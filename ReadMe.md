@@ -57,7 +57,7 @@ The application will print progress information and the final size comparison to
 
 * Not Feature-Complete: Does not implement all features of the original pngcrush (e.g., chunk removal, color type reduction, brute-force methods).
 * Limited Strategies: Only tries filter types 0-4 and two ZLib compression levels (Optimal, SmallestSize). A full pngcrush tests many more combinations.
-* Interlaced PNGs Not Supported: The application will likely fail or produce corrupted output if given an interlaced (Adam7) PNG.
+* Interlaced PNG Output Not Supported: The application will not produce interlaced (Adam7) PNGs.
 * Basic Validation: Performs basic checks on IHDR and chunk integrity but may not handle heavily corrupted PNGs gracefully.
 * Performance: Compression/decompression using C#'s ZLibStream might be slower than the highly optimized C zlib library used by the original pngcrush.
 
