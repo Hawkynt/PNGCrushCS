@@ -83,7 +83,7 @@ internal static class PngParser {
     var width = ReadInt32BigEndian(reader);
     var height = ReadInt32BigEndian(reader);
     var bitDepth = reader.ReadByte();
-    var colorType = reader.ReadByte();
+    var colorType = (ColorType)reader.ReadByte();
     var compressionMethod = reader.ReadByte();
     var filterMethod = reader.ReadByte();
     var interlaceMethod = reader.ReadByte();
@@ -97,13 +97,15 @@ internal static class PngParser {
 
     // Basic validation for color type and bit depth combinations
     var validCombination = (colorType, bitDepth) switch {
-      (0, 1 or 2 or 4 or 8 or 16) => true, // Grayscale
-      (2, 8 or 16) => true,                // Truecolor
-      (3, 1 or 2 or 4 or 8) => true,       // Indexed-color
-      (4, 8 or 16) => true,                // Grayscale with alpha
-      (6, 8 or 16) => true,                // Truecolor with alpha
+      (ColorType.Grasyscale, 1 or 2 or 4 or 8 or 16) => true,
+      (ColorType.Truecolor, 8 or 16) => true,                
+      (ColorType.IndexedColor, 1 or 2 or 4 or 8) => true,    
+      (ColorType.GrayscaleAlpha, 8 or 16) => true,           
+      (ColorType.TruecolorAlpha, 8 or 16) => true,           
       _ => false
     };
+    
+    // Note: The PNG spec allows for some unusual combinations, but they are rare and not widely supported.
     switch (validCombination) {
       case false:
         Console.WriteLine($"Warning: Unusual ColorType ({colorType}) / BitDepth ({bitDepth}) combination in IHDR.");
@@ -131,21 +133,17 @@ internal static class PngParser {
 
     // Concatenate data from all found IDAT chunks
     using MemoryStream combinedStream = new();
-    foreach (var idatChunk in idatChunks) {
+    foreach (var idatChunk in idatChunks)
       combinedStream.Write(idatChunk.Data, 0, idatChunk.Data.Length);
-    }
+
     return combinedStream.ToArray();
   }
 
 
   // --- Endianness Helpers ---
-  public static uint ReadUInt32BigEndian(BinaryReader reader) {
-    return BinaryPrimitives.ReadUInt32BigEndian(reader.ReadBytes(4));
-  }
+  public static uint ReadUInt32BigEndian(BinaryReader reader) => BinaryPrimitives.ReadUInt32BigEndian(reader.ReadBytes(4));
 
-  public static int ReadInt32BigEndian(BinaryReader reader) {
-    return BinaryPrimitives.ReadInt32BigEndian(reader.ReadBytes(4));
-  }
+  public static int ReadInt32BigEndian(BinaryReader reader) => BinaryPrimitives.ReadInt32BigEndian(reader.ReadBytes(4));
 
   public static void WriteUInt32BigEndian(BinaryWriter writer, uint value) {
     Span<byte> buffer = stackalloc byte[4];
