@@ -80,13 +80,14 @@ internal static class PngParser {
     using MemoryStream ms = new(ihdrChunk.Data);
     using BinaryReader reader = new(ms);
 
+    // TODO: better get a structure for this instead of using BinaryReader and single extracts
     var width = ReadInt32BigEndian(reader);
     var height = ReadInt32BigEndian(reader);
     var bitDepth = reader.ReadByte();
     var colorType = (ColorType)reader.ReadByte();
     var compressionMethod = reader.ReadByte();
     var filterMethod = reader.ReadByte();
-    var interlaceMethod = reader.ReadByte();
+    var interlaceMethod = (InterlaceMethod)reader.ReadByte();
 
     if (compressionMethod != 0)
       throw new ArgumentException("Invalid compression method in IHDR (must be 0).");

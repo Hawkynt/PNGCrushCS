@@ -89,7 +89,7 @@ internal static class PngOptimizer {
   /// <returns>Bytes per pixel.</returns>
   /// <exception cref="NotSupportedException">If color type or bit depth is unsupported.</exception>
   public static int CalculateBytesPerPixel(IhdrData ihdr) {
-    var samplesPerPixel = (ColorType)ihdr.ColorType switch {
+    var samplesPerPixel = ihdr.ColorType switch {
       ColorType.Grasyscale => 1,
       ColorType.Truecolor => 3, 
       ColorType.IndexedColor => 1, 
