@@ -24,6 +24,7 @@ public sealed class PngFilterOptimizer(
     return strategy switch {
       FilterStrategy.SingleFilter => this.OptimizeSingleFilter(),
       FilterStrategy.WeightedContinuity => this.OptimizeWeightedContinuity(),
+      FilterStrategy.ScanlineAdaptive=>this.OptimizeScanlineAdaptive(),
       _ => this.OptimizeScanlineAdaptive()
     };
   }
@@ -63,10 +64,9 @@ public sealed class PngFilterOptimizer(
   /// <summary>Optimizes each scanline independently for the best filter</summary>
   private FilterType[] OptimizeScanlineAdaptive() {
     var selectedFilters = new FilterType[height];
-
-    for (var y = 0; y < height; y++) {
+    for (var y = 0; y < height; ++y) {
       var scanline = imageData[y];
-      byte[]? previousScanline = y > 0 ? imageData[y - 1] : null;
+      var previousScanline = y > 0 ? imageData[y - 1] : null;
 
       selectedFilters[y] = this._filterSelector.SelectFilterForScanline(scanline, previousScanline);
     }

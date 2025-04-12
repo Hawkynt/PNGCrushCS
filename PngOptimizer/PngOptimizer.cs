@@ -99,7 +99,19 @@ public sealed partial class PngOptimizer {
     var tasks = combinations.Select(async combo => {
       await semaphore.WaitAsync();
       try {
-        return TestCombination(combo);
+        var combinationResult = TestCombination(combo);
+        Console.WriteLine($"""
+                           Found Optimization Result:
+                             Color Mode       : {combinationResult.ColorMode}
+                             Bit Depth        : {combinationResult.BitDepth}
+                             Interlace Method : {combinationResult.InterlaceMethod}
+                             Filter Strategy  : {combinationResult.FilterStrategy}
+                             Deflate Method   : {combinationResult.DeflateMethod}
+                             Compressed Size  : {combinationResult.CompressedSize} bytes
+                             Filter Transitions: {combinationResult.FilterTransitions}
+                           """);
+
+        return combinationResult;
       } finally {
         semaphore.Release();
       }
