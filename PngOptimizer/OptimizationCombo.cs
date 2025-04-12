@@ -6,4 +6,5 @@ public readonly record struct OptimizationCombo(
   int BitDepth,
   InterlaceMethod InterlaceMethod,
   FilterStrategy FilterStrategy,
-  DeflateMethod DeflateMethod);
+  DeflateMethod DeflateMethod
+);

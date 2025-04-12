@@ -12,9 +12,9 @@ public sealed class PngFilterOptimizer(
   bool isGrayscale,
   bool isPalette,
   int bitDepth,
-  byte[][] imageData) {
-  private readonly PngFilterSelector _filterSelector = new PngFilterSelector(
-    width, height, bytesPerPixel, isGrayscale, isPalette, bitDepth);
+  byte[][] imageData
+) {
+  private readonly PngFilterSelector _filterSelector = new(bytesPerPixel, isGrayscale, isPalette, bitDepth);
 
   private readonly int _width = width;
   private readonly int _bytesPerScanline = imageData[0].Length;

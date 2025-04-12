@@ -7,16 +7,11 @@ namespace PngOptimizer;
 
 /// <summary>Class for handling PNG filtering for specific scanlines</summary>
 public sealed class PngFilterSelector(
-  int width,
-  int height,
   int bytesPerPixel,
   bool isGrayscale,
   bool isPalette,
   int bitDepth) {
-  // Image properties
-  private readonly int _width = width;
-  private readonly int _height = height;
-
+  
   // For weighted sum heuristic
   private FilterType _lastUsedFilter = FilterType.None;
   private readonly double _weightingFactor = 0.9; // Experimental value
@@ -24,14 +19,12 @@ public sealed class PngFilterSelector(
   /// <summary>Selects the best filter for a scanline based on the described heuristics</summary>
   public FilterType SelectFilterForScanline(ReadOnlySpan<byte> scanline, ReadOnlySpan<byte> previousScanline) {
     // Rule 1: For palette images, don't use filtering
-    if (isPalette) {
+    if (isPalette)
       return FilterType.None;
-    }
 
     // Rule 2: For low-bit-depth grayscale images, filtering is rarely useful
-    if (isGrayscale && bitDepth < 8) {
+    if (isGrayscale && bitDepth < 8)
       return FilterType.None;
-    }
 
     // For 8+ bit grayscale and truecolor, use dynamic filtering
     return this.SelectDynamicFilter(scanline, previousScanline);
@@ -133,9 +126,8 @@ public sealed class PngFilterSelector(
     scanline[..bytesPerPixel].CopyTo(result);
 
     // For remaining bytes, subtract the value of the byte to the left
-    for (var i = bytesPerPixel; i < scanline.Length; i++) {
+    for (var i = bytesPerPixel; i < scanline.Length; ++i)
       result[i] = (byte)(scanline[i] - scanline[i - bytesPerPixel]);
-    }
   }
 
   /// <summary>Applies the Up filter (type 2)</summary>
@@ -148,22 +140,21 @@ public sealed class PngFilterSelector(
     }
 
     // Subtract the value of the byte above
-    for (var i = 0; i < scanline.Length; i++) {
+    for (var i = 0; i < scanline.Length; ++i)
       result[i] = (byte)(scanline[i] - previousScanline[i]);
-    }
   }
 
   /// <summary>Applies the Average filter (type 3)</summary>
   [MethodImpl(MethodImplOptions.AggressiveInlining)]
   private void ApplyAverageFilter(ReadOnlySpan<byte> scanline, ReadOnlySpan<byte> previousScanline, Span<byte> result) {
     // First bytesPerPixel bytes have no left neighbor
-    for (var i = 0; i < bytesPerPixel; i++) {
+    for (var i = 0; i < bytesPerPixel; ++i) {
       var above = previousScanline.IsEmpty ? 0 : previousScanline[i];
       result[i] = (byte)(scanline[i] - (above >> 1)); // Divide by 2 with bit shift
     }
 
     // For remaining bytes, use the average of left and above
-    for (var i = bytesPerPixel; i < scanline.Length; i++) {
+    for (var i = bytesPerPixel; i < scanline.Length; ++i) {
       var left = scanline[i - bytesPerPixel] & 0xFF;
       var above = previousScanline.IsEmpty ? 0 : previousScanline[i] & 0xFF;
       var average = (left + above) >> 1; // Divide by 2 with bit shift
@@ -175,13 +166,13 @@ public sealed class PngFilterSelector(
   [MethodImpl(MethodImplOptions.AggressiveInlining)]
   private void ApplyPaethFilter(ReadOnlySpan<byte> scanline, ReadOnlySpan<byte> previousScanline, Span<byte> result) {
     // First bytesPerPixel bytes have no left neighbor
-    for (var i = 0; i < bytesPerPixel; i++) {
+    for (var i = 0; i < bytesPerPixel; ++i) {
       var above = previousScanline.IsEmpty ? 0 : previousScanline[i];
       result[i] = (byte)(scanline[i] - above);
     }
 
     // For remaining bytes, use the Paeth predictor
-    for (var i = bytesPerPixel; i < scanline.Length; i++) {
+    for (var i = bytesPerPixel; i < scanline.Length; ++i) {
       var a = scanline[i - bytesPerPixel] & 0xFF; // Left
       var b = previousScanline.IsEmpty ? 0 : previousScanline[i] & 0xFF; // Above
       var c = previousScanline.IsEmpty ? 0 : previousScanline[i - bytesPerPixel] & 0xFF; // Upper left

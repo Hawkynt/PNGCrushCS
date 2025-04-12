@@ -39,8 +39,7 @@ public sealed class ImagePartitioner {
       this._partitionParams = partitionParams.Value;
     }
 
-    this._filterSelector = new PngFilterSelector(
-      width, height, bytesPerPixel, isGrayscale, isPalette, bitDepth);
+    this._filterSelector = new PngFilterSelector(bytesPerPixel, isGrayscale, isPalette, bitDepth);
   }
 
   /// <summary>Optimize filters for each partition of the image using content-aware approaches</summary>

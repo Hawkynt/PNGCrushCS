@@ -3,19 +3,19 @@
 namespace PngOptimizer;
 
 /// <summary>Represents an optimization result for comparison</summary>
-public sealed record OptimizationResult {
-  public required ColorMode ColorMode { get; init; }
-  public required int BitDepth { get; init; }
-  public required InterlaceMethod InterlaceMethod { get; init; }
-  public required FilterStrategy FilterStrategy { get; init; }
-  public required DeflateMethod DeflateMethod { get; init; }
-  public required long CompressedSize { get; init; }
-  public required byte[][] FilteredData { get; init; }
-  public required FilterType[] Filters { get; init; }
-  public required int FilterTransitions { get; init; }
-  public required TimeSpan ProcessingTime { get; init; }
-  public byte[] FileContents { get; init; }
-
+public record struct OptimizationResult(
+  ColorMode ColorMode, 
+  int BitDepth, 
+  InterlaceMethod InterlaceMethod, 
+  FilterStrategy FilterStrategy, 
+  DeflateMethod DeflateMethod, 
+  long CompressedSize, 
+  byte[][] FilteredData, 
+  FilterType[] Filters, 
+  int FilterTransitions, 
+  TimeSpan ProcessingTime, 
+  byte[] FileContents
+) {
   public override string ToString() =>
     $"Size: {this.CompressedSize} bytes, " +
     $"ColorMode: {this.ColorMode}, " +
