@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "PngCrush": {
+      "commandName": "Project",
+      "commandLineArgs": "-i Examples\\StressTest.png -o output.png --verbose\r\n"
+    }
+  }
+}

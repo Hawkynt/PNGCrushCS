@@ -21,6 +21,15 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="CommandLineParser" Version="2.9.1" />
+    <PackageReference Include="FrameworkExtensions.Corlib" Version="1.0.2.459" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PngOptimizer\PngOptimizer.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Update="Examples\StressTest.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

@@ -1,9 +1,11 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.13.35919.96 d17.13
+VisualStudioVersion = 17.13.35919.96
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PngCrush", "PngCrush.csproj", "{1347CAFA-CBD4-4AF4-B9E4-EE4D7B02BA3D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PngCrush", "PngCrush\PngCrush.csproj", "{1347CAFA-CBD4-4AF4-B9E4-EE4D7B02BA3D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PngOptimizer", "PngOptimizer\PngOptimizer.csproj", "{B3DB6734-403A-4E73-865E-CA6FD6B317AB}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +17,10 @@ Global
 		{1347CAFA-CBD4-4AF4-B9E4-EE4D7B02BA3D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1347CAFA-CBD4-4AF4-B9E4-EE4D7B02BA3D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1347CAFA-CBD4-4AF4-B9E4-EE4D7B02BA3D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B3DB6734-403A-4E73-865E-CA6FD6B317AB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B3DB6734-403A-4E73-865E-CA6FD6B317AB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B3DB6734-403A-4E73-865E-CA6FD6B317AB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B3DB6734-403A-4E73-865E-CA6FD6B317AB}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
