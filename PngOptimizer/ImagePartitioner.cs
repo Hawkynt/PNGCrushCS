@@ -6,7 +6,7 @@ using System.Linq;
 namespace PngOptimizer;
 
 /// <summary>Class to partition an image and optimize filters for each partition</summary>
-public sealed class ImagePartitioner(
+public sealed partial class ImagePartitioner(
   byte[][] imageData,
   int height,
   int bytesPerPixel,
@@ -45,11 +45,17 @@ public sealed class ImagePartitioner(
 
   /// <summary>Content-aware partitioning that avoids excessive filter changes</summary>
   private FilterType[] OptimizeFiltersWithSmartPartitioning() {
-    var filters = new FilterType[height];
-    var currentFilter = FilterType.None; // Start with None as default
 
+    // step 1: Calculate filter scores for each row
+    var stats = new Dictionary<FilterType, FilterStatsPerRow>[height];
+    for (var y = 0; y < height; ++y)
+      stats[y] = this.CalculateAllFilterScores(y);
+
+    // step 2: Select the best filter for each row based on the scores
+    var filters = new FilterType[height];
+    var currentFilter = FilterType.None;
     for (var y = 0; y < height; ++y) {
-      var filterScores = this.CalculateAllFilterScores(y);
+      var filterScores = stats[y];
 
       // If we're close to the end of the image, don't change filters
       if (y > height - this._partitionParams.MinRowsForMinorImprovement) {
@@ -58,7 +64,7 @@ public sealed class ImagePartitioner(
       }
 
       // Find potential better filter
-      var bestFilter = filterScores.MinBy(kv => kv.Value).Key;
+      var bestFilter = filterScores.MinBy(kv => kv.Value.Score).Key;
       if (bestFilter == currentFilter) {
         // Already using the best filter
         filters[y] = currentFilter;
@@ -71,13 +77,11 @@ public sealed class ImagePartitioner(
 
       // Check the next several rows to see if the new filter would be better
       for (var ahead = 0; ahead < this._partitionParams.MinRowsForMinorImprovement && y + ahead < height; ++ahead) {
-        var futureScores = this.CalculateAllFilterScores(y + ahead);
+        var futureScores = stats[y + ahead];
 
         var currentFilterScore = futureScores[currentFilter];
         var newFilterScore = futureScores[bestFilter];
-
-        // Calculate improvement ratio (lower score is better)
-        var improvementRatio = currentFilterScore / (double)newFilterScore;
+        var improvementRatio = currentFilterScore.Score / (float)newFilterScore.Score;
 
         if (improvementRatio >= this._partitionParams.StrongImprovementThreshold)
           ++strongImprovementCount;
@@ -100,17 +104,17 @@ public sealed class ImagePartitioner(
   }
 
   /// <summary>Calculate scores for all filter types on a given row</summary>
-  private Dictionary<FilterType, int> CalculateAllFilterScores(int rowIndex) {
+  private Dictionary<FilterType, FilterStatsPerRow> CalculateAllFilterScores(int rowIndex) {
     var scanline = imageData[rowIndex];
     var previousScanline = rowIndex > 0 ? imageData[rowIndex - 1] : null;
 
-    var scores = new Dictionary<FilterType, int>();
+    var scores = new Dictionary<FilterType, FilterStatsPerRow>();
     var token = ArrayPool<byte>.Shared.Rent(scanline.Length);
     try {
       var currentLine = token.AsSpan(0, scanline.Length);
       foreach (FilterType filterType in Enum.GetValues(typeof(FilterType))) {
         FilterTools.ApplyFilterTo(filterType, scanline, previousScanline, bytesPerPixel, currentLine);
-        scores[filterType] = PngFilterSelector.CalculateSumOfAbsoluteDifferences(currentLine);
+        scores[filterType] = FilterStatsPerRow.FromRow(currentLine);
       }
     } finally {
       ArrayPool<byte>.Shared.Return(token);
@@ -118,5 +122,6 @@ public sealed class ImagePartitioner(
 
     return scores;
   }
+
 
 }
