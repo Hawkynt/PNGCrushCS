@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -43,15 +44,21 @@ public sealed class PngFilterOptimizer(
       totalSums[filterType] = 0;
 
     // Try each filter type on each scanline and accumulate the sums
-    for (var y = 0; y < height; ++y) {
-      var scanline = imageData[y];
-      var previousScanline = y > 0 ? imageData[y - 1] : null;
+    var token=ArrayPool<byte>.Shared.Rent(this._bytesPerScanline);
+    try {
+      var currentLine = token.AsSpan(0, this._bytesPerScanline);
+      for (var y = 0; y < height; ++y) {
+        var scanline = imageData[y];
+        var previousScanline = y > 0 ? imageData[y - 1] : null;
 
-      foreach (FilterType filterType in Enum.GetValues(typeof(FilterType))) {
-        var filtered = this._filterSelector.TestFilter(filterType, scanline, previousScanline);
-        var sum = this._filterSelector.CalculateSumOfAbsoluteDifferences(filtered);
-        totalSums[filterType] += sum;
+        foreach (FilterType filterType in Enum.GetValues(typeof(FilterType))) {
+          FilterTools.ApplyFilterTo(filterType, scanline, previousScanline, bytesPerPixel,currentLine);
+          var sum = PngFilterSelector.CalculateSumOfAbsoluteDifferences(currentLine);
+          totalSums[filterType] += sum;
+        }
       }
+    } finally {
+      ArrayPool<byte>.Shared.Return(token);
     }
 
     // Find the filter with the lowest total sum
@@ -73,25 +80,5 @@ public sealed class PngFilterOptimizer(
 
     return selectedFilters;
   }
-
-  /// <summary>Applies the selected filters to the image data and returns the filtered data</summary>
-  public byte[][] ApplyFilters(FilterType[] filters) {
-    var filteredData = new byte[height][];
-
-    for (var y = 0; y < height; ++y) {
-      var scanline = imageData[y];
-      var previousScanline = y > 0 ? imageData[y - 1] : null;
-
-      // Create filtered scanline with a type byte at the beginning
-      var filteredScanline = new byte[this._bytesPerScanline + 1];
-      filteredScanline[0] = (byte)filters[y]; // Filter type byte
-
-      var filtered = this._filterSelector.TestFilter(filters[y], scanline, previousScanline);
-      filtered.CopyTo(filteredScanline, 1);
-
-      filteredData[y] = filteredScanline;
-    }
-
-    return filteredData;
-  }
+  
 }

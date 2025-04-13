@@ -200,12 +200,12 @@ public sealed partial class PngOptimizer {
       FilterType[] filters;
       byte[][] filteredData;
 
+      var bytesPerPixel = GetBytesPerPixel(combo.ColorMode, combo.BitDepth);
       if (combo.FilterStrategy == FilterStrategy.PartitionOptimized && this._options.TryPartitioning) {
         var partitioner = new ImagePartitioner(
           imageData,
-          this._imageWidth,
           this._imageHeight,
-          GetBytesPerPixel(combo.ColorMode, combo.BitDepth),
+          bytesPerPixel,
           combo.ColorMode == ColorMode.Palette,
           combo.ColorMode is ColorMode.Grayscale or ColorMode.GrayscaleAlpha,
           combo.BitDepth
@@ -216,7 +216,7 @@ public sealed partial class PngOptimizer {
         var filterOptimizer = new PngFilterOptimizer(
           this._imageWidth,
           this._imageHeight,
-          GetBytesPerPixel(combo.ColorMode, combo.BitDepth),
+          bytesPerPixel,
           combo.ColorMode is ColorMode.Grayscale or ColorMode.GrayscaleAlpha,
           combo.ColorMode == ColorMode.Palette,
           combo.BitDepth,
@@ -224,7 +224,7 @@ public sealed partial class PngOptimizer {
         );
 
         filters = filterOptimizer.OptimizeFilters(combo.FilterStrategy);
-        filteredData = filterOptimizer.ApplyFilters(filters);
+        filteredData = FilterTools.ApplyFilters(imageData, filters, bytesPerPixel);
       }
 
       var filterTransitions = CountFilterTransitions(filteredData);

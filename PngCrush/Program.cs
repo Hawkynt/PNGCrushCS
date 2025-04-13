@@ -116,7 +116,12 @@ public static partial class Program {
           if (result.Count != 0)
             return result;
 
-          result.Add(FilterStrategy.SingleFilter);
+          // Use default from the Option attribute via reflection
+          var defaultValue = GetDefaultValueFromAttribute(nameof(CommandLineOptions.FilterStrategies));
+          foreach (var strategy in defaultValue.Split(',', StringSplitOptions.RemoveEmptyEntries))
+            if (Enum.TryParse<FilterStrategy>(strategy.Trim(), out var filterStrategy))
+              result.Add(filterStrategy);
+
           return result;
         }
 
@@ -130,8 +135,27 @@ public static partial class Program {
           if (result.Count != 0)
             return result;
 
-          result.Add(DeflateMethod.Default);
+          // Use default from the Option attribute via reflection
+          var defaultValue = GetDefaultValueFromAttribute(nameof(CommandLineOptions.DeflateMethods));
+          foreach (var method in defaultValue.Split(',', StringSplitOptions.RemoveEmptyEntries))
+            if (Enum.TryParse<DeflateMethod>(method.Trim(), out var deflateMethod))
+              result.Add(deflateMethod);
+
           return result;
+        }
+
+        static string GetDefaultValueFromAttribute(string propertyName) {
+          var property = typeof(CommandLineOptions).GetProperty(propertyName);
+          if (property == null)
+            throw new InvalidOperationException($"Property '{propertyName}' not found.");
+
+          var optionAttribute = property.GetCustomAttributes(typeof(OptionAttribute), false)
+            .Cast<OptionAttribute>()
+            .FirstOrDefault();
+          if (optionAttribute == null)
+            throw new InvalidOperationException($"Option attribute not found on '{propertyName}'.");
+
+          return optionAttribute.Default?.ToString() ?? string.Empty;
         }
       }
 

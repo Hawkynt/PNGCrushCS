@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -39,10 +40,16 @@ public sealed class PngFilterSelector(
     var filterSums = new Dictionary<FilterType, int>();
 
     // Apply each filter type and calculate the sum of absolute differences
-    foreach (FilterType filterType in Enum.GetValues(typeof(FilterType))) {
-      var filtered = this.TestFilter(filterType, scanline, previousScanline);
-      var sum = this.CalculateSumOfAbsoluteDifferences(filtered);
-      filterSums[filterType] = sum;
+    var token= ArrayPool<byte>.Shared.Rent(scanline.Length);
+    try {
+      var currentLine = token.AsSpan(0, scanline.Length);
+      foreach (FilterType filterType in Enum.GetValues(typeof(FilterType))) {
+        FilterTools.ApplyFilterTo(filterType, scanline, previousScanline, bytesPerPixel,currentLine);
+        var sum = CalculateSumOfAbsoluteDifferences(currentLine);
+        filterSums[filterType] = sum;
+      }
+    } finally {
+      ArrayPool<byte>.Shared.Return(token);
     }
 
     // Use the weighted sum heuristic or standard approach
@@ -67,107 +74,12 @@ public sealed class PngFilterSelector(
 
   /// <summary>Calculates the sum of absolute differences, treating bytes as signed values</summary>
   [MethodImpl(MethodImplOptions.AggressiveInlining)]
-  public int CalculateSumOfAbsoluteDifferences(ReadOnlySpan<byte> filtered) {
+  public static int CalculateSumOfAbsoluteDifferences(ReadOnlySpan<byte> filtered) {
     var sum = 0;
-    for (var index = 0; index < filtered.Length-1; ++index)
-      sum += (filtered[index+1]- filtered[index]).Abs();
+    for (var index = 0; index < filtered.Length - 1; ++index)
+      sum += (filtered[index + 1] - filtered[index]).Abs();
 
     return sum;
   }
 
-  /// <summary>Test a specific filter type without changing the last used filter</summary>
-  public byte[] TestFilter(FilterType filterType, ReadOnlySpan<byte> scanline, ReadOnlySpan<byte> previousScanline) 
-    => this.ApplyFilter(filterType, scanline, previousScanline)
-    ;
-
-  /// <summary>Applies the specified filter to the scanline</summary>
-  private byte[] ApplyFilter(FilterType filterType, ReadOnlySpan<byte> scanline, ReadOnlySpan<byte> previousScanline) {
-    var result = new byte[scanline.Length];
-
-    switch (filterType) {
-      case FilterType.None:
-        scanline.CopyTo(result);
-        break;
-
-      case FilterType.Sub:
-        this.ApplySubFilter(scanline, result);
-        break;
-
-      case FilterType.Up:
-        this.ApplyUpFilter(scanline, previousScanline, result);
-        break;
-
-      case FilterType.Average:
-        this.ApplyAverageFilter(scanline, previousScanline, result);
-        break;
-
-      case FilterType.Paeth:
-        this.ApplyPaethFilter(scanline, previousScanline, result);
-        break;
-    }
-
-    return result;
-  }
-
-  /// <summary>Applies the Sub filter (type 1)</summary>
-  [MethodImpl(MethodImplOptions.AggressiveInlining)]
-  private void ApplySubFilter(ReadOnlySpan<byte> scanline, Span<byte> result) {
-    scanline[..bytesPerPixel].CopyTo(result);
-    for (var i = bytesPerPixel; i < scanline.Length; ++i)
-      result[i] = (byte)(scanline[i] - scanline[i - bytesPerPixel]);
-  }
-
-  /// <summary>Applies the Up filter (type 2)</summary>
-  [MethodImpl(MethodImplOptions.AggressiveInlining)]
-  private void ApplyUpFilter(ReadOnlySpan<byte> scanline, ReadOnlySpan<byte> previousScanline, Span<byte> result) {
-    if (previousScanline.IsEmpty) {
-      scanline.CopyTo(result);
-      return;
-    }
-
-    for (var i = 0; i < scanline.Length; ++i)
-      result[i] = (byte)(scanline[i] - previousScanline[i]);
-  }
-
-  /// <summary>Applies the Average filter (type 3)</summary>
-  [MethodImpl(MethodImplOptions.AggressiveInlining)]
-  private void ApplyAverageFilter(ReadOnlySpan<byte> scanline, ReadOnlySpan<byte> previousScanline, Span<byte> result) {
-    for (var i = 0; i < bytesPerPixel; ++i) {
-      var above = previousScanline.IsEmpty ? 0 : previousScanline[i];
-      result[i] = (byte)(scanline[i] - (above >> 1)); // Divide by 2 with bit shift
-    }
-
-    for (var i = bytesPerPixel; i < scanline.Length; ++i) {
-      var left = scanline[i - bytesPerPixel] & 0xFF;
-      var above = previousScanline.IsEmpty ? 0 : previousScanline[i] & 0xFF;
-      var average = (left + above) >> 1; // Divide by 2 with bit shift
-      result[i] = (byte)(scanline[i] - average);
-    }
-  }
-
-  /// <summary>Applies the Paeth filter (type 4)</summary>
-  [MethodImpl(MethodImplOptions.AggressiveInlining)]
-  private void ApplyPaethFilter(ReadOnlySpan<byte> scanline, ReadOnlySpan<byte> previousScanline, Span<byte> result) {
-    for (var i = 0; i < bytesPerPixel; ++i) {
-      var above = previousScanline.IsEmpty ? 0 : previousScanline[i];
-      result[i] = (byte)(scanline[i] - above);
-    }
-
-    // For remaining bytes, use the Paeth predictor
-    for (var i = bytesPerPixel; i < scanline.Length; ++i) {
-      var a = scanline[i - bytesPerPixel] & 0xFF; // Left
-      var b = previousScanline.IsEmpty ? 0 : previousScanline[i] & 0xFF; // Above
-      var c = previousScanline.IsEmpty ? 0 : previousScanline[i - bytesPerPixel] & 0xFF; // Upper left
-
-      var p = a + b - c; // Initial estimate
-      var pa = (p - a).Abs(); // Distance to a
-      var pb = (p - b).Abs(); // Distance to b
-      var pc = (p - c).Abs(); // Distance to c
-
-      // Return nearest of a, b, c, breaking ties in order a, b, c
-      var pr = pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
-
-      result[i] = (byte)(scanline[i] - pr);
-    }
-  }
 }

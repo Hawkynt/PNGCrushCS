@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -7,17 +8,13 @@ namespace PngOptimizer;
 /// <summary>Class to partition an image and optimize filters for each partition</summary>
 public sealed class ImagePartitioner(
   byte[][] imageData,
-  int width,
   int height,
   int bytesPerPixel,
   bool isPalette,
   bool isGrayscale,
   int bitDepth,
   SmartPartitioningParams? partitionParams = null
-  ) {
-  private readonly int _width = width;
-  private readonly int _bytesPerPixel = bytesPerPixel;
-  private readonly PngFilterSelector _filterSelector = new(bytesPerPixel, isGrayscale, isPalette, bitDepth);
+) {
 
   // Default smart partitioning parameters
   private readonly SmartPartitioningParams _partitionParams = partitionParams ?? SmartPartitioningParams.Default;
@@ -35,14 +32,14 @@ public sealed class ImagePartitioner(
   /// <summary>Optimizes using a single filter for the entire image</summary>
   private (FilterType[] filters, byte[][] filteredData) OptimizeWithSingleFilter(FilterType filterType) {
     var filters = Enumerable.Repeat(filterType, height).ToArray();
-    var filteredData = this.ApplyFilters(filters);
+    var filteredData = FilterTools.ApplyFilters(imageData, filters, bytesPerPixel);
     return (filters, filteredData);
   }
 
   /// <summary>Optimizes partitions based on smart content analysis</summary>
   private (FilterType[] filters, byte[][] filteredData) OptimizeWithSmartPartitioning() {
     var filters = this.OptimizeFiltersWithSmartPartitioning();
-    var filteredData = this.ApplyFilters(filters);
+    var filteredData = FilterTools.ApplyFilters(imageData, filters, bytesPerPixel);
     return (filters, filteredData);
   }
 
@@ -90,9 +87,9 @@ public sealed class ImagePartitioner(
 
       // Change filter only if we have sustained improvement
       if (
-        strongImprovementCount >= this._partitionParams.MinRowsForStrongImprovement ||
-        minorImprovementCount >= this._partitionParams.MinRowsForMinorImprovement
-      )
+          strongImprovementCount >= this._partitionParams.MinRowsForStrongImprovement ||
+          minorImprovementCount >= this._partitionParams.MinRowsForMinorImprovement
+        )
         // Switch to new filter - it shows sustained improvement
         currentFilter = bestFilter;
 
@@ -108,34 +105,18 @@ public sealed class ImagePartitioner(
     var previousScanline = rowIndex > 0 ? imageData[rowIndex - 1] : null;
 
     var scores = new Dictionary<FilterType, int>();
-
-    foreach (FilterType filterType in Enum.GetValues(typeof(FilterType))) {
-      var filtered = this._filterSelector.TestFilter(filterType, scanline, previousScanline);
-      scores[filterType] = this._filterSelector.CalculateSumOfAbsoluteDifferences(filtered);
+    var token = ArrayPool<byte>.Shared.Rent(scanline.Length);
+    try {
+      var currentLine = token.AsSpan(0, scanline.Length);
+      foreach (FilterType filterType in Enum.GetValues(typeof(FilterType))) {
+        FilterTools.ApplyFilterTo(filterType, scanline, previousScanline, bytesPerPixel, currentLine);
+        scores[filterType] = PngFilterSelector.CalculateSumOfAbsoluteDifferences(currentLine);
+      }
+    } finally {
+      ArrayPool<byte>.Shared.Return(token);
     }
 
     return scores;
-  }
-
-  /// <summary>Apply chosen filters to all scanlines and return filtered data</summary>
-  private byte[][] ApplyFilters(FilterType[] filters) {
-    var filteredData = new byte[height][];
-
-    for (var y = 0; y < height; ++y) {
-      var scanline = imageData[y];
-      var previousScanline = y > 0 ? imageData[y - 1] : null;
-
-      // Create filtered scanline with a type byte at the beginning
-      var filteredScanline = new byte[scanline.Length + 1];
-      filteredScanline[0] = (byte)filters[y]; // Filter type byte
-
-      var filtered = this._filterSelector.TestFilter(filters[y], scanline, previousScanline);
-      Array.Copy(filtered, 0, filteredScanline, 1, filtered.Length);
-
-      filteredData[y] = filteredScanline;
-    }
-
-    return filteredData;
   }
 
 }

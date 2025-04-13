@@ -14,7 +14,7 @@ public static partial class Program {
     [Option('a', "auto-color-mode", Default = true, HelpText = "Automatically select best color mode")]
     public bool AutoColorMode { get; set; } = true;
 
-    [Option("interlace", Default = false, HelpText = "Try interlaced PNG encoding")]
+    [Option("interlace", Default = true, HelpText = "Try interlaced PNG encoding")]
     public bool TryInterlacing { get; set; } = false;
 
     [Option('p', "partition", Default = true, HelpText = "Try smart partitioning for better compression")]
