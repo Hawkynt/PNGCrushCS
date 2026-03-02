@@ -1,0 +1,61 @@
+name: Build
+on:
+  schedule:
+    - cron: '59 23 * * 0'
+  workflow_dispatch:
+jobs:
+
+  # This job tries to run the prerequisites, just to see if this works
+  TryInit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checking-out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.x
+        
+      - name: Show Info
+        run: dotnet --info
+      
+      - name: Receive Versions
+        run: perl ".github/workflows/UpdateVersions.pl" "."
+
+  # this is the real job needed to build and publish
+  BuildAndPublishApplications:
+    needs: TryInit
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        csproj-file: 
+          - 'PngCrush/PngCrush.csproj'
+          - 'TiffCrush/TiffCrush.csproj'
+          - 'GifCrush/GifCrush.csproj'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.x
+      
+      - run: |
+          projectDir=$(dirname ${{ matrix.csproj-file }})
+          projectName=$(basename $projectDir)
+          echo "ProjectDir=$projectDir" >> $GITHUB_ENV
+          echo "ProjectName=$projectName" >> $GITHUB_ENV
+      - run: perl ".github/workflows/UpdateVersions.pl" "."
+      - run: dotnet restore "${{ matrix.csproj-file }}"
+      - run: dotnet build "${{ matrix.csproj-file }}" --no-restore --configuration Release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{env.ProjectName}}
+          path: ${{env.ProjectDir}}/bin/Release
+

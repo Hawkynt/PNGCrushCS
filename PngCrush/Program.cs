@@ -1,5 +1,5 @@
-using System.Drawing;
 using System.Diagnostics;
+using System.Drawing;
 using CommandLine;
 
 namespace PngOptimizer;
@@ -22,6 +22,13 @@ public static partial class Program {
           return 1;
         }
 
+        // Validate output directory exists
+        var outputDir = Path.GetDirectoryName(Path.GetFullPath(options.OutputFile));
+        if (outputDir != null && !Directory.Exists(outputDir)) {
+          Console.Error.WriteLine($"Error: Output directory '{outputDir}' does not exist.");
+          return 1;
+        }
+
         if (options.Verbose) {
           Console.WriteLine($"Input file: {options.InputFile}");
           Console.WriteLine($"Output file: {options.OutputFile}");
@@ -40,12 +47,27 @@ public static partial class Program {
         // Set up optimization options
         var pngOptions = CreatePngOptions(options);
 
+        // Load original bytes for chunk preservation if needed
+        var originalPngBytes = options.PreserveChunks ? File.ReadAllBytes(options.InputFile) : null;
+
         // Create optimizer
-        var optimizer = new PngOptimizer(inputBitmap, pngOptions);
+        var optimizer = new PngOptimizer(inputBitmap, originalPngBytes, pngOptions);
+
+        // Wire Ctrl+C to cancellation
+        using var cts = new CancellationTokenSource();
+        Console.CancelKeyPress += (_, e) => {
+          e.Cancel = true;
+          cts.Cancel();
+        };
 
         // Run optimization
         var stopwatch = Stopwatch.StartNew();
-        var result = await optimizer.OptimizeAsync();
+        var progressReporter = new Progress<OptimizationProgress>(p =>
+          Console.Write(
+            $"\r[{p.CombosCompleted}/{p.CombosTotal}] Best: {FormatFileSize(p.BestSizeSoFar)} | Phase: {p.Phase}    ")
+        );
+        var result = await optimizer.OptimizeAsync(cts.Token, progressReporter);
+        Console.WriteLine();
         stopwatch.Stop();
 
         // Save the result
@@ -56,7 +78,8 @@ public static partial class Program {
         var savingsPercent = Math.Round((1 - newFileSize / (double)originalFileSize) * 100, 2);
 
         Console.WriteLine($"Output: {Path.GetFileName(options.OutputFile)} ({FormatFileSize(newFileSize)})");
-        Console.WriteLine($"Compression savings: {savingsPercent}% (reduced by {FormatFileSize(originalFileSize - newFileSize)})");
+        Console.WriteLine(
+          $"Compression savings: {savingsPercent}% (reduced by {FormatFileSize(originalFileSize - newFileSize)})");
         Console.WriteLine($"Total time: {stopwatch.Elapsed.TotalSeconds:F1} seconds");
 
         if (options.Verbose) {
@@ -82,7 +105,6 @@ public static partial class Program {
 #else
       return 1;
 #endif
-
       }
 
       static Bitmap LoadPngFile(string filePath) {
@@ -101,10 +123,21 @@ public static partial class Program {
           AutoSelectColorMode = options.AutoColorMode,
           TryInterlacing = options.TryInterlacing,
           TryPartitioning = options.TryPartitioning,
+          AllowLossyPalette = options.LossyPalette,
+          UseDithering = options.UseDithering,
+          IsHighQualityQuantization = options.HighQualityQuantize,
+          QuantizerNames = ParseNames(options.Quantizers),
+          DithererNames = ParseNames(options.Ditherers),
           FilterStrategies = filterStrategies,
           DeflateMethods = deflateMethods,
+          PreserveAncillaryChunks = options.PreserveChunks,
           MaxParallelTasks = options.ParallelTasks <= 0 ? Environment.ProcessorCount : options.ParallelTasks
         };
+
+        static List<string> ParseNames(string input) {
+          return input.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToList();
+        }
 
         static List<FilterStrategy> ParseFilterStrategies(string input) {
           var result = new List<FilterStrategy>();
@@ -169,14 +202,14 @@ public static partial class Program {
 
         Console.WriteLine("\nFilter usage statistics:");
         foreach (var kvp in filterCounts.OrderByDescending(kv => kv.Value)) {
-          var percentage = (kvp.Value / (double)filters.Length) * 100;
+          var percentage = kvp.Value / (double)filters.Length * 100;
           Console.WriteLine($"  {kvp.Key}: {kvp.Value} scanlines ({percentage:F1}%)");
         }
       }
 
       static void PrintHeader() {
         Console.WriteLine("PNG Optimizer v1.1 - Advanced PNG compression tool");
-        Console.WriteLine("Copyright © Hawkynt 2025 - All rights reserved");
+        Console.WriteLine("Copyright ï¿½ Hawkynt 2025 - All rights reserved");
         Console.WriteLine("------------------------------------------------");
       }
 
@@ -191,7 +224,6 @@ public static partial class Program {
 
         return $"{size:0.##} {sizes[order]}";
       }
-
     }
   }
 }

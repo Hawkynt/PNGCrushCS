@@ -6,5 +6,6 @@ public enum DeflateMethod {
   Fast = 1,
   Default = 2,
   Maximum = 3,
-  Ultra = 4  // Custom ultra compression with brute force approach
+  Ultra = 4, // DP optimal parsing with 2-pass refinement
+  Hyper = 5 // Full Zopfli-class with iterative refinement and block splitting
 }

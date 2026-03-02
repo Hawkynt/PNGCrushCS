@@ -1,46 +1,65 @@
-﻿namespace PngOptimizer;
+﻿using System;
 
-using System;
-using System.Collections.Generic;
+namespace PngOptimizer;
 
 partial class ImagePartitioner {
-
-  private readonly record struct FilterStatsPerRow(int SumOfAbsoluteDifferences, int Min, int Max, int Distinct, int Changes) {
-
+  private readonly record struct FilterStatsPerRow(
+    int DeflateAwareScore,
+    int Min,
+    int Max,
+    int Distinct,
+    int Changes,
+    int ZeroRuns,
+    int RepeatedRuns) {
     private int Range => this.Max - this.Min;
 
     /// <summary>Heuristic score for compressibility. Lower means potentially better compressible.</summary>
-    public int Score => CalculateCompressibilityScore();
+    public int Score => this.CalculateCompressibilityScore();
 
     private int CalculateCompressibilityScore() {
-      // A heuristic score combining multiple factors to estimate compressibility
-      // Lower distinct values, fewer changes, and smaller range are favorable for compression
       const int DistinctWeight = 5;
       const int ChangesWeight = 3;
       const int RangeWeight = 2;
+      const int ZeroRunWeight = 8;
+      const int RepeatedRunWeight = 4;
 
-      return (this.SumOfAbsoluteDifferences)
-             + (this.Distinct * DistinctWeight)
-             + (this.Changes * ChangesWeight)
-             + (this.Range * RangeWeight);
+      return this.DeflateAwareScore
+             + this.Distinct * DistinctWeight
+             + this.Changes * ChangesWeight
+             + this.Range * RangeWeight
+             - this.ZeroRuns * ZeroRunWeight
+             - this.RepeatedRuns * RepeatedRunWeight;
     }
 
     public static FilterStatsPerRow FromRow(Span<byte> scanline) {
       if (scanline.IsEmpty)
         return new FilterStatsPerRow();
 
+      Span<bool> seen = stackalloc bool[256];
       var lastValue = scanline[0];
       var min = lastValue;
       var max = lastValue;
-      var distinctValues = new HashSet<byte>(256) { lastValue };
+      seen[lastValue] = true;
+      var distinctCount = 1;
       var changes = 0;
+      var zeroRuns = 0;
+      var repeatedRuns = 0;
+      var inZeroRun = lastValue == 0;
+      var inRepeatedRun = lastValue != 0;
 
-      for (var i = 1; i < scanline.Length; i++) {
+      for (var i = 1; i < scanline.Length; ++i) {
         var value = scanline[i];
 
         if (value != lastValue) {
+          if (inZeroRun)
+            ++zeroRuns;
+          else if (inRepeatedRun)
+            ++repeatedRuns;
+
           ++changes;
           lastValue = value;
+          inZeroRun = value == 0;
+          inRepeatedRun = value != 0;
         }
 
         if (value < min)
@@ -49,12 +68,19 @@ partial class ImagePartitioner {
         if (value > max)
           max = value;
 
-        distinctValues.Add(value);
+        if (!seen[value]) {
+          seen[value] = true;
+          ++distinctCount;
+        }
       }
 
-      var sum = PngFilterSelector.CalculateSumOfAbsoluteDifferences(scanline);
-      return new(sum, min, max, distinctValues.Count, changes);
+      if (inZeroRun)
+        ++zeroRuns;
+      else if (inRepeatedRun)
+        ++repeatedRuns;
+
+      var score = PngFilterSelector.CalculateDeflateAwareScore(scanline);
+      return new FilterStatsPerRow(score, min, max, distinctCount, changes, zeroRuns, repeatedRuns);
     }
   }
-
 }

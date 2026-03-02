@@ -1,0 +1,25 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/Gif/">
+    <Project Path="../AnythingToGif/GifFileFormat/GifFileFormat.csproj" />
+    <Project Path="GifCrush/GifCrush.csproj" />
+    <Project Path="GifOptimizer.Tests/GifOptimizer.Tests.csproj" />
+    <Project Path="GifOptimizer/GifOptimizer.csproj" />
+  </Folder>
+  <Folder Name="/Png/">
+    <Project Path="PngCrush/PngCrush.csproj" />
+    <Project Path="PngOptimizer.Tests/PngOptimizer.Tests.csproj" />
+    <Project Path="PngOptimizer/PngOptimizer.csproj" />
+  </Folder>
+  <Folder Name="/Tiff/">
+    <Project Path="TiffCrush/TiffCrush.csproj" />
+    <Project Path="TiffOptimizer.Tests/TiffOptimizer.Tests.csproj" />
+    <Project Path="TiffOptimizer/TiffOptimizer.csproj" />
+  </Folder>
+  <Project Path="Compression.Core/Compression.Core.csproj" />
+  <Project Path="Compression.Tests/Compression.Tests.csproj" />
+</Solution>

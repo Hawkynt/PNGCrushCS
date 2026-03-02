@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>preview</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+    <Version>1.0.0</Version>
+    <Authors>Hawkynt</Authors>
+    <Description>GIF optimization engine with palette reordering, LZW re-encoding, and frame optimization.</Description>
+    <PackageReadmeFile>ReadMe.md</PackageReadmeFile>
+    <PackageProjectUrl>https://github.com/Hawkynt/PNGCrush</PackageProjectUrl>
+    <PackageTags>GifCrush;GifOptimizer;Hawkynt</PackageTags>
+    <RepositoryUrl>https://github.com/Hawkynt/PNGCrush</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>LGPL-3.0-or-later</PackageLicenseExpression>
+    <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="GifOptimizer.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\AnythingToGif\GifFileFormat\GifFileFormat.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Drawing.Common" Version="9.0.4" />
+  </ItemGroup>
+
+</Project>
