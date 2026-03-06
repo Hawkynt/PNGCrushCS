@@ -17,11 +17,14 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.x
-        
+          dotnet-version: |
+            8.x
+            9.x
+            10.x
+
       - name: Show Info
         run: dotnet --info
-      
+
       - name: Receive Versions
         run: perl ".github/workflows/UpdateVersions.pl" "."
 
@@ -32,10 +35,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        csproj-file: 
-          - 'PngCrush/PngCrush.csproj'
-          - 'TiffCrush/TiffCrush.csproj'
-          - 'GifCrush/GifCrush.csproj'
+        csproj-file:
+          - 'Crush.Png/Crush.Png.csproj'
+          - 'Crush.Tiff/Crush.Tiff.csproj'
+          - 'Crush.Gif/Crush.Gif.csproj'
+          - 'Crush.Bmp/Crush.Bmp.csproj'
+          - 'Crush.Tga/Crush.Tga.csproj'
+          - 'Crush.Pcx/Crush.Pcx.csproj'
+          - 'Crush.Jpeg/Crush.Jpeg.csproj'
+          - 'Crush.Ico/Crush.Ico.csproj'
+          - 'Crush.Cur/Crush.Cur.csproj'
+          - 'Crush.Ani/Crush.Ani.csproj'
+          - 'Crush.WebP/Crush.WebP.csproj'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -43,7 +54,10 @@ jobs:
 
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.x
+          dotnet-version: |
+            8.x
+            9.x
+            10.x
       
       - run: |
           projectDir=$(dirname ${{ matrix.csproj-file }})
