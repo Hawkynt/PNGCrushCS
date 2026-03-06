@@ -4,22 +4,321 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
+  <Folder Name="/Bmp/">
+    <Project Path="FileFormat.Bmp/FileFormat.Bmp.csproj" />
+    <Project Path="FileFormat.Bmp.Tests/FileFormat.Bmp.Tests.csproj" />
+    <Project Path="Crush.Bmp/Crush.Bmp.csproj" />
+    <Project Path="Optimizer.Bmp.Tests/Optimizer.Bmp.Tests.csproj" />
+    <Project Path="Optimizer.Bmp/Optimizer.Bmp.csproj" />
+  </Folder>
+  <Folder Name="/Ico/">
+    <Project Path="FileFormat.Ico/FileFormat.Ico.csproj" />
+    <Project Path="FileFormat.Ico.Tests/FileFormat.Ico.Tests.csproj" />
+    <Project Path="Crush.Ico/Crush.Ico.csproj" />
+    <Project Path="Optimizer.Ico.Tests/Optimizer.Ico.Tests.csproj" />
+    <Project Path="Optimizer.Ico/Optimizer.Ico.csproj" />
+  </Folder>
+  <Folder Name="/Cur/">
+    <Project Path="FileFormat.Cur/FileFormat.Cur.csproj" />
+    <Project Path="FileFormat.Cur.Tests/FileFormat.Cur.Tests.csproj" />
+    <Project Path="Crush.Cur/Crush.Cur.csproj" />
+    <Project Path="Optimizer.Cur.Tests/Optimizer.Cur.Tests.csproj" />
+    <Project Path="Optimizer.Cur/Optimizer.Cur.csproj" />
+  </Folder>
   <Folder Name="/Gif/">
     <Project Path="../AnythingToGif/GifFileFormat/GifFileFormat.csproj" />
-    <Project Path="GifCrush/GifCrush.csproj" />
-    <Project Path="GifOptimizer.Tests/GifOptimizer.Tests.csproj" />
-    <Project Path="GifOptimizer/GifOptimizer.csproj" />
+    <Project Path="Crush.Gif/Crush.Gif.csproj" />
+    <Project Path="Optimizer.Gif.Tests/Optimizer.Gif.Tests.csproj" />
+    <Project Path="Optimizer.Gif/Optimizer.Gif.csproj" />
+  </Folder>
+  <Folder Name="/Jpeg/">
+    <Project Path="FileFormat.Jpeg/FileFormat.Jpeg.csproj" />
+    <Project Path="FileFormat.Jpeg.Tests/FileFormat.Jpeg.Tests.csproj" />
+    <Project Path="Crush.Jpeg/Crush.Jpeg.csproj" />
+    <Project Path="Optimizer.Jpeg.Tests/Optimizer.Jpeg.Tests.csproj" />
+    <Project Path="Optimizer.Jpeg/Optimizer.Jpeg.csproj" />
+  </Folder>
+  <Folder Name="/Pcx/">
+    <Project Path="FileFormat.Pcx/FileFormat.Pcx.csproj" />
+    <Project Path="FileFormat.Pcx.Tests/FileFormat.Pcx.Tests.csproj" />
+    <Project Path="Crush.Pcx/Crush.Pcx.csproj" />
+    <Project Path="Optimizer.Pcx.Tests/Optimizer.Pcx.Tests.csproj" />
+    <Project Path="Optimizer.Pcx/Optimizer.Pcx.csproj" />
   </Folder>
   <Folder Name="/Png/">
-    <Project Path="PngCrush/PngCrush.csproj" />
-    <Project Path="PngOptimizer.Tests/PngOptimizer.Tests.csproj" />
-    <Project Path="PngOptimizer/PngOptimizer.csproj" />
+    <Project Path="FileFormat.Png/FileFormat.Png.csproj" />
+    <Project Path="FileFormat.Png.Tests/FileFormat.Png.Tests.csproj" />
+    <Project Path="Crush.Png/Crush.Png.csproj" />
+    <Project Path="Optimizer.Png.Tests/Optimizer.Png.Tests.csproj" />
+    <Project Path="Optimizer.Png/Optimizer.Png.csproj" />
+  </Folder>
+  <Folder Name="/Tga/">
+    <Project Path="FileFormat.Tga/FileFormat.Tga.csproj" />
+    <Project Path="FileFormat.Tga.Tests/FileFormat.Tga.Tests.csproj" />
+    <Project Path="Crush.Tga/Crush.Tga.csproj" />
+    <Project Path="Optimizer.Tga.Tests/Optimizer.Tga.Tests.csproj" />
+    <Project Path="Optimizer.Tga/Optimizer.Tga.csproj" />
   </Folder>
   <Folder Name="/Tiff/">
-    <Project Path="TiffCrush/TiffCrush.csproj" />
-    <Project Path="TiffOptimizer.Tests/TiffOptimizer.Tests.csproj" />
-    <Project Path="TiffOptimizer/TiffOptimizer.csproj" />
+    <Project Path="FileFormat.Tiff/FileFormat.Tiff.csproj" />
+    <Project Path="FileFormat.Tiff.Tests/FileFormat.Tiff.Tests.csproj" />
+    <Project Path="Crush.Tiff/Crush.Tiff.csproj" />
+    <Project Path="Optimizer.Tiff.Tests/Optimizer.Tiff.Tests.csproj" />
+    <Project Path="Optimizer.Tiff/Optimizer.Tiff.csproj" />
+  </Folder>
+  <Folder Name="/Ani/">
+    <Project Path="FileFormat.Ani/FileFormat.Ani.csproj" />
+    <Project Path="FileFormat.Ani.Tests/FileFormat.Ani.Tests.csproj" />
+    <Project Path="Crush.Ani/Crush.Ani.csproj" />
+    <Project Path="Optimizer.Ani.Tests/Optimizer.Ani.Tests.csproj" />
+    <Project Path="Optimizer.Ani/Optimizer.Ani.csproj" />
+  </Folder>
+  <Folder Name="/WebP/">
+    <Project Path="FileFormat.WebP/FileFormat.WebP.csproj" />
+    <Project Path="FileFormat.WebP.Tests/FileFormat.WebP.Tests.csproj" />
+    <Project Path="Crush.WebP/Crush.WebP.csproj" />
+    <Project Path="Optimizer.WebP.Tests/Optimizer.WebP.Tests.csproj" />
+    <Project Path="Optimizer.WebP/Optimizer.WebP.csproj" />
+  </Folder>
+  <Folder Name="/Qoi/">
+    <Project Path="FileFormat.Qoi/FileFormat.Qoi.csproj" />
+    <Project Path="FileFormat.Qoi.Tests/FileFormat.Qoi.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Iff/">
+    <Project Path="FileFormat.Iff/FileFormat.Iff.csproj" />
+    <Project Path="FileFormat.Iff.Tests/FileFormat.Iff.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Ilbm/">
+    <Project Path="FileFormat.Ilbm/FileFormat.Ilbm.csproj" />
+    <Project Path="FileFormat.Ilbm.Tests/FileFormat.Ilbm.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Riff/">
+    <Project Path="FileFormat.Riff/FileFormat.Riff.csproj" />
+    <Project Path="FileFormat.Riff.Tests/FileFormat.Riff.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Wbmp/">
+    <Project Path="FileFormat.Wbmp/FileFormat.Wbmp.csproj" />
+    <Project Path="FileFormat.Wbmp.Tests/FileFormat.Wbmp.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Farbfeld/">
+    <Project Path="FileFormat.Farbfeld/FileFormat.Farbfeld.csproj" />
+    <Project Path="FileFormat.Farbfeld.Tests/FileFormat.Farbfeld.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Netpbm/">
+    <Project Path="FileFormat.Netpbm/FileFormat.Netpbm.csproj" />
+    <Project Path="FileFormat.Netpbm.Tests/FileFormat.Netpbm.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Xbm/">
+    <Project Path="FileFormat.Xbm/FileFormat.Xbm.csproj" />
+    <Project Path="FileFormat.Xbm.Tests/FileFormat.Xbm.Tests.csproj" />
+  </Folder>
+  <Folder Name="/ZxSpectrum/">
+    <Project Path="FileFormat.ZxSpectrum/FileFormat.ZxSpectrum.csproj" />
+    <Project Path="FileFormat.ZxSpectrum.Tests/FileFormat.ZxSpectrum.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Koala/">
+    <Project Path="FileFormat.Koala/FileFormat.Koala.csproj" />
+    <Project Path="FileFormat.Koala.Tests/FileFormat.Koala.Tests.csproj" />
+  </Folder>
+  <Folder Name="/C64Multi/">
+    <Project Path="FileFormat.C64Multi/FileFormat.C64Multi.csproj" />
+    <Project Path="FileFormat.C64Multi.Tests/FileFormat.C64Multi.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Xpm/">
+    <Project Path="FileFormat.Xpm/FileFormat.Xpm.csproj" />
+    <Project Path="FileFormat.Xpm.Tests/FileFormat.Xpm.Tests.csproj" />
+  </Folder>
+  <Folder Name="/GemImg/">
+    <Project Path="FileFormat.GemImg/FileFormat.GemImg.csproj" />
+    <Project Path="FileFormat.GemImg.Tests/FileFormat.GemImg.Tests.csproj" />
+  </Folder>
+  <Folder Name="/MacPaint/">
+    <Project Path="FileFormat.MacPaint/FileFormat.MacPaint.csproj" />
+    <Project Path="FileFormat.MacPaint.Tests/FileFormat.MacPaint.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Degas/">
+    <Project Path="FileFormat.Degas/FileFormat.Degas.csproj" />
+    <Project Path="FileFormat.Degas.Tests/FileFormat.Degas.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Neochrome/">
+    <Project Path="FileFormat.Neochrome/FileFormat.Neochrome.csproj" />
+    <Project Path="FileFormat.Neochrome.Tests/FileFormat.Neochrome.Tests.csproj" />
+  </Folder>
+  <Folder Name="/AmstradCpc/">
+    <Project Path="FileFormat.AmstradCpc/FileFormat.AmstradCpc.csproj" />
+    <Project Path="FileFormat.AmstradCpc.Tests/FileFormat.AmstradCpc.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Pfm/">
+    <Project Path="FileFormat.Pfm/FileFormat.Pfm.csproj" />
+    <Project Path="FileFormat.Pfm.Tests/FileFormat.Pfm.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Sgi/">
+    <Project Path="FileFormat.Sgi/FileFormat.Sgi.csproj" />
+    <Project Path="FileFormat.Sgi.Tests/FileFormat.Sgi.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Cineon/">
+    <Project Path="FileFormat.Cineon/FileFormat.Cineon.csproj" />
+    <Project Path="FileFormat.Cineon.Tests/FileFormat.Cineon.Tests.csproj" />
+  </Folder>
+  <Folder Name="/DrHalo/">
+    <Project Path="FileFormat.DrHalo/FileFormat.DrHalo.csproj" />
+    <Project Path="FileFormat.DrHalo.Tests/FileFormat.DrHalo.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Hdr/">
+    <Project Path="FileFormat.Hdr/FileFormat.Hdr.csproj" />
+    <Project Path="FileFormat.Hdr.Tests/FileFormat.Hdr.Tests.csproj" />
+  </Folder>
+  <Folder Name="/SunRaster/">
+    <Project Path="FileFormat.SunRaster/FileFormat.SunRaster.csproj" />
+    <Project Path="FileFormat.SunRaster.Tests/FileFormat.SunRaster.Tests.csproj" />
+  </Folder>
+  <Folder Name="/UtahRle/">
+    <Project Path="FileFormat.UtahRle/FileFormat.UtahRle.csproj" />
+    <Project Path="FileFormat.UtahRle.Tests/FileFormat.UtahRle.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Fli/">
+    <Project Path="FileFormat.Fli/FileFormat.Fli.csproj" />
+    <Project Path="FileFormat.Fli.Tests/FileFormat.Fli.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Dds/">
+    <Project Path="FileFormat.Dds/FileFormat.Dds.csproj" />
+    <Project Path="FileFormat.Dds.Tests/FileFormat.Dds.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Vtf/">
+    <Project Path="FileFormat.Vtf/FileFormat.Vtf.csproj" />
+    <Project Path="FileFormat.Vtf.Tests/FileFormat.Vtf.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Exr/">
+    <Project Path="FileFormat.Exr/FileFormat.Exr.csproj" />
+    <Project Path="FileFormat.Exr.Tests/FileFormat.Exr.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Ktx/">
+    <Project Path="FileFormat.Ktx/FileFormat.Ktx.csproj" />
+    <Project Path="FileFormat.Ktx.Tests/FileFormat.Ktx.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Fits/">
+    <Project Path="FileFormat.Fits/FileFormat.Fits.csproj" />
+    <Project Path="FileFormat.Fits.Tests/FileFormat.Fits.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Dpx/">
+    <Project Path="FileFormat.Dpx/FileFormat.Dpx.csproj" />
+    <Project Path="FileFormat.Dpx.Tests/FileFormat.Dpx.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Psd/">
+    <Project Path="FileFormat.Psd/FileFormat.Psd.csproj" />
+    <Project Path="FileFormat.Psd.Tests/FileFormat.Psd.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Ccitt/">
+    <Project Path="FileFormat.Ccitt/FileFormat.Ccitt.csproj" />
+    <Project Path="FileFormat.Ccitt.Tests/FileFormat.Ccitt.Tests.csproj" />
+  </Folder>
+  <Folder Name="/BbcMicro/">
+    <Project Path="FileFormat.BbcMicro/FileFormat.BbcMicro.csproj" />
+    <Project Path="FileFormat.BbcMicro.Tests/FileFormat.BbcMicro.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Hrz/">
+    <Project Path="FileFormat.Hrz/FileFormat.Hrz.csproj" />
+    <Project Path="FileFormat.Hrz.Tests/FileFormat.Hrz.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Cmu/">
+    <Project Path="FileFormat.Cmu/FileFormat.Cmu.csproj" />
+    <Project Path="FileFormat.Cmu.Tests/FileFormat.Cmu.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Mtv/">
+    <Project Path="FileFormat.Mtv/FileFormat.Mtv.csproj" />
+    <Project Path="FileFormat.Mtv.Tests/FileFormat.Mtv.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Qrt/">
+    <Project Path="FileFormat.Qrt/FileFormat.Qrt.csproj" />
+    <Project Path="FileFormat.Qrt.Tests/FileFormat.Qrt.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Msp/">
+    <Project Path="FileFormat.Msp/FileFormat.Msp.csproj" />
+    <Project Path="FileFormat.Msp.Tests/FileFormat.Msp.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Dcx/">
+    <Project Path="FileFormat.Dcx/FileFormat.Dcx.csproj" />
+    <Project Path="FileFormat.Dcx.Tests/FileFormat.Dcx.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Astc/">
+    <Project Path="FileFormat.Astc/FileFormat.Astc.csproj" />
+    <Project Path="FileFormat.Astc.Tests/FileFormat.Astc.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Pkm/">
+    <Project Path="FileFormat.Pkm/FileFormat.Pkm.csproj" />
+    <Project Path="FileFormat.Pkm.Tests/FileFormat.Pkm.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Tim/">
+    <Project Path="FileFormat.Tim/FileFormat.Tim.csproj" />
+    <Project Path="FileFormat.Tim.Tests/FileFormat.Tim.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Tim2/">
+    <Project Path="FileFormat.Tim2/FileFormat.Tim2.csproj" />
+    <Project Path="FileFormat.Tim2.Tests/FileFormat.Tim2.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Wal/">
+    <Project Path="FileFormat.Wal/FileFormat.Wal.csproj" />
+    <Project Path="FileFormat.Wal.Tests/FileFormat.Wal.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Pvr/">
+    <Project Path="FileFormat.Pvr/FileFormat.Pvr.csproj" />
+    <Project Path="FileFormat.Pvr.Tests/FileFormat.Pvr.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Wpg/">
+    <Project Path="FileFormat.Wpg/FileFormat.Wpg.csproj" />
+    <Project Path="FileFormat.Wpg.Tests/FileFormat.Wpg.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Bsave/">
+    <Project Path="FileFormat.Bsave/FileFormat.Bsave.csproj" />
+    <Project Path="FileFormat.Bsave.Tests/FileFormat.Bsave.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Clp/">
+    <Project Path="FileFormat.Clp/FileFormat.Clp.csproj" />
+    <Project Path="FileFormat.Clp.Tests/FileFormat.Clp.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Spectrum512/">
+    <Project Path="FileFormat.Spectrum512/FileFormat.Spectrum512.csproj" />
+    <Project Path="FileFormat.Spectrum512.Tests/FileFormat.Spectrum512.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Tiny/">
+    <Project Path="FileFormat.Tiny/FileFormat.Tiny.csproj" />
+    <Project Path="FileFormat.Tiny.Tests/FileFormat.Tiny.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Sixel/">
+    <Project Path="FileFormat.Sixel/FileFormat.Sixel.csproj" />
+    <Project Path="FileFormat.Sixel.Tests/FileFormat.Sixel.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Apng/">
+    <Project Path="FileFormat.Apng/FileFormat.Apng.csproj" />
+    <Project Path="FileFormat.Apng.Tests/FileFormat.Apng.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Mng/">
+    <Project Path="FileFormat.Mng/FileFormat.Mng.csproj" />
+    <Project Path="FileFormat.Mng.Tests/FileFormat.Mng.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Xcf/">
+    <Project Path="FileFormat.Xcf/FileFormat.Xcf.csproj" />
+    <Project Path="FileFormat.Xcf.Tests/FileFormat.Xcf.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Pict/">
+    <Project Path="FileFormat.Pict/FileFormat.Pict.csproj" />
+    <Project Path="FileFormat.Pict.Tests/FileFormat.Pict.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Dicom/">
+    <Project Path="FileFormat.Dicom/FileFormat.Dicom.csproj" />
+    <Project Path="FileFormat.Dicom.Tests/FileFormat.Dicom.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Wad/">
+    <Project Path="FileFormat.Wad/FileFormat.Wad.csproj" />
+    <Project Path="FileFormat.Wad.Tests/FileFormat.Wad.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Wad3/">
+    <Project Path="FileFormat.Wad3/FileFormat.Wad3.csproj" />
+    <Project Path="FileFormat.Wad3.Tests/FileFormat.Wad3.Tests.csproj" />
   </Folder>
   <Project Path="Compression.Core/Compression.Core.csproj" />
   <Project Path="Compression.Tests/Compression.Tests.csproj" />
+  <Project Path="Crush.Core/Crush.Core.csproj" />
+  <Project Path="Crush.TestUtilities/Crush.TestUtilities.csproj" />
+  <Project Path="FileFormat.Core/FileFormat.Core.csproj" />
 </Solution>
