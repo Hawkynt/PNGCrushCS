@@ -1,9 +1,17 @@
+using System;
 using System.Collections.Generic;
+using System.IO;
+using FileFormat.Core;
 
 namespace FileFormat.Png;
 
 /// <summary>Data model representing a PNG file</summary>
-public sealed class PngFile {
+public sealed class PngFile : IImageFileFormat<PngFile> {
+
+  static string IImageFileFormat<PngFile>.PrimaryExtension => ".png";
+  static string[] IImageFileFormat<PngFile>.FileExtensions => [".png"];
+  static PngFile IImageFileFormat<PngFile>.FromFile(FileInfo file) => PngReader.FromFile(file);
+  static byte[] IImageFileFormat<PngFile>.ToBytes(PngFile file) => PngWriter.ToBytes(file);
   /// <summary>Image width in pixels</summary>
   public required int Width { get; init; }
 
@@ -39,4 +47,144 @@ public sealed class PngFile {
 
   /// <summary>Ancillary chunks to preserve after IDAT</summary>
   public IReadOnlyList<PngChunk>? ChunksAfterIdat { get; init; }
+
+  public static RawImage ToRawImage(PngFile file) {
+    ArgumentNullException.ThrowIfNull(file);
+    if (file.PixelData == null)
+      throw new ArgumentException("PixelData must not be null.", nameof(file));
+
+    var format = _GetPixelFormat(file.ColorType, file.BitDepth);
+    var pixelData = _FlattenRows(file.PixelData);
+
+    // For indexed with BitDepth 2, unpack to 8-bit indices
+    if (file.ColorType == PngColorType.Palette && file.BitDepth == 2)
+      pixelData = _Unpack2BitTo8Bit(pixelData, file.Width, file.Height);
+
+    byte[]? palette = null;
+    var paletteCount = 0;
+    byte[]? alphaTable = null;
+
+    if (file.ColorType == PngColorType.Palette) {
+      palette = file.Palette != null ? (byte[])file.Palette.Clone() : null;
+      paletteCount = file.PaletteCount;
+      if (file.Transparency != null)
+        alphaTable = (byte[])file.Transparency.Clone();
+    }
+
+    return new() {
+      Width = file.Width,
+      Height = file.Height,
+      Format = format,
+      PixelData = pixelData,
+      Palette = palette,
+      PaletteCount = paletteCount,
+      AlphaTable = alphaTable,
+    };
+  }
+
+  public static PngFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var (colorType, bitDepth) = _GetPngSettings(image.Format);
+    var stride = _CalculateStride(image.Width, image.Format, bitDepth);
+    var rows = _SplitIntoRows(image.PixelData, stride, image.Height);
+
+    byte[]? palette = null;
+    var paletteCount = 0;
+    byte[]? transparency = null;
+
+    if (colorType == PngColorType.Palette) {
+      palette = image.Palette != null ? (byte[])image.Palette.Clone() : null;
+      paletteCount = image.PaletteCount;
+      if (image.AlphaTable != null)
+        transparency = (byte[])image.AlphaTable.Clone();
+    }
+
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      BitDepth = bitDepth,
+      ColorType = colorType,
+      PixelData = rows,
+      Palette = palette,
+      PaletteCount = paletteCount,
+      Transparency = transparency,
+    };
+  }
+
+  private static PixelFormat _GetPixelFormat(PngColorType colorType, int bitDepth) => colorType switch {
+    PngColorType.Grayscale when bitDepth == 8 => PixelFormat.Gray8,
+    PngColorType.Grayscale when bitDepth == 16 => PixelFormat.Gray16,
+    PngColorType.GrayscaleAlpha when bitDepth == 8 => PixelFormat.GrayAlpha16,
+    PngColorType.RGB when bitDepth == 8 => PixelFormat.Rgb24,
+    PngColorType.RGB when bitDepth == 16 => PixelFormat.Rgb48,
+    PngColorType.RGBA when bitDepth == 8 => PixelFormat.Rgba32,
+    PngColorType.RGBA when bitDepth == 16 => PixelFormat.Rgba64,
+    PngColorType.Palette when bitDepth == 1 => PixelFormat.Indexed1,
+    PngColorType.Palette when bitDepth == 4 => PixelFormat.Indexed4,
+    PngColorType.Palette when bitDepth is 2 or 8 => PixelFormat.Indexed8,
+    _ => throw new ArgumentException($"Unsupported PNG color type {colorType} with bit depth {bitDepth}.")
+  };
+
+  private static (PngColorType colorType, int bitDepth) _GetPngSettings(PixelFormat format) => format switch {
+    PixelFormat.Gray8 => (PngColorType.Grayscale, 8),
+    PixelFormat.Gray16 => (PngColorType.Grayscale, 16),
+    PixelFormat.GrayAlpha16 => (PngColorType.GrayscaleAlpha, 8),
+    PixelFormat.Rgb24 => (PngColorType.RGB, 8),
+    PixelFormat.Rgb48 => (PngColorType.RGB, 16),
+    PixelFormat.Rgba32 => (PngColorType.RGBA, 8),
+    PixelFormat.Rgba64 => (PngColorType.RGBA, 16),
+    PixelFormat.Indexed8 => (PngColorType.Palette, 8),
+    PixelFormat.Indexed4 => (PngColorType.Palette, 4),
+    PixelFormat.Indexed1 => (PngColorType.Palette, 1),
+    _ => throw new ArgumentException($"Unsupported pixel format for PNG: {format}.", nameof(format))
+  };
+
+  private static int _CalculateStride(int width, PixelFormat format, int bitDepth) {
+    var bpp = RawImage.BitsPerPixel(format);
+    return (width * bpp + 7) / 8;
+  }
+
+  private static byte[] _FlattenRows(byte[][] rows) {
+    var totalLength = 0;
+    foreach (var row in rows)
+      totalLength += row.Length;
+
+    var result = new byte[totalLength];
+    var offset = 0;
+    foreach (var row in rows) {
+      Array.Copy(row, 0, result, offset, row.Length);
+      offset += row.Length;
+    }
+
+    return result;
+  }
+
+  private static byte[][] _SplitIntoRows(byte[] data, int stride, int height) {
+    var rows = new byte[height][];
+    for (var y = 0; y < height; ++y) {
+      rows[y] = new byte[stride];
+      var sourceOffset = y * stride;
+      var copyLength = Math.Min(stride, data.Length - sourceOffset);
+      if (copyLength > 0)
+        Array.Copy(data, sourceOffset, rows[y], 0, copyLength);
+    }
+
+    return rows;
+  }
+
+  private static byte[] _Unpack2BitTo8Bit(byte[] packed, int width, int height) {
+    var result = new byte[width * height];
+    var packedStride = (width * 2 + 7) / 8;
+    for (var y = 0; y < height; ++y) {
+      var rowOffset = y * packedStride;
+      for (var x = 0; x < width; ++x) {
+        var byteIndex = rowOffset + x / 4;
+        var shift = 6 - (x % 4) * 2;
+        result[y * width + x] = (byte)((packed[byteIndex] >> shift) & 0x03);
+      }
+    }
+
+    return result;
+  }
 }

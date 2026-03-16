@@ -19,6 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\FileFormat.Core\FileFormat.Core.csproj" />
     <ProjectReference Include="..\FileFormat.Ico\FileFormat.Ico.csproj" />
   </ItemGroup>
 </Project>

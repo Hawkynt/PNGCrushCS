@@ -26,6 +26,8 @@
     <ItemGroup>
         <ProjectReference Include="..\Compression.Core\Compression.Core.csproj" />
         <ProjectReference Include="..\FileFormat.Core\FileFormat.Core.csproj" />
+        <ProjectReference Include="..\FileFormat.Core.Generators\FileFormat.Core.Generators.csproj"
+                          OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
     </ItemGroup>
 
 </Project>

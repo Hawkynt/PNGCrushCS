@@ -15,6 +15,12 @@
     <InternalsVisibleTo Include="Optimizer.Jpeg" />
     <InternalsVisibleTo Include="Optimizer.Jpeg.Tests" />
     <InternalsVisibleTo Include="FileFormat.Jpeg.Tests" />
+    <InternalsVisibleTo Include="FileFormat.Mpo" />
+    <InternalsVisibleTo Include="FileFormat.Mpo.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FileFormat.Core\FileFormat.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

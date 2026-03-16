@@ -12,7 +12,7 @@
     <Description>GIF optimization engine with palette reordering, LZW re-encoding, and frame optimization.</Description>
     <PackageReadmeFile>ReadMe.md</PackageReadmeFile>
     <PackageProjectUrl>https://github.com/Hawkynt/PNGCrush</PackageProjectUrl>
-    <PackageTags>GifCrush;GifOptimizer;Hawkynt</PackageTags>
+    <PackageTags>GifOptimizer;ImageCrush;Hawkynt</PackageTags>
     <RepositoryUrl>https://github.com/Hawkynt/PNGCrush</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>LGPL-3.0-or-later</PackageLicenseExpression>
