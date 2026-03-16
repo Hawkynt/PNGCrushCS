@@ -799,36 +799,9 @@ public sealed partial class PngOptimizer {
     }
   }
 
-  /// <summary>Dispatch to the correct ReduceColors generic instantiation based on quantizer and ditherer names</summary>
   private static Bitmap _DispatchReduceColors(Bitmap source, string quantizerName, string dithererName,
-    int colorCount, bool isHighQuality) {
-    return quantizerName.ToLowerInvariant() switch {
-      "wu" => _WithDitherer(source, new WuQuantizer(), dithererName, colorCount, isHighQuality),
-      "octree" => _WithDitherer(source, new OctreeQuantizer(), dithererName, colorCount, isHighQuality),
-      "mediancut" => _WithDitherer(source, new Hawkynt.ColorProcessing.Quantization.MedianCutQuantizer(),
-        dithererName, colorCount, isHighQuality),
-      "neuquant" => _WithDitherer(source, new NeuquantQuantizer(), dithererName, colorCount, isHighQuality),
-      "pngquant" => _WithDitherer(source, new PngQuantQuantizer(), dithererName, colorCount, isHighQuality),
-      _ => throw new ArgumentException($"Unknown quantizer: {quantizerName}")
-    };
-  }
-
-  private static Bitmap _WithDitherer<TQ>(Bitmap source, TQ quantizer, string dithererName, int colorCount,
-    bool isHighQuality)
-    where TQ : struct, IQuantizer {
-    return dithererName.ToLowerInvariant() switch {
-      "none" => source.ReduceColors<TQ, NoDithering>(quantizer, default, colorCount, isHighQuality),
-      "floydsteinberg" => source.ReduceColors(quantizer, ErrorDiffusion.FloydSteinberg,
-        colorCount, isHighQuality),
-      "atkinson" => source.ReduceColors(quantizer, ErrorDiffusion.Atkinson, colorCount,
-        isHighQuality),
-      "sierra" => source.ReduceColors(quantizer, ErrorDiffusion.Sierra, colorCount,
-        isHighQuality),
-      "bayer4x4" => source.ReduceColors(quantizer, OrderedDitherer.Bayer4x4, colorCount,
-        isHighQuality),
-      _ => throw new ArgumentException($"Unknown ditherer: {dithererName}")
-    };
-  }
+    int colorCount, bool isHighQuality)
+    => ReduceColorsDispatch.ReduceColors(source, quantizerName, dithererName, colorCount, isHighQuality);
 
   /// <summary>Sort palette entries: non-opaque first by frequency desc, then opaque by frequency desc</summary>
   private static void _FrequencySortPaletteWithAlpha(ArgbPixel[] pixels, int width, int height, bool includeAlpha,

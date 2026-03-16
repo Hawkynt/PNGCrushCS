@@ -11,7 +11,7 @@
         <Description>This package provides a PngOptimizer implementation.</Description>
         <PackageReadmeFile>ReadMe.md</PackageReadmeFile>
         <PackageProjectUrl>https://github.com/Hawkynt/PNGCrush</PackageProjectUrl>
-        <PackageTags>PNGCrush;Hawkynt</PackageTags>
+        <PackageTags>PngOptimizer;ImageCrush;Hawkynt</PackageTags>
         <RepositoryUrl>https://github.com/Hawkynt/PNGCrush</RepositoryUrl>
         <RepositoryType>git</RepositoryType>
         <PackageLicenseExpression>LGPL-3.0-or-later</PackageLicenseExpression>
@@ -21,6 +21,7 @@
 
     <ItemGroup>
         <InternalsVisibleTo Include="Optimizer.Png.Tests" />
+        <InternalsVisibleTo Include="Optimizer.Image" />
     </ItemGroup>
 
     <ItemGroup>

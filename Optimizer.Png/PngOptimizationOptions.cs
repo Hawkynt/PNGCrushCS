@@ -35,9 +35,9 @@ public sealed record PngOptimizationOptions(
   public List<DeflateMethod> DeflateMethods { get; init; } =
     DeflateMethods ?? [DeflateMethod.Default, DeflateMethod.Ultra];
 
-  public List<string> QuantizerNames { get; init; } = QuantizerNames ?? ["Wu", "Octree", "MedianCut"];
+  public List<string> QuantizerNames { get; init; } = QuantizerNames ?? ["Wu", "Octree", "Median Cut"];
 
-  public List<string> DithererNames { get; init; } = DithererNames ?? ["None", "FloydSteinberg"];
+  public List<string> DithererNames { get; init; } = DithererNames ?? ["NoDithering_Instance", "ErrorDiffusion_FloydSteinberg"];
 
   public int MaxParallelTasks { get; init; } = MaxParallelTasks <= 0 ? Environment.ProcessorCount : MaxParallelTasks;
 }

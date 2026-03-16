@@ -1,0 +1,215 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <LangVersion>preview</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Version>1.0.0</Version>
+    <Authors>Hawkynt</Authors>
+    <Description>Universal image optimization engine supporting multiple formats.</Description>
+    <PackageLicenseExpression>LGPL-3.0-or-later</PackageLicenseExpression>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Optimizer.Image.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Drawing.Common" Version="9.0.4" />
+    <PackageReference Include="FrameworkExtensions.Backports" Version="1.0.0.256" />
+    <PackageReference Include="FrameworkExtensions.Corlib" Version="1.0.2.459" />
+    <PackageReference Include="FrameworkExtensions.System.Drawing" Version="1.0.0.132" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Crush.Core\Crush.Core.csproj" />
+    <ProjectReference Include="..\Optimizer.Png\Optimizer.Png.csproj" />
+    <ProjectReference Include="..\Optimizer.Gif\Optimizer.Gif.csproj" />
+    <ProjectReference Include="..\Optimizer.Tiff\Optimizer.Tiff.csproj" />
+    <ProjectReference Include="..\Optimizer.Bmp\Optimizer.Bmp.csproj" />
+    <ProjectReference Include="..\Optimizer.Tga\Optimizer.Tga.csproj" />
+    <ProjectReference Include="..\Optimizer.Pcx\Optimizer.Pcx.csproj" />
+    <ProjectReference Include="..\Optimizer.Jpeg\Optimizer.Jpeg.csproj" />
+    <ProjectReference Include="..\Optimizer.Ico\Optimizer.Ico.csproj" />
+    <ProjectReference Include="..\Optimizer.Cur\Optimizer.Cur.csproj" />
+    <ProjectReference Include="..\Optimizer.Ani\Optimizer.Ani.csproj" />
+    <ProjectReference Include="..\Optimizer.WebP\Optimizer.WebP.csproj" />
+    <ProjectReference Include="..\FileFormat.Core\FileFormat.Core.csproj" />
+    <ProjectReference Include="..\FileFormat.Acorn\FileFormat.Acorn.csproj" />
+    <ProjectReference Include="..\FileFormat.AliasPix\FileFormat.AliasPix.csproj" />
+    <ProjectReference Include="..\FileFormat.AmstradCpc\FileFormat.AmstradCpc.csproj" />
+    <ProjectReference Include="..\FileFormat.Apng\FileFormat.Apng.csproj" />
+    <ProjectReference Include="..\FileFormat.AppleII\FileFormat.AppleII.csproj" />
+    <ProjectReference Include="..\FileFormat.AppleIIgs\FileFormat.AppleIIgs.csproj" />
+    <ProjectReference Include="..\FileFormat.Art\FileFormat.Art.csproj" />
+    <ProjectReference Include="..\FileFormat.Astc\FileFormat.Astc.csproj" />
+    <ProjectReference Include="..\FileFormat.Avs\FileFormat.Avs.csproj" />
+    <ProjectReference Include="..\FileFormat.BbcMicro\FileFormat.BbcMicro.csproj" />
+    <ProjectReference Include="..\FileFormat.Bmp\FileFormat.Bmp.csproj" />
+    <ProjectReference Include="..\FileFormat.Bsave\FileFormat.Bsave.csproj" />
+    <ProjectReference Include="..\FileFormat.C64Multi\FileFormat.C64Multi.csproj" />
+    <ProjectReference Include="..\FileFormat.Cals\FileFormat.Cals.csproj" />
+    <ProjectReference Include="..\FileFormat.Ccitt\FileFormat.Ccitt.csproj" />
+    <ProjectReference Include="..\FileFormat.Cineon\FileFormat.Cineon.csproj" />
+    <ProjectReference Include="..\FileFormat.Clp\FileFormat.Clp.csproj" />
+    <ProjectReference Include="..\FileFormat.Cmu\FileFormat.Cmu.csproj" />
+    <ProjectReference Include="..\FileFormat.CrackArt\FileFormat.CrackArt.csproj" />
+    <ProjectReference Include="..\FileFormat.Cur\FileFormat.Cur.csproj" />
+    <ProjectReference Include="..\FileFormat.Dcx\FileFormat.Dcx.csproj" />
+    <ProjectReference Include="..\FileFormat.Dds\FileFormat.Dds.csproj" />
+    <ProjectReference Include="..\FileFormat.Degas\FileFormat.Degas.csproj" />
+    <ProjectReference Include="..\FileFormat.Dicom\FileFormat.Dicom.csproj" />
+    <ProjectReference Include="..\FileFormat.Dpx\FileFormat.Dpx.csproj" />
+    <ProjectReference Include="..\FileFormat.DrHalo\FileFormat.DrHalo.csproj" />
+    <ProjectReference Include="..\FileFormat.Exr\FileFormat.Exr.csproj" />
+    <ProjectReference Include="..\FileFormat.Farbfeld\FileFormat.Farbfeld.csproj" />
+    <ProjectReference Include="..\FileFormat.Fits\FileFormat.Fits.csproj" />
+    <ProjectReference Include="..\FileFormat.Fli\FileFormat.Fli.csproj" />
+    <ProjectReference Include="..\FileFormat.GemImg\FileFormat.GemImg.csproj" />
+    <ProjectReference Include="..\FileFormat.Hdr\FileFormat.Hdr.csproj" />
+    <ProjectReference Include="..\FileFormat.Hrz\FileFormat.Hrz.csproj" />
+    <ProjectReference Include="..\FileFormat.Ico\FileFormat.Ico.csproj" />
+    <ProjectReference Include="..\FileFormat.Ilbm\FileFormat.Ilbm.csproj" />
+    <ProjectReference Include="..\FileFormat.Jng\FileFormat.Jng.csproj" />
+    <ProjectReference Include="..\FileFormat.Jpeg\FileFormat.Jpeg.csproj" />
+    <ProjectReference Include="..\FileFormat.Koala\FileFormat.Koala.csproj" />
+    <ProjectReference Include="..\FileFormat.Ktx\FileFormat.Ktx.csproj" />
+    <ProjectReference Include="..\FileFormat.MacPaint\FileFormat.MacPaint.csproj" />
+    <ProjectReference Include="..\FileFormat.Miff\FileFormat.Miff.csproj" />
+    <ProjectReference Include="..\FileFormat.Mng\FileFormat.Mng.csproj" />
+    <ProjectReference Include="..\FileFormat.Msp\FileFormat.Msp.csproj" />
+    <ProjectReference Include="..\FileFormat.Msx\FileFormat.Msx.csproj" />
+    <ProjectReference Include="..\FileFormat.Mtv\FileFormat.Mtv.csproj" />
+    <ProjectReference Include="..\FileFormat.Neochrome\FileFormat.Neochrome.csproj" />
+    <ProjectReference Include="..\FileFormat.Netpbm\FileFormat.Netpbm.csproj" />
+    <ProjectReference Include="..\FileFormat.Nifti\FileFormat.Nifti.csproj" />
+    <ProjectReference Include="..\FileFormat.Nrrd\FileFormat.Nrrd.csproj" />
+    <ProjectReference Include="..\FileFormat.OpenRaster\FileFormat.OpenRaster.csproj" />
+    <ProjectReference Include="..\FileFormat.Oric\FileFormat.Oric.csproj" />
+    <ProjectReference Include="..\FileFormat.Otb\FileFormat.Otb.csproj" />
+    <ProjectReference Include="..\FileFormat.Palm\FileFormat.Palm.csproj" />
+    <ProjectReference Include="..\FileFormat.Pcx\FileFormat.Pcx.csproj" />
+    <ProjectReference Include="..\FileFormat.Pfm\FileFormat.Pfm.csproj" />
+    <ProjectReference Include="..\FileFormat.Pict\FileFormat.Pict.csproj" />
+    <ProjectReference Include="..\FileFormat.Pkm\FileFormat.Pkm.csproj" />
+    <ProjectReference Include="..\FileFormat.Png\FileFormat.Png.csproj" />
+    <ProjectReference Include="..\FileFormat.Psd\FileFormat.Psd.csproj" />
+    <ProjectReference Include="..\FileFormat.Pvr\FileFormat.Pvr.csproj" />
+    <ProjectReference Include="..\FileFormat.Qoi\FileFormat.Qoi.csproj" />
+    <ProjectReference Include="..\FileFormat.Qrt\FileFormat.Qrt.csproj" />
+    <ProjectReference Include="..\FileFormat.Rla\FileFormat.Rla.csproj" />
+    <ProjectReference Include="..\FileFormat.SamCoupe\FileFormat.SamCoupe.csproj" />
+    <ProjectReference Include="..\FileFormat.Sff\FileFormat.Sff.csproj" />
+    <ProjectReference Include="..\FileFormat.Sgi\FileFormat.Sgi.csproj" />
+    <ProjectReference Include="..\FileFormat.Sixel\FileFormat.Sixel.csproj" />
+    <ProjectReference Include="..\FileFormat.Spectrum512\FileFormat.Spectrum512.csproj" />
+    <ProjectReference Include="..\FileFormat.SunRaster\FileFormat.SunRaster.csproj" />
+    <ProjectReference Include="..\FileFormat.Tga\FileFormat.Tga.csproj" />
+    <ProjectReference Include="..\FileFormat.Tiff\FileFormat.Tiff.csproj" />
+    <ProjectReference Include="..\FileFormat.Tim\FileFormat.Tim.csproj" />
+    <ProjectReference Include="..\FileFormat.Tim2\FileFormat.Tim2.csproj" />
+    <ProjectReference Include="..\FileFormat.Tiny\FileFormat.Tiny.csproj" />
+    <ProjectReference Include="..\FileFormat.Vicar\FileFormat.Vicar.csproj" />
+    <ProjectReference Include="..\FileFormat.Viff\FileFormat.Viff.csproj" />
+    <ProjectReference Include="..\FileFormat.Vtf\FileFormat.Vtf.csproj" />
+    <ProjectReference Include="..\FileFormat.Wal\FileFormat.Wal.csproj" />
+    <ProjectReference Include="..\FileFormat.Wad3\FileFormat.Wad3.csproj" />
+    <ProjectReference Include="..\FileFormat.Wbmp\FileFormat.Wbmp.csproj" />
+    <ProjectReference Include="..\FileFormat.Wpg\FileFormat.Wpg.csproj" />
+    <ProjectReference Include="..\FileFormat.Xbm\FileFormat.Xbm.csproj" />
+    <ProjectReference Include="..\FileFormat.Xcf\FileFormat.Xcf.csproj" />
+    <ProjectReference Include="..\FileFormat.Xpm\FileFormat.Xpm.csproj" />
+    <ProjectReference Include="..\FileFormat.Xwd\FileFormat.Xwd.csproj" />
+    <ProjectReference Include="..\FileFormat.ZxSpectrum\FileFormat.ZxSpectrum.csproj" />
+    <ProjectReference Include="..\FileFormat.Aai\FileFormat.Aai.csproj" />
+    <ProjectReference Include="..\FileFormat.Rgf\FileFormat.Rgf.csproj" />
+    <ProjectReference Include="..\FileFormat.Fbm\FileFormat.Fbm.csproj" />
+    <ProjectReference Include="..\FileFormat.Gbr\FileFormat.Gbr.csproj" />
+    <ProjectReference Include="..\FileFormat.Pat\FileFormat.Pat.csproj" />
+    <ProjectReference Include="..\FileFormat.Xyz\FileFormat.Xyz.csproj" />
+    <ProjectReference Include="..\FileFormat.Lss16\FileFormat.Lss16.csproj" />
+    <ProjectReference Include="..\FileFormat.ColoRix\FileFormat.ColoRix.csproj" />
+    <ProjectReference Include="..\FileFormat.SunIcon\FileFormat.SunIcon.csproj" />
+    <ProjectReference Include="..\FileFormat.Cel\FileFormat.Cel.csproj" />
+    <ProjectReference Include="..\FileFormat.AmigaIcon\FileFormat.AmigaIcon.csproj" />
+    <ProjectReference Include="..\FileFormat.Gaf\FileFormat.Gaf.csproj" />
+    <ProjectReference Include="..\FileFormat.GunPaint\FileFormat.GunPaint.csproj" />
+    <ProjectReference Include="..\FileFormat.GeoPaint\FileFormat.GeoPaint.csproj" />
+    <ProjectReference Include="..\FileFormat.Psb\FileFormat.Psb.csproj" />
+    <ProjectReference Include="..\FileFormat.Icns\FileFormat.Icns.csproj" />
+    <ProjectReference Include="..\FileFormat.Blp\FileFormat.Blp.csproj" />
+    <ProjectReference Include="..\FileFormat.Fsh\FileFormat.Fsh.csproj" />
+    <ProjectReference Include="..\FileFormat.Mpo\FileFormat.Mpo.csproj" />
+    <ProjectReference Include="..\FileFormat.Pds\FileFormat.Pds.csproj" />
+    <ProjectReference Include="..\FileFormat.Ics\FileFormat.Ics.csproj" />
+    <ProjectReference Include="..\FileFormat.BioRadPic\FileFormat.BioRadPic.csproj" />
+    <ProjectReference Include="..\FileFormat.Ptif\FileFormat.Ptif.csproj" />
+    <ProjectReference Include="..\FileFormat.Bsb\FileFormat.Bsb.csproj" />
+    <ProjectReference Include="..\FileFormat.Awd\FileFormat.Awd.csproj" />
+    <ProjectReference Include="..\FileFormat.Psp\FileFormat.Psp.csproj" />
+    <ProjectReference Include="..\FileFormat.Qtif\FileFormat.Qtif.csproj" />
+    <ProjectReference Include="..\FileFormat.Ingr\FileFormat.Ingr.csproj" />
+    <ProjectReference Include="..\FileFormat.Nitf\FileFormat.Nitf.csproj" />
+    <ProjectReference Include="..\FileFormat.Uhdr\FileFormat.Uhdr.csproj" />
+    <ProjectReference Include="..\FileFormat.PalmPdb\FileFormat.PalmPdb.csproj" />
+    <ProjectReference Include="..\FileFormat.Pcd\FileFormat.Pcd.csproj" />
+    <ProjectReference Include="..\FileFormat.PhotoPaint\FileFormat.PhotoPaint.csproj" />
+    <ProjectReference Include="..\FileFormat.Pdn\FileFormat.Pdn.csproj" />
+    <ProjectReference Include="..\FileFormat.Fpx\FileFormat.Fpx.csproj" />
+    <ProjectReference Include="..\FileFormat.JpegLs\FileFormat.JpegLs.csproj" />
+    <ProjectReference Include="..\FileFormat.Jbig\FileFormat.Jbig.csproj" />
+    <ProjectReference Include="..\FileFormat.Wsq\FileFormat.Wsq.csproj" />
+    <ProjectReference Include="..\FileFormat.DjVu\FileFormat.DjVu.csproj" />
+    <ProjectReference Include="..\FileFormat.Jbig2\FileFormat.Jbig2.csproj" />
+    <ProjectReference Include="..\FileFormat.Flif\FileFormat.Flif.csproj" />
+    <ProjectReference Include="..\FileFormat.Jpeg2000\FileFormat.Jpeg2000.csproj" />
+    <ProjectReference Include="..\FileFormat.JpegXr\FileFormat.JpegXr.csproj" />
+    <ProjectReference Include="..\FileFormat.Heif\FileFormat.Heif.csproj" />
+    <ProjectReference Include="..\FileFormat.Avif\FileFormat.Avif.csproj" />
+    <ProjectReference Include="..\FileFormat.JpegXl\FileFormat.JpegXl.csproj" />
+    <ProjectReference Include="..\FileFormat.Bpg\FileFormat.Bpg.csproj" />
+    <ProjectReference Include="..\FileFormat.Dng\FileFormat.Dng.csproj" />
+    <ProjectReference Include="..\FileFormat.CameraRaw\FileFormat.CameraRaw.csproj" />
+    <ProjectReference Include="..\FileFormat.Krita\FileFormat.Krita.csproj" />
+    <ProjectReference Include="..\FileFormat.Analyze\FileFormat.Analyze.csproj" />
+    <ProjectReference Include="..\FileFormat.MetaImage\FileFormat.MetaImage.csproj" />
+    <ProjectReference Include="..\FileFormat.Eps\FileFormat.Eps.csproj" />
+    <ProjectReference Include="..\FileFormat.Wmf\FileFormat.Wmf.csproj" />
+    <ProjectReference Include="..\FileFormat.Emf\FileFormat.Emf.csproj" />
+    <ProjectReference Include="..\FileFormat.Vips\FileFormat.Vips.csproj" />
+    <ProjectReference Include="..\FileFormat.QuakeSpr\FileFormat.QuakeSpr.csproj" />
+    <ProjectReference Include="..\FileFormat.NesChr\FileFormat.NesChr.csproj" />
+    <ProjectReference Include="..\FileFormat.GameBoyTile\FileFormat.GameBoyTile.csproj" />
+    <ProjectReference Include="..\FileFormat.Atari8Bit\FileFormat.Atari8Bit.csproj" />
+    <ProjectReference Include="..\FileFormat.IffAnim\FileFormat.IffAnim.csproj" />
+    <ProjectReference Include="..\FileFormat.SoftImage\FileFormat.SoftImage.csproj" />
+    <ProjectReference Include="..\FileFormat.MayaIff\FileFormat.MayaIff.csproj" />
+    <ProjectReference Include="..\FileFormat.Envi\FileFormat.Envi.csproj" />
+    <ProjectReference Include="..\FileFormat.Xcursor\FileFormat.Xcursor.csproj" />
+    <ProjectReference Include="..\FileFormat.IffPbm\FileFormat.IffPbm.csproj" />
+    <ProjectReference Include="..\FileFormat.PcPaint\FileFormat.PcPaint.csproj" />
+    <ProjectReference Include="..\FileFormat.IffAcbm\FileFormat.IffAcbm.csproj" />
+    <ProjectReference Include="..\FileFormat.IffDeep\FileFormat.IffDeep.csproj" />
+    <ProjectReference Include="..\FileFormat.IffRgb8\FileFormat.IffRgb8.csproj" />
+    <ProjectReference Include="..\FileFormat.Interfile\FileFormat.Interfile.csproj" />
+    <ProjectReference Include="..\FileFormat.AtariFalcon\FileFormat.AtariFalcon.csproj" />
+    <ProjectReference Include="..\FileFormat.Trs80\FileFormat.Trs80.csproj" />
+    <ProjectReference Include="..\FileFormat.SnesTile\FileFormat.SnesTile.csproj" />
+    <ProjectReference Include="..\FileFormat.SegaGenTile\FileFormat.SegaGenTile.csproj" />
+    <ProjectReference Include="..\FileFormat.PcEngineTile\FileFormat.PcEngineTile.csproj" />
+    <ProjectReference Include="..\FileFormat.MasterSystemTile\FileFormat.MasterSystemTile.csproj" />
+    <ProjectReference Include="..\FileFormat.SymbianMbm\FileFormat.SymbianMbm.csproj" />
+    <ProjectReference Include="..\FileFormat.XvThumbnail\FileFormat.XvThumbnail.csproj" />
+    <ProjectReference Include="..\FileFormat.IffRgbn\FileFormat.IffRgbn.csproj" />
+    <ProjectReference Include="..\FileFormat.Mrc\FileFormat.Mrc.csproj" />
+    <ProjectReference Include="..\FileFormat.Gd2\FileFormat.Gd2.csproj" />
+    <ProjectReference Include="..\FileFormat.BigTiff\FileFormat.BigTiff.csproj" />
+    <ProjectReference Include="..\FileFormat.AutodeskCel\FileFormat.AutodeskCel.csproj" />
+    <ProjectReference Include="..\FileFormat.Wad2\FileFormat.Wad2.csproj" />
+  </ItemGroup>
+
+</Project>
