@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 
 namespace FileFormat.Pcx;
@@ -118,7 +118,7 @@ public static class PcxWriter {
         var planeData = new byte[bytesPerLine];
         var copyLen = Math.Min(srcBytesPerRow, pixelData.Length - rowOffset);
         if (copyLen > 0)
-          Array.Copy(pixelData, rowOffset, planeData, 0, copyLen);
+          pixelData.AsSpan(rowOffset, copyLen).CopyTo(planeData.AsSpan(0));
 
         var compressed = PcxRleCompressor.Compress(planeData);
         ms.Write(compressed, 0, compressed.Length);

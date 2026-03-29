@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>preview</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Version>1.0.0</Version>
+    <Authors>Hawkynt</Authors>
+    <Description>Pure C# Turbo View file format reader and writer for Atari ST image formats.</Description>
+    <PackageLicenseExpression>LGPL-3.0-or-later</PackageLicenseExpression>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Optimizer.TurboView" />
+    <InternalsVisibleTo Include="Optimizer.TurboView.Tests" />
+    <InternalsVisibleTo Include="FileFormat.TurboView.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\FileFormat.Core\FileFormat.Core.csproj" />
+    <ProjectReference Include="..\FileFormat.Core.Generators\FileFormat.Core.Generators.csproj"
+                      OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+</Project>

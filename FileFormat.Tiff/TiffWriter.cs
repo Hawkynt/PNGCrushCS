@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using BitMiracle.LibTiff.Classic;
 using Compression.Core;
@@ -12,20 +12,98 @@ public static class TiffWriter {
   public static byte[] ToBytes(TiffFile file, TiffCompression compression = TiffCompression.None,
     TiffPredictor predictor = TiffPredictor.None, int stripRowCount = 1, int zopfliIterations = 15,
     int tileWidth = 0, int tileHeight = 0) {
-    var photometric = _DeterminePhotometric(file);
-    return Assemble(
-      file.PixelData, file.Width, file.Height,
-      file.SamplesPerPixel, file.BitsPerSample,
-      compression, predictor, stripRowCount, zopfliIterations,
-      photometric, file.ColorMap,
-      tileWidth, tileHeight
-    );
+    if (file.Pages.Count == 0) {
+      var photometric = _DeterminePhotometric(file.ColorMap, file.SamplesPerPixel);
+      return Assemble(
+        file.PixelData, file.Width, file.Height,
+        file.SamplesPerPixel, file.BitsPerSample,
+        compression, predictor, stripRowCount, zopfliIterations,
+        photometric, file.ColorMap,
+        tileWidth, tileHeight
+      );
+    }
+
+    return _AssembleMultiPage(file, compression, predictor, stripRowCount, zopfliIterations, tileWidth, tileHeight);
   }
 
-  private static ushort _DeterminePhotometric(TiffFile file) {
-    if (file.ColorMap != null)
+  private static byte[] _AssembleMultiPage(TiffFile file, TiffCompression compression, TiffPredictor predictor,
+    int stripRowCount, int zopfliIterations, int tileWidth, int tileHeight) {
+    using var ms = new MemoryStream();
+    using var tiff = LibTiff.ClientOpen("output", "w", ms, new TiffStream());
+
+    // Write first page (from TiffFile's own properties)
+    _WriteDirectory(tiff, file.PixelData, file.Width, file.Height, file.SamplesPerPixel, file.BitsPerSample,
+      compression, predictor, stripRowCount, zopfliIterations,
+      _DeterminePhotometric(file.ColorMap, file.SamplesPerPixel), file.ColorMap, tileWidth, tileHeight);
+    tiff.WriteDirectory();
+
+    // Write additional pages
+    foreach (var page in file.Pages) {
+      _WriteDirectory(tiff, page.PixelData, page.Width, page.Height, page.SamplesPerPixel, page.BitsPerSample,
+        compression, predictor, stripRowCount, zopfliIterations,
+        _DeterminePhotometric(page.ColorMap, page.SamplesPerPixel), page.ColorMap, tileWidth, tileHeight);
+      tiff.WriteDirectory();
+    }
+
+    tiff.Flush();
+    return ms.ToArray();
+  }
+
+  private static void _WriteDirectory(LibTiff tiff, byte[] pixelData, int width, int height,
+    int samplesPerPixel, int bitsPerSample, TiffCompression compression, TiffPredictor predictor,
+    int stripRowCount, int zopfliIterations, ushort photometric, byte[]? colorMap,
+    int tileWidth, int tileHeight) {
+    tiff.SetField(TiffTag.IMAGEWIDTH, width);
+    tiff.SetField(TiffTag.IMAGELENGTH, height);
+    tiff.SetField(TiffTag.SAMPLESPERPIXEL, samplesPerPixel);
+    tiff.SetField(TiffTag.BITSPERSAMPLE, bitsPerSample);
+    tiff.SetField(TiffTag.ORIENTATION, Orientation.TOPLEFT);
+    tiff.SetField(TiffTag.PHOTOMETRIC, (Photometric)photometric);
+    tiff.SetField(TiffTag.PLANARCONFIG, PlanarConfig.CONTIG);
+
+    var isTiled = tileWidth > 0 && tileHeight > 0;
+    if (isTiled) {
+      tiff.SetField(TiffTag.TILEWIDTH, tileWidth);
+      tiff.SetField(TiffTag.TILELENGTH, tileHeight);
+    } else {
+      tiff.SetField(TiffTag.ROWSPERSTRIP, stripRowCount);
+    }
+
+    var libTiffCompression = _MapCompression(compression);
+    tiff.SetField(TiffTag.COMPRESSION, libTiffCompression);
+
+    if (predictor == TiffPredictor.HorizontalDifferencing &&
+        compression is not (TiffCompression.None or TiffCompression.PackBits))
+      tiff.SetField(TiffTag.PREDICTOR, Predictor.HORIZONTAL);
+
+    if (colorMap != null && photometric == (ushort)Photometric.PALETTE) {
+      var paletteSize = 1 << bitsPerSample;
+      var redMap = new ushort[paletteSize];
+      var greenMap = new ushort[paletteSize];
+      var blueMap = new ushort[paletteSize];
+
+      for (var i = 0; i < paletteSize && i * 3 + 2 < colorMap.Length; ++i) {
+        redMap[i] = (ushort)(colorMap[i * 3] * 257);
+        greenMap[i] = (ushort)(colorMap[i * 3 + 1] * 257);
+        blueMap[i] = (ushort)(colorMap[i * 3 + 2] * 257);
+      }
+
+      tiff.SetField(TiffTag.COLORMAP, redMap, greenMap, blueMap);
+    }
+
+    var bytesPerRow = (width * samplesPerPixel * bitsPerSample + 7) / 8;
+    for (var row = 0; row < height; ++row) {
+      var rowOffset = row * bytesPerRow;
+      var rowData = new byte[bytesPerRow];
+      pixelData.AsSpan(rowOffset, Math.Min(bytesPerRow, pixelData.Length - rowOffset)).CopyTo(rowData.AsSpan(0));
+      tiff.WriteScanline(rowData, row);
+    }
+  }
+
+  private static ushort _DeterminePhotometric(byte[]? colorMap, int samplesPerPixel) {
+    if (colorMap != null)
       return (ushort)Photometric.PALETTE;
-    if (file.SamplesPerPixel == 1)
+    if (samplesPerPixel == 1)
       return (ushort)Photometric.MINISBLACK;
     return (ushort)Photometric.RGB;
   }
@@ -122,7 +200,7 @@ public static class TiffWriter {
         var stripOffset = row * bytesPerRow;
 
         var stripData = new byte[stripSize];
-        Array.Copy(pixelData, stripOffset, stripData, 0, Math.Min(stripSize, pixelData.Length - stripOffset));
+        pixelData.AsSpan(stripOffset, Math.Min(stripSize, pixelData.Length - stripOffset)).CopyTo(stripData.AsSpan(0));
 
         if (predictor == TiffPredictor.HorizontalDifferencing && samplesPerPixel > 0 && bitsPerSample == 8)
           _ApplyHorizontalDifferencing(stripData, bytesPerRow, rowsInStrip, samplesPerPixel);
@@ -138,7 +216,7 @@ public static class TiffWriter {
         for (var r = 0; r < rowsInStrip; ++r) {
           var rowOffset = (row + r) * bytesPerRow;
           var rowData = new byte[bytesPerRow];
-          Array.Copy(pixelData, rowOffset, rowData, 0, Math.Min(bytesPerRow, pixelData.Length - rowOffset));
+          pixelData.AsSpan(rowOffset, Math.Min(bytesPerRow, pixelData.Length - rowOffset)).CopyTo(rowData.AsSpan(0));
           tiff.WriteScanline(rowData, row + r);
         }
       }
@@ -180,7 +258,7 @@ public static class TiffWriter {
         var srcOffset = (ty + r) * bytesPerRow + tx * bytesPerPixel;
         var dstOffset = r * tileBytesPerRow;
         if (srcOffset + bytesToCopy <= pixelData.Length)
-          Array.Copy(pixelData, srcOffset, tileData, dstOffset, bytesToCopy);
+          pixelData.AsSpan(srcOffset, bytesToCopy).CopyTo(tileData.AsSpan(dstOffset));
       }
 
       if (isZopfli) {

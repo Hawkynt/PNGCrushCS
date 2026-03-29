@@ -16,6 +16,11 @@ public static class PcxReader {
 
   public static PcxFile FromStream(Stream stream) {
     ArgumentNullException.ThrowIfNull(stream);
+    if (stream.CanSeek) {
+      var data = new byte[stream.Length - stream.Position];
+      stream.ReadExactly(data);
+      return FromBytes(data);
+    }
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
     return FromBytes(ms.ToArray());
@@ -75,7 +80,7 @@ public static class PcxReader {
       }
     } else {
       var remaining = Math.Min(decodedScanlines.Length, data.Length - offset);
-      Array.Copy(data, offset, decodedScanlines, 0, remaining);
+      data.AsSpan(offset, remaining).CopyTo(decodedScanlines.AsSpan(0));
     }
 
     // Determine color mode and extract pixel data + palette
@@ -104,13 +109,13 @@ public static class PcxReader {
       var srcBytesPerRow = width;
       pixelData = new byte[width * height];
       for (var y = 0; y < height; ++y)
-        Array.Copy(decodedScanlines, y * bytesPerLine, pixelData, y * srcBytesPerRow, srcBytesPerRow);
+        decodedScanlines.AsSpan(y * bytesPerLine, srcBytesPerRow).CopyTo(pixelData.AsSpan(y * srcBytesPerRow));
 
       if (data.Length >= 769) {
         var paletteMarkerPos = data.Length - 769;
         if (data[paletteMarkerPos] == 0x0C) {
           palette = new byte[768];
-          Array.Copy(data, paletteMarkerPos + 1, palette, 0, 768);
+          data.AsSpan(paletteMarkerPos + 1, 768).CopyTo(palette.AsSpan(0));
           paletteColorCount = 256;
         }
       }
@@ -119,26 +124,26 @@ public static class PcxReader {
       var srcBytesPerRow = (width + 1) / 2;
       pixelData = new byte[srcBytesPerRow * height];
       for (var y = 0; y < height; ++y)
-        Array.Copy(decodedScanlines, y * bytesPerLine, pixelData, y * srcBytesPerRow, srcBytesPerRow);
+        decodedScanlines.AsSpan(y * bytesPerLine, srcBytesPerRow).CopyTo(pixelData.AsSpan(y * srcBytesPerRow));
 
       palette = new byte[48];
-      Array.Copy(egaPalette, palette, 48);
+      egaPalette.AsSpan(0, 48).CopyTo(palette);
       paletteColorCount = 16;
     } else if (numPlanes == 1 && bitsPerPixel == 1) {
       colorMode = PcxColorMode.Monochrome;
       var srcBytesPerRow = (width + 7) / 8;
       pixelData = new byte[srcBytesPerRow * height];
       for (var y = 0; y < height; ++y)
-        Array.Copy(decodedScanlines, y * bytesPerLine, pixelData, y * srcBytesPerRow, srcBytesPerRow);
+        decodedScanlines.AsSpan(y * bytesPerLine, srcBytesPerRow).CopyTo(pixelData.AsSpan(y * srcBytesPerRow));
 
       palette = new byte[6];
-      Array.Copy(egaPalette, palette, Math.Min(6, egaPalette.Length));
+      egaPalette.AsSpan(0, Math.Min(6, egaPalette.Length)).CopyTo(palette);
       paletteColorCount = 2;
     } else {
       colorMode = PcxColorMode.Original;
       planeConfig = numPlanes > 1 ? PcxPlaneConfig.SeparatePlanes : PcxPlaneConfig.SinglePlane;
       pixelData = new byte[decodedScanlines.Length];
-      Array.Copy(decodedScanlines, pixelData, decodedScanlines.Length);
+      decodedScanlines.AsSpan(0, decodedScanlines.Length).CopyTo(pixelData);
     }
 
     return new PcxFile {

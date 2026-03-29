@@ -13,7 +13,7 @@
     <Description>TIFF optimization engine with compression method selection, predictor optimization, and color mode reduction.</Description>
     <PackageReadmeFile>ReadMe.md</PackageReadmeFile>
     <PackageProjectUrl>https://github.com/Hawkynt/PNGCrush</PackageProjectUrl>
-    <PackageTags>TiffCrush;TiffOptimizer;Hawkynt</PackageTags>
+    <PackageTags>TiffOptimizer;ImageCrush;Hawkynt</PackageTags>
     <RepositoryUrl>https://github.com/Hawkynt/PNGCrush</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>LGPL-3.0-or-later</PackageLicenseExpression>

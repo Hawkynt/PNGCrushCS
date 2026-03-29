@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>preview</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Version>1.0.0</Version>
+    <Authors>Hawkynt</Authors>
+    <Description>Pure C# Atari ST Fullscreen Construction Kit (.kid) overscan image format reader and writer. 416x274 or 448x272, 16 colors, 4-plane low resolution.</Description>
+    <PackageLicenseExpression>LGPL-3.0-or-later</PackageLicenseExpression>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Optimizer.FullscreenKit" />
+    <InternalsVisibleTo Include="Optimizer.FullscreenKit.Tests" />
+    <InternalsVisibleTo Include="FileFormat.FullscreenKit.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\FileFormat.Core\FileFormat.Core.csproj" />
+    <ProjectReference Include="..\FileFormat.Core.Generators\FileFormat.Core.Generators.csproj"
+                      OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+</Project>

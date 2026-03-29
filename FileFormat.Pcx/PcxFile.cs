@@ -5,12 +5,21 @@ using FileFormat.Core;
 namespace FileFormat.Pcx;
 
 /// <summary>In-memory representation of a PCX image.</summary>
+[FormatDetectionPriority(999)]
 public sealed class PcxFile : IImageFileFormat<PcxFile> {
 
   static string IImageFileFormat<PcxFile>.PrimaryExtension => ".pcx";
-  static string[] IImageFileFormat<PcxFile>.FileExtensions => [".pcx"];
+  static string[] IImageFileFormat<PcxFile>.FileExtensions => [".pcx", ".pcc", ".fcx"];
+  static FormatCapability IImageFileFormat<PcxFile>.Capabilities => FormatCapability.HasDedicatedOptimizer;
   static PcxFile IImageFileFormat<PcxFile>.FromFile(FileInfo file) => PcxReader.FromFile(file);
+  static PcxFile IImageFileFormat<PcxFile>.FromBytes(byte[] data) => PcxReader.FromBytes(data);
+  static PcxFile IImageFileFormat<PcxFile>.FromStream(Stream stream) => PcxReader.FromStream(stream);
   static byte[] IImageFileFormat<PcxFile>.ToBytes(PcxFile file) => PcxWriter.ToBytes(file);
+
+  static bool? IImageFileFormat<PcxFile>.MatchesSignature(ReadOnlySpan<byte> header)
+    => header.Length >= 2 && header[0] == 0x0A && header[1] <= 5
+      ? true : null;
+
   public int Width { get; init; }
   public int Height { get; init; }
   public int BitsPerPixel { get; init; }

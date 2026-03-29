@@ -17,6 +17,11 @@ public static class JpegReader {
 
   public static JpegFile FromStream(Stream stream) {
     ArgumentNullException.ThrowIfNull(stream);
+    if (stream.CanSeek) {
+      var data = new byte[stream.Length - stream.Position];
+      stream.ReadExactly(data);
+      return FromBytes(data);
+    }
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
     return FromBytes(ms.ToArray());
@@ -63,7 +68,7 @@ public static class JpegReader {
           rgbPixelData[dstIdx + 2] = g;
         }
       else
-        Array.Copy(rowBuffer, 0, rgbPixelData, y * width * 3, width * 3);
+        rowBuffer.AsSpan(0, width * 3).CopyTo(rgbPixelData.AsSpan(y * width * 3));
     }
 
     cinfo.jpeg_finish_decompress();

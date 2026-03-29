@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 
 namespace FileFormat.Bmp;
@@ -114,7 +114,7 @@ public static class BmpWriter {
       offset += paletteEntryCount * 4;
     }
 
-    Array.Copy(imageData, 0, result, offset, imageData.Length);
+    imageData.AsSpan(0, imageData.Length).CopyTo(result.AsSpan(offset));
 
     return result;
   }
@@ -138,7 +138,7 @@ public static class BmpWriter {
         var srcRow = rowOrder == BmpRowOrder.BottomUp ? height - 1 - row : row;
         var rowOffset = srcRow * bytesPerRow;
         var rowData = new byte[bytesPerRow];
-        Array.Copy(pixelData, rowOffset, rowData, 0, Math.Min(bytesPerRow, pixelData.Length - rowOffset));
+        pixelData.AsSpan(rowOffset, Math.Min(bytesPerRow, pixelData.Length - rowOffset)).CopyTo(rowData.AsSpan(0));
 
         byte[] compressed;
         if (compression == BmpCompression.Rle8)
@@ -159,7 +159,7 @@ public static class BmpWriter {
         var rowData = new byte[paddedBytesPerRow];
         var copyLen = Math.Min(bytesPerRow, pixelData.Length - rowOffset);
         if (copyLen > 0)
-          Array.Copy(pixelData, rowOffset, rowData, 0, copyLen);
+          pixelData.AsSpan(rowOffset, copyLen).CopyTo(rowData.AsSpan(0));
 
         ms.Write(rowData);
       }

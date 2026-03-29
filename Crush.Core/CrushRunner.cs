@@ -73,4 +73,71 @@ public static class CrushRunner {
 
     return 0;
   }
+
+  /// <summary>Overload that resolves the output file path dynamically from the result (e.g. when format conversion changes the extension).</summary>
+  public static async Task<int> RunAsync<TResult>(
+    string toolName,
+    string inputPath,
+    string outputPath,
+    bool verbose,
+    Func<CancellationToken, IProgress<OptimizationProgress>, ValueTask<TResult>> optimize,
+    Func<TResult, byte[]> getFileContents,
+    Func<TResult, FileInfo> resolveOutputFile,
+    Func<TResult, string>? formatResult = null,
+    Action? beforeOptimize = null
+  ) {
+    Console.WriteLine($"{toolName}");
+    Console.WriteLine(new string('=', 40));
+
+    var inputFile = new FileInfo(inputPath);
+    if (!inputFile.Exists) {
+      Console.Error.WriteLine($"Input file not found: {inputFile.FullName}");
+      return 1;
+    }
+
+    var outputDir = Path.GetDirectoryName(Path.GetFullPath(outputPath));
+    if (outputDir != null && !Directory.Exists(outputDir)) {
+      Console.Error.WriteLine($"Output directory not found: {outputDir}");
+      return 1;
+    }
+
+    var originalSize = inputFile.Length;
+    Console.WriteLine($"Input:  {inputFile.FullName} ({FileFormatting.FormatFileSize(originalSize)})");
+
+    beforeOptimize?.Invoke();
+
+    Console.WriteLine("Optimizing...");
+    using var cts = new CancellationTokenSource();
+    Console.CancelKeyPress += (_, e) => {
+      e.Cancel = true;
+      cts.Cancel();
+    };
+
+    var sw = Stopwatch.StartNew();
+    var progressReporter = new Progress<OptimizationProgress>(p =>
+      Console.Write(
+        $"\r[{p.CombosCompleted}/{p.CombosTotal}] Best: {FileFormatting.FormatFileSize(p.BestSizeSoFar)} | Phase: {p.Phase}    ")
+    );
+
+    var result = await optimize(cts.Token, progressReporter);
+    Console.WriteLine();
+    sw.Stop();
+
+    var fileContents = getFileContents(result);
+    var outputFile = resolveOutputFile(result);
+    await File.WriteAllBytesAsync(outputFile.FullName, fileContents, cts.Token);
+
+    var newSize = (long)fileContents.Length;
+    var reduction = originalSize > 0 ? (1.0 - (double)newSize / originalSize) * 100 : 0;
+
+    Console.WriteLine($"Output: {outputFile.FullName} ({FileFormatting.FormatFileSize(newSize)})");
+    Console.WriteLine($"Reduction: {reduction:F1}% ({FileFormatting.FormatFileSize(originalSize - newSize)} saved)");
+
+    if (formatResult != null)
+      Console.WriteLine(formatResult(result));
+
+    Console.WriteLine($"Time: {sw.Elapsed.TotalSeconds:F1}s");
+
+    return 0;
+  }
 }

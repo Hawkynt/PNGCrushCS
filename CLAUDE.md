@@ -104,6 +104,54 @@ dotnet build FileFormat.Mng/FileFormat.Mng.csproj -c Release
 dotnet build FileFormat.Xcf/FileFormat.Xcf.csproj -c Release
 dotnet build FileFormat.Pict/FileFormat.Pict.csproj -c Release
 dotnet build FileFormat.Dicom/FileFormat.Dicom.csproj -c Release
+dotnet build FileFormat.Trs80/FileFormat.Trs80.csproj -c Release
+dotnet build FileFormat.Envi/FileFormat.Envi.csproj -c Release
+dotnet build FileFormat.SoftImage/FileFormat.SoftImage.csproj -c Release
+dotnet build FileFormat.MayaIff/FileFormat.MayaIff.csproj -c Release
+dotnet build FileFormat.Xcursor/FileFormat.Xcursor.csproj -c Release
+dotnet build FileFormat.IffPbm/FileFormat.IffPbm.csproj -c Release
+dotnet build FileFormat.PcPaint/FileFormat.PcPaint.csproj -c Release
+dotnet build FileFormat.IffAcbm/FileFormat.IffAcbm.csproj -c Release
+dotnet build FileFormat.IffDeep/FileFormat.IffDeep.csproj -c Release
+dotnet build FileFormat.IffRgb8/FileFormat.IffRgb8.csproj -c Release
+dotnet build FileFormat.IffRgbn/FileFormat.IffRgbn.csproj -c Release
+dotnet build FileFormat.Interfile/FileFormat.Interfile.csproj -c Release
+dotnet build FileFormat.AtariFalcon/FileFormat.AtariFalcon.csproj -c Release
+dotnet build FileFormat.SnesTile/FileFormat.SnesTile.csproj -c Release
+dotnet build FileFormat.SegaGenTile/FileFormat.SegaGenTile.csproj -c Release
+dotnet build FileFormat.PcEngineTile/FileFormat.PcEngineTile.csproj -c Release
+dotnet build FileFormat.MasterSystemTile/FileFormat.MasterSystemTile.csproj -c Release
+dotnet build FileFormat.SymbianMbm/FileFormat.SymbianMbm.csproj -c Release
+dotnet build FileFormat.XvThumbnail/FileFormat.XvThumbnail.csproj -c Release
+dotnet build FileFormat.Mrc/FileFormat.Mrc.csproj -c Release
+dotnet build FileFormat.Gd2/FileFormat.Gd2.csproj -c Release
+dotnet build FileFormat.BigTiff/FileFormat.BigTiff.csproj -c Release
+dotnet build FileFormat.AutodeskCel/FileFormat.AutodeskCel.csproj -c Release
+dotnet build FileFormat.Wad2/FileFormat.Wad2.csproj -c Release
+dotnet build FileFormat.Pdf/FileFormat.Pdf.csproj -c Release
+dotnet build FileFormat.WindowsPe/FileFormat.WindowsPe.csproj -c Release
+dotnet build FileFormat.Phm/FileFormat.Phm.csproj -c Release
+dotnet build FileFormat.Fl32/FileFormat.Fl32.csproj -c Release
+dotnet build FileFormat.Nie/FileFormat.Nie.csproj -c Release
+dotnet build FileFormat.FaceSaver/FileFormat.FaceSaver.csproj -c Release
+dotnet build FileFormat.DaliST/FileFormat.DaliST.csproj -c Release
+dotnet build FileFormat.MultiPalettePicture/FileFormat.MultiPalettePicture.csproj -c Release
+dotnet build FileFormat.DrawIt/FileFormat.DrawIt.csproj -c Release
+dotnet build FileFormat.DuneGraph/FileFormat.DuneGraph.csproj -c Release
+dotnet build FileFormat.PrismPaint/FileFormat.PrismPaint.csproj -c Release
+dotnet build FileFormat.Rembrandt/FileFormat.Rembrandt.csproj -c Release
+dotnet build FileFormat.PabloPaint/FileFormat.PabloPaint.csproj -c Release
+dotnet build FileFormat.QuantumPaint/FileFormat.QuantumPaint.csproj -c Release
+dotnet build FileFormat.SinbadSlideshow/FileFormat.SinbadSlideshow.csproj -c Release
+dotnet build FileFormat.SyntheticArts/FileFormat.SyntheticArts.csproj -c Release
+dotnet build FileFormat.HighresMedium/FileFormat.HighresMedium.csproj -c Release
+dotnet build FileFormat.FullscreenKit/FileFormat.FullscreenKit.csproj -c Release
+dotnet build FileFormat.FliEditor/FileFormat.FliEditor.csproj -c Release
+dotnet build FileFormat.FliDesigner/FileFormat.FliDesigner.csproj -c Release
+dotnet build FileFormat.MuifliEditor/FileFormat.MuifliEditor.csproj -c Release
+dotnet build FileFormat.CokeAtari/FileFormat.CokeAtari.csproj -c Release
+dotnet build FileFormat.AtariFalconXga/FileFormat.AtariFalconXga.csproj -c Release
+dotnet build FileFormat.SpookySpritesFalcon/FileFormat.SpookySpritesFalcon.csproj -c Release
 
 # Run all tests
 dotnet test Compression.Tests/Compression.Tests.csproj
@@ -187,6 +235,56 @@ dotnet test FileFormat.Mng.Tests/FileFormat.Mng.Tests.csproj
 dotnet test FileFormat.Xcf.Tests/FileFormat.Xcf.Tests.csproj
 dotnet test FileFormat.Pict.Tests/FileFormat.Pict.Tests.csproj
 dotnet test FileFormat.Dicom.Tests/FileFormat.Dicom.Tests.csproj
+dotnet test Tests/FileFormat.Trs80.Tests/FileFormat.Trs80.Tests.csproj
+dotnet test Tests/FileFormat.SoftImage.Tests/FileFormat.SoftImage.Tests.csproj
+dotnet test Tests/FileFormat.Envi.Tests/FileFormat.Envi.Tests.csproj
+dotnet test Tests/FileFormat.MayaIff.Tests/FileFormat.MayaIff.Tests.csproj
+dotnet test Tests/FileFormat.Xcursor.Tests/FileFormat.Xcursor.Tests.csproj
+dotnet test Tests/FileFormat.IffPbm.Tests/FileFormat.IffPbm.Tests.csproj
+dotnet test Tests/FileFormat.PcPaint.Tests/FileFormat.PcPaint.Tests.csproj
+dotnet test Tests/FileFormat.IffAcbm.Tests/FileFormat.IffAcbm.Tests.csproj
+dotnet test Tests/FileFormat.IffDeep.Tests/FileFormat.IffDeep.Tests.csproj
+dotnet test Tests/FileFormat.IffRgb8.Tests/FileFormat.IffRgb8.Tests.csproj
+dotnet test Tests/FileFormat.IffRgbn.Tests/FileFormat.IffRgbn.Tests.csproj
+dotnet test Tests/FileFormat.Interfile.Tests/FileFormat.Interfile.Tests.csproj
+dotnet test Tests/FileFormat.AtariFalcon.Tests/FileFormat.AtariFalcon.Tests.csproj
+dotnet test Tests/FileFormat.SnesTile.Tests/FileFormat.SnesTile.Tests.csproj
+dotnet test Tests/FileFormat.SegaGenTile.Tests/FileFormat.SegaGenTile.Tests.csproj
+dotnet test Tests/FileFormat.PcEngineTile.Tests/FileFormat.PcEngineTile.Tests.csproj
+dotnet test Tests/FileFormat.MasterSystemTile.Tests/FileFormat.MasterSystemTile.Tests.csproj
+dotnet test Tests/FileFormat.SymbianMbm.Tests/FileFormat.SymbianMbm.Tests.csproj
+dotnet test Tests/FileFormat.XvThumbnail.Tests/FileFormat.XvThumbnail.Tests.csproj
+dotnet test Tests/FileFormat.Mrc.Tests/FileFormat.Mrc.Tests.csproj
+dotnet test Tests/FileFormat.Gd2.Tests/FileFormat.Gd2.Tests.csproj
+dotnet test Tests/FileFormat.BigTiff.Tests/FileFormat.BigTiff.Tests.csproj
+dotnet test Tests/FileFormat.AutodeskCel.Tests/FileFormat.AutodeskCel.Tests.csproj
+dotnet test Tests/FileFormat.Wad2.Tests/FileFormat.Wad2.Tests.csproj
+dotnet test Tests/FileFormat.Pdf.Tests/FileFormat.Pdf.Tests.csproj
+dotnet test Tests/FileFormat.WindowsPe.Tests/FileFormat.WindowsPe.Tests.csproj
+dotnet test Tests/FileFormat.CameraRaw.Tests/FileFormat.CameraRaw.Tests.csproj
+dotnet test Tests/FileFormat.Core.Tests/FileFormat.Core.Tests.csproj
+dotnet test Tests/FileFormat.Phm.Tests/FileFormat.Phm.Tests.csproj
+dotnet test Tests/FileFormat.Fl32.Tests/FileFormat.Fl32.Tests.csproj
+dotnet test Tests/FileFormat.Nie.Tests/FileFormat.Nie.Tests.csproj
+dotnet test Tests/FileFormat.FaceSaver.Tests/FileFormat.FaceSaver.Tests.csproj
+dotnet test Tests/FileFormat.DaliST.Tests/FileFormat.DaliST.Tests.csproj
+dotnet test Tests/FileFormat.MultiPalettePicture.Tests/FileFormat.MultiPalettePicture.Tests.csproj
+dotnet test Tests/FileFormat.DrawIt.Tests/FileFormat.DrawIt.Tests.csproj
+dotnet test Tests/FileFormat.DuneGraph.Tests/FileFormat.DuneGraph.Tests.csproj
+dotnet test Tests/FileFormat.PrismPaint.Tests/FileFormat.PrismPaint.Tests.csproj
+dotnet test Tests/FileFormat.Rembrandt.Tests/FileFormat.Rembrandt.Tests.csproj
+dotnet test Tests/FileFormat.PabloPaint.Tests/FileFormat.PabloPaint.Tests.csproj
+dotnet test Tests/FileFormat.QuantumPaint.Tests/FileFormat.QuantumPaint.Tests.csproj
+dotnet test Tests/FileFormat.SinbadSlideshow.Tests/FileFormat.SinbadSlideshow.Tests.csproj
+dotnet test Tests/FileFormat.SyntheticArts.Tests/FileFormat.SyntheticArts.Tests.csproj
+dotnet test Tests/FileFormat.HighresMedium.Tests/FileFormat.HighresMedium.Tests.csproj
+dotnet test Tests/FileFormat.FullscreenKit.Tests/FileFormat.FullscreenKit.Tests.csproj
+dotnet test Tests/FileFormat.FliEditor.Tests/FileFormat.FliEditor.Tests.csproj
+dotnet test Tests/FileFormat.FliDesigner.Tests/FileFormat.FliDesigner.Tests.csproj
+dotnet test Tests/FileFormat.MuifliEditor.Tests/FileFormat.MuifliEditor.Tests.csproj
+dotnet test Tests/FileFormat.CokeAtari.Tests/FileFormat.CokeAtari.Tests.csproj
+dotnet test Tests/FileFormat.AtariFalconXga.Tests/FileFormat.AtariFalconXga.Tests.csproj
+dotnet test Tests/FileFormat.SpookySpritesFalcon.Tests/FileFormat.SpookySpritesFalcon.Tests.csproj
 
 # Run tests with coverage
 dotnet test Optimizer.Png.Tests/Optimizer.Png.Tests.csproj --collect:"XPlat Code Coverage"
@@ -212,7 +310,7 @@ dotnet run --project Crush.WebP -- -i <input.webp> -o <output.webp>
 
 ## Architecture
 
-~179-project solution across two repos: compression library, seventy format-specific file format libraries (including RIFF/IFF containers), one shared file format core library, eleven optimizer libraries, eleven CLI wrappers, shared CLI utilities, shared test utilities, and ~81 test projects.
+~1100-project solution across two repos, organized in slnx solution folders: `/FileFormats/` (542 FileFormat.* + GifFileFormat), `/Optimizers/` (11 Optimizer.*), `/Image/` (Optimizer.Image + Crush.Image), `/Tests/` (~557 test projects + Crush.TestUtilities), and root (Compression.Core, Crush.Core). Includes a compression library, five hundred forty-two format-specific file format libraries (including RIFF/IFF containers, PDF/PE resource extractors, and full pixel codecs for WebP/JPEG2000/JPEGXL/JPEGLS/JPEGXR/HEIF/AVIF/BPG/FLIF/JBIG2/DjVu/ECW), one shared file format core library with attribute-based header mapping and GPU block decoders, eleven format-specific optimizer libraries, one universal image optimizer library, one unified CLI (Crush.Image), shared CLI utilities, and shared test utilities.
 
 **Compression.Core** (net8.0, library) — pure RFC 1951 DEFLATE compression library with no PNG or platform dependencies. Contains the Zopfli-class encoder (`ZopfliDeflater`) reusable by any project needing high-ratio DEFLATE compression. No `System.Drawing.Common` or Windows dependency.
 
@@ -220,7 +318,7 @@ dotnet run --project Crush.WebP -- -i <input.webp> -o <output.webp>
 
 **Crush.TestUtilities** (net8.0, library) — shared test helpers. Contains `TestBitmapFactory` (creates reproducible test bitmaps with configurable dimensions, grayscale, and alpha) and `TempFileScope` (IDisposable temp file lifecycle management).
 
-**FileFormat.Core** (net8.0, library) — shared data types for file format header field mapping. Contains `HeaderFieldDescriptor` (readonly record struct for hex editor field coloring).
+**FileFormat.Core** (net8.0, library) — shared data types for file format header field mapping and pixel conversion. Contains `HeaderFieldDescriptor` (readonly record struct for hex editor field coloring), `PixelConverter` (SIMD-accelerated pixel format conversion: 37 methods covering BGRA hub conversions, direct RGBA32/RGB24/Gray8/band-sequential routes with Vector128/Vector256 shuffle paths, plus 16-bit precision paths: Gray16/Rgb48/Rgba64 hub routes, direct 16-to-16 routes bypassing 8-bit hub, 16-to-8 downscale, 8-to-16 upscale via v*257), `RawImage` (platform-independent pixel data model), `PixelFormat` (enum of supported formats including Gray16, Rgb48, Rgba64), `IImageFileFormat<T>` (generic file format interface with `FromFile`, `FromBytes` (static virtual, default writes to temp file), `FromStream` (static virtual, default reads all bytes), `ToRawImage`, `FromRawImage`, `ToBytes`), `IMultiImageFileFormat<T>` (companion interface for multi-image formats with `ImageCount`, indexed `ToRawImage(file, index)`, default `ToRawImages`), `FormatCapability` (flags enum: VariableResolution=1, MonochromeOnly=2, IndexedOnly=4, HasDedicatedOptimizer=8, MultiImage=16). Block decoders in `BlockDecoders/`: `Bc1Decoder`, `Bc2Decoder`, `Bc3Decoder`, `Bc4Decoder`, `Bc5Decoder`, `Bc6HDecoder` (14-mode HDR signed/unsigned), `Bc7Decoder` (8-mode with 1-3 subsets and 64 partition patterns), `Etc1Decoder`, `Etc2Decoder`, `AstcBlockDecoder`, `PvrtcDecoder` (bilinear blend 2bpp/4bpp). Formats implementing `IMultiImageFileFormat<T>`: IcoFile, CurFile, AniFile, ApngFile, MngFile, FliFile, DcxFile, MpoFile, IcnsFile, TiffFile, BigTiffFile.
 
 **FileFormat.Png** (net8.0, library) — PNG file format reader/writer. Contains `PngReader` (full PNG parser: signature, chunks, IDAT decompress, de-filter, Adam7 de-interlace), `PngWriter` (PNG byte stream assembly: IHDR, PLTE, tRNS, IDAT, CRC32, IEND, with internal fast path accepting pre-filtered/pre-compressed data), `PngFile` (data model), `PngChunkReader` (ancillary chunk extraction), `PngChunk` (chunk record), `PngColorType`, `PngInterlaceMethod`, `PngFilterType` (spec-aligned enums), and `Adam7` (interlace pass definitions). References Compression.Core for DEFLATE and System.IO.Hashing for CRC32.
 
@@ -232,7 +330,7 @@ dotnet run --project Crush.WebP -- -i <input.webp> -o <output.webp>
 
 **Crush.Gif** (net9.0-windows, console app) — async CLI for GIF optimization using `CommandLineParser`. Uses `CrushRunner.RunAsync` from Crush.Core for common CLI operations (cancellation wiring, progress display, file validation, timing).
 
-**FileFormat.Tiff** (net8.0, library) — TIFF file format reader/writer. Contains `TiffReader` (TIFF parser via LibTiff.NET wrapper), `TiffWriter` (TIFF strip/tile assembly with custom raw writing for Zopfli integration), `TiffFile` (data model), `PackBitsCompressor` (PackBits RLE encoder/decoder), `TiffCompression`, `TiffPredictor`, `TiffColorMode` (enums). References BitMiracle.LibTiff.NET and Compression.Core.
+**FileFormat.Tiff** (net8.0, library) — TIFF file format reader/writer with multi-page support. Contains `TiffReader` (TIFF parser via LibTiff.NET wrapper, reads all IFDs via `ReadDirectory()` loop), `TiffWriter` (TIFF strip/tile assembly with custom raw writing for Zopfli integration, multi-page writing via `WriteDirectory()` per IFD), `TiffFile` (data model implementing `IMultiImageFileFormat<TiffFile>`, with `Pages` collection of `TiffPage` entries), `TiffPage` (single-page data model), `PackBitsCompressor` (PackBits RLE encoder/decoder), `TiffCompression`, `TiffPredictor`, `TiffColorMode` (enums). References BitMiracle.LibTiff.NET and Compression.Core.
 
 **Optimizer.Tiff** (net8.0, library) — TIFF optimization engine. References `FileFormat.Tiff`. Supports PackBits, LZW, DEFLATE (with Zopfli Ultra/Hyper), horizontal differencing predictor, and color mode reduction.
 
@@ -280,9 +378,13 @@ dotnet run --project Crush.WebP -- -i <input.webp> -o <output.webp>
 
 **Crush.Ani** (net9.0, console app) — async CLI for ANI optimization using `CommandLineParser`. Uses `CrushRunner.RunAsync` from Crush.Core for common CLI operations (cancellation wiring, progress display, file validation, timing).
 
-**FileFormat.WebP** (net8.0, library) — WebP file format reader/writer at the RIFF container level. Contains `WebPReader` (parses RIFF WEBP, extracts VP8/VP8L/VP8X chunks, dimensions from keyframe headers and VP8L bitfields, feature flags), `WebPWriter` (assembles RIFF WEBP with simple or extended format), `WebPFile` (data model), `WebPFeatures` (readonly record struct). References FileFormat.Riff.
+**FileFormat.WebP** (net8.0, library) — WebP file format reader/writer with full pixel codecs. VP8L lossless: `Vp8LBitReader` (LSB-first 64-bit buffer), `Vp8LDecoder` (LZ77 + Huffman pipeline with 5 code groups), `Vp8LHuffmanTree` (canonical Huffman), `Vp8LTransform` (14 Predictor modes, Color, SubtractGreen, ColorIndexing), `Vp8LEncoder` (SubtractGreen + Huffman + LZ77). VP8 lossy: `Vp8BoolDecoder` (boolean arithmetic range decoder), `Vp8Decoder` (keyframe macroblock parsing, residual decode, reconstruction), `Vp8Dct` (4x4 integer IDCT + Walsh-Hadamard DC), `Vp8IntraPredictor` (DC/V/H/TrueMotion for 4x4 and 16x16), `Vp8LoopFilter` (normal/simple edge filtering), `Vp8Encoder` (basic keyframe encoder). References FileFormat.Riff.
 
-**Optimizer.WebP** (net8.0, library) — WebP optimization engine. Phase 2: container-level optimization (no pixel encode/decode). References `FileFormat.WebP` and `Crush.Core`. Reads WebP via `WebPReader`, tries metadata stripping (EXIF, ICCP, XMP removal) and RIFF container rewriting, returns smallest result.
+**Optimizer.WebP** (net8.0, library) — WebP optimization engine. Container-level optimization with metadata stripping. References `FileFormat.WebP` and `Crush.Core`. Reads WebP via `WebPReader`, tries metadata stripping (EXIF, ICCP, XMP removal) and RIFF container rewriting, returns smallest result.
+
+**FileFormat.Pdf** (net8.0, library) — PDF embedded image extractor. Contains `PdfReader` (parses xref tables/streams, finds XObject Image resources), `PdfWriter` (minimal PDF wrapping a single image), `PdfFile` (data model implementing `IImageFileFormat<PdfFile>` + `IMultiImageFileFormat<PdfFile>`), `PdfParser` (PDF object parser: numbers, strings, names, arrays, dicts, streams), `PdfXrefParser` (cross-reference table/stream parser). Stream filters: FlateDecode (zlib), DCTDecode (JPEG pass-through), CCITTFaxDecode, ASCII85Decode, ASCIIHexDecode. References Compression.Core, FileFormat.Core, FileFormat.Jpeg, FileFormat.Ccitt.
+
+**FileFormat.WindowsPe** (net8.0, library) — PE (EXE/DLL) resource image extractor. Contains `PeResourceReader` (parses DOS/PE headers, .rsrc section, RT_ICON/RT_GROUP_ICON/RT_CURSOR/RT_BITMAP resources), `PeResourceFile` (data model implementing `IImageFileFormat<PeResourceFile>` + `IMultiImageFileFormat<PeResourceFile>`). Extracts icons, cursors, bitmaps, and other embedded image resources. References FileFormat.Core, FileFormat.Bmp, FileFormat.Ico.
 
 **Crush.WebP** (net9.0, console app) — async CLI for WebP optimization using `CommandLineParser`. Uses `CrushRunner.RunAsync` from Crush.Core for common CLI operations (cancellation wiring, progress display, file validation, timing).
 
@@ -305,6 +407,12 @@ dotnet run --project Crush.WebP -- -i <input.webp> -o <output.webp>
 **FileFormat.Koala** (net8.0, library) — Commodore 64 Koala Painter reader/writer. Fixed 10003-byte format, 160x200 multicolor, 16 C64 colors.
 
 **FileFormat.Degas** (net8.0, library) — Atari ST DEGAS/DEGAS Elite reader/writer. 34-byte header, 16-word palette, raw or PackBits compressed planar data.
+
+**FileFormat.DaliST** (net8.0, library) — Atari ST Dali image format reader/writer. Multi-resolution support: SD0 (320x200, 4 planes, 16 colors), SD1 (640x200, 2 planes, 4 colors), SD2 (640x400, 1 plane, mono). 32-byte palette (16 words BE, 12-bit ST RGB) + 32000 bytes raw planar pixel data = 32032 bytes total.
+
+**FileFormat.MultiPalettePicture** (net8.0, library) — Atari STe Multi Palette Picture (MPP) reader/writer. Per-scanline palette changes, 320x200 low-res, 4 planes. File structure: 200 records of 160 bytes pixel data + 32 bytes palette = 192 bytes per scanline, 38400 bytes total. 12-bit STe RGB palettes (4-bit per channel).
+
+**FileFormat.DrawIt** (net8.0, library) — DrawIt (DIT) indexed color image reader/writer. 4-byte header (width LE uint16, height LE uint16) + 768-byte RGB palette (256 entries x 3 bytes) + 8-bit indexed pixel data. Variable dimensions.
 
 **FileFormat.Neochrome** (net8.0, library) — Atari ST NEOchrome reader/writer. 128-byte header, 320x200, 16 colors, 32000 bytes raw planar.
 
@@ -332,7 +440,7 @@ dotnet run --project Crush.WebP -- -i <input.webp> -o <output.webp>
 
 **FileFormat.Cineon** (net8.0, library) — Kodak Cineon reader/writer. 1024-byte header, 10-bit log film scanning, big-endian.
 
-**FileFormat.Dds** (net8.0, library) — DirectDraw Surface reader/writer. 128-byte header (4 magic + 124 DdsHeader), optional 20-byte DX10 header, GPU textures as raw blocks.
+**FileFormat.Dds** (net8.0, library) — DirectDraw Surface reader/writer. 128-byte header (4 magic + 124 DdsHeader), optional 20-byte DX10 header with DXGI format mapping, GPU textures as raw blocks. Supports DXT1/DXT3/DXT5, BC4/BC5 (ATI1/ATI2), BC6H (HDR unsigned/signed), BC7, and uncompressed RGB/RGBA. FourCC detection for legacy formats plus DX10 DXGI format mapping for modern formats.
 
 **FileFormat.Vtf** (net8.0, library) — Valve Texture Format reader/writer. VTF 7.x, mipmaps, BCn + custom formats, 64-byte header.
 
@@ -386,6 +494,12 @@ dotnet run --project Crush.WebP -- -i <input.webp> -o <output.webp>
 
 **FileFormat.Tiny** (net8.0, library) — Atari ST Compressed DEGAS reader/writer. Resolution byte + 16-word palette + delta+word-level RLE per bitplane. Supports Low/Medium/High resolutions.
 
+**FileFormat.SyntheticArts** (net8.0, library) — Atari ST Synthetic Arts medium resolution reader/writer. Fixed 32032-byte format: 32-byte palette (16 words BE, only first 4 used) + 32000 bytes word-interleaved 2-plane planar data, 640x200, 4 colors. Contains `SyntheticArtsReader` (validates exact size, FromFile/FromStream/FromBytes), `SyntheticArtsWriter` (returns exactly 32032 bytes), `SyntheticArtsFile` (data model implementing `IImageFileFormat<SyntheticArtsFile>`, Palette short[16], PixelData byte[32000]). ToRawImage: Indexed8 with 4-color palette. FromRawImage: requires Indexed8 640x200. Extensions: .srt. References FileFormat.Core.
+
+**FileFormat.HighresMedium** (net8.0, library) — Atari ST interlaced medium resolution reader/writer. Fixed 64064-byte format: 2 frames of (32-byte palette + 32000 bytes planar), 640x200. Contains `HighresMediumReader` (validates exact size, FromFile/FromStream/FromBytes), `HighresMediumWriter` (returns exactly 64064 bytes), `HighresMediumFile` (data model implementing `IImageFileFormat<HighresMediumFile>`, Palette1/PixelData1/Palette2/PixelData2). ToRawImage: Rgb24 via RGB-average blend of both frames. FromRawImage: requires Rgb24 640x200, quantizes to 4 colors. Extensions: .hrm. References FileFormat.Core.
+
+**FileFormat.FullscreenKit** (net8.0, library) — Atari ST Fullscreen Construction Kit overscan reader/writer. 32-byte palette (16 words BE) + planar pixel data (4 planes). Two supported variants: 416x274 (57024 bytes) and 448x272 (60928 bytes). Auto-detects variant from file size. Contains `FullscreenKitReader` (validates file size against both variants, FromFile/FromStream/FromBytes), `FullscreenKitWriter` (assembles palette + pixel data), `FullscreenKitFile` (data model implementing `IImageFileFormat<FullscreenKitFile>`, Width, Height, Palette, PixelData). ToRawImage: Indexed8 with 16-color palette. FromRawImage: requires Indexed8 416x274 or 448x272. Extensions: .kid. References FileFormat.Core.
+
 **FileFormat.Sixel** (net8.0, library) — DEC Terminal Graphics reader/writer. Text-based ESC P params q sixel-data ESC \ encoding, 6-pixel vertical bands, RLE compression, HLS/RGB color definitions.
 
 **FileFormat.Wad** (net8.0, library) — Doom WAD container reader/writer. "IWAD"/"PWAD" magic, 12-byte header, directory of 16-byte entries with named lumps.
@@ -401,6 +515,10 @@ dotnet run --project Crush.WebP -- -i <input.webp> -o <output.webp>
 **FileFormat.Pict** (net8.0, library) — Apple QuickDraw PICT reader/writer (raster subset). 512-byte preamble, PICT2 opcodes (PackBitsRect for indexed, DirectBitsRect for RGB), PackBits per-component compression.
 
 **FileFormat.Dicom** (net8.0, library) — DICOM medical imaging reader/writer (basic subset). 128-byte preamble + "DICM" magic, Explicit VR Little Endian tag-length-value elements, single-frame uncompressed pixel data.
+
+**FileFormat.Trs80** (net8.0, library) — TRS-80 hi-res graphics screen dump reader/writer (Model I/III). No header, raw pixel data. Fixed 6144-byte format: 128x48 character cells, each byte encodes a 2x3 pixel block (effective resolution 256x144). Bit mapping: bit 0=top-left, bit 1=top-right, bit 2=mid-left, bit 3=mid-right, bit 4=bot-left, bit 5=bot-right (bits 6-7 ignored). Contains `Trs80Reader` (validates exact 6144-byte size, FromFile/FromStream/FromBytes), `Trs80Writer` (returns exactly 6144 bytes), `Trs80File` (data model implementing `IImageFileFormat<Trs80File>`, fixed 256x144, RawData byte[]). ToRawImage: Indexed1 with B&W palette (2 entries), 32 bytes per row. FromRawImage: requires Indexed1 256x144, packs 2x3 pixel blocks into character cells. Extensions: .hr. References FileFormat.Core.
+
+**FileFormat.SoftImage** (net8.0, library) — Softimage PIC 3D texture format reader/writer. 100-byte big-endian header with 0x5380F634 magic, float32 version, 80-byte ASCII comment, uint16 BE width/height. Channel info packets (4 bytes each: chained, size, type, channel bitmask). Mixed RLE pixel data encoding (count < 128: literal pixels, count >= 128: run-length repeat). Contains `SoftImageReader` (validates magic, parses BE header, reads channel info packets, decodes mixed RLE), `SoftImageWriter` (assembles 100-byte header, channel info packets, mixed RLE encoded pixel data), `SoftImageFile` (data model implementing `IImageFileFormat<SoftImageFile>`: Width, Height, PixelData, Comment, HasAlpha, Version). ToRawImage: Rgb24 or Rgba32 based on alpha channel presence. FromRawImage: accepts Rgb24 or Rgba32. Extensions: .pic. References FileFormat.Core.
 
 **Compression.Tests** (net8.0, NUnit 4) — tests for `ZopfliDeflater`: BitWriter, symbol tables, Huffman trees, hash chain, round-trip compression, compression ratios, convergence detection.
 
@@ -544,8 +662,10 @@ Each FileFormat library follows a consistent pattern with `{Format}File` (data m
 - `IcoFile`, `IcoReader`, `IcoWriter` — FileFormat.Ico. Supports BMP DIB and PNG embedded image formats. `IcoReader` auto-detects format via PNG signature sniffing.
 - `CurFile`, `CurReader`, `CurWriter` — FileFormat.Cur. CUR format identical to ICO except type=2 and hotspot fields in directory entries. Reuses IcoReader._Parse and IcoWriter._Assemble via InternalsVisibleTo.
 - `AniFile`, `AniReader`, `AniWriter` — FileFormat.Ani. RIFF ACON container with anih header, optional rate/seq chunks, LIST fram with ICO frames. Uses FileFormat.Riff and FileFormat.Ico.
-- `WebPFile`, `WebPReader`, `WebPWriter` — FileFormat.WebP. RIFF WEBP container with VP8/VP8L/VP8X chunk parsing, dimension extraction from keyframe headers and VP8L bitfields, metadata chunk collection (ICCP, EXIF, XMP). Uses FileFormat.Riff.
+- `WebPFile`, `WebPReader`, `WebPWriter` — FileFormat.WebP. RIFF WEBP container with full VP8L (lossless) and VP8 (lossy) pixel codecs. VP8L: `Vp8LDecoder`, `Vp8LEncoder`, `Vp8LBitReader`, `Vp8LHuffmanTree`, `Vp8LTransform`. VP8: `Vp8Decoder`, `Vp8Encoder`, `Vp8BoolDecoder`, `Vp8Dct`, `Vp8IntraPredictor`, `Vp8LoopFilter`. Uses FileFormat.Riff.
 - `WebPFeatures` — FileFormat.WebP. Readonly record struct with Width, Height, HasAlpha, IsLossless, IsAnimated.
+- `PdfFile`, `PdfReader`, `PdfWriter` — FileFormat.Pdf. PDF image extractor with xref parsing, XObject Image resources, stream filter decoding (FlateDecode, DCTDecode, CCITTFaxDecode, ASCII85Decode, ASCIIHexDecode). Implements `IMultiImageFileFormat<PdfFile>`.
+- `PeResourceFile`, `PeResourceReader` — FileFormat.WindowsPe. PE resource extractor for icons, cursors, bitmaps from EXE/DLL .rsrc sections. Implements `IMultiImageFileFormat<PeResourceFile>`.
 - `RiffFile`, `RiffReader`, `RiffWriter` — FileFormat.Riff. Generic RIFF container with `FourCC` four-character codes, recursive LIST/chunk structure, word-aligned offsets.
 - `WbmpFile`, `WbmpReader`, `WbmpWriter` — FileFormat.Wbmp. WBMP (Wireless Bitmap) monochrome 1bpp format with variable-length multi-byte integer encoded dimensions. `WbmpMultiByteInt` handles 7-bit encoding with continuation bits.
 - `C64MultiFile`, `C64MultiReader`, `C64MultiWriter` — FileFormat.C64Multi. C64 multiformat art program files. Supports Art Studio Hires (9009 bytes, 320x200, 1bpp) and Art Studio Multicolor (10018 bytes, 160x200, 2bpp). Format detection from file size. `C64MultiFormat` enum (ArtStudioHires/ArtStudioMulti/AmicaPaint).
@@ -570,6 +690,30 @@ Each FileFormat library follows a consistent pattern with `{Format}File` (data m
 - Compression.Core has no platform dependencies (pure BCL).
 - FileFormat.Ani uses FileFormat.Riff and FileFormat.Ico, targets net8.0 with no platform dependencies.
 - All FileFormat libraries target net8.0 with no platform dependencies (except FileFormat.Jpeg and FileFormat.Tiff which use BitMiracle wrapper libraries).
+
+**FileFormat.PabloPaint** (net8.0, library) — Atari ST Pablo Paint monochrome image reader/writer. No header, raw pixel data. Fixed 32000-byte format: 640x400 pixels, 1bpp monochrome, MSB first, 0=white 1=black. Contains `PabloPaintReader`, `PabloPaintWriter`, `PabloPaintFile` (data model implementing `IImageFileFormat<PabloPaintFile>`, Capabilities: MonochromeOnly). ToRawImage: Indexed1 with B&W palette. FromRawImage: requires Indexed1 640x400. Extensions: .pa3. References FileFormat.Core.
+
+**FileFormat.PabloPaint.Tests** (NUnit 4, 34 tests) — reader validation (null, missing, too small, exact size, larger, stream, data copy), writer output (null, size, pixel data, empty), round-trip (preserve, all zeros, all ones, via file, via RawImage, via RawImage all zeros, via RawImage all pixels set), data type tests (width, height, defaults, file size, init, ToRawImage/FromRawImage null/format/dimensions/indexed1/palette/pixel data size/cloning).
+
+**FileFormat.QuantumPaint** (net8.0, library) — Atari ST QuantumPaint image reader/writer. 32-byte palette (16 words BE, 12-bit RGB) + 32000 bytes Atari ST word-interleaved planar data (4 planes). Fixed 320x200, 16 colors. Contains `QuantumPaintReader`, `QuantumPaintWriter`, `QuantumPaintFile` (data model implementing `IImageFileFormat<QuantumPaintFile>`, Capabilities: IndexedOnly). ToRawImage: Indexed8 with ST palette. FromRawImage: requires Indexed8 320x200. Extensions: .pbx. References FileFormat.Core.
+
+**FileFormat.QuantumPaint.Tests** (NUnit 4, 37 tests) — reader validation (null, missing, too small, valid, palette, pixel data, stream, data copy), writer output (null, size, palette BE, pixel data offset, empty), round-trip (all fields, all zeros, random, via file, via RawImage, via RawImage palette), data type tests (width, height, palette, defaults, min file size, init, ToRawImage/FromRawImage null/format/dimensions/indexed8/palette count/pixel data size).
+
+**FileFormat.SinbadSlideshow** (net8.0, library) — Atari ST Sinbad Slideshow single-frame image reader/writer. 32-byte palette (16 words BE, 12-bit RGB) + 32000 bytes Atari ST word-interleaved planar data (4 planes). Fixed 320x200, 16 colors. Contains `SinbadSlideshowReader`, `SinbadSlideshowWriter`, `SinbadSlideshowFile` (data model implementing `IImageFileFormat<SinbadSlideshowFile>`, Capabilities: IndexedOnly). ToRawImage: Indexed8 with ST palette. FromRawImage: requires Indexed8 320x200. Extensions: .ssb. References FileFormat.Core.
+
+**FileFormat.SinbadSlideshow.Tests** (NUnit 4, 37 tests) — reader validation (null, missing, too small, valid, palette, pixel data, stream, data copy), writer output (null, size, palette BE, pixel data offset, empty), round-trip (all fields, all zeros, random, via file, via RawImage, via RawImage palette), data type tests (width, height, palette, defaults, file size, init, ToRawImage/FromRawImage null/format/dimensions/indexed8/palette count/pixel data size).
+
+**FileFormat.CokeAtari** (net8.0, library) — Atari Falcon COKE 16-bit true-color reader/writer. 4-byte header (width BE u16, height BE u16) + RGB565 big-endian pixel data. Variable resolution. Contains `CokeAtariReader` (validates header + pixel data size, FromFile/FromStream/FromBytes), `CokeAtariWriter` (assembles header + pixel data via ToBytes), `CokeAtariFile` (data model implementing `IImageFileFormat<CokeAtariFile>`, Width, Height, PixelData), `CokeAtariHeader` (readonly partial record struct with `[GenerateSerializer]`, 4-byte BE header). ToRawImage: Rgb24 via RGB565 expansion. FromRawImage: requires Rgb24. Extensions: .tg1. References FileFormat.Core.
+
+**FileFormat.CokeAtari.Tests** (NUnit 4, 41 tests) — reader validation (null, missing, too small, truncated pixel data, valid parsing, dimensions, pixel data, stream), writer output (null, header BE dimensions, pixel data, total length), header tests (round-trip, known values, struct size, field map), round-trip (small image, all zeros, large image, via file, via RawImage pure red/green/RGB565 precision), data type tests (defaults, init properties, extensions, ToRawImage/FromRawImage null/format validation/dimensions/pixel data size/cloning).
+
+**FileFormat.AtariFalconXga** (net8.0, library) — Atari Falcon XGA 16-bit true-color reader/writer. 4-byte header (width BE u16, height BE u16) + RGB565 big-endian pixel data. Variable resolution. Contains `AtariFalconXgaReader` (validates header + pixel data size, FromFile/FromStream/FromBytes), `AtariFalconXgaWriter` (assembles header + pixel data via ToBytes), `AtariFalconXgaFile` (data model implementing `IImageFileFormat<AtariFalconXgaFile>`, Width, Height, PixelData), `AtariFalconXgaHeader` (readonly partial record struct with `[GenerateSerializer]`, 4-byte BE header). ToRawImage: Rgb24 via RGB565 expansion. FromRawImage: requires Rgb24. Extensions: .xga. References FileFormat.Core.
+
+**FileFormat.AtariFalconXga.Tests** (NUnit 4, 40 tests) — reader validation (null, missing, too small, truncated pixel data, valid parsing, dimensions, pixel data, stream), writer output (null, header BE dimensions, pixel data, total length), header tests (round-trip, known values, struct size, field map), round-trip (small image, all zeros, large image, via file, via RawImage pure red/green/RGB565 precision), data type tests (defaults, init properties, extensions, ToRawImage/FromRawImage null/format validation/dimensions/pixel data size/cloning).
+
+**FileFormat.SpookySpritesFalcon** (net8.0, library) — Atari Falcon Spooky Sprites compressed 16-bit true-color reader/writer. 4-byte header (width BE u16, height BE u16) + RLE-compressed RGB565 big-endian pixel data. RLE scheme: signed byte count (positive=literal run of N pixels, negative=repeat single pixel |N| times, zero=end marker). Variable resolution. Contains `SpookySpritesFalconReader` (validates header, decompresses RLE, FromFile/FromStream/FromBytes), `SpookySpritesFalconWriter` (compresses pixel data via RLE, assembles header + compressed data via ToBytes), `SpookySpritesFalconFile` (data model implementing `IImageFileFormat<SpookySpritesFalconFile>`, Width, Height, PixelData), `SpookySpritesFalconHeader` (readonly partial record struct with `[GenerateSerializer]`, 4-byte BE header), `SpookySpritesFalconRleCompressor` (internal static class: Compress/Decompress). ToRawImage: Rgb24 via RGB565 expansion. FromRawImage: requires Rgb24. Extensions: .tre. References FileFormat.Core.
+
+**FileFormat.SpookySpritesFalcon.Tests** (NUnit 4, 50 tests) — reader validation (null, missing, too small, valid parsing, dimensions, pixel data, stream), writer output (null, header BE dimensions, end marker, compressed smaller for repeat data, pixel data decode), RLE compressor tests (decompress empty/literal/repeat, round-trip all same/different/mixed/large/single pixel, compress smaller, compress end marker), header tests (round-trip, known values, struct size, field map), round-trip (small image, all zeros, large image, via file, via RawImage pure red/green/RGB565 precision, compressed all same pixels, all max values), data type tests (defaults, init properties, extensions, ToRawImage/FromRawImage null/format validation/dimensions/pixel data size/cloning).
 
 ## Test Infrastructure
 
@@ -630,12 +774,13 @@ Each FileFormat library follows a consistent pattern with `{Format}File` (data m
 - `RoundTripTests` — lossy dimensions, grayscale detection, lossless dimensions, raw bytes
 - `DataTypeTests` — JpegMode(2), JpegSubsampling(3) enum values
 
-**FileFormat.Tiff.Tests** (NUnit 4, 23 tests) contains:
+**FileFormat.Tiff.Tests** (NUnit 4, 44 tests) contains:
 - `TiffReaderTests` — null, missing, too small, invalid signature
 - `TiffWriterTests` — TIFF header, palette colormap, file size, LZW validity
 - `RoundTripTests` — Rgb, Grayscale, Palette, PackBits, Lzw, Tiled
 - `PackBitsCompressorTests` — empty, allSame, mixed round-trip, allDifferent literal, compression ratio
 - `DataTypeTests` — TiffColorMode(5), TiffCompression(6), TiffPredictor(2) enum values
+- `MultiPageTests` — ImageCount single/multi-page, Pages property, indexed ToRawImage, multi-page round-trip (grayscale + RGB), single-page backward compatibility
 
 **FileFormat.Png.Tests** (NUnit 4, 32 tests) contains:
 - `PngReaderTests` — null, missing, too small, invalid signature, valid RGB parsing
@@ -708,6 +853,12 @@ Each FileFormat library follows a consistent pattern with `{Format}File` (data m
 **FileFormat.Koala.Tests** (NUnit 4, 24 tests) — reader validation, writer output, round-trip.
 
 **FileFormat.Degas.Tests** (NUnit 4, 22 tests) — reader validation, writer output, planar conversion, round-trip, header tests.
+
+**FileFormat.DaliST.Tests** (NUnit 4, 29 tests) — reader validation (null, missing, too small, all resolutions, stream, palette/pixel preservation), writer output (null, file size, palette values, pixel data offset, zero palette), round-trip (low/medium/high res, via file, all zeros), data type tests (enum values, constants, defaults).
+
+**FileFormat.MultiPalettePicture.Tests** (NUnit 4, 31 tests) — reader validation (null, missing, too small, valid parsing, per-scanline palette, palette/pixel preservation, stream), writer output (null, file size, palette values, pixel data offsets, second scanline palette), round-trip (pixel data, palettes, all zeros, via file, dimensions), data type tests (constants, defaults).
+
+**FileFormat.DrawIt.Tests** (NUnit 4, 36 tests) — reader validation (null, missing, too small, zero width/height, truncated, valid parsing, palette/pixel preservation, stream), writer output (null, file size, dimensions, palette offset, pixel data offset, small image), header tests (round-trip, known values, struct size, field map), round-trip (all fields, small image, via file, all zeros, large image), data type tests (constants, defaults, init properties).
 
 **FileFormat.Neochrome.Tests** (NUnit 4, 25 tests) — reader validation, writer output, round-trip, header tests.
 
@@ -785,6 +936,12 @@ Each FileFormat library follows a consistent pattern with `{Format}File` (data m
 
 **FileFormat.Tiny.Tests** (NUnit 4, 20 tests) — reader validation, writer output, compressor tests, round-trip (low/med/high).
 
+**FileFormat.SyntheticArts.Tests** (NUnit 4, 33 tests) — reader validation (null, missing, too small, valid parsing, palette, pixel data, stream), writer output (null, size, palette, pixel data, unused entries), round-trip (all fields, zeros, random, via file, via RawImage, FromRawImage), data type tests (constants, defaults, extensions).
+
+**FileFormat.HighresMedium.Tests** (NUnit 4, 34 tests) — reader validation (null, missing, too small, valid parsing, both palettes, both frame pixel data, stream), writer output (null, size, frame 1/2 palettes, frame 1/2 pixel data), round-trip (all fields, zeros, random, via file, ToRawImage Rgb24, blend verification, FromRawImage validation), data type tests (constants, defaults).
+
+**FileFormat.FullscreenKit.Tests** (NUnit 4, 41 tests) — reader validation (null, missing, too small, invalid size, primary 416x274, alternate 448x272, palette, pixel data, stream), writer output (null, primary/alternate sizes, palette, pixel data), round-trip (primary, alternate, zeros, random, via file, via RawImage, FromRawImage validation, alternate dimensions), data type tests (constants, calculations).
+
 **FileFormat.Sixel.Tests** (NUnit 4, 22 tests) — reader validation, writer output, codec tests (RLE/bands/colors), round-trip, data types.
 
 **FileFormat.Wad.Tests** (NUnit 4, 29 tests) — reader validation, writer output, round-trip, data types.
@@ -800,6 +957,62 @@ Each FileFormat library follows a consistent pattern with `{Format}File` (data m
 **FileFormat.Pict.Tests** (NUnit 4, 16 tests) — reader validation, writer output, round-trip (indexed PackBits, direct RGB).
 
 **FileFormat.Dicom.Tests** (NUnit 4, 23 tests) — reader validation, writer output, tag reader tests, round-trip (8-bit mono, 16-bit mono, RGB).
+
+**FileFormat.Trs80.Tests** (NUnit 4, 41 tests) — reader validation (null, missing, too small, too large, exact size, stream, data copy), writer output (size 6144, null, data preserved, short data padding), round-trip (specific cells, all zeros, all ones, via file, via RawImage, via RawImage all zeros, via RawImage all pixels set, bit mapping top-left/top-right/mid-left/bot-right), data type tests (fixed width 256, fixed height 144, defaults, FileSize/Columns/Rows constants, init properties, extensions, ToRawImage/FromRawImage null/format/dimensions/palette/pixel data size/cloning).
+
+**FileFormat.SoftImage.Tests** (NUnit 4, 53 tests) — reader validation (null, missing, too small, invalid magic, valid RGB/RGBA parsing, dimensions, pixel data, comment, version, stream), writer output (null, magic bytes, header size, dimensions BE, comment field, version field, channel info packets RGB/RGBA, pixel data), round-trip (RGB24, RGBA32, via file, all zeros, gradient, via RawImage RGB24/RGBA32, version preserved, comment preserved, larger image), data type tests (defaults for PixelData/Width/Height/Comment/HasAlpha/Version, init properties, extensions, magic/header/comment constants, ToRawImage/FromRawImage null/format validation/RGB/RGBA/cloning).
+
+**FileFormat.Envi** (net8.0, library) — ENVI remote sensing image format reader/writer. Text header starting with "ENVI\n" magic, keyword = value lines (multiline brace {} support). Key fields: samples (width), lines (height), bands, data type (1=uint8, 2=int16, 4=float32, 12=uint16), interleave (bsq/bip/bil), byte order (0=LE, 1=BE), header offset. Contains `EnviReader`, `EnviWriter`, `EnviFile` (data model implementing `IImageFileFormat<EnviFile>`), `EnviHeaderParser` (internal), `EnviInterleave` (Bsq/Bip/Bil enum). ToRawImage: Gray8 (bands=1, data_type=1), Rgb24 (bands>=3, data_type=1). FromRawImage: Gray8 or Rgb24. Extensions: .hdr. References FileFormat.Core.
+
+**FileFormat.Envi.Tests** (NUnit 4, 74 tests) — reader validation (null, missing, too small, invalid magic, valid grayscale/RGB, stream, pixel data preserved), writer output (null, magic, header fields, pixel data), header parser (dimensions, bands, interleave, data type, multiline values, brace values), round-trip (grayscale, RGB BIP/BSQ/BIL, via file, via RawImage), data type tests (EnviInterleave enum, defaults, extensions, cloning).
+
+**FileFormat.MayaIff** (net8.0, library) — Maya IFF (FOR4/CIMG) image format reader/writer. FOR4 container (4-byte aligned) with CIMG form type, TBHD tile-based header (32 bytes BE: width, height, prnum, prden, flags, bytes, tiles, compression), RGBA/RGB data chunks. Contains `MayaIffReader`, `MayaIffWriter`, `MayaIffFile` (data model implementing `IImageFileFormat<MayaIffFile>`). ToRawImage: Rgba32 or Rgb24. Extensions: .iff, .maya. References FileFormat.Core.
+
+**FileFormat.MayaIff.Tests** (NUnit 4, 49 tests) — reader validation, writer output, round-trip (RGB/RGBA), data type tests.
+
+**FileFormat.Xcursor** (net8.0, library) — X11 cursor theme format reader/writer. "Xcur" 4-byte magic, TOC entries pointing to image chunks with ARGB premultiplied pixels. Contains `XcursorReader`, `XcursorWriter`, `XcursorFile` (data model implementing `IImageFileFormat<XcursorFile>`). ToRawImage: Rgba32 (unpremultiplied). Extensions: .xcur, .cursor. References FileFormat.Core.
+
+**FileFormat.Xcursor.Tests** (NUnit 4, 52 tests) — reader validation, writer output, round-trip, data type tests.
+
+**FileFormat.IffPbm** (net8.0, library) — IFF Packed Bitmap (chunky non-planar) reader/writer. FORM+PBM container, BMHD 20-byte header, CMAP palette, ByteRun1 compressed chunky 8-bit indexed pixels. Contains `IffPbmReader`, `IffPbmWriter`, `IffPbmFile` (data model implementing `IImageFileFormat<IffPbmFile>`). ToRawImage: Indexed8 with CMAP palette. Extensions: .lbm, .pbm. References FileFormat.Iff and FileFormat.Core.
+
+**FileFormat.IffPbm.Tests** (NUnit 4, 54 tests) — reader validation, writer output, round-trip, data type tests.
+
+**FileFormat.PcPaint** (net8.0, library) — PC Paint/Pictor page format reader/writer. 0x1234 LE magic, 16-byte header with dimensions/planes/bpp, VGA palette, per-scanline RLE encoding. Contains `PcPaintReader`, `PcPaintWriter`, `PcPaintFile` (data model implementing `IImageFileFormat<PcPaintFile>`). ToRawImage: Indexed8 with VGA palette. Extensions: .pic, .clp. References FileFormat.Core.
+
+**FileFormat.PcPaint.Tests** (NUnit 4, 62 tests) — reader validation, writer output, round-trip, data type tests.
+
+**FileFormat.IffAcbm** (net8.0, library) — IFF Amiga Contiguous Bitmap reader/writer. FORM+ACBM container, BMHD header, CMAP palette, ABIT chunk with contiguous (non-interleaved) bitplane data. Contains `IffAcbmReader`, `IffAcbmWriter`, `IffAcbmFile` (data model implementing `IImageFileFormat<IffAcbmFile>`). ToRawImage: Indexed8. Extensions: .acbm, .iff. References FileFormat.Iff and FileFormat.Core.
+
+**FileFormat.IffAcbm.Tests** (NUnit 4, 57 tests) — reader validation, writer output, round-trip, data type tests.
+
+**FileFormat.IffDeep** (net8.0, library) — IFF Deep Paint format reader/writer. FORM+DEEP container, DGBL chunk (width/height/compression/numElements), DPEL chunk (element descriptors), DBOD/BODY pixel data with optional ByteRun1 compression. Contains `IffDeepReader`, `IffDeepWriter`, `IffDeepFile` (data model implementing `IImageFileFormat<IffDeepFile>`). ToRawImage: Rgb24 or Rgba32. Extensions: .deep, .iff. References FileFormat.Iff and FileFormat.Core.
+
+**FileFormat.IffDeep.Tests** (NUnit 4, 71 tests) — reader validation, writer output, round-trip, data type tests.
+
+**FileFormat.IffRgb8** (net8.0, library) — IFF 24-bit RGB format reader/writer. FORM+RGB8 container, BMHD header (numPlanes=25), BODY with 4-byte pixel group ByteRun1 compression (R,G,B,pad). Contains `IffRgb8Reader`, `IffRgb8Writer`, `IffRgb8File` (data model implementing `IImageFileFormat<IffRgb8File>`). ToRawImage: Rgb24. Extensions: .rgb8, .iff. References FileFormat.Iff and FileFormat.Core.
+
+**FileFormat.IffRgb8.Tests** (NUnit 4, 49 tests) — reader validation, writer output, round-trip, data type tests.
+
+**FileFormat.IffRgbn** (net8.0, library) — IFF 13-bit RGB + genlock format reader/writer. FORM+RGBN container, BMHD header (numPlanes=13), BODY with 2-byte pixel units (4-bit R, 4-bit G, 4-bit B, 1-bit genlock, 3-bit repeat count). Contains `IffRgbnReader`, `IffRgbnWriter`, `IffRgbnFile` (data model implementing `IImageFileFormat<IffRgbnFile>`). ToRawImage: Rgb24. FromRawImage: quantizes to 4-bit channels, no RLE. Extensions: .rgbn, .iff. References FileFormat.Core.
+
+**FileFormat.IffRgbn.Tests** (NUnit 4, 43 tests) — reader validation, writer output, round-trip (quantization, RLE repeat expansion), data type tests.
+
+**FileFormat.Interfile** (net8.0, library) — Interfile nuclear medicine imaging format reader/writer. Text header starting with "!INTERFILE :=" line, !keyword := value pairs. Key fields: matrix size[1/2] (dimensions), number format, bytes per pixel, data file name. Contains `InterfileReader`, `InterfileWriter`, `InterfileFile` (data model implementing `IImageFileFormat<InterfileFile>`). ToRawImage: Gray8 or Rgb24. Extensions: .hv. References FileFormat.Core.
+
+**FileFormat.Interfile.Tests** (NUnit 4, 54 tests) — reader validation, writer output, round-trip, data type tests.
+
+**FileFormat.AtariFalcon** (net8.0, library) — Atari Falcon true-color screen dump reader/writer. No header, raw pixel data. Fixed 153600-byte format: 320x240 pixels, 16-bit RGB565 big-endian. Contains `AtariFalconReader`, `AtariFalconWriter`, `AtariFalconFile` (data model implementing `IImageFileFormat<AtariFalconFile>`). ToRawImage: Rgb24. Extensions: .ftc. References FileFormat.Core.
+
+**FileFormat.AtariFalcon.Tests** (NUnit 4, 37 tests) — reader validation, writer output, round-trip, data type tests.
+
+**FileFormat.BigTiff** (net8.0, library) — BigTIFF (.btf/.tf8) image format reader/writer. Custom binary parser for 64-bit TIFF variant (version 43, 8-byte offsets). 16-byte header, 20-byte IFD entries with uint64 count/value, IFD chain following for multi-page support. Contains `BigTiffReader` (validates byte order, version, offset size, follows IFD chain, handles inline and external BitsPerSample values), `BigTiffWriter` (assembles single/multi-page BigTIFF with inline BitsPerSample packing and IFD patching), `BigTiffFile` (data model implementing `IImageFileFormat<BigTiffFile>` and `IMultiImageFileFormat<BigTiffFile>`), `BigTiffPage` (per-page data model), `BigTiffFileHeader` (binary header struct). Supports Gray8, Rgb24, Gray16, Rgb48 (8-bit and 16-bit), uncompressed only. Multi-page: `Pages` property, `ImageCount()`, indexed `ToRawImage(file, index)`. Extensions: .btf, .tf8. References FileFormat.Core.
+
+**FileFormat.BigTiff.Tests** (NUnit 4, 81 tests) — reader validation (null, missing, too small, invalid byte order/version/offset size/reserved/IFD offset), writer output (header, IFD entries, pixel data), round-trip (grayscale, RGB, via file, via stream, big-endian, RawImage), multi-page tests (ImageCount, Pages property, indexed ToRawImage, multi-page round-trip grayscale+RGB, single-page backward compat), data type tests (constants, defaults, extensions, header struct).
+
+**FileFormat.CameraRaw.Tests** (NUnit 4, 128 tests) — lossless JPEG decoder tests (DHT parsing, all 7 prediction modes, 12/14/16-bit precision, multi-component, restart markers, Canon CR2 slicing, input validation), Nikon decompressor tests (null/bounds validation, output length, 12/14-bit range, curve application), Sony decompressor tests (null/bounds validation, output length, 12/14-bit range), Bayer demosaic uint16 tests (all 4 patterns, 14-bit input), RAW preprocessor uint16 tests (black level, white balance).
+
+**FileFormat.Core.Tests** (NUnit 4, 278 tests) — multi-image format tests (IMultiImageFileFormat implementations across IcoFile, CurFile, AniFile, ApngFile, MngFile, FliFile, DcxFile, MpoFile, IcnsFile: ImageCount, indexed ToRawImage, null validation, out-of-range, cross-format pixel isolation, FormatCapability.MultiImage flag), block decoder tests (Bc6HDecoder: unsigned/signed modes, full alpha, unknown mode magenta, empty data; Bc7Decoder: mode-6 uniform color, black endpoints, reserved mode, image sizes, insufficient data; PvrtcDecoder: 4bpp/2bpp output sizes, all-zero data, opaque blocks, modulation), pixel format conversion (37 methods including 16-bit Gray16/Rgb48/Rgba64 paths with round-trip verification), header field mapping, format detection.
 
 **Crush.TestUtilities** (net8.0, NUnit helpers) — shared test infrastructure: `TestBitmapFactory` (creates reproducible gradient test bitmaps), `TempFileScope` (IDisposable temp file lifecycle). Used by Optimizer.Bmp.Tests, Optimizer.Tga.Tests, Optimizer.Pcx.Tests, Optimizer.Jpeg.Tests, Optimizer.Tiff.Tests.
 

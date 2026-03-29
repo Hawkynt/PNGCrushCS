@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using FileFormat.Core;
 
@@ -8,8 +8,16 @@ namespace FileFormat.Jpeg;
 public sealed class JpegFile : IImageFileFormat<JpegFile> {
 
   static string IImageFileFormat<JpegFile>.PrimaryExtension => ".jpg";
-  static string[] IImageFileFormat<JpegFile>.FileExtensions => [".jpg", ".jpeg", ".jpe", ".jfif"];
+  static string[] IImageFileFormat<JpegFile>.FileExtensions => [".jpg", ".jpeg", ".jpe", ".jfif", ".jps", ".thm"];
+  static FormatCapability IImageFileFormat<JpegFile>.Capabilities => FormatCapability.HasDedicatedOptimizer;
+
+  static bool? IImageFileFormat<JpegFile>.MatchesSignature(ReadOnlySpan<byte> header)
+    => header.Length >= 3 && header[0] == 0xFF && header[1] == 0xD8 && header[2] == 0xFF
+      ? true : null;
+
   static JpegFile IImageFileFormat<JpegFile>.FromFile(FileInfo file) => JpegReader.FromFile(file);
+  static JpegFile IImageFileFormat<JpegFile>.FromBytes(byte[] data) => JpegReader.FromBytes(data);
+  static JpegFile IImageFileFormat<JpegFile>.FromStream(Stream stream) => JpegReader.FromStream(stream);
   static byte[] IImageFileFormat<JpegFile>.ToBytes(JpegFile file) => JpegWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
@@ -26,7 +34,7 @@ public sealed class JpegFile : IImageFileFormat<JpegFile> {
       Width = file.Width,
       Height = file.Height,
       Format = file.IsGrayscale ? PixelFormat.Gray8 : PixelFormat.Rgb24,
-      PixelData = (byte[])file.RgbPixelData.Clone(),
+      PixelData = file.RgbPixelData[..],
     };
   }
 
@@ -45,7 +53,7 @@ public sealed class JpegFile : IImageFileFormat<JpegFile> {
       Width = image.Width,
       Height = image.Height,
       IsGrayscale = isGrayscale,
-      RgbPixelData = (byte[])image.PixelData.Clone(),
+      RgbPixelData = image.PixelData[..],
     };
   }
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using BitMiracle.LibTiff.Classic;
 using LibTiff = BitMiracle.LibTiff.Classic.Tiff;
@@ -18,6 +19,11 @@ public static class TiffReader {
 
   public static TiffFile FromStream(Stream stream) {
     ArgumentNullException.ThrowIfNull(stream);
+    if (stream.CanSeek) {
+      var data = new byte[stream.Length - stream.Position];
+      stream.ReadExactly(data);
+      return FromBytes(data);
+    }
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
     return FromBytes(ms.ToArray());
@@ -33,6 +39,41 @@ public static class TiffReader {
     if (tiff == null)
       throw new InvalidDataException("Failed to open TIFF data.");
 
+    // Read first IFD (directory 0)
+    var (width, height, samplesPerPixel, bitsPerSample, colorMap, pixelData, colorMode) = _ReadCurrentDirectory(tiff);
+
+    // Read additional directories as pages
+    var pages = new List<TiffPage>();
+    while (tiff.ReadDirectory()) {
+      try {
+        var (pw, ph, pspp, pbps, pcm, ppd, pcm2) = _ReadCurrentDirectory(tiff);
+        pages.Add(new TiffPage {
+          Width = pw,
+          Height = ph,
+          SamplesPerPixel = pspp,
+          BitsPerSample = pbps,
+          PixelData = ppd,
+          ColorMap = pcm,
+          ColorMode = pcm2,
+        });
+      } catch {
+        // Skip unreadable directories
+      }
+    }
+
+    return new TiffFile {
+      Width = width,
+      Height = height,
+      SamplesPerPixel = samplesPerPixel,
+      BitsPerSample = bitsPerSample,
+      PixelData = pixelData,
+      ColorMap = colorMap,
+      ColorMode = colorMode,
+      Pages = pages,
+    };
+  }
+
+  private static (int Width, int Height, int SamplesPerPixel, int BitsPerSample, byte[]? ColorMap, byte[] PixelData, TiffColorMode ColorMode) _ReadCurrentDirectory(LibTiff tiff) {
     var widthField = tiff.GetField(TiffTag.IMAGEWIDTH);
     var heightField = tiff.GetField(TiffTag.IMAGELENGTH);
     if (widthField == null || heightField == null)
@@ -50,7 +91,6 @@ public static class TiffReader {
     var photoField = tiff.GetField(TiffTag.PHOTOMETRIC);
     var photometric = photoField != null ? (Photometric)photoField[0].ToInt() : Photometric.RGB;
 
-    // Read color map if palette
     byte[]? colorMap = null;
     if (photometric == Photometric.PALETTE) {
       var cmField = tiff.GetField(TiffTag.COLORMAP);
@@ -68,25 +108,15 @@ public static class TiffReader {
       }
     }
 
-    // Read pixel data
     byte[] pixelData;
-    if (tiff.IsTiled()) {
+    if (tiff.IsTiled())
       pixelData = _ReadTiledPixelData(tiff, width, height, samplesPerPixel, bitsPerSample);
-    } else {
+    else
       pixelData = _ReadStrippedPixelData(tiff, width, height, samplesPerPixel, bitsPerSample);
-    }
 
     var colorMode = _DetectColorMode(photometric, samplesPerPixel, bitsPerSample);
 
-    return new TiffFile {
-      Width = width,
-      Height = height,
-      SamplesPerPixel = samplesPerPixel,
-      BitsPerSample = bitsPerSample,
-      PixelData = pixelData,
-      ColorMap = colorMap,
-      ColorMode = colorMode
-    };
+    return (width, height, samplesPerPixel, bitsPerSample, colorMap, pixelData, colorMode);
   }
 
   private static byte[] _ReadStrippedPixelData(LibTiff tiff, int width, int height, int samplesPerPixel, int bitsPerSample) {
@@ -97,7 +127,7 @@ public static class TiffReader {
     for (var row = 0; row < height; ++row) {
       tiff.ReadScanline(scanline, row);
       var copyLen = Math.Min(bytesPerRow, scanline.Length);
-      Array.Copy(scanline, 0, pixelData, row * bytesPerRow, copyLen);
+      scanline.AsSpan(0, copyLen).CopyTo(pixelData.AsSpan(row * bytesPerRow));
     }
 
     return pixelData;
@@ -132,7 +162,7 @@ public static class TiffReader {
         var srcOffset = r * tileBytesPerRow;
         var dstOffset = (ty + r) * bytesPerRow + tx * bytesPerPixel;
         if (srcOffset + bytesToCopy <= tileBuf.Length && dstOffset + bytesToCopy <= pixelData.Length)
-          Array.Copy(tileBuf, srcOffset, pixelData, dstOffset, bytesToCopy);
+          tileBuf.AsSpan(srcOffset, bytesToCopy).CopyTo(pixelData.AsSpan(dstOffset));
       }
 
       ++tileIndex;

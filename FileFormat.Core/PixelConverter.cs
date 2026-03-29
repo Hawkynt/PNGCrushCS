@@ -40,6 +40,33 @@ public static class PixelConverter {
       (PixelFormat.Rgba32, PixelFormat.Rgb24) => Rgba32ToRgb24(data, totalPixels),
       (PixelFormat.Rgb24, PixelFormat.Rgba32) => Rgb24ToRgba32(data, totalPixels),
       (PixelFormat.Gray8, PixelFormat.Rgb24) => Gray8ToRgb24(data, totalPixels),
+
+      // Gray16 hub routes
+      (PixelFormat.Gray16, PixelFormat.Bgra32) => Gray16ToBgra(data, totalPixels),
+      (PixelFormat.Bgra32, PixelFormat.Gray16) => BgraToGray16(data, totalPixels),
+
+      // 16-bit upscale from Bgra32
+      (PixelFormat.Bgra32, PixelFormat.Rgb48) => BgraToRgb48(data, totalPixels),
+      (PixelFormat.Bgra32, PixelFormat.Rgba64) => BgraToRgba64(data, totalPixels),
+
+      // Direct 16↔16 routes (avoid lossy 8-bit hub)
+      (PixelFormat.Rgb48, PixelFormat.Rgba64) => Rgb48ToRgba64(data, totalPixels),
+      (PixelFormat.Rgba64, PixelFormat.Rgb48) => Rgba64ToRgb48(data, totalPixels),
+      (PixelFormat.Gray16, PixelFormat.Rgb48) => Gray16ToRgb48(data, totalPixels),
+      (PixelFormat.Gray16, PixelFormat.Rgba64) => Gray16ToRgba64(data, totalPixels),
+      (PixelFormat.Rgb48, PixelFormat.Gray16) => Rgb48ToGray16(data, totalPixels),
+      (PixelFormat.Rgba64, PixelFormat.Gray16) => Rgba64ToGray16(data, totalPixels),
+
+      // Direct 16→8 shortcuts (avoid extra hub step)
+      (PixelFormat.Rgb48, PixelFormat.Rgb24) => Rgb48ToRgb24(data, totalPixels),
+      (PixelFormat.Rgba64, PixelFormat.Rgba32) => Rgba64ToRgba32(data, totalPixels),
+      (PixelFormat.Gray16, PixelFormat.Gray8) => Gray16ToGray8(data, totalPixels),
+
+      // Direct 8→16 upscale
+      (PixelFormat.Rgb24, PixelFormat.Rgb48) => Rgb24ToRgb48(data, totalPixels),
+      (PixelFormat.Rgba32, PixelFormat.Rgba64) => Rgba32ToRgba64(data, totalPixels),
+      (PixelFormat.Gray8, PixelFormat.Gray16) => Gray8ToGray16(data, totalPixels),
+
       _ => _ConvertViaIntermediate(source, target),
     };
 
@@ -790,6 +817,310 @@ public static class PixelConverter {
       result[dst] = gray;
       result[dst + 1] = gray;
       result[dst + 2] = gray;
+    }
+
+    return result;
+  }
+
+  // ── 16-bit Gray16 hub routes ────────────────────────────────────────────────
+
+  /// <summary>Converts 16-bit big-endian grayscale (2 bytes/pixel) to BGRA (4 bytes/pixel).</summary>
+  public static byte[] Gray16ToBgra(byte[] data, int totalPixels) {
+    var result = new byte[totalPixels * 4];
+
+    for (var i = 0; i < totalPixels; ++i) {
+      var gray = data[i * 2]; // high byte
+      var dst = i * 4;
+      result[dst] = gray;
+      result[dst + 1] = gray;
+      result[dst + 2] = gray;
+      result[dst + 3] = 255;
+    }
+
+    return result;
+  }
+
+  /// <summary>Converts BGRA (4 bytes/pixel) to 16-bit big-endian grayscale (2 bytes/pixel) using luminance. Upscales via v*257.</summary>
+  public static byte[] BgraToGray16(byte[] data, int totalPixels) {
+    var result = new byte[totalPixels * 2];
+
+    for (var i = 0; i < totalPixels; ++i) {
+      var src = i * 4;
+      var b = data[src];
+      var g = data[src + 1];
+      var r = data[src + 2];
+      var gray8 = (byte)((r * 77 + g * 150 + b * 29) >> 8);
+      var dst = i * 2;
+      result[dst] = gray8;     // high byte (v*257 >> 8 == v)
+      result[dst + 1] = gray8; // low byte  (v*257 & 0xFF == v)
+    }
+
+    return result;
+  }
+
+  // ── 16-bit upscale from Bgra32 ────────────────────────────────────────────
+
+  /// <summary>Converts BGRA (4 bytes/pixel) to RGB48 big-endian (6 bytes/pixel). Upscales 8→16 bit via v*257.</summary>
+  public static byte[] BgraToRgb48(byte[] data, int totalPixels) {
+    var result = new byte[totalPixels * 6];
+
+    for (var i = 0; i < totalPixels; ++i) {
+      var src = i * 4;
+      var b = data[src];
+      var g = data[src + 1];
+      var r = data[src + 2];
+      var dst = i * 6;
+      // RGB big-endian 16-bit: v*257 = (v<<8)|v, so hi=v, lo=v
+      result[dst] = r;
+      result[dst + 1] = r;
+      result[dst + 2] = g;
+      result[dst + 3] = g;
+      result[dst + 4] = b;
+      result[dst + 5] = b;
+    }
+
+    return result;
+  }
+
+  /// <summary>Converts BGRA (4 bytes/pixel) to RGBA64 big-endian (8 bytes/pixel). Upscales 8→16 bit via v*257.</summary>
+  public static byte[] BgraToRgba64(byte[] data, int totalPixels) {
+    var result = new byte[totalPixels * 8];
+
+    for (var i = 0; i < totalPixels; ++i) {
+      var src = i * 4;
+      var b = data[src];
+      var g = data[src + 1];
+      var r = data[src + 2];
+      var a = data[src + 3];
+      var dst = i * 8;
+      result[dst] = r;
+      result[dst + 1] = r;
+      result[dst + 2] = g;
+      result[dst + 3] = g;
+      result[dst + 4] = b;
+      result[dst + 5] = b;
+      result[dst + 6] = a;
+      result[dst + 7] = a;
+    }
+
+    return result;
+  }
+
+  // ── Direct 16↔16 routes ───────────────────────────────────────────────────
+
+  /// <summary>Converts RGB48 big-endian (6 bytes/pixel) to RGBA64 big-endian (8 bytes/pixel) with opaque alpha.</summary>
+  public static byte[] Rgb48ToRgba64(byte[] data, int totalPixels) {
+    var result = new byte[totalPixels * 8];
+
+    for (var i = 0; i < totalPixels; ++i) {
+      var src = i * 6;
+      var dst = i * 8;
+      result[dst] = data[src];         // R hi
+      result[dst + 1] = data[src + 1]; // R lo
+      result[dst + 2] = data[src + 2]; // G hi
+      result[dst + 3] = data[src + 3]; // G lo
+      result[dst + 4] = data[src + 4]; // B hi
+      result[dst + 5] = data[src + 5]; // B lo
+      result[dst + 6] = 0xFF;          // A hi
+      result[dst + 7] = 0xFF;          // A lo
+    }
+
+    return result;
+  }
+
+  /// <summary>Converts RGBA64 big-endian (8 bytes/pixel) to RGB48 big-endian (6 bytes/pixel), discarding alpha.</summary>
+  public static byte[] Rgba64ToRgb48(byte[] data, int totalPixels) {
+    var result = new byte[totalPixels * 6];
+
+    for (var i = 0; i < totalPixels; ++i) {
+      var src = i * 8;
+      var dst = i * 6;
+      result[dst] = data[src];         // R hi
+      result[dst + 1] = data[src + 1]; // R lo
+      result[dst + 2] = data[src + 2]; // G hi
+      result[dst + 3] = data[src + 3]; // G lo
+      result[dst + 4] = data[src + 4]; // B hi
+      result[dst + 5] = data[src + 5]; // B lo
+    }
+
+    return result;
+  }
+
+  /// <summary>Converts 16-bit big-endian grayscale (2 bytes/pixel) to RGB48 big-endian (6 bytes/pixel).</summary>
+  public static byte[] Gray16ToRgb48(byte[] data, int totalPixels) {
+    var result = new byte[totalPixels * 6];
+
+    for (var i = 0; i < totalPixels; ++i) {
+      var hi = data[i * 2];
+      var lo = data[i * 2 + 1];
+      var dst = i * 6;
+      result[dst] = hi;
+      result[dst + 1] = lo;
+      result[dst + 2] = hi;
+      result[dst + 3] = lo;
+      result[dst + 4] = hi;
+      result[dst + 5] = lo;
+    }
+
+    return result;
+  }
+
+  /// <summary>Converts 16-bit big-endian grayscale (2 bytes/pixel) to RGBA64 big-endian (8 bytes/pixel).</summary>
+  public static byte[] Gray16ToRgba64(byte[] data, int totalPixels) {
+    var result = new byte[totalPixels * 8];
+
+    for (var i = 0; i < totalPixels; ++i) {
+      var hi = data[i * 2];
+      var lo = data[i * 2 + 1];
+      var dst = i * 8;
+      result[dst] = hi;
+      result[dst + 1] = lo;
+      result[dst + 2] = hi;
+      result[dst + 3] = lo;
+      result[dst + 4] = hi;
+      result[dst + 5] = lo;
+      result[dst + 6] = 0xFF;
+      result[dst + 7] = 0xFF;
+    }
+
+    return result;
+  }
+
+  /// <summary>Converts RGB48 big-endian (6 bytes/pixel) to 16-bit big-endian grayscale (2 bytes/pixel) using luminance.</summary>
+  public static byte[] Rgb48ToGray16(byte[] data, int totalPixels) {
+    var result = new byte[totalPixels * 2];
+
+    for (var i = 0; i < totalPixels; ++i) {
+      var src = i * 6;
+      var r = (data[src] << 8) | data[src + 1];
+      var g = (data[src + 2] << 8) | data[src + 3];
+      var b = (data[src + 4] << 8) | data[src + 5];
+      // Luminance: (R*19595 + G*38470 + B*7471) >> 16
+      var gray = (r * 19595 + g * 38470 + b * 7471) >> 16;
+      var dst = i * 2;
+      result[dst] = (byte)(gray >> 8);
+      result[dst + 1] = (byte)gray;
+    }
+
+    return result;
+  }
+
+  /// <summary>Converts RGBA64 big-endian (8 bytes/pixel) to 16-bit big-endian grayscale (2 bytes/pixel) using luminance, discarding alpha.</summary>
+  public static byte[] Rgba64ToGray16(byte[] data, int totalPixels) {
+    var result = new byte[totalPixels * 2];
+
+    for (var i = 0; i < totalPixels; ++i) {
+      var src = i * 8;
+      var r = (data[src] << 8) | data[src + 1];
+      var g = (data[src + 2] << 8) | data[src + 3];
+      var b = (data[src + 4] << 8) | data[src + 5];
+      var gray = (r * 19595 + g * 38470 + b * 7471) >> 16;
+      var dst = i * 2;
+      result[dst] = (byte)(gray >> 8);
+      result[dst + 1] = (byte)gray;
+    }
+
+    return result;
+  }
+
+  // ── Direct 16→8 shortcuts ─────────────────────────────────────────────────
+
+  /// <summary>Converts RGB48 big-endian (6 bytes/pixel) to RGB24 (3 bytes/pixel) by taking high bytes.</summary>
+  public static byte[] Rgb48ToRgb24(byte[] data, int totalPixels) {
+    var result = new byte[totalPixels * 3];
+
+    for (var i = 0; i < totalPixels; ++i) {
+      var src = i * 6;
+      var dst = i * 3;
+      result[dst] = data[src];     // R hi
+      result[dst + 1] = data[src + 2]; // G hi
+      result[dst + 2] = data[src + 4]; // B hi
+    }
+
+    return result;
+  }
+
+  /// <summary>Converts RGBA64 big-endian (8 bytes/pixel) to RGBA32 (4 bytes/pixel) by taking high bytes.</summary>
+  public static byte[] Rgba64ToRgba32(byte[] data, int totalPixels) {
+    var result = new byte[totalPixels * 4];
+
+    for (var i = 0; i < totalPixels; ++i) {
+      var src = i * 8;
+      var dst = i * 4;
+      result[dst] = data[src];     // R hi
+      result[dst + 1] = data[src + 2]; // G hi
+      result[dst + 2] = data[src + 4]; // B hi
+      result[dst + 3] = data[src + 6]; // A hi
+    }
+
+    return result;
+  }
+
+  /// <summary>Converts 16-bit big-endian grayscale (2 bytes/pixel) to 8-bit grayscale (1 byte/pixel) by taking the high byte.</summary>
+  public static byte[] Gray16ToGray8(byte[] data, int totalPixels) {
+    var result = new byte[totalPixels];
+
+    for (var i = 0; i < totalPixels; ++i)
+      result[i] = data[i * 2]; // high byte
+
+    return result;
+  }
+
+  // ── Direct 8→16 upscale ───────────────────────────────────────────────────
+
+  /// <summary>Converts RGB24 (3 bytes/pixel) to RGB48 big-endian (6 bytes/pixel). Upscales via v*257 = (v&lt;&lt;8)|v.</summary>
+  public static byte[] Rgb24ToRgb48(byte[] data, int totalPixels) {
+    var result = new byte[totalPixels * 6];
+
+    for (var i = 0; i < totalPixels; ++i) {
+      var src = i * 3;
+      var dst = i * 6;
+      var r = data[src];
+      var g = data[src + 1];
+      var b = data[src + 2];
+      result[dst] = r;
+      result[dst + 1] = r;
+      result[dst + 2] = g;
+      result[dst + 3] = g;
+      result[dst + 4] = b;
+      result[dst + 5] = b;
+    }
+
+    return result;
+  }
+
+  /// <summary>Converts RGBA32 (4 bytes/pixel) to RGBA64 big-endian (8 bytes/pixel). Upscales via v*257.</summary>
+  public static byte[] Rgba32ToRgba64(byte[] data, int totalPixels) {
+    var result = new byte[totalPixels * 8];
+
+    for (var i = 0; i < totalPixels; ++i) {
+      var src = i * 4;
+      var dst = i * 8;
+      var r = data[src];
+      var g = data[src + 1];
+      var b = data[src + 2];
+      var a = data[src + 3];
+      result[dst] = r;
+      result[dst + 1] = r;
+      result[dst + 2] = g;
+      result[dst + 3] = g;
+      result[dst + 4] = b;
+      result[dst + 5] = b;
+      result[dst + 6] = a;
+      result[dst + 7] = a;
+    }
+
+    return result;
+  }
+
+  /// <summary>Converts 8-bit grayscale (1 byte/pixel) to 16-bit big-endian grayscale (2 bytes/pixel). Upscales via v*257.</summary>
+  public static byte[] Gray8ToGray16(byte[] data, int totalPixels) {
+    var result = new byte[totalPixels * 2];
+
+    for (var i = 0; i < totalPixels; ++i) {
+      var v = data[i];
+      result[i * 2] = v;     // hi = v
+      result[i * 2 + 1] = v; // lo = v (v*257 = v<<8 | v)
     }
 
     return result;

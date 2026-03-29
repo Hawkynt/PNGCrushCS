@@ -52,7 +52,7 @@ public sealed class PngChunkReader {
 
       var data = new byte[length];
       if (length > 0)
-        Array.Copy(pngBytes, offset, data, 0, length);
+        pngBytes.AsSpan(offset, length).CopyTo(data.AsSpan(0));
       offset += length;
 
       offset += 4;

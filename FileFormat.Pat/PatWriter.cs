@@ -1,0 +1,46 @@
+﻿using System;
+using System.Buffers.Binary;
+using System.Text;
+
+namespace FileFormat.Pat;
+
+/// <summary>Assembles GIMP Pattern (PAT) file bytes.</summary>
+public static class PatWriter {
+
+  /// <summary>Fixed header fields before the name: header_size(4) + version(4) + width(4) + height(4) + bpp(4) + magic(4) = 24 bytes.</summary>
+  private const int _FIXED_HEADER_SIZE = 24;
+
+  public static byte[] ToBytes(PatFile file) {
+    ArgumentNullException.ThrowIfNull(file);
+    return Assemble(file.Width, file.Height, file.BytesPerPixel, file.Name, file.PixelData);
+  }
+
+  internal static byte[] Assemble(int width, int height, int bytesPerPixel, string name, byte[] pixelData) {
+    var nameBytes = Encoding.UTF8.GetBytes(name ?? string.Empty);
+    var headerSize = _FIXED_HEADER_SIZE + nameBytes.Length + 1; // +1 for null terminator
+    var expectedPixelBytes = width * height * bytesPerPixel;
+    var result = new byte[headerSize + expectedPixelBytes];
+    var span = result.AsSpan();
+
+    BinaryPrimitives.WriteUInt32BigEndian(span, (uint)headerSize);
+    BinaryPrimitives.WriteUInt32BigEndian(span[4..], 1u); // version
+    BinaryPrimitives.WriteUInt32BigEndian(span[8..], (uint)width);
+    BinaryPrimitives.WriteUInt32BigEndian(span[12..], (uint)height);
+    BinaryPrimitives.WriteUInt32BigEndian(span[16..], (uint)bytesPerPixel);
+
+    // Magic "GPAT" at offset 20
+    result[20] = (byte)'G';
+    result[21] = (byte)'P';
+    result[22] = (byte)'A';
+    result[23] = (byte)'T';
+
+    // Name (UTF-8, null-terminated)
+    nameBytes.AsSpan(0, nameBytes.Length).CopyTo(result.AsSpan(_FIXED_HEADER_SIZE));
+    result[_FIXED_HEADER_SIZE + nameBytes.Length] = 0; // null terminator
+
+    // Pixel data
+    pixelData.AsSpan(0, Math.Min(expectedPixelBytes, pixelData.Length)).CopyTo(result.AsSpan(headerSize));
+
+    return result;
+  }
+}

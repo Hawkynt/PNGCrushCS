@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>preview</LangVersion>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.0" />
+    <PackageReference Include="NUnit" Version="4.3.2" />
+    <PackageReference Include="NUnit.Analyzers" Version="4.7.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\FileFormat.Core\FileFormat.Core.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Msp\FileFormat.Msp.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Ico\FileFormat.Ico.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Cur\FileFormat.Cur.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Ani\FileFormat.Ani.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Apng\FileFormat.Apng.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Mng\FileFormat.Mng.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Fli\FileFormat.Fli.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Dcx\FileFormat.Dcx.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Mpo\FileFormat.Mpo.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Icns\FileFormat.Icns.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Tiff\FileFormat.Tiff.csproj" />
+    <ProjectReference Include="..\..\FileFormat.BigTiff\FileFormat.BigTiff.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Png\FileFormat.Png.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Pcx\FileFormat.Pcx.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Jpeg\FileFormat.Jpeg.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Riff\FileFormat.Riff.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="NUnit.Framework" />
+  </ItemGroup>
+</Project>

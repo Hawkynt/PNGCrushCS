@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <LangVersion>preview</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.0" />
+    <PackageReference Include="NUnit" Version="4.3.2" />
+    <PackageReference Include="NUnit.Analyzers" Version="4.7.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Optimizer.Image\Optimizer.Image.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Core\FileFormat.Core.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Bmp\FileFormat.Bmp.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Farbfeld\FileFormat.Farbfeld.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Pcx\FileFormat.Pcx.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Qoi\FileFormat.Qoi.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Sgi\FileFormat.Sgi.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Tga\FileFormat.Tga.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="NUnit.Framework" />
+  </ItemGroup>
+
+</Project>

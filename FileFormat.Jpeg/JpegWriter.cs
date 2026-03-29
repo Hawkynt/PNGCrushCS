@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using BitMiracle.LibJpeg.Classic;
 
@@ -119,7 +119,7 @@ internal static class JpegWriter {
     var rowBuffer = new byte[rowStride];
 
     for (var y = 0; y < height; ++y) {
-      Array.Copy(rgbPixelData, y * rowStride, rowBuffer, 0, rowStride);
+      rgbPixelData.AsSpan(y * rowStride, rowStride).CopyTo(rowBuffer.AsSpan(0));
       var rowPointer = new byte[][] { rowBuffer };
       cinfo.jpeg_write_scanlines(rowPointer, 1);
     }

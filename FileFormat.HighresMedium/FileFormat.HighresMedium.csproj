@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>preview</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Version>1.0.0</Version>
+    <Authors>Hawkynt</Authors>
+    <Description>Pure C# Atari ST Highres Medium (.hrm) interlaced image format reader and writer. 640x200, 2 frames blended for more colors.</Description>
+    <PackageLicenseExpression>LGPL-3.0-or-later</PackageLicenseExpression>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Optimizer.HighresMedium" />
+    <InternalsVisibleTo Include="Optimizer.HighresMedium.Tests" />
+    <InternalsVisibleTo Include="FileFormat.HighresMedium.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\FileFormat.Core\FileFormat.Core.csproj" />
+    <ProjectReference Include="..\FileFormat.Core.Generators\FileFormat.Core.Generators.csproj"
+                      OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+</Project>

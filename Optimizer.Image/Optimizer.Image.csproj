@@ -210,6 +210,421 @@
     <ProjectReference Include="..\FileFormat.BigTiff\FileFormat.BigTiff.csproj" />
     <ProjectReference Include="..\FileFormat.AutodeskCel\FileFormat.AutodeskCel.csproj" />
     <ProjectReference Include="..\FileFormat.Wad2\FileFormat.Wad2.csproj" />
+    <ProjectReference Include="..\FileFormat.GbaTile\FileFormat.GbaTile.csproj" />
+    <ProjectReference Include="..\FileFormat.WonderSwanTile\FileFormat.WonderSwanTile.csproj" />
+    <ProjectReference Include="..\FileFormat.NeoGeoSprite\FileFormat.NeoGeoSprite.csproj" />
+    <ProjectReference Include="..\FileFormat.NdsTexture\FileFormat.NdsTexture.csproj" />
+    <ProjectReference Include="..\FileFormat.VirtualBoyTile\FileFormat.VirtualBoyTile.csproj" />
+    <ProjectReference Include="..\FileFormat.Vic20\FileFormat.Vic20.csproj" />
+    <ProjectReference Include="..\FileFormat.Dragon\FileFormat.Dragon.csproj" />
+    <ProjectReference Include="..\FileFormat.JupiterAce\FileFormat.JupiterAce.csproj" />
+    <ProjectReference Include="..\FileFormat.Zx81\FileFormat.Zx81.csproj" />
+    <ProjectReference Include="..\FileFormat.C128\FileFormat.C128.csproj" />
+    <ProjectReference Include="..\FileFormat.C16Plus4\FileFormat.C16Plus4.csproj" />
+    <ProjectReference Include="..\FileFormat.Electronika\FileFormat.Electronika.csproj" />
+    <ProjectReference Include="..\FileFormat.Vector06c\FileFormat.Vector06c.csproj" />
+    <ProjectReference Include="..\FileFormat.TiBitmap\FileFormat.TiBitmap.csproj" />
+    <ProjectReference Include="..\FileFormat.HpGrob\FileFormat.HpGrob.csproj" />
+    <ProjectReference Include="..\FileFormat.EpaBios\FileFormat.EpaBios.csproj" />
+    <ProjectReference Include="..\FileFormat.CiscoIp\FileFormat.CiscoIp.csproj" />
+    <ProjectReference Include="..\FileFormat.PocketPc2bp\FileFormat.PocketPc2bp.csproj" />
+    <ProjectReference Include="..\FileFormat.Mag\FileFormat.Mag.csproj" />
+    <ProjectReference Include="..\FileFormat.Pi\FileFormat.Pi.csproj" />
+    <ProjectReference Include="..\FileFormat.Q0\FileFormat.Q0.csproj" />
+    <ProjectReference Include="..\FileFormat.NokiaLogo\FileFormat.NokiaLogo.csproj" />
+    <ProjectReference Include="..\FileFormat.NokiaNlm\FileFormat.NokiaNlm.csproj" />
+    <ProjectReference Include="..\FileFormat.SiemensBmx\FileFormat.SiemensBmx.csproj" />
+    <ProjectReference Include="..\FileFormat.PsionPic\FileFormat.PsionPic.csproj" />
+    <ProjectReference Include="..\FileFormat.KofaxKfx\FileFormat.KofaxKfx.csproj" />
+    <ProjectReference Include="..\FileFormat.BrooktroutFax\FileFormat.BrooktroutFax.csproj" />
+    <ProjectReference Include="..\FileFormat.WinFax\FileFormat.WinFax.csproj" />
+    <ProjectReference Include="..\FileFormat.EdmicsC4\FileFormat.EdmicsC4.csproj" />
+    <ProjectReference Include="..\FileFormat.PixarRib\FileFormat.PixarRib.csproj" />
+    <ProjectReference Include="..\FileFormat.Sdt\FileFormat.Sdt.csproj" />
+    <ProjectReference Include="..\FileFormat.MatLab\FileFormat.MatLab.csproj" />
+    <ProjectReference Include="..\FileFormat.Ipl\FileFormat.Ipl.csproj" />
+    <ProjectReference Include="..\FileFormat.Vivid\FileFormat.Vivid.csproj" />
+    <ProjectReference Include="..\FileFormat.Bob\FileFormat.Bob.csproj" />
+    <ProjectReference Include="..\FileFormat.GfaRaytrace\FileFormat.GfaRaytrace.csproj" />
+    <ProjectReference Include="..\FileFormat.Cloe\FileFormat.Cloe.csproj" />
+    <ProjectReference Include="..\FileFormat.QuakeLmp\FileFormat.QuakeLmp.csproj" />
+    <ProjectReference Include="..\FileFormat.HalfLifeMdl\FileFormat.HalfLifeMdl.csproj" />
+    <ProjectReference Include="..\FileFormat.HereticM8\FileFormat.HereticM8.csproj" />
+    <ProjectReference Include="..\FileFormat.DoomFlat\FileFormat.DoomFlat.csproj" />
+    <ProjectReference Include="..\FileFormat.FaxG3\FileFormat.FaxG3.csproj" />
+    <ProjectReference Include="..\FileFormat.StelaRaw\FileFormat.StelaRaw.csproj" />
+    <ProjectReference Include="..\FileFormat.MonoMagic\FileFormat.MonoMagic.csproj" />
+    <ProjectReference Include="..\FileFormat.Ecw\FileFormat.Ecw.csproj" />
+    <!-- Wave 22 -->
+    <ProjectReference Include="..\FileFormat.Thomson\FileFormat.Thomson.csproj" />
+    <ProjectReference Include="..\FileFormat.CommodorePet\FileFormat.CommodorePet.csproj" />
+    <ProjectReference Include="..\FileFormat.FmTowns\FileFormat.FmTowns.csproj" />
+    <ProjectReference Include="..\FileFormat.Pc88\FileFormat.Pc88.csproj" />
+    <ProjectReference Include="..\FileFormat.Enterprise128\FileFormat.Enterprise128.csproj" />
+    <ProjectReference Include="..\FileFormat.Atari7800\FileFormat.Atari7800.csproj" />
+    <ProjectReference Include="..\FileFormat.SharpX68k\FileFormat.SharpX68k.csproj" />
+    <ProjectReference Include="..\FileFormat.RiscOsSprite\FileFormat.RiscOsSprite.csproj" />
+    <ProjectReference Include="..\FileFormat.NeoGeoPocket\FileFormat.NeoGeoPocket.csproj" />
+    <ProjectReference Include="..\FileFormat.Atari2600\FileFormat.Atari2600.csproj" />
+    <ProjectReference Include="..\FileFormat.ScitexCt\FileFormat.ScitexCt.csproj" />
+    <ProjectReference Include="..\FileFormat.UtahRle\FileFormat.UtahRle.csproj" />
+    <!-- Wave 23: C64 art program formats -->
+    <ProjectReference Include="..\FileFormat.Doodle\FileFormat.Doodle.csproj" />
+    <ProjectReference Include="..\FileFormat.DoodleComp\FileFormat.DoodleComp.csproj" />
+    <ProjectReference Include="..\FileFormat.MicroIllustrator\FileFormat.MicroIllustrator.csproj" />
+    <ProjectReference Include="..\FileFormat.Vidcom64\FileFormat.Vidcom64.csproj" />
+    <ProjectReference Include="..\FileFormat.Picasso64\FileFormat.Picasso64.csproj" />
+    <ProjectReference Include="..\FileFormat.InterPaintHi\FileFormat.InterPaintHi.csproj" />
+    <ProjectReference Include="..\FileFormat.InterPaintMc\FileFormat.InterPaintMc.csproj" />
+    <ProjectReference Include="..\FileFormat.AdvancedArtStudio\FileFormat.AdvancedArtStudio.csproj" />
+    <ProjectReference Include="..\FileFormat.RunPaint\FileFormat.RunPaint.csproj" />
+    <ProjectReference Include="..\FileFormat.Bfli\FileFormat.Bfli.csproj" />
+    <ProjectReference Include="..\FileFormat.FunPainter\FileFormat.FunPainter.csproj" />
+    <ProjectReference Include="..\FileFormat.DrazPaint\FileFormat.DrazPaint.csproj" />
+    <ProjectReference Include="..\FileFormat.GigaPaint\FileFormat.GigaPaint.csproj" />
+    <ProjectReference Include="..\FileFormat.PrintfoxPagefox\FileFormat.PrintfoxPagefox.csproj" />
+    <!-- Wave 24: Retro/scientific/professional formats -->
+    <ProjectReference Include="..\FileFormat.Stad\FileFormat.Stad.csproj" />
+    <ProjectReference Include="..\FileFormat.PortfolioGraphics\FileFormat.PortfolioGraphics.csproj" />
+    <ProjectReference Include="..\FileFormat.PrintShop\FileFormat.PrintShop.csproj" />
+    <ProjectReference Include="..\FileFormat.IconLibrary\FileFormat.IconLibrary.csproj" />
+    <ProjectReference Include="..\FileFormat.YuvRaw\FileFormat.YuvRaw.csproj" />
+    <ProjectReference Include="..\FileFormat.ZeissLsm\FileFormat.ZeissLsm.csproj" />
+    <ProjectReference Include="..\FileFormat.Ioca\FileFormat.Ioca.csproj" />
+    <ProjectReference Include="..\FileFormat.SpotImage\FileFormat.SpotImage.csproj" />
+    <ProjectReference Include="..\FileFormat.ImageSystem\FileFormat.ImageSystem.csproj" />
+    <ProjectReference Include="..\FileFormat.ZeissBivas\FileFormat.ZeissBivas.csproj" />
+    <ProjectReference Include="..\FileFormat.PrintMaster\FileFormat.PrintMaster.csproj" />
+    <!-- Wave 25: C64 art programs round 2 -->
+    <ProjectReference Include="..\FileFormat.Artist64\FileFormat.Artist64.csproj" />
+    <ProjectReference Include="..\FileFormat.FacePainter\FileFormat.FacePainter.csproj" />
+    <ProjectReference Include="..\FileFormat.FunGraphicsMachine\FileFormat.FunGraphicsMachine.csproj" />
+    <ProjectReference Include="..\FileFormat.GoDot4Bit\FileFormat.GoDot4Bit.csproj" />
+    <ProjectReference Include="..\FileFormat.HiresC64\FileFormat.HiresC64.csproj" />
+    <ProjectReference Include="..\FileFormat.EggPaint\FileFormat.EggPaint.csproj" />
+    <ProjectReference Include="..\FileFormat.CDUPaint\FileFormat.CDUPaint.csproj" />
+    <ProjectReference Include="..\FileFormat.RainbowPainter\FileFormat.RainbowPainter.csproj" />
+    <ProjectReference Include="..\FileFormat.KoalaCompressed\FileFormat.KoalaCompressed.csproj" />
+    <!-- Wave 26: Atari ST round 2 -->
+    <ProjectReference Include="..\FileFormat.DoodleAtari\FileFormat.DoodleAtari.csproj" />
+    <ProjectReference Include="..\FileFormat.Spectrum512Comp\FileFormat.Spectrum512Comp.csproj" />
+    <ProjectReference Include="..\FileFormat.Spectrum512Smoosh\FileFormat.Spectrum512Smoosh.csproj" />
+    <ProjectReference Include="..\FileFormat.DaliRaw\FileFormat.DaliRaw.csproj" />
+    <ProjectReference Include="..\FileFormat.Gigacad\FileFormat.Gigacad.csproj" />
+    <ProjectReference Include="..\FileFormat.MegaPaint\FileFormat.MegaPaint.csproj" />
+    <ProjectReference Include="..\FileFormat.FontasyGrafik\FileFormat.FontasyGrafik.csproj" />
+    <ProjectReference Include="..\FileFormat.ArtDirector\FileFormat.ArtDirector.csproj" />
+    <!-- Wave 27: Unix/raytracer/scientific -->
+    <ProjectReference Include="..\FileFormat.AndrewToolkit\FileFormat.AndrewToolkit.csproj" />
+    <ProjectReference Include="..\FileFormat.MgrBitmap\FileFormat.MgrBitmap.csproj" />
+    <ProjectReference Include="..\FileFormat.FaceServer\FileFormat.FaceServer.csproj" />
+    <ProjectReference Include="..\FileFormat.DbwRender\FileFormat.DbwRender.csproj" />
+    <ProjectReference Include="..\FileFormat.SbigCcd\FileFormat.SbigCcd.csproj" />
+    <ProjectReference Include="..\FileFormat.Cp8Gray\FileFormat.Cp8Gray.csproj" />
+    <ProjectReference Include="..\FileFormat.ComputerEyes\FileFormat.ComputerEyes.csproj" />
+    <ProjectReference Include="..\FileFormat.PmBitmap\FileFormat.PmBitmap.csproj" />
+    <!-- Wave 28: Game/fax/misc -->
+    <ProjectReference Include="..\FileFormat.DivGameMap\FileFormat.DivGameMap.csproj" />
+    <ProjectReference Include="..\FileFormat.HomeworldLif\FileFormat.HomeworldLif.csproj" />
+    <ProjectReference Include="..\FileFormat.Ps2Txc\FileFormat.Ps2Txc.csproj" />
+    <ProjectReference Include="..\FileFormat.HayesJtfax\FileFormat.HayesJtfax.csproj" />
+    <ProjectReference Include="..\FileFormat.GammaFax\FileFormat.GammaFax.csproj" />
+    <ProjectReference Include="..\FileFormat.CompW\FileFormat.CompW.csproj" />
+    <ProjectReference Include="..\FileFormat.DolphinEd\FileFormat.DolphinEd.csproj" />
+    <ProjectReference Include="..\FileFormat.NokiaGroupGraphics\FileFormat.NokiaGroupGraphics.csproj" />
+    <!-- Wave 29: Additional misc -->
+    <ProjectReference Include="..\FileFormat.Im5Visilog\FileFormat.Im5Visilog.csproj" />
+    <ProjectReference Include="..\FileFormat.Pco16Bit\FileFormat.Pco16Bit.csproj" />
+    <ProjectReference Include="..\FileFormat.HiEddi\FileFormat.HiEddi.csproj" />
+    <ProjectReference Include="..\FileFormat.PaintMagic\FileFormat.PaintMagic.csproj" />
+    <ProjectReference Include="..\FileFormat.SaracenPaint\FileFormat.SaracenPaint.csproj" />
+    <!-- Wave 30: Fax variants batch 1 -->
+    <ProjectReference Include="..\FileFormat.AttGroup4\FileFormat.AttGroup4.csproj" />
+    <ProjectReference Include="..\FileFormat.AccessFax\FileFormat.AccessFax.csproj" />
+    <ProjectReference Include="..\FileFormat.AdTechFax\FileFormat.AdTechFax.csproj" />
+    <ProjectReference Include="..\FileFormat.BfxBitware\FileFormat.BfxBitware.csproj" />
+    <ProjectReference Include="..\FileFormat.BrotherFax\FileFormat.BrotherFax.csproj" />
+    <ProjectReference Include="..\FileFormat.CanonNavFax\FileFormat.CanonNavFax.csproj" />
+    <ProjectReference Include="..\FileFormat.EverexFax\FileFormat.EverexFax.csproj" />
+    <ProjectReference Include="..\FileFormat.FaxMan\FileFormat.FaxMan.csproj" />
+    <ProjectReference Include="..\FileFormat.FremontFax\FileFormat.FremontFax.csproj" />
+    <ProjectReference Include="..\FileFormat.ImagingFax\FileFormat.ImagingFax.csproj" />
+    <!-- Wave 31: Fax variants batch 2 -->
+    <ProjectReference Include="..\FileFormat.MobileFax\FileFormat.MobileFax.csproj" />
+    <ProjectReference Include="..\FileFormat.OazFax\FileFormat.OazFax.csproj" />
+    <ProjectReference Include="..\FileFormat.OlicomFax\FileFormat.OlicomFax.csproj" />
+    <ProjectReference Include="..\FileFormat.RicohFax\FileFormat.RicohFax.csproj" />
+    <ProjectReference Include="..\FileFormat.SciFax\FileFormat.SciFax.csproj" />
+    <ProjectReference Include="..\FileFormat.SmartFax\FileFormat.SmartFax.csproj" />
+    <ProjectReference Include="..\FileFormat.Tg4\FileFormat.Tg4.csproj" />
+    <ProjectReference Include="..\FileFormat.TeliFax\FileFormat.TeliFax.csproj" />
+    <ProjectReference Include="..\FileFormat.VentaFax\FileFormat.VentaFax.csproj" />
+    <ProjectReference Include="..\FileFormat.WorldportFax\FileFormat.WorldportFax.csproj" />
+    <!-- Wave 32: Scientific/satellite/industrial -->
+    <ProjectReference Include="..\FileFormat.NistIHead\FileFormat.NistIHead.csproj" />
+    <ProjectReference Include="..\FileFormat.AvhrrImage\FileFormat.AvhrrImage.csproj" />
+    <ProjectReference Include="..\FileFormat.ByuSir\FileFormat.ByuSir.csproj" />
+    <ProjectReference Include="..\FileFormat.Grs16\FileFormat.Grs16.csproj" />
+    <ProjectReference Include="..\FileFormat.CsvImage\FileFormat.CsvImage.csproj" />
+    <ProjectReference Include="..\FileFormat.HfImage\FileFormat.HfImage.csproj" />
+    <ProjectReference Include="..\FileFormat.LucasFilm\FileFormat.LucasFilm.csproj" />
+    <ProjectReference Include="..\FileFormat.QuantelVpb\FileFormat.QuantelVpb.csproj" />
+    <!-- Wave 33: Game/camera/retro -->
+    <ProjectReference Include="..\FileFormat.RedStormRsb\FileFormat.RedStormRsb.csproj" />
+    <ProjectReference Include="..\FileFormat.SegaSj1\FileFormat.SegaSj1.csproj" />
+    <ProjectReference Include="..\FileFormat.SonyMavica\FileFormat.SonyMavica.csproj" />
+    <ProjectReference Include="..\FileFormat.Pic2\FileFormat.Pic2.csproj" />
+    <ProjectReference Include="..\FileFormat.FunPhotor\FileFormat.FunPhotor.csproj" />
+    <ProjectReference Include="..\FileFormat.AtariGrafik\FileFormat.AtariGrafik.csproj" />
+    <ProjectReference Include="..\FileFormat.Calamus\FileFormat.Calamus.csproj" />
+    <ProjectReference Include="..\FileFormat.NewsRoom\FileFormat.NewsRoom.csproj" />
+    <!-- Wave 34: Miscellaneous remaining -->
+    <ProjectReference Include="..\FileFormat.AdexImage\FileFormat.AdexImage.csproj" />
+    <ProjectReference Include="..\FileFormat.AimGrayScale\FileFormat.AimGrayScale.csproj" />
+    <ProjectReference Include="..\FileFormat.QdvImage\FileFormat.QdvImage.csproj" />
+    <ProjectReference Include="..\FileFormat.SifImage\FileFormat.SifImage.csproj" />
+    <ProjectReference Include="..\FileFormat.WebShots\FileFormat.WebShots.csproj" />
+    <ProjectReference Include="..\FileFormat.Rlc2\FileFormat.Rlc2.csproj" />
+    <ProjectReference Include="..\FileFormat.SeqImage\FileFormat.SeqImage.csproj" />
+    <!-- Wave 35: C64 art programs round 3 -->
+    <ProjectReference Include="..\FileFormat.Afli\FileFormat.Afli.csproj" />
+    <ProjectReference Include="..\FileFormat.Fli64\FileFormat.Fli64.csproj" />
+    <ProjectReference Include="..\FileFormat.FliGraph\FileFormat.FliGraph.csproj" />
+    <ProjectReference Include="..\FileFormat.Blazing\FileFormat.Blazing.csproj" />
+    <ProjectReference Include="..\FileFormat.DoodlePacked\FileFormat.DoodlePacked.csproj" />
+    <ProjectReference Include="..\FileFormat.SuperHires\FileFormat.SuperHires.csproj" />
+    <ProjectReference Include="..\FileFormat.FliDesigner2\FileFormat.FliDesigner2.csproj" />
+    <ProjectReference Include="..\FileFormat.Centauri\FileFormat.Centauri.csproj" />
+    <ProjectReference Include="..\FileFormat.Pixel64\FileFormat.Pixel64.csproj" />
+    <ProjectReference Include="..\FileFormat.HiResEditor\FileFormat.HiResEditor.csproj" />
+    <ProjectReference Include="..\FileFormat.MultiPainter\FileFormat.MultiPainter.csproj" />
+    <ProjectReference Include="..\FileFormat.BugBitmap\FileFormat.BugBitmap.csproj" />
+    <ProjectReference Include="..\FileFormat.AnimPainter\FileFormat.AnimPainter.csproj" />
+    <ProjectReference Include="..\FileFormat.Cheese\FileFormat.Cheese.csproj" />
+    <ProjectReference Include="..\FileFormat.ImageSysC64\FileFormat.ImageSysC64.csproj" />
+    <ProjectReference Include="..\FileFormat.Sprite64\FileFormat.Sprite64.csproj" />
+    <ProjectReference Include="..\FileFormat.CharSet64\FileFormat.CharSet64.csproj" />
+    <!-- Wave 36: Atari 8-bit -->
+    <ProjectReference Include="..\FileFormat.MicroPainter8\FileFormat.MicroPainter8.csproj" />
+    <ProjectReference Include="..\FileFormat.GraphicsMaster\FileFormat.GraphicsMaster.csproj" />
+    <ProjectReference Include="..\FileFormat.FuntasticPaint\FileFormat.FuntasticPaint.csproj" />
+    <ProjectReference Include="..\FileFormat.Interlace8\FileFormat.Interlace8.csproj" />
+    <ProjectReference Include="..\FileFormat.AtariPlayer\FileFormat.AtariPlayer.csproj" />
+    <ProjectReference Include="..\FileFormat.AtariCompressed\FileFormat.AtariCompressed.csproj" />
+    <ProjectReference Include="..\FileFormat.AtariFont\FileFormat.AtariFont.csproj" />
+    <ProjectReference Include="..\FileFormat.ArtStudio8\FileFormat.ArtStudio8.csproj" />
+    <ProjectReference Include="..\FileFormat.AtariGraphics9\FileFormat.AtariGraphics9.csproj" />
+    <ProjectReference Include="..\FileFormat.AtariGraphics10\FileFormat.AtariGraphics10.csproj" />
+    <ProjectReference Include="..\FileFormat.AtariGraphics11\FileFormat.AtariGraphics11.csproj" />
+    <ProjectReference Include="..\FileFormat.RamBrandt\FileFormat.RamBrandt.csproj" />
+    <ProjectReference Include="..\FileFormat.AtariArtist\FileFormat.AtariArtist.csproj" />
+    <ProjectReference Include="..\FileFormat.GreatPaint\FileFormat.GreatPaint.csproj" />
+    <ProjectReference Include="..\FileFormat.AtariCAD\FileFormat.AtariCAD.csproj" />
+    <ProjectReference Include="..\FileFormat.AtariDump\FileFormat.AtariDump.csproj" />
+    <ProjectReference Include="..\FileFormat.MicroIllustratorA8\FileFormat.MicroIllustratorA8.csproj" />
+    <ProjectReference Include="..\FileFormat.PictureEditor\FileFormat.PictureEditor.csproj" />
+    <ProjectReference Include="..\FileFormat.HighResAtari\FileFormat.HighResAtari.csproj" />
+    <ProjectReference Include="..\FileFormat.AtariMaxi\FileFormat.AtariMaxi.csproj" />
+    <ProjectReference Include="..\FileFormat.SoftwareAutomation\FileFormat.SoftwareAutomation.csproj" />
+    <ProjectReference Include="..\FileFormat.AtariPicture\FileFormat.AtariPicture.csproj" />
+    <ProjectReference Include="..\FileFormat.AtariAnimation\FileFormat.AtariAnimation.csproj" />
+    <ProjectReference Include="..\FileFormat.CinemasterAtari\FileFormat.CinemasterAtari.csproj" />
+    <ProjectReference Include="..\FileFormat.AtariAnticMode\FileFormat.AtariAnticMode.csproj" />
+    <!-- Wave 37: Atari ST/STE round 3 -->
+    <ProjectReference Include="..\FileFormat.AladdinPaint\FileFormat.AladdinPaint.csproj" />
+    <ProjectReference Include="..\FileFormat.Canvas\FileFormat.Canvas.csproj" />
+    <ProjectReference Include="..\FileFormat.Crack\FileFormat.Crack.csproj" />
+    <ProjectReference Include="..\FileFormat.Deluxe\FileFormat.Deluxe.csproj" />
+    <ProjectReference Include="..\FileFormat.DigiSpec\FileFormat.DigiSpec.csproj" />
+    <ProjectReference Include="..\FileFormat.EscapePaint\FileFormat.EscapePaint.csproj" />
+    <ProjectReference Include="..\FileFormat.FreeHand\FileFormat.FreeHand.csproj" />
+    <ProjectReference Include="..\FileFormat.GfaPaint\FileFormat.GfaPaint.csproj" />
+    <ProjectReference Include="..\FileFormat.HighResST\FileFormat.HighResST.csproj" />
+    <ProjectReference Include="..\FileFormat.ImagicPaint\FileFormat.ImagicPaint.csproj" />
+    <ProjectReference Include="..\FileFormat.MonoStar\FileFormat.MonoStar.csproj" />
+    <ProjectReference Include="..\FileFormat.OcsPics\FileFormat.OcsPics.csproj" />
+    <ProjectReference Include="..\FileFormat.PaintPro\FileFormat.PaintPro.csproj" />
+    <ProjectReference Include="..\FileFormat.PicWorks\FileFormat.PicWorks.csproj" />
+    <ProjectReference Include="..\FileFormat.ScreenBlaster\FileFormat.ScreenBlaster.csproj" />
+    <ProjectReference Include="..\FileFormat.SpcPainter\FileFormat.SpcPainter.csproj" />
+    <ProjectReference Include="..\FileFormat.StTrueColor\FileFormat.StTrueColor.csproj" />
+    <ProjectReference Include="..\FileFormat.TurboView\FileFormat.TurboView.csproj" />
+    <!-- Wave 38: Atari Falcon -->
+    <ProjectReference Include="..\FileFormat.FalconPaint\FileFormat.FalconPaint.csproj" />
+    <ProjectReference Include="..\FileFormat.FalconRes\FileFormat.FalconRes.csproj" />
+    <ProjectReference Include="..\FileFormat.GodPaint\FileFormat.GodPaint.csproj" />
+    <ProjectReference Include="..\FileFormat.IndyPaint\FileFormat.IndyPaint.csproj" />
+    <ProjectReference Include="..\FileFormat.PhotoChrome\FileFormat.PhotoChrome.csproj" />
+    <ProjectReference Include="..\FileFormat.PntrFalcon\FileFormat.PntrFalcon.csproj" />
+    <ProjectReference Include="..\FileFormat.RagePaint\FileFormat.RagePaint.csproj" />
+    <ProjectReference Include="..\FileFormat.SmartST\FileFormat.SmartST.csproj" />
+    <ProjectReference Include="..\FileFormat.SpeederFalcon\FileFormat.SpeederFalcon.csproj" />
+    <ProjectReference Include="..\FileFormat.TriPaint\FileFormat.TriPaint.csproj" />
+    <ProjectReference Include="..\FileFormat.VidiChrome\FileFormat.VidiChrome.csproj" />
+    <!-- Wave 39: MSX2/MSX2+ -->
+    <ProjectReference Include="..\FileFormat.GraphSaurus\FileFormat.GraphSaurus.csproj" />
+    <ProjectReference Include="..\FileFormat.MsxView\FileFormat.MsxView.csproj" />
+    <ProjectReference Include="..\FileFormat.MsxVideo\FileFormat.MsxVideo.csproj" />
+    <ProjectReference Include="..\FileFormat.YJKImage\FileFormat.YJKImage.csproj" />
+    <ProjectReference Include="..\FileFormat.MsxSprite\FileFormat.MsxSprite.csproj" />
+    <ProjectReference Include="..\FileFormat.MsxFont\FileFormat.MsxFont.csproj" />
+    <!-- Wave 40: ZX Spectrum extensions -->
+    <ProjectReference Include="..\FileFormat.ZxMulticolor\FileFormat.ZxMulticolor.csproj" />
+    <ProjectReference Include="..\FileFormat.ZxGigascreen\FileFormat.ZxGigascreen.csproj" />
+    <ProjectReference Include="..\FileFormat.ZxTimex\FileFormat.ZxTimex.csproj" />
+    <ProjectReference Include="..\FileFormat.ZxArtStudio\FileFormat.ZxArtStudio.csproj" />
+    <ProjectReference Include="..\FileFormat.ZxFlash\FileFormat.ZxFlash.csproj" />
+    <ProjectReference Include="..\FileFormat.ZxMlg\FileFormat.ZxMlg.csproj" />
+    <ProjectReference Include="..\FileFormat.ZxChrd\FileFormat.ZxChrd.csproj" />
+    <ProjectReference Include="..\FileFormat.ZxTricolor\FileFormat.ZxTricolor.csproj" />
+    <ProjectReference Include="..\FileFormat.ZxUlaPlus\FileFormat.ZxUlaPlus.csproj" />
+    <ProjectReference Include="..\FileFormat.ZxNext\FileFormat.ZxNext.csproj" />
+    <!-- Wave 41: Amiga extensions -->
+    <ProjectReference Include="..\FileFormat.IffSham\FileFormat.IffSham.csproj" />
+    <ProjectReference Include="..\FileFormat.IffDctv\FileFormat.IffDctv.csproj" />
+    <ProjectReference Include="..\FileFormat.IffHame\FileFormat.IffHame.csproj" />
+    <ProjectReference Include="..\FileFormat.IffAnim8\FileFormat.IffAnim8.csproj" />
+    <ProjectReference Include="..\FileFormat.IffDpan\FileFormat.IffDpan.csproj" />
+    <ProjectReference Include="..\FileFormat.IffMultiPalette\FileFormat.IffMultiPalette.csproj" />
+    <!-- Wave 42: TRS-80 CoCo / C128 / CPC -->
+    <ProjectReference Include="..\FileFormat.CoCo\FileFormat.CoCo.csproj" />
+    <ProjectReference Include="..\FileFormat.CoCo3\FileFormat.CoCo3.csproj" />
+    <ProjectReference Include="..\FileFormat.CoCoMax\FileFormat.CoCoMax.csproj" />
+    <ProjectReference Include="..\FileFormat.C128Multi\FileFormat.C128Multi.csproj" />
+    <ProjectReference Include="..\FileFormat.C128VDC\FileFormat.C128VDC.csproj" />
+    <ProjectReference Include="..\FileFormat.C128Hires\FileFormat.C128Hires.csproj" />
+    <ProjectReference Include="..\FileFormat.CpcAdvanced\FileFormat.CpcAdvanced.csproj" />
+    <ProjectReference Include="..\FileFormat.CpcOverscan\FileFormat.CpcOverscan.csproj" />
+    <ProjectReference Include="..\FileFormat.CpcPlus\FileFormat.CpcPlus.csproj" />
+    <ProjectReference Include="..\FileFormat.CpcSprite\FileFormat.CpcSprite.csproj" />
+    <ProjectReference Include="..\FileFormat.CpcFont\FileFormat.CpcFont.csproj" />
+    <!-- Wave 43: Miscellaneous remaining -->
+    <ProjectReference Include="..\FileFormat.AppleShr\FileFormat.AppleShr.csproj" />
+    <ProjectReference Include="..\FileFormat.MobyDick\FileFormat.MobyDick.csproj" />
+    <ProjectReference Include="..\FileFormat.ScreenMaker\FileFormat.ScreenMaker.csproj" />
+    <ProjectReference Include="..\FileFormat.PlotMaker\FileFormat.PlotMaker.csproj" />
+    <ProjectReference Include="..\FileFormat.DigiView\FileFormat.DigiView.csproj" />
+    <!-- Wave 44: HDR/float/lossless formats -->
+    <ProjectReference Include="..\FileFormat.Phm\FileFormat.Phm.csproj" />
+    <ProjectReference Include="..\FileFormat.Fl32\FileFormat.Fl32.csproj" />
+    <ProjectReference Include="..\FileFormat.Nie\FileFormat.Nie.csproj" />
+    <!-- Wave 45: Text-based/legacy formats -->
+    <ProjectReference Include="..\FileFormat.FaceSaver\FileFormat.FaceSaver.csproj" />
+    <!-- Wave 46: C64 additional art programs -->
+    <ProjectReference Include="..\FileFormat.Drazlace\FileFormat.Drazlace.csproj" />
+    <ProjectReference Include="..\FileFormat.TruePaint\FileFormat.TruePaint.csproj" />
+    <ProjectReference Include="..\FileFormat.PixelPerfect\FileFormat.PixelPerfect.csproj" />
+    <ProjectReference Include="..\FileFormat.EciGraphicEditor\FileFormat.EciGraphicEditor.csproj" />
+    <ProjectReference Include="..\FileFormat.CreateWithGarfield\FileFormat.CreateWithGarfield.csproj" />
+    <ProjectReference Include="..\FileFormat.SpritePad\FileFormat.SpritePad.csproj" />
+    <ProjectReference Include="..\FileFormat.FliProfi\FileFormat.FliProfi.csproj" />
+    <!-- Wave 47: ZX Spectrum additional -->
+    <ProjectReference Include="..\FileFormat.ZxBorderScreen\FileFormat.ZxBorderScreen.csproj" />
+    <ProjectReference Include="..\FileFormat.ZxMultiArtist\FileFormat.ZxMultiArtist.csproj" />
+    <!-- Wave 48: Professional/mobile -->
+    <ProjectReference Include="..\FileFormat.SeattleFilmWorks\FileFormat.SeattleFilmWorks.csproj" />
+    <ProjectReference Include="..\FileFormat.NokiaOperatorLogo\FileFormat.NokiaOperatorLogo.csproj" />
+    <!-- Wave 49: Atari ST additional -->
+    <ProjectReference Include="..\FileFormat.AtariPaintworks\FileFormat.AtariPaintworks.csproj" />
+    <ProjectReference Include="..\FileFormat.ExtendedGemImg\FileFormat.ExtendedGemImg.csproj" />
+    <!-- Wave 50: C64 hires/FLI formats -->
+    <ProjectReference Include="..\FileFormat.HiresFliCrest\FileFormat.HiresFliCrest.csproj" />
+    <ProjectReference Include="..\FileFormat.HiresManager\FileFormat.HiresManager.csproj" />
+    <ProjectReference Include="..\FileFormat.HiresInterlaceFeniks\FileFormat.HiresInterlaceFeniks.csproj" />
+    <ProjectReference Include="..\FileFormat.HiPicCreator\FileFormat.HiPicCreator.csproj" />
+    <ProjectReference Include="..\FileFormat.InterlaceHiresEditor\FileFormat.InterlaceHiresEditor.csproj" />
+    <ProjectReference Include="..\FileFormat.MultiLaceEditor\FileFormat.MultiLaceEditor.csproj" />
+    <!-- Wave 51: C64 additional art programs -->
+    <ProjectReference Include="..\FileFormat.LogoPainter\FileFormat.LogoPainter.csproj" />
+    <ProjectReference Include="..\FileFormat.Ffli\FileFormat.Ffli.csproj" />
+    <ProjectReference Include="..\FileFormat.Flip64\FileFormat.Flip64.csproj" />
+    <!-- Wave 52: Atari ST/misc -->
+    <ProjectReference Include="..\FileFormat.DaliSt\FileFormat.DaliSt.csproj" />
+    <ProjectReference Include="..\FileFormat.MultiPalettePicture\FileFormat.MultiPalettePicture.csproj" />
+    <ProjectReference Include="..\FileFormat.DrawIt\FileFormat.DrawIt.csproj" />
+    <!-- Wave 53: ZX Spectrum/misc -->
+    <ProjectReference Include="..\FileFormat.ZxPaintbrush\FileFormat.ZxPaintbrush.csproj" />
+    <ProjectReference Include="..\FileFormat.SpeccyExtended\FileFormat.SpeccyExtended.csproj" />
+    <ProjectReference Include="..\FileFormat.MagicPainter\FileFormat.MagicPainter.csproj" />
+    <!-- Wave 54: C64 FLI variants -->
+    <ProjectReference Include="..\FileFormat.CfliDesigner\FileFormat.CfliDesigner.csproj" />
+    <ProjectReference Include="..\FileFormat.UfliEditor\FileFormat.UfliEditor.csproj" />
+    <ProjectReference Include="..\FileFormat.NufliEditor\FileFormat.NufliEditor.csproj" />
+    <!-- Wave 55: C64 multicolor editors -->
+    <ProjectReference Include="..\FileFormat.AmicaPaint\FileFormat.AmicaPaint.csproj" />
+    <ProjectReference Include="..\FileFormat.EmcEditor\FileFormat.EmcEditor.csproj" />
+    <ProjectReference Include="..\FileFormat.Flimatic\FileFormat.Flimatic.csproj" />
+    <!-- Wave 56: Atari ST additional -->
+    <ProjectReference Include="..\FileFormat.EzArt\FileFormat.EzArt.csproj" />
+    <ProjectReference Include="..\FileFormat.Spectrum512Ext\FileFormat.Spectrum512Ext.csproj" />
+    <ProjectReference Include="..\FileFormat.PublicPainter\FileFormat.PublicPainter.csproj" />
+    <!-- Wave 57: Atari Falcon additional -->
+    <ProjectReference Include="..\FileFormat.DuneGraph\FileFormat.DuneGraph.csproj" />
+    <ProjectReference Include="..\FileFormat.PrismPaint\FileFormat.PrismPaint.csproj" />
+    <ProjectReference Include="..\FileFormat.Rembrandt\FileFormat.Rembrandt.csproj" />
+    <!-- Wave 58: MSX/ZX/C64 additional -->
+    <ProjectReference Include="..\FileFormat.G9b\FileFormat.G9b.csproj" />
+    <ProjectReference Include="..\FileFormat.ZxBorderMulticolor\FileFormat.ZxBorderMulticolor.csproj" />
+    <ProjectReference Include="..\FileFormat.Hireslace\FileFormat.Hireslace.csproj" />
+    <!-- Wave 59: C64 hires/interlace editors -->
+    <ProjectReference Include="..\FileFormat.SuperHiresEditor\FileFormat.SuperHiresEditor.csproj" />
+    <ProjectReference Include="..\FileFormat.Zoomatic\FileFormat.Zoomatic.csproj" />
+    <ProjectReference Include="..\FileFormat.XFliEditor\FileFormat.XFliEditor.csproj" />
+    <!-- Wave 60: C64 FLI editors -->
+    <ProjectReference Include="..\FileFormat.MuifliEditor\FileFormat.MuifliEditor.csproj" />
+    <ProjectReference Include="..\FileFormat.FliEditor\FileFormat.FliEditor.csproj" />
+    <ProjectReference Include="..\FileFormat.FliDesigner\FileFormat.FliDesigner.csproj" />
+    <!-- Wave 61: Atari ST additional -->
+    <ProjectReference Include="..\FileFormat.SyntheticArts\FileFormat.SyntheticArts.csproj" />
+    <ProjectReference Include="..\FileFormat.HighresMedium\FileFormat.HighresMedium.csproj" />
+    <ProjectReference Include="..\FileFormat.FullscreenKit\FileFormat.FullscreenKit.csproj" />
+    <!-- Wave 62: Atari Falcon additional -->
+    <ProjectReference Include="..\FileFormat.CokeAtari\FileFormat.CokeAtari.csproj" />
+    <ProjectReference Include="..\FileFormat.AtariFalconXga\FileFormat.AtariFalconXga.csproj" />
+    <ProjectReference Include="..\FileFormat.SpookySpritesFalcon\FileFormat.SpookySpritesFalcon.csproj" />
+    <!-- Wave 63: Atari ST art programs -->
+    <ProjectReference Include="..\FileFormat.PabloPaint\FileFormat.PabloPaint.csproj" />
+    <ProjectReference Include="..\FileFormat.QuantumPaint\FileFormat.QuantumPaint.csproj" />
+    <ProjectReference Include="..\FileFormat.SinbadSlideshow\FileFormat.SinbadSlideshow.csproj" />
+    <!-- Wave 64: C64 hires/interlace -->
+    <ProjectReference Include="..\FileFormat.GephardHires\FileFormat.GephardHires.csproj" />
+    <ProjectReference Include="..\FileFormat.HardInterlace\FileFormat.HardInterlace.csproj" />
+    <ProjectReference Include="..\FileFormat.RockyInterlace\FileFormat.RockyInterlace.csproj" />
+    <!-- Wave 65: C64 multicolor/hires -->
+    <ProjectReference Include="..\FileFormat.Din\FileFormat.Din.csproj" />
+    <ProjectReference Include="..\FileFormat.HinterGrundBild\FileFormat.HinterGrundBild.csproj" />
+    <ProjectReference Include="..\FileFormat.WigmoreArtist\FileFormat.WigmoreArtist.csproj" />
+    <!-- Wave 66: MSX screen modes -->
+    <ProjectReference Include="..\FileFormat.MsxScreen2\FileFormat.MsxScreen2.csproj" />
+    <ProjectReference Include="..\FileFormat.MsxScreen5\FileFormat.MsxScreen5.csproj" />
+    <ProjectReference Include="..\FileFormat.MsxScreen8\FileFormat.MsxScreen8.csproj" />
+    <!-- Wave 67: Atari 8-bit graphics modes -->
+    <ProjectReference Include="..\FileFormat.AtariGr8\FileFormat.AtariGr8.csproj" />
+    <ProjectReference Include="..\FileFormat.AtariGr7\FileFormat.AtariGr7.csproj" />
+    <ProjectReference Include="..\FileFormat.AtariAgp\FileFormat.AtariAgp.csproj" />
+    <!-- Wave 68: Cross-platform simple -->
+    <ProjectReference Include="..\FileFormat.BennetYeeFace\FileFormat.BennetYeeFace.csproj" />
+    <ProjectReference Include="..\FileFormat.Olpc565\FileFormat.Olpc565.csproj" />
+    <ProjectReference Include="..\FileFormat.NokiaPictureMessage\FileFormat.NokiaPictureMessage.csproj" />
+    <!-- Wave 23 additional -->
+    <ProjectReference Include="..\FileFormat.Pagefox\FileFormat.Pagefox.csproj" />
+    <!-- PDF/PE containers -->
+    <ProjectReference Include="..\FileFormat.Pdf\FileFormat.Pdf.csproj" />
+    <ProjectReference Include="..\FileFormat.WindowsPe\FileFormat.WindowsPe.csproj" />
+    <!-- Wave 69: C64 interlace/multicolor -->
+    <ProjectReference Include="..\FileFormat.ChampionsInterlace\FileFormat.ChampionsInterlace.csproj" />
+    <ProjectReference Include="..\FileFormat.InterlaceStudio\FileFormat.InterlaceStudio.csproj" />
+    <ProjectReference Include="..\FileFormat.Mlt\FileFormat.Mlt.csproj" />
+    <ProjectReference Include="..\FileFormat.Mcs\FileFormat.Mcs.csproj" />
+    <!-- Wave 70: Atari 8-bit / Apple II / misc -->
+    <ProjectReference Include="..\FileFormat.AtariDrg\FileFormat.AtariDrg.csproj" />
+    <ProjectReference Include="..\FileFormat.AppleIIHgr\FileFormat.AppleIIHgr.csproj" />
+    <ProjectReference Include="..\FileFormat.AppleIIDhr\FileFormat.AppleIIDhr.csproj" />
+    <ProjectReference Include="..\FileFormat.LogoSys\FileFormat.LogoSys.csproj" />
+    <!-- Wave 71: Gap-fill -->
+    <ProjectReference Include="..\FileFormat.AtariGfb\FileFormat.AtariGfb.csproj" />
+    <ProjectReference Include="..\FileFormat.AtariHr\FileFormat.AtariHr.csproj" />
+    <ProjectReference Include="..\FileFormat.HiresBitmap\FileFormat.HiresBitmap.csproj" />
   </ItemGroup>
 
 </Project>

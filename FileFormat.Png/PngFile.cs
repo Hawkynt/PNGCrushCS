@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using FileFormat.Core;
@@ -6,11 +6,15 @@ using FileFormat.Core;
 namespace FileFormat.Png;
 
 /// <summary>Data model representing a PNG file</summary>
+[FormatMagicBytes([0x89, 0x50, 0x4E, 0x47])]
 public sealed class PngFile : IImageFileFormat<PngFile> {
 
   static string IImageFileFormat<PngFile>.PrimaryExtension => ".png";
   static string[] IImageFileFormat<PngFile>.FileExtensions => [".png"];
+  static FormatCapability IImageFileFormat<PngFile>.Capabilities => FormatCapability.HasDedicatedOptimizer;
   static PngFile IImageFileFormat<PngFile>.FromFile(FileInfo file) => PngReader.FromFile(file);
+  static PngFile IImageFileFormat<PngFile>.FromBytes(byte[] data) => PngReader.FromBytes(data);
+  static PngFile IImageFileFormat<PngFile>.FromStream(Stream stream) => PngReader.FromStream(stream);
   static byte[] IImageFileFormat<PngFile>.ToBytes(PngFile file) => PngWriter.ToBytes(file);
   /// <summary>Image width in pixels</summary>
   public required int Width { get; init; }
@@ -65,10 +69,10 @@ public sealed class PngFile : IImageFileFormat<PngFile> {
     byte[]? alphaTable = null;
 
     if (file.ColorType == PngColorType.Palette) {
-      palette = file.Palette != null ? (byte[])file.Palette.Clone() : null;
+      palette = file.Palette != null ? file.Palette[..] : null;
       paletteCount = file.PaletteCount;
       if (file.Transparency != null)
-        alphaTable = (byte[])file.Transparency.Clone();
+        alphaTable = file.Transparency[..];
     }
 
     return new() {
@@ -94,10 +98,10 @@ public sealed class PngFile : IImageFileFormat<PngFile> {
     byte[]? transparency = null;
 
     if (colorType == PngColorType.Palette) {
-      palette = image.Palette != null ? (byte[])image.Palette.Clone() : null;
+      palette = image.Palette != null ? image.Palette[..] : null;
       paletteCount = image.PaletteCount;
       if (image.AlphaTable != null)
-        transparency = (byte[])image.AlphaTable.Clone();
+        transparency = image.AlphaTable[..];
     }
 
     return new() {
@@ -153,7 +157,7 @@ public sealed class PngFile : IImageFileFormat<PngFile> {
     var result = new byte[totalLength];
     var offset = 0;
     foreach (var row in rows) {
-      Array.Copy(row, 0, result, offset, row.Length);
+      row.AsSpan(0, row.Length).CopyTo(result.AsSpan(offset));
       offset += row.Length;
     }
 
@@ -167,7 +171,7 @@ public sealed class PngFile : IImageFileFormat<PngFile> {
       var sourceOffset = y * stride;
       var copyLength = Math.Min(stride, data.Length - sourceOffset);
       if (copyLength > 0)
-        Array.Copy(data, sourceOffset, rows[y], 0, copyLength);
+        data.AsSpan(sourceOffset, copyLength).CopyTo(rows[y].AsSpan(0));
     }
 
     return rows;

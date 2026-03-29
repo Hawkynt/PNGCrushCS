@@ -14,6 +14,10 @@ internal static class BitmapConverter {
   internal static RawImage? LoadRawImage(FileInfo file, ImageFormat format)
     => FormatRegistry.GetEntry(format)?.LoadRawImage(file);
 
+  /// <summary>Loads an image from pre-read bytes as a <see cref="RawImage"/>. Returns null if the format is unsupported or reading fails.</summary>
+  internal static RawImage? LoadRawImage(byte[] data, ImageFormat format)
+    => FormatRegistry.GetEntry(format)?.LoadRawImageFromBytes(data);
+
   /// <summary>Converts a <see cref="RawImage"/> to a GDI+ <see cref="Bitmap"/> in BGRA32 format.</summary>
   internal static Bitmap RawImageToBitmap(RawImage raw) {
     ArgumentNullException.ThrowIfNull(raw);
@@ -60,6 +64,22 @@ internal static class BitmapConverter {
 
     // GDI+ fallback for formats without dedicated readers (GIF, etc.)
     return new(file.FullName);
+  }
+
+  /// <summary>Loads an image from pre-read bytes as a <see cref="Bitmap"/>. Tries format-specific readers first, falls back to GDI+ via temp file.</summary>
+  internal static Bitmap LoadBitmap(byte[] data, ImageFormat format) {
+    var raw = LoadRawImage(data, format);
+    if (raw != null)
+      return RawImageToBitmap(raw);
+
+    // GDI+ fallback: write to temp file, load via GDI+
+    var tmp = Path.GetTempFileName();
+    try {
+      File.WriteAllBytes(tmp, data);
+      return new(tmp);
+    } finally {
+      try { File.Delete(tmp); } catch { /* best effort */ }
+    }
   }
 
   /// <summary>Quantizes a <see cref="RawImage"/> to an indexed image with the specified max palette size using FrameworkExtensions quantizer/ditherer dispatch.</summary>

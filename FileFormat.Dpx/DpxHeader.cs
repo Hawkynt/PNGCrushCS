@@ -1,0 +1,23 @@
+using FileFormat.Core;
+
+namespace FileFormat.Dpx;
+
+/// <summary>The 32-byte DPX file information header core fields.</summary>
+[GenerateSerializer]
+public readonly partial record struct DpxHeader(
+  [property: HeaderField(0, 4, Endianness = Endianness.Big)] int Magic,
+  [property: HeaderField(4, 4, EndianFieldName = "Magic", EndianComputeValue = 0x53445058)] int ImageDataOffset,
+  [property: HeaderField(8, 8)] string Version,
+  [property: HeaderField(16, 4, EndianFieldName = "Magic", EndianComputeValue = 0x53445058)] int FileSize,
+  [property: HeaderField(20, 4, EndianFieldName = "Magic", EndianComputeValue = 0x53445058)] int DittoKey,
+  [property: HeaderField(24, 4, EndianFieldName = "Magic", EndianComputeValue = 0x53445058)] int GenericHeaderSize,
+  [property: HeaderField(28, 4, EndianFieldName = "Magic", EndianComputeValue = 0x53445058)] int IndustryHeaderSize
+) {
+
+  public const int StructSize = 32;
+  public const int MagicBigEndian = 0x53445058; // "SDPX"
+  public const int MagicLittleEndian = 0x58504453; // "XPDS"
+
+  public static HeaderFieldDescriptor[] GetFieldMap()
+    => HeaderFieldMapper.GetFieldMap<DpxHeader>();
+}

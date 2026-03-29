@@ -2,428 +2,251 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using FileFormat.Acorn;
-using FileFormat.AliasPix;
-using FileFormat.AmstradCpc;
-using FileFormat.Apng;
-using FileFormat.AppleII;
-using FileFormat.AppleIIgs;
-using FileFormat.Art;
-using FileFormat.Astc;
-using FileFormat.Avs;
-using FileFormat.BbcMicro;
-using FileFormat.Bmp;
-using FileFormat.Bsave;
-using FileFormat.C64Multi;
-using FileFormat.Cals;
-using FileFormat.Ccitt;
-using FileFormat.Cineon;
-using FileFormat.Clp;
-using FileFormat.Cmu;
+using System.Reflection;
 using FileFormat.Core;
-using FileFormat.CrackArt;
-using FileFormat.Cur;
-using FileFormat.Dcx;
-using FileFormat.Dds;
-using FileFormat.Degas;
-using FileFormat.Dicom;
-using FileFormat.Dpx;
-using FileFormat.DrHalo;
-using FileFormat.Exr;
-using FileFormat.Farbfeld;
-using FileFormat.Fits;
-using FileFormat.Fli;
-using FileFormat.GemImg;
-using FileFormat.Hdr;
-using FileFormat.Hrz;
-using FileFormat.Ico;
-using FileFormat.Ilbm;
-using FileFormat.Jng;
-using FileFormat.Jpeg;
-using FileFormat.Koala;
-using FileFormat.Ktx;
-using FileFormat.MacPaint;
-using FileFormat.Miff;
-using FileFormat.Mng;
-using FileFormat.Msp;
-using FileFormat.Msx;
-using FileFormat.Mtv;
-using FileFormat.Neochrome;
-using FileFormat.Netpbm;
-using FileFormat.Nifti;
-using FileFormat.Nrrd;
-using FileFormat.OpenRaster;
-using FileFormat.Oric;
-using FileFormat.Otb;
-using FileFormat.Palm;
-using FileFormat.Pcx;
-using FileFormat.Pfm;
-using FileFormat.Pict;
-using FileFormat.Pkm;
-using FileFormat.Png;
-using FileFormat.Psd;
-using FileFormat.Pvr;
-using FileFormat.Qoi;
-using FileFormat.Qrt;
-using FileFormat.Rla;
-using FileFormat.SamCoupe;
-using FileFormat.Sff;
-using FileFormat.Sgi;
-using FileFormat.Sixel;
-using FileFormat.Spectrum512;
-using FileFormat.SunRaster;
-using FileFormat.Tga;
-using FileFormat.Tiff;
-using FileFormat.Tim;
-using FileFormat.Tim2;
-using FileFormat.Tiny;
-using FileFormat.Vicar;
-using FileFormat.Viff;
-using FileFormat.Vtf;
-using FileFormat.Wal;
-using FileFormat.Wad3;
-using FileFormat.Wbmp;
-using FileFormat.Wpg;
-using FileFormat.Xbm;
-using FileFormat.Xcf;
-using FileFormat.Xpm;
-using FileFormat.Xwd;
-using FileFormat.ZxSpectrum;
-using FileFormat.Aai;
-using FileFormat.Rgf;
-using FileFormat.Fbm;
-using FileFormat.Gbr;
-using FileFormat.Pat;
-using FileFormat.Xyz;
-using FileFormat.Lss16;
-using FileFormat.ColoRix;
-using FileFormat.SunIcon;
-using FileFormat.Cel;
-using FileFormat.AmigaIcon;
-using FileFormat.Gaf;
-using FileFormat.GunPaint;
-using FileFormat.GeoPaint;
-using FileFormat.Psb;
-using FileFormat.Icns;
-using FileFormat.Blp;
-using FileFormat.Fsh;
-using FileFormat.Mpo;
-using FileFormat.Pds;
-using FileFormat.Ics;
-using FileFormat.BioRadPic;
-using FileFormat.Ptif;
-using FileFormat.Bsb;
-using FileFormat.Awd;
-using FileFormat.Psp;
-using FileFormat.Qtif;
-using FileFormat.Ingr;
-using FileFormat.Nitf;
-using FileFormat.Uhdr;
-using FileFormat.PalmPdb;
-using FileFormat.Pcd;
-using FileFormat.PhotoPaint;
-using FileFormat.Pdn;
-using FileFormat.Fpx;
-using FileFormat.JpegLs;
-using FileFormat.Jbig;
-using FileFormat.Wsq;
-using FileFormat.DjVu;
-using FileFormat.Jbig2;
-using FileFormat.Flif;
-using FileFormat.Jpeg2000;
-using FileFormat.JpegXr;
-using FileFormat.Heif;
-using FileFormat.Avif;
-using FileFormat.JpegXl;
-using FileFormat.Bpg;
-using FileFormat.Dng;
-using FileFormat.CameraRaw;
-using FileFormat.Krita;
-using FileFormat.Analyze;
-using FileFormat.MetaImage;
-using FileFormat.Eps;
-using FileFormat.Wmf;
-using FileFormat.Emf;
-using FileFormat.Vips;
-using FileFormat.QuakeSpr;
-using FileFormat.NesChr;
-using FileFormat.GameBoyTile;
-using FileFormat.Atari8Bit;
-using FileFormat.IffAnim;
-using FileFormat.SoftImage;
-using FileFormat.MayaIff;
-using FileFormat.Envi;
-using FileFormat.Xcursor;
-using FileFormat.IffPbm;
-using FileFormat.PcPaint;
-using FileFormat.IffAcbm;
-using FileFormat.IffDeep;
-using FileFormat.IffRgb8;
-using FileFormat.Interfile;
-using FileFormat.AtariFalcon;
-using FileFormat.Trs80;
-using FileFormat.SnesTile;
-using FileFormat.SegaGenTile;
-using FileFormat.PcEngineTile;
-using FileFormat.MasterSystemTile;
-using FileFormat.SymbianMbm;
-using FileFormat.XvThumbnail;
-using FileFormat.IffRgbn;
-using FileFormat.Mrc;
-using FileFormat.Gd2;
-using FileFormat.BigTiff;
-using FileFormat.AutodeskCel;
-using FileFormat.Wad2;
 
 namespace Optimizer.Image;
 
-/// <summary>Data-driven registry mapping <see cref="ImageFormat"/> to format-specific operations via <see cref="IImageFileFormat{TSelf}"/>.</summary>
+/// <summary>Data-driven registry mapping <see cref="ImageFormat"/> to format-specific operations, discovered automatically from <see cref="IImageFileFormat{TSelf}"/> implementations.</summary>
 internal static class FormatRegistry {
 
   internal sealed record FormatEntry(
     ImageFormat Format,
+    string Name,
     string PrimaryExtension,
     string[] AllExtensions,
     Func<FileInfo, RawImage?> LoadRawImage,
+    Func<byte[], RawImage?> LoadRawImageFromBytes,
     Func<RawImage, byte[]> ConvertFromRawImage,
-    FormatCapability Capabilities
+    FormatCapability Capabilities,
+    MagicSignature[] MagicSignatures,
+    Func<byte[], bool?>? MatchesSignature,
+    int DetectionPriority,
+    Func<FileInfo, int>? GetImageCount = null,
+    Func<FileInfo, int, RawImage?>? LoadRawImageAtIndex = null,
+    Func<FileInfo, IReadOnlyList<RawImage>?>? LoadAllRawImages = null
+  );
+
+  internal readonly record struct MagicSignature(byte[] Signature, int Offset, int MinHeaderLength);
+
+  /// <summary>Lightweight entry for formats without <see cref="IImageFileFormat{TSelf}"/> (e.g. GIF).</summary>
+  private sealed record DetectionOnlyEntry(
+    ImageFormat Format,
+    string Name,
+    MagicSignature[] MagicSignatures,
+    Func<byte[], bool?>? MatchesSignature,
+    int DetectionPriority
   );
 
   private static readonly Dictionary<ImageFormat, FormatEntry> _byFormat = new();
   private static readonly Dictionary<string, ImageFormat> _byExtension = new(StringComparer.OrdinalIgnoreCase);
 
+  /// <summary>Pre-sorted list of all entries (full + detection-only) that can participate in signature detection.</summary>
+  private static readonly SignatureEntry[] _signatureEntries;
+
+  /// <summary>Unified type for signature detection iteration.</summary>
+  private readonly record struct SignatureEntry(
+    ImageFormat Format,
+    MagicSignature[] MagicSignatures,
+    Func<byte[], bool?>? MatchesSignature,
+    int DetectionPriority
+  );
+
+  private static readonly MethodInfo _registerGenericMethod =
+    typeof(FormatRegistry).GetMethod(nameof(_RegisterGeneric), BindingFlags.NonPublic | BindingFlags.Static)!;
+
+  private static readonly MethodInfo _registerMultiImageMethod =
+    typeof(FormatRegistry).GetMethod(nameof(_RegisterMultiImage), BindingFlags.NonPublic | BindingFlags.Static)!;
+
   static FormatRegistry() {
-    // Formats with dedicated optimizers
-    _Register<PngFile>(ImageFormat.Png, FormatCapability.HasDedicatedOptimizer);
-    _Register<BmpFile>(ImageFormat.Bmp, FormatCapability.HasDedicatedOptimizer);
-    _Register<TgaFile>(ImageFormat.Tga, FormatCapability.HasDedicatedOptimizer);
-    _Register<PcxFile>(ImageFormat.Pcx, FormatCapability.HasDedicatedOptimizer);
-    _Register<JpegFile>(ImageFormat.Jpeg, FormatCapability.HasDedicatedOptimizer);
-    _Register<TiffFile>(ImageFormat.Tiff, FormatCapability.HasDedicatedOptimizer);
-    _Register<IcoFile>(ImageFormat.Ico, FormatCapability.HasDedicatedOptimizer);
-    _Register<CurFile>(ImageFormat.Cur, FormatCapability.HasDedicatedOptimizer);
+    // Force-load all FileFormat assemblies from the output directory.
+    // GetReferencedAssemblies() only returns assemblies the compiler detected as actually used in code;
+    // since format types are discovered via reflection (not direct usage), we must load them from disk.
+    var baseDir = AppContext.BaseDirectory;
+    foreach (var dll in Directory.GetFiles(baseDir, "FileFormat.*.dll")) {
+      try {
+        var asmName = AssemblyName.GetAssemblyName(dll);
+        Assembly.Load(asmName);
+      } catch {
+        // ignore load failures
+      }
+    }
 
-    // Lossless raster — variable resolution
-    _Register<QoiFile>(ImageFormat.Qoi);
-    _Register<FarbfeldFile>(ImageFormat.Farbfeld);
-    _Register<SgiFile>(ImageFormat.Sgi);
-    _Register<SunRasterFile>(ImageFormat.SunRaster);
-    _Register<NetpbmFile>(ImageFormat.Netpbm);
-    _Register<HrzFile>(ImageFormat.Hrz);
-    _Register<MtvFile>(ImageFormat.Mtv);
-    _Register<QrtFile>(ImageFormat.Qrt);
-    _Register<AvsFile>(ImageFormat.Avs);
+    // Scan all loaded assemblies for IImageFileFormat<T> implementations
+    foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+      _ScanAssembly(assembly);
 
-    // Complex raster — variable resolution
-    _Register<HdrFile>(ImageFormat.Hdr);
-    _Register<PfmFile>(ImageFormat.Pfm);
-    _Register<PsdFile>(ImageFormat.Psd);
-    _Register<XcfFile>(ImageFormat.Xcf);
-    _Register<DdsFile>(ImageFormat.Dds);
-    _Register<VtfFile>(ImageFormat.Vtf);
-    _Register<KtxFile>(ImageFormat.Ktx);
-    _Register<ExrFile>(ImageFormat.Exr);
-    _Register<DpxFile>(ImageFormat.Dpx);
-    _Register<MiffFile>(ImageFormat.Miff);
-    _Register<AliasPixFile>(ImageFormat.AliasPix);
-    _Register<RlaFile>(ImageFormat.Rla);
-    _Register<ViffFile>(ImageFormat.Viff);
-    _Register<XwdFile>(ImageFormat.Xwd);
-    _Register<DicomFile>(ImageFormat.Dicom);
-    _Register<CineonFile>(ImageFormat.Cineon);
+    // Manual detection entries for formats without IImageFileFormat<T> (GIF uses external GifFileFormat repo)
+    var detectionOnly = new List<DetectionOnlyEntry>();
 
-    // Indexed/planar/retro — variable resolution
-    _Register<DrHaloFile>(ImageFormat.DrHalo);
-    _Register<PalmFile>(ImageFormat.Palm);
-    _Register<SixelFile>(ImageFormat.Sixel);
-    _Register<CcittFile>(ImageFormat.Ccitt);
-    _Register<CalsFile>(ImageFormat.Cals);
-    _Register<SffFile>(ImageFormat.Sff);
-    _Register<OricFile>(ImageFormat.Oric);
-    _Register<VicarFile>(ImageFormat.Vicar);
-    _Register<BbcMicroFile>(ImageFormat.BbcMicro);
-    _Register<AmstradCpcFile>(ImageFormat.AmstradCpc);
-    _Register<C64MultiFile>(ImageFormat.C64Multi);
-    _Register<BsaveFile>(ImageFormat.Bsave);
-    _Register<DegasFile>(ImageFormat.Degas);
-    _Register<NeochromeFile>(ImageFormat.Neochrome);
-    _Register<CrackArtFile>(ImageFormat.CrackArt);
-    _Register<Spectrum512File>(ImageFormat.Spectrum512);
-    _Register<TinyFile>(ImageFormat.Tiny);
-    _Register<AppleIIFile>(ImageFormat.AppleII);
-    _Register<AppleIIgsFile>(ImageFormat.AppleIIgs);
-    _Register<MsxFile>(ImageFormat.Msx);
-    _Register<SamCoupeFile>(ImageFormat.SamCoupe);
-    _Register<KoalaFile>(ImageFormat.Koala);
-    _Register<ZxSpectrumFile>(ImageFormat.ZxSpectrum);
-    _Register<JngFile>(ImageFormat.Jng);
-    _Register<NiftiFile>(ImageFormat.Nifti);
-    _Register<NrrdFile>(ImageFormat.Nrrd);
-    _Register<FitsFile>(ImageFormat.Fits);
-    _Register<FliFile>(ImageFormat.Fli);
+    _RegisterDetectionOnly(
+      detectionOnly, ImageFormat.Gif, "Gif",
+      [".gif", ".giff"],
+      [new([0x47, 0x49, 0x46, 0x38], 0, 4)],
+      null, 100
+    );
 
-    // Planar/container
-    _Register<AcornFile>(ImageFormat.Acorn);
-    _Register<IlbmFile>(ImageFormat.Ilbm);
-    _Register<PictFile>(ImageFormat.Pict);
-    _Register<OpenRasterFile>(ImageFormat.OpenRaster);
+    // Build sorted signature detection index from both full entries and detection-only entries
+    var sigFromFull = _byFormat.Values
+      .Where(e => e.MagicSignatures.Length > 0 || e.MatchesSignature != null)
+      .Select(e => new SignatureEntry(e.Format, e.MagicSignatures, e.MatchesSignature, e.DetectionPriority));
 
-    // Container/multi-image
-    _Register<ApngFile>(ImageFormat.Apng);
-    _Register<MngFile>(ImageFormat.Mng);
-    _Register<DcxFile>(ImageFormat.Dcx);
-    _Register<Wad3File>(ImageFormat.Wad3);
-    _Register<ArtFile>(ImageFormat.Art);
-    _Register<TimFile>(ImageFormat.Tim);
-    _Register<Tim2File>(ImageFormat.Tim2);
-    _Register<WalFile>(ImageFormat.Wal);
-    _Register<WpgFile>(ImageFormat.Wpg);
-    _Register<PkmFile>(ImageFormat.Pkm);
-    _Register<AstcFile>(ImageFormat.Astc);
-    _Register<PvrFile>(ImageFormat.Pvr);
-    _Register<ClpFile>(ImageFormat.Clp);
+    var sigFromDetection = detectionOnly
+      .Where(e => e.MagicSignatures.Length > 0 || e.MatchesSignature != null)
+      .Select(e => new SignatureEntry(e.Format, e.MagicSignatures, e.MatchesSignature, e.DetectionPriority));
 
-    // Monochrome-only formats
-    _Register<WbmpFile>(ImageFormat.Wbmp, FormatCapability.MonochromeOnly);
-    _Register<XbmFile>(ImageFormat.Xbm, FormatCapability.MonochromeOnly);
-    _Register<MspFile>(ImageFormat.Msp, FormatCapability.MonochromeOnly);
-    _Register<CmuFile>(ImageFormat.Cmu, FormatCapability.MonochromeOnly);
-    _Register<OtbFile>(ImageFormat.Otb, FormatCapability.MonochromeOnly);
-    _Register<MacPaintFile>(ImageFormat.MacPaint, FormatCapability.MonochromeOnly);
-
-    // Indexed-only formats
-    _Register<XpmFile>(ImageFormat.Xpm, FormatCapability.IndexedOnly);
-    _Register<GemImgFile>(ImageFormat.GemImg, FormatCapability.IndexedOnly);
-    _Register<Lss16File>(ImageFormat.Lss16, FormatCapability.IndexedOnly);
-    _Register<ColoRixFile>(ImageFormat.ColoRix, FormatCapability.IndexedOnly);
-    _Register<XyzFile>(ImageFormat.Xyz, FormatCapability.IndexedOnly);
-    _Register<GafFile>(ImageFormat.Gaf, FormatCapability.IndexedOnly);
-
-    // Wave 4: Trivial formats — variable resolution
-    _Register<AaiFile>(ImageFormat.Aai);
-    _Register<FbmFile>(ImageFormat.Fbm);
-    _Register<GbrFile>(ImageFormat.Gbr);
-    _Register<PatFile>(ImageFormat.Pat);
-    _Register<CelFile>(ImageFormat.Cel);
-    _Register<AmigaIconFile>(ImageFormat.AmigaIcon);
-
-    // Wave 4: Monochrome-only
-    _Register<RgfFile>(ImageFormat.Rgf, FormatCapability.MonochromeOnly);
-    _Register<SunIconFile>(ImageFormat.SunIcon, FormatCapability.MonochromeOnly);
-    _Register<GeoPaintFile>(ImageFormat.GeoPaint, FormatCapability.MonochromeOnly);
-
-    // GunPaint is read-only (FromRawImage not supported) — extension detection only, no registry entry
-
-    // Wave 5: Extensions & containers
-    _Register<PsbFile>(ImageFormat.Psb);
-    _Register<IcnsFile>(ImageFormat.Icns);
-    _Register<BlpFile>(ImageFormat.Blp);
-    _Register<FshFile>(ImageFormat.Fsh);
-    _Register<MpoFile>(ImageFormat.Mpo);
-    _Register<PdsFile>(ImageFormat.Pds);
-    _Register<IcsFile>(ImageFormat.Ics);
-    _Register<BioRadPicFile>(ImageFormat.BioRadPic);
-    _Register<PtifFile>(ImageFormat.Ptif);
-
-    // Wave 6: Medium complexity
-    _Register<PspFile>(ImageFormat.Psp);
-    _Register<QtifFile>(ImageFormat.Qtif);
-    _Register<IngrFile>(ImageFormat.Ingr);
-    _Register<NitfFile>(ImageFormat.Nitf);
-    _Register<UhdrFile>(ImageFormat.Uhdr);
-    _Register<PalmPdbFile>(ImageFormat.PalmPdb);
-    _Register<PcdFile>(ImageFormat.Pcd);
-    _Register<PhotoPaintFile>(ImageFormat.PhotoPaint);
-    _Register<PdnFile>(ImageFormat.Pdn);
-    _Register<FpxFile>(ImageFormat.Fpx);
-
-    // Wave 6: Indexed-only
-    _Register<BsbFile>(ImageFormat.Bsb, FormatCapability.IndexedOnly);
-
-    // Wave 6: Monochrome-only
-    _Register<AwdFile>(ImageFormat.Awd, FormatCapability.MonochromeOnly);
-
-    // Wave 7: Complex codecs
-    _Register<JpegLsFile>(ImageFormat.JpegLs);
-    _Register<WsqFile>(ImageFormat.Wsq);
-    _Register<DjVuFile>(ImageFormat.DjVu);
-    _Register<FlifFile>(ImageFormat.Flif);
-    _Register<Jpeg2000File>(ImageFormat.Jpeg2000);
-    _Register<JpegXrFile>(ImageFormat.JpegXr);
-
-    // Wave 7: Monochrome-only
-    _Register<JbigFile>(ImageFormat.Jbig, FormatCapability.MonochromeOnly);
-    _Register<Jbig2File>(ImageFormat.Jbig2, FormatCapability.MonochromeOnly);
-
-    // Wave 8: Advanced codecs
-    _Register<HeifFile>(ImageFormat.Heif);
-    _Register<AvifFile>(ImageFormat.Avif);
-    _Register<JpegXlFile>(ImageFormat.JpegXl);
-    _Register<BpgFile>(ImageFormat.Bpg);
-    _Register<DngFile>(ImageFormat.Dng);
-    _Register<CameraRawFile>(ImageFormat.CameraRaw);
-
-    // Wave 9: Additional formats
-    _Register<KritaFile>(ImageFormat.Krita);
-    _Register<AnalyzeFile>(ImageFormat.Analyze);
-    _Register<MetaImageFile>(ImageFormat.MetaImage);
-    _Register<EpsFile>(ImageFormat.Eps);
-    _Register<WmfFile>(ImageFormat.Wmf);
-    _Register<EmfFile>(ImageFormat.Emf);
-    _Register<VipsFile>(ImageFormat.Vips);
-    _Register<QuakeSprFile>(ImageFormat.QuakeSpr);
-    _Register<NesChrFile>(ImageFormat.NesChr, FormatCapability.IndexedOnly);
-    _Register<GameBoyTileFile>(ImageFormat.GameBoyTile, FormatCapability.IndexedOnly);
-    _Register<Atari8BitFile>(ImageFormat.Atari8Bit, FormatCapability.IndexedOnly);
-    _Register<IffAnimFile>(ImageFormat.IffAnim);
-
-    // Wave 10: IFF variants, professional 3D, scientific, retro
-    _Register<SoftImageFile>(ImageFormat.SoftImage);
-    _Register<MayaIffFile>(ImageFormat.MayaIff);
-    _Register<EnviFile>(ImageFormat.Envi);
-    _Register<XcursorFile>(ImageFormat.Xcursor);
-    _Register<IffPbmFile>(ImageFormat.IffPbm, FormatCapability.IndexedOnly);
-    _Register<PcPaintFile>(ImageFormat.PcPaint, FormatCapability.IndexedOnly);
-    _Register<IffAcbmFile>(ImageFormat.IffAcbm, FormatCapability.IndexedOnly);
-    _Register<IffDeepFile>(ImageFormat.IffDeep);
-    _Register<IffRgb8File>(ImageFormat.IffRgb8);
-    _Register<InterfileFile>(ImageFormat.Interfile);
-    _Register<AtariFalconFile>(ImageFormat.AtariFalcon);
-    _Register<Trs80File>(ImageFormat.Trs80, FormatCapability.MonochromeOnly);
-
-    // Wave 11: Console tiles, containers, scientific, retro
-    _Register<SnesTileFile>(ImageFormat.SnesTile, FormatCapability.IndexedOnly);
-    _Register<SegaGenTileFile>(ImageFormat.SegaGenTile, FormatCapability.IndexedOnly);
-    _Register<PcEngineTileFile>(ImageFormat.PcEngineTile, FormatCapability.IndexedOnly);
-    _Register<MasterSystemTileFile>(ImageFormat.MasterSystemTile, FormatCapability.IndexedOnly);
-    _Register<SymbianMbmFile>(ImageFormat.SymbianMbm);
-    _Register<XvThumbnailFile>(ImageFormat.XvThumbnail);
-    _Register<IffRgbnFile>(ImageFormat.IffRgbn);
-    _Register<MrcFile>(ImageFormat.Mrc);
-    _Register<Gd2File>(ImageFormat.Gd2);
-    _Register<BigTiffFile>(ImageFormat.BigTiff);
-    _Register<AutodeskCelFile>(ImageFormat.AutodeskCel, FormatCapability.IndexedOnly);
-    _Register<Wad2File>(ImageFormat.Wad2, FormatCapability.IndexedOnly);
+    _signatureEntries = sigFromFull
+      .Concat(sigFromDetection)
+      .OrderBy(e => e.DetectionPriority)
+      .ThenBy(e => e.Format.ToString())
+      .ToArray();
   }
 
-  private static void _Register<T>(ImageFormat format, FormatCapability caps = FormatCapability.VariableResolution)
-    where T : IImageFileFormat<T> {
+  private static void _ScanAssembly(Assembly assembly) {
+    Type[] types;
+    try {
+      types = assembly.GetTypes();
+    } catch {
+      return;
+    }
+
+    var ifaceType = typeof(IImageFileFormat<>);
+    var multiIfaceType = typeof(IMultiImageFileFormat<>);
+    foreach (var type in types) {
+      if (type.IsAbstract || type.IsInterface || type.IsGenericTypeDefinition)
+        continue;
+
+      var hasImageFormat = false;
+      var hasMultiImage = false;
+      foreach (var iface in type.GetInterfaces()) {
+        if (!iface.IsGenericType)
+          continue;
+        if (iface.GetGenericArguments()[0] != type)
+          continue;
+
+        var def = iface.GetGenericTypeDefinition();
+        if (def == ifaceType)
+          hasImageFormat = true;
+        else if (def == multiIfaceType)
+          hasMultiImage = true;
+      }
+
+      if (!hasImageFormat)
+        continue;
+
+      try {
+        _registerGenericMethod.MakeGenericMethod(type).Invoke(null, null);
+      } catch {
+        // Skip types that fail to register (e.g. missing dependencies)
+      }
+
+      if (hasMultiImage)
+        try {
+          _registerMultiImageMethod.MakeGenericMethod(type).Invoke(null, null);
+        } catch {
+          // Skip types that fail to register
+        }
+    }
+  }
+
+  private static void _RegisterGeneric<T>() where T : IImageFileFormat<T> {
+    var type = typeof(T);
+    var name = type.Name.EndsWith("File") ? type.Name[..^4] : type.Name;
+
+    // Bridge to ImageFormat enum via naming convention
+    var format = Enum.TryParse<ImageFormat>(name, out var f) ? f : ImageFormat.Unknown;
+
+    // Read attribute-based metadata
+    var magicSignatures = type.GetCustomAttributes<FormatMagicBytesAttribute>()
+      .Select(a => new MagicSignature(a.Signature, a.Offset, a.MinHeaderLength))
+      .ToArray();
+
+    var priority = type.GetCustomAttribute<FormatDetectionPriorityAttribute>()?.Priority ?? 100;
+
+    // Detect if MatchesSignature is explicitly overridden (not the default null-returning implementation)
+    var hasMatchOverride = type
+      .GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.DeclaredOnly)
+      .Any(m => m.Name.Contains("MatchesSignature"));
+
+    Func<byte[], bool?>? matchesSignature = hasMatchOverride
+      ? header => T.MatchesSignature(header)
+      : null;
+
     var entry = new FormatEntry(
-      format,
-      T.PrimaryExtension,
-      T.FileExtensions,
-      file => {
+      Format: format,
+      Name: name,
+      PrimaryExtension: T.PrimaryExtension,
+      AllExtensions: T.FileExtensions,
+      LoadRawImage: file => {
         try {
           return T.ToRawImage(T.FromFile(file));
         } catch {
           return null;
         }
       },
-      raw => T.ToBytes(T.FromRawImage(raw)),
-      caps
+      LoadRawImageFromBytes: bytes => {
+        try {
+          return T.ToRawImage(T.FromBytes(bytes));
+        } catch {
+          return null;
+        }
+      },
+      ConvertFromRawImage: raw => T.ToBytes(T.FromRawImage(raw)),
+      Capabilities: T.Capabilities,
+      MagicSignatures: magicSignatures,
+      MatchesSignature: matchesSignature,
+      DetectionPriority: priority
     );
-    _byFormat[format] = entry;
+
+    if (format != ImageFormat.Unknown)
+      _byFormat.TryAdd(format, entry);
+
     foreach (var ext in T.FileExtensions)
+      _byExtension.TryAdd(ext, format);
+  }
+
+  private static void _RegisterMultiImage<T>() where T : IImageFileFormat<T>, IMultiImageFileFormat<T> {
+    var type = typeof(T);
+    var name = type.Name.EndsWith("File") ? type.Name[..^4] : type.Name;
+    var format = Enum.TryParse<ImageFormat>(name, out var f) ? f : ImageFormat.Unknown;
+    if (format == ImageFormat.Unknown || !_byFormat.TryGetValue(format, out var existing))
+      return;
+
+    _byFormat[format] = existing with {
+      GetImageCount = file => {
+        try {
+          return T.ImageCount(T.FromFile(file));
+        } catch {
+          return 0;
+        }
+      },
+      LoadRawImageAtIndex = (file, index) => {
+        try {
+          return T.ToRawImage(T.FromFile(file), index);
+        } catch {
+          return null;
+        }
+      },
+      LoadAllRawImages = file => {
+        try {
+          return T.ToRawImages(T.FromFile(file));
+        } catch {
+          return null;
+        }
+      }
+    };
+  }
+
+  private static void _RegisterDetectionOnly(
+    List<DetectionOnlyEntry> list,
+    ImageFormat format, string name,
+    string[] extensions,
+    MagicSignature[] magicSignatures,
+    Func<byte[], bool?>? matchesSignature,
+    int detectionPriority
+  ) {
+    list.Add(new(format, name, magicSignatures, matchesSignature, detectionPriority));
+    foreach (var ext in extensions)
       _byExtension.TryAdd(ext, format);
   }
 
@@ -435,6 +258,60 @@ internal static class FormatRegistry {
 
   internal static ImageFormat DetectFromExtension(string extension)
     => _byExtension.GetValueOrDefault(extension);
+
+  /// <summary>Detects image format from magic bytes using pre-sorted signature entries.</summary>
+  internal static FormatEntry? DetectFromSignature(ReadOnlySpan<byte> header) {
+    if (header.Length < 2)
+      return null;
+
+    byte[]? headerArray = null;
+
+    foreach (var entry in _signatureEntries) {
+      // Check MatchesSignature first — complex logic can match or explicitly reject
+      if (entry.MatchesSignature != null) {
+        headerArray ??= header.ToArray();
+        var result = entry.MatchesSignature(headerArray);
+        if (result == true)
+          return _byFormat.GetValueOrDefault(entry.Format);
+        if (result == false)
+          continue;
+      }
+
+      // Check magic byte signatures
+      foreach (var sig in entry.MagicSignatures) {
+        if (header.Length >= sig.MinHeaderLength && header.Slice(sig.Offset, sig.Signature.Length).SequenceEqual(sig.Signature))
+          return _byFormat.GetValueOrDefault(entry.Format);
+      }
+    }
+
+    return null;
+  }
+
+  /// <summary>Detects image format enum from magic bytes. Returns <see cref="ImageFormat.Unknown"/> if unrecognized.</summary>
+  internal static ImageFormat DetectFormatFromSignature(ReadOnlySpan<byte> header) {
+    if (header.Length < 2)
+      return ImageFormat.Unknown;
+
+    byte[]? headerArray = null;
+
+    foreach (var entry in _signatureEntries) {
+      if (entry.MatchesSignature != null) {
+        headerArray ??= header.ToArray();
+        var result = entry.MatchesSignature(headerArray);
+        if (result == true)
+          return entry.Format;
+        if (result == false)
+          continue;
+      }
+
+      foreach (var sig in entry.MagicSignatures) {
+        if (header.Length >= sig.MinHeaderLength && header.Slice(sig.Offset, sig.Signature.Length).SequenceEqual(sig.Signature))
+          return entry.Format;
+      }
+    }
+
+    return ImageFormat.Unknown;
+  }
 
   internal static IEnumerable<FormatEntry> ConversionTargets
     => _byFormat.Values.Where(e => (e.Capabilities & FormatCapability.HasDedicatedOptimizer) == 0);

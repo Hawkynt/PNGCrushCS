@@ -1,15 +1,30 @@
-using System;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Tiff;
 
 /// <summary>In-memory representation of a TIFF image.</summary>
-public sealed class TiffFile : IImageFileFormat<TiffFile> {
+public sealed class TiffFile : IImageFileFormat<TiffFile>, IMultiImageFileFormat<TiffFile> {
 
   static string IImageFileFormat<TiffFile>.PrimaryExtension => ".tiff";
-  static string[] IImageFileFormat<TiffFile>.FileExtensions => [".tif", ".tiff"];
+  static string[] IImageFileFormat<TiffFile>.FileExtensions => [".tif", ".tiff", ".ftf"];
+  static FormatCapability IImageFileFormat<TiffFile>.Capabilities => FormatCapability.HasDedicatedOptimizer | FormatCapability.MultiImage;
+
+  static bool? IImageFileFormat<TiffFile>.MatchesSignature(ReadOnlySpan<byte> header) {
+    if (header.Length < 4)
+      return null;
+    if (header[0] == 0x49 && header[1] == 0x49 && header[2] == 0x2A && header[3] == 0x00)
+      return true;
+    if (header[0] == 0x4D && header[1] == 0x4D && header[2] == 0x00 && header[3] == 0x2A)
+      return true;
+    return null;
+  }
+
   static TiffFile IImageFileFormat<TiffFile>.FromFile(FileInfo file) => TiffReader.FromFile(file);
+  static TiffFile IImageFileFormat<TiffFile>.FromBytes(byte[] data) => TiffReader.FromBytes(data);
+  static TiffFile IImageFileFormat<TiffFile>.FromStream(Stream stream) => TiffReader.FromStream(stream);
   static byte[] IImageFileFormat<TiffFile>.ToBytes(TiffFile file) => TiffWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
@@ -18,6 +33,71 @@ public sealed class TiffFile : IImageFileFormat<TiffFile> {
   public byte[] PixelData { get; init; } = [];
   public byte[]? ColorMap { get; init; }
   public TiffColorMode ColorMode { get; init; }
+
+  /// <summary>Additional pages beyond the first IFD. Empty for single-page TIFFs.</summary>
+  public IReadOnlyList<TiffPage> Pages { get; init; } = [];
+
+  /// <summary>Returns the total number of pages (IFDs) in the TIFF file.</summary>
+  public static int ImageCount(TiffFile file) {
+    ArgumentNullException.ThrowIfNull(file);
+    return 1 + file.Pages.Count;
+  }
+
+  /// <summary>Converts a specific page at the given index to a <see cref="RawImage"/>.</summary>
+  public static RawImage ToRawImage(TiffFile file, int index) {
+    ArgumentNullException.ThrowIfNull(file);
+    var total = 1 + file.Pages.Count;
+    if ((uint)index >= (uint)total)
+      throw new ArgumentOutOfRangeException(nameof(index));
+
+    if (index == 0)
+      return ToRawImage(file);
+
+    var page = file.Pages[index - 1];
+    return _PageToRawImage(page);
+  }
+
+  private static RawImage _PageToRawImage(TiffPage page) {
+    PixelFormat format;
+    byte[]? palette = null;
+    var paletteCount = 0;
+
+    switch (page.SamplesPerPixel) {
+      case 3 when page.BitsPerSample == 8:
+        format = PixelFormat.Rgb24;
+        break;
+      case 4 when page.BitsPerSample == 8:
+        format = PixelFormat.Rgba32;
+        break;
+      case 1 when page.BitsPerSample == 8 && page.ColorMap != null:
+        format = PixelFormat.Indexed8;
+        palette = _ConvertTiffColorMap(page.ColorMap);
+        paletteCount = page.ColorMap.Length / 6;
+        break;
+      case 1 when page.BitsPerSample == 8:
+        format = PixelFormat.Gray8;
+        break;
+      case 1 when page.BitsPerSample == 16:
+        format = PixelFormat.Gray16;
+        break;
+      case 1 when page.BitsPerSample == 1:
+        format = PixelFormat.Indexed1;
+        palette = [0, 0, 0, 255, 255, 255];
+        paletteCount = 2;
+        break;
+      default:
+        throw new ArgumentException($"Unsupported TIFF page configuration: SamplesPerPixel={page.SamplesPerPixel}, BitsPerSample={page.BitsPerSample}.");
+    }
+
+    return new() {
+      Width = page.Width,
+      Height = page.Height,
+      Format = format,
+      PixelData = page.PixelData[..],
+      Palette = palette,
+      PaletteCount = paletteCount,
+    };
+  }
 
   public static RawImage ToRawImage(TiffFile file) {
     ArgumentNullException.ThrowIfNull(file);
@@ -57,7 +137,7 @@ public sealed class TiffFile : IImageFileFormat<TiffFile> {
       Width = file.Width,
       Height = file.Height,
       Format = format,
-      PixelData = (byte[])file.PixelData.Clone(),
+      PixelData = file.PixelData[..],
       Palette = palette,
       PaletteCount = paletteCount,
     };
@@ -112,7 +192,7 @@ public sealed class TiffFile : IImageFileFormat<TiffFile> {
       Height = image.Height,
       SamplesPerPixel = samplesPerPixel,
       BitsPerSample = bitsPerSample,
-      PixelData = (byte[])image.PixelData.Clone(),
+      PixelData = image.PixelData[..],
       ColorMap = colorMap,
       ColorMode = colorMode,
     };

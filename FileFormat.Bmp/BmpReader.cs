@@ -16,6 +16,11 @@ public static class BmpReader {
 
   public static BmpFile FromStream(Stream stream) {
     ArgumentNullException.ThrowIfNull(stream);
+    if (stream.CanSeek) {
+      var data = new byte[stream.Length - stream.Position];
+      stream.ReadExactly(data);
+      return FromBytes(data);
+    }
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
     return FromBytes(ms.ToArray());
@@ -72,7 +77,7 @@ public static class BmpReader {
     // Read pixel data
     var remainingBytes = data.Length - pixelDataOffset;
     var rawPixelData = new byte[remainingBytes];
-    Array.Copy(data, pixelDataOffset, rawPixelData, 0, remainingBytes);
+    data.AsSpan(pixelDataOffset, remainingBytes).CopyTo(rawPixelData.AsSpan(0));
 
     var compression = bmpCompression switch {
       1 => BmpCompression.Rle8,
@@ -94,7 +99,7 @@ public static class BmpReader {
         var dstRow = rowOrder == BmpRowOrder.BottomUp ? height - 1 - row : row;
         var dstOffset = dstRow * bytesPerRow;
         if (srcOffset + bytesPerRow <= rawPixelData.Length)
-          Array.Copy(rawPixelData, srcOffset, pixelData, dstOffset, bytesPerRow);
+          rawPixelData.AsSpan(srcOffset, bytesPerRow).CopyTo(pixelData.AsSpan(dstOffset));
       }
       // After de-ordering, data is in top-down order
       rowOrder = BmpRowOrder.TopDown;

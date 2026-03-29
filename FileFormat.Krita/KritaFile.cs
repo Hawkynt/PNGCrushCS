@@ -1,0 +1,47 @@
+﻿using System;
+using System.IO;
+using FileFormat.Core;
+
+namespace FileFormat.Krita;
+
+/// <summary>In-memory representation of a Krita (.kra) image.</summary>
+public sealed class KritaFile : IImageFileFormat<KritaFile> {
+
+  static string IImageFileFormat<KritaFile>.PrimaryExtension => ".kra";
+  static string[] IImageFileFormat<KritaFile>.FileExtensions => [".kra"];
+  static KritaFile IImageFileFormat<KritaFile>.FromFile(FileInfo file) => KritaReader.FromFile(file);
+  static KritaFile IImageFileFormat<KritaFile>.FromBytes(byte[] data) => KritaReader.FromBytes(data);
+  static KritaFile IImageFileFormat<KritaFile>.FromStream(Stream stream) => KritaReader.FromStream(stream);
+  static byte[] IImageFileFormat<KritaFile>.ToBytes(KritaFile file) => KritaWriter.ToBytes(file);
+
+  /// <summary>Image width in pixels.</summary>
+  public int Width { get; init; }
+
+  /// <summary>Image height in pixels.</summary>
+  public int Height { get; init; }
+
+  /// <summary>Flat composite RGBA pixel data (4 bytes per pixel, row-major).</summary>
+  public byte[] PixelData { get; init; } = [];
+
+  public static RawImage ToRawImage(KritaFile file) {
+    ArgumentNullException.ThrowIfNull(file);
+    return new() {
+      Width = file.Width,
+      Height = file.Height,
+      Format = PixelFormat.Rgba32,
+      PixelData = file.PixelData[..],
+    };
+  }
+
+  public static KritaFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Format != PixelFormat.Rgba32)
+      throw new ArgumentException($"Expected {PixelFormat.Rgba32} but got {image.Format}.", nameof(image));
+
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      PixelData = image.PixelData[..],
+    };
+  }
+}

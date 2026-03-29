@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>preview</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Version>1.0.0</Version>
+    <Authors>Hawkynt</Authors>
+    <Description>Pure C# Atari 8-bit character set reader and writer. 128 chars in 128x64 grid (16x8 chars).</Description>
+    <PackageLicenseExpression>LGPL-3.0-or-later</PackageLicenseExpression>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="FileFormat.AtariFont.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\FileFormat.Core\FileFormat.Core.csproj" />
+  </ItemGroup>
+</Project>

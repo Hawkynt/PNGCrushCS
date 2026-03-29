@@ -1,15 +1,19 @@
-using System;
+﻿using System;
 using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Bmp;
 
 /// <summary>In-memory representation of a BMP image.</summary>
+[FormatMagicBytes([0x42, 0x4D])]
 public sealed class BmpFile : IImageFileFormat<BmpFile> {
 
   static string IImageFileFormat<BmpFile>.PrimaryExtension => ".bmp";
-  static string[] IImageFileFormat<BmpFile>.FileExtensions => [".bmp", ".dib"];
+  static string[] IImageFileFormat<BmpFile>.FileExtensions => [".bmp", ".dib", ".bga", ".rl4", ".rl8", ".vga", ".sys"];
+  static FormatCapability IImageFileFormat<BmpFile>.Capabilities => FormatCapability.HasDedicatedOptimizer;
   static BmpFile IImageFileFormat<BmpFile>.FromFile(FileInfo file) => BmpReader.FromFile(file);
+  static BmpFile IImageFileFormat<BmpFile>.FromBytes(byte[] data) => BmpReader.FromBytes(data);
+  static BmpFile IImageFileFormat<BmpFile>.FromStream(Stream stream) => BmpReader.FromStream(stream);
   static byte[] IImageFileFormat<BmpFile>.ToBytes(BmpFile file) => BmpWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
@@ -143,7 +147,7 @@ public sealed class BmpFile : IImageFileFormat<BmpFile> {
   private static byte[] _FlipRows(byte[] data, int stride, int height) {
     var result = new byte[data.Length];
     for (var y = 0; y < height; ++y)
-      Array.Copy(data, (height - 1 - y) * stride, result, y * stride, stride);
+      data.AsSpan((height - 1 - y) * stride, stride).CopyTo(result.AsSpan(y * stride));
     return result;
   }
 }

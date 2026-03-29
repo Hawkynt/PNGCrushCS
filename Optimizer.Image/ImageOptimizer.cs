@@ -28,7 +28,8 @@ public sealed partial class ImageOptimizer {
 
   private readonly FileInfo _inputFile;
   private readonly ImageOptimizationOptions _options;
-  private readonly ImageFormat _detectedFormat;
+  private byte[]? _fileBytes;
+  private ImageFormat _detectedFormat;
   private FileFormat.Core.RawImage? _cachedRawImage;
 
   public ImageOptimizer(FileInfo inputFile, ImageOptimizationOptions? options = null) {
@@ -38,7 +39,6 @@ public sealed partial class ImageOptimizer {
 
     _inputFile = inputFile;
     _options = options ?? new();
-    _detectedFormat = ImageFormatDetector.Detect(inputFile);
   }
 
   public async ValueTask<ImageOptimizationResult> OptimizeAsync(
@@ -46,7 +46,9 @@ public sealed partial class ImageOptimizer {
     IProgress<OptimizationProgress>? progress = null
   ) {
     var sw = Stopwatch.StartNew();
-    var originalBytes = await File.ReadAllBytesAsync(_inputFile.FullName, cancellationToken);
+    var originalBytes = _fileBytes ??= await File.ReadAllBytesAsync(_inputFile.FullName, cancellationToken);
+    if (_detectedFormat == default)
+      _detectedFormat = ImageFormatDetector.Detect(originalBytes, _inputFile);
     var originalFormat = _detectedFormat;
 
     if (originalFormat == ImageFormat.Unknown)
@@ -479,10 +481,15 @@ public sealed partial class ImageOptimizer {
     }));
   }
 
-  private Bitmap _LoadBitmap() => BitmapConverter.LoadBitmap(_inputFile, _detectedFormat);
+  private Bitmap _LoadBitmap()
+    => _fileBytes != null
+      ? BitmapConverter.LoadBitmap(_fileBytes, _detectedFormat)
+      : BitmapConverter.LoadBitmap(_inputFile, _detectedFormat);
 
   private FileFormat.Core.RawImage? _LoadRawImage()
-    => _cachedRawImage ??= BitmapConverter.LoadRawImage(_inputFile, _detectedFormat);
+    => _cachedRawImage ??= _fileBytes != null
+      ? BitmapConverter.LoadRawImage(_fileBytes, _detectedFormat)
+      : BitmapConverter.LoadRawImage(_inputFile, _detectedFormat);
 
   private FileFormat.Core.RawImage _LoadRawImageOrFromBitmap() {
     var raw = _LoadRawImage();

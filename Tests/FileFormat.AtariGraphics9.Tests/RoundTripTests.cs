@@ -1,0 +1,31 @@
+using System;
+using NUnit.Framework;
+using FileFormat.AtariGraphics9;
+
+namespace FileFormat.AtariGraphics9.Tests;
+
+[TestFixture]
+public sealed class RoundTripTests {
+
+  [Test]
+  [Category("Integration")]
+  public void WriteThenRead_PreservesData() {
+    var original = new AtariGraphics9File {
+      PixelData = new byte[7680],
+    };
+    var bytes = AtariGraphics9Writer.ToBytes(original);
+    var roundTripped = AtariGraphics9Reader.FromBytes(bytes);
+    Assert.That(roundTripped, Is.Not.Null);
+    Assert.That(roundTripped.PixelData, Is.EqualTo(original.PixelData));
+  }
+
+  [Test]
+  public void Reader_NullBytes_ThrowsArgumentNullException() {
+    Assert.That(() => AtariGraphics9Reader.FromBytes(null!), Throws.TypeOf<ArgumentNullException>());
+  }
+
+  [Test]
+  public void Writer_NullFile_ThrowsArgumentNullException() {
+    Assert.That(() => AtariGraphics9Writer.ToBytes(null!), Throws.TypeOf<ArgumentNullException>());
+  }
+}
