@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.UfliEditor;
 
 /// <summary>In-memory representation of a C64 UFLI (Unrestricted FLI) multicolor image.</summary>
-public sealed class UfliEditorFile : IImageFileFormat<UfliEditorFile> {
+public readonly record struct UfliEditorFile : IImageFormatReader<UfliEditorFile>, IImageToRawImage<UfliEditorFile>, IImageFormatWriter<UfliEditorFile> {
 
-  static string IImageFileFormat<UfliEditorFile>.PrimaryExtension => ".ufl";
-  static string[] IImageFileFormat<UfliEditorFile>.FileExtensions => [".ufl"];
-  static UfliEditorFile IImageFileFormat<UfliEditorFile>.FromFile(FileInfo file) => UfliEditorReader.FromFile(file);
-  static UfliEditorFile IImageFileFormat<UfliEditorFile>.FromBytes(byte[] data) => UfliEditorReader.FromBytes(data);
-  static UfliEditorFile IImageFileFormat<UfliEditorFile>.FromStream(Stream stream) => UfliEditorReader.FromStream(stream);
-  static byte[] IImageFileFormat<UfliEditorFile>.ToBytes(UfliEditorFile file) => UfliEditorWriter.ToBytes(file);
+  static string IImageFormatMetadata<UfliEditorFile>.PrimaryExtension => ".ufl";
+  static string[] IImageFormatMetadata<UfliEditorFile>.FileExtensions => [".ufl"];
+  static UfliEditorFile IImageFormatReader<UfliEditorFile>.FromSpan(ReadOnlySpan<byte> data) => UfliEditorReader.FromSpan(data);
+  static byte[] IImageFormatWriter<UfliEditorFile>.ToBytes(UfliEditorFile file) => UfliEditorWriter.ToBytes(file);
 
   /// <summary>The fixed width of the image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -58,11 +55,10 @@ public sealed class UfliEditorFile : IImageFileFormat<UfliEditorFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Raw payload data (entire file content after load address).</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   /// <summary>Converts this UFLI image to a platform-independent <see cref="RawImage"/> in Rgb24 format using FLI multicolor decode.</summary>
   public static RawImage ToRawImage(UfliEditorFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -114,9 +110,4 @@ public sealed class UfliEditorFile : IImageFileFormat<UfliEditorFile> {
     };
   }
 
-  /// <summary>Not supported. UFLI images have complex FLI color switching constraints.</summary>
-  public static UfliEditorFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to UfliEditorFile is not supported due to complex FLI color switching constraints.");
-  }
 }

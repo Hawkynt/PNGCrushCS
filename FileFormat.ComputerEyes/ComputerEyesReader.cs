@@ -26,6 +26,8 @@ public static class ComputerEyesReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static ComputerEyesFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static ComputerEyesFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < ComputerEyesFile.HeaderSize)

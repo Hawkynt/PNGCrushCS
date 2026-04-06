@@ -1,11 +1,10 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.LogoSys;
 
 /// <summary>In-memory representation of a Windows 95/98 boot logo (logo.sys) raw pixel dump.</summary>
-public sealed class LogoSysFile : IImageFileFormat<LogoSysFile> {
+public readonly record struct LogoSysFile : IImageFormatReader<LogoSysFile>, IImageToRawImage<LogoSysFile>, IImageFromRawImage<LogoSysFile>, IImageFormatWriter<LogoSysFile> {
 
   /// <summary>Pixel width of the logo image.</summary>
   internal const int PixelWidth = 320;
@@ -28,15 +27,11 @@ public sealed class LogoSysFile : IImageFileFormat<LogoSysFile> {
   /// <summary>Exact file size in bytes (768 palette + 128000 pixels = 128768).</summary>
   internal const int FileSize = PaletteSize + PixelDataSize;
 
-  static string IImageFileFormat<LogoSysFile>.PrimaryExtension => ".sys";
-  static string[] IImageFileFormat<LogoSysFile>.FileExtensions => [".sys", ".logo"];
-  static FormatCapability IImageFileFormat<LogoSysFile>.Capabilities => FormatCapability.IndexedOnly;
-  static LogoSysFile IImageFileFormat<LogoSysFile>.FromFile(FileInfo file) => LogoSysReader.FromFile(file);
-  static LogoSysFile IImageFileFormat<LogoSysFile>.FromBytes(byte[] data) => LogoSysReader.FromBytes(data);
-  static LogoSysFile IImageFileFormat<LogoSysFile>.FromStream(Stream stream) => LogoSysReader.FromStream(stream);
-  static RawImage IImageFileFormat<LogoSysFile>.ToRawImage(LogoSysFile file) => ToRawImage(file);
-  static LogoSysFile IImageFileFormat<LogoSysFile>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<LogoSysFile>.ToBytes(LogoSysFile file) => LogoSysWriter.ToBytes(file);
+  static string IImageFormatMetadata<LogoSysFile>.PrimaryExtension => ".sys";
+  static string[] IImageFormatMetadata<LogoSysFile>.FileExtensions => [".sys", ".logo"];
+  static LogoSysFile IImageFormatReader<LogoSysFile>.FromSpan(ReadOnlySpan<byte> data) => LogoSysReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<LogoSysFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<LogoSysFile>.ToBytes(LogoSysFile file) => LogoSysWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>
   public int Width => PixelWidth;
@@ -45,14 +40,13 @@ public sealed class LogoSysFile : IImageFileFormat<LogoSysFile> {
   public int Height => PixelHeight;
 
   /// <summary>256-color RGB palette (768 bytes: 256 entries, 3 bytes each in RGB order).</summary>
-  public byte[] Palette { get; init; } = [];
+  public byte[] Palette { get; init; }
 
   /// <summary>8-bit indexed pixel data (128000 bytes: 320x400, top-to-bottom, left-to-right).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts the logo.sys file to an Indexed8 raw image (320x400 with 256-color palette).</summary>
   public static RawImage ToRawImage(LogoSysFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     return new() {
       Width = PixelWidth,

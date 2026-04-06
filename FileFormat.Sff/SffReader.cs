@@ -27,6 +27,8 @@ public static class SffReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static SffFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static SffFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < SffHeader.StructSize)

@@ -1,18 +1,15 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Rla;
 
 /// <summary>In-memory representation of a Wavefront RLA image.</summary>
-public sealed class RlaFile : IImageFileFormat<RlaFile> {
+public readonly record struct RlaFile : IImageFormatReader<RlaFile>, IImageToRawImage<RlaFile>, IImageFromRawImage<RlaFile>, IImageFormatWriter<RlaFile> {
 
-  static string IImageFileFormat<RlaFile>.PrimaryExtension => ".rla";
-  static string[] IImageFileFormat<RlaFile>.FileExtensions => [".rla", ".rlb", ".rpf"];
-  static RlaFile IImageFileFormat<RlaFile>.FromFile(FileInfo file) => RlaReader.FromFile(file);
-  static RlaFile IImageFileFormat<RlaFile>.FromBytes(byte[] data) => RlaReader.FromBytes(data);
-  static RlaFile IImageFileFormat<RlaFile>.FromStream(Stream stream) => RlaReader.FromStream(stream);
-  static byte[] IImageFileFormat<RlaFile>.ToBytes(RlaFile file) => RlaWriter.ToBytes(file);
+  static string IImageFormatMetadata<RlaFile>.PrimaryExtension => ".rla";
+  static string[] IImageFormatMetadata<RlaFile>.FileExtensions => [".rla", ".rlb", ".rpf"];
+  static RlaFile IImageFormatReader<RlaFile>.FromSpan(ReadOnlySpan<byte> data) => RlaReader.FromSpan(data);
+  static byte[] IImageFormatWriter<RlaFile>.ToBytes(RlaFile file) => RlaWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
   public int NumChannels { get; init; }
@@ -20,14 +17,13 @@ public sealed class RlaFile : IImageFileFormat<RlaFile> {
   public int NumBits { get; init; }
   public int StorageType { get; init; }
   public int FrameNumber { get; init; }
-  public string Description { get; init; } = string.Empty;
-  public string ProgramName { get; init; } = string.Empty;
+  public string Description { get; init; }
+  public string ProgramName { get; init; }
 
   /// <summary>Raw pixel data stored in channel-planar order per scanline (bottom-to-top, channel-interleaved per scanline).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(RlaFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     PixelFormat format;
     int bytesPerPixel;

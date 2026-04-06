@@ -68,30 +68,6 @@ public sealed class StadReaderTests {
 }
 
 [TestFixture]
-public sealed class StadWriterTests {
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => StadWriter.ToBytes(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_ProducesOutput() {
-    var file = new StadFile { RawData = new byte[32000] };
-
-    var bytes = StadWriter.ToBytes(file);
-
-    Assert.That(bytes.Length, Is.GreaterThan(4));
-    Assert.That(bytes[0], Is.EqualTo((byte)'p'));
-    Assert.That(bytes[1], Is.EqualTo((byte)'M'));
-    Assert.That(bytes[2], Is.EqualTo((byte)'8'));
-    Assert.That(bytes[3], Is.EqualTo((byte)'6'));
-  }
-}
-
-[TestFixture]
 public sealed class RoundTripTests {
 
   [Test]
@@ -141,54 +117,3 @@ public sealed class RoundTripTests {
   }
 }
 
-[TestFixture]
-public sealed class DataTypeTests {
-
-  [Test]
-  [Category("Unit")]
-  public void StadFile_DefaultWidth_Is640() {
-    Assert.That(new StadFile().Width, Is.EqualTo(640));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void StadFile_DefaultHeight_Is400() {
-    Assert.That(new StadFile().Height, Is.EqualTo(400));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void StadFile_ToRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => StadFile.ToRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void StadFile_FromRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => StadFile.FromRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void StadFile_FromRawImage_ThrowsNotSupportedException() {
-    var raw = new RawImage {
-      Width = 640, Height = 400,
-      Format = PixelFormat.Indexed1,
-      PixelData = new byte[80 * 400],
-      Palette = new byte[6], PaletteCount = 2,
-    };
-    Assert.Throws<NotSupportedException>(() => StadFile.FromRawImage(raw));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void StadFile_ToRawImage_ReturnsIndexed1() {
-    var file = new StadFile { RawData = new byte[32000] };
-    var raw = StadFile.ToRawImage(file);
-
-    Assert.That(raw.Format, Is.EqualTo(PixelFormat.Indexed1));
-    Assert.That(raw.Width, Is.EqualTo(640));
-    Assert.That(raw.Height, Is.EqualTo(400));
-    Assert.That(raw.PaletteCount, Is.EqualTo(2));
-  }
-}

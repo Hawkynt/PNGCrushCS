@@ -26,6 +26,8 @@ public static class DuneGraphReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static DuneGraphFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static DuneGraphFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < DuneGraphFile.PaletteDataSize + 1)

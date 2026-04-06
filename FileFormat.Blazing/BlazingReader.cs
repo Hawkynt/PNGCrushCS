@@ -26,6 +26,8 @@ public static class BlazingReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static BlazingFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static BlazingFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < BlazingFile.ExpectedFileSize)

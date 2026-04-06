@@ -27,6 +27,8 @@ public static class ZoomaticReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static ZoomaticFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static ZoomaticFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
 

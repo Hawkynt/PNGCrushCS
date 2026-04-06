@@ -41,25 +41,6 @@ public class SiemensBmxReaderTests {
 }
 
 [TestFixture]
-public class SiemensBmxWriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => SiemensBmxWriter.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_IncludesHeader() {
-    var file = new SiemensBmxFile {
-      Width = 101,
-      Height = 64,
-      PixelData = new byte[101 * 64],
-    };
-    var bytes = SiemensBmxWriter.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(8 + 101 * 64));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -90,30 +71,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void HeaderSize_Is8()
-    => Assert.That(SiemensBmxFile.HeaderSize, Is.EqualTo(8));
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => SiemensBmxFile.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => SiemensBmxFile.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 101, Height = 64, Format = PixelFormat.Rgb24, PixelData = new byte[101 * 64 * 3] };
-    Assert.Throws<ArgumentException>(() => SiemensBmxFile.FromRawImage(raw));
-  }
-
-  [Test]
-  public void FileExtensions_ContainsPrimary() {
-    string[] exts = [".bmx"];
-    Assert.That(exts, Does.Contain(".bmx"));
-  }
-}

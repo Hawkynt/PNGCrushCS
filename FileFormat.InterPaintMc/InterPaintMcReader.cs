@@ -26,6 +26,8 @@ public static class InterPaintMcReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static InterPaintMcFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static InterPaintMcFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < InterPaintMcFile.ExpectedFileSize)

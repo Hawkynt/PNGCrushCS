@@ -32,6 +32,8 @@ public static class DicomReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static DicomFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static DicomFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MIN_FILE_SIZE)

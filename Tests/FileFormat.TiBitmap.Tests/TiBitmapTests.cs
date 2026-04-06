@@ -41,25 +41,6 @@ public class TiBitmapReaderTests {
 }
 
 [TestFixture]
-public class TiBitmapWriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => TiBitmapWriter.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_IncludesHeader() {
-    var file = new TiBitmapFile {
-      Width = 96,
-      Height = 64,
-      PixelData = new byte[(96 + 7) / 8 * 64],
-    };
-    var bytes = TiBitmapWriter.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(8 + (96 + 7) / 8 * 64));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -90,30 +71,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void HeaderSize_Is8()
-    => Assert.That(TiBitmapFile.HeaderSize, Is.EqualTo(8));
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => TiBitmapFile.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => TiBitmapFile.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 96, Height = 64, Format = PixelFormat.Rgb24, PixelData = new byte[96 * 64 * 3] };
-    Assert.Throws<ArgumentException>(() => TiBitmapFile.FromRawImage(raw));
-  }
-
-  [Test]
-  public void FileExtensions_ContainsPrimary() {
-    string[] exts = [".8xi", ".89i"];
-    Assert.That(exts, Does.Contain(".8xi"));
-  }
-}

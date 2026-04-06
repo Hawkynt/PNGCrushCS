@@ -50,6 +50,8 @@ public static class ZxBorderMulticolorReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static ZxBorderMulticolorFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static ZxBorderMulticolorFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != FileSize)

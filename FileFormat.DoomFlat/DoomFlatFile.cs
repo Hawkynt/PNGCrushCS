@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.DoomFlat;
 
 /// <summary>In-memory representation of a Doom flat texture lump image.</summary>
-public sealed class DoomFlatFile : IImageFileFormat<DoomFlatFile> {
+public readonly record struct DoomFlatFile : IImageFormatReader<DoomFlatFile>, IImageToRawImage<DoomFlatFile>, IImageFromRawImage<DoomFlatFile>, IImageFormatWriter<DoomFlatFile> {
 
   internal const int FixedWidth = 64;
   internal const int FixedHeight = 64;
@@ -13,20 +12,17 @@ public sealed class DoomFlatFile : IImageFileFormat<DoomFlatFile> {
 
   private static readonly byte[] _DefaultPalette = [0, 0, 0, 0, 0, 170, 0, 170, 0, 0, 170, 170, 170, 0, 0, 170, 0, 170, 170, 85, 0, 170, 170, 170, 85, 85, 85, 85, 85, 255, 85, 255, 85, 85, 255, 255, 255, 85, 85, 255, 85, 255, 255, 255, 85, 255, 255, 255];
 
-  static string IImageFileFormat<DoomFlatFile>.PrimaryExtension => ".flat";
-  static string[] IImageFileFormat<DoomFlatFile>.FileExtensions => [".flat"];
-  static FormatCapability IImageFileFormat<DoomFlatFile>.Capabilities => FormatCapability.IndexedOnly;
-  static DoomFlatFile IImageFileFormat<DoomFlatFile>.FromFile(FileInfo file) => DoomFlatReader.FromFile(file);
-  static DoomFlatFile IImageFileFormat<DoomFlatFile>.FromBytes(byte[] data) => DoomFlatReader.FromBytes(data);
-  static DoomFlatFile IImageFileFormat<DoomFlatFile>.FromStream(Stream stream) => DoomFlatReader.FromStream(stream);
-  static byte[] IImageFileFormat<DoomFlatFile>.ToBytes(DoomFlatFile file) => DoomFlatWriter.ToBytes(file);
+  static string IImageFormatMetadata<DoomFlatFile>.PrimaryExtension => ".flat";
+  static string[] IImageFormatMetadata<DoomFlatFile>.FileExtensions => [".flat"];
+  static DoomFlatFile IImageFormatReader<DoomFlatFile>.FromSpan(ReadOnlySpan<byte> data) => DoomFlatReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<DoomFlatFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<DoomFlatFile>.ToBytes(DoomFlatFile file) => DoomFlatWriter.ToBytes(file);
 
   public int Width => FixedWidth;
   public int Height => FixedHeight;
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(DoomFlatFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = FixedWidth,
       Height = FixedHeight,

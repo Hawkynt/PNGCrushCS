@@ -27,6 +27,8 @@ public static class Tim2Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static Tim2File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static Tim2File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < Tim2Header.StructSize)

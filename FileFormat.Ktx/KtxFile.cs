@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using FileFormat.Core;
 using FileFormat.Core.BlockDecoders;
 
@@ -9,14 +8,12 @@ namespace FileFormat.Ktx;
 /// <summary>In-memory representation of a KTX texture container.</summary>
 [FormatMagicBytes([0xAB, 0x4B, 0x54, 0x58, 0x20, 0x31, 0x31, 0xBB])]
 [FormatMagicBytes([0xAB, 0x4B, 0x54, 0x58, 0x20, 0x32, 0x30, 0xBB])]
-public sealed class KtxFile : IImageFileFormat<KtxFile> {
+public readonly record struct KtxFile : IImageFormatReader<KtxFile>, IImageToRawImage<KtxFile>, IImageFormatWriter<KtxFile> {
 
-  static string IImageFileFormat<KtxFile>.PrimaryExtension => ".ktx";
-  static string[] IImageFileFormat<KtxFile>.FileExtensions => [".ktx", ".ktx2"];
-  static KtxFile IImageFileFormat<KtxFile>.FromFile(FileInfo file) => KtxReader.FromFile(file);
-  static KtxFile IImageFileFormat<KtxFile>.FromBytes(byte[] data) => KtxReader.FromBytes(data);
-  static KtxFile IImageFileFormat<KtxFile>.FromStream(Stream stream) => KtxReader.FromStream(stream);
-  static byte[] IImageFileFormat<KtxFile>.ToBytes(KtxFile file) => KtxWriter.ToBytes(file);
+  static string IImageFormatMetadata<KtxFile>.PrimaryExtension => ".ktx";
+  static string[] IImageFormatMetadata<KtxFile>.FileExtensions => [".ktx", ".ktx2"];
+  static KtxFile IImageFormatReader<KtxFile>.FromSpan(ReadOnlySpan<byte> data) => KtxReader.FromSpan(data);
+  static byte[] IImageFormatWriter<KtxFile>.ToBytes(KtxFile file) => KtxWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
   public int Depth { get; init; }
@@ -24,7 +21,7 @@ public sealed class KtxFile : IImageFileFormat<KtxFile> {
   public int MipmapCount { get; init; }
   public int Faces { get; init; }
   public int ArrayElements { get; init; }
-  public IReadOnlyList<KtxMipLevel> MipLevels { get; init; } = [];
+  public IReadOnlyList<KtxMipLevel> MipLevels { get; init; }
   public IReadOnlyList<KtxKeyValue>? KeyValues { get; init; }
 
   // KTX1 fields
@@ -41,7 +38,6 @@ public sealed class KtxFile : IImageFileFormat<KtxFile> {
 
   /// <summary>Decodes the first mip level of a KTX file into a <see cref="RawImage"/>.</summary>
   public static RawImage ToRawImage(KtxFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     if (file.MipLevels.Count == 0)
       throw new InvalidOperationException("KTX file contains no mip levels.");

@@ -93,9 +93,9 @@ public sealed class DataTypeTests {
     Assert.That(exts[0], Is.EqualTo(".blp"));
   }
 
-  private static string _GetPrimaryExtension<T>() where T : IImageFileFormat<T>
+  private static string _GetPrimaryExtension<T>() where T : IImageFormatMetadata<T>
     => T.PrimaryExtension;
 
-  private static string[] _GetFileExtensions<T>() where T : IImageFileFormat<T>
+  private static string[] _GetFileExtensions<T>() where T : IImageFormatMetadata<T>
     => T.FileExtensions;
 }

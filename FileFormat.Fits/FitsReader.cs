@@ -29,6 +29,8 @@ public static class FitsReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static FitsFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static FitsFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _BLOCK_SIZE)

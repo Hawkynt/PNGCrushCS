@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.TruePaint;
 
 /// <summary>In-memory representation of a True Paint interlace multicolor image (.mci).</summary>
-public sealed class TruePaintFile : IImageFileFormat<TruePaintFile> {
+public readonly record struct TruePaintFile : IImageFormatReader<TruePaintFile>, IImageToRawImage<TruePaintFile>, IImageFormatWriter<TruePaintFile> {
 
-  static string IImageFileFormat<TruePaintFile>.PrimaryExtension => ".mci";
-  static string[] IImageFileFormat<TruePaintFile>.FileExtensions => [".mci"];
-  static TruePaintFile IImageFileFormat<TruePaintFile>.FromFile(FileInfo file) => TruePaintReader.FromFile(file);
-  static TruePaintFile IImageFileFormat<TruePaintFile>.FromBytes(byte[] data) => TruePaintReader.FromBytes(data);
-  static TruePaintFile IImageFileFormat<TruePaintFile>.FromStream(Stream stream) => TruePaintReader.FromStream(stream);
-  static byte[] IImageFileFormat<TruePaintFile>.ToBytes(TruePaintFile file) => TruePaintWriter.ToBytes(file);
+  static string IImageFormatMetadata<TruePaintFile>.PrimaryExtension => ".mci";
+  static string[] IImageFormatMetadata<TruePaintFile>.FileExtensions => [".mci"];
+  static TruePaintFile IImageFormatReader<TruePaintFile>.FromSpan(ReadOnlySpan<byte> data) => TruePaintReader.FromSpan(data);
+  static byte[] IImageFormatWriter<TruePaintFile>.ToBytes(TruePaintFile file) => TruePaintWriter.ToBytes(file);
 
   /// <summary>The fixed width of the image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -61,19 +58,19 @@ public sealed class TruePaintFile : IImageFileFormat<TruePaintFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>First multicolor bitmap data (8000 bytes).</summary>
-  public byte[] BitmapData1 { get; init; } = [];
+  public byte[] BitmapData1 { get; init; }
 
   /// <summary>First screen RAM (1000 bytes).</summary>
-  public byte[] ScreenRam1 { get; init; } = [];
+  public byte[] ScreenRam1 { get; init; }
 
   /// <summary>Second multicolor bitmap data (8000 bytes).</summary>
-  public byte[] BitmapData2 { get; init; } = [];
+  public byte[] BitmapData2 { get; init; }
 
   /// <summary>Second screen RAM (1000 bytes).</summary>
-  public byte[] ScreenRam2 { get; init; } = [];
+  public byte[] ScreenRam2 { get; init; }
 
   /// <summary>Color RAM shared by both bitmaps (1000 bytes).</summary>
-  public byte[] ColorRam { get; init; } = [];
+  public byte[] ColorRam { get; init; }
 
   /// <summary>Background color index (0-15).</summary>
   public byte BackgroundColor { get; init; }
@@ -83,7 +80,6 @@ public sealed class TruePaintFile : IImageFileFormat<TruePaintFile> {
 
   /// <summary>Converts this True Paint image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(TruePaintFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -139,9 +135,4 @@ public sealed class TruePaintFile : IImageFileFormat<TruePaintFile> {
     };
   }
 
-  /// <summary>Not supported. True Paint images have complex cell-based interlace color constraints.</summary>
-  public static TruePaintFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to TruePaintFile is not supported due to complex cell-based interlace color constraints.");
-  }
 }

@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.HiresBitmap;
 
 /// <summary>In-memory representation of a C64 Hires Bitmap (.hbm) image.</summary>
-public sealed class HiresBitmapFile : IImageFileFormat<HiresBitmapFile> {
+public readonly record struct HiresBitmapFile : IImageFormatReader<HiresBitmapFile>, IImageToRawImage<HiresBitmapFile>, IImageFormatWriter<HiresBitmapFile> {
 
-  static string IImageFileFormat<HiresBitmapFile>.PrimaryExtension => ".hbm";
-  static string[] IImageFileFormat<HiresBitmapFile>.FileExtensions => [".hbm", ".hir"];
-  static HiresBitmapFile IImageFileFormat<HiresBitmapFile>.FromFile(FileInfo file) => HiresBitmapReader.FromFile(file);
-  static HiresBitmapFile IImageFileFormat<HiresBitmapFile>.FromBytes(byte[] data) => HiresBitmapReader.FromBytes(data);
-  static HiresBitmapFile IImageFileFormat<HiresBitmapFile>.FromStream(Stream stream) => HiresBitmapReader.FromStream(stream);
-  static byte[] IImageFileFormat<HiresBitmapFile>.ToBytes(HiresBitmapFile file) => HiresBitmapWriter.ToBytes(file);
+  static string IImageFormatMetadata<HiresBitmapFile>.PrimaryExtension => ".hbm";
+  static string[] IImageFormatMetadata<HiresBitmapFile>.FileExtensions => [".hbm", ".hir"];
+  static HiresBitmapFile IImageFormatReader<HiresBitmapFile>.FromSpan(ReadOnlySpan<byte> data) => HiresBitmapReader.FromSpan(data);
+  static byte[] IImageFormatWriter<HiresBitmapFile>.ToBytes(HiresBitmapFile file) => HiresBitmapWriter.ToBytes(file);
 
   /// <summary>Size of the bitmap data section in bytes.</summary>
   internal const int BitmapDataSize = 8000;
@@ -46,17 +43,16 @@ public sealed class HiresBitmapFile : IImageFileFormat<HiresBitmapFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Bitmap data (8000 bytes).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Screen RAM / video matrix (1000 bytes).</summary>
-  public byte[] ScreenData { get; init; } = [];
+  public byte[] ScreenData { get; init; }
 
   /// <summary>Any trailing bytes beyond the minimum payload.</summary>
-  public byte[] TrailingData { get; init; } = [];
+  public byte[] TrailingData { get; init; }
 
   /// <summary>Converts this Hires Bitmap image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(HiresBitmapFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = ImageWidth;
     const int height = ImageHeight;
@@ -92,6 +88,4 @@ public sealed class HiresBitmapFile : IImageFileFormat<HiresBitmapFile> {
     };
   }
 
-  /// <summary>Creates a Hires Bitmap image from a <see cref="RawImage"/>. Not supported.</summary>
-  public static HiresBitmapFile FromRawImage(RawImage image) => throw new NotSupportedException("Creating HiresBitmap files from raw images is not supported.");
 }

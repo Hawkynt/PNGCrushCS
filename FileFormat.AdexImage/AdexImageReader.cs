@@ -26,6 +26,8 @@ public static class AdexImageReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static AdexImageFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AdexImageFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < AdexImageFile.MinFileSize)

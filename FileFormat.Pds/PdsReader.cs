@@ -30,6 +30,8 @@ public static class PdsReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static PdsFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static PdsFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MIN_HEADER_SIZE)

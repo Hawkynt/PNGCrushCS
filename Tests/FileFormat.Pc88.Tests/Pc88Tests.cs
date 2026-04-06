@@ -47,21 +47,6 @@ public class Pc88ReaderTests {
 }
 
 [TestFixture]
-public class Pc88WriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => Pc88Writer.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_OutputSize_IsCorrect() {
-    var file = new Pc88File { PixelData = new byte[Pc88File.ImageWidth * Pc88File.ImageHeight] };
-    var bytes = Pc88Writer.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(Pc88File.FileSize));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -94,41 +79,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void PrimaryExtension_IsCorrect()
-    => Assert.That(_GetPrimaryExtension<Pc88File>(), Is.EqualTo(".pc8"));
-
-  [Test]
-  public void FileExtensions_ContainsPrimary() {
-    var exts = _GetFileExtensions<Pc88File>();
-    Assert.That(exts, Does.Contain(".pc8"));
-  }
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => Pc88File.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => Pc88File.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 640, Height = 200, Format = PixelFormat.Rgb24, PixelData = new byte[640 * 200 * 3] };
-    Assert.Throws<ArgumentException>(() => Pc88File.FromRawImage(raw));
-  }
-
-  [Test]
-  public void Constants_AreCorrect() {
-    Assert.That(Pc88File.FileSize, Is.EqualTo(16000));
-    Assert.That(Pc88File.ImageWidth, Is.EqualTo(640));
-    Assert.That(Pc88File.ImageHeight, Is.EqualTo(200));
-  }
-
-  private static string _GetPrimaryExtension<T>() where T : IImageFileFormat<T> => T.PrimaryExtension;
-
-  private static string[] _GetFileExtensions<T>() where T : IImageFileFormat<T> => T.FileExtensions;
-}

@@ -1,40 +1,36 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.ScreenBlaster;
 
 /// <summary>In-memory representation of a Screen Blaster image (Atari ST, 320x200, 16 colors).</summary>
-public sealed class ScreenBlasterFile : IImageFileFormat<ScreenBlasterFile> {
+public readonly record struct ScreenBlasterFile : IImageFormatReader<ScreenBlasterFile>, IImageToRawImage<ScreenBlasterFile>, IImageFromRawImage<ScreenBlasterFile>, IImageFormatWriter<ScreenBlasterFile> {
 
   /// <summary>Expected file size: 2-byte resolution + 32-byte palette + 32000 bytes planar data.</summary>
   public const int FileSize = 32034;
 
-  static string IImageFileFormat<ScreenBlasterFile>.PrimaryExtension => ".sbl";
-  static string[] IImageFileFormat<ScreenBlasterFile>.FileExtensions => [".sbl"];
-  static FormatCapability IImageFileFormat<ScreenBlasterFile>.Capabilities => FormatCapability.IndexedOnly;
-  static ScreenBlasterFile IImageFileFormat<ScreenBlasterFile>.FromFile(FileInfo file) => ScreenBlasterReader.FromFile(file);
-  static ScreenBlasterFile IImageFileFormat<ScreenBlasterFile>.FromBytes(byte[] data) => ScreenBlasterReader.FromBytes(data);
-  static ScreenBlasterFile IImageFileFormat<ScreenBlasterFile>.FromStream(Stream stream) => ScreenBlasterReader.FromStream(stream);
-  static byte[] IImageFileFormat<ScreenBlasterFile>.ToBytes(ScreenBlasterFile file) => ScreenBlasterWriter.ToBytes(file);
+  static string IImageFormatMetadata<ScreenBlasterFile>.PrimaryExtension => ".sbl";
+  static string[] IImageFormatMetadata<ScreenBlasterFile>.FileExtensions => [".sbl"];
+  static ScreenBlasterFile IImageFormatReader<ScreenBlasterFile>.FromSpan(ReadOnlySpan<byte> data) => ScreenBlasterReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<ScreenBlasterFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<ScreenBlasterFile>.ToBytes(ScreenBlasterFile file) => ScreenBlasterWriter.ToBytes(file);
 
   /// <summary>Image width (always 320).</summary>
-  public int Width { get; init; } = 320;
+  public int Width { get; init; }
 
   /// <summary>Image height (always 200).</summary>
-  public int Height { get; init; } = 200;
+  public int Height { get; init; }
 
   /// <summary>Resolution word (0 = low 320x200).</summary>
   public ushort Resolution { get; init; }
 
   /// <summary>16-entry palette of Atari ST 9-bit RGB values.</summary>
-  public short[] Palette { get; init; } = new short[16];
+  public short[] Palette { get; init; }
 
   /// <summary>32000 bytes of Atari ST word-interleaved planar pixel data.</summary>
-  public byte[] PixelData { get; init; } = new byte[32000];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(ScreenBlasterFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var chunky = PlanarConverter.AtariStToChunky(file.PixelData, file.Width, file.Height, 4);
     var paletteCount = Math.Min(16, file.Palette.Length);

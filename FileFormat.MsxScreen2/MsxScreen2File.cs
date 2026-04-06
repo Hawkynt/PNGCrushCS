@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.MsxScreen2;
@@ -10,14 +9,13 @@ namespace FileFormat.MsxScreen2;
 /// 256x192, pattern-based 16 colors (TMS9918 palette).
 /// </summary>
 [FormatMagicBytes([0xFE])]
-public sealed class MsxScreen2File : IImageFileFormat<MsxScreen2File> {
+public sealed class MsxScreen2File : IImageFormatReader<MsxScreen2File>, IImageToRawImage<MsxScreen2File>, IImageFormatWriter<MsxScreen2File> {
 
-  static string IImageFileFormat<MsxScreen2File>.PrimaryExtension => ".sc2";
-  static string[] IImageFileFormat<MsxScreen2File>.FileExtensions => [".sc2", ".grp"];
-  static MsxScreen2File IImageFileFormat<MsxScreen2File>.FromFile(FileInfo file) => MsxScreen2Reader.FromFile(file);
-  static MsxScreen2File IImageFileFormat<MsxScreen2File>.FromBytes(byte[] data) => MsxScreen2Reader.FromBytes(data);
-  static MsxScreen2File IImageFileFormat<MsxScreen2File>.FromStream(Stream stream) => MsxScreen2Reader.FromStream(stream);
-  static byte[] IImageFileFormat<MsxScreen2File>.ToBytes(MsxScreen2File file) => MsxScreen2Writer.ToBytes(file);
+  static string IImageFormatMetadata<MsxScreen2File>.PrimaryExtension => ".sc2";
+  static string[] IImageFormatMetadata<MsxScreen2File>.FileExtensions => [".sc2", ".grp"];
+  static MsxScreen2File IImageFormatReader<MsxScreen2File>.FromSpan(ReadOnlySpan<byte> data) => MsxScreen2Reader.FromSpan(data);
+
+  static byte[] IImageFormatWriter<MsxScreen2File>.ToBytes(MsxScreen2File file) => MsxScreen2Writer.ToBytes(file);
 
   /// <summary>Fixed width of an MSX Screen 2 image.</summary>
   public const int FixedWidth = 256;
@@ -126,9 +124,4 @@ public sealed class MsxScreen2File : IImageFileFormat<MsxScreen2File> {
     };
   }
 
-  /// <summary>Not supported. MSX Screen 2 has complex pattern-based constraints.</summary>
-  public static MsxScreen2File FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to MsxScreen2File is not supported due to complex pattern-based constraints.");
-  }
 }

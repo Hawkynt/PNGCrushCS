@@ -1,21 +1,18 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.GodPaint;
 
 /// <summary>In-memory representation of a GodPaint (.gpn) screen dump.</summary>
-public sealed class GodPaintFile : IImageFileFormat<GodPaintFile> {
+public readonly record struct GodPaintFile : IImageFormatReader<GodPaintFile>, IImageToRawImage<GodPaintFile>, IImageFromRawImage<GodPaintFile>, IImageFormatWriter<GodPaintFile> {
 
   /// <summary>The exact file size: 320 x 240 x 2 bytes per pixel.</summary>
   public const int ExpectedFileSize = 320 * 240 * 2;
 
-  static string IImageFileFormat<GodPaintFile>.PrimaryExtension => ".gpn";
-  static string[] IImageFileFormat<GodPaintFile>.FileExtensions => [".gpn", ".gdp"];
-  static GodPaintFile IImageFileFormat<GodPaintFile>.FromFile(FileInfo file) => GodPaintReader.FromFile(file);
-  static GodPaintFile IImageFileFormat<GodPaintFile>.FromBytes(byte[] data) => GodPaintReader.FromBytes(data);
-  static GodPaintFile IImageFileFormat<GodPaintFile>.FromStream(Stream stream) => GodPaintReader.FromStream(stream);
-  static byte[] IImageFileFormat<GodPaintFile>.ToBytes(GodPaintFile file) => GodPaintWriter.ToBytes(file);
+  static string IImageFormatMetadata<GodPaintFile>.PrimaryExtension => ".gpn";
+  static string[] IImageFormatMetadata<GodPaintFile>.FileExtensions => [".gpn", ".gdp"];
+  static GodPaintFile IImageFormatReader<GodPaintFile>.FromSpan(ReadOnlySpan<byte> data) => GodPaintReader.FromSpan(data);
+  static byte[] IImageFormatWriter<GodPaintFile>.ToBytes(GodPaintFile file) => GodPaintWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>
   public int Width => 320;
@@ -24,10 +21,9 @@ public sealed class GodPaintFile : IImageFileFormat<GodPaintFile> {
   public int Height => 240;
 
   /// <summary>Raw RGB565 big-endian pixel data (2 bytes per pixel, 153600 bytes total).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(GodPaintFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var rgb565 = file.PixelData;
     var pixelCount = 320 * 240;

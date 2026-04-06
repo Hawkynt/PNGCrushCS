@@ -29,6 +29,8 @@ public static class DoodlePackedReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static DoodlePackedFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static DoodlePackedFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < MinFileSize)

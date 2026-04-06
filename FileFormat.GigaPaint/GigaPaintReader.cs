@@ -26,6 +26,8 @@ public static class GigaPaintReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static GigaPaintFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static GigaPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < GigaPaintFile.LoadAddressSize + GigaPaintFile.MinBitmapSize)

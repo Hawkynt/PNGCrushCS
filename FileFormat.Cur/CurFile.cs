@@ -9,15 +9,13 @@ namespace FileFormat.Cur;
 
 /// <summary>In-memory representation of a CUR file.</summary>
 [FormatMagicBytes([0x00, 0x00, 0x02, 0x00])]
-public sealed class CurFile : IImageFileFormat<CurFile>, IMultiImageFileFormat<CurFile> {
+public sealed class CurFile : IImageFormatReader<CurFile>, IImageToRawImage<CurFile>, IImageFormatWriter<CurFile>, IMultiImageFileFormat<CurFile> {
 
-  static string IImageFileFormat<CurFile>.PrimaryExtension => ".cur";
-  static string[] IImageFileFormat<CurFile>.FileExtensions => [".cur"];
-  static FormatCapability IImageFileFormat<CurFile>.Capabilities => FormatCapability.HasDedicatedOptimizer | FormatCapability.MultiImage;
-  static CurFile IImageFileFormat<CurFile>.FromFile(FileInfo file) => CurReader.FromFile(file);
-  static CurFile IImageFileFormat<CurFile>.FromBytes(byte[] data) => CurReader.FromBytes(data);
-  static CurFile IImageFileFormat<CurFile>.FromStream(Stream stream) => CurReader.FromStream(stream);
-  static byte[] IImageFileFormat<CurFile>.ToBytes(CurFile file) => CurWriter.ToBytes(file);
+  static string IImageFormatMetadata<CurFile>.PrimaryExtension => ".cur";
+  static string[] IImageFormatMetadata<CurFile>.FileExtensions => [".cur"];
+  static CurFile IImageFormatReader<CurFile>.FromSpan(ReadOnlySpan<byte> data) => CurReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<CurFile>.Capabilities => FormatCapability.HasDedicatedOptimizer | FormatCapability.MultiImage;
+  static byte[] IImageFormatWriter<CurFile>.ToBytes(CurFile file) => CurWriter.ToBytes(file);
   public IReadOnlyList<CurImage> Images { get; init; } = [];
 
   /// <summary>Returns the number of cursor entries in this CUR file.</summary>
@@ -63,6 +61,4 @@ public sealed class CurFile : IImageFileFormat<CurFile>, IMultiImageFileFormat<C
     return IcoFile.ToRawImage(icoFile);
   }
 
-  /// <summary>CUR files require multiple resolutions and hotspot data; single-image creation is not supported.</summary>
-  public static CurFile FromRawImage(RawImage image) => throw new NotSupportedException("CUR encoding from a single raw image is not supported.");
 }

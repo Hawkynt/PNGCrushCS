@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Centauri;
 
 /// <summary>In-memory representation of a Commodore 64 Centauri paint image.</summary>
-public sealed class CentauriFile : IImageFileFormat<CentauriFile> {
+public readonly record struct CentauriFile : IImageFormatReader<CentauriFile>, IImageToRawImage<CentauriFile>, IImageFormatWriter<CentauriFile> {
 
-  static string IImageFileFormat<CentauriFile>.PrimaryExtension => ".cnt";
-  static string[] IImageFileFormat<CentauriFile>.FileExtensions => [".cnt", ".cen"];
-  static CentauriFile IImageFileFormat<CentauriFile>.FromFile(FileInfo file) => CentauriReader.FromFile(file);
-  static CentauriFile IImageFileFormat<CentauriFile>.FromBytes(byte[] data) => CentauriReader.FromBytes(data);
-  static CentauriFile IImageFileFormat<CentauriFile>.FromStream(Stream stream) => CentauriReader.FromStream(stream);
-  static byte[] IImageFileFormat<CentauriFile>.ToBytes(CentauriFile file) => CentauriWriter.ToBytes(file);
+  static string IImageFormatMetadata<CentauriFile>.PrimaryExtension => ".cnt";
+  static string[] IImageFormatMetadata<CentauriFile>.FileExtensions => [".cnt", ".cen"];
+  static CentauriFile IImageFormatReader<CentauriFile>.FromSpan(ReadOnlySpan<byte> data) => CentauriReader.FromSpan(data);
+  static byte[] IImageFormatWriter<CentauriFile>.ToBytes(CentauriFile file) => CentauriWriter.ToBytes(file);
 
   /// <summary>The fixed width of a Centauri image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -55,13 +52,13 @@ public sealed class CentauriFile : IImageFileFormat<CentauriFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Multicolor bitmap data (8000 bytes, 2 bits per pixel).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Video matrix / screen RAM (1000 bytes, upper/lower nybble = 2 colors per cell).</summary>
-  public byte[] VideoMatrix { get; init; } = [];
+  public byte[] VideoMatrix { get; init; }
 
   /// <summary>Color RAM (1000 bytes, lower nybble = 3rd color per cell).</summary>
-  public byte[] ColorRam { get; init; } = [];
+  public byte[] ColorRam { get; init; }
 
   /// <summary>Border color index (0-15).</summary>
   public byte BorderColor { get; init; }
@@ -70,11 +67,10 @@ public sealed class CentauriFile : IImageFileFormat<CentauriFile> {
   public byte BackgroundColor { get; init; }
 
   /// <summary>Trailing padding bytes (14 bytes).</summary>
-  public byte[] Padding { get; init; } = [];
+  public byte[] Padding { get; init; }
 
   /// <summary>Converts this Centauri image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(CentauriFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -113,9 +109,4 @@ public sealed class CentauriFile : IImageFileFormat<CentauriFile> {
     };
   }
 
-  /// <summary>Not supported. Centauri images have complex cell-based color constraints.</summary>
-  public static CentauriFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to CentauriFile is not supported due to complex cell-based color constraints.");
-  }
 }

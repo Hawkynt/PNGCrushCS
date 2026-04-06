@@ -29,6 +29,8 @@ public static class DaliSTReader {
     return _Parse(ms.ToArray(), DaliSTResolution.Low);
   }
 
+  public static DaliSTFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static DaliSTFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     return _Parse(data, DaliSTResolution.Low);

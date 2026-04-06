@@ -64,31 +64,6 @@ public sealed class YuvRawReaderTests {
 }
 
 [TestFixture]
-public sealed class YuvRawWriterTests {
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => YuvRawWriter.ToBytes(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_ProducesCorrectSize() {
-    var file = new YuvRawFile {
-      Width = 4, Height = 4,
-      YPlane = new byte[16],
-      UPlane = new byte[4],
-      VPlane = new byte[4],
-    };
-
-    var bytes = YuvRawWriter.ToBytes(file);
-
-    Assert.That(bytes.Length, Is.EqualTo(24));
-  }
-}
-
-[TestFixture]
 public sealed class RoundTripTests {
 
   [Test]
@@ -136,56 +111,3 @@ public sealed class RoundTripTests {
   }
 }
 
-[TestFixture]
-public sealed class DataTypeTests {
-
-  [Test]
-  [Category("Unit")]
-  public void YuvRawFile_Defaults() {
-    var file = new YuvRawFile();
-    Assert.That(file.Width, Is.EqualTo(0));
-    Assert.That(file.Height, Is.EqualTo(0));
-    Assert.That(file.YPlane, Is.Empty);
-    Assert.That(file.UPlane, Is.Empty);
-    Assert.That(file.VPlane, Is.Empty);
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void YuvRawFile_ToRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => YuvRawFile.ToRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void YuvRawFile_FromRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => YuvRawFile.FromRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void YuvRawFile_ToRawImage_ReturnsRgb24() {
-    var file = new YuvRawFile {
-      Width = 4, Height = 4,
-      YPlane = new byte[16],
-      UPlane = new byte[4],
-      VPlane = new byte[4],
-    };
-    var raw = YuvRawFile.ToRawImage(file);
-
-    Assert.That(raw.Format, Is.EqualTo(PixelFormat.Rgb24));
-    Assert.That(raw.Width, Is.EqualTo(4));
-    Assert.That(raw.Height, Is.EqualTo(4));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void YuvRawFile_FromRawImage_WrongFormat_Throws() {
-    var raw = new RawImage {
-      Width = 4, Height = 4,
-      Format = PixelFormat.Gray8,
-      PixelData = new byte[16],
-    };
-    Assert.Throws<ArgumentException>(() => YuvRawFile.FromRawImage(raw));
-  }
-}

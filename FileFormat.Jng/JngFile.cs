@@ -1,19 +1,16 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Jng;
 
 /// <summary>In-memory representation of a JNG image.</summary>
 [FormatMagicBytes([0x8B, 0x4A, 0x4E, 0x47])]
-public sealed class JngFile : IImageFileFormat<JngFile> {
+public readonly record struct JngFile : IImageFormatReader<JngFile>, IImageToRawImage<JngFile>, IImageFormatWriter<JngFile> {
 
-  static string IImageFileFormat<JngFile>.PrimaryExtension => ".jng";
-  static string[] IImageFileFormat<JngFile>.FileExtensions => [".jng"];
-  static JngFile IImageFileFormat<JngFile>.FromFile(FileInfo file) => JngReader.FromFile(file);
-  static JngFile IImageFileFormat<JngFile>.FromBytes(byte[] data) => JngReader.FromBytes(data);
-  static JngFile IImageFileFormat<JngFile>.FromStream(Stream stream) => JngReader.FromStream(stream);
-  static byte[] IImageFileFormat<JngFile>.ToBytes(JngFile file) => JngWriter.ToBytes(file);
+  static string IImageFormatMetadata<JngFile>.PrimaryExtension => ".jng";
+  static string[] IImageFormatMetadata<JngFile>.FileExtensions => [".jng"];
+  static JngFile IImageFormatReader<JngFile>.FromSpan(ReadOnlySpan<byte> data) => JngReader.FromSpan(data);
+  static byte[] IImageFormatWriter<JngFile>.ToBytes(JngFile file) => JngWriter.ToBytes(file);
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
 
@@ -33,18 +30,13 @@ public sealed class JngFile : IImageFileFormat<JngFile> {
   public JngAlphaCompression AlphaCompression { get; init; }
 
   /// <summary>Concatenated JPEG image data from all JDAT chunks.</summary>
-  public byte[] JpegData { get; init; } = [];
+  public byte[] JpegData { get; init; }
 
   /// <summary>Concatenated alpha channel data from all JDAA or IDAT chunks, or null if no alpha.</summary>
   public byte[]? AlphaData { get; init; }
 
   public static RawImage ToRawImage(JngFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     throw new NotSupportedException("JNG conversion requires JPEG decoding which is not available in this library. Use FileFormat.Jpeg to decode JpegData first.");
   }
 
-  public static JngFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("JNG conversion requires JPEG encoding which is not available in this library. Use FileFormat.Jpeg to encode pixel data first.");
-  }
 }

@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Dragon;
 
 /// <summary>In-memory representation of a Dragon 32/64 PMODE 4 screen image.</summary>
-public sealed class DragonFile : IImageFileFormat<DragonFile> {
+public readonly record struct DragonFile : IImageFormatReader<DragonFile>, IImageToRawImage<DragonFile>, IImageFromRawImage<DragonFile>, IImageFormatWriter<DragonFile> {
 
   internal const int FixedWidth = 256;
   internal const int FixedHeight = 192;
@@ -13,20 +12,17 @@ public sealed class DragonFile : IImageFileFormat<DragonFile> {
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
-  static string IImageFileFormat<DragonFile>.PrimaryExtension => ".dgn";
-  static string[] IImageFileFormat<DragonFile>.FileExtensions => [".dgn"];
-  static FormatCapability IImageFileFormat<DragonFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static DragonFile IImageFileFormat<DragonFile>.FromFile(FileInfo file) => DragonReader.FromFile(file);
-  static DragonFile IImageFileFormat<DragonFile>.FromBytes(byte[] data) => DragonReader.FromBytes(data);
-  static DragonFile IImageFileFormat<DragonFile>.FromStream(Stream stream) => DragonReader.FromStream(stream);
-  static byte[] IImageFileFormat<DragonFile>.ToBytes(DragonFile file) => DragonWriter.ToBytes(file);
+  static string IImageFormatMetadata<DragonFile>.PrimaryExtension => ".dgn";
+  static string[] IImageFormatMetadata<DragonFile>.FileExtensions => [".dgn"];
+  static DragonFile IImageFormatReader<DragonFile>.FromSpan(ReadOnlySpan<byte> data) => DragonReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<DragonFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<DragonFile>.ToBytes(DragonFile file) => DragonWriter.ToBytes(file);
 
   public int Width => FixedWidth;
   public int Height => FixedHeight;
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(DragonFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = FixedWidth,
       Height = FixedHeight,

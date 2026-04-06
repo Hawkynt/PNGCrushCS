@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.VirtualBoyTile;
 
 /// <summary>In-memory representation of a Virtual Boy 2bpp red tile data image.</summary>
-public sealed class VirtualBoyTileFile : IImageFileFormat<VirtualBoyTileFile> {
+public readonly record struct VirtualBoyTileFile : IImageFormatReader<VirtualBoyTileFile>, IImageToRawImage<VirtualBoyTileFile>, IImageFromRawImage<VirtualBoyTileFile>, IImageFormatWriter<VirtualBoyTileFile> {
 
   internal const int BytesPerTile = 16;
   internal const int TileSize = 8;
@@ -15,21 +14,18 @@ public sealed class VirtualBoyTileFile : IImageFileFormat<VirtualBoyTileFile> {
 
   private static readonly byte[] _DefaultPalette = [0, 0, 0, 85, 0, 0, 170, 0, 0, 255, 0, 0];
 
-  static string IImageFileFormat<VirtualBoyTileFile>.PrimaryExtension => ".vbt";
-  static string[] IImageFileFormat<VirtualBoyTileFile>.FileExtensions => [".vbt", ".vb", ".vboy"];
-  static FormatCapability IImageFileFormat<VirtualBoyTileFile>.Capabilities => FormatCapability.IndexedOnly;
-  static VirtualBoyTileFile IImageFileFormat<VirtualBoyTileFile>.FromFile(FileInfo file) => VirtualBoyTileReader.FromFile(file);
-  static VirtualBoyTileFile IImageFileFormat<VirtualBoyTileFile>.FromBytes(byte[] data) => VirtualBoyTileReader.FromBytes(data);
-  static VirtualBoyTileFile IImageFileFormat<VirtualBoyTileFile>.FromStream(Stream stream) => VirtualBoyTileReader.FromStream(stream);
-  static byte[] IImageFileFormat<VirtualBoyTileFile>.ToBytes(VirtualBoyTileFile file) => VirtualBoyTileWriter.ToBytes(file);
+  static string IImageFormatMetadata<VirtualBoyTileFile>.PrimaryExtension => ".vbt";
+  static string[] IImageFormatMetadata<VirtualBoyTileFile>.FileExtensions => [".vbt", ".vb", ".vboy"];
+  static VirtualBoyTileFile IImageFormatReader<VirtualBoyTileFile>.FromSpan(ReadOnlySpan<byte> data) => VirtualBoyTileReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<VirtualBoyTileFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<VirtualBoyTileFile>.ToBytes(VirtualBoyTileFile file) => VirtualBoyTileWriter.ToBytes(file);
 
-  public int Width { get; init; } = TilesPerRow * TileSize;
+  public int Width { get; init; }
   public int Height { get; init; }
-  public byte[] PixelData { get; init; } = [];
-  public byte[] Palette { get; init; } = _DefaultPalette[..];
+  public byte[] PixelData { get; init; }
+  public byte[] Palette { get; init; }
 
   public static RawImage ToRawImage(VirtualBoyTileFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

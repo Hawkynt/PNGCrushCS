@@ -49,25 +49,6 @@ public sealed class PrintfoxPagefoxReaderTests {
 }
 
 [TestFixture]
-public sealed class PrintfoxPagefoxWriterTests {
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => PrintfoxPagefoxWriter.ToBytes(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_CorrectOutputSize() {
-    var file = new PrintfoxPagefoxFile { RawData = new byte[8000] };
-    var bytes = PrintfoxPagefoxWriter.ToBytes(file);
-
-    Assert.That(bytes.Length, Is.EqualTo(8000));
-  }
-}
-
-[TestFixture]
 public sealed class PrintfoxPagefoxRoundTripTests {
 
   [Test]
@@ -86,59 +67,3 @@ public sealed class PrintfoxPagefoxRoundTripTests {
   }
 }
 
-[TestFixture]
-public sealed class PrintfoxPagefoxDataTypeTests {
-
-  [Test]
-  [Category("Unit")]
-  public void PrimaryExtension_IsBs() {
-    Assert.That(_GetPrimaryExtension(), Is.EqualTo(".bs"));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FileExtensions_ContainsBsAndPg() {
-    var extensions = _GetFileExtensions();
-    Assert.That(extensions, Does.Contain(".bs"));
-    Assert.That(extensions, Does.Contain(".pg"));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => PrintfoxPagefoxFile.ToRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => PrintfoxPagefoxFile.FromRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_ThrowsNotSupportedException() {
-    var image = new RawImage { Width = 320, Height = 200, Format = PixelFormat.Indexed1, PixelData = new byte[40 * 200] };
-    Assert.Throws<NotSupportedException>(() => PrintfoxPagefoxFile.FromRawImage(image));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToRawImage_ReturnsIndexed1Format() {
-    var file = new PrintfoxPagefoxFile { RawData = new byte[8000] };
-    var raw = PrintfoxPagefoxFile.ToRawImage(file);
-
-    Assert.That(raw.Format, Is.EqualTo(PixelFormat.Indexed1));
-    Assert.That(raw.Width, Is.EqualTo(320));
-    Assert.That(raw.Height, Is.EqualTo(200));
-    Assert.That(raw.PaletteCount, Is.EqualTo(2));
-  }
-
-  private static string _GetPrimaryExtension() => _Helper<PrintfoxPagefoxFile>.PrimaryExtension;
-  private static string[] _GetFileExtensions() => _Helper<PrintfoxPagefoxFile>.FileExtensions;
-
-  private static class _Helper<T> where T : IImageFileFormat<T> {
-    public static string PrimaryExtension => T.PrimaryExtension;
-    public static string[] FileExtensions => T.FileExtensions;
-  }
-}

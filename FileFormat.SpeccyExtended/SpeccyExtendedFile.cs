@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.SpeccyExtended;
@@ -10,16 +9,15 @@ namespace FileFormat.SpeccyExtended;
 /// </summary>
 [FormatDetectionPriority(100)]
 [FormatMagicBytes(new byte[] { 0x53, 0x58, 0x47 })]
-public sealed class SpeccyExtendedFile : IImageFileFormat<SpeccyExtendedFile> {
+public sealed class SpeccyExtendedFile : IImageFormatReader<SpeccyExtendedFile>, IImageToRawImage<SpeccyExtendedFile>, IImageFormatWriter<SpeccyExtendedFile> {
 
-  static string IImageFileFormat<SpeccyExtendedFile>.PrimaryExtension => ".sxg";
-  static string[] IImageFileFormat<SpeccyExtendedFile>.FileExtensions => [".sxg"];
-  static SpeccyExtendedFile IImageFileFormat<SpeccyExtendedFile>.FromFile(FileInfo file) => SpeccyExtendedReader.FromFile(file);
-  static SpeccyExtendedFile IImageFileFormat<SpeccyExtendedFile>.FromBytes(byte[] data) => SpeccyExtendedReader.FromBytes(data);
-  static SpeccyExtendedFile IImageFileFormat<SpeccyExtendedFile>.FromStream(Stream stream) => SpeccyExtendedReader.FromStream(stream);
-  static byte[] IImageFileFormat<SpeccyExtendedFile>.ToBytes(SpeccyExtendedFile file) => SpeccyExtendedWriter.ToBytes(file);
+  static string IImageFormatMetadata<SpeccyExtendedFile>.PrimaryExtension => ".sxg";
+  static string[] IImageFormatMetadata<SpeccyExtendedFile>.FileExtensions => [".sxg"];
+  static SpeccyExtendedFile IImageFormatReader<SpeccyExtendedFile>.FromSpan(ReadOnlySpan<byte> data) => SpeccyExtendedReader.FromSpan(data);
 
-  static bool? IImageFileFormat<SpeccyExtendedFile>.MatchesSignature(ReadOnlySpan<byte> header)
+  static byte[] IImageFormatWriter<SpeccyExtendedFile>.ToBytes(SpeccyExtendedFile file) => SpeccyExtendedWriter.ToBytes(file);
+
+  static bool? IImageFormatMetadata<SpeccyExtendedFile>.MatchesSignature(ReadOnlySpan<byte> header)
     => header.Length >= 3 && header[0] == 0x53 && header[1] == 0x58 && header[2] == 0x47;
 
   /// <summary>ZX Spectrum normal palette (bright=0): Black, Blue, Red, Magenta, Green, Cyan, Yellow, White.</summary>
@@ -96,9 +94,4 @@ public sealed class SpeccyExtendedFile : IImageFileFormat<SpeccyExtendedFile> {
     };
   }
 
-  /// <summary>Not supported. SXG images have complex attribute-based color constraints.</summary>
-  public static SpeccyExtendedFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to SpeccyExtendedFile is not supported due to complex attribute-based color constraints.");
-  }
 }

@@ -1,11 +1,10 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.AppleIIHgr;
 
 /// <summary>In-memory representation of an Apple II High-Resolution graphics screen dump.</summary>
-public sealed class AppleIIHgrFile : IImageFileFormat<AppleIIHgrFile> {
+public readonly record struct AppleIIHgrFile : IImageFormatReader<AppleIIHgrFile>, IImageToRawImage<AppleIIHgrFile>, IImageFromRawImage<AppleIIHgrFile>, IImageFormatWriter<AppleIIHgrFile> {
 
   /// <summary>Exact file size in bytes (8192 = 0x2000 memory region).</summary>
   internal const int FileSize = 8192;
@@ -19,15 +18,11 @@ public sealed class AppleIIHgrFile : IImageFileFormat<AppleIIHgrFile> {
   /// <summary>Bytes per scanline row in the screen memory (40 bytes = 280/7).</summary>
   internal const int BytesPerRow = 40;
 
-  static string IImageFileFormat<AppleIIHgrFile>.PrimaryExtension => ".hgr";
-  static string[] IImageFileFormat<AppleIIHgrFile>.FileExtensions => [".hgr"];
-  static FormatCapability IImageFileFormat<AppleIIHgrFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static AppleIIHgrFile IImageFileFormat<AppleIIHgrFile>.FromFile(FileInfo file) => AppleIIHgrReader.FromFile(file);
-  static AppleIIHgrFile IImageFileFormat<AppleIIHgrFile>.FromBytes(byte[] data) => AppleIIHgrReader.FromBytes(data);
-  static AppleIIHgrFile IImageFileFormat<AppleIIHgrFile>.FromStream(Stream stream) => AppleIIHgrReader.FromStream(stream);
-  static RawImage IImageFileFormat<AppleIIHgrFile>.ToRawImage(AppleIIHgrFile file) => ToRawImage(file);
-  static AppleIIHgrFile IImageFileFormat<AppleIIHgrFile>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<AppleIIHgrFile>.ToBytes(AppleIIHgrFile file) => AppleIIHgrWriter.ToBytes(file);
+  static string IImageFormatMetadata<AppleIIHgrFile>.PrimaryExtension => ".hgr";
+  static string[] IImageFormatMetadata<AppleIIHgrFile>.FileExtensions => [".hgr"];
+  static AppleIIHgrFile IImageFormatReader<AppleIIHgrFile>.FromSpan(ReadOnlySpan<byte> data) => AppleIIHgrReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<AppleIIHgrFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<AppleIIHgrFile>.ToBytes(AppleIIHgrFile file) => AppleIIHgrWriter.ToBytes(file);
 
   /// <summary>Always 280.</summary>
   public int Width => PixelWidth;
@@ -36,7 +31,7 @@ public sealed class AppleIIHgrFile : IImageFileFormat<AppleIIHgrFile> {
   public int Height => PixelHeight;
 
   /// <summary>Raw memory dump data (8192 bytes). Includes the Apple II interleaved layout and memory holes.</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
@@ -52,7 +47,6 @@ public sealed class AppleIIHgrFile : IImageFileFormat<AppleIIHgrFile> {
   /// Each byte has 7 data bits (bits 0-6, LSB first) and a palette select bit (bit 7, ignored for mono).
   /// </summary>
   public static RawImage ToRawImage(AppleIIHgrFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     // Indexed1: 280 pixels / 8 = 35 bytes per row
     var rowStride = (PixelWidth + 7) / 8; // 35

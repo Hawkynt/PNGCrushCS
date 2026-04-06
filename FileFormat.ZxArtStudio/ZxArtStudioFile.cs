@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.ZxArtStudio;
 
 /// <summary>In-memory representation of a ZX Spectrum Art Studio file (6912 bytes: 6144 bitmap + 768 attributes).</summary>
-public sealed class ZxArtStudioFile : IImageFileFormat<ZxArtStudioFile> {
+public readonly record struct ZxArtStudioFile : IImageFormatReader<ZxArtStudioFile>, IImageToRawImage<ZxArtStudioFile>, IImageFormatWriter<ZxArtStudioFile> {
 
-  static string IImageFileFormat<ZxArtStudioFile>.PrimaryExtension => ".zas";
-  static string[] IImageFileFormat<ZxArtStudioFile>.FileExtensions => [".zas"];
-  static ZxArtStudioFile IImageFileFormat<ZxArtStudioFile>.FromFile(FileInfo file) => ZxArtStudioReader.FromFile(file);
-  static ZxArtStudioFile IImageFileFormat<ZxArtStudioFile>.FromBytes(byte[] data) => ZxArtStudioReader.FromBytes(data);
-  static ZxArtStudioFile IImageFileFormat<ZxArtStudioFile>.FromStream(Stream stream) => ZxArtStudioReader.FromStream(stream);
-  static byte[] IImageFileFormat<ZxArtStudioFile>.ToBytes(ZxArtStudioFile file) => ZxArtStudioWriter.ToBytes(file);
+  static string IImageFormatMetadata<ZxArtStudioFile>.PrimaryExtension => ".zas";
+  static string[] IImageFormatMetadata<ZxArtStudioFile>.FileExtensions => [".zas"];
+  static ZxArtStudioFile IImageFormatReader<ZxArtStudioFile>.FromSpan(ReadOnlySpan<byte> data) => ZxArtStudioReader.FromSpan(data);
+  static byte[] IImageFormatWriter<ZxArtStudioFile>.ToBytes(ZxArtStudioFile file) => ZxArtStudioWriter.ToBytes(file);
 
   /// <summary>ZX Spectrum normal palette (bright=0).</summary>
   internal static readonly int[] NormalPalette = [
@@ -31,14 +28,13 @@ public sealed class ZxArtStudioFile : IImageFileFormat<ZxArtStudioFile> {
   public int Height => 192;
 
   /// <summary>6144 bytes of 1bpp bitmap data in linear row order.</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>768 bytes of attribute data, one per 8x8 cell.</summary>
-  public byte[] AttributeData { get; init; } = [];
+  public byte[] AttributeData { get; init; }
 
   /// <summary>Converts this Art Studio screen to Rgb24.</summary>
   public static RawImage ToRawImage(ZxArtStudioFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = 256;
     const int height = 192;
@@ -74,9 +70,4 @@ public sealed class ZxArtStudioFile : IImageFileFormat<ZxArtStudioFile> {
     };
   }
 
-  /// <summary>Not supported.</summary>
-  public static ZxArtStudioFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to ZxArtStudioFile is not supported due to complex attribute-based color constraints.");
-  }
 }

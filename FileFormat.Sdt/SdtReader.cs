@@ -25,6 +25,8 @@ public static class SdtReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static SdtFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static SdtFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < SdtFile.HeaderSize)

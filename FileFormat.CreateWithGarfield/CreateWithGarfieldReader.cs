@@ -26,6 +26,8 @@ public static class CreateWithGarfieldReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static CreateWithGarfieldFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static CreateWithGarfieldFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < CreateWithGarfieldFile.ExpectedFileSize)

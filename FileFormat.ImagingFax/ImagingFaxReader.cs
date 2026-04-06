@@ -26,6 +26,8 @@ public static class ImagingFaxReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static ImagingFaxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static ImagingFaxFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < ImagingFaxFile.MinFileSize)

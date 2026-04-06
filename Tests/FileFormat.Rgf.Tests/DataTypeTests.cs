@@ -51,7 +51,7 @@ public sealed class DataTypeTests {
       PixelData = new byte[] { 0xFF }
     };
 
-    var raw = file.ToRawImage();
+    var raw = RgfFile.ToRawImage(file);
 
     Assert.That(raw.Format, Is.EqualTo(FileFormat.Core.PixelFormat.Indexed1));
     Assert.That(raw.Width, Is.EqualTo(8));
@@ -70,7 +70,7 @@ public sealed class DataTypeTests {
       PixelData = new byte[] { 0x00 }
     };
 
-    var raw = file.ToRawImage();
+    var raw = RgfFile.ToRawImage(file);
 
     // Entry 0: black (0, 0, 0)
     Assert.That(raw.Palette![0], Is.EqualTo(0));
@@ -92,7 +92,7 @@ public sealed class DataTypeTests {
       PixelData = pixelData
     };
 
-    var raw = file.ToRawImage();
+    var raw = RgfFile.ToRawImage(file);
 
     Assert.That(raw.PixelData, Is.Not.SameAs(pixelData));
     Assert.That(raw.PixelData, Is.EqualTo(pixelData));

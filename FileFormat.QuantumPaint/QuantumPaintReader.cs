@@ -27,6 +27,8 @@ public static class QuantumPaintReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static QuantumPaintFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static QuantumPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < QuantumPaintFile.MinFileSize)

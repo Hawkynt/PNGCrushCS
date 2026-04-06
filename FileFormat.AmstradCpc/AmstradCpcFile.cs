@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.AmstradCpc;
 
 /// <summary>In-memory representation of an Amstrad CPC screen memory dump.</summary>
-public sealed class AmstradCpcFile : IImageFileFormat<AmstradCpcFile> {
+public readonly record struct AmstradCpcFile : IImageFormatReader<AmstradCpcFile>, IImageToRawImage<AmstradCpcFile>, IImageFromRawImage<AmstradCpcFile>, IImageFormatWriter<AmstradCpcFile> {
 
-  static string IImageFileFormat<AmstradCpcFile>.PrimaryExtension => ".cpc";
-  static string[] IImageFileFormat<AmstradCpcFile>.FileExtensions => [".cpc"];
-  static AmstradCpcFile IImageFileFormat<AmstradCpcFile>.FromFile(FileInfo file) => AmstradCpcReader.FromFile(file);
-  static AmstradCpcFile IImageFileFormat<AmstradCpcFile>.FromBytes(byte[] data) => AmstradCpcReader.FromBytes(data);
-  static AmstradCpcFile IImageFileFormat<AmstradCpcFile>.FromStream(Stream stream) => AmstradCpcReader.FromStream(stream);
-  static byte[] IImageFileFormat<AmstradCpcFile>.ToBytes(AmstradCpcFile file) => AmstradCpcWriter.ToBytes(file);
+  static string IImageFormatMetadata<AmstradCpcFile>.PrimaryExtension => ".cpc";
+  static string[] IImageFormatMetadata<AmstradCpcFile>.FileExtensions => [".cpc"];
+  static AmstradCpcFile IImageFormatReader<AmstradCpcFile>.FromSpan(ReadOnlySpan<byte> data) => AmstradCpcReader.FromSpan(data);
+  static byte[] IImageFormatWriter<AmstradCpcFile>.ToBytes(AmstradCpcFile file) => AmstradCpcWriter.ToBytes(file);
   /// <summary>Width in pixels (depends on mode: 160, 320, or 640).</summary>
   public int Width { get; init; }
   /// <summary>Height in pixels (always 200).</summary>
@@ -20,7 +17,7 @@ public sealed class AmstradCpcFile : IImageFileFormat<AmstradCpcFile> {
   /// <summary>Screen mode.</summary>
   public AmstradCpcMode Mode { get; init; }
   /// <summary>Raw screen memory (16384 bytes for standard screen).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
   /// <summary>Hardware palette indices (up to 16 entries), optional.</summary>
   public byte[]? Palette { get; init; }
 
@@ -64,7 +61,6 @@ public sealed class AmstradCpcFile : IImageFileFormat<AmstradCpcFile> {
 
   /// <summary>Converts this Amstrad CPC screen to a platform-independent <see cref="RawImage"/> in Indexed8 format.</summary>
   public static RawImage ToRawImage(AmstradCpcFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var width = file.Width;
     var height = file.Height;

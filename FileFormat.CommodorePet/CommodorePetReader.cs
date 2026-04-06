@@ -25,6 +25,8 @@ public static class CommodorePetReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static CommodorePetFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static CommodorePetFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < CommodorePetFile.FileSize)

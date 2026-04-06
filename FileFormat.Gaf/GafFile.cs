@@ -1,21 +1,17 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Gaf;
 
 /// <summary>In-memory representation of a GAF (Total Annihilation) texture archive image.</summary>
 [FormatMagicBytes([0x00, 0x01, 0x01, 0x00])]
-public sealed class GafFile : IImageFileFormat<GafFile> {
+public readonly record struct GafFile : IImageFormatReader<GafFile>, IImageToRawImage<GafFile>, IImageFromRawImage<GafFile>, IImageFormatWriter<GafFile> {
 
-  static string IImageFileFormat<GafFile>.PrimaryExtension => ".gaf";
-  static string[] IImageFileFormat<GafFile>.FileExtensions => [".gaf"];
-  static FormatCapability IImageFileFormat<GafFile>.Capabilities => FormatCapability.IndexedOnly;
-  static GafFile IImageFileFormat<GafFile>.FromFile(FileInfo file) => GafReader.FromFile(file);
-  static GafFile IImageFileFormat<GafFile>.FromBytes(byte[] data) => GafReader.FromBytes(data);
-  static GafFile IImageFileFormat<GafFile>.FromStream(Stream stream) => GafReader.FromStream(stream);
-  static RawImage IImageFileFormat<GafFile>.ToRawImage(GafFile file) => ToRawImage(file);
-  static byte[] IImageFileFormat<GafFile>.ToBytes(GafFile file) => GafWriter.ToBytes(file);
+  static string IImageFormatMetadata<GafFile>.PrimaryExtension => ".gaf";
+  static string[] IImageFormatMetadata<GafFile>.FileExtensions => [".gaf"];
+  static GafFile IImageFormatReader<GafFile>.FromSpan(ReadOnlySpan<byte> data) => GafReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<GafFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<GafFile>.ToBytes(GafFile file) => GafWriter.ToBytes(file);
 
   /// <summary>Width of the first frame in pixels.</summary>
   public int Width { get; init; }
@@ -24,13 +20,13 @@ public sealed class GafFile : IImageFileFormat<GafFile> {
   public int Height { get; init; }
 
   /// <summary>Entry name (up to 32 ASCII characters, null-terminated).</summary>
-  public string Name { get; init; } = string.Empty;
+  public string Name { get; init; }
 
   /// <summary>Palette index treated as transparent (typically 9 in TA).</summary>
-  public byte TransparencyIndex { get; init; } = 9;
+  public byte TransparencyIndex { get; init; }
 
   /// <summary>8-bit indexed pixel data (one byte per pixel, row-major).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Optional external palette as RGB triplets (3 bytes per entry, up to 256 entries). Null means use default grayscale.</summary>
   public byte[]? Palette { get; init; }
@@ -43,7 +39,6 @@ public sealed class GafFile : IImageFileFormat<GafFile> {
 
   /// <summary>Converts a GAF file to a <see cref="RawImage"/>. Uses embedded palette or a default 256-entry grayscale palette.</summary>
   public static RawImage ToRawImage(GafFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     byte[] palette;
     int paletteCount;

@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.FliDesigner;
 
 /// <summary>In-memory representation of a C64 FLI Designer multicolor image.</summary>
-public sealed class FliDesignerFile : IImageFileFormat<FliDesignerFile> {
+public readonly record struct FliDesignerFile : IImageFormatReader<FliDesignerFile>, IImageToRawImage<FliDesignerFile>, IImageFormatWriter<FliDesignerFile> {
 
-  static string IImageFileFormat<FliDesignerFile>.PrimaryExtension => ".fd2";
-  static string[] IImageFileFormat<FliDesignerFile>.FileExtensions => [".fd2"];
-  static FliDesignerFile IImageFileFormat<FliDesignerFile>.FromFile(FileInfo file) => FliDesignerReader.FromFile(file);
-  static FliDesignerFile IImageFileFormat<FliDesignerFile>.FromBytes(byte[] data) => FliDesignerReader.FromBytes(data);
-  static FliDesignerFile IImageFileFormat<FliDesignerFile>.FromStream(Stream stream) => FliDesignerReader.FromStream(stream);
-  static byte[] IImageFileFormat<FliDesignerFile>.ToBytes(FliDesignerFile file) => FliDesignerWriter.ToBytes(file);
+  static string IImageFormatMetadata<FliDesignerFile>.PrimaryExtension => ".fd2";
+  static string[] IImageFormatMetadata<FliDesignerFile>.FileExtensions => [".fd2"];
+  static FliDesignerFile IImageFormatReader<FliDesignerFile>.FromSpan(ReadOnlySpan<byte> data) => FliDesignerReader.FromSpan(data);
+  static byte[] IImageFormatWriter<FliDesignerFile>.ToBytes(FliDesignerFile file) => FliDesignerWriter.ToBytes(file);
 
   /// <summary>The fixed width of the image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -58,11 +55,10 @@ public sealed class FliDesignerFile : IImageFileFormat<FliDesignerFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Raw payload data (entire file content after load address).</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   /// <summary>Converts this FLI Designer image to a platform-independent <see cref="RawImage"/> in Rgb24 format using FLI multicolor decode.</summary>
   public static RawImage ToRawImage(FliDesignerFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -114,9 +110,4 @@ public sealed class FliDesignerFile : IImageFileFormat<FliDesignerFile> {
     };
   }
 
-  /// <summary>Not supported. FLI Designer images have complex FLI color switching constraints.</summary>
-  public static FliDesignerFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to FliDesignerFile is not supported due to complex FLI color switching constraints.");
-  }
 }

@@ -26,6 +26,8 @@ public static class FliProfiReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static FliProfiFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static FliProfiFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < FliProfiFile.LoadAddressSize + FliProfiFile.MinPayloadSize)

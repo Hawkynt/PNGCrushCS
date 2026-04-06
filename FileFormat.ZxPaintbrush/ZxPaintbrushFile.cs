@@ -1,19 +1,16 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.ZxPaintbrush;
 
 /// <summary>In-memory representation of a ZX Spectrum ZX-Paintbrush image (6912+ bytes: 6144 bitmap + 768 attributes + optional extra data).</summary>
 [FormatDetectionPriority(200)]
-public sealed class ZxPaintbrushFile : IImageFileFormat<ZxPaintbrushFile> {
+public readonly record struct ZxPaintbrushFile : IImageFormatReader<ZxPaintbrushFile>, IImageToRawImage<ZxPaintbrushFile>, IImageFormatWriter<ZxPaintbrushFile> {
 
-  static string IImageFileFormat<ZxPaintbrushFile>.PrimaryExtension => ".zxp";
-  static string[] IImageFileFormat<ZxPaintbrushFile>.FileExtensions => [".zxp"];
-  static ZxPaintbrushFile IImageFileFormat<ZxPaintbrushFile>.FromFile(FileInfo file) => ZxPaintbrushReader.FromFile(file);
-  static ZxPaintbrushFile IImageFileFormat<ZxPaintbrushFile>.FromBytes(byte[] data) => ZxPaintbrushReader.FromBytes(data);
-  static ZxPaintbrushFile IImageFileFormat<ZxPaintbrushFile>.FromStream(Stream stream) => ZxPaintbrushReader.FromStream(stream);
-  static byte[] IImageFileFormat<ZxPaintbrushFile>.ToBytes(ZxPaintbrushFile file) => ZxPaintbrushWriter.ToBytes(file);
+  static string IImageFormatMetadata<ZxPaintbrushFile>.PrimaryExtension => ".zxp";
+  static string[] IImageFormatMetadata<ZxPaintbrushFile>.FileExtensions => [".zxp"];
+  static ZxPaintbrushFile IImageFormatReader<ZxPaintbrushFile>.FromSpan(ReadOnlySpan<byte> data) => ZxPaintbrushReader.FromSpan(data);
+  static byte[] IImageFormatWriter<ZxPaintbrushFile>.ToBytes(ZxPaintbrushFile file) => ZxPaintbrushWriter.ToBytes(file);
 
   /// <summary>ZX Spectrum normal palette (bright=0): Black, Blue, Red, Magenta, Green, Cyan, Yellow, White.</summary>
   private static readonly int[] _NormalPalette = [
@@ -32,17 +29,16 @@ public sealed class ZxPaintbrushFile : IImageFileFormat<ZxPaintbrushFile> {
   public int Height => 192;
 
   /// <summary>6144 bytes of 1bpp bitmap data in linear row order (deinterleaved).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>768 bytes of attribute data, one per 8x8 cell (bit 7=flash, bit 6=bright, bits 5-3=paper, bits 2-0=ink).</summary>
-  public byte[] AttributeData { get; init; } = [];
+  public byte[] AttributeData { get; init; }
 
   /// <summary>Optional extra data appended after the standard 6912 bytes.</summary>
-  public byte[] ExtraData { get; init; } = [];
+  public byte[] ExtraData { get; init; }
 
   /// <summary>Converts this ZX-Paintbrush screen to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(ZxPaintbrushFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = 256;
     const int height = 192;
@@ -78,9 +74,4 @@ public sealed class ZxPaintbrushFile : IImageFileFormat<ZxPaintbrushFile> {
     };
   }
 
-  /// <summary>Not supported. ZX-Paintbrush images have complex attribute-based color constraints.</summary>
-  public static ZxPaintbrushFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to ZxPaintbrushFile is not supported due to complex attribute-based color constraints.");
-  }
 }

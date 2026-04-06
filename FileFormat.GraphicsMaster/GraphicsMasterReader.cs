@@ -26,6 +26,8 @@ public static class GraphicsMasterReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static GraphicsMasterFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static GraphicsMasterFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != GraphicsMasterFile.ExpectedFileSize)

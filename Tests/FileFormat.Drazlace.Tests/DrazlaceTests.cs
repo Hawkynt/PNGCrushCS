@@ -48,35 +48,6 @@ public sealed class DrazlaceReaderTests {
 }
 
 [TestFixture]
-public sealed class DrazlaceWriterTests {
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => DrazlaceWriter.ToBytes(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_StartsWithLoadAddress() {
-    var file = new DrazlaceFile {
-      LoadAddress = 0x5800,
-      BitmapData1 = new byte[8000],
-      ScreenRam1 = new byte[1000],
-      ColorRam = new byte[1000],
-      BackgroundColor = 0,
-      BitmapData2 = new byte[8000],
-      ScreenRam2 = new byte[1000],
-    };
-    var bytes = DrazlaceWriter.ToBytes(file);
-
-    Assert.That(bytes[0], Is.EqualTo(0x00));
-    Assert.That(bytes[1], Is.EqualTo(0x58));
-    Assert.That(bytes.Length, Is.GreaterThan(2));
-  }
-}
-
-[TestFixture]
 public sealed class DrazlaceRoundTripTests {
 
   [Test]
@@ -94,67 +65,6 @@ public sealed class DrazlaceRoundTripTests {
     Assert.That(restored.BackgroundColor, Is.EqualTo(original.BackgroundColor));
     Assert.That(restored.BitmapData2, Is.EqualTo(original.BitmapData2));
     Assert.That(restored.ScreenRam2, Is.EqualTo(original.ScreenRam2));
-  }
-}
-
-[TestFixture]
-public sealed class DrazlaceDataTypeTests {
-
-  [Test]
-  [Category("Unit")]
-  public void PrimaryExtension_IsDlp() {
-    Assert.That(_GetPrimaryExtension(), Is.EqualTo(".dlp"));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FileExtensions_ContainsDlp() {
-    Assert.That(_GetFileExtensions(), Does.Contain(".dlp"));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FileExtensions_ContainsDrl() {
-    Assert.That(_GetFileExtensions(), Does.Contain(".drl"));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => DrazlaceFile.ToRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => DrazlaceFile.FromRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_ThrowsNotSupportedException() {
-    var image = new RawImage { Width = 160, Height = 200, Format = PixelFormat.Rgb24, PixelData = new byte[160 * 200 * 3] };
-    Assert.Throws<NotSupportedException>(() => DrazlaceFile.FromRawImage(image));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToRawImage_ReturnsRgb24() {
-    var file = TestHelpers._BuildValidDrazlaceFile(0x5800, 0x00);
-    var raw = DrazlaceFile.ToRawImage(file);
-
-    Assert.That(raw.Width, Is.EqualTo(160));
-    Assert.That(raw.Height, Is.EqualTo(200));
-    Assert.That(raw.Format, Is.EqualTo(PixelFormat.Rgb24));
-    Assert.That(raw.PixelData.Length, Is.EqualTo(160 * 200 * 3));
-  }
-
-  private static string _GetPrimaryExtension() => _Helper<DrazlaceFile>.PrimaryExtension;
-  private static string[] _GetFileExtensions() => _Helper<DrazlaceFile>.FileExtensions;
-
-  private static class _Helper<T> where T : IImageFileFormat<T> {
-    public static string PrimaryExtension => T.PrimaryExtension;
-    public static string[] FileExtensions => T.FileExtensions;
   }
 }
 

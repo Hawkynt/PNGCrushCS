@@ -26,6 +26,8 @@ public static class SmartFaxReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static SmartFaxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static SmartFaxFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < SmartFaxFile.MinFileSize)

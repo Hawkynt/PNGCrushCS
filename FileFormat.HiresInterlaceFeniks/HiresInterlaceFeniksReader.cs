@@ -26,6 +26,8 @@ public static class HiresInterlaceFeniksReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static HiresInterlaceFeniksFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static HiresInterlaceFeniksFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < HiresInterlaceFeniksFile.LoadAddressSize + HiresInterlaceFeniksFile.MinPayloadSize)

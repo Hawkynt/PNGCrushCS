@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.GigaPaint;
 
 /// <summary>In-memory representation of a GigaPaint hires image.</summary>
-public sealed class GigaPaintFile : IImageFileFormat<GigaPaintFile> {
+public readonly record struct GigaPaintFile : IImageFormatReader<GigaPaintFile>, IImageToRawImage<GigaPaintFile>, IImageFormatWriter<GigaPaintFile> {
 
-  static string IImageFileFormat<GigaPaintFile>.PrimaryExtension => ".gih";
-  static string[] IImageFileFormat<GigaPaintFile>.FileExtensions => [".gih", ".gig"];
-  static GigaPaintFile IImageFileFormat<GigaPaintFile>.FromFile(FileInfo file) => GigaPaintReader.FromFile(file);
-  static GigaPaintFile IImageFileFormat<GigaPaintFile>.FromBytes(byte[] data) => GigaPaintReader.FromBytes(data);
-  static GigaPaintFile IImageFileFormat<GigaPaintFile>.FromStream(Stream stream) => GigaPaintReader.FromStream(stream);
-  static byte[] IImageFileFormat<GigaPaintFile>.ToBytes(GigaPaintFile file) => GigaPaintWriter.ToBytes(file);
+  static string IImageFormatMetadata<GigaPaintFile>.PrimaryExtension => ".gih";
+  static string[] IImageFormatMetadata<GigaPaintFile>.FileExtensions => [".gih", ".gig"];
+  static GigaPaintFile IImageFormatReader<GigaPaintFile>.FromSpan(ReadOnlySpan<byte> data) => GigaPaintReader.FromSpan(data);
+  static byte[] IImageFormatWriter<GigaPaintFile>.ToBytes(GigaPaintFile file) => GigaPaintWriter.ToBytes(file);
 
   /// <summary>The fixed width of the image in pixels.</summary>
   public const int FixedWidth = 320;
@@ -46,11 +43,10 @@ public sealed class GigaPaintFile : IImageFileFormat<GigaPaintFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Raw payload data (entire file content after load address).</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   /// <summary>Converts this GigaPaint image to a platform-independent <see cref="RawImage"/> in Rgb24 format using simplified hires decode.</summary>
   public static RawImage ToRawImage(GigaPaintFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -93,9 +89,4 @@ public sealed class GigaPaintFile : IImageFileFormat<GigaPaintFile> {
     };
   }
 
-  /// <summary>Not supported. GigaPaint images have complex hires color constraints.</summary>
-  public static GigaPaintFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to GigaPaintFile is not supported due to complex hires color constraints.");
-  }
 }

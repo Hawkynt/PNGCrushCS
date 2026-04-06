@@ -26,6 +26,8 @@ public static class DbwRenderReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static DbwRenderFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static DbwRenderFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < DbwRenderFile.HeaderSize)

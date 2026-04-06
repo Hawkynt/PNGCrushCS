@@ -1,12 +1,11 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Fl32;
 
 /// <summary>In-memory representation of a FL32 (FilmLight 32-bit float) image.</summary>
 [FormatMagicBytes([0x46, 0x4C, 0x33, 0x32])]
-public sealed class Fl32File : IImageFileFormat<Fl32File> {
+public readonly record struct Fl32File : IImageFormatReader<Fl32File>, IImageToRawImage<Fl32File>, IImageFromRawImage<Fl32File>, IImageFormatWriter<Fl32File> {
 
   /// <summary>Magic bytes "FL32" as a uint32 little-endian value (842222662).</summary>
   public const uint Magic = 0x32334C46;
@@ -14,27 +13,24 @@ public sealed class Fl32File : IImageFileFormat<Fl32File> {
   /// <summary>Header size: 4 (magic) + 4 (height) + 4 (width) + 4 (channels) = 16 bytes.</summary>
   public const int HeaderSize = 16;
 
-  static string IImageFileFormat<Fl32File>.PrimaryExtension => ".fl32";
-  static string[] IImageFileFormat<Fl32File>.FileExtensions => [".fl32"];
-  static Fl32File IImageFileFormat<Fl32File>.FromFile(FileInfo file) => Fl32Reader.FromFile(file);
-  static Fl32File IImageFileFormat<Fl32File>.FromBytes(byte[] data) => Fl32Reader.FromBytes(data);
-  static Fl32File IImageFileFormat<Fl32File>.FromStream(Stream stream) => Fl32Reader.FromStream(stream);
-  static RawImage IImageFileFormat<Fl32File>.ToRawImage(Fl32File file) => file.ToRawImage();
-  static byte[] IImageFileFormat<Fl32File>.ToBytes(Fl32File file) => Fl32Writer.ToBytes(file);
+  static string IImageFormatMetadata<Fl32File>.PrimaryExtension => ".fl32";
+  static string[] IImageFormatMetadata<Fl32File>.FileExtensions => [".fl32"];
+  static Fl32File IImageFormatReader<Fl32File>.FromSpan(ReadOnlySpan<byte> data) => Fl32Reader.FromSpan(data);
+  static byte[] IImageFormatWriter<Fl32File>.ToBytes(Fl32File file) => Fl32Writer.ToBytes(file);
 
   public int Width { get; init; }
   public int Height { get; init; }
   public int Channels { get; init; }
 
   /// <summary>Float samples in top-to-bottom, left-to-right, channel-interleaved order.</summary>
-  public float[] PixelData { get; init; } = [];
+  public float[] PixelData { get; init; }
 
   /// <summary>Converts this FL32 image to a 16-bit <see cref="RawImage"/>.</summary>
-  public RawImage ToRawImage() {
-    var width = this.Width;
-    var height = this.Height;
-    var channels = this.Channels;
-    var src = this.PixelData;
+  public static RawImage ToRawImage(Fl32File file) {
+    var width = file.Width;
+    var height = file.Height;
+    var channels = file.Channels;
+    var src = file.PixelData;
     var pixelCount = width * height;
 
     switch (channels) {

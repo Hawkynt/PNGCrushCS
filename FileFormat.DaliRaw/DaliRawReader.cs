@@ -27,6 +27,8 @@ public static class DaliRawReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static DaliRawFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static DaliRawFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != DaliRawFile.ExpectedFileSize)

@@ -1,11 +1,10 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.AtariGr8;
 
 /// <summary>In-memory representation of an Atari 8-bit Graphics Mode 8 screen dump (320x192, 1bpp monochrome).</summary>
-public sealed class AtariGr8File : IImageFileFormat<AtariGr8File> {
+public readonly record struct AtariGr8File : IImageFormatReader<AtariGr8File>, IImageToRawImage<AtariGr8File>, IImageFromRawImage<AtariGr8File>, IImageFormatWriter<AtariGr8File> {
 
   /// <summary>Fixed width in pixels.</summary>
   internal const int PixelWidth = 320;
@@ -19,15 +18,11 @@ public sealed class AtariGr8File : IImageFileFormat<AtariGr8File> {
   /// <summary>Exact file size in bytes (40 x 192 = 7680).</summary>
   internal const int FileSize = BytesPerRow * PixelHeight;
 
-  static string IImageFileFormat<AtariGr8File>.PrimaryExtension => ".gr8";
-  static string[] IImageFileFormat<AtariGr8File>.FileExtensions => [".gr8"];
-  static FormatCapability IImageFileFormat<AtariGr8File>.Capabilities => FormatCapability.MonochromeOnly;
-  static AtariGr8File IImageFileFormat<AtariGr8File>.FromFile(FileInfo file) => AtariGr8Reader.FromFile(file);
-  static AtariGr8File IImageFileFormat<AtariGr8File>.FromBytes(byte[] data) => AtariGr8Reader.FromBytes(data);
-  static AtariGr8File IImageFileFormat<AtariGr8File>.FromStream(Stream stream) => AtariGr8Reader.FromStream(stream);
-  static RawImage IImageFileFormat<AtariGr8File>.ToRawImage(AtariGr8File file) => ToRawImage(file);
-  static AtariGr8File IImageFileFormat<AtariGr8File>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<AtariGr8File>.ToBytes(AtariGr8File file) => AtariGr8Writer.ToBytes(file);
+  static string IImageFormatMetadata<AtariGr8File>.PrimaryExtension => ".gr8";
+  static string[] IImageFormatMetadata<AtariGr8File>.FileExtensions => [".gr8"];
+  static AtariGr8File IImageFormatReader<AtariGr8File>.FromSpan(ReadOnlySpan<byte> data) => AtariGr8Reader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<AtariGr8File>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<AtariGr8File>.ToBytes(AtariGr8File file) => AtariGr8Writer.ToBytes(file);
 
   /// <summary>Always 320.</summary>
   public int Width => PixelWidth;
@@ -36,13 +31,12 @@ public sealed class AtariGr8File : IImageFileFormat<AtariGr8File> {
   public int Height => PixelHeight;
 
   /// <summary>Raw screen data (7680 bytes). 1bpp MSB-first, 40 bytes per row.</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
   /// <summary>Converts this GR.8 screen dump to an Indexed1 raw image (320x192, B&amp;W palette).</summary>
   public static RawImage ToRawImage(AtariGr8File file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var pixelData = new byte[BytesPerRow * PixelHeight];
     var srcLen = Math.Min(file.RawData.Length, FileSize);

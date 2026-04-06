@@ -1,18 +1,15 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.AdexImage;
 
 /// <summary>In-memory representation of an ADEX image.</summary>
-public sealed class AdexImageFile : IImageFileFormat<AdexImageFile> {
+public readonly record struct AdexImageFile : IImageFormatReader<AdexImageFile>, IImageToRawImage<AdexImageFile>, IImageFormatWriter<AdexImageFile> {
 
-  static string IImageFileFormat<AdexImageFile>.PrimaryExtension => ".adx";
-  static string[] IImageFileFormat<AdexImageFile>.FileExtensions => [".adx"];
-  static AdexImageFile IImageFileFormat<AdexImageFile>.FromFile(FileInfo file) => AdexImageReader.FromFile(file);
-  static AdexImageFile IImageFileFormat<AdexImageFile>.FromBytes(byte[] data) => AdexImageReader.FromBytes(data);
-  static AdexImageFile IImageFileFormat<AdexImageFile>.FromStream(Stream stream) => AdexImageReader.FromStream(stream);
-  static byte[] IImageFileFormat<AdexImageFile>.ToBytes(AdexImageFile file) => AdexImageWriter.ToBytes(file);
+  static string IImageFormatMetadata<AdexImageFile>.PrimaryExtension => ".adx";
+  static string[] IImageFormatMetadata<AdexImageFile>.FileExtensions => [".adx"];
+  static AdexImageFile IImageFormatReader<AdexImageFile>.FromSpan(ReadOnlySpan<byte> data) => AdexImageReader.FromSpan(data);
+  static byte[] IImageFormatWriter<AdexImageFile>.ToBytes(AdexImageFile file) => AdexImageWriter.ToBytes(file);
 
   /// <summary>Magic bytes: "ADEX" (0x41 0x44 0x45 0x58).</summary>
   internal static readonly byte[] Magic = [0x41, 0x44, 0x45, 0x58];
@@ -36,11 +33,10 @@ public sealed class AdexImageFile : IImageFileFormat<AdexImageFile> {
   public ushort Compression { get; init; }
 
   /// <summary>Raw pixel data.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this ADEX image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(AdexImageFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,
@@ -49,9 +45,4 @@ public sealed class AdexImageFile : IImageFileFormat<AdexImageFile> {
     };
   }
 
-  /// <summary>Not supported.</summary>
-  public static AdexImageFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to AdexImageFile is not supported.");
-  }
 }

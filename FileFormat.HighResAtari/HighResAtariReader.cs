@@ -26,6 +26,8 @@ public static class HighResAtariReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static HighResAtariFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static HighResAtariFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != HighResAtariFile.FileSize)

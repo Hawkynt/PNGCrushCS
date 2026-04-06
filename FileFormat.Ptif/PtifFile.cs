@@ -1,18 +1,15 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Ptif;
 
 /// <summary>In-memory representation of a PTIF (Pyramid TIFF) image. Only the first (full-resolution) IFD is used.</summary>
-public sealed class PtifFile : IImageFileFormat<PtifFile> {
+public readonly record struct PtifFile : IImageFormatReader<PtifFile>, IImageToRawImage<PtifFile>, IImageFromRawImage<PtifFile>, IImageFormatWriter<PtifFile> {
 
-  static string IImageFileFormat<PtifFile>.PrimaryExtension => ".ptif";
-  static string[] IImageFileFormat<PtifFile>.FileExtensions => [".ptif", ".ptiff"];
-  static PtifFile IImageFileFormat<PtifFile>.FromFile(FileInfo file) => PtifReader.FromFile(file);
-  static PtifFile IImageFileFormat<PtifFile>.FromBytes(byte[] data) => PtifReader.FromBytes(data);
-  static PtifFile IImageFileFormat<PtifFile>.FromStream(Stream stream) => PtifReader.FromStream(stream);
-  static byte[] IImageFileFormat<PtifFile>.ToBytes(PtifFile file) => PtifWriter.ToBytes(file);
+  static string IImageFormatMetadata<PtifFile>.PrimaryExtension => ".ptif";
+  static string[] IImageFormatMetadata<PtifFile>.FileExtensions => [".ptif", ".ptiff"];
+  static PtifFile IImageFormatReader<PtifFile>.FromSpan(ReadOnlySpan<byte> data) => PtifReader.FromSpan(data);
+  static byte[] IImageFormatWriter<PtifFile>.ToBytes(PtifFile file) => PtifWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -27,10 +24,9 @@ public sealed class PtifFile : IImageFileFormat<PtifFile> {
   public int BitsPerSample { get; init; }
 
   /// <summary>Raw pixel data in interleaved channel order.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(PtifFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     var format = file.SamplesPerPixel switch {
       1 when file.BitsPerSample == 8 => PixelFormat.Gray8,
       3 when file.BitsPerSample == 8 => PixelFormat.Rgb24,

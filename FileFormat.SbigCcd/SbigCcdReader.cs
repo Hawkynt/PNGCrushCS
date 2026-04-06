@@ -26,6 +26,8 @@ public static class SbigCcdReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static SbigCcdFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static SbigCcdFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < SbigCcdFile.HeaderSize)

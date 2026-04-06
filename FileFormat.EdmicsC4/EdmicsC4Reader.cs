@@ -25,6 +25,8 @@ public static class EdmicsC4Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static EdmicsC4File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static EdmicsC4File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < EdmicsC4File.HeaderSize)

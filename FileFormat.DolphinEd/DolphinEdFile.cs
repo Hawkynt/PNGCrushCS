@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.DolphinEd;
 
 /// <summary>In-memory representation of a Dolphin Ed C64 multicolor image (Koala layout).</summary>
-public sealed class DolphinEdFile : IImageFileFormat<DolphinEdFile> {
+public readonly record struct DolphinEdFile : IImageFormatReader<DolphinEdFile>, IImageToRawImage<DolphinEdFile>, IImageFormatWriter<DolphinEdFile> {
 
-  static string IImageFileFormat<DolphinEdFile>.PrimaryExtension => ".dol";
-  static string[] IImageFileFormat<DolphinEdFile>.FileExtensions => [".dol"];
-  static DolphinEdFile IImageFileFormat<DolphinEdFile>.FromFile(FileInfo file) => DolphinEdReader.FromFile(file);
-  static DolphinEdFile IImageFileFormat<DolphinEdFile>.FromBytes(byte[] data) => DolphinEdReader.FromBytes(data);
-  static DolphinEdFile IImageFileFormat<DolphinEdFile>.FromStream(Stream stream) => DolphinEdReader.FromStream(stream);
-  static byte[] IImageFileFormat<DolphinEdFile>.ToBytes(DolphinEdFile file) => DolphinEdWriter.ToBytes(file);
+  static string IImageFormatMetadata<DolphinEdFile>.PrimaryExtension => ".dol";
+  static string[] IImageFormatMetadata<DolphinEdFile>.FileExtensions => [".dol"];
+  static DolphinEdFile IImageFormatReader<DolphinEdFile>.FromSpan(ReadOnlySpan<byte> data) => DolphinEdReader.FromSpan(data);
+  static byte[] IImageFormatWriter<DolphinEdFile>.ToBytes(DolphinEdFile file) => DolphinEdWriter.ToBytes(file);
 
   /// <summary>The fixed width of a Dolphin Ed image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -44,20 +41,19 @@ public sealed class DolphinEdFile : IImageFileFormat<DolphinEdFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Multicolor bitmap data (8000 bytes).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Video matrix / screen RAM (1000 bytes).</summary>
-  public byte[] VideoMatrix { get; init; } = [];
+  public byte[] VideoMatrix { get; init; }
 
   /// <summary>Color RAM (1000 bytes).</summary>
-  public byte[] ColorRam { get; init; } = [];
+  public byte[] ColorRam { get; init; }
 
   /// <summary>Background color index (0-15).</summary>
   public byte BackgroundColor { get; init; }
 
   /// <summary>Converts this Dolphin Ed image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(DolphinEdFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -96,9 +92,4 @@ public sealed class DolphinEdFile : IImageFileFormat<DolphinEdFile> {
     };
   }
 
-  /// <summary>Not supported.</summary>
-  public static DolphinEdFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to DolphinEdFile is not supported due to complex cell-based color constraints.");
-  }
 }

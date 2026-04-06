@@ -26,6 +26,8 @@ public static class TruePaintReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static TruePaintFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static TruePaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != TruePaintFile.ExpectedFileSize)

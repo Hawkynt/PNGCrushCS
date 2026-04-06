@@ -1,11 +1,10 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.NokiaOperatorLogo;
 
 /// <summary>In-memory representation of a Nokia Operator Logo (NOL) image.</summary>
-public sealed class NokiaOperatorLogoFile : IImageFileFormat<NokiaOperatorLogoFile> {
+public readonly record struct NokiaOperatorLogoFile : IImageFormatReader<NokiaOperatorLogoFile>, IImageToRawImage<NokiaOperatorLogoFile>, IImageFromRawImage<NokiaOperatorLogoFile>, IImageFormatWriter<NokiaOperatorLogoFile> {
 
   /// <summary>Magic bytes: "NOL" (0x4E 0x4F 0x4C).</summary>
   internal static readonly byte[] Magic = [0x4E, 0x4F, 0x4C];
@@ -18,13 +17,11 @@ public sealed class NokiaOperatorLogoFile : IImageFileFormat<NokiaOperatorLogoFi
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
-  static string IImageFileFormat<NokiaOperatorLogoFile>.PrimaryExtension => ".nol";
-  static string[] IImageFileFormat<NokiaOperatorLogoFile>.FileExtensions => [".nol"];
-  static FormatCapability IImageFileFormat<NokiaOperatorLogoFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static NokiaOperatorLogoFile IImageFileFormat<NokiaOperatorLogoFile>.FromFile(FileInfo file) => NokiaOperatorLogoReader.FromFile(file);
-  static NokiaOperatorLogoFile IImageFileFormat<NokiaOperatorLogoFile>.FromBytes(byte[] data) => NokiaOperatorLogoReader.FromBytes(data);
-  static NokiaOperatorLogoFile IImageFileFormat<NokiaOperatorLogoFile>.FromStream(Stream stream) => NokiaOperatorLogoReader.FromStream(stream);
-  static byte[] IImageFileFormat<NokiaOperatorLogoFile>.ToBytes(NokiaOperatorLogoFile file) => NokiaOperatorLogoWriter.ToBytes(file);
+  static string IImageFormatMetadata<NokiaOperatorLogoFile>.PrimaryExtension => ".nol";
+  static string[] IImageFormatMetadata<NokiaOperatorLogoFile>.FileExtensions => [".nol"];
+  static NokiaOperatorLogoFile IImageFormatReader<NokiaOperatorLogoFile>.FromSpan(ReadOnlySpan<byte> data) => NokiaOperatorLogoReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<NokiaOperatorLogoFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<NokiaOperatorLogoFile>.ToBytes(NokiaOperatorLogoFile file) => NokiaOperatorLogoWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -39,11 +36,10 @@ public sealed class NokiaOperatorLogoFile : IImageFileFormat<NokiaOperatorLogoFi
   public int Mnc { get; init; }
 
   /// <summary>1bpp pixel data, MSB-first, rows padded to byte boundary.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this NOL image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(NokiaOperatorLogoFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var bytesPerRow = (file.Width + 7) / 8;
     var rgb = new byte[file.Width * file.Height * 3];

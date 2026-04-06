@@ -1,76 +1,72 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Sgi;
 
 /// <summary>In-memory representation of an SGI image.</summary>
 [FormatMagicBytes([0x01, 0xDA])]
-public sealed class SgiFile : IImageFileFormat<SgiFile> {
+public readonly record struct SgiFile : IImageFormatReader<SgiFile>, IImageToRawImage<SgiFile>, IImageFromRawImage<SgiFile>, IImageFormatWriter<SgiFile> {
 
-  static string IImageFileFormat<SgiFile>.PrimaryExtension => ".sgi";
-  static string[] IImageFileFormat<SgiFile>.FileExtensions => [".sgi", ".rgb", ".bw", ".iris", ".rgba", ".inta"];
-  static SgiFile IImageFileFormat<SgiFile>.FromFile(FileInfo file) => SgiReader.FromFile(file);
-  static SgiFile IImageFileFormat<SgiFile>.FromBytes(byte[] data) => SgiReader.FromBytes(data);
-  static SgiFile IImageFileFormat<SgiFile>.FromStream(Stream stream) => SgiReader.FromStream(stream);
-  static RawImage IImageFileFormat<SgiFile>.ToRawImage(SgiFile file) => file.ToRawImage();
-  static byte[] IImageFileFormat<SgiFile>.ToBytes(SgiFile file) => SgiWriter.ToBytes(file);
+  static string IImageFormatMetadata<SgiFile>.PrimaryExtension => ".sgi";
+  static string[] IImageFormatMetadata<SgiFile>.FileExtensions => [".sgi", ".rgb", ".bw", ".iris", ".rgba", ".inta"];
+  static SgiFile IImageFormatReader<SgiFile>.FromSpan(ReadOnlySpan<byte> data) => SgiReader.FromSpan(data);
+  static byte[] IImageFormatWriter<SgiFile>.ToBytes(SgiFile file) => SgiWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
   public int Channels { get; init; }
   public int BytesPerChannel { get; init; }
   public SgiCompression Compression { get; init; }
   public SgiColorMode ColorMode { get; init; }
-  public string ImageName { get; init; } = string.Empty;
-  public byte[] PixelData { get; init; } = [];
+  public string ImageName { get; init; }
+  public byte[] PixelData { get; init; }
 
-  public RawImage ToRawImage() {
-    var width = this.Width;
-    var height = this.Height;
-    var channels = this.Channels;
-    var bpc = this.BytesPerChannel;
+  public static RawImage ToRawImage(SgiFile file) {
+    var width = file.Width;
+    var height = file.Height;
+    var channels = file.Channels;
+    var bpc = file.BytesPerChannel;
     switch (channels) {
       case 1 when bpc == 1:
         return new() {
           Width = width,
           Height = height,
           Format = PixelFormat.Gray8,
-          PixelData = this.PixelData[..],
+          PixelData = file.PixelData[..],
         };
       case 1 when bpc == 2:
         return new() {
           Width = width,
           Height = height,
           Format = PixelFormat.Gray16,
-          PixelData = this.PixelData[..],
+          PixelData = file.PixelData[..],
         };
       case 3 when bpc == 1:
         return new() {
           Width = width,
           Height = height,
           Format = PixelFormat.Rgb24,
-          PixelData = _Deplanarize(this.PixelData, width, height, 3),
+          PixelData = _Deplanarize(file.PixelData, width, height, 3),
         };
       case 3 when bpc == 2:
         return new() {
           Width = width,
           Height = height,
           Format = PixelFormat.Rgb48,
-          PixelData = _Deplanarize16(this.PixelData, width, height, 3),
+          PixelData = _Deplanarize16(file.PixelData, width, height, 3),
         };
       case 4 when bpc == 1:
         return new() {
           Width = width,
           Height = height,
           Format = PixelFormat.Rgba32,
-          PixelData = _Deplanarize(this.PixelData, width, height, 4),
+          PixelData = _Deplanarize(file.PixelData, width, height, 4),
         };
       case 4 when bpc == 2:
         return new() {
           Width = width,
           Height = height,
           Format = PixelFormat.Rgba64,
-          PixelData = _Deplanarize16(this.PixelData, width, height, 4),
+          PixelData = _Deplanarize16(file.PixelData, width, height, 4),
         };
       default:
         throw new NotSupportedException($"SGI image with {channels} channels and {bpc} bytes/channel is not supported.");

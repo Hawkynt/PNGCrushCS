@@ -26,6 +26,8 @@ public static class CheeseReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static CheeseFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static CheeseFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < CheeseFile.ExpectedFileSize)

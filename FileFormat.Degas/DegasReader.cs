@@ -29,6 +29,8 @@ public static class DegasReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static DegasFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static DegasFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < DegasHeader.StructSize)

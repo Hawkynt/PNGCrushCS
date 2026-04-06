@@ -26,6 +26,8 @@ public static class ViffReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static ViffFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static ViffFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < ViffHeader.StructSize)

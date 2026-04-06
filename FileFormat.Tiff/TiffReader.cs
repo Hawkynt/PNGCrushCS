@@ -29,6 +29,8 @@ public static class TiffReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static TiffFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static TiffFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < 8)

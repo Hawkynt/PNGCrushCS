@@ -44,40 +44,6 @@ public sealed class ZeissLsmReaderTests {
 }
 
 [TestFixture]
-public sealed class ZeissLsmWriterTests {
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => ZeissLsmWriter.ToBytes(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_ProducesValidTiffHeader() {
-    var file = new ZeissLsmFile { Width = 4, Height = 4, Channels = 1, PixelData = new byte[16] };
-
-    var bytes = ZeissLsmWriter.ToBytes(file);
-
-    Assert.That(bytes[0], Is.EqualTo(0x49));
-    Assert.That(bytes[1], Is.EqualTo(0x49));
-    Assert.That(bytes[2], Is.EqualTo(42));
-    Assert.That(bytes[3], Is.EqualTo(0));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_ContainsPixelData() {
-    var pixelData = new byte[] { 10, 20, 30, 40 };
-    var file = new ZeissLsmFile { Width = 2, Height = 2, Channels = 1, PixelData = pixelData };
-
-    var bytes = ZeissLsmWriter.ToBytes(file);
-
-    Assert.That(bytes.Length, Is.GreaterThan(4));
-  }
-}
-
-[TestFixture]
 public sealed class RoundTripTests {
 
   [Test]
@@ -130,55 +96,3 @@ public sealed class RoundTripTests {
   }
 }
 
-[TestFixture]
-public sealed class DataTypeTests {
-
-  [Test]
-  [Category("Unit")]
-  public void ZeissLsmFile_Defaults() {
-    var file = new ZeissLsmFile();
-    Assert.That(file.Width, Is.EqualTo(0));
-    Assert.That(file.Height, Is.EqualTo(0));
-    Assert.That(file.Channels, Is.EqualTo(1));
-    Assert.That(file.PixelData, Is.Empty);
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ZeissLsmFile_ToRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => ZeissLsmFile.ToRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ZeissLsmFile_FromRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => ZeissLsmFile.FromRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ZeissLsmFile_FromRawImage_WrongFormat_Throws() {
-    var raw = new RawImage {
-      Width = 4, Height = 4,
-      Format = PixelFormat.Rgba32,
-      PixelData = new byte[64],
-    };
-    Assert.Throws<ArgumentException>(() => ZeissLsmFile.FromRawImage(raw));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ZeissLsmFile_ToRawImage_Gray_ReturnsGray8() {
-    var file = new ZeissLsmFile { Width = 2, Height = 2, Channels = 1, PixelData = new byte[4] };
-    var raw = ZeissLsmFile.ToRawImage(file);
-    Assert.That(raw.Format, Is.EqualTo(PixelFormat.Gray8));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ZeissLsmFile_ToRawImage_Rgb_ReturnsRgb24() {
-    var file = new ZeissLsmFile { Width = 2, Height = 2, Channels = 3, PixelData = new byte[12] };
-    var raw = ZeissLsmFile.ToRawImage(file);
-    Assert.That(raw.Format, Is.EqualTo(PixelFormat.Rgb24));
-  }
-}

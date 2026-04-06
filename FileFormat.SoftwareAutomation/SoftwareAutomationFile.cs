@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.SoftwareAutomation;
 
 /// <summary>In-memory representation of a Software Automation Graphics (.sag) file.</summary>
-public sealed class SoftwareAutomationFile : IImageFileFormat<SoftwareAutomationFile> {
+public readonly record struct SoftwareAutomationFile : IImageFormatReader<SoftwareAutomationFile>, IImageToRawImage<SoftwareAutomationFile>, IImageFromRawImage<SoftwareAutomationFile>, IImageFormatWriter<SoftwareAutomationFile> {
 
   /// <summary>Exact file size: 40 bytes/row x 192 rows.</summary>
   public const int ExpectedFileSize = 7680;
@@ -19,13 +18,11 @@ public sealed class SoftwareAutomationFile : IImageFileFormat<SoftwareAutomation
   /// <summary>Bytes per row in the raw screen dump.</summary>
   internal const int BytesPerRow = 40;
 
-  static string IImageFileFormat<SoftwareAutomationFile>.PrimaryExtension => ".sag";
-  static string[] IImageFileFormat<SoftwareAutomationFile>.FileExtensions => [".sag", ".swa"];
-  static FormatCapability IImageFileFormat<SoftwareAutomationFile>.Capabilities => FormatCapability.IndexedOnly;
-  static SoftwareAutomationFile IImageFileFormat<SoftwareAutomationFile>.FromFile(FileInfo file) => SoftwareAutomationReader.FromFile(file);
-  static SoftwareAutomationFile IImageFileFormat<SoftwareAutomationFile>.FromBytes(byte[] data) => SoftwareAutomationReader.FromBytes(data);
-  static SoftwareAutomationFile IImageFileFormat<SoftwareAutomationFile>.FromStream(Stream stream) => SoftwareAutomationReader.FromStream(stream);
-  static byte[] IImageFileFormat<SoftwareAutomationFile>.ToBytes(SoftwareAutomationFile file) => SoftwareAutomationWriter.ToBytes(file);
+  static string IImageFormatMetadata<SoftwareAutomationFile>.PrimaryExtension => ".sag";
+  static string[] IImageFormatMetadata<SoftwareAutomationFile>.FileExtensions => [".sag", ".swa"];
+  static SoftwareAutomationFile IImageFormatReader<SoftwareAutomationFile>.FromSpan(ReadOnlySpan<byte> data) => SoftwareAutomationReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<SoftwareAutomationFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<SoftwareAutomationFile>.ToBytes(SoftwareAutomationFile file) => SoftwareAutomationWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>
   public int Width => PixelWidth;
@@ -34,13 +31,12 @@ public sealed class SoftwareAutomationFile : IImageFileFormat<SoftwareAutomation
   public int Height => PixelHeight;
 
   /// <summary>Raw 1bpp MSB-first screen data (7680 bytes).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
   /// <summary>Converts this Software Automation Graphics file to an Indexed1 raw image (320x192, B&amp;W palette).</summary>
   public static RawImage ToRawImage(SoftwareAutomationFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var pixelData = new byte[ExpectedFileSize];
     file.PixelData.AsSpan(0, Math.Min(file.PixelData.Length, ExpectedFileSize)).CopyTo(pixelData);

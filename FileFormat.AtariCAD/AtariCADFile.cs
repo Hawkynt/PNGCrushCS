@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.AtariCAD;
 
 /// <summary>In-memory representation of an Atari CAD Screen (.acd) file.</summary>
-public sealed class AtariCADFile : IImageFileFormat<AtariCADFile> {
+public readonly record struct AtariCADFile : IImageFormatReader<AtariCADFile>, IImageToRawImage<AtariCADFile>, IImageFromRawImage<AtariCADFile>, IImageFormatWriter<AtariCADFile> {
 
   /// <summary>Exact file size: 40 bytes/row x 192 rows.</summary>
   public const int ExpectedFileSize = 7680;
@@ -19,13 +18,11 @@ public sealed class AtariCADFile : IImageFileFormat<AtariCADFile> {
   /// <summary>Bytes per row in the raw screen dump.</summary>
   internal const int BytesPerRow = 40;
 
-  static string IImageFileFormat<AtariCADFile>.PrimaryExtension => ".acd";
-  static string[] IImageFileFormat<AtariCADFile>.FileExtensions => [".acd"];
-  static FormatCapability IImageFileFormat<AtariCADFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static AtariCADFile IImageFileFormat<AtariCADFile>.FromFile(FileInfo file) => AtariCADReader.FromFile(file);
-  static AtariCADFile IImageFileFormat<AtariCADFile>.FromBytes(byte[] data) => AtariCADReader.FromBytes(data);
-  static AtariCADFile IImageFileFormat<AtariCADFile>.FromStream(Stream stream) => AtariCADReader.FromStream(stream);
-  static byte[] IImageFileFormat<AtariCADFile>.ToBytes(AtariCADFile file) => AtariCADWriter.ToBytes(file);
+  static string IImageFormatMetadata<AtariCADFile>.PrimaryExtension => ".acd";
+  static string[] IImageFormatMetadata<AtariCADFile>.FileExtensions => [".acd"];
+  static AtariCADFile IImageFormatReader<AtariCADFile>.FromSpan(ReadOnlySpan<byte> data) => AtariCADReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<AtariCADFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<AtariCADFile>.ToBytes(AtariCADFile file) => AtariCADWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>
   public int Width => PixelWidth;
@@ -34,13 +31,12 @@ public sealed class AtariCADFile : IImageFileFormat<AtariCADFile> {
   public int Height => PixelHeight;
 
   /// <summary>Raw 1bpp MSB-first screen data (7680 bytes).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
   /// <summary>Converts this Atari CAD Screen to an Indexed1 raw image (320x192, B&amp;W palette).</summary>
   public static RawImage ToRawImage(AtariCADFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var pixelData = new byte[ExpectedFileSize];
     file.PixelData.AsSpan(0, Math.Min(file.PixelData.Length, ExpectedFileSize)).CopyTo(pixelData);

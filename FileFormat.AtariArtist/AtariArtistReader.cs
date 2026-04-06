@@ -26,6 +26,8 @@ public static class AtariArtistReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static AtariArtistFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AtariArtistFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != AtariArtistFile.ExpectedFileSize)

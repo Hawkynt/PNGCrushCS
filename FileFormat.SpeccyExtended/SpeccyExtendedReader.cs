@@ -47,6 +47,8 @@ public static class SpeccyExtendedReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static SpeccyExtendedFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static SpeccyExtendedFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < FileSize)

@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.HiEddi;
 
 /// <summary>In-memory representation of a HiEddi C64 hires image (Doodle layout).</summary>
-public sealed class HiEddiFile : IImageFileFormat<HiEddiFile> {
+public readonly record struct HiEddiFile : IImageFormatReader<HiEddiFile>, IImageToRawImage<HiEddiFile>, IImageFormatWriter<HiEddiFile> {
 
-  static string IImageFileFormat<HiEddiFile>.PrimaryExtension => ".hed";
-  static string[] IImageFileFormat<HiEddiFile>.FileExtensions => [".hed"];
-  static HiEddiFile IImageFileFormat<HiEddiFile>.FromFile(FileInfo file) => HiEddiReader.FromFile(file);
-  static HiEddiFile IImageFileFormat<HiEddiFile>.FromBytes(byte[] data) => HiEddiReader.FromBytes(data);
-  static HiEddiFile IImageFileFormat<HiEddiFile>.FromStream(Stream stream) => HiEddiReader.FromStream(stream);
-  static byte[] IImageFileFormat<HiEddiFile>.ToBytes(HiEddiFile file) => HiEddiWriter.ToBytes(file);
+  static string IImageFormatMetadata<HiEddiFile>.PrimaryExtension => ".hed";
+  static string[] IImageFormatMetadata<HiEddiFile>.FileExtensions => [".hed"];
+  static HiEddiFile IImageFormatReader<HiEddiFile>.FromSpan(ReadOnlySpan<byte> data) => HiEddiReader.FromSpan(data);
+  static byte[] IImageFormatWriter<HiEddiFile>.ToBytes(HiEddiFile file) => HiEddiWriter.ToBytes(file);
 
   /// <summary>The fixed width of a HiEddi image in pixels.</summary>
   public const int FixedWidth = 320;
@@ -44,14 +41,13 @@ public sealed class HiEddiFile : IImageFileFormat<HiEddiFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Hires bitmap data (8000 bytes, 1 bit per pixel).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Screen RAM (1000 bytes, upper/lower nybble = fg/bg color per 8x8 cell).</summary>
-  public byte[] ScreenRam { get; init; } = [];
+  public byte[] ScreenRam { get; init; }
 
   /// <summary>Converts this HiEddi image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(HiEddiFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -87,9 +83,4 @@ public sealed class HiEddiFile : IImageFileFormat<HiEddiFile> {
     };
   }
 
-  /// <summary>Not supported.</summary>
-  public static HiEddiFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to HiEddiFile is not supported due to complex cell-based color constraints.");
-  }
 }

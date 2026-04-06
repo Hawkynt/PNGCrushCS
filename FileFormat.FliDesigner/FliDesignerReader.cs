@@ -26,6 +26,8 @@ public static class FliDesignerReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static FliDesignerFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static FliDesignerFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < FliDesignerFile.LoadAddressSize + FliDesignerFile.MinPayloadSize)

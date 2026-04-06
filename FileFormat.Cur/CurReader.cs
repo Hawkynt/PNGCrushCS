@@ -29,6 +29,8 @@ public static class CurReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static CurFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static CurFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
 

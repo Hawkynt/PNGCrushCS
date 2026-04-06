@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.ZxUlaPlus;
 
 /// <summary>In-memory representation of a ZX Spectrum ULAplus file (6976 bytes: 6144 bitmap + 768 attributes + 64 palette entries).</summary>
-public sealed class ZxUlaPlusFile : IImageFileFormat<ZxUlaPlusFile> {
+public readonly record struct ZxUlaPlusFile : IImageFormatReader<ZxUlaPlusFile>, IImageToRawImage<ZxUlaPlusFile>, IImageFormatWriter<ZxUlaPlusFile> {
 
-  static string IImageFileFormat<ZxUlaPlusFile>.PrimaryExtension => ".ulp";
-  static string[] IImageFileFormat<ZxUlaPlusFile>.FileExtensions => [".ulp"];
-  static ZxUlaPlusFile IImageFileFormat<ZxUlaPlusFile>.FromFile(FileInfo file) => ZxUlaPlusReader.FromFile(file);
-  static ZxUlaPlusFile IImageFileFormat<ZxUlaPlusFile>.FromBytes(byte[] data) => ZxUlaPlusReader.FromBytes(data);
-  static ZxUlaPlusFile IImageFileFormat<ZxUlaPlusFile>.FromStream(Stream stream) => ZxUlaPlusReader.FromStream(stream);
-  static byte[] IImageFileFormat<ZxUlaPlusFile>.ToBytes(ZxUlaPlusFile file) => ZxUlaPlusWriter.ToBytes(file);
+  static string IImageFormatMetadata<ZxUlaPlusFile>.PrimaryExtension => ".ulp";
+  static string[] IImageFormatMetadata<ZxUlaPlusFile>.FileExtensions => [".ulp"];
+  static ZxUlaPlusFile IImageFormatReader<ZxUlaPlusFile>.FromSpan(ReadOnlySpan<byte> data) => ZxUlaPlusReader.FromSpan(data);
+  static byte[] IImageFormatWriter<ZxUlaPlusFile>.ToBytes(ZxUlaPlusFile file) => ZxUlaPlusWriter.ToBytes(file);
 
   /// <summary>Always 256.</summary>
   public int Width => 256;
@@ -21,13 +18,13 @@ public sealed class ZxUlaPlusFile : IImageFileFormat<ZxUlaPlusFile> {
   public int Height => 192;
 
   /// <summary>6144 bytes of 1bpp bitmap data in linear row order.</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>768 bytes of attribute data, one per 8x8 cell.</summary>
-  public byte[] AttributeData { get; init; } = [];
+  public byte[] AttributeData { get; init; }
 
   /// <summary>64 bytes of ULAplus palette entries (3-bit GRB encoding per byte).</summary>
-  public byte[] PaletteData { get; init; } = [];
+  public byte[] PaletteData { get; init; }
 
   /// <summary>Decodes a ULAplus palette entry (bits 7-5=G, bits 4-2=R, bits 1-0=B) to an RGB color value.</summary>
   internal static int DecodePaletteEntry(byte entry) {
@@ -46,7 +43,6 @@ public sealed class ZxUlaPlusFile : IImageFileFormat<ZxUlaPlusFile> {
 
   /// <summary>Converts this ULAplus screen to Rgb24 using the custom 64-color palette.</summary>
   public static RawImage ToRawImage(ZxUlaPlusFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = 256;
     const int height = 192;
@@ -98,9 +94,4 @@ public sealed class ZxUlaPlusFile : IImageFileFormat<ZxUlaPlusFile> {
     };
   }
 
-  /// <summary>Not supported.</summary>
-  public static ZxUlaPlusFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to ZxUlaPlusFile is not supported due to ULAplus palette constraints.");
-  }
 }

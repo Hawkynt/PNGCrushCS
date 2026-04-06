@@ -41,6 +41,8 @@ public static class ZxMlgReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static ZxMlgFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static ZxMlgFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != FileSize)

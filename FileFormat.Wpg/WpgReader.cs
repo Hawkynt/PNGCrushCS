@@ -26,6 +26,8 @@ public static class WpgReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static WpgFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static WpgFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < WpgHeader.StructSize)

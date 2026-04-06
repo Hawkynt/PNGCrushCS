@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.FaceSaver;
@@ -11,14 +10,13 @@ namespace FileFormat.FaceSaver;
 /// of an ASCII header with key: value fields followed by hex-encoded pixel data.
 /// Pixels are 8-bit grayscale stored bottom-to-top.
 /// </remarks>
-public sealed class FaceSaverFile : IImageFileFormat<FaceSaverFile> {
+public sealed class FaceSaverFile : IImageFormatReader<FaceSaverFile>, IImageToRawImage<FaceSaverFile>, IImageFromRawImage<FaceSaverFile>, IImageFormatWriter<FaceSaverFile> {
 
-  static string IImageFileFormat<FaceSaverFile>.PrimaryExtension => ".face";
-  static string[] IImageFileFormat<FaceSaverFile>.FileExtensions => [".face", ".fac"];
-  static FaceSaverFile IImageFileFormat<FaceSaverFile>.FromFile(FileInfo file) => FaceSaverReader.FromFile(file);
-  static FaceSaverFile IImageFileFormat<FaceSaverFile>.FromBytes(byte[] data) => FaceSaverReader.FromBytes(data);
-  static FaceSaverFile IImageFileFormat<FaceSaverFile>.FromStream(Stream stream) => FaceSaverReader.FromStream(stream);
-  static byte[] IImageFileFormat<FaceSaverFile>.ToBytes(FaceSaverFile file) => FaceSaverWriter.ToBytes(file);
+  static string IImageFormatMetadata<FaceSaverFile>.PrimaryExtension => ".face";
+  static string[] IImageFormatMetadata<FaceSaverFile>.FileExtensions => [".face", ".fac"];
+  static FaceSaverFile IImageFormatReader<FaceSaverFile>.FromSpan(ReadOnlySpan<byte> data) => FaceSaverReader.FromSpan(data);
+
+  static byte[] IImageFormatWriter<FaceSaverFile>.ToBytes(FaceSaverFile file) => FaceSaverWriter.ToBytes(file);
 
   /// <summary>Image width in pixels (from PicData field).</summary>
   public int Width { get; init; }

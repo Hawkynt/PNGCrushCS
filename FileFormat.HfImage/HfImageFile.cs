@@ -1,18 +1,15 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.HfImage;
 
 /// <summary>In-memory representation of an HF height field image.</summary>
-public sealed class HfImageFile : IImageFileFormat<HfImageFile> {
+public readonly record struct HfImageFile : IImageFormatReader<HfImageFile>, IImageToRawImage<HfImageFile>, IImageFromRawImage<HfImageFile>, IImageFormatWriter<HfImageFile> {
 
-  static string IImageFileFormat<HfImageFile>.PrimaryExtension => ".hf";
-  static string[] IImageFileFormat<HfImageFile>.FileExtensions => [".hf"];
-  static HfImageFile IImageFileFormat<HfImageFile>.FromFile(FileInfo file) => HfImageReader.FromFile(file);
-  static HfImageFile IImageFileFormat<HfImageFile>.FromBytes(byte[] data) => HfImageReader.FromBytes(data);
-  static HfImageFile IImageFileFormat<HfImageFile>.FromStream(Stream stream) => HfImageReader.FromStream(stream);
-  static byte[] IImageFileFormat<HfImageFile>.ToBytes(HfImageFile file) => HfImageWriter.ToBytes(file);
+  static string IImageFormatMetadata<HfImageFile>.PrimaryExtension => ".hf";
+  static string[] IImageFormatMetadata<HfImageFile>.FileExtensions => [".hf"];
+  static HfImageFile IImageFormatReader<HfImageFile>.FromSpan(ReadOnlySpan<byte> data) => HfImageReader.FromSpan(data);
+  static byte[] IImageFormatWriter<HfImageFile>.ToBytes(HfImageFile file) => HfImageWriter.ToBytes(file);
 
   /// <summary>Magic bytes: "HF" (0x48 0x46).</summary>
   internal static readonly byte[] Magic = [0x48, 0x46];
@@ -33,10 +30,9 @@ public sealed class HfImageFile : IImageFileFormat<HfImageFile> {
   public ushort DataType { get; init; }
 
   /// <summary>Raw grayscale pixel data (1 byte per pixel).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(HfImageFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

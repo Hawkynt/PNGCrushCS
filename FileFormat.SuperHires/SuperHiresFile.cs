@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.SuperHires;
 
 /// <summary>In-memory representation of a Super Hires (C64 interlace hires) image.</summary>
-public sealed class SuperHiresFile : IImageFileFormat<SuperHiresFile> {
+public readonly record struct SuperHiresFile : IImageFormatReader<SuperHiresFile>, IImageToRawImage<SuperHiresFile>, IImageFormatWriter<SuperHiresFile> {
 
-  static string IImageFileFormat<SuperHiresFile>.PrimaryExtension => ".shi";
-  static string[] IImageFileFormat<SuperHiresFile>.FileExtensions => [".shi"];
-  static SuperHiresFile IImageFileFormat<SuperHiresFile>.FromFile(FileInfo file) => SuperHiresReader.FromFile(file);
-  static SuperHiresFile IImageFileFormat<SuperHiresFile>.FromBytes(byte[] data) => SuperHiresReader.FromBytes(data);
-  static SuperHiresFile IImageFileFormat<SuperHiresFile>.FromStream(Stream stream) => SuperHiresReader.FromStream(stream);
-  static byte[] IImageFileFormat<SuperHiresFile>.ToBytes(SuperHiresFile file) => SuperHiresWriter.ToBytes(file);
+  static string IImageFormatMetadata<SuperHiresFile>.PrimaryExtension => ".shi";
+  static string[] IImageFormatMetadata<SuperHiresFile>.FileExtensions => [".shi"];
+  static SuperHiresFile IImageFormatReader<SuperHiresFile>.FromSpan(ReadOnlySpan<byte> data) => SuperHiresReader.FromSpan(data);
+  static byte[] IImageFormatWriter<SuperHiresFile>.ToBytes(SuperHiresFile file) => SuperHiresWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public const int ImageWidth = 320;
@@ -46,23 +43,22 @@ public sealed class SuperHiresFile : IImageFileFormat<SuperHiresFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Bitmap data for frame 1 (8000 bytes).</summary>
-  public byte[] BitmapData1 { get; init; } = [];
+  public byte[] BitmapData1 { get; init; }
 
   /// <summary>Screen RAM for frame 1 (1000 bytes).</summary>
-  public byte[] ScreenData1 { get; init; } = [];
+  public byte[] ScreenData1 { get; init; }
 
   /// <summary>Bitmap data for frame 2 (8000 bytes).</summary>
-  public byte[] BitmapData2 { get; init; } = [];
+  public byte[] BitmapData2 { get; init; }
 
   /// <summary>Screen RAM for frame 2 (1000 bytes).</summary>
-  public byte[] ScreenData2 { get; init; } = [];
+  public byte[] ScreenData2 { get; init; }
 
   /// <summary>Trailing padding/extra data.</summary>
-  public byte[] Padding { get; init; } = [];
+  public byte[] Padding { get; init; }
 
   /// <summary>Converts this Super Hires image to a platform-independent <see cref="RawImage"/> in Rgb24 format by blending two interlace frames.</summary>
   public static RawImage ToRawImage(SuperHiresFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var rgb = new byte[ImageWidth * ImageHeight * 3];
 
@@ -119,7 +115,4 @@ public sealed class SuperHiresFile : IImageFileFormat<SuperHiresFile> {
     };
   }
 
-  /// <summary>Not supported. Super Hires is a read-only format.</summary>
-  public static SuperHiresFile FromRawImage(RawImage image)
-    => throw new NotSupportedException("Creating Super Hires files from raw images is not supported.");
 }

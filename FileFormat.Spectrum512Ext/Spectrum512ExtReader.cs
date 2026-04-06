@@ -29,6 +29,8 @@ public static class Spectrum512ExtReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static Spectrum512ExtFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static Spectrum512ExtFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != Spectrum512ExtFile.FileSize)

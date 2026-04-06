@@ -1,36 +1,32 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Psd;
 
 /// <summary>In-memory representation of a PSD image (flat composite only).</summary>
-public sealed class PsdFile : IImageFileFormat<PsdFile> {
+public readonly record struct PsdFile : IImageFormatReader<PsdFile>, IImageToRawImage<PsdFile>, IImageFromRawImage<PsdFile>, IImageFormatWriter<PsdFile> {
 
-  static string IImageFileFormat<PsdFile>.PrimaryExtension => ".psd";
-  static string[] IImageFileFormat<PsdFile>.FileExtensions => [".psd"];
+  static string IImageFormatMetadata<PsdFile>.PrimaryExtension => ".psd";
+  static string[] IImageFormatMetadata<PsdFile>.FileExtensions => [".psd"];
+  static PsdFile IImageFormatReader<PsdFile>.FromSpan(ReadOnlySpan<byte> data) => PsdReader.FromSpan(data);
 
-  static bool? IImageFileFormat<PsdFile>.MatchesSignature(ReadOnlySpan<byte> header)
+  static bool? IImageFormatMetadata<PsdFile>.MatchesSignature(ReadOnlySpan<byte> header)
     => header.Length >= 6 && header[0] == 0x38 && header[1] == 0x42 && header[2] == 0x50 && header[3] == 0x53
       && header[4] == 0x00 && header[5] == 0x01
       ? true : null;
 
-  static PsdFile IImageFileFormat<PsdFile>.FromFile(FileInfo file) => PsdReader.FromFile(file);
-  static PsdFile IImageFileFormat<PsdFile>.FromBytes(byte[] data) => PsdReader.FromBytes(data);
-  static PsdFile IImageFileFormat<PsdFile>.FromStream(Stream stream) => PsdReader.FromStream(stream);
-  static byte[] IImageFileFormat<PsdFile>.ToBytes(PsdFile file) => PsdWriter.ToBytes(file);
+  static byte[] IImageFormatWriter<PsdFile>.ToBytes(PsdFile file) => PsdWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
   public int Channels { get; init; }
   public int Depth { get; init; }
   public PsdColorMode ColorMode { get; init; }
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
   public byte[]? Palette { get; init; }
   public byte[]? ImageResources { get; init; }
   public byte[]? LayerMaskInfo { get; init; }
 
   public static RawImage ToRawImage(PsdFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     if (file.Depth != 8)
       throw new NotSupportedException($"Only Depth=8 is supported, got {file.Depth}.");
 

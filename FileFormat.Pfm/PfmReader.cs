@@ -26,6 +26,8 @@ public static class PfmReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static PfmFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static PfmFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < PfmHeaderParser.MinHeaderSize)

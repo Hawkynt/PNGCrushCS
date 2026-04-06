@@ -43,6 +43,8 @@ public static class SunIconReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static SunIconFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static SunIconFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MINIMUM_SIZE)

@@ -1,26 +1,22 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Tiny;
 
 /// <summary>In-memory representation of a Tiny (compressed DEGAS) image.</summary>
-public sealed class TinyFile : IImageFileFormat<TinyFile> {
+public readonly record struct TinyFile : IImageFormatReader<TinyFile>, IImageToRawImage<TinyFile>, IImageFromRawImage<TinyFile>, IImageFormatWriter<TinyFile> {
 
-  static string IImageFileFormat<TinyFile>.PrimaryExtension => ".tny";
-  static string[] IImageFileFormat<TinyFile>.FileExtensions => [".tny", ".tn1", ".tn2", ".tn3"];
-  static TinyFile IImageFileFormat<TinyFile>.FromFile(FileInfo file) => TinyReader.FromFile(file);
-  static TinyFile IImageFileFormat<TinyFile>.FromBytes(byte[] data) => TinyReader.FromBytes(data);
-  static TinyFile IImageFileFormat<TinyFile>.FromStream(Stream stream) => TinyReader.FromStream(stream);
-  static byte[] IImageFileFormat<TinyFile>.ToBytes(TinyFile file) => TinyWriter.ToBytes(file);
+  static string IImageFormatMetadata<TinyFile>.PrimaryExtension => ".tny";
+  static string[] IImageFormatMetadata<TinyFile>.FileExtensions => [".tny", ".tn1", ".tn2", ".tn3"];
+  static TinyFile IImageFormatReader<TinyFile>.FromSpan(ReadOnlySpan<byte> data) => TinyReader.FromSpan(data);
+  static byte[] IImageFormatWriter<TinyFile>.ToBytes(TinyFile file) => TinyWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
   public TinyResolution Resolution { get; init; }
-  public short[] Palette { get; init; } = new short[16];
-  public byte[] PixelData { get; init; } = [];
+  public short[] Palette { get; init; }
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(TinyFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var numPlanes = file.Resolution switch {
       TinyResolution.Low => 4,

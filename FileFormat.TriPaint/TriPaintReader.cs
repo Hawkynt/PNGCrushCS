@@ -29,6 +29,8 @@ public static class TriPaintReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static TriPaintFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static TriPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != _EXPECTED_SIZE)

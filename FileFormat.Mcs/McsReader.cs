@@ -27,6 +27,8 @@ public static class McsReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static McsFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static McsFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
 

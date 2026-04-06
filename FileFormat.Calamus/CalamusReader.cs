@@ -26,6 +26,8 @@ public static class CalamusReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static CalamusFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static CalamusFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < CalamusFile.MinFileSize)

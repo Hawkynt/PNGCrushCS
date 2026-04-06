@@ -28,6 +28,8 @@ public static class Fl32Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static Fl32File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static Fl32File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < Fl32File.HeaderSize)

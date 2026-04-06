@@ -26,6 +26,8 @@ public static class RunPaintReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static RunPaintFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static RunPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < RunPaintFile.LoadAddressSize + 1)

@@ -26,6 +26,8 @@ public static class SpritePadReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static SpritePadFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static SpritePadFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < SpritePadFile.V1HeaderSize + SpritePadFile.BytesPerSprite)

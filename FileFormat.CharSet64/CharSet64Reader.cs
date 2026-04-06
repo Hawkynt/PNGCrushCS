@@ -26,6 +26,8 @@ public static class CharSet64Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static CharSet64File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static CharSet64File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < CharSet64File.ExpectedFileSize)

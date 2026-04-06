@@ -1,28 +1,23 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.MatLab;
 
 /// <summary>In-memory representation of a MATLAB Level 5 image image.</summary>
-public sealed class MatLabFile : IImageFileFormat<MatLabFile> {
+public readonly record struct MatLabFile : IImageFormatReader<MatLabFile>, IImageToRawImage<MatLabFile>, IImageFromRawImage<MatLabFile>, IImageFormatWriter<MatLabFile> {
 
   internal const int HeaderSize = 128;
 
-
-  static string IImageFileFormat<MatLabFile>.PrimaryExtension => ".mat";
-  static string[] IImageFileFormat<MatLabFile>.FileExtensions => [".mat"];
-  static MatLabFile IImageFileFormat<MatLabFile>.FromFile(FileInfo file) => MatLabReader.FromFile(file);
-  static MatLabFile IImageFileFormat<MatLabFile>.FromBytes(byte[] data) => MatLabReader.FromBytes(data);
-  static MatLabFile IImageFileFormat<MatLabFile>.FromStream(Stream stream) => MatLabReader.FromStream(stream);
-  static byte[] IImageFileFormat<MatLabFile>.ToBytes(MatLabFile file) => MatLabWriter.ToBytes(file);
+  static string IImageFormatMetadata<MatLabFile>.PrimaryExtension => ".mat";
+  static string[] IImageFormatMetadata<MatLabFile>.FileExtensions => [".mat"];
+  static MatLabFile IImageFormatReader<MatLabFile>.FromSpan(ReadOnlySpan<byte> data) => MatLabReader.FromSpan(data);
+  static byte[] IImageFormatWriter<MatLabFile>.ToBytes(MatLabFile file) => MatLabWriter.ToBytes(file);
 
   public int Width { get; init; }
   public int Height { get; init; }
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(MatLabFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

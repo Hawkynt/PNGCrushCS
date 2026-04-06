@@ -26,6 +26,8 @@ public static class UhdrReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static UhdrFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static UhdrFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < UhdrHeader.StructSize)

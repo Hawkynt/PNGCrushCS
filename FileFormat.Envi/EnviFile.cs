@@ -1,20 +1,17 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Envi;
 
 /// <summary>In-memory representation of an ENVI remote sensing image.</summary>
-public sealed class EnviFile : IImageFileFormat<EnviFile> {
+public readonly record struct EnviFile : IImageFormatReader<EnviFile>, IImageToRawImage<EnviFile>, IImageFromRawImage<EnviFile>, IImageFormatWriter<EnviFile> {
 
-  static string IImageFileFormat<EnviFile>.PrimaryExtension => ".hdr";
-  static string[] IImageFileFormat<EnviFile>.FileExtensions => [".hdr"];
-  static EnviFile IImageFileFormat<EnviFile>.FromFile(FileInfo file) => EnviReader.FromFile(file);
-  static EnviFile IImageFileFormat<EnviFile>.FromBytes(byte[] data) => EnviReader.FromBytes(data);
-  static EnviFile IImageFileFormat<EnviFile>.FromStream(Stream stream) => EnviReader.FromStream(stream);
-  static byte[] IImageFileFormat<EnviFile>.ToBytes(EnviFile file) => EnviWriter.ToBytes(file);
+  static string IImageFormatMetadata<EnviFile>.PrimaryExtension => ".hdr";
+  static string[] IImageFormatMetadata<EnviFile>.FileExtensions => [".hdr"];
+  static EnviFile IImageFormatReader<EnviFile>.FromSpan(ReadOnlySpan<byte> data) => EnviReader.FromSpan(data);
+  static byte[] IImageFormatWriter<EnviFile>.ToBytes(EnviFile file) => EnviWriter.ToBytes(file);
 
-  static bool? IImageFileFormat<EnviFile>.MatchesSignature(ReadOnlySpan<byte> header)
+  static bool? IImageFormatMetadata<EnviFile>.MatchesSignature(ReadOnlySpan<byte> header)
     => header.Length >= 5 && header[0] == 0x45 && header[1] == 0x4E && header[2] == 0x56 && header[3] == 0x49
       && (header[4] == 0x0D || header[4] == 0x0A)
       ? true : null;
@@ -26,10 +23,10 @@ public sealed class EnviFile : IImageFileFormat<EnviFile> {
   public int Height { get; init; }
 
   /// <summary>Number of spectral bands.</summary>
-  public int Bands { get; init; } = 1;
+  public int Bands { get; init; }
 
   /// <summary>ENVI data type code (1=uint8, 2=int16, 4=float32, 12=uint16).</summary>
-  public int DataType { get; init; } = 1;
+  public int DataType { get; init; }
 
   /// <summary>Band interleave organization.</summary>
   public EnviInterleave Interleave { get; init; }
@@ -38,10 +35,9 @@ public sealed class EnviFile : IImageFileFormat<EnviFile> {
   public int ByteOrder { get; init; }
 
   /// <summary>Raw pixel data bytes.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(EnviFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var dataType = file.DataType;
     var bands = file.Bands;

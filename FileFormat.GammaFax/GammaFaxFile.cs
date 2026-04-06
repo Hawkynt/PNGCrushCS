@@ -1,19 +1,16 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.GammaFax;
 
 /// <summary>In-memory representation of a GammaFax GMF image.</summary>
-public sealed class GammaFaxFile : IImageFileFormat<GammaFaxFile> {
+public readonly record struct GammaFaxFile : IImageFormatReader<GammaFaxFile>, IImageToRawImage<GammaFaxFile>, IImageFormatWriter<GammaFaxFile> {
 
-  static string IImageFileFormat<GammaFaxFile>.PrimaryExtension => ".gmf";
-  static string[] IImageFileFormat<GammaFaxFile>.FileExtensions => [".gmf"];
-  static FormatCapability IImageFileFormat<GammaFaxFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static GammaFaxFile IImageFileFormat<GammaFaxFile>.FromFile(FileInfo file) => GammaFaxReader.FromFile(file);
-  static GammaFaxFile IImageFileFormat<GammaFaxFile>.FromBytes(byte[] data) => GammaFaxReader.FromBytes(data);
-  static GammaFaxFile IImageFileFormat<GammaFaxFile>.FromStream(Stream stream) => GammaFaxReader.FromStream(stream);
-  static byte[] IImageFileFormat<GammaFaxFile>.ToBytes(GammaFaxFile file) => GammaFaxWriter.ToBytes(file);
+  static string IImageFormatMetadata<GammaFaxFile>.PrimaryExtension => ".gmf";
+  static string[] IImageFormatMetadata<GammaFaxFile>.FileExtensions => [".gmf"];
+  static GammaFaxFile IImageFormatReader<GammaFaxFile>.FromSpan(ReadOnlySpan<byte> data) => GammaFaxReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<GammaFaxFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<GammaFaxFile>.ToBytes(GammaFaxFile file) => GammaFaxWriter.ToBytes(file);
 
   /// <summary>Magic bytes: "GF" (0x47 0x46).</summary>
   internal static readonly byte[] Magic = [0x47, 0x46];
@@ -37,11 +34,10 @@ public sealed class GammaFaxFile : IImageFileFormat<GammaFaxFile> {
   public ushort Compression { get; init; }
 
   /// <summary>1bpp pixel data, MSB first, rows padded to byte boundary.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this GMF image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(GammaFaxFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var bytesPerRow = (file.Width + 7) / 8;
     var rgb = new byte[file.Width * file.Height * 3];
@@ -66,9 +62,4 @@ public sealed class GammaFaxFile : IImageFileFormat<GammaFaxFile> {
     };
   }
 
-  /// <summary>Not supported.</summary>
-  public static GammaFaxFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to GammaFaxFile is not supported.");
-  }
 }

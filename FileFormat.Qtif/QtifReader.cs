@@ -34,6 +34,8 @@ public static class QtifReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static QtifFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static QtifFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MIN_SIZE)

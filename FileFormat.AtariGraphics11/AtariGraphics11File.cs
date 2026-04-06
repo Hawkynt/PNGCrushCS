@@ -1,11 +1,10 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.AtariGraphics11;
 
 /// <summary>In-memory representation of an Atari Graphics 11 (GTIA 16-luminance) image. 80x192.</summary>
-public sealed class AtariGraphics11File : IImageFileFormat<AtariGraphics11File> {
+public readonly record struct AtariGraphics11File : IImageFormatReader<AtariGraphics11File>, IImageToRawImage<AtariGraphics11File>, IImageFromRawImage<AtariGraphics11File>, IImageFormatWriter<AtariGraphics11File> {
 
   /// <summary>Image width in pixels.</summary>
   internal const int PixelWidth = 80;
@@ -19,15 +18,11 @@ public sealed class AtariGraphics11File : IImageFileFormat<AtariGraphics11File> 
   /// <summary>Exact file size in bytes (40 bytes/line x 192 lines).</summary>
   internal const int FileSize = BytesPerLine * PixelHeight;
 
-  static string IImageFileFormat<AtariGraphics11File>.PrimaryExtension => ".gr11";
-  static string[] IImageFileFormat<AtariGraphics11File>.FileExtensions => [".gr11", ".g11"];
-  static FormatCapability IImageFileFormat<AtariGraphics11File>.Capabilities => FormatCapability.IndexedOnly;
-  static AtariGraphics11File IImageFileFormat<AtariGraphics11File>.FromFile(FileInfo file) => AtariGraphics11Reader.FromFile(file);
-  static AtariGraphics11File IImageFileFormat<AtariGraphics11File>.FromBytes(byte[] data) => AtariGraphics11Reader.FromBytes(data);
-  static AtariGraphics11File IImageFileFormat<AtariGraphics11File>.FromStream(Stream stream) => AtariGraphics11Reader.FromStream(stream);
-  static RawImage IImageFileFormat<AtariGraphics11File>.ToRawImage(AtariGraphics11File file) => ToRawImage(file);
-  static AtariGraphics11File IImageFileFormat<AtariGraphics11File>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<AtariGraphics11File>.ToBytes(AtariGraphics11File file) => AtariGraphics11Writer.ToBytes(file);
+  static string IImageFormatMetadata<AtariGraphics11File>.PrimaryExtension => ".gr11";
+  static string[] IImageFormatMetadata<AtariGraphics11File>.FileExtensions => [".gr11", ".g11"];
+  static AtariGraphics11File IImageFormatReader<AtariGraphics11File>.FromSpan(ReadOnlySpan<byte> data) => AtariGraphics11Reader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<AtariGraphics11File>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<AtariGraphics11File>.ToBytes(AtariGraphics11File file) => AtariGraphics11Writer.ToBytes(file);
 
   /// <summary>Always 80.</summary>
   public int Width => PixelWidth;
@@ -36,11 +31,10 @@ public sealed class AtariGraphics11File : IImageFileFormat<AtariGraphics11File> 
   public int Height => PixelHeight;
 
   /// <summary>Raw screen data (7680 bytes). Each byte contains 2 pixels in nybbles (upper=left, lower=right), values 0-15.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts the Graphics 11 image to a Gray8 raw image (80x192). Each nybble 0-15 maps to grayscale 0-255 (value x 17).</summary>
   public static RawImage ToRawImage(AtariGraphics11File file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var gray = new byte[PixelWidth * PixelHeight];
 

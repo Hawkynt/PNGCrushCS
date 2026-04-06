@@ -28,6 +28,8 @@ public static class Cp8GrayReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static Cp8GrayFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static Cp8GrayFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MIN_FILE_SIZE)

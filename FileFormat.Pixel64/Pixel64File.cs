@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Pixel64;
 
 /// <summary>In-memory representation of a Commodore 64 Pixel Perfect paint image.</summary>
-public sealed class Pixel64File : IImageFileFormat<Pixel64File> {
+public readonly record struct Pixel64File : IImageFormatReader<Pixel64File>, IImageToRawImage<Pixel64File>, IImageFormatWriter<Pixel64File> {
 
-  static string IImageFileFormat<Pixel64File>.PrimaryExtension => ".px64";
-  static string[] IImageFileFormat<Pixel64File>.FileExtensions => [".px64", ".px"];
-  static Pixel64File IImageFileFormat<Pixel64File>.FromFile(FileInfo file) => Pixel64Reader.FromFile(file);
-  static Pixel64File IImageFileFormat<Pixel64File>.FromBytes(byte[] data) => Pixel64Reader.FromBytes(data);
-  static Pixel64File IImageFileFormat<Pixel64File>.FromStream(Stream stream) => Pixel64Reader.FromStream(stream);
-  static byte[] IImageFileFormat<Pixel64File>.ToBytes(Pixel64File file) => Pixel64Writer.ToBytes(file);
+  static string IImageFormatMetadata<Pixel64File>.PrimaryExtension => ".px64";
+  static string[] IImageFormatMetadata<Pixel64File>.FileExtensions => [".px64", ".px"];
+  static Pixel64File IImageFormatReader<Pixel64File>.FromSpan(ReadOnlySpan<byte> data) => Pixel64Reader.FromSpan(data);
+  static byte[] IImageFormatWriter<Pixel64File>.ToBytes(Pixel64File file) => Pixel64Writer.ToBytes(file);
 
   /// <summary>The fixed width of a Pixel64 image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -55,13 +52,13 @@ public sealed class Pixel64File : IImageFileFormat<Pixel64File> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Multicolor bitmap data (8000 bytes, 2 bits per pixel).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Video matrix / screen RAM (1000 bytes, upper/lower nybble = 2 colors per cell).</summary>
-  public byte[] VideoMatrix { get; init; } = [];
+  public byte[] VideoMatrix { get; init; }
 
   /// <summary>Color RAM (1000 bytes, lower nybble = 3rd color per cell).</summary>
-  public byte[] ColorRam { get; init; } = [];
+  public byte[] ColorRam { get; init; }
 
   /// <summary>Border color index (0-15).</summary>
   public byte BorderColor { get; init; }
@@ -70,11 +67,10 @@ public sealed class Pixel64File : IImageFileFormat<Pixel64File> {
   public byte BackgroundColor { get; init; }
 
   /// <summary>Trailing padding bytes (14 bytes).</summary>
-  public byte[] Padding { get; init; } = [];
+  public byte[] Padding { get; init; }
 
   /// <summary>Converts this Pixel64 image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(Pixel64File file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -113,9 +109,4 @@ public sealed class Pixel64File : IImageFileFormat<Pixel64File> {
     };
   }
 
-  /// <summary>Not supported. Pixel64 images have complex cell-based color constraints.</summary>
-  public static Pixel64File FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to Pixel64File is not supported due to complex cell-based color constraints.");
-  }
 }

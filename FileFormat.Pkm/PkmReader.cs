@@ -26,6 +26,8 @@ public static class PkmReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static PkmFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static PkmFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < PkmHeader.StructSize)

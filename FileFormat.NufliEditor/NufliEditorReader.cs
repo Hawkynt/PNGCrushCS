@@ -26,6 +26,8 @@ public static class NufliEditorReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static NufliEditorFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static NufliEditorFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < NufliEditorFile.LoadAddressSize + NufliEditorFile.MinPayloadSize)

@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.FunGraphicsMachine;
 
 /// <summary>In-memory representation of a Commodore 64 Fun Graphics Machine hires image.</summary>
-public sealed class FunGraphicsMachineFile : IImageFileFormat<FunGraphicsMachineFile> {
+public readonly record struct FunGraphicsMachineFile : IImageFormatReader<FunGraphicsMachineFile>, IImageToRawImage<FunGraphicsMachineFile>, IImageFormatWriter<FunGraphicsMachineFile> {
 
-  static string IImageFileFormat<FunGraphicsMachineFile>.PrimaryExtension => ".fgs";
-  static string[] IImageFileFormat<FunGraphicsMachineFile>.FileExtensions => [".fgs"];
-  static FunGraphicsMachineFile IImageFileFormat<FunGraphicsMachineFile>.FromFile(FileInfo file) => FunGraphicsMachineReader.FromFile(file);
-  static FunGraphicsMachineFile IImageFileFormat<FunGraphicsMachineFile>.FromBytes(byte[] data) => FunGraphicsMachineReader.FromBytes(data);
-  static FunGraphicsMachineFile IImageFileFormat<FunGraphicsMachineFile>.FromStream(Stream stream) => FunGraphicsMachineReader.FromStream(stream);
-  static byte[] IImageFileFormat<FunGraphicsMachineFile>.ToBytes(FunGraphicsMachineFile file) => FunGraphicsMachineWriter.ToBytes(file);
+  static string IImageFormatMetadata<FunGraphicsMachineFile>.PrimaryExtension => ".fgs";
+  static string[] IImageFormatMetadata<FunGraphicsMachineFile>.FileExtensions => [".fgs"];
+  static FunGraphicsMachineFile IImageFormatReader<FunGraphicsMachineFile>.FromSpan(ReadOnlySpan<byte> data) => FunGraphicsMachineReader.FromSpan(data);
+  static byte[] IImageFormatWriter<FunGraphicsMachineFile>.ToBytes(FunGraphicsMachineFile file) => FunGraphicsMachineWriter.ToBytes(file);
 
   /// <summary>The fixed width of a Fun Graphics Machine image in pixels.</summary>
   public const int FixedWidth = 320;
@@ -52,14 +49,13 @@ public sealed class FunGraphicsMachineFile : IImageFileFormat<FunGraphicsMachine
   public ushort LoadAddress { get; init; }
 
   /// <summary>Screen RAM (1000 bytes, upper nybble = foreground color, lower nybble = background color per cell).</summary>
-  public byte[] ScreenRam { get; init; } = [];
+  public byte[] ScreenRam { get; init; }
 
   /// <summary>Hires bitmap data (8000 bytes, 1 bit per pixel within 8x8 cells).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Converts this Fun Graphics Machine image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(FunGraphicsMachineFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -95,9 +91,4 @@ public sealed class FunGraphicsMachineFile : IImageFileFormat<FunGraphicsMachine
     };
   }
 
-  /// <summary>Not supported. Fun Graphics Machine images have complex cell-based color constraints.</summary>
-  public static FunGraphicsMachineFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to FunGraphicsMachineFile is not supported due to complex cell-based color constraints.");
-  }
 }

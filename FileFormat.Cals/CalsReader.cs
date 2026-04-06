@@ -26,6 +26,8 @@ public static class CalsReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static CalsFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static CalsFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < CalsHeaderParser.HeaderSize)

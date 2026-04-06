@@ -1,20 +1,16 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Otb;
 
 /// <summary>In-memory representation of an OTB (Nokia Over-The-Air Bitmap) image.</summary>
-public sealed class OtbFile : IImageFileFormat<OtbFile> {
+public readonly record struct OtbFile : IImageFormatReader<OtbFile>, IImageToRawImage<OtbFile>, IImageFromRawImage<OtbFile>, IImageFormatWriter<OtbFile> {
 
-  static string IImageFileFormat<OtbFile>.PrimaryExtension => ".otb";
-  static string[] IImageFileFormat<OtbFile>.FileExtensions => [".otb"];
-  static FormatCapability IImageFileFormat<OtbFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static OtbFile IImageFileFormat<OtbFile>.FromFile(FileInfo file) => OtbReader.FromFile(file);
-  static OtbFile IImageFileFormat<OtbFile>.FromBytes(byte[] data) => OtbReader.FromBytes(data);
-  static OtbFile IImageFileFormat<OtbFile>.FromStream(Stream stream) => OtbReader.FromStream(stream);
-  static RawImage IImageFileFormat<OtbFile>.ToRawImage(OtbFile file) => file.ToRawImage();
-  static byte[] IImageFileFormat<OtbFile>.ToBytes(OtbFile file) => OtbWriter.ToBytes(file);
+  static string IImageFormatMetadata<OtbFile>.PrimaryExtension => ".otb";
+  static string[] IImageFormatMetadata<OtbFile>.FileExtensions => [".otb"];
+  static OtbFile IImageFormatReader<OtbFile>.FromSpan(ReadOnlySpan<byte> data) => OtbReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<OtbFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<OtbFile>.ToBytes(OtbFile file) => OtbWriter.ToBytes(file);
   /// <summary>Image width in pixels (1..255).</summary>
   public int Width { get; init; }
 
@@ -22,15 +18,15 @@ public sealed class OtbFile : IImageFileFormat<OtbFile> {
   public int Height { get; init; }
 
   /// <summary>1bpp packed pixel data, MSB first, ceil(width/8) bytes per row.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
-  public RawImage ToRawImage() => new() {
-    Width = this.Width,
-    Height = this.Height,
+  public static RawImage ToRawImage(OtbFile file) => new() {
+    Width = file.Width,
+    Height = file.Height,
     Format = PixelFormat.Indexed1,
-    PixelData = this.PixelData[..],
+    PixelData = file.PixelData[..],
     Palette = _BlackWhitePalette[..],
     PaletteCount = 2,
   };

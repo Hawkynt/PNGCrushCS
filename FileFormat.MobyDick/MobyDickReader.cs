@@ -26,6 +26,8 @@ public static class MobyDickReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static MobyDickFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static MobyDickFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < MobyDickFile.ExpectedFileSize)

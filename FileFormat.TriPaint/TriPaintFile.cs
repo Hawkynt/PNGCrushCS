@@ -1,21 +1,18 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.TriPaint;
 
 /// <summary>In-memory representation of a TriPaint true-color (.tpf) screen dump.</summary>
-public sealed class TriPaintFile : IImageFileFormat<TriPaintFile> {
+public readonly record struct TriPaintFile : IImageFormatReader<TriPaintFile>, IImageToRawImage<TriPaintFile>, IImageFromRawImage<TriPaintFile>, IImageFormatWriter<TriPaintFile> {
 
   /// <summary>The exact file size: 320 x 240 x 2 bytes per pixel.</summary>
   public const int ExpectedFileSize = 320 * 240 * 2;
 
-  static string IImageFileFormat<TriPaintFile>.PrimaryExtension => ".tpf";
-  static string[] IImageFileFormat<TriPaintFile>.FileExtensions => [".tpf"];
-  static TriPaintFile IImageFileFormat<TriPaintFile>.FromFile(FileInfo file) => TriPaintReader.FromFile(file);
-  static TriPaintFile IImageFileFormat<TriPaintFile>.FromBytes(byte[] data) => TriPaintReader.FromBytes(data);
-  static TriPaintFile IImageFileFormat<TriPaintFile>.FromStream(Stream stream) => TriPaintReader.FromStream(stream);
-  static byte[] IImageFileFormat<TriPaintFile>.ToBytes(TriPaintFile file) => TriPaintWriter.ToBytes(file);
+  static string IImageFormatMetadata<TriPaintFile>.PrimaryExtension => ".tpf";
+  static string[] IImageFormatMetadata<TriPaintFile>.FileExtensions => [".tpf"];
+  static TriPaintFile IImageFormatReader<TriPaintFile>.FromSpan(ReadOnlySpan<byte> data) => TriPaintReader.FromSpan(data);
+  static byte[] IImageFormatWriter<TriPaintFile>.ToBytes(TriPaintFile file) => TriPaintWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>
   public int Width => 320;
@@ -24,10 +21,9 @@ public sealed class TriPaintFile : IImageFileFormat<TriPaintFile> {
   public int Height => 240;
 
   /// <summary>Raw RGB565 big-endian pixel data (2 bytes per pixel, 153600 bytes total).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(TriPaintFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var rgb565 = file.PixelData;
     var pixelCount = 320 * 240;

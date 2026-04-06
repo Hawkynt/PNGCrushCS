@@ -29,6 +29,8 @@ public static class AcornReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static AcornFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AcornFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _AREA_HEADER_SIZE)

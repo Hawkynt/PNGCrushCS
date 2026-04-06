@@ -1,28 +1,23 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Q0;
 
 /// <summary>In-memory representation of a Q0 raw RGB format image.</summary>
-public sealed class Q0File : IImageFileFormat<Q0File> {
+public readonly record struct Q0File : IImageFormatReader<Q0File>, IImageToRawImage<Q0File>, IImageFromRawImage<Q0File>, IImageFormatWriter<Q0File> {
 
   internal const int HeaderSize = 8;
 
-
-  static string IImageFileFormat<Q0File>.PrimaryExtension => ".q0";
-  static string[] IImageFileFormat<Q0File>.FileExtensions => [".q0"];
-  static Q0File IImageFileFormat<Q0File>.FromFile(FileInfo file) => Q0Reader.FromFile(file);
-  static Q0File IImageFileFormat<Q0File>.FromBytes(byte[] data) => Q0Reader.FromBytes(data);
-  static Q0File IImageFileFormat<Q0File>.FromStream(Stream stream) => Q0Reader.FromStream(stream);
-  static byte[] IImageFileFormat<Q0File>.ToBytes(Q0File file) => Q0Writer.ToBytes(file);
+  static string IImageFormatMetadata<Q0File>.PrimaryExtension => ".q0";
+  static string[] IImageFormatMetadata<Q0File>.FileExtensions => [".q0"];
+  static Q0File IImageFormatReader<Q0File>.FromSpan(ReadOnlySpan<byte> data) => Q0Reader.FromSpan(data);
+  static byte[] IImageFormatWriter<Q0File>.ToBytes(Q0File file) => Q0Writer.ToBytes(file);
 
   public int Width { get; init; }
   public int Height { get; init; }
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(Q0File file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

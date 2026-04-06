@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Vidcom64;
 
 /// <summary>In-memory representation of a Commodore 64 Vidcom 64 multicolor image.</summary>
-public sealed class Vidcom64File : IImageFileFormat<Vidcom64File> {
+public readonly record struct Vidcom64File : IImageFormatReader<Vidcom64File>, IImageToRawImage<Vidcom64File>, IImageFormatWriter<Vidcom64File> {
 
-  static string IImageFileFormat<Vidcom64File>.PrimaryExtension => ".vid";
-  static string[] IImageFileFormat<Vidcom64File>.FileExtensions => [".vid"];
-  static Vidcom64File IImageFileFormat<Vidcom64File>.FromFile(FileInfo file) => Vidcom64Reader.FromFile(file);
-  static Vidcom64File IImageFileFormat<Vidcom64File>.FromBytes(byte[] data) => Vidcom64Reader.FromBytes(data);
-  static Vidcom64File IImageFileFormat<Vidcom64File>.FromStream(Stream stream) => Vidcom64Reader.FromStream(stream);
-  static byte[] IImageFileFormat<Vidcom64File>.ToBytes(Vidcom64File file) => Vidcom64Writer.ToBytes(file);
+  static string IImageFormatMetadata<Vidcom64File>.PrimaryExtension => ".vid";
+  static string[] IImageFormatMetadata<Vidcom64File>.FileExtensions => [".vid"];
+  static Vidcom64File IImageFormatReader<Vidcom64File>.FromSpan(ReadOnlySpan<byte> data) => Vidcom64Reader.FromSpan(data);
+  static byte[] IImageFormatWriter<Vidcom64File>.ToBytes(Vidcom64File file) => Vidcom64Writer.ToBytes(file);
 
   /// <summary>The fixed width of a Vidcom 64 image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -55,23 +52,22 @@ public sealed class Vidcom64File : IImageFileFormat<Vidcom64File> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Vidcom 64 header data (47 bytes).</summary>
-  public byte[] HeaderData { get; init; } = [];
+  public byte[] HeaderData { get; init; }
 
   /// <summary>Multicolor bitmap data (8000 bytes, 2 bits per pixel).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Screen RAM (1000 bytes, upper/lower nybble = 2 colors per cell).</summary>
-  public byte[] ScreenRam { get; init; } = [];
+  public byte[] ScreenRam { get; init; }
 
   /// <summary>Color RAM (1000 bytes, lower nybble = 3rd color per cell).</summary>
-  public byte[] ColorRam { get; init; } = [];
+  public byte[] ColorRam { get; init; }
 
   /// <summary>Background color index (0-15).</summary>
   public byte BackgroundColor { get; init; }
 
   /// <summary>Converts this Vidcom 64 image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(Vidcom64File file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -110,9 +106,4 @@ public sealed class Vidcom64File : IImageFileFormat<Vidcom64File> {
     };
   }
 
-  /// <summary>Not supported. Vidcom 64 images have complex cell-based color constraints.</summary>
-  public static Vidcom64File FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to Vidcom64File is not supported due to complex cell-based color constraints.");
-  }
 }

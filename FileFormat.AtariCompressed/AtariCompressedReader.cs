@@ -27,6 +27,8 @@ public static class AtariCompressedReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static AtariCompressedFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AtariCompressedFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < 1)

@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.AtariPicture;
 
 /// <summary>In-memory representation of an Atari Picture generic screen capture (.apc) file.</summary>
-public sealed class AtariPictureFile : IImageFileFormat<AtariPictureFile> {
+public readonly record struct AtariPictureFile : IImageFormatReader<AtariPictureFile>, IImageToRawImage<AtariPictureFile>, IImageFromRawImage<AtariPictureFile>, IImageFormatWriter<AtariPictureFile> {
 
   /// <summary>Exact file size: 40 bytes/row x 192 rows.</summary>
   public const int ExpectedFileSize = 7680;
@@ -19,13 +18,11 @@ public sealed class AtariPictureFile : IImageFileFormat<AtariPictureFile> {
   /// <summary>Bytes per row in the raw screen dump.</summary>
   internal const int BytesPerRow = 40;
 
-  static string IImageFileFormat<AtariPictureFile>.PrimaryExtension => ".apc";
-  static string[] IImageFileFormat<AtariPictureFile>.FileExtensions => [".apc"];
-  static FormatCapability IImageFileFormat<AtariPictureFile>.Capabilities => FormatCapability.IndexedOnly;
-  static AtariPictureFile IImageFileFormat<AtariPictureFile>.FromFile(FileInfo file) => AtariPictureReader.FromFile(file);
-  static AtariPictureFile IImageFileFormat<AtariPictureFile>.FromBytes(byte[] data) => AtariPictureReader.FromBytes(data);
-  static AtariPictureFile IImageFileFormat<AtariPictureFile>.FromStream(Stream stream) => AtariPictureReader.FromStream(stream);
-  static byte[] IImageFileFormat<AtariPictureFile>.ToBytes(AtariPictureFile file) => AtariPictureWriter.ToBytes(file);
+  static string IImageFormatMetadata<AtariPictureFile>.PrimaryExtension => ".apc";
+  static string[] IImageFormatMetadata<AtariPictureFile>.FileExtensions => [".apc"];
+  static AtariPictureFile IImageFormatReader<AtariPictureFile>.FromSpan(ReadOnlySpan<byte> data) => AtariPictureReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<AtariPictureFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<AtariPictureFile>.ToBytes(AtariPictureFile file) => AtariPictureWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>
   public int Width => PixelWidth;
@@ -34,13 +31,12 @@ public sealed class AtariPictureFile : IImageFileFormat<AtariPictureFile> {
   public int Height => PixelHeight;
 
   /// <summary>Raw 1bpp MSB-first screen data (7680 bytes).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
   /// <summary>Converts this Atari Picture to an Indexed1 raw image (320x192, B&amp;W palette).</summary>
   public static RawImage ToRawImage(AtariPictureFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var pixelData = new byte[ExpectedFileSize];
     file.PixelData.AsSpan(0, Math.Min(file.PixelData.Length, ExpectedFileSize)).CopyTo(pixelData);

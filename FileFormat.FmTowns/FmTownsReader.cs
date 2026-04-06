@@ -25,6 +25,8 @@ public static class FmTownsReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static FmTownsFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static FmTownsFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < FmTownsFile.FileSize)

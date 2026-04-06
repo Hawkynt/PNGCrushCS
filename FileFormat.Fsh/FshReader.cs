@@ -34,6 +34,8 @@ public static class FshReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static FshFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static FshFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _FILE_HEADER_SIZE)

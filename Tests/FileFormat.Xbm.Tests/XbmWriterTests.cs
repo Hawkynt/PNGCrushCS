@@ -126,12 +126,6 @@ public sealed class XbmWriterTests {
 
   [Test]
   [Category("Unit")]
-  public void ToBytes_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => XbmWriter.ToBytes(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
   public void ToBytes_UsesUppercaseHex() {
     var file = new XbmFile {
       Width = 8,

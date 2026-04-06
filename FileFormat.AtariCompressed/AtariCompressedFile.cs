@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.AtariCompressed;
 
 /// <summary>In-memory representation of an Atari Compressed Screen (.acr) with RLE encoding.</summary>
-public sealed class AtariCompressedFile : IImageFileFormat<AtariCompressedFile> {
+public readonly record struct AtariCompressedFile : IImageFormatReader<AtariCompressedFile>, IImageToRawImage<AtariCompressedFile>, IImageFromRawImage<AtariCompressedFile>, IImageFormatWriter<AtariCompressedFile> {
 
   /// <summary>Default decompressed screen size: 40 bytes/row x 192 rows (Graphics 8, 1bpp).</summary>
   internal const int DecompressedSize = 7680;
@@ -19,28 +18,25 @@ public sealed class AtariCompressedFile : IImageFileFormat<AtariCompressedFile> 
   /// <summary>Bytes per row in the raw screen dump.</summary>
   internal const int BytesPerRow = 40;
 
-  static string IImageFileFormat<AtariCompressedFile>.PrimaryExtension => ".acr";
-  static string[] IImageFileFormat<AtariCompressedFile>.FileExtensions => [".acr", ".acp"];
-  static FormatCapability IImageFileFormat<AtariCompressedFile>.Capabilities => FormatCapability.IndexedOnly;
-  static AtariCompressedFile IImageFileFormat<AtariCompressedFile>.FromFile(FileInfo file) => AtariCompressedReader.FromFile(file);
-  static AtariCompressedFile IImageFileFormat<AtariCompressedFile>.FromBytes(byte[] data) => AtariCompressedReader.FromBytes(data);
-  static AtariCompressedFile IImageFileFormat<AtariCompressedFile>.FromStream(Stream stream) => AtariCompressedReader.FromStream(stream);
-  static byte[] IImageFileFormat<AtariCompressedFile>.ToBytes(AtariCompressedFile file) => AtariCompressedWriter.ToBytes(file);
+  static string IImageFormatMetadata<AtariCompressedFile>.PrimaryExtension => ".acr";
+  static string[] IImageFormatMetadata<AtariCompressedFile>.FileExtensions => [".acr", ".acp"];
+  static AtariCompressedFile IImageFormatReader<AtariCompressedFile>.FromSpan(ReadOnlySpan<byte> data) => AtariCompressedReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<AtariCompressedFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<AtariCompressedFile>.ToBytes(AtariCompressedFile file) => AtariCompressedWriter.ToBytes(file);
 
   /// <summary>Width in pixels.</summary>
-  public int Width { get; init; } = DefaultWidth;
+  public int Width { get; init; }
 
   /// <summary>Height in pixels.</summary>
-  public int Height { get; init; } = DefaultHeight;
+  public int Height { get; init; }
 
   /// <summary>Raw decompressed screen data (7680 bytes for default 320x192 1bpp).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
   /// <summary>Converts this Atari Compressed Screen to an Indexed1 raw image (320x192, B&amp;W palette).</summary>
   public static RawImage ToRawImage(AtariCompressedFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var rowStride = file.Width / 8;
     var pixelData = new byte[rowStride * file.Height];

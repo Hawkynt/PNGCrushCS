@@ -1,29 +1,24 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Mag;
 
 /// <summary>In-memory representation of a MAKIchan Graphics image.</summary>
-public sealed class MagFile : IImageFileFormat<MagFile> {
+public readonly record struct MagFile : IImageFormatReader<MagFile>, IImageToRawImage<MagFile>, IImageFromRawImage<MagFile>, IImageFormatWriter<MagFile> {
 
   internal const int HeaderSize = 32;
 
-
-  static string IImageFileFormat<MagFile>.PrimaryExtension => ".mag";
-  static string[] IImageFileFormat<MagFile>.FileExtensions => [".mag", ".mki"];
-  static FormatCapability IImageFileFormat<MagFile>.Capabilities => FormatCapability.IndexedOnly;
-  static MagFile IImageFileFormat<MagFile>.FromFile(FileInfo file) => MagReader.FromFile(file);
-  static MagFile IImageFileFormat<MagFile>.FromBytes(byte[] data) => MagReader.FromBytes(data);
-  static MagFile IImageFileFormat<MagFile>.FromStream(Stream stream) => MagReader.FromStream(stream);
-  static byte[] IImageFileFormat<MagFile>.ToBytes(MagFile file) => MagWriter.ToBytes(file);
+  static string IImageFormatMetadata<MagFile>.PrimaryExtension => ".mag";
+  static string[] IImageFormatMetadata<MagFile>.FileExtensions => [".mag", ".mki"];
+  static MagFile IImageFormatReader<MagFile>.FromSpan(ReadOnlySpan<byte> data) => MagReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<MagFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<MagFile>.ToBytes(MagFile file) => MagWriter.ToBytes(file);
 
   public int Width { get; init; }
   public int Height { get; init; }
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(MagFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

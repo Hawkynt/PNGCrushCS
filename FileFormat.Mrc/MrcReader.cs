@@ -27,6 +27,8 @@ public static class MrcReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static MrcFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static MrcFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < MrcFile.HeaderSize)

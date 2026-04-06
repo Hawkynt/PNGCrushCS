@@ -26,6 +26,8 @@ public static class VentaFaxReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static VentaFaxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static VentaFaxFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < VentaFaxFile.MinFileSize)

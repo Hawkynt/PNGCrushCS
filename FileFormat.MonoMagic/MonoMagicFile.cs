@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.MonoMagic;
 
 /// <summary>In-memory representation of a Mono Magic C64 image image.</summary>
-public sealed class MonoMagicFile : IImageFileFormat<MonoMagicFile> {
+public readonly record struct MonoMagicFile : IImageFormatReader<MonoMagicFile>, IImageToRawImage<MonoMagicFile>, IImageFromRawImage<MonoMagicFile>, IImageFormatWriter<MonoMagicFile> {
 
   internal const int FixedWidth = 320;
   internal const int FixedHeight = 200;
@@ -13,20 +12,17 @@ public sealed class MonoMagicFile : IImageFileFormat<MonoMagicFile> {
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
-  static string IImageFileFormat<MonoMagicFile>.PrimaryExtension => ".mon";
-  static string[] IImageFileFormat<MonoMagicFile>.FileExtensions => [".mon"];
-  static FormatCapability IImageFileFormat<MonoMagicFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static MonoMagicFile IImageFileFormat<MonoMagicFile>.FromFile(FileInfo file) => MonoMagicReader.FromFile(file);
-  static MonoMagicFile IImageFileFormat<MonoMagicFile>.FromBytes(byte[] data) => MonoMagicReader.FromBytes(data);
-  static MonoMagicFile IImageFileFormat<MonoMagicFile>.FromStream(Stream stream) => MonoMagicReader.FromStream(stream);
-  static byte[] IImageFileFormat<MonoMagicFile>.ToBytes(MonoMagicFile file) => MonoMagicWriter.ToBytes(file);
+  static string IImageFormatMetadata<MonoMagicFile>.PrimaryExtension => ".mon";
+  static string[] IImageFormatMetadata<MonoMagicFile>.FileExtensions => [".mon"];
+  static MonoMagicFile IImageFormatReader<MonoMagicFile>.FromSpan(ReadOnlySpan<byte> data) => MonoMagicReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<MonoMagicFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<MonoMagicFile>.ToBytes(MonoMagicFile file) => MonoMagicWriter.ToBytes(file);
 
   public int Width => FixedWidth;
   public int Height => FixedHeight;
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(MonoMagicFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = FixedWidth,
       Height = FixedHeight,

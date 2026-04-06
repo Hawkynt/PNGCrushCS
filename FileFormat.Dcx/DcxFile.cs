@@ -8,15 +8,13 @@ namespace FileFormat.Dcx;
 
 /// <summary>In-memory representation of a DCX (multi-page PCX) file.</summary>
 [FormatMagicBytes([0xB1, 0x68, 0xDE, 0x3A])]
-public sealed class DcxFile : IImageFileFormat<DcxFile>, IMultiImageFileFormat<DcxFile> {
+public sealed class DcxFile : IImageFormatReader<DcxFile>, IImageToRawImage<DcxFile>, IImageFromRawImage<DcxFile>, IImageFormatWriter<DcxFile>, IMultiImageFileFormat<DcxFile> {
 
-  static string IImageFileFormat<DcxFile>.PrimaryExtension => ".dcx";
-  static string[] IImageFileFormat<DcxFile>.FileExtensions => [".dcx"];
-  static FormatCapability IImageFileFormat<DcxFile>.Capabilities => FormatCapability.VariableResolution | FormatCapability.MultiImage;
-  static DcxFile IImageFileFormat<DcxFile>.FromFile(FileInfo file) => DcxReader.FromFile(file);
-  static DcxFile IImageFileFormat<DcxFile>.FromBytes(byte[] data) => DcxReader.FromBytes(data);
-  static DcxFile IImageFileFormat<DcxFile>.FromStream(Stream stream) => DcxReader.FromStream(stream);
-  static byte[] IImageFileFormat<DcxFile>.ToBytes(DcxFile file) => DcxWriter.ToBytes(file);
+  static string IImageFormatMetadata<DcxFile>.PrimaryExtension => ".dcx";
+  static string[] IImageFormatMetadata<DcxFile>.FileExtensions => [".dcx"];
+  static DcxFile IImageFormatReader<DcxFile>.FromSpan(ReadOnlySpan<byte> data) => DcxReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<DcxFile>.Capabilities => FormatCapability.VariableResolution | FormatCapability.MultiImage;
+  static byte[] IImageFormatWriter<DcxFile>.ToBytes(DcxFile file) => DcxWriter.ToBytes(file);
   /// <summary>The PCX pages contained in this file.</summary>
   public IReadOnlyList<PcxFile> Pages { get; init; } = [];
 

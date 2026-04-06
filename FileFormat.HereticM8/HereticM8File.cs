@@ -1,29 +1,24 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.HereticM8;
 
 /// <summary>In-memory representation of a Heretic II MipMap texture image.</summary>
-public sealed class HereticM8File : IImageFileFormat<HereticM8File> {
+public readonly record struct HereticM8File : IImageFormatReader<HereticM8File>, IImageToRawImage<HereticM8File>, IImageFromRawImage<HereticM8File>, IImageFormatWriter<HereticM8File> {
 
   internal const int HeaderSize = 8;
 
-
-  static string IImageFileFormat<HereticM8File>.PrimaryExtension => ".m8";
-  static string[] IImageFileFormat<HereticM8File>.FileExtensions => [".m8"];
-  static FormatCapability IImageFileFormat<HereticM8File>.Capabilities => FormatCapability.IndexedOnly;
-  static HereticM8File IImageFileFormat<HereticM8File>.FromFile(FileInfo file) => HereticM8Reader.FromFile(file);
-  static HereticM8File IImageFileFormat<HereticM8File>.FromBytes(byte[] data) => HereticM8Reader.FromBytes(data);
-  static HereticM8File IImageFileFormat<HereticM8File>.FromStream(Stream stream) => HereticM8Reader.FromStream(stream);
-  static byte[] IImageFileFormat<HereticM8File>.ToBytes(HereticM8File file) => HereticM8Writer.ToBytes(file);
+  static string IImageFormatMetadata<HereticM8File>.PrimaryExtension => ".m8";
+  static string[] IImageFormatMetadata<HereticM8File>.FileExtensions => [".m8"];
+  static HereticM8File IImageFormatReader<HereticM8File>.FromSpan(ReadOnlySpan<byte> data) => HereticM8Reader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<HereticM8File>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<HereticM8File>.ToBytes(HereticM8File file) => HereticM8Writer.ToBytes(file);
 
   public int Width { get; init; }
   public int Height { get; init; }
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(HereticM8File file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

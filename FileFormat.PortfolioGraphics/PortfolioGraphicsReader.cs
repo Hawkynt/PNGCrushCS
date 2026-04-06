@@ -29,6 +29,8 @@ public static class PortfolioGraphicsReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static PortfolioGraphicsFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static PortfolioGraphicsFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < PortfolioGraphicsFile.PgfHeaderSize + PortfolioGraphicsFile.PixelDataSize)

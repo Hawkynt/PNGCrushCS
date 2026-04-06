@@ -1,24 +1,41 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Bmp;
 
 /// <summary>In-memory representation of a BMP image.</summary>
 [FormatMagicBytes([0x42, 0x4D])]
-public sealed class BmpFile : IImageFileFormat<BmpFile> {
+public readonly record struct BmpFile : IImageFormatReader<BmpFile>, IImageToRawImage<BmpFile>, IImageFromRawImage<BmpFile>, IImageFormatWriter<BmpFile>, IImageInfoReader<BmpFile> {
 
-  static string IImageFileFormat<BmpFile>.PrimaryExtension => ".bmp";
-  static string[] IImageFileFormat<BmpFile>.FileExtensions => [".bmp", ".dib", ".bga", ".rl4", ".rl8", ".vga", ".sys"];
-  static FormatCapability IImageFileFormat<BmpFile>.Capabilities => FormatCapability.HasDedicatedOptimizer;
-  static BmpFile IImageFileFormat<BmpFile>.FromFile(FileInfo file) => BmpReader.FromFile(file);
-  static BmpFile IImageFileFormat<BmpFile>.FromBytes(byte[] data) => BmpReader.FromBytes(data);
-  static BmpFile IImageFileFormat<BmpFile>.FromStream(Stream stream) => BmpReader.FromStream(stream);
-  static byte[] IImageFileFormat<BmpFile>.ToBytes(BmpFile file) => BmpWriter.ToBytes(file);
+  static string IImageFormatMetadata<BmpFile>.PrimaryExtension => ".bmp";
+  static string[] IImageFormatMetadata<BmpFile>.FileExtensions => [".bmp", ".dib", ".bga", ".rl4", ".rl8", ".vga", ".sys"];
+  static BmpFile IImageFormatReader<BmpFile>.FromSpan(ReadOnlySpan<byte> data) => BmpReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<BmpFile>.Capabilities => FormatCapability.HasDedicatedOptimizer;
+  static byte[] IImageFormatWriter<BmpFile>.ToBytes(BmpFile file) => BmpWriter.ToBytes(file);
+
+  public static ImageInfo? ReadImageInfo(ReadOnlySpan<byte> header) {
+    if (header.Length < 26 || header[0] != 0x42 || header[1] != 0x4D)
+      return null;
+
+    var width = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(header[18..]);
+    var height = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(header[22..]);
+    if (height < 0) height = -height;
+    var bpp = System.Buffers.Binary.BinaryPrimitives.ReadInt16LittleEndian(header[28..]);
+
+    return new(width, height, bpp, bpp switch {
+      1 => "Monochrome",
+      4 => "Indexed4",
+      8 => "Indexed8",
+      16 => "Rgb16",
+      24 => "Rgb24",
+      32 => "Rgba32",
+      _ => null
+    });
+  }
   public int Width { get; init; }
   public int Height { get; init; }
   public int BitsPerPixel { get; init; }
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
   public byte[]? Palette { get; init; }
   public int PaletteColorCount { get; init; }
   public BmpRowOrder RowOrder { get; init; }
@@ -26,7 +43,6 @@ public sealed class BmpFile : IImageFileFormat<BmpFile> {
   public BmpColorMode ColorMode { get; init; }
 
   public static RawImage ToRawImage(BmpFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var mode = file.ColorMode;
     if (mode == BmpColorMode.Original)

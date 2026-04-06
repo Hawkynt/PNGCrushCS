@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.EmcEditor;
 
 /// <summary>In-memory representation of a Commodore 64 EMC Editor extended multicolor image.</summary>
-public sealed class EmcEditorFile : IImageFileFormat<EmcEditorFile> {
+public readonly record struct EmcEditorFile : IImageFormatReader<EmcEditorFile>, IImageToRawImage<EmcEditorFile>, IImageFormatWriter<EmcEditorFile> {
 
-  static string IImageFileFormat<EmcEditorFile>.PrimaryExtension => ".emc";
-  static string[] IImageFileFormat<EmcEditorFile>.FileExtensions => [".emc"];
-  static EmcEditorFile IImageFileFormat<EmcEditorFile>.FromFile(FileInfo file) => EmcEditorReader.FromFile(file);
-  static EmcEditorFile IImageFileFormat<EmcEditorFile>.FromBytes(byte[] data) => EmcEditorReader.FromBytes(data);
-  static EmcEditorFile IImageFileFormat<EmcEditorFile>.FromStream(Stream stream) => EmcEditorReader.FromStream(stream);
-  static byte[] IImageFileFormat<EmcEditorFile>.ToBytes(EmcEditorFile file) => EmcEditorWriter.ToBytes(file);
+  static string IImageFormatMetadata<EmcEditorFile>.PrimaryExtension => ".emc";
+  static string[] IImageFormatMetadata<EmcEditorFile>.FileExtensions => [".emc"];
+  static EmcEditorFile IImageFormatReader<EmcEditorFile>.FromSpan(ReadOnlySpan<byte> data) => EmcEditorReader.FromSpan(data);
+  static byte[] IImageFormatWriter<EmcEditorFile>.ToBytes(EmcEditorFile file) => EmcEditorWriter.ToBytes(file);
 
   /// <summary>The fixed width of the image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -52,11 +49,10 @@ public sealed class EmcEditorFile : IImageFileFormat<EmcEditorFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Raw payload data (entire file content after load address).</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   /// <summary>Converts this EMC Editor image to a platform-independent <see cref="RawImage"/> in Rgb24 format using multicolor decode.</summary>
   public static RawImage ToRawImage(EmcEditorFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -107,9 +103,4 @@ public sealed class EmcEditorFile : IImageFileFormat<EmcEditorFile> {
     };
   }
 
-  /// <summary>Not supported. EMC Editor images have complex cell-based multicolor constraints.</summary>
-  public static EmcEditorFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to EmcEditorFile is not supported due to complex cell-based multicolor constraints.");
-  }
 }

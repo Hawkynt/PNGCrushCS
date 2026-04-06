@@ -25,6 +25,8 @@ public static class NokiaNlmReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static NokiaNlmFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static NokiaNlmFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != NokiaNlmFile.FileSize)

@@ -1,18 +1,15 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.ByuSir;
 
 /// <summary>In-memory representation of a BYU SIR grayscale image.</summary>
-public sealed class ByuSirFile : IImageFileFormat<ByuSirFile> {
+public readonly record struct ByuSirFile : IImageFormatReader<ByuSirFile>, IImageToRawImage<ByuSirFile>, IImageFromRawImage<ByuSirFile>, IImageFormatWriter<ByuSirFile> {
 
-  static string IImageFileFormat<ByuSirFile>.PrimaryExtension => ".sir";
-  static string[] IImageFileFormat<ByuSirFile>.FileExtensions => [".sir"];
-  static ByuSirFile IImageFileFormat<ByuSirFile>.FromFile(FileInfo file) => ByuSirReader.FromFile(file);
-  static ByuSirFile IImageFileFormat<ByuSirFile>.FromBytes(byte[] data) => ByuSirReader.FromBytes(data);
-  static ByuSirFile IImageFileFormat<ByuSirFile>.FromStream(Stream stream) => ByuSirReader.FromStream(stream);
-  static byte[] IImageFileFormat<ByuSirFile>.ToBytes(ByuSirFile file) => ByuSirWriter.ToBytes(file);
+  static string IImageFormatMetadata<ByuSirFile>.PrimaryExtension => ".sir";
+  static string[] IImageFormatMetadata<ByuSirFile>.FileExtensions => [".sir"];
+  static ByuSirFile IImageFormatReader<ByuSirFile>.FromSpan(ReadOnlySpan<byte> data) => ByuSirReader.FromSpan(data);
+  static byte[] IImageFormatWriter<ByuSirFile>.ToBytes(ByuSirFile file) => ByuSirWriter.ToBytes(file);
 
   /// <summary>Magic bytes: "SIR\0" (0x53 0x49 0x52 0x00).</summary>
   internal static readonly byte[] Magic = [0x53, 0x49, 0x52, 0x00];
@@ -36,10 +33,9 @@ public sealed class ByuSirFile : IImageFileFormat<ByuSirFile> {
   public ushort Reserved { get; init; }
 
   /// <summary>Raw grayscale pixel data (1 byte per pixel).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(ByuSirFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

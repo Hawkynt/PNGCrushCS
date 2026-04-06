@@ -38,31 +38,6 @@ public class C16Plus4ReaderTests {
 }
 
 [TestFixture]
-public class C16Plus4WriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => C16Plus4Writer.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_OutputSize_Is10003() {
-    var file = new C16Plus4File { PixelData = new byte[10003] };
-    var bytes = C16Plus4Writer.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(10003));
-  }
-
-  [Test]
-  public void ToBytes_DataPreserved() {
-    var data = new byte[10003];
-    for (var i = 0; i < data.Length; ++i)
-      data[i] = (byte)(i & 0xFF);
-    var file = new C16Plus4File { PixelData = data };
-    var bytes = C16Plus4Writer.ToBytes(file);
-    Assert.That(bytes, Is.EqualTo(data));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -90,32 +65,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void FixedWidth_Is160()
-    => Assert.That(C16Plus4File.FixedWidth, Is.EqualTo(160));
-
-  [Test]
-  public void FixedHeight_Is200()
-    => Assert.That(C16Plus4File.FixedHeight, Is.EqualTo(200));
-
-  [Test]
-  public void FileSize_Is10003()
-    => Assert.That(C16Plus4File.FileSize, Is.EqualTo(10003));
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => C16Plus4File.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => C16Plus4File.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 160, Height = 200, Format = PixelFormat.Rgb24, PixelData = new byte[160 * 200 * 3] };
-    Assert.Throws<ArgumentException>(() => C16Plus4File.FromRawImage(raw));
-  }
-}

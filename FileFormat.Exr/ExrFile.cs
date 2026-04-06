@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using FileFormat.Core;
 
@@ -8,29 +7,26 @@ namespace FileFormat.Exr;
 
 /// <summary>In-memory representation of an OpenEXR image.</summary>
 [FormatMagicBytes([0x76, 0x2F, 0x31, 0x01])]
-public sealed class ExrFile : IImageFileFormat<ExrFile> {
+public readonly record struct ExrFile : IImageFormatReader<ExrFile>, IImageToRawImage<ExrFile>, IImageFromRawImage<ExrFile>, IImageFormatWriter<ExrFile> {
 
-  static string IImageFileFormat<ExrFile>.PrimaryExtension => ".exr";
-  static string[] IImageFileFormat<ExrFile>.FileExtensions => [".exr"];
-  static ExrFile IImageFileFormat<ExrFile>.FromFile(FileInfo file) => ExrReader.FromFile(file);
-  static ExrFile IImageFileFormat<ExrFile>.FromBytes(byte[] data) => ExrReader.FromBytes(data);
-  static ExrFile IImageFileFormat<ExrFile>.FromStream(Stream stream) => ExrReader.FromStream(stream);
-  static RawImage IImageFileFormat<ExrFile>.ToRawImage(ExrFile file) => file.ToRawImage();
-  static byte[] IImageFileFormat<ExrFile>.ToBytes(ExrFile file) => ExrWriter.ToBytes(file);
+  static string IImageFormatMetadata<ExrFile>.PrimaryExtension => ".exr";
+  static string[] IImageFormatMetadata<ExrFile>.FileExtensions => [".exr"];
+  static ExrFile IImageFormatReader<ExrFile>.FromSpan(ReadOnlySpan<byte> data) => ExrReader.FromSpan(data);
+  static byte[] IImageFormatWriter<ExrFile>.ToBytes(ExrFile file) => ExrWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
   public ExrCompression Compression { get; init; }
   public ExrLineOrder LineOrder { get; init; }
-  public IReadOnlyList<ExrChannel> Channels { get; init; } = [];
-  public byte[] PixelData { get; init; } = [];
+  public IReadOnlyList<ExrChannel> Channels { get; init; }
+  public byte[] PixelData { get; init; }
   public IReadOnlyList<ExrAttribute>? Attributes { get; init; }
 
   /// <summary>Converts this EXR image to a 16-bit <see cref="RawImage"/>. Outputs Gray16 (single channel), Rgba64 (with alpha), or Rgb48.</summary>
-  public RawImage ToRawImage() {
-    var width = this.Width;
-    var height = this.Height;
-    var src = this.PixelData;
-    var channels = this.Channels.OrderBy(c => c.Name, StringComparer.Ordinal).ToArray();
+  public static RawImage ToRawImage(ExrFile file) {
+    var width = file.Width;
+    var height = file.Height;
+    var src = file.PixelData;
+    var channels = file.Channels.OrderBy(c => c.Name, StringComparer.Ordinal).ToArray();
     var channelCount = channels.Length;
 
     var bytesPerSample = new int[channelCount];

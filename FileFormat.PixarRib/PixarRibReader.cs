@@ -25,6 +25,8 @@ public static class PixarRibReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static PixarRibFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static PixarRibFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < PixarRibFile.HeaderSize)

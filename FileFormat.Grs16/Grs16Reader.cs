@@ -26,6 +26,8 @@ public static class Grs16Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static Grs16File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static Grs16File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < Grs16File.MinFileSize)

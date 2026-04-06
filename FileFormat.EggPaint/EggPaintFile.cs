@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.EggPaint;
 
 /// <summary>In-memory representation of a Commodore 64 Egg Paint multicolor image.</summary>
-public sealed class EggPaintFile : IImageFileFormat<EggPaintFile> {
+public readonly record struct EggPaintFile : IImageFormatReader<EggPaintFile>, IImageToRawImage<EggPaintFile>, IImageFormatWriter<EggPaintFile> {
 
-  static string IImageFileFormat<EggPaintFile>.PrimaryExtension => ".trp";
-  static string[] IImageFileFormat<EggPaintFile>.FileExtensions => [".trp"];
-  static EggPaintFile IImageFileFormat<EggPaintFile>.FromFile(FileInfo file) => EggPaintReader.FromFile(file);
-  static EggPaintFile IImageFileFormat<EggPaintFile>.FromBytes(byte[] data) => EggPaintReader.FromBytes(data);
-  static EggPaintFile IImageFileFormat<EggPaintFile>.FromStream(Stream stream) => EggPaintReader.FromStream(stream);
-  static byte[] IImageFileFormat<EggPaintFile>.ToBytes(EggPaintFile file) => EggPaintWriter.ToBytes(file);
+  static string IImageFormatMetadata<EggPaintFile>.PrimaryExtension => ".trp";
+  static string[] IImageFormatMetadata<EggPaintFile>.FileExtensions => [".trp"];
+  static EggPaintFile IImageFormatReader<EggPaintFile>.FromSpan(ReadOnlySpan<byte> data) => EggPaintReader.FromSpan(data);
+  static byte[] IImageFormatWriter<EggPaintFile>.ToBytes(EggPaintFile file) => EggPaintWriter.ToBytes(file);
 
   /// <summary>The fixed width of an Egg Paint image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -52,20 +49,19 @@ public sealed class EggPaintFile : IImageFileFormat<EggPaintFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Multicolor bitmap data (8000 bytes, 2 bits per pixel).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Video matrix / screen RAM (1000 bytes, upper/lower nybble = 2 colors per cell).</summary>
-  public byte[] VideoMatrix { get; init; } = [];
+  public byte[] VideoMatrix { get; init; }
 
   /// <summary>Color RAM (1000 bytes, lower nybble = 3rd color per cell).</summary>
-  public byte[] ColorRam { get; init; } = [];
+  public byte[] ColorRam { get; init; }
 
   /// <summary>Background color index (0-15).</summary>
   public byte BackgroundColor { get; init; }
 
   /// <summary>Converts this Egg Paint image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(EggPaintFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -104,9 +100,4 @@ public sealed class EggPaintFile : IImageFileFormat<EggPaintFile> {
     };
   }
 
-  /// <summary>Not supported. Egg Paint images have complex cell-based color constraints.</summary>
-  public static EggPaintFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to EggPaintFile is not supported due to complex cell-based color constraints.");
-  }
 }

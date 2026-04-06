@@ -1,29 +1,26 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Pdf;
 
 /// <summary>In-memory representation of a PDF file's extracted raster images.</summary>
 [FormatMagicBytes([0x25, 0x50, 0x44, 0x46])] // %PDF
-public sealed class PdfFile : IImageFileFormat<PdfFile>, IMultiImageFileFormat<PdfFile> {
+public sealed class PdfFile : IImageFormatReader<PdfFile>, IImageToRawImage<PdfFile>, IImageFromRawImage<PdfFile>, IImageFormatWriter<PdfFile>, IMultiImageFileFormat<PdfFile> {
 
-  static string IImageFileFormat<PdfFile>.PrimaryExtension => ".pdf";
-  static string[] IImageFileFormat<PdfFile>.FileExtensions => [".pdf"];
-  static FormatCapability IImageFileFormat<PdfFile>.Capabilities => FormatCapability.VariableResolution | FormatCapability.MultiImage;
+  static string IImageFormatMetadata<PdfFile>.PrimaryExtension => ".pdf";
+  static string[] IImageFormatMetadata<PdfFile>.FileExtensions => [".pdf"];
+  static PdfFile IImageFormatReader<PdfFile>.FromSpan(ReadOnlySpan<byte> data) => PdfReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<PdfFile>.Capabilities => FormatCapability.VariableResolution | FormatCapability.MultiImage;
 
-  static bool? IImageFileFormat<PdfFile>.MatchesSignature(ReadOnlySpan<byte> header) {
+  static bool? IImageFormatMetadata<PdfFile>.MatchesSignature(ReadOnlySpan<byte> header) {
     if (header.Length < 4)
       return null;
 
     return header[0] == 0x25 && header[1] == 0x50 && header[2] == 0x44 && header[3] == 0x46;
   }
 
-  static PdfFile IImageFileFormat<PdfFile>.FromFile(FileInfo file) => PdfReader.FromFile(file);
-  static PdfFile IImageFileFormat<PdfFile>.FromBytes(byte[] data) => PdfReader.FromBytes(data);
-  static PdfFile IImageFileFormat<PdfFile>.FromStream(Stream stream) => PdfReader.FromStream(stream);
-  static byte[] IImageFileFormat<PdfFile>.ToBytes(PdfFile file) => PdfWriter.ToBytes(file);
+  static byte[] IImageFormatWriter<PdfFile>.ToBytes(PdfFile file) => PdfWriter.ToBytes(file);
 
   /// <summary>All extracted raster images from the PDF.</summary>
   public IReadOnlyList<PdfImage> Images { get; init; } = [];

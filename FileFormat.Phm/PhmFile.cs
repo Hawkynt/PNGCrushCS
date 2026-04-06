@@ -1,21 +1,17 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Phm;
 
 /// <summary>In-memory representation of a PHM (Portable Half Map) image — half-precision float variant of PFM.</summary>
-public sealed class PhmFile : IImageFileFormat<PhmFile> {
+public readonly record struct PhmFile : IImageFormatReader<PhmFile>, IImageToRawImage<PhmFile>, IImageFromRawImage<PhmFile>, IImageFormatWriter<PhmFile> {
 
-  static string IImageFileFormat<PhmFile>.PrimaryExtension => ".phm";
-  static string[] IImageFileFormat<PhmFile>.FileExtensions => [".phm"];
-  static PhmFile IImageFileFormat<PhmFile>.FromFile(FileInfo file) => PhmReader.FromFile(file);
-  static PhmFile IImageFileFormat<PhmFile>.FromBytes(byte[] data) => PhmReader.FromBytes(data);
-  static PhmFile IImageFileFormat<PhmFile>.FromStream(Stream stream) => PhmReader.FromStream(stream);
-  static RawImage IImageFileFormat<PhmFile>.ToRawImage(PhmFile file) => file.ToRawImage();
-  static byte[] IImageFileFormat<PhmFile>.ToBytes(PhmFile file) => PhmWriter.ToBytes(file);
+  static string IImageFormatMetadata<PhmFile>.PrimaryExtension => ".phm";
+  static string[] IImageFormatMetadata<PhmFile>.FileExtensions => [".phm"];
+  static PhmFile IImageFormatReader<PhmFile>.FromSpan(ReadOnlySpan<byte> data) => PhmReader.FromSpan(data);
+  static byte[] IImageFormatWriter<PhmFile>.ToBytes(PhmFile file) => PhmWriter.ToBytes(file);
 
-  static bool? IImageFileFormat<PhmFile>.MatchesSignature(ReadOnlySpan<byte> header)
+  static bool? IImageFormatMetadata<PhmFile>.MatchesSignature(ReadOnlySpan<byte> header)
     => header.Length >= 3 && header[0] == 0x50 && (header[1] == 0x48 || header[1] == 0x68)
       && (header[2] == 0x0A || header[2] == 0x0D || header[2] == 0x20)
       ? true : null;
@@ -30,15 +26,15 @@ public sealed class PhmFile : IImageFileFormat<PhmFile> {
   /// Half-precision samples in top-to-bottom, left-to-right order.
   /// Grayscale: Width * Height halves. RGB: Width * Height * 3 halves (R, G, B interleaved).
   /// </summary>
-  public Half[] PixelData { get; init; } = [];
+  public Half[] PixelData { get; init; }
 
   /// <summary>Converts this PHM image to a 16-bit <see cref="RawImage"/>. Grayscale outputs Gray16, color outputs Rgb48.</summary>
-  public RawImage ToRawImage() {
-    var width = this.Width;
-    var height = this.Height;
-    var src = this.PixelData;
+  public static RawImage ToRawImage(PhmFile file) {
+    var width = file.Width;
+    var height = file.Height;
+    var src = file.PixelData;
 
-    if (this.ColorMode == PhmColorMode.Grayscale) {
+    if (file.ColorMode == PhmColorMode.Grayscale) {
       var pixelCount = width * height;
 
       var min = (float)Half.MaxValue;

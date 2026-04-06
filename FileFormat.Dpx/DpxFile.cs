@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Dpx;
@@ -7,15 +6,12 @@ namespace FileFormat.Dpx;
 /// <summary>In-memory representation of a DPX image.</summary>
 [FormatMagicBytes([0x53, 0x44, 0x50, 0x58])]
 [FormatMagicBytes([0x58, 0x50, 0x44, 0x53])]
-public sealed class DpxFile : IImageFileFormat<DpxFile> {
+public readonly record struct DpxFile : IImageFormatReader<DpxFile>, IImageToRawImage<DpxFile>, IImageFromRawImage<DpxFile>, IImageFormatWriter<DpxFile> {
 
-  static string IImageFileFormat<DpxFile>.PrimaryExtension => ".dpx";
-  static string[] IImageFileFormat<DpxFile>.FileExtensions => [".dpx"];
-  static DpxFile IImageFileFormat<DpxFile>.FromFile(FileInfo file) => DpxReader.FromFile(file);
-  static DpxFile IImageFileFormat<DpxFile>.FromBytes(byte[] data) => DpxReader.FromBytes(data);
-  static DpxFile IImageFileFormat<DpxFile>.FromStream(Stream stream) => DpxReader.FromStream(stream);
-  static RawImage IImageFileFormat<DpxFile>.ToRawImage(DpxFile file) => file.ToRawImage();
-  static byte[] IImageFileFormat<DpxFile>.ToBytes(DpxFile file) => DpxWriter.ToBytes(file);
+  static string IImageFormatMetadata<DpxFile>.PrimaryExtension => ".dpx";
+  static string[] IImageFormatMetadata<DpxFile>.FileExtensions => [".dpx"];
+  static DpxFile IImageFormatReader<DpxFile>.FromSpan(ReadOnlySpan<byte> data) => DpxReader.FromSpan(data);
+  static byte[] IImageFormatWriter<DpxFile>.ToBytes(DpxFile file) => DpxWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
   public int BitsPerElement { get; init; }
@@ -24,17 +20,17 @@ public sealed class DpxFile : IImageFileFormat<DpxFile> {
   public DpxTransfer Transfer { get; init; }
   public bool IsBigEndian { get; init; }
   public int ImageDataOffset { get; init; }
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this DPX image to a 16-bit <see cref="RawImage"/>. 8-bit sources remain 8-bit; 10/16-bit sources output Rgb48/Rgba64/Gray16.</summary>
-  public RawImage ToRawImage() {
-    var width = this.Width;
-    var height = this.Height;
-    var bits = this.BitsPerElement;
-    var src = this.PixelData;
+  public static RawImage ToRawImage(DpxFile file) {
+    var width = file.Width;
+    var height = file.Height;
+    var bits = file.BitsPerElement;
+    var src = file.PixelData;
     var pixelCount = width * height;
 
-    switch (this.Descriptor) {
+    switch (file.Descriptor) {
       case DpxDescriptor.Rgb: {
         switch (bits) {
           case 8: {
@@ -51,7 +47,7 @@ public sealed class DpxFile : IImageFileFormat<DpxFile> {
             var result = new byte[pixelCount * 6];
             for (var i = 0; i < pixelCount; ++i) {
               var offset = i * 4;
-              var word = _ReadUInt32(src, offset, this.IsBigEndian);
+              var word = _ReadUInt32(src, offset, file.IsBigEndian);
               var r = (ushort)(((word >> 22) & 0x3FF) * 65535 / 1023);
               var g = (ushort)(((word >> 12) & 0x3FF) * 65535 / 1023);
               var b = (ushort)(((word >> 2) & 0x3FF) * 65535 / 1023);
@@ -76,9 +72,9 @@ public sealed class DpxFile : IImageFileFormat<DpxFile> {
             for (var i = 0; i < pixelCount; ++i) {
               var offset = i * 6;
               var di = i * 6;
-              var r = _ReadUInt16(src, offset, this.IsBigEndian);
-              var g = _ReadUInt16(src, offset + 2, this.IsBigEndian);
-              var b = _ReadUInt16(src, offset + 4, this.IsBigEndian);
+              var r = _ReadUInt16(src, offset, file.IsBigEndian);
+              var g = _ReadUInt16(src, offset + 2, file.IsBigEndian);
+              var b = _ReadUInt16(src, offset + 4, file.IsBigEndian);
               result[di] = (byte)(r >> 8);
               result[di + 1] = (byte)r;
               result[di + 2] = (byte)(g >> 8);
@@ -127,7 +123,7 @@ public sealed class DpxFile : IImageFileFormat<DpxFile> {
             var result = new byte[pixelCount * 2];
             for (var i = 0; i < pixelCount; ++i) {
               var offset = i * 4;
-              var word = _ReadUInt32(src, offset, this.IsBigEndian);
+              var word = _ReadUInt32(src, offset, file.IsBigEndian);
               var v = (ushort)(((word >> 22) & 0x3FF) * 65535 / 1023);
               result[i * 2] = (byte)(v >> 8);
               result[i * 2 + 1] = (byte)v;
@@ -143,7 +139,7 @@ public sealed class DpxFile : IImageFileFormat<DpxFile> {
           case 16: {
             var result = new byte[pixelCount * 2];
             for (var i = 0; i < pixelCount; ++i) {
-              var v = _ReadUInt16(src, i * 2, this.IsBigEndian);
+              var v = _ReadUInt16(src, i * 2, file.IsBigEndian);
               result[i * 2] = (byte)(v >> 8);
               result[i * 2 + 1] = (byte)v;
             }
@@ -160,7 +156,7 @@ public sealed class DpxFile : IImageFileFormat<DpxFile> {
         }
       }
       default:
-        throw new NotSupportedException($"DPX descriptor {this.Descriptor} is not supported.");
+        throw new NotSupportedException($"DPX descriptor {file.Descriptor} is not supported.");
     }
   }
 

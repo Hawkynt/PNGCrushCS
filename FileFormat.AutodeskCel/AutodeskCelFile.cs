@@ -1,12 +1,11 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.AutodeskCel;
 
 /// <summary>In-memory representation of an Autodesk Animator CEL/PIC image.</summary>
 [FormatMagicBytes([0x19, 0x91])]
-public sealed class AutodeskCelFile : IImageFileFormat<AutodeskCelFile> {
+public readonly record struct AutodeskCelFile : IImageFormatReader<AutodeskCelFile>, IImageToRawImage<AutodeskCelFile>, IImageFromRawImage<AutodeskCelFile>, IImageFormatWriter<AutodeskCelFile> {
 
   /// <summary>Header size in bytes.</summary>
   public const int HeaderSize = 16;
@@ -20,15 +19,11 @@ public sealed class AutodeskCelFile : IImageFileFormat<AutodeskCelFile> {
   /// <summary>Number of palette entries.</summary>
   public const int PaletteEntryCount = 256;
 
-  static string IImageFileFormat<AutodeskCelFile>.PrimaryExtension => ".cel";
-  static string[] IImageFileFormat<AutodeskCelFile>.FileExtensions => [".cel"];
-  static FormatCapability IImageFileFormat<AutodeskCelFile>.Capabilities => FormatCapability.IndexedOnly;
-  static AutodeskCelFile IImageFileFormat<AutodeskCelFile>.FromFile(FileInfo file) => AutodeskCelReader.FromFile(file);
-  static AutodeskCelFile IImageFileFormat<AutodeskCelFile>.FromBytes(byte[] data) => AutodeskCelReader.FromBytes(data);
-  static AutodeskCelFile IImageFileFormat<AutodeskCelFile>.FromStream(Stream stream) => AutodeskCelReader.FromStream(stream);
-  static RawImage IImageFileFormat<AutodeskCelFile>.ToRawImage(AutodeskCelFile file) => ToRawImage(file);
-  static AutodeskCelFile IImageFileFormat<AutodeskCelFile>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<AutodeskCelFile>.ToBytes(AutodeskCelFile file) => AutodeskCelWriter.ToBytes(file);
+  static string IImageFormatMetadata<AutodeskCelFile>.PrimaryExtension => ".cel";
+  static string[] IImageFormatMetadata<AutodeskCelFile>.FileExtensions => [".cel"];
+  static AutodeskCelFile IImageFormatReader<AutodeskCelFile>.FromSpan(ReadOnlySpan<byte> data) => AutodeskCelReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<AutodeskCelFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<AutodeskCelFile>.ToBytes(AutodeskCelFile file) => AutodeskCelWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -43,19 +38,18 @@ public sealed class AutodeskCelFile : IImageFileFormat<AutodeskCelFile> {
   public int YOffset { get; init; }
 
   /// <summary>Bits per pixel (typically 8).</summary>
-  public int BitsPerPixel { get; init; } = 8;
+  public int BitsPerPixel { get; init; }
 
   /// <summary>Compression type (0 = none).</summary>
   public byte Compression { get; init; }
 
   /// <summary>Raw indexed pixel data (width * height bytes for 8bpp).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Palette as RGB triplets (3 bytes per entry, 8-bit values 0-255). 256 entries = 768 bytes.</summary>
-  public byte[] Palette { get; init; } = _BuildDefaultGrayscalePalette();
+  public byte[] Palette { get; init; }
 
   public static RawImage ToRawImage(AutodeskCelFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

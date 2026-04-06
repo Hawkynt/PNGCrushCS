@@ -1,28 +1,24 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Art;
 
 /// <summary>In-memory representation of a Build Engine ART tile archive.</summary>
-public sealed class ArtFile : IImageFileFormat<ArtFile> {
+public readonly record struct ArtFile : IImageFormatReader<ArtFile>, IImageToRawImage<ArtFile>, IImageFromRawImage<ArtFile>, IImageFormatWriter<ArtFile> {
 
-  static string IImageFileFormat<ArtFile>.PrimaryExtension => ".art";
-  static string[] IImageFileFormat<ArtFile>.FileExtensions => [".art"];
-  static ArtFile IImageFileFormat<ArtFile>.FromFile(FileInfo file) => ArtReader.FromFile(file);
-  static ArtFile IImageFileFormat<ArtFile>.FromBytes(byte[] data) => ArtReader.FromBytes(data);
-  static ArtFile IImageFileFormat<ArtFile>.FromStream(Stream stream) => ArtReader.FromStream(stream);
-  static byte[] IImageFileFormat<ArtFile>.ToBytes(ArtFile file) => ArtWriter.ToBytes(file);
+  static string IImageFormatMetadata<ArtFile>.PrimaryExtension => ".art";
+  static string[] IImageFormatMetadata<ArtFile>.FileExtensions => [".art"];
+  static ArtFile IImageFormatReader<ArtFile>.FromSpan(ReadOnlySpan<byte> data) => ArtReader.FromSpan(data);
+  static byte[] IImageFormatWriter<ArtFile>.ToBytes(ArtFile file) => ArtWriter.ToBytes(file);
   /// <summary>Starting tile number in the global tile index.</summary>
   public int TileStart { get; init; }
 
   /// <summary>Tiles contained in this ART file.</summary>
-  public IReadOnlyList<ArtTile> Tiles { get; init; } = [];
+  public IReadOnlyList<ArtTile> Tiles { get; init; }
 
   /// <summary>Converts the first tile of an ART file to a <see cref="RawImage"/>.</summary>
   public static RawImage ToRawImage(ArtFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     if (file.Tiles.Count == 0)
       throw new ArgumentException("ART file contains no tiles.", nameof(file));
 

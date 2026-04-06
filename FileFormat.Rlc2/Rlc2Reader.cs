@@ -26,6 +26,8 @@ public static class Rlc2Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static Rlc2File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static Rlc2File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < Rlc2File.MinFileSize)

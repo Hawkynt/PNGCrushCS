@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.CinemasterAtari;
 
 /// <summary>In-memory representation of a Cinemaster Atari animation (.cin8) file.</summary>
-public sealed class CinemasterAtariFile : IImageFileFormat<CinemasterAtariFile> {
+public readonly record struct CinemasterAtariFile : IImageFormatReader<CinemasterAtariFile>, IImageToRawImage<CinemasterAtariFile>, IImageFromRawImage<CinemasterAtariFile>, IImageFormatWriter<CinemasterAtariFile> {
 
   /// <summary>Size of one frame in bytes (40 bytes/row x 192 rows).</summary>
   public const int FrameSize = 7680;
@@ -22,13 +21,11 @@ public sealed class CinemasterAtariFile : IImageFileFormat<CinemasterAtariFile> 
   /// <summary>Bytes per row in each frame.</summary>
   internal const int BytesPerRow = 40;
 
-  static string IImageFileFormat<CinemasterAtariFile>.PrimaryExtension => ".cin8";
-  static string[] IImageFileFormat<CinemasterAtariFile>.FileExtensions => [".cin8"];
-  static FormatCapability IImageFileFormat<CinemasterAtariFile>.Capabilities => FormatCapability.IndexedOnly;
-  static CinemasterAtariFile IImageFileFormat<CinemasterAtariFile>.FromFile(FileInfo file) => CinemasterAtariReader.FromFile(file);
-  static CinemasterAtariFile IImageFileFormat<CinemasterAtariFile>.FromBytes(byte[] data) => CinemasterAtariReader.FromBytes(data);
-  static CinemasterAtariFile IImageFileFormat<CinemasterAtariFile>.FromStream(Stream stream) => CinemasterAtariReader.FromStream(stream);
-  static byte[] IImageFileFormat<CinemasterAtariFile>.ToBytes(CinemasterAtariFile file) => CinemasterAtariWriter.ToBytes(file);
+  static string IImageFormatMetadata<CinemasterAtariFile>.PrimaryExtension => ".cin8";
+  static string[] IImageFormatMetadata<CinemasterAtariFile>.FileExtensions => [".cin8"];
+  static CinemasterAtariFile IImageFormatReader<CinemasterAtariFile>.FromSpan(ReadOnlySpan<byte> data) => CinemasterAtariReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<CinemasterAtariFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<CinemasterAtariFile>.ToBytes(CinemasterAtariFile file) => CinemasterAtariWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>
   public int Width => PixelWidth;
@@ -40,13 +37,12 @@ public sealed class CinemasterAtariFile : IImageFileFormat<CinemasterAtariFile> 
   public ushort FrameCount { get; init; }
 
   /// <summary>Animation frames (each frame is 7680 bytes of 1bpp MSB-first screen data).</summary>
-  public byte[][] Frames { get; init; } = [];
+  public byte[][] Frames { get; init; }
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
   /// <summary>Converts the first frame to an Indexed1 raw image (320x192, B&amp;W palette).</summary>
   public static RawImage ToRawImage(CinemasterAtariFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var pixelData = new byte[FrameSize];
     if (file.Frames.Length > 0)

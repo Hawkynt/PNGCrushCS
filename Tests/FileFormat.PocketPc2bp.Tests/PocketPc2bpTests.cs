@@ -41,25 +41,6 @@ public class PocketPc2bpReaderTests {
 }
 
 [TestFixture]
-public class PocketPc2bpWriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => PocketPc2bpWriter.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_IncludesHeader() {
-    var file = new PocketPc2bpFile {
-      Width = 64,
-      Height = 64,
-      PixelData = new byte[(64 + 7) / 8 * 64],
-    };
-    var bytes = PocketPc2bpWriter.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(8 + (64 + 7) / 8 * 64));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -90,30 +71,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void HeaderSize_Is8()
-    => Assert.That(PocketPc2bpFile.HeaderSize, Is.EqualTo(8));
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => PocketPc2bpFile.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => PocketPc2bpFile.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 64, Height = 64, Format = PixelFormat.Rgb24, PixelData = new byte[64 * 64 * 3] };
-    Assert.Throws<ArgumentException>(() => PocketPc2bpFile.FromRawImage(raw));
-  }
-
-  [Test]
-  public void FileExtensions_ContainsPrimary() {
-    string[] exts = [".2bp"];
-    Assert.That(exts, Does.Contain(".2bp"));
-  }
-}

@@ -1,18 +1,15 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Pic2;
 
 /// <summary>In-memory representation of a PIC2 image.</summary>
-public sealed class Pic2File : IImageFileFormat<Pic2File> {
+public readonly record struct Pic2File : IImageFormatReader<Pic2File>, IImageToRawImage<Pic2File>, IImageFromRawImage<Pic2File>, IImageFormatWriter<Pic2File> {
 
-  static string IImageFileFormat<Pic2File>.PrimaryExtension => ".p2";
-  static string[] IImageFileFormat<Pic2File>.FileExtensions => [".p2"];
-  static Pic2File IImageFileFormat<Pic2File>.FromFile(FileInfo file) => Pic2Reader.FromFile(file);
-  static Pic2File IImageFileFormat<Pic2File>.FromBytes(byte[] data) => Pic2Reader.FromBytes(data);
-  static Pic2File IImageFileFormat<Pic2File>.FromStream(Stream stream) => Pic2Reader.FromStream(stream);
-  static byte[] IImageFileFormat<Pic2File>.ToBytes(Pic2File file) => Pic2Writer.ToBytes(file);
+  static string IImageFormatMetadata<Pic2File>.PrimaryExtension => ".p2";
+  static string[] IImageFormatMetadata<Pic2File>.FileExtensions => [".p2"];
+  static Pic2File IImageFormatReader<Pic2File>.FromSpan(ReadOnlySpan<byte> data) => Pic2Reader.FromSpan(data);
+  static byte[] IImageFormatWriter<Pic2File>.ToBytes(Pic2File file) => Pic2Writer.ToBytes(file);
 
   /// <summary>Magic bytes: "PIC2" (0x50 0x49 0x43 0x32).</summary>
   internal static readonly byte[] Magic = [0x50, 0x49, 0x43, 0x32];
@@ -36,11 +33,10 @@ public sealed class Pic2File : IImageFileFormat<Pic2File> {
   public ushort Mode { get; init; }
 
   /// <summary>Raw RGB pixel data (3 bytes per pixel).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this PIC2 image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(Pic2File file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

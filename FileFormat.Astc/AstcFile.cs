@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 using FileFormat.Core.BlockDecoders;
 
@@ -7,14 +6,12 @@ namespace FileFormat.Astc;
 
 /// <summary>In-memory representation of an ASTC (Adaptive Scalable Texture Compression) image.</summary>
 [FormatMagicBytes([0x13, 0xAB, 0xA1, 0x5C])]
-public sealed class AstcFile : IImageFileFormat<AstcFile> {
+public readonly record struct AstcFile : IImageFormatReader<AstcFile>, IImageToRawImage<AstcFile>, IImageFromRawImage<AstcFile>, IImageFormatWriter<AstcFile> {
 
-  static string IImageFileFormat<AstcFile>.PrimaryExtension => ".astc";
-  static string[] IImageFileFormat<AstcFile>.FileExtensions => [".astc"];
-  static AstcFile IImageFileFormat<AstcFile>.FromFile(FileInfo file) => AstcReader.FromFile(file);
-  static AstcFile IImageFileFormat<AstcFile>.FromBytes(byte[] data) => AstcReader.FromBytes(data);
-  static AstcFile IImageFileFormat<AstcFile>.FromStream(Stream stream) => AstcReader.FromStream(stream);
-  static byte[] IImageFileFormat<AstcFile>.ToBytes(AstcFile file) => AstcWriter.ToBytes(file);
+  static string IImageFormatMetadata<AstcFile>.PrimaryExtension => ".astc";
+  static string[] IImageFormatMetadata<AstcFile>.FileExtensions => [".astc"];
+  static AstcFile IImageFormatReader<AstcFile>.FromSpan(ReadOnlySpan<byte> data) => AstcReader.FromSpan(data);
+  static byte[] IImageFormatWriter<AstcFile>.ToBytes(AstcFile file) => AstcWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
   public int Depth { get; init; }
@@ -23,11 +20,10 @@ public sealed class AstcFile : IImageFileFormat<AstcFile> {
   public byte BlockDimZ { get; init; }
 
   /// <summary>Raw ASTC compressed block data (16 bytes per block).</summary>
-  public byte[] CompressedData { get; init; } = [];
+  public byte[] CompressedData { get; init; }
 
   /// <summary>Decodes the ASTC compressed data into a <see cref="RawImage"/> with RGBA32 pixels.</summary>
   public static RawImage ToRawImage(AstcFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var width = file.Width;
     var height = file.Height;

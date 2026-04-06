@@ -29,6 +29,8 @@ public static class VipsReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static VipsFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static VipsFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < VipsHeader.StructSize)

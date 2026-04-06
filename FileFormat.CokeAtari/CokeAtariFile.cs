@@ -1,27 +1,23 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.CokeAtari;
 
 /// <summary>In-memory representation of a COKE Atari Falcon 16-bit true color (.tg1) image.</summary>
-public sealed class CokeAtariFile : IImageFileFormat<CokeAtariFile> {
+public readonly record struct CokeAtariFile : IImageFormatReader<CokeAtariFile>, IImageToRawImage<CokeAtariFile>, IImageFromRawImage<CokeAtariFile>, IImageFormatWriter<CokeAtariFile> {
 
-  static string IImageFileFormat<CokeAtariFile>.PrimaryExtension => ".tg1";
-  static string[] IImageFileFormat<CokeAtariFile>.FileExtensions => [".tg1"];
-  static CokeAtariFile IImageFileFormat<CokeAtariFile>.FromFile(FileInfo file) => CokeAtariReader.FromFile(file);
-  static CokeAtariFile IImageFileFormat<CokeAtariFile>.FromBytes(byte[] data) => CokeAtariReader.FromBytes(data);
-  static CokeAtariFile IImageFileFormat<CokeAtariFile>.FromStream(Stream stream) => CokeAtariReader.FromStream(stream);
-  static byte[] IImageFileFormat<CokeAtariFile>.ToBytes(CokeAtariFile file) => CokeAtariWriter.ToBytes(file);
+  static string IImageFormatMetadata<CokeAtariFile>.PrimaryExtension => ".tg1";
+  static string[] IImageFormatMetadata<CokeAtariFile>.FileExtensions => [".tg1"];
+  static CokeAtariFile IImageFormatReader<CokeAtariFile>.FromSpan(ReadOnlySpan<byte> data) => CokeAtariReader.FromSpan(data);
+  static byte[] IImageFormatWriter<CokeAtariFile>.ToBytes(CokeAtariFile file) => CokeAtariWriter.ToBytes(file);
 
   public int Width { get; init; }
   public int Height { get; init; }
 
   /// <summary>Raw RGB565 big-endian pixel data (2 bytes per pixel).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(CokeAtariFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var rgb565 = file.PixelData;
     var pixelCount = file.Width * file.Height;

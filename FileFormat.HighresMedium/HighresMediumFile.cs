@@ -1,11 +1,10 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.HighresMedium;
 
 /// <summary>In-memory representation of an Atari ST Highres Medium interlaced image (640x200, 2 frames blended).</summary>
-public sealed class HighresMediumFile : IImageFileFormat<HighresMediumFile> {
+public readonly record struct HighresMediumFile : IImageFormatReader<HighresMediumFile>, IImageToRawImage<HighresMediumFile>, IImageFromRawImage<HighresMediumFile>, IImageFormatWriter<HighresMediumFile> {
 
   /// <summary>Total file size: 2 frames of (32-byte palette + 32000 bytes planar) = 64064 bytes.</summary>
   public const int FileSize = HighresMediumHeader.FrameSize * 2;
@@ -22,27 +21,24 @@ public sealed class HighresMediumFile : IImageFileFormat<HighresMediumFile> {
   /// <summary>Number of usable palette colors per frame (always 4 for 2 planes).</summary>
   public const int ColorCount = 4;
 
-  static string IImageFileFormat<HighresMediumFile>.PrimaryExtension => ".hrm";
-  static string[] IImageFileFormat<HighresMediumFile>.FileExtensions => [".hrm"];
-  static HighresMediumFile IImageFileFormat<HighresMediumFile>.FromFile(FileInfo file) => HighresMediumReader.FromFile(file);
-  static HighresMediumFile IImageFileFormat<HighresMediumFile>.FromBytes(byte[] data) => HighresMediumReader.FromBytes(data);
-  static HighresMediumFile IImageFileFormat<HighresMediumFile>.FromStream(Stream stream) => HighresMediumReader.FromStream(stream);
-  static byte[] IImageFileFormat<HighresMediumFile>.ToBytes(HighresMediumFile file) => HighresMediumWriter.ToBytes(file);
+  static string IImageFormatMetadata<HighresMediumFile>.PrimaryExtension => ".hrm";
+  static string[] IImageFormatMetadata<HighresMediumFile>.FileExtensions => [".hrm"];
+  static HighresMediumFile IImageFormatReader<HighresMediumFile>.FromSpan(ReadOnlySpan<byte> data) => HighresMediumReader.FromSpan(data);
+  static byte[] IImageFormatWriter<HighresMediumFile>.ToBytes(HighresMediumFile file) => HighresMediumWriter.ToBytes(file);
 
   /// <summary>16-entry palette for frame 1 (only first 4 entries used).</summary>
-  public short[] Palette1 { get; init; } = new short[16];
+  public short[] Palette1 { get; init; }
 
   /// <summary>32000 bytes of Atari ST word-interleaved 2-plane planar pixel data for frame 1.</summary>
-  public byte[] PixelData1 { get; init; } = new byte[32000];
+  public byte[] PixelData1 { get; init; }
 
   /// <summary>16-entry palette for frame 2 (only first 4 entries used).</summary>
-  public short[] Palette2 { get; init; } = new short[16];
+  public short[] Palette2 { get; init; }
 
   /// <summary>32000 bytes of Atari ST word-interleaved 2-plane planar pixel data for frame 2.</summary>
-  public byte[] PixelData2 { get; init; } = new byte[32000];
+  public byte[] PixelData2 { get; init; }
 
   public static RawImage ToRawImage(HighresMediumFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var chunky1 = PlanarConverter.AtariStToChunky(file.PixelData1, ImageWidth, ImageHeight, NumPlanes);
     var chunky2 = PlanarConverter.AtariStToChunky(file.PixelData2, ImageWidth, ImageHeight, NumPlanes);

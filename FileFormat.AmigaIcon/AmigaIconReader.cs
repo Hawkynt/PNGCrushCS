@@ -26,6 +26,8 @@ public static class AmigaIconReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static AmigaIconFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AmigaIconFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < AmigaIconHeader.StructSize)

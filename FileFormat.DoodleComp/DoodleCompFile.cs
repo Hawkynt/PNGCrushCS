@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.DoodleComp;
 
 /// <summary>In-memory representation of a Commodore 64 Doodle Compressed hires image.</summary>
-public sealed class DoodleCompFile : IImageFileFormat<DoodleCompFile> {
+public readonly record struct DoodleCompFile : IImageFormatReader<DoodleCompFile>, IImageToRawImage<DoodleCompFile>, IImageFormatWriter<DoodleCompFile> {
 
-  static string IImageFileFormat<DoodleCompFile>.PrimaryExtension => ".jj";
-  static string[] IImageFileFormat<DoodleCompFile>.FileExtensions => [".jj"];
-  static DoodleCompFile IImageFileFormat<DoodleCompFile>.FromFile(FileInfo file) => DoodleCompReader.FromFile(file);
-  static DoodleCompFile IImageFileFormat<DoodleCompFile>.FromBytes(byte[] data) => DoodleCompReader.FromBytes(data);
-  static DoodleCompFile IImageFileFormat<DoodleCompFile>.FromStream(Stream stream) => DoodleCompReader.FromStream(stream);
-  static byte[] IImageFileFormat<DoodleCompFile>.ToBytes(DoodleCompFile file) => DoodleCompWriter.ToBytes(file);
+  static string IImageFormatMetadata<DoodleCompFile>.PrimaryExtension => ".jj";
+  static string[] IImageFormatMetadata<DoodleCompFile>.FileExtensions => [".jj"];
+  static DoodleCompFile IImageFormatReader<DoodleCompFile>.FromSpan(ReadOnlySpan<byte> data) => DoodleCompReader.FromSpan(data);
+  static byte[] IImageFormatWriter<DoodleCompFile>.ToBytes(DoodleCompFile file) => DoodleCompWriter.ToBytes(file);
 
   /// <summary>The fixed width of a Doodle Compressed image in pixels.</summary>
   public const int FixedWidth = 320;
@@ -55,14 +52,13 @@ public sealed class DoodleCompFile : IImageFileFormat<DoodleCompFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Hires bitmap data (8000 bytes, 1 bit per pixel within 8x8 cells).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Screen RAM (1000 bytes, upper nybble = foreground color, lower nybble = background color per cell).</summary>
-  public byte[] ScreenRam { get; init; } = [];
+  public byte[] ScreenRam { get; init; }
 
   /// <summary>Converts this Doodle Compressed image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(DoodleCompFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -98,9 +94,4 @@ public sealed class DoodleCompFile : IImageFileFormat<DoodleCompFile> {
     };
   }
 
-  /// <summary>Not supported. Doodle Compressed images have complex cell-based color constraints.</summary>
-  public static DoodleCompFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to DoodleCompFile is not supported due to complex cell-based color constraints.");
-  }
 }

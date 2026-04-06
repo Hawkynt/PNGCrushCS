@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.InterPaintMc;
 
 /// <summary>In-memory representation of a Commodore 64 InterPaint Multicolor image.</summary>
-public sealed class InterPaintMcFile : IImageFileFormat<InterPaintMcFile> {
+public readonly record struct InterPaintMcFile : IImageFormatReader<InterPaintMcFile>, IImageToRawImage<InterPaintMcFile>, IImageFormatWriter<InterPaintMcFile> {
 
-  static string IImageFileFormat<InterPaintMcFile>.PrimaryExtension => ".ipt";
-  static string[] IImageFileFormat<InterPaintMcFile>.FileExtensions => [".ipt"];
-  static InterPaintMcFile IImageFileFormat<InterPaintMcFile>.FromFile(FileInfo file) => InterPaintMcReader.FromFile(file);
-  static InterPaintMcFile IImageFileFormat<InterPaintMcFile>.FromBytes(byte[] data) => InterPaintMcReader.FromBytes(data);
-  static InterPaintMcFile IImageFileFormat<InterPaintMcFile>.FromStream(Stream stream) => InterPaintMcReader.FromStream(stream);
-  static byte[] IImageFileFormat<InterPaintMcFile>.ToBytes(InterPaintMcFile file) => InterPaintMcWriter.ToBytes(file);
+  static string IImageFormatMetadata<InterPaintMcFile>.PrimaryExtension => ".ipt";
+  static string[] IImageFormatMetadata<InterPaintMcFile>.FileExtensions => [".ipt"];
+  static InterPaintMcFile IImageFormatReader<InterPaintMcFile>.FromSpan(ReadOnlySpan<byte> data) => InterPaintMcReader.FromSpan(data);
+  static byte[] IImageFormatWriter<InterPaintMcFile>.ToBytes(InterPaintMcFile file) => InterPaintMcWriter.ToBytes(file);
 
   /// <summary>The fixed width of an InterPaint Multicolor image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -52,20 +49,19 @@ public sealed class InterPaintMcFile : IImageFileFormat<InterPaintMcFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Multicolor bitmap data (8000 bytes, 2 bits per pixel).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Video matrix / screen RAM (1000 bytes, upper/lower nybble = 2 colors per cell).</summary>
-  public byte[] VideoMatrix { get; init; } = [];
+  public byte[] VideoMatrix { get; init; }
 
   /// <summary>Color RAM (1000 bytes, lower nybble = 3rd color per cell).</summary>
-  public byte[] ColorRam { get; init; } = [];
+  public byte[] ColorRam { get; init; }
 
   /// <summary>Background color index (0-15).</summary>
   public byte BackgroundColor { get; init; }
 
   /// <summary>Converts this InterPaint Multicolor image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(InterPaintMcFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -104,9 +100,4 @@ public sealed class InterPaintMcFile : IImageFileFormat<InterPaintMcFile> {
     };
   }
 
-  /// <summary>Not supported. InterPaint Multicolor images have complex cell-based color constraints.</summary>
-  public static InterPaintMcFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to InterPaintMcFile is not supported due to complex cell-based color constraints.");
-  }
 }

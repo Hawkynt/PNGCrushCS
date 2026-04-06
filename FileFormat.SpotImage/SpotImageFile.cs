@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.SpotImage;
 
 /// <summary>In-memory representation of a SPOT satellite imagery file.</summary>
-public sealed class SpotImageFile : IImageFileFormat<SpotImageFile> {
+public readonly record struct SpotImageFile : IImageFormatReader<SpotImageFile>, IImageToRawImage<SpotImageFile>, IImageFromRawImage<SpotImageFile>, IImageFormatWriter<SpotImageFile> {
 
   /// <summary>Magic bytes "SPOT".</summary>
   internal static readonly byte[] Magic = [(byte)'S', (byte)'P', (byte)'O', (byte)'T'];
@@ -13,14 +12,10 @@ public sealed class SpotImageFile : IImageFileFormat<SpotImageFile> {
   /// <summary>Header size in bytes (4 magic + 2 width + 2 height + 2 bpp + 6 reserved = 16).</summary>
   internal const int HeaderSize = 16;
 
-  static string IImageFileFormat<SpotImageFile>.PrimaryExtension => ".dat";
-  static string[] IImageFileFormat<SpotImageFile>.FileExtensions => [".dat"];
-  static SpotImageFile IImageFileFormat<SpotImageFile>.FromFile(FileInfo file) => SpotImageReader.FromFile(file);
-  static SpotImageFile IImageFileFormat<SpotImageFile>.FromBytes(byte[] data) => SpotImageReader.FromBytes(data);
-  static SpotImageFile IImageFileFormat<SpotImageFile>.FromStream(Stream stream) => SpotImageReader.FromStream(stream);
-  static RawImage IImageFileFormat<SpotImageFile>.ToRawImage(SpotImageFile file) => ToRawImage(file);
-  static SpotImageFile IImageFileFormat<SpotImageFile>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<SpotImageFile>.ToBytes(SpotImageFile file) => SpotImageWriter.ToBytes(file);
+  static string IImageFormatMetadata<SpotImageFile>.PrimaryExtension => ".dat";
+  static string[] IImageFormatMetadata<SpotImageFile>.FileExtensions => [".dat"];
+  static SpotImageFile IImageFormatReader<SpotImageFile>.FromSpan(ReadOnlySpan<byte> data) => SpotImageReader.FromSpan(data);
+  static byte[] IImageFormatWriter<SpotImageFile>.ToBytes(SpotImageFile file) => SpotImageWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -29,14 +24,13 @@ public sealed class SpotImageFile : IImageFileFormat<SpotImageFile> {
   public int Height { get; init; }
 
   /// <summary>Bits per pixel (8 for grayscale, 24 for RGB).</summary>
-  public int BitsPerPixel { get; init; } = 8;
+  public int BitsPerPixel { get; init; }
 
   /// <summary>Raw pixel data.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts to Gray8 (8bpp) or Rgb24 (24bpp).</summary>
   public static RawImage ToRawImage(SpotImageFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     if (file.BitsPerPixel >= 24) {
       var expectedSize = file.Width * file.Height * 3;

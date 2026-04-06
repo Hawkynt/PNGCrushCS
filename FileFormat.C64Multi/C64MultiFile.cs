@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.C64Multi;
 
 /// <summary>In-memory representation of a C64 multiformat art program image.</summary>
-public sealed class C64MultiFile : IImageFileFormat<C64MultiFile> {
+public readonly record struct C64MultiFile : IImageFormatReader<C64MultiFile>, IImageToRawImage<C64MultiFile>, IImageFromRawImage<C64MultiFile>, IImageFormatWriter<C64MultiFile> {
 
-  static string IImageFileFormat<C64MultiFile>.PrimaryExtension => ".ocp";
-  static string[] IImageFileFormat<C64MultiFile>.FileExtensions => [".ocp", ".hires", ".ami"];
-  static C64MultiFile IImageFileFormat<C64MultiFile>.FromFile(FileInfo file) => C64MultiReader.FromFile(file);
-  static C64MultiFile IImageFileFormat<C64MultiFile>.FromBytes(byte[] data) => C64MultiReader.FromBytes(data);
-  static C64MultiFile IImageFileFormat<C64MultiFile>.FromStream(Stream stream) => C64MultiReader.FromStream(stream);
-  static byte[] IImageFileFormat<C64MultiFile>.ToBytes(C64MultiFile file) => C64MultiWriter.ToBytes(file);
+  static string IImageFormatMetadata<C64MultiFile>.PrimaryExtension => ".ocp";
+  static string[] IImageFormatMetadata<C64MultiFile>.FileExtensions => [".ocp", ".hires", ".ami"];
+  static C64MultiFile IImageFormatReader<C64MultiFile>.FromSpan(ReadOnlySpan<byte> data) => C64MultiReader.FromSpan(data);
+  static byte[] IImageFormatWriter<C64MultiFile>.ToBytes(C64MultiFile file) => C64MultiWriter.ToBytes(file);
 
   /// <summary>Size of the bitmap data section in bytes.</summary>
   internal const int BitmapDataSize = 8000;
@@ -58,10 +55,10 @@ public sealed class C64MultiFile : IImageFileFormat<C64MultiFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Bitmap data (8000 bytes).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Screen RAM / video matrix (1000 bytes).</summary>
-  public byte[] ScreenData { get; init; } = [];
+  public byte[] ScreenData { get; init; }
 
   /// <summary>Color RAM (1000 bytes, multicolor only; null for hires).</summary>
   public byte[]? ColorData { get; init; }
@@ -71,7 +68,6 @@ public sealed class C64MultiFile : IImageFileFormat<C64MultiFile> {
 
   /// <summary>Converts this C64 multi-format image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(C64MultiFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     return file.Format switch {
       C64MultiFormat.ArtStudioHires => _HiresToRawImage(file),

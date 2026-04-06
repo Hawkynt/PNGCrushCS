@@ -64,37 +64,6 @@ public sealed class HiresFliCrestReaderTests {
 }
 
 [TestFixture]
-public sealed class HiresFliCrestWriterTests {
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => HiresFliCrestWriter.ToBytes(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_CorrectOutputSize() {
-    var rawData = new byte[HiresFliCrestFile.MinPayloadSize];
-    var file = new HiresFliCrestFile { LoadAddress = 0x3C00, RawData = rawData };
-    var bytes = HiresFliCrestWriter.ToBytes(file);
-
-    Assert.That(bytes.Length, Is.EqualTo(HiresFliCrestFile.LoadAddressSize + HiresFliCrestFile.MinPayloadSize));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_LoadAddress_IsLittleEndian() {
-    var rawData = new byte[HiresFliCrestFile.MinPayloadSize];
-    var file = new HiresFliCrestFile { LoadAddress = 0x3C00, RawData = rawData };
-    var bytes = HiresFliCrestWriter.ToBytes(file);
-
-    Assert.That(bytes[0], Is.EqualTo(0x00));
-    Assert.That(bytes[1], Is.EqualTo(0x3C));
-  }
-}
-
-[TestFixture]
 public sealed class HiresFliCrestRoundTripTests {
 
   [Test]
@@ -132,75 +101,6 @@ public sealed class HiresFliCrestRoundTripTests {
       if (File.Exists(path))
         File.Delete(path);
     }
-  }
-}
-
-[TestFixture]
-public sealed class HiresFliCrestDataTypeTests {
-
-  [Test]
-  [Category("Unit")]
-  public void PrimaryExtension_IsHfc() {
-    Assert.That(_GetPrimaryExtension(), Is.EqualTo(".hfc"));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FileExtensions_ContainsHfc() {
-    var extensions = _GetFileExtensions();
-    Assert.That(extensions, Does.Contain(".hfc"));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => HiresFliCrestFile.ToRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => HiresFliCrestFile.FromRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_ThrowsNotSupportedException() {
-    var image = new RawImage { Width = 320, Height = 200, Format = PixelFormat.Rgb24, PixelData = new byte[320 * 200 * 3] };
-    Assert.Throws<NotSupportedException>(() => HiresFliCrestFile.FromRawImage(image));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToRawImage_ValidData_ProducesRgb24() {
-    var data = TestHelpers._BuildValidHiresFliCrestData(0x3C00);
-    var file = HiresFliCrestReader.FromBytes(data);
-    var raw = HiresFliCrestFile.ToRawImage(file);
-
-    Assert.That(raw.Width, Is.EqualTo(320));
-    Assert.That(raw.Height, Is.EqualTo(200));
-    Assert.That(raw.Format, Is.EqualTo(PixelFormat.Rgb24));
-    Assert.That(raw.PixelData.Length, Is.EqualTo(320 * 200 * 3));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FixedWidth_Is320() {
-    Assert.That(HiresFliCrestFile.FixedWidth, Is.EqualTo(320));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FixedHeight_Is200() {
-    Assert.That(HiresFliCrestFile.FixedHeight, Is.EqualTo(200));
-  }
-
-  private static string _GetPrimaryExtension() => _Helper<HiresFliCrestFile>.PrimaryExtension;
-  private static string[] _GetFileExtensions() => _Helper<HiresFliCrestFile>.FileExtensions;
-
-  private static class _Helper<T> where T : IImageFileFormat<T> {
-    public static string PrimaryExtension => T.PrimaryExtension;
-    public static string[] FileExtensions => T.FileExtensions;
   }
 }
 

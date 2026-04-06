@@ -1,19 +1,16 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.GoDot4Bit;
 
 /// <summary>In-memory representation of a Commodore 64 GoDot 4-bit image.</summary>
-public sealed class GoDot4BitFile : IImageFileFormat<GoDot4BitFile> {
+public readonly record struct GoDot4BitFile : IImageFormatReader<GoDot4BitFile>, IImageToRawImage<GoDot4BitFile>, IImageFormatWriter<GoDot4BitFile> {
 
-  static string IImageFileFormat<GoDot4BitFile>.PrimaryExtension => ".4bt";
-  static string[] IImageFileFormat<GoDot4BitFile>.FileExtensions => [".4bt", ".4bit"];
-  static FormatCapability IImageFileFormat<GoDot4BitFile>.Capabilities => FormatCapability.IndexedOnly;
-  static GoDot4BitFile IImageFileFormat<GoDot4BitFile>.FromFile(FileInfo file) => GoDot4BitReader.FromFile(file);
-  static GoDot4BitFile IImageFileFormat<GoDot4BitFile>.FromBytes(byte[] data) => GoDot4BitReader.FromBytes(data);
-  static GoDot4BitFile IImageFileFormat<GoDot4BitFile>.FromStream(Stream stream) => GoDot4BitReader.FromStream(stream);
-  static byte[] IImageFileFormat<GoDot4BitFile>.ToBytes(GoDot4BitFile file) => GoDot4BitWriter.ToBytes(file);
+  static string IImageFormatMetadata<GoDot4BitFile>.PrimaryExtension => ".4bt";
+  static string[] IImageFormatMetadata<GoDot4BitFile>.FileExtensions => [".4bt", ".4bit"];
+  static GoDot4BitFile IImageFormatReader<GoDot4BitFile>.FromSpan(ReadOnlySpan<byte> data) => GoDot4BitReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<GoDot4BitFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<GoDot4BitFile>.ToBytes(GoDot4BitFile file) => GoDot4BitWriter.ToBytes(file);
 
   /// <summary>The fixed width of a GoDot 4-bit image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -38,11 +35,10 @@ public sealed class GoDot4BitFile : IImageFileFormat<GoDot4BitFile> {
   public int Height => FixedHeight;
 
   /// <summary>Raw 4bpp packed pixel data (16384 bytes, two pixels per byte, high nibble first).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this GoDot 4-bit image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(GoDot4BitFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -81,9 +77,4 @@ public sealed class GoDot4BitFile : IImageFileFormat<GoDot4BitFile> {
     };
   }
 
-  /// <summary>Not supported. GoDot 4-bit images use a fixed C64 palette.</summary>
-  public static GoDot4BitFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to GoDot4BitFile is not supported due to fixed C64 palette constraints.");
-  }
 }

@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Pcd;
 
 /// <summary>In-memory representation of a PCD (Kodak Photo CD) image.</summary>
-public sealed class PcdFile : IImageFileFormat<PcdFile> {
+public readonly record struct PcdFile : IImageFormatReader<PcdFile>, IImageToRawImage<PcdFile>, IImageFromRawImage<PcdFile>, IImageFormatWriter<PcdFile> {
 
   /// <summary>Size of the preamble (zeros) before the magic identifier.</summary>
   internal const int PreambleSize = 2048;
@@ -16,12 +15,10 @@ public sealed class PcdFile : IImageFileFormat<PcdFile> {
   /// <summary>Total header size: preamble + magic + 2 x uint16 dimensions.</summary>
   internal const int HeaderSize = PreambleSize + 8 + 4;
 
-  static string IImageFileFormat<PcdFile>.PrimaryExtension => ".pcd";
-  static string[] IImageFileFormat<PcdFile>.FileExtensions => [".pcd"];
-  static PcdFile IImageFileFormat<PcdFile>.FromFile(FileInfo file) => PcdReader.FromFile(file);
-  static PcdFile IImageFileFormat<PcdFile>.FromBytes(byte[] data) => PcdReader.FromBytes(data);
-  static PcdFile IImageFileFormat<PcdFile>.FromStream(Stream stream) => PcdReader.FromStream(stream);
-  static byte[] IImageFileFormat<PcdFile>.ToBytes(PcdFile file) => PcdWriter.ToBytes(file);
+  static string IImageFormatMetadata<PcdFile>.PrimaryExtension => ".pcd";
+  static string[] IImageFormatMetadata<PcdFile>.FileExtensions => [".pcd"];
+  static PcdFile IImageFormatReader<PcdFile>.FromSpan(ReadOnlySpan<byte> data) => PcdReader.FromSpan(data);
+  static byte[] IImageFormatWriter<PcdFile>.ToBytes(PcdFile file) => PcdWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -30,10 +27,9 @@ public sealed class PcdFile : IImageFileFormat<PcdFile> {
   public int Height { get; init; }
 
   /// <summary>Raw RGB pixel data (3 bytes per pixel).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(PcdFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

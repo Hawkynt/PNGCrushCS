@@ -41,25 +41,6 @@ public class IplReaderTests {
 }
 
 [TestFixture]
-public class IplWriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => IplWriter.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_IncludesHeader() {
-    var file = new IplFile {
-      Width = 320,
-      Height = 240,
-      PixelData = new byte[320 * 240 * 3],
-    };
-    var bytes = IplWriter.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(16 + 320 * 240 * 3));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -90,30 +71,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void HeaderSize_Is16()
-    => Assert.That(IplFile.HeaderSize, Is.EqualTo(16));
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => IplFile.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => IplFile.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 320, Height = 240, Format = PixelFormat.Indexed8, PixelData = new byte[320 * 240] };
-    Assert.Throws<ArgumentException>(() => IplFile.FromRawImage(raw));
-  }
-
-  [Test]
-  public void FileExtensions_ContainsPrimary() {
-    string[] exts = [".ipl"];
-    Assert.That(exts, Does.Contain(".ipl"));
-  }
-}

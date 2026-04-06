@@ -1,11 +1,10 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.SyntheticArts;
 
 /// <summary>In-memory representation of an Atari ST Synthetic Arts image (640x200, 4 colors, 2-plane medium resolution).</summary>
-public sealed class SyntheticArtsFile : IImageFileFormat<SyntheticArtsFile> {
+public readonly record struct SyntheticArtsFile : IImageFormatReader<SyntheticArtsFile>, IImageToRawImage<SyntheticArtsFile>, IImageFromRawImage<SyntheticArtsFile>, IImageFormatWriter<SyntheticArtsFile> {
 
   /// <summary>Total file size: 32-byte palette + 32000 bytes planar data.</summary>
   public const int FileSize = SyntheticArtsHeader.StructSize + 32000;
@@ -22,21 +21,18 @@ public sealed class SyntheticArtsFile : IImageFileFormat<SyntheticArtsFile> {
   /// <summary>Number of usable palette colors (always 4 for 2 planes).</summary>
   public const int ColorCount = 4;
 
-  static string IImageFileFormat<SyntheticArtsFile>.PrimaryExtension => ".srt";
-  static string[] IImageFileFormat<SyntheticArtsFile>.FileExtensions => [".srt"];
-  static SyntheticArtsFile IImageFileFormat<SyntheticArtsFile>.FromFile(FileInfo file) => SyntheticArtsReader.FromFile(file);
-  static SyntheticArtsFile IImageFileFormat<SyntheticArtsFile>.FromBytes(byte[] data) => SyntheticArtsReader.FromBytes(data);
-  static SyntheticArtsFile IImageFileFormat<SyntheticArtsFile>.FromStream(Stream stream) => SyntheticArtsReader.FromStream(stream);
-  static byte[] IImageFileFormat<SyntheticArtsFile>.ToBytes(SyntheticArtsFile file) => SyntheticArtsWriter.ToBytes(file);
+  static string IImageFormatMetadata<SyntheticArtsFile>.PrimaryExtension => ".srt";
+  static string[] IImageFormatMetadata<SyntheticArtsFile>.FileExtensions => [".srt"];
+  static SyntheticArtsFile IImageFormatReader<SyntheticArtsFile>.FromSpan(ReadOnlySpan<byte> data) => SyntheticArtsReader.FromSpan(data);
+  static byte[] IImageFormatWriter<SyntheticArtsFile>.ToBytes(SyntheticArtsFile file) => SyntheticArtsWriter.ToBytes(file);
 
   /// <summary>16-entry palette of Atari ST RGB values (0x0RGB, R/G/B in 0-7). Only the first 4 entries are used.</summary>
-  public short[] Palette { get; init; } = new short[16];
+  public short[] Palette { get; init; }
 
   /// <summary>32000 bytes of Atari ST word-interleaved 2-plane planar pixel data.</summary>
-  public byte[] PixelData { get; init; } = new byte[32000];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(SyntheticArtsFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var chunky = PlanarConverter.AtariStToChunky(file.PixelData, ImageWidth, ImageHeight, NumPlanes);
     var paletteCount = Math.Min(ColorCount, file.Palette.Length);

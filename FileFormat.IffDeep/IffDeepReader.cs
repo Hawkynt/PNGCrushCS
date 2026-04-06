@@ -30,6 +30,8 @@ public static class IffDeepReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static IffDeepFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static IffDeepFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MIN_IFF_SIZE)

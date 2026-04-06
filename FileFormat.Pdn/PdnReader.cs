@@ -34,6 +34,8 @@ public static class PdnReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static PdnFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static PdnFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < HEADER_SIZE)

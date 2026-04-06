@@ -26,6 +26,8 @@ public static class AtariPictureReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static AtariPictureFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AtariPictureFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != AtariPictureFile.ExpectedFileSize)

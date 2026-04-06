@@ -31,6 +31,8 @@ public static class PngReader {
   }
 
   /// <summary>Read a PNG from a byte array</summary>
+  public static PngFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static PngFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < 8 + 25)

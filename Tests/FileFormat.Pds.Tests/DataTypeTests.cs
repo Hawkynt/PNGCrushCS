@@ -116,11 +116,11 @@ public sealed class DataTypeTests {
     return GetPrimary<PdsFile>();
   }
 
-  private static string GetPrimary<T>() where T : FileFormat.Core.IImageFileFormat<T>
+  private static string GetPrimary<T>() where T : FileFormat.Core.IImageFormatMetadata<T>
     => T.PrimaryExtension;
 
   private static string[] GetFileExtensions() => GetExts<PdsFile>();
 
-  private static string[] GetExts<T>() where T : FileFormat.Core.IImageFileFormat<T>
+  private static string[] GetExts<T>() where T : FileFormat.Core.IImageFormatMetadata<T>
     => T.FileExtensions;
 }

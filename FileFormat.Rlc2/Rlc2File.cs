@@ -1,18 +1,15 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Rlc2;
 
 /// <summary>In-memory representation of an RLC2 image.</summary>
-public sealed class Rlc2File : IImageFileFormat<Rlc2File> {
+public readonly record struct Rlc2File : IImageFormatReader<Rlc2File>, IImageToRawImage<Rlc2File>, IImageFormatWriter<Rlc2File> {
 
-  static string IImageFileFormat<Rlc2File>.PrimaryExtension => ".rlc";
-  static string[] IImageFileFormat<Rlc2File>.FileExtensions => [".rlc"];
-  static Rlc2File IImageFileFormat<Rlc2File>.FromFile(FileInfo file) => Rlc2Reader.FromFile(file);
-  static Rlc2File IImageFileFormat<Rlc2File>.FromBytes(byte[] data) => Rlc2Reader.FromBytes(data);
-  static Rlc2File IImageFileFormat<Rlc2File>.FromStream(Stream stream) => Rlc2Reader.FromStream(stream);
-  static byte[] IImageFileFormat<Rlc2File>.ToBytes(Rlc2File file) => Rlc2Writer.ToBytes(file);
+  static string IImageFormatMetadata<Rlc2File>.PrimaryExtension => ".rlc";
+  static string[] IImageFormatMetadata<Rlc2File>.FileExtensions => [".rlc"];
+  static Rlc2File IImageFormatReader<Rlc2File>.FromSpan(ReadOnlySpan<byte> data) => Rlc2Reader.FromSpan(data);
+  static byte[] IImageFormatWriter<Rlc2File>.ToBytes(Rlc2File file) => Rlc2Writer.ToBytes(file);
 
   /// <summary>Magic bytes: "RLC2" (0x52 0x4C 0x43 0x32).</summary>
   internal static readonly byte[] Magic = [0x52, 0x4C, 0x43, 0x32];
@@ -33,11 +30,10 @@ public sealed class Rlc2File : IImageFileFormat<Rlc2File> {
   public ushort Bpp { get; init; }
 
   /// <summary>Raw pixel data.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this RLC2 image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(Rlc2File file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,
@@ -46,9 +42,4 @@ public sealed class Rlc2File : IImageFileFormat<Rlc2File> {
     };
   }
 
-  /// <summary>Not supported.</summary>
-  public static Rlc2File FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to Rlc2File is not supported.");
-  }
 }

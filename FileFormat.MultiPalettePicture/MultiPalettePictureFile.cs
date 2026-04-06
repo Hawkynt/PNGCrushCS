@@ -1,12 +1,11 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.MultiPalettePicture;
 
 /// <summary>In-memory representation of an Atari ST Multi Palette Picture (MPP) image (320x200, 16 colors per scanline).</summary>
-public sealed class MultiPalettePictureFile : IImageFileFormat<MultiPalettePictureFile> {
+public readonly record struct MultiPalettePictureFile : IImageFormatReader<MultiPalettePictureFile>, IImageToRawImage<MultiPalettePictureFile>, IImageFromRawImage<MultiPalettePictureFile>, IImageFormatWriter<MultiPalettePictureFile> {
 
   /// <summary>Width is always 320 pixels.</summary>
   public const int ImageWidth = 320;
@@ -29,27 +28,24 @@ public sealed class MultiPalettePictureFile : IImageFileFormat<MultiPalettePictu
   /// <summary>The exact file size: 200 * 192 = 38400 bytes.</summary>
   public const int ExpectedFileSize = ImageHeight * RecordSize;
 
-  static string IImageFileFormat<MultiPalettePictureFile>.PrimaryExtension => ".mpp";
-  static string[] IImageFileFormat<MultiPalettePictureFile>.FileExtensions => [".mpp"];
-  static MultiPalettePictureFile IImageFileFormat<MultiPalettePictureFile>.FromFile(FileInfo file) => MultiPalettePictureReader.FromFile(file);
-  static MultiPalettePictureFile IImageFileFormat<MultiPalettePictureFile>.FromBytes(byte[] data) => MultiPalettePictureReader.FromBytes(data);
-  static MultiPalettePictureFile IImageFileFormat<MultiPalettePictureFile>.FromStream(Stream stream) => MultiPalettePictureReader.FromStream(stream);
-  static byte[] IImageFileFormat<MultiPalettePictureFile>.ToBytes(MultiPalettePictureFile file) => MultiPalettePictureWriter.ToBytes(file);
+  static string IImageFormatMetadata<MultiPalettePictureFile>.PrimaryExtension => ".mpp";
+  static string[] IImageFormatMetadata<MultiPalettePictureFile>.FileExtensions => [".mpp"];
+  static MultiPalettePictureFile IImageFormatReader<MultiPalettePictureFile>.FromSpan(ReadOnlySpan<byte> data) => MultiPalettePictureReader.FromSpan(data);
+  static byte[] IImageFormatWriter<MultiPalettePictureFile>.ToBytes(MultiPalettePictureFile file) => MultiPalettePictureWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>
-  public int Width { get; init; } = ImageWidth;
+  public int Width { get; init; }
 
   /// <summary>Always 200.</summary>
-  public int Height { get; init; } = ImageHeight;
+  public int Height { get; init; }
 
   /// <summary>32000 bytes of Atari ST interleaved planar pixel data (concatenated 160-byte scanlines).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Per-scanline palettes: 200 entries, each a 16-element array of 12-bit Atari ST RGB values.</summary>
-  public short[][] Palettes { get; init; } = new short[ImageHeight][];
+  public short[][] Palettes { get; init; }
 
   public static RawImage ToRawImage(MultiPalettePictureFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var chunky = PlanarConverter.AtariStToChunky(file.PixelData, ImageWidth, ImageHeight, NumPlanes);
     var rgb = new byte[ImageWidth * ImageHeight * 3];

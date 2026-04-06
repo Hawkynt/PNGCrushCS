@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.SaracenPaint;
 
 /// <summary>In-memory representation of a Saracen Paint C64 hires image (Art Studio hires layout).</summary>
-public sealed class SaracenPaintFile : IImageFileFormat<SaracenPaintFile> {
+public readonly record struct SaracenPaintFile : IImageFormatReader<SaracenPaintFile>, IImageToRawImage<SaracenPaintFile>, IImageFormatWriter<SaracenPaintFile> {
 
-  static string IImageFileFormat<SaracenPaintFile>.PrimaryExtension => ".sar";
-  static string[] IImageFileFormat<SaracenPaintFile>.FileExtensions => [".sar"];
-  static SaracenPaintFile IImageFileFormat<SaracenPaintFile>.FromFile(FileInfo file) => SaracenPaintReader.FromFile(file);
-  static SaracenPaintFile IImageFileFormat<SaracenPaintFile>.FromBytes(byte[] data) => SaracenPaintReader.FromBytes(data);
-  static SaracenPaintFile IImageFileFormat<SaracenPaintFile>.FromStream(Stream stream) => SaracenPaintReader.FromStream(stream);
-  static byte[] IImageFileFormat<SaracenPaintFile>.ToBytes(SaracenPaintFile file) => SaracenPaintWriter.ToBytes(file);
+  static string IImageFormatMetadata<SaracenPaintFile>.PrimaryExtension => ".sar";
+  static string[] IImageFormatMetadata<SaracenPaintFile>.FileExtensions => [".sar"];
+  static SaracenPaintFile IImageFormatReader<SaracenPaintFile>.FromSpan(ReadOnlySpan<byte> data) => SaracenPaintReader.FromSpan(data);
+  static byte[] IImageFormatWriter<SaracenPaintFile>.ToBytes(SaracenPaintFile file) => SaracenPaintWriter.ToBytes(file);
 
   /// <summary>The fixed width of a Saracen Paint image in pixels.</summary>
   public const int FixedWidth = 320;
@@ -44,14 +41,13 @@ public sealed class SaracenPaintFile : IImageFileFormat<SaracenPaintFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Screen RAM (1000 bytes, upper/lower nybble = fg/bg color per 8x8 cell).</summary>
-  public byte[] ScreenRam { get; init; } = [];
+  public byte[] ScreenRam { get; init; }
 
   /// <summary>Hires bitmap data (8000 bytes, 1 bit per pixel).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Converts this Saracen Paint image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(SaracenPaintFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -87,9 +83,4 @@ public sealed class SaracenPaintFile : IImageFileFormat<SaracenPaintFile> {
     };
   }
 
-  /// <summary>Not supported.</summary>
-  public static SaracenPaintFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to SaracenPaintFile is not supported due to complex cell-based color constraints.");
-  }
 }

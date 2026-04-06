@@ -27,6 +27,8 @@ public static class VtfReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static VtfFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static VtfFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < VtfHeader.StructSize)

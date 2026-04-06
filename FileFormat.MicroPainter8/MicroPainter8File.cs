@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.MicroPainter8;
 
 /// <summary>In-memory representation of a Micro Painter (Atari 8-bit) image. 320x192 Graphics 8 monochrome.</summary>
-public sealed class MicroPainter8File : IImageFileFormat<MicroPainter8File> {
+public readonly record struct MicroPainter8File : IImageFormatReader<MicroPainter8File>, IImageToRawImage<MicroPainter8File>, IImageFromRawImage<MicroPainter8File>, IImageFormatWriter<MicroPainter8File> {
 
   /// <summary>Image width in pixels.</summary>
   internal const int PixelWidth = 320;
@@ -19,15 +18,11 @@ public sealed class MicroPainter8File : IImageFileFormat<MicroPainter8File> {
   /// <summary>Exact file size in bytes (40 bytes/line x 192 lines).</summary>
   internal const int FileSize = BytesPerLine * PixelHeight;
 
-  static string IImageFileFormat<MicroPainter8File>.PrimaryExtension => ".mpt8";
-  static string[] IImageFileFormat<MicroPainter8File>.FileExtensions => [".mpt8", ".mp8"];
-  static FormatCapability IImageFileFormat<MicroPainter8File>.Capabilities => FormatCapability.MonochromeOnly;
-  static MicroPainter8File IImageFileFormat<MicroPainter8File>.FromFile(FileInfo file) => MicroPainter8Reader.FromFile(file);
-  static MicroPainter8File IImageFileFormat<MicroPainter8File>.FromBytes(byte[] data) => MicroPainter8Reader.FromBytes(data);
-  static MicroPainter8File IImageFileFormat<MicroPainter8File>.FromStream(Stream stream) => MicroPainter8Reader.FromStream(stream);
-  static RawImage IImageFileFormat<MicroPainter8File>.ToRawImage(MicroPainter8File file) => ToRawImage(file);
-  static MicroPainter8File IImageFileFormat<MicroPainter8File>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<MicroPainter8File>.ToBytes(MicroPainter8File file) => MicroPainter8Writer.ToBytes(file);
+  static string IImageFormatMetadata<MicroPainter8File>.PrimaryExtension => ".mpt8";
+  static string[] IImageFormatMetadata<MicroPainter8File>.FileExtensions => [".mpt8", ".mp8"];
+  static MicroPainter8File IImageFormatReader<MicroPainter8File>.FromSpan(ReadOnlySpan<byte> data) => MicroPainter8Reader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<MicroPainter8File>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<MicroPainter8File>.ToBytes(MicroPainter8File file) => MicroPainter8Writer.ToBytes(file);
 
   /// <summary>Always 320.</summary>
   public int Width => PixelWidth;
@@ -36,13 +31,12 @@ public sealed class MicroPainter8File : IImageFileFormat<MicroPainter8File> {
   public int Height => PixelHeight;
 
   /// <summary>Raw 1bpp screen data (7680 bytes: 40 bytes/line x 192 lines, MSB-first).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
   /// <summary>Converts the Micro Painter image to an Indexed1 raw image (320x192, B&amp;W palette).</summary>
   public static RawImage ToRawImage(MicroPainter8File file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var pixelData = new byte[FileSize];
     file.PixelData.AsSpan(0, Math.Min(file.PixelData.Length, FileSize)).CopyTo(pixelData);

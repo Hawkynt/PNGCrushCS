@@ -56,6 +56,8 @@ public static class CameraRawReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static CameraRawFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static CameraRawFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MIN_TIFF_SIZE)

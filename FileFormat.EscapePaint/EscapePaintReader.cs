@@ -26,6 +26,8 @@ public static class EscapePaintReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static EscapePaintFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static EscapePaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < EscapePaintHeader.StructSize)

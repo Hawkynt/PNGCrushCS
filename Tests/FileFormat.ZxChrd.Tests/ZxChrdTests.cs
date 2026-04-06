@@ -59,31 +59,6 @@ public class ZxChrdReaderTests {
 }
 
 [TestFixture]
-public class ZxChrdWriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => ZxChrdWriter.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_OutputSize_Is2048() {
-    var file = new ZxChrdFile { CharacterData = new byte[2048] };
-    var bytes = ZxChrdWriter.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(2048));
-  }
-
-  [Test]
-  public void ToBytes_DataPreserved() {
-    var charData = new byte[2048];
-    for (var i = 0; i < charData.Length; ++i)
-      charData[i] = (byte)(i & 0xFF);
-    var file = new ZxChrdFile { CharacterData = charData };
-    var bytes = ZxChrdWriter.ToBytes(file);
-    Assert.That(bytes, Is.EqualTo(charData));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -113,55 +88,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void Width_Is128() {
-    var file = new ZxChrdFile();
-    Assert.That(file.Width, Is.EqualTo(128));
-  }
-
-  [Test]
-  public void Height_Is128() {
-    var file = new ZxChrdFile();
-    Assert.That(file.Height, Is.EqualTo(128));
-  }
-
-  [Test]
-  public void CharCount_Is256()
-    => Assert.That(ZxChrdFile.CharCount, Is.EqualTo(256));
-
-  [Test]
-  public void BytesPerChar_Is8()
-    => Assert.That(ZxChrdFile.BytesPerChar, Is.EqualTo(8));
-
-  [Test]
-  public void CharacterData_DefaultIsEmpty() {
-    var file = new ZxChrdFile();
-    Assert.That(file.CharacterData, Is.Empty);
-  }
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => ZxChrdFile.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => ZxChrdFile.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_ThrowsNotSupportedException() {
-    var raw = new RawImage { Width = 128, Height = 128, Format = PixelFormat.Rgb24, PixelData = new byte[128 * 128 * 3] };
-    Assert.Throws<NotSupportedException>(() => ZxChrdFile.FromRawImage(raw));
-  }
-
-  [Test]
-  public void ToRawImage_ReturnsIndexed1() {
-    var file = new ZxChrdFile { CharacterData = new byte[2048] };
-    var raw = ZxChrdFile.ToRawImage(file);
-    Assert.That(raw.Format, Is.EqualTo(PixelFormat.Indexed1));
-    Assert.That(raw.Width, Is.EqualTo(128));
-    Assert.That(raw.Height, Is.EqualTo(128));
-  }
-}

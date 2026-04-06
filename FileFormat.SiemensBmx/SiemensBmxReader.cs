@@ -25,6 +25,8 @@ public static class SiemensBmxReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static SiemensBmxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static SiemensBmxFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < SiemensBmxFile.HeaderSize)

@@ -1,30 +1,27 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Neochrome;
 
 /// <summary>In-memory representation of an Atari ST NEOchrome image (320x200, 16 colors).</summary>
-public sealed class NeochromeFile : IImageFileFormat<NeochromeFile> {
+public readonly record struct NeochromeFile : IImageFormatReader<NeochromeFile>, IImageToRawImage<NeochromeFile>, IImageFromRawImage<NeochromeFile>, IImageFormatWriter<NeochromeFile> {
 
-  static string IImageFileFormat<NeochromeFile>.PrimaryExtension => ".neo";
-  static string[] IImageFileFormat<NeochromeFile>.FileExtensions => [".neo"];
-  static NeochromeFile IImageFileFormat<NeochromeFile>.FromFile(FileInfo file) => NeochromeReader.FromFile(file);
-  static NeochromeFile IImageFileFormat<NeochromeFile>.FromBytes(byte[] data) => NeochromeReader.FromBytes(data);
-  static NeochromeFile IImageFileFormat<NeochromeFile>.FromStream(Stream stream) => NeochromeReader.FromStream(stream);
-  static byte[] IImageFileFormat<NeochromeFile>.ToBytes(NeochromeFile file) => NeochromeWriter.ToBytes(file);
+  static string IImageFormatMetadata<NeochromeFile>.PrimaryExtension => ".neo";
+  static string[] IImageFormatMetadata<NeochromeFile>.FileExtensions => [".neo"];
+  static NeochromeFile IImageFormatReader<NeochromeFile>.FromSpan(ReadOnlySpan<byte> data) => NeochromeReader.FromSpan(data);
+  static byte[] IImageFormatWriter<NeochromeFile>.ToBytes(NeochromeFile file) => NeochromeWriter.ToBytes(file);
 
   /// <summary>Image width (always 320).</summary>
-  public int Width { get; init; } = 320;
+  public int Width { get; init; }
 
   /// <summary>Image height (always 200).</summary>
-  public int Height { get; init; } = 200;
+  public int Height { get; init; }
 
   /// <summary>Header flag word (typically 0).</summary>
   public short Flag { get; init; }
 
   /// <summary>16-entry palette of 9-bit Atari ST RGB values (0x0RGB, R/G/B in 0-7).</summary>
-  public short[] Palette { get; init; } = new short[16];
+  public short[] Palette { get; init; }
 
   /// <summary>Animation speed.</summary>
   public byte AnimSpeed { get; init; }
@@ -48,10 +45,9 @@ public sealed class NeochromeFile : IImageFileFormat<NeochromeFile> {
   public short AnimHeight { get; init; }
 
   /// <summary>32000 bytes of Atari ST interleaved planar pixel data.</summary>
-  public byte[] PixelData { get; init; } = new byte[32000];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(NeochromeFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var chunky = PlanarConverter.AtariStToChunky(file.PixelData, 320, 200, 4);
     var paletteCount = Math.Min(16, file.Palette.Length);

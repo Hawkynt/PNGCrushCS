@@ -26,6 +26,8 @@ public static class Picasso64Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static Picasso64File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static Picasso64File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < Picasso64File.ExpectedFileSize)

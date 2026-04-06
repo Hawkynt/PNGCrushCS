@@ -5,14 +5,12 @@ using FileFormat.Core;
 namespace FileFormat.Drazlace;
 
 /// <summary>In-memory representation of a Drazlace interlace multicolor image (.dlp/.drl).</summary>
-public sealed class DrazlaceFile : IImageFileFormat<DrazlaceFile> {
+public readonly record struct DrazlaceFile : IImageFormatReader<DrazlaceFile>, IImageToRawImage<DrazlaceFile>, IImageFormatWriter<DrazlaceFile> {
 
-  static string IImageFileFormat<DrazlaceFile>.PrimaryExtension => ".dlp";
-  static string[] IImageFileFormat<DrazlaceFile>.FileExtensions => [".dlp", ".drl"];
-  static DrazlaceFile IImageFileFormat<DrazlaceFile>.FromFile(FileInfo file) => DrazlaceReader.FromFile(file);
-  static DrazlaceFile IImageFileFormat<DrazlaceFile>.FromBytes(byte[] data) => DrazlaceReader.FromBytes(data);
-  static DrazlaceFile IImageFileFormat<DrazlaceFile>.FromStream(Stream stream) => DrazlaceReader.FromStream(stream);
-  static byte[] IImageFileFormat<DrazlaceFile>.ToBytes(DrazlaceFile file) => DrazlaceWriter.ToBytes(file);
+  static string IImageFormatMetadata<DrazlaceFile>.PrimaryExtension => ".dlp";
+  static string[] IImageFormatMetadata<DrazlaceFile>.FileExtensions => [".dlp", ".drl"];
+  static DrazlaceFile IImageFormatReader<DrazlaceFile>.FromSpan(ReadOnlySpan<byte> data) => DrazlaceReader.FromSpan(data);
+  static byte[] IImageFormatWriter<DrazlaceFile>.ToBytes(DrazlaceFile file) => DrazlaceWriter.ToBytes(file);
 
   /// <summary>The fixed width of the image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -55,26 +53,25 @@ public sealed class DrazlaceFile : IImageFileFormat<DrazlaceFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Multicolor bitmap data for frame 1 (8000 bytes).</summary>
-  public byte[] BitmapData1 { get; init; } = [];
+  public byte[] BitmapData1 { get; init; }
 
   /// <summary>Screen RAM for frame 1 (1000 bytes).</summary>
-  public byte[] ScreenRam1 { get; init; } = [];
+  public byte[] ScreenRam1 { get; init; }
 
   /// <summary>Color RAM shared between both frames (1000 bytes).</summary>
-  public byte[] ColorRam { get; init; } = [];
+  public byte[] ColorRam { get; init; }
 
   /// <summary>Background color index (0-15).</summary>
   public byte BackgroundColor { get; init; }
 
   /// <summary>Multicolor bitmap data for frame 2 (8000 bytes).</summary>
-  public byte[] BitmapData2 { get; init; } = [];
+  public byte[] BitmapData2 { get; init; }
 
   /// <summary>Screen RAM for frame 2 (1000 bytes).</summary>
-  public byte[] ScreenRam2 { get; init; } = [];
+  public byte[] ScreenRam2 { get; init; }
 
   /// <summary>Converts this Drazlace image to a platform-independent <see cref="RawImage"/> in Rgb24 format by decoding both frames and blending.</summary>
   public static RawImage ToRawImage(DrazlaceFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -123,12 +120,6 @@ public sealed class DrazlaceFile : IImageFileFormat<DrazlaceFile> {
     };
 
     return _C64Palette[colorIndex];
-  }
-
-  /// <summary>Not supported. Drazlace images have complex cell-based color constraints.</summary>
-  public static DrazlaceFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to DrazlaceFile is not supported due to complex cell-based color constraints.");
   }
 
   /// <summary>RLE-decompresses data using 0x00 escape byte encoding: 0x00, count, value.</summary>

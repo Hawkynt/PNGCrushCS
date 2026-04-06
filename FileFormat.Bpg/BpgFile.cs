@@ -1,5 +1,4 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Bpg.Codec;
 using FileFormat.Core;
 
@@ -7,7 +6,7 @@ namespace FileFormat.Bpg;
 
 /// <summary>In-memory representation of a BPG (Better Portable Graphics) image container.</summary>
 [FormatMagicBytes([0x42, 0x50, 0x47, 0xFB])]
-public sealed class BpgFile : IImageFileFormat<BpgFile> {
+public sealed class BpgFile : IImageFormatReader<BpgFile>, IImageToRawImage<BpgFile>, IImageFromRawImage<BpgFile>, IImageFormatWriter<BpgFile> {
 
   /// <summary>BPG magic bytes: "BPG" + 0xFB.</summary>
   internal static readonly byte[] Magic = [0x42, 0x50, 0x47, 0xFB];
@@ -15,12 +14,10 @@ public sealed class BpgFile : IImageFileFormat<BpgFile> {
   /// <summary>Minimum header size (magic + byte4 + byte5 + at least 2 ue7 bytes for width/height).</summary>
   internal const int MinHeaderSize = 6;
 
-  static string IImageFileFormat<BpgFile>.PrimaryExtension => ".bpg";
-  static string[] IImageFileFormat<BpgFile>.FileExtensions => [".bpg"];
-  static BpgFile IImageFileFormat<BpgFile>.FromFile(FileInfo file) => BpgReader.FromFile(file);
-  static BpgFile IImageFileFormat<BpgFile>.FromBytes(byte[] data) => BpgReader.FromBytes(data);
-  static BpgFile IImageFileFormat<BpgFile>.FromStream(Stream stream) => BpgReader.FromStream(stream);
-  static byte[] IImageFileFormat<BpgFile>.ToBytes(BpgFile file) => BpgWriter.ToBytes(file);
+  static string IImageFormatMetadata<BpgFile>.PrimaryExtension => ".bpg";
+  static string[] IImageFormatMetadata<BpgFile>.FileExtensions => [".bpg"];
+  static BpgFile IImageFormatReader<BpgFile>.FromSpan(ReadOnlySpan<byte> data) => BpgReader.FromSpan(data);
+  static byte[] IImageFormatWriter<BpgFile>.ToBytes(BpgFile file) => BpgWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }

@@ -30,6 +30,8 @@ public static class XyzReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static XyzFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static XyzFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _HEADER_SIZE)

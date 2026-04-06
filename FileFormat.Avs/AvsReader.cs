@@ -29,6 +29,8 @@ public static class AvsReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static AvsFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AvsFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _HEADER_SIZE)

@@ -31,6 +31,8 @@ public static class IffAcbmReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static IffAcbmFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static IffAcbmFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MIN_IFF_SIZE)

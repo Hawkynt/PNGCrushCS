@@ -35,6 +35,8 @@ public static class AmstradCpcReader {
     return FromBytes(ms.ToArray(), mode);
   }
 
+  public static AmstradCpcFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AmstradCpcFile FromBytes(byte[] data, AmstradCpcMode mode = AmstradCpcMode.Mode1) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _SCREEN_SIZE)

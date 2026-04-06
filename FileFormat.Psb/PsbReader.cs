@@ -27,6 +27,8 @@ public static class PsbReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static PsbFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static PsbFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < PsbHeader.StructSize)

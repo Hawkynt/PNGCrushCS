@@ -26,6 +26,8 @@ public static class C128HiresReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static C128HiresFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static C128HiresFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != C128HiresFile.ExpectedFileSize)

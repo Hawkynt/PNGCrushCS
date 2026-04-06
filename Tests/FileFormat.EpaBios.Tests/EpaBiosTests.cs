@@ -38,31 +38,6 @@ public class EpaBiosReaderTests {
 }
 
 [TestFixture]
-public class EpaBiosWriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => EpaBiosWriter.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_OutputSize_Is714() {
-    var file = new EpaBiosFile { PixelData = new byte[714] };
-    var bytes = EpaBiosWriter.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(714));
-  }
-
-  [Test]
-  public void ToBytes_DataPreserved() {
-    var data = new byte[714];
-    for (var i = 0; i < data.Length; ++i)
-      data[i] = (byte)(i & 0xFF);
-    var file = new EpaBiosFile { PixelData = data };
-    var bytes = EpaBiosWriter.ToBytes(file);
-    Assert.That(bytes, Is.EqualTo(data));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -90,32 +65,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void FixedWidth_Is136()
-    => Assert.That(EpaBiosFile.FixedWidth, Is.EqualTo(136));
-
-  [Test]
-  public void FixedHeight_Is84()
-    => Assert.That(EpaBiosFile.FixedHeight, Is.EqualTo(84));
-
-  [Test]
-  public void FileSize_Is714()
-    => Assert.That(EpaBiosFile.FileSize, Is.EqualTo(714));
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => EpaBiosFile.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => EpaBiosFile.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 136, Height = 84, Format = PixelFormat.Rgb24, PixelData = new byte[136 * 84 * 3] };
-    Assert.Throws<ArgumentException>(() => EpaBiosFile.FromRawImage(raw));
-  }
-}

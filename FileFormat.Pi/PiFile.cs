@@ -1,29 +1,24 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Pi;
 
 /// <summary>In-memory representation of a Pi format (NEC PC-88/98) image.</summary>
-public sealed class PiFile : IImageFileFormat<PiFile> {
+public readonly record struct PiFile : IImageFormatReader<PiFile>, IImageToRawImage<PiFile>, IImageFromRawImage<PiFile>, IImageFormatWriter<PiFile> {
 
   internal const int HeaderSize = 18;
 
-
-  static string IImageFileFormat<PiFile>.PrimaryExtension => ".pi";
-  static string[] IImageFileFormat<PiFile>.FileExtensions => [".pi"];
-  static FormatCapability IImageFileFormat<PiFile>.Capabilities => FormatCapability.IndexedOnly;
-  static PiFile IImageFileFormat<PiFile>.FromFile(FileInfo file) => PiReader.FromFile(file);
-  static PiFile IImageFileFormat<PiFile>.FromBytes(byte[] data) => PiReader.FromBytes(data);
-  static PiFile IImageFileFormat<PiFile>.FromStream(Stream stream) => PiReader.FromStream(stream);
-  static byte[] IImageFileFormat<PiFile>.ToBytes(PiFile file) => PiWriter.ToBytes(file);
+  static string IImageFormatMetadata<PiFile>.PrimaryExtension => ".pi";
+  static string[] IImageFormatMetadata<PiFile>.FileExtensions => [".pi"];
+  static PiFile IImageFormatReader<PiFile>.FromSpan(ReadOnlySpan<byte> data) => PiReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<PiFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<PiFile>.ToBytes(PiFile file) => PiWriter.ToBytes(file);
 
   public int Width { get; init; }
   public int Height { get; init; }
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(PiFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

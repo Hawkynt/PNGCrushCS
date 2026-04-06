@@ -41,25 +41,6 @@ public class MagReaderTests {
 }
 
 [TestFixture]
-public class MagWriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => MagWriter.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_IncludesHeader() {
-    var file = new MagFile {
-      Width = 640,
-      Height = 400,
-      PixelData = new byte[640 * 400],
-    };
-    var bytes = MagWriter.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(32 + 640 * 400));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -90,30 +71,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void HeaderSize_Is32()
-    => Assert.That(MagFile.HeaderSize, Is.EqualTo(32));
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => MagFile.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => MagFile.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 640, Height = 400, Format = PixelFormat.Rgb24, PixelData = new byte[640 * 400 * 3] };
-    Assert.Throws<ArgumentException>(() => MagFile.FromRawImage(raw));
-  }
-
-  [Test]
-  public void FileExtensions_ContainsPrimary() {
-    string[] exts = [".mag", ".mki"];
-    Assert.That(exts, Does.Contain(".mag"));
-  }
-}

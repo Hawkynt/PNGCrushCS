@@ -26,6 +26,8 @@ public static class Fli64Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static Fli64File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static Fli64File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
 

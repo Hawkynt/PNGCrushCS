@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Fli64;
 
 /// <summary>In-memory representation of a FLI Designer (FLI multicolor) image for the Commodore 64.</summary>
-public sealed class Fli64File : IImageFileFormat<Fli64File> {
+public readonly record struct Fli64File : IImageFormatReader<Fli64File>, IImageToRawImage<Fli64File>, IImageFormatWriter<Fli64File> {
 
-  static string IImageFileFormat<Fli64File>.PrimaryExtension => ".fli64";
-  static string[] IImageFileFormat<Fli64File>.FileExtensions => [".fli64"];
-  static Fli64File IImageFileFormat<Fli64File>.FromFile(FileInfo file) => Fli64Reader.FromFile(file);
-  static Fli64File IImageFileFormat<Fli64File>.FromBytes(byte[] data) => Fli64Reader.FromBytes(data);
-  static Fli64File IImageFileFormat<Fli64File>.FromStream(Stream stream) => Fli64Reader.FromStream(stream);
-  static byte[] IImageFileFormat<Fli64File>.ToBytes(Fli64File file) => Fli64Writer.ToBytes(file);
+  static string IImageFormatMetadata<Fli64File>.PrimaryExtension => ".fli64";
+  static string[] IImageFormatMetadata<Fli64File>.FileExtensions => [".fli64"];
+  static Fli64File IImageFormatReader<Fli64File>.FromSpan(ReadOnlySpan<byte> data) => Fli64Reader.FromSpan(data);
+  static byte[] IImageFormatWriter<Fli64File>.ToBytes(Fli64File file) => Fli64Writer.ToBytes(file);
 
   /// <summary>Image width in pixels, always 160 (multicolor).</summary>
   public const int FixedWidth = 160;
@@ -55,27 +52,20 @@ public sealed class Fli64File : IImageFileFormat<Fli64File> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Bitmap data (8000 bytes).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Per-scanline screen RAM (8000 bytes: 40 bytes per scanline x 200 lines).</summary>
-  public byte[] ScreenData { get; init; } = [];
+  public byte[] ScreenData { get; init; }
 
   /// <summary>Color RAM (1000 bytes, one per 4x8 cell).</summary>
-  public byte[] ColorRam { get; init; } = [];
+  public byte[] ColorRam { get; init; }
 
   /// <summary>Padding bytes at the end of the file (472 bytes).</summary>
-  public byte[] Padding { get; init; } = [];
+  public byte[] Padding { get; init; }
 
   /// <summary>Converts this FLI multicolor image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(Fli64File file) {
-    ArgumentNullException.ThrowIfNull(file);
     return _FliMultiToRawImage(file.BitmapData, file.ScreenData, file.ColorRam);
-  }
-
-  /// <summary>Not supported. FLI multicolor images have complex per-scanline color constraints.</summary>
-  public static Fli64File FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to Fli64File is not supported due to complex per-scanline FLI color constraints.");
   }
 
   /// <summary>Shared FLI multicolor decode: per-scanline screen RAM instead of per-cell.</summary>

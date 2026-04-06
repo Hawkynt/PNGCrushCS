@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.FunPhotor;
 
 /// <summary>In-memory representation of a Fun Photor C64 multicolor image.</summary>
-public sealed class FunPhotorFile : IImageFileFormat<FunPhotorFile> {
+public readonly record struct FunPhotorFile : IImageFormatReader<FunPhotorFile>, IImageToRawImage<FunPhotorFile>, IImageFormatWriter<FunPhotorFile> {
 
-  static string IImageFileFormat<FunPhotorFile>.PrimaryExtension => ".fpr";
-  static string[] IImageFileFormat<FunPhotorFile>.FileExtensions => [".fpr"];
-  static FunPhotorFile IImageFileFormat<FunPhotorFile>.FromFile(FileInfo file) => FunPhotorReader.FromFile(file);
-  static FunPhotorFile IImageFileFormat<FunPhotorFile>.FromBytes(byte[] data) => FunPhotorReader.FromBytes(data);
-  static FunPhotorFile IImageFileFormat<FunPhotorFile>.FromStream(Stream stream) => FunPhotorReader.FromStream(stream);
-  static byte[] IImageFileFormat<FunPhotorFile>.ToBytes(FunPhotorFile file) => FunPhotorWriter.ToBytes(file);
+  static string IImageFormatMetadata<FunPhotorFile>.PrimaryExtension => ".fpr";
+  static string[] IImageFormatMetadata<FunPhotorFile>.FileExtensions => [".fpr"];
+  static FunPhotorFile IImageFormatReader<FunPhotorFile>.FromSpan(ReadOnlySpan<byte> data) => FunPhotorReader.FromSpan(data);
+  static byte[] IImageFormatWriter<FunPhotorFile>.ToBytes(FunPhotorFile file) => FunPhotorWriter.ToBytes(file);
 
   /// <summary>Fixed total file size: 2 + 8000 + 1000 + 1000 + 48 = 10050 bytes.</summary>
   internal const int ExpectedFileSize = 10050;
@@ -52,20 +49,19 @@ public sealed class FunPhotorFile : IImageFileFormat<FunPhotorFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Multicolor bitmap data (8000 bytes).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Screen RAM (1000 bytes).</summary>
-  public byte[] ScreenData { get; init; } = [];
+  public byte[] ScreenData { get; init; }
 
   /// <summary>Color RAM (1000 bytes).</summary>
-  public byte[] ColorData { get; init; } = [];
+  public byte[] ColorData { get; init; }
 
   /// <summary>Reserved bytes at end of file (48 bytes).</summary>
-  public byte[] Reserved { get; init; } = [];
+  public byte[] Reserved { get; init; }
 
   /// <summary>Converts this Fun Photor image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(FunPhotorFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = 160;
     const int height = 200;
@@ -104,9 +100,4 @@ public sealed class FunPhotorFile : IImageFileFormat<FunPhotorFile> {
     };
   }
 
-  /// <summary>Not supported.</summary>
-  public static FunPhotorFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to FunPhotorFile is not supported.");
-  }
 }

@@ -26,6 +26,8 @@ public static class FunPhotorReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static FunPhotorFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static FunPhotorFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != FunPhotorFile.ExpectedFileSize)

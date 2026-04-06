@@ -29,6 +29,8 @@ public static class IndyPaintReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static IndyPaintFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static IndyPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != _EXPECTED_SIZE)

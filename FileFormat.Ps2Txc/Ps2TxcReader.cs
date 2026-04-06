@@ -26,6 +26,8 @@ public static class Ps2TxcReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static Ps2TxcFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static Ps2TxcFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < Ps2TxcFile.MinFileSize)

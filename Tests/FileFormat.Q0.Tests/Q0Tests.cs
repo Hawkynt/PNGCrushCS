@@ -41,25 +41,6 @@ public class Q0ReaderTests {
 }
 
 [TestFixture]
-public class Q0WriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => Q0Writer.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_IncludesHeader() {
-    var file = new Q0File {
-      Width = 640,
-      Height = 400,
-      PixelData = new byte[640 * 400 * 3],
-    };
-    var bytes = Q0Writer.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(8 + 640 * 400 * 3));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -90,30 +71,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void HeaderSize_Is8()
-    => Assert.That(Q0File.HeaderSize, Is.EqualTo(8));
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => Q0File.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => Q0File.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 640, Height = 400, Format = PixelFormat.Indexed8, PixelData = new byte[640 * 400] };
-    Assert.Throws<ArgumentException>(() => Q0File.FromRawImage(raw));
-  }
-
-  [Test]
-  public void FileExtensions_ContainsPrimary() {
-    string[] exts = [".q0"];
-    Assert.That(exts, Does.Contain(".q0"));
-  }
-}

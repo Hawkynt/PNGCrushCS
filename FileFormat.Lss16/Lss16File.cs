@@ -1,12 +1,11 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Lss16;
 
 /// <summary>In-memory representation of a Syslinux LSS16 splash screen image.</summary>
 [FormatMagicBytes([0x3D, 0xF3, 0x13, 0x14])]
-public sealed class Lss16File : IImageFileFormat<Lss16File> {
+public readonly record struct Lss16File : IImageFormatReader<Lss16File>, IImageToRawImage<Lss16File>, IImageFromRawImage<Lss16File>, IImageFormatWriter<Lss16File> {
 
   /// <summary>Magic bytes identifying an LSS16 file: 0x3D 0xF3 0x13 0x14.</summary>
   internal static readonly byte[] Magic = [0x3D, 0xF3, 0x13, 0x14];
@@ -23,13 +22,11 @@ public sealed class Lss16File : IImageFileFormat<Lss16File> {
   /// <summary>Total palette size in bytes.</summary>
   internal const int PaletteSize = PaletteEntryCount * BytesPerPaletteEntry;
 
-  static string IImageFileFormat<Lss16File>.PrimaryExtension => ".lss";
-  static string[] IImageFileFormat<Lss16File>.FileExtensions => [".lss", ".16"];
-  static FormatCapability IImageFileFormat<Lss16File>.Capabilities => FormatCapability.IndexedOnly;
-  static Lss16File IImageFileFormat<Lss16File>.FromFile(FileInfo file) => Lss16Reader.FromFile(file);
-  static Lss16File IImageFileFormat<Lss16File>.FromBytes(byte[] data) => Lss16Reader.FromBytes(data);
-  static Lss16File IImageFileFormat<Lss16File>.FromStream(Stream stream) => Lss16Reader.FromStream(stream);
-  static byte[] IImageFileFormat<Lss16File>.ToBytes(Lss16File file) => Lss16Writer.ToBytes(file);
+  static string IImageFormatMetadata<Lss16File>.PrimaryExtension => ".lss";
+  static string[] IImageFormatMetadata<Lss16File>.FileExtensions => [".lss", ".16"];
+  static Lss16File IImageFormatReader<Lss16File>.FromSpan(ReadOnlySpan<byte> data) => Lss16Reader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<Lss16File>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<Lss16File>.ToBytes(Lss16File file) => Lss16Writer.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -38,13 +35,12 @@ public sealed class Lss16File : IImageFileFormat<Lss16File> {
   public int Height { get; init; }
 
   /// <summary>16-entry color table, 3 bytes per entry (R, G, B), 6-bit VGA values (0-63).</summary>
-  public byte[] Palette { get; init; } = new byte[PaletteSize];
+  public byte[] Palette { get; init; }
 
   /// <summary>Pixel data, one byte per pixel, values 0-15 (4-bit color index stored in a full byte).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(Lss16File file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var expandedPalette = new byte[PaletteSize];
     for (var i = 0; i < PaletteSize; ++i) {

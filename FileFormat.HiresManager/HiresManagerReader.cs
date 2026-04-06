@@ -26,6 +26,8 @@ public static class HiresManagerReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static HiresManagerFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static HiresManagerFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < HiresManagerFile.LoadAddressSize + HiresManagerFile.MinPayloadSize)

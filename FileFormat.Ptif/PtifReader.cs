@@ -47,6 +47,8 @@ public static class PtifReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static PtifFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static PtifFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MIN_FILE_SIZE)

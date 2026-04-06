@@ -44,6 +44,8 @@ public static class ZxTricolorReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static ZxTricolorFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static ZxTricolorFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != FileSize)

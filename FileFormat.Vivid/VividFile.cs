@@ -1,28 +1,23 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Vivid;
 
 /// <summary>In-memory representation of a Vivid Ray-Tracer image image.</summary>
-public sealed class VividFile : IImageFileFormat<VividFile> {
+public readonly record struct VividFile : IImageFormatReader<VividFile>, IImageToRawImage<VividFile>, IImageFromRawImage<VividFile>, IImageFormatWriter<VividFile> {
 
   internal const int HeaderSize = 8;
 
-
-  static string IImageFileFormat<VividFile>.PrimaryExtension => ".vivid";
-  static string[] IImageFileFormat<VividFile>.FileExtensions => [".vivid", ".dis"];
-  static VividFile IImageFileFormat<VividFile>.FromFile(FileInfo file) => VividReader.FromFile(file);
-  static VividFile IImageFileFormat<VividFile>.FromBytes(byte[] data) => VividReader.FromBytes(data);
-  static VividFile IImageFileFormat<VividFile>.FromStream(Stream stream) => VividReader.FromStream(stream);
-  static byte[] IImageFileFormat<VividFile>.ToBytes(VividFile file) => VividWriter.ToBytes(file);
+  static string IImageFormatMetadata<VividFile>.PrimaryExtension => ".vivid";
+  static string[] IImageFormatMetadata<VividFile>.FileExtensions => [".vivid", ".dis"];
+  static VividFile IImageFormatReader<VividFile>.FromSpan(ReadOnlySpan<byte> data) => VividReader.FromSpan(data);
+  static byte[] IImageFormatWriter<VividFile>.ToBytes(VividFile file) => VividWriter.ToBytes(file);
 
   public int Width { get; init; }
   public int Height { get; init; }
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(VividFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

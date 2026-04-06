@@ -26,6 +26,8 @@ public static class QdvImageReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static QdvImageFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static QdvImageFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < QdvImageFile.MinFileSize)

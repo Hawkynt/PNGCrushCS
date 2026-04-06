@@ -1,40 +1,36 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.GfaPaint;
 
 /// <summary>In-memory representation of a GFA Paint image (Atari ST, 320x200, 16 colors).</summary>
-public sealed class GfaPaintFile : IImageFileFormat<GfaPaintFile> {
+public readonly record struct GfaPaintFile : IImageFormatReader<GfaPaintFile>, IImageToRawImage<GfaPaintFile>, IImageFromRawImage<GfaPaintFile>, IImageFormatWriter<GfaPaintFile> {
 
   /// <summary>Expected file size: 2-byte resolution + 32-byte palette + 32000 bytes planar data.</summary>
   public const int FileSize = 32034;
 
-  static string IImageFileFormat<GfaPaintFile>.PrimaryExtension => ".gfp";
-  static string[] IImageFileFormat<GfaPaintFile>.FileExtensions => [".gfp"];
-  static FormatCapability IImageFileFormat<GfaPaintFile>.Capabilities => FormatCapability.IndexedOnly;
-  static GfaPaintFile IImageFileFormat<GfaPaintFile>.FromFile(FileInfo file) => GfaPaintReader.FromFile(file);
-  static GfaPaintFile IImageFileFormat<GfaPaintFile>.FromBytes(byte[] data) => GfaPaintReader.FromBytes(data);
-  static GfaPaintFile IImageFileFormat<GfaPaintFile>.FromStream(Stream stream) => GfaPaintReader.FromStream(stream);
-  static byte[] IImageFileFormat<GfaPaintFile>.ToBytes(GfaPaintFile file) => GfaPaintWriter.ToBytes(file);
+  static string IImageFormatMetadata<GfaPaintFile>.PrimaryExtension => ".gfp";
+  static string[] IImageFormatMetadata<GfaPaintFile>.FileExtensions => [".gfp"];
+  static GfaPaintFile IImageFormatReader<GfaPaintFile>.FromSpan(ReadOnlySpan<byte> data) => GfaPaintReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<GfaPaintFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<GfaPaintFile>.ToBytes(GfaPaintFile file) => GfaPaintWriter.ToBytes(file);
 
   /// <summary>Image width (always 320).</summary>
-  public int Width { get; init; } = 320;
+  public int Width { get; init; }
 
   /// <summary>Image height (always 200).</summary>
-  public int Height { get; init; } = 200;
+  public int Height { get; init; }
 
   /// <summary>Resolution word (0 = low 320x200).</summary>
   public ushort Resolution { get; init; }
 
   /// <summary>16-entry palette of Atari ST 9-bit RGB values.</summary>
-  public short[] Palette { get; init; } = new short[16];
+  public short[] Palette { get; init; }
 
   /// <summary>32000 bytes of Atari ST word-interleaved planar pixel data.</summary>
-  public byte[] PixelData { get; init; } = new byte[32000];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(GfaPaintFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var chunky = PlanarConverter.AtariStToChunky(file.PixelData, file.Width, file.Height, 4);
     var paletteCount = Math.Min(16, file.Palette.Length);

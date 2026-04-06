@@ -1,18 +1,16 @@
-﻿using System;
+using System;
 using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.DigiView;
 
 /// <summary>In-memory representation of a DigiView digitizer image.</summary>
-public sealed class DigiViewFile : IImageFileFormat<DigiViewFile> {
+public readonly record struct DigiViewFile : IImageFormatReader<DigiViewFile>, IImageToRawImage<DigiViewFile>, IImageFromRawImage<DigiViewFile>, IImageFormatWriter<DigiViewFile> {
 
-  static string IImageFileFormat<DigiViewFile>.PrimaryExtension => ".dgv";
-  static string[] IImageFileFormat<DigiViewFile>.FileExtensions => [".dgv"];
-  static DigiViewFile IImageFileFormat<DigiViewFile>.FromFile(FileInfo file) => DigiViewReader.FromFile(file);
-  static DigiViewFile IImageFileFormat<DigiViewFile>.FromBytes(byte[] data) => DigiViewReader.FromBytes(data);
-  static DigiViewFile IImageFileFormat<DigiViewFile>.FromStream(Stream stream) => DigiViewReader.FromStream(stream);
-  static byte[] IImageFileFormat<DigiViewFile>.ToBytes(DigiViewFile file) => DigiViewWriter.ToBytes(file);
+  static string IImageFormatMetadata<DigiViewFile>.PrimaryExtension => ".dgv";
+  static string[] IImageFormatMetadata<DigiViewFile>.FileExtensions => [".dgv"];
+  static DigiViewFile IImageFormatReader<DigiViewFile>.FromSpan(ReadOnlySpan<byte> data) => DigiViewReader.FromSpan(data);
+  static byte[] IImageFormatWriter<DigiViewFile>.ToBytes(DigiViewFile file) => DigiViewWriter.ToBytes(file);
 
   /// <summary>Size of the header in bytes (2 width BE + 2 height BE + 1 channels).</summary>
   internal const int HeaderSize = 5;
@@ -27,11 +25,10 @@ public sealed class DigiViewFile : IImageFileFormat<DigiViewFile> {
   public byte Channels { get; init; }
 
   /// <summary>Pixel data (width x height x channels bytes).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this DigiView image to a platform-independent <see cref="RawImage"/>.</summary>
   public static RawImage ToRawImage(DigiViewFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     return file.Channels switch {
       1 => new() {

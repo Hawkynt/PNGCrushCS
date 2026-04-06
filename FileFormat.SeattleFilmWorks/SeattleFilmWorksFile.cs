@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.SeattleFilmWorks;
@@ -12,7 +11,7 @@ namespace FileFormat.SeattleFilmWorks;
 /// </remarks>
 [FormatMagicBytes([0x53, 0x46, 0x57, 0x39, 0x34, 0x41])] // "SFW94A"
 [FormatMagicBytes([0x53, 0x46, 0x57, 0x39, 0x35, 0x41])] // "SFW95A"
-public sealed class SeattleFilmWorksFile : IImageFileFormat<SeattleFilmWorksFile> {
+public sealed class SeattleFilmWorksFile : IImageFormatReader<SeattleFilmWorksFile>, IImageToRawImage<SeattleFilmWorksFile>, IImageFromRawImage<SeattleFilmWorksFile>, IImageFormatWriter<SeattleFilmWorksFile> {
 
   /// <summary>SFW magic header: "SFW94A" (6 bytes).</summary>
   internal static readonly byte[] SfwMagic = [0x53, 0x46, 0x57, 0x39, 0x34, 0x41];
@@ -29,14 +28,13 @@ public sealed class SeattleFilmWorksFile : IImageFileFormat<SeattleFilmWorksFile
   /// <summary>Minimum valid file size: 6-byte magic + 2-byte JPEG SOI.</summary>
   internal const int MIN_FILE_SIZE = MAGIC_LENGTH + 2;
 
-  static string IImageFileFormat<SeattleFilmWorksFile>.PrimaryExtension => ".sfw";
-  static string[] IImageFileFormat<SeattleFilmWorksFile>.FileExtensions => [".sfw", ".pwp"];
-  static SeattleFilmWorksFile IImageFileFormat<SeattleFilmWorksFile>.FromFile(FileInfo file) => SeattleFilmWorksReader.FromFile(file);
-  static SeattleFilmWorksFile IImageFileFormat<SeattleFilmWorksFile>.FromBytes(byte[] data) => SeattleFilmWorksReader.FromBytes(data);
-  static SeattleFilmWorksFile IImageFileFormat<SeattleFilmWorksFile>.FromStream(Stream stream) => SeattleFilmWorksReader.FromStream(stream);
-  static byte[] IImageFileFormat<SeattleFilmWorksFile>.ToBytes(SeattleFilmWorksFile file) => SeattleFilmWorksWriter.ToBytes(file);
+  static string IImageFormatMetadata<SeattleFilmWorksFile>.PrimaryExtension => ".sfw";
+  static string[] IImageFormatMetadata<SeattleFilmWorksFile>.FileExtensions => [".sfw", ".pwp"];
+  static SeattleFilmWorksFile IImageFormatReader<SeattleFilmWorksFile>.FromSpan(ReadOnlySpan<byte> data) => SeattleFilmWorksReader.FromSpan(data);
 
-  static bool? IImageFileFormat<SeattleFilmWorksFile>.MatchesSignature(ReadOnlySpan<byte> header) {
+  static byte[] IImageFormatWriter<SeattleFilmWorksFile>.ToBytes(SeattleFilmWorksFile file) => SeattleFilmWorksWriter.ToBytes(file);
+
+  static bool? IImageFormatMetadata<SeattleFilmWorksFile>.MatchesSignature(ReadOnlySpan<byte> header) {
     if (header.Length < MAGIC_LENGTH)
       return null;
 

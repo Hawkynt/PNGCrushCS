@@ -1,11 +1,10 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.AtariHr;
 
 /// <summary>In-memory representation of an Atari 8-bit HR hires screen dump (320x192, 1bpp monochrome).</summary>
-public sealed class AtariHrFile : IImageFileFormat<AtariHrFile> {
+public readonly record struct AtariHrFile : IImageFormatReader<AtariHrFile>, IImageToRawImage<AtariHrFile>, IImageFromRawImage<AtariHrFile>, IImageFormatWriter<AtariHrFile> {
 
   /// <summary>Fixed width in pixels.</summary>
   internal const int PixelWidth = 320;
@@ -19,15 +18,11 @@ public sealed class AtariHrFile : IImageFileFormat<AtariHrFile> {
   /// <summary>Exact file size in bytes (40 x 192 = 7680).</summary>
   internal const int FileSize = BytesPerRow * PixelHeight;
 
-  static string IImageFileFormat<AtariHrFile>.PrimaryExtension => ".hr";
-  static string[] IImageFileFormat<AtariHrFile>.FileExtensions => [".hr"];
-  static FormatCapability IImageFileFormat<AtariHrFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static AtariHrFile IImageFileFormat<AtariHrFile>.FromFile(FileInfo file) => AtariHrReader.FromFile(file);
-  static AtariHrFile IImageFileFormat<AtariHrFile>.FromBytes(byte[] data) => AtariHrReader.FromBytes(data);
-  static AtariHrFile IImageFileFormat<AtariHrFile>.FromStream(Stream stream) => AtariHrReader.FromStream(stream);
-  static RawImage IImageFileFormat<AtariHrFile>.ToRawImage(AtariHrFile file) => ToRawImage(file);
-  static AtariHrFile IImageFileFormat<AtariHrFile>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<AtariHrFile>.ToBytes(AtariHrFile file) => AtariHrWriter.ToBytes(file);
+  static string IImageFormatMetadata<AtariHrFile>.PrimaryExtension => ".hr";
+  static string[] IImageFormatMetadata<AtariHrFile>.FileExtensions => [".hr"];
+  static AtariHrFile IImageFormatReader<AtariHrFile>.FromSpan(ReadOnlySpan<byte> data) => AtariHrReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<AtariHrFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<AtariHrFile>.ToBytes(AtariHrFile file) => AtariHrWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>
   public int Width => PixelWidth;
@@ -36,13 +31,12 @@ public sealed class AtariHrFile : IImageFileFormat<AtariHrFile> {
   public int Height => PixelHeight;
 
   /// <summary>Raw screen data (7680 bytes). 1bpp MSB-first, 40 bytes per row.</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
   /// <summary>Converts this HR screen dump to an Indexed1 raw image (320x192, B&amp;W palette).</summary>
   public static RawImage ToRawImage(AtariHrFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var pixelData = new byte[BytesPerRow * PixelHeight];
     var srcLen = Math.Min(file.RawData.Length, FileSize);

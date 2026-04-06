@@ -39,6 +39,8 @@ public static class WebPReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static WebPFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static WebPFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < 12)

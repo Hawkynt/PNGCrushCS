@@ -1,23 +1,18 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.ZeissBivas;
 
 /// <summary>In-memory representation of a Zeiss BIVAS microscopy raw data image.</summary>
-public sealed class ZeissBivasFile : IImageFileFormat<ZeissBivasFile> {
+public readonly record struct ZeissBivasFile : IImageFormatReader<ZeissBivasFile>, IImageToRawImage<ZeissBivasFile>, IImageFromRawImage<ZeissBivasFile>, IImageFormatWriter<ZeissBivasFile> {
 
   /// <summary>Header size: uint32 width + uint32 height + uint32 bpp = 12 bytes.</summary>
   internal const int HeaderSize = 12;
 
-  static string IImageFileFormat<ZeissBivasFile>.PrimaryExtension => ".dta";
-  static string[] IImageFileFormat<ZeissBivasFile>.FileExtensions => [".dta"];
-  static ZeissBivasFile IImageFileFormat<ZeissBivasFile>.FromFile(FileInfo file) => ZeissBivasReader.FromFile(file);
-  static ZeissBivasFile IImageFileFormat<ZeissBivasFile>.FromBytes(byte[] data) => ZeissBivasReader.FromBytes(data);
-  static ZeissBivasFile IImageFileFormat<ZeissBivasFile>.FromStream(Stream stream) => ZeissBivasReader.FromStream(stream);
-  static RawImage IImageFileFormat<ZeissBivasFile>.ToRawImage(ZeissBivasFile file) => ToRawImage(file);
-  static ZeissBivasFile IImageFileFormat<ZeissBivasFile>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<ZeissBivasFile>.ToBytes(ZeissBivasFile file) => ZeissBivasWriter.ToBytes(file);
+  static string IImageFormatMetadata<ZeissBivasFile>.PrimaryExtension => ".dta";
+  static string[] IImageFormatMetadata<ZeissBivasFile>.FileExtensions => [".dta"];
+  static ZeissBivasFile IImageFormatReader<ZeissBivasFile>.FromSpan(ReadOnlySpan<byte> data) => ZeissBivasReader.FromSpan(data);
+  static byte[] IImageFormatWriter<ZeissBivasFile>.ToBytes(ZeissBivasFile file) => ZeissBivasWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -26,14 +21,13 @@ public sealed class ZeissBivasFile : IImageFileFormat<ZeissBivasFile> {
   public int Height { get; init; }
 
   /// <summary>Bits per pixel (typically 8).</summary>
-  public int BitsPerPixel { get; init; } = 8;
+  public int BitsPerPixel { get; init; }
 
   /// <summary>Raw pixel data.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts to Gray8.</summary>
   public static RawImage ToRawImage(ZeissBivasFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var expectedSize = file.Width * file.Height;
     var pixelData = new byte[expectedSize];

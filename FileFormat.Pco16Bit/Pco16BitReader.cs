@@ -26,6 +26,8 @@ public static class Pco16BitReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static Pco16BitFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static Pco16BitFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < Pco16BitFile.MinFileSize)

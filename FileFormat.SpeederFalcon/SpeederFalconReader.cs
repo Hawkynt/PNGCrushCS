@@ -29,6 +29,8 @@ public static class SpeederFalconReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static SpeederFalconFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static SpeederFalconFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != _EXPECTED_SIZE)

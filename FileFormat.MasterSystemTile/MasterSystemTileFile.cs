@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.MasterSystemTile;
 
 /// <summary>In-memory representation of Sega Master System / Game Gear 4bpp planar tile data (8x8 tiles, 32 bytes/tile, 16 tiles per row).</summary>
-public sealed class MasterSystemTileFile : IImageFileFormat<MasterSystemTileFile> {
+public readonly record struct MasterSystemTileFile : IImageFormatReader<MasterSystemTileFile>, IImageToRawImage<MasterSystemTileFile>, IImageFromRawImage<MasterSystemTileFile>, IImageFormatWriter<MasterSystemTileFile> {
 
   /// <summary>Number of pixels per tile row/column.</summary>
   internal const int TileSize = 8;
@@ -40,29 +39,26 @@ public sealed class MasterSystemTileFile : IImageFileFormat<MasterSystemTileFile
     return palette;
   }
 
-  static string IImageFileFormat<MasterSystemTileFile>.PrimaryExtension => ".sms";
-  static string[] IImageFileFormat<MasterSystemTileFile>.FileExtensions => [".sms", ".gg"];
-  static FormatCapability IImageFileFormat<MasterSystemTileFile>.Capabilities => FormatCapability.IndexedOnly;
-  static MasterSystemTileFile IImageFileFormat<MasterSystemTileFile>.FromFile(FileInfo file) => MasterSystemTileReader.FromFile(file);
-  static MasterSystemTileFile IImageFileFormat<MasterSystemTileFile>.FromBytes(byte[] data) => MasterSystemTileReader.FromBytes(data);
-  static MasterSystemTileFile IImageFileFormat<MasterSystemTileFile>.FromStream(Stream stream) => MasterSystemTileReader.FromStream(stream);
-  static byte[] IImageFileFormat<MasterSystemTileFile>.ToBytes(MasterSystemTileFile file) => MasterSystemTileWriter.ToBytes(file);
+  static string IImageFormatMetadata<MasterSystemTileFile>.PrimaryExtension => ".sms";
+  static string[] IImageFormatMetadata<MasterSystemTileFile>.FileExtensions => [".sms", ".gg"];
+  static MasterSystemTileFile IImageFormatReader<MasterSystemTileFile>.FromSpan(ReadOnlySpan<byte> data) => MasterSystemTileReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<MasterSystemTileFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<MasterSystemTileFile>.ToBytes(MasterSystemTileFile file) => MasterSystemTileWriter.ToBytes(file);
 
   /// <summary>Image width in pixels (always 128).</summary>
-  public int Width { get; init; } = FixedWidth;
+  public int Width { get; init; }
 
   /// <summary>Image height in pixels (multiple of 8).</summary>
   public int Height { get; init; }
 
   /// <summary>Indexed pixel data (values 0-15, one byte per pixel, row-major).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>16-entry RGB palette (48 bytes: 16 colors x 3 bytes each).</summary>
-  public byte[] Palette { get; init; } = _DefaultPalette[..];
+  public byte[] Palette { get; init; }
 
   /// <summary>Converts this file to a platform-independent <see cref="RawImage"/> in Indexed8 format.</summary>
   public static RawImage ToRawImage(MasterSystemTileFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     return new() {
       Width = file.Width,

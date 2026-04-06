@@ -25,6 +25,8 @@ public static class Q0Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static Q0File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static Q0File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < Q0File.HeaderSize)

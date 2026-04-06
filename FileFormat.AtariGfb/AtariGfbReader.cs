@@ -26,6 +26,8 @@ public static class AtariGfbReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static AtariGfbFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AtariGfbFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < AtariGfbFile.FileSize)

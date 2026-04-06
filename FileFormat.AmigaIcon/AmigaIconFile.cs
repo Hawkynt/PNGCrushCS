@@ -1,21 +1,16 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.AmigaIcon;
 
 /// <summary>In-memory representation of an Amiga Workbench icon (.info) file.</summary>
 [FormatMagicBytes([0xE3, 0x10])]
-public sealed class AmigaIconFile : IImageFileFormat<AmigaIconFile> {
+public readonly record struct AmigaIconFile : IImageFormatReader<AmigaIconFile>, IImageToRawImage<AmigaIconFile>, IImageFromRawImage<AmigaIconFile>, IImageFormatWriter<AmigaIconFile> {
 
-  static string IImageFileFormat<AmigaIconFile>.PrimaryExtension => ".info";
-  static string[] IImageFileFormat<AmigaIconFile>.FileExtensions => [".info"];
-  static AmigaIconFile IImageFileFormat<AmigaIconFile>.FromFile(FileInfo file) => AmigaIconReader.FromFile(file);
-  static AmigaIconFile IImageFileFormat<AmigaIconFile>.FromBytes(byte[] data) => AmigaIconReader.FromBytes(data);
-  static AmigaIconFile IImageFileFormat<AmigaIconFile>.FromStream(Stream stream) => AmigaIconReader.FromStream(stream);
-  static RawImage IImageFileFormat<AmigaIconFile>.ToRawImage(AmigaIconFile file) => file.ToRawImage();
-  static AmigaIconFile IImageFileFormat<AmigaIconFile>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<AmigaIconFile>.ToBytes(AmigaIconFile file) => AmigaIconWriter.ToBytes(file);
+  static string IImageFormatMetadata<AmigaIconFile>.PrimaryExtension => ".info";
+  static string[] IImageFormatMetadata<AmigaIconFile>.FileExtensions => [".info"];
+  static AmigaIconFile IImageFormatReader<AmigaIconFile>.FromSpan(ReadOnlySpan<byte> data) => AmigaIconReader.FromSpan(data);
+  static byte[] IImageFormatWriter<AmigaIconFile>.ToBytes(AmigaIconFile file) => AmigaIconWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -27,10 +22,10 @@ public sealed class AmigaIconFile : IImageFileFormat<AmigaIconFile> {
   public int Depth { get; init; }
 
   /// <summary>Icon type (1=Disk, 2=Drawer, 3=Tool, etc.).</summary>
-  public int IconType { get; init; } = (int)AmigaIconType.Tool;
+  public int IconType { get; init; }
 
   /// <summary>Raw planar bitmap data for the first image. Non-interleaved: all rows of plane 0, then plane 1, etc. Word-aligned rows.</summary>
-  public byte[] PlanarData { get; init; } = [];
+  public byte[] PlanarData { get; init; }
 
   /// <summary>Optional palette as RGB triplets (3 bytes per entry). Defaults to the Workbench 4-color palette when null.</summary>
   public byte[]? Palette { get; init; }
@@ -52,14 +47,14 @@ public sealed class AmigaIconFile : IImageFileFormat<AmigaIconFile> {
   /// <summary>Computes the total expected planar data size for one image.</summary>
   internal static int PlanarDataSize(int width, int height, int depth) => BytesPerPlaneRow(width) * height * depth;
 
-  public RawImage ToRawImage() {
-    var palette = this.Palette ?? _GetDefaultPaletteForDepth(this.Depth);
+  public static RawImage ToRawImage(AmigaIconFile file) {
+    var palette = file.Palette ?? _GetDefaultPaletteForDepth(file.Depth);
     var paletteCount = palette.Length / 3;
-    var chunky = _PlanarToChunky(this.PlanarData, this.Width, this.Height, this.Depth);
+    var chunky = _PlanarToChunky(file.PlanarData, file.Width, file.Height, file.Depth);
 
     return new() {
-      Width = this.Width,
-      Height = this.Height,
+      Width = file.Width,
+      Height = file.Height,
       Format = PixelFormat.Indexed8,
       PixelData = chunky,
       Palette = palette[..],

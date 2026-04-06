@@ -25,6 +25,8 @@ public static class JupiterAceReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static JupiterAceFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static JupiterAceFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != JupiterAceFile.FileSize)

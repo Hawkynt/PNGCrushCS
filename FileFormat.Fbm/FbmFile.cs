@@ -1,19 +1,16 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Fbm;
 
 /// <summary>In-memory representation of a CMU Fuzzy Bitmap (FBM) image.</summary>
 [FormatMagicBytes([0x25, 0x62, 0x69, 0x74, 0x6D, 0x61, 0x70, 0x00])]
-public sealed class FbmFile : IImageFileFormat<FbmFile> {
+public readonly record struct FbmFile : IImageFormatReader<FbmFile>, IImageToRawImage<FbmFile>, IImageFromRawImage<FbmFile>, IImageFormatWriter<FbmFile> {
 
-  static string IImageFileFormat<FbmFile>.PrimaryExtension => ".fbm";
-  static string[] IImageFileFormat<FbmFile>.FileExtensions => [".fbm"];
-  static FbmFile IImageFileFormat<FbmFile>.FromFile(FileInfo file) => FbmReader.FromFile(file);
-  static FbmFile IImageFileFormat<FbmFile>.FromBytes(byte[] data) => FbmReader.FromBytes(data);
-  static FbmFile IImageFileFormat<FbmFile>.FromStream(Stream stream) => FbmReader.FromStream(stream);
-  static byte[] IImageFileFormat<FbmFile>.ToBytes(FbmFile file) => FbmWriter.ToBytes(file);
+  static string IImageFormatMetadata<FbmFile>.PrimaryExtension => ".fbm";
+  static string[] IImageFormatMetadata<FbmFile>.FileExtensions => [".fbm"];
+  static FbmFile IImageFormatReader<FbmFile>.FromSpan(ReadOnlySpan<byte> data) => FbmReader.FromSpan(data);
+  static byte[] IImageFormatWriter<FbmFile>.ToBytes(FbmFile file) => FbmWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -25,13 +22,12 @@ public sealed class FbmFile : IImageFileFormat<FbmFile> {
   public int Bands { get; init; }
 
   /// <summary>Raw pixel data (band-interleaved, no row padding). Length = Width * Height * Bands.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Optional title string from the header (up to 207 characters).</summary>
-  public string Title { get; init; } = string.Empty;
+  public string Title { get; init; }
 
   public static RawImage ToRawImage(FbmFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

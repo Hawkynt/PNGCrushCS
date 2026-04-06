@@ -1,21 +1,18 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Png;
 
 /// <summary>Data model representing a PNG file</summary>
 [FormatMagicBytes([0x89, 0x50, 0x4E, 0x47])]
-public sealed class PngFile : IImageFileFormat<PngFile> {
+public readonly record struct PngFile : IImageFormatReader<PngFile>, IImageToRawImage<PngFile>, IImageFromRawImage<PngFile>, IImageFormatWriter<PngFile> {
 
-  static string IImageFileFormat<PngFile>.PrimaryExtension => ".png";
-  static string[] IImageFileFormat<PngFile>.FileExtensions => [".png"];
-  static FormatCapability IImageFileFormat<PngFile>.Capabilities => FormatCapability.HasDedicatedOptimizer;
-  static PngFile IImageFileFormat<PngFile>.FromFile(FileInfo file) => PngReader.FromFile(file);
-  static PngFile IImageFileFormat<PngFile>.FromBytes(byte[] data) => PngReader.FromBytes(data);
-  static PngFile IImageFileFormat<PngFile>.FromStream(Stream stream) => PngReader.FromStream(stream);
-  static byte[] IImageFileFormat<PngFile>.ToBytes(PngFile file) => PngWriter.ToBytes(file);
+  static string IImageFormatMetadata<PngFile>.PrimaryExtension => ".png";
+  static string[] IImageFormatMetadata<PngFile>.FileExtensions => [".png"];
+  static PngFile IImageFormatReader<PngFile>.FromSpan(ReadOnlySpan<byte> data) => PngReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<PngFile>.Capabilities => FormatCapability.HasDedicatedOptimizer;
+  static byte[] IImageFormatWriter<PngFile>.ToBytes(PngFile file) => PngWriter.ToBytes(file);
   /// <summary>Image width in pixels</summary>
   public required int Width { get; init; }
 
@@ -29,7 +26,7 @@ public sealed class PngFile : IImageFileFormat<PngFile> {
   public required PngColorType ColorType { get; init; }
 
   /// <summary>Interlace method</summary>
-  public PngInterlaceMethod InterlaceMethod { get; init; } = PngInterlaceMethod.None;
+  public PngInterlaceMethod InterlaceMethod { get; init; }
 
   /// <summary>Raw pixel data as scanlines (one byte array per row, without filter bytes)</summary>
   public byte[][]? PixelData { get; init; }
@@ -53,7 +50,6 @@ public sealed class PngFile : IImageFileFormat<PngFile> {
   public IReadOnlyList<PngChunk>? ChunksAfterIdat { get; init; }
 
   public static RawImage ToRawImage(PngFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     if (file.PixelData == null)
       throw new ArgumentException("PixelData must not be null.", nameof(file));
 

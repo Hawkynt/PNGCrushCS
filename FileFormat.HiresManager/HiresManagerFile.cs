@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.HiresManager;
 
 /// <summary>In-memory representation of a C64 Hires Manager by Cosmos (.him) image.</summary>
-public sealed class HiresManagerFile : IImageFileFormat<HiresManagerFile> {
+public readonly record struct HiresManagerFile : IImageFormatReader<HiresManagerFile>, IImageToRawImage<HiresManagerFile>, IImageFormatWriter<HiresManagerFile> {
 
-  static string IImageFileFormat<HiresManagerFile>.PrimaryExtension => ".him";
-  static string[] IImageFileFormat<HiresManagerFile>.FileExtensions => [".him"];
-  static HiresManagerFile IImageFileFormat<HiresManagerFile>.FromFile(FileInfo file) => HiresManagerReader.FromFile(file);
-  static HiresManagerFile IImageFileFormat<HiresManagerFile>.FromBytes(byte[] data) => HiresManagerReader.FromBytes(data);
-  static HiresManagerFile IImageFileFormat<HiresManagerFile>.FromStream(Stream stream) => HiresManagerReader.FromStream(stream);
-  static byte[] IImageFileFormat<HiresManagerFile>.ToBytes(HiresManagerFile file) => HiresManagerWriter.ToBytes(file);
+  static string IImageFormatMetadata<HiresManagerFile>.PrimaryExtension => ".him";
+  static string[] IImageFormatMetadata<HiresManagerFile>.FileExtensions => [".him"];
+  static HiresManagerFile IImageFormatReader<HiresManagerFile>.FromSpan(ReadOnlySpan<byte> data) => HiresManagerReader.FromSpan(data);
+  static byte[] IImageFormatWriter<HiresManagerFile>.ToBytes(HiresManagerFile file) => HiresManagerWriter.ToBytes(file);
 
   /// <summary>The fixed width of the image in pixels.</summary>
   public const int FixedWidth = 320;
@@ -49,11 +46,10 @@ public sealed class HiresManagerFile : IImageFileFormat<HiresManagerFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Raw payload data (entire file content after load address).</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   /// <summary>Converts this Hires Manager image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(HiresManagerFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -96,9 +92,4 @@ public sealed class HiresManagerFile : IImageFileFormat<HiresManagerFile> {
     };
   }
 
-  /// <summary>Not supported. Hires Manager images have complex cell-based color constraints.</summary>
-  public static HiresManagerFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to HiresManagerFile is not supported due to complex cell-based color constraints.");
-  }
 }

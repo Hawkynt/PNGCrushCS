@@ -26,6 +26,8 @@ public static class BmpReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static BmpFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static BmpFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < BitmapFileHeader.StructSize + BitmapInfoHeader.StructSize)

@@ -1,18 +1,15 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Ps2Txc;
 
 /// <summary>In-memory representation of a PS2 TXC texture image.</summary>
-public sealed class Ps2TxcFile : IImageFileFormat<Ps2TxcFile> {
+public readonly record struct Ps2TxcFile : IImageFormatReader<Ps2TxcFile>, IImageToRawImage<Ps2TxcFile>, IImageFormatWriter<Ps2TxcFile> {
 
-  static string IImageFileFormat<Ps2TxcFile>.PrimaryExtension => ".txc";
-  static string[] IImageFileFormat<Ps2TxcFile>.FileExtensions => [".txc"];
-  static Ps2TxcFile IImageFileFormat<Ps2TxcFile>.FromFile(FileInfo file) => Ps2TxcReader.FromFile(file);
-  static Ps2TxcFile IImageFileFormat<Ps2TxcFile>.FromBytes(byte[] data) => Ps2TxcReader.FromBytes(data);
-  static Ps2TxcFile IImageFileFormat<Ps2TxcFile>.FromStream(Stream stream) => Ps2TxcReader.FromStream(stream);
-  static byte[] IImageFileFormat<Ps2TxcFile>.ToBytes(Ps2TxcFile file) => Ps2TxcWriter.ToBytes(file);
+  static string IImageFormatMetadata<Ps2TxcFile>.PrimaryExtension => ".txc";
+  static string[] IImageFormatMetadata<Ps2TxcFile>.FileExtensions => [".txc"];
+  static Ps2TxcFile IImageFormatReader<Ps2TxcFile>.FromSpan(ReadOnlySpan<byte> data) => Ps2TxcReader.FromSpan(data);
+  static byte[] IImageFormatWriter<Ps2TxcFile>.ToBytes(Ps2TxcFile file) => Ps2TxcWriter.ToBytes(file);
 
   /// <summary>Header size: width(2) + height(2) + bpp(2) + flags(2) = 8 bytes.</summary>
   internal const int HeaderSize = 8;
@@ -33,11 +30,10 @@ public sealed class Ps2TxcFile : IImageFileFormat<Ps2TxcFile> {
   public ushort Flags { get; init; }
 
   /// <summary>Raw pixel data.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this TXC image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(Ps2TxcFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var pixelCount = file.Width * file.Height;
     var rgb = new byte[pixelCount * 3];
@@ -77,9 +73,4 @@ public sealed class Ps2TxcFile : IImageFileFormat<Ps2TxcFile> {
     };
   }
 
-  /// <summary>Not supported.</summary>
-  public static Ps2TxcFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to Ps2TxcFile is not supported.");
-  }
 }

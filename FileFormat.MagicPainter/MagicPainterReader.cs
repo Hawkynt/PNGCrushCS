@@ -32,6 +32,8 @@ public static class MagicPainterReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static MagicPainterFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static MagicPainterFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < HeaderSize)

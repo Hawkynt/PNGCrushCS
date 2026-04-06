@@ -1,20 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.CpcPlus;
 
 /// <summary>In-memory representation of a CPC Plus Mode 1 image (16384 bytes screen + 16 bytes palette: 320x200, 4 colors from 4096-color palette).</summary>
-public sealed class CpcPlusFile : IImageFileFormat<CpcPlusFile> {
+public readonly record struct CpcPlusFile : IImageFormatReader<CpcPlusFile>, IImageToRawImage<CpcPlusFile>, IImageFormatWriter<CpcPlusFile> {
 
-  static string IImageFileFormat<CpcPlusFile>.PrimaryExtension => ".cpp";
-  static string[] IImageFileFormat<CpcPlusFile>.FileExtensions => [".cpp"];
-  static CpcPlusFile IImageFileFormat<CpcPlusFile>.FromFile(FileInfo file) => CpcPlusReader.FromFile(file);
-  static CpcPlusFile IImageFileFormat<CpcPlusFile>.FromBytes(byte[] data) => CpcPlusReader.FromBytes(data);
-  static CpcPlusFile IImageFileFormat<CpcPlusFile>.FromStream(Stream stream) => CpcPlusReader.FromStream(stream);
-  static RawImage IImageFileFormat<CpcPlusFile>.ToRawImage(CpcPlusFile file) => ToRawImage(file);
-  static CpcPlusFile IImageFileFormat<CpcPlusFile>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<CpcPlusFile>.ToBytes(CpcPlusFile file) => CpcPlusWriter.ToBytes(file);
+  static string IImageFormatMetadata<CpcPlusFile>.PrimaryExtension => ".cpp";
+  static string[] IImageFormatMetadata<CpcPlusFile>.FileExtensions => [".cpp"];
+  static CpcPlusFile IImageFormatReader<CpcPlusFile>.FromSpan(ReadOnlySpan<byte> data) => CpcPlusReader.FromSpan(data);
+  static byte[] IImageFormatWriter<CpcPlusFile>.ToBytes(CpcPlusFile file) => CpcPlusWriter.ToBytes(file);
 
   /// <summary>Screen data size in bytes.</summary>
   internal const int ScreenDataSize = 16384;
@@ -47,14 +42,13 @@ public sealed class CpcPlusFile : IImageFileFormat<CpcPlusFile> {
   public int Height => PixelHeight;
 
   /// <summary>Deinterleaved pixel data (200 rows x 80 bytes, Mode 1 packed).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>12-bit palette entries (4 entries, each stored as 4 bytes: 0x0R, 0x0G, 0x0B, 0x00).</summary>
-  public byte[] PaletteData { get; init; } = [];
+  public byte[] PaletteData { get; init; }
 
   /// <summary>Converts the CPC Plus screen to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(CpcPlusFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     // Decode 12-bit palette to RGB24
     var palette = new byte[PaletteEntries * 3];
@@ -107,9 +101,4 @@ public sealed class CpcPlusFile : IImageFileFormat<CpcPlusFile> {
     };
   }
 
-  /// <summary>Not supported. CPC Plus images require 12-bit palette mapping.</summary>
-  public static CpcPlusFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to CpcPlusFile is not supported.");
-  }
 }

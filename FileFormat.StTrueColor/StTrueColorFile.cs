@@ -1,34 +1,30 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.StTrueColor;
 
 /// <summary>In-memory representation of an ST True Color 12-bit image (Atari STE, 320x200, 4096 colors).</summary>
-public sealed class StTrueColorFile : IImageFileFormat<StTrueColorFile> {
+public readonly record struct StTrueColorFile : IImageFormatReader<StTrueColorFile>, IImageToRawImage<StTrueColorFile>, IImageFromRawImage<StTrueColorFile>, IImageFormatWriter<StTrueColorFile> {
 
   public const int FileSize = 128000;
   private const int _WIDTH = 320;
   private const int _HEIGHT = 200;
 
-  static string IImageFileFormat<StTrueColorFile>.PrimaryExtension => ".stc";
-  static string[] IImageFileFormat<StTrueColorFile>.FileExtensions => [".stc"];
-  static StTrueColorFile IImageFileFormat<StTrueColorFile>.FromFile(FileInfo file) => StTrueColorReader.FromFile(file);
-  static StTrueColorFile IImageFileFormat<StTrueColorFile>.FromBytes(byte[] data) => StTrueColorReader.FromBytes(data);
-  static StTrueColorFile IImageFileFormat<StTrueColorFile>.FromStream(Stream stream) => StTrueColorReader.FromStream(stream);
-  static byte[] IImageFileFormat<StTrueColorFile>.ToBytes(StTrueColorFile file) => StTrueColorWriter.ToBytes(file);
+  static string IImageFormatMetadata<StTrueColorFile>.PrimaryExtension => ".stc";
+  static string[] IImageFormatMetadata<StTrueColorFile>.FileExtensions => [".stc"];
+  static StTrueColorFile IImageFormatReader<StTrueColorFile>.FromSpan(ReadOnlySpan<byte> data) => StTrueColorReader.FromSpan(data);
+  static byte[] IImageFormatWriter<StTrueColorFile>.ToBytes(StTrueColorFile file) => StTrueColorWriter.ToBytes(file);
 
   /// <summary>Image width (always 320).</summary>
-  public int Width { get; init; } = _WIDTH;
+  public int Width { get; init; }
 
   /// <summary>Image height (always 200).</summary>
-  public int Height { get; init; } = _HEIGHT;
+  public int Height { get; init; }
 
   /// <summary>128000 bytes of 12-bit per pixel data (2 bytes per pixel, 320x200).</summary>
-  public byte[] PixelData { get; init; } = new byte[FileSize];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(StTrueColorFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var rgb = new byte[_WIDTH * _HEIGHT * 3];
     var src = file.PixelData;

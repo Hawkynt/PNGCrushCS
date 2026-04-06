@@ -1,27 +1,23 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Qoi;
 
 /// <summary>In-memory representation of a QOI image.</summary>
 [FormatMagicBytes([0x71, 0x6F, 0x69, 0x66])]
-public sealed class QoiFile : IImageFileFormat<QoiFile> {
+public readonly record struct QoiFile : IImageFormatReader<QoiFile>, IImageToRawImage<QoiFile>, IImageFromRawImage<QoiFile>, IImageFormatWriter<QoiFile> {
 
-  static string IImageFileFormat<QoiFile>.PrimaryExtension => ".qoi";
-  static string[] IImageFileFormat<QoiFile>.FileExtensions => [".qoi"];
-  static QoiFile IImageFileFormat<QoiFile>.FromFile(FileInfo file) => QoiReader.FromFile(file);
-  static QoiFile IImageFileFormat<QoiFile>.FromBytes(byte[] data) => QoiReader.FromBytes(data);
-  static QoiFile IImageFileFormat<QoiFile>.FromStream(Stream stream) => QoiReader.FromStream(stream);
-  static byte[] IImageFileFormat<QoiFile>.ToBytes(QoiFile file) => QoiWriter.ToBytes(file);
+  static string IImageFormatMetadata<QoiFile>.PrimaryExtension => ".qoi";
+  static string[] IImageFormatMetadata<QoiFile>.FileExtensions => [".qoi"];
+  static QoiFile IImageFormatReader<QoiFile>.FromSpan(ReadOnlySpan<byte> data) => QoiReader.FromSpan(data);
+  static byte[] IImageFormatWriter<QoiFile>.ToBytes(QoiFile file) => QoiWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
   public QoiChannels Channels { get; init; }
   public QoiColorSpace ColorSpace { get; init; }
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(QoiFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

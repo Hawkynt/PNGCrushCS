@@ -26,6 +26,8 @@ public static class ArtStudio8Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static ArtStudio8File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static ArtStudio8File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != ArtStudio8File.FileSize)

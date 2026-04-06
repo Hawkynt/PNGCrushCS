@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.MsxScreen8;
@@ -9,14 +8,12 @@ namespace FileFormat.MsxScreen8;
 /// 256x212, 256 colors direct color, each byte encodes G(3)-R(3)-B(2).
 /// </summary>
 [FormatMagicBytes([0xFE])]
-public sealed class MsxScreen8File : IImageFileFormat<MsxScreen8File> {
+public readonly record struct MsxScreen8File : IImageFormatReader<MsxScreen8File>, IImageToRawImage<MsxScreen8File>, IImageFromRawImage<MsxScreen8File>, IImageFormatWriter<MsxScreen8File> {
 
-  static string IImageFileFormat<MsxScreen8File>.PrimaryExtension => ".sc8";
-  static string[] IImageFileFormat<MsxScreen8File>.FileExtensions => [".sc8"];
-  static MsxScreen8File IImageFileFormat<MsxScreen8File>.FromFile(FileInfo file) => MsxScreen8Reader.FromFile(file);
-  static MsxScreen8File IImageFileFormat<MsxScreen8File>.FromBytes(byte[] data) => MsxScreen8Reader.FromBytes(data);
-  static MsxScreen8File IImageFileFormat<MsxScreen8File>.FromStream(Stream stream) => MsxScreen8Reader.FromStream(stream);
-  static byte[] IImageFileFormat<MsxScreen8File>.ToBytes(MsxScreen8File file) => MsxScreen8Writer.ToBytes(file);
+  static string IImageFormatMetadata<MsxScreen8File>.PrimaryExtension => ".sc8";
+  static string[] IImageFormatMetadata<MsxScreen8File>.FileExtensions => [".sc8"];
+  static MsxScreen8File IImageFormatReader<MsxScreen8File>.FromSpan(ReadOnlySpan<byte> data) => MsxScreen8Reader.FromSpan(data);
+  static byte[] IImageFormatWriter<MsxScreen8File>.ToBytes(MsxScreen8File file) => MsxScreen8Writer.ToBytes(file);
 
   /// <summary>Fixed width of an MSX Screen 8 image.</summary>
   public const int FixedWidth = 256;
@@ -43,14 +40,13 @@ public sealed class MsxScreen8File : IImageFileFormat<MsxScreen8File> {
   public int Height => FixedHeight;
 
   /// <summary>Raw pixel data (54272 bytes, each byte = GGGRRRBB).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Whether the original data had a 7-byte BSAVE header.</summary>
   public bool HasBsaveHeader { get; init; }
 
   /// <summary>Converts this MSX Screen 8 image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(MsxScreen8File file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var rgb = new byte[FixedWidth * FixedHeight * 3];
 

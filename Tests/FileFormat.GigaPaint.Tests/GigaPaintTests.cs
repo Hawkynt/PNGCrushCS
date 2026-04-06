@@ -47,26 +47,6 @@ public sealed class GigaPaintReaderTests {
 }
 
 [TestFixture]
-public sealed class GigaPaintWriterTests {
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => GigaPaintWriter.ToBytes(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_CorrectOutputSize() {
-    var rawData = new byte[9000];
-    var file = new GigaPaintFile { LoadAddress = 0x2000, RawData = rawData };
-    var bytes = GigaPaintWriter.ToBytes(file);
-
-    Assert.That(bytes.Length, Is.EqualTo(2 + 9000));
-  }
-}
-
-[TestFixture]
 public sealed class GigaPaintRoundTripTests {
 
   [Test]
@@ -83,51 +63,6 @@ public sealed class GigaPaintRoundTripTests {
 
     Assert.That(restored.LoadAddress, Is.EqualTo(original.LoadAddress));
     Assert.That(restored.RawData, Is.EqualTo(original.RawData));
-  }
-}
-
-[TestFixture]
-public sealed class GigaPaintDataTypeTests {
-
-  [Test]
-  [Category("Unit")]
-  public void PrimaryExtension_IsGih() {
-    Assert.That(_GetPrimaryExtension(), Is.EqualTo(".gih"));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FileExtensions_ContainsGihAndGig() {
-    var extensions = _GetFileExtensions();
-    Assert.That(extensions, Does.Contain(".gih"));
-    Assert.That(extensions, Does.Contain(".gig"));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => GigaPaintFile.ToRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => GigaPaintFile.FromRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_ThrowsNotSupportedException() {
-    var image = new RawImage { Width = 320, Height = 200, Format = PixelFormat.Rgb24, PixelData = new byte[320 * 200 * 3] };
-    Assert.Throws<NotSupportedException>(() => GigaPaintFile.FromRawImage(image));
-  }
-
-  private static string _GetPrimaryExtension() => _Helper<GigaPaintFile>.PrimaryExtension;
-  private static string[] _GetFileExtensions() => _Helper<GigaPaintFile>.FileExtensions;
-
-  private static class _Helper<T> where T : IImageFileFormat<T> {
-    public static string PrimaryExtension => T.PrimaryExtension;
-    public static string[] FileExtensions => T.FileExtensions;
   }
 }
 

@@ -5,7 +5,7 @@ using FileFormat.Core;
 namespace FileFormat.FullscreenKit;
 
 /// <summary>In-memory representation of an Atari ST Fullscreen Construction Kit overscan image (416x274 or 448x272, 16 colors, 4 planes).</summary>
-public sealed class FullscreenKitFile : IImageFileFormat<FullscreenKitFile> {
+public readonly record struct FullscreenKitFile : IImageFormatReader<FullscreenKitFile>, IImageToRawImage<FullscreenKitFile>, IImageFromRawImage<FullscreenKitFile>, IImageFormatWriter<FullscreenKitFile> {
 
   /// <summary>Number of bitplanes (always 4 for low resolution).</summary>
   public const int NumPlanes = 4;
@@ -37,24 +37,22 @@ public sealed class FullscreenKitFile : IImageFileFormat<FullscreenKitFile> {
   /// <summary>Pixel data size for 448x272: (448/16)*4*2*272 = 60928.</summary>
   internal const int AlternatePixelDataSize = (AlternateWidth / 16) * NumPlanes * 2 * AlternateHeight;
 
-  static string IImageFileFormat<FullscreenKitFile>.PrimaryExtension => ".kid";
-  static string[] IImageFileFormat<FullscreenKitFile>.FileExtensions => [".kid"];
-  static FullscreenKitFile IImageFileFormat<FullscreenKitFile>.FromFile(FileInfo file) => FullscreenKitReader.FromFile(file);
-  static FullscreenKitFile IImageFileFormat<FullscreenKitFile>.FromBytes(byte[] data) => FullscreenKitReader.FromBytes(data);
-  static FullscreenKitFile IImageFileFormat<FullscreenKitFile>.FromStream(Stream stream) => FullscreenKitReader.FromStream(stream);
-  static byte[] IImageFileFormat<FullscreenKitFile>.ToBytes(FullscreenKitFile file) => FullscreenKitWriter.ToBytes(file);
+  static string IImageFormatMetadata<FullscreenKitFile>.PrimaryExtension => ".kid";
+  static string[] IImageFormatMetadata<FullscreenKitFile>.FileExtensions => [".kid"];
+  static FullscreenKitFile IImageFormatReader<FullscreenKitFile>.FromSpan(ReadOnlySpan<byte> data) => FullscreenKitReader.FromSpan(data);
+  static byte[] IImageFormatWriter<FullscreenKitFile>.ToBytes(FullscreenKitFile file) => FullscreenKitWriter.ToBytes(file);
 
   /// <summary>Image width (416 or 448).</summary>
-  public int Width { get; init; } = PrimaryWidth;
+  public int Width { get; init; }
 
   /// <summary>Image height (274 or 272).</summary>
-  public int Height { get; init; } = PrimaryHeight;
+  public int Height { get; init; }
 
   /// <summary>16-entry palette of Atari ST RGB values (0x0RGB, R/G/B in 0-7).</summary>
-  public short[] Palette { get; init; } = new short[16];
+  public short[] Palette { get; init; }
 
   /// <summary>Atari ST word-interleaved 4-plane planar pixel data (overscan size).</summary>
-  public byte[] PixelData { get; init; } = new byte[PrimaryPixelDataSize];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Detects dimensions from the pixel data size after subtracting the palette header.</summary>
   internal static (int Width, int Height) DetectDimensions(int dataLength) {
@@ -71,7 +69,6 @@ public sealed class FullscreenKitFile : IImageFileFormat<FullscreenKitFile> {
   }
 
   public static RawImage ToRawImage(FullscreenKitFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var chunky = PlanarConverter.AtariStToChunky(file.PixelData, file.Width, file.Height, NumPlanes);
     var paletteCount = Math.Min(ColorCount, file.Palette.Length);

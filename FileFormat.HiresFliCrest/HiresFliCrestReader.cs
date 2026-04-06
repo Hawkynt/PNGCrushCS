@@ -26,6 +26,8 @@ public static class HiresFliCrestReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static HiresFliCrestFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static HiresFliCrestFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < HiresFliCrestFile.LoadAddressSize + HiresFliCrestFile.MinPayloadSize)

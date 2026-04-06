@@ -26,6 +26,8 @@ public static class MuifliEditorReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static MuifliEditorFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static MuifliEditorFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < MuifliEditorFile.LoadAddressSize + MuifliEditorFile.MinPayloadSize)

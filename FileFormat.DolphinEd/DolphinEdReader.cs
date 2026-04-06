@@ -26,6 +26,8 @@ public static class DolphinEdReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static DolphinEdFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static DolphinEdFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < DolphinEdFile.ExpectedFileSize)

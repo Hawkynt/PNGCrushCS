@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.NdsTexture;
 
 /// <summary>In-memory representation of a Nintendo DS 4bpp tile texture image.</summary>
-public sealed class NdsTextureFile : IImageFileFormat<NdsTextureFile> {
+public readonly record struct NdsTextureFile : IImageFormatReader<NdsTextureFile>, IImageToRawImage<NdsTextureFile>, IImageFromRawImage<NdsTextureFile>, IImageFormatWriter<NdsTextureFile> {
 
   internal const int BytesPerTile = 32;
   internal const int TileSize = 8;
@@ -15,21 +14,18 @@ public sealed class NdsTextureFile : IImageFileFormat<NdsTextureFile> {
 
   private static readonly byte[] _DefaultPalette = [0, 0, 0, 0, 0, 170, 0, 170, 0, 0, 170, 170, 170, 0, 0, 170, 0, 170, 170, 85, 0, 170, 170, 170, 85, 85, 85, 85, 85, 255, 85, 255, 85, 85, 255, 255, 255, 85, 85, 255, 85, 255, 255, 255, 85, 255, 255, 255];
 
-  static string IImageFileFormat<NdsTextureFile>.PrimaryExtension => ".nbfs";
-  static string[] IImageFileFormat<NdsTextureFile>.FileExtensions => [".nbfs", ".nds"];
-  static FormatCapability IImageFileFormat<NdsTextureFile>.Capabilities => FormatCapability.IndexedOnly;
-  static NdsTextureFile IImageFileFormat<NdsTextureFile>.FromFile(FileInfo file) => NdsTextureReader.FromFile(file);
-  static NdsTextureFile IImageFileFormat<NdsTextureFile>.FromBytes(byte[] data) => NdsTextureReader.FromBytes(data);
-  static NdsTextureFile IImageFileFormat<NdsTextureFile>.FromStream(Stream stream) => NdsTextureReader.FromStream(stream);
-  static byte[] IImageFileFormat<NdsTextureFile>.ToBytes(NdsTextureFile file) => NdsTextureWriter.ToBytes(file);
+  static string IImageFormatMetadata<NdsTextureFile>.PrimaryExtension => ".nbfs";
+  static string[] IImageFormatMetadata<NdsTextureFile>.FileExtensions => [".nbfs", ".nds"];
+  static NdsTextureFile IImageFormatReader<NdsTextureFile>.FromSpan(ReadOnlySpan<byte> data) => NdsTextureReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<NdsTextureFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<NdsTextureFile>.ToBytes(NdsTextureFile file) => NdsTextureWriter.ToBytes(file);
 
-  public int Width { get; init; } = TilesPerRow * TileSize;
+  public int Width { get; init; }
   public int Height { get; init; }
-  public byte[] PixelData { get; init; } = [];
-  public byte[] Palette { get; init; } = _DefaultPalette[..];
+  public byte[] PixelData { get; init; }
+  public byte[] Palette { get; init; }
 
   public static RawImage ToRawImage(NdsTextureFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

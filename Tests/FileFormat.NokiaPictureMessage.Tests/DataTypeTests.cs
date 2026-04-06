@@ -38,7 +38,7 @@ public sealed class DataTypeTests {
       PixelData = new byte[] { 0xFF }
     };
 
-    var raw = file.ToRawImage();
+    var raw = NokiaPictureMessageFile.ToRawImage(file);
 
     Assert.That(raw.Format, Is.EqualTo(PixelFormat.Indexed1));
     Assert.That(raw.PaletteCount, Is.EqualTo(2));

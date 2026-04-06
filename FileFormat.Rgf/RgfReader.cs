@@ -29,6 +29,8 @@ public static class RgfReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static RgfFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static RgfFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _HEADER_SIZE)

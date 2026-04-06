@@ -1,18 +1,15 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Pict;
 
 /// <summary>In-memory representation of a PICT image (raster subset).</summary>
-public sealed class PictFile : IImageFileFormat<PictFile> {
+public readonly record struct PictFile : IImageFormatReader<PictFile>, IImageToRawImage<PictFile>, IImageFromRawImage<PictFile>, IImageFormatWriter<PictFile> {
 
-  static string IImageFileFormat<PictFile>.PrimaryExtension => ".pict";
-  static string[] IImageFileFormat<PictFile>.FileExtensions => [".pict", ".pct"];
-  static PictFile IImageFileFormat<PictFile>.FromFile(FileInfo file) => PictReader.FromFile(file);
-  static PictFile IImageFileFormat<PictFile>.FromBytes(byte[] data) => PictReader.FromBytes(data);
-  static PictFile IImageFileFormat<PictFile>.FromStream(Stream stream) => PictReader.FromStream(stream);
-  static byte[] IImageFileFormat<PictFile>.ToBytes(PictFile file) => PictWriter.ToBytes(file);
+  static string IImageFormatMetadata<PictFile>.PrimaryExtension => ".pict";
+  static string[] IImageFormatMetadata<PictFile>.FileExtensions => [".pict", ".pct"];
+  static PictFile IImageFormatReader<PictFile>.FromSpan(ReadOnlySpan<byte> data) => PictReader.FromSpan(data);
+  static byte[] IImageFormatWriter<PictFile>.ToBytes(PictFile file) => PictWriter.ToBytes(file);
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
   /// <summary>Image height in pixels.</summary>
@@ -20,13 +17,12 @@ public sealed class PictFile : IImageFileFormat<PictFile> {
   /// <summary>Bits per pixel (8 for indexed, 24 for direct RGB).</summary>
   public int BitsPerPixel { get; init; }
   /// <summary>Pixel data: RGB interleaved for 24bpp, indexed for 8bpp.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
   /// <summary>Optional palette for indexed images (R,G,B triplets).</summary>
   public byte[]? Palette { get; init; }
 
   /// <summary>Converts this PICT file to a format-independent <see cref="RawImage"/>.</summary>
   public static RawImage ToRawImage(PictFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     if (file.BitsPerPixel == 24)
       return new() {

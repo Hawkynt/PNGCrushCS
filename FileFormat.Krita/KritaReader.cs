@@ -30,6 +30,8 @@ public static class KritaReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static KritaFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static KritaFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < 4)

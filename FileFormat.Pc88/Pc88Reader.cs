@@ -25,6 +25,8 @@ public static class Pc88Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static Pc88File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static Pc88File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < Pc88File.FileSize)

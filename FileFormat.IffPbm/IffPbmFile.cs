@@ -1,25 +1,22 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.IffPbm;
 
 /// <summary>In-memory representation of an IFF PBM (Packed Bitmap) image.</summary>
 [FormatMagicBytes([0x46, 0x4F, 0x52, 0x4D])]
-public sealed class IffPbmFile : IImageFileFormat<IffPbmFile> {
+public readonly record struct IffPbmFile : IImageFormatReader<IffPbmFile>, IImageToRawImage<IffPbmFile>, IImageFromRawImage<IffPbmFile>, IImageFormatWriter<IffPbmFile> {
 
-  static string IImageFileFormat<IffPbmFile>.PrimaryExtension => ".lbm";
-  static string[] IImageFileFormat<IffPbmFile>.FileExtensions => [".lbm", ".pbm"];
-  static FormatCapability IImageFileFormat<IffPbmFile>.Capabilities => FormatCapability.IndexedOnly;
+  static string IImageFormatMetadata<IffPbmFile>.PrimaryExtension => ".lbm";
+  static string[] IImageFormatMetadata<IffPbmFile>.FileExtensions => [".lbm", ".pbm"];
+  static IffPbmFile IImageFormatReader<IffPbmFile>.FromSpan(ReadOnlySpan<byte> data) => IffPbmReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<IffPbmFile>.Capabilities => FormatCapability.IndexedOnly;
 
-  static bool? IImageFileFormat<IffPbmFile>.MatchesSignature(ReadOnlySpan<byte> header)
+  static bool? IImageFormatMetadata<IffPbmFile>.MatchesSignature(ReadOnlySpan<byte> header)
     => header.Length >= 12 && header[0] == 0x46 && header[1] == 0x4F && header[2] == 0x52 && header[3] == 0x4D
       && header[8] == 0x50 && header[9] == 0x42 && header[10] == 0x4D && header[11] == 0x20;
 
-  static IffPbmFile IImageFileFormat<IffPbmFile>.FromFile(FileInfo file) => IffPbmReader.FromFile(file);
-  static IffPbmFile IImageFileFormat<IffPbmFile>.FromBytes(byte[] data) => IffPbmReader.FromBytes(data);
-  static IffPbmFile IImageFileFormat<IffPbmFile>.FromStream(Stream stream) => IffPbmReader.FromStream(stream);
-  static byte[] IImageFileFormat<IffPbmFile>.ToBytes(IffPbmFile file) => IffPbmWriter.ToBytes(file);
+  static byte[] IImageFormatWriter<IffPbmFile>.ToBytes(IffPbmFile file) => IffPbmWriter.ToBytes(file);
 
   public int Width { get; init; }
   public int Height { get; init; }
@@ -29,12 +26,11 @@ public sealed class IffPbmFile : IImageFileFormat<IffPbmFile> {
   public byte YAspect { get; init; }
   public int PageWidth { get; init; }
   public int PageHeight { get; init; }
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
   public byte[]? Palette { get; init; }
 
   /// <summary>Converts this PBM file to a format-independent <see cref="RawImage"/>.</summary>
   public static RawImage ToRawImage(IffPbmFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var palette = file.Palette is { } p ? p[..] : null;
     var paletteCount = palette != null ? palette.Length / 3 : 256;

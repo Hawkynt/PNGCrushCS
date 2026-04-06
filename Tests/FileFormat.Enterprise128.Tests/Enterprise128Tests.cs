@@ -47,21 +47,6 @@ public class Enterprise128ReaderTests {
 }
 
 [TestFixture]
-public class Enterprise128WriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => Enterprise128Writer.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_OutputSize_IsCorrect() {
-    var file = new Enterprise128File { PixelData = new byte[Enterprise128File.ImageWidth * Enterprise128File.ImageHeight] };
-    var bytes = Enterprise128Writer.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(Enterprise128File.FileSize));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -94,41 +79,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void PrimaryExtension_IsCorrect()
-    => Assert.That(_GetPrimaryExtension<Enterprise128File>(), Is.EqualTo(".ep"));
-
-  [Test]
-  public void FileExtensions_ContainsPrimary() {
-    var exts = _GetFileExtensions<Enterprise128File>();
-    Assert.That(exts, Does.Contain(".ep"));
-  }
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => Enterprise128File.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => Enterprise128File.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 512, Height = 256, Format = PixelFormat.Rgb24, PixelData = new byte[512 * 256 * 3] };
-    Assert.Throws<ArgumentException>(() => Enterprise128File.FromRawImage(raw));
-  }
-
-  [Test]
-  public void Constants_AreCorrect() {
-    Assert.That(Enterprise128File.FileSize, Is.EqualTo(16384));
-    Assert.That(Enterprise128File.ImageWidth, Is.EqualTo(512));
-    Assert.That(Enterprise128File.ImageHeight, Is.EqualTo(256));
-  }
-
-  private static string _GetPrimaryExtension<T>() where T : IImageFileFormat<T> => T.PrimaryExtension;
-
-  private static string[] _GetFileExtensions<T>() where T : IImageFileFormat<T> => T.FileExtensions;
-}

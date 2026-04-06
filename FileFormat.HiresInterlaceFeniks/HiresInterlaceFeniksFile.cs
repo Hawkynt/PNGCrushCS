@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.HiresInterlaceFeniks;
 
 /// <summary>In-memory representation of a C64 Hires Interlace by Feniks (.hlf) image.</summary>
-public sealed class HiresInterlaceFeniksFile : IImageFileFormat<HiresInterlaceFeniksFile> {
+public readonly record struct HiresInterlaceFeniksFile : IImageFormatReader<HiresInterlaceFeniksFile>, IImageToRawImage<HiresInterlaceFeniksFile>, IImageFormatWriter<HiresInterlaceFeniksFile> {
 
-  static string IImageFileFormat<HiresInterlaceFeniksFile>.PrimaryExtension => ".hlf";
-  static string[] IImageFileFormat<HiresInterlaceFeniksFile>.FileExtensions => [".hlf"];
-  static HiresInterlaceFeniksFile IImageFileFormat<HiresInterlaceFeniksFile>.FromFile(FileInfo file) => HiresInterlaceFeniksReader.FromFile(file);
-  static HiresInterlaceFeniksFile IImageFileFormat<HiresInterlaceFeniksFile>.FromBytes(byte[] data) => HiresInterlaceFeniksReader.FromBytes(data);
-  static HiresInterlaceFeniksFile IImageFileFormat<HiresInterlaceFeniksFile>.FromStream(Stream stream) => HiresInterlaceFeniksReader.FromStream(stream);
-  static byte[] IImageFileFormat<HiresInterlaceFeniksFile>.ToBytes(HiresInterlaceFeniksFile file) => HiresInterlaceFeniksWriter.ToBytes(file);
+  static string IImageFormatMetadata<HiresInterlaceFeniksFile>.PrimaryExtension => ".hlf";
+  static string[] IImageFormatMetadata<HiresInterlaceFeniksFile>.FileExtensions => [".hlf"];
+  static HiresInterlaceFeniksFile IImageFormatReader<HiresInterlaceFeniksFile>.FromSpan(ReadOnlySpan<byte> data) => HiresInterlaceFeniksReader.FromSpan(data);
+  static byte[] IImageFormatWriter<HiresInterlaceFeniksFile>.ToBytes(HiresInterlaceFeniksFile file) => HiresInterlaceFeniksWriter.ToBytes(file);
 
   /// <summary>The fixed width of the image in pixels.</summary>
   public const int FixedWidth = 320;
@@ -52,11 +49,10 @@ public sealed class HiresInterlaceFeniksFile : IImageFileFormat<HiresInterlaceFe
   public ushort LoadAddress { get; init; }
 
   /// <summary>Raw payload data (entire file content after load address).</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   /// <summary>Converts this Hires Interlace image to a platform-independent <see cref="RawImage"/> in Rgb24 format by averaging both hires frames.</summary>
   public static RawImage ToRawImage(HiresInterlaceFeniksFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -122,9 +118,4 @@ public sealed class HiresInterlaceFeniksFile : IImageFileFormat<HiresInterlaceFe
     return _C64Palette[colorIndex];
   }
 
-  /// <summary>Not supported. Hires Interlace images have complex dual-frame color constraints.</summary>
-  public static HiresInterlaceFeniksFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to HiresInterlaceFeniksFile is not supported due to complex dual-frame color constraints.");
-  }
 }

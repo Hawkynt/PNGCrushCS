@@ -28,6 +28,8 @@ public static class EnviReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static EnviFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static EnviFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MIN_SIZE)

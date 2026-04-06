@@ -25,6 +25,8 @@ public static class BrooktroutFaxReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static BrooktroutFaxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static BrooktroutFaxFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < BrooktroutFaxFile.HeaderSize)

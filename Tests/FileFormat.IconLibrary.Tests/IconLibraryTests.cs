@@ -64,24 +64,6 @@ public sealed class IconLibraryReaderTests {
 }
 
 [TestFixture]
-public sealed class IconLibraryWriterTests {
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => IconLibraryWriter.ToBytes(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_ProducesOutput() {
-    var file = new IconLibraryFile { RawData = new byte[] { 1, 2, 3, 4, 5, 6 } };
-    var bytes = IconLibraryWriter.ToBytes(file);
-    Assert.That(bytes, Is.EqualTo(new byte[] { 1, 2, 3, 4, 5, 6 }));
-  }
-}
-
-[TestFixture]
 public sealed class RoundTripTests {
 
   [Test]
@@ -104,52 +86,3 @@ public sealed class RoundTripTests {
   }
 }
 
-[TestFixture]
-public sealed class DataTypeTests {
-
-  [Test]
-  [Category("Unit")]
-  public void IconLibraryFile_DefaultWidth_Is32() {
-    Assert.That(new IconLibraryFile().Width, Is.EqualTo(32));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void IconLibraryFile_DefaultHeight_Is32() {
-    Assert.That(new IconLibraryFile().Height, Is.EqualTo(32));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void IconLibraryFile_ToRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => IconLibraryFile.ToRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void IconLibraryFile_FromRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => IconLibraryFile.FromRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void IconLibraryFile_FromRawImage_ThrowsNotSupportedException() {
-    var raw = new RawImage {
-      Width = 32, Height = 32,
-      Format = PixelFormat.Rgb24,
-      PixelData = new byte[32 * 32 * 3],
-    };
-    Assert.Throws<NotSupportedException>(() => IconLibraryFile.FromRawImage(raw));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void IconLibraryFile_ToRawImage_ReturnsRgb24() {
-    var file = new IconLibraryFile { RawData = new byte[6] };
-    var raw = IconLibraryFile.ToRawImage(file);
-
-    Assert.That(raw.Format, Is.EqualTo(PixelFormat.Rgb24));
-    Assert.That(raw.Width, Is.EqualTo(32));
-    Assert.That(raw.Height, Is.EqualTo(32));
-  }
-}

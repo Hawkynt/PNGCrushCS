@@ -26,6 +26,8 @@ public static class AtariCADReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static AtariCADFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AtariCADFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != AtariCADFile.ExpectedFileSize)

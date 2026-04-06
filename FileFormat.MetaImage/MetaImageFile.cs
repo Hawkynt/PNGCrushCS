@@ -1,30 +1,26 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.MetaImage;
 
 /// <summary>In-memory representation of a MetaImage (.mha/.mhd) file used by ITK/VTK.</summary>
-public sealed class MetaImageFile : IImageFileFormat<MetaImageFile> {
+public readonly record struct MetaImageFile : IImageFormatReader<MetaImageFile>, IImageToRawImage<MetaImageFile>, IImageFromRawImage<MetaImageFile>, IImageFormatWriter<MetaImageFile> {
 
-  static string IImageFileFormat<MetaImageFile>.PrimaryExtension => ".mha";
-  static string[] IImageFileFormat<MetaImageFile>.FileExtensions => [".mha", ".mhd"];
-  static MetaImageFile IImageFileFormat<MetaImageFile>.FromFile(FileInfo file) => MetaImageReader.FromFile(file);
-  static MetaImageFile IImageFileFormat<MetaImageFile>.FromBytes(byte[] data) => MetaImageReader.FromBytes(data);
-  static MetaImageFile IImageFileFormat<MetaImageFile>.FromStream(Stream stream) => MetaImageReader.FromStream(stream);
-  static byte[] IImageFileFormat<MetaImageFile>.ToBytes(MetaImageFile file) => MetaImageWriter.ToBytes(file);
+  static string IImageFormatMetadata<MetaImageFile>.PrimaryExtension => ".mha";
+  static string[] IImageFormatMetadata<MetaImageFile>.FileExtensions => [".mha", ".mhd"];
+  static MetaImageFile IImageFormatReader<MetaImageFile>.FromSpan(ReadOnlySpan<byte> data) => MetaImageReader.FromSpan(data);
+  static byte[] IImageFormatWriter<MetaImageFile>.ToBytes(MetaImageFile file) => MetaImageWriter.ToBytes(file);
 
   public int Width { get; init; }
   public int Height { get; init; }
   public MetaImageElementType ElementType { get; init; }
-  public int Channels { get; init; } = 1;
+  public int Channels { get; init; }
   public bool IsCompressed { get; init; }
 
   /// <summary>Raw pixel data in the layout specified by <see cref="ElementType"/> and <see cref="Channels"/>.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(MetaImageFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     if (file.ElementType != MetaImageElementType.MetUChar)
       throw new NotSupportedException($"ToRawImage only supports {MetaImageElementType.MetUChar}, got {file.ElementType}.");
 

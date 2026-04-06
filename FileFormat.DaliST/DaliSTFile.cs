@@ -1,11 +1,10 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.DaliST;
 
 /// <summary>In-memory representation of an Atari ST Dali image (SD0/SD1/SD2).</summary>
-public sealed class DaliSTFile : IImageFileFormat<DaliSTFile> {
+public readonly record struct DaliSTFile : IImageFormatReader<DaliSTFile>, IImageToRawImage<DaliSTFile>, IImageFromRawImage<DaliSTFile>, IImageFormatWriter<DaliSTFile> {
 
   /// <summary>Palette size in bytes (16 words = 32 bytes).</summary>
   public const int PaletteSize = 32;
@@ -16,13 +15,11 @@ public sealed class DaliSTFile : IImageFileFormat<DaliSTFile> {
   /// <summary>The exact file size: 32 + 32000 = 32032 bytes.</summary>
   public const int ExpectedFileSize = PaletteSize + PlanarDataSize;
 
-  static string IImageFileFormat<DaliSTFile>.PrimaryExtension => ".sd0";
-  static string[] IImageFileFormat<DaliSTFile>.FileExtensions => [".sd0", ".sd1", ".sd2"];
-  static FormatCapability IImageFileFormat<DaliSTFile>.Capabilities => FormatCapability.IndexedOnly;
-  static DaliSTFile IImageFileFormat<DaliSTFile>.FromFile(FileInfo file) => DaliSTReader.FromFile(file);
-  static DaliSTFile IImageFileFormat<DaliSTFile>.FromBytes(byte[] data) => DaliSTReader.FromBytes(data);
-  static DaliSTFile IImageFileFormat<DaliSTFile>.FromStream(Stream stream) => DaliSTReader.FromStream(stream);
-  static byte[] IImageFileFormat<DaliSTFile>.ToBytes(DaliSTFile file) => DaliSTWriter.ToBytes(file);
+  static string IImageFormatMetadata<DaliSTFile>.PrimaryExtension => ".sd0";
+  static string[] IImageFormatMetadata<DaliSTFile>.FileExtensions => [".sd0", ".sd1", ".sd2"];
+  static DaliSTFile IImageFormatReader<DaliSTFile>.FromSpan(ReadOnlySpan<byte> data) => DaliSTReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<DaliSTFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<DaliSTFile>.ToBytes(DaliSTFile file) => DaliSTWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -34,13 +31,12 @@ public sealed class DaliSTFile : IImageFileFormat<DaliSTFile> {
   public DaliSTResolution Resolution { get; init; }
 
   /// <summary>16-entry palette of 12-bit Atari ST RGB values (0x0RGB, R/G/B in 0-7).</summary>
-  public short[] Palette { get; init; } = new short[16];
+  public short[] Palette { get; init; }
 
   /// <summary>32000 bytes of Atari ST interleaved planar pixel data.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(DaliSTFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var numPlanes = file.Resolution switch {
       DaliSTResolution.Low => 4,

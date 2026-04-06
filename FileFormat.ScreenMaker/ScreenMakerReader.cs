@@ -26,6 +26,8 @@ public static class ScreenMakerReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static ScreenMakerFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static ScreenMakerFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < ScreenMakerFile.HeaderSize + ScreenMakerFile.PaletteDataSize)

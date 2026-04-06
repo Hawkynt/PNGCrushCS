@@ -26,6 +26,8 @@ public static class DeluxeReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static DeluxeFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static DeluxeFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < DeluxeHeader.StructSize)

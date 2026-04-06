@@ -1,20 +1,16 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Rgf;
 
 /// <summary>In-memory representation of an RGF (LEGO Mindstorms EV3) image.</summary>
-public sealed class RgfFile : IImageFileFormat<RgfFile> {
+public readonly record struct RgfFile : IImageFormatReader<RgfFile>, IImageToRawImage<RgfFile>, IImageFromRawImage<RgfFile>, IImageFormatWriter<RgfFile> {
 
-  static string IImageFileFormat<RgfFile>.PrimaryExtension => ".rgf";
-  static string[] IImageFileFormat<RgfFile>.FileExtensions => [".rgf"];
-  static FormatCapability IImageFileFormat<RgfFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static RgfFile IImageFileFormat<RgfFile>.FromFile(FileInfo file) => RgfReader.FromFile(file);
-  static RgfFile IImageFileFormat<RgfFile>.FromBytes(byte[] data) => RgfReader.FromBytes(data);
-  static RgfFile IImageFileFormat<RgfFile>.FromStream(Stream stream) => RgfReader.FromStream(stream);
-  static RawImage IImageFileFormat<RgfFile>.ToRawImage(RgfFile file) => file.ToRawImage();
-  static byte[] IImageFileFormat<RgfFile>.ToBytes(RgfFile file) => RgfWriter.ToBytes(file);
+  static string IImageFormatMetadata<RgfFile>.PrimaryExtension => ".rgf";
+  static string[] IImageFormatMetadata<RgfFile>.FileExtensions => [".rgf"];
+  static RgfFile IImageFormatReader<RgfFile>.FromSpan(ReadOnlySpan<byte> data) => RgfReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<RgfFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<RgfFile>.ToBytes(RgfFile file) => RgfWriter.ToBytes(file);
 
   /// <summary>Image width in pixels (1-178).</summary>
   public int Width { get; init; }
@@ -23,15 +19,15 @@ public sealed class RgfFile : IImageFileFormat<RgfFile> {
   public int Height { get; init; }
 
   /// <summary>1bpp packed pixel data, MSB first, ceil(width/8) bytes per row.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
-  public RawImage ToRawImage() => new() {
-    Width = this.Width,
-    Height = this.Height,
+  public static RawImage ToRawImage(RgfFile file) => new() {
+    Width = file.Width,
+    Height = file.Height,
     Format = PixelFormat.Indexed1,
-    PixelData = this.PixelData[..],
+    PixelData = file.PixelData[..],
     Palette = _BlackWhitePalette[..],
     PaletteCount = 2,
   };

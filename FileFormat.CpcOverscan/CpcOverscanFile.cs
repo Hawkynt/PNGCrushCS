@@ -1,21 +1,16 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.CpcOverscan;
 
 /// <summary>In-memory representation of a CPC overscan image (32768 bytes: 384x272, Mode 1, 4 colors).</summary>
-public sealed class CpcOverscanFile : IImageFileFormat<CpcOverscanFile> {
+public readonly record struct CpcOverscanFile : IImageFormatReader<CpcOverscanFile>, IImageToRawImage<CpcOverscanFile>, IImageFormatWriter<CpcOverscanFile> {
 
-  static string IImageFileFormat<CpcOverscanFile>.PrimaryExtension => ".cpo";
-  static string[] IImageFileFormat<CpcOverscanFile>.FileExtensions => [".cpo"];
-  static FormatCapability IImageFileFormat<CpcOverscanFile>.Capabilities => FormatCapability.IndexedOnly;
-  static CpcOverscanFile IImageFileFormat<CpcOverscanFile>.FromFile(FileInfo file) => CpcOverscanReader.FromFile(file);
-  static CpcOverscanFile IImageFileFormat<CpcOverscanFile>.FromBytes(byte[] data) => CpcOverscanReader.FromBytes(data);
-  static CpcOverscanFile IImageFileFormat<CpcOverscanFile>.FromStream(Stream stream) => CpcOverscanReader.FromStream(stream);
-  static RawImage IImageFileFormat<CpcOverscanFile>.ToRawImage(CpcOverscanFile file) => ToRawImage(file);
-  static CpcOverscanFile IImageFileFormat<CpcOverscanFile>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<CpcOverscanFile>.ToBytes(CpcOverscanFile file) => CpcOverscanWriter.ToBytes(file);
+  static string IImageFormatMetadata<CpcOverscanFile>.PrimaryExtension => ".cpo";
+  static string[] IImageFormatMetadata<CpcOverscanFile>.FileExtensions => [".cpo"];
+  static CpcOverscanFile IImageFormatReader<CpcOverscanFile>.FromSpan(ReadOnlySpan<byte> data) => CpcOverscanReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<CpcOverscanFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<CpcOverscanFile>.ToBytes(CpcOverscanFile file) => CpcOverscanWriter.ToBytes(file);
 
   /// <summary>Expected file size in bytes (two 16KB banks).</summary>
   internal const int ExpectedFileSize = 32768;
@@ -39,7 +34,7 @@ public sealed class CpcOverscanFile : IImageFileFormat<CpcOverscanFile> {
   public int Height => PixelHeight;
 
   /// <summary>Deinterleaved pixel data (272 rows x 96 bytes, Mode 1 packed).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Default CPC 4-color palette for Mode 1 as RGB triplets.</summary>
   private static readonly byte[] _CpcMode1Palette = [
@@ -51,7 +46,6 @@ public sealed class CpcOverscanFile : IImageFileFormat<CpcOverscanFile> {
 
   /// <summary>Converts the CPC overscan screen to an Indexed8 raw image (384x272, 4-entry palette).</summary>
   public static RawImage ToRawImage(CpcOverscanFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var pixels = new byte[PixelWidth * PixelHeight];
 
@@ -92,9 +86,4 @@ public sealed class CpcOverscanFile : IImageFileFormat<CpcOverscanFile> {
     };
   }
 
-  /// <summary>Not supported. CPC overscan images require hardware palette mapping.</summary>
-  public static CpcOverscanFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to CpcOverscanFile is not supported.");
-  }
 }

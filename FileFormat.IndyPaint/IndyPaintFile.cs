@@ -1,21 +1,18 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.IndyPaint;
 
 /// <summary>In-memory representation of an IndyPaint (.ipn) screen dump.</summary>
-public sealed class IndyPaintFile : IImageFileFormat<IndyPaintFile> {
+public readonly record struct IndyPaintFile : IImageFormatReader<IndyPaintFile>, IImageToRawImage<IndyPaintFile>, IImageFromRawImage<IndyPaintFile>, IImageFormatWriter<IndyPaintFile> {
 
   /// <summary>The exact file size: 320 x 240 x 2 bytes per pixel.</summary>
   public const int ExpectedFileSize = 320 * 240 * 2;
 
-  static string IImageFileFormat<IndyPaintFile>.PrimaryExtension => ".ipn";
-  static string[] IImageFileFormat<IndyPaintFile>.FileExtensions => [".ipn", ".idy"];
-  static IndyPaintFile IImageFileFormat<IndyPaintFile>.FromFile(FileInfo file) => IndyPaintReader.FromFile(file);
-  static IndyPaintFile IImageFileFormat<IndyPaintFile>.FromBytes(byte[] data) => IndyPaintReader.FromBytes(data);
-  static IndyPaintFile IImageFileFormat<IndyPaintFile>.FromStream(Stream stream) => IndyPaintReader.FromStream(stream);
-  static byte[] IImageFileFormat<IndyPaintFile>.ToBytes(IndyPaintFile file) => IndyPaintWriter.ToBytes(file);
+  static string IImageFormatMetadata<IndyPaintFile>.PrimaryExtension => ".ipn";
+  static string[] IImageFormatMetadata<IndyPaintFile>.FileExtensions => [".ipn", ".idy"];
+  static IndyPaintFile IImageFormatReader<IndyPaintFile>.FromSpan(ReadOnlySpan<byte> data) => IndyPaintReader.FromSpan(data);
+  static byte[] IImageFormatWriter<IndyPaintFile>.ToBytes(IndyPaintFile file) => IndyPaintWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>
   public int Width => 320;
@@ -24,10 +21,9 @@ public sealed class IndyPaintFile : IImageFileFormat<IndyPaintFile> {
   public int Height => 240;
 
   /// <summary>Raw RGB565 big-endian pixel data (2 bytes per pixel, 153600 bytes total).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(IndyPaintFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var rgb565 = file.PixelData;
     var pixelCount = 320 * 240;

@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.ZxTimex;
 
 /// <summary>In-memory representation of a Timex HiColor file (12288 bytes: 6144 bitmap + 6144 per-scanline-row extended attributes).</summary>
-public sealed class ZxTimexFile : IImageFileFormat<ZxTimexFile> {
+public readonly record struct ZxTimexFile : IImageFormatReader<ZxTimexFile>, IImageToRawImage<ZxTimexFile>, IImageFormatWriter<ZxTimexFile> {
 
-  static string IImageFileFormat<ZxTimexFile>.PrimaryExtension => ".tmx";
-  static string[] IImageFileFormat<ZxTimexFile>.FileExtensions => [".tmx"];
-  static ZxTimexFile IImageFileFormat<ZxTimexFile>.FromFile(FileInfo file) => ZxTimexReader.FromFile(file);
-  static ZxTimexFile IImageFileFormat<ZxTimexFile>.FromBytes(byte[] data) => ZxTimexReader.FromBytes(data);
-  static ZxTimexFile IImageFileFormat<ZxTimexFile>.FromStream(Stream stream) => ZxTimexReader.FromStream(stream);
-  static byte[] IImageFileFormat<ZxTimexFile>.ToBytes(ZxTimexFile file) => ZxTimexWriter.ToBytes(file);
+  static string IImageFormatMetadata<ZxTimexFile>.PrimaryExtension => ".tmx";
+  static string[] IImageFormatMetadata<ZxTimexFile>.FileExtensions => [".tmx"];
+  static ZxTimexFile IImageFormatReader<ZxTimexFile>.FromSpan(ReadOnlySpan<byte> data) => ZxTimexReader.FromSpan(data);
+  static byte[] IImageFormatWriter<ZxTimexFile>.ToBytes(ZxTimexFile file) => ZxTimexWriter.ToBytes(file);
 
   /// <summary>ZX Spectrum normal palette (bright=0).</summary>
   internal static readonly int[] NormalPalette = [
@@ -31,14 +28,13 @@ public sealed class ZxTimexFile : IImageFileFormat<ZxTimexFile> {
   public int Height => 192;
 
   /// <summary>6144 bytes of 1bpp bitmap data in linear row order.</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>6144 bytes of per-scanline-row extended attribute data (32 per row, 192 rows).</summary>
-  public byte[] AttributeData { get; init; } = [];
+  public byte[] AttributeData { get; init; }
 
   /// <summary>Converts this Timex HiColor screen to Rgb24.</summary>
   public static RawImage ToRawImage(ZxTimexFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = 256;
     const int height = 192;
@@ -73,9 +69,4 @@ public sealed class ZxTimexFile : IImageFileFormat<ZxTimexFile> {
     };
   }
 
-  /// <summary>Not supported.</summary>
-  public static ZxTimexFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to ZxTimexFile is not supported due to complex per-scanline attribute constraints.");
-  }
 }

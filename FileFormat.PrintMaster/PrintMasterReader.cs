@@ -26,6 +26,8 @@ public static class PrintMasterReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static PrintMasterFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static PrintMasterFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < PrintMasterFile.HeaderSize)

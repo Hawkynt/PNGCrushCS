@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.ArtStudio8;
 
 /// <summary>In-memory representation of an Art Studio (Atari 8-bit) image. 320x192 Graphics 8 monochrome.</summary>
-public sealed class ArtStudio8File : IImageFileFormat<ArtStudio8File> {
+public readonly record struct ArtStudio8File : IImageFormatReader<ArtStudio8File>, IImageToRawImage<ArtStudio8File>, IImageFromRawImage<ArtStudio8File>, IImageFormatWriter<ArtStudio8File> {
 
   /// <summary>Image width in pixels.</summary>
   internal const int PixelWidth = 320;
@@ -19,15 +18,11 @@ public sealed class ArtStudio8File : IImageFileFormat<ArtStudio8File> {
   /// <summary>Exact file size in bytes (40 bytes/line x 192 lines).</summary>
   internal const int FileSize = BytesPerLine * PixelHeight;
 
-  static string IImageFileFormat<ArtStudio8File>.PrimaryExtension => ".as8";
-  static string[] IImageFileFormat<ArtStudio8File>.FileExtensions => [".as8"];
-  static FormatCapability IImageFileFormat<ArtStudio8File>.Capabilities => FormatCapability.IndexedOnly;
-  static ArtStudio8File IImageFileFormat<ArtStudio8File>.FromFile(FileInfo file) => ArtStudio8Reader.FromFile(file);
-  static ArtStudio8File IImageFileFormat<ArtStudio8File>.FromBytes(byte[] data) => ArtStudio8Reader.FromBytes(data);
-  static ArtStudio8File IImageFileFormat<ArtStudio8File>.FromStream(Stream stream) => ArtStudio8Reader.FromStream(stream);
-  static RawImage IImageFileFormat<ArtStudio8File>.ToRawImage(ArtStudio8File file) => ToRawImage(file);
-  static ArtStudio8File IImageFileFormat<ArtStudio8File>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<ArtStudio8File>.ToBytes(ArtStudio8File file) => ArtStudio8Writer.ToBytes(file);
+  static string IImageFormatMetadata<ArtStudio8File>.PrimaryExtension => ".as8";
+  static string[] IImageFormatMetadata<ArtStudio8File>.FileExtensions => [".as8"];
+  static ArtStudio8File IImageFormatReader<ArtStudio8File>.FromSpan(ReadOnlySpan<byte> data) => ArtStudio8Reader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<ArtStudio8File>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<ArtStudio8File>.ToBytes(ArtStudio8File file) => ArtStudio8Writer.ToBytes(file);
 
   /// <summary>Always 320.</summary>
   public int Width => PixelWidth;
@@ -36,13 +31,12 @@ public sealed class ArtStudio8File : IImageFileFormat<ArtStudio8File> {
   public int Height => PixelHeight;
 
   /// <summary>Raw 1bpp screen data (7680 bytes: 40 bytes/line x 192 lines, MSB-first).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
   /// <summary>Converts the Art Studio image to an Indexed1 raw image (320x192, B&amp;W palette).</summary>
   public static RawImage ToRawImage(ArtStudio8File file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var pixelData = new byte[FileSize];
     file.PixelData.AsSpan(0, Math.Min(file.PixelData.Length, FileSize)).CopyTo(pixelData);

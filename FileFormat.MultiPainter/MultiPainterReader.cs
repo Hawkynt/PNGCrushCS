@@ -26,6 +26,8 @@ public static class MultiPainterReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static MultiPainterFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static MultiPainterFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < MultiPainterFile.ExpectedFileSize)

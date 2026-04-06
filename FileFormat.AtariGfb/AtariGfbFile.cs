@@ -1,11 +1,10 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.AtariGfb;
 
 /// <summary>In-memory representation of an Atari 8-bit GFB screen dump (320x192, 1bpp monochrome).</summary>
-public sealed class AtariGfbFile : IImageFileFormat<AtariGfbFile> {
+public readonly record struct AtariGfbFile : IImageFormatReader<AtariGfbFile>, IImageToRawImage<AtariGfbFile>, IImageFromRawImage<AtariGfbFile>, IImageFormatWriter<AtariGfbFile> {
 
   /// <summary>Fixed width in pixels.</summary>
   internal const int PixelWidth = 320;
@@ -19,15 +18,11 @@ public sealed class AtariGfbFile : IImageFileFormat<AtariGfbFile> {
   /// <summary>Exact file size in bytes (40 x 192 = 7680).</summary>
   internal const int FileSize = BytesPerRow * PixelHeight;
 
-  static string IImageFileFormat<AtariGfbFile>.PrimaryExtension => ".gfb";
-  static string[] IImageFileFormat<AtariGfbFile>.FileExtensions => [".gfb"];
-  static FormatCapability IImageFileFormat<AtariGfbFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static AtariGfbFile IImageFileFormat<AtariGfbFile>.FromFile(FileInfo file) => AtariGfbReader.FromFile(file);
-  static AtariGfbFile IImageFileFormat<AtariGfbFile>.FromBytes(byte[] data) => AtariGfbReader.FromBytes(data);
-  static AtariGfbFile IImageFileFormat<AtariGfbFile>.FromStream(Stream stream) => AtariGfbReader.FromStream(stream);
-  static RawImage IImageFileFormat<AtariGfbFile>.ToRawImage(AtariGfbFile file) => ToRawImage(file);
-  static AtariGfbFile IImageFileFormat<AtariGfbFile>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<AtariGfbFile>.ToBytes(AtariGfbFile file) => AtariGfbWriter.ToBytes(file);
+  static string IImageFormatMetadata<AtariGfbFile>.PrimaryExtension => ".gfb";
+  static string[] IImageFormatMetadata<AtariGfbFile>.FileExtensions => [".gfb"];
+  static AtariGfbFile IImageFormatReader<AtariGfbFile>.FromSpan(ReadOnlySpan<byte> data) => AtariGfbReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<AtariGfbFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<AtariGfbFile>.ToBytes(AtariGfbFile file) => AtariGfbWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>
   public int Width => PixelWidth;
@@ -36,13 +31,12 @@ public sealed class AtariGfbFile : IImageFileFormat<AtariGfbFile> {
   public int Height => PixelHeight;
 
   /// <summary>Raw screen data (7680 bytes). 1bpp MSB-first, 40 bytes per row.</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
   /// <summary>Converts this GFB screen dump to an Indexed1 raw image (320x192, B&amp;W palette).</summary>
   public static RawImage ToRawImage(AtariGfbFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var pixelData = new byte[BytesPerRow * PixelHeight];
     var srcLen = Math.Min(file.RawData.Length, FileSize);

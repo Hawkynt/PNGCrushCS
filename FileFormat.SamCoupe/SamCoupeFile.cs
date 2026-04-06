@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.SamCoupe;
 
 /// <summary>In-memory representation of a SAM Coupe screen memory dump (24576 bytes).</summary>
-public sealed class SamCoupeFile : IImageFileFormat<SamCoupeFile> {
+public readonly record struct SamCoupeFile : IImageFormatReader<SamCoupeFile>, IImageToRawImage<SamCoupeFile>, IImageFromRawImage<SamCoupeFile>, IImageFormatWriter<SamCoupeFile> {
 
-  static string IImageFileFormat<SamCoupeFile>.PrimaryExtension => ".sam";
-  static string[] IImageFileFormat<SamCoupeFile>.FileExtensions => [".sam"];
-  static SamCoupeFile IImageFileFormat<SamCoupeFile>.FromFile(FileInfo file) => SamCoupeReader.FromFile(file);
-  static SamCoupeFile IImageFileFormat<SamCoupeFile>.FromBytes(byte[] data) => SamCoupeReader.FromBytes(data);
-  static SamCoupeFile IImageFileFormat<SamCoupeFile>.FromStream(Stream stream) => SamCoupeReader.FromStream(stream);
-  static byte[] IImageFileFormat<SamCoupeFile>.ToBytes(SamCoupeFile file) => SamCoupeWriter.ToBytes(file);
+  static string IImageFormatMetadata<SamCoupeFile>.PrimaryExtension => ".sam";
+  static string[] IImageFormatMetadata<SamCoupeFile>.FileExtensions => [".sam"];
+  static SamCoupeFile IImageFormatReader<SamCoupeFile>.FromSpan(ReadOnlySpan<byte> data) => SamCoupeReader.FromSpan(data);
+  static byte[] IImageFormatWriter<SamCoupeFile>.ToBytes(SamCoupeFile file) => SamCoupeWriter.ToBytes(file);
 
   /// <summary>Width in pixels (256 for Mode 4, 512 for Mode 3).</summary>
   public int Width { get; init; }
@@ -24,11 +21,10 @@ public sealed class SamCoupeFile : IImageFileFormat<SamCoupeFile> {
   public SamCoupeMode Mode { get; init; }
 
   /// <summary>Linear pixel data in scanline order (deinterleaved from page layout).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this SAM Coupe screen to a platform-independent <see cref="RawImage"/> in Indexed8 format.</summary>
   public static RawImage ToRawImage(SamCoupeFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     return file.Mode switch {
       SamCoupeMode.Mode3 => _Mode3ToRawImage(file),

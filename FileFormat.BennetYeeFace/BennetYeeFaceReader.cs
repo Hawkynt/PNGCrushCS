@@ -26,6 +26,8 @@ public static class BennetYeeFaceReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static BennetYeeFaceFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static BennetYeeFaceFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < BennetYeeFaceHeader.StructSize)

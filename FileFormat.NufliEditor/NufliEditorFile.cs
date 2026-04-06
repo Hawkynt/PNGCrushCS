@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.NufliEditor;
 
 /// <summary>In-memory representation of a C64 NUFLI (New Unrestricted FLI) multicolor image.</summary>
-public sealed class NufliEditorFile : IImageFileFormat<NufliEditorFile> {
+public readonly record struct NufliEditorFile : IImageFormatReader<NufliEditorFile>, IImageToRawImage<NufliEditorFile>, IImageFormatWriter<NufliEditorFile> {
 
-  static string IImageFileFormat<NufliEditorFile>.PrimaryExtension => ".nuf";
-  static string[] IImageFileFormat<NufliEditorFile>.FileExtensions => [".nuf", ".nup"];
-  static NufliEditorFile IImageFileFormat<NufliEditorFile>.FromFile(FileInfo file) => NufliEditorReader.FromFile(file);
-  static NufliEditorFile IImageFileFormat<NufliEditorFile>.FromBytes(byte[] data) => NufliEditorReader.FromBytes(data);
-  static NufliEditorFile IImageFileFormat<NufliEditorFile>.FromStream(Stream stream) => NufliEditorReader.FromStream(stream);
-  static byte[] IImageFileFormat<NufliEditorFile>.ToBytes(NufliEditorFile file) => NufliEditorWriter.ToBytes(file);
+  static string IImageFormatMetadata<NufliEditorFile>.PrimaryExtension => ".nuf";
+  static string[] IImageFormatMetadata<NufliEditorFile>.FileExtensions => [".nuf", ".nup"];
+  static NufliEditorFile IImageFormatReader<NufliEditorFile>.FromSpan(ReadOnlySpan<byte> data) => NufliEditorReader.FromSpan(data);
+  static byte[] IImageFormatWriter<NufliEditorFile>.ToBytes(NufliEditorFile file) => NufliEditorWriter.ToBytes(file);
 
   /// <summary>The fixed width of the image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -61,11 +58,10 @@ public sealed class NufliEditorFile : IImageFileFormat<NufliEditorFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Raw payload data (entire file content after load address).</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   /// <summary>Converts this NUFLI image to a platform-independent <see cref="RawImage"/> in Rgb24 format using FLI multicolor decode.</summary>
   public static RawImage ToRawImage(NufliEditorFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -117,9 +113,4 @@ public sealed class NufliEditorFile : IImageFileFormat<NufliEditorFile> {
     };
   }
 
-  /// <summary>Not supported. NUFLI images have complex FLI color switching constraints.</summary>
-  public static NufliEditorFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to NufliEditorFile is not supported due to complex FLI color switching constraints.");
-  }
 }

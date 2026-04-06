@@ -26,6 +26,8 @@ public static class BrotherFaxReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static BrotherFaxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static BrotherFaxFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < BrotherFaxFile.MinFileSize)

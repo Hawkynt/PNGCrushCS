@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.XFliEditor;
 
 /// <summary>In-memory representation of a C64 X-FLI Editor (.xfl) extended FLI multicolor image.</summary>
-public sealed class XFliEditorFile : IImageFileFormat<XFliEditorFile> {
+public readonly record struct XFliEditorFile : IImageFormatReader<XFliEditorFile>, IImageToRawImage<XFliEditorFile>, IImageFormatWriter<XFliEditorFile> {
 
-  static string IImageFileFormat<XFliEditorFile>.PrimaryExtension => ".xfl";
-  static string[] IImageFileFormat<XFliEditorFile>.FileExtensions => [".xfl"];
-  static XFliEditorFile IImageFileFormat<XFliEditorFile>.FromFile(FileInfo file) => XFliEditorReader.FromFile(file);
-  static XFliEditorFile IImageFileFormat<XFliEditorFile>.FromBytes(byte[] data) => XFliEditorReader.FromBytes(data);
-  static XFliEditorFile IImageFileFormat<XFliEditorFile>.FromStream(Stream stream) => XFliEditorReader.FromStream(stream);
-  static byte[] IImageFileFormat<XFliEditorFile>.ToBytes(XFliEditorFile file) => XFliEditorWriter.ToBytes(file);
+  static string IImageFormatMetadata<XFliEditorFile>.PrimaryExtension => ".xfl";
+  static string[] IImageFormatMetadata<XFliEditorFile>.FileExtensions => [".xfl"];
+  static XFliEditorFile IImageFormatReader<XFliEditorFile>.FromSpan(ReadOnlySpan<byte> data) => XFliEditorReader.FromSpan(data);
+  static byte[] IImageFormatWriter<XFliEditorFile>.ToBytes(XFliEditorFile file) => XFliEditorWriter.ToBytes(file);
 
   /// <summary>Size of the bitmap data section in bytes.</summary>
   internal const int BitmapDataSize = 8000;
@@ -52,23 +49,22 @@ public sealed class XFliEditorFile : IImageFileFormat<XFliEditorFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Bitmap data (8000 bytes).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>8 screen RAM banks, each 1000 bytes. ScreenBanks[bank][cellIndex].</summary>
-  public byte[][] ScreenBanks { get; init; } = [];
+  public byte[][] ScreenBanks { get; init; }
 
   /// <summary>Color RAM (1000 bytes).</summary>
-  public byte[] ColorData { get; init; } = [];
+  public byte[] ColorData { get; init; }
 
   /// <summary>Background color index (0-15). Bit-pair 0 maps to this color.</summary>
   public byte BackgroundColor { get; init; }
 
   /// <summary>Any trailing bytes beyond the minimum payload.</summary>
-  public byte[] TrailingData { get; init; } = [];
+  public byte[] TrailingData { get; init; }
 
   /// <summary>Converts this X-FLI Editor image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(XFliEditorFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = ImageWidth;
     const int height = ImageHeight;
@@ -110,6 +106,4 @@ public sealed class XFliEditorFile : IImageFileFormat<XFliEditorFile> {
     };
   }
 
-  /// <summary>Creates an X-FLI Editor image from a <see cref="RawImage"/>. Not supported.</summary>
-  public static XFliEditorFile FromRawImage(RawImage image) => throw new NotSupportedException("Creating X-FLI Editor files from raw images is not supported.");
 }

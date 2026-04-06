@@ -26,6 +26,8 @@ public static class PcPaintReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static PcPaintFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static PcPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < PcPaintFile.HeaderSize)

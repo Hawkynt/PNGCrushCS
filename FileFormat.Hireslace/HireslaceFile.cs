@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Hireslace;
@@ -8,14 +7,12 @@ namespace FileFormat.Hireslace;
 /// Two interlaced hires frames (320x200) blended together.
 /// Payload: LoadAddress(2) + bitmap1(8000) + screen1(1000) + bitmap2(8000) + screen2(1000) = 18002 bytes.
 /// </summary>
-public sealed class HireslaceFile : IImageFileFormat<HireslaceFile> {
+public readonly record struct HireslaceFile : IImageFormatReader<HireslaceFile>, IImageToRawImage<HireslaceFile>, IImageFromRawImage<HireslaceFile>, IImageFormatWriter<HireslaceFile> {
 
-  static string IImageFileFormat<HireslaceFile>.PrimaryExtension => ".hle";
-  static string[] IImageFileFormat<HireslaceFile>.FileExtensions => [".hle"];
-  static HireslaceFile IImageFileFormat<HireslaceFile>.FromFile(FileInfo file) => HireslaceReader.FromFile(file);
-  static HireslaceFile IImageFileFormat<HireslaceFile>.FromBytes(byte[] data) => HireslaceReader.FromBytes(data);
-  static HireslaceFile IImageFileFormat<HireslaceFile>.FromStream(Stream stream) => HireslaceReader.FromStream(stream);
-  static byte[] IImageFileFormat<HireslaceFile>.ToBytes(HireslaceFile file) => HireslaceWriter.ToBytes(file);
+  static string IImageFormatMetadata<HireslaceFile>.PrimaryExtension => ".hle";
+  static string[] IImageFormatMetadata<HireslaceFile>.FileExtensions => [".hle"];
+  static HireslaceFile IImageFormatReader<HireslaceFile>.FromSpan(ReadOnlySpan<byte> data) => HireslaceReader.FromSpan(data);
+  static byte[] IImageFormatWriter<HireslaceFile>.ToBytes(HireslaceFile file) => HireslaceWriter.ToBytes(file);
 
   /// <summary>Bitmap data size per frame in bytes (320x200 / 8 * 8 cell-ordered).</summary>
   internal const int BitmapDataSize = 8000;
@@ -46,20 +43,19 @@ public sealed class HireslaceFile : IImageFileFormat<HireslaceFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Bitmap data for frame 1 (8000 bytes, cell-ordered).</summary>
-  public byte[] Bitmap1 { get; init; } = [];
+  public byte[] Bitmap1 { get; init; }
 
   /// <summary>Screen RAM for frame 1 (1000 bytes).</summary>
-  public byte[] Screen1 { get; init; } = [];
+  public byte[] Screen1 { get; init; }
 
   /// <summary>Bitmap data for frame 2 (8000 bytes, cell-ordered).</summary>
-  public byte[] Bitmap2 { get; init; } = [];
+  public byte[] Bitmap2 { get; init; }
 
   /// <summary>Screen RAM for frame 2 (1000 bytes).</summary>
-  public byte[] Screen2 { get; init; } = [];
+  public byte[] Screen2 { get; init; }
 
   /// <summary>Converts this Hireslace image to a platform-independent <see cref="RawImage"/> in Rgb24 format (320x200, interlace-blended).</summary>
   public static RawImage ToRawImage(HireslaceFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = 320;
     const int height = 200;

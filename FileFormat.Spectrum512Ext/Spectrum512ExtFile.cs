@@ -1,12 +1,11 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Spectrum512Ext;
 
 /// <summary>In-memory representation of a Spectrum 512 Extended (.spx) image (Atari ST, 320x199, up to 4096 colors).</summary>
-public sealed class Spectrum512ExtFile : IImageFileFormat<Spectrum512ExtFile> {
+public readonly record struct Spectrum512ExtFile : IImageFormatReader<Spectrum512ExtFile>, IImageToRawImage<Spectrum512ExtFile>, IImageFromRawImage<Spectrum512ExtFile>, IImageFormatWriter<Spectrum512ExtFile> {
 
   /// <summary>Expected file size: 32000 bytes pixel data + 199 lines * 48 entries * 2 bytes = 51104 bytes.</summary>
   public const int FileSize = 51104;
@@ -17,27 +16,24 @@ public sealed class Spectrum512ExtFile : IImageFileFormat<Spectrum512ExtFile> {
   /// <summary>Palette entries per scanline.</summary>
   public const int PaletteEntriesPerLine = 48;
 
-  static string IImageFileFormat<Spectrum512ExtFile>.PrimaryExtension => ".spx";
-  static string[] IImageFileFormat<Spectrum512ExtFile>.FileExtensions => [".spx"];
-  static Spectrum512ExtFile IImageFileFormat<Spectrum512ExtFile>.FromFile(FileInfo file) => Spectrum512ExtReader.FromFile(file);
-  static Spectrum512ExtFile IImageFileFormat<Spectrum512ExtFile>.FromBytes(byte[] data) => Spectrum512ExtReader.FromBytes(data);
-  static Spectrum512ExtFile IImageFileFormat<Spectrum512ExtFile>.FromStream(Stream stream) => Spectrum512ExtReader.FromStream(stream);
-  static byte[] IImageFileFormat<Spectrum512ExtFile>.ToBytes(Spectrum512ExtFile file) => Spectrum512ExtWriter.ToBytes(file);
+  static string IImageFormatMetadata<Spectrum512ExtFile>.PrimaryExtension => ".spx";
+  static string[] IImageFormatMetadata<Spectrum512ExtFile>.FileExtensions => [".spx"];
+  static Spectrum512ExtFile IImageFormatReader<Spectrum512ExtFile>.FromSpan(ReadOnlySpan<byte> data) => Spectrum512ExtReader.FromSpan(data);
+  static byte[] IImageFormatWriter<Spectrum512ExtFile>.ToBytes(Spectrum512ExtFile file) => Spectrum512ExtWriter.ToBytes(file);
 
   /// <summary>Image width (always 320).</summary>
-  public int Width { get; init; } = 320;
+  public int Width { get; init; }
 
   /// <summary>Image height (always 199).</summary>
-  public int Height { get; init; } = 199;
+  public int Height { get; init; }
 
   /// <summary>32000 bytes of Atari ST interleaved planar pixel data (4 planes).</summary>
-  public byte[] PixelData { get; init; } = new byte[32000];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Per-scanline palettes: 199 lines, each with 48 palette entries (3 entries per 16-pixel group).</summary>
-  public short[][] Palettes { get; init; } = new short[ScanlineCount][];
+  public short[][] Palettes { get; init; }
 
   public static RawImage ToRawImage(Spectrum512ExtFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = 320;
     var height = file.Height;

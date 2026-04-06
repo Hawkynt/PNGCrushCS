@@ -1,20 +1,17 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Viff;
 
 /// <summary>In-memory representation of a VIFF (Khoros Visualization Image File Format) image.</summary>
-public sealed class ViffFile : IImageFileFormat<ViffFile> {
+public readonly record struct ViffFile : IImageFormatReader<ViffFile>, IImageToRawImage<ViffFile>, IImageFromRawImage<ViffFile>, IImageFormatWriter<ViffFile> {
 
-  static string IImageFileFormat<ViffFile>.PrimaryExtension => ".viff";
-  static string[] IImageFileFormat<ViffFile>.FileExtensions => [".viff", ".xv"];
-  static ViffFile IImageFileFormat<ViffFile>.FromFile(FileInfo file) => ViffReader.FromFile(file);
-  static ViffFile IImageFileFormat<ViffFile>.FromBytes(byte[] data) => ViffReader.FromBytes(data);
-  static ViffFile IImageFileFormat<ViffFile>.FromStream(Stream stream) => ViffReader.FromStream(stream);
-  static byte[] IImageFileFormat<ViffFile>.ToBytes(ViffFile file) => ViffWriter.ToBytes(file);
+  static string IImageFormatMetadata<ViffFile>.PrimaryExtension => ".viff";
+  static string[] IImageFormatMetadata<ViffFile>.FileExtensions => [".viff", ".xv"];
+  static ViffFile IImageFormatReader<ViffFile>.FromSpan(ReadOnlySpan<byte> data) => ViffReader.FromSpan(data);
+  static byte[] IImageFormatWriter<ViffFile>.ToBytes(ViffFile file) => ViffWriter.ToBytes(file);
 
-  static bool? IImageFileFormat<ViffFile>.MatchesSignature(ReadOnlySpan<byte> header)
+  static bool? IImageFormatMetadata<ViffFile>.MatchesSignature(ReadOnlySpan<byte> header)
     => header.Length >= 2 && header[0] == 0xAB && header[1] == 0x01
       ? true : null;
 
@@ -34,10 +31,10 @@ public sealed class ViffFile : IImageFileFormat<ViffFile> {
   public ViffColorSpaceModel ColorSpaceModel { get; init; }
 
   /// <summary>512-byte ASCII comment from the header.</summary>
-  public string Comment { get; init; } = "";
+  public string Comment { get; init; }
 
   /// <summary>Raw pixel data bytes (band-interleaved).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Optional color map data.</summary>
   public byte[]? MapData { get; init; }
@@ -55,7 +52,6 @@ public sealed class ViffFile : IImageFileFormat<ViffFile> {
   public ViffStorageType MapStorageType { get; init; }
 
   public static RawImage ToRawImage(ViffFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     if (file.StorageType != ViffStorageType.Byte)
       throw new ArgumentException($"Only Byte storage is supported for conversion, got {file.StorageType}.", nameof(file));

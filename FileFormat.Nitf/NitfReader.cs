@@ -92,6 +92,8 @@ public static class NitfReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static NitfFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static NitfFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MIN_FILE_SIZE)

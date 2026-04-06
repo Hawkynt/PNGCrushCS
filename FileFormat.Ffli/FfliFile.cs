@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Ffli;
 
 /// <summary>In-memory representation of a C64 Full FLI multicolor image.</summary>
-public sealed class FfliFile : IImageFileFormat<FfliFile> {
+public readonly record struct FfliFile : IImageFormatReader<FfliFile>, IImageToRawImage<FfliFile>, IImageFormatWriter<FfliFile> {
 
-  static string IImageFileFormat<FfliFile>.PrimaryExtension => ".ffli";
-  static string[] IImageFileFormat<FfliFile>.FileExtensions => [".ffli"];
-  static FfliFile IImageFileFormat<FfliFile>.FromFile(FileInfo file) => FfliReader.FromFile(file);
-  static FfliFile IImageFileFormat<FfliFile>.FromBytes(byte[] data) => FfliReader.FromBytes(data);
-  static FfliFile IImageFileFormat<FfliFile>.FromStream(Stream stream) => FfliReader.FromStream(stream);
-  static byte[] IImageFileFormat<FfliFile>.ToBytes(FfliFile file) => FfliWriter.ToBytes(file);
+  static string IImageFormatMetadata<FfliFile>.PrimaryExtension => ".ffli";
+  static string[] IImageFormatMetadata<FfliFile>.FileExtensions => [".ffli"];
+  static FfliFile IImageFormatReader<FfliFile>.FromSpan(ReadOnlySpan<byte> data) => FfliReader.FromSpan(data);
+  static byte[] IImageFormatWriter<FfliFile>.ToBytes(FfliFile file) => FfliWriter.ToBytes(file);
 
   /// <summary>The fixed width of the image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -58,11 +55,10 @@ public sealed class FfliFile : IImageFileFormat<FfliFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Raw payload data (entire file content after load address).</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   /// <summary>Converts this FFLI image to a platform-independent <see cref="RawImage"/> in Rgb24 format using FLI multicolor decode.</summary>
   public static RawImage ToRawImage(FfliFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -114,9 +110,4 @@ public sealed class FfliFile : IImageFileFormat<FfliFile> {
     };
   }
 
-  /// <summary>Not supported. FFLI images have complex FLI color switching constraints.</summary>
-  public static FfliFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to FfliFile is not supported due to complex FLI color switching constraints.");
-  }
 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -9,15 +9,13 @@ namespace FileFormat.Icns;
 
 /// <summary>In-memory representation of an Apple ICNS icon container file.</summary>
 [FormatMagicBytes([0x69, 0x63, 0x6E, 0x73])]
-public sealed class IcnsFile : IImageFileFormat<IcnsFile>, IMultiImageFileFormat<IcnsFile> {
+public sealed class IcnsFile : IImageFormatReader<IcnsFile>, IImageToRawImage<IcnsFile>, IImageFromRawImage<IcnsFile>, IImageFormatWriter<IcnsFile>, IMultiImageFileFormat<IcnsFile> {
 
-  static string IImageFileFormat<IcnsFile>.PrimaryExtension => ".icns";
-  static string[] IImageFileFormat<IcnsFile>.FileExtensions => [".icns"];
-  static FormatCapability IImageFileFormat<IcnsFile>.Capabilities => FormatCapability.MultiImage;
-  static IcnsFile IImageFileFormat<IcnsFile>.FromFile(FileInfo file) => IcnsReader.FromFile(file);
-  static IcnsFile IImageFileFormat<IcnsFile>.FromBytes(byte[] data) => IcnsReader.FromBytes(data);
-  static IcnsFile IImageFileFormat<IcnsFile>.FromStream(Stream stream) => IcnsReader.FromStream(stream);
-  static byte[] IImageFileFormat<IcnsFile>.ToBytes(IcnsFile file) => IcnsWriter.ToBytes(file);
+  static string IImageFormatMetadata<IcnsFile>.PrimaryExtension => ".icns";
+  static string[] IImageFormatMetadata<IcnsFile>.FileExtensions => [".icns"];
+  static IcnsFile IImageFormatReader<IcnsFile>.FromSpan(ReadOnlySpan<byte> data) => IcnsReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<IcnsFile>.Capabilities => FormatCapability.MultiImage;
+  static byte[] IImageFormatWriter<IcnsFile>.ToBytes(IcnsFile file) => IcnsWriter.ToBytes(file);
 
   /// <summary>The icon entries contained in this ICNS file.</summary>
   public IReadOnlyList<IcnsEntry> Entries { get; init; } = [];

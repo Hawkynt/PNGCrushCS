@@ -26,6 +26,8 @@ public static class FunPainterReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static FunPainterFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static FunPainterFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < FunPainterFile.LoadAddressSize + FunPainterFile.MinBitmapSize)

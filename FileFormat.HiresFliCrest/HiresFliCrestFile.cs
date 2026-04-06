@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.HiresFliCrest;
 
 /// <summary>In-memory representation of a C64 Hires FLI by Crest (.hfc) image.</summary>
-public sealed class HiresFliCrestFile : IImageFileFormat<HiresFliCrestFile> {
+public readonly record struct HiresFliCrestFile : IImageFormatReader<HiresFliCrestFile>, IImageToRawImage<HiresFliCrestFile>, IImageFormatWriter<HiresFliCrestFile> {
 
-  static string IImageFileFormat<HiresFliCrestFile>.PrimaryExtension => ".hfc";
-  static string[] IImageFileFormat<HiresFliCrestFile>.FileExtensions => [".hfc"];
-  static HiresFliCrestFile IImageFileFormat<HiresFliCrestFile>.FromFile(FileInfo file) => HiresFliCrestReader.FromFile(file);
-  static HiresFliCrestFile IImageFileFormat<HiresFliCrestFile>.FromBytes(byte[] data) => HiresFliCrestReader.FromBytes(data);
-  static HiresFliCrestFile IImageFileFormat<HiresFliCrestFile>.FromStream(Stream stream) => HiresFliCrestReader.FromStream(stream);
-  static byte[] IImageFileFormat<HiresFliCrestFile>.ToBytes(HiresFliCrestFile file) => HiresFliCrestWriter.ToBytes(file);
+  static string IImageFormatMetadata<HiresFliCrestFile>.PrimaryExtension => ".hfc";
+  static string[] IImageFormatMetadata<HiresFliCrestFile>.FileExtensions => [".hfc"];
+  static HiresFliCrestFile IImageFormatReader<HiresFliCrestFile>.FromSpan(ReadOnlySpan<byte> data) => HiresFliCrestReader.FromSpan(data);
+  static byte[] IImageFormatWriter<HiresFliCrestFile>.ToBytes(HiresFliCrestFile file) => HiresFliCrestWriter.ToBytes(file);
 
   /// <summary>The fixed width of the image in pixels.</summary>
   public const int FixedWidth = 320;
@@ -55,11 +52,10 @@ public sealed class HiresFliCrestFile : IImageFileFormat<HiresFliCrestFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Raw payload data (entire file content after load address).</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   /// <summary>Converts this Hires FLI image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(HiresFliCrestFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -104,9 +100,4 @@ public sealed class HiresFliCrestFile : IImageFileFormat<HiresFliCrestFile> {
     };
   }
 
-  /// <summary>Not supported. Hires FLI images have complex FLI color switching constraints.</summary>
-  public static HiresFliCrestFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to HiresFliCrestFile is not supported due to complex FLI color switching constraints.");
-  }
 }

@@ -33,6 +33,8 @@ public static class ZeissLsmReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static ZeissLsmFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static ZeissLsmFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < 8)

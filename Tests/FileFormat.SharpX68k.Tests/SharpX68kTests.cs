@@ -43,22 +43,6 @@ public class SharpX68kReaderTests {
 }
 
 [TestFixture]
-public class SharpX68kWriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => SharpX68kWriter.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_HeaderContainsDimensions() {
-    var file = new SharpX68kFile { Width = 512, Height = 512, PixelData = new byte[512 * 512 * 3] };
-    var bytes = SharpX68kWriter.ToBytes(file);
-    Assert.That(bytes[0] | (bytes[1] << 8), Is.EqualTo(512));
-    Assert.That(bytes[2] | (bytes[3] << 8), Is.EqualTo(512));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -81,34 +65,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void PrimaryExtension_IsCorrect()
-    => Assert.That(_GetPrimaryExtension<SharpX68kFile>(), Is.EqualTo(".x68"));
-
-  [Test]
-  public void FileExtensions_ContainsPrimary() {
-    var exts = _GetFileExtensions<SharpX68kFile>();
-    Assert.That(exts, Does.Contain(".x68"));
-  }
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => SharpX68kFile.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => SharpX68kFile.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 512, Height = 512, Format = PixelFormat.Indexed1, PixelData = new byte[512 * 512 * 1] };
-    Assert.Throws<ArgumentException>(() => SharpX68kFile.FromRawImage(raw));
-  }
-
-  private static string _GetPrimaryExtension<T>() where T : IImageFileFormat<T> => T.PrimaryExtension;
-
-  private static string[] _GetFileExtensions<T>() where T : IImageFileFormat<T> => T.FileExtensions;
-}

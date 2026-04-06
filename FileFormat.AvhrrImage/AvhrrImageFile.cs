@@ -1,18 +1,15 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.AvhrrImage;
 
 /// <summary>In-memory representation of an AVHRR satellite grayscale image.</summary>
-public sealed class AvhrrImageFile : IImageFileFormat<AvhrrImageFile> {
+public readonly record struct AvhrrImageFile : IImageFormatReader<AvhrrImageFile>, IImageToRawImage<AvhrrImageFile>, IImageFromRawImage<AvhrrImageFile>, IImageFormatWriter<AvhrrImageFile> {
 
-  static string IImageFileFormat<AvhrrImageFile>.PrimaryExtension => ".sst";
-  static string[] IImageFileFormat<AvhrrImageFile>.FileExtensions => [".sst"];
-  static AvhrrImageFile IImageFileFormat<AvhrrImageFile>.FromFile(FileInfo file) => AvhrrImageReader.FromFile(file);
-  static AvhrrImageFile IImageFileFormat<AvhrrImageFile>.FromBytes(byte[] data) => AvhrrImageReader.FromBytes(data);
-  static AvhrrImageFile IImageFileFormat<AvhrrImageFile>.FromStream(Stream stream) => AvhrrImageReader.FromStream(stream);
-  static byte[] IImageFileFormat<AvhrrImageFile>.ToBytes(AvhrrImageFile file) => AvhrrImageWriter.ToBytes(file);
+  static string IImageFormatMetadata<AvhrrImageFile>.PrimaryExtension => ".sst";
+  static string[] IImageFormatMetadata<AvhrrImageFile>.FileExtensions => [".sst"];
+  static AvhrrImageFile IImageFormatReader<AvhrrImageFile>.FromSpan(ReadOnlySpan<byte> data) => AvhrrImageReader.FromSpan(data);
+  static byte[] IImageFormatWriter<AvhrrImageFile>.ToBytes(AvhrrImageFile file) => AvhrrImageWriter.ToBytes(file);
 
   /// <summary>Magic bytes: "AVHR" (0x41 0x56 0x48 0x52).</summary>
   internal static readonly byte[] Magic = [0x41, 0x56, 0x48, 0x52];
@@ -36,10 +33,9 @@ public sealed class AvhrrImageFile : IImageFileFormat<AvhrrImageFile> {
   public ushort DataType { get; init; }
 
   /// <summary>Raw grayscale pixel data (1 byte per pixel).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(AvhrrImageFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

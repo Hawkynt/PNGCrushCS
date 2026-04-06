@@ -1,27 +1,23 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Degas;
 
 /// <summary>In-memory representation of a DEGAS/DEGAS Elite image.</summary>
-public sealed class DegasFile : IImageFileFormat<DegasFile> {
+public readonly record struct DegasFile : IImageFormatReader<DegasFile>, IImageToRawImage<DegasFile>, IImageFromRawImage<DegasFile>, IImageFormatWriter<DegasFile> {
 
-  static string IImageFileFormat<DegasFile>.PrimaryExtension => ".pi1";
-  static string[] IImageFileFormat<DegasFile>.FileExtensions => [".pi1", ".pi2", ".pi3", ".pc1", ".pc2", ".pc3"];
-  static DegasFile IImageFileFormat<DegasFile>.FromFile(FileInfo file) => DegasReader.FromFile(file);
-  static DegasFile IImageFileFormat<DegasFile>.FromBytes(byte[] data) => DegasReader.FromBytes(data);
-  static DegasFile IImageFileFormat<DegasFile>.FromStream(Stream stream) => DegasReader.FromStream(stream);
-  static byte[] IImageFileFormat<DegasFile>.ToBytes(DegasFile file) => DegasWriter.ToBytes(file);
+  static string IImageFormatMetadata<DegasFile>.PrimaryExtension => ".pi1";
+  static string[] IImageFormatMetadata<DegasFile>.FileExtensions => [".pi1", ".pi2", ".pi3", ".pc1", ".pc2", ".pc3"];
+  static DegasFile IImageFormatReader<DegasFile>.FromSpan(ReadOnlySpan<byte> data) => DegasReader.FromSpan(data);
+  static byte[] IImageFormatWriter<DegasFile>.ToBytes(DegasFile file) => DegasWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
   public DegasResolution Resolution { get; init; }
   public bool IsCompressed { get; init; }
-  public short[] Palette { get; init; } = new short[16];
-  public byte[] PixelData { get; init; } = [];
+  public short[] Palette { get; init; }
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(DegasFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var numPlanes = file.Resolution switch {
       DegasResolution.Low => 4,

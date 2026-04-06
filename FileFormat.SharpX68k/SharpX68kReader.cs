@@ -25,6 +25,8 @@ public static class SharpX68kReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static SharpX68kFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static SharpX68kFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < SharpX68kFile.HeaderSize)

@@ -26,6 +26,8 @@ public static class GunPaintReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static GunPaintFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static GunPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < GunPaintFile.ExpectedFileSize)

@@ -9,6 +9,7 @@ public sealed class CcittFile : IImageFileFormat<CcittFile> {
 
   static string IImageFileFormat<CcittFile>.PrimaryExtension => ".g3";
   static string[] IImageFileFormat<CcittFile>.FileExtensions => [".g3", ".g4", ".ccitt"];
+  static CcittFile IImageFileFormat<CcittFile>.FromBytes(byte[] data) => throw new NotSupportedException("CCITT files require external width, height, and format parameters. Use CcittReader.FromFile(FileInfo, int, int, CcittFormat) instead.");
   static CcittFile IImageFileFormat<CcittFile>.FromFile(FileInfo file) => throw new NotSupportedException("CCITT files require external width, height, and format parameters. Use CcittReader.FromFile(FileInfo, int, int, CcittFormat) instead.");
   static RawImage IImageFileFormat<CcittFile>.ToRawImage(CcittFile file) => file.ToRawImage();
   static byte[] IImageFileFormat<CcittFile>.ToBytes(CcittFile file) => CcittWriter.ToBytes(file);

@@ -26,6 +26,8 @@ public static class Pixel64Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static Pixel64File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static Pixel64File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < Pixel64File.ExpectedFileSize)

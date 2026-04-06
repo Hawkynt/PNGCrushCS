@@ -30,6 +30,8 @@ public static class IcoReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static IcoFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static IcoFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     return _Parse(data, IcoFileType.Icon);

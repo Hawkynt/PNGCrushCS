@@ -26,6 +26,8 @@ public static class TgaReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static TgaFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static TgaFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < TgaHeader.StructSize)

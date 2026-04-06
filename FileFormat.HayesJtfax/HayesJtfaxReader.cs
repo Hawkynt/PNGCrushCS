@@ -26,6 +26,8 @@ public static class HayesJtfaxReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static HayesJtfaxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static HayesJtfaxFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < HayesJtfaxFile.MinFileSize)

@@ -1,11 +1,10 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.HiResEditor;
 
 /// <summary>In-memory representation of a Hires Editor image (C64, 320x200, 1bpp cell-based).</summary>
-public sealed class HiResEditorFile : IImageFileFormat<HiResEditorFile> {
+public readonly record struct HiResEditorFile : IImageFormatReader<HiResEditorFile>, IImageToRawImage<HiResEditorFile>, IImageFormatWriter<HiResEditorFile> {
 
   /// <summary>Size of the load address in bytes.</summary>
   internal const int LoadAddressSize = 2;
@@ -38,14 +37,10 @@ public sealed class HiResEditorFile : IImageFileFormat<HiResEditorFile> {
     0x777777, 0xAAFF66, 0x0088FF, 0xBBBBBB
   ];
 
-  static string IImageFileFormat<HiResEditorFile>.PrimaryExtension => ".hre";
-  static string[] IImageFileFormat<HiResEditorFile>.FileExtensions => [".hre"];
-  static HiResEditorFile IImageFileFormat<HiResEditorFile>.FromFile(FileInfo file) => HiResEditorReader.FromFile(file);
-  static HiResEditorFile IImageFileFormat<HiResEditorFile>.FromBytes(byte[] data) => HiResEditorReader.FromBytes(data);
-  static HiResEditorFile IImageFileFormat<HiResEditorFile>.FromStream(Stream stream) => HiResEditorReader.FromStream(stream);
-  static RawImage IImageFileFormat<HiResEditorFile>.ToRawImage(HiResEditorFile file) => ToRawImage(file);
-  static HiResEditorFile IImageFileFormat<HiResEditorFile>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<HiResEditorFile>.ToBytes(HiResEditorFile file) => HiResEditorWriter.ToBytes(file);
+  static string IImageFormatMetadata<HiResEditorFile>.PrimaryExtension => ".hre";
+  static string[] IImageFormatMetadata<HiResEditorFile>.FileExtensions => [".hre"];
+  static HiResEditorFile IImageFormatReader<HiResEditorFile>.FromSpan(ReadOnlySpan<byte> data) => HiResEditorReader.FromSpan(data);
+  static byte[] IImageFormatWriter<HiResEditorFile>.ToBytes(HiResEditorFile file) => HiResEditorWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>
   public int Width => PixelWidth;
@@ -54,17 +49,16 @@ public sealed class HiResEditorFile : IImageFileFormat<HiResEditorFile> {
   public int Height => PixelHeight;
 
   /// <summary>C64 memory load address (2 bytes, little-endian).</summary>
-  public ushort LoadAddress { get; init; } = DefaultLoadAddress;
+  public ushort LoadAddress { get; init; }
 
   /// <summary>Bitmap data (8000 bytes).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Screen RAM / video matrix (1000 bytes). Upper nybble = foreground color, lower nybble = background color per 8x8 cell.</summary>
-  public byte[] ScreenData { get; init; } = [];
+  public byte[] ScreenData { get; init; }
 
   /// <summary>Converts this Hires Editor image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(HiResEditorFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var rgb = new byte[PixelWidth * PixelHeight * 3];
 
@@ -98,6 +92,4 @@ public sealed class HiResEditorFile : IImageFileFormat<HiResEditorFile> {
     };
   }
 
-  /// <summary>Not supported. Hires Editor images cannot be created from raw images.</summary>
-  public static HiResEditorFile FromRawImage(RawImage image) => throw new NotSupportedException("Creating Hires Editor images from raw images is not supported.");
 }

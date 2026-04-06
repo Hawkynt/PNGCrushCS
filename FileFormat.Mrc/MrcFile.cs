@@ -1,19 +1,15 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Mrc;
 
 /// <summary>In-memory representation of an MRC2014 electron microscopy image.</summary>
-public sealed class MrcFile : IImageFileFormat<MrcFile> {
+public readonly record struct MrcFile : IImageFormatReader<MrcFile>, IImageToRawImage<MrcFile>, IImageFromRawImage<MrcFile>, IImageFormatWriter<MrcFile> {
 
-  static string IImageFileFormat<MrcFile>.PrimaryExtension => ".mrc";
-  static string[] IImageFileFormat<MrcFile>.FileExtensions => [".mrc", ".map"];
-  static MrcFile IImageFileFormat<MrcFile>.FromFile(FileInfo file) => MrcReader.FromFile(file);
-  static MrcFile IImageFileFormat<MrcFile>.FromBytes(byte[] data) => MrcReader.FromBytes(data);
-  static MrcFile IImageFileFormat<MrcFile>.FromStream(Stream stream) => MrcReader.FromStream(stream);
-  static RawImage IImageFileFormat<MrcFile>.ToRawImage(MrcFile file) => ToRawImage(file);
-  static byte[] IImageFileFormat<MrcFile>.ToBytes(MrcFile file) => MrcWriter.ToBytes(file);
+  static string IImageFormatMetadata<MrcFile>.PrimaryExtension => ".mrc";
+  static string[] IImageFormatMetadata<MrcFile>.FileExtensions => [".mrc", ".map"];
+  static MrcFile IImageFormatReader<MrcFile>.FromSpan(ReadOnlySpan<byte> data) => MrcReader.FromSpan(data);
+  static byte[] IImageFormatWriter<MrcFile>.ToBytes(MrcFile file) => MrcWriter.ToBytes(file);
 
   /// <summary>The fixed size of the MRC2014 header in bytes.</summary>
   public const int HeaderSize = 1024;
@@ -31,7 +27,7 @@ public sealed class MrcFile : IImageFileFormat<MrcFile> {
   public int Height { get; init; }
 
   /// <summary>Number of sections (NZ). For 2D images this is 1.</summary>
-  public int Sections { get; init; } = 1;
+  public int Sections { get; init; }
 
   /// <summary>Data mode. 0=int8, 1=int16, 2=float32, 6=uint16.</summary>
   public int Mode { get; init; }
@@ -43,13 +39,12 @@ public sealed class MrcFile : IImageFileFormat<MrcFile> {
   public int ExtendedHeaderSize { get; init; }
 
   /// <summary>Extended header bytes (NSYMBT bytes after the 1024-byte header).</summary>
-  public byte[] ExtendedHeader { get; init; } = [];
+  public byte[] ExtendedHeader { get; init; }
 
   /// <summary>Raw pixel data in the file's native byte order.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(MrcFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     if (file.Sections != 1)
       throw new NotSupportedException($"Only single-section (NZ=1) images are supported, got NZ={file.Sections}.");
 

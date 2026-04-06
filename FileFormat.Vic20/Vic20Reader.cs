@@ -25,6 +25,8 @@ public static class Vic20Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static Vic20File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static Vic20File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != Vic20File.FileSize)

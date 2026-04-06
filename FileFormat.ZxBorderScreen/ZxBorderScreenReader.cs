@@ -44,6 +44,8 @@ public static class ZxBorderScreenReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static ZxBorderScreenFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static ZxBorderScreenFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != FileSize)

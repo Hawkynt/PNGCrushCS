@@ -1,30 +1,26 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.KofaxKfx;
 
 /// <summary>In-memory representation of a Kofax Group 4 fax image image.</summary>
-public sealed class KofaxKfxFile : IImageFileFormat<KofaxKfxFile> {
+public readonly record struct KofaxKfxFile : IImageFormatReader<KofaxKfxFile>, IImageToRawImage<KofaxKfxFile>, IImageFromRawImage<KofaxKfxFile>, IImageFormatWriter<KofaxKfxFile> {
 
   internal const int HeaderSize = 16;
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
-  static string IImageFileFormat<KofaxKfxFile>.PrimaryExtension => ".kfx";
-  static string[] IImageFileFormat<KofaxKfxFile>.FileExtensions => [".kfx"];
-  static FormatCapability IImageFileFormat<KofaxKfxFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static KofaxKfxFile IImageFileFormat<KofaxKfxFile>.FromFile(FileInfo file) => KofaxKfxReader.FromFile(file);
-  static KofaxKfxFile IImageFileFormat<KofaxKfxFile>.FromBytes(byte[] data) => KofaxKfxReader.FromBytes(data);
-  static KofaxKfxFile IImageFileFormat<KofaxKfxFile>.FromStream(Stream stream) => KofaxKfxReader.FromStream(stream);
-  static byte[] IImageFileFormat<KofaxKfxFile>.ToBytes(KofaxKfxFile file) => KofaxKfxWriter.ToBytes(file);
+  static string IImageFormatMetadata<KofaxKfxFile>.PrimaryExtension => ".kfx";
+  static string[] IImageFormatMetadata<KofaxKfxFile>.FileExtensions => [".kfx"];
+  static KofaxKfxFile IImageFormatReader<KofaxKfxFile>.FromSpan(ReadOnlySpan<byte> data) => KofaxKfxReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<KofaxKfxFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<KofaxKfxFile>.ToBytes(KofaxKfxFile file) => KofaxKfxWriter.ToBytes(file);
 
   public int Width { get; init; }
   public int Height { get; init; }
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(KofaxKfxFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

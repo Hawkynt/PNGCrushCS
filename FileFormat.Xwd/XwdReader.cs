@@ -29,6 +29,8 @@ public static class XwdReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static XwdFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static XwdFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < XwdHeader.StructSize)

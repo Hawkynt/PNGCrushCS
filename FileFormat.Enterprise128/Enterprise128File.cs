@@ -1,11 +1,11 @@
-﻿using System;
+using System;
 using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Enterprise128;
 
 /// <summary>Enterprise 128/Elan screen dump data model.</summary>
-public sealed class Enterprise128File : IImageFileFormat<Enterprise128File> {
+public sealed class Enterprise128File : IImageFormatReader<Enterprise128File>, IImageToRawImage<Enterprise128File>, IImageFromRawImage<Enterprise128File>, IImageFormatWriter<Enterprise128File> {
 
   public const int FileSize = 16384;
   public const int ImageWidth = 512;
@@ -18,6 +18,7 @@ public sealed class Enterprise128File : IImageFileFormat<Enterprise128File> {
 
   public static string PrimaryExtension => ".ep";
   public static string[] FileExtensions => [".ep", ".elan"];
+  static Enterprise128File IImageFormatReader<Enterprise128File>.FromSpan(ReadOnlySpan<byte> data) => Enterprise128Reader.FromSpan(data);
   public static FormatCapability Capabilities => FormatCapability.MonochromeOnly;
   public static Enterprise128File FromFile(FileInfo file) => Enterprise128Reader.FromFile(file);
   public static Enterprise128File FromBytes(byte[] data) => Enterprise128Reader.FromBytes(data);

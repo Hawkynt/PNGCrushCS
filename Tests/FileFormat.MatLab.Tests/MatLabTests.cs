@@ -41,25 +41,6 @@ public class MatLabReaderTests {
 }
 
 [TestFixture]
-public class MatLabWriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => MatLabWriter.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_IncludesHeader() {
-    var file = new MatLabFile {
-      Width = 64,
-      Height = 64,
-      PixelData = new byte[64 * 64 * 3],
-    };
-    var bytes = MatLabWriter.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(128 + 64 * 64 * 3));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -90,30 +71,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void HeaderSize_Is128()
-    => Assert.That(MatLabFile.HeaderSize, Is.EqualTo(128));
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => MatLabFile.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => MatLabFile.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 64, Height = 64, Format = PixelFormat.Indexed8, PixelData = new byte[64 * 64] };
-    Assert.Throws<ArgumentException>(() => MatLabFile.FromRawImage(raw));
-  }
-
-  [Test]
-  public void FileExtensions_ContainsPrimary() {
-    string[] exts = [".mat"];
-    Assert.That(exts, Does.Contain(".mat"));
-  }
-}

@@ -30,6 +30,8 @@ public static class VicarReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static VicarFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static VicarFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MIN_HEADER_SIZE)

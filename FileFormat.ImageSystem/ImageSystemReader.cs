@@ -26,6 +26,8 @@ public static class ImageSystemReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static ImageSystemFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static ImageSystemFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
 

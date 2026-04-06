@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.AdvancedArtStudio;
 
 /// <summary>In-memory representation of an Advanced Art Studio multicolor image (.ocp).</summary>
-public sealed class AdvancedArtStudioFile : IImageFileFormat<AdvancedArtStudioFile> {
+public readonly record struct AdvancedArtStudioFile : IImageFormatReader<AdvancedArtStudioFile>, IImageToRawImage<AdvancedArtStudioFile>, IImageFormatWriter<AdvancedArtStudioFile> {
 
-  static string IImageFileFormat<AdvancedArtStudioFile>.PrimaryExtension => ".ocp";
-  static string[] IImageFileFormat<AdvancedArtStudioFile>.FileExtensions => [".ocp"];
-  static AdvancedArtStudioFile IImageFileFormat<AdvancedArtStudioFile>.FromFile(FileInfo file) => AdvancedArtStudioReader.FromFile(file);
-  static AdvancedArtStudioFile IImageFileFormat<AdvancedArtStudioFile>.FromBytes(byte[] data) => AdvancedArtStudioReader.FromBytes(data);
-  static AdvancedArtStudioFile IImageFileFormat<AdvancedArtStudioFile>.FromStream(Stream stream) => AdvancedArtStudioReader.FromStream(stream);
-  static byte[] IImageFileFormat<AdvancedArtStudioFile>.ToBytes(AdvancedArtStudioFile file) => AdvancedArtStudioWriter.ToBytes(file);
+  static string IImageFormatMetadata<AdvancedArtStudioFile>.PrimaryExtension => ".ocp";
+  static string[] IImageFormatMetadata<AdvancedArtStudioFile>.FileExtensions => [".ocp"];
+  static AdvancedArtStudioFile IImageFormatReader<AdvancedArtStudioFile>.FromSpan(ReadOnlySpan<byte> data) => AdvancedArtStudioReader.FromSpan(data);
+  static byte[] IImageFormatWriter<AdvancedArtStudioFile>.ToBytes(AdvancedArtStudioFile file) => AdvancedArtStudioWriter.ToBytes(file);
 
   /// <summary>The fixed width of the image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -55,13 +52,13 @@ public sealed class AdvancedArtStudioFile : IImageFileFormat<AdvancedArtStudioFi
   public ushort LoadAddress { get; init; }
 
   /// <summary>Multicolor bitmap data (8000 bytes, 2 bits per pixel).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Screen RAM (1000 bytes, upper/lower nybble = 2 colors per cell).</summary>
-  public byte[] ScreenRam { get; init; } = [];
+  public byte[] ScreenRam { get; init; }
 
   /// <summary>Color RAM (1000 bytes, lower nybble = 3rd color per cell).</summary>
-  public byte[] ColorRam { get; init; } = [];
+  public byte[] ColorRam { get; init; }
 
   /// <summary>Background color index (0-15).</summary>
   public byte BackgroundColor { get; init; }
@@ -71,7 +68,6 @@ public sealed class AdvancedArtStudioFile : IImageFileFormat<AdvancedArtStudioFi
 
   /// <summary>Converts this image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(AdvancedArtStudioFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -110,9 +106,4 @@ public sealed class AdvancedArtStudioFile : IImageFileFormat<AdvancedArtStudioFi
     };
   }
 
-  /// <summary>Not supported. Advanced Art Studio images have complex cell-based color constraints.</summary>
-  public static AdvancedArtStudioFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to AdvancedArtStudioFile is not supported due to complex cell-based color constraints.");
-  }
 }

@@ -1,18 +1,15 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Qtif;
 
 /// <summary>In-memory representation of a QTIF (QuickTime Image) file.</summary>
-public sealed class QtifFile : IImageFileFormat<QtifFile> {
+public readonly record struct QtifFile : IImageFormatReader<QtifFile>, IImageToRawImage<QtifFile>, IImageFromRawImage<QtifFile>, IImageFormatWriter<QtifFile> {
 
-  static string IImageFileFormat<QtifFile>.PrimaryExtension => ".qtif";
-  static string[] IImageFileFormat<QtifFile>.FileExtensions => [".qtif", ".qti"];
-  static QtifFile IImageFileFormat<QtifFile>.FromFile(FileInfo file) => QtifReader.FromFile(file);
-  static QtifFile IImageFileFormat<QtifFile>.FromBytes(byte[] data) => QtifReader.FromBytes(data);
-  static QtifFile IImageFileFormat<QtifFile>.FromStream(Stream stream) => QtifReader.FromStream(stream);
-  static byte[] IImageFileFormat<QtifFile>.ToBytes(QtifFile file) => QtifWriter.ToBytes(file);
+  static string IImageFormatMetadata<QtifFile>.PrimaryExtension => ".qtif";
+  static string[] IImageFormatMetadata<QtifFile>.FileExtensions => [".qtif", ".qti"];
+  static QtifFile IImageFormatReader<QtifFile>.FromSpan(ReadOnlySpan<byte> data) => QtifReader.FromSpan(data);
+  static byte[] IImageFormatWriter<QtifFile>.ToBytes(QtifFile file) => QtifWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -21,10 +18,9 @@ public sealed class QtifFile : IImageFileFormat<QtifFile> {
   public int Height { get; init; }
 
   /// <summary>Raw RGB24 pixel data (3 bytes per pixel).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(QtifFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

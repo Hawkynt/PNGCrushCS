@@ -26,6 +26,8 @@ public static class AstcReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static AstcFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AstcFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < AstcHeader.StructSize)

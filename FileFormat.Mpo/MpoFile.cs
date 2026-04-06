@@ -7,15 +7,13 @@ using FileFormat.Jpeg;
 namespace FileFormat.Mpo;
 
 /// <summary>In-memory representation of an MPO (Multi-Picture Object) file.</summary>
-public sealed class MpoFile : IImageFileFormat<MpoFile>, IMultiImageFileFormat<MpoFile> {
+public sealed class MpoFile : IImageFormatReader<MpoFile>, IImageToRawImage<MpoFile>, IImageFromRawImage<MpoFile>, IImageFormatWriter<MpoFile>, IMultiImageFileFormat<MpoFile> {
 
-  static string IImageFileFormat<MpoFile>.PrimaryExtension => ".mpo";
-  static string[] IImageFileFormat<MpoFile>.FileExtensions => [".mpo"];
-  static FormatCapability IImageFileFormat<MpoFile>.Capabilities => FormatCapability.MultiImage;
-  static MpoFile IImageFileFormat<MpoFile>.FromFile(FileInfo file) => MpoReader.FromFile(file);
-  static MpoFile IImageFileFormat<MpoFile>.FromBytes(byte[] data) => MpoReader.FromBytes(data);
-  static MpoFile IImageFileFormat<MpoFile>.FromStream(Stream stream) => MpoReader.FromStream(stream);
-  static byte[] IImageFileFormat<MpoFile>.ToBytes(MpoFile file) => MpoWriter.ToBytes(file);
+  static string IImageFormatMetadata<MpoFile>.PrimaryExtension => ".mpo";
+  static string[] IImageFormatMetadata<MpoFile>.FileExtensions => [".mpo"];
+  static MpoFile IImageFormatReader<MpoFile>.FromSpan(ReadOnlySpan<byte> data) => MpoReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<MpoFile>.Capabilities => FormatCapability.MultiImage;
+  static byte[] IImageFormatWriter<MpoFile>.ToBytes(MpoFile file) => MpoWriter.ToBytes(file);
 
   /// <summary>The individual JPEG images contained in this MPO file, each as a complete JPEG byte array.</summary>
   public IReadOnlyList<byte[]> Images { get; init; } = [];

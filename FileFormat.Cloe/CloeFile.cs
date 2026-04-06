@@ -1,28 +1,23 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Cloe;
 
 /// <summary>In-memory representation of a Cloe Ray-Tracer image image.</summary>
-public sealed class CloeFile : IImageFileFormat<CloeFile> {
+public readonly record struct CloeFile : IImageFormatReader<CloeFile>, IImageToRawImage<CloeFile>, IImageFromRawImage<CloeFile>, IImageFormatWriter<CloeFile> {
 
   internal const int HeaderSize = 8;
 
-
-  static string IImageFileFormat<CloeFile>.PrimaryExtension => ".clo";
-  static string[] IImageFileFormat<CloeFile>.FileExtensions => [".clo"];
-  static CloeFile IImageFileFormat<CloeFile>.FromFile(FileInfo file) => CloeReader.FromFile(file);
-  static CloeFile IImageFileFormat<CloeFile>.FromBytes(byte[] data) => CloeReader.FromBytes(data);
-  static CloeFile IImageFileFormat<CloeFile>.FromStream(Stream stream) => CloeReader.FromStream(stream);
-  static byte[] IImageFileFormat<CloeFile>.ToBytes(CloeFile file) => CloeWriter.ToBytes(file);
+  static string IImageFormatMetadata<CloeFile>.PrimaryExtension => ".clo";
+  static string[] IImageFormatMetadata<CloeFile>.FileExtensions => [".clo"];
+  static CloeFile IImageFormatReader<CloeFile>.FromSpan(ReadOnlySpan<byte> data) => CloeReader.FromSpan(data);
+  static byte[] IImageFormatWriter<CloeFile>.ToBytes(CloeFile file) => CloeWriter.ToBytes(file);
 
   public int Width { get; init; }
   public int Height { get; init; }
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(CloeFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

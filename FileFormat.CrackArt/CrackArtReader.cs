@@ -28,6 +28,8 @@ public static class CrackArtReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static CrackArtFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static CrackArtFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < CrackArtHeader.StructSize)

@@ -1,19 +1,16 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.AtariPaintworks;
 
 /// <summary>In-memory representation of an Atari ST Paintworks/GFA/DeskPic image file.</summary>
-public sealed class AtariPaintworksFile : IImageFileFormat<AtariPaintworksFile> {
+public readonly record struct AtariPaintworksFile : IImageFormatReader<AtariPaintworksFile>, IImageToRawImage<AtariPaintworksFile>, IImageFromRawImage<AtariPaintworksFile>, IImageFormatWriter<AtariPaintworksFile> {
 
-  static string IImageFileFormat<AtariPaintworksFile>.PrimaryExtension => ".cl0";
-  static string[] IImageFileFormat<AtariPaintworksFile>.FileExtensions => [".cl0", ".cl1", ".cl2", ".pg0", ".pg1", ".pg2", ".pg3", ".sc0", ".sc1", ".sc2"];
-  static FormatCapability IImageFileFormat<AtariPaintworksFile>.Capabilities => FormatCapability.IndexedOnly;
-  static AtariPaintworksFile IImageFileFormat<AtariPaintworksFile>.FromFile(FileInfo file) => AtariPaintworksReader.FromFile(file);
-  static AtariPaintworksFile IImageFileFormat<AtariPaintworksFile>.FromBytes(byte[] data) => AtariPaintworksReader.FromBytes(data);
-  static AtariPaintworksFile IImageFileFormat<AtariPaintworksFile>.FromStream(Stream stream) => AtariPaintworksReader.FromStream(stream);
-  static byte[] IImageFileFormat<AtariPaintworksFile>.ToBytes(AtariPaintworksFile file) => AtariPaintworksWriter.ToBytes(file);
+  static string IImageFormatMetadata<AtariPaintworksFile>.PrimaryExtension => ".cl0";
+  static string[] IImageFormatMetadata<AtariPaintworksFile>.FileExtensions => [".cl0", ".cl1", ".cl2", ".pg0", ".pg1", ".pg2", ".pg3", ".sc0", ".sc1", ".sc2"];
+  static AtariPaintworksFile IImageFormatReader<AtariPaintworksFile>.FromSpan(ReadOnlySpan<byte> data) => AtariPaintworksReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<AtariPaintworksFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<AtariPaintworksFile>.ToBytes(AtariPaintworksFile file) => AtariPaintworksWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -25,13 +22,12 @@ public sealed class AtariPaintworksFile : IImageFileFormat<AtariPaintworksFile> 
   public AtariPaintworksResolution Resolution { get; init; }
 
   /// <summary>16-entry palette of 9-bit Atari ST RGB values (0x0RGB, R/G/B in 0-7).</summary>
-  public short[] Palette { get; init; } = new short[16];
+  public short[] Palette { get; init; }
 
   /// <summary>Atari ST word-interleaved planar pixel data (32000 bytes for full screen).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(AtariPaintworksFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var numPlanes = file.Resolution switch {
       AtariPaintworksResolution.Low => 4,

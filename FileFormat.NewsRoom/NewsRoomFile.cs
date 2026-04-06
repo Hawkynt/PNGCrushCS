@@ -1,19 +1,16 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.NewsRoom;
 
 /// <summary>In-memory representation of a NewsRoom NSR image (320x192, 1bpp monochrome).</summary>
-public sealed class NewsRoomFile : IImageFileFormat<NewsRoomFile> {
+public readonly record struct NewsRoomFile : IImageFormatReader<NewsRoomFile>, IImageToRawImage<NewsRoomFile>, IImageFormatWriter<NewsRoomFile> {
 
-  static string IImageFileFormat<NewsRoomFile>.PrimaryExtension => ".nsr";
-  static string[] IImageFileFormat<NewsRoomFile>.FileExtensions => [".nsr"];
-  static FormatCapability IImageFileFormat<NewsRoomFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static NewsRoomFile IImageFileFormat<NewsRoomFile>.FromFile(FileInfo file) => NewsRoomReader.FromFile(file);
-  static NewsRoomFile IImageFileFormat<NewsRoomFile>.FromBytes(byte[] data) => NewsRoomReader.FromBytes(data);
-  static NewsRoomFile IImageFileFormat<NewsRoomFile>.FromStream(Stream stream) => NewsRoomReader.FromStream(stream);
-  static byte[] IImageFileFormat<NewsRoomFile>.ToBytes(NewsRoomFile file) => NewsRoomWriter.ToBytes(file);
+  static string IImageFormatMetadata<NewsRoomFile>.PrimaryExtension => ".nsr";
+  static string[] IImageFormatMetadata<NewsRoomFile>.FileExtensions => [".nsr"];
+  static NewsRoomFile IImageFormatReader<NewsRoomFile>.FromSpan(ReadOnlySpan<byte> data) => NewsRoomReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<NewsRoomFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<NewsRoomFile>.ToBytes(NewsRoomFile file) => NewsRoomWriter.ToBytes(file);
 
   /// <summary>Fixed image width: 320 pixels.</summary>
   internal const int FixedWidth = 320;
@@ -37,11 +34,10 @@ public sealed class NewsRoomFile : IImageFileFormat<NewsRoomFile> {
   public int Height => FixedHeight;
 
   /// <summary>Raw 1bpp bitmap data (7680 bytes, MSB first).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this NewsRoom image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(NewsRoomFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var rgb = new byte[FixedWidth * FixedHeight * 3];
 
@@ -65,9 +61,4 @@ public sealed class NewsRoomFile : IImageFileFormat<NewsRoomFile> {
     };
   }
 
-  /// <summary>Not supported.</summary>
-  public static NewsRoomFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to NewsRoomFile is not supported.");
-  }
 }

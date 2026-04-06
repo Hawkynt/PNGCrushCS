@@ -38,6 +38,8 @@ public static class AniReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static AniFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AniFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < 12)

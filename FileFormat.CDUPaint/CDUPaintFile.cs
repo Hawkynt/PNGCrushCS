@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.CDUPaint;
 
 /// <summary>In-memory representation of a Commodore 64 CDU-Paint multicolor image.</summary>
-public sealed class CDUPaintFile : IImageFileFormat<CDUPaintFile> {
+public readonly record struct CDUPaintFile : IImageFormatReader<CDUPaintFile>, IImageToRawImage<CDUPaintFile>, IImageFormatWriter<CDUPaintFile> {
 
-  static string IImageFileFormat<CDUPaintFile>.PrimaryExtension => ".cdu";
-  static string[] IImageFileFormat<CDUPaintFile>.FileExtensions => [".cdu"];
-  static CDUPaintFile IImageFileFormat<CDUPaintFile>.FromFile(FileInfo file) => CDUPaintReader.FromFile(file);
-  static CDUPaintFile IImageFileFormat<CDUPaintFile>.FromBytes(byte[] data) => CDUPaintReader.FromBytes(data);
-  static CDUPaintFile IImageFileFormat<CDUPaintFile>.FromStream(Stream stream) => CDUPaintReader.FromStream(stream);
-  static byte[] IImageFileFormat<CDUPaintFile>.ToBytes(CDUPaintFile file) => CDUPaintWriter.ToBytes(file);
+  static string IImageFormatMetadata<CDUPaintFile>.PrimaryExtension => ".cdu";
+  static string[] IImageFormatMetadata<CDUPaintFile>.FileExtensions => [".cdu"];
+  static CDUPaintFile IImageFormatReader<CDUPaintFile>.FromSpan(ReadOnlySpan<byte> data) => CDUPaintReader.FromSpan(data);
+  static byte[] IImageFormatWriter<CDUPaintFile>.ToBytes(CDUPaintFile file) => CDUPaintWriter.ToBytes(file);
 
   /// <summary>The fixed width of a CDU-Paint image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -52,20 +49,19 @@ public sealed class CDUPaintFile : IImageFileFormat<CDUPaintFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Multicolor bitmap data (8000 bytes, 2 bits per pixel).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Video matrix / screen RAM (1000 bytes, upper/lower nybble = 2 colors per cell).</summary>
-  public byte[] VideoMatrix { get; init; } = [];
+  public byte[] VideoMatrix { get; init; }
 
   /// <summary>Color RAM (1000 bytes, lower nybble = 3rd color per cell).</summary>
-  public byte[] ColorRam { get; init; } = [];
+  public byte[] ColorRam { get; init; }
 
   /// <summary>Background color index (0-15).</summary>
   public byte BackgroundColor { get; init; }
 
   /// <summary>Converts this CDU-Paint image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(CDUPaintFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -104,9 +100,4 @@ public sealed class CDUPaintFile : IImageFileFormat<CDUPaintFile> {
     };
   }
 
-  /// <summary>Not supported. CDU-Paint images have complex cell-based color constraints.</summary>
-  public static CDUPaintFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to CDUPaintFile is not supported due to complex cell-based color constraints.");
-  }
 }

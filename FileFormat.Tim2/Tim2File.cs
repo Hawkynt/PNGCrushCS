@@ -1,28 +1,24 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Tim2;
 
 /// <summary>In-memory representation of a PlayStation 2/PSP TIM2 texture file.</summary>
-public sealed class Tim2File : IImageFileFormat<Tim2File> {
+public readonly record struct Tim2File : IImageFormatReader<Tim2File>, IImageToRawImage<Tim2File>, IImageFormatWriter<Tim2File> {
 
-  static string IImageFileFormat<Tim2File>.PrimaryExtension => ".tm2";
-  static string[] IImageFileFormat<Tim2File>.FileExtensions => [".tm2"];
-  static Tim2File IImageFileFormat<Tim2File>.FromFile(FileInfo file) => Tim2Reader.FromFile(file);
-  static Tim2File IImageFileFormat<Tim2File>.FromBytes(byte[] data) => Tim2Reader.FromBytes(data);
-  static Tim2File IImageFileFormat<Tim2File>.FromStream(Stream stream) => Tim2Reader.FromStream(stream);
-  static byte[] IImageFileFormat<Tim2File>.ToBytes(Tim2File file) => Tim2Writer.ToBytes(file);
+  static string IImageFormatMetadata<Tim2File>.PrimaryExtension => ".tm2";
+  static string[] IImageFormatMetadata<Tim2File>.FileExtensions => [".tm2"];
+  static Tim2File IImageFormatReader<Tim2File>.FromSpan(ReadOnlySpan<byte> data) => Tim2Reader.FromSpan(data);
+  static byte[] IImageFormatWriter<Tim2File>.ToBytes(Tim2File file) => Tim2Writer.ToBytes(file);
   public byte Version { get; init; }
   public byte Alignment { get; init; }
 
   /// <summary>All pictures contained in this TIM2 file.</summary>
-  public IReadOnlyList<Tim2Picture> Pictures { get; init; } = [];
+  public IReadOnlyList<Tim2Picture> Pictures { get; init; }
 
   /// <summary>Converts the first picture of a TIM2 file to a <see cref="RawImage"/>.</summary>
   public static RawImage ToRawImage(Tim2File file) {
-    ArgumentNullException.ThrowIfNull(file);
     if (file.Pictures.Count == 0)
       throw new ArgumentException("TIM2 file contains no pictures.", nameof(file));
 
@@ -36,9 +32,6 @@ public sealed class Tim2File : IImageFileFormat<Tim2File> {
       _ => throw new NotSupportedException($"Unsupported TIM2 format: {pic.Format}")
     };
   }
-
-  /// <summary>TIM2 encoding is not supported from a single raw image.</summary>
-  public static Tim2File FromRawImage(RawImage image) => throw new NotSupportedException("TIM2 encoding from a single raw image is not supported.");
 
   private static byte[] _ConvertPaletteToRgb(byte[] paletteData, int colorCount) {
     var palette = new byte[colorCount * 3];

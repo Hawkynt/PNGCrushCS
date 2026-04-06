@@ -26,6 +26,8 @@ public static class BugBitmapReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static BugBitmapFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static BugBitmapFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < BugBitmapFile.ExpectedFileSize)

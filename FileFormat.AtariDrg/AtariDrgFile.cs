@@ -1,11 +1,10 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.AtariDrg;
 
 /// <summary>In-memory representation of an Atari 8-bit DRG graphics screen dump (160x192, 2bpp, 4 colors).</summary>
-public sealed class AtariDrgFile : IImageFileFormat<AtariDrgFile> {
+public readonly record struct AtariDrgFile : IImageFormatReader<AtariDrgFile>, IImageToRawImage<AtariDrgFile>, IImageFromRawImage<AtariDrgFile>, IImageFormatWriter<AtariDrgFile> {
 
   /// <summary>Fixed width in pixels.</summary>
   internal const int PixelWidth = 160;
@@ -25,15 +24,11 @@ public sealed class AtariDrgFile : IImageFileFormat<AtariDrgFile> {
   /// <summary>Exact file size in bytes (40 x 192 = 7680).</summary>
   internal const int FileSize = BytesPerRow * PixelHeight;
 
-  static string IImageFileFormat<AtariDrgFile>.PrimaryExtension => ".drg";
-  static string[] IImageFileFormat<AtariDrgFile>.FileExtensions => [".drg"];
-  static FormatCapability IImageFileFormat<AtariDrgFile>.Capabilities => FormatCapability.IndexedOnly;
-  static AtariDrgFile IImageFileFormat<AtariDrgFile>.FromFile(FileInfo file) => AtariDrgReader.FromFile(file);
-  static AtariDrgFile IImageFileFormat<AtariDrgFile>.FromBytes(byte[] data) => AtariDrgReader.FromBytes(data);
-  static AtariDrgFile IImageFileFormat<AtariDrgFile>.FromStream(Stream stream) => AtariDrgReader.FromStream(stream);
-  static RawImage IImageFileFormat<AtariDrgFile>.ToRawImage(AtariDrgFile file) => ToRawImage(file);
-  static AtariDrgFile IImageFileFormat<AtariDrgFile>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<AtariDrgFile>.ToBytes(AtariDrgFile file) => AtariDrgWriter.ToBytes(file);
+  static string IImageFormatMetadata<AtariDrgFile>.PrimaryExtension => ".drg";
+  static string[] IImageFormatMetadata<AtariDrgFile>.FileExtensions => [".drg"];
+  static AtariDrgFile IImageFormatReader<AtariDrgFile>.FromSpan(ReadOnlySpan<byte> data) => AtariDrgReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<AtariDrgFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<AtariDrgFile>.ToBytes(AtariDrgFile file) => AtariDrgWriter.ToBytes(file);
 
   /// <summary>Always 160.</summary>
   public int Width => PixelWidth;
@@ -42,17 +37,16 @@ public sealed class AtariDrgFile : IImageFileFormat<AtariDrgFile> {
   public int Height => PixelHeight;
 
   /// <summary>Indexed pixel data (one byte per pixel, values 0-3). Length = 160 x 192 = 30720.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>RGB palette triplets (3 bytes per entry, 4 entries = 12 bytes).</summary>
-  public byte[] Palette { get; init; } = [];
+  public byte[] Palette { get; init; }
 
   /// <summary>Default grayscale palette for DRG (4 shades).</summary>
   internal static readonly byte[] DefaultPalette = [0, 0, 0, 85, 85, 85, 170, 170, 170, 255, 255, 255];
 
   /// <summary>Converts this DRG screen dump to an Indexed8 raw image (160x192, 4-color palette).</summary>
   public static RawImage ToRawImage(AtariDrgFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var palette = file.Palette.Length >= ColorCount * 3 ? file.Palette[..(ColorCount * 3)] : DefaultPalette[..];
     var pixelData = new byte[PixelWidth * PixelHeight];

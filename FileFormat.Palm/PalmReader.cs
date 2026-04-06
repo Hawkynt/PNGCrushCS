@@ -26,6 +26,8 @@ public static class PalmReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static PalmFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static PalmFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < PalmHeader.StructSize)

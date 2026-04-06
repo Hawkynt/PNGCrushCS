@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Mlt;
 
 /// <summary>In-memory representation of a C64 Mlt (.mlt) multicolor art image.</summary>
-public sealed class MltFile : IImageFileFormat<MltFile> {
+public readonly record struct MltFile : IImageFormatReader<MltFile>, IImageToRawImage<MltFile>, IImageFormatWriter<MltFile> {
 
-  static string IImageFileFormat<MltFile>.PrimaryExtension => ".mlt";
-  static string[] IImageFileFormat<MltFile>.FileExtensions => [".mlt"];
-  static MltFile IImageFileFormat<MltFile>.FromFile(FileInfo file) => MltReader.FromFile(file);
-  static MltFile IImageFileFormat<MltFile>.FromBytes(byte[] data) => MltReader.FromBytes(data);
-  static MltFile IImageFileFormat<MltFile>.FromStream(Stream stream) => MltReader.FromStream(stream);
-  static byte[] IImageFileFormat<MltFile>.ToBytes(MltFile file) => MltWriter.ToBytes(file);
+  static string IImageFormatMetadata<MltFile>.PrimaryExtension => ".mlt";
+  static string[] IImageFormatMetadata<MltFile>.FileExtensions => [".mlt"];
+  static MltFile IImageFormatReader<MltFile>.FromSpan(ReadOnlySpan<byte> data) => MltReader.FromSpan(data);
+  static byte[] IImageFormatWriter<MltFile>.ToBytes(MltFile file) => MltWriter.ToBytes(file);
 
   /// <summary>Size of the bitmap data section in bytes.</summary>
   internal const int BitmapDataSize = 8000;
@@ -52,23 +49,22 @@ public sealed class MltFile : IImageFileFormat<MltFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Bitmap data (8000 bytes).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Screen RAM / video matrix (1000 bytes).</summary>
-  public byte[] ScreenData { get; init; } = [];
+  public byte[] ScreenData { get; init; }
 
   /// <summary>Color RAM (1000 bytes).</summary>
-  public byte[] ColorData { get; init; } = [];
+  public byte[] ColorData { get; init; }
 
   /// <summary>Background color index (0-15). Bit-pair 0 maps to this color.</summary>
   public byte BackgroundColor { get; init; }
 
   /// <summary>Any trailing bytes beyond the minimum payload.</summary>
-  public byte[] TrailingData { get; init; } = [];
+  public byte[] TrailingData { get; init; }
 
   /// <summary>Converts this Mlt image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(MltFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = ImageWidth;
     const int height = ImageHeight;
@@ -107,6 +103,4 @@ public sealed class MltFile : IImageFileFormat<MltFile> {
     };
   }
 
-  /// <summary>Creates a Mlt image from a <see cref="RawImage"/>. Not supported.</summary>
-  public static MltFile FromRawImage(RawImage image) => throw new NotSupportedException("Creating Mlt files from raw images is not supported.");
 }

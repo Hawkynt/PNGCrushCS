@@ -1,28 +1,23 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.PixarRib;
 
 /// <summary>In-memory representation of a Pixar RIB texture image.</summary>
-public sealed class PixarRibFile : IImageFileFormat<PixarRibFile> {
+public readonly record struct PixarRibFile : IImageFormatReader<PixarRibFile>, IImageToRawImage<PixarRibFile>, IImageFromRawImage<PixarRibFile>, IImageFormatWriter<PixarRibFile> {
 
   internal const int HeaderSize = 512;
 
-
-  static string IImageFileFormat<PixarRibFile>.PrimaryExtension => ".pxr";
-  static string[] IImageFileFormat<PixarRibFile>.FileExtensions => [".pxr", ".pixar", ".picio"];
-  static PixarRibFile IImageFileFormat<PixarRibFile>.FromFile(FileInfo file) => PixarRibReader.FromFile(file);
-  static PixarRibFile IImageFileFormat<PixarRibFile>.FromBytes(byte[] data) => PixarRibReader.FromBytes(data);
-  static PixarRibFile IImageFileFormat<PixarRibFile>.FromStream(Stream stream) => PixarRibReader.FromStream(stream);
-  static byte[] IImageFileFormat<PixarRibFile>.ToBytes(PixarRibFile file) => PixarRibWriter.ToBytes(file);
+  static string IImageFormatMetadata<PixarRibFile>.PrimaryExtension => ".pxr";
+  static string[] IImageFormatMetadata<PixarRibFile>.FileExtensions => [".pxr", ".pixar", ".picio"];
+  static PixarRibFile IImageFormatReader<PixarRibFile>.FromSpan(ReadOnlySpan<byte> data) => PixarRibReader.FromSpan(data);
+  static byte[] IImageFormatWriter<PixarRibFile>.ToBytes(PixarRibFile file) => PixarRibWriter.ToBytes(file);
 
   public int Width { get; init; }
   public int Height { get; init; }
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(PixarRibFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

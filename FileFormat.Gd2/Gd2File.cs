@@ -1,20 +1,16 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Gd2;
 
 /// <summary>In-memory representation of a libgd GD2 image.</summary>
 [FormatMagicBytes([0x67, 0x64, 0x32, 0x00])]
-public sealed class Gd2File : IImageFileFormat<Gd2File> {
+public readonly record struct Gd2File : IImageFormatReader<Gd2File>, IImageToRawImage<Gd2File>, IImageFromRawImage<Gd2File>, IImageFormatWriter<Gd2File> {
 
-  static string IImageFileFormat<Gd2File>.PrimaryExtension => ".gd2";
-  static string[] IImageFileFormat<Gd2File>.FileExtensions => [".gd2"];
-  static Gd2File IImageFileFormat<Gd2File>.FromFile(FileInfo file) => Gd2Reader.FromFile(file);
-  static Gd2File IImageFileFormat<Gd2File>.FromBytes(byte[] data) => Gd2Reader.FromBytes(data);
-  static Gd2File IImageFileFormat<Gd2File>.FromStream(Stream stream) => Gd2Reader.FromStream(stream);
-  static RawImage IImageFileFormat<Gd2File>.ToRawImage(Gd2File file) => ToRawImage(file);
-  static byte[] IImageFileFormat<Gd2File>.ToBytes(Gd2File file) => Gd2Writer.ToBytes(file);
+  static string IImageFormatMetadata<Gd2File>.PrimaryExtension => ".gd2";
+  static string[] IImageFormatMetadata<Gd2File>.FileExtensions => [".gd2"];
+  static Gd2File IImageFormatReader<Gd2File>.FromSpan(ReadOnlySpan<byte> data) => Gd2Reader.FromSpan(data);
+  static byte[] IImageFormatWriter<Gd2File>.ToBytes(Gd2File file) => Gd2Writer.ToBytes(file);
 
   /// <summary>The 4-byte GD2 signature: "gd2\0" (0x67 0x64 0x32 0x00).</summary>
   public static ReadOnlySpan<byte> Signature => [0x67, 0x64, 0x32, 0x00];
@@ -29,19 +25,18 @@ public sealed class Gd2File : IImageFileFormat<Gd2File> {
   public int Height { get; init; }
 
   /// <summary>GD2 format version (typically 2).</summary>
-  public int Version { get; init; } = 2;
+  public int Version { get; init; }
 
   /// <summary>Chunk size used for tiled storage.</summary>
   public int ChunkSize { get; init; }
 
   /// <summary>Format code (1=raw, 2=compressed).</summary>
-  public int Format { get; init; } = 1;
+  public int Format { get; init; }
 
   /// <summary>Raw ARGB pixel data in GD2 byte order (4 bytes per pixel, big-endian, 7-bit alpha: 0=opaque, 127=transparent).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(Gd2File file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var pixelCount = file.Width * file.Height;
     var rgba = new byte[pixelCount * 4];

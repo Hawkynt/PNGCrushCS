@@ -1,21 +1,16 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.CoCo;
 
 /// <summary>In-memory representation of a TRS-80 CoCo PMODE 4 graphics screen (6144 bytes: 256x192 mono, 32 bytes/row).</summary>
-public sealed class CoCoFile : IImageFileFormat<CoCoFile> {
+public readonly record struct CoCoFile : IImageFormatReader<CoCoFile>, IImageToRawImage<CoCoFile>, IImageFromRawImage<CoCoFile>, IImageFormatWriter<CoCoFile> {
 
-  static string IImageFileFormat<CoCoFile>.PrimaryExtension => ".coc";
-  static string[] IImageFileFormat<CoCoFile>.FileExtensions => [".coc"];
-  static FormatCapability IImageFileFormat<CoCoFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static CoCoFile IImageFileFormat<CoCoFile>.FromFile(FileInfo file) => CoCoReader.FromFile(file);
-  static CoCoFile IImageFileFormat<CoCoFile>.FromBytes(byte[] data) => CoCoReader.FromBytes(data);
-  static CoCoFile IImageFileFormat<CoCoFile>.FromStream(Stream stream) => CoCoReader.FromStream(stream);
-  static RawImage IImageFileFormat<CoCoFile>.ToRawImage(CoCoFile file) => ToRawImage(file);
-  static CoCoFile IImageFileFormat<CoCoFile>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<CoCoFile>.ToBytes(CoCoFile file) => CoCoWriter.ToBytes(file);
+  static string IImageFormatMetadata<CoCoFile>.PrimaryExtension => ".coc";
+  static string[] IImageFormatMetadata<CoCoFile>.FileExtensions => [".coc"];
+  static CoCoFile IImageFormatReader<CoCoFile>.FromSpan(ReadOnlySpan<byte> data) => CoCoReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<CoCoFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<CoCoFile>.ToBytes(CoCoFile file) => CoCoWriter.ToBytes(file);
 
   /// <summary>Expected file size in bytes.</summary>
   internal const int ExpectedFileSize = 6144;
@@ -36,13 +31,12 @@ public sealed class CoCoFile : IImageFileFormat<CoCoFile> {
   public int Height => PixelHeight;
 
   /// <summary>Raw pixel data (6144 bytes: 1bpp MSB-first, 32 bytes per row, 192 rows).</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
   /// <summary>Converts the CoCo screen to an Indexed1 raw image (256x192, B&amp;W palette).</summary>
   public static RawImage ToRawImage(CoCoFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var pixelData = new byte[BytesPerRow * PixelHeight];
     file.RawData.AsSpan(0, Math.Min(file.RawData.Length, pixelData.Length)).CopyTo(pixelData);

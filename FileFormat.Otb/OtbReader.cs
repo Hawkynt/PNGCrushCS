@@ -26,6 +26,8 @@ public static class OtbReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static OtbFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static OtbFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < OtbHeader.StructSize)

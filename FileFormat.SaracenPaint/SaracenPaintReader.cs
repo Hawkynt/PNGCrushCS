@@ -26,6 +26,8 @@ public static class SaracenPaintReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static SaracenPaintFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static SaracenPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < SaracenPaintFile.ExpectedFileSize)

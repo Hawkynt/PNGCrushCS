@@ -47,6 +47,8 @@ public static class XcfReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static XcfFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static XcfFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < 14)

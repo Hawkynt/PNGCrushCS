@@ -44,6 +44,8 @@ public static class ZxUlaPlusReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static ZxUlaPlusFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static ZxUlaPlusFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != FileSize)

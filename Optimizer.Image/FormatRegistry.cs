@@ -7,7 +7,7 @@ using FileFormat.Core;
 
 namespace Optimizer.Image;
 
-/// <summary>Data-driven registry mapping <see cref="ImageFormat"/> to format-specific operations, discovered automatically from <see cref="IImageFileFormat{TSelf}"/> implementations.</summary>
+/// <summary>Data-driven registry mapping <see cref="ImageFormat"/> to format-specific operations, discovered automatically from split interface implementations.</summary>
 internal static class FormatRegistry {
 
   internal sealed record FormatEntry(
@@ -17,11 +17,12 @@ internal static class FormatRegistry {
     string[] AllExtensions,
     Func<FileInfo, RawImage?> LoadRawImage,
     Func<byte[], RawImage?> LoadRawImageFromBytes,
-    Func<RawImage, byte[]> ConvertFromRawImage,
+    Func<RawImage, byte[]>? ConvertFromRawImage,
     FormatCapability Capabilities,
     MagicSignature[] MagicSignatures,
     Func<byte[], bool?>? MatchesSignature,
     int DetectionPriority,
+    Func<byte[], ImageInfo?>? ReadImageInfo = null,
     Func<FileInfo, int>? GetImageCount = null,
     Func<FileInfo, int, RawImage?>? LoadRawImageAtIndex = null,
     Func<FileInfo, IReadOnlyList<RawImage>?>? LoadAllRawImages = null
@@ -29,7 +30,7 @@ internal static class FormatRegistry {
 
   internal readonly record struct MagicSignature(byte[] Signature, int Offset, int MinHeaderLength);
 
-  /// <summary>Lightweight entry for formats without <see cref="IImageFileFormat{TSelf}"/> (e.g. GIF).</summary>
+  /// <summary>Lightweight entry for formats without full implementation (e.g. GIF).</summary>
   private sealed record DetectionOnlyEntry(
     ImageFormat Format,
     string Name,
@@ -41,10 +42,8 @@ internal static class FormatRegistry {
   private static readonly Dictionary<ImageFormat, FormatEntry> _byFormat = new();
   private static readonly Dictionary<string, ImageFormat> _byExtension = new(StringComparer.OrdinalIgnoreCase);
 
-  /// <summary>Pre-sorted list of all entries (full + detection-only) that can participate in signature detection.</summary>
   private static readonly SignatureEntry[] _signatureEntries;
 
-  /// <summary>Unified type for signature detection iteration.</summary>
   private readonly record struct SignatureEntry(
     ImageFormat Format,
     MagicSignature[] MagicSignatures,
@@ -52,33 +51,34 @@ internal static class FormatRegistry {
     int DetectionPriority
   );
 
-  private static readonly MethodInfo _registerGenericMethod =
-    typeof(FormatRegistry).GetMethod(nameof(_RegisterGeneric), BindingFlags.NonPublic | BindingFlags.Static)!;
+  private static readonly MethodInfo _registerReaderMethod =
+    typeof(FormatRegistry).GetMethod(nameof(_RegisterReader), BindingFlags.NonPublic | BindingFlags.Static)!;
 
-  private static readonly MethodInfo _registerMultiImageMethod =
-    typeof(FormatRegistry).GetMethod(nameof(_RegisterMultiImage), BindingFlags.NonPublic | BindingFlags.Static)!;
+  private static readonly MethodInfo _registerFullMethod =
+    typeof(FormatRegistry).GetMethod(nameof(_RegisterFull), BindingFlags.NonPublic | BindingFlags.Static)!;
+
+  private static readonly MethodInfo _augmentInfoReaderMethod =
+    typeof(FormatRegistry).GetMethod(nameof(_AugmentInfoReader), BindingFlags.NonPublic | BindingFlags.Static)!;
+
+  private static readonly MethodInfo _registerMultiImageReaderMethod =
+    typeof(FormatRegistry).GetMethod(nameof(_RegisterMultiImageReader), BindingFlags.NonPublic | BindingFlags.Static)!;
+
+  private static readonly MethodInfo _registerMultiImageFullMethod =
+    typeof(FormatRegistry).GetMethod(nameof(_RegisterMultiImageFull), BindingFlags.NonPublic | BindingFlags.Static)!;
 
   static FormatRegistry() {
-    // Force-load all FileFormat assemblies from the output directory.
-    // GetReferencedAssemblies() only returns assemblies the compiler detected as actually used in code;
-    // since format types are discovered via reflection (not direct usage), we must load them from disk.
     var baseDir = AppContext.BaseDirectory;
     foreach (var dll in Directory.GetFiles(baseDir, "FileFormat.*.dll")) {
       try {
         var asmName = AssemblyName.GetAssemblyName(dll);
         Assembly.Load(asmName);
-      } catch {
-        // ignore load failures
-      }
+      } catch { }
     }
 
-    // Scan all loaded assemblies for IImageFileFormat<T> implementations
     foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
       _ScanAssembly(assembly);
 
-    // Manual detection entries for formats without IImageFileFormat<T> (GIF uses external GifFileFormat repo)
     var detectionOnly = new List<DetectionOnlyEntry>();
-
     _RegisterDetectionOnly(
       detectionOnly, ImageFormat.Gif, "Gif",
       [".gif", ".giff"],
@@ -86,7 +86,6 @@ internal static class FormatRegistry {
       null, 100
     );
 
-    // Build sorted signature detection index from both full entries and detection-only entries
     var sigFromFull = _byFormat.Values
       .Where(e => e.MagicSignatures.Length > 0 || e.MatchesSignature != null)
       .Select(e => new SignatureEntry(e.Format, e.MagicSignatures, e.MatchesSignature, e.DetectionPriority));
@@ -110,67 +109,84 @@ internal static class FormatRegistry {
       return;
     }
 
-    var ifaceType = typeof(IImageFileFormat<>);
-    var multiIfaceType = typeof(IMultiImageFileFormat<>);
+    var readerType = typeof(IImageFormatReader<>);
+    var toRawType = typeof(IImageToRawImage<>);
+    var fromRawType = typeof(IImageFromRawImage<>);
+    var writerType = typeof(IImageFormatWriter<>);
+    var multiType = typeof(IMultiImageFileFormat<>);
+    var infoReaderType = typeof(IImageInfoReader<>);
+
     foreach (var type in types) {
       if (type.IsAbstract || type.IsInterface || type.IsGenericTypeDefinition)
         continue;
 
-      var hasImageFormat = false;
-      var hasMultiImage = false;
+      var hasReader = false;
+      var hasToRaw = false;
+      var hasFromRaw = false;
+      var hasWriter = false;
+      var hasMulti = false;
+      var hasInfoReader = false;
+
       foreach (var iface in type.GetInterfaces()) {
-        if (!iface.IsGenericType)
-          continue;
-        if (iface.GetGenericArguments()[0] != type)
+        if (!iface.IsGenericType || iface.GetGenericArguments()[0] != type)
           continue;
 
         var def = iface.GetGenericTypeDefinition();
-        if (def == ifaceType)
-          hasImageFormat = true;
-        else if (def == multiIfaceType)
-          hasMultiImage = true;
+        if (def == readerType) hasReader = true;
+        else if (def == toRawType) hasToRaw = true;
+        else if (def == fromRawType) hasFromRaw = true;
+        else if (def == writerType) hasWriter = true;
+        else if (def == multiType) hasMulti = true;
+        else if (def == infoReaderType) hasInfoReader = true;
       }
 
-      if (!hasImageFormat)
+      if (!hasReader || !hasToRaw)
         continue;
 
       try {
-        _registerGenericMethod.MakeGenericMethod(type).Invoke(null, null);
-      } catch {
-        // Skip types that fail to register (e.g. missing dependencies)
-      }
+        if (hasFromRaw && hasWriter)
+          _registerFullMethod.MakeGenericMethod(type).Invoke(null, null);
+        else
+          _registerReaderMethod.MakeGenericMethod(type).Invoke(null, null);
+      } catch { }
 
-      if (hasMultiImage)
+      if (hasInfoReader)
         try {
-          _registerMultiImageMethod.MakeGenericMethod(type).Invoke(null, null);
-        } catch {
-          // Skip types that fail to register
-        }
+          _augmentInfoReaderMethod.MakeGenericMethod(type).Invoke(null, null);
+        } catch { }
+
+      if (hasMulti)
+        try {
+          if (hasFromRaw && hasWriter)
+            _registerMultiImageFullMethod.MakeGenericMethod(type).Invoke(null, null);
+          else
+            _registerMultiImageReaderMethod.MakeGenericMethod(type).Invoke(null, null);
+        } catch { }
     }
   }
 
-  private static void _RegisterGeneric<T>() where T : IImageFileFormat<T> {
+  private static (string name, ImageFormat format, MagicSignature[] magic, int priority, Func<byte[], bool?>? matchSig) _ExtractMetadata<T>() where T : IImageFormatMetadata<T> {
     var type = typeof(T);
     var name = type.Name.EndsWith("File") ? type.Name[..^4] : type.Name;
-
-    // Bridge to ImageFormat enum via naming convention
     var format = Enum.TryParse<ImageFormat>(name, out var f) ? f : ImageFormat.Unknown;
 
-    // Read attribute-based metadata
-    var magicSignatures = type.GetCustomAttributes<FormatMagicBytesAttribute>()
+    var magic = type.GetCustomAttributes<FormatMagicBytesAttribute>()
       .Select(a => new MagicSignature(a.Signature, a.Offset, a.MinHeaderLength))
       .ToArray();
 
     var priority = type.GetCustomAttribute<FormatDetectionPriorityAttribute>()?.Priority ?? 100;
 
-    // Detect if MatchesSignature is explicitly overridden (not the default null-returning implementation)
-    var hasMatchOverride = type
+    var hasMatch = type
       .GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.DeclaredOnly)
       .Any(m => m.Name.Contains("MatchesSignature"));
 
-    Func<byte[], bool?>? matchesSignature = hasMatchOverride
-      ? header => T.MatchesSignature(header)
-      : null;
+    Func<byte[], bool?>? matchSig = hasMatch ? header => T.MatchesSignature(header) : null;
+
+    return (name, format, magic, priority, matchSig);
+  }
+
+  private static void _RegisterReader<T>() where T : IImageFormatReader<T>, IImageToRawImage<T> {
+    var (name, format, magic, priority, matchSig) = _ExtractMetadata<T>();
 
     var entry = new FormatEntry(
       Format: format,
@@ -178,63 +194,77 @@ internal static class FormatRegistry {
       PrimaryExtension: T.PrimaryExtension,
       AllExtensions: T.FileExtensions,
       LoadRawImage: file => {
-        try {
-          return T.ToRawImage(T.FromFile(file));
-        } catch {
-          return null;
-        }
+        try { return FormatIO.Decode<T>(file); } catch { return null; }
       },
       LoadRawImageFromBytes: bytes => {
-        try {
-          return T.ToRawImage(T.FromBytes(bytes));
-        } catch {
-          return null;
-        }
+        try { return FormatIO.Decode<T>(bytes); } catch { return null; }
       },
-      ConvertFromRawImage: raw => T.ToBytes(T.FromRawImage(raw)),
+      ConvertFromRawImage: null,
       Capabilities: T.Capabilities,
-      MagicSignatures: magicSignatures,
-      MatchesSignature: matchesSignature,
+      MagicSignatures: magic,
+      MatchesSignature: matchSig,
       DetectionPriority: priority
     );
 
     if (format != ImageFormat.Unknown)
       _byFormat.TryAdd(format, entry);
-
     foreach (var ext in T.FileExtensions)
       _byExtension.TryAdd(ext, format);
   }
 
-  private static void _RegisterMultiImage<T>() where T : IImageFileFormat<T>, IMultiImageFileFormat<T> {
-    var type = typeof(T);
-    var name = type.Name.EndsWith("File") ? type.Name[..^4] : type.Name;
+  private static void _RegisterFull<T>() where T : IImageFormatReader<T>, IImageToRawImage<T>, IImageFromRawImage<T>, IImageFormatWriter<T> {
+    var (name, format, magic, priority, matchSig) = _ExtractMetadata<T>();
+
+    var entry = new FormatEntry(
+      Format: format,
+      Name: name,
+      PrimaryExtension: T.PrimaryExtension,
+      AllExtensions: T.FileExtensions,
+      LoadRawImage: file => {
+        try { return FormatIO.Decode<T>(file); } catch { return null; }
+      },
+      LoadRawImageFromBytes: bytes => {
+        try { return FormatIO.Decode<T>(bytes); } catch { return null; }
+      },
+      ConvertFromRawImage: raw => FormatIO.Encode<T>(raw),
+      Capabilities: T.Capabilities,
+      MagicSignatures: magic,
+      MatchesSignature: matchSig,
+      DetectionPriority: priority
+    );
+
+    if (format != ImageFormat.Unknown)
+      _byFormat.TryAdd(format, entry);
+    foreach (var ext in T.FileExtensions)
+      _byExtension.TryAdd(ext, format);
+  }
+
+  private static void _AugmentInfoReader<T>() where T : IImageInfoReader<T> {
+    var name = typeof(T).Name.EndsWith("File") ? typeof(T).Name[..^4] : typeof(T).Name;
     var format = Enum.TryParse<ImageFormat>(name, out var f) ? f : ImageFormat.Unknown;
     if (format == ImageFormat.Unknown || !_byFormat.TryGetValue(format, out var existing))
       return;
 
     _byFormat[format] = existing with {
-      GetImageCount = file => {
-        try {
-          return T.ImageCount(T.FromFile(file));
-        } catch {
-          return 0;
-        }
-      },
-      LoadRawImageAtIndex = (file, index) => {
-        try {
-          return T.ToRawImage(T.FromFile(file), index);
-        } catch {
-          return null;
-        }
-      },
-      LoadAllRawImages = file => {
-        try {
-          return T.ToRawImages(T.FromFile(file));
-        } catch {
-          return null;
-        }
-      }
+      ReadImageInfo = data => { try { return T.ReadImageInfo(data); } catch { return null; } }
     };
+  }
+
+  private static void _RegisterMultiImageReader<T>() where T : IImageFormatReader<T>, IImageToRawImage<T>, IMultiImageFileFormat<T> {
+    var name = typeof(T).Name.EndsWith("File") ? typeof(T).Name[..^4] : typeof(T).Name;
+    var format = Enum.TryParse<ImageFormat>(name, out var f) ? f : ImageFormat.Unknown;
+    if (format == ImageFormat.Unknown || !_byFormat.TryGetValue(format, out var existing))
+      return;
+
+    _byFormat[format] = existing with {
+      GetImageCount = file => { try { return T.ImageCount(FormatIO.Read<T>(file)); } catch { return 0; } },
+      LoadRawImageAtIndex = (file, index) => { try { return T.ToRawImage(FormatIO.Read<T>(file), index); } catch { return null; } },
+      LoadAllRawImages = file => { try { return T.ToRawImages(FormatIO.Read<T>(file)); } catch { return null; } }
+    };
+  }
+
+  private static void _RegisterMultiImageFull<T>() where T : IImageFormatReader<T>, IImageToRawImage<T>, IImageFromRawImage<T>, IImageFormatWriter<T>, IMultiImageFileFormat<T> {
+    _RegisterMultiImageReader<T>();
   }
 
   private static void _RegisterDetectionOnly(
@@ -259,15 +289,12 @@ internal static class FormatRegistry {
   internal static ImageFormat DetectFromExtension(string extension)
     => _byExtension.GetValueOrDefault(extension);
 
-  /// <summary>Detects image format from magic bytes using pre-sorted signature entries.</summary>
   internal static FormatEntry? DetectFromSignature(ReadOnlySpan<byte> header) {
     if (header.Length < 2)
       return null;
 
     byte[]? headerArray = null;
-
     foreach (var entry in _signatureEntries) {
-      // Check MatchesSignature first — complex logic can match or explicitly reject
       if (entry.MatchesSignature != null) {
         headerArray ??= header.ToArray();
         var result = entry.MatchesSignature(headerArray);
@@ -277,23 +304,19 @@ internal static class FormatRegistry {
           continue;
       }
 
-      // Check magic byte signatures
       foreach (var sig in entry.MagicSignatures) {
         if (header.Length >= sig.MinHeaderLength && header.Slice(sig.Offset, sig.Signature.Length).SequenceEqual(sig.Signature))
           return _byFormat.GetValueOrDefault(entry.Format);
       }
     }
-
     return null;
   }
 
-  /// <summary>Detects image format enum from magic bytes. Returns <see cref="ImageFormat.Unknown"/> if unrecognized.</summary>
   internal static ImageFormat DetectFormatFromSignature(ReadOnlySpan<byte> header) {
     if (header.Length < 2)
       return ImageFormat.Unknown;
 
     byte[]? headerArray = null;
-
     foreach (var entry in _signatureEntries) {
       if (entry.MatchesSignature != null) {
         headerArray ??= header.ToArray();
@@ -309,10 +332,11 @@ internal static class FormatRegistry {
           return entry.Format;
       }
     }
-
     return ImageFormat.Unknown;
   }
 
   internal static IEnumerable<FormatEntry> ConversionTargets
-    => _byFormat.Values.Where(e => (e.Capabilities & FormatCapability.HasDedicatedOptimizer) == 0);
+    => _byFormat.Values.Where(e =>
+      (e.Capabilities & FormatCapability.HasDedicatedOptimizer) == 0
+      && e.ConvertFromRawImage != null);
 }

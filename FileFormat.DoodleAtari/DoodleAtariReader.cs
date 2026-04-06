@@ -26,6 +26,8 @@ public static class DoodleAtariReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static DoodleAtariFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static DoodleAtariFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != DoodleAtariFile.ExpectedFileSize)

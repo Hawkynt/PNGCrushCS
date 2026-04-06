@@ -1,11 +1,10 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.QuantumPaint;
 
 /// <summary>In-memory representation of an Atari ST QuantumPaint image (320x200, 16 colors, 4 planes).</summary>
-public sealed class QuantumPaintFile : IImageFileFormat<QuantumPaintFile> {
+public readonly record struct QuantumPaintFile : IImageFormatReader<QuantumPaintFile>, IImageToRawImage<QuantumPaintFile>, IImageFromRawImage<QuantumPaintFile>, IImageFormatWriter<QuantumPaintFile> {
 
   /// <summary>Image width (always 320).</summary>
   internal const int PixelWidth = 320;
@@ -25,13 +24,11 @@ public sealed class QuantumPaintFile : IImageFileFormat<QuantumPaintFile> {
   /// <summary>Minimum file size (palette + pixel data).</summary>
   internal const int MinFileSize = PaletteSize + PixelDataSize;
 
-  static string IImageFileFormat<QuantumPaintFile>.PrimaryExtension => ".pbx";
-  static string[] IImageFileFormat<QuantumPaintFile>.FileExtensions => [".pbx"];
-  static FormatCapability IImageFileFormat<QuantumPaintFile>.Capabilities => FormatCapability.IndexedOnly;
-  static QuantumPaintFile IImageFileFormat<QuantumPaintFile>.FromFile(FileInfo file) => QuantumPaintReader.FromFile(file);
-  static QuantumPaintFile IImageFileFormat<QuantumPaintFile>.FromBytes(byte[] data) => QuantumPaintReader.FromBytes(data);
-  static QuantumPaintFile IImageFileFormat<QuantumPaintFile>.FromStream(Stream stream) => QuantumPaintReader.FromStream(stream);
-  static byte[] IImageFileFormat<QuantumPaintFile>.ToBytes(QuantumPaintFile file) => QuantumPaintWriter.ToBytes(file);
+  static string IImageFormatMetadata<QuantumPaintFile>.PrimaryExtension => ".pbx";
+  static string[] IImageFormatMetadata<QuantumPaintFile>.FileExtensions => [".pbx"];
+  static QuantumPaintFile IImageFormatReader<QuantumPaintFile>.FromSpan(ReadOnlySpan<byte> data) => QuantumPaintReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<QuantumPaintFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<QuantumPaintFile>.ToBytes(QuantumPaintFile file) => QuantumPaintWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>
   public int Width => PixelWidth;
@@ -40,13 +37,12 @@ public sealed class QuantumPaintFile : IImageFileFormat<QuantumPaintFile> {
   public int Height => PixelHeight;
 
   /// <summary>16-entry palette of 12-bit Atari ST RGB values (0x0RGB, R/G/B in 0-7).</summary>
-  public short[] Palette { get; init; } = new short[16];
+  public short[] Palette { get; init; }
 
   /// <summary>32000 bytes of Atari ST word-interleaved planar pixel data (4 planes).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(QuantumPaintFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var chunky = PlanarConverter.AtariStToChunky(file.PixelData, PixelWidth, PixelHeight, NumPlanes);
     var paletteCount = Math.Min(16, file.Palette.Length);

@@ -26,6 +26,8 @@ public static class PixelPerfectReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static PixelPerfectFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static PixelPerfectFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < PixelPerfectFile.LoadAddressSize + PixelPerfectFile.MinBitmapSize)

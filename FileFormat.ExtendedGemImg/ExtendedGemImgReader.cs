@@ -27,6 +27,8 @@ public static class ExtendedGemImgReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static ExtendedGemImgFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static ExtendedGemImgFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < ExtendedGemImgHeader.StructSize)

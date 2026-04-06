@@ -41,25 +41,6 @@ public class PiReaderTests {
 }
 
 [TestFixture]
-public class PiWriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => PiWriter.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_IncludesHeader() {
-    var file = new PiFile {
-      Width = 640,
-      Height = 400,
-      PixelData = new byte[640 * 400],
-    };
-    var bytes = PiWriter.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(18 + 640 * 400));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -90,30 +71,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void HeaderSize_Is18()
-    => Assert.That(PiFile.HeaderSize, Is.EqualTo(18));
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => PiFile.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => PiFile.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 640, Height = 400, Format = PixelFormat.Rgb24, PixelData = new byte[640 * 400 * 3] };
-    Assert.Throws<ArgumentException>(() => PiFile.FromRawImage(raw));
-  }
-
-  [Test]
-  public void FileExtensions_ContainsPrimary() {
-    string[] exts = [".pi"];
-    Assert.That(exts, Does.Contain(".pi"));
-  }
-}

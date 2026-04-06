@@ -25,6 +25,8 @@ public static class PiReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static PiFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static PiFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < PiFile.HeaderSize)

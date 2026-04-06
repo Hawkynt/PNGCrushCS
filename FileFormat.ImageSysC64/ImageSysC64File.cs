@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.ImageSysC64;
 
 /// <summary>In-memory representation of a Commodore 64 Image System C64 image.</summary>
-public sealed class ImageSysC64File : IImageFileFormat<ImageSysC64File> {
+public readonly record struct ImageSysC64File : IImageFormatReader<ImageSysC64File>, IImageToRawImage<ImageSysC64File>, IImageFormatWriter<ImageSysC64File> {
 
-  static string IImageFileFormat<ImageSysC64File>.PrimaryExtension => ".isc";
-  static string[] IImageFileFormat<ImageSysC64File>.FileExtensions => [".isc"];
-  static ImageSysC64File IImageFileFormat<ImageSysC64File>.FromFile(FileInfo file) => ImageSysC64Reader.FromFile(file);
-  static ImageSysC64File IImageFileFormat<ImageSysC64File>.FromBytes(byte[] data) => ImageSysC64Reader.FromBytes(data);
-  static ImageSysC64File IImageFileFormat<ImageSysC64File>.FromStream(Stream stream) => ImageSysC64Reader.FromStream(stream);
-  static byte[] IImageFileFormat<ImageSysC64File>.ToBytes(ImageSysC64File file) => ImageSysC64Writer.ToBytes(file);
+  static string IImageFormatMetadata<ImageSysC64File>.PrimaryExtension => ".isc";
+  static string[] IImageFormatMetadata<ImageSysC64File>.FileExtensions => [".isc"];
+  static ImageSysC64File IImageFormatReader<ImageSysC64File>.FromSpan(ReadOnlySpan<byte> data) => ImageSysC64Reader.FromSpan(data);
+  static byte[] IImageFormatWriter<ImageSysC64File>.ToBytes(ImageSysC64File file) => ImageSysC64Writer.ToBytes(file);
 
   /// <summary>The fixed width of an Image System C64 image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -55,13 +52,13 @@ public sealed class ImageSysC64File : IImageFileFormat<ImageSysC64File> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Multicolor bitmap data (8000 bytes, 2 bits per pixel).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Video matrix / screen RAM (1000 bytes, upper/lower nybble = 2 colors per cell).</summary>
-  public byte[] VideoMatrix { get; init; } = [];
+  public byte[] VideoMatrix { get; init; }
 
   /// <summary>Color RAM (1000 bytes, lower nybble = 3rd color per cell).</summary>
-  public byte[] ColorRam { get; init; } = [];
+  public byte[] ColorRam { get; init; }
 
   /// <summary>Border color index (0-15).</summary>
   public byte BorderColor { get; init; }
@@ -70,11 +67,10 @@ public sealed class ImageSysC64File : IImageFileFormat<ImageSysC64File> {
   public byte BackgroundColor { get; init; }
 
   /// <summary>Trailing padding bytes (14 bytes).</summary>
-  public byte[] Padding { get; init; } = [];
+  public byte[] Padding { get; init; }
 
   /// <summary>Converts this Image System C64 image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(ImageSysC64File file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -113,9 +109,4 @@ public sealed class ImageSysC64File : IImageFileFormat<ImageSysC64File> {
     };
   }
 
-  /// <summary>Not supported. Image System C64 images have complex cell-based color constraints.</summary>
-  public static ImageSysC64File FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to ImageSysC64File is not supported due to complex cell-based color constraints.");
-  }
 }

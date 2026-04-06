@@ -1,40 +1,36 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Canvas;
 
 /// <summary>In-memory representation of a Canvas ST image (Atari ST, 320x200, 16 colors).</summary>
-public sealed class CanvasFile : IImageFileFormat<CanvasFile> {
+public readonly record struct CanvasFile : IImageFormatReader<CanvasFile>, IImageToRawImage<CanvasFile>, IImageFromRawImage<CanvasFile>, IImageFormatWriter<CanvasFile> {
 
   /// <summary>Expected file size: 2-byte resolution + 32-byte palette + 32000 bytes planar data.</summary>
   public const int FileSize = 32034;
 
-  static string IImageFileFormat<CanvasFile>.PrimaryExtension => ".cvs";
-  static string[] IImageFileFormat<CanvasFile>.FileExtensions => [".cvs"];
-  static FormatCapability IImageFileFormat<CanvasFile>.Capabilities => FormatCapability.IndexedOnly;
-  static CanvasFile IImageFileFormat<CanvasFile>.FromFile(FileInfo file) => CanvasReader.FromFile(file);
-  static CanvasFile IImageFileFormat<CanvasFile>.FromBytes(byte[] data) => CanvasReader.FromBytes(data);
-  static CanvasFile IImageFileFormat<CanvasFile>.FromStream(Stream stream) => CanvasReader.FromStream(stream);
-  static byte[] IImageFileFormat<CanvasFile>.ToBytes(CanvasFile file) => CanvasWriter.ToBytes(file);
+  static string IImageFormatMetadata<CanvasFile>.PrimaryExtension => ".cvs";
+  static string[] IImageFormatMetadata<CanvasFile>.FileExtensions => [".cvs"];
+  static CanvasFile IImageFormatReader<CanvasFile>.FromSpan(ReadOnlySpan<byte> data) => CanvasReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<CanvasFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<CanvasFile>.ToBytes(CanvasFile file) => CanvasWriter.ToBytes(file);
 
   /// <summary>Image width (always 320).</summary>
-  public int Width { get; init; } = 320;
+  public int Width { get; init; }
 
   /// <summary>Image height (always 200).</summary>
-  public int Height { get; init; } = 200;
+  public int Height { get; init; }
 
   /// <summary>Resolution word (0 = low 320x200).</summary>
   public ushort Resolution { get; init; }
 
   /// <summary>16-entry palette of Atari ST 9-bit RGB values.</summary>
-  public short[] Palette { get; init; } = new short[16];
+  public short[] Palette { get; init; }
 
   /// <summary>32000 bytes of Atari ST word-interleaved planar pixel data.</summary>
-  public byte[] PixelData { get; init; } = new byte[32000];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(CanvasFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var chunky = PlanarConverter.AtariStToChunky(file.PixelData, file.Width, file.Height, 4);
     var paletteCount = Math.Min(16, file.Palette.Length);

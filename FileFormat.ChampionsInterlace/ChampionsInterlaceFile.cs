@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.ChampionsInterlace;
 
 /// <summary>In-memory representation of a C64 Champions Interlace (.cin) multicolor interlace image.</summary>
-public sealed class ChampionsInterlaceFile : IImageFileFormat<ChampionsInterlaceFile> {
+public readonly record struct ChampionsInterlaceFile : IImageFormatReader<ChampionsInterlaceFile>, IImageToRawImage<ChampionsInterlaceFile>, IImageFormatWriter<ChampionsInterlaceFile> {
 
-  static string IImageFileFormat<ChampionsInterlaceFile>.PrimaryExtension => ".cin";
-  static string[] IImageFileFormat<ChampionsInterlaceFile>.FileExtensions => [".cin"];
-  static ChampionsInterlaceFile IImageFileFormat<ChampionsInterlaceFile>.FromFile(FileInfo file) => ChampionsInterlaceReader.FromFile(file);
-  static ChampionsInterlaceFile IImageFileFormat<ChampionsInterlaceFile>.FromBytes(byte[] data) => ChampionsInterlaceReader.FromBytes(data);
-  static ChampionsInterlaceFile IImageFileFormat<ChampionsInterlaceFile>.FromStream(Stream stream) => ChampionsInterlaceReader.FromStream(stream);
-  static byte[] IImageFileFormat<ChampionsInterlaceFile>.ToBytes(ChampionsInterlaceFile file) => ChampionsInterlaceWriter.ToBytes(file);
+  static string IImageFormatMetadata<ChampionsInterlaceFile>.PrimaryExtension => ".cin";
+  static string[] IImageFormatMetadata<ChampionsInterlaceFile>.FileExtensions => [".cin"];
+  static ChampionsInterlaceFile IImageFormatReader<ChampionsInterlaceFile>.FromSpan(ReadOnlySpan<byte> data) => ChampionsInterlaceReader.FromSpan(data);
+  static byte[] IImageFormatWriter<ChampionsInterlaceFile>.ToBytes(ChampionsInterlaceFile file) => ChampionsInterlaceWriter.ToBytes(file);
 
   /// <summary>Image width in pixels, always 160 (multicolor).</summary>
   public const int ImageWidth = 160;
@@ -49,26 +46,25 @@ public sealed class ChampionsInterlaceFile : IImageFileFormat<ChampionsInterlace
   public ushort LoadAddress { get; init; }
 
   /// <summary>First frame bitmap data (8000 bytes).</summary>
-  public byte[] Bitmap1 { get; init; } = [];
+  public byte[] Bitmap1 { get; init; }
 
   /// <summary>First frame screen RAM (1000 bytes).</summary>
-  public byte[] Screen1 { get; init; } = [];
+  public byte[] Screen1 { get; init; }
 
   /// <summary>Shared color RAM (1000 bytes).</summary>
-  public byte[] ColorData { get; init; } = [];
+  public byte[] ColorData { get; init; }
 
   /// <summary>Second frame bitmap data (8000 bytes).</summary>
-  public byte[] Bitmap2 { get; init; } = [];
+  public byte[] Bitmap2 { get; init; }
 
   /// <summary>Second frame screen RAM (1000 bytes).</summary>
-  public byte[] Screen2 { get; init; } = [];
+  public byte[] Screen2 { get; init; }
 
   /// <summary>Background color index (0-15).</summary>
   public byte BackgroundColor { get; init; }
 
   /// <summary>Converts this Champions Interlace image to a platform-independent <see cref="RawImage"/> in Rgb24 format by averaging both multicolor frames.</summary>
   public static RawImage ToRawImage(ChampionsInterlaceFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = ImageWidth;
     const int height = ImageHeight;
@@ -120,6 +116,4 @@ public sealed class ChampionsInterlaceFile : IImageFileFormat<ChampionsInterlace
     return _C64Palette[colorIndex];
   }
 
-  /// <summary>Not supported. Champions Interlace images have complex dual-frame color constraints.</summary>
-  public static ChampionsInterlaceFile FromRawImage(RawImage image) => throw new NotSupportedException("Creating Champions Interlace files from raw images is not supported.");
 }

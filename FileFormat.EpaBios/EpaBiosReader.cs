@@ -25,6 +25,8 @@ public static class EpaBiosReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static EpaBiosFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static EpaBiosFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != EpaBiosFile.FileSize)

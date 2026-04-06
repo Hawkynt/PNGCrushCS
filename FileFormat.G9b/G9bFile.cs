@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.G9b;
@@ -8,15 +7,13 @@ namespace FileFormat.G9b;
 /// Header: 3-byte magic "G9B" + 2-byte LE header size + 1-byte screen mode + 1-byte color mode + 2-byte LE width + 2-byte LE height + pixel data.
 /// </summary>
 [FormatMagicBytes([0x47, 0x39, 0x42])]
-public sealed class G9bFile : IImageFileFormat<G9bFile> {
+public readonly record struct G9bFile : IImageFormatReader<G9bFile>, IImageToRawImage<G9bFile>, IImageFromRawImage<G9bFile>, IImageFormatWriter<G9bFile> {
 
-  static string IImageFileFormat<G9bFile>.PrimaryExtension => ".g9b";
-  static string[] IImageFileFormat<G9bFile>.FileExtensions => [".g9b"];
-  static FormatCapability IImageFileFormat<G9bFile>.Capabilities => FormatCapability.VariableResolution;
-  static G9bFile IImageFileFormat<G9bFile>.FromFile(FileInfo file) => G9bReader.FromFile(file);
-  static G9bFile IImageFileFormat<G9bFile>.FromBytes(byte[] data) => G9bReader.FromBytes(data);
-  static G9bFile IImageFileFormat<G9bFile>.FromStream(Stream stream) => G9bReader.FromStream(stream);
-  static byte[] IImageFileFormat<G9bFile>.ToBytes(G9bFile file) => G9bWriter.ToBytes(file);
+  static string IImageFormatMetadata<G9bFile>.PrimaryExtension => ".g9b";
+  static string[] IImageFormatMetadata<G9bFile>.FileExtensions => [".g9b"];
+  static G9bFile IImageFormatReader<G9bFile>.FromSpan(ReadOnlySpan<byte> data) => G9bReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<G9bFile>.Capabilities => FormatCapability.VariableResolution;
+  static byte[] IImageFormatWriter<G9bFile>.ToBytes(G9bFile file) => G9bWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -31,14 +28,13 @@ public sealed class G9bFile : IImageFileFormat<G9bFile> {
   public byte ColorMode { get; init; }
 
   /// <summary>Header size as stored in the file (default 11).</summary>
-  public int HeaderSize { get; init; } = G9bReader.DefaultHeaderSize;
+  public int HeaderSize { get; init; }
 
   /// <summary>Raw pixel data.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this G9B image to a platform-independent <see cref="RawImage"/>.</summary>
   public static RawImage ToRawImage(G9bFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     return file.ScreenMode switch {
       G9bScreenMode.Indexed8 => _Mode3ToRawImage(file),

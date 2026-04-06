@@ -1,5 +1,4 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Nitf;
@@ -12,14 +11,12 @@ public enum NitfImageMode : byte {
 
 /// <summary>In-memory representation of a NITF (National Imagery Transmission Format) image.</summary>
 [FormatMagicBytes([0x4E, 0x49, 0x54, 0x46])]
-public sealed class NitfFile : IImageFileFormat<NitfFile> {
+public readonly record struct NitfFile : IImageFormatReader<NitfFile>, IImageToRawImage<NitfFile>, IImageFromRawImage<NitfFile>, IImageFormatWriter<NitfFile> {
 
-  static string IImageFileFormat<NitfFile>.PrimaryExtension => ".ntf";
-  static string[] IImageFileFormat<NitfFile>.FileExtensions => [".ntf", ".nitf"];
-  static NitfFile IImageFileFormat<NitfFile>.FromFile(FileInfo file) => NitfReader.FromFile(file);
-  static NitfFile IImageFileFormat<NitfFile>.FromBytes(byte[] data) => NitfReader.FromBytes(data);
-  static NitfFile IImageFileFormat<NitfFile>.FromStream(Stream stream) => NitfReader.FromStream(stream);
-  static byte[] IImageFileFormat<NitfFile>.ToBytes(NitfFile file) => NitfWriter.ToBytes(file);
+  static string IImageFormatMetadata<NitfFile>.PrimaryExtension => ".ntf";
+  static string[] IImageFormatMetadata<NitfFile>.FileExtensions => [".ntf", ".nitf"];
+  static NitfFile IImageFormatReader<NitfFile>.FromSpan(ReadOnlySpan<byte> data) => NitfReader.FromSpan(data);
+  static byte[] IImageFormatWriter<NitfFile>.ToBytes(NitfFile file) => NitfWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -28,19 +25,18 @@ public sealed class NitfFile : IImageFileFormat<NitfFile> {
   public int Height { get; init; }
 
   /// <summary>Image representation mode (Grayscale or RGB).</summary>
-  public NitfImageMode Mode { get; init; } = NitfImageMode.Rgb;
+  public NitfImageMode Mode { get; init; }
 
   /// <summary>File title from the NITF file header (up to 80 characters).</summary>
-  public string Title { get; init; } = string.Empty;
+  public string Title { get; init; }
 
   /// <summary>Security classification character (U/R/C/S/T).</summary>
-  public char Classification { get; init; } = 'U';
+  public char Classification { get; init; }
 
   /// <summary>Raw pixel data bytes (Grayscale: 1 byte/pixel, RGB: 3 bytes/pixel band-sequential).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(NitfFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     return file.Mode switch {
       NitfImageMode.Grayscale => new() {

@@ -1,24 +1,21 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Wad2;
 
 /// <summary>In-memory representation of a Quake 1 WAD2 texture package.</summary>
 [FormatMagicBytes([0x57, 0x41, 0x44, 0x32])]
-public sealed class Wad2File : IImageFileFormat<Wad2File> {
+public readonly record struct Wad2File : IImageFormatReader<Wad2File>, IImageToRawImage<Wad2File>, IImageFromRawImage<Wad2File>, IImageFormatWriter<Wad2File> {
 
-  static string IImageFileFormat<Wad2File>.PrimaryExtension => ".wad";
-  static string[] IImageFileFormat<Wad2File>.FileExtensions => [".wad"];
-  static FormatCapability IImageFileFormat<Wad2File>.Capabilities => FormatCapability.IndexedOnly;
-  static Wad2File IImageFileFormat<Wad2File>.FromFile(FileInfo file) => Wad2Reader.FromFile(file);
-  static Wad2File IImageFileFormat<Wad2File>.FromBytes(byte[] data) => Wad2Reader.FromBytes(data);
-  static Wad2File IImageFileFormat<Wad2File>.FromStream(Stream stream) => Wad2Reader.FromStream(stream);
-  static byte[] IImageFileFormat<Wad2File>.ToBytes(Wad2File file) => Wad2Writer.ToBytes(file);
+  static string IImageFormatMetadata<Wad2File>.PrimaryExtension => ".wad";
+  static string[] IImageFormatMetadata<Wad2File>.FileExtensions => [".wad"];
+  static Wad2File IImageFormatReader<Wad2File>.FromSpan(ReadOnlySpan<byte> data) => Wad2Reader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<Wad2File>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<Wad2File>.ToBytes(Wad2File file) => Wad2Writer.ToBytes(file);
 
   /// <summary>Textures contained in this WAD2 file.</summary>
-  public IReadOnlyList<Wad2Texture> Textures { get; init; } = [];
+  public IReadOnlyList<Wad2Texture> Textures { get; init; }
 
   /// <summary>The default 256-color Quake palette (grayscale ramp for format implementation).</summary>
   public static byte[] DefaultPalette { get; } = _BuildDefaultPalette();
@@ -35,7 +32,6 @@ public sealed class Wad2File : IImageFileFormat<Wad2File> {
 
   /// <summary>Converts the first texture of a WAD2 file to a <see cref="RawImage"/>.</summary>
   public static RawImage ToRawImage(Wad2File file) {
-    ArgumentNullException.ThrowIfNull(file);
     if (file.Textures.Count == 0)
       throw new ArgumentException("WAD2 file contains no textures.", nameof(file));
 

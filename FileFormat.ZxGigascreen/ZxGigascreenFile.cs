@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.ZxGigascreen;
 
 /// <summary>In-memory representation of a ZX Spectrum Gigascreen file (13824 bytes: two complete 6912-byte screens, averaged for more colors).</summary>
-public sealed class ZxGigascreenFile : IImageFileFormat<ZxGigascreenFile> {
+public readonly record struct ZxGigascreenFile : IImageFormatReader<ZxGigascreenFile>, IImageToRawImage<ZxGigascreenFile>, IImageFormatWriter<ZxGigascreenFile> {
 
-  static string IImageFileFormat<ZxGigascreenFile>.PrimaryExtension => ".gsc";
-  static string[] IImageFileFormat<ZxGigascreenFile>.FileExtensions => [".gsc"];
-  static ZxGigascreenFile IImageFileFormat<ZxGigascreenFile>.FromFile(FileInfo file) => ZxGigascreenReader.FromFile(file);
-  static ZxGigascreenFile IImageFileFormat<ZxGigascreenFile>.FromBytes(byte[] data) => ZxGigascreenReader.FromBytes(data);
-  static ZxGigascreenFile IImageFileFormat<ZxGigascreenFile>.FromStream(Stream stream) => ZxGigascreenReader.FromStream(stream);
-  static byte[] IImageFileFormat<ZxGigascreenFile>.ToBytes(ZxGigascreenFile file) => ZxGigascreenWriter.ToBytes(file);
+  static string IImageFormatMetadata<ZxGigascreenFile>.PrimaryExtension => ".gsc";
+  static string[] IImageFormatMetadata<ZxGigascreenFile>.FileExtensions => [".gsc"];
+  static ZxGigascreenFile IImageFormatReader<ZxGigascreenFile>.FromSpan(ReadOnlySpan<byte> data) => ZxGigascreenReader.FromSpan(data);
+  static byte[] IImageFormatWriter<ZxGigascreenFile>.ToBytes(ZxGigascreenFile file) => ZxGigascreenWriter.ToBytes(file);
 
   /// <summary>ZX Spectrum normal palette (bright=0).</summary>
   internal static readonly int[] NormalPalette = [
@@ -31,20 +28,19 @@ public sealed class ZxGigascreenFile : IImageFileFormat<ZxGigascreenFile> {
   public int Height => 192;
 
   /// <summary>Screen 1: 6144 bytes bitmap data in linear row order.</summary>
-  public byte[] BitmapData1 { get; init; } = [];
+  public byte[] BitmapData1 { get; init; }
 
   /// <summary>Screen 1: 768 bytes attribute data.</summary>
-  public byte[] AttributeData1 { get; init; } = [];
+  public byte[] AttributeData1 { get; init; }
 
   /// <summary>Screen 2: 6144 bytes bitmap data in linear row order.</summary>
-  public byte[] BitmapData2 { get; init; } = [];
+  public byte[] BitmapData2 { get; init; }
 
   /// <summary>Screen 2: 768 bytes attribute data.</summary>
-  public byte[] AttributeData2 { get; init; } = [];
+  public byte[] AttributeData2 { get; init; }
 
   /// <summary>Converts this gigascreen to Rgb24 by averaging two screens pixel by pixel.</summary>
   public static RawImage ToRawImage(ZxGigascreenFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = 256;
     const int height = 192;
@@ -94,9 +90,4 @@ public sealed class ZxGigascreenFile : IImageFileFormat<ZxGigascreenFile> {
     };
   }
 
-  /// <summary>Not supported.</summary>
-  public static ZxGigascreenFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to ZxGigascreenFile is not supported due to dual-screen attribute constraints.");
-  }
 }

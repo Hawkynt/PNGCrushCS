@@ -43,25 +43,6 @@ public class NeoGeoPocketReaderTests {
 }
 
 [TestFixture]
-public class NeoGeoPocketWriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => NeoGeoPocketWriter.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_SingleTile_CorrectSize() {
-    var file = new NeoGeoPocketFile {
-      Width = 128,
-      Height = 8,
-      PixelData = new byte[128 * 8],
-    };
-    var bytes = NeoGeoPocketWriter.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(16 * 16));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -85,41 +66,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void PrimaryExtension_IsCorrect()
-    => Assert.That(_GetPrimaryExtension<NeoGeoPocketFile>(), Is.EqualTo(".ngp"));
-
-  [Test]
-  public void FileExtensions_ContainsPrimary() {
-    var exts = _GetFileExtensions<NeoGeoPocketFile>();
-    Assert.That(exts, Does.Contain(".ngp"));
-  }
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => NeoGeoPocketFile.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => NeoGeoPocketFile.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 128, Height = 8, Format = PixelFormat.Rgb24, PixelData = new byte[128 * 8 * 3] };
-    Assert.Throws<ArgumentException>(() => NeoGeoPocketFile.FromRawImage(raw));
-  }
-
-  [Test]
-  public void Constants_AreCorrect() {
-    Assert.That(NeoGeoPocketFile.BytesPerTile, Is.EqualTo(16));
-    Assert.That(NeoGeoPocketFile.TileSize, Is.EqualTo(8));
-    Assert.That(NeoGeoPocketFile.TilesPerRow, Is.EqualTo(16));
-  }
-
-  private static string _GetPrimaryExtension<T>() where T : IImageFileFormat<T> => T.PrimaryExtension;
-
-  private static string[] _GetFileExtensions<T>() where T : IImageFileFormat<T> => T.FileExtensions;
-}

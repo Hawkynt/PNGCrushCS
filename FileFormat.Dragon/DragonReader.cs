@@ -25,6 +25,8 @@ public static class DragonReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static DragonFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static DragonFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != DragonFile.FileSize)

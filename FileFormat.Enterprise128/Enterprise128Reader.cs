@@ -25,6 +25,8 @@ public static class Enterprise128Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static Enterprise128File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static Enterprise128File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < Enterprise128File.FileSize)

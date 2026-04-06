@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.ZxBorderMulticolor;
 
 /// <summary>In-memory representation of a ZX Spectrum Border Multicolor 8x4 file (11904 bytes: 6144 bitmap + 1536 attributes + 4224 border data).</summary>
-public sealed class ZxBorderMulticolorFile : IImageFileFormat<ZxBorderMulticolorFile> {
+public readonly record struct ZxBorderMulticolorFile : IImageFormatReader<ZxBorderMulticolorFile>, IImageToRawImage<ZxBorderMulticolorFile>, IImageFormatWriter<ZxBorderMulticolorFile> {
 
-  static string IImageFileFormat<ZxBorderMulticolorFile>.PrimaryExtension => ".bmc4";
-  static string[] IImageFileFormat<ZxBorderMulticolorFile>.FileExtensions => [".bmc4"];
-  static ZxBorderMulticolorFile IImageFileFormat<ZxBorderMulticolorFile>.FromFile(FileInfo file) => ZxBorderMulticolorReader.FromFile(file);
-  static ZxBorderMulticolorFile IImageFileFormat<ZxBorderMulticolorFile>.FromBytes(byte[] data) => ZxBorderMulticolorReader.FromBytes(data);
-  static ZxBorderMulticolorFile IImageFileFormat<ZxBorderMulticolorFile>.FromStream(Stream stream) => ZxBorderMulticolorReader.FromStream(stream);
-  static byte[] IImageFileFormat<ZxBorderMulticolorFile>.ToBytes(ZxBorderMulticolorFile file) => ZxBorderMulticolorWriter.ToBytes(file);
+  static string IImageFormatMetadata<ZxBorderMulticolorFile>.PrimaryExtension => ".bmc4";
+  static string[] IImageFormatMetadata<ZxBorderMulticolorFile>.FileExtensions => [".bmc4"];
+  static ZxBorderMulticolorFile IImageFormatReader<ZxBorderMulticolorFile>.FromSpan(ReadOnlySpan<byte> data) => ZxBorderMulticolorReader.FromSpan(data);
+  static byte[] IImageFormatWriter<ZxBorderMulticolorFile>.ToBytes(ZxBorderMulticolorFile file) => ZxBorderMulticolorWriter.ToBytes(file);
 
   /// <summary>ZX Spectrum normal palette (bright=0): Black, Blue, Red, Magenta, Green, Cyan, Yellow, White.</summary>
   internal static readonly int[] NormalPalette = [
@@ -31,18 +28,17 @@ public sealed class ZxBorderMulticolorFile : IImageFileFormat<ZxBorderMulticolor
   public int Height => 192;
 
   /// <summary>6144 bytes of 1bpp bitmap data in linear row order (deinterleaved).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>1536 bytes of 8x4 attribute data (each attribute covers 8 pixels wide by 4 pixels tall).
   /// Bit 7=flash, bit 6=bright, bits 5-3=paper, bits 2-0=ink.</summary>
-  public byte[] AttributeData { get; init; } = [];
+  public byte[] AttributeData { get; init; }
 
   /// <summary>4224 bytes of border color data.</summary>
-  public byte[] BorderData { get; init; } = [];
+  public byte[] BorderData { get; init; }
 
   /// <summary>Converts this ZX Spectrum Border Multicolor 8x4 image to a platform-independent <see cref="RawImage"/> in Rgb24 format (256x192).</summary>
   public static RawImage ToRawImage(ZxBorderMulticolorFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = 256;
     const int height = 192;
@@ -79,9 +75,4 @@ public sealed class ZxBorderMulticolorFile : IImageFileFormat<ZxBorderMulticolor
     };
   }
 
-  /// <summary>Not supported. ZX Spectrum images have complex attribute-based color constraints.</summary>
-  public static ZxBorderMulticolorFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to ZxBorderMulticolorFile is not supported due to complex attribute-based color constraints.");
-  }
 }

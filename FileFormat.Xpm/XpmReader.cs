@@ -29,6 +29,8 @@ public static class XpmReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static XpmFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static XpmFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _Magic.Length)

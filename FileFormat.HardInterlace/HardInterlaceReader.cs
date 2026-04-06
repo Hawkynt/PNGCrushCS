@@ -26,6 +26,8 @@ public static class HardInterlaceReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static HardInterlaceFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static HardInterlaceFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < HardInterlaceFile.LoadAddressSize + HardInterlaceFile.MinPayloadSize)

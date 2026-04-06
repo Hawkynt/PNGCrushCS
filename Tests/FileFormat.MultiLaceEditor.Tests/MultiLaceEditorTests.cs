@@ -47,26 +47,6 @@ public sealed class MultiLaceEditorReaderTests {
 }
 
 [TestFixture]
-public sealed class MultiLaceEditorWriterTests {
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => MultiLaceEditorWriter.ToBytes(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_CorrectOutputSize() {
-    var rawData = new byte[19000];
-    var file = new MultiLaceEditorFile { LoadAddress = 0x3C00, RawData = rawData };
-    var bytes = MultiLaceEditorWriter.ToBytes(file);
-
-    Assert.That(bytes.Length, Is.EqualTo(2 + 19000));
-  }
-}
-
-[TestFixture]
 public sealed class MultiLaceEditorRoundTripTests {
 
   [Test]
@@ -83,50 +63,6 @@ public sealed class MultiLaceEditorRoundTripTests {
 
     Assert.That(restored.LoadAddress, Is.EqualTo(original.LoadAddress));
     Assert.That(restored.RawData, Is.EqualTo(original.RawData));
-  }
-}
-
-[TestFixture]
-public sealed class MultiLaceEditorDataTypeTests {
-
-  [Test]
-  [Category("Unit")]
-  public void PrimaryExtension_IsMle() {
-    Assert.That(_GetPrimaryExtension(), Is.EqualTo(".mle"));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FileExtensions_ContainsMle() {
-    var extensions = _GetFileExtensions();
-    Assert.That(extensions, Does.Contain(".mle"));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => MultiLaceEditorFile.ToRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => MultiLaceEditorFile.FromRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_ThrowsNotSupportedException() {
-    var image = new RawImage { Width = 160, Height = 200, Format = PixelFormat.Rgb24, PixelData = new byte[160 * 200 * 3] };
-    Assert.Throws<NotSupportedException>(() => MultiLaceEditorFile.FromRawImage(image));
-  }
-
-  private static string _GetPrimaryExtension() => _Helper<MultiLaceEditorFile>.PrimaryExtension;
-  private static string[] _GetFileExtensions() => _Helper<MultiLaceEditorFile>.FileExtensions;
-
-  private static class _Helper<T> where T : IImageFileFormat<T> {
-    public static string PrimaryExtension => T.PrimaryExtension;
-    public static string[] FileExtensions => T.FileExtensions;
   }
 }
 

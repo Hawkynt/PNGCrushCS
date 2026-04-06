@@ -26,6 +26,8 @@ public static class MultiLaceEditorReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static MultiLaceEditorFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static MultiLaceEditorFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < MultiLaceEditorFile.LoadAddressSize + MultiLaceEditorFile.MinPayloadSize)

@@ -41,6 +41,8 @@ public static class ZxPaintbrushReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static ZxPaintbrushFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static ZxPaintbrushFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < MinFileSize)

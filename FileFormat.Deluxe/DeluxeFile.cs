@@ -1,40 +1,36 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Deluxe;
 
 /// <summary>In-memory representation of a Deluxe Paint ST image (Atari ST, 320x200, 16 colors).</summary>
-public sealed class DeluxeFile : IImageFileFormat<DeluxeFile> {
+public readonly record struct DeluxeFile : IImageFormatReader<DeluxeFile>, IImageToRawImage<DeluxeFile>, IImageFromRawImage<DeluxeFile>, IImageFormatWriter<DeluxeFile> {
 
   /// <summary>Expected file size: 2-byte resolution + 32-byte palette + 32000 bytes planar data.</summary>
   public const int FileSize = 32034;
 
-  static string IImageFileFormat<DeluxeFile>.PrimaryExtension => ".dps";
-  static string[] IImageFileFormat<DeluxeFile>.FileExtensions => [".dps", ".dlx"];
-  static FormatCapability IImageFileFormat<DeluxeFile>.Capabilities => FormatCapability.IndexedOnly;
-  static DeluxeFile IImageFileFormat<DeluxeFile>.FromFile(FileInfo file) => DeluxeReader.FromFile(file);
-  static DeluxeFile IImageFileFormat<DeluxeFile>.FromBytes(byte[] data) => DeluxeReader.FromBytes(data);
-  static DeluxeFile IImageFileFormat<DeluxeFile>.FromStream(Stream stream) => DeluxeReader.FromStream(stream);
-  static byte[] IImageFileFormat<DeluxeFile>.ToBytes(DeluxeFile file) => DeluxeWriter.ToBytes(file);
+  static string IImageFormatMetadata<DeluxeFile>.PrimaryExtension => ".dps";
+  static string[] IImageFormatMetadata<DeluxeFile>.FileExtensions => [".dps", ".dlx"];
+  static DeluxeFile IImageFormatReader<DeluxeFile>.FromSpan(ReadOnlySpan<byte> data) => DeluxeReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<DeluxeFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<DeluxeFile>.ToBytes(DeluxeFile file) => DeluxeWriter.ToBytes(file);
 
   /// <summary>Image width (always 320).</summary>
-  public int Width { get; init; } = 320;
+  public int Width { get; init; }
 
   /// <summary>Image height (always 200).</summary>
-  public int Height { get; init; } = 200;
+  public int Height { get; init; }
 
   /// <summary>Resolution word (0 = low 320x200).</summary>
   public ushort Resolution { get; init; }
 
   /// <summary>16-entry palette of Atari ST 9-bit RGB values.</summary>
-  public short[] Palette { get; init; } = new short[16];
+  public short[] Palette { get; init; }
 
   /// <summary>32000 bytes of Atari ST word-interleaved planar pixel data.</summary>
-  public byte[] PixelData { get; init; } = new byte[32000];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(DeluxeFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var chunky = PlanarConverter.AtariStToChunky(file.PixelData, file.Width, file.Height, 4);
     var paletteCount = Math.Min(16, file.Palette.Length);

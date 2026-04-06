@@ -1,21 +1,18 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.IO;
 using FileFormat.Core;
 using FileFormat.Png;
 
 namespace FileFormat.Apng;
 
 /// <summary>In-memory representation of an Animated PNG file.</summary>
-public sealed class ApngFile : IImageFileFormat<ApngFile>, IMultiImageFileFormat<ApngFile> {
+public sealed class ApngFile : IImageFormatReader<ApngFile>, IImageToRawImage<ApngFile>, IImageFromRawImage<ApngFile>, IImageFormatWriter<ApngFile>, IMultiImageFileFormat<ApngFile> {
 
-  static string IImageFileFormat<ApngFile>.PrimaryExtension => ".apng";
-  static string[] IImageFileFormat<ApngFile>.FileExtensions => [".apng"];
-  static FormatCapability IImageFileFormat<ApngFile>.Capabilities => FormatCapability.VariableResolution | FormatCapability.MultiImage;
-  static ApngFile IImageFileFormat<ApngFile>.FromFile(FileInfo file) => ApngReader.FromFile(file);
-  static ApngFile IImageFileFormat<ApngFile>.FromBytes(byte[] data) => ApngReader.FromBytes(data);
-  static ApngFile IImageFileFormat<ApngFile>.FromStream(Stream stream) => ApngReader.FromStream(stream);
-  static byte[] IImageFileFormat<ApngFile>.ToBytes(ApngFile file) => ApngWriter.ToBytes(file);
+  static string IImageFormatMetadata<ApngFile>.PrimaryExtension => ".apng";
+  static string[] IImageFormatMetadata<ApngFile>.FileExtensions => [".apng"];
+  static ApngFile IImageFormatReader<ApngFile>.FromSpan(ReadOnlySpan<byte> data) => ApngReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<ApngFile>.Capabilities => FormatCapability.VariableResolution | FormatCapability.MultiImage;
+  static byte[] IImageFormatWriter<ApngFile>.ToBytes(ApngFile file) => ApngWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
   public int BitDepth { get; init; }

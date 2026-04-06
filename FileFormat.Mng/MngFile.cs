@@ -8,15 +8,13 @@ namespace FileFormat.Mng;
 
 /// <summary>In-memory representation of an MNG (VLC profile) animation.</summary>
 [FormatMagicBytes([0x8A, 0x4D, 0x4E, 0x47])]
-public sealed class MngFile : IImageFileFormat<MngFile>, IMultiImageFileFormat<MngFile> {
+public sealed class MngFile : IImageFormatReader<MngFile>, IImageToRawImage<MngFile>, IImageFormatWriter<MngFile>, IMultiImageFileFormat<MngFile> {
 
-  static string IImageFileFormat<MngFile>.PrimaryExtension => ".mng";
-  static string[] IImageFileFormat<MngFile>.FileExtensions => [".mng"];
-  static FormatCapability IImageFileFormat<MngFile>.Capabilities => FormatCapability.VariableResolution | FormatCapability.MultiImage;
-  static MngFile IImageFileFormat<MngFile>.FromFile(FileInfo file) => MngReader.FromFile(file);
-  static MngFile IImageFileFormat<MngFile>.FromBytes(byte[] data) => MngReader.FromBytes(data);
-  static MngFile IImageFileFormat<MngFile>.FromStream(Stream stream) => MngReader.FromStream(stream);
-  static byte[] IImageFileFormat<MngFile>.ToBytes(MngFile file) => MngWriter.ToBytes(file);
+  static string IImageFormatMetadata<MngFile>.PrimaryExtension => ".mng";
+  static string[] IImageFormatMetadata<MngFile>.FileExtensions => [".mng"];
+  static MngFile IImageFormatReader<MngFile>.FromSpan(ReadOnlySpan<byte> data) => MngReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<MngFile>.Capabilities => FormatCapability.VariableResolution | FormatCapability.MultiImage;
+  static byte[] IImageFormatWriter<MngFile>.ToBytes(MngFile file) => MngWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
   public int TicksPerSecond { get; init; }
@@ -47,6 +45,4 @@ public sealed class MngFile : IImageFileFormat<MngFile>, IMultiImageFileFormat<M
     return PngFile.ToRawImage(PngReader.FromBytes(file.Frames[0]));
   }
 
-  /// <summary>MNG encoding requires animation data; single-image creation is not supported.</summary>
-  public static MngFile FromRawImage(RawImage image) => throw new NotSupportedException("MNG encoding from a single raw image is not supported.");
 }

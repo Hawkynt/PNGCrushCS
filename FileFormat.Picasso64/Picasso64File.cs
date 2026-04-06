@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Picasso64;
 
 /// <summary>In-memory representation of a Commodore 64 Picasso 64 multicolor image.</summary>
-public sealed class Picasso64File : IImageFileFormat<Picasso64File> {
+public readonly record struct Picasso64File : IImageFormatReader<Picasso64File>, IImageToRawImage<Picasso64File>, IImageFormatWriter<Picasso64File> {
 
-  static string IImageFileFormat<Picasso64File>.PrimaryExtension => ".p64";
-  static string[] IImageFileFormat<Picasso64File>.FileExtensions => [".p64"];
-  static Picasso64File IImageFileFormat<Picasso64File>.FromFile(FileInfo file) => Picasso64Reader.FromFile(file);
-  static Picasso64File IImageFileFormat<Picasso64File>.FromBytes(byte[] data) => Picasso64Reader.FromBytes(data);
-  static Picasso64File IImageFileFormat<Picasso64File>.FromStream(Stream stream) => Picasso64Reader.FromStream(stream);
-  static byte[] IImageFileFormat<Picasso64File>.ToBytes(Picasso64File file) => Picasso64Writer.ToBytes(file);
+  static string IImageFormatMetadata<Picasso64File>.PrimaryExtension => ".p64";
+  static string[] IImageFormatMetadata<Picasso64File>.FileExtensions => [".p64"];
+  static Picasso64File IImageFormatReader<Picasso64File>.FromSpan(ReadOnlySpan<byte> data) => Picasso64Reader.FromSpan(data);
+  static byte[] IImageFormatWriter<Picasso64File>.ToBytes(Picasso64File file) => Picasso64Writer.ToBytes(file);
 
   /// <summary>The fixed width of a Picasso 64 image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -55,13 +52,13 @@ public sealed class Picasso64File : IImageFileFormat<Picasso64File> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Multicolor bitmap data (8000 bytes, 2 bits per pixel).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Screen RAM (1000 bytes, upper/lower nybble = 2 colors per cell).</summary>
-  public byte[] ScreenRam { get; init; } = [];
+  public byte[] ScreenRam { get; init; }
 
   /// <summary>Color RAM (1000 bytes, lower nybble = 3rd color per cell).</summary>
-  public byte[] ColorRam { get; init; } = [];
+  public byte[] ColorRam { get; init; }
 
   /// <summary>Background color index (0-15).</summary>
   public byte BackgroundColor { get; init; }
@@ -70,11 +67,10 @@ public sealed class Picasso64File : IImageFileFormat<Picasso64File> {
   public byte BorderColor { get; init; }
 
   /// <summary>Extra data (46 bytes of format-specific metadata).</summary>
-  public byte[] ExtraData { get; init; } = [];
+  public byte[] ExtraData { get; init; }
 
   /// <summary>Converts this Picasso 64 image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(Picasso64File file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -113,9 +109,4 @@ public sealed class Picasso64File : IImageFileFormat<Picasso64File> {
     };
   }
 
-  /// <summary>Not supported. Picasso 64 images have complex cell-based color constraints.</summary>
-  public static Picasso64File FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to Picasso64File is not supported due to complex cell-based color constraints.");
-  }
 }

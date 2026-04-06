@@ -1,21 +1,16 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.CpcSprite;
 
 /// <summary>In-memory representation of a CPC sprite (64 bytes: 16x16 pixels, Mode 1 packing, 4 colors).</summary>
-public sealed class CpcSpriteFile : IImageFileFormat<CpcSpriteFile> {
+public readonly record struct CpcSpriteFile : IImageFormatReader<CpcSpriteFile>, IImageToRawImage<CpcSpriteFile>, IImageFormatWriter<CpcSpriteFile> {
 
-  static string IImageFileFormat<CpcSpriteFile>.PrimaryExtension => ".cps";
-  static string[] IImageFileFormat<CpcSpriteFile>.FileExtensions => [".cps"];
-  static FormatCapability IImageFileFormat<CpcSpriteFile>.Capabilities => FormatCapability.IndexedOnly;
-  static CpcSpriteFile IImageFileFormat<CpcSpriteFile>.FromFile(FileInfo file) => CpcSpriteReader.FromFile(file);
-  static CpcSpriteFile IImageFileFormat<CpcSpriteFile>.FromBytes(byte[] data) => CpcSpriteReader.FromBytes(data);
-  static CpcSpriteFile IImageFileFormat<CpcSpriteFile>.FromStream(Stream stream) => CpcSpriteReader.FromStream(stream);
-  static RawImage IImageFileFormat<CpcSpriteFile>.ToRawImage(CpcSpriteFile file) => ToRawImage(file);
-  static CpcSpriteFile IImageFileFormat<CpcSpriteFile>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<CpcSpriteFile>.ToBytes(CpcSpriteFile file) => CpcSpriteWriter.ToBytes(file);
+  static string IImageFormatMetadata<CpcSpriteFile>.PrimaryExtension => ".cps";
+  static string[] IImageFormatMetadata<CpcSpriteFile>.FileExtensions => [".cps"];
+  static CpcSpriteFile IImageFormatReader<CpcSpriteFile>.FromSpan(ReadOnlySpan<byte> data) => CpcSpriteReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<CpcSpriteFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<CpcSpriteFile>.ToBytes(CpcSpriteFile file) => CpcSpriteWriter.ToBytes(file);
 
   /// <summary>Expected file size in bytes (16 rows x 4 bytes per row).</summary>
   internal const int ExpectedFileSize = 64;
@@ -39,7 +34,7 @@ public sealed class CpcSpriteFile : IImageFileFormat<CpcSpriteFile> {
   public int Height => PixelHeight;
 
   /// <summary>Raw sprite data (64 bytes: Mode 1 packed, 4 bytes per row, 16 rows).</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   /// <summary>Default CPC 4-color palette for Mode 1 as RGB triplets.</summary>
   private static readonly byte[] _CpcMode1Palette = [
@@ -51,7 +46,6 @@ public sealed class CpcSpriteFile : IImageFileFormat<CpcSpriteFile> {
 
   /// <summary>Converts the CPC sprite to an Indexed8 raw image (16x16, 4-entry CPC palette).</summary>
   public static RawImage ToRawImage(CpcSpriteFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var pixels = new byte[PixelWidth * PixelHeight];
 
@@ -88,9 +82,4 @@ public sealed class CpcSpriteFile : IImageFileFormat<CpcSpriteFile> {
     };
   }
 
-  /// <summary>Not supported. CPC sprite data requires specific Mode 1 pixel packing.</summary>
-  public static CpcSpriteFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to CpcSpriteFile is not supported.");
-  }
 }

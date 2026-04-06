@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.PcPaint;
 
 /// <summary>In-memory representation of a PC Paint/Pictor Page Format image.</summary>
-public sealed class PcPaintFile : IImageFileFormat<PcPaintFile> {
+public readonly record struct PcPaintFile : IImageFormatReader<PcPaintFile>, IImageToRawImage<PcPaintFile>, IImageFromRawImage<PcPaintFile>, IImageFormatWriter<PcPaintFile> {
 
   /// <summary>Magic number identifying PC Paint/Pictor files (0x1234, stored as 34 12 in LE).</summary>
   internal const ushort Magic = 0x1234;
@@ -16,15 +15,13 @@ public sealed class PcPaintFile : IImageFileFormat<PcPaintFile> {
   /// <summary>Size of a 256-entry RGB palette in bytes (256 entries x 3 bytes).</summary>
   internal const int PaletteSize = 768;
 
-  static string IImageFileFormat<PcPaintFile>.PrimaryExtension => ".pic";
-  static string[] IImageFileFormat<PcPaintFile>.FileExtensions => [".pic", ".clp"];
-  static FormatCapability IImageFileFormat<PcPaintFile>.Capabilities => FormatCapability.IndexedOnly;
-  static PcPaintFile IImageFileFormat<PcPaintFile>.FromFile(FileInfo file) => PcPaintReader.FromFile(file);
-  static PcPaintFile IImageFileFormat<PcPaintFile>.FromBytes(byte[] data) => PcPaintReader.FromBytes(data);
-  static PcPaintFile IImageFileFormat<PcPaintFile>.FromStream(Stream stream) => PcPaintReader.FromStream(stream);
-  static byte[] IImageFileFormat<PcPaintFile>.ToBytes(PcPaintFile file) => PcPaintWriter.ToBytes(file);
+  static string IImageFormatMetadata<PcPaintFile>.PrimaryExtension => ".pic";
+  static string[] IImageFormatMetadata<PcPaintFile>.FileExtensions => [".pic", ".clp"];
+  static PcPaintFile IImageFormatReader<PcPaintFile>.FromSpan(ReadOnlySpan<byte> data) => PcPaintReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<PcPaintFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<PcPaintFile>.ToBytes(PcPaintFile file) => PcPaintWriter.ToBytes(file);
 
-  static bool? IImageFileFormat<PcPaintFile>.MatchesSignature(ReadOnlySpan<byte> header) {
+  static bool? IImageFormatMetadata<PcPaintFile>.MatchesSignature(ReadOnlySpan<byte> header) {
     if (header.Length < 12 || header[0] != 0x34 || header[1] != 0x12)
       return null;
     var w = (ushort)(header[2] | (header[3] << 8));
@@ -47,10 +44,10 @@ public sealed class PcPaintFile : IImageFileFormat<PcPaintFile> {
   public ushort YOffset { get; init; }
 
   /// <summary>Number of bit planes (1-4).</summary>
-  public byte Planes { get; init; } = 1;
+  public byte Planes { get; init; }
 
   /// <summary>Bits per pixel per plane (1, 2, 4, or 8).</summary>
-  public byte BitsPerPixel { get; init; } = 8;
+  public byte BitsPerPixel { get; init; }
 
   /// <summary>Horizontal aspect ratio.</summary>
   public ushort XAspect { get; init; }
@@ -59,14 +56,13 @@ public sealed class PcPaintFile : IImageFileFormat<PcPaintFile> {
   public ushort YAspect { get; init; }
 
   /// <summary>Palette data (RGB triplets, 3 bytes per entry).</summary>
-  public byte[] Palette { get; init; } = [];
+  public byte[] Palette { get; init; }
 
   /// <summary>Pixel data (width * height bytes of 8-bit palette indices).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts a PC Paint file to a <see cref="RawImage"/> with Indexed8 format.</summary>
   public static RawImage ToRawImage(PcPaintFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     return new() {
       Width = file.Width,

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using FileFormat.Core;
@@ -7,24 +7,21 @@ namespace FileFormat.Fsh;
 
 /// <summary>In-memory representation of an FSH (EA Sports Shape/Texture) archive.</summary>
 [FormatMagicBytes([0x53, 0x48, 0x50, 0x49])]
-public sealed class FshFile : IImageFileFormat<FshFile> {
+public readonly record struct FshFile : IImageFormatReader<FshFile>, IImageToRawImage<FshFile>, IImageFromRawImage<FshFile>, IImageFormatWriter<FshFile> {
 
-  static string IImageFileFormat<FshFile>.PrimaryExtension => ".fsh";
-  static string[] IImageFileFormat<FshFile>.FileExtensions => [".fsh"];
-  static FshFile IImageFileFormat<FshFile>.FromFile(FileInfo file) => FshReader.FromFile(file);
-  static FshFile IImageFileFormat<FshFile>.FromBytes(byte[] data) => FshReader.FromBytes(data);
-  static FshFile IImageFileFormat<FshFile>.FromStream(Stream stream) => FshReader.FromStream(stream);
-  static byte[] IImageFileFormat<FshFile>.ToBytes(FshFile file) => FshWriter.ToBytes(file);
+  static string IImageFormatMetadata<FshFile>.PrimaryExtension => ".fsh";
+  static string[] IImageFormatMetadata<FshFile>.FileExtensions => [".fsh"];
+  static FshFile IImageFormatReader<FshFile>.FromSpan(ReadOnlySpan<byte> data) => FshReader.FromSpan(data);
+  static byte[] IImageFormatWriter<FshFile>.ToBytes(FshFile file) => FshWriter.ToBytes(file);
 
   /// <summary>4-character directory ID (e.g. "GIMX").</summary>
-  public string DirectoryId { get; init; } = "GIMX";
+  public string DirectoryId { get; init; }
 
   /// <summary>Image entries contained in this FSH archive.</summary>
-  public IReadOnlyList<FshEntry> Entries { get; init; } = [];
+  public IReadOnlyList<FshEntry> Entries { get; init; }
 
   /// <summary>Converts the first supported entry of an FSH file to a <see cref="RawImage"/>.</summary>
   public static RawImage ToRawImage(FshFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     if (file.Entries.Count == 0)
       throw new ArgumentException("FSH file contains no entries.", nameof(file));
 

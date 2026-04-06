@@ -26,6 +26,8 @@ public static class FacePainterReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static FacePainterFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static FacePainterFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < FacePainterFile.ExpectedFileSize)

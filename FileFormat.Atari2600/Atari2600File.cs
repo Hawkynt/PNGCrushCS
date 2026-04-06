@@ -1,11 +1,11 @@
-﻿using System;
+using System;
 using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Atari2600;
 
 /// <summary>Atari 2600 TIA playfield graphics data model.</summary>
-public sealed class Atari2600File : IImageFileFormat<Atari2600File> {
+public sealed class Atari2600File : IImageFormatReader<Atari2600File>, IImageToRawImage<Atari2600File>, IImageFromRawImage<Atari2600File>, IImageFormatWriter<Atari2600File> {
 
   public const int BytesPerTile = 8;
   public const int TileSize = 8;
@@ -18,6 +18,7 @@ public sealed class Atari2600File : IImageFileFormat<Atari2600File> {
 
   public static string PrimaryExtension => ".a26";
   public static string[] FileExtensions => [".a26", ".tia"];
+  static Atari2600File IImageFormatReader<Atari2600File>.FromSpan(ReadOnlySpan<byte> data) => Atari2600Reader.FromSpan(data);
   public static FormatCapability Capabilities => FormatCapability.MonochromeOnly;
   public static Atari2600File FromFile(FileInfo file) => Atari2600Reader.FromFile(file);
   public static Atari2600File FromBytes(byte[] data) => Atari2600Reader.FromBytes(data);

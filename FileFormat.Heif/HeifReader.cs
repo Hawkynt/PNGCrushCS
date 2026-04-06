@@ -36,6 +36,8 @@ public static class HeifReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static HeifFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static HeifFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MIN_FILE_SIZE)

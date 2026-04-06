@@ -26,6 +26,8 @@ public static class HomeworldLifReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static HomeworldLifFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static HomeworldLifFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < HomeworldLifFile.MinFileSize)

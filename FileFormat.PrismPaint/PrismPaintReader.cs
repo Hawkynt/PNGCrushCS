@@ -26,6 +26,8 @@ public static class PrismPaintReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static PrismPaintFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static PrismPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < PrismPaintFile.MinFileSize)

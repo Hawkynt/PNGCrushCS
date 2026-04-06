@@ -26,6 +26,8 @@ public static class LogoPainterReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static LogoPainterFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static LogoPainterFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < LogoPainterFile.LoadAddressSize + LogoPainterFile.MinPayloadSize)

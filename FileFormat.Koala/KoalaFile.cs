@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Koala;
 
 /// <summary>In-memory representation of a Commodore 64 Koala Painter image.</summary>
-public sealed class KoalaFile : IImageFileFormat<KoalaFile> {
+public readonly record struct KoalaFile : IImageFormatReader<KoalaFile>, IImageToRawImage<KoalaFile>, IImageFormatWriter<KoalaFile> {
 
-  static string IImageFileFormat<KoalaFile>.PrimaryExtension => ".koa";
-  static string[] IImageFileFormat<KoalaFile>.FileExtensions => [".koa", ".koala", ".kla"];
-  static KoalaFile IImageFileFormat<KoalaFile>.FromFile(FileInfo file) => KoalaReader.FromFile(file);
-  static KoalaFile IImageFileFormat<KoalaFile>.FromBytes(byte[] data) => KoalaReader.FromBytes(data);
-  static KoalaFile IImageFileFormat<KoalaFile>.FromStream(Stream stream) => KoalaReader.FromStream(stream);
-  static byte[] IImageFileFormat<KoalaFile>.ToBytes(KoalaFile file) => KoalaWriter.ToBytes(file);
+  static string IImageFormatMetadata<KoalaFile>.PrimaryExtension => ".koa";
+  static string[] IImageFormatMetadata<KoalaFile>.FileExtensions => [".koa", ".koala", ".kla"];
+  static KoalaFile IImageFormatReader<KoalaFile>.FromSpan(ReadOnlySpan<byte> data) => KoalaReader.FromSpan(data);
+  static byte[] IImageFormatWriter<KoalaFile>.ToBytes(KoalaFile file) => KoalaWriter.ToBytes(file);
 
   /// <summary>The fixed width of a Koala image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -52,20 +49,19 @@ public sealed class KoalaFile : IImageFileFormat<KoalaFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Multicolor bitmap data (8000 bytes, 2 bits per pixel).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Video matrix / screen RAM (1000 bytes, upper/lower nybble = 2 colors per cell).</summary>
-  public byte[] VideoMatrix { get; init; } = [];
+  public byte[] VideoMatrix { get; init; }
 
   /// <summary>Color RAM (1000 bytes, lower nybble = 3rd color per cell).</summary>
-  public byte[] ColorRam { get; init; } = [];
+  public byte[] ColorRam { get; init; }
 
   /// <summary>Background color index (0-15).</summary>
   public byte BackgroundColor { get; init; }
 
   /// <summary>Converts this Koala image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(KoalaFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -104,9 +100,4 @@ public sealed class KoalaFile : IImageFileFormat<KoalaFile> {
     };
   }
 
-  /// <summary>Not supported. Koala images have complex cell-based color constraints.</summary>
-  public static KoalaFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to KoalaFile is not supported due to complex cell-based color constraints.");
-  }
 }

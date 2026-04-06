@@ -1,22 +1,17 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Jbig2;
 
 /// <summary>In-memory representation of a JBIG2 (ITU-T T.88) bi-level image.</summary>
 [FormatMagicBytes([0x97, 0x4A, 0x42, 0x32])]
-public sealed class Jbig2File : IImageFileFormat<Jbig2File> {
+public readonly record struct Jbig2File : IImageFormatReader<Jbig2File>, IImageToRawImage<Jbig2File>, IImageFromRawImage<Jbig2File>, IImageFormatWriter<Jbig2File> {
 
-  static string IImageFileFormat<Jbig2File>.PrimaryExtension => ".jb2";
-  static string[] IImageFileFormat<Jbig2File>.FileExtensions => [".jb2", ".jbig2"];
-  static FormatCapability IImageFileFormat<Jbig2File>.Capabilities => FormatCapability.MonochromeOnly;
-  static Jbig2File IImageFileFormat<Jbig2File>.FromFile(FileInfo file) => Jbig2Reader.FromFile(file);
-  static Jbig2File IImageFileFormat<Jbig2File>.FromBytes(byte[] data) => Jbig2Reader.FromBytes(data);
-  static Jbig2File IImageFileFormat<Jbig2File>.FromStream(Stream stream) => Jbig2Reader.FromStream(stream);
-  static RawImage IImageFileFormat<Jbig2File>.ToRawImage(Jbig2File file) => ToRawImage(file);
-  static Jbig2File IImageFileFormat<Jbig2File>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<Jbig2File>.ToBytes(Jbig2File file) => Jbig2Writer.ToBytes(file);
+  static string IImageFormatMetadata<Jbig2File>.PrimaryExtension => ".jb2";
+  static string[] IImageFormatMetadata<Jbig2File>.FileExtensions => [".jb2", ".jbig2"];
+  static Jbig2File IImageFormatReader<Jbig2File>.FromSpan(ReadOnlySpan<byte> data) => Jbig2Reader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<Jbig2File>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<Jbig2File>.ToBytes(Jbig2File file) => Jbig2Writer.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -25,15 +20,14 @@ public sealed class Jbig2File : IImageFileFormat<Jbig2File> {
   public int Height { get; init; }
 
   /// <summary>1bpp packed pixel data (MSB first, ceil(width/8) bytes per row). Bit=1 means black, bit=0 means white.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>The parsed segments from the JBIG2 file.</summary>
-  public Jbig2Segment[] Segments { get; init; } = [];
+  public Jbig2Segment[] Segments { get; init; }
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
   public static RawImage ToRawImage(Jbig2File file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     return new() {
       Width = file.Width,

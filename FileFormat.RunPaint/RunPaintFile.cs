@@ -5,14 +5,12 @@ using FileFormat.Core;
 namespace FileFormat.RunPaint;
 
 /// <summary>In-memory representation of a Run Paint multicolor image (.rpm).</summary>
-public sealed class RunPaintFile : IImageFileFormat<RunPaintFile> {
+public readonly record struct RunPaintFile : IImageFormatReader<RunPaintFile>, IImageToRawImage<RunPaintFile>, IImageFormatWriter<RunPaintFile> {
 
-  static string IImageFileFormat<RunPaintFile>.PrimaryExtension => ".rpm";
-  static string[] IImageFileFormat<RunPaintFile>.FileExtensions => [".rpm"];
-  static RunPaintFile IImageFileFormat<RunPaintFile>.FromFile(FileInfo file) => RunPaintReader.FromFile(file);
-  static RunPaintFile IImageFileFormat<RunPaintFile>.FromBytes(byte[] data) => RunPaintReader.FromBytes(data);
-  static RunPaintFile IImageFileFormat<RunPaintFile>.FromStream(Stream stream) => RunPaintReader.FromStream(stream);
-  static byte[] IImageFileFormat<RunPaintFile>.ToBytes(RunPaintFile file) => RunPaintWriter.ToBytes(file);
+  static string IImageFormatMetadata<RunPaintFile>.PrimaryExtension => ".rpm";
+  static string[] IImageFormatMetadata<RunPaintFile>.FileExtensions => [".rpm"];
+  static RunPaintFile IImageFormatReader<RunPaintFile>.FromSpan(ReadOnlySpan<byte> data) => RunPaintReader.FromSpan(data);
+  static byte[] IImageFormatWriter<RunPaintFile>.ToBytes(RunPaintFile file) => RunPaintWriter.ToBytes(file);
 
   /// <summary>The fixed width of the image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -52,20 +50,19 @@ public sealed class RunPaintFile : IImageFileFormat<RunPaintFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Multicolor bitmap data (8000 bytes).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Screen RAM (1000 bytes).</summary>
-  public byte[] ScreenRam { get; init; } = [];
+  public byte[] ScreenRam { get; init; }
 
   /// <summary>Color RAM (1000 bytes).</summary>
-  public byte[] ColorRam { get; init; } = [];
+  public byte[] ColorRam { get; init; }
 
   /// <summary>Background color index (0-15).</summary>
   public byte BackgroundColor { get; init; }
 
   /// <summary>Converts this image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(RunPaintFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -102,12 +99,6 @@ public sealed class RunPaintFile : IImageFileFormat<RunPaintFile> {
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
     };
-  }
-
-  /// <summary>Not supported. Run Paint images have complex cell-based color constraints.</summary>
-  public static RunPaintFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to RunPaintFile is not supported due to complex cell-based color constraints.");
   }
 
   /// <summary>RLE-decompresses data using 0xC0 mask encoding.</summary>

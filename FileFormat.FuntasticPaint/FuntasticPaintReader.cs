@@ -26,6 +26,8 @@ public static class FuntasticPaintReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static FuntasticPaintFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static FuntasticPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != FuntasticPaintFile.ExpectedFileSize)

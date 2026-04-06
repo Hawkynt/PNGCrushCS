@@ -32,6 +32,8 @@ public static class InterfileReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static InterfileFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static InterfileFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MIN_SIZE)

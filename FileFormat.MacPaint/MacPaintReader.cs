@@ -28,6 +28,8 @@ public static class MacPaintReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static MacPaintFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static MacPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < MacPaintHeader.StructSize)

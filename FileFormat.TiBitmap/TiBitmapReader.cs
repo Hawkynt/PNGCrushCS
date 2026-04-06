@@ -25,6 +25,8 @@ public static class TiBitmapReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static TiBitmapFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static TiBitmapFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < TiBitmapFile.HeaderSize)

@@ -26,6 +26,8 @@ public static class SyntheticArtsReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static SyntheticArtsFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static SyntheticArtsFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < SyntheticArtsFile.FileSize)

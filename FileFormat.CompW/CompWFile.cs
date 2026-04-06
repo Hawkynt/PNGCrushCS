@@ -1,19 +1,16 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.CompW;
 
 /// <summary>In-memory representation of a CompW WLM indexed image.</summary>
-public sealed class CompWFile : IImageFileFormat<CompWFile> {
+public readonly record struct CompWFile : IImageFormatReader<CompWFile>, IImageToRawImage<CompWFile>, IImageFormatWriter<CompWFile> {
 
-  static string IImageFileFormat<CompWFile>.PrimaryExtension => ".wlm";
-  static string[] IImageFileFormat<CompWFile>.FileExtensions => [".wlm"];
-  static FormatCapability IImageFileFormat<CompWFile>.Capabilities => FormatCapability.IndexedOnly;
-  static CompWFile IImageFileFormat<CompWFile>.FromFile(FileInfo file) => CompWReader.FromFile(file);
-  static CompWFile IImageFileFormat<CompWFile>.FromBytes(byte[] data) => CompWReader.FromBytes(data);
-  static CompWFile IImageFileFormat<CompWFile>.FromStream(Stream stream) => CompWReader.FromStream(stream);
-  static byte[] IImageFileFormat<CompWFile>.ToBytes(CompWFile file) => CompWWriter.ToBytes(file);
+  static string IImageFormatMetadata<CompWFile>.PrimaryExtension => ".wlm";
+  static string[] IImageFormatMetadata<CompWFile>.FileExtensions => [".wlm"];
+  static CompWFile IImageFormatReader<CompWFile>.FromSpan(ReadOnlySpan<byte> data) => CompWReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<CompWFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<CompWFile>.ToBytes(CompWFile file) => CompWWriter.ToBytes(file);
 
   /// <summary>Magic bytes: "CW" (0x43 0x57).</summary>
   internal static readonly byte[] Magic = [0x43, 0x57];
@@ -37,14 +34,13 @@ public sealed class CompWFile : IImageFileFormat<CompWFile> {
   public int BitsPerPixel { get; init; }
 
   /// <summary>8-bit indexed pixel data.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Palette (768 bytes, 256 RGB triplets).</summary>
-  public byte[] Palette { get; init; } = [];
+  public byte[] Palette { get; init; }
 
   /// <summary>Converts this CompW image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(CompWFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var rgb = new byte[file.Width * file.Height * 3];
     for (var i = 0; i < file.PixelData.Length; ++i) {
@@ -64,9 +60,4 @@ public sealed class CompWFile : IImageFileFormat<CompWFile> {
     };
   }
 
-  /// <summary>Not supported.</summary>
-  public static CompWFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to CompWFile is not supported.");
-  }
 }

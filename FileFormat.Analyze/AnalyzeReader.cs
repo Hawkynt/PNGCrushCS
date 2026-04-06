@@ -41,6 +41,8 @@ public static class AnalyzeReader {
   }
 
   /// <summary>Parses concatenated header+pixel data bytes (348-byte header followed by pixel data).</summary>
+  public static AnalyzeFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AnalyzeFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < HEADER_SIZE)

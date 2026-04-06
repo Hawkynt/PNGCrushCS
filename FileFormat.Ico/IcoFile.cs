@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
@@ -11,15 +11,13 @@ namespace FileFormat.Ico;
 
 /// <summary>In-memory representation of an ICO file.</summary>
 [FormatMagicBytes([0x00, 0x00, 0x01, 0x00])]
-public sealed class IcoFile : IImageFileFormat<IcoFile>, IMultiImageFileFormat<IcoFile> {
+public sealed class IcoFile : IImageFormatReader<IcoFile>, IImageToRawImage<IcoFile>, IImageFormatWriter<IcoFile>, IMultiImageFileFormat<IcoFile> {
 
-  static string IImageFileFormat<IcoFile>.PrimaryExtension => ".ico";
-  static string[] IImageFileFormat<IcoFile>.FileExtensions => [".ico"];
-  static FormatCapability IImageFileFormat<IcoFile>.Capabilities => FormatCapability.HasDedicatedOptimizer | FormatCapability.MultiImage;
-  static IcoFile IImageFileFormat<IcoFile>.FromFile(FileInfo file) => IcoReader.FromFile(file);
-  static IcoFile IImageFileFormat<IcoFile>.FromBytes(byte[] data) => IcoReader.FromBytes(data);
-  static IcoFile IImageFileFormat<IcoFile>.FromStream(Stream stream) => IcoReader.FromStream(stream);
-  static byte[] IImageFileFormat<IcoFile>.ToBytes(IcoFile file) => IcoWriter.ToBytes(file);
+  static string IImageFormatMetadata<IcoFile>.PrimaryExtension => ".ico";
+  static string[] IImageFormatMetadata<IcoFile>.FileExtensions => [".ico"];
+  static IcoFile IImageFormatReader<IcoFile>.FromSpan(ReadOnlySpan<byte> data) => IcoReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<IcoFile>.Capabilities => FormatCapability.HasDedicatedOptimizer | FormatCapability.MultiImage;
+  static byte[] IImageFormatWriter<IcoFile>.ToBytes(IcoFile file) => IcoWriter.ToBytes(file);
   public IReadOnlyList<IcoImage> Images { get; init; } = [];
 
   /// <summary>Returns the number of image entries in this ICO file.</summary>
@@ -52,9 +50,6 @@ public sealed class IcoFile : IImageFileFormat<IcoFile>, IMultiImageFileFormat<I
       ? PngFile.ToRawImage(PngReader.FromBytes(best.Data))
       : _DecodeDib(best);
   }
-
-  /// <summary>ICO files require multiple resolutions; single-image creation is not supported.</summary>
-  public static IcoFile FromRawImage(RawImage image) => throw new NotSupportedException("ICO encoding from a single raw image is not supported.");
 
   private static RawImage _DecodeDib(IcoImage entry) {
     var dib = entry.Data;

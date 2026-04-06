@@ -1,31 +1,27 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Hdr;
 
 /// <summary>In-memory representation of a Radiance HDR image.</summary>
 [FormatMagicBytes([0x23, 0x3F])]
-public sealed class HdrFile : IImageFileFormat<HdrFile> {
+public readonly record struct HdrFile : IImageFormatReader<HdrFile>, IImageToRawImage<HdrFile>, IImageFromRawImage<HdrFile>, IImageFormatWriter<HdrFile> {
 
-  static string IImageFileFormat<HdrFile>.PrimaryExtension => ".hdr";
-  static string[] IImageFileFormat<HdrFile>.FileExtensions => [".hdr", ".rgbe", ".xyze", ".rad"];
-  static HdrFile IImageFileFormat<HdrFile>.FromFile(FileInfo file) => HdrReader.FromFile(file);
-  static HdrFile IImageFileFormat<HdrFile>.FromBytes(byte[] data) => HdrReader.FromBytes(data);
-  static HdrFile IImageFileFormat<HdrFile>.FromStream(Stream stream) => HdrReader.FromStream(stream);
-  static RawImage IImageFileFormat<HdrFile>.ToRawImage(HdrFile file) => file.ToRawImage();
-  static byte[] IImageFileFormat<HdrFile>.ToBytes(HdrFile file) => HdrWriter.ToBytes(file);
+  static string IImageFormatMetadata<HdrFile>.PrimaryExtension => ".hdr";
+  static string[] IImageFormatMetadata<HdrFile>.FileExtensions => [".hdr", ".rgbe", ".xyze", ".rad"];
+  static HdrFile IImageFormatReader<HdrFile>.FromSpan(ReadOnlySpan<byte> data) => HdrReader.FromSpan(data);
+  static byte[] IImageFormatWriter<HdrFile>.ToBytes(HdrFile file) => HdrWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
-  public float Exposure { get; init; } = 1.0f;
-  public float[] PixelData { get; init; } = [];
+  public float Exposure { get; init; }
+  public float[] PixelData { get; init; }
 
   /// <summary>Converts this HDR image to a 16-bit <see cref="RawImage"/> using Reinhard tone mapping with exposure.</summary>
-  public RawImage ToRawImage() {
-    var width = this.Width;
-    var height = this.Height;
-    var exposure = this.Exposure;
-    var src = this.PixelData;
+  public static RawImage ToRawImage(HdrFile file) {
+    var width = file.Width;
+    var height = file.Height;
+    var exposure = file.Exposure;
+    var src = file.PixelData;
     var pixelCount = width * height;
     var result = new byte[pixelCount * 6];
     for (var i = 0; i < pixelCount; ++i) {

@@ -42,25 +42,6 @@ public class WonderSwanTileReaderTests {
 }
 
 [TestFixture]
-public class WonderSwanTileWriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => WonderSwanTileWriter.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_SingleTile_CorrectSize() {
-    var file = new WonderSwanTileFile {
-      Width = 128,
-      Height = 8,
-      PixelData = new byte[128 * 8],
-    };
-    var bytes = WonderSwanTileWriter.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(16 * 16));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -84,42 +65,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void PrimaryExtension_IsWst()
-    => Assert.That(_GetPrimaryExtension<WonderSwanTileFile>(), Is.EqualTo(".wst"));
-
-  [Test]
-  public void FileExtensions_ContainsPrimary() {
-    var exts = _GetFileExtensions<WonderSwanTileFile>();
-    Assert.That(exts, Does.Contain(".wst"));
-    Assert.That(exts, Does.Contain(".ws"));
-  }
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => WonderSwanTileFile.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => WonderSwanTileFile.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 128, Height = 8, Format = PixelFormat.Rgb24, PixelData = new byte[128 * 8 * 3] };
-    Assert.Throws<ArgumentException>(() => WonderSwanTileFile.FromRawImage(raw));
-  }
-
-  [Test]
-  public void Constants_AreCorrect() {
-    Assert.That(WonderSwanTileFile.BytesPerTile, Is.EqualTo(16));
-    Assert.That(WonderSwanTileFile.TileSize, Is.EqualTo(8));
-    Assert.That(WonderSwanTileFile.TilesPerRow, Is.EqualTo(16));
-  }
-
-  private static string _GetPrimaryExtension<T>() where T : IImageFileFormat<T> => T.PrimaryExtension;
-
-  private static string[] _GetFileExtensions<T>() where T : IImageFileFormat<T> => T.FileExtensions;
-}

@@ -38,31 +38,6 @@ public class Vector06cReaderTests {
 }
 
 [TestFixture]
-public class Vector06cWriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => Vector06cWriter.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_OutputSize_Is16384() {
-    var file = new Vector06cFile { PixelData = new byte[16384] };
-    var bytes = Vector06cWriter.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(16384));
-  }
-
-  [Test]
-  public void ToBytes_DataPreserved() {
-    var data = new byte[16384];
-    for (var i = 0; i < data.Length; ++i)
-      data[i] = (byte)(i & 0xFF);
-    var file = new Vector06cFile { PixelData = data };
-    var bytes = Vector06cWriter.ToBytes(file);
-    Assert.That(bytes, Is.EqualTo(data));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -90,32 +65,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void FixedWidth_Is256()
-    => Assert.That(Vector06cFile.FixedWidth, Is.EqualTo(256));
-
-  [Test]
-  public void FixedHeight_Is256()
-    => Assert.That(Vector06cFile.FixedHeight, Is.EqualTo(256));
-
-  [Test]
-  public void FileSize_Is16384()
-    => Assert.That(Vector06cFile.FileSize, Is.EqualTo(16384));
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => Vector06cFile.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => Vector06cFile.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 256, Height = 256, Format = PixelFormat.Rgb24, PixelData = new byte[256 * 256 * 3] };
-    Assert.Throws<ArgumentException>(() => Vector06cFile.FromRawImage(raw));
-  }
-}

@@ -1,40 +1,36 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.PicWorks;
 
 /// <summary>In-memory representation of a PicWorks image (Atari ST, 320x200, 16 colors).</summary>
-public sealed class PicWorksFile : IImageFileFormat<PicWorksFile> {
+public readonly record struct PicWorksFile : IImageFormatReader<PicWorksFile>, IImageToRawImage<PicWorksFile>, IImageFromRawImage<PicWorksFile>, IImageFormatWriter<PicWorksFile> {
 
   /// <summary>Expected file size: 2-byte resolution + 32-byte palette + 32000 bytes planar data.</summary>
   public const int FileSize = 32034;
 
-  static string IImageFileFormat<PicWorksFile>.PrimaryExtension => ".pwk";
-  static string[] IImageFileFormat<PicWorksFile>.FileExtensions => [".pwk", ".pws"];
-  static FormatCapability IImageFileFormat<PicWorksFile>.Capabilities => FormatCapability.IndexedOnly;
-  static PicWorksFile IImageFileFormat<PicWorksFile>.FromFile(FileInfo file) => PicWorksReader.FromFile(file);
-  static PicWorksFile IImageFileFormat<PicWorksFile>.FromBytes(byte[] data) => PicWorksReader.FromBytes(data);
-  static PicWorksFile IImageFileFormat<PicWorksFile>.FromStream(Stream stream) => PicWorksReader.FromStream(stream);
-  static byte[] IImageFileFormat<PicWorksFile>.ToBytes(PicWorksFile file) => PicWorksWriter.ToBytes(file);
+  static string IImageFormatMetadata<PicWorksFile>.PrimaryExtension => ".pwk";
+  static string[] IImageFormatMetadata<PicWorksFile>.FileExtensions => [".pwk", ".pws"];
+  static PicWorksFile IImageFormatReader<PicWorksFile>.FromSpan(ReadOnlySpan<byte> data) => PicWorksReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<PicWorksFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<PicWorksFile>.ToBytes(PicWorksFile file) => PicWorksWriter.ToBytes(file);
 
   /// <summary>Image width (always 320).</summary>
-  public int Width { get; init; } = 320;
+  public int Width { get; init; }
 
   /// <summary>Image height (always 200).</summary>
-  public int Height { get; init; } = 200;
+  public int Height { get; init; }
 
   /// <summary>Resolution word (0 = low 320x200).</summary>
   public ushort Resolution { get; init; }
 
   /// <summary>16-entry palette of Atari ST 9-bit RGB values.</summary>
-  public short[] Palette { get; init; } = new short[16];
+  public short[] Palette { get; init; }
 
   /// <summary>32000 bytes of Atari ST word-interleaved planar pixel data.</summary>
-  public byte[] PixelData { get; init; } = new byte[32000];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(PicWorksFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var chunky = PlanarConverter.AtariStToChunky(file.PixelData, file.Width, file.Height, 4);
     var paletteCount = Math.Min(16, file.Palette.Length);

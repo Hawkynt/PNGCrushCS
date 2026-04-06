@@ -25,6 +25,8 @@ public static class WonderSwanTileReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static WonderSwanTileFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static WonderSwanTileFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < WonderSwanTileFile.BytesPerTile)

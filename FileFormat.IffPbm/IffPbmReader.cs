@@ -30,6 +30,8 @@ public static class IffPbmReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static IffPbmFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static IffPbmFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MIN_IFF_SIZE)

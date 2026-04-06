@@ -26,6 +26,8 @@ public static class CfliDesignerReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static CfliDesignerFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static CfliDesignerFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < CfliDesignerFile.LoadAddressSize + CfliDesignerFile.MinPayloadSize)

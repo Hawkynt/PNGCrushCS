@@ -88,50 +88,6 @@ public sealed class Flip64ReaderTests {
 }
 
 [TestFixture]
-public sealed class Flip64WriterTests {
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => Flip64Writer.ToBytes(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_CorrectOutputSize() {
-    var rawData = new byte[19000];
-    var file = new Flip64File { LoadAddress = 0x4000, RawData = rawData };
-    var bytes = Flip64Writer.ToBytes(file);
-
-    Assert.That(bytes.Length, Is.EqualTo(2 + 19000));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_LoadAddress_LittleEndian() {
-    var file = new Flip64File { LoadAddress = 0xABCD, RawData = new byte[19000] };
-    var bytes = Flip64Writer.ToBytes(file);
-
-    Assert.That(bytes[0], Is.EqualTo(0xCD));
-    Assert.That(bytes[1], Is.EqualTo(0xAB));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_RawDataPreserved() {
-    var rawData = new byte[19000];
-    for (var i = 0; i < rawData.Length; ++i)
-      rawData[i] = (byte)(i * 7 % 256);
-
-    var file = new Flip64File { LoadAddress = 0x4000, RawData = rawData };
-    var bytes = Flip64Writer.ToBytes(file);
-
-    for (var i = 0; i < rawData.Length; ++i)
-      Assert.That(bytes[2 + i], Is.EqualTo(rawData[i]));
-  }
-}
-
-[TestFixture]
 public sealed class Flip64RoundTripTests {
 
   [Test]
@@ -184,88 +140,6 @@ public sealed class Flip64RoundTripTests {
     var restored = Flip64Reader.FromBytes(bytes);
 
     Assert.That(restored.RawData, Is.EqualTo(original.RawData));
-  }
-}
-
-[TestFixture]
-public sealed class Flip64DataTypeTests {
-
-  [Test]
-  [Category("Unit")]
-  public void PrimaryExtension_IsFbi() {
-    Assert.That(_GetPrimaryExtension(), Is.EqualTo(".fbi"));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FileExtensions_ContainsFbi() {
-    var extensions = _GetFileExtensions();
-    Assert.That(extensions, Does.Contain(".fbi"));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => Flip64File.ToRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => Flip64File.FromRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_ThrowsNotSupportedException() {
-    var image = new RawImage { Width = 160, Height = 200, Format = PixelFormat.Rgb24, PixelData = new byte[160 * 200 * 3] };
-    Assert.Throws<NotSupportedException>(() => Flip64File.FromRawImage(image));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FixedWidth_Is160() {
-    Assert.That(Flip64File.FixedWidth, Is.EqualTo(160));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FixedHeight_Is200() {
-    Assert.That(Flip64File.FixedHeight, Is.EqualTo(200));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToRawImage_ProducesRgb24() {
-    var data = TestHelpers._BuildValidFlip64Data(0x4000);
-    var file = Flip64Reader.FromBytes(data);
-    var rawImage = Flip64File.ToRawImage(file);
-
-    Assert.That(rawImage.Format, Is.EqualTo(PixelFormat.Rgb24));
-    Assert.That(rawImage.Width, Is.EqualTo(160));
-    Assert.That(rawImage.Height, Is.EqualTo(200));
-    Assert.That(rawImage.PixelData.Length, Is.EqualTo(160 * 200 * 3));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void MinPayloadSize_IsTwoBitmapsTwoScreensPlusColor() {
-    Assert.That(Flip64File.MinPayloadSize, Is.EqualTo(8000 + 1000 + 8000 + 1000 + 1000));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void DefaultRawData_IsEmpty() {
-    var file = new Flip64File();
-    Assert.That(file.RawData, Is.Empty);
-  }
-
-  private static string _GetPrimaryExtension() => _Helper<Flip64File>.PrimaryExtension;
-  private static string[] _GetFileExtensions() => _Helper<Flip64File>.FileExtensions;
-
-  private static class _Helper<T> where T : IImageFileFormat<T> {
-    public static string PrimaryExtension => T.PrimaryExtension;
-    public static string[] FileExtensions => T.FileExtensions;
   }
 }
 

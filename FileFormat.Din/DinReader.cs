@@ -27,6 +27,8 @@ public static class DinReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static DinFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static DinFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
 

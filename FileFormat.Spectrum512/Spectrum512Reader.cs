@@ -33,6 +33,8 @@ public static class Spectrum512Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static Spectrum512File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static Spectrum512File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != _EXPECTED_FILE_SIZE)

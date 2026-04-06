@@ -26,6 +26,8 @@ public static class BioRadPicReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static BioRadPicFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static BioRadPicFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < BioRadPicHeader.StructSize)

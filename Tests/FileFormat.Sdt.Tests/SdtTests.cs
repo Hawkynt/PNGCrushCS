@@ -41,25 +41,6 @@ public class SdtReaderTests {
 }
 
 [TestFixture]
-public class SdtWriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => SdtWriter.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_IncludesHeader() {
-    var file = new SdtFile {
-      Width = 128,
-      Height = 128,
-      PixelData = new byte[128 * 128 * 3],
-    };
-    var bytes = SdtWriter.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(8 + 128 * 128 * 3));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -90,30 +71,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void HeaderSize_Is8()
-    => Assert.That(SdtFile.HeaderSize, Is.EqualTo(8));
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => SdtFile.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => SdtFile.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 128, Height = 128, Format = PixelFormat.Indexed8, PixelData = new byte[128 * 128] };
-    Assert.Throws<ArgumentException>(() => SdtFile.FromRawImage(raw));
-  }
-
-  [Test]
-  public void FileExtensions_ContainsPrimary() {
-    string[] exts = [".sdt"];
-    Assert.That(exts, Does.Contain(".sdt"));
-  }
-}

@@ -48,33 +48,6 @@ public sealed class DrazPaintReaderTests {
 }
 
 [TestFixture]
-public sealed class DrazPaintWriterTests {
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => DrazPaintWriter.ToBytes(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_StartsWithLoadAddress() {
-    var file = new DrazPaintFile {
-      LoadAddress = 0x5800,
-      BitmapData = new byte[8000],
-      ScreenRam = new byte[1000],
-      ColorRam = new byte[1000],
-      BackgroundColor = 0,
-    };
-    var bytes = DrazPaintWriter.ToBytes(file);
-
-    Assert.That(bytes[0], Is.EqualTo(0x00));
-    Assert.That(bytes[1], Is.EqualTo(0x58));
-    Assert.That(bytes.Length, Is.GreaterThan(2));
-  }
-}
-
-[TestFixture]
 public sealed class DrazPaintRoundTripTests {
 
   [Test]
@@ -90,49 +63,6 @@ public sealed class DrazPaintRoundTripTests {
     Assert.That(restored.ScreenRam, Is.EqualTo(original.ScreenRam));
     Assert.That(restored.ColorRam, Is.EqualTo(original.ColorRam));
     Assert.That(restored.BackgroundColor, Is.EqualTo(original.BackgroundColor));
-  }
-}
-
-[TestFixture]
-public sealed class DrazPaintDataTypeTests {
-
-  [Test]
-  [Category("Unit")]
-  public void PrimaryExtension_IsDrz() {
-    Assert.That(_GetPrimaryExtension(), Is.EqualTo(".drz"));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FileExtensions_ContainsDrz() {
-    Assert.That(_GetFileExtensions(), Does.Contain(".drz"));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => DrazPaintFile.ToRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => DrazPaintFile.FromRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_ThrowsNotSupportedException() {
-    var image = new RawImage { Width = 160, Height = 200, Format = PixelFormat.Rgb24, PixelData = new byte[160 * 200 * 3] };
-    Assert.Throws<NotSupportedException>(() => DrazPaintFile.FromRawImage(image));
-  }
-
-  private static string _GetPrimaryExtension() => _Helper<DrazPaintFile>.PrimaryExtension;
-  private static string[] _GetFileExtensions() => _Helper<DrazPaintFile>.FileExtensions;
-
-  private static class _Helper<T> where T : IImageFileFormat<T> {
-    public static string PrimaryExtension => T.PrimaryExtension;
-    public static string[] FileExtensions => T.FileExtensions;
   }
 }
 

@@ -1,11 +1,10 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.PublicPainter;
 
 /// <summary>In-memory representation of a Public Painter compressed monochrome image (Atari ST, 640x400).</summary>
-public sealed class PublicPainterFile : IImageFileFormat<PublicPainterFile> {
+public readonly record struct PublicPainterFile : IImageFormatReader<PublicPainterFile>, IImageToRawImage<PublicPainterFile>, IImageFromRawImage<PublicPainterFile>, IImageFormatWriter<PublicPainterFile> {
 
   /// <summary>Decompressed bitmap size: 640x400 / 8 bits per byte = 32000 bytes.</summary>
   public const int DecompressedSize = 32000;
@@ -16,27 +15,24 @@ public sealed class PublicPainterFile : IImageFileFormat<PublicPainterFile> {
   /// <summary>Fixed image height.</summary>
   public const int ImageHeight = 400;
 
-  static string IImageFileFormat<PublicPainterFile>.PrimaryExtension => ".cmp";
-  static string[] IImageFileFormat<PublicPainterFile>.FileExtensions => [".cmp"];
-  static FormatCapability IImageFileFormat<PublicPainterFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static PublicPainterFile IImageFileFormat<PublicPainterFile>.FromFile(FileInfo file) => PublicPainterReader.FromFile(file);
-  static PublicPainterFile IImageFileFormat<PublicPainterFile>.FromBytes(byte[] data) => PublicPainterReader.FromBytes(data);
-  static PublicPainterFile IImageFileFormat<PublicPainterFile>.FromStream(Stream stream) => PublicPainterReader.FromStream(stream);
-  static byte[] IImageFileFormat<PublicPainterFile>.ToBytes(PublicPainterFile file) => PublicPainterWriter.ToBytes(file);
+  static string IImageFormatMetadata<PublicPainterFile>.PrimaryExtension => ".cmp";
+  static string[] IImageFormatMetadata<PublicPainterFile>.FileExtensions => [".cmp"];
+  static PublicPainterFile IImageFormatReader<PublicPainterFile>.FromSpan(ReadOnlySpan<byte> data) => PublicPainterReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<PublicPainterFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<PublicPainterFile>.ToBytes(PublicPainterFile file) => PublicPainterWriter.ToBytes(file);
 
   /// <summary>Image width (always 640).</summary>
-  public int Width { get; init; } = ImageWidth;
+  public int Width { get; init; }
 
   /// <summary>Image height (always 400).</summary>
-  public int Height { get; init; } = ImageHeight;
+  public int Height { get; init; }
 
   /// <summary>32000 bytes of 1bpp monochrome bitmap data (MSB first, 80 bytes per row).</summary>
-  public byte[] PixelData { get; init; } = new byte[DecompressedSize];
+  public byte[] PixelData { get; init; }
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
   public static RawImage ToRawImage(PublicPainterFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     return new() {
       Width = ImageWidth,

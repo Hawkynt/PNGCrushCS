@@ -25,6 +25,8 @@ public static class CiscoIpReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static CiscoIpFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static CiscoIpFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < CiscoIpFile.HeaderSize)

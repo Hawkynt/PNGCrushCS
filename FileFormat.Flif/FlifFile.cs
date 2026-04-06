@@ -1,19 +1,16 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Flif;
 
 /// <summary>In-memory representation of a FLIF (Free Lossless Image Format) image.</summary>
 [FormatMagicBytes([0x46, 0x4C, 0x49, 0x46])]
-public sealed class FlifFile : IImageFileFormat<FlifFile> {
+public readonly record struct FlifFile : IImageFormatReader<FlifFile>, IImageToRawImage<FlifFile>, IImageFromRawImage<FlifFile>, IImageFormatWriter<FlifFile> {
 
-  static string IImageFileFormat<FlifFile>.PrimaryExtension => ".flif";
-  static string[] IImageFileFormat<FlifFile>.FileExtensions => [".flif"];
-  static FlifFile IImageFileFormat<FlifFile>.FromFile(FileInfo file) => FlifReader.FromFile(file);
-  static FlifFile IImageFileFormat<FlifFile>.FromBytes(byte[] data) => FlifReader.FromBytes(data);
-  static FlifFile IImageFileFormat<FlifFile>.FromStream(Stream stream) => FlifReader.FromStream(stream);
-  static byte[] IImageFileFormat<FlifFile>.ToBytes(FlifFile file) => FlifWriter.ToBytes(file);
+  static string IImageFormatMetadata<FlifFile>.PrimaryExtension => ".flif";
+  static string[] IImageFormatMetadata<FlifFile>.FileExtensions => [".flif"];
+  static FlifFile IImageFormatReader<FlifFile>.FromSpan(ReadOnlySpan<byte> data) => FlifReader.FromSpan(data);
+  static byte[] IImageFormatWriter<FlifFile>.ToBytes(FlifFile file) => FlifWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -22,10 +19,10 @@ public sealed class FlifFile : IImageFileFormat<FlifFile> {
   public int Height { get; init; }
 
   /// <summary>Number of channels (1=Gray, 3=RGB, 4=RGBA).</summary>
-  public FlifChannelCount ChannelCount { get; init; } = FlifChannelCount.Rgb;
+  public FlifChannelCount ChannelCount { get; init; }
 
   /// <summary>Bits per channel (8 or 16).</summary>
-  public int BitsPerChannel { get; init; } = 8;
+  public int BitsPerChannel { get; init; }
 
   /// <summary>Whether the image uses interlacing.</summary>
   public bool IsInterlaced { get; init; }
@@ -34,10 +31,9 @@ public sealed class FlifFile : IImageFileFormat<FlifFile> {
   public bool IsAnimated { get; init; }
 
   /// <summary>Raw pixel data in channel order (Gray8, Rgb24, or Rgba32 depending on channel count for 8-bit).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(FlifFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var format = file.ChannelCount switch {
       FlifChannelCount.Gray => PixelFormat.Gray8,

@@ -25,6 +25,8 @@ public static class HalfLifeMdlReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static HalfLifeMdlFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static HalfLifeMdlFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < HalfLifeMdlFile.HeaderSize)

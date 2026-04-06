@@ -27,6 +27,8 @@ public static class FontasyGrafikReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static FontasyGrafikFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static FontasyGrafikFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < FontasyGrafikFile.ExpectedFileSize)

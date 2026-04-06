@@ -1,21 +1,16 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.MsxFont;
 
 /// <summary>In-memory representation of an MSX font pattern table (2048 bytes: 256 characters x 8 bytes each, 8x8 mono).</summary>
-public sealed class MsxFontFile : IImageFileFormat<MsxFontFile> {
+public readonly record struct MsxFontFile : IImageFormatReader<MsxFontFile>, IImageToRawImage<MsxFontFile>, IImageFormatWriter<MsxFontFile> {
 
-  static string IImageFileFormat<MsxFontFile>.PrimaryExtension => ".fnt";
-  static string[] IImageFileFormat<MsxFontFile>.FileExtensions => [".fnt", ".mft"];
-  static FormatCapability IImageFileFormat<MsxFontFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static MsxFontFile IImageFileFormat<MsxFontFile>.FromFile(FileInfo file) => MsxFontReader.FromFile(file);
-  static MsxFontFile IImageFileFormat<MsxFontFile>.FromBytes(byte[] data) => MsxFontReader.FromBytes(data);
-  static MsxFontFile IImageFileFormat<MsxFontFile>.FromStream(Stream stream) => MsxFontReader.FromStream(stream);
-  static RawImage IImageFileFormat<MsxFontFile>.ToRawImage(MsxFontFile file) => ToRawImage(file);
-  static MsxFontFile IImageFileFormat<MsxFontFile>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<MsxFontFile>.ToBytes(MsxFontFile file) => MsxFontWriter.ToBytes(file);
+  static string IImageFormatMetadata<MsxFontFile>.PrimaryExtension => ".fnt";
+  static string[] IImageFormatMetadata<MsxFontFile>.FileExtensions => [".fnt", ".mft"];
+  static MsxFontFile IImageFormatReader<MsxFontFile>.FromSpan(ReadOnlySpan<byte> data) => MsxFontReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<MsxFontFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<MsxFontFile>.ToBytes(MsxFontFile file) => MsxFontWriter.ToBytes(file);
 
   /// <summary>Expected file size in bytes.</summary>
   internal const int ExpectedFileSize = 2048;
@@ -51,13 +46,12 @@ public sealed class MsxFontFile : IImageFileFormat<MsxFontFile> {
   public int Height => PixelHeight;
 
   /// <summary>Raw font pattern data (2048 bytes).</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
   /// <summary>Converts the MSX font table to an Indexed1 raw image (128x128, B&amp;W palette).</summary>
   public static RawImage ToRawImage(MsxFontFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var rowStride = PixelWidth / 8;
     var pixelData = new byte[rowStride * PixelHeight];
@@ -95,9 +89,4 @@ public sealed class MsxFontFile : IImageFileFormat<MsxFontFile> {
     };
   }
 
-  /// <summary>Not supported. MSX font tables have fixed structure constraints.</summary>
-  public static MsxFontFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to MsxFontFile is not supported.");
-  }
 }

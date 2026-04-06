@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.AtariGraphics10;
 
 /// <summary>In-memory representation of an Atari Graphics 10 (GTIA 9-color) image. 80x192.</summary>
-public sealed class AtariGraphics10File : IImageFileFormat<AtariGraphics10File> {
+public sealed class AtariGraphics10File : IImageFormatReader<AtariGraphics10File>, IImageToRawImage<AtariGraphics10File>, IImageFormatWriter<AtariGraphics10File> {
 
   /// <summary>Image width in pixels.</summary>
   internal const int PixelWidth = 80;
@@ -22,15 +21,13 @@ public sealed class AtariGraphics10File : IImageFileFormat<AtariGraphics10File> 
   /// <summary>Number of colors in the GTIA 9-color mode (4 playfield + 4 player/missile + 1 background).</summary>
   internal const int PaletteColors = 9;
 
-  static string IImageFileFormat<AtariGraphics10File>.PrimaryExtension => ".gr10";
-  static string[] IImageFileFormat<AtariGraphics10File>.FileExtensions => [".gr10", ".g10"];
-  static FormatCapability IImageFileFormat<AtariGraphics10File>.Capabilities => FormatCapability.IndexedOnly;
-  static AtariGraphics10File IImageFileFormat<AtariGraphics10File>.FromFile(FileInfo file) => AtariGraphics10Reader.FromFile(file);
-  static AtariGraphics10File IImageFileFormat<AtariGraphics10File>.FromBytes(byte[] data) => AtariGraphics10Reader.FromBytes(data);
-  static AtariGraphics10File IImageFileFormat<AtariGraphics10File>.FromStream(Stream stream) => AtariGraphics10Reader.FromStream(stream);
-  static RawImage IImageFileFormat<AtariGraphics10File>.ToRawImage(AtariGraphics10File file) => ToRawImage(file);
-  static AtariGraphics10File IImageFileFormat<AtariGraphics10File>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<AtariGraphics10File>.ToBytes(AtariGraphics10File file) => AtariGraphics10Writer.ToBytes(file);
+  static string IImageFormatMetadata<AtariGraphics10File>.PrimaryExtension => ".gr10";
+  static string[] IImageFormatMetadata<AtariGraphics10File>.FileExtensions => [".gr10", ".g10"];
+  static AtariGraphics10File IImageFormatReader<AtariGraphics10File>.FromSpan(ReadOnlySpan<byte> data) => AtariGraphics10Reader.FromSpan(data);
+
+  static FormatCapability IImageFormatMetadata<AtariGraphics10File>.Capabilities => FormatCapability.IndexedOnly;
+  static RawImage IImageToRawImage<AtariGraphics10File>.ToRawImage(AtariGraphics10File file) => ToRawImage(file);
+  static byte[] IImageFormatWriter<AtariGraphics10File>.ToBytes(AtariGraphics10File file) => AtariGraphics10Writer.ToBytes(file);
 
   /// <summary>Always 80.</summary>
   public int Width => PixelWidth;
@@ -86,8 +83,4 @@ public sealed class AtariGraphics10File : IImageFileFormat<AtariGraphics10File> 
       PaletteCount = PaletteColors,
     };
   }
-
-  /// <summary>FromRawImage is not supported for Graphics 10 because the palette is hardware-register dependent.</summary>
-  public static AtariGraphics10File FromRawImage(RawImage image) =>
-    throw new NotSupportedException("Graphics 10 palette is hardware-register dependent; FromRawImage is not supported.");
 }

@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.AccessFax;
 
 /// <summary>In-memory representation of an AccessFax G4 image.</summary>
-public sealed class AccessFaxFile : IImageFileFormat<AccessFaxFile> {
+public readonly record struct AccessFaxFile : IImageFormatReader<AccessFaxFile>, IImageToRawImage<AccessFaxFile>, IImageFormatWriter<AccessFaxFile> {
 
-  static string IImageFileFormat<AccessFaxFile>.PrimaryExtension => ".g4";
-  static string[] IImageFileFormat<AccessFaxFile>.FileExtensions => [".g4", ".acc"];
-  static AccessFaxFile IImageFileFormat<AccessFaxFile>.FromFile(FileInfo file) => AccessFaxReader.FromFile(file);
-  static AccessFaxFile IImageFileFormat<AccessFaxFile>.FromBytes(byte[] data) => AccessFaxReader.FromBytes(data);
-  static AccessFaxFile IImageFileFormat<AccessFaxFile>.FromStream(Stream stream) => AccessFaxReader.FromStream(stream);
-  static byte[] IImageFileFormat<AccessFaxFile>.ToBytes(AccessFaxFile file) => AccessFaxWriter.ToBytes(file);
+  static string IImageFormatMetadata<AccessFaxFile>.PrimaryExtension => ".g4";
+  static string[] IImageFormatMetadata<AccessFaxFile>.FileExtensions => [".g4", ".acc"];
+  static AccessFaxFile IImageFormatReader<AccessFaxFile>.FromSpan(ReadOnlySpan<byte> data) => AccessFaxReader.FromSpan(data);
+  static byte[] IImageFormatWriter<AccessFaxFile>.ToBytes(AccessFaxFile file) => AccessFaxWriter.ToBytes(file);
 
   /// <summary>Magic bytes: 0x00 0x00.</summary>
   internal static readonly byte[] Magic = [0x00, 0x00];
@@ -33,11 +30,10 @@ public sealed class AccessFaxFile : IImageFileFormat<AccessFaxFile> {
   public ushort Flags { get; init; }
 
   /// <summary>1bpp pixel data, MSB first, rows padded to byte boundary.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this AccessFax image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(AccessFaxFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var bytesPerRow = (file.Width + 7) / 8;
     var rgb = new byte[file.Width * file.Height * 3];
@@ -62,9 +58,4 @@ public sealed class AccessFaxFile : IImageFileFormat<AccessFaxFile> {
     };
   }
 
-  /// <summary>Not supported.</summary>
-  public static AccessFaxFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to AccessFaxFile is not supported.");
-  }
 }

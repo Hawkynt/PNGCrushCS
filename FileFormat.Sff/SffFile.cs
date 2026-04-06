@@ -1,35 +1,31 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Sff;
 
 /// <summary>In-memory representation of a SFF (Structured Fax File).</summary>
 [FormatMagicBytes([0x53, 0x46, 0x46, 0x46])]
-public sealed class SffFile : IImageFileFormat<SffFile> {
+public readonly record struct SffFile : IImageFormatReader<SffFile>, IImageToRawImage<SffFile>, IImageFromRawImage<SffFile>, IImageFormatWriter<SffFile> {
 
-  static string IImageFileFormat<SffFile>.PrimaryExtension => ".sff";
-  static string[] IImageFileFormat<SffFile>.FileExtensions => [".sff"];
-  static SffFile IImageFileFormat<SffFile>.FromFile(FileInfo file) => SffReader.FromFile(file);
-  static SffFile IImageFileFormat<SffFile>.FromBytes(byte[] data) => SffReader.FromBytes(data);
-  static SffFile IImageFileFormat<SffFile>.FromStream(Stream stream) => SffReader.FromStream(stream);
-  static RawImage IImageFileFormat<SffFile>.ToRawImage(SffFile file) => file.ToRawImage();
-  static byte[] IImageFileFormat<SffFile>.ToBytes(SffFile file) => SffWriter.ToBytes(file);
+  static string IImageFormatMetadata<SffFile>.PrimaryExtension => ".sff";
+  static string[] IImageFormatMetadata<SffFile>.FileExtensions => [".sff"];
+  static SffFile IImageFormatReader<SffFile>.FromSpan(ReadOnlySpan<byte> data) => SffReader.FromSpan(data);
+  static byte[] IImageFormatWriter<SffFile>.ToBytes(SffFile file) => SffWriter.ToBytes(file);
 
   /// <summary>File format version (typically 1).</summary>
-  public byte Version { get; init; } = 1;
+  public byte Version { get; init; }
 
   /// <summary>The fax pages in this file.</summary>
-  public IReadOnlyList<SffPage> Pages { get; init; } = [];
+  public IReadOnlyList<SffPage> Pages { get; init; }
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
-  public RawImage ToRawImage() {
-    if (this.Pages.Count == 0)
+  public static RawImage ToRawImage(SffFile file) {
+    if (file.Pages.Count == 0)
       throw new InvalidOperationException("SFF file contains no pages.");
 
-    var page = this.Pages[0];
+    var page = file.Pages[0];
     return new() {
       Width = page.Width,
       Height = page.Height,

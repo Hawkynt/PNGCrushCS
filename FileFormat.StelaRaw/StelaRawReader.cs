@@ -25,6 +25,8 @@ public static class StelaRawReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static StelaRawFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static StelaRawFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < StelaRawFile.HeaderSize)

@@ -48,7 +48,6 @@ public sealed class InterlaceStudioReaderTests {
 
     var result = InterlaceStudioReader.FromBytes(data);
 
-    Assert.That(result, Is.Not.Null);
     Assert.That(result.LoadAddress, Is.EqualTo(0x4000));
   }
 

@@ -1,33 +1,29 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Cmu;
 
 /// <summary>In-memory representation of a CMU (CMU Window Manager Bitmap) image.</summary>
-public sealed class CmuFile : IImageFileFormat<CmuFile> {
+public readonly record struct CmuFile : IImageFormatReader<CmuFile>, IImageToRawImage<CmuFile>, IImageFromRawImage<CmuFile>, IImageFormatWriter<CmuFile> {
 
-  static string IImageFileFormat<CmuFile>.PrimaryExtension => ".cmu";
-  static string[] IImageFileFormat<CmuFile>.FileExtensions => [".cmu"];
-  static FormatCapability IImageFileFormat<CmuFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static CmuFile IImageFileFormat<CmuFile>.FromFile(FileInfo file) => CmuReader.FromFile(file);
-  static CmuFile IImageFileFormat<CmuFile>.FromBytes(byte[] data) => CmuReader.FromBytes(data);
-  static CmuFile IImageFileFormat<CmuFile>.FromStream(Stream stream) => CmuReader.FromStream(stream);
-  static RawImage IImageFileFormat<CmuFile>.ToRawImage(CmuFile file) => file.ToRawImage();
-  static byte[] IImageFileFormat<CmuFile>.ToBytes(CmuFile file) => CmuWriter.ToBytes(file);
+  static string IImageFormatMetadata<CmuFile>.PrimaryExtension => ".cmu";
+  static string[] IImageFormatMetadata<CmuFile>.FileExtensions => [".cmu"];
+  static CmuFile IImageFormatReader<CmuFile>.FromSpan(ReadOnlySpan<byte> data) => CmuReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<CmuFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<CmuFile>.ToBytes(CmuFile file) => CmuWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
 
   /// <summary>1bpp packed pixel data, MSB first, ceil(width/8) bytes per row.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
-  public RawImage ToRawImage() => new() {
-    Width = this.Width,
-    Height = this.Height,
+  public static RawImage ToRawImage(CmuFile file) => new() {
+    Width = file.Width,
+    Height = file.Height,
     Format = PixelFormat.Indexed1,
-    PixelData = this.PixelData[..],
+    PixelData = file.PixelData[..],
     Palette = _BlackWhitePalette[..],
     PaletteCount = 2,
   };

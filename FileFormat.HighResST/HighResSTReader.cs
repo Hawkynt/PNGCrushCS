@@ -30,6 +30,8 @@ public static class HighResSTReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static HighResSTFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static HighResSTFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _HEADER_SIZE)

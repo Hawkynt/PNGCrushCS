@@ -26,6 +26,8 @@ public static class SciFaxReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static SciFaxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static SciFaxFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < SciFaxFile.MinFileSize)

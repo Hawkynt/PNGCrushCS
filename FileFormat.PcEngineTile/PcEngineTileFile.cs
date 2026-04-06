@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.PcEngineTile;
 
 /// <summary>In-memory representation of PC Engine/TurboGrafx-16 4BPP planar tile data (SNES-style interleave, 8x8 tiles, 16 tiles per row).</summary>
-public sealed class PcEngineTileFile : IImageFileFormat<PcEngineTileFile> {
+public readonly record struct PcEngineTileFile : IImageFormatReader<PcEngineTileFile>, IImageToRawImage<PcEngineTileFile>, IImageFromRawImage<PcEngineTileFile>, IImageFormatWriter<PcEngineTileFile> {
 
   /// <summary>Number of pixels per tile row/column.</summary>
   internal const int TileSize = 8;
@@ -40,29 +39,26 @@ public sealed class PcEngineTileFile : IImageFileFormat<PcEngineTileFile> {
     return palette;
   }
 
-  static string IImageFileFormat<PcEngineTileFile>.PrimaryExtension => ".pce";
-  static string[] IImageFileFormat<PcEngineTileFile>.FileExtensions => [".pce"];
-  static FormatCapability IImageFileFormat<PcEngineTileFile>.Capabilities => FormatCapability.IndexedOnly;
-  static PcEngineTileFile IImageFileFormat<PcEngineTileFile>.FromFile(FileInfo file) => PcEngineTileReader.FromFile(file);
-  static PcEngineTileFile IImageFileFormat<PcEngineTileFile>.FromBytes(byte[] data) => PcEngineTileReader.FromBytes(data);
-  static PcEngineTileFile IImageFileFormat<PcEngineTileFile>.FromStream(Stream stream) => PcEngineTileReader.FromStream(stream);
-  static byte[] IImageFileFormat<PcEngineTileFile>.ToBytes(PcEngineTileFile file) => PcEngineTileWriter.ToBytes(file);
+  static string IImageFormatMetadata<PcEngineTileFile>.PrimaryExtension => ".pce";
+  static string[] IImageFormatMetadata<PcEngineTileFile>.FileExtensions => [".pce"];
+  static PcEngineTileFile IImageFormatReader<PcEngineTileFile>.FromSpan(ReadOnlySpan<byte> data) => PcEngineTileReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<PcEngineTileFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<PcEngineTileFile>.ToBytes(PcEngineTileFile file) => PcEngineTileWriter.ToBytes(file);
 
   /// <summary>Image width in pixels (always 128).</summary>
-  public int Width { get; init; } = FixedWidth;
+  public int Width { get; init; }
 
   /// <summary>Image height in pixels (multiple of 8).</summary>
   public int Height { get; init; }
 
   /// <summary>Indexed pixel data (values 0-15, one byte per pixel, row-major).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>16-entry RGB palette (48 bytes: 16 colors x 3 bytes each).</summary>
-  public byte[] Palette { get; init; } = _DefaultPalette[..];
+  public byte[] Palette { get; init; }
 
   /// <summary>Converts this PC Engine tile file to a platform-independent <see cref="RawImage"/> in Indexed8 format.</summary>
   public static RawImage ToRawImage(PcEngineTileFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     return new() {
       Width = file.Width,

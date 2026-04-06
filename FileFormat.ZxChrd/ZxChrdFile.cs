@@ -1,19 +1,16 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.ZxChrd;
 
 /// <summary>In-memory representation of a ZX Spectrum character set file (2048 bytes: 256 characters x 8 bytes each, 1bpp 8x8 per character).</summary>
-public sealed class ZxChrdFile : IImageFileFormat<ZxChrdFile> {
+public readonly record struct ZxChrdFile : IImageFormatReader<ZxChrdFile>, IImageToRawImage<ZxChrdFile>, IImageFormatWriter<ZxChrdFile> {
 
-  static string IImageFileFormat<ZxChrdFile>.PrimaryExtension => ".chr";
-  static string[] IImageFileFormat<ZxChrdFile>.FileExtensions => [".chr", ".chrd"];
-  static FormatCapability IImageFileFormat<ZxChrdFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static ZxChrdFile IImageFileFormat<ZxChrdFile>.FromFile(FileInfo file) => ZxChrdReader.FromFile(file);
-  static ZxChrdFile IImageFileFormat<ZxChrdFile>.FromBytes(byte[] data) => ZxChrdReader.FromBytes(data);
-  static ZxChrdFile IImageFileFormat<ZxChrdFile>.FromStream(Stream stream) => ZxChrdReader.FromStream(stream);
-  static byte[] IImageFileFormat<ZxChrdFile>.ToBytes(ZxChrdFile file) => ZxChrdWriter.ToBytes(file);
+  static string IImageFormatMetadata<ZxChrdFile>.PrimaryExtension => ".chr";
+  static string[] IImageFormatMetadata<ZxChrdFile>.FileExtensions => [".chr", ".chrd"];
+  static ZxChrdFile IImageFormatReader<ZxChrdFile>.FromSpan(ReadOnlySpan<byte> data) => ZxChrdReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<ZxChrdFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<ZxChrdFile>.ToBytes(ZxChrdFile file) => ZxChrdWriter.ToBytes(file);
 
   /// <summary>Number of characters in the font.</summary>
   public const int CharCount = 256;
@@ -34,11 +31,10 @@ public sealed class ZxChrdFile : IImageFileFormat<ZxChrdFile> {
   public int Height => 128;
 
   /// <summary>2048 bytes of character data (256 characters x 8 bytes).</summary>
-  public byte[] CharacterData { get; init; } = [];
+  public byte[] CharacterData { get; init; }
 
   /// <summary>Converts this character set to Indexed1 rendered as a 128x128 grid (16x16 characters).</summary>
   public static RawImage ToRawImage(ZxChrdFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = 128;
     const int height = 128;
@@ -67,9 +63,4 @@ public sealed class ZxChrdFile : IImageFileFormat<ZxChrdFile> {
     };
   }
 
-  /// <summary>Not supported.</summary>
-  public static ZxChrdFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to ZxChrdFile is not supported.");
-  }
 }

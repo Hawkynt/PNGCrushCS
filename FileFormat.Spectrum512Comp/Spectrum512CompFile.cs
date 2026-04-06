@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Buffers.Binary;
 using System.IO;
 using FileFormat.Core;
@@ -6,7 +6,7 @@ using FileFormat.Core;
 namespace FileFormat.Spectrum512Comp;
 
 /// <summary>In-memory representation of an Atari ST Spectrum 512 Compressed (SPC) image (320x199, 512 colors).</summary>
-public sealed class Spectrum512CompFile : IImageFileFormat<Spectrum512CompFile> {
+public readonly record struct Spectrum512CompFile : IImageFormatReader<Spectrum512CompFile>, IImageToRawImage<Spectrum512CompFile>, IImageFormatWriter<Spectrum512CompFile> {
 
   /// <summary>The decompressed data size (same as SPU format): 32000 + 19104 = 51104 bytes.</summary>
   public const int DecompressedSize = 51104;
@@ -18,12 +18,10 @@ public sealed class Spectrum512CompFile : IImageFileFormat<Spectrum512CompFile> 
   private const int _SCANLINE_COUNT = 199;
   private const int _PALETTE_ENTRIES_PER_LINE = 48;
 
-  static string IImageFileFormat<Spectrum512CompFile>.PrimaryExtension => ".spc";
-  static string[] IImageFileFormat<Spectrum512CompFile>.FileExtensions => [".spc"];
-  static Spectrum512CompFile IImageFileFormat<Spectrum512CompFile>.FromFile(FileInfo file) => Spectrum512CompReader.FromFile(file);
-  static Spectrum512CompFile IImageFileFormat<Spectrum512CompFile>.FromBytes(byte[] data) => Spectrum512CompReader.FromBytes(data);
-  static Spectrum512CompFile IImageFileFormat<Spectrum512CompFile>.FromStream(Stream stream) => Spectrum512CompReader.FromStream(stream);
-  static byte[] IImageFileFormat<Spectrum512CompFile>.ToBytes(Spectrum512CompFile file) => Spectrum512CompWriter.ToBytes(file);
+  static string IImageFormatMetadata<Spectrum512CompFile>.PrimaryExtension => ".spc";
+  static string[] IImageFormatMetadata<Spectrum512CompFile>.FileExtensions => [".spc"];
+  static Spectrum512CompFile IImageFormatReader<Spectrum512CompFile>.FromSpan(ReadOnlySpan<byte> data) => Spectrum512CompReader.FromSpan(data);
+  static byte[] IImageFormatWriter<Spectrum512CompFile>.ToBytes(Spectrum512CompFile file) => Spectrum512CompWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>
   public int Width => 320;
@@ -32,10 +30,9 @@ public sealed class Spectrum512CompFile : IImageFileFormat<Spectrum512CompFile> 
   public int Height => 199;
 
   /// <summary>The raw compressed data bytes.</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   public static RawImage ToRawImage(Spectrum512CompFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var decompressed = _PackBitsDecompress(file.RawData, DecompressedSize);
     if (decompressed.Length < DecompressedSize)
@@ -75,8 +72,6 @@ public sealed class Spectrum512CompFile : IImageFileFormat<Spectrum512CompFile> 
       PixelData = rgb,
     };
   }
-
-  public static Spectrum512CompFile FromRawImage(RawImage image) => throw new NotSupportedException("Spectrum512Comp format does not support creation from RawImage.");
 
   private static byte[] _PackBitsDecompress(byte[] compressed, int expectedSize) {
     var result = new byte[expectedSize];

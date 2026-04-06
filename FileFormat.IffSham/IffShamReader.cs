@@ -26,6 +26,8 @@ public static class IffShamReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static IffShamFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static IffShamFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < IffShamFile.MinFileSize)

@@ -70,7 +70,7 @@ public sealed class MultiImageTests {
     return _ToBytes(jpegFile);
   }
 
-  private static byte[] _ToBytes<T>(T file) where T : IImageFileFormat<T>
+  private static byte[] _ToBytes<T>(T file) where T : IImageFormatWriter<T>
     => T.ToBytes(file);
 
   private static PcxFile _CreateSmallPcxFile(int width, int height) {
@@ -1017,7 +1017,7 @@ public sealed class MultiImageTests {
 
   #region Helper for capabilities
 
-  private static FormatCapability _GetCapabilities<T>() where T : IImageFileFormat<T>
+  private static FormatCapability _GetCapabilities<T>() where T : IImageFormatMetadata<T>
     => T.Capabilities;
 
   #endregion

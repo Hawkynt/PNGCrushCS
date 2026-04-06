@@ -32,6 +32,8 @@ public static class AtariPaintworksReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static AtariPaintworksFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AtariPaintworksFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < AtariPaintworksHeader.StructSize)

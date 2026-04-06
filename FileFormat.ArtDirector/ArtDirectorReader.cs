@@ -27,6 +27,8 @@ public static class ArtDirectorReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static ArtDirectorFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static ArtDirectorFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != ArtDirectorFile.ExpectedFileSize)

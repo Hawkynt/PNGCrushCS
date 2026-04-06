@@ -1,11 +1,11 @@
-﻿using System;
+using System;
 using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Thomson;
 
 /// <summary>Thomson TO7/MO5 binary screen dump data model.</summary>
-public sealed class ThomsonFile : IImageFileFormat<ThomsonFile> {
+public sealed class ThomsonFile : IImageFormatReader<ThomsonFile>, IImageToRawImage<ThomsonFile>, IImageFromRawImage<ThomsonFile>, IImageFormatWriter<ThomsonFile> {
 
   public const int FileSize = 8000;
   public const int ImageWidth = 320;
@@ -18,6 +18,7 @@ public sealed class ThomsonFile : IImageFileFormat<ThomsonFile> {
 
   public static string PrimaryExtension => ".map";
   public static string[] FileExtensions => [".map"];
+  static ThomsonFile IImageFormatReader<ThomsonFile>.FromSpan(ReadOnlySpan<byte> data) => ThomsonReader.FromSpan(data);
   public static FormatCapability Capabilities => FormatCapability.MonochromeOnly;
   public static ThomsonFile FromFile(FileInfo file) => ThomsonReader.FromFile(file);
   public static ThomsonFile FromBytes(byte[] data) => ThomsonReader.FromBytes(data);

@@ -26,6 +26,8 @@ public static class HireslaceReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static HireslaceFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static HireslaceFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < HireslaceFile.ExpectedFileSize)

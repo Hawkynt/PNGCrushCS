@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.MultiPainter;
 
 /// <summary>In-memory representation of a Commodore 64 Multi Painter image.</summary>
-public sealed class MultiPainterFile : IImageFileFormat<MultiPainterFile> {
+public readonly record struct MultiPainterFile : IImageFormatReader<MultiPainterFile>, IImageToRawImage<MultiPainterFile>, IImageFormatWriter<MultiPainterFile> {
 
-  static string IImageFileFormat<MultiPainterFile>.PrimaryExtension => ".mpt";
-  static string[] IImageFileFormat<MultiPainterFile>.FileExtensions => [".mpt", ".mlt64"];
-  static MultiPainterFile IImageFileFormat<MultiPainterFile>.FromFile(FileInfo file) => MultiPainterReader.FromFile(file);
-  static MultiPainterFile IImageFileFormat<MultiPainterFile>.FromBytes(byte[] data) => MultiPainterReader.FromBytes(data);
-  static MultiPainterFile IImageFileFormat<MultiPainterFile>.FromStream(Stream stream) => MultiPainterReader.FromStream(stream);
-  static byte[] IImageFileFormat<MultiPainterFile>.ToBytes(MultiPainterFile file) => MultiPainterWriter.ToBytes(file);
+  static string IImageFormatMetadata<MultiPainterFile>.PrimaryExtension => ".mpt";
+  static string[] IImageFormatMetadata<MultiPainterFile>.FileExtensions => [".mpt", ".mlt64"];
+  static MultiPainterFile IImageFormatReader<MultiPainterFile>.FromSpan(ReadOnlySpan<byte> data) => MultiPainterReader.FromSpan(data);
+  static byte[] IImageFormatWriter<MultiPainterFile>.ToBytes(MultiPainterFile file) => MultiPainterWriter.ToBytes(file);
 
   /// <summary>The fixed width of a Multi Painter image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -55,13 +52,13 @@ public sealed class MultiPainterFile : IImageFileFormat<MultiPainterFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Multicolor bitmap data (8000 bytes, 2 bits per pixel).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Video matrix / screen RAM (1000 bytes, upper/lower nybble = 2 colors per cell).</summary>
-  public byte[] VideoMatrix { get; init; } = [];
+  public byte[] VideoMatrix { get; init; }
 
   /// <summary>Color RAM (1000 bytes, lower nybble = 3rd color per cell).</summary>
-  public byte[] ColorRam { get; init; } = [];
+  public byte[] ColorRam { get; init; }
 
   /// <summary>Border color index (0-15).</summary>
   public byte BorderColor { get; init; }
@@ -70,11 +67,10 @@ public sealed class MultiPainterFile : IImageFileFormat<MultiPainterFile> {
   public byte BackgroundColor { get; init; }
 
   /// <summary>Trailing padding bytes (14 bytes).</summary>
-  public byte[] Padding { get; init; } = [];
+  public byte[] Padding { get; init; }
 
   /// <summary>Converts this Multi Painter image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(MultiPainterFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -113,9 +109,4 @@ public sealed class MultiPainterFile : IImageFileFormat<MultiPainterFile> {
     };
   }
 
-  /// <summary>Not supported. Multi Painter images have complex cell-based color constraints.</summary>
-  public static MultiPainterFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to MultiPainterFile is not supported due to complex cell-based color constraints.");
-  }
 }

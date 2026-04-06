@@ -25,6 +25,8 @@ public static class ElectronikaReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static ElectronikaFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static ElectronikaFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != ElectronikaFile.FileSize)

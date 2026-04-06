@@ -1,20 +1,15 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.CoCo3;
 
 /// <summary>In-memory representation of a CoCo 3 GIME 320x200x16 color graphics screen (38400 bytes: 4bpp, 2 pixels per byte).</summary>
-public sealed class CoCo3File : IImageFileFormat<CoCo3File> {
+public readonly record struct CoCo3File : IImageFormatReader<CoCo3File>, IImageToRawImage<CoCo3File>, IImageFromRawImage<CoCo3File>, IImageFormatWriter<CoCo3File> {
 
-  static string IImageFileFormat<CoCo3File>.PrimaryExtension => ".cc3";
-  static string[] IImageFileFormat<CoCo3File>.FileExtensions => [".cc3"];
-  static CoCo3File IImageFileFormat<CoCo3File>.FromFile(FileInfo file) => CoCo3Reader.FromFile(file);
-  static CoCo3File IImageFileFormat<CoCo3File>.FromBytes(byte[] data) => CoCo3Reader.FromBytes(data);
-  static CoCo3File IImageFileFormat<CoCo3File>.FromStream(Stream stream) => CoCo3Reader.FromStream(stream);
-  static RawImage IImageFileFormat<CoCo3File>.ToRawImage(CoCo3File file) => ToRawImage(file);
-  static CoCo3File IImageFileFormat<CoCo3File>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<CoCo3File>.ToBytes(CoCo3File file) => CoCo3Writer.ToBytes(file);
+  static string IImageFormatMetadata<CoCo3File>.PrimaryExtension => ".cc3";
+  static string[] IImageFormatMetadata<CoCo3File>.FileExtensions => [".cc3"];
+  static CoCo3File IImageFormatReader<CoCo3File>.FromSpan(ReadOnlySpan<byte> data) => CoCo3Reader.FromSpan(data);
+  static byte[] IImageFormatWriter<CoCo3File>.ToBytes(CoCo3File file) => CoCo3Writer.ToBytes(file);
 
   /// <summary>Expected file size in bytes (320 * 200 / 2).</summary>
   internal const int ExpectedFileSize = 32000;
@@ -35,7 +30,7 @@ public sealed class CoCo3File : IImageFileFormat<CoCo3File> {
   public int Height => PixelHeight;
 
   /// <summary>Raw pixel data (32000 bytes: 4bpp, high nybble = left pixel, low nybble = right pixel).</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   /// <summary>CoCo 3 default 16-color CGA-like palette as RGB triplets.</summary>
   private static readonly byte[] _DefaultPalette = [
@@ -59,7 +54,6 @@ public sealed class CoCo3File : IImageFileFormat<CoCo3File> {
 
   /// <summary>Converts the CoCo 3 screen to an Indexed8 raw image (320x200, 16-entry palette).</summary>
   public static RawImage ToRawImage(CoCo3File file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var pixels = new byte[PixelWidth * PixelHeight];
 

@@ -1,35 +1,31 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Fits;
 
 /// <summary>In-memory representation of a FITS image.</summary>
 [FormatMagicBytes([0x53, 0x49, 0x4D, 0x50, 0x4C, 0x45])]
-public sealed class FitsFile : IImageFileFormat<FitsFile> {
+public readonly record struct FitsFile : IImageFormatReader<FitsFile>, IImageToRawImage<FitsFile>, IImageFromRawImage<FitsFile>, IImageFormatWriter<FitsFile> {
 
-  static string IImageFileFormat<FitsFile>.PrimaryExtension => ".fits";
-  static string[] IImageFileFormat<FitsFile>.FileExtensions => [".fits", ".fit", ".fts"];
-  static FitsFile IImageFileFormat<FitsFile>.FromFile(FileInfo file) => FitsReader.FromFile(file);
-  static FitsFile IImageFileFormat<FitsFile>.FromBytes(byte[] data) => FitsReader.FromBytes(data);
-  static FitsFile IImageFileFormat<FitsFile>.FromStream(Stream stream) => FitsReader.FromStream(stream);
-  static RawImage IImageFileFormat<FitsFile>.ToRawImage(FitsFile file) => file.ToRawImage();
-  static byte[] IImageFileFormat<FitsFile>.ToBytes(FitsFile file) => FitsWriter.ToBytes(file);
+  static string IImageFormatMetadata<FitsFile>.PrimaryExtension => ".fits";
+  static string[] IImageFormatMetadata<FitsFile>.FileExtensions => [".fits", ".fit", ".fts"];
+  static FitsFile IImageFormatReader<FitsFile>.FromSpan(ReadOnlySpan<byte> data) => FitsReader.FromSpan(data);
+  static byte[] IImageFormatWriter<FitsFile>.ToBytes(FitsFile file) => FitsWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
   public FitsBitpix Bitpix { get; init; }
-  public IReadOnlyList<FitsKeyword> Keywords { get; init; } = [];
-  public byte[] PixelData { get; init; } = [];
+  public IReadOnlyList<FitsKeyword> Keywords { get; init; }
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this FITS image to a <see cref="RawImage"/>, preserving 16-bit precision where possible.</summary>
-  public RawImage ToRawImage() {
-    var width = this.Width;
-    var height = this.Height;
-    var src = this.PixelData;
+  public static RawImage ToRawImage(FitsFile file) {
+    var width = file.Width;
+    var height = file.Height;
+    var src = file.PixelData;
     var pixelCount = width * height;
 
-    switch (this.Bitpix) {
+    switch (file.Bitpix) {
       case FitsBitpix.UInt8: {
         var result = new byte[pixelCount];
         Buffer.BlockCopy(src, 0, result, 0, Math.Min(src.Length, pixelCount));
@@ -80,7 +76,7 @@ public sealed class FitsFile : IImageFileFormat<FitsFile> {
         };
       }
       default:
-        throw new NotSupportedException($"FITS BITPIX {(int)this.Bitpix} is not supported.");
+        throw new NotSupportedException($"FITS BITPIX {(int)file.Bitpix} is not supported.");
     }
   }
 

@@ -26,6 +26,8 @@ public static class MsxSpriteReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static MsxSpriteFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static MsxSpriteFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != MsxSpriteFile.ExpectedFileSize)

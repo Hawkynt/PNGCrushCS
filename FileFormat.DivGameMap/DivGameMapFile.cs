@@ -1,19 +1,16 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.DivGameMap;
 
 /// <summary>In-memory representation of a DIV Games Studio FPG image (first entry).</summary>
-public sealed class DivGameMapFile : IImageFileFormat<DivGameMapFile> {
+public readonly record struct DivGameMapFile : IImageFormatReader<DivGameMapFile>, IImageToRawImage<DivGameMapFile>, IImageFormatWriter<DivGameMapFile> {
 
-  static string IImageFileFormat<DivGameMapFile>.PrimaryExtension => ".fpg";
-  static string[] IImageFileFormat<DivGameMapFile>.FileExtensions => [".fpg"];
-  static FormatCapability IImageFileFormat<DivGameMapFile>.Capabilities => FormatCapability.IndexedOnly;
-  static DivGameMapFile IImageFileFormat<DivGameMapFile>.FromFile(FileInfo file) => DivGameMapReader.FromFile(file);
-  static DivGameMapFile IImageFileFormat<DivGameMapFile>.FromBytes(byte[] data) => DivGameMapReader.FromBytes(data);
-  static DivGameMapFile IImageFileFormat<DivGameMapFile>.FromStream(Stream stream) => DivGameMapReader.FromStream(stream);
-  static byte[] IImageFileFormat<DivGameMapFile>.ToBytes(DivGameMapFile file) => DivGameMapWriter.ToBytes(file);
+  static string IImageFormatMetadata<DivGameMapFile>.PrimaryExtension => ".fpg";
+  static string[] IImageFormatMetadata<DivGameMapFile>.FileExtensions => [".fpg"];
+  static DivGameMapFile IImageFormatReader<DivGameMapFile>.FromSpan(ReadOnlySpan<byte> data) => DivGameMapReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<DivGameMapFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<DivGameMapFile>.ToBytes(DivGameMapFile file) => DivGameMapWriter.ToBytes(file);
 
   /// <summary>Magic bytes: "fpg\x1A" (0x66 0x70 0x67 0x1A).</summary>
   internal static readonly byte[] Magic = [0x66, 0x70, 0x67, 0x1A];
@@ -37,14 +34,13 @@ public sealed class DivGameMapFile : IImageFileFormat<DivGameMapFile> {
   public int Height { get; init; }
 
   /// <summary>8-bit indexed pixel data (width * height bytes).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Global palette (768 bytes, 256 RGB triplets).</summary>
-  public byte[] Palette { get; init; } = [];
+  public byte[] Palette { get; init; }
 
   /// <summary>Converts this FPG image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(DivGameMapFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var rgb = new byte[file.Width * file.Height * 3];
     for (var i = 0; i < file.PixelData.Length; ++i) {
@@ -64,9 +60,4 @@ public sealed class DivGameMapFile : IImageFileFormat<DivGameMapFile> {
     };
   }
 
-  /// <summary>Not supported. FPG files have complex multi-entry structure.</summary>
-  public static DivGameMapFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to DivGameMapFile is not supported.");
-  }
 }

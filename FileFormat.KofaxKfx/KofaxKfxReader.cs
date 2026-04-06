@@ -25,6 +25,8 @@ public static class KofaxKfxReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static KofaxKfxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static KofaxKfxFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < KofaxKfxFile.HeaderSize)

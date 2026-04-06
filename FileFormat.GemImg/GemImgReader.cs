@@ -26,6 +26,8 @@ public static class GemImgReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static GemImgFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static GemImgFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < GemImgHeader.StructSize)

@@ -38,31 +38,6 @@ public class NokiaLogoReaderTests {
 }
 
 [TestFixture]
-public class NokiaLogoWriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => NokiaLogoWriter.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_OutputSize_Is131() {
-    var file = new NokiaLogoFile { PixelData = new byte[131] };
-    var bytes = NokiaLogoWriter.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(131));
-  }
-
-  [Test]
-  public void ToBytes_DataPreserved() {
-    var data = new byte[131];
-    for (var i = 0; i < data.Length; ++i)
-      data[i] = (byte)(i & 0xFF);
-    var file = new NokiaLogoFile { PixelData = data };
-    var bytes = NokiaLogoWriter.ToBytes(file);
-    Assert.That(bytes, Is.EqualTo(data));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -90,32 +65,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void FixedWidth_Is72()
-    => Assert.That(NokiaLogoFile.FixedWidth, Is.EqualTo(72));
-
-  [Test]
-  public void FixedHeight_Is14()
-    => Assert.That(NokiaLogoFile.FixedHeight, Is.EqualTo(14));
-
-  [Test]
-  public void FileSize_Is131()
-    => Assert.That(NokiaLogoFile.FileSize, Is.EqualTo(131));
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => NokiaLogoFile.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => NokiaLogoFile.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 72, Height = 14, Format = PixelFormat.Rgb24, PixelData = new byte[72 * 14 * 3] };
-    Assert.Throws<ArgumentException>(() => NokiaLogoFile.FromRawImage(raw));
-  }
-}

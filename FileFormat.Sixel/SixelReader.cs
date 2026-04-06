@@ -31,6 +31,8 @@ public static class SixelReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static SixelFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static SixelFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < 4)

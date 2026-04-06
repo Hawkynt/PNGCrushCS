@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.ZxMulticolor;
 
 /// <summary>In-memory representation of a ZX Spectrum Multicolor file (12288 bytes: 6144 bitmap + 6144 per-scanline attributes).</summary>
-public sealed class ZxMulticolorFile : IImageFileFormat<ZxMulticolorFile> {
+public readonly record struct ZxMulticolorFile : IImageFormatReader<ZxMulticolorFile>, IImageToRawImage<ZxMulticolorFile>, IImageFormatWriter<ZxMulticolorFile> {
 
-  static string IImageFileFormat<ZxMulticolorFile>.PrimaryExtension => ".mlt";
-  static string[] IImageFileFormat<ZxMulticolorFile>.FileExtensions => [".mlt"];
-  static ZxMulticolorFile IImageFileFormat<ZxMulticolorFile>.FromFile(FileInfo file) => ZxMulticolorReader.FromFile(file);
-  static ZxMulticolorFile IImageFileFormat<ZxMulticolorFile>.FromBytes(byte[] data) => ZxMulticolorReader.FromBytes(data);
-  static ZxMulticolorFile IImageFileFormat<ZxMulticolorFile>.FromStream(Stream stream) => ZxMulticolorReader.FromStream(stream);
-  static byte[] IImageFileFormat<ZxMulticolorFile>.ToBytes(ZxMulticolorFile file) => ZxMulticolorWriter.ToBytes(file);
+  static string IImageFormatMetadata<ZxMulticolorFile>.PrimaryExtension => ".mlt";
+  static string[] IImageFormatMetadata<ZxMulticolorFile>.FileExtensions => [".mlt"];
+  static ZxMulticolorFile IImageFormatReader<ZxMulticolorFile>.FromSpan(ReadOnlySpan<byte> data) => ZxMulticolorReader.FromSpan(data);
+  static byte[] IImageFormatWriter<ZxMulticolorFile>.ToBytes(ZxMulticolorFile file) => ZxMulticolorWriter.ToBytes(file);
 
   /// <summary>ZX Spectrum normal palette (bright=0).</summary>
   internal static readonly int[] NormalPalette = [
@@ -31,14 +28,13 @@ public sealed class ZxMulticolorFile : IImageFileFormat<ZxMulticolorFile> {
   public int Height => 192;
 
   /// <summary>6144 bytes of 1bpp bitmap data in linear row order.</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>6144 bytes of per-scanline attribute data (32 attributes per scanline, 192 scanlines).</summary>
-  public byte[] AttributeData { get; init; } = [];
+  public byte[] AttributeData { get; init; }
 
   /// <summary>Converts this multicolor screen to Rgb24.</summary>
   public static RawImage ToRawImage(ZxMulticolorFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = 256;
     const int height = 192;
@@ -73,9 +69,4 @@ public sealed class ZxMulticolorFile : IImageFileFormat<ZxMulticolorFile> {
     };
   }
 
-  /// <summary>Not supported.</summary>
-  public static ZxMulticolorFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to ZxMulticolorFile is not supported due to complex per-scanline attribute constraints.");
-  }
 }

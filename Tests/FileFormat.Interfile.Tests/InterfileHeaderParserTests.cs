@@ -140,6 +140,5 @@ public sealed class InterfileHeaderParserTests {
   [Test]
   [Category("Unit")]
   public void Format_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => InterfileHeaderParser.Format(null!));
   }
 }

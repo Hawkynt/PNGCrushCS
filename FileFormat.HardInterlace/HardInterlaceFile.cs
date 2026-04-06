@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.HardInterlace;
 
 /// <summary>In-memory representation of a C64 Hard Interlace (.hip) image.</summary>
-public sealed class HardInterlaceFile : IImageFileFormat<HardInterlaceFile> {
+public readonly record struct HardInterlaceFile : IImageFormatReader<HardInterlaceFile>, IImageToRawImage<HardInterlaceFile>, IImageFormatWriter<HardInterlaceFile> {
 
-  static string IImageFileFormat<HardInterlaceFile>.PrimaryExtension => ".hip";
-  static string[] IImageFileFormat<HardInterlaceFile>.FileExtensions => [".hip"];
-  static HardInterlaceFile IImageFileFormat<HardInterlaceFile>.FromFile(FileInfo file) => HardInterlaceReader.FromFile(file);
-  static HardInterlaceFile IImageFileFormat<HardInterlaceFile>.FromBytes(byte[] data) => HardInterlaceReader.FromBytes(data);
-  static HardInterlaceFile IImageFileFormat<HardInterlaceFile>.FromStream(Stream stream) => HardInterlaceReader.FromStream(stream);
-  static byte[] IImageFileFormat<HardInterlaceFile>.ToBytes(HardInterlaceFile file) => HardInterlaceWriter.ToBytes(file);
+  static string IImageFormatMetadata<HardInterlaceFile>.PrimaryExtension => ".hip";
+  static string[] IImageFormatMetadata<HardInterlaceFile>.FileExtensions => [".hip"];
+  static HardInterlaceFile IImageFormatReader<HardInterlaceFile>.FromSpan(ReadOnlySpan<byte> data) => HardInterlaceReader.FromSpan(data);
+  static byte[] IImageFormatWriter<HardInterlaceFile>.ToBytes(HardInterlaceFile file) => HardInterlaceWriter.ToBytes(file);
 
   /// <summary>The fixed width of the image in pixels.</summary>
   public const int FixedWidth = 320;
@@ -52,11 +49,10 @@ public sealed class HardInterlaceFile : IImageFileFormat<HardInterlaceFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Raw payload data (entire file content after load address).</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   /// <summary>Converts this Hard Interlace image to a platform-independent <see cref="RawImage"/> in Rgb24 format by averaging both hires frames.</summary>
   public static RawImage ToRawImage(HardInterlaceFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -122,9 +118,4 @@ public sealed class HardInterlaceFile : IImageFileFormat<HardInterlaceFile> {
     return _C64Palette[colorIndex];
   }
 
-  /// <summary>Not supported. Hard Interlace images have complex dual-frame color constraints.</summary>
-  public static HardInterlaceFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to HardInterlaceFile is not supported due to complex dual-frame color constraints.");
-  }
 }

@@ -1,19 +1,16 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Psp;
 
 /// <summary>In-memory representation of a Paint Shop Pro image.</summary>
 [FormatMagicBytes([0x50, 0x61, 0x69, 0x6E, 0x74, 0x20, 0x53, 0x68])]
-public sealed class PspFile : IImageFileFormat<PspFile> {
+public readonly record struct PspFile : IImageFormatReader<PspFile>, IImageToRawImage<PspFile>, IImageFromRawImage<PspFile>, IImageFormatWriter<PspFile> {
 
-  static string IImageFileFormat<PspFile>.PrimaryExtension => ".psp";
-  static string[] IImageFileFormat<PspFile>.FileExtensions => [".psp", ".pspimage"];
-  static PspFile IImageFileFormat<PspFile>.FromFile(FileInfo file) => PspReader.FromFile(file);
-  static PspFile IImageFileFormat<PspFile>.FromBytes(byte[] data) => PspReader.FromBytes(data);
-  static PspFile IImageFileFormat<PspFile>.FromStream(Stream stream) => PspReader.FromStream(stream);
-  static byte[] IImageFileFormat<PspFile>.ToBytes(PspFile file) => PspWriter.ToBytes(file);
+  static string IImageFormatMetadata<PspFile>.PrimaryExtension => ".psp";
+  static string[] IImageFormatMetadata<PspFile>.FileExtensions => [".psp", ".pspimage"];
+  static PspFile IImageFormatReader<PspFile>.FromSpan(ReadOnlySpan<byte> data) => PspReader.FromSpan(data);
+  static byte[] IImageFormatWriter<PspFile>.ToBytes(PspFile file) => PspWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -22,16 +19,16 @@ public sealed class PspFile : IImageFileFormat<PspFile> {
   public int Height { get; init; }
 
   /// <summary>Bits per pixel (default 24 for RGB24).</summary>
-  public int BitDepth { get; init; } = 24;
+  public int BitDepth { get; init; }
 
   /// <summary>Major version of the PSP file format.</summary>
-  public ushort MajorVersion { get; init; } = 5;
+  public ushort MajorVersion { get; init; }
 
   /// <summary>Minor version of the PSP file format.</summary>
   public ushort MinorVersion { get; init; }
 
   /// <summary>Raw RGB24 pixel data (3 bytes per pixel, row-major).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>The 32-byte file magic identifying a PSP file.</summary>
   internal static readonly byte[] Magic = _BuildMagic();
@@ -50,7 +47,6 @@ public sealed class PspFile : IImageFileFormat<PspFile> {
   }
 
   public static RawImage ToRawImage(PspFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

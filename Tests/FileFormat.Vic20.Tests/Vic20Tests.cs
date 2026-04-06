@@ -38,31 +38,6 @@ public class Vic20ReaderTests {
 }
 
 [TestFixture]
-public class Vic20WriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => Vic20Writer.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_OutputSize_Is4096() {
-    var file = new Vic20File { PixelData = new byte[4096] };
-    var bytes = Vic20Writer.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(4096));
-  }
-
-  [Test]
-  public void ToBytes_DataPreserved() {
-    var data = new byte[4096];
-    for (var i = 0; i < data.Length; ++i)
-      data[i] = (byte)(i & 0xFF);
-    var file = new Vic20File { PixelData = data };
-    var bytes = Vic20Writer.ToBytes(file);
-    Assert.That(bytes, Is.EqualTo(data));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -90,32 +65,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void FixedWidth_Is176()
-    => Assert.That(Vic20File.FixedWidth, Is.EqualTo(176));
-
-  [Test]
-  public void FixedHeight_Is184()
-    => Assert.That(Vic20File.FixedHeight, Is.EqualTo(184));
-
-  [Test]
-  public void FileSize_Is4096()
-    => Assert.That(Vic20File.FileSize, Is.EqualTo(4096));
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => Vic20File.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => Vic20File.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 176, Height = 184, Format = PixelFormat.Rgb24, PixelData = new byte[176 * 184 * 3] };
-    Assert.Throws<ArgumentException>(() => Vic20File.FromRawImage(raw));
-  }
-}

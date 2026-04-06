@@ -1,37 +1,32 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.SunIcon;
 
 /// <summary>In-memory representation of a Sun Icon (.icon) image.</summary>
 [FormatMagicBytes([0x2F, 0x2A, 0x20])]
-public sealed class SunIconFile : IImageFileFormat<SunIconFile> {
+public readonly record struct SunIconFile : IImageFormatReader<SunIconFile>, IImageToRawImage<SunIconFile>, IImageFromRawImage<SunIconFile>, IImageFormatWriter<SunIconFile> {
 
-  static string IImageFileFormat<SunIconFile>.PrimaryExtension => ".icon";
-  static string[] IImageFileFormat<SunIconFile>.FileExtensions => [".icon"];
-  static FormatCapability IImageFileFormat<SunIconFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static SunIconFile IImageFileFormat<SunIconFile>.FromFile(FileInfo file) => SunIconReader.FromFile(file);
-  static SunIconFile IImageFileFormat<SunIconFile>.FromBytes(byte[] data) => SunIconReader.FromBytes(data);
-  static SunIconFile IImageFileFormat<SunIconFile>.FromStream(Stream stream) => SunIconReader.FromStream(stream);
-  static RawImage IImageFileFormat<SunIconFile>.ToRawImage(SunIconFile file) => file.ToRawImage();
-  static SunIconFile IImageFileFormat<SunIconFile>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<SunIconFile>.ToBytes(SunIconFile file) => SunIconWriter.ToBytes(file);
+  static string IImageFormatMetadata<SunIconFile>.PrimaryExtension => ".icon";
+  static string[] IImageFormatMetadata<SunIconFile>.FileExtensions => [".icon"];
+  static SunIconFile IImageFormatReader<SunIconFile>.FromSpan(ReadOnlySpan<byte> data) => SunIconReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<SunIconFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<SunIconFile>.ToBytes(SunIconFile file) => SunIconWriter.ToBytes(file);
 
   public int Width { get; init; }
   public int Height { get; init; }
 
   /// <summary>1bpp packed pixel data, MSB-first within each byte, ceil(width/8) bytes per row.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   // 1 = foreground (black), 0 = background (white)
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
-  public RawImage ToRawImage() => new() {
-    Width = this.Width,
-    Height = this.Height,
+  public static RawImage ToRawImage(SunIconFile file) => new() {
+    Width = file.Width,
+    Height = file.Height,
     Format = PixelFormat.Indexed1,
-    PixelData = this.PixelData[..],
+    PixelData = file.PixelData[..],
     Palette = _BlackWhitePalette[..],
     PaletteCount = 2,
   };

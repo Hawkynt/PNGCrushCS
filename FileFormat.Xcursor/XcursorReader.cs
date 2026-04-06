@@ -29,6 +29,8 @@ public static class XcursorReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static XcursorFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static XcursorFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < XcursorFileHeader.StructSize)

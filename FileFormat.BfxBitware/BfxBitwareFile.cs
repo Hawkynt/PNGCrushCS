@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.BfxBitware;
 
 /// <summary>In-memory representation of a Bitware BFX fax image.</summary>
-public sealed class BfxBitwareFile : IImageFileFormat<BfxBitwareFile> {
+public readonly record struct BfxBitwareFile : IImageFormatReader<BfxBitwareFile>, IImageToRawImage<BfxBitwareFile>, IImageFormatWriter<BfxBitwareFile> {
 
-  static string IImageFileFormat<BfxBitwareFile>.PrimaryExtension => ".bfx";
-  static string[] IImageFileFormat<BfxBitwareFile>.FileExtensions => [".bfx"];
-  static BfxBitwareFile IImageFileFormat<BfxBitwareFile>.FromFile(FileInfo file) => BfxBitwareReader.FromFile(file);
-  static BfxBitwareFile IImageFileFormat<BfxBitwareFile>.FromBytes(byte[] data) => BfxBitwareReader.FromBytes(data);
-  static BfxBitwareFile IImageFileFormat<BfxBitwareFile>.FromStream(Stream stream) => BfxBitwareReader.FromStream(stream);
-  static byte[] IImageFileFormat<BfxBitwareFile>.ToBytes(BfxBitwareFile file) => BfxBitwareWriter.ToBytes(file);
+  static string IImageFormatMetadata<BfxBitwareFile>.PrimaryExtension => ".bfx";
+  static string[] IImageFormatMetadata<BfxBitwareFile>.FileExtensions => [".bfx"];
+  static BfxBitwareFile IImageFormatReader<BfxBitwareFile>.FromSpan(ReadOnlySpan<byte> data) => BfxBitwareReader.FromSpan(data);
+  static byte[] IImageFormatWriter<BfxBitwareFile>.ToBytes(BfxBitwareFile file) => BfxBitwareWriter.ToBytes(file);
 
   /// <summary>Magic bytes: "BFX\0" (0x42 0x46 0x58 0x00).</summary>
   internal static readonly byte[] Magic = [0x42, 0x46, 0x58, 0x00];
@@ -36,11 +33,10 @@ public sealed class BfxBitwareFile : IImageFileFormat<BfxBitwareFile> {
   public ushort Compression { get; init; }
 
   /// <summary>1bpp pixel data, MSB first, rows padded to byte boundary.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this BFX image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(BfxBitwareFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var bytesPerRow = (file.Width + 7) / 8;
     var rgb = new byte[file.Width * file.Height * 3];
@@ -65,9 +61,4 @@ public sealed class BfxBitwareFile : IImageFileFormat<BfxBitwareFile> {
     };
   }
 
-  /// <summary>Not supported.</summary>
-  public static BfxBitwareFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to BfxBitwareFile is not supported.");
-  }
 }

@@ -26,6 +26,8 @@ public static class FunGraphicsMachineReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static FunGraphicsMachineFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static FunGraphicsMachineFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < FunGraphicsMachineFile.ExpectedFileSize)

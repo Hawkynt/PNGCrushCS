@@ -26,6 +26,8 @@ public static class YuvRawReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static YuvRawFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static YuvRawFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < 6)

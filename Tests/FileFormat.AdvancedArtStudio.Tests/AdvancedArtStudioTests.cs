@@ -51,32 +51,6 @@ public sealed class AdvancedArtStudioReaderTests {
 }
 
 [TestFixture]
-public sealed class AdvancedArtStudioWriterTests {
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => AdvancedArtStudioWriter.ToBytes(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_CorrectOutputSize() {
-    var file = new AdvancedArtStudioFile {
-      LoadAddress = 0x2000,
-      BitmapData = new byte[8000],
-      ScreenRam = new byte[1000],
-      ColorRam = new byte[1000],
-      BackgroundColor = 0,
-      BorderColor = 0,
-    };
-    var bytes = AdvancedArtStudioWriter.ToBytes(file);
-
-    Assert.That(bytes.Length, Is.EqualTo(AdvancedArtStudioFile.ExpectedFileSize));
-  }
-}
-
-[TestFixture]
 public sealed class AdvancedArtStudioRoundTripTests {
 
   [Test]
@@ -112,49 +86,6 @@ public sealed class AdvancedArtStudioRoundTripTests {
     Assert.That(restored.ColorRam, Is.EqualTo(original.ColorRam));
     Assert.That(restored.BackgroundColor, Is.EqualTo(original.BackgroundColor));
     Assert.That(restored.BorderColor, Is.EqualTo(original.BorderColor));
-  }
-}
-
-[TestFixture]
-public sealed class AdvancedArtStudioDataTypeTests {
-
-  [Test]
-  [Category("Unit")]
-  public void PrimaryExtension_IsOcp() {
-    Assert.That(_GetPrimaryExtension(), Is.EqualTo(".ocp"));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FileExtensions_ContainsOcp() {
-    Assert.That(_GetFileExtensions(), Does.Contain(".ocp"));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => AdvancedArtStudioFile.ToRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => AdvancedArtStudioFile.FromRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_ThrowsNotSupportedException() {
-    var image = new RawImage { Width = 160, Height = 200, Format = PixelFormat.Rgb24, PixelData = new byte[160 * 200 * 3] };
-    Assert.Throws<NotSupportedException>(() => AdvancedArtStudioFile.FromRawImage(image));
-  }
-
-  private static string _GetPrimaryExtension() => _Helper<AdvancedArtStudioFile>.PrimaryExtension;
-  private static string[] _GetFileExtensions() => _Helper<AdvancedArtStudioFile>.FileExtensions;
-
-  private static class _Helper<T> where T : IImageFileFormat<T> {
-    public static string PrimaryExtension => T.PrimaryExtension;
-    public static string[] FileExtensions => T.FileExtensions;
   }
 }
 

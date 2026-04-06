@@ -26,6 +26,8 @@ public static class TeliFaxReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static TeliFaxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static TeliFaxFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < TeliFaxFile.MinFileSize)

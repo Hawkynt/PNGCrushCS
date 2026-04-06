@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.InterlaceHiresEditor;
 
 /// <summary>In-memory representation of a C64 Interlace Hires Editor image (two hires frames blended).</summary>
-public sealed class InterlaceHiresEditorFile : IImageFileFormat<InterlaceHiresEditorFile> {
+public readonly record struct InterlaceHiresEditorFile : IImageFormatReader<InterlaceHiresEditorFile>, IImageToRawImage<InterlaceHiresEditorFile>, IImageFormatWriter<InterlaceHiresEditorFile> {
 
-  static string IImageFileFormat<InterlaceHiresEditorFile>.PrimaryExtension => ".ihe";
-  static string[] IImageFileFormat<InterlaceHiresEditorFile>.FileExtensions => [".ihe"];
-  static InterlaceHiresEditorFile IImageFileFormat<InterlaceHiresEditorFile>.FromFile(FileInfo file) => InterlaceHiresEditorReader.FromFile(file);
-  static InterlaceHiresEditorFile IImageFileFormat<InterlaceHiresEditorFile>.FromBytes(byte[] data) => InterlaceHiresEditorReader.FromBytes(data);
-  static InterlaceHiresEditorFile IImageFileFormat<InterlaceHiresEditorFile>.FromStream(Stream stream) => InterlaceHiresEditorReader.FromStream(stream);
-  static byte[] IImageFileFormat<InterlaceHiresEditorFile>.ToBytes(InterlaceHiresEditorFile file) => InterlaceHiresEditorWriter.ToBytes(file);
+  static string IImageFormatMetadata<InterlaceHiresEditorFile>.PrimaryExtension => ".ihe";
+  static string[] IImageFormatMetadata<InterlaceHiresEditorFile>.FileExtensions => [".ihe"];
+  static InterlaceHiresEditorFile IImageFormatReader<InterlaceHiresEditorFile>.FromSpan(ReadOnlySpan<byte> data) => InterlaceHiresEditorReader.FromSpan(data);
+  static byte[] IImageFormatWriter<InterlaceHiresEditorFile>.ToBytes(InterlaceHiresEditorFile file) => InterlaceHiresEditorWriter.ToBytes(file);
 
   /// <summary>The fixed width of the image in pixels.</summary>
   public const int FixedWidth = 320;
@@ -49,11 +46,10 @@ public sealed class InterlaceHiresEditorFile : IImageFileFormat<InterlaceHiresEd
   public ushort LoadAddress { get; init; }
 
   /// <summary>Raw payload data (entire file content after load address).</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   /// <summary>Converts this Interlace Hires Editor image to a platform-independent <see cref="RawImage"/> in Rgb24 format by averaging two hires frames.</summary>
   public static RawImage ToRawImage(InterlaceHiresEditorFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -118,9 +114,4 @@ public sealed class InterlaceHiresEditorFile : IImageFileFormat<InterlaceHiresEd
     };
   }
 
-  /// <summary>Not supported. Interlace Hires Editor images have complex interlace constraints.</summary>
-  public static InterlaceHiresEditorFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to InterlaceHiresEditorFile is not supported due to complex interlace constraints.");
-  }
 }

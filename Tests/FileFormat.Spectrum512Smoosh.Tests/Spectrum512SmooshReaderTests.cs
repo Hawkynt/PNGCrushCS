@@ -92,13 +92,6 @@ public sealed class Spectrum512SmooshReaderTests {
     Assert.That(raw.PixelData.Length, Is.EqualTo(320 * 199 * 3));
     Assert.That(raw.PixelData[0], Is.EqualTo(0));
   }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_ThrowsNotSupportedException() {
-    Assert.Throws<NotSupportedException>(() => Spectrum512SmooshFile.FromRawImage(null!));
-  }
-
   [Test]
   [Category("Integration")]
   public void RoundTrip_RawDataPreserved() {

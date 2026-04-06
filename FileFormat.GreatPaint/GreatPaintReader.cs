@@ -26,6 +26,8 @@ public static class GreatPaintReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static GreatPaintFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static GreatPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != GreatPaintFile.ExpectedFileSize)

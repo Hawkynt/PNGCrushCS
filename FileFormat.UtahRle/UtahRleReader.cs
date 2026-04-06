@@ -27,6 +27,8 @@ public static class UtahRleReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static UtahRleFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static UtahRleFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < UtahRleHeader.StructSize)

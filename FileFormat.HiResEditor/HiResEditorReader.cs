@@ -26,6 +26,8 @@ public static class HiResEditorReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static HiResEditorFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static HiResEditorFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < HiResEditorFile.ExpectedFileSize)

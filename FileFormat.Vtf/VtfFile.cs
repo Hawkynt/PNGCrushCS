@@ -1,6 +1,5 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.IO;
 using FileFormat.Core;
 using FileFormat.Core.BlockDecoders;
 
@@ -8,14 +7,12 @@ namespace FileFormat.Vtf;
 
 /// <summary>In-memory representation of a VTF texture file.</summary>
 [FormatMagicBytes([0x56, 0x54, 0x46, 0x00])]
-public sealed class VtfFile : IImageFileFormat<VtfFile> {
+public readonly record struct VtfFile : IImageFormatReader<VtfFile>, IImageToRawImage<VtfFile>, IImageFormatWriter<VtfFile> {
 
-  static string IImageFileFormat<VtfFile>.PrimaryExtension => ".vtf";
-  static string[] IImageFileFormat<VtfFile>.FileExtensions => [".vtf"];
-  static VtfFile IImageFileFormat<VtfFile>.FromFile(FileInfo file) => VtfReader.FromFile(file);
-  static VtfFile IImageFileFormat<VtfFile>.FromBytes(byte[] data) => VtfReader.FromBytes(data);
-  static VtfFile IImageFileFormat<VtfFile>.FromStream(Stream stream) => VtfReader.FromStream(stream);
-  static byte[] IImageFileFormat<VtfFile>.ToBytes(VtfFile file) => VtfWriter.ToBytes(file);
+  static string IImageFormatMetadata<VtfFile>.PrimaryExtension => ".vtf";
+  static string[] IImageFormatMetadata<VtfFile>.FileExtensions => [".vtf"];
+  static VtfFile IImageFormatReader<VtfFile>.FromSpan(ReadOnlySpan<byte> data) => VtfReader.FromSpan(data);
+  static byte[] IImageFormatWriter<VtfFile>.ToBytes(VtfFile file) => VtfWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
   public int MipmapCount { get; init; }
@@ -25,10 +22,9 @@ public sealed class VtfFile : IImageFileFormat<VtfFile> {
   public int VersionMajor { get; init; }
   public int VersionMinor { get; init; }
   public byte[]? ThumbnailData { get; init; }
-  public IReadOnlyList<VtfSurface> Surfaces { get; init; } = [];
+  public IReadOnlyList<VtfSurface> Surfaces { get; init; }
 
   public static RawImage ToRawImage(VtfFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     if (file.Surfaces.Count == 0)
       throw new InvalidOperationException("VTF file contains no surfaces.");
 

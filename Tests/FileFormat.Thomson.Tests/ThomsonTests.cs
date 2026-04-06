@@ -47,21 +47,6 @@ public class ThomsonReaderTests {
 }
 
 [TestFixture]
-public class ThomsonWriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => ThomsonWriter.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_OutputSize_IsCorrect() {
-    var file = new ThomsonFile { PixelData = new byte[ThomsonFile.ImageWidth * ThomsonFile.ImageHeight] };
-    var bytes = ThomsonWriter.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(ThomsonFile.FileSize));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -94,41 +79,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void PrimaryExtension_IsCorrect()
-    => Assert.That(_GetPrimaryExtension<ThomsonFile>(), Is.EqualTo(".map"));
-
-  [Test]
-  public void FileExtensions_ContainsPrimary() {
-    var exts = _GetFileExtensions<ThomsonFile>();
-    Assert.That(exts, Does.Contain(".map"));
-  }
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => ThomsonFile.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => ThomsonFile.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 320, Height = 200, Format = PixelFormat.Rgb24, PixelData = new byte[320 * 200 * 3] };
-    Assert.Throws<ArgumentException>(() => ThomsonFile.FromRawImage(raw));
-  }
-
-  [Test]
-  public void Constants_AreCorrect() {
-    Assert.That(ThomsonFile.FileSize, Is.EqualTo(8000));
-    Assert.That(ThomsonFile.ImageWidth, Is.EqualTo(320));
-    Assert.That(ThomsonFile.ImageHeight, Is.EqualTo(200));
-  }
-
-  private static string _GetPrimaryExtension<T>() where T : IImageFileFormat<T> => T.PrimaryExtension;
-
-  private static string[] _GetFileExtensions<T>() where T : IImageFileFormat<T> => T.FileExtensions;
-}

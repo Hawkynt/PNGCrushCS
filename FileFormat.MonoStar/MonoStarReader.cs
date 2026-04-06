@@ -30,6 +30,8 @@ public static class MonoStarReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static MonoStarFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static MonoStarFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _HEADER_SIZE)

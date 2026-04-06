@@ -27,6 +27,8 @@ public static class ChampionsInterlaceReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static ChampionsInterlaceFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static ChampionsInterlaceFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
 

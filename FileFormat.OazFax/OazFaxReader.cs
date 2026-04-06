@@ -26,6 +26,8 @@ public static class OazFaxReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static OazFaxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static OazFaxFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < OazFaxFile.MinFileSize)

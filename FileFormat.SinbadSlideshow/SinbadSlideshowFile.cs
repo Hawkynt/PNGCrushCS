@@ -1,11 +1,10 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.SinbadSlideshow;
 
 /// <summary>In-memory representation of an Atari ST Sinbad Slideshow image (320x200, 16 colors, 4 planes).</summary>
-public sealed class SinbadSlideshowFile : IImageFileFormat<SinbadSlideshowFile> {
+public readonly record struct SinbadSlideshowFile : IImageFormatReader<SinbadSlideshowFile>, IImageToRawImage<SinbadSlideshowFile>, IImageFromRawImage<SinbadSlideshowFile>, IImageFormatWriter<SinbadSlideshowFile> {
 
   /// <summary>Image width (always 320).</summary>
   internal const int PixelWidth = 320;
@@ -25,13 +24,11 @@ public sealed class SinbadSlideshowFile : IImageFileFormat<SinbadSlideshowFile> 
   /// <summary>Exact file size (palette + pixel data).</summary>
   internal const int FileSize = PaletteSize + PixelDataSize;
 
-  static string IImageFileFormat<SinbadSlideshowFile>.PrimaryExtension => ".ssb";
-  static string[] IImageFileFormat<SinbadSlideshowFile>.FileExtensions => [".ssb"];
-  static FormatCapability IImageFileFormat<SinbadSlideshowFile>.Capabilities => FormatCapability.IndexedOnly;
-  static SinbadSlideshowFile IImageFileFormat<SinbadSlideshowFile>.FromFile(FileInfo file) => SinbadSlideshowReader.FromFile(file);
-  static SinbadSlideshowFile IImageFileFormat<SinbadSlideshowFile>.FromBytes(byte[] data) => SinbadSlideshowReader.FromBytes(data);
-  static SinbadSlideshowFile IImageFileFormat<SinbadSlideshowFile>.FromStream(Stream stream) => SinbadSlideshowReader.FromStream(stream);
-  static byte[] IImageFileFormat<SinbadSlideshowFile>.ToBytes(SinbadSlideshowFile file) => SinbadSlideshowWriter.ToBytes(file);
+  static string IImageFormatMetadata<SinbadSlideshowFile>.PrimaryExtension => ".ssb";
+  static string[] IImageFormatMetadata<SinbadSlideshowFile>.FileExtensions => [".ssb"];
+  static SinbadSlideshowFile IImageFormatReader<SinbadSlideshowFile>.FromSpan(ReadOnlySpan<byte> data) => SinbadSlideshowReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<SinbadSlideshowFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<SinbadSlideshowFile>.ToBytes(SinbadSlideshowFile file) => SinbadSlideshowWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>
   public int Width => PixelWidth;
@@ -40,13 +37,12 @@ public sealed class SinbadSlideshowFile : IImageFileFormat<SinbadSlideshowFile> 
   public int Height => PixelHeight;
 
   /// <summary>16-entry palette of 12-bit Atari ST RGB values (0x0RGB, R/G/B in 0-7).</summary>
-  public short[] Palette { get; init; } = new short[16];
+  public short[] Palette { get; init; }
 
   /// <summary>32000 bytes of Atari ST word-interleaved planar pixel data (4 planes).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(SinbadSlideshowFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var chunky = PlanarConverter.AtariStToChunky(file.PixelData, PixelWidth, PixelHeight, NumPlanes);
     var paletteCount = Math.Min(16, file.Palette.Length);

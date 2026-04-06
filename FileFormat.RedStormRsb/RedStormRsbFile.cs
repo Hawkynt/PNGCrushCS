@@ -1,18 +1,15 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.RedStormRsb;
 
 /// <summary>In-memory representation of a Red Storm RSB image.</summary>
-public sealed class RedStormRsbFile : IImageFileFormat<RedStormRsbFile> {
+public readonly record struct RedStormRsbFile : IImageFormatReader<RedStormRsbFile>, IImageToRawImage<RedStormRsbFile>, IImageFromRawImage<RedStormRsbFile>, IImageFormatWriter<RedStormRsbFile> {
 
-  static string IImageFileFormat<RedStormRsbFile>.PrimaryExtension => ".rsb";
-  static string[] IImageFileFormat<RedStormRsbFile>.FileExtensions => [".rsb"];
-  static RedStormRsbFile IImageFileFormat<RedStormRsbFile>.FromFile(FileInfo file) => RedStormRsbReader.FromFile(file);
-  static RedStormRsbFile IImageFileFormat<RedStormRsbFile>.FromBytes(byte[] data) => RedStormRsbReader.FromBytes(data);
-  static RedStormRsbFile IImageFileFormat<RedStormRsbFile>.FromStream(Stream stream) => RedStormRsbReader.FromStream(stream);
-  static byte[] IImageFileFormat<RedStormRsbFile>.ToBytes(RedStormRsbFile file) => RedStormRsbWriter.ToBytes(file);
+  static string IImageFormatMetadata<RedStormRsbFile>.PrimaryExtension => ".rsb";
+  static string[] IImageFormatMetadata<RedStormRsbFile>.FileExtensions => [".rsb"];
+  static RedStormRsbFile IImageFormatReader<RedStormRsbFile>.FromSpan(ReadOnlySpan<byte> data) => RedStormRsbReader.FromSpan(data);
+  static byte[] IImageFormatWriter<RedStormRsbFile>.ToBytes(RedStormRsbFile file) => RedStormRsbWriter.ToBytes(file);
 
   /// <summary>Magic bytes: "RSB\0" (0x52 0x53 0x42 0x00).</summary>
   internal static readonly byte[] Magic = [0x52, 0x53, 0x42, 0x00];
@@ -36,11 +33,10 @@ public sealed class RedStormRsbFile : IImageFileFormat<RedStormRsbFile> {
   public ushort Bpp { get; init; }
 
   /// <summary>Raw RGB pixel data (3 bytes per pixel).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this RSB image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(RedStormRsbFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

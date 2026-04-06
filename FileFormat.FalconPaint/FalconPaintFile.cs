@@ -1,21 +1,18 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.FalconPaint;
 
 /// <summary>In-memory representation of a Falcon Paint (.fpn) screen dump.</summary>
-public sealed class FalconPaintFile : IImageFileFormat<FalconPaintFile> {
+public readonly record struct FalconPaintFile : IImageFormatReader<FalconPaintFile>, IImageToRawImage<FalconPaintFile>, IImageFromRawImage<FalconPaintFile>, IImageFormatWriter<FalconPaintFile> {
 
   /// <summary>The exact file size: 320 x 240 x 2 bytes per pixel.</summary>
   public const int ExpectedFileSize = 320 * 240 * 2;
 
-  static string IImageFileFormat<FalconPaintFile>.PrimaryExtension => ".fpn";
-  static string[] IImageFileFormat<FalconPaintFile>.FileExtensions => [".fpn"];
-  static FalconPaintFile IImageFileFormat<FalconPaintFile>.FromFile(FileInfo file) => FalconPaintReader.FromFile(file);
-  static FalconPaintFile IImageFileFormat<FalconPaintFile>.FromBytes(byte[] data) => FalconPaintReader.FromBytes(data);
-  static FalconPaintFile IImageFileFormat<FalconPaintFile>.FromStream(Stream stream) => FalconPaintReader.FromStream(stream);
-  static byte[] IImageFileFormat<FalconPaintFile>.ToBytes(FalconPaintFile file) => FalconPaintWriter.ToBytes(file);
+  static string IImageFormatMetadata<FalconPaintFile>.PrimaryExtension => ".fpn";
+  static string[] IImageFormatMetadata<FalconPaintFile>.FileExtensions => [".fpn"];
+  static FalconPaintFile IImageFormatReader<FalconPaintFile>.FromSpan(ReadOnlySpan<byte> data) => FalconPaintReader.FromSpan(data);
+  static byte[] IImageFormatWriter<FalconPaintFile>.ToBytes(FalconPaintFile file) => FalconPaintWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>
   public int Width => 320;
@@ -24,10 +21,9 @@ public sealed class FalconPaintFile : IImageFileFormat<FalconPaintFile> {
   public int Height => 240;
 
   /// <summary>Raw RGB565 big-endian pixel data (2 bytes per pixel, 153600 bytes total).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(FalconPaintFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var rgb565 = file.PixelData;
     var pixelCount = 320 * 240;

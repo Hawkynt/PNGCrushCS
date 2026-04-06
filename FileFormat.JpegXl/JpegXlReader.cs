@@ -38,6 +38,8 @@ public static class JpegXlReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static JpegXlFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static JpegXlFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MinSize)

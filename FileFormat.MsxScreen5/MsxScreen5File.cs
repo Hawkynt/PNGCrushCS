@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.MsxScreen5;
@@ -9,14 +8,12 @@ namespace FileFormat.MsxScreen5;
 /// 256x212, 16 colors, 2 pixels per byte (high nibble = left, low nibble = right).
 /// </summary>
 [FormatMagicBytes([0xFE])]
-public sealed class MsxScreen5File : IImageFileFormat<MsxScreen5File> {
+public readonly record struct MsxScreen5File : IImageFormatReader<MsxScreen5File>, IImageToRawImage<MsxScreen5File>, IImageFormatWriter<MsxScreen5File> {
 
-  static string IImageFileFormat<MsxScreen5File>.PrimaryExtension => ".sc5";
-  static string[] IImageFileFormat<MsxScreen5File>.FileExtensions => [".sc5", ".ge5"];
-  static MsxScreen5File IImageFileFormat<MsxScreen5File>.FromFile(FileInfo file) => MsxScreen5Reader.FromFile(file);
-  static MsxScreen5File IImageFileFormat<MsxScreen5File>.FromBytes(byte[] data) => MsxScreen5Reader.FromBytes(data);
-  static MsxScreen5File IImageFileFormat<MsxScreen5File>.FromStream(Stream stream) => MsxScreen5Reader.FromStream(stream);
-  static byte[] IImageFileFormat<MsxScreen5File>.ToBytes(MsxScreen5File file) => MsxScreen5Writer.ToBytes(file);
+  static string IImageFormatMetadata<MsxScreen5File>.PrimaryExtension => ".sc5";
+  static string[] IImageFormatMetadata<MsxScreen5File>.FileExtensions => [".sc5", ".ge5"];
+  static MsxScreen5File IImageFormatReader<MsxScreen5File>.FromSpan(ReadOnlySpan<byte> data) => MsxScreen5Reader.FromSpan(data);
+  static byte[] IImageFormatWriter<MsxScreen5File>.ToBytes(MsxScreen5File file) => MsxScreen5Writer.ToBytes(file);
 
   /// <summary>Fixed width of an MSX Screen 5 image.</summary>
   public const int FixedWidth = 256;
@@ -66,7 +63,7 @@ public sealed class MsxScreen5File : IImageFileFormat<MsxScreen5File> {
   public int Height => FixedHeight;
 
   /// <summary>Raw pixel data (27136 bytes, 2 pixels per byte, high nibble = left pixel).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>MSX2 V9938 palette (32 bytes: 16 entries x 2 bytes), or null if no palette in file.</summary>
   public byte[]? Palette { get; init; }
@@ -76,7 +73,6 @@ public sealed class MsxScreen5File : IImageFileFormat<MsxScreen5File> {
 
   /// <summary>Converts this MSX Screen 5 image to a platform-independent <see cref="RawImage"/> in Indexed8 format.</summary>
   public static RawImage ToRawImage(MsxScreen5File file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var pixels = new byte[FixedWidth * FixedHeight];
 
@@ -101,12 +97,6 @@ public sealed class MsxScreen5File : IImageFileFormat<MsxScreen5File> {
       Palette = _ConvertMsx2Palette(file.Palette),
       PaletteCount = 16,
     };
-  }
-
-  /// <summary>Not supported. MSX Screen 5 has format-specific palette constraints.</summary>
-  public static MsxScreen5File FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to MsxScreen5File is not supported due to format-specific palette constraints.");
   }
 
   /// <summary>Converts MSX V9938 palette (16 entries x 2 bytes: 0RRR0BBB, 00000GGG) to RGB triplets.</summary>

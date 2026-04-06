@@ -117,7 +117,7 @@ public sealed class RoundTripTests {
       PixelData = new byte[] { 0xFF, 0xAA }
     };
 
-    var raw = original.ToRawImage();
+    var raw = NokiaPictureMessageFile.ToRawImage(original);
     var restored = NokiaPictureMessageFile.FromRawImage(raw);
 
     Assert.That(restored.Width, Is.EqualTo(original.Width));

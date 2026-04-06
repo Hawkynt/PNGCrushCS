@@ -27,6 +27,8 @@ public static class RlaReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static RlaFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static RlaFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < RlaHeader.StructSize)

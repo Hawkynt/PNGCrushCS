@@ -121,7 +121,7 @@ public sealed class RoundTripTests {
       PixelData = new byte[] { 0xFF, 0x00, 0xAA, 0x55 }
     };
 
-    var raw = original.ToRawImage();
+    var raw = BennetYeeFaceFile.ToRawImage(original);
     var restored = BennetYeeFaceFile.FromRawImage(raw);
 
     Assert.That(restored.Width, Is.EqualTo(original.Width));

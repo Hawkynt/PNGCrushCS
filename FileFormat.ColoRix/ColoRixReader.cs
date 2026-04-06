@@ -28,6 +28,8 @@ public static class ColoRixReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static ColoRixFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static ColoRixFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < ColoRixFile.HeaderSize)

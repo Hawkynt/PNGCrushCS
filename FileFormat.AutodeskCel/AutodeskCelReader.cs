@@ -27,6 +27,8 @@ public static class AutodeskCelReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static AutodeskCelFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AutodeskCelFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < AutodeskCelFile.HeaderSize)

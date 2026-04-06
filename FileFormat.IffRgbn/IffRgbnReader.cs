@@ -31,6 +31,8 @@ public static class IffRgbnReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static IffRgbnFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static IffRgbnFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MIN_IFF_SIZE)

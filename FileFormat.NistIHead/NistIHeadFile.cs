@@ -1,18 +1,15 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.NistIHead;
 
 /// <summary>In-memory representation of a NIST IHead grayscale image.</summary>
-public sealed class NistIHeadFile : IImageFileFormat<NistIHeadFile> {
+public readonly record struct NistIHeadFile : IImageFormatReader<NistIHeadFile>, IImageToRawImage<NistIHeadFile>, IImageFromRawImage<NistIHeadFile>, IImageFormatWriter<NistIHeadFile> {
 
-  static string IImageFileFormat<NistIHeadFile>.PrimaryExtension => ".nst";
-  static string[] IImageFileFormat<NistIHeadFile>.FileExtensions => [".nst"];
-  static NistIHeadFile IImageFileFormat<NistIHeadFile>.FromFile(FileInfo file) => NistIHeadReader.FromFile(file);
-  static NistIHeadFile IImageFileFormat<NistIHeadFile>.FromBytes(byte[] data) => NistIHeadReader.FromBytes(data);
-  static NistIHeadFile IImageFileFormat<NistIHeadFile>.FromStream(Stream stream) => NistIHeadReader.FromStream(stream);
-  static byte[] IImageFileFormat<NistIHeadFile>.ToBytes(NistIHeadFile file) => NistIHeadWriter.ToBytes(file);
+  static string IImageFormatMetadata<NistIHeadFile>.PrimaryExtension => ".nst";
+  static string[] IImageFormatMetadata<NistIHeadFile>.FileExtensions => [".nst"];
+  static NistIHeadFile IImageFormatReader<NistIHeadFile>.FromSpan(ReadOnlySpan<byte> data) => NistIHeadReader.FromSpan(data);
+  static byte[] IImageFormatWriter<NistIHeadFile>.ToBytes(NistIHeadFile file) => NistIHeadWriter.ToBytes(file);
 
   /// <summary>Magic bytes: "NIST" (0x4E 0x49 0x53 0x54).</summary>
   internal static readonly byte[] Magic = [0x4E, 0x49, 0x53, 0x54];
@@ -39,10 +36,9 @@ public sealed class NistIHeadFile : IImageFileFormat<NistIHeadFile> {
   public uint Reserved { get; init; }
 
   /// <summary>Raw grayscale pixel data (1 byte per pixel).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(NistIHeadFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

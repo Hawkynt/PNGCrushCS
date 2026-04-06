@@ -26,6 +26,8 @@ public static class Flip64Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static Flip64File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static Flip64File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < Flip64File.LoadAddressSize + Flip64File.MinPayloadSize)

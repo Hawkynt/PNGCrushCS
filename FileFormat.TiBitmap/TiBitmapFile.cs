@@ -1,30 +1,26 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.TiBitmap;
 
 /// <summary>In-memory representation of a TI Calculator bitmap image.</summary>
-public sealed class TiBitmapFile : IImageFileFormat<TiBitmapFile> {
+public readonly record struct TiBitmapFile : IImageFormatReader<TiBitmapFile>, IImageToRawImage<TiBitmapFile>, IImageFromRawImage<TiBitmapFile>, IImageFormatWriter<TiBitmapFile> {
 
   internal const int HeaderSize = 8;
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
-  static string IImageFileFormat<TiBitmapFile>.PrimaryExtension => ".8xi";
-  static string[] IImageFileFormat<TiBitmapFile>.FileExtensions => [".8xi", ".89i"];
-  static FormatCapability IImageFileFormat<TiBitmapFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static TiBitmapFile IImageFileFormat<TiBitmapFile>.FromFile(FileInfo file) => TiBitmapReader.FromFile(file);
-  static TiBitmapFile IImageFileFormat<TiBitmapFile>.FromBytes(byte[] data) => TiBitmapReader.FromBytes(data);
-  static TiBitmapFile IImageFileFormat<TiBitmapFile>.FromStream(Stream stream) => TiBitmapReader.FromStream(stream);
-  static byte[] IImageFileFormat<TiBitmapFile>.ToBytes(TiBitmapFile file) => TiBitmapWriter.ToBytes(file);
+  static string IImageFormatMetadata<TiBitmapFile>.PrimaryExtension => ".8xi";
+  static string[] IImageFormatMetadata<TiBitmapFile>.FileExtensions => [".8xi", ".89i"];
+  static TiBitmapFile IImageFormatReader<TiBitmapFile>.FromSpan(ReadOnlySpan<byte> data) => TiBitmapReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<TiBitmapFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<TiBitmapFile>.ToBytes(TiBitmapFile file) => TiBitmapWriter.ToBytes(file);
 
   public int Width { get; init; }
   public int Height { get; init; }
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(TiBitmapFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

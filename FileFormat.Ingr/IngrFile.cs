@@ -1,5 +1,4 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Ingr;
@@ -11,14 +10,12 @@ public enum IngrDataType : ushort {
 }
 
 /// <summary>In-memory representation of an Intergraph Raster (INGR) image.</summary>
-public sealed class IngrFile : IImageFileFormat<IngrFile> {
+public readonly record struct IngrFile : IImageFormatReader<IngrFile>, IImageToRawImage<IngrFile>, IImageFromRawImage<IngrFile>, IImageFormatWriter<IngrFile> {
 
-  static string IImageFileFormat<IngrFile>.PrimaryExtension => ".cit";
-  static string[] IImageFileFormat<IngrFile>.FileExtensions => [".cit", ".itg"];
-  static IngrFile IImageFileFormat<IngrFile>.FromFile(FileInfo file) => IngrReader.FromFile(file);
-  static IngrFile IImageFileFormat<IngrFile>.FromBytes(byte[] data) => IngrReader.FromBytes(data);
-  static IngrFile IImageFileFormat<IngrFile>.FromStream(Stream stream) => IngrReader.FromStream(stream);
-  static byte[] IImageFileFormat<IngrFile>.ToBytes(IngrFile file) => IngrWriter.ToBytes(file);
+  static string IImageFormatMetadata<IngrFile>.PrimaryExtension => ".cit";
+  static string[] IImageFormatMetadata<IngrFile>.FileExtensions => [".cit", ".itg"];
+  static IngrFile IImageFormatReader<IngrFile>.FromSpan(ReadOnlySpan<byte> data) => IngrReader.FromSpan(data);
+  static byte[] IImageFormatWriter<IngrFile>.ToBytes(IngrFile file) => IngrWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -27,13 +24,12 @@ public sealed class IngrFile : IImageFileFormat<IngrFile> {
   public int Height { get; init; }
 
   /// <summary>Data type code indicating pixel format and compression.</summary>
-  public IngrDataType DataType { get; init; } = IngrDataType.Rgb24;
+  public IngrDataType DataType { get; init; }
 
   /// <summary>Raw pixel data bytes.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(IngrFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     return file.DataType switch {
       IngrDataType.ByteData => new() {

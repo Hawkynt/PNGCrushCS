@@ -1,12 +1,11 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.PhotoPaint;
 
 /// <summary>In-memory representation of a Corel Photo-Paint CPT image.</summary>
 [FormatMagicBytes([0x43, 0x50, 0x54, 0x00])]
-public sealed class PhotoPaintFile : IImageFileFormat<PhotoPaintFile> {
+public readonly record struct PhotoPaintFile : IImageFormatReader<PhotoPaintFile>, IImageToRawImage<PhotoPaintFile>, IImageFromRawImage<PhotoPaintFile>, IImageFormatWriter<PhotoPaintFile> {
 
   /// <summary>"CPT\0" magic bytes identifying the format.</summary>
   internal static readonly byte[] Magic = [(byte)'C', (byte)'P', (byte)'T', 0x00];
@@ -20,12 +19,10 @@ public sealed class PhotoPaintFile : IImageFileFormat<PhotoPaintFile> {
   /// <summary>Bit depth for RGB24 pixel data.</summary>
   internal const ushort BitDepth = 24;
 
-  static string IImageFileFormat<PhotoPaintFile>.PrimaryExtension => ".cpt";
-  static string[] IImageFileFormat<PhotoPaintFile>.FileExtensions => [".cpt"];
-  static PhotoPaintFile IImageFileFormat<PhotoPaintFile>.FromFile(FileInfo file) => PhotoPaintReader.FromFile(file);
-  static PhotoPaintFile IImageFileFormat<PhotoPaintFile>.FromBytes(byte[] data) => PhotoPaintReader.FromBytes(data);
-  static PhotoPaintFile IImageFileFormat<PhotoPaintFile>.FromStream(Stream stream) => PhotoPaintReader.FromStream(stream);
-  static byte[] IImageFileFormat<PhotoPaintFile>.ToBytes(PhotoPaintFile file) => PhotoPaintWriter.ToBytes(file);
+  static string IImageFormatMetadata<PhotoPaintFile>.PrimaryExtension => ".cpt";
+  static string[] IImageFormatMetadata<PhotoPaintFile>.FileExtensions => [".cpt"];
+  static PhotoPaintFile IImageFormatReader<PhotoPaintFile>.FromSpan(ReadOnlySpan<byte> data) => PhotoPaintReader.FromSpan(data);
+  static byte[] IImageFormatWriter<PhotoPaintFile>.ToBytes(PhotoPaintFile file) => PhotoPaintWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -34,11 +31,10 @@ public sealed class PhotoPaintFile : IImageFileFormat<PhotoPaintFile> {
   public int Height { get; init; }
 
   /// <summary>Raw RGB24 pixel data (3 bytes per pixel).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts a PhotoPaint file to a <see cref="RawImage"/> with Rgb24 format.</summary>
   public static RawImage ToRawImage(PhotoPaintFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

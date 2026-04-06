@@ -1,21 +1,18 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.VidiChrome;
 
 /// <summary>In-memory representation of a VidiChrome true-color (.vdc) screen dump.</summary>
-public sealed class VidiChromeFile : IImageFileFormat<VidiChromeFile> {
+public readonly record struct VidiChromeFile : IImageFormatReader<VidiChromeFile>, IImageToRawImage<VidiChromeFile>, IImageFromRawImage<VidiChromeFile>, IImageFormatWriter<VidiChromeFile> {
 
   /// <summary>The exact file size: 320 x 240 x 2 bytes per pixel.</summary>
   public const int ExpectedFileSize = 320 * 240 * 2;
 
-  static string IImageFileFormat<VidiChromeFile>.PrimaryExtension => ".vdc";
-  static string[] IImageFileFormat<VidiChromeFile>.FileExtensions => [".vdc", ".vdc2"];
-  static VidiChromeFile IImageFileFormat<VidiChromeFile>.FromFile(FileInfo file) => VidiChromeReader.FromFile(file);
-  static VidiChromeFile IImageFileFormat<VidiChromeFile>.FromBytes(byte[] data) => VidiChromeReader.FromBytes(data);
-  static VidiChromeFile IImageFileFormat<VidiChromeFile>.FromStream(Stream stream) => VidiChromeReader.FromStream(stream);
-  static byte[] IImageFileFormat<VidiChromeFile>.ToBytes(VidiChromeFile file) => VidiChromeWriter.ToBytes(file);
+  static string IImageFormatMetadata<VidiChromeFile>.PrimaryExtension => ".vdc";
+  static string[] IImageFormatMetadata<VidiChromeFile>.FileExtensions => [".vdc", ".vdc2"];
+  static VidiChromeFile IImageFormatReader<VidiChromeFile>.FromSpan(ReadOnlySpan<byte> data) => VidiChromeReader.FromSpan(data);
+  static byte[] IImageFormatWriter<VidiChromeFile>.ToBytes(VidiChromeFile file) => VidiChromeWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>
   public int Width => 320;
@@ -24,10 +21,9 @@ public sealed class VidiChromeFile : IImageFileFormat<VidiChromeFile> {
   public int Height => 240;
 
   /// <summary>Raw RGB565 big-endian pixel data (2 bytes per pixel, 153600 bytes total).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(VidiChromeFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var rgb565 = file.PixelData;
     var pixelCount = 320 * 240;

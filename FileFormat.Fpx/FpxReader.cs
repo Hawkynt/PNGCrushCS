@@ -26,6 +26,8 @@ public static class FpxReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static FpxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static FpxFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < FpxHeader.StructSize)

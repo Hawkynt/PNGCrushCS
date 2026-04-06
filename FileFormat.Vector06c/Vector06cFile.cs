@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Vector06c;
 
 /// <summary>In-memory representation of a Vector-06C screen image.</summary>
-public sealed class Vector06cFile : IImageFileFormat<Vector06cFile> {
+public readonly record struct Vector06cFile : IImageFormatReader<Vector06cFile>, IImageToRawImage<Vector06cFile>, IImageFromRawImage<Vector06cFile>, IImageFormatWriter<Vector06cFile> {
 
   internal const int FixedWidth = 256;
   internal const int FixedHeight = 256;
@@ -13,20 +12,17 @@ public sealed class Vector06cFile : IImageFileFormat<Vector06cFile> {
 
   private static readonly byte[] _DefaultPalette = [0, 0, 0, 0, 0, 255, 0, 255, 0, 255, 0, 0];
 
-  static string IImageFileFormat<Vector06cFile>.PrimaryExtension => ".v06";
-  static string[] IImageFileFormat<Vector06cFile>.FileExtensions => [".v06", ".scr"];
-  static FormatCapability IImageFileFormat<Vector06cFile>.Capabilities => FormatCapability.IndexedOnly;
-  static Vector06cFile IImageFileFormat<Vector06cFile>.FromFile(FileInfo file) => Vector06cReader.FromFile(file);
-  static Vector06cFile IImageFileFormat<Vector06cFile>.FromBytes(byte[] data) => Vector06cReader.FromBytes(data);
-  static Vector06cFile IImageFileFormat<Vector06cFile>.FromStream(Stream stream) => Vector06cReader.FromStream(stream);
-  static byte[] IImageFileFormat<Vector06cFile>.ToBytes(Vector06cFile file) => Vector06cWriter.ToBytes(file);
+  static string IImageFormatMetadata<Vector06cFile>.PrimaryExtension => ".v06";
+  static string[] IImageFormatMetadata<Vector06cFile>.FileExtensions => [".v06", ".scr"];
+  static Vector06cFile IImageFormatReader<Vector06cFile>.FromSpan(ReadOnlySpan<byte> data) => Vector06cReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<Vector06cFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<Vector06cFile>.ToBytes(Vector06cFile file) => Vector06cWriter.ToBytes(file);
 
   public int Width => FixedWidth;
   public int Height => FixedHeight;
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(Vector06cFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = FixedWidth,
       Height = FixedHeight,

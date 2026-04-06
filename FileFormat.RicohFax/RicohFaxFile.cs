@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.RicohFax;
 
 /// <summary>In-memory representation of a RicohFax RIC image.</summary>
-public sealed class RicohFaxFile : IImageFileFormat<RicohFaxFile> {
+public readonly record struct RicohFaxFile : IImageFormatReader<RicohFaxFile>, IImageToRawImage<RicohFaxFile>, IImageFormatWriter<RicohFaxFile> {
 
-  static string IImageFileFormat<RicohFaxFile>.PrimaryExtension => ".ric";
-  static string[] IImageFileFormat<RicohFaxFile>.FileExtensions => [".ric"];
-  static RicohFaxFile IImageFileFormat<RicohFaxFile>.FromFile(FileInfo file) => RicohFaxReader.FromFile(file);
-  static RicohFaxFile IImageFileFormat<RicohFaxFile>.FromBytes(byte[] data) => RicohFaxReader.FromBytes(data);
-  static RicohFaxFile IImageFileFormat<RicohFaxFile>.FromStream(Stream stream) => RicohFaxReader.FromStream(stream);
-  static byte[] IImageFileFormat<RicohFaxFile>.ToBytes(RicohFaxFile file) => RicohFaxWriter.ToBytes(file);
+  static string IImageFormatMetadata<RicohFaxFile>.PrimaryExtension => ".ric";
+  static string[] IImageFormatMetadata<RicohFaxFile>.FileExtensions => [".ric"];
+  static RicohFaxFile IImageFormatReader<RicohFaxFile>.FromSpan(ReadOnlySpan<byte> data) => RicohFaxReader.FromSpan(data);
+  static byte[] IImageFormatWriter<RicohFaxFile>.ToBytes(RicohFaxFile file) => RicohFaxWriter.ToBytes(file);
 
   /// <summary>Magic bytes: "RICF" (0x52 0x49 0x43 0x46).</summary>
   internal static readonly byte[] Magic = [0x52, 0x49, 0x43, 0x46];
@@ -36,11 +33,10 @@ public sealed class RicohFaxFile : IImageFileFormat<RicohFaxFile> {
   public ushort Compression { get; init; }
 
   /// <summary>1bpp pixel data, MSB first, rows padded to byte boundary.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this RIC image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(RicohFaxFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var bytesPerRow = (file.Width + 7) / 8;
     var rgb = new byte[file.Width * file.Height * 3];
@@ -65,9 +61,4 @@ public sealed class RicohFaxFile : IImageFileFormat<RicohFaxFile> {
     };
   }
 
-  /// <summary>Not supported.</summary>
-  public static RicohFaxFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to RicohFaxFile is not supported.");
-  }
 }

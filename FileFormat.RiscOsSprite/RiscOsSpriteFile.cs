@@ -1,11 +1,11 @@
-﻿using System;
+using System;
 using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.RiscOsSprite;
 
 /// <summary>Acorn RISC OS sprite format data model.</summary>
-public sealed class RiscOsSpriteFile : IImageFileFormat<RiscOsSpriteFile> {
+public sealed class RiscOsSpriteFile : IImageFormatReader<RiscOsSpriteFile>, IImageToRawImage<RiscOsSpriteFile>, IImageFromRawImage<RiscOsSpriteFile>, IImageFormatWriter<RiscOsSpriteFile> {
 
   public const int HeaderSize = 16;
 
@@ -13,9 +13,9 @@ public sealed class RiscOsSpriteFile : IImageFileFormat<RiscOsSpriteFile> {
   public int Height { get; init; } = 256;
   public byte[] PixelData { get; init; } = [];
 
-
   public static string PrimaryExtension => ".spr";
   public static string[] FileExtensions => [".spr", ".ros"];
+  static RiscOsSpriteFile IImageFormatReader<RiscOsSpriteFile>.FromSpan(ReadOnlySpan<byte> data) => RiscOsSpriteReader.FromSpan(data);
   public static RiscOsSpriteFile FromFile(FileInfo file) => RiscOsSpriteReader.FromFile(file);
   public static RiscOsSpriteFile FromBytes(byte[] data) => RiscOsSpriteReader.FromBytes(data);
   public static RiscOsSpriteFile FromStream(Stream stream) => RiscOsSpriteReader.FromStream(stream);

@@ -1,26 +1,22 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.CrackArt;
 
 /// <summary>In-memory representation of a CrackArt packed image.</summary>
-public sealed class CrackArtFile : IImageFileFormat<CrackArtFile> {
+public readonly record struct CrackArtFile : IImageFormatReader<CrackArtFile>, IImageToRawImage<CrackArtFile>, IImageFromRawImage<CrackArtFile>, IImageFormatWriter<CrackArtFile> {
 
-  static string IImageFileFormat<CrackArtFile>.PrimaryExtension => ".ca1";
-  static string[] IImageFileFormat<CrackArtFile>.FileExtensions => [".ca1", ".ca2", ".ca3"];
-  static CrackArtFile IImageFileFormat<CrackArtFile>.FromFile(FileInfo file) => CrackArtReader.FromFile(file);
-  static CrackArtFile IImageFileFormat<CrackArtFile>.FromBytes(byte[] data) => CrackArtReader.FromBytes(data);
-  static CrackArtFile IImageFileFormat<CrackArtFile>.FromStream(Stream stream) => CrackArtReader.FromStream(stream);
-  static byte[] IImageFileFormat<CrackArtFile>.ToBytes(CrackArtFile file) => CrackArtWriter.ToBytes(file);
+  static string IImageFormatMetadata<CrackArtFile>.PrimaryExtension => ".ca1";
+  static string[] IImageFormatMetadata<CrackArtFile>.FileExtensions => [".ca1", ".ca2", ".ca3"];
+  static CrackArtFile IImageFormatReader<CrackArtFile>.FromSpan(ReadOnlySpan<byte> data) => CrackArtReader.FromSpan(data);
+  static byte[] IImageFormatWriter<CrackArtFile>.ToBytes(CrackArtFile file) => CrackArtWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
   public CrackArtResolution Resolution { get; init; }
-  public short[] Palette { get; init; } = new short[16];
-  public byte[] PixelData { get; init; } = [];
+  public short[] Palette { get; init; }
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(CrackArtFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var numPlanes = file.Resolution switch {
       CrackArtResolution.Low => 4,

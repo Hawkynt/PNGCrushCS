@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.HinterGrundBild;
 
 /// <summary>In-memory representation of a C64 HinterGrundBild (.hgb) multicolor art image.</summary>
-public sealed class HinterGrundBildFile : IImageFileFormat<HinterGrundBildFile> {
+public readonly record struct HinterGrundBildFile : IImageFormatReader<HinterGrundBildFile>, IImageToRawImage<HinterGrundBildFile>, IImageFormatWriter<HinterGrundBildFile> {
 
-  static string IImageFileFormat<HinterGrundBildFile>.PrimaryExtension => ".hgb";
-  static string[] IImageFileFormat<HinterGrundBildFile>.FileExtensions => [".hgb"];
-  static HinterGrundBildFile IImageFileFormat<HinterGrundBildFile>.FromFile(FileInfo file) => HinterGrundBildReader.FromFile(file);
-  static HinterGrundBildFile IImageFileFormat<HinterGrundBildFile>.FromBytes(byte[] data) => HinterGrundBildReader.FromBytes(data);
-  static HinterGrundBildFile IImageFileFormat<HinterGrundBildFile>.FromStream(Stream stream) => HinterGrundBildReader.FromStream(stream);
-  static byte[] IImageFileFormat<HinterGrundBildFile>.ToBytes(HinterGrundBildFile file) => HinterGrundBildWriter.ToBytes(file);
+  static string IImageFormatMetadata<HinterGrundBildFile>.PrimaryExtension => ".hgb";
+  static string[] IImageFormatMetadata<HinterGrundBildFile>.FileExtensions => [".hgb"];
+  static HinterGrundBildFile IImageFormatReader<HinterGrundBildFile>.FromSpan(ReadOnlySpan<byte> data) => HinterGrundBildReader.FromSpan(data);
+  static byte[] IImageFormatWriter<HinterGrundBildFile>.ToBytes(HinterGrundBildFile file) => HinterGrundBildWriter.ToBytes(file);
 
   /// <summary>Size of the bitmap data section in bytes.</summary>
   internal const int BitmapDataSize = 8000;
@@ -46,23 +43,22 @@ public sealed class HinterGrundBildFile : IImageFileFormat<HinterGrundBildFile> 
   public ushort LoadAddress { get; init; }
 
   /// <summary>Bitmap data (8000 bytes).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Screen RAM / video matrix (1000 bytes).</summary>
-  public byte[] ScreenData { get; init; } = [];
+  public byte[] ScreenData { get; init; }
 
   /// <summary>Color RAM (1000 bytes).</summary>
-  public byte[] ColorData { get; init; } = [];
+  public byte[] ColorData { get; init; }
 
   /// <summary>Background color index (0-15). Bit-pair 0 maps to this color.</summary>
   public byte BackgroundColor { get; init; }
 
   /// <summary>Any trailing bytes beyond the minimum payload.</summary>
-  public byte[] TrailingData { get; init; } = [];
+  public byte[] TrailingData { get; init; }
 
   /// <summary>Converts this HinterGrundBild image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(HinterGrundBildFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = ImageWidth;
     const int height = ImageHeight;
@@ -101,6 +97,4 @@ public sealed class HinterGrundBildFile : IImageFileFormat<HinterGrundBildFile> 
     };
   }
 
-  /// <summary>Creates a HinterGrundBild image from a <see cref="RawImage"/>. Not supported.</summary>
-  public static HinterGrundBildFile FromRawImage(RawImage image) => throw new NotSupportedException("Creating HinterGrundBild files from raw images is not supported.");
 }

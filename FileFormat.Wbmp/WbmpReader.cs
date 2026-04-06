@@ -26,6 +26,8 @@ public static class WbmpReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static WbmpFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static WbmpFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < 4)

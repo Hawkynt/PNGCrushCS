@@ -26,6 +26,8 @@ public static class C64MultiReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static C64MultiFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static C64MultiFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
 

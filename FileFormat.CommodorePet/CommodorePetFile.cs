@@ -1,11 +1,11 @@
-﻿using System;
+using System;
 using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.CommodorePet;
 
 /// <summary>Commodore PET PETSCII screen dump data model.</summary>
-public sealed class CommodorePetFile : IImageFileFormat<CommodorePetFile> {
+public sealed class CommodorePetFile : IImageFormatReader<CommodorePetFile>, IImageToRawImage<CommodorePetFile>, IImageFromRawImage<CommodorePetFile>, IImageFormatWriter<CommodorePetFile> {
 
   public const int FileSize = 1000;
   public const int ImageWidth = 40;
@@ -18,7 +18,8 @@ public sealed class CommodorePetFile : IImageFileFormat<CommodorePetFile> {
 
   public static string PrimaryExtension => ".pet";
   public static string[] FileExtensions => [".pet"];
-  static FormatCapability IImageFileFormat<CommodorePetFile>.Capabilities => FormatCapability.IndexedOnly;
+  static CommodorePetFile IImageFormatReader<CommodorePetFile>.FromSpan(ReadOnlySpan<byte> data) => CommodorePetReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<CommodorePetFile>.Capabilities => FormatCapability.IndexedOnly;
   public static CommodorePetFile FromFile(FileInfo file) => CommodorePetReader.FromFile(file);
   public static CommodorePetFile FromBytes(byte[] data) => CommodorePetReader.FromBytes(data);
   public static CommodorePetFile FromStream(Stream stream) => CommodorePetReader.FromStream(stream);

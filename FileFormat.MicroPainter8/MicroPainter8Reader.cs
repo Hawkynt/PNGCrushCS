@@ -26,6 +26,8 @@ public static class MicroPainter8Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static MicroPainter8File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static MicroPainter8File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != MicroPainter8File.FileSize)

@@ -1,18 +1,15 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Xwd;
 
 /// <summary>In-memory representation of an XWD (X Window Dump) image.</summary>
-public sealed class XwdFile : IImageFileFormat<XwdFile> {
+public readonly record struct XwdFile : IImageFormatReader<XwdFile>, IImageToRawImage<XwdFile>, IImageFromRawImage<XwdFile>, IImageFormatWriter<XwdFile> {
 
-  static string IImageFileFormat<XwdFile>.PrimaryExtension => ".xwd";
-  static string[] IImageFileFormat<XwdFile>.FileExtensions => [".xwd"];
-  static XwdFile IImageFileFormat<XwdFile>.FromFile(FileInfo file) => XwdReader.FromFile(file);
-  static XwdFile IImageFileFormat<XwdFile>.FromBytes(byte[] data) => XwdReader.FromBytes(data);
-  static XwdFile IImageFileFormat<XwdFile>.FromStream(Stream stream) => XwdReader.FromStream(stream);
-  static byte[] IImageFileFormat<XwdFile>.ToBytes(XwdFile file) => XwdWriter.ToBytes(file);
+  static string IImageFormatMetadata<XwdFile>.PrimaryExtension => ".xwd";
+  static string[] IImageFormatMetadata<XwdFile>.FileExtensions => [".xwd"];
+  static XwdFile IImageFormatReader<XwdFile>.FromSpan(ReadOnlySpan<byte> data) => XwdReader.FromSpan(data);
+  static byte[] IImageFormatWriter<XwdFile>.ToBytes(XwdFile file) => XwdWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
   public int BitsPerPixel { get; init; }
@@ -33,14 +30,13 @@ public sealed class XwdFile : IImageFileFormat<XwdFile> {
   public int WindowX { get; init; }
   public int WindowY { get; init; }
   public uint WindowBorderWidth { get; init; }
-  public string WindowName { get; init; } = "";
-  public byte[] PixelData { get; init; } = [];
+  public string WindowName { get; init; }
+  public byte[] PixelData { get; init; }
 
   /// <summary>Raw colormap data: 12 bytes per entry (pixel u32 BE, red u16 BE, green u16 BE, blue u16 BE, flags u8, padding u8).</summary>
   public byte[]? Colormap { get; init; }
 
   public static RawImage ToRawImage(XwdFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var width = file.Width;
     var height = file.Height;

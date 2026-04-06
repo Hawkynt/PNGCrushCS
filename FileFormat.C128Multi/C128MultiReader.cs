@@ -26,6 +26,8 @@ public static class C128MultiReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static C128MultiFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static C128MultiFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != C128MultiFile.ExpectedFileSize)

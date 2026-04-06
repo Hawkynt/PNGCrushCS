@@ -26,6 +26,8 @@ public static class AfliReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static AfliFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AfliFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
 

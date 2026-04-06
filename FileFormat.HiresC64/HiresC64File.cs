@@ -1,19 +1,16 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.HiresC64;
 
 /// <summary>In-memory representation of a Commodore 64 bare hires monochrome bitmap.</summary>
-public sealed class HiresC64File : IImageFileFormat<HiresC64File> {
+public readonly record struct HiresC64File : IImageFormatReader<HiresC64File>, IImageToRawImage<HiresC64File>, IImageFormatWriter<HiresC64File> {
 
-  static string IImageFileFormat<HiresC64File>.PrimaryExtension => ".hir";
-  static string[] IImageFileFormat<HiresC64File>.FileExtensions => [".hir", ".hbm"];
-  static FormatCapability IImageFileFormat<HiresC64File>.Capabilities => FormatCapability.MonochromeOnly;
-  static HiresC64File IImageFileFormat<HiresC64File>.FromFile(FileInfo file) => HiresC64Reader.FromFile(file);
-  static HiresC64File IImageFileFormat<HiresC64File>.FromBytes(byte[] data) => HiresC64Reader.FromBytes(data);
-  static HiresC64File IImageFileFormat<HiresC64File>.FromStream(Stream stream) => HiresC64Reader.FromStream(stream);
-  static byte[] IImageFileFormat<HiresC64File>.ToBytes(HiresC64File file) => HiresC64Writer.ToBytes(file);
+  static string IImageFormatMetadata<HiresC64File>.PrimaryExtension => ".hir";
+  static string[] IImageFormatMetadata<HiresC64File>.FileExtensions => [".hir", ".hbm"];
+  static HiresC64File IImageFormatReader<HiresC64File>.FromSpan(ReadOnlySpan<byte> data) => HiresC64Reader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<HiresC64File>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<HiresC64File>.ToBytes(HiresC64File file) => HiresC64Writer.ToBytes(file);
 
   /// <summary>The fixed width of a hires C64 image in pixels.</summary>
   public const int FixedWidth = 320;
@@ -31,11 +28,10 @@ public sealed class HiresC64File : IImageFileFormat<HiresC64File> {
   public int Height => FixedHeight;
 
   /// <summary>Raw bitmap data (8000 bytes, 1 bit per pixel within 8x8 cells).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Converts this hires C64 image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(HiresC64File file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -66,9 +62,4 @@ public sealed class HiresC64File : IImageFileFormat<HiresC64File> {
     };
   }
 
-  /// <summary>Not supported. Hires C64 images have cell-based bitmap layout.</summary>
-  public static HiresC64File FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to HiresC64File is not supported due to cell-based bitmap layout constraints.");
-  }
 }

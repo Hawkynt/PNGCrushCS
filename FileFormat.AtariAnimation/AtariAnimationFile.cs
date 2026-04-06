@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.AtariAnimation;
 
 /// <summary>In-memory representation of an Atari Animation (.aan) multi-frame file.</summary>
-public sealed class AtariAnimationFile : IImageFileFormat<AtariAnimationFile> {
+public readonly record struct AtariAnimationFile : IImageFormatReader<AtariAnimationFile>, IImageToRawImage<AtariAnimationFile>, IImageFromRawImage<AtariAnimationFile>, IImageFormatWriter<AtariAnimationFile> {
 
   /// <summary>Size of one frame in bytes (40 bytes/row x 192 rows).</summary>
   public const int FrameSize = 7680;
@@ -19,13 +18,11 @@ public sealed class AtariAnimationFile : IImageFileFormat<AtariAnimationFile> {
   /// <summary>Bytes per row in each frame.</summary>
   internal const int BytesPerRow = 40;
 
-  static string IImageFileFormat<AtariAnimationFile>.PrimaryExtension => ".aan";
-  static string[] IImageFileFormat<AtariAnimationFile>.FileExtensions => [".aan"];
-  static FormatCapability IImageFileFormat<AtariAnimationFile>.Capabilities => FormatCapability.IndexedOnly;
-  static AtariAnimationFile IImageFileFormat<AtariAnimationFile>.FromFile(FileInfo file) => AtariAnimationReader.FromFile(file);
-  static AtariAnimationFile IImageFileFormat<AtariAnimationFile>.FromBytes(byte[] data) => AtariAnimationReader.FromBytes(data);
-  static AtariAnimationFile IImageFileFormat<AtariAnimationFile>.FromStream(Stream stream) => AtariAnimationReader.FromStream(stream);
-  static byte[] IImageFileFormat<AtariAnimationFile>.ToBytes(AtariAnimationFile file) => AtariAnimationWriter.ToBytes(file);
+  static string IImageFormatMetadata<AtariAnimationFile>.PrimaryExtension => ".aan";
+  static string[] IImageFormatMetadata<AtariAnimationFile>.FileExtensions => [".aan"];
+  static AtariAnimationFile IImageFormatReader<AtariAnimationFile>.FromSpan(ReadOnlySpan<byte> data) => AtariAnimationReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<AtariAnimationFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<AtariAnimationFile>.ToBytes(AtariAnimationFile file) => AtariAnimationWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>
   public int Width => PixelWidth;
@@ -34,13 +31,12 @@ public sealed class AtariAnimationFile : IImageFileFormat<AtariAnimationFile> {
   public int Height => PixelHeight;
 
   /// <summary>Animation frames (each frame is 7680 bytes of 1bpp MSB-first screen data).</summary>
-  public byte[][] Frames { get; init; } = [];
+  public byte[][] Frames { get; init; }
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
   /// <summary>Converts the first frame of this animation to an Indexed1 raw image (320x192, B&amp;W palette).</summary>
   public static RawImage ToRawImage(AtariAnimationFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var pixelData = new byte[FrameSize];
     if (file.Frames.Length > 0)

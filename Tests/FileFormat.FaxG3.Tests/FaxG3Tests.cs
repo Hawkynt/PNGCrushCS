@@ -41,25 +41,6 @@ public class FaxG3ReaderTests {
 }
 
 [TestFixture]
-public class FaxG3WriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => FaxG3Writer.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_IncludesHeader() {
-    var file = new FaxG3File {
-      Width = 1728,
-      Height = 2200,
-      PixelData = new byte[(1728 + 7) / 8 * 2200],
-    };
-    var bytes = FaxG3Writer.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(6 + (1728 + 7) / 8 * 2200));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -90,30 +71,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void HeaderSize_Is6()
-    => Assert.That(FaxG3File.HeaderSize, Is.EqualTo(6));
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => FaxG3File.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => FaxG3File.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 1728, Height = 2200, Format = PixelFormat.Rgb24, PixelData = new byte[1728 * 2200 * 3] };
-    Assert.Throws<ArgumentException>(() => FaxG3File.FromRawImage(raw));
-  }
-
-  [Test]
-  public void FileExtensions_ContainsPrimary() {
-    string[] exts = [".g3"];
-    Assert.That(exts, Does.Contain(".g3"));
-  }
-}

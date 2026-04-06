@@ -1,19 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Oric;
 
 /// <summary>In-memory representation of an Oric hi-res graphics screen dump.</summary>
-public sealed class OricFile : IImageFileFormat<OricFile> {
+public readonly record struct OricFile : IImageFormatReader<OricFile>, IImageToRawImage<OricFile>, IImageFormatWriter<OricFile> {
 
-  static string IImageFileFormat<OricFile>.PrimaryExtension => ".oric";
-  static string[] IImageFileFormat<OricFile>.FileExtensions => [".oric", ".tap"];
-  static OricFile IImageFileFormat<OricFile>.FromFile(FileInfo file) => OricReader.FromFile(file);
-  static OricFile IImageFileFormat<OricFile>.FromBytes(byte[] data) => OricReader.FromBytes(data);
-  static OricFile IImageFileFormat<OricFile>.FromStream(Stream stream) => OricReader.FromStream(stream);
-  static RawImage IImageFileFormat<OricFile>.ToRawImage(OricFile file) => file.ToRawImage();
-  static byte[] IImageFileFormat<OricFile>.ToBytes(OricFile file) => OricWriter.ToBytes(file);
+  static string IImageFormatMetadata<OricFile>.PrimaryExtension => ".oric";
+  static string[] IImageFormatMetadata<OricFile>.FileExtensions => [".oric", ".tap"];
+  static OricFile IImageFormatReader<OricFile>.FromSpan(ReadOnlySpan<byte> data) => OricReader.FromSpan(data);
+  static byte[] IImageFormatWriter<OricFile>.ToBytes(OricFile file) => OricWriter.ToBytes(file);
   /// <summary>Always 240.</summary>
   public int Width => 240;
 
@@ -21,7 +17,7 @@ public sealed class OricFile : IImageFileFormat<OricFile> {
   public int Height => 200;
 
   /// <summary>Raw screen data (40 bytes per row x 200 rows = 8000 bytes). Each byte is either pixel data (bit 6=0: bits 0-5 = 6 pixels MSB-first) or an attribute byte (bit 6=1).</summary>
-  public byte[] ScreenData { get; init; } = [];
+  public byte[] ScreenData { get; init; }
 
   private static readonly byte[][] _OricPalette = [
     [0, 0, 0],       // 0 = Black
@@ -34,7 +30,7 @@ public sealed class OricFile : IImageFileFormat<OricFile> {
     [255, 255, 255], // 7 = White
   ];
 
-  public RawImage ToRawImage() {
+  public static RawImage ToRawImage(OricFile file) {
     const int rowBytes = 40;
     const int pixelsPerByte = 6;
     const int width = 240;
@@ -47,7 +43,7 @@ public sealed class OricFile : IImageFileFormat<OricFile> {
       var pixelX = 0;
 
       for (var col = 0; col < rowBytes; ++col) {
-        var b = y * rowBytes + col < this.ScreenData.Length ? this.ScreenData[y * rowBytes + col] : (byte)0;
+        var b = y * rowBytes + col < file.ScreenData.Length ? file.ScreenData[y * rowBytes + col] : (byte)0;
 
         if ((b & 0x40) != 0) {
           // Attribute byte
@@ -87,6 +83,4 @@ public sealed class OricFile : IImageFileFormat<OricFile> {
     };
   }
 
-  public static OricFile FromRawImage(RawImage image)
-    => throw new NotSupportedException("Oric attribute encoding from raw image is not supported.");
 }

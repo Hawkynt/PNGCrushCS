@@ -25,6 +25,8 @@ public static class Atari2600Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static Atari2600File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static Atari2600File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < Atari2600File.BytesPerTile)

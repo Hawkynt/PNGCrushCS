@@ -1,11 +1,10 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.AtariMaxi;
 
 /// <summary>In-memory representation of a Maxi (Atari 8-bit) image (ANTIC Mode E, 160x192, 4-color).</summary>
-public sealed class AtariMaxiFile : IImageFileFormat<AtariMaxiFile> {
+public readonly record struct AtariMaxiFile : IImageFormatReader<AtariMaxiFile>, IImageToRawImage<AtariMaxiFile>, IImageFromRawImage<AtariMaxiFile>, IImageFormatWriter<AtariMaxiFile> {
 
   /// <summary>The exact file size: 40 bytes/line x 192 lines.</summary>
   public const int ExpectedFileSize = 7680;
@@ -22,13 +21,11 @@ public sealed class AtariMaxiFile : IImageFileFormat<AtariMaxiFile> {
   /// <summary>Default Atari 4-color palette as 0xRRGGBB values.</summary>
   private static readonly int[] _DefaultPalette = [0x000000, 0x884400, 0x00AA44, 0xDDCC88];
 
-  static string IImageFileFormat<AtariMaxiFile>.PrimaryExtension => ".max8";
-  static string[] IImageFileFormat<AtariMaxiFile>.FileExtensions => [".max8", ".amx"];
-  static FormatCapability IImageFileFormat<AtariMaxiFile>.Capabilities => FormatCapability.IndexedOnly;
-  static AtariMaxiFile IImageFileFormat<AtariMaxiFile>.FromFile(FileInfo file) => AtariMaxiReader.FromFile(file);
-  static AtariMaxiFile IImageFileFormat<AtariMaxiFile>.FromBytes(byte[] data) => AtariMaxiReader.FromBytes(data);
-  static AtariMaxiFile IImageFileFormat<AtariMaxiFile>.FromStream(Stream stream) => AtariMaxiReader.FromStream(stream);
-  static byte[] IImageFileFormat<AtariMaxiFile>.ToBytes(AtariMaxiFile file) => AtariMaxiWriter.ToBytes(file);
+  static string IImageFormatMetadata<AtariMaxiFile>.PrimaryExtension => ".max8";
+  static string[] IImageFormatMetadata<AtariMaxiFile>.FileExtensions => [".max8", ".amx"];
+  static AtariMaxiFile IImageFormatReader<AtariMaxiFile>.FromSpan(ReadOnlySpan<byte> data) => AtariMaxiReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<AtariMaxiFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<AtariMaxiFile>.ToBytes(AtariMaxiFile file) => AtariMaxiWriter.ToBytes(file);
 
   /// <summary>Always 160.</summary>
   public int Width => FixedWidth;
@@ -37,11 +34,10 @@ public sealed class AtariMaxiFile : IImageFileFormat<AtariMaxiFile> {
   public int Height => FixedHeight;
 
   /// <summary>Raw pixel data (7680 bytes, 2bpp packed: 4 pixels per byte, 40 bytes per row, 192 rows).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this image to a platform-independent <see cref="RawImage"/> in Indexed8 format with a 4-entry palette.</summary>
   public static RawImage ToRawImage(AtariMaxiFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var indices = new byte[FixedWidth * FixedHeight];
 

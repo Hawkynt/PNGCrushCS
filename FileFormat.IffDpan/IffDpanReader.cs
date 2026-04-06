@@ -26,6 +26,8 @@ public static class IffDpanReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static IffDpanFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static IffDpanFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < IffDpanFile.MinFileSize)

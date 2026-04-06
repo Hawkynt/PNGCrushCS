@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.C128;
 
 /// <summary>In-memory representation of a Commodore 128 VDC screen image.</summary>
-public sealed class C128File : IImageFileFormat<C128File> {
+public readonly record struct C128File : IImageFormatReader<C128File>, IImageToRawImage<C128File>, IImageFromRawImage<C128File>, IImageFormatWriter<C128File> {
 
   internal const int FixedWidth = 640;
   internal const int FixedHeight = 200;
@@ -13,20 +12,17 @@ public sealed class C128File : IImageFileFormat<C128File> {
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
-  static string IImageFileFormat<C128File>.PrimaryExtension => ".c128";
-  static string[] IImageFileFormat<C128File>.FileExtensions => [".c128", ".vdc"];
-  static FormatCapability IImageFileFormat<C128File>.Capabilities => FormatCapability.MonochromeOnly;
-  static C128File IImageFileFormat<C128File>.FromFile(FileInfo file) => C128Reader.FromFile(file);
-  static C128File IImageFileFormat<C128File>.FromBytes(byte[] data) => C128Reader.FromBytes(data);
-  static C128File IImageFileFormat<C128File>.FromStream(Stream stream) => C128Reader.FromStream(stream);
-  static byte[] IImageFileFormat<C128File>.ToBytes(C128File file) => C128Writer.ToBytes(file);
+  static string IImageFormatMetadata<C128File>.PrimaryExtension => ".c128";
+  static string[] IImageFormatMetadata<C128File>.FileExtensions => [".c128", ".vdc"];
+  static C128File IImageFormatReader<C128File>.FromSpan(ReadOnlySpan<byte> data) => C128Reader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<C128File>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<C128File>.ToBytes(C128File file) => C128Writer.ToBytes(file);
 
   public int Width => FixedWidth;
   public int Height => FixedHeight;
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(C128File file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = FixedWidth,
       Height = FixedHeight,

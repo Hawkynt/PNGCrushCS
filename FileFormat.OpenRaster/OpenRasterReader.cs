@@ -33,6 +33,8 @@ public static class OpenRasterReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static OpenRasterFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static OpenRasterFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < 4)

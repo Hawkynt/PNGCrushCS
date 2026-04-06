@@ -27,6 +27,8 @@ public static class DrHaloReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static DrHaloFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static DrHaloFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < DrHaloHeader.StructSize)

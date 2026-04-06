@@ -1,19 +1,16 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.PrintfoxPagefox;
 
 /// <summary>In-memory representation of a Printfox/Pagefox hires image.</summary>
-public sealed class PrintfoxPagefoxFile : IImageFileFormat<PrintfoxPagefoxFile> {
+public readonly record struct PrintfoxPagefoxFile : IImageFormatReader<PrintfoxPagefoxFile>, IImageToRawImage<PrintfoxPagefoxFile>, IImageFormatWriter<PrintfoxPagefoxFile> {
 
-  static string IImageFileFormat<PrintfoxPagefoxFile>.PrimaryExtension => ".bs";
-  static string[] IImageFileFormat<PrintfoxPagefoxFile>.FileExtensions => [".bs", ".pg"];
-  static FormatCapability IImageFileFormat<PrintfoxPagefoxFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static PrintfoxPagefoxFile IImageFileFormat<PrintfoxPagefoxFile>.FromFile(FileInfo file) => PrintfoxPagefoxReader.FromFile(file);
-  static PrintfoxPagefoxFile IImageFileFormat<PrintfoxPagefoxFile>.FromBytes(byte[] data) => PrintfoxPagefoxReader.FromBytes(data);
-  static PrintfoxPagefoxFile IImageFileFormat<PrintfoxPagefoxFile>.FromStream(Stream stream) => PrintfoxPagefoxReader.FromStream(stream);
-  static byte[] IImageFileFormat<PrintfoxPagefoxFile>.ToBytes(PrintfoxPagefoxFile file) => PrintfoxPagefoxWriter.ToBytes(file);
+  static string IImageFormatMetadata<PrintfoxPagefoxFile>.PrimaryExtension => ".bs";
+  static string[] IImageFormatMetadata<PrintfoxPagefoxFile>.FileExtensions => [".bs", ".pg"];
+  static PrintfoxPagefoxFile IImageFormatReader<PrintfoxPagefoxFile>.FromSpan(ReadOnlySpan<byte> data) => PrintfoxPagefoxReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<PrintfoxPagefoxFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<PrintfoxPagefoxFile>.ToBytes(PrintfoxPagefoxFile file) => PrintfoxPagefoxWriter.ToBytes(file);
 
   /// <summary>The fixed width of the image in pixels.</summary>
   public const int FixedWidth = 320;
@@ -37,11 +34,10 @@ public sealed class PrintfoxPagefoxFile : IImageFileFormat<PrintfoxPagefoxFile> 
   public int Height => FixedHeight;
 
   /// <summary>Raw bitmap data (at least 8000 bytes of 1bpp packed pixel data).</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   /// <summary>Converts this Printfox/Pagefox image to an Indexed1 <see cref="RawImage"/>.</summary>
   public static RawImage ToRawImage(PrintfoxPagefoxFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var pixelData = new byte[BytesPerRow * FixedHeight];
     var copyLength = Math.Min(file.RawData.Length, pixelData.Length);
@@ -57,9 +53,4 @@ public sealed class PrintfoxPagefoxFile : IImageFileFormat<PrintfoxPagefoxFile> 
     };
   }
 
-  /// <summary>Not supported. Printfox/Pagefox images are read-only raw bitmap data.</summary>
-  public static PrintfoxPagefoxFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to PrintfoxPagefoxFile is not supported.");
-  }
 }

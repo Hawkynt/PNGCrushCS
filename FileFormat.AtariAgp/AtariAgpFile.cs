@@ -1,11 +1,10 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.AtariAgp;
 
 /// <summary>In-memory representation of an Atari 8-bit AGP (Atari Graphics Processor) image.</summary>
-public sealed class AtariAgpFile : IImageFileFormat<AtariAgpFile> {
+public readonly record struct AtariAgpFile : IImageFormatReader<AtariAgpFile>, IImageToRawImage<AtariAgpFile>, IImageFromRawImage<AtariAgpFile>, IImageFormatWriter<AtariAgpFile> {
 
   /// <summary>File size for Graphics 8 mode (320x192, 1bpp).</summary>
   internal const int FileSizeGr8 = 7680;
@@ -16,15 +15,11 @@ public sealed class AtariAgpFile : IImageFileFormat<AtariAgpFile> {
   /// <summary>File size for Graphics 8 with 2 appended color bytes.</summary>
   internal const int FileSizeGr8WithColors = 7682;
 
-  static string IImageFileFormat<AtariAgpFile>.PrimaryExtension => ".agp";
-  static string[] IImageFileFormat<AtariAgpFile>.FileExtensions => [".agp"];
-  static FormatCapability IImageFileFormat<AtariAgpFile>.Capabilities => FormatCapability.IndexedOnly;
-  static AtariAgpFile IImageFileFormat<AtariAgpFile>.FromFile(FileInfo file) => AtariAgpReader.FromFile(file);
-  static AtariAgpFile IImageFileFormat<AtariAgpFile>.FromBytes(byte[] data) => AtariAgpReader.FromBytes(data);
-  static AtariAgpFile IImageFileFormat<AtariAgpFile>.FromStream(Stream stream) => AtariAgpReader.FromStream(stream);
-  static RawImage IImageFileFormat<AtariAgpFile>.ToRawImage(AtariAgpFile file) => ToRawImage(file);
-  static AtariAgpFile IImageFileFormat<AtariAgpFile>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<AtariAgpFile>.ToBytes(AtariAgpFile file) => AtariAgpWriter.ToBytes(file);
+  static string IImageFormatMetadata<AtariAgpFile>.PrimaryExtension => ".agp";
+  static string[] IImageFormatMetadata<AtariAgpFile>.FileExtensions => [".agp"];
+  static AtariAgpFile IImageFormatReader<AtariAgpFile>.FromSpan(ReadOnlySpan<byte> data) => AtariAgpReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<AtariAgpFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<AtariAgpFile>.ToBytes(AtariAgpFile file) => AtariAgpWriter.ToBytes(file);
 
   /// <summary>Width in pixels (320 for GR.8, 160 for GR.7).</summary>
   public int Width { get; init; }
@@ -36,10 +31,10 @@ public sealed class AtariAgpFile : IImageFileFormat<AtariAgpFile> {
   public AtariAgpMode Mode { get; init; }
 
   /// <summary>Indexed pixel data (one byte per pixel).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>RGB palette triplets (3 bytes per entry).</summary>
-  public byte[] Palette { get; init; } = [];
+  public byte[] Palette { get; init; }
 
   /// <summary>Optional foreground color byte (from GR.8 with colors variant).</summary>
   public byte ForegroundColor { get; init; }
@@ -73,7 +68,6 @@ public sealed class AtariAgpFile : IImageFileFormat<AtariAgpFile> {
 
   /// <summary>Converts this AGP image to an Indexed8 raw image.</summary>
   public static RawImage ToRawImage(AtariAgpFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var width = file.Width;
     var height = file.Height;

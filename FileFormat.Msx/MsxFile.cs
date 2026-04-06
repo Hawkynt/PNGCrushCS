@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Msx;
 
 /// <summary>In-memory representation of an MSX2 screen dump.</summary>
-public sealed class MsxFile : IImageFileFormat<MsxFile> {
+public readonly record struct MsxFile : IImageFormatReader<MsxFile>, IImageToRawImage<MsxFile>, IImageFormatWriter<MsxFile> {
 
-  static string IImageFileFormat<MsxFile>.PrimaryExtension => ".sc5";
-  static string[] IImageFileFormat<MsxFile>.FileExtensions => [".sc2", ".sc5", ".sc7", ".sc8"];
-  static MsxFile IImageFileFormat<MsxFile>.FromFile(FileInfo file) => MsxReader.FromFile(file);
-  static MsxFile IImageFileFormat<MsxFile>.FromBytes(byte[] data) => MsxReader.FromBytes(data);
-  static MsxFile IImageFileFormat<MsxFile>.FromStream(Stream stream) => MsxReader.FromStream(stream);
-  static byte[] IImageFileFormat<MsxFile>.ToBytes(MsxFile file) => MsxWriter.ToBytes(file);
+  static string IImageFormatMetadata<MsxFile>.PrimaryExtension => ".sc5";
+  static string[] IImageFormatMetadata<MsxFile>.FileExtensions => [".sc2", ".sc5", ".sc7", ".sc8"];
+  static MsxFile IImageFormatReader<MsxFile>.FromSpan(ReadOnlySpan<byte> data) => MsxReader.FromSpan(data);
+  static byte[] IImageFormatWriter<MsxFile>.ToBytes(MsxFile file) => MsxWriter.ToBytes(file);
 
   /// <summary>TMS9918 fixed 16-color palette as RGB triplets.</summary>
   private static readonly byte[] _Tms9918Palette = [
@@ -47,7 +44,7 @@ public sealed class MsxFile : IImageFileFormat<MsxFile> {
   public int BitsPerPixel { get; init; }
 
   /// <summary>Raw pixel/pattern data.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Optional palette data (32 bytes for SC5/SC7, null for SC2/SC8).</summary>
   public byte[]? Palette { get; init; }
@@ -57,7 +54,6 @@ public sealed class MsxFile : IImageFileFormat<MsxFile> {
 
   /// <summary>Converts this MSX2 screen to a platform-independent <see cref="RawImage"/>.</summary>
   public static RawImage ToRawImage(MsxFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     return file.Mode switch {
       MsxMode.Screen2 => _Sc2ToRawImage(file),
@@ -66,12 +62,6 @@ public sealed class MsxFile : IImageFileFormat<MsxFile> {
       MsxMode.Screen8 => _Sc8ToRawImage(file),
       _ => throw new NotSupportedException($"Unsupported MSX mode: {file.Mode}.")
     };
-  }
-
-  /// <summary>Not supported. MSX screen modes have complex format-specific constraints.</summary>
-  public static MsxFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to MsxFile is not supported due to complex format-specific constraints.");
   }
 
   /// <summary>Screen2: pattern-based TMS9918. Output as Rgb24 using fixed palette.</summary>

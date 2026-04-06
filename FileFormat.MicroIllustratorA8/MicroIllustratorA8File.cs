@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.MicroIllustratorA8;
 
 /// <summary>In-memory representation of a Micro Illustrator Atari 8-bit (.mia) image.</summary>
-public sealed class MicroIllustratorA8File : IImageFileFormat<MicroIllustratorA8File> {
+public readonly record struct MicroIllustratorA8File : IImageFormatReader<MicroIllustratorA8File>, IImageToRawImage<MicroIllustratorA8File>, IImageFormatWriter<MicroIllustratorA8File> {
 
   /// <summary>Exact file size: 40 bytes/row x 192 rows.</summary>
   public const int ExpectedFileSize = 7680;
@@ -22,13 +21,11 @@ public sealed class MicroIllustratorA8File : IImageFileFormat<MicroIllustratorA8
   /// <summary>Bits per pixel (2bpp, 4 pixels per byte).</summary>
   internal const int BitsPerPixel = 2;
 
-  static string IImageFileFormat<MicroIllustratorA8File>.PrimaryExtension => ".mia";
-  static string[] IImageFileFormat<MicroIllustratorA8File>.FileExtensions => [".mia"];
-  static FormatCapability IImageFileFormat<MicroIllustratorA8File>.Capabilities => FormatCapability.IndexedOnly;
-  static MicroIllustratorA8File IImageFileFormat<MicroIllustratorA8File>.FromFile(FileInfo file) => MicroIllustratorA8Reader.FromFile(file);
-  static MicroIllustratorA8File IImageFileFormat<MicroIllustratorA8File>.FromBytes(byte[] data) => MicroIllustratorA8Reader.FromBytes(data);
-  static MicroIllustratorA8File IImageFileFormat<MicroIllustratorA8File>.FromStream(Stream stream) => MicroIllustratorA8Reader.FromStream(stream);
-  static byte[] IImageFileFormat<MicroIllustratorA8File>.ToBytes(MicroIllustratorA8File file) => MicroIllustratorA8Writer.ToBytes(file);
+  static string IImageFormatMetadata<MicroIllustratorA8File>.PrimaryExtension => ".mia";
+  static string[] IImageFormatMetadata<MicroIllustratorA8File>.FileExtensions => [".mia"];
+  static MicroIllustratorA8File IImageFormatReader<MicroIllustratorA8File>.FromSpan(ReadOnlySpan<byte> data) => MicroIllustratorA8Reader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<MicroIllustratorA8File>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<MicroIllustratorA8File>.ToBytes(MicroIllustratorA8File file) => MicroIllustratorA8Writer.ToBytes(file);
 
   /// <summary>Always 160.</summary>
   public int Width => PixelWidth;
@@ -37,7 +34,7 @@ public sealed class MicroIllustratorA8File : IImageFileFormat<MicroIllustratorA8
   public int Height => PixelHeight;
 
   /// <summary>Raw 2bpp ANTIC Mode E screen data (7680 bytes, 4 pixels per byte).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Default 4-color ANTIC Mode E palette as RGB triplets.</summary>
   private static readonly byte[] _DefaultPalette = [
@@ -49,7 +46,6 @@ public sealed class MicroIllustratorA8File : IImageFileFormat<MicroIllustratorA8
 
   /// <summary>Converts this Micro Illustrator image to an Indexed8 raw image with a 4-entry palette.</summary>
   public static RawImage ToRawImage(MicroIllustratorA8File file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var pixels = new byte[PixelWidth * PixelHeight];
 
@@ -77,9 +73,4 @@ public sealed class MicroIllustratorA8File : IImageFileFormat<MicroIllustratorA8
     };
   }
 
-  /// <summary>Not supported. Micro Illustrator images use a fixed ANTIC Mode E palette.</summary>
-  public static MicroIllustratorA8File FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to MicroIllustratorA8File is not supported.");
-  }
 }

@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.InterlaceStudio;
 
 /// <summary>In-memory representation of a C64 Interlace Studio (.ist) multicolor interlace image.</summary>
-public sealed class InterlaceStudioFile : IImageFileFormat<InterlaceStudioFile> {
+public readonly record struct InterlaceStudioFile : IImageFormatReader<InterlaceStudioFile>, IImageToRawImage<InterlaceStudioFile>, IImageFormatWriter<InterlaceStudioFile> {
 
-  static string IImageFileFormat<InterlaceStudioFile>.PrimaryExtension => ".ist";
-  static string[] IImageFileFormat<InterlaceStudioFile>.FileExtensions => [".ist"];
-  static InterlaceStudioFile IImageFileFormat<InterlaceStudioFile>.FromFile(FileInfo file) => InterlaceStudioReader.FromFile(file);
-  static InterlaceStudioFile IImageFileFormat<InterlaceStudioFile>.FromBytes(byte[] data) => InterlaceStudioReader.FromBytes(data);
-  static InterlaceStudioFile IImageFileFormat<InterlaceStudioFile>.FromStream(Stream stream) => InterlaceStudioReader.FromStream(stream);
-  static byte[] IImageFileFormat<InterlaceStudioFile>.ToBytes(InterlaceStudioFile file) => InterlaceStudioWriter.ToBytes(file);
+  static string IImageFormatMetadata<InterlaceStudioFile>.PrimaryExtension => ".ist";
+  static string[] IImageFormatMetadata<InterlaceStudioFile>.FileExtensions => [".ist"];
+  static InterlaceStudioFile IImageFormatReader<InterlaceStudioFile>.FromSpan(ReadOnlySpan<byte> data) => InterlaceStudioReader.FromSpan(data);
+  static byte[] IImageFormatWriter<InterlaceStudioFile>.ToBytes(InterlaceStudioFile file) => InterlaceStudioWriter.ToBytes(file);
 
   /// <summary>Image width in pixels, always 160 (multicolor).</summary>
   public const int ImageWidth = 160;
@@ -49,26 +46,25 @@ public sealed class InterlaceStudioFile : IImageFileFormat<InterlaceStudioFile> 
   public ushort LoadAddress { get; init; }
 
   /// <summary>First frame bitmap data (8000 bytes).</summary>
-  public byte[] Bitmap1 { get; init; } = [];
+  public byte[] Bitmap1 { get; init; }
 
   /// <summary>First frame screen RAM (1000 bytes).</summary>
-  public byte[] Screen1 { get; init; } = [];
+  public byte[] Screen1 { get; init; }
 
   /// <summary>Shared color RAM (1000 bytes).</summary>
-  public byte[] ColorData { get; init; } = [];
+  public byte[] ColorData { get; init; }
 
   /// <summary>Second frame bitmap data (8000 bytes).</summary>
-  public byte[] Bitmap2 { get; init; } = [];
+  public byte[] Bitmap2 { get; init; }
 
   /// <summary>Second frame screen RAM (1000 bytes).</summary>
-  public byte[] Screen2 { get; init; } = [];
+  public byte[] Screen2 { get; init; }
 
   /// <summary>Background color index (0-15).</summary>
   public byte BackgroundColor { get; init; }
 
   /// <summary>Converts this Interlace Studio image to a platform-independent <see cref="RawImage"/> in Rgb24 format by averaging both multicolor frames.</summary>
   public static RawImage ToRawImage(InterlaceStudioFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = ImageWidth;
     const int height = ImageHeight;
@@ -120,6 +116,4 @@ public sealed class InterlaceStudioFile : IImageFileFormat<InterlaceStudioFile> 
     return _C64Palette[colorIndex];
   }
 
-  /// <summary>Not supported. Interlace Studio images have complex dual-frame color constraints.</summary>
-  public static InterlaceStudioFile FromRawImage(RawImage image) => throw new NotSupportedException("Creating Interlace Studio files from raw images is not supported.");
 }

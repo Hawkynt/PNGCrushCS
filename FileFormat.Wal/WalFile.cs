@@ -1,31 +1,27 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Wal;
 
 /// <summary>In-memory representation of a WAL (Quake 2 Texture) file.</summary>
-public sealed class WalFile : IImageFileFormat<WalFile> {
+public readonly record struct WalFile : IImageFormatReader<WalFile>, IImageToRawImage<WalFile>, IImageFromRawImage<WalFile>, IImageFormatWriter<WalFile> {
 
-  static string IImageFileFormat<WalFile>.PrimaryExtension => ".wal";
-  static string[] IImageFileFormat<WalFile>.FileExtensions => [".wal"];
-  static WalFile IImageFileFormat<WalFile>.FromFile(FileInfo file) => WalReader.FromFile(file);
-  static WalFile IImageFileFormat<WalFile>.FromBytes(byte[] data) => WalReader.FromBytes(data);
-  static WalFile IImageFileFormat<WalFile>.FromStream(Stream stream) => WalReader.FromStream(stream);
-  static byte[] IImageFileFormat<WalFile>.ToBytes(WalFile file) => WalWriter.ToBytes(file);
-  public string Name { get; init; } = string.Empty;
+  static string IImageFormatMetadata<WalFile>.PrimaryExtension => ".wal";
+  static string[] IImageFormatMetadata<WalFile>.FileExtensions => [".wal"];
+  static WalFile IImageFormatReader<WalFile>.FromSpan(ReadOnlySpan<byte> data) => WalReader.FromSpan(data);
+  static byte[] IImageFormatWriter<WalFile>.ToBytes(WalFile file) => WalWriter.ToBytes(file);
+  public string Name { get; init; }
   public int Width { get; init; }
   public int Height { get; init; }
-  public string NextFrameName { get; init; } = string.Empty;
+  public string NextFrameName { get; init; }
   public uint Flags { get; init; }
   public uint Contents { get; init; }
   public uint Value { get; init; }
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
   public byte[][]? MipMaps { get; init; }
 
   /// <summary>Converts a WAL file to a <see cref="RawImage"/>. No palette is embedded (uses external Quake 2 palette).</summary>
   public static RawImage ToRawImage(WalFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     return new RawImage {
       Width = file.Width,

@@ -1,11 +1,11 @@
-﻿using System;
+using System;
 using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Atari7800;
 
 /// <summary>Atari 7800 Maria screen dump data model.</summary>
-public sealed class Atari7800File : IImageFileFormat<Atari7800File> {
+public sealed class Atari7800File : IImageFormatReader<Atari7800File>, IImageToRawImage<Atari7800File>, IImageFromRawImage<Atari7800File>, IImageFormatWriter<Atari7800File> {
 
   public const int FileSize = 38400;
   public const int ImageWidth = 160;
@@ -18,7 +18,8 @@ public sealed class Atari7800File : IImageFileFormat<Atari7800File> {
 
   public static string PrimaryExtension => ".a78";
   public static string[] FileExtensions => [".a78", ".a7800"];
-  static FormatCapability IImageFileFormat<Atari7800File>.Capabilities => FormatCapability.IndexedOnly;
+  static Atari7800File IImageFormatReader<Atari7800File>.FromSpan(ReadOnlySpan<byte> data) => Atari7800Reader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<Atari7800File>.Capabilities => FormatCapability.IndexedOnly;
   public static Atari7800File FromFile(FileInfo file) => Atari7800Reader.FromFile(file);
   public static Atari7800File FromBytes(byte[] data) => Atari7800Reader.FromBytes(data);
   public static Atari7800File FromStream(Stream stream) => Atari7800Reader.FromStream(stream);

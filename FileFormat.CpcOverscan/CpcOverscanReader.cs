@@ -29,6 +29,8 @@ public static class CpcOverscanReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static CpcOverscanFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static CpcOverscanFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != CpcOverscanFile.ExpectedFileSize)

@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.EverexFax;
 
 /// <summary>In-memory representation of an Everex Fax EFX image.</summary>
-public sealed class EverexFaxFile : IImageFileFormat<EverexFaxFile> {
+public readonly record struct EverexFaxFile : IImageFormatReader<EverexFaxFile>, IImageToRawImage<EverexFaxFile>, IImageFormatWriter<EverexFaxFile> {
 
-  static string IImageFileFormat<EverexFaxFile>.PrimaryExtension => ".efx";
-  static string[] IImageFileFormat<EverexFaxFile>.FileExtensions => [".efx", ".ef3"];
-  static EverexFaxFile IImageFileFormat<EverexFaxFile>.FromFile(FileInfo file) => EverexFaxReader.FromFile(file);
-  static EverexFaxFile IImageFileFormat<EverexFaxFile>.FromBytes(byte[] data) => EverexFaxReader.FromBytes(data);
-  static EverexFaxFile IImageFileFormat<EverexFaxFile>.FromStream(Stream stream) => EverexFaxReader.FromStream(stream);
-  static byte[] IImageFileFormat<EverexFaxFile>.ToBytes(EverexFaxFile file) => EverexFaxWriter.ToBytes(file);
+  static string IImageFormatMetadata<EverexFaxFile>.PrimaryExtension => ".efx";
+  static string[] IImageFormatMetadata<EverexFaxFile>.FileExtensions => [".efx", ".ef3"];
+  static EverexFaxFile IImageFormatReader<EverexFaxFile>.FromSpan(ReadOnlySpan<byte> data) => EverexFaxReader.FromSpan(data);
+  static byte[] IImageFormatWriter<EverexFaxFile>.ToBytes(EverexFaxFile file) => EverexFaxWriter.ToBytes(file);
 
   /// <summary>Magic bytes: "EFAX" (0x45 0x46 0x41 0x58).</summary>
   internal static readonly byte[] Magic = [0x45, 0x46, 0x41, 0x58];
@@ -42,11 +39,10 @@ public sealed class EverexFaxFile : IImageFileFormat<EverexFaxFile> {
   public ushort Reserved { get; init; }
 
   /// <summary>1bpp pixel data, MSB first, rows padded to byte boundary.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this EFX image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(EverexFaxFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var bytesPerRow = (file.Width + 7) / 8;
     var rgb = new byte[file.Width * file.Height * 3];
@@ -71,9 +67,4 @@ public sealed class EverexFaxFile : IImageFileFormat<EverexFaxFile> {
     };
   }
 
-  /// <summary>Not supported.</summary>
-  public static EverexFaxFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to EverexFaxFile is not supported.");
-  }
 }

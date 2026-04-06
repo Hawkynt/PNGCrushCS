@@ -26,6 +26,8 @@ public static class CpcAdvancedReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static CpcAdvancedFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static CpcAdvancedFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != CpcAdvancedFile.ExpectedFileSize)

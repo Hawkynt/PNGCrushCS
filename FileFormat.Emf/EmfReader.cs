@@ -33,6 +33,8 @@ public static class EmfReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static EmfFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static EmfFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MIN_HEADER_SIZE)

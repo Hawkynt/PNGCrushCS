@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.MobileFax;
 
 /// <summary>In-memory representation of a MobileFax RFA image.</summary>
-public sealed class MobileFaxFile : IImageFileFormat<MobileFaxFile> {
+public readonly record struct MobileFaxFile : IImageFormatReader<MobileFaxFile>, IImageToRawImage<MobileFaxFile>, IImageFormatWriter<MobileFaxFile> {
 
-  static string IImageFileFormat<MobileFaxFile>.PrimaryExtension => ".rfa";
-  static string[] IImageFileFormat<MobileFaxFile>.FileExtensions => [".rfa"];
-  static MobileFaxFile IImageFileFormat<MobileFaxFile>.FromFile(FileInfo file) => MobileFaxReader.FromFile(file);
-  static MobileFaxFile IImageFileFormat<MobileFaxFile>.FromBytes(byte[] data) => MobileFaxReader.FromBytes(data);
-  static MobileFaxFile IImageFileFormat<MobileFaxFile>.FromStream(Stream stream) => MobileFaxReader.FromStream(stream);
-  static byte[] IImageFileFormat<MobileFaxFile>.ToBytes(MobileFaxFile file) => MobileFaxWriter.ToBytes(file);
+  static string IImageFormatMetadata<MobileFaxFile>.PrimaryExtension => ".rfa";
+  static string[] IImageFormatMetadata<MobileFaxFile>.FileExtensions => [".rfa"];
+  static MobileFaxFile IImageFormatReader<MobileFaxFile>.FromSpan(ReadOnlySpan<byte> data) => MobileFaxReader.FromSpan(data);
+  static byte[] IImageFormatWriter<MobileFaxFile>.ToBytes(MobileFaxFile file) => MobileFaxWriter.ToBytes(file);
 
   /// <summary>Magic bytes: "MF" (0x4D 0x46).</summary>
   internal static readonly byte[] Magic = [0x4D, 0x46];
@@ -33,11 +30,10 @@ public sealed class MobileFaxFile : IImageFileFormat<MobileFaxFile> {
   public ushort Version { get; init; }
 
   /// <summary>1bpp pixel data, MSB first, rows padded to byte boundary.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this RFA image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(MobileFaxFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var bytesPerRow = (file.Width + 7) / 8;
     var rgb = new byte[file.Width * file.Height * 3];
@@ -62,9 +58,4 @@ public sealed class MobileFaxFile : IImageFileFormat<MobileFaxFile> {
     };
   }
 
-  /// <summary>Not supported.</summary>
-  public static MobileFaxFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to MobileFaxFile is not supported.");
-  }
 }

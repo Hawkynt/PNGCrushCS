@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.InterPaintHi;
 
 /// <summary>In-memory representation of a Commodore 64 InterPaint Hires image.</summary>
-public sealed class InterPaintHiFile : IImageFileFormat<InterPaintHiFile> {
+public readonly record struct InterPaintHiFile : IImageFormatReader<InterPaintHiFile>, IImageToRawImage<InterPaintHiFile>, IImageFormatWriter<InterPaintHiFile> {
 
-  static string IImageFileFormat<InterPaintHiFile>.PrimaryExtension => ".iph";
-  static string[] IImageFileFormat<InterPaintHiFile>.FileExtensions => [".iph"];
-  static InterPaintHiFile IImageFileFormat<InterPaintHiFile>.FromFile(FileInfo file) => InterPaintHiReader.FromFile(file);
-  static InterPaintHiFile IImageFileFormat<InterPaintHiFile>.FromBytes(byte[] data) => InterPaintHiReader.FromBytes(data);
-  static InterPaintHiFile IImageFileFormat<InterPaintHiFile>.FromStream(Stream stream) => InterPaintHiReader.FromStream(stream);
-  static byte[] IImageFileFormat<InterPaintHiFile>.ToBytes(InterPaintHiFile file) => InterPaintHiWriter.ToBytes(file);
+  static string IImageFormatMetadata<InterPaintHiFile>.PrimaryExtension => ".iph";
+  static string[] IImageFormatMetadata<InterPaintHiFile>.FileExtensions => [".iph"];
+  static InterPaintHiFile IImageFormatReader<InterPaintHiFile>.FromSpan(ReadOnlySpan<byte> data) => InterPaintHiReader.FromSpan(data);
+  static byte[] IImageFormatWriter<InterPaintHiFile>.ToBytes(InterPaintHiFile file) => InterPaintHiWriter.ToBytes(file);
 
   /// <summary>The fixed width of an InterPaint Hires image in pixels.</summary>
   public const int FixedWidth = 320;
@@ -49,14 +46,13 @@ public sealed class InterPaintHiFile : IImageFileFormat<InterPaintHiFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Hires bitmap data (8000 bytes, 1 bit per pixel within 8x8 cells).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Screen RAM (1000 bytes, upper nybble = foreground color, lower nybble = background color per cell).</summary>
-  public byte[] ScreenRam { get; init; } = [];
+  public byte[] ScreenRam { get; init; }
 
   /// <summary>Converts this InterPaint Hires image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(InterPaintHiFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -92,9 +88,4 @@ public sealed class InterPaintHiFile : IImageFileFormat<InterPaintHiFile> {
     };
   }
 
-  /// <summary>Not supported. InterPaint Hires images have complex cell-based color constraints.</summary>
-  public static InterPaintHiFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to InterPaintHiFile is not supported due to complex cell-based color constraints.");
-  }
 }

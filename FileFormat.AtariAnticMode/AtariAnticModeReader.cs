@@ -26,6 +26,8 @@ public static class AtariAnticModeReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static AtariAnticModeFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AtariAnticModeFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != AtariAnticModeFile.ExpectedFileSize)

@@ -26,6 +26,8 @@ public static class JbigReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static JbigFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static JbigFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < JbigHeader.StructSize)

@@ -46,6 +46,8 @@ public static class MayaIffReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static MayaIffFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static MayaIffFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MIN_FILE_SIZE)

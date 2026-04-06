@@ -29,6 +29,8 @@ public static class FalconResReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static FalconResFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static FalconResFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != _EXPECTED_SIZE)

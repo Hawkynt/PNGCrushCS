@@ -26,6 +26,8 @@ public static class FaxManReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static FaxManFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static FaxManFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < FaxManFile.MinFileSize)

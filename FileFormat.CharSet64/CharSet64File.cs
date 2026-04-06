@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.CharSet64;
 
 /// <summary>In-memory representation of a C64 character set (256 chars x 8 bytes each = 2048 bytes).</summary>
-public sealed class CharSet64File : IImageFileFormat<CharSet64File> {
+public readonly record struct CharSet64File : IImageFormatReader<CharSet64File>, IImageToRawImage<CharSet64File>, IImageFromRawImage<CharSet64File>, IImageFormatWriter<CharSet64File> {
 
   /// <summary>Number of characters in the set.</summary>
   internal const int CharCount = 256;
@@ -37,15 +36,11 @@ public sealed class CharSet64File : IImageFileFormat<CharSet64File> {
   /// <summary>Black and white palette for indexed output (2 entries, 3 bytes each).</summary>
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
-  static string IImageFileFormat<CharSet64File>.PrimaryExtension => ".chr64";
-  static string[] IImageFileFormat<CharSet64File>.FileExtensions => [".chr64"];
-  static FormatCapability IImageFileFormat<CharSet64File>.Capabilities => FormatCapability.MonochromeOnly;
-  static CharSet64File IImageFileFormat<CharSet64File>.FromFile(FileInfo file) => CharSet64Reader.FromFile(file);
-  static CharSet64File IImageFileFormat<CharSet64File>.FromBytes(byte[] data) => CharSet64Reader.FromBytes(data);
-  static CharSet64File IImageFileFormat<CharSet64File>.FromStream(Stream stream) => CharSet64Reader.FromStream(stream);
-  static RawImage IImageFileFormat<CharSet64File>.ToRawImage(CharSet64File file) => ToRawImage(file);
-  static CharSet64File IImageFileFormat<CharSet64File>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<CharSet64File>.ToBytes(CharSet64File file) => CharSet64Writer.ToBytes(file);
+  static string IImageFormatMetadata<CharSet64File>.PrimaryExtension => ".chr64";
+  static string[] IImageFormatMetadata<CharSet64File>.FileExtensions => [".chr64"];
+  static CharSet64File IImageFormatReader<CharSet64File>.FromSpan(ReadOnlySpan<byte> data) => CharSet64Reader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<CharSet64File>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<CharSet64File>.ToBytes(CharSet64File file) => CharSet64Writer.ToBytes(file);
 
   /// <summary>Always 128 (16 chars x 8 pixels).</summary>
   public int Width => PixelWidth;
@@ -54,14 +49,13 @@ public sealed class CharSet64File : IImageFileFormat<CharSet64File> {
   public int Height => PixelHeight;
 
   /// <summary>Raw character set data (2048 bytes: 256 characters x 8 bytes each).</summary>
-  public byte[] CharData { get; init; } = [];
+  public byte[] CharData { get; init; }
 
   /// <summary>
   /// Converts this C64 character set to a platform-independent <see cref="RawImage"/> in Indexed1 format.
   /// Characters are arranged in a 16x16 grid, each 8x8 pixels, producing a 128x128 image.
   /// </summary>
   public static RawImage ToRawImage(CharSet64File file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var rowStride = PixelWidth / 8; // 16 bytes per row
     var pixelData = new byte[rowStride * PixelHeight];

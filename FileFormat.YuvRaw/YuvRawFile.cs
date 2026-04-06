@@ -1,20 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.YuvRaw;
 
 /// <summary>In-memory representation of a raw YUV 4:2:0 planar image.</summary>
-public sealed class YuvRawFile : IImageFileFormat<YuvRawFile> {
+public readonly record struct YuvRawFile : IImageFormatReader<YuvRawFile>, IImageToRawImage<YuvRawFile>, IImageFromRawImage<YuvRawFile>, IImageFormatWriter<YuvRawFile> {
 
-  static string IImageFileFormat<YuvRawFile>.PrimaryExtension => ".yuv";
-  static string[] IImageFileFormat<YuvRawFile>.FileExtensions => [".yuv"];
-  static YuvRawFile IImageFileFormat<YuvRawFile>.FromFile(FileInfo file) => YuvRawReader.FromFile(file);
-  static YuvRawFile IImageFileFormat<YuvRawFile>.FromBytes(byte[] data) => YuvRawReader.FromBytes(data);
-  static YuvRawFile IImageFileFormat<YuvRawFile>.FromStream(Stream stream) => YuvRawReader.FromStream(stream);
-  static RawImage IImageFileFormat<YuvRawFile>.ToRawImage(YuvRawFile file) => ToRawImage(file);
-  static YuvRawFile IImageFileFormat<YuvRawFile>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<YuvRawFile>.ToBytes(YuvRawFile file) => YuvRawWriter.ToBytes(file);
+  static string IImageFormatMetadata<YuvRawFile>.PrimaryExtension => ".yuv";
+  static string[] IImageFormatMetadata<YuvRawFile>.FileExtensions => [".yuv"];
+  static YuvRawFile IImageFormatReader<YuvRawFile>.FromSpan(ReadOnlySpan<byte> data) => YuvRawReader.FromSpan(data);
+  static byte[] IImageFormatWriter<YuvRawFile>.ToBytes(YuvRawFile file) => YuvRawWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -23,13 +18,13 @@ public sealed class YuvRawFile : IImageFileFormat<YuvRawFile> {
   public int Height { get; init; }
 
   /// <summary>Y (luminance) plane data (Width * Height bytes).</summary>
-  public byte[] YPlane { get; init; } = [];
+  public byte[] YPlane { get; init; }
 
   /// <summary>U (Cb chrominance) plane data (Width/2 * Height/2 bytes).</summary>
-  public byte[] UPlane { get; init; } = [];
+  public byte[] UPlane { get; init; }
 
   /// <summary>V (Cr chrominance) plane data (Width/2 * Height/2 bytes).</summary>
-  public byte[] VPlane { get; init; } = [];
+  public byte[] VPlane { get; init; }
 
   /// <summary>Known YUV 4:2:0 resolutions indexed by file size (width*height*3/2).</summary>
   internal static readonly (int Width, int Height)[] KnownResolutions = [
@@ -45,7 +40,6 @@ public sealed class YuvRawFile : IImageFileFormat<YuvRawFile> {
 
   /// <summary>Converts YUV 4:2:0 to Rgb24 raw image.</summary>
   public static RawImage ToRawImage(YuvRawFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var w = file.Width;
     var h = file.Height;

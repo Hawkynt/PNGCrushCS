@@ -26,6 +26,8 @@ public static class Atari8BitReader {
     return FromBytes(ms.ToArray(), mode);
   }
 
+  public static Atari8BitFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static Atari8BitFile FromBytes(byte[] data, Atari8BitMode? mode = null) {
     ArgumentNullException.ThrowIfNull(data);
 

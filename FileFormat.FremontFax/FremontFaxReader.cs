@@ -26,6 +26,8 @@ public static class FremontFaxReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static FremontFaxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static FremontFaxFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < FremontFaxFile.MinFileSize)

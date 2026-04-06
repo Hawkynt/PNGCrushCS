@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.RainbowPainter;
 
 /// <summary>In-memory representation of a Commodore 64 Rainbow Painter multicolor image.</summary>
-public sealed class RainbowPainterFile : IImageFileFormat<RainbowPainterFile> {
+public readonly record struct RainbowPainterFile : IImageFormatReader<RainbowPainterFile>, IImageToRawImage<RainbowPainterFile>, IImageFormatWriter<RainbowPainterFile> {
 
-  static string IImageFileFormat<RainbowPainterFile>.PrimaryExtension => ".rp";
-  static string[] IImageFileFormat<RainbowPainterFile>.FileExtensions => [".rp"];
-  static RainbowPainterFile IImageFileFormat<RainbowPainterFile>.FromFile(FileInfo file) => RainbowPainterReader.FromFile(file);
-  static RainbowPainterFile IImageFileFormat<RainbowPainterFile>.FromBytes(byte[] data) => RainbowPainterReader.FromBytes(data);
-  static RainbowPainterFile IImageFileFormat<RainbowPainterFile>.FromStream(Stream stream) => RainbowPainterReader.FromStream(stream);
-  static byte[] IImageFileFormat<RainbowPainterFile>.ToBytes(RainbowPainterFile file) => RainbowPainterWriter.ToBytes(file);
+  static string IImageFormatMetadata<RainbowPainterFile>.PrimaryExtension => ".rp";
+  static string[] IImageFormatMetadata<RainbowPainterFile>.FileExtensions => [".rp"];
+  static RainbowPainterFile IImageFormatReader<RainbowPainterFile>.FromSpan(ReadOnlySpan<byte> data) => RainbowPainterReader.FromSpan(data);
+  static byte[] IImageFormatWriter<RainbowPainterFile>.ToBytes(RainbowPainterFile file) => RainbowPainterWriter.ToBytes(file);
 
   /// <summary>The fixed width of a Rainbow Painter image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -52,20 +49,19 @@ public sealed class RainbowPainterFile : IImageFileFormat<RainbowPainterFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Multicolor bitmap data (8000 bytes, 2 bits per pixel).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Video matrix / screen RAM (1000 bytes, upper/lower nybble = 2 colors per cell).</summary>
-  public byte[] VideoMatrix { get; init; } = [];
+  public byte[] VideoMatrix { get; init; }
 
   /// <summary>Color RAM (1000 bytes, lower nybble = 3rd color per cell).</summary>
-  public byte[] ColorRam { get; init; } = [];
+  public byte[] ColorRam { get; init; }
 
   /// <summary>Background color index (0-15).</summary>
   public byte BackgroundColor { get; init; }
 
   /// <summary>Converts this Rainbow Painter image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(RainbowPainterFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -104,9 +100,4 @@ public sealed class RainbowPainterFile : IImageFileFormat<RainbowPainterFile> {
     };
   }
 
-  /// <summary>Not supported. Rainbow Painter images have complex cell-based color constraints.</summary>
-  public static RainbowPainterFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to RainbowPainterFile is not supported due to complex cell-based color constraints.");
-  }
 }

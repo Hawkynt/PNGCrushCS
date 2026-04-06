@@ -26,6 +26,8 @@ public static class AimGrayScaleReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static AimGrayScaleFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AimGrayScaleFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < AimGrayScaleFile.MinFileSize)

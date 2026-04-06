@@ -8,14 +8,12 @@ namespace FileFormat.Pvr;
 
 /// <summary>In-memory representation of a PVR (PowerVR Texture v3) file.</summary>
 [FormatMagicBytes([0x50, 0x56, 0x52, 0x03])]
-public sealed class PvrFile : IImageFileFormat<PvrFile> {
+public readonly record struct PvrFile : IImageFormatReader<PvrFile>, IImageToRawImage<PvrFile>, IImageFromRawImage<PvrFile>, IImageFormatWriter<PvrFile> {
 
-  static string IImageFileFormat<PvrFile>.PrimaryExtension => ".pvr";
-  static string[] IImageFileFormat<PvrFile>.FileExtensions => [".pvr"];
-  static PvrFile IImageFileFormat<PvrFile>.FromFile(FileInfo file) => PvrReader.FromFile(file);
-  static PvrFile IImageFileFormat<PvrFile>.FromBytes(byte[] data) => PvrReader.FromBytes(data);
-  static PvrFile IImageFileFormat<PvrFile>.FromStream(Stream stream) => PvrReader.FromStream(stream);
-  static byte[] IImageFileFormat<PvrFile>.ToBytes(PvrFile file) => PvrWriter.ToBytes(file);
+  static string IImageFormatMetadata<PvrFile>.PrimaryExtension => ".pvr";
+  static string[] IImageFormatMetadata<PvrFile>.FileExtensions => [".pvr"];
+  static PvrFile IImageFormatReader<PvrFile>.FromSpan(ReadOnlySpan<byte> data) => PvrReader.FromSpan(data);
+  static byte[] IImageFormatWriter<PvrFile>.ToBytes(PvrFile file) => PvrWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
   public int Depth { get; init; }
@@ -27,12 +25,11 @@ public sealed class PvrFile : IImageFileFormat<PvrFile> {
   public int Faces { get; init; }
   public int MipmapCount { get; init; }
   public int MetadataSize { get; init; }
-  public byte[] Metadata { get; init; } = [];
-  public byte[] CompressedData { get; init; } = [];
+  public byte[] Metadata { get; init; }
+  public byte[] CompressedData { get; init; }
 
   /// <summary>Decodes the PVR compressed data into a <see cref="RawImage"/> with RGBA32 pixels.</summary>
   public static RawImage ToRawImage(PvrFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var width = file.Width;
     var height = file.Height;

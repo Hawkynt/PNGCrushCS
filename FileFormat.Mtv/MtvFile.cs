@@ -1,26 +1,22 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Mtv;
 
 /// <summary>In-memory representation of an MTV Ray Tracer image.</summary>
-public sealed class MtvFile : IImageFileFormat<MtvFile> {
+public readonly record struct MtvFile : IImageFormatReader<MtvFile>, IImageToRawImage<MtvFile>, IImageFromRawImage<MtvFile>, IImageFormatWriter<MtvFile> {
 
-  static string IImageFileFormat<MtvFile>.PrimaryExtension => ".mtv";
-  static string[] IImageFileFormat<MtvFile>.FileExtensions => [".mtv"];
-  static MtvFile IImageFileFormat<MtvFile>.FromFile(FileInfo file) => MtvReader.FromFile(file);
-  static MtvFile IImageFileFormat<MtvFile>.FromBytes(byte[] data) => MtvReader.FromBytes(data);
-  static MtvFile IImageFileFormat<MtvFile>.FromStream(Stream stream) => MtvReader.FromStream(stream);
-  static byte[] IImageFileFormat<MtvFile>.ToBytes(MtvFile file) => MtvWriter.ToBytes(file);
+  static string IImageFormatMetadata<MtvFile>.PrimaryExtension => ".mtv";
+  static string[] IImageFormatMetadata<MtvFile>.FileExtensions => [".mtv"];
+  static MtvFile IImageFormatReader<MtvFile>.FromSpan(ReadOnlySpan<byte> data) => MtvReader.FromSpan(data);
+  static byte[] IImageFormatWriter<MtvFile>.ToBytes(MtvFile file) => MtvWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
 
   /// <summary>Raw RGB pixel data (3 bytes per pixel).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(MtvFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

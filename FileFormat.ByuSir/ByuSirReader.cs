@@ -26,6 +26,8 @@ public static class ByuSirReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static ByuSirFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static ByuSirFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < ByuSirFile.MinFileSize)

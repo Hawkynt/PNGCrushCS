@@ -44,6 +44,8 @@ public static class ZxFlashReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static ZxFlashFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static ZxFlashFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < MinFileSize)

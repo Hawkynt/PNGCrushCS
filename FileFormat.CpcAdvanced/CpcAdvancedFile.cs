@@ -1,21 +1,16 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.CpcAdvanced;
 
 /// <summary>In-memory representation of a CPC Advanced Mode 0 image (16384 bytes: 160x200, 16 colors, CPC memory interleave).</summary>
-public sealed class CpcAdvancedFile : IImageFileFormat<CpcAdvancedFile> {
+public readonly record struct CpcAdvancedFile : IImageFormatReader<CpcAdvancedFile>, IImageToRawImage<CpcAdvancedFile>, IImageFormatWriter<CpcAdvancedFile> {
 
-  static string IImageFileFormat<CpcAdvancedFile>.PrimaryExtension => ".cpa";
-  static string[] IImageFileFormat<CpcAdvancedFile>.FileExtensions => [".cpa"];
-  static FormatCapability IImageFileFormat<CpcAdvancedFile>.Capabilities => FormatCapability.IndexedOnly;
-  static CpcAdvancedFile IImageFileFormat<CpcAdvancedFile>.FromFile(FileInfo file) => CpcAdvancedReader.FromFile(file);
-  static CpcAdvancedFile IImageFileFormat<CpcAdvancedFile>.FromBytes(byte[] data) => CpcAdvancedReader.FromBytes(data);
-  static CpcAdvancedFile IImageFileFormat<CpcAdvancedFile>.FromStream(Stream stream) => CpcAdvancedReader.FromStream(stream);
-  static RawImage IImageFileFormat<CpcAdvancedFile>.ToRawImage(CpcAdvancedFile file) => ToRawImage(file);
-  static CpcAdvancedFile IImageFileFormat<CpcAdvancedFile>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<CpcAdvancedFile>.ToBytes(CpcAdvancedFile file) => CpcAdvancedWriter.ToBytes(file);
+  static string IImageFormatMetadata<CpcAdvancedFile>.PrimaryExtension => ".cpa";
+  static string[] IImageFormatMetadata<CpcAdvancedFile>.FileExtensions => [".cpa"];
+  static CpcAdvancedFile IImageFormatReader<CpcAdvancedFile>.FromSpan(ReadOnlySpan<byte> data) => CpcAdvancedReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<CpcAdvancedFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<CpcAdvancedFile>.ToBytes(CpcAdvancedFile file) => CpcAdvancedWriter.ToBytes(file);
 
   /// <summary>Expected file size in bytes.</summary>
   internal const int ExpectedFileSize = 16384;
@@ -39,7 +34,7 @@ public sealed class CpcAdvancedFile : IImageFileFormat<CpcAdvancedFile> {
   public int Height => PixelHeight;
 
   /// <summary>Deinterleaved pixel data (200 rows x 80 bytes, Mode 0 packed).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Default CPC 16-color palette as RGB triplets.</summary>
   private static readonly byte[] _CpcPalette = [
@@ -63,7 +58,6 @@ public sealed class CpcAdvancedFile : IImageFileFormat<CpcAdvancedFile> {
 
   /// <summary>Converts the CPC Advanced screen to an Indexed8 raw image (160x200, 16-entry CPC palette).</summary>
   public static RawImage ToRawImage(CpcAdvancedFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var pixels = new byte[PixelWidth * PixelHeight];
 
@@ -91,12 +85,6 @@ public sealed class CpcAdvancedFile : IImageFileFormat<CpcAdvancedFile> {
       Palette = _CpcPalette[..],
       PaletteCount = 16,
     };
-  }
-
-  /// <summary>Not supported. CPC Advanced images require hardware palette mapping.</summary>
-  public static CpcAdvancedFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to CpcAdvancedFile is not supported.");
   }
 
   /// <summary>Unpacks pixel 0 from a CPC Mode 0 byte: bits [7,3,5,1].</summary>

@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.MultiLaceEditor;
 
 /// <summary>In-memory representation of a C64 Multi-Lace Editor multicolor interlace image (two multicolor frames blended).</summary>
-public sealed class MultiLaceEditorFile : IImageFileFormat<MultiLaceEditorFile> {
+public readonly record struct MultiLaceEditorFile : IImageFormatReader<MultiLaceEditorFile>, IImageToRawImage<MultiLaceEditorFile>, IImageFormatWriter<MultiLaceEditorFile> {
 
-  static string IImageFileFormat<MultiLaceEditorFile>.PrimaryExtension => ".mle";
-  static string[] IImageFileFormat<MultiLaceEditorFile>.FileExtensions => [".mle"];
-  static MultiLaceEditorFile IImageFileFormat<MultiLaceEditorFile>.FromFile(FileInfo file) => MultiLaceEditorReader.FromFile(file);
-  static MultiLaceEditorFile IImageFileFormat<MultiLaceEditorFile>.FromBytes(byte[] data) => MultiLaceEditorReader.FromBytes(data);
-  static MultiLaceEditorFile IImageFileFormat<MultiLaceEditorFile>.FromStream(Stream stream) => MultiLaceEditorReader.FromStream(stream);
-  static byte[] IImageFileFormat<MultiLaceEditorFile>.ToBytes(MultiLaceEditorFile file) => MultiLaceEditorWriter.ToBytes(file);
+  static string IImageFormatMetadata<MultiLaceEditorFile>.PrimaryExtension => ".mle";
+  static string[] IImageFormatMetadata<MultiLaceEditorFile>.FileExtensions => [".mle"];
+  static MultiLaceEditorFile IImageFormatReader<MultiLaceEditorFile>.FromSpan(ReadOnlySpan<byte> data) => MultiLaceEditorReader.FromSpan(data);
+  static byte[] IImageFormatWriter<MultiLaceEditorFile>.ToBytes(MultiLaceEditorFile file) => MultiLaceEditorWriter.ToBytes(file);
 
   /// <summary>The fixed width of the image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -52,7 +49,7 @@ public sealed class MultiLaceEditorFile : IImageFileFormat<MultiLaceEditorFile> 
   public ushort LoadAddress { get; init; }
 
   /// <summary>Raw payload data (entire file content after load address).</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   /// <summary>Decodes a single multicolor frame from the raw payload.</summary>
   private static int _DecodeMulticolorPixel(byte[] rawData, int bitmapStart, int screenStart, int colorStart, bool hasScreen, bool hasColor, int cellIndex, int byteInCell, int pixelInByte) {
@@ -77,7 +74,6 @@ public sealed class MultiLaceEditorFile : IImageFileFormat<MultiLaceEditorFile> 
 
   /// <summary>Converts this Multi-Lace Editor image to a platform-independent <see cref="RawImage"/> in Rgb24 format by averaging two multicolor frames.</summary>
   public static RawImage ToRawImage(MultiLaceEditorFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -132,9 +128,4 @@ public sealed class MultiLaceEditorFile : IImageFileFormat<MultiLaceEditorFile> 
     };
   }
 
-  /// <summary>Not supported. Multi-Lace Editor images have complex multicolor interlace constraints.</summary>
-  public static MultiLaceEditorFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to MultiLaceEditorFile is not supported due to complex multicolor interlace constraints.");
-  }
 }

@@ -1,5 +1,4 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 using FileFormat.Core.BlockDecoders;
 
@@ -7,14 +6,12 @@ namespace FileFormat.Pkm;
 
 /// <summary>In-memory representation of a PKM (Ericsson Texture Container) file.</summary>
 [FormatMagicBytes([0x50, 0x4B, 0x4D, 0x20])]
-public sealed class PkmFile : IImageFileFormat<PkmFile> {
+public readonly record struct PkmFile : IImageFormatReader<PkmFile>, IImageToRawImage<PkmFile>, IImageFromRawImage<PkmFile>, IImageFormatWriter<PkmFile> {
 
-  static string IImageFileFormat<PkmFile>.PrimaryExtension => ".pkm";
-  static string[] IImageFileFormat<PkmFile>.FileExtensions => [".pkm"];
-  static PkmFile IImageFileFormat<PkmFile>.FromFile(FileInfo file) => PkmReader.FromFile(file);
-  static PkmFile IImageFileFormat<PkmFile>.FromBytes(byte[] data) => PkmReader.FromBytes(data);
-  static PkmFile IImageFileFormat<PkmFile>.FromStream(Stream stream) => PkmReader.FromStream(stream);
-  static byte[] IImageFileFormat<PkmFile>.ToBytes(PkmFile file) => PkmWriter.ToBytes(file);
+  static string IImageFormatMetadata<PkmFile>.PrimaryExtension => ".pkm";
+  static string[] IImageFormatMetadata<PkmFile>.FileExtensions => [".pkm"];
+  static PkmFile IImageFormatReader<PkmFile>.FromSpan(ReadOnlySpan<byte> data) => PkmReader.FromSpan(data);
+  static byte[] IImageFormatWriter<PkmFile>.ToBytes(PkmFile file) => PkmWriter.ToBytes(file);
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
   /// <summary>Image height in pixels.</summary>
@@ -26,13 +23,12 @@ public sealed class PkmFile : IImageFileFormat<PkmFile> {
   /// <summary>The ETC compression format.</summary>
   public PkmFormat Format { get; init; }
   /// <summary>Version string: "10" for PKM 1.0 or "20" for PKM 2.0.</summary>
-  public string Version { get; init; } = "10";
+  public string Version { get; init; }
   /// <summary>The raw ETC-compressed block data.</summary>
-  public byte[] CompressedData { get; init; } = [];
+  public byte[] CompressedData { get; init; }
 
   /// <summary>Decodes the ETC-compressed data into a <see cref="RawImage"/> with RGBA32 pixels.</summary>
   public static RawImage ToRawImage(PkmFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var width = file.Width;
     var height = file.Height;

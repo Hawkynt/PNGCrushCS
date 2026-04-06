@@ -26,6 +26,8 @@ public static class SunRasterReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static SunRasterFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static SunRasterFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < SunRasterHeader.StructSize)

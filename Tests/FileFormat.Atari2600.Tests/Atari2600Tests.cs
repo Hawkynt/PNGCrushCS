@@ -43,25 +43,6 @@ public class Atari2600ReaderTests {
 }
 
 [TestFixture]
-public class Atari2600WriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => Atari2600Writer.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_SingleTile_CorrectSize() {
-    var file = new Atari2600File {
-      Width = 128,
-      Height = 8,
-      PixelData = new byte[128 * 8],
-    };
-    var bytes = Atari2600Writer.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(16 * 8));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -85,41 +66,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void PrimaryExtension_IsCorrect()
-    => Assert.That(_GetPrimaryExtension<Atari2600File>(), Is.EqualTo(".a26"));
-
-  [Test]
-  public void FileExtensions_ContainsPrimary() {
-    var exts = _GetFileExtensions<Atari2600File>();
-    Assert.That(exts, Does.Contain(".a26"));
-  }
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => Atari2600File.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => Atari2600File.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 128, Height = 8, Format = PixelFormat.Rgb24, PixelData = new byte[128 * 8 * 3] };
-    Assert.Throws<ArgumentException>(() => Atari2600File.FromRawImage(raw));
-  }
-
-  [Test]
-  public void Constants_AreCorrect() {
-    Assert.That(Atari2600File.BytesPerTile, Is.EqualTo(8));
-    Assert.That(Atari2600File.TileSize, Is.EqualTo(8));
-    Assert.That(Atari2600File.TilesPerRow, Is.EqualTo(16));
-  }
-
-  private static string _GetPrimaryExtension<T>() where T : IImageFileFormat<T> => T.PrimaryExtension;
-
-  private static string[] _GetFileExtensions<T>() where T : IImageFileFormat<T> => T.FileExtensions;
-}

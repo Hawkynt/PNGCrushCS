@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.GunPaint;
 
 /// <summary>In-memory representation of a C64 GunPaint FLI (Flexible Line Interpretation) multicolor image.</summary>
-public sealed class GunPaintFile : IImageFileFormat<GunPaintFile> {
+public readonly record struct GunPaintFile : IImageFormatReader<GunPaintFile>, IImageToRawImage<GunPaintFile>, IImageFormatWriter<GunPaintFile> {
 
-  static string IImageFileFormat<GunPaintFile>.PrimaryExtension => ".gun";
-  static string[] IImageFileFormat<GunPaintFile>.FileExtensions => [".gun"];
-  static GunPaintFile IImageFileFormat<GunPaintFile>.FromFile(FileInfo file) => GunPaintReader.FromFile(file);
-  static GunPaintFile IImageFileFormat<GunPaintFile>.FromBytes(byte[] data) => GunPaintReader.FromBytes(data);
-  static GunPaintFile IImageFileFormat<GunPaintFile>.FromStream(Stream stream) => GunPaintReader.FromStream(stream);
-  static byte[] IImageFileFormat<GunPaintFile>.ToBytes(GunPaintFile file) => GunPaintWriter.ToBytes(file);
+  static string IImageFormatMetadata<GunPaintFile>.PrimaryExtension => ".gun";
+  static string[] IImageFormatMetadata<GunPaintFile>.FileExtensions => [".gun"];
+  static GunPaintFile IImageFormatReader<GunPaintFile>.FromSpan(ReadOnlySpan<byte> data) => GunPaintReader.FromSpan(data);
+  static byte[] IImageFormatWriter<GunPaintFile>.ToBytes(GunPaintFile file) => GunPaintWriter.ToBytes(file);
 
   /// <summary>The fixed width of a GunPaint image in multicolor pixels.</summary>
   public const int FixedWidth = 160;
@@ -61,11 +58,10 @@ public sealed class GunPaintFile : IImageFileFormat<GunPaintFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Raw file payload after the 2-byte load address (33601 bytes). Contains bitmap data, screen RAM, color RAM, FLI color banks, and sprite data at fixed offsets.</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   /// <summary>Converts this GunPaint image to a platform-independent <see cref="RawImage"/> in Rgb24 format using simplified multicolor decoding (without full FLI processing).</summary>
   public static RawImage ToRawImage(GunPaintFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -111,9 +107,4 @@ public sealed class GunPaintFile : IImageFileFormat<GunPaintFile> {
     };
   }
 
-  /// <summary>Not supported. GunPaint FLI images have complex per-scanline color constraints that cannot be trivially encoded.</summary>
-  public static GunPaintFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to GunPaintFile is not supported due to complex FLI per-scanline color constraints.");
-  }
 }

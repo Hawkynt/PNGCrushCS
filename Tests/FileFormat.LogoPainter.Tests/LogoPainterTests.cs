@@ -84,50 +84,6 @@ public sealed class LogoPainterReaderTests {
 }
 
 [TestFixture]
-public sealed class LogoPainterWriterTests {
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => LogoPainterWriter.ToBytes(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_CorrectOutputSize() {
-    var rawData = new byte[10000];
-    var file = new LogoPainterFile { LoadAddress = 0x4000, RawData = rawData };
-    var bytes = LogoPainterWriter.ToBytes(file);
-
-    Assert.That(bytes.Length, Is.EqualTo(2 + 10000));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_LoadAddress_LittleEndian() {
-    var file = new LogoPainterFile { LoadAddress = 0xABCD, RawData = new byte[10000] };
-    var bytes = LogoPainterWriter.ToBytes(file);
-
-    Assert.That(bytes[0], Is.EqualTo(0xCD));
-    Assert.That(bytes[1], Is.EqualTo(0xAB));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_RawDataPreserved() {
-    var rawData = new byte[10000];
-    for (var i = 0; i < rawData.Length; ++i)
-      rawData[i] = (byte)(i * 7 % 256);
-
-    var file = new LogoPainterFile { LoadAddress = 0x4000, RawData = rawData };
-    var bytes = LogoPainterWriter.ToBytes(file);
-
-    for (var i = 0; i < rawData.Length; ++i)
-      Assert.That(bytes[2 + i], Is.EqualTo(rawData[i]));
-  }
-}
-
-[TestFixture]
 public sealed class LogoPainterRoundTripTests {
 
   [Test]
@@ -180,82 +136,6 @@ public sealed class LogoPainterRoundTripTests {
     var restored = LogoPainterReader.FromBytes(bytes);
 
     Assert.That(restored.RawData, Is.EqualTo(original.RawData));
-  }
-}
-
-[TestFixture]
-public sealed class LogoPainterDataTypeTests {
-
-  [Test]
-  [Category("Unit")]
-  public void PrimaryExtension_IsLp3() {
-    Assert.That(_GetPrimaryExtension(), Is.EqualTo(".lp3"));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FileExtensions_ContainsLp3() {
-    var extensions = _GetFileExtensions();
-    Assert.That(extensions, Does.Contain(".lp3"));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => LogoPainterFile.ToRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => LogoPainterFile.FromRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_ThrowsNotSupportedException() {
-    var image = new RawImage { Width = 160, Height = 200, Format = PixelFormat.Rgb24, PixelData = new byte[160 * 200 * 3] };
-    Assert.Throws<NotSupportedException>(() => LogoPainterFile.FromRawImage(image));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FixedWidth_Is160() {
-    Assert.That(LogoPainterFile.FixedWidth, Is.EqualTo(160));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FixedHeight_Is200() {
-    Assert.That(LogoPainterFile.FixedHeight, Is.EqualTo(200));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToRawImage_ProducesRgb24() {
-    var data = TestHelpers._BuildValidLogoPainterData(0x4000);
-    var file = LogoPainterReader.FromBytes(data);
-    var rawImage = LogoPainterFile.ToRawImage(file);
-
-    Assert.That(rawImage.Format, Is.EqualTo(PixelFormat.Rgb24));
-    Assert.That(rawImage.Width, Is.EqualTo(160));
-    Assert.That(rawImage.Height, Is.EqualTo(200));
-    Assert.That(rawImage.PixelData.Length, Is.EqualTo(160 * 200 * 3));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void DefaultRawData_IsEmpty() {
-    var file = new LogoPainterFile();
-    Assert.That(file.RawData, Is.Empty);
-  }
-
-  private static string _GetPrimaryExtension() => _Helper<LogoPainterFile>.PrimaryExtension;
-  private static string[] _GetFileExtensions() => _Helper<LogoPainterFile>.FileExtensions;
-
-  private static class _Helper<T> where T : IImageFileFormat<T> {
-    public static string PrimaryExtension => T.PrimaryExtension;
-    public static string[] FileExtensions => T.FileExtensions;
   }
 }
 

@@ -25,6 +25,8 @@ public static class PsionPicReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static PsionPicFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static PsionPicFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < PsionPicFile.HeaderSize)

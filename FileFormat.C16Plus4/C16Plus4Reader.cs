@@ -25,6 +25,8 @@ public static class C16Plus4Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static C16Plus4File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static C16Plus4File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != C16Plus4File.FileSize)

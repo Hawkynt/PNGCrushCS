@@ -1,21 +1,18 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Acorn;
 
 /// <summary>In-memory representation of an Acorn RISC OS sprite file.</summary>
-public sealed class AcornFile : IImageFileFormat<AcornFile> {
+public readonly record struct AcornFile : IImageFormatReader<AcornFile>, IImageToRawImage<AcornFile>, IImageFromRawImage<AcornFile>, IImageFormatWriter<AcornFile> {
 
-  static string IImageFileFormat<AcornFile>.PrimaryExtension => ".spr";
-  static string[] IImageFileFormat<AcornFile>.FileExtensions => [".spr"];
-  static AcornFile IImageFileFormat<AcornFile>.FromFile(FileInfo file) => AcornReader.FromFile(file);
-  static AcornFile IImageFileFormat<AcornFile>.FromBytes(byte[] data) => AcornReader.FromBytes(data);
-  static AcornFile IImageFileFormat<AcornFile>.FromStream(Stream stream) => AcornReader.FromStream(stream);
-  static byte[] IImageFileFormat<AcornFile>.ToBytes(AcornFile file) => AcornWriter.ToBytes(file);
+  static string IImageFormatMetadata<AcornFile>.PrimaryExtension => ".spr";
+  static string[] IImageFormatMetadata<AcornFile>.FileExtensions => [".spr"];
+  static AcornFile IImageFormatReader<AcornFile>.FromSpan(ReadOnlySpan<byte> data) => AcornReader.FromSpan(data);
+  static byte[] IImageFormatWriter<AcornFile>.ToBytes(AcornFile file) => AcornWriter.ToBytes(file);
   /// <summary>Sprites contained in this file.</summary>
-  public IReadOnlyList<AcornSprite> Sprites { get; init; } = [];
+  public IReadOnlyList<AcornSprite> Sprites { get; init; }
 
   // Standard RISC OS 16-color desktop palette (indices 0-15)
   private static readonly byte[] _DefaultPalette4Bpp = [
@@ -39,7 +36,6 @@ public sealed class AcornFile : IImageFileFormat<AcornFile> {
 
   /// <summary>Converts the first sprite in an <see cref="AcornFile"/> to a format-independent <see cref="RawImage"/>.</summary>
   public static RawImage ToRawImage(AcornFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     if (file.Sprites.Count == 0)
       throw new InvalidOperationException("AcornFile contains no sprites.");
 

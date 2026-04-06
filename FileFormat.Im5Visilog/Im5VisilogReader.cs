@@ -26,6 +26,8 @@ public static class Im5VisilogReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static Im5VisilogFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static Im5VisilogFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < Im5VisilogFile.MinFileSize)

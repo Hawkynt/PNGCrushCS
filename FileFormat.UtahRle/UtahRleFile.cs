@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using FileFormat.Core;
 
@@ -6,26 +6,23 @@ namespace FileFormat.UtahRle;
 
 /// <summary>In-memory representation of a Utah RLE image.</summary>
 [FormatMagicBytes([0xCC, 0x52])]
-public sealed class UtahRleFile : IImageFileFormat<UtahRleFile> {
+public readonly record struct UtahRleFile : IImageFormatReader<UtahRleFile>, IImageToRawImage<UtahRleFile>, IImageFromRawImage<UtahRleFile>, IImageFormatWriter<UtahRleFile> {
 
-  static string IImageFileFormat<UtahRleFile>.PrimaryExtension => ".rle";
-  static string[] IImageFileFormat<UtahRleFile>.FileExtensions => [".rle", ".urt"];
-  static UtahRleFile IImageFileFormat<UtahRleFile>.FromFile(FileInfo file) => UtahRleReader.FromFile(file);
-  static UtahRleFile IImageFileFormat<UtahRleFile>.FromBytes(byte[] data) => UtahRleReader.FromBytes(data);
-  static UtahRleFile IImageFileFormat<UtahRleFile>.FromStream(Stream stream) => UtahRleReader.FromStream(stream);
-  static byte[] IImageFileFormat<UtahRleFile>.ToBytes(UtahRleFile file) => UtahRleWriter.ToBytes(file);
+  static string IImageFormatMetadata<UtahRleFile>.PrimaryExtension => ".rle";
+  static string[] IImageFormatMetadata<UtahRleFile>.FileExtensions => [".rle", ".urt"];
+  static UtahRleFile IImageFormatReader<UtahRleFile>.FromSpan(ReadOnlySpan<byte> data) => UtahRleReader.FromSpan(data);
+  static byte[] IImageFormatWriter<UtahRleFile>.ToBytes(UtahRleFile file) => UtahRleWriter.ToBytes(file);
 
   public int XPos { get; init; }
   public int YPos { get; init; }
   public int Width { get; init; }
   public int Height { get; init; }
   public int NumChannels { get; init; }
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
   public byte[]? BackgroundColor { get; init; }
 
   /// <summary>Converts this Utah RLE image to a platform-independent <see cref="RawImage"/>.</summary>
   public static RawImage ToRawImage(UtahRleFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var width = file.Width;
     var height = file.Height;

@@ -26,6 +26,8 @@ public static class JpegLsReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static JpegLsFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static JpegLsFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < 4)

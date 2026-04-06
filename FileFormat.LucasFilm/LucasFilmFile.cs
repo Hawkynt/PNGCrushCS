@@ -1,18 +1,15 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.LucasFilm;
 
 /// <summary>In-memory representation of a LucasFilm LFF RGB image.</summary>
-public sealed class LucasFilmFile : IImageFileFormat<LucasFilmFile> {
+public readonly record struct LucasFilmFile : IImageFormatReader<LucasFilmFile>, IImageToRawImage<LucasFilmFile>, IImageFromRawImage<LucasFilmFile>, IImageFormatWriter<LucasFilmFile> {
 
-  static string IImageFileFormat<LucasFilmFile>.PrimaryExtension => ".lff";
-  static string[] IImageFileFormat<LucasFilmFile>.FileExtensions => [".lff"];
-  static LucasFilmFile IImageFileFormat<LucasFilmFile>.FromFile(FileInfo file) => LucasFilmReader.FromFile(file);
-  static LucasFilmFile IImageFileFormat<LucasFilmFile>.FromBytes(byte[] data) => LucasFilmReader.FromBytes(data);
-  static LucasFilmFile IImageFileFormat<LucasFilmFile>.FromStream(Stream stream) => LucasFilmReader.FromStream(stream);
-  static byte[] IImageFileFormat<LucasFilmFile>.ToBytes(LucasFilmFile file) => LucasFilmWriter.ToBytes(file);
+  static string IImageFormatMetadata<LucasFilmFile>.PrimaryExtension => ".lff";
+  static string[] IImageFormatMetadata<LucasFilmFile>.FileExtensions => [".lff"];
+  static LucasFilmFile IImageFormatReader<LucasFilmFile>.FromSpan(ReadOnlySpan<byte> data) => LucasFilmReader.FromSpan(data);
+  static byte[] IImageFormatWriter<LucasFilmFile>.ToBytes(LucasFilmFile file) => LucasFilmWriter.ToBytes(file);
 
   /// <summary>Magic bytes: "LFF\0" (0x4C 0x46 0x46 0x00).</summary>
   internal static readonly byte[] Magic = [0x4C, 0x46, 0x46, 0x00];
@@ -39,10 +36,9 @@ public sealed class LucasFilmFile : IImageFileFormat<LucasFilmFile> {
   public uint Reserved { get; init; }
 
   /// <summary>Raw RGB pixel data (3 bytes per pixel).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(LucasFilmFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

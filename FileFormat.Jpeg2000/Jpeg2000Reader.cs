@@ -53,6 +53,8 @@ public static class Jpeg2000Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static Jpeg2000File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static Jpeg2000File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MINIMUM_SIZE)

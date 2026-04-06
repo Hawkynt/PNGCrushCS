@@ -26,6 +26,8 @@ public static class MicroIllustratorA8Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static MicroIllustratorA8File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static MicroIllustratorA8File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != MicroIllustratorA8File.ExpectedFileSize)

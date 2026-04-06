@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Artist64;
 
 /// <summary>In-memory representation of a Commodore 64 Artist 64 multicolor image.</summary>
-public sealed class Artist64File : IImageFileFormat<Artist64File> {
+public readonly record struct Artist64File : IImageFormatReader<Artist64File>, IImageToRawImage<Artist64File>, IImageFormatWriter<Artist64File> {
 
-  static string IImageFileFormat<Artist64File>.PrimaryExtension => ".a64";
-  static string[] IImageFileFormat<Artist64File>.FileExtensions => [".a64"];
-  static Artist64File IImageFileFormat<Artist64File>.FromFile(FileInfo file) => Artist64Reader.FromFile(file);
-  static Artist64File IImageFileFormat<Artist64File>.FromBytes(byte[] data) => Artist64Reader.FromBytes(data);
-  static Artist64File IImageFileFormat<Artist64File>.FromStream(Stream stream) => Artist64Reader.FromStream(stream);
-  static byte[] IImageFileFormat<Artist64File>.ToBytes(Artist64File file) => Artist64Writer.ToBytes(file);
+  static string IImageFormatMetadata<Artist64File>.PrimaryExtension => ".a64";
+  static string[] IImageFormatMetadata<Artist64File>.FileExtensions => [".a64"];
+  static Artist64File IImageFormatReader<Artist64File>.FromSpan(ReadOnlySpan<byte> data) => Artist64Reader.FromSpan(data);
+  static byte[] IImageFormatWriter<Artist64File>.ToBytes(Artist64File file) => Artist64Writer.ToBytes(file);
 
   /// <summary>The fixed width of an Artist 64 image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -55,17 +52,16 @@ public sealed class Artist64File : IImageFileFormat<Artist64File> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Multicolor bitmap data (8000 bytes, 2 bits per pixel).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Video matrix / screen RAM (1000 bytes, upper/lower nybble = 2 colors per cell).</summary>
-  public byte[] VideoMatrix { get; init; } = [];
+  public byte[] VideoMatrix { get; init; }
 
   /// <summary>Color RAM (1000 bytes, lower nybble = 3rd color per cell).</summary>
-  public byte[] ColorRam { get; init; } = [];
+  public byte[] ColorRam { get; init; }
 
   /// <summary>Converts this Artist 64 image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(Artist64File file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -104,9 +100,4 @@ public sealed class Artist64File : IImageFileFormat<Artist64File> {
     };
   }
 
-  /// <summary>Not supported. Artist 64 images have complex cell-based color constraints.</summary>
-  public static Artist64File FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to Artist64File is not supported due to complex cell-based color constraints.");
-  }
 }

@@ -26,6 +26,8 @@ public static class GigacadReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static GigacadFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static GigacadFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != GigacadFile.ExpectedFileSize)

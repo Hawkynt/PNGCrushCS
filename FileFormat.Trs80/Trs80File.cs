@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Trs80;
 
 /// <summary>In-memory representation of a TRS-80 hi-res graphics screen dump (Model I/III).</summary>
-public sealed class Trs80File : IImageFileFormat<Trs80File> {
+public readonly record struct Trs80File : IImageFormatReader<Trs80File>, IImageToRawImage<Trs80File>, IImageFromRawImage<Trs80File>, IImageFormatWriter<Trs80File> {
 
   /// <summary>Number of character columns in the screen dump.</summary>
   internal const int Columns = 128;
@@ -22,15 +21,11 @@ public sealed class Trs80File : IImageFileFormat<Trs80File> {
   /// <summary>Effective pixel height (3 pixels per character cell vertically).</summary>
   internal const int PixelHeight = Rows * 3;
 
-  static string IImageFileFormat<Trs80File>.PrimaryExtension => ".hr";
-  static string[] IImageFileFormat<Trs80File>.FileExtensions => [".hr"];
-  static FormatCapability IImageFileFormat<Trs80File>.Capabilities => FormatCapability.MonochromeOnly;
-  static Trs80File IImageFileFormat<Trs80File>.FromFile(FileInfo file) => Trs80Reader.FromFile(file);
-  static Trs80File IImageFileFormat<Trs80File>.FromBytes(byte[] data) => Trs80Reader.FromBytes(data);
-  static Trs80File IImageFileFormat<Trs80File>.FromStream(Stream stream) => Trs80Reader.FromStream(stream);
-  static RawImage IImageFileFormat<Trs80File>.ToRawImage(Trs80File file) => ToRawImage(file);
-  static Trs80File IImageFileFormat<Trs80File>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<Trs80File>.ToBytes(Trs80File file) => Trs80Writer.ToBytes(file);
+  static string IImageFormatMetadata<Trs80File>.PrimaryExtension => ".hr";
+  static string[] IImageFormatMetadata<Trs80File>.FileExtensions => [".hr"];
+  static Trs80File IImageFormatReader<Trs80File>.FromSpan(ReadOnlySpan<byte> data) => Trs80Reader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<Trs80File>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<Trs80File>.ToBytes(Trs80File file) => Trs80Writer.ToBytes(file);
 
   /// <summary>Always 256.</summary>
   public int Width => PixelWidth;
@@ -39,7 +34,7 @@ public sealed class Trs80File : IImageFileFormat<Trs80File> {
   public int Height => PixelHeight;
 
   /// <summary>Raw character cell data (6144 bytes: 128 columns x 48 rows). Each byte encodes a 2x3 pixel block.</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
@@ -49,7 +44,6 @@ public sealed class Trs80File : IImageFileFormat<Trs80File> {
   /// bit 0=top-left, bit 1=top-right, bit 2=mid-left, bit 3=mid-right, bit 4=bot-left, bit 5=bot-right.
   /// </summary>
   public static RawImage ToRawImage(Trs80File file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var rowStride = PixelWidth / 8; // 32 bytes per row
     var pixelData = new byte[rowStride * PixelHeight];

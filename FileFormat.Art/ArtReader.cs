@@ -28,6 +28,8 @@ public static class ArtReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static ArtFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static ArtFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < ArtHeader.StructSize)

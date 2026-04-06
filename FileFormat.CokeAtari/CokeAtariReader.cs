@@ -26,6 +26,8 @@ public static class CokeAtariReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static CokeAtariFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static CokeAtariFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < CokeAtariHeader.StructSize)

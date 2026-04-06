@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Sprite64;
 
 /// <summary>In-memory representation of a C64 sprite (24x21, mono or multicolor, 64 bytes).</summary>
-public sealed class Sprite64File : IImageFileFormat<Sprite64File> {
+public readonly record struct Sprite64File : IImageFormatReader<Sprite64File>, IImageToRawImage<Sprite64File>, IImageFormatWriter<Sprite64File> {
 
   /// <summary>Size of the sprite pixel data in bytes (3 bytes/row x 21 rows = 63).</summary>
   internal const int SpriteDataSize = 63;
@@ -28,15 +27,11 @@ public sealed class Sprite64File : IImageFileFormat<Sprite64File> {
   /// <summary>Black and white palette for indexed output (2 entries, 3 bytes each).</summary>
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
-  static string IImageFileFormat<Sprite64File>.PrimaryExtension => ".s64";
-  static string[] IImageFileFormat<Sprite64File>.FileExtensions => [".s64", ".spr64"];
-  static FormatCapability IImageFileFormat<Sprite64File>.Capabilities => FormatCapability.IndexedOnly;
-  static Sprite64File IImageFileFormat<Sprite64File>.FromFile(FileInfo file) => Sprite64Reader.FromFile(file);
-  static Sprite64File IImageFileFormat<Sprite64File>.FromBytes(byte[] data) => Sprite64Reader.FromBytes(data);
-  static Sprite64File IImageFileFormat<Sprite64File>.FromStream(Stream stream) => Sprite64Reader.FromStream(stream);
-  static RawImage IImageFileFormat<Sprite64File>.ToRawImage(Sprite64File file) => ToRawImage(file);
-  static Sprite64File IImageFileFormat<Sprite64File>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<Sprite64File>.ToBytes(Sprite64File file) => Sprite64Writer.ToBytes(file);
+  static string IImageFormatMetadata<Sprite64File>.PrimaryExtension => ".s64";
+  static string[] IImageFormatMetadata<Sprite64File>.FileExtensions => [".s64", ".spr64"];
+  static Sprite64File IImageFormatReader<Sprite64File>.FromSpan(ReadOnlySpan<byte> data) => Sprite64Reader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<Sprite64File>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<Sprite64File>.ToBytes(Sprite64File file) => Sprite64Writer.ToBytes(file);
 
   /// <summary>Always 24.</summary>
   public int Width => PixelWidth;
@@ -45,7 +40,7 @@ public sealed class Sprite64File : IImageFileFormat<Sprite64File> {
   public int Height => PixelHeight;
 
   /// <summary>Sprite pixel data (63 bytes: 3 bytes per row x 21 rows).</summary>
-  public byte[] SpriteData { get; init; } = [];
+  public byte[] SpriteData { get; init; }
 
   /// <summary>Mode byte. Bit 7 set = multicolor sprite.</summary>
   public byte ModeByte { get; init; }
@@ -60,7 +55,6 @@ public sealed class Sprite64File : IImageFileFormat<Sprite64File> {
   /// Output is always 24x21 Indexed8 with a 2-entry B&amp;W palette.
   /// </summary>
   public static RawImage ToRawImage(Sprite64File file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var pixels = new byte[PixelWidth * PixelHeight];
 
@@ -78,9 +72,6 @@ public sealed class Sprite64File : IImageFileFormat<Sprite64File> {
       PaletteCount = 2,
     };
   }
-
-  /// <summary>Not supported. C64 sprites cannot be created from raw images.</summary>
-  public static Sprite64File FromRawImage(RawImage image) => throw new NotSupportedException("Creating C64 sprites from raw images is not supported.");
 
   /// <summary>Decodes a mono (hi-res) sprite: 1bpp, 24 pixels per row, 3 bytes per row.</summary>
   private static void _DecodeMono(byte[] spriteData, byte[] pixels) {

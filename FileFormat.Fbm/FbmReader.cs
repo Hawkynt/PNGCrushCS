@@ -26,6 +26,8 @@ public static class FbmReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static FbmFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static FbmFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < FbmHeader.StructSize)

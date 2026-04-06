@@ -27,6 +27,8 @@ public static class ScitexCtReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static ScitexCtFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static ScitexCtFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < ScitexCtHeader.StructSize)

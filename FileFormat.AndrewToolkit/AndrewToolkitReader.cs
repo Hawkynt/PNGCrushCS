@@ -30,6 +30,8 @@ public static class AndrewToolkitReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static AndrewToolkitFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AndrewToolkitFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MIN_FILE_SIZE)

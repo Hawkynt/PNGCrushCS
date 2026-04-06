@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.PmBitmap;
 
 /// <summary>In-memory representation of a PM bitmap image.</summary>
-public sealed class PmBitmapFile : IImageFileFormat<PmBitmapFile> {
+public readonly record struct PmBitmapFile : IImageFormatReader<PmBitmapFile>, IImageToRawImage<PmBitmapFile>, IImageFormatWriter<PmBitmapFile> {
 
   /// <summary>Header size: 3 magic + 1 version + 2 width + 2 height + 2 depth + 2 padding = 12 bytes.</summary>
   public const int HeaderSize = 12;
@@ -13,13 +12,10 @@ public sealed class PmBitmapFile : IImageFileFormat<PmBitmapFile> {
   /// <summary>Magic bytes: "PM\0".</summary>
   public static readonly byte[] Magic = [(byte)'P', (byte)'M', 0];
 
-  static string IImageFileFormat<PmBitmapFile>.PrimaryExtension => ".pm1";
-  static string[] IImageFileFormat<PmBitmapFile>.FileExtensions => [".pm1", ".pm2", ".pm3", ".pm4"];
-  static PmBitmapFile IImageFileFormat<PmBitmapFile>.FromFile(FileInfo file) => PmBitmapReader.FromFile(file);
-  static PmBitmapFile IImageFileFormat<PmBitmapFile>.FromBytes(byte[] data) => PmBitmapReader.FromBytes(data);
-  static PmBitmapFile IImageFileFormat<PmBitmapFile>.FromStream(Stream stream) => PmBitmapReader.FromStream(stream);
-  static RawImage IImageFileFormat<PmBitmapFile>.ToRawImage(PmBitmapFile file) => ToRawImage(file);
-  static byte[] IImageFileFormat<PmBitmapFile>.ToBytes(PmBitmapFile file) => PmBitmapWriter.ToBytes(file);
+  static string IImageFormatMetadata<PmBitmapFile>.PrimaryExtension => ".pm1";
+  static string[] IImageFormatMetadata<PmBitmapFile>.FileExtensions => [".pm1", ".pm2", ".pm3", ".pm4"];
+  static PmBitmapFile IImageFormatReader<PmBitmapFile>.FromSpan(ReadOnlySpan<byte> data) => PmBitmapReader.FromSpan(data);
+  static byte[] IImageFormatWriter<PmBitmapFile>.ToBytes(PmBitmapFile file) => PmBitmapWriter.ToBytes(file);
 
   public int Width { get; init; }
   public int Height { get; init; }
@@ -31,10 +27,9 @@ public sealed class PmBitmapFile : IImageFileFormat<PmBitmapFile> {
   public byte Version { get; init; }
 
   /// <summary>Raw pixel data (grayscale or RGB depending on <see cref="Depth"/>).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(PmBitmapFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     if (file.Depth == 24)
       return new() {
         Width = file.Width,
@@ -60,5 +55,4 @@ public sealed class PmBitmapFile : IImageFileFormat<PmBitmapFile> {
     };
   }
 
-  public static PmBitmapFile FromRawImage(RawImage image) => throw new NotSupportedException("PM bitmap writing from raw image is not supported.");
 }

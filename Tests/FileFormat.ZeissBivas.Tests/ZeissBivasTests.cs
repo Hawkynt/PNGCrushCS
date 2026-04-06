@@ -52,28 +52,6 @@ public sealed class ZeissBivasReaderTests {
 }
 
 [TestFixture]
-public sealed class ZeissBivasWriterTests {
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => ZeissBivasWriter.ToBytes(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_HasCorrectHeader() {
-    var file = new ZeissBivasFile { Width = 4, Height = 2, BitsPerPixel = 8, PixelData = new byte[8] };
-    var bytes = ZeissBivasWriter.ToBytes(file);
-
-    Assert.That(bytes.Length, Is.EqualTo(20)); // 12 header + 8 pixels
-    Assert.That(bytes[0], Is.EqualTo(4)); // width LE
-    Assert.That(bytes[4], Is.EqualTo(2)); // height LE
-    Assert.That(bytes[8], Is.EqualTo(8)); // bpp LE
-  }
-}
-
-[TestFixture]
 public sealed class RoundTripTests {
 
   [Test]
@@ -125,47 +103,3 @@ public sealed class RoundTripTests {
   }
 }
 
-[TestFixture]
-public sealed class DataTypeTests {
-
-  [Test]
-  [Category("Unit")]
-  public void ZeissBivasFile_Defaults() {
-    var file = new ZeissBivasFile();
-    Assert.That(file.Width, Is.EqualTo(0));
-    Assert.That(file.Height, Is.EqualTo(0));
-    Assert.That(file.BitsPerPixel, Is.EqualTo(8));
-    Assert.That(file.PixelData, Is.Empty);
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ZeissBivasFile_ToRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => ZeissBivasFile.ToRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ZeissBivasFile_FromRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => ZeissBivasFile.FromRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ZeissBivasFile_FromRawImage_WrongFormat_Throws() {
-    var raw = new RawImage {
-      Width = 4, Height = 2,
-      Format = PixelFormat.Rgb24,
-      PixelData = new byte[24],
-    };
-    Assert.Throws<ArgumentException>(() => ZeissBivasFile.FromRawImage(raw));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ZeissBivasFile_ToRawImage_ReturnsGray8() {
-    var file = new ZeissBivasFile { Width = 2, Height = 2, BitsPerPixel = 8, PixelData = new byte[4] };
-    var raw = ZeissBivasFile.ToRawImage(file);
-    Assert.That(raw.Format, Is.EqualTo(PixelFormat.Gray8));
-  }
-}

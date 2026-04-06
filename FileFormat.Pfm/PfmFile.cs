@@ -1,21 +1,17 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Pfm;
 
 /// <summary>In-memory representation of a PFM (Portable Float Map) image.</summary>
-public sealed class PfmFile : IImageFileFormat<PfmFile> {
+public readonly record struct PfmFile : IImageFormatReader<PfmFile>, IImageToRawImage<PfmFile>, IImageFromRawImage<PfmFile>, IImageFormatWriter<PfmFile> {
 
-  static string IImageFileFormat<PfmFile>.PrimaryExtension => ".pfm";
-  static string[] IImageFileFormat<PfmFile>.FileExtensions => [".pfm"];
-  static PfmFile IImageFileFormat<PfmFile>.FromFile(FileInfo file) => PfmReader.FromFile(file);
-  static PfmFile IImageFileFormat<PfmFile>.FromBytes(byte[] data) => PfmReader.FromBytes(data);
-  static PfmFile IImageFileFormat<PfmFile>.FromStream(Stream stream) => PfmReader.FromStream(stream);
-  static RawImage IImageFileFormat<PfmFile>.ToRawImage(PfmFile file) => file.ToRawImage();
-  static byte[] IImageFileFormat<PfmFile>.ToBytes(PfmFile file) => PfmWriter.ToBytes(file);
+  static string IImageFormatMetadata<PfmFile>.PrimaryExtension => ".pfm";
+  static string[] IImageFormatMetadata<PfmFile>.FileExtensions => [".pfm"];
+  static PfmFile IImageFormatReader<PfmFile>.FromSpan(ReadOnlySpan<byte> data) => PfmReader.FromSpan(data);
+  static byte[] IImageFormatWriter<PfmFile>.ToBytes(PfmFile file) => PfmWriter.ToBytes(file);
 
-  static bool? IImageFileFormat<PfmFile>.MatchesSignature(ReadOnlySpan<byte> header)
+  static bool? IImageFormatMetadata<PfmFile>.MatchesSignature(ReadOnlySpan<byte> header)
     => header.Length >= 3 && header[0] == 0x50 && (header[1] == 0x46 || header[1] == 0x66)
       && (header[2] == 0x0A || header[2] == 0x0D || header[2] == 0x20)
       ? true : null;
@@ -34,15 +30,15 @@ public sealed class PfmFile : IImageFileFormat<PfmFile> {
   /// Float samples in top-to-bottom, left-to-right order.
   /// Grayscale: Width * Height floats. RGB: Width * Height * 3 floats (R, G, B interleaved).
   /// </summary>
-  public float[] PixelData { get; init; } = [];
+  public float[] PixelData { get; init; }
 
   /// <summary>Converts this PFM image to a 16-bit <see cref="RawImage"/>. Grayscale PFM outputs Gray16, color PFM outputs Rgb48.</summary>
-  public RawImage ToRawImage() {
-    var width = this.Width;
-    var height = this.Height;
-    var src = this.PixelData;
+  public static RawImage ToRawImage(PfmFile file) {
+    var width = file.Width;
+    var height = file.Height;
+    var src = file.PixelData;
 
-    if (this.ColorMode == PfmColorMode.Grayscale) {
+    if (file.ColorMode == PfmColorMode.Grayscale) {
       var pixelCount = width * height;
 
       var min = float.MaxValue;

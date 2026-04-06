@@ -26,6 +26,8 @@ public static class SuperHiresReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static SuperHiresFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static SuperHiresFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < SuperHiresFile.ExpectedFileSize)

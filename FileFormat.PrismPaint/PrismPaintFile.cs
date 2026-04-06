@@ -1,11 +1,10 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.PrismPaint;
 
 /// <summary>In-memory representation of an Atari Falcon Prism Paint (.pnt/.tpi) indexed image.</summary>
-public sealed class PrismPaintFile : IImageFileFormat<PrismPaintFile> {
+public readonly record struct PrismPaintFile : IImageFormatReader<PrismPaintFile>, IImageToRawImage<PrismPaintFile>, IImageFromRawImage<PrismPaintFile>, IImageFormatWriter<PrismPaintFile> {
 
   /// <summary>Size of the dimension header (width u16 LE + height u16 LE).</summary>
   public const int HeaderSize = 4;
@@ -22,13 +21,11 @@ public sealed class PrismPaintFile : IImageFileFormat<PrismPaintFile> {
   /// <summary>Minimum valid file size (header + palette + at least 1 pixel).</summary>
   public const int MinFileSize = HeaderSize + PaletteDataSize + 1;
 
-  static string IImageFileFormat<PrismPaintFile>.PrimaryExtension => ".pnt";
-  static string[] IImageFileFormat<PrismPaintFile>.FileExtensions => [".pnt", ".tpi"];
-  static FormatCapability IImageFileFormat<PrismPaintFile>.Capabilities => FormatCapability.IndexedOnly;
-  static PrismPaintFile IImageFileFormat<PrismPaintFile>.FromFile(FileInfo file) => PrismPaintReader.FromFile(file);
-  static PrismPaintFile IImageFileFormat<PrismPaintFile>.FromBytes(byte[] data) => PrismPaintReader.FromBytes(data);
-  static PrismPaintFile IImageFileFormat<PrismPaintFile>.FromStream(Stream stream) => PrismPaintReader.FromStream(stream);
-  static byte[] IImageFileFormat<PrismPaintFile>.ToBytes(PrismPaintFile file) => PrismPaintWriter.ToBytes(file);
+  static string IImageFormatMetadata<PrismPaintFile>.PrimaryExtension => ".pnt";
+  static string[] IImageFormatMetadata<PrismPaintFile>.FileExtensions => [".pnt", ".tpi"];
+  static PrismPaintFile IImageFormatReader<PrismPaintFile>.FromSpan(ReadOnlySpan<byte> data) => PrismPaintReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<PrismPaintFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<PrismPaintFile>.ToBytes(PrismPaintFile file) => PrismPaintWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -37,10 +34,10 @@ public sealed class PrismPaintFile : IImageFileFormat<PrismPaintFile> {
   public int Height { get; init; }
 
   /// <summary>RGB palette (3 bytes per entry, 768 bytes total).</summary>
-  public byte[] Palette { get; init; } = [];
+  public byte[] Palette { get; init; }
 
   /// <summary>Pixel data (1 byte per pixel, width x height bytes).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts the Falcon 4-byte palette entry to an RGB triplet.</summary>
   internal static void ConvertFalconPaletteToRgb(ReadOnlySpan<byte> falcon, Span<byte> rgb) {
@@ -66,7 +63,6 @@ public sealed class PrismPaintFile : IImageFileFormat<PrismPaintFile> {
   }
 
   public static RawImage ToRawImage(PrismPaintFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     return new() {
       Width = file.Width,

@@ -27,6 +27,8 @@ public static class XFliEditorReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static XFliEditorFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static XFliEditorFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
 

@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.PortfolioGraphics;
 
 /// <summary>In-memory representation of an Atari Portfolio Graphics image (PGF/PGC).</summary>
-public sealed class PortfolioGraphicsFile : IImageFileFormat<PortfolioGraphicsFile> {
+public readonly record struct PortfolioGraphicsFile : IImageFormatReader<PortfolioGraphicsFile>, IImageToRawImage<PortfolioGraphicsFile>, IImageFromRawImage<PortfolioGraphicsFile>, IImageFormatWriter<PortfolioGraphicsFile> {
 
   /// <summary>Fixed pixel width.</summary>
   internal const int PixelWidth = 240;
@@ -25,15 +24,11 @@ public sealed class PortfolioGraphicsFile : IImageFileFormat<PortfolioGraphicsFi
   /// <summary>PGF fixed file size.</summary>
   internal const int PgfFileSize = 3848;
 
-  static string IImageFileFormat<PortfolioGraphicsFile>.PrimaryExtension => ".pgf";
-  static string[] IImageFileFormat<PortfolioGraphicsFile>.FileExtensions => [".pgf", ".pgc"];
-  static FormatCapability IImageFileFormat<PortfolioGraphicsFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static PortfolioGraphicsFile IImageFileFormat<PortfolioGraphicsFile>.FromFile(FileInfo file) => PortfolioGraphicsReader.FromFile(file);
-  static PortfolioGraphicsFile IImageFileFormat<PortfolioGraphicsFile>.FromBytes(byte[] data) => PortfolioGraphicsReader.FromBytes(data);
-  static PortfolioGraphicsFile IImageFileFormat<PortfolioGraphicsFile>.FromStream(Stream stream) => PortfolioGraphicsReader.FromStream(stream);
-  static RawImage IImageFileFormat<PortfolioGraphicsFile>.ToRawImage(PortfolioGraphicsFile file) => ToRawImage(file);
-  static PortfolioGraphicsFile IImageFileFormat<PortfolioGraphicsFile>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<PortfolioGraphicsFile>.ToBytes(PortfolioGraphicsFile file) => PortfolioGraphicsWriter.ToBytes(file);
+  static string IImageFormatMetadata<PortfolioGraphicsFile>.PrimaryExtension => ".pgf";
+  static string[] IImageFormatMetadata<PortfolioGraphicsFile>.FileExtensions => [".pgf", ".pgc"];
+  static PortfolioGraphicsFile IImageFormatReader<PortfolioGraphicsFile>.FromSpan(ReadOnlySpan<byte> data) => PortfolioGraphicsReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<PortfolioGraphicsFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<PortfolioGraphicsFile>.ToBytes(PortfolioGraphicsFile file) => PortfolioGraphicsWriter.ToBytes(file);
 
   /// <summary>Always 240.</summary>
   public int Width => PixelWidth;
@@ -42,13 +37,12 @@ public sealed class PortfolioGraphicsFile : IImageFileFormat<PortfolioGraphicsFi
   public int Height => PixelHeight;
 
   /// <summary>Packed 1bpp pixel data (1920 bytes).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
   /// <summary>Converts the Portfolio Graphics image to an Indexed1 raw image.</summary>
   public static RawImage ToRawImage(PortfolioGraphicsFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var pixelData = new byte[PixelDataSize];
     file.PixelData.AsSpan(0, Math.Min(file.PixelData.Length, PixelDataSize)).CopyTo(pixelData);

@@ -27,6 +27,8 @@ public static class NokiaOperatorLogoReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static NokiaOperatorLogoFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static NokiaOperatorLogoFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < NokiaOperatorLogoFile.MinFileSize)

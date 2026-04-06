@@ -1,19 +1,16 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Interfile;
 
 /// <summary>In-memory representation of an Interfile nuclear medicine image (SPECT/PET).</summary>
 [FormatMagicBytes([0x21, 0x49, 0x4E, 0x54, 0x45, 0x52, 0x46, 0x49, 0x4C, 0x45])]
-public sealed class InterfileFile : IImageFileFormat<InterfileFile> {
+public readonly record struct InterfileFile : IImageFormatReader<InterfileFile>, IImageToRawImage<InterfileFile>, IImageFromRawImage<InterfileFile>, IImageFormatWriter<InterfileFile> {
 
-  static string IImageFileFormat<InterfileFile>.PrimaryExtension => ".hv";
-  static string[] IImageFileFormat<InterfileFile>.FileExtensions => [".hv"];
-  static InterfileFile IImageFileFormat<InterfileFile>.FromFile(FileInfo file) => InterfileReader.FromFile(file);
-  static InterfileFile IImageFileFormat<InterfileFile>.FromBytes(byte[] data) => InterfileReader.FromBytes(data);
-  static InterfileFile IImageFileFormat<InterfileFile>.FromStream(Stream stream) => InterfileReader.FromStream(stream);
-  static byte[] IImageFileFormat<InterfileFile>.ToBytes(InterfileFile file) => InterfileWriter.ToBytes(file);
+  static string IImageFormatMetadata<InterfileFile>.PrimaryExtension => ".hv";
+  static string[] IImageFormatMetadata<InterfileFile>.FileExtensions => [".hv"];
+  static InterfileFile IImageFormatReader<InterfileFile>.FromSpan(ReadOnlySpan<byte> data) => InterfileReader.FromSpan(data);
+  static byte[] IImageFormatWriter<InterfileFile>.ToBytes(InterfileFile file) => InterfileWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -22,16 +19,15 @@ public sealed class InterfileFile : IImageFileFormat<InterfileFile> {
   public int Height { get; init; }
 
   /// <summary>Bytes per pixel (1 for grayscale, 2 for 16-bit, 3 for RGB, 4 for 32-bit).</summary>
-  public int BytesPerPixel { get; init; } = 1;
+  public int BytesPerPixel { get; init; }
 
   /// <summary>Number format string (e.g. "unsigned integer", "signed integer").</summary>
-  public string NumberFormat { get; init; } = "unsigned integer";
+  public string NumberFormat { get; init; }
 
   /// <summary>Raw pixel data.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(InterfileFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     switch (file.BytesPerPixel) {
       case 1:

@@ -25,6 +25,8 @@ public static class Atari7800Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static Atari7800File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static Atari7800File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < Atari7800File.FileSize)

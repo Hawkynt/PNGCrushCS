@@ -26,6 +26,8 @@ public static class HiresC64Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static HiresC64File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static HiresC64File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < HiresC64File.ExpectedFileSize)

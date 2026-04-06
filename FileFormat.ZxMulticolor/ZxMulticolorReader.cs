@@ -41,6 +41,8 @@ public static class ZxMulticolorReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static ZxMulticolorFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static ZxMulticolorFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != FileSize)

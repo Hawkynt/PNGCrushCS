@@ -26,6 +26,8 @@ public static class EggPaintReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static EggPaintFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static EggPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < EggPaintFile.ExpectedFileSize)

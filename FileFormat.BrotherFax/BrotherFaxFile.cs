@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.BrotherFax;
 
 /// <summary>In-memory representation of a Brother fax UNI image.</summary>
-public sealed class BrotherFaxFile : IImageFileFormat<BrotherFaxFile> {
+public readonly record struct BrotherFaxFile : IImageFormatReader<BrotherFaxFile>, IImageToRawImage<BrotherFaxFile>, IImageFormatWriter<BrotherFaxFile> {
 
-  static string IImageFileFormat<BrotherFaxFile>.PrimaryExtension => ".uni";
-  static string[] IImageFileFormat<BrotherFaxFile>.FileExtensions => [".uni"];
-  static BrotherFaxFile IImageFileFormat<BrotherFaxFile>.FromFile(FileInfo file) => BrotherFaxReader.FromFile(file);
-  static BrotherFaxFile IImageFileFormat<BrotherFaxFile>.FromBytes(byte[] data) => BrotherFaxReader.FromBytes(data);
-  static BrotherFaxFile IImageFileFormat<BrotherFaxFile>.FromStream(Stream stream) => BrotherFaxReader.FromStream(stream);
-  static byte[] IImageFileFormat<BrotherFaxFile>.ToBytes(BrotherFaxFile file) => BrotherFaxWriter.ToBytes(file);
+  static string IImageFormatMetadata<BrotherFaxFile>.PrimaryExtension => ".uni";
+  static string[] IImageFormatMetadata<BrotherFaxFile>.FileExtensions => [".uni"];
+  static BrotherFaxFile IImageFormatReader<BrotherFaxFile>.FromSpan(ReadOnlySpan<byte> data) => BrotherFaxReader.FromSpan(data);
+  static byte[] IImageFormatWriter<BrotherFaxFile>.ToBytes(BrotherFaxFile file) => BrotherFaxWriter.ToBytes(file);
 
   /// <summary>Magic bytes: "BF" (0x42 0x46).</summary>
   internal static readonly byte[] Magic = [0x42, 0x46];
@@ -36,11 +33,10 @@ public sealed class BrotherFaxFile : IImageFileFormat<BrotherFaxFile> {
   public ushort Compression { get; init; }
 
   /// <summary>1bpp pixel data, MSB first, rows padded to byte boundary.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this UNI image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(BrotherFaxFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var bytesPerRow = (file.Width + 7) / 8;
     var rgb = new byte[file.Width * file.Height * 3];
@@ -65,9 +61,4 @@ public sealed class BrotherFaxFile : IImageFileFormat<BrotherFaxFile> {
     };
   }
 
-  /// <summary>Not supported.</summary>
-  public static BrotherFaxFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to BrotherFaxFile is not supported.");
-  }
 }

@@ -1,20 +1,17 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Emf;
 
 /// <summary>In-memory representation of an EMF (Enhanced Metafile) image.</summary>
-public sealed class EmfFile : IImageFileFormat<EmfFile> {
+public readonly record struct EmfFile : IImageFormatReader<EmfFile>, IImageToRawImage<EmfFile>, IImageFromRawImage<EmfFile>, IImageFormatWriter<EmfFile> {
 
-  static string IImageFileFormat<EmfFile>.PrimaryExtension => ".emf";
-  static string[] IImageFileFormat<EmfFile>.FileExtensions => [".emf"];
-  static EmfFile IImageFileFormat<EmfFile>.FromFile(FileInfo file) => EmfReader.FromFile(file);
-  static EmfFile IImageFileFormat<EmfFile>.FromBytes(byte[] data) => EmfReader.FromBytes(data);
-  static EmfFile IImageFileFormat<EmfFile>.FromStream(Stream stream) => EmfReader.FromStream(stream);
-  static byte[] IImageFileFormat<EmfFile>.ToBytes(EmfFile file) => EmfWriter.ToBytes(file);
+  static string IImageFormatMetadata<EmfFile>.PrimaryExtension => ".emf";
+  static string[] IImageFormatMetadata<EmfFile>.FileExtensions => [".emf"];
+  static EmfFile IImageFormatReader<EmfFile>.FromSpan(ReadOnlySpan<byte> data) => EmfReader.FromSpan(data);
+  static byte[] IImageFormatWriter<EmfFile>.ToBytes(EmfFile file) => EmfWriter.ToBytes(file);
 
-  static bool? IImageFileFormat<EmfFile>.MatchesSignature(ReadOnlySpan<byte> header)
+  static bool? IImageFormatMetadata<EmfFile>.MatchesSignature(ReadOnlySpan<byte> header)
     => header.Length >= 44 && header[0] == 0x01 && header[1] == 0x00 && header[2] == 0x00 && header[3] == 0x00
       && header[40] == 0x20 && header[41] == 0x45 && header[42] == 0x4D && header[43] == 0x46
       ? true : null;
@@ -23,10 +20,9 @@ public sealed class EmfFile : IImageFileFormat<EmfFile> {
   public int Height { get; init; }
 
   /// <summary>Raw RGB24 pixel data (3 bytes per pixel, top-down, no row padding).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(EmfFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

@@ -1,19 +1,16 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Dicom;
 
 /// <summary>In-memory representation of a DICOM image (basic subset).</summary>
 [FormatMagicBytes([0x44, 0x49, 0x43, 0x4D], offset: 128)]
-public sealed class DicomFile : IImageFileFormat<DicomFile> {
+public readonly record struct DicomFile : IImageFormatReader<DicomFile>, IImageToRawImage<DicomFile>, IImageFromRawImage<DicomFile>, IImageFormatWriter<DicomFile> {
 
-  static string IImageFileFormat<DicomFile>.PrimaryExtension => ".dcm";
-  static string[] IImageFileFormat<DicomFile>.FileExtensions => [".dcm", ".dicom", ".acr", ".dic", ".dc3"];
-  static DicomFile IImageFileFormat<DicomFile>.FromFile(FileInfo file) => DicomReader.FromFile(file);
-  static DicomFile IImageFileFormat<DicomFile>.FromBytes(byte[] data) => DicomReader.FromBytes(data);
-  static DicomFile IImageFileFormat<DicomFile>.FromStream(Stream stream) => DicomReader.FromStream(stream);
-  static byte[] IImageFileFormat<DicomFile>.ToBytes(DicomFile file) => DicomWriter.ToBytes(file);
+  static string IImageFormatMetadata<DicomFile>.PrimaryExtension => ".dcm";
+  static string[] IImageFormatMetadata<DicomFile>.FileExtensions => [".dcm", ".dicom", ".acr", ".dic", ".dc3"];
+  static DicomFile IImageFormatReader<DicomFile>.FromSpan(ReadOnlySpan<byte> data) => DicomReader.FromSpan(data);
+  static byte[] IImageFormatWriter<DicomFile>.ToBytes(DicomFile file) => DicomWriter.ToBytes(file);
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
   /// <summary>Image height in pixels.</summary>
@@ -27,14 +24,13 @@ public sealed class DicomFile : IImageFileFormat<DicomFile> {
   /// <summary>Photometric interpretation.</summary>
   public DicomPhotometricInterpretation PhotometricInterpretation { get; init; }
   /// <summary>Raw pixel data.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
   /// <summary>Window center for display mapping.</summary>
   public double WindowCenter { get; init; }
   /// <summary>Window width for display mapping.</summary>
   public double WindowWidth { get; init; }
 
   public static RawImage ToRawImage(DicomFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     PixelFormat format;
     if (file.SamplesPerPixel == 3)

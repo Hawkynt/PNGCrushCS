@@ -1,20 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.C128Multi;
 
 /// <summary>In-memory representation of a C128 multicolor image (10240 bytes: 8000 bitmap + 1000 screen + 1000 color + 240 spare).</summary>
-public sealed class C128MultiFile : IImageFileFormat<C128MultiFile> {
+public readonly record struct C128MultiFile : IImageFormatReader<C128MultiFile>, IImageToRawImage<C128MultiFile>, IImageFormatWriter<C128MultiFile> {
 
-  static string IImageFileFormat<C128MultiFile>.PrimaryExtension => ".c1m";
-  static string[] IImageFileFormat<C128MultiFile>.FileExtensions => [".c1m"];
-  static C128MultiFile IImageFileFormat<C128MultiFile>.FromFile(FileInfo file) => C128MultiReader.FromFile(file);
-  static C128MultiFile IImageFileFormat<C128MultiFile>.FromBytes(byte[] data) => C128MultiReader.FromBytes(data);
-  static C128MultiFile IImageFileFormat<C128MultiFile>.FromStream(Stream stream) => C128MultiReader.FromStream(stream);
-  static RawImage IImageFileFormat<C128MultiFile>.ToRawImage(C128MultiFile file) => ToRawImage(file);
-  static C128MultiFile IImageFileFormat<C128MultiFile>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<C128MultiFile>.ToBytes(C128MultiFile file) => C128MultiWriter.ToBytes(file);
+  static string IImageFormatMetadata<C128MultiFile>.PrimaryExtension => ".c1m";
+  static string[] IImageFormatMetadata<C128MultiFile>.FileExtensions => [".c1m"];
+  static C128MultiFile IImageFormatReader<C128MultiFile>.FromSpan(ReadOnlySpan<byte> data) => C128MultiReader.FromSpan(data);
+  static byte[] IImageFormatWriter<C128MultiFile>.ToBytes(C128MultiFile file) => C128MultiWriter.ToBytes(file);
 
   /// <summary>Expected file size in bytes.</summary>
   internal const int ExpectedFileSize = 10240;
@@ -44,13 +39,13 @@ public sealed class C128MultiFile : IImageFileFormat<C128MultiFile> {
   public int Height => PixelHeight;
 
   /// <summary>Multicolor bitmap data (8000 bytes, 2 bits per pixel in 8x8 cells).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Screen RAM (1000 bytes, upper/lower nybble = 2 colors per cell).</summary>
-  public byte[] ScreenData { get; init; } = [];
+  public byte[] ScreenData { get; init; }
 
   /// <summary>Color RAM (1000 bytes, lower nybble = 3rd color per cell).</summary>
-  public byte[] ColorData { get; init; } = [];
+  public byte[] ColorData { get; init; }
 
   /// <summary>Background color index (0-15), stored in spare area.</summary>
   public byte BackgroundColor { get; init; }
@@ -64,7 +59,6 @@ public sealed class C128MultiFile : IImageFileFormat<C128MultiFile> {
 
   /// <summary>Converts the C128 multicolor image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(C128MultiFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var rgb = new byte[PixelWidth * PixelHeight * 3];
 
@@ -103,9 +97,4 @@ public sealed class C128MultiFile : IImageFileFormat<C128MultiFile> {
     };
   }
 
-  /// <summary>Not supported. C128 multicolor images have complex cell-based color constraints.</summary>
-  public static C128MultiFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to C128MultiFile is not supported due to complex cell-based color constraints.");
-  }
 }

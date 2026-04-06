@@ -1,19 +1,16 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.MobyDick;
 
 /// <summary>In-memory representation of a Moby Dick paint image.</summary>
-public sealed class MobyDickFile : IImageFileFormat<MobyDickFile> {
+public readonly record struct MobyDickFile : IImageFormatReader<MobyDickFile>, IImageToRawImage<MobyDickFile>, IImageFormatWriter<MobyDickFile> {
 
-  static string IImageFileFormat<MobyDickFile>.PrimaryExtension => ".mby";
-  static string[] IImageFileFormat<MobyDickFile>.FileExtensions => [".mby", ".mbd"];
-  static FormatCapability IImageFileFormat<MobyDickFile>.Capabilities => FormatCapability.IndexedOnly;
-  static MobyDickFile IImageFileFormat<MobyDickFile>.FromFile(FileInfo file) => MobyDickReader.FromFile(file);
-  static MobyDickFile IImageFileFormat<MobyDickFile>.FromBytes(byte[] data) => MobyDickReader.FromBytes(data);
-  static MobyDickFile IImageFileFormat<MobyDickFile>.FromStream(Stream stream) => MobyDickReader.FromStream(stream);
-  static byte[] IImageFileFormat<MobyDickFile>.ToBytes(MobyDickFile file) => MobyDickWriter.ToBytes(file);
+  static string IImageFormatMetadata<MobyDickFile>.PrimaryExtension => ".mby";
+  static string[] IImageFormatMetadata<MobyDickFile>.FileExtensions => [".mby", ".mbd"];
+  static MobyDickFile IImageFormatReader<MobyDickFile>.FromSpan(ReadOnlySpan<byte> data) => MobyDickReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<MobyDickFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<MobyDickFile>.ToBytes(MobyDickFile file) => MobyDickWriter.ToBytes(file);
 
   /// <summary>The fixed width of a Moby Dick image in pixels.</summary>
   public const int FixedWidth = 320;
@@ -37,14 +34,13 @@ public sealed class MobyDickFile : IImageFileFormat<MobyDickFile> {
   public int Height => FixedHeight;
 
   /// <summary>Palette data (768 bytes, 256 entries x 3 bytes RGB).</summary>
-  public byte[] Palette { get; init; } = [];
+  public byte[] Palette { get; init; }
 
   /// <summary>Pixel data (64000 bytes, 1 byte per pixel, index into palette).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this Moby Dick image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(MobyDickFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -67,9 +63,4 @@ public sealed class MobyDickFile : IImageFileFormat<MobyDickFile> {
     };
   }
 
-  /// <summary>Not supported. Moby Dick images require palette quantization.</summary>
-  public static MobyDickFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to MobyDickFile is not supported.");
-  }
 }

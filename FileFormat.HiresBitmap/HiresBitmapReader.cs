@@ -27,6 +27,8 @@ public static class HiresBitmapReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static HiresBitmapFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static HiresBitmapFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
 

@@ -29,6 +29,8 @@ public static class ExrReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static ExrFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static ExrFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < ExrMagicHeader.StructSize)

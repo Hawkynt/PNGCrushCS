@@ -1,11 +1,10 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.GraphicsMaster;
 
 /// <summary>In-memory representation of a Graphics Master (Atari 8-bit) image (ANTIC Mode E, 160x192, 4-color).</summary>
-public sealed class GraphicsMasterFile : IImageFileFormat<GraphicsMasterFile> {
+public readonly record struct GraphicsMasterFile : IImageFormatReader<GraphicsMasterFile>, IImageToRawImage<GraphicsMasterFile>, IImageFromRawImage<GraphicsMasterFile>, IImageFormatWriter<GraphicsMasterFile> {
 
   /// <summary>The exact file size: 40 bytes/line x 192 lines.</summary>
   public const int ExpectedFileSize = 7680;
@@ -22,13 +21,11 @@ public sealed class GraphicsMasterFile : IImageFileFormat<GraphicsMasterFile> {
   /// <summary>Default Atari 4-color palette as 0xRRGGBB values.</summary>
   private static readonly int[] _DefaultPalette = [0x000000, 0x884400, 0x00AA44, 0xDDCC88];
 
-  static string IImageFileFormat<GraphicsMasterFile>.PrimaryExtension => ".gms";
-  static string[] IImageFileFormat<GraphicsMasterFile>.FileExtensions => [".gms", ".gm8"];
-  static FormatCapability IImageFileFormat<GraphicsMasterFile>.Capabilities => FormatCapability.IndexedOnly;
-  static GraphicsMasterFile IImageFileFormat<GraphicsMasterFile>.FromFile(FileInfo file) => GraphicsMasterReader.FromFile(file);
-  static GraphicsMasterFile IImageFileFormat<GraphicsMasterFile>.FromBytes(byte[] data) => GraphicsMasterReader.FromBytes(data);
-  static GraphicsMasterFile IImageFileFormat<GraphicsMasterFile>.FromStream(Stream stream) => GraphicsMasterReader.FromStream(stream);
-  static byte[] IImageFileFormat<GraphicsMasterFile>.ToBytes(GraphicsMasterFile file) => GraphicsMasterWriter.ToBytes(file);
+  static string IImageFormatMetadata<GraphicsMasterFile>.PrimaryExtension => ".gms";
+  static string[] IImageFormatMetadata<GraphicsMasterFile>.FileExtensions => [".gms", ".gm8"];
+  static GraphicsMasterFile IImageFormatReader<GraphicsMasterFile>.FromSpan(ReadOnlySpan<byte> data) => GraphicsMasterReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<GraphicsMasterFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<GraphicsMasterFile>.ToBytes(GraphicsMasterFile file) => GraphicsMasterWriter.ToBytes(file);
 
   /// <summary>Always 160.</summary>
   public int Width => FixedWidth;
@@ -37,11 +34,10 @@ public sealed class GraphicsMasterFile : IImageFileFormat<GraphicsMasterFile> {
   public int Height => FixedHeight;
 
   /// <summary>Raw pixel data (7680 bytes, 2bpp packed: 4 pixels per byte, 40 bytes per row, 192 rows).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this image to a platform-independent <see cref="RawImage"/> in Indexed8 format with a 4-entry palette.</summary>
   public static RawImage ToRawImage(GraphicsMasterFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var indices = new byte[FixedWidth * FixedHeight];
 

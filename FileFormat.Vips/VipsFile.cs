@@ -1,18 +1,15 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Vips;
 
 /// <summary>In-memory representation of a libvips native image (.v / .vips).</summary>
-public sealed class VipsFile : IImageFileFormat<VipsFile> {
+public readonly record struct VipsFile : IImageFormatReader<VipsFile>, IImageToRawImage<VipsFile>, IImageFromRawImage<VipsFile>, IImageFormatWriter<VipsFile> {
 
-  static string IImageFileFormat<VipsFile>.PrimaryExtension => ".v";
-  static string[] IImageFileFormat<VipsFile>.FileExtensions => [".v", ".vips"];
-  static VipsFile IImageFileFormat<VipsFile>.FromFile(FileInfo file) => VipsReader.FromFile(file);
-  static VipsFile IImageFileFormat<VipsFile>.FromBytes(byte[] data) => VipsReader.FromBytes(data);
-  static VipsFile IImageFileFormat<VipsFile>.FromStream(Stream stream) => VipsReader.FromStream(stream);
-  static byte[] IImageFileFormat<VipsFile>.ToBytes(VipsFile file) => VipsWriter.ToBytes(file);
+  static string IImageFormatMetadata<VipsFile>.PrimaryExtension => ".v";
+  static string[] IImageFormatMetadata<VipsFile>.FileExtensions => [".v", ".vips"];
+  static VipsFile IImageFormatReader<VipsFile>.FromSpan(ReadOnlySpan<byte> data) => VipsReader.FromSpan(data);
+  static byte[] IImageFormatWriter<VipsFile>.ToBytes(VipsFile file) => VipsWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -21,16 +18,15 @@ public sealed class VipsFile : IImageFileFormat<VipsFile> {
   public int Height { get; init; }
 
   /// <summary>Number of bands/channels (1=gray, 3=RGB, 4=RGBA).</summary>
-  public int Bands { get; init; } = 3;
+  public int Bands { get; init; }
 
   /// <summary>Band sample format.</summary>
   public VipsBandFormat BandFormat { get; init; }
 
   /// <summary>Raw pixel data (Bands bytes per pixel for UChar).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(VipsFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     if (file.BandFormat != VipsBandFormat.UChar)
       throw new NotSupportedException($"Only UChar band format is supported, got {file.BandFormat}.");

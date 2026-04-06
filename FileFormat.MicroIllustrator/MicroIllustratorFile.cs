@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.MicroIllustrator;
 
 /// <summary>In-memory representation of a Commodore 64 Micro Illustrator multicolor image.</summary>
-public sealed class MicroIllustratorFile : IImageFileFormat<MicroIllustratorFile> {
+public readonly record struct MicroIllustratorFile : IImageFormatReader<MicroIllustratorFile>, IImageToRawImage<MicroIllustratorFile>, IImageFormatWriter<MicroIllustratorFile> {
 
-  static string IImageFileFormat<MicroIllustratorFile>.PrimaryExtension => ".mil";
-  static string[] IImageFileFormat<MicroIllustratorFile>.FileExtensions => [".mil"];
-  static MicroIllustratorFile IImageFileFormat<MicroIllustratorFile>.FromFile(FileInfo file) => MicroIllustratorReader.FromFile(file);
-  static MicroIllustratorFile IImageFileFormat<MicroIllustratorFile>.FromBytes(byte[] data) => MicroIllustratorReader.FromBytes(data);
-  static MicroIllustratorFile IImageFileFormat<MicroIllustratorFile>.FromStream(Stream stream) => MicroIllustratorReader.FromStream(stream);
-  static byte[] IImageFileFormat<MicroIllustratorFile>.ToBytes(MicroIllustratorFile file) => MicroIllustratorWriter.ToBytes(file);
+  static string IImageFormatMetadata<MicroIllustratorFile>.PrimaryExtension => ".mil";
+  static string[] IImageFormatMetadata<MicroIllustratorFile>.FileExtensions => [".mil"];
+  static MicroIllustratorFile IImageFormatReader<MicroIllustratorFile>.FromSpan(ReadOnlySpan<byte> data) => MicroIllustratorReader.FromSpan(data);
+  static byte[] IImageFormatWriter<MicroIllustratorFile>.ToBytes(MicroIllustratorFile file) => MicroIllustratorWriter.ToBytes(file);
 
   /// <summary>The fixed width of a Micro Illustrator image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -52,20 +49,19 @@ public sealed class MicroIllustratorFile : IImageFileFormat<MicroIllustratorFile
   public ushort LoadAddress { get; init; }
 
   /// <summary>Multicolor bitmap data (8000 bytes, 2 bits per pixel).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Video matrix / screen RAM (1000 bytes, upper/lower nybble = 2 colors per cell).</summary>
-  public byte[] VideoMatrix { get; init; } = [];
+  public byte[] VideoMatrix { get; init; }
 
   /// <summary>Color RAM (1000 bytes, lower nybble = 3rd color per cell).</summary>
-  public byte[] ColorRam { get; init; } = [];
+  public byte[] ColorRam { get; init; }
 
   /// <summary>Background color index (0-15).</summary>
   public byte BackgroundColor { get; init; }
 
   /// <summary>Converts this Micro Illustrator image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(MicroIllustratorFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -104,9 +100,4 @@ public sealed class MicroIllustratorFile : IImageFileFormat<MicroIllustratorFile
     };
   }
 
-  /// <summary>Not supported. Micro Illustrator images have complex cell-based color constraints.</summary>
-  public static MicroIllustratorFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to MicroIllustratorFile is not supported due to complex cell-based color constraints.");
-  }
 }

@@ -27,6 +27,8 @@ public static class MegaPaintReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static MegaPaintFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static MegaPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < MegaPaintFile.MinFileSize)

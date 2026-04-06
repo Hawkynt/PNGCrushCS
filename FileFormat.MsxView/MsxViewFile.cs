@@ -1,19 +1,16 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.MsxView;
 
 /// <summary>In-memory representation of an MSX View image (MSX2 Screen 8, 256x212, 256-color RGB332).</summary>
-public sealed class MsxViewFile : IImageFileFormat<MsxViewFile> {
+public readonly record struct MsxViewFile : IImageFormatReader<MsxViewFile>, IImageToRawImage<MsxViewFile>, IImageFromRawImage<MsxViewFile>, IImageFormatWriter<MsxViewFile> {
 
-  static string IImageFileFormat<MsxViewFile>.PrimaryExtension => ".mvw";
-  static string[] IImageFileFormat<MsxViewFile>.FileExtensions => [".mvw", ".msv"];
-  static FormatCapability IImageFileFormat<MsxViewFile>.Capabilities => FormatCapability.IndexedOnly;
-  static MsxViewFile IImageFileFormat<MsxViewFile>.FromFile(FileInfo file) => MsxViewReader.FromFile(file);
-  static MsxViewFile IImageFileFormat<MsxViewFile>.FromBytes(byte[] data) => MsxViewReader.FromBytes(data);
-  static MsxViewFile IImageFileFormat<MsxViewFile>.FromStream(Stream stream) => MsxViewReader.FromStream(stream);
-  static byte[] IImageFileFormat<MsxViewFile>.ToBytes(MsxViewFile file) => MsxViewWriter.ToBytes(file);
+  static string IImageFormatMetadata<MsxViewFile>.PrimaryExtension => ".mvw";
+  static string[] IImageFormatMetadata<MsxViewFile>.FileExtensions => [".mvw", ".msv"];
+  static MsxViewFile IImageFormatReader<MsxViewFile>.FromSpan(ReadOnlySpan<byte> data) => MsxViewReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<MsxViewFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<MsxViewFile>.ToBytes(MsxViewFile file) => MsxViewWriter.ToBytes(file);
 
   /// <summary>Fixed image width.</summary>
   public const int FixedWidth = 256;
@@ -31,11 +28,10 @@ public sealed class MsxViewFile : IImageFileFormat<MsxViewFile> {
   public int Height => FixedHeight;
 
   /// <summary>Raw pixel data (54272 bytes, one byte per pixel in RGB332 encoding).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this MSX View image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(MsxViewFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var rgb = new byte[FixedWidth * FixedHeight * 3];
 

@@ -26,6 +26,8 @@ public static class GameBoyTileReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static GameBoyTileFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static GameBoyTileFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < GameBoyTileFile.BytesPerTile)

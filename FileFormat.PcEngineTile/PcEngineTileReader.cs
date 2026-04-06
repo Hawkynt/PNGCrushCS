@@ -26,6 +26,8 @@ public static class PcEngineTileReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static PcEngineTileFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static PcEngineTileFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < PcEngineTileFile.BytesPerTile)

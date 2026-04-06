@@ -25,6 +25,8 @@ public static class SnesTileReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static SnesTileFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static SnesTileFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < SnesTileFile.BytesPerTile)

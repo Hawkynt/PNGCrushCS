@@ -51,7 +51,7 @@ public sealed class DataTypeTests {
       PixelData = [0xFF]
     };
 
-    var raw = file.ToRawImage();
+    var raw = SunIconFile.ToRawImage(file);
 
     Assert.That(raw.Format, Is.EqualTo(FileFormat.Core.PixelFormat.Indexed1));
   }
@@ -65,7 +65,7 @@ public sealed class DataTypeTests {
       PixelData = [0xFF]
     };
 
-    var raw = file.ToRawImage();
+    var raw = SunIconFile.ToRawImage(file);
 
     Assert.That(raw.PaletteCount, Is.EqualTo(2));
     Assert.That(raw.Palette, Is.Not.Null);

@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.ZxTricolor;
 
 /// <summary>In-memory representation of a ZX Spectrum Tricolor file (20736 bytes: three complete 6912-byte screens, interlaced for more colors).</summary>
-public sealed class ZxTricolorFile : IImageFileFormat<ZxTricolorFile> {
+public readonly record struct ZxTricolorFile : IImageFormatReader<ZxTricolorFile>, IImageToRawImage<ZxTricolorFile>, IImageFormatWriter<ZxTricolorFile> {
 
-  static string IImageFileFormat<ZxTricolorFile>.PrimaryExtension => ".3cl";
-  static string[] IImageFileFormat<ZxTricolorFile>.FileExtensions => [".3cl"];
-  static ZxTricolorFile IImageFileFormat<ZxTricolorFile>.FromFile(FileInfo file) => ZxTricolorReader.FromFile(file);
-  static ZxTricolorFile IImageFileFormat<ZxTricolorFile>.FromBytes(byte[] data) => ZxTricolorReader.FromBytes(data);
-  static ZxTricolorFile IImageFileFormat<ZxTricolorFile>.FromStream(Stream stream) => ZxTricolorReader.FromStream(stream);
-  static byte[] IImageFileFormat<ZxTricolorFile>.ToBytes(ZxTricolorFile file) => ZxTricolorWriter.ToBytes(file);
+  static string IImageFormatMetadata<ZxTricolorFile>.PrimaryExtension => ".3cl";
+  static string[] IImageFormatMetadata<ZxTricolorFile>.FileExtensions => [".3cl"];
+  static ZxTricolorFile IImageFormatReader<ZxTricolorFile>.FromSpan(ReadOnlySpan<byte> data) => ZxTricolorReader.FromSpan(data);
+  static byte[] IImageFormatWriter<ZxTricolorFile>.ToBytes(ZxTricolorFile file) => ZxTricolorWriter.ToBytes(file);
 
   /// <summary>ZX Spectrum normal palette (bright=0).</summary>
   internal static readonly int[] NormalPalette = [
@@ -31,26 +28,25 @@ public sealed class ZxTricolorFile : IImageFileFormat<ZxTricolorFile> {
   public int Height => 192;
 
   /// <summary>Screen 1: 6144 bytes bitmap data in linear row order.</summary>
-  public byte[] BitmapData1 { get; init; } = [];
+  public byte[] BitmapData1 { get; init; }
 
   /// <summary>Screen 1: 768 bytes attribute data.</summary>
-  public byte[] AttributeData1 { get; init; } = [];
+  public byte[] AttributeData1 { get; init; }
 
   /// <summary>Screen 2: 6144 bytes bitmap data in linear row order.</summary>
-  public byte[] BitmapData2 { get; init; } = [];
+  public byte[] BitmapData2 { get; init; }
 
   /// <summary>Screen 2: 768 bytes attribute data.</summary>
-  public byte[] AttributeData2 { get; init; } = [];
+  public byte[] AttributeData2 { get; init; }
 
   /// <summary>Screen 3: 6144 bytes bitmap data in linear row order.</summary>
-  public byte[] BitmapData3 { get; init; } = [];
+  public byte[] BitmapData3 { get; init; }
 
   /// <summary>Screen 3: 768 bytes attribute data.</summary>
-  public byte[] AttributeData3 { get; init; } = [];
+  public byte[] AttributeData3 { get; init; }
 
   /// <summary>Converts this tricolor screen to Rgb24 by averaging all three screens pixel by pixel.</summary>
   public static RawImage ToRawImage(ZxTricolorFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = 256;
     const int height = 192;
@@ -96,9 +92,4 @@ public sealed class ZxTricolorFile : IImageFileFormat<ZxTricolorFile> {
     return palette[bitValue == 1 ? ink : paper];
   }
 
-  /// <summary>Not supported.</summary>
-  public static ZxTricolorFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to ZxTricolorFile is not supported due to triple-screen attribute constraints.");
-  }
 }

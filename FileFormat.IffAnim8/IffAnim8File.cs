@@ -1,11 +1,10 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.IffAnim8;
 
 /// <summary>In-memory representation of an IFF ANIM8 (Long-word delta animation) file.</summary>
-public sealed class IffAnim8File : IImageFileFormat<IffAnim8File> {
+public readonly record struct IffAnim8File : IImageFormatReader<IffAnim8File>, IImageToRawImage<IffAnim8File>, IImageFormatWriter<IffAnim8File> {
 
   /// <summary>Minimum valid file size (FORM header = 12 bytes).</summary>
   internal const int MinFileSize = 12;
@@ -16,27 +15,22 @@ public sealed class IffAnim8File : IImageFileFormat<IffAnim8File> {
   /// <summary>Default height for ANIM8 images.</summary>
   internal const int DefaultHeight = 200;
 
-  static string IImageFileFormat<IffAnim8File>.PrimaryExtension => ".an8";
-  static string[] IImageFileFormat<IffAnim8File>.FileExtensions => [".an8", ".anim8"];
-  static IffAnim8File IImageFileFormat<IffAnim8File>.FromFile(FileInfo file) => IffAnim8Reader.FromFile(file);
-  static IffAnim8File IImageFileFormat<IffAnim8File>.FromBytes(byte[] data) => IffAnim8Reader.FromBytes(data);
-  static IffAnim8File IImageFileFormat<IffAnim8File>.FromStream(Stream stream) => IffAnim8Reader.FromStream(stream);
-  static RawImage IImageFileFormat<IffAnim8File>.ToRawImage(IffAnim8File file) => ToRawImage(file);
-  static IffAnim8File IImageFileFormat<IffAnim8File>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<IffAnim8File>.ToBytes(IffAnim8File file) => IffAnim8Writer.ToBytes(file);
+  static string IImageFormatMetadata<IffAnim8File>.PrimaryExtension => ".an8";
+  static string[] IImageFormatMetadata<IffAnim8File>.FileExtensions => [".an8", ".anim8"];
+  static IffAnim8File IImageFormatReader<IffAnim8File>.FromSpan(ReadOnlySpan<byte> data) => IffAnim8Reader.FromSpan(data);
+  static byte[] IImageFormatWriter<IffAnim8File>.ToBytes(IffAnim8File file) => IffAnim8Writer.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
-  public int Width { get; init; } = DefaultWidth;
+  public int Width { get; init; }
 
   /// <summary>Image height in pixels.</summary>
-  public int Height { get; init; } = DefaultHeight;
+  public int Height { get; init; }
 
   /// <summary>Raw file data.</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   /// <summary>Converts this ANIM8 file to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(IffAnim8File file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var width = file.Width;
     var height = file.Height;
@@ -50,9 +44,4 @@ public sealed class IffAnim8File : IImageFileFormat<IffAnim8File> {
     };
   }
 
-  /// <summary>Not supported. ANIM8 files require complex delta animation encoding.</summary>
-  public static IffAnim8File FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to IffAnim8File is not supported due to complex delta animation encoding.");
-  }
 }

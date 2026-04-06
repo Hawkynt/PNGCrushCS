@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Pco16Bit;
 
 /// <summary>In-memory representation of a PCO 16-bit grayscale image.</summary>
-public sealed class Pco16BitFile : IImageFileFormat<Pco16BitFile> {
+public readonly record struct Pco16BitFile : IImageFormatReader<Pco16BitFile>, IImageToRawImage<Pco16BitFile>, IImageFromRawImage<Pco16BitFile>, IImageFormatWriter<Pco16BitFile> {
 
-  static string IImageFileFormat<Pco16BitFile>.PrimaryExtension => ".b16";
-  static string[] IImageFileFormat<Pco16BitFile>.FileExtensions => [".b16"];
-  static Pco16BitFile IImageFileFormat<Pco16BitFile>.FromFile(FileInfo file) => Pco16BitReader.FromFile(file);
-  static Pco16BitFile IImageFileFormat<Pco16BitFile>.FromBytes(byte[] data) => Pco16BitReader.FromBytes(data);
-  static Pco16BitFile IImageFileFormat<Pco16BitFile>.FromStream(Stream stream) => Pco16BitReader.FromStream(stream);
-  static byte[] IImageFileFormat<Pco16BitFile>.ToBytes(Pco16BitFile file) => Pco16BitWriter.ToBytes(file);
+  static string IImageFormatMetadata<Pco16BitFile>.PrimaryExtension => ".b16";
+  static string[] IImageFormatMetadata<Pco16BitFile>.FileExtensions => [".b16"];
+  static Pco16BitFile IImageFormatReader<Pco16BitFile>.FromSpan(ReadOnlySpan<byte> data) => Pco16BitReader.FromSpan(data);
+  static byte[] IImageFormatWriter<Pco16BitFile>.ToBytes(Pco16BitFile file) => Pco16BitWriter.ToBytes(file);
 
   /// <summary>Header size: width(4) + height(4) = 8 bytes.</summary>
   internal const int HeaderSize = 8;
@@ -27,11 +24,10 @@ public sealed class Pco16BitFile : IImageFileFormat<Pco16BitFile> {
   public int Height { get; init; }
 
   /// <summary>16-bit LE grayscale pixel data (2 bytes per pixel).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this PCO image to a platform-independent <see cref="RawImage"/> in Gray16 format.</summary>
   public static RawImage ToRawImage(Pco16BitFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var pixelCount = file.Width * file.Height;
     var gray16 = new byte[pixelCount * 2];

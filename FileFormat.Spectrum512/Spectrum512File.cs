@@ -1,27 +1,23 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Spectrum512;
 
 /// <summary>In-memory representation of a Spectrum 512 image (Atari ST 512-color).</summary>
-public sealed class Spectrum512File : IImageFileFormat<Spectrum512File> {
+public readonly record struct Spectrum512File : IImageFormatReader<Spectrum512File>, IImageToRawImage<Spectrum512File>, IImageFromRawImage<Spectrum512File>, IImageFormatWriter<Spectrum512File> {
 
-  static string IImageFileFormat<Spectrum512File>.PrimaryExtension => ".spu";
-  static string[] IImageFileFormat<Spectrum512File>.FileExtensions => [".spu"];
-  static Spectrum512File IImageFileFormat<Spectrum512File>.FromFile(FileInfo file) => Spectrum512Reader.FromFile(file);
-  static Spectrum512File IImageFileFormat<Spectrum512File>.FromBytes(byte[] data) => Spectrum512Reader.FromBytes(data);
-  static Spectrum512File IImageFileFormat<Spectrum512File>.FromStream(Stream stream) => Spectrum512Reader.FromStream(stream);
-  static byte[] IImageFileFormat<Spectrum512File>.ToBytes(Spectrum512File file) => Spectrum512Writer.ToBytes(file);
-  public int Width { get; init; } = 320;
-  public int Height { get; init; } = 199;
+  static string IImageFormatMetadata<Spectrum512File>.PrimaryExtension => ".spu";
+  static string[] IImageFormatMetadata<Spectrum512File>.FileExtensions => [".spu"];
+  static Spectrum512File IImageFormatReader<Spectrum512File>.FromSpan(ReadOnlySpan<byte> data) => Spectrum512Reader.FromSpan(data);
+  static byte[] IImageFormatWriter<Spectrum512File>.ToBytes(Spectrum512File file) => Spectrum512Writer.ToBytes(file);
+  public int Width { get; init; }
+  public int Height { get; init; }
   public Spectrum512Variant Variant { get; init; }
-  public byte[] PixelData { get; init; } = new byte[32000];
-  public short[][] Palettes { get; init; } = new short[199][];
+  public byte[] PixelData { get; init; }
+  public short[][] Palettes { get; init; }
 
   public static RawImage ToRawImage(Spectrum512File file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = 320;
     var height = file.Height;

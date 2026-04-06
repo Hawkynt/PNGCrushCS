@@ -28,6 +28,8 @@ public static class BigTiffReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static BigTiffFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static BigTiffFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < BigTiffFile.MinimumFileSize)

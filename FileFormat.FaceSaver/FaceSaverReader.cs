@@ -22,6 +22,8 @@ public static class FaceSaverReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static FaceSaverFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static FaceSaverFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < 10)

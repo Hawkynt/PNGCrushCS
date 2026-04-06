@@ -1,20 +1,17 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Analyze;
 
 /// <summary>In-memory representation of an Analyze 7.5 medical imaging file (.hdr + .img paired files).</summary>
-public sealed class AnalyzeFile : IImageFileFormat<AnalyzeFile> {
+public readonly record struct AnalyzeFile : IImageFormatReader<AnalyzeFile>, IImageToRawImage<AnalyzeFile>, IImageFromRawImage<AnalyzeFile>, IImageFormatWriter<AnalyzeFile> {
 
-  static string IImageFileFormat<AnalyzeFile>.PrimaryExtension => ".hdr";
-  static string[] IImageFileFormat<AnalyzeFile>.FileExtensions => [".hdr", ".img"];
-  static AnalyzeFile IImageFileFormat<AnalyzeFile>.FromFile(FileInfo file) => AnalyzeReader.FromFile(file);
-  static AnalyzeFile IImageFileFormat<AnalyzeFile>.FromBytes(byte[] data) => AnalyzeReader.FromBytes(data);
-  static AnalyzeFile IImageFileFormat<AnalyzeFile>.FromStream(Stream stream) => AnalyzeReader.FromStream(stream);
-  static byte[] IImageFileFormat<AnalyzeFile>.ToBytes(AnalyzeFile file) => AnalyzeWriter.ToBytes(file);
+  static string IImageFormatMetadata<AnalyzeFile>.PrimaryExtension => ".hdr";
+  static string[] IImageFormatMetadata<AnalyzeFile>.FileExtensions => [".hdr", ".img"];
+  static AnalyzeFile IImageFormatReader<AnalyzeFile>.FromSpan(ReadOnlySpan<byte> data) => AnalyzeReader.FromSpan(data);
+  static byte[] IImageFormatWriter<AnalyzeFile>.ToBytes(AnalyzeFile file) => AnalyzeWriter.ToBytes(file);
 
-  static bool? IImageFileFormat<AnalyzeFile>.MatchesSignature(ReadOnlySpan<byte> header) {
+  static bool? IImageFormatMetadata<AnalyzeFile>.MatchesSignature(ReadOnlySpan<byte> header) {
     if (header.Length < 44 || header[0] != 0x5C || header[1] != 0x01 || header[2] != 0x00 || header[3] != 0x00)
       return null;
     var dim0 = (short)(header[40] | (header[41] << 8));
@@ -31,10 +28,9 @@ public sealed class AnalyzeFile : IImageFileFormat<AnalyzeFile> {
   public int BitsPerPixel { get; init; }
 
   /// <summary>Raw pixel data from the .img file.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(AnalyzeFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     var format = file.DataType switch {
       AnalyzeDataType.UInt8 => PixelFormat.Gray8,
       AnalyzeDataType.Rgb24 => PixelFormat.Rgb24,

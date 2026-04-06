@@ -1,19 +1,16 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.GemImg;
 
 /// <summary>In-memory representation of a GEM IMG raster image.</summary>
-public sealed class GemImgFile : IImageFileFormat<GemImgFile> {
+public readonly record struct GemImgFile : IImageFormatReader<GemImgFile>, IImageToRawImage<GemImgFile>, IImageFromRawImage<GemImgFile>, IImageFormatWriter<GemImgFile> {
 
-  static string IImageFileFormat<GemImgFile>.PrimaryExtension => ".img";
-  static string[] IImageFileFormat<GemImgFile>.FileExtensions => [".img"];
-  static FormatCapability IImageFileFormat<GemImgFile>.Capabilities => FormatCapability.IndexedOnly;
-  static GemImgFile IImageFileFormat<GemImgFile>.FromFile(FileInfo file) => GemImgReader.FromFile(file);
-  static GemImgFile IImageFileFormat<GemImgFile>.FromBytes(byte[] data) => GemImgReader.FromBytes(data);
-  static GemImgFile IImageFileFormat<GemImgFile>.FromStream(Stream stream) => GemImgReader.FromStream(stream);
-  static byte[] IImageFileFormat<GemImgFile>.ToBytes(GemImgFile file) => GemImgWriter.ToBytes(file);
+  static string IImageFormatMetadata<GemImgFile>.PrimaryExtension => ".img";
+  static string[] IImageFormatMetadata<GemImgFile>.FileExtensions => [".img"];
+  static GemImgFile IImageFormatReader<GemImgFile>.FromSpan(ReadOnlySpan<byte> data) => GemImgReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<GemImgFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<GemImgFile>.ToBytes(GemImgFile file) => GemImgWriter.ToBytes(file);
   public int Version { get; init; }
   public int Width { get; init; }
   public int Height { get; init; }
@@ -21,11 +18,10 @@ public sealed class GemImgFile : IImageFileFormat<GemImgFile> {
   public int PatternLength { get; init; }
   public int PixelWidth { get; init; }
   public int PixelHeight { get; init; }
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this GEM IMG file to a format-independent <see cref="RawImage"/>.</summary>
   public static RawImage ToRawImage(GemImgFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var chunky = PlanarConverter.NonInterleavedPlanarToChunky(file.PixelData, file.Width, file.Height, file.NumPlanes);
     var paletteCount = Math.Min(1 << file.NumPlanes, 256);

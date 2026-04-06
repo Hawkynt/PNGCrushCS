@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.HomeworldLif;
 
 /// <summary>In-memory representation of a Homeworld LIF texture image.</summary>
-public sealed class HomeworldLifFile : IImageFileFormat<HomeworldLifFile> {
+public readonly record struct HomeworldLifFile : IImageFormatReader<HomeworldLifFile>, IImageToRawImage<HomeworldLifFile>, IImageFormatWriter<HomeworldLifFile> {
 
-  static string IImageFileFormat<HomeworldLifFile>.PrimaryExtension => ".lif";
-  static string[] IImageFileFormat<HomeworldLifFile>.FileExtensions => [".lif"];
-  static HomeworldLifFile IImageFileFormat<HomeworldLifFile>.FromFile(FileInfo file) => HomeworldLifReader.FromFile(file);
-  static HomeworldLifFile IImageFileFormat<HomeworldLifFile>.FromBytes(byte[] data) => HomeworldLifReader.FromBytes(data);
-  static HomeworldLifFile IImageFileFormat<HomeworldLifFile>.FromStream(Stream stream) => HomeworldLifReader.FromStream(stream);
-  static byte[] IImageFileFormat<HomeworldLifFile>.ToBytes(HomeworldLifFile file) => HomeworldLifWriter.ToBytes(file);
+  static string IImageFormatMetadata<HomeworldLifFile>.PrimaryExtension => ".lif";
+  static string[] IImageFormatMetadata<HomeworldLifFile>.FileExtensions => [".lif"];
+  static HomeworldLifFile IImageFormatReader<HomeworldLifFile>.FromSpan(ReadOnlySpan<byte> data) => HomeworldLifReader.FromSpan(data);
+  static byte[] IImageFormatWriter<HomeworldLifFile>.ToBytes(HomeworldLifFile file) => HomeworldLifWriter.ToBytes(file);
 
   /// <summary>Magic bytes: "Lif " (0x4C 0x69 0x66 0x20).</summary>
   internal static readonly byte[] Magic = [0x4C, 0x69, 0x66, 0x20];
@@ -33,11 +30,10 @@ public sealed class HomeworldLifFile : IImageFileFormat<HomeworldLifFile> {
   public int Version { get; init; }
 
   /// <summary>Raw RGBA32 pixel data (4 bytes per pixel).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this LIF image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(HomeworldLifFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var pixelCount = file.Width * file.Height;
     var rgb = new byte[pixelCount * 3];
@@ -57,9 +53,4 @@ public sealed class HomeworldLifFile : IImageFileFormat<HomeworldLifFile> {
     };
   }
 
-  /// <summary>Not supported.</summary>
-  public static HomeworldLifFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to HomeworldLifFile is not supported.");
-  }
 }

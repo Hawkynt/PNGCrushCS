@@ -91,7 +91,7 @@ public sealed class RoundTripTests {
       PixelData = [0.0f, 0.33f, 0.66f, 1.0f]
     };
 
-    var raw = original.ToRawImage();
+    var raw = Fl32File.ToRawImage(original);
     Assert.That(raw.Format, Is.EqualTo(PixelFormat.Gray16));
 
     var restored = Fl32File.FromRawImage(raw);
@@ -110,7 +110,7 @@ public sealed class RoundTripTests {
       pixels[i] = i / (float)pixels.Length;
 
     var original = new Fl32File { Width = 2, Height = 2, Channels = 3, PixelData = pixels };
-    var raw = original.ToRawImage();
+    var raw = Fl32File.ToRawImage(original);
     Assert.That(raw.Format, Is.EqualTo(PixelFormat.Rgb48));
 
     var restored = Fl32File.FromRawImage(raw);
@@ -129,7 +129,7 @@ public sealed class RoundTripTests {
       pixels[i] = i / (float)pixels.Length;
 
     var original = new Fl32File { Width = 2, Height = 2, Channels = 4, PixelData = pixels };
-    var raw = original.ToRawImage();
+    var raw = Fl32File.ToRawImage(original);
     Assert.That(raw.Format, Is.EqualTo(PixelFormat.Rgba64));
 
     var restored = Fl32File.FromRawImage(raw);

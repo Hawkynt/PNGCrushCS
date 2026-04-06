@@ -26,6 +26,8 @@ public static class Artist64Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static Artist64File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static Artist64File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < Artist64File.ExpectedFileSize)

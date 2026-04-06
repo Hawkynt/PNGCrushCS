@@ -1,21 +1,18 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.SpeederFalcon;
 
 /// <summary>In-memory representation of a Speeder Falcon true-color (.spf) screen dump.</summary>
-public sealed class SpeederFalconFile : IImageFileFormat<SpeederFalconFile> {
+public readonly record struct SpeederFalconFile : IImageFormatReader<SpeederFalconFile>, IImageToRawImage<SpeederFalconFile>, IImageFromRawImage<SpeederFalconFile>, IImageFormatWriter<SpeederFalconFile> {
 
   /// <summary>The exact file size: 320 x 240 x 2 bytes per pixel.</summary>
   public const int ExpectedFileSize = 320 * 240 * 2;
 
-  static string IImageFileFormat<SpeederFalconFile>.PrimaryExtension => ".spf";
-  static string[] IImageFileFormat<SpeederFalconFile>.FileExtensions => [".spf"];
-  static SpeederFalconFile IImageFileFormat<SpeederFalconFile>.FromFile(FileInfo file) => SpeederFalconReader.FromFile(file);
-  static SpeederFalconFile IImageFileFormat<SpeederFalconFile>.FromBytes(byte[] data) => SpeederFalconReader.FromBytes(data);
-  static SpeederFalconFile IImageFileFormat<SpeederFalconFile>.FromStream(Stream stream) => SpeederFalconReader.FromStream(stream);
-  static byte[] IImageFileFormat<SpeederFalconFile>.ToBytes(SpeederFalconFile file) => SpeederFalconWriter.ToBytes(file);
+  static string IImageFormatMetadata<SpeederFalconFile>.PrimaryExtension => ".spf";
+  static string[] IImageFormatMetadata<SpeederFalconFile>.FileExtensions => [".spf"];
+  static SpeederFalconFile IImageFormatReader<SpeederFalconFile>.FromSpan(ReadOnlySpan<byte> data) => SpeederFalconReader.FromSpan(data);
+  static byte[] IImageFormatWriter<SpeederFalconFile>.ToBytes(SpeederFalconFile file) => SpeederFalconWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>
   public int Width => 320;
@@ -24,10 +21,9 @@ public sealed class SpeederFalconFile : IImageFileFormat<SpeederFalconFile> {
   public int Height => 240;
 
   /// <summary>Raw RGB565 big-endian pixel data (2 bytes per pixel, 153600 bytes total).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(SpeederFalconFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var rgb565 = file.PixelData;
     var pixelCount = 320 * 240;

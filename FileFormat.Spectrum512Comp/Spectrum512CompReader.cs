@@ -26,6 +26,8 @@ public static class Spectrum512CompReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static Spectrum512CompFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static Spectrum512CompFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < Spectrum512CompFile.MinFileSize)

@@ -28,6 +28,8 @@ public static class SoftImageReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static SoftImageFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static SoftImageFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < SoftImageFile.HeaderSize)

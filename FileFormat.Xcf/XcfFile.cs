@@ -1,32 +1,28 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Xcf;
 
 /// <summary>In-memory representation of an XCF image (flat composite of first layer).</summary>
 [FormatMagicBytes([0x67, 0x69, 0x6D, 0x70, 0x20, 0x78, 0x63, 0x66])]
-public sealed class XcfFile : IImageFileFormat<XcfFile> {
+public readonly record struct XcfFile : IImageFormatReader<XcfFile>, IImageToRawImage<XcfFile>, IImageFromRawImage<XcfFile>, IImageFormatWriter<XcfFile> {
 
-  static string IImageFileFormat<XcfFile>.PrimaryExtension => ".xcf";
-  static string[] IImageFileFormat<XcfFile>.FileExtensions => [".xcf"];
-  static XcfFile IImageFileFormat<XcfFile>.FromFile(FileInfo file) => XcfReader.FromFile(file);
-  static XcfFile IImageFileFormat<XcfFile>.FromBytes(byte[] data) => XcfReader.FromBytes(data);
-  static XcfFile IImageFileFormat<XcfFile>.FromStream(Stream stream) => XcfReader.FromStream(stream);
-  static byte[] IImageFileFormat<XcfFile>.ToBytes(XcfFile file) => XcfWriter.ToBytes(file);
+  static string IImageFormatMetadata<XcfFile>.PrimaryExtension => ".xcf";
+  static string[] IImageFormatMetadata<XcfFile>.FileExtensions => [".xcf"];
+  static XcfFile IImageFormatReader<XcfFile>.FromSpan(ReadOnlySpan<byte> data) => XcfReader.FromSpan(data);
+  static byte[] IImageFormatWriter<XcfFile>.ToBytes(XcfFile file) => XcfWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
   public XcfColorMode ColorMode { get; init; }
   public int Version { get; init; }
 
   /// <summary>Flat pixel data: RGBA for RGB mode, GrayA for Grayscale, index bytes for Indexed.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Palette bytes (RGB triplets) for indexed mode, null otherwise.</summary>
   public byte[]? Palette { get; init; }
 
   public static RawImage ToRawImage(XcfFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     switch (file.ColorMode) {
       case XcfColorMode.Rgb:

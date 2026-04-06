@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.VentaFax;
 
 /// <summary>In-memory representation of a VentaFax VFX image.</summary>
-public sealed class VentaFaxFile : IImageFileFormat<VentaFaxFile> {
+public readonly record struct VentaFaxFile : IImageFormatReader<VentaFaxFile>, IImageToRawImage<VentaFaxFile>, IImageFormatWriter<VentaFaxFile> {
 
-  static string IImageFileFormat<VentaFaxFile>.PrimaryExtension => ".vfx";
-  static string[] IImageFileFormat<VentaFaxFile>.FileExtensions => [".vfx"];
-  static VentaFaxFile IImageFileFormat<VentaFaxFile>.FromFile(FileInfo file) => VentaFaxReader.FromFile(file);
-  static VentaFaxFile IImageFileFormat<VentaFaxFile>.FromBytes(byte[] data) => VentaFaxReader.FromBytes(data);
-  static VentaFaxFile IImageFileFormat<VentaFaxFile>.FromStream(Stream stream) => VentaFaxReader.FromStream(stream);
-  static byte[] IImageFileFormat<VentaFaxFile>.ToBytes(VentaFaxFile file) => VentaFaxWriter.ToBytes(file);
+  static string IImageFormatMetadata<VentaFaxFile>.PrimaryExtension => ".vfx";
+  static string[] IImageFormatMetadata<VentaFaxFile>.FileExtensions => [".vfx"];
+  static VentaFaxFile IImageFormatReader<VentaFaxFile>.FromSpan(ReadOnlySpan<byte> data) => VentaFaxReader.FromSpan(data);
+  static byte[] IImageFormatWriter<VentaFaxFile>.ToBytes(VentaFaxFile file) => VentaFaxWriter.ToBytes(file);
 
   /// <summary>Magic bytes: "VFAX" (0x56 0x46 0x41 0x58).</summary>
   internal static readonly byte[] Magic = [0x56, 0x46, 0x41, 0x58];
@@ -36,11 +33,10 @@ public sealed class VentaFaxFile : IImageFileFormat<VentaFaxFile> {
   public ushort Encoding { get; init; }
 
   /// <summary>1bpp pixel data, MSB first, rows padded to byte boundary.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this VFX image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(VentaFaxFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var bytesPerRow = (file.Width + 7) / 8;
     var rgb = new byte[file.Width * file.Height * 3];
@@ -65,9 +61,4 @@ public sealed class VentaFaxFile : IImageFileFormat<VentaFaxFile> {
     };
   }
 
-  /// <summary>Not supported.</summary>
-  public static VentaFaxFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to VentaFaxFile is not supported.");
-  }
 }

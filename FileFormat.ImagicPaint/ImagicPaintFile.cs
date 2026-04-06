@@ -1,40 +1,36 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.ImagicPaint;
 
 /// <summary>In-memory representation of an Imagic Paint image (Atari ST, 320x200, 16 colors).</summary>
-public sealed class ImagicPaintFile : IImageFileFormat<ImagicPaintFile> {
+public readonly record struct ImagicPaintFile : IImageFormatReader<ImagicPaintFile>, IImageToRawImage<ImagicPaintFile>, IImageFromRawImage<ImagicPaintFile>, IImageFormatWriter<ImagicPaintFile> {
 
   /// <summary>Expected file size: 2-byte resolution + 32-byte palette + 32000 bytes planar data.</summary>
   public const int FileSize = 32034;
 
-  static string IImageFileFormat<ImagicPaintFile>.PrimaryExtension => ".imp";
-  static string[] IImageFileFormat<ImagicPaintFile>.FileExtensions => [".imp", ".igp"];
-  static FormatCapability IImageFileFormat<ImagicPaintFile>.Capabilities => FormatCapability.IndexedOnly;
-  static ImagicPaintFile IImageFileFormat<ImagicPaintFile>.FromFile(FileInfo file) => ImagicPaintReader.FromFile(file);
-  static ImagicPaintFile IImageFileFormat<ImagicPaintFile>.FromBytes(byte[] data) => ImagicPaintReader.FromBytes(data);
-  static ImagicPaintFile IImageFileFormat<ImagicPaintFile>.FromStream(Stream stream) => ImagicPaintReader.FromStream(stream);
-  static byte[] IImageFileFormat<ImagicPaintFile>.ToBytes(ImagicPaintFile file) => ImagicPaintWriter.ToBytes(file);
+  static string IImageFormatMetadata<ImagicPaintFile>.PrimaryExtension => ".imp";
+  static string[] IImageFormatMetadata<ImagicPaintFile>.FileExtensions => [".imp", ".igp"];
+  static ImagicPaintFile IImageFormatReader<ImagicPaintFile>.FromSpan(ReadOnlySpan<byte> data) => ImagicPaintReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<ImagicPaintFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<ImagicPaintFile>.ToBytes(ImagicPaintFile file) => ImagicPaintWriter.ToBytes(file);
 
   /// <summary>Image width (always 320).</summary>
-  public int Width { get; init; } = 320;
+  public int Width { get; init; }
 
   /// <summary>Image height (always 200).</summary>
-  public int Height { get; init; } = 200;
+  public int Height { get; init; }
 
   /// <summary>Resolution word (0 = low 320x200).</summary>
   public ushort Resolution { get; init; }
 
   /// <summary>16-entry palette of Atari ST 9-bit RGB values.</summary>
-  public short[] Palette { get; init; } = new short[16];
+  public short[] Palette { get; init; }
 
   /// <summary>32000 bytes of Atari ST word-interleaved planar pixel data.</summary>
-  public byte[] PixelData { get; init; } = new byte[32000];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(ImagicPaintFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var chunky = PlanarConverter.AtariStToChunky(file.PixelData, file.Width, file.Height, 4);
     var paletteCount = Math.Min(16, file.Palette.Length);

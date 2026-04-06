@@ -1,19 +1,16 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.PalmPdb;
 
 /// <summary>In-memory representation of a Palm PDB (Palm Database) image file.</summary>
 [FormatMagicBytes([0x49, 0x6D, 0x67, 0x20], offset: 60)]
-public sealed class PalmPdbFile : IImageFileFormat<PalmPdbFile> {
+public readonly record struct PalmPdbFile : IImageFormatReader<PalmPdbFile>, IImageToRawImage<PalmPdbFile>, IImageFromRawImage<PalmPdbFile>, IImageFormatWriter<PalmPdbFile> {
 
-  static string IImageFileFormat<PalmPdbFile>.PrimaryExtension => ".pdb";
-  static string[] IImageFileFormat<PalmPdbFile>.FileExtensions => [".pdb"];
-  static PalmPdbFile IImageFileFormat<PalmPdbFile>.FromFile(FileInfo file) => PalmPdbReader.FromFile(file);
-  static PalmPdbFile IImageFileFormat<PalmPdbFile>.FromBytes(byte[] data) => PalmPdbReader.FromBytes(data);
-  static PalmPdbFile IImageFileFormat<PalmPdbFile>.FromStream(Stream stream) => PalmPdbReader.FromStream(stream);
-  static byte[] IImageFileFormat<PalmPdbFile>.ToBytes(PalmPdbFile file) => PalmPdbWriter.ToBytes(file);
+  static string IImageFormatMetadata<PalmPdbFile>.PrimaryExtension => ".pdb";
+  static string[] IImageFormatMetadata<PalmPdbFile>.FileExtensions => [".pdb"];
+  static PalmPdbFile IImageFormatReader<PalmPdbFile>.FromSpan(ReadOnlySpan<byte> data) => PalmPdbReader.FromSpan(data);
+  static byte[] IImageFormatWriter<PalmPdbFile>.ToBytes(PalmPdbFile file) => PalmPdbWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -22,13 +19,12 @@ public sealed class PalmPdbFile : IImageFileFormat<PalmPdbFile> {
   public int Height { get; init; }
 
   /// <summary>Database name (up to 31 characters, null-terminated in file).</summary>
-  public string Name { get; init; } = "Image";
+  public string Name { get; init; }
 
   /// <summary>Raw RGB24 pixel data (3 bytes per pixel: R, G, B).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(PalmPdbFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

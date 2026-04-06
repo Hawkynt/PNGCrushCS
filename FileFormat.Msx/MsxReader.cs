@@ -44,6 +44,8 @@ public static class MsxReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static MsxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static MsxFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _SC2_SIZE)

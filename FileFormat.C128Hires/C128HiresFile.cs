@@ -1,21 +1,16 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.C128Hires;
 
 /// <summary>In-memory representation of a C128 hires 320x200 mono bitmap (8000 bytes in 8x8 character cell order).</summary>
-public sealed class C128HiresFile : IImageFileFormat<C128HiresFile> {
+public readonly record struct C128HiresFile : IImageFormatReader<C128HiresFile>, IImageToRawImage<C128HiresFile>, IImageFromRawImage<C128HiresFile>, IImageFormatWriter<C128HiresFile> {
 
-  static string IImageFileFormat<C128HiresFile>.PrimaryExtension => ".c1h";
-  static string[] IImageFileFormat<C128HiresFile>.FileExtensions => [".c1h"];
-  static FormatCapability IImageFileFormat<C128HiresFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static C128HiresFile IImageFileFormat<C128HiresFile>.FromFile(FileInfo file) => C128HiresReader.FromFile(file);
-  static C128HiresFile IImageFileFormat<C128HiresFile>.FromBytes(byte[] data) => C128HiresReader.FromBytes(data);
-  static C128HiresFile IImageFileFormat<C128HiresFile>.FromStream(Stream stream) => C128HiresReader.FromStream(stream);
-  static RawImage IImageFileFormat<C128HiresFile>.ToRawImage(C128HiresFile file) => ToRawImage(file);
-  static C128HiresFile IImageFileFormat<C128HiresFile>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<C128HiresFile>.ToBytes(C128HiresFile file) => C128HiresWriter.ToBytes(file);
+  static string IImageFormatMetadata<C128HiresFile>.PrimaryExtension => ".c1h";
+  static string[] IImageFormatMetadata<C128HiresFile>.FileExtensions => [".c1h"];
+  static C128HiresFile IImageFormatReader<C128HiresFile>.FromSpan(ReadOnlySpan<byte> data) => C128HiresReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<C128HiresFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<C128HiresFile>.ToBytes(C128HiresFile file) => C128HiresWriter.ToBytes(file);
 
   /// <summary>Expected file size in bytes (40 * 25 * 8).</summary>
   internal const int ExpectedFileSize = 8000;
@@ -39,13 +34,12 @@ public sealed class C128HiresFile : IImageFileFormat<C128HiresFile> {
   public int Height => PixelHeight;
 
   /// <summary>Raw bitmap data (8000 bytes in 8x8 character cell order: cell[0] rows 0-7, cell[1] rows 0-7, ...).</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
   /// <summary>Converts the C128 hires screen to an Indexed1 raw image (320x200, B&amp;W palette).</summary>
   public static RawImage ToRawImage(C128HiresFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var rowStride = PixelWidth / 8; // 40 bytes per row
     var pixelData = new byte[rowStride * PixelHeight];

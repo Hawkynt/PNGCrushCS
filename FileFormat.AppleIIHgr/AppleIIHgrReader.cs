@@ -26,6 +26,8 @@ public static class AppleIIHgrReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static AppleIIHgrFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AppleIIHgrFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != AppleIIHgrFile.FileSize)

@@ -124,13 +124,6 @@ public sealed class DoodleAtariReaderTests {
     Assert.That(raw.PixelData[1], Is.EqualTo(0));
     Assert.That(raw.PixelData[2], Is.EqualTo(0));
   }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_ThrowsNotSupportedException() {
-    Assert.Throws<NotSupportedException>(() => DoodleAtariFile.FromRawImage(null!));
-  }
-
   [Test]
   [Category("Integration")]
   public void RoundTrip_PixelDataPreserved() {

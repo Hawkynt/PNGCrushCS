@@ -27,6 +27,8 @@ public static class SinbadSlideshowReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static SinbadSlideshowFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static SinbadSlideshowFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < SinbadSlideshowFile.FileSize)

@@ -26,6 +26,8 @@ public static class AladdinPaintReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static AladdinPaintFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AladdinPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < AladdinPaintHeader.StructSize)

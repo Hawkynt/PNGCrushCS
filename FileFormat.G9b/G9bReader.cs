@@ -35,6 +35,8 @@ public static class G9bReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static G9bFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static G9bFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < MinHeaderSize)

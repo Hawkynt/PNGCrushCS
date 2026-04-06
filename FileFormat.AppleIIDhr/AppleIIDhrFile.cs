@@ -1,11 +1,10 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.AppleIIDhr;
 
 /// <summary>In-memory representation of an Apple II Double High-Resolution graphics screen dump.</summary>
-public sealed class AppleIIDhrFile : IImageFileFormat<AppleIIDhrFile> {
+public readonly record struct AppleIIDhrFile : IImageFormatReader<AppleIIDhrFile>, IImageToRawImage<AppleIIDhrFile>, IImageFromRawImage<AppleIIDhrFile>, IImageFormatWriter<AppleIIDhrFile> {
 
   /// <summary>Exact file size in bytes (16384 = two banks of 8192 each: aux + main).</summary>
   internal const int FileSize = 16384;
@@ -22,15 +21,11 @@ public sealed class AppleIIDhrFile : IImageFileFormat<AppleIIDhrFile> {
   /// <summary>Bytes per scanline row per bank (40 bytes).</summary>
   internal const int BytesPerRowPerBank = 40;
 
-  static string IImageFileFormat<AppleIIDhrFile>.PrimaryExtension => ".dhr";
-  static string[] IImageFileFormat<AppleIIDhrFile>.FileExtensions => [".dhr", ".a2d"];
-  static FormatCapability IImageFileFormat<AppleIIDhrFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static AppleIIDhrFile IImageFileFormat<AppleIIDhrFile>.FromFile(FileInfo file) => AppleIIDhrReader.FromFile(file);
-  static AppleIIDhrFile IImageFileFormat<AppleIIDhrFile>.FromBytes(byte[] data) => AppleIIDhrReader.FromBytes(data);
-  static AppleIIDhrFile IImageFileFormat<AppleIIDhrFile>.FromStream(Stream stream) => AppleIIDhrReader.FromStream(stream);
-  static RawImage IImageFileFormat<AppleIIDhrFile>.ToRawImage(AppleIIDhrFile file) => ToRawImage(file);
-  static AppleIIDhrFile IImageFileFormat<AppleIIDhrFile>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<AppleIIDhrFile>.ToBytes(AppleIIDhrFile file) => AppleIIDhrWriter.ToBytes(file);
+  static string IImageFormatMetadata<AppleIIDhrFile>.PrimaryExtension => ".dhr";
+  static string[] IImageFormatMetadata<AppleIIDhrFile>.FileExtensions => [".dhr", ".a2d"];
+  static AppleIIDhrFile IImageFormatReader<AppleIIDhrFile>.FromSpan(ReadOnlySpan<byte> data) => AppleIIDhrReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<AppleIIDhrFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<AppleIIDhrFile>.ToBytes(AppleIIDhrFile file) => AppleIIDhrWriter.ToBytes(file);
 
   /// <summary>Always 560.</summary>
   public int Width => PixelWidth;
@@ -39,7 +34,7 @@ public sealed class AppleIIDhrFile : IImageFileFormat<AppleIIDhrFile> {
   public int Height => PixelHeight;
 
   /// <summary>Raw memory dump data (16384 bytes). First 8192 = aux bank, next 8192 = main bank.</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
@@ -56,7 +51,6 @@ public sealed class AppleIIDhrFile : IImageFileFormat<AppleIIDhrFile> {
   /// Each byte has 7 data bits (bits 0-6, LSB first).
   /// </summary>
   public static RawImage ToRawImage(AppleIIDhrFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var rowStride = (PixelWidth + 7) / 8; // 70
     var pixelData = new byte[rowStride * PixelHeight];

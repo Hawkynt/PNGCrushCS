@@ -61,36 +61,6 @@ public sealed class SpotImageReaderTests {
 }
 
 [TestFixture]
-public sealed class SpotImageWriterTests {
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => SpotImageWriter.ToBytes(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_HasSpotMagic() {
-    var file = new SpotImageFile { Width = 4, Height = 2, BitsPerPixel = 8, PixelData = new byte[8] };
-    var bytes = SpotImageWriter.ToBytes(file);
-
-    Assert.That(bytes[0], Is.EqualTo((byte)'S'));
-    Assert.That(bytes[1], Is.EqualTo((byte)'P'));
-    Assert.That(bytes[2], Is.EqualTo((byte)'O'));
-    Assert.That(bytes[3], Is.EqualTo((byte)'T'));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_CorrectSize() {
-    var file = new SpotImageFile { Width = 4, Height = 2, BitsPerPixel = 8, PixelData = new byte[8] };
-    var bytes = SpotImageWriter.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(24)); // 16 header + 8 pixels
-  }
-}
-
-[TestFixture]
 public sealed class RoundTripTests {
 
   [Test]
@@ -139,55 +109,3 @@ public sealed class RoundTripTests {
   }
 }
 
-[TestFixture]
-public sealed class DataTypeTests {
-
-  [Test]
-  [Category("Unit")]
-  public void SpotImageFile_Defaults() {
-    var file = new SpotImageFile();
-    Assert.That(file.Width, Is.EqualTo(0));
-    Assert.That(file.Height, Is.EqualTo(0));
-    Assert.That(file.BitsPerPixel, Is.EqualTo(8));
-    Assert.That(file.PixelData, Is.Empty);
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void SpotImageFile_ToRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => SpotImageFile.ToRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void SpotImageFile_FromRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => SpotImageFile.FromRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void SpotImageFile_FromRawImage_WrongFormat_Throws() {
-    var raw = new RawImage {
-      Width = 4, Height = 2,
-      Format = PixelFormat.Rgba32,
-      PixelData = new byte[32],
-    };
-    Assert.Throws<ArgumentException>(() => SpotImageFile.FromRawImage(raw));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void SpotImageFile_ToRawImage_Gray_ReturnsGray8() {
-    var file = new SpotImageFile { Width = 2, Height = 2, BitsPerPixel = 8, PixelData = new byte[4] };
-    var raw = SpotImageFile.ToRawImage(file);
-    Assert.That(raw.Format, Is.EqualTo(PixelFormat.Gray8));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void SpotImageFile_ToRawImage_Rgb_ReturnsRgb24() {
-    var file = new SpotImageFile { Width = 2, Height = 2, BitsPerPixel = 24, PixelData = new byte[12] };
-    var raw = SpotImageFile.ToRawImage(file);
-    Assert.That(raw.Format, Is.EqualTo(PixelFormat.Rgb24));
-  }
-}

@@ -6,14 +6,12 @@ namespace FileFormat.SymbianMbm;
 
 /// <summary>In-memory representation of a Symbian OS MBM (multi-bitmap) container.</summary>
 [FormatMagicBytes([0x37, 0x00, 0x00, 0x10])]
-public sealed class SymbianMbmFile : IImageFileFormat<SymbianMbmFile> {
+public readonly record struct SymbianMbmFile : IImageFormatReader<SymbianMbmFile>, IImageToRawImage<SymbianMbmFile>, IImageFromRawImage<SymbianMbmFile>, IImageFormatWriter<SymbianMbmFile> {
 
-  static string IImageFileFormat<SymbianMbmFile>.PrimaryExtension => ".mbm";
-  static string[] IImageFileFormat<SymbianMbmFile>.FileExtensions => [".mbm"];
-  static SymbianMbmFile IImageFileFormat<SymbianMbmFile>.FromFile(FileInfo file) => SymbianMbmReader.FromFile(file);
-  static SymbianMbmFile IImageFileFormat<SymbianMbmFile>.FromBytes(byte[] data) => SymbianMbmReader.FromBytes(data);
-  static SymbianMbmFile IImageFileFormat<SymbianMbmFile>.FromStream(Stream stream) => SymbianMbmReader.FromStream(stream);
-  static byte[] IImageFileFormat<SymbianMbmFile>.ToBytes(SymbianMbmFile file) => SymbianMbmWriter.ToBytes(file);
+  static string IImageFormatMetadata<SymbianMbmFile>.PrimaryExtension => ".mbm";
+  static string[] IImageFormatMetadata<SymbianMbmFile>.FileExtensions => [".mbm"];
+  static SymbianMbmFile IImageFormatReader<SymbianMbmFile>.FromSpan(ReadOnlySpan<byte> data) => SymbianMbmReader.FromSpan(data);
+  static byte[] IImageFormatWriter<SymbianMbmFile>.ToBytes(SymbianMbmFile file) => SymbianMbmWriter.ToBytes(file);
 
   /// <summary>UID1 value (always 0x10000037).</summary>
   public const uint Uid1 = 0x10000037;
@@ -34,10 +32,9 @@ public sealed class SymbianMbmFile : IImageFileFormat<SymbianMbmFile> {
   public const int BitmapHeaderSize = 40;
 
   /// <summary>The individual bitmap entries in this MBM container.</summary>
-  public SymbianMbmBitmap[] Bitmaps { get; init; } = [];
+  public SymbianMbmBitmap[] Bitmaps { get; init; }
 
   public static RawImage ToRawImage(SymbianMbmFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     if (file.Bitmaps.Length == 0)
       throw new InvalidDataException("MBM file contains no bitmaps.");
 
@@ -201,5 +198,5 @@ public sealed class SymbianMbmBitmap {
   public uint DataSize { get; init; }
 
   /// <summary>Raw pixel data bytes.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 }

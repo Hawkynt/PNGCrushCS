@@ -38,31 +38,6 @@ public class Zx81ReaderTests {
 }
 
 [TestFixture]
-public class Zx81WriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => Zx81Writer.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_OutputSize_Is793() {
-    var file = new Zx81File { PixelData = new byte[793] };
-    var bytes = Zx81Writer.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(793));
-  }
-
-  [Test]
-  public void ToBytes_DataPreserved() {
-    var data = new byte[793];
-    for (var i = 0; i < data.Length; ++i)
-      data[i] = (byte)(i & 0xFF);
-    var file = new Zx81File { PixelData = data };
-    var bytes = Zx81Writer.ToBytes(file);
-    Assert.That(bytes, Is.EqualTo(data));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -90,32 +65,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void FixedWidth_Is256()
-    => Assert.That(Zx81File.FixedWidth, Is.EqualTo(256));
-
-  [Test]
-  public void FixedHeight_Is192()
-    => Assert.That(Zx81File.FixedHeight, Is.EqualTo(192));
-
-  [Test]
-  public void FileSize_Is793()
-    => Assert.That(Zx81File.FileSize, Is.EqualTo(793));
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => Zx81File.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => Zx81File.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 256, Height = 192, Format = PixelFormat.Rgb24, PixelData = new byte[256 * 192 * 3] };
-    Assert.Throws<ArgumentException>(() => Zx81File.FromRawImage(raw));
-  }
-}

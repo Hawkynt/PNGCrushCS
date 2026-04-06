@@ -38,31 +38,6 @@ public class DoomFlatReaderTests {
 }
 
 [TestFixture]
-public class DoomFlatWriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => DoomFlatWriter.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_OutputSize_Is4096() {
-    var file = new DoomFlatFile { PixelData = new byte[4096] };
-    var bytes = DoomFlatWriter.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(4096));
-  }
-
-  [Test]
-  public void ToBytes_DataPreserved() {
-    var data = new byte[4096];
-    for (var i = 0; i < data.Length; ++i)
-      data[i] = (byte)(i & 0xFF);
-    var file = new DoomFlatFile { PixelData = data };
-    var bytes = DoomFlatWriter.ToBytes(file);
-    Assert.That(bytes, Is.EqualTo(data));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -90,32 +65,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void FixedWidth_Is64()
-    => Assert.That(DoomFlatFile.FixedWidth, Is.EqualTo(64));
-
-  [Test]
-  public void FixedHeight_Is64()
-    => Assert.That(DoomFlatFile.FixedHeight, Is.EqualTo(64));
-
-  [Test]
-  public void FileSize_Is4096()
-    => Assert.That(DoomFlatFile.FileSize, Is.EqualTo(4096));
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => DoomFlatFile.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => DoomFlatFile.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 64, Height = 64, Format = PixelFormat.Rgb24, PixelData = new byte[64 * 64 * 3] };
-    Assert.Throws<ArgumentException>(() => DoomFlatFile.FromRawImage(raw));
-  }
-}

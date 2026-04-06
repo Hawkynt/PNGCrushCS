@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Flimatic;
 
 /// <summary>In-memory representation of a Commodore 64 Flimatic multicolor FLI image.</summary>
-public sealed class FlimaticFile : IImageFileFormat<FlimaticFile> {
+public readonly record struct FlimaticFile : IImageFormatReader<FlimaticFile>, IImageToRawImage<FlimaticFile>, IImageFormatWriter<FlimaticFile> {
 
-  static string IImageFileFormat<FlimaticFile>.PrimaryExtension => ".flm";
-  static string[] IImageFileFormat<FlimaticFile>.FileExtensions => [".flm"];
-  static FlimaticFile IImageFileFormat<FlimaticFile>.FromFile(FileInfo file) => FlimaticReader.FromFile(file);
-  static FlimaticFile IImageFileFormat<FlimaticFile>.FromBytes(byte[] data) => FlimaticReader.FromBytes(data);
-  static FlimaticFile IImageFileFormat<FlimaticFile>.FromStream(Stream stream) => FlimaticReader.FromStream(stream);
-  static byte[] IImageFileFormat<FlimaticFile>.ToBytes(FlimaticFile file) => FlimaticWriter.ToBytes(file);
+  static string IImageFormatMetadata<FlimaticFile>.PrimaryExtension => ".flm";
+  static string[] IImageFormatMetadata<FlimaticFile>.FileExtensions => [".flm"];
+  static FlimaticFile IImageFormatReader<FlimaticFile>.FromSpan(ReadOnlySpan<byte> data) => FlimaticReader.FromSpan(data);
+  static byte[] IImageFormatWriter<FlimaticFile>.ToBytes(FlimaticFile file) => FlimaticWriter.ToBytes(file);
 
   /// <summary>The fixed width of the image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -58,11 +55,10 @@ public sealed class FlimaticFile : IImageFileFormat<FlimaticFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Raw payload data (entire file content after load address).</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   /// <summary>Converts this Flimatic image to a platform-independent <see cref="RawImage"/> in Rgb24 format using FLI multicolor decode.</summary>
   public static RawImage ToRawImage(FlimaticFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -114,9 +110,4 @@ public sealed class FlimaticFile : IImageFileFormat<FlimaticFile> {
     };
   }
 
-  /// <summary>Not supported. Flimatic images have complex FLI color switching constraints.</summary>
-  public static FlimaticFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to FlimaticFile is not supported due to complex FLI color switching constraints.");
-  }
 }

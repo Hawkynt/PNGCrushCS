@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.RockyInterlace;
 
 /// <summary>In-memory representation of a C64 Rocky Interlace (.rip) image.</summary>
-public sealed class RockyInterlaceFile : IImageFileFormat<RockyInterlaceFile> {
+public readonly record struct RockyInterlaceFile : IImageFormatReader<RockyInterlaceFile>, IImageToRawImage<RockyInterlaceFile>, IImageFormatWriter<RockyInterlaceFile> {
 
-  static string IImageFileFormat<RockyInterlaceFile>.PrimaryExtension => ".rip";
-  static string[] IImageFileFormat<RockyInterlaceFile>.FileExtensions => [".rip"];
-  static RockyInterlaceFile IImageFileFormat<RockyInterlaceFile>.FromFile(FileInfo file) => RockyInterlaceReader.FromFile(file);
-  static RockyInterlaceFile IImageFileFormat<RockyInterlaceFile>.FromBytes(byte[] data) => RockyInterlaceReader.FromBytes(data);
-  static RockyInterlaceFile IImageFileFormat<RockyInterlaceFile>.FromStream(Stream stream) => RockyInterlaceReader.FromStream(stream);
-  static byte[] IImageFileFormat<RockyInterlaceFile>.ToBytes(RockyInterlaceFile file) => RockyInterlaceWriter.ToBytes(file);
+  static string IImageFormatMetadata<RockyInterlaceFile>.PrimaryExtension => ".rip";
+  static string[] IImageFormatMetadata<RockyInterlaceFile>.FileExtensions => [".rip"];
+  static RockyInterlaceFile IImageFormatReader<RockyInterlaceFile>.FromSpan(ReadOnlySpan<byte> data) => RockyInterlaceReader.FromSpan(data);
+  static byte[] IImageFormatWriter<RockyInterlaceFile>.ToBytes(RockyInterlaceFile file) => RockyInterlaceWriter.ToBytes(file);
 
   /// <summary>The fixed width of the image in pixels.</summary>
   public const int FixedWidth = 320;
@@ -52,11 +49,10 @@ public sealed class RockyInterlaceFile : IImageFileFormat<RockyInterlaceFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Raw payload data (entire file content after load address).</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   /// <summary>Converts this Rocky Interlace image to a platform-independent <see cref="RawImage"/> in Rgb24 format by averaging both hires frames.</summary>
   public static RawImage ToRawImage(RockyInterlaceFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -122,9 +118,4 @@ public sealed class RockyInterlaceFile : IImageFileFormat<RockyInterlaceFile> {
     return _C64Palette[colorIndex];
   }
 
-  /// <summary>Not supported. Rocky Interlace images have complex dual-frame color constraints.</summary>
-  public static RockyInterlaceFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to RockyInterlaceFile is not supported due to complex dual-frame color constraints.");
-  }
 }

@@ -44,6 +44,8 @@ public static class ZxGigascreenReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static ZxGigascreenFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static ZxGigascreenFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != FileSize)

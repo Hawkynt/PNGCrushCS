@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.WigmoreArtist;
 
 /// <summary>In-memory representation of a C64 Wigmore Artist (.wig) hires art image.</summary>
-public sealed class WigmoreArtistFile : IImageFileFormat<WigmoreArtistFile> {
+public readonly record struct WigmoreArtistFile : IImageFormatReader<WigmoreArtistFile>, IImageToRawImage<WigmoreArtistFile>, IImageFormatWriter<WigmoreArtistFile> {
 
-  static string IImageFileFormat<WigmoreArtistFile>.PrimaryExtension => ".wig";
-  static string[] IImageFileFormat<WigmoreArtistFile>.FileExtensions => [".wig"];
-  static WigmoreArtistFile IImageFileFormat<WigmoreArtistFile>.FromFile(FileInfo file) => WigmoreArtistReader.FromFile(file);
-  static WigmoreArtistFile IImageFileFormat<WigmoreArtistFile>.FromBytes(byte[] data) => WigmoreArtistReader.FromBytes(data);
-  static WigmoreArtistFile IImageFileFormat<WigmoreArtistFile>.FromStream(Stream stream) => WigmoreArtistReader.FromStream(stream);
-  static byte[] IImageFileFormat<WigmoreArtistFile>.ToBytes(WigmoreArtistFile file) => WigmoreArtistWriter.ToBytes(file);
+  static string IImageFormatMetadata<WigmoreArtistFile>.PrimaryExtension => ".wig";
+  static string[] IImageFormatMetadata<WigmoreArtistFile>.FileExtensions => [".wig"];
+  static WigmoreArtistFile IImageFormatReader<WigmoreArtistFile>.FromSpan(ReadOnlySpan<byte> data) => WigmoreArtistReader.FromSpan(data);
+  static byte[] IImageFormatWriter<WigmoreArtistFile>.ToBytes(WigmoreArtistFile file) => WigmoreArtistWriter.ToBytes(file);
 
   /// <summary>The fixed width of the image in pixels.</summary>
   public const int FixedWidth = 320;
@@ -49,11 +46,10 @@ public sealed class WigmoreArtistFile : IImageFileFormat<WigmoreArtistFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Raw payload data (entire file content after load address).</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   /// <summary>Converts this Wigmore Artist image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(WigmoreArtistFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -96,9 +92,4 @@ public sealed class WigmoreArtistFile : IImageFileFormat<WigmoreArtistFile> {
     };
   }
 
-  /// <summary>Not supported. Wigmore Artist images have complex cell-based color constraints.</summary>
-  public static WigmoreArtistFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to WigmoreArtistFile is not supported due to complex cell-based color constraints.");
-  }
 }

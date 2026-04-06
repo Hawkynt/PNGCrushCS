@@ -26,6 +26,8 @@ public static class CDUPaintReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static CDUPaintFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static CDUPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < CDUPaintFile.ExpectedFileSize)

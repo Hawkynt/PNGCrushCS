@@ -29,6 +29,8 @@ public static class PntrFalconReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static PntrFalconFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static PntrFalconFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != _EXPECTED_SIZE)

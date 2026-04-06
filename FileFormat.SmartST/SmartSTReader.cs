@@ -29,6 +29,8 @@ public static class SmartSTReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static SmartSTFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static SmartSTFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != _EXPECTED_SIZE)

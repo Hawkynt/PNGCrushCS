@@ -31,6 +31,8 @@ public static class EzArtReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static EzArtFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static EzArtFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < EzArtFile.FileSize)

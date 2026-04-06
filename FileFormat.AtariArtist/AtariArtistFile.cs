@@ -1,11 +1,10 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.AtariArtist;
 
 /// <summary>In-memory representation of an Atari Artist image (ANTIC Mode E, 160x192, 4-color).</summary>
-public sealed class AtariArtistFile : IImageFileFormat<AtariArtistFile> {
+public readonly record struct AtariArtistFile : IImageFormatReader<AtariArtistFile>, IImageToRawImage<AtariArtistFile>, IImageFromRawImage<AtariArtistFile>, IImageFormatWriter<AtariArtistFile> {
 
   /// <summary>The exact file size: 40 bytes/line x 192 lines.</summary>
   public const int ExpectedFileSize = 7680;
@@ -22,13 +21,11 @@ public sealed class AtariArtistFile : IImageFileFormat<AtariArtistFile> {
   /// <summary>Default Atari 4-color palette as 0xRRGGBB values.</summary>
   private static readonly int[] _DefaultPalette = [0x000000, 0x884400, 0x00AA44, 0xDDCC88];
 
-  static string IImageFileFormat<AtariArtistFile>.PrimaryExtension => ".aat";
-  static string[] IImageFileFormat<AtariArtistFile>.FileExtensions => [".aat"];
-  static FormatCapability IImageFileFormat<AtariArtistFile>.Capabilities => FormatCapability.IndexedOnly;
-  static AtariArtistFile IImageFileFormat<AtariArtistFile>.FromFile(FileInfo file) => AtariArtistReader.FromFile(file);
-  static AtariArtistFile IImageFileFormat<AtariArtistFile>.FromBytes(byte[] data) => AtariArtistReader.FromBytes(data);
-  static AtariArtistFile IImageFileFormat<AtariArtistFile>.FromStream(Stream stream) => AtariArtistReader.FromStream(stream);
-  static byte[] IImageFileFormat<AtariArtistFile>.ToBytes(AtariArtistFile file) => AtariArtistWriter.ToBytes(file);
+  static string IImageFormatMetadata<AtariArtistFile>.PrimaryExtension => ".aat";
+  static string[] IImageFormatMetadata<AtariArtistFile>.FileExtensions => [".aat"];
+  static AtariArtistFile IImageFormatReader<AtariArtistFile>.FromSpan(ReadOnlySpan<byte> data) => AtariArtistReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<AtariArtistFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<AtariArtistFile>.ToBytes(AtariArtistFile file) => AtariArtistWriter.ToBytes(file);
 
   /// <summary>Always 160.</summary>
   public int Width => FixedWidth;
@@ -37,11 +34,10 @@ public sealed class AtariArtistFile : IImageFileFormat<AtariArtistFile> {
   public int Height => FixedHeight;
 
   /// <summary>Raw pixel data (7680 bytes, 2bpp packed: 4 pixels per byte, 40 bytes per row, 192 rows).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this image to a platform-independent <see cref="RawImage"/> in Indexed8 format with a 4-entry palette.</summary>
   public static RawImage ToRawImage(AtariArtistFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var indices = new byte[FixedWidth * FixedHeight];
 

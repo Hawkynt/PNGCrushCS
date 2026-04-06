@@ -27,6 +27,8 @@ public static class HinterGrundBildReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static HinterGrundBildFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static HinterGrundBildFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
 

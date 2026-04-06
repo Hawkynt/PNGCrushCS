@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.CreateWithGarfield;
 
 /// <summary>In-memory representation of a Commodore 64 Create with Garfield hires image.</summary>
-public sealed class CreateWithGarfieldFile : IImageFileFormat<CreateWithGarfieldFile> {
+public readonly record struct CreateWithGarfieldFile : IImageFormatReader<CreateWithGarfieldFile>, IImageToRawImage<CreateWithGarfieldFile>, IImageFormatWriter<CreateWithGarfieldFile> {
 
-  static string IImageFileFormat<CreateWithGarfieldFile>.PrimaryExtension => ".cwg";
-  static string[] IImageFileFormat<CreateWithGarfieldFile>.FileExtensions => [".cwg"];
-  static CreateWithGarfieldFile IImageFileFormat<CreateWithGarfieldFile>.FromFile(FileInfo file) => CreateWithGarfieldReader.FromFile(file);
-  static CreateWithGarfieldFile IImageFileFormat<CreateWithGarfieldFile>.FromBytes(byte[] data) => CreateWithGarfieldReader.FromBytes(data);
-  static CreateWithGarfieldFile IImageFileFormat<CreateWithGarfieldFile>.FromStream(Stream stream) => CreateWithGarfieldReader.FromStream(stream);
-  static byte[] IImageFileFormat<CreateWithGarfieldFile>.ToBytes(CreateWithGarfieldFile file) => CreateWithGarfieldWriter.ToBytes(file);
+  static string IImageFormatMetadata<CreateWithGarfieldFile>.PrimaryExtension => ".cwg";
+  static string[] IImageFormatMetadata<CreateWithGarfieldFile>.FileExtensions => [".cwg"];
+  static CreateWithGarfieldFile IImageFormatReader<CreateWithGarfieldFile>.FromSpan(ReadOnlySpan<byte> data) => CreateWithGarfieldReader.FromSpan(data);
+  static byte[] IImageFormatWriter<CreateWithGarfieldFile>.ToBytes(CreateWithGarfieldFile file) => CreateWithGarfieldWriter.ToBytes(file);
 
   /// <summary>The fixed width of a Create with Garfield image in pixels.</summary>
   public const int FixedWidth = 320;
@@ -52,17 +49,16 @@ public sealed class CreateWithGarfieldFile : IImageFileFormat<CreateWithGarfield
   public ushort LoadAddress { get; init; }
 
   /// <summary>Hires bitmap data (8000 bytes, 1 bit per pixel within 8x8 cells).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Screen RAM (1000 bytes, upper nybble = foreground color, lower nybble = background color per cell).</summary>
-  public byte[] ScreenRam { get; init; } = [];
+  public byte[] ScreenRam { get; init; }
 
   /// <summary>Border color index (0-15).</summary>
   public byte BorderColor { get; init; }
 
   /// <summary>Converts this Create with Garfield image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(CreateWithGarfieldFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -98,9 +94,4 @@ public sealed class CreateWithGarfieldFile : IImageFileFormat<CreateWithGarfield
     };
   }
 
-  /// <summary>Not supported. Create with Garfield images have complex cell-based color constraints.</summary>
-  public static CreateWithGarfieldFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to CreateWithGarfieldFile is not supported due to complex cell-based color constraints.");
-  }
 }

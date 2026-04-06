@@ -28,6 +28,8 @@ public static class QuakeSprReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static QuakeSprFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static QuakeSprFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < QuakeSprHeader.StructSize)

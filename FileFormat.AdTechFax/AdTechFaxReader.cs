@@ -26,6 +26,8 @@ public static class AdTechFaxReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static AdTechFaxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AdTechFaxFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < AdTechFaxFile.MinFileSize)

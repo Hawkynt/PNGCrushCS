@@ -26,6 +26,8 @@ public static class Pic2Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static Pic2File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static Pic2File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < Pic2File.MinFileSize)

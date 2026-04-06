@@ -1,40 +1,36 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.EscapePaint;
 
 /// <summary>In-memory representation of an Escape Paint image (Atari ST, 320x200, 16 colors).</summary>
-public sealed class EscapePaintFile : IImageFileFormat<EscapePaintFile> {
+public readonly record struct EscapePaintFile : IImageFormatReader<EscapePaintFile>, IImageToRawImage<EscapePaintFile>, IImageFromRawImage<EscapePaintFile>, IImageFormatWriter<EscapePaintFile> {
 
   /// <summary>Expected file size: 2-byte resolution + 32-byte palette + 32000 bytes planar data.</summary>
   public const int FileSize = 32034;
 
-  static string IImageFileFormat<EscapePaintFile>.PrimaryExtension => ".esp";
-  static string[] IImageFileFormat<EscapePaintFile>.FileExtensions => [".esp"];
-  static FormatCapability IImageFileFormat<EscapePaintFile>.Capabilities => FormatCapability.IndexedOnly;
-  static EscapePaintFile IImageFileFormat<EscapePaintFile>.FromFile(FileInfo file) => EscapePaintReader.FromFile(file);
-  static EscapePaintFile IImageFileFormat<EscapePaintFile>.FromBytes(byte[] data) => EscapePaintReader.FromBytes(data);
-  static EscapePaintFile IImageFileFormat<EscapePaintFile>.FromStream(Stream stream) => EscapePaintReader.FromStream(stream);
-  static byte[] IImageFileFormat<EscapePaintFile>.ToBytes(EscapePaintFile file) => EscapePaintWriter.ToBytes(file);
+  static string IImageFormatMetadata<EscapePaintFile>.PrimaryExtension => ".esp";
+  static string[] IImageFormatMetadata<EscapePaintFile>.FileExtensions => [".esp"];
+  static EscapePaintFile IImageFormatReader<EscapePaintFile>.FromSpan(ReadOnlySpan<byte> data) => EscapePaintReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<EscapePaintFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<EscapePaintFile>.ToBytes(EscapePaintFile file) => EscapePaintWriter.ToBytes(file);
 
   /// <summary>Image width (always 320).</summary>
-  public int Width { get; init; } = 320;
+  public int Width { get; init; }
 
   /// <summary>Image height (always 200).</summary>
-  public int Height { get; init; } = 200;
+  public int Height { get; init; }
 
   /// <summary>Resolution word (0 = low 320x200).</summary>
   public ushort Resolution { get; init; }
 
   /// <summary>16-entry palette of Atari ST 9-bit RGB values.</summary>
-  public short[] Palette { get; init; } = new short[16];
+  public short[] Palette { get; init; }
 
   /// <summary>32000 bytes of Atari ST word-interleaved planar pixel data.</summary>
-  public byte[] PixelData { get; init; } = new byte[32000];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(EscapePaintFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var chunky = PlanarConverter.AtariStToChunky(file.PixelData, file.Width, file.Height, 4);
     var paletteCount = Math.Min(16, file.Palette.Length);

@@ -26,6 +26,8 @@ public static class Spectrum512SmooshReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static Spectrum512SmooshFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static Spectrum512SmooshFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < Spectrum512SmooshFile.MinFileSize)

@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.XvThumbnail;
@@ -7,14 +6,12 @@ namespace FileFormat.XvThumbnail;
 /// <summary>In-memory representation of an XV thumbnail image (P7 332 format).</summary>
 [FormatDetectionPriority(90)]
 [FormatMagicBytes([0x50, 0x37, 0x20, 0x33, 0x33, 0x32])]
-public sealed class XvThumbnailFile : IImageFileFormat<XvThumbnailFile> {
+public readonly record struct XvThumbnailFile : IImageFormatReader<XvThumbnailFile>, IImageToRawImage<XvThumbnailFile>, IImageFromRawImage<XvThumbnailFile>, IImageFormatWriter<XvThumbnailFile> {
 
-  static string IImageFileFormat<XvThumbnailFile>.PrimaryExtension => ".xv";
-  static string[] IImageFileFormat<XvThumbnailFile>.FileExtensions => [".xv"];
-  static XvThumbnailFile IImageFileFormat<XvThumbnailFile>.FromFile(FileInfo file) => XvThumbnailReader.FromFile(file);
-  static XvThumbnailFile IImageFileFormat<XvThumbnailFile>.FromBytes(byte[] data) => XvThumbnailReader.FromBytes(data);
-  static XvThumbnailFile IImageFileFormat<XvThumbnailFile>.FromStream(Stream stream) => XvThumbnailReader.FromStream(stream);
-  static byte[] IImageFileFormat<XvThumbnailFile>.ToBytes(XvThumbnailFile file) => XvThumbnailWriter.ToBytes(file);
+  static string IImageFormatMetadata<XvThumbnailFile>.PrimaryExtension => ".xv";
+  static string[] IImageFormatMetadata<XvThumbnailFile>.FileExtensions => [".xv"];
+  static XvThumbnailFile IImageFormatReader<XvThumbnailFile>.FromSpan(ReadOnlySpan<byte> data) => XvThumbnailReader.FromSpan(data);
+  static byte[] IImageFormatWriter<XvThumbnailFile>.ToBytes(XvThumbnailFile file) => XvThumbnailWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -23,11 +20,10 @@ public sealed class XvThumbnailFile : IImageFileFormat<XvThumbnailFile> {
   public int Height { get; init; }
 
   /// <summary>Raw 3-3-2 packed pixel data (1 byte per pixel).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts an XV thumbnail to a platform-independent RGB24 image.</summary>
   public static RawImage ToRawImage(XvThumbnailFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var pixelCount = file.Width * file.Height;
     var rgb = new byte[pixelCount * 3];

@@ -27,6 +27,8 @@ public static class SgiReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static SgiFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static SgiFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < SgiHeader.StructSize)

@@ -27,6 +27,8 @@ public static class MsxScreen5Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static MsxScreen5File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static MsxScreen5File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < MsxScreen5File.PixelDataSize)

@@ -1,19 +1,16 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Tim;
 
 /// <summary>In-memory representation of a PlayStation 1 TIM texture.</summary>
 [FormatMagicBytes([0x10, 0x00, 0x00, 0x00])]
-public sealed class TimFile : IImageFileFormat<TimFile> {
+public readonly record struct TimFile : IImageFormatReader<TimFile>, IImageToRawImage<TimFile>, IImageFormatWriter<TimFile> {
 
-  static string IImageFileFormat<TimFile>.PrimaryExtension => ".tim";
-  static string[] IImageFileFormat<TimFile>.FileExtensions => [".tim"];
-  static TimFile IImageFileFormat<TimFile>.FromFile(FileInfo file) => TimReader.FromFile(file);
-  static TimFile IImageFileFormat<TimFile>.FromBytes(byte[] data) => TimReader.FromBytes(data);
-  static TimFile IImageFileFormat<TimFile>.FromStream(Stream stream) => TimReader.FromStream(stream);
-  static byte[] IImageFileFormat<TimFile>.ToBytes(TimFile file) => TimWriter.ToBytes(file);
+  static string IImageFormatMetadata<TimFile>.PrimaryExtension => ".tim";
+  static string[] IImageFormatMetadata<TimFile>.FileExtensions => [".tim"];
+  static TimFile IImageFormatReader<TimFile>.FromSpan(ReadOnlySpan<byte> data) => TimReader.FromSpan(data);
+  static byte[] IImageFormatWriter<TimFile>.ToBytes(TimFile file) => TimWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
   public TimBpp Bpp { get; init; }
@@ -30,11 +27,10 @@ public sealed class TimFile : IImageFileFormat<TimFile> {
   public int ImageY { get; init; }
 
   /// <summary>Raw pixel data as stored in the TIM file.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts a TIM file to a <see cref="RawImage"/>.</summary>
   public static RawImage ToRawImage(TimFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     return file.Bpp switch {
       TimBpp.Bpp4 => _Decode4Bpp(file),
@@ -44,9 +40,6 @@ public sealed class TimFile : IImageFileFormat<TimFile> {
       _ => throw new NotSupportedException($"Unsupported TIM BPP: {file.Bpp}")
     };
   }
-
-  /// <summary>TIM files have VRAM-specific addressing; single-image creation is not supported.</summary>
-  public static TimFile FromRawImage(RawImage image) => throw new NotSupportedException("TIM encoding from a single raw image is not supported.");
 
   private static byte[] _ConvertClutToRgbPalette(byte[] clutData, int entryCount) {
     var palette = new byte[entryCount * 3];

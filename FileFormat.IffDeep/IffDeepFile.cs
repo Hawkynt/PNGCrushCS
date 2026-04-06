@@ -1,24 +1,21 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.IffDeep;
 
 /// <summary>In-memory representation of an IFF DEEP (Deep Paint) image.</summary>
 [FormatMagicBytes([0x46, 0x4F, 0x52, 0x4D])]
-public sealed class IffDeepFile : IImageFileFormat<IffDeepFile> {
+public readonly record struct IffDeepFile : IImageFormatReader<IffDeepFile>, IImageToRawImage<IffDeepFile>, IImageFromRawImage<IffDeepFile>, IImageFormatWriter<IffDeepFile> {
 
-  static string IImageFileFormat<IffDeepFile>.PrimaryExtension => ".deep";
-  static string[] IImageFileFormat<IffDeepFile>.FileExtensions => [".deep", ".iff"];
+  static string IImageFormatMetadata<IffDeepFile>.PrimaryExtension => ".deep";
+  static string[] IImageFormatMetadata<IffDeepFile>.FileExtensions => [".deep", ".iff"];
+  static IffDeepFile IImageFormatReader<IffDeepFile>.FromSpan(ReadOnlySpan<byte> data) => IffDeepReader.FromSpan(data);
 
-  static bool? IImageFileFormat<IffDeepFile>.MatchesSignature(ReadOnlySpan<byte> header)
+  static bool? IImageFormatMetadata<IffDeepFile>.MatchesSignature(ReadOnlySpan<byte> header)
     => header.Length >= 12 && header[0] == 0x46 && header[1] == 0x4F && header[2] == 0x52 && header[3] == 0x4D
       && header[8] == 0x44 && header[9] == 0x45 && header[10] == 0x45 && header[11] == 0x50;
 
-  static IffDeepFile IImageFileFormat<IffDeepFile>.FromFile(FileInfo file) => IffDeepReader.FromFile(file);
-  static IffDeepFile IImageFileFormat<IffDeepFile>.FromBytes(byte[] data) => IffDeepReader.FromBytes(data);
-  static IffDeepFile IImageFileFormat<IffDeepFile>.FromStream(Stream stream) => IffDeepReader.FromStream(stream);
-  static byte[] IImageFileFormat<IffDeepFile>.ToBytes(IffDeepFile file) => IffDeepWriter.ToBytes(file);
+  static byte[] IImageFormatWriter<IffDeepFile>.ToBytes(IffDeepFile file) => IffDeepWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -33,11 +30,10 @@ public sealed class IffDeepFile : IImageFileFormat<IffDeepFile> {
   public IffDeepCompression Compression { get; init; }
 
   /// <summary>Raw pixel data (RGB or RGBA, one byte per component).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this IFF DEEP file to a format-independent <see cref="RawImage"/>.</summary>
   public static RawImage ToRawImage(IffDeepFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     return new() {
       Width = file.Width,

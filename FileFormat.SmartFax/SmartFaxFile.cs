@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.SmartFax;
 
 /// <summary>In-memory representation of a SmartFax SMF image.</summary>
-public sealed class SmartFaxFile : IImageFileFormat<SmartFaxFile> {
+public readonly record struct SmartFaxFile : IImageFormatReader<SmartFaxFile>, IImageToRawImage<SmartFaxFile>, IImageFormatWriter<SmartFaxFile> {
 
-  static string IImageFileFormat<SmartFaxFile>.PrimaryExtension => ".smf";
-  static string[] IImageFileFormat<SmartFaxFile>.FileExtensions => [".smf"];
-  static SmartFaxFile IImageFileFormat<SmartFaxFile>.FromFile(FileInfo file) => SmartFaxReader.FromFile(file);
-  static SmartFaxFile IImageFileFormat<SmartFaxFile>.FromBytes(byte[] data) => SmartFaxReader.FromBytes(data);
-  static SmartFaxFile IImageFileFormat<SmartFaxFile>.FromStream(Stream stream) => SmartFaxReader.FromStream(stream);
-  static byte[] IImageFileFormat<SmartFaxFile>.ToBytes(SmartFaxFile file) => SmartFaxWriter.ToBytes(file);
+  static string IImageFormatMetadata<SmartFaxFile>.PrimaryExtension => ".smf";
+  static string[] IImageFormatMetadata<SmartFaxFile>.FileExtensions => [".smf"];
+  static SmartFaxFile IImageFormatReader<SmartFaxFile>.FromSpan(ReadOnlySpan<byte> data) => SmartFaxReader.FromSpan(data);
+  static byte[] IImageFormatWriter<SmartFaxFile>.ToBytes(SmartFaxFile file) => SmartFaxWriter.ToBytes(file);
 
   /// <summary>Magic bytes: "SMFX" (0x53 0x4D 0x46 0x58).</summary>
   internal static readonly byte[] Magic = [0x53, 0x4D, 0x46, 0x58];
@@ -33,11 +30,10 @@ public sealed class SmartFaxFile : IImageFileFormat<SmartFaxFile> {
   public ushort Flags { get; init; }
 
   /// <summary>1bpp pixel data, MSB first, rows padded to byte boundary.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this SMF image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(SmartFaxFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var bytesPerRow = (file.Width + 7) / 8;
     var rgb = new byte[file.Width * file.Height * 3];
@@ -62,9 +58,4 @@ public sealed class SmartFaxFile : IImageFileFormat<SmartFaxFile> {
     };
   }
 
-  /// <summary>Not supported.</summary>
-  public static SmartFaxFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to SmartFaxFile is not supported.");
-  }
 }

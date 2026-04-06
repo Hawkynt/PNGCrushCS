@@ -26,6 +26,8 @@ public static class Interlace8Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static Interlace8File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static Interlace8File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != Interlace8File.ExpectedFileSize)

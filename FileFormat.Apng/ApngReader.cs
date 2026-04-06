@@ -36,6 +36,8 @@ public static class ApngReader {
   }
 
   /// <summary>Read an APNG from a byte array.</summary>
+  public static ApngFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static ApngFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < 8 + 25)

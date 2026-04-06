@@ -1,28 +1,23 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Bob;
 
 /// <summary>In-memory representation of a Bob Raytracer image image.</summary>
-public sealed class BobFile : IImageFileFormat<BobFile> {
+public readonly record struct BobFile : IImageFormatReader<BobFile>, IImageToRawImage<BobFile>, IImageFromRawImage<BobFile>, IImageFormatWriter<BobFile> {
 
   internal const int HeaderSize = 8;
 
-
-  static string IImageFileFormat<BobFile>.PrimaryExtension => ".bob";
-  static string[] IImageFileFormat<BobFile>.FileExtensions => [".bob"];
-  static BobFile IImageFileFormat<BobFile>.FromFile(FileInfo file) => BobReader.FromFile(file);
-  static BobFile IImageFileFormat<BobFile>.FromBytes(byte[] data) => BobReader.FromBytes(data);
-  static BobFile IImageFileFormat<BobFile>.FromStream(Stream stream) => BobReader.FromStream(stream);
-  static byte[] IImageFileFormat<BobFile>.ToBytes(BobFile file) => BobWriter.ToBytes(file);
+  static string IImageFormatMetadata<BobFile>.PrimaryExtension => ".bob";
+  static string[] IImageFormatMetadata<BobFile>.FileExtensions => [".bob"];
+  static BobFile IImageFormatReader<BobFile>.FromSpan(ReadOnlySpan<byte> data) => BobReader.FromSpan(data);
+  static byte[] IImageFormatWriter<BobFile>.ToBytes(BobFile file) => BobWriter.ToBytes(file);
 
   public int Width { get; init; }
   public int Height { get; init; }
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(BobFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

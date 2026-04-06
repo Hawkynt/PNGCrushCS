@@ -44,6 +44,8 @@ public static class DjVuReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static DjVuFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static DjVuFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MIN_SIZE)

@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.ZxMultiArtist;
@@ -17,14 +16,13 @@ public enum ZxMultiArtistMode {
 }
 
 /// <summary>In-memory representation of a ZX Spectrum MultiArtist image with variable attribute cell sizes.</summary>
-public sealed class ZxMultiArtistFile : IImageFileFormat<ZxMultiArtistFile> {
+public sealed class ZxMultiArtistFile : IImageFormatReader<ZxMultiArtistFile>, IImageToRawImage<ZxMultiArtistFile>, IImageFormatWriter<ZxMultiArtistFile> {
 
-  static string IImageFileFormat<ZxMultiArtistFile>.PrimaryExtension => ".mg1";
-  static string[] IImageFileFormat<ZxMultiArtistFile>.FileExtensions => [".mg1", ".mg2", ".mg4", ".mg8"];
-  static ZxMultiArtistFile IImageFileFormat<ZxMultiArtistFile>.FromFile(FileInfo file) => ZxMultiArtistReader.FromFile(file);
-  static ZxMultiArtistFile IImageFileFormat<ZxMultiArtistFile>.FromBytes(byte[] data) => ZxMultiArtistReader.FromBytes(data);
-  static ZxMultiArtistFile IImageFileFormat<ZxMultiArtistFile>.FromStream(Stream stream) => ZxMultiArtistReader.FromStream(stream);
-  static byte[] IImageFileFormat<ZxMultiArtistFile>.ToBytes(ZxMultiArtistFile file) => ZxMultiArtistWriter.ToBytes(file);
+  static string IImageFormatMetadata<ZxMultiArtistFile>.PrimaryExtension => ".mg1";
+  static string[] IImageFormatMetadata<ZxMultiArtistFile>.FileExtensions => [".mg1", ".mg2", ".mg4", ".mg8"];
+  static ZxMultiArtistFile IImageFormatReader<ZxMultiArtistFile>.FromSpan(ReadOnlySpan<byte> data) => ZxMultiArtistReader.FromSpan(data);
+
+  static byte[] IImageFormatWriter<ZxMultiArtistFile>.ToBytes(ZxMultiArtistFile file) => ZxMultiArtistWriter.ToBytes(file);
 
   /// <summary>ZX Spectrum normal palette (bright=0): Black, Blue, Red, Magenta, Green, Cyan, Yellow, White.</summary>
   internal static readonly int[] NormalPalette = [
@@ -112,9 +110,4 @@ public sealed class ZxMultiArtistFile : IImageFileFormat<ZxMultiArtistFile> {
     };
   }
 
-  /// <summary>Not supported. ZX Spectrum images have complex attribute-based color constraints.</summary>
-  public static ZxMultiArtistFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to ZxMultiArtistFile is not supported due to complex attribute-based color constraints.");
-  }
 }

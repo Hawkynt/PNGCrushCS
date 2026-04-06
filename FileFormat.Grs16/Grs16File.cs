@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Grs16;
 
 /// <summary>In-memory representation of a headerless raw 16-bit grayscale image.</summary>
-public sealed class Grs16File : IImageFileFormat<Grs16File> {
+public readonly record struct Grs16File : IImageFormatReader<Grs16File>, IImageToRawImage<Grs16File>, IImageFromRawImage<Grs16File>, IImageFormatWriter<Grs16File> {
 
-  static string IImageFileFormat<Grs16File>.PrimaryExtension => ".g16";
-  static string[] IImageFileFormat<Grs16File>.FileExtensions => [".g16"];
-  static Grs16File IImageFileFormat<Grs16File>.FromFile(FileInfo file) => Grs16Reader.FromFile(file);
-  static Grs16File IImageFileFormat<Grs16File>.FromBytes(byte[] data) => Grs16Reader.FromBytes(data);
-  static Grs16File IImageFileFormat<Grs16File>.FromStream(Stream stream) => Grs16Reader.FromStream(stream);
-  static byte[] IImageFileFormat<Grs16File>.ToBytes(Grs16File file) => Grs16Writer.ToBytes(file);
+  static string IImageFormatMetadata<Grs16File>.PrimaryExtension => ".g16";
+  static string[] IImageFormatMetadata<Grs16File>.FileExtensions => [".g16"];
+  static Grs16File IImageFormatReader<Grs16File>.FromSpan(ReadOnlySpan<byte> data) => Grs16Reader.FromSpan(data);
+  static byte[] IImageFormatWriter<Grs16File>.ToBytes(Grs16File file) => Grs16Writer.ToBytes(file);
 
   /// <summary>Minimum valid file size (at least one 16-bit pixel).</summary>
   public const int MinFileSize = 2;
@@ -30,10 +27,9 @@ public sealed class Grs16File : IImageFileFormat<Grs16File> {
   public int Height { get; init; }
 
   /// <summary>Raw 16-bit little-endian grayscale pixel data (2 bytes per pixel).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(Grs16File file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var pixelCount = file.Width * file.Height;
     var gray16 = new byte[pixelCount * 2];

@@ -92,7 +92,7 @@ public sealed class DataTypeTests {
       PixelData = [0xFF]
     };
 
-    var raw = file.ToRawImage();
+    var raw = JbigFile.ToRawImage(file);
 
     Assert.That(raw.Format, Is.EqualTo(PixelFormat.Indexed1));
     Assert.That(raw.PaletteCount, Is.EqualTo(2));
@@ -109,7 +109,7 @@ public sealed class DataTypeTests {
       PixelData = [0x00]
     };
 
-    var raw = file.ToRawImage();
+    var raw = JbigFile.ToRawImage(file);
 
     // Index 0 = black (0,0,0), Index 1 = white (255,255,255)
     Assert.That(raw.Palette![0], Is.EqualTo(0));
@@ -130,15 +130,15 @@ public sealed class DataTypeTests {
       PixelData = pixelData
     };
 
-    var raw = file.ToRawImage();
+    var raw = JbigFile.ToRawImage(file);
 
     Assert.That(raw.PixelData, Is.Not.SameAs(pixelData));
     Assert.That(raw.PixelData, Is.EqualTo(pixelData));
   }
 
-  private static string _GetPrimaryExtension<T>() where T : IImageFileFormat<T>
+  private static string _GetPrimaryExtension<T>() where T : IImageFormatMetadata<T>
     => T.PrimaryExtension;
 
-  private static string[] _GetFileExtensions<T>() where T : IImageFileFormat<T>
+  private static string[] _GetFileExtensions<T>() where T : IImageFormatMetadata<T>
     => T.FileExtensions;
 }

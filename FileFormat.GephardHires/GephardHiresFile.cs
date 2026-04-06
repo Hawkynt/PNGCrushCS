@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.GephardHires;
 
 /// <summary>In-memory representation of a C64 Gephard Hires (.ghg) image.</summary>
-public sealed class GephardHiresFile : IImageFileFormat<GephardHiresFile> {
+public readonly record struct GephardHiresFile : IImageFormatReader<GephardHiresFile>, IImageToRawImage<GephardHiresFile>, IImageFormatWriter<GephardHiresFile> {
 
-  static string IImageFileFormat<GephardHiresFile>.PrimaryExtension => ".ghg";
-  static string[] IImageFileFormat<GephardHiresFile>.FileExtensions => [".ghg"];
-  static GephardHiresFile IImageFileFormat<GephardHiresFile>.FromFile(FileInfo file) => GephardHiresReader.FromFile(file);
-  static GephardHiresFile IImageFileFormat<GephardHiresFile>.FromBytes(byte[] data) => GephardHiresReader.FromBytes(data);
-  static GephardHiresFile IImageFileFormat<GephardHiresFile>.FromStream(Stream stream) => GephardHiresReader.FromStream(stream);
-  static byte[] IImageFileFormat<GephardHiresFile>.ToBytes(GephardHiresFile file) => GephardHiresWriter.ToBytes(file);
+  static string IImageFormatMetadata<GephardHiresFile>.PrimaryExtension => ".ghg";
+  static string[] IImageFormatMetadata<GephardHiresFile>.FileExtensions => [".ghg"];
+  static GephardHiresFile IImageFormatReader<GephardHiresFile>.FromSpan(ReadOnlySpan<byte> data) => GephardHiresReader.FromSpan(data);
+  static byte[] IImageFormatWriter<GephardHiresFile>.ToBytes(GephardHiresFile file) => GephardHiresWriter.ToBytes(file);
 
   /// <summary>The fixed width of the image in pixels.</summary>
   public const int FixedWidth = 320;
@@ -49,11 +46,10 @@ public sealed class GephardHiresFile : IImageFileFormat<GephardHiresFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Raw payload data (entire file content after load address).</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   /// <summary>Converts this Gephard Hires image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(GephardHiresFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -96,9 +92,4 @@ public sealed class GephardHiresFile : IImageFileFormat<GephardHiresFile> {
     };
   }
 
-  /// <summary>Not supported. Gephard Hires images have complex cell-based color constraints.</summary>
-  public static GephardHiresFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to GephardHiresFile is not supported due to complex cell-based color constraints.");
-  }
 }

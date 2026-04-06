@@ -41,25 +41,6 @@ public class PixarRibReaderTests {
 }
 
 [TestFixture]
-public class PixarRibWriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => PixarRibWriter.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_IncludesHeader() {
-    var file = new PixarRibFile {
-      Width = 256,
-      Height = 256,
-      PixelData = new byte[256 * 256 * 3],
-    };
-    var bytes = PixarRibWriter.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(512 + 256 * 256 * 3));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -90,30 +71,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void HeaderSize_Is512()
-    => Assert.That(PixarRibFile.HeaderSize, Is.EqualTo(512));
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => PixarRibFile.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => PixarRibFile.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 256, Height = 256, Format = PixelFormat.Indexed8, PixelData = new byte[256 * 256] };
-    Assert.Throws<ArgumentException>(() => PixarRibFile.FromRawImage(raw));
-  }
-
-  [Test]
-  public void FileExtensions_ContainsPrimary() {
-    string[] exts = [".pxr"];
-    Assert.That(exts, Does.Contain(".pxr"));
-  }
-}

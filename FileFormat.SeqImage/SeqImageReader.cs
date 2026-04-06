@@ -26,6 +26,8 @@ public static class SeqImageReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static SeqImageFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static SeqImageFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < SeqImageFile.MinFileSize)

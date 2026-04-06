@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.BugBitmap;
 
 /// <summary>In-memory representation of a Commodore 64 Bug Bitmap image.</summary>
-public sealed class BugBitmapFile : IImageFileFormat<BugBitmapFile> {
+public readonly record struct BugBitmapFile : IImageFormatReader<BugBitmapFile>, IImageToRawImage<BugBitmapFile>, IImageFormatWriter<BugBitmapFile> {
 
-  static string IImageFileFormat<BugBitmapFile>.PrimaryExtension => ".bbm";
-  static string[] IImageFileFormat<BugBitmapFile>.FileExtensions => [".bbm", ".bug"];
-  static BugBitmapFile IImageFileFormat<BugBitmapFile>.FromFile(FileInfo file) => BugBitmapReader.FromFile(file);
-  static BugBitmapFile IImageFileFormat<BugBitmapFile>.FromBytes(byte[] data) => BugBitmapReader.FromBytes(data);
-  static BugBitmapFile IImageFileFormat<BugBitmapFile>.FromStream(Stream stream) => BugBitmapReader.FromStream(stream);
-  static byte[] IImageFileFormat<BugBitmapFile>.ToBytes(BugBitmapFile file) => BugBitmapWriter.ToBytes(file);
+  static string IImageFormatMetadata<BugBitmapFile>.PrimaryExtension => ".bbm";
+  static string[] IImageFormatMetadata<BugBitmapFile>.FileExtensions => [".bbm", ".bug"];
+  static BugBitmapFile IImageFormatReader<BugBitmapFile>.FromSpan(ReadOnlySpan<byte> data) => BugBitmapReader.FromSpan(data);
+  static byte[] IImageFormatWriter<BugBitmapFile>.ToBytes(BugBitmapFile file) => BugBitmapWriter.ToBytes(file);
 
   /// <summary>The fixed width of a Bug Bitmap image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -55,13 +52,13 @@ public sealed class BugBitmapFile : IImageFileFormat<BugBitmapFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Multicolor bitmap data (8000 bytes, 2 bits per pixel).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Video matrix / screen RAM (1000 bytes, upper/lower nybble = 2 colors per cell).</summary>
-  public byte[] VideoMatrix { get; init; } = [];
+  public byte[] VideoMatrix { get; init; }
 
   /// <summary>Color RAM (1000 bytes, lower nybble = 3rd color per cell).</summary>
-  public byte[] ColorRam { get; init; } = [];
+  public byte[] ColorRam { get; init; }
 
   /// <summary>Border color index (0-15).</summary>
   public byte BorderColor { get; init; }
@@ -70,11 +67,10 @@ public sealed class BugBitmapFile : IImageFileFormat<BugBitmapFile> {
   public byte BackgroundColor { get; init; }
 
   /// <summary>Trailing padding bytes (14 bytes).</summary>
-  public byte[] Padding { get; init; } = [];
+  public byte[] Padding { get; init; }
 
   /// <summary>Converts this Bug Bitmap image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(BugBitmapFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -113,9 +109,4 @@ public sealed class BugBitmapFile : IImageFileFormat<BugBitmapFile> {
     };
   }
 
-  /// <summary>Not supported. Bug Bitmap images have complex cell-based color constraints.</summary>
-  public static BugBitmapFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to BugBitmapFile is not supported due to complex cell-based color constraints.");
-  }
 }

@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.EciGraphicEditor;
 
 /// <summary>In-memory representation of a Commodore 64 ECI Graphic Editor (Extended Color Interlace) image by Crest.</summary>
-public sealed class EciGraphicEditorFile : IImageFileFormat<EciGraphicEditorFile> {
+public readonly record struct EciGraphicEditorFile : IImageFormatReader<EciGraphicEditorFile>, IImageToRawImage<EciGraphicEditorFile>, IImageFormatWriter<EciGraphicEditorFile> {
 
-  static string IImageFileFormat<EciGraphicEditorFile>.PrimaryExtension => ".eci";
-  static string[] IImageFileFormat<EciGraphicEditorFile>.FileExtensions => [".eci", ".ecp"];
-  static EciGraphicEditorFile IImageFileFormat<EciGraphicEditorFile>.FromFile(FileInfo file) => EciGraphicEditorReader.FromFile(file);
-  static EciGraphicEditorFile IImageFileFormat<EciGraphicEditorFile>.FromBytes(byte[] data) => EciGraphicEditorReader.FromBytes(data);
-  static EciGraphicEditorFile IImageFileFormat<EciGraphicEditorFile>.FromStream(Stream stream) => EciGraphicEditorReader.FromStream(stream);
-  static byte[] IImageFileFormat<EciGraphicEditorFile>.ToBytes(EciGraphicEditorFile file) => EciGraphicEditorWriter.ToBytes(file);
+  static string IImageFormatMetadata<EciGraphicEditorFile>.PrimaryExtension => ".eci";
+  static string[] IImageFormatMetadata<EciGraphicEditorFile>.FileExtensions => [".eci", ".ecp"];
+  static EciGraphicEditorFile IImageFormatReader<EciGraphicEditorFile>.FromSpan(ReadOnlySpan<byte> data) => EciGraphicEditorReader.FromSpan(data);
+  static byte[] IImageFormatWriter<EciGraphicEditorFile>.ToBytes(EciGraphicEditorFile file) => EciGraphicEditorWriter.ToBytes(file);
 
   /// <summary>The fixed width of the image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -52,11 +49,10 @@ public sealed class EciGraphicEditorFile : IImageFileFormat<EciGraphicEditorFile
   public ushort LoadAddress { get; init; }
 
   /// <summary>Raw payload data (entire file content after load address).</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   /// <summary>Converts this ECI image to a platform-independent <see cref="RawImage"/> in Rgb24 format using simplified multicolor interlace decode.</summary>
   public static RawImage ToRawImage(EciGraphicEditorFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -140,9 +136,4 @@ public sealed class EciGraphicEditorFile : IImageFileFormat<EciGraphicEditorFile
     };
   }
 
-  /// <summary>Not supported. ECI images have complex interlace color switching constraints.</summary>
-  public static EciGraphicEditorFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to EciGraphicEditorFile is not supported due to complex interlace color switching constraints.");
-  }
 }

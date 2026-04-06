@@ -1,11 +1,10 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Rembrandt;
 
 /// <summary>In-memory representation of an Atari Falcon Rembrandt (.tcp) true-color image.</summary>
-public sealed class RembrandtFile : IImageFileFormat<RembrandtFile> {
+public readonly record struct RembrandtFile : IImageFormatReader<RembrandtFile>, IImageToRawImage<RembrandtFile>, IImageFromRawImage<RembrandtFile>, IImageFormatWriter<RembrandtFile> {
 
   /// <summary>Size of the dimension header (width BE u16 + height BE u16).</summary>
   public const int HeaderSize = 4;
@@ -13,12 +12,10 @@ public sealed class RembrandtFile : IImageFileFormat<RembrandtFile> {
   /// <summary>Minimum valid file size (header + at least 1 pixel x 2 bytes).</summary>
   public const int MinFileSize = HeaderSize + 2;
 
-  static string IImageFileFormat<RembrandtFile>.PrimaryExtension => ".tcp";
-  static string[] IImageFileFormat<RembrandtFile>.FileExtensions => [".tcp"];
-  static RembrandtFile IImageFileFormat<RembrandtFile>.FromFile(FileInfo file) => RembrandtReader.FromFile(file);
-  static RembrandtFile IImageFileFormat<RembrandtFile>.FromBytes(byte[] data) => RembrandtReader.FromBytes(data);
-  static RembrandtFile IImageFileFormat<RembrandtFile>.FromStream(Stream stream) => RembrandtReader.FromStream(stream);
-  static byte[] IImageFileFormat<RembrandtFile>.ToBytes(RembrandtFile file) => RembrandtWriter.ToBytes(file);
+  static string IImageFormatMetadata<RembrandtFile>.PrimaryExtension => ".tcp";
+  static string[] IImageFormatMetadata<RembrandtFile>.FileExtensions => [".tcp"];
+  static RembrandtFile IImageFormatReader<RembrandtFile>.FromSpan(ReadOnlySpan<byte> data) => RembrandtReader.FromSpan(data);
+  static byte[] IImageFormatWriter<RembrandtFile>.ToBytes(RembrandtFile file) => RembrandtWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -27,10 +24,9 @@ public sealed class RembrandtFile : IImageFileFormat<RembrandtFile> {
   public int Height { get; init; }
 
   /// <summary>Raw RGB565 big-endian pixel data (2 bytes per pixel).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(RembrandtFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var pixelCount = file.Width * file.Height;
     var rgb24 = new byte[pixelCount * 3];

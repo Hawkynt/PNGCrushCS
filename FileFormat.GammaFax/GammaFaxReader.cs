@@ -26,6 +26,8 @@ public static class GammaFaxReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static GammaFaxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static GammaFaxFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < GammaFaxFile.MinFileSize)

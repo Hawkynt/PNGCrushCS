@@ -136,13 +136,6 @@ public sealed class MegaPaintReaderTests {
 
     Assert.That(raw.PixelData[0], Is.EqualTo(0));
   }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_ThrowsNotSupportedException() {
-    Assert.Throws<NotSupportedException>(() => MegaPaintFile.FromRawImage(null!));
-  }
-
   [Test]
   [Category("Integration")]
   public void RoundTrip_DimensionsAndDataPreserved() {

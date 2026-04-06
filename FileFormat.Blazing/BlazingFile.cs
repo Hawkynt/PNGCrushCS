@@ -1,11 +1,10 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Blazing;
 
 /// <summary>In-memory representation of a Blazing Paddles hires image (C64, 320x200, 1bpp cell-based).</summary>
-public sealed class BlazingFile : IImageFileFormat<BlazingFile> {
+public readonly record struct BlazingFile : IImageFormatReader<BlazingFile>, IImageToRawImage<BlazingFile>, IImageFormatWriter<BlazingFile> {
 
   /// <summary>Size of the load address in bytes.</summary>
   internal const int LoadAddressSize = 2;
@@ -38,14 +37,10 @@ public sealed class BlazingFile : IImageFileFormat<BlazingFile> {
     0x777777, 0xAAFF66, 0x0088FF, 0xBBBBBB
   ];
 
-  static string IImageFileFormat<BlazingFile>.PrimaryExtension => ".blz";
-  static string[] IImageFileFormat<BlazingFile>.FileExtensions => [".blz"];
-  static BlazingFile IImageFileFormat<BlazingFile>.FromFile(FileInfo file) => BlazingReader.FromFile(file);
-  static BlazingFile IImageFileFormat<BlazingFile>.FromBytes(byte[] data) => BlazingReader.FromBytes(data);
-  static BlazingFile IImageFileFormat<BlazingFile>.FromStream(Stream stream) => BlazingReader.FromStream(stream);
-  static RawImage IImageFileFormat<BlazingFile>.ToRawImage(BlazingFile file) => ToRawImage(file);
-  static BlazingFile IImageFileFormat<BlazingFile>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<BlazingFile>.ToBytes(BlazingFile file) => BlazingWriter.ToBytes(file);
+  static string IImageFormatMetadata<BlazingFile>.PrimaryExtension => ".blz";
+  static string[] IImageFormatMetadata<BlazingFile>.FileExtensions => [".blz"];
+  static BlazingFile IImageFormatReader<BlazingFile>.FromSpan(ReadOnlySpan<byte> data) => BlazingReader.FromSpan(data);
+  static byte[] IImageFormatWriter<BlazingFile>.ToBytes(BlazingFile file) => BlazingWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>
   public int Width => PixelWidth;
@@ -54,17 +49,16 @@ public sealed class BlazingFile : IImageFileFormat<BlazingFile> {
   public int Height => PixelHeight;
 
   /// <summary>C64 memory load address (2 bytes, little-endian).</summary>
-  public ushort LoadAddress { get; init; } = DefaultLoadAddress;
+  public ushort LoadAddress { get; init; }
 
   /// <summary>Bitmap data (8000 bytes).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Screen RAM / video matrix (1000 bytes). Upper nybble = foreground color, lower nybble = background color per 8x8 cell.</summary>
-  public byte[] ScreenData { get; init; } = [];
+  public byte[] ScreenData { get; init; }
 
   /// <summary>Converts this Blazing Paddles image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(BlazingFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var rgb = new byte[PixelWidth * PixelHeight * 3];
 
@@ -98,6 +92,4 @@ public sealed class BlazingFile : IImageFileFormat<BlazingFile> {
     };
   }
 
-  /// <summary>Not supported. Blazing Paddles images cannot be created from raw images.</summary>
-  public static BlazingFile FromRawImage(RawImage image) => throw new NotSupportedException("Creating Blazing Paddles images from raw images is not supported.");
 }

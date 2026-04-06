@@ -29,6 +29,8 @@ public static class IcsReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static IcsFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static IcsFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MIN_HEADER_SIZE)

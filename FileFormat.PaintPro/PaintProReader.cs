@@ -26,6 +26,8 @@ public static class PaintProReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static PaintProFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static PaintProFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < PaintProHeader.StructSize)

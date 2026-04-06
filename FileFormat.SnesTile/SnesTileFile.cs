@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.SnesTile;
 
 /// <summary>In-memory representation of SNES 4BPP planar tile data (8x8 tiles, 16 tiles per row).</summary>
-public sealed class SnesTileFile : IImageFileFormat<SnesTileFile> {
+public readonly record struct SnesTileFile : IImageFormatReader<SnesTileFile>, IImageToRawImage<SnesTileFile>, IImageFromRawImage<SnesTileFile>, IImageFormatWriter<SnesTileFile> {
 
   /// <summary>Number of pixels per tile row/column.</summary>
   internal const int TileSize = 8;
@@ -22,28 +21,25 @@ public sealed class SnesTileFile : IImageFileFormat<SnesTileFile> {
   /// <summary>Default 16-entry grayscale palette (RGB triplets).</summary>
   private static readonly byte[] _DefaultPalette = _BuildGrayscalePalette(16);
 
-  static string IImageFileFormat<SnesTileFile>.PrimaryExtension => ".sfc";
-  static string[] IImageFileFormat<SnesTileFile>.FileExtensions => [".sfc", ".snes"];
-  static FormatCapability IImageFileFormat<SnesTileFile>.Capabilities => FormatCapability.IndexedOnly;
-  static SnesTileFile IImageFileFormat<SnesTileFile>.FromFile(FileInfo file) => SnesTileReader.FromFile(file);
-  static SnesTileFile IImageFileFormat<SnesTileFile>.FromBytes(byte[] data) => SnesTileReader.FromBytes(data);
-  static SnesTileFile IImageFileFormat<SnesTileFile>.FromStream(Stream stream) => SnesTileReader.FromStream(stream);
-  static byte[] IImageFileFormat<SnesTileFile>.ToBytes(SnesTileFile file) => SnesTileWriter.ToBytes(file);
+  static string IImageFormatMetadata<SnesTileFile>.PrimaryExtension => ".sfc";
+  static string[] IImageFormatMetadata<SnesTileFile>.FileExtensions => [".sfc", ".snes"];
+  static SnesTileFile IImageFormatReader<SnesTileFile>.FromSpan(ReadOnlySpan<byte> data) => SnesTileReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<SnesTileFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<SnesTileFile>.ToBytes(SnesTileFile file) => SnesTileWriter.ToBytes(file);
 
   /// <summary>Image width in pixels (always 128).</summary>
-  public int Width { get; init; } = FixedWidth;
+  public int Width { get; init; }
 
   /// <summary>Image height in pixels (multiple of 8).</summary>
   public int Height { get; init; }
 
   /// <summary>Indexed pixel data (values 0-15, one byte per pixel, row-major).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>16-entry RGB palette (48 bytes: 16 colors x 3 bytes each).</summary>
-  public byte[] Palette { get; init; } = _DefaultPalette[..];
+  public byte[] Palette { get; init; }
 
   public static RawImage ToRawImage(SnesTileFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

@@ -25,6 +25,8 @@ public static class HereticM8Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static HereticM8File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static HereticM8File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < HereticM8File.HeaderSize)

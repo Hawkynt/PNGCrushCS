@@ -26,6 +26,8 @@ public static class QoiReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static QoiFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static QoiFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < QoiHeader.StructSize + 8)

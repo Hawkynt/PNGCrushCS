@@ -26,6 +26,8 @@ public static class BfliReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static BfliFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static BfliFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < BfliFile.LoadAddressSize + BfliFile.MinBitmapSize)

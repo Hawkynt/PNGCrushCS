@@ -26,6 +26,8 @@ public static class AppleShrReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static AppleShrFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AppleShrFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < AppleShrFile.ExpectedFileSize)

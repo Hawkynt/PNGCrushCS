@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.OazFax;
 
 /// <summary>In-memory representation of an OazFax OAZ/XFX image.</summary>
-public sealed class OazFaxFile : IImageFileFormat<OazFaxFile> {
+public readonly record struct OazFaxFile : IImageFormatReader<OazFaxFile>, IImageToRawImage<OazFaxFile>, IImageFormatWriter<OazFaxFile> {
 
-  static string IImageFileFormat<OazFaxFile>.PrimaryExtension => ".oaz";
-  static string[] IImageFileFormat<OazFaxFile>.FileExtensions => [".oaz", ".xfx"];
-  static OazFaxFile IImageFileFormat<OazFaxFile>.FromFile(FileInfo file) => OazFaxReader.FromFile(file);
-  static OazFaxFile IImageFileFormat<OazFaxFile>.FromBytes(byte[] data) => OazFaxReader.FromBytes(data);
-  static OazFaxFile IImageFileFormat<OazFaxFile>.FromStream(Stream stream) => OazFaxReader.FromStream(stream);
-  static byte[] IImageFileFormat<OazFaxFile>.ToBytes(OazFaxFile file) => OazFaxWriter.ToBytes(file);
+  static string IImageFormatMetadata<OazFaxFile>.PrimaryExtension => ".oaz";
+  static string[] IImageFormatMetadata<OazFaxFile>.FileExtensions => [".oaz", ".xfx"];
+  static OazFaxFile IImageFormatReader<OazFaxFile>.FromSpan(ReadOnlySpan<byte> data) => OazFaxReader.FromSpan(data);
+  static byte[] IImageFormatWriter<OazFaxFile>.ToBytes(OazFaxFile file) => OazFaxWriter.ToBytes(file);
 
   /// <summary>Magic bytes: "OAZF" (0x4F 0x41 0x5A 0x46).</summary>
   internal static readonly byte[] Magic = [0x4F, 0x41, 0x5A, 0x46];
@@ -36,11 +33,10 @@ public sealed class OazFaxFile : IImageFileFormat<OazFaxFile> {
   public ushort Encoding { get; init; }
 
   /// <summary>1bpp pixel data, MSB first, rows padded to byte boundary.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this OAZ image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(OazFaxFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var bytesPerRow = (file.Width + 7) / 8;
     var rgb = new byte[file.Width * file.Height * 3];
@@ -65,9 +61,4 @@ public sealed class OazFaxFile : IImageFileFormat<OazFaxFile> {
     };
   }
 
-  /// <summary>Not supported.</summary>
-  public static OazFaxFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to OazFaxFile is not supported.");
-  }
 }

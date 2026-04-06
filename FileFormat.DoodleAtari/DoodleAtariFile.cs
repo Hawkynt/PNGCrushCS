@@ -1,22 +1,19 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.DoodleAtari;
 
 /// <summary>In-memory representation of an Atari ST Doodle monochrome image (640x400, 1 bitplane).</summary>
-public sealed class DoodleAtariFile : IImageFileFormat<DoodleAtariFile> {
+public readonly record struct DoodleAtariFile : IImageFormatReader<DoodleAtariFile>, IImageToRawImage<DoodleAtariFile>, IImageFormatWriter<DoodleAtariFile> {
 
   /// <summary>The exact file size: 80 bytes/line x 400 lines = 32000 bytes.</summary>
   public const int ExpectedFileSize = 32000;
 
-  static string IImageFileFormat<DoodleAtariFile>.PrimaryExtension => ".doo";
-  static string[] IImageFileFormat<DoodleAtariFile>.FileExtensions => [".doo"];
-  static FormatCapability IImageFileFormat<DoodleAtariFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static DoodleAtariFile IImageFileFormat<DoodleAtariFile>.FromFile(FileInfo file) => DoodleAtariReader.FromFile(file);
-  static DoodleAtariFile IImageFileFormat<DoodleAtariFile>.FromBytes(byte[] data) => DoodleAtariReader.FromBytes(data);
-  static DoodleAtariFile IImageFileFormat<DoodleAtariFile>.FromStream(Stream stream) => DoodleAtariReader.FromStream(stream);
-  static byte[] IImageFileFormat<DoodleAtariFile>.ToBytes(DoodleAtariFile file) => DoodleAtariWriter.ToBytes(file);
+  static string IImageFormatMetadata<DoodleAtariFile>.PrimaryExtension => ".doo";
+  static string[] IImageFormatMetadata<DoodleAtariFile>.FileExtensions => [".doo"];
+  static DoodleAtariFile IImageFormatReader<DoodleAtariFile>.FromSpan(ReadOnlySpan<byte> data) => DoodleAtariReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<DoodleAtariFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<DoodleAtariFile>.ToBytes(DoodleAtariFile file) => DoodleAtariWriter.ToBytes(file);
 
   /// <summary>Always 640.</summary>
   public int Width => 640;
@@ -25,10 +22,9 @@ public sealed class DoodleAtariFile : IImageFileFormat<DoodleAtariFile> {
   public int Height => 400;
 
   /// <summary>Raw monochrome bitmap data (1 bit per pixel, 32000 bytes total).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(DoodleAtariFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = 640;
     const int height = 400;
@@ -55,5 +51,4 @@ public sealed class DoodleAtariFile : IImageFileFormat<DoodleAtariFile> {
     };
   }
 
-  public static DoodleAtariFile FromRawImage(RawImage image) => throw new NotSupportedException("DoodleAtari format does not support creation from RawImage.");
 }

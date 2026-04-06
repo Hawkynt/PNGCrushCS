@@ -1,19 +1,16 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Atari8Bit;
 
 /// <summary>In-memory representation of an Atari 8-bit ANTIC mode screen dump.</summary>
-public sealed class Atari8BitFile : IImageFileFormat<Atari8BitFile> {
+public readonly record struct Atari8BitFile : IImageFormatReader<Atari8BitFile>, IImageToRawImage<Atari8BitFile>, IImageFromRawImage<Atari8BitFile>, IImageFormatWriter<Atari8BitFile> {
 
-  static string IImageFileFormat<Atari8BitFile>.PrimaryExtension => ".gr8";
-  static string[] IImageFileFormat<Atari8BitFile>.FileExtensions => [".gr7", ".gr8", ".gr9", ".gr15", ".hip", ".mic", ".int"];
-  static FormatCapability IImageFileFormat<Atari8BitFile>.Capabilities => FormatCapability.IndexedOnly;
-  static Atari8BitFile IImageFileFormat<Atari8BitFile>.FromFile(FileInfo file) => Atari8BitReader.FromFile(file);
-  static Atari8BitFile IImageFileFormat<Atari8BitFile>.FromBytes(byte[] data) => Atari8BitReader.FromBytes(data);
-  static Atari8BitFile IImageFileFormat<Atari8BitFile>.FromStream(Stream stream) => Atari8BitReader.FromStream(stream);
-  static byte[] IImageFileFormat<Atari8BitFile>.ToBytes(Atari8BitFile file) => Atari8BitWriter.ToBytes(file);
+  static string IImageFormatMetadata<Atari8BitFile>.PrimaryExtension => ".gr8";
+  static string[] IImageFormatMetadata<Atari8BitFile>.FileExtensions => [".gr7", ".gr8", ".gr9", ".gr15", ".hip", ".mic", ".int"];
+  static Atari8BitFile IImageFormatReader<Atari8BitFile>.FromSpan(ReadOnlySpan<byte> data) => Atari8BitReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<Atari8BitFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<Atari8BitFile>.ToBytes(Atari8BitFile file) => Atari8BitWriter.ToBytes(file);
 
   /// <summary>Width in pixels (depends on mode: 320, 160, or 80).</summary>
   public int Width { get; init; }
@@ -25,10 +22,10 @@ public sealed class Atari8BitFile : IImageFileFormat<Atari8BitFile> {
   public Atari8BitMode Mode { get; init; }
 
   /// <summary>Indexed pixel data (one byte per pixel, values are palette indices).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>RGB palette triplets (3 bytes per entry).</summary>
-  public byte[] Palette { get; init; } = [];
+  public byte[] Palette { get; init; }
 
   /// <summary>File size for GR.8/GR.9/GR.15: 40 bytes/row x 192 rows.</summary>
   internal const int FileSize7680 = 7680;
@@ -112,7 +109,6 @@ public sealed class Atari8BitFile : IImageFileFormat<Atari8BitFile> {
 
   /// <summary>Converts this Atari 8-bit screen to a platform-independent <see cref="RawImage"/> in Indexed8 format.</summary>
   public static RawImage ToRawImage(Atari8BitFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var palette = file.Palette.Length > 0 ? file.Palette[..] : GetDefaultPalette(file.Mode);
     var paletteCount = palette.Length / 3;

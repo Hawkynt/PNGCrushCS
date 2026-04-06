@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.AmicaPaint;
 
 /// <summary>In-memory representation of a Commodore 64 Amica Paint multicolor image.</summary>
-public sealed class AmicaPaintFile : IImageFileFormat<AmicaPaintFile> {
+public readonly record struct AmicaPaintFile : IImageFormatReader<AmicaPaintFile>, IImageToRawImage<AmicaPaintFile>, IImageFormatWriter<AmicaPaintFile> {
 
-  static string IImageFileFormat<AmicaPaintFile>.PrimaryExtension => ".ami";
-  static string[] IImageFileFormat<AmicaPaintFile>.FileExtensions => [".ami"];
-  static AmicaPaintFile IImageFileFormat<AmicaPaintFile>.FromFile(FileInfo file) => AmicaPaintReader.FromFile(file);
-  static AmicaPaintFile IImageFileFormat<AmicaPaintFile>.FromBytes(byte[] data) => AmicaPaintReader.FromBytes(data);
-  static AmicaPaintFile IImageFileFormat<AmicaPaintFile>.FromStream(Stream stream) => AmicaPaintReader.FromStream(stream);
-  static byte[] IImageFileFormat<AmicaPaintFile>.ToBytes(AmicaPaintFile file) => AmicaPaintWriter.ToBytes(file);
+  static string IImageFormatMetadata<AmicaPaintFile>.PrimaryExtension => ".ami";
+  static string[] IImageFormatMetadata<AmicaPaintFile>.FileExtensions => [".ami"];
+  static AmicaPaintFile IImageFormatReader<AmicaPaintFile>.FromSpan(ReadOnlySpan<byte> data) => AmicaPaintReader.FromSpan(data);
+  static byte[] IImageFormatWriter<AmicaPaintFile>.ToBytes(AmicaPaintFile file) => AmicaPaintWriter.ToBytes(file);
 
   /// <summary>The fixed width of the image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -55,20 +52,19 @@ public sealed class AmicaPaintFile : IImageFileFormat<AmicaPaintFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Bitmap data (8000 bytes, 2 bits per pixel within 4x8 cells).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Screen RAM (1000 bytes, upper nybble = color 1, lower nybble = color 2 per cell).</summary>
-  public byte[] ScreenRam { get; init; } = [];
+  public byte[] ScreenRam { get; init; }
 
   /// <summary>Color RAM (1000 bytes, lower nybble = color 3 per cell).</summary>
-  public byte[] ColorRam { get; init; } = [];
+  public byte[] ColorRam { get; init; }
 
   /// <summary>Background color index (0-15).</summary>
   public byte BackgroundColor { get; init; }
 
   /// <summary>Converts this Amica Paint image to a platform-independent <see cref="RawImage"/> in Rgb24 format using multicolor decode.</summary>
   public static RawImage ToRawImage(AmicaPaintFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -107,9 +103,4 @@ public sealed class AmicaPaintFile : IImageFileFormat<AmicaPaintFile> {
     };
   }
 
-  /// <summary>Not supported. Amica Paint images have complex cell-based multicolor constraints.</summary>
-  public static AmicaPaintFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to AmicaPaintFile is not supported due to complex cell-based multicolor constraints.");
-  }
 }

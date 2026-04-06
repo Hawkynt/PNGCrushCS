@@ -1,11 +1,10 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.ImageSystem;
 
 /// <summary>In-memory representation of a C64 Image System image (ISH hires / ISM multicolor).</summary>
-public sealed class ImageSystemFile : IImageFileFormat<ImageSystemFile> {
+public readonly record struct ImageSystemFile : IImageFormatReader<ImageSystemFile>, IImageToRawImage<ImageSystemFile>, IImageFormatWriter<ImageSystemFile> {
 
   /// <summary>Size of bitmap data section.</summary>
   internal const int BitmapDataSize = 8000;
@@ -32,14 +31,10 @@ public sealed class ImageSystemFile : IImageFileFormat<ImageSystemFile> {
     0x777777, 0xAAFF66, 0x0088FF, 0xBBBBBB
   ];
 
-  static string IImageFileFormat<ImageSystemFile>.PrimaryExtension => ".ish";
-  static string[] IImageFileFormat<ImageSystemFile>.FileExtensions => [".ish", ".ism"];
-  static ImageSystemFile IImageFileFormat<ImageSystemFile>.FromFile(FileInfo file) => ImageSystemReader.FromFile(file);
-  static ImageSystemFile IImageFileFormat<ImageSystemFile>.FromBytes(byte[] data) => ImageSystemReader.FromBytes(data);
-  static ImageSystemFile IImageFileFormat<ImageSystemFile>.FromStream(Stream stream) => ImageSystemReader.FromStream(stream);
-  static RawImage IImageFileFormat<ImageSystemFile>.ToRawImage(ImageSystemFile file) => ToRawImage(file);
-  static ImageSystemFile IImageFileFormat<ImageSystemFile>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<ImageSystemFile>.ToBytes(ImageSystemFile file) => ImageSystemWriter.ToBytes(file);
+  static string IImageFormatMetadata<ImageSystemFile>.PrimaryExtension => ".ish";
+  static string[] IImageFormatMetadata<ImageSystemFile>.FileExtensions => [".ish", ".ism"];
+  static ImageSystemFile IImageFormatReader<ImageSystemFile>.FromSpan(ReadOnlySpan<byte> data) => ImageSystemReader.FromSpan(data);
+  static byte[] IImageFormatWriter<ImageSystemFile>.ToBytes(ImageSystemFile file) => ImageSystemWriter.ToBytes(file);
 
   /// <summary>Image width in pixels (320 for hires, 160 for multicolor).</summary>
   public int Width { get; init; }
@@ -54,10 +49,10 @@ public sealed class ImageSystemFile : IImageFileFormat<ImageSystemFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Bitmap data (8000 bytes).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Screen RAM (1000 bytes).</summary>
-  public byte[] ScreenData { get; init; } = [];
+  public byte[] ScreenData { get; init; }
 
   /// <summary>Color RAM (1000 bytes, multicolor only; null for hires).</summary>
   public byte[]? ColorData { get; init; }
@@ -67,14 +62,7 @@ public sealed class ImageSystemFile : IImageFileFormat<ImageSystemFile> {
 
   /// <summary>Converts this Image System file to an Rgb24 raw image.</summary>
   public static RawImage ToRawImage(ImageSystemFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return file.IsHires ? _HiresToRawImage(file) : _MultiToRawImage(file);
-  }
-
-  /// <summary>Not supported. Image System images have complex cell-based color constraints.</summary>
-  public static ImageSystemFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to ImageSystemFile is not supported.");
   }
 
   private static RawImage _HiresToRawImage(ImageSystemFile file) {

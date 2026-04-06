@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Afli;
 
 /// <summary>In-memory representation of an AFLI (Advanced FLI) hires image for the Commodore 64.</summary>
-public sealed class AfliFile : IImageFileFormat<AfliFile> {
+public readonly record struct AfliFile : IImageFormatReader<AfliFile>, IImageToRawImage<AfliFile>, IImageFormatWriter<AfliFile> {
 
-  static string IImageFileFormat<AfliFile>.PrimaryExtension => ".afl";
-  static string[] IImageFileFormat<AfliFile>.FileExtensions => [".afl"];
-  static AfliFile IImageFileFormat<AfliFile>.FromFile(FileInfo file) => AfliReader.FromFile(file);
-  static AfliFile IImageFileFormat<AfliFile>.FromBytes(byte[] data) => AfliReader.FromBytes(data);
-  static AfliFile IImageFileFormat<AfliFile>.FromStream(Stream stream) => AfliReader.FromStream(stream);
-  static byte[] IImageFileFormat<AfliFile>.ToBytes(AfliFile file) => AfliWriter.ToBytes(file);
+  static string IImageFormatMetadata<AfliFile>.PrimaryExtension => ".afl";
+  static string[] IImageFormatMetadata<AfliFile>.FileExtensions => [".afl"];
+  static AfliFile IImageFormatReader<AfliFile>.FromSpan(ReadOnlySpan<byte> data) => AfliReader.FromSpan(data);
+  static byte[] IImageFormatWriter<AfliFile>.ToBytes(AfliFile file) => AfliWriter.ToBytes(file);
 
   /// <summary>Image width in pixels, always 320.</summary>
   public const int FixedWidth = 320;
@@ -52,11 +49,10 @@ public sealed class AfliFile : IImageFileFormat<AfliFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Raw FLI data (9216 bytes: bitmap + screen banks + padding).</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   /// <summary>Converts this AFLI image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(AfliFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -99,9 +95,4 @@ public sealed class AfliFile : IImageFileFormat<AfliFile> {
     };
   }
 
-  /// <summary>Not supported. AFLI images have complex FLI-specific color constraints.</summary>
-  public static AfliFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to AfliFile is not supported due to complex FLI-specific color constraints.");
-  }
 }

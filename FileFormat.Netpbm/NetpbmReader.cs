@@ -30,6 +30,8 @@ public static class NetpbmReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static NetpbmFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static NetpbmFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MIN_SIZE)

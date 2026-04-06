@@ -26,6 +26,8 @@ public static class DrazlaceReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static DrazlaceFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static DrazlaceFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < DrazlaceFile.LoadAddressSize + 1)

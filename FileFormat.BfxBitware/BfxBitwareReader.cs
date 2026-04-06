@@ -26,6 +26,8 @@ public static class BfxBitwareReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static BfxBitwareFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static BfxBitwareFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < BfxBitwareFile.MinFileSize)

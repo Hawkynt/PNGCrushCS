@@ -26,6 +26,8 @@ public static class IconLibraryReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static IconLibraryFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static IconLibraryFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < 6)

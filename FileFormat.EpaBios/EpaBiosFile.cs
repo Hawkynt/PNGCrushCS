@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.EpaBios;
 
 /// <summary>In-memory representation of a Award BIOS Logo (.epa) image.</summary>
-public sealed class EpaBiosFile : IImageFileFormat<EpaBiosFile> {
+public readonly record struct EpaBiosFile : IImageFormatReader<EpaBiosFile>, IImageToRawImage<EpaBiosFile>, IImageFromRawImage<EpaBiosFile>, IImageFormatWriter<EpaBiosFile> {
 
   internal const int FixedWidth = 136;
   internal const int FixedHeight = 84;
@@ -13,20 +12,17 @@ public sealed class EpaBiosFile : IImageFileFormat<EpaBiosFile> {
 
   private static readonly byte[] _DefaultPalette = [0, 0, 0, 0, 0, 170, 0, 170, 0, 0, 170, 170, 170, 0, 0, 170, 0, 170, 170, 85, 0, 170, 170, 170, 85, 85, 85, 85, 85, 255, 85, 255, 85, 85, 255, 255, 255, 85, 85, 255, 85, 255, 255, 255, 85, 255, 255, 255];
 
-  static string IImageFileFormat<EpaBiosFile>.PrimaryExtension => ".epa";
-  static string[] IImageFileFormat<EpaBiosFile>.FileExtensions => [".epa"];
-  static FormatCapability IImageFileFormat<EpaBiosFile>.Capabilities => FormatCapability.IndexedOnly;
-  static EpaBiosFile IImageFileFormat<EpaBiosFile>.FromFile(FileInfo file) => EpaBiosReader.FromFile(file);
-  static EpaBiosFile IImageFileFormat<EpaBiosFile>.FromBytes(byte[] data) => EpaBiosReader.FromBytes(data);
-  static EpaBiosFile IImageFileFormat<EpaBiosFile>.FromStream(Stream stream) => EpaBiosReader.FromStream(stream);
-  static byte[] IImageFileFormat<EpaBiosFile>.ToBytes(EpaBiosFile file) => EpaBiosWriter.ToBytes(file);
+  static string IImageFormatMetadata<EpaBiosFile>.PrimaryExtension => ".epa";
+  static string[] IImageFormatMetadata<EpaBiosFile>.FileExtensions => [".epa"];
+  static EpaBiosFile IImageFormatReader<EpaBiosFile>.FromSpan(ReadOnlySpan<byte> data) => EpaBiosReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<EpaBiosFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<EpaBiosFile>.ToBytes(EpaBiosFile file) => EpaBiosWriter.ToBytes(file);
 
   public int Width => FixedWidth;
   public int Height => FixedHeight;
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(EpaBiosFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = FixedWidth,
       Height = FixedHeight,

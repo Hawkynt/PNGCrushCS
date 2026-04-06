@@ -26,6 +26,8 @@ public static class PabloPaintReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static PabloPaintFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static PabloPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < PabloPaintFile.FileSize)

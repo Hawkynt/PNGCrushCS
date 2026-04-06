@@ -1,37 +1,33 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.SunRaster;
 
 /// <summary>In-memory representation of a Sun Raster image.</summary>
 [FormatMagicBytes([0x59, 0xA6, 0x6A, 0x95])]
-public sealed class SunRasterFile : IImageFileFormat<SunRasterFile> {
+public readonly record struct SunRasterFile : IImageFormatReader<SunRasterFile>, IImageToRawImage<SunRasterFile>, IImageFromRawImage<SunRasterFile>, IImageFormatWriter<SunRasterFile> {
 
-  static string IImageFileFormat<SunRasterFile>.PrimaryExtension => ".ras";
-  static string[] IImageFileFormat<SunRasterFile>.FileExtensions => [".ras", ".sun", ".rast", ".rs"];
-  static SunRasterFile IImageFileFormat<SunRasterFile>.FromFile(FileInfo file) => SunRasterReader.FromFile(file);
-  static SunRasterFile IImageFileFormat<SunRasterFile>.FromBytes(byte[] data) => SunRasterReader.FromBytes(data);
-  static SunRasterFile IImageFileFormat<SunRasterFile>.FromStream(Stream stream) => SunRasterReader.FromStream(stream);
-  static RawImage IImageFileFormat<SunRasterFile>.ToRawImage(SunRasterFile file) => file.ToRawImage();
-  static byte[] IImageFileFormat<SunRasterFile>.ToBytes(SunRasterFile file) => SunRasterWriter.ToBytes(file);
+  static string IImageFormatMetadata<SunRasterFile>.PrimaryExtension => ".ras";
+  static string[] IImageFormatMetadata<SunRasterFile>.FileExtensions => [".ras", ".sun", ".rast", ".rs"];
+  static SunRasterFile IImageFormatReader<SunRasterFile>.FromSpan(ReadOnlySpan<byte> data) => SunRasterReader.FromSpan(data);
+  static byte[] IImageFormatWriter<SunRasterFile>.ToBytes(SunRasterFile file) => SunRasterWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
   public int Depth { get; init; }
   public SunRasterCompression Compression { get; init; }
   public SunRasterColorMode ColorMode { get; init; }
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
   public byte[]? Palette { get; init; }
   public int PaletteColorCount { get; init; }
 
-  public RawImage ToRawImage() {
-    var width = this.Width;
-    var height = this.Height;
-    switch (this.ColorMode) {
+  public static RawImage ToRawImage(SunRasterFile file) {
+    var width = file.Width;
+    var height = file.Height;
+    switch (file.ColorMode) {
       case SunRasterColorMode.Rgb24: {
         var bytesPerRow = width * 3;
         var paddedBytesPerRow = _PadTo2(bytesPerRow);
-        var stripped = _StripRowPadding(this.PixelData, bytesPerRow, paddedBytesPerRow, height);
+        var stripped = _StripRowPadding(file.PixelData, bytesPerRow, paddedBytesPerRow, height);
         return new() {
           Width = width,
           Height = height,
@@ -43,8 +39,8 @@ public sealed class SunRasterFile : IImageFileFormat<SunRasterFile> {
         // Sun Raster 32-bit: [pad/alpha, B, G, R] per pixel → convert to [B, G, R, A] for Bgra32
         var bytesPerRow = width * 4;
         var paddedBytesPerRow = _PadTo2(bytesPerRow);
-        var stripped = _StripRowPadding(this.PixelData, bytesPerRow, paddedBytesPerRow, height);
-        var pixels = this.Width * this.Height;
+        var stripped = _StripRowPadding(file.PixelData, bytesPerRow, paddedBytesPerRow, height);
+        var pixels = file.Width * file.Height;
         var result = new byte[pixels * 4];
         for (var i = 0; i < pixels; ++i) {
           var src = i * 4;
@@ -64,20 +60,20 @@ public sealed class SunRasterFile : IImageFileFormat<SunRasterFile> {
       case SunRasterColorMode.Palette8: {
         var bytesPerRow = width;
         var paddedBytesPerRow = _PadTo2(bytesPerRow);
-        var stripped = _StripRowPadding(this.PixelData, bytesPerRow, paddedBytesPerRow, height);
+        var stripped = _StripRowPadding(file.PixelData, bytesPerRow, paddedBytesPerRow, height);
         return new() {
           Width = width,
           Height = height,
           Format = PixelFormat.Indexed8,
           PixelData = stripped,
-          Palette = this.Palette,
-          PaletteCount = this.PaletteColorCount,
+          Palette = file.Palette,
+          PaletteCount = file.PaletteColorCount,
         };
       }
       case SunRasterColorMode.Monochrome: {
         var bytesPerRow = (width + 7) / 8;
         var paddedBytesPerRow = _PadTo2(bytesPerRow);
-        var stripped = _StripRowPadding(this.PixelData, bytesPerRow, paddedBytesPerRow, height);
+        var stripped = _StripRowPadding(file.PixelData, bytesPerRow, paddedBytesPerRow, height);
         // B/W palette: index 0 = white (255,255,255), index 1 = black (0,0,0)
         // In Sun Raster 1bpp, bit=1 means black, bit=0 means white (standard)
         var palette = new byte[] { 255, 255, 255, 0, 0, 0 };
@@ -92,11 +88,11 @@ public sealed class SunRasterFile : IImageFileFormat<SunRasterFile> {
       }
       case SunRasterColorMode.Original:
       default: {
-        switch (this.Depth) {
+        switch (file.Depth) {
           case 1: {
             var bytesPerRow = (width + 7) / 8;
             var paddedBytesPerRow = _PadTo2(bytesPerRow);
-            var stripped = _StripRowPadding(this.PixelData, bytesPerRow, paddedBytesPerRow, height);
+            var stripped = _StripRowPadding(file.PixelData, bytesPerRow, paddedBytesPerRow, height);
             var palette = new byte[] { 255, 255, 255, 0, 0, 0 };
             return new() {
               Width = width,
@@ -110,15 +106,15 @@ public sealed class SunRasterFile : IImageFileFormat<SunRasterFile> {
           case 8: {
             var bytesPerRow = width;
             var paddedBytesPerRow = _PadTo2(bytesPerRow);
-            var stripped = _StripRowPadding(this.PixelData, bytesPerRow, paddedBytesPerRow, height);
-            if (this.Palette != null && this.PaletteColorCount > 0)
+            var stripped = _StripRowPadding(file.PixelData, bytesPerRow, paddedBytesPerRow, height);
+            if (file.Palette != null && file.PaletteColorCount > 0)
               return new() {
                 Width = width,
                 Height = height,
                 Format = PixelFormat.Indexed8,
                 PixelData = stripped,
-                Palette = this.Palette,
-                PaletteCount = this.PaletteColorCount,
+                Palette = file.Palette,
+                PaletteCount = file.PaletteColorCount,
               };
             return new() {
               Width = width,
@@ -130,7 +126,7 @@ public sealed class SunRasterFile : IImageFileFormat<SunRasterFile> {
           case 24: {
             var bytesPerRow = width * 3;
             var paddedBytesPerRow = _PadTo2(bytesPerRow);
-            var stripped = _StripRowPadding(this.PixelData, bytesPerRow, paddedBytesPerRow, height);
+            var stripped = _StripRowPadding(file.PixelData, bytesPerRow, paddedBytesPerRow, height);
             return new() {
               Width = width,
               Height = height,
@@ -141,7 +137,7 @@ public sealed class SunRasterFile : IImageFileFormat<SunRasterFile> {
           case 32: {
             var bytesPerRow = width * 4;
             var paddedBytesPerRow = _PadTo2(bytesPerRow);
-            var stripped = _StripRowPadding(this.PixelData, bytesPerRow, paddedBytesPerRow, height);
+            var stripped = _StripRowPadding(file.PixelData, bytesPerRow, paddedBytesPerRow, height);
             var pixels = width * height;
             var result = new byte[pixels * 4];
             for (var i = 0; i < pixels; ++i) {
@@ -160,7 +156,7 @@ public sealed class SunRasterFile : IImageFileFormat<SunRasterFile> {
             };
           }
           default:
-            throw new NotSupportedException($"Sun Raster depth {this.Depth} is not supported.");
+            throw new NotSupportedException($"Sun Raster depth {file.Depth} is not supported.");
         }
       }
     }

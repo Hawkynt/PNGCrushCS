@@ -29,6 +29,8 @@ public static class MgrBitmapReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static MgrBitmapFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static MgrBitmapFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MIN_FILE_SIZE)

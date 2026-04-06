@@ -35,6 +35,8 @@ public static class IcnsReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static IcnsFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static IcnsFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < MinFileSize)

@@ -64,37 +64,6 @@ public sealed class HiresManagerReaderTests {
 }
 
 [TestFixture]
-public sealed class HiresManagerWriterTests {
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => HiresManagerWriter.ToBytes(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_CorrectOutputSize() {
-    var rawData = new byte[HiresManagerFile.MinPayloadSize];
-    var file = new HiresManagerFile { LoadAddress = 0x2000, RawData = rawData };
-    var bytes = HiresManagerWriter.ToBytes(file);
-
-    Assert.That(bytes.Length, Is.EqualTo(HiresManagerFile.LoadAddressSize + HiresManagerFile.MinPayloadSize));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_LoadAddress_IsLittleEndian() {
-    var rawData = new byte[HiresManagerFile.MinPayloadSize];
-    var file = new HiresManagerFile { LoadAddress = 0x2000, RawData = rawData };
-    var bytes = HiresManagerWriter.ToBytes(file);
-
-    Assert.That(bytes[0], Is.EqualTo(0x00));
-    Assert.That(bytes[1], Is.EqualTo(0x20));
-  }
-}
-
-[TestFixture]
 public sealed class HiresManagerRoundTripTests {
 
   [Test]
@@ -132,75 +101,6 @@ public sealed class HiresManagerRoundTripTests {
       if (File.Exists(path))
         File.Delete(path);
     }
-  }
-}
-
-[TestFixture]
-public sealed class HiresManagerDataTypeTests {
-
-  [Test]
-  [Category("Unit")]
-  public void PrimaryExtension_IsHim() {
-    Assert.That(_GetPrimaryExtension(), Is.EqualTo(".him"));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FileExtensions_ContainsHim() {
-    var extensions = _GetFileExtensions();
-    Assert.That(extensions, Does.Contain(".him"));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => HiresManagerFile.ToRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => HiresManagerFile.FromRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_ThrowsNotSupportedException() {
-    var image = new RawImage { Width = 320, Height = 200, Format = PixelFormat.Rgb24, PixelData = new byte[320 * 200 * 3] };
-    Assert.Throws<NotSupportedException>(() => HiresManagerFile.FromRawImage(image));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToRawImage_ValidData_ProducesRgb24() {
-    var data = TestHelpers._BuildValidHiresManagerData(0x2000);
-    var file = HiresManagerReader.FromBytes(data);
-    var raw = HiresManagerFile.ToRawImage(file);
-
-    Assert.That(raw.Width, Is.EqualTo(320));
-    Assert.That(raw.Height, Is.EqualTo(200));
-    Assert.That(raw.Format, Is.EqualTo(PixelFormat.Rgb24));
-    Assert.That(raw.PixelData.Length, Is.EqualTo(320 * 200 * 3));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FixedWidth_Is320() {
-    Assert.That(HiresManagerFile.FixedWidth, Is.EqualTo(320));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FixedHeight_Is200() {
-    Assert.That(HiresManagerFile.FixedHeight, Is.EqualTo(200));
-  }
-
-  private static string _GetPrimaryExtension() => _Helper<HiresManagerFile>.PrimaryExtension;
-  private static string[] _GetFileExtensions() => _Helper<HiresManagerFile>.FileExtensions;
-
-  private static class _Helper<T> where T : IImageFileFormat<T> {
-    public static string PrimaryExtension => T.PrimaryExtension;
-    public static string[] FileExtensions => T.FileExtensions;
   }
 }
 

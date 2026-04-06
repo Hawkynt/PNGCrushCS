@@ -25,6 +25,8 @@ public static class NdsTextureReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static NdsTextureFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static NdsTextureFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < NdsTextureFile.BytesPerTile)

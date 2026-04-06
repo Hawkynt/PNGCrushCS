@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.HighResAtari;
 
 /// <summary>In-memory representation of an Atari Hi-Res Paint image. 320x192 Graphics 8 monochrome.</summary>
-public sealed class HighResAtariFile : IImageFileFormat<HighResAtariFile> {
+public readonly record struct HighResAtariFile : IImageFormatReader<HighResAtariFile>, IImageToRawImage<HighResAtariFile>, IImageFromRawImage<HighResAtariFile>, IImageFormatWriter<HighResAtariFile> {
 
   /// <summary>Image width in pixels.</summary>
   internal const int PixelWidth = 320;
@@ -19,15 +18,11 @@ public sealed class HighResAtariFile : IImageFileFormat<HighResAtariFile> {
   /// <summary>Exact file size in bytes (40 bytes/line x 192 lines).</summary>
   internal const int FileSize = BytesPerLine * PixelHeight;
 
-  static string IImageFileFormat<HighResAtariFile>.PrimaryExtension => ".hra";
-  static string[] IImageFileFormat<HighResAtariFile>.FileExtensions => [".hra"];
-  static FormatCapability IImageFileFormat<HighResAtariFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static HighResAtariFile IImageFileFormat<HighResAtariFile>.FromFile(FileInfo file) => HighResAtariReader.FromFile(file);
-  static HighResAtariFile IImageFileFormat<HighResAtariFile>.FromBytes(byte[] data) => HighResAtariReader.FromBytes(data);
-  static HighResAtariFile IImageFileFormat<HighResAtariFile>.FromStream(Stream stream) => HighResAtariReader.FromStream(stream);
-  static RawImage IImageFileFormat<HighResAtariFile>.ToRawImage(HighResAtariFile file) => ToRawImage(file);
-  static HighResAtariFile IImageFileFormat<HighResAtariFile>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<HighResAtariFile>.ToBytes(HighResAtariFile file) => HighResAtariWriter.ToBytes(file);
+  static string IImageFormatMetadata<HighResAtariFile>.PrimaryExtension => ".hra";
+  static string[] IImageFormatMetadata<HighResAtariFile>.FileExtensions => [".hra"];
+  static HighResAtariFile IImageFormatReader<HighResAtariFile>.FromSpan(ReadOnlySpan<byte> data) => HighResAtariReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<HighResAtariFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<HighResAtariFile>.ToBytes(HighResAtariFile file) => HighResAtariWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>
   public int Width => PixelWidth;
@@ -36,13 +31,12 @@ public sealed class HighResAtariFile : IImageFileFormat<HighResAtariFile> {
   public int Height => PixelHeight;
 
   /// <summary>Raw 1bpp screen data (7680 bytes: 40 bytes/line x 192 lines, MSB-first).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
   /// <summary>Converts the Hi-Res Paint image to an Indexed1 raw image (320x192, B&amp;W palette).</summary>
   public static RawImage ToRawImage(HighResAtariFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var pixelData = new byte[FileSize];
     file.PixelData.AsSpan(0, Math.Min(file.PixelData.Length, FileSize)).CopyTo(pixelData);

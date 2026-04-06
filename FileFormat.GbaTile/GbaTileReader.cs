@@ -25,6 +25,8 @@ public static class GbaTileReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static GbaTileFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static GbaTileFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < GbaTileFile.BytesPerTile)

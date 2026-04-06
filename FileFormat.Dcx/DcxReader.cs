@@ -33,6 +33,8 @@ public static class DcxReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static DcxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static DcxFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MIN_SIZE)

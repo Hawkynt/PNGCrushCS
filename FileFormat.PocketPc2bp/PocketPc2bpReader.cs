@@ -25,6 +25,8 @@ public static class PocketPc2bpReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static PocketPc2bpFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static PocketPc2bpFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < PocketPc2bpFile.HeaderSize)

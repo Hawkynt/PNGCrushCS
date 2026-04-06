@@ -26,6 +26,8 @@ public static class CanonNavFaxReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static CanonNavFaxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static CanonNavFaxFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < CanonNavFaxFile.MinFileSize)

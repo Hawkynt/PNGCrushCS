@@ -25,6 +25,8 @@ public static class NeoGeoSpriteReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static NeoGeoSpriteFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static NeoGeoSpriteFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < NeoGeoSpriteFile.BytesPerTile)

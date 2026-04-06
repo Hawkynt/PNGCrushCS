@@ -1,21 +1,18 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Ics;
 
 /// <summary>In-memory representation of an ICS (Image Cytometry Standard) image.</summary>
-public sealed class IcsFile : IImageFileFormat<IcsFile> {
+public readonly record struct IcsFile : IImageFormatReader<IcsFile>, IImageToRawImage<IcsFile>, IImageFromRawImage<IcsFile>, IImageFormatWriter<IcsFile> {
 
-  static string IImageFileFormat<IcsFile>.PrimaryExtension => ".ics";
-  static string[] IImageFileFormat<IcsFile>.FileExtensions => [".ics"];
-  static IcsFile IImageFileFormat<IcsFile>.FromFile(FileInfo file) => IcsReader.FromFile(file);
-  static IcsFile IImageFileFormat<IcsFile>.FromBytes(byte[] data) => IcsReader.FromBytes(data);
-  static IcsFile IImageFileFormat<IcsFile>.FromStream(Stream stream) => IcsReader.FromStream(stream);
-  static byte[] IImageFileFormat<IcsFile>.ToBytes(IcsFile file) => IcsWriter.ToBytes(file);
+  static string IImageFormatMetadata<IcsFile>.PrimaryExtension => ".ics";
+  static string[] IImageFormatMetadata<IcsFile>.FileExtensions => [".ics"];
+  static IcsFile IImageFormatReader<IcsFile>.FromSpan(ReadOnlySpan<byte> data) => IcsReader.FromSpan(data);
+  static byte[] IImageFormatWriter<IcsFile>.ToBytes(IcsFile file) => IcsWriter.ToBytes(file);
 
   /// <summary>ICS version ("1.0" or "2.0").</summary>
-  public string Version { get; init; } = "2.0";
+  public string Version { get; init; }
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -24,10 +21,10 @@ public sealed class IcsFile : IImageFileFormat<IcsFile> {
   public int Height { get; init; }
 
   /// <summary>Number of channels (1 for grayscale, 3 for RGB).</summary>
-  public int Channels { get; init; } = 1;
+  public int Channels { get; init; }
 
   /// <summary>Bits per sample (e.g. 8).</summary>
-  public int BitsPerSample { get; init; } = 8;
+  public int BitsPerSample { get; init; }
 
   /// <summary>Whether pixel data is compressed.</summary>
   public bool IsCompressed => Compression != IcsCompression.Uncompressed;
@@ -36,10 +33,9 @@ public sealed class IcsFile : IImageFileFormat<IcsFile> {
   public IcsCompression Compression { get; init; }
 
   /// <summary>Raw pixel data (interleaved channel order: for 3-channel, R G B R G B ...).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(IcsFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var format = file.Channels switch {
       1 => PixelFormat.Gray8,

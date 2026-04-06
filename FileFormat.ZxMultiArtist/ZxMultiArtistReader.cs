@@ -37,6 +37,8 @@ public static class ZxMultiArtistReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static ZxMultiArtistFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static ZxMultiArtistFile FromBytes(byte[] data) => FromBytes(data, null);
 
   public static ZxMultiArtistFile FromBytes(byte[] data, ZxMultiArtistMode? hintMode) {

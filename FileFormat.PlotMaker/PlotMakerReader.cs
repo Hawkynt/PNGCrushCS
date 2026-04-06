@@ -26,6 +26,8 @@ public static class PlotMakerReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static PlotMakerFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static PlotMakerFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < PlotMakerFile.HeaderSize)

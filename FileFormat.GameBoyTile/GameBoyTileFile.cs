@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.GameBoyTile;
 
 /// <summary>In-memory representation of a Game Boy 2bpp tile data image.</summary>
-public sealed class GameBoyTileFile : IImageFileFormat<GameBoyTileFile> {
+public readonly record struct GameBoyTileFile : IImageFormatReader<GameBoyTileFile>, IImageToRawImage<GameBoyTileFile>, IImageFromRawImage<GameBoyTileFile>, IImageFormatWriter<GameBoyTileFile> {
 
   /// <summary>Bytes per tile (8 rows x 2 bytes per row).</summary>
   internal const int BytesPerTile = 16;
@@ -24,29 +23,26 @@ public sealed class GameBoyTileFile : IImageFileFormat<GameBoyTileFile> {
     8, 24, 32
   ];
 
-  static string IImageFileFormat<GameBoyTileFile>.PrimaryExtension => ".2bpp";
-  static string[] IImageFileFormat<GameBoyTileFile>.FileExtensions => [".2bpp", ".cgb"];
-  static FormatCapability IImageFileFormat<GameBoyTileFile>.Capabilities => FormatCapability.IndexedOnly;
-  static GameBoyTileFile IImageFileFormat<GameBoyTileFile>.FromFile(FileInfo file) => GameBoyTileReader.FromFile(file);
-  static GameBoyTileFile IImageFileFormat<GameBoyTileFile>.FromBytes(byte[] data) => GameBoyTileReader.FromBytes(data);
-  static GameBoyTileFile IImageFileFormat<GameBoyTileFile>.FromStream(Stream stream) => GameBoyTileReader.FromStream(stream);
-  static byte[] IImageFileFormat<GameBoyTileFile>.ToBytes(GameBoyTileFile file) => GameBoyTileWriter.ToBytes(file);
+  static string IImageFormatMetadata<GameBoyTileFile>.PrimaryExtension => ".2bpp";
+  static string[] IImageFormatMetadata<GameBoyTileFile>.FileExtensions => [".2bpp", ".cgb"];
+  static GameBoyTileFile IImageFormatReader<GameBoyTileFile>.FromSpan(ReadOnlySpan<byte> data) => GameBoyTileReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<GameBoyTileFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<GameBoyTileFile>.ToBytes(GameBoyTileFile file) => GameBoyTileWriter.ToBytes(file);
 
   /// <summary>Image width in pixels (always 128 = 16 tiles x 8 pixels).</summary>
-  public int Width { get; init; } = TilesPerRow * TileSize;
+  public int Width { get; init; }
 
   /// <summary>Image height in pixels (ceil(tileCount / 16) * 8).</summary>
   public int Height { get; init; }
 
   /// <summary>Indexed pixel data (1 byte per pixel, values 0-3).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Palette as RGB triplets (4 entries x 3 bytes = 12 bytes).</summary>
-  public byte[] Palette { get; init; } = _DefaultPalette[..];
+  public byte[] Palette { get; init; }
 
   /// <summary>Converts a Game Boy tile file to a <see cref="RawImage"/> with Indexed8 format and the 4-color palette.</summary>
   public static RawImage ToRawImage(GameBoyTileFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     return new() {
       Width = file.Width,

@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.AtariFont;
 
 /// <summary>In-memory representation of an Atari 8-bit character set. 128 chars arranged in a 128x64 grid (16x8 chars, 8x8 each).</summary>
-public sealed class AtariFontFile : IImageFileFormat<AtariFontFile> {
+public readonly record struct AtariFontFile : IImageFormatReader<AtariFontFile>, IImageToRawImage<AtariFontFile>, IImageFromRawImage<AtariFontFile>, IImageFormatWriter<AtariFontFile> {
 
   /// <summary>Number of characters in the set.</summary>
   internal const int CharCount = 128;
@@ -34,15 +33,11 @@ public sealed class AtariFontFile : IImageFileFormat<AtariFontFile> {
   /// <summary>Exact file size in bytes (128 chars x 8 bytes each).</summary>
   internal const int FileSize = CharCount * BytesPerChar;
 
-  static string IImageFileFormat<AtariFontFile>.PrimaryExtension => ".fnt8";
-  static string[] IImageFileFormat<AtariFontFile>.FileExtensions => [".fnt8"];
-  static FormatCapability IImageFileFormat<AtariFontFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static AtariFontFile IImageFileFormat<AtariFontFile>.FromFile(FileInfo file) => AtariFontReader.FromFile(file);
-  static AtariFontFile IImageFileFormat<AtariFontFile>.FromBytes(byte[] data) => AtariFontReader.FromBytes(data);
-  static AtariFontFile IImageFileFormat<AtariFontFile>.FromStream(Stream stream) => AtariFontReader.FromStream(stream);
-  static RawImage IImageFileFormat<AtariFontFile>.ToRawImage(AtariFontFile file) => ToRawImage(file);
-  static AtariFontFile IImageFileFormat<AtariFontFile>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<AtariFontFile>.ToBytes(AtariFontFile file) => AtariFontWriter.ToBytes(file);
+  static string IImageFormatMetadata<AtariFontFile>.PrimaryExtension => ".fnt8";
+  static string[] IImageFormatMetadata<AtariFontFile>.FileExtensions => [".fnt8"];
+  static AtariFontFile IImageFormatReader<AtariFontFile>.FromSpan(ReadOnlySpan<byte> data) => AtariFontReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<AtariFontFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<AtariFontFile>.ToBytes(AtariFontFile file) => AtariFontWriter.ToBytes(file);
 
   /// <summary>Always 128.</summary>
   public int Width => PixelWidth;
@@ -51,13 +46,12 @@ public sealed class AtariFontFile : IImageFileFormat<AtariFontFile> {
   public int Height => PixelHeight;
 
   /// <summary>Raw character set data (1024 bytes: 128 chars x 8 bytes each). Each byte is one row of 8 pixels, MSB-first.</summary>
-  public byte[] FontData { get; init; } = [];
+  public byte[] FontData { get; init; }
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
   /// <summary>Converts the character set to an Indexed1 raw image (128x64, B&amp;W palette). Characters arranged in a 16x8 grid.</summary>
   public static RawImage ToRawImage(AtariFontFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var rowStride = PixelWidth / 8; // 16 bytes per row
     var pixelData = new byte[rowStride * PixelHeight];

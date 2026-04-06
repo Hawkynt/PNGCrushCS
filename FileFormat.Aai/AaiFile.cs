@@ -1,26 +1,22 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Aai;
 
 /// <summary>In-memory representation of an AAI (Dune HD) image.</summary>
-public sealed class AaiFile : IImageFileFormat<AaiFile> {
+public readonly record struct AaiFile : IImageFormatReader<AaiFile>, IImageToRawImage<AaiFile>, IImageFromRawImage<AaiFile>, IImageFormatWriter<AaiFile> {
 
-  static string IImageFileFormat<AaiFile>.PrimaryExtension => ".aai";
-  static string[] IImageFileFormat<AaiFile>.FileExtensions => [".aai"];
-  static AaiFile IImageFileFormat<AaiFile>.FromFile(FileInfo file) => AaiReader.FromFile(file);
-  static AaiFile IImageFileFormat<AaiFile>.FromBytes(byte[] data) => AaiReader.FromBytes(data);
-  static AaiFile IImageFileFormat<AaiFile>.FromStream(Stream stream) => AaiReader.FromStream(stream);
-  static byte[] IImageFileFormat<AaiFile>.ToBytes(AaiFile file) => AaiWriter.ToBytes(file);
+  static string IImageFormatMetadata<AaiFile>.PrimaryExtension => ".aai";
+  static string[] IImageFormatMetadata<AaiFile>.FileExtensions => [".aai"];
+  static AaiFile IImageFormatReader<AaiFile>.FromSpan(ReadOnlySpan<byte> data) => AaiReader.FromSpan(data);
+  static byte[] IImageFormatWriter<AaiFile>.ToBytes(AaiFile file) => AaiWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
 
   /// <summary>Raw RGBA pixel data (4 bytes per pixel: R, G, B, A).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(AaiFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

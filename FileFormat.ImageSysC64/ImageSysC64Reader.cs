@@ -26,6 +26,8 @@ public static class ImageSysC64Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static ImageSysC64File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static ImageSysC64File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < ImageSysC64File.ExpectedFileSize)

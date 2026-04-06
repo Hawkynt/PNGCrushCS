@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.GeoPaint;
 
 /// <summary>In-memory representation of a C64 GEOS GeoPaint image (640 pixels wide, 1bpp monochrome, RLE-compressed scanlines).</summary>
-public sealed class GeoPaintFile : IImageFileFormat<GeoPaintFile> {
+public readonly record struct GeoPaintFile : IImageFormatReader<GeoPaintFile>, IImageToRawImage<GeoPaintFile>, IImageFromRawImage<GeoPaintFile>, IImageFormatWriter<GeoPaintFile> {
 
   /// <summary>Fixed width of a GeoPaint image in pixels.</summary>
   public const int FixedWidth = 640;
@@ -16,15 +15,11 @@ public sealed class GeoPaintFile : IImageFileFormat<GeoPaintFile> {
   /// <summary>Bytes per uncompressed scanline (640 / 8).</summary>
   public const int BytesPerRow = 80;
 
-  static string IImageFileFormat<GeoPaintFile>.PrimaryExtension => ".geo";
-  static string[] IImageFileFormat<GeoPaintFile>.FileExtensions => [".geo"];
-  static FormatCapability IImageFileFormat<GeoPaintFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static GeoPaintFile IImageFileFormat<GeoPaintFile>.FromFile(FileInfo file) => GeoPaintReader.FromFile(file);
-  static GeoPaintFile IImageFileFormat<GeoPaintFile>.FromBytes(byte[] data) => GeoPaintReader.FromBytes(data);
-  static GeoPaintFile IImageFileFormat<GeoPaintFile>.FromStream(Stream stream) => GeoPaintReader.FromStream(stream);
-  static RawImage IImageFileFormat<GeoPaintFile>.ToRawImage(GeoPaintFile file) => file.ToRawImage();
-  static GeoPaintFile IImageFileFormat<GeoPaintFile>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<GeoPaintFile>.ToBytes(GeoPaintFile file) => GeoPaintWriter.ToBytes(file);
+  static string IImageFormatMetadata<GeoPaintFile>.PrimaryExtension => ".geo";
+  static string[] IImageFormatMetadata<GeoPaintFile>.FileExtensions => [".geo"];
+  static GeoPaintFile IImageFormatReader<GeoPaintFile>.FromSpan(ReadOnlySpan<byte> data) => GeoPaintReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<GeoPaintFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<GeoPaintFile>.ToBytes(GeoPaintFile file) => GeoPaintWriter.ToBytes(file);
 
   /// <summary>Always 640.</summary>
   public int Width => FixedWidth;
@@ -33,15 +28,15 @@ public sealed class GeoPaintFile : IImageFileFormat<GeoPaintFile> {
   public int Height { get; init; }
 
   /// <summary>1bpp packed pixel data, MSB-first, 80 bytes per row.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
-  public RawImage ToRawImage() => new() {
+  public static RawImage ToRawImage(GeoPaintFile file) => new() {
     Width = FixedWidth,
-    Height = this.Height,
+    Height = file.Height,
     Format = PixelFormat.Indexed1,
-    PixelData = this.PixelData[..],
+    PixelData = file.PixelData[..],
     Palette = _BlackWhitePalette[..],
     PaletteCount = 2,
   };

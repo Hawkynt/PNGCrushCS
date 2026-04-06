@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.CfliDesigner;
 
 /// <summary>In-memory representation of a C64 CFLI (Color FLI) multicolor image.</summary>
-public sealed class CfliDesignerFile : IImageFileFormat<CfliDesignerFile> {
+public readonly record struct CfliDesignerFile : IImageFormatReader<CfliDesignerFile>, IImageToRawImage<CfliDesignerFile>, IImageFormatWriter<CfliDesignerFile> {
 
-  static string IImageFileFormat<CfliDesignerFile>.PrimaryExtension => ".cfli";
-  static string[] IImageFileFormat<CfliDesignerFile>.FileExtensions => [".cfli"];
-  static CfliDesignerFile IImageFileFormat<CfliDesignerFile>.FromFile(FileInfo file) => CfliDesignerReader.FromFile(file);
-  static CfliDesignerFile IImageFileFormat<CfliDesignerFile>.FromBytes(byte[] data) => CfliDesignerReader.FromBytes(data);
-  static CfliDesignerFile IImageFileFormat<CfliDesignerFile>.FromStream(Stream stream) => CfliDesignerReader.FromStream(stream);
-  static byte[] IImageFileFormat<CfliDesignerFile>.ToBytes(CfliDesignerFile file) => CfliDesignerWriter.ToBytes(file);
+  static string IImageFormatMetadata<CfliDesignerFile>.PrimaryExtension => ".cfli";
+  static string[] IImageFormatMetadata<CfliDesignerFile>.FileExtensions => [".cfli"];
+  static CfliDesignerFile IImageFormatReader<CfliDesignerFile>.FromSpan(ReadOnlySpan<byte> data) => CfliDesignerReader.FromSpan(data);
+  static byte[] IImageFormatWriter<CfliDesignerFile>.ToBytes(CfliDesignerFile file) => CfliDesignerWriter.ToBytes(file);
 
   /// <summary>The fixed width of the image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -58,11 +55,10 @@ public sealed class CfliDesignerFile : IImageFileFormat<CfliDesignerFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Raw payload data (entire file content after load address).</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   /// <summary>Converts this CFLI image to a platform-independent <see cref="RawImage"/> in Rgb24 format using FLI multicolor decode.</summary>
   public static RawImage ToRawImage(CfliDesignerFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -114,9 +110,4 @@ public sealed class CfliDesignerFile : IImageFileFormat<CfliDesignerFile> {
     };
   }
 
-  /// <summary>Not supported. CFLI images have complex FLI color switching constraints.</summary>
-  public static CfliDesignerFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to CfliDesignerFile is not supported due to complex FLI color switching constraints.");
-  }
 }

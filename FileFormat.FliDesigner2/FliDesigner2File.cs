@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.FliDesigner2;
 
 /// <summary>In-memory representation of a FLI Designer 2 (enhanced FLI multicolor) image for the Commodore 64.</summary>
-public sealed class FliDesigner2File : IImageFileFormat<FliDesigner2File> {
+public readonly record struct FliDesigner2File : IImageFormatReader<FliDesigner2File>, IImageToRawImage<FliDesigner2File>, IImageFormatWriter<FliDesigner2File> {
 
-  static string IImageFileFormat<FliDesigner2File>.PrimaryExtension => ".fd2";
-  static string[] IImageFileFormat<FliDesigner2File>.FileExtensions => [".fd2"];
-  static FliDesigner2File IImageFileFormat<FliDesigner2File>.FromFile(FileInfo file) => FliDesigner2Reader.FromFile(file);
-  static FliDesigner2File IImageFileFormat<FliDesigner2File>.FromBytes(byte[] data) => FliDesigner2Reader.FromBytes(data);
-  static FliDesigner2File IImageFileFormat<FliDesigner2File>.FromStream(Stream stream) => FliDesigner2Reader.FromStream(stream);
-  static byte[] IImageFileFormat<FliDesigner2File>.ToBytes(FliDesigner2File file) => FliDesigner2Writer.ToBytes(file);
+  static string IImageFormatMetadata<FliDesigner2File>.PrimaryExtension => ".fd2";
+  static string[] IImageFormatMetadata<FliDesigner2File>.FileExtensions => [".fd2"];
+  static FliDesigner2File IImageFormatReader<FliDesigner2File>.FromSpan(ReadOnlySpan<byte> data) => FliDesigner2Reader.FromSpan(data);
+  static byte[] IImageFormatWriter<FliDesigner2File>.ToBytes(FliDesigner2File file) => FliDesigner2Writer.ToBytes(file);
 
   /// <summary>Image width in pixels, always 160 (multicolor).</summary>
   public const int FixedWidth = 160;
@@ -55,27 +52,20 @@ public sealed class FliDesigner2File : IImageFileFormat<FliDesigner2File> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Bitmap data (8000 bytes).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Per-scanline screen RAM (8000 bytes: 40 bytes per scanline x 200 lines).</summary>
-  public byte[] ScreenData { get; init; } = [];
+  public byte[] ScreenData { get; init; }
 
   /// <summary>Color RAM (1000 bytes, one per 4x8 cell).</summary>
-  public byte[] ColorRam { get; init; } = [];
+  public byte[] ColorRam { get; init; }
 
   /// <summary>Extra data beyond the base FLI multicolor layout (variable length, may be empty).</summary>
-  public byte[] ExtraData { get; init; } = [];
+  public byte[] ExtraData { get; init; }
 
   /// <summary>Converts this FLI Designer 2 image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(FliDesigner2File file) {
-    ArgumentNullException.ThrowIfNull(file);
     return _FliMultiToRawImage(file.BitmapData, file.ScreenData, file.ColorRam);
-  }
-
-  /// <summary>Not supported. FLI multicolor images have complex per-scanline color constraints.</summary>
-  public static FliDesigner2File FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to FliDesigner2File is not supported due to complex per-scanline FLI color constraints.");
   }
 
   /// <summary>Shared FLI multicolor decode: per-scanline screen RAM instead of per-cell.</summary>

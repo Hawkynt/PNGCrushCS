@@ -26,6 +26,8 @@ public static class MobileFaxReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static MobileFaxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static MobileFaxFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < MobileFaxFile.MinFileSize)

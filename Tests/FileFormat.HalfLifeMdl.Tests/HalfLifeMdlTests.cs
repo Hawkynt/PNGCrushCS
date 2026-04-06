@@ -41,25 +41,6 @@ public class HalfLifeMdlReaderTests {
 }
 
 [TestFixture]
-public class HalfLifeMdlWriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => HalfLifeMdlWriter.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_IncludesHeader() {
-    var file = new HalfLifeMdlFile {
-      Width = 256,
-      Height = 256,
-      PixelData = new byte[256 * 256],
-    };
-    var bytes = HalfLifeMdlWriter.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(16 + 256 * 256));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -90,30 +71,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void HeaderSize_Is16()
-    => Assert.That(HalfLifeMdlFile.HeaderSize, Is.EqualTo(16));
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => HalfLifeMdlFile.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => HalfLifeMdlFile.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 256, Height = 256, Format = PixelFormat.Rgb24, PixelData = new byte[256 * 256 * 3] };
-    Assert.Throws<ArgumentException>(() => HalfLifeMdlFile.FromRawImage(raw));
-  }
-
-  [Test]
-  public void FileExtensions_ContainsPrimary() {
-    string[] exts = [".mdltex"];
-    Assert.That(exts, Does.Contain(".mdltex"));
-  }
-}

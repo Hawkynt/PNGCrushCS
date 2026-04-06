@@ -26,6 +26,8 @@ public static class PrintShopReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static PrintShopFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static PrintShopFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
 

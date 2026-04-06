@@ -26,6 +26,8 @@ public static class WorldportFaxReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static WorldportFaxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static WorldportFaxFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < WorldportFaxFile.MinFileSize)

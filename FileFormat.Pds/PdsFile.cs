@@ -1,20 +1,17 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Pds;
 
 /// <summary>In-memory representation of a NASA Planetary Data System (PDS3) image.</summary>
 [FormatMagicBytes([0x50, 0x44, 0x53, 0x5F])]
-public sealed class PdsFile : IImageFileFormat<PdsFile> {
+public readonly record struct PdsFile : IImageFormatReader<PdsFile>, IImageToRawImage<PdsFile>, IImageFromRawImage<PdsFile>, IImageFormatWriter<PdsFile> {
 
-  static string IImageFileFormat<PdsFile>.PrimaryExtension => ".pds";
-  static string[] IImageFileFormat<PdsFile>.FileExtensions => [".pds", ".lbl"];
-  static PdsFile IImageFileFormat<PdsFile>.FromFile(FileInfo file) => PdsReader.FromFile(file);
-  static PdsFile IImageFileFormat<PdsFile>.FromBytes(byte[] data) => PdsReader.FromBytes(data);
-  static PdsFile IImageFileFormat<PdsFile>.FromStream(Stream stream) => PdsReader.FromStream(stream);
-  static byte[] IImageFileFormat<PdsFile>.ToBytes(PdsFile file) => PdsWriter.ToBytes(file);
+  static string IImageFormatMetadata<PdsFile>.PrimaryExtension => ".pds";
+  static string[] IImageFormatMetadata<PdsFile>.FileExtensions => [".pds", ".lbl"];
+  static PdsFile IImageFormatReader<PdsFile>.FromSpan(ReadOnlySpan<byte> data) => PdsReader.FromSpan(data);
+  static byte[] IImageFormatWriter<PdsFile>.ToBytes(PdsFile file) => PdsWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -23,10 +20,10 @@ public sealed class PdsFile : IImageFileFormat<PdsFile> {
   public int Height { get; init; }
 
   /// <summary>Bits per sample (8 or 16).</summary>
-  public int SampleBits { get; init; } = 8;
+  public int SampleBits { get; init; }
 
   /// <summary>Number of color bands (1 = grayscale, 3 = RGB).</summary>
-  public int Bands { get; init; } = 1;
+  public int Bands { get; init; }
 
   /// <summary>Band storage organization.</summary>
   public PdsBandStorage BandStorage { get; init; }
@@ -35,13 +32,12 @@ public sealed class PdsFile : IImageFileFormat<PdsFile> {
   public PdsSampleType SampleType { get; init; }
 
   /// <summary>Raw pixel data bytes.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>All keyword=value labels from the PDS header.</summary>
-  public Dictionary<string, string> Labels { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+  public Dictionary<string, string> Labels { get; init; }
 
   public static RawImage ToRawImage(PdsFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     if (file.SampleBits == 8 && file.Bands == 1)
       return new() {

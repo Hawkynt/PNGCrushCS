@@ -26,6 +26,8 @@ public static class AtariFontReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static AtariFontFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AtariFontFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != AtariFontFile.FileSize)

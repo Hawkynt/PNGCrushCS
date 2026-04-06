@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.AtariDump;
 
 /// <summary>In-memory representation of a generic Atari 8-bit screen dump. Default 320x192 Graphics 8 (1bpp monochrome).</summary>
-public sealed class AtariDumpFile : IImageFileFormat<AtariDumpFile> {
+public readonly record struct AtariDumpFile : IImageFormatReader<AtariDumpFile>, IImageToRawImage<AtariDumpFile>, IImageFromRawImage<AtariDumpFile>, IImageFormatWriter<AtariDumpFile> {
 
   /// <summary>Default image width in pixels (Graphics 8).</summary>
   internal const int DefaultWidth = 320;
@@ -25,33 +24,28 @@ public sealed class AtariDumpFile : IImageFileFormat<AtariDumpFile> {
   /// <summary>Default ANTIC mode (0x0F = Graphics 8).</summary>
   internal const byte DefaultAnticMode = 0x0F;
 
-  static string IImageFileFormat<AtariDumpFile>.PrimaryExtension => ".asd";
-  static string[] IImageFileFormat<AtariDumpFile>.FileExtensions => [".asd", ".adm"];
-  static FormatCapability IImageFileFormat<AtariDumpFile>.Capabilities => FormatCapability.IndexedOnly;
-  static AtariDumpFile IImageFileFormat<AtariDumpFile>.FromFile(FileInfo file) => AtariDumpReader.FromFile(file);
-  static AtariDumpFile IImageFileFormat<AtariDumpFile>.FromBytes(byte[] data) => AtariDumpReader.FromBytes(data);
-  static AtariDumpFile IImageFileFormat<AtariDumpFile>.FromStream(Stream stream) => AtariDumpReader.FromStream(stream);
-  static RawImage IImageFileFormat<AtariDumpFile>.ToRawImage(AtariDumpFile file) => ToRawImage(file);
-  static AtariDumpFile IImageFileFormat<AtariDumpFile>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<AtariDumpFile>.ToBytes(AtariDumpFile file) => AtariDumpWriter.ToBytes(file);
+  static string IImageFormatMetadata<AtariDumpFile>.PrimaryExtension => ".asd";
+  static string[] IImageFormatMetadata<AtariDumpFile>.FileExtensions => [".asd", ".adm"];
+  static AtariDumpFile IImageFormatReader<AtariDumpFile>.FromSpan(ReadOnlySpan<byte> data) => AtariDumpReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<AtariDumpFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<AtariDumpFile>.ToBytes(AtariDumpFile file) => AtariDumpWriter.ToBytes(file);
 
   /// <summary>Image width in pixels. Default 320.</summary>
-  public int Width { get; init; } = DefaultWidth;
+  public int Width { get; init; }
 
   /// <summary>Image height in pixels. Default 192.</summary>
-  public int Height { get; init; } = DefaultHeight;
+  public int Height { get; init; }
 
   /// <summary>ANTIC display mode byte. Default 0x0F (Graphics 8).</summary>
-  public byte AnticMode { get; init; } = DefaultAnticMode;
+  public byte AnticMode { get; init; }
 
   /// <summary>Raw screen dump data. For default Graphics 8: 1bpp MSB-first, 40 bytes per row.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
   /// <summary>Converts the screen dump to an Indexed1 raw image (default 320x192, B&amp;W palette).</summary>
   public static RawImage ToRawImage(AtariDumpFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var bytesPerLine = file.Width / 8;
     var expectedSize = bytesPerLine * file.Height;

@@ -29,6 +29,8 @@ public static class ClpReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static ClpFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static ClpFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < ClpHeader.StructSize)

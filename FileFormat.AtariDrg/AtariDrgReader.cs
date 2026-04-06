@@ -26,6 +26,8 @@ public static class AtariDrgReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static AtariDrgFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AtariDrgFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < AtariDrgFile.FileSize)

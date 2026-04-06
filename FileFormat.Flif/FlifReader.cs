@@ -34,6 +34,8 @@ public static class FlifReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static FlifFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static FlifFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < MinFileSize)

@@ -1,23 +1,20 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Tga;
 
 /// <summary>In-memory representation of a TGA image.</summary>
-public sealed class TgaFile : IImageFileFormat<TgaFile> {
+public readonly record struct TgaFile : IImageFormatReader<TgaFile>, IImageToRawImage<TgaFile>, IImageFromRawImage<TgaFile>, IImageFormatWriter<TgaFile> {
 
-  static string IImageFileFormat<TgaFile>.PrimaryExtension => ".tga";
-  static string[] IImageFileFormat<TgaFile>.FileExtensions => [".tga", ".vda", ".icb", ".vst", ".bpx", ".targa", ".ivb"];
-  static FormatCapability IImageFileFormat<TgaFile>.Capabilities => FormatCapability.HasDedicatedOptimizer;
-  static TgaFile IImageFileFormat<TgaFile>.FromFile(FileInfo file) => TgaReader.FromFile(file);
-  static TgaFile IImageFileFormat<TgaFile>.FromBytes(byte[] data) => TgaReader.FromBytes(data);
-  static TgaFile IImageFileFormat<TgaFile>.FromStream(Stream stream) => TgaReader.FromStream(stream);
-  static byte[] IImageFileFormat<TgaFile>.ToBytes(TgaFile file) => TgaWriter.ToBytes(file);
+  static string IImageFormatMetadata<TgaFile>.PrimaryExtension => ".tga";
+  static string[] IImageFormatMetadata<TgaFile>.FileExtensions => [".tga", ".vda", ".icb", ".vst", ".bpx", ".targa", ".ivb"];
+  static TgaFile IImageFormatReader<TgaFile>.FromSpan(ReadOnlySpan<byte> data) => TgaReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<TgaFile>.Capabilities => FormatCapability.HasDedicatedOptimizer;
+  static byte[] IImageFormatWriter<TgaFile>.ToBytes(TgaFile file) => TgaWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
   public int BitsPerPixel { get; init; }
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
   public byte[]? Palette { get; init; }
   public int PaletteColorCount { get; init; }
   public TgaOrigin Origin { get; init; }
@@ -25,7 +22,6 @@ public sealed class TgaFile : IImageFileFormat<TgaFile> {
   public TgaColorMode ColorMode { get; init; }
 
   public static RawImage ToRawImage(TgaFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var mode = file.ColorMode;
     if (mode == TgaColorMode.Original)

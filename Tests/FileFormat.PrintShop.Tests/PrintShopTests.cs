@@ -63,24 +63,6 @@ public sealed class PrintShopReaderTests {
 }
 
 [TestFixture]
-public sealed class PrintShopWriterTests {
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => PrintShopWriter.ToBytes(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_ProducesCorrectSize() {
-    var file = new PrintShopFile { PixelData = new byte[572] };
-    var bytes = PrintShopWriter.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(572));
-  }
-}
-
-[TestFixture]
 public sealed class RoundTripTests {
 
   [Test]
@@ -112,40 +94,3 @@ public sealed class RoundTripTests {
   }
 }
 
-[TestFixture]
-public sealed class DataTypeTests {
-
-  [Test]
-  [Category("Unit")]
-  public void PrintShopFile_DefaultWidth_Is88() {
-    Assert.That(new PrintShopFile().Width, Is.EqualTo(88));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void PrintShopFile_DefaultHeight_Is52() {
-    Assert.That(new PrintShopFile().Height, Is.EqualTo(52));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void PrintShopFile_ToRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => PrintShopFile.ToRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void PrintShopFile_FromRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => PrintShopFile.FromRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void PrintShopFile_ToRawImage_ReturnsIndexed1() {
-    var file = new PrintShopFile { PixelData = new byte[572] };
-    var raw = PrintShopFile.ToRawImage(file);
-
-    Assert.That(raw.Format, Is.EqualTo(PixelFormat.Indexed1));
-    Assert.That(raw.PaletteCount, Is.EqualTo(2));
-  }
-}

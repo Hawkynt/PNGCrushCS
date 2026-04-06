@@ -27,6 +27,8 @@ public static class MultiPalettePictureReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static MultiPalettePictureFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static MultiPalettePictureFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < MultiPalettePictureFile.ExpectedFileSize)

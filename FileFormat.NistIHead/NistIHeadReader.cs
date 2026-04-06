@@ -26,6 +26,8 @@ public static class NistIHeadReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static NistIHeadFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static NistIHeadFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < NistIHeadFile.MinFileSize)

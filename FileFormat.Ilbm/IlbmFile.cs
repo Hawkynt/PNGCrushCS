@@ -1,24 +1,21 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Ilbm;
 
 /// <summary>In-memory representation of an IFF ILBM image.</summary>
 [FormatMagicBytes([0x46, 0x4F, 0x52, 0x4D])]
-public sealed class IlbmFile : IImageFileFormat<IlbmFile> {
+public readonly record struct IlbmFile : IImageFormatReader<IlbmFile>, IImageToRawImage<IlbmFile>, IImageFromRawImage<IlbmFile>, IImageFormatWriter<IlbmFile> {
 
-  static string IImageFileFormat<IlbmFile>.PrimaryExtension => ".lbm";
-  static string[] IImageFileFormat<IlbmFile>.FileExtensions => [".lbm", ".ilbm", ".iff"];
+  static string IImageFormatMetadata<IlbmFile>.PrimaryExtension => ".lbm";
+  static string[] IImageFormatMetadata<IlbmFile>.FileExtensions => [".lbm", ".ilbm", ".iff"];
+  static IlbmFile IImageFormatReader<IlbmFile>.FromSpan(ReadOnlySpan<byte> data) => IlbmReader.FromSpan(data);
 
-  static bool? IImageFileFormat<IlbmFile>.MatchesSignature(ReadOnlySpan<byte> header)
+  static bool? IImageFormatMetadata<IlbmFile>.MatchesSignature(ReadOnlySpan<byte> header)
     => header.Length >= 12 && header[0] == 0x46 && header[1] == 0x4F && header[2] == 0x52 && header[3] == 0x4D
       && header[8] == 0x49 && header[9] == 0x4C && header[10] == 0x42 && header[11] == 0x4D;
 
-  static IlbmFile IImageFileFormat<IlbmFile>.FromFile(FileInfo file) => IlbmReader.FromFile(file);
-  static IlbmFile IImageFileFormat<IlbmFile>.FromBytes(byte[] data) => IlbmReader.FromBytes(data);
-  static IlbmFile IImageFileFormat<IlbmFile>.FromStream(Stream stream) => IlbmReader.FromStream(stream);
-  static byte[] IImageFileFormat<IlbmFile>.ToBytes(IlbmFile file) => IlbmWriter.ToBytes(file);
+  static byte[] IImageFormatWriter<IlbmFile>.ToBytes(IlbmFile file) => IlbmWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
   public int NumPlanes { get; init; }
@@ -29,7 +26,7 @@ public sealed class IlbmFile : IImageFileFormat<IlbmFile> {
   public byte YAspect { get; init; }
   public int PageWidth { get; init; }
   public int PageHeight { get; init; }
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
   public byte[]? Palette { get; init; }
 
   /// <summary>CAMG viewport mode bits (from the Amiga display hardware).</summary>
@@ -43,7 +40,6 @@ public sealed class IlbmFile : IImageFileFormat<IlbmFile> {
 
   /// <summary>Converts this ILBM file to a format-independent <see cref="RawImage"/>.</summary>
   public static RawImage ToRawImage(IlbmFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     // HAM mode: decode indexed data to RGB via HamDecoder
     if (file.IsHam && file.Palette is { } hamPalette) {

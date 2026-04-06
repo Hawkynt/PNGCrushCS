@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using FileFormat.Core;
 
@@ -6,16 +6,12 @@ namespace FileFormat.Cel;
 
 /// <summary>In-memory representation of a KiSS CEL (paper doll cell) image.</summary>
 [FormatMagicBytes([0x4B, 0x69, 0x53, 0x53])]
-public sealed class CelFile : IImageFileFormat<CelFile> {
+public readonly record struct CelFile : IImageFormatReader<CelFile>, IImageToRawImage<CelFile>, IImageFromRawImage<CelFile>, IImageFormatWriter<CelFile> {
 
-  static string IImageFileFormat<CelFile>.PrimaryExtension => ".cel";
-  static string[] IImageFileFormat<CelFile>.FileExtensions => [".cel"];
-  static CelFile IImageFileFormat<CelFile>.FromFile(FileInfo file) => CelReader.FromFile(file);
-  static CelFile IImageFileFormat<CelFile>.FromBytes(byte[] data) => CelReader.FromBytes(data);
-  static CelFile IImageFileFormat<CelFile>.FromStream(Stream stream) => CelReader.FromStream(stream);
-  static RawImage IImageFileFormat<CelFile>.ToRawImage(CelFile file) => ToRawImage(file);
-  static CelFile IImageFileFormat<CelFile>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<CelFile>.ToBytes(CelFile file) => CelWriter.ToBytes(file);
+  static string IImageFormatMetadata<CelFile>.PrimaryExtension => ".cel";
+  static string[] IImageFormatMetadata<CelFile>.FileExtensions => [".cel"];
+  static CelFile IImageFormatReader<CelFile>.FromSpan(ReadOnlySpan<byte> data) => CelReader.FromSpan(data);
+  static byte[] IImageFormatWriter<CelFile>.ToBytes(CelFile file) => CelWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -33,13 +29,12 @@ public sealed class CelFile : IImageFileFormat<CelFile> {
   public int YOffset { get; init; }
 
   /// <summary>Raw pixel data. For bpp=4: packed nybbles (low-first). For bpp=8: one byte per pixel. For bpp=32: RGBA 4 bytes per pixel.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Optional palette as RGB triplets (3 bytes per entry). Required for indexed modes (bpp=4 or bpp=8).</summary>
   public byte[]? Palette { get; init; }
 
   public static RawImage ToRawImage(CelFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return file.BitsPerPixel switch {
       32 => new() {
         Width = file.Width,

@@ -1,11 +1,10 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.IffDctv;
 
 /// <summary>In-memory representation of an IFF DCTV (Composite Video) image.</summary>
-public sealed class IffDctvFile : IImageFileFormat<IffDctvFile> {
+public readonly record struct IffDctvFile : IImageFormatReader<IffDctvFile>, IImageToRawImage<IffDctvFile>, IImageFormatWriter<IffDctvFile> {
 
   /// <summary>Minimum valid file size (FORM header = 12 bytes).</summary>
   internal const int MinFileSize = 12;
@@ -16,27 +15,22 @@ public sealed class IffDctvFile : IImageFileFormat<IffDctvFile> {
   /// <summary>Default height for DCTV images.</summary>
   internal const int DefaultHeight = 200;
 
-  static string IImageFileFormat<IffDctvFile>.PrimaryExtension => ".dctv";
-  static string[] IImageFileFormat<IffDctvFile>.FileExtensions => [".dctv"];
-  static IffDctvFile IImageFileFormat<IffDctvFile>.FromFile(FileInfo file) => IffDctvReader.FromFile(file);
-  static IffDctvFile IImageFileFormat<IffDctvFile>.FromBytes(byte[] data) => IffDctvReader.FromBytes(data);
-  static IffDctvFile IImageFileFormat<IffDctvFile>.FromStream(Stream stream) => IffDctvReader.FromStream(stream);
-  static RawImage IImageFileFormat<IffDctvFile>.ToRawImage(IffDctvFile file) => ToRawImage(file);
-  static IffDctvFile IImageFileFormat<IffDctvFile>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<IffDctvFile>.ToBytes(IffDctvFile file) => IffDctvWriter.ToBytes(file);
+  static string IImageFormatMetadata<IffDctvFile>.PrimaryExtension => ".dctv";
+  static string[] IImageFormatMetadata<IffDctvFile>.FileExtensions => [".dctv"];
+  static IffDctvFile IImageFormatReader<IffDctvFile>.FromSpan(ReadOnlySpan<byte> data) => IffDctvReader.FromSpan(data);
+  static byte[] IImageFormatWriter<IffDctvFile>.ToBytes(IffDctvFile file) => IffDctvWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
-  public int Width { get; init; } = DefaultWidth;
+  public int Width { get; init; }
 
   /// <summary>Image height in pixels.</summary>
-  public int Height { get; init; } = DefaultHeight;
+  public int Height { get; init; }
 
   /// <summary>Raw file data.</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   /// <summary>Converts this DCTV image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(IffDctvFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var width = file.Width;
     var height = file.Height;
@@ -62,9 +56,4 @@ public sealed class IffDctvFile : IImageFileFormat<IffDctvFile> {
     };
   }
 
-  /// <summary>Not supported. DCTV images require composite video color encoding.</summary>
-  public static IffDctvFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to IffDctvFile is not supported due to composite video color encoding requirements.");
-  }
 }

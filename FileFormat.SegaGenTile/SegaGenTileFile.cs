@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.SegaGenTile;
 
 /// <summary>In-memory representation of Sega Genesis/Mega Drive 4BPP tile data (8x8 tiles, 16 tiles per row).</summary>
-public sealed class SegaGenTileFile : IImageFileFormat<SegaGenTileFile> {
+public readonly record struct SegaGenTileFile : IImageFormatReader<SegaGenTileFile>, IImageToRawImage<SegaGenTileFile>, IImageFromRawImage<SegaGenTileFile>, IImageFormatWriter<SegaGenTileFile> {
 
   internal const int TileSize = 8;
   internal const int BytesPerTile = 32;
@@ -14,21 +13,18 @@ public sealed class SegaGenTileFile : IImageFileFormat<SegaGenTileFile> {
 
   private static readonly byte[] _DefaultPalette = _BuildGrayscalePalette(16);
 
-  static string IImageFileFormat<SegaGenTileFile>.PrimaryExtension => ".gen";
-  static string[] IImageFileFormat<SegaGenTileFile>.FileExtensions => [".gen", ".sgd"];
-  static FormatCapability IImageFileFormat<SegaGenTileFile>.Capabilities => FormatCapability.IndexedOnly;
-  static SegaGenTileFile IImageFileFormat<SegaGenTileFile>.FromFile(FileInfo file) => SegaGenTileReader.FromFile(file);
-  static SegaGenTileFile IImageFileFormat<SegaGenTileFile>.FromBytes(byte[] data) => SegaGenTileReader.FromBytes(data);
-  static SegaGenTileFile IImageFileFormat<SegaGenTileFile>.FromStream(Stream stream) => SegaGenTileReader.FromStream(stream);
-  static byte[] IImageFileFormat<SegaGenTileFile>.ToBytes(SegaGenTileFile file) => SegaGenTileWriter.ToBytes(file);
+  static string IImageFormatMetadata<SegaGenTileFile>.PrimaryExtension => ".gen";
+  static string[] IImageFormatMetadata<SegaGenTileFile>.FileExtensions => [".gen", ".sgd"];
+  static SegaGenTileFile IImageFormatReader<SegaGenTileFile>.FromSpan(ReadOnlySpan<byte> data) => SegaGenTileReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<SegaGenTileFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<SegaGenTileFile>.ToBytes(SegaGenTileFile file) => SegaGenTileWriter.ToBytes(file);
 
-  public int Width { get; init; } = FixedWidth;
+  public int Width { get; init; }
   public int Height { get; init; }
-  public byte[] PixelData { get; init; } = [];
-  public byte[] Palette { get; init; } = _DefaultPalette[..];
+  public byte[] PixelData { get; init; }
+  public byte[] Palette { get; init; }
 
   public static RawImage ToRawImage(SegaGenTileFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

@@ -1,18 +1,16 @@
-﻿using System;
+using System;
 using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.ScitexCt;
 
 /// <summary>In-memory representation of a Scitex CT (Continuous Tone) image.</summary>
-public sealed class ScitexCtFile : IImageFileFormat<ScitexCtFile> {
+public readonly record struct ScitexCtFile : IImageFormatReader<ScitexCtFile>, IImageToRawImage<ScitexCtFile>, IImageFromRawImage<ScitexCtFile>, IImageFormatWriter<ScitexCtFile> {
 
-  static string IImageFileFormat<ScitexCtFile>.PrimaryExtension => ".sct";
-  static string[] IImageFileFormat<ScitexCtFile>.FileExtensions => [".sct", ".ct"];
-  static ScitexCtFile IImageFileFormat<ScitexCtFile>.FromFile(FileInfo file) => ScitexCtReader.FromFile(file);
-  static ScitexCtFile IImageFileFormat<ScitexCtFile>.FromBytes(byte[] data) => ScitexCtReader.FromBytes(data);
-  static ScitexCtFile IImageFileFormat<ScitexCtFile>.FromStream(Stream stream) => ScitexCtReader.FromStream(stream);
-  static byte[] IImageFileFormat<ScitexCtFile>.ToBytes(ScitexCtFile file) => ScitexCtWriter.ToBytes(file);
+  static string IImageFormatMetadata<ScitexCtFile>.PrimaryExtension => ".sct";
+  static string[] IImageFormatMetadata<ScitexCtFile>.FileExtensions => [".sct", ".ct"];
+  static ScitexCtFile IImageFormatReader<ScitexCtFile>.FromSpan(ReadOnlySpan<byte> data) => ScitexCtReader.FromSpan(data);
+  static byte[] IImageFormatWriter<ScitexCtFile>.ToBytes(ScitexCtFile file) => ScitexCtWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -33,14 +31,13 @@ public sealed class ScitexCtFile : IImageFileFormat<ScitexCtFile> {
   public int VResolution { get; init; }
 
   /// <summary>Image description (up to 36 ASCII characters).</summary>
-  public string Description { get; init; } = "";
+  public string Description { get; init; }
 
   /// <summary>Raw pixel data: Width * Height * channels bytes.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this Scitex CT image to a platform-independent <see cref="RawImage"/>.</summary>
   public static RawImage ToRawImage(ScitexCtFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var width = file.Width;
     var height = file.Height;

@@ -1,28 +1,24 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Xbm;
 
 /// <summary>In-memory representation of an XBM (X BitMap) image.</summary>
-public sealed class XbmFile : IImageFileFormat<XbmFile> {
+public readonly record struct XbmFile : IImageFormatReader<XbmFile>, IImageToRawImage<XbmFile>, IImageFromRawImage<XbmFile>, IImageFormatWriter<XbmFile> {
 
-  static string IImageFileFormat<XbmFile>.PrimaryExtension => ".xbm";
-  static string[] IImageFileFormat<XbmFile>.FileExtensions => [".xbm"];
-  static FormatCapability IImageFileFormat<XbmFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static XbmFile IImageFileFormat<XbmFile>.FromFile(FileInfo file) => XbmReader.FromFile(file);
-  static XbmFile IImageFileFormat<XbmFile>.FromBytes(byte[] data) => XbmReader.FromBytes(data);
-  static XbmFile IImageFileFormat<XbmFile>.FromStream(Stream stream) => XbmReader.FromStream(stream);
-  static RawImage IImageFileFormat<XbmFile>.ToRawImage(XbmFile file) => file.ToRawImage();
-  static byte[] IImageFileFormat<XbmFile>.ToBytes(XbmFile file) => XbmWriter.ToBytes(file);
+  static string IImageFormatMetadata<XbmFile>.PrimaryExtension => ".xbm";
+  static string[] IImageFormatMetadata<XbmFile>.FileExtensions => [".xbm"];
+  static XbmFile IImageFormatReader<XbmFile>.FromSpan(ReadOnlySpan<byte> data) => XbmReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<XbmFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<XbmFile>.ToBytes(XbmFile file) => XbmWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
-  public string Name { get; init; } = "image";
+  public string Name { get; init; }
   public int? HotspotX { get; init; }
   public int? HotspotY { get; init; }
 
   /// <summary>1bpp packed pixel data, LSB-first within each byte, ceil(width/8) bytes per row.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
@@ -35,14 +31,14 @@ public sealed class XbmFile : IImageFileFormat<XbmFile> {
     return (byte)result;
   }
 
-  public RawImage ToRawImage() {
-    var msb = new byte[this.PixelData.Length];
-    for (var i = 0; i < this.PixelData.Length; ++i)
-      msb[i] = _ReverseBits(this.PixelData[i]);
+  public static RawImage ToRawImage(XbmFile file) {
+    var msb = new byte[file.PixelData.Length];
+    for (var i = 0; i < file.PixelData.Length; ++i)
+      msb[i] = _ReverseBits(file.PixelData[i]);
 
     return new() {
-      Width = this.Width,
-      Height = this.Height,
+      Width = file.Width,
+      Height = file.Height,
       Format = PixelFormat.Indexed1,
       PixelData = msb,
       Palette = _BlackWhitePalette[..],

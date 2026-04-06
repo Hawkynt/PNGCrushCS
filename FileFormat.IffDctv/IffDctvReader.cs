@@ -26,6 +26,8 @@ public static class IffDctvReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static IffDctvFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static IffDctvFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < IffDctvFile.MinFileSize)

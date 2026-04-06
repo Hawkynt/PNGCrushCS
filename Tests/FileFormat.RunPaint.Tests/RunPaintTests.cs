@@ -48,33 +48,6 @@ public sealed class RunPaintReaderTests {
 }
 
 [TestFixture]
-public sealed class RunPaintWriterTests {
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => RunPaintWriter.ToBytes(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_StartsWithLoadAddress() {
-    var file = new RunPaintFile {
-      LoadAddress = 0x6000,
-      BitmapData = new byte[8000],
-      ScreenRam = new byte[1000],
-      ColorRam = new byte[1000],
-      BackgroundColor = 0,
-    };
-    var bytes = RunPaintWriter.ToBytes(file);
-
-    Assert.That(bytes[0], Is.EqualTo(0x00));
-    Assert.That(bytes[1], Is.EqualTo(0x60));
-    Assert.That(bytes.Length, Is.GreaterThan(2));
-  }
-}
-
-[TestFixture]
 public sealed class RunPaintRoundTripTests {
 
   [Test]
@@ -90,49 +63,6 @@ public sealed class RunPaintRoundTripTests {
     Assert.That(restored.ScreenRam, Is.EqualTo(original.ScreenRam));
     Assert.That(restored.ColorRam, Is.EqualTo(original.ColorRam));
     Assert.That(restored.BackgroundColor, Is.EqualTo(original.BackgroundColor));
-  }
-}
-
-[TestFixture]
-public sealed class RunPaintDataTypeTests {
-
-  [Test]
-  [Category("Unit")]
-  public void PrimaryExtension_IsRpm() {
-    Assert.That(_GetPrimaryExtension(), Is.EqualTo(".rpm"));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FileExtensions_ContainsRpm() {
-    Assert.That(_GetFileExtensions(), Does.Contain(".rpm"));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => RunPaintFile.ToRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => RunPaintFile.FromRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_ThrowsNotSupportedException() {
-    var image = new RawImage { Width = 160, Height = 200, Format = PixelFormat.Rgb24, PixelData = new byte[160 * 200 * 3] };
-    Assert.Throws<NotSupportedException>(() => RunPaintFile.FromRawImage(image));
-  }
-
-  private static string _GetPrimaryExtension() => _Helper<RunPaintFile>.PrimaryExtension;
-  private static string[] _GetFileExtensions() => _Helper<RunPaintFile>.FileExtensions;
-
-  private static class _Helper<T> where T : IImageFileFormat<T> {
-    public static string PrimaryExtension => T.PrimaryExtension;
-    public static string[] FileExtensions => T.FileExtensions;
   }
 }
 

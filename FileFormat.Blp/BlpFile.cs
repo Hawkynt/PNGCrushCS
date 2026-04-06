@@ -1,19 +1,16 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Blp;
 
 /// <summary>In-memory representation of a BLP2 (Blizzard Texture) file.</summary>
 [FormatMagicBytes([0x42, 0x4C, 0x50, 0x32])]
-public sealed class BlpFile : IImageFileFormat<BlpFile> {
+public readonly record struct BlpFile : IImageFormatReader<BlpFile>, IImageToRawImage<BlpFile>, IImageFromRawImage<BlpFile>, IImageFormatWriter<BlpFile> {
 
-  static string IImageFileFormat<BlpFile>.PrimaryExtension => ".blp";
-  static string[] IImageFileFormat<BlpFile>.FileExtensions => [".blp"];
-  static BlpFile IImageFileFormat<BlpFile>.FromFile(FileInfo file) => BlpReader.FromFile(file);
-  static BlpFile IImageFileFormat<BlpFile>.FromBytes(byte[] data) => BlpReader.FromBytes(data);
-  static BlpFile IImageFileFormat<BlpFile>.FromStream(Stream stream) => BlpReader.FromStream(stream);
-  static byte[] IImageFileFormat<BlpFile>.ToBytes(BlpFile file) => BlpWriter.ToBytes(file);
+  static string IImageFormatMetadata<BlpFile>.PrimaryExtension => ".blp";
+  static string[] IImageFormatMetadata<BlpFile>.FileExtensions => [".blp"];
+  static BlpFile IImageFormatReader<BlpFile>.FromSpan(ReadOnlySpan<byte> data) => BlpReader.FromSpan(data);
+  static byte[] IImageFormatWriter<BlpFile>.ToBytes(BlpFile file) => BlpWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -37,11 +34,10 @@ public sealed class BlpFile : IImageFileFormat<BlpFile> {
   public byte[]? Palette { get; init; }
 
   /// <summary>Mipmap level data arrays. Index 0 is the full-resolution image.</summary>
-  public byte[][] MipData { get; init; } = [];
+  public byte[][] MipData { get; init; }
 
   /// <summary>Converts a BLP file to a platform-independent BGRA32 raw image (mip level 0).</summary>
   public static RawImage ToRawImage(BlpFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     if (file.MipData.Length == 0 || file.MipData[0].Length == 0)
       throw new InvalidOperationException("BLP file contains no image data.");
 

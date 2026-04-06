@@ -1,32 +1,28 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Wpg;
 
 /// <summary>In-memory representation of a WPG (WordPerfect Graphics) raster image.</summary>
 [FormatMagicBytes([0xFF, 0x57, 0x50, 0x43])]
-public sealed class WpgFile : IImageFileFormat<WpgFile> {
+public readonly record struct WpgFile : IImageFormatReader<WpgFile>, IImageToRawImage<WpgFile>, IImageFromRawImage<WpgFile>, IImageFormatWriter<WpgFile> {
 
-  static string IImageFileFormat<WpgFile>.PrimaryExtension => ".wpg";
-  static string[] IImageFileFormat<WpgFile>.FileExtensions => [".wpg"];
-  static WpgFile IImageFileFormat<WpgFile>.FromFile(FileInfo file) => WpgReader.FromFile(file);
-  static WpgFile IImageFileFormat<WpgFile>.FromBytes(byte[] data) => WpgReader.FromBytes(data);
-  static WpgFile IImageFileFormat<WpgFile>.FromStream(Stream stream) => WpgReader.FromStream(stream);
-  static byte[] IImageFileFormat<WpgFile>.ToBytes(WpgFile file) => WpgWriter.ToBytes(file);
+  static string IImageFormatMetadata<WpgFile>.PrimaryExtension => ".wpg";
+  static string[] IImageFormatMetadata<WpgFile>.FileExtensions => [".wpg"];
+  static WpgFile IImageFormatReader<WpgFile>.FromSpan(ReadOnlySpan<byte> data) => WpgReader.FromSpan(data);
+  static byte[] IImageFormatWriter<WpgFile>.ToBytes(WpgFile file) => WpgWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
   public int BitsPerPixel { get; init; }
 
   /// <summary>Raw pixel data (indexed or monochrome).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>RGB palette (3 bytes per entry), or null if no palette.</summary>
   public byte[]? Palette { get; init; }
 
   /// <summary>Converts a WPG file to a <see cref="RawImage"/>. Unpacks 1/4bpp to Indexed8.</summary>
   public static RawImage ToRawImage(WpgFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     byte[] pixels;
     int paletteCount;

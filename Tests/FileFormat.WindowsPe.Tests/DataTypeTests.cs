@@ -149,7 +149,7 @@ public sealed class DataTypeTests {
   }
 
   private static T _GetStaticProperty<T>(string name) {
-    var map = typeof(PeResourceFile).GetInterfaceMap(typeof(IImageFileFormat<PeResourceFile>));
+    var map = typeof(PeResourceFile).GetInterfaceMap(typeof(IImageFormatMetadata<PeResourceFile>));
     foreach (var method in map.TargetMethods)
       if (method.Name.Contains(name))
         return (T)method.Invoke(null, null)!;

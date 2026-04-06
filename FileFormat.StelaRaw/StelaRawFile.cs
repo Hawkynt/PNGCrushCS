@@ -1,28 +1,23 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.StelaRaw;
 
 /// <summary>In-memory representation of a Stela/HSI Raw image image.</summary>
-public sealed class StelaRawFile : IImageFileFormat<StelaRawFile> {
+public readonly record struct StelaRawFile : IImageFormatReader<StelaRawFile>, IImageToRawImage<StelaRawFile>, IImageFromRawImage<StelaRawFile>, IImageFormatWriter<StelaRawFile> {
 
   internal const int HeaderSize = 8;
 
-
-  static string IImageFileFormat<StelaRawFile>.PrimaryExtension => ".hsi";
-  static string[] IImageFileFormat<StelaRawFile>.FileExtensions => [".hsi"];
-  static StelaRawFile IImageFileFormat<StelaRawFile>.FromFile(FileInfo file) => StelaRawReader.FromFile(file);
-  static StelaRawFile IImageFileFormat<StelaRawFile>.FromBytes(byte[] data) => StelaRawReader.FromBytes(data);
-  static StelaRawFile IImageFileFormat<StelaRawFile>.FromStream(Stream stream) => StelaRawReader.FromStream(stream);
-  static byte[] IImageFileFormat<StelaRawFile>.ToBytes(StelaRawFile file) => StelaRawWriter.ToBytes(file);
+  static string IImageFormatMetadata<StelaRawFile>.PrimaryExtension => ".hsi";
+  static string[] IImageFormatMetadata<StelaRawFile>.FileExtensions => [".hsi"];
+  static StelaRawFile IImageFormatReader<StelaRawFile>.FromSpan(ReadOnlySpan<byte> data) => StelaRawReader.FromSpan(data);
+  static byte[] IImageFormatWriter<StelaRawFile>.ToBytes(StelaRawFile file) => StelaRawWriter.ToBytes(file);
 
   public int Width { get; init; }
   public int Height { get; init; }
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(StelaRawFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

@@ -38,31 +38,6 @@ public class DragonReaderTests {
 }
 
 [TestFixture]
-public class DragonWriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => DragonWriter.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_OutputSize_Is6144() {
-    var file = new DragonFile { PixelData = new byte[6144] };
-    var bytes = DragonWriter.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(6144));
-  }
-
-  [Test]
-  public void ToBytes_DataPreserved() {
-    var data = new byte[6144];
-    for (var i = 0; i < data.Length; ++i)
-      data[i] = (byte)(i & 0xFF);
-    var file = new DragonFile { PixelData = data };
-    var bytes = DragonWriter.ToBytes(file);
-    Assert.That(bytes, Is.EqualTo(data));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -90,32 +65,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void FixedWidth_Is256()
-    => Assert.That(DragonFile.FixedWidth, Is.EqualTo(256));
-
-  [Test]
-  public void FixedHeight_Is192()
-    => Assert.That(DragonFile.FixedHeight, Is.EqualTo(192));
-
-  [Test]
-  public void FileSize_Is6144()
-    => Assert.That(DragonFile.FileSize, Is.EqualTo(6144));
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => DragonFile.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => DragonFile.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 256, Height = 192, Format = PixelFormat.Rgb24, PixelData = new byte[256 * 192 * 3] };
-    Assert.Throws<ArgumentException>(() => DragonFile.FromRawImage(raw));
-  }
-}

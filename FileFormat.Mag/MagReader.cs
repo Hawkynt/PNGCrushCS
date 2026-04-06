@@ -25,6 +25,8 @@ public static class MagReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static MagFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static MagFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < MagFile.HeaderSize)

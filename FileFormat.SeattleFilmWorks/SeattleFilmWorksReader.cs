@@ -27,6 +27,8 @@ public static class SeattleFilmWorksReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static SeattleFilmWorksFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static SeattleFilmWorksFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < SeattleFilmWorksFile.MIN_FILE_SIZE)

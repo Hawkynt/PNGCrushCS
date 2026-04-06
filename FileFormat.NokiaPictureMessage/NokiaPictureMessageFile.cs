@@ -1,20 +1,16 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.NokiaPictureMessage;
 
 /// <summary>In-memory representation of a Nokia Picture Message (.npm) monochrome bitmap image.</summary>
-public sealed class NokiaPictureMessageFile : IImageFileFormat<NokiaPictureMessageFile> {
+public readonly record struct NokiaPictureMessageFile : IImageFormatReader<NokiaPictureMessageFile>, IImageToRawImage<NokiaPictureMessageFile>, IImageFromRawImage<NokiaPictureMessageFile>, IImageFormatWriter<NokiaPictureMessageFile> {
 
-  static string IImageFileFormat<NokiaPictureMessageFile>.PrimaryExtension => ".npm";
-  static string[] IImageFileFormat<NokiaPictureMessageFile>.FileExtensions => [".npm"];
-  static FormatCapability IImageFileFormat<NokiaPictureMessageFile>.Capabilities => FormatCapability.MonochromeOnly | FormatCapability.VariableResolution;
-  static NokiaPictureMessageFile IImageFileFormat<NokiaPictureMessageFile>.FromFile(FileInfo file) => NokiaPictureMessageReader.FromFile(file);
-  static NokiaPictureMessageFile IImageFileFormat<NokiaPictureMessageFile>.FromBytes(byte[] data) => NokiaPictureMessageReader.FromBytes(data);
-  static NokiaPictureMessageFile IImageFileFormat<NokiaPictureMessageFile>.FromStream(Stream stream) => NokiaPictureMessageReader.FromStream(stream);
-  static RawImage IImageFileFormat<NokiaPictureMessageFile>.ToRawImage(NokiaPictureMessageFile file) => file.ToRawImage();
-  static byte[] IImageFileFormat<NokiaPictureMessageFile>.ToBytes(NokiaPictureMessageFile file) => NokiaPictureMessageWriter.ToBytes(file);
+  static string IImageFormatMetadata<NokiaPictureMessageFile>.PrimaryExtension => ".npm";
+  static string[] IImageFormatMetadata<NokiaPictureMessageFile>.FileExtensions => [".npm"];
+  static NokiaPictureMessageFile IImageFormatReader<NokiaPictureMessageFile>.FromSpan(ReadOnlySpan<byte> data) => NokiaPictureMessageReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<NokiaPictureMessageFile>.Capabilities => FormatCapability.MonochromeOnly | FormatCapability.VariableResolution;
+  static byte[] IImageFormatWriter<NokiaPictureMessageFile>.ToBytes(NokiaPictureMessageFile file) => NokiaPictureMessageWriter.ToBytes(file);
 
   /// <summary>Image width in pixels (1..255).</summary>
   public int Width { get; init; }
@@ -23,16 +19,16 @@ public sealed class NokiaPictureMessageFile : IImageFileFormat<NokiaPictureMessa
   public int Height { get; init; }
 
   /// <summary>1bpp packed pixel data, MSB first, ceil(width/8) bytes per row, no padding.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   // Nokia convention: 0=white, 1=black
   private static readonly byte[] _WhiteBlackPalette = [255, 255, 255, 0, 0, 0];
 
-  public RawImage ToRawImage() => new() {
-    Width = this.Width,
-    Height = this.Height,
+  public static RawImage ToRawImage(NokiaPictureMessageFile file) => new() {
+    Width = file.Width,
+    Height = file.Height,
     Format = PixelFormat.Indexed1,
-    PixelData = this.PixelData[..],
+    PixelData = file.PixelData[..],
     Palette = _WhiteBlackPalette[..],
     PaletteCount = 2,
   };

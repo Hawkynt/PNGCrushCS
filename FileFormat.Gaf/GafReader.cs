@@ -34,6 +34,8 @@ public static class GafReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static GafFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static GafFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MIN_FILE_SIZE)

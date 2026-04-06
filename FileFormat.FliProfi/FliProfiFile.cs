@@ -1,20 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.FliProfi;
 
 /// <summary>In-memory representation of a FLI Profi (.fpr) C64 image with per-raster-line color switching.</summary>
-public sealed class FliProfiFile : IImageFileFormat<FliProfiFile> {
+public readonly record struct FliProfiFile : IImageFormatReader<FliProfiFile>, IImageToRawImage<FliProfiFile>, IImageFormatWriter<FliProfiFile> {
 
-  static string IImageFileFormat<FliProfiFile>.PrimaryExtension => ".fpr";
-  static string[] IImageFileFormat<FliProfiFile>.FileExtensions => [".fpr"];
-  static FliProfiFile IImageFileFormat<FliProfiFile>.FromFile(FileInfo file) => FliProfiReader.FromFile(file);
-  static FliProfiFile IImageFileFormat<FliProfiFile>.FromBytes(byte[] data) => FliProfiReader.FromBytes(data);
-  static FliProfiFile IImageFileFormat<FliProfiFile>.FromStream(Stream stream) => FliProfiReader.FromStream(stream);
-  static RawImage IImageFileFormat<FliProfiFile>.ToRawImage(FliProfiFile file) => ToRawImage(file);
-  static FliProfiFile IImageFileFormat<FliProfiFile>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<FliProfiFile>.ToBytes(FliProfiFile file) => FliProfiWriter.ToBytes(file);
+  static string IImageFormatMetadata<FliProfiFile>.PrimaryExtension => ".fpr";
+  static string[] IImageFormatMetadata<FliProfiFile>.FileExtensions => [".fpr"];
+  static FliProfiFile IImageFormatReader<FliProfiFile>.FromSpan(ReadOnlySpan<byte> data) => FliProfiReader.FromSpan(data);
+  static byte[] IImageFormatWriter<FliProfiFile>.ToBytes(FliProfiFile file) => FliProfiWriter.ToBytes(file);
 
   /// <summary>The fixed width of the image in pixels (multicolor mode = 160 effective, but displayed as 160).</summary>
   public const int FixedWidth = 160;
@@ -60,14 +55,13 @@ public sealed class FliProfiFile : IImageFileFormat<FliProfiFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Raw payload data (entire file content after load address).</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   /// <summary>
   /// Converts this FLI Profi image to a platform-independent <see cref="RawImage"/> in Rgb24 format.
   /// Uses multicolor FLI decode: 2bpp pixels with per-raster-line screen RAM bank switching.
   /// </summary>
   public static RawImage ToRawImage(FliProfiFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -124,9 +118,4 @@ public sealed class FliProfiFile : IImageFileFormat<FliProfiFile> {
     };
   }
 
-  /// <summary>Not supported. FLI Profi images have complex per-line color switching constraints.</summary>
-  public static FliProfiFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to FliProfiFile is not supported due to complex FLI color switching constraints.");
-  }
 }

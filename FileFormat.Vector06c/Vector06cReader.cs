@@ -25,6 +25,8 @@ public static class Vector06cReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static Vector06cFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static Vector06cFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != Vector06cFile.FileSize)

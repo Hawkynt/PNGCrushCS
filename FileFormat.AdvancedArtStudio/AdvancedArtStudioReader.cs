@@ -26,6 +26,8 @@ public static class AdvancedArtStudioReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static AdvancedArtStudioFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AdvancedArtStudioFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < AdvancedArtStudioFile.ExpectedFileSize)

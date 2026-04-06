@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.WonderSwanTile;
 
 /// <summary>In-memory representation of a WonderSwan 2bpp tile data image.</summary>
-public sealed class WonderSwanTileFile : IImageFileFormat<WonderSwanTileFile> {
+public readonly record struct WonderSwanTileFile : IImageFormatReader<WonderSwanTileFile>, IImageToRawImage<WonderSwanTileFile>, IImageFromRawImage<WonderSwanTileFile>, IImageFormatWriter<WonderSwanTileFile> {
 
   internal const int BytesPerTile = 16;
   internal const int TileSize = 8;
@@ -15,21 +14,18 @@ public sealed class WonderSwanTileFile : IImageFileFormat<WonderSwanTileFile> {
 
   private static readonly byte[] _DefaultPalette = [224, 248, 208, 136, 192, 112, 52, 104, 86, 8, 24, 32];
 
-  static string IImageFileFormat<WonderSwanTileFile>.PrimaryExtension => ".wst";
-  static string[] IImageFileFormat<WonderSwanTileFile>.FileExtensions => [".wst", ".ws"];
-  static FormatCapability IImageFileFormat<WonderSwanTileFile>.Capabilities => FormatCapability.IndexedOnly;
-  static WonderSwanTileFile IImageFileFormat<WonderSwanTileFile>.FromFile(FileInfo file) => WonderSwanTileReader.FromFile(file);
-  static WonderSwanTileFile IImageFileFormat<WonderSwanTileFile>.FromBytes(byte[] data) => WonderSwanTileReader.FromBytes(data);
-  static WonderSwanTileFile IImageFileFormat<WonderSwanTileFile>.FromStream(Stream stream) => WonderSwanTileReader.FromStream(stream);
-  static byte[] IImageFileFormat<WonderSwanTileFile>.ToBytes(WonderSwanTileFile file) => WonderSwanTileWriter.ToBytes(file);
+  static string IImageFormatMetadata<WonderSwanTileFile>.PrimaryExtension => ".wst";
+  static string[] IImageFormatMetadata<WonderSwanTileFile>.FileExtensions => [".wst", ".ws"];
+  static WonderSwanTileFile IImageFormatReader<WonderSwanTileFile>.FromSpan(ReadOnlySpan<byte> data) => WonderSwanTileReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<WonderSwanTileFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<WonderSwanTileFile>.ToBytes(WonderSwanTileFile file) => WonderSwanTileWriter.ToBytes(file);
 
-  public int Width { get; init; } = TilesPerRow * TileSize;
+  public int Width { get; init; }
   public int Height { get; init; }
-  public byte[] PixelData { get; init; } = [];
-  public byte[] Palette { get; init; } = _DefaultPalette[..];
+  public byte[] PixelData { get; init; }
+  public byte[] Palette { get; init; }
 
   public static RawImage ToRawImage(WonderSwanTileFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

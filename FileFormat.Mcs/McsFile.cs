@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Mcs;
 
 /// <summary>In-memory representation of a C64 Mcs (.mcs) multicolor screen image.</summary>
-public sealed class McsFile : IImageFileFormat<McsFile> {
+public readonly record struct McsFile : IImageFormatReader<McsFile>, IImageToRawImage<McsFile>, IImageFormatWriter<McsFile> {
 
-  static string IImageFileFormat<McsFile>.PrimaryExtension => ".mcs";
-  static string[] IImageFileFormat<McsFile>.FileExtensions => [".mcs"];
-  static McsFile IImageFileFormat<McsFile>.FromFile(FileInfo file) => McsReader.FromFile(file);
-  static McsFile IImageFileFormat<McsFile>.FromBytes(byte[] data) => McsReader.FromBytes(data);
-  static McsFile IImageFileFormat<McsFile>.FromStream(Stream stream) => McsReader.FromStream(stream);
-  static byte[] IImageFileFormat<McsFile>.ToBytes(McsFile file) => McsWriter.ToBytes(file);
+  static string IImageFormatMetadata<McsFile>.PrimaryExtension => ".mcs";
+  static string[] IImageFormatMetadata<McsFile>.FileExtensions => [".mcs"];
+  static McsFile IImageFormatReader<McsFile>.FromSpan(ReadOnlySpan<byte> data) => McsReader.FromSpan(data);
+  static byte[] IImageFormatWriter<McsFile>.ToBytes(McsFile file) => McsWriter.ToBytes(file);
 
   /// <summary>Size of the bitmap data section in bytes.</summary>
   internal const int BitmapDataSize = 8000;
@@ -52,23 +49,22 @@ public sealed class McsFile : IImageFileFormat<McsFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Bitmap data (8000 bytes).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Screen RAM / video matrix (1000 bytes).</summary>
-  public byte[] ScreenData { get; init; } = [];
+  public byte[] ScreenData { get; init; }
 
   /// <summary>Color RAM (1000 bytes).</summary>
-  public byte[] ColorData { get; init; } = [];
+  public byte[] ColorData { get; init; }
 
   /// <summary>Background color index (0-15). Bit-pair 0 maps to this color.</summary>
   public byte BackgroundColor { get; init; }
 
   /// <summary>Any trailing bytes beyond the minimum payload.</summary>
-  public byte[] TrailingData { get; init; } = [];
+  public byte[] TrailingData { get; init; }
 
   /// <summary>Converts this Mcs image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(McsFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = ImageWidth;
     const int height = ImageHeight;
@@ -107,6 +103,4 @@ public sealed class McsFile : IImageFileFormat<McsFile> {
     };
   }
 
-  /// <summary>Creates a Mcs image from a <see cref="RawImage"/>. Not supported.</summary>
-  public static McsFile FromRawImage(RawImage image) => throw new NotSupportedException("Creating Mcs files from raw images is not supported.");
 }

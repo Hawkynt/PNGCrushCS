@@ -1,28 +1,23 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Cp8Gray;
 
 /// <summary>In-memory representation of a CP8 grayscale image (headerless, square dimensions).</summary>
-public sealed class Cp8GrayFile : IImageFileFormat<Cp8GrayFile> {
+public readonly record struct Cp8GrayFile : IImageFormatReader<Cp8GrayFile>, IImageToRawImage<Cp8GrayFile>, IImageFormatWriter<Cp8GrayFile> {
 
-  static string IImageFileFormat<Cp8GrayFile>.PrimaryExtension => ".cp8";
-  static string[] IImageFileFormat<Cp8GrayFile>.FileExtensions => [".cp8"];
-  static Cp8GrayFile IImageFileFormat<Cp8GrayFile>.FromFile(FileInfo file) => Cp8GrayReader.FromFile(file);
-  static Cp8GrayFile IImageFileFormat<Cp8GrayFile>.FromBytes(byte[] data) => Cp8GrayReader.FromBytes(data);
-  static Cp8GrayFile IImageFileFormat<Cp8GrayFile>.FromStream(Stream stream) => Cp8GrayReader.FromStream(stream);
-  static RawImage IImageFileFormat<Cp8GrayFile>.ToRawImage(Cp8GrayFile file) => ToRawImage(file);
-  static byte[] IImageFileFormat<Cp8GrayFile>.ToBytes(Cp8GrayFile file) => Cp8GrayWriter.ToBytes(file);
+  static string IImageFormatMetadata<Cp8GrayFile>.PrimaryExtension => ".cp8";
+  static string[] IImageFormatMetadata<Cp8GrayFile>.FileExtensions => [".cp8"];
+  static Cp8GrayFile IImageFormatReader<Cp8GrayFile>.FromSpan(ReadOnlySpan<byte> data) => Cp8GrayReader.FromSpan(data);
+  static byte[] IImageFormatWriter<Cp8GrayFile>.ToBytes(Cp8GrayFile file) => Cp8GrayWriter.ToBytes(file);
 
   public int Width { get; init; }
   public int Height { get; init; }
 
   /// <summary>Raw 8-bit grayscale pixel data.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(Cp8GrayFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     var pixelCount = file.Width * file.Height;
     var rgb = new byte[pixelCount * 3];
     for (var i = 0; i < pixelCount; ++i) {
@@ -40,5 +35,4 @@ public sealed class Cp8GrayFile : IImageFileFormat<Cp8GrayFile> {
     };
   }
 
-  public static Cp8GrayFile FromRawImage(RawImage image) => throw new NotSupportedException("CP8 writing from raw image is not supported.");
 }

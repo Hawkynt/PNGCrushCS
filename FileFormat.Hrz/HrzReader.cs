@@ -3,11 +3,22 @@ using System.IO;
 
 namespace FileFormat.Hrz;
 
-/// <summary>Reads HRZ files from bytes, streams, or file paths.</summary>
+/// <summary>Reads HRZ files from spans, bytes, streams, or file paths.</summary>
 public static class HrzReader {
 
-  /// <summary>The exact file size of a valid HRZ image (256 x 240 x 3 bytes).</summary>
   private const int _EXPECTED_SIZE = 256 * 240 * 3;
+
+  public static HrzFile FromSpan(ReadOnlySpan<byte> data) {
+    if (data.Length != _EXPECTED_SIZE)
+      throw new InvalidDataException($"Invalid HRZ data size: expected exactly {_EXPECTED_SIZE} bytes, got {data.Length}.");
+
+    return new HrzFile { PixelData = data[.._EXPECTED_SIZE].ToArray() };
+  }
+
+  public static HrzFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
 
   public static HrzFile FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
@@ -27,18 +38,5 @@ public static class HrzReader {
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
     return FromBytes(ms.ToArray());
-  }
-
-  public static HrzFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
-    if (data.Length != _EXPECTED_SIZE)
-      throw new InvalidDataException($"Invalid HRZ data size: expected exactly {_EXPECTED_SIZE} bytes, got {data.Length}.");
-
-    var pixelData = new byte[_EXPECTED_SIZE];
-    data.AsSpan(0, _EXPECTED_SIZE).CopyTo(pixelData);
-
-    return new HrzFile {
-      PixelData = pixelData
-    };
   }
 }

@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.PaintMagic;
 
 /// <summary>In-memory representation of a Paint Magic C64 multicolor image (Koala layout).</summary>
-public sealed class PaintMagicFile : IImageFileFormat<PaintMagicFile> {
+public readonly record struct PaintMagicFile : IImageFormatReader<PaintMagicFile>, IImageToRawImage<PaintMagicFile>, IImageFormatWriter<PaintMagicFile> {
 
-  static string IImageFileFormat<PaintMagicFile>.PrimaryExtension => ".pmg";
-  static string[] IImageFileFormat<PaintMagicFile>.FileExtensions => [".pmg"];
-  static PaintMagicFile IImageFileFormat<PaintMagicFile>.FromFile(FileInfo file) => PaintMagicReader.FromFile(file);
-  static PaintMagicFile IImageFileFormat<PaintMagicFile>.FromBytes(byte[] data) => PaintMagicReader.FromBytes(data);
-  static PaintMagicFile IImageFileFormat<PaintMagicFile>.FromStream(Stream stream) => PaintMagicReader.FromStream(stream);
-  static byte[] IImageFileFormat<PaintMagicFile>.ToBytes(PaintMagicFile file) => PaintMagicWriter.ToBytes(file);
+  static string IImageFormatMetadata<PaintMagicFile>.PrimaryExtension => ".pmg";
+  static string[] IImageFormatMetadata<PaintMagicFile>.FileExtensions => [".pmg"];
+  static PaintMagicFile IImageFormatReader<PaintMagicFile>.FromSpan(ReadOnlySpan<byte> data) => PaintMagicReader.FromSpan(data);
+  static byte[] IImageFormatWriter<PaintMagicFile>.ToBytes(PaintMagicFile file) => PaintMagicWriter.ToBytes(file);
 
   /// <summary>The fixed width of a Paint Magic image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -44,20 +41,19 @@ public sealed class PaintMagicFile : IImageFileFormat<PaintMagicFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Multicolor bitmap data (8000 bytes).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Video matrix / screen RAM (1000 bytes).</summary>
-  public byte[] VideoMatrix { get; init; } = [];
+  public byte[] VideoMatrix { get; init; }
 
   /// <summary>Color RAM (1000 bytes).</summary>
-  public byte[] ColorRam { get; init; } = [];
+  public byte[] ColorRam { get; init; }
 
   /// <summary>Background color index (0-15).</summary>
   public byte BackgroundColor { get; init; }
 
   /// <summary>Converts this Paint Magic image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(PaintMagicFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -96,9 +92,4 @@ public sealed class PaintMagicFile : IImageFileFormat<PaintMagicFile> {
     };
   }
 
-  /// <summary>Not supported.</summary>
-  public static PaintMagicFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to PaintMagicFile is not supported due to complex cell-based color constraints.");
-  }
 }

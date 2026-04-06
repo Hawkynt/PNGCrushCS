@@ -1,19 +1,16 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.AppleShr;
 
 /// <summary>In-memory representation of an Apple IIgs Super Hi-Res image.</summary>
-public sealed class AppleShrFile : IImageFileFormat<AppleShrFile> {
+public readonly record struct AppleShrFile : IImageFormatReader<AppleShrFile>, IImageToRawImage<AppleShrFile>, IImageFormatWriter<AppleShrFile> {
 
-  static string IImageFileFormat<AppleShrFile>.PrimaryExtension => ".shr";
-  static string[] IImageFileFormat<AppleShrFile>.FileExtensions => [".shr"];
-  static FormatCapability IImageFileFormat<AppleShrFile>.Capabilities => FormatCapability.IndexedOnly;
-  static AppleShrFile IImageFileFormat<AppleShrFile>.FromFile(FileInfo file) => AppleShrReader.FromFile(file);
-  static AppleShrFile IImageFileFormat<AppleShrFile>.FromBytes(byte[] data) => AppleShrReader.FromBytes(data);
-  static AppleShrFile IImageFileFormat<AppleShrFile>.FromStream(Stream stream) => AppleShrReader.FromStream(stream);
-  static byte[] IImageFileFormat<AppleShrFile>.ToBytes(AppleShrFile file) => AppleShrWriter.ToBytes(file);
+  static string IImageFormatMetadata<AppleShrFile>.PrimaryExtension => ".shr";
+  static string[] IImageFormatMetadata<AppleShrFile>.FileExtensions => [".shr"];
+  static AppleShrFile IImageFormatReader<AppleShrFile>.FromSpan(ReadOnlySpan<byte> data) => AppleShrReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<AppleShrFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<AppleShrFile>.ToBytes(AppleShrFile file) => AppleShrWriter.ToBytes(file);
 
   /// <summary>The fixed width of a Super Hi-Res image in pixels (320 mode).</summary>
   public const int FixedWidth = 320;
@@ -43,17 +40,16 @@ public sealed class AppleShrFile : IImageFileFormat<AppleShrFile> {
   public int Height => FixedHeight;
 
   /// <summary>Pixel data (32000 bytes, 4bpp packed, 2 pixels per byte, 160 bytes per row).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Scanline control bytes (200 bytes, 1 per scanline, low nibble selects palette 0-15).</summary>
-  public byte[] ScanlineControl { get; init; } = [];
+  public byte[] ScanlineControl { get; init; }
 
   /// <summary>Palette data (512 bytes, 16 palettes x 16 entries x 2 bytes, 0RGB 4 bits each).</summary>
-  public byte[] Palette { get; init; } = [];
+  public byte[] Palette { get; init; }
 
   /// <summary>Converts this Apple IIgs SHR image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(AppleShrFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -93,9 +89,4 @@ public sealed class AppleShrFile : IImageFileFormat<AppleShrFile> {
     };
   }
 
-  /// <summary>Not supported. Apple IIgs SHR images have complex per-scanline palette constraints.</summary>
-  public static AppleShrFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to AppleShrFile is not supported due to per-scanline palette constraints.");
-  }
 }

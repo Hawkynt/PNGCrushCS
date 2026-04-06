@@ -26,6 +26,8 @@ public static class C128VDCReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static C128VDCFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static C128VDCFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != C128VDCFile.ExpectedFileSize)

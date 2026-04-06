@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.KoalaCompressed;
 
 /// <summary>In-memory representation of a Commodore 64 compressed Koala multicolor image.</summary>
-public sealed class KoalaCompressedFile : IImageFileFormat<KoalaCompressedFile> {
+public readonly record struct KoalaCompressedFile : IImageFormatReader<KoalaCompressedFile>, IImageToRawImage<KoalaCompressedFile>, IImageFormatWriter<KoalaCompressedFile> {
 
-  static string IImageFileFormat<KoalaCompressedFile>.PrimaryExtension => ".gg";
-  static string[] IImageFileFormat<KoalaCompressedFile>.FileExtensions => [".gg"];
-  static KoalaCompressedFile IImageFileFormat<KoalaCompressedFile>.FromFile(FileInfo file) => KoalaCompressedReader.FromFile(file);
-  static KoalaCompressedFile IImageFileFormat<KoalaCompressedFile>.FromBytes(byte[] data) => KoalaCompressedReader.FromBytes(data);
-  static KoalaCompressedFile IImageFileFormat<KoalaCompressedFile>.FromStream(Stream stream) => KoalaCompressedReader.FromStream(stream);
-  static byte[] IImageFileFormat<KoalaCompressedFile>.ToBytes(KoalaCompressedFile file) => KoalaCompressedWriter.ToBytes(file);
+  static string IImageFormatMetadata<KoalaCompressedFile>.PrimaryExtension => ".gg";
+  static string[] IImageFormatMetadata<KoalaCompressedFile>.FileExtensions => [".gg"];
+  static KoalaCompressedFile IImageFormatReader<KoalaCompressedFile>.FromSpan(ReadOnlySpan<byte> data) => KoalaCompressedReader.FromSpan(data);
+  static byte[] IImageFormatWriter<KoalaCompressedFile>.ToBytes(KoalaCompressedFile file) => KoalaCompressedWriter.ToBytes(file);
 
   /// <summary>The fixed width of a Koala image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -58,20 +55,19 @@ public sealed class KoalaCompressedFile : IImageFileFormat<KoalaCompressedFile> 
   public ushort LoadAddress { get; init; }
 
   /// <summary>Multicolor bitmap data (8000 bytes, 2 bits per pixel).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Video matrix / screen RAM (1000 bytes, upper/lower nybble = 2 colors per cell).</summary>
-  public byte[] VideoMatrix { get; init; } = [];
+  public byte[] VideoMatrix { get; init; }
 
   /// <summary>Color RAM (1000 bytes, lower nybble = 3rd color per cell).</summary>
-  public byte[] ColorRam { get; init; } = [];
+  public byte[] ColorRam { get; init; }
 
   /// <summary>Background color index (0-15).</summary>
   public byte BackgroundColor { get; init; }
 
   /// <summary>Converts this compressed Koala image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(KoalaCompressedFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -110,9 +106,4 @@ public sealed class KoalaCompressedFile : IImageFileFormat<KoalaCompressedFile> 
     };
   }
 
-  /// <summary>Not supported. Compressed Koala images have complex cell-based color constraints.</summary>
-  public static KoalaCompressedFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to KoalaCompressedFile is not supported due to complex cell-based color constraints.");
-  }
 }

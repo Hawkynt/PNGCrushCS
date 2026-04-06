@@ -28,6 +28,8 @@ public static class FarbfeldReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static FarbfeldFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static FarbfeldFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < FarbfeldHeader.StructSize)

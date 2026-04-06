@@ -41,25 +41,6 @@ public class BrooktroutFaxReaderTests {
 }
 
 [TestFixture]
-public class BrooktroutFaxWriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => BrooktroutFaxWriter.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_IncludesHeader() {
-    var file = new BrooktroutFaxFile {
-      Width = 1728,
-      Height = 2200,
-      PixelData = new byte[(1728 + 7) / 8 * 2200],
-    };
-    var bytes = BrooktroutFaxWriter.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(32 + (1728 + 7) / 8 * 2200));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -90,30 +71,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void HeaderSize_Is32()
-    => Assert.That(BrooktroutFaxFile.HeaderSize, Is.EqualTo(32));
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => BrooktroutFaxFile.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => BrooktroutFaxFile.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 1728, Height = 2200, Format = PixelFormat.Rgb24, PixelData = new byte[1728 * 2200 * 3] };
-    Assert.Throws<ArgumentException>(() => BrooktroutFaxFile.FromRawImage(raw));
-  }
-
-  [Test]
-  public void FileExtensions_ContainsPrimary() {
-    string[] exts = [".brk", ".301"];
-    Assert.That(exts, Does.Contain(".brk"));
-  }
-}

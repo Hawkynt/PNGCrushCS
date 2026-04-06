@@ -26,6 +26,8 @@ public static class AtariHrReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static AtariHrFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AtariHrFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < AtariHrFile.FileSize)

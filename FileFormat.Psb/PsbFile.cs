@@ -1,37 +1,33 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Psb;
 
 /// <summary>In-memory representation of a PSB (Photoshop Big) image (flat composite only).</summary>
 [FormatDetectionPriority(50)]
-public sealed class PsbFile : IImageFileFormat<PsbFile> {
+public readonly record struct PsbFile : IImageFormatReader<PsbFile>, IImageToRawImage<PsbFile>, IImageFromRawImage<PsbFile>, IImageFormatWriter<PsbFile> {
 
-  static string IImageFileFormat<PsbFile>.PrimaryExtension => ".psb";
-  static string[] IImageFileFormat<PsbFile>.FileExtensions => [".psb"];
+  static string IImageFormatMetadata<PsbFile>.PrimaryExtension => ".psb";
+  static string[] IImageFormatMetadata<PsbFile>.FileExtensions => [".psb"];
+  static PsbFile IImageFormatReader<PsbFile>.FromSpan(ReadOnlySpan<byte> data) => PsbReader.FromSpan(data);
 
-  static bool? IImageFileFormat<PsbFile>.MatchesSignature(ReadOnlySpan<byte> header)
+  static bool? IImageFormatMetadata<PsbFile>.MatchesSignature(ReadOnlySpan<byte> header)
     => header.Length >= 6 && header[0] == 0x38 && header[1] == 0x42 && header[2] == 0x50 && header[3] == 0x53
       && header[4] == 0x00 && header[5] == 0x02
       ? true : null;
 
-  static PsbFile IImageFileFormat<PsbFile>.FromFile(FileInfo file) => PsbReader.FromFile(file);
-  static PsbFile IImageFileFormat<PsbFile>.FromBytes(byte[] data) => PsbReader.FromBytes(data);
-  static PsbFile IImageFileFormat<PsbFile>.FromStream(Stream stream) => PsbReader.FromStream(stream);
-  static byte[] IImageFileFormat<PsbFile>.ToBytes(PsbFile file) => PsbWriter.ToBytes(file);
+  static byte[] IImageFormatWriter<PsbFile>.ToBytes(PsbFile file) => PsbWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
   public int Channels { get; init; }
   public int Depth { get; init; }
   public PsbColorMode ColorMode { get; init; }
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
   public byte[]? Palette { get; init; }
   public byte[]? ImageResources { get; init; }
   public byte[]? LayerMaskInfo { get; init; }
 
   public static RawImage ToRawImage(PsbFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     if (file.Depth != 8)
       throw new NotSupportedException($"Only Depth=8 is supported, got {file.Depth}.");
 

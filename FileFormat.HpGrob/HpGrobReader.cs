@@ -25,6 +25,8 @@ public static class HpGrobReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static HpGrobFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static HpGrobFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < HpGrobFile.HeaderSize)

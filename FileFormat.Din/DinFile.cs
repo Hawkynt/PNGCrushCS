@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Din;
 
 /// <summary>In-memory representation of a C64 Din (.din) multicolor art image.</summary>
-public sealed class DinFile : IImageFileFormat<DinFile> {
+public readonly record struct DinFile : IImageFormatReader<DinFile>, IImageToRawImage<DinFile>, IImageFormatWriter<DinFile> {
 
-  static string IImageFileFormat<DinFile>.PrimaryExtension => ".din";
-  static string[] IImageFileFormat<DinFile>.FileExtensions => [".din"];
-  static DinFile IImageFileFormat<DinFile>.FromFile(FileInfo file) => DinReader.FromFile(file);
-  static DinFile IImageFileFormat<DinFile>.FromBytes(byte[] data) => DinReader.FromBytes(data);
-  static DinFile IImageFileFormat<DinFile>.FromStream(Stream stream) => DinReader.FromStream(stream);
-  static byte[] IImageFileFormat<DinFile>.ToBytes(DinFile file) => DinWriter.ToBytes(file);
+  static string IImageFormatMetadata<DinFile>.PrimaryExtension => ".din";
+  static string[] IImageFormatMetadata<DinFile>.FileExtensions => [".din"];
+  static DinFile IImageFormatReader<DinFile>.FromSpan(ReadOnlySpan<byte> data) => DinReader.FromSpan(data);
+  static byte[] IImageFormatWriter<DinFile>.ToBytes(DinFile file) => DinWriter.ToBytes(file);
 
   /// <summary>Size of the bitmap data section in bytes.</summary>
   internal const int BitmapDataSize = 8000;
@@ -46,23 +43,22 @@ public sealed class DinFile : IImageFileFormat<DinFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Bitmap data (8000 bytes).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Screen RAM / video matrix (1000 bytes).</summary>
-  public byte[] ScreenData { get; init; } = [];
+  public byte[] ScreenData { get; init; }
 
   /// <summary>Color RAM (1000 bytes).</summary>
-  public byte[] ColorData { get; init; } = [];
+  public byte[] ColorData { get; init; }
 
   /// <summary>Background color index (0-15). Bit-pair 0 maps to this color.</summary>
   public byte BackgroundColor { get; init; }
 
   /// <summary>Any trailing bytes beyond the minimum payload.</summary>
-  public byte[] TrailingData { get; init; } = [];
+  public byte[] TrailingData { get; init; }
 
   /// <summary>Converts this Din image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(DinFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = ImageWidth;
     const int height = ImageHeight;
@@ -101,6 +97,4 @@ public sealed class DinFile : IImageFileFormat<DinFile> {
     };
   }
 
-  /// <summary>Creates a Din image from a <see cref="RawImage"/>. Not supported.</summary>
-  public static DinFile FromRawImage(RawImage image) => throw new NotSupportedException("Creating Din files from raw images is not supported.");
 }

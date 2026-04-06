@@ -41,25 +41,6 @@ public class KofaxKfxReaderTests {
 }
 
 [TestFixture]
-public class KofaxKfxWriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => KofaxKfxWriter.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_IncludesHeader() {
-    var file = new KofaxKfxFile {
-      Width = 1728,
-      Height = 2200,
-      PixelData = new byte[(1728 + 7) / 8 * 2200],
-    };
-    var bytes = KofaxKfxWriter.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(16 + (1728 + 7) / 8 * 2200));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -90,30 +71,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void HeaderSize_Is16()
-    => Assert.That(KofaxKfxFile.HeaderSize, Is.EqualTo(16));
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => KofaxKfxFile.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => KofaxKfxFile.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 1728, Height = 2200, Format = PixelFormat.Rgb24, PixelData = new byte[1728 * 2200 * 3] };
-    Assert.Throws<ArgumentException>(() => KofaxKfxFile.FromRawImage(raw));
-  }
-
-  [Test]
-  public void FileExtensions_ContainsPrimary() {
-    string[] exts = [".kfx"];
-    Assert.That(exts, Does.Contain(".kfx"));
-  }
-}

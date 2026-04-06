@@ -37,6 +37,8 @@ public static class MpoReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static MpoFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static MpoFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MIN_SIZE)

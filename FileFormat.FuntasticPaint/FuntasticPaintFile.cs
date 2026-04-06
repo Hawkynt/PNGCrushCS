@@ -1,11 +1,10 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.FuntasticPaint;
 
 /// <summary>In-memory representation of a Fun*tastic Paint (Atari 8-bit GTIA 16-shade) image (80x192).</summary>
-public sealed class FuntasticPaintFile : IImageFileFormat<FuntasticPaintFile> {
+public readonly record struct FuntasticPaintFile : IImageFormatReader<FuntasticPaintFile>, IImageToRawImage<FuntasticPaintFile>, IImageFromRawImage<FuntasticPaintFile>, IImageFormatWriter<FuntasticPaintFile> {
 
   /// <summary>The exact file size: 40 bytes/line x 192 lines.</summary>
   public const int ExpectedFileSize = 7680;
@@ -19,13 +18,11 @@ public sealed class FuntasticPaintFile : IImageFileFormat<FuntasticPaintFile> {
   /// <summary>Bytes per scanline (2 pixels per byte, 80/2 = 40).</summary>
   internal const int BytesPerRow = 40;
 
-  static string IImageFileFormat<FuntasticPaintFile>.PrimaryExtension => ".fun8";
-  static string[] IImageFileFormat<FuntasticPaintFile>.FileExtensions => [".fun8", ".ftp"];
-  static FormatCapability IImageFileFormat<FuntasticPaintFile>.Capabilities => FormatCapability.IndexedOnly;
-  static FuntasticPaintFile IImageFileFormat<FuntasticPaintFile>.FromFile(FileInfo file) => FuntasticPaintReader.FromFile(file);
-  static FuntasticPaintFile IImageFileFormat<FuntasticPaintFile>.FromBytes(byte[] data) => FuntasticPaintReader.FromBytes(data);
-  static FuntasticPaintFile IImageFileFormat<FuntasticPaintFile>.FromStream(Stream stream) => FuntasticPaintReader.FromStream(stream);
-  static byte[] IImageFileFormat<FuntasticPaintFile>.ToBytes(FuntasticPaintFile file) => FuntasticPaintWriter.ToBytes(file);
+  static string IImageFormatMetadata<FuntasticPaintFile>.PrimaryExtension => ".fun8";
+  static string[] IImageFormatMetadata<FuntasticPaintFile>.FileExtensions => [".fun8", ".ftp"];
+  static FuntasticPaintFile IImageFormatReader<FuntasticPaintFile>.FromSpan(ReadOnlySpan<byte> data) => FuntasticPaintReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<FuntasticPaintFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<FuntasticPaintFile>.ToBytes(FuntasticPaintFile file) => FuntasticPaintWriter.ToBytes(file);
 
   /// <summary>Always 80.</summary>
   public int Width => FixedWidth;
@@ -34,11 +31,10 @@ public sealed class FuntasticPaintFile : IImageFileFormat<FuntasticPaintFile> {
   public int Height => FixedHeight;
 
   /// <summary>Raw pixel data (7680 bytes, 2 pixels per byte as high/low nybbles, 40 bytes per row, 192 rows).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this image to a platform-independent <see cref="RawImage"/> in Gray8 format.</summary>
   public static RawImage ToRawImage(FuntasticPaintFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var gray = new byte[FixedWidth * FixedHeight];
 

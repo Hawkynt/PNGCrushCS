@@ -25,6 +25,8 @@ public static class QuakeLmpReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static QuakeLmpFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static QuakeLmpFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < QuakeLmpFile.HeaderSize)

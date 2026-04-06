@@ -26,6 +26,8 @@ public static class RainbowPainterReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static RainbowPainterFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static RainbowPainterFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < RainbowPainterFile.ExpectedFileSize)

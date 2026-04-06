@@ -1,18 +1,15 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Dng;
 
 /// <summary>In-memory representation of a DNG (Adobe Digital Negative) image.</summary>
-public sealed class DngFile : IImageFileFormat<DngFile> {
+public sealed class DngFile : IImageFormatReader<DngFile>, IImageToRawImage<DngFile>, IImageFromRawImage<DngFile>, IImageFormatWriter<DngFile> {
 
-  static string IImageFileFormat<DngFile>.PrimaryExtension => ".dng";
-  static string[] IImageFileFormat<DngFile>.FileExtensions => [".dng"];
-  static DngFile IImageFileFormat<DngFile>.FromFile(FileInfo file) => DngReader.FromFile(file);
-  static DngFile IImageFileFormat<DngFile>.FromBytes(byte[] data) => DngReader.FromBytes(data);
-  static DngFile IImageFileFormat<DngFile>.FromStream(Stream stream) => DngReader.FromStream(stream);
-  static byte[] IImageFileFormat<DngFile>.ToBytes(DngFile file) => DngWriter.ToBytes(file);
+  static string IImageFormatMetadata<DngFile>.PrimaryExtension => ".dng";
+  static string[] IImageFormatMetadata<DngFile>.FileExtensions => [".dng"];
+  static DngFile IImageFormatReader<DngFile>.FromSpan(ReadOnlySpan<byte> data) => DngReader.FromSpan(data);
+  static byte[] IImageFormatWriter<DngFile>.ToBytes(DngFile file) => DngWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }

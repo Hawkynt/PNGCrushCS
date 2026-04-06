@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.SuperHiresEditor;
 
 /// <summary>In-memory representation of a C64 Super Hires Editor (.she) interlace hires image.</summary>
-public sealed class SuperHiresEditorFile : IImageFileFormat<SuperHiresEditorFile> {
+public readonly record struct SuperHiresEditorFile : IImageFormatReader<SuperHiresEditorFile>, IImageToRawImage<SuperHiresEditorFile>, IImageFormatWriter<SuperHiresEditorFile> {
 
-  static string IImageFileFormat<SuperHiresEditorFile>.PrimaryExtension => ".she";
-  static string[] IImageFileFormat<SuperHiresEditorFile>.FileExtensions => [".she"];
-  static SuperHiresEditorFile IImageFileFormat<SuperHiresEditorFile>.FromFile(FileInfo file) => SuperHiresEditorReader.FromFile(file);
-  static SuperHiresEditorFile IImageFileFormat<SuperHiresEditorFile>.FromBytes(byte[] data) => SuperHiresEditorReader.FromBytes(data);
-  static SuperHiresEditorFile IImageFileFormat<SuperHiresEditorFile>.FromStream(Stream stream) => SuperHiresEditorReader.FromStream(stream);
-  static byte[] IImageFileFormat<SuperHiresEditorFile>.ToBytes(SuperHiresEditorFile file) => SuperHiresEditorWriter.ToBytes(file);
+  static string IImageFormatMetadata<SuperHiresEditorFile>.PrimaryExtension => ".she";
+  static string[] IImageFormatMetadata<SuperHiresEditorFile>.FileExtensions => [".she"];
+  static SuperHiresEditorFile IImageFormatReader<SuperHiresEditorFile>.FromSpan(ReadOnlySpan<byte> data) => SuperHiresEditorReader.FromSpan(data);
+  static byte[] IImageFormatWriter<SuperHiresEditorFile>.ToBytes(SuperHiresEditorFile file) => SuperHiresEditorWriter.ToBytes(file);
 
   /// <summary>Size of one bitmap section in bytes (320x200 / 8 = 8000).</summary>
   internal const int BitmapDataSize = 8000;
@@ -43,23 +40,22 @@ public sealed class SuperHiresEditorFile : IImageFileFormat<SuperHiresEditorFile
   public ushort LoadAddress { get; init; }
 
   /// <summary>Bitmap data for frame 1 (8000 bytes).</summary>
-  public byte[] Bitmap1 { get; init; } = [];
+  public byte[] Bitmap1 { get; init; }
 
   /// <summary>Screen RAM for frame 1 (1000 bytes).</summary>
-  public byte[] Screen1 { get; init; } = [];
+  public byte[] Screen1 { get; init; }
 
   /// <summary>Bitmap data for frame 2 (8000 bytes).</summary>
-  public byte[] Bitmap2 { get; init; } = [];
+  public byte[] Bitmap2 { get; init; }
 
   /// <summary>Screen RAM for frame 2 (1000 bytes).</summary>
-  public byte[] Screen2 { get; init; } = [];
+  public byte[] Screen2 { get; init; }
 
   /// <summary>Any trailing bytes beyond the minimum payload.</summary>
-  public byte[] TrailingData { get; init; } = [];
+  public byte[] TrailingData { get; init; }
 
   /// <summary>Converts this Super Hires Editor image to a platform-independent <see cref="RawImage"/> in Rgb24 format by averaging the two interlace frames.</summary>
   public static RawImage ToRawImage(SuperHiresEditorFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = ImageWidth;
     const int height = ImageHeight;
@@ -88,9 +84,6 @@ public sealed class SuperHiresEditorFile : IImageFileFormat<SuperHiresEditorFile
       PixelData = rgb,
     };
   }
-
-  /// <summary>Creates a Super Hires Editor image from a <see cref="RawImage"/>. Not supported.</summary>
-  public static SuperHiresEditorFile FromRawImage(RawImage image) => throw new NotSupportedException("Creating Super Hires Editor files from raw images is not supported.");
 
   /// <summary>Decodes a single hires pixel from bitmap + screen data and returns the C64 palette color as 0xRRGGBB.</summary>
   private static int _DecodeHiresPixel(byte[] bitmap, byte[] screen, int x, int y) {

@@ -26,6 +26,8 @@ public static class PagefoxReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static PagefoxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static PagefoxFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < PagefoxFile.ExpectedFileSize)

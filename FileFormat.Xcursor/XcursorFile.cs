@@ -1,19 +1,16 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Xcursor;
 
 /// <summary>In-memory representation of an Xcursor (X11 cursor theme) image.</summary>
 [FormatMagicBytes([0x58, 0x63, 0x75, 0x72])]
-public sealed class XcursorFile : IImageFileFormat<XcursorFile> {
+public readonly record struct XcursorFile : IImageFormatReader<XcursorFile>, IImageToRawImage<XcursorFile>, IImageFromRawImage<XcursorFile>, IImageFormatWriter<XcursorFile> {
 
-  static string IImageFileFormat<XcursorFile>.PrimaryExtension => ".xcur";
-  static string[] IImageFileFormat<XcursorFile>.FileExtensions => [".xcur", ".cursor"];
-  static XcursorFile IImageFileFormat<XcursorFile>.FromFile(FileInfo file) => XcursorReader.FromFile(file);
-  static XcursorFile IImageFileFormat<XcursorFile>.FromBytes(byte[] data) => XcursorReader.FromBytes(data);
-  static XcursorFile IImageFileFormat<XcursorFile>.FromStream(Stream stream) => XcursorReader.FromStream(stream);
-  static byte[] IImageFileFormat<XcursorFile>.ToBytes(XcursorFile file) => XcursorWriter.ToBytes(file);
+  static string IImageFormatMetadata<XcursorFile>.PrimaryExtension => ".xcur";
+  static string[] IImageFormatMetadata<XcursorFile>.FileExtensions => [".xcur", ".cursor"];
+  static XcursorFile IImageFormatReader<XcursorFile>.FromSpan(ReadOnlySpan<byte> data) => XcursorReader.FromSpan(data);
+  static byte[] IImageFormatWriter<XcursorFile>.ToBytes(XcursorFile file) => XcursorWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -34,11 +31,10 @@ public sealed class XcursorFile : IImageFileFormat<XcursorFile> {
   public int Delay { get; init; }
 
   /// <summary>Raw ARGB pixel data with premultiplied alpha (4 bytes per pixel, little-endian uint32 ARGB).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts the Xcursor image to a platform-independent <see cref="RawImage"/> with straight (unpremultiplied) alpha.</summary>
   public static RawImage ToRawImage(XcursorFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var pixelCount = file.Width * file.Height;
     var rgba = new byte[pixelCount * 4];

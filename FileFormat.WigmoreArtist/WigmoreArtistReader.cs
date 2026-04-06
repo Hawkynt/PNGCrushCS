@@ -26,6 +26,8 @@ public static class WigmoreArtistReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static WigmoreArtistFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static WigmoreArtistFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < WigmoreArtistFile.LoadAddressSize + WigmoreArtistFile.MinPayloadSize)

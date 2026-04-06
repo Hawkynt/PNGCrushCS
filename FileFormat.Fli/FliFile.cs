@@ -1,17 +1,17 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Fli;
 
 /// <summary>In-memory representation of a FLI/FLC animation file.</summary>
-public sealed class FliFile : IImageFileFormat<FliFile>, IMultiImageFileFormat<FliFile> {
+public sealed class FliFile : IImageFormatReader<FliFile>, IImageToRawImage<FliFile>, IImageFormatWriter<FliFile>, IMultiImageFileFormat<FliFile> {
 
-  static string IImageFileFormat<FliFile>.PrimaryExtension => ".fli";
-  static string[] IImageFileFormat<FliFile>.FileExtensions => [".fli", ".flc"];
+  static string IImageFormatMetadata<FliFile>.PrimaryExtension => ".fli";
+  static string[] IImageFormatMetadata<FliFile>.FileExtensions => [".fli", ".flc"];
+  static FliFile IImageFormatReader<FliFile>.FromSpan(ReadOnlySpan<byte> data) => FliReader.FromSpan(data);
 
-  static bool? IImageFileFormat<FliFile>.MatchesSignature(ReadOnlySpan<byte> header) {
+  static bool? IImageFormatMetadata<FliFile>.MatchesSignature(ReadOnlySpan<byte> header) {
     if (header.Length < 6)
       return null;
     if (header[4] == 0x11 && header[5] == 0xAF)
@@ -21,11 +21,8 @@ public sealed class FliFile : IImageFileFormat<FliFile>, IMultiImageFileFormat<F
     return null;
   }
 
-  static FormatCapability IImageFileFormat<FliFile>.Capabilities => FormatCapability.VariableResolution | FormatCapability.MultiImage;
-  static FliFile IImageFileFormat<FliFile>.FromFile(FileInfo file) => FliReader.FromFile(file);
-  static FliFile IImageFileFormat<FliFile>.FromBytes(byte[] data) => FliReader.FromBytes(data);
-  static FliFile IImageFileFormat<FliFile>.FromStream(Stream stream) => FliReader.FromStream(stream);
-  static byte[] IImageFileFormat<FliFile>.ToBytes(FliFile file) => FliWriter.ToBytes(file);
+  static FormatCapability IImageFormatMetadata<FliFile>.Capabilities => FormatCapability.VariableResolution | FormatCapability.MultiImage;
+  static byte[] IImageFormatWriter<FliFile>.ToBytes(FliFile file) => FliWriter.ToBytes(file);
   public short Width { get; init; }
   public short Height { get; init; }
   public short FrameCount { get; init; }
@@ -90,9 +87,6 @@ public sealed class FliFile : IImageFileFormat<FliFile>, IMultiImageFileFormat<F
           break;
       }
   }
-
-  /// <summary>FLI encoding is not supported due to its frame-differencing complexity.</summary>
-  public static FliFile FromRawImage(RawImage image) => throw new NotSupportedException("FLI encoding from a single raw image is not supported.");
 
   private static byte[] _BuildDefaultPalette() {
     var palette = new byte[768];

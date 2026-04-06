@@ -27,6 +27,8 @@ public static class MtvReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static MtvFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static MtvFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
 

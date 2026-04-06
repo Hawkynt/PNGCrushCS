@@ -1,11 +1,10 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Interlace8;
 
 /// <summary>In-memory representation of an Atari Interlace Mode image (320x192, 2 frames combined).</summary>
-public sealed class Interlace8File : IImageFileFormat<Interlace8File> {
+public readonly record struct Interlace8File : IImageFormatReader<Interlace8File>, IImageToRawImage<Interlace8File>, IImageFormatWriter<Interlace8File> {
 
   /// <summary>The size of one frame in bytes (40 bytes/line x 192 lines).</summary>
   public const int FrameSize = 7680;
@@ -22,12 +21,10 @@ public sealed class Interlace8File : IImageFileFormat<Interlace8File> {
   /// <summary>Bytes per scanline per frame (320 pixels / 8 bits per pixel = 40).</summary>
   internal const int BytesPerRow = 40;
 
-  static string IImageFileFormat<Interlace8File>.PrimaryExtension => ".int8";
-  static string[] IImageFileFormat<Interlace8File>.FileExtensions => [".int8"];
-  static Interlace8File IImageFileFormat<Interlace8File>.FromFile(FileInfo file) => Interlace8Reader.FromFile(file);
-  static Interlace8File IImageFileFormat<Interlace8File>.FromBytes(byte[] data) => Interlace8Reader.FromBytes(data);
-  static Interlace8File IImageFileFormat<Interlace8File>.FromStream(Stream stream) => Interlace8Reader.FromStream(stream);
-  static byte[] IImageFileFormat<Interlace8File>.ToBytes(Interlace8File file) => Interlace8Writer.ToBytes(file);
+  static string IImageFormatMetadata<Interlace8File>.PrimaryExtension => ".int8";
+  static string[] IImageFormatMetadata<Interlace8File>.FileExtensions => [".int8"];
+  static Interlace8File IImageFormatReader<Interlace8File>.FromSpan(ReadOnlySpan<byte> data) => Interlace8Reader.FromSpan(data);
+  static byte[] IImageFormatWriter<Interlace8File>.ToBytes(Interlace8File file) => Interlace8Writer.ToBytes(file);
 
   /// <summary>Always 320.</summary>
   public int Width => FixedWidth;
@@ -36,17 +33,16 @@ public sealed class Interlace8File : IImageFileFormat<Interlace8File> {
   public int Height => FixedHeight;
 
   /// <summary>First frame pixel data (7680 bytes, 1bpp, 40 bytes per row, 192 rows).</summary>
-  public byte[] Frame1Data { get; init; } = [];
+  public byte[] Frame1Data { get; init; }
 
   /// <summary>Second frame pixel data (7680 bytes, 1bpp, 40 bytes per row, 192 rows).</summary>
-  public byte[] Frame2Data { get; init; } = [];
+  public byte[] Frame2Data { get; init; }
 
   /// <summary>Converts this interlace image to a platform-independent <see cref="RawImage"/> in Gray8 format.</summary>
   /// <remarks>
   /// Both frames on = white (255), frame 1 only = light gray (170), frame 2 only = dark gray (85), neither = black (0).
   /// </remarks>
   public static RawImage ToRawImage(Interlace8File file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var gray = new byte[FixedWidth * FixedHeight];
 
@@ -75,9 +71,4 @@ public sealed class Interlace8File : IImageFileFormat<Interlace8File> {
     };
   }
 
-  /// <summary>Not supported. Interlace images require two distinct frames that cannot be reconstructed from a single grayscale image without ambiguity.</summary>
-  public static Interlace8File FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to Interlace8File is not supported.");
-  }
 }

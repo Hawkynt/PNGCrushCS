@@ -1,12 +1,11 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.ColoRix;
 
 /// <summary>In-memory representation of a ColoRIX VGA paint image.</summary>
 [FormatMagicBytes([0x52, 0x49, 0x58, 0x33])]
-public sealed class ColoRixFile : IImageFileFormat<ColoRixFile> {
+public readonly record struct ColoRixFile : IImageFormatReader<ColoRixFile>, IImageToRawImage<ColoRixFile>, IImageFromRawImage<ColoRixFile>, IImageFormatWriter<ColoRixFile> {
 
   /// <summary>The VGA palette type marker (0xAF).</summary>
   internal const byte VgaPaletteType = 0xAF;
@@ -17,13 +16,11 @@ public sealed class ColoRixFile : IImageFileFormat<ColoRixFile> {
   /// <summary>Size of the file header in bytes.</summary>
   internal const int HeaderSize = 10;
 
-  static string IImageFileFormat<ColoRixFile>.PrimaryExtension => ".rix";
-  static string[] IImageFileFormat<ColoRixFile>.FileExtensions => [".rix", ".scx", ".sci"];
-  static FormatCapability IImageFileFormat<ColoRixFile>.Capabilities => FormatCapability.IndexedOnly;
-  static ColoRixFile IImageFileFormat<ColoRixFile>.FromFile(FileInfo file) => ColoRixReader.FromFile(file);
-  static ColoRixFile IImageFileFormat<ColoRixFile>.FromBytes(byte[] data) => ColoRixReader.FromBytes(data);
-  static ColoRixFile IImageFileFormat<ColoRixFile>.FromStream(Stream stream) => ColoRixReader.FromStream(stream);
-  static byte[] IImageFileFormat<ColoRixFile>.ToBytes(ColoRixFile file) => ColoRixWriter.ToBytes(file);
+  static string IImageFormatMetadata<ColoRixFile>.PrimaryExtension => ".rix";
+  static string[] IImageFormatMetadata<ColoRixFile>.FileExtensions => [".rix", ".scx", ".sci"];
+  static ColoRixFile IImageFormatReader<ColoRixFile>.FromSpan(ReadOnlySpan<byte> data) => ColoRixReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<ColoRixFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<ColoRixFile>.ToBytes(ColoRixFile file) => ColoRixWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -32,17 +29,16 @@ public sealed class ColoRixFile : IImageFileFormat<ColoRixFile> {
   public int Height { get; init; }
 
   /// <summary>VGA palette (768 bytes: 256 entries x 3 bytes, 6-bit values 0-63).</summary>
-  public byte[] Palette { get; init; } = [];
+  public byte[] Palette { get; init; }
 
   /// <summary>Pixel data (width * height bytes of 8-bit palette indices).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Storage type (uncompressed or RLE).</summary>
   public ColoRixCompression StorageType { get; init; }
 
   /// <summary>Converts a ColoRIX file to a <see cref="RawImage"/> with Indexed8 format and 8-bit expanded palette.</summary>
   public static RawImage ToRawImage(ColoRixFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var palette8Bit = new byte[PaletteSize];
     for (var i = 0; i < PaletteSize; ++i)

@@ -26,6 +26,8 @@ public static class DigiViewReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static DigiViewFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static DigiViewFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < DigiViewFile.HeaderSize)

@@ -1,20 +1,17 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.JpegXl;
 
 /// <summary>In-memory representation of a JPEG XL image.</summary>
-public sealed class JpegXlFile : IImageFileFormat<JpegXlFile> {
+public readonly record struct JpegXlFile : IImageFormatReader<JpegXlFile>, IImageToRawImage<JpegXlFile>, IImageFromRawImage<JpegXlFile>, IImageFormatWriter<JpegXlFile> {
 
-  static string IImageFileFormat<JpegXlFile>.PrimaryExtension => ".jxl";
-  static string[] IImageFileFormat<JpegXlFile>.FileExtensions => [".jxl"];
-  static JpegXlFile IImageFileFormat<JpegXlFile>.FromFile(FileInfo file) => JpegXlReader.FromFile(file);
-  static JpegXlFile IImageFileFormat<JpegXlFile>.FromBytes(byte[] data) => JpegXlReader.FromBytes(data);
-  static JpegXlFile IImageFileFormat<JpegXlFile>.FromStream(Stream stream) => JpegXlReader.FromStream(stream);
-  static byte[] IImageFileFormat<JpegXlFile>.ToBytes(JpegXlFile file) => JpegXlWriter.ToBytes(file);
+  static string IImageFormatMetadata<JpegXlFile>.PrimaryExtension => ".jxl";
+  static string[] IImageFormatMetadata<JpegXlFile>.FileExtensions => [".jxl"];
+  static JpegXlFile IImageFormatReader<JpegXlFile>.FromSpan(ReadOnlySpan<byte> data) => JpegXlReader.FromSpan(data);
+  static byte[] IImageFormatWriter<JpegXlFile>.ToBytes(JpegXlFile file) => JpegXlWriter.ToBytes(file);
 
-  static bool? IImageFileFormat<JpegXlFile>.MatchesSignature(ReadOnlySpan<byte> header) {
+  static bool? IImageFormatMetadata<JpegXlFile>.MatchesSignature(ReadOnlySpan<byte> header) {
     if (header.Length >= 2 && header[0] == 0xFF && header[1] == 0x0A)
       return true;
     if (header.Length >= 12 && header[4] == 0x66 && header[5] == 0x74 && header[6] == 0x79 && header[7] == 0x70
@@ -30,16 +27,15 @@ public sealed class JpegXlFile : IImageFileFormat<JpegXlFile> {
   public int Height { get; init; }
 
   /// <summary>Number of color components (1 for grayscale, 3 for RGB).</summary>
-  public int ComponentCount { get; init; } = 3;
+  public int ComponentCount { get; init; }
 
   /// <summary>Raw pixel data (Gray8 or Rgb24 layout).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>ISOBMFF brand string (default "jxl ").</summary>
-  public string Brand { get; init; } = "jxl ";
+  public string Brand { get; init; }
 
   public static RawImage ToRawImage(JpegXlFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

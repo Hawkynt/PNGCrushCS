@@ -25,6 +25,8 @@ public static class VividReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static VividFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static VividFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < VividFile.HeaderSize)

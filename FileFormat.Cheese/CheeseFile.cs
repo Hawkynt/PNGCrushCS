@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Cheese;
 
 /// <summary>In-memory representation of a Commodore 64 Cheese paint image.</summary>
-public sealed class CheeseFile : IImageFileFormat<CheeseFile> {
+public readonly record struct CheeseFile : IImageFormatReader<CheeseFile>, IImageToRawImage<CheeseFile>, IImageFormatWriter<CheeseFile> {
 
-  static string IImageFileFormat<CheeseFile>.PrimaryExtension => ".che";
-  static string[] IImageFileFormat<CheeseFile>.FileExtensions => [".che", ".chs"];
-  static CheeseFile IImageFileFormat<CheeseFile>.FromFile(FileInfo file) => CheeseReader.FromFile(file);
-  static CheeseFile IImageFileFormat<CheeseFile>.FromBytes(byte[] data) => CheeseReader.FromBytes(data);
-  static CheeseFile IImageFileFormat<CheeseFile>.FromStream(Stream stream) => CheeseReader.FromStream(stream);
-  static byte[] IImageFileFormat<CheeseFile>.ToBytes(CheeseFile file) => CheeseWriter.ToBytes(file);
+  static string IImageFormatMetadata<CheeseFile>.PrimaryExtension => ".che";
+  static string[] IImageFormatMetadata<CheeseFile>.FileExtensions => [".che", ".chs"];
+  static CheeseFile IImageFormatReader<CheeseFile>.FromSpan(ReadOnlySpan<byte> data) => CheeseReader.FromSpan(data);
+  static byte[] IImageFormatWriter<CheeseFile>.ToBytes(CheeseFile file) => CheeseWriter.ToBytes(file);
 
   /// <summary>The fixed width of a Cheese image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -55,13 +52,13 @@ public sealed class CheeseFile : IImageFileFormat<CheeseFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Multicolor bitmap data (8000 bytes, 2 bits per pixel).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Video matrix / screen RAM (1000 bytes, upper/lower nybble = 2 colors per cell).</summary>
-  public byte[] VideoMatrix { get; init; } = [];
+  public byte[] VideoMatrix { get; init; }
 
   /// <summary>Color RAM (1000 bytes, lower nybble = 3rd color per cell).</summary>
-  public byte[] ColorRam { get; init; } = [];
+  public byte[] ColorRam { get; init; }
 
   /// <summary>Border color index (0-15).</summary>
   public byte BorderColor { get; init; }
@@ -70,11 +67,10 @@ public sealed class CheeseFile : IImageFileFormat<CheeseFile> {
   public byte BackgroundColor { get; init; }
 
   /// <summary>Trailing padding bytes (14 bytes).</summary>
-  public byte[] Padding { get; init; } = [];
+  public byte[] Padding { get; init; }
 
   /// <summary>Converts this Cheese image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(CheeseFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -113,9 +109,4 @@ public sealed class CheeseFile : IImageFileFormat<CheeseFile> {
     };
   }
 
-  /// <summary>Not supported. Cheese images have complex cell-based color constraints.</summary>
-  public static CheeseFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to CheeseFile is not supported due to complex cell-based color constraints.");
-  }
 }

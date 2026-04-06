@@ -7,7 +7,7 @@ using FileFormat.Ico;
 namespace FileFormat.Ani;
 
 /// <summary>In-memory representation of an ANI animated cursor file.</summary>
-public sealed class AniFile : IImageFileFormat<AniFile>, IMultiImageFileFormat<AniFile> {
+public sealed class AniFile : IImageFormatReader<AniFile>, IImageToRawImage<AniFile>, IImageFormatWriter<AniFile>, IMultiImageFileFormat<AniFile> {
 
   public required AniHeader Header { get; init; }
   public IReadOnlyList<IcoFile> Frames { get; init; } = [];
@@ -16,6 +16,7 @@ public sealed class AniFile : IImageFileFormat<AniFile>, IMultiImageFileFormat<A
 
   public static string PrimaryExtension => ".ani";
   public static string[] FileExtensions => [".ani"];
+  static AniFile IImageFormatReader<AniFile>.FromSpan(ReadOnlySpan<byte> data) => AniReader.FromSpan(data);
 
   public static bool? MatchesSignature(ReadOnlySpan<byte> header)
     => header.Length >= 12
@@ -46,6 +47,4 @@ public sealed class AniFile : IImageFileFormat<AniFile>, IMultiImageFileFormat<A
       ? ToRawImage(file, 0)
       : throw new NotSupportedException("ANI file contains no frames.");
 
-  public static AniFile FromRawImage(RawImage image)
-    => throw new NotSupportedException("ANI is a multi-frame animation format; direct pixel conversion is not supported.");
 }

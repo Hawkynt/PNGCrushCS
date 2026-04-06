@@ -27,6 +27,8 @@ public static class Gd2Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static Gd2File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static Gd2File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < Gd2File.HeaderSize)

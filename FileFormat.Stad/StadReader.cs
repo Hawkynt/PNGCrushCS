@@ -30,6 +30,8 @@ public static class StadReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static StadFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static StadFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < 4)

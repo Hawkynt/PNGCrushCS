@@ -26,6 +26,8 @@ public static class IffMultiPaletteReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static IffMultiPaletteFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static IffMultiPaletteFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < IffMultiPaletteFile.MinFileSize)

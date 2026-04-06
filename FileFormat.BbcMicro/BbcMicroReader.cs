@@ -26,6 +26,8 @@ public static class BbcMicroReader {
     return FromBytes(ms.ToArray(), mode);
   }
 
+  public static BbcMicroFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static BbcMicroFile FromBytes(byte[] data, BbcMicroMode mode = BbcMicroMode.Mode1) {
     ArgumentNullException.ThrowIfNull(data);
 

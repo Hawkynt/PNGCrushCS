@@ -27,6 +27,8 @@ public static class PsdReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static PsdFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static PsdFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < PsdHeader.StructSize)

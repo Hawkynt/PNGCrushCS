@@ -27,6 +27,8 @@ public static class SuperHiresEditorReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static SuperHiresEditorFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static SuperHiresEditorFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
 

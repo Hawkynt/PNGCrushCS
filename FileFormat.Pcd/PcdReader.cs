@@ -27,6 +27,8 @@ public static class PcdReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static PcdFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static PcdFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < PcdFile.HeaderSize)

@@ -26,6 +26,8 @@ public static class BpgReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static BpgFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static BpgFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < BpgFile.MinHeaderSize)

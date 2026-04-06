@@ -26,6 +26,8 @@ public static class Vidcom64Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static Vidcom64File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static Vidcom64File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < Vidcom64File.ExpectedFileSize)

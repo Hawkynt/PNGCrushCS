@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.PixelPerfect;
 
 /// <summary>In-memory representation of a Commodore 64 Pixel Perfect multicolor image.</summary>
-public sealed class PixelPerfectFile : IImageFileFormat<PixelPerfectFile> {
+public readonly record struct PixelPerfectFile : IImageFormatReader<PixelPerfectFile>, IImageToRawImage<PixelPerfectFile>, IImageFormatWriter<PixelPerfectFile> {
 
-  static string IImageFileFormat<PixelPerfectFile>.PrimaryExtension => ".pp";
-  static string[] IImageFileFormat<PixelPerfectFile>.FileExtensions => [".pp", ".ppp"];
-  static PixelPerfectFile IImageFileFormat<PixelPerfectFile>.FromFile(FileInfo file) => PixelPerfectReader.FromFile(file);
-  static PixelPerfectFile IImageFileFormat<PixelPerfectFile>.FromBytes(byte[] data) => PixelPerfectReader.FromBytes(data);
-  static PixelPerfectFile IImageFileFormat<PixelPerfectFile>.FromStream(Stream stream) => PixelPerfectReader.FromStream(stream);
-  static byte[] IImageFileFormat<PixelPerfectFile>.ToBytes(PixelPerfectFile file) => PixelPerfectWriter.ToBytes(file);
+  static string IImageFormatMetadata<PixelPerfectFile>.PrimaryExtension => ".pp";
+  static string[] IImageFormatMetadata<PixelPerfectFile>.FileExtensions => [".pp", ".ppp"];
+  static PixelPerfectFile IImageFormatReader<PixelPerfectFile>.FromSpan(ReadOnlySpan<byte> data) => PixelPerfectReader.FromSpan(data);
+  static byte[] IImageFormatWriter<PixelPerfectFile>.ToBytes(PixelPerfectFile file) => PixelPerfectWriter.ToBytes(file);
 
   /// <summary>The fixed width of the image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -49,11 +46,10 @@ public sealed class PixelPerfectFile : IImageFileFormat<PixelPerfectFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Raw payload data (entire file content after load address).</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   /// <summary>Converts this Pixel Perfect image to a platform-independent <see cref="RawImage"/> in Rgb24 format using multicolor decode.</summary>
   public static RawImage ToRawImage(PixelPerfectFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -101,9 +97,4 @@ public sealed class PixelPerfectFile : IImageFileFormat<PixelPerfectFile> {
     };
   }
 
-  /// <summary>Not supported. Pixel Perfect images require specific C64 multicolor constraints.</summary>
-  public static PixelPerfectFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to PixelPerfectFile is not supported due to C64 multicolor constraints.");
-  }
 }

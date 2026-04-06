@@ -26,6 +26,8 @@ public static class SifImageReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static SifImageFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static SifImageFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < SifImageFile.MinFileSize)

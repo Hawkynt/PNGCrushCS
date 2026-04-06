@@ -41,25 +41,6 @@ public class QuakeLmpReaderTests {
 }
 
 [TestFixture]
-public class QuakeLmpWriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => QuakeLmpWriter.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_IncludesHeader() {
-    var file = new QuakeLmpFile {
-      Width = 128,
-      Height = 128,
-      PixelData = new byte[128 * 128],
-    };
-    var bytes = QuakeLmpWriter.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(8 + 128 * 128));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -90,30 +71,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void HeaderSize_Is8()
-    => Assert.That(QuakeLmpFile.HeaderSize, Is.EqualTo(8));
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => QuakeLmpFile.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => QuakeLmpFile.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 128, Height = 128, Format = PixelFormat.Rgb24, PixelData = new byte[128 * 128 * 3] };
-    Assert.Throws<ArgumentException>(() => QuakeLmpFile.FromRawImage(raw));
-  }
-
-  [Test]
-  public void FileExtensions_ContainsPrimary() {
-    string[] exts = [".lmp"];
-    Assert.That(exts, Does.Contain(".lmp"));
-  }
-}

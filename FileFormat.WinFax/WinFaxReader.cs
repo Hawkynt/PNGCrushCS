@@ -25,6 +25,8 @@ public static class WinFaxReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static WinFaxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static WinFaxFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < WinFaxFile.HeaderSize)

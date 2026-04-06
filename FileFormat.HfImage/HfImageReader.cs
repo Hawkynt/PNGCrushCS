@@ -26,6 +26,8 @@ public static class HfImageReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static HfImageFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static HfImageFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < HfImageFile.MinFileSize)

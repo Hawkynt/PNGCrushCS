@@ -1,21 +1,16 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.MsxSprite;
 
 /// <summary>In-memory representation of an MSX sprite pattern table (2048 bytes: 32 sprites x 8 bytes each, 8x8 mono).</summary>
-public sealed class MsxSpriteFile : IImageFileFormat<MsxSpriteFile> {
+public readonly record struct MsxSpriteFile : IImageFormatReader<MsxSpriteFile>, IImageToRawImage<MsxSpriteFile>, IImageFormatWriter<MsxSpriteFile> {
 
-  static string IImageFileFormat<MsxSpriteFile>.PrimaryExtension => ".spt";
-  static string[] IImageFileFormat<MsxSpriteFile>.FileExtensions => [".spt"];
-  static FormatCapability IImageFileFormat<MsxSpriteFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static MsxSpriteFile IImageFileFormat<MsxSpriteFile>.FromFile(FileInfo file) => MsxSpriteReader.FromFile(file);
-  static MsxSpriteFile IImageFileFormat<MsxSpriteFile>.FromBytes(byte[] data) => MsxSpriteReader.FromBytes(data);
-  static MsxSpriteFile IImageFileFormat<MsxSpriteFile>.FromStream(Stream stream) => MsxSpriteReader.FromStream(stream);
-  static RawImage IImageFileFormat<MsxSpriteFile>.ToRawImage(MsxSpriteFile file) => ToRawImage(file);
-  static MsxSpriteFile IImageFileFormat<MsxSpriteFile>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<MsxSpriteFile>.ToBytes(MsxSpriteFile file) => MsxSpriteWriter.ToBytes(file);
+  static string IImageFormatMetadata<MsxSpriteFile>.PrimaryExtension => ".spt";
+  static string[] IImageFormatMetadata<MsxSpriteFile>.FileExtensions => [".spt"];
+  static MsxSpriteFile IImageFormatReader<MsxSpriteFile>.FromSpan(ReadOnlySpan<byte> data) => MsxSpriteReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<MsxSpriteFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<MsxSpriteFile>.ToBytes(MsxSpriteFile file) => MsxSpriteWriter.ToBytes(file);
 
   /// <summary>Expected file size in bytes.</summary>
   internal const int ExpectedFileSize = 2048;
@@ -48,13 +43,12 @@ public sealed class MsxSpriteFile : IImageFileFormat<MsxSpriteFile> {
   public int Height => PixelHeight;
 
   /// <summary>Raw sprite pattern data (2048 bytes).</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
   /// <summary>Converts the MSX sprite table to an Indexed1 raw image (128x16, B&amp;W palette).</summary>
   public static RawImage ToRawImage(MsxSpriteFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var rowStride = PixelWidth / 8;
     var pixelData = new byte[rowStride * PixelHeight];
@@ -92,9 +86,4 @@ public sealed class MsxSpriteFile : IImageFileFormat<MsxSpriteFile> {
     };
   }
 
-  /// <summary>Not supported. MSX sprite tables have fixed structure constraints.</summary>
-  public static MsxSpriteFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to MsxSpriteFile is not supported.");
-  }
 }

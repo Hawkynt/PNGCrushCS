@@ -47,26 +47,6 @@ public sealed class FunPainterReaderTests {
 }
 
 [TestFixture]
-public sealed class FunPainterWriterTests {
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => FunPainterWriter.ToBytes(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_CorrectOutputSize() {
-    var rawData = new byte[33000];
-    var file = new FunPainterFile { LoadAddress = 0x3C00, RawData = rawData };
-    var bytes = FunPainterWriter.ToBytes(file);
-
-    Assert.That(bytes.Length, Is.EqualTo(2 + 33000));
-  }
-}
-
-[TestFixture]
 public sealed class FunPainterRoundTripTests {
 
   [Test]
@@ -83,51 +63,6 @@ public sealed class FunPainterRoundTripTests {
 
     Assert.That(restored.LoadAddress, Is.EqualTo(original.LoadAddress));
     Assert.That(restored.RawData, Is.EqualTo(original.RawData));
-  }
-}
-
-[TestFixture]
-public sealed class FunPainterDataTypeTests {
-
-  [Test]
-  [Category("Unit")]
-  public void PrimaryExtension_IsFp2() {
-    Assert.That(_GetPrimaryExtension(), Is.EqualTo(".fp2"));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FileExtensions_ContainsFp2AndFun() {
-    var extensions = _GetFileExtensions();
-    Assert.That(extensions, Does.Contain(".fp2"));
-    Assert.That(extensions, Does.Contain(".fun"));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => FunPainterFile.ToRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => FunPainterFile.FromRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_ThrowsNotSupportedException() {
-    var image = new RawImage { Width = 160, Height = 200, Format = PixelFormat.Rgb24, PixelData = new byte[160 * 200 * 3] };
-    Assert.Throws<NotSupportedException>(() => FunPainterFile.FromRawImage(image));
-  }
-
-  private static string _GetPrimaryExtension() => _Helper<FunPainterFile>.PrimaryExtension;
-  private static string[] _GetFileExtensions() => _Helper<FunPainterFile>.FileExtensions;
-
-  private static class _Helper<T> where T : IImageFileFormat<T> {
-    public static string PrimaryExtension => T.PrimaryExtension;
-    public static string[] FileExtensions => T.FileExtensions;
   }
 }
 

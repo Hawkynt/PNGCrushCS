@@ -26,6 +26,8 @@ public static class PhotoPaintReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static PhotoPaintFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static PhotoPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < PhotoPaintFile.HeaderSize)

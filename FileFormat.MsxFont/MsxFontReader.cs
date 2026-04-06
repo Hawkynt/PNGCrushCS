@@ -26,6 +26,8 @@ public static class MsxFontReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static MsxFontFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static MsxFontFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != MsxFontFile.ExpectedFileSize)

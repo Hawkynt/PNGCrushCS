@@ -1,18 +1,15 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.QdvImage;
 
 /// <summary>In-memory representation of a QDV image.</summary>
-public sealed class QdvImageFile : IImageFileFormat<QdvImageFile> {
+public readonly record struct QdvImageFile : IImageFormatReader<QdvImageFile>, IImageToRawImage<QdvImageFile>, IImageFormatWriter<QdvImageFile> {
 
-  static string IImageFileFormat<QdvImageFile>.PrimaryExtension => ".qdv";
-  static string[] IImageFileFormat<QdvImageFile>.FileExtensions => [".qdv"];
-  static QdvImageFile IImageFileFormat<QdvImageFile>.FromFile(FileInfo file) => QdvImageReader.FromFile(file);
-  static QdvImageFile IImageFileFormat<QdvImageFile>.FromBytes(byte[] data) => QdvImageReader.FromBytes(data);
-  static QdvImageFile IImageFileFormat<QdvImageFile>.FromStream(Stream stream) => QdvImageReader.FromStream(stream);
-  static byte[] IImageFileFormat<QdvImageFile>.ToBytes(QdvImageFile file) => QdvImageWriter.ToBytes(file);
+  static string IImageFormatMetadata<QdvImageFile>.PrimaryExtension => ".qdv";
+  static string[] IImageFormatMetadata<QdvImageFile>.FileExtensions => [".qdv"];
+  static QdvImageFile IImageFormatReader<QdvImageFile>.FromSpan(ReadOnlySpan<byte> data) => QdvImageReader.FromSpan(data);
+  static byte[] IImageFormatWriter<QdvImageFile>.ToBytes(QdvImageFile file) => QdvImageWriter.ToBytes(file);
 
   /// <summary>Magic bytes: "QDV\0" (0x51 0x44 0x56 0x00).</summary>
   internal static readonly byte[] Magic = [0x51, 0x44, 0x56, 0x00];
@@ -36,11 +33,10 @@ public sealed class QdvImageFile : IImageFileFormat<QdvImageFile> {
   public ushort Flags { get; init; }
 
   /// <summary>Raw pixel data.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this QDV image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(QdvImageFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,
@@ -49,9 +45,4 @@ public sealed class QdvImageFile : IImageFileFormat<QdvImageFile> {
     };
   }
 
-  /// <summary>Not supported.</summary>
-  public static QdvImageFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to QdvImageFile is not supported.");
-  }
 }

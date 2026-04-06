@@ -1,27 +1,23 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.SpookySpritesFalcon;
 
 /// <summary>In-memory representation of a Spooky Sprites Atari Falcon compressed 16-bit true color (.tre) image.</summary>
-public sealed class SpookySpritesFalconFile : IImageFileFormat<SpookySpritesFalconFile> {
+public readonly record struct SpookySpritesFalconFile : IImageFormatReader<SpookySpritesFalconFile>, IImageToRawImage<SpookySpritesFalconFile>, IImageFromRawImage<SpookySpritesFalconFile>, IImageFormatWriter<SpookySpritesFalconFile> {
 
-  static string IImageFileFormat<SpookySpritesFalconFile>.PrimaryExtension => ".tre";
-  static string[] IImageFileFormat<SpookySpritesFalconFile>.FileExtensions => [".tre"];
-  static SpookySpritesFalconFile IImageFileFormat<SpookySpritesFalconFile>.FromFile(FileInfo file) => SpookySpritesFalconReader.FromFile(file);
-  static SpookySpritesFalconFile IImageFileFormat<SpookySpritesFalconFile>.FromBytes(byte[] data) => SpookySpritesFalconReader.FromBytes(data);
-  static SpookySpritesFalconFile IImageFileFormat<SpookySpritesFalconFile>.FromStream(Stream stream) => SpookySpritesFalconReader.FromStream(stream);
-  static byte[] IImageFileFormat<SpookySpritesFalconFile>.ToBytes(SpookySpritesFalconFile file) => SpookySpritesFalconWriter.ToBytes(file);
+  static string IImageFormatMetadata<SpookySpritesFalconFile>.PrimaryExtension => ".tre";
+  static string[] IImageFormatMetadata<SpookySpritesFalconFile>.FileExtensions => [".tre"];
+  static SpookySpritesFalconFile IImageFormatReader<SpookySpritesFalconFile>.FromSpan(ReadOnlySpan<byte> data) => SpookySpritesFalconReader.FromSpan(data);
+  static byte[] IImageFormatWriter<SpookySpritesFalconFile>.ToBytes(SpookySpritesFalconFile file) => SpookySpritesFalconWriter.ToBytes(file);
 
   public int Width { get; init; }
   public int Height { get; init; }
 
   /// <summary>Raw RGB565 big-endian pixel data (2 bytes per pixel, decompressed).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(SpookySpritesFalconFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var rgb565 = file.PixelData;
     var pixelCount = file.Width * file.Height;

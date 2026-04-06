@@ -1,11 +1,11 @@
-﻿using System;
+using System;
 using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.SharpX68k;
 
 /// <summary>Sharp X68000 16-bit color screen data model.</summary>
-public sealed class SharpX68kFile : IImageFileFormat<SharpX68kFile> {
+public sealed class SharpX68kFile : IImageFormatReader<SharpX68kFile>, IImageToRawImage<SharpX68kFile>, IImageFromRawImage<SharpX68kFile>, IImageFormatWriter<SharpX68kFile> {
 
   public const int HeaderSize = 8;
 
@@ -13,9 +13,9 @@ public sealed class SharpX68kFile : IImageFileFormat<SharpX68kFile> {
   public int Height { get; init; } = 512;
   public byte[] PixelData { get; init; } = [];
 
-
   public static string PrimaryExtension => ".x68";
   public static string[] FileExtensions => [".x68", ".x68k"];
+  static SharpX68kFile IImageFormatReader<SharpX68kFile>.FromSpan(ReadOnlySpan<byte> data) => SharpX68kReader.FromSpan(data);
   public static SharpX68kFile FromFile(FileInfo file) => SharpX68kReader.FromFile(file);
   public static SharpX68kFile FromBytes(byte[] data) => SharpX68kReader.FromBytes(data);
   public static SharpX68kFile FromStream(Stream stream) => SharpX68kReader.FromStream(stream);

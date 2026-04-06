@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.WorldportFax;
 
 /// <summary>In-memory representation of a WorldportFax WPF image.</summary>
-public sealed class WorldportFaxFile : IImageFileFormat<WorldportFaxFile> {
+public readonly record struct WorldportFaxFile : IImageFormatReader<WorldportFaxFile>, IImageToRawImage<WorldportFaxFile>, IImageFormatWriter<WorldportFaxFile> {
 
-  static string IImageFileFormat<WorldportFaxFile>.PrimaryExtension => ".wpf";
-  static string[] IImageFileFormat<WorldportFaxFile>.FileExtensions => [".wpf"];
-  static WorldportFaxFile IImageFileFormat<WorldportFaxFile>.FromFile(FileInfo file) => WorldportFaxReader.FromFile(file);
-  static WorldportFaxFile IImageFileFormat<WorldportFaxFile>.FromBytes(byte[] data) => WorldportFaxReader.FromBytes(data);
-  static WorldportFaxFile IImageFileFormat<WorldportFaxFile>.FromStream(Stream stream) => WorldportFaxReader.FromStream(stream);
-  static byte[] IImageFileFormat<WorldportFaxFile>.ToBytes(WorldportFaxFile file) => WorldportFaxWriter.ToBytes(file);
+  static string IImageFormatMetadata<WorldportFaxFile>.PrimaryExtension => ".wpf";
+  static string[] IImageFormatMetadata<WorldportFaxFile>.FileExtensions => [".wpf"];
+  static WorldportFaxFile IImageFormatReader<WorldportFaxFile>.FromSpan(ReadOnlySpan<byte> data) => WorldportFaxReader.FromSpan(data);
+  static byte[] IImageFormatWriter<WorldportFaxFile>.ToBytes(WorldportFaxFile file) => WorldportFaxWriter.ToBytes(file);
 
   /// <summary>Magic bytes: "WPFX" (0x57 0x50 0x46 0x58).</summary>
   internal static readonly byte[] Magic = [0x57, 0x50, 0x46, 0x58];
@@ -33,11 +30,10 @@ public sealed class WorldportFaxFile : IImageFileFormat<WorldportFaxFile> {
   public ushort Flags { get; init; }
 
   /// <summary>1bpp pixel data, MSB first, rows padded to byte boundary.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this WPF image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(WorldportFaxFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var bytesPerRow = (file.Width + 7) / 8;
     var rgb = new byte[file.Width * file.Height * 3];
@@ -62,9 +58,4 @@ public sealed class WorldportFaxFile : IImageFileFormat<WorldportFaxFile> {
     };
   }
 
-  /// <summary>Not supported.</summary>
-  public static WorldportFaxFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to WorldportFaxFile is not supported.");
-  }
 }

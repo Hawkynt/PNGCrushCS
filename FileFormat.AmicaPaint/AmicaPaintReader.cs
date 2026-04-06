@@ -26,6 +26,8 @@ public static class AmicaPaintReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static AmicaPaintFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AmicaPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < AmicaPaintFile.ExpectedFileSize)

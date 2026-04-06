@@ -1,18 +1,15 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.SifImage;
 
 /// <summary>In-memory representation of a SIF image.</summary>
-public sealed class SifImageFile : IImageFileFormat<SifImageFile> {
+public readonly record struct SifImageFile : IImageFormatReader<SifImageFile>, IImageToRawImage<SifImageFile>, IImageFormatWriter<SifImageFile> {
 
-  static string IImageFileFormat<SifImageFile>.PrimaryExtension => ".sif";
-  static string[] IImageFileFormat<SifImageFile>.FileExtensions => [".sif"];
-  static SifImageFile IImageFileFormat<SifImageFile>.FromFile(FileInfo file) => SifImageReader.FromFile(file);
-  static SifImageFile IImageFileFormat<SifImageFile>.FromBytes(byte[] data) => SifImageReader.FromBytes(data);
-  static SifImageFile IImageFileFormat<SifImageFile>.FromStream(Stream stream) => SifImageReader.FromStream(stream);
-  static byte[] IImageFileFormat<SifImageFile>.ToBytes(SifImageFile file) => SifImageWriter.ToBytes(file);
+  static string IImageFormatMetadata<SifImageFile>.PrimaryExtension => ".sif";
+  static string[] IImageFormatMetadata<SifImageFile>.FileExtensions => [".sif"];
+  static SifImageFile IImageFormatReader<SifImageFile>.FromSpan(ReadOnlySpan<byte> data) => SifImageReader.FromSpan(data);
+  static byte[] IImageFormatWriter<SifImageFile>.ToBytes(SifImageFile file) => SifImageWriter.ToBytes(file);
 
   /// <summary>Magic bytes: "SIF\0" (0x53 0x49 0x46 0x00).</summary>
   internal static readonly byte[] Magic = [0x53, 0x49, 0x46, 0x00];
@@ -33,11 +30,10 @@ public sealed class SifImageFile : IImageFileFormat<SifImageFile> {
   public ushort Bpp { get; init; }
 
   /// <summary>Raw pixel data.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this SIF image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(SifImageFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,
@@ -46,9 +42,4 @@ public sealed class SifImageFile : IImageFileFormat<SifImageFile> {
     };
   }
 
-  /// <summary>Not supported.</summary>
-  public static SifImageFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to SifImageFile is not supported.");
-  }
 }

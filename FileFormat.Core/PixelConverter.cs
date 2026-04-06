@@ -582,8 +582,36 @@ public static class PixelConverter {
   /// <summary>Converts GrayAlpha16 (2 bytes/pixel: gray+alpha) to BGRA (4 bytes/pixel).</summary>
   public static byte[] GrayAlpha16ToBgra(byte[] data, int totalPixels) {
     var result = new byte[totalPixels * 4];
+    var i = 0;
 
-    for (var i = 0; i < totalPixels; ++i) {
+    if (Vector128.IsHardwareAccelerated) {
+      // Process 8 pixels at a time: 16 src bytes (GA GA GA GA GA GA GA GA) → 32 dst bytes (BGRA x8)
+      var shuffleGray = Vector128.Create((byte)0, 0, 0, 1, 2, 2, 2, 3, 4, 4, 4, 5, 6, 6, 6, 7);
+      var shuffleAlpha = Vector128.Create((byte)8, 8, 8, 9, 10, 10, 10, 11, 12, 12, 12, 13, 14, 14, 14, 15);
+      for (; i <= totalPixels - 8; i += 8) {
+        var src = Vector128.Create(data, i * 2);
+        var lo = Vector128.Shuffle(src, shuffleGray);
+        var hi = Vector128.Shuffle(src, shuffleAlpha);
+        // Interleave gray broadcast with alpha: B=G=R=gray, A=alpha
+        var alphaMask = Vector128.Create((byte)0, 0, 0, 0xFF, 0, 0, 0, 0xFF, 0, 0, 0, 0xFF, 0, 0, 0, 0xFF);
+        var grayMask = Vector128.Create((byte)0xFF, 0xFF, 0xFF, 0, 0xFF, 0xFF, 0xFF, 0, 0xFF, 0xFF, 0xFF, 0, 0xFF, 0xFF, 0xFF, 0);
+        // For first 4 pixels: gray from lo, alpha from original positions
+        var pix03 = Vector128.Create(
+          data[i * 2], data[i * 2], data[i * 2], data[i * 2 + 1],
+          data[i * 2 + 2], data[i * 2 + 2], data[i * 2 + 2], data[i * 2 + 3],
+          data[i * 2 + 4], data[i * 2 + 4], data[i * 2 + 4], data[i * 2 + 5],
+          data[i * 2 + 6], data[i * 2 + 6], data[i * 2 + 6], data[i * 2 + 7]);
+        pix03.CopyTo(result, i * 4);
+        var pix47 = Vector128.Create(
+          data[i * 2 + 8], data[i * 2 + 8], data[i * 2 + 8], data[i * 2 + 9],
+          data[i * 2 + 10], data[i * 2 + 10], data[i * 2 + 10], data[i * 2 + 11],
+          data[i * 2 + 12], data[i * 2 + 12], data[i * 2 + 12], data[i * 2 + 13],
+          data[i * 2 + 14], data[i * 2 + 14], data[i * 2 + 14], data[i * 2 + 15]);
+        pix47.CopyTo(result, i * 4 + 16);
+      }
+    }
+
+    for (; i < totalPixels; ++i) {
       var src = i * 2;
       var gray = data[src];
       var alpha = data[src + 1];
@@ -1043,14 +1071,29 @@ public static class PixelConverter {
   /// <summary>Converts RGBA64 big-endian (8 bytes/pixel) to RGBA32 (4 bytes/pixel) by taking high bytes.</summary>
   public static byte[] Rgba64ToRgba32(byte[] data, int totalPixels) {
     var result = new byte[totalPixels * 4];
+    var i = 0;
 
-    for (var i = 0; i < totalPixels; ++i) {
+    if (Vector128.IsHardwareAccelerated) {
+      // Process 4 pixels at a time: 32 bytes → 16 bytes (extract high bytes from each 16-bit pair)
+      var shuffle = Vector128.Create((byte)0, 2, 4, 6, 8, 10, 12, 14, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80);
+      for (; i <= totalPixels - 4; i += 4) {
+        var src0 = Vector128.Create(data, i * 8);       // pixels 0-1 (16 bytes)
+        var src1 = Vector128.Create(data, i * 8 + 16);  // pixels 2-3 (16 bytes)
+        var lo = Vector128.Shuffle(src0, shuffle); // 8 useful bytes in low half
+        var hi = Vector128.Shuffle(src1, shuffle); // 8 useful bytes in low half
+        // Combine: lo bytes 0-7 → result 0-7, hi bytes 0-7 → result 8-15
+        var combined = lo.WithUpper(hi.GetLower());
+        combined.CopyTo(result, i * 4);
+      }
+    }
+
+    for (; i < totalPixels; ++i) {
       var src = i * 8;
       var dst = i * 4;
-      result[dst] = data[src];     // R hi
-      result[dst + 1] = data[src + 2]; // G hi
-      result[dst + 2] = data[src + 4]; // B hi
-      result[dst + 3] = data[src + 6]; // A hi
+      result[dst] = data[src];
+      result[dst + 1] = data[src + 2];
+      result[dst + 2] = data[src + 4];
+      result[dst + 3] = data[src + 6];
     }
 
     return result;
@@ -1092,8 +1135,20 @@ public static class PixelConverter {
   /// <summary>Converts RGBA32 (4 bytes/pixel) to RGBA64 big-endian (8 bytes/pixel). Upscales via v*257.</summary>
   public static byte[] Rgba32ToRgba64(byte[] data, int totalPixels) {
     var result = new byte[totalPixels * 8];
+    var i = 0;
 
-    for (var i = 0; i < totalPixels; ++i) {
+    if (Vector128.IsHardwareAccelerated) {
+      // Process 4 pixels at a time: 16 bytes → 32 bytes (each byte duplicated)
+      var shuffleLo = Vector128.Create((byte)0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7);
+      var shuffleHi = Vector128.Create((byte)8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15);
+      for (; i <= totalPixels - 4; i += 4) {
+        var src = Vector128.Create(data, i * 4);
+        Vector128.Shuffle(src, shuffleLo).CopyTo(result, i * 8);
+        Vector128.Shuffle(src, shuffleHi).CopyTo(result, i * 8 + 16);
+      }
+    }
+
+    for (; i < totalPixels; ++i) {
       var src = i * 4;
       var dst = i * 8;
       var r = data[src];
@@ -1116,11 +1171,26 @@ public static class PixelConverter {
   /// <summary>Converts 8-bit grayscale (1 byte/pixel) to 16-bit big-endian grayscale (2 bytes/pixel). Upscales via v*257.</summary>
   public static byte[] Gray8ToGray16(byte[] data, int totalPixels) {
     var result = new byte[totalPixels * 2];
+    var i = 0;
 
-    for (var i = 0; i < totalPixels; ++i) {
+    if (Vector128.IsHardwareAccelerated) {
+      // Process 16 pixels at a time: duplicate each byte (v → v,v)
+      for (; i <= totalPixels - 16; i += 16) {
+        var src = Vector128.Create(data, i);
+        // Unpack low 8 bytes: interleave with self → 16 bytes (v0,v0,v1,v1,...)
+        var lo = Vector128.Create(
+          (byte)0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7);
+        var hi = Vector128.Create(
+          (byte)8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15);
+        Vector128.Shuffle(src, lo).CopyTo(result, i * 2);
+        Vector128.Shuffle(src, hi).CopyTo(result, i * 2 + 16);
+      }
+    }
+
+    for (; i < totalPixels; ++i) {
       var v = data[i];
-      result[i * 2] = v;     // hi = v
-      result[i * 2 + 1] = v; // lo = v (v*257 = v<<8 | v)
+      result[i * 2] = v;
+      result[i * 2 + 1] = v;
     }
 
     return result;

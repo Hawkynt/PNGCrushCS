@@ -5,14 +5,12 @@ using FileFormat.Core;
 namespace FileFormat.DrazPaint;
 
 /// <summary>In-memory representation of a DrazPaint multicolor image (.drz).</summary>
-public sealed class DrazPaintFile : IImageFileFormat<DrazPaintFile> {
+public readonly record struct DrazPaintFile : IImageFormatReader<DrazPaintFile>, IImageToRawImage<DrazPaintFile>, IImageFormatWriter<DrazPaintFile> {
 
-  static string IImageFileFormat<DrazPaintFile>.PrimaryExtension => ".drz";
-  static string[] IImageFileFormat<DrazPaintFile>.FileExtensions => [".drz"];
-  static DrazPaintFile IImageFileFormat<DrazPaintFile>.FromFile(FileInfo file) => DrazPaintReader.FromFile(file);
-  static DrazPaintFile IImageFileFormat<DrazPaintFile>.FromBytes(byte[] data) => DrazPaintReader.FromBytes(data);
-  static DrazPaintFile IImageFileFormat<DrazPaintFile>.FromStream(Stream stream) => DrazPaintReader.FromStream(stream);
-  static byte[] IImageFileFormat<DrazPaintFile>.ToBytes(DrazPaintFile file) => DrazPaintWriter.ToBytes(file);
+  static string IImageFormatMetadata<DrazPaintFile>.PrimaryExtension => ".drz";
+  static string[] IImageFormatMetadata<DrazPaintFile>.FileExtensions => [".drz"];
+  static DrazPaintFile IImageFormatReader<DrazPaintFile>.FromSpan(ReadOnlySpan<byte> data) => DrazPaintReader.FromSpan(data);
+  static byte[] IImageFormatWriter<DrazPaintFile>.ToBytes(DrazPaintFile file) => DrazPaintWriter.ToBytes(file);
 
   /// <summary>The fixed width of the image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -55,20 +53,19 @@ public sealed class DrazPaintFile : IImageFileFormat<DrazPaintFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Multicolor bitmap data (8000 bytes).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Screen RAM (1000 bytes).</summary>
-  public byte[] ScreenRam { get; init; } = [];
+  public byte[] ScreenRam { get; init; }
 
   /// <summary>Color RAM (1000 bytes).</summary>
-  public byte[] ColorRam { get; init; } = [];
+  public byte[] ColorRam { get; init; }
 
   /// <summary>Background color index (0-15).</summary>
   public byte BackgroundColor { get; init; }
 
   /// <summary>Converts this DrazPaint image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(DrazPaintFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -105,12 +102,6 @@ public sealed class DrazPaintFile : IImageFileFormat<DrazPaintFile> {
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
     };
-  }
-
-  /// <summary>Not supported. DrazPaint images have complex cell-based color constraints.</summary>
-  public static DrazPaintFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to DrazPaintFile is not supported due to complex cell-based color constraints.");
   }
 
   /// <summary>RLE-decompresses data using 0x00 escape byte encoding: 0x00, count, value.</summary>

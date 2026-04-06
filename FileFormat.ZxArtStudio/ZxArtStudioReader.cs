@@ -41,6 +41,8 @@ public static class ZxArtStudioReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static ZxArtStudioFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static ZxArtStudioFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != FileSize)

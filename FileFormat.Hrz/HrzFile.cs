@@ -1,18 +1,19 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Hrz;
 
 /// <summary>In-memory representation of a HRZ (slow-scan television) image.</summary>
-public sealed class HrzFile : IImageFileFormat<HrzFile> {
+public readonly record struct HrzFile :
+  IImageFormatReader<HrzFile>, IImageToRawImage<HrzFile>,
+  IImageFromRawImage<HrzFile>, IImageFormatWriter<HrzFile>,
+  IImageInfoReader<HrzFile> {
 
-  static string IImageFileFormat<HrzFile>.PrimaryExtension => ".hrz";
-  static string[] IImageFileFormat<HrzFile>.FileExtensions => [".hrz"];
-  static HrzFile IImageFileFormat<HrzFile>.FromFile(FileInfo file) => HrzReader.FromFile(file);
-  static HrzFile IImageFileFormat<HrzFile>.FromBytes(byte[] data) => HrzReader.FromBytes(data);
-  static HrzFile IImageFileFormat<HrzFile>.FromStream(Stream stream) => HrzReader.FromStream(stream);
-  static byte[] IImageFileFormat<HrzFile>.ToBytes(HrzFile file) => HrzWriter.ToBytes(file);
+  static string IImageFormatMetadata<HrzFile>.PrimaryExtension => ".hrz";
+  static string[] IImageFormatMetadata<HrzFile>.FileExtensions => [".hrz"];
+  static HrzFile IImageFormatReader<HrzFile>.FromSpan(ReadOnlySpan<byte> data) => HrzReader.FromSpan(data);
+  static byte[] IImageFormatWriter<HrzFile>.ToBytes(HrzFile file) => HrzWriter.ToBytes(file);
+
   /// <summary>Always 256.</summary>
   public int Width => 256;
 
@@ -20,17 +21,17 @@ public sealed class HrzFile : IImageFileFormat<HrzFile> {
   public int Height => 240;
 
   /// <summary>Raw RGB pixel data (3 bytes per pixel, 184320 bytes total).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
-  public static RawImage ToRawImage(HrzFile file) {
-    ArgumentNullException.ThrowIfNull(file);
-    return new() {
-      Width = file.Width,
-      Height = file.Height,
-      Format = PixelFormat.Rgb24,
-      PixelData = file.PixelData[..],
-    };
-  }
+  public static ImageInfo? ReadImageInfo(ReadOnlySpan<byte> header)
+    => header.Length == 256 * 240 * 3 ? new(256, 240, 24, "Rgb24") : null;
+
+  public static RawImage ToRawImage(HrzFile file) => new() {
+    Width = file.Width,
+    Height = file.Height,
+    Format = PixelFormat.Rgb24,
+    PixelData = file.PixelData[..],
+  };
 
   public static HrzFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
@@ -39,8 +40,6 @@ public sealed class HrzFile : IImageFileFormat<HrzFile> {
     if (image.Width != 256 || image.Height != 240)
       throw new ArgumentException($"Expected 256x240 but got {image.Width}x{image.Height}.", nameof(image));
 
-    return new() {
-      PixelData = image.PixelData[..],
-    };
+    return new() { PixelData = image.PixelData[..] };
   }
 }

@@ -1,28 +1,23 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.GfaRaytrace;
 
 /// <summary>In-memory representation of a GfA Raytrace image image.</summary>
-public sealed class GfaRaytraceFile : IImageFileFormat<GfaRaytraceFile> {
+public readonly record struct GfaRaytraceFile : IImageFormatReader<GfaRaytraceFile>, IImageToRawImage<GfaRaytraceFile>, IImageFromRawImage<GfaRaytraceFile>, IImageFormatWriter<GfaRaytraceFile> {
 
   internal const int HeaderSize = 8;
 
-
-  static string IImageFileFormat<GfaRaytraceFile>.PrimaryExtension => ".sul";
-  static string[] IImageFileFormat<GfaRaytraceFile>.FileExtensions => [".sul"];
-  static GfaRaytraceFile IImageFileFormat<GfaRaytraceFile>.FromFile(FileInfo file) => GfaRaytraceReader.FromFile(file);
-  static GfaRaytraceFile IImageFileFormat<GfaRaytraceFile>.FromBytes(byte[] data) => GfaRaytraceReader.FromBytes(data);
-  static GfaRaytraceFile IImageFileFormat<GfaRaytraceFile>.FromStream(Stream stream) => GfaRaytraceReader.FromStream(stream);
-  static byte[] IImageFileFormat<GfaRaytraceFile>.ToBytes(GfaRaytraceFile file) => GfaRaytraceWriter.ToBytes(file);
+  static string IImageFormatMetadata<GfaRaytraceFile>.PrimaryExtension => ".sul";
+  static string[] IImageFormatMetadata<GfaRaytraceFile>.FileExtensions => [".sul"];
+  static GfaRaytraceFile IImageFormatReader<GfaRaytraceFile>.FromSpan(ReadOnlySpan<byte> data) => GfaRaytraceReader.FromSpan(data);
+  static byte[] IImageFormatWriter<GfaRaytraceFile>.ToBytes(GfaRaytraceFile file) => GfaRaytraceWriter.ToBytes(file);
 
   public int Width { get; init; }
   public int Height { get; init; }
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(GfaRaytraceFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

@@ -1,35 +1,31 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Vicar;
 
 /// <summary>In-memory representation of a NASA JPL VICAR image.</summary>
-public sealed class VicarFile : IImageFileFormat<VicarFile> {
+public readonly record struct VicarFile : IImageFormatReader<VicarFile>, IImageToRawImage<VicarFile>, IImageFromRawImage<VicarFile>, IImageFormatWriter<VicarFile> {
 
-  static string IImageFileFormat<VicarFile>.PrimaryExtension => ".vic";
-  static string[] IImageFileFormat<VicarFile>.FileExtensions => [".vic", ".vicar"];
-  static VicarFile IImageFileFormat<VicarFile>.FromFile(FileInfo file) => VicarReader.FromFile(file);
-  static VicarFile IImageFileFormat<VicarFile>.FromBytes(byte[] data) => VicarReader.FromBytes(data);
-  static VicarFile IImageFileFormat<VicarFile>.FromStream(Stream stream) => VicarReader.FromStream(stream);
-  static byte[] IImageFileFormat<VicarFile>.ToBytes(VicarFile file) => VicarWriter.ToBytes(file);
+  static string IImageFormatMetadata<VicarFile>.PrimaryExtension => ".vic";
+  static string[] IImageFormatMetadata<VicarFile>.FileExtensions => [".vic", ".vicar"];
+  static VicarFile IImageFormatReader<VicarFile>.FromSpan(ReadOnlySpan<byte> data) => VicarReader.FromSpan(data);
+  static byte[] IImageFormatWriter<VicarFile>.ToBytes(VicarFile file) => VicarWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
-  public int Bands { get; init; } = 1;
+  public int Bands { get; init; }
   public VicarPixelType PixelType { get; init; }
   public VicarOrganization Organization { get; init; }
-  public string IntFormat { get; init; } = "LOW";
-  public string RealFormat { get; init; } = "IEEE";
+  public string IntFormat { get; init; }
+  public string RealFormat { get; init; }
 
   /// <summary>Raw pixel data bytes.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>All keyword=value labels from the VICAR header.</summary>
-  public Dictionary<string, string> Labels { get; init; } = new();
+  public Dictionary<string, string> Labels { get; init; }
 
   public static RawImage ToRawImage(VicarFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     if (file.PixelType != VicarPixelType.Byte)
       throw new ArgumentException($"Only Byte pixel type is supported for conversion, got {file.PixelType}.", nameof(file));

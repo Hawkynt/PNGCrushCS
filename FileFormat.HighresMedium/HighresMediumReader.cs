@@ -26,6 +26,8 @@ public static class HighresMediumReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static HighresMediumFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static HighresMediumFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < HighresMediumFile.FileSize)

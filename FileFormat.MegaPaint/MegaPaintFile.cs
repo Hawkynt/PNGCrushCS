@@ -1,11 +1,10 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.MegaPaint;
 
 /// <summary>In-memory representation of an Atari ST MegaPaint monochrome image.</summary>
-public sealed class MegaPaintFile : IImageFileFormat<MegaPaintFile> {
+public readonly record struct MegaPaintFile : IImageFormatReader<MegaPaintFile>, IImageToRawImage<MegaPaintFile>, IImageFormatWriter<MegaPaintFile> {
 
   /// <summary>Header size in bytes: 2 (width) + 2 (height) + 4 (reserved) = 8.</summary>
   public const int HeaderSize = 8;
@@ -13,13 +12,11 @@ public sealed class MegaPaintFile : IImageFileFormat<MegaPaintFile> {
   /// <summary>Minimum file size for validation.</summary>
   public const int MinFileSize = 8;
 
-  static string IImageFileFormat<MegaPaintFile>.PrimaryExtension => ".bld";
-  static string[] IImageFileFormat<MegaPaintFile>.FileExtensions => [".bld"];
-  static FormatCapability IImageFileFormat<MegaPaintFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static MegaPaintFile IImageFileFormat<MegaPaintFile>.FromFile(FileInfo file) => MegaPaintReader.FromFile(file);
-  static MegaPaintFile IImageFileFormat<MegaPaintFile>.FromBytes(byte[] data) => MegaPaintReader.FromBytes(data);
-  static MegaPaintFile IImageFileFormat<MegaPaintFile>.FromStream(Stream stream) => MegaPaintReader.FromStream(stream);
-  static byte[] IImageFileFormat<MegaPaintFile>.ToBytes(MegaPaintFile file) => MegaPaintWriter.ToBytes(file);
+  static string IImageFormatMetadata<MegaPaintFile>.PrimaryExtension => ".bld";
+  static string[] IImageFormatMetadata<MegaPaintFile>.FileExtensions => [".bld"];
+  static MegaPaintFile IImageFormatReader<MegaPaintFile>.FromSpan(ReadOnlySpan<byte> data) => MegaPaintReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<MegaPaintFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<MegaPaintFile>.ToBytes(MegaPaintFile file) => MegaPaintWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -28,10 +25,9 @@ public sealed class MegaPaintFile : IImageFileFormat<MegaPaintFile> {
   public int Height { get; init; }
 
   /// <summary>Raw monochrome bitmap data (1 bit per pixel, padded to byte boundary per row).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(MegaPaintFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var width = file.Width;
     var height = file.Height;
@@ -59,5 +55,4 @@ public sealed class MegaPaintFile : IImageFileFormat<MegaPaintFile> {
     };
   }
 
-  public static MegaPaintFile FromRawImage(RawImage image) => throw new NotSupportedException("MegaPaint format does not support creation from RawImage.");
 }

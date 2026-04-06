@@ -1,31 +1,27 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Clp;
 
 /// <summary>In-memory representation of a CLP (Windows Clipboard) image file.</summary>
 [FormatMagicBytes([0xC3, 0x50])]
-public sealed class ClpFile : IImageFileFormat<ClpFile> {
+public readonly record struct ClpFile : IImageFormatReader<ClpFile>, IImageToRawImage<ClpFile>, IImageFromRawImage<ClpFile>, IImageFormatWriter<ClpFile> {
 
-  static string IImageFileFormat<ClpFile>.PrimaryExtension => ".clp";
-  static string[] IImageFileFormat<ClpFile>.FileExtensions => [".clp"];
-  static ClpFile IImageFileFormat<ClpFile>.FromFile(FileInfo file) => ClpReader.FromFile(file);
-  static ClpFile IImageFileFormat<ClpFile>.FromBytes(byte[] data) => ClpReader.FromBytes(data);
-  static ClpFile IImageFileFormat<ClpFile>.FromStream(Stream stream) => ClpReader.FromStream(stream);
-  static byte[] IImageFileFormat<ClpFile>.ToBytes(ClpFile file) => ClpWriter.ToBytes(file);
+  static string IImageFormatMetadata<ClpFile>.PrimaryExtension => ".clp";
+  static string[] IImageFormatMetadata<ClpFile>.FileExtensions => [".clp"];
+  static ClpFile IImageFormatReader<ClpFile>.FromSpan(ReadOnlySpan<byte> data) => ClpReader.FromSpan(data);
+  static byte[] IImageFormatWriter<ClpFile>.ToBytes(ClpFile file) => ClpWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
   public int BitsPerPixel { get; init; }
 
   /// <summary>Raw pixel data (bottom-up DIB order, row-padded to 4-byte boundary).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>BGRX palette (4 bytes per entry), or null if no palette.</summary>
   public byte[]? Palette { get; init; }
 
   public static RawImage ToRawImage(ClpFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var width = file.Width;
     var height = file.Height;

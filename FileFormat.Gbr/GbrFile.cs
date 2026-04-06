@@ -1,19 +1,16 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Gbr;
 
 /// <summary>In-memory representation of a GIMP Brush (GBR) version 2 image.</summary>
 [FormatMagicBytes([0x47, 0x49, 0x4D, 0x50], offset: 20)]
-public sealed class GbrFile : IImageFileFormat<GbrFile> {
+public readonly record struct GbrFile : IImageFormatReader<GbrFile>, IImageToRawImage<GbrFile>, IImageFromRawImage<GbrFile>, IImageFormatWriter<GbrFile> {
 
-  static string IImageFileFormat<GbrFile>.PrimaryExtension => ".gbr";
-  static string[] IImageFileFormat<GbrFile>.FileExtensions => [".gbr"];
-  static GbrFile IImageFileFormat<GbrFile>.FromFile(FileInfo file) => GbrReader.FromFile(file);
-  static GbrFile IImageFileFormat<GbrFile>.FromBytes(byte[] data) => GbrReader.FromBytes(data);
-  static GbrFile IImageFileFormat<GbrFile>.FromStream(Stream stream) => GbrReader.FromStream(stream);
-  static byte[] IImageFileFormat<GbrFile>.ToBytes(GbrFile file) => GbrWriter.ToBytes(file);
+  static string IImageFormatMetadata<GbrFile>.PrimaryExtension => ".gbr";
+  static string[] IImageFormatMetadata<GbrFile>.FileExtensions => [".gbr"];
+  static GbrFile IImageFormatReader<GbrFile>.FromSpan(ReadOnlySpan<byte> data) => GbrReader.FromSpan(data);
+  static byte[] IImageFormatWriter<GbrFile>.ToBytes(GbrFile file) => GbrWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -28,13 +25,12 @@ public sealed class GbrFile : IImageFileFormat<GbrFile> {
   public int Spacing { get; init; }
 
   /// <summary>Brush name (UTF-8, stored null-terminated in file).</summary>
-  public string Name { get; init; } = string.Empty;
+  public string Name { get; init; }
 
   /// <summary>Raw pixel data (width * height * bytes_per_pixel bytes, row-major).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(GbrFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

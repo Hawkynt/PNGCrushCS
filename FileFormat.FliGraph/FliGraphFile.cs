@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.FliGraph;
 
 /// <summary>In-memory representation of a FLI Graph (FLI multicolor variant) image for the Commodore 64.</summary>
-public sealed class FliGraphFile : IImageFileFormat<FliGraphFile> {
+public readonly record struct FliGraphFile : IImageFormatReader<FliGraphFile>, IImageToRawImage<FliGraphFile>, IImageFormatWriter<FliGraphFile> {
 
-  static string IImageFileFormat<FliGraphFile>.PrimaryExtension => ".flg";
-  static string[] IImageFileFormat<FliGraphFile>.FileExtensions => [".flg"];
-  static FliGraphFile IImageFileFormat<FliGraphFile>.FromFile(FileInfo file) => FliGraphReader.FromFile(file);
-  static FliGraphFile IImageFileFormat<FliGraphFile>.FromBytes(byte[] data) => FliGraphReader.FromBytes(data);
-  static FliGraphFile IImageFileFormat<FliGraphFile>.FromStream(Stream stream) => FliGraphReader.FromStream(stream);
-  static byte[] IImageFileFormat<FliGraphFile>.ToBytes(FliGraphFile file) => FliGraphWriter.ToBytes(file);
+  static string IImageFormatMetadata<FliGraphFile>.PrimaryExtension => ".flg";
+  static string[] IImageFormatMetadata<FliGraphFile>.FileExtensions => [".flg"];
+  static FliGraphFile IImageFormatReader<FliGraphFile>.FromSpan(ReadOnlySpan<byte> data) => FliGraphReader.FromSpan(data);
+  static byte[] IImageFormatWriter<FliGraphFile>.ToBytes(FliGraphFile file) => FliGraphWriter.ToBytes(file);
 
   /// <summary>Image width in pixels, always 160 (multicolor).</summary>
   public const int FixedWidth = 160;
@@ -55,27 +52,20 @@ public sealed class FliGraphFile : IImageFileFormat<FliGraphFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Bitmap data (8000 bytes).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Per-scanline screen RAM (8000 bytes: 40 bytes per scanline x 200 lines).</summary>
-  public byte[] ScreenData { get; init; } = [];
+  public byte[] ScreenData { get; init; }
 
   /// <summary>Color RAM (1000 bytes, one per 4x8 cell).</summary>
-  public byte[] ColorRam { get; init; } = [];
+  public byte[] ColorRam { get; init; }
 
   /// <summary>Padding bytes at the end of the file (472 bytes).</summary>
-  public byte[] Padding { get; init; } = [];
+  public byte[] Padding { get; init; }
 
   /// <summary>Converts this FLI Graph image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(FliGraphFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return _FliMultiToRawImage(file.BitmapData, file.ScreenData, file.ColorRam);
-  }
-
-  /// <summary>Not supported. FLI multicolor images have complex per-scanline color constraints.</summary>
-  public static FliGraphFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to FliGraphFile is not supported due to complex per-scanline FLI color constraints.");
   }
 
   /// <summary>Shared FLI multicolor decode: per-scanline screen RAM instead of per-cell.</summary>

@@ -26,6 +26,8 @@ public static class AtariPlayerReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static AtariPlayerFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AtariPlayerFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != AtariPlayerFile.FileSize)

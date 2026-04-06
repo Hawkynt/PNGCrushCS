@@ -26,6 +26,8 @@ public static class SpookySpritesFalconReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static SpookySpritesFalconFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static SpookySpritesFalconFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < SpookySpritesFalconHeader.StructSize)

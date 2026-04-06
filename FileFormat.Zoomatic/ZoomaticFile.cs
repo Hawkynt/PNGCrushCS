@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Zoomatic;
 
 /// <summary>In-memory representation of a C64 Zoomatic (.zom) multicolor art image.</summary>
-public sealed class ZoomaticFile : IImageFileFormat<ZoomaticFile> {
+public readonly record struct ZoomaticFile : IImageFormatReader<ZoomaticFile>, IImageToRawImage<ZoomaticFile>, IImageFormatWriter<ZoomaticFile> {
 
-  static string IImageFileFormat<ZoomaticFile>.PrimaryExtension => ".zom";
-  static string[] IImageFileFormat<ZoomaticFile>.FileExtensions => [".zom"];
-  static ZoomaticFile IImageFileFormat<ZoomaticFile>.FromFile(FileInfo file) => ZoomaticReader.FromFile(file);
-  static ZoomaticFile IImageFileFormat<ZoomaticFile>.FromBytes(byte[] data) => ZoomaticReader.FromBytes(data);
-  static ZoomaticFile IImageFileFormat<ZoomaticFile>.FromStream(Stream stream) => ZoomaticReader.FromStream(stream);
-  static byte[] IImageFileFormat<ZoomaticFile>.ToBytes(ZoomaticFile file) => ZoomaticWriter.ToBytes(file);
+  static string IImageFormatMetadata<ZoomaticFile>.PrimaryExtension => ".zom";
+  static string[] IImageFormatMetadata<ZoomaticFile>.FileExtensions => [".zom"];
+  static ZoomaticFile IImageFormatReader<ZoomaticFile>.FromSpan(ReadOnlySpan<byte> data) => ZoomaticReader.FromSpan(data);
+  static byte[] IImageFormatWriter<ZoomaticFile>.ToBytes(ZoomaticFile file) => ZoomaticWriter.ToBytes(file);
 
   /// <summary>Size of the bitmap data section in bytes.</summary>
   internal const int BitmapDataSize = 8000;
@@ -46,23 +43,22 @@ public sealed class ZoomaticFile : IImageFileFormat<ZoomaticFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Bitmap data (8000 bytes).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Screen RAM / video matrix (1000 bytes).</summary>
-  public byte[] ScreenData { get; init; } = [];
+  public byte[] ScreenData { get; init; }
 
   /// <summary>Color RAM (1000 bytes).</summary>
-  public byte[] ColorData { get; init; } = [];
+  public byte[] ColorData { get; init; }
 
   /// <summary>Background color index (0-15). Bit-pair 0 maps to this color.</summary>
   public byte BackgroundColor { get; init; }
 
   /// <summary>Any trailing bytes beyond the minimum payload.</summary>
-  public byte[] TrailingData { get; init; } = [];
+  public byte[] TrailingData { get; init; }
 
   /// <summary>Converts this Zoomatic image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(ZoomaticFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = ImageWidth;
     const int height = ImageHeight;
@@ -101,6 +97,4 @@ public sealed class ZoomaticFile : IImageFileFormat<ZoomaticFile> {
     };
   }
 
-  /// <summary>Creates a Zoomatic image from a <see cref="RawImage"/>. Not supported.</summary>
-  public static ZoomaticFile FromRawImage(RawImage image) => throw new NotSupportedException("Creating Zoomatic files from raw images is not supported.");
 }

@@ -1,19 +1,16 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.GraphSaurus;
 
 /// <summary>In-memory representation of a Graph Saurus image (MSX2 Screen 8, 256x212, 256-color RGB332).</summary>
-public sealed class GraphSaurusFile : IImageFileFormat<GraphSaurusFile> {
+public readonly record struct GraphSaurusFile : IImageFormatReader<GraphSaurusFile>, IImageToRawImage<GraphSaurusFile>, IImageFromRawImage<GraphSaurusFile>, IImageFormatWriter<GraphSaurusFile> {
 
-  static string IImageFileFormat<GraphSaurusFile>.PrimaryExtension => ".grs";
-  static string[] IImageFileFormat<GraphSaurusFile>.FileExtensions => [".grs", ".sr5", ".sr7", ".sr8", ".srs"];
-  static FormatCapability IImageFileFormat<GraphSaurusFile>.Capabilities => FormatCapability.IndexedOnly;
-  static GraphSaurusFile IImageFileFormat<GraphSaurusFile>.FromFile(FileInfo file) => GraphSaurusReader.FromFile(file);
-  static GraphSaurusFile IImageFileFormat<GraphSaurusFile>.FromBytes(byte[] data) => GraphSaurusReader.FromBytes(data);
-  static GraphSaurusFile IImageFileFormat<GraphSaurusFile>.FromStream(Stream stream) => GraphSaurusReader.FromStream(stream);
-  static byte[] IImageFileFormat<GraphSaurusFile>.ToBytes(GraphSaurusFile file) => GraphSaurusWriter.ToBytes(file);
+  static string IImageFormatMetadata<GraphSaurusFile>.PrimaryExtension => ".grs";
+  static string[] IImageFormatMetadata<GraphSaurusFile>.FileExtensions => [".grs", ".sr5", ".sr7", ".sr8", ".srs"];
+  static GraphSaurusFile IImageFormatReader<GraphSaurusFile>.FromSpan(ReadOnlySpan<byte> data) => GraphSaurusReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<GraphSaurusFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<GraphSaurusFile>.ToBytes(GraphSaurusFile file) => GraphSaurusWriter.ToBytes(file);
 
   /// <summary>Fixed image width.</summary>
   public const int FixedWidth = 256;
@@ -31,11 +28,10 @@ public sealed class GraphSaurusFile : IImageFileFormat<GraphSaurusFile> {
   public int Height => FixedHeight;
 
   /// <summary>Raw pixel data (54272 bytes, one byte per pixel in RGB332 encoding).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this Graph Saurus image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(GraphSaurusFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var rgb = new byte[FixedWidth * FixedHeight * 3];
 

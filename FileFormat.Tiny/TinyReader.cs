@@ -29,6 +29,8 @@ public static class TinyReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static TinyFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static TinyFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _HEADER_SIZE)

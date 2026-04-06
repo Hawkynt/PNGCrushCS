@@ -41,25 +41,6 @@ public class BobReaderTests {
 }
 
 [TestFixture]
-public class BobWriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => BobWriter.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_IncludesHeader() {
-    var file = new BobFile {
-      Width = 320,
-      Height = 200,
-      PixelData = new byte[320 * 200 * 3],
-    };
-    var bytes = BobWriter.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(8 + 320 * 200 * 3));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -90,30 +71,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void HeaderSize_Is8()
-    => Assert.That(BobFile.HeaderSize, Is.EqualTo(8));
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => BobFile.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => BobFile.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 320, Height = 200, Format = PixelFormat.Indexed8, PixelData = new byte[320 * 200] };
-    Assert.Throws<ArgumentException>(() => BobFile.FromRawImage(raw));
-  }
-
-  [Test]
-  public void FileExtensions_ContainsPrimary() {
-    string[] exts = [".bob"];
-    Assert.That(exts, Does.Contain(".bob"));
-  }
-}

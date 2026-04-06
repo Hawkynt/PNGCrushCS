@@ -1,18 +1,15 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.CsvImage;
 
 /// <summary>In-memory representation of a CSV-encoded grayscale image.</summary>
-public sealed class CsvImageFile : IImageFileFormat<CsvImageFile> {
+public readonly record struct CsvImageFile : IImageFormatReader<CsvImageFile>, IImageToRawImage<CsvImageFile>, IImageFromRawImage<CsvImageFile>, IImageFormatWriter<CsvImageFile> {
 
-  static string IImageFileFormat<CsvImageFile>.PrimaryExtension => ".csv";
-  static string[] IImageFileFormat<CsvImageFile>.FileExtensions => [".csv"];
-  static CsvImageFile IImageFileFormat<CsvImageFile>.FromFile(FileInfo file) => CsvImageReader.FromFile(file);
-  static CsvImageFile IImageFileFormat<CsvImageFile>.FromBytes(byte[] data) => CsvImageReader.FromBytes(data);
-  static CsvImageFile IImageFileFormat<CsvImageFile>.FromStream(Stream stream) => CsvImageReader.FromStream(stream);
-  static byte[] IImageFileFormat<CsvImageFile>.ToBytes(CsvImageFile file) => CsvImageWriter.ToBytes(file);
+  static string IImageFormatMetadata<CsvImageFile>.PrimaryExtension => ".csv";
+  static string[] IImageFormatMetadata<CsvImageFile>.FileExtensions => [".csv"];
+  static CsvImageFile IImageFormatReader<CsvImageFile>.FromSpan(ReadOnlySpan<byte> data) => CsvImageReader.FromSpan(data);
+  static byte[] IImageFormatWriter<CsvImageFile>.ToBytes(CsvImageFile file) => CsvImageWriter.ToBytes(file);
 
   /// <summary>Minimum valid file size (at least header line "1,1\n").</summary>
   public const int MinFileSize = 4;
@@ -24,10 +21,9 @@ public sealed class CsvImageFile : IImageFileFormat<CsvImageFile> {
   public int Height { get; init; }
 
   /// <summary>Raw grayscale pixel data (1 byte per pixel).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(CsvImageFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

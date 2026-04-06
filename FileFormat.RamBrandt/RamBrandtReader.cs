@@ -26,6 +26,8 @@ public static class RamBrandtReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static RamBrandtFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static RamBrandtFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != RamBrandtFile.ExpectedFileSize)

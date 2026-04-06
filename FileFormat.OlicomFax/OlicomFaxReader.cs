@@ -26,6 +26,8 @@ public static class OlicomFaxReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static OlicomFaxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static OlicomFaxFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < OlicomFaxFile.MinFileSize)

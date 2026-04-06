@@ -26,6 +26,8 @@ public static class AtariGraphics11Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static AtariGraphics11File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AtariGraphics11File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != AtariGraphics11File.FileSize)

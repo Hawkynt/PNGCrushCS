@@ -51,29 +51,6 @@ public sealed class PrintMasterReaderTests {
 }
 
 [TestFixture]
-public sealed class PrintMasterWriterTests {
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => PrintMasterWriter.ToBytes(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_ProducesCorrectHeader() {
-    var file = new PrintMasterFile { Width = 88, Height = 52, PixelData = new byte[11 * 52] };
-    var bytes = PrintMasterWriter.ToBytes(file);
-
-    Assert.That(bytes[0], Is.EqualTo(11)); // widthBytes
-    Assert.That(bytes[1], Is.EqualTo(0));
-    Assert.That(bytes[2], Is.EqualTo(52)); // height
-    Assert.That(bytes[3], Is.EqualTo(0));
-    Assert.That(bytes.Length, Is.EqualTo(4 + 11 * 52));
-  }
-}
-
-[TestFixture]
 public sealed class RoundTripTests {
 
   [Test]
@@ -141,50 +118,3 @@ public sealed class RoundTripTests {
   }
 }
 
-[TestFixture]
-public sealed class DataTypeTests {
-
-  [Test]
-  [Category("Unit")]
-  public void PrintMasterFile_Defaults() {
-    var file = new PrintMasterFile();
-    Assert.That(file.Width, Is.EqualTo(0));
-    Assert.That(file.Height, Is.EqualTo(0));
-    Assert.That(file.PixelData, Is.Empty);
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void PrintMasterFile_ToRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => PrintMasterFile.ToRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void PrintMasterFile_FromRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => PrintMasterFile.FromRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void PrintMasterFile_FromRawImage_WrongFormat_Throws() {
-    var raw = new RawImage {
-      Width = 88, Height = 52,
-      Format = PixelFormat.Rgb24,
-      PixelData = new byte[88 * 52 * 3],
-    };
-    Assert.Throws<ArgumentException>(() => PrintMasterFile.FromRawImage(raw));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void PrintMasterFile_ToRawImage_ReturnsIndexed1() {
-    var file = new PrintMasterFile { Width = 16, Height = 4, PixelData = new byte[8] };
-    var raw = PrintMasterFile.ToRawImage(file);
-
-    Assert.That(raw.Format, Is.EqualTo(PixelFormat.Indexed1));
-    Assert.That(raw.PaletteCount, Is.EqualTo(2));
-    Assert.That(raw.Width, Is.EqualTo(16));
-    Assert.That(raw.Height, Is.EqualTo(4));
-  }
-}

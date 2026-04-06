@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Bfli;
 
 /// <summary>In-memory representation of a BFLI (Flexible Line Interpretation) image.</summary>
-public sealed class BfliFile : IImageFileFormat<BfliFile> {
+public readonly record struct BfliFile : IImageFormatReader<BfliFile>, IImageToRawImage<BfliFile>, IImageFormatWriter<BfliFile> {
 
-  static string IImageFileFormat<BfliFile>.PrimaryExtension => ".bfl";
-  static string[] IImageFileFormat<BfliFile>.FileExtensions => [".bfl", ".bfli"];
-  static BfliFile IImageFileFormat<BfliFile>.FromFile(FileInfo file) => BfliReader.FromFile(file);
-  static BfliFile IImageFileFormat<BfliFile>.FromBytes(byte[] data) => BfliReader.FromBytes(data);
-  static BfliFile IImageFileFormat<BfliFile>.FromStream(Stream stream) => BfliReader.FromStream(stream);
-  static byte[] IImageFileFormat<BfliFile>.ToBytes(BfliFile file) => BfliWriter.ToBytes(file);
+  static string IImageFormatMetadata<BfliFile>.PrimaryExtension => ".bfl";
+  static string[] IImageFormatMetadata<BfliFile>.FileExtensions => [".bfl", ".bfli"];
+  static BfliFile IImageFormatReader<BfliFile>.FromSpan(ReadOnlySpan<byte> data) => BfliReader.FromSpan(data);
+  static byte[] IImageFormatWriter<BfliFile>.ToBytes(BfliFile file) => BfliWriter.ToBytes(file);
 
   /// <summary>The fixed width of the image in pixels.</summary>
   public const int FixedWidth = 320;
@@ -46,11 +43,10 @@ public sealed class BfliFile : IImageFileFormat<BfliFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Raw payload data (entire file content after load address).</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   /// <summary>Converts this BFLI image to a platform-independent <see cref="RawImage"/> in Rgb24 format using simplified hires decode.</summary>
   public static RawImage ToRawImage(BfliFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -93,9 +89,4 @@ public sealed class BfliFile : IImageFileFormat<BfliFile> {
     };
   }
 
-  /// <summary>Not supported. BFLI images have complex FLI color switching constraints.</summary>
-  public static BfliFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to BfliFile is not supported due to complex FLI color switching constraints.");
-  }
 }

@@ -1,27 +1,23 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.AtariFalconXga;
 
 /// <summary>In-memory representation of an Atari Falcon XGA 16-bit true color (.xga) image.</summary>
-public sealed class AtariFalconXgaFile : IImageFileFormat<AtariFalconXgaFile> {
+public readonly record struct AtariFalconXgaFile : IImageFormatReader<AtariFalconXgaFile>, IImageToRawImage<AtariFalconXgaFile>, IImageFromRawImage<AtariFalconXgaFile>, IImageFormatWriter<AtariFalconXgaFile> {
 
-  static string IImageFileFormat<AtariFalconXgaFile>.PrimaryExtension => ".xga";
-  static string[] IImageFileFormat<AtariFalconXgaFile>.FileExtensions => [".xga"];
-  static AtariFalconXgaFile IImageFileFormat<AtariFalconXgaFile>.FromFile(FileInfo file) => AtariFalconXgaReader.FromFile(file);
-  static AtariFalconXgaFile IImageFileFormat<AtariFalconXgaFile>.FromBytes(byte[] data) => AtariFalconXgaReader.FromBytes(data);
-  static AtariFalconXgaFile IImageFileFormat<AtariFalconXgaFile>.FromStream(Stream stream) => AtariFalconXgaReader.FromStream(stream);
-  static byte[] IImageFileFormat<AtariFalconXgaFile>.ToBytes(AtariFalconXgaFile file) => AtariFalconXgaWriter.ToBytes(file);
+  static string IImageFormatMetadata<AtariFalconXgaFile>.PrimaryExtension => ".xga";
+  static string[] IImageFormatMetadata<AtariFalconXgaFile>.FileExtensions => [".xga"];
+  static AtariFalconXgaFile IImageFormatReader<AtariFalconXgaFile>.FromSpan(ReadOnlySpan<byte> data) => AtariFalconXgaReader.FromSpan(data);
+  static byte[] IImageFormatWriter<AtariFalconXgaFile>.ToBytes(AtariFalconXgaFile file) => AtariFalconXgaWriter.ToBytes(file);
 
   public int Width { get; init; }
   public int Height { get; init; }
 
   /// <summary>Raw RGB565 big-endian pixel data (2 bytes per pixel).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(AtariFalconXgaFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var rgb565 = file.PixelData;
     var pixelCount = file.Width * file.Height;

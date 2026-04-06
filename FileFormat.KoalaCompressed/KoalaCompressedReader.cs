@@ -27,6 +27,8 @@ public static class KoalaCompressedReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static KoalaCompressedFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static KoalaCompressedFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < KoalaCompressedFile.MinFileSize)

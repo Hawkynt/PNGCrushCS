@@ -26,6 +26,8 @@ public static class FfliReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static FfliFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static FfliFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < FfliFile.LoadAddressSize + FfliFile.MinPayloadSize)

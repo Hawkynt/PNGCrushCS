@@ -1,18 +1,18 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Tiff;
 
 /// <summary>In-memory representation of a TIFF image.</summary>
-public sealed class TiffFile : IImageFileFormat<TiffFile>, IMultiImageFileFormat<TiffFile> {
+public sealed class TiffFile : IImageFormatReader<TiffFile>, IImageToRawImage<TiffFile>, IImageFromRawImage<TiffFile>, IImageFormatWriter<TiffFile>, IMultiImageFileFormat<TiffFile> {
 
-  static string IImageFileFormat<TiffFile>.PrimaryExtension => ".tiff";
-  static string[] IImageFileFormat<TiffFile>.FileExtensions => [".tif", ".tiff", ".ftf"];
-  static FormatCapability IImageFileFormat<TiffFile>.Capabilities => FormatCapability.HasDedicatedOptimizer | FormatCapability.MultiImage;
+  static string IImageFormatMetadata<TiffFile>.PrimaryExtension => ".tiff";
+  static string[] IImageFormatMetadata<TiffFile>.FileExtensions => [".tif", ".tiff", ".ftf"];
+  static TiffFile IImageFormatReader<TiffFile>.FromSpan(ReadOnlySpan<byte> data) => TiffReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<TiffFile>.Capabilities => FormatCapability.HasDedicatedOptimizer | FormatCapability.MultiImage;
 
-  static bool? IImageFileFormat<TiffFile>.MatchesSignature(ReadOnlySpan<byte> header) {
+  static bool? IImageFormatMetadata<TiffFile>.MatchesSignature(ReadOnlySpan<byte> header) {
     if (header.Length < 4)
       return null;
     if (header[0] == 0x49 && header[1] == 0x49 && header[2] == 0x2A && header[3] == 0x00)
@@ -22,10 +22,7 @@ public sealed class TiffFile : IImageFileFormat<TiffFile>, IMultiImageFileFormat
     return null;
   }
 
-  static TiffFile IImageFileFormat<TiffFile>.FromFile(FileInfo file) => TiffReader.FromFile(file);
-  static TiffFile IImageFileFormat<TiffFile>.FromBytes(byte[] data) => TiffReader.FromBytes(data);
-  static TiffFile IImageFileFormat<TiffFile>.FromStream(Stream stream) => TiffReader.FromStream(stream);
-  static byte[] IImageFileFormat<TiffFile>.ToBytes(TiffFile file) => TiffWriter.ToBytes(file);
+  static byte[] IImageFormatWriter<TiffFile>.ToBytes(TiffFile file) => TiffWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
   public int SamplesPerPixel { get; init; }

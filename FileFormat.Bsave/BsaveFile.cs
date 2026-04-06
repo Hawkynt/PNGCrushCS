@@ -1,25 +1,22 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Bsave;
 
 /// <summary>In-memory representation of a BSAVE (IBM PC BSAVE Graphics) screen dump.</summary>
 [FormatMagicBytes([0xFD])]
-public sealed class BsaveFile : IImageFileFormat<BsaveFile> {
+public readonly record struct BsaveFile : IImageFormatReader<BsaveFile>, IImageToRawImage<BsaveFile>, IImageFromRawImage<BsaveFile>, IImageFormatWriter<BsaveFile> {
 
-  static string IImageFileFormat<BsaveFile>.PrimaryExtension => ".bsv";
-  static string[] IImageFileFormat<BsaveFile>.FileExtensions => [".bsv"];
-  static BsaveFile IImageFileFormat<BsaveFile>.FromFile(FileInfo file) => BsaveReader.FromFile(file);
-  static BsaveFile IImageFileFormat<BsaveFile>.FromBytes(byte[] data) => BsaveReader.FromBytes(data);
-  static BsaveFile IImageFileFormat<BsaveFile>.FromStream(Stream stream) => BsaveReader.FromStream(stream);
-  static byte[] IImageFileFormat<BsaveFile>.ToBytes(BsaveFile file) => BsaveWriter.ToBytes(file);
+  static string IImageFormatMetadata<BsaveFile>.PrimaryExtension => ".bsv";
+  static string[] IImageFormatMetadata<BsaveFile>.FileExtensions => [".bsv"];
+  static BsaveFile IImageFormatReader<BsaveFile>.FromSpan(ReadOnlySpan<byte> data) => BsaveReader.FromSpan(data);
+  static byte[] IImageFormatWriter<BsaveFile>.ToBytes(BsaveFile file) => BsaveWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
   public BsaveMode Mode { get; init; }
 
   /// <summary>Raw screen memory bytes.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   // CGA palette 1 high-intensity: black, cyan, magenta, white
   private static readonly byte[] _CgaPalette = [
@@ -39,7 +36,6 @@ public sealed class BsaveFile : IImageFileFormat<BsaveFile> {
 
   /// <summary>Converts this BSAVE screen dump to a platform-independent <see cref="RawImage"/>.</summary>
   public static RawImage ToRawImage(BsaveFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     return file.Mode switch {
       BsaveMode.Cga320x200x4 => _Cga4ToRawImage(file),

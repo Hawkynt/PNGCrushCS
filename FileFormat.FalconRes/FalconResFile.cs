@@ -1,21 +1,18 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.FalconRes;
 
 /// <summary>In-memory representation of a Falcon Res (.frs) screen dump.</summary>
-public sealed class FalconResFile : IImageFileFormat<FalconResFile> {
+public readonly record struct FalconResFile : IImageFormatReader<FalconResFile>, IImageToRawImage<FalconResFile>, IImageFromRawImage<FalconResFile>, IImageFormatWriter<FalconResFile> {
 
   /// <summary>The exact file size: 320 x 240 x 2 bytes per pixel.</summary>
   public const int ExpectedFileSize = 320 * 240 * 2;
 
-  static string IImageFileFormat<FalconResFile>.PrimaryExtension => ".frs";
-  static string[] IImageFileFormat<FalconResFile>.FileExtensions => [".frs"];
-  static FalconResFile IImageFileFormat<FalconResFile>.FromFile(FileInfo file) => FalconResReader.FromFile(file);
-  static FalconResFile IImageFileFormat<FalconResFile>.FromBytes(byte[] data) => FalconResReader.FromBytes(data);
-  static FalconResFile IImageFileFormat<FalconResFile>.FromStream(Stream stream) => FalconResReader.FromStream(stream);
-  static byte[] IImageFileFormat<FalconResFile>.ToBytes(FalconResFile file) => FalconResWriter.ToBytes(file);
+  static string IImageFormatMetadata<FalconResFile>.PrimaryExtension => ".frs";
+  static string[] IImageFormatMetadata<FalconResFile>.FileExtensions => [".frs"];
+  static FalconResFile IImageFormatReader<FalconResFile>.FromSpan(ReadOnlySpan<byte> data) => FalconResReader.FromSpan(data);
+  static byte[] IImageFormatWriter<FalconResFile>.ToBytes(FalconResFile file) => FalconResWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>
   public int Width => 320;
@@ -24,10 +21,9 @@ public sealed class FalconResFile : IImageFileFormat<FalconResFile> {
   public int Height => 240;
 
   /// <summary>Raw RGB565 big-endian pixel data (2 bytes per pixel, 153600 bytes total).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(FalconResFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var rgb565 = file.PixelData;
     var pixelCount = 320 * 240;

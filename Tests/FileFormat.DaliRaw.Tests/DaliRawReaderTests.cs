@@ -105,13 +105,6 @@ public sealed class DaliRawReaderTests {
     Assert.That(raw.Format, Is.EqualTo(FileFormat.Core.PixelFormat.Indexed8));
     Assert.That(raw.PaletteCount, Is.EqualTo(16));
   }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_ThrowsNotSupportedException() {
-    Assert.Throws<NotSupportedException>(() => DaliRawFile.FromRawImage(null!));
-  }
-
   [Test]
   [Category("Integration")]
   public void RoundTrip_PaletteAndDataPreserved() {

@@ -26,6 +26,8 @@ public static class FlimaticReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static FlimaticFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static FlimaticFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < FlimaticFile.LoadAddressSize + FlimaticFile.MinPayloadSize)

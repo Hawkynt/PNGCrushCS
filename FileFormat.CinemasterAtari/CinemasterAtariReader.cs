@@ -26,6 +26,8 @@ public static class CinemasterAtariReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static CinemasterAtariFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static CinemasterAtariFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < CinemasterAtariFile.HeaderSize)

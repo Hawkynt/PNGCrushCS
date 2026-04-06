@@ -26,6 +26,8 @@ public static class EmcEditorReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static EmcEditorFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static EmcEditorFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < EmcEditorFile.LoadAddressSize + EmcEditorFile.MinPayloadSize)

@@ -1,18 +1,15 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.QuantelVpb;
 
 /// <summary>In-memory representation of a Quantel VPB RGB image.</summary>
-public sealed class QuantelVpbFile : IImageFileFormat<QuantelVpbFile> {
+public readonly record struct QuantelVpbFile : IImageFormatReader<QuantelVpbFile>, IImageToRawImage<QuantelVpbFile>, IImageFromRawImage<QuantelVpbFile>, IImageFormatWriter<QuantelVpbFile> {
 
-  static string IImageFileFormat<QuantelVpbFile>.PrimaryExtension => ".vpb";
-  static string[] IImageFileFormat<QuantelVpbFile>.FileExtensions => [".vpb"];
-  static QuantelVpbFile IImageFileFormat<QuantelVpbFile>.FromFile(FileInfo file) => QuantelVpbReader.FromFile(file);
-  static QuantelVpbFile IImageFileFormat<QuantelVpbFile>.FromBytes(byte[] data) => QuantelVpbReader.FromBytes(data);
-  static QuantelVpbFile IImageFileFormat<QuantelVpbFile>.FromStream(Stream stream) => QuantelVpbReader.FromStream(stream);
-  static byte[] IImageFileFormat<QuantelVpbFile>.ToBytes(QuantelVpbFile file) => QuantelVpbWriter.ToBytes(file);
+  static string IImageFormatMetadata<QuantelVpbFile>.PrimaryExtension => ".vpb";
+  static string[] IImageFormatMetadata<QuantelVpbFile>.FileExtensions => [".vpb"];
+  static QuantelVpbFile IImageFormatReader<QuantelVpbFile>.FromSpan(ReadOnlySpan<byte> data) => QuantelVpbReader.FromSpan(data);
+  static byte[] IImageFormatWriter<QuantelVpbFile>.ToBytes(QuantelVpbFile file) => QuantelVpbWriter.ToBytes(file);
 
   /// <summary>Magic bytes: "QVPB" (0x51 0x56 0x50 0x42).</summary>
   internal static readonly byte[] Magic = [0x51, 0x56, 0x50, 0x42];
@@ -39,10 +36,9 @@ public sealed class QuantelVpbFile : IImageFileFormat<QuantelVpbFile> {
   public uint Reserved { get; init; }
 
   /// <summary>Raw RGB pixel data (3 bytes per pixel).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(QuantelVpbFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

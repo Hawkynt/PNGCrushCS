@@ -26,6 +26,8 @@ public static class CompWReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static CompWFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static CompWFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < CompWFile.MinFileSize)

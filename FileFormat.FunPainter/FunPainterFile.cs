@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.FunPainter;
 
 /// <summary>In-memory representation of a Fun Painter II IFLI multicolor image.</summary>
-public sealed class FunPainterFile : IImageFileFormat<FunPainterFile> {
+public readonly record struct FunPainterFile : IImageFormatReader<FunPainterFile>, IImageToRawImage<FunPainterFile>, IImageFormatWriter<FunPainterFile> {
 
-  static string IImageFileFormat<FunPainterFile>.PrimaryExtension => ".fp2";
-  static string[] IImageFileFormat<FunPainterFile>.FileExtensions => [".fp2", ".fun"];
-  static FunPainterFile IImageFileFormat<FunPainterFile>.FromFile(FileInfo file) => FunPainterReader.FromFile(file);
-  static FunPainterFile IImageFileFormat<FunPainterFile>.FromBytes(byte[] data) => FunPainterReader.FromBytes(data);
-  static FunPainterFile IImageFileFormat<FunPainterFile>.FromStream(Stream stream) => FunPainterReader.FromStream(stream);
-  static byte[] IImageFileFormat<FunPainterFile>.ToBytes(FunPainterFile file) => FunPainterWriter.ToBytes(file);
+  static string IImageFormatMetadata<FunPainterFile>.PrimaryExtension => ".fp2";
+  static string[] IImageFormatMetadata<FunPainterFile>.FileExtensions => [".fp2", ".fun"];
+  static FunPainterFile IImageFormatReader<FunPainterFile>.FromSpan(ReadOnlySpan<byte> data) => FunPainterReader.FromSpan(data);
+  static byte[] IImageFormatWriter<FunPainterFile>.ToBytes(FunPainterFile file) => FunPainterWriter.ToBytes(file);
 
   /// <summary>The fixed width of the image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -49,11 +46,10 @@ public sealed class FunPainterFile : IImageFileFormat<FunPainterFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Raw payload data (entire file content after load address).</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   /// <summary>Converts this Fun Painter image to a platform-independent <see cref="RawImage"/> in Rgb24 format using simplified multicolor decode.</summary>
   public static RawImage ToRawImage(FunPainterFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -103,9 +99,4 @@ public sealed class FunPainterFile : IImageFileFormat<FunPainterFile> {
     };
   }
 
-  /// <summary>Not supported. Fun Painter images have complex IFLI color switching constraints.</summary>
-  public static FunPainterFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to FunPainterFile is not supported due to complex IFLI color switching constraints.");
-  }
 }

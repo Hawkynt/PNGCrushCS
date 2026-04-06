@@ -26,6 +26,8 @@ public static class CmuReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static CmuFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static CmuFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < CmuHeader.StructSize)

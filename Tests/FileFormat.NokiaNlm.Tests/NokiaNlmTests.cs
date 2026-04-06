@@ -38,31 +38,6 @@ public class NokiaNlmReaderTests {
 }
 
 [TestFixture]
-public class NokiaNlmWriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => NokiaNlmWriter.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_OutputSize_Is508() {
-    var file = new NokiaNlmFile { PixelData = new byte[508] };
-    var bytes = NokiaNlmWriter.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(508));
-  }
-
-  [Test]
-  public void ToBytes_DataPreserved() {
-    var data = new byte[508];
-    for (var i = 0; i < data.Length; ++i)
-      data[i] = (byte)(i & 0xFF);
-    var file = new NokiaNlmFile { PixelData = data };
-    var bytes = NokiaNlmWriter.ToBytes(file);
-    Assert.That(bytes, Is.EqualTo(data));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -90,32 +65,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void FixedWidth_Is84()
-    => Assert.That(NokiaNlmFile.FixedWidth, Is.EqualTo(84));
-
-  [Test]
-  public void FixedHeight_Is48()
-    => Assert.That(NokiaNlmFile.FixedHeight, Is.EqualTo(48));
-
-  [Test]
-  public void FileSize_Is508()
-    => Assert.That(NokiaNlmFile.FileSize, Is.EqualTo(508));
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => NokiaNlmFile.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => NokiaNlmFile.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 84, Height = 48, Format = PixelFormat.Rgb24, PixelData = new byte[84 * 48 * 3] };
-    Assert.Throws<ArgumentException>(() => NokiaNlmFile.FromRawImage(raw));
-  }
-}

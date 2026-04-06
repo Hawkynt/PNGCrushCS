@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.FacePainter;
 
 /// <summary>In-memory representation of a Commodore 64 Face Painter multicolor image.</summary>
-public sealed class FacePainterFile : IImageFileFormat<FacePainterFile> {
+public readonly record struct FacePainterFile : IImageFormatReader<FacePainterFile>, IImageToRawImage<FacePainterFile>, IImageFormatWriter<FacePainterFile> {
 
-  static string IImageFileFormat<FacePainterFile>.PrimaryExtension => ".fpt";
-  static string[] IImageFileFormat<FacePainterFile>.FileExtensions => [".fpt"];
-  static FacePainterFile IImageFileFormat<FacePainterFile>.FromFile(FileInfo file) => FacePainterReader.FromFile(file);
-  static FacePainterFile IImageFileFormat<FacePainterFile>.FromBytes(byte[] data) => FacePainterReader.FromBytes(data);
-  static FacePainterFile IImageFileFormat<FacePainterFile>.FromStream(Stream stream) => FacePainterReader.FromStream(stream);
-  static byte[] IImageFileFormat<FacePainterFile>.ToBytes(FacePainterFile file) => FacePainterWriter.ToBytes(file);
+  static string IImageFormatMetadata<FacePainterFile>.PrimaryExtension => ".fpt";
+  static string[] IImageFormatMetadata<FacePainterFile>.FileExtensions => [".fpt"];
+  static FacePainterFile IImageFormatReader<FacePainterFile>.FromSpan(ReadOnlySpan<byte> data) => FacePainterReader.FromSpan(data);
+  static byte[] IImageFormatWriter<FacePainterFile>.ToBytes(FacePainterFile file) => FacePainterWriter.ToBytes(file);
 
   /// <summary>The fixed width of a Face Painter image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -52,17 +49,16 @@ public sealed class FacePainterFile : IImageFileFormat<FacePainterFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Multicolor bitmap data (8000 bytes, 2 bits per pixel).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Video matrix / screen RAM (1000 bytes, upper/lower nybble = 2 colors per cell).</summary>
-  public byte[] VideoMatrix { get; init; } = [];
+  public byte[] VideoMatrix { get; init; }
 
   /// <summary>Color RAM (1000 bytes, lower nybble = 3rd color per cell).</summary>
-  public byte[] ColorRam { get; init; } = [];
+  public byte[] ColorRam { get; init; }
 
   /// <summary>Converts this Face Painter image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(FacePainterFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -101,9 +97,4 @@ public sealed class FacePainterFile : IImageFileFormat<FacePainterFile> {
     };
   }
 
-  /// <summary>Not supported. Face Painter images have complex cell-based color constraints.</summary>
-  public static FacePainterFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to FacePainterFile is not supported due to complex cell-based color constraints.");
-  }
 }

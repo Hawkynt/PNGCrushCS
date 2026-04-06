@@ -1,18 +1,15 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.AimGrayScale;
 
 /// <summary>In-memory representation of an AIM grayscale image.</summary>
-public sealed class AimGrayScaleFile : IImageFileFormat<AimGrayScaleFile> {
+public readonly record struct AimGrayScaleFile : IImageFormatReader<AimGrayScaleFile>, IImageToRawImage<AimGrayScaleFile>, IImageFromRawImage<AimGrayScaleFile>, IImageFormatWriter<AimGrayScaleFile> {
 
-  static string IImageFileFormat<AimGrayScaleFile>.PrimaryExtension => ".aim";
-  static string[] IImageFileFormat<AimGrayScaleFile>.FileExtensions => [".aim"];
-  static AimGrayScaleFile IImageFileFormat<AimGrayScaleFile>.FromFile(FileInfo file) => AimGrayScaleReader.FromFile(file);
-  static AimGrayScaleFile IImageFileFormat<AimGrayScaleFile>.FromBytes(byte[] data) => AimGrayScaleReader.FromBytes(data);
-  static AimGrayScaleFile IImageFileFormat<AimGrayScaleFile>.FromStream(Stream stream) => AimGrayScaleReader.FromStream(stream);
-  static byte[] IImageFileFormat<AimGrayScaleFile>.ToBytes(AimGrayScaleFile file) => AimGrayScaleWriter.ToBytes(file);
+  static string IImageFormatMetadata<AimGrayScaleFile>.PrimaryExtension => ".aim";
+  static string[] IImageFormatMetadata<AimGrayScaleFile>.FileExtensions => [".aim"];
+  static AimGrayScaleFile IImageFormatReader<AimGrayScaleFile>.FromSpan(ReadOnlySpan<byte> data) => AimGrayScaleReader.FromSpan(data);
+  static byte[] IImageFormatWriter<AimGrayScaleFile>.ToBytes(AimGrayScaleFile file) => AimGrayScaleWriter.ToBytes(file);
 
   /// <summary>Magic bytes: "AIM\0" (0x41 0x49 0x4D 0x00).</summary>
   internal static readonly byte[] Magic = [0x41, 0x49, 0x4D, 0x00];
@@ -30,11 +27,10 @@ public sealed class AimGrayScaleFile : IImageFileFormat<AimGrayScaleFile> {
   public int Height { get; init; }
 
   /// <summary>Grayscale pixel data (1 byte per pixel).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this AIM image to a platform-independent <see cref="RawImage"/> in Gray8 format.</summary>
   public static RawImage ToRawImage(AimGrayScaleFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

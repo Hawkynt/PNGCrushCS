@@ -26,6 +26,8 @@ public static class UfliEditorReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static UfliEditorFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static UfliEditorFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < UfliEditorFile.LoadAddressSize + UfliEditorFile.MinPayloadSize)

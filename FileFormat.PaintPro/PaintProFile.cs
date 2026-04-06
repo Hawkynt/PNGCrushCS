@@ -1,40 +1,36 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.PaintPro;
 
 /// <summary>In-memory representation of a Paint Pro image (Atari ST, 320x200, 16 colors).</summary>
-public sealed class PaintProFile : IImageFileFormat<PaintProFile> {
+public readonly record struct PaintProFile : IImageFormatReader<PaintProFile>, IImageToRawImage<PaintProFile>, IImageFromRawImage<PaintProFile>, IImageFormatWriter<PaintProFile> {
 
   /// <summary>Expected file size: 2-byte resolution + 32-byte palette + 32000 bytes planar data.</summary>
   public const int FileSize = 32034;
 
-  static string IImageFileFormat<PaintProFile>.PrimaryExtension => ".ppro";
-  static string[] IImageFileFormat<PaintProFile>.FileExtensions => [".ppro"];
-  static FormatCapability IImageFileFormat<PaintProFile>.Capabilities => FormatCapability.IndexedOnly;
-  static PaintProFile IImageFileFormat<PaintProFile>.FromFile(FileInfo file) => PaintProReader.FromFile(file);
-  static PaintProFile IImageFileFormat<PaintProFile>.FromBytes(byte[] data) => PaintProReader.FromBytes(data);
-  static PaintProFile IImageFileFormat<PaintProFile>.FromStream(Stream stream) => PaintProReader.FromStream(stream);
-  static byte[] IImageFileFormat<PaintProFile>.ToBytes(PaintProFile file) => PaintProWriter.ToBytes(file);
+  static string IImageFormatMetadata<PaintProFile>.PrimaryExtension => ".ppro";
+  static string[] IImageFormatMetadata<PaintProFile>.FileExtensions => [".ppro"];
+  static PaintProFile IImageFormatReader<PaintProFile>.FromSpan(ReadOnlySpan<byte> data) => PaintProReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<PaintProFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<PaintProFile>.ToBytes(PaintProFile file) => PaintProWriter.ToBytes(file);
 
   /// <summary>Image width (always 320).</summary>
-  public int Width { get; init; } = 320;
+  public int Width { get; init; }
 
   /// <summary>Image height (always 200).</summary>
-  public int Height { get; init; } = 200;
+  public int Height { get; init; }
 
   /// <summary>Resolution word (0 = low 320x200).</summary>
   public ushort Resolution { get; init; }
 
   /// <summary>16-entry palette of Atari ST 9-bit RGB values.</summary>
-  public short[] Palette { get; init; } = new short[16];
+  public short[] Palette { get; init; }
 
   /// <summary>32000 bytes of Atari ST word-interleaved planar pixel data.</summary>
-  public byte[] PixelData { get; init; } = new byte[32000];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(PaintProFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var chunky = PlanarConverter.AtariStToChunky(file.PixelData, file.Width, file.Height, 4);
     var paletteCount = Math.Min(16, file.Palette.Length);

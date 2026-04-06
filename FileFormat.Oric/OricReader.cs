@@ -29,6 +29,8 @@ public static class OricReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static OricFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static OricFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != _EXPECTED_SIZE)

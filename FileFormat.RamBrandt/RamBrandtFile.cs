@@ -1,11 +1,10 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.RamBrandt;
 
 /// <summary>In-memory representation of a Ram Brandt (Atari 8-bit) image (ANTIC Mode E, 160x192, 4-color).</summary>
-public sealed class RamBrandtFile : IImageFileFormat<RamBrandtFile> {
+public readonly record struct RamBrandtFile : IImageFormatReader<RamBrandtFile>, IImageToRawImage<RamBrandtFile>, IImageFromRawImage<RamBrandtFile>, IImageFormatWriter<RamBrandtFile> {
 
   /// <summary>The exact file size: 40 bytes/line x 192 lines.</summary>
   public const int ExpectedFileSize = 7680;
@@ -22,13 +21,11 @@ public sealed class RamBrandtFile : IImageFileFormat<RamBrandtFile> {
   /// <summary>Default Atari 4-color palette as 0xRRGGBB values.</summary>
   private static readonly int[] _DefaultPalette = [0x000000, 0x884400, 0x00AA44, 0xDDCC88];
 
-  static string IImageFileFormat<RamBrandtFile>.PrimaryExtension => ".rmb";
-  static string[] IImageFileFormat<RamBrandtFile>.FileExtensions => [".rmb", ".rbr"];
-  static FormatCapability IImageFileFormat<RamBrandtFile>.Capabilities => FormatCapability.IndexedOnly;
-  static RamBrandtFile IImageFileFormat<RamBrandtFile>.FromFile(FileInfo file) => RamBrandtReader.FromFile(file);
-  static RamBrandtFile IImageFileFormat<RamBrandtFile>.FromBytes(byte[] data) => RamBrandtReader.FromBytes(data);
-  static RamBrandtFile IImageFileFormat<RamBrandtFile>.FromStream(Stream stream) => RamBrandtReader.FromStream(stream);
-  static byte[] IImageFileFormat<RamBrandtFile>.ToBytes(RamBrandtFile file) => RamBrandtWriter.ToBytes(file);
+  static string IImageFormatMetadata<RamBrandtFile>.PrimaryExtension => ".rmb";
+  static string[] IImageFormatMetadata<RamBrandtFile>.FileExtensions => [".rmb", ".rbr"];
+  static RamBrandtFile IImageFormatReader<RamBrandtFile>.FromSpan(ReadOnlySpan<byte> data) => RamBrandtReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<RamBrandtFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<RamBrandtFile>.ToBytes(RamBrandtFile file) => RamBrandtWriter.ToBytes(file);
 
   /// <summary>Always 160.</summary>
   public int Width => FixedWidth;
@@ -37,11 +34,10 @@ public sealed class RamBrandtFile : IImageFileFormat<RamBrandtFile> {
   public int Height => FixedHeight;
 
   /// <summary>Raw pixel data (7680 bytes, 2bpp packed: 4 pixels per byte, 40 bytes per row, 192 rows).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this image to a platform-independent <see cref="RawImage"/> in Indexed8 format with a 4-entry palette.</summary>
   public static RawImage ToRawImage(RamBrandtFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var indices = new byte[FixedWidth * FixedHeight];
 

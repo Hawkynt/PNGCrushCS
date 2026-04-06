@@ -27,6 +27,8 @@ public static class InterlaceStudioReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static InterlaceStudioFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static InterlaceStudioFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
 

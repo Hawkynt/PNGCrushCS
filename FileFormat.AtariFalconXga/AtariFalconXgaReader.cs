@@ -26,6 +26,8 @@ public static class AtariFalconXgaReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static AtariFalconXgaFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AtariFalconXgaFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < AtariFalconXgaHeader.StructSize)

@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.ZxMlg;
 
 /// <summary>In-memory representation of a ZX Spectrum MLG editor file (6912 bytes: 6144 bitmap + 768 attributes).</summary>
-public sealed class ZxMlgFile : IImageFileFormat<ZxMlgFile> {
+public readonly record struct ZxMlgFile : IImageFormatReader<ZxMlgFile>, IImageToRawImage<ZxMlgFile>, IImageFormatWriter<ZxMlgFile> {
 
-  static string IImageFileFormat<ZxMlgFile>.PrimaryExtension => ".mlg";
-  static string[] IImageFileFormat<ZxMlgFile>.FileExtensions => [".mlg"];
-  static ZxMlgFile IImageFileFormat<ZxMlgFile>.FromFile(FileInfo file) => ZxMlgReader.FromFile(file);
-  static ZxMlgFile IImageFileFormat<ZxMlgFile>.FromBytes(byte[] data) => ZxMlgReader.FromBytes(data);
-  static ZxMlgFile IImageFileFormat<ZxMlgFile>.FromStream(Stream stream) => ZxMlgReader.FromStream(stream);
-  static byte[] IImageFileFormat<ZxMlgFile>.ToBytes(ZxMlgFile file) => ZxMlgWriter.ToBytes(file);
+  static string IImageFormatMetadata<ZxMlgFile>.PrimaryExtension => ".mlg";
+  static string[] IImageFormatMetadata<ZxMlgFile>.FileExtensions => [".mlg"];
+  static ZxMlgFile IImageFormatReader<ZxMlgFile>.FromSpan(ReadOnlySpan<byte> data) => ZxMlgReader.FromSpan(data);
+  static byte[] IImageFormatWriter<ZxMlgFile>.ToBytes(ZxMlgFile file) => ZxMlgWriter.ToBytes(file);
 
   /// <summary>ZX Spectrum normal palette (bright=0).</summary>
   internal static readonly int[] NormalPalette = [
@@ -31,14 +28,13 @@ public sealed class ZxMlgFile : IImageFileFormat<ZxMlgFile> {
   public int Height => 192;
 
   /// <summary>6144 bytes of 1bpp bitmap data in linear row order.</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>768 bytes of attribute data, one per 8x8 cell.</summary>
-  public byte[] AttributeData { get; init; } = [];
+  public byte[] AttributeData { get; init; }
 
   /// <summary>Converts this MLG screen to Rgb24.</summary>
   public static RawImage ToRawImage(ZxMlgFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = 256;
     const int height = 192;
@@ -74,9 +70,4 @@ public sealed class ZxMlgFile : IImageFileFormat<ZxMlgFile> {
     };
   }
 
-  /// <summary>Not supported.</summary>
-  public static ZxMlgFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to ZxMlgFile is not supported due to complex attribute-based color constraints.");
-  }
 }

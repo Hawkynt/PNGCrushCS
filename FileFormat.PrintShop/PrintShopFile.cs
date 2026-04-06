@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.PrintShop;
 
 /// <summary>In-memory representation of a Print Shop graphics clip art image (PSA/PSB).</summary>
-public sealed class PrintShopFile : IImageFileFormat<PrintShopFile> {
+public readonly record struct PrintShopFile : IImageFormatReader<PrintShopFile>, IImageToRawImage<PrintShopFile>, IImageFromRawImage<PrintShopFile>, IImageFormatWriter<PrintShopFile> {
 
   /// <summary>Fixed pixel width.</summary>
   internal const int PixelWidth = 88;
@@ -28,15 +27,11 @@ public sealed class PrintShopFile : IImageFileFormat<PrintShopFile> {
   /// <summary>PSB header size.</summary>
   internal const int PsbHeaderSize = 4;
 
-  static string IImageFileFormat<PrintShopFile>.PrimaryExtension => ".psa";
-  static string[] IImageFileFormat<PrintShopFile>.FileExtensions => [".psa", ".psb"];
-  static FormatCapability IImageFileFormat<PrintShopFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static PrintShopFile IImageFileFormat<PrintShopFile>.FromFile(FileInfo file) => PrintShopReader.FromFile(file);
-  static PrintShopFile IImageFileFormat<PrintShopFile>.FromBytes(byte[] data) => PrintShopReader.FromBytes(data);
-  static PrintShopFile IImageFileFormat<PrintShopFile>.FromStream(Stream stream) => PrintShopReader.FromStream(stream);
-  static RawImage IImageFileFormat<PrintShopFile>.ToRawImage(PrintShopFile file) => ToRawImage(file);
-  static PrintShopFile IImageFileFormat<PrintShopFile>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<PrintShopFile>.ToBytes(PrintShopFile file) => PrintShopWriter.ToBytes(file);
+  static string IImageFormatMetadata<PrintShopFile>.PrimaryExtension => ".psa";
+  static string[] IImageFormatMetadata<PrintShopFile>.FileExtensions => [".psa", ".psb"];
+  static PrintShopFile IImageFormatReader<PrintShopFile>.FromSpan(ReadOnlySpan<byte> data) => PrintShopReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<PrintShopFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<PrintShopFile>.ToBytes(PrintShopFile file) => PrintShopWriter.ToBytes(file);
 
   /// <summary>Always 88.</summary>
   public int Width => PixelWidth;
@@ -45,7 +40,7 @@ public sealed class PrintShopFile : IImageFileFormat<PrintShopFile> {
   public int Height => PixelHeight;
 
   /// <summary>Packed 1bpp pixel data (572 bytes).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Whether this was loaded from a PSB (format B with header) file.</summary>
   public bool IsFormatB { get; init; }
@@ -54,7 +49,6 @@ public sealed class PrintShopFile : IImageFileFormat<PrintShopFile> {
 
   /// <summary>Converts the Print Shop image to an Indexed1 raw image.</summary>
   public static RawImage ToRawImage(PrintShopFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var pixelData = new byte[PixelDataSize];
     file.PixelData.AsSpan(0, Math.Min(file.PixelData.Length, PixelDataSize)).CopyTo(pixelData);

@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.MonoStar;
 
 /// <summary>In-memory representation of a MonoStar monochrome paint image (Atari ST, 640x400, 1 bitplane).</summary>
-public sealed class MonoStarFile : IImageFileFormat<MonoStarFile> {
+public readonly record struct MonoStarFile : IImageFormatReader<MonoStarFile>, IImageToRawImage<MonoStarFile>, IImageFromRawImage<MonoStarFile>, IImageFormatWriter<MonoStarFile> {
 
   public const int FileSize = 32034;
   private const int _PIXEL_DATA_SIZE = 32000;
@@ -14,28 +13,25 @@ public sealed class MonoStarFile : IImageFileFormat<MonoStarFile> {
   private const int _NUM_PLANES = 1;
   private const int _BYTES_PER_ROW = 80;
 
-  static string IImageFileFormat<MonoStarFile>.PrimaryExtension => ".mst";
-  static string[] IImageFileFormat<MonoStarFile>.FileExtensions => [".mst", ".mns"];
-  static FormatCapability IImageFileFormat<MonoStarFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static MonoStarFile IImageFileFormat<MonoStarFile>.FromFile(FileInfo file) => MonoStarReader.FromFile(file);
-  static MonoStarFile IImageFileFormat<MonoStarFile>.FromBytes(byte[] data) => MonoStarReader.FromBytes(data);
-  static MonoStarFile IImageFileFormat<MonoStarFile>.FromStream(Stream stream) => MonoStarReader.FromStream(stream);
-  static byte[] IImageFileFormat<MonoStarFile>.ToBytes(MonoStarFile file) => MonoStarWriter.ToBytes(file);
+  static string IImageFormatMetadata<MonoStarFile>.PrimaryExtension => ".mst";
+  static string[] IImageFormatMetadata<MonoStarFile>.FileExtensions => [".mst", ".mns"];
+  static MonoStarFile IImageFormatReader<MonoStarFile>.FromSpan(ReadOnlySpan<byte> data) => MonoStarReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<MonoStarFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<MonoStarFile>.ToBytes(MonoStarFile file) => MonoStarWriter.ToBytes(file);
 
   /// <summary>Image width (always 640).</summary>
-  public int Width { get; init; } = _WIDTH;
+  public int Width { get; init; }
 
   /// <summary>Image height (always 400).</summary>
-  public int Height { get; init; } = _HEIGHT;
+  public int Height { get; init; }
 
   /// <summary>16-entry palette of 9-bit Atari ST RGB values (only first 2 entries used for mono).</summary>
-  public short[] Palette { get; init; } = new short[16];
+  public short[] Palette { get; init; }
 
   /// <summary>32000 bytes of monochrome planar pixel data (1 bitplane, 80 bytes/row, 400 rows).</summary>
-  public byte[] PixelData { get; init; } = new byte[_PIXEL_DATA_SIZE];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(MonoStarFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var rowBytes = (_WIDTH + 7) / 8;
     var outputData = new byte[rowBytes * _HEIGHT];

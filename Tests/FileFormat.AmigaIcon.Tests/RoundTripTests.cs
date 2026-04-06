@@ -195,7 +195,7 @@ public sealed class RoundTripTests {
       PlanarData = planarData,
     };
 
-    var rawImage = original.ToRawImage();
+    var rawImage = AmigaIconFile.ToRawImage(original);
     var restored = AmigaIconFile.FromRawImage(rawImage);
 
     Assert.That(restored.Width, Is.EqualTo(original.Width));

@@ -25,6 +25,8 @@ public static class VirtualBoyTileReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static VirtualBoyTileFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static VirtualBoyTileFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < VirtualBoyTileFile.BytesPerTile)

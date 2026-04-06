@@ -29,6 +29,8 @@ public static class PhotoChromeReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static PhotoChromeFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static PhotoChromeFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != _EXPECTED_SIZE)

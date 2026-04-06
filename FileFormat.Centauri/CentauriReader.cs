@@ -26,6 +26,8 @@ public static class CentauriReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static CentauriFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static CentauriFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < CentauriFile.ExpectedFileSize)

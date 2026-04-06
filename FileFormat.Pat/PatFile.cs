@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using FileFormat.Core;
 
@@ -6,14 +6,12 @@ namespace FileFormat.Pat;
 
 /// <summary>In-memory representation of a GIMP Pattern (PAT) image.</summary>
 [FormatMagicBytes([0x47, 0x50, 0x41, 0x54], offset: 20)]
-public sealed class PatFile : IImageFileFormat<PatFile> {
+public readonly record struct PatFile : IImageFormatReader<PatFile>, IImageToRawImage<PatFile>, IImageFromRawImage<PatFile>, IImageFormatWriter<PatFile> {
 
-  static string IImageFileFormat<PatFile>.PrimaryExtension => ".pat";
-  static string[] IImageFileFormat<PatFile>.FileExtensions => [".pat"];
-  static PatFile IImageFileFormat<PatFile>.FromFile(FileInfo file) => PatReader.FromFile(file);
-  static PatFile IImageFileFormat<PatFile>.FromBytes(byte[] data) => PatReader.FromBytes(data);
-  static PatFile IImageFileFormat<PatFile>.FromStream(Stream stream) => PatReader.FromStream(stream);
-  static byte[] IImageFileFormat<PatFile>.ToBytes(PatFile file) => PatWriter.ToBytes(file);
+  static string IImageFormatMetadata<PatFile>.PrimaryExtension => ".pat";
+  static string[] IImageFormatMetadata<PatFile>.FileExtensions => [".pat"];
+  static PatFile IImageFormatReader<PatFile>.FromSpan(ReadOnlySpan<byte> data) => PatReader.FromSpan(data);
+  static byte[] IImageFormatWriter<PatFile>.ToBytes(PatFile file) => PatWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -25,13 +23,12 @@ public sealed class PatFile : IImageFileFormat<PatFile> {
   public int BytesPerPixel { get; init; }
 
   /// <summary>Pattern name (null-terminated UTF-8 string from the header).</summary>
-  public string Name { get; init; } = string.Empty;
+  public string Name { get; init; }
 
   /// <summary>Raw pixel data (width * height * bytes_per_pixel bytes, row-major).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(PatFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

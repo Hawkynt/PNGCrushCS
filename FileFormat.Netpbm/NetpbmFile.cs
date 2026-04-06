@@ -1,22 +1,18 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Netpbm;
 
 /// <summary>In-memory representation of a Netpbm image (PBM/PGM/PPM/PAM).</summary>
 [FormatDetectionPriority(150)]
-public sealed class NetpbmFile : IImageFileFormat<NetpbmFile> {
+public readonly record struct NetpbmFile : IImageFormatReader<NetpbmFile>, IImageToRawImage<NetpbmFile>, IImageFromRawImage<NetpbmFile>, IImageFormatWriter<NetpbmFile> {
 
-  static string IImageFileFormat<NetpbmFile>.PrimaryExtension => ".ppm";
-  static string[] IImageFileFormat<NetpbmFile>.FileExtensions => [".pbm", ".pgm", ".ppm", ".pnm", ".pam"];
-  static NetpbmFile IImageFileFormat<NetpbmFile>.FromFile(FileInfo file) => NetpbmReader.FromFile(file);
-  static NetpbmFile IImageFileFormat<NetpbmFile>.FromBytes(byte[] data) => NetpbmReader.FromBytes(data);
-  static NetpbmFile IImageFileFormat<NetpbmFile>.FromStream(Stream stream) => NetpbmReader.FromStream(stream);
-  static RawImage IImageFileFormat<NetpbmFile>.ToRawImage(NetpbmFile file) => file.ToRawImage();
-  static byte[] IImageFileFormat<NetpbmFile>.ToBytes(NetpbmFile file) => NetpbmWriter.ToBytes(file);
+  static string IImageFormatMetadata<NetpbmFile>.PrimaryExtension => ".ppm";
+  static string[] IImageFormatMetadata<NetpbmFile>.FileExtensions => [".pbm", ".pgm", ".ppm", ".pnm", ".pam"];
+  static NetpbmFile IImageFormatReader<NetpbmFile>.FromSpan(ReadOnlySpan<byte> data) => NetpbmReader.FromSpan(data);
+  static byte[] IImageFormatWriter<NetpbmFile>.ToBytes(NetpbmFile file) => NetpbmWriter.ToBytes(file);
 
-  static bool? IImageFileFormat<NetpbmFile>.MatchesSignature(ReadOnlySpan<byte> header) {
+  static bool? IImageFormatMetadata<NetpbmFile>.MatchesSignature(ReadOnlySpan<byte> header) {
     if (header.Length < 2 || header[0] != 0x50 || header[1] < 0x31 || header[1] > 0x37)
       return null;
     if (header.Length >= 6 && header[1] == 0x37 && header[2] == 0x20 && header[3] == 0x33 && header[4] == 0x33 && header[5] == 0x32)
@@ -29,16 +25,16 @@ public sealed class NetpbmFile : IImageFileFormat<NetpbmFile> {
   public int Height { get; init; }
   public int MaxValue { get; init; }
   public int Channels { get; init; }
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
   public string? TupleType { get; init; }
 
-  public RawImage ToRawImage() {
-    var width = this.Width;
-    var height = this.Height;
-    var format = this.Format;
-    var channels = this.Channels;
-    var maxValue = this.MaxValue;
-    var src = this.PixelData;
+  public static RawImage ToRawImage(NetpbmFile file) {
+    var width = file.Width;
+    var height = file.Height;
+    var format = file.Format;
+    var channels = file.Channels;
+    var maxValue = file.MaxValue;
+    var src = file.PixelData;
 
     switch (format) {
       case NetpbmFormat.PbmAscii:

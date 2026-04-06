@@ -28,6 +28,8 @@ public static class HdrReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static HdrFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static HdrFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MIN_FILE_SIZE)

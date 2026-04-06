@@ -1,21 +1,16 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.CoCoMax;
 
 /// <summary>In-memory representation of a CoCoMax paint program image (6144 bytes: 256x192 mono).</summary>
-public sealed class CoCoMaxFile : IImageFileFormat<CoCoMaxFile> {
+public readonly record struct CoCoMaxFile : IImageFormatReader<CoCoMaxFile>, IImageToRawImage<CoCoMaxFile>, IImageFromRawImage<CoCoMaxFile>, IImageFormatWriter<CoCoMaxFile> {
 
-  static string IImageFileFormat<CoCoMaxFile>.PrimaryExtension => ".max";
-  static string[] IImageFileFormat<CoCoMaxFile>.FileExtensions => [".max"];
-  static FormatCapability IImageFileFormat<CoCoMaxFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static CoCoMaxFile IImageFileFormat<CoCoMaxFile>.FromFile(FileInfo file) => CoCoMaxReader.FromFile(file);
-  static CoCoMaxFile IImageFileFormat<CoCoMaxFile>.FromBytes(byte[] data) => CoCoMaxReader.FromBytes(data);
-  static CoCoMaxFile IImageFileFormat<CoCoMaxFile>.FromStream(Stream stream) => CoCoMaxReader.FromStream(stream);
-  static RawImage IImageFileFormat<CoCoMaxFile>.ToRawImage(CoCoMaxFile file) => ToRawImage(file);
-  static CoCoMaxFile IImageFileFormat<CoCoMaxFile>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<CoCoMaxFile>.ToBytes(CoCoMaxFile file) => CoCoMaxWriter.ToBytes(file);
+  static string IImageFormatMetadata<CoCoMaxFile>.PrimaryExtension => ".max";
+  static string[] IImageFormatMetadata<CoCoMaxFile>.FileExtensions => [".max"];
+  static CoCoMaxFile IImageFormatReader<CoCoMaxFile>.FromSpan(ReadOnlySpan<byte> data) => CoCoMaxReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<CoCoMaxFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<CoCoMaxFile>.ToBytes(CoCoMaxFile file) => CoCoMaxWriter.ToBytes(file);
 
   /// <summary>Expected file size in bytes.</summary>
   internal const int ExpectedFileSize = 6144;
@@ -36,13 +31,12 @@ public sealed class CoCoMaxFile : IImageFileFormat<CoCoMaxFile> {
   public int Height => PixelHeight;
 
   /// <summary>Raw pixel data (6144 bytes: 1bpp MSB-first, 32 bytes per row, 192 rows).</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
   /// <summary>Converts the CoCoMax screen to an Indexed1 raw image (256x192, B&amp;W palette).</summary>
   public static RawImage ToRawImage(CoCoMaxFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var pixelData = new byte[BytesPerRow * PixelHeight];
     file.RawData.AsSpan(0, Math.Min(file.RawData.Length, pixelData.Length)).CopyTo(pixelData);

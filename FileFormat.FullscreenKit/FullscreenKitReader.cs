@@ -26,6 +26,8 @@ public static class FullscreenKitReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static FullscreenKitFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static FullscreenKitFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < FullscreenKitHeader.StructSize)

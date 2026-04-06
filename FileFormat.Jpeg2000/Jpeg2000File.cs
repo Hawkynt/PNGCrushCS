@@ -1,19 +1,16 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Jpeg2000;
 
 /// <summary>In-memory representation of a JPEG 2000 image.</summary>
 [FormatMagicBytes([0x00, 0x00, 0x00, 0x0C, 0x6A, 0x50])]
-public sealed class Jpeg2000File : IImageFileFormat<Jpeg2000File> {
+public readonly record struct Jpeg2000File : IImageFormatReader<Jpeg2000File>, IImageToRawImage<Jpeg2000File>, IImageFromRawImage<Jpeg2000File>, IImageFormatWriter<Jpeg2000File> {
 
-  static string IImageFileFormat<Jpeg2000File>.PrimaryExtension => ".jp2";
-  static string[] IImageFileFormat<Jpeg2000File>.FileExtensions => [".jp2", ".j2k", ".j2c", ".jpx", ".jpc", ".jpf", ".jpt", ".jpm"];
-  static Jpeg2000File IImageFileFormat<Jpeg2000File>.FromFile(FileInfo file) => Jpeg2000Reader.FromFile(file);
-  static Jpeg2000File IImageFileFormat<Jpeg2000File>.FromBytes(byte[] data) => Jpeg2000Reader.FromBytes(data);
-  static Jpeg2000File IImageFileFormat<Jpeg2000File>.FromStream(Stream stream) => Jpeg2000Reader.FromStream(stream);
-  static byte[] IImageFileFormat<Jpeg2000File>.ToBytes(Jpeg2000File file) => Jpeg2000Writer.ToBytes(file);
+  static string IImageFormatMetadata<Jpeg2000File>.PrimaryExtension => ".jp2";
+  static string[] IImageFormatMetadata<Jpeg2000File>.FileExtensions => [".jp2", ".j2k", ".j2c", ".jpx", ".jpc", ".jpf", ".jpt", ".jpm"];
+  static Jpeg2000File IImageFormatReader<Jpeg2000File>.FromSpan(ReadOnlySpan<byte> data) => Jpeg2000Reader.FromSpan(data);
+  static byte[] IImageFormatWriter<Jpeg2000File>.ToBytes(Jpeg2000File file) => Jpeg2000Writer.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -22,19 +19,18 @@ public sealed class Jpeg2000File : IImageFileFormat<Jpeg2000File> {
   public int Height { get; init; }
 
   /// <summary>Number of image components (1 for grayscale, 3 for RGB).</summary>
-  public int ComponentCount { get; init; } = 3;
+  public int ComponentCount { get; init; }
 
   /// <summary>Bits per component (always 8 in this implementation).</summary>
-  public int BitsPerComponent { get; init; } = 8;
+  public int BitsPerComponent { get; init; }
 
   /// <summary>Number of DWT decomposition levels used.</summary>
-  public int DecompositionLevels { get; init; } = 3;
+  public int DecompositionLevels { get; init; }
 
   /// <summary>Raw pixel data in Gray8 (1 component) or Rgb24 (3 components) layout.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(Jpeg2000File file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

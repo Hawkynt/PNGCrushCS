@@ -26,6 +26,8 @@ public static class CoCoMaxReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static CoCoMaxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static CoCoMaxFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != CoCoMaxFile.ExpectedFileSize)

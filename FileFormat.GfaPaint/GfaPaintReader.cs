@@ -26,6 +26,8 @@ public static class GfaPaintReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static GfaPaintFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static GfaPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < GfaPaintHeader.StructSize)

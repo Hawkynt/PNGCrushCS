@@ -1,18 +1,15 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.WebShots;
 
 /// <summary>In-memory representation of a WebShots image.</summary>
-public sealed class WebShotsFile : IImageFileFormat<WebShotsFile> {
+public readonly record struct WebShotsFile : IImageFormatReader<WebShotsFile>, IImageToRawImage<WebShotsFile>, IImageFormatWriter<WebShotsFile> {
 
-  static string IImageFileFormat<WebShotsFile>.PrimaryExtension => ".wb1";
-  static string[] IImageFileFormat<WebShotsFile>.FileExtensions => [".wb1", ".wbc", ".wbp", ".wbz"];
-  static WebShotsFile IImageFileFormat<WebShotsFile>.FromFile(FileInfo file) => WebShotsReader.FromFile(file);
-  static WebShotsFile IImageFileFormat<WebShotsFile>.FromBytes(byte[] data) => WebShotsReader.FromBytes(data);
-  static WebShotsFile IImageFileFormat<WebShotsFile>.FromStream(Stream stream) => WebShotsReader.FromStream(stream);
-  static byte[] IImageFileFormat<WebShotsFile>.ToBytes(WebShotsFile file) => WebShotsWriter.ToBytes(file);
+  static string IImageFormatMetadata<WebShotsFile>.PrimaryExtension => ".wb1";
+  static string[] IImageFormatMetadata<WebShotsFile>.FileExtensions => [".wb1", ".wbc", ".wbp", ".wbz"];
+  static WebShotsFile IImageFormatReader<WebShotsFile>.FromSpan(ReadOnlySpan<byte> data) => WebShotsReader.FromSpan(data);
+  static byte[] IImageFormatWriter<WebShotsFile>.ToBytes(WebShotsFile file) => WebShotsWriter.ToBytes(file);
 
   /// <summary>Magic bytes: "WBST" (0x57 0x42 0x53 0x54).</summary>
   internal static readonly byte[] Magic = [0x57, 0x42, 0x53, 0x54];
@@ -36,11 +33,10 @@ public sealed class WebShotsFile : IImageFileFormat<WebShotsFile> {
   public ushort Bpp { get; init; }
 
   /// <summary>Raw pixel data.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this WebShots image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(WebShotsFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,
@@ -49,9 +45,4 @@ public sealed class WebShotsFile : IImageFileFormat<WebShotsFile> {
     };
   }
 
-  /// <summary>Not supported.</summary>
-  public static WebShotsFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to WebShotsFile is not supported.");
-  }
 }

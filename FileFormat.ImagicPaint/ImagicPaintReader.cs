@@ -26,6 +26,8 @@ public static class ImagicPaintReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static ImagicPaintFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static ImagicPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < ImagicPaintHeader.StructSize)

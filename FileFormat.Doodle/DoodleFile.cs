@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Doodle;
 
 /// <summary>In-memory representation of a Commodore 64 Doodle hires image.</summary>
-public sealed class DoodleFile : IImageFileFormat<DoodleFile> {
+public readonly record struct DoodleFile : IImageFormatReader<DoodleFile>, IImageToRawImage<DoodleFile>, IImageFormatWriter<DoodleFile> {
 
-  static string IImageFileFormat<DoodleFile>.PrimaryExtension => ".dd";
-  static string[] IImageFileFormat<DoodleFile>.FileExtensions => [".dd"];
-  static DoodleFile IImageFileFormat<DoodleFile>.FromFile(FileInfo file) => DoodleReader.FromFile(file);
-  static DoodleFile IImageFileFormat<DoodleFile>.FromBytes(byte[] data) => DoodleReader.FromBytes(data);
-  static DoodleFile IImageFileFormat<DoodleFile>.FromStream(Stream stream) => DoodleReader.FromStream(stream);
-  static byte[] IImageFileFormat<DoodleFile>.ToBytes(DoodleFile file) => DoodleWriter.ToBytes(file);
+  static string IImageFormatMetadata<DoodleFile>.PrimaryExtension => ".dd";
+  static string[] IImageFormatMetadata<DoodleFile>.FileExtensions => [".dd"];
+  static DoodleFile IImageFormatReader<DoodleFile>.FromSpan(ReadOnlySpan<byte> data) => DoodleReader.FromSpan(data);
+  static byte[] IImageFormatWriter<DoodleFile>.ToBytes(DoodleFile file) => DoodleWriter.ToBytes(file);
 
   /// <summary>The fixed width of a Doodle image in pixels.</summary>
   public const int FixedWidth = 320;
@@ -52,14 +49,13 @@ public sealed class DoodleFile : IImageFileFormat<DoodleFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Hires bitmap data (8000 bytes, 1 bit per pixel within 8x8 cells).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Screen RAM (1000 bytes, upper nybble = foreground color, lower nybble = background color per cell).</summary>
-  public byte[] ScreenRam { get; init; } = [];
+  public byte[] ScreenRam { get; init; }
 
   /// <summary>Converts this Doodle image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(DoodleFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -95,9 +91,4 @@ public sealed class DoodleFile : IImageFileFormat<DoodleFile> {
     };
   }
 
-  /// <summary>Not supported. Doodle images have complex cell-based color constraints.</summary>
-  public static DoodleFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to DoodleFile is not supported due to complex cell-based color constraints.");
-  }
 }

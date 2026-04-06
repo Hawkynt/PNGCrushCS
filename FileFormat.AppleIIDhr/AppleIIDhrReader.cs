@@ -26,6 +26,8 @@ public static class AppleIIDhrReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static AppleIIDhrFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AppleIIDhrFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != AppleIIDhrFile.FileSize)

@@ -1,30 +1,26 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Xpm;
 
 /// <summary>In-memory representation of an XPM image.</summary>
-public sealed class XpmFile : IImageFileFormat<XpmFile> {
+public readonly record struct XpmFile : IImageFormatReader<XpmFile>, IImageToRawImage<XpmFile>, IImageFromRawImage<XpmFile>, IImageFormatWriter<XpmFile> {
 
-  static string IImageFileFormat<XpmFile>.PrimaryExtension => ".xpm";
-  static string[] IImageFileFormat<XpmFile>.FileExtensions => [".xpm"];
-  static FormatCapability IImageFileFormat<XpmFile>.Capabilities => FormatCapability.IndexedOnly;
-  static XpmFile IImageFileFormat<XpmFile>.FromFile(FileInfo file) => XpmReader.FromFile(file);
-  static XpmFile IImageFileFormat<XpmFile>.FromBytes(byte[] data) => XpmReader.FromBytes(data);
-  static XpmFile IImageFileFormat<XpmFile>.FromStream(Stream stream) => XpmReader.FromStream(stream);
-  static byte[] IImageFileFormat<XpmFile>.ToBytes(XpmFile file) => XpmWriter.ToBytes(file);
+  static string IImageFormatMetadata<XpmFile>.PrimaryExtension => ".xpm";
+  static string[] IImageFormatMetadata<XpmFile>.FileExtensions => [".xpm"];
+  static XpmFile IImageFormatReader<XpmFile>.FromSpan(ReadOnlySpan<byte> data) => XpmReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<XpmFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<XpmFile>.ToBytes(XpmFile file) => XpmWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
   public int CharsPerPixel { get; init; }
-  public string Name { get; init; } = "image";
-  public byte[] Palette { get; init; } = [];
+  public string Name { get; init; }
+  public byte[] Palette { get; init; }
   public int PaletteColorCount { get; init; }
   public int? TransparentIndex { get; init; }
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(XpmFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     byte[]? alphaTable = null;
     if (file.TransparentIndex.HasValue) {
       alphaTable = new byte[file.PaletteColorCount];

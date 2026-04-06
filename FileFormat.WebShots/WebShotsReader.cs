@@ -26,6 +26,8 @@ public static class WebShotsReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static WebShotsFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static WebShotsFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < WebShotsFile.MinFileSize)

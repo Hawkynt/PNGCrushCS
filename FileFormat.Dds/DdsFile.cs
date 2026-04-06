@@ -1,6 +1,5 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.IO;
 using FileFormat.Core;
 using FileFormat.Core.BlockDecoders;
 
@@ -8,24 +7,21 @@ namespace FileFormat.Dds;
 
 /// <summary>In-memory representation of a DDS (DirectDraw Surface) file.</summary>
 [FormatMagicBytes([0x44, 0x44, 0x53, 0x20])]
-public sealed class DdsFile : IImageFileFormat<DdsFile> {
+public readonly record struct DdsFile : IImageFormatReader<DdsFile>, IImageToRawImage<DdsFile>, IImageFormatWriter<DdsFile> {
 
-  static string IImageFileFormat<DdsFile>.PrimaryExtension => ".dds";
-  static string[] IImageFileFormat<DdsFile>.FileExtensions => [".dds"];
-  static DdsFile IImageFileFormat<DdsFile>.FromFile(FileInfo file) => DdsReader.FromFile(file);
-  static DdsFile IImageFileFormat<DdsFile>.FromBytes(byte[] data) => DdsReader.FromBytes(data);
-  static DdsFile IImageFileFormat<DdsFile>.FromStream(Stream stream) => DdsReader.FromStream(stream);
-  static byte[] IImageFileFormat<DdsFile>.ToBytes(DdsFile file) => DdsWriter.ToBytes(file);
+  static string IImageFormatMetadata<DdsFile>.PrimaryExtension => ".dds";
+  static string[] IImageFormatMetadata<DdsFile>.FileExtensions => [".dds"];
+  static DdsFile IImageFormatReader<DdsFile>.FromSpan(ReadOnlySpan<byte> data) => DdsReader.FromSpan(data);
+  static byte[] IImageFormatWriter<DdsFile>.ToBytes(DdsFile file) => DdsWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
   public int Depth { get; init; }
   public int MipMapCount { get; init; }
   public DdsFormat Format { get; init; }
   public bool HasDx10Header { get; init; }
-  public IReadOnlyList<DdsSurface> Surfaces { get; init; } = [];
+  public IReadOnlyList<DdsSurface> Surfaces { get; init; }
 
   public static RawImage ToRawImage(DdsFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     if (file.Surfaces.Count == 0)
       throw new InvalidOperationException("DDS file contains no surfaces.");
 

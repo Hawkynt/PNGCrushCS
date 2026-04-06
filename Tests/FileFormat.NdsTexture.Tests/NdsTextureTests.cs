@@ -42,25 +42,6 @@ public class NdsTextureReaderTests {
 }
 
 [TestFixture]
-public class NdsTextureWriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => NdsTextureWriter.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_SingleTile_CorrectSize() {
-    var file = new NdsTextureFile {
-      Width = 128,
-      Height = 8,
-      PixelData = new byte[128 * 8],
-    };
-    var bytes = NdsTextureWriter.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(16 * 32));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -84,42 +65,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void PrimaryExtension_IsNbfs()
-    => Assert.That(_GetPrimaryExtension<NdsTextureFile>(), Is.EqualTo(".nbfs"));
-
-  [Test]
-  public void FileExtensions_ContainsPrimary() {
-    var exts = _GetFileExtensions<NdsTextureFile>();
-    Assert.That(exts, Does.Contain(".nbfs"));
-    Assert.That(exts, Does.Contain(".nds"));
-  }
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => NdsTextureFile.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => NdsTextureFile.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 128, Height = 8, Format = PixelFormat.Rgb24, PixelData = new byte[128 * 8 * 3] };
-    Assert.Throws<ArgumentException>(() => NdsTextureFile.FromRawImage(raw));
-  }
-
-  [Test]
-  public void Constants_AreCorrect() {
-    Assert.That(NdsTextureFile.BytesPerTile, Is.EqualTo(32));
-    Assert.That(NdsTextureFile.TileSize, Is.EqualTo(8));
-    Assert.That(NdsTextureFile.TilesPerRow, Is.EqualTo(16));
-  }
-
-  private static string _GetPrimaryExtension<T>() where T : IImageFileFormat<T> => T.PrimaryExtension;
-
-  private static string[] _GetFileExtensions<T>() where T : IImageFileFormat<T> => T.FileExtensions;
-}

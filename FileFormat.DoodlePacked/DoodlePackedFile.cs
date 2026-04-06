@@ -5,14 +5,12 @@ using FileFormat.Core;
 namespace FileFormat.DoodlePacked;
 
 /// <summary>In-memory representation of a Doodle Packed (RLE-compressed C64 hires) image.</summary>
-public sealed class DoodlePackedFile : IImageFileFormat<DoodlePackedFile> {
+public readonly record struct DoodlePackedFile : IImageFormatReader<DoodlePackedFile>, IImageToRawImage<DoodlePackedFile>, IImageFormatWriter<DoodlePackedFile> {
 
-  static string IImageFileFormat<DoodlePackedFile>.PrimaryExtension => ".dpk";
-  static string[] IImageFileFormat<DoodlePackedFile>.FileExtensions => [".dpk"];
-  static DoodlePackedFile IImageFileFormat<DoodlePackedFile>.FromFile(FileInfo file) => DoodlePackedReader.FromFile(file);
-  static DoodlePackedFile IImageFileFormat<DoodlePackedFile>.FromBytes(byte[] data) => DoodlePackedReader.FromBytes(data);
-  static DoodlePackedFile IImageFileFormat<DoodlePackedFile>.FromStream(Stream stream) => DoodlePackedReader.FromStream(stream);
-  static byte[] IImageFileFormat<DoodlePackedFile>.ToBytes(DoodlePackedFile file) => DoodlePackedWriter.ToBytes(file);
+  static string IImageFormatMetadata<DoodlePackedFile>.PrimaryExtension => ".dpk";
+  static string[] IImageFormatMetadata<DoodlePackedFile>.FileExtensions => [".dpk"];
+  static DoodlePackedFile IImageFormatReader<DoodlePackedFile>.FromSpan(ReadOnlySpan<byte> data) => DoodlePackedReader.FromSpan(data);
+  static byte[] IImageFormatWriter<DoodlePackedFile>.ToBytes(DoodlePackedFile file) => DoodlePackedWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public const int ImageWidth = 320;
@@ -49,14 +47,13 @@ public sealed class DoodlePackedFile : IImageFileFormat<DoodlePackedFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Bitmap data (8000 bytes).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>Screen RAM / video matrix (1000 bytes).</summary>
-  public byte[] ScreenData { get; init; } = [];
+  public byte[] ScreenData { get; init; }
 
   /// <summary>Converts this Doodle Packed image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(DoodlePackedFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var rgb = new byte[ImageWidth * ImageHeight * 3];
 
@@ -89,10 +86,6 @@ public sealed class DoodlePackedFile : IImageFileFormat<DoodlePackedFile> {
       PixelData = rgb,
     };
   }
-
-  /// <summary>Not supported. Doodle Packed is a read-only format.</summary>
-  public static DoodlePackedFile FromRawImage(RawImage image)
-    => throw new NotSupportedException("Creating Doodle Packed files from raw images is not supported.");
 
   /// <summary>Decompresses RLE-encoded data using the Doodle Packed scheme.</summary>
   internal static byte[] RleDecode(byte[] compressed) {

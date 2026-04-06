@@ -29,6 +29,8 @@ public static class KtxReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static KtxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static KtxFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < KtxHeader.IdentifierSize)

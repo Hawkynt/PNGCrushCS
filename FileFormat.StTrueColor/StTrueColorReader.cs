@@ -26,6 +26,8 @@ public static class StTrueColorReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static StTrueColorFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static StTrueColorFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < StTrueColorFile.FileSize)

@@ -26,6 +26,8 @@ public static class BsaveReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static BsaveFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static BsaveFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < BsaveHeader.StructSize)

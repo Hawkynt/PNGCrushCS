@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Flip64;
 
 /// <summary>In-memory representation of a C64 Flip interlaced multicolor image.</summary>
-public sealed class Flip64File : IImageFileFormat<Flip64File> {
+public readonly record struct Flip64File : IImageFormatReader<Flip64File>, IImageToRawImage<Flip64File>, IImageFormatWriter<Flip64File> {
 
-  static string IImageFileFormat<Flip64File>.PrimaryExtension => ".fbi";
-  static string[] IImageFileFormat<Flip64File>.FileExtensions => [".fbi"];
-  static Flip64File IImageFileFormat<Flip64File>.FromFile(FileInfo file) => Flip64Reader.FromFile(file);
-  static Flip64File IImageFileFormat<Flip64File>.FromBytes(byte[] data) => Flip64Reader.FromBytes(data);
-  static Flip64File IImageFileFormat<Flip64File>.FromStream(Stream stream) => Flip64Reader.FromStream(stream);
-  static byte[] IImageFileFormat<Flip64File>.ToBytes(Flip64File file) => Flip64Writer.ToBytes(file);
+  static string IImageFormatMetadata<Flip64File>.PrimaryExtension => ".fbi";
+  static string[] IImageFormatMetadata<Flip64File>.FileExtensions => [".fbi"];
+  static Flip64File IImageFormatReader<Flip64File>.FromSpan(ReadOnlySpan<byte> data) => Flip64Reader.FromSpan(data);
+  static byte[] IImageFormatWriter<Flip64File>.ToBytes(Flip64File file) => Flip64Writer.ToBytes(file);
 
   /// <summary>The fixed width of the image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -52,11 +49,10 @@ public sealed class Flip64File : IImageFileFormat<Flip64File> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Raw payload data (entire file content after load address).</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   /// <summary>Converts this Flip image to a platform-independent <see cref="RawImage"/> in Rgb24 format by blending two interlaced frames.</summary>
   public static RawImage ToRawImage(Flip64File file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -130,9 +126,4 @@ public sealed class Flip64File : IImageFileFormat<Flip64File> {
     };
   }
 
-  /// <summary>Not supported. Flip images have complex interlace multicolor constraints.</summary>
-  public static Flip64File FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to Flip64File is not supported due to complex interlace multicolor constraints.");
-  }
 }

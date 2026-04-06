@@ -26,6 +26,8 @@ public static class ZeissBivasReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static ZeissBivasFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static ZeissBivasFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < ZeissBivasFile.HeaderSize)

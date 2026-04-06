@@ -25,6 +25,8 @@ public static class FaxG3Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static FaxG3File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static FaxG3File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < FaxG3File.HeaderSize)

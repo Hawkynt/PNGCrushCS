@@ -25,6 +25,8 @@ public static class GfaRaytraceReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static GfaRaytraceFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static GfaRaytraceFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < GfaRaytraceFile.HeaderSize)

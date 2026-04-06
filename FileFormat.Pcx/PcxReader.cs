@@ -26,6 +26,8 @@ public static class PcxReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static PcxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static PcxFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < PcxHeader.StructSize)

@@ -47,26 +47,6 @@ public sealed class HiPicCreatorReaderTests {
 }
 
 [TestFixture]
-public sealed class HiPicCreatorWriterTests {
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => HiPicCreatorWriter.ToBytes(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_CorrectOutputSize() {
-    var rawData = new byte[10000];
-    var file = new HiPicCreatorFile { LoadAddress = 0x4000, RawData = rawData };
-    var bytes = HiPicCreatorWriter.ToBytes(file);
-
-    Assert.That(bytes.Length, Is.EqualTo(2 + 10000));
-  }
-}
-
-[TestFixture]
 public sealed class HiPicCreatorRoundTripTests {
 
   [Test]
@@ -83,50 +63,6 @@ public sealed class HiPicCreatorRoundTripTests {
 
     Assert.That(restored.LoadAddress, Is.EqualTo(original.LoadAddress));
     Assert.That(restored.RawData, Is.EqualTo(original.RawData));
-  }
-}
-
-[TestFixture]
-public sealed class HiPicCreatorDataTypeTests {
-
-  [Test]
-  [Category("Unit")]
-  public void PrimaryExtension_IsHpc() {
-    Assert.That(_GetPrimaryExtension(), Is.EqualTo(".hpc"));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FileExtensions_ContainsHpc() {
-    var extensions = _GetFileExtensions();
-    Assert.That(extensions, Does.Contain(".hpc"));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => HiPicCreatorFile.ToRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => HiPicCreatorFile.FromRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_ThrowsNotSupportedException() {
-    var image = new RawImage { Width = 160, Height = 200, Format = PixelFormat.Rgb24, PixelData = new byte[160 * 200 * 3] };
-    Assert.Throws<NotSupportedException>(() => HiPicCreatorFile.FromRawImage(image));
-  }
-
-  private static string _GetPrimaryExtension() => _Helper<HiPicCreatorFile>.PrimaryExtension;
-  private static string[] _GetFileExtensions() => _Helper<HiPicCreatorFile>.FileExtensions;
-
-  private static class _Helper<T> where T : IImageFileFormat<T> {
-    public static string PrimaryExtension => T.PrimaryExtension;
-    public static string[] FileExtensions => T.FileExtensions;
   }
 }
 

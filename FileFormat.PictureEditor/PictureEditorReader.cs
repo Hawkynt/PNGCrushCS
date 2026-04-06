@@ -26,6 +26,8 @@ public static class PictureEditorReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static PictureEditorFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static PictureEditorFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != PictureEditorFile.ExpectedFileSize)

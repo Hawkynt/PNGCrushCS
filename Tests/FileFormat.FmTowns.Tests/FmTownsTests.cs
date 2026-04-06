@@ -47,21 +47,6 @@ public class FmTownsReaderTests {
 }
 
 [TestFixture]
-public class FmTownsWriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => FmTownsWriter.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_OutputSize_IsCorrect() {
-    var file = new FmTownsFile { PixelData = new byte[FmTownsFile.ImageWidth * FmTownsFile.ImageHeight] };
-    var bytes = FmTownsWriter.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(FmTownsFile.FileSize));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -94,41 +79,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void PrimaryExtension_IsCorrect()
-    => Assert.That(_GetPrimaryExtension<FmTownsFile>(), Is.EqualTo(".fmt"));
-
-  [Test]
-  public void FileExtensions_ContainsPrimary() {
-    var exts = _GetFileExtensions<FmTownsFile>();
-    Assert.That(exts, Does.Contain(".fmt"));
-  }
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => FmTownsFile.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => FmTownsFile.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 320, Height = 200, Format = PixelFormat.Rgba32, PixelData = new byte[320 * 200 * 4] };
-    Assert.Throws<ArgumentException>(() => FmTownsFile.FromRawImage(raw));
-  }
-
-  [Test]
-  public void Constants_AreCorrect() {
-    Assert.That(FmTownsFile.FileSize, Is.EqualTo(64000));
-    Assert.That(FmTownsFile.ImageWidth, Is.EqualTo(320));
-    Assert.That(FmTownsFile.ImageHeight, Is.EqualTo(200));
-  }
-
-  private static string _GetPrimaryExtension<T>() where T : IImageFileFormat<T> => T.PrimaryExtension;
-
-  private static string[] _GetFileExtensions<T>() where T : IImageFileFormat<T> => T.FileExtensions;
-}

@@ -1,21 +1,18 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.SmartST;
 
 /// <summary>In-memory representation of a Smart ST true-color (.sst) screen dump.</summary>
-public sealed class SmartSTFile : IImageFileFormat<SmartSTFile> {
+public readonly record struct SmartSTFile : IImageFormatReader<SmartSTFile>, IImageToRawImage<SmartSTFile>, IImageFromRawImage<SmartSTFile>, IImageFormatWriter<SmartSTFile> {
 
   /// <summary>The exact file size: 320 x 240 x 2 bytes per pixel.</summary>
   public const int ExpectedFileSize = 320 * 240 * 2;
 
-  static string IImageFileFormat<SmartSTFile>.PrimaryExtension => ".sst";
-  static string[] IImageFileFormat<SmartSTFile>.FileExtensions => [".sst", ".sst2"];
-  static SmartSTFile IImageFileFormat<SmartSTFile>.FromFile(FileInfo file) => SmartSTReader.FromFile(file);
-  static SmartSTFile IImageFileFormat<SmartSTFile>.FromBytes(byte[] data) => SmartSTReader.FromBytes(data);
-  static SmartSTFile IImageFileFormat<SmartSTFile>.FromStream(Stream stream) => SmartSTReader.FromStream(stream);
-  static byte[] IImageFileFormat<SmartSTFile>.ToBytes(SmartSTFile file) => SmartSTWriter.ToBytes(file);
+  static string IImageFormatMetadata<SmartSTFile>.PrimaryExtension => ".sst";
+  static string[] IImageFormatMetadata<SmartSTFile>.FileExtensions => [".sst", ".sst2"];
+  static SmartSTFile IImageFormatReader<SmartSTFile>.FromSpan(ReadOnlySpan<byte> data) => SmartSTReader.FromSpan(data);
+  static byte[] IImageFormatWriter<SmartSTFile>.ToBytes(SmartSTFile file) => SmartSTWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>
   public int Width => 320;
@@ -24,10 +21,9 @@ public sealed class SmartSTFile : IImageFileFormat<SmartSTFile> {
   public int Height => 240;
 
   /// <summary>Raw RGB565 big-endian pixel data (2 bytes per pixel, 153600 bytes total).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(SmartSTFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var rgb565 = file.PixelData;
     var pixelCount = 320 * 240;

@@ -26,6 +26,8 @@ public static class AtariAnimationReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static AtariAnimationFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AtariAnimationFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < AtariAnimationFile.FrameSize)

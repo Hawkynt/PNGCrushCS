@@ -33,6 +33,8 @@ public static class FliReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static FliFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static FliFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < FliHeader.StructSize)

@@ -26,6 +26,8 @@ public static class NokiaPictureMessageReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static NokiaPictureMessageFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static NokiaPictureMessageFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < NokiaPictureMessageHeader.StructSize)

@@ -83,7 +83,7 @@ public sealed class PdfImageTests {
   [Test]
   [Category("Unit")]
   public void PrimaryExtension_IsPdf() {
-    var map = typeof(PdfFile).GetInterfaceMap(typeof(IImageFileFormat<PdfFile>));
+    var map = typeof(PdfFile).GetInterfaceMap(typeof(IImageFormatMetadata<PdfFile>));
     string? ext = null;
     foreach (var method in map.TargetMethods)
       if (method.Name.Contains("PrimaryExtension"))
@@ -94,7 +94,7 @@ public sealed class PdfImageTests {
   [Test]
   [Category("Unit")]
   public void FileExtensions_ContainsPdf() {
-    var map = typeof(PdfFile).GetInterfaceMap(typeof(IImageFileFormat<PdfFile>));
+    var map = typeof(PdfFile).GetInterfaceMap(typeof(IImageFormatMetadata<PdfFile>));
     string[]? exts = null;
     foreach (var method in map.TargetMethods)
       if (method.Name.Contains("FileExtensions"))

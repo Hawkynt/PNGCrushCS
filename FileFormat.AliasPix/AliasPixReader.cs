@@ -26,6 +26,8 @@ public static class AliasPixReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static AliasPixFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AliasPixFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < AliasPixHeader.StructSize)

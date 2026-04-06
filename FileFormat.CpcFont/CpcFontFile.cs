@@ -1,21 +1,16 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.CpcFont;
 
 /// <summary>In-memory representation of a CPC font file (2048 bytes: 256 characters x 8 bytes each, 8x8 mono).</summary>
-public sealed class CpcFontFile : IImageFileFormat<CpcFontFile> {
+public readonly record struct CpcFontFile : IImageFormatReader<CpcFontFile>, IImageToRawImage<CpcFontFile>, IImageFormatWriter<CpcFontFile> {
 
-  static string IImageFileFormat<CpcFontFile>.PrimaryExtension => ".cpf";
-  static string[] IImageFileFormat<CpcFontFile>.FileExtensions => [".cpf"];
-  static FormatCapability IImageFileFormat<CpcFontFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static CpcFontFile IImageFileFormat<CpcFontFile>.FromFile(FileInfo file) => CpcFontReader.FromFile(file);
-  static CpcFontFile IImageFileFormat<CpcFontFile>.FromBytes(byte[] data) => CpcFontReader.FromBytes(data);
-  static CpcFontFile IImageFileFormat<CpcFontFile>.FromStream(Stream stream) => CpcFontReader.FromStream(stream);
-  static RawImage IImageFileFormat<CpcFontFile>.ToRawImage(CpcFontFile file) => ToRawImage(file);
-  static CpcFontFile IImageFileFormat<CpcFontFile>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<CpcFontFile>.ToBytes(CpcFontFile file) => CpcFontWriter.ToBytes(file);
+  static string IImageFormatMetadata<CpcFontFile>.PrimaryExtension => ".cpf";
+  static string[] IImageFormatMetadata<CpcFontFile>.FileExtensions => [".cpf"];
+  static CpcFontFile IImageFormatReader<CpcFontFile>.FromSpan(ReadOnlySpan<byte> data) => CpcFontReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<CpcFontFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<CpcFontFile>.ToBytes(CpcFontFile file) => CpcFontWriter.ToBytes(file);
 
   /// <summary>Expected file size in bytes.</summary>
   internal const int ExpectedFileSize = 2048;
@@ -51,13 +46,12 @@ public sealed class CpcFontFile : IImageFileFormat<CpcFontFile> {
   public int Height => PixelHeight;
 
   /// <summary>Raw font pattern data (2048 bytes).</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
   /// <summary>Converts the CPC font to an Indexed1 raw image (128x128, B&amp;W palette).</summary>
   public static RawImage ToRawImage(CpcFontFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var rowStride = PixelWidth / 8;
     var pixelData = new byte[rowStride * PixelHeight];
@@ -95,9 +89,4 @@ public sealed class CpcFontFile : IImageFileFormat<CpcFontFile> {
     };
   }
 
-  /// <summary>Not supported. CPC font files have fixed structure constraints.</summary>
-  public static CpcFontFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to CpcFontFile is not supported.");
-  }
 }

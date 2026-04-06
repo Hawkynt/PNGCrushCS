@@ -28,6 +28,8 @@ public static class WalReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static WalFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static WalFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MIN_FILE_SIZE)

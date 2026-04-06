@@ -1,11 +1,10 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.DuneGraph;
 
 /// <summary>In-memory representation of an Atari Falcon DuneGraph (.dg1/.dc1) indexed image.</summary>
-public sealed class DuneGraphFile : IImageFileFormat<DuneGraphFile> {
+public readonly record struct DuneGraphFile : IImageFormatReader<DuneGraphFile>, IImageToRawImage<DuneGraphFile>, IImageFromRawImage<DuneGraphFile>, IImageFormatWriter<DuneGraphFile> {
 
   /// <summary>Fixed image width.</summary>
   public const int FixedWidth = 320;
@@ -31,13 +30,11 @@ public sealed class DuneGraphFile : IImageFileFormat<DuneGraphFile> {
   /// <summary>The RLE escape byte used in .dc1 compressed files.</summary>
   internal const byte RleEscape = 0x00;
 
-  static string IImageFileFormat<DuneGraphFile>.PrimaryExtension => ".dg1";
-  static string[] IImageFileFormat<DuneGraphFile>.FileExtensions => [".dg1", ".dc1"];
-  static FormatCapability IImageFileFormat<DuneGraphFile>.Capabilities => FormatCapability.IndexedOnly;
-  static DuneGraphFile IImageFileFormat<DuneGraphFile>.FromFile(FileInfo file) => DuneGraphReader.FromFile(file);
-  static DuneGraphFile IImageFileFormat<DuneGraphFile>.FromBytes(byte[] data) => DuneGraphReader.FromBytes(data);
-  static DuneGraphFile IImageFileFormat<DuneGraphFile>.FromStream(Stream stream) => DuneGraphReader.FromStream(stream);
-  static byte[] IImageFileFormat<DuneGraphFile>.ToBytes(DuneGraphFile file) => DuneGraphWriter.ToBytes(file);
+  static string IImageFormatMetadata<DuneGraphFile>.PrimaryExtension => ".dg1";
+  static string[] IImageFormatMetadata<DuneGraphFile>.FileExtensions => [".dg1", ".dc1"];
+  static DuneGraphFile IImageFormatReader<DuneGraphFile>.FromSpan(ReadOnlySpan<byte> data) => DuneGraphReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<DuneGraphFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<DuneGraphFile>.ToBytes(DuneGraphFile file) => DuneGraphWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>
   public int Width => FixedWidth;
@@ -49,10 +46,10 @@ public sealed class DuneGraphFile : IImageFileFormat<DuneGraphFile> {
   public bool IsCompressed { get; init; }
 
   /// <summary>RGB palette (3 bytes per entry, 768 bytes total).</summary>
-  public byte[] Palette { get; init; } = [];
+  public byte[] Palette { get; init; }
 
   /// <summary>Pixel data (1 byte per pixel, 64000 bytes total).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts the Falcon 4-byte palette entry to an RGB triplet.</summary>
   internal static void ConvertFalconPaletteToRgb(ReadOnlySpan<byte> falcon, Span<byte> rgb) {
@@ -78,7 +75,6 @@ public sealed class DuneGraphFile : IImageFileFormat<DuneGraphFile> {
   }
 
   public static RawImage ToRawImage(DuneGraphFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     return new() {
       Width = FixedWidth,

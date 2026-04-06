@@ -27,6 +27,8 @@ public static class MspReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static MspFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static MspFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < MspHeader.StructSize)

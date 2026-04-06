@@ -1,34 +1,30 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Jbig;
 
 /// <summary>In-memory representation of a JBIG1 (ITU-T T.82) bi-level image.</summary>
-public sealed class JbigFile : IImageFileFormat<JbigFile> {
+public readonly record struct JbigFile : IImageFormatReader<JbigFile>, IImageToRawImage<JbigFile>, IImageFromRawImage<JbigFile>, IImageFormatWriter<JbigFile> {
 
-  static string IImageFileFormat<JbigFile>.PrimaryExtension => ".jbg";
-  static string[] IImageFileFormat<JbigFile>.FileExtensions => [".jbg", ".bie", ".jbig"];
-  static FormatCapability IImageFileFormat<JbigFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static JbigFile IImageFileFormat<JbigFile>.FromFile(FileInfo file) => JbigReader.FromFile(file);
-  static JbigFile IImageFileFormat<JbigFile>.FromBytes(byte[] data) => JbigReader.FromBytes(data);
-  static JbigFile IImageFileFormat<JbigFile>.FromStream(Stream stream) => JbigReader.FromStream(stream);
-  static RawImage IImageFileFormat<JbigFile>.ToRawImage(JbigFile file) => file.ToRawImage();
-  static byte[] IImageFileFormat<JbigFile>.ToBytes(JbigFile file) => JbigWriter.ToBytes(file);
+  static string IImageFormatMetadata<JbigFile>.PrimaryExtension => ".jbg";
+  static string[] IImageFormatMetadata<JbigFile>.FileExtensions => [".jbg", ".bie", ".jbig"];
+  static JbigFile IImageFormatReader<JbigFile>.FromSpan(ReadOnlySpan<byte> data) => JbigReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<JbigFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<JbigFile>.ToBytes(JbigFile file) => JbigWriter.ToBytes(file);
 
   public int Width { get; init; }
   public int Height { get; init; }
 
   /// <summary>1bpp packed pixel data, MSB first, ceil(width/8) bytes per row.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
-  public RawImage ToRawImage() => new() {
-    Width = this.Width,
-    Height = this.Height,
+  public static RawImage ToRawImage(JbigFile file) => new() {
+    Width = file.Width,
+    Height = file.Height,
     Format = PixelFormat.Indexed1,
-    PixelData = this.PixelData[..],
+    PixelData = file.PixelData[..],
     Palette = _BlackWhitePalette[..],
     PaletteCount = 2,
   };

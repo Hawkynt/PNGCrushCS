@@ -26,6 +26,8 @@ public static class QuantelVpbReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static QuantelVpbFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static QuantelVpbFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < QuantelVpbFile.MinFileSize)

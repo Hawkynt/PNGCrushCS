@@ -26,6 +26,8 @@ public static class InterPaintHiReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static InterPaintHiFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static InterPaintHiFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < InterPaintHiFile.ExpectedFileSize)

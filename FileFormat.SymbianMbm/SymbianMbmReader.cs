@@ -27,6 +27,8 @@ public static class SymbianMbmReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static SymbianMbmFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static SymbianMbmFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < SymbianMbmFile.MinimumFileSize)

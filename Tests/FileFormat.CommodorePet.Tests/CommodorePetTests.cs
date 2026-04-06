@@ -47,21 +47,6 @@ public class CommodorePetReaderTests {
 }
 
 [TestFixture]
-public class CommodorePetWriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => CommodorePetWriter.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_OutputSize_IsCorrect() {
-    var file = new CommodorePetFile { PixelData = new byte[CommodorePetFile.ImageWidth * CommodorePetFile.ImageHeight] };
-    var bytes = CommodorePetWriter.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(CommodorePetFile.FileSize));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -94,41 +79,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void PrimaryExtension_IsCorrect()
-    => Assert.That(_GetPrimaryExtension<CommodorePetFile>(), Is.EqualTo(".pet"));
-
-  [Test]
-  public void FileExtensions_ContainsPrimary() {
-    var exts = _GetFileExtensions<CommodorePetFile>();
-    Assert.That(exts, Does.Contain(".pet"));
-  }
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => CommodorePetFile.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => CommodorePetFile.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 40, Height = 25, Format = PixelFormat.Rgba32, PixelData = new byte[40 * 25 * 4] };
-    Assert.Throws<ArgumentException>(() => CommodorePetFile.FromRawImage(raw));
-  }
-
-  [Test]
-  public void Constants_AreCorrect() {
-    Assert.That(CommodorePetFile.FileSize, Is.EqualTo(1000));
-    Assert.That(CommodorePetFile.ImageWidth, Is.EqualTo(40));
-    Assert.That(CommodorePetFile.ImageHeight, Is.EqualTo(25));
-  }
-
-  private static string _GetPrimaryExtension<T>() where T : IImageFileFormat<T> => T.PrimaryExtension;
-
-  private static string[] _GetFileExtensions<T>() where T : IImageFileFormat<T> => T.FileExtensions;
-}

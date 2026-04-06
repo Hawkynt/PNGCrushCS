@@ -54,6 +54,8 @@ public static class DngReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static DngFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static DngFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MIN_FILE_SIZE)

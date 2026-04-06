@@ -25,6 +25,8 @@ public static class MonoMagicReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static MonoMagicFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static MonoMagicFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != MonoMagicFile.FileSize)

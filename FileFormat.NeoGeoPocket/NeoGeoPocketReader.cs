@@ -25,6 +25,8 @@ public static class NeoGeoPocketReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static NeoGeoPocketFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static NeoGeoPocketFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < NeoGeoPocketFile.BytesPerTile)

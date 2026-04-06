@@ -41,6 +41,8 @@ public static class ZxSpectrumReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static ZxSpectrumFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static ZxSpectrumFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != FileSize)

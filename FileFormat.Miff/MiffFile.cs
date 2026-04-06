@@ -1,31 +1,27 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Miff;
 
 /// <summary>In-memory representation of a MIFF (ImageMagick) image.</summary>
 [FormatMagicBytes([0x69, 0x64, 0x3D, 0x49, 0x6D, 0x61, 0x67, 0x65, 0x4D, 0x61, 0x67, 0x69, 0x63, 0x6B])]
-public sealed class MiffFile : IImageFileFormat<MiffFile> {
+public readonly record struct MiffFile : IImageFormatReader<MiffFile>, IImageToRawImage<MiffFile>, IImageFromRawImage<MiffFile>, IImageFormatWriter<MiffFile> {
 
-  static string IImageFileFormat<MiffFile>.PrimaryExtension => ".miff";
-  static string[] IImageFileFormat<MiffFile>.FileExtensions => [".miff", ".mif"];
-  static MiffFile IImageFileFormat<MiffFile>.FromFile(FileInfo file) => MiffReader.FromFile(file);
-  static MiffFile IImageFileFormat<MiffFile>.FromBytes(byte[] data) => MiffReader.FromBytes(data);
-  static MiffFile IImageFileFormat<MiffFile>.FromStream(Stream stream) => MiffReader.FromStream(stream);
-  static byte[] IImageFileFormat<MiffFile>.ToBytes(MiffFile file) => MiffWriter.ToBytes(file);
+  static string IImageFormatMetadata<MiffFile>.PrimaryExtension => ".miff";
+  static string[] IImageFormatMetadata<MiffFile>.FileExtensions => [".miff", ".mif"];
+  static MiffFile IImageFormatReader<MiffFile>.FromSpan(ReadOnlySpan<byte> data) => MiffReader.FromSpan(data);
+  static byte[] IImageFormatWriter<MiffFile>.ToBytes(MiffFile file) => MiffWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
-  public int Depth { get; init; } = 8;
+  public int Depth { get; init; }
   public MiffColorClass ColorClass { get; init; }
   public MiffCompression Compression { get; init; }
-  public string Colorspace { get; init; } = "sRGB";
-  public string Type { get; init; } = "TrueColor";
-  public byte[] PixelData { get; init; } = [];
+  public string Colorspace { get; init; }
+  public string Type { get; init; }
+  public byte[] PixelData { get; init; }
   public byte[]? Palette { get; init; }
 
   public static RawImage ToRawImage(MiffFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     if (file.ColorClass == MiffColorClass.PseudoClass && file.Palette != null)
       return new() {

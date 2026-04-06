@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.LogoPainter;
 
 /// <summary>In-memory representation of a C64 Logo Painter 3/3+ multicolor image.</summary>
-public sealed class LogoPainterFile : IImageFileFormat<LogoPainterFile> {
+public readonly record struct LogoPainterFile : IImageFormatReader<LogoPainterFile>, IImageToRawImage<LogoPainterFile>, IImageFormatWriter<LogoPainterFile> {
 
-  static string IImageFileFormat<LogoPainterFile>.PrimaryExtension => ".lp3";
-  static string[] IImageFileFormat<LogoPainterFile>.FileExtensions => [".lp3"];
-  static LogoPainterFile IImageFileFormat<LogoPainterFile>.FromFile(FileInfo file) => LogoPainterReader.FromFile(file);
-  static LogoPainterFile IImageFileFormat<LogoPainterFile>.FromBytes(byte[] data) => LogoPainterReader.FromBytes(data);
-  static LogoPainterFile IImageFileFormat<LogoPainterFile>.FromStream(Stream stream) => LogoPainterReader.FromStream(stream);
-  static byte[] IImageFileFormat<LogoPainterFile>.ToBytes(LogoPainterFile file) => LogoPainterWriter.ToBytes(file);
+  static string IImageFormatMetadata<LogoPainterFile>.PrimaryExtension => ".lp3";
+  static string[] IImageFormatMetadata<LogoPainterFile>.FileExtensions => [".lp3"];
+  static LogoPainterFile IImageFormatReader<LogoPainterFile>.FromSpan(ReadOnlySpan<byte> data) => LogoPainterReader.FromSpan(data);
+  static byte[] IImageFormatWriter<LogoPainterFile>.ToBytes(LogoPainterFile file) => LogoPainterWriter.ToBytes(file);
 
   /// <summary>The fixed width of the image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -52,11 +49,10 @@ public sealed class LogoPainterFile : IImageFileFormat<LogoPainterFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Raw payload data (entire file content after load address).</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   /// <summary>Converts this Logo Painter image to a platform-independent <see cref="RawImage"/> in Rgb24 format using multicolor decode.</summary>
   public static RawImage ToRawImage(LogoPainterFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -106,9 +102,4 @@ public sealed class LogoPainterFile : IImageFileFormat<LogoPainterFile> {
     };
   }
 
-  /// <summary>Not supported. Logo Painter images have complex multicolor constraints.</summary>
-  public static LogoPainterFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to LogoPainterFile is not supported due to complex multicolor constraints.");
-  }
 }

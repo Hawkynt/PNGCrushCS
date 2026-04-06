@@ -29,6 +29,8 @@ public static class IocaReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static IocaFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static IocaFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < IocaFile.MinHeaderSize)

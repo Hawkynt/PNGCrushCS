@@ -30,6 +30,8 @@ public static class DpxReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static DpxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static DpxFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MINIMUM_HEADER_SIZE)

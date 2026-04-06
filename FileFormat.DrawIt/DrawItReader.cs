@@ -26,6 +26,8 @@ public static class DrawItReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static DrawItFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static DrawItFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < DrawItHeader.StructSize)

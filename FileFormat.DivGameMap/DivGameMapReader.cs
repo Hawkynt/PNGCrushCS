@@ -26,6 +26,8 @@ public static class DivGameMapReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static DivGameMapFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static DivGameMapFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < DivGameMapFile.MinFileSize)

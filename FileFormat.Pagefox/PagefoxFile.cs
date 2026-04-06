@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Pagefox;
 
 /// <summary>In-memory representation of a Pagefox hires image (640x200, 1bpp monochrome, 16384 bytes).</summary>
-public sealed class PagefoxFile : IImageFileFormat<PagefoxFile> {
+public readonly record struct PagefoxFile : IImageFormatReader<PagefoxFile>, IImageToRawImage<PagefoxFile>, IImageFromRawImage<PagefoxFile>, IImageFormatWriter<PagefoxFile> {
 
   /// <summary>Expected file size in bytes (640 * 200 / 8 = 16000, padded to 16384).</summary>
   public const int ExpectedFileSize = 16384;
@@ -25,14 +24,10 @@ public sealed class PagefoxFile : IImageFileFormat<PagefoxFile> {
   /// <summary>Black and white palette for indexed output (2 entries, 3 bytes each).</summary>
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
-  static string IImageFileFormat<PagefoxFile>.PrimaryExtension => ".pfx";
-  static string[] IImageFileFormat<PagefoxFile>.FileExtensions => [".pfx"];
-  static PagefoxFile IImageFileFormat<PagefoxFile>.FromFile(FileInfo file) => PagefoxReader.FromFile(file);
-  static PagefoxFile IImageFileFormat<PagefoxFile>.FromBytes(byte[] data) => PagefoxReader.FromBytes(data);
-  static PagefoxFile IImageFileFormat<PagefoxFile>.FromStream(Stream stream) => PagefoxReader.FromStream(stream);
-  static RawImage IImageFileFormat<PagefoxFile>.ToRawImage(PagefoxFile file) => ToRawImage(file);
-  static PagefoxFile IImageFileFormat<PagefoxFile>.FromRawImage(RawImage image) => FromRawImage(image);
-  static byte[] IImageFileFormat<PagefoxFile>.ToBytes(PagefoxFile file) => PagefoxWriter.ToBytes(file);
+  static string IImageFormatMetadata<PagefoxFile>.PrimaryExtension => ".pfx";
+  static string[] IImageFormatMetadata<PagefoxFile>.FileExtensions => [".pfx"];
+  static PagefoxFile IImageFormatReader<PagefoxFile>.FromSpan(ReadOnlySpan<byte> data) => PagefoxReader.FromSpan(data);
+  static byte[] IImageFormatWriter<PagefoxFile>.ToBytes(PagefoxFile file) => PagefoxWriter.ToBytes(file);
 
   /// <summary>Always 640.</summary>
   public int Width => PixelWidth;
@@ -41,14 +36,13 @@ public sealed class PagefoxFile : IImageFileFormat<PagefoxFile> {
   public int Height => PixelHeight;
 
   /// <summary>Raw bitmap data (16384 bytes; first 16000 bytes are active pixel data, remainder is padding).</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   /// <summary>
   /// Converts this Pagefox image to a platform-independent <see cref="RawImage"/> in Indexed1 format.
   /// 1bpp MSB-first, 80 bytes per row, 200 rows. Output 640x200 with B&amp;W palette.
   /// </summary>
   public static RawImage ToRawImage(PagefoxFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var rowStride = BytesPerRow; // 80 bytes per row
     var pixelData = new byte[rowStride * PixelHeight];

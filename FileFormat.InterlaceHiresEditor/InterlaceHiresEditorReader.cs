@@ -26,6 +26,8 @@ public static class InterlaceHiresEditorReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static InterlaceHiresEditorFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static InterlaceHiresEditorFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < InterlaceHiresEditorFile.LoadAddressSize + InterlaceHiresEditorFile.MinPayloadSize)

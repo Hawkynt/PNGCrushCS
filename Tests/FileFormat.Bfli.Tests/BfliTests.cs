@@ -47,26 +47,6 @@ public sealed class BfliReaderTests {
 }
 
 [TestFixture]
-public sealed class BfliWriterTests {
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => BfliWriter.ToBytes(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_CorrectOutputSize() {
-    var rawData = new byte[9000];
-    var file = new BfliFile { LoadAddress = 0x3C00, RawData = rawData };
-    var bytes = BfliWriter.ToBytes(file);
-
-    Assert.That(bytes.Length, Is.EqualTo(2 + 9000));
-  }
-}
-
-[TestFixture]
 public sealed class BfliRoundTripTests {
 
   [Test]
@@ -83,51 +63,6 @@ public sealed class BfliRoundTripTests {
 
     Assert.That(restored.LoadAddress, Is.EqualTo(original.LoadAddress));
     Assert.That(restored.RawData, Is.EqualTo(original.RawData));
-  }
-}
-
-[TestFixture]
-public sealed class BfliDataTypeTests {
-
-  [Test]
-  [Category("Unit")]
-  public void PrimaryExtension_IsBfl() {
-    Assert.That(_GetPrimaryExtension(), Is.EqualTo(".bfl"));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FileExtensions_ContainsBflAndBfli() {
-    var extensions = _GetFileExtensions();
-    Assert.That(extensions, Does.Contain(".bfl"));
-    Assert.That(extensions, Does.Contain(".bfli"));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => BfliFile.ToRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => BfliFile.FromRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_ThrowsNotSupportedException() {
-    var image = new RawImage { Width = 320, Height = 200, Format = PixelFormat.Rgb24, PixelData = new byte[320 * 200 * 3] };
-    Assert.Throws<NotSupportedException>(() => BfliFile.FromRawImage(image));
-  }
-
-  private static string _GetPrimaryExtension() => _Helper<BfliFile>.PrimaryExtension;
-  private static string[] _GetFileExtensions() => _Helper<BfliFile>.FileExtensions;
-
-  private static class _Helper<T> where T : IImageFileFormat<T> {
-    public static string PrimaryExtension => T.PrimaryExtension;
-    public static string[] FileExtensions => T.FileExtensions;
   }
 }
 

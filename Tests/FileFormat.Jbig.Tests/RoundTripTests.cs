@@ -151,7 +151,7 @@ public sealed class RoundTripTests {
       PixelData = pixelData
     };
 
-    var raw = original.ToRawImage();
+    var raw = JbigFile.ToRawImage(original);
 
     Assert.That(raw.Format, Is.EqualTo(PixelFormat.Indexed1));
     Assert.That(raw.Width, Is.EqualTo(width));

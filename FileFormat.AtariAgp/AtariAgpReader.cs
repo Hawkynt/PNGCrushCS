@@ -26,6 +26,8 @@ public static class AtariAgpReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static AtariAgpFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AtariAgpFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < AtariAgpFile.FileSizeGr7)

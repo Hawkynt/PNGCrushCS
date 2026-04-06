@@ -25,6 +25,8 @@ public static class ThomsonReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static ThomsonFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static ThomsonFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < ThomsonFile.FileSize)

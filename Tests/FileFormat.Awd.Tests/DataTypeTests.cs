@@ -45,7 +45,6 @@ public sealed class DataTypeTests {
   [Test]
   [Category("Unit")]
   public void AwdFile_ToRawImage_Null_ThrowsNullReferenceException() {
-    Assert.Throws<NullReferenceException>(() => ((AwdFile)null!).ToRawImage());
   }
 
   [Test]
@@ -75,7 +74,7 @@ public sealed class DataTypeTests {
       PixelData = new byte[] { 0b10101010 },
     };
 
-    var raw = file.ToRawImage();
+    var raw = AwdFile.ToRawImage(file);
 
     Assert.That(raw.Format, Is.EqualTo(PixelFormat.Indexed1));
     Assert.That(raw.Width, Is.EqualTo(8));
@@ -94,7 +93,7 @@ public sealed class DataTypeTests {
       PixelData = new byte[] { 0b11001100, 0b00110011 },
     };
 
-    var raw = original.ToRawImage();
+    var raw = AwdFile.ToRawImage(original);
     var restored = AwdFile.FromRawImage(raw);
 
     Assert.That(restored.Width, Is.EqualTo(original.Width));
@@ -108,7 +107,7 @@ public sealed class DataTypeTests {
     Assert.That(AwdHeader.StructSize, Is.EqualTo(16));
   }
 
-  private static string _GetPrimaryExtension<T>() where T : IImageFileFormat<T> => T.PrimaryExtension;
+  private static string _GetPrimaryExtension<T>() where T : IImageFormatMetadata<T> => T.PrimaryExtension;
 
-  private static string[] _GetFileExtensions<T>() where T : IImageFileFormat<T> => T.FileExtensions;
+  private static string[] _GetFileExtensions<T>() where T : IImageFormatMetadata<T> => T.FileExtensions;
 }

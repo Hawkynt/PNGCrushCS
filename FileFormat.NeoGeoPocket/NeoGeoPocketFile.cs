@@ -1,11 +1,11 @@
-﻿using System;
+using System;
 using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.NeoGeoPocket;
 
 /// <summary>Neo Geo Pocket Color 2bpp tile data data model.</summary>
-public sealed class NeoGeoPocketFile : IImageFileFormat<NeoGeoPocketFile> {
+public sealed class NeoGeoPocketFile : IImageFormatReader<NeoGeoPocketFile>, IImageToRawImage<NeoGeoPocketFile>, IImageFromRawImage<NeoGeoPocketFile>, IImageFormatWriter<NeoGeoPocketFile> {
 
   public const int BytesPerTile = 16;
   public const int TileSize = 8;
@@ -18,7 +18,8 @@ public sealed class NeoGeoPocketFile : IImageFileFormat<NeoGeoPocketFile> {
 
   public static string PrimaryExtension => ".ngp";
   public static string[] FileExtensions => [".ngp", ".ngpc"];
-  static FormatCapability IImageFileFormat<NeoGeoPocketFile>.Capabilities => FormatCapability.IndexedOnly;
+  static NeoGeoPocketFile IImageFormatReader<NeoGeoPocketFile>.FromSpan(ReadOnlySpan<byte> data) => NeoGeoPocketReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<NeoGeoPocketFile>.Capabilities => FormatCapability.IndexedOnly;
   public static NeoGeoPocketFile FromFile(FileInfo file) => NeoGeoPocketReader.FromFile(file);
   public static NeoGeoPocketFile FromBytes(byte[] data) => NeoGeoPocketReader.FromBytes(data);
   public static NeoGeoPocketFile FromStream(Stream stream) => NeoGeoPocketReader.FromStream(stream);

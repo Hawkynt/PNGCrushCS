@@ -64,37 +64,6 @@ public sealed class GephardHiresReaderTests {
 }
 
 [TestFixture]
-public sealed class GephardHiresWriterTests {
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => GephardHiresWriter.ToBytes(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_CorrectOutputSize() {
-    var rawData = new byte[GephardHiresFile.MinPayloadSize];
-    var file = new GephardHiresFile { LoadAddress = 0x2000, RawData = rawData };
-    var bytes = GephardHiresWriter.ToBytes(file);
-
-    Assert.That(bytes.Length, Is.EqualTo(GephardHiresFile.LoadAddressSize + GephardHiresFile.MinPayloadSize));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_LoadAddress_IsLittleEndian() {
-    var rawData = new byte[GephardHiresFile.MinPayloadSize];
-    var file = new GephardHiresFile { LoadAddress = 0x2000, RawData = rawData };
-    var bytes = GephardHiresWriter.ToBytes(file);
-
-    Assert.That(bytes[0], Is.EqualTo(0x00));
-    Assert.That(bytes[1], Is.EqualTo(0x20));
-  }
-}
-
-[TestFixture]
 public sealed class GephardHiresRoundTripTests {
 
   [Test]
@@ -132,75 +101,6 @@ public sealed class GephardHiresRoundTripTests {
       if (File.Exists(path))
         File.Delete(path);
     }
-  }
-}
-
-[TestFixture]
-public sealed class GephardHiresDataTypeTests {
-
-  [Test]
-  [Category("Unit")]
-  public void PrimaryExtension_IsGhg() {
-    Assert.That(_GetPrimaryExtension(), Is.EqualTo(".ghg"));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FileExtensions_ContainsGhg() {
-    var extensions = _GetFileExtensions();
-    Assert.That(extensions, Does.Contain(".ghg"));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => GephardHiresFile.ToRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => GephardHiresFile.FromRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_ThrowsNotSupportedException() {
-    var image = new RawImage { Width = 320, Height = 200, Format = PixelFormat.Rgb24, PixelData = new byte[320 * 200 * 3] };
-    Assert.Throws<NotSupportedException>(() => GephardHiresFile.FromRawImage(image));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToRawImage_ValidData_ProducesRgb24() {
-    var data = TestHelpers._BuildValidGephardHiresData(0x2000);
-    var file = GephardHiresReader.FromBytes(data);
-    var raw = GephardHiresFile.ToRawImage(file);
-
-    Assert.That(raw.Width, Is.EqualTo(320));
-    Assert.That(raw.Height, Is.EqualTo(200));
-    Assert.That(raw.Format, Is.EqualTo(PixelFormat.Rgb24));
-    Assert.That(raw.PixelData.Length, Is.EqualTo(320 * 200 * 3));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FixedWidth_Is320() {
-    Assert.That(GephardHiresFile.FixedWidth, Is.EqualTo(320));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FixedHeight_Is200() {
-    Assert.That(GephardHiresFile.FixedHeight, Is.EqualTo(200));
-  }
-
-  private static string _GetPrimaryExtension() => _Helper<GephardHiresFile>.PrimaryExtension;
-  private static string[] _GetFileExtensions() => _Helper<GephardHiresFile>.FileExtensions;
-
-  private static class _Helper<T> where T : IImageFileFormat<T> {
-    public static string PrimaryExtension => T.PrimaryExtension;
-    public static string[] FileExtensions => T.FileExtensions;
   }
 }
 

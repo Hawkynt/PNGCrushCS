@@ -31,6 +31,8 @@ public static class Wad2Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static Wad2File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static Wad2File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < Wad2Header.StructSize)

@@ -1,24 +1,21 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.JpegLs;
 
 /// <summary>In-memory representation of a JPEG-LS (ITU-T T.87) image.</summary>
 [FormatDetectionPriority(10)]
-public sealed class JpegLsFile : IImageFileFormat<JpegLsFile> {
+public readonly record struct JpegLsFile : IImageFormatReader<JpegLsFile>, IImageToRawImage<JpegLsFile>, IImageFromRawImage<JpegLsFile>, IImageFormatWriter<JpegLsFile> {
 
-  static string IImageFileFormat<JpegLsFile>.PrimaryExtension => ".jls";
-  static string[] IImageFileFormat<JpegLsFile>.FileExtensions => [".jls"];
+  static string IImageFormatMetadata<JpegLsFile>.PrimaryExtension => ".jls";
+  static string[] IImageFormatMetadata<JpegLsFile>.FileExtensions => [".jls"];
+  static JpegLsFile IImageFormatReader<JpegLsFile>.FromSpan(ReadOnlySpan<byte> data) => JpegLsReader.FromSpan(data);
 
-  static bool? IImageFileFormat<JpegLsFile>.MatchesSignature(ReadOnlySpan<byte> header)
+  static bool? IImageFormatMetadata<JpegLsFile>.MatchesSignature(ReadOnlySpan<byte> header)
     => header.Length >= 4 && header[0] == 0xFF && header[1] == 0xD8 && header[2] == 0xFF && header[3] == 0xF7
       ? true : null;
 
-  static JpegLsFile IImageFileFormat<JpegLsFile>.FromFile(FileInfo file) => JpegLsReader.FromFile(file);
-  static JpegLsFile IImageFileFormat<JpegLsFile>.FromBytes(byte[] data) => JpegLsReader.FromBytes(data);
-  static JpegLsFile IImageFileFormat<JpegLsFile>.FromStream(Stream stream) => JpegLsReader.FromStream(stream);
-  static byte[] IImageFileFormat<JpegLsFile>.ToBytes(JpegLsFile file) => JpegLsWriter.ToBytes(file);
+  static byte[] IImageFormatWriter<JpegLsFile>.ToBytes(JpegLsFile file) => JpegLsWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -27,19 +24,18 @@ public sealed class JpegLsFile : IImageFileFormat<JpegLsFile> {
   public int Height { get; init; }
 
   /// <summary>Bits per sample (8 or 16).</summary>
-  public int BitsPerSample { get; init; } = 8;
+  public int BitsPerSample { get; init; }
 
   /// <summary>Number of components (1 for grayscale, 3 for RGB).</summary>
-  public int ComponentCount { get; init; } = 1;
+  public int ComponentCount { get; init; }
 
   /// <summary>Near-lossless parameter (0 = lossless).</summary>
   public int NearLossless { get; init; }
 
   /// <summary>Pixel data: for 8-bit: Gray8 (1 comp) or Rgb24 (3 comp); for 16-bit: Gray16 BE (1 comp) or Rgb48 BE (3 comp).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(JpegLsFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     PixelFormat format;
     if (file.BitsPerSample > 8)

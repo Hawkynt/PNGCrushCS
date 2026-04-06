@@ -41,6 +41,8 @@ public static class ZxTimexReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static ZxTimexFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static ZxTimexFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != FileSize)

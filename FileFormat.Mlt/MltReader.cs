@@ -27,6 +27,8 @@ public static class MltReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static MltFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static MltFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
 

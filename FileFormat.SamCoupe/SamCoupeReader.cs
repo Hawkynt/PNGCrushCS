@@ -41,6 +41,8 @@ public static class SamCoupeReader {
     return FromBytes(ms.ToArray(), mode);
   }
 
+  public static SamCoupeFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static SamCoupeFile FromBytes(byte[] data, SamCoupeMode mode = SamCoupeMode.Mode4) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != FileSize)

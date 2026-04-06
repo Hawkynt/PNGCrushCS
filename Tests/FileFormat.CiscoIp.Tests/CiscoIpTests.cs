@@ -41,25 +41,6 @@ public class CiscoIpReaderTests {
 }
 
 [TestFixture]
-public class CiscoIpWriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => CiscoIpWriter.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_IncludesHeader() {
-    var file = new CiscoIpFile {
-      Width = 320,
-      Height = 240,
-      PixelData = new byte[320 * 240 * 3],
-    };
-    var bytes = CiscoIpWriter.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(80 + 320 * 240 * 3));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -90,30 +71,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void HeaderSize_Is80()
-    => Assert.That(CiscoIpFile.HeaderSize, Is.EqualTo(80));
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => CiscoIpFile.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => CiscoIpFile.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 320, Height = 240, Format = PixelFormat.Indexed8, PixelData = new byte[320 * 240] };
-    Assert.Throws<ArgumentException>(() => CiscoIpFile.FromRawImage(raw));
-  }
-
-  [Test]
-  public void FileExtensions_ContainsPrimary() {
-    string[] exts = [".cip"];
-    Assert.That(exts, Does.Contain(".cip"));
-  }
-}

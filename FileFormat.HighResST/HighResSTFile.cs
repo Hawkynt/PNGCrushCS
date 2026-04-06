@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.HighResST;
 
 /// <summary>In-memory representation of a HighRes ST monochrome image (Atari ST, 640x400, 1 bitplane).</summary>
-public sealed class HighResSTFile : IImageFileFormat<HighResSTFile> {
+public readonly record struct HighResSTFile : IImageFormatReader<HighResSTFile>, IImageToRawImage<HighResSTFile>, IImageFromRawImage<HighResSTFile>, IImageFormatWriter<HighResSTFile> {
 
   public const int FileSize = 32034;
   private const int _PIXEL_DATA_SIZE = 32000;
@@ -14,28 +13,25 @@ public sealed class HighResSTFile : IImageFileFormat<HighResSTFile> {
   private const int _NUM_PLANES = 1;
   private const int _BYTES_PER_ROW = 80;
 
-  static string IImageFileFormat<HighResSTFile>.PrimaryExtension => ".hst";
-  static string[] IImageFileFormat<HighResSTFile>.FileExtensions => [".hst", ".hrs"];
-  static FormatCapability IImageFileFormat<HighResSTFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static HighResSTFile IImageFileFormat<HighResSTFile>.FromFile(FileInfo file) => HighResSTReader.FromFile(file);
-  static HighResSTFile IImageFileFormat<HighResSTFile>.FromBytes(byte[] data) => HighResSTReader.FromBytes(data);
-  static HighResSTFile IImageFileFormat<HighResSTFile>.FromStream(Stream stream) => HighResSTReader.FromStream(stream);
-  static byte[] IImageFileFormat<HighResSTFile>.ToBytes(HighResSTFile file) => HighResSTWriter.ToBytes(file);
+  static string IImageFormatMetadata<HighResSTFile>.PrimaryExtension => ".hst";
+  static string[] IImageFormatMetadata<HighResSTFile>.FileExtensions => [".hst", ".hrs"];
+  static HighResSTFile IImageFormatReader<HighResSTFile>.FromSpan(ReadOnlySpan<byte> data) => HighResSTReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<HighResSTFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static byte[] IImageFormatWriter<HighResSTFile>.ToBytes(HighResSTFile file) => HighResSTWriter.ToBytes(file);
 
   /// <summary>Image width (always 640).</summary>
-  public int Width { get; init; } = _WIDTH;
+  public int Width { get; init; }
 
   /// <summary>Image height (always 400).</summary>
-  public int Height { get; init; } = _HEIGHT;
+  public int Height { get; init; }
 
   /// <summary>16-entry palette of 9-bit Atari ST RGB values (only first 2 entries used for mono).</summary>
-  public short[] Palette { get; init; } = new short[16];
+  public short[] Palette { get; init; }
 
   /// <summary>32000 bytes of monochrome planar pixel data (1 bitplane, 80 bytes/row, 400 rows).</summary>
-  public byte[] PixelData { get; init; } = new byte[_PIXEL_DATA_SIZE];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(HighResSTFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     // 1bpp mono: each byte encodes 8 pixels, MSB first
     // Output as Indexed1 with B&W palette

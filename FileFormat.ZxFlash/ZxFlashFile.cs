@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.ZxFlash;
 
 /// <summary>In-memory representation of a ZX Spectrum Flash animation file (6912+ bytes: base screen + additional frames for flash cycling).</summary>
-public sealed class ZxFlashFile : IImageFileFormat<ZxFlashFile> {
+public readonly record struct ZxFlashFile : IImageFormatReader<ZxFlashFile>, IImageToRawImage<ZxFlashFile>, IImageFormatWriter<ZxFlashFile> {
 
-  static string IImageFileFormat<ZxFlashFile>.PrimaryExtension => ".zfl";
-  static string[] IImageFileFormat<ZxFlashFile>.FileExtensions => [".zfl"];
-  static ZxFlashFile IImageFileFormat<ZxFlashFile>.FromFile(FileInfo file) => ZxFlashReader.FromFile(file);
-  static ZxFlashFile IImageFileFormat<ZxFlashFile>.FromBytes(byte[] data) => ZxFlashReader.FromBytes(data);
-  static ZxFlashFile IImageFileFormat<ZxFlashFile>.FromStream(Stream stream) => ZxFlashReader.FromStream(stream);
-  static byte[] IImageFileFormat<ZxFlashFile>.ToBytes(ZxFlashFile file) => ZxFlashWriter.ToBytes(file);
+  static string IImageFormatMetadata<ZxFlashFile>.PrimaryExtension => ".zfl";
+  static string[] IImageFormatMetadata<ZxFlashFile>.FileExtensions => [".zfl"];
+  static ZxFlashFile IImageFormatReader<ZxFlashFile>.FromSpan(ReadOnlySpan<byte> data) => ZxFlashReader.FromSpan(data);
+  static byte[] IImageFormatWriter<ZxFlashFile>.ToBytes(ZxFlashFile file) => ZxFlashWriter.ToBytes(file);
 
   /// <summary>ZX Spectrum normal palette (bright=0).</summary>
   internal static readonly int[] NormalPalette = [
@@ -31,17 +28,16 @@ public sealed class ZxFlashFile : IImageFileFormat<ZxFlashFile> {
   public int Height => 192;
 
   /// <summary>6144 bytes of 1bpp bitmap data in linear row order.</summary>
-  public byte[] BitmapData { get; init; } = [];
+  public byte[] BitmapData { get; init; }
 
   /// <summary>768 bytes of attribute data, one per 8x8 cell.</summary>
-  public byte[] AttributeData { get; init; } = [];
+  public byte[] AttributeData { get; init; }
 
   /// <summary>Number of frames in the flash animation.</summary>
-  public int FrameCount { get; init; } = 1;
+  public int FrameCount { get; init; }
 
   /// <summary>Converts the first frame to Rgb24.</summary>
   public static RawImage ToRawImage(ZxFlashFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = 256;
     const int height = 192;
@@ -77,9 +73,4 @@ public sealed class ZxFlashFile : IImageFileFormat<ZxFlashFile> {
     };
   }
 
-  /// <summary>Not supported.</summary>
-  public static ZxFlashFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to ZxFlashFile is not supported due to flash animation constraints.");
-  }
 }

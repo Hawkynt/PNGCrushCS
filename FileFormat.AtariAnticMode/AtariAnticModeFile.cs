@@ -1,11 +1,10 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.AtariAnticMode;
 
 /// <summary>In-memory representation of an Atari ANTIC Mode E/F Screen (.ame) file.</summary>
-public sealed class AtariAnticModeFile : IImageFileFormat<AtariAnticModeFile> {
+public readonly record struct AtariAnticModeFile : IImageFormatReader<AtariAnticModeFile>, IImageToRawImage<AtariAnticModeFile>, IImageFormatWriter<AtariAnticModeFile> {
 
   /// <summary>Size of the screen data in bytes.</summary>
   public const int ScreenDataSize = 7680;
@@ -22,13 +21,11 @@ public sealed class AtariAnticModeFile : IImageFileFormat<AtariAnticModeFile> {
   /// <summary>Mode byte value for ANTIC Mode F (mono, 320x192).</summary>
   public const byte ModeF = 0x0F;
 
-  static string IImageFileFormat<AtariAnticModeFile>.PrimaryExtension => ".ame";
-  static string[] IImageFileFormat<AtariAnticModeFile>.FileExtensions => [".ame", ".anm"];
-  static FormatCapability IImageFileFormat<AtariAnticModeFile>.Capabilities => FormatCapability.IndexedOnly;
-  static AtariAnticModeFile IImageFileFormat<AtariAnticModeFile>.FromFile(FileInfo file) => AtariAnticModeReader.FromFile(file);
-  static AtariAnticModeFile IImageFileFormat<AtariAnticModeFile>.FromBytes(byte[] data) => AtariAnticModeReader.FromBytes(data);
-  static AtariAnticModeFile IImageFileFormat<AtariAnticModeFile>.FromStream(Stream stream) => AtariAnticModeReader.FromStream(stream);
-  static byte[] IImageFileFormat<AtariAnticModeFile>.ToBytes(AtariAnticModeFile file) => AtariAnticModeWriter.ToBytes(file);
+  static string IImageFormatMetadata<AtariAnticModeFile>.PrimaryExtension => ".ame";
+  static string[] IImageFormatMetadata<AtariAnticModeFile>.FileExtensions => [".ame", ".anm"];
+  static AtariAnticModeFile IImageFormatReader<AtariAnticModeFile>.FromSpan(ReadOnlySpan<byte> data) => AtariAnticModeReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<AtariAnticModeFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<AtariAnticModeFile>.ToBytes(AtariAnticModeFile file) => AtariAnticModeWriter.ToBytes(file);
 
   /// <summary>Width in pixels (320 for Mode F, 160 for Mode E).</summary>
   public int Width => Mode == ModeE ? 160 : 320;
@@ -37,10 +34,10 @@ public sealed class AtariAnticModeFile : IImageFileFormat<AtariAnticModeFile> {
   public int Height => 192;
 
   /// <summary>Raw screen data (7680 bytes).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>ANTIC mode byte: 0x0E = Mode E (4-color), 0x0F = Mode F (mono).</summary>
-  public byte Mode { get; init; } = ModeF;
+  public byte Mode { get; init; }
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
@@ -58,18 +55,11 @@ public sealed class AtariAnticModeFile : IImageFileFormat<AtariAnticModeFile> {
   /// Mode E: Indexed8 160x192 with 4-color palette.
   /// </summary>
   public static RawImage ToRawImage(AtariAnticModeFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     if (file.Mode == ModeE)
       return _DecodeModeE(file);
 
     return _DecodeModeF(file);
-  }
-
-  /// <summary>Not supported. Mode is ambiguous when converting from a raw image.</summary>
-  public static AtariAnticModeFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to AtariAnticModeFile is not supported because the ANTIC mode is ambiguous.");
   }
 
   private static RawImage _DecodeModeF(AtariAnticModeFile file) {

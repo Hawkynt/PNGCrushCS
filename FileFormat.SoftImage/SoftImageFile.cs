@@ -1,12 +1,11 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.SoftImage;
 
 /// <summary>In-memory representation of a Softimage PIC image.</summary>
 [FormatMagicBytes([0x53, 0x80, 0xF6, 0x34])]
-public sealed class SoftImageFile : IImageFileFormat<SoftImageFile> {
+public readonly record struct SoftImageFile : IImageFormatReader<SoftImageFile>, IImageToRawImage<SoftImageFile>, IImageFromRawImage<SoftImageFile>, IImageFormatWriter<SoftImageFile> {
 
   /// <summary>Magic number identifying a Softimage PIC file (0x5380F634).</summary>
   internal const uint Magic = 0x5380F634;
@@ -17,12 +16,10 @@ public sealed class SoftImageFile : IImageFileFormat<SoftImageFile> {
   /// <summary>Size of the comment field in bytes.</summary>
   internal const int CommentSize = 80;
 
-  static string IImageFileFormat<SoftImageFile>.PrimaryExtension => ".pic";
-  static string[] IImageFileFormat<SoftImageFile>.FileExtensions => [".pic", ".si"];
-  static SoftImageFile IImageFileFormat<SoftImageFile>.FromFile(FileInfo file) => SoftImageReader.FromFile(file);
-  static SoftImageFile IImageFileFormat<SoftImageFile>.FromBytes(byte[] data) => SoftImageReader.FromBytes(data);
-  static SoftImageFile IImageFileFormat<SoftImageFile>.FromStream(Stream stream) => SoftImageReader.FromStream(stream);
-  static byte[] IImageFileFormat<SoftImageFile>.ToBytes(SoftImageFile file) => SoftImageWriter.ToBytes(file);
+  static string IImageFormatMetadata<SoftImageFile>.PrimaryExtension => ".pic";
+  static string[] IImageFormatMetadata<SoftImageFile>.FileExtensions => [".pic", ".si"];
+  static SoftImageFile IImageFormatReader<SoftImageFile>.FromSpan(ReadOnlySpan<byte> data) => SoftImageReader.FromSpan(data);
+  static byte[] IImageFormatWriter<SoftImageFile>.ToBytes(SoftImageFile file) => SoftImageWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -31,10 +28,10 @@ public sealed class SoftImageFile : IImageFileFormat<SoftImageFile> {
   public int Height { get; init; }
 
   /// <summary>Raw pixel data (RGB or RGBA, interleaved, 8 bits per component).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>80-byte ASCII comment from the file header.</summary>
-  public string Comment { get; init; } = string.Empty;
+  public string Comment { get; init; }
 
   /// <summary>Whether the image contains an alpha channel.</summary>
   public bool HasAlpha { get; init; }
@@ -44,7 +41,6 @@ public sealed class SoftImageFile : IImageFileFormat<SoftImageFile> {
 
   /// <summary>Converts a Softimage PIC file to a <see cref="RawImage"/>.</summary>
   public static RawImage ToRawImage(SoftImageFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

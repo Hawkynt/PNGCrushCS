@@ -26,6 +26,8 @@ public static class RembrandtReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static RembrandtFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static RembrandtFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < RembrandtFile.MinFileSize)

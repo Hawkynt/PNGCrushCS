@@ -1,11 +1,10 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.PictureEditor;
 
 /// <summary>In-memory representation of a Picture Editor (Atari 8-bit) image (ANTIC Mode E, 160x192, 4-color).</summary>
-public sealed class PictureEditorFile : IImageFileFormat<PictureEditorFile> {
+public readonly record struct PictureEditorFile : IImageFormatReader<PictureEditorFile>, IImageToRawImage<PictureEditorFile>, IImageFromRawImage<PictureEditorFile>, IImageFormatWriter<PictureEditorFile> {
 
   /// <summary>The exact file size: 40 bytes/line x 192 lines.</summary>
   public const int ExpectedFileSize = 7680;
@@ -22,13 +21,11 @@ public sealed class PictureEditorFile : IImageFileFormat<PictureEditorFile> {
   /// <summary>Default Atari 4-color palette as 0xRRGGBB values.</summary>
   private static readonly int[] _DefaultPalette = [0x000000, 0x884400, 0x00AA44, 0xDDCC88];
 
-  static string IImageFileFormat<PictureEditorFile>.PrimaryExtension => ".ped";
-  static string[] IImageFileFormat<PictureEditorFile>.FileExtensions => [".ped"];
-  static FormatCapability IImageFileFormat<PictureEditorFile>.Capabilities => FormatCapability.IndexedOnly;
-  static PictureEditorFile IImageFileFormat<PictureEditorFile>.FromFile(FileInfo file) => PictureEditorReader.FromFile(file);
-  static PictureEditorFile IImageFileFormat<PictureEditorFile>.FromBytes(byte[] data) => PictureEditorReader.FromBytes(data);
-  static PictureEditorFile IImageFileFormat<PictureEditorFile>.FromStream(Stream stream) => PictureEditorReader.FromStream(stream);
-  static byte[] IImageFileFormat<PictureEditorFile>.ToBytes(PictureEditorFile file) => PictureEditorWriter.ToBytes(file);
+  static string IImageFormatMetadata<PictureEditorFile>.PrimaryExtension => ".ped";
+  static string[] IImageFormatMetadata<PictureEditorFile>.FileExtensions => [".ped"];
+  static PictureEditorFile IImageFormatReader<PictureEditorFile>.FromSpan(ReadOnlySpan<byte> data) => PictureEditorReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<PictureEditorFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<PictureEditorFile>.ToBytes(PictureEditorFile file) => PictureEditorWriter.ToBytes(file);
 
   /// <summary>Always 160.</summary>
   public int Width => FixedWidth;
@@ -37,11 +34,10 @@ public sealed class PictureEditorFile : IImageFileFormat<PictureEditorFile> {
   public int Height => FixedHeight;
 
   /// <summary>Raw pixel data (7680 bytes, 2bpp packed: 4 pixels per byte, 40 bytes per row, 192 rows).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this image to a platform-independent <see cref="RawImage"/> in Indexed8 format with a 4-entry palette.</summary>
   public static RawImage ToRawImage(PictureEditorFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var indices = new byte[FixedWidth * FixedHeight];
 

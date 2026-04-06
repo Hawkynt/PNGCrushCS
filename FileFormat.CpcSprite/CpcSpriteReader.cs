@@ -26,6 +26,8 @@ public static class CpcSpriteReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static CpcSpriteFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static CpcSpriteFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != CpcSpriteFile.ExpectedFileSize)

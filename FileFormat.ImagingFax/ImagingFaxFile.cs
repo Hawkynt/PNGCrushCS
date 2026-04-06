@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.ImagingFax;
 
 /// <summary>In-memory representation of an ImagingFax G3N image.</summary>
-public sealed class ImagingFaxFile : IImageFileFormat<ImagingFaxFile> {
+public readonly record struct ImagingFaxFile : IImageFormatReader<ImagingFaxFile>, IImageToRawImage<ImagingFaxFile>, IImageFormatWriter<ImagingFaxFile> {
 
-  static string IImageFileFormat<ImagingFaxFile>.PrimaryExtension => ".g3n";
-  static string[] IImageFileFormat<ImagingFaxFile>.FileExtensions => [".g3n"];
-  static ImagingFaxFile IImageFileFormat<ImagingFaxFile>.FromFile(FileInfo file) => ImagingFaxReader.FromFile(file);
-  static ImagingFaxFile IImageFileFormat<ImagingFaxFile>.FromBytes(byte[] data) => ImagingFaxReader.FromBytes(data);
-  static ImagingFaxFile IImageFileFormat<ImagingFaxFile>.FromStream(Stream stream) => ImagingFaxReader.FromStream(stream);
-  static byte[] IImageFileFormat<ImagingFaxFile>.ToBytes(ImagingFaxFile file) => ImagingFaxWriter.ToBytes(file);
+  static string IImageFormatMetadata<ImagingFaxFile>.PrimaryExtension => ".g3n";
+  static string[] IImageFormatMetadata<ImagingFaxFile>.FileExtensions => [".g3n"];
+  static ImagingFaxFile IImageFormatReader<ImagingFaxFile>.FromSpan(ReadOnlySpan<byte> data) => ImagingFaxReader.FromSpan(data);
+  static byte[] IImageFormatWriter<ImagingFaxFile>.ToBytes(ImagingFaxFile file) => ImagingFaxWriter.ToBytes(file);
 
   /// <summary>Magic bytes: "IMFX" (0x49 0x4D 0x46 0x58).</summary>
   internal static readonly byte[] Magic = [0x49, 0x4D, 0x46, 0x58];
@@ -36,11 +33,10 @@ public sealed class ImagingFaxFile : IImageFileFormat<ImagingFaxFile> {
   public ushort Flags { get; init; }
 
   /// <summary>1bpp pixel data, MSB first, rows padded to byte boundary.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this G3N image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(ImagingFaxFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var bytesPerRow = (file.Width + 7) / 8;
     var rgb = new byte[file.Width * file.Height * 3];
@@ -65,9 +61,4 @@ public sealed class ImagingFaxFile : IImageFileFormat<ImagingFaxFile> {
     };
   }
 
-  /// <summary>Not supported.</summary>
-  public static ImagingFaxFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to ImagingFaxFile is not supported.");
-  }
 }

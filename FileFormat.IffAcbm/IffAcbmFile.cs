@@ -1,25 +1,22 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.IffAcbm;
 
 /// <summary>In-memory representation of an IFF ACBM (Amiga Contiguous Bitmap) image.</summary>
 [FormatMagicBytes([0x46, 0x4F, 0x52, 0x4D])]
-public sealed class IffAcbmFile : IImageFileFormat<IffAcbmFile> {
+public readonly record struct IffAcbmFile : IImageFormatReader<IffAcbmFile>, IImageToRawImage<IffAcbmFile>, IImageFromRawImage<IffAcbmFile>, IImageFormatWriter<IffAcbmFile> {
 
-  static string IImageFileFormat<IffAcbmFile>.PrimaryExtension => ".acbm";
-  static string[] IImageFileFormat<IffAcbmFile>.FileExtensions => [".acbm", ".iff"];
-  static FormatCapability IImageFileFormat<IffAcbmFile>.Capabilities => FormatCapability.IndexedOnly;
+  static string IImageFormatMetadata<IffAcbmFile>.PrimaryExtension => ".acbm";
+  static string[] IImageFormatMetadata<IffAcbmFile>.FileExtensions => [".acbm", ".iff"];
+  static IffAcbmFile IImageFormatReader<IffAcbmFile>.FromSpan(ReadOnlySpan<byte> data) => IffAcbmReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<IffAcbmFile>.Capabilities => FormatCapability.IndexedOnly;
 
-  static bool? IImageFileFormat<IffAcbmFile>.MatchesSignature(ReadOnlySpan<byte> header)
+  static bool? IImageFormatMetadata<IffAcbmFile>.MatchesSignature(ReadOnlySpan<byte> header)
     => header.Length >= 12 && header[0] == 0x46 && header[1] == 0x4F && header[2] == 0x52 && header[3] == 0x4D
       && header[8] == 0x41 && header[9] == 0x43 && header[10] == 0x42 && header[11] == 0x4D;
 
-  static IffAcbmFile IImageFileFormat<IffAcbmFile>.FromFile(FileInfo file) => IffAcbmReader.FromFile(file);
-  static IffAcbmFile IImageFileFormat<IffAcbmFile>.FromBytes(byte[] data) => IffAcbmReader.FromBytes(data);
-  static IffAcbmFile IImageFileFormat<IffAcbmFile>.FromStream(Stream stream) => IffAcbmReader.FromStream(stream);
-  static byte[] IImageFileFormat<IffAcbmFile>.ToBytes(IffAcbmFile file) => IffAcbmWriter.ToBytes(file);
+  static byte[] IImageFormatWriter<IffAcbmFile>.ToBytes(IffAcbmFile file) => IffAcbmWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -31,10 +28,10 @@ public sealed class IffAcbmFile : IImageFileFormat<IffAcbmFile> {
   public byte NumPlanes { get; init; }
 
   /// <summary>Indexed pixel data (one byte per pixel, each byte is a palette index).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Palette as RGB triplets (3 bytes per entry).</summary>
-  public byte[] Palette { get; init; } = [];
+  public byte[] Palette { get; init; }
 
   /// <summary>X aspect ratio from BMHD.</summary>
   public byte XAspect { get; init; }
@@ -53,7 +50,6 @@ public sealed class IffAcbmFile : IImageFileFormat<IffAcbmFile> {
 
   /// <summary>Converts this ACBM file to a format-independent <see cref="RawImage"/>.</summary>
   public static RawImage ToRawImage(IffAcbmFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var palette = file.Palette.Length > 0 ? file.Palette[..] : null;
     var paletteCount = palette != null ? palette.Length / 3 : 1 << file.NumPlanes;

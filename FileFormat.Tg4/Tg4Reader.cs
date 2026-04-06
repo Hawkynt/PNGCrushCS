@@ -26,6 +26,8 @@ public static class Tg4Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static Tg4File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static Tg4File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < Tg4File.MinFileSize)

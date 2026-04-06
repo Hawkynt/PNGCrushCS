@@ -26,6 +26,8 @@ public static class AccessFaxReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static AccessFaxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AccessFaxFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < AccessFaxFile.MinFileSize)

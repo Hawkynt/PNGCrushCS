@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.MuifliEditor;
 
 /// <summary>In-memory representation of a C64 MUIFLI (Multicolor Unrestricted FLI Interlace) image.</summary>
-public sealed class MuifliEditorFile : IImageFileFormat<MuifliEditorFile> {
+public readonly record struct MuifliEditorFile : IImageFormatReader<MuifliEditorFile>, IImageToRawImage<MuifliEditorFile>, IImageFormatWriter<MuifliEditorFile> {
 
-  static string IImageFileFormat<MuifliEditorFile>.PrimaryExtension => ".muf";
-  static string[] IImageFileFormat<MuifliEditorFile>.FileExtensions => [".muf", ".mui", ".mup"];
-  static MuifliEditorFile IImageFileFormat<MuifliEditorFile>.FromFile(FileInfo file) => MuifliEditorReader.FromFile(file);
-  static MuifliEditorFile IImageFileFormat<MuifliEditorFile>.FromBytes(byte[] data) => MuifliEditorReader.FromBytes(data);
-  static MuifliEditorFile IImageFileFormat<MuifliEditorFile>.FromStream(Stream stream) => MuifliEditorReader.FromStream(stream);
-  static byte[] IImageFileFormat<MuifliEditorFile>.ToBytes(MuifliEditorFile file) => MuifliEditorWriter.ToBytes(file);
+  static string IImageFormatMetadata<MuifliEditorFile>.PrimaryExtension => ".muf";
+  static string[] IImageFormatMetadata<MuifliEditorFile>.FileExtensions => [".muf", ".mui", ".mup"];
+  static MuifliEditorFile IImageFormatReader<MuifliEditorFile>.FromSpan(ReadOnlySpan<byte> data) => MuifliEditorReader.FromSpan(data);
+  static byte[] IImageFormatWriter<MuifliEditorFile>.ToBytes(MuifliEditorFile file) => MuifliEditorWriter.ToBytes(file);
 
   /// <summary>The fixed width of the image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -64,11 +61,10 @@ public sealed class MuifliEditorFile : IImageFileFormat<MuifliEditorFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Raw payload data (entire file content after load address).</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   /// <summary>Converts this MUIFLI Editor image to a platform-independent <see cref="RawImage"/> in Rgb24 format by decoding two interlace frames and averaging their colors.</summary>
   public static RawImage ToRawImage(MuifliEditorFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -137,9 +133,4 @@ public sealed class MuifliEditorFile : IImageFileFormat<MuifliEditorFile> {
     };
   }
 
-  /// <summary>Not supported. MUIFLI images have complex interlace FLI color switching constraints.</summary>
-  public static MuifliEditorFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to MuifliEditorFile is not supported due to complex interlace FLI color switching constraints.");
-  }
 }

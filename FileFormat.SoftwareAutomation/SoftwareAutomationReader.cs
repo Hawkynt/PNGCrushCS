@@ -26,6 +26,8 @@ public static class SoftwareAutomationReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static SoftwareAutomationFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static SoftwareAutomationFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != SoftwareAutomationFile.ExpectedFileSize)

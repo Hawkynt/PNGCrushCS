@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.BbcMicro;
 
 /// <summary>In-memory representation of a BBC Micro screen memory dump.</summary>
-public sealed class BbcMicroFile : IImageFileFormat<BbcMicroFile> {
+public readonly record struct BbcMicroFile : IImageFormatReader<BbcMicroFile>, IImageToRawImage<BbcMicroFile>, IImageFromRawImage<BbcMicroFile>, IImageFormatWriter<BbcMicroFile> {
 
-  static string IImageFileFormat<BbcMicroFile>.PrimaryExtension => ".bbc";
-  static string[] IImageFileFormat<BbcMicroFile>.FileExtensions => [".bbc"];
-  static BbcMicroFile IImageFileFormat<BbcMicroFile>.FromFile(FileInfo file) => BbcMicroReader.FromFile(file);
-  static BbcMicroFile IImageFileFormat<BbcMicroFile>.FromBytes(byte[] data) => BbcMicroReader.FromBytes(data);
-  static BbcMicroFile IImageFileFormat<BbcMicroFile>.FromStream(Stream stream) => BbcMicroReader.FromStream(stream);
-  static byte[] IImageFileFormat<BbcMicroFile>.ToBytes(BbcMicroFile file) => BbcMicroWriter.ToBytes(file);
+  static string IImageFormatMetadata<BbcMicroFile>.PrimaryExtension => ".bbc";
+  static string[] IImageFormatMetadata<BbcMicroFile>.FileExtensions => [".bbc"];
+  static BbcMicroFile IImageFormatReader<BbcMicroFile>.FromSpan(ReadOnlySpan<byte> data) => BbcMicroReader.FromSpan(data);
+  static byte[] IImageFormatWriter<BbcMicroFile>.ToBytes(BbcMicroFile file) => BbcMicroWriter.ToBytes(file);
   /// <summary>Width in pixels (depends on mode: 640, 320, or 160).</summary>
   public int Width { get; init; }
   /// <summary>Height in pixels (always 256).</summary>
@@ -20,7 +17,7 @@ public sealed class BbcMicroFile : IImageFileFormat<BbcMicroFile> {
   /// <summary>Screen mode.</summary>
   public BbcMicroMode Mode { get; init; }
   /// <summary>Raw screen memory (linearized from character block layout).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
   /// <summary>Optional palette indices.</summary>
   public byte[]? Palette { get; init; }
 
@@ -82,7 +79,6 @@ public sealed class BbcMicroFile : IImageFileFormat<BbcMicroFile> {
 
   /// <summary>Converts this BBC Micro screen to a platform-independent <see cref="RawImage"/> in Indexed8 format.</summary>
   public static RawImage ToRawImage(BbcMicroFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var width = file.Width;
     var height = file.Height;

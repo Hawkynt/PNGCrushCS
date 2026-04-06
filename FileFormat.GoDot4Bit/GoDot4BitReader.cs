@@ -26,6 +26,8 @@ public static class GoDot4BitReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static GoDot4BitFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static GoDot4BitFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < GoDot4BitFile.ExpectedFileSize)

@@ -26,6 +26,8 @@ public static class MsxViewReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static MsxViewFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static MsxViewFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != MsxViewFile.ExpectedFileSize)

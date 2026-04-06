@@ -65,39 +65,6 @@ public sealed class ImageSystemReaderTests {
 }
 
 [TestFixture]
-public sealed class ImageSystemWriterTests {
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => ImageSystemWriter.ToBytes(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_Hires_ProducesCorrectSize() {
-    var file = new ImageSystemFile {
-      Width = 320, Height = 200, IsHires = true,
-      BitmapData = new byte[8000], ScreenData = new byte[1000],
-    };
-    var bytes = ImageSystemWriter.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(9009));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_Multicolor_ProducesCorrectSize() {
-    var file = new ImageSystemFile {
-      Width = 160, Height = 200, IsHires = false,
-      BitmapData = new byte[8000], ScreenData = new byte[1000],
-      ColorData = new byte[1000],
-    };
-    var bytes = ImageSystemWriter.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(10003));
-  }
-}
-
-[TestFixture]
 public sealed class RoundTripTests {
 
   [Test]
@@ -151,54 +118,3 @@ public sealed class RoundTripTests {
   }
 }
 
-[TestFixture]
-public sealed class DataTypeTests {
-
-  [Test]
-  [Category("Unit")]
-  public void ImageSystemFile_Defaults() {
-    var file = new ImageSystemFile();
-    Assert.That(file.Width, Is.EqualTo(0));
-    Assert.That(file.Height, Is.EqualTo(0));
-    Assert.That(file.IsHires, Is.False);
-    Assert.That(file.BitmapData, Is.Empty);
-    Assert.That(file.ScreenData, Is.Empty);
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ImageSystemFile_ToRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => ImageSystemFile.ToRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ImageSystemFile_FromRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => ImageSystemFile.FromRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ImageSystemFile_FromRawImage_ThrowsNotSupportedException() {
-    var raw = new RawImage {
-      Width = 320, Height = 200,
-      Format = PixelFormat.Rgb24,
-      PixelData = new byte[320 * 200 * 3],
-    };
-    Assert.Throws<NotSupportedException>(() => ImageSystemFile.FromRawImage(raw));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ImageSystemFile_ToRawImage_Hires_ReturnsRgb24() {
-    var file = new ImageSystemFile {
-      Width = 320, Height = 200, IsHires = true,
-      BitmapData = new byte[8000], ScreenData = new byte[1000],
-    };
-    var raw = ImageSystemFile.ToRawImage(file);
-
-    Assert.That(raw.Format, Is.EqualTo(PixelFormat.Rgb24));
-    Assert.That(raw.Width, Is.EqualTo(320));
-    Assert.That(raw.Height, Is.EqualTo(200));
-  }
-}

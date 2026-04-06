@@ -32,6 +32,8 @@ public static class Zx81Reader {
     return new() { PixelData = buffer };
   }
 
+  public static Zx81File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static Zx81File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != Zx81File.FileSize)

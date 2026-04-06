@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.HiPicCreator;
 
 /// <summary>In-memory representation of a C64 Hi-Pic Creator multicolor image.</summary>
-public sealed class HiPicCreatorFile : IImageFileFormat<HiPicCreatorFile> {
+public readonly record struct HiPicCreatorFile : IImageFormatReader<HiPicCreatorFile>, IImageToRawImage<HiPicCreatorFile>, IImageFormatWriter<HiPicCreatorFile> {
 
-  static string IImageFileFormat<HiPicCreatorFile>.PrimaryExtension => ".hpc";
-  static string[] IImageFileFormat<HiPicCreatorFile>.FileExtensions => [".hpc"];
-  static HiPicCreatorFile IImageFileFormat<HiPicCreatorFile>.FromFile(FileInfo file) => HiPicCreatorReader.FromFile(file);
-  static HiPicCreatorFile IImageFileFormat<HiPicCreatorFile>.FromBytes(byte[] data) => HiPicCreatorReader.FromBytes(data);
-  static HiPicCreatorFile IImageFileFormat<HiPicCreatorFile>.FromStream(Stream stream) => HiPicCreatorReader.FromStream(stream);
-  static byte[] IImageFileFormat<HiPicCreatorFile>.ToBytes(HiPicCreatorFile file) => HiPicCreatorWriter.ToBytes(file);
+  static string IImageFormatMetadata<HiPicCreatorFile>.PrimaryExtension => ".hpc";
+  static string[] IImageFormatMetadata<HiPicCreatorFile>.FileExtensions => [".hpc"];
+  static HiPicCreatorFile IImageFormatReader<HiPicCreatorFile>.FromSpan(ReadOnlySpan<byte> data) => HiPicCreatorReader.FromSpan(data);
+  static byte[] IImageFormatWriter<HiPicCreatorFile>.ToBytes(HiPicCreatorFile file) => HiPicCreatorWriter.ToBytes(file);
 
   /// <summary>The fixed width of the image in pixels.</summary>
   public const int FixedWidth = 160;
@@ -52,11 +49,10 @@ public sealed class HiPicCreatorFile : IImageFileFormat<HiPicCreatorFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Raw payload data (entire file content after load address).</summary>
-  public byte[] RawData { get; init; } = [];
+  public byte[] RawData { get; init; }
 
   /// <summary>Converts this Hi-Pic Creator image to a platform-independent <see cref="RawImage"/> in Rgb24 format using multicolor decode.</summary>
   public static RawImage ToRawImage(HiPicCreatorFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     const int width = FixedWidth;
     const int height = FixedHeight;
@@ -106,9 +102,4 @@ public sealed class HiPicCreatorFile : IImageFileFormat<HiPicCreatorFile> {
     };
   }
 
-  /// <summary>Not supported. Hi-Pic Creator images have complex multicolor constraints.</summary>
-  public static HiPicCreatorFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to HiPicCreatorFile is not supported due to complex multicolor constraints.");
-  }
 }

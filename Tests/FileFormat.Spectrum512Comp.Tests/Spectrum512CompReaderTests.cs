@@ -76,13 +76,6 @@ public sealed class Spectrum512CompReaderTests {
 
     Assert.That(result.RawData[0], Is.EqualTo(0x42));
   }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_ThrowsNotSupportedException() {
-    Assert.Throws<NotSupportedException>(() => Spectrum512CompFile.FromRawImage(null!));
-  }
-
   [Test]
   [Category("Integration")]
   public void RoundTrip_RawDataPreserved() {

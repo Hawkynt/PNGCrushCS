@@ -25,6 +25,8 @@ public static class IplReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static IplFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static IplFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < IplFile.HeaderSize)

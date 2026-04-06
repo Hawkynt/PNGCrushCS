@@ -26,6 +26,8 @@ public static class ScreenBlasterReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static ScreenBlasterFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static ScreenBlasterFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < ScreenBlasterHeader.StructSize)

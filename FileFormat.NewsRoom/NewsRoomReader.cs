@@ -26,6 +26,8 @@ public static class NewsRoomReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static NewsRoomFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static NewsRoomFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != NewsRoomFile.ExpectedFileSize)

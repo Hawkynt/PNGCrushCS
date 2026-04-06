@@ -8,7 +8,7 @@ using FileFormat.WebP.Vp8L;
 namespace FileFormat.WebP;
 
 /// <summary>In-memory representation of a WebP file with full VP8/VP8L pixel codec support.</summary>
-public sealed class WebPFile : IImageFileFormat<WebPFile> {
+public sealed class WebPFile : IImageFormatReader<WebPFile>, IImageToRawImage<WebPFile>, IImageFromRawImage<WebPFile>, IImageFormatWriter<WebPFile> {
 
   public required WebPFeatures Features { get; init; }
   public byte[] ImageData { get; init; } = [];
@@ -17,6 +17,7 @@ public sealed class WebPFile : IImageFileFormat<WebPFile> {
 
   public static string PrimaryExtension => ".webp";
   public static string[] FileExtensions => [".webp", ".wep"];
+  static WebPFile IImageFormatReader<WebPFile>.FromSpan(ReadOnlySpan<byte> data) => WebPReader.FromSpan(data);
 
   public static bool? MatchesSignature(ReadOnlySpan<byte> header)
     => header.Length >= 12

@@ -1,11 +1,11 @@
-﻿using System;
+using System;
 using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.FmTowns;
 
 /// <summary>Fujitsu FM Towns 256-color screen dump data model.</summary>
-public sealed class FmTownsFile : IImageFileFormat<FmTownsFile> {
+public sealed class FmTownsFile : IImageFormatReader<FmTownsFile>, IImageToRawImage<FmTownsFile>, IImageFromRawImage<FmTownsFile>, IImageFormatWriter<FmTownsFile> {
 
   public const int FileSize = 64000;
   public const int ImageWidth = 320;
@@ -18,7 +18,8 @@ public sealed class FmTownsFile : IImageFileFormat<FmTownsFile> {
 
   public static string PrimaryExtension => ".fmt";
   public static string[] FileExtensions => [".fmt"];
-  static FormatCapability IImageFileFormat<FmTownsFile>.Capabilities => FormatCapability.IndexedOnly;
+  static FmTownsFile IImageFormatReader<FmTownsFile>.FromSpan(ReadOnlySpan<byte> data) => FmTownsReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<FmTownsFile>.Capabilities => FormatCapability.IndexedOnly;
   public static FmTownsFile FromFile(FileInfo file) => FmTownsReader.FromFile(file);
   public static FmTownsFile FromBytes(byte[] data) => FmTownsReader.FromBytes(data);
   public static FmTownsFile FromStream(Stream stream) => FmTownsReader.FromStream(stream);

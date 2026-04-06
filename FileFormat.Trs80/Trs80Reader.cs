@@ -26,6 +26,8 @@ public static class Trs80Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static Trs80File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static Trs80File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != Trs80File.FileSize)

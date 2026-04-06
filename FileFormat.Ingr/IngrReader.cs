@@ -29,6 +29,8 @@ public static class IngrReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static IngrFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static IngrFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < HeaderSize)

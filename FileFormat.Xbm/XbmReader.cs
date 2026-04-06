@@ -29,6 +29,8 @@ public static class XbmReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static XbmFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static XbmFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MINIMUM_SIZE)

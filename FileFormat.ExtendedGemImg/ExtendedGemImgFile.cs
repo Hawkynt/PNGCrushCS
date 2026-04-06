@@ -1,19 +1,16 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.ExtendedGemImg;
 
 /// <summary>In-memory representation of an Extended GEM Bit Image (XIMG) raster image.</summary>
-public sealed class ExtendedGemImgFile : IImageFileFormat<ExtendedGemImgFile> {
+public readonly record struct ExtendedGemImgFile : IImageFormatReader<ExtendedGemImgFile>, IImageToRawImage<ExtendedGemImgFile>, IImageFromRawImage<ExtendedGemImgFile>, IImageFormatWriter<ExtendedGemImgFile> {
 
-  static string IImageFileFormat<ExtendedGemImgFile>.PrimaryExtension => ".ximg";
-  static string[] IImageFileFormat<ExtendedGemImgFile>.FileExtensions => [".ximg"];
-  static FormatCapability IImageFileFormat<ExtendedGemImgFile>.Capabilities => FormatCapability.IndexedOnly;
-  static ExtendedGemImgFile IImageFileFormat<ExtendedGemImgFile>.FromFile(FileInfo file) => ExtendedGemImgReader.FromFile(file);
-  static ExtendedGemImgFile IImageFileFormat<ExtendedGemImgFile>.FromBytes(byte[] data) => ExtendedGemImgReader.FromBytes(data);
-  static ExtendedGemImgFile IImageFileFormat<ExtendedGemImgFile>.FromStream(Stream stream) => ExtendedGemImgReader.FromStream(stream);
-  static byte[] IImageFileFormat<ExtendedGemImgFile>.ToBytes(ExtendedGemImgFile file) => ExtendedGemImgWriter.ToBytes(file);
+  static string IImageFormatMetadata<ExtendedGemImgFile>.PrimaryExtension => ".ximg";
+  static string[] IImageFormatMetadata<ExtendedGemImgFile>.FileExtensions => [".ximg"];
+  static ExtendedGemImgFile IImageFormatReader<ExtendedGemImgFile>.FromSpan(ReadOnlySpan<byte> data) => ExtendedGemImgReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<ExtendedGemImgFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<ExtendedGemImgFile>.ToBytes(ExtendedGemImgFile file) => ExtendedGemImgWriter.ToBytes(file);
 
   /// <summary>IMG version (typically 1).</summary>
   public int Version { get; init; }
@@ -43,14 +40,13 @@ public sealed class ExtendedGemImgFile : IImageFileFormat<ExtendedGemImgFile> {
   ///   Palette data: each entry is 3 shorts (R, G, B or C, M, Y) in the range 0-1000.
   ///   Array length = paletteCount * 3.
   /// </summary>
-  public short[] PaletteData { get; init; } = [];
+  public short[] PaletteData { get; init; }
 
   /// <summary>Non-interleaved planar pixel data (plane-by-plane, row-by-row).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this XIMG file to a format-independent <see cref="RawImage"/>.</summary>
   public static RawImage ToRawImage(ExtendedGemImgFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var chunky = PlanarConverter.NonInterleavedPlanarToChunky(file.PixelData, file.Width, file.Height, file.NumPlanes);
     var paletteCount = Math.Min(1 << file.NumPlanes, 256);

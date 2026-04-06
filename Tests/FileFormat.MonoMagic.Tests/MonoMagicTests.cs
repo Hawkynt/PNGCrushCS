@@ -38,31 +38,6 @@ public class MonoMagicReaderTests {
 }
 
 [TestFixture]
-public class MonoMagicWriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => MonoMagicWriter.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_OutputSize_Is9009() {
-    var file = new MonoMagicFile { PixelData = new byte[9009] };
-    var bytes = MonoMagicWriter.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(9009));
-  }
-
-  [Test]
-  public void ToBytes_DataPreserved() {
-    var data = new byte[9009];
-    for (var i = 0; i < data.Length; ++i)
-      data[i] = (byte)(i & 0xFF);
-    var file = new MonoMagicFile { PixelData = data };
-    var bytes = MonoMagicWriter.ToBytes(file);
-    Assert.That(bytes, Is.EqualTo(data));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -90,32 +65,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void FixedWidth_Is320()
-    => Assert.That(MonoMagicFile.FixedWidth, Is.EqualTo(320));
-
-  [Test]
-  public void FixedHeight_Is200()
-    => Assert.That(MonoMagicFile.FixedHeight, Is.EqualTo(200));
-
-  [Test]
-  public void FileSize_Is9009()
-    => Assert.That(MonoMagicFile.FileSize, Is.EqualTo(9009));
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => MonoMagicFile.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => MonoMagicFile.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 320, Height = 200, Format = PixelFormat.Rgb24, PixelData = new byte[320 * 200 * 3] };
-    Assert.Throws<ArgumentException>(() => MonoMagicFile.FromRawImage(raw));
-  }
-}

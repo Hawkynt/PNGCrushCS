@@ -47,26 +47,6 @@ public sealed class InterlaceHiresEditorReaderTests {
 }
 
 [TestFixture]
-public sealed class InterlaceHiresEditorWriterTests {
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => InterlaceHiresEditorWriter.ToBytes(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_CorrectOutputSize() {
-    var rawData = new byte[18000];
-    var file = new InterlaceHiresEditorFile { LoadAddress = 0x3C00, RawData = rawData };
-    var bytes = InterlaceHiresEditorWriter.ToBytes(file);
-
-    Assert.That(bytes.Length, Is.EqualTo(2 + 18000));
-  }
-}
-
-[TestFixture]
 public sealed class InterlaceHiresEditorRoundTripTests {
 
   [Test]
@@ -83,50 +63,6 @@ public sealed class InterlaceHiresEditorRoundTripTests {
 
     Assert.That(restored.LoadAddress, Is.EqualTo(original.LoadAddress));
     Assert.That(restored.RawData, Is.EqualTo(original.RawData));
-  }
-}
-
-[TestFixture]
-public sealed class InterlaceHiresEditorDataTypeTests {
-
-  [Test]
-  [Category("Unit")]
-  public void PrimaryExtension_IsIhe() {
-    Assert.That(_GetPrimaryExtension(), Is.EqualTo(".ihe"));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FileExtensions_ContainsIhe() {
-    var extensions = _GetFileExtensions();
-    Assert.That(extensions, Does.Contain(".ihe"));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => InterlaceHiresEditorFile.ToRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => InterlaceHiresEditorFile.FromRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_ThrowsNotSupportedException() {
-    var image = new RawImage { Width = 320, Height = 200, Format = PixelFormat.Rgb24, PixelData = new byte[320 * 200 * 3] };
-    Assert.Throws<NotSupportedException>(() => InterlaceHiresEditorFile.FromRawImage(image));
-  }
-
-  private static string _GetPrimaryExtension() => _Helper<InterlaceHiresEditorFile>.PrimaryExtension;
-  private static string[] _GetFileExtensions() => _Helper<InterlaceHiresEditorFile>.FileExtensions;
-
-  private static class _Helper<T> where T : IImageFileFormat<T> {
-    public static string PrimaryExtension => T.PrimaryExtension;
-    public static string[] FileExtensions => T.FileExtensions;
   }
 }
 

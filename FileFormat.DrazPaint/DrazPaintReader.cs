@@ -26,6 +26,8 @@ public static class DrazPaintReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static DrazPaintFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static DrazPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < DrazPaintFile.LoadAddressSize + 1)

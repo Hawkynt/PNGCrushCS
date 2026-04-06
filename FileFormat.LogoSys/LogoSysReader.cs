@@ -26,6 +26,8 @@ public static class LogoSysReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static LogoSysFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static LogoSysFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length != LogoSysFile.FileSize)

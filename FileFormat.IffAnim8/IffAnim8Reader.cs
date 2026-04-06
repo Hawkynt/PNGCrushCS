@@ -26,6 +26,8 @@ public static class IffAnim8Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static IffAnim8File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static IffAnim8File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < IffAnim8File.MinFileSize)

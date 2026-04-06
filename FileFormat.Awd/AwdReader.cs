@@ -26,6 +26,8 @@ public static class AwdReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static AwdFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AwdFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < AwdHeader.StructSize)

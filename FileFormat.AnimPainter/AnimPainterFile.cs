@@ -18,14 +18,13 @@ public readonly record struct AnimPainterFrame(
 );
 
 /// <summary>In-memory representation of an Anim Painter (animated C64 multicolor) image.</summary>
-public sealed class AnimPainterFile : IImageFileFormat<AnimPainterFile> {
+public sealed class AnimPainterFile : IImageFormatReader<AnimPainterFile>, IImageToRawImage<AnimPainterFile>, IImageFormatWriter<AnimPainterFile> {
 
-  static string IImageFileFormat<AnimPainterFile>.PrimaryExtension => ".anp";
-  static string[] IImageFileFormat<AnimPainterFile>.FileExtensions => [".anp"];
-  static AnimPainterFile IImageFileFormat<AnimPainterFile>.FromFile(FileInfo file) => AnimPainterReader.FromFile(file);
-  static AnimPainterFile IImageFileFormat<AnimPainterFile>.FromBytes(byte[] data) => AnimPainterReader.FromBytes(data);
-  static AnimPainterFile IImageFileFormat<AnimPainterFile>.FromStream(Stream stream) => AnimPainterReader.FromStream(stream);
-  static byte[] IImageFileFormat<AnimPainterFile>.ToBytes(AnimPainterFile file) => AnimPainterWriter.ToBytes(file);
+  static string IImageFormatMetadata<AnimPainterFile>.PrimaryExtension => ".anp";
+  static string[] IImageFormatMetadata<AnimPainterFile>.FileExtensions => [".anp"];
+  static AnimPainterFile IImageFormatReader<AnimPainterFile>.FromSpan(ReadOnlySpan<byte> data) => AnimPainterReader.FromSpan(data);
+
+  static byte[] IImageFormatWriter<AnimPainterFile>.ToBytes(AnimPainterFile file) => AnimPainterWriter.ToBytes(file);
 
   /// <summary>Image width in pixels (multicolor).</summary>
   public const int ImageWidth = 160;
@@ -62,14 +61,13 @@ public sealed class AnimPainterFile : IImageFileFormat<AnimPainterFile> {
   public ushort LoadAddress { get; init; }
 
   /// <summary>Animation frames.</summary>
-  public IReadOnlyList<AnimPainterFrame> Frames { get; init; } = [];
+  public IReadOnlyList<AnimPainterFrame> Frames { get; init; }
 
   /// <summary>Number of animation frames.</summary>
   public int FrameCount => Frames.Count;
 
   /// <summary>Converts this Anim Painter image to a platform-independent <see cref="RawImage"/> in Rgb24 format by decoding the first frame as multicolor.</summary>
   public static RawImage ToRawImage(AnimPainterFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     if (file.Frames.Count == 0)
       throw new InvalidDataException("Anim Painter file contains no frames.");
 
@@ -109,7 +107,4 @@ public sealed class AnimPainterFile : IImageFileFormat<AnimPainterFile> {
     };
   }
 
-  /// <summary>Not supported. Anim Painter is a read-only format.</summary>
-  public static AnimPainterFile FromRawImage(RawImage image)
-    => throw new NotSupportedException("Creating Anim Painter files from raw images is not supported.");
 }

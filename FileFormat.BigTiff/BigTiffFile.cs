@@ -1,12 +1,11 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.BigTiff;
 
 /// <summary>In-memory representation of a BigTIFF (.btf/.tf8) image file.</summary>
-public sealed class BigTiffFile : IImageFileFormat<BigTiffFile>, IMultiImageFileFormat<BigTiffFile> {
+public sealed class BigTiffFile : IImageFormatReader<BigTiffFile>, IImageToRawImage<BigTiffFile>, IImageFromRawImage<BigTiffFile>, IImageFormatWriter<BigTiffFile>, IMultiImageFileFormat<BigTiffFile> {
 
   /// <summary>BigTIFF version number (43).</summary>
   public const ushort Version = 43;
@@ -62,10 +61,11 @@ public sealed class BigTiffFile : IImageFileFormat<BigTiffFile>, IMultiImageFile
   /// <summary>PhotometricInterpretation: RGB.</summary>
   internal const ushort PhotometricRgb = 2;
 
-  static string IImageFileFormat<BigTiffFile>.PrimaryExtension => ".btf";
-  static string[] IImageFileFormat<BigTiffFile>.FileExtensions => [".btf", ".tf8"];
+  static string IImageFormatMetadata<BigTiffFile>.PrimaryExtension => ".btf";
+  static string[] IImageFormatMetadata<BigTiffFile>.FileExtensions => [".btf", ".tf8"];
+  static BigTiffFile IImageFormatReader<BigTiffFile>.FromSpan(ReadOnlySpan<byte> data) => BigTiffReader.FromSpan(data);
 
-  static bool? IImageFileFormat<BigTiffFile>.MatchesSignature(ReadOnlySpan<byte> header) {
+  static bool? IImageFormatMetadata<BigTiffFile>.MatchesSignature(ReadOnlySpan<byte> header) {
     if (header.Length < 4)
       return null;
     if (header[0] == 0x49 && header[1] == 0x49 && header[2] == 0x2B && header[3] == 0x00)
@@ -75,10 +75,7 @@ public sealed class BigTiffFile : IImageFileFormat<BigTiffFile>, IMultiImageFile
     return null;
   }
 
-  static BigTiffFile IImageFileFormat<BigTiffFile>.FromFile(FileInfo file) => BigTiffReader.FromFile(file);
-  static BigTiffFile IImageFileFormat<BigTiffFile>.FromBytes(byte[] data) => BigTiffReader.FromBytes(data);
-  static BigTiffFile IImageFileFormat<BigTiffFile>.FromStream(Stream stream) => BigTiffReader.FromStream(stream);
-  static byte[] IImageFileFormat<BigTiffFile>.ToBytes(BigTiffFile file) => BigTiffWriter.ToBytes(file);
+  static byte[] IImageFormatWriter<BigTiffFile>.ToBytes(BigTiffFile file) => BigTiffWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }

@@ -1,18 +1,15 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.FaxMan;
 
 /// <summary>In-memory representation of a FaxMan FMF image.</summary>
-public sealed class FaxManFile : IImageFileFormat<FaxManFile> {
+public readonly record struct FaxManFile : IImageFormatReader<FaxManFile>, IImageToRawImage<FaxManFile>, IImageFormatWriter<FaxManFile> {
 
-  static string IImageFileFormat<FaxManFile>.PrimaryExtension => ".fmf";
-  static string[] IImageFileFormat<FaxManFile>.FileExtensions => [".fmf"];
-  static FaxManFile IImageFileFormat<FaxManFile>.FromFile(FileInfo file) => FaxManReader.FromFile(file);
-  static FaxManFile IImageFileFormat<FaxManFile>.FromBytes(byte[] data) => FaxManReader.FromBytes(data);
-  static FaxManFile IImageFileFormat<FaxManFile>.FromStream(Stream stream) => FaxManReader.FromStream(stream);
-  static byte[] IImageFileFormat<FaxManFile>.ToBytes(FaxManFile file) => FaxManWriter.ToBytes(file);
+  static string IImageFormatMetadata<FaxManFile>.PrimaryExtension => ".fmf";
+  static string[] IImageFormatMetadata<FaxManFile>.FileExtensions => [".fmf"];
+  static FaxManFile IImageFormatReader<FaxManFile>.FromSpan(ReadOnlySpan<byte> data) => FaxManReader.FromSpan(data);
+  static byte[] IImageFormatWriter<FaxManFile>.ToBytes(FaxManFile file) => FaxManWriter.ToBytes(file);
 
   /// <summary>Magic bytes: "FM" (0x46 0x4D).</summary>
   internal static readonly byte[] Magic = [0x46, 0x4D];
@@ -36,11 +33,10 @@ public sealed class FaxManFile : IImageFileFormat<FaxManFile> {
   public ushort Flags { get; init; }
 
   /// <summary>1bpp pixel data, MSB first, rows padded to byte boundary.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this FMF image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(FaxManFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var bytesPerRow = (file.Width + 7) / 8;
     var rgb = new byte[file.Width * file.Height * 3];
@@ -65,9 +61,4 @@ public sealed class FaxManFile : IImageFileFormat<FaxManFile> {
     };
   }
 
-  /// <summary>Not supported.</summary>
-  public static FaxManFile FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    throw new NotSupportedException("Conversion from RawImage to FaxManFile is not supported.");
-  }
 }

@@ -1,18 +1,15 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.SegaSj1;
 
 /// <summary>In-memory representation of a Sega SJ1 image.</summary>
-public sealed class SegaSj1File : IImageFileFormat<SegaSj1File> {
+public readonly record struct SegaSj1File : IImageFormatReader<SegaSj1File>, IImageToRawImage<SegaSj1File>, IImageFromRawImage<SegaSj1File>, IImageFormatWriter<SegaSj1File> {
 
-  static string IImageFileFormat<SegaSj1File>.PrimaryExtension => ".sj1";
-  static string[] IImageFileFormat<SegaSj1File>.FileExtensions => [".sj1"];
-  static SegaSj1File IImageFileFormat<SegaSj1File>.FromFile(FileInfo file) => SegaSj1Reader.FromFile(file);
-  static SegaSj1File IImageFileFormat<SegaSj1File>.FromBytes(byte[] data) => SegaSj1Reader.FromBytes(data);
-  static SegaSj1File IImageFileFormat<SegaSj1File>.FromStream(Stream stream) => SegaSj1Reader.FromStream(stream);
-  static byte[] IImageFileFormat<SegaSj1File>.ToBytes(SegaSj1File file) => SegaSj1Writer.ToBytes(file);
+  static string IImageFormatMetadata<SegaSj1File>.PrimaryExtension => ".sj1";
+  static string[] IImageFormatMetadata<SegaSj1File>.FileExtensions => [".sj1"];
+  static SegaSj1File IImageFormatReader<SegaSj1File>.FromSpan(ReadOnlySpan<byte> data) => SegaSj1Reader.FromSpan(data);
+  static byte[] IImageFormatWriter<SegaSj1File>.ToBytes(SegaSj1File file) => SegaSj1Writer.ToBytes(file);
 
   /// <summary>Magic bytes: "SJ1\0" (0x53 0x4A 0x31 0x00).</summary>
   internal static readonly byte[] Magic = [0x53, 0x4A, 0x31, 0x00];
@@ -36,11 +33,10 @@ public sealed class SegaSj1File : IImageFileFormat<SegaSj1File> {
   public ushort Flags { get; init; }
 
   /// <summary>Raw RGB pixel data (3 bytes per pixel).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   /// <summary>Converts this SJ1 image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(SegaSj1File file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

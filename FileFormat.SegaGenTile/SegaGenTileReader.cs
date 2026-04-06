@@ -25,6 +25,8 @@ public static class SegaGenTileReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static SegaGenTileFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static SegaGenTileFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < SegaGenTileFile.BytesPerTile)

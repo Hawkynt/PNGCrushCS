@@ -42,25 +42,6 @@ public class GbaTileReaderTests {
 }
 
 [TestFixture]
-public class GbaTileWriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => GbaTileWriter.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_SingleTile_CorrectSize() {
-    var file = new GbaTileFile {
-      Width = 128,
-      Height = 8,
-      PixelData = new byte[128 * 8],
-    };
-    var bytes = GbaTileWriter.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(16 * 32));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -84,42 +65,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void PrimaryExtension_Is4bpp()
-    => Assert.That(_GetPrimaryExtension<GbaTileFile>(), Is.EqualTo(".4bpp"));
-
-  [Test]
-  public void FileExtensions_ContainsPrimary() {
-    var exts = _GetFileExtensions<GbaTileFile>();
-    Assert.That(exts, Does.Contain(".4bpp"));
-    Assert.That(exts, Does.Contain(".gba"));
-  }
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => GbaTileFile.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => GbaTileFile.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 128, Height = 8, Format = PixelFormat.Rgb24, PixelData = new byte[128 * 8 * 3] };
-    Assert.Throws<ArgumentException>(() => GbaTileFile.FromRawImage(raw));
-  }
-
-  [Test]
-  public void Constants_AreCorrect() {
-    Assert.That(GbaTileFile.BytesPerTile, Is.EqualTo(32));
-    Assert.That(GbaTileFile.TileSize, Is.EqualTo(8));
-    Assert.That(GbaTileFile.TilesPerRow, Is.EqualTo(16));
-  }
-
-  private static string _GetPrimaryExtension<T>() where T : IImageFileFormat<T> => T.PrimaryExtension;
-
-  private static string[] _GetFileExtensions<T>() where T : IImageFileFormat<T> => T.FileExtensions;
-}

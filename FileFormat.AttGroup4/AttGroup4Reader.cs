@@ -26,6 +26,8 @@ public static class AttGroup4Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static AttGroup4File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AttGroup4File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < AttGroup4File.MinFileSize)

@@ -26,6 +26,8 @@ public static class SpotImageReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static SpotImageFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static SpotImageFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < SpotImageFile.HeaderSize)

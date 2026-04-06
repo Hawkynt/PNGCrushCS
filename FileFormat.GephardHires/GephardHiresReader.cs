@@ -26,6 +26,8 @@ public static class GephardHiresReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static GephardHiresFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static GephardHiresFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < GephardHiresFile.LoadAddressSize + GephardHiresFile.MinPayloadSize)

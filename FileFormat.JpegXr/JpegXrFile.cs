@@ -1,23 +1,20 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.JpegXr;
 
 /// <summary>In-memory representation of a JPEG XR (ITU-T T.832 / ISO 29199-2) image.</summary>
-public sealed class JpegXrFile : IImageFileFormat<JpegXrFile> {
+public readonly record struct JpegXrFile : IImageFormatReader<JpegXrFile>, IImageToRawImage<JpegXrFile>, IImageFromRawImage<JpegXrFile>, IImageFormatWriter<JpegXrFile> {
 
-  static string IImageFileFormat<JpegXrFile>.PrimaryExtension => ".jxr";
-  static string[] IImageFileFormat<JpegXrFile>.FileExtensions => [".jxr", ".wdp", ".hdp"];
+  static string IImageFormatMetadata<JpegXrFile>.PrimaryExtension => ".jxr";
+  static string[] IImageFormatMetadata<JpegXrFile>.FileExtensions => [".jxr", ".wdp", ".hdp"];
+  static JpegXrFile IImageFormatReader<JpegXrFile>.FromSpan(ReadOnlySpan<byte> data) => JpegXrReader.FromSpan(data);
 
-  static bool? IImageFileFormat<JpegXrFile>.MatchesSignature(ReadOnlySpan<byte> header)
+  static bool? IImageFormatMetadata<JpegXrFile>.MatchesSignature(ReadOnlySpan<byte> header)
     => header.Length >= 4 && header[0] == 0x49 && header[1] == 0x49 && header[2] == 0x01 && header[3] == 0xBC
       ? true : null;
 
-  static JpegXrFile IImageFileFormat<JpegXrFile>.FromFile(FileInfo file) => JpegXrReader.FromFile(file);
-  static JpegXrFile IImageFileFormat<JpegXrFile>.FromBytes(byte[] data) => JpegXrReader.FromBytes(data);
-  static JpegXrFile IImageFileFormat<JpegXrFile>.FromStream(Stream stream) => JpegXrReader.FromStream(stream);
-  static byte[] IImageFileFormat<JpegXrFile>.ToBytes(JpegXrFile file) => JpegXrWriter.ToBytes(file);
+  static byte[] IImageFormatWriter<JpegXrFile>.ToBytes(JpegXrFile file) => JpegXrWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -29,10 +26,9 @@ public sealed class JpegXrFile : IImageFileFormat<JpegXrFile> {
   public int ComponentCount { get; init; }
 
   /// <summary>Raw pixel data: Gray8 (1 byte/pixel) or Rgb24 (3 bytes/pixel).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(JpegXrFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     var format = file.ComponentCount switch {
       1 => PixelFormat.Gray8,
       3 => PixelFormat.Rgb24,

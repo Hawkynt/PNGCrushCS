@@ -26,6 +26,8 @@ public static class FliGraphReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static FliGraphFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static FliGraphFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
 

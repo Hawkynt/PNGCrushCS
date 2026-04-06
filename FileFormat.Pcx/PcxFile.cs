@@ -1,36 +1,32 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Pcx;
 
 /// <summary>In-memory representation of a PCX image.</summary>
 [FormatDetectionPriority(999)]
-public sealed class PcxFile : IImageFileFormat<PcxFile> {
+public readonly record struct PcxFile : IImageFormatReader<PcxFile>, IImageToRawImage<PcxFile>, IImageFromRawImage<PcxFile>, IImageFormatWriter<PcxFile> {
 
-  static string IImageFileFormat<PcxFile>.PrimaryExtension => ".pcx";
-  static string[] IImageFileFormat<PcxFile>.FileExtensions => [".pcx", ".pcc", ".fcx"];
-  static FormatCapability IImageFileFormat<PcxFile>.Capabilities => FormatCapability.HasDedicatedOptimizer;
-  static PcxFile IImageFileFormat<PcxFile>.FromFile(FileInfo file) => PcxReader.FromFile(file);
-  static PcxFile IImageFileFormat<PcxFile>.FromBytes(byte[] data) => PcxReader.FromBytes(data);
-  static PcxFile IImageFileFormat<PcxFile>.FromStream(Stream stream) => PcxReader.FromStream(stream);
-  static byte[] IImageFileFormat<PcxFile>.ToBytes(PcxFile file) => PcxWriter.ToBytes(file);
+  static string IImageFormatMetadata<PcxFile>.PrimaryExtension => ".pcx";
+  static string[] IImageFormatMetadata<PcxFile>.FileExtensions => [".pcx", ".pcc", ".fcx"];
+  static PcxFile IImageFormatReader<PcxFile>.FromSpan(ReadOnlySpan<byte> data) => PcxReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<PcxFile>.Capabilities => FormatCapability.HasDedicatedOptimizer;
+  static byte[] IImageFormatWriter<PcxFile>.ToBytes(PcxFile file) => PcxWriter.ToBytes(file);
 
-  static bool? IImageFileFormat<PcxFile>.MatchesSignature(ReadOnlySpan<byte> header)
+  static bool? IImageFormatMetadata<PcxFile>.MatchesSignature(ReadOnlySpan<byte> header)
     => header.Length >= 2 && header[0] == 0x0A && header[1] <= 5
       ? true : null;
 
   public int Width { get; init; }
   public int Height { get; init; }
   public int BitsPerPixel { get; init; }
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
   public byte[]? Palette { get; init; }
   public int PaletteColorCount { get; init; }
   public PcxColorMode ColorMode { get; init; }
   public PcxPlaneConfig PlaneConfig { get; init; }
 
   public static RawImage ToRawImage(PcxFile file) {
-    ArgumentNullException.ThrowIfNull(file);
 
     var mode = file.ColorMode;
     if (mode == PcxColorMode.Original)

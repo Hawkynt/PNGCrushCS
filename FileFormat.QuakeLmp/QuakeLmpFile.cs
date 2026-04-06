@@ -1,29 +1,24 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.QuakeLmp;
 
 /// <summary>In-memory representation of a Quake LMP picture lump image.</summary>
-public sealed class QuakeLmpFile : IImageFileFormat<QuakeLmpFile> {
+public readonly record struct QuakeLmpFile : IImageFormatReader<QuakeLmpFile>, IImageToRawImage<QuakeLmpFile>, IImageFromRawImage<QuakeLmpFile>, IImageFormatWriter<QuakeLmpFile> {
 
   internal const int HeaderSize = 8;
 
-
-  static string IImageFileFormat<QuakeLmpFile>.PrimaryExtension => ".lmp";
-  static string[] IImageFileFormat<QuakeLmpFile>.FileExtensions => [".lmp"];
-  static FormatCapability IImageFileFormat<QuakeLmpFile>.Capabilities => FormatCapability.IndexedOnly;
-  static QuakeLmpFile IImageFileFormat<QuakeLmpFile>.FromFile(FileInfo file) => QuakeLmpReader.FromFile(file);
-  static QuakeLmpFile IImageFileFormat<QuakeLmpFile>.FromBytes(byte[] data) => QuakeLmpReader.FromBytes(data);
-  static QuakeLmpFile IImageFileFormat<QuakeLmpFile>.FromStream(Stream stream) => QuakeLmpReader.FromStream(stream);
-  static byte[] IImageFileFormat<QuakeLmpFile>.ToBytes(QuakeLmpFile file) => QuakeLmpWriter.ToBytes(file);
+  static string IImageFormatMetadata<QuakeLmpFile>.PrimaryExtension => ".lmp";
+  static string[] IImageFormatMetadata<QuakeLmpFile>.FileExtensions => [".lmp"];
+  static QuakeLmpFile IImageFormatReader<QuakeLmpFile>.FromSpan(ReadOnlySpan<byte> data) => QuakeLmpReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<QuakeLmpFile>.Capabilities => FormatCapability.IndexedOnly;
+  static byte[] IImageFormatWriter<QuakeLmpFile>.ToBytes(QuakeLmpFile file) => QuakeLmpWriter.ToBytes(file);
 
   public int Width { get; init; }
   public int Height { get; init; }
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(QuakeLmpFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

@@ -1,18 +1,15 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Krita;
 
 /// <summary>In-memory representation of a Krita (.kra) image.</summary>
-public sealed class KritaFile : IImageFileFormat<KritaFile> {
+public readonly record struct KritaFile : IImageFormatReader<KritaFile>, IImageToRawImage<KritaFile>, IImageFromRawImage<KritaFile>, IImageFormatWriter<KritaFile> {
 
-  static string IImageFileFormat<KritaFile>.PrimaryExtension => ".kra";
-  static string[] IImageFileFormat<KritaFile>.FileExtensions => [".kra"];
-  static KritaFile IImageFileFormat<KritaFile>.FromFile(FileInfo file) => KritaReader.FromFile(file);
-  static KritaFile IImageFileFormat<KritaFile>.FromBytes(byte[] data) => KritaReader.FromBytes(data);
-  static KritaFile IImageFileFormat<KritaFile>.FromStream(Stream stream) => KritaReader.FromStream(stream);
-  static byte[] IImageFileFormat<KritaFile>.ToBytes(KritaFile file) => KritaWriter.ToBytes(file);
+  static string IImageFormatMetadata<KritaFile>.PrimaryExtension => ".kra";
+  static string[] IImageFormatMetadata<KritaFile>.FileExtensions => [".kra"];
+  static KritaFile IImageFormatReader<KritaFile>.FromSpan(ReadOnlySpan<byte> data) => KritaReader.FromSpan(data);
+  static byte[] IImageFormatWriter<KritaFile>.ToBytes(KritaFile file) => KritaWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -21,10 +18,9 @@ public sealed class KritaFile : IImageFileFormat<KritaFile> {
   public int Height { get; init; }
 
   /// <summary>Flat composite RGBA pixel data (4 bytes per pixel, row-major).</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(KritaFile file) {
-    ArgumentNullException.ThrowIfNull(file);
     return new() {
       Width = file.Width,
       Height = file.Height,

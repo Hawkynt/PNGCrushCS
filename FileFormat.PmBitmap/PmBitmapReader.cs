@@ -26,6 +26,8 @@ public static class PmBitmapReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static PmBitmapFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static PmBitmapFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < PmBitmapFile.HeaderSize)

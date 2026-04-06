@@ -26,6 +26,8 @@ public static class RedStormRsbReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static RedStormRsbFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static RedStormRsbFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < RedStormRsbFile.MinFileSize)

@@ -55,29 +55,6 @@ public sealed class IocaReaderTests {
 }
 
 [TestFixture]
-public sealed class IocaWriterTests {
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => IocaWriter.ToBytes(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToBytes_ProducesOutput() {
-    var file = new IocaFile { Width = 8, Height = 2, PixelData = new byte[2] };
-    var bytes = IocaWriter.ToBytes(file);
-
-    Assert.That(bytes.Length, Is.EqualTo(6)); // 4 header + 2 pixel data
-    Assert.That(bytes[0], Is.EqualTo(0x00));
-    Assert.That(bytes[1], Is.EqualTo(0x08)); // width = 8
-    Assert.That(bytes[2], Is.EqualTo(0x00));
-    Assert.That(bytes[3], Is.EqualTo(0x02)); // height = 2
-  }
-}
-
-[TestFixture]
 public sealed class RoundTripTests {
 
   [Test]
@@ -125,48 +102,3 @@ public sealed class RoundTripTests {
   }
 }
 
-[TestFixture]
-public sealed class DataTypeTests {
-
-  [Test]
-  [Category("Unit")]
-  public void IocaFile_Defaults() {
-    var file = new IocaFile();
-    Assert.That(file.Width, Is.EqualTo(0));
-    Assert.That(file.Height, Is.EqualTo(0));
-    Assert.That(file.PixelData, Is.Empty);
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void IocaFile_ToRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => IocaFile.ToRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void IocaFile_FromRawImage_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => IocaFile.FromRawImage(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void IocaFile_FromRawImage_WrongFormat_Throws() {
-    var raw = new RawImage {
-      Width = 8, Height = 2,
-      Format = PixelFormat.Rgb24,
-      PixelData = new byte[48],
-    };
-    Assert.Throws<ArgumentException>(() => IocaFile.FromRawImage(raw));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void IocaFile_ToRawImage_ReturnsIndexed1() {
-    var file = new IocaFile { Width = 8, Height = 2, PixelData = new byte[2] };
-    var raw = IocaFile.ToRawImage(file);
-
-    Assert.That(raw.Format, Is.EqualTo(PixelFormat.Indexed1));
-    Assert.That(raw.PaletteCount, Is.EqualTo(2));
-  }
-}

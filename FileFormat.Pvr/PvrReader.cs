@@ -28,6 +28,8 @@ public static class PvrReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static PvrFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static PvrFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MIN_FILE_SIZE)

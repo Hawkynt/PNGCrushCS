@@ -31,6 +31,8 @@ public static class JngReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static JngFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static JngFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < 8)

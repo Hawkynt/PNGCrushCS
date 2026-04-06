@@ -25,6 +25,8 @@ public static class CloeReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static CloeFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static CloeFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < CloeFile.HeaderSize)

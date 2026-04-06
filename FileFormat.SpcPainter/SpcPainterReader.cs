@@ -30,6 +30,8 @@ public static class SpcPainterReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static SpcPainterFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static SpcPainterFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _HEADER_SIZE)

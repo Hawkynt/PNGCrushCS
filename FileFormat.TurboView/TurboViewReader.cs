@@ -30,6 +30,8 @@ public static class TurboViewReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static TurboViewFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static TurboViewFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _HEADER_SIZE)

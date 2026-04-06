@@ -41,25 +41,6 @@ public class HereticM8ReaderTests {
 }
 
 [TestFixture]
-public class HereticM8WriterTests {
-
-  [Test]
-  public void ToBytes_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => HereticM8Writer.ToBytes(null!));
-
-  [Test]
-  public void ToBytes_IncludesHeader() {
-    var file = new HereticM8File {
-      Width = 256,
-      Height = 256,
-      PixelData = new byte[256 * 256],
-    };
-    var bytes = HereticM8Writer.ToBytes(file);
-    Assert.That(bytes.Length, Is.EqualTo(8 + 256 * 256));
-  }
-}
-
-[TestFixture]
 public class RoundTripTests {
 
   [Test]
@@ -90,30 +71,3 @@ public class RoundTripTests {
   }
 }
 
-[TestFixture]
-public class DataTypeTests {
-
-  [Test]
-  public void HeaderSize_Is8()
-    => Assert.That(HereticM8File.HeaderSize, Is.EqualTo(8));
-
-  [Test]
-  public void ToRawImage_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => HereticM8File.ToRawImage(null!));
-
-  [Test]
-  public void FromRawImage_NullImage_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => HereticM8File.FromRawImage(null!));
-
-  [Test]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
-    var raw = new RawImage { Width = 256, Height = 256, Format = PixelFormat.Rgb24, PixelData = new byte[256 * 256 * 3] };
-    Assert.Throws<ArgumentException>(() => HereticM8File.FromRawImage(raw));
-  }
-
-  [Test]
-  public void FileExtensions_ContainsPrimary() {
-    string[] exts = [".m8"];
-    Assert.That(exts, Does.Contain(".m8"));
-  }
-}

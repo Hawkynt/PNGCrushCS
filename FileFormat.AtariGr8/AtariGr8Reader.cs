@@ -26,6 +26,8 @@ public static class AtariGr8Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static AtariGr8File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static AtariGr8File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < AtariGr8File.FileSize)

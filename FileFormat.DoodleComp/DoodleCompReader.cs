@@ -26,6 +26,8 @@ public static class DoodleCompReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static DoodleCompFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static DoodleCompFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < DoodleCompFile.MinimumFileSize)

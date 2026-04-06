@@ -121,7 +121,7 @@ public sealed class RoundTripTests {
       PixelData = [(Half)0.0f, (Half)0.33f, (Half)0.66f, (Half)1.0f]
     };
 
-    var raw = original.ToRawImage();
+    var raw = PhmFile.ToRawImage(original);
     Assert.That(raw.Format, Is.EqualTo(PixelFormat.Gray16));
 
     var restored = PhmFile.FromRawImage(raw);
@@ -144,7 +144,7 @@ public sealed class RoundTripTests {
       Scale = 1.0f, IsLittleEndian = true, PixelData = pixelData
     };
 
-    var raw = original.ToRawImage();
+    var raw = PhmFile.ToRawImage(original);
     Assert.That(raw.Format, Is.EqualTo(PixelFormat.Rgb48));
 
     var restored = PhmFile.FromRawImage(raw);

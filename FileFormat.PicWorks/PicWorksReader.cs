@@ -26,6 +26,8 @@ public static class PicWorksReader {
     return FromBytes(ms.ToArray());
   }
 
+  public static PicWorksFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static PicWorksFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < PicWorksHeader.StructSize)

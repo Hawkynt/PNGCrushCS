@@ -26,6 +26,8 @@ public static class Lss16Reader {
     return FromBytes(ms.ToArray());
   }
 
+  public static Lss16File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+
   public static Lss16File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < Lss16File.HeaderSize)
