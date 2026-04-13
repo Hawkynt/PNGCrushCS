@@ -34,10 +34,12 @@ public static class JpegXrReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static JpegXrFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
   public static JpegXrFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  public static JpegXrFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_FILE_SIZE)
       throw new InvalidDataException("Data too small for a valid JPEG XR file.");
 
@@ -46,16 +48,16 @@ public static class JpegXrReader {
       throw new InvalidDataException($"Invalid JPEG XR byte order: expected 'II', got 0x{data[0]:X2} 0x{data[1]:X2}.");
 
     // Validate magic number
-    var magic = BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(2));
+    var magic = BinaryPrimitives.ReadUInt16LittleEndian(data[2..]);
     if (magic != JPEGXR_MAGIC)
       throw new InvalidDataException($"Invalid JPEG XR magic: expected 0x{JPEGXR_MAGIC:X4}, got 0x{magic:X4}.");
 
     // Read IFD offset
-    var ifdOffset = (int)BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(4));
+    var ifdOffset = (int)BinaryPrimitives.ReadUInt32LittleEndian(data[4..]);
     if (ifdOffset < 8 || ifdOffset + 2 > data.Length)
       throw new InvalidDataException($"Invalid IFD offset: {ifdOffset}.");
 
-    return _ParseIfd(data, ifdOffset);
+    return _ParseIfd(data.ToArray(), ifdOffset);
   }
 
   private static JpegXrFile _ParseIfd(byte[] data, int ifdOffset) {

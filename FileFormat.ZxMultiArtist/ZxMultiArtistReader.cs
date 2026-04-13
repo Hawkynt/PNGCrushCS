@@ -37,13 +37,7 @@ public static class ZxMultiArtistReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static ZxMultiArtistFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static ZxMultiArtistFile FromBytes(byte[] data) => FromBytes(data, null);
-
-  public static ZxMultiArtistFile FromBytes(byte[] data, ZxMultiArtistMode? hintMode) {
-    ArgumentNullException.ThrowIfNull(data);
-
+  public static ZxMultiArtistFile FromSpan(ReadOnlySpan<byte> data, ZxMultiArtistMode? hintMode = null) {
     var mode = hintMode ?? ZxMultiArtistFile.DetectMode(data.Length)
       ?? throw new InvalidDataException($"Cannot determine MultiArtist mode from file size {data.Length}. Expected 6912 (MG8), 7680 (MG4), 9216 (MG2), or 12288 (MG1).");
 
@@ -60,18 +54,25 @@ public static class ZxMultiArtistReader {
       var pixelLine = y % 8;
       var srcOffset = third * 2048 + pixelLine * 256 + characterRow * BytesPerRow;
       var dstOffset = y * BytesPerRow;
-      data.AsSpan(srcOffset, BytesPerRow).CopyTo(linearBitmap.AsSpan(dstOffset));
+      data.Slice(srcOffset, BytesPerRow).CopyTo(linearBitmap.AsSpan(dstOffset));
     }
 
     var attributeSize = ZxMultiArtistFile.GetAttributeSize(mode);
     var attributes = new byte[attributeSize];
-    data.AsSpan(BitmapSize, attributeSize).CopyTo(attributes);
+    data.Slice(BitmapSize, attributeSize).CopyTo(attributes);
 
     return new ZxMultiArtistFile {
       Mode = mode,
       BitmapData = linearBitmap,
       AttributeData = attributes,
     };
+  }
+
+  public static ZxMultiArtistFile FromBytes(byte[] data) => FromBytes(data, null);
+
+  public static ZxMultiArtistFile FromBytes(byte[] data, ZxMultiArtistMode? hintMode) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data, hintMode);
   }
 
   private static ZxMultiArtistMode? _DetectModeFromExtension(string extension) => extension.ToLowerInvariant() switch {

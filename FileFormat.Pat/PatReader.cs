@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Buffers.Binary;
 using System.IO;
 using System.Text;
@@ -34,24 +34,22 @@ public static class PatReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static PatFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static PatFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static PatFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MIN_HEADER_SIZE)
       throw new InvalidDataException($"Data too small for a valid PAT file: expected at least {_MIN_HEADER_SIZE} bytes, got {data.Length}.");
 
-    var headerSize = (int)BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(0));
+    var headerSize = (int)BinaryPrimitives.ReadUInt32BigEndian(data[0..]);
     if (headerSize < _MIN_HEADER_SIZE)
       throw new InvalidDataException($"Invalid PAT header size: {headerSize}.");
 
-    var version = (int)BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(4));
+    var version = (int)BinaryPrimitives.ReadUInt32BigEndian(data[4..]);
     if (version != 1)
       throw new InvalidDataException($"Unsupported PAT version: {version}.");
 
-    var width = (int)BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(8));
-    var height = (int)BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(12));
-    var bytesPerPixel = (int)BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(16));
+    var width = (int)BinaryPrimitives.ReadUInt32BigEndian(data[8..]);
+    var height = (int)BinaryPrimitives.ReadUInt32BigEndian(data[12..]);
+    var bytesPerPixel = (int)BinaryPrimitives.ReadUInt32BigEndian(data[16..]);
 
     if (width <= 0)
       throw new InvalidDataException($"Invalid PAT width: {width}.");
@@ -75,14 +73,14 @@ public static class PatReader {
       ++nameLength;
     }
 
-    var name = nameLength > 0 ? Encoding.UTF8.GetString(data, 24, nameLength) : string.Empty;
+    var name = nameLength > 0 ? Encoding.UTF8.GetString(data.Slice(24, nameLength)) : string.Empty;
 
     var expectedPixelBytes = width * height * bytesPerPixel;
     if (data.Length - headerSize < expectedPixelBytes)
       throw new InvalidDataException($"Insufficient pixel data: expected {expectedPixelBytes} bytes after header, got {data.Length - headerSize}.");
 
     var pixelData = new byte[expectedPixelBytes];
-    data.AsSpan(headerSize, expectedPixelBytes).CopyTo(pixelData.AsSpan(0));
+    data.Slice(headerSize, expectedPixelBytes).CopyTo(pixelData.AsSpan(0));
 
     return new PatFile {
       Width = width,
@@ -91,5 +89,10 @@ public static class PatReader {
       Name = name,
       PixelData = pixelData
     };
+  }
+
+  public static PatFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

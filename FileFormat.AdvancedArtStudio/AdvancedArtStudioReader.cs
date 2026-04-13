@@ -26,7 +26,42 @@ public static class AdvancedArtStudioReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static AdvancedArtStudioFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static AdvancedArtStudioFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < AdvancedArtStudioFile.ExpectedFileSize)
+      throw new InvalidDataException($"Data too small for a valid Advanced Art Studio file (expected {AdvancedArtStudioFile.ExpectedFileSize} bytes, got {data.Length}).");
+
+    var offset = 0;
+
+    var loadAddress = (ushort)(data[offset] | (data[offset + 1] << 8));
+    offset += AdvancedArtStudioFile.LoadAddressSize;
+
+    var bitmapData = new byte[AdvancedArtStudioFile.BitmapDataSize];
+    data.Slice(offset, AdvancedArtStudioFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
+    offset += AdvancedArtStudioFile.BitmapDataSize;
+
+    var screenRam = new byte[AdvancedArtStudioFile.ScreenRamSize];
+    data.Slice(offset, AdvancedArtStudioFile.ScreenRamSize).CopyTo(screenRam.AsSpan(0));
+    offset += AdvancedArtStudioFile.ScreenRamSize;
+
+    var colorRam = new byte[AdvancedArtStudioFile.ColorRamSize];
+    data.Slice(offset, AdvancedArtStudioFile.ColorRamSize).CopyTo(colorRam.AsSpan(0));
+    offset += AdvancedArtStudioFile.ColorRamSize;
+
+    var backgroundColor = data[offset];
+    ++offset;
+
+    var borderColor = data[offset];
+
+    return new() {
+      LoadAddress = loadAddress,
+      BitmapData = bitmapData,
+      ScreenRam = screenRam,
+      ColorRam = colorRam,
+      BackgroundColor = backgroundColor,
+      BorderColor = borderColor,
+    };
+    }
 
   public static AdvancedArtStudioFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

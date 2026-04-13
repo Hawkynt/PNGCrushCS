@@ -26,10 +26,7 @@ public static class DoodleCompReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static DoodleCompFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static DoodleCompFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static DoodleCompFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < DoodleCompFile.MinimumFileSize)
       throw new InvalidDataException($"Data too small for a valid DoodleComp file (minimum {DoodleCompFile.MinimumFileSize} bytes, got {data.Length}).");
 
@@ -43,10 +40,10 @@ public static class DoodleCompReader {
       throw new InvalidDataException($"Decompressed data too small (expected {DoodleCompFile.DecompressedDataSize} bytes, got {decompressed.Length}).");
 
     var bitmapData = new byte[DoodleCompFile.BitmapDataSize];
-    decompressed.AsSpan(0, DoodleCompFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
+    decompressed.AsSpan(0, DoodleCompFile.BitmapDataSize).CopyTo(bitmapData);
 
     var screenRam = new byte[DoodleCompFile.ScreenRamSize];
-    decompressed.AsSpan(DoodleCompFile.BitmapDataSize, DoodleCompFile.ScreenRamSize).CopyTo(screenRam.AsSpan(0));
+    decompressed.AsSpan(DoodleCompFile.BitmapDataSize, DoodleCompFile.ScreenRamSize).CopyTo(screenRam);
 
     return new() {
       LoadAddress = loadAddress,
@@ -55,7 +52,12 @@ public static class DoodleCompReader {
     };
   }
 
-  private static byte[] _Decompress(byte[] data, int startOffset) {
+  public static DoodleCompFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  private static byte[] _Decompress(ReadOnlySpan<byte> data, int startOffset) {
     using var output = new MemoryStream();
     var i = startOffset;
     while (i < data.Length) {

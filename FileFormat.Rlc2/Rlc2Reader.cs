@@ -1,4 +1,5 @@
-using System;
+﻿using System;
+using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.Rlc2;
@@ -26,19 +27,17 @@ public static class Rlc2Reader {
     return FromBytes(ms.ToArray());
   }
 
-  public static Rlc2File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static Rlc2File FromSpan(ReadOnlySpan<byte> data) {
 
-  public static Rlc2File FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < Rlc2File.MinFileSize)
       throw new InvalidDataException($"Data too small for a valid RLC2 file (need at least {Rlc2File.MinFileSize} bytes, got {data.Length}).");
 
     if (data[0] != Rlc2File.Magic[0] || data[1] != Rlc2File.Magic[1] || data[2] != Rlc2File.Magic[2] || data[3] != Rlc2File.Magic[3])
       throw new InvalidDataException("Invalid RLC2 magic bytes.");
 
-    var width = BitConverter.ToUInt16(data, 4);
-    var height = BitConverter.ToUInt16(data, 6);
-    var bpp = BitConverter.ToUInt16(data, 8);
+    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
+    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
+    var bpp = BinaryPrimitives.ReadUInt16LittleEndian(data[8..]);
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid RLC2 dimensions: {width}x{height}.");
@@ -46,7 +45,7 @@ public static class Rlc2Reader {
     var pixelDataSize = data.Length - Rlc2File.HeaderSize;
     var pixelData = new byte[pixelDataSize];
     if (pixelDataSize > 0)
-      data.AsSpan(Rlc2File.HeaderSize, pixelDataSize).CopyTo(pixelData.AsSpan(0));
+      data.Slice(Rlc2File.HeaderSize, pixelDataSize).CopyTo(pixelData.AsSpan(0));
 
     return new() {
       Width = width,
@@ -54,5 +53,10 @@ public static class Rlc2Reader {
       Bpp = bpp,
       PixelData = pixelData,
     };
+  }
+
+  public static Rlc2File FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

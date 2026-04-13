@@ -26,7 +26,32 @@ public static class HiResEditorReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static HiResEditorFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static HiResEditorFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < HiResEditorFile.ExpectedFileSize)
+      throw new InvalidDataException($"Hires Editor file too small (got {data.Length} bytes, expected {HiResEditorFile.ExpectedFileSize}).");
+
+    var offset = 0;
+
+    // Load address (2 bytes, little-endian)
+    var loadAddress = (ushort)(data[offset] | (data[offset + 1] << 8));
+    offset += HiResEditorFile.LoadAddressSize;
+
+    // Bitmap data (8000 bytes)
+    var bitmapData = new byte[HiResEditorFile.BitmapDataSize];
+    data.Slice(offset, HiResEditorFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
+    offset += HiResEditorFile.BitmapDataSize;
+
+    // Screen RAM (1000 bytes)
+    var screenData = new byte[HiResEditorFile.ScreenDataSize];
+    data.Slice(offset, HiResEditorFile.ScreenDataSize).CopyTo(screenData.AsSpan(0));
+
+    return new() {
+      LoadAddress = loadAddress,
+      BitmapData = bitmapData,
+      ScreenData = screenData,
+    };
+    }
 
   public static HiResEditorFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

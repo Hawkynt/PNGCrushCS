@@ -26,14 +26,12 @@ public static class PkmReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static PkmFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static PkmFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static PkmFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < PkmHeader.StructSize)
       throw new InvalidDataException("Data too small for a valid PKM file.");
 
-    var span = data.AsSpan();
+    var span = data;
     var header = PkmHeader.ReadFrom(span);
 
     if (header.Magic1 != (byte)'P' || header.Magic2 != (byte)'K' || header.Magic3 != (byte)'M' || header.Magic4 != (byte)' ')
@@ -47,7 +45,7 @@ public static class PkmReader {
       throw new InvalidDataException($"Unsupported PKM version: {version}.");
 
     var compressedData = new byte[data.Length - PkmHeader.StructSize];
-    data.AsSpan(PkmHeader.StructSize, compressedData.Length).CopyTo(compressedData.AsSpan(0));
+    data.Slice(PkmHeader.StructSize, compressedData.Length).CopyTo(compressedData.AsSpan(0));
 
     return new PkmFile {
       Width = header.Width,
@@ -58,5 +56,10 @@ public static class PkmReader {
       Version = version,
       CompressedData = compressedData
     };
+    }
+
+  public static PkmFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

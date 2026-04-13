@@ -26,22 +26,20 @@ public static class AladdinPaintReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static AladdinPaintFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static AladdinPaintFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static AladdinPaintFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < AladdinPaintHeader.StructSize)
       throw new InvalidDataException("Data too small for a valid Aladdin Paint file.");
 
     if (data.Length < AladdinPaintFile.FileSize)
       throw new InvalidDataException($"Data too small for the expected {AladdinPaintFile.FileSize}-byte Aladdin Paint file.");
 
-    var span = data.AsSpan();
+    var span = data;
     var header = AladdinPaintHeader.ReadFrom(span);
     var palette = header.GetPaletteArray();
 
     var pixelData = new byte[32000];
-    data.AsSpan(AladdinPaintHeader.StructSize, 32000).CopyTo(pixelData.AsSpan(0));
+    data.Slice(AladdinPaintHeader.StructSize, 32000).CopyTo(pixelData.AsSpan(0));
 
     return new AladdinPaintFile {
       Width = 320,
@@ -50,5 +48,10 @@ public static class AladdinPaintReader {
       Palette = palette,
       PixelData = pixelData
     };
+    }
+
+  public static AladdinPaintFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

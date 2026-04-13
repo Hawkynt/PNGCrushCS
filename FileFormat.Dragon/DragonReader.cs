@@ -25,7 +25,15 @@ public static class DragonReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static DragonFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static DragonFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != DragonFile.FileSize)
+      throw new InvalidDataException($"Invalid Dragon data size: expected exactly {DragonFile.FileSize} bytes, got {data.Length}.");
+
+    var pixelData = new byte[DragonFile.FileSize];
+    data.Slice(0, DragonFile.FileSize).CopyTo(pixelData);
+    return new() { PixelData = pixelData };
+    }
 
   public static DragonFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

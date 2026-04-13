@@ -26,16 +26,19 @@ public static class JpegLsReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static JpegLsFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
   public static JpegLsFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  public static JpegLsFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < 4)
       throw new InvalidDataException("Data too small for a valid JPEG-LS file.");
 
+    var dataArray = data.ToArray();
     var pos = 0;
 
-    if (_ReadMarker(data, ref pos) != JpegLsCodec.MarkerSoi)
+    if (_ReadMarker(dataArray, ref pos) != JpegLsCodec.MarkerSoi)
       throw new InvalidDataException("Missing JPEG SOI marker (FF D8).");
 
     int bitsPerSample = 0, height = 0, width = 0, componentCount = 0, near = 0;
@@ -44,36 +47,36 @@ public static class JpegLsReader {
 
     int? customT1 = null, customT2 = null, customT3 = null, customReset = null, customMaxVal = null;
 
-    while (pos < data.Length - 1) {
+    while (pos < dataArray.Length - 1) {
       // Look for marker prefix
-      if (data[pos] != 0xFF) {
+      if (dataArray[pos] != 0xFF) {
         ++pos;
         continue;
       }
 
       // Skip fill bytes (0xFF followed by 0xFF)
-      while (pos < data.Length - 1 && data[pos + 1] == 0xFF)
+      while (pos < dataArray.Length - 1 && dataArray[pos + 1] == 0xFF)
         ++pos;
 
-      if (pos >= data.Length - 1)
+      if (pos >= dataArray.Length - 1)
         break;
 
-      var marker = _ReadMarker(data, ref pos);
+      var marker = _ReadMarker(dataArray, ref pos);
 
       switch (marker) {
         case JpegLsCodec.MarkerSof55:
-          _ParseSof55(data, ref pos, out bitsPerSample, out height, out width, out componentCount);
+          _ParseSof55(dataArray, ref pos, out bitsPerSample, out height, out width, out componentCount);
           foundSof = true;
           break;
 
         case JpegLsCodec.MarkerLse:
-          _ParseLse(data, ref pos, ref customMaxVal, ref customT1, ref customT2, ref customT3, ref customReset);
+          _ParseLse(dataArray, ref pos, ref customMaxVal, ref customT1, ref customT2, ref customT3, ref customReset);
           break;
 
         case JpegLsCodec.MarkerSos: {
           if (!foundSof)
             throw new InvalidDataException("SOS marker found before SOF55.");
-          _ParseSos(data, ref pos, out var componentIds, out near, out _);
+          _ParseSos(dataArray, ref pos, out var componentIds, out near, out _);
 
           var bytesPerSample = bitsPerSample > 8 ? 2 : 1;
           pixelData ??= new byte[width * height * componentCount * bytesPerSample];
@@ -83,9 +86,9 @@ public static class JpegLsReader {
           foreach (var cId in componentIds) {
             var codec = _CreateCodec(maxVal, near, customT1, customT2, customT3, customReset);
 
-            var scanEnd = _FindScanEnd(data, pos);
+            var scanEnd = _FindScanEnd(dataArray, pos);
             var stuffed = new byte[scanEnd - pos];
-            data.AsSpan(pos, stuffed.Length).CopyTo(stuffed.AsSpan(0));
+            data.Slice(pos, stuffed.Length).CopyTo(stuffed.AsSpan(0));
             var scanData = _ByteUnstuff(stuffed);
 
             var componentSamples = _DecodeSingleComponent(scanData, width, height, codec);
@@ -102,8 +105,8 @@ public static class JpegLsReader {
 
         default:
           // Skip unknown marker segments
-          if (pos + 1 < data.Length) {
-            var segLen = (data[pos] << 8) | data[pos + 1];
+          if (pos + 1 < dataArray.Length) {
+            var segLen = (dataArray[pos] << 8) | dataArray[pos + 1];
             pos += segLen;
           }
           break;

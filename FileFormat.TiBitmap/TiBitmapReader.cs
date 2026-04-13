@@ -25,10 +25,8 @@ public static class TiBitmapReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static TiBitmapFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static TiBitmapFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static TiBitmapFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < TiBitmapFile.HeaderSize)
       throw new InvalidDataException("Data too small for a valid TiBitmap file.");
 
@@ -48,12 +46,17 @@ public static class TiBitmapReader {
     var pixelData = new byte[pixelBytes];
     var available = Math.Min(pixelBytes, data.Length - TiBitmapFile.HeaderSize);
     if (available > 0)
-      data.AsSpan(TiBitmapFile.HeaderSize, available).CopyTo(pixelData.AsSpan(0));
+      data.Slice(TiBitmapFile.HeaderSize, available).CopyTo(pixelData.AsSpan(0));
 
     return new() {
       Width = width,
       Height = height,
       PixelData = pixelData,
     };
+  }
+
+  public static TiBitmapFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

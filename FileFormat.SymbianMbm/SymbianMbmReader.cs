@@ -27,14 +27,12 @@ public static class SymbianMbmReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static SymbianMbmFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static SymbianMbmFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static SymbianMbmFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < SymbianMbmFile.MinimumFileSize)
       throw new InvalidDataException($"Data too small for a valid MBM file: expected at least {SymbianMbmFile.MinimumFileSize} bytes, got {data.Length}.");
 
-    var span = data.AsSpan();
+    var span = data;
 
     // Parse file header
     var fileHeader = SymbianMbmFileHeader.ReadFrom(span[..SymbianMbmFileHeader.StructSize]);
@@ -83,7 +81,7 @@ public static class SymbianMbmReader {
 
       var pixelData = new byte[pixelDataLength];
       if (pixelDataLength > 0)
-        data.AsSpan(pixelDataOffset, pixelDataLength).CopyTo(pixelData.AsSpan(0));
+        data.Slice(pixelDataOffset, pixelDataLength).CopyTo(pixelData.AsSpan(0));
 
       bitmaps[i] = new SymbianMbmBitmap {
         Width = bmpHeader.Width,
@@ -100,5 +98,10 @@ public static class SymbianMbmReader {
     return new SymbianMbmFile {
       Bitmaps = bitmaps
     };
+    }
+
+  public static SymbianMbmFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Buffers.Binary;
 using System.IO;
 using System.Text;
@@ -34,10 +34,7 @@ public static class QtifReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static QtifFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static QtifFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static QtifFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_SIZE)
       throw new InvalidDataException($"Data too small for QTIF: expected at least {_MIN_SIZE} bytes, got {data.Length}.");
 
@@ -47,8 +44,8 @@ public static class QtifReader {
 
     var offset = 0;
     while (offset + 8 <= data.Length) {
-      var atomSize = (int)BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(offset));
-      var atomType = Encoding.ASCII.GetString(data, offset + 4, 4);
+      var atomSize = (int)BinaryPrimitives.ReadUInt32BigEndian(data[offset..]);
+      var atomType = Encoding.ASCII.GetString(data.Slice(offset + 4, 4));
 
       if (atomSize < 8)
         throw new InvalidDataException($"Invalid atom size {atomSize} at offset {offset}.");
@@ -60,14 +57,14 @@ public static class QtifReader {
         case "idsc":
           if (atomSize - 8 < _IDSC_SIZE)
             throw new InvalidDataException($"Image description too small: expected at least {_IDSC_SIZE} bytes, got {atomSize - 8}.");
-          width = BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(offset + 8 + 32));
-          height = BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(offset + 8 + 34));
+          width = BinaryPrimitives.ReadUInt16BigEndian(data[(offset + 8 + 32)..]);
+          height = BinaryPrimitives.ReadUInt16BigEndian(data[(offset + 8 + 34)..]);
           hasIdsc = true;
           break;
         case "idat":
           var dataLen = atomSize - 8;
           pixelData = new byte[dataLen];
-          data.AsSpan(offset + 8, dataLen).CopyTo(pixelData.AsSpan(0));
+          data.Slice(offset + 8, dataLen).CopyTo(pixelData);
           break;
       }
 
@@ -92,5 +89,11 @@ public static class QtifReader {
       Height = height,
       PixelData = pixelData,
     };
+  
+  }
+
+  public static QtifFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

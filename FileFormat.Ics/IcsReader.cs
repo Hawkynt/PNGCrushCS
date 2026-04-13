@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.IO.Compression;
 
@@ -29,10 +29,7 @@ public static class IcsReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static IcsFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static IcsFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static IcsFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_HEADER_SIZE)
       throw new InvalidDataException("Data too small for a valid ICS file.");
 
@@ -40,7 +37,9 @@ public static class IcsReader {
     if (data[0] != (byte)'i' || data[1] != (byte)'c' || data[2] != (byte)'s' || data[3] != (byte)'_')
       throw new InvalidDataException("Invalid ICS header: missing 'ics_version' identifier.");
 
-    var header = IcsHeaderParser.Parse(data);
+    // IcsHeaderParser.Parse requires byte[]
+    var bytes = data.ToArray();
+    var header = IcsHeaderParser.Parse(bytes);
 
     // Read pixel data
     var dataOffset = header.DataOffset;
@@ -58,7 +57,7 @@ public static class IcsReader {
       };
 
     var rawData = new byte[remainingBytes];
-    data.AsSpan(dataOffset, remainingBytes).CopyTo(rawData.AsSpan(0));
+    data.Slice(dataOffset, remainingBytes).CopyTo(rawData.AsSpan(0));
 
     var bytesPerSample = Math.Max(1, header.BitsPerSample / 8);
     var expectedPixelBytes = header.Width * header.Height * header.Channels * bytesPerSample;
@@ -80,6 +79,12 @@ public static class IcsReader {
       Compression = header.Compression,
       PixelData = pixelData,
     };
+  
+  }
+
+  public static IcsFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   private static byte[] _DecompressGzip(byte[] compressedData, int expectedSize) {

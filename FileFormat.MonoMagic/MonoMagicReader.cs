@@ -25,7 +25,15 @@ public static class MonoMagicReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static MonoMagicFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static MonoMagicFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != MonoMagicFile.FileSize)
+      throw new InvalidDataException($"Invalid MonoMagic data size: expected exactly {MonoMagicFile.FileSize} bytes, got {data.Length}.");
+
+    var pixelData = new byte[MonoMagicFile.FileSize];
+    data.Slice(0, MonoMagicFile.FileSize).CopyTo(pixelData);
+    return new() { PixelData = pixelData };
+    }
 
   public static MonoMagicFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

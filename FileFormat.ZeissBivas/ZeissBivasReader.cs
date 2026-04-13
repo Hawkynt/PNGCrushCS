@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 
 namespace FileFormat.ZeissBivas;
@@ -26,10 +26,7 @@ public static class ZeissBivasReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static ZeissBivasFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static ZeissBivasFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static ZeissBivasFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < ZeissBivasFile.HeaderSize)
       throw new InvalidDataException($"Zeiss BIVAS data too small: expected at least {ZeissBivasFile.HeaderSize} bytes, got {data.Length}.");
 
@@ -45,11 +42,17 @@ public static class ZeissBivasReader {
     var pixelData = new byte[pixelDataSize];
     var available = Math.Min(data.Length - ZeissBivasFile.HeaderSize, pixelDataSize);
     if (available > 0)
-      data.AsSpan(ZeissBivasFile.HeaderSize, available).CopyTo(pixelData.AsSpan(0));
+      data.Slice(ZeissBivasFile.HeaderSize, available).CopyTo(pixelData);
 
     return new() { Width = width, Height = height, BitsPerPixel = bpp, PixelData = pixelData };
+  
   }
 
-  private static uint _ReadUInt32LE(byte[] data, int offset) =>
+  public static ZeissBivasFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  private static uint _ReadUInt32LE(ReadOnlySpan<byte> data, int offset) =>
     (uint)(data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) | (data[offset + 3] << 24));
 }

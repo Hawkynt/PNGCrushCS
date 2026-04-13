@@ -26,7 +26,26 @@ public static class PrintMasterReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static PrintMasterFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static PrintMasterFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < PrintMasterFile.HeaderSize)
+      throw new InvalidDataException($"Print Master data too small: expected at least {PrintMasterFile.HeaderSize} bytes, got {data.Length}.");
+
+    var widthBytes = data[0] | (data[1] << 8);
+    var height = data[2] | (data[3] << 8);
+
+    if (widthBytes <= 0 || height <= 0)
+      throw new InvalidDataException($"Invalid Print Master dimensions: widthBytes={widthBytes}, height={height}.");
+
+    var width = widthBytes * 8;
+    var pixelDataSize = widthBytes * height;
+    var pixelData = new byte[pixelDataSize];
+    var available = Math.Min(data.Length - PrintMasterFile.HeaderSize, pixelDataSize);
+    if (available > 0)
+      data.Slice(PrintMasterFile.HeaderSize, available).CopyTo(pixelData.AsSpan(0));
+
+    return new() { Width = width, Height = height, PixelData = pixelData };
+    }
 
   public static PrintMasterFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

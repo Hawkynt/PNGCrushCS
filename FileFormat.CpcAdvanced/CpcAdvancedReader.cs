@@ -26,7 +26,21 @@ public static class CpcAdvancedReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static CpcAdvancedFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static CpcAdvancedFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != CpcAdvancedFile.ExpectedFileSize)
+      throw new InvalidDataException($"Invalid CPC Advanced data size: expected exactly {CpcAdvancedFile.ExpectedFileSize} bytes, got {data.Length}.");
+
+    // Deinterleave CPC memory layout: Line Y address = ((Y / 8) * 80) + ((Y % 8) * 2048)
+    var linearData = new byte[CpcAdvancedFile.PixelHeight * CpcAdvancedFile.BytesPerRow];
+    for (var y = 0; y < CpcAdvancedFile.PixelHeight; ++y) {
+      var srcOffset = (y / 8) * CpcAdvancedFile.BytesPerRow + (y % 8) * 2048;
+      var dstOffset = y * CpcAdvancedFile.BytesPerRow;
+      data.Slice(srcOffset, CpcAdvancedFile.BytesPerRow).CopyTo(linearData.AsSpan(dstOffset));
+    }
+
+    return new CpcAdvancedFile { PixelData = linearData };
+    }
 
   public static CpcAdvancedFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

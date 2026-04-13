@@ -26,7 +26,18 @@ public static class PrintfoxPagefoxReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static PrintfoxPagefoxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static PrintfoxPagefoxFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < PrintfoxPagefoxFile.MinDataSize)
+      throw new InvalidDataException($"Data too small for a valid Printfox/Pagefox file (expected at least {PrintfoxPagefoxFile.MinDataSize} bytes, got {data.Length}).");
+
+    var rawData = new byte[data.Length];
+    data.Slice(0, data.Length).CopyTo(rawData);
+
+    return new() {
+      RawData = rawData,
+    };
+    }
 
   public static PrintfoxPagefoxFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

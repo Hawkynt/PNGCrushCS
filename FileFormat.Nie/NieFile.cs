@@ -1,12 +1,13 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Nie;
 
 /// <summary>In-memory representation of a NIE (Wuffs Naive Image) file.</summary>
 [FormatMagicBytes([0x6E, 0xC3, 0xAF, 0x45])]
-public sealed class NieFile : IImageFileFormat<NieFile> {
+public sealed class NieFile :
+  IImageFormatReader<NieFile>, IImageToRawImage<NieFile>,
+  IImageFromRawImage<NieFile>, IImageFormatWriter<NieFile> {
 
   /// <summary>Magic bytes: nïE = 0x6E 0xC3 0xAF 0x45.</summary>
   public static readonly byte[] MagicBytes = [0x6E, 0xC3, 0xAF, 0x45];
@@ -14,13 +15,10 @@ public sealed class NieFile : IImageFileFormat<NieFile> {
   /// <summary>Header size: 4 (magic) + 4 (config + padding) + 4 (width) + 4 (height) = 16 bytes.</summary>
   public const int HeaderSize = 16;
 
-  static string IImageFileFormat<NieFile>.PrimaryExtension => ".nie";
-  static string[] IImageFileFormat<NieFile>.FileExtensions => [".nie"];
-  static NieFile IImageFileFormat<NieFile>.FromFile(FileInfo file) => NieReader.FromFile(file);
-  static NieFile IImageFileFormat<NieFile>.FromBytes(byte[] data) => NieReader.FromBytes(data);
-  static NieFile IImageFileFormat<NieFile>.FromStream(Stream stream) => NieReader.FromStream(stream);
-  static RawImage IImageFileFormat<NieFile>.ToRawImage(NieFile file) => file.ToRawImage();
-  static byte[] IImageFileFormat<NieFile>.ToBytes(NieFile file) => NieWriter.ToBytes(file);
+  static string IImageFormatMetadata<NieFile>.PrimaryExtension => ".nie";
+  static string[] IImageFormatMetadata<NieFile>.FileExtensions => [".nie"];
+  static NieFile IImageFormatReader<NieFile>.FromSpan(ReadOnlySpan<byte> data) => NieReader.FromSpan(data);
+  static byte[] IImageFormatWriter<NieFile>.ToBytes(NieFile file) => NieWriter.ToBytes(file);
 
   public int Width { get; init; }
   public int Height { get; init; }
@@ -38,14 +36,15 @@ public sealed class NieFile : IImageFileFormat<NieFile> {
   /// <summary>Whether the pixel data is 16-bit per channel.</summary>
   public bool Is16Bit => this.PixelConfig is NiePixelConfig.Bgra16 or NiePixelConfig.BgraPremul16;
 
-  /// <summary>Converts this NIE image to a <see cref="RawImage"/>.</summary>
-  public RawImage ToRawImage() {
-    var width = this.Width;
-    var height = this.Height;
-    var src = this.PixelData;
+  /// <summary>Converts a NIE image to a <see cref="RawImage"/>.</summary>
+  public static RawImage ToRawImage(NieFile file) {
+    ArgumentNullException.ThrowIfNull(file);
+    var width = file.Width;
+    var height = file.Height;
+    var src = file.PixelData;
     var pixelCount = width * height;
 
-    if (this.Is16Bit) {
+    if (file.Is16Bit) {
       // BGRA16 → Rgba64 (big-endian uint16 per channel, reorder B,G,R,A → R,G,B,A)
       var result = new byte[pixelCount * 8];
       for (var i = 0; i < pixelCount; ++i) {
@@ -58,7 +57,7 @@ public sealed class NieFile : IImageFileFormat<NieFile> {
         var r = (ushort)(src[si + 4] | (src[si + 5] << 8));
         var a = (ushort)(src[si + 6] | (src[si + 7] << 8));
 
-        if (this.IsPremultiplied && a > 0 && a < 65535) {
+        if (file.IsPremultiplied && a > 0 && a < 65535) {
           r = (ushort)Math.Min(r * 65535 / a, 65535);
           g = (ushort)Math.Min(g * 65535 / a, 65535);
           b = (ushort)Math.Min(b * 65535 / a, 65535);
@@ -83,7 +82,7 @@ public sealed class NieFile : IImageFileFormat<NieFile> {
       var result = new byte[pixelCount * 4];
       var copyLen = Math.Min(src.Length, result.Length);
 
-      if (this.IsPremultiplied) {
+      if (file.IsPremultiplied) {
         for (var i = 0; i < pixelCount; ++i) {
           var si = i * 4;
           if (si + 3 >= src.Length)

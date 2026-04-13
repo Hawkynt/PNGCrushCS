@@ -30,10 +30,7 @@ public static class StadReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static StadFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static StadFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static StadFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < 4)
       throw new InvalidDataException($"STAD data too small: expected at least 4 bytes, got {data.Length}.");
 
@@ -44,14 +41,19 @@ public static class StadReader {
     // Fallback: treat as raw 32000-byte uncompressed screen data
     if (data.Length == StadFile.ScreenDataSize) {
       var rawData = new byte[StadFile.ScreenDataSize];
-      data.AsSpan(0, StadFile.ScreenDataSize).CopyTo(rawData);
+      data.Slice(0, StadFile.ScreenDataSize).CopyTo(rawData);
       return new StadFile { RawData = rawData };
     }
 
     throw new InvalidDataException("Invalid STAD data: unrecognized magic and size is not 32000 bytes.");
   }
 
-  private static bool _HasMagic(byte[] data, byte[] magic) {
+  public static StadFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  private static bool _HasMagic(ReadOnlySpan<byte> data, byte[] magic) {
     for (var i = 0; i < magic.Length; ++i)
       if (data[i] != magic[i])
         return false;
@@ -59,7 +61,7 @@ public static class StadReader {
   }
 
   /// <summary>Decompresses PackBits-style RLE data starting at the given offset.</summary>
-  private static byte[] _Decompress(byte[] data, int offset) {
+  private static byte[] _Decompress(ReadOnlySpan<byte> data, int offset) {
     var output = new List<byte>(StadFile.ScreenDataSize);
     var pos = offset;
 

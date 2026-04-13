@@ -25,10 +25,8 @@ public static class SdtReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static SdtFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static SdtFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static SdtFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < SdtFile.HeaderSize)
       throw new InvalidDataException("Data too small for a valid Sdt file.");
 
@@ -48,12 +46,17 @@ public static class SdtReader {
     var pixelData = new byte[pixelBytes];
     var available = Math.Min(pixelBytes, data.Length - SdtFile.HeaderSize);
     if (available > 0)
-      data.AsSpan(SdtFile.HeaderSize, available).CopyTo(pixelData.AsSpan(0));
+      data.Slice(SdtFile.HeaderSize, available).CopyTo(pixelData.AsSpan(0));
 
     return new() {
       Width = width,
       Height = height,
       PixelData = pixelData,
     };
+    }
+
+  public static SdtFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

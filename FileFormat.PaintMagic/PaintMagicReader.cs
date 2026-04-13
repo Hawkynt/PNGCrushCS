@@ -26,7 +26,41 @@ public static class PaintMagicReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static PaintMagicFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static PaintMagicFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < PaintMagicFile.ExpectedFileSize)
+      throw new InvalidDataException($"Data too small for a valid Paint Magic file (expected {PaintMagicFile.ExpectedFileSize} bytes, got {data.Length}).");
+
+    if (data.Length != PaintMagicFile.ExpectedFileSize)
+      throw new InvalidDataException($"Invalid Paint Magic file size (expected {PaintMagicFile.ExpectedFileSize} bytes, got {data.Length}).");
+
+    var offset = 0;
+
+    var loadAddress = (ushort)(data[offset] | (data[offset + 1] << 8));
+    offset += PaintMagicFile.LoadAddressSize;
+
+    var bitmapData = new byte[PaintMagicFile.BitmapDataSize];
+    data.Slice(offset, PaintMagicFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
+    offset += PaintMagicFile.BitmapDataSize;
+
+    var videoMatrix = new byte[PaintMagicFile.VideoMatrixSize];
+    data.Slice(offset, PaintMagicFile.VideoMatrixSize).CopyTo(videoMatrix.AsSpan(0));
+    offset += PaintMagicFile.VideoMatrixSize;
+
+    var colorRam = new byte[PaintMagicFile.ColorRamSize];
+    data.Slice(offset, PaintMagicFile.ColorRamSize).CopyTo(colorRam.AsSpan(0));
+    offset += PaintMagicFile.ColorRamSize;
+
+    var backgroundColor = data[offset];
+
+    return new() {
+      LoadAddress = loadAddress,
+      BitmapData = bitmapData,
+      VideoMatrix = videoMatrix,
+      ColorRam = colorRam,
+      BackgroundColor = backgroundColor,
+    };
+    }
 
   public static PaintMagicFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

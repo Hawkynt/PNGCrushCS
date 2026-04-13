@@ -28,29 +28,27 @@ public static class SoftImageReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static SoftImageFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static SoftImageFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static SoftImageFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < SoftImageFile.HeaderSize)
       throw new InvalidDataException("Data too small for a valid Softimage PIC file.");
 
-    var magic = BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(0));
+    var magic = BinaryPrimitives.ReadUInt32BigEndian(data);
     if (magic != SoftImageFile.Magic)
       throw new InvalidDataException($"Invalid Softimage PIC magic (expected 0x{SoftImageFile.Magic:X8}, got 0x{magic:X8}).");
 
-    var versionBits = BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(4));
+    var versionBits = BinaryPrimitives.ReadInt32BigEndian(data[4..]);
     var version = BitConverter.Int32BitsToSingle(versionBits);
 
-    var commentBytes = data.AsSpan(8, SoftImageFile.CommentSize);
+    var commentBytes = data.Slice(8, SoftImageFile.CommentSize);
     var commentEnd = commentBytes.IndexOf((byte)0);
     var comment = commentEnd >= 0
       ? Encoding.ASCII.GetString(commentBytes[..commentEnd])
       : Encoding.ASCII.GetString(commentBytes);
 
-    var width = BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(88));
-    var height = BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(90));
+    var width = BinaryPrimitives.ReadUInt16BigEndian(data[88..]);
+    var height = BinaryPrimitives.ReadUInt16BigEndian(data[90..]);
 
+    var bytes = data.ToArray();
     var offset = 96;
     var hasAlpha = false;
     byte compressionType = 2;
@@ -76,9 +74,9 @@ public static class SoftImageReader {
     var pixelData = new byte[pixelCount * channels];
 
     if (compressionType == 2)
-      _DecodeMixedRle(data, offset, pixelData, pixelCount, channels);
+      _DecodeMixedRle(bytes, offset, pixelData, pixelCount, channels);
     else
-      _DecodeUncompressed(data, offset, pixelData, pixelCount, channels);
+      _DecodeUncompressed(bytes, offset, pixelData, pixelCount, channels);
 
     return new SoftImageFile {
       Width = width,
@@ -88,6 +86,11 @@ public static class SoftImageReader {
       HasAlpha = hasAlpha,
       Version = version,
     };
+  }
+
+  public static SoftImageFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   private static void _DecodeMixedRle(byte[] data, int offset, byte[] pixelData, int pixelCount, int channels) {

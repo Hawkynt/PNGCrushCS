@@ -25,7 +25,15 @@ public static class NokiaLogoReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static NokiaLogoFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static NokiaLogoFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != NokiaLogoFile.FileSize)
+      throw new InvalidDataException($"Invalid NokiaLogo data size: expected exactly {NokiaLogoFile.FileSize} bytes, got {data.Length}.");
+
+    var pixelData = new byte[NokiaLogoFile.FileSize];
+    data.Slice(0, NokiaLogoFile.FileSize).CopyTo(pixelData);
+    return new() { PixelData = pixelData };
+    }
 
   public static NokiaLogoFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

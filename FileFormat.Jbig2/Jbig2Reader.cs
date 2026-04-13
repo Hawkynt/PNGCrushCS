@@ -34,10 +34,12 @@ public static class Jbig2Reader {
     return FromBytes(ms.ToArray());
   }
 
-  public static Jbig2File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
   public static Jbig2File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  public static Jbig2File FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MinFileSize)
       throw new InvalidDataException($"Data too small for a valid JBIG2 file: expected at least {_MinFileSize} bytes, got {data.Length}.");
 
@@ -46,26 +48,27 @@ public static class Jbig2Reader {
       if (data[i] != Magic[i])
         throw new InvalidDataException("Invalid JBIG2 file magic signature.");
 
+    var dataArray = data.ToArray();
     var offset = 8;
 
     // Parse file header flags
-    var flags = data[offset++];
+    var flags = dataArray[offset++];
     var isSequential = (flags & 0x01) != 0;
     var hasKnownPageCount = (flags & 0x02) == 0; // bit 1: 0 = known, 1 = unknown
 
     var pageCount = 0;
     if (hasKnownPageCount) {
-      if (offset + 4 > data.Length)
+      if (offset + 4 > dataArray.Length)
         throw new InvalidDataException("Data too small for page count.");
 
-      pageCount = _ReadInt32BE(data, offset);
+      pageCount = _ReadInt32BE(dataArray, offset);
       offset += 4;
     }
 
     // Parse all segments
     var segments = new List<Jbig2Segment>();
-    while (offset < data.Length) {
-      var segment = _ParseSegment(data, ref offset);
+    while (offset < dataArray.Length) {
+      var segment = _ParseSegment(dataArray, ref offset);
       if (segment == null)
         break;
 

@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.Clp;
@@ -29,15 +30,11 @@ public static class ClpReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static ClpFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static ClpFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static ClpFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < ClpHeader.StructSize)
       throw new InvalidDataException("Data too small for a valid CLP file.");
 
-    var span = data.AsSpan();
-    var header = ClpHeader.ReadFrom(span);
+    var header = ClpHeader.ReadFrom(data);
 
     if (header.FileId != ClpHeader.FileIdValue)
       throw new InvalidDataException($"Invalid CLP file ID: expected 0x{ClpHeader.FileIdValue:X4}, got 0x{header.FileId:X4}.");
@@ -48,9 +45,9 @@ public static class ClpReader {
       if (offset + 10 > data.Length)
         throw new InvalidDataException("Format directory truncated.");
 
-      var formatId = BitConverter.ToUInt16(data, offset);
-      var dataLength = BitConverter.ToUInt32(data, offset + 2);
-      var dataOffset = BitConverter.ToUInt32(data, offset + 6);
+      var formatId = BinaryPrimitives.ReadUInt16LittleEndian(data[offset..]);
+      var dataLength = BinaryPrimitives.ReadUInt32LittleEndian(data[(offset + 2)..]);
+      var dataOffset = BinaryPrimitives.ReadUInt32LittleEndian(data[(offset + 6)..]);
 
       // Skip past fixed fields (2 + 4 + 4 = 10 bytes) then null-terminated name
       var nameStart = offset + 10;
@@ -72,10 +69,10 @@ public static class ClpReader {
         throw new InvalidDataException("DIB data truncated.");
 
       var dibOffset = (int)dataOffset;
-      var biWidth = BitConverter.ToInt32(data, dibOffset + 4);
-      var biHeight = BitConverter.ToInt32(data, dibOffset + 8);
-      var biBitsPerPixel = BitConverter.ToUInt16(data, dibOffset + 14);
-      var biClrUsed = BitConverter.ToUInt32(data, dibOffset + 32);
+      var biWidth = BinaryPrimitives.ReadInt32LittleEndian(data[(dibOffset + 4)..]);
+      var biHeight = BinaryPrimitives.ReadInt32LittleEndian(data[(dibOffset + 8)..]);
+      var biBitsPerPixel = BinaryPrimitives.ReadUInt16LittleEndian(data[(dibOffset + 14)..]);
+      var biClrUsed = BinaryPrimitives.ReadUInt32LittleEndian(data[(dibOffset + 32)..]);
 
       var absHeight = Math.Abs(biHeight);
 
@@ -92,7 +89,7 @@ public static class ClpReader {
           throw new InvalidDataException("Palette data truncated.");
 
         palette = new byte[paletteSize];
-        data.AsSpan(paletteOffset, paletteSize).CopyTo(palette.AsSpan(0));
+        data.Slice(paletteOffset, paletteSize).CopyTo(palette);
       }
 
       // Pixel data follows palette
@@ -105,7 +102,7 @@ public static class ClpReader {
         throw new InvalidDataException("No pixel data found.");
 
       var pixelData = new byte[available];
-      data.AsSpan(pixelDataOffset, available).CopyTo(pixelData.AsSpan(0));
+      data.Slice(pixelDataOffset, available).CopyTo(pixelData);
 
       return new ClpFile {
         Width = biWidth,
@@ -117,5 +114,10 @@ public static class ClpReader {
     }
 
     throw new InvalidDataException("No CF_DIB format found in CLP file.");
+  }
+
+  public static ClpFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

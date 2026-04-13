@@ -33,7 +33,35 @@ public static class Spectrum512Reader {
     return FromBytes(ms.ToArray());
   }
 
-  public static Spectrum512File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static Spectrum512File FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != _EXPECTED_FILE_SIZE)
+      throw new InvalidDataException($"SPU file must be exactly {_EXPECTED_FILE_SIZE} bytes, got {data.Length}.");
+
+    var pixelData = new byte[_PIXEL_DATA_SIZE];
+    data.Slice(0, _PIXEL_DATA_SIZE).CopyTo(pixelData.AsSpan(0));
+
+    var palettes = new short[_SCANLINE_COUNT][];
+    var span = data;
+    var paletteOffset = _PIXEL_DATA_SIZE;
+
+    for (var line = 0; line < _SCANLINE_COUNT; ++line) {
+      var palette = new short[_PALETTE_ENTRIES_PER_LINE];
+      for (var entry = 0; entry < _PALETTE_ENTRIES_PER_LINE; ++entry) {
+        var offset = paletteOffset + (line * _PALETTE_ENTRIES_PER_LINE + entry) * 2;
+        palette[entry] = BinaryPrimitives.ReadInt16BigEndian(span[offset..]);
+      }
+      palettes[line] = palette;
+    }
+
+    return new Spectrum512File {
+      Width = 320,
+      Height = _SCANLINE_COUNT,
+      Variant = Spectrum512Variant.Uncompressed,
+      PixelData = pixelData,
+      Palettes = palettes
+    };
+    }
 
   public static Spectrum512File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

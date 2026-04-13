@@ -27,14 +27,16 @@ public static class SgiReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static SgiFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
   public static SgiFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  public static SgiFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < SgiHeader.StructSize)
       throw new InvalidDataException("Data too small for a valid SGI file.");
 
-    var header = SgiHeader.ReadFrom(data.AsSpan());
+    var header = SgiHeader.ReadFrom(data);
     if (header.Magic != 0x01DA)
       throw new InvalidDataException("Invalid SGI magic number.");
 
@@ -56,14 +58,15 @@ public static class SgiReader {
     var totalPixelBytes = scanlineSize * height * channels;
 
     byte[] pixelData;
+    var dataArray = data.ToArray();
     if (compression == SgiCompression.Rle) {
-      pixelData = _ReadRleData(data, width, height, channels, bytesPerChannel);
+      pixelData = _ReadRleData(dataArray, width, height, channels, bytesPerChannel);
     } else {
       pixelData = new byte[totalPixelBytes];
       var srcOffset = SgiHeader.StructSize;
       var available = Math.Min(totalPixelBytes, data.Length - srcOffset);
       if (available > 0)
-        data.AsSpan(srcOffset, available).CopyTo(pixelData.AsSpan(0));
+        data.Slice(srcOffset, available).CopyTo(pixelData.AsSpan(0));
     }
 
     return new SgiFile {

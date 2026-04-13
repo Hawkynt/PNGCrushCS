@@ -26,10 +26,8 @@ public static class DigiViewReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static DigiViewFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static DigiViewFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static DigiViewFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < DigiViewFile.HeaderSize)
       throw new InvalidDataException($"Data too small for a valid DigiView file (minimum {DigiViewFile.HeaderSize} bytes, got {data.Length}).");
 
@@ -56,7 +54,7 @@ public static class DigiViewReader {
       throw new InvalidDataException($"Data too small for pixel data: expected {expectedSize} bytes, got {data.Length}.");
 
     var pixelData = new byte[pixelDataSize];
-    data.AsSpan(DigiViewFile.HeaderSize, pixelDataSize).CopyTo(pixelData.AsSpan(0));
+    data.Slice(DigiViewFile.HeaderSize, pixelDataSize).CopyTo(pixelData.AsSpan(0));
 
     return new() {
       Width = width,
@@ -64,5 +62,10 @@ public static class DigiViewReader {
       Channels = channels,
       PixelData = pixelData,
     };
+    }
+
+  public static DigiViewFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

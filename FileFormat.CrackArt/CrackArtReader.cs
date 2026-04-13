@@ -28,7 +28,33 @@ public static class CrackArtReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static CrackArtFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static CrackArtFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < CrackArtHeader.StructSize)
+      throw new InvalidDataException("Data too small for a valid CrackArt file.");
+
+    var span = data;
+    var header = CrackArtHeader.ReadFrom(span);
+
+    var resolutionValue = header.Resolution;
+    if (resolutionValue > 2)
+      throw new InvalidDataException($"Invalid CrackArt resolution value: {resolutionValue}.");
+
+    var resolution = (CrackArtResolution)resolutionValue;
+    var (width, height) = _GetDimensions(resolution);
+
+    var compressedData = new byte[data.Length - CrackArtHeader.StructSize];
+    data.Slice(CrackArtHeader.StructSize, compressedData.Length).CopyTo(compressedData.AsSpan(0));
+    var pixelData = CrackArtCompressor.Decompress(compressedData, _DECOMPRESSED_PIXEL_DATA_SIZE);
+
+    return new CrackArtFile {
+      Width = width,
+      Height = height,
+      Resolution = resolution,
+      Palette = header.GetPaletteArray(),
+      PixelData = pixelData
+    };
+    }
 
   public static CrackArtFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

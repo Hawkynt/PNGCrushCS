@@ -27,14 +27,12 @@ public static class UtahRleReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static UtahRleFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static UtahRleFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static UtahRleFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < UtahRleHeader.StructSize)
       throw new InvalidDataException("Data too small for a valid Utah RLE file.");
 
-    var span = data.AsSpan();
+    var span = data;
     var header = UtahRleHeader.ReadFrom(span);
 
     if (header.Magic != UtahRleHeader.MagicValue)
@@ -57,13 +55,13 @@ public static class UtahRleReader {
 
     // Skip color map if present
     if (header.NumColorMapChannels > 0 && offset + 2 <= data.Length) {
-      var mapLength = BinaryPrimitives.ReadInt16LittleEndian(data.AsSpan(offset));
+      var mapLength = BinaryPrimitives.ReadInt16LittleEndian(data[offset..]);
       offset += 2;
       offset += mapLength * header.NumColorMapChannels;
     }
 
     // Decode scanline data
-    var scanlineData = data.AsSpan(offset);
+    var scanlineData = data[offset..];
     var pixelData = UtahRleDecoder.Decode(scanlineData, width, height, numChannels, background);
 
     return new UtahRleFile {
@@ -75,5 +73,10 @@ public static class UtahRleReader {
       PixelData = pixelData,
       BackgroundColor = background
     };
+    }
+
+  public static UtahRleFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

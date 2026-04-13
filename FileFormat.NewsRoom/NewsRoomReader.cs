@@ -26,7 +26,18 @@ public static class NewsRoomReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static NewsRoomFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static NewsRoomFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != NewsRoomFile.ExpectedFileSize)
+      throw new InvalidDataException($"NewsRoom file must be exactly {NewsRoomFile.ExpectedFileSize} bytes, got {data.Length}.");
+
+    var pixelData = new byte[NewsRoomFile.ExpectedFileSize];
+    data.Slice(0, NewsRoomFile.ExpectedFileSize).CopyTo(pixelData);
+
+    return new() {
+      PixelData = pixelData,
+    };
+    }
 
   public static NewsRoomFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

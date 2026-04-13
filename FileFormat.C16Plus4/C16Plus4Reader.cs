@@ -25,7 +25,15 @@ public static class C16Plus4Reader {
     return FromBytes(ms.ToArray());
   }
 
-  public static C16Plus4File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static C16Plus4File FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != C16Plus4File.FileSize)
+      throw new InvalidDataException($"Invalid C16Plus4 data size: expected exactly {C16Plus4File.FileSize} bytes, got {data.Length}.");
+
+    var pixelData = new byte[C16Plus4File.FileSize];
+    data.Slice(0, C16Plus4File.FileSize).CopyTo(pixelData);
+    return new() { PixelData = pixelData };
+    }
 
   public static C16Plus4File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

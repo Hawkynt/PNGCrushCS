@@ -1,20 +1,18 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Olpc565;
 
 /// <summary>In-memory representation of an OLPC (One Laptop Per Child) RGB565 bitmap image.</summary>
-public sealed class Olpc565File : IImageFileFormat<Olpc565File> {
+public sealed class Olpc565File :
+  IImageFormatReader<Olpc565File>, IImageToRawImage<Olpc565File>,
+  IImageFromRawImage<Olpc565File>, IImageFormatWriter<Olpc565File> {
 
-  static string IImageFileFormat<Olpc565File>.PrimaryExtension => ".565";
-  static string[] IImageFileFormat<Olpc565File>.FileExtensions => [".565"];
-  static FormatCapability IImageFileFormat<Olpc565File>.Capabilities => FormatCapability.VariableResolution;
-  static Olpc565File IImageFileFormat<Olpc565File>.FromFile(FileInfo file) => Olpc565Reader.FromFile(file);
-  static Olpc565File IImageFileFormat<Olpc565File>.FromBytes(byte[] data) => Olpc565Reader.FromBytes(data);
-  static Olpc565File IImageFileFormat<Olpc565File>.FromStream(Stream stream) => Olpc565Reader.FromStream(stream);
-  static RawImage IImageFileFormat<Olpc565File>.ToRawImage(Olpc565File file) => file.ToRawImage();
-  static byte[] IImageFileFormat<Olpc565File>.ToBytes(Olpc565File file) => Olpc565Writer.ToBytes(file);
+  static string IImageFormatMetadata<Olpc565File>.PrimaryExtension => ".565";
+  static string[] IImageFormatMetadata<Olpc565File>.FileExtensions => [".565"];
+  static FormatCapability IImageFormatMetadata<Olpc565File>.Capabilities => FormatCapability.VariableResolution;
+  static Olpc565File IImageFormatReader<Olpc565File>.FromSpan(ReadOnlySpan<byte> data) => Olpc565Reader.FromSpan(data);
+  static byte[] IImageFormatWriter<Olpc565File>.ToBytes(Olpc565File file) => Olpc565Writer.ToBytes(file);
 
   public int Width { get; init; }
   public int Height { get; init; }
@@ -22,13 +20,14 @@ public sealed class Olpc565File : IImageFileFormat<Olpc565File> {
   /// <summary>Raw RGB565 pixel data (2 bytes per pixel, little-endian).</summary>
   public byte[] PixelData { get; init; } = [];
 
-  public RawImage ToRawImage() {
-    var pixelCount = this.Width * this.Height;
+  public static RawImage ToRawImage(Olpc565File file) {
+    ArgumentNullException.ThrowIfNull(file);
+    var pixelCount = file.Width * file.Height;
     var rgb = new byte[pixelCount * 3];
 
     for (var i = 0; i < pixelCount; ++i) {
       var offset = i * 2;
-      var pixel = (ushort)(this.PixelData[offset] | (this.PixelData[offset + 1] << 8));
+      var pixel = (ushort)(file.PixelData[offset] | (file.PixelData[offset + 1] << 8));
       var r = (pixel >> 11) & 0x1F;
       var g = (pixel >> 5) & 0x3F;
       var b = pixel & 0x1F;
@@ -39,8 +38,8 @@ public sealed class Olpc565File : IImageFileFormat<Olpc565File> {
     }
 
     return new() {
-      Width = this.Width,
-      Height = this.Height,
+      Width = file.Width,
+      Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
     };

@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.DivGameMap;
@@ -26,10 +27,7 @@ public static class DivGameMapReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static DivGameMapFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static DivGameMapFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static DivGameMapFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < DivGameMapFile.MinFileSize)
       throw new InvalidDataException($"Data too small for a valid FPG file (need at least {DivGameMapFile.MinFileSize} bytes, got {data.Length}).");
 
@@ -39,7 +37,7 @@ public static class DivGameMapReader {
     var offset = DivGameMapFile.MagicSize;
 
     var palette = new byte[DivGameMapFile.PaletteSize];
-    data.AsSpan(offset, DivGameMapFile.PaletteSize).CopyTo(palette.AsSpan(0));
+    data.Slice(offset, DivGameMapFile.PaletteSize).CopyTo(palette);
     offset += DivGameMapFile.PaletteSize;
 
     if (data.Length < offset + DivGameMapFile.EntryHeaderSize)
@@ -51,11 +49,11 @@ public static class DivGameMapReader {
     offset += 32; // skip description
     offset += 12; // skip filename
 
-    var width = BitConverter.ToInt32(data, offset);
+    var width = BinaryPrimitives.ReadInt32LittleEndian(data[offset..]);
     offset += 4;
-    var height = BitConverter.ToInt32(data, offset);
+    var height = BinaryPrimitives.ReadInt32LittleEndian(data[offset..]);
     offset += 4;
-    var numPoints = BitConverter.ToInt32(data, offset);
+    var numPoints = BinaryPrimitives.ReadInt32LittleEndian(data[offset..]);
     offset += 4;
 
     if (width <= 0 || height <= 0)
@@ -69,7 +67,7 @@ public static class DivGameMapReader {
       throw new InvalidDataException("FPG file truncated: not enough pixel data.");
 
     var pixelData = new byte[pixelCount];
-    data.AsSpan(offset, pixelCount).CopyTo(pixelData.AsSpan(0));
+    data.Slice(offset, pixelCount).CopyTo(pixelData);
 
     return new() {
       Width = width,
@@ -77,5 +75,10 @@ public static class DivGameMapReader {
       PixelData = pixelData,
       Palette = palette,
     };
+  }
+
+  public static DivGameMapFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

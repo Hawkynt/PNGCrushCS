@@ -29,7 +29,18 @@ public static class FalconPaintReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static FalconPaintFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static FalconPaintFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != _EXPECTED_SIZE)
+      throw new InvalidDataException($"Invalid Falcon Paint data size: expected exactly {_EXPECTED_SIZE} bytes, got {data.Length}.");
+
+    var pixelData = new byte[_EXPECTED_SIZE];
+    data.Slice(0, _EXPECTED_SIZE).CopyTo(pixelData);
+
+    return new FalconPaintFile {
+      PixelData = pixelData
+    };
+    }
 
   public static FalconPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

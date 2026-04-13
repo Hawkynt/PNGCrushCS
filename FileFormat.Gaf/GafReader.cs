@@ -19,7 +19,7 @@ public static class GafReader {
     if (!file.Exists)
       throw new FileNotFoundException("GAF file not found.", file.FullName);
 
-    return FromBytes(File.ReadAllBytes(file.FullName));
+    return FromSpan(File.ReadAllBytes(file.FullName));
   }
 
   public static GafFile FromStream(Stream stream) {
@@ -27,27 +27,27 @@ public static class GafReader {
     if (stream.CanSeek) {
       var data = new byte[stream.Length - stream.Position];
       stream.ReadExactly(data);
-      return FromBytes(data);
+      return FromSpan(data);
     }
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
+    return FromSpan(ms.ToArray());
   }
-
-  public static GafFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
 
   public static GafFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  public static GafFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_FILE_SIZE)
       throw new InvalidDataException("Data too small for a valid GAF file.");
 
-    var span = data.AsSpan();
-
-    var version = BinaryPrimitives.ReadUInt32LittleEndian(span);
+    var version = BinaryPrimitives.ReadUInt32LittleEndian(data);
     if (version != _MAGIC)
       throw new InvalidDataException($"Invalid GAF magic: expected 0x{_MAGIC:X8}, got 0x{version:X8}.");
 
-    var entryCount = BinaryPrimitives.ReadUInt32LittleEndian(span[4..]);
+    var entryCount = BinaryPrimitives.ReadUInt32LittleEndian(data[4..]);
     // bytes 8..11 are reserved/unknown
 
     if (entryCount == 0)
@@ -58,14 +58,14 @@ public static class GafReader {
     if (data.Length < entryPointersOffset + 4)
       throw new InvalidDataException("Data too small for entry pointer table.");
 
-    var entryOffset = (int)BinaryPrimitives.ReadUInt32LittleEndian(span[entryPointersOffset..]);
+    var entryOffset = (int)BinaryPrimitives.ReadUInt32LittleEndian(data[entryPointersOffset..]);
 
     // Parse entry header (40 bytes): frame_count(u16), unknown(u16), unknown(u32), name(32 bytes)
     const int entryHeaderSize = 40;
     if (data.Length < entryOffset + entryHeaderSize)
       throw new InvalidDataException("Data too small for entry header.");
 
-    var entrySpan = span[entryOffset..];
+    var entrySpan = data[entryOffset..];
     var frameCount = BinaryPrimitives.ReadUInt16LittleEndian(entrySpan);
     // bytes 2..3: unknown u16
     // bytes 4..7: unknown u32
@@ -84,14 +84,14 @@ public static class GafReader {
     if (data.Length < framePointersOffset + 4)
       throw new InvalidDataException("Data too small for frame pointer table.");
 
-    var frameOffset = (int)BinaryPrimitives.ReadUInt32LittleEndian(span[framePointersOffset..]);
+    var frameOffset = (int)BinaryPrimitives.ReadUInt32LittleEndian(data[framePointersOffset..]);
 
     // Parse frame header (20 bytes)
     const int frameHeaderSize = 20;
     if (data.Length < frameOffset + frameHeaderSize)
       throw new InvalidDataException("Data too small for frame header.");
 
-    var frameSpan = span[frameOffset..];
+    var frameSpan = data[frameOffset..];
     var width = BinaryPrimitives.ReadUInt16LittleEndian(frameSpan);
     var height = BinaryPrimitives.ReadUInt16LittleEndian(frameSpan[2..]);
     var xOffset = BinaryPrimitives.ReadInt16LittleEndian(frameSpan[4..]);
@@ -111,11 +111,11 @@ public static class GafReader {
       if (data.Length < dataOffset + 4)
         throw new InvalidDataException("Data too small for subframe pointer table.");
 
-      var subFrameOffset = (int)BinaryPrimitives.ReadUInt32LittleEndian(span[dataOffset..]);
+      var subFrameOffset = (int)BinaryPrimitives.ReadUInt32LittleEndian(data[dataOffset..]);
       if (data.Length < subFrameOffset + frameHeaderSize)
         throw new InvalidDataException("Data too small for subframe header.");
 
-      var subFrameSpan = span[subFrameOffset..];
+      var subFrameSpan = data[subFrameOffset..];
       width = BinaryPrimitives.ReadUInt16LittleEndian(subFrameSpan);
       height = BinaryPrimitives.ReadUInt16LittleEndian(subFrameSpan[2..]);
       xOffset = BinaryPrimitives.ReadInt16LittleEndian(subFrameSpan[4..]);
@@ -144,16 +144,16 @@ public static class GafReader {
     };
   }
 
-  private static byte[] _ReadUncompressed(byte[] data, int offset, int count) {
+  private static byte[] _ReadUncompressed(ReadOnlySpan<byte> data, int offset, int count) {
     if (data.Length < offset + count)
       throw new InvalidDataException("Data too small for uncompressed pixel data.");
 
     var pixels = new byte[count];
-    data.AsSpan(offset, count).CopyTo(pixels.AsSpan(0));
+    data.Slice(offset, count).CopyTo(pixels.AsSpan(0));
     return pixels;
   }
 
-  private static byte[] _ReadRle(byte[] data, int offset, int width, int height, byte transparencyIndex) {
+  private static byte[] _ReadRle(ReadOnlySpan<byte> data, int offset, int width, int height, byte transparencyIndex) {
     var pixels = new byte[width * height];
     var pos = offset;
 
@@ -161,7 +161,7 @@ public static class GafReader {
       if (pos + 2 > data.Length)
         throw new InvalidDataException("Unexpected end of RLE data reading scanline length.");
 
-      var lineBytes = BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(pos));
+      var lineBytes = BinaryPrimitives.ReadUInt16LittleEndian(data[pos..]);
       pos += 2;
 
       var lineEnd = pos + lineBytes;

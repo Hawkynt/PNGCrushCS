@@ -7,10 +7,9 @@ public sealed class DataTypeTests {
 
   [Test]
   [Category("Unit")]
-  public void AvsFile_DefaultPixelData_IsEmptyArray() {
+  public void _DefaultPixelData_IsNull() {
     var file = new AvsFile();
-    Assert.That(file.PixelData, Is.Not.Null);
-    Assert.That(file.PixelData, Is.Empty);
+    Assert.That(file.PixelData, Is.Null);
   }
 
   [Test]

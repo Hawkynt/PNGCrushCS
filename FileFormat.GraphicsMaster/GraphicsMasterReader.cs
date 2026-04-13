@@ -26,7 +26,16 @@ public static class GraphicsMasterReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static GraphicsMasterFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static GraphicsMasterFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != GraphicsMasterFile.ExpectedFileSize)
+      throw new InvalidDataException($"Graphics Master file must be exactly {GraphicsMasterFile.ExpectedFileSize} bytes, got {data.Length}.");
+
+    var pixelData = new byte[GraphicsMasterFile.ExpectedFileSize];
+    data.Slice(0, GraphicsMasterFile.ExpectedFileSize).CopyTo(pixelData);
+
+    return new GraphicsMasterFile { PixelData = pixelData };
+    }
 
   public static GraphicsMasterFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

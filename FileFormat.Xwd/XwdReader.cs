@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Text;
 
@@ -29,14 +29,12 @@ public static class XwdReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static XwdFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static XwdFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static XwdFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < XwdHeader.StructSize)
       throw new InvalidDataException("Data too small for a valid XWD file.");
 
-    var span = data.AsSpan();
+    var span = data;
     var header = XwdHeader.ReadFrom(span);
 
     if (header.FileVersion != 7)
@@ -77,7 +75,7 @@ public static class XwdReader {
         throw new InvalidDataException("Data too small for colormap entries.");
 
       colormap = new byte[colormapSize];
-      data.AsSpan(offset, colormapSize).CopyTo(colormap.AsSpan(0));
+      data.Slice(offset, colormapSize).CopyTo(colormap.AsSpan(0));
       offset += colormapSize;
     }
 
@@ -89,7 +87,7 @@ public static class XwdReader {
       throw new InvalidDataException($"Data too small for pixel data: expected {offset + pixelDataSize} bytes, got {data.Length}.");
 
     var pixelData = new byte[pixelDataSize];
-    data.AsSpan(offset, pixelDataSize).CopyTo(pixelData.AsSpan(0));
+    data.Slice(offset, pixelDataSize).CopyTo(pixelData.AsSpan(0));
 
     return new XwdFile {
       Width = width,
@@ -116,5 +114,10 @@ public static class XwdReader {
       PixelData = pixelData,
       Colormap = colormap
     };
+  }
+
+  public static XwdFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

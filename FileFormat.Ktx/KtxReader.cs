@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
@@ -29,21 +29,22 @@ public static class KtxReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static KtxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static KtxFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static KtxFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < KtxHeader.IdentifierSize)
       throw new InvalidDataException("Data too small for a valid KTX file.");
 
-    var span = data.AsSpan();
-    if (_MatchesIdentifier(span, KtxHeader.Identifier))
-      return _ParseKtx1(data);
+    if (_MatchesIdentifier(data, KtxHeader.Identifier))
+      return _ParseKtx1(data.ToArray());
 
-    if (_MatchesIdentifier(span, Ktx2Header.Identifier))
-      return _ParseKtx2(data);
+    if (_MatchesIdentifier(data, Ktx2Header.Identifier))
+      return _ParseKtx2(data.ToArray());
 
     throw new InvalidDataException("Invalid KTX identifier.");
+  }
+
+  public static KtxFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   private static bool _MatchesIdentifier(ReadOnlySpan<byte> data, byte[] identifier) {

@@ -54,20 +54,19 @@ public static class DngReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static DngFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static DngFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static DngFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_FILE_SIZE)
       throw new InvalidDataException("Data too small for a valid DNG/TIFF file.");
 
-    var isLittleEndian = _DetectByteOrder(data);
-    var magic = _ReadUInt16(data, 2, isLittleEndian);
+    var bytes = data.ToArray();
+
+    var isLittleEndian = _DetectByteOrder(bytes);
+    var magic = _ReadUInt16(bytes, 2, isLittleEndian);
     if (magic != _TIFF_MAGIC)
       throw new InvalidDataException($"Invalid TIFF magic number: expected {_TIFF_MAGIC}, got {magic}.");
 
-    var ifdOffset = (int)_ReadUInt32(data, 4, isLittleEndian);
-    if (ifdOffset < 8 || ifdOffset + 2 > data.Length)
+    var ifdOffset = (int)_ReadUInt32(bytes, 4, isLittleEndian);
+    if (ifdOffset < 8 || ifdOffset + 2 > bytes.Length)
       throw new InvalidDataException($"Invalid first IFD offset: {ifdOffset}.");
 
     // Walk IFDs to find the full-res image (SubfileType=0) and verify DNGVersion exists
@@ -78,7 +77,7 @@ public static class DngReader {
 
     var currentOffset = ifdOffset;
     while (currentOffset != 0) {
-      var (file, nextIfd, foundDngVersion, foundDngVersionBytes, foundCameraModel) = _ParseIfd(data, currentOffset, isLittleEndian);
+      var (file, nextIfd, foundDngVersion, foundDngVersionBytes, foundCameraModel) = _ParseIfd(bytes, currentOffset, isLittleEndian);
       if (foundDngVersion) {
         hasDngVersion = true;
         dngVersion = foundDngVersionBytes;
@@ -109,6 +108,11 @@ public static class DngReader {
       CameraModel = cameraModel,
       Photometric = result.Photometric,
     };
+  }
+
+  public static DngFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   private static bool _DetectByteOrder(byte[] data) {

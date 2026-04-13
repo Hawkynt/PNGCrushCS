@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -43,10 +43,8 @@ public static class SunIconReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static SunIconFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static SunIconFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static SunIconFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MINIMUM_SIZE)
       throw new InvalidDataException("Data too small for a valid Sun Icon file.");
 
@@ -56,6 +54,11 @@ public static class SunIconReader {
       throw new InvalidDataException("Invalid Sun Icon format: missing '/* ' magic.");
 
     return _Parse(text);
+  }
+
+  public static SunIconFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   private static SunIconFile _Parse(string text) {

@@ -25,7 +25,15 @@ public static class EpaBiosReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static EpaBiosFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static EpaBiosFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != EpaBiosFile.FileSize)
+      throw new InvalidDataException($"Invalid EpaBios data size: expected exactly {EpaBiosFile.FileSize} bytes, got {data.Length}.");
+
+    var pixelData = new byte[EpaBiosFile.FileSize];
+    data.Slice(0, EpaBiosFile.FileSize).CopyTo(pixelData);
+    return new() { PixelData = pixelData };
+    }
 
   public static EpaBiosFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

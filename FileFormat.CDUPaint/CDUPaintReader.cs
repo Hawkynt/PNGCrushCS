@@ -26,7 +26,41 @@ public static class CDUPaintReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static CDUPaintFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static CDUPaintFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < CDUPaintFile.ExpectedFileSize)
+      throw new InvalidDataException($"Data too small for a valid CDU-Paint file (expected {CDUPaintFile.ExpectedFileSize} bytes, got {data.Length}).");
+
+    if (data.Length != CDUPaintFile.ExpectedFileSize)
+      throw new InvalidDataException($"Invalid CDU-Paint file size (expected {CDUPaintFile.ExpectedFileSize} bytes, got {data.Length}).");
+
+    var offset = 0;
+
+    var loadAddress = (ushort)(data[offset] | (data[offset + 1] << 8));
+    offset += CDUPaintFile.LoadAddressSize;
+
+    var bitmapData = new byte[CDUPaintFile.BitmapDataSize];
+    data.Slice(offset, CDUPaintFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
+    offset += CDUPaintFile.BitmapDataSize;
+
+    var videoMatrix = new byte[CDUPaintFile.VideoMatrixSize];
+    data.Slice(offset, CDUPaintFile.VideoMatrixSize).CopyTo(videoMatrix.AsSpan(0));
+    offset += CDUPaintFile.VideoMatrixSize;
+
+    var colorRam = new byte[CDUPaintFile.ColorRamSize];
+    data.Slice(offset, CDUPaintFile.ColorRamSize).CopyTo(colorRam.AsSpan(0));
+    offset += CDUPaintFile.ColorRamSize;
+
+    var backgroundColor = data[offset];
+
+    return new() {
+      LoadAddress = loadAddress,
+      BitmapData = bitmapData,
+      VideoMatrix = videoMatrix,
+      ColorRam = colorRam,
+      BackgroundColor = backgroundColor,
+    };
+    }
 
   public static CDUPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.IO.Compression;
 using System.Globalization;
@@ -31,18 +31,18 @@ public static class NrrdReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static NrrdFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static NrrdFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_FILE_SIZE)
       throw new InvalidDataException("Data is too small to be a valid NRRD file.");
 
     // Validate magic
-    var magic = Encoding.ASCII.GetString(data, 0, 4);
+    var magic = Encoding.ASCII.GetString(data.Slice(0, 4));
     if (magic != "NRRD")
       throw new InvalidDataException($"Invalid NRRD magic: expected 'NRRD', got '{magic}'.");
 
-    var dataOffset = NrrdHeaderParser.FindDataOffset(data);
-    var headerText = Encoding.ASCII.GetString(data, 0, dataOffset);
+    var bytes = data.ToArray();
+    var dataOffset = NrrdHeaderParser.FindDataOffset(bytes);
+    var headerText = Encoding.ASCII.GetString(data.Slice(0, dataOffset));
     var fields = NrrdHeaderParser.Parse(headerText);
 
     // Parse required fields
@@ -72,7 +72,7 @@ public static class NrrdReader {
       labels = _ParseLabels(labelsStr);
 
     var rawData = new byte[data.Length - dataOffset];
-    data.AsSpan(dataOffset, rawData.Length).CopyTo(rawData.AsSpan(0));
+    data.Slice(dataOffset, rawData.Length).CopyTo(rawData.AsSpan(0));
 
     var pixelData = _DecodeData(rawData, encoding, dataType, sizes, endian);
 
@@ -85,6 +85,12 @@ public static class NrrdReader {
       PixelData = pixelData,
       Labels = labels
     };
+  
+  }
+
+  public static NrrdFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   private static byte[] _DecodeData(byte[] rawData, NrrdEncoding encoding, NrrdType dataType, int[] sizes, string endian) => encoding switch {

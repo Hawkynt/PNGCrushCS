@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Text;
 
@@ -30,32 +30,30 @@ public static class VicarReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static VicarFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static VicarFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static VicarFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_HEADER_SIZE)
       throw new InvalidDataException("Data too small for a valid VICAR file.");
 
-    var magic = Encoding.ASCII.GetString(data, 0, _MAGIC.Length);
+    var magic = Encoding.ASCII.GetString(data.Slice(0, _MAGIC.Length));
     if (!magic.Equals(_MAGIC, StringComparison.Ordinal))
       throw new InvalidDataException("Invalid VICAR signature: header must start with 'LBLSIZE='.");
 
-    var lblSizeEnd = Array.IndexOf(data, (byte)' ', _MAGIC.Length);
+    var lblSizeRel = data[_MAGIC.Length..].IndexOf((byte)' ');
+    var lblSizeEnd = lblSizeRel >= 0 ? lblSizeRel + _MAGIC.Length : -1;
     if (lblSizeEnd < 0) {
       for (lblSizeEnd = _MAGIC.Length; lblSizeEnd < data.Length; ++lblSizeEnd)
         if (data[lblSizeEnd] < '0' || data[lblSizeEnd] > '9')
           break;
     }
 
-    var lblSizeText = Encoding.ASCII.GetString(data, _MAGIC.Length, lblSizeEnd - _MAGIC.Length);
+    var lblSizeText = Encoding.ASCII.GetString(data.Slice(_MAGIC.Length, lblSizeEnd - _MAGIC.Length));
     if (!int.TryParse(lblSizeText, out var lblSize) || lblSize <= 0)
       throw new InvalidDataException($"Invalid LBLSIZE value: '{lblSizeText}'.");
 
     if (data.Length < lblSize)
       throw new InvalidDataException($"Data too small for declared LBLSIZE={lblSize}.");
 
-    var headerText = Encoding.ASCII.GetString(data, 0, lblSize);
+    var headerText = Encoding.ASCII.GetString(data.Slice(0, lblSize));
     var labels = VicarHeaderParser.Parse(headerText);
 
     var nl = _GetIntLabel(labels, "NL");
@@ -77,7 +75,7 @@ public static class VicarReader {
 
     var pixelData = new byte[expectedPixelBytes];
     if (copyLen > 0)
-      data.AsSpan(lblSize, copyLen).CopyTo(pixelData.AsSpan(0));
+      data.Slice(lblSize, copyLen).CopyTo(pixelData);
 
     return new VicarFile {
       Width = ns,
@@ -90,6 +88,12 @@ public static class VicarReader {
       PixelData = pixelData,
       Labels = labels
     };
+  
+  }
+
+  public static VicarFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   private static int _GetIntLabel(System.Collections.Generic.Dictionary<string, string> labels, string key) {

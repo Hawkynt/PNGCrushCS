@@ -31,10 +31,12 @@ public static class SixelReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static SixelFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
   public static SixelFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  public static SixelFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < 4)
       throw new InvalidDataException("Data too small for a valid Sixel stream.");
 

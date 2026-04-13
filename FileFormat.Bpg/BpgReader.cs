@@ -19,17 +19,14 @@ public static class BpgReader {
     if (stream.CanSeek) {
       var data = new byte[stream.Length - stream.Position];
       stream.ReadExactly(data);
-      return FromBytes(data);
+      return FromSpan(data);
     }
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
+    return FromSpan(ms.ToArray());
   }
 
-  public static BpgFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static BpgFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static BpgFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < BpgFile.MinHeaderSize)
       throw new InvalidDataException("Data too small for a valid BPG file.");
 
@@ -52,19 +49,18 @@ public static class BpgReader {
     var animationFlag = (byte5 & 0x01) != 0;
 
     var offset = 6;
-    var span = new ReadOnlySpan<byte>(data);
 
-    var width = BpgUe7.Read(span, ref offset);
-    var height = BpgUe7.Read(span, ref offset);
-    var pictureDataLength = BpgUe7.Read(span, ref offset);
+    var width = BpgUe7.Read(data, ref offset);
+    var height = BpgUe7.Read(data, ref offset);
+    var pictureDataLength = BpgUe7.Read(data, ref offset);
 
     var extensionData = Array.Empty<byte>();
     if (extensionPresent) {
-      var extensionDataLength = BpgUe7.Read(span, ref offset);
+      var extensionDataLength = BpgUe7.Read(data, ref offset);
       extensionData = new byte[extensionDataLength];
       var available = Math.Min(extensionDataLength, data.Length - offset);
       if (available > 0)
-        data.AsSpan(offset, available).CopyTo(extensionData.AsSpan(0));
+        data.Slice(offset, available).CopyTo(extensionData.AsSpan(0));
 
       offset += extensionDataLength;
     }
@@ -72,7 +68,7 @@ public static class BpgReader {
     var pixelDataLength = Math.Min(pictureDataLength, data.Length - offset);
     var pixelData = new byte[pixelDataLength > 0 ? pixelDataLength : 0];
     if (pixelDataLength > 0)
-      data.AsSpan(offset, pixelDataLength).CopyTo(pixelData.AsSpan(0));
+      data.Slice(offset, pixelDataLength).CopyTo(pixelData.AsSpan(0));
 
     return new() {
       Width = width,
@@ -88,5 +84,10 @@ public static class BpgReader {
       ExtensionData = extensionData,
       PixelData = pixelData,
     };
+  }
+
+  public static BpgFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

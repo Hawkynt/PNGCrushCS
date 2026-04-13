@@ -26,7 +26,41 @@ public static class RainbowPainterReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static RainbowPainterFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static RainbowPainterFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < RainbowPainterFile.ExpectedFileSize)
+      throw new InvalidDataException($"Data too small for a valid Rainbow Painter file (expected {RainbowPainterFile.ExpectedFileSize} bytes, got {data.Length}).");
+
+    if (data.Length != RainbowPainterFile.ExpectedFileSize)
+      throw new InvalidDataException($"Invalid Rainbow Painter file size (expected {RainbowPainterFile.ExpectedFileSize} bytes, got {data.Length}).");
+
+    var offset = 0;
+
+    var loadAddress = (ushort)(data[offset] | (data[offset + 1] << 8));
+    offset += RainbowPainterFile.LoadAddressSize;
+
+    var bitmapData = new byte[RainbowPainterFile.BitmapDataSize];
+    data.Slice(offset, RainbowPainterFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
+    offset += RainbowPainterFile.BitmapDataSize;
+
+    var videoMatrix = new byte[RainbowPainterFile.VideoMatrixSize];
+    data.Slice(offset, RainbowPainterFile.VideoMatrixSize).CopyTo(videoMatrix.AsSpan(0));
+    offset += RainbowPainterFile.VideoMatrixSize;
+
+    var colorRam = new byte[RainbowPainterFile.ColorRamSize];
+    data.Slice(offset, RainbowPainterFile.ColorRamSize).CopyTo(colorRam.AsSpan(0));
+    offset += RainbowPainterFile.ColorRamSize;
+
+    var backgroundColor = data[offset];
+
+    return new() {
+      LoadAddress = loadAddress,
+      BitmapData = bitmapData,
+      VideoMatrix = videoMatrix,
+      ColorRam = colorRam,
+      BackgroundColor = backgroundColor,
+    };
+    }
 
   public static RainbowPainterFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

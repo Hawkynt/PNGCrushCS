@@ -30,11 +30,9 @@ public static class PngReader {
     return FromBytes(ms.ToArray());
   }
 
-  /// <summary>Read a PNG from a byte array</summary>
-  public static PngFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  /// <summary>Read a PNG from a span of bytes</summary>
+  public static PngFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static PngFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < 8 + 25)
       throw new InvalidDataException("Data too short to be a valid PNG file.");
 
@@ -57,7 +55,7 @@ public static class PngReader {
     var seenIdat = false;
 
     while (offset + PngChunkHeader.StructSize <= data.Length) {
-      var chunkHeader = PngChunkHeader.ReadFrom(data.AsSpan(offset));
+      var chunkHeader = PngChunkHeader.ReadFrom(data[offset..]);
       var chunkLength = chunkHeader.Length;
       var chunkType = chunkHeader.Type;
       offset += PngChunkHeader.StructSize;
@@ -65,7 +63,7 @@ public static class PngReader {
       if (chunkLength < 0 || offset + chunkLength + 4 > data.Length)
         break;
 
-      var chunkData = data.AsSpan(offset, chunkLength);
+      var chunkData = data.Slice(offset, chunkLength);
 
       switch (chunkType) {
         case "IHDR":
@@ -131,6 +129,11 @@ public static class PngReader {
       ChunksBetweenPlteAndIdat = chunksBetweenPlteAndIdat.Count > 0 ? chunksBetweenPlteAndIdat : null,
       ChunksAfterIdat = chunksAfterIdat.Count > 0 ? chunksAfterIdat : null
     };
+    }
+
+  public static PngFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   private static byte[] _ConcatenateIdatChunks(List<byte[]> chunks) {

@@ -29,15 +29,13 @@ public static class AvsReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static AvsFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static AvsFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static AvsFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _HEADER_SIZE)
       throw new InvalidDataException("Data too small for a valid AVS file.");
 
-    var width = (int)BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(0));
-    var height = (int)BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(4));
+    var width = (int)BinaryPrimitives.ReadUInt32BigEndian(data[0..]);
+    var height = (int)BinaryPrimitives.ReadUInt32BigEndian(data[4..]);
 
     if (width <= 0)
       throw new InvalidDataException($"Invalid AVS width: {width}.");
@@ -49,12 +47,17 @@ public static class AvsReader {
       throw new InvalidDataException($"Invalid AVS data size: expected {_HEADER_SIZE + expectedPixelBytes} bytes, got {data.Length}.");
 
     var pixelData = new byte[expectedPixelBytes];
-    data.AsSpan(_HEADER_SIZE, expectedPixelBytes).CopyTo(pixelData.AsSpan(0));
+    data.Slice(_HEADER_SIZE, expectedPixelBytes).CopyTo(pixelData.AsSpan(0));
 
     return new AvsFile {
       Width = width,
       Height = height,
       PixelData = pixelData
     };
+    }
+
+  public static AvsFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

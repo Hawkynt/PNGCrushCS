@@ -27,7 +27,24 @@ public static class FontasyGrafikReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static FontasyGrafikFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static FontasyGrafikFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < FontasyGrafikFile.ExpectedFileSize)
+      throw new InvalidDataException($"Data too small for a valid Fontasy Grafik file: expected at least {FontasyGrafikFile.ExpectedFileSize} bytes, got {data.Length}.");
+
+    var span = data;
+    var palette = new short[16];
+    for (var i = 0; i < 16; ++i)
+      palette[i] = BinaryPrimitives.ReadInt16BigEndian(span[(i * 2)..]);
+
+    var pixelData = new byte[FontasyGrafikFile.PlanarDataSize];
+    data.Slice(FontasyGrafikFile.PaletteSize + FontasyGrafikFile.PaddingSize, FontasyGrafikFile.PlanarDataSize).CopyTo(pixelData.AsSpan(0));
+
+    return new FontasyGrafikFile {
+      Palette = palette,
+      PixelData = pixelData
+    };
+    }
 
   public static FontasyGrafikFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

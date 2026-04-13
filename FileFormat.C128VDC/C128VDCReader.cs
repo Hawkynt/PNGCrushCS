@@ -26,7 +26,16 @@ public static class C128VDCReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static C128VDCFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static C128VDCFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != C128VDCFile.ExpectedFileSize)
+      throw new InvalidDataException($"Invalid C128 VDC data size: expected exactly {C128VDCFile.ExpectedFileSize} bytes, got {data.Length}.");
+
+    var rawData = new byte[C128VDCFile.ExpectedFileSize];
+    data.Slice(0, C128VDCFile.ExpectedFileSize).CopyTo(rawData);
+
+    return new C128VDCFile { RawData = rawData };
+    }
 
   public static C128VDCFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

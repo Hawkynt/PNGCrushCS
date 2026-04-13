@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 
 namespace FileFormat.Mlt;
@@ -27,10 +27,8 @@ public static class MltReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static MltFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static MltFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static MltFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
 
     if (data.Length < MltFile.MinFileSize)
       throw new InvalidDataException($"File too small for Mlt format (got {data.Length} bytes, need at least {MltFile.MinFileSize}).");
@@ -43,17 +41,17 @@ public static class MltReader {
 
     // Bitmap data (8000 bytes)
     var bitmapData = new byte[MltFile.BitmapDataSize];
-    data.AsSpan(offset, MltFile.BitmapDataSize).CopyTo(bitmapData);
+    data.Slice(offset, MltFile.BitmapDataSize).CopyTo(bitmapData);
     offset += MltFile.BitmapDataSize;
 
     // Screen RAM (1000 bytes)
     var screenData = new byte[MltFile.ScreenDataSize];
-    data.AsSpan(offset, MltFile.ScreenDataSize).CopyTo(screenData);
+    data.Slice(offset, MltFile.ScreenDataSize).CopyTo(screenData);
     offset += MltFile.ScreenDataSize;
 
     // Color RAM (1000 bytes)
     var colorData = new byte[MltFile.ColorDataSize];
-    data.AsSpan(offset, MltFile.ColorDataSize).CopyTo(colorData);
+    data.Slice(offset, MltFile.ColorDataSize).CopyTo(colorData);
     offset += MltFile.ColorDataSize;
 
     // Background color (1 byte)
@@ -64,7 +62,7 @@ public static class MltReader {
     var trailingData = Array.Empty<byte>();
     if (offset < data.Length) {
       trailingData = new byte[data.Length - offset];
-      data.AsSpan(offset).CopyTo(trailingData);
+      data[offset..].CopyTo(trailingData);
     }
 
     return new() {
@@ -75,5 +73,10 @@ public static class MltReader {
       BackgroundColor = backgroundColor,
       TrailingData = trailingData,
     };
+  }
+
+  public static MltFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

@@ -32,7 +32,32 @@ public static class AtariPaintworksReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static AtariPaintworksFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static AtariPaintworksFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < AtariPaintworksHeader.StructSize)
+      throw new InvalidDataException("Data too small for a valid Atari Paintworks file.");
+
+    if (data.Length < _EXPECTED_FILE_SIZE)
+      throw new InvalidDataException($"Data too small: expected at least {_EXPECTED_FILE_SIZE} bytes for palette + screen data, got {data.Length}.");
+
+    var span = data;
+    var header = AtariPaintworksHeader.ReadFrom(span);
+
+    // Determine resolution from file size context; default to low res for standard 32032-byte files
+    var resolution = _DetectResolution(data.Length);
+    var (width, height) = _GetDimensions(resolution);
+
+    var pixelData = new byte[_PIXEL_DATA_SIZE];
+    data.Slice(AtariPaintworksHeader.StructSize, _PIXEL_DATA_SIZE).CopyTo(pixelData.AsSpan(0));
+
+    return new AtariPaintworksFile {
+      Width = width,
+      Height = height,
+      Resolution = resolution,
+      Palette = header.GetPaletteArray(),
+      PixelData = pixelData
+    };
+    }
 
   public static AtariPaintworksFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

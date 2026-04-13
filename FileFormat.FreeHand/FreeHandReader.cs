@@ -30,7 +30,36 @@ public static class FreeHandReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static FreeHandFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static FreeHandFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < _HEADER_SIZE)
+      throw new InvalidDataException("Data too small for a valid FreeHand ST file.");
+
+    if (data.Length < _EXPECTED_FILE_SIZE)
+      throw new InvalidDataException($"Data too small for the expected {_EXPECTED_FILE_SIZE}-byte FreeHand ST file.");
+
+    var span = data;
+
+    var resolution = (short)((span[0] << 8) | span[1]);
+    if (resolution != 0)
+      throw new InvalidDataException($"Invalid FreeHand ST resolution value: {resolution}; expected 0 (low-res).");
+
+    var palette = new short[16];
+    for (var i = 0; i < 16; ++i) {
+      var offset = 2 + i * 2;
+      palette[i] = (short)((span[offset] << 8) | span[offset + 1]);
+    }
+
+    var pixelData = new byte[_PIXEL_DATA_SIZE];
+    data.Slice(_HEADER_SIZE, _PIXEL_DATA_SIZE).CopyTo(pixelData.AsSpan(0));
+
+    return new FreeHandFile {
+      Width = 320,
+      Height = 200,
+      Palette = palette,
+      PixelData = pixelData,
+    };
+    }
 
   public static FreeHandFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

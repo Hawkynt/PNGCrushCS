@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 
 namespace FileFormat.ZeissLsm;
@@ -33,10 +33,7 @@ public static class ZeissLsmReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static ZeissLsmFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static ZeissLsmFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static ZeissLsmFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < 8)
       throw new InvalidDataException($"Zeiss LSM data too small: expected at least 8 bytes, got {data.Length}.");
 
@@ -94,14 +91,20 @@ public static class ZeissLsmReader {
     var pixelDataSize = stripByteCount > 0 ? (int)stripByteCount : width * height * channels;
     var pixelData = new byte[pixelDataSize];
     if (stripOffset > 0 && stripOffset + pixelDataSize <= data.Length)
-      data.AsSpan((int)stripOffset, pixelDataSize).CopyTo(pixelData);
+      data.Slice((int)stripOffset, pixelDataSize).CopyTo(pixelData);
 
     return new() { Width = width, Height = height, Channels = channels, PixelData = pixelData };
+  
   }
 
-  private static ushort _ReadUInt16LE(byte[] data, int offset) =>
+  public static ZeissLsmFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  private static ushort _ReadUInt16LE(ReadOnlySpan<byte> data, int offset) =>
     (ushort)(data[offset] | (data[offset + 1] << 8));
 
-  private static uint _ReadUInt32LE(byte[] data, int offset) =>
+  private static uint _ReadUInt32LE(ReadOnlySpan<byte> data, int offset) =>
     (uint)(data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) | (data[offset + 3] << 24));
 }

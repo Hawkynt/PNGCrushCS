@@ -26,18 +26,21 @@ public static class Spectrum512CompReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static Spectrum512CompFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static Spectrum512CompFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static Spectrum512CompFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < Spectrum512CompFile.MinFileSize)
       throw new InvalidDataException($"Data too small for a valid SPC file: expected at least {Spectrum512CompFile.MinFileSize} bytes, got {data.Length}.");
 
     var rawData = new byte[data.Length];
-    data.AsSpan(0, data.Length).CopyTo(rawData);
+    data.Slice(0, data.Length).CopyTo(rawData);
 
     return new Spectrum512CompFile {
       RawData = rawData
     };
+    }
+
+  public static Spectrum512CompFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

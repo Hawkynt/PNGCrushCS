@@ -25,7 +25,15 @@ public static class JupiterAceReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static JupiterAceFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static JupiterAceFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != JupiterAceFile.FileSize)
+      throw new InvalidDataException($"Invalid JupiterAce data size: expected exactly {JupiterAceFile.FileSize} bytes, got {data.Length}.");
+
+    var pixelData = new byte[JupiterAceFile.FileSize];
+    data.Slice(0, JupiterAceFile.FileSize).CopyTo(pixelData);
+    return new() { PixelData = pixelData };
+    }
 
   public static JupiterAceFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

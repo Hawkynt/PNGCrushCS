@@ -25,7 +25,21 @@ public static class Pc88Reader {
     return FromBytes(ms.ToArray());
   }
 
-  public static Pc88File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static Pc88File FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < Pc88File.FileSize)
+      throw new InvalidDataException($"Data too small: {data.Length} bytes, expected 16000.");
+
+    var pixelData = new byte[Pc88File.ImageWidth * Pc88File.ImageHeight];
+    for (var y = 0; y < Pc88File.ImageHeight; ++y)
+      for (var x = 0; x < Pc88File.ImageWidth; x += 8) {
+        var b = data[y * 80 + x / 8];
+        for (var bit = 0; bit < 8 && x + bit < Pc88File.ImageWidth; ++bit)
+          pixelData[y * Pc88File.ImageWidth + x + bit] = (byte)((b >> (7 - bit)) & 1);
+      }
+
+    return new Pc88File { PixelData = pixelData };
+    }
 
   public static Pc88File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

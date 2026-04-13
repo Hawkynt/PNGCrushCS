@@ -25,10 +25,8 @@ public static class CloeReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static CloeFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static CloeFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static CloeFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < CloeFile.HeaderSize)
       throw new InvalidDataException("Data too small for a valid Cloe file.");
 
@@ -48,12 +46,17 @@ public static class CloeReader {
     var pixelData = new byte[pixelBytes];
     var available = Math.Min(pixelBytes, data.Length - CloeFile.HeaderSize);
     if (available > 0)
-      data.AsSpan(CloeFile.HeaderSize, available).CopyTo(pixelData.AsSpan(0));
+      data.Slice(CloeFile.HeaderSize, available).CopyTo(pixelData);
 
     return new() {
       Width = width,
       Height = height,
       PixelData = pixelData,
     };
+  }
+
+  public static CloeFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

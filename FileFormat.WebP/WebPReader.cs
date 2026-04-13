@@ -39,14 +39,12 @@ public static class WebPReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static WebPFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static WebPFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static WebPFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < 12)
       throw new InvalidDataException("Data is too small to be a valid WebP file.");
 
-    var riff = RiffReader.FromBytes(data);
+    var riff = RiffReader.FromBytes(data.ToArray());
     if (riff.FormType.ToString() != _FORM_TYPE)
       throw new InvalidDataException($"Invalid WebP form type: expected '{_FORM_TYPE}', got '{riff.FormType}'.");
 
@@ -93,6 +91,11 @@ public static class WebPReader {
     };
   }
 
+  public static WebPFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
   private static Dictionary<string, byte[]> _BuildChunkLookup(List<RiffChunk> chunks) {
     var lookup = new Dictionary<string, byte[]>();
     foreach (var chunk in chunks) {
@@ -103,7 +106,7 @@ public static class WebPReader {
     return lookup;
   }
 
-  private static WebPFeatures _ParseVp8X(byte[] data, bool isLossless) {
+  private static WebPFeatures _ParseVp8X(ReadOnlySpan<byte> data, bool isLossless) {
     if (data.Length < Vp8XHeader.StructSize)
       throw new InvalidDataException("VP8X chunk is too small.");
 
@@ -111,7 +114,7 @@ public static class WebPReader {
     return new WebPFeatures(header.CanvasWidth, header.CanvasHeight, header.HasAlpha, isLossless, header.IsAnimated);
   }
 
-  internal static WebPFeatures _ParseVp8L(byte[] data) {
+  internal static WebPFeatures _ParseVp8L(ReadOnlySpan<byte> data) {
     if (data.Length < Vp8LHeader.StructSize)
       throw new InvalidDataException("VP8L chunk is too small.");
 
@@ -122,7 +125,7 @@ public static class WebPReader {
     return new WebPFeatures(header.Width, header.Height, header.HasAlpha, IsLossless: true, IsAnimated: false);
   }
 
-  internal static WebPFeatures _ParseVp8(byte[] data) {
+  internal static WebPFeatures _ParseVp8(ReadOnlySpan<byte> data) {
     if (data.Length < Vp8FrameHeader.StructSize)
       throw new InvalidDataException("VP8 chunk is too small.");
 

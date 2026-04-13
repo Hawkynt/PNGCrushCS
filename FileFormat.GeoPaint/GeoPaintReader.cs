@@ -14,7 +14,7 @@ public static class GeoPaintReader {
     if (!file.Exists)
       throw new FileNotFoundException("GeoPaint file not found.", file.FullName);
 
-    return FromBytes(File.ReadAllBytes(file.FullName));
+    return FromSpan(File.ReadAllBytes(file.FullName));
   }
 
   public static GeoPaintFile FromStream(Stream stream) {
@@ -22,26 +22,31 @@ public static class GeoPaintReader {
     if (stream.CanSeek) {
       var data = new byte[stream.Length - stream.Position];
       stream.ReadExactly(data);
-      return FromBytes(data);
+      return FromSpan(data);
     }
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
+    return FromSpan(ms.ToArray());
   }
-
-  public static GeoPaintFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
 
   public static GeoPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  public static GeoPaintFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_SIZE)
       throw new InvalidDataException($"Data too small for a valid GeoPaint file: expected at least {_MIN_SIZE} byte(s), got {data.Length}.");
+
+    // GeoPaintRleCompressor takes byte[], so materialize
+    var bytes = data.ToArray();
 
     // Determine height by decompressing scanlines until data is exhausted
     var offset = 0;
     var rowCount = 0;
-    while (offset < data.Length && rowCount < GeoPaintFile.MaxHeight) {
+    while (offset < bytes.Length && rowCount < GeoPaintFile.MaxHeight) {
       var before = offset;
-      GeoPaintRleCompressor.DecompressScanline(data, ref offset, GeoPaintFile.BytesPerRow, out var bytesDecoded);
+      GeoPaintRleCompressor.DecompressScanline(bytes, ref offset, GeoPaintFile.BytesPerRow, out var bytesDecoded);
 
       // If offset didn't advance, the data is malformed or exhausted
       if (offset <= before)
@@ -59,7 +64,7 @@ public static class GeoPaintReader {
       throw new InvalidDataException("GeoPaint data contains no decompressible scanlines.");
 
     // Now decompress fully with known height
-    var pixelData = GeoPaintRleCompressor.Decompress(data, rowCount);
+    var pixelData = GeoPaintRleCompressor.Decompress(bytes, rowCount);
 
     return new GeoPaintFile {
       Height = rowCount,

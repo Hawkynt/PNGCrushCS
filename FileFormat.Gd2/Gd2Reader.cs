@@ -27,25 +27,25 @@ public static class Gd2Reader {
     return FromBytes(ms.ToArray());
   }
 
-  public static Gd2File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
   public static Gd2File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  public static Gd2File FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < Gd2File.HeaderSize)
       throw new InvalidDataException($"Data too small for a valid GD2 file: expected at least {Gd2File.HeaderSize} bytes, got {data.Length}.");
 
-    var span = data.AsSpan();
-
-    if (!span[..4].SequenceEqual(Gd2File.Signature))
+    if (!data[..4].SequenceEqual(Gd2File.Signature))
       throw new InvalidDataException("Invalid GD2 signature.");
 
-    var version = BinaryPrimitives.ReadUInt16BigEndian(span[4..]);
-    var width = BinaryPrimitives.ReadUInt16BigEndian(span[6..]);
-    var height = BinaryPrimitives.ReadUInt16BigEndian(span[8..]);
-    var chunkSize = BinaryPrimitives.ReadUInt16BigEndian(span[10..]);
-    var format = BinaryPrimitives.ReadUInt16BigEndian(span[12..]);
-    var xChunkCount = BinaryPrimitives.ReadUInt16BigEndian(span[14..]);
-    var yChunkCount = BinaryPrimitives.ReadUInt16BigEndian(span[16..]);
+    var version = BinaryPrimitives.ReadUInt16BigEndian(data[4..]);
+    var width = BinaryPrimitives.ReadUInt16BigEndian(data[6..]);
+    var height = BinaryPrimitives.ReadUInt16BigEndian(data[8..]);
+    var chunkSize = BinaryPrimitives.ReadUInt16BigEndian(data[10..]);
+    var format = BinaryPrimitives.ReadUInt16BigEndian(data[12..]);
+    var xChunkCount = BinaryPrimitives.ReadUInt16BigEndian(data[14..]);
+    var yChunkCount = BinaryPrimitives.ReadUInt16BigEndian(data[16..]);
 
     if (width == 0 || height == 0)
       throw new InvalidDataException("GD2 image dimensions must be non-zero.");
@@ -60,7 +60,7 @@ public static class Gd2Reader {
       throw new InvalidDataException($"Not enough pixel data: expected {expectedPixelBytes} bytes, got {available}.");
 
     var pixelData = new byte[expectedPixelBytes];
-    data.AsSpan(Gd2File.HeaderSize, expectedPixelBytes).CopyTo(pixelData.AsSpan(0));
+    data.Slice(Gd2File.HeaderSize, expectedPixelBytes).CopyTo(pixelData.AsSpan(0));
 
     return new Gd2File {
       Width = width,

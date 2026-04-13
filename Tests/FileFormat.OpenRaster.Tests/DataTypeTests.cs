@@ -8,18 +8,16 @@ public sealed class DataTypeTests {
 
   [Test]
   [Category("Unit")]
-  public void OpenRasterFile_DefaultPixelData_IsEmptyArray() {
+  public void _DefaultPixelData_IsNull() {
     var file = new OpenRasterFile { Width = 1, Height = 1 };
-    Assert.That(file.PixelData, Is.Not.Null);
-    Assert.That(file.PixelData, Has.Length.EqualTo(0));
+    Assert.That(file.PixelData, Is.Null);
   }
 
   [Test]
   [Category("Unit")]
-  public void OpenRasterFile_DefaultLayers_IsEmptyList() {
+  public void OpenRasterFile_DefaultLayers_IsNull() {
     var file = new OpenRasterFile { Width = 1, Height = 1 };
-    Assert.That(file.Layers, Is.Not.Null);
-    Assert.That(file.Layers, Has.Count.EqualTo(0));
+    Assert.That(file.Layers, Is.Null);
   }
 
   [Test]

@@ -27,7 +27,25 @@ public static class SinbadSlideshowReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static SinbadSlideshowFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static SinbadSlideshowFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < SinbadSlideshowFile.FileSize)
+      throw new InvalidDataException($"Data too small for a valid Sinbad Slideshow file: expected at least {SinbadSlideshowFile.FileSize} bytes, got {data.Length}.");
+
+    var span = data;
+
+    var palette = new short[16];
+    for (var i = 0; i < 16; ++i)
+      palette[i] = BinaryPrimitives.ReadInt16BigEndian(span.Slice(i * 2, 2));
+
+    var pixelData = new byte[SinbadSlideshowFile.PixelDataSize];
+    span.Slice(SinbadSlideshowFile.PaletteSize, SinbadSlideshowFile.PixelDataSize).CopyTo(pixelData);
+
+    return new SinbadSlideshowFile {
+      Palette = palette,
+      PixelData = pixelData,
+    };
+    }
 
   public static SinbadSlideshowFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

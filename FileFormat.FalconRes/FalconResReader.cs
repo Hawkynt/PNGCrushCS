@@ -29,7 +29,18 @@ public static class FalconResReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static FalconResFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static FalconResFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != _EXPECTED_SIZE)
+      throw new InvalidDataException($"Invalid Falcon Res data size: expected exactly {_EXPECTED_SIZE} bytes, got {data.Length}.");
+
+    var pixelData = new byte[_EXPECTED_SIZE];
+    data.Slice(0, _EXPECTED_SIZE).CopyTo(pixelData);
+
+    return new FalconResFile {
+      PixelData = pixelData
+    };
+    }
 
   public static FalconResFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

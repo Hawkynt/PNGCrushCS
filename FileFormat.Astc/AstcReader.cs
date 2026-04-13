@@ -26,14 +26,12 @@ public static class AstcReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static AstcFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static AstcFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static AstcFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < AstcHeader.StructSize)
       throw new InvalidDataException("Data too small for a valid ASTC file.");
 
-    var span = data.AsSpan();
+    var span = data;
     var header = AstcHeader.ReadFrom(span);
 
     if (header.Magic != AstcHeader.MagicValue)
@@ -41,7 +39,7 @@ public static class AstcReader {
 
     var compressedDataLength = data.Length - AstcHeader.StructSize;
     var compressedData = new byte[compressedDataLength];
-    data.AsSpan(AstcHeader.StructSize, compressedDataLength).CopyTo(compressedData.AsSpan(0));
+    data.Slice(AstcHeader.StructSize, compressedDataLength).CopyTo(compressedData.AsSpan(0));
 
     return new AstcFile {
       Width = header.Width,
@@ -52,5 +50,10 @@ public static class AstcReader {
       BlockDimZ = header.BlockDimZ,
       CompressedData = compressedData
     };
+    }
+
+  public static AstcFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

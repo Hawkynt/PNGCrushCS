@@ -25,7 +25,15 @@ public static class ElectronikaReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static ElectronikaFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static ElectronikaFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != ElectronikaFile.FileSize)
+      throw new InvalidDataException($"Invalid Electronika data size: expected exactly {ElectronikaFile.FileSize} bytes, got {data.Length}.");
+
+    var pixelData = new byte[ElectronikaFile.FileSize];
+    data.Slice(0, ElectronikaFile.FileSize).CopyTo(pixelData);
+    return new() { PixelData = pixelData };
+    }
 
   public static ElectronikaFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

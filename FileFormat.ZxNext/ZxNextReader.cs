@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 
 namespace FileFormat.ZxNext;
@@ -35,16 +35,21 @@ public static class ZxNextReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static ZxNextFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static ZxNextFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length != FileSize)
       throw new InvalidDataException($"ZX Spectrum Next file must be exactly {FileSize} bytes, got {data.Length}.");
 
     var pixelData = new byte[FileSize];
-    data.AsSpan(0, FileSize).CopyTo(pixelData);
+    data.Slice(0, FileSize).CopyTo(pixelData);
 
     return new ZxNextFile {
       PixelData = pixelData,
     };
+  
+  }
+
+  public static ZxNextFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

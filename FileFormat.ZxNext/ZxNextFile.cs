@@ -1,19 +1,18 @@
-﻿using System;
-using System.IO;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.ZxNext;
 
 /// <summary>In-memory representation of a ZX Spectrum Next 256-color image (49152 bytes: 256x192 at 8bpp).</summary>
-public sealed class ZxNextFile : IImageFileFormat<ZxNextFile> {
+public sealed class ZxNextFile :
+  IImageFormatReader<ZxNextFile>, IImageToRawImage<ZxNextFile>,
+  IImageFromRawImage<ZxNextFile>, IImageFormatWriter<ZxNextFile> {
 
-  static string IImageFileFormat<ZxNextFile>.PrimaryExtension => ".nxt";
-  static string[] IImageFileFormat<ZxNextFile>.FileExtensions => [".nxt"];
-  static FormatCapability IImageFileFormat<ZxNextFile>.Capabilities => FormatCapability.IndexedOnly;
-  static ZxNextFile IImageFileFormat<ZxNextFile>.FromFile(FileInfo file) => ZxNextReader.FromFile(file);
-  static ZxNextFile IImageFileFormat<ZxNextFile>.FromBytes(byte[] data) => ZxNextReader.FromBytes(data);
-  static ZxNextFile IImageFileFormat<ZxNextFile>.FromStream(Stream stream) => ZxNextReader.FromStream(stream);
-  static byte[] IImageFileFormat<ZxNextFile>.ToBytes(ZxNextFile file) => ZxNextWriter.ToBytes(file);
+  static string IImageFormatMetadata<ZxNextFile>.PrimaryExtension => ".nxt";
+  static string[] IImageFormatMetadata<ZxNextFile>.FileExtensions => [".nxt"];
+  static FormatCapability IImageFormatMetadata<ZxNextFile>.Capabilities => FormatCapability.IndexedOnly;
+  static ZxNextFile IImageFormatReader<ZxNextFile>.FromSpan(ReadOnlySpan<byte> data) => ZxNextReader.FromSpan(data);
+  static byte[] IImageFormatWriter<ZxNextFile>.ToBytes(ZxNextFile file) => ZxNextWriter.ToBytes(file);
 
   /// <summary>Always 256.</summary>
   public int Width => 256;

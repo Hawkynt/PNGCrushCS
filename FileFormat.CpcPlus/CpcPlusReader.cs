@@ -26,7 +26,28 @@ public static class CpcPlusReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static CpcPlusFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static CpcPlusFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != CpcPlusFile.ExpectedFileSize)
+      throw new InvalidDataException($"Invalid CPC Plus data size: expected exactly {CpcPlusFile.ExpectedFileSize} bytes, got {data.Length}.");
+
+    // Deinterleave CPC memory layout for the screen data portion
+    var linearData = new byte[CpcPlusFile.PixelHeight * CpcPlusFile.BytesPerRow];
+    for (var y = 0; y < CpcPlusFile.PixelHeight; ++y) {
+      var srcOffset = (y / 8) * CpcPlusFile.BytesPerRow + (y % 8) * 2048;
+      var dstOffset = y * CpcPlusFile.BytesPerRow;
+      data.Slice(srcOffset, CpcPlusFile.BytesPerRow).CopyTo(linearData.AsSpan(dstOffset));
+    }
+
+    // Read palette data from after screen data
+    var paletteData = new byte[CpcPlusFile.PaletteDataSize];
+    data.Slice(CpcPlusFile.ScreenDataSize, CpcPlusFile.PaletteDataSize).CopyTo(paletteData.AsSpan(0));
+
+    return new CpcPlusFile {
+      PixelData = linearData,
+      PaletteData = paletteData,
+    };
+    }
 
   public static CpcPlusFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

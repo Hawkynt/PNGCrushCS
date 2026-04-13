@@ -21,18 +21,16 @@ public sealed class DataTypeTests {
 
   [Test]
   [Category("Unit")]
-  public void Lss16File_DefaultPixelData_IsEmptyArray() {
+  public void Lss16File_DefaultPixelData_IsNull() {
     var file = new Lss16File();
-    Assert.That(file.PixelData, Is.Not.Null);
-    Assert.That(file.PixelData.Length, Is.EqualTo(0));
+    Assert.That(file.PixelData, Is.Null);
   }
 
   [Test]
   [Category("Unit")]
-  public void Lss16File_DefaultPalette_Is48Bytes() {
+  public void Lss16File_DefaultPalette_IsNull() {
     var file = new Lss16File();
-    Assert.That(file.Palette, Is.Not.Null);
-    Assert.That(file.Palette.Length, Is.EqualTo(48));
+    Assert.That(file.Palette, Is.Null);
   }
 
   [Test]

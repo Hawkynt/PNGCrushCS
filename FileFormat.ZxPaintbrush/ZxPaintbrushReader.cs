@@ -41,7 +41,35 @@ public static class ZxPaintbrushReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static ZxPaintbrushFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static ZxPaintbrushFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < MinFileSize)
+      throw new InvalidDataException($"ZX-Paintbrush file must be at least {MinFileSize} bytes, got {data.Length}.");
+
+    var linearBitmap = new byte[BitmapSize];
+
+    // Deinterleave from ZX Spectrum memory layout to linear row order
+    for (var y = 0; y < RowCount; ++y) {
+      var third = y / 64;
+      var characterRow = (y % 64) / 8;
+      var pixelLine = y % 8;
+      var srcOffset = third * 2048 + pixelLine * 256 + characterRow * BytesPerRow;
+      var dstOffset = y * BytesPerRow;
+      data.Slice(srcOffset, BytesPerRow).CopyTo(linearBitmap.AsSpan(dstOffset));
+    }
+
+    var attributes = new byte[AttributeSize];
+    data.Slice(BitmapSize, AttributeSize).CopyTo(attributes);
+
+    var extraLength = data.Length - MinFileSize;
+    var extraData = extraLength > 0 ? data.Slice(MinFileSize, extraLength).ToArray() : [];
+
+    return new ZxPaintbrushFile {
+      BitmapData = linearBitmap,
+      AttributeData = attributes,
+      ExtraData = extraData,
+    };
+    }
 
   public static ZxPaintbrushFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

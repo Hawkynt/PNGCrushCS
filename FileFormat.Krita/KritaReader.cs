@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.IO.Compression;
 using FileFormat.Png;
@@ -30,14 +30,12 @@ public static class KritaReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static KritaFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static KritaFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static KritaFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < 4)
       throw new InvalidDataException("Data too small for a valid Krita file.");
 
-    using var zipStream = new MemoryStream(data, writable: false);
+    // ZipArchive requires a Stream backed by byte[]
+    using var zipStream = new MemoryStream(data.ToArray(), writable: false);
     ZipArchive archive;
     try {
       archive = new ZipArchive(zipStream, ZipArchiveMode.Read);
@@ -65,6 +63,12 @@ public static class KritaReader {
         PixelData = pixelData
       };
     }
+  
+  }
+
+  public static KritaFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   private static string _ReadEntryText(ZipArchiveEntry entry) {

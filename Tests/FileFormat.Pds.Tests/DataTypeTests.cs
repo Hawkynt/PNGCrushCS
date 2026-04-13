@@ -47,34 +47,34 @@ public sealed class DataTypeTests {
 
   [Test]
   [Category("Unit")]
-  public void PdsFile_DefaultSampleBits_Is8() {
+  public void PdsFile_DefaultSampleBits_IsZero() {
     var file = new PdsFile();
 
-    Assert.That(file.SampleBits, Is.EqualTo(8));
+    Assert.That(file.SampleBits, Is.EqualTo(0));
   }
 
   [Test]
   [Category("Unit")]
-  public void PdsFile_DefaultBands_Is1() {
+  public void PdsFile_DefaultBands_IsZero() {
     var file = new PdsFile();
 
-    Assert.That(file.Bands, Is.EqualTo(1));
+    Assert.That(file.Bands, Is.EqualTo(0));
   }
 
   [Test]
   [Category("Unit")]
-  public void PdsFile_DefaultPixelData_IsEmpty() {
+  public void PdsFile_DefaultPixelData_IsNull() {
     var file = new PdsFile();
 
-    Assert.That(file.PixelData, Is.Empty);
+    Assert.That(file.PixelData, Is.Null);
   }
 
   [Test]
   [Category("Unit")]
-  public void PdsFile_DefaultLabels_IsEmpty() {
+  public void PdsFile_DefaultLabels_IsNull() {
     var file = new PdsFile();
 
-    Assert.That(file.Labels, Is.Empty);
+    Assert.That(file.Labels, Is.Null);
   }
 
   [Test]

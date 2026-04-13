@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.EverexFax;
@@ -26,22 +27,19 @@ public static class EverexFaxReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static EverexFaxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static EverexFaxFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static EverexFaxFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < EverexFaxFile.MinFileSize)
       throw new InvalidDataException($"Data too small for a valid EFX file (need at least {EverexFaxFile.MinFileSize} bytes, got {data.Length}).");
 
     if (data[0] != EverexFaxFile.Magic[0] || data[1] != EverexFaxFile.Magic[1] || data[2] != EverexFaxFile.Magic[2] || data[3] != EverexFaxFile.Magic[3])
       throw new InvalidDataException("Invalid EFX magic bytes.");
 
-    var version = BitConverter.ToUInt16(data, 4);
-    var width = BitConverter.ToUInt16(data, 6);
-    var height = BitConverter.ToUInt16(data, 8);
-    var pages = BitConverter.ToUInt16(data, 10);
-    var compression = BitConverter.ToUInt16(data, 12);
-    var reserved = BitConverter.ToUInt16(data, 14);
+    var version = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
+    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
+    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[8..]);
+    var pages = BinaryPrimitives.ReadUInt16LittleEndian(data[10..]);
+    var compression = BinaryPrimitives.ReadUInt16LittleEndian(data[12..]);
+    var reserved = BinaryPrimitives.ReadUInt16LittleEndian(data[14..]);
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid EFX dimensions: {width}x{height}.");
@@ -52,7 +50,7 @@ public static class EverexFaxReader {
       throw new InvalidDataException("EFX file truncated: not enough pixel data.");
 
     var pixelData = new byte[pixelDataSize];
-    data.AsSpan(EverexFaxFile.HeaderSize, pixelDataSize).CopyTo(pixelData.AsSpan(0));
+    data.Slice(EverexFaxFile.HeaderSize, pixelDataSize).CopyTo(pixelData);
 
     return new() {
       Width = width,
@@ -63,5 +61,10 @@ public static class EverexFaxReader {
       Reserved = reserved,
       PixelData = pixelData,
     };
+  }
+
+  public static EverexFaxFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

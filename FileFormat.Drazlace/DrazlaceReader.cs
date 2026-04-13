@@ -26,17 +26,15 @@ public static class DrazlaceReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static DrazlaceFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static DrazlaceFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static DrazlaceFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < DrazlaceFile.LoadAddressSize + 1)
       throw new InvalidDataException($"Data too small for a valid Drazlace file (got {data.Length} bytes).");
 
     var loadAddress = (ushort)(data[0] | (data[1] << 8));
 
     var compressed = new byte[data.Length - DrazlaceFile.LoadAddressSize];
-    data.AsSpan(DrazlaceFile.LoadAddressSize, compressed.Length).CopyTo(compressed.AsSpan(0));
+    data.Slice(DrazlaceFile.LoadAddressSize, compressed.Length).CopyTo(compressed.AsSpan(0));
 
     var decompressed = DrazlaceFile.RleDecode(compressed);
     if (decompressed.Length < DrazlaceFile.UncompressedPayloadSize)
@@ -75,5 +73,10 @@ public static class DrazlaceReader {
       BitmapData2 = bitmapData2,
       ScreenRam2 = screenRam2,
     };
+    }
+
+  public static DrazlaceFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

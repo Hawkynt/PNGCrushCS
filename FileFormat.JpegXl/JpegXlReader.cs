@@ -38,19 +38,23 @@ public static class JpegXlReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static JpegXlFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
   public static JpegXlFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  public static JpegXlFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MinSize)
       throw new InvalidDataException("Data too small for a valid JPEG XL file.");
 
+    var dataArray = data.ToArray();
+
     // Detect bare codestream (FF 0A) vs ISOBMFF container
     if (data[0] == _CodestreamByte0 && data[1] == _CodestreamByte1)
-      return _ParseCodestream(data, 0, data.Length, "jxl ");
+      return _ParseCodestream(dataArray, 0, dataArray.Length, "jxl ");
 
     // Try ISOBMFF container: look for ftyp box
-    return _ParseContainer(data);
+    return _ParseContainer(dataArray);
   }
 
   private static JpegXlFile _ParseContainer(byte[] data) {

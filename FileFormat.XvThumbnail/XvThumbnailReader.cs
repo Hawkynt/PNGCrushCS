@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Text;
 
@@ -30,10 +30,7 @@ public static class XvThumbnailReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static XvThumbnailFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static XvThumbnailFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static XvThumbnailFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MAGIC.Length)
       throw new InvalidDataException($"Data too small for XV thumbnail: need at least {_MAGIC.Length} bytes, got {data.Length}.");
 
@@ -45,18 +42,19 @@ public static class XvThumbnailReader {
 
     // Skip comment lines starting with '#'
     while (offset < data.Length && data[offset] == (byte)'#') {
-      var eol = Array.IndexOf(data, (byte)'\n', offset);
-      if (eol < 0)
+      var eolRel = data[offset..].IndexOf((byte)'\n');
+      if (eolRel < 0)
         throw new InvalidDataException("Unterminated comment line in XV thumbnail header.");
-      offset = eol + 1;
+      offset += eolRel + 1;
     }
 
     // Parse "width height maxval\n"
-    var newlineIndex = Array.IndexOf(data, (byte)'\n', offset);
-    if (newlineIndex < 0)
+    var nlRel = data[offset..].IndexOf((byte)'\n');
+    if (nlRel < 0)
       throw new InvalidDataException("No dimension line found in XV thumbnail header.");
+    var newlineIndex = offset + nlRel;
 
-    var dimLine = Encoding.ASCII.GetString(data, offset, newlineIndex - offset);
+    var dimLine = Encoding.ASCII.GetString(data.Slice(offset, newlineIndex - offset));
     var parts = dimLine.Split(' ', StringSplitOptions.RemoveEmptyEntries);
     if (parts.Length < 3)
       throw new InvalidDataException($"Expected \"width height maxval\" but got \"{dimLine}\".");
@@ -73,12 +71,18 @@ public static class XvThumbnailReader {
     var copyLen = Math.Min(expectedPixelBytes, available);
 
     var pixelData = new byte[expectedPixelBytes];
-    data.AsSpan(pixelOffset, copyLen).CopyTo(pixelData.AsSpan(0));
+    data.Slice(pixelOffset, copyLen).CopyTo(pixelData);
 
     return new XvThumbnailFile {
       Width = width,
       Height = height,
       PixelData = pixelData,
     };
+  
+  }
+
+  public static XvThumbnailFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

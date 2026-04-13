@@ -26,7 +26,16 @@ public static class MsxFontReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static MsxFontFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static MsxFontFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != MsxFontFile.ExpectedFileSize)
+      throw new InvalidDataException($"Invalid MSX font data size: expected exactly {MsxFontFile.ExpectedFileSize} bytes, got {data.Length}.");
+
+    var rawData = new byte[MsxFontFile.ExpectedFileSize];
+    data.Slice(0, MsxFontFile.ExpectedFileSize).CopyTo(rawData);
+
+    return new MsxFontFile { RawData = rawData };
+    }
 
   public static MsxFontFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

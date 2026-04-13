@@ -86,112 +86,20 @@ public static class PixelConverter {
     return Convert(bgra, target).PixelData;
   }
 
+  private static readonly Vector128<byte> _BgrExpandMask = Vector128.Create((byte)0, 1, 2, 0xFF, 3, 4, 5, 0xFF, 6, 7, 8, 0xFF, 9, 10, 11, 0xFF);
+  private static readonly Vector128<byte> _RgbToBgraExpandMask = Vector128.Create((byte)2, 1, 0, 0xFF, 5, 4, 3, 0xFF, 8, 7, 6, 0xFF, 11, 10, 9, 0xFF);
+
   /// <summary>Converts BGR (3 bytes/pixel) to BGRA (4 bytes/pixel) with alpha 255.</summary>
-  public static byte[] BgrToBgra(byte[] data, int totalPixels) {
-    var result = new byte[totalPixels * 4];
-    var srcOffset = 0;
-    var dstOffset = 0;
-
-    if (Vector128.IsHardwareAccelerated) {
-      // Process 4 pixels: load 16 bytes (12 used), shuffle to 16 bytes with alpha
-      var expandMask = Vector128.Create((byte)0, 1, 2, 0xFF, 3, 4, 5, 0xFF, 6, 7, 8, 0xFF, 9, 10, 11, 0xFF);
-      var alphaMask = Vector128.Create((byte)0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255);
-      var srcSpan = data.AsSpan();
-      var dstSpan = result.AsSpan();
-
-      while (srcOffset + 16 <= data.Length && dstOffset + 16 <= result.Length) {
-        var vec = Vector128.Create(srcSpan.Slice(srcOffset, 16));
-        var expanded = Vector128.Shuffle(vec, expandMask) | alphaMask;
-        expanded.CopyTo(dstSpan.Slice(dstOffset, 16));
-        srcOffset += 12;
-        dstOffset += 16;
-      }
-    }
-
-    var pixel = srcOffset / 3;
-    for (; pixel < totalPixels; ++pixel) {
-      var src = pixel * 3;
-      var dst = pixel * 4;
-      result[dst] = data[src];
-      result[dst + 1] = data[src + 1];
-      result[dst + 2] = data[src + 2];
-      result[dst + 3] = 255;
-    }
-
-    return result;
-  }
+  public static byte[] BgrToBgra(byte[] data, int totalPixels) => _Expand3To4(data, totalPixels, _BgrExpandMask, 0, 1, 2);
 
   /// <summary>Converts RGB (3 bytes/pixel) to BGRA (4 bytes/pixel) with alpha 255 and R/B swap.</summary>
-  public static byte[] RgbToBgra(byte[] data, int totalPixels) {
-    var result = new byte[totalPixels * 4];
-    var srcOffset = 0;
-    var dstOffset = 0;
+  public static byte[] RgbToBgra(byte[] data, int totalPixels) => _Expand3To4(data, totalPixels, _RgbToBgraExpandMask, 2, 1, 0);
 
-    if (Vector128.IsHardwareAccelerated) {
-      // Process 4 pixels: RGB→BGRA with channel swap
-      var expandMask = Vector128.Create((byte)2, 1, 0, 0xFF, 5, 4, 3, 0xFF, 8, 7, 6, 0xFF, 11, 10, 9, 0xFF);
-      var alphaMask = Vector128.Create((byte)0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255);
-      var srcSpan = data.AsSpan();
-      var dstSpan = result.AsSpan();
-
-      while (srcOffset + 16 <= data.Length && dstOffset + 16 <= result.Length) {
-        var vec = Vector128.Create(srcSpan.Slice(srcOffset, 16));
-        var expanded = Vector128.Shuffle(vec, expandMask) | alphaMask;
-        expanded.CopyTo(dstSpan.Slice(dstOffset, 16));
-        srcOffset += 12;
-        dstOffset += 16;
-      }
-    }
-
-    var pixel = srcOffset / 3;
-    for (; pixel < totalPixels; ++pixel) {
-      var src = pixel * 3;
-      var dst = pixel * 4;
-      result[dst] = data[src + 2];
-      result[dst + 1] = data[src + 1];
-      result[dst + 2] = data[src];
-      result[dst + 3] = 255;
-    }
-
-    return result;
-  }
+  private static readonly Vector128<byte> _RgbaBgraSwapMask = Vector128.Create((byte)2, 1, 0, 3, 6, 5, 4, 7, 10, 9, 8, 11, 14, 13, 12, 15);
+  private static readonly Vector128<byte> _ArgbBgraSwapMask = Vector128.Create((byte)3, 2, 1, 0, 7, 6, 5, 4, 11, 10, 9, 8, 15, 14, 13, 12);
 
   /// <summary>Converts RGBA (4 bytes/pixel) to BGRA (4 bytes/pixel) by swapping R and B channels.</summary>
-  public static byte[] RgbaToBgra(byte[] data, int totalPixels) {
-    var result = new byte[totalPixels * 4];
-    var byteLen = totalPixels * 4;
-    var i = 0;
-
-    if (Vector128.IsHardwareAccelerated) {
-      var mask = Vector128.Create((byte)2, 1, 0, 3, 6, 5, 4, 7, 10, 9, 8, 11, 14, 13, 12, 15);
-      var srcSpan = data.AsSpan();
-      var dstSpan = result.AsSpan();
-
-      if (Vector256.IsHardwareAccelerated) {
-        var mask256 = Vector256.Create(mask, mask);
-        for (; i + 32 <= byteLen; i += 32) {
-          var vec = Vector256.Create(srcSpan.Slice(i, 32));
-          var shuffled = Vector256.Shuffle(vec, mask256);
-          shuffled.CopyTo(dstSpan.Slice(i, 32));
-        }
-      }
-
-      for (; i + 16 <= byteLen; i += 16) {
-        var vec = Vector128.Create(srcSpan.Slice(i, 16));
-        var shuffled = Vector128.Shuffle(vec, mask);
-        shuffled.CopyTo(dstSpan.Slice(i, 16));
-      }
-    }
-
-    for (; i < byteLen; i += 4) {
-      result[i] = data[i + 2];
-      result[i + 1] = data[i + 1];
-      result[i + 2] = data[i];
-      result[i + 3] = data[i + 3];
-    }
-
-    return result;
-  }
+  public static byte[] RgbaToBgra(byte[] data, int totalPixels) => _Shuffle4To4(data, totalPixels, _RgbaBgraSwapMask, 2, 1, 0, 3);
 
   /// <summary>Converts 8-bit grayscale (1 byte/pixel) to BGRA (4 bytes/pixel).</summary>
   public static byte[] Gray8ToBgra(byte[] data, int totalPixels) {
@@ -322,152 +230,22 @@ public static class PixelConverter {
   }
 
   /// <summary>Converts ARGB (4 bytes/pixel) to BGRA (4 bytes/pixel).</summary>
-  public static byte[] ArgbToBgra(byte[] data, int totalPixels) {
-    var result = new byte[totalPixels * 4];
-    var byteLen = totalPixels * 4;
-    var i = 0;
+  /// <summary>Converts ARGB (4 bytes/pixel) to BGRA (4 bytes/pixel) by reversing byte order per pixel.</summary>
+  public static byte[] ArgbToBgra(byte[] data, int totalPixels) => _Shuffle4To4(data, totalPixels, _ArgbBgraSwapMask, 3, 2, 1, 0);
 
-    if (Vector128.IsHardwareAccelerated) {
-      var mask = Vector128.Create((byte)3, 2, 1, 0, 7, 6, 5, 4, 11, 10, 9, 8, 15, 14, 13, 12);
-      var srcSpan = data.AsSpan();
-      var dstSpan = result.AsSpan();
-
-      if (Vector256.IsHardwareAccelerated) {
-        var mask256 = Vector256.Create(mask, mask);
-        for (; i + 32 <= byteLen; i += 32) {
-          var vec = Vector256.Create(srcSpan.Slice(i, 32));
-          var shuffled = Vector256.Shuffle(vec, mask256);
-          shuffled.CopyTo(dstSpan.Slice(i, 32));
-        }
-      }
-
-      for (; i + 16 <= byteLen; i += 16) {
-        var vec = Vector128.Create(srcSpan.Slice(i, 16));
-        var shuffled = Vector128.Shuffle(vec, mask);
-        shuffled.CopyTo(dstSpan.Slice(i, 16));
-      }
-    }
-
-    for (; i < byteLen; i += 4) {
-      result[i] = data[i + 3];
-      result[i + 1] = data[i + 2];
-      result[i + 2] = data[i + 1];
-      result[i + 3] = data[i];
-    }
-
-    return result;
-  }
+  private static readonly Vector128<byte> _BgraToRgbCompactMask = Vector128.Create((byte)2, 1, 0, 6, 5, 4, 10, 9, 8, 14, 13, 12, 0xFF, 0xFF, 0xFF, 0xFF);
+  private static readonly Vector128<byte> _BgrCompactMask = Vector128.Create((byte)0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 14, 0xFF, 0xFF, 0xFF, 0xFF);
+  private static readonly Vector128<byte> _RgbaToRgbCompactMask = Vector128.Create((byte)0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 14, 0xFF, 0xFF, 0xFF, 0xFF);
 
   /// <summary>Converts BGRA (4 bytes/pixel) to RGB (3 bytes/pixel), discarding alpha.</summary>
-  public static byte[] BgraToRgb(byte[] data, int totalPixels) {
-    var result = new byte[totalPixels * 3];
-    var srcOffset = 0;
-    var dstOffset = 0;
-
-    if (Vector128.IsHardwareAccelerated) {
-      // Process 4 pixels: compact BGRA→RGB with channel swap (B,G,R,A → R,G,B)
-      var compactMask = Vector128.Create((byte)2, 1, 0, 6, 5, 4, 10, 9, 8, 14, 13, 12, 0xFF, 0xFF, 0xFF, 0xFF);
-      var srcSpan = data.AsSpan();
-      var dstSpan = result.AsSpan();
-
-      while (srcOffset + 16 <= data.Length && dstOffset + 12 <= result.Length) {
-        var vec = Vector128.Create(srcSpan.Slice(srcOffset, 16));
-        var compacted = Vector128.Shuffle(vec, compactMask);
-        compacted.GetLower().CopyTo(dstSpan.Slice(dstOffset, 8));
-        dstSpan[dstOffset + 8] = compacted.GetElement(8);
-        dstSpan[dstOffset + 9] = compacted.GetElement(9);
-        dstSpan[dstOffset + 10] = compacted.GetElement(10);
-        dstSpan[dstOffset + 11] = compacted.GetElement(11);
-        srcOffset += 16;
-        dstOffset += 12;
-      }
-    }
-
-    var pixel = srcOffset / 4;
-    for (; pixel < totalPixels; ++pixel) {
-      var src = pixel * 4;
-      var dst = pixel * 3;
-      result[dst] = data[src + 2];
-      result[dst + 1] = data[src + 1];
-      result[dst + 2] = data[src];
-    }
-
-    return result;
-  }
+  public static byte[] BgraToRgb(byte[] data, int totalPixels) => _Compact4To3(data, totalPixels, _BgraToRgbCompactMask, 2, 1, 0);
 
   /// <summary>Converts BGRA (4 bytes/pixel) to RGBA (4 bytes/pixel) by swapping R and B.</summary>
-  public static byte[] BgraToRgba(byte[] data, int totalPixels) {
-    var result = new byte[totalPixels * 4];
-    var byteLen = totalPixels * 4;
-    var i = 0;
-
-    if (Vector128.IsHardwareAccelerated) {
-      var mask = Vector128.Create((byte)2, 1, 0, 3, 6, 5, 4, 7, 10, 9, 8, 11, 14, 13, 12, 15);
-      var srcSpan = data.AsSpan();
-      var dstSpan = result.AsSpan();
-
-      if (Vector256.IsHardwareAccelerated) {
-        var mask256 = Vector256.Create(mask, mask);
-        for (; i + 32 <= byteLen; i += 32) {
-          var vec = Vector256.Create(srcSpan.Slice(i, 32));
-          var shuffled = Vector256.Shuffle(vec, mask256);
-          shuffled.CopyTo(dstSpan.Slice(i, 32));
-        }
-      }
-
-      for (; i + 16 <= byteLen; i += 16) {
-        var vec = Vector128.Create(srcSpan.Slice(i, 16));
-        var shuffled = Vector128.Shuffle(vec, mask);
-        shuffled.CopyTo(dstSpan.Slice(i, 16));
-      }
-    }
-
-    for (; i < byteLen; i += 4) {
-      result[i] = data[i + 2];
-      result[i + 1] = data[i + 1];
-      result[i + 2] = data[i];
-      result[i + 3] = data[i + 3];
-    }
-
-    return result;
-  }
+  /// <summary>Converts BGRA (4 bytes/pixel) to RGBA (4 bytes/pixel) by swapping R and B channels.</summary>
+  public static byte[] BgraToRgba(byte[] data, int totalPixels) => _Shuffle4To4(data, totalPixels, _RgbaBgraSwapMask, 2, 1, 0, 3);
 
   /// <summary>Converts BGRA (4 bytes/pixel) to BGR (3 bytes/pixel), discarding alpha.</summary>
-  public static byte[] BgraToBgr(byte[] data, int totalPixels) {
-    var result = new byte[totalPixels * 3];
-    var srcOffset = 0;
-    var dstOffset = 0;
-
-    if (Vector128.IsHardwareAccelerated) {
-      // Process 4 pixels: compact BGRA→BGR (drop alpha byte)
-      var compactMask = Vector128.Create((byte)0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 14, 0xFF, 0xFF, 0xFF, 0xFF);
-      var srcSpan = data.AsSpan();
-      var dstSpan = result.AsSpan();
-
-      while (srcOffset + 16 <= data.Length && dstOffset + 12 <= result.Length) {
-        var vec = Vector128.Create(srcSpan.Slice(srcOffset, 16));
-        var compacted = Vector128.Shuffle(vec, compactMask);
-        compacted.GetLower().CopyTo(dstSpan.Slice(dstOffset, 8));
-        dstSpan[dstOffset + 8] = compacted.GetElement(8);
-        dstSpan[dstOffset + 9] = compacted.GetElement(9);
-        dstSpan[dstOffset + 10] = compacted.GetElement(10);
-        dstSpan[dstOffset + 11] = compacted.GetElement(11);
-        srcOffset += 16;
-        dstOffset += 12;
-      }
-    }
-
-    var pixel = srcOffset / 4;
-    for (; pixel < totalPixels; ++pixel) {
-      var src = pixel * 4;
-      var dst = pixel * 3;
-      result[dst] = data[src];
-      result[dst + 1] = data[src + 1];
-      result[dst + 2] = data[src + 2];
-    }
-
-    return result;
-  }
+  public static byte[] BgraToBgr(byte[] data, int totalPixels) => _Compact4To3(data, totalPixels, _BgrCompactMask, 0, 1, 2);
 
   /// <summary>Converts BGRA (4 bytes/pixel) to 8-bit grayscale using luminance formula: (R*77 + G*150 + B*29) >> 8.</summary>
   public static byte[] BgraToGray8(byte[] data, int totalPixels) {
@@ -525,41 +303,8 @@ public static class PixelConverter {
   }
 
   /// <summary>Converts BGRA (4 bytes/pixel) to ARGB (4 bytes/pixel).</summary>
-  public static byte[] BgraToArgb(byte[] data, int totalPixels) {
-    var result = new byte[totalPixels * 4];
-    var byteLen = totalPixels * 4;
-    var i = 0;
-
-    if (Vector128.IsHardwareAccelerated) {
-      var mask = Vector128.Create((byte)3, 2, 1, 0, 7, 6, 5, 4, 11, 10, 9, 8, 15, 14, 13, 12);
-      var srcSpan = data.AsSpan();
-      var dstSpan = result.AsSpan();
-
-      if (Vector256.IsHardwareAccelerated) {
-        var mask256 = Vector256.Create(mask, mask);
-        for (; i + 32 <= byteLen; i += 32) {
-          var vec = Vector256.Create(srcSpan.Slice(i, 32));
-          var shuffled = Vector256.Shuffle(vec, mask256);
-          shuffled.CopyTo(dstSpan.Slice(i, 32));
-        }
-      }
-
-      for (; i + 16 <= byteLen; i += 16) {
-        var vec = Vector128.Create(srcSpan.Slice(i, 16));
-        var shuffled = Vector128.Shuffle(vec, mask);
-        shuffled.CopyTo(dstSpan.Slice(i, 16));
-      }
-    }
-
-    for (; i < byteLen; i += 4) {
-      result[i] = data[i + 3];
-      result[i + 1] = data[i + 2];
-      result[i + 2] = data[i + 1];
-      result[i + 3] = data[i];
-    }
-
-    return result;
-  }
+  /// <summary>Converts BGRA (4 bytes/pixel) to ARGB (4 bytes/pixel) by reversing byte order per pixel.</summary>
+  public static byte[] BgraToArgb(byte[] data, int totalPixels) => _Shuffle4To4(data, totalPixels, _ArgbBgraSwapMask, 3, 2, 1, 0);
 
   /// <summary>Converts BGRA (4 bytes/pixel) to RGB565 (2 bytes/pixel, little-endian).</summary>
   public static byte[] BgraToRgb565(byte[] data, int totalPixels) {
@@ -713,74 +458,10 @@ public static class PixelConverter {
   }
 
   /// <summary>Converts RGBA (4 bytes/pixel) to RGB (3 bytes/pixel), discarding alpha.</summary>
-  public static byte[] Rgba32ToRgb24(byte[] data, int totalPixels) {
-    var result = new byte[totalPixels * 3];
-    var srcOffset = 0;
-    var dstOffset = 0;
-
-    if (Vector128.IsHardwareAccelerated) {
-      var compactMask = Vector128.Create((byte)0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 14, 0xFF, 0xFF, 0xFF, 0xFF);
-      var srcSpan = data.AsSpan();
-      var dstSpan = result.AsSpan();
-
-      while (srcOffset + 16 <= data.Length && dstOffset + 12 <= result.Length) {
-        var vec = Vector128.Create(srcSpan.Slice(srcOffset, 16));
-        var compacted = Vector128.Shuffle(vec, compactMask);
-        compacted.GetLower().CopyTo(dstSpan.Slice(dstOffset, 8));
-        dstSpan[dstOffset + 8] = compacted.GetElement(8);
-        dstSpan[dstOffset + 9] = compacted.GetElement(9);
-        dstSpan[dstOffset + 10] = compacted.GetElement(10);
-        dstSpan[dstOffset + 11] = compacted.GetElement(11);
-        srcOffset += 16;
-        dstOffset += 12;
-      }
-    }
-
-    var pixel = srcOffset / 4;
-    for (; pixel < totalPixels; ++pixel) {
-      var src = pixel * 4;
-      var dst = pixel * 3;
-      result[dst] = data[src];
-      result[dst + 1] = data[src + 1];
-      result[dst + 2] = data[src + 2];
-    }
-
-    return result;
-  }
+  public static byte[] Rgba32ToRgb24(byte[] data, int totalPixels) => _Compact4To3(data, totalPixels, _RgbaToRgbCompactMask, 0, 1, 2);
 
   /// <summary>Converts RGB (3 bytes/pixel) to RGBA (4 bytes/pixel) with alpha 255.</summary>
-  public static byte[] Rgb24ToRgba32(byte[] data, int totalPixels) {
-    var result = new byte[totalPixels * 4];
-    var srcOffset = 0;
-    var dstOffset = 0;
-
-    if (Vector128.IsHardwareAccelerated) {
-      var expandMask = Vector128.Create((byte)0, 1, 2, 0xFF, 3, 4, 5, 0xFF, 6, 7, 8, 0xFF, 9, 10, 11, 0xFF);
-      var alphaMask = Vector128.Create((byte)0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255);
-      var srcSpan = data.AsSpan();
-      var dstSpan = result.AsSpan();
-
-      while (srcOffset + 16 <= data.Length && dstOffset + 16 <= result.Length) {
-        var vec = Vector128.Create(srcSpan.Slice(srcOffset, 16));
-        var expanded = Vector128.Shuffle(vec, expandMask) | alphaMask;
-        expanded.CopyTo(dstSpan.Slice(dstOffset, 16));
-        srcOffset += 12;
-        dstOffset += 16;
-      }
-    }
-
-    var pixel = srcOffset / 3;
-    for (; pixel < totalPixels; ++pixel) {
-      var src = pixel * 3;
-      var dst = pixel * 4;
-      result[dst] = data[src];
-      result[dst + 1] = data[src + 1];
-      result[dst + 2] = data[src + 2];
-      result[dst + 3] = 255;
-    }
-
-    return result;
-  }
+  public static byte[] Rgb24ToRgba32(byte[] data, int totalPixels) => _Expand3To4(data, totalPixels, _BgrExpandMask, 0, 1, 2);
 
   /// <summary>Converts 8-bit grayscale (1 byte/pixel) to RGB (3 bytes/pixel), replicating the gray value to R, G, B.</summary>
   public static byte[] Gray8ToRgb24(byte[] data, int totalPixels) {
@@ -1389,6 +1070,109 @@ public static class PixelConverter {
       for (var i = 0; i < pixelCount; ++i)
         for (var band = 0; band < bands; ++band)
           result[band * pixelCount + i] = interleaved[i * bands + band];
+    }
+
+    return result;
+  }
+
+  // ── Shared SIMD helpers ───────────────────────────────────────────────────
+
+  /// <summary>Shuffles 4-byte pixels in-place using Vector128/Vector256 with a given mask. Scalar fallback uses per-byte mapping.</summary>
+  private static byte[] _Shuffle4To4(byte[] data, int totalPixels, Vector128<byte> mask, byte map0, byte map1, byte map2, byte map3) {
+    var result = new byte[totalPixels * 4];
+    var byteLen = totalPixels * 4;
+    var i = 0;
+
+    if (Vector128.IsHardwareAccelerated) {
+      var srcSpan = data.AsSpan();
+      var dstSpan = result.AsSpan();
+
+      if (Vector256.IsHardwareAccelerated) {
+        var mask256 = Vector256.Create(mask, mask);
+        for (; i + 32 <= byteLen; i += 32) {
+          var vec = Vector256.Create(srcSpan.Slice(i, 32));
+          Vector256.Shuffle(vec, mask256).CopyTo(dstSpan.Slice(i, 32));
+        }
+      }
+
+      for (; i + 16 <= byteLen; i += 16) {
+        var vec = Vector128.Create(srcSpan.Slice(i, 16));
+        Vector128.Shuffle(vec, mask).CopyTo(dstSpan.Slice(i, 16));
+      }
+    }
+
+    for (; i < byteLen; i += 4) {
+      result[i] = data[i + map0];
+      result[i + 1] = data[i + map1];
+      result[i + 2] = data[i + map2];
+      result[i + 3] = data[i + map3];
+    }
+
+    return result;
+  }
+
+  /// <summary>Expands 3-byte pixels to 4-byte pixels with alpha=255 using Vector128 shuffle.</summary>
+  private static byte[] _Expand3To4(byte[] data, int totalPixels, Vector128<byte> expandMask, byte map0, byte map1, byte map2) {
+    var result = new byte[totalPixels * 4];
+    var srcOffset = 0;
+    var dstOffset = 0;
+
+    if (Vector128.IsHardwareAccelerated) {
+      var alphaMask = Vector128.Create((byte)0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255);
+      var srcSpan = data.AsSpan();
+      var dstSpan = result.AsSpan();
+
+      while (srcOffset + 16 <= data.Length && dstOffset + 16 <= result.Length) {
+        var vec = Vector128.Create(srcSpan.Slice(srcOffset, 16));
+        (Vector128.Shuffle(vec, expandMask) | alphaMask).CopyTo(dstSpan.Slice(dstOffset, 16));
+        srcOffset += 12;
+        dstOffset += 16;
+      }
+    }
+
+    var pixel = srcOffset / 3;
+    for (; pixel < totalPixels; ++pixel) {
+      var src = pixel * 3;
+      var dst = pixel * 4;
+      result[dst] = data[src + map0];
+      result[dst + 1] = data[src + map1];
+      result[dst + 2] = data[src + map2];
+      result[dst + 3] = 255;
+    }
+
+    return result;
+  }
+
+  /// <summary>Compacts 4-byte pixels to 3-byte pixels (drops alpha) using Vector128 shuffle.</summary>
+  private static byte[] _Compact4To3(byte[] data, int totalPixels, Vector128<byte> compactMask, byte map0, byte map1, byte map2) {
+    var result = new byte[totalPixels * 3];
+    var srcOffset = 0;
+    var dstOffset = 0;
+
+    if (Vector128.IsHardwareAccelerated) {
+      var srcSpan = data.AsSpan();
+      var dstSpan = result.AsSpan();
+
+      while (srcOffset + 16 <= data.Length && dstOffset + 12 <= result.Length) {
+        var vec = Vector128.Create(srcSpan.Slice(srcOffset, 16));
+        var compacted = Vector128.Shuffle(vec, compactMask);
+        compacted.GetLower().CopyTo(dstSpan.Slice(dstOffset, 8));
+        dstSpan[dstOffset + 8] = compacted.GetElement(8);
+        dstSpan[dstOffset + 9] = compacted.GetElement(9);
+        dstSpan[dstOffset + 10] = compacted.GetElement(10);
+        dstSpan[dstOffset + 11] = compacted.GetElement(11);
+        srcOffset += 16;
+        dstOffset += 12;
+      }
+    }
+
+    var pixel = srcOffset / 4;
+    for (; pixel < totalPixels; ++pixel) {
+      var src = pixel * 4;
+      var dst = pixel * 3;
+      result[dst] = data[src + map0];
+      result[dst + 1] = data[src + map1];
+      result[dst + 2] = data[src + map2];
     }
 
     return result;

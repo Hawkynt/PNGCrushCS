@@ -25,7 +25,15 @@ public static class DoomFlatReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static DoomFlatFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static DoomFlatFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != DoomFlatFile.FileSize)
+      throw new InvalidDataException($"Invalid DoomFlat data size: expected exactly {DoomFlatFile.FileSize} bytes, got {data.Length}.");
+
+    var pixelData = new byte[DoomFlatFile.FileSize];
+    data.Slice(0, DoomFlatFile.FileSize).CopyTo(pixelData);
+    return new() { PixelData = pixelData };
+    }
 
   public static DoomFlatFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

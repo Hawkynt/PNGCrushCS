@@ -25,10 +25,8 @@ public static class PiReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static PiFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static PiFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static PiFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < PiFile.HeaderSize)
       throw new InvalidDataException("Data too small for a valid Pi file.");
 
@@ -48,12 +46,17 @@ public static class PiReader {
     var pixelData = new byte[pixelBytes];
     var available = Math.Min(pixelBytes, data.Length - PiFile.HeaderSize);
     if (available > 0)
-      data.AsSpan(PiFile.HeaderSize, available).CopyTo(pixelData.AsSpan(0));
+      data.Slice(PiFile.HeaderSize, available).CopyTo(pixelData.AsSpan(0));
 
     return new() {
       Width = width,
       Height = height,
       PixelData = pixelData,
     };
+    }
+
+  public static PiFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

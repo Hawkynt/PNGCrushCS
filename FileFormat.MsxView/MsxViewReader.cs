@@ -26,7 +26,16 @@ public static class MsxViewReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static MsxViewFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static MsxViewFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != MsxViewFile.ExpectedFileSize)
+      throw new InvalidDataException($"MSX View file must be exactly {MsxViewFile.ExpectedFileSize} bytes, got {data.Length}.");
+
+    var pixels = new byte[MsxViewFile.ExpectedFileSize];
+    data.Slice(0, MsxViewFile.ExpectedFileSize).CopyTo(pixels);
+
+    return new() { PixelData = pixels };
+    }
 
   public static MsxViewFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

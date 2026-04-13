@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 
 namespace FileFormat.IffSham;
@@ -26,10 +26,12 @@ public static class IffShamReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static IffShamFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
   public static IffShamFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  public static IffShamFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < IffShamFile.MinFileSize)
       throw new InvalidDataException($"Invalid SHAM data: expected at least {IffShamFile.MinFileSize} bytes, got {data.Length}.");
 
@@ -39,8 +41,7 @@ public static class IffShamReader {
     // Try to extract dimensions from BMHD chunk if present
     _TryParseBmhd(data, out width, out height);
 
-    var rawData = new byte[data.Length];
-    data.AsSpan(0, data.Length).CopyTo(rawData);
+    var rawData = data.ToArray();
 
     return new() {
       Width = width,
@@ -50,7 +51,7 @@ public static class IffShamReader {
   }
 
   /// <summary>Attempts to find and parse a BMHD chunk for dimensions.</summary>
-  private static void _TryParseBmhd(byte[] data, out int width, out int height) {
+  private static void _TryParseBmhd(ReadOnlySpan<byte> data, out int width, out int height) {
     width = IffShamFile.DefaultWidth;
     height = IffShamFile.DefaultHeight;
 

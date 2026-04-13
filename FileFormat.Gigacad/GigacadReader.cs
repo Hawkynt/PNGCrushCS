@@ -26,7 +26,18 @@ public static class GigacadReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static GigacadFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static GigacadFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != GigacadFile.ExpectedFileSize)
+      throw new InvalidDataException($"Invalid GigaCAD data size: expected exactly {GigacadFile.ExpectedFileSize} bytes, got {data.Length}.");
+
+    var pixelData = new byte[GigacadFile.ExpectedFileSize];
+    data.Slice(0, GigacadFile.ExpectedFileSize).CopyTo(pixelData);
+
+    return new GigacadFile {
+      PixelData = pixelData
+    };
+    }
 
   public static GigacadFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

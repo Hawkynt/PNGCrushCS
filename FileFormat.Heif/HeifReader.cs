@@ -36,14 +36,12 @@ public static class HeifReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static HeifFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static HeifFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static HeifFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_FILE_SIZE)
       throw new InvalidDataException("Data too small for a valid HEIF file.");
 
-    var boxes = IsoBmffBox.ReadBoxes(data, 0, data.Length);
+    var bytes = data.ToArray();
+    var boxes = IsoBmffBox.ReadBoxes(bytes, 0, bytes.Length);
 
     var ftypBox = _FindBox(boxes, IsoBmffBox.Ftyp);
     if (ftypBox == null)
@@ -102,6 +100,11 @@ public static class HeifReader {
     };
   }
 
+  public static HeifFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
   /// <summary>Checks whether data looks like HEVC NAL unit data (length-prefixed or Annex B).</summary>
   private static bool _LooksLikeHevcData(byte[] data) {
     if (data.Length < 4)
@@ -112,7 +115,7 @@ public static class HeifReader {
       return true;
 
     // Check for length-prefixed NAL: first 4 bytes as BE length should be reasonable
-    var length = BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(0));
+    var length = BinaryPrimitives.ReadUInt32BigEndian(data);
     return length > 0 && length < (uint)data.Length;
   }
 
@@ -120,7 +123,7 @@ public static class HeifReader {
     if (ftypData.Length < 4)
       return string.Empty;
 
-    return Encoding.ASCII.GetString(ftypData, 0, 4);
+    return Encoding.ASCII.GetString(ftypData.AsSpan(0, 4));
   }
 
   private static void _ParseMetaBox(byte[] data, ref int width, ref int height, ref byte[]? hvcCData) {

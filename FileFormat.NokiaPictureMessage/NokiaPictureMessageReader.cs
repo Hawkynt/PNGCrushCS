@@ -26,7 +26,42 @@ public static class NokiaPictureMessageReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static NokiaPictureMessageFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static NokiaPictureMessageFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < NokiaPictureMessageHeader.StructSize)
+      throw new InvalidDataException("Data too small for a valid NPM file.");
+
+    var header = NokiaPictureMessageHeader.ReadFrom(data);
+
+    if (header.Type != 0x00)
+      throw new InvalidDataException($"Invalid NPM type field: expected 0x00, got 0x{header.Type:X2}.");
+
+    if (header.Depth != 0x01)
+      throw new InvalidDataException($"Invalid NPM depth: expected 0x01, got 0x{header.Depth:X2}.");
+
+    var width = (int)header.Width;
+    var height = (int)header.Height;
+
+    if (width == 0)
+      throw new InvalidDataException("Invalid NPM width: must be greater than zero.");
+    if (height == 0)
+      throw new InvalidDataException("Invalid NPM height: must be greater than zero.");
+
+    var bytesPerRow = (width + 7) / 8;
+    var expectedPixelBytes = bytesPerRow * height;
+
+    if (data.Length < NokiaPictureMessageHeader.StructSize + expectedPixelBytes)
+      throw new InvalidDataException($"Data too small for pixel data: expected {NokiaPictureMessageHeader.StructSize + expectedPixelBytes} bytes, got {data.Length}.");
+
+    var pixelData = new byte[expectedPixelBytes];
+    data.Slice(NokiaPictureMessageHeader.StructSize, expectedPixelBytes).CopyTo(pixelData.AsSpan(0));
+
+    return new NokiaPictureMessageFile {
+      Width = width,
+      Height = height,
+      PixelData = pixelData
+    };
+    }
 
   public static NokiaPictureMessageFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

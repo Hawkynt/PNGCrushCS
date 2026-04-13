@@ -1,19 +1,18 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Nifti;
 
 /// <summary>In-memory representation of a NIfTI neuroimaging file.</summary>
-public sealed class NiftiFile : IImageFileFormat<NiftiFile> {
+public sealed class NiftiFile :
+  IImageFormatReader<NiftiFile>, IImageToRawImage<NiftiFile>,
+  IImageFormatWriter<NiftiFile> {
 
-  static string IImageFileFormat<NiftiFile>.PrimaryExtension => ".nii";
-  static string[] IImageFileFormat<NiftiFile>.FileExtensions => [".nii"];
-  static NiftiFile IImageFileFormat<NiftiFile>.FromFile(FileInfo file) => NiftiReader.FromFile(file);
-  static NiftiFile IImageFileFormat<NiftiFile>.FromBytes(byte[] data) => NiftiReader.FromBytes(data);
-  static NiftiFile IImageFileFormat<NiftiFile>.FromStream(Stream stream) => NiftiReader.FromStream(stream);
-  static RawImage IImageFileFormat<NiftiFile>.ToRawImage(NiftiFile file) => file.ToRawImage();
-  static byte[] IImageFileFormat<NiftiFile>.ToBytes(NiftiFile file) => NiftiWriter.ToBytes(file);
+  static string IImageFormatMetadata<NiftiFile>.PrimaryExtension => ".nii";
+  static string[] IImageFormatMetadata<NiftiFile>.FileExtensions => [".nii"];
+  static NiftiFile IImageFormatReader<NiftiFile>.FromSpan(ReadOnlySpan<byte> data) => NiftiReader.FromSpan(data);
+  static byte[] IImageFormatWriter<NiftiFile>.ToBytes(NiftiFile file) => NiftiWriter.ToBytes(file);
+
   public int Width { get; init; }
   public int Height { get; init; }
   public int Depth { get; init; }
@@ -31,16 +30,17 @@ public sealed class NiftiFile : IImageFileFormat<NiftiFile> {
   public float[] Pixdim { get; init; } = [];
 
   /// <summary>Converts the first 2D slice of this NIfTI volume to a <see cref="RawImage"/>, preserving 16-bit precision where possible.</summary>
-  public RawImage ToRawImage() {
-    var width = this.Width;
-    var height = this.Height;
-    var src = this.PixelData;
+  public static RawImage ToRawImage(NiftiFile file) {
+    ArgumentNullException.ThrowIfNull(file);
+    var width = file.Width;
+    var height = file.Height;
+    var src = file.PixelData;
     var pixelCount = width * height;
-    var slope = this.SclSlope;
-    var inter = this.SclInter;
+    var slope = file.SclSlope;
+    var inter = file.SclInter;
     var useScaling = slope != 0.0f && slope != 1.0f || inter != 0.0f;
 
-    if (this.Datatype == NiftiDataType.Rgb24) {
+    if (file.Datatype == NiftiDataType.Rgb24) {
       var bytesNeeded = pixelCount * 3;
       var result = new byte[bytesNeeded];
       Buffer.BlockCopy(src, 0, result, 0, Math.Min(src.Length, bytesNeeded));
@@ -54,7 +54,7 @@ public sealed class NiftiFile : IImageFileFormat<NiftiFile> {
 
     // 8-bit types without scaling stay at 8-bit
     if (!useScaling)
-      switch (this.Datatype) {
+      switch (file.Datatype) {
         case NiftiDataType.UInt8: {
           var output = new byte[pixelCount];
           Buffer.BlockCopy(src, 0, output, 0, Math.Min(src.Length, pixelCount));
@@ -96,7 +96,7 @@ public sealed class NiftiFile : IImageFileFormat<NiftiFile> {
     // All remaining types (>8-bit, scaled 8-bit, floats) normalize to Gray16
     var result16 = new byte[pixelCount * 2];
 
-    switch (this.Datatype) {
+    switch (file.Datatype) {
       case NiftiDataType.UInt8:
         _NormalizeToGray16WithScaling(src, result16, pixelCount, 1, i => src[i], slope, inter);
         break;
@@ -122,7 +122,7 @@ public sealed class NiftiFile : IImageFileFormat<NiftiFile> {
         _NormalizeFloatToGray16LE(src, result16, pixelCount, 8, offset => BitConverter.ToDouble(src, offset), slope, inter, useScaling);
         break;
       default:
-        throw new NotSupportedException($"NIfTI data type {this.Datatype} is not supported.");
+        throw new NotSupportedException($"NIfTI data type {file.Datatype} is not supported.");
     }
 
     return new() {
@@ -132,9 +132,6 @@ public sealed class NiftiFile : IImageFileFormat<NiftiFile> {
       PixelData = result16,
     };
   }
-
-  /// <summary>NIfTI encoding requires specific voxel data types and 3D volume support.</summary>
-  public static NiftiFile FromRawImage(RawImage image) => throw new NotSupportedException("NIfTI encoding from RawImage is not supported because it requires specific voxel data types and 3D volume support.");
 
   /// <summary>Converts little-endian signed Int16 to Gray16 (big-endian uint16) by offsetting by 32768.</summary>
   private static byte[] _Int16LEToGray16(byte[] src, int count) {

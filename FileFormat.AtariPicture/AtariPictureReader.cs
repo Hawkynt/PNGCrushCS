@@ -26,7 +26,16 @@ public static class AtariPictureReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static AtariPictureFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static AtariPictureFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != AtariPictureFile.ExpectedFileSize)
+      throw new InvalidDataException($"Invalid Atari Picture data size: expected exactly {AtariPictureFile.ExpectedFileSize} bytes, got {data.Length}.");
+
+    var pixelData = new byte[AtariPictureFile.ExpectedFileSize];
+    data.Slice(0, AtariPictureFile.ExpectedFileSize).CopyTo(pixelData);
+
+    return new AtariPictureFile { PixelData = pixelData };
+    }
 
   public static AtariPictureFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

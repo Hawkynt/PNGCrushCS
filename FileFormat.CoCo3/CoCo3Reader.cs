@@ -26,7 +26,16 @@ public static class CoCo3Reader {
     return FromBytes(ms.ToArray());
   }
 
-  public static CoCo3File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static CoCo3File FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != CoCo3File.ExpectedFileSize)
+      throw new InvalidDataException($"Invalid CoCo 3 data size: expected exactly {CoCo3File.ExpectedFileSize} bytes, got {data.Length}.");
+
+    var rawData = new byte[CoCo3File.ExpectedFileSize];
+    data.Slice(0, CoCo3File.ExpectedFileSize).CopyTo(rawData);
+
+    return new CoCo3File { RawData = rawData };
+    }
 
   public static CoCo3File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

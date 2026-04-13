@@ -26,7 +26,21 @@ public static class FliProfiReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static FliProfiFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static FliProfiFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < FliProfiFile.LoadAddressSize + FliProfiFile.MinPayloadSize)
+      throw new InvalidDataException($"Data too small for a valid FLI Profi file (expected at least {FliProfiFile.LoadAddressSize + FliProfiFile.MinPayloadSize} bytes, got {data.Length}).");
+
+    var loadAddress = (ushort)(data[0] | (data[1] << 8));
+
+    var rawData = new byte[data.Length - FliProfiFile.LoadAddressSize];
+    data.Slice(FliProfiFile.LoadAddressSize, rawData.Length).CopyTo(rawData.AsSpan(0));
+
+    return new() {
+      LoadAddress = loadAddress,
+      RawData = rawData,
+    };
+    }
 
   public static FliProfiFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

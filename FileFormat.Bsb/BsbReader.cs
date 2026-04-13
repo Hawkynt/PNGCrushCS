@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -21,17 +21,15 @@ public static class BsbReader {
     if (stream.CanSeek) {
       var data = new byte[stream.Length - stream.Position];
       stream.ReadExactly(data);
-      return FromBytes(data);
+      return FromSpan(data);
     }
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
+    return FromSpan(ms.ToArray());
   }
 
-  public static BsbFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static BsbFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static BsbFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < 4)
       throw new InvalidDataException("Data too small for a valid BSB file.");
 
@@ -39,7 +37,7 @@ public static class BsbReader {
     if (headerEnd < 0)
       throw new InvalidDataException("No NUL terminator found; invalid BSB header.");
 
-    var headerText = Encoding.ASCII.GetString(data, 0, headerEnd);
+    var headerText = Encoding.ASCII.GetString(data.Slice(0, headerEnd));
     var lines = _SplitHeaderLines(headerText);
 
     var width = 0;
@@ -100,12 +98,14 @@ public static class BsbReader {
     };
   }
 
-  private static int _FindHeaderEnd(byte[] data) {
-    for (var i = 0; i < data.Length; ++i)
-      if (data[i] == 0x00)
-        return i;
+  public static BsbFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
 
-    return -1;
+  private static int _FindHeaderEnd(ReadOnlySpan<byte> data) {
+    var idx = data.IndexOf((byte)0x00);
+    return idx;
   }
 
   private static List<string> _SplitHeaderLines(string headerText) {
@@ -183,7 +183,7 @@ public static class BsbReader {
     return max;
   }
 
-  internal static byte[] _DecodePixelData(byte[] data, int offset, int width, int height, int depth) {
+  internal static byte[] _DecodePixelData(ReadOnlySpan<byte> data, int offset, int width, int height, int depth) {
     var pixels = new byte[width * height];
     var colorBits = depth;
     var runBits = 8 - colorBits;

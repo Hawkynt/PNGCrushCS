@@ -1,19 +1,17 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.AppleII;
 
 /// <summary>In-memory representation of an Apple II Hi-Res Graphics image.</summary>
-public sealed class AppleIIFile : IImageFileFormat<AppleIIFile> {
+public sealed class AppleIIFile :
+  IImageFormatReader<AppleIIFile>, IImageToRawImage<AppleIIFile>,
+  IImageFromRawImage<AppleIIFile>, IImageFormatWriter<AppleIIFile> {
 
-  static string IImageFileFormat<AppleIIFile>.PrimaryExtension => ".hgr";
-  static string[] IImageFileFormat<AppleIIFile>.FileExtensions => [".hgr", ".dhgr"];
-  static AppleIIFile IImageFileFormat<AppleIIFile>.FromFile(FileInfo file) => AppleIIReader.FromFile(file);
-  static AppleIIFile IImageFileFormat<AppleIIFile>.FromBytes(byte[] data) => AppleIIReader.FromBytes(data);
-  static AppleIIFile IImageFileFormat<AppleIIFile>.FromStream(Stream stream) => AppleIIReader.FromStream(stream);
-  static RawImage IImageFileFormat<AppleIIFile>.ToRawImage(AppleIIFile file) => file.ToRawImage();
-  static byte[] IImageFileFormat<AppleIIFile>.ToBytes(AppleIIFile file) => AppleIIWriter.ToBytes(file);
+  static string IImageFormatMetadata<AppleIIFile>.PrimaryExtension => ".hgr";
+  static string[] IImageFormatMetadata<AppleIIFile>.FileExtensions => [".hgr", ".dhgr"];
+  static AppleIIFile IImageFormatReader<AppleIIFile>.FromSpan(ReadOnlySpan<byte> data) => AppleIIReader.FromSpan(data);
+  static byte[] IImageFormatWriter<AppleIIFile>.ToBytes(AppleIIFile file) => AppleIIWriter.ToBytes(file);
   /// <summary>Width in pixels (280 for HGR, 560 for DHGR).</summary>
   public int Width { get; init; }
   /// <summary>Height in pixels (always 192).</summary>
@@ -30,9 +28,9 @@ public sealed class AppleIIFile : IImageFileFormat<AppleIIFile> {
   private const int _HGR_WIDTH = _HGR_BYTES_PER_LINE * _PIXELS_PER_BYTE;
   private const int _DHGR_WIDTH = _DHGR_BYTES_PER_LINE * _PIXELS_PER_BYTE;
 
-  /// <summary>Converts this Apple II image to a platform-independent <see cref="RawImage"/>.</summary>
-  public RawImage ToRawImage() {
-    var bytesPerLine = Mode == AppleIIMode.Dhgr ? _DHGR_BYTES_PER_LINE : _HGR_BYTES_PER_LINE;
+  /// <summary>Converts an Apple II image to a platform-independent <see cref="RawImage"/>.</summary>
+  public static RawImage ToRawImage(AppleIIFile file) {
+    var bytesPerLine = file.Mode == AppleIIMode.Dhgr ? _DHGR_BYTES_PER_LINE : _HGR_BYTES_PER_LINE;
     var width = bytesPerLine * _PIXELS_PER_BYTE;
     var pixels = new byte[width * _HEIGHT];
 
@@ -40,7 +38,7 @@ public sealed class AppleIIFile : IImageFileFormat<AppleIIFile> {
       var lineOffset = y * bytesPerLine;
       var pixelOffset = y * width;
       for (var byteIndex = 0; byteIndex < bytesPerLine; ++byteIndex) {
-        var b = PixelData[lineOffset + byteIndex];
+        var b = file.PixelData[lineOffset + byteIndex];
         for (var bit = 0; bit < _PIXELS_PER_BYTE; ++bit)
           pixels[pixelOffset + byteIndex * _PIXELS_PER_BYTE + bit] = (byte)((b >> bit) & 1);
       }

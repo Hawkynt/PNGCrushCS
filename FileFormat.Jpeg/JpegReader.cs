@@ -27,17 +27,20 @@ public static class JpegReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static JpegFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
   public static JpegFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  public static JpegFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < 2)
       throw new InvalidDataException("Data too small for a valid JPEG file.");
 
     if (data[0] != 0xFF || data[1] != 0xD8)
       throw new InvalidDataException("Invalid JPEG signature.");
 
-    using var inputStream = new MemoryStream(data);
+    var dataArray = data.ToArray();
+    using var inputStream = new MemoryStream(dataArray);
 
     var cinfo = new jpeg_decompress_struct();
     cinfo.jpeg_stdio_src(inputStream);
@@ -80,7 +83,7 @@ public static class JpegReader {
       Height = height,
       IsGrayscale = isGrayscale,
       RgbPixelData = rgbPixelData,
-      RawJpegBytes = data
+      RawJpegBytes = dataArray
     };
   }
 }

@@ -13,7 +13,7 @@ public static class FaceServerReader {
     if (!file.Exists)
       throw new FileNotFoundException("FaceServer file not found.", file.FullName);
 
-    return FromBytes(File.ReadAllBytes(file.FullName));
+    return FromSpan(File.ReadAllBytes(file.FullName));
   }
 
   public static FaceServerFile FromStream(Stream stream) {
@@ -21,17 +21,19 @@ public static class FaceServerReader {
     if (stream.CanSeek) {
       var data = new byte[stream.Length - stream.Position];
       stream.ReadExactly(data);
-      return FromBytes(data);
+      return FromSpan(data);
     }
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
+    return FromSpan(ms.ToArray());
   }
-
-  public static FaceServerFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
 
   public static FaceServerFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  public static FaceServerFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_FILE_SIZE)
       throw new InvalidDataException($"Data too small for a valid FaceServer file: expected at least {_MIN_FILE_SIZE} bytes, got {data.Length}.");
 
@@ -42,19 +44,21 @@ public static class FaceServerReader {
       throw new InvalidDataException($"Not enough pixel data after header: expected {FaceServerFile.PixelCount} bytes, got {remaining}.");
 
     var pixelData = new byte[FaceServerFile.PixelCount];
-    data.AsSpan(headerEnd, FaceServerFile.PixelCount).CopyTo(pixelData.AsSpan(0));
+    data.Slice(headerEnd, FaceServerFile.PixelCount).CopyTo(pixelData.AsSpan(0));
 
     return new FaceServerFile {
       PixelData = pixelData,
     };
   }
 
-  private static int _FindPixelDataStart(byte[] data) {
+  private static int _FindPixelDataStart(ReadOnlySpan<byte> data) {
     var offset = 0;
     while (offset < data.Length) {
-      var lineEnd = Array.IndexOf(data, (byte)'\n', offset);
+      var lineEnd = data[offset..].IndexOf((byte)'\n');
       if (lineEnd < 0)
         return offset;
+
+      lineEnd += offset;
 
       var hasColon = false;
       for (var i = offset; i < lineEnd; ++i)

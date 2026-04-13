@@ -26,10 +26,8 @@ public static class NokiaGroupGraphicsReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static NokiaGroupGraphicsFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static NokiaGroupGraphicsFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static NokiaGroupGraphicsFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < NokiaGroupGraphicsFile.MinFileSize)
       throw new InvalidDataException($"Data too small for a valid NGG file (need at least {NokiaGroupGraphicsFile.MinFileSize} bytes, got {data.Length}).");
 
@@ -49,7 +47,7 @@ public static class NokiaGroupGraphicsReader {
       throw new InvalidDataException("NGG file truncated: not enough pixel data.");
 
     var pixelData = new byte[pixelDataSize];
-    data.AsSpan(NokiaGroupGraphicsFile.HeaderSize, pixelDataSize).CopyTo(pixelData.AsSpan(0));
+    data.Slice(NokiaGroupGraphicsFile.HeaderSize, pixelDataSize).CopyTo(pixelData.AsSpan(0));
 
     return new() {
       Width = width,
@@ -57,5 +55,10 @@ public static class NokiaGroupGraphicsReader {
       Version = version,
       PixelData = pixelData,
     };
+    }
+
+  public static NokiaGroupGraphicsFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

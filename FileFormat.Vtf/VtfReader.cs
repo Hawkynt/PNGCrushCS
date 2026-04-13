@@ -27,14 +27,12 @@ public static class VtfReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static VtfFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static VtfFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static VtfFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < VtfHeader.StructSize)
       throw new InvalidDataException("Data too small for a valid VTF file.");
 
-    var span = data.AsSpan();
+    var span = data;
     var header = VtfHeader.ReadFrom(span);
 
     if (header.Sig0 != (byte)'V' || header.Sig1 != (byte)'T' || header.Sig2 != (byte)'F' || header.Sig3 != 0)
@@ -57,7 +55,7 @@ public static class VtfReader {
       var thumbSize = _CalculateDataSize(header.LowResWidth, header.LowResHeight, lowResFormat);
       if (offset + thumbSize <= data.Length) {
         thumbnailData = new byte[thumbSize];
-        data.AsSpan(offset, thumbSize).CopyTo(thumbnailData.AsSpan(0));
+        data.Slice(offset, thumbSize).CopyTo(thumbnailData.AsSpan(0));
         offset += thumbSize;
       }
     }
@@ -74,7 +72,7 @@ public static class VtfReader {
           break;
 
         var surfaceData = new byte[mipSize];
-        data.AsSpan(offset, mipSize).CopyTo(surfaceData.AsSpan(0));
+        data.Slice(offset, mipSize).CopyTo(surfaceData.AsSpan(0));
         offset += mipSize;
 
         surfaces.Add(new VtfSurface {
@@ -99,6 +97,11 @@ public static class VtfReader {
       ThumbnailData = thumbnailData,
       Surfaces = surfaces
     };
+    }
+
+  public static VtfFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   internal static int _CalculateDataSize(int width, int height, VtfFormat format) => format switch {

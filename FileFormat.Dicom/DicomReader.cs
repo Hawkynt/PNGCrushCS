@@ -32,10 +32,7 @@ public static class DicomReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static DicomFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static DicomFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static DicomFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_FILE_SIZE)
       throw new InvalidDataException("Data too small for a valid DICOM file.");
 
@@ -43,6 +40,8 @@ public static class DicomReader {
     if (data[128] != _DicmMagic[0] || data[129] != _DicmMagic[1] ||
         data[130] != _DicmMagic[2] || data[131] != _DicmMagic[3])
       throw new InvalidDataException("Missing DICM magic at offset 128.");
+
+    var bytes = data.ToArray();
 
     var width = 0;
     var height = 0;
@@ -56,8 +55,8 @@ public static class DicomReader {
 
     var offset = _PREAMBLE_SIZE + _MAGIC_SIZE;
 
-    while (offset < data.Length) {
-      var (group, element, vr, value, nextOffset) = DicomTagReader.ReadTag(data, offset);
+    while (offset < bytes.Length) {
+      var (group, element, vr, value, nextOffset) = DicomTagReader.ReadTag(bytes, offset);
       if (nextOffset <= offset)
         break;
 
@@ -105,6 +104,11 @@ public static class DicomReader {
       WindowCenter = windowCenter,
       WindowWidth = windowWidth
     };
+  }
+
+  public static DicomFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   private static DicomPhotometricInterpretation _ParsePhotometric(string value) => value switch {

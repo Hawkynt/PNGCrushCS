@@ -26,16 +26,19 @@ public static class AtariFontReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static AtariFontFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static AtariFontFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static AtariFontFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length != AtariFontFile.FileSize)
       throw new InvalidDataException($"Invalid Atari font data size: expected exactly {AtariFontFile.FileSize} bytes, got {data.Length}.");
 
     var fontData = new byte[AtariFontFile.FileSize];
-    data.AsSpan(0, AtariFontFile.FileSize).CopyTo(fontData);
+    data.Slice(0, AtariFontFile.FileSize).CopyTo(fontData);
 
     return new AtariFontFile { FontData = fontData };
+    }
+
+  public static AtariFontFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

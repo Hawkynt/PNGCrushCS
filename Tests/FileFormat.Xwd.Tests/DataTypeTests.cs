@@ -33,11 +33,10 @@ public sealed class DataTypeTests {
 
   [Test]
   [Category("Unit")]
-  public void XwdFile_DefaultPixelData_IsEmptyArray() {
+  public void XwdFile_DefaultPixelData_IsNull() {
     var file = new XwdFile { Width = 1, Height = 1 };
-    Assert.That(file.PixelData, Is.Not.Null);
-    Assert.That(file.PixelData, Has.Length.EqualTo(0));
-    Assert.That(file.WindowName, Is.EqualTo(""));
+    Assert.That(file.PixelData, Is.Null);
+    Assert.That(file.WindowName, Is.Null);
     Assert.That(file.Colormap, Is.Null);
   }
 }

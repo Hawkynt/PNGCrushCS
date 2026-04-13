@@ -26,7 +26,21 @@ public static class HiresInterlaceFeniksReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static HiresInterlaceFeniksFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static HiresInterlaceFeniksFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < HiresInterlaceFeniksFile.LoadAddressSize + HiresInterlaceFeniksFile.MinPayloadSize)
+      throw new InvalidDataException($"Data too small for a valid Hires Interlace Feniks file (expected at least {HiresInterlaceFeniksFile.LoadAddressSize + HiresInterlaceFeniksFile.MinPayloadSize} bytes, got {data.Length}).");
+
+    var loadAddress = (ushort)(data[0] | (data[1] << 8));
+
+    var rawData = new byte[data.Length - HiresInterlaceFeniksFile.LoadAddressSize];
+    data.Slice(HiresInterlaceFeniksFile.LoadAddressSize, rawData.Length).CopyTo(rawData.AsSpan(0));
+
+    return new() {
+      LoadAddress = loadAddress,
+      RawData = rawData,
+    };
+    }
 
   public static HiresInterlaceFeniksFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

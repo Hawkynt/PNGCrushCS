@@ -28,14 +28,12 @@ public static class ArtReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static ArtFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static ArtFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static ArtFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < ArtHeader.StructSize)
       throw new InvalidDataException("Data too small for a valid ART file.");
 
-    var span = data.AsSpan();
+    var span = data;
     var header = ArtHeader.ReadFrom(span);
 
     if (header.Version != 1)
@@ -114,5 +112,10 @@ public static class ArtReader {
     }
 
     return new ArtFile { TileStart = header.TileStart, Tiles = tiles };
+    }
+
+  public static ArtFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

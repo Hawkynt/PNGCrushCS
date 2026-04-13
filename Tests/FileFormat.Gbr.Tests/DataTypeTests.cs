@@ -7,18 +7,16 @@ public sealed class DataTypeTests {
 
   [Test]
   [Category("Unit")]
-  public void GbrFile_DefaultPixelData_IsEmptyArray() {
+  public void _DefaultPixelData_IsNull() {
     var file = new GbrFile();
-    Assert.That(file.PixelData, Is.Not.Null);
-    Assert.That(file.PixelData, Is.Empty);
+    Assert.That(file.PixelData, Is.Null);
   }
 
   [Test]
   [Category("Unit")]
-  public void GbrFile_DefaultName_IsEmptyString() {
+  public void GbrFile_DefaultName_IsNull() {
     var file = new GbrFile();
-    Assert.That(file.Name, Is.Not.Null);
-    Assert.That(file.Name, Is.EqualTo(string.Empty));
+    Assert.That(file.Name, Is.Null);
   }
 
   [Test]

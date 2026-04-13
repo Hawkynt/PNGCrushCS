@@ -1,20 +1,18 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.AppleIIgs;
 
 /// <summary>In-memory representation of an Apple IIGS Super Hi-Res ($C1) image (32768 bytes total).</summary>
-public sealed class AppleIIgsFile : IImageFileFormat<AppleIIgsFile> {
+public sealed class AppleIIgsFile :
+  IImageFormatReader<AppleIIgsFile>, IImageToRawImage<AppleIIgsFile>,
+  IImageFromRawImage<AppleIIgsFile>, IImageFormatWriter<AppleIIgsFile> {
 
-  static string IImageFileFormat<AppleIIgsFile>.PrimaryExtension => ".shr";
-  static string[] IImageFileFormat<AppleIIgsFile>.FileExtensions => [".shr", ".c1", ".pic"];
-  static AppleIIgsFile IImageFileFormat<AppleIIgsFile>.FromFile(FileInfo file) => AppleIIgsReader.FromFile(file);
-  static AppleIIgsFile IImageFileFormat<AppleIIgsFile>.FromBytes(byte[] data) => AppleIIgsReader.FromBytes(data);
-  static AppleIIgsFile IImageFileFormat<AppleIIgsFile>.FromStream(Stream stream) => AppleIIgsReader.FromStream(stream);
-  static RawImage IImageFileFormat<AppleIIgsFile>.ToRawImage(AppleIIgsFile file) => file.ToRawImage();
-  static byte[] IImageFileFormat<AppleIIgsFile>.ToBytes(AppleIIgsFile file) => AppleIIgsWriter.ToBytes(file);
+  static string IImageFormatMetadata<AppleIIgsFile>.PrimaryExtension => ".shr";
+  static string[] IImageFormatMetadata<AppleIIgsFile>.FileExtensions => [".shr", ".c1", ".pic"];
+  static AppleIIgsFile IImageFormatReader<AppleIIgsFile>.FromSpan(ReadOnlySpan<byte> data) => AppleIIgsReader.FromSpan(data);
+  static byte[] IImageFormatWriter<AppleIIgsFile>.ToBytes(AppleIIgsFile file) => AppleIIgsWriter.ToBytes(file);
 
   /// <summary>Image width in pixels (320 for Mode320, 640 for Mode640).</summary>
   public int Width { get; init; }
@@ -42,21 +40,21 @@ public sealed class AppleIIgsFile : IImageFileFormat<AppleIIgsFile> {
   private const int _PIXELS_PER_BYTE_320 = 2;
   private const int _PIXELS_PER_BYTE_640 = 4;
 
-  /// <summary>Converts this Apple IIGS image to a platform-independent <see cref="RawImage"/>.</summary>
-  public RawImage ToRawImage() {
-    var isMode640 = Mode == AppleIIgsMode.Mode640;
+  /// <summary>Converts an Apple IIGS image to a platform-independent <see cref="RawImage"/>.</summary>
+  public static RawImage ToRawImage(AppleIIgsFile file) {
+    var isMode640 = file.Mode == AppleIIgsMode.Mode640;
     var width = isMode640 ? _MODE640_WIDTH : _MODE320_WIDTH;
     var pixels = new byte[width * _HEIGHT * 3];
 
     for (var y = 0; y < _HEIGHT; ++y) {
-      var paletteNum = Scbs[y] & 0x0F;
+      var paletteNum = file.Scbs[y] & 0x0F;
       var paletteBase = paletteNum * _PALETTE_SIZE;
       var lineOffset = y * _BYTES_PER_LINE;
       var pixelRowOffset = y * width * 3;
 
       if (isMode640) {
         for (var byteIndex = 0; byteIndex < _BYTES_PER_LINE; ++byteIndex) {
-          var b = PixelData[lineOffset + byteIndex];
+          var b = file.PixelData[lineOffset + byteIndex];
           var pixelBase = pixelRowOffset + byteIndex * _PIXELS_PER_BYTE_640 * 3;
 
           var idx0 = (b >> 6) & 0x03;
@@ -64,21 +62,21 @@ public sealed class AppleIIgsFile : IImageFileFormat<AppleIIgsFile> {
           var idx2 = (b >> 2) & 0x03;
           var idx3 = b & 0x03;
 
-          _WriteColor(pixels, pixelBase, Palettes[paletteBase + idx0]);
-          _WriteColor(pixels, pixelBase + 3, Palettes[paletteBase + idx1]);
-          _WriteColor(pixels, pixelBase + 6, Palettes[paletteBase + idx2]);
-          _WriteColor(pixels, pixelBase + 9, Palettes[paletteBase + idx3]);
+          _WriteColor(pixels, pixelBase, file.Palettes[paletteBase + idx0]);
+          _WriteColor(pixels, pixelBase + 3, file.Palettes[paletteBase + idx1]);
+          _WriteColor(pixels, pixelBase + 6, file.Palettes[paletteBase + idx2]);
+          _WriteColor(pixels, pixelBase + 9, file.Palettes[paletteBase + idx3]);
         }
       } else {
         for (var byteIndex = 0; byteIndex < _BYTES_PER_LINE; ++byteIndex) {
-          var b = PixelData[lineOffset + byteIndex];
+          var b = file.PixelData[lineOffset + byteIndex];
           var pixelBase = pixelRowOffset + byteIndex * _PIXELS_PER_BYTE_320 * 3;
 
           var hiNibble = (b >> 4) & 0x0F;
           var loNibble = b & 0x0F;
 
-          _WriteColor(pixels, pixelBase, Palettes[paletteBase + hiNibble]);
-          _WriteColor(pixels, pixelBase + 3, Palettes[paletteBase + loNibble]);
+          _WriteColor(pixels, pixelBase, file.Palettes[paletteBase + hiNibble]);
+          _WriteColor(pixels, pixelBase + 3, file.Palettes[paletteBase + loNibble]);
         }
       }
     }

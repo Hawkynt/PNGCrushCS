@@ -26,7 +26,21 @@ public static class WigmoreArtistReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static WigmoreArtistFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static WigmoreArtistFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < WigmoreArtistFile.LoadAddressSize + WigmoreArtistFile.MinPayloadSize)
+      throw new InvalidDataException($"Data too small for a valid Wigmore Artist file (expected at least {WigmoreArtistFile.LoadAddressSize + WigmoreArtistFile.MinPayloadSize} bytes, got {data.Length}).");
+
+    var loadAddress = (ushort)(data[0] | (data[1] << 8));
+
+    var rawData = new byte[data.Length - WigmoreArtistFile.LoadAddressSize];
+    data.Slice(WigmoreArtistFile.LoadAddressSize, rawData.Length).CopyTo(rawData.AsSpan(0));
+
+    return new() {
+      LoadAddress = loadAddress,
+      RawData = rawData,
+    };
+    }
 
   public static WigmoreArtistFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

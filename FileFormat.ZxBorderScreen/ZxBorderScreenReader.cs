@@ -44,7 +44,35 @@ public static class ZxBorderScreenReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static ZxBorderScreenFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static ZxBorderScreenFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != FileSize)
+      throw new InvalidDataException($"ZX Spectrum Border Screen file must be exactly {FileSize} bytes, got {data.Length}.");
+
+    var linearBitmap = new byte[BitmapSize];
+
+    // Deinterleave from ZX Spectrum memory layout to linear row order
+    for (var y = 0; y < RowCount; ++y) {
+      var third = y / 64;
+      var characterRow = (y % 64) / 8;
+      var pixelLine = y % 8;
+      var srcOffset = third * 2048 + pixelLine * 256 + characterRow * BytesPerRow;
+      var dstOffset = y * BytesPerRow;
+      data.Slice(srcOffset, BytesPerRow).CopyTo(linearBitmap.AsSpan(dstOffset));
+    }
+
+    var attributes = new byte[AttributeSize];
+    data.Slice(BitmapSize, AttributeSize).CopyTo(attributes);
+
+    var border = new byte[BorderSize];
+    data.Slice(BitmapSize + AttributeSize, BorderSize).CopyTo(border);
+
+    return new ZxBorderScreenFile {
+      BitmapData = linearBitmap,
+      AttributeData = attributes,
+      BorderData = border,
+    };
+    }
 
   public static ZxBorderScreenFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

@@ -26,7 +26,21 @@ public static class FliDesignerReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static FliDesignerFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static FliDesignerFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < FliDesignerFile.LoadAddressSize + FliDesignerFile.MinPayloadSize)
+      throw new InvalidDataException($"Data too small for a valid FLI Designer file (expected at least {FliDesignerFile.LoadAddressSize + FliDesignerFile.MinPayloadSize} bytes, got {data.Length}).");
+
+    var loadAddress = (ushort)(data[0] | (data[1] << 8));
+
+    var rawData = new byte[data.Length - FliDesignerFile.LoadAddressSize];
+    data.Slice(FliDesignerFile.LoadAddressSize, rawData.Length).CopyTo(rawData.AsSpan(0));
+
+    return new() {
+      LoadAddress = loadAddress,
+      RawData = rawData,
+    };
+    }
 
   public static FliDesignerFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

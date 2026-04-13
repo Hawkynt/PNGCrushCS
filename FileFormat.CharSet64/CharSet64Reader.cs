@@ -26,7 +26,16 @@ public static class CharSet64Reader {
     return FromBytes(ms.ToArray());
   }
 
-  public static CharSet64File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static CharSet64File FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < CharSet64File.ExpectedFileSize)
+      throw new InvalidDataException($"C64 character set file too small (got {data.Length} bytes, expected {CharSet64File.ExpectedFileSize}).");
+
+    var charData = new byte[CharSet64File.ExpectedFileSize];
+    data.Slice(0, CharSet64File.ExpectedFileSize).CopyTo(charData.AsSpan(0));
+
+    return new() { CharData = charData };
+    }
 
   public static CharSet64File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

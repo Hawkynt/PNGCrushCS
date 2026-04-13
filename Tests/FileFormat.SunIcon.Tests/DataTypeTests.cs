@@ -7,10 +7,9 @@ public sealed class DataTypeTests {
 
   [Test]
   [Category("Unit")]
-  public void SunIconFile_DefaultPixelData_IsEmptyArray() {
+  public void SunIconFile_DefaultPixelData_IsNull() {
     var file = new SunIconFile();
-    Assert.That(file.PixelData, Is.Not.Null);
-    Assert.That(file.PixelData.Length, Is.EqualTo(0));
+    Assert.That(file.PixelData, Is.Null);
   }
 
   [Test]

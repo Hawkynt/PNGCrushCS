@@ -31,7 +31,27 @@ public static class EzArtReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static EzArtFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static EzArtFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < EzArtFile.FileSize)
+      throw new InvalidDataException($"Data too small for a valid EZ-Art file (expected {EzArtFile.FileSize} bytes, got {data.Length}).");
+
+    var span = data;
+
+    var palette = new short[_PALETTE_ENTRIES];
+    for (var i = 0; i < _PALETTE_ENTRIES; ++i)
+      palette[i] = BinaryPrimitives.ReadInt16BigEndian(span[(i * 2)..]);
+
+    var pixelData = new byte[_PIXEL_DATA_SIZE];
+    data.Slice(_PALETTE_SIZE, _PIXEL_DATA_SIZE).CopyTo(pixelData.AsSpan(0));
+
+    return new EzArtFile {
+      Width = 320,
+      Height = 200,
+      Palette = palette,
+      PixelData = pixelData,
+    };
+    }
 
   public static EzArtFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

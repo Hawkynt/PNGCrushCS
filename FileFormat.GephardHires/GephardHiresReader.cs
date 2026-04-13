@@ -26,7 +26,21 @@ public static class GephardHiresReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static GephardHiresFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static GephardHiresFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < GephardHiresFile.LoadAddressSize + GephardHiresFile.MinPayloadSize)
+      throw new InvalidDataException($"Data too small for a valid Gephard Hires file (expected at least {GephardHiresFile.LoadAddressSize + GephardHiresFile.MinPayloadSize} bytes, got {data.Length}).");
+
+    var loadAddress = (ushort)(data[0] | (data[1] << 8));
+
+    var rawData = new byte[data.Length - GephardHiresFile.LoadAddressSize];
+    data.Slice(GephardHiresFile.LoadAddressSize, rawData.Length).CopyTo(rawData.AsSpan(0));
+
+    return new() {
+      LoadAddress = loadAddress,
+      RawData = rawData,
+    };
+    }
 
   public static GephardHiresFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

@@ -30,14 +30,14 @@ public static class IcoReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static IcoFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
   public static IcoFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    return _Parse(data, IcoFileType.Icon);
+    return FromSpan(data);
   }
 
-  internal static IcoFile _Parse(byte[] data, IcoFileType expectedType) {
+  public static IcoFile FromSpan(ReadOnlySpan<byte> data) => _Parse(data, IcoFileType.Icon);
+
+  internal static IcoFile _Parse(ReadOnlySpan<byte> data, IcoFileType expectedType) {
     if (data.Length < IcoHeader.StructSize)
       throw new InvalidDataException("Data too small for a valid ICO file.");
 
@@ -56,7 +56,7 @@ public static class IcoReader {
 
     var images = new List<IcoImage>(count);
     for (var i = 0; i < count; ++i) {
-      var entry = IcoDirectoryEntry.ReadFrom(data.AsSpan(IcoHeader.StructSize + i * IcoDirectoryEntry.StructSize));
+      var entry = IcoDirectoryEntry.ReadFrom(data[(IcoHeader.StructSize + i * IcoDirectoryEntry.StructSize)..]);
       var width = entry.Width == 0 ? 256 : entry.Width;
       var height = entry.Height == 0 ? 256 : entry.Height;
       var bitCount = entry.Field5;
@@ -70,7 +70,7 @@ public static class IcoReader {
         throw new InvalidDataException($"Directory entry {i} references data beyond end of file.");
 
       var embeddedData = new byte[dataSize];
-      data.AsSpan(dataOffset, dataSize).CopyTo(embeddedData.AsSpan(0));
+      data.Slice(dataOffset, dataSize).CopyTo(embeddedData.AsSpan(0));
 
       var isPng = _IsPngSignature(embeddedData);
       if (isPng) {

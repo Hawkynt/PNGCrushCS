@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 
 namespace FileFormat.MacPaint;
@@ -28,10 +28,7 @@ public static class MacPaintReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static MacPaintFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static MacPaintFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static MacPaintFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < MacPaintHeader.StructSize)
       throw new InvalidDataException("Data too small for a valid MacPaint file.");
 
@@ -39,7 +36,7 @@ public static class MacPaintReader {
     if (data.Length - offset < MacPaintHeader.StructSize)
       throw new InvalidDataException("Data too small for a valid MacPaint file.");
 
-    var span = data.AsSpan(offset);
+    var span = data[offset..];
     var header = MacPaintHeader.ReadFrom(span);
 
     var compressedData = data[(offset + MacPaintHeader.StructSize)..];
@@ -52,9 +49,15 @@ public static class MacPaintReader {
       BrushPatterns = header.Patterns,
       PixelData = pixelData
     };
+  
   }
 
-  private static int _DetectMacBinaryOffset(byte[] data) {
+  public static MacPaintFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  private static int _DetectMacBinaryOffset(ReadOnlySpan<byte> data) {
     if (data.Length <= 128 + MacPaintHeader.StructSize)
       return 0;
 

@@ -1,4 +1,5 @@
-using System;
+﻿using System;
+using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.QdvImage;
@@ -26,20 +27,18 @@ public static class QdvImageReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static QdvImageFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static QdvImageFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static QdvImageFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < QdvImageFile.MinFileSize)
       throw new InvalidDataException($"Data too small for a valid QDV file (need at least {QdvImageFile.MinFileSize} bytes, got {data.Length}).");
 
     if (data[0] != QdvImageFile.Magic[0] || data[1] != QdvImageFile.Magic[1] || data[2] != QdvImageFile.Magic[2] || data[3] != QdvImageFile.Magic[3])
       throw new InvalidDataException("Invalid QDV magic bytes.");
 
-    var width = BitConverter.ToUInt16(data, 4);
-    var height = BitConverter.ToUInt16(data, 6);
-    var bpp = BitConverter.ToUInt16(data, 8);
-    var flags = BitConverter.ToUInt16(data, 10);
+    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
+    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
+    var bpp = BinaryPrimitives.ReadUInt16LittleEndian(data[8..]);
+    var flags = BinaryPrimitives.ReadUInt16LittleEndian(data[10..]);
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid QDV dimensions: {width}x{height}.");
@@ -47,7 +46,7 @@ public static class QdvImageReader {
     var pixelDataSize = data.Length - QdvImageFile.HeaderSize;
     var pixelData = new byte[pixelDataSize];
     if (pixelDataSize > 0)
-      data.AsSpan(QdvImageFile.HeaderSize, pixelDataSize).CopyTo(pixelData.AsSpan(0));
+      data.Slice(QdvImageFile.HeaderSize, pixelDataSize).CopyTo(pixelData.AsSpan(0));
 
     return new() {
       Width = width,
@@ -56,5 +55,10 @@ public static class QdvImageReader {
       Flags = flags,
       PixelData = pixelData,
     };
+  }
+
+  public static QdvImageFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

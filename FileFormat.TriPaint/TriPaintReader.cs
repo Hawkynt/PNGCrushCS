@@ -29,7 +29,18 @@ public static class TriPaintReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static TriPaintFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static TriPaintFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != _EXPECTED_SIZE)
+      throw new InvalidDataException($"Invalid TriPaint data size: expected exactly {_EXPECTED_SIZE} bytes, got {data.Length}.");
+
+    var pixelData = new byte[_EXPECTED_SIZE];
+    data.Slice(0, _EXPECTED_SIZE).CopyTo(pixelData);
+
+    return new TriPaintFile {
+      PixelData = pixelData
+    };
+    }
 
   public static TriPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

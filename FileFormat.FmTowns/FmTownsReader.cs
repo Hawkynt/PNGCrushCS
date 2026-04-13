@@ -25,7 +25,16 @@ public static class FmTownsReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static FmTownsFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static FmTownsFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < FmTownsFile.FileSize)
+      throw new InvalidDataException($"Data too small: {data.Length} bytes, expected 64000.");
+
+    var pixelData = new byte[FmTownsFile.ImageWidth * FmTownsFile.ImageHeight];
+    data.Slice(0, pixelData.Length).CopyTo(pixelData.AsSpan(0));
+
+    return new FmTownsFile { PixelData = pixelData };
+    }
 
   public static FmTownsFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

@@ -25,10 +25,8 @@ public static class BobReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static BobFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static BobFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static BobFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < BobFile.HeaderSize)
       throw new InvalidDataException("Data too small for a valid Bob file.");
 
@@ -48,12 +46,17 @@ public static class BobReader {
     var pixelData = new byte[pixelBytes];
     var available = Math.Min(pixelBytes, data.Length - BobFile.HeaderSize);
     if (available > 0)
-      data.AsSpan(BobFile.HeaderSize, available).CopyTo(pixelData.AsSpan(0));
+      data.Slice(BobFile.HeaderSize, available).CopyTo(pixelData);
 
     return new() {
       Width = width,
       Height = height,
       PixelData = pixelData,
     };
+  }
+
+  public static BobFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

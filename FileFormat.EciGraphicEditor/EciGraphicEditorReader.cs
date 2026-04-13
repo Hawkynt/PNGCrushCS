@@ -26,7 +26,21 @@ public static class EciGraphicEditorReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static EciGraphicEditorFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static EciGraphicEditorFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < EciGraphicEditorFile.LoadAddressSize + EciGraphicEditorFile.MinPayloadSize)
+      throw new InvalidDataException($"Data too small for a valid ECI Graphic Editor file (expected at least {EciGraphicEditorFile.LoadAddressSize + EciGraphicEditorFile.MinPayloadSize} bytes, got {data.Length}).");
+
+    var loadAddress = (ushort)(data[0] | (data[1] << 8));
+
+    var rawData = new byte[data.Length - EciGraphicEditorFile.LoadAddressSize];
+    data.Slice(EciGraphicEditorFile.LoadAddressSize, rawData.Length).CopyTo(rawData.AsSpan(0));
+
+    return new() {
+      LoadAddress = loadAddress,
+      RawData = rawData,
+    };
+    }
 
   public static EciGraphicEditorFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

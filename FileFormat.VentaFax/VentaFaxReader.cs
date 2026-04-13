@@ -1,4 +1,5 @@
-using System;
+﻿using System;
+using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.VentaFax;
@@ -26,20 +27,18 @@ public static class VentaFaxReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static VentaFaxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static VentaFaxFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static VentaFaxFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < VentaFaxFile.MinFileSize)
       throw new InvalidDataException($"Data too small for a valid VFX file (need at least {VentaFaxFile.MinFileSize} bytes, got {data.Length}).");
 
     if (data[0] != VentaFaxFile.Magic[0] || data[1] != VentaFaxFile.Magic[1] || data[2] != VentaFaxFile.Magic[2] || data[3] != VentaFaxFile.Magic[3])
       throw new InvalidDataException("Invalid VFX magic bytes.");
 
-    var version = BitConverter.ToUInt16(data, 4);
-    var width = BitConverter.ToUInt16(data, 6);
-    var height = BitConverter.ToUInt16(data, 8);
-    var encoding = BitConverter.ToUInt16(data, 10);
+    var version = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
+    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
+    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[8..]);
+    var encoding = BinaryPrimitives.ReadUInt16LittleEndian(data[10..]);
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid VFX dimensions: {width}x{height}.");
@@ -50,7 +49,7 @@ public static class VentaFaxReader {
       throw new InvalidDataException("VFX file truncated: not enough pixel data.");
 
     var pixelData = new byte[pixelDataSize];
-    data.AsSpan(VentaFaxFile.HeaderSize, pixelDataSize).CopyTo(pixelData.AsSpan(0));
+    data.Slice(VentaFaxFile.HeaderSize, pixelDataSize).CopyTo(pixelData.AsSpan(0));
 
     return new() {
       Width = width,
@@ -59,5 +58,10 @@ public static class VentaFaxReader {
       Encoding = encoding,
       PixelData = pixelData,
     };
+  }
+
+  public static VentaFaxFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 
@@ -29,25 +29,28 @@ public static class PortfolioGraphicsReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static PortfolioGraphicsFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static PortfolioGraphicsFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static PortfolioGraphicsFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < PortfolioGraphicsFile.PgfHeaderSize + PortfolioGraphicsFile.PixelDataSize)
       return _ParsePgc(data);
     return _ParsePgf(data);
+  
   }
 
-  private static PortfolioGraphicsFile _ParsePgf(byte[] data) {
+  public static PortfolioGraphicsFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  private static PortfolioGraphicsFile _ParsePgf(ReadOnlySpan<byte> data) {
     if (data.Length < PortfolioGraphicsFile.PgfHeaderSize + PortfolioGraphicsFile.PixelDataSize)
       throw new InvalidDataException($"PGF data too small: expected at least {PortfolioGraphicsFile.PgfHeaderSize + PortfolioGraphicsFile.PixelDataSize} bytes, got {data.Length}.");
 
     var pixelData = new byte[PortfolioGraphicsFile.PixelDataSize];
-    data.AsSpan(PortfolioGraphicsFile.PgfHeaderSize, PortfolioGraphicsFile.PixelDataSize).CopyTo(pixelData.AsSpan(0));
+    data.Slice(PortfolioGraphicsFile.PgfHeaderSize, PortfolioGraphicsFile.PixelDataSize).CopyTo(pixelData);
     return new() { PixelData = pixelData };
   }
 
-  private static PortfolioGraphicsFile _ParsePgc(byte[] data) {
+  private static PortfolioGraphicsFile _ParsePgc(ReadOnlySpan<byte> data) {
     if (data.Length < 2)
       throw new InvalidDataException($"PGC data too small: expected at least 2 bytes, got {data.Length}.");
 

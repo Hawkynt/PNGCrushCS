@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 
 namespace FileFormat.ImageSystem;
@@ -26,10 +26,7 @@ public static class ImageSystemReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static ImageSystemFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static ImageSystemFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static ImageSystemFile FromSpan(ReadOnlySpan<byte> data) {
 
     if (data.Length == ImageSystemFile.HiresFileSize)
       return _ParseHires(data);
@@ -39,16 +36,22 @@ public static class ImageSystemReader {
 
     throw new InvalidDataException(
       $"Invalid Image System data size: expected {ImageSystemFile.HiresFileSize} (hires) or {ImageSystemFile.MulticolorFileSize} (multicolor) bytes, got {data.Length}.");
+  
   }
 
-  private static ImageSystemFile _ParseHires(byte[] data) {
+  public static ImageSystemFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  private static ImageSystemFile _ParseHires(ReadOnlySpan<byte> data) {
     var loadAddress = (ushort)(data[0] | (data[1] << 8));
 
     var bitmapData = new byte[ImageSystemFile.BitmapDataSize];
-    data.AsSpan(ImageSystemFile.LoadAddressSize, ImageSystemFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
+    data.Slice(ImageSystemFile.LoadAddressSize, ImageSystemFile.BitmapDataSize).CopyTo(bitmapData);
 
     var screenData = new byte[ImageSystemFile.ScreenDataSize];
-    data.AsSpan(ImageSystemFile.LoadAddressSize + ImageSystemFile.BitmapDataSize, ImageSystemFile.ScreenDataSize).CopyTo(screenData.AsSpan(0));
+    data.Slice(ImageSystemFile.LoadAddressSize + ImageSystemFile.BitmapDataSize, ImageSystemFile.ScreenDataSize).CopyTo(screenData);
 
     // Border color byte follows screen data
     var borderColorOffset = ImageSystemFile.LoadAddressSize + ImageSystemFile.BitmapDataSize + ImageSystemFile.ScreenDataSize;
@@ -66,17 +69,17 @@ public static class ImageSystemReader {
     };
   }
 
-  private static ImageSystemFile _ParseMulticolor(byte[] data) {
+  private static ImageSystemFile _ParseMulticolor(ReadOnlySpan<byte> data) {
     var loadAddress = (ushort)(data[0] | (data[1] << 8));
 
     var bitmapData = new byte[ImageSystemFile.BitmapDataSize];
-    data.AsSpan(ImageSystemFile.LoadAddressSize, ImageSystemFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
+    data.Slice(ImageSystemFile.LoadAddressSize, ImageSystemFile.BitmapDataSize).CopyTo(bitmapData);
 
     var screenData = new byte[ImageSystemFile.ScreenDataSize];
-    data.AsSpan(ImageSystemFile.LoadAddressSize + ImageSystemFile.BitmapDataSize, ImageSystemFile.ScreenDataSize).CopyTo(screenData.AsSpan(0));
+    data.Slice(ImageSystemFile.LoadAddressSize + ImageSystemFile.BitmapDataSize, ImageSystemFile.ScreenDataSize).CopyTo(screenData);
 
     var colorData = new byte[ImageSystemFile.ColorDataSize];
-    data.AsSpan(ImageSystemFile.LoadAddressSize + ImageSystemFile.BitmapDataSize + ImageSystemFile.ScreenDataSize, ImageSystemFile.ColorDataSize).CopyTo(colorData.AsSpan(0));
+    data.Slice(ImageSystemFile.LoadAddressSize + ImageSystemFile.BitmapDataSize + ImageSystemFile.ScreenDataSize, ImageSystemFile.ColorDataSize).CopyTo(colorData);
 
     var bgColorOffset = ImageSystemFile.LoadAddressSize + ImageSystemFile.BitmapDataSize + ImageSystemFile.ScreenDataSize + ImageSystemFile.ColorDataSize;
     var bgColor = bgColorOffset < data.Length ? data[bgColorOffset] : (byte)0;

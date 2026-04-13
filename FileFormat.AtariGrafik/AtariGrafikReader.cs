@@ -27,7 +27,27 @@ public static class AtariGrafikReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static AtariGrafikFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static AtariGrafikFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != AtariGrafikFile.ExpectedFileSize)
+      throw new InvalidDataException($"Atari Grafik file must be exactly {AtariGrafikFile.ExpectedFileSize} bytes, got {data.Length}.");
+
+    var span = data;
+    var resolution = BinaryPrimitives.ReadInt16BigEndian(span);
+
+    var palette = new short[16];
+    for (var i = 0; i < 16; ++i)
+      palette[i] = BinaryPrimitives.ReadInt16BigEndian(span[(2 + i * 2)..]);
+
+    var pixelData = new byte[AtariGrafikFile.PixelDataSize];
+    data.Slice(AtariGrafikFile.HeaderSize, AtariGrafikFile.PixelDataSize).CopyTo(pixelData.AsSpan(0));
+
+    return new() {
+      Resolution = resolution,
+      Palette = palette,
+      PixelData = pixelData,
+    };
+    }
 
   public static AtariGrafikFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

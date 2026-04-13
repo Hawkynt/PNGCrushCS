@@ -26,10 +26,8 @@ public static class DoodleReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static DoodleFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static DoodleFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static DoodleFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < DoodleFile.ExpectedFileSize)
       throw new InvalidDataException($"Data too small for a valid Doodle file (expected {DoodleFile.ExpectedFileSize} bytes, got {data.Length}).");
 
@@ -42,16 +40,21 @@ public static class DoodleReader {
     offset += DoodleFile.LoadAddressSize;
 
     var bitmapData = new byte[DoodleFile.BitmapDataSize];
-    data.AsSpan(offset, DoodleFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
+    data.Slice(offset, DoodleFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
     offset += DoodleFile.BitmapDataSize;
 
     var screenRam = new byte[DoodleFile.ScreenRamSize];
-    data.AsSpan(offset, DoodleFile.ScreenRamSize).CopyTo(screenRam.AsSpan(0));
+    data.Slice(offset, DoodleFile.ScreenRamSize).CopyTo(screenRam.AsSpan(0));
 
     return new() {
       LoadAddress = loadAddress,
       BitmapData = bitmapData,
       ScreenRam = screenRam,
     };
+    }
+
+  public static DoodleFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

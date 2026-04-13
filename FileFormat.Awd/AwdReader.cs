@@ -26,18 +26,16 @@ public static class AwdReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static AwdFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static AwdFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static AwdFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < AwdHeader.StructSize)
       throw new InvalidDataException("Data too small for a valid AWD file.");
 
-    var magic = data.AsSpan(0, 4);
+    var magic = data.Slice(0, 4);
     if (!magic.SequenceEqual(AwdHeader.Magic))
       throw new InvalidDataException("Invalid AWD magic bytes.");
 
-    var header = AwdHeader.ReadFrom(data.AsSpan());
+    var header = AwdHeader.ReadFrom(data);
     var width = (int)header.Width;
     var height = (int)header.Height;
 
@@ -53,12 +51,17 @@ public static class AwdReader {
       throw new InvalidDataException($"Data too small for pixel data: expected {AwdHeader.StructSize + expectedPixelBytes} bytes, got {data.Length}.");
 
     var pixelData = new byte[expectedPixelBytes];
-    data.AsSpan(AwdHeader.StructSize, expectedPixelBytes).CopyTo(pixelData.AsSpan(0));
+    data.Slice(AwdHeader.StructSize, expectedPixelBytes).CopyTo(pixelData.AsSpan(0));
 
     return new AwdFile {
       Width = width,
       Height = height,
       PixelData = pixelData,
     };
+    }
+
+  public static AwdFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

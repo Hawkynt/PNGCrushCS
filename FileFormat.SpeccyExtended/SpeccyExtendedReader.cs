@@ -47,7 +47,45 @@ public static class SpeccyExtendedReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static SpeccyExtendedFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static SpeccyExtendedFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < FileSize)
+      throw new InvalidDataException($"SXG file must be at least {FileSize} bytes, got {data.Length}.");
+
+    // Validate magic bytes
+    if (data[0] != Magic[0] || data[1] != Magic[1] || data[2] != Magic[2])
+      throw new InvalidDataException($"Invalid SXG magic: expected 'SXG', got '{(char)data[0]}{(char)data[1]}{(char)data[2]}'.");
+
+    var version = data[3];
+
+    var bitmapOffset = HeaderSize;
+    var linearBitmap = new byte[BitmapSize];
+
+    // Deinterleave from ZX Spectrum memory layout to linear row order
+    for (var y = 0; y < RowCount; ++y) {
+      var third = y / 64;
+      var characterRow = (y % 64) / 8;
+      var pixelLine = y % 8;
+      var srcOffset = bitmapOffset + third * 2048 + pixelLine * 256 + characterRow * BytesPerRow;
+      var dstOffset = y * BytesPerRow;
+      data.Slice(srcOffset, BytesPerRow).CopyTo(linearBitmap.AsSpan(dstOffset));
+    }
+
+    var stdAttrOffset = bitmapOffset + BitmapSize;
+    var attributes = new byte[AttributeSize];
+    data.Slice(stdAttrOffset, AttributeSize).CopyTo(attributes);
+
+    var extAttrOffset = stdAttrOffset + AttributeSize;
+    var extAttributes = new byte[AttributeSize];
+    data.Slice(extAttrOffset, AttributeSize).CopyTo(extAttributes);
+
+    return new SpeccyExtendedFile {
+      Version = version,
+      BitmapData = linearBitmap,
+      AttributeData = attributes,
+      ExtendedAttributeData = extAttributes,
+    };
+    }
 
   public static SpeccyExtendedFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

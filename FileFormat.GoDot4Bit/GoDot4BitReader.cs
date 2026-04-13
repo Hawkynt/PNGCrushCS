@@ -26,10 +26,12 @@ public static class GoDot4BitReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static GoDot4BitFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
   public static GoDot4BitFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  public static GoDot4BitFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < GoDot4BitFile.ExpectedFileSize)
       throw new InvalidDataException($"Data too small for a valid GoDot 4-bit file (expected {GoDot4BitFile.ExpectedFileSize} bytes, got {data.Length}).");
 
@@ -37,7 +39,7 @@ public static class GoDot4BitReader {
       throw new InvalidDataException($"Invalid GoDot 4-bit file size (expected {GoDot4BitFile.ExpectedFileSize} bytes, got {data.Length}).");
 
     var pixelData = new byte[GoDot4BitFile.ExpectedFileSize];
-    data.AsSpan(0, GoDot4BitFile.ExpectedFileSize).CopyTo(pixelData.AsSpan(0));
+    data.Slice(0, GoDot4BitFile.ExpectedFileSize).CopyTo(pixelData.AsSpan(0));
 
     return new() {
       PixelData = pixelData,

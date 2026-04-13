@@ -26,7 +26,16 @@ public static class AppleIIDhrReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static AppleIIDhrFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static AppleIIDhrFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != AppleIIDhrFile.FileSize)
+      throw new InvalidDataException($"Invalid Apple II DHGR data size: expected exactly {AppleIIDhrFile.FileSize} bytes, got {data.Length}.");
+
+    var rawData = new byte[AppleIIDhrFile.FileSize];
+    data.Slice(0, AppleIIDhrFile.FileSize).CopyTo(rawData);
+
+    return new AppleIIDhrFile { RawData = rawData };
+    }
 
   public static AppleIIDhrFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

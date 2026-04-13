@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 
 namespace FileFormat.ZxTricolor;
@@ -44,24 +44,21 @@ public static class ZxTricolorReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static ZxTricolorFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static ZxTricolorFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static ZxTricolorFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length != FileSize)
       throw new InvalidDataException($"ZX Spectrum Tricolor file must be exactly {FileSize} bytes, got {data.Length}.");
 
     var bitmap1 = _DeinterleaveBitmap(data, 0);
     var attr1 = new byte[AttributeSize];
-    data.AsSpan(BitmapSize, AttributeSize).CopyTo(attr1.AsSpan(0));
+    data.Slice(BitmapSize, AttributeSize).CopyTo(attr1);
 
     var bitmap2 = _DeinterleaveBitmap(data, ScreenSize);
     var attr2 = new byte[AttributeSize];
-    data.AsSpan(ScreenSize + BitmapSize, AttributeSize).CopyTo(attr2.AsSpan(0));
+    data.Slice(ScreenSize + BitmapSize, AttributeSize).CopyTo(attr2);
 
     var bitmap3 = _DeinterleaveBitmap(data, ScreenSize * 2);
     var attr3 = new byte[AttributeSize];
-    data.AsSpan(ScreenSize * 2 + BitmapSize, AttributeSize).CopyTo(attr3.AsSpan(0));
+    data.Slice(ScreenSize * 2 + BitmapSize, AttributeSize).CopyTo(attr3);
 
     return new ZxTricolorFile {
       BitmapData1 = bitmap1,
@@ -71,9 +68,15 @@ public static class ZxTricolorReader {
       BitmapData3 = bitmap3,
       AttributeData3 = attr3,
     };
+  
   }
 
-  private static byte[] _DeinterleaveBitmap(byte[] data, int baseOffset) {
+  public static ZxTricolorFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  private static byte[] _DeinterleaveBitmap(ReadOnlySpan<byte> data, int baseOffset) {
     var linear = new byte[BitmapSize];
     for (var y = 0; y < RowCount; ++y) {
       var third = y / 64;
@@ -81,7 +84,7 @@ public static class ZxTricolorReader {
       var pixelLine = y % 8;
       var srcOffset = baseOffset + third * 2048 + pixelLine * 256 + characterRow * BytesPerRow;
       var dstOffset = y * BytesPerRow;
-      data.AsSpan(srcOffset, BytesPerRow).CopyTo(linear.AsSpan(dstOffset));
+      data.Slice(srcOffset, BytesPerRow).CopyTo(linear.AsSpan(dstOffset));
     }
     return linear;
   }

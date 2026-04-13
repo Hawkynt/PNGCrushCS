@@ -26,7 +26,16 @@ public static class MicroIllustratorA8Reader {
     return FromBytes(ms.ToArray());
   }
 
-  public static MicroIllustratorA8File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static MicroIllustratorA8File FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != MicroIllustratorA8File.ExpectedFileSize)
+      throw new InvalidDataException($"Invalid Micro Illustrator data size: expected exactly {MicroIllustratorA8File.ExpectedFileSize} bytes, got {data.Length}.");
+
+    var pixelData = new byte[MicroIllustratorA8File.ExpectedFileSize];
+    data.Slice(0, MicroIllustratorA8File.ExpectedFileSize).CopyTo(pixelData);
+
+    return new MicroIllustratorA8File { PixelData = pixelData };
+    }
 
   public static MicroIllustratorA8File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

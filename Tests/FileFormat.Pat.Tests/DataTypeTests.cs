@@ -7,17 +7,16 @@ public sealed class DataTypeTests {
 
   [Test]
   [Category("Unit")]
-  public void PatFile_DefaultPixelData_IsEmptyArray() {
+  public void _DefaultPixelData_IsNull() {
     var file = new PatFile();
-    Assert.That(file.PixelData, Is.Not.Null);
-    Assert.That(file.PixelData, Is.Empty);
+    Assert.That(file.PixelData, Is.Null);
   }
 
   [Test]
   [Category("Unit")]
-  public void PatFile_DefaultName_IsEmpty() {
+  public void PatFile_DefaultName_IsNull() {
     var file = new PatFile();
-    Assert.That(file.Name, Is.EqualTo(string.Empty));
+    Assert.That(file.Name, Is.Null);
   }
 
   [Test]

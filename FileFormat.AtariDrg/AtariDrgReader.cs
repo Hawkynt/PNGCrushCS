@@ -26,10 +26,7 @@ public static class AtariDrgReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static AtariDrgFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static AtariDrgFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static AtariDrgFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < AtariDrgFile.FileSize)
       throw new InvalidDataException($"Data too small for Atari DRG screen dump. Expected {AtariDrgFile.FileSize} bytes, got {data.Length}.");
     if (data.Length != AtariDrgFile.FileSize)
@@ -43,7 +40,12 @@ public static class AtariDrgReader {
     };
   }
 
-  private static byte[] _UnpackPixels(byte[] data) {
+  public static AtariDrgFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  private static byte[] _UnpackPixels(ReadOnlySpan<byte> data) {
     var pixels = new byte[AtariDrgFile.PixelWidth * AtariDrgFile.PixelHeight];
 
     for (var y = 0; y < AtariDrgFile.PixelHeight; ++y)

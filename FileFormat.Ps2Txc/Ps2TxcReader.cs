@@ -1,4 +1,5 @@
-using System;
+﻿using System;
+using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.Ps2Txc;
@@ -26,17 +27,15 @@ public static class Ps2TxcReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static Ps2TxcFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static Ps2TxcFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static Ps2TxcFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < Ps2TxcFile.MinFileSize)
       throw new InvalidDataException($"Data too small for a valid TXC file (need at least {Ps2TxcFile.MinFileSize} bytes, got {data.Length}).");
 
-    var width = BitConverter.ToUInt16(data, 0);
-    var height = BitConverter.ToUInt16(data, 2);
-    var bpp = BitConverter.ToUInt16(data, 4);
-    var flags = BitConverter.ToUInt16(data, 6);
+    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[0..]);
+    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[2..]);
+    var bpp = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
+    var flags = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid TXC dimensions: {width}x{height}.");
@@ -49,7 +48,7 @@ public static class Ps2TxcReader {
       throw new InvalidDataException("TXC file truncated: not enough pixel data.");
 
     var pixelData = new byte[pixelDataSize];
-    data.AsSpan(Ps2TxcFile.HeaderSize, pixelDataSize).CopyTo(pixelData.AsSpan(0));
+    data.Slice(Ps2TxcFile.HeaderSize, pixelDataSize).CopyTo(pixelData.AsSpan(0));
 
     return new() {
       Width = width,
@@ -58,5 +57,10 @@ public static class Ps2TxcReader {
       Flags = flags,
       PixelData = pixelData,
     };
+  }
+
+  public static Ps2TxcFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

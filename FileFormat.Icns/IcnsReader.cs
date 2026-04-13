@@ -20,7 +20,7 @@ public static class IcnsReader {
     if (!file.Exists)
       throw new FileNotFoundException("ICNS file not found.", file.FullName);
 
-    return FromBytes(File.ReadAllBytes(file.FullName));
+    return FromSpan(File.ReadAllBytes(file.FullName));
   }
 
   public static IcnsFile FromStream(Stream stream) {
@@ -28,25 +28,27 @@ public static class IcnsReader {
     if (stream.CanSeek) {
       var data = new byte[stream.Length - stream.Position];
       stream.ReadExactly(data);
-      return FromBytes(data);
+      return FromSpan(data);
     }
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
+    return FromSpan(ms.ToArray());
   }
-
-  public static IcnsFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
 
   public static IcnsFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  public static IcnsFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < MinFileSize)
       throw new InvalidDataException("Data too small for a valid ICNS file.");
 
     if (data[0] != _Magic[0] || data[1] != _Magic[1] || data[2] != _Magic[2] || data[3] != _Magic[3])
       throw new InvalidDataException("Invalid ICNS magic signature.");
 
-    var fileLength = BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(4));
-    if (fileLength < MinFileSize || fileLength > data.Length)
+    var fileLength = BinaryPrimitives.ReadUInt32BigEndian(data[4..]);
+    if (fileLength < MinFileSize || fileLength > (uint)data.Length)
       throw new InvalidDataException("Invalid ICNS file length field.");
 
     var entries = new List<IcnsEntry>();
@@ -54,8 +56,8 @@ public static class IcnsReader {
     var end = (int)fileLength;
 
     while (offset + IcnsEntry.HeaderSize <= end) {
-      var osType = Encoding.ASCII.GetString(data, offset, 4);
-      var entryLength = (int)BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(offset + 4));
+      var osType = Encoding.ASCII.GetString(data.Slice(offset, 4));
+      var entryLength = (int)BinaryPrimitives.ReadUInt32BigEndian(data[(offset + 4)..]);
 
       if (entryLength < IcnsEntry.HeaderSize)
         throw new InvalidDataException($"Invalid entry length {entryLength} for entry '{osType}' at offset {offset}.");
@@ -65,7 +67,7 @@ public static class IcnsReader {
         break;
 
       var entryData = new byte[dataLength];
-      data.AsSpan(offset + IcnsEntry.HeaderSize, dataLength).CopyTo(entryData.AsSpan(0));
+      data.Slice(offset + IcnsEntry.HeaderSize, dataLength).CopyTo(entryData.AsSpan(0));
 
       var (width, height) = _GetDimensions(osType, entryData);
       entries.Add(new(osType, entryData, width, height));

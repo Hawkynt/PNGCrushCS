@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 
 namespace FileFormat.IffDctv;
@@ -26,10 +26,12 @@ public static class IffDctvReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static IffDctvFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
   public static IffDctvFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  public static IffDctvFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < IffDctvFile.MinFileSize)
       throw new InvalidDataException($"Invalid DCTV data: expected at least {IffDctvFile.MinFileSize} bytes, got {data.Length}.");
 
@@ -38,8 +40,7 @@ public static class IffDctvReader {
 
     _TryParseBmhd(data, out width, out height);
 
-    var rawData = new byte[data.Length];
-    data.AsSpan(0, data.Length).CopyTo(rawData);
+    var rawData = data.ToArray();
 
     return new() {
       Width = width,
@@ -48,7 +49,7 @@ public static class IffDctvReader {
     };
   }
 
-  private static void _TryParseBmhd(byte[] data, out int width, out int height) {
+  private static void _TryParseBmhd(ReadOnlySpan<byte> data, out int width, out int height) {
     width = IffDctvFile.DefaultWidth;
     height = IffDctvFile.DefaultHeight;
 

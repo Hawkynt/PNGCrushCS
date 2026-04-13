@@ -27,10 +27,7 @@ public static class AtariCompressedReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static AtariCompressedFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static AtariCompressedFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static AtariCompressedFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < 1)
       throw new InvalidDataException("Atari Compressed Screen data is empty.");
 
@@ -44,12 +41,17 @@ public static class AtariCompressedReader {
     };
   }
 
+  public static AtariCompressedFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
   /// <summary>
   /// Decompresses Atari RLE data.
   /// Byte &gt;= 0x80: repeat count = (byte &amp; 0x7F), next byte = value.
   /// Byte &lt; 0x80: literal byte.
   /// </summary>
-  private static byte[] _DecompressRle(byte[] data) {
+  private static byte[] _DecompressRle(ReadOnlySpan<byte> data) {
     var result = new List<byte>(AtariCompressedFile.DecompressedSize);
     var i = 0;
 

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 
 namespace FileFormat.Zoomatic;
@@ -27,10 +27,8 @@ public static class ZoomaticReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static ZoomaticFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static ZoomaticFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static ZoomaticFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
 
     if (data.Length < ZoomaticFile.LoadAddressSize + ZoomaticFile.MinPayloadSize)
       throw new InvalidDataException($"File too small for Zoomatic format (got {data.Length} bytes, need at least {ZoomaticFile.LoadAddressSize + ZoomaticFile.MinPayloadSize}).");
@@ -43,17 +41,17 @@ public static class ZoomaticReader {
 
     // Bitmap data (8000 bytes)
     var bitmapData = new byte[ZoomaticFile.BitmapDataSize];
-    data.AsSpan(offset, ZoomaticFile.BitmapDataSize).CopyTo(bitmapData);
+    data.Slice(offset, ZoomaticFile.BitmapDataSize).CopyTo(bitmapData);
     offset += ZoomaticFile.BitmapDataSize;
 
     // Screen RAM (1000 bytes)
     var screenData = new byte[ZoomaticFile.ScreenDataSize];
-    data.AsSpan(offset, ZoomaticFile.ScreenDataSize).CopyTo(screenData);
+    data.Slice(offset, ZoomaticFile.ScreenDataSize).CopyTo(screenData);
     offset += ZoomaticFile.ScreenDataSize;
 
     // Color RAM (1000 bytes)
     var colorData = new byte[ZoomaticFile.ColorDataSize];
-    data.AsSpan(offset, ZoomaticFile.ColorDataSize).CopyTo(colorData);
+    data.Slice(offset, ZoomaticFile.ColorDataSize).CopyTo(colorData);
     offset += ZoomaticFile.ColorDataSize;
 
     // Background color: first byte of trailing data if available, else 0
@@ -64,7 +62,7 @@ public static class ZoomaticReader {
       ++offset;
       if (offset < data.Length) {
         trailingData = new byte[data.Length - offset];
-        data.AsSpan(offset).CopyTo(trailingData);
+        data[offset..].CopyTo(trailingData);
       }
     }
 
@@ -76,5 +74,10 @@ public static class ZoomaticReader {
       BackgroundColor = backgroundColor,
       TrailingData = trailingData,
     };
+  }
+
+  public static ZoomaticFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

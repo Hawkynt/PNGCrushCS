@@ -20,6 +20,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Optimizer.Image\Optimizer.Image.csproj" />
     <ProjectReference Include="..\..\FileFormat.Core\FileFormat.Core.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Bam\FileFormat.Bam.csproj" />
     <ProjectReference Include="..\..\FileFormat.Bmp\FileFormat.Bmp.csproj" />
     <ProjectReference Include="..\..\FileFormat.Farbfeld\FileFormat.Farbfeld.csproj" />
     <ProjectReference Include="..\..\FileFormat.Pcx\FileFormat.Pcx.csproj" />

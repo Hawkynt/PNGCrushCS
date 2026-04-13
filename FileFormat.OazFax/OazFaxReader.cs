@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.OazFax;
@@ -26,20 +27,17 @@ public static class OazFaxReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static OazFaxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static OazFaxFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static OazFaxFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < OazFaxFile.MinFileSize)
       throw new InvalidDataException($"Data too small for a valid OAZ file (need at least {OazFaxFile.MinFileSize} bytes, got {data.Length}).");
 
     if (data[0] != OazFaxFile.Magic[0] || data[1] != OazFaxFile.Magic[1] || data[2] != OazFaxFile.Magic[2] || data[3] != OazFaxFile.Magic[3])
       throw new InvalidDataException("Invalid OAZ magic bytes.");
 
-    var version = BitConverter.ToUInt16(data, 4);
-    var width = BitConverter.ToUInt16(data, 6);
-    var height = BitConverter.ToUInt16(data, 8);
-    var encoding = BitConverter.ToUInt16(data, 10);
+    var version = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
+    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
+    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[8..]);
+    var encoding = BinaryPrimitives.ReadUInt16LittleEndian(data[10..]);
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid OAZ dimensions: {width}x{height}.");
@@ -50,7 +48,7 @@ public static class OazFaxReader {
       throw new InvalidDataException("OAZ file truncated: not enough pixel data.");
 
     var pixelData = new byte[pixelDataSize];
-    data.AsSpan(OazFaxFile.HeaderSize, pixelDataSize).CopyTo(pixelData.AsSpan(0));
+    data.Slice(OazFaxFile.HeaderSize, pixelDataSize).CopyTo(pixelData.AsSpan(0));
 
     return new() {
       Width = width,
@@ -59,5 +57,10 @@ public static class OazFaxReader {
       Encoding = encoding,
       PixelData = pixelData,
     };
+  }
+
+  public static OazFaxFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

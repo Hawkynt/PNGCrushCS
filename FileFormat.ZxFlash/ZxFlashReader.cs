@@ -44,7 +44,34 @@ public static class ZxFlashReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static ZxFlashFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static ZxFlashFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < MinFileSize)
+      throw new InvalidDataException($"ZX Spectrum Flash file must be at least {MinFileSize} bytes, got {data.Length}.");
+
+    var frameCount = data.Length / ScreenSize;
+
+    var linearBitmap = new byte[BitmapSize];
+
+    // Deinterleave first frame from ZX Spectrum memory layout to linear row order
+    for (var y = 0; y < RowCount; ++y) {
+      var third = y / 64;
+      var characterRow = (y % 64) / 8;
+      var pixelLine = y % 8;
+      var srcOffset = third * 2048 + pixelLine * 256 + characterRow * BytesPerRow;
+      var dstOffset = y * BytesPerRow;
+      data.Slice(srcOffset, BytesPerRow).CopyTo(linearBitmap.AsSpan(dstOffset));
+    }
+
+    var attributes = new byte[AttributeSize];
+    data.Slice(BitmapSize, AttributeSize).CopyTo(attributes.AsSpan(0));
+
+    return new ZxFlashFile {
+      BitmapData = linearBitmap,
+      AttributeData = attributes,
+      FrameCount = frameCount,
+    };
+    }
 
   public static ZxFlashFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

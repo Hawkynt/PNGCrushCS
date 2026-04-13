@@ -10,7 +10,6 @@ namespace FileFormat.Registry.Generator;
 [Generator]
 public sealed class ImageFormatGenerator : IIncrementalGenerator {
 
-  private const string _IMAGE_FILE_FORMAT = "FileFormat.Core.IImageFileFormat`1";
   private const string _IMAGE_FORMAT_READER = "FileFormat.Core.IImageFormatReader`1";
   private const string _IMAGE_TO_RAW_IMAGE = "FileFormat.Core.IImageToRawImage`1";
   private const string _IMAGE_FROM_RAW_IMAGE = "FileFormat.Core.IImageFromRawImage`1";
@@ -28,15 +27,13 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
     var visited = new HashSet<string>();
 
     // Resolve interface symbols by metadata name for reliable comparison
-    var imageFileFormat = compilation.GetTypeByMetadataName(_IMAGE_FILE_FORMAT);
     var imageFormatReader = compilation.GetTypeByMetadataName(_IMAGE_FORMAT_READER);
     var imageToRawImage = compilation.GetTypeByMetadataName(_IMAGE_TO_RAW_IMAGE);
     var imageFromRawImage = compilation.GetTypeByMetadataName(_IMAGE_FROM_RAW_IMAGE);
     var imageFormatWriter = compilation.GetTypeByMetadataName(_IMAGE_FORMAT_WRITER);
     var multiImageFileFormat = compilation.GetTypeByMetadataName(_MULTI_IMAGE_FILE_FORMAT);
 
-    // If we can't resolve IImageFileFormat, the core library isn't referenced
-    if (imageFileFormat == null && imageFormatReader == null)
+    if (imageFormatReader == null)
       return ImmutableArray<FormatInfo>.Empty;
 
     // Scan all referenced assemblies + current compilation
@@ -50,7 +47,6 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
       if (type.DeclaredAccessibility != Accessibility.Public)
         continue;
 
-      var hasImageFileFormat = false;
       var hasFormatReader = false;
       var hasToRawImage = false;
       var hasFromRawImage = false;
@@ -70,9 +66,7 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
           continue;
 
         var def = iface.OriginalDefinition;
-        if (imageFileFormat != null && SymbolEqualityComparer.Default.Equals(def, imageFileFormat))
-          hasImageFileFormat = true;
-        else if (imageFormatReader != null && SymbolEqualityComparer.Default.Equals(def, imageFormatReader))
+        if (imageFormatReader != null && SymbolEqualityComparer.Default.Equals(def, imageFormatReader))
           hasFormatReader = true;
         else if (imageToRawImage != null && SymbolEqualityComparer.Default.Equals(def, imageToRawImage))
           hasToRawImage = true;
@@ -85,7 +79,7 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
       }
 
       // Must implement at least one of the format interfaces
-      if (!hasImageFileFormat && !hasFormatReader)
+      if (!hasFormatReader)
         continue;
 
       var typeName = type.Name;
@@ -100,7 +94,6 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
       results.Add(new FormatInfo(
         formatId,
         fullName,
-        hasImageFileFormat,
         hasFormatReader,
         hasToRawImage,
         hasFromRawImage,
@@ -120,7 +113,7 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
         if (!visited.Add(formatId))
           continue;
 
-        results.Add(new FormatInfo(formatId, null, false, false, false, false, false, false));
+        results.Add(new FormatInfo(formatId, null, false, false, false, false, false));
       }
     }
 
@@ -167,7 +160,7 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
     sb.AppendLine();
     sb.AppendLine("namespace Optimizer.Image;");
     sb.AppendLine();
-    sb.AppendLine("/// <summary>Supported image formats, auto-generated from discovered IImageFileFormat implementations.</summary>");
+    sb.AppendLine("/// <summary>Supported image formats, auto-generated from discovered IImageFormatReader implementations.</summary>");
     sb.AppendLine("public enum ImageFormat {");
     sb.AppendLine("  Unknown,");
 
@@ -193,9 +186,7 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
       if (format.FullTypeName == null)
         continue; // Enum-only entry from [AdditionalImageFormat]
 
-      if (format.HasImageFileFormat)
-        sb.Append("    _Register<").Append(format.FullTypeName).Append(">(ImageFormat.").Append(format.FormatId).AppendLine(");");
-      else if (format.HasFormatReader && format.HasToRawImage && format.HasFromRawImage && format.HasFormatWriter)
+      if (format.HasFormatReader && format.HasToRawImage && format.HasFromRawImage && format.HasFormatWriter)
         sb.Append("    _RegisterReaderWriter<").Append(format.FullTypeName).Append(">(ImageFormat.").Append(format.FormatId).AppendLine(");");
       else if (format.HasFormatReader && format.HasToRawImage)
         sb.Append("    _RegisterReader<").Append(format.FullTypeName).Append(">(ImageFormat.").Append(format.FormatId).AppendLine(");");
@@ -209,9 +200,7 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
       if (format.FullTypeName == null || !format.HasMultiImage)
         continue;
 
-      if (format.HasImageFileFormat)
-        sb.Append("    _RegisterMultiImage<").Append(format.FullTypeName).Append(">(ImageFormat.").Append(format.FormatId).AppendLine(");");
-      else if (format.HasFormatReader && format.HasToRawImage)
+      if (format.HasFormatReader && format.HasToRawImage)
         sb.Append("    _RegisterMultiImageReader<").Append(format.FullTypeName).Append(">(ImageFormat.").Append(format.FormatId).AppendLine(");");
     }
 
@@ -224,7 +213,6 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
   private sealed class FormatInfo {
     public string FormatId { get; }
     public string? FullTypeName { get; }
-    public bool HasImageFileFormat { get; }
     public bool HasFormatReader { get; }
     public bool HasToRawImage { get; }
     public bool HasFromRawImage { get; }
@@ -233,12 +221,11 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
 
     public FormatInfo(
       string formatId, string? fullTypeName,
-      bool hasImageFileFormat, bool hasFormatReader, bool hasToRawImage,
+      bool hasFormatReader, bool hasToRawImage,
       bool hasFromRawImage, bool hasFormatWriter, bool hasMultiImage
     ) {
       FormatId = formatId;
       FullTypeName = fullTypeName;
-      HasImageFileFormat = hasImageFileFormat;
       HasFormatReader = hasFormatReader;
       HasToRawImage = hasToRawImage;
       HasFromRawImage = hasFromRawImage;

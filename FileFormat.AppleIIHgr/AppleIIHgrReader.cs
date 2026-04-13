@@ -26,7 +26,16 @@ public static class AppleIIHgrReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static AppleIIHgrFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static AppleIIHgrFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != AppleIIHgrFile.FileSize)
+      throw new InvalidDataException($"Invalid Apple II HGR data size: expected exactly {AppleIIHgrFile.FileSize} bytes, got {data.Length}.");
+
+    var rawData = new byte[AppleIIHgrFile.FileSize];
+    data.Slice(0, AppleIIHgrFile.FileSize).CopyTo(rawData);
+
+    return new AppleIIHgrFile { RawData = rawData };
+    }
 
   public static AppleIIHgrFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

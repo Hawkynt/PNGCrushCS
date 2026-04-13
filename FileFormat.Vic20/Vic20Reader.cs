@@ -25,7 +25,15 @@ public static class Vic20Reader {
     return FromBytes(ms.ToArray());
   }
 
-  public static Vic20File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static Vic20File FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != Vic20File.FileSize)
+      throw new InvalidDataException($"Invalid Vic20 data size: expected exactly {Vic20File.FileSize} bytes, got {data.Length}.");
+
+    var pixelData = new byte[Vic20File.FileSize];
+    data.Slice(0, Vic20File.FileSize).CopyTo(pixelData);
+    return new() { PixelData = pixelData };
+    }
 
   public static Vic20File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

@@ -40,7 +40,7 @@ internal static class PackBitsCompressor {
   }
 
   /// <summary>Decompresses PackBits RLE data to the expected size.</summary>
-  public static byte[] Decompress(byte[] data, int expectedSize) {
+  public static byte[] Decompress(ReadOnlySpan<byte> data, int expectedSize) {
     var output = new byte[expectedSize];
     var outIdx = 0;
     var inIdx = 0;

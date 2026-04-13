@@ -33,15 +33,12 @@ public static class DcxReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static DcxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static DcxFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static DcxFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MIN_SIZE)
       throw new InvalidDataException("Data too small for a valid DCX file.");
 
-    var span = data.AsSpan();
-    var magic = BinaryPrimitives.ReadUInt32LittleEndian(span);
+    var magic = BinaryPrimitives.ReadUInt32LittleEndian(data);
     if (magic != _MAGIC)
       throw new InvalidDataException("Invalid DCX magic bytes.");
 
@@ -49,7 +46,7 @@ public static class DcxReader {
     var offsets = new List<uint>();
     var pos = 4;
     while (pos + 4 <= data.Length && offsets.Count < _MAX_PAGES) {
-      var offset = BinaryPrimitives.ReadUInt32LittleEndian(span[pos..]);
+      var offset = BinaryPrimitives.ReadUInt32LittleEndian(data[pos..]);
       pos += 4;
       if (offset == 0)
         break;
@@ -67,10 +64,15 @@ public static class DcxReader {
         end = data.Length;
 
       var pageData = new byte[end - start];
-      data.AsSpan(start, pageData.Length).CopyTo(pageData.AsSpan(0));
+      data.Slice(start, pageData.Length).CopyTo(pageData);
       pages.Add(PcxReader.FromBytes(pageData));
     }
 
     return new DcxFile { Pages = pages };
+  }
+
+  public static DcxFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

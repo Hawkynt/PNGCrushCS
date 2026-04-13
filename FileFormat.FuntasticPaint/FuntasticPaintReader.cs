@@ -26,7 +26,16 @@ public static class FuntasticPaintReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static FuntasticPaintFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static FuntasticPaintFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != FuntasticPaintFile.ExpectedFileSize)
+      throw new InvalidDataException($"Fun*tastic Paint file must be exactly {FuntasticPaintFile.ExpectedFileSize} bytes, got {data.Length}.");
+
+    var pixelData = new byte[FuntasticPaintFile.ExpectedFileSize];
+    data.Slice(0, FuntasticPaintFile.ExpectedFileSize).CopyTo(pixelData);
+
+    return new FuntasticPaintFile { PixelData = pixelData };
+    }
 
   public static FuntasticPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

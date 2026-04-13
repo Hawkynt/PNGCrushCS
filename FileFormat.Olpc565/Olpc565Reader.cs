@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 
 namespace FileFormat.Olpc565;
@@ -26,12 +26,11 @@ public static class Olpc565Reader {
     return FromBytes(ms.ToArray());
   }
 
-  public static Olpc565File FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static Olpc565File FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < Olpc565Header.StructSize)
       throw new InvalidDataException("Data too small for a valid 565 file.");
 
-    var header = Olpc565Header.ReadFrom(data.AsSpan());
+    var header = Olpc565Header.ReadFrom(data);
     var width = (int)header.Width;
     var height = (int)header.Height;
 
@@ -46,12 +45,18 @@ public static class Olpc565Reader {
       throw new InvalidDataException($"Data too small for pixel data: expected {Olpc565Header.StructSize + expectedPixelBytes} bytes, got {data.Length}.");
 
     var pixelData = new byte[expectedPixelBytes];
-    data.AsSpan(Olpc565Header.StructSize, expectedPixelBytes).CopyTo(pixelData.AsSpan(0));
+    data.Slice(Olpc565Header.StructSize, expectedPixelBytes).CopyTo(pixelData.AsSpan(0));
 
     return new Olpc565File {
       Width = width,
       Height = height,
       PixelData = pixelData
     };
+  
+  }
+
+  public static Olpc565File FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

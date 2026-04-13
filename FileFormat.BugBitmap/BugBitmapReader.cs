@@ -26,10 +26,8 @@ public static class BugBitmapReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static BugBitmapFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static BugBitmapFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static BugBitmapFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < BugBitmapFile.ExpectedFileSize)
       throw new InvalidDataException($"Data too small for a valid Bug Bitmap file (expected {BugBitmapFile.ExpectedFileSize} bytes, got {data.Length}).");
 
@@ -44,17 +42,17 @@ public static class BugBitmapReader {
 
     // Bitmap data (8000 bytes)
     var bitmapData = new byte[BugBitmapFile.BitmapDataSize];
-    data.AsSpan(offset, BugBitmapFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
+    data.Slice(offset, BugBitmapFile.BitmapDataSize).CopyTo(bitmapData);
     offset += BugBitmapFile.BitmapDataSize;
 
     // Video matrix (1000 bytes)
     var videoMatrix = new byte[BugBitmapFile.VideoMatrixSize];
-    data.AsSpan(offset, BugBitmapFile.VideoMatrixSize).CopyTo(videoMatrix.AsSpan(0));
+    data.Slice(offset, BugBitmapFile.VideoMatrixSize).CopyTo(videoMatrix);
     offset += BugBitmapFile.VideoMatrixSize;
 
     // Color RAM (1000 bytes)
     var colorRam = new byte[BugBitmapFile.ColorRamSize];
-    data.AsSpan(offset, BugBitmapFile.ColorRamSize).CopyTo(colorRam.AsSpan(0));
+    data.Slice(offset, BugBitmapFile.ColorRamSize).CopyTo(colorRam);
     offset += BugBitmapFile.ColorRamSize;
 
     // Border color (1 byte)
@@ -67,7 +65,7 @@ public static class BugBitmapReader {
 
     // Padding (14 bytes)
     var padding = new byte[BugBitmapFile.PaddingSize];
-    data.AsSpan(offset, BugBitmapFile.PaddingSize).CopyTo(padding.AsSpan(0));
+    data.Slice(offset, BugBitmapFile.PaddingSize).CopyTo(padding);
 
     return new() {
       LoadAddress = loadAddress,
@@ -78,5 +76,10 @@ public static class BugBitmapReader {
       BackgroundColor = backgroundColor,
       Padding = padding,
     };
+  }
+
+  public static BugBitmapFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

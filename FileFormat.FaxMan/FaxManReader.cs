@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.FaxMan;
@@ -26,20 +27,17 @@ public static class FaxManReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static FaxManFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static FaxManFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static FaxManFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < FaxManFile.MinFileSize)
       throw new InvalidDataException($"Data too small for a valid FMF file (need at least {FaxManFile.MinFileSize} bytes, got {data.Length}).");
 
     if (data[0] != FaxManFile.Magic[0] || data[1] != FaxManFile.Magic[1])
       throw new InvalidDataException("Invalid FMF magic bytes.");
 
-    var width = BitConverter.ToUInt16(data, 2);
-    var height = BitConverter.ToUInt16(data, 4);
-    var version = BitConverter.ToUInt16(data, 6);
-    var flags = BitConverter.ToUInt16(data, 8);
+    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[2..]);
+    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
+    var version = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
+    var flags = BinaryPrimitives.ReadUInt16LittleEndian(data[8..]);
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid FMF dimensions: {width}x{height}.");
@@ -50,7 +48,7 @@ public static class FaxManReader {
       throw new InvalidDataException("FMF file truncated: not enough pixel data.");
 
     var pixelData = new byte[pixelDataSize];
-    data.AsSpan(FaxManFile.HeaderSize, pixelDataSize).CopyTo(pixelData.AsSpan(0));
+    data.Slice(FaxManFile.HeaderSize, pixelDataSize).CopyTo(pixelData);
 
     return new() {
       Width = width,
@@ -59,5 +57,10 @@ public static class FaxManReader {
       Flags = flags,
       PixelData = pixelData,
     };
+  }
+
+  public static FaxManFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

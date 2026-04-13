@@ -26,7 +26,23 @@ public static class AtariAnticModeReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static AtariAnticModeFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static AtariAnticModeFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != AtariAnticModeFile.ExpectedFileSize)
+      throw new InvalidDataException($"Invalid Atari ANTIC Mode data size: expected exactly {AtariAnticModeFile.ExpectedFileSize} bytes, got {data.Length}.");
+
+    var pixelData = new byte[AtariAnticModeFile.ScreenDataSize];
+    data.Slice(0, AtariAnticModeFile.ScreenDataSize).CopyTo(pixelData);
+
+    var mode = data[AtariAnticModeFile.ScreenDataSize];
+    if (mode != AtariAnticModeFile.ModeE && mode != AtariAnticModeFile.ModeF)
+      throw new InvalidDataException($"Invalid ANTIC mode byte: expected 0x{AtariAnticModeFile.ModeE:X2} (Mode E) or 0x{AtariAnticModeFile.ModeF:X2} (Mode F), got 0x{mode:X2}.");
+
+    return new AtariAnticModeFile {
+      PixelData = pixelData,
+      Mode = mode,
+    };
+    }
 
   public static AtariAnticModeFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

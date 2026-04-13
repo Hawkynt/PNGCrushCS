@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.HayesJtfax;
@@ -26,19 +27,21 @@ public static class HayesJtfaxReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static HayesJtfaxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
   public static HayesJtfaxFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  public static HayesJtfaxFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < HayesJtfaxFile.MinFileSize)
       throw new InvalidDataException($"Data too small for a valid JTF file (need at least {HayesJtfaxFile.MinFileSize} bytes, got {data.Length}).");
 
     if (data[0] != HayesJtfaxFile.Magic[0] || data[1] != HayesJtfaxFile.Magic[1])
       throw new InvalidDataException("Invalid JTF magic bytes.");
 
-    var version = BitConverter.ToUInt16(data, 2);
-    var width = BitConverter.ToUInt16(data, 4);
-    var height = BitConverter.ToUInt16(data, 6);
+    var version = BinaryPrimitives.ReadUInt16LittleEndian(data[2..]);
+    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
+    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid JTF dimensions: {width}x{height}.");
@@ -49,7 +52,7 @@ public static class HayesJtfaxReader {
       throw new InvalidDataException("JTF file truncated: not enough pixel data.");
 
     var pixelData = new byte[pixelDataSize];
-    data.AsSpan(HayesJtfaxFile.HeaderSize, pixelDataSize).CopyTo(pixelData.AsSpan(0));
+    data.Slice(HayesJtfaxFile.HeaderSize, pixelDataSize).CopyTo(pixelData.AsSpan(0));
 
     return new() {
       Width = width,

@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.GammaFax;
@@ -26,20 +27,22 @@ public static class GammaFaxReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static GammaFaxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
   public static GammaFaxFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  public static GammaFaxFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < GammaFaxFile.MinFileSize)
       throw new InvalidDataException($"Data too small for a valid GMF file (need at least {GammaFaxFile.MinFileSize} bytes, got {data.Length}).");
 
     if (data[0] != GammaFaxFile.Magic[0] || data[1] != GammaFaxFile.Magic[1])
       throw new InvalidDataException("Invalid GMF magic bytes.");
 
-    var version = BitConverter.ToUInt16(data, 2);
-    var width = BitConverter.ToUInt16(data, 4);
-    var height = BitConverter.ToUInt16(data, 6);
-    var compression = BitConverter.ToUInt16(data, 8);
+    var version = BinaryPrimitives.ReadUInt16LittleEndian(data[2..]);
+    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
+    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
+    var compression = BinaryPrimitives.ReadUInt16LittleEndian(data[8..]);
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid GMF dimensions: {width}x{height}.");
@@ -50,7 +53,7 @@ public static class GammaFaxReader {
       throw new InvalidDataException("GMF file truncated: not enough pixel data.");
 
     var pixelData = new byte[pixelDataSize];
-    data.AsSpan(GammaFaxFile.HeaderSize, pixelDataSize).CopyTo(pixelData.AsSpan(0));
+    data.Slice(GammaFaxFile.HeaderSize, pixelDataSize).CopyTo(pixelData.AsSpan(0));
 
     return new() {
       Width = width,

@@ -1,4 +1,5 @@
-using System;
+﻿using System;
+using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.Tg4;
@@ -26,18 +27,16 @@ public static class Tg4Reader {
     return FromBytes(ms.ToArray());
   }
 
-  public static Tg4File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static Tg4File FromSpan(ReadOnlySpan<byte> data) {
 
-  public static Tg4File FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < Tg4File.MinFileSize)
       throw new InvalidDataException($"Data too small for a valid TG4 file (need at least {Tg4File.MinFileSize} bytes, got {data.Length}).");
 
     if (data[0] != Tg4File.Magic[0] || data[1] != Tg4File.Magic[1] || data[2] != Tg4File.Magic[2] || data[3] != Tg4File.Magic[3])
       throw new InvalidDataException("Invalid TG4 magic bytes.");
 
-    var width = BitConverter.ToUInt16(data, 4);
-    var height = BitConverter.ToUInt16(data, 6);
+    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
+    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid TG4 dimensions: {width}x{height}.");
@@ -48,12 +47,17 @@ public static class Tg4Reader {
       throw new InvalidDataException("TG4 file truncated: not enough pixel data.");
 
     var pixelData = new byte[pixelDataSize];
-    data.AsSpan(Tg4File.HeaderSize, pixelDataSize).CopyTo(pixelData.AsSpan(0));
+    data.Slice(Tg4File.HeaderSize, pixelDataSize).CopyTo(pixelData.AsSpan(0));
 
     return new() {
       Width = width,
       Height = height,
       PixelData = pixelData,
     };
+  }
+
+  public static Tg4File FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.Calamus;
@@ -26,20 +27,17 @@ public static class CalamusReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static CalamusFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static CalamusFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static CalamusFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < CalamusFile.MinFileSize)
       throw new InvalidDataException($"Data too small for a valid Calamus file (need at least {CalamusFile.MinFileSize} bytes, got {data.Length}).");
 
     if (data[0] != CalamusFile.Magic[0] || data[1] != CalamusFile.Magic[1] || data[2] != CalamusFile.Magic[2] || data[3] != CalamusFile.Magic[3])
       throw new InvalidDataException("Invalid Calamus magic bytes.");
 
-    var version = BitConverter.ToUInt16(data, 4);
-    var width = BitConverter.ToUInt16(data, 6);
-    var height = BitConverter.ToUInt16(data, 8);
-    var bpp = BitConverter.ToUInt16(data, 10);
+    var version = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
+    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
+    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[8..]);
+    var bpp = BinaryPrimitives.ReadUInt16LittleEndian(data[10..]);
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid Calamus dimensions: {width}x{height}.");
@@ -50,7 +48,7 @@ public static class CalamusReader {
       throw new InvalidDataException("Calamus file truncated: not enough pixel data.");
 
     var pixelData = new byte[pixelDataSize];
-    data.AsSpan(CalamusFile.HeaderSize, pixelDataSize).CopyTo(pixelData.AsSpan(0));
+    data.Slice(CalamusFile.HeaderSize, pixelDataSize).CopyTo(pixelData);
 
     return new() {
       Width = width,
@@ -59,5 +57,10 @@ public static class CalamusReader {
       Bpp = bpp,
       PixelData = pixelData,
     };
+  }
+
+  public static CalamusFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

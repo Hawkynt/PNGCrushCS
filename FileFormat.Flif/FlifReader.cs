@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using FileFormat.Flif.Codec;
@@ -34,22 +34,17 @@ public static class FlifReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static FlifFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static FlifFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static FlifFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < MinFileSize)
       throw new InvalidDataException("Data too small for a valid FLIF file.");
 
-    var span = data.AsSpan();
-
     // Validate magic "FLIF"
     for (var i = 0; i < _Magic.Length; ++i)
-      if (span[i] != _Magic[i])
+      if (data[i] != _Magic[i])
         throw new InvalidDataException("Invalid FLIF signature.");
 
     // Parse header byte (offset 4)
-    var headerByte = span[4];
+    var headerByte = data[4];
     var isInterlaced = (headerByte & 0x10) != 0;
     var isAnimated = (headerByte & 0x08) != 0;
     var channelBits = headerByte & 0x07;
@@ -62,7 +57,7 @@ public static class FlifReader {
     };
 
     // Parse bytes per channel (offset 5)
-    var bpcByte = span[5];
+    var bpcByte = data[5];
     var bitsPerChannel = bpcByte switch {
       0 => 8,  // '1' => 8-bit
       1 => 16, // '2' => 16-bit
@@ -71,14 +66,14 @@ public static class FlifReader {
 
     // Parse varint-encoded dimensions
     var offset = 6;
-    var widthMinus1 = FlifVarint.Decode(span, ref offset);
-    var heightMinus1 = FlifVarint.Decode(span, ref offset);
+    var widthMinus1 = FlifVarint.Decode(data, ref offset);
+    var heightMinus1 = FlifVarint.Decode(data, ref offset);
     var width = widthMinus1 + 1;
     var height = heightMinus1 + 1;
 
     // Skip frame count for animated (not supported in round-trip, but parse it)
     if (isAnimated) {
-      var frameCountMinus2 = FlifVarint.Decode(span, ref offset);
+      var frameCountMinus2 = FlifVarint.Decode(data, ref offset);
       _ = frameCountMinus2; // not used for single-frame extraction
     }
 
@@ -87,9 +82,11 @@ public static class FlifReader {
     var bytesPerPixel = numChannels * (bitsPerChannel / 8);
     var expectedPixelDataLength = width * height * bytesPerPixel;
 
+    // FlifRangeDecoder requires byte[] for its internal buffer
+    var dataArray = data.ToArray();
     byte[] pixelData;
     try {
-      pixelData = _DecodePixelData(data, offset, width, height, numChannels, bitsPerChannel, isInterlaced);
+      pixelData = _DecodePixelData(dataArray, offset, width, height, numChannels, bitsPerChannel, isInterlaced);
     } catch (Exception ex) when (ex is not InvalidDataException) {
       throw new InvalidDataException("Failed to decompress FLIF pixel data.", ex);
     }
@@ -110,6 +107,12 @@ public static class FlifReader {
       IsAnimated = isAnimated,
       PixelData = pixelData,
     };
+  
+  }
+
+  public static FlifFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   /// <summary>

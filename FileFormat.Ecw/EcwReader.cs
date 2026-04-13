@@ -26,10 +26,7 @@ public static class EcwReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static EcwFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static EcwFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static EcwFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < EcwFile.HeaderSize)
       throw new InvalidDataException("Data too small for a valid Ecw file.");
 
@@ -37,7 +34,7 @@ public static class EcwReader {
     var fallbackWidth = _ParseFallbackWidth(data);
     var fallbackHeight = _ParseFallbackHeight(data);
 
-    var (pixelData, width, height) = EcwDecoder.Decode(data, fallbackWidth, fallbackHeight);
+    var (pixelData, width, height) = EcwDecoder.Decode(data.ToArray(), fallbackWidth, fallbackHeight);
 
     return new() {
       Width = width,
@@ -46,8 +43,13 @@ public static class EcwReader {
     };
   }
 
+  public static EcwFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
   /// <summary>Parses width from the legacy header format for fallback.</summary>
-  private static int _ParseFallbackWidth(byte[] data) {
+  private static int _ParseFallbackWidth(ReadOnlySpan<byte> data) {
     var width = data[0] | (data[1] << 8);
     if (width == 0)
       width = data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24);
@@ -57,7 +59,7 @@ public static class EcwReader {
   }
 
   /// <summary>Parses height from the legacy header format for fallback.</summary>
-  private static int _ParseFallbackHeight(byte[] data) {
+  private static int _ParseFallbackHeight(ReadOnlySpan<byte> data) {
     var height = data[4] | (data[5] << 8);
     if (height <= 0 || height > 65535)
       height = 256;

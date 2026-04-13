@@ -38,7 +38,7 @@ public sealed class DataTypeTests {
       PixelData = new byte[] { 0x00, 0x00 }
     };
 
-    var raw = file.ToRawImage();
+    var raw = Olpc565File.ToRawImage(file);
 
     Assert.That(raw.Format, Is.EqualTo(PixelFormat.Rgb24));
   }
@@ -52,7 +52,7 @@ public sealed class DataTypeTests {
       PixelData = new byte[] { 0x00, 0x00 }
     };
 
-    var raw = file.ToRawImage();
+    var raw = Olpc565File.ToRawImage(file);
 
     Assert.That(raw.PixelData[0], Is.EqualTo(0));
     Assert.That(raw.PixelData[1], Is.EqualTo(0));
@@ -68,7 +68,7 @@ public sealed class DataTypeTests {
       PixelData = new byte[] { 0xFF, 0xFF } // R=31, G=63, B=31
     };
 
-    var raw = file.ToRawImage();
+    var raw = Olpc565File.ToRawImage(file);
 
     Assert.That(raw.PixelData[0], Is.EqualTo(255));
     Assert.That(raw.PixelData[1], Is.EqualTo(255));

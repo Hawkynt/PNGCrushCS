@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Buffers.Binary;
 using System.IO;
 
@@ -27,38 +27,34 @@ public static class MrcReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static MrcFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static MrcFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static MrcFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < MrcFile.HeaderSize)
       throw new InvalidDataException($"Data too small for a valid MRC file: expected at least {MrcFile.HeaderSize} bytes, got {data.Length}.");
 
     // Validate MAP magic at offset 208
-    var span = data.AsSpan();
-    if (span[208] != MrcFile.MapMagic[0]
-        || span[209] != MrcFile.MapMagic[1]
-        || span[210] != MrcFile.MapMagic[2]
-        || span[211] != MrcFile.MapMagic[3])
+    if (data[208] != MrcFile.MapMagic[0]
+        || data[209] != MrcFile.MapMagic[1]
+        || data[210] != MrcFile.MapMagic[2]
+        || data[211] != MrcFile.MapMagic[3])
       throw new InvalidDataException("Invalid MRC file: missing MAP magic at offset 208.");
 
     // Detect endianness from MACHST at offset 212
-    var machineStamp = span[212];
+    var machineStamp = data[212];
     var isBigEndian = machineStamp == 0x11;
 
     int nx, ny, nz, mode, nsymbt;
     if (isBigEndian) {
-      nx = BinaryPrimitives.ReadInt32BigEndian(span);
-      ny = BinaryPrimitives.ReadInt32BigEndian(span[4..]);
-      nz = BinaryPrimitives.ReadInt32BigEndian(span[8..]);
-      mode = BinaryPrimitives.ReadInt32BigEndian(span[12..]);
-      nsymbt = BinaryPrimitives.ReadInt32BigEndian(span[92..]);
+      nx = BinaryPrimitives.ReadInt32BigEndian(data);
+      ny = BinaryPrimitives.ReadInt32BigEndian(data[4..]);
+      nz = BinaryPrimitives.ReadInt32BigEndian(data[8..]);
+      mode = BinaryPrimitives.ReadInt32BigEndian(data[12..]);
+      nsymbt = BinaryPrimitives.ReadInt32BigEndian(data[92..]);
     } else {
-      nx = BinaryPrimitives.ReadInt32LittleEndian(span);
-      ny = BinaryPrimitives.ReadInt32LittleEndian(span[4..]);
-      nz = BinaryPrimitives.ReadInt32LittleEndian(span[8..]);
-      mode = BinaryPrimitives.ReadInt32LittleEndian(span[12..]);
-      nsymbt = BinaryPrimitives.ReadInt32LittleEndian(span[92..]);
+      nx = BinaryPrimitives.ReadInt32LittleEndian(data);
+      ny = BinaryPrimitives.ReadInt32LittleEndian(data[4..]);
+      nz = BinaryPrimitives.ReadInt32LittleEndian(data[8..]);
+      mode = BinaryPrimitives.ReadInt32LittleEndian(data[12..]);
+      nsymbt = BinaryPrimitives.ReadInt32LittleEndian(data[92..]);
     }
 
     if (nx <= 0)
@@ -76,7 +72,7 @@ public static class MrcReader {
         throw new InvalidDataException($"Data too small for extended header: expected {MrcFile.HeaderSize + nsymbt} bytes, got {data.Length}.");
 
       extendedHeader = new byte[nsymbt];
-      data.AsSpan(MrcFile.HeaderSize, nsymbt).CopyTo(extendedHeader.AsSpan(0));
+      data.Slice(MrcFile.HeaderSize, nsymbt).CopyTo(extendedHeader.AsSpan(0));
     }
 
     var dataOffset = MrcFile.HeaderSize + nsymbt;
@@ -94,7 +90,7 @@ public static class MrcReader {
 
     var pixelData = new byte[expectedPixelBytes];
     if (copyLen > 0)
-      data.AsSpan(dataOffset, copyLen).CopyTo(pixelData.AsSpan(0));
+      data.Slice(dataOffset, copyLen).CopyTo(pixelData.AsSpan(0));
 
     return new MrcFile {
       Width = nx,
@@ -106,5 +102,10 @@ public static class MrcReader {
       ExtendedHeader = extendedHeader,
       PixelData = pixelData,
     };
+  }
+
+  public static MrcFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

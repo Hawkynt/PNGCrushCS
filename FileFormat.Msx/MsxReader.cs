@@ -44,15 +44,13 @@ public static class MsxReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static MsxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static MsxFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static MsxFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _SC2_SIZE)
       throw new InvalidDataException($"Data too small for a valid MSX screen dump: got {data.Length} bytes.");
 
     var hasBload = data.Length >= _BLOAD_HEADER_SIZE && data[0] == _BLOAD_MAGIC;
-    var rawData = hasBload ? data.AsSpan(_BLOAD_HEADER_SIZE) : data.AsSpan();
+    var rawData = hasBload ? data[_BLOAD_HEADER_SIZE..] : data;
     var rawLength = rawData.Length;
 
     return rawLength switch {
@@ -61,6 +59,11 @@ public static class MsxReader {
       _SC7_SC8_SIZE => _ParseSc8(rawData, hasBload),
       _ => throw new InvalidDataException($"Unrecognized MSX data size: {rawLength} bytes (after BLOAD header stripping).")
     };
+    }
+
+  public static MsxFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   private static MsxFile _ParseSc2(ReadOnlySpan<byte> rawData, bool hasBload) {

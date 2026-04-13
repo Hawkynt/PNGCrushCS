@@ -26,7 +26,19 @@ public static class PublicPainterReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static PublicPainterFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static PublicPainterFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < 2)
+      throw new InvalidDataException("Data too small for a valid Public Painter file.");
+
+    var pixelData = PublicPainterCompressor.Decompress(data, PublicPainterFile.DecompressedSize);
+
+    return new PublicPainterFile {
+      Width = PublicPainterFile.ImageWidth,
+      Height = PublicPainterFile.ImageHeight,
+      PixelData = pixelData,
+    };
+    }
 
   public static PublicPainterFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

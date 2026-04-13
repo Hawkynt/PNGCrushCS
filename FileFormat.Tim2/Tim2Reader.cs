@@ -27,14 +27,12 @@ public static class Tim2Reader {
     return FromBytes(ms.ToArray());
   }
 
-  public static Tim2File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static Tim2File FromSpan(ReadOnlySpan<byte> data) {
 
-  public static Tim2File FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < Tim2Header.StructSize)
       throw new InvalidDataException("Data too small for a valid TIM2 file.");
 
-    var span = data.AsSpan();
+    var span = data;
     var header = Tim2Header.ReadFrom(span);
     if (!header.IsValid)
       throw new InvalidDataException("Invalid TIM2 signature.");
@@ -62,7 +60,7 @@ public static class Tim2Reader {
         throw new InvalidDataException($"Image data extends beyond file for picture {i}.");
 
       var pixelData = new byte[imageDataSize];
-      data.AsSpan(imageDataOffset, imageDataSize).CopyTo(pixelData.AsSpan(0));
+      data.Slice(imageDataOffset, imageDataSize).CopyTo(pixelData.AsSpan(0));
 
       byte[]? paletteData = null;
       if (paletteSize > 0) {
@@ -71,7 +69,7 @@ public static class Tim2Reader {
           throw new InvalidDataException($"Palette data extends beyond file for picture {i}.");
 
         paletteData = new byte[paletteSize];
-        data.AsSpan(paletteOffset, paletteSize).CopyTo(paletteData.AsSpan(0));
+        data.Slice(paletteOffset, paletteSize).CopyTo(paletteData.AsSpan(0));
       }
 
       pictures.Add(new Tim2Picture {
@@ -92,5 +90,10 @@ public static class Tim2Reader {
       Alignment = alignment,
       Pictures = pictures.AsReadOnly()
     };
+    }
+
+  public static Tim2File FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Buffers.Binary;
 using System.IO;
 
@@ -29,29 +29,30 @@ public static class DaliSTReader {
     return _Parse(ms.ToArray(), DaliSTResolution.Low);
   }
 
-  public static DaliSTFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static DaliSTFile FromSpan(ReadOnlySpan<byte> data) => _Parse(data, DaliSTResolution.Low);
 
   public static DaliSTFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    return _Parse(data, DaliSTResolution.Low);
+    return FromSpan(data);
   }
+
+  public static DaliSTFile FromSpan(ReadOnlySpan<byte> data, DaliSTResolution resolution) => _Parse(data, resolution);
 
   public static DaliSTFile FromBytes(byte[] data, DaliSTResolution resolution) {
     ArgumentNullException.ThrowIfNull(data);
-    return _Parse(data, resolution);
+    return FromSpan(data, resolution);
   }
 
-  private static DaliSTFile _Parse(byte[] data, DaliSTResolution resolution) {
+  private static DaliSTFile _Parse(ReadOnlySpan<byte> data, DaliSTResolution resolution) {
     if (data.Length < DaliSTFile.ExpectedFileSize)
       throw new InvalidDataException($"Data too small for a valid Dali ST file: expected {DaliSTFile.ExpectedFileSize} bytes, got {data.Length}.");
 
-    var span = data.AsSpan();
     var palette = new short[16];
     for (var i = 0; i < 16; ++i)
-      palette[i] = BinaryPrimitives.ReadInt16BigEndian(span[(i * 2)..]);
+      palette[i] = BinaryPrimitives.ReadInt16BigEndian(data[(i * 2)..]);
 
     var pixelData = new byte[DaliSTFile.PlanarDataSize];
-    data.AsSpan(DaliSTFile.PaletteSize, DaliSTFile.PlanarDataSize).CopyTo(pixelData.AsSpan(0));
+    data.Slice(DaliSTFile.PaletteSize, DaliSTFile.PlanarDataSize).CopyTo(pixelData);
 
     var (width, height) = _GetDimensions(resolution);
 

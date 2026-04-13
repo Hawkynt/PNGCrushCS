@@ -29,21 +29,17 @@ public static class CurReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static CurFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static CurFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
-
+  public static CurFile FromSpan(ReadOnlySpan<byte> data) {
     // Parse image data using IcoReader's internal parser with Cursor type
     var icoFile = IcoReader._Parse(data, IcoFileType.Cursor);
 
     // Re-read directory entries to extract hotspot fields
-    var count = BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(4));
+    var count = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
     var images = new List<CurImage>(count);
     for (var i = 0; i < count; ++i) {
       var entryOffset = 6 + i * 16;
-      var hotspotX = BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(entryOffset + 4));
-      var hotspotY = BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(entryOffset + 6));
+      var hotspotX = BinaryPrimitives.ReadUInt16LittleEndian(data[(entryOffset + 4)..]);
+      var hotspotY = BinaryPrimitives.ReadUInt16LittleEndian(data[(entryOffset + 6)..]);
 
       var icoImage = icoFile.Images[i];
       images.Add(new CurImage {
@@ -58,5 +54,10 @@ public static class CurReader {
     }
 
     return new CurFile { Images = images };
+  }
+
+  public static CurFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

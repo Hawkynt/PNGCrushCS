@@ -27,14 +27,16 @@ public static class PhmReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static PhmFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
   public static PhmFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  public static PhmFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < PhmHeaderParser.MinHeaderSize)
       throw new InvalidDataException("Data too small for a valid PHM file.");
 
-    var header = PhmHeaderParser.Parse(data);
+    var header = PhmHeaderParser.Parse(data.ToArray());
     var channelsPerPixel = header.ColorMode == PhmColorMode.Rgb ? 3 : 1;
     var totalHalves = header.Width * header.Height * channelsPerPixel;
     var expectedDataBytes = totalHalves * 2;

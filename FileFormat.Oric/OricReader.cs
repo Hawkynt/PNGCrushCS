@@ -29,7 +29,18 @@ public static class OricReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static OricFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static OricFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != _EXPECTED_SIZE)
+      throw new InvalidDataException($"Invalid Oric data size: expected exactly {_EXPECTED_SIZE} bytes, got {data.Length}.");
+
+    var screenData = new byte[_EXPECTED_SIZE];
+    data.Slice(0, _EXPECTED_SIZE).CopyTo(screenData);
+
+    return new OricFile {
+      ScreenData = screenData
+    };
+    }
 
   public static OricFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

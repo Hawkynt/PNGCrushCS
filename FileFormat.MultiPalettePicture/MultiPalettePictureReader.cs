@@ -27,7 +27,36 @@ public static class MultiPalettePictureReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static MultiPalettePictureFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static MultiPalettePictureFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < MultiPalettePictureFile.ExpectedFileSize)
+      throw new InvalidDataException($"Data too small for a valid MPP file: expected {MultiPalettePictureFile.ExpectedFileSize} bytes, got {data.Length}.");
+
+    var span = data;
+    var pixelData = new byte[MultiPalettePictureFile.BytesPerScanline * MultiPalettePictureFile.ImageHeight];
+    var palettes = new short[MultiPalettePictureFile.ImageHeight][];
+
+    for (var y = 0; y < MultiPalettePictureFile.ImageHeight; ++y) {
+      var recordOffset = y * MultiPalettePictureFile.RecordSize;
+
+      // Copy 160 bytes of pixel data
+      data.Slice(recordOffset, MultiPalettePictureFile.BytesPerScanline)
+        .CopyTo(pixelData.AsSpan(y * MultiPalettePictureFile.BytesPerScanline));
+
+      // Read 16-word palette after pixel data
+      var palette = new short[16];
+      var paletteOffset = recordOffset + MultiPalettePictureFile.BytesPerScanline;
+      for (var i = 0; i < 16; ++i)
+        palette[i] = BinaryPrimitives.ReadInt16BigEndian(span[(paletteOffset + i * 2)..]);
+
+      palettes[y] = palette;
+    }
+
+    return new MultiPalettePictureFile {
+      PixelData = pixelData,
+      Palettes = palettes
+    };
+    }
 
   public static MultiPalettePictureFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

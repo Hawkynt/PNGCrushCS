@@ -26,14 +26,12 @@ public static class BsaveReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static BsaveFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static BsaveFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static BsaveFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < BsaveHeader.StructSize)
       throw new InvalidDataException("Data too small for a valid BSAVE file.");
 
-    var header = BsaveHeader.ReadFrom(data.AsSpan());
+    var header = BsaveHeader.ReadFrom(data);
 
     if (header.Magic != BsaveHeader.MagicValue)
       throw new InvalidDataException($"Invalid BSAVE magic byte: expected 0x{BsaveHeader.MagicValue:X2}, got 0x{header.Magic:X2}.");
@@ -43,7 +41,7 @@ public static class BsaveReader {
 
     var dataLength = data.Length - BsaveHeader.StructSize;
     var pixelData = new byte[dataLength];
-    data.AsSpan(BsaveHeader.StructSize, dataLength).CopyTo(pixelData.AsSpan(0));
+    data.Slice(BsaveHeader.StructSize, dataLength).CopyTo(pixelData);
 
     return new BsaveFile {
       Width = width,
@@ -51,6 +49,11 @@ public static class BsaveReader {
       Mode = mode,
       PixelData = pixelData
     };
+  }
+
+  public static BsaveFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   private static BsaveMode _DetectMode(ushort segment, ushort length) {

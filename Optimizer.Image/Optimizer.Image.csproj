@@ -16,6 +16,9 @@
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
       <_Parameter1>Optimizer.Image.Tests</_Parameter1>
     </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Crush.Viewer</_Parameter1>
+    </AssemblyAttribute>
   </ItemGroup>
 
   <ItemGroup>
@@ -67,6 +70,7 @@
     <ProjectReference Include="..\FileFormat.DrHalo\FileFormat.DrHalo.csproj" />
     <ProjectReference Include="..\FileFormat.Exr\FileFormat.Exr.csproj" />
     <ProjectReference Include="..\FileFormat.Farbfeld\FileFormat.Farbfeld.csproj" />
+    <ProjectReference Include="..\FileFormat.Bam\FileFormat.Bam.csproj" />
     <ProjectReference Include="..\FileFormat.Fits\FileFormat.Fits.csproj" />
     <ProjectReference Include="..\FileFormat.Fli\FileFormat.Fli.csproj" />
     <ProjectReference Include="..\FileFormat.GemImg\FileFormat.GemImg.csproj" />

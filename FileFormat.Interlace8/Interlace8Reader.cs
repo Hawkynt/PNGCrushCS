@@ -26,7 +26,21 @@ public static class Interlace8Reader {
     return FromBytes(ms.ToArray());
   }
 
-  public static Interlace8File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static Interlace8File FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != Interlace8File.ExpectedFileSize)
+      throw new InvalidDataException($"Interlace Mode file must be exactly {Interlace8File.ExpectedFileSize} bytes, got {data.Length}.");
+
+    var frame1 = new byte[Interlace8File.FrameSize];
+    var frame2 = new byte[Interlace8File.FrameSize];
+    data.Slice(0, Interlace8File.FrameSize).CopyTo(frame1.AsSpan(0));
+    data.Slice(Interlace8File.FrameSize, Interlace8File.FrameSize).CopyTo(frame2.AsSpan(0));
+
+    return new Interlace8File {
+      Frame1Data = frame1,
+      Frame2Data = frame2,
+    };
+    }
 
   public static Interlace8File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

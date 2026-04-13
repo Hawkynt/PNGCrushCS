@@ -8,18 +8,16 @@ public sealed class DataTypeTests {
 
   [Test]
   [Category("Unit")]
-  public void XyzFile_DefaultPalette_IsEmptyArray() {
+  public void XyzFile_DefaultPalette_IsNull() {
     var file = new XyzFile { Width = 1, Height = 1 };
-    Assert.That(file.Palette, Is.Not.Null);
-    Assert.That(file.Palette, Has.Length.EqualTo(0));
+    Assert.That(file.Palette, Is.Null);
   }
 
   [Test]
   [Category("Unit")]
-  public void XyzFile_DefaultPixelData_IsEmptyArray() {
+  public void _DefaultPixelData_IsNull() {
     var file = new XyzFile { Width = 1, Height = 1 };
-    Assert.That(file.PixelData, Is.Not.Null);
-    Assert.That(file.PixelData, Has.Length.EqualTo(0));
+    Assert.That(file.PixelData, Is.Null);
   }
 
   [Test]

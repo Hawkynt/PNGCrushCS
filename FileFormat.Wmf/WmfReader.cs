@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Buffers.Binary;
 using System.IO;
 using FileFormat.Bmp;
@@ -34,14 +34,11 @@ public static class WmfReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static WmfFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static WmfFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static WmfFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_FILE_SIZE)
       throw new InvalidDataException("Data too small for a valid WMF file.");
 
-    var placeable = WmfPlaceableHeader.ReadFrom(data.AsSpan(0, WmfPlaceableHeader.StructSize));
+    var placeable = WmfPlaceableHeader.ReadFrom(data.Slice(0, WmfPlaceableHeader.StructSize));
     if (placeable.Magic != _PLACEABLE_MAGIC)
       throw new InvalidDataException($"Invalid WMF magic: 0x{placeable.Magic:X8}, expected 0x{_PLACEABLE_MAGIC:X8}.");
 
@@ -49,8 +46,8 @@ public static class WmfReader {
     var offset = WmfPlaceableHeader.StructSize + WmfStandardHeader.StructSize;
 
     while (offset + 6 <= data.Length) {
-      var recordSizeInWords = BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(offset));
-      var function = BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(offset + 4));
+      var recordSizeInWords = BinaryPrimitives.ReadUInt32LittleEndian(data[offset..]);
+      var function = BinaryPrimitives.ReadUInt16LittleEndian(data[(offset + 4)..]);
 
       if (function == _META_EOF)
         break;
@@ -71,10 +68,16 @@ public static class WmfReader {
     }
 
     throw new InvalidDataException("No META_STRETCHDIB record found in WMF file.");
+  
   }
 
-  private static WmfFile _ParseDib(byte[] data, int dibOffset) {
-    var bih = BitmapInfoHeader.ReadFrom(data.AsSpan(dibOffset, BitmapInfoHeader.StructSize));
+  public static WmfFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  private static WmfFile _ParseDib(ReadOnlySpan<byte> data, int dibOffset) {
+    var bih = BitmapInfoHeader.ReadFrom(data.Slice(dibOffset, BitmapInfoHeader.StructSize));
     var width = bih.Width;
     var height = bih.Height;
     var bitCount = bih.BitsPerPixel;

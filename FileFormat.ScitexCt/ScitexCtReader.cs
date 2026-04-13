@@ -27,18 +27,20 @@ public static class ScitexCtReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static ScitexCtFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
   public static ScitexCtFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  public static ScitexCtFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < ScitexCtHeader.StructSize)
       throw new InvalidDataException("Data too small for a valid Scitex CT file.");
 
-    var sig = Encoding.ASCII.GetString(data, 0, 2);
+    var sig = Encoding.ASCII.GetString(data.Slice(0, 2));
     if (sig != "CT")
       throw new InvalidDataException($"Invalid Scitex CT signature: expected 'CT', got '{sig}'.");
 
-    var header = ScitexCtHeader.ReadFrom(data.AsSpan());
+    var header = ScitexCtHeader.ReadFrom(data);
 
     var width = header.Width;
     var height = header.Height;
@@ -61,7 +63,7 @@ public static class ScitexCtReader {
       throw new InvalidDataException($"Data too small for pixel data: expected {ScitexCtHeader.StructSize + expectedPixelBytes} bytes, got {data.Length}.");
 
     var pixelData = new byte[expectedPixelBytes];
-    data.AsSpan(ScitexCtHeader.StructSize, expectedPixelBytes).CopyTo(pixelData.AsSpan(0));
+    data.Slice(ScitexCtHeader.StructSize, expectedPixelBytes).CopyTo(pixelData.AsSpan(0));
 
     return new ScitexCtFile {
       Width = width,

@@ -1,4 +1,5 @@
-using System;
+﻿using System;
+using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.Pfm;
@@ -26,14 +27,12 @@ public static class PfmReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static PfmFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static PfmFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static PfmFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < PfmHeaderParser.MinHeaderSize)
       throw new InvalidDataException("Data too small for a valid PFM file.");
 
-    var header = PfmHeaderParser.Parse(data);
+    // PfmHeaderParser.Parse requires byte[]
+    var header = PfmHeaderParser.Parse(data.ToArray());
     var channelsPerPixel = header.ColorMode == PfmColorMode.Rgb ? 3 : 1;
     var totalFloats = header.Width * header.Height * channelsPerPixel;
     var expectedDataBytes = totalFloats * 4;
@@ -61,7 +60,7 @@ public static class PfmReader {
           swapBuf[3] = data[byteOffset];
           pixelData[dstOffset + i] = BitConverter.ToSingle(swapBuf);
         } else
-          pixelData[dstOffset + i] = BitConverter.ToSingle(data, byteOffset);
+          pixelData[dstOffset + i] = BinaryPrimitives.ReadSingleLittleEndian(data[byteOffset..]);
       }
     }
 
@@ -73,5 +72,11 @@ public static class PfmReader {
       IsLittleEndian = header.IsLittleEndian,
       PixelData = pixelData
     };
+  
+  }
+
+  public static PfmFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Text;
 
@@ -27,10 +27,7 @@ public static class CsvImageReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static CsvImageFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static CsvImageFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static CsvImageFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < CsvImageFile.MinFileSize)
       throw new InvalidDataException($"Data too small for a valid CSV image file (need at least {CsvImageFile.MinFileSize} bytes, got {data.Length}).");
 
@@ -65,5 +62,11 @@ public static class CsvImageReader {
       Height = height,
       PixelData = pixelData,
     };
+  
+  }
+
+  public static CsvImageFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

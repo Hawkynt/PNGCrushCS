@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 
 namespace FileFormat.Nifti;
@@ -26,12 +26,11 @@ public static class NiftiReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static NiftiFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static NiftiFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < NiftiHeader.StructSize)
       throw new InvalidDataException("Data too small for a valid NIfTI file.");
 
-    var header = NiftiHeader.ReadFrom(data.AsSpan());
+    var header = NiftiHeader.ReadFrom(data);
 
     if (header.SizeOfHdr != NiftiHeader.StructSize)
       throw new InvalidDataException($"Invalid NIfTI SizeOfHdr: expected {NiftiHeader.StructSize}, got {header.SizeOfHdr}.");
@@ -52,7 +51,7 @@ public static class NiftiReader {
     if (pixelDataStart < data.Length) {
       var available = data.Length - pixelDataStart;
       pixelData = new byte[available];
-      data.AsSpan(pixelDataStart, available).CopyTo(pixelData.AsSpan(0));
+      data.Slice(pixelDataStart, available).CopyTo(pixelData.AsSpan(0));
     }
 
     return new NiftiFile {
@@ -68,5 +67,11 @@ public static class NiftiReader {
       PixelData = pixelData,
       Pixdim = header.Pixdim
     };
+  
+  }
+
+  public static NiftiFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

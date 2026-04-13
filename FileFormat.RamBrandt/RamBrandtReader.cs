@@ -26,7 +26,16 @@ public static class RamBrandtReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static RamBrandtFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static RamBrandtFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != RamBrandtFile.ExpectedFileSize)
+      throw new InvalidDataException($"Ram Brandt file must be exactly {RamBrandtFile.ExpectedFileSize} bytes, got {data.Length}.");
+
+    var pixelData = new byte[RamBrandtFile.ExpectedFileSize];
+    data.Slice(0, RamBrandtFile.ExpectedFileSize).CopyTo(pixelData);
+
+    return new RamBrandtFile { PixelData = pixelData };
+    }
 
   public static RamBrandtFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

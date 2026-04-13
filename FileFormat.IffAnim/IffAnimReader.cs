@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Buffers.Binary;
 using System.IO;
 using System.Text;
@@ -32,20 +32,18 @@ public static class IffAnimReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static IffAnimFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static IffAnimFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static IffAnimFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MIN_SIZE)
       throw new InvalidDataException("Data too small for a valid IFF ANIM file.");
 
-    var span = data.AsSpan();
+    var span = data;
 
-    var formTag = Encoding.ASCII.GetString(data, 0, 4);
+    var formTag = Encoding.ASCII.GetString(data.Slice(0, 4));
     if (formTag != "FORM")
       throw new InvalidDataException($"Invalid IFF magic: expected 'FORM', got '{formTag}'.");
 
-    var formType = Encoding.ASCII.GetString(data, 8, 4);
+    var formType = Encoding.ASCII.GetString(data.Slice(8, 4));
     if (formType != "ANIM")
       throw new InvalidDataException($"Invalid IFF form type: expected 'ANIM', got '{formType}'.");
 
@@ -55,18 +53,18 @@ public static class IffAnimReader {
     // Scan for first embedded FORM ILBM
     var offset = 12;
     while (offset + 12 <= endOffset) {
-      var chunkId = Encoding.ASCII.GetString(data, offset, 4);
+      var chunkId = Encoding.ASCII.GetString(data.Slice(offset, 4));
       var chunkSize = BinaryPrimitives.ReadInt32BigEndian(span[(offset + 4)..]);
 
       if (chunkId == "FORM" && offset + 12 <= endOffset) {
-        var subFormType = Encoding.ASCII.GetString(data, offset + 8, 4);
+        var subFormType = Encoding.ASCII.GetString(data.Slice(offset + 8, 4));
         if (subFormType == "ILBM") {
           var ilbmTotalSize = 8 + chunkSize; // "FORM" + size + data
           if (offset + ilbmTotalSize > data.Length)
             ilbmTotalSize = data.Length - offset;
 
           var ilbmBytes = new byte[ilbmTotalSize];
-          data.AsSpan(offset, ilbmTotalSize).CopyTo(ilbmBytes.AsSpan(0));
+          data.Slice(offset, ilbmTotalSize).CopyTo(ilbmBytes.AsSpan(0));
 
           var ilbmFile = IlbmReader.FromBytes(ilbmBytes);
           var rawImage = IlbmFile.ToRawImage(ilbmFile);
@@ -90,5 +88,10 @@ public static class IffAnimReader {
     }
 
     throw new InvalidDataException("No FORM ILBM frame found in the ANIM container.");
+  }
+
+  public static IffAnimFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

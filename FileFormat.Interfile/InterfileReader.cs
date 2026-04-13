@@ -32,10 +32,12 @@ public static class InterfileReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static InterfileFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
   public static InterfileFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  public static InterfileFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_SIZE)
       throw new InvalidDataException("Data too small for a valid Interfile.");
 
@@ -43,7 +45,8 @@ public static class InterfileReader {
       if (data[i] != _MAGIC[i])
         throw new InvalidDataException("Invalid Interfile: missing '!INTERFILE' magic.");
 
-    var header = InterfileHeaderParser.Parse(data);
+    var dataArray = data.ToArray();
+    var header = InterfileHeaderParser.Parse(dataArray);
 
     var dataOffset = header.DataOffset;
     var remainingBytes = data.Length - dataOffset;
@@ -55,7 +58,7 @@ public static class InterfileReader {
       pixelData = [];
     } else {
       pixelData = new byte[expectedPixelBytes];
-      data.AsSpan(dataOffset, Math.Min(remainingBytes, expectedPixelBytes)).CopyTo(pixelData.AsSpan(0));
+      data.Slice(dataOffset, Math.Min(remainingBytes, expectedPixelBytes)).CopyTo(pixelData.AsSpan(0));
     }
 
     return new InterfileFile {

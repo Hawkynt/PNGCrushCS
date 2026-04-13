@@ -32,33 +32,28 @@ public static class BlpReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static BlpFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static BlpFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static BlpFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _HEADER_SIZE)
       throw new InvalidDataException("Data too small for a valid BLP2 file.");
 
-    var span = data.AsSpan();
-
-    var magic = BinaryPrimitives.ReadUInt32LittleEndian(span);
+    var magic = BinaryPrimitives.ReadUInt32LittleEndian(data);
     if (magic != _MAGIC)
       throw new InvalidDataException("Invalid BLP2 magic number.");
 
-    var type = BinaryPrimitives.ReadUInt32LittleEndian(span.Slice(4));
-    var encoding = (BlpEncoding)span[8];
-    var alphaDepth = span[9];
-    var alphaEncoding = (BlpAlphaEncoding)span[10];
-    var hasMips = span[11] != 0;
-    var width = (int)BinaryPrimitives.ReadUInt32LittleEndian(span.Slice(12));
-    var height = (int)BinaryPrimitives.ReadUInt32LittleEndian(span.Slice(16));
+    var type = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(4));
+    var encoding = (BlpEncoding)data[8];
+    var alphaDepth = data[9];
+    var alphaEncoding = (BlpAlphaEncoding)data[10];
+    var hasMips = data[11] != 0;
+    var width = (int)BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(12));
+    var height = (int)BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(16));
 
     // Read mip offsets and sizes
     var mipOffsets = new uint[_MAX_MIPS];
     var mipSizes = new uint[_MAX_MIPS];
     for (var i = 0; i < _MAX_MIPS; ++i) {
-      mipOffsets[i] = BinaryPrimitives.ReadUInt32LittleEndian(span.Slice(20 + i * 4));
-      mipSizes[i] = BinaryPrimitives.ReadUInt32LittleEndian(span.Slice(84 + i * 4));
+      mipOffsets[i] = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(20 + i * 4));
+      mipSizes[i] = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(84 + i * 4));
     }
 
     // Count actual mipmap levels
@@ -76,7 +71,7 @@ public static class BlpReader {
         throw new InvalidDataException("Data too small to contain BLP palette.");
 
       palette = new byte[_PALETTE_SIZE];
-      data.AsSpan(_HEADER_SIZE, _PALETTE_SIZE).CopyTo(palette.AsSpan(0));
+      data.Slice(_HEADER_SIZE, _PALETTE_SIZE).CopyTo(palette);
     }
 
     // Read mipmap data
@@ -88,7 +83,7 @@ public static class BlpReader {
 
       var available = Math.Min(size, data.Length - offset);
       if (available > 0 && offset >= 0 && offset < data.Length)
-        data.AsSpan(offset, available).CopyTo(mipData[i].AsSpan(0));
+        data.Slice(offset, available).CopyTo(mipData[i]);
     }
 
     return new() {
@@ -101,5 +96,10 @@ public static class BlpReader {
       Palette = palette,
       MipData = mipData,
     };
+  }
+
+  public static BlpFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

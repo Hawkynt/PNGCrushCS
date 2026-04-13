@@ -27,17 +27,12 @@ public static class PsbReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static PsbFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static PsbFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static PsbFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < PsbHeader.StructSize)
       throw new InvalidDataException("Data too small for a valid PSB file.");
 
-    var span = data.AsSpan();
-
     // Header (26 bytes)
-    var header = PsbHeader.ReadFrom(span);
+    var header = PsbHeader.ReadFrom(data);
     if (header.Sig0 != (byte)'8' || header.Sig1 != (byte)'B' || header.Sig2 != (byte)'P' || header.Sig3 != (byte)'S')
       throw new InvalidDataException("Invalid PSB signature.");
 
@@ -57,7 +52,7 @@ public static class PsbReader {
     if (offset + 4 > data.Length)
       throw new InvalidDataException("Unexpected end of file in color mode data section.");
 
-    var colorModeDataLength = BinaryPrimitives.ReadInt32BigEndian(span[offset..]);
+    var colorModeDataLength = BinaryPrimitives.ReadInt32BigEndian(data[offset..]);
     offset += 4;
 
     if (colorModeDataLength > 0) {
@@ -65,7 +60,7 @@ public static class PsbReader {
         throw new InvalidDataException("Color mode data extends beyond file.");
 
       if (colorMode == PsbColorMode.Indexed && colorModeDataLength >= 768)
-        palette = data[offset..(offset + 768)];
+        palette = data.Slice(offset, 768).ToArray();
 
       offset += colorModeDataLength;
     }
@@ -75,14 +70,14 @@ public static class PsbReader {
     if (offset + 4 > data.Length)
       throw new InvalidDataException("Unexpected end of file in image resources section.");
 
-    var imageResourcesLength = BinaryPrimitives.ReadInt32BigEndian(span[offset..]);
+    var imageResourcesLength = BinaryPrimitives.ReadInt32BigEndian(data[offset..]);
     offset += 4;
 
     if (imageResourcesLength > 0) {
       if (offset + imageResourcesLength > data.Length)
         throw new InvalidDataException("Image resources data extends beyond file.");
 
-      imageResources = data[offset..(offset + imageResourcesLength)];
+      imageResources = data.Slice(offset, imageResourcesLength).ToArray();
       offset += imageResourcesLength;
     }
 
@@ -91,14 +86,14 @@ public static class PsbReader {
     if (offset + 8 > data.Length)
       throw new InvalidDataException("Unexpected end of file in layer/mask info section.");
 
-    var layerMaskInfoLength = BinaryPrimitives.ReadInt64BigEndian(span[offset..]);
+    var layerMaskInfoLength = BinaryPrimitives.ReadInt64BigEndian(data[offset..]);
     offset += 8;
 
     if (layerMaskInfoLength > 0) {
       if (offset + layerMaskInfoLength > data.Length)
         throw new InvalidDataException("Layer/mask info data extends beyond file.");
 
-      layerMaskInfo = data[offset..(offset + (int)layerMaskInfoLength)];
+      layerMaskInfo = data.Slice(offset, (int)layerMaskInfoLength).ToArray();
       offset += (int)layerMaskInfoLength;
     }
 
@@ -106,7 +101,7 @@ public static class PsbReader {
     if (offset + 2 > data.Length)
       throw new InvalidDataException("Unexpected end of file in image data section.");
 
-    var compression = (PsbCompression)BinaryPrimitives.ReadInt16BigEndian(span[offset..]);
+    var compression = (PsbCompression)BinaryPrimitives.ReadInt16BigEndian(data[offset..]);
     offset += 2;
 
     var bytesPerChannel = (depth + 7) / 8;
@@ -123,7 +118,7 @@ public static class PsbReader {
 
       var byteCounts = new int[scanlineCount];
       for (var i = 0; i < scanlineCount; ++i)
-        byteCounts[i] = BinaryPrimitives.ReadInt32BigEndian(span[(offset + i * 4)..]);
+        byteCounts[i] = BinaryPrimitives.ReadInt32BigEndian(data[(offset + i * 4)..]);
 
       offset += byteCountTableSize;
 
@@ -135,7 +130,7 @@ public static class PsbReader {
         if (offset + compressedLength > data.Length)
           throw new InvalidDataException("RLE compressed data extends beyond file.");
 
-        _DecompressPackBits(span.Slice(offset, compressedLength), pixelData, ref pixelOffset, scanlineLength);
+        _DecompressPackBits(data.Slice(offset, compressedLength), pixelData, ref pixelOffset, scanlineLength);
         offset += compressedLength;
       }
     } else {
@@ -143,7 +138,7 @@ public static class PsbReader {
       var remaining = data.Length - offset;
       var copyLength = Math.Min(remaining, totalPixelDataLength);
       pixelData = new byte[totalPixelDataLength];
-      data.AsSpan(offset, copyLength).CopyTo(pixelData.AsSpan(0));
+      data.Slice(offset, copyLength).CopyTo(pixelData.AsSpan(0));
     }
 
     return new PsbFile {
@@ -157,6 +152,11 @@ public static class PsbReader {
       ImageResources = imageResources,
       LayerMaskInfo = layerMaskInfo
     };
+  }
+
+  public static PsbFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   private static void _DecompressPackBits(ReadOnlySpan<byte> source, byte[] destination, ref int destOffset, int expectedLength) {

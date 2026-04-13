@@ -26,7 +26,16 @@ public static class C128HiresReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static C128HiresFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static C128HiresFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != C128HiresFile.ExpectedFileSize)
+      throw new InvalidDataException($"Invalid C128 hires data size: expected exactly {C128HiresFile.ExpectedFileSize} bytes, got {data.Length}.");
+
+    var rawData = new byte[C128HiresFile.ExpectedFileSize];
+    data.Slice(0, C128HiresFile.ExpectedFileSize).CopyTo(rawData);
+
+    return new C128HiresFile { RawData = rawData };
+    }
 
   public static C128HiresFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

@@ -19,17 +19,14 @@ public static class AtariAgpReader {
     if (stream.CanSeek) {
       var data = new byte[stream.Length - stream.Position];
       stream.ReadExactly(data);
-      return FromBytes(data);
+      return FromSpan(data);
     }
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
+    return FromSpan(ms.ToArray());
   }
 
-  public static AtariAgpFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static AtariAgpFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static AtariAgpFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < AtariAgpFile.FileSizeGr7)
       throw new InvalidDataException($"Data too small for Atari AGP image. Minimum {AtariAgpFile.FileSizeGr7} bytes, got {data.Length}.");
 
@@ -60,6 +57,11 @@ public static class AtariAgpReader {
     };
   }
 
+  public static AtariAgpFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
   private static AtariAgpMode _InferMode(int size) => size switch {
     AtariAgpFile.FileSizeGr7 => AtariAgpMode.Graphics7,
     AtariAgpFile.FileSizeGr8 => AtariAgpMode.Graphics8,
@@ -67,7 +69,7 @@ public static class AtariAgpReader {
     _ => throw new InvalidDataException($"Unrecognized Atari AGP file size: {size} bytes. Expected {AtariAgpFile.FileSizeGr7}, {AtariAgpFile.FileSizeGr8}, or {AtariAgpFile.FileSizeGr8WithColors}.")
   };
 
-  private static byte[] _UnpackGr8(byte[] data, int width, int height) {
+  private static byte[] _UnpackGr8(ReadOnlySpan<byte> data, int width, int height) {
     var bytesPerRow = width / 8;
     var pixels = new byte[width * height];
 
@@ -85,7 +87,7 @@ public static class AtariAgpReader {
     return pixels;
   }
 
-  private static byte[] _UnpackGr7(byte[] data, int width, int height) {
+  private static byte[] _UnpackGr7(ReadOnlySpan<byte> data, int width, int height) {
     var bytesPerRow = 40;
     var pixels = new byte[width * height];
 

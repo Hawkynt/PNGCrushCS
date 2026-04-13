@@ -113,7 +113,7 @@ public sealed class RoundTripTests {
       Width = 2, Height = 2, PixelConfig = NiePixelConfig.Bgra8, PixelData = pixels
     };
 
-    var raw = original.ToRawImage();
+    var raw = NieFile.ToRawImage(original);
     Assert.That(raw.Format, Is.EqualTo(PixelFormat.Bgra32));
 
     var restored = NieFile.FromRawImage(raw);
@@ -136,7 +136,7 @@ public sealed class RoundTripTests {
       Width = 2, Height = 2, PixelConfig = NiePixelConfig.Bgra16, PixelData = pixels
     };
 
-    var raw = original.ToRawImage();
+    var raw = NieFile.ToRawImage(original);
     Assert.That(raw.Format, Is.EqualTo(PixelFormat.Rgba64));
 
     var restored = NieFile.FromRawImage(raw);

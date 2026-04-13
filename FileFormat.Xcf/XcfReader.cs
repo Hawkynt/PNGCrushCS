@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 
@@ -47,14 +47,11 @@ public static class XcfReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static XcfFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static XcfFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static XcfFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < 14)
       throw new InvalidDataException("Data too small for a valid XCF file.");
 
-    var span = data.AsSpan();
+    var span = data;
 
     // Validate magic: "gimp xcf "
     for (var i = 0; i < _MAGIC.Length; ++i)
@@ -67,7 +64,7 @@ public static class XcfReader {
     while (versionEnd < data.Length && data[versionEnd] != 0)
       ++versionEnd;
 
-    var versionStr = System.Text.Encoding.ASCII.GetString(data, versionStart, versionEnd - versionStart);
+    var versionStr = System.Text.Encoding.ASCII.GetString(data.Slice(versionStart, versionEnd - versionStart));
     var version = _ParseVersion(versionStr);
     var useWideOffsets = version >= 11;
 
@@ -116,6 +113,12 @@ public static class XcfReader {
       PixelData = pixelData,
       Palette = palette
     };
+  
+  }
+
+  public static XcfFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   private static int _ParseVersion(string versionStr) => versionStr switch {
@@ -137,11 +140,10 @@ public static class XcfReader {
     _ => 0
   };
 
-  private static int _ParseProperties(byte[] data, int offset, ref XcfCompression compression, ref byte[]? palette) {
-    var span = data.AsSpan();
+  private static int _ParseProperties(ReadOnlySpan<byte> data, int offset, ref XcfCompression compression, ref byte[]? palette) {
     while (offset + 8 <= data.Length) {
-      var propType = _ReadUInt32BE(span[offset..]);
-      var propSize = (int)_ReadUInt32BE(span[(offset + 4)..]);
+      var propType = _ReadUInt32BE(data[offset..]);
+      var propSize = (int)_ReadUInt32BE(data[(offset + 4)..]);
       offset += 8;
 
       if (propType == PROP_END)
@@ -157,11 +159,11 @@ public static class XcfReader {
           break;
         case PROP_COLORMAP:
           if (propSize >= 4) {
-            var colorCount = (int)_ReadUInt32BE(span[offset..]);
+            var colorCount = (int)_ReadUInt32BE(data[offset..]);
             var paletteDataSize = colorCount * 3;
             if (offset + 4 + paletteDataSize <= data.Length) {
               palette = new byte[paletteDataSize];
-              data.AsSpan(offset + 4, paletteDataSize).CopyTo(palette.AsSpan(0));
+              data.Slice(offset + 4, paletteDataSize).CopyTo(palette);
             }
           }
           break;
@@ -173,16 +175,15 @@ public static class XcfReader {
     return offset;
   }
 
-  private static byte[] _ReadLayer(byte[] data, int layerStart, XcfCompression compression, bool useWideOffsets, int canvasWidth, int canvasHeight) {
-    var span = data.AsSpan();
+  private static byte[] _ReadLayer(ReadOnlySpan<byte> data, int layerStart, XcfCompression compression, bool useWideOffsets, int canvasWidth, int canvasHeight) {
     var offset = layerStart;
 
     if (offset + 12 > data.Length)
       return [];
 
-    var layerWidth = (int)_ReadUInt32BE(span[offset..]);
-    var layerHeight = (int)_ReadUInt32BE(span[(offset + 4)..]);
-    var layerType = _ReadUInt32BE(span[(offset + 8)..]);
+    var layerWidth = (int)_ReadUInt32BE(data[offset..]);
+    var layerHeight = (int)_ReadUInt32BE(data[(offset + 4)..]);
+    var layerType = _ReadUInt32BE(data[(offset + 8)..]);
     offset += 12;
 
     var bpp = _LayerTypeToBpp(layerType);
@@ -190,13 +191,13 @@ public static class XcfReader {
     // Skip name (null-terminated string prefixed by uint32 length)
     if (offset + 4 > data.Length)
       return [];
-    var nameLen = (int)_ReadUInt32BE(span[offset..]);
+    var nameLen = (int)_ReadUInt32BE(data[offset..]);
     offset += 4 + nameLen;
 
     // Parse layer properties (skip all)
     while (offset + 8 <= data.Length) {
-      var propType = _ReadUInt32BE(span[offset..]);
-      var propSize = (int)_ReadUInt32BE(span[(offset + 4)..]);
+      var propType = _ReadUInt32BE(data[offset..]);
+      var propSize = (int)_ReadUInt32BE(data[(offset + 4)..]);
       offset += 8;
       if (propType == PROP_END)
         break;
@@ -208,11 +209,11 @@ public static class XcfReader {
     if (useWideOffsets) {
       if (offset + 8 > data.Length)
         return [];
-      hierarchyOffset = (uint)_ReadUInt64BE(span[offset..]);
+      hierarchyOffset = (uint)_ReadUInt64BE(data[offset..]);
     } else {
       if (offset + 4 > data.Length)
         return [];
-      hierarchyOffset = _ReadUInt32BE(span[offset..]);
+      hierarchyOffset = _ReadUInt32BE(data[offset..]);
     }
 
     if (hierarchyOffset == 0 || hierarchyOffset >= data.Length)
@@ -221,8 +222,7 @@ public static class XcfReader {
     return _ReadHierarchy(data, (int)hierarchyOffset, bpp, compression, useWideOffsets, layerWidth, layerHeight);
   }
 
-  private static byte[] _ReadHierarchy(byte[] data, int hierarchyStart, int bpp, XcfCompression compression, bool useWideOffsets, int width, int height) {
-    var span = data.AsSpan();
+  private static byte[] _ReadHierarchy(ReadOnlySpan<byte> data, int hierarchyStart, int bpp, XcfCompression compression, bool useWideOffsets, int width, int height) {
     var offset = hierarchyStart;
 
     if (offset + 12 > data.Length)
@@ -236,11 +236,11 @@ public static class XcfReader {
     if (useWideOffsets) {
       if (offset + 8 > data.Length)
         return [];
-      levelOffset = (uint)_ReadUInt64BE(span[offset..]);
+      levelOffset = (uint)_ReadUInt64BE(data[offset..]);
     } else {
       if (offset + 4 > data.Length)
         return [];
-      levelOffset = _ReadUInt32BE(span[offset..]);
+      levelOffset = _ReadUInt32BE(data[offset..]);
     }
 
     if (levelOffset == 0 || levelOffset >= data.Length)
@@ -249,8 +249,7 @@ public static class XcfReader {
     return _ReadLevel(data, (int)levelOffset, bpp, compression, useWideOffsets, width, height);
   }
 
-  private static byte[] _ReadLevel(byte[] data, int levelStart, int bpp, XcfCompression compression, bool useWideOffsets, int width, int height) {
-    var span = data.AsSpan();
+  private static byte[] _ReadLevel(ReadOnlySpan<byte> data, int levelStart, int bpp, XcfCompression compression, bool useWideOffsets, int width, int height) {
     var offset = levelStart;
 
     if (offset + 8 > data.Length)
@@ -266,12 +265,12 @@ public static class XcfReader {
       if (useWideOffsets) {
         if (offset + 8 > data.Length)
           break;
-        tileOffset = (uint)_ReadUInt64BE(span[offset..]);
+        tileOffset = (uint)_ReadUInt64BE(data[offset..]);
         offset += 8;
       } else {
         if (offset + 4 > data.Length)
           break;
-        tileOffset = _ReadUInt32BE(span[offset..]);
+        tileOffset = _ReadUInt32BE(data[offset..]);
         offset += 4;
       }
 
@@ -306,8 +305,8 @@ public static class XcfReader {
       if (tileDataLen <= 0)
         continue;
 
-      var tileCompressed = new byte[tileDataLen];
-      data.AsSpan(tileStart, Math.Min(tileDataLen, data.Length - tileStart)).CopyTo(tileCompressed.AsSpan(0));
+      var tileCompressed = new byte[Math.Min(tileDataLen, data.Length - tileStart)];
+      data.Slice(tileStart, tileCompressed.Length).CopyTo(tileCompressed);
 
       byte[] tilePixels;
       switch (compression) {

@@ -26,7 +26,16 @@ public static class GraphSaurusReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static GraphSaurusFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static GraphSaurusFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != GraphSaurusFile.ExpectedFileSize)
+      throw new InvalidDataException($"Graph Saurus file must be exactly {GraphSaurusFile.ExpectedFileSize} bytes, got {data.Length}.");
+
+    var pixels = new byte[GraphSaurusFile.ExpectedFileSize];
+    data.Slice(0, GraphSaurusFile.ExpectedFileSize).CopyTo(pixels);
+
+    return new() { PixelData = pixels };
+    }
 
   public static GraphSaurusFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

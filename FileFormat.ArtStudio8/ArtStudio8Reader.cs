@@ -26,7 +26,16 @@ public static class ArtStudio8Reader {
     return FromBytes(ms.ToArray());
   }
 
-  public static ArtStudio8File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static ArtStudio8File FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != ArtStudio8File.FileSize)
+      throw new InvalidDataException($"Invalid Art Studio data size: expected exactly {ArtStudio8File.FileSize} bytes, got {data.Length}.");
+
+    var pixelData = new byte[ArtStudio8File.FileSize];
+    data.Slice(0, ArtStudio8File.FileSize).CopyTo(pixelData);
+
+    return new ArtStudio8File { PixelData = pixelData };
+    }
 
   public static ArtStudio8File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

@@ -26,7 +26,32 @@ public static class BlazingReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static BlazingFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static BlazingFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < BlazingFile.ExpectedFileSize)
+      throw new InvalidDataException($"Blazing Paddles file too small (got {data.Length} bytes, expected {BlazingFile.ExpectedFileSize}).");
+
+    var offset = 0;
+
+    // Load address (2 bytes, little-endian)
+    var loadAddress = (ushort)(data[offset] | (data[offset + 1] << 8));
+    offset += BlazingFile.LoadAddressSize;
+
+    // Bitmap data (8000 bytes)
+    var bitmapData = new byte[BlazingFile.BitmapDataSize];
+    data.Slice(offset, BlazingFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
+    offset += BlazingFile.BitmapDataSize;
+
+    // Screen RAM (1000 bytes)
+    var screenData = new byte[BlazingFile.ScreenDataSize];
+    data.Slice(offset, BlazingFile.ScreenDataSize).CopyTo(screenData.AsSpan(0));
+
+    return new() {
+      LoadAddress = loadAddress,
+      BitmapData = bitmapData,
+      ScreenData = screenData,
+    };
+    }
 
   public static BlazingFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

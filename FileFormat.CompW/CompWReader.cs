@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.CompW;
@@ -26,19 +27,16 @@ public static class CompWReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static CompWFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static CompWFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static CompWFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < CompWFile.MinFileSize)
       throw new InvalidDataException($"Data too small for a valid WLM file (need at least {CompWFile.MinFileSize} bytes, got {data.Length}).");
 
     if (data[0] != CompWFile.Magic[0] || data[1] != CompWFile.Magic[1])
       throw new InvalidDataException("Invalid WLM magic bytes.");
 
-    var width = BitConverter.ToUInt16(data, 2);
-    var height = BitConverter.ToUInt16(data, 4);
-    var bpp = BitConverter.ToUInt16(data, 6);
+    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[2..]);
+    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
+    var bpp = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid WLM dimensions: {width}x{height}.");
@@ -49,10 +47,10 @@ public static class CompWReader {
       throw new InvalidDataException("WLM file truncated.");
 
     var pixelData = new byte[pixelCount];
-    data.AsSpan(CompWFile.HeaderSize, pixelCount).CopyTo(pixelData.AsSpan(0));
+    data.Slice(CompWFile.HeaderSize, pixelCount).CopyTo(pixelData);
 
     var palette = new byte[CompWFile.PaletteSize];
-    data.AsSpan(CompWFile.HeaderSize + pixelCount, CompWFile.PaletteSize).CopyTo(palette.AsSpan(0));
+    data.Slice(CompWFile.HeaderSize + pixelCount, CompWFile.PaletteSize).CopyTo(palette);
 
     return new() {
       Width = width,
@@ -61,5 +59,10 @@ public static class CompWReader {
       PixelData = pixelData,
       Palette = palette,
     };
+  }
+
+  public static CompWFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

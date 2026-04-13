@@ -25,7 +25,15 @@ public static class NokiaNlmReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static NokiaNlmFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static NokiaNlmFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != NokiaNlmFile.FileSize)
+      throw new InvalidDataException($"Invalid NokiaNlm data size: expected exactly {NokiaNlmFile.FileSize} bytes, got {data.Length}.");
+
+    var pixelData = new byte[NokiaNlmFile.FileSize];
+    data.Slice(0, NokiaNlmFile.FileSize).CopyTo(pixelData);
+    return new() { PixelData = pixelData };
+    }
 
   public static NokiaNlmFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

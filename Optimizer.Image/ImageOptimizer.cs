@@ -561,7 +561,7 @@ public sealed partial class ImageOptimizer {
   }
 
   private static string _GetExtension(ImageFormat format) => format switch {
-    // Formats not in FormatRegistry (no IImageFileFormat implementation)
+    // Formats not in FormatRegistry (no IImageFormatReader implementation)
     ImageFormat.Gif => ".gif",
     ImageFormat.Ani => ".ani",
     ImageFormat.WebP => ".webp",

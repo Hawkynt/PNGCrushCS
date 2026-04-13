@@ -26,7 +26,32 @@ public static class ComputerEyesReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static ComputerEyesFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static ComputerEyesFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < ComputerEyesFile.HeaderSize)
+      throw new InvalidDataException($"Data too small for a valid ComputerEyes file: expected at least {ComputerEyesFile.HeaderSize} bytes, got {data.Length}.");
+
+    var width = data[0] | (data[1] << 8);
+    var height = data[2] | (data[3] << 8);
+
+    if (width <= 0)
+      throw new InvalidDataException($"Invalid ComputerEyes width: {width}.");
+    if (height <= 0)
+      throw new InvalidDataException($"Invalid ComputerEyes height: {height}.");
+
+    var expectedPixelBytes = width * height;
+    if (data.Length < ComputerEyesFile.HeaderSize + expectedPixelBytes)
+      throw new InvalidDataException($"Data too small for pixel data: expected {ComputerEyesFile.HeaderSize + expectedPixelBytes} bytes, got {data.Length}.");
+
+    var pixelData = new byte[expectedPixelBytes];
+    data.Slice(ComputerEyesFile.HeaderSize, expectedPixelBytes).CopyTo(pixelData.AsSpan(0));
+
+    return new ComputerEyesFile {
+      Width = width,
+      Height = height,
+      PixelData = pixelData,
+    };
+    }
 
   public static ComputerEyesFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

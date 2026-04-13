@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
@@ -43,14 +43,14 @@ public static class PeResourceReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static PeResourceFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static PeResourceFile FromSpan(ReadOnlySpan<byte> data) {
+    var bytes = data.ToArray();
 
     if (data.Length < 64 || data[0] != 0x4D || data[1] != 0x5A)
       throw new InvalidDataException("Not a valid PE file: missing MZ signature.");
 
     // Read PE offset from e_lfanew at offset 60
-    var peOffset = BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(60));
+    var peOffset = BinaryPrimitives.ReadInt32LittleEndian(data[60..]);
     if (peOffset < 0 || peOffset + 4 > data.Length)
       throw new InvalidDataException("Invalid PE offset.");
 
@@ -66,8 +66,8 @@ public static class PeResourceReader {
     if (coffOffset + _COFF_HEADER_SIZE > data.Length)
       throw new InvalidDataException("Data too small for COFF header.");
 
-    var numberOfSections = BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(coffOffset + 2));
-    var sizeOfOptionalHeader = BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(coffOffset + 16));
+    var numberOfSections = BinaryPrimitives.ReadUInt16LittleEndian(data[(coffOffset + 2)..]);
+    var sizeOfOptionalHeader = BinaryPrimitives.ReadUInt16LittleEndian(data[(coffOffset + 16)..]);
 
     // Optional header follows COFF header
     var optionalOffset = coffOffset + _COFF_HEADER_SIZE;
@@ -77,7 +77,7 @@ public static class PeResourceReader {
     if (optionalOffset + sizeOfOptionalHeader > data.Length)
       throw new InvalidDataException("Data too small for optional header.");
 
-    var magic = BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(optionalOffset));
+    var magic = BinaryPrimitives.ReadUInt16LittleEndian(data[optionalOffset..]);
     int dataDirOffset;
     if (magic == 0x10B) // PE32
       dataDirOffset = optionalOffset + 96;
@@ -94,15 +94,15 @@ public static class PeResourceReader {
     if (resourceDirIndex + 8 > data.Length)
       return new PeResourceFile();
 
-    var resourceRva = BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(resourceDirIndex));
-    var resourceSize = BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(resourceDirIndex + 4));
+    var resourceRva = BinaryPrimitives.ReadUInt32LittleEndian(data[resourceDirIndex..]);
+    var resourceSize = BinaryPrimitives.ReadUInt32LittleEndian(data[(resourceDirIndex + 4)..]);
 
     if (resourceRva == 0 || resourceSize == 0)
       return new PeResourceFile(); // No resources
 
     // Parse section headers to find the section containing the resource RVA
     var sectionTableOffset = optionalOffset + sizeOfOptionalHeader;
-    if (!_FindSectionForRva(data, sectionTableOffset, numberOfSections, resourceRva, out var rsrcFileOffset, out _))
+    if (!_FindSectionForRva(bytes, sectionTableOffset, numberOfSections, resourceRva, out var rsrcFileOffset, out _))
       return new PeResourceFile(); // Resource section not found
 
     if (rsrcFileOffset < 0 || rsrcFileOffset + resourceSize > data.Length)
@@ -117,7 +117,7 @@ public static class PeResourceReader {
     var otherResources = new List<(int TypeId, int ResourceId, int Offset, int Size)>();
 
     _ParseTopLevelDirectory(
-      data,
+      bytes,
       rsrcFileOffset,
       resourceRva,
       iconResources,
@@ -133,7 +133,7 @@ public static class PeResourceReader {
     var imageResources = new List<PeImageResource>();
 
     foreach (var (groupId, (offset, size)) in groupIconResources) {
-      var icoData = _AssembleIco(data, offset, size, iconResources, rsrcFileOffset, resourceRva, isCursor: false);
+      var icoData = _AssembleIco(bytes, offset, size, iconResources, rsrcFileOffset, resourceRva, isCursor: false);
       if (icoData != null) {
         groups.Add(new PeIconGroup { GroupId = groupId, IsCursor = false, IcoData = icoData });
         imageResources.Add(new PeImageResource {
@@ -145,7 +145,7 @@ public static class PeResourceReader {
     }
 
     foreach (var (groupId, (offset, size)) in groupCursorResources) {
-      var curData = _AssembleCur(data, offset, size, cursorResources, rsrcFileOffset, resourceRva);
+      var curData = _AssembleCur(bytes, offset, size, cursorResources, rsrcFileOffset, resourceRva);
       if (curData != null) {
         groups.Add(new PeIconGroup { GroupId = groupId, IsCursor = true, IcoData = curData });
         imageResources.Add(new PeImageResource {
@@ -161,7 +161,7 @@ public static class PeResourceReader {
       if (size <= 0 || offset + size > data.Length)
         continue;
 
-      var bmpData = _PrependBitmapFileHeader(data, offset, size);
+      var bmpData = _PrependBitmapFileHeader(bytes, offset, size);
       imageResources.Add(new PeImageResource {
         ResourceType = PeImageResourceType.Bitmap,
         ResourceId = resId,
@@ -174,12 +174,12 @@ public static class PeResourceReader {
       if (size <= 0 || offset + size > data.Length)
         continue;
 
-      var formatHint = _DetectImageSignature(data, offset, size);
+      var formatHint = _DetectImageSignature(bytes, offset, size);
       if (formatHint == null)
         continue;
 
       var rawData = new byte[size];
-      data.AsSpan(offset, size).CopyTo(rawData);
+      data.Slice(offset, size).CopyTo(rawData);
       imageResources.Add(new PeImageResource {
         ResourceType = PeImageResourceType.EmbeddedImage,
         ResourceId = resId,
@@ -189,6 +189,12 @@ public static class PeResourceReader {
     }
 
     return new PeResourceFile { IconGroups = groups, ImageResources = imageResources };
+  
+  }
+
+  public static PeResourceFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   private static bool _FindSectionForRva(

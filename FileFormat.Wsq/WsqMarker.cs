@@ -1,3 +1,5 @@
+using System;
+
 namespace FileFormat.Wsq;
 
 /// <summary>WSQ marker codes (JPEG-like two-byte markers starting with 0xFF).</summary>
@@ -31,7 +33,7 @@ internal static class WsqMarker {
   public const ushort COM = 0xFFFE;
 
   /// <summary>Reads a big-endian ushort from a span.</summary>
-  public static ushort ReadUInt16BE(byte[] data, int offset)
+  public static ushort ReadUInt16BE(ReadOnlySpan<byte> data, int offset)
     => (ushort)((data[offset] << 8) | data[offset + 1]);
 
   /// <summary>Writes a big-endian ushort to a byte array.</summary>

@@ -28,10 +28,7 @@ public static class EnviReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static EnviFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static EnviFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static EnviFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_SIZE)
       throw new InvalidDataException($"Data too small for a valid ENVI file: expected at least {_MIN_SIZE} bytes, got {data.Length}.");
 
@@ -42,7 +39,7 @@ public static class EnviReader {
     if (data[4] != 0x0D && data[4] != 0x0A)
       throw new InvalidDataException("Invalid ENVI header: expected CR or LF after 'ENVI' magic.");
 
-    var (fields, headerEndOffset) = EnviHeaderParser.Parse(data);
+    var (fields, headerEndOffset) = EnviHeaderParser.Parse(data.ToArray());
 
     var width = EnviHeaderParser.GetInt(fields, "samples");
     var height = EnviHeaderParser.GetInt(fields, "lines");
@@ -62,7 +59,7 @@ public static class EnviReader {
 
     var pixelData = new byte[expectedPixelBytes];
     if (copyLen > 0)
-      data.AsSpan(pixelStart, copyLen).CopyTo(pixelData.AsSpan(0));
+      data.Slice(pixelStart, copyLen).CopyTo(pixelData);
 
     return new EnviFile {
       Width = width,
@@ -73,6 +70,11 @@ public static class EnviReader {
       ByteOrder = byteOrder,
       PixelData = pixelData
     };
+  }
+
+  public static EnviFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   private static int _BytesPerSample(int dataType) => dataType switch {

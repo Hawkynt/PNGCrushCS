@@ -30,14 +30,12 @@ public static class MngReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static MngFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static MngFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static MngFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < 8)
       throw new InvalidDataException("Data too small for a valid MNG file.");
 
-    var span = data.AsSpan();
+    var span = data;
 
     for (var i = 0; i < _MNG_SIGNATURE.Length; ++i)
       if (span[i] != _MNG_SIGNATURE[i])
@@ -106,6 +104,11 @@ public static class MngReader {
       TermAction = termAction,
       Frames = frames
     };
+    }
+
+  public static MngFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   private static void _AddChunkRaw(List<byte[]> chunks, ReadOnlySpan<byte> data, int chunkStart, int chunkLength) {

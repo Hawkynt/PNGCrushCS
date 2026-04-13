@@ -29,7 +29,18 @@ public static class PhotoChromeReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static PhotoChromeFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static PhotoChromeFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != _EXPECTED_SIZE)
+      throw new InvalidDataException($"Invalid PhotoChrome data size: expected exactly {_EXPECTED_SIZE} bytes, got {data.Length}.");
+
+    var pixelData = new byte[_EXPECTED_SIZE];
+    data.Slice(0, _EXPECTED_SIZE).CopyTo(pixelData);
+
+    return new PhotoChromeFile {
+      PixelData = pixelData
+    };
+    }
 
   public static PhotoChromeFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

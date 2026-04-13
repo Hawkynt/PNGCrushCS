@@ -41,19 +41,22 @@ public static class AnalyzeReader {
   }
 
   /// <summary>Parses concatenated header+pixel data bytes (348-byte header followed by pixel data).</summary>
-  public static AnalyzeFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static AnalyzeFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static AnalyzeFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < HEADER_SIZE)
       throw new InvalidDataException($"Data too small for a valid Analyze 7.5 file (need at least {HEADER_SIZE} bytes, got {data.Length}).");
 
-    var hdrBytes = data.AsSpan(0, HEADER_SIZE).ToArray();
+    var hdrBytes = data.Slice(0, HEADER_SIZE).ToArray();
     var imgBytes = data.Length > HEADER_SIZE
-      ? data.AsSpan(HEADER_SIZE).ToArray()
+      ? data[HEADER_SIZE..].ToArray()
       : [];
 
     return _Parse(hdrBytes, imgBytes);
+    }
+
+  public static AnalyzeFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   private static AnalyzeFile _Parse(byte[] hdrBytes, byte[] imgBytes) {

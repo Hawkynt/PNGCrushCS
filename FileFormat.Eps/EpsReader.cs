@@ -33,7 +33,38 @@ public static class EpsReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static EpsFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static EpsFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < _HEADER_SIZE)
+      throw new InvalidDataException("Data too small for a valid EPS file.");
+
+    if (!data.Slice(0, 4).SequenceEqual(_Magic))
+      throw new InvalidDataException("Invalid EPS magic bytes.");
+
+    var tiffOffset = BinaryPrimitives.ReadUInt32LittleEndian(data[20..]);
+    var tiffLength = BinaryPrimitives.ReadUInt32LittleEndian(data[24..]);
+
+    if (tiffOffset == 0 || tiffLength == 0)
+      throw new InvalidDataException("EPS file has no embedded TIFF preview.");
+
+    if (tiffOffset + tiffLength > (uint)data.Length)
+      throw new InvalidDataException("TIFF preview extends beyond end of file.");
+
+    var tiffData = new byte[tiffLength];
+    data.Slice((int)tiffOffset, (int)tiffLength).CopyTo(tiffData.AsSpan(0));
+
+    var tiff = TiffReader.FromBytes(tiffData);
+    var raw = TiffFile.ToRawImage(tiff);
+
+    // Convert to RGB24 if needed
+    var rgb24 = raw.ToRgb24();
+
+    return new EpsFile {
+      Width = raw.Width,
+      Height = raw.Height,
+      PixelData = rgb24,
+    };
+    }
 
   public static EpsFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

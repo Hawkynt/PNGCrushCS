@@ -28,18 +28,21 @@ public static class HdrReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static HdrFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
   public static HdrFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  public static HdrFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_FILE_SIZE)
       throw new InvalidDataException("Data is too small to be a valid HDR file.");
 
     if (data[0] != (byte)'#' || data[1] != (byte)'?')
       throw new InvalidDataException("Invalid HDR magic: expected '#?'.");
 
-    var (width, height, exposure, dataOffset) = HdrHeaderParser.Parse(data);
-    var pixelData = _DecodeScanlines(data, dataOffset, width, height);
+    var bytes = data.ToArray();
+    var (width, height, exposure, dataOffset) = HdrHeaderParser.Parse(bytes);
+    var pixelData = _DecodeScanlines(bytes, dataOffset, width, height);
 
     return new HdrFile {
       Width = width,

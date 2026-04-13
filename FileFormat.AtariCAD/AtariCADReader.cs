@@ -26,16 +26,19 @@ public static class AtariCADReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static AtariCADFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static AtariCADFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static AtariCADFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length != AtariCADFile.ExpectedFileSize)
       throw new InvalidDataException($"Invalid Atari CAD data size: expected exactly {AtariCADFile.ExpectedFileSize} bytes, got {data.Length}.");
 
     var pixelData = new byte[AtariCADFile.ExpectedFileSize];
-    data.AsSpan(0, AtariCADFile.ExpectedFileSize).CopyTo(pixelData);
+    data.Slice(0, AtariCADFile.ExpectedFileSize).CopyTo(pixelData);
 
     return new AtariCADFile { PixelData = pixelData };
+    }
+
+  public static AtariCADFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

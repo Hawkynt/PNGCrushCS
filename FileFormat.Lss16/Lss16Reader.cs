@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 
 namespace FileFormat.Lss16;
@@ -26,10 +26,7 @@ public static class Lss16Reader {
     return FromBytes(ms.ToArray());
   }
 
-  public static Lss16File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static Lss16File FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static Lss16File FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < Lss16File.HeaderSize)
       throw new InvalidDataException($"Data too small for a valid LSS16 file: expected at least {Lss16File.HeaderSize} bytes, got {data.Length}.");
 
@@ -45,9 +42,10 @@ public static class Lss16Reader {
       throw new InvalidDataException("Invalid LSS16 height: must be greater than zero.");
 
     var palette = new byte[Lss16File.PaletteSize];
-    data.AsSpan(8, Lss16File.PaletteSize).CopyTo(palette.AsSpan(0));
+    data.Slice(8, Lss16File.PaletteSize).CopyTo(palette.AsSpan(0));
 
-    var pixelData = _DecodePixels(data, Lss16File.HeaderSize, width, height);
+    // _DecodePixels uses a local function that captures the buffer, which cannot be a span
+    var pixelData = _DecodePixels(data.ToArray(), Lss16File.HeaderSize, width, height);
 
     return new Lss16File {
       Width = width,
@@ -55,6 +53,12 @@ public static class Lss16Reader {
       Palette = palette,
       PixelData = pixelData,
     };
+  
+  }
+
+  public static Lss16File FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   /// <summary>Decodes nybble-based RLE pixel data from the LSS16 stream.</summary>

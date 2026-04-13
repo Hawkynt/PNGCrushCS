@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Buffers.Binary;
 using System.IO;
 using System.Text;
@@ -30,22 +30,20 @@ public static class IffPbmReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static IffPbmFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static IffPbmFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static IffPbmFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MIN_IFF_SIZE)
       throw new InvalidDataException("Data too small for a valid IFF PBM file.");
 
-    var span = data.AsSpan();
+    var span = data;
 
     // Validate FORM magic
-    var formId = Encoding.ASCII.GetString(data, 0, 4);
+    var formId = Encoding.ASCII.GetString(data.Slice(0, 4));
     if (formId != "FORM")
       throw new InvalidDataException($"Invalid IFF magic: expected 'FORM', got '{formId}'.");
 
     // Validate PBM form type (note: "PBM " with trailing space)
-    var formType = Encoding.ASCII.GetString(data, 8, 4);
+    var formType = Encoding.ASCII.GetString(data.Slice(8, 4));
     if (formType != "PBM ")
       throw new InvalidDataException($"Invalid IFF form type: expected 'PBM ', got '{formType}'.");
 
@@ -60,7 +58,7 @@ public static class IffPbmReader {
     var endOffset = Math.Min(8 + formSize, data.Length);
 
     while (offset + 8 <= endOffset) {
-      var chunkId = Encoding.ASCII.GetString(data, offset, 4);
+      var chunkId = Encoding.ASCII.GetString(data.Slice(offset, 4));
       var chunkSize = BinaryPrimitives.ReadInt32BigEndian(span[(offset + 4)..]);
       var chunkDataOffset = offset + 8;
 
@@ -129,5 +127,10 @@ public static class IffPbmReader {
       PixelData = pixelData,
       Palette = cmap,
     };
+  }
+
+  public static IffPbmFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

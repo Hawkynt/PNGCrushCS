@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 
 namespace FileFormat.Din;
@@ -27,10 +27,8 @@ public static class DinReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static DinFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static DinFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static DinFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
 
     if (data.Length < DinFile.LoadAddressSize + DinFile.MinPayloadSize)
       throw new InvalidDataException($"File too small for Din format (got {data.Length} bytes, need at least {DinFile.LoadAddressSize + DinFile.MinPayloadSize}).");
@@ -43,17 +41,17 @@ public static class DinReader {
 
     // Bitmap data (8000 bytes)
     var bitmapData = new byte[DinFile.BitmapDataSize];
-    data.AsSpan(offset, DinFile.BitmapDataSize).CopyTo(bitmapData);
+    data.Slice(offset, DinFile.BitmapDataSize).CopyTo(bitmapData);
     offset += DinFile.BitmapDataSize;
 
     // Screen RAM (1000 bytes)
     var screenData = new byte[DinFile.ScreenDataSize];
-    data.AsSpan(offset, DinFile.ScreenDataSize).CopyTo(screenData);
+    data.Slice(offset, DinFile.ScreenDataSize).CopyTo(screenData);
     offset += DinFile.ScreenDataSize;
 
     // Color RAM (1000 bytes)
     var colorData = new byte[DinFile.ColorDataSize];
-    data.AsSpan(offset, DinFile.ColorDataSize).CopyTo(colorData);
+    data.Slice(offset, DinFile.ColorDataSize).CopyTo(colorData);
     offset += DinFile.ColorDataSize;
 
     // Background color: first byte of trailing data if available, else 0
@@ -64,7 +62,7 @@ public static class DinReader {
       ++offset;
       if (offset < data.Length) {
         trailingData = new byte[data.Length - offset];
-        data.AsSpan(offset).CopyTo(trailingData);
+        data[offset..].CopyTo(trailingData);
       }
     }
 
@@ -76,5 +74,10 @@ public static class DinReader {
       BackgroundColor = backgroundColor,
       TrailingData = trailingData,
     };
+  }
+
+  public static DinFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

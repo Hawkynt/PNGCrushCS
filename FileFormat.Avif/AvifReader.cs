@@ -27,21 +27,19 @@ public static class AvifReader {
     if (stream.CanSeek) {
       var data = new byte[stream.Length - stream.Position];
       stream.ReadExactly(data);
-      return FromBytes(data);
+      return FromSpan(data);
     }
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
+    return FromSpan(ms.ToArray());
   }
 
-  public static AvifFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static AvifFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static AvifFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_FILE_SIZE)
       throw new InvalidDataException("Data too small for a valid AVIF file.");
 
-    var boxes = IsoBmffBox.ReadBoxes(data, 0, data.Length);
+    var bytes = data.ToArray();
+    var boxes = IsoBmffBox.ReadBoxes(bytes, 0, bytes.Length);
 
     var ftypBox = boxes.FirstOrDefault(b => b.Type == IsoBmffBox.Ftyp)
                   ?? throw new InvalidDataException("Missing ftyp box.");
@@ -88,6 +86,11 @@ public static class AvifReader {
       Brand = brand,
       RawImageData = rawImageData,
     };
+  }
+
+  public static AvifFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   /// <summary>Checks whether the data starts with a valid AV1 OBU header.</summary>

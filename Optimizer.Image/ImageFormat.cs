@@ -7,7 +7,7 @@ public enum ImageFormat {
   Png, Gif, Tiff, Bmp, Tga, Pcx, Jpeg, Ico, Cur, Ani, WebP,
   // Lossless raster
   Qoi, Farbfeld, Sgi, SunRaster, Netpbm, Wbmp, Xbm, Xpm,
-  Hrz, Cmu, Mtv, Qrt, Otb, Avs, Msp,
+  Hrz, Cmu, Mtv, Qrt, Otb, Avs, Msp, Bam,
   // Complex raster
   Hdr, Pfm, Psd, Xcf, Dds, Vtf, Ktx, Exr, Dpx, Miff,
   AliasPix, Rla, ScitexCt, Viff, Xwd, Dicom, Cineon,

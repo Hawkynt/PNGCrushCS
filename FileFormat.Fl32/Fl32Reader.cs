@@ -28,10 +28,7 @@ public static class Fl32Reader {
     return FromBytes(ms.ToArray());
   }
 
-  public static Fl32File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static Fl32File FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static Fl32File FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < Fl32File.HeaderSize)
       throw new InvalidDataException("Data too small for a valid FL32 file.");
 
@@ -39,9 +36,9 @@ public static class Fl32Reader {
     if (magic != Fl32File.Magic)
       throw new InvalidDataException($"Invalid FL32 magic: 0x{magic:X8}. Expected 0x{Fl32File.Magic:X8}.");
 
-    var height = BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(4));
-    var width = BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(8));
-    var channels = BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(12));
+    var height = BinaryPrimitives.ReadInt32LittleEndian(data[4..]);
+    var width = BinaryPrimitives.ReadInt32LittleEndian(data[8..]);
+    var channels = BinaryPrimitives.ReadInt32LittleEndian(data[12..]);
 
     if (width <= 0 || height <= 0)
       throw new InvalidDataException($"Invalid FL32 dimensions: {width}x{height}.");
@@ -57,7 +54,7 @@ public static class Fl32Reader {
 
     var pixelData = new float[totalFloats];
     for (var i = 0; i < totalFloats; ++i)
-      pixelData[i] = BinaryPrimitives.ReadSingleLittleEndian(data.AsSpan(Fl32File.HeaderSize + i * 4));
+      pixelData[i] = BinaryPrimitives.ReadSingleLittleEndian(data[(Fl32File.HeaderSize + i * 4)..]);
 
     return new() {
       Width = width,
@@ -65,5 +62,10 @@ public static class Fl32Reader {
       Channels = channels,
       PixelData = pixelData,
     };
+  }
+
+  public static Fl32File FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

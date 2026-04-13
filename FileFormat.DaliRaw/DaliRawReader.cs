@@ -27,7 +27,24 @@ public static class DaliRawReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static DaliRawFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static DaliRawFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != DaliRawFile.ExpectedFileSize)
+      throw new InvalidDataException($"Invalid Dali raw data size: expected exactly {DaliRawFile.ExpectedFileSize} bytes, got {data.Length}.");
+
+    var span = data;
+    var palette = new short[16];
+    for (var i = 0; i < 16; ++i)
+      palette[i] = BinaryPrimitives.ReadInt16BigEndian(span[(i * 2)..]);
+
+    var pixelData = new byte[DaliRawFile.PlanarDataSize];
+    data.Slice(DaliRawFile.PaletteSize + DaliRawFile.PaddingSize, DaliRawFile.PlanarDataSize).CopyTo(pixelData.AsSpan(0));
+
+    return new DaliRawFile {
+      Palette = palette,
+      PixelData = pixelData
+    };
+    }
 
   public static DaliRawFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

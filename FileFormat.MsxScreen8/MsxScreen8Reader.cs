@@ -27,7 +27,25 @@ public static class MsxScreen8Reader {
     return FromBytes(ms.ToArray());
   }
 
-  public static MsxScreen8File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static MsxScreen8File FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < MsxScreen8File.PixelDataSize)
+      throw new InvalidDataException($"Data too small for a valid MSX Screen 8 file: got {data.Length} bytes, need at least {MsxScreen8File.PixelDataSize}.");
+
+    var hasBsave = data.Length >= MsxScreen8File.BsaveHeaderSize + MsxScreen8File.PixelDataSize && data[0] == MsxScreen8File.BsaveMagic;
+    var rawOffset = hasBsave ? MsxScreen8File.BsaveHeaderSize : 0;
+
+    if (data.Length - rawOffset < MsxScreen8File.PixelDataSize)
+      throw new InvalidDataException($"Data too small for MSX Screen 8 pixel data after header: got {data.Length - rawOffset} bytes, need {MsxScreen8File.PixelDataSize}.");
+
+    var pixelData = new byte[MsxScreen8File.PixelDataSize];
+    data.Slice(rawOffset, MsxScreen8File.PixelDataSize).CopyTo(pixelData);
+
+    return new() {
+      PixelData = pixelData,
+      HasBsaveHeader = hasBsave,
+    };
+    }
 
   public static MsxScreen8File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

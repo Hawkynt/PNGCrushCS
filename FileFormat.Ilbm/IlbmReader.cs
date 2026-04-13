@@ -30,26 +30,26 @@ public static class IlbmReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static IlbmFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
   public static IlbmFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  public static IlbmFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_IFF_SIZE)
       throw new InvalidDataException("Data too small for a valid IFF ILBM file.");
 
-    var span = data.AsSpan();
-
     // Validate FORM magic
-    var formId = Encoding.ASCII.GetString(data, 0, 4);
+    var formId = Encoding.ASCII.GetString(data.Slice(0, 4));
     if (formId != "FORM")
       throw new InvalidDataException($"Invalid IFF magic: expected 'FORM', got '{formId}'.");
 
     // Validate ILBM form type
-    var formType = Encoding.ASCII.GetString(data, 8, 4);
+    var formType = Encoding.ASCII.GetString(data.Slice(8, 4));
     if (formType != "ILBM")
       throw new InvalidDataException($"Invalid IFF form type: expected 'ILBM', got '{formType}'.");
 
-    var formSize = BinaryPrimitives.ReadInt32BigEndian(span[4..]);
+    var formSize = BinaryPrimitives.ReadInt32BigEndian(data[4..]);
 
     // Parse chunks
     BmhdChunk? bmhd = null;
@@ -61,8 +61,8 @@ public static class IlbmReader {
     var endOffset = Math.Min(8 + formSize, data.Length);
 
     while (offset + 8 <= endOffset) {
-      var chunkId = Encoding.ASCII.GetString(data, offset, 4);
-      var chunkSize = BinaryPrimitives.ReadInt32BigEndian(span[(offset + 4)..]);
+      var chunkId = Encoding.ASCII.GetString(data.Slice(offset, 4));
+      var chunkSize = BinaryPrimitives.ReadInt32BigEndian(data[(offset + 4)..]);
       var chunkDataOffset = offset + 8;
 
       if (chunkDataOffset + chunkSize > data.Length)
@@ -71,19 +71,19 @@ public static class IlbmReader {
       switch (chunkId) {
         case "BMHD":
           if (chunkSize >= BmhdChunk.StructSize)
-            bmhd = BmhdChunk.ReadFrom(span[chunkDataOffset..]);
+            bmhd = BmhdChunk.ReadFrom(data[chunkDataOffset..]);
           break;
         case "CMAP":
           cmap = new byte[chunkSize];
-          span.Slice(chunkDataOffset, chunkSize).CopyTo(cmap);
+          data.Slice(chunkDataOffset, chunkSize).CopyTo(cmap);
           break;
         case "CAMG":
           if (chunkSize >= 4)
-            camg = BinaryPrimitives.ReadUInt32BigEndian(span[chunkDataOffset..]);
+            camg = BinaryPrimitives.ReadUInt32BigEndian(data[chunkDataOffset..]);
           break;
         case "BODY":
           body = new byte[chunkSize];
-          span.Slice(chunkDataOffset, chunkSize).CopyTo(body);
+          data.Slice(chunkDataOffset, chunkSize).CopyTo(body);
           break;
       }
 

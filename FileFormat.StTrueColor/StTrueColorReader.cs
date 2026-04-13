@@ -26,7 +26,20 @@ public static class StTrueColorReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static StTrueColorFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static StTrueColorFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < StTrueColorFile.FileSize)
+      throw new InvalidDataException($"Data too small for a valid ST True Color file; expected {StTrueColorFile.FileSize} bytes, got {data.Length}.");
+
+    var pixelData = new byte[StTrueColorFile.FileSize];
+    data.Slice(0, StTrueColorFile.FileSize).CopyTo(pixelData.AsSpan(0));
+
+    return new StTrueColorFile {
+      Width = 320,
+      Height = 200,
+      PixelData = pixelData,
+    };
+    }
 
   public static StTrueColorFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

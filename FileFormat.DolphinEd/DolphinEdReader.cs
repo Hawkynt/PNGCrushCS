@@ -26,7 +26,41 @@ public static class DolphinEdReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static DolphinEdFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static DolphinEdFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < DolphinEdFile.ExpectedFileSize)
+      throw new InvalidDataException($"Data too small for a valid Dolphin Ed file (expected {DolphinEdFile.ExpectedFileSize} bytes, got {data.Length}).");
+
+    if (data.Length != DolphinEdFile.ExpectedFileSize)
+      throw new InvalidDataException($"Invalid Dolphin Ed file size (expected {DolphinEdFile.ExpectedFileSize} bytes, got {data.Length}).");
+
+    var offset = 0;
+
+    var loadAddress = (ushort)(data[offset] | (data[offset + 1] << 8));
+    offset += DolphinEdFile.LoadAddressSize;
+
+    var bitmapData = new byte[DolphinEdFile.BitmapDataSize];
+    data.Slice(offset, DolphinEdFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
+    offset += DolphinEdFile.BitmapDataSize;
+
+    var videoMatrix = new byte[DolphinEdFile.VideoMatrixSize];
+    data.Slice(offset, DolphinEdFile.VideoMatrixSize).CopyTo(videoMatrix.AsSpan(0));
+    offset += DolphinEdFile.VideoMatrixSize;
+
+    var colorRam = new byte[DolphinEdFile.ColorRamSize];
+    data.Slice(offset, DolphinEdFile.ColorRamSize).CopyTo(colorRam.AsSpan(0));
+    offset += DolphinEdFile.ColorRamSize;
+
+    var backgroundColor = data[offset];
+
+    return new() {
+      LoadAddress = loadAddress,
+      BitmapData = bitmapData,
+      VideoMatrix = videoMatrix,
+      ColorRam = colorRam,
+      BackgroundColor = backgroundColor,
+    };
+    }
 
   public static DolphinEdFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

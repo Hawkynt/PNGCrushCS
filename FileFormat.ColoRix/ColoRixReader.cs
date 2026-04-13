@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 
 namespace FileFormat.ColoRix;
@@ -21,17 +21,15 @@ public static class ColoRixReader {
     if (stream.CanSeek) {
       var data = new byte[stream.Length - stream.Position];
       stream.ReadExactly(data);
-      return FromBytes(data);
+      return FromSpan(data);
     }
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
+    return FromSpan(ms.ToArray());
   }
 
-  public static ColoRixFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static ColoRixFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static ColoRixFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < ColoRixFile.HeaderSize)
       throw new InvalidDataException("Data too small for a valid ColoRIX file.");
 
@@ -53,7 +51,7 @@ public static class ColoRixReader {
       if (data.Length < offset + ColoRixFile.PaletteSize)
         throw new InvalidDataException("Data too small: palette extends beyond file.");
 
-      data.AsSpan(offset, ColoRixFile.PaletteSize).CopyTo(palette.AsSpan(0));
+      data.Slice(offset, ColoRixFile.PaletteSize).CopyTo(palette.AsSpan(0));
       offset += ColoRixFile.PaletteSize;
     }
 
@@ -65,7 +63,7 @@ public static class ColoRixReader {
     else {
       pixelData = new byte[pixelCount];
       var available = Math.Min(data.Length - offset, pixelCount);
-      data.AsSpan(offset, available).CopyTo(pixelData.AsSpan(0));
+      data.Slice(offset, available).CopyTo(pixelData.AsSpan(0));
     }
 
     return new ColoRixFile {
@@ -77,7 +75,12 @@ public static class ColoRixReader {
     };
   }
 
-  private static byte[] _DecompressRle(byte[] data, int offset, int expectedSize) {
+  public static ColoRixFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  private static byte[] _DecompressRle(ReadOnlySpan<byte> data, int offset, int expectedSize) {
     var output = new byte[expectedSize];
     var inIdx = offset;
     var outIdx = 0;

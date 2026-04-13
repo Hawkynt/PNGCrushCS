@@ -19,18 +19,14 @@ public static class Atari8BitReader {
     if (stream.CanSeek) {
       var data = new byte[stream.Length - stream.Position];
       stream.ReadExactly(data);
-      return FromBytes(data, mode);
+      return FromSpan(data, mode);
     }
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
-    return FromBytes(ms.ToArray(), mode);
+    return FromSpan(ms.ToArray(), mode);
   }
 
-  public static Atari8BitFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static Atari8BitFile FromBytes(byte[] data, Atari8BitMode? mode = null) {
-    ArgumentNullException.ThrowIfNull(data);
-
+  public static Atari8BitFile FromSpan(ReadOnlySpan<byte> data, Atari8BitMode? mode = null) {
     var resolvedMode = mode ?? _InferModeFromSize(data.Length);
     var expectedSize = Atari8BitFile.GetFileSize(resolvedMode);
 
@@ -57,6 +53,11 @@ public static class Atari8BitReader {
     };
   }
 
+  public static Atari8BitFile FromBytes(byte[] data, Atari8BitMode? mode = null) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data, mode);
+  }
+
   private static Atari8BitMode _InferModeFromSize(int size) => size switch {
     Atari8BitFile.FileSize1920 => Atari8BitMode.Gr7,
     Atari8BitFile.FileSize7680 => Atari8BitMode.Gr8,
@@ -71,7 +72,7 @@ public static class Atari8BitReader {
     _ => mode.ToString()
   };
 
-  private static byte[] _UnpackPixels(byte[] data, int width, int height, int bpp, int bytesPerRow, int pixelScale) {
+  private static byte[] _UnpackPixels(ReadOnlySpan<byte> data, int width, int height, int bpp, int bytesPerRow, int pixelScale) {
     var pixels = new byte[width * height];
     var pixelsPerByte = 8 / bpp;
     var mask = (1 << bpp) - 1;

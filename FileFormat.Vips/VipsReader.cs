@@ -29,14 +29,12 @@ public static class VipsReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static VipsFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static VipsFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static VipsFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < VipsHeader.StructSize)
       throw new InvalidDataException("Data too small for a valid VIPS file.");
 
-    var header = VipsHeader.ReadFrom(data.AsSpan(0, VipsHeader.StructSize));
+    var header = VipsHeader.ReadFrom(data.Slice(0, VipsHeader.StructSize));
 
     if (header.Magic != VipsHeader.MagicValue)
       throw new InvalidDataException($"Invalid VIPS magic: expected 0x{VipsHeader.MagicValue:X8}, got 0x{header.Magic:X8}.");
@@ -58,7 +56,7 @@ public static class VipsReader {
     var copyLen = Math.Min(expectedPixelBytes, available);
 
     var pixelData = new byte[expectedPixelBytes];
-    data.AsSpan(VipsHeader.StructSize, copyLen).CopyTo(pixelData.AsSpan(0));
+    data.Slice(VipsHeader.StructSize, copyLen).CopyTo(pixelData.AsSpan(0));
 
     return new VipsFile {
       Width = header.Width,
@@ -67,5 +65,10 @@ public static class VipsReader {
       BandFormat = bandFormat,
       PixelData = pixelData,
     };
+    }
+
+  public static VipsFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

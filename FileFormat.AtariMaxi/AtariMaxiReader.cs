@@ -26,7 +26,16 @@ public static class AtariMaxiReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static AtariMaxiFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static AtariMaxiFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != AtariMaxiFile.ExpectedFileSize)
+      throw new InvalidDataException($"Maxi file must be exactly {AtariMaxiFile.ExpectedFileSize} bytes, got {data.Length}.");
+
+    var pixelData = new byte[AtariMaxiFile.ExpectedFileSize];
+    data.Slice(0, AtariMaxiFile.ExpectedFileSize).CopyTo(pixelData);
+
+    return new AtariMaxiFile { PixelData = pixelData };
+    }
 
   public static AtariMaxiFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

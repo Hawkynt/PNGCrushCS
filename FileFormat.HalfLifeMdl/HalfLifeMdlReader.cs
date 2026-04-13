@@ -25,7 +25,35 @@ public static class HalfLifeMdlReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static HalfLifeMdlFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static HalfLifeMdlFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < HalfLifeMdlFile.HeaderSize)
+      throw new InvalidDataException("Data too small for a valid HalfLifeMdl file.");
+
+    var width = data[0] | (data[1] << 8);
+    var height = data[2] | (data[3] << 8);
+    if (width == 0) width = data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24);
+    if (width <= 0 || width > 65535) width = 256;
+
+    if (16 >= 8) {
+      height = data[4] | (data[5] << 8);
+      if (height <= 0 || height > 65535) height = 256;
+    } else if (height <= 0 || height > 65535) {
+      height = 256;
+    }
+
+    var pixelBytes = width * height;
+    var pixelData = new byte[pixelBytes];
+    var available = Math.Min(pixelBytes, data.Length - HalfLifeMdlFile.HeaderSize);
+    if (available > 0)
+      data.Slice(HalfLifeMdlFile.HeaderSize, available).CopyTo(pixelData.AsSpan(0));
+
+    return new() {
+      Width = width,
+      Height = height,
+      PixelData = pixelData,
+    };
+    }
 
   public static HalfLifeMdlFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Buffers.Binary;
 using System.IO;
 using System.Text;
@@ -46,17 +46,14 @@ public static class MayaIffReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static MayaIffFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static MayaIffFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static MayaIffFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_FILE_SIZE)
       throw new InvalidDataException("Data too small for a valid Maya IFF file.");
 
-    if (!data.AsSpan(0, 4).SequenceEqual(_FOR4_MAGIC))
+    if (!data.Slice(0, 4).SequenceEqual(_FOR4_MAGIC))
       throw new InvalidDataException("Invalid Maya IFF magic: expected FOR4.");
 
-    if (!data.AsSpan(8, 4).SequenceEqual(_CIMG_TYPE))
+    if (!data.Slice(8, 4).SequenceEqual(_CIMG_TYPE))
       throw new InvalidDataException("Invalid Maya IFF form type: expected CIMG.");
 
     var offset = 12;
@@ -67,15 +64,15 @@ public static class MayaIffReader {
     var hasAlpha = false;
 
     while (offset + 8 <= data.Length) {
-      var chunkTag = data.AsSpan(offset, 4);
-      var chunkSize = (int)BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(offset + 4));
+      var chunkTag = data.Slice(offset, 4);
+      var chunkSize = (int)BinaryPrimitives.ReadUInt32BigEndian(data[(offset + 4)..]);
       var chunkDataOffset = offset + 8;
 
       if (chunkTag.SequenceEqual(_TBHD_TAG)) {
         if (chunkDataOffset + MayaIffTbhdHeader.StructSize > data.Length)
           throw new InvalidDataException("TBHD chunk data truncated.");
 
-        var tbhd = MayaIffTbhdHeader.ReadFrom(data.AsSpan(chunkDataOffset, MayaIffTbhdHeader.StructSize));
+        var tbhd = MayaIffTbhdHeader.ReadFrom(data.Slice(chunkDataOffset, MayaIffTbhdHeader.StructSize));
         width = (int)tbhd.Width;
         height = (int)tbhd.Height;
         tbhdFound = true;
@@ -83,7 +80,7 @@ public static class MayaIffReader {
         hasAlpha = chunkTag.SequenceEqual(_RGBA_TAG);
         var pixelBytes = Math.Min(chunkSize, data.Length - chunkDataOffset);
         pixelData = new byte[pixelBytes];
-        data.AsSpan(chunkDataOffset, pixelBytes).CopyTo(pixelData.AsSpan(0));
+        data.Slice(chunkDataOffset, pixelBytes).CopyTo(pixelData.AsSpan(0));
       }
 
       // Advance to next chunk, aligned to 4 bytes
@@ -100,5 +97,11 @@ public static class MayaIffReader {
       HasAlpha = hasAlpha,
       PixelData = pixelData ?? [],
     };
+  
+  }
+
+  public static MayaIffFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

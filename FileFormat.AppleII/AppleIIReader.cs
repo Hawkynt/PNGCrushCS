@@ -24,6 +24,27 @@ public static class AppleIIReader {
   /// <summary>Bytes per scanline for HGR.</summary>
   internal const int HgrBytesPerLine = 40;
 
+  public static AppleIIFile FromSpan(ReadOnlySpan<byte> data) {
+    if (data.Length < HgrFileSize)
+      throw new InvalidDataException($"Data too small for a valid Apple II HGR file. Expected at least {HgrFileSize} bytes, got {data.Length}.");
+
+    var mode = data.Length switch {
+      HgrFileSize => AppleIIMode.Hgr,
+      DhgrFileSize => AppleIIMode.Dhgr,
+      _ => throw new InvalidDataException($"Invalid Apple II HGR file size. Expected {HgrFileSize} (HGR) or {DhgrFileSize} (DHGR) bytes, got {data.Length}.")
+    };
+
+    var width = mode == AppleIIMode.Dhgr ? DhgrWidth : HgrWidth;
+    var pixelData = AppleIILayoutConverter.Deinterleave(data.ToArray(), mode);
+
+    return new AppleIIFile {
+      Width = width,
+      Height = RowCount,
+      Mode = mode,
+      PixelData = pixelData
+    };
+  }
+
   public static AppleIIFile FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
@@ -46,23 +67,6 @@ public static class AppleIIReader {
 
   public static AppleIIFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < HgrFileSize)
-      throw new InvalidDataException($"Data too small for a valid Apple II HGR file. Expected at least {HgrFileSize} bytes, got {data.Length}.");
-
-    var mode = data.Length switch {
-      HgrFileSize => AppleIIMode.Hgr,
-      DhgrFileSize => AppleIIMode.Dhgr,
-      _ => throw new InvalidDataException($"Invalid Apple II HGR file size. Expected {HgrFileSize} (HGR) or {DhgrFileSize} (DHGR) bytes, got {data.Length}.")
-    };
-
-    var width = mode == AppleIIMode.Dhgr ? DhgrWidth : HgrWidth;
-    var pixelData = AppleIILayoutConverter.Deinterleave(data, mode);
-
-    return new AppleIIFile {
-      Width = width,
-      Height = RowCount,
-      Mode = mode,
-      PixelData = pixelData
-    };
+    return FromSpan(data);
   }
 }

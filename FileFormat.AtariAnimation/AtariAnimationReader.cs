@@ -26,10 +26,8 @@ public static class AtariAnimationReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static AtariAnimationFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static AtariAnimationFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static AtariAnimationFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < AtariAnimationFile.FrameSize)
       throw new InvalidDataException($"Atari Animation data too small: minimum {AtariAnimationFile.FrameSize} bytes required, got {data.Length}.");
 
@@ -41,9 +39,14 @@ public static class AtariAnimationReader {
 
     for (var i = 0; i < frameCount; ++i) {
       frames[i] = new byte[AtariAnimationFile.FrameSize];
-      data.AsSpan(i * AtariAnimationFile.FrameSize, AtariAnimationFile.FrameSize).CopyTo(frames[i].AsSpan(0));
+      data.Slice(i * AtariAnimationFile.FrameSize, AtariAnimationFile.FrameSize).CopyTo(frames[i].AsSpan(0));
     }
 
     return new AtariAnimationFile { Frames = frames };
+    }
+
+  public static AtariAnimationFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

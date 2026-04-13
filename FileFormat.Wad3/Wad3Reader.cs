@@ -31,15 +31,12 @@ public static class Wad3Reader {
     return FromBytes(ms.ToArray());
   }
 
-  public static Wad3File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static Wad3File FromSpan(ReadOnlySpan<byte> data) {
 
-  public static Wad3File FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < Wad3Header.StructSize)
       throw new InvalidDataException("Data too small for a valid WAD3 file.");
 
-    var span = data.AsSpan();
-    var header = Wad3Header.ReadFrom(span);
+    var header = Wad3Header.ReadFrom(data);
 
     if (header.Magic1 != (byte)'W' || header.Magic2 != (byte)'A' || header.Magic3 != (byte)'D' || header.Magic4 != (byte)'3')
       throw new InvalidDataException("Invalid WAD3 signature.");
@@ -54,7 +51,7 @@ public static class Wad3Reader {
     var textures = new List<Wad3Texture>();
     for (var i = 0; i < numLumps; ++i) {
       var entryOffset = directoryOffset + i * Wad3Entry.StructSize;
-      var entry = Wad3Entry.ReadFrom(span[entryOffset..]);
+      var entry = Wad3Entry.ReadFrom(data[entryOffset..]);
 
       if (entry.Type != (byte)Wad3LumpType.MipTex)
         continue;
@@ -70,28 +67,32 @@ public static class Wad3Reader {
     return new Wad3File { Textures = textures };
   }
 
-  private static Wad3Texture _ReadMipTex(byte[] data, int lumpStart) {
-    var span = data.AsSpan();
+  public static Wad3File FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  private static Wad3Texture _ReadMipTex(ReadOnlySpan<byte> data, int lumpStart) {
 
     // Read MipTex header (40 bytes)
-    var nameBytes = span.Slice(lumpStart, 16);
+    var nameBytes = data.Slice(lumpStart, 16);
     var nameEnd = nameBytes.IndexOf((byte)0);
     var name = nameEnd < 0
       ? Encoding.ASCII.GetString(nameBytes)
       : Encoding.ASCII.GetString(nameBytes[..nameEnd]);
 
-    var width = (int)BinaryPrimitives.ReadUInt32LittleEndian(span[(lumpStart + 16)..]);
-    var height = (int)BinaryPrimitives.ReadUInt32LittleEndian(span[(lumpStart + 20)..]);
+    var width = (int)BinaryPrimitives.ReadUInt32LittleEndian(data[(lumpStart + 16)..]);
+    var height = (int)BinaryPrimitives.ReadUInt32LittleEndian(data[(lumpStart + 20)..]);
 
-    var mipOffset0 = (int)BinaryPrimitives.ReadUInt32LittleEndian(span[(lumpStart + 24)..]);
-    var mipOffset1 = (int)BinaryPrimitives.ReadUInt32LittleEndian(span[(lumpStart + 28)..]);
-    var mipOffset2 = (int)BinaryPrimitives.ReadUInt32LittleEndian(span[(lumpStart + 32)..]);
-    var mipOffset3 = (int)BinaryPrimitives.ReadUInt32LittleEndian(span[(lumpStart + 36)..]);
+    var mipOffset0 = (int)BinaryPrimitives.ReadUInt32LittleEndian(data[(lumpStart + 24)..]);
+    var mipOffset1 = (int)BinaryPrimitives.ReadUInt32LittleEndian(data[(lumpStart + 28)..]);
+    var mipOffset2 = (int)BinaryPrimitives.ReadUInt32LittleEndian(data[(lumpStart + 32)..]);
+    var mipOffset3 = (int)BinaryPrimitives.ReadUInt32LittleEndian(data[(lumpStart + 36)..]);
 
     // Mip level 0 pixel data
     var mip0Size = width * height;
     var pixelData = new byte[mip0Size];
-    data.AsSpan(lumpStart + mipOffset0, mip0Size).CopyTo(pixelData.AsSpan(0));
+    data.Slice(lumpStart + mipOffset0, mip0Size).CopyTo(pixelData.AsSpan(0));
 
     // Mip levels 1-3
     var mip1Size = (width / 2) * (height / 2);
@@ -103,16 +104,16 @@ public static class Wad3Reader {
     mipMaps[1] = new byte[mip2Size];
     mipMaps[2] = new byte[mip3Size];
 
-    data.AsSpan(lumpStart + mipOffset1, mip1Size).CopyTo(mipMaps[0].AsSpan(0));
-    data.AsSpan(lumpStart + mipOffset2, mip2Size).CopyTo(mipMaps[1].AsSpan(0));
-    data.AsSpan(lumpStart + mipOffset3, mip3Size).CopyTo(mipMaps[2].AsSpan(0));
+    data.Slice(lumpStart + mipOffset1, mip1Size).CopyTo(mipMaps[0].AsSpan(0));
+    data.Slice(lumpStart + mipOffset2, mip2Size).CopyTo(mipMaps[1].AsSpan(0));
+    data.Slice(lumpStart + mipOffset3, mip3Size).CopyTo(mipMaps[2].AsSpan(0));
 
     // Palette: after mip3 data, 2-byte count then 768 bytes RGB
     var paletteCountOffset = lumpStart + mipOffset3 + mip3Size;
-    var paletteCount = BinaryPrimitives.ReadUInt16LittleEndian(span[paletteCountOffset..]);
+    var paletteCount = BinaryPrimitives.ReadUInt16LittleEndian(data[paletteCountOffset..]);
     var paletteSize = paletteCount * 3;
     var palette = new byte[paletteSize];
-    data.AsSpan(paletteCountOffset + 2, paletteSize).CopyTo(palette.AsSpan(0));
+    data.Slice(paletteCountOffset + 2, paletteSize).CopyTo(palette.AsSpan(0));
 
     return new Wad3Texture {
       Name = name,

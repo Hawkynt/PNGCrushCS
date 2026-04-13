@@ -23,17 +23,14 @@ public static class AndrewToolkitReader {
     if (stream.CanSeek) {
       var data = new byte[stream.Length - stream.Position];
       stream.ReadExactly(data);
-      return FromBytes(data);
+      return FromSpan(data);
     }
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
+    return FromSpan(ms.ToArray());
   }
 
-  public static AndrewToolkitFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static AndrewToolkitFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static AndrewToolkitFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_FILE_SIZE)
       throw new InvalidDataException($"Data too small for a valid ATK file: expected at least {_MIN_FILE_SIZE} bytes, got {data.Length}.");
 
@@ -43,11 +40,13 @@ public static class AndrewToolkitReader {
     var height = 0;
 
     while (offset < data.Length) {
-      var lineEnd = Array.IndexOf(data, (byte)'\n', offset);
+      var lineEnd = data[offset..].IndexOf((byte)'\n');
       if (lineEnd < 0)
         break;
 
-      var line = Encoding.ASCII.GetString(data, offset, lineEnd - offset).Trim();
+      lineEnd += offset;
+
+      var line = Encoding.ASCII.GetString(data.Slice(offset, lineEnd - offset)).Trim();
       offset = lineEnd + 1;
       headerLines.Add(line);
 
@@ -67,7 +66,7 @@ public static class AndrewToolkitReader {
     var remaining = data.Length - offset;
     var rawData = new byte[remaining];
     if (remaining > 0)
-      data.AsSpan(offset, remaining).CopyTo(rawData.AsSpan(0));
+      data.Slice(offset, remaining).CopyTo(rawData.AsSpan(0));
 
     return new AndrewToolkitFile {
       Width = width,
@@ -75,6 +74,11 @@ public static class AndrewToolkitReader {
       RawData = rawData,
       HeaderLines = headerLines.ToArray(),
     };
+  }
+
+  public static AndrewToolkitFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   private static string _ExtractValue(string line, string keyword) {

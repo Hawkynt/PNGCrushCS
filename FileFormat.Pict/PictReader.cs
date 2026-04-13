@@ -32,10 +32,12 @@ public static class PictReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static PictFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
   public static PictFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  public static PictFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_FILE_SIZE)
       throw new InvalidDataException("Data too small for a valid PICT file.");
 
@@ -45,13 +47,13 @@ public static class PictReader {
     offset += _PICTURE_SIZE_FIELD;
 
     // Read bounding rect: top, left, bottom, right (int16 BE each)
-    var top = BinaryPrimitives.ReadInt16BigEndian(data.AsSpan(offset));
+    var top = BinaryPrimitives.ReadInt16BigEndian(data[offset..]);
     offset += 2;
-    var left = BinaryPrimitives.ReadInt16BigEndian(data.AsSpan(offset));
+    var left = BinaryPrimitives.ReadInt16BigEndian(data[offset..]);
     offset += 2;
-    var bottom = BinaryPrimitives.ReadInt16BigEndian(data.AsSpan(offset));
+    var bottom = BinaryPrimitives.ReadInt16BigEndian(data[offset..]);
     offset += 2;
-    var right = BinaryPrimitives.ReadInt16BigEndian(data.AsSpan(offset));
+    var right = BinaryPrimitives.ReadInt16BigEndian(data[offset..]);
     offset += 2;
 
     var width = right - left;
@@ -68,7 +70,7 @@ public static class PictReader {
       if (offset + 2 > data.Length)
         break;
 
-      var opcode = BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(offset));
+      var opcode = BinaryPrimitives.ReadUInt16BigEndian(data[offset..]);
       offset += 2;
 
       switch ((PictOpcode)opcode) {
@@ -86,11 +88,11 @@ public static class PictReader {
           break;
 
         case PictOpcode.DirectBitsRect:
-          (pixelData, bitsPerPixel) = _ReadDirectBitsRect(data, ref offset, width, height);
+          (pixelData, bitsPerPixel) = _ReadDirectBitsRect(data.ToArray(), ref offset, width, height);
           break;
 
         case PictOpcode.PackBitsRect:
-          (pixelData, palette, bitsPerPixel) = _ReadPackBitsRect(data, ref offset, width, height);
+          (pixelData, palette, bitsPerPixel) = _ReadPackBitsRect(data.ToArray(), ref offset, width, height);
           break;
 
         default:

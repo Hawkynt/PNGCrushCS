@@ -25,7 +25,15 @@ public static class C128Reader {
     return FromBytes(ms.ToArray());
   }
 
-  public static C128File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static C128File FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != C128File.FileSize)
+      throw new InvalidDataException($"Invalid C128 data size: expected exactly {C128File.FileSize} bytes, got {data.Length}.");
+
+    var pixelData = new byte[C128File.FileSize];
+    data.Slice(0, C128File.FileSize).CopyTo(pixelData);
+    return new() { PixelData = pixelData };
+    }
 
   public static C128File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

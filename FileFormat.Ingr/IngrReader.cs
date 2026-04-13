@@ -1,4 +1,5 @@
-using System;
+﻿using System;
+using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.Ingr;
@@ -29,28 +30,26 @@ public static class IngrReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static IngrFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static IngrFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static IngrFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < HeaderSize)
       throw new InvalidDataException($"INGR data too small: {data.Length} bytes, need at least {HeaderSize}.");
 
-    var dataTypeCode = BitConverter.ToUInt16(data, 2);
+    var dataTypeCode = BinaryPrimitives.ReadUInt16LittleEndian(data[2..]);
     if (!Enum.IsDefined(typeof(IngrDataType), dataTypeCode))
       throw new InvalidDataException($"Unsupported INGR data type code: {dataTypeCode}.");
 
     var dataType = (IngrDataType)dataTypeCode;
-    var width = BitConverter.ToInt32(data, 184);
-    var height = BitConverter.ToInt32(data, 188);
+    var width = BinaryPrimitives.ReadInt32LittleEndian(data[184..]);
+    var height = BinaryPrimitives.ReadInt32LittleEndian(data[188..]);
 
     if (width <= 0) {
-      var xExtent = Math.Abs(BitConverter.ToInt16(data, 8));
+      var xExtent = Math.Abs(BinaryPrimitives.ReadInt16LittleEndian(data[8..]));
       width = xExtent > 0 ? xExtent : throw new InvalidDataException("INGR image width must be positive.");
     }
 
     if (height <= 0) {
-      var yExtent = Math.Abs(BitConverter.ToInt16(data, 10));
+      var yExtent = Math.Abs(BinaryPrimitives.ReadInt16LittleEndian(data[10..]));
       height = yExtent > 0 ? yExtent : throw new InvalidDataException("INGR image height must be positive.");
     }
 
@@ -60,7 +59,7 @@ public static class IngrReader {
     var copyLen = Math.Min(expectedPixelBytes, available);
 
     var pixelData = new byte[expectedPixelBytes];
-    data.AsSpan(HeaderSize, copyLen).CopyTo(pixelData.AsSpan(0));
+    data.Slice(HeaderSize, copyLen).CopyTo(pixelData.AsSpan(0));
 
     return new IngrFile {
       Width = width,
@@ -68,5 +67,10 @@ public static class IngrReader {
       DataType = dataType,
       PixelData = pixelData,
     };
+  }
+
+  public static IngrFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

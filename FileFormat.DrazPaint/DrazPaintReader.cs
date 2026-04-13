@@ -26,17 +26,15 @@ public static class DrazPaintReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static DrazPaintFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static DrazPaintFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static DrazPaintFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < DrazPaintFile.LoadAddressSize + 1)
       throw new InvalidDataException($"Data too small for a valid DrazPaint file (got {data.Length} bytes).");
 
     var loadAddress = (ushort)(data[0] | (data[1] << 8));
 
     var compressed = new byte[data.Length - DrazPaintFile.LoadAddressSize];
-    data.AsSpan(DrazPaintFile.LoadAddressSize, compressed.Length).CopyTo(compressed.AsSpan(0));
+    data.Slice(DrazPaintFile.LoadAddressSize, compressed.Length).CopyTo(compressed.AsSpan(0));
 
     var decompressed = DrazPaintFile.RleDecode(compressed);
     if (decompressed.Length < DrazPaintFile.UncompressedPayloadSize)
@@ -65,5 +63,10 @@ public static class DrazPaintReader {
       ColorRam = colorRam,
       BackgroundColor = backgroundColor,
     };
+    }
+
+  public static DrazPaintFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

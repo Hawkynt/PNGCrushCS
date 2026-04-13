@@ -30,10 +30,12 @@ public static class PdfReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static PdfFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
   public static PdfFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  public static PdfFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_SIZE)
       throw new InvalidDataException("Data too small for a valid PDF file.");
 
@@ -41,8 +43,9 @@ public static class PdfReader {
     if (data[0] != 0x25 || data[1] != 0x50 || data[2] != 0x44 || data[3] != 0x46)
       throw new InvalidDataException("Invalid PDF signature.");
 
-    var xref = PdfXrefParser.Parse(data);
-    var trailer = PdfXrefParser.ParseTrailer(data, xref);
+    var dataArray = data.ToArray();
+    var xref = PdfXrefParser.Parse(dataArray);
+    var trailer = PdfXrefParser.ParseTrailer(dataArray, xref);
     if (trailer == null)
       throw new InvalidDataException("Cannot parse PDF trailer.");
 
@@ -50,14 +53,14 @@ public static class PdfReader {
 
     // Navigate catalog -> pages tree
     if (trailer.TryGetValue("Root", out var rootRef)) {
-      var catalog = PdfParser.ResolveDict(rootRef, data, xref);
+      var catalog = PdfParser.ResolveDict(rootRef, dataArray, xref);
       if (catalog != null)
-        _ExtractFromCatalog(catalog, data, xref, images);
+        _ExtractFromCatalog(catalog, dataArray, xref, images);
     }
 
     // If page tree traversal found nothing, try a brute-force scan of all objects
     if (images.Count == 0)
-      _BruteForceScanImages(data, xref, images);
+      _BruteForceScanImages(dataArray, xref, images);
 
     return new PdfFile { Images = images };
   }

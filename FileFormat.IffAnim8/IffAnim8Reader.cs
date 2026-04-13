@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 
 namespace FileFormat.IffAnim8;
@@ -26,10 +26,12 @@ public static class IffAnim8Reader {
     return FromBytes(ms.ToArray());
   }
 
-  public static IffAnim8File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
   public static IffAnim8File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  public static IffAnim8File FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < IffAnim8File.MinFileSize)
       throw new InvalidDataException($"Invalid ANIM8 data: expected at least {IffAnim8File.MinFileSize} bytes, got {data.Length}.");
 
@@ -38,8 +40,7 @@ public static class IffAnim8Reader {
 
     _TryParseBmhd(data, out width, out height);
 
-    var rawData = new byte[data.Length];
-    data.AsSpan(0, data.Length).CopyTo(rawData);
+    var rawData = data.ToArray();
 
     return new() {
       Width = width,
@@ -48,7 +49,7 @@ public static class IffAnim8Reader {
     };
   }
 
-  private static void _TryParseBmhd(byte[] data, out int width, out int height) {
+  private static void _TryParseBmhd(ReadOnlySpan<byte> data, out int width, out int height) {
     width = IffAnim8File.DefaultWidth;
     height = IffAnim8File.DefaultHeight;
 

@@ -26,7 +26,28 @@ public static class CinemasterAtariReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static CinemasterAtariFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static CinemasterAtariFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < CinemasterAtariFile.HeaderSize)
+      throw new InvalidDataException($"Cinemaster Atari data too small: minimum {CinemasterAtariFile.HeaderSize} bytes required, got {data.Length}.");
+
+    var frameCount = (ushort)(data[0] | (data[1] << 8));
+    var expectedSize = CinemasterAtariFile.HeaderSize + frameCount * CinemasterAtariFile.FrameSize;
+
+    if (data.Length < expectedSize)
+      throw new InvalidDataException($"Cinemaster Atari data too small for {frameCount} frames: expected {expectedSize} bytes, got {data.Length}.");
+
+    var frames = new byte[frameCount][];
+    for (var i = 0; i < frameCount; ++i) {
+      frames[i] = new byte[CinemasterAtariFile.FrameSize];
+      data.Slice(CinemasterAtariFile.HeaderSize + i * CinemasterAtariFile.FrameSize, CinemasterAtariFile.FrameSize).CopyTo(frames[i].AsSpan(0));
+    }
+
+    return new CinemasterAtariFile {
+      FrameCount = frameCount,
+      Frames = frames,
+    };
+    }
 
   public static CinemasterAtariFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

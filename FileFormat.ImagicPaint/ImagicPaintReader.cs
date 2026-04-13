@@ -26,7 +26,29 @@ public static class ImagicPaintReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static ImagicPaintFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static ImagicPaintFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < ImagicPaintHeader.StructSize)
+      throw new InvalidDataException("Data too small for a valid Imagic Paint file.");
+
+    if (data.Length < ImagicPaintFile.FileSize)
+      throw new InvalidDataException($"Data too small for the expected {ImagicPaintFile.FileSize}-byte Imagic Paint file.");
+
+    var span = data;
+    var header = ImagicPaintHeader.ReadFrom(span);
+    var palette = header.GetPaletteArray();
+
+    var pixelData = new byte[32000];
+    data.Slice(ImagicPaintHeader.StructSize, 32000).CopyTo(pixelData.AsSpan(0));
+
+    return new ImagicPaintFile {
+      Width = 320,
+      Height = 200,
+      Resolution = (ushort)header.Resolution,
+      Palette = palette,
+      PixelData = pixelData
+    };
+    }
 
   public static ImagicPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

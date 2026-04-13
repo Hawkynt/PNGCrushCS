@@ -26,14 +26,12 @@ public static class SunRasterReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static SunRasterFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static SunRasterFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static SunRasterFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < SunRasterHeader.StructSize)
       throw new InvalidDataException("Data too small for a valid Sun Raster file.");
 
-    var span = data.AsSpan();
+    var span = data;
     var header = SunRasterHeader.ReadFrom(span);
 
     if (header.Magic != SunRasterHeader.MagicValue)
@@ -70,7 +68,7 @@ public static class SunRasterReader {
     // Read pixel data
     var remainingBytes = data.Length - offset;
     var rawPixelData = new byte[remainingBytes];
-    data.AsSpan(offset, remainingBytes).CopyTo(rawPixelData.AsSpan(0));
+    data.Slice(offset, remainingBytes).CopyTo(rawPixelData.AsSpan(0));
 
     // Rows are padded to 16-bit (2-byte) boundary
     var bytesPerRow = (width * depth + 7) / 8;
@@ -98,6 +96,11 @@ public static class SunRasterReader {
       Palette = palette,
       PaletteColorCount = paletteColorCount
     };
+    }
+
+  public static SunRasterFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   private static SunRasterColorMode _DetectColorMode(int depth, byte[]? palette, int paletteColorCount) {

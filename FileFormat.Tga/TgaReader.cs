@@ -26,15 +26,12 @@ public static class TgaReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static TgaFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static TgaFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static TgaFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < TgaHeader.StructSize)
       throw new InvalidDataException("Data too small for a valid TGA file.");
 
-    var span = data.AsSpan();
-    var header = TgaHeader.ReadFrom(span);
+    var header = TgaHeader.ReadFrom(data);
 
     var idLength = header.IdLength;
     var colorMapType = header.ColorMapType;
@@ -63,9 +60,9 @@ public static class TgaReader {
 
       for (var i = 0; i < paletteColorCount; ++i) {
         if (entryBytes >= 3) {
-          var b = span[offset];
-          var g = span[offset + 1];
-          var r = span[offset + 2];
+          var b = data[offset];
+          var g = data[offset + 1];
+          var r = data[offset + 2];
           palette[i * 3] = r;
           palette[i * 3 + 1] = g;
           palette[i * 3 + 2] = b;
@@ -103,7 +100,7 @@ public static class TgaReader {
     }
 
     var remainingBytes = pixelDataEnd - offset;
-    var rawPixelData = span.Slice(offset, remainingBytes).ToArray();
+    var rawPixelData = data.Slice(offset, remainingBytes).ToArray();
 
     byte[] pixelData;
     if (isRle)
@@ -137,6 +134,11 @@ public static class TgaReader {
       Compression = compression,
       ColorMode = colorMode
     };
+  }
+
+  public static TgaFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   private static TgaColorMode _DetectColorMode(int baseType, int bitsPerPixel, byte[]? palette, int paletteColorCount, int alphaBits) {

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 
 namespace FileFormat.HinterGrundBild;
@@ -27,10 +27,8 @@ public static class HinterGrundBildReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static HinterGrundBildFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static HinterGrundBildFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static HinterGrundBildFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
 
     if (data.Length < HinterGrundBildFile.LoadAddressSize + HinterGrundBildFile.MinPayloadSize)
       throw new InvalidDataException($"File too small for HinterGrundBild format (got {data.Length} bytes, need at least {HinterGrundBildFile.LoadAddressSize + HinterGrundBildFile.MinPayloadSize}).");
@@ -43,17 +41,17 @@ public static class HinterGrundBildReader {
 
     // Bitmap data (8000 bytes)
     var bitmapData = new byte[HinterGrundBildFile.BitmapDataSize];
-    data.AsSpan(offset, HinterGrundBildFile.BitmapDataSize).CopyTo(bitmapData);
+    data.Slice(offset, HinterGrundBildFile.BitmapDataSize).CopyTo(bitmapData);
     offset += HinterGrundBildFile.BitmapDataSize;
 
     // Screen RAM (1000 bytes)
     var screenData = new byte[HinterGrundBildFile.ScreenDataSize];
-    data.AsSpan(offset, HinterGrundBildFile.ScreenDataSize).CopyTo(screenData);
+    data.Slice(offset, HinterGrundBildFile.ScreenDataSize).CopyTo(screenData);
     offset += HinterGrundBildFile.ScreenDataSize;
 
     // Color RAM (1000 bytes)
     var colorData = new byte[HinterGrundBildFile.ColorDataSize];
-    data.AsSpan(offset, HinterGrundBildFile.ColorDataSize).CopyTo(colorData);
+    data.Slice(offset, HinterGrundBildFile.ColorDataSize).CopyTo(colorData);
     offset += HinterGrundBildFile.ColorDataSize;
 
     // Background color: first byte of trailing data if available, else 0
@@ -64,7 +62,7 @@ public static class HinterGrundBildReader {
       ++offset;
       if (offset < data.Length) {
         trailingData = new byte[data.Length - offset];
-        data.AsSpan(offset).CopyTo(trailingData);
+        data[offset..].CopyTo(trailingData);
       }
     }
 
@@ -76,5 +74,10 @@ public static class HinterGrundBildReader {
       BackgroundColor = backgroundColor,
       TrailingData = trailingData,
     };
+  }
+
+  public static HinterGrundBildFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

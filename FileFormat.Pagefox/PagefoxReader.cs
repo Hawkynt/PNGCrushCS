@@ -26,7 +26,16 @@ public static class PagefoxReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static PagefoxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static PagefoxFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < PagefoxFile.ExpectedFileSize)
+      throw new InvalidDataException($"Pagefox file too small (got {data.Length} bytes, expected {PagefoxFile.ExpectedFileSize}).");
+
+    var rawData = new byte[PagefoxFile.ExpectedFileSize];
+    data.Slice(0, PagefoxFile.ExpectedFileSize).CopyTo(rawData.AsSpan(0));
+
+    return new() { RawData = rawData };
+    }
 
   public static PagefoxFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

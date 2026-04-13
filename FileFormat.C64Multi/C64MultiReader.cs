@@ -26,11 +26,7 @@ public static class C64MultiReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static C64MultiFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static C64MultiFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
-
+  public static C64MultiFile FromSpan(ReadOnlySpan<byte> data) {
     var format = _DetectFormat(data.Length);
 
     return format switch {
@@ -40,13 +36,18 @@ public static class C64MultiReader {
     };
   }
 
+  public static C64MultiFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
   private static C64MultiFormat _DetectFormat(int fileSize) => fileSize switch {
     C64MultiFile.ArtStudioHiresFileSize => C64MultiFormat.ArtStudioHires,
     C64MultiFile.ArtStudioMultiFileSize => C64MultiFormat.ArtStudioMulti,
     _ => throw new InvalidDataException($"Unrecognized C64 multi file size (got {fileSize} bytes, expected {C64MultiFile.ArtStudioHiresFileSize} or {C64MultiFile.ArtStudioMultiFileSize}).")
   };
 
-  private static C64MultiFile _ParseArtStudioHires(byte[] data) {
+  private static C64MultiFile _ParseArtStudioHires(ReadOnlySpan<byte> data) {
     var offset = 0;
 
     // Load address (2 bytes, little-endian)
@@ -55,12 +56,12 @@ public static class C64MultiReader {
 
     // Bitmap data (8000 bytes)
     var bitmapData = new byte[C64MultiFile.BitmapDataSize];
-    data.AsSpan(offset, C64MultiFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
+    data.Slice(offset, C64MultiFile.BitmapDataSize).CopyTo(bitmapData);
     offset += C64MultiFile.BitmapDataSize;
 
     // Screen RAM (1000 bytes)
     var screenData = new byte[C64MultiFile.ScreenDataSize];
-    data.AsSpan(offset, C64MultiFile.ScreenDataSize).CopyTo(screenData.AsSpan(0));
+    data.Slice(offset, C64MultiFile.ScreenDataSize).CopyTo(screenData);
     offset += C64MultiFile.ScreenDataSize;
 
     // Border color (1 byte)
@@ -78,7 +79,7 @@ public static class C64MultiReader {
     };
   }
 
-  private static C64MultiFile _ParseArtStudioMulti(byte[] data) {
+  private static C64MultiFile _ParseArtStudioMulti(ReadOnlySpan<byte> data) {
     var offset = 0;
 
     // Load address (2 bytes, little-endian)
@@ -87,17 +88,17 @@ public static class C64MultiReader {
 
     // Bitmap data (8000 bytes)
     var bitmapData = new byte[C64MultiFile.BitmapDataSize];
-    data.AsSpan(offset, C64MultiFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
+    data.Slice(offset, C64MultiFile.BitmapDataSize).CopyTo(bitmapData);
     offset += C64MultiFile.BitmapDataSize;
 
     // Screen RAM (1000 bytes)
     var screenData = new byte[C64MultiFile.ScreenDataSize];
-    data.AsSpan(offset, C64MultiFile.ScreenDataSize).CopyTo(screenData.AsSpan(0));
+    data.Slice(offset, C64MultiFile.ScreenDataSize).CopyTo(screenData);
     offset += C64MultiFile.ScreenDataSize;
 
     // Color RAM (1000 bytes)
     var colorData = new byte[C64MultiFile.ColorDataSize];
-    data.AsSpan(offset, C64MultiFile.ColorDataSize).CopyTo(colorData.AsSpan(0));
+    data.Slice(offset, C64MultiFile.ColorDataSize).CopyTo(colorData);
     offset += C64MultiFile.ColorDataSize;
 
     // Background color (1 byte)

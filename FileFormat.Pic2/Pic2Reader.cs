@@ -1,4 +1,5 @@
-using System;
+﻿using System;
+using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.Pic2;
@@ -26,20 +27,17 @@ public static class Pic2Reader {
     return FromBytes(ms.ToArray());
   }
 
-  public static Pic2File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static Pic2File FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static Pic2File FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < Pic2File.MinFileSize)
       throw new InvalidDataException($"Data too small for a valid PIC2 file (need at least {Pic2File.MinFileSize} bytes, got {data.Length}).");
 
     if (data[0] != Pic2File.Magic[0] || data[1] != Pic2File.Magic[1] || data[2] != Pic2File.Magic[2] || data[3] != Pic2File.Magic[3])
       throw new InvalidDataException("Invalid PIC2 magic bytes.");
 
-    var width = BitConverter.ToUInt16(data, 4);
-    var height = BitConverter.ToUInt16(data, 6);
-    var bpp = BitConverter.ToUInt16(data, 8);
-    var mode = BitConverter.ToUInt16(data, 10);
+    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
+    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
+    var bpp = BinaryPrimitives.ReadUInt16LittleEndian(data[8..]);
+    var mode = BinaryPrimitives.ReadUInt16LittleEndian(data[10..]);
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid PIC2 dimensions: {width}x{height}.");
@@ -53,7 +51,7 @@ public static class Pic2Reader {
       throw new InvalidDataException("PIC2 file truncated: not enough pixel data.");
 
     var pixelData = new byte[pixelDataSize];
-    data.AsSpan(Pic2File.HeaderSize, pixelDataSize).CopyTo(pixelData.AsSpan(0));
+    data.Slice(Pic2File.HeaderSize, pixelDataSize).CopyTo(pixelData.AsSpan(0));
 
     return new() {
       Width = width,
@@ -62,5 +60,10 @@ public static class Pic2Reader {
       Mode = mode,
       PixelData = pixelData,
     };
+  }
+
+  public static Pic2File FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

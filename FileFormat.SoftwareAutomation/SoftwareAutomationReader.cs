@@ -26,7 +26,16 @@ public static class SoftwareAutomationReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static SoftwareAutomationFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static SoftwareAutomationFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != SoftwareAutomationFile.ExpectedFileSize)
+      throw new InvalidDataException($"Invalid Software Automation Graphics data size: expected exactly {SoftwareAutomationFile.ExpectedFileSize} bytes, got {data.Length}.");
+
+    var pixelData = new byte[SoftwareAutomationFile.ExpectedFileSize];
+    data.Slice(0, SoftwareAutomationFile.ExpectedFileSize).CopyTo(pixelData);
+
+    return new SoftwareAutomationFile { PixelData = pixelData };
+    }
 
   public static SoftwareAutomationFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

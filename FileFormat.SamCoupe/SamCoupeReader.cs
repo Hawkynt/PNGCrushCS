@@ -41,10 +41,7 @@ public static class SamCoupeReader {
     return FromBytes(ms.ToArray(), mode);
   }
 
-  public static SamCoupeFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static SamCoupeFile FromBytes(byte[] data, SamCoupeMode mode = SamCoupeMode.Mode4) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static SamCoupeFile FromSpan(ReadOnlySpan<byte> data, SamCoupeMode mode = SamCoupeMode.Mode4) {
     if (data.Length != FileSize)
       throw new InvalidDataException($"SAM Coupe screen must be exactly {FileSize} bytes, got {data.Length}.");
 
@@ -61,8 +58,8 @@ public static class SamCoupeReader {
       var evenRow = i * 2;
       var oddRow = i * 2 + 1;
 
-      data.AsSpan(i * BytesPerRow, BytesPerRow).CopyTo(linearData.AsSpan(evenRow * BytesPerRow));
-      data.AsSpan(PageSize + i * BytesPerRow, BytesPerRow).CopyTo(linearData.AsSpan(oddRow * BytesPerRow));
+      data.Slice(i * BytesPerRow, BytesPerRow).CopyTo(linearData.AsSpan(evenRow * BytesPerRow));
+      data.Slice(PageSize + i * BytesPerRow, BytesPerRow).CopyTo(linearData.AsSpan(oddRow * BytesPerRow));
     }
 
     return new() {
@@ -71,5 +68,10 @@ public static class SamCoupeReader {
       Mode = mode,
       PixelData = linearData
     };
+  }
+
+  public static SamCoupeFile FromBytes(byte[] data, SamCoupeMode mode = SamCoupeMode.Mode4) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data, mode);
   }
 }

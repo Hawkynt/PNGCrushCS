@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.CanonNavFax;
@@ -26,20 +27,17 @@ public static class CanonNavFaxReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static CanonNavFaxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static CanonNavFaxFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static CanonNavFaxFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < CanonNavFaxFile.MinFileSize)
       throw new InvalidDataException($"Data too small for a valid CAN file (need at least {CanonNavFaxFile.MinFileSize} bytes, got {data.Length}).");
 
     if (data[0] != CanonNavFaxFile.Magic[0] || data[1] != CanonNavFaxFile.Magic[1] || data[2] != CanonNavFaxFile.Magic[2] || data[3] != CanonNavFaxFile.Magic[3])
       throw new InvalidDataException("Invalid CAN magic bytes.");
 
-    var width = BitConverter.ToUInt16(data, 4);
-    var height = BitConverter.ToUInt16(data, 6);
-    var resolution = BitConverter.ToUInt16(data, 8);
-    var encoding = BitConverter.ToUInt16(data, 10);
+    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
+    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
+    var resolution = BinaryPrimitives.ReadUInt16LittleEndian(data[8..]);
+    var encoding = BinaryPrimitives.ReadUInt16LittleEndian(data[10..]);
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid CAN dimensions: {width}x{height}.");
@@ -50,7 +48,7 @@ public static class CanonNavFaxReader {
       throw new InvalidDataException("CAN file truncated: not enough pixel data.");
 
     var pixelData = new byte[pixelDataSize];
-    data.AsSpan(CanonNavFaxFile.HeaderSize, pixelDataSize).CopyTo(pixelData.AsSpan(0));
+    data.Slice(CanonNavFaxFile.HeaderSize, pixelDataSize).CopyTo(pixelData);
 
     return new() {
       Width = width,
@@ -59,5 +57,10 @@ public static class CanonNavFaxReader {
       Encoding = encoding,
       PixelData = pixelData,
     };
+  }
+
+  public static CanonNavFaxFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

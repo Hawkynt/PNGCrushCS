@@ -27,13 +27,12 @@ public static class WadReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static WadFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static WadFile FromSpan(ReadOnlySpan<byte> data) {
+
     if (data.Length < WadHeader.StructSize)
       throw new InvalidDataException("Data too small for a valid WAD file.");
 
-    var span = data.AsSpan();
-    var header = WadHeader.ReadFrom(span);
+    var header = WadHeader.ReadFrom(data);
 
     var type = (header.Id1, header.Id2, header.Id3, header.Id4) switch {
       ((byte)'I', (byte)'W', (byte)'A', (byte)'D') => WadType.Iwad,
@@ -51,15 +50,20 @@ public static class WadReader {
     var lumps = new List<WadLump>(numLumps);
     for (var i = 0; i < numLumps; ++i) {
       var entryOffset = directoryOffset + i * WadEntry.StructSize;
-      var entry = WadEntry.ReadFrom(span[entryOffset..]);
+      var entry = WadEntry.ReadFrom(data[entryOffset..]);
 
       var lumpData = new byte[entry.Size];
       if (entry.Size > 0)
-        data.AsSpan(entry.FilePos, entry.Size).CopyTo(lumpData.AsSpan(0));
+        data.Slice(entry.FilePos, entry.Size).CopyTo(lumpData.AsSpan(0));
 
       lumps.Add(new WadLump { Name = entry.Name, Data = lumpData });
     }
 
     return new WadFile { Type = type, Lumps = lumps };
+  }
+
+  public static WadFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

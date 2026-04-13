@@ -28,10 +28,10 @@ public sealed class DataTypeTests {
 
   [Test]
   [Category("Unit")]
-  public void QoiFile_DefaultPixelData_IsEmptyArray() {
+  public void QoiFile_DefaultPixelData_IsNull() {
+    // QoiFile is a readonly record struct — uninitialized PixelData is null, not empty array
     var file = new QoiFile { Width = 1, Height = 1, Channels = QoiChannels.Rgb };
-    Assert.That(file.PixelData, Is.Not.Null);
-    Assert.That(file.PixelData, Has.Length.EqualTo(0));
+    Assert.That(file.PixelData, Is.Null);
   }
 
   [Test]

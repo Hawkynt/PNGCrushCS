@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.AccessFax;
@@ -26,19 +27,16 @@ public static class AccessFaxReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static AccessFaxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static AccessFaxFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static AccessFaxFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < AccessFaxFile.MinFileSize)
       throw new InvalidDataException($"Data too small for a valid AccessFax file (need at least {AccessFaxFile.MinFileSize} bytes, got {data.Length}).");
 
     if (data[0] != AccessFaxFile.Magic[0] || data[1] != AccessFaxFile.Magic[1])
       throw new InvalidDataException("Invalid AccessFax magic bytes.");
 
-    var width = BitConverter.ToUInt16(data, 2);
-    var height = BitConverter.ToUInt16(data, 4);
-    var flags = BitConverter.ToUInt16(data, 6);
+    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[2..]);
+    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
+    var flags = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid AccessFax dimensions: {width}x{height}.");
@@ -49,7 +47,7 @@ public static class AccessFaxReader {
       throw new InvalidDataException("AccessFax file truncated: not enough pixel data.");
 
     var pixelData = new byte[pixelDataSize];
-    data.AsSpan(AccessFaxFile.HeaderSize, pixelDataSize).CopyTo(pixelData.AsSpan(0));
+    data.Slice(AccessFaxFile.HeaderSize, pixelDataSize).CopyTo(pixelData.AsSpan(0));
 
     return new() {
       Width = width,
@@ -57,5 +55,10 @@ public static class AccessFaxReader {
       Flags = flags,
       PixelData = pixelData,
     };
+  }
+
+  public static AccessFaxFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

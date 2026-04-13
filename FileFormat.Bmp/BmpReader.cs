@@ -26,24 +26,20 @@ public static class BmpReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static BmpFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static BmpFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static BmpFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < BitmapFileHeader.StructSize + BitmapInfoHeader.StructSize)
       throw new InvalidDataException("Data too small for a valid BMP file.");
 
-    var span = data.AsSpan();
-
     // BITMAPFILEHEADER (14 bytes)
-    var fileHeader = BitmapFileHeader.ReadFrom(span);
+    var fileHeader = BitmapFileHeader.ReadFrom(data);
     if (fileHeader.Sig1 != (byte)'B' || fileHeader.Sig2 != (byte)'M')
       throw new InvalidDataException("Invalid BMP signature.");
 
     var pixelDataOffset = fileHeader.PixelDataOffset;
 
     // BITMAPINFOHEADER (40 bytes minimum)
-    var infoHeader = BitmapInfoHeader.ReadFrom(span[BitmapFileHeader.StructSize..]);
+    var infoHeader = BitmapInfoHeader.ReadFrom(data[BitmapFileHeader.StructSize..]);
     if (infoHeader.HeaderSize < BitmapInfoHeader.StructSize)
       throw new InvalidDataException($"Unsupported BMP header size: {infoHeader.HeaderSize}.");
 
@@ -79,7 +75,7 @@ public static class BmpReader {
     // Read pixel data
     var remainingBytes = data.Length - pixelDataOffset;
     var rawPixelData = new byte[remainingBytes];
-    data.AsSpan(pixelDataOffset, remainingBytes).CopyTo(rawPixelData.AsSpan(0));
+    data.Slice(pixelDataOffset, remainingBytes).CopyTo(rawPixelData.AsSpan(0));
 
     var compression = bmpCompression switch {
       1 => BmpCompression.Rle8,
@@ -118,6 +114,11 @@ public static class BmpReader {
       Compression = compression,
       ColorMode = colorMode
     };
+  }
+
+  public static BmpFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   private static BmpColorMode _DetectColorMode(int bitsPerPixel, int bmpCompression, byte[]? palette, int paletteColorCount) {

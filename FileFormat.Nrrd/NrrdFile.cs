@@ -1,20 +1,19 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Nrrd;
 
 /// <summary>In-memory representation of a NRRD (Nearly Raw Raster Data) file.</summary>
 [FormatMagicBytes([0x4E, 0x52, 0x52, 0x44])]
-public sealed class NrrdFile : IImageFileFormat<NrrdFile> {
+public sealed class NrrdFile :
+  IImageFormatReader<NrrdFile>, IImageToRawImage<NrrdFile>,
+  IImageFormatWriter<NrrdFile> {
 
-  static string IImageFileFormat<NrrdFile>.PrimaryExtension => ".nrrd";
-  static string[] IImageFileFormat<NrrdFile>.FileExtensions => [".nrrd", ".nhdr"];
-  static NrrdFile IImageFileFormat<NrrdFile>.FromFile(FileInfo file) => NrrdReader.FromFile(file);
-  static NrrdFile IImageFileFormat<NrrdFile>.FromBytes(byte[] data) => NrrdReader.FromBytes(data);
-  static NrrdFile IImageFileFormat<NrrdFile>.FromStream(Stream stream) => NrrdReader.FromStream(stream);
-  static RawImage IImageFileFormat<NrrdFile>.ToRawImage(NrrdFile file) => file.ToRawImage();
-  static byte[] IImageFileFormat<NrrdFile>.ToBytes(NrrdFile file) => NrrdWriter.ToBytes(file);
+  static string IImageFormatMetadata<NrrdFile>.PrimaryExtension => ".nrrd";
+  static string[] IImageFormatMetadata<NrrdFile>.FileExtensions => [".nrrd", ".nhdr"];
+  static NrrdFile IImageFormatReader<NrrdFile>.FromSpan(ReadOnlySpan<byte> data) => NrrdReader.FromSpan(data);
+  static byte[] IImageFormatWriter<NrrdFile>.ToBytes(NrrdFile file) => NrrdWriter.ToBytes(file);
+
   public int[] Sizes { get; init; } = [];
   public NrrdType DataType { get; init; }
   public NrrdEncoding Encoding { get; init; }
@@ -24,13 +23,14 @@ public sealed class NrrdFile : IImageFileFormat<NrrdFile> {
   public string[] Labels { get; init; } = [];
 
   /// <summary>Converts this NRRD image to a <see cref="RawImage"/>, preserving 16-bit precision where possible.</summary>
-  public RawImage ToRawImage() {
-    var sizes = this.Sizes;
+  public static RawImage ToRawImage(NrrdFile file) {
+    ArgumentNullException.ThrowIfNull(file);
+    var sizes = file.Sizes;
     if (sizes.Length < 2)
       throw new NotSupportedException("NRRD data must have at least 2 dimensions.");
 
-    var src = this.PixelData;
-    var isBigEndian = string.Equals(this.Endian, "big", StringComparison.OrdinalIgnoreCase);
+    var src = file.PixelData;
+    var isBigEndian = string.Equals(file.Endian, "big", StringComparison.OrdinalIgnoreCase);
 
     int width, height, channels;
 
@@ -45,12 +45,12 @@ public sealed class NrrdFile : IImageFileFormat<NrrdFile> {
     }
 
     var pixelCount = width * height;
-    var bytesPerSample = _BytesPerSample(this.DataType);
-    var is16Bit = _Is16BitDirect(this.DataType);
-    var needsNormalize = _NeedsNormalize(this.DataType);
+    var bytesPerSample = _BytesPerSample(file.DataType);
+    var is16Bit = _Is16BitDirect(file.DataType);
+    var needsNormalize = _NeedsNormalize(file.DataType);
 
     if (channels == 1) {
-      if (this.DataType == NrrdType.UInt8) {
+      if (file.DataType == NrrdType.UInt8) {
         var result = new byte[pixelCount];
         Buffer.BlockCopy(src, 0, result, 0, Math.Min(src.Length, pixelCount));
         var palette = _BuildGrayscalePalette();
@@ -65,18 +65,18 @@ public sealed class NrrdFile : IImageFileFormat<NrrdFile> {
       }
 
       if (is16Bit) {
-        var result = _DirectToGray16(src, pixelCount, bytesPerSample, isBigEndian, this.DataType);
+        var result = _DirectToGray16(src, pixelCount, bytesPerSample, isBigEndian, file.DataType);
         return new() { Width = width, Height = height, Format = PixelFormat.Gray16, PixelData = result };
       }
 
       if (needsNormalize) {
-        var result = _NormalizeChannelToGray16(src, pixelCount, bytesPerSample, isBigEndian, this.DataType);
+        var result = _NormalizeChannelToGray16(src, pixelCount, bytesPerSample, isBigEndian, file.DataType);
         return new() { Width = width, Height = height, Format = PixelFormat.Gray16, PixelData = result };
       }
 
       {
         var result = new byte[pixelCount];
-        _NormalizeChannel(src, result, pixelCount, bytesPerSample, isBigEndian, this.DataType);
+        _NormalizeChannel(src, result, pixelCount, bytesPerSample, isBigEndian, file.DataType);
         var palette = _BuildGrayscalePalette();
         return new() {
           Width = width,
@@ -90,7 +90,7 @@ public sealed class NrrdFile : IImageFileFormat<NrrdFile> {
     }
 
     if (channels == 3) {
-      if (this.DataType == NrrdType.UInt8) {
+      if (file.DataType == NrrdType.UInt8) {
         var result = new byte[pixelCount * 3];
         for (var i = 0; i < pixelCount; ++i) {
           var srcBase = i * 3;
@@ -107,13 +107,13 @@ public sealed class NrrdFile : IImageFileFormat<NrrdFile> {
       }
 
       if (is16Bit || needsNormalize)
-        return _ToRgb48MultiChannel(src, width, height, 3, bytesPerSample, isBigEndian, this.DataType, is16Bit);
+        return _ToRgb48MultiChannel(src, width, height, 3, bytesPerSample, isBigEndian, file.DataType, is16Bit);
 
-      return _NormalizeMultiChannel(src, width, height, 3, bytesPerSample, isBigEndian, this.DataType);
+      return _NormalizeMultiChannel(src, width, height, 3, bytesPerSample, isBigEndian, file.DataType);
     }
 
     if (channels == 4) {
-      if (this.DataType == NrrdType.UInt8) {
+      if (file.DataType == NrrdType.UInt8) {
         var result = new byte[pixelCount * 4];
         for (var i = 0; i < pixelCount; ++i) {
           var srcBase = i * 4;
@@ -131,18 +131,18 @@ public sealed class NrrdFile : IImageFileFormat<NrrdFile> {
       }
 
       if (is16Bit || needsNormalize)
-        return _ToRgba64MultiChannel(src, width, height, 4, bytesPerSample, isBigEndian, this.DataType, is16Bit);
+        return _ToRgba64MultiChannel(src, width, height, 4, bytesPerSample, isBigEndian, file.DataType, is16Bit);
 
-      return _NormalizeMultiChannel(src, width, height, 4, bytesPerSample, isBigEndian, this.DataType);
+      return _NormalizeMultiChannel(src, width, height, 4, bytesPerSample, isBigEndian, file.DataType);
     }
 
     if (channels == 2) {
       var result = new byte[pixelCount];
-      if (this.DataType == NrrdType.UInt8) {
+      if (file.DataType == NrrdType.UInt8) {
         for (var i = 0; i < pixelCount && i * 2 < src.Length; ++i)
           result[i] = src[i * 2];
       } else {
-        _NormalizeChannelStrided(src, result, pixelCount, bytesPerSample, 2, 0, isBigEndian, this.DataType);
+        _NormalizeChannelStrided(src, result, pixelCount, bytesPerSample, 2, 0, isBigEndian, file.DataType);
       }
 
       var palette = _BuildGrayscalePalette();
@@ -158,9 +158,6 @@ public sealed class NrrdFile : IImageFileFormat<NrrdFile> {
 
     throw new NotSupportedException($"NRRD with {channels} channels is not supported.");
   }
-
-  /// <summary>NRRD encoding requires multi-dimensional data support and is not supported from 8-bit input.</summary>
-  public static NrrdFile FromRawImage(RawImage image) => throw new NotSupportedException("NRRD encoding from RawImage is not supported because it requires multi-dimensional data support.");
 
   private static int _BytesPerSample(NrrdType type) => type switch {
     NrrdType.Int8 => 1,
@@ -279,7 +276,7 @@ public sealed class NrrdFile : IImageFileFormat<NrrdFile> {
     }
   }
 
-  private RawImage _NormalizeMultiChannel(byte[] src, int width, int height, int channels, int bytesPerSample, bool isBigEndian, NrrdType type) {
+  private static RawImage _NormalizeMultiChannel(byte[] src, int width, int height, int channels, int bytesPerSample, bool isBigEndian, NrrdType type) {
     var pixelCount = width * height;
     var isFloat = type == NrrdType.Float || type == NrrdType.Double;
 

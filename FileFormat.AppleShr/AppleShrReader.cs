@@ -26,7 +26,36 @@ public static class AppleShrReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static AppleShrFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static AppleShrFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < AppleShrFile.ExpectedFileSize)
+      throw new InvalidDataException($"Data too small for a valid SHR file (expected {AppleShrFile.ExpectedFileSize} bytes, got {data.Length}).");
+
+    if (data.Length != AppleShrFile.ExpectedFileSize)
+      throw new InvalidDataException($"Invalid SHR file size (expected {AppleShrFile.ExpectedFileSize} bytes, got {data.Length}).");
+
+    var offset = 0;
+
+    var pixelData = new byte[AppleShrFile.PixelDataSize];
+    data.Slice(offset, AppleShrFile.PixelDataSize).CopyTo(pixelData.AsSpan(0));
+    offset += AppleShrFile.PixelDataSize;
+
+    var scb = new byte[AppleShrFile.ScbSize];
+    data.Slice(offset, AppleShrFile.ScbSize).CopyTo(scb.AsSpan(0));
+    offset += AppleShrFile.ScbSize;
+
+    // Skip padding
+    offset += AppleShrFile.PaddingSize;
+
+    var palette = new byte[AppleShrFile.PaletteSize];
+    data.Slice(offset, AppleShrFile.PaletteSize).CopyTo(palette.AsSpan(0));
+
+    return new() {
+      PixelData = pixelData,
+      ScanlineControl = scb,
+      Palette = palette,
+    };
+    }
 
   public static AppleShrFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

@@ -26,7 +26,37 @@ public static class Artist64Reader {
     return FromBytes(ms.ToArray());
   }
 
-  public static Artist64File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static Artist64File FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < Artist64File.ExpectedFileSize)
+      throw new InvalidDataException($"Data too small for a valid Artist 64 file (expected {Artist64File.ExpectedFileSize} bytes, got {data.Length}).");
+
+    if (data.Length != Artist64File.ExpectedFileSize)
+      throw new InvalidDataException($"Invalid Artist 64 file size (expected {Artist64File.ExpectedFileSize} bytes, got {data.Length}).");
+
+    var offset = 0;
+
+    var loadAddress = (ushort)(data[offset] | (data[offset + 1] << 8));
+    offset += Artist64File.LoadAddressSize;
+
+    var bitmapData = new byte[Artist64File.BitmapDataSize];
+    data.Slice(offset, Artist64File.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
+    offset += Artist64File.BitmapDataSize;
+
+    var videoMatrix = new byte[Artist64File.VideoMatrixSize];
+    data.Slice(offset, Artist64File.VideoMatrixSize).CopyTo(videoMatrix.AsSpan(0));
+    offset += Artist64File.VideoMatrixSize;
+
+    var colorRam = new byte[Artist64File.ColorRamSize];
+    data.Slice(offset, Artist64File.ColorRamSize).CopyTo(colorRam.AsSpan(0));
+
+    return new() {
+      LoadAddress = loadAddress,
+      BitmapData = bitmapData,
+      VideoMatrix = videoMatrix,
+      ColorRam = colorRam,
+    };
+    }
 
   public static Artist64File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 
 namespace FileFormat.YuvRaw;
@@ -26,20 +26,21 @@ public static class YuvRawReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static YuvRawFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static YuvRawFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static YuvRawFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < 6)
       throw new InvalidDataException($"YUV data too small: expected at least 6 bytes, got {data.Length}.");
 
     var (width, height) = _DetectResolution(data.Length);
-    return FromBytes(data, width, height);
+    return FromSpan(data, width, height);
+
   }
 
-  public static YuvRawFile FromBytes(byte[] data, int width, int height) {
+  public static YuvRawFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
 
+  public static YuvRawFile FromSpan(ReadOnlySpan<byte> data, int width, int height) {
     var ySize = width * height;
     var uvSize = (width / 2) * (height / 2);
     var expectedSize = ySize + uvSize * 2;
@@ -51,11 +52,16 @@ public static class YuvRawReader {
     var uPlane = new byte[uvSize];
     var vPlane = new byte[uvSize];
 
-    data.AsSpan(0, ySize).CopyTo(yPlane.AsSpan(0));
-    data.AsSpan(ySize, uvSize).CopyTo(uPlane.AsSpan(0));
-    data.AsSpan(ySize + uvSize, uvSize).CopyTo(vPlane.AsSpan(0));
+    data.Slice(0, ySize).CopyTo(yPlane);
+    data.Slice(ySize, uvSize).CopyTo(uPlane);
+    data.Slice(ySize + uvSize, uvSize).CopyTo(vPlane);
 
     return new() { Width = width, Height = height, YPlane = yPlane, UPlane = uPlane, VPlane = vPlane };
+  }
+
+  public static YuvRawFile FromBytes(byte[] data, int width, int height) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data, width, height);
   }
 
   private static (int Width, int Height) _DetectResolution(int fileSize) {

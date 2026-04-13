@@ -26,7 +26,18 @@ public static class AtariGr8Reader {
     return FromBytes(ms.ToArray());
   }
 
-  public static AtariGr8File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static AtariGr8File FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < AtariGr8File.FileSize)
+      throw new InvalidDataException($"Data too small for Atari GR.8 screen dump. Expected {AtariGr8File.FileSize} bytes, got {data.Length}.");
+    if (data.Length != AtariGr8File.FileSize)
+      throw new InvalidDataException($"Invalid Atari GR.8 screen dump size. Expected exactly {AtariGr8File.FileSize} bytes, got {data.Length}.");
+
+    var rawData = new byte[AtariGr8File.FileSize];
+    data.Slice(0, AtariGr8File.FileSize).CopyTo(rawData);
+
+    return new AtariGr8File { RawData = rawData };
+    }
 
   public static AtariGr8File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

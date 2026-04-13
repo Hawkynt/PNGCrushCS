@@ -44,33 +44,29 @@ public static class DjVuReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static DjVuFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static DjVuFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static DjVuFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_SIZE)
       throw new InvalidDataException("Data too small for a valid DjVu file.");
 
-    var span = data.AsSpan();
-
     // Validate AT&T magic
-    if (!span[..4].SequenceEqual(_Magic))
+    if (!data[..4].SequenceEqual(_Magic))
       throw new InvalidDataException("Invalid DjVu magic: expected 'AT&T'.");
 
     // Validate FORM tag
-    if (!span[4..8].SequenceEqual(_FormTag))
+    if (!data[4..8].SequenceEqual(_FormTag))
       throw new InvalidDataException("Invalid DjVu container: expected 'FORM' tag.");
 
     // Read FORM size (big-endian)
-    var formSize = (int)BinaryPrimitives.ReadUInt32BigEndian(span[8..]);
+    var formSize = (int)BinaryPrimitives.ReadUInt32BigEndian(data[8..]);
 
     // Validate DJVU form type
-    var formType = Encoding.ASCII.GetString(data, 12, 4);
+    var formType = Encoding.ASCII.GetString(data.Slice(12, 4));
     if (formType != "DJVU")
       throw new InvalidDataException($"Invalid DjVu form type: expected 'DJVU', got '{formType}'.");
 
     // Parse chunks starting after FORM header (offset 16)
-    var chunks = _ParseChunks(data, 16, Math.Min(12 + formSize, data.Length));
+    var bytes = data.ToArray();
+    var chunks = _ParseChunks(bytes, 16, Math.Min(12 + formSize, data.Length));
 
     // Extract INFO chunk and collect IW44 chunks
     DjVuChunk? infoChunk = null;
@@ -131,6 +127,11 @@ public static class DjVuReader {
       PixelData = pixelData,
       RawChunks = rawChunks,
     };
+  }
+
+  public static DjVuFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   internal static List<DjVuChunk> ParseChunks(byte[] data, int offset, int endOffset) => _ParseChunks(data, offset, endOffset);

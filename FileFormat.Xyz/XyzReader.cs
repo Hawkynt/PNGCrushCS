@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.IO.Compression;
 
@@ -30,10 +30,7 @@ public static class XyzReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static XyzFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static XyzFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static XyzFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _HEADER_SIZE)
       throw new InvalidDataException("Data too small for a valid XYZ file.");
 
@@ -49,12 +46,13 @@ public static class XyzReader {
       throw new InvalidDataException("XYZ image dimensions must be non-zero.");
 
     // Decompress zlib data (skip 2-byte zlib header, use DeflateStream)
-    var compressedSpan = data.AsSpan(_HEADER_SIZE);
+    var compressedSpan = data[_HEADER_SIZE..];
     if (compressedSpan.Length < 2)
       throw new InvalidDataException("Data too small: missing compressed data.");
 
-    // Skip zlib header (2 bytes) and decompress
-    using var compressedStream = new MemoryStream(data, _HEADER_SIZE + 2, data.Length - _HEADER_SIZE - 2);
+    // Skip zlib header (2 bytes) and decompress; MemoryStream requires byte[]
+    var compressedArray = data.Slice(_HEADER_SIZE + 2, data.Length - _HEADER_SIZE - 2).ToArray();
+    using var compressedStream = new MemoryStream(compressedArray);
     using var deflateStream = new DeflateStream(compressedStream, CompressionMode.Decompress);
     using var decompressed = new MemoryStream();
     deflateStream.CopyTo(decompressed);
@@ -66,11 +64,11 @@ public static class XyzReader {
 
     // First 768 bytes = palette
     var palette = new byte[_PALETTE_SIZE];
-    raw.AsSpan(0, _PALETTE_SIZE).CopyTo(palette.AsSpan(0));
+    raw.AsSpan(0, _PALETTE_SIZE).CopyTo(palette);
 
     // Remainder = pixel data
     var pixelData = new byte[width * height];
-    raw.AsSpan(_PALETTE_SIZE, pixelData.Length).CopyTo(pixelData.AsSpan(0));
+    raw.AsSpan(_PALETTE_SIZE, pixelData.Length).CopyTo(pixelData);
 
     return new XyzFile {
       Width = width,
@@ -78,5 +76,11 @@ public static class XyzReader {
       Palette = palette,
       PixelData = pixelData,
     };
+  
+  }
+
+  public static XyzFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

@@ -38,14 +38,12 @@ public static class AniReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static AniFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static AniFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static AniFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < 12)
       throw new InvalidDataException("Data is too small to be a valid ANI file.");
 
-    var riff = RiffReader.FromBytes(data);
+    // RiffReader and IcoReader require byte[] — allocate once here
+    var riff = RiffReader.FromBytes(data.ToArray());
     if (riff.FormType.ToString() != _FORM_TYPE)
       throw new InvalidDataException($"Invalid ANI form type: expected '{_FORM_TYPE}', got '{riff.FormType}'.");
 
@@ -79,6 +77,11 @@ public static class AniReader {
       Rates = rates,
       Sequence = sequence
     };
+  }
+
+  public static AniFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   private static int[] _ParseIntArray(byte[] data, int expectedCount) {

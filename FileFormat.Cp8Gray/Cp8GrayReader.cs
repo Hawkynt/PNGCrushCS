@@ -28,7 +28,24 @@ public static class Cp8GrayReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static Cp8GrayFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static Cp8GrayFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < _MIN_FILE_SIZE)
+      throw new InvalidDataException($"Data too small for a valid CP8 file: expected at least {_MIN_FILE_SIZE} byte, got {data.Length}.");
+
+    var side = (int)Math.Sqrt(data.Length);
+    if (side * side != data.Length)
+      throw new InvalidDataException($"CP8 file size {data.Length} is not a perfect square.");
+
+    var pixelData = new byte[data.Length];
+    data.Slice(0, data.Length).CopyTo(pixelData);
+
+    return new Cp8GrayFile {
+      Width = side,
+      Height = side,
+      PixelData = pixelData,
+    };
+    }
 
   public static Cp8GrayFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

@@ -1,20 +1,18 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Cineon;
 
 /// <summary>In-memory representation of a Cineon image.</summary>
 [FormatMagicBytes([0x80, 0x2A, 0x5F, 0xD7])]
-public sealed class CineonFile : IImageFileFormat<CineonFile> {
+public sealed class CineonFile :
+  IImageFormatReader<CineonFile>, IImageToRawImage<CineonFile>,
+  IImageFromRawImage<CineonFile>, IImageFormatWriter<CineonFile> {
 
-  static string IImageFileFormat<CineonFile>.PrimaryExtension => ".cin";
-  static string[] IImageFileFormat<CineonFile>.FileExtensions => [".cin"];
-  static CineonFile IImageFileFormat<CineonFile>.FromFile(FileInfo file) => CineonReader.FromFile(file);
-  static CineonFile IImageFileFormat<CineonFile>.FromBytes(byte[] data) => CineonReader.FromBytes(data);
-  static CineonFile IImageFileFormat<CineonFile>.FromStream(Stream stream) => CineonReader.FromStream(stream);
-  static RawImage IImageFileFormat<CineonFile>.ToRawImage(CineonFile file) => file.ToRawImage();
-  static byte[] IImageFileFormat<CineonFile>.ToBytes(CineonFile file) => CineonWriter.ToBytes(file);
+  static string IImageFormatMetadata<CineonFile>.PrimaryExtension => ".cin";
+  static string[] IImageFormatMetadata<CineonFile>.FileExtensions => [".cin"];
+  static CineonFile IImageFormatReader<CineonFile>.FromSpan(ReadOnlySpan<byte> data) => CineonReader.FromSpan(data);
+  static byte[] IImageFormatWriter<CineonFile>.ToBytes(CineonFile file) => CineonWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
   public int BitsPerSample { get; init; }
@@ -22,14 +20,14 @@ public sealed class CineonFile : IImageFileFormat<CineonFile> {
   public int ImageDataOffset { get; init; }
   public byte[] PixelData { get; init; } = [];
 
-  /// <summary>Converts this Cineon image to a 16-bit <see cref="RawImage"/> by scaling 10-bit values to Rgb48.</summary>
-  public RawImage ToRawImage() {
-    if (this.BitsPerSample != 10)
-      throw new NotSupportedException($"Cineon bit depth {this.BitsPerSample} is not supported; only 10-bit is implemented.");
+  /// <summary>Converts a Cineon image to a 16-bit <see cref="RawImage"/> by scaling 10-bit values to Rgb48.</summary>
+  public static RawImage ToRawImage(CineonFile file) {
+    if (file.BitsPerSample != 10)
+      throw new NotSupportedException($"Cineon bit depth {file.BitsPerSample} is not supported; only 10-bit is implemented.");
 
-    var width = this.Width;
-    var height = this.Height;
-    var src = this.PixelData;
+    var width = file.Width;
+    var height = file.Height;
+    var src = file.PixelData;
     var pixelCount = width * height;
     var result = new byte[pixelCount * 6];
 

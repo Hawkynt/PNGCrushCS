@@ -28,17 +28,14 @@ public static class AmstradCpcReader {
     if (stream.CanSeek) {
       var data = new byte[stream.Length - stream.Position];
       stream.ReadExactly(data);
-      return FromBytes(data, mode);
+      return FromSpan(data, mode);
     }
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
-    return FromBytes(ms.ToArray(), mode);
+    return FromSpan(ms.ToArray(), mode);
   }
 
-  public static AmstradCpcFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static AmstradCpcFile FromBytes(byte[] data, AmstradCpcMode mode = AmstradCpcMode.Mode1) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static AmstradCpcFile FromSpan(ReadOnlySpan<byte> data, AmstradCpcMode mode = AmstradCpcMode.Mode1) {
     if (data.Length < _SCREEN_SIZE)
       throw new InvalidDataException($"Data too small for a valid CPC screen dump. Expected {_SCREEN_SIZE} bytes, got {data.Length}.");
 
@@ -59,7 +56,7 @@ public static class AmstradCpcReader {
     for (var y = 0; y < _HEIGHT; ++y) {
       var srcOffset = (y / 8) * _BYTES_PER_LINE + (y % 8) * 2048;
       var dstOffset = y * _BYTES_PER_LINE;
-      data.AsSpan(srcOffset, _BYTES_PER_LINE).CopyTo(linearData.AsSpan(dstOffset));
+      data.Slice(srcOffset, _BYTES_PER_LINE).CopyTo(linearData.AsSpan(dstOffset));
     }
 
     return new AmstradCpcFile {
@@ -68,5 +65,10 @@ public static class AmstradCpcReader {
       Mode = mode,
       PixelData = linearData
     };
+  }
+
+  public static AmstradCpcFile FromBytes(byte[] data, AmstradCpcMode mode = AmstradCpcMode.Mode1) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data, mode);
   }
 }

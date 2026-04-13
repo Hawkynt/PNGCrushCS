@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Buffers.Binary;
 using System.IO;
 
@@ -27,14 +27,12 @@ public static class ExtendedGemImgReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static ExtendedGemImgFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static ExtendedGemImgFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static ExtendedGemImgFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < ExtendedGemImgHeader.StructSize)
       throw new InvalidDataException("Data too small for a valid XIMG file.");
 
-    var span = data.AsSpan();
+    var span = data;
     var header = ExtendedGemImgHeader.ReadFrom(span);
 
     var dataOffset = header.HeaderLength * 2;
@@ -99,7 +97,7 @@ public static class ExtendedGemImgReader {
             ++pos;
             var dstRowOffset = planeOffset + row * bytesPerRow;
             var toCopy = Math.Min(count, Math.Min(data.Length - pos, bytesPerRow));
-            data.AsSpan(pos, toCopy).CopyTo(pixelData.AsSpan(dstRowOffset));
+            data.Slice(pos, toCopy).CopyTo(pixelData.AsSpan(dstRowOffset));
             pos += count;
             ++row;
           } else if (opcode == 0xFF && pos + 1 < data.Length) {
@@ -133,5 +131,10 @@ public static class ExtendedGemImgReader {
       PaletteData = paletteData,
       PixelData = pixelData
     };
+  }
+
+  public static ExtendedGemImgFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

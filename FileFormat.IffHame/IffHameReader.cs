@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 
 namespace FileFormat.IffHame;
@@ -26,10 +26,12 @@ public static class IffHameReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static IffHameFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
   public static IffHameFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  public static IffHameFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < IffHameFile.MinFileSize)
       throw new InvalidDataException($"Invalid HAM-E data: expected at least {IffHameFile.MinFileSize} bytes, got {data.Length}.");
 
@@ -38,8 +40,7 @@ public static class IffHameReader {
 
     _TryParseBmhd(data, out width, out height);
 
-    var rawData = new byte[data.Length];
-    data.AsSpan(0, data.Length).CopyTo(rawData);
+    var rawData = data.ToArray();
 
     return new() {
       Width = width,
@@ -48,7 +49,7 @@ public static class IffHameReader {
     };
   }
 
-  private static void _TryParseBmhd(byte[] data, out int width, out int height) {
+  private static void _TryParseBmhd(ReadOnlySpan<byte> data, out int width, out int height) {
     width = IffHameFile.DefaultWidth;
     height = IffHameFile.DefaultHeight;
 

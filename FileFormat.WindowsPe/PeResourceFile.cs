@@ -11,19 +11,16 @@ namespace FileFormat.WindowsPe;
 /// <summary>In-memory representation of image resources extracted from a Windows PE file.</summary>
 [FormatMagicBytes([0x4D, 0x5A])] // MZ
 [FormatDetectionPriority(999)]    // Very common signature, low priority for image detection
-public sealed class PeResourceFile : IImageFileFormat<PeResourceFile>, IMultiImageFileFormat<PeResourceFile> {
+public sealed class PeResourceFile :
+  IImageFormatReader<PeResourceFile>, IImageToRawImage<PeResourceFile>,
+  IMultiImageFileFormat<PeResourceFile> {
 
-  static string IImageFileFormat<PeResourceFile>.PrimaryExtension => ".exe";
-  static string[] IImageFileFormat<PeResourceFile>.FileExtensions => [".exe", ".dll", ".ocx", ".scr", ".cpl"];
-  static FormatCapability IImageFileFormat<PeResourceFile>.Capabilities => FormatCapability.MultiImage;
+  static string IImageFormatMetadata<PeResourceFile>.PrimaryExtension => ".exe";
+  static string[] IImageFormatMetadata<PeResourceFile>.FileExtensions => [".exe", ".dll", ".ocx", ".scr", ".cpl"];
+  static FormatCapability IImageFormatMetadata<PeResourceFile>.Capabilities => FormatCapability.MultiImage;
+  static PeResourceFile IImageFormatReader<PeResourceFile>.FromSpan(ReadOnlySpan<byte> data) => PeResourceReader.FromSpan(data);
 
-  /// <summary>All icon and cursor groups found in the PE resource section (backward-compatible).</summary>
-  public IReadOnlyList<PeIconGroup> IconGroups { get; init; } = [];
-
-  /// <summary>All image resources found in the PE resource section (icons, cursors, bitmaps, embedded images).</summary>
-  public IReadOnlyList<PeImageResource> ImageResources { get; init; } = [];
-
-  static bool? IImageFileFormat<PeResourceFile>.MatchesSignature(ReadOnlySpan<byte> header) {
+  static bool? IImageFormatMetadata<PeResourceFile>.MatchesSignature(ReadOnlySpan<byte> header) {
     if (header.Length < 64)
       return null;
 
@@ -39,12 +36,11 @@ public sealed class PeResourceFile : IImageFileFormat<PeResourceFile>, IMultiIma
     return true;
   }
 
-  static PeResourceFile IImageFileFormat<PeResourceFile>.FromFile(FileInfo file) => PeResourceReader.FromFile(file);
-  static PeResourceFile IImageFileFormat<PeResourceFile>.FromBytes(byte[] data) => PeResourceReader.FromBytes(data);
-  static PeResourceFile IImageFileFormat<PeResourceFile>.FromStream(Stream stream) => PeResourceReader.FromStream(stream);
+  /// <summary>All icon and cursor groups found in the PE resource section (backward-compatible).</summary>
+  public IReadOnlyList<PeIconGroup> IconGroups { get; init; } = [];
 
-  static byte[] IImageFileFormat<PeResourceFile>.ToBytes(PeResourceFile file)
-    => throw new NotSupportedException("Writing PE files is not supported.");
+  /// <summary>All image resources found in the PE resource section (icons, cursors, bitmaps, embedded images).</summary>
+  public IReadOnlyList<PeImageResource> ImageResources { get; init; } = [];
 
   public static RawImage ToRawImage(PeResourceFile file) {
     ArgumentNullException.ThrowIfNull(file);
@@ -59,9 +55,6 @@ public sealed class PeResourceFile : IImageFileFormat<PeResourceFile>, IMultiIma
 
     return _ToRawImage(resource);
   }
-
-  static PeResourceFile IImageFileFormat<PeResourceFile>.FromRawImage(RawImage image)
-    => throw new NotSupportedException("Creating PE files from images is not supported.");
 
   public static int ImageCount(PeResourceFile file) {
     ArgumentNullException.ThrowIfNull(file);

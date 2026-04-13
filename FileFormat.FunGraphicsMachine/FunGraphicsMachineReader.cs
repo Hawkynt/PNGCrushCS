@@ -26,7 +26,32 @@ public static class FunGraphicsMachineReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static FunGraphicsMachineFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static FunGraphicsMachineFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < FunGraphicsMachineFile.ExpectedFileSize)
+      throw new InvalidDataException($"Data too small for a valid Fun Graphics Machine file (expected {FunGraphicsMachineFile.ExpectedFileSize} bytes, got {data.Length}).");
+
+    if (data.Length != FunGraphicsMachineFile.ExpectedFileSize)
+      throw new InvalidDataException($"Invalid Fun Graphics Machine file size (expected {FunGraphicsMachineFile.ExpectedFileSize} bytes, got {data.Length}).");
+
+    var offset = 0;
+
+    var loadAddress = (ushort)(data[offset] | (data[offset + 1] << 8));
+    offset += FunGraphicsMachineFile.LoadAddressSize;
+
+    var screenRam = new byte[FunGraphicsMachineFile.ScreenRamSize];
+    data.Slice(offset, FunGraphicsMachineFile.ScreenRamSize).CopyTo(screenRam.AsSpan(0));
+    offset += FunGraphicsMachineFile.ScreenRamSize;
+
+    var bitmapData = new byte[FunGraphicsMachineFile.BitmapDataSize];
+    data.Slice(offset, FunGraphicsMachineFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
+
+    return new() {
+      LoadAddress = loadAddress,
+      ScreenRam = screenRam,
+      BitmapData = bitmapData,
+    };
+    }
 
   public static FunGraphicsMachineFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

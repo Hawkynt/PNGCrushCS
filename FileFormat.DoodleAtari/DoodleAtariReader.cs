@@ -26,7 +26,18 @@ public static class DoodleAtariReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static DoodleAtariFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static DoodleAtariFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != DoodleAtariFile.ExpectedFileSize)
+      throw new InvalidDataException($"Invalid Doodle data size: expected exactly {DoodleAtariFile.ExpectedFileSize} bytes, got {data.Length}.");
+
+    var pixelData = new byte[DoodleAtariFile.ExpectedFileSize];
+    data.Slice(0, DoodleAtariFile.ExpectedFileSize).CopyTo(pixelData);
+
+    return new DoodleAtariFile {
+      PixelData = pixelData
+    };
+    }
 
   public static DoodleAtariFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

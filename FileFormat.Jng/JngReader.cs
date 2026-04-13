@@ -31,10 +31,12 @@ public static class JngReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static JngFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
   public static JngFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  public static JngFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < 8)
       throw new InvalidDataException("Data too small for a valid JNG file.");
 
@@ -49,14 +51,14 @@ public static class JngReader {
     var alphaChunks = new List<byte[]>();
 
     while (offset + 8 <= data.Length) {
-      var chunkLength = BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(offset));
-      var chunkType = Encoding.ASCII.GetString(data, offset + 4, 4);
+      var chunkLength = BinaryPrimitives.ReadInt32BigEndian(data[offset..]);
+      var chunkType = Encoding.ASCII.GetString(data.Slice(offset + 4, 4));
       offset += 8;
 
       if (chunkLength < 0 || offset + chunkLength + 4 > data.Length)
         break;
 
-      var chunkData = data.AsSpan(offset, chunkLength);
+      var chunkData = data.Slice(offset, chunkLength);
 
       switch (chunkType) {
         case "JHDR":

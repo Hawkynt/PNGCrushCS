@@ -39,10 +39,7 @@ public static class PalmPdbReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static PalmPdbFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static PalmPdbFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static PalmPdbFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_FILE_SIZE)
       throw new InvalidDataException("Data too small for a valid PDB file.");
 
@@ -50,27 +47,27 @@ public static class PalmPdbReader {
     var nameEnd = 0;
     while (nameEnd < 32 && data[nameEnd] != 0)
       ++nameEnd;
-    var name = Encoding.ASCII.GetString(data, 0, nameEnd);
+    var name = Encoding.ASCII.GetString(data.Slice(0, nameEnd));
 
     // Validate type field at offset 60
-    var typeSpan = data.AsSpan(60, 4);
+    var typeSpan = data.Slice(60, 4);
     if (!typeSpan.SequenceEqual(_ExpectedType))
-      throw new InvalidDataException($"Invalid PDB type: expected 'Img ' but got '{Encoding.ASCII.GetString(data, 60, 4)}'.");
+      throw new InvalidDataException($"Invalid PDB type: expected 'Img ' but got '{Encoding.ASCII.GetString(data.Slice(60, 4))}'.");
 
     // Record count at offset 76
-    var recordCount = BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(76));
+    var recordCount = BinaryPrimitives.ReadUInt16BigEndian(data[76..]);
     if (recordCount < 1)
       throw new InvalidDataException("PDB file contains no records.");
 
     // First record entry at offset 78
-    var recordOffset = (int)BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(_HEADER_SIZE));
+    var recordOffset = (int)BinaryPrimitives.ReadUInt32BigEndian(data[_HEADER_SIZE..]);
 
     if (recordOffset + _IMAGE_RECORD_HEADER_SIZE > data.Length)
       throw new InvalidDataException("Record offset points beyond file data.");
 
     // Image record: uint16 BE width, uint16 BE height, then RGB24 pixels
-    var width = (int)BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(recordOffset));
-    var height = (int)BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(recordOffset + 2));
+    var width = (int)BinaryPrimitives.ReadUInt16BigEndian(data[recordOffset..]);
+    var height = (int)BinaryPrimitives.ReadUInt16BigEndian(data[(recordOffset + 2)..]);
 
     if (width <= 0)
       throw new InvalidDataException($"Invalid image width: {width}.");
@@ -84,7 +81,7 @@ public static class PalmPdbReader {
       throw new InvalidDataException($"Insufficient pixel data: expected {expectedPixelBytes} bytes at offset {pixelStart}.");
 
     var pixelData = new byte[expectedPixelBytes];
-    data.AsSpan(pixelStart, expectedPixelBytes).CopyTo(pixelData.AsSpan(0));
+    data.Slice(pixelStart, expectedPixelBytes).CopyTo(pixelData.AsSpan(0));
 
     return new PalmPdbFile {
       Width = width,
@@ -92,5 +89,10 @@ public static class PalmPdbReader {
       Name = name,
       PixelData = pixelData,
     };
+  }
+
+  public static PalmPdbFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

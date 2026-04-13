@@ -25,10 +25,8 @@ public static class Q0Reader {
     return FromBytes(ms.ToArray());
   }
 
-  public static Q0File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static Q0File FromSpan(ReadOnlySpan<byte> data) {
 
-  public static Q0File FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < Q0File.HeaderSize)
       throw new InvalidDataException("Data too small for a valid Q0 file.");
 
@@ -48,12 +46,17 @@ public static class Q0Reader {
     var pixelData = new byte[pixelBytes];
     var available = Math.Min(pixelBytes, data.Length - Q0File.HeaderSize);
     if (available > 0)
-      data.AsSpan(Q0File.HeaderSize, available).CopyTo(pixelData.AsSpan(0));
+      data.Slice(Q0File.HeaderSize, available).CopyTo(pixelData.AsSpan(0));
 
     return new() {
       Width = width,
       Height = height,
       PixelData = pixelData,
     };
+    }
+
+  public static Q0File FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

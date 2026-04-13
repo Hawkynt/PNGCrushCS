@@ -26,7 +26,21 @@ public static class UfliEditorReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static UfliEditorFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static UfliEditorFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < UfliEditorFile.LoadAddressSize + UfliEditorFile.MinPayloadSize)
+      throw new InvalidDataException($"Data too small for a valid UFLI file (expected at least {UfliEditorFile.LoadAddressSize + UfliEditorFile.MinPayloadSize} bytes, got {data.Length}).");
+
+    var loadAddress = (ushort)(data[0] | (data[1] << 8));
+
+    var rawData = new byte[data.Length - UfliEditorFile.LoadAddressSize];
+    data.Slice(UfliEditorFile.LoadAddressSize, rawData.Length).CopyTo(rawData.AsSpan(0));
+
+    return new() {
+      LoadAddress = loadAddress,
+      RawData = rawData,
+    };
+    }
 
   public static UfliEditorFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

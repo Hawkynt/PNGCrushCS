@@ -28,15 +28,16 @@ public static class PvrReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static PvrFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
   public static PvrFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  public static PvrFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_FILE_SIZE)
       throw new InvalidDataException("Data too small for a valid PVR file.");
 
-    var span = data.AsSpan();
-    var header = PvrHeader.ReadFrom(span);
+    var header = PvrHeader.ReadFrom(data);
 
     if (header.Version != PvrHeader.Magic)
       throw new InvalidDataException("Invalid PVR magic number.");
@@ -47,14 +48,14 @@ public static class PvrReader {
     var metadata = Array.Empty<byte>();
     if (metadataSize > 0 && dataOffset <= data.Length) {
       metadata = new byte[metadataSize];
-      data.AsSpan(PvrHeader.StructSize, Math.Min(metadataSize, data.Length - PvrHeader.StructSize)).CopyTo(metadata.AsSpan(0));
+      data.Slice(PvrHeader.StructSize, Math.Min(metadataSize, data.Length - PvrHeader.StructSize)).CopyTo(metadata.AsSpan(0));
     }
 
     var compressedDataSize = data.Length - dataOffset;
     var compressedData = Array.Empty<byte>();
     if (compressedDataSize > 0) {
       compressedData = new byte[compressedDataSize];
-      data.AsSpan(dataOffset, compressedDataSize).CopyTo(compressedData.AsSpan(0));
+      data.Slice(dataOffset, compressedDataSize).CopyTo(compressedData.AsSpan(0));
     }
 
     return new PvrFile {

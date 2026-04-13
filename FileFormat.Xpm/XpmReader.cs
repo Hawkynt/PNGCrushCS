@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Text;
 
@@ -29,10 +29,8 @@ public static class XpmReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static XpmFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static XpmFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static XpmFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _Magic.Length)
       throw new InvalidDataException("Data too small for a valid XPM file.");
 
@@ -47,20 +45,24 @@ public static class XpmReader {
     }
   }
 
-  private static bool _ContainsMagic(byte[] data) {
-    var span = data.AsSpan();
+  public static XpmFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  private static bool _ContainsMagic(ReadOnlySpan<byte> data) {
     // Skip leading whitespace/BOM
     var offset = 0;
     // Skip UTF-8 BOM if present
-    if (span.Length >= 3 && span[0] == 0xEF && span[1] == 0xBB && span[2] == 0xBF)
+    if (data.Length >= 3 && data[0] == 0xEF && data[1] == 0xBB && data[2] == 0xBF)
       offset = 3;
 
-    while (offset < span.Length && (span[offset] == (byte)' ' || span[offset] == (byte)'\t' || span[offset] == (byte)'\r' || span[offset] == (byte)'\n'))
+    while (offset < data.Length && (data[offset] == (byte)' ' || data[offset] == (byte)'\t' || data[offset] == (byte)'\r' || data[offset] == (byte)'\n'))
       ++offset;
 
-    if (offset + _Magic.Length > span.Length)
+    if (offset + _Magic.Length > data.Length)
       return false;
 
-    return span.Slice(offset, _Magic.Length).SequenceEqual(_Magic);
+    return data.Slice(offset, _Magic.Length).SequenceEqual(_Magic);
   }
 }

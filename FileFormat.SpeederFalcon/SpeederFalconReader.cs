@@ -29,7 +29,18 @@ public static class SpeederFalconReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static SpeederFalconFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static SpeederFalconFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != _EXPECTED_SIZE)
+      throw new InvalidDataException($"Invalid Speeder Falcon data size: expected exactly {_EXPECTED_SIZE} bytes, got {data.Length}.");
+
+    var pixelData = new byte[_EXPECTED_SIZE];
+    data.Slice(0, _EXPECTED_SIZE).CopyTo(pixelData);
+
+    return new SpeederFalconFile {
+      PixelData = pixelData
+    };
+    }
 
   public static SpeederFalconFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

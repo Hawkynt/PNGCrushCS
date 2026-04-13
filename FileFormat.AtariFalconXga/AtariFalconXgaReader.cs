@@ -26,7 +26,32 @@ public static class AtariFalconXgaReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static AtariFalconXgaFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static AtariFalconXgaFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < AtariFalconXgaHeader.StructSize)
+      throw new InvalidDataException("Data too small for a valid Atari Falcon XGA file.");
+
+    var header = AtariFalconXgaHeader.ReadFrom(data);
+    var width = (int)header.Width;
+    var height = (int)header.Height;
+
+    if (width == 0 || height == 0)
+      throw new InvalidDataException("Atari Falcon XGA image dimensions must be non-zero.");
+
+    var expectedPixelBytes = width * height * 2;
+    var available = data.Length - AtariFalconXgaHeader.StructSize;
+    if (available < expectedPixelBytes)
+      throw new InvalidDataException($"Data too small for pixel data: expected {AtariFalconXgaHeader.StructSize + expectedPixelBytes} bytes, got {data.Length}.");
+
+    var pixelData = new byte[expectedPixelBytes];
+    data.Slice(AtariFalconXgaHeader.StructSize, expectedPixelBytes).CopyTo(pixelData);
+
+    return new AtariFalconXgaFile {
+      Width = width,
+      Height = height,
+      PixelData = pixelData,
+    };
+    }
 
   public static AtariFalconXgaFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

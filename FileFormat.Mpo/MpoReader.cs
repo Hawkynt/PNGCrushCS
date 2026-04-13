@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
@@ -37,23 +37,27 @@ public static class MpoReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static MpoFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static MpoFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static MpoFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_SIZE)
       throw new InvalidDataException("Data too small for a valid MPO file.");
 
     if (data[0] != _MARKER_PREFIX || data[1] != _SOI)
       throw new InvalidDataException("Invalid JPEG/MPO signature.");
 
+    var dataArray = data.ToArray();
+
     // Try to parse MP Entry offsets from the APP2 MPF marker
-    var mpEntryOffsets = _TryParseMpEntries(data);
+    var mpEntryOffsets = _TryParseMpEntries(dataArray);
     if (mpEntryOffsets != null && mpEntryOffsets.Count > 0)
-      return _ExtractFromMpEntries(data, mpEntryOffsets);
+      return _ExtractFromMpEntries(dataArray, mpEntryOffsets);
 
     // Fallback: scan for JPEG SOI markers to find image boundaries
-    return _ExtractBySoiScan(data);
+    return _ExtractBySoiScan(dataArray);
+  }
+
+  public static MpoFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   /// <summary>Tries to find and parse the APP2 MPF marker in the first JPEG image.</summary>

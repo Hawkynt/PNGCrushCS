@@ -26,7 +26,16 @@ public static class MsxVideoReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static MsxVideoFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static MsxVideoFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != MsxVideoFile.ExpectedFileSize)
+      throw new InvalidDataException($"Video MSX file must be exactly {MsxVideoFile.ExpectedFileSize} bytes, got {data.Length}.");
+
+    var pixels = new byte[MsxVideoFile.ExpectedFileSize];
+    data.Slice(0, MsxVideoFile.ExpectedFileSize).CopyTo(pixels);
+
+    return new() { PixelData = pixels };
+    }
 
   public static MsxVideoFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

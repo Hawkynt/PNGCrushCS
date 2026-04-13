@@ -92,43 +92,47 @@ public static class NitfReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static NitfFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static NitfFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static NitfFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_FILE_SIZE)
       throw new InvalidDataException($"Data too small for a valid NITF file (minimum {_MIN_FILE_SIZE} bytes, got {data.Length}).");
 
-    var magic = Encoding.ASCII.GetString(data, _FHDR_OFFSET, _FHDR_LENGTH);
+    var bytes = data.ToArray();
+
+    var magic = Encoding.ASCII.GetString(data.Slice(_FHDR_OFFSET, _FHDR_LENGTH));
     if (magic != _MAGIC)
       throw new InvalidDataException($"Invalid NITF magic: expected '{_MAGIC}', got '{magic}'.");
 
-    var version = Encoding.ASCII.GetString(data, _FVER_OFFSET, _FVER_LENGTH);
+    var version = Encoding.ASCII.GetString(data.Slice(_FVER_OFFSET, _FVER_LENGTH));
     if (version != _VERSION)
       throw new InvalidDataException($"Unsupported NITF version: expected '{_VERSION}', got '{version}'.");
 
-    var title = _ReadField(data, _FTITLE_OFFSET, _FTITLE_LENGTH).TrimEnd();
-    var classification = _ReadField(data, _FSCLAS_OFFSET, _FSCLAS_LENGTH)[0];
+    var title = _ReadField(bytes, _FTITLE_OFFSET, _FTITLE_LENGTH).TrimEnd();
+    var classification = _ReadField(bytes, _FSCLAS_OFFSET, _FSCLAS_LENGTH)[0];
 
     // Read HL (header length)
     var flOffset = _FlOffset;
     var hlOffset = flOffset + _FL_LENGTH;
-    var hl = _ReadInt(data, hlOffset, _HL_LENGTH);
+    var hl = _ReadInt(bytes, hlOffset, _HL_LENGTH);
 
     // Read NUMI (number of image segments)
     var numiOffset = hlOffset + _HL_LENGTH;
-    var numi = _ReadInt(data, numiOffset, _NUMI_LENGTH);
+    var numi = _ReadInt(bytes, numiOffset, _NUMI_LENGTH);
     if (numi < 1)
       throw new InvalidDataException("NITF file contains no image segments.");
 
     // Read first image segment lengths
     var imageInfoOffset = numiOffset + _NUMI_LENGTH;
-    var lish = _ReadInt(data, imageInfoOffset, _LISH_LENGTH);
-    var li = _ReadLong(data, imageInfoOffset + _LISH_LENGTH, _LI_LENGTH);
+    var lish = _ReadInt(bytes, imageInfoOffset, _LISH_LENGTH);
+    var li = _ReadLong(bytes, imageInfoOffset + _LISH_LENGTH, _LI_LENGTH);
 
     // The image subheader starts at offset HL
     var subheaderOffset = hl;
-    return _ParseImageSegment(data, subheaderOffset, (int)li, title, classification);
+    return _ParseImageSegment(bytes, subheaderOffset, (int)li, title, classification);
+  }
+
+  public static NitfFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   private static NitfFile _ParseImageSegment(byte[] data, int subheaderOffset, int dataLength, string title, char classification) {

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 
 namespace FileFormat.XFliEditor;
@@ -27,10 +27,8 @@ public static class XFliEditorReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static XFliEditorFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static XFliEditorFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static XFliEditorFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
 
     if (data.Length < XFliEditorFile.LoadAddressSize + XFliEditorFile.MinPayloadSize)
       throw new InvalidDataException($"File too small for X-FLI Editor format (got {data.Length} bytes, need at least {XFliEditorFile.LoadAddressSize + XFliEditorFile.MinPayloadSize}).");
@@ -43,20 +41,20 @@ public static class XFliEditorReader {
 
     // Bitmap data (8000 bytes)
     var bitmapData = new byte[XFliEditorFile.BitmapDataSize];
-    data.AsSpan(offset, XFliEditorFile.BitmapDataSize).CopyTo(bitmapData);
+    data.Slice(offset, XFliEditorFile.BitmapDataSize).CopyTo(bitmapData);
     offset += XFliEditorFile.BitmapDataSize;
 
     // 8 screen banks (8 x 1000 bytes)
     var screenBanks = new byte[XFliEditorFile.ScreenBankCount][];
     for (var i = 0; i < XFliEditorFile.ScreenBankCount; ++i) {
       screenBanks[i] = new byte[XFliEditorFile.ScreenBankSize];
-      data.AsSpan(offset, XFliEditorFile.ScreenBankSize).CopyTo(screenBanks[i]);
+      data.Slice(offset, XFliEditorFile.ScreenBankSize).CopyTo(screenBanks[i]);
       offset += XFliEditorFile.ScreenBankSize;
     }
 
     // Color RAM (1000 bytes)
     var colorData = new byte[XFliEditorFile.ColorDataSize];
-    data.AsSpan(offset, XFliEditorFile.ColorDataSize).CopyTo(colorData);
+    data.Slice(offset, XFliEditorFile.ColorDataSize).CopyTo(colorData);
     offset += XFliEditorFile.ColorDataSize;
 
     // Background color: next byte if available, else 0
@@ -67,7 +65,7 @@ public static class XFliEditorReader {
       ++offset;
       if (offset < data.Length) {
         trailingData = new byte[data.Length - offset];
-        data.AsSpan(offset).CopyTo(trailingData);
+        data[offset..].CopyTo(trailingData);
       }
     }
 
@@ -79,5 +77,10 @@ public static class XFliEditorReader {
       BackgroundColor = backgroundColor,
       TrailingData = trailingData,
     };
+  }
+
+  public static XFliEditorFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

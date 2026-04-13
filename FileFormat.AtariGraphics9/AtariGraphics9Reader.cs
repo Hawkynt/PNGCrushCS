@@ -26,7 +26,16 @@ public static class AtariGraphics9Reader {
     return FromBytes(ms.ToArray());
   }
 
-  public static AtariGraphics9File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static AtariGraphics9File FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != AtariGraphics9File.FileSize)
+      throw new InvalidDataException($"Invalid Atari Graphics 9 data size: expected exactly {AtariGraphics9File.FileSize} bytes, got {data.Length}.");
+
+    var pixelData = new byte[AtariGraphics9File.FileSize];
+    data.Slice(0, AtariGraphics9File.FileSize).CopyTo(pixelData);
+
+    return new AtariGraphics9File { PixelData = pixelData };
+    }
 
   public static AtariGraphics9File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

@@ -26,14 +26,16 @@ public static class JbigReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static JbigFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
   public static JbigFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  public static JbigFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < JbigHeader.StructSize)
       throw new InvalidDataException("Data too small for a valid JBIG file.");
 
-    var header = JbigHeader.ReadFrom(data.AsSpan());
+    var header = JbigHeader.ReadFrom(data);
     var width = header.XD;
     var height = header.YD;
 
@@ -57,7 +59,8 @@ public static class JbigReader {
     var bytesPerRow = (width + 7) / 8;
     var pixelData = new byte[bytesPerRow * height];
 
-    _Decode(data, JbigHeader.StructSize, data.Length - JbigHeader.StructSize, width, height, l0, tpbon, pixelData);
+    var dataArray = data.ToArray();
+    _Decode(dataArray, JbigHeader.StructSize, dataArray.Length - JbigHeader.StructSize, width, height, l0, tpbon, pixelData);
 
     return new JbigFile {
       Width = width,

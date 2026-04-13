@@ -19,7 +19,7 @@ public static class GbrReader {
     if (!file.Exists)
       throw new FileNotFoundException("GBR file not found.", file.FullName);
 
-    return FromBytes(File.ReadAllBytes(file.FullName));
+    return FromSpan(File.ReadAllBytes(file.FullName));
   }
 
   public static GbrFile FromStream(Stream stream) {
@@ -27,22 +27,23 @@ public static class GbrReader {
     if (stream.CanSeek) {
       var data = new byte[stream.Length - stream.Position];
       stream.ReadExactly(data);
-      return FromBytes(data);
+      return FromSpan(data);
     }
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
+    return FromSpan(ms.ToArray());
   }
-
-  public static GbrFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
 
   public static GbrFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  public static GbrFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_HEADER_SIZE)
       throw new InvalidDataException($"Data too small for a valid GBR file: expected at least {_MIN_HEADER_SIZE} bytes, got {data.Length}.");
 
-    var span = data.AsSpan();
-    var headerSize = (int)BinaryPrimitives.ReadUInt32BigEndian(span);
+    var headerSize = (int)BinaryPrimitives.ReadUInt32BigEndian(data);
 
     if (headerSize < _MIN_HEADER_SIZE)
       throw new InvalidDataException($"Invalid GBR header size: {headerSize}.");
@@ -50,18 +51,18 @@ public static class GbrReader {
     if (data.Length < headerSize)
       throw new InvalidDataException($"Data too small for declared header size: expected at least {headerSize} bytes, got {data.Length}.");
 
-    var version = (int)BinaryPrimitives.ReadUInt32BigEndian(span[4..]);
+    var version = (int)BinaryPrimitives.ReadUInt32BigEndian(data[4..]);
     if (version != 2)
       throw new InvalidDataException($"Unsupported GBR version: {version} (expected 2).");
 
-    var width = (int)BinaryPrimitives.ReadUInt32BigEndian(span[8..]);
-    var height = (int)BinaryPrimitives.ReadUInt32BigEndian(span[12..]);
-    var bytesPerPixel = (int)BinaryPrimitives.ReadUInt32BigEndian(span[16..]);
+    var width = (int)BinaryPrimitives.ReadUInt32BigEndian(data[8..]);
+    var height = (int)BinaryPrimitives.ReadUInt32BigEndian(data[12..]);
+    var bytesPerPixel = (int)BinaryPrimitives.ReadUInt32BigEndian(data[16..]);
 
-    if (span[20] != _MAGIC[0] || span[21] != _MAGIC[1] || span[22] != _MAGIC[2] || span[23] != _MAGIC[3])
+    if (data[20] != _MAGIC[0] || data[21] != _MAGIC[1] || data[22] != _MAGIC[2] || data[23] != _MAGIC[3])
       throw new InvalidDataException("Invalid GBR magic: expected 'GIMP' at offset 20.");
 
-    var spacing = (int)BinaryPrimitives.ReadUInt32BigEndian(span[24..]);
+    var spacing = (int)BinaryPrimitives.ReadUInt32BigEndian(data[24..]);
 
     if (width <= 0)
       throw new InvalidDataException($"Invalid GBR width: {width}.");
@@ -73,7 +74,7 @@ public static class GbrReader {
     var name = string.Empty;
     var nameLength = headerSize - _MIN_HEADER_SIZE;
     if (nameLength > 0) {
-      var nameSpan = span.Slice(_MIN_HEADER_SIZE, nameLength);
+      var nameSpan = data.Slice(_MIN_HEADER_SIZE, nameLength);
       var nullIndex = nameSpan.IndexOf((byte)0);
       if (nullIndex >= 0)
         nameSpan = nameSpan[..nullIndex];
@@ -86,7 +87,7 @@ public static class GbrReader {
       throw new InvalidDataException($"Data too small for pixel data: expected {headerSize + expectedPixelBytes} bytes, got {data.Length}.");
 
     var pixelData = new byte[expectedPixelBytes];
-    data.AsSpan(headerSize, expectedPixelBytes).CopyTo(pixelData.AsSpan(0));
+    data.Slice(headerSize, expectedPixelBytes).CopyTo(pixelData.AsSpan(0));
 
     return new GbrFile {
       Width = width,

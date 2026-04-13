@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Text;
 
@@ -29,10 +29,8 @@ public static class XbmReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static XbmFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static XbmFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static XbmFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MINIMUM_SIZE)
       throw new InvalidDataException("Data too small for a valid XBM file.");
 
@@ -42,5 +40,10 @@ public static class XbmReader {
       throw new InvalidDataException("Invalid XBM format: no #define directives found.");
 
     return XbmTextParser.Parse(text);
+  }
+
+  public static XbmFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

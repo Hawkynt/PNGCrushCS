@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 
 namespace FileFormat.SuperHiresEditor;
@@ -27,10 +27,8 @@ public static class SuperHiresEditorReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static SuperHiresEditorFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static SuperHiresEditorFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static SuperHiresEditorFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
 
     if (data.Length < SuperHiresEditorFile.LoadAddressSize + SuperHiresEditorFile.MinPayloadSize)
       throw new InvalidDataException($"File too small for Super Hires Editor format (got {data.Length} bytes, need at least {SuperHiresEditorFile.LoadAddressSize + SuperHiresEditorFile.MinPayloadSize}).");
@@ -43,29 +41,29 @@ public static class SuperHiresEditorReader {
 
     // Bitmap 1 (8000 bytes)
     var bitmap1 = new byte[SuperHiresEditorFile.BitmapDataSize];
-    data.AsSpan(offset, SuperHiresEditorFile.BitmapDataSize).CopyTo(bitmap1);
+    data.Slice(offset, SuperHiresEditorFile.BitmapDataSize).CopyTo(bitmap1);
     offset += SuperHiresEditorFile.BitmapDataSize;
 
     // Screen 1 (1000 bytes)
     var screen1 = new byte[SuperHiresEditorFile.ScreenDataSize];
-    data.AsSpan(offset, SuperHiresEditorFile.ScreenDataSize).CopyTo(screen1);
+    data.Slice(offset, SuperHiresEditorFile.ScreenDataSize).CopyTo(screen1);
     offset += SuperHiresEditorFile.ScreenDataSize;
 
     // Bitmap 2 (8000 bytes)
     var bitmap2 = new byte[SuperHiresEditorFile.BitmapDataSize];
-    data.AsSpan(offset, SuperHiresEditorFile.BitmapDataSize).CopyTo(bitmap2);
+    data.Slice(offset, SuperHiresEditorFile.BitmapDataSize).CopyTo(bitmap2);
     offset += SuperHiresEditorFile.BitmapDataSize;
 
     // Screen 2 (1000 bytes)
     var screen2 = new byte[SuperHiresEditorFile.ScreenDataSize];
-    data.AsSpan(offset, SuperHiresEditorFile.ScreenDataSize).CopyTo(screen2);
+    data.Slice(offset, SuperHiresEditorFile.ScreenDataSize).CopyTo(screen2);
     offset += SuperHiresEditorFile.ScreenDataSize;
 
     // Any trailing data
     var trailingData = Array.Empty<byte>();
     if (offset < data.Length) {
       trailingData = new byte[data.Length - offset];
-      data.AsSpan(offset).CopyTo(trailingData);
+      data[offset..].CopyTo(trailingData);
     }
 
     return new() {
@@ -76,5 +74,10 @@ public static class SuperHiresEditorReader {
       Screen2 = screen2,
       TrailingData = trailingData,
     };
+  }
+
+  public static SuperHiresEditorFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

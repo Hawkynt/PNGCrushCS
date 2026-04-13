@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -30,24 +30,23 @@ public static class NetpbmReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static NetpbmFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static NetpbmFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static NetpbmFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_SIZE)
       throw new InvalidDataException("Data too small for a valid Netpbm file.");
 
     if (data[0] != (byte)'P' || data[1] < (byte)'1' || data[1] > (byte)'7')
       throw new InvalidDataException("Invalid Netpbm magic number.");
 
-    var header = NetpbmHeaderParser.Parse(data);
+    // NetpbmHeaderParser.Parse and private reader methods require byte[]
+    var bytes = data.ToArray();
+    var header = NetpbmHeaderParser.Parse(bytes);
 
     var pixelData = header.Format switch {
-      NetpbmFormat.PbmAscii => _ReadPbmAscii(data, header),
-      NetpbmFormat.PgmAscii => _ReadAsciiSamples(data, header),
-      NetpbmFormat.PpmAscii => _ReadAsciiSamples(data, header),
-      NetpbmFormat.PbmBinary => _ReadPbmBinary(data, header),
-      NetpbmFormat.PgmBinary or NetpbmFormat.PpmBinary or NetpbmFormat.Pam => _ReadBinarySamples(data, header),
+      NetpbmFormat.PbmAscii => _ReadPbmAscii(bytes, header),
+      NetpbmFormat.PgmAscii => _ReadAsciiSamples(bytes, header),
+      NetpbmFormat.PpmAscii => _ReadAsciiSamples(bytes, header),
+      NetpbmFormat.PbmBinary => _ReadPbmBinary(bytes, header),
+      NetpbmFormat.PgmBinary or NetpbmFormat.PpmBinary or NetpbmFormat.Pam => _ReadBinarySamples(bytes, header),
       _ => throw new InvalidDataException($"Unsupported Netpbm format: {header.Format}.")
     };
 
@@ -60,6 +59,12 @@ public static class NetpbmReader {
       PixelData = pixelData,
       TupleType = header.TupleType
     };
+  
+  }
+
+  public static NetpbmFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   private static byte[] _ReadPbmAscii(byte[] data, NetpbmHeaderParser.ParsedHeader header) {

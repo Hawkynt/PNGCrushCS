@@ -26,17 +26,15 @@ public static class RunPaintReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static RunPaintFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static RunPaintFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static RunPaintFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < RunPaintFile.LoadAddressSize + 1)
       throw new InvalidDataException($"Data too small for a valid Run Paint file (got {data.Length} bytes).");
 
     var loadAddress = (ushort)(data[0] | (data[1] << 8));
 
     var compressed = new byte[data.Length - RunPaintFile.LoadAddressSize];
-    data.AsSpan(RunPaintFile.LoadAddressSize, compressed.Length).CopyTo(compressed.AsSpan(0));
+    data.Slice(RunPaintFile.LoadAddressSize, compressed.Length).CopyTo(compressed.AsSpan(0));
 
     var decompressed = RunPaintFile.RleDecode(compressed);
     if (decompressed.Length < RunPaintFile.UncompressedPayloadSize)
@@ -65,5 +63,10 @@ public static class RunPaintReader {
       ColorRam = colorRam,
       BackgroundColor = backgroundColor,
     };
+    }
+
+  public static RunPaintFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

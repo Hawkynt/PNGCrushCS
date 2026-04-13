@@ -100,7 +100,7 @@ public sealed class RoundTripTests {
       PixelData = new byte[] { 0x00, 0xF8 }
     };
 
-    var raw = original.ToRawImage();
+    var raw = Olpc565File.ToRawImage(original);
 
     Assert.That(raw.PixelData[0], Is.EqualTo(255)); // R
     Assert.That(raw.PixelData[1], Is.EqualTo(0));   // G
@@ -117,7 +117,7 @@ public sealed class RoundTripTests {
       PixelData = new byte[] { 0xE0, 0x07 }
     };
 
-    var raw = original.ToRawImage();
+    var raw = Olpc565File.ToRawImage(original);
 
     Assert.That(raw.PixelData[0], Is.EqualTo(0));   // R
     Assert.That(raw.PixelData[1], Is.EqualTo(255)); // G
@@ -134,7 +134,7 @@ public sealed class RoundTripTests {
       PixelData = new byte[] { 0x1F, 0x00 }
     };
 
-    var raw = original.ToRawImage();
+    var raw = Olpc565File.ToRawImage(original);
 
     Assert.That(raw.PixelData[0], Is.EqualTo(0));   // R
     Assert.That(raw.PixelData[1], Is.EqualTo(0));   // G
@@ -150,7 +150,7 @@ public sealed class RoundTripTests {
       PixelData = new byte[] { 0xFF, 0xFF, 0x00, 0x00 } // white, black
     };
 
-    var raw = original.ToRawImage();
+    var raw = Olpc565File.ToRawImage(original);
     var restored = Olpc565File.FromRawImage(raw);
 
     Assert.That(restored.Width, Is.EqualTo(original.Width));

@@ -26,7 +26,36 @@ public static class CreateWithGarfieldReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static CreateWithGarfieldFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static CreateWithGarfieldFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < CreateWithGarfieldFile.ExpectedFileSize)
+      throw new InvalidDataException($"Data too small for a valid Create with Garfield file (expected {CreateWithGarfieldFile.ExpectedFileSize} bytes, got {data.Length}).");
+
+    if (data.Length != CreateWithGarfieldFile.ExpectedFileSize)
+      throw new InvalidDataException($"Invalid Create with Garfield file size (expected {CreateWithGarfieldFile.ExpectedFileSize} bytes, got {data.Length}).");
+
+    var offset = 0;
+
+    var loadAddress = (ushort)(data[offset] | (data[offset + 1] << 8));
+    offset += CreateWithGarfieldFile.LoadAddressSize;
+
+    var bitmapData = new byte[CreateWithGarfieldFile.BitmapDataSize];
+    data.Slice(offset, CreateWithGarfieldFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
+    offset += CreateWithGarfieldFile.BitmapDataSize;
+
+    var screenRam = new byte[CreateWithGarfieldFile.ScreenRamSize];
+    data.Slice(offset, CreateWithGarfieldFile.ScreenRamSize).CopyTo(screenRam.AsSpan(0));
+    offset += CreateWithGarfieldFile.ScreenRamSize;
+
+    var borderColor = data[offset];
+
+    return new() {
+      LoadAddress = loadAddress,
+      BitmapData = bitmapData,
+      ScreenRam = screenRam,
+      BorderColor = borderColor,
+    };
+    }
 
   public static CreateWithGarfieldFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

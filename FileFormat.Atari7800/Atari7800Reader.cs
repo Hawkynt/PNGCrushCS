@@ -25,7 +25,16 @@ public static class Atari7800Reader {
     return FromBytes(ms.ToArray());
   }
 
-  public static Atari7800File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static Atari7800File FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < Atari7800File.FileSize)
+      throw new InvalidDataException($"Data too small: {data.Length} bytes, expected {Atari7800File.FileSize}.");
+
+    var pixelData = new byte[Atari7800File.ImageWidth * Atari7800File.ImageHeight];
+    data.Slice(0, pixelData.Length).CopyTo(pixelData.AsSpan(0));
+
+    return new Atari7800File { PixelData = pixelData };
+    }
 
   public static Atari7800File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

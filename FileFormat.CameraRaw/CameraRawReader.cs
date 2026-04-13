@@ -56,19 +56,24 @@ public static class CameraRawReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static CameraRawFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static CameraRawFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static CameraRawFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_TIFF_SIZE)
       throw new InvalidDataException("Data too small for a valid Camera RAW file.");
 
+    // Internal APIs require byte[], so materialize once
+    var bytes = data.ToArray();
+
     // Check for RAF signature first
-    if (_IsRafSignature(data))
-      return _ParseRaf(data);
+    if (_IsRafSignature(bytes))
+      return _ParseRaf(bytes);
 
     // Try TIFF-based parsing
-    return _ParseTiffBased(data);
+    return _ParseTiffBased(bytes);
+  }
+
+  public static CameraRawFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   private static bool _IsRafSignature(byte[] data) {

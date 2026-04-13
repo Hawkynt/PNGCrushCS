@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.Wpg;
@@ -26,20 +27,16 @@ public static class WpgReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static WpgFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static WpgFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static WpgFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < WpgHeader.StructSize)
       throw new InvalidDataException("Data too small for a valid WPG file.");
 
-    var span = data.AsSpan();
-
     // Validate magic bytes
-    if (span[0] != WpgHeader.MagicByte1 || span[1] != WpgHeader.MagicByte2 || span[2] != WpgHeader.MagicByte3 || span[3] != WpgHeader.MagicByte4)
+    if (data[0] != WpgHeader.MagicByte1 || data[1] != WpgHeader.MagicByte2 || data[2] != WpgHeader.MagicByte3 || data[3] != WpgHeader.MagicByte4)
       throw new InvalidDataException("Invalid WPG magic bytes.");
 
-    var header = WpgHeader.ReadFrom(span);
+    var header = WpgHeader.ReadFrom(data);
 
     // Scan records after header
     var offset = WpgHeader.StructSize;
@@ -68,14 +65,14 @@ public static class WpgReader {
         if (offset + 2 > data.Length)
           break;
 
-        recordSize = BitConverter.ToUInt16(data, offset);
+        recordSize = BinaryPrimitives.ReadUInt16LittleEndian(data[offset..]);
         offset += 2;
       } else {
         // 0xFE: 4-byte size
         if (offset + 4 > data.Length)
           break;
 
-        recordSize = BitConverter.ToUInt32(data, offset);
+        recordSize = BinaryPrimitives.ReadUInt32LittleEndian(data[offset..]);
         offset += 4;
       }
 
@@ -89,9 +86,9 @@ public static class WpgReader {
           if (offset + 10 > recordEnd)
             break;
 
-          width = BitConverter.ToUInt16(data, offset);
-          height = BitConverter.ToUInt16(data, offset + 2);
-          bitsPerPixel = BitConverter.ToUInt16(data, offset + 4);
+          width = BinaryPrimitives.ReadUInt16LittleEndian(data[offset..]);
+          height = BinaryPrimitives.ReadUInt16LittleEndian(data[(offset + 2)..]);
+          bitsPerPixel = BinaryPrimitives.ReadUInt16LittleEndian(data[(offset + 4)..]);
           // xdpi and ydpi at +6 and +8, skipped
           var pixelDataOffset = offset + 10;
           var pixelDataLength = recordEnd - pixelDataOffset;
@@ -103,11 +100,11 @@ public static class WpgReader {
             if (pixelDataLength == expectedSize) {
               // Uncompressed: copy raw pixel data directly
               pixelData = new byte[expectedSize];
-              data.AsSpan(pixelDataOffset, expectedSize).CopyTo(pixelData.AsSpan(0));
+              data.Slice(pixelDataOffset, expectedSize).CopyTo(pixelData.AsSpan(0));
             } else {
               // RLE compressed
               var compressedData = new byte[pixelDataLength];
-              data.AsSpan(pixelDataOffset, pixelDataLength).CopyTo(compressedData.AsSpan(0));
+              data.Slice(pixelDataOffset, pixelDataLength).CopyTo(compressedData.AsSpan(0));
               pixelData = WpgRleCompressor.Decompress(compressedData, expectedSize);
             }
           }
@@ -119,14 +116,14 @@ public static class WpgReader {
           if (offset + 4 > recordEnd)
             break;
 
-          var startIndex = BitConverter.ToUInt16(data, offset);
-          var numEntries = BitConverter.ToUInt16(data, offset + 2);
+          var startIndex = BinaryPrimitives.ReadUInt16LittleEndian(data[offset..]);
+          var numEntries = BinaryPrimitives.ReadUInt16LittleEndian(data[(offset + 2)..]);
           var paletteOffset = offset + 4;
           var paletteSize = numEntries * 3;
 
           if (paletteOffset + paletteSize <= recordEnd) {
             palette = new byte[paletteSize];
-            data.AsSpan(paletteOffset, paletteSize).CopyTo(palette.AsSpan(0));
+            data.Slice(paletteOffset, paletteSize).CopyTo(palette.AsSpan(0));
           }
 
           break;
@@ -150,5 +147,10 @@ public static class WpgReader {
       PixelData = pixelData,
       Palette = palette
     };
+  }
+
+  public static WpgFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

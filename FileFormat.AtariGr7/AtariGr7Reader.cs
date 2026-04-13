@@ -19,17 +19,14 @@ public static class AtariGr7Reader {
     if (stream.CanSeek) {
       var data = new byte[stream.Length - stream.Position];
       stream.ReadExactly(data);
-      return FromBytes(data);
+      return FromSpan(data);
     }
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
+    return FromSpan(ms.ToArray());
   }
 
-  public static AtariGr7File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static AtariGr7File FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static AtariGr7File FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < AtariGr7File.FileSize)
       throw new InvalidDataException($"Data too small for Atari GR.7 screen dump. Expected {AtariGr7File.FileSize} bytes, got {data.Length}.");
     if (data.Length != AtariGr7File.FileSize)
@@ -43,7 +40,12 @@ public static class AtariGr7Reader {
     };
   }
 
-  private static byte[] _UnpackPixels(byte[] data) {
+  public static AtariGr7File FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  private static byte[] _UnpackPixels(ReadOnlySpan<byte> data) {
     var pixels = new byte[AtariGr7File.PixelWidth * AtariGr7File.PixelHeight];
 
     for (var y = 0; y < AtariGr7File.PixelHeight; ++y)

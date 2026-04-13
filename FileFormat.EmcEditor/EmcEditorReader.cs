@@ -26,7 +26,21 @@ public static class EmcEditorReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static EmcEditorFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static EmcEditorFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < EmcEditorFile.LoadAddressSize + EmcEditorFile.MinPayloadSize)
+      throw new InvalidDataException($"Data too small for a valid EMC Editor file (expected at least {EmcEditorFile.LoadAddressSize + EmcEditorFile.MinPayloadSize} bytes, got {data.Length}).");
+
+    var loadAddress = (ushort)(data[0] | (data[1] << 8));
+
+    var rawData = new byte[data.Length - EmcEditorFile.LoadAddressSize];
+    data.Slice(EmcEditorFile.LoadAddressSize, rawData.Length).CopyTo(rawData.AsSpan(0));
+
+    return new() {
+      LoadAddress = loadAddress,
+      RawData = rawData,
+    };
+    }
 
   public static EmcEditorFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

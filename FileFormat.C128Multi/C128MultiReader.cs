@@ -26,10 +26,8 @@ public static class C128MultiReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static C128MultiFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static C128MultiFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static C128MultiFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length != C128MultiFile.ExpectedFileSize)
       throw new InvalidDataException($"Invalid C128 multicolor data size: expected exactly {C128MultiFile.ExpectedFileSize} bytes, got {data.Length}.");
 
@@ -37,9 +35,9 @@ public static class C128MultiReader {
     var screenData = new byte[C128MultiFile.ScreenDataSize];
     var colorData = new byte[C128MultiFile.ColorDataSize];
 
-    data.AsSpan(0, C128MultiFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
-    data.AsSpan(C128MultiFile.BitmapDataSize, C128MultiFile.ScreenDataSize).CopyTo(screenData.AsSpan(0));
-    data.AsSpan(C128MultiFile.BitmapDataSize + C128MultiFile.ScreenDataSize, C128MultiFile.ColorDataSize).CopyTo(colorData.AsSpan(0));
+    data.Slice(0, C128MultiFile.BitmapDataSize).CopyTo(bitmapData);
+    data.Slice(C128MultiFile.BitmapDataSize, C128MultiFile.ScreenDataSize).CopyTo(screenData);
+    data.Slice(C128MultiFile.BitmapDataSize + C128MultiFile.ScreenDataSize, C128MultiFile.ColorDataSize).CopyTo(colorData);
 
     var bgColor = data[C128MultiFile.BitmapDataSize + C128MultiFile.ScreenDataSize + C128MultiFile.ColorDataSize];
 
@@ -49,5 +47,10 @@ public static class C128MultiReader {
       ColorData = colorData,
       BackgroundColor = bgColor,
     };
+  }
+
+  public static C128MultiFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

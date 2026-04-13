@@ -26,7 +26,22 @@ public static class SyntheticArtsReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static SyntheticArtsFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static SyntheticArtsFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < SyntheticArtsFile.FileSize)
+      throw new InvalidDataException($"Data too small for a valid Synthetic Arts file (expected {SyntheticArtsFile.FileSize} bytes, got {data.Length}).");
+
+    var header = SyntheticArtsHeader.ReadFrom(data);
+    var palette = header.GetPaletteArray();
+
+    var pixelData = new byte[32000];
+    data.Slice(SyntheticArtsHeader.StructSize, 32000).CopyTo(pixelData);
+
+    return new SyntheticArtsFile {
+      Palette = palette,
+      PixelData = pixelData,
+    };
+    }
 
   public static SyntheticArtsFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

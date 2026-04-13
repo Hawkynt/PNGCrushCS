@@ -26,7 +26,35 @@ public static class UhdrReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static UhdrFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static UhdrFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < UhdrHeader.StructSize)
+      throw new InvalidDataException("Data too small for a valid UHDR file.");
+
+    var header = UhdrHeader.ReadFrom(data);
+
+    if (header.Magic != UhdrHeader.MagicValue)
+      throw new InvalidDataException($"Invalid UHDR magic: expected '{UhdrHeader.MagicValue}', got '{header.Magic}'.");
+
+    var width = (int)header.Width;
+    var height = (int)header.Height;
+
+    if (width == 0 || height == 0)
+      throw new InvalidDataException("UHDR image dimensions must be non-zero.");
+
+    var expectedPixelBytes = width * height * 3;
+    var available = data.Length - UhdrHeader.StructSize;
+    var copyLen = Math.Min(expectedPixelBytes, available);
+
+    var pixelData = new byte[expectedPixelBytes];
+    data.Slice(UhdrHeader.StructSize, copyLen).CopyTo(pixelData.AsSpan(0));
+
+    return new UhdrFile {
+      Width = width,
+      Height = height,
+      PixelData = pixelData
+    };
+    }
 
   public static UhdrFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

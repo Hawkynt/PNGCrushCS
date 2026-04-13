@@ -29,17 +29,15 @@ public static class ExrReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static ExrFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static ExrFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static ExrFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < ExrMagicHeader.StructSize)
       throw new InvalidDataException("Data too small for a valid EXR file.");
 
+    var bytes = data.ToArray();
     var offset = 0;
 
     // Magic header (8 bytes)
-    var header = ExrMagicHeader.ReadFrom(data.AsSpan(offset));
+    var header = ExrMagicHeader.ReadFrom(data);
     if (header.Magic != ExrMagicHeader.ExpectedMagic)
       throw new InvalidDataException("Invalid EXR magic number.");
 
@@ -55,27 +53,27 @@ public static class ExrReader {
     var dataWindowXMax = 0;
     var dataWindowYMax = 0;
 
-    while (offset < data.Length) {
+    while (offset < bytes.Length) {
       // Read attribute name (null-terminated)
-      var name = _ReadNullTerminatedString(data, ref offset);
+      var name = _ReadNullTerminatedString(bytes, ref offset);
       if (name.Length == 0)
         break; // End of header
 
       // Read attribute type name (null-terminated)
-      var typeName = _ReadNullTerminatedString(data, ref offset);
+      var typeName = _ReadNullTerminatedString(bytes, ref offset);
 
       // Read attribute value size (int32 LE)
-      if (offset + 4 > data.Length)
+      if (offset + 4 > bytes.Length)
         throw new InvalidDataException("Unexpected end of data reading attribute size.");
 
-      var valueSize = BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(offset));
+      var valueSize = BinaryPrimitives.ReadInt32LittleEndian(data[offset..]);
       offset += 4;
 
-      if (offset + valueSize > data.Length)
+      if (offset + valueSize > bytes.Length)
         throw new InvalidDataException("Unexpected end of data reading attribute value.");
 
       var value = new byte[valueSize];
-      data.AsSpan(offset, valueSize).CopyTo(value.AsSpan(0));
+      data.Slice(offset, valueSize).CopyTo(value);
 
       // Parse well-known attributes
       switch (name) {
@@ -115,7 +113,7 @@ public static class ExrReader {
 
     var offsets = new long[scanlineBlockCount];
     for (var i = 0; i < scanlineBlockCount; ++i) {
-      offsets[i] = BinaryPrimitives.ReadInt64LittleEndian(data.AsSpan(offset));
+      offsets[i] = BinaryPrimitives.ReadInt64LittleEndian(data[offset..]);
       offset += 8;
     }
 
@@ -139,7 +137,7 @@ public static class ExrReader {
         throw new InvalidDataException("Scanline block offset out of range.");
 
       // Y coordinate (int32) + pixel data size (int32)
-      var blockDataSize = BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(blockOffset + 4));
+      var blockDataSize = BinaryPrimitives.ReadInt32LittleEndian(data[(blockOffset + 4)..]);
       var blockDataStart = blockOffset + 8;
 
       if (blockDataStart + blockDataSize > data.Length)
@@ -147,7 +145,7 @@ public static class ExrReader {
 
       var dstOffset = i * bytesPerScanline;
       var copyLen = Math.Min(blockDataSize, bytesPerScanline);
-      data.AsSpan(blockDataStart, copyLen).CopyTo(pixelData.AsSpan(dstOffset));
+      data.Slice(blockDataStart, copyLen).CopyTo(pixelData.AsSpan(dstOffset));
     }
 
     return new ExrFile {
@@ -161,12 +159,17 @@ public static class ExrReader {
     };
   }
 
+  public static ExrFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
   private static string _ReadNullTerminatedString(byte[] data, ref int offset) {
     var start = offset;
     while (offset < data.Length && data[offset] != 0)
       ++offset;
 
-    var result = Encoding.ASCII.GetString(data, start, offset - start);
+    var result = Encoding.ASCII.GetString(data.AsSpan(start, offset - start));
     if (offset < data.Length)
       ++offset; // Skip null terminator
 
@@ -186,7 +189,7 @@ public static class ExrReader {
       if (offset == nameStart)
         break; // Empty name = end of channel list
 
-      var name = Encoding.ASCII.GetString(data, nameStart, offset - nameStart);
+      var name = Encoding.ASCII.GetString(data.AsSpan(nameStart, offset - nameStart));
       ++offset; // Skip null terminator
 
       if (offset + 16 > data.Length)

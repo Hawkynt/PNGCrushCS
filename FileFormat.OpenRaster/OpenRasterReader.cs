@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -33,14 +33,12 @@ public static class OpenRasterReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static OpenRasterFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static OpenRasterFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static OpenRasterFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < 4)
       throw new InvalidDataException("Data too small for a valid OpenRaster file.");
 
-    using var zipStream = new MemoryStream(data, writable: false);
+    // ZipArchive requires a Stream backed by byte[]
+    using var zipStream = new MemoryStream(data.ToArray(), writable: false);
     ZipArchive archive;
     try {
       archive = new ZipArchive(zipStream, ZipArchiveMode.Read);
@@ -121,6 +119,12 @@ public static class OpenRasterReader {
         Layers = layers
       };
     }
+  
+  }
+
+  public static OpenRasterFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   private static string _ReadEntryText(ZipArchiveEntry entry) {

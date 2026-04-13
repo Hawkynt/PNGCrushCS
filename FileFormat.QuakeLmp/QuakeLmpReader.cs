@@ -25,7 +25,35 @@ public static class QuakeLmpReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static QuakeLmpFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static QuakeLmpFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < QuakeLmpFile.HeaderSize)
+      throw new InvalidDataException("Data too small for a valid QuakeLmp file.");
+
+    var width = data[0] | (data[1] << 8);
+    var height = data[2] | (data[3] << 8);
+    if (width == 0) width = data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24);
+    if (width <= 0 || width > 65535) width = 128;
+
+    if (8 >= 8) {
+      height = data[4] | (data[5] << 8);
+      if (height <= 0 || height > 65535) height = 128;
+    } else if (height <= 0 || height > 65535) {
+      height = 128;
+    }
+
+    var pixelBytes = width * height;
+    var pixelData = new byte[pixelBytes];
+    var available = Math.Min(pixelBytes, data.Length - QuakeLmpFile.HeaderSize);
+    if (available > 0)
+      data.Slice(QuakeLmpFile.HeaderSize, available).CopyTo(pixelData.AsSpan(0));
+
+    return new() {
+      Width = width,
+      Height = height,
+      PixelData = pixelData,
+    };
+    }
 
   public static QuakeLmpFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

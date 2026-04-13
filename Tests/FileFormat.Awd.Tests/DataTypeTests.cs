@@ -9,10 +9,9 @@ public sealed class DataTypeTests {
 
   [Test]
   [Category("Unit")]
-  public void AwdFile_DefaultPixelData_IsEmptyArray() {
+  public void AwdFile_DefaultPixelData_IsNull() {
     var file = new AwdFile();
-    Assert.That(file.PixelData, Is.Not.Null);
-    Assert.That(file.PixelData.Length, Is.EqualTo(0));
+    Assert.That(file.PixelData, Is.Null);
   }
 
   [Test]

@@ -26,7 +26,16 @@ public static class AtariPlayerReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static AtariPlayerFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static AtariPlayerFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != AtariPlayerFile.FileSize)
+      throw new InvalidDataException($"Invalid Atari Player/Missile data size: expected exactly {AtariPlayerFile.FileSize} bytes, got {data.Length}.");
+
+    var playerData = new byte[AtariPlayerFile.FileSize];
+    data.Slice(0, AtariPlayerFile.FileSize).CopyTo(playerData);
+
+    return new AtariPlayerFile { PlayerData = playerData };
+    }
 
   public static AtariPlayerFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

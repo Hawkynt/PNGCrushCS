@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Buffers.Binary;
 using System.IO;
 using System.Text;
@@ -30,26 +30,26 @@ public static class IffDeepReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static IffDeepFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
   public static IffDeepFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  public static IffDeepFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_IFF_SIZE)
       throw new InvalidDataException("Data too small for a valid IFF DEEP file.");
 
-    var span = data.AsSpan();
-
     // Validate FORM magic
-    var formId = Encoding.ASCII.GetString(data, 0, 4);
+    var formId = Encoding.ASCII.GetString(data.Slice(0, 4));
     if (formId != "FORM")
       throw new InvalidDataException($"Invalid IFF magic: expected 'FORM', got '{formId}'.");
 
     // Validate DEEP form type
-    var formType = Encoding.ASCII.GetString(data, 8, 4);
+    var formType = Encoding.ASCII.GetString(data.Slice(8, 4));
     if (formType != "DEEP")
       throw new InvalidDataException($"Invalid IFF form type: expected 'DEEP', got '{formType}'.");
 
-    var formSize = BinaryPrimitives.ReadInt32BigEndian(span[4..]);
+    var formSize = BinaryPrimitives.ReadInt32BigEndian(data[4..]);
 
     // Parse chunks
     int width = 0, height = 0;
@@ -62,8 +62,8 @@ public static class IffDeepReader {
     var endOffset = Math.Min(8 + formSize, data.Length);
 
     while (offset + 8 <= endOffset) {
-      var chunkId = Encoding.ASCII.GetString(data, offset, 4);
-      var chunkSize = BinaryPrimitives.ReadInt32BigEndian(span[(offset + 4)..]);
+      var chunkId = Encoding.ASCII.GetString(data.Slice(offset, 4));
+      var chunkSize = BinaryPrimitives.ReadInt32BigEndian(data[(offset + 4)..]);
       var chunkDataOffset = offset + 8;
 
       if (chunkDataOffset + chunkSize > data.Length)
@@ -72,19 +72,19 @@ public static class IffDeepReader {
       switch (chunkId) {
         case "DGBL":
           if (chunkSize >= 8) {
-            width = BinaryPrimitives.ReadUInt16BigEndian(span[chunkDataOffset..]);
-            height = BinaryPrimitives.ReadUInt16BigEndian(span[(chunkDataOffset + 2)..]);
-            compression = (IffDeepCompression)BinaryPrimitives.ReadUInt16BigEndian(span[(chunkDataOffset + 4)..]);
+            width = BinaryPrimitives.ReadUInt16BigEndian(data[chunkDataOffset..]);
+            height = BinaryPrimitives.ReadUInt16BigEndian(data[(chunkDataOffset + 2)..]);
+            compression = (IffDeepCompression)BinaryPrimitives.ReadUInt16BigEndian(data[(chunkDataOffset + 4)..]);
             hasDgbl = true;
           }
           break;
         case "DPEL":
-          hasAlpha = _ParseDpelChunk(span.Slice(chunkDataOffset, chunkSize));
+          hasAlpha = _ParseDpelChunk(data.Slice(chunkDataOffset, chunkSize));
           break;
         case "DBOD":
         case "BODY":
           bodyData = new byte[chunkSize];
-          span.Slice(chunkDataOffset, chunkSize).CopyTo(bodyData);
+          data.Slice(chunkDataOffset, chunkSize).CopyTo(bodyData);
           break;
       }
 

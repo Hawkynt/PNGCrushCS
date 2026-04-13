@@ -29,10 +29,8 @@ public static class TinyReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static TinyFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static TinyFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static TinyFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _HEADER_SIZE)
       throw new InvalidDataException("Data too small for a valid Tiny file.");
 
@@ -43,13 +41,12 @@ public static class TinyReader {
     var resolution = (TinyResolution)resolutionByte;
     var (width, height, planeCount, wordsPerPlane) = _GetFormatInfo(resolution);
 
-    var span = data.AsSpan();
     var palette = new short[16];
     for (var i = 0; i < 16; ++i)
-      palette[i] = BinaryPrimitives.ReadInt16BigEndian(span[(1 + i * 2)..]);
+      palette[i] = BinaryPrimitives.ReadInt16BigEndian(data[(1 + i * 2)..]);
 
     var compressedData = new byte[data.Length - _HEADER_SIZE];
-    data.AsSpan(_HEADER_SIZE, compressedData.Length).CopyTo(compressedData.AsSpan(0));
+    data.Slice(_HEADER_SIZE, compressedData.Length).CopyTo(compressedData.AsSpan(0));
 
     var pixelData = TinyCompressor.Decompress(compressedData, planeCount, wordsPerPlane);
 
@@ -60,6 +57,11 @@ public static class TinyReader {
       Palette = palette,
       PixelData = pixelData
     };
+  }
+
+  public static TinyFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   private static (int Width, int Height, int PlaneCount, int WordsPerPlane) _GetFormatInfo(TinyResolution resolution) => resolution switch {

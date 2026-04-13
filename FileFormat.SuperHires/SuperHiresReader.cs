@@ -26,7 +26,52 @@ public static class SuperHiresReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static SuperHiresFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static SuperHiresFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < SuperHiresFile.ExpectedFileSize)
+      throw new InvalidDataException($"Data too small for Super Hires file (got {data.Length} bytes, expected {SuperHiresFile.ExpectedFileSize}).");
+
+    var offset = 0;
+
+    // Load address (2 bytes, little-endian)
+    var loadAddress = (ushort)(data[offset] | (data[offset + 1] << 8));
+    offset += SuperHiresFile.LoadAddressSize;
+
+    // Frame 1: Bitmap data (8000 bytes)
+    var bitmapData1 = new byte[SuperHiresFile.BitmapDataSize];
+    data.Slice(offset, SuperHiresFile.BitmapDataSize).CopyTo(bitmapData1.AsSpan(0));
+    offset += SuperHiresFile.BitmapDataSize;
+
+    // Frame 1: Screen RAM (1000 bytes)
+    var screenData1 = new byte[SuperHiresFile.ScreenDataSize];
+    data.Slice(offset, SuperHiresFile.ScreenDataSize).CopyTo(screenData1.AsSpan(0));
+    offset += SuperHiresFile.ScreenDataSize;
+
+    // Frame 2: Bitmap data (8000 bytes)
+    var bitmapData2 = new byte[SuperHiresFile.BitmapDataSize];
+    data.Slice(offset, SuperHiresFile.BitmapDataSize).CopyTo(bitmapData2.AsSpan(0));
+    offset += SuperHiresFile.BitmapDataSize;
+
+    // Frame 2: Screen RAM (1000 bytes)
+    var screenData2 = new byte[SuperHiresFile.ScreenDataSize];
+    data.Slice(offset, SuperHiresFile.ScreenDataSize).CopyTo(screenData2.AsSpan(0));
+    offset += SuperHiresFile.ScreenDataSize;
+
+    // Padding/extra data (remaining bytes)
+    var paddingLength = data.Length - offset;
+    var padding = new byte[paddingLength];
+    if (paddingLength > 0)
+      data.Slice(offset, paddingLength).CopyTo(padding.AsSpan(0));
+
+    return new() {
+      LoadAddress = loadAddress,
+      BitmapData1 = bitmapData1,
+      ScreenData1 = screenData1,
+      BitmapData2 = bitmapData2,
+      ScreenData2 = screenData2,
+      Padding = padding,
+    };
+    }
 
   public static SuperHiresFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

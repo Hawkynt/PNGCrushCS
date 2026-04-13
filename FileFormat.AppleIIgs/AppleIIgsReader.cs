@@ -34,6 +34,45 @@ public static class AppleIIgsReader {
   /// <summary>SCB bit mask for 640 mode.</summary>
   internal const byte Scb640ModeBit = 0x80;
 
+  public static AppleIIgsFile FromSpan(ReadOnlySpan<byte> data) {
+    if (data.Length < FileSize)
+      throw new InvalidDataException($"Data too small for a valid Apple IIGS file (expected {FileSize} bytes, got {data.Length}).");
+
+    if (data.Length != FileSize)
+      throw new InvalidDataException($"Invalid Apple IIGS file size (expected {FileSize} bytes, got {data.Length}).");
+
+    var offset = 0;
+
+    // Pixel data (32000 bytes)
+    var pixelData = new byte[PixelDataSize];
+    data.Slice(offset, PixelDataSize).CopyTo(pixelData);
+    offset += PixelDataSize;
+
+    // SCBs (200 bytes)
+    var scbs = new byte[ScbSize];
+    data.Slice(offset, ScbSize).CopyTo(scbs);
+    offset += ScbSize;
+
+    // Palettes (512 bytes = 256 x 16-bit LE values)
+    var palettes = new short[PaletteEntryCount];
+    var paletteSpan = data.Slice(offset, PaletteSize);
+    for (var i = 0; i < PaletteEntryCount; ++i)
+      palettes[i] = BinaryPrimitives.ReadInt16LittleEndian(paletteSpan[(i * 2)..]);
+
+    // Determine mode from first SCB bit 7
+    var mode = (scbs[0] & Scb640ModeBit) != 0 ? AppleIIgsMode.Mode640 : AppleIIgsMode.Mode320;
+    var width = mode == AppleIIgsMode.Mode640 ? 640 : 320;
+
+    return new AppleIIgsFile {
+      Width = width,
+      Height = LineCount,
+      Mode = mode,
+      PixelData = pixelData,
+      Scbs = scbs,
+      Palettes = palettes
+    };
+  }
+
   public static AppleIIgsFile FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
@@ -56,41 +95,6 @@ public static class AppleIIgsReader {
 
   public static AppleIIgsFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < FileSize)
-      throw new InvalidDataException($"Data too small for a valid Apple IIGS file (expected {FileSize} bytes, got {data.Length}).");
-
-    if (data.Length != FileSize)
-      throw new InvalidDataException($"Invalid Apple IIGS file size (expected {FileSize} bytes, got {data.Length}).");
-
-    var offset = 0;
-
-    // Pixel data (32000 bytes)
-    var pixelData = new byte[PixelDataSize];
-    data.AsSpan(offset, PixelDataSize).CopyTo(pixelData.AsSpan(0));
-    offset += PixelDataSize;
-
-    // SCBs (200 bytes)
-    var scbs = new byte[ScbSize];
-    data.AsSpan(offset, ScbSize).CopyTo(scbs.AsSpan(0));
-    offset += ScbSize;
-
-    // Palettes (512 bytes = 256 x 16-bit LE values)
-    var palettes = new short[PaletteEntryCount];
-    var span = data.AsSpan(offset, PaletteSize);
-    for (var i = 0; i < PaletteEntryCount; ++i)
-      palettes[i] = BinaryPrimitives.ReadInt16LittleEndian(span[(i * 2)..]);
-
-    // Determine mode from first SCB bit 7
-    var mode = (scbs[0] & Scb640ModeBit) != 0 ? AppleIIgsMode.Mode640 : AppleIIgsMode.Mode320;
-    var width = mode == AppleIIgsMode.Mode640 ? 640 : 320;
-
-    return new AppleIIgsFile {
-      Width = width,
-      Height = LineCount,
-      Mode = mode,
-      PixelData = pixelData,
-      Scbs = scbs,
-      Palettes = palettes
-    };
+    return FromSpan(data);
   }
 }

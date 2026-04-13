@@ -26,18 +26,21 @@ public static class AtariGfbReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static AtariGfbFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static AtariGfbFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static AtariGfbFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < AtariGfbFile.FileSize)
       throw new InvalidDataException($"Data too small for Atari GFB screen dump. Expected {AtariGfbFile.FileSize} bytes, got {data.Length}.");
     if (data.Length != AtariGfbFile.FileSize)
       throw new InvalidDataException($"Invalid Atari GFB screen dump size. Expected exactly {AtariGfbFile.FileSize} bytes, got {data.Length}.");
 
     var rawData = new byte[AtariGfbFile.FileSize];
-    data.AsSpan(0, AtariGfbFile.FileSize).CopyTo(rawData);
+    data.Slice(0, AtariGfbFile.FileSize).CopyTo(rawData);
 
     return new AtariGfbFile { RawData = rawData };
+    }
+
+  public static AtariGfbFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

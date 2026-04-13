@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Buffers.Binary;
 using System.IO;
 
@@ -32,17 +32,14 @@ public static class PspReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static PspFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static PspFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static PspFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _FILE_HEADER_SIZE)
       throw new InvalidDataException("Data too small for a valid PSP file.");
 
     _ValidateMagic(data);
 
-    var majorVersion = BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(_MAGIC_SIZE));
-    var minorVersion = BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(_MAGIC_SIZE + 2));
+    var majorVersion = BinaryPrimitives.ReadUInt16LittleEndian(data[_MAGIC_SIZE..]);
+    var minorVersion = BinaryPrimitives.ReadUInt16LittleEndian(data[(_MAGIC_SIZE + 2)..]);
 
     var width = 0;
     var height = 0;
@@ -51,8 +48,8 @@ public static class PspReader {
 
     var offset = _FILE_HEADER_SIZE;
     while (offset + 6 <= data.Length) {
-      var blockId = BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(offset));
-      var initialLength = BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(offset + 2));
+      var blockId = BinaryPrimitives.ReadUInt16LittleEndian(data[offset..]);
+      var initialLength = BinaryPrimitives.ReadUInt32LittleEndian(data[(offset + 2)..]);
 
       uint totalLength;
       int dataOffset;
@@ -60,7 +57,7 @@ public static class PspReader {
         if (offset + _BLOCK_HEADER_SIZE_V5 > data.Length)
           break;
 
-        totalLength = BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(offset + 6));
+        totalLength = BinaryPrimitives.ReadUInt32LittleEndian(data[(offset + 6)..]);
         dataOffset = offset + _BLOCK_HEADER_SIZE_V5;
       } else {
         totalLength = initialLength;
@@ -99,30 +96,35 @@ public static class PspReader {
     };
   }
 
-  private static void _ValidateMagic(byte[] data) {
+  public static PspFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  private static void _ValidateMagic(ReadOnlySpan<byte> data) {
     for (var i = 0; i < PspFile.Magic.Length; ++i)
       if (data[i] != PspFile.Magic[i])
         throw new InvalidDataException("Invalid PSP magic bytes.");
   }
 
-  private static void _ParseGeneralAttributes(byte[] data, int offset, int length, out int width, out int height, out int bitDepth) {
+  private static void _ParseGeneralAttributes(ReadOnlySpan<byte> data, int offset, int length, out int width, out int height, out int bitDepth) {
     if (length < _GENERAL_ATTRIBUTES_MIN_SIZE || offset + _GENERAL_ATTRIBUTES_MIN_SIZE > data.Length)
       throw new InvalidDataException("General Image Attributes block too small.");
 
-    var span = data.AsSpan(offset);
+    var span = data[offset..];
     width = BinaryPrimitives.ReadInt32LittleEndian(span);
     height = BinaryPrimitives.ReadInt32LittleEndian(span[4..]);
     // resolution(8 bytes) at offset 8, metric(1) at offset 16, compression(2) at offset 17
     bitDepth = BinaryPrimitives.ReadUInt16LittleEndian(span[19..]);
   }
 
-  private static byte[]? _ParseCompositeImage(byte[] data, int offset, int availableLength) {
+  private static byte[]? _ParseCompositeImage(ReadOnlySpan<byte> data, int offset, int availableLength) {
     if (availableLength <= 0 || offset >= data.Length)
       return null;
 
     var copyLen = Math.Min(availableLength, data.Length - offset);
     var result = new byte[copyLen];
-    data.AsSpan(offset, copyLen).CopyTo(result.AsSpan(0));
+    data.Slice(offset, copyLen).CopyTo(result.AsSpan(0));
     return result;
   }
 }

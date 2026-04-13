@@ -26,7 +26,41 @@ public static class MicroIllustratorReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static MicroIllustratorFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static MicroIllustratorFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < MicroIllustratorFile.ExpectedFileSize)
+      throw new InvalidDataException($"Data too small for a valid Micro Illustrator file (expected {MicroIllustratorFile.ExpectedFileSize} bytes, got {data.Length}).");
+
+    if (data.Length != MicroIllustratorFile.ExpectedFileSize)
+      throw new InvalidDataException($"Invalid Micro Illustrator file size (expected {MicroIllustratorFile.ExpectedFileSize} bytes, got {data.Length}).");
+
+    var offset = 0;
+
+    var loadAddress = (ushort)(data[offset] | (data[offset + 1] << 8));
+    offset += MicroIllustratorFile.LoadAddressSize;
+
+    var bitmapData = new byte[MicroIllustratorFile.BitmapDataSize];
+    data.Slice(offset, MicroIllustratorFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
+    offset += MicroIllustratorFile.BitmapDataSize;
+
+    var videoMatrix = new byte[MicroIllustratorFile.VideoMatrixSize];
+    data.Slice(offset, MicroIllustratorFile.VideoMatrixSize).CopyTo(videoMatrix.AsSpan(0));
+    offset += MicroIllustratorFile.VideoMatrixSize;
+
+    var colorRam = new byte[MicroIllustratorFile.ColorRamSize];
+    data.Slice(offset, MicroIllustratorFile.ColorRamSize).CopyTo(colorRam.AsSpan(0));
+    offset += MicroIllustratorFile.ColorRamSize;
+
+    var backgroundColor = data[offset];
+
+    return new() {
+      LoadAddress = loadAddress,
+      BitmapData = bitmapData,
+      VideoMatrix = videoMatrix,
+      ColorRam = colorRam,
+      BackgroundColor = backgroundColor
+    };
+    }
 
   public static MicroIllustratorFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

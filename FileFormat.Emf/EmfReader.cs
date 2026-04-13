@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Buffers.Binary;
 using System.IO;
 using FileFormat.Bmp;
@@ -33,17 +33,12 @@ public static class EmfReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static EmfFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static EmfFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static EmfFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_HEADER_SIZE)
       throw new InvalidDataException("Data too small for a valid EMF file.");
 
-    var span = data.AsSpan();
-
     // Parse and validate EMR_HEADER
-    var header = EmfHeaderRecord.ReadFrom(span[..EmfHeaderRecord.StructSize]);
+    var header = EmfHeaderRecord.ReadFrom(data[..EmfHeaderRecord.StructSize]);
     if (header.RecordType != _EMR_HEADER)
       throw new InvalidDataException($"Invalid EMF: first record type is {header.RecordType}, expected {_EMR_HEADER}.");
 
@@ -53,8 +48,8 @@ public static class EmfReader {
     // Scan records for EMR_STRETCHDIBITS
     var offset = 0;
     while (offset + 8 <= data.Length) {
-      var recordType = BinaryPrimitives.ReadUInt32LittleEndian(span[offset..]);
-      var recordSize = (int)BinaryPrimitives.ReadUInt32LittleEndian(span[(offset + 4)..]);
+      var recordType = BinaryPrimitives.ReadUInt32LittleEndian(data[offset..]);
+      var recordSize = (int)BinaryPrimitives.ReadUInt32LittleEndian(data[(offset + 4)..]);
 
       if (recordSize < 8 || offset + recordSize > data.Length)
         break;
@@ -66,10 +61,16 @@ public static class EmfReader {
     }
 
     throw new InvalidDataException("No EMR_STRETCHDIBITS record found in EMF file.");
+  
   }
 
-  private static EmfFile _ParseStretchDiBits(byte[] data, int recordOffset, int recordSize) {
-    var span = data.AsSpan(recordOffset);
+  public static EmfFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  private static EmfFile _ParseStretchDiBits(ReadOnlySpan<byte> data, int recordOffset, int recordSize) {
+    var span = data[recordOffset..];
 
     // Parse StretchDIBits fixed portion
     var stretch = EmfStretchDiBitsRecord.ReadFrom(span[..EmfStretchDiBitsRecord.StructSize]);

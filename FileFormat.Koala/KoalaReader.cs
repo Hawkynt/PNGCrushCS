@@ -26,7 +26,46 @@ public static class KoalaReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static KoalaFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static KoalaFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < KoalaFile.ExpectedFileSize)
+      throw new InvalidDataException($"Data too small for a valid Koala file (expected {KoalaFile.ExpectedFileSize} bytes, got {data.Length}).");
+
+    if (data.Length != KoalaFile.ExpectedFileSize)
+      throw new InvalidDataException($"Invalid Koala file size (expected {KoalaFile.ExpectedFileSize} bytes, got {data.Length}).");
+
+    var offset = 0;
+
+    // Load address (2 bytes, little-endian)
+    var loadAddress = (ushort)(data[offset] | (data[offset + 1] << 8));
+    offset += KoalaFile.LoadAddressSize;
+
+    // Bitmap data (8000 bytes)
+    var bitmapData = new byte[KoalaFile.BitmapDataSize];
+    data.Slice(offset, KoalaFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
+    offset += KoalaFile.BitmapDataSize;
+
+    // Video matrix (1000 bytes)
+    var videoMatrix = new byte[KoalaFile.VideoMatrixSize];
+    data.Slice(offset, KoalaFile.VideoMatrixSize).CopyTo(videoMatrix.AsSpan(0));
+    offset += KoalaFile.VideoMatrixSize;
+
+    // Color RAM (1000 bytes)
+    var colorRam = new byte[KoalaFile.ColorRamSize];
+    data.Slice(offset, KoalaFile.ColorRamSize).CopyTo(colorRam.AsSpan(0));
+    offset += KoalaFile.ColorRamSize;
+
+    // Background color (1 byte)
+    var backgroundColor = data[offset];
+
+    return new() {
+      LoadAddress = loadAddress,
+      BitmapData = bitmapData,
+      VideoMatrix = videoMatrix,
+      ColorRam = colorRam,
+      BackgroundColor = backgroundColor
+    };
+    }
 
   public static KoalaFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
@@ -31,19 +31,18 @@ public static class MiffReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static MiffFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static MiffFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static MiffFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_HEADER_SIZE)
       throw new InvalidDataException("Data too small for a valid MIFF file.");
 
     // Verify magic
-    var magic = Encoding.ASCII.GetString(data, 0, _MAGIC.Length);
+    var magic = Encoding.ASCII.GetString(data.Slice(0, _MAGIC.Length));
     if (magic != _MAGIC)
       throw new InvalidDataException("Invalid MIFF signature.");
 
-    var fields = MiffHeaderParser.Parse(data, out var dataOffset);
+    // MiffHeaderParser.Parse and MiffRleCompressor.Decompress require byte[]
+    var bytes = data.ToArray();
+    var fields = MiffHeaderParser.Parse(bytes, out var dataOffset);
 
     // Extract fields
     var width = fields.TryGetValue("columns", out var colStr) ? int.Parse(colStr) : 0;
@@ -74,14 +73,14 @@ public static class MiffReader {
     if (colorClass == MiffColorClass.PseudoClass && paletteColorCount > 0) {
       var paletteSize = paletteColorCount * 3 * bytesPerChannel;
       palette = new byte[paletteSize];
-      data.AsSpan(dataOffset, Math.Min(paletteSize, data.Length - dataOffset)).CopyTo(palette.AsSpan(0));
+      data.Slice(dataOffset, Math.Min(paletteSize, data.Length - dataOffset)).CopyTo(palette.AsSpan(0));
       dataOffset += paletteSize;
     }
 
     // Read pixel data
     var remainingBytes = data.Length - dataOffset;
     var rawData = new byte[remainingBytes];
-    data.AsSpan(dataOffset, remainingBytes).CopyTo(rawData.AsSpan(0));
+    data.Slice(dataOffset, remainingBytes).CopyTo(rawData.AsSpan(0));
 
     var channelsPerPixel = _GetChannelsPerPixel(type, colorspace);
     var bytesPerPixel = channelsPerPixel * bytesPerChannel;
@@ -112,6 +111,12 @@ public static class MiffReader {
       PixelData = pixelData,
       Palette = palette
     };
+  
+  }
+
+  public static MiffFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   private static int _GetChannelsPerPixel(string type, string colorspace) {

@@ -26,7 +26,21 @@ public static class InterlaceHiresEditorReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static InterlaceHiresEditorFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static InterlaceHiresEditorFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < InterlaceHiresEditorFile.LoadAddressSize + InterlaceHiresEditorFile.MinPayloadSize)
+      throw new InvalidDataException($"Data too small for a valid Interlace Hires Editor file (expected at least {InterlaceHiresEditorFile.LoadAddressSize + InterlaceHiresEditorFile.MinPayloadSize} bytes, got {data.Length}).");
+
+    var loadAddress = (ushort)(data[0] | (data[1] << 8));
+
+    var rawData = new byte[data.Length - InterlaceHiresEditorFile.LoadAddressSize];
+    data.Slice(InterlaceHiresEditorFile.LoadAddressSize, rawData.Length).CopyTo(rawData.AsSpan(0));
+
+    return new() {
+      LoadAddress = loadAddress,
+      RawData = rawData,
+    };
+    }
 
   public static InterlaceHiresEditorFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

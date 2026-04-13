@@ -30,14 +30,12 @@ public static class DpxReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static DpxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static DpxFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static DpxFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MINIMUM_HEADER_SIZE)
       throw new InvalidDataException("Data too small for a valid DPX file.");
 
-    var span = data.AsSpan();
+    var span = data;
 
     var rawMagic = BinaryPrimitives.ReadInt32BigEndian(span);
     bool isBigEndian;
@@ -93,7 +91,7 @@ public static class DpxReader {
     var pixelDataLength = data.Length - dataOffset;
     var pixelData = new byte[pixelDataLength > 0 ? pixelDataLength : 0];
     if (pixelDataLength > 0)
-      data.AsSpan(dataOffset, pixelDataLength).CopyTo(pixelData.AsSpan(0));
+      data.Slice(dataOffset, pixelDataLength).CopyTo(pixelData.AsSpan(0));
 
     return new DpxFile {
       Width = width,
@@ -106,5 +104,10 @@ public static class DpxReader {
       ImageDataOffset = dataOffset,
       PixelData = pixelData
     };
+    }
+
+  public static DpxFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

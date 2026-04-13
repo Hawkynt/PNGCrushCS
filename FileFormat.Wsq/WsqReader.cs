@@ -1,4 +1,5 @@
-using System;
+﻿using System;
+using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.Wsq;
@@ -28,10 +29,7 @@ public static class WsqReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static WsqFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static WsqFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static WsqFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_FILE_SIZE)
       throw new InvalidDataException("Data too small for a valid WSQ file.");
 
@@ -40,9 +38,15 @@ public static class WsqReader {
       throw new InvalidDataException($"Invalid WSQ signature: expected 0x{WsqMarker.SOI:X4}, got 0x{marker:X4}.");
 
     return _Parse(data);
+  
   }
 
-  private static WsqFile _Parse(byte[] data) {
+  public static WsqFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  private static WsqFile _Parse(ReadOnlySpan<byte> data) {
     var pos = 2; // Skip SOI
     var width = 0;
     var height = 0;
@@ -135,7 +139,7 @@ public static class WsqReader {
     };
   }
 
-  private static void _ParseSOF(byte[] data, ref int pos, out int width, out int height, out double scale, out double shift, out int ppi) {
+  private static void _ParseSOF(ReadOnlySpan<byte> data, ref int pos, out int width, out int height, out double scale, out double shift, out int ppi) {
     var len = WsqMarker.ReadUInt16BE(data, pos);
     var end = pos + len;
     pos += 2;
@@ -156,13 +160,9 @@ public static class WsqReader {
 
     // Read scale/shift if present
     if (pos + 8 <= end) {
-      scale = BitConverter.IsLittleEndian
-        ? BitConverter.ToSingle(_ReverseBytes(data, pos, 4), 0)
-        : BitConverter.ToSingle(data, pos);
+      scale = BinaryPrimitives.ReadSingleBigEndian(data[pos..]);
       pos += 4;
-      shift = BitConverter.IsLittleEndian
-        ? BitConverter.ToSingle(_ReverseBytes(data, pos, 4), 0)
-        : BitConverter.ToSingle(data, pos);
+      shift = BinaryPrimitives.ReadSingleBigEndian(data[pos..]);
       pos += 4;
     }
 
@@ -177,7 +177,7 @@ public static class WsqReader {
     pos = end;
   }
 
-  private static WsqQuantizer.QuantParams[] _ParseSOB(byte[] data, ref int pos, int numSubbands) {
+  private static WsqQuantizer.QuantParams[] _ParseSOB(ReadOnlySpan<byte> data, ref int pos, int numSubbands) {
     var len = WsqMarker.ReadUInt16BE(data, pos);
     var end = pos + len;
     pos += 2;
@@ -188,13 +188,9 @@ public static class WsqReader {
 
     var result = new WsqQuantizer.QuantParams[numSubbands];
     for (var i = 0; i < count && pos + 8 <= end; ++i) {
-      var binWidth = BitConverter.IsLittleEndian
-        ? BitConverter.ToSingle(_ReverseBytes(data, pos, 4), 0)
-        : BitConverter.ToSingle(data, pos);
+      var binWidth = BinaryPrimitives.ReadSingleBigEndian(data[pos..]);
       pos += 4;
-      var zeroBin = BitConverter.IsLittleEndian
-        ? BitConverter.ToSingle(_ReverseBytes(data, pos, 4), 0)
-        : BitConverter.ToSingle(data, pos);
+      var zeroBin = BinaryPrimitives.ReadSingleBigEndian(data[pos..]);
       pos += 4;
       result[i] = new(binWidth, zeroBin);
     }
@@ -207,7 +203,7 @@ public static class WsqReader {
     return result;
   }
 
-  private static WsqHuffman.HuffmanTable _ParseDHT(byte[] data, ref int pos) {
+  private static WsqHuffman.HuffmanTable _ParseDHT(ReadOnlySpan<byte> data, ref int pos) {
     var len = WsqMarker.ReadUInt16BE(data, pos);
     var end = pos + len;
     pos += 2;
@@ -230,7 +226,7 @@ public static class WsqReader {
     return new WsqHuffman.HuffmanTable { CodeLengths = codeLengths, Values = values };
   }
 
-  private static byte[] _ParseSOS(byte[] data, ref int pos) {
+  private static byte[] _ParseSOS(ReadOnlySpan<byte> data, ref int pos) {
     var len = WsqMarker.ReadUInt16BE(data, pos);
     var headerEnd = pos + len;
     pos += 2;
@@ -251,7 +247,7 @@ public static class WsqReader {
     // Extract scan data
     if (scanLen > 0 && pos + scanLen <= data.Length) {
       var scanData = new byte[scanLen];
-      data.AsSpan(pos, scanLen).CopyTo(scanData.AsSpan(0));
+      data.Slice(pos, scanLen).CopyTo(scanData);
       pos += scanLen;
       return scanData;
     }
@@ -267,26 +263,19 @@ public static class WsqReader {
     }
 
     var fallbackData = new byte[end - start];
-    data.AsSpan(start, fallbackData.Length).CopyTo(fallbackData.AsSpan(0));
+    data.Slice(start, fallbackData.Length).CopyTo(fallbackData);
     pos = end;
     return fallbackData;
   }
 
-  private static void _SkipSegment(byte[] data, ref int pos) {
+  private static void _SkipSegment(ReadOnlySpan<byte> data, ref int pos) {
     if (pos + 1 >= data.Length)
       return;
     var len = WsqMarker.ReadUInt16BE(data, pos);
     pos += len;
   }
 
-  private static int _ReadUInt8(byte[] data, ref int pos) => data[pos++];
-
-  private static byte[] _ReverseBytes(byte[] data, int offset, int count) {
-    var result = new byte[count];
-    for (var i = 0; i < count; ++i)
-      result[i] = data[offset + count - 1 - i];
-    return result;
-  }
+  private static int _ReadUInt8(ReadOnlySpan<byte> data, ref int pos) => data[pos++];
 
   private static WsqQuantizer.QuantParams[] _DefaultQuantParams(int count) {
     var result = new WsqQuantizer.QuantParams[count];

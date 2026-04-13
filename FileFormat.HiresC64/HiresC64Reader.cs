@@ -26,7 +26,21 @@ public static class HiresC64Reader {
     return FromBytes(ms.ToArray());
   }
 
-  public static HiresC64File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static HiresC64File FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < HiresC64File.ExpectedFileSize)
+      throw new InvalidDataException($"Data too small for a valid hires C64 file (expected {HiresC64File.ExpectedFileSize} bytes, got {data.Length}).");
+
+    if (data.Length != HiresC64File.ExpectedFileSize)
+      throw new InvalidDataException($"Invalid hires C64 file size (expected {HiresC64File.ExpectedFileSize} bytes, got {data.Length}).");
+
+    var bitmapData = new byte[HiresC64File.ExpectedFileSize];
+    data.Slice(0, HiresC64File.ExpectedFileSize).CopyTo(bitmapData.AsSpan(0));
+
+    return new() {
+      BitmapData = bitmapData,
+    };
+    }
 
   public static HiresC64File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

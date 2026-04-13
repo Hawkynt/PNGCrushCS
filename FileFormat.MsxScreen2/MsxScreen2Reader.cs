@@ -27,7 +27,35 @@ public static class MsxScreen2Reader {
     return FromBytes(ms.ToArray());
   }
 
-  public static MsxScreen2File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static MsxScreen2File FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < MsxScreen2File.VramDataSize)
+      throw new InvalidDataException($"Data too small for a valid MSX Screen 2 file: got {data.Length} bytes, need at least {MsxScreen2File.VramDataSize}.");
+
+    var hasBsave = data.Length >= MsxScreen2File.BsaveHeaderSize + MsxScreen2File.VramDataSize && data[0] == MsxScreen2File.BsaveMagic;
+    var rawOffset = hasBsave ? MsxScreen2File.BsaveHeaderSize : 0;
+
+    if (data.Length - rawOffset < MsxScreen2File.VramDataSize)
+      throw new InvalidDataException($"Data too small for MSX Screen 2 VRAM after header: got {data.Length - rawOffset} bytes, need {MsxScreen2File.VramDataSize}.");
+
+    var span = data[rawOffset..];
+
+    var patternGenerator = new byte[MsxScreen2File.PatternGeneratorSize];
+    span[..MsxScreen2File.PatternGeneratorSize].CopyTo(patternGenerator);
+
+    var colorTable = new byte[MsxScreen2File.ColorTableSize];
+    span.Slice(MsxScreen2File.PatternGeneratorSize, MsxScreen2File.ColorTableSize).CopyTo(colorTable);
+
+    var patternNameTable = new byte[MsxScreen2File.PatternNameTableSize];
+    span.Slice(MsxScreen2File.PatternGeneratorSize + MsxScreen2File.ColorTableSize, MsxScreen2File.PatternNameTableSize).CopyTo(patternNameTable);
+
+    return new() {
+      PatternGenerator = patternGenerator,
+      ColorTable = colorTable,
+      PatternNameTable = patternNameTable,
+      HasBsaveHeader = hasBsave,
+    };
+    }
 
   public static MsxScreen2File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

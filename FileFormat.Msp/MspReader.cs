@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Buffers.Binary;
 using System.IO;
 
@@ -27,15 +27,11 @@ public static class MspReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static MspFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static MspFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static MspFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < MspHeader.StructSize)
       throw new InvalidDataException("Data too small for a valid MSP file.");
 
-    var span = data.AsSpan();
-    var header = MspHeader.ReadFrom(span);
+    var header = MspHeader.ReadFrom(data);
 
     var version = _DetectVersion(header.Key1, header.Key2);
     if (version == null)
@@ -52,7 +48,7 @@ public static class MspReader {
       var expectedPixelBytes = bytesPerRow * height;
       pixelData = new byte[expectedPixelBytes];
       var available = Math.Min(expectedPixelBytes, data.Length - MspHeader.StructSize);
-      data.AsSpan(MspHeader.StructSize, available).CopyTo(pixelData.AsSpan(0));
+      data.Slice(MspHeader.StructSize, available).CopyTo(pixelData.AsSpan(0));
     } else {
       // V2: scan-line map at offset 32 (Height * uint16 LE values), then encoded scanlines
       var scanLineMapOffset = MspHeader.StructSize;
@@ -63,7 +59,7 @@ public static class MspReader {
 
       var scanLineLengths = new ushort[height];
       for (var i = 0; i < height; ++i)
-        scanLineLengths[i] = BinaryPrimitives.ReadUInt16LittleEndian(span[(scanLineMapOffset + i * 2)..]);
+        scanLineLengths[i] = BinaryPrimitives.ReadUInt16LittleEndian(data[(scanLineMapOffset + i * 2)..]);
 
       var dataOffset = scanLineMapOffset + scanLineMapSize;
       pixelData = new byte[bytesPerRow * height];
@@ -77,7 +73,7 @@ public static class MspReader {
         } else {
           var encodedScanline = new byte[scanLineLength];
           var available = Math.Min(scanLineLength, data.Length - dataOffset);
-          data.AsSpan(dataOffset, available).CopyTo(encodedScanline.AsSpan(0));
+          data.Slice(dataOffset, available).CopyTo(encodedScanline.AsSpan(0));
 
           var decompressed = MspRleCompressor.Decompress(encodedScanline, bytesPerRow);
           decompressed.AsSpan(0, bytesPerRow).CopyTo(pixelData.AsSpan(y * bytesPerRow));
@@ -93,6 +89,11 @@ public static class MspReader {
       Version = version.Value,
       PixelData = pixelData
     };
+  }
+
+  public static MspFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   private static MspVersion? _DetectVersion(ushort key1, ushort key2) {

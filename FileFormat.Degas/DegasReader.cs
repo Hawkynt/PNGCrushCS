@@ -29,14 +29,12 @@ public static class DegasReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static DegasFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static DegasFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static DegasFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < DegasHeader.StructSize)
       throw new InvalidDataException("Data too small for a valid DEGAS file.");
 
-    var span = data.AsSpan();
+    var span = data;
     var header = DegasHeader.ReadFrom(span);
 
     var rawResolution = header.Resolution;
@@ -52,14 +50,14 @@ public static class DegasReader {
     byte[] pixelData;
     if (isCompressed) {
       var compressedData = new byte[data.Length - DegasHeader.StructSize];
-      data.AsSpan(DegasHeader.StructSize, compressedData.Length).CopyTo(compressedData.AsSpan(0));
+      data.Slice(DegasHeader.StructSize, compressedData.Length).CopyTo(compressedData.AsSpan(0));
       pixelData = PackBitsCompressor.Decompress(compressedData, _UNCOMPRESSED_PIXEL_DATA_SIZE);
     } else {
       if (data.Length < DegasHeader.StructSize + _UNCOMPRESSED_PIXEL_DATA_SIZE)
         throw new InvalidDataException("Data too small for uncompressed DEGAS file.");
 
       pixelData = new byte[_UNCOMPRESSED_PIXEL_DATA_SIZE];
-      data.AsSpan(DegasHeader.StructSize, _UNCOMPRESSED_PIXEL_DATA_SIZE).CopyTo(pixelData.AsSpan(0));
+      data.Slice(DegasHeader.StructSize, _UNCOMPRESSED_PIXEL_DATA_SIZE).CopyTo(pixelData.AsSpan(0));
     }
 
     return new DegasFile {
@@ -70,6 +68,11 @@ public static class DegasReader {
       Palette = header.GetPaletteArray(),
       PixelData = pixelData
     };
+    }
+
+  public static DegasFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   private static (int Width, int Height) _GetDimensions(DegasResolution resolution) => resolution switch {

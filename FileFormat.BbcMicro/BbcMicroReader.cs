@@ -19,18 +19,14 @@ public static class BbcMicroReader {
     if (stream.CanSeek) {
       var data = new byte[stream.Length - stream.Position];
       stream.ReadExactly(data);
-      return FromBytes(data, mode);
+      return FromSpan(data, mode);
     }
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
-    return FromBytes(ms.ToArray(), mode);
+    return FromSpan(ms.ToArray(), mode);
   }
 
-  public static BbcMicroFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static BbcMicroFile FromBytes(byte[] data, BbcMicroMode mode = BbcMicroMode.Mode1) {
-    ArgumentNullException.ThrowIfNull(data);
-
+  public static BbcMicroFile FromSpan(ReadOnlySpan<byte> data, BbcMicroMode mode = BbcMicroMode.Mode1) {
     var expectedSize = BbcMicroFile.GetExpectedScreenSize(mode);
     if (data.Length < expectedSize)
       throw new InvalidDataException($"Data too small for a valid BBC Micro mode {(int)mode} screen dump. Expected {expectedSize} bytes, got {data.Length}.");
@@ -42,7 +38,7 @@ public static class BbcMicroReader {
     var height = BbcMicroFile.FixedHeight;
 
     // Convert from character-block layout to linear scanline order
-    var linearData = BbcMicroLayoutConverter.CharacterBlockToLinear(data, width, height, mode);
+    var linearData = BbcMicroLayoutConverter.CharacterBlockToLinear(data.ToArray(), width, height, mode);
 
     return new() {
       Width = width,
@@ -50,5 +46,10 @@ public static class BbcMicroReader {
       Mode = mode,
       PixelData = linearData
     };
+  }
+
+  public static BbcMicroFile FromBytes(byte[] data, BbcMicroMode mode = BbcMicroMode.Mode1) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data, mode);
   }
 }

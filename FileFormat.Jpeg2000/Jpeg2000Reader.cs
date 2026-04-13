@@ -53,20 +53,24 @@ public static class Jpeg2000Reader {
     return FromBytes(ms.ToArray());
   }
 
-  public static Jpeg2000File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
   public static Jpeg2000File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  public static Jpeg2000File FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MINIMUM_SIZE)
       throw new InvalidDataException("Data too small for a valid JPEG 2000 file.");
 
+    var dataArray = data.ToArray();
+
     // Check for JP2 container (box-based)
-    if (_IsJp2Container(data))
-      return _ParseJp2(data);
+    if (_IsJp2Container(dataArray))
+      return _ParseJp2(dataArray);
 
     // Check for raw J2K codestream
     if (data.Length >= 2 && data[0] == 0xFF && data[1] == 0x4F)
-      return _ParseCodestream(data, 0, data.Length);
+      return _ParseCodestream(dataArray, 0, dataArray.Length);
 
     throw new InvalidDataException("Invalid JPEG 2000 signature: expected JP2 box or J2K SOC marker.");
   }

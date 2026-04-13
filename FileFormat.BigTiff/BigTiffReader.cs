@@ -28,10 +28,7 @@ public static class BigTiffReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static BigTiffFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static BigTiffFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static BigTiffFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < BigTiffFile.MinimumFileSize)
       throw new InvalidDataException($"Data too small for BigTIFF: expected at least {BigTiffFile.MinimumFileSize} bytes, got {data.Length}.");
 
@@ -41,7 +38,7 @@ public static class BigTiffReader {
     ulong ifdOffset;
 
     if (!isBigEndian) {
-      var header = BigTiffFileHeader.ReadFrom(data.AsSpan(0, BigTiffFileHeader.StructSize));
+      var header = BigTiffFileHeader.ReadFrom(data[..BigTiffFileHeader.StructSize]);
       version = header.Version;
       offsetSize = header.OffsetSize;
       reserved = header.Reserved;
@@ -98,7 +95,12 @@ public static class BigTiffReader {
     };
   }
 
-  private static bool _ReadByteOrder(byte[] data) {
+  public static BigTiffFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  private static bool _ReadByteOrder(ReadOnlySpan<byte> data) {
     if (data[0] == 0x49 && data[1] == 0x49)
       return false;
     if (data[0] == 0x4D && data[1] == 0x4D)
@@ -106,22 +108,22 @@ public static class BigTiffReader {
     throw new InvalidDataException($"Invalid byte order mark: 0x{data[0]:X2}{data[1]:X2}.");
   }
 
-  private static ushort _ReadUInt16(byte[] data, int offset, bool bigEndian) {
-    var span = data.AsSpan(offset, 2);
+  private static ushort _ReadUInt16(ReadOnlySpan<byte> data, int offset, bool bigEndian) {
+    var span = data.Slice(offset, 2);
     return bigEndian ? BinaryPrimitives.ReadUInt16BigEndian(span) : BinaryPrimitives.ReadUInt16LittleEndian(span);
   }
 
-  private static uint _ReadUInt32(byte[] data, int offset, bool bigEndian) {
-    var span = data.AsSpan(offset, 4);
+  private static uint _ReadUInt32(ReadOnlySpan<byte> data, int offset, bool bigEndian) {
+    var span = data.Slice(offset, 4);
     return bigEndian ? BinaryPrimitives.ReadUInt32BigEndian(span) : BinaryPrimitives.ReadUInt32LittleEndian(span);
   }
 
-  private static ulong _ReadUInt64(byte[] data, int offset, bool bigEndian) {
-    var span = data.AsSpan(offset, 8);
+  private static ulong _ReadUInt64(ReadOnlySpan<byte> data, int offset, bool bigEndian) {
+    var span = data.Slice(offset, 8);
     return bigEndian ? BinaryPrimitives.ReadUInt64BigEndian(span) : BinaryPrimitives.ReadUInt64LittleEndian(span);
   }
 
-  private static (BigTiffFile File, ulong NextIfdOffset) _ParseIfd(byte[] data, int ifdOffset, bool isBigEndian) {
+  private static (BigTiffFile File, ulong NextIfdOffset) _ParseIfd(ReadOnlySpan<byte> data, int ifdOffset, bool isBigEndian) {
     var entryCount = _ReadUInt64(data, ifdOffset, isBigEndian);
     var pos = ifdOffset + 8;
 
@@ -197,7 +199,7 @@ public static class BigTiffReader {
 
     var pixelData = new byte[expectedDataSize];
     if ((int)stripOffset < data.Length)
-      data.AsSpan((int)stripOffset, Math.Max(0, copyLength)).CopyTo(pixelData.AsSpan(0));
+      data.Slice((int)stripOffset, Math.Max(0, copyLength)).CopyTo(pixelData);
 
     var file = new BigTiffFile {
       Width = width,
@@ -212,7 +214,7 @@ public static class BigTiffReader {
     return (file, nextIfdOffset);
   }
 
-  private static ulong _ReadTagValue(byte[] data, int valueOffset, ushort type, ulong count, bool bigEndian) {
+  private static ulong _ReadTagValue(ReadOnlySpan<byte> data, int valueOffset, ushort type, ulong count, bool bigEndian) {
     var typeSize = type switch {
       BigTiffFile.TypeShort => 2UL,
       BigTiffFile.TypeLong => 4UL,

@@ -25,10 +25,8 @@ public static class SiemensBmxReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static SiemensBmxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static SiemensBmxFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static SiemensBmxFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < SiemensBmxFile.HeaderSize)
       throw new InvalidDataException("Data too small for a valid SiemensBmx file.");
 
@@ -48,12 +46,17 @@ public static class SiemensBmxReader {
     var pixelData = new byte[pixelBytes];
     var available = Math.Min(pixelBytes, data.Length - SiemensBmxFile.HeaderSize);
     if (available > 0)
-      data.AsSpan(SiemensBmxFile.HeaderSize, available).CopyTo(pixelData.AsSpan(0));
+      data.Slice(SiemensBmxFile.HeaderSize, available).CopyTo(pixelData.AsSpan(0));
 
     return new() {
       Width = width,
       Height = height,
       PixelData = pixelData,
     };
+  }
+
+  public static SiemensBmxFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

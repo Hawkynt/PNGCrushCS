@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.AttGroup4;
@@ -26,18 +27,15 @@ public static class AttGroup4Reader {
     return FromBytes(ms.ToArray());
   }
 
-  public static AttGroup4File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static AttGroup4File FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static AttGroup4File FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < AttGroup4File.MinFileSize)
       throw new InvalidDataException($"Data too small for a valid ATT file (need at least {AttGroup4File.MinFileSize} bytes, got {data.Length}).");
 
     if (data[0] != AttGroup4File.Magic[0] || data[1] != AttGroup4File.Magic[1] || data[2] != AttGroup4File.Magic[2] || data[3] != AttGroup4File.Magic[3])
       throw new InvalidDataException("Invalid ATT magic bytes.");
 
-    var width = BitConverter.ToUInt16(data, 4);
-    var height = BitConverter.ToUInt16(data, 6);
+    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
+    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid ATT dimensions: {width}x{height}.");
@@ -48,12 +46,17 @@ public static class AttGroup4Reader {
       throw new InvalidDataException("ATT file truncated: not enough pixel data.");
 
     var pixelData = new byte[pixelDataSize];
-    data.AsSpan(AttGroup4File.HeaderSize, pixelDataSize).CopyTo(pixelData.AsSpan(0));
+    data.Slice(AttGroup4File.HeaderSize, pixelDataSize).CopyTo(pixelData.AsSpan(0));
 
     return new() {
       Width = width,
       Height = height,
       PixelData = pixelData,
     };
+  }
+
+  public static AttGroup4File FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

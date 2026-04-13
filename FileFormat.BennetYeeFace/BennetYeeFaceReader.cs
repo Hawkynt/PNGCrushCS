@@ -26,14 +26,12 @@ public static class BennetYeeFaceReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static BennetYeeFaceFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static BennetYeeFaceFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static BennetYeeFaceFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < BennetYeeFaceHeader.StructSize)
       throw new InvalidDataException("Data too small for a valid YBM file.");
 
-    var header = BennetYeeFaceHeader.ReadFrom(data.AsSpan());
+    var header = BennetYeeFaceHeader.ReadFrom(data);
     var width = (int)header.Width;
     var height = (int)header.Height;
 
@@ -49,12 +47,17 @@ public static class BennetYeeFaceReader {
       throw new InvalidDataException($"Data too small for pixel data: expected {BennetYeeFaceHeader.StructSize + expectedPixelBytes} bytes, got {data.Length}.");
 
     var pixelData = new byte[expectedPixelBytes];
-    data.AsSpan(BennetYeeFaceHeader.StructSize, expectedPixelBytes).CopyTo(pixelData.AsSpan(0));
+    data.Slice(BennetYeeFaceHeader.StructSize, expectedPixelBytes).CopyTo(pixelData);
 
     return new BennetYeeFaceFile {
       Width = width,
       Height = height,
       PixelData = pixelData
     };
+  }
+
+  public static BennetYeeFaceFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

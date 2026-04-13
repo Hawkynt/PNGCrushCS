@@ -26,7 +26,16 @@ public static class CpcSpriteReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static CpcSpriteFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static CpcSpriteFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != CpcSpriteFile.ExpectedFileSize)
+      throw new InvalidDataException($"Invalid CPC sprite data size: expected exactly {CpcSpriteFile.ExpectedFileSize} bytes, got {data.Length}.");
+
+    var rawData = new byte[CpcSpriteFile.ExpectedFileSize];
+    data.Slice(0, CpcSpriteFile.ExpectedFileSize).CopyTo(rawData);
+
+    return new CpcSpriteFile { RawData = rawData };
+    }
 
   public static CpcSpriteFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

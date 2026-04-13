@@ -26,8 +26,7 @@ public static class CcittReader {
     return FromBytes(ms.ToArray(), width, height, format);
   }
 
-  public static CcittFile FromBytes(byte[] data, int width, int height, CcittFormat format) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static CcittFile FromSpan(ReadOnlySpan<byte> data, int width, int height, CcittFormat format) {
     if (data.Length < 1)
       throw new InvalidDataException("Data too small for valid CCITT compressed data.");
 
@@ -37,9 +36,12 @@ public static class CcittReader {
     if (height <= 0)
       throw new ArgumentOutOfRangeException(nameof(height), "Height must be positive.");
 
+    // Decoders require byte[], so materialize once
+    var bytes = data.ToArray();
+
     var pixelData = format switch {
-      CcittFormat.Group3_1D => CcittG3Decoder.Decode(data, width, height),
-      CcittFormat.Group4 => CcittG4Decoder.Decode(data, width, height),
+      CcittFormat.Group3_1D => CcittG3Decoder.Decode(bytes, width, height),
+      CcittFormat.Group4 => CcittG4Decoder.Decode(bytes, width, height),
       _ => throw new NotSupportedException($"CCITT format {format} is not supported.")
     };
 
@@ -49,5 +51,10 @@ public static class CcittReader {
       Format = format,
       PixelData = pixelData
     };
+  }
+
+  public static CcittFile FromBytes(byte[] data, int width, int height, CcittFormat format) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data, width, height, format);
   }
 }

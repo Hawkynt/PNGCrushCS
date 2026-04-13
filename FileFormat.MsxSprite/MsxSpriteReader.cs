@@ -26,7 +26,16 @@ public static class MsxSpriteReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static MsxSpriteFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static MsxSpriteFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != MsxSpriteFile.ExpectedFileSize)
+      throw new InvalidDataException($"Invalid MSX sprite data size: expected exactly {MsxSpriteFile.ExpectedFileSize} bytes, got {data.Length}.");
+
+    var rawData = new byte[MsxSpriteFile.ExpectedFileSize];
+    data.Slice(0, MsxSpriteFile.ExpectedFileSize).CopyTo(rawData);
+
+    return new MsxSpriteFile { RawData = rawData };
+    }
 
   public static MsxSpriteFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

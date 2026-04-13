@@ -26,13 +26,11 @@ public static class CineonReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static CineonFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static CineonFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < CineonHeader.StructSize)
       throw new InvalidDataException("Data too small for a valid Cineon file.");
 
-    var span = data.AsSpan();
-    var header = CineonHeader.ReadFrom(span);
+    var header = CineonHeader.ReadFrom(data);
 
     if (header.Magic != CineonHeader.MagicNumber)
       throw new InvalidDataException("Invalid Cineon magic number.");
@@ -44,7 +42,7 @@ public static class CineonReader {
     var pixelDataLength = data.Length - dataOffset;
     var pixelData = new byte[pixelDataLength];
     if (pixelDataLength > 0)
-      data.AsSpan(dataOffset, pixelDataLength).CopyTo(pixelData.AsSpan(0));
+      data.Slice(dataOffset, pixelDataLength).CopyTo(pixelData);
 
     return new CineonFile {
       Width = header.PixelsPerLine,
@@ -54,5 +52,10 @@ public static class CineonReader {
       ImageDataOffset = dataOffset,
       PixelData = pixelData
     };
+  }
+
+  public static CineonFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

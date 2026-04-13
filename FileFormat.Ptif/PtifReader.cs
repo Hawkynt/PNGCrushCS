@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Buffers.Binary;
 using System.IO;
 
@@ -47,10 +47,7 @@ public static class PtifReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static PtifFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static PtifFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static PtifFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_FILE_SIZE)
       throw new InvalidDataException("Data too small for a valid PTIF/TIFF file.");
 
@@ -64,9 +61,15 @@ public static class PtifReader {
       throw new InvalidDataException($"Invalid first IFD offset: {ifdOffset}.");
 
     return _ParseIfd(data, ifdOffset, isLittleEndian);
+  
   }
 
-  private static bool _DetectByteOrder(byte[] data) {
+  public static PtifFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  private static bool _DetectByteOrder(ReadOnlySpan<byte> data) {
     var bom = (char)data[0];
     var bom2 = (char)data[1];
     if (bom == 'I' && bom2 == 'I')
@@ -77,7 +80,7 @@ public static class PtifReader {
     throw new InvalidDataException($"Invalid TIFF byte order marker: 0x{data[0]:X2} 0x{data[1]:X2}.");
   }
 
-  private static PtifFile _ParseIfd(byte[] data, int ifdOffset, bool isLittleEndian) {
+  private static PtifFile _ParseIfd(ReadOnlySpan<byte> data, int ifdOffset, bool isLittleEndian) {
     var entryCount = _ReadUInt16(data, ifdOffset, isLittleEndian);
     var pos = ifdOffset + 2;
 
@@ -151,7 +154,7 @@ public static class PtifReader {
       if (srcOffset + toCopy > data.Length)
         throw new InvalidDataException($"Strip {s} extends beyond file (offset={srcOffset}, count={toCopy}, file={data.Length}).");
 
-      data.AsSpan(srcOffset, toCopy).CopyTo(pixelData.AsSpan(destOffset));
+      data.Slice(srcOffset, toCopy).CopyTo(pixelData.AsSpan(destOffset));
       destOffset += toCopy;
     }
 
@@ -164,7 +167,7 @@ public static class PtifReader {
     };
   }
 
-  private static uint _ReadTagValue(byte[] data, ushort type, uint count, int valueOffset, bool isLittleEndian) {
+  private static uint _ReadTagValue(ReadOnlySpan<byte> data, ushort type, uint count, int valueOffset, bool isLittleEndian) {
     if (count == 1) {
       return type switch {
         _TYPE_SHORT => _ReadUInt16(data, valueOffset, isLittleEndian),
@@ -182,7 +185,7 @@ public static class PtifReader {
     };
   }
 
-  private static uint[] _ReadTagArray(byte[] data, ushort type, uint count, int valueOffset, bool isLittleEndian) {
+  private static uint[] _ReadTagArray(ReadOnlySpan<byte> data, ushort type, uint count, int valueOffset, bool isLittleEndian) {
     var elementSize = type == _TYPE_SHORT ? 2 : 4;
     var totalBytes = count * (uint)elementSize;
 
@@ -202,13 +205,13 @@ public static class PtifReader {
     return result;
   }
 
-  private static ushort _ReadUInt16(byte[] data, int offset, bool isLittleEndian) =>
+  private static ushort _ReadUInt16(ReadOnlySpan<byte> data, int offset, bool isLittleEndian) =>
     isLittleEndian
-      ? BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(offset))
-      : BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(offset));
+      ? BinaryPrimitives.ReadUInt16LittleEndian(data[offset..])
+      : BinaryPrimitives.ReadUInt16BigEndian(data[offset..]);
 
-  private static uint _ReadUInt32(byte[] data, int offset, bool isLittleEndian) =>
+  private static uint _ReadUInt32(ReadOnlySpan<byte> data, int offset, bool isLittleEndian) =>
     isLittleEndian
-      ? BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(offset))
-      : BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(offset));
+      ? BinaryPrimitives.ReadUInt32LittleEndian(data[offset..])
+      : BinaryPrimitives.ReadUInt32BigEndian(data[offset..]);
 }

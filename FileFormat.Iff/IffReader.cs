@@ -32,17 +32,20 @@ public static class IffReader {
 
   public static IffFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  public static IffFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < 12)
       throw new InvalidDataException("Data is too small to be a valid IFF file.");
 
-    var span = data.AsSpan();
-    var outerHeader = IffChunkHeader.ReadFrom(span);
+    var outerHeader = IffChunkHeader.ReadFrom(data);
     var outerId = outerHeader.ChunkId.ToString();
     if (!_GroupIds.Contains(outerId))
       throw new InvalidDataException($"Invalid IFF signature: expected FORM, LIST, or CAT but got '{outerId}'.");
 
-    var formType = FourCC.ReadFrom(span[IffChunkHeader.StructSize..]);
-    var chunks = _ParseChunks(span, IffChunkHeader.StructSize + 4, Math.Min(data.Length, IffChunkHeader.StructSize + outerHeader.Size));
+    var formType = FourCC.ReadFrom(data[IffChunkHeader.StructSize..]);
+    var chunks = _ParseChunks(data, IffChunkHeader.StructSize + 4, Math.Min(data.Length, IffChunkHeader.StructSize + outerHeader.Size));
 
     return new IffFile { FormType = formType, Chunks = chunks };
   }

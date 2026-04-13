@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 
@@ -27,10 +27,7 @@ public static class KoalaCompressedReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static KoalaCompressedFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static KoalaCompressedFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static KoalaCompressedFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < KoalaCompressedFile.MinFileSize)
       throw new InvalidDataException($"Data too small for a valid compressed Koala file (minimum {KoalaCompressedFile.MinFileSize} bytes, got {data.Length}).");
 
@@ -63,9 +60,15 @@ public static class KoalaCompressedReader {
       ColorRam = colorRam,
       BackgroundColor = backgroundColor,
     };
+  
   }
 
-  private static byte[] _DecompressRle(byte[] data, int startOffset) {
+  public static KoalaCompressedFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  private static byte[] _DecompressRle(ReadOnlySpan<byte> data, int startOffset) {
     var result = new List<byte>(KoalaCompressedFile.DecompressedDataSize);
     var i = startOffset;
     while (i < data.Length) {

@@ -1,18 +1,17 @@
 ﻿using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Ccitt;
 
 /// <summary>In-memory representation of a CCITT-compressed bi-level image.</summary>
-public sealed class CcittFile : IImageFileFormat<CcittFile> {
+public sealed class CcittFile :
+  IImageFormatReader<CcittFile>, IImageToRawImage<CcittFile>,
+  IImageFromRawImage<CcittFile>, IImageFormatWriter<CcittFile> {
 
-  static string IImageFileFormat<CcittFile>.PrimaryExtension => ".g3";
-  static string[] IImageFileFormat<CcittFile>.FileExtensions => [".g3", ".g4", ".ccitt"];
-  static CcittFile IImageFileFormat<CcittFile>.FromBytes(byte[] data) => throw new NotSupportedException("CCITT files require external width, height, and format parameters. Use CcittReader.FromFile(FileInfo, int, int, CcittFormat) instead.");
-  static CcittFile IImageFileFormat<CcittFile>.FromFile(FileInfo file) => throw new NotSupportedException("CCITT files require external width, height, and format parameters. Use CcittReader.FromFile(FileInfo, int, int, CcittFormat) instead.");
-  static RawImage IImageFileFormat<CcittFile>.ToRawImage(CcittFile file) => file.ToRawImage();
-  static byte[] IImageFileFormat<CcittFile>.ToBytes(CcittFile file) => CcittWriter.ToBytes(file);
+  static string IImageFormatMetadata<CcittFile>.PrimaryExtension => ".g3";
+  static string[] IImageFormatMetadata<CcittFile>.FileExtensions => [".g3", ".g4", ".ccitt"];
+  static CcittFile IImageFormatReader<CcittFile>.FromSpan(ReadOnlySpan<byte> data) => throw new NotSupportedException("CCITT files require external width, height, and format parameters. Use CcittReader.FromBytes(byte[], int, int, CcittFormat) instead.");
+  static byte[] IImageFormatWriter<CcittFile>.ToBytes(CcittFile file) => CcittWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
   public CcittFormat Format { get; init; }
@@ -22,11 +21,11 @@ public sealed class CcittFile : IImageFileFormat<CcittFile> {
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
-  public RawImage ToRawImage() => new() {
-    Width = this.Width,
-    Height = this.Height,
+  public static RawImage ToRawImage(CcittFile file) => new() {
+    Width = file.Width,
+    Height = file.Height,
     Format = Core.PixelFormat.Indexed1,
-    PixelData = this.PixelData[..],
+    PixelData = file.PixelData[..],
     Palette = _BlackWhitePalette[..],
     PaletteCount = 2,
   };

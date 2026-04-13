@@ -26,7 +26,33 @@ public static class RembrandtReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static RembrandtFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static RembrandtFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < RembrandtFile.MinFileSize)
+      throw new InvalidDataException($"Data too small for a valid Rembrandt file (minimum {RembrandtFile.MinFileSize} bytes, got {data.Length}).");
+
+    // Read dimensions (BE u16)
+    var width = (ushort)((data[0] << 8) | data[1]);
+    var height = (ushort)((data[2] << 8) | data[3]);
+
+    if (width == 0 || height == 0)
+      throw new InvalidDataException($"Invalid Rembrandt dimensions: {width}x{height}.");
+
+    // Read pixel data
+    var pixelOffset = RembrandtFile.HeaderSize;
+    var expectedPixelBytes = width * height * 2;
+    var available = data.Length - pixelOffset;
+    var copyLen = Math.Min(expectedPixelBytes, available);
+
+    var pixelData = new byte[expectedPixelBytes];
+    data.Slice(pixelOffset, copyLen).CopyTo(pixelData);
+
+    return new RembrandtFile {
+      Width = width,
+      Height = height,
+      PixelData = pixelData,
+    };
+    }
 
   public static RembrandtFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Buffers.Binary;
 using System.IO;
 using System.IO.Compression;
@@ -34,20 +34,17 @@ public static class PdnReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static PdnFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static PdnFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static PdnFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < HEADER_SIZE)
       throw new InvalidDataException($"Data too small for a valid PDN file: expected at least {HEADER_SIZE} bytes, got {data.Length}.");
 
     if (data[0] != _MAGIC[0] || data[1] != _MAGIC[1] || data[2] != _MAGIC[2] || data[3] != _MAGIC[3])
-      throw new InvalidDataException($"Invalid PDN magic: expected 'PDN3', got '{Encoding.ASCII.GetString(data, 0, 4)}'.");
+      throw new InvalidDataException($"Invalid PDN magic: expected 'PDN3', got '{Encoding.ASCII.GetString(data.Slice(0, 4))}'.");
 
-    var version = BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(4));
+    var version = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
     // reserved at offset 6
-    var width = (int)BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(8));
-    var height = (int)BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(12));
+    var width = (int)BinaryPrimitives.ReadUInt32LittleEndian(data[8..]);
+    var height = (int)BinaryPrimitives.ReadUInt32LittleEndian(data[12..]);
 
     if (width <= 0)
       throw new InvalidDataException($"Invalid PDN width: {width}.");
@@ -58,7 +55,9 @@ public static class PdnReader {
     byte[] pixelData;
 
     if (data.Length > HEADER_SIZE) {
-      using var compressedStream = new MemoryStream(data, HEADER_SIZE, data.Length - HEADER_SIZE);
+      // GZipStream requires a Stream backed by byte[]
+      var bytes = data.ToArray();
+      using var compressedStream = new MemoryStream(bytes, HEADER_SIZE, bytes.Length - HEADER_SIZE);
       using var gzipStream = new GZipStream(compressedStream, CompressionMode.Decompress);
       using var decompressed = new MemoryStream();
       gzipStream.CopyTo(decompressed);
@@ -76,5 +75,11 @@ public static class PdnReader {
       Height = height,
       PixelData = pixelData,
     };
+  
+  }
+
+  public static PdnFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

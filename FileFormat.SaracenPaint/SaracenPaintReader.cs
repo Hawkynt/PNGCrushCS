@@ -26,7 +26,33 @@ public static class SaracenPaintReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static SaracenPaintFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static SaracenPaintFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < SaracenPaintFile.ExpectedFileSize)
+      throw new InvalidDataException($"Data too small for a valid Saracen Paint file (expected {SaracenPaintFile.ExpectedFileSize} bytes, got {data.Length}).");
+
+    if (data.Length != SaracenPaintFile.ExpectedFileSize)
+      throw new InvalidDataException($"Invalid Saracen Paint file size (expected {SaracenPaintFile.ExpectedFileSize} bytes, got {data.Length}).");
+
+    var offset = 0;
+
+    var loadAddress = (ushort)(data[offset] | (data[offset + 1] << 8));
+    offset += SaracenPaintFile.LoadAddressSize;
+
+    // Layout: loadAddress(2) + screenRam(1000) + bitmapData(8000) + padding(7)
+    var screenRam = new byte[SaracenPaintFile.ScreenRamSize];
+    data.Slice(offset, SaracenPaintFile.ScreenRamSize).CopyTo(screenRam.AsSpan(0));
+    offset += SaracenPaintFile.ScreenRamSize;
+
+    var bitmapData = new byte[SaracenPaintFile.BitmapDataSize];
+    data.Slice(offset, SaracenPaintFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
+
+    return new() {
+      LoadAddress = loadAddress,
+      ScreenRam = screenRam,
+      BitmapData = bitmapData,
+    };
+    }
 
   public static SaracenPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

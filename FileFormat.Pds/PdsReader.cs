@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Text;
 
@@ -30,18 +30,15 @@ public static class PdsReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static PdsFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static PdsFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static PdsFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_HEADER_SIZE)
       throw new InvalidDataException("Data too small for a valid PDS file.");
 
-    var prefix = Encoding.ASCII.GetString(data, 0, Math.Min(_MAGIC.Length, data.Length));
+    var prefix = Encoding.ASCII.GetString(data.Slice(0, Math.Min(_MAGIC.Length, data.Length)));
     if (!prefix.Equals(_MAGIC, StringComparison.Ordinal))
       throw new InvalidDataException("Invalid PDS signature: header must start with 'PDS_VERSION_ID'.");
 
-    var (labels, imageOffset) = PdsHeaderParser.Parse(data);
+    var (labels, imageOffset) = PdsHeaderParser.Parse(data.ToArray());
 
     var width = _GetIntLabel(labels, "LINE_SAMPLES");
     var height = _GetIntLabel(labels, "LINES");
@@ -60,7 +57,7 @@ public static class PdsReader {
 
     var pixelData = new byte[expectedPixelBytes];
     if (copyLen > 0)
-      data.AsSpan(imageOffset, copyLen).CopyTo(pixelData.AsSpan(0));
+      data.Slice(imageOffset, copyLen).CopyTo(pixelData.AsSpan(0));
 
     return new PdsFile {
       Width = width,
@@ -72,6 +69,11 @@ public static class PdsReader {
       PixelData = pixelData,
       Labels = labels
     };
+  }
+
+  public static PdsFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   private static int _GetIntLabel(System.Collections.Generic.Dictionary<string, string> labels, string key) {

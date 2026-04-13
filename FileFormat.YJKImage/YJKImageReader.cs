@@ -26,7 +26,16 @@ public static class YJKImageReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static YJKImageFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static YJKImageFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != YJKImageFile.ExpectedFileSize)
+      throw new InvalidDataException($"YJK image file must be exactly {YJKImageFile.ExpectedFileSize} bytes, got {data.Length}.");
+
+    var pixels = new byte[YJKImageFile.ExpectedFileSize];
+    data.Slice(0, YJKImageFile.ExpectedFileSize).CopyTo(pixels);
+
+    return new() { PixelData = pixels };
+    }
 
   public static YJKImageFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

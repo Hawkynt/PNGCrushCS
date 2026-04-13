@@ -33,14 +33,12 @@ public static class FliReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static FliFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static FliFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static FliFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < FliHeader.StructSize)
       throw new InvalidDataException("Data is too small to be a valid FLI/FLC file.");
 
-    var span = data.AsSpan();
+    var span = data;
     var header = FliHeader.ReadFrom(span);
 
     if (header.Magic != _FLI_MAGIC && header.Magic != _FLC_MAGIC)
@@ -70,7 +68,7 @@ public static class FliReader {
         var dataSize = Math.Max(0, chunkSize - 6);
         var chunkData = new byte[dataSize];
         if (dataSize > 0 && chunkOffset + 6 + dataSize <= data.Length)
-          data.AsSpan(chunkOffset + 6, dataSize).CopyTo(chunkData.AsSpan(0));
+          data.Slice(chunkOffset + 6, dataSize).CopyTo(chunkData.AsSpan(0));
 
         chunks.Add(new FliFrameChunk { ChunkType = chunkType, Data = chunkData });
 
@@ -96,6 +94,11 @@ public static class FliReader {
       Palette = palette,
       Frames = frames
     };
+    }
+
+  public static FliFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   private static byte[] _ParseColor256(byte[] data) {

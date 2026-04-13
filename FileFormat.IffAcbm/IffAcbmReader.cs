@@ -31,24 +31,24 @@ public static class IffAcbmReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static IffAcbmFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
   public static IffAcbmFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  public static IffAcbmFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_IFF_SIZE)
       throw new InvalidDataException("Data too small for a valid IFF ACBM file.");
 
-    var span = data.AsSpan();
-
-    var formId = Encoding.ASCII.GetString(data, 0, 4);
+    var formId = Encoding.ASCII.GetString(data.Slice(0, 4));
     if (formId != "FORM")
       throw new InvalidDataException($"Invalid IFF magic: expected 'FORM', got '{formId}'.");
 
-    var formType = Encoding.ASCII.GetString(data, 8, 4);
+    var formType = Encoding.ASCII.GetString(data.Slice(8, 4));
     if (formType != "ACBM")
       throw new InvalidDataException($"Invalid IFF form type: expected 'ACBM', got '{formType}'.");
 
-    var formSize = BinaryPrimitives.ReadInt32BigEndian(span[4..]);
+    var formSize = BinaryPrimitives.ReadInt32BigEndian(data[4..]);
 
     // Parse chunks
     ushort width = 0, height = 0;
@@ -64,8 +64,8 @@ public static class IffAcbmReader {
     var endOffset = Math.Min(8 + formSize, data.Length);
 
     while (offset + 8 <= endOffset) {
-      var chunkId = Encoding.ASCII.GetString(data, offset, 4);
-      var chunkSize = BinaryPrimitives.ReadInt32BigEndian(span[(offset + 4)..]);
+      var chunkId = Encoding.ASCII.GetString(data.Slice(offset, 4));
+      var chunkSize = BinaryPrimitives.ReadInt32BigEndian(data[(offset + 4)..]);
       var chunkDataOffset = offset + 8;
 
       if (chunkDataOffset + chunkSize > data.Length)
@@ -74,7 +74,7 @@ public static class IffAcbmReader {
       switch (chunkId) {
         case "BMHD":
           if (chunkSize >= _BMHD_SIZE) {
-            var bmhd = span[chunkDataOffset..];
+            var bmhd = data[chunkDataOffset..];
             width = BinaryPrimitives.ReadUInt16BigEndian(bmhd);
             height = BinaryPrimitives.ReadUInt16BigEndian(bmhd[2..]);
             // skip xPos (4), yPos (6)
@@ -90,11 +90,11 @@ public static class IffAcbmReader {
           break;
         case "CMAP":
           cmap = new byte[chunkSize];
-          span.Slice(chunkDataOffset, chunkSize).CopyTo(cmap);
+          data.Slice(chunkDataOffset, chunkSize).CopyTo(cmap);
           break;
         case "ABIT":
           abit = new byte[chunkSize];
-          span.Slice(chunkDataOffset, chunkSize).CopyTo(abit);
+          data.Slice(chunkDataOffset, chunkSize).CopyTo(abit);
           break;
       }
 

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 
 namespace FileFormat.Zx81;
@@ -32,13 +32,16 @@ public static class Zx81Reader {
     return new() { PixelData = buffer };
   }
 
-  public static Zx81File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static Zx81File FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static Zx81File FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length != Zx81File.FileSize)
       throw new InvalidDataException($"Invalid Zx81 data size: expected exactly {Zx81File.FileSize} bytes, got {data.Length}.");
 
-    return new() { PixelData = data[..Zx81File.FileSize] };
+    return new() { PixelData = data[..Zx81File.FileSize].ToArray() };
+  
+  }
+
+  public static Zx81File FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

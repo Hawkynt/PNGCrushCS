@@ -26,10 +26,8 @@ public static class SbigCcdReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static SbigCcdFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static SbigCcdFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static SbigCcdFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < SbigCcdFile.HeaderSize)
       throw new InvalidDataException($"Data too small for a valid SBIG CCD file: expected at least {SbigCcdFile.HeaderSize} bytes, got {data.Length}.");
 
@@ -46,12 +44,17 @@ public static class SbigCcdReader {
       throw new InvalidDataException($"Data too small for pixel data: expected {SbigCcdFile.HeaderSize + expectedPixelBytes} bytes, got {data.Length}.");
 
     var pixelData = new byte[expectedPixelBytes];
-    data.AsSpan(SbigCcdFile.HeaderSize, expectedPixelBytes).CopyTo(pixelData.AsSpan(0));
+    data.Slice(SbigCcdFile.HeaderSize, expectedPixelBytes).CopyTo(pixelData.AsSpan(0));
 
     return new SbigCcdFile {
       Width = width,
       Height = height,
       PixelData = pixelData,
     };
+    }
+
+  public static SbigCcdFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

@@ -35,11 +35,8 @@ public static class ApngReader {
     return FromBytes(ms.ToArray());
   }
 
-  /// <summary>Read an APNG from a byte array.</summary>
-  public static ApngFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static ApngFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  /// <summary>Read an APNG from a span.</summary>
+  public static ApngFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < 8 + 25)
       throw new InvalidDataException("Data too short to be a valid APNG file.");
 
@@ -58,14 +55,14 @@ public static class ApngReader {
     _FrameBuilder? currentFrame = null;
 
     while (offset + 8 <= data.Length) {
-      var chunkLength = BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(offset));
-      var chunkType = Encoding.ASCII.GetString(data, offset + 4, 4);
+      var chunkLength = BinaryPrimitives.ReadInt32BigEndian(data[offset..]);
+      var chunkType = Encoding.ASCII.GetString(data.Slice(offset + 4, 4));
       offset += 8;
 
       if (chunkLength < 0 || offset + chunkLength + 4 > data.Length)
         break;
 
-      var chunkData = data.AsSpan(offset, chunkLength);
+      var chunkData = data.Slice(offset, chunkLength);
 
       switch (chunkType) {
         case "IHDR":
@@ -185,7 +182,12 @@ public static class ApngReader {
     };
   }
 
-  private static bool _CheckSignature(byte[] data) {
+  public static ApngFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  private static bool _CheckSignature(ReadOnlySpan<byte> data) {
     if (data.Length < 8)
       return false;
 

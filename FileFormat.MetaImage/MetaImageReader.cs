@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
@@ -31,15 +31,13 @@ public static class MetaImageReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static MetaImageFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static MetaImageFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static MetaImageFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_HEADER_SIZE)
       throw new InvalidDataException("Data too small for a valid MetaImage file.");
 
+    var dataArray = data.ToArray();
     var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-    var dataOffset = _ParseHeader(data, headers);
+    var dataOffset = _ParseHeader(dataArray, headers);
 
     if (!headers.ContainsKey("ObjectType"))
       throw new InvalidDataException("Invalid MetaImage header: missing 'ObjectType' tag.");
@@ -74,10 +72,10 @@ public static class MetaImageReader {
     if (remainingBytes <= 0) {
       pixelData = [];
     } else if (isCompressed) {
-      pixelData = _DecompressGzip(data, dataOffset, remainingBytes, expectedPixelBytes);
+      pixelData = _DecompressGzip(dataArray, dataOffset, remainingBytes, expectedPixelBytes);
     } else {
       pixelData = new byte[expectedPixelBytes];
-      data.AsSpan(dataOffset, Math.Min(remainingBytes, expectedPixelBytes)).CopyTo(pixelData.AsSpan(0));
+      data.Slice(dataOffset, Math.Min(remainingBytes, expectedPixelBytes)).CopyTo(pixelData.AsSpan(0));
     }
 
     return new MetaImageFile {
@@ -88,6 +86,11 @@ public static class MetaImageReader {
       IsCompressed = isCompressed,
       PixelData = pixelData,
     };
+  }
+
+  public static MetaImageFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   private static int _ParseHeader(byte[] data, Dictionary<string, string> headers) {

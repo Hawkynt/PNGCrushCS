@@ -26,10 +26,12 @@ public static class PcPaintReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static PcPaintFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
   public static PcPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  public static PcPaintFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < PcPaintFile.HeaderSize)
       throw new InvalidDataException("Data too small for a valid PC Paint file.");
 
@@ -65,13 +67,13 @@ public static class PcPaintReader {
     if (paletteInfoLength > 0) {
       var paletteBytes = Math.Min((int)paletteInfoLength, PcPaintFile.PaletteSize);
       if (data.Length >= offset + paletteBytes)
-        data.AsSpan(offset, paletteBytes).CopyTo(palette.AsSpan(0));
+        data.Slice(offset, paletteBytes).CopyTo(palette.AsSpan(0));
 
       offset += paletteInfoLength;
     }
 
     var pixelCount = width * height;
-    var pixelData = _DecompressRle(data, offset, pixelCount);
+    var pixelData = _DecompressRle(data.ToArray(), offset, pixelCount);
 
     return new() {
       Width = width,

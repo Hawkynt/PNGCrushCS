@@ -29,10 +29,8 @@ public static class DoodlePackedReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static DoodlePackedFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static DoodlePackedFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static DoodlePackedFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < MinFileSize)
       throw new InvalidDataException($"Data too small for Doodle Packed file (got {data.Length} bytes, need at least {MinFileSize}).");
 
@@ -44,7 +42,7 @@ public static class DoodlePackedReader {
 
     // RLE-compressed payload
     var compressed = new byte[data.Length - offset];
-    data.AsSpan(offset, compressed.Length).CopyTo(compressed.AsSpan(0));
+    data.Slice(offset, compressed.Length).CopyTo(compressed.AsSpan(0));
 
     var decompressed = DoodlePackedFile.RleDecode(compressed);
     if (decompressed.Length < DoodlePackedFile.DecompressedSize)
@@ -63,5 +61,10 @@ public static class DoodlePackedReader {
       BitmapData = bitmapData,
       ScreenData = screenData,
     };
+    }
+
+  public static DoodlePackedFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

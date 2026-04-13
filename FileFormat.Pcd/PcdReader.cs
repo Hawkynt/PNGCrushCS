@@ -27,20 +27,18 @@ public static class PcdReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static PcdFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static PcdFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static PcdFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < PcdFile.HeaderSize)
       throw new InvalidDataException($"Data too small for PCD: expected at least {PcdFile.HeaderSize} bytes, got {data.Length}.");
 
     for (var i = 0; i < PcdFile.Magic.Length; ++i)
       if (data[PcdFile.PreambleSize + i] != PcdFile.Magic[i])
-        throw new InvalidDataException("Invalid PCD magic at offset 2048: expected \"PCD_IPI\\0\".");
+        throw new InvalidDataException("Invalid PCD magic at offset 2048: expected \"PCD_IPI\0\".");
 
     var magicEnd = PcdFile.PreambleSize + PcdFile.Magic.Length;
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(magicEnd));
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(magicEnd + 2));
+    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[magicEnd..]);
+    var height = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(magicEnd + 2));
 
     if (width == 0 || height == 0)
       throw new InvalidDataException("PCD image dimensions must be positive.");
@@ -51,12 +49,17 @@ public static class PcdReader {
     var copyLen = Math.Min(expectedPixelBytes, available);
 
     var pixelData = new byte[expectedPixelBytes];
-    data.AsSpan(pixelDataOffset, copyLen).CopyTo(pixelData.AsSpan(0));
+    data.Slice(pixelDataOffset, copyLen).CopyTo(pixelData.AsSpan(0));
 
     return new PcdFile {
       Width = width,
       Height = height,
       PixelData = pixelData,
     };
+    }
+
+  public static PcdFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

@@ -20,31 +20,27 @@ public static class AutodeskCelReader {
     if (stream.CanSeek) {
       var data = new byte[stream.Length - stream.Position];
       stream.ReadExactly(data);
-      return FromBytes(data);
+      return FromSpan(data);
     }
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
+    return FromSpan(ms.ToArray());
   }
 
-  public static AutodeskCelFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static AutodeskCelFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static AutodeskCelFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < AutodeskCelFile.HeaderSize)
       throw new InvalidDataException($"Data too small for a valid Autodesk CEL file: expected at least {AutodeskCelFile.HeaderSize} bytes, got {data.Length}.");
 
-    var span = data.AsSpan();
-    var magic = BinaryPrimitives.ReadUInt16LittleEndian(span);
+    var magic = BinaryPrimitives.ReadUInt16LittleEndian(data);
     if (magic != AutodeskCelFile.Magic)
       throw new InvalidDataException($"Invalid Autodesk CEL magic: expected 0x{AutodeskCelFile.Magic:X4}, got 0x{magic:X4}.");
 
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(span[2..]);
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(span[4..]);
-    var xOffset = BinaryPrimitives.ReadUInt16LittleEndian(span[6..]);
-    var yOffset = BinaryPrimitives.ReadUInt16LittleEndian(span[8..]);
-    var bitsPerPixel = BinaryPrimitives.ReadUInt16LittleEndian(span[10..]);
-    var compression = span[12];
+    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[2..]);
+    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
+    var xOffset = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
+    var yOffset = BinaryPrimitives.ReadUInt16LittleEndian(data[8..]);
+    var bitsPerPixel = BinaryPrimitives.ReadUInt16LittleEndian(data[10..]);
+    var compression = data[12];
 
     if (width == 0)
       throw new InvalidDataException("Invalid Autodesk CEL width: must be greater than zero.");
@@ -63,7 +59,7 @@ public static class AutodeskCelReader {
       throw new InvalidDataException($"Data too small for pixel data: expected at least {expectedWithoutPalette} bytes, got {data.Length}.");
 
     var pixelData = new byte[pixelDataSize];
-    data.AsSpan(AutodeskCelFile.HeaderSize, pixelDataSize).CopyTo(pixelData.AsSpan(0));
+    data.Slice(AutodeskCelFile.HeaderSize, pixelDataSize).CopyTo(pixelData.AsSpan(0));
 
     var palette = _ReadPalette(data, expectedWithoutPalette);
 
@@ -79,7 +75,12 @@ public static class AutodeskCelReader {
     };
   }
 
-  private static byte[] _ReadPalette(byte[] data, int expectedWithoutPalette) {
+  public static AutodeskCelFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  private static byte[] _ReadPalette(ReadOnlySpan<byte> data, int expectedWithoutPalette) {
     var hasPalette = data.Length >= expectedWithoutPalette + AutodeskCelFile.PaletteSize;
     var palette = new byte[AutodeskCelFile.PaletteSize];
 

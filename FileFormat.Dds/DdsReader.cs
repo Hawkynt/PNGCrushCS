@@ -41,7 +41,73 @@ public static class DdsReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static DdsFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static DdsFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < _MIN_FILE_SIZE)
+      throw new InvalidDataException("Data too small for a valid DDS file.");
+
+    var span = data;
+
+    var magic = BinaryPrimitives.ReadInt32LittleEndian(span);
+    if (magic != _MAGIC)
+      throw new InvalidDataException("Invalid DDS magic number.");
+
+    var header = DdsHeader.ReadFrom(span[_MAGIC_SIZE..]);
+    if (header.Size != DdsHeader.StructSize)
+      throw new InvalidDataException($"Invalid DDS header size: {header.Size}.");
+
+    var format = _DetectFormat(header.PixelFormat);
+    var hasDx10 = false;
+    var dataOffset = _MAGIC_SIZE + DdsHeader.StructSize;
+
+    if (format == DdsFormat.Dx10) {
+      if (data.Length < dataOffset + DdsDx10Header.StructSize)
+        throw new InvalidDataException("Data too small for DX10 extended header.");
+
+      hasDx10 = true;
+      var dx10 = DdsDx10Header.ReadFrom(span.Slice(dataOffset));
+      format = _MapDxgiFormat(dx10.DxgiFormat) ?? format;
+      dataOffset += DdsDx10Header.StructSize;
+    }
+
+    var width = header.Width;
+    var height = header.Height;
+    var depth = header.Depth > 0 ? header.Depth : 1;
+    var mipMapCount = header.MipMapCount > 0 ? header.MipMapCount : 1;
+
+    var surfaces = new List<DdsSurface>();
+    var offset = dataOffset;
+
+    for (var mip = 0; mip < mipMapCount; ++mip) {
+      var mipWidth = Math.Max(1, width >> mip);
+      var mipHeight = Math.Max(1, height >> mip);
+      var mipSize = DdsBlockInfo.CalculateMipSize(mipWidth, mipHeight, format);
+
+      var surfaceData = new byte[mipSize];
+      var available = Math.Min(mipSize, data.Length - offset);
+      if (available > 0)
+        data.Slice(offset, available).CopyTo(surfaceData.AsSpan(0));
+
+      surfaces.Add(new DdsSurface {
+        Width = mipWidth,
+        Height = mipHeight,
+        MipLevel = mip,
+        Data = surfaceData
+      });
+
+      offset += mipSize;
+    }
+
+    return new DdsFile {
+      Width = width,
+      Height = height,
+      Depth = depth,
+      MipMapCount = mipMapCount,
+      Format = format,
+      HasDx10Header = hasDx10,
+      Surfaces = surfaces
+    };
+    }
 
   public static DdsFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

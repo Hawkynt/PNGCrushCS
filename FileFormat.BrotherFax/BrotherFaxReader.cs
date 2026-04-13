@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.BrotherFax;
@@ -26,20 +27,17 @@ public static class BrotherFaxReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static BrotherFaxFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static BrotherFaxFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static BrotherFaxFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < BrotherFaxFile.MinFileSize)
       throw new InvalidDataException($"Data too small for a valid UNI file (need at least {BrotherFaxFile.MinFileSize} bytes, got {data.Length}).");
 
     if (data[0] != BrotherFaxFile.Magic[0] || data[1] != BrotherFaxFile.Magic[1])
       throw new InvalidDataException("Invalid UNI magic bytes.");
 
-    var version = BitConverter.ToUInt16(data, 2);
-    var width = BitConverter.ToUInt16(data, 4);
-    var height = BitConverter.ToUInt16(data, 6);
-    var compression = BitConverter.ToUInt16(data, 8);
+    var version = BinaryPrimitives.ReadUInt16LittleEndian(data[2..]);
+    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
+    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
+    var compression = BinaryPrimitives.ReadUInt16LittleEndian(data[8..]);
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid UNI dimensions: {width}x{height}.");
@@ -50,7 +48,7 @@ public static class BrotherFaxReader {
       throw new InvalidDataException("UNI file truncated: not enough pixel data.");
 
     var pixelData = new byte[pixelDataSize];
-    data.AsSpan(BrotherFaxFile.HeaderSize, pixelDataSize).CopyTo(pixelData.AsSpan(0));
+    data.Slice(BrotherFaxFile.HeaderSize, pixelDataSize).CopyTo(pixelData);
 
     return new() {
       Width = width,
@@ -59,5 +57,10 @@ public static class BrotherFaxReader {
       Compression = compression,
       PixelData = pixelData,
     };
+  }
+
+  public static BrotherFaxFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

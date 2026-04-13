@@ -26,7 +26,21 @@ public static class LogoPainterReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static LogoPainterFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static LogoPainterFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < LogoPainterFile.LoadAddressSize + LogoPainterFile.MinPayloadSize)
+      throw new InvalidDataException($"Data too small for a valid Logo Painter file (expected at least {LogoPainterFile.LoadAddressSize + LogoPainterFile.MinPayloadSize} bytes, got {data.Length}).");
+
+    var loadAddress = (ushort)(data[0] | (data[1] << 8));
+
+    var rawData = new byte[data.Length - LogoPainterFile.LoadAddressSize];
+    data.Slice(LogoPainterFile.LoadAddressSize, rawData.Length).CopyTo(rawData.AsSpan(0));
+
+    return new() {
+      LoadAddress = loadAddress,
+      RawData = rawData,
+    };
+    }
 
   public static LogoPainterFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

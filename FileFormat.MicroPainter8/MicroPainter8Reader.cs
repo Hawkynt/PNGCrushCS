@@ -26,7 +26,16 @@ public static class MicroPainter8Reader {
     return FromBytes(ms.ToArray());
   }
 
-  public static MicroPainter8File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static MicroPainter8File FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != MicroPainter8File.FileSize)
+      throw new InvalidDataException($"Invalid Micro Painter data size: expected exactly {MicroPainter8File.FileSize} bytes, got {data.Length}.");
+
+    var pixelData = new byte[MicroPainter8File.FileSize];
+    data.Slice(0, MicroPainter8File.FileSize).CopyTo(pixelData);
+
+    return new MicroPainter8File { PixelData = pixelData };
+    }
 
   public static MicroPainter8File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

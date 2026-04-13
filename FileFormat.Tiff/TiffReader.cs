@@ -29,14 +29,11 @@ public static class TiffReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static TiffFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static TiffFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static TiffFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < 8)
       throw new InvalidDataException("Data too small for a valid TIFF file.");
 
-    using var ms = new MemoryStream(data);
+    using var ms = new MemoryStream(data.ToArray());
     using var tiff = LibTiff.ClientOpen("input", "r", ms, new TiffStream());
     if (tiff == null)
       throw new InvalidDataException("Failed to open TIFF data.");
@@ -73,6 +70,11 @@ public static class TiffReader {
       ColorMode = colorMode,
       Pages = pages,
     };
+  }
+
+  public static TiffFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   private static (int Width, int Height, int SamplesPerPixel, int BitsPerSample, byte[]? ColorMap, byte[] PixelData, TiffColorMode ColorMode) _ReadCurrentDirectory(LibTiff tiff) {

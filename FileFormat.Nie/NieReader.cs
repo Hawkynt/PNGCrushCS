@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Buffers.Binary;
 using System.IO;
 
@@ -28,8 +28,7 @@ public static class NieReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static NieFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static NieFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < NieFile.HeaderSize)
       throw new InvalidDataException("Data too small for a valid NIE file.");
 
@@ -41,8 +40,8 @@ public static class NieReader {
       throw new InvalidDataException($"Invalid NIE pixel config byte: 0x{configByte:X2}.");
 
     var pixelConfig = (NiePixelConfig)configByte;
-    var width = (int)BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(8));
-    var height = (int)BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(12));
+    var width = (int)BinaryPrimitives.ReadUInt32LittleEndian(data[8..]);
+    var height = (int)BinaryPrimitives.ReadUInt32LittleEndian(data[12..]);
 
     if (width <= 0 || height <= 0)
       throw new InvalidDataException($"Invalid NIE dimensions: {width}x{height}.");
@@ -54,7 +53,7 @@ public static class NieReader {
       throw new InvalidDataException("Data too small for the declared image dimensions.");
 
     var pixelData = new byte[(int)expectedDataSize];
-    Buffer.BlockCopy(data, NieFile.HeaderSize, pixelData, 0, pixelData.Length);
+    data.Slice(NieFile.HeaderSize, pixelData.Length).CopyTo(pixelData);
 
     return new() {
       Width = width,
@@ -62,5 +61,11 @@ public static class NieReader {
       PixelConfig = pixelConfig,
       PixelData = pixelData,
     };
+  
+  }
+
+  public static NieFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

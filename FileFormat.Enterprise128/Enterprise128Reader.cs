@@ -25,7 +25,21 @@ public static class Enterprise128Reader {
     return FromBytes(ms.ToArray());
   }
 
-  public static Enterprise128File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static Enterprise128File FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < Enterprise128File.FileSize)
+      throw new InvalidDataException($"Data too small: {data.Length} bytes, expected 16384.");
+
+    var pixelData = new byte[Enterprise128File.ImageWidth * Enterprise128File.ImageHeight];
+    for (var y = 0; y < Enterprise128File.ImageHeight; ++y)
+      for (var x = 0; x < Enterprise128File.ImageWidth; x += 8) {
+        var b = data[y * 64 + x / 8];
+        for (var bit = 0; bit < 8 && x + bit < Enterprise128File.ImageWidth; ++bit)
+          pixelData[y * Enterprise128File.ImageWidth + x + bit] = (byte)((b >> (7 - bit)) & 1);
+      }
+
+    return new Enterprise128File { PixelData = pixelData };
+    }
 
   public static Enterprise128File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

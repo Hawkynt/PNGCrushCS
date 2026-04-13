@@ -26,7 +26,16 @@ public static class PictureEditorReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static PictureEditorFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static PictureEditorFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != PictureEditorFile.ExpectedFileSize)
+      throw new InvalidDataException($"Picture Editor file must be exactly {PictureEditorFile.ExpectedFileSize} bytes, got {data.Length}.");
+
+    var pixelData = new byte[PictureEditorFile.ExpectedFileSize];
+    data.Slice(0, PictureEditorFile.ExpectedFileSize).CopyTo(pixelData);
+
+    return new PictureEditorFile { PixelData = pixelData };
+    }
 
   public static PictureEditorFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

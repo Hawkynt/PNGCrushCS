@@ -26,7 +26,41 @@ public static class AmicaPaintReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static AmicaPaintFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static AmicaPaintFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < AmicaPaintFile.ExpectedFileSize)
+      throw new InvalidDataException($"Data too small for a valid Amica Paint file (expected {AmicaPaintFile.ExpectedFileSize} bytes, got {data.Length}).");
+
+    if (data.Length != AmicaPaintFile.ExpectedFileSize)
+      throw new InvalidDataException($"Invalid Amica Paint file size (expected {AmicaPaintFile.ExpectedFileSize} bytes, got {data.Length}).");
+
+    var offset = 0;
+
+    var loadAddress = (ushort)(data[offset] | (data[offset + 1] << 8));
+    offset += AmicaPaintFile.LoadAddressSize;
+
+    var bitmapData = new byte[AmicaPaintFile.BitmapDataSize];
+    data.Slice(offset, AmicaPaintFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
+    offset += AmicaPaintFile.BitmapDataSize;
+
+    var screenRam = new byte[AmicaPaintFile.ScreenRamSize];
+    data.Slice(offset, AmicaPaintFile.ScreenRamSize).CopyTo(screenRam.AsSpan(0));
+    offset += AmicaPaintFile.ScreenRamSize;
+
+    var colorRam = new byte[AmicaPaintFile.ColorRamSize];
+    data.Slice(offset, AmicaPaintFile.ColorRamSize).CopyTo(colorRam.AsSpan(0));
+    offset += AmicaPaintFile.ColorRamSize;
+
+    var backgroundColor = data[offset];
+
+    return new() {
+      LoadAddress = loadAddress,
+      BitmapData = bitmapData,
+      ScreenRam = screenRam,
+      ColorRam = colorRam,
+      BackgroundColor = backgroundColor,
+    };
+    }
 
   public static AmicaPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

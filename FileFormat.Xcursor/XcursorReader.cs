@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 
 namespace FileFormat.Xcursor;
@@ -29,14 +29,12 @@ public static class XcursorReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static XcursorFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static XcursorFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static XcursorFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < XcursorFileHeader.StructSize)
       throw new InvalidDataException("Data too small for a valid Xcursor file.");
 
-    var fileHeader = XcursorFileHeader.ReadFrom(data.AsSpan(0, XcursorFileHeader.StructSize));
+    var fileHeader = XcursorFileHeader.ReadFrom(data.Slice(0, XcursorFileHeader.StructSize));
 
     if (fileHeader.Magic != XcursorWriter.Magic)
       throw new InvalidDataException("Invalid Xcursor magic: expected 'Xcur'.");
@@ -52,7 +50,7 @@ public static class XcursorReader {
 
     for (var i = 0; i < ntoc; ++i) {
       var entryOffset = tocStart + i * XcursorTocEntry.StructSize;
-      var entry = XcursorTocEntry.ReadFrom(data.AsSpan(entryOffset, XcursorTocEntry.StructSize));
+      var entry = XcursorTocEntry.ReadFrom(data.Slice(entryOffset, XcursorTocEntry.StructSize));
 
       if (entry.Type != ImageChunkType)
         continue;
@@ -63,11 +61,16 @@ public static class XcursorReader {
     throw new InvalidDataException("No image chunk found in Xcursor file.");
   }
 
-  private static XcursorFile _ReadImageChunk(byte[] data, int position, int nominalSize) {
+  public static XcursorFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  private static XcursorFile _ReadImageChunk(ReadOnlySpan<byte> data, int position, int nominalSize) {
     if (data.Length < position + XcursorImageChunkHeader.StructSize)
       throw new InvalidDataException("Data too small for image chunk header.");
 
-    var chunk = XcursorImageChunkHeader.ReadFrom(data.AsSpan(position, XcursorImageChunkHeader.StructSize));
+    var chunk = XcursorImageChunkHeader.ReadFrom(data.Slice(position, XcursorImageChunkHeader.StructSize));
 
     if (chunk.ChunkType != ImageChunkType)
       throw new InvalidDataException($"Expected image chunk type 0x{ImageChunkType:X8}, got 0x{chunk.ChunkType:X8}.");
@@ -79,7 +82,7 @@ public static class XcursorReader {
       throw new InvalidDataException("Data too small for image pixel data.");
 
     var pixelData = new byte[pixelDataSize];
-    data.AsSpan(pixelStart, pixelDataSize).CopyTo(pixelData.AsSpan(0));
+    data.Slice(pixelStart, pixelDataSize).CopyTo(pixelData.AsSpan(0));
 
     return new XcursorFile {
       Width = (int)chunk.Width,

@@ -34,22 +34,22 @@ public static class FshReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static FshFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
   public static FshFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
+  }
+
+  public static FshFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _FILE_HEADER_SIZE)
       throw new InvalidDataException("Data too small for a valid FSH file.");
 
-    var span = data.AsSpan();
-
     // Validate magic "SHPI"
-    if (span[0] != (byte)'S' || span[1] != (byte)'H' || span[2] != (byte)'P' || span[3] != (byte)'I')
+    if (data[0] != (byte)'S' || data[1] != (byte)'H' || data[2] != (byte)'P' || data[3] != (byte)'I')
       throw new InvalidDataException("Invalid FSH signature: expected 'SHPI'.");
 
-    var fileSize = BinaryPrimitives.ReadInt32LittleEndian(span[4..]);
-    var entryCount = BinaryPrimitives.ReadInt32LittleEndian(span[8..]);
-    var directoryId = Encoding.ASCII.GetString(span.Slice(12, 4));
+    var fileSize = BinaryPrimitives.ReadInt32LittleEndian(data[4..]);
+    var entryCount = BinaryPrimitives.ReadInt32LittleEndian(data[8..]);
+    var directoryId = Encoding.ASCII.GetString(data.Slice(12, 4));
 
     if (entryCount < 0)
       throw new InvalidDataException($"Invalid FSH entry count: {entryCount}.");
@@ -61,8 +61,8 @@ public static class FshReader {
     var entries = new List<FshEntry>(entryCount);
     for (var i = 0; i < entryCount; ++i) {
       var dirOffset = _FILE_HEADER_SIZE + i * _DIRECTORY_ENTRY_SIZE;
-      var tag = Encoding.ASCII.GetString(span.Slice(dirOffset, 4));
-      var entryOffset = BinaryPrimitives.ReadInt32LittleEndian(span[(dirOffset + 4)..]);
+      var tag = Encoding.ASCII.GetString(data.Slice(dirOffset, 4));
+      var entryOffset = BinaryPrimitives.ReadInt32LittleEndian(data[(dirOffset + 4)..]);
 
       if (entryOffset < 0 || entryOffset + _RECORD_HEADER_SIZE > data.Length)
         continue;
@@ -77,15 +77,13 @@ public static class FshReader {
     };
   }
 
-  private static FshEntry _ReadEntry(byte[] data, int offset, string tag) {
-    var span = data.AsSpan();
-
-    var recordCode = span[offset];
+  private static FshEntry _ReadEntry(ReadOnlySpan<byte> data, int offset, string tag) {
+    var recordCode = data[offset];
     // Bytes 1-3: data size in 16-byte units (24-bit LE)
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(span[(offset + 4)..]);
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(span[(offset + 6)..]);
-    var centerX = BinaryPrimitives.ReadUInt16LittleEndian(span[(offset + 8)..]);
-    var centerY = BinaryPrimitives.ReadUInt16LittleEndian(span[(offset + 10)..]);
+    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[(offset + 4)..]);
+    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[(offset + 6)..]);
+    var centerX = BinaryPrimitives.ReadUInt16LittleEndian(data[(offset + 8)..]);
+    var centerY = BinaryPrimitives.ReadUInt16LittleEndian(data[(offset + 10)..]);
 
     var pixelStart = offset + _RECORD_HEADER_SIZE;
     byte[]? palette = null;
@@ -96,7 +94,7 @@ public static class FshReader {
         throw new InvalidDataException("Data too small for FSH indexed palette.");
 
       palette = new byte[_PALETTE_SIZE];
-      data.AsSpan(pixelStart, _PALETTE_SIZE).CopyTo(palette.AsSpan(0));
+      data.Slice(pixelStart, _PALETTE_SIZE).CopyTo(palette.AsSpan(0));
       pixelStart += _PALETTE_SIZE;
     }
 
@@ -109,7 +107,7 @@ public static class FshReader {
 
     var pixelData = new byte[pixelDataSize];
     if (pixelDataSize > 0)
-      data.AsSpan(pixelStart, pixelDataSize).CopyTo(pixelData.AsSpan(0));
+      data.Slice(pixelStart, pixelDataSize).CopyTo(pixelData.AsSpan(0));
 
     return new FshEntry {
       Tag = tag,

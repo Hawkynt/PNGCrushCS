@@ -28,14 +28,12 @@ public static class WalReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static WalFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static WalFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static WalFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MIN_FILE_SIZE)
       throw new InvalidDataException("Data too small for a valid WAL file.");
 
-    var span = data.AsSpan();
+    var span = data;
     var header = WalHeader.ReadFrom(span);
 
     var width = (int)header.Width;
@@ -51,7 +49,7 @@ public static class WalReader {
       throw new InvalidDataException("WAL mip level 0 data extends beyond file.");
 
     var pixelData = new byte[mip0Size];
-    data.AsSpan(mip0Offset, mip0Size).CopyTo(pixelData.AsSpan(0));
+    data.Slice(mip0Offset, mip0Size).CopyTo(pixelData.AsSpan(0));
 
     byte[][]? mipMaps = null;
 
@@ -87,7 +85,7 @@ public static class WalReader {
         var offset = (int)mipOffsets[i];
         var size = mipWidth * mipHeight;
         mipMaps[i] = new byte[size];
-        data.AsSpan(offset, size).CopyTo(mipMaps[i].AsSpan(0));
+        data.Slice(offset, size).CopyTo(mipMaps[i].AsSpan(0));
       }
     }
 
@@ -102,5 +100,10 @@ public static class WalReader {
       PixelData = pixelData,
       MipMaps = mipMaps
     };
+    }
+
+  public static WalFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

@@ -26,7 +26,36 @@ public static class DuneGraphReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static DuneGraphFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static DuneGraphFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < DuneGraphFile.PaletteDataSize + 1)
+      throw new InvalidDataException($"Data too small for a valid DuneGraph file (minimum {DuneGraphFile.PaletteDataSize + 1} bytes, got {data.Length}).");
+
+    // Convert Falcon palette to RGB
+    var rgbPalette = new byte[DuneGraphFile.PaletteEntryCount * 3];
+    DuneGraphFile.ConvertFalconPaletteToRgb(data.Slice(0, DuneGraphFile.PaletteDataSize), rgbPalette);
+
+    var pixelSection = data.Slice(DuneGraphFile.PaletteDataSize);
+    var isUncompressed = data.Length == DuneGraphFile.UncompressedFileSize;
+
+    byte[] pixelData;
+    bool isCompressed;
+
+    if (isUncompressed) {
+      pixelData = new byte[DuneGraphFile.PixelDataSize];
+      pixelSection.Slice(0, DuneGraphFile.PixelDataSize).CopyTo(pixelData);
+      isCompressed = false;
+    } else {
+      pixelData = _DecompressRle(pixelSection);
+      isCompressed = true;
+    }
+
+    return new DuneGraphFile {
+      IsCompressed = isCompressed,
+      Palette = rgbPalette,
+      PixelData = pixelData,
+    };
+    }
 
   public static DuneGraphFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

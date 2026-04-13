@@ -26,7 +26,16 @@ public static class CpcFontReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static CpcFontFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static CpcFontFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != CpcFontFile.ExpectedFileSize)
+      throw new InvalidDataException($"Invalid CPC font data size: expected exactly {CpcFontFile.ExpectedFileSize} bytes, got {data.Length}.");
+
+    var rawData = new byte[CpcFontFile.ExpectedFileSize];
+    data.Slice(0, CpcFontFile.ExpectedFileSize).CopyTo(rawData);
+
+    return new CpcFontFile { RawData = rawData };
+    }
 
   public static CpcFontFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

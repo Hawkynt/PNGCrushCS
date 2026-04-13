@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Buffers.Binary;
 using System.IO;
 using System.Text;
@@ -32,22 +32,20 @@ public static class IffRgb8Reader {
     return FromBytes(ms.ToArray());
   }
 
-  public static IffRgb8File FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static IffRgb8File FromSpan(ReadOnlySpan<byte> data) {
 
-  public static IffRgb8File FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _MIN_IFF_SIZE)
       throw new InvalidDataException("Data too small for a valid IFF RGB8 file.");
 
-    var span = data.AsSpan();
+    var span = data;
 
     // Validate FORM magic
-    var formId = Encoding.ASCII.GetString(data, 0, 4);
+    var formId = Encoding.ASCII.GetString(data.Slice(0, 4));
     if (formId != "FORM")
       throw new InvalidDataException($"Invalid IFF magic: expected 'FORM', got '{formId}'.");
 
     // Validate RGB8 form type
-    var formType = Encoding.ASCII.GetString(data, 8, 4);
+    var formType = Encoding.ASCII.GetString(data.Slice(8, 4));
     if (formType != "RGB8")
       throw new InvalidDataException($"Invalid IFF form type: expected 'RGB8', got '{formType}'.");
 
@@ -61,7 +59,7 @@ public static class IffRgb8Reader {
     var endOffset = Math.Min(8 + formSize, data.Length);
 
     while (offset + 8 <= endOffset) {
-      var chunkId = Encoding.ASCII.GetString(data, offset, 4);
+      var chunkId = Encoding.ASCII.GetString(data.Slice(offset, 4));
       var chunkSize = BinaryPrimitives.ReadInt32BigEndian(span[(offset + 4)..]);
       var chunkDataOffset = offset + 8;
 
@@ -112,5 +110,10 @@ public static class IffRgb8Reader {
       Compression = compression,
       PixelData = rgb24,
     };
+  }
+
+  public static IffRgb8File FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

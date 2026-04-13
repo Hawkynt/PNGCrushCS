@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Text;
 
@@ -29,18 +29,15 @@ public static class MgrBitmapReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static MgrBitmapFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
-
-  public static MgrBitmapFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
+  public static MgrBitmapFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_FILE_SIZE)
       throw new InvalidDataException($"Data too small for a valid MGR file: expected at least {_MIN_FILE_SIZE} bytes, got {data.Length}.");
 
-    var newlineIdx = Array.IndexOf(data, (byte)'\n');
+    var newlineIdx = data.IndexOf((byte)'\n');
     if (newlineIdx < 0)
       throw new InvalidDataException("Invalid MGR header: missing newline terminator.");
 
-    var headerLine = Encoding.ASCII.GetString(data, 0, newlineIdx);
+    var headerLine = Encoding.ASCII.GetString(data.Slice(0, newlineIdx));
     var xIdx = headerLine.IndexOf('x', StringComparison.OrdinalIgnoreCase);
     if (xIdx < 0)
       throw new InvalidDataException("Invalid MGR header: missing 'x' dimension separator.");
@@ -59,12 +56,18 @@ public static class MgrBitmapReader {
       throw new InvalidDataException($"Data too small for pixel data: expected {pixelOffset + expectedPixelBytes} bytes, got {data.Length}.");
 
     var pixelData = new byte[expectedPixelBytes];
-    data.AsSpan(pixelOffset, expectedPixelBytes).CopyTo(pixelData.AsSpan(0));
+    data.Slice(pixelOffset, expectedPixelBytes).CopyTo(pixelData.AsSpan(0));
 
     return new MgrBitmapFile {
       Width = width,
       Height = height,
       PixelData = pixelData,
     };
+  
+  }
+
+  public static MgrBitmapFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

@@ -26,7 +26,16 @@ public static class HighResAtariReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static HighResAtariFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static HighResAtariFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != HighResAtariFile.FileSize)
+      throw new InvalidDataException($"Invalid Atari Hi-Res Paint data size: expected exactly {HighResAtariFile.FileSize} bytes, got {data.Length}.");
+
+    var pixelData = new byte[HighResAtariFile.FileSize];
+    data.Slice(0, HighResAtariFile.FileSize).CopyTo(pixelData);
+
+    return new HighResAtariFile { PixelData = pixelData };
+    }
 
   public static HighResAtariFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

@@ -26,7 +26,49 @@ public static class TruePaintReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static TruePaintFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static TruePaintFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != TruePaintFile.ExpectedFileSize)
+      throw new InvalidDataException($"Invalid True Paint file size (expected {TruePaintFile.ExpectedFileSize} bytes, got {data.Length}).");
+
+    var loadAddress = (ushort)(data[0] | (data[1] << 8));
+
+    var offset = TruePaintFile.LoadAddressSize;
+
+    var bitmapData1 = new byte[TruePaintFile.BitmapDataSize];
+    data.Slice(offset, TruePaintFile.BitmapDataSize).CopyTo(bitmapData1);
+    offset += TruePaintFile.BitmapDataSize;
+
+    var screenRam1 = new byte[TruePaintFile.ScreenRamSize];
+    data.Slice(offset, TruePaintFile.ScreenRamSize).CopyTo(screenRam1);
+    offset += TruePaintFile.ScreenRamSize;
+
+    var bitmapData2 = new byte[TruePaintFile.BitmapDataSize];
+    data.Slice(offset, TruePaintFile.BitmapDataSize).CopyTo(bitmapData2);
+    offset += TruePaintFile.BitmapDataSize;
+
+    var screenRam2 = new byte[TruePaintFile.ScreenRamSize];
+    data.Slice(offset, TruePaintFile.ScreenRamSize).CopyTo(screenRam2);
+    offset += TruePaintFile.ScreenRamSize;
+
+    var colorRam = new byte[TruePaintFile.ColorRamSize];
+    data.Slice(offset, TruePaintFile.ColorRamSize).CopyTo(colorRam);
+    offset += TruePaintFile.ColorRamSize;
+
+    var backgroundColor = data[offset];
+    var borderColor = data[offset + 1];
+
+    return new() {
+      LoadAddress = loadAddress,
+      BitmapData1 = bitmapData1,
+      ScreenRam1 = screenRam1,
+      BitmapData2 = bitmapData2,
+      ScreenRam2 = screenRam2,
+      ColorRam = colorRam,
+      BackgroundColor = backgroundColor,
+      BorderColor = borderColor,
+    };
+    }
 
   public static TruePaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

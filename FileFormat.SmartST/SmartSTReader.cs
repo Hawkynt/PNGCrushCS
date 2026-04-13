@@ -29,7 +29,18 @@ public static class SmartSTReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static SmartSTFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static SmartSTFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length != _EXPECTED_SIZE)
+      throw new InvalidDataException($"Invalid Smart ST data size: expected exactly {_EXPECTED_SIZE} bytes, got {data.Length}.");
+
+    var pixelData = new byte[_EXPECTED_SIZE];
+    data.Slice(0, _EXPECTED_SIZE).CopyTo(pixelData);
+
+    return new SmartSTFile {
+      PixelData = pixelData
+    };
+    }
 
   public static SmartSTFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

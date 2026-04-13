@@ -26,7 +26,21 @@ public static class HiresFliCrestReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static HiresFliCrestFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static HiresFliCrestFile FromSpan(ReadOnlySpan<byte> data) {
+
+    if (data.Length < HiresFliCrestFile.LoadAddressSize + HiresFliCrestFile.MinPayloadSize)
+      throw new InvalidDataException($"Data too small for a valid Hires FLI Crest file (expected at least {HiresFliCrestFile.LoadAddressSize + HiresFliCrestFile.MinPayloadSize} bytes, got {data.Length}).");
+
+    var loadAddress = (ushort)(data[0] | (data[1] << 8));
+
+    var rawData = new byte[data.Length - HiresFliCrestFile.LoadAddressSize];
+    data.Slice(HiresFliCrestFile.LoadAddressSize, rawData.Length).CopyTo(rawData.AsSpan(0));
+
+    return new() {
+      LoadAddress = loadAddress,
+      RawData = rawData,
+    };
+    }
 
   public static HiresFliCrestFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

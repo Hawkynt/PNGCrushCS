@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 
 namespace FileFormat.HiresBitmap;
@@ -27,10 +27,8 @@ public static class HiresBitmapReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static HiresBitmapFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static HiresBitmapFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static HiresBitmapFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
 
     if (data.Length < HiresBitmapFile.MinFileSize)
       throw new InvalidDataException($"File too small for Hires Bitmap format (got {data.Length} bytes, need at least {HiresBitmapFile.MinFileSize}).");
@@ -43,19 +41,19 @@ public static class HiresBitmapReader {
 
     // Bitmap data (8000 bytes)
     var bitmapData = new byte[HiresBitmapFile.BitmapDataSize];
-    data.AsSpan(offset, HiresBitmapFile.BitmapDataSize).CopyTo(bitmapData);
+    data.Slice(offset, HiresBitmapFile.BitmapDataSize).CopyTo(bitmapData);
     offset += HiresBitmapFile.BitmapDataSize;
 
     // Screen RAM (1000 bytes)
     var screenData = new byte[HiresBitmapFile.ScreenDataSize];
-    data.AsSpan(offset, HiresBitmapFile.ScreenDataSize).CopyTo(screenData);
+    data.Slice(offset, HiresBitmapFile.ScreenDataSize).CopyTo(screenData);
     offset += HiresBitmapFile.ScreenDataSize;
 
     // Trailing data
     var trailingData = Array.Empty<byte>();
     if (offset < data.Length) {
       trailingData = new byte[data.Length - offset];
-      data.AsSpan(offset).CopyTo(trailingData);
+      data[offset..].CopyTo(trailingData);
     }
 
     return new() {
@@ -64,5 +62,10 @@ public static class HiresBitmapReader {
       ScreenData = screenData,
       TrailingData = trailingData,
     };
+  }
+
+  public static HiresBitmapFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

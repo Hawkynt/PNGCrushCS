@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Text;
 
@@ -22,15 +22,18 @@ public static class FaceSaverReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static FaceSaverFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static FaceSaverFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static FaceSaverFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < 10)
       throw new InvalidDataException("Data too small for FaceSaver file.");
 
     var text = Encoding.ASCII.GetString(data);
     return _Parse(text);
+  }
+
+  public static FaceSaverFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 
   private static FaceSaverFile _Parse(string text) {

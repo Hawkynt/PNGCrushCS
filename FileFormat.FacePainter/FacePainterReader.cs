@@ -26,10 +26,8 @@ public static class FacePainterReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static FacePainterFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static FacePainterFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static FacePainterFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < FacePainterFile.ExpectedFileSize)
       throw new InvalidDataException($"Data too small for a valid Face Painter file (expected {FacePainterFile.ExpectedFileSize} bytes, got {data.Length}).");
 
@@ -42,15 +40,15 @@ public static class FacePainterReader {
     offset += FacePainterFile.LoadAddressSize;
 
     var bitmapData = new byte[FacePainterFile.BitmapDataSize];
-    data.AsSpan(offset, FacePainterFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
+    data.Slice(offset, FacePainterFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
     offset += FacePainterFile.BitmapDataSize;
 
     var videoMatrix = new byte[FacePainterFile.VideoMatrixSize];
-    data.AsSpan(offset, FacePainterFile.VideoMatrixSize).CopyTo(videoMatrix.AsSpan(0));
+    data.Slice(offset, FacePainterFile.VideoMatrixSize).CopyTo(videoMatrix.AsSpan(0));
     offset += FacePainterFile.VideoMatrixSize;
 
     var colorRam = new byte[FacePainterFile.ColorRamSize];
-    data.AsSpan(offset, FacePainterFile.ColorRamSize).CopyTo(colorRam.AsSpan(0));
+    data.Slice(offset, FacePainterFile.ColorRamSize).CopyTo(colorRam.AsSpan(0));
 
     return new() {
       LoadAddress = loadAddress,
@@ -58,5 +56,10 @@ public static class FacePainterReader {
       VideoMatrix = videoMatrix,
       ColorRam = colorRam,
     };
+    }
+
+  public static FacePainterFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }

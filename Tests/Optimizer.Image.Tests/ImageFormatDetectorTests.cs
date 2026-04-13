@@ -725,9 +725,9 @@ public sealed class ImageFormatDetectorTests {
   }
 
   [Test]
-  public void DetectFromExtension_HrExtension_ReturnsTrs80() {
+  public void DetectFromExtension_HrExtension_ReturnsAtariHr() {
     var file = new FileInfo("test.hr");
-    Assert.That(ImageFormatDetector.DetectFromExtension(file), Is.EqualTo(ImageFormat.Trs80));
+    Assert.That(ImageFormatDetector.DetectFromExtension(file), Is.EqualTo(ImageFormat.AtariHr));
   }
 
   // Wave 11 signature tests

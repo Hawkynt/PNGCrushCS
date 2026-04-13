@@ -28,14 +28,12 @@ public static class QuakeSprReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static QuakeSprFile FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
+  public static QuakeSprFile FromSpan(ReadOnlySpan<byte> data) {
 
-  public static QuakeSprFile FromBytes(byte[] data) {
-    ArgumentNullException.ThrowIfNull(data);
     if (data.Length < QuakeSprHeader.StructSize)
       throw new InvalidDataException("Data too small for a valid Quake sprite file.");
 
-    var header = QuakeSprHeader.ReadFrom(data.AsSpan(0, QuakeSprHeader.StructSize));
+    var header = QuakeSprHeader.ReadFrom(data.Slice(0, QuakeSprHeader.StructSize));
 
     if (header.Magic != _MAGIC)
       throw new InvalidDataException($"Invalid Quake sprite magic: 0x{header.Magic:X8}, expected 0x{_MAGIC:X8}.");
@@ -51,7 +49,7 @@ public static class QuakeSprReader {
     if (data.Length < offset + QuakeSprFrameHeader.StructSize)
       throw new InvalidDataException("Data too small for frame header.");
 
-    var frameHeader = QuakeSprFrameHeader.ReadFrom(data.AsSpan(offset, QuakeSprFrameHeader.StructSize));
+    var frameHeader = QuakeSprFrameHeader.ReadFrom(data.Slice(offset, QuakeSprFrameHeader.StructSize));
 
     if (frameHeader.Width <= 0)
       throw new InvalidDataException($"Invalid frame width: {frameHeader.Width}.");
@@ -64,7 +62,7 @@ public static class QuakeSprReader {
       throw new InvalidDataException("Data too small for pixel data.");
 
     var pixelData = new byte[pixelCount];
-    data.AsSpan(pixelOffset, pixelCount).CopyTo(pixelData.AsSpan(0));
+    data.Slice(pixelOffset, pixelCount).CopyTo(pixelData.AsSpan(0));
 
     return new() {
       Width = frameHeader.Width,
@@ -76,5 +74,10 @@ public static class QuakeSprReader {
       SyncType = header.SyncType,
       PixelData = pixelData,
     };
+    }
+
+  public static QuakeSprFile FromBytes(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data);
   }
 }
