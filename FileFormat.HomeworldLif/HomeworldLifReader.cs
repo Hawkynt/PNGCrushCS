@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.HomeworldLif;
@@ -39,9 +38,10 @@ public static class HomeworldLifReader {
     if (data[0] != HomeworldLifFile.Magic[0] || data[1] != HomeworldLifFile.Magic[1] || data[2] != HomeworldLifFile.Magic[2] || data[3] != HomeworldLifFile.Magic[3])
       throw new InvalidDataException("Invalid LIF magic bytes.");
 
-    var version = BinaryPrimitives.ReadInt32LittleEndian(data[4..]);
-    var width = BinaryPrimitives.ReadInt32LittleEndian(data[8..]);
-    var height = BinaryPrimitives.ReadInt32LittleEndian(data[12..]);
+    var header = HomeworldLifHeader.ReadFrom(data);
+    var version = header.Version;
+    var width = header.Width;
+    var height = header.Height;
 
     if (width <= 0 || height <= 0)
       throw new InvalidDataException($"Invalid LIF dimensions: {width}x{height}.");

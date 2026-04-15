@@ -1,14 +1,11 @@
 ﻿using System;
 using System.Buffers.Binary;
 using System.IO;
-using System.Text;
 
 namespace FileFormat.Wad3;
 
 /// <summary>Assembles WAD3 file bytes from a <see cref="Wad3File"/>.</summary>
 public static class Wad3Writer {
-
-  private const int _MIPTEX_HEADER_SIZE = 40;
 
   public static byte[] ToBytes(Wad3File file) {
     ArgumentNullException.ThrowIfNull(file);
@@ -69,53 +66,42 @@ public static class Wad3Writer {
     var mip3 = (w / 8) * (h / 8);
 
     // Header(40) + mip0 + mip1 + mip2 + mip3 + palette count(2) + palette(768)
-    return _MIPTEX_HEADER_SIZE + mip0 + mip1 + mip2 + mip3 + 2 + 768;
+    return Wad3MipTexHeader.StructSize + mip0 + mip1 + mip2 + mip3 + 2 + 768;
   }
 
   private static void _WriteMipTex(byte[] result, int offset, Wad3Texture texture) {
-    var span = result.AsSpan();
     var w = texture.Width;
     var h = texture.Height;
 
-    // Name (16 bytes, null-padded)
-    span.Slice(offset, 16).Clear();
-    var nameBytes = Encoding.ASCII.GetBytes(texture.Name);
-    var nameLen = Math.Min(nameBytes.Length, 15); // leave room for null terminator
-    nameBytes.AsSpan(0, nameLen).CopyTo(span.Slice(offset, 16));
-
-    // Width, Height
-    BinaryPrimitives.WriteUInt32LittleEndian(span[(offset + 16)..], (uint)w);
-    BinaryPrimitives.WriteUInt32LittleEndian(span[(offset + 20)..], (uint)h);
-
-    // Calculate mip offsets relative to lump start
     var mip0Size = w * h;
     var mip1Size = (w / 2) * (h / 2);
     var mip2Size = (w / 4) * (h / 4);
     var mip3Size = (w / 8) * (h / 8);
 
-    var mipOffset0 = _MIPTEX_HEADER_SIZE;
-    var mipOffset1 = mipOffset0 + mip0Size;
-    var mipOffset2 = mipOffset1 + mip1Size;
-    var mipOffset3 = mipOffset2 + mip2Size;
+    var mipOffset0 = (uint)Wad3MipTexHeader.StructSize;
+    var mipOffset1 = mipOffset0 + (uint)mip0Size;
+    var mipOffset2 = mipOffset1 + (uint)mip1Size;
+    var mipOffset3 = mipOffset2 + (uint)mip2Size;
 
-    BinaryPrimitives.WriteUInt32LittleEndian(span[(offset + 24)..], (uint)mipOffset0);
-    BinaryPrimitives.WriteUInt32LittleEndian(span[(offset + 28)..], (uint)mipOffset1);
-    BinaryPrimitives.WriteUInt32LittleEndian(span[(offset + 32)..], (uint)mipOffset2);
-    BinaryPrimitives.WriteUInt32LittleEndian(span[(offset + 36)..], (uint)mipOffset3);
+    var mipTexHeader = new Wad3MipTexHeader(
+      texture.Name, (uint)w, (uint)h,
+      mipOffset0, mipOffset1, mipOffset2, mipOffset3
+    );
+    mipTexHeader.WriteTo(result.AsSpan(offset));
 
     // Write mip level 0
-    texture.PixelData.AsSpan(0, Math.Min(texture.PixelData.Length, mip0Size)).CopyTo(result.AsSpan(offset + mipOffset0));
+    texture.PixelData.AsSpan(0, Math.Min(texture.PixelData.Length, mip0Size)).CopyTo(result.AsSpan(offset + (int)mipOffset0));
 
     // Write mip levels 1-3
     if (texture.MipMaps is { Length: >= 3 }) {
-      texture.MipMaps[0].AsSpan(0, Math.Min(texture.MipMaps[0].Length, mip1Size)).CopyTo(result.AsSpan(offset + mipOffset1));
-      texture.MipMaps[1].AsSpan(0, Math.Min(texture.MipMaps[1].Length, mip2Size)).CopyTo(result.AsSpan(offset + mipOffset2));
-      texture.MipMaps[2].AsSpan(0, Math.Min(texture.MipMaps[2].Length, mip3Size)).CopyTo(result.AsSpan(offset + mipOffset3));
+      texture.MipMaps[0].AsSpan(0, Math.Min(texture.MipMaps[0].Length, mip1Size)).CopyTo(result.AsSpan(offset + (int)mipOffset1));
+      texture.MipMaps[1].AsSpan(0, Math.Min(texture.MipMaps[1].Length, mip2Size)).CopyTo(result.AsSpan(offset + (int)mipOffset2));
+      texture.MipMaps[2].AsSpan(0, Math.Min(texture.MipMaps[2].Length, mip3Size)).CopyTo(result.AsSpan(offset + (int)mipOffset3));
     }
 
     // Palette count (256) + palette data
-    var paletteOffset = offset + mipOffset3 + mip3Size;
-    BinaryPrimitives.WriteUInt16LittleEndian(span[paletteOffset..], 256);
+    var paletteOffset = offset + (int)mipOffset3 + mip3Size;
+    BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(paletteOffset), 256);
     var paletteLen = Math.Min(texture.Palette.Length, 768);
     texture.Palette.AsSpan(0, paletteLen).CopyTo(result.AsSpan(paletteOffset + 2));
   }

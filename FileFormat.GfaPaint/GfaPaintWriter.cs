@@ -11,7 +11,7 @@ public static class GfaPaintWriter {
     var result = new byte[GfaPaintFile.FileSize];
     var span = result.AsSpan();
 
-    var header = GfaPaintHeader.FromPalette((short)file.Resolution, file.Palette);
+    var header = new GfaPaintHeader((short)file.Resolution, file.Palette);
     header.WriteTo(span);
 
     file.PixelData.AsSpan(0, Math.Min(32000, file.PixelData.Length)).CopyTo(result.AsSpan(GfaPaintHeader.StructSize));

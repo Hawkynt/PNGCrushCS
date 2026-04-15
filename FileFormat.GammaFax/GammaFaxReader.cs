@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.GammaFax;
@@ -39,10 +38,11 @@ public static class GammaFaxReader {
     if (data[0] != GammaFaxFile.Magic[0] || data[1] != GammaFaxFile.Magic[1])
       throw new InvalidDataException("Invalid GMF magic bytes.");
 
-    var version = BinaryPrimitives.ReadUInt16LittleEndian(data[2..]);
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
-    var compression = BinaryPrimitives.ReadUInt16LittleEndian(data[8..]);
+    var header = GammaFaxHeader.ReadFrom(data);
+    var version = header.Version;
+    var width = header.Width;
+    var height = header.Height;
+    var compression = header.Compression;
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid GMF dimensions: {width}x{height}.");

@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.ImagingFax;
@@ -39,10 +38,11 @@ public static class ImagingFaxReader {
     if (data[0] != ImagingFaxFile.Magic[0] || data[1] != ImagingFaxFile.Magic[1] || data[2] != ImagingFaxFile.Magic[2] || data[3] != ImagingFaxFile.Magic[3])
       throw new InvalidDataException("Invalid G3N magic bytes.");
 
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
-    var encoding = BinaryPrimitives.ReadUInt16LittleEndian(data[8..]);
-    var flags = BinaryPrimitives.ReadUInt16LittleEndian(data[10..]);
+    var header = ImagingFaxHeader.ReadFrom(data);
+    var width = header.Width;
+    var height = header.Height;
+    var encoding = header.Encoding;
+    var flags = header.Flags;
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid G3N dimensions: {width}x{height}.");

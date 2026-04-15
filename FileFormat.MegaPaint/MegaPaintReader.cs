@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.MegaPaint;
@@ -32,9 +31,9 @@ public static class MegaPaintReader {
     if (data.Length < MegaPaintFile.MinFileSize)
       throw new InvalidDataException($"Data too small for a valid MegaPaint file: expected at least {MegaPaintFile.MinFileSize} bytes, got {data.Length}.");
 
-    var span = data;
-    var width = BinaryPrimitives.ReadUInt16BigEndian(span);
-    var height = BinaryPrimitives.ReadUInt16BigEndian(span[2..]);
+    var header = MegaPaintHeader.ReadFrom(data);
+    var width = header.Width;
+    var height = header.Height;
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid MegaPaint dimensions: {width}x{height}.");
@@ -58,30 +57,6 @@ public static class MegaPaintReader {
 
   public static MegaPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < MegaPaintFile.MinFileSize)
-      throw new InvalidDataException($"Data too small for a valid MegaPaint file: expected at least {MegaPaintFile.MinFileSize} bytes, got {data.Length}.");
-
-    var span = data.AsSpan();
-    var width = BinaryPrimitives.ReadUInt16BigEndian(span);
-    var height = BinaryPrimitives.ReadUInt16BigEndian(span[2..]);
-
-    if (width == 0 || height == 0)
-      throw new InvalidDataException($"Invalid MegaPaint dimensions: {width}x{height}.");
-
-    var bytesPerRow = (width + 7) / 8;
-    var expectedPixelDataSize = bytesPerRow * height;
-    var availablePixelData = data.Length - MegaPaintFile.HeaderSize;
-
-    if (availablePixelData < expectedPixelDataSize)
-      throw new InvalidDataException($"Data too small for {width}x{height} MegaPaint image: expected {expectedPixelDataSize} bytes of pixel data, got {availablePixelData}.");
-
-    var pixelData = new byte[expectedPixelDataSize];
-    data.AsSpan(MegaPaintFile.HeaderSize, expectedPixelDataSize).CopyTo(pixelData.AsSpan(0));
-
-    return new MegaPaintFile {
-      Width = width,
-      Height = height,
-      PixelData = pixelData
-    };
+    return FromSpan(data);
   }
 }

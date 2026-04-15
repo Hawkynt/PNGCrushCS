@@ -14,6 +14,7 @@ internal sealed class ImagePanel : Panel {
   private PointF _offset;
   private Point? _lastMouse;
   private bool _panning;
+  private bool _autoFit = true;
 
   private static readonly Brush _checkerLight = new SolidBrush(Color.FromArgb(204, 204, 204));
   private static readonly Brush _checkerDark = new SolidBrush(Color.FromArgb(170, 170, 170));
@@ -30,14 +31,15 @@ internal sealed class ImagePanel : Panel {
     get => _image;
     set {
       _image = value;
-      Invalidate();
+      _autoFit = true;
+      FitToWindow();
     }
   }
 
   internal float Zoom => _zoom;
 
   internal void FitToWindow() {
-    if (_image == null)
+    if (_image == null || ClientSize.Width <= 0 || ClientSize.Height <= 0)
       return;
 
     var scaleX = (float)ClientSize.Width / _image.Width;
@@ -47,6 +49,7 @@ internal sealed class ImagePanel : Panel {
       (ClientSize.Width - _image.Width * _zoom) / 2f,
       (ClientSize.Height - _image.Height * _zoom) / 2f
     );
+    _autoFit = true;
     Invalidate();
   }
 
@@ -59,11 +62,18 @@ internal sealed class ImagePanel : Panel {
       (ClientSize.Width - _image.Width) / 2f,
       (ClientSize.Height - _image.Height) / 2f
     );
+    _autoFit = false;
     Invalidate();
   }
 
-  internal void ZoomIn() => _SetZoom(_zoom * 1.25f);
-  internal void ZoomOut() => _SetZoom(_zoom / 1.25f);
+  internal void ZoomIn() { _autoFit = false; _SetZoom(_zoom * 1.25f); }
+  internal void ZoomOut() { _autoFit = false; _SetZoom(_zoom / 1.25f); }
+
+  protected override void OnResize(EventArgs e) {
+    base.OnResize(e);
+    if (_autoFit)
+      FitToWindow();
+  }
 
   private void _SetZoom(float newZoom) {
     if (_image == null)
@@ -83,6 +93,7 @@ internal sealed class ImagePanel : Panel {
     if (_image == null)
       return;
 
+    _autoFit = false;
     var factor = e.Delta > 0 ? 1.15f : 1f / 1.15f;
     var newZoom = Math.Clamp(_zoom * factor, 0.01f, 100f);
     var imageX = (e.X - _offset.X) / _zoom;
@@ -106,6 +117,7 @@ internal sealed class ImagePanel : Panel {
     if (!_panning || _lastMouse == null)
       return;
 
+    _autoFit = false;
     _offset = new(_offset.X + e.X - _lastMouse.Value.X, _offset.Y + e.Y - _lastMouse.Value.Y);
     _lastMouse = e.Location;
     Invalidate();
@@ -134,12 +146,19 @@ internal sealed class ImagePanel : Panel {
     var g = e.Graphics;
     var destRect = new RectangleF(_offset.X, _offset.Y, _image.Width * _zoom, _image.Height * _zoom);
 
-    // Checkerboard for alpha transparency
     _DrawCheckerboard(g, destRect);
 
-    // Interpolation mode based on zoom level
-    g.InterpolationMode = _zoom > 2f ? InterpolationMode.NearestNeighbor : InterpolationMode.HighQualityBicubic;
-    g.PixelOffsetMode = _zoom > 2f ? PixelOffsetMode.Half : PixelOffsetMode.HighQuality;
+    // Interpolation mode:
+    // - NearestNeighbor at zoom >= 1.0 (pixel-perfect, no artifacts when viewing at actual size or zoomed in)
+    // - Bilinear at zoom < 1.0 (smooth downscale without ringing artifacts that bicubic introduces)
+    if (_zoom >= 1f) {
+      g.InterpolationMode = InterpolationMode.NearestNeighbor;
+      g.PixelOffsetMode = PixelOffsetMode.Half;
+    } else {
+      g.InterpolationMode = InterpolationMode.HighQualityBilinear;
+      g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+    }
+
     g.DrawImage(_image, destRect);
   }
 

@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.CanonNavFax;
@@ -34,10 +33,11 @@ public static class CanonNavFaxReader {
     if (data[0] != CanonNavFaxFile.Magic[0] || data[1] != CanonNavFaxFile.Magic[1] || data[2] != CanonNavFaxFile.Magic[2] || data[3] != CanonNavFaxFile.Magic[3])
       throw new InvalidDataException("Invalid CAN magic bytes.");
 
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
-    var resolution = BinaryPrimitives.ReadUInt16LittleEndian(data[8..]);
-    var encoding = BinaryPrimitives.ReadUInt16LittleEndian(data[10..]);
+    var header = CanonNavFaxHeader.ReadFrom(data);
+    var width = header.Width;
+    var height = header.Height;
+    var resolution = header.Resolution;
+    var encoding = header.Encoding;
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid CAN dimensions: {width}x{height}.");

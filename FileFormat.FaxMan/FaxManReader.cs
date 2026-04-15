@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.FaxMan;
@@ -34,10 +33,11 @@ public static class FaxManReader {
     if (data[0] != FaxManFile.Magic[0] || data[1] != FaxManFile.Magic[1])
       throw new InvalidDataException("Invalid FMF magic bytes.");
 
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[2..]);
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
-    var version = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
-    var flags = BinaryPrimitives.ReadUInt16LittleEndian(data[8..]);
+    var header = FaxManHeader.ReadFrom(data);
+    var width = header.Width;
+    var height = header.Height;
+    var version = header.Version;
+    var flags = header.Flags;
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid FMF dimensions: {width}x{height}.");

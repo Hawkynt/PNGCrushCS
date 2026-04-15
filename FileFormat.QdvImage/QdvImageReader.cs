@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.QdvImage;
@@ -35,10 +34,11 @@ public static class QdvImageReader {
     if (data[0] != QdvImageFile.Magic[0] || data[1] != QdvImageFile.Magic[1] || data[2] != QdvImageFile.Magic[2] || data[3] != QdvImageFile.Magic[3])
       throw new InvalidDataException("Invalid QDV magic bytes.");
 
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
-    var bpp = BinaryPrimitives.ReadUInt16LittleEndian(data[8..]);
-    var flags = BinaryPrimitives.ReadUInt16LittleEndian(data[10..]);
+    var header = QdvImageHeader.ReadFrom(data);
+    var width = header.Width;
+    var height = header.Height;
+    var bpp = header.Bpp;
+    var flags = header.Flags;
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid QDV dimensions: {width}x{height}.");

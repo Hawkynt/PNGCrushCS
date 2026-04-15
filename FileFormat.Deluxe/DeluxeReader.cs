@@ -36,7 +36,7 @@ public static class DeluxeReader {
 
     var span = data;
     var header = DeluxeHeader.ReadFrom(span);
-    var palette = header.GetPaletteArray();
+    var palette = header.Palette;
 
     var pixelData = new byte[32000];
     data.Slice(DeluxeHeader.StructSize, 32000).CopyTo(pixelData.AsSpan(0));
@@ -60,7 +60,7 @@ public static class DeluxeReader {
 
     var span = data.AsSpan();
     var header = DeluxeHeader.ReadFrom(span);
-    var palette = header.GetPaletteArray();
+    var palette = header.Palette;
 
     var pixelData = new byte[32000];
     data.AsSpan(DeluxeHeader.StructSize, 32000).CopyTo(pixelData.AsSpan(0));

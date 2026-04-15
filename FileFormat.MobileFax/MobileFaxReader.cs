@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.MobileFax;
@@ -39,9 +38,10 @@ public static class MobileFaxReader {
     if (data[0] != MobileFaxFile.Magic[0] || data[1] != MobileFaxFile.Magic[1])
       throw new InvalidDataException("Invalid RFA magic bytes.");
 
-    var version = BinaryPrimitives.ReadUInt16LittleEndian(data[2..]);
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
+    var header = MobileFaxHeader.ReadFrom(data);
+    var version = header.Version;
+    var width = header.Width;
+    var height = header.Height;
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid RFA dimensions: {width}x{height}.");

@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.AvhrrImage;
@@ -34,10 +33,11 @@ public static class AvhrrImageReader {
     if (data[0] != AvhrrImageFile.Magic[0] || data[1] != AvhrrImageFile.Magic[1] || data[2] != AvhrrImageFile.Magic[2] || data[3] != AvhrrImageFile.Magic[3])
       throw new InvalidDataException("Invalid SST magic bytes.");
 
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
-    var bands = BinaryPrimitives.ReadUInt16LittleEndian(data[8..]);
-    var dataType = BinaryPrimitives.ReadUInt16LittleEndian(data[10..]);
+    var header = AvhrrImageHeader.ReadFrom(data);
+    var width = header.Width;
+    var height = header.Height;
+    var bands = header.Bands;
+    var dataType = header.DataType;
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid SST dimensions: {width}x{height}.");

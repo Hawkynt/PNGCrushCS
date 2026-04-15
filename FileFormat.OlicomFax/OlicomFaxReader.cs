@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.OlicomFax;
@@ -34,9 +33,10 @@ public static class OlicomFaxReader {
     if (data[0] != OlicomFaxFile.Magic[0] || data[1] != OlicomFaxFile.Magic[1] || data[2] != OlicomFaxFile.Magic[2] || data[3] != OlicomFaxFile.Magic[3])
       throw new InvalidDataException("Invalid OFX magic bytes.");
 
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
-    var flags = BinaryPrimitives.ReadUInt16LittleEndian(data[8..]);
+    var header = OlicomFaxHeader.ReadFrom(data);
+    var width = header.Width;
+    var height = header.Height;
+    var flags = header.Flags;
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid OFX dimensions: {width}x{height}.");

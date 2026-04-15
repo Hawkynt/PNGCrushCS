@@ -4,28 +4,12 @@ namespace FileFormat.Emf;
 
 /// <summary>The 88-byte EMR_HEADER record at the start of every EMF file.</summary>
 [GenerateSerializer]
-[HeaderFiller("Unused", 60, 28)]
-public readonly partial record struct EmfHeaderRecord(
-  [property: HeaderField(0, 4)] uint RecordType,
-  [property: HeaderField(4, 4)] uint RecordSize,
-  [property: HeaderField(8, 4)] int BoundsLeft,
-  [property: HeaderField(12, 4)] int BoundsTop,
-  [property: HeaderField(16, 4)] int BoundsRight,
-  [property: HeaderField(20, 4)] int BoundsBottom,
-  [property: HeaderField(24, 4)] int FrameLeft,
-  [property: HeaderField(28, 4)] int FrameTop,
-  [property: HeaderField(32, 4)] int FrameRight,
-  [property: HeaderField(36, 4)] int FrameBottom,
-  [property: HeaderField(40, 4)] uint Signature,
-  [property: HeaderField(44, 4)] uint Version,
-  [property: HeaderField(48, 4)] uint FileSize,
-  [property: HeaderField(52, 4)] uint RecordCount,
-  [property: HeaderField(56, 2)] ushort NumHandles,
-  [property: HeaderField(58, 2)] ushort Reserved
+[Filler(60, 28)]
+public readonly partial record struct EmfHeaderRecord( uint RecordType, uint RecordSize, int BoundsLeft, int BoundsTop, int BoundsRight, int BoundsBottom, int FrameLeft, int FrameTop, int FrameRight, int FrameBottom, uint Signature, uint Version, uint FileSize, uint RecordCount, ushort NumHandles, ushort Reserved
 ) {
 
-  public const int StructSize = 88;
+ public const int StructSize = 88;
 
-  public static HeaderFieldDescriptor[] GetFieldMap()
-    => HeaderFieldMapper.GetFieldMap<EmfHeaderRecord>();
+ public static HeaderFieldDescriptor[] GetFieldMap()
+ => HeaderFieldMapper.GetFieldMap<EmfHeaderRecord>();
 }

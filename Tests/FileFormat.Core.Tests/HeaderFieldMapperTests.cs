@@ -8,35 +8,35 @@ namespace FileFormat.Core.Tests;
 public sealed class HeaderFieldMapperTests {
 
   private readonly record struct SimpleHeader(
-    [property: HeaderField(0, 4)] int Magic,
-    [property: HeaderField(4, 2)] short Width,
-    [property: HeaderField(6, 2)] short Height
+    [property: Field(0, 4)] int Magic,
+    [property: Field(4, 2)] short Width,
+    [property: Field(6, 2)] short Height
   );
 
   private readonly record struct HeaderWithNameOverride(
-    [property: HeaderField(0, 4)] int Magic,
-    [property: HeaderField(4, 16, Name = "Dim[8]")] byte Dimensions
+    [property: Field(0, 4)] int Magic,
+    [property: Field(4, 16, Name = "Dim[8]")] byte Dimensions
   );
 
-  [HeaderFiller("Padding", 6, 2)]
+  [Filler(6, 2)]
   private readonly record struct HeaderWithFiller(
-    [property: HeaderField(0, 4)] int Magic,
-    [property: HeaderField(4, 2)] short Version
+    [property: Field(0, 4)] int Magic,
+    [property: Field(4, 2)] short Version
   );
 
-  [HeaderFiller("Reserved1", 8, 4)]
-  [HeaderFiller("Reserved2", 12, 4)]
+  [Filler(8, 4)]
+  [Filler(12, 4)]
   private readonly record struct HeaderWithMultipleFillers(
-    [property: HeaderField(0, 4)] int Magic,
-    [property: HeaderField(4, 4)] int Flags
+    [property: Field(0, 4)] int Magic,
+    [property: Field(4, 4)] int Flags
   );
 
   private readonly record struct EmptyHeader();
 
   private readonly record struct MixedHeader(
-    [property: HeaderField(10, 2)] short Field3,
-    [property: HeaderField(0, 4)] int Field1,
-    [property: HeaderField(4, 2)] short Field2
+    [property: Field(10, 2)] short Field3,
+    [property: Field(0, 4)] int Field1,
+    [property: Field(4, 2)] short Field2
   );
 
   private readonly record struct HeaderNoAttributes(
@@ -72,7 +72,7 @@ public sealed class HeaderFieldMapperTests {
     var map = HeaderFieldMapper.GetFieldMap<HeaderWithFiller>();
 
     Assert.That(map, Has.Length.EqualTo(3));
-    var padding = map.Single(d => d.Name == "Padding");
+    var padding = map.Single(d => d.Name == "(padding)");
     Assert.That(padding.Offset, Is.EqualTo(6));
     Assert.That(padding.Size, Is.EqualTo(2));
   }
@@ -82,8 +82,7 @@ public sealed class HeaderFieldMapperTests {
     var map = HeaderFieldMapper.GetFieldMap<HeaderWithMultipleFillers>();
 
     Assert.That(map, Has.Length.EqualTo(4));
-    Assert.That(map.Select(d => d.Name), Does.Contain("Reserved1"));
-    Assert.That(map.Select(d => d.Name), Does.Contain("Reserved2"));
+    Assert.That(map.Count(d => d.Name == "(padding)"), Is.EqualTo(2));
   }
 
   [Test]
@@ -135,8 +134,8 @@ public sealed class HeaderFieldMapperTests {
   }
 
   [Test]
-  public void HeaderFieldAttribute_ExposesOffsetAndSize() {
-    var attr = new HeaderFieldAttribute(10, 4);
+  public void FieldAttribute_ExposesOffsetAndSize() {
+    var attr = new FieldAttribute(10, 4);
 
     Assert.That(attr.Offset, Is.EqualTo(10));
     Assert.That(attr.Size, Is.EqualTo(4));
@@ -144,17 +143,16 @@ public sealed class HeaderFieldMapperTests {
   }
 
   [Test]
-  public void HeaderFieldAttribute_NameInitProperty_SetsCustomName() {
-    var attr = new HeaderFieldAttribute(0, 2) { Name = "Custom" };
+  public void FieldAttribute_NameInitProperty_SetsCustomName() {
+    var attr = new FieldAttribute(0, 2) { Name = "Custom" };
 
     Assert.That(attr.Name, Is.EqualTo("Custom"));
   }
 
   [Test]
-  public void HeaderFillerAttribute_ExposesFields() {
-    var attr = new HeaderFillerAttribute("Padding", 12, 8);
+  public void FillerAttribute_ExposesFields() {
+    var attr = new FillerAttribute(12, 8);
 
-    Assert.That(attr.Name, Is.EqualTo("Padding"));
     Assert.That(attr.Offset, Is.EqualTo(12));
     Assert.That(attr.Size, Is.EqualTo(8));
   }

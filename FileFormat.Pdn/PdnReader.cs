@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Buffers.Binary;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
@@ -10,7 +9,7 @@ namespace FileFormat.Pdn;
 public static class PdnReader {
 
   /// <summary>Header size: 4 (magic) + 2 (version) + 2 (reserved) + 4 (width) + 4 (height) = 16 bytes.</summary>
-  internal const int HEADER_SIZE = 16;
+  internal const int HEADER_SIZE = PdnHeader.StructSize;
 
   private static readonly byte[] _MAGIC = "PDN3"u8.ToArray();
 
@@ -41,10 +40,10 @@ public static class PdnReader {
     if (data[0] != _MAGIC[0] || data[1] != _MAGIC[1] || data[2] != _MAGIC[2] || data[3] != _MAGIC[3])
       throw new InvalidDataException($"Invalid PDN magic: expected 'PDN3', got '{Encoding.ASCII.GetString(data.Slice(0, 4))}'.");
 
-    var version = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
-    // reserved at offset 6
-    var width = (int)BinaryPrimitives.ReadUInt32LittleEndian(data[8..]);
-    var height = (int)BinaryPrimitives.ReadUInt32LittleEndian(data[12..]);
+    var header = PdnHeader.ReadFrom(data);
+    var version = header.Version;
+    var width = (int)header.Width;
+    var height = (int)header.Height;
 
     if (width <= 0)
       throw new InvalidDataException($"Invalid PDN width: {width}.");
@@ -75,7 +74,7 @@ public static class PdnReader {
       Height = height,
       PixelData = pixelData,
     };
-  
+
   }
 
   public static PdnFile FromBytes(byte[] data) {

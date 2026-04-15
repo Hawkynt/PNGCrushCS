@@ -11,7 +11,6 @@ public static class FliReader {
   private const short _FLI_MAGIC = unchecked((short)0xAF11);
   private const short _FLC_MAGIC = unchecked((short)0xAF12);
   private const short _FRAME_MAGIC = unchecked((short)0xF1FA);
-  private const int _FRAME_HEADER_SIZE = 16;
 
   public static FliFile FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
@@ -50,25 +49,24 @@ public static class FliReader {
     var frames = new List<FliFrame>();
     byte[]? palette = null;
 
-    for (var f = 0; f < header.Frames && offset + _FRAME_HEADER_SIZE <= data.Length; ++f) {
-      var frameSize = BinaryPrimitives.ReadInt32LittleEndian(span[offset..]);
-      var frameMagic = BinaryPrimitives.ReadInt16LittleEndian(span[(offset + 4)..]);
-      var chunkCount = BinaryPrimitives.ReadInt16LittleEndian(span[(offset + 6)..]);
+    for (var f = 0; f < header.Frames && offset + FliFrameHeader.StructSize <= data.Length; ++f) {
+      var frameHdr = FliFrameHeader.ReadFrom(span[offset..]);
 
-      if (frameMagic != _FRAME_MAGIC)
-        throw new InvalidDataException($"Invalid frame magic at offset {offset}: 0x{(ushort)frameMagic:X4}.");
+      if (frameHdr.Magic != _FRAME_MAGIC)
+        throw new InvalidDataException($"Invalid frame magic at offset {offset}: 0x{(ushort)frameHdr.Magic:X4}.");
 
       var chunks = new List<FliFrameChunk>();
-      var chunkOffset = offset + _FRAME_HEADER_SIZE;
+      var chunkOffset = offset + FliFrameHeader.StructSize;
 
-      for (var c = 0; c < chunkCount && chunkOffset + 6 <= data.Length; ++c) {
-        var chunkSize = BinaryPrimitives.ReadInt32LittleEndian(span[chunkOffset..]);
-        var chunkType = (FliChunkType)BinaryPrimitives.ReadInt16LittleEndian(span[(chunkOffset + 4)..]);
+      for (var c = 0; c < frameHdr.Chunks && chunkOffset + FliChunkHeader.StructSize <= data.Length; ++c) {
+        var chunkHdr = FliChunkHeader.ReadFrom(span[chunkOffset..]);
+        var chunkSize = chunkHdr.Size;
+        var chunkType = (FliChunkType)chunkHdr.Type;
 
-        var dataSize = Math.Max(0, chunkSize - 6);
+        var dataSize = Math.Max(0, chunkSize - FliChunkHeader.StructSize);
         var chunkData = new byte[dataSize];
-        if (dataSize > 0 && chunkOffset + 6 + dataSize <= data.Length)
-          data.Slice(chunkOffset + 6, dataSize).CopyTo(chunkData.AsSpan(0));
+        if (dataSize > 0 && chunkOffset + FliChunkHeader.StructSize + dataSize <= data.Length)
+          data.Slice(chunkOffset + FliChunkHeader.StructSize, dataSize).CopyTo(chunkData.AsSpan(0));
 
         chunks.Add(new FliFrameChunk { ChunkType = chunkType, Data = chunkData });
 
@@ -78,11 +76,11 @@ public static class FliReader {
         else if (chunkType == FliChunkType.Color64)
           palette = _ParseColor64(chunkData);
 
-        chunkOffset += Math.Max(6, chunkSize);
+        chunkOffset += Math.Max(FliChunkHeader.StructSize, chunkSize);
       }
 
       frames.Add(new FliFrame { Chunks = chunks });
-      offset += Math.Max(_FRAME_HEADER_SIZE, frameSize);
+      offset += Math.Max(FliFrameHeader.StructSize, frameHdr.Size);
     }
 
     return new FliFile {

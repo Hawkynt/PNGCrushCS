@@ -11,7 +11,7 @@ public static class ImagicPaintWriter {
     var result = new byte[ImagicPaintFile.FileSize];
     var span = result.AsSpan();
 
-    var header = ImagicPaintHeader.FromPalette((short)file.Resolution, file.Palette);
+    var header = new ImagicPaintHeader((short)file.Resolution, file.Palette);
     header.WriteTo(span);
 
     file.PixelData.AsSpan(0, Math.Min(32000, file.PixelData.Length)).CopyTo(result.AsSpan(ImagicPaintHeader.StructSize));

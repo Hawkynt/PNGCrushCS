@@ -25,16 +25,13 @@ public static class GbrWriter {
     var span = result.AsSpan();
 
     BinaryPrimitives.WriteUInt32BigEndian(span, (uint)headerSize);
-    BinaryPrimitives.WriteUInt32BigEndian(span[4..], 2u); // version
-    BinaryPrimitives.WriteUInt32BigEndian(span[8..], (uint)width);
-    BinaryPrimitives.WriteUInt32BigEndian(span[12..], (uint)height);
-    BinaryPrimitives.WriteUInt32BigEndian(span[16..], (uint)bytesPerPixel);
+    new GbrHeader(2u, (uint)width, (uint)height, (uint)bytesPerPixel).WriteTo(span);
 
     // magic "GIMP"
-    span[20] = (byte)'G';
-    span[21] = (byte)'I';
-    span[22] = (byte)'M';
-    span[23] = (byte)'P';
+    span[GbrHeader.StructSize] = (byte)'G';
+    span[GbrHeader.StructSize + 1] = (byte)'I';
+    span[GbrHeader.StructSize + 2] = (byte)'M';
+    span[GbrHeader.StructSize + 3] = (byte)'P';
 
     BinaryPrimitives.WriteUInt32BigEndian(span[24..], (uint)spacing);
 

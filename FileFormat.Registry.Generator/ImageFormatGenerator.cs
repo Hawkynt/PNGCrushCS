@@ -15,7 +15,10 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
   private const string _IMAGE_FROM_RAW_IMAGE = "FileFormat.Core.IImageFromRawImage`1";
   private const string _IMAGE_FORMAT_WRITER = "FileFormat.Core.IImageFormatWriter`1";
   private const string _MULTI_IMAGE_FILE_FORMAT = "FileFormat.Core.IMultiImageFileFormat`1";
+  private const string _IMAGE_INFO_READER = "FileFormat.Core.IImageInfoReader`1";
   private const string _ADDITIONAL_IMAGE_FORMAT = "FileFormat.Core.AdditionalImageFormatAttribute";
+  private const string _FORMAT_MAGIC_BYTES = "FileFormat.Core.FormatMagicBytesAttribute";
+  private const string _FORMAT_DETECTION_PRIORITY = "FileFormat.Core.FormatDetectionPriorityAttribute";
 
   public void Initialize(IncrementalGeneratorInitializationContext context) {
     var formatTypes = context.CompilationProvider.Select(static (compilation, ct) => _DiscoverFormats(compilation, ct));
@@ -32,6 +35,9 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
     var imageFromRawImage = compilation.GetTypeByMetadataName(_IMAGE_FROM_RAW_IMAGE);
     var imageFormatWriter = compilation.GetTypeByMetadataName(_IMAGE_FORMAT_WRITER);
     var multiImageFileFormat = compilation.GetTypeByMetadataName(_MULTI_IMAGE_FILE_FORMAT);
+    var imageInfoReader = compilation.GetTypeByMetadataName(_IMAGE_INFO_READER);
+    var magicBytesAttr = compilation.GetTypeByMetadataName(_FORMAT_MAGIC_BYTES);
+    var detectionPriorityAttr = compilation.GetTypeByMetadataName(_FORMAT_DETECTION_PRIORITY);
 
     if (imageFormatReader == null)
       return ImmutableArray<FormatInfo>.Empty;
@@ -52,6 +58,7 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
       var hasFromRawImage = false;
       var hasFormatWriter = false;
       var hasMultiImage = false;
+      var hasImageInfoReader = false;
 
       foreach (var iface in type.AllInterfaces) {
         if (!iface.IsGenericType)
@@ -76,6 +83,8 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
           hasFormatWriter = true;
         else if (multiImageFileFormat != null && SymbolEqualityComparer.Default.Equals(def, multiImageFileFormat))
           hasMultiImage = true;
+        else if (imageInfoReader != null && SymbolEqualityComparer.Default.Equals(def, imageInfoReader))
+          hasImageInfoReader = true;
       }
 
       // Must implement at least one of the format interfaces
@@ -91,6 +100,45 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
 
       var fullName = type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
 
+      // Extract [FormatMagicBytes] attributes at compile time
+      var magicSignatures = new List<MagicBytesInfo>();
+      if (magicBytesAttr != null) {
+        foreach (var attr in type.GetAttributes()) {
+          if (!SymbolEqualityComparer.Default.Equals(attr.AttributeClass, magicBytesAttr))
+            continue;
+          if (attr.ConstructorArguments.Length < 1)
+            continue;
+          var sigArg = attr.ConstructorArguments[0];
+          if (sigArg.Kind != TypedConstantKind.Array)
+            continue;
+          var bytes = new List<byte>();
+          foreach (var element in sigArg.Values)
+            if (element.Value is byte b)
+              bytes.Add(b);
+          var offset = 0;
+          if (attr.ConstructorArguments.Length >= 2 && attr.ConstructorArguments[1].Value is int off)
+            offset = off;
+          else {
+            foreach (var named in attr.NamedArguments)
+              if (named.Key == "offset" && named.Value.Value is int namedOff)
+                offset = namedOff;
+          }
+          if (bytes.Count > 0)
+            magicSignatures.Add(new MagicBytesInfo(bytes.ToArray(), offset));
+        }
+      }
+
+      // Extract [FormatDetectionPriority] attribute at compile time
+      var detectionPriority = 100; // default
+      if (detectionPriorityAttr != null) {
+        foreach (var attr in type.GetAttributes()) {
+          if (!SymbolEqualityComparer.Default.Equals(attr.AttributeClass, detectionPriorityAttr))
+            continue;
+          if (attr.ConstructorArguments.Length >= 1 && attr.ConstructorArguments[0].Value is int prio)
+            detectionPriority = prio;
+        }
+      }
+
       results.Add(new FormatInfo(
         formatId,
         fullName,
@@ -98,7 +146,10 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
         hasToRawImage,
         hasFromRawImage,
         hasFormatWriter,
-        hasMultiImage
+        hasMultiImage,
+        hasImageInfoReader,
+        magicSignatures.ToArray(),
+        detectionPriority
       ));
     }
 
@@ -172,6 +223,31 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
     spc.AddSource("ImageFormat.g.cs", sb.ToString());
   }
 
+  private static string _FormatMagicArray(MagicBytesInfo magic) {
+    var sb = new StringBuilder();
+    sb.Append("new FormatRegistry.MagicSignature(new byte[] { ");
+    for (var i = 0; i < magic.Signature.Length; ++i) {
+      if (i > 0) sb.Append(", ");
+      sb.Append("0x").Append(magic.Signature[i].ToString("X2"));
+    }
+    sb.Append(" }, ").Append(magic.Offset).Append(", ").Append(magic.Offset + magic.Signature.Length).Append(')');
+    return sb.ToString();
+  }
+
+  private static void _EmitMagicArray(StringBuilder sb, FormatInfo format) {
+    if (format.MagicSignatures.Length == 0) {
+      sb.Append("System.Array.Empty<FormatRegistry.MagicSignature>()");
+      return;
+    }
+
+    sb.Append("new FormatRegistry.MagicSignature[] { ");
+    for (var i = 0; i < format.MagicSignatures.Length; ++i) {
+      if (i > 0) sb.Append(", ");
+      sb.Append(_FormatMagicArray(format.MagicSignatures[i]));
+    }
+    sb.Append(" }");
+  }
+
   private static void _GenerateRegistration(SourceProductionContext spc, ImmutableArray<FormatInfo> formats) {
     var sb = new StringBuilder();
     sb.AppendLine("// <auto-generated />");
@@ -186,12 +262,13 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
       if (format.FullTypeName == null)
         continue; // Enum-only entry from [AdditionalImageFormat]
 
-      if (format.HasFormatReader && format.HasToRawImage && format.HasFromRawImage && format.HasFormatWriter)
-        sb.Append("    _RegisterReaderWriter<").Append(format.FullTypeName).Append(">(ImageFormat.").Append(format.FormatId).AppendLine(");");
-      else if (format.HasFormatReader && format.HasToRawImage)
-        sb.Append("    _RegisterReader<").Append(format.FullTypeName).Append(">(ImageFormat.").Append(format.FormatId).AppendLine(");");
-      else if (format.HasFormatReader)
-        sb.Append("    _RegisterReader<").Append(format.FullTypeName).Append(">(ImageFormat.").Append(format.FormatId).AppendLine(");");
+      var method = format.HasFormatReader && format.HasToRawImage && format.HasFromRawImage && format.HasFormatWriter
+        ? "_RegisterReaderWriter"
+        : "_RegisterReader";
+
+      sb.Append("    ").Append(method).Append('<').Append(format.FullTypeName).Append(">(ImageFormat.").Append(format.FormatId).Append(", ");
+      _EmitMagicArray(sb, format);
+      sb.Append(", ").Append(format.DetectionPriority).AppendLine(");");
     }
 
     sb.AppendLine();
@@ -204,10 +281,29 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
         sb.Append("    _RegisterMultiImageReader<").Append(format.FullTypeName).Append(">(ImageFormat.").Append(format.FormatId).AppendLine(");");
     }
 
+    sb.AppendLine();
+    sb.AppendLine("    // Info reader registrations");
+    foreach (var format in formats) {
+      if (format.FullTypeName == null || !format.HasImageInfoReader)
+        continue;
+
+      sb.Append("    _AugmentInfoReader<").Append(format.FullTypeName).Append(">(ImageFormat.").Append(format.FormatId).AppendLine(");");
+    }
+
     sb.AppendLine("  }");
     sb.AppendLine("}");
 
     spc.AddSource("FormatRegistration.g.cs", sb.ToString());
+  }
+
+  private sealed class MagicBytesInfo {
+    public byte[] Signature { get; }
+    public int Offset { get; }
+
+    public MagicBytesInfo(byte[] signature, int offset) {
+      Signature = signature;
+      Offset = offset;
+    }
   }
 
   private sealed class FormatInfo {
@@ -218,11 +314,17 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
     public bool HasFromRawImage { get; }
     public bool HasFormatWriter { get; }
     public bool HasMultiImage { get; }
+    public bool HasImageInfoReader { get; }
+    public MagicBytesInfo[] MagicSignatures { get; }
+    public int DetectionPriority { get; }
 
     public FormatInfo(
       string formatId, string? fullTypeName,
       bool hasFormatReader, bool hasToRawImage,
-      bool hasFromRawImage, bool hasFormatWriter, bool hasMultiImage
+      bool hasFromRawImage, bool hasFormatWriter, bool hasMultiImage,
+      bool hasImageInfoReader = false,
+      MagicBytesInfo[]? magicSignatures = null,
+      int detectionPriority = 100
     ) {
       FormatId = formatId;
       FullTypeName = fullTypeName;
@@ -231,6 +333,9 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
       HasFromRawImage = hasFromRawImage;
       HasFormatWriter = hasFormatWriter;
       HasMultiImage = hasMultiImage;
+      HasImageInfoReader = hasImageInfoReader;
+      MagicSignatures = magicSignatures ?? Array.Empty<MagicBytesInfo>();
+      DetectionPriority = detectionPriority;
     }
   }
 }

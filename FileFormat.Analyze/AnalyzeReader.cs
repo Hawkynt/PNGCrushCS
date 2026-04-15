@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.Analyze;
@@ -60,28 +59,16 @@ public static class AnalyzeReader {
   }
 
   private static AnalyzeFile _Parse(byte[] hdrBytes, byte[] imgBytes) {
-    var span = hdrBytes.AsSpan();
+    var header = AnalyzeHeader.ReadFrom(hdrBytes);
 
-    // offset 0: int32 sizeof_hdr must be 348
-    var sizeofHdr = BinaryPrimitives.ReadInt32LittleEndian(span);
-    if (sizeofHdr != HEADER_SIZE)
-      throw new InvalidDataException($"Invalid Analyze sizeof_hdr: expected {HEADER_SIZE}, got {sizeofHdr}.");
-
-    // offset 40: int16[8] dim array
-    var width = BinaryPrimitives.ReadInt16LittleEndian(span[42..]);   // dim[1]
-    var height = BinaryPrimitives.ReadInt16LittleEndian(span[44..]);  // dim[2]
-
-    // offset 70: int16 datatype
-    var datatype = BinaryPrimitives.ReadInt16LittleEndian(span[70..]);
-
-    // offset 72: int16 bitpix
-    var bitpix = BinaryPrimitives.ReadInt16LittleEndian(span[72..]);
+    if (header.SizeofHdr != HEADER_SIZE)
+      throw new InvalidDataException($"Invalid Analyze sizeof_hdr: expected {HEADER_SIZE}, got {header.SizeofHdr}.");
 
     return new AnalyzeFile {
-      Width = width,
-      Height = height,
-      DataType = (AnalyzeDataType)datatype,
-      BitsPerPixel = bitpix,
+      Width = header.Width,
+      Height = header.Height,
+      DataType = (AnalyzeDataType)header.DataType,
+      BitsPerPixel = header.BitPix,
       PixelData = imgBytes,
     };
   }

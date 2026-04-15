@@ -12,13 +12,13 @@ public static class HighresMediumWriter {
     var span = result.AsSpan();
 
     // Frame 1
-    var header1 = HighresMediumHeader.FromPalette(file.Palette1);
+    var header1 = new HighresMediumHeader(file.Palette1);
     header1.WriteTo(span);
     file.PixelData1.AsSpan(0, Math.Min(32000, file.PixelData1.Length)).CopyTo(span.Slice(HighresMediumHeader.StructSize));
 
     // Frame 2
     var frame2Offset = HighresMediumHeader.FrameSize;
-    var header2 = HighresMediumHeader.FromPalette(file.Palette2);
+    var header2 = new HighresMediumHeader(file.Palette2);
     header2.WriteTo(span.Slice(frame2Offset));
     file.PixelData2.AsSpan(0, Math.Min(32000, file.PixelData2.Length)).CopyTo(span.Slice(frame2Offset + HighresMediumHeader.StructSize));
 

@@ -13,18 +13,18 @@ namespace FileFormat.Ico;
 /// <param name="DataOffset">Offset of the image data from the start of the file.</param>
 [GenerateSerializer]
 internal readonly partial record struct IcoDirectoryEntry(
-  [property: HeaderField(0, 1)] byte Width,
-  [property: HeaderField(1, 1)] byte Height,
-  [property: HeaderField(2, 1)] byte ColorCount,
-  [property: HeaderField(3, 1)] byte Reserved,
-  [property: HeaderField(4, 2)] ushort Field4,
-  [property: HeaderField(6, 2)] ushort Field5,
-  [property: HeaderField(8, 4)] int DataSize,
-  [property: HeaderField(12, 4)] int DataOffset
+  byte Width,
+  byte Height,
+  byte ColorCount,
+  byte Reserved,
+  ushort Field4,
+  ushort Field5,
+  int DataSize,
+  int DataOffset
 ) {
 
-  public const int StructSize = 16;
+ public const int StructSize = 16;
 
-  public static HeaderFieldDescriptor[] GetFieldMap()
-    => HeaderFieldMapper.GetFieldMap<IcoDirectoryEntry>();
+ public static HeaderFieldDescriptor[] GetFieldMap()
+ => HeaderFieldMapper.GetFieldMap<IcoDirectoryEntry>();
 }

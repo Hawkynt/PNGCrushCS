@@ -8,7 +8,7 @@ public static class FullscreenKitWriter {
   public static byte[] ToBytes(FullscreenKitFile file) {
     ArgumentNullException.ThrowIfNull(file);
 
-    var header = FullscreenKitHeader.FromPalette(file.Palette);
+    var header = new FullscreenKitHeader(file.Palette);
     var totalSize = FullscreenKitHeader.StructSize + file.PixelData.Length;
     var result = new byte[totalSize];
     header.WriteTo(result.AsSpan());

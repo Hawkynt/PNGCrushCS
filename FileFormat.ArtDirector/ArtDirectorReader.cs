@@ -32,8 +32,8 @@ public static class ArtDirectorReader {
     if (data.Length != ArtDirectorFile.ExpectedFileSize)
       throw new InvalidDataException($"Invalid Art Director data size: expected exactly {ArtDirectorFile.ExpectedFileSize} bytes, got {data.Length}.");
 
-    var span = data;
-    var resolution = BinaryPrimitives.ReadInt16BigEndian(span);
+    var header = ArtDirectorHeader.ReadFrom(data);
+    var resolution = header.Resolution;
 
     if (resolution is < 0 or > 2)
       throw new InvalidDataException($"Invalid Art Director resolution value: {resolution}.");
@@ -47,7 +47,7 @@ public static class ArtDirectorReader {
 
     var palette = new short[16];
     for (var i = 0; i < 16; ++i)
-      palette[i] = BinaryPrimitives.ReadInt16BigEndian(span[(ArtDirectorFile.PaletteOffset + i * 2)..]);
+      palette[i] = BinaryPrimitives.ReadInt16BigEndian(data[(ArtDirectorFile.PaletteOffset + i * 2)..]);
 
     var pixelData = new byte[ArtDirectorFile.PlanarDataSize];
     data.Slice(ArtDirectorFile.HeaderSize, ArtDirectorFile.PlanarDataSize).CopyTo(pixelData.AsSpan(0));
@@ -63,35 +63,6 @@ public static class ArtDirectorReader {
 
   public static ArtDirectorFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length != ArtDirectorFile.ExpectedFileSize)
-      throw new InvalidDataException($"Invalid Art Director data size: expected exactly {ArtDirectorFile.ExpectedFileSize} bytes, got {data.Length}.");
-
-    var span = data.AsSpan();
-    var resolution = BinaryPrimitives.ReadInt16BigEndian(span);
-
-    if (resolution is < 0 or > 2)
-      throw new InvalidDataException($"Invalid Art Director resolution value: {resolution}.");
-
-    var (width, height) = resolution switch {
-      0 => (320, 200),
-      1 => (640, 200),
-      2 => (640, 400),
-      _ => (320, 200)
-    };
-
-    var palette = new short[16];
-    for (var i = 0; i < 16; ++i)
-      palette[i] = BinaryPrimitives.ReadInt16BigEndian(span[(ArtDirectorFile.PaletteOffset + i * 2)..]);
-
-    var pixelData = new byte[ArtDirectorFile.PlanarDataSize];
-    data.AsSpan(ArtDirectorFile.HeaderSize, ArtDirectorFile.PlanarDataSize).CopyTo(pixelData.AsSpan(0));
-
-    return new ArtDirectorFile {
-      Width = width,
-      Height = height,
-      Resolution = resolution,
-      Palette = palette,
-      PixelData = pixelData
-    };
+    return FromSpan(data);
   }
 }

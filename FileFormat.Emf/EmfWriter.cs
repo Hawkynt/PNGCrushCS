@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using FileFormat.Bmp;
 
 namespace FileFormat.Emf;
@@ -101,13 +100,14 @@ public static class EmfWriter {
 
     // --- EMR_EOF record ---
     var eofOffset = stretchOffset + stretchRecordSize;
-    var es = span[eofOffset..];
-    BinaryPrimitives.WriteUInt32LittleEndian(es, _EMR_EOF);
-    BinaryPrimitives.WriteUInt32LittleEndian(es[4..], (uint)_EOF_RECORD_SIZE);
-    // nPalEntries = 0 (already zero)
-    // offPalEntries = 0 (already zero)
-    // nSizeLast = size of EOF record
-    BinaryPrimitives.WriteUInt32LittleEndian(es[16..], (uint)_EOF_RECORD_SIZE);
+    var eofRecord = new EmfEofRecord(
+      RecordType: _EMR_EOF,
+      RecordSize: (uint)_EOF_RECORD_SIZE,
+      NumPalEntries: 0,
+      OffPalEntries: 0,
+      SizeLast: (uint)_EOF_RECORD_SIZE
+    );
+    eofRecord.WriteTo(span[eofOffset..]);
 
     return result;
   }

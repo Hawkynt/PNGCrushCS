@@ -11,7 +11,7 @@ public static class PaintProWriter {
     var result = new byte[PaintProFile.FileSize];
     var span = result.AsSpan();
 
-    var header = PaintProHeader.FromPalette((short)file.Resolution, file.Palette);
+    var header = new PaintProHeader((short)file.Resolution, file.Palette);
     header.WriteTo(span);
 
     file.PixelData.AsSpan(0, Math.Min(32000, file.PixelData.Length)).CopyTo(result.AsSpan(PaintProHeader.StructSize));

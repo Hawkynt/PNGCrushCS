@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.TeliFax;
@@ -35,9 +34,10 @@ public static class TeliFaxReader {
     if (data[0] != TeliFaxFile.Magic[0] || data[1] != TeliFaxFile.Magic[1])
       throw new InvalidDataException("Invalid MH magic bytes.");
 
-    var version = BinaryPrimitives.ReadUInt16LittleEndian(data[2..]);
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
+    var header = TeliFaxHeader.ReadFrom(data);
+    var version = header.Version;
+    var width = header.Width;
+    var height = header.Height;
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid MH dimensions: {width}x{height}.");

@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.Pcd;
@@ -37,8 +36,9 @@ public static class PcdReader {
         throw new InvalidDataException("Invalid PCD magic at offset 2048: expected \"PCD_IPI\0\".");
 
     var magicEnd = PcdFile.PreambleSize + PcdFile.Magic.Length;
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[magicEnd..]);
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(magicEnd + 2));
+    var header = PcdHeader.ReadFrom(data[magicEnd..]);
+    var width = (int)header.Width;
+    var height = (int)header.Height;
 
     if (width == 0 || height == 0)
       throw new InvalidDataException("PCD image dimensions must be positive.");

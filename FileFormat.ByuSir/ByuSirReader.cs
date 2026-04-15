@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.ByuSir;
@@ -35,10 +34,11 @@ public static class ByuSirReader {
     if (data[0] != ByuSirFile.Magic[0] || data[1] != ByuSirFile.Magic[1] || data[2] != ByuSirFile.Magic[2] || data[3] != ByuSirFile.Magic[3])
       throw new InvalidDataException("Invalid SIR magic bytes.");
 
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
-    var dataType = BinaryPrimitives.ReadUInt16LittleEndian(data[8..]);
-    var reserved = BinaryPrimitives.ReadUInt16LittleEndian(data[10..]);
+    var header = ByuSirHeader.ReadFrom(data);
+    var width = header.Width;
+    var height = header.Height;
+    var dataType = header.DataType;
+    var reserved = header.Reserved;
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid SIR dimensions: {width}x{height}.");

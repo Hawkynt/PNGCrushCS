@@ -38,18 +38,14 @@ public static class WpgWriter {
     // ColorMap record (if palette present)
     if (palette is { Length: > 0 }) {
       ms.WriteByte((byte)WpgRecordType.ColorMap);
-      var colorMapSize = 4 + palette.Length; // startIndex(2) + numEntries(2) + palette data
+      var colorMapSize = WpgColorMapSubHeader.StructSize + palette.Length;
 
       _WriteRecordSize(ms, colorMapSize);
 
-      // startIndex = 0
-      ms.WriteByte(0);
-      ms.WriteByte(0);
-
-      // numEntries
-      var numEntries = (ushort)(palette.Length / 3);
-      ms.WriteByte((byte)(numEntries & 0xFF));
-      ms.WriteByte((byte)(numEntries >> 8));
+      var colorMapSub = new WpgColorMapSubHeader(0, (ushort)(palette.Length / 3));
+      Span<byte> colorMapSubBuf = stackalloc byte[WpgColorMapSubHeader.StructSize];
+      colorMapSub.WriteTo(colorMapSubBuf);
+      ms.Write(colorMapSubBuf);
 
       ms.Write(palette, 0, palette.Length);
     }
@@ -58,28 +54,13 @@ public static class WpgWriter {
     ms.WriteByte((byte)WpgRecordType.BitmapType1);
 
     // Bitmap sub-header: width(2) + height(2) + depth(2) + xdpi(2) + ydpi(2) = 10 bytes + pixel data
-    var bitmapSize = 10 + pixelData.Length;
+    var bitmapSize = WpgBitmapSubHeader.StructSize + pixelData.Length;
     _WriteRecordSize(ms, bitmapSize);
 
-    // Width LE
-    ms.WriteByte((byte)(width & 0xFF));
-    ms.WriteByte((byte)(width >> 8));
-
-    // Height LE
-    ms.WriteByte((byte)(height & 0xFF));
-    ms.WriteByte((byte)(height >> 8));
-
-    // Depth LE
-    ms.WriteByte((byte)(bitsPerPixel & 0xFF));
-    ms.WriteByte((byte)(bitsPerPixel >> 8));
-
-    // xdpi LE (96)
-    ms.WriteByte(96);
-    ms.WriteByte(0);
-
-    // ydpi LE (96)
-    ms.WriteByte(96);
-    ms.WriteByte(0);
+    var bmpSub = new WpgBitmapSubHeader((ushort)width, (ushort)height, (ushort)bitsPerPixel, 96, 96);
+    Span<byte> bmpSubBuf = stackalloc byte[WpgBitmapSubHeader.StructSize];
+    bmpSub.WriteTo(bmpSubBuf);
+    ms.Write(bmpSubBuf);
 
     // Uncompressed pixel data
     ms.Write(pixelData, 0, pixelData.Length);

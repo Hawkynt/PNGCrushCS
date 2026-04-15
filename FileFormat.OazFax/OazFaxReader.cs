@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.OazFax;
@@ -34,10 +33,11 @@ public static class OazFaxReader {
     if (data[0] != OazFaxFile.Magic[0] || data[1] != OazFaxFile.Magic[1] || data[2] != OazFaxFile.Magic[2] || data[3] != OazFaxFile.Magic[3])
       throw new InvalidDataException("Invalid OAZ magic bytes.");
 
-    var version = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[8..]);
-    var encoding = BinaryPrimitives.ReadUInt16LittleEndian(data[10..]);
+    var header = OazFaxHeader.ReadFrom(data);
+    var version = header.Version;
+    var width = header.Width;
+    var height = header.Height;
+    var encoding = header.Encoding;
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid OAZ dimensions: {width}x{height}.");

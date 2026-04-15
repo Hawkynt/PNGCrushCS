@@ -11,7 +11,7 @@ public static class ScreenBlasterWriter {
     var result = new byte[ScreenBlasterFile.FileSize];
     var span = result.AsSpan();
 
-    var header = ScreenBlasterHeader.FromPalette((short)file.Resolution, file.Palette);
+    var header = new ScreenBlasterHeader((short)file.Resolution, file.Palette);
     header.WriteTo(span);
 
     file.PixelData.AsSpan(0, Math.Min(32000, file.PixelData.Length)).CopyTo(result.AsSpan(ScreenBlasterHeader.StructSize));

@@ -83,14 +83,14 @@ public static class WpgReader {
       switch ((WpgRecordType)recordType) {
         case WpgRecordType.BitmapType1: {
           // Bitmap sub-header: width(2), height(2), depth(2), xdpi(2), ydpi(2) = 10 bytes
-          if (offset + 10 > recordEnd)
+          if (offset + WpgBitmapSubHeader.StructSize > recordEnd)
             break;
 
-          width = BinaryPrimitives.ReadUInt16LittleEndian(data[offset..]);
-          height = BinaryPrimitives.ReadUInt16LittleEndian(data[(offset + 2)..]);
-          bitsPerPixel = BinaryPrimitives.ReadUInt16LittleEndian(data[(offset + 4)..]);
-          // xdpi and ydpi at +6 and +8, skipped
-          var pixelDataOffset = offset + 10;
+          var bmpSub = WpgBitmapSubHeader.ReadFrom(data[offset..]);
+          width = bmpSub.Width;
+          height = bmpSub.Height;
+          bitsPerPixel = bmpSub.Depth;
+          var pixelDataOffset = offset + WpgBitmapSubHeader.StructSize;
           var pixelDataLength = recordEnd - pixelDataOffset;
 
           if (pixelDataLength > 0) {
@@ -113,12 +113,12 @@ public static class WpgReader {
         }
         case WpgRecordType.ColorMap: {
           // ColorMap: startIndex(2), numEntries(2), then R,G,B for each entry
-          if (offset + 4 > recordEnd)
+          if (offset + WpgColorMapSubHeader.StructSize > recordEnd)
             break;
 
-          var startIndex = BinaryPrimitives.ReadUInt16LittleEndian(data[offset..]);
-          var numEntries = BinaryPrimitives.ReadUInt16LittleEndian(data[(offset + 2)..]);
-          var paletteOffset = offset + 4;
+          var colorMapSub = WpgColorMapSubHeader.ReadFrom(data[offset..]);
+          var numEntries = colorMapSub.NumEntries;
+          var paletteOffset = offset + WpgColorMapSubHeader.StructSize;
           var paletteSize = numEntries * 3;
 
           if (paletteOffset + paletteSize <= recordEnd) {

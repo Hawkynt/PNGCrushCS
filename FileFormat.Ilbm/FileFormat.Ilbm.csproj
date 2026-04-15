@@ -19,6 +19,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\FileFormat.Core\FileFormat.Core.csproj" />
+    <ProjectReference Include="..\FileFormat.Iff\FileFormat.Iff.csproj" />
+    <ProjectReference Include="..\FileFormat.Riff\FileFormat.Riff.csproj" />
     <ProjectReference Include="..\FileFormat.Core.Generators\FileFormat.Core.Generators.csproj"
                       OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>

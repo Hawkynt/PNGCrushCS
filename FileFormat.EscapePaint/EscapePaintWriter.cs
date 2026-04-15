@@ -11,7 +11,7 @@ public static class EscapePaintWriter {
     var result = new byte[EscapePaintFile.FileSize];
     var span = result.AsSpan();
 
-    var header = EscapePaintHeader.FromPalette((short)file.Resolution, file.Palette);
+    var header = new EscapePaintHeader((short)file.Resolution, file.Palette);
     header.WriteTo(span);
 
     file.PixelData.AsSpan(0, Math.Min(32000, file.PixelData.Length)).CopyTo(result.AsSpan(EscapePaintHeader.StructSize));

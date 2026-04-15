@@ -36,7 +36,7 @@ public static class AladdinPaintReader {
 
     var span = data;
     var header = AladdinPaintHeader.ReadFrom(span);
-    var palette = header.GetPaletteArray();
+    var palette = header.Palette;
 
     var pixelData = new byte[32000];
     data.Slice(AladdinPaintHeader.StructSize, 32000).CopyTo(pixelData.AsSpan(0));

@@ -54,7 +54,7 @@ public static class AtariPaintworksReader {
       Width = width,
       Height = height,
       Resolution = resolution,
-      Palette = header.GetPaletteArray(),
+      Palette = header.Palette,
       PixelData = pixelData
     };
     }
@@ -81,7 +81,7 @@ public static class AtariPaintworksReader {
       Width = width,
       Height = height,
       Resolution = resolution,
-      Palette = header.GetPaletteArray(),
+      Palette = header.Palette,
       PixelData = pixelData
     };
   }
@@ -124,7 +124,7 @@ public static class AtariPaintworksReader {
       Width = width,
       Height = height,
       Resolution = resolution,
-      Palette = header.GetPaletteArray(),
+      Palette = header.Palette,
       PixelData = pixelData
     };
   }

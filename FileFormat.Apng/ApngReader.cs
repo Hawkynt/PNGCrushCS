@@ -66,10 +66,11 @@ public static class ApngReader {
 
       switch (chunkType) {
         case "IHDR":
-          width = BinaryPrimitives.ReadInt32BigEndian(chunkData);
-          height = BinaryPrimitives.ReadInt32BigEndian(chunkData[4..]);
-          bitDepth = chunkData[8];
-          colorType = (PngColorType)chunkData[9];
+          var ihdr = PngIhdr.ReadFrom(chunkData);
+          width = ihdr.Width;
+          height = ihdr.Height;
+          bitDepth = ihdr.BitDepth;
+          colorType = (PngColorType)ihdr.ColorType;
           break;
         case "PLTE":
           palette = chunkData.ToArray();

@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.Ps2Txc;
@@ -32,10 +31,11 @@ public static class Ps2TxcReader {
     if (data.Length < Ps2TxcFile.MinFileSize)
       throw new InvalidDataException($"Data too small for a valid TXC file (need at least {Ps2TxcFile.MinFileSize} bytes, got {data.Length}).");
 
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[0..]);
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[2..]);
-    var bpp = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
-    var flags = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
+    var header = Ps2TxcHeader.ReadFrom(data);
+    var width = header.Width;
+    var height = header.Height;
+    var bpp = header.Bpp;
+    var flags = header.Flags;
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid TXC dimensions: {width}x{height}.");

@@ -24,14 +24,9 @@ public static class ApngWriter {
     ms.Write(_PngSignature);
 
     // IHDR
-    var ihdrData = new byte[13];
-    BinaryPrimitives.WriteInt32BigEndian(ihdrData, file.Width);
-    BinaryPrimitives.WriteInt32BigEndian(ihdrData.AsSpan(4), file.Height);
-    ihdrData[8] = (byte)file.BitDepth;
-    ihdrData[9] = (byte)file.ColorType;
-    ihdrData[10] = 0; // compression method: deflate
-    ihdrData[11] = 0; // filter method: adaptive
-    ihdrData[12] = 0; // interlace method: none
+    var ihdrData = new byte[PngIhdr.StructSize];
+    var ihdr = new PngIhdr(file.Width, file.Height, (byte)file.BitDepth, (byte)file.ColorType, 0, 0, 0);
+    ihdr.WriteTo(ihdrData);
     _WriteChunk(ms, "IHDR", ihdrData);
 
     // acTL

@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.Calamus;
@@ -34,10 +33,11 @@ public static class CalamusReader {
     if (data[0] != CalamusFile.Magic[0] || data[1] != CalamusFile.Magic[1] || data[2] != CalamusFile.Magic[2] || data[3] != CalamusFile.Magic[3])
       throw new InvalidDataException("Invalid Calamus magic bytes.");
 
-    var version = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[8..]);
-    var bpp = BinaryPrimitives.ReadUInt16LittleEndian(data[10..]);
+    var header = CalamusHeader.ReadFrom(data);
+    var version = header.Version;
+    var width = header.Width;
+    var height = header.Height;
+    var bpp = header.Bpp;
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid Calamus dimensions: {width}x{height}.");

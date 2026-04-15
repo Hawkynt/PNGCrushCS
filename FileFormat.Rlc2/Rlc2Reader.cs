@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.Rlc2;
@@ -35,9 +34,10 @@ public static class Rlc2Reader {
     if (data[0] != Rlc2File.Magic[0] || data[1] != Rlc2File.Magic[1] || data[2] != Rlc2File.Magic[2] || data[3] != Rlc2File.Magic[3])
       throw new InvalidDataException("Invalid RLC2 magic bytes.");
 
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
-    var bpp = BinaryPrimitives.ReadUInt16LittleEndian(data[8..]);
+    var header = Rlc2Header.ReadFrom(data);
+    var width = header.Width;
+    var height = header.Height;
+    var bpp = header.Bpp;
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid RLC2 dimensions: {width}x{height}.");

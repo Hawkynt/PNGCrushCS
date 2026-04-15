@@ -19,7 +19,7 @@ public static class FshReader {
     if (!file.Exists)
       throw new FileNotFoundException("FSH file not found.", file.FullName);
 
-    return FromBytes(File.ReadAllBytes(file.FullName));
+    return FromSpan(File.ReadAllBytes(file.FullName));
   }
 
   public static FshFile FromStream(Stream stream) {
@@ -27,11 +27,11 @@ public static class FshReader {
     if (stream.CanSeek) {
       var data = new byte[stream.Length - stream.Position];
       stream.ReadExactly(data);
-      return FromBytes(data);
+      return FromSpan(data);
     }
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
+    return FromSpan(ms.ToArray());
   }
 
   public static FshFile FromBytes(byte[] data) {
@@ -47,8 +47,9 @@ public static class FshReader {
     if (data[0] != (byte)'S' || data[1] != (byte)'H' || data[2] != (byte)'P' || data[3] != (byte)'I')
       throw new InvalidDataException("Invalid FSH signature: expected 'SHPI'.");
 
-    var fileSize = BinaryPrimitives.ReadInt32LittleEndian(data[4..]);
-    var entryCount = BinaryPrimitives.ReadInt32LittleEndian(data[8..]);
+    var fileHeader = FshHeader.ReadFrom(data);
+    var fileSize = fileHeader.FileSize;
+    var entryCount = fileHeader.EntryCount;
     var directoryId = Encoding.ASCII.GetString(data.Slice(12, 4));
 
     if (entryCount < 0)

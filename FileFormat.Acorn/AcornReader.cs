@@ -7,8 +7,6 @@ namespace FileFormat.Acorn;
 /// <summary>Reads Acorn RISC OS sprite files from bytes, streams, or file paths.</summary>
 public static class AcornReader {
 
-  private const int _AREA_HEADER_SIZE = 12;
-
   public static AcornFile FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
@@ -31,12 +29,13 @@ public static class AcornReader {
 
   public static AcornFile FromSpan(ReadOnlySpan<byte> data) {
 
-    if (data.Length < _AREA_HEADER_SIZE)
+    if (data.Length < AcornAreaHeader.StructSize)
       throw new InvalidDataException("Data too small for a valid Acorn sprite file.");
 
     var span = data;
-    var spriteCount = _ReadInt32LE(span, 0);
-    var firstSpriteOffset = _ReadInt32LE(span, 4);
+    var areaHeader = AcornAreaHeader.ReadFrom(span);
+    var spriteCount = areaHeader.SpriteCount;
+    var firstSpriteOffset = areaHeader.FirstSpriteOffset;
 
     if (spriteCount < 0)
       throw new InvalidDataException($"Invalid sprite count: {spriteCount}.");
@@ -50,8 +49,8 @@ public static class AcornReader {
     // Sprites start at firstSpriteOffset - 4 in the data (since the area "start" includes an implicit size word before our data).
     // For simplicity: sprites start at offset (firstSpriteOffset - 4) in our data array.
     var spriteStart = firstSpriteOffset - 4;
-    if (spriteStart < _AREA_HEADER_SIZE)
-      spriteStart = _AREA_HEADER_SIZE;
+    if (spriteStart < AcornAreaHeader.StructSize)
+      spriteStart = AcornAreaHeader.StructSize;
 
     var sprites = new List<AcornSprite>();
     var offset = spriteStart;
@@ -126,12 +125,13 @@ public static class AcornReader {
 
   public static AcornFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < _AREA_HEADER_SIZE)
+    if (data.Length < AcornAreaHeader.StructSize)
       throw new InvalidDataException("Data too small for a valid Acorn sprite file.");
 
     var span = data.AsSpan();
-    var spriteCount = _ReadInt32LE(span, 0);
-    var firstSpriteOffset = _ReadInt32LE(span, 4);
+    var areaHeader = AcornAreaHeader.ReadFrom(span);
+    var spriteCount = areaHeader.SpriteCount;
+    var firstSpriteOffset = areaHeader.FirstSpriteOffset;
 
     if (spriteCount < 0)
       throw new InvalidDataException($"Invalid sprite count: {spriteCount}.");
@@ -145,8 +145,8 @@ public static class AcornReader {
     // Sprites start at firstSpriteOffset - 4 in the data (since the area "start" includes an implicit size word before our data).
     // For simplicity: sprites start at offset (firstSpriteOffset - 4) in our data array.
     var spriteStart = firstSpriteOffset - 4;
-    if (spriteStart < _AREA_HEADER_SIZE)
-      spriteStart = _AREA_HEADER_SIZE;
+    if (spriteStart < AcornAreaHeader.StructSize)
+      spriteStart = AcornAreaHeader.StructSize;
 
     var sprites = new List<AcornSprite>();
     var offset = spriteStart;
@@ -238,6 +238,4 @@ public static class AcornReader {
     };
   }
 
-  private static int _ReadInt32LE(ReadOnlySpan<byte> span, int offset)
-    => System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(span[offset..]);
 }

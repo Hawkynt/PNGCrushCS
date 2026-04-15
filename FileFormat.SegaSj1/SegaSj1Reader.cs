@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.SegaSj1;
@@ -35,10 +34,11 @@ public static class SegaSj1Reader {
     if (data[0] != SegaSj1File.Magic[0] || data[1] != SegaSj1File.Magic[1] || data[2] != SegaSj1File.Magic[2] || data[3] != SegaSj1File.Magic[3])
       throw new InvalidDataException("Invalid SJ1 magic bytes.");
 
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
-    var bpp = BinaryPrimitives.ReadUInt16LittleEndian(data[8..]);
-    var flags = BinaryPrimitives.ReadUInt16LittleEndian(data[10..]);
+    var header = SegaSj1Header.ReadFrom(data);
+    var width = header.Width;
+    var height = header.Height;
+    var bpp = header.Bpp;
+    var flags = header.Flags;
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid SJ1 dimensions: {width}x{height}.");

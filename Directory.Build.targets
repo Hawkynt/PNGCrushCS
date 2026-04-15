@@ -1,0 +1,8 @@
+<Project>
+  <!-- Source generators target netstandard2.0 — disable trimming/AOT for them -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+    <PublishTrimmed>false</PublishTrimmed>
+    <IsTrimmable>false</IsTrimmable>
+    <IsAotCompatible>false</IsAotCompatible>
+  </PropertyGroup>
+</Project>

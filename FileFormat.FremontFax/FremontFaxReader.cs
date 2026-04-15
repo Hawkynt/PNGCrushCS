@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.FremontFax;
@@ -39,8 +38,9 @@ public static class FremontFaxReader {
     if (data[0] != FremontFaxFile.Magic[0] || data[1] != FremontFaxFile.Magic[1] || data[2] != FremontFaxFile.Magic[2] || data[3] != FremontFaxFile.Magic[3])
       throw new InvalidDataException("Invalid F96 magic bytes.");
 
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
+    var header = FremontFaxHeader.ReadFrom(data);
+    var width = header.Width;
+    var height = header.Height;
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid F96 dimensions: {width}x{height}.");

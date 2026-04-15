@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using FileFormat.Ico;
@@ -34,12 +33,13 @@ public static class CurReader {
     var icoFile = IcoReader._Parse(data, IcoFileType.Cursor);
 
     // Re-read directory entries to extract hotspot fields
-    var count = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
+    var header = IcoHeader.ReadFrom(data);
+    var count = header.Count;
     var images = new List<CurImage>(count);
     for (var i = 0; i < count; ++i) {
-      var entryOffset = 6 + i * 16;
-      var hotspotX = BinaryPrimitives.ReadUInt16LittleEndian(data[(entryOffset + 4)..]);
-      var hotspotY = BinaryPrimitives.ReadUInt16LittleEndian(data[(entryOffset + 6)..]);
+      var entry = IcoDirectoryEntry.ReadFrom(data[(IcoHeader.StructSize + i * IcoDirectoryEntry.StructSize)..]);
+      var hotspotX = entry.Field4;
+      var hotspotY = entry.Field5;
 
       var icoImage = icoFile.Images[i];
       images.Add(new CurImage {

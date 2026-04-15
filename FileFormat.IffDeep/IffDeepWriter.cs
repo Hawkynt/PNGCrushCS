@@ -1,7 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.IO;
-using System.Text;
+using FileFormat.Iff;
 
 namespace FileFormat.IffDeep;
 
@@ -52,30 +52,26 @@ public static class IffDeepWriter {
     using var ms = new MemoryStream(totalSize);
 
     // FORM header
-    ms.Write(Encoding.ASCII.GetBytes("FORM"));
-    _WriteInt32BigEndian(ms, formDataSize);
+    _WriteChunkHeader(ms, "FORM", formDataSize);
 
     // Form type
-    ms.Write(Encoding.ASCII.GetBytes("DEEP"));
+    ms.Write("DEEP"u8);
 
     // DGBL chunk
-    ms.Write(Encoding.ASCII.GetBytes("DGBL"));
-    _WriteInt32BigEndian(ms, 8);
+    _WriteChunkHeader(ms, "DGBL", 8);
     _WriteUInt16BigEndian(ms, (ushort)width);
     _WriteUInt16BigEndian(ms, (ushort)height);
     _WriteUInt16BigEndian(ms, (ushort)file.Compression);
     _WriteUInt16BigEndian(ms, (ushort)dpelElementCount);
 
     // DPEL chunk
-    ms.Write(Encoding.ASCII.GetBytes("DPEL"));
-    _WriteInt32BigEndian(ms, dpelData.Length);
+    _WriteChunkHeader(ms, "DPEL", dpelData.Length);
     ms.Write(dpelData);
     if ((dpelData.Length & 1) != 0)
       ms.WriteByte(0);
 
     // BODY chunk
-    ms.Write(Encoding.ASCII.GetBytes("BODY"));
-    _WriteInt32BigEndian(ms, bodyData.Length);
+    _WriteChunkHeader(ms, "BODY", bodyData.Length);
     ms.Write(bodyData);
     if ((bodyData.Length & 1) != 0)
       ms.WriteByte(0);
@@ -83,9 +79,10 @@ public static class IffDeepWriter {
     return ms.ToArray();
   }
 
-  private static void _WriteInt32BigEndian(Stream stream, int value) {
-    Span<byte> buffer = stackalloc byte[4];
-    BinaryPrimitives.WriteInt32BigEndian(buffer, value);
+  private static void _WriteChunkHeader(Stream stream, string chunkId, int size) {
+    Span<byte> buffer = stackalloc byte[IffChunkHeader.StructSize];
+    new Riff.FourCC(chunkId).WriteTo(buffer);
+    BinaryPrimitives.WriteInt32BigEndian(buffer[4..], size);
     stream.Write(buffer);
   }
 

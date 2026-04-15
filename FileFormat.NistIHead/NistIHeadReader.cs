@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.NistIHead;
@@ -35,11 +34,12 @@ public static class NistIHeadReader {
     if (data[0] != NistIHeadFile.Magic[0] || data[1] != NistIHeadFile.Magic[1] || data[2] != NistIHeadFile.Magic[2] || data[3] != NistIHeadFile.Magic[3])
       throw new InvalidDataException("Invalid NST magic bytes.");
 
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
-    var bpp = BinaryPrimitives.ReadUInt16LittleEndian(data[8..]);
-    var compression = BinaryPrimitives.ReadUInt16LittleEndian(data[10..]);
-    var reserved = BinaryPrimitives.ReadUInt32LittleEndian(data[12..]);
+    var header = NistIHeadHeader.ReadFrom(data);
+    var width = header.Width;
+    var height = header.Height;
+    var bpp = header.Bpp;
+    var compression = header.Compression;
+    var reserved = header.Reserved;
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid NST dimensions: {width}x{height}.");

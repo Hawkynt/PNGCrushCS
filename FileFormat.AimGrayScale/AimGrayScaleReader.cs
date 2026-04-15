@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.AimGrayScale;
@@ -34,8 +33,9 @@ public static class AimGrayScaleReader {
     if (data[0] != AimGrayScaleFile.Magic[0] || data[1] != AimGrayScaleFile.Magic[1] || data[2] != AimGrayScaleFile.Magic[2] || data[3] != AimGrayScaleFile.Magic[3])
       throw new InvalidDataException("Invalid AIM magic bytes.");
 
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
+    var header = AimGrayScaleHeader.ReadFrom(data);
+    var width = header.Width;
+    var height = header.Height;
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid AIM dimensions: {width}x{height}.");

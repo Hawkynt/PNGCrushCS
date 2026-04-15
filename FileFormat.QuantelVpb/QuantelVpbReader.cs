@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.QuantelVpb;
@@ -35,11 +34,12 @@ public static class QuantelVpbReader {
     if (data[0] != QuantelVpbFile.Magic[0] || data[1] != QuantelVpbFile.Magic[1] || data[2] != QuantelVpbFile.Magic[2] || data[3] != QuantelVpbFile.Magic[3])
       throw new InvalidDataException("Invalid VPB magic bytes.");
 
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
-    var bpp = BinaryPrimitives.ReadUInt16LittleEndian(data[8..]);
-    var fields = BinaryPrimitives.ReadUInt16LittleEndian(data[10..]);
-    var reserved = BinaryPrimitives.ReadUInt32LittleEndian(data[12..]);
+    var header = QuantelVpbHeader.ReadFrom(data);
+    var width = header.Width;
+    var height = header.Height;
+    var bpp = header.Bpp;
+    var fields = header.Fields;
+    var reserved = header.Reserved;
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid VPB dimensions: {width}x{height}.");

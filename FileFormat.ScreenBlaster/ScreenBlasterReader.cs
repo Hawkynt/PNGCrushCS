@@ -36,7 +36,7 @@ public static class ScreenBlasterReader {
 
     var span = data;
     var header = ScreenBlasterHeader.ReadFrom(span);
-    var palette = header.GetPaletteArray();
+    var palette = header.Palette;
 
     var pixelData = new byte[32000];
     data.Slice(ScreenBlasterHeader.StructSize, 32000).CopyTo(pixelData.AsSpan(0));
@@ -60,7 +60,7 @@ public static class ScreenBlasterReader {
 
     var span = data.AsSpan();
     var header = ScreenBlasterHeader.ReadFrom(span);
-    var palette = header.GetPaletteArray();
+    var palette = header.Palette;
 
     var pixelData = new byte[32000];
     data.AsSpan(ScreenBlasterHeader.StructSize, 32000).CopyTo(pixelData.AsSpan(0));

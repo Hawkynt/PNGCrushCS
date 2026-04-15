@@ -35,7 +35,7 @@ public static class FullscreenKitReader {
     var pixelDataSize = data.Length - FullscreenKitHeader.StructSize;
 
     var header = FullscreenKitHeader.ReadFrom(data);
-    var palette = header.GetPaletteArray();
+    var palette = header.Palette;
 
     var pixelData = new byte[pixelDataSize];
     data.Slice(FullscreenKitHeader.StructSize, pixelDataSize).CopyTo(pixelData);
@@ -57,7 +57,7 @@ public static class FullscreenKitReader {
     var pixelDataSize = data.Length - FullscreenKitHeader.StructSize;
 
     var header = FullscreenKitHeader.ReadFrom(data.AsSpan());
-    var palette = header.GetPaletteArray();
+    var palette = header.Palette;
 
     var pixelData = new byte[pixelDataSize];
     data.AsSpan(FullscreenKitHeader.StructSize, pixelDataSize).CopyTo(pixelData);

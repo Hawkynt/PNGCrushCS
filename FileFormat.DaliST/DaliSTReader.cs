@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.DaliST;
@@ -47,9 +46,8 @@ public static class DaliSTReader {
     if (data.Length < DaliSTFile.ExpectedFileSize)
       throw new InvalidDataException($"Data too small for a valid Dali ST file: expected {DaliSTFile.ExpectedFileSize} bytes, got {data.Length}.");
 
-    var palette = new short[16];
-    for (var i = 0; i < 16; ++i)
-      palette[i] = BinaryPrimitives.ReadInt16BigEndian(data[(i * 2)..]);
+    var header = DaliSTHeader.ReadFrom(data);
+    var palette = header.Palette;
 
     var pixelData = new byte[DaliSTFile.PlanarDataSize];
     data.Slice(DaliSTFile.PaletteSize, DaliSTFile.PlanarDataSize).CopyTo(pixelData);

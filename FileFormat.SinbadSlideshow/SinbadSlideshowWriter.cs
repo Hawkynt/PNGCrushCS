@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 
 namespace FileFormat.SinbadSlideshow;
 
@@ -10,13 +9,11 @@ public static class SinbadSlideshowWriter {
     ArgumentNullException.ThrowIfNull(file);
 
     var result = new byte[SinbadSlideshowFile.FileSize];
-    var span = result.AsSpan();
 
-    for (var i = 0; i < 16; ++i)
-      BinaryPrimitives.WriteInt16BigEndian(span.Slice(i * 2, 2), i < file.Palette.Length ? file.Palette[i] : (short)0);
+    new SinbadSlideshowHeader(file.Palette).WriteTo(result);
 
     file.PixelData.AsSpan(0, Math.Min(file.PixelData.Length, SinbadSlideshowFile.PixelDataSize))
-      .CopyTo(span.Slice(SinbadSlideshowFile.PaletteSize));
+      .CopyTo(result.AsSpan(SinbadSlideshowFile.PaletteSize));
 
     return result;
   }

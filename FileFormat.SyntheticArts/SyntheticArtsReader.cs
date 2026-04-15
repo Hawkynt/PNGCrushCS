@@ -32,7 +32,7 @@ public static class SyntheticArtsReader {
       throw new InvalidDataException($"Data too small for a valid Synthetic Arts file (expected {SyntheticArtsFile.FileSize} bytes, got {data.Length}).");
 
     var header = SyntheticArtsHeader.ReadFrom(data);
-    var palette = header.GetPaletteArray();
+    var palette = header.Palette;
 
     var pixelData = new byte[32000];
     data.Slice(SyntheticArtsHeader.StructSize, 32000).CopyTo(pixelData);
@@ -49,7 +49,7 @@ public static class SyntheticArtsReader {
       throw new InvalidDataException($"Data too small for a valid Synthetic Arts file (expected {SyntheticArtsFile.FileSize} bytes, got {data.Length}).");
 
     var header = SyntheticArtsHeader.ReadFrom(data.AsSpan());
-    var palette = header.GetPaletteArray();
+    var palette = header.Palette;
 
     var pixelData = new byte[32000];
     data.AsSpan(SyntheticArtsHeader.StructSize, 32000).CopyTo(pixelData);

@@ -1,7 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.IO;
-using System.Text;
+using FileFormat.Iff;
 
 namespace FileFormat.IffAcbm;
 
@@ -33,15 +33,13 @@ public static class IffAcbmWriter {
     using var ms = new MemoryStream(totalSize);
 
     // FORM header
-    ms.Write("FORM"u8);
-    _WriteInt32BigEndian(ms, formDataSize);
+    _WriteChunkHeader(ms, "FORM", formDataSize);
 
     // Form type
     ms.Write("ACBM"u8);
 
     // BMHD chunk
-    ms.Write("BMHD"u8);
-    _WriteInt32BigEndian(ms, _BMHD_SIZE);
+    _WriteChunkHeader(ms, "BMHD", _BMHD_SIZE);
     Span<byte> bmhdBuffer = stackalloc byte[_BMHD_SIZE];
     BinaryPrimitives.WriteUInt16BigEndian(bmhdBuffer, (ushort)width);
     BinaryPrimitives.WriteUInt16BigEndian(bmhdBuffer[2..], (ushort)height);
@@ -60,16 +58,14 @@ public static class IffAcbmWriter {
 
     // CMAP chunk (optional)
     if (cmapDataSize > 0) {
-      ms.Write("CMAP"u8);
-      _WriteInt32BigEndian(ms, cmapDataSize);
+      _WriteChunkHeader(ms, "CMAP", cmapDataSize);
       ms.Write(file.Palette);
       if ((cmapDataSize & 1) != 0)
         ms.WriteByte(0); // pad to 2-byte alignment
     }
 
     // ABIT chunk
-    ms.Write("ABIT"u8);
-    _WriteInt32BigEndian(ms, abitDataSize);
+    _WriteChunkHeader(ms, "ABIT", abitDataSize);
     ms.Write(abitData);
     if ((abitDataSize & 1) != 0)
       ms.WriteByte(0); // pad to 2-byte alignment
@@ -107,9 +103,10 @@ public static class IffAcbmWriter {
     return result;
   }
 
-  private static void _WriteInt32BigEndian(Stream stream, int value) {
-    Span<byte> buffer = stackalloc byte[4];
-    BinaryPrimitives.WriteInt32BigEndian(buffer, value);
+  private static void _WriteChunkHeader(Stream stream, string chunkId, int size) {
+    Span<byte> buffer = stackalloc byte[IffChunkHeader.StructSize];
+    new Riff.FourCC(chunkId).WriteTo(buffer);
+    BinaryPrimitives.WriteInt32BigEndian(buffer[4..], size);
     stream.Write(buffer);
   }
 }

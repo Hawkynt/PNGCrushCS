@@ -1,8 +1,7 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
-using System.Text;
 using FileFormat.Core;
+using FileFormat.Iff;
 using FileFormat.Ilbm;
 
 namespace FileFormat.IffAnim;
@@ -29,17 +28,17 @@ public static class IffAnimWriter {
 
     using var ms = new MemoryStream(totalSize);
 
-    ms.Write(Encoding.ASCII.GetBytes("FORM"));
-    _WriteInt32BigEndian(ms, formDataSize);
-    ms.Write(Encoding.ASCII.GetBytes("ANIM"));
+    _WriteChunkHeader(ms, "FORM", formDataSize);
+    ms.Write("ANIM"u8);
     ms.Write(ilbmBytes);
 
     return ms.ToArray();
   }
 
-  private static void _WriteInt32BigEndian(Stream stream, int value) {
-    Span<byte> buffer = stackalloc byte[4];
-    BinaryPrimitives.WriteInt32BigEndian(buffer, value);
+  private static void _WriteChunkHeader(Stream stream, string chunkId, int size) {
+    Span<byte> buffer = stackalloc byte[IffChunkHeader.StructSize];
+    new Riff.FourCC(chunkId).WriteTo(buffer);
+    System.Buffers.Binary.BinaryPrimitives.WriteInt32BigEndian(buffer[4..], size);
     stream.Write(buffer);
   }
 }

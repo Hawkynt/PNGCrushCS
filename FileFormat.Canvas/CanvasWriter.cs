@@ -11,7 +11,7 @@ public static class CanvasWriter {
     var result = new byte[CanvasFile.FileSize];
     var span = result.AsSpan();
 
-    var header = CanvasHeader.FromPalette((short)file.Resolution, file.Palette);
+    var header = new CanvasHeader((short)file.Resolution, file.Palette);
     header.WriteTo(span);
 
     file.PixelData.AsSpan(0, Math.Min(32000, file.PixelData.Length)).CopyTo(result.AsSpan(CanvasHeader.StructSize));

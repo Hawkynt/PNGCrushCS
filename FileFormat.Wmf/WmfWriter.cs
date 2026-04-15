@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using FileFormat.Bmp;
 
 namespace FileFormat.Wmf;
@@ -36,11 +35,12 @@ public static class WmfWriter {
     var result = new byte[totalFileSize];
     var span = result.AsSpan();
 
-    // Placeable header
+    // Placeable header: write with checksum=0 first, compute checksum, then re-write with correct value
     var placeable = new WmfPlaceableHeader(_PLACEABLE_MAGIC, 0, 0, 0, (short)width, (short)height, _LOGICAL_UNITS_PER_INCH, 0, 0);
     placeable.WriteTo(span);
     var checksum = WmfPlaceableHeader.ComputeChecksum(span[..WmfPlaceableHeader.StructSize]);
-    BinaryPrimitives.WriteUInt16LittleEndian(span[20..], checksum);
+    placeable = placeable with { Checksum = checksum };
+    placeable.WriteTo(span);
 
     // Standard WMF header
     var fileSizeInWords = (uint)((WmfStandardHeader.StructSize + totalRecordSize) / 2);
@@ -49,22 +49,24 @@ public static class WmfWriter {
 
     // META_STRETCHDIB record
     var recOff = WmfPlaceableHeader.StructSize + WmfStandardHeader.StructSize;
-    BinaryPrimitives.WriteUInt32LittleEndian(span[recOff..], (uint)stretchDibRecordSizeInWords); // size in words
-    BinaryPrimitives.WriteUInt16LittleEndian(span[(recOff + 4)..], _META_STRETCHDIB); // function
-    // Parameters: rasterOp (SRCCOPY = 0x00CC0020)
-    BinaryPrimitives.WriteUInt32LittleEndian(span[(recOff + 6)..], 0x00CC0020);
-    BinaryPrimitives.WriteUInt16LittleEndian(span[(recOff + 10)..], (ushort)height); // srcHeight
-    BinaryPrimitives.WriteUInt16LittleEndian(span[(recOff + 12)..], (ushort)width);  // srcWidth
-    BinaryPrimitives.WriteUInt16LittleEndian(span[(recOff + 14)..], 0);  // ySrc
-    BinaryPrimitives.WriteUInt16LittleEndian(span[(recOff + 16)..], 0);  // xSrc
-    BinaryPrimitives.WriteUInt16LittleEndian(span[(recOff + 18)..], (ushort)height); // destHeight
-    BinaryPrimitives.WriteUInt16LittleEndian(span[(recOff + 20)..], (ushort)width);  // destWidth
-    BinaryPrimitives.WriteUInt16LittleEndian(span[(recOff + 22)..], 0);  // yDest
-    BinaryPrimitives.WriteUInt16LittleEndian(span[(recOff + 24)..], 0);  // xDest
-    BinaryPrimitives.WriteUInt16LittleEndian(span[(recOff + 26)..], 0);  // colorUse = DIB_RGB_COLORS
+    var stretchDib = new WmfStretchDibRecord(
+      SizeInWords: (uint)stretchDibRecordSizeInWords,
+      Function: _META_STRETCHDIB,
+      RasterOp: 0x00CC0020,
+      SrcHeight: (ushort)height,
+      SrcWidth: (ushort)width,
+      YSrc: 0,
+      XSrc: 0,
+      DestHeight: (ushort)height,
+      DestWidth: (ushort)width,
+      YDest: 0,
+      XDest: 0,
+      ColorUse: 0
+    );
+    stretchDib.WriteTo(span[recOff..]);
 
     // BITMAPINFOHEADER
-    var bihOff = recOff + 28;
+    var bihOff = recOff + WmfStretchDibRecord.StructSize;
     var bih = new BitmapInfoHeader(_BITMAPINFOHEADER_SIZE, width, height, 1, 24, 0, 0, 0, 0, 0, 0);
     bih.WriteTo(span[bihOff..]);
 
@@ -85,8 +87,8 @@ public static class WmfWriter {
 
     // META_EOF record
     var eofOff = recOff + stretchDibRecordSize;
-    BinaryPrimitives.WriteUInt32LittleEndian(span[eofOff..], 3); // size = 3 words
-    BinaryPrimitives.WriteUInt16LittleEndian(span[(eofOff + 4)..], 0); // function = 0 (META_EOF)
+    var eofRecord = new WmfEofRecord(SizeInWords: 3, Function: 0);
+    eofRecord.WriteTo(span[eofOff..]);
 
     return result;
   }

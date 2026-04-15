@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.LucasFilm;
@@ -39,11 +38,12 @@ public static class LucasFilmReader {
     if (data[0] != LucasFilmFile.Magic[0] || data[1] != LucasFilmFile.Magic[1] || data[2] != LucasFilmFile.Magic[2] || data[3] != LucasFilmFile.Magic[3])
       throw new InvalidDataException("Invalid LFF magic bytes.");
 
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
-    var bpp = BinaryPrimitives.ReadUInt16LittleEndian(data[8..]);
-    var channels = BinaryPrimitives.ReadUInt16LittleEndian(data[10..]);
-    var reserved = BinaryPrimitives.ReadUInt32LittleEndian(data[12..]);
+    var header = LucasFilmHeader.ReadFrom(data);
+    var width = header.Width;
+    var height = header.Height;
+    var bpp = header.Bpp;
+    var channels = header.Channels;
+    var reserved = header.Reserved;
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid LFF dimensions: {width}x{height}.");

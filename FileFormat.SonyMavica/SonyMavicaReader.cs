@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.SonyMavica;
@@ -35,9 +34,10 @@ public static class SonyMavicaReader {
     if (data[0] != SonyMavicaFile.Magic[0] || data[1] != SonyMavicaFile.Magic[1])
       throw new InvalidDataException("Invalid Mavica magic bytes.");
 
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[2..]);
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
-    var format = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
+    var header = SonyMavicaHeader.ReadFrom(data);
+    var width = header.Width;
+    var height = header.Height;
+    var format = header.Format;
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid Mavica dimensions: {width}x{height}.");

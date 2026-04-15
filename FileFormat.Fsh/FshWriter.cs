@@ -38,8 +38,7 @@ public static class FshWriter {
     result[1] = (byte)'H';
     result[2] = (byte)'P';
     result[3] = (byte)'I';
-    BinaryPrimitives.WriteInt32LittleEndian(span[4..], totalSize);
-    BinaryPrimitives.WriteInt32LittleEndian(span[8..], entryCount);
+    new FshHeader(totalSize, entryCount).WriteTo(span);
 
     var dirId = file.DirectoryId ?? "GIMX";
     var dirIdBytes = Encoding.ASCII.GetBytes(dirId.Length >= 4 ? dirId[..4] : dirId.PadRight(4, '\0'));

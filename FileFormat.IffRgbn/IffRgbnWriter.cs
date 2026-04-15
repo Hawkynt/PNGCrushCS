@@ -1,7 +1,6 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
-using System.Text;
+using FileFormat.Iff;
 
 namespace FileFormat.IffRgbn;
 
@@ -45,13 +44,11 @@ public static class IffRgbnWriter {
 
     using var ms = new MemoryStream(totalSize);
 
-    ms.Write(Encoding.ASCII.GetBytes("FORM"));
-    _WriteInt32BigEndian(ms, formDataSize);
+    _WriteChunkHeader(ms, "FORM", formDataSize);
 
-    ms.Write(Encoding.ASCII.GetBytes("RGBN"));
+    ms.Write("RGBN"u8);
 
-    ms.Write(Encoding.ASCII.GetBytes("BMHD"));
-    _WriteInt32BigEndian(ms, RgbnBmhdChunk.StructSize);
+    _WriteChunkHeader(ms, "BMHD", RgbnBmhdChunk.StructSize);
     var bmhdBuffer = new byte[RgbnBmhdChunk.StructSize];
     var bmhd = new RgbnBmhdChunk(
       (ushort)width,
@@ -71,8 +68,7 @@ public static class IffRgbnWriter {
     bmhd.WriteTo(bmhdBuffer);
     ms.Write(bmhdBuffer);
 
-    ms.Write(Encoding.ASCII.GetBytes("BODY"));
-    _WriteInt32BigEndian(ms, bodyData.Length);
+    _WriteChunkHeader(ms, "BODY", bodyData.Length);
     ms.Write(bodyData);
     if ((bodyData.Length & 1) != 0)
       ms.WriteByte(0);
@@ -80,9 +76,10 @@ public static class IffRgbnWriter {
     return ms.ToArray();
   }
 
-  private static void _WriteInt32BigEndian(Stream stream, int value) {
-    Span<byte> buffer = stackalloc byte[4];
-    BinaryPrimitives.WriteInt32BigEndian(buffer, value);
+  private static void _WriteChunkHeader(Stream stream, string chunkId, int size) {
+    Span<byte> buffer = stackalloc byte[IffChunkHeader.StructSize];
+    new Riff.FourCC(chunkId).WriteTo(buffer);
+    System.Buffers.Binary.BinaryPrimitives.WriteInt32BigEndian(buffer[4..], size);
     stream.Write(buffer);
   }
 }

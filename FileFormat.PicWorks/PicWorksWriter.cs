@@ -11,7 +11,7 @@ public static class PicWorksWriter {
     var result = new byte[PicWorksFile.FileSize];
     var span = result.AsSpan();
 
-    var header = PicWorksHeader.FromPalette((short)file.Resolution, file.Palette);
+    var header = new PicWorksHeader((short)file.Resolution, file.Palette);
     header.WriteTo(span);
 
     file.PixelData.AsSpan(0, Math.Min(32000, file.PixelData.Length)).CopyTo(result.AsSpan(PicWorksHeader.StructSize));

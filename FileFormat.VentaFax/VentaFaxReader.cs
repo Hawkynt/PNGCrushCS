@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.VentaFax;
@@ -35,10 +34,11 @@ public static class VentaFaxReader {
     if (data[0] != VentaFaxFile.Magic[0] || data[1] != VentaFaxFile.Magic[1] || data[2] != VentaFaxFile.Magic[2] || data[3] != VentaFaxFile.Magic[3])
       throw new InvalidDataException("Invalid VFX magic bytes.");
 
-    var version = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[8..]);
-    var encoding = BinaryPrimitives.ReadUInt16LittleEndian(data[10..]);
+    var header = VentaFaxHeader.ReadFrom(data);
+    var version = header.Version;
+    var width = header.Width;
+    var height = header.Height;
+    var encoding = header.Encoding;
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid VFX dimensions: {width}x{height}.");

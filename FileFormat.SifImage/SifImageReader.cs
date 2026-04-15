@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.SifImage;
@@ -34,9 +33,10 @@ public static class SifImageReader {
     if (data[0] != SifImageFile.Magic[0] || data[1] != SifImageFile.Magic[1] || data[2] != SifImageFile.Magic[2] || data[3] != SifImageFile.Magic[3])
       throw new InvalidDataException("Invalid SIF magic bytes.");
 
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
-    var bpp = BinaryPrimitives.ReadUInt16LittleEndian(data[8..]);
+    var header = SifImageHeader.ReadFrom(data);
+    var width = header.Width;
+    var height = header.Height;
+    var bpp = header.Bpp;
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid SIF dimensions: {width}x{height}.");

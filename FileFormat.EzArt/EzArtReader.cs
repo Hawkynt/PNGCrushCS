@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.EzArt;
@@ -36,11 +35,9 @@ public static class EzArtReader {
     if (data.Length < EzArtFile.FileSize)
       throw new InvalidDataException($"Data too small for a valid EZ-Art file (expected {EzArtFile.FileSize} bytes, got {data.Length}).");
 
-    var span = data;
 
-    var palette = new short[_PALETTE_ENTRIES];
-    for (var i = 0; i < _PALETTE_ENTRIES; ++i)
-      palette[i] = BinaryPrimitives.ReadInt16BigEndian(span[(i * 2)..]);
+    var header = EzArtHeader.ReadFrom(data);
+    var palette = header.Palette;
 
     var pixelData = new byte[_PIXEL_DATA_SIZE];
     data.Slice(_PALETTE_SIZE, _PIXEL_DATA_SIZE).CopyTo(pixelData.AsSpan(0));
@@ -58,11 +55,9 @@ public static class EzArtReader {
     if (data.Length < EzArtFile.FileSize)
       throw new InvalidDataException($"Data too small for a valid EZ-Art file (expected {EzArtFile.FileSize} bytes, got {data.Length}).");
 
-    var span = data.AsSpan();
 
-    var palette = new short[_PALETTE_ENTRIES];
-    for (var i = 0; i < _PALETTE_ENTRIES; ++i)
-      palette[i] = BinaryPrimitives.ReadInt16BigEndian(span[(i * 2)..]);
+    var header = EzArtHeader.ReadFrom(data);
+    var palette = header.Palette;
 
     var pixelData = new byte[_PIXEL_DATA_SIZE];
     data.AsSpan(_PALETTE_SIZE, _PIXEL_DATA_SIZE).CopyTo(pixelData.AsSpan(0));

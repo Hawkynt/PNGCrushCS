@@ -8,7 +8,7 @@ public static class CrackArtWriter {
   public static byte[] ToBytes(CrackArtFile file) {
     ArgumentNullException.ThrowIfNull(file);
 
-    var header = CrackArtHeader.FromPalette((byte)file.Resolution, file.Palette);
+    var header = new CrackArtHeader((byte)file.Resolution, file.Palette);
     var compressedData = CrackArtCompressor.Compress(file.PixelData);
 
     var result = new byte[CrackArtHeader.StructSize + compressedData.Length];

@@ -1,7 +1,6 @@
-﻿using System;
-using System.Buffers.Binary;
+using System;
 using System.IO;
-using System.Text;
+using FileFormat.Iff;
 
 namespace FileFormat.IffPbm;
 
@@ -40,15 +39,13 @@ public static class IffPbmWriter {
     using var ms = new MemoryStream(totalSize);
 
     // FORM header
-    ms.Write(Encoding.ASCII.GetBytes("FORM"));
-    _WriteInt32BigEndian(ms, formDataSize);
+    _WriteChunkHeader(ms, "FORM", formDataSize);
 
     // Form type (note: "PBM " with trailing space)
-    ms.Write(Encoding.ASCII.GetBytes("PBM "));
+    ms.Write("PBM "u8);
 
     // BMHD chunk
-    ms.Write(Encoding.ASCII.GetBytes("BMHD"));
-    _WriteInt32BigEndian(ms, IffPbmBmhd.StructSize);
+    _WriteChunkHeader(ms, "BMHD", IffPbmBmhd.StructSize);
     var bmhdBuffer = new byte[IffPbmBmhd.StructSize];
     var bmhd = new IffPbmBmhd(
       (ushort)width,
@@ -70,16 +67,14 @@ public static class IffPbmWriter {
 
     // CMAP chunk (optional)
     if (file.Palette != null) {
-      ms.Write(Encoding.ASCII.GetBytes("CMAP"));
-      _WriteInt32BigEndian(ms, file.Palette.Length);
+      _WriteChunkHeader(ms, "CMAP", file.Palette.Length);
       ms.Write(file.Palette);
       if ((file.Palette.Length & 1) != 0)
         ms.WriteByte(0); // pad to 2-byte alignment
     }
 
     // BODY chunk
-    ms.Write(Encoding.ASCII.GetBytes("BODY"));
-    _WriteInt32BigEndian(ms, bodyData.Length);
+    _WriteChunkHeader(ms, "BODY", bodyData.Length);
     ms.Write(bodyData);
     if ((bodyData.Length & 1) != 0)
       ms.WriteByte(0); // pad to 2-byte alignment
@@ -87,9 +82,10 @@ public static class IffPbmWriter {
     return ms.ToArray();
   }
 
-  private static void _WriteInt32BigEndian(Stream stream, int value) {
-    Span<byte> buffer = stackalloc byte[4];
-    BinaryPrimitives.WriteInt32BigEndian(buffer, value);
+  private static void _WriteChunkHeader(Stream stream, string chunkId, int size) {
+    Span<byte> buffer = stackalloc byte[IffChunkHeader.StructSize];
+    new Riff.FourCC(chunkId).WriteTo(buffer);
+    System.Buffers.Binary.BinaryPrimitives.WriteInt32BigEndian(buffer[4..], size);
     stream.Write(buffer);
   }
 }

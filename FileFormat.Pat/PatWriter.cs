@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Buffers.Binary;
 using System.Text;
 
 namespace FileFormat.Pat;
@@ -22,17 +21,13 @@ public static class PatWriter {
     var result = new byte[headerSize + expectedPixelBytes];
     var span = result.AsSpan();
 
-    BinaryPrimitives.WriteUInt32BigEndian(span, (uint)headerSize);
-    BinaryPrimitives.WriteUInt32BigEndian(span[4..], 1u); // version
-    BinaryPrimitives.WriteUInt32BigEndian(span[8..], (uint)width);
-    BinaryPrimitives.WriteUInt32BigEndian(span[12..], (uint)height);
-    BinaryPrimitives.WriteUInt32BigEndian(span[16..], (uint)bytesPerPixel);
+    new PatHeader((uint)headerSize, 1u, (uint)width, (uint)height, (uint)bytesPerPixel).WriteTo(span);
 
     // Magic "GPAT" at offset 20
-    result[20] = (byte)'G';
-    result[21] = (byte)'P';
-    result[22] = (byte)'A';
-    result[23] = (byte)'T';
+    result[PatHeader.StructSize] = (byte)'G';
+    result[PatHeader.StructSize + 1] = (byte)'P';
+    result[PatHeader.StructSize + 2] = (byte)'A';
+    result[PatHeader.StructSize + 3] = (byte)'T';
 
     // Name (UTF-8, null-terminated)
     nameBytes.AsSpan(0, nameBytes.Length).CopyTo(result.AsSpan(_FIXED_HEADER_SIZE));

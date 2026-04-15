@@ -1,14 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
-    <ImplicitUsings>disable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <LangVersion>preview</LangVersion>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <Version>1.0.0</Version>
-    <Authors>Hawkynt</Authors>
     <Description>Pure C# MacPaint file format reader and writer with zero external dependencies.</Description>
-    <PackageLicenseExpression>LGPL-3.0-or-later</PackageLicenseExpression>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,7 +11,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\FileFormat.Core\FileFormat.Core.csproj" />
-    <ProjectReference Include="..\FileFormat.Core.Generators\FileFormat.Core.Generators.csproj"
-                      OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\FileFormat.Core.Generators\FileFormat.Core.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
 </Project>

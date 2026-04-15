@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.Im5Visilog;
@@ -32,9 +31,10 @@ public static class Im5VisilogReader {
     if (data.Length < Im5VisilogFile.MinFileSize)
       throw new InvalidDataException($"Data too small for a valid IM5 file (need at least {Im5VisilogFile.MinFileSize} bytes, got {data.Length}).");
 
-    var width = BinaryPrimitives.ReadInt32LittleEndian(data[0..]);
-    var height = BinaryPrimitives.ReadInt32LittleEndian(data[4..]);
-    var depth = BinaryPrimitives.ReadInt32LittleEndian(data[8..]);
+    var header = Im5VisilogHeader.ReadFrom(data);
+    var width = header.Width;
+    var height = header.Height;
+    var depth = header.Depth;
 
     if (width <= 0 || height <= 0)
       throw new InvalidDataException($"Invalid IM5 dimensions: {width}x{height}.");

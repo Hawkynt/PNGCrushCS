@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.AttGroup4;
@@ -34,8 +33,9 @@ public static class AttGroup4Reader {
     if (data[0] != AttGroup4File.Magic[0] || data[1] != AttGroup4File.Magic[1] || data[2] != AttGroup4File.Magic[2] || data[3] != AttGroup4File.Magic[3])
       throw new InvalidDataException("Invalid ATT magic bytes.");
 
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
+    var header = AttGroup4Header.ReadFrom(data);
+    var width = header.Width;
+    var height = header.Height;
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid ATT dimensions: {width}x{height}.");

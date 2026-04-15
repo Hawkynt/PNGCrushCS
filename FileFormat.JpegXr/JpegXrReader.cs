@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 using FileFormat.JpegXr.Codec;
 
@@ -47,13 +46,14 @@ public static class JpegXrReader {
     if (data[0] != (byte)'I' || data[1] != (byte)'I')
       throw new InvalidDataException($"Invalid JPEG XR byte order: expected 'II', got 0x{data[0]:X2} 0x{data[1]:X2}.");
 
+    var header = JpegXrHeader.ReadFrom(data);
+
     // Validate magic number
-    var magic = BinaryPrimitives.ReadUInt16LittleEndian(data[2..]);
-    if (magic != JPEGXR_MAGIC)
-      throw new InvalidDataException($"Invalid JPEG XR magic: expected 0x{JPEGXR_MAGIC:X4}, got 0x{magic:X4}.");
+    if (header.Magic != JPEGXR_MAGIC)
+      throw new InvalidDataException($"Invalid JPEG XR magic: expected 0x{JPEGXR_MAGIC:X4}, got 0x{header.Magic:X4}.");
 
     // Read IFD offset
-    var ifdOffset = (int)BinaryPrimitives.ReadUInt32LittleEndian(data[4..]);
+    var ifdOffset = (int)header.IfdOffset;
     if (ifdOffset < 8 || ifdOffset + 2 > data.Length)
       throw new InvalidDataException($"Invalid IFD offset: {ifdOffset}.");
 

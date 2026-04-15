@@ -12,7 +12,7 @@ public static class ArtDirectorWriter {
     var result = new byte[ArtDirectorFile.ExpectedFileSize];
     var span = result.AsSpan();
 
-    BinaryPrimitives.WriteInt16BigEndian(span, file.Resolution);
+    new ArtDirectorHeader(file.Resolution).WriteTo(span);
 
     for (var i = 0; i < 16; ++i)
       BinaryPrimitives.WriteInt16BigEndian(span[(ArtDirectorFile.PaletteOffset + i * 2)..], i < file.Palette.Length ? file.Palette[i] : (short)0);

@@ -25,10 +25,10 @@ public sealed class DataTypeTests {
   }
 
   [Test]
-  public void HeaderFieldAttribute_NewProperties_HaveDefaults() {
-    var attr = new HeaderFieldAttribute(0, 4);
+  public void FieldAttribute_NewProperties_HaveDefaults() {
+    var attr = new FieldAttribute(0, 4);
 
-    Assert.That(attr.Endianness, Is.EqualTo(Endianness.Little));
+    Assert.That((int)attr.Endianness, Is.EqualTo(-1)); // sentinel: inherit from class-level [Endian]
     Assert.That(attr.EndianFieldName, Is.Null);
     Assert.That(attr.ArrayLength, Is.EqualTo(0));
     Assert.That(attr.BitOffset, Is.EqualTo(-1));
@@ -36,30 +36,30 @@ public sealed class DataTypeTests {
   }
 
   [Test]
-  public void HeaderFieldAttribute_SetEndianness_BigEndian() {
-    var attr = new HeaderFieldAttribute(0, 4) { Endianness = Endianness.Big };
+  public void FieldAttribute_SetEndianness_BigEndian() {
+    var attr = new FieldAttribute(0, 4) { Endianness = Endianness.Big };
 
     Assert.That(attr.Endianness, Is.EqualTo(Endianness.Big));
   }
 
   [Test]
-  public void HeaderFieldAttribute_SetArrayLength() {
-    var attr = new HeaderFieldAttribute(0, 48) { ArrayLength = 16 };
+  public void FieldAttribute_SetArrayLength() {
+    var attr = new FieldAttribute(0, 48) { ArrayLength = 16 };
 
     Assert.That(attr.ArrayLength, Is.EqualTo(16));
   }
 
   [Test]
-  public void HeaderFieldAttribute_SetBitFields() {
-    var attr = new HeaderFieldAttribute(0, 1) { BitOffset = 3, BitCount = 4 };
+  public void FieldAttribute_SetBitFields() {
+    var attr = new FieldAttribute(0, 1) { BitOffset = 3, BitCount = 4 };
 
     Assert.That(attr.BitOffset, Is.EqualTo(3));
     Assert.That(attr.BitCount, Is.EqualTo(4));
   }
 
   [Test]
-  public void HeaderFieldAttribute_SetEndianFieldName() {
-    var attr = new HeaderFieldAttribute(0, 4) { EndianFieldName = "isBigEndian" };
+  public void FieldAttribute_SetEndianFieldName() {
+    var attr = new FieldAttribute(0, 4) { EndianFieldName = "isBigEndian" };
 
     Assert.That(attr.EndianFieldName, Is.EqualTo("isBigEndian"));
   }

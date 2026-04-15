@@ -51,7 +51,7 @@ public static class CrackArtReader {
       Width = width,
       Height = height,
       Resolution = resolution,
-      Palette = header.GetPaletteArray(),
+      Palette = header.Palette,
       PixelData = pixelData
     };
     }
@@ -79,7 +79,7 @@ public static class CrackArtReader {
       Width = width,
       Height = height,
       Resolution = resolution,
-      Palette = header.GetPaletteArray(),
+      Palette = header.Palette,
       PixelData = pixelData
     };
   }

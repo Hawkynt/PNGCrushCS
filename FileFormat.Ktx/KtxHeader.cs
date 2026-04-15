@@ -4,21 +4,21 @@ namespace FileFormat.Ktx;
 
 /// <summary>The 64-byte KTX1 header.</summary>
 [GenerateSerializer]
-[HeaderFiller("Identifier", 0, 12)]
+[Filler(0, 12)]
 public readonly partial record struct KtxHeader(
-  [property: HeaderField(12, 4)] int Endianness,
-  [property: HeaderField(16, 4, EndianFieldName = "Endianness", EndianComputeValue = 0x01020304)] int GlType,
-  [property: HeaderField(20, 4, EndianFieldName = "Endianness", EndianComputeValue = 0x01020304)] int GlTypeSize,
-  [property: HeaderField(24, 4, EndianFieldName = "Endianness", EndianComputeValue = 0x01020304)] int GlFormat,
-  [property: HeaderField(28, 4, EndianFieldName = "Endianness", EndianComputeValue = 0x01020304)] int GlInternalFormat,
-  [property: HeaderField(32, 4, EndianFieldName = "Endianness", EndianComputeValue = 0x01020304)] int GlBaseInternalFormat,
-  [property: HeaderField(36, 4, EndianFieldName = "Endianness", EndianComputeValue = 0x01020304)] int PixelWidth,
-  [property: HeaderField(40, 4, EndianFieldName = "Endianness", EndianComputeValue = 0x01020304)] int PixelHeight,
-  [property: HeaderField(44, 4, EndianFieldName = "Endianness", EndianComputeValue = 0x01020304)] int PixelDepth,
-  [property: HeaderField(48, 4, EndianFieldName = "Endianness", EndianComputeValue = 0x01020304)] int NumberOfArrayElements,
-  [property: HeaderField(52, 4, EndianFieldName = "Endianness", EndianComputeValue = 0x01020304)] int NumberOfFaces,
-  [property: HeaderField(56, 4, EndianFieldName = "Endianness", EndianComputeValue = 0x01020304)] int NumberOfMipmapLevels,
-  [property: HeaderField(60, 4, EndianFieldName = "Endianness", EndianComputeValue = 0x01020304)] int BytesOfKeyValueData
+  [property: Field(12, 4)] int Endianness,
+  [property: Field(16, 4, EndianFieldName = "Endianness", EndianComputeValue = 0x01020304)] int GlType,
+  [property: Field(20, 4, EndianFieldName = "Endianness", EndianComputeValue = 0x01020304)] int GlTypeSize,
+  [property: Field(24, 4, EndianFieldName = "Endianness", EndianComputeValue = 0x01020304)] int GlFormat,
+  [property: Field(28, 4, EndianFieldName = "Endianness", EndianComputeValue = 0x01020304)] int GlInternalFormat,
+  [property: Field(32, 4, EndianFieldName = "Endianness", EndianComputeValue = 0x01020304)] int GlBaseInternalFormat,
+  [property: Field(36, 4, EndianFieldName = "Endianness", EndianComputeValue = 0x01020304)] int PixelWidth,
+  [property: Field(40, 4, EndianFieldName = "Endianness", EndianComputeValue = 0x01020304)] int PixelHeight,
+  [property: Field(44, 4, EndianFieldName = "Endianness", EndianComputeValue = 0x01020304)] int PixelDepth,
+  [property: Field(48, 4, EndianFieldName = "Endianness", EndianComputeValue = 0x01020304)] int NumberOfArrayElements,
+  [property: Field(52, 4, EndianFieldName = "Endianness", EndianComputeValue = 0x01020304)] int NumberOfFaces,
+  [property: Field(56, 4, EndianFieldName = "Endianness", EndianComputeValue = 0x01020304)] int NumberOfMipmapLevels,
+  [property: Field(60, 4, EndianFieldName = "Endianness", EndianComputeValue = 0x01020304)] int BytesOfKeyValueData
 ) {
 
   public const int StructSize = 64;

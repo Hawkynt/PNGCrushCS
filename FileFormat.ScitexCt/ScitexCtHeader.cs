@@ -4,18 +4,18 @@ namespace FileFormat.ScitexCt;
 
 /// <summary>The 80-byte ASCII header at the start of every Scitex CT file.</summary>
 [GenerateSerializer(FillByte = 0x20)]
-[HeaderFiller("Signature", 0, 2)]
-[HeaderFiller("HeaderSize", 2, 6)]
-[HeaderFiller("Padding", 74, 6)]
+[Filler(0, 2)]
+[Filler(2, 6)]
+[Filler(74, 6)]
 public readonly partial record struct ScitexCtHeader(
-  [property: HeaderField(8, 6, AsciiEncoding = AsciiEncoding.Decimal)] int Width,
-  [property: HeaderField(14, 6, AsciiEncoding = AsciiEncoding.Decimal)] int Height,
-  [property: HeaderField(20, 2, AsciiEncoding = AsciiEncoding.Decimal)] ScitexCtColorMode ColorMode,
-  [property: HeaderField(22, 2, AsciiEncoding = AsciiEncoding.Decimal)] int BitsPerComponent,
-  [property: HeaderField(24, 2, AsciiEncoding = AsciiEncoding.Decimal)] int Units,
-  [property: HeaderField(26, 6, AsciiEncoding = AsciiEncoding.Decimal)] int HResolution,
-  [property: HeaderField(32, 6, AsciiEncoding = AsciiEncoding.Decimal)] int VResolution,
-  [property: HeaderField(38, 36)] string Description
+  [property: Field(8, 6), TypeOverride(WireType.DecimalString)] int Width,
+  [property: Field(14, 6), TypeOverride(WireType.DecimalString)] int Height,
+  [property: Field(20, 2), TypeOverride(WireType.DecimalString)] ScitexCtColorMode ColorMode,
+  [property: Field(22, 2), TypeOverride(WireType.DecimalString)] int BitsPerComponent,
+  [property: Field(24, 2), TypeOverride(WireType.DecimalString)] int Units,
+  [property: Field(26, 6), TypeOverride(WireType.DecimalString)] int HResolution,
+  [property: Field(32, 6), TypeOverride(WireType.DecimalString)] int VResolution,
+  [property: Field(38, 36), String] string Description
 ) {
 
   public const int StructSize = 80;

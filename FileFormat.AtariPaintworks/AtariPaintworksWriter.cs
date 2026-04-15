@@ -14,7 +14,7 @@ public static class AtariPaintworksWriter {
     var result = new byte[_FILE_SIZE];
     var span = result.AsSpan();
 
-    var header = AtariPaintworksHeader.FromPalette(file.Palette);
+    var header = new AtariPaintworksHeader(file.Palette);
     header.WriteTo(span);
 
     file.PixelData.AsSpan(0, Math.Min(32000, file.PixelData.Length))

@@ -1,7 +1,5 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
-using System.Text;
 
 namespace FileFormat.SoftImage;
 
@@ -32,21 +30,15 @@ public static class SoftImageReader {
     if (data.Length < SoftImageFile.HeaderSize)
       throw new InvalidDataException("Data too small for a valid Softimage PIC file.");
 
-    var magic = BinaryPrimitives.ReadUInt32BigEndian(data);
-    if (magic != SoftImageFile.Magic)
-      throw new InvalidDataException($"Invalid Softimage PIC magic (expected 0x{SoftImageFile.Magic:X8}, got 0x{magic:X8}).");
+    var header = SoftImageHeader.ReadFrom(data);
 
-    var versionBits = BinaryPrimitives.ReadInt32BigEndian(data[4..]);
-    var version = BitConverter.Int32BitsToSingle(versionBits);
+    if (header.Magic != SoftImageFile.Magic)
+      throw new InvalidDataException($"Invalid Softimage PIC magic (expected 0x{SoftImageFile.Magic:X8}, got 0x{header.Magic:X8}).");
 
-    var commentBytes = data.Slice(8, SoftImageFile.CommentSize);
-    var commentEnd = commentBytes.IndexOf((byte)0);
-    var comment = commentEnd >= 0
-      ? Encoding.ASCII.GetString(commentBytes[..commentEnd])
-      : Encoding.ASCII.GetString(commentBytes);
-
-    var width = BinaryPrimitives.ReadUInt16BigEndian(data[88..]);
-    var height = BinaryPrimitives.ReadUInt16BigEndian(data[90..]);
+    var version = header.Version;
+    var comment = header.Comment ?? string.Empty;
+    var width = header.Width;
+    var height = header.Height;
 
     var bytes = data.ToArray();
     var offset = 96;

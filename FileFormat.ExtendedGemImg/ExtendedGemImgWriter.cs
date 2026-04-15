@@ -35,11 +35,14 @@ public static class ExtendedGemImgWriter {
     header.WriteTo(headerBytes);
     ms.Write(headerBytes, 0, headerBytes.Length);
 
-    // Write XIMG extension marker "XIMG"
+    // Write XIMG extension marker "XIMG" + color model via struct
     var extBytes = new byte[ximgExtensionSize];
-    BinaryPrimitives.WriteInt16BigEndian(extBytes.AsSpan(0), ExtendedGemImgHeader.XimgMarker1);
-    BinaryPrimitives.WriteInt16BigEndian(extBytes.AsSpan(2), ExtendedGemImgHeader.XimgMarker2);
-    BinaryPrimitives.WriteInt16BigEndian(extBytes.AsSpan(4), (short)file.ColorModel);
+    var extHeader = new ExtendedGemImgExtensionHeader(
+      ExtendedGemImgHeader.XimgMarker1,
+      ExtendedGemImgHeader.XimgMarker2,
+      (short)file.ColorModel
+    );
+    extHeader.WriteTo(extBytes.AsSpan());
 
     // Write palette entries (3 big-endian shorts per entry)
     for (var i = 0; i < actualPaletteEntries * 3; ++i)

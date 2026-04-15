@@ -7,7 +7,7 @@ namespace FileFormat.Blp;
 /// <summary>Reads BLP2 (Blizzard Texture) files from bytes, streams, or file paths.</summary>
 public static class BlpReader {
 
-  private const int _MAGIC = 0x32504C42; // "BLP2" as uint32 LE
+  private const uint _MAGIC = 0x32504C42; // "BLP2" as uint32 LE
   private const int _HEADER_SIZE = 148;
   private const int _PALETTE_SIZE = 1024; // 256 entries x 4 bytes (BGRA)
   private const int _MAX_MIPS = 16;
@@ -17,7 +17,7 @@ public static class BlpReader {
     if (!file.Exists)
       throw new FileNotFoundException("BLP file not found.", file.FullName);
 
-    return FromBytes(File.ReadAllBytes(file.FullName));
+    return FromSpan(File.ReadAllBytes(file.FullName));
   }
 
   public static BlpFile FromStream(Stream stream) {
@@ -25,30 +25,29 @@ public static class BlpReader {
     if (stream.CanSeek) {
       var data = new byte[stream.Length - stream.Position];
       stream.ReadExactly(data);
-      return FromBytes(data);
+      return FromSpan(data);
     }
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
+    return FromSpan(ms.ToArray());
   }
 
   public static BlpFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _HEADER_SIZE)
       throw new InvalidDataException("Data too small for a valid BLP2 file.");
 
-    var magic = BinaryPrimitives.ReadUInt32LittleEndian(data);
-    if (magic != _MAGIC)
+    var header = BlpHeader.ReadFrom(data);
+    if (header.Magic != _MAGIC)
       throw new InvalidDataException("Invalid BLP2 magic number.");
 
-    var type = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(4));
-    var encoding = (BlpEncoding)data[8];
-    var alphaDepth = data[9];
-    var alphaEncoding = (BlpAlphaEncoding)data[10];
-    var hasMips = data[11] != 0;
-    var width = (int)BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(12));
-    var height = (int)BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(16));
+    var encoding = (BlpEncoding)header.Encoding;
+    var alphaDepth = header.AlphaDepth;
+    var alphaEncoding = (BlpAlphaEncoding)header.AlphaEncoding;
+    var hasMips = header.HasMips != 0;
+    var width = (int)header.Width;
+    var height = (int)header.Height;
 
-    // Read mip offsets and sizes
+    // Read mip offsets and sizes (after 20-byte fixed header)
     var mipOffsets = new uint[_MAX_MIPS];
     var mipSizes = new uint[_MAX_MIPS];
     for (var i = 0; i < _MAX_MIPS; ++i) {

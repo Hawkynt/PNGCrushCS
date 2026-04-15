@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.WorldportFax;
@@ -35,9 +34,10 @@ public static class WorldportFaxReader {
     if (data[0] != WorldportFaxFile.Magic[0] || data[1] != WorldportFaxFile.Magic[1] || data[2] != WorldportFaxFile.Magic[2] || data[3] != WorldportFaxFile.Magic[3])
       throw new InvalidDataException("Invalid WPF magic bytes.");
 
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
-    var flags = BinaryPrimitives.ReadUInt16LittleEndian(data[8..]);
+    var header = WorldportFaxHeader.ReadFrom(data);
+    var width = header.Width;
+    var height = header.Height;
+    var flags = header.Flags;
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid WPF dimensions: {width}x{height}.");

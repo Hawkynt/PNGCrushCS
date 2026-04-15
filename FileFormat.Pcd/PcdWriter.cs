@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Buffers.Binary;
 
 namespace FileFormat.Pcd;
 
@@ -18,8 +17,8 @@ public static class PcdWriter {
     PcdFile.Magic.AsSpan(0, PcdFile.Magic.Length).CopyTo(result.AsSpan(PcdFile.PreambleSize));
 
     var dimOffset = PcdFile.PreambleSize + PcdFile.Magic.Length;
-    BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(dimOffset), (ushort)width);
-    BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(dimOffset + 2), (ushort)height);
+    var header = new PcdHeader((ushort)width, (ushort)height);
+    header.WriteTo(result.AsSpan(dimOffset));
 
     var copyLen = Math.Min(expectedPixelBytes, pixelData.Length);
     pixelData.AsSpan(0, copyLen).CopyTo(result.AsSpan(PcdFile.HeaderSize));

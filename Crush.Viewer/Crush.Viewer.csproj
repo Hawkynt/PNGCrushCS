@@ -4,14 +4,9 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms>
-    <LangVersion>preview</LangVersion>
-    <ImplicitUsings>disable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <Version>1.0.0</Version>
-    <Authors>Hawkynt</Authors>
     <Description>Image viewer supporting 500+ formats with zoom, pan, multi-image navigation, and format conversion.</Description>
-    <PackageLicenseExpression>LGPL-3.0-or-later</PackageLicenseExpression>
     <PublishSingleFile>true</PublishSingleFile>
+    <!-- WinForms is not compatible with trimming (NETSDK1175) -->
     <SelfContained>true</SelfContained>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>

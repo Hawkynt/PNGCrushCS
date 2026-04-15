@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Buffers.Binary;
 
 namespace FileFormat.MegaPaint;
 
@@ -11,14 +10,12 @@ public static class MegaPaintWriter {
 
     var bytesPerRow = (file.Width + 7) / 8;
     var pixelDataSize = bytesPerRow * file.Height;
-    var result = new byte[MegaPaintFile.HeaderSize + pixelDataSize];
+    var result = new byte[MegaPaintHeader.StructSize + pixelDataSize];
     var span = result.AsSpan();
 
-    BinaryPrimitives.WriteUInt16BigEndian(span, (ushort)file.Width);
-    BinaryPrimitives.WriteUInt16BigEndian(span[2..], (ushort)file.Height);
-    // bytes 4-7 are reserved (zero)
+    new MegaPaintHeader((ushort)file.Width, (ushort)file.Height, 0).WriteTo(span);
 
-    file.PixelData.AsSpan(0, Math.Min(file.PixelData.Length, pixelDataSize)).CopyTo(result.AsSpan(MegaPaintFile.HeaderSize));
+    file.PixelData.AsSpan(0, Math.Min(file.PixelData.Length, pixelDataSize)).CopyTo(result.AsSpan(MegaPaintHeader.StructSize));
 
     return result;
   }

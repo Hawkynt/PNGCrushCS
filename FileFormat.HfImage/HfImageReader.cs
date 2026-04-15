@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.HfImage;
@@ -39,9 +38,10 @@ public static class HfImageReader {
     if (data[0] != HfImageFile.Magic[0] || data[1] != HfImageFile.Magic[1])
       throw new InvalidDataException("Invalid HF magic bytes.");
 
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[2..]);
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
-    var dataType = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
+    var header = HfImageHeader.ReadFrom(data);
+    var width = header.Width;
+    var height = header.Height;
+    var dataType = header.DataType;
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid HF dimensions: {width}x{height}.");

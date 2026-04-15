@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.Nie;
@@ -40,8 +39,9 @@ public static class NieReader {
       throw new InvalidDataException($"Invalid NIE pixel config byte: 0x{configByte:X2}.");
 
     var pixelConfig = (NiePixelConfig)configByte;
-    var width = (int)BinaryPrimitives.ReadUInt32LittleEndian(data[8..]);
-    var height = (int)BinaryPrimitives.ReadUInt32LittleEndian(data[12..]);
+    var header = NieHeader.ReadFrom(data);
+    var width = (int)header.Width;
+    var height = (int)header.Height;
 
     if (width <= 0 || height <= 0)
       throw new InvalidDataException($"Invalid NIE dimensions: {width}x{height}.");

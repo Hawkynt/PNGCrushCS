@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <Description>End-to-end tests validating format reading, writing, and pixel conversion across all supported image formats.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <Using Include="NUnit.Framework" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="NUnit" Version="4.3.2" />
+    <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.0" />
+    <PackageReference Include="System.Drawing.Common" Version="9.0.4" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\FileFormat.Core\FileFormat.Core.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Png\FileFormat.Png.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Bmp\FileFormat.Bmp.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Qoi\FileFormat.Qoi.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Tga\FileFormat.Tga.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Farbfeld\FileFormat.Farbfeld.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Netpbm\FileFormat.Netpbm.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Aai\FileFormat.Aai.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Cmu\FileFormat.Cmu.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Hrz\FileFormat.Hrz.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Wbmp\FileFormat.Wbmp.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Sgi\FileFormat.Sgi.csproj" />
+    <ProjectReference Include="..\..\FileFormat.WebP\FileFormat.WebP.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Fixtures\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

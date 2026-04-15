@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Buffers.Binary;
 using System.IO;
 using FileFormat.Bmp;
 
@@ -45,9 +44,10 @@ public static class WmfReader {
     // Skip placeable header, skip standard header, scan records
     var offset = WmfPlaceableHeader.StructSize + WmfStandardHeader.StructSize;
 
-    while (offset + 6 <= data.Length) {
-      var recordSizeInWords = BinaryPrimitives.ReadUInt32LittleEndian(data[offset..]);
-      var function = BinaryPrimitives.ReadUInt16LittleEndian(data[(offset + 4)..]);
+    while (offset + WmfEofRecord.StructSize <= data.Length) {
+      var recordPrefix = WmfEofRecord.ReadFrom(data.Slice(offset, WmfEofRecord.StructSize));
+      var recordSizeInWords = recordPrefix.SizeInWords;
+      var function = recordPrefix.Function;
 
       if (function == _META_EOF)
         break;

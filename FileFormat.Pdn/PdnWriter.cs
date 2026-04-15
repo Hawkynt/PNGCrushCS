@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 using System.IO.Compression;
 
@@ -7,8 +6,6 @@ namespace FileFormat.Pdn;
 
 /// <summary>Assembles PDN file bytes from pixel data.</summary>
 public static class PdnWriter {
-
-  private static readonly byte[] _MAGIC = "PDN3"u8.ToArray();
 
   public static byte[] ToBytes(PdnFile file) {
     ArgumentNullException.ThrowIfNull(file);
@@ -19,13 +16,14 @@ public static class PdnWriter {
     using var output = new MemoryStream();
 
     // Write header (16 bytes)
-    Span<byte> header = stackalloc byte[PdnReader.HEADER_SIZE];
-    _MAGIC.CopyTo(header);
-    BinaryPrimitives.WriteUInt16LittleEndian(header[4..], version);
-    BinaryPrimitives.WriteUInt16LittleEndian(header[6..], 0); // reserved
-    BinaryPrimitives.WriteUInt32LittleEndian(header[8..], (uint)width);
-    BinaryPrimitives.WriteUInt32LittleEndian(header[12..], (uint)height);
-    output.Write(header);
+    Span<byte> headerBytes = stackalloc byte[PdnHeader.StructSize];
+    var header = new PdnHeader(
+      (byte)'P', (byte)'D', (byte)'N', (byte)'3',
+      version, 0,
+      (uint)width, (uint)height
+    );
+    header.WriteTo(headerBytes);
+    output.Write(headerBytes);
 
     // Write gzip-compressed BGRA32 pixel data
     var expectedPixelBytes = width * height * 4;

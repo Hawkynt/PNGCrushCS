@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.RicohFax;
@@ -35,10 +34,11 @@ public static class RicohFaxReader {
     if (data[0] != RicohFaxFile.Magic[0] || data[1] != RicohFaxFile.Magic[1] || data[2] != RicohFaxFile.Magic[2] || data[3] != RicohFaxFile.Magic[3])
       throw new InvalidDataException("Invalid RIC magic bytes.");
 
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
-    var resolution = BinaryPrimitives.ReadUInt16LittleEndian(data[8..]);
-    var compression = BinaryPrimitives.ReadUInt16LittleEndian(data[10..]);
+    var header = RicohFaxHeader.ReadFrom(data);
+    var width = header.Width;
+    var height = header.Height;
+    var resolution = header.Resolution;
+    var compression = header.Compression;
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid RIC dimensions: {width}x{height}.");

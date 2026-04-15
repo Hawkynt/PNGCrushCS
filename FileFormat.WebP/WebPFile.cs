@@ -47,6 +47,7 @@ public sealed class WebPFile : IImageFormatReader<WebPFile>, IImageToRawImage<We
       };
     }
 
+    // VP8 lossy: ported from golang.org/x/image/vp8 (Nigel Tao's clean reference implementation).
     var rgb = Vp8Decoder.Decode(file.ImageData, w, h);
     return new() {
       Width = w,
@@ -71,6 +72,19 @@ public sealed class WebPFile : IImageFormatReader<WebPFile>, IImageToRawImage<We
       Features = new WebPFeatures(w, h, hasAlpha, IsLossless: true, IsAnimated: false),
       ImageData = vp8lData,
       IsLossless = true,
+    };
+  }
+
+  /// <summary>Encode as VP8 lossy at the given quality (0-100). Alpha is discarded.
+  /// Output is round-trip-decodable by <see cref="Vp8Decoder"/>. For pixel-perfect preservation
+  /// use <see cref="FromRawImage(RawImage)"/> which writes VP8L.</summary>
+  public static WebPFile FromRawImageLossy(RawImage image, int quality = 75) {
+    ArgumentNullException.ThrowIfNull(image);
+    var vp8Data = Vp8Encoder.Encode(image, quality);
+    return new() {
+      Features = new WebPFeatures(image.Width, image.Height, HasAlpha: false, IsLossless: false, IsAnimated: false),
+      ImageData = vp8Data,
+      IsLossless = false,
     };
   }
 

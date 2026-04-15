@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 
 namespace FileFormat.Nie;
 
@@ -25,8 +24,7 @@ public static class NieWriter {
     result[7] = 0;
 
     // Width and height as uint32 LE
-    BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(8), (uint)file.Width);
-    BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(12), (uint)file.Height);
+    new NieHeader((uint)file.Width, (uint)file.Height).WriteTo(result);
 
     // Pixel data
     var copyLen = Math.Min(file.PixelData.Length, pixelDataSize);

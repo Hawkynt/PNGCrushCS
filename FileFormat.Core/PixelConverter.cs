@@ -1088,10 +1088,13 @@ public static class PixelConverter {
       var dstSpan = result.AsSpan();
 
       if (Vector256.IsHardwareAccelerated) {
-        var mask256 = Vector256.Create(mask, mask);
+        // Vector256.Shuffle is cross-lane — NOT two independent Vector128 shuffles.
+        // Use explicit per-lane Vector128 shuffles to avoid cross-lane contamination.
         for (; i + 32 <= byteLen; i += 32) {
-          var vec = Vector256.Create(srcSpan.Slice(i, 32));
-          Vector256.Shuffle(vec, mask256).CopyTo(dstSpan.Slice(i, 32));
+          var lo = Vector128.Create(srcSpan.Slice(i, 16));
+          var hi = Vector128.Create(srcSpan.Slice(i + 16, 16));
+          Vector128.Shuffle(lo, mask).CopyTo(dstSpan.Slice(i, 16));
+          Vector128.Shuffle(hi, mask).CopyTo(dstSpan.Slice(i + 16, 16));
         }
       }
 

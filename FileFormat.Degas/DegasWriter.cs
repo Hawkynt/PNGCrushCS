@@ -14,7 +14,7 @@ public static class DegasWriter {
     if (file.IsCompressed)
       resolutionValue = (short)(resolutionValue | _COMPRESSION_FLAG);
 
-    var header = DegasHeader.FromPalette(resolutionValue, file.Palette);
+    var header = new DegasHeader(resolutionValue, file.Palette);
 
     byte[] imageData;
     if (file.IsCompressed)

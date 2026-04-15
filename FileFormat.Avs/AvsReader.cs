@@ -1,14 +1,10 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.Avs;
 
 /// <summary>Reads AVS files from bytes, streams, or file paths.</summary>
 public static class AvsReader {
-
-  private const int _HEADER_SIZE = 8;
-
   public static AvsFile FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
@@ -31,11 +27,12 @@ public static class AvsReader {
 
   public static AvsFile FromSpan(ReadOnlySpan<byte> data) {
 
-    if (data.Length < _HEADER_SIZE)
+    if (data.Length < AvsHeader.StructSize)
       throw new InvalidDataException("Data too small for a valid AVS file.");
 
-    var width = (int)BinaryPrimitives.ReadUInt32BigEndian(data[0..]);
-    var height = (int)BinaryPrimitives.ReadUInt32BigEndian(data[4..]);
+    var header = AvsHeader.ReadFrom(data);
+    var width = (int)header.Width;
+    var height = (int)header.Height;
 
     if (width <= 0)
       throw new InvalidDataException($"Invalid AVS width: {width}.");
@@ -43,11 +40,11 @@ public static class AvsReader {
       throw new InvalidDataException($"Invalid AVS height: {height}.");
 
     var expectedPixelBytes = width * height * 4;
-    if (data.Length - _HEADER_SIZE != expectedPixelBytes)
-      throw new InvalidDataException($"Invalid AVS data size: expected {_HEADER_SIZE + expectedPixelBytes} bytes, got {data.Length}.");
+    if (data.Length - AvsHeader.StructSize != expectedPixelBytes)
+      throw new InvalidDataException($"Invalid AVS data size: expected {AvsHeader.StructSize + expectedPixelBytes} bytes, got {data.Length}.");
 
     var pixelData = new byte[expectedPixelBytes];
-    data.Slice(_HEADER_SIZE, expectedPixelBytes).CopyTo(pixelData.AsSpan(0));
+    data.Slice(AvsHeader.StructSize, expectedPixelBytes).CopyTo(pixelData.AsSpan(0));
 
     return new AvsFile {
       Width = width,

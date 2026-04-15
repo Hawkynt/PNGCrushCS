@@ -12,10 +12,10 @@ public static class AtariGrafikWriter {
     var result = new byte[AtariGrafikFile.ExpectedFileSize];
     var span = result.AsSpan();
 
-    BinaryPrimitives.WriteInt16BigEndian(span, file.Resolution);
+    new AtariGrafikHeader(file.Resolution).WriteTo(span);
 
     for (var i = 0; i < 16; ++i)
-      BinaryPrimitives.WriteInt16BigEndian(span[(2 + i * 2)..], file.Palette[i]);
+      BinaryPrimitives.WriteInt16BigEndian(span[(AtariGrafikHeader.StructSize + i * 2)..], file.Palette[i]);
 
     file.PixelData.AsSpan(0, Math.Min(file.PixelData.Length, AtariGrafikFile.PixelDataSize)).CopyTo(result.AsSpan(AtariGrafikFile.HeaderSize));
 

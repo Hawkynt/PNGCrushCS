@@ -12,7 +12,7 @@ public static class Fl32Reader {
     if (!file.Exists)
       throw new FileNotFoundException("FL32 file not found.", file.FullName);
 
-    return FromBytes(File.ReadAllBytes(file.FullName));
+    return FromSpan(File.ReadAllBytes(file.FullName));
   }
 
   public static Fl32File FromStream(Stream stream) {
@@ -20,12 +20,12 @@ public static class Fl32Reader {
     if (stream.CanSeek) {
       var data = new byte[stream.Length - stream.Position];
       stream.ReadExactly(data);
-      return FromBytes(data);
+      return FromSpan(data);
     }
 
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
+    return FromSpan(ms.ToArray());
   }
 
   public static Fl32File FromSpan(ReadOnlySpan<byte> data) {
@@ -36,9 +36,10 @@ public static class Fl32Reader {
     if (magic != Fl32File.Magic)
       throw new InvalidDataException($"Invalid FL32 magic: 0x{magic:X8}. Expected 0x{Fl32File.Magic:X8}.");
 
-    var height = BinaryPrimitives.ReadInt32LittleEndian(data[4..]);
-    var width = BinaryPrimitives.ReadInt32LittleEndian(data[8..]);
-    var channels = BinaryPrimitives.ReadInt32LittleEndian(data[12..]);
+    var header = Fl32Header.ReadFrom(data);
+    var width = header.Width;
+    var height = header.Height;
+    var channels = header.Channels;
 
     if (width <= 0 || height <= 0)
       throw new InvalidDataException($"Invalid FL32 dimensions: {width}x{height}.");

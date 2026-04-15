@@ -36,8 +36,7 @@ public static class JpegXrWriter {
     // Header
     result[0] = (byte)'I';
     result[1] = (byte)'I';
-    BinaryPrimitives.WriteUInt16LittleEndian(span[2..], JpegXrReader.JPEGXR_MAGIC);
-    BinaryPrimitives.WriteUInt32LittleEndian(span[4..], (uint)ifdOffset);
+    new JpegXrHeader(JpegXrReader.JPEGXR_MAGIC, (uint)ifdOffset).WriteTo(span);
 
     // IFD
     var pos = ifdOffset;

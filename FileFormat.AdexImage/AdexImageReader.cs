@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.AdexImage;
@@ -34,10 +33,11 @@ public static class AdexImageReader {
     if (data[0] != AdexImageFile.Magic[0] || data[1] != AdexImageFile.Magic[1] || data[2] != AdexImageFile.Magic[2] || data[3] != AdexImageFile.Magic[3])
       throw new InvalidDataException("Invalid ADX magic bytes.");
 
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
-    var bpp = BinaryPrimitives.ReadUInt16LittleEndian(data[8..]);
-    var compression = BinaryPrimitives.ReadUInt16LittleEndian(data[10..]);
+    var header = AdexImageHeader.ReadFrom(data);
+    var width = header.Width;
+    var height = header.Height;
+    var bpp = header.Bpp;
+    var compression = header.Compression;
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid ADX dimensions: {width}x{height}.");

@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.AdTechFax;
@@ -34,10 +33,11 @@ public static class AdTechFaxReader {
     if (data[0] != AdTechFaxFile.Magic[0] || data[1] != AdTechFaxFile.Magic[1] || data[2] != AdTechFaxFile.Magic[2] || data[3] != AdTechFaxFile.Magic[3])
       throw new InvalidDataException("Invalid ADT magic bytes.");
 
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
-    var resolution = BinaryPrimitives.ReadUInt16LittleEndian(data[8..]);
-    var reserved = BinaryPrimitives.ReadUInt16LittleEndian(data[10..]);
+    var header = AdTechFaxHeader.ReadFrom(data);
+    var width = header.Width;
+    var height = header.Height;
+    var resolution = header.Resolution;
+    var reserved = header.Reserved;
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid ADT dimensions: {width}x{height}.");

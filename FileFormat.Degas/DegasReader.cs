@@ -65,7 +65,7 @@ public static class DegasReader {
       Height = height,
       Resolution = resolution,
       IsCompressed = isCompressed,
-      Palette = header.GetPaletteArray(),
+      Palette = header.Palette,
       PixelData = pixelData
     };
     }

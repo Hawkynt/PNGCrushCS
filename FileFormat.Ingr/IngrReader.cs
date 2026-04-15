@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.Ingr;
@@ -35,21 +34,22 @@ public static class IngrReader {
     if (data.Length < HeaderSize)
       throw new InvalidDataException($"INGR data too small: {data.Length} bytes, need at least {HeaderSize}.");
 
-    var dataTypeCode = BinaryPrimitives.ReadUInt16LittleEndian(data[2..]);
-    if (!Enum.IsDefined(typeof(IngrDataType), dataTypeCode))
-      throw new InvalidDataException($"Unsupported INGR data type code: {dataTypeCode}.");
+    var header = IngrHeader.ReadFrom(data);
 
-    var dataType = (IngrDataType)dataTypeCode;
-    var width = BinaryPrimitives.ReadInt32LittleEndian(data[184..]);
-    var height = BinaryPrimitives.ReadInt32LittleEndian(data[188..]);
+    if (!Enum.IsDefined(typeof(IngrDataType), header.DataTypeCode))
+      throw new InvalidDataException($"Unsupported INGR data type code: {header.DataTypeCode}.");
+
+    var dataType = (IngrDataType)header.DataTypeCode;
+    var width = header.PixelsPerLine;
+    var height = header.NumberOfLines;
 
     if (width <= 0) {
-      var xExtent = Math.Abs(BinaryPrimitives.ReadInt16LittleEndian(data[8..]));
+      var xExtent = Math.Abs(header.XExtent);
       width = xExtent > 0 ? xExtent : throw new InvalidDataException("INGR image width must be positive.");
     }
 
     if (height <= 0) {
-      var yExtent = Math.Abs(BinaryPrimitives.ReadInt16LittleEndian(data[10..]));
+      var yExtent = Math.Abs(header.YExtent);
       height = yExtent > 0 ? yExtent : throw new InvalidDataException("INGR image height must be positive.");
     }
 

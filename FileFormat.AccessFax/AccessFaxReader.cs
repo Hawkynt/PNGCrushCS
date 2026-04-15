@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.AccessFax;
@@ -34,9 +33,10 @@ public static class AccessFaxReader {
     if (data[0] != AccessFaxFile.Magic[0] || data[1] != AccessFaxFile.Magic[1])
       throw new InvalidDataException("Invalid AccessFax magic bytes.");
 
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[2..]);
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
-    var flags = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
+    var header = AccessFaxHeader.ReadFrom(data);
+    var width = header.Width;
+    var height = header.Height;
+    var flags = header.Flags;
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid AccessFax dimensions: {width}x{height}.");

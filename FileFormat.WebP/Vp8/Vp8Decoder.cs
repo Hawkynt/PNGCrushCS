@@ -1,1214 +1,440 @@
 using System;
+using System.IO;
+using System.Runtime.CompilerServices;
 
 namespace FileFormat.WebP.Vp8;
 
-/// <summary>VP8 keyframe decoder: decodes VP8 lossy bitstream data to RGB24 byte array.</summary>
-internal static class Vp8Decoder {
+/// <summary>
+/// VP8 lossy decoder per RFC 6386. Faithful port of golang.org/x/image/vp8 by Nigel Tao,
+/// which itself follows libwebp's implementation. Handles keyframes only (still images);
+/// Golden/AltRef frames used by video are not supported.
+/// </summary>
+internal sealed partial class Vp8Decoder {
 
-  // Number of block types for coefficient probabilities
-  private const int _NUM_TYPES = 4;    // 0=Y_WITH_Y2, 1=Y_AFTER_Y2, 2=UV, 3=Y2
-  private const int _NUM_BANDS = 8;
-  private const int _NUM_CTX = 3;
-  private const int _NUM_PROBAS = 11;
+  // --- Constants (from decode.go / token.go / reconstruct.go) ---
 
-  // Macroblock prediction mode indices for keyframes
-  private const int _B_PRED = 0;       // 4x4 sub-block prediction
-  private const int _DC_PRED = 1;
-  private const int _V_PRED = 2;
-  private const int _H_PRED = 3;
-  private const int _TM_PRED = 4;
+  private const int NSegment = 4;
+  private const int NSegmentProb = 3;
+  private const int NRefLfDelta = 4;
+  private const int NModeLfDelta = 4;
 
-  // Dequantization factors
-  private sealed class DequantFactors {
-    public int Y1Dc;
-    public int Y1Ac;
-    public int Y2Dc;
-    public int Y2Ac;
-    public int UvDc;
-    public int UvAc;
+  private const int NPlane = 4;
+  private const int NBand = 8;
+  private const int NContext = 3;
+  private const int NProb = 11;
+
+  private const int PlaneY1WithY2 = 0;
+  private const int PlaneY2 = 1;
+  private const int PlaneUV = 2;
+  private const int PlaneY1SansY2 = 3;
+
+  // Coefficient layout: 16 luma DCT blocks, 4 U + 4 V chroma, 1 Y2 WHT block.
+  private const int CoeffCount = 1 * 16 * 16 + 2 * 8 * 8 + 1 * 4 * 4; // 400
+  private const int BCoeffBase = 1 * 16 * 16 + 0 * 8 * 8;              // 256
+  private const int RCoeffBase = 1 * 16 * 16 + 1 * 8 * 8;              // 320
+  private const int WhtCoeffBase = 1 * 16 * 16 + 2 * 8 * 8;            // 384
+
+  private const int YbrYX = 8;
+  private const int YbrYY = 1;
+  private const int YbrBX = 8;
+  private const int YbrBY = 18;
+  private const int YbrRX = 24;
+  private const int YbrRY = 18;
+
+  // --- Nested types (port of Go struct fields) ---
+
+  internal struct FrameHeader {
+    public bool KeyFrame;
+    public byte VersionNumber;
+    public bool ShowFrame;
+    public uint FirstPartitionLen;
+    public int Width;
+    public int Height;
+    public byte XScale;
+    public byte YScale;
   }
 
-  /// <summary>Decode VP8 keyframe data to RGB24 byte array.</summary>
-  public static byte[] Decode(byte[] vp8Data, int width, int height) {
-    ArgumentNullException.ThrowIfNull(vp8Data);
-    if (vp8Data.Length < 10)
-      throw new InvalidOperationException("VP8 data too small for frame header.");
+  private struct SegmentHeader {
+    public bool UseSegment;
+    public bool UpdateMap;
+    public bool RelativeDelta;
+    public sbyte Quantizer0, Quantizer1, Quantizer2, Quantizer3;
+    public sbyte FilterStrength0, FilterStrength1, FilterStrength2, FilterStrength3;
+    public byte Prob0, Prob1, Prob2;
 
-    // Parse the 3-byte uncompressed frame tag
-    var frameTag = vp8Data[0] | (vp8Data[1] << 8) | (vp8Data[2] << 16);
-    var isKeyframe = (frameTag & 1) == 0;
-    if (!isKeyframe)
-      throw new InvalidOperationException("VP8 data is not a keyframe.");
-
-    var dataPartition0Size = frameTag >> 5;
-
-    // Skip 10-byte header: 3 byte tag + 3 byte signature (9D 01 2A) + 2 byte width + 2 byte height
-    var headerOffset = 10;
-    if (headerOffset + dataPartition0Size > vp8Data.Length)
-      throw new InvalidOperationException("VP8 partition 0 extends beyond data.");
-
-    // Initialize the bool decoder for partition 0 (frame header + MB modes)
-    var br = new Vp8BoolDecoder(vp8Data, headerOffset);
-
-    // Read frame header fields
-    var colorSpace = br.ReadBool(128);   // 0 = YCbCr
-    var clampingType = br.ReadBool(128); // 0 = clamping required
-
-    // Segmentation
-    var segmentationEnabled = br.ReadBool(128) != 0;
-    var segmentQuantizers = new int[4];
-    var segmentFilterLevels = new int[4];
-    var segmentAbsoluteMode = false;
-    if (segmentationEnabled) {
-      var updateMap = br.ReadBool(128) != 0;
-      var updateData = br.ReadBool(128) != 0;
-      if (updateData) {
-        segmentAbsoluteMode = br.ReadBool(128) != 0;
-        for (var i = 0; i < 4; ++i)
-          segmentQuantizers[i] = br.ReadBool(128) != 0 ? br.ReadSignedLiteral(7) : 0;
-        for (var i = 0; i < 4; ++i)
-          segmentFilterLevels[i] = br.ReadBool(128) != 0 ? br.ReadSignedLiteral(6) : 0;
-      }
-
-      if (updateMap)
-        for (var i = 0; i < 3; ++i)
-          _ = br.ReadBool(128) != 0 ? br.ReadLiteral(8) : 255; // segment probabilities
-    }
-
-    // Loop filter parameters
-    var filterType = br.ReadBool(128);       // 0=simple, 1=normal
-    var filterLevel = br.ReadLiteral(6);
-    var sharpness = br.ReadLiteral(3);
-
-    // Loop filter adjustments
-    var loopFilterAdj = br.ReadBool(128) != 0;
-    if (loopFilterAdj) {
-      var updateAdj = br.ReadBool(128) != 0;
-      if (updateAdj) {
-        for (var i = 0; i < 4; ++i)
-          if (br.ReadBool(128) != 0)
-            _ = br.ReadSignedLiteral(6); // ref frame delta
-        for (var i = 0; i < 4; ++i)
-          if (br.ReadBool(128) != 0)
-            _ = br.ReadSignedLiteral(6); // mode delta
-      }
-    }
-
-    // Number of data partitions (coefficient data)
-    var log2NumPartitions = br.ReadLiteral(2);
-    var numPartitions = 1 << log2NumPartitions;
-
-    // Quantization parameters
-    var yAcQi = br.ReadLiteral(7);
-    var yDcDelta = br.ReadBool(128) != 0 ? br.ReadSignedLiteral(4) : 0;
-    var y2DcDelta = br.ReadBool(128) != 0 ? br.ReadSignedLiteral(4) : 0;
-    var y2AcDelta = br.ReadBool(128) != 0 ? br.ReadSignedLiteral(4) : 0;
-    var uvDcDelta = br.ReadBool(128) != 0 ? br.ReadSignedLiteral(4) : 0;
-    var uvAcDelta = br.ReadBool(128) != 0 ? br.ReadSignedLiteral(4) : 0;
-
-    var dqf = new DequantFactors {
-      Y1Dc = _DcLookup[_Clamp127(yAcQi + yDcDelta)],
-      Y1Ac = _AcLookup[_Clamp127(yAcQi)],
-      Y2Dc = _DcLookup[_Clamp127(yAcQi + y2DcDelta)] * 2,
-      Y2Ac = _AcLookup[_Clamp127(yAcQi + y2AcDelta)] * 155 / 100,
-      UvDc = _DcLookup[_Clamp127(yAcQi + uvDcDelta)],
-      UvAc = _AcLookup[_Clamp127(yAcQi + uvAcDelta)]
+    public sbyte GetQuantizer(int i) => i switch {
+      0 => Quantizer0, 1 => Quantizer1, 2 => Quantizer2, _ => Quantizer3,
     };
-    if (dqf.Y2Ac < 8)
-      dqf.Y2Ac = 8;
-    if (dqf.UvDc > 132)
-      dqf.UvDc = 132;
-
-    // Read coefficient probability updates
-    var coeffProbs = _InitDefaultCoeffProbs();
-    for (var t = 0; t < _NUM_TYPES; ++t)
-      for (var b = 0; b < _NUM_BANDS; ++b)
-        for (var c = 0; c < _NUM_CTX; ++c)
-          for (var p = 0; p < _NUM_PROBAS; ++p)
-            if (br.ReadBool(_CoeffUpdateProbs[t][b][c][p]) != 0)
-              coeffProbs[t][b][c][p] = (byte)br.ReadLiteral(8);
-
-    // Skip coefficient flag
-    var mbNoSkipCoeff = br.ReadBool(128) != 0;
-    var skipProb = mbNoSkipCoeff ? br.ReadLiteral(8) : 0;
-
-    // Macroblock dimensions
-    var mbWidth = (width + 15) >> 4;
-    var mbHeight = (height + 15) >> 4;
-
-    // Read macroblock prediction modes from partition 0
-    var mbModes = new int[mbWidth * mbHeight];                // 16x16 Y prediction mode
-    var mbSubModes = new int[mbWidth * mbHeight * 16];        // 4x4 sub-block modes (only if B_PRED)
-    var mbUvModes = new int[mbWidth * mbHeight];              // UV prediction mode
-    var mbSkip = new bool[mbWidth * mbHeight];
-
-    for (var mbRow = 0; mbRow < mbHeight; ++mbRow)
-      for (var mbCol = 0; mbCol < mbWidth; ++mbCol) {
-        var mbIdx = mbRow * mbWidth + mbCol;
-
-        if (mbNoSkipCoeff)
-          mbSkip[mbIdx] = br.ReadBool(skipProb) != 0;
-
-        // Read Y prediction mode using keyframe probability table
-        var yMode = _ReadKeyframeMbMode(br);
-        mbModes[mbIdx] = yMode;
-
-        if (yMode == _B_PRED) {
-          // Read 16 sub-block modes
-          for (var i = 0; i < 16; ++i) {
-            var above = _GetAboveSubMode(mbModes, mbSubModes, mbRow, mbCol, mbWidth, i);
-            var left = _GetLeftSubMode(mbModes, mbSubModes, mbRow, mbCol, mbWidth, i);
-            mbSubModes[mbIdx * 16 + i] = _ReadKeyframeSubBlockMode(br, above, left);
-          }
-        }
-
-        // Read UV prediction mode
-        mbUvModes[mbIdx] = _ReadKeyframeUvMode(br);
-      }
-
-    // Locate data partitions for coefficient data
-    var part0End = headerOffset + dataPartition0Size;
-    var tokenPartitions = new Vp8BoolDecoder[numPartitions];
-    var partOffset = part0End;
-
-    // Read partition sizes (numPartitions-1 sizes, 3 bytes each LE)
-    if (numPartitions > 1) {
-      var sizeStart = part0End;
-      partOffset = sizeStart + 3 * (numPartitions - 1);
-      for (var i = 0; i < numPartitions - 1; ++i) {
-        var sz = vp8Data[sizeStart + i * 3]
-                 | (vp8Data[sizeStart + i * 3 + 1] << 8)
-                 | (vp8Data[sizeStart + i * 3 + 2] << 16);
-        tokenPartitions[i] = new Vp8BoolDecoder(vp8Data, partOffset);
-        partOffset += sz;
-      }
-
-      tokenPartitions[numPartitions - 1] = new Vp8BoolDecoder(vp8Data, partOffset);
-    } else {
-      tokenPartitions[0] = new Vp8BoolDecoder(vp8Data, part0End);
+    public void SetQuantizer(int i, sbyte v) {
+      switch (i) { case 0: Quantizer0 = v; break; case 1: Quantizer1 = v; break; case 2: Quantizer2 = v; break; default: Quantizer3 = v; break; }
     }
-
-    // Allocate YUV planes (with 1-macroblock border for prediction reference)
-    var yStride = mbWidth * 16;
-    var uvStride = mbWidth * 8;
-    var yPlane = new byte[yStride * mbHeight * 16];
-    var uPlane = new byte[uvStride * mbHeight * 8];
-    var vPlane = new byte[uvStride * mbHeight * 8];
-
-    // Decode coefficients and reconstruct macroblocks
-    var coeffs = new short[16];   // reusable buffer for one 4x4 block
-    var y2Coeffs = new short[16]; // Y2 (WHT) block
-    var y2Output = new short[16]; // WHT output (16 DC values)
-
-    for (var mbRow = 0; mbRow < mbHeight; ++mbRow) {
-      var tokenBr = tokenPartitions[mbRow % numPartitions];
-
-      for (var mbCol = 0; mbCol < mbWidth; ++mbCol) {
-        var mbIdx = mbRow * mbWidth + mbCol;
-        var yMode = mbModes[mbIdx];
-        var uvMode = mbUvModes[mbIdx];
-
-        var mbX = mbCol * 16;
-        var mbY = mbRow * 16;
-        var uvMbX = mbCol * 8;
-        var uvMbY = mbRow * 8;
-
-        // Build above/left reference arrays for Y 16x16
-        var yAbove = _GetAboveRow(yPlane, mbX, mbY, yStride, 16);
-        var yLeft = _GetLeftCol(yPlane, mbX, mbY, yStride, 16);
-        var yTopLeft = _GetTopLeft(yPlane, mbX, mbY, yStride);
-
-        // Build above/left reference arrays for UV 8x8
-        var uAbove = _GetAboveRow(uPlane, uvMbX, uvMbY, uvStride, 8);
-        var uLeft = _GetLeftCol(uPlane, uvMbX, uvMbY, uvStride, 8);
-        var uTopLeft = _GetTopLeft(uPlane, uvMbX, uvMbY, uvStride);
-        var vAbove = _GetAboveRow(vPlane, uvMbX, uvMbY, uvStride, 8);
-        var vLeft = _GetLeftCol(vPlane, uvMbX, uvMbY, uvStride, 8);
-        var vTopLeft = _GetTopLeft(vPlane, uvMbX, uvMbY, uvStride);
-
-        if (yMode != _B_PRED) {
-          // 16x16 Y prediction
-          var predMode = yMode switch {
-            _DC_PRED => Vp8IntraPredictor.DC_PRED,
-            _V_PRED => Vp8IntraPredictor.V_PRED,
-            _H_PRED => Vp8IntraPredictor.H_PRED,
-            _TM_PRED => Vp8IntraPredictor.TM_PRED,
-            _ => Vp8IntraPredictor.DC_PRED
-          };
-          Vp8IntraPredictor.Predict16x16(predMode, yPlane, mbY * yStride + mbX, yStride, yAbove, yLeft, yTopLeft);
-
-          if (!mbSkip[mbIdx]) {
-            // Read Y2 (WHT) block
-            Array.Clear(y2Coeffs, 0, 16);
-            _ReadCoefficients(tokenBr, coeffProbs, 3, y2Coeffs, 0);
-            _DequantizeY2(y2Coeffs, dqf);
-            Vp8Dct.InverseWht(y2Coeffs, y2Output);
-
-            // Read and apply 16 Y sub-blocks (AC only, DC from WHT)
-            for (var i = 0; i < 16; ++i) {
-              var subY = mbY + (i >> 2) * 4;
-              var subX = mbX + (i & 3) * 4;
-              Array.Clear(coeffs, 0, 16);
-              _ReadCoefficients(tokenBr, coeffProbs, 1, coeffs, 1); // skip DC (index 0)
-              coeffs[0] = y2Output[i]; // DC from WHT
-              _DequantizeY(coeffs, dqf, hasDcFromY2: true);
-              Vp8Dct.InverseDct4x4(coeffs, yPlane, subY * yStride + subX, yStride);
-            }
-          } else {
-            // Skip: no residuals, Y2 is all zero
-          }
-        } else {
-          // 4x4 sub-block prediction (B_PRED)
-          // Build extended above row for 4x4 prediction (needs 8 pixels above for some modes)
-          var extAbove = _GetExtendedAboveRow(yPlane, mbX, mbY, yStride);
-
-          for (var i = 0; i < 16; ++i) {
-            var subRow = i >> 2;
-            var subCol = i & 3;
-            var subY = mbY + subRow * 4;
-            var subX = mbX + subCol * 4;
-            var subMode = mbSubModes[mbIdx * 16 + i];
-
-            // Build per-sub-block above/left references
-            var sAbove = _Get4x4Above(yPlane, extAbove, subX, subY, yStride, subCol);
-            var sAboveOff = 0;
-            var sLeft = _Get4x4Left(yPlane, subX, subY, yStride);
-            var sTl = _Get4x4TopLeft(yPlane, subX, subY, yStride, yTopLeft, subRow, subCol);
-
-            Vp8IntraPredictor.Predict4x4(subMode, yPlane, subY * yStride + subX, yStride, sAbove, sAboveOff, sLeft, sTl);
-
-            if (!mbSkip[mbIdx]) {
-              Array.Clear(coeffs, 0, 16);
-              _ReadCoefficients(tokenBr, coeffProbs, 0, coeffs, 0);
-              _DequantizeY(coeffs, dqf, hasDcFromY2: false);
-              Vp8Dct.InverseDct4x4(coeffs, yPlane, subY * yStride + subX, yStride);
-            }
-          }
-        }
-
-        // UV prediction
-        var uvPredMode = uvMode switch {
-          0 => Vp8IntraPredictor.DC_PRED,
-          1 => Vp8IntraPredictor.V_PRED,
-          2 => Vp8IntraPredictor.H_PRED,
-          3 => Vp8IntraPredictor.TM_PRED,
-          _ => Vp8IntraPredictor.DC_PRED
-        };
-        Vp8IntraPredictor.Predict8x8(uvPredMode, uPlane, uvMbY * uvStride + uvMbX, uvStride, uAbove, uLeft, uTopLeft);
-        Vp8IntraPredictor.Predict8x8(uvPredMode, vPlane, uvMbY * uvStride + uvMbX, uvStride, vAbove, vLeft, vTopLeft);
-
-        if (!mbSkip[mbIdx]) {
-          // Read and apply 4 U + 4 V sub-blocks
-          for (var i = 0; i < 4; ++i) {
-            var subY = uvMbY + (i >> 1) * 4;
-            var subX = uvMbX + (i & 1) * 4;
-            Array.Clear(coeffs, 0, 16);
-            _ReadCoefficients(tokenBr, coeffProbs, 2, coeffs, 0);
-            _DequantizeUv(coeffs, dqf);
-            Vp8Dct.InverseDct4x4(coeffs, uPlane, subY * uvStride + subX, uvStride);
-          }
-
-          for (var i = 0; i < 4; ++i) {
-            var subY = uvMbY + (i >> 1) * 4;
-            var subX = uvMbX + (i & 1) * 4;
-            Array.Clear(coeffs, 0, 16);
-            _ReadCoefficients(tokenBr, coeffProbs, 2, coeffs, 0);
-            _DequantizeUv(coeffs, dqf);
-            Vp8Dct.InverseDct4x4(coeffs, vPlane, subY * uvStride + subX, uvStride);
-          }
-        }
-      }
+    public sbyte GetFilterStrength(int i) => i switch {
+      0 => FilterStrength0, 1 => FilterStrength1, 2 => FilterStrength2, _ => FilterStrength3,
+    };
+    public void SetFilterStrength(int i, sbyte v) {
+      switch (i) { case 0: FilterStrength0 = v; break; case 1: FilterStrength1 = v; break; case 2: FilterStrength2 = v; break; default: FilterStrength3 = v; break; }
     }
-
-    // Apply loop filter
-    if (filterLevel > 0) {
-      if (filterType == 0)
-        Vp8LoopFilter.ApplySimple(yPlane, width, height, yStride, filterLevel, sharpness);
-      else
-        Vp8LoopFilter.ApplyNormal(yPlane, yStride, uPlane, vPlane, uvStride, width, height, filterLevel, sharpness);
-    }
-
-    // Convert YUV 4:2:0 to RGB24
-    return _ConvertYuvToRgb24(yPlane, uPlane, vPlane, width, height, yStride, uvStride);
-  }
-
-  #region coefficient reading
-
-  // Read one 4x4 block of coefficients using the VP8 token probability tree
-  private static void _ReadCoefficients(Vp8BoolDecoder br, byte[][][][] probs, int type, short[] coeffs, int startIndex) {
-    var lastNonZero = -1;
-    for (var i = startIndex; i < 16; ++i) {
-      var band = _Bands[i];
-      var ctx = lastNonZero < 0 ? 0 : lastNonZero == 0 ? 1 : 2;
-      if (i > startIndex && ctx == 0)
-        ctx = 0;
-
-      var p = probs[type][band][ctx];
-
-      // Token tree decode
-      if (br.ReadBool(p[0]) == 0)
-        // EOB: end of block, remaining coefficients are zero
-        return;
-
-      // Not EOB, read more of the tree
-      if (br.ReadBool(p[1]) == 0) {
-        // DCT_0 (zero coefficient)
-        coeffs[_ZigZag[i]] = 0;
-        lastNonZero = 0;
-        continue;
-      }
-
-      // Non-zero coefficient
-      int v;
-      if (br.ReadBool(p[2]) == 0) {
-        // DCT_1
-        v = 1;
-      } else if (br.ReadBool(p[3]) == 0) {
-        // DCT_2
-        v = 2;
-      } else if (br.ReadBool(p[4]) == 0) {
-        if (br.ReadBool(p[5]) == 0)
-          v = 3;
-        else
-          v = 4;
-      } else if (br.ReadBool(p[6]) == 0) {
-        // Category 1 or 2
-        if (br.ReadBool(p[7]) == 0) {
-          // CAT1: 5 + 1 extra bit
-          v = 5 + br.ReadBool(159);
-        } else {
-          // CAT2: 7 + 2 extra bits
-          v = 7 + br.ReadBool(165) * 2 + br.ReadBool(145);
-        }
-      } else {
-        // Category 3-6
-        if (br.ReadBool(p[8]) == 0) {
-          if (br.ReadBool(p[9]) == 0) {
-            // CAT3: 11 + 3 extra bits
-            v = 11;
-            v += br.ReadBool(173) * 4;
-            v += br.ReadBool(148) * 2;
-            v += br.ReadBool(140);
-          } else {
-            // CAT4: 19 + 4 extra bits
-            v = 19;
-            v += br.ReadBool(176) * 8;
-            v += br.ReadBool(155) * 4;
-            v += br.ReadBool(140) * 2;
-            v += br.ReadBool(135);
-          }
-        } else {
-          if (br.ReadBool(p[10]) == 0) {
-            // CAT5: 35 + 5 extra bits
-            v = 35;
-            v += br.ReadBool(180) * 16;
-            v += br.ReadBool(157) * 8;
-            v += br.ReadBool(141) * 4;
-            v += br.ReadBool(134) * 2;
-            v += br.ReadBool(130);
-          } else {
-            // CAT6: 67 + 11 extra bits
-            v = 67;
-            v += br.ReadBool(254) * 1024;
-            v += br.ReadBool(254) * 512;
-            v += br.ReadBool(243) * 256;
-            v += br.ReadBool(230) * 128;
-            v += br.ReadBool(196) * 64;
-            v += br.ReadBool(177) * 32;
-            v += br.ReadBool(153) * 16;
-            v += br.ReadBool(140) * 8;
-            v += br.ReadBool(133) * 4;
-            v += br.ReadBool(130) * 2;
-            v += br.ReadBool(129);
-          }
-        }
-      }
-
-      // Read sign bit
-      if (br.ReadBool(128) != 0)
-        v = -v;
-
-      coeffs[_ZigZag[i]] = (short)v;
-      lastNonZero = v != 0 ? (Math.Abs(v) > 1 ? 2 : 1) : 0;
+    public byte GetProb(int i) => i switch { 0 => Prob0, 1 => Prob1, _ => Prob2 };
+    public void SetProb(int i, byte v) {
+      switch (i) { case 0: Prob0 = v; break; case 1: Prob1 = v; break; default: Prob2 = v; break; }
     }
   }
 
-  #endregion
+  private struct FilterHeader {
+    public bool Simple;
+    public sbyte Level;
+    public byte Sharpness;
+    public bool UseLfDelta;
+    public sbyte RefLfDelta0, RefLfDelta1, RefLfDelta2, RefLfDelta3;
+    public sbyte ModeLfDelta0, ModeLfDelta1, ModeLfDelta2, ModeLfDelta3;
+    public sbyte PerSegmentLevel0, PerSegmentLevel1, PerSegmentLevel2, PerSegmentLevel3;
 
-  #region dequantization
-
-  private static void _DequantizeY(short[] coeffs, DequantFactors dqf, bool hasDcFromY2) {
-    if (!hasDcFromY2)
-      coeffs[0] = (short)(coeffs[0] * dqf.Y1Dc);
-    // else DC already set from WHT output (already dequantized via Y2)
-    for (var i = 1; i < 16; ++i)
-      coeffs[i] = (short)(coeffs[i] * dqf.Y1Ac);
-  }
-
-  private static void _DequantizeY2(short[] coeffs, DequantFactors dqf) {
-    coeffs[0] = (short)(coeffs[0] * dqf.Y2Dc);
-    for (var i = 1; i < 16; ++i)
-      coeffs[i] = (short)(coeffs[i] * dqf.Y2Ac);
-  }
-
-  private static void _DequantizeUv(short[] coeffs, DequantFactors dqf) {
-    coeffs[0] = (short)(coeffs[0] * dqf.UvDc);
-    for (var i = 1; i < 16; ++i)
-      coeffs[i] = (short)(coeffs[i] * dqf.UvAc);
-  }
-
-  #endregion
-
-  #region macroblock mode reading
-
-  // Keyframe Y mode probabilities (from VP8 spec section 11.6.1)
-  private static readonly int[] _KfYModeProbs = [145, 156, 163, 128];
-
-  // Keyframe UV mode probabilities
-  private static readonly int[] _KfUvModeProbs = [142, 114, 183];
-
-  // Keyframe sub-block mode probabilities [above_mode][left_mode][10 probs]
-  private static readonly int[][][] _KfBModeProbs = [
-    // above=B_DC_PRED(0)
-    [
-      [231, 120, 48, 89, 115, 113, 120, 152, 112],  // left=0
-      [152, 179, 64, 126, 170, 118, 46, 70, 95],     // left=1
-      [175, 69, 143, 80, 85, 82, 72, 155, 103],      // left=2
-      [56, 58, 10, 171, 218, 189, 17, 13, 152],      // left=3
-      [114, 26, 17, 163, 44, 195, 21, 10, 173],      // left=4
-      [121, 24, 80, 195, 26, 62, 44, 64, 85],        // left=5
-      [144, 71, 10, 38, 171, 213, 144, 34, 26],      // left=6
-      [170, 46, 55, 19, 136, 160, 33, 206, 71],      // left=7
-      [63, 20, 8, 114, 114, 208, 12, 9, 226],        // left=8
-      [81, 40, 11, 96, 182, 84, 29, 16, 36],         // left=9
-    ],
-    // above=B_TM_PRED(1)
-    [
-      [134, 183, 89, 137, 98, 101, 106, 165, 148],
-      [72, 187, 100, 130, 157, 111, 32, 75, 80],
-      [66, 102, 167, 99, 74, 62, 40, 234, 128],
-      [41, 53, 9, 178, 241, 141, 26, 8, 107],
-      [74, 43, 26, 146, 73, 166, 49, 23, 157],
-      [65, 38, 105, 160, 51, 52, 31, 115, 128],
-      [104, 79, 12, 27, 217, 255, 87, 17, 7],
-      [87, 68, 71, 44, 114, 51, 15, 186, 23],
-      [47, 41, 14, 110, 182, 183, 21, 17, 194],
-      [66, 45, 25, 102, 197, 189, 23, 18, 22],
-    ],
-    // above=B_VE_PRED(2)
-    [
-      [88, 88, 147, 150, 42, 46, 45, 196, 205],
-      [43, 97, 183, 117, 85, 38, 35, 179, 61],
-      [39, 53, 200, 87, 26, 21, 43, 232, 171],
-      [56, 34, 51, 104, 114, 102, 29, 93, 77],
-      [39, 28, 85, 171, 58, 165, 90, 98, 64],
-      [34, 22, 116, 206, 23, 34, 43, 166, 73],
-      [107, 54, 32, 26, 51, 1, 81, 43, 31],
-      [68, 25, 106, 22, 64, 171, 36, 225, 114],
-      [34, 19, 21, 102, 132, 188, 16, 76, 124],
-      [62, 18, 78, 95, 85, 57, 50, 48, 51],
-    ],
-    // above=B_HE_PRED(3)
-    [
-      [193, 101, 35, 159, 215, 111, 89, 46, 111],
-      [60, 148, 31, 172, 219, 228, 21, 18, 111],
-      [112, 113, 77, 85, 179, 255, 38, 120, 114],
-      [40, 42, 1, 196, 245, 209, 10, 25, 109],
-      [88, 43, 29, 140, 166, 213, 37, 43, 154],
-      [61, 63, 30, 155, 67, 45, 68, 1, 209],
-      [100, 80, 8, 43, 154, 1, 51, 26, 71],
-      [142, 78, 78, 16, 255, 128, 34, 197, 171],
-      [41, 40, 5, 102, 211, 183, 4, 1, 221],
-      [51, 50, 17, 168, 209, 192, 23, 25, 82],
-    ],
-    // above=B_RD_PRED(4)
-    [
-      [68, 45, 128, 34, 1, 47, 11, 245, 171],
-      [62, 17, 19, 70, 146, 85, 55, 62, 70],
-      [37, 43, 37, 154, 100, 163, 85, 160, 1],
-      [63, 9, 92, 136, 28, 64, 32, 201, 85],
-      [75, 15, 9, 9, 64, 255, 184, 119, 16],
-      [86, 6, 28, 5, 64, 255, 25, 248, 1],
-      [56, 8, 17, 132, 137, 255, 55, 116, 128],
-      [58, 15, 20, 82, 135, 57, 26, 121, 40],
-      [80, 10, 44, 83, 128, 195, 4, 141, 1],
-      [59, 26, 19, 66, 99, 58, 103, 74, 10],
-    ],
-    // above=B_VR_PRED(5)
-    [
-      [112, 113, 77, 85, 179, 255, 38, 120, 114],
-      [40, 42, 1, 196, 245, 209, 10, 25, 109],
-      [88, 43, 29, 140, 166, 213, 37, 43, 154],
-      [61, 63, 30, 155, 67, 45, 68, 1, 209],
-      [100, 80, 8, 43, 154, 1, 51, 26, 71],
-      [142, 78, 78, 16, 255, 128, 34, 197, 171],
-      [41, 40, 5, 102, 211, 183, 4, 1, 221],
-      [51, 50, 17, 168, 209, 192, 23, 25, 82],
-      [60, 148, 31, 172, 219, 228, 21, 18, 111],
-      [112, 113, 77, 85, 179, 255, 38, 120, 114],
-    ],
-    // above=B_LD_PRED(6)
-    [
-      [224, 124, 74, 58, 103, 106, 96, 47, 67],
-      [152, 179, 64, 126, 170, 118, 46, 70, 95],
-      [153, 69, 143, 80, 85, 82, 72, 155, 103],
-      [56, 58, 10, 171, 218, 189, 17, 13, 152],
-      [114, 26, 17, 163, 44, 195, 21, 10, 173],
-      [121, 24, 80, 195, 26, 62, 44, 64, 85],
-      [144, 71, 10, 38, 171, 213, 144, 34, 26],
-      [170, 46, 55, 19, 136, 160, 33, 206, 71],
-      [63, 20, 8, 114, 114, 208, 12, 9, 226],
-      [81, 40, 11, 96, 182, 84, 29, 16, 36],
-    ],
-    // above=B_VL_PRED(7)
-    [
-      [197, 159, 128, 34, 1, 47, 11, 245, 171],
-      [62, 17, 19, 70, 146, 85, 55, 62, 70],
-      [37, 43, 37, 154, 100, 163, 85, 160, 1],
-      [63, 9, 92, 136, 28, 64, 32, 201, 85],
-      [75, 15, 9, 9, 64, 255, 184, 119, 16],
-      [86, 6, 28, 5, 64, 255, 25, 248, 1],
-      [56, 8, 17, 132, 137, 255, 55, 116, 128],
-      [58, 15, 20, 82, 135, 57, 26, 121, 40],
-      [80, 10, 44, 83, 128, 195, 4, 141, 1],
-      [59, 26, 19, 66, 99, 58, 103, 74, 10],
-    ],
-    // above=B_HD_PRED(8)
-    [
-      [130, 57, 36, 155, 116, 77, 92, 49, 122],
-      [76, 133, 29, 172, 209, 210, 18, 28, 120],
-      [100, 78, 116, 94, 117, 131, 62, 147, 100],
-      [47, 50, 8, 180, 229, 163, 14, 18, 120],
-      [79, 37, 21, 148, 113, 196, 31, 34, 166],
-      [65, 47, 47, 167, 57, 44, 58, 8, 183],
-      [93, 73, 12, 47, 161, 49, 55, 35, 72],
-      [128, 64, 72, 25, 198, 100, 25, 191, 137],
-      [43, 39, 6, 112, 204, 186, 6, 4, 213],
-      [55, 48, 14, 158, 199, 181, 23, 22, 86],
-    ],
-    // above=B_HU_PRED(9)
-    [
-      [156, 72, 46, 149, 158, 113, 93, 53, 116],
-      [83, 162, 42, 145, 186, 170, 25, 39, 97],
-      [118, 81, 125, 96, 107, 116, 56, 159, 105],
-      [48, 47, 5, 185, 235, 176, 14, 14, 133],
-      [87, 31, 23, 157, 86, 191, 32, 27, 164],
-      [77, 38, 72, 174, 42, 47, 49, 42, 133],
-      [111, 74, 11, 38, 171, 173, 96, 34, 37],
-      [149, 55, 63, 22, 158, 117, 27, 197, 93],
-      [49, 32, 9, 112, 160, 185, 9, 8, 216],
-      [63, 43, 15, 117, 191, 124, 28, 20, 49],
-    ],
-  ];
-
-  private static int _ReadKeyframeMbMode(Vp8BoolDecoder br) {
-    // Tree: if(!B) -> B_PRED(0), else if(!B) -> DC_PRED(1), else if(!B) -> V_PRED(2), else if(!B) -> H_PRED(3), else -> TM_PRED(4)
-    if (br.ReadBool(_KfYModeProbs[0]) == 0)
-      return _B_PRED;
-    if (br.ReadBool(_KfYModeProbs[1]) == 0)
-      return _DC_PRED;
-    if (br.ReadBool(_KfYModeProbs[2]) == 0)
-      return _V_PRED;
-    return br.ReadBool(_KfYModeProbs[3]) == 0 ? _H_PRED : _TM_PRED;
-  }
-
-  private static int _ReadKeyframeUvMode(Vp8BoolDecoder br) {
-    if (br.ReadBool(_KfUvModeProbs[0]) == 0)
-      return 0; // DC
-    if (br.ReadBool(_KfUvModeProbs[1]) == 0)
-      return 1; // V
-    return br.ReadBool(_KfUvModeProbs[2]) == 0 ? 2 : 3; // H or TM
-  }
-
-  private static int _ReadKeyframeSubBlockMode(Vp8BoolDecoder br, int aboveMode, int leftMode) {
-    var p = _KfBModeProbs[aboveMode][leftMode];
-    // Tree decoding for 10 intra 4x4 modes
-    if (br.ReadBool(p[0]) == 0)
-      return Vp8IntraPredictor.B_DC_PRED;
-    if (br.ReadBool(p[1]) == 0)
-      return Vp8IntraPredictor.B_TM_PRED;
-    if (br.ReadBool(p[2]) == 0)
-      return Vp8IntraPredictor.B_VE_PRED;
-    if (br.ReadBool(p[3]) == 0) {
-      if (br.ReadBool(p[4]) == 0)
-        return Vp8IntraPredictor.B_HE_PRED;
-      return br.ReadBool(p[5]) == 0 ? Vp8IntraPredictor.B_RD_PRED : Vp8IntraPredictor.B_VR_PRED;
+    public sbyte GetRefLfDelta(int i) => i switch {
+      0 => RefLfDelta0, 1 => RefLfDelta1, 2 => RefLfDelta2, _ => RefLfDelta3,
+    };
+    public void SetRefLfDelta(int i, sbyte v) {
+      switch (i) { case 0: RefLfDelta0 = v; break; case 1: RefLfDelta1 = v; break; case 2: RefLfDelta2 = v; break; default: RefLfDelta3 = v; break; }
     }
-    if (br.ReadBool(p[6]) == 0)
-      return Vp8IntraPredictor.B_LD_PRED;
-    return br.ReadBool(p[7]) == 0
-      ? Vp8IntraPredictor.B_VL_PRED
-      : br.ReadBool(p[8]) == 0
-        ? Vp8IntraPredictor.B_HD_PRED
-        : Vp8IntraPredictor.B_HU_PRED;
-  }
-
-  private static int _GetAboveSubMode(int[] mbModes, int[] mbSubModes, int mbRow, int mbCol, int mbWidth, int subIdx) {
-    var subRow = subIdx >> 2;
-    var subCol = subIdx & 3;
-    if (subRow > 0) {
-      // Above sub-block is in the same macroblock
-      var mbIdx = mbRow * mbWidth + mbCol;
-      return mbSubModes[mbIdx * 16 + (subRow - 1) * 4 + subCol];
+    public sbyte GetModeLfDelta(int i) => i switch {
+      0 => ModeLfDelta0, 1 => ModeLfDelta1, 2 => ModeLfDelta2, _ => ModeLfDelta3,
+    };
+    public void SetModeLfDelta(int i, sbyte v) {
+      switch (i) { case 0: ModeLfDelta0 = v; break; case 1: ModeLfDelta1 = v; break; case 2: ModeLfDelta2 = v; break; default: ModeLfDelta3 = v; break; }
     }
-
-    if (mbRow == 0)
-      return Vp8IntraPredictor.B_DC_PRED; // Default for top edge
-
-    // Above sub-block is in the macroblock above (bottom row, same column)
-    var aboveMbIdx = (mbRow - 1) * mbWidth + mbCol;
-    if (mbModes[aboveMbIdx] != _B_PRED)
-      return Vp8IntraPredictor.B_DC_PRED;
-    return mbSubModes[aboveMbIdx * 16 + 12 + subCol];
-  }
-
-  private static int _GetLeftSubMode(int[] mbModes, int[] mbSubModes, int mbRow, int mbCol, int mbWidth, int subIdx) {
-    var subRow = subIdx >> 2;
-    var subCol = subIdx & 3;
-    if (subCol > 0) {
-      var mbIdx = mbRow * mbWidth + mbCol;
-      return mbSubModes[mbIdx * 16 + subRow * 4 + (subCol - 1)];
+    public void SetPerSegmentLevel(int i, sbyte v) {
+      switch (i) { case 0: PerSegmentLevel0 = v; break; case 1: PerSegmentLevel1 = v; break; case 2: PerSegmentLevel2 = v; break; default: PerSegmentLevel3 = v; break; }
     }
-
-    if (mbCol == 0)
-      return Vp8IntraPredictor.B_DC_PRED;
-
-    var leftMbIdx = mbRow * mbWidth + (mbCol - 1);
-    if (mbModes[leftMbIdx] != _B_PRED)
-      return Vp8IntraPredictor.B_DC_PRED;
-    return mbSubModes[leftMbIdx * 16 + subRow * 4 + 3];
   }
 
-  #endregion
-
-  #region prediction reference helpers
-
-  private static byte[]? _GetAboveRow(byte[] plane, int mbX, int mbY, int stride, int size) {
-    if (mbY == 0)
-      return null;
-    var row = new byte[size];
-    var off = (mbY - 1) * stride + mbX;
-    Buffer.BlockCopy(plane, off, row, 0, size);
-    return row;
+  private struct Quant {
+    public ushort Y1Dc, Y1Ac;
+    public ushort Y2Dc, Y2Ac;
+    public ushort UvDc, UvAc;
   }
 
-  private static byte[]? _GetLeftCol(byte[] plane, int mbX, int mbY, int stride, int size) {
-    if (mbX == 0)
-      return null;
-    var col = new byte[size];
-    for (var i = 0; i < size; ++i)
-      col[i] = plane[(mbY + i) * stride + mbX - 1];
-    return col;
+  private struct FilterParam {
+    public byte Level, Ilevel, Hlevel;
+    public bool Inner;
   }
 
-  private static byte _GetTopLeft(byte[] plane, int mbX, int mbY, int stride) {
-    if (mbX == 0 || mbY == 0)
-      return 128;
-    return plane[(mbY - 1) * stride + mbX - 1];
-  }
+  /// <summary>Per-macroblock decode state: one per column (upMB) and one current-row-left (leftMB).</summary>
+  private struct Mb {
+    public byte Pred0, Pred1, Pred2, Pred3; // 4x4 luma region predictor modes
+    public byte NzMask;                      // 4 luma + 2 U + 2 V non-zero flags
+    public byte NzY16;                       // 1 iff Y16-prediction with non-zero DC
 
-  private static byte[] _GetExtendedAboveRow(byte[] plane, int mbX, int mbY, int stride) {
-    // Returns 24 pixels: 16 from above + up to 8 from above-right
-    var row = new byte[24];
-    if (mbY == 0) {
-      for (var i = 0; i < 24; ++i)
-        row[i] = 127;
-      return row;
+    public byte GetPred(int i) => i switch { 0 => Pred0, 1 => Pred1, 2 => Pred2, _ => Pred3 };
+    public void SetPred(int i, byte v) {
+      switch (i) { case 0: Pred0 = v; break; case 1: Pred1 = v; break; case 2: Pred2 = v; break; default: Pred3 = v; break; }
     }
-
-    var off = (mbY - 1) * stride + mbX;
-    for (var i = 0; i < 16; ++i)
-      row[i] = off + i < plane.Length ? plane[off + i] : (byte)127;
-    for (var i = 16; i < 24; ++i)
-      row[i] = off + i < plane.Length ? plane[off + i] : row[15];
-    return row;
   }
 
-  private static byte[]? _Get4x4Above(byte[] plane, byte[] extAbove, int subX, int subY, int stride, int subCol) {
-    if (subY == 0)
-      return null;
+  // --- State (maps 1:1 to Go's Decoder struct) ---
 
-    // Return 8 pixels above (4 directly above + 4 above-right for diagonal modes)
-    var above = new byte[8];
-    var off = (subY - 1) * stride + subX;
+  private byte[] _src = [];   // Raw VP8 chunk bytes.
+  private int _srcPos;         // Cursor during header parsing.
+  private int _srcEnd;         // End of VP8 chunk (Go's limitReader.n tracks remaining).
+
+  private FrameHeader _fh;
+  private SegmentHeader _segmentHeader;
+  private FilterHeader _filterHeader;
+
+  private readonly Vp8Partition _fp = new();
+  private readonly Vp8Partition[] _op = new Vp8Partition[8];
+  private int _nOp;
+
+  // YCbCr output buffers. Sized to (16*mbw, 16*mbh) for Y and (8*mbw, 8*mbh) for Cb/Cr.
+  private byte[] _yPlane = [];
+  private byte[] _cbPlane = [];
+  private byte[] _crPlane = [];
+  private int _yStride;
+  private int _cStride;
+
+  private int _mbw, _mbh;
+
+  private readonly Quant[] _quant = new Quant[NSegment];
+  // Token probabilities: 4 planes * 8 bands * 3 contexts * 11 probs.
+  private readonly byte[] _tokenProb = new byte[NPlane * NBand * NContext * NProb];
+  private bool _useSkipProb;
+  private byte _skipProb;
+
+  private readonly FilterParam[] _filterParams = new FilterParam[NSegment * 2];
+  private FilterParam[] _perMBFilterParams = [];
+
+  private int _segment;
+  private Mb _leftMB;
+  private Mb[] _upMB = [];
+  private uint _nzDcMask, _nzAcMask;
+
+  private bool _usePredY16;
+  private byte _predY16;
+  private byte _predC8;
+  // predY4[j][i] = pred mode for luma 4x4 block (i, j). Packed as row-major 16 bytes.
+  private readonly byte[] _predY4 = new byte[16];
+
+  // Workspace: coefficients and reconstruction scratch. ybr = 26 rows x 32 cols.
+  private readonly short[] _coeff = new short[CoeffCount];
+  private readonly byte[] _ybr = new byte[26 * 32];
+
+  public Vp8Decoder() {
     for (var i = 0; i < 8; ++i)
-      above[i] = off + i < plane.Length ? plane[off + i] : (off + i > 0 ? plane[Math.Min(off + 3, plane.Length - 1)] : (byte)127);
-    return above;
+      _op[i] = new Vp8Partition();
   }
 
-  private static byte[]? _Get4x4Left(byte[] plane, int subX, int subY, int stride) {
-    if (subX == 0)
-      return null;
-    var left = new byte[4];
-    for (var i = 0; i < 4; ++i)
-      left[i] = plane[(subY + i) * stride + subX - 1];
-    return left;
+  // --- Public entry points ---
+
+  /// <summary>Decode a complete VP8 chunk into an RGB24 byte array.</summary>
+  public static byte[] Decode(byte[] vp8ChunkData, int expectedWidth, int expectedHeight) {
+    ArgumentNullException.ThrowIfNull(vp8ChunkData);
+    var d = new Vp8Decoder();
+    d._Init(vp8ChunkData);
+    d._DecodeFrameHeader();
+    if (d._fh.Width != expectedWidth || d._fh.Height != expectedHeight)
+      throw new InvalidDataException(
+        $"VP8 header dimensions ({d._fh.Width}x{d._fh.Height}) do not match RIFF dimensions ({expectedWidth}x{expectedHeight}).");
+    d._DecodeFrame();
+    return d._YuvToRgb24();
   }
 
-  private static byte _Get4x4TopLeft(byte[] plane, int subX, int subY, int stride, byte mbTopLeft, int subRow, int subCol) {
-    if (subX == 0 || subY == 0)
-      return subX == 0 && subY == 0 ? mbTopLeft : (byte)127;
-    return plane[(subY - 1) * stride + subX - 1];
+  // --- Internal helpers ---
+
+  private void _Init(byte[] chunk) {
+    _src = chunk;
+    _srcPos = 0;
+    _srcEnd = chunk.Length;
   }
 
-  #endregion
+  /// <summary>Read exactly n bytes from the input chunk into a new array. Mirrors Go's limitReader.ReadFull.</summary>
+  private byte[] _ReadFull(int n) {
+    if (n > _srcEnd - _srcPos)
+      throw new EndOfStreamException("VP8 chunk shorter than header advertises.");
+    var buf = new byte[n];
+    Array.Copy(_src, _srcPos, buf, 0, n);
+    _srcPos += n;
+    return buf;
+  }
 
-  #region YUV to RGB conversion
+  /// <summary>Parse the 3-byte frame tag and 7-byte keyframe header. Port of DecodeFrameHeader.</summary>
+  private void _DecodeFrameHeader() {
+    var b = _ReadFull(3);
+    _fh.KeyFrame = (b[0] & 1) == 0;
+    _fh.VersionNumber = (byte)((b[0] >> 1) & 7);
+    _fh.ShowFrame = ((b[0] >> 4) & 1) == 1;
+    _fh.FirstPartitionLen = (uint)b[0] >> 5 | (uint)b[1] << 3 | (uint)b[2] << 11;
+    if (!_fh.KeyFrame)
+      throw new InvalidDataException("VP8 still image must start with a keyframe.");
+    var kh = _ReadFull(7);
+    if (kh[0] != 0x9d || kh[1] != 0x01 || kh[2] != 0x2a)
+      throw new InvalidDataException("VP8: invalid keyframe start code (expected 0x9D 0x01 0x2A).");
+    _fh.Width = (kh[4] & 0x3f) << 8 | kh[3];
+    _fh.Height = (kh[6] & 0x3f) << 8 | kh[5];
+    _fh.XScale = (byte)(kh[4] >> 6);
+    _fh.YScale = (byte)(kh[6] >> 6);
+    _mbw = (_fh.Width + 0x0f) >> 4;
+    _mbh = (_fh.Height + 0x0f) >> 4;
+    _segmentHeader = default;
+    _segmentHeader.Prob0 = 0xff;
+    _segmentHeader.Prob1 = 0xff;
+    _segmentHeader.Prob2 = 0xff;
+    Buffer.BlockCopy(DefaultTokenProb, 0, _tokenProb, 0, _tokenProb.Length);
+    _segment = 0;
+  }
 
-  private static byte[] _ConvertYuvToRgb24(byte[] yPlane, byte[] uPlane, byte[] vPlane, int width, int height, int yStride, int uvStride) {
-    var rgb = new byte[width * height * 3];
+  /// <summary>Allocate image and per-macroblock buffers. Port of ensureImg.</summary>
+  private void _EnsureImg() {
+    _yStride = 16 * _mbw;
+    _cStride = 8 * _mbw;
+    _yPlane = new byte[_yStride * 16 * _mbh];
+    _cbPlane = new byte[_cStride * 8 * _mbh];
+    _crPlane = new byte[_cStride * 8 * _mbh];
+    _perMBFilterParams = new FilterParam[_mbw * _mbh];
+    _upMB = new Mb[_mbw];
+  }
 
-    for (var row = 0; row < height; ++row) {
-      var uvRow = row >> 1;
-      for (var col = 0; col < width; ++col) {
-        var uvCol = col >> 1;
-        var y = yPlane[row * yStride + col];
-        var u = uPlane[uvRow * uvStride + uvCol];
-        var v = vPlane[uvRow * uvStride + uvCol];
-
-        // BT.601 integer approximation:
-        // R = clamp((298*(Y-16) + 409*(V-128) + 128) >> 8)
-        // G = clamp((298*(Y-16) - 100*(U-128) - 208*(V-128) + 128) >> 8)
-        // B = clamp((298*(Y-16) + 516*(U-128) + 128) >> 8)
-        var yy = 298 * y - 56992;
-        var rgbOff = (row * width + col) * 3;
-        rgb[rgbOff + 0] = _ClampByte((yy + 409 * v + 128) >> 8);
-        rgb[rgbOff + 1] = _ClampByte((yy - 100 * u - 208 * v + 39424 + 128) >> 8);
-        rgb[rgbOff + 2] = _ClampByte((yy + 516 * u - 70688 + 128) >> 8);
+  /// <summary>Decode macroblocks + apply loop filter. Port of DecodeFrame.</summary>
+  private void _DecodeFrame() {
+    _EnsureImg();
+    _ParseOtherHeaders();
+    for (var mbx = 0; mbx < _mbw; ++mbx)
+      _upMB[mbx] = default;
+    for (var mby = 0; mby < _mbh; ++mby) {
+      _leftMB = default;
+      for (var mbx = 0; mbx < _mbw; ++mbx) {
+        var skip = _Reconstruct(mbx, mby);
+        ref var fs = ref _filterParams[_segment * 2 + (_usePredY16 ? 0 : 1)];
+        var fp = fs;
+        fp.Inner = fp.Inner || !skip;
+        _perMBFilterParams[_mbw * mby + mbx] = fp;
       }
     }
+    if (_fp.UnexpectedEof) throw new EndOfStreamException("Unexpected EOF in VP8 first partition.");
+    for (var i = 0; i < _nOp; ++i)
+      if (_op[i].UnexpectedEof) throw new EndOfStreamException($"Unexpected EOF in VP8 coefficient partition {i}.");
+    if (_filterHeader.Level != 0) {
+      if (_filterHeader.Simple)
+        _SimpleFilter();
+      else
+        _NormalFilter();
+    }
+  }
 
+  /// <summary>Port of parseOtherHeaders.</summary>
+  private void _ParseOtherHeaders() {
+    var firstPartition = _ReadFull((int)_fh.FirstPartitionLen);
+    _fp.Init(firstPartition);
+    // Keyframes: 1 bit color-space, 1 bit pixel-clamp (both ignored).
+    _fp.ReadBit(Vp8Partition.UniformProb);
+    _fp.ReadBit(Vp8Partition.UniformProb);
+    _ParseSegmentHeader();
+    _ParseFilterHeader();
+    _ParseOtherPartitions();
+    _ParseQuant();
+    // Non-keyframe flag (refreshLastFrameBuffer) — we reject non-keyframes in header, but
+    // still need to consume the bit per spec for keyframes.
+    _fp.ReadBit(Vp8Partition.UniformProb);
+    _ParseTokenProb();
+    _useSkipProb = _fp.ReadBit(Vp8Partition.UniformProb);
+    if (_useSkipProb)
+      _skipProb = (byte)_fp.ReadUint(Vp8Partition.UniformProb, 8);
+    if (_fp.UnexpectedEof)
+      throw new EndOfStreamException("Unexpected EOF while parsing VP8 headers.");
+  }
+
+  /// <summary>Port of parseSegmentHeader.</summary>
+  private void _ParseSegmentHeader() {
+    _segmentHeader.UseSegment = _fp.ReadBit(Vp8Partition.UniformProb);
+    if (!_segmentHeader.UseSegment) {
+      _segmentHeader.UpdateMap = false;
+      return;
+    }
+    _segmentHeader.UpdateMap = _fp.ReadBit(Vp8Partition.UniformProb);
+    if (_fp.ReadBit(Vp8Partition.UniformProb)) {
+      _segmentHeader.RelativeDelta = !_fp.ReadBit(Vp8Partition.UniformProb);
+      for (var i = 0; i < NSegment; ++i)
+        _segmentHeader.SetQuantizer(i, (sbyte)_fp.ReadOptionalInt(Vp8Partition.UniformProb, 7));
+      for (var i = 0; i < NSegment; ++i)
+        _segmentHeader.SetFilterStrength(i, (sbyte)_fp.ReadOptionalInt(Vp8Partition.UniformProb, 6));
+    }
+    if (!_segmentHeader.UpdateMap) return;
+    for (var i = 0; i < NSegmentProb; ++i) {
+      if (_fp.ReadBit(Vp8Partition.UniformProb))
+        _segmentHeader.SetProb(i, (byte)_fp.ReadUint(Vp8Partition.UniformProb, 8));
+      else
+        _segmentHeader.SetProb(i, 0xff);
+    }
+  }
+
+  /// <summary>Port of parseFilterHeader.</summary>
+  private void _ParseFilterHeader() {
+    _filterHeader.Simple = _fp.ReadBit(Vp8Partition.UniformProb);
+    _filterHeader.Level = (sbyte)_fp.ReadUint(Vp8Partition.UniformProb, 6);
+    _filterHeader.Sharpness = (byte)_fp.ReadUint(Vp8Partition.UniformProb, 3);
+    _filterHeader.UseLfDelta = _fp.ReadBit(Vp8Partition.UniformProb);
+    if (_filterHeader.UseLfDelta && _fp.ReadBit(Vp8Partition.UniformProb)) {
+      for (var i = 0; i < NRefLfDelta; ++i)
+        _filterHeader.SetRefLfDelta(i, (sbyte)_fp.ReadOptionalInt(Vp8Partition.UniformProb, 6));
+      for (var i = 0; i < NModeLfDelta; ++i)
+        _filterHeader.SetModeLfDelta(i, (sbyte)_fp.ReadOptionalInt(Vp8Partition.UniformProb, 6));
+    }
+    if (_filterHeader.Level == 0) return;
+    if (_segmentHeader.UseSegment) {
+      for (var i = 0; i < NSegment; ++i) {
+        var strength = _segmentHeader.GetFilterStrength(i);
+        if (_segmentHeader.RelativeDelta)
+          strength = (sbyte)(strength + _filterHeader.Level);
+        _filterHeader.SetPerSegmentLevel(i, strength);
+      }
+    } else {
+      _filterHeader.PerSegmentLevel0 = _filterHeader.Level;
+    }
+    _ComputeFilterParams();
+  }
+
+  /// <summary>Port of parseOtherPartitions: split the rest of the chunk into nOp coefficient partitions.</summary>
+  private void _ParseOtherPartitions() {
+    const int maxNOp = 1 << 3;
+    Span<int> partLens = stackalloc int[maxNOp];
+    _nOp = 1 << (int)_fp.ReadUint(Vp8Partition.UniformProb, 2);
+    var n = 3 * (_nOp - 1);
+    var remaining = _srcEnd - _srcPos;
+    partLens[_nOp - 1] = remaining - n;
+    if (partLens[_nOp - 1] < 0)
+      throw new EndOfStreamException("VP8: too little data for partition header.");
+    if (n > 0) {
+      var hdr = _ReadFull(n);
+      for (var i = 0; i < _nOp - 1; ++i) {
+        var pl = hdr[3 * i + 0] | hdr[3 * i + 1] << 8 | hdr[3 * i + 2] << 16;
+        if (pl > partLens[_nOp - 1]) throw new EndOfStreamException("VP8: partition length exceeds remaining data.");
+        partLens[i] = pl;
+        partLens[_nOp - 1] -= pl;
+      }
+    }
+    if (partLens[_nOp - 1] >= 1 << 24)
+      throw new InvalidDataException("VP8: final partition too large.");
+    var rest = _ReadFull(_srcEnd - _srcPos);
+    var off = 0;
+    for (var i = 0; i < _nOp; ++i) {
+      var pl = partLens[i];
+      var pbuf = new byte[pl];
+      Array.Copy(rest, off, pbuf, 0, pl);
+      _op[i].Init(pbuf);
+      off += pl;
+    }
+  }
+
+  // --- YUV → RGB24 (BT.601 studio range, matching libwebp's VP8YuvToRgb) ---
+  // Y in [16, 235], UV in [16, 240]. Fixed-point formula from libwebp src/dsp/yuv.h:
+  //   R = Clip8(MultHi(y,19077) + MultHi(v,26149) - 14234)
+  //   G = Clip8(MultHi(y,19077) - MultHi(u,6419) - MultHi(v,13320) + 8708)
+  //   B = Clip8(MultHi(y,19077) + MultHi(u,33050) - 17685)
+  // where MultHi(a,b) = (a*b)>>8 and Clip8(v) = v>>6 if in [0, 16383], else saturate to [0,255].
+
+  private byte[] _YuvToRgb24() {
+    var w = _fh.Width;
+    var h = _fh.Height;
+    var rgb = new byte[w * h * 3];
+    for (var y = 0; y < h; ++y) {
+      var yRow = y * _yStride;
+      var cRow = (y >> 1) * _cStride;
+      for (var x = 0; x < w; ++x) {
+        int Y = _yPlane[yRow + x];
+        int u = _cbPlane[cRow + (x >> 1)];
+        int v = _crPlane[cRow + (x >> 1)];
+        var o = (y * w + x) * 3;
+        rgb[o + 0] = _YuvToR(Y, v);
+        rgb[o + 1] = _YuvToG(Y, u, v);
+        rgb[o + 2] = _YuvToB(Y, u);
+      }
+    }
     return rgb;
   }
 
-  private static byte _ClampByte(int v) => (byte)(v < 0 ? 0 : v > 255 ? 255 : v);
+  [MethodImpl(MethodImplOptions.AggressiveInlining)]
+  private static int _MultHi(int v, int coeff) => v * coeff >> 8;
 
-  #endregion
+  [MethodImpl(MethodImplOptions.AggressiveInlining)]
+  private static byte _YuvClip8(int v) => (v & ~16383) == 0 ? (byte)(v >> 6) : v < 0 ? (byte)0 : (byte)255;
 
-  #region lookup tables
+  [MethodImpl(MethodImplOptions.AggressiveInlining)]
+  private static byte _YuvToR(int y, int v) => _YuvClip8(_MultHi(y, 19077) + _MultHi(v, 26149) - 14234);
 
-  private static int _Clamp127(int v) => v < 0 ? 0 : v > 127 ? 127 : v;
+  [MethodImpl(MethodImplOptions.AggressiveInlining)]
+  private static byte _YuvToG(int y, int u, int v) => _YuvClip8(_MultHi(y, 19077) - _MultHi(u, 6419) - _MultHi(v, 13320) + 8708);
 
-  // VP8 zig-zag scan order for 4x4 blocks
-  private static readonly int[] _ZigZag = [
-    0, 1, 4, 8, 5, 2, 3, 6, 9, 12, 13, 10, 7, 11, 14, 15
-  ];
+  [MethodImpl(MethodImplOptions.AggressiveInlining)]
+  private static byte _YuvToB(int y, int u) => _YuvClip8(_MultHi(y, 19077) + _MultHi(u, 33050) - 17685);
 
-  // Band index for each coefficient position (0-15)
-  private static readonly int[] _Bands = [
-    0, 1, 2, 3, 6, 4, 5, 6, 6, 6, 6, 6, 6, 6, 6, 7
-  ];
+  [MethodImpl(MethodImplOptions.AggressiveInlining)]
+  private static byte _Clip8(int x) => x < 0 ? (byte)0 : x > 255 ? (byte)255 : (byte)x;
 
-  // DC dequantization lookup table (index 0-127)
-  private static readonly int[] _DcLookup = [
-      4,   5,   6,   7,   8,   9,  10,  10,
-     11,  12,  13,  14,  15,  16,  17,  17,
-     18,  19,  20,  20,  21,  21,  22,  22,
-     23,  23,  24,  25,  25,  26,  27,  28,
-     29,  30,  31,  32,  33,  34,  35,  36,
-     37,  37,  38,  39,  40,  41,  42,  43,
-     44,  45,  46,  46,  47,  48,  49,  50,
-     51,  52,  53,  54,  55,  56,  57,  58,
-     59,  60,  61,  62,  63,  64,  65,  66,
-     67,  68,  69,  70,  71,  72,  73,  74,
-     75,  76,  76,  77,  78,  79,  80,  81,
-     82,  83,  84,  85,  86,  87,  88,  89,
-     91,  93,  95,  96,  98, 100, 101, 102,
-    104, 106, 108, 110, 112, 114, 116, 118,
-    122, 124, 126, 128, 130, 132, 134, 136,
-    138, 140, 143, 145, 148, 151, 155, 157
-  ];
+  // --- ybr workspace accessors ---
+  // ybr is 26 rows × 32 cols. Index helper for clarity.
+  [MethodImpl(MethodImplOptions.AggressiveInlining)]
+  private static int Ybr(int y, int x) => y * 32 + x;
 
-  // AC dequantization lookup table (index 0-127)
-  private static readonly int[] _AcLookup = [
-      4,   5,   6,   7,   8,   9,  10,  11,
-     12,  13,  14,  15,  16,  17,  18,  19,
-     20,  21,  22,  23,  24,  25,  26,  27,
-     28,  29,  30,  31,  32,  33,  34,  35,
-     36,  37,  38,  39,  40,  41,  42,  43,
-     44,  45,  46,  47,  48,  49,  50,  51,
-     52,  53,  54,  55,  56,  57,  58,  60,
-     62,  64,  66,  68,  70,  72,  74,  76,
-     78,  80,  82,  84,  86,  88,  90,  92,
-     94,  96,  98, 100, 102, 104, 106, 108,
-    110, 112, 114, 116, 119, 122, 125, 128,
-    131, 134, 137, 140, 143, 146, 149, 152,
-    155, 158, 161, 164, 167, 170, 173, 177,
-    181, 185, 189, 193, 197, 201, 205, 209,
-    213, 217, 221, 225, 229, 234, 239, 245,
-    249, 254, 259, 264, 269, 274, 279, 284
-  ];
+  // --- coeff/predY4 helpers (3D indexing into flat arrays) ---
 
-  // Coefficient probability update probabilities [type][band][ctx][proba]
-  // From VP8 spec section 13.4
-  private static readonly byte[][][][] _CoeffUpdateProbs = _InitCoeffUpdateProbs();
-
-  private static byte[][][][] _InitCoeffUpdateProbs() {
-    // These are the probabilities that a coefficient probability is updated
-    // Organized as [4 types][8 bands][3 contexts][11 probabilities]
-    var p = new byte[_NUM_TYPES][][][];
-
-    // Type 0: Y_WITH_Y2 (luma with Y2 block present, i.e. B_PRED mode)
-    p[0] = [
-      [
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-      ],
-      [
-        [176, 246, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [223, 241, 252, 255, 255, 255, 255, 255, 255, 255, 255],
-        [249, 253, 253, 255, 255, 255, 255, 255, 255, 255, 255],
-      ],
-      [
-        [255, 244, 252, 255, 255, 255, 255, 255, 255, 255, 255],
-        [234, 254, 254, 255, 255, 255, 255, 255, 255, 255, 255],
-        [253, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-      ],
-      [
-        [255, 246, 254, 255, 255, 255, 255, 255, 255, 255, 255],
-        [239, 253, 254, 255, 255, 255, 255, 255, 255, 255, 255],
-        [254, 255, 254, 255, 255, 255, 255, 255, 255, 255, 255],
-      ],
-      [
-        [255, 248, 254, 255, 255, 255, 255, 255, 255, 255, 255],
-        [251, 255, 254, 255, 255, 255, 255, 255, 255, 255, 255],
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-      ],
-      [
-        [255, 253, 254, 255, 255, 255, 255, 255, 255, 255, 255],
-        [251, 254, 254, 255, 255, 255, 255, 255, 255, 255, 255],
-        [254, 255, 254, 255, 255, 255, 255, 255, 255, 255, 255],
-      ],
-      [
-        [255, 254, 253, 255, 254, 255, 255, 255, 255, 255, 255],
-        [250, 255, 254, 255, 254, 255, 255, 255, 255, 255, 255],
-        [254, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-      ],
-      [
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-      ],
-    ];
-
-    // Type 1: Y_AFTER_Y2 (luma AC after Y2 DC subtraction)
-    p[1] = [
-      [
-        [217, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [225, 252, 241, 253, 255, 255, 254, 255, 255, 255, 255],
-        [234, 250, 241, 250, 253, 255, 253, 254, 255, 255, 255],
-      ],
-      [
-        [255, 254, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [223, 254, 254, 255, 255, 255, 255, 255, 255, 255, 255],
-        [238, 253, 254, 254, 255, 255, 255, 255, 255, 255, 255],
-      ],
-      [
-        [255, 248, 254, 255, 255, 255, 255, 255, 255, 255, 255],
-        [249, 254, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-      ],
-      [
-        [255, 253, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [247, 254, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-      ],
-      [
-        [255, 253, 254, 255, 255, 255, 255, 255, 255, 255, 255],
-        [252, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-      ],
-      [
-        [255, 254, 254, 255, 255, 255, 255, 255, 255, 255, 255],
-        [253, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-      ],
-      [
-        [255, 254, 253, 255, 255, 255, 255, 255, 255, 255, 255],
-        [250, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [254, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-      ],
-      [
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-      ],
-    ];
-
-    // Type 2: UV (chroma)
-    p[2] = [
-      [
-        [186, 251, 250, 255, 255, 255, 255, 255, 255, 255, 255],
-        [234, 251, 244, 254, 255, 255, 255, 255, 255, 255, 255],
-        [251, 251, 243, 253, 254, 255, 254, 255, 255, 255, 255],
-      ],
-      [
-        [255, 253, 254, 255, 255, 255, 255, 255, 255, 255, 255],
-        [236, 253, 254, 255, 255, 255, 255, 255, 255, 255, 255],
-        [251, 253, 253, 254, 254, 255, 255, 255, 255, 255, 255],
-      ],
-      [
-        [255, 254, 254, 255, 255, 255, 255, 255, 255, 255, 255],
-        [254, 254, 254, 255, 255, 255, 255, 255, 255, 255, 255],
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-      ],
-      [
-        [255, 254, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [254, 254, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [254, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-      ],
-      [
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [254, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-      ],
-      [
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-      ],
-      [
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-      ],
-      [
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-      ],
-    ];
-
-    // Type 3: Y2 (WHT second-order)
-    p[3] = [
-      [
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-      ],
-      [
-        [255, 248, 254, 255, 255, 255, 255, 255, 255, 255, 255],
-        [249, 254, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-      ],
-      [
-        [255, 253, 254, 255, 255, 255, 255, 255, 255, 255, 255],
-        [247, 254, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-      ],
-      [
-        [255, 253, 254, 255, 255, 255, 255, 255, 255, 255, 255],
-        [252, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-      ],
-      [
-        [255, 254, 254, 255, 255, 255, 255, 255, 255, 255, 255],
-        [253, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-      ],
-      [
-        [255, 254, 253, 255, 255, 255, 255, 255, 255, 255, 255],
-        [250, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [254, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-      ],
-      [
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-      ],
-      [
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-      ],
-    ];
-
-    return p;
-  }
-
-  // Default coefficient probabilities (from VP8 spec section 13.5)
-  private static byte[][][][] _InitDefaultCoeffProbs() {
-    var p = new byte[_NUM_TYPES][][][];
-
-    // Type 0: Y_WITH_Y2
-    p[0] = [
-      [
-        [128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128],
-        [128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128],
-        [128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128],
-      ],
-      [
-        [253, 136, 254, 255, 228, 219, 128, 128, 128, 128, 128],
-        [189, 129, 242, 255, 227, 213, 255, 219, 128, 128, 128],
-        [106, 126, 227, 252, 214, 209, 255, 255, 128, 128, 128],
-      ],
-      [
-        [  1,  98, 248, 255, 236, 226, 255, 255, 128, 128, 128],
-        [181, 133, 238, 254, 221, 234, 255, 154, 128, 128, 128],
-        [ 78, 134, 202, 247, 198, 180, 255, 219, 128, 128, 128],
-      ],
-      [
-        [  1, 185, 249, 255, 243, 255, 128, 128, 128, 128, 128],
-        [184, 150, 247, 255, 236, 224, 128, 128, 128, 128, 128],
-        [ 77, 110, 216, 255, 236, 230, 128, 128, 128, 128, 128],
-      ],
-      [
-        [  1, 101, 251, 255, 241, 255, 128, 128, 128, 128, 128],
-        [170, 139, 241, 252, 236, 209, 255, 255, 128, 128, 128],
-        [ 37, 116, 196, 243, 228, 255, 255, 255, 128, 128, 128],
-      ],
-      [
-        [  1, 204, 254, 255, 245, 255, 128, 128, 128, 128, 128],
-        [207, 160, 250, 255, 238, 128, 128, 128, 128, 128, 128],
-        [102, 103, 231, 255, 211, 171, 128, 128, 128, 128, 128],
-      ],
-      [
-        [  1, 152, 252, 255, 240, 255, 128, 128, 128, 128, 128],
-        [177, 135, 243, 255, 234, 225, 128, 128, 128, 128, 128],
-        [ 80, 129, 211, 255, 194, 224, 128, 128, 128, 128, 128],
-      ],
-      [
-        [  1,   1, 255, 128, 128, 128, 128, 128, 128, 128, 128],
-        [246,   1, 255, 128, 128, 128, 128, 128, 128, 128, 128],
-        [255, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128],
-      ],
-    ];
-
-    // Type 1: Y_AFTER_Y2
-    p[1] = [
-      [
-        [198,  35, 237, 223, 193, 187, 162, 160, 145, 155,  62],
-        [131,  45, 198, 221, 172, 176, 220, 157, 252, 221,   1],
-        [ 68,  47, 146, 208, 149, 167, 221, 162, 255, 223, 128],
-      ],
-      [
-        [  1, 149, 241, 255, 221, 224, 255, 255, 128, 128, 128],
-        [184, 141, 234, 253, 222, 220, 255, 199, 128, 128, 128],
-        [ 81, 99,  181, 242, 195, 203, 255, 219, 128, 128, 128],
-      ],
-      [
-        [  1, 129, 232, 253, 214, 197, 242, 196, 255, 255, 128],
-        [ 99, 121, 210, 250, 201, 198, 255, 202, 128, 128, 128],
-        [ 23,  91, 163, 242, 170, 187, 247, 210, 255, 255, 128],
-      ],
-      [
-        [  1, 200, 246, 255, 234, 255, 128, 128, 128, 128, 128],
-        [109, 178, 241, 255, 231, 245, 255, 255, 128, 128, 128],
-        [ 44, 130, 201, 253, 205, 185, 255, 255, 128, 128, 128],
-      ],
-      [
-        [  1, 132, 239, 251, 219, 209, 255, 165, 128, 128, 128],
-        [ 94, 136, 225, 251, 218, 190, 255, 255, 128, 128, 128],
-        [ 22, 100, 174, 245, 186, 161, 255, 199, 128, 128, 128],
-      ],
-      [
-        [  1, 182, 249, 255, 232, 235, 128, 128, 128, 128, 128],
-        [124, 143, 241, 255, 227, 234, 128, 128, 128, 128, 128],
-        [ 35,  77, 181, 251, 193, 211, 255, 205, 128, 128, 128],
-      ],
-      [
-        [  1, 157, 247, 255, 236, 231, 255, 255, 128, 128, 128],
-        [121, 141, 235, 255, 225, 227, 255, 255, 128, 128, 128],
-        [ 45, 99,  188, 251, 195, 217, 255, 224, 128, 128, 128],
-      ],
-      [
-        [  1,   1, 251, 255, 213, 255, 128, 128, 128, 128, 128],
-        [203,   1, 248, 255, 255, 128, 128, 128, 128, 128, 128],
-        [137,   1, 177, 255, 224, 255, 128, 128, 128, 128, 128],
-      ],
-    ];
-
-    // Type 2: UV
-    p[2] = [
-      [
-        [253, 9,   248, 251, 207, 208, 255, 192, 128, 128, 128],
-        [175, 13,  224, 243, 193, 185, 249, 198, 255, 255, 128],
-        [ 73, 17,  171, 221, 161, 179, 236, 167, 255, 234, 128],
-      ],
-      [
-        [  1,  95, 247, 253, 212, 183, 255, 255, 128, 128, 128],
-        [239, 148, 254, 255, 222, 171, 255, 218, 128, 128, 128],
-        [132, 138, 247, 253, 219, 198, 255, 228, 128, 128, 128],
-      ],
-      [
-        [  1, 101, 251, 255, 241, 255, 128, 128, 128, 128, 128],
-        [194, 169, 254, 255, 227, 255, 128, 128, 128, 128, 128],
-        [117, 110, 240, 255, 229, 255, 128, 128, 128, 128, 128],
-      ],
-      [
-        [  1, 152, 252, 255, 240, 255, 128, 128, 128, 128, 128],
-        [177, 135, 243, 255, 234, 225, 128, 128, 128, 128, 128],
-        [ 80, 129, 211, 255, 194, 224, 128, 128, 128, 128, 128],
-      ],
-      [
-        [  1, 227, 254, 255, 244, 255, 128, 128, 128, 128, 128],
-        [202, 166, 253, 255, 235, 255, 128, 128, 128, 128, 128],
-        [117, 109, 245, 255, 215, 255, 128, 128, 128, 128, 128],
-      ],
-      [
-        [  1, 237, 253, 255, 246, 255, 128, 128, 128, 128, 128],
-        [204, 168, 253, 253, 236, 255, 128, 128, 128, 128, 128],
-        [109,  93, 243, 255, 231, 255, 128, 128, 128, 128, 128],
-      ],
-      [
-        [  1, 155, 247, 255, 236, 255, 128, 128, 128, 128, 128],
-        [154, 117, 236, 255, 224, 255, 128, 128, 128, 128, 128],
-        [ 77, 103, 213, 255, 192, 255, 128, 128, 128, 128, 128],
-      ],
-      [
-        [  1,   1, 255, 128, 128, 128, 128, 128, 128, 128, 128],
-        [246,   1, 255, 128, 128, 128, 128, 128, 128, 128, 128],
-        [255, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128],
-      ],
-    ];
-
-    // Type 3: Y2
-    p[3] = [
-      [
-        [255, 253, 254, 255, 255, 255, 255, 255, 255, 255, 255],
-        [255, 254, 254, 255, 255, 255, 255, 255, 255, 255, 255],
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-      ],
-      [
-        [255, 246, 254, 255, 255, 255, 255, 255, 255, 255, 255],
-        [239, 253, 254, 255, 255, 255, 255, 255, 255, 255, 255],
-        [254, 255, 254, 255, 255, 255, 255, 255, 255, 255, 255],
-      ],
-      [
-        [255, 248, 254, 255, 255, 255, 255, 255, 255, 255, 255],
-        [251, 255, 254, 255, 255, 255, 255, 255, 255, 255, 255],
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-      ],
-      [
-        [255, 253, 254, 255, 255, 255, 255, 255, 255, 255, 255],
-        [251, 254, 254, 255, 255, 255, 255, 255, 255, 255, 255],
-        [254, 255, 254, 255, 255, 255, 255, 255, 255, 255, 255],
-      ],
-      [
-        [255, 254, 253, 255, 254, 255, 255, 255, 255, 255, 255],
-        [250, 255, 254, 255, 254, 255, 255, 255, 255, 255, 255],
-        [254, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-      ],
-      [
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-      ],
-      [
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-      ],
-      [
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-        [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-      ],
-    ];
-
-    return p;
-  }
-
-  #endregion
+  [MethodImpl(MethodImplOptions.AggressiveInlining)]
+  private static int TpIdx(int plane, int band, int ctx, int i) =>
+    ((plane * NBand + band) * NContext + ctx) * NProb + i;
 }

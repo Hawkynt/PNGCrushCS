@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.BfxBitware;
@@ -34,10 +33,11 @@ public static class BfxBitwareReader {
     if (data[0] != BfxBitwareFile.Magic[0] || data[1] != BfxBitwareFile.Magic[1] || data[2] != BfxBitwareFile.Magic[2] || data[3] != BfxBitwareFile.Magic[3])
       throw new InvalidDataException("Invalid BFX magic bytes.");
 
-    var version = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[8..]);
-    var compression = BinaryPrimitives.ReadUInt16LittleEndian(data[10..]);
+    var header = BfxBitwareHeader.ReadFrom(data);
+    var version = header.Version;
+    var width = header.Width;
+    var height = header.Height;
+    var compression = header.Compression;
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid BFX dimensions: {width}x{height}.");

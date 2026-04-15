@@ -35,14 +35,14 @@ public static class HighresMediumReader {
 
     // Frame 1: palette + planar data
     var header1 = HighresMediumHeader.ReadFrom(span);
-    var palette1 = header1.GetPaletteArray();
+    var palette1 = header1.Palette;
     var pixelData1 = new byte[32000];
     span.Slice(HighresMediumHeader.StructSize, 32000).CopyTo(pixelData1);
 
     // Frame 2: palette + planar data
     var frame2Offset = HighresMediumHeader.FrameSize;
     var header2 = HighresMediumHeader.ReadFrom(span.Slice(frame2Offset));
-    var palette2 = header2.GetPaletteArray();
+    var palette2 = header2.Palette;
     var pixelData2 = new byte[32000];
     span.Slice(frame2Offset + HighresMediumHeader.StructSize, 32000).CopyTo(pixelData2);
 
@@ -63,14 +63,14 @@ public static class HighresMediumReader {
 
     // Frame 1: palette + planar data
     var header1 = HighresMediumHeader.ReadFrom(span);
-    var palette1 = header1.GetPaletteArray();
+    var palette1 = header1.Palette;
     var pixelData1 = new byte[32000];
     span.Slice(HighresMediumHeader.StructSize, 32000).CopyTo(pixelData1);
 
     // Frame 2: palette + planar data
     var frame2Offset = HighresMediumHeader.FrameSize;
     var header2 = HighresMediumHeader.ReadFrom(span.Slice(frame2Offset));
-    var palette2 = header2.GetPaletteArray();
+    var palette2 = header2.Palette;
     var pixelData2 = new byte[32000];
     span.Slice(frame2Offset + HighresMediumHeader.StructSize, 32000).CopyTo(pixelData2);
 

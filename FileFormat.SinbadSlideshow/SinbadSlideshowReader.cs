@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.SinbadSlideshow;
@@ -12,7 +11,7 @@ public static class SinbadSlideshowReader {
     if (!file.Exists)
       throw new FileNotFoundException("Sinbad Slideshow file not found.", file.FullName);
 
-    return FromBytes(File.ReadAllBytes(file.FullName));
+    return FromSpan(File.ReadAllBytes(file.FullName));
   }
 
   public static SinbadSlideshowFile FromStream(Stream stream) {
@@ -20,50 +19,27 @@ public static class SinbadSlideshowReader {
     if (stream.CanSeek) {
       var data = new byte[stream.Length - stream.Position];
       stream.ReadExactly(data);
-      return FromBytes(data);
+      return FromSpan(data);
     }
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
+    return FromSpan(ms.ToArray());
   }
 
   public static SinbadSlideshowFile FromSpan(ReadOnlySpan<byte> data) {
-
     if (data.Length < SinbadSlideshowFile.FileSize)
       throw new InvalidDataException($"Data too small for a valid Sinbad Slideshow file: expected at least {SinbadSlideshowFile.FileSize} bytes, got {data.Length}.");
 
-    var span = data;
-
-    var palette = new short[16];
-    for (var i = 0; i < 16; ++i)
-      palette[i] = BinaryPrimitives.ReadInt16BigEndian(span.Slice(i * 2, 2));
-
-    var pixelData = new byte[SinbadSlideshowFile.PixelDataSize];
-    span.Slice(SinbadSlideshowFile.PaletteSize, SinbadSlideshowFile.PixelDataSize).CopyTo(pixelData);
+    var header = SinbadSlideshowHeader.ReadFrom(data);
 
     return new SinbadSlideshowFile {
-      Palette = palette,
-      PixelData = pixelData,
+      Palette = header.Palette,
+      PixelData = data.Slice(SinbadSlideshowFile.PaletteSize, SinbadSlideshowFile.PixelDataSize).ToArray(),
     };
-    }
+  }
 
   public static SinbadSlideshowFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < SinbadSlideshowFile.FileSize)
-      throw new InvalidDataException($"Data too small for a valid Sinbad Slideshow file: expected at least {SinbadSlideshowFile.FileSize} bytes, got {data.Length}.");
-
-    var span = data.AsSpan();
-
-    var palette = new short[16];
-    for (var i = 0; i < 16; ++i)
-      palette[i] = BinaryPrimitives.ReadInt16BigEndian(span.Slice(i * 2, 2));
-
-    var pixelData = new byte[SinbadSlideshowFile.PixelDataSize];
-    span.Slice(SinbadSlideshowFile.PaletteSize, SinbadSlideshowFile.PixelDataSize).CopyTo(pixelData);
-
-    return new SinbadSlideshowFile {
-      Palette = palette,
-      PixelData = pixelData,
-    };
+    return FromSpan(data);
   }
 }

@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.DaliRaw;
@@ -12,7 +11,7 @@ public static class DaliRawReader {
     if (!file.Exists)
       throw new FileNotFoundException("Dali raw file not found.", file.FullName);
 
-    return FromBytes(File.ReadAllBytes(file.FullName));
+    return FromSpan(File.ReadAllBytes(file.FullName));
   }
 
   public static DaliRawFile FromStream(Stream stream) {
@@ -20,48 +19,27 @@ public static class DaliRawReader {
     if (stream.CanSeek) {
       var data = new byte[stream.Length - stream.Position];
       stream.ReadExactly(data);
-      return FromBytes(data);
+      return FromSpan(data);
     }
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
+    return FromSpan(ms.ToArray());
   }
 
   public static DaliRawFile FromSpan(ReadOnlySpan<byte> data) {
-
     if (data.Length != DaliRawFile.ExpectedFileSize)
       throw new InvalidDataException($"Invalid Dali raw data size: expected exactly {DaliRawFile.ExpectedFileSize} bytes, got {data.Length}.");
 
-    var span = data;
-    var palette = new short[16];
-    for (var i = 0; i < 16; ++i)
-      palette[i] = BinaryPrimitives.ReadInt16BigEndian(span[(i * 2)..]);
-
-    var pixelData = new byte[DaliRawFile.PlanarDataSize];
-    data.Slice(DaliRawFile.PaletteSize + DaliRawFile.PaddingSize, DaliRawFile.PlanarDataSize).CopyTo(pixelData.AsSpan(0));
+    var header = DaliRawHeader.ReadFrom(data);
 
     return new DaliRawFile {
-      Palette = palette,
-      PixelData = pixelData
+      Palette = header.Palette,
+      PixelData = data.Slice(DaliRawFile.PaletteSize + DaliRawFile.PaddingSize, DaliRawFile.PlanarDataSize).ToArray()
     };
-    }
+  }
 
   public static DaliRawFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length != DaliRawFile.ExpectedFileSize)
-      throw new InvalidDataException($"Invalid Dali raw data size: expected exactly {DaliRawFile.ExpectedFileSize} bytes, got {data.Length}.");
-
-    var span = data.AsSpan();
-    var palette = new short[16];
-    for (var i = 0; i < 16; ++i)
-      palette[i] = BinaryPrimitives.ReadInt16BigEndian(span[(i * 2)..]);
-
-    var pixelData = new byte[DaliRawFile.PlanarDataSize];
-    data.AsSpan(DaliRawFile.PaletteSize + DaliRawFile.PaddingSize, DaliRawFile.PlanarDataSize).CopyTo(pixelData.AsSpan(0));
-
-    return new DaliRawFile {
-      Palette = palette,
-      PixelData = pixelData
-    };
+    return FromSpan(data);
   }
 }

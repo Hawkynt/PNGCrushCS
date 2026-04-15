@@ -51,13 +51,14 @@ public static class GbrReader {
     if (data.Length < headerSize)
       throw new InvalidDataException($"Data too small for declared header size: expected at least {headerSize} bytes, got {data.Length}.");
 
-    var version = (int)BinaryPrimitives.ReadUInt32BigEndian(data[4..]);
+    var header = GbrHeader.ReadFrom(data);
+    var version = (int)header.Version;
     if (version != 2)
       throw new InvalidDataException($"Unsupported GBR version: {version} (expected 2).");
 
-    var width = (int)BinaryPrimitives.ReadUInt32BigEndian(data[8..]);
-    var height = (int)BinaryPrimitives.ReadUInt32BigEndian(data[12..]);
-    var bytesPerPixel = (int)BinaryPrimitives.ReadUInt32BigEndian(data[16..]);
+    var width = (int)header.Width;
+    var height = (int)header.Height;
+    var bytesPerPixel = (int)header.BytesPerPixel;
 
     if (data[20] != _MAGIC[0] || data[21] != _MAGIC[1] || data[22] != _MAGIC[2] || data[23] != _MAGIC[3])
       throw new InvalidDataException("Invalid GBR magic: expected 'GIMP' at offset 20.");

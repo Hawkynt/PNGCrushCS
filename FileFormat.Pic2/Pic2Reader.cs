@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.Pic2;
@@ -34,10 +33,11 @@ public static class Pic2Reader {
     if (data[0] != Pic2File.Magic[0] || data[1] != Pic2File.Magic[1] || data[2] != Pic2File.Magic[2] || data[3] != Pic2File.Magic[3])
       throw new InvalidDataException("Invalid PIC2 magic bytes.");
 
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
-    var bpp = BinaryPrimitives.ReadUInt16LittleEndian(data[8..]);
-    var mode = BinaryPrimitives.ReadUInt16LittleEndian(data[10..]);
+    var header = Pic2Header.ReadFrom(data);
+    var width = header.Width;
+    var height = header.Height;
+    var bpp = header.Bpp;
+    var mode = header.Mode;
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid PIC2 dimensions: {width}x{height}.");

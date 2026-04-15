@@ -36,7 +36,7 @@ public static class ImagicPaintReader {
 
     var span = data;
     var header = ImagicPaintHeader.ReadFrom(span);
-    var palette = header.GetPaletteArray();
+    var palette = header.Palette;
 
     var pixelData = new byte[32000];
     data.Slice(ImagicPaintHeader.StructSize, 32000).CopyTo(pixelData.AsSpan(0));
@@ -60,7 +60,7 @@ public static class ImagicPaintReader {
 
     var span = data.AsSpan();
     var header = ImagicPaintHeader.ReadFrom(span);
-    var palette = header.GetPaletteArray();
+    var palette = header.Palette;
 
     var pixelData = new byte[32000];
     data.AsSpan(ImagicPaintHeader.StructSize, 32000).CopyTo(pixelData.AsSpan(0));

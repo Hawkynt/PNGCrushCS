@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.SeqImage;
@@ -35,11 +34,12 @@ public static class SeqImageReader {
     if (data[0] != SeqImageFile.Magic[0] || data[1] != SeqImageFile.Magic[1] || data[2] != SeqImageFile.Magic[2] || data[3] != SeqImageFile.Magic[3])
       throw new InvalidDataException("Invalid SEQ magic bytes.");
 
-    var version = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[8..]);
-    var frameCount = BinaryPrimitives.ReadUInt16LittleEndian(data[10..]);
-    var bpp = BinaryPrimitives.ReadUInt16LittleEndian(data[12..]);
+    var header = SeqImageHeader.ReadFrom(data);
+    var version = header.Version;
+    var width = header.Width;
+    var height = header.Height;
+    var frameCount = header.FrameCount;
+    var bpp = header.Bpp;
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid SEQ dimensions: {width}x{height}.");

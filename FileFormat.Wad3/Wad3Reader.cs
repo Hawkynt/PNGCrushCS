@@ -2,14 +2,11 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
-using System.Text;
 
 namespace FileFormat.Wad3;
 
 /// <summary>Reads WAD3 files from bytes, streams, or file paths.</summary>
 public static class Wad3Reader {
-
-  private const int _MIPTEX_HEADER_SIZE = 40;
 
   public static Wad3File FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
@@ -57,7 +54,7 @@ public static class Wad3Reader {
         continue;
 
       var lumpStart = entry.FilePos;
-      if (lumpStart + _MIPTEX_HEADER_SIZE > data.Length)
+      if (lumpStart + Wad3MipTexHeader.StructSize > data.Length)
         continue;
 
       var texture = _ReadMipTex(data, lumpStart);
@@ -73,21 +70,16 @@ public static class Wad3Reader {
   }
 
   private static Wad3Texture _ReadMipTex(ReadOnlySpan<byte> data, int lumpStart) {
+    var mipTex = Wad3MipTexHeader.ReadFrom(data[lumpStart..]);
 
-    // Read MipTex header (40 bytes)
-    var nameBytes = data.Slice(lumpStart, 16);
-    var nameEnd = nameBytes.IndexOf((byte)0);
-    var name = nameEnd < 0
-      ? Encoding.ASCII.GetString(nameBytes)
-      : Encoding.ASCII.GetString(nameBytes[..nameEnd]);
+    var name = mipTex.Name;
+    var width = (int)mipTex.Width;
+    var height = (int)mipTex.Height;
 
-    var width = (int)BinaryPrimitives.ReadUInt32LittleEndian(data[(lumpStart + 16)..]);
-    var height = (int)BinaryPrimitives.ReadUInt32LittleEndian(data[(lumpStart + 20)..]);
-
-    var mipOffset0 = (int)BinaryPrimitives.ReadUInt32LittleEndian(data[(lumpStart + 24)..]);
-    var mipOffset1 = (int)BinaryPrimitives.ReadUInt32LittleEndian(data[(lumpStart + 28)..]);
-    var mipOffset2 = (int)BinaryPrimitives.ReadUInt32LittleEndian(data[(lumpStart + 32)..]);
-    var mipOffset3 = (int)BinaryPrimitives.ReadUInt32LittleEndian(data[(lumpStart + 36)..]);
+    var mipOffset0 = (int)mipTex.MipOffset0;
+    var mipOffset1 = (int)mipTex.MipOffset1;
+    var mipOffset2 = (int)mipTex.MipOffset2;
+    var mipOffset3 = (int)mipTex.MipOffset3;
 
     // Mip level 0 pixel data
     var mip0Size = width * height;

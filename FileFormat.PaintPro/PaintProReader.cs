@@ -36,7 +36,7 @@ public static class PaintProReader {
 
     var span = data;
     var header = PaintProHeader.ReadFrom(span);
-    var palette = header.GetPaletteArray();
+    var palette = header.Palette;
 
     var pixelData = new byte[32000];
     data.Slice(PaintProHeader.StructSize, 32000).CopyTo(pixelData.AsSpan(0));
@@ -60,7 +60,7 @@ public static class PaintProReader {
 
     var span = data.AsSpan();
     var header = PaintProHeader.ReadFrom(span);
-    var palette = header.GetPaletteArray();
+    var palette = header.Palette;
 
     var pixelData = new byte[32000];
     data.AsSpan(PaintProHeader.StructSize, 32000).CopyTo(pixelData.AsSpan(0));

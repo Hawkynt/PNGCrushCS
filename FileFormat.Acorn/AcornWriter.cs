@@ -1,13 +1,10 @@
 ﻿using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.Acorn;
 
 /// <summary>Assembles Acorn RISC OS sprite file bytes from an <see cref="AcornFile"/>.</summary>
 public static class AcornWriter {
-
-  private const int _AREA_HEADER_SIZE = 12;
 
   public static byte[] ToBytes(AcornFile file) {
     ArgumentNullException.ThrowIfNull(file);
@@ -16,7 +13,7 @@ public static class AcornWriter {
     var spriteCount = sprites.Count;
 
     // Calculate total size
-    var totalSize = _AREA_HEADER_SIZE;
+    var totalSize = AcornAreaHeader.StructSize;
     for (var i = 0; i < spriteCount; ++i)
       totalSize += _CalculateSpriteSize(sprites[i]);
 
@@ -25,11 +22,10 @@ public static class AcornWriter {
 
     // Area header: spriteCount, firstSpriteOffset (16 = area header size in the RISC OS sense = 12 + 4 implicit),
     // freeWordOffset (totalSize + 4)
-    BinaryPrimitives.WriteInt32LittleEndian(span, spriteCount);
-    BinaryPrimitives.WriteInt32LittleEndian(span[4..], 16); // firstSpriteOffset (area start + 16)
-    BinaryPrimitives.WriteInt32LittleEndian(span[8..], totalSize + 4); // freeWordOffset
+    var areaHeader = new AcornAreaHeader(spriteCount, 16, totalSize + 4);
+    areaHeader.WriteTo(span);
 
-    var offset = _AREA_HEADER_SIZE;
+    var offset = AcornAreaHeader.StructSize;
     for (var i = 0; i < spriteCount; ++i) {
       var sprite = sprites[i];
       var spriteSize = _CalculateSpriteSize(sprite);

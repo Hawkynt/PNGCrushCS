@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.SmartFax;
@@ -35,9 +34,10 @@ public static class SmartFaxReader {
     if (data[0] != SmartFaxFile.Magic[0] || data[1] != SmartFaxFile.Magic[1] || data[2] != SmartFaxFile.Magic[2] || data[3] != SmartFaxFile.Magic[3])
       throw new InvalidDataException("Invalid SMF magic bytes.");
 
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
-    var flags = BinaryPrimitives.ReadUInt16LittleEndian(data[8..]);
+    var header = SmartFaxHeader.ReadFrom(data);
+    var width = header.Width;
+    var height = header.Height;
+    var flags = header.Flags;
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid SMF dimensions: {width}x{height}.");

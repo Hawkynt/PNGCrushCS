@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.Fli;
@@ -8,8 +7,6 @@ namespace FileFormat.Fli;
 public static class FliWriter {
 
   private const short _FRAME_MAGIC = unchecked((short)0xF1FA);
-  private const int _FRAME_HEADER_SIZE = 16;
-  private const int _CHUNK_HEADER_SIZE = 6;
 
   public static byte[] ToBytes(FliFile file) {
     ArgumentNullException.ThrowIfNull(file);
@@ -19,21 +16,21 @@ public static class FliWriter {
     // Reserve space for file header (128 bytes)
     ms.Write(new byte[FliHeader.StructSize]);
 
-    var chunkHeaderBuffer = new byte[_CHUNK_HEADER_SIZE];
-    var frameHeaderBuffer = new byte[_FRAME_HEADER_SIZE];
+    var chunkHeaderBuffer = new byte[FliChunkHeader.StructSize];
+    var frameHeaderBuffer = new byte[FliFrameHeader.StructSize];
 
     // Write frames
     foreach (var frame in file.Frames) {
       var frameStart = ms.Position;
 
       // Reserve space for frame header (16 bytes)
-      ms.Write(new byte[_FRAME_HEADER_SIZE]);
+      ms.Write(new byte[FliFrameHeader.StructSize]);
 
       // Write chunks
       foreach (var chunk in frame.Chunks) {
-        var chunkSize = _CHUNK_HEADER_SIZE + chunk.Data.Length;
-        BinaryPrimitives.WriteInt32LittleEndian(chunkHeaderBuffer, chunkSize);
-        BinaryPrimitives.WriteInt16LittleEndian(chunkHeaderBuffer.AsSpan(4), (short)chunk.ChunkType);
+        var chunkSize = FliChunkHeader.StructSize + chunk.Data.Length;
+        var chunkHeader = new FliChunkHeader(chunkSize, (short)chunk.ChunkType);
+        chunkHeader.WriteTo(chunkHeaderBuffer);
         ms.Write(chunkHeaderBuffer);
         ms.Write(chunk.Data);
       }
@@ -43,10 +40,8 @@ public static class FliWriter {
       var frameSize = (int)(frameEnd - frameStart);
       ms.Position = frameStart;
 
-      Array.Clear(frameHeaderBuffer);
-      BinaryPrimitives.WriteInt32LittleEndian(frameHeaderBuffer, frameSize);
-      BinaryPrimitives.WriteInt16LittleEndian(frameHeaderBuffer.AsSpan(4), _FRAME_MAGIC);
-      BinaryPrimitives.WriteInt16LittleEndian(frameHeaderBuffer.AsSpan(6), (short)frame.Chunks.Count);
+      var frameHeader = new FliFrameHeader(frameSize, _FRAME_MAGIC, (short)frame.Chunks.Count);
+      frameHeader.WriteTo(frameHeaderBuffer);
       ms.Write(frameHeaderBuffer);
 
       ms.Position = frameEnd;

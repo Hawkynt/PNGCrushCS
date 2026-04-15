@@ -18,11 +18,7 @@ public static class AutodeskCelWriter {
 
     // Header: 16 bytes
     BinaryPrimitives.WriteUInt16LittleEndian(span, AutodeskCelFile.Magic);
-    BinaryPrimitives.WriteUInt16LittleEndian(span[2..], (ushort)width);
-    BinaryPrimitives.WriteUInt16LittleEndian(span[4..], (ushort)height);
-    BinaryPrimitives.WriteUInt16LittleEndian(span[6..], (ushort)xOffset);
-    BinaryPrimitives.WriteUInt16LittleEndian(span[8..], (ushort)yOffset);
-    BinaryPrimitives.WriteUInt16LittleEndian(span[10..], (ushort)bitsPerPixel);
+    new AutodeskCelHeader((ushort)width, (ushort)height, (ushort)xOffset, (ushort)yOffset, (ushort)bitsPerPixel).WriteTo(span);
     span[12] = compression;
     // Bytes 13-15: padding (already zeroed)
 

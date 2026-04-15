@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.Gd2;
@@ -39,13 +38,14 @@ public static class Gd2Reader {
     if (!data[..4].SequenceEqual(Gd2File.Signature))
       throw new InvalidDataException("Invalid GD2 signature.");
 
-    var version = BinaryPrimitives.ReadUInt16BigEndian(data[4..]);
-    var width = BinaryPrimitives.ReadUInt16BigEndian(data[6..]);
-    var height = BinaryPrimitives.ReadUInt16BigEndian(data[8..]);
-    var chunkSize = BinaryPrimitives.ReadUInt16BigEndian(data[10..]);
-    var format = BinaryPrimitives.ReadUInt16BigEndian(data[12..]);
-    var xChunkCount = BinaryPrimitives.ReadUInt16BigEndian(data[14..]);
-    var yChunkCount = BinaryPrimitives.ReadUInt16BigEndian(data[16..]);
+    var header = Gd2Header.ReadFrom(data);
+    var version = header.Version;
+    var width = header.Width;
+    var height = header.Height;
+    var chunkSize = header.ChunkSize;
+    var format = header.Format;
+    var xChunkCount = header.XChunkCount;
+    var yChunkCount = header.YChunkCount;
 
     if (width == 0 || height == 0)
       throw new InvalidDataException("GD2 image dimensions must be non-zero.");

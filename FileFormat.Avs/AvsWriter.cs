@@ -1,12 +1,9 @@
 ﻿using System;
-using System.Buffers.Binary;
 
 namespace FileFormat.Avs;
 
 /// <summary>Assembles AVS file bytes from pixel data.</summary>
 public static class AvsWriter {
-
-  private const int _HEADER_SIZE = 8;
 
   public static byte[] ToBytes(AvsFile file) {
     ArgumentNullException.ThrowIfNull(file);
@@ -15,13 +12,11 @@ public static class AvsWriter {
 
   internal static byte[] Assemble(byte[] pixelData, int width, int height) {
     var expectedPixelBytes = width * height * 4;
-    var result = new byte[_HEADER_SIZE + expectedPixelBytes];
-    var span = result.AsSpan();
+    var result = new byte[AvsHeader.StructSize + expectedPixelBytes];
 
-    BinaryPrimitives.WriteUInt32BigEndian(span, (uint)width);
-    BinaryPrimitives.WriteUInt32BigEndian(span[4..], (uint)height);
+    new AvsHeader((uint)width, (uint)height).WriteTo(result);
 
-    pixelData.AsSpan(0, Math.Min(expectedPixelBytes, pixelData.Length)).CopyTo(result.AsSpan(_HEADER_SIZE));
+    pixelData.AsSpan(0, Math.Min(expectedPixelBytes, pixelData.Length)).CopyTo(result.AsSpan(AvsHeader.StructSize));
 
     return result;
   }

@@ -48,16 +48,14 @@ public static class ExtendedGemImgReader {
 
     if (dataOffset > ExtendedGemImgHeader.StructSize + ExtendedGemImgHeader.XimgExtensionFixedSize) {
       var extOffset = ExtendedGemImgHeader.StructSize;
-      if (extOffset + 4 <= data.Length) {
-        var marker1 = BinaryPrimitives.ReadInt16BigEndian(span.Slice(extOffset));
-        var marker2 = BinaryPrimitives.ReadInt16BigEndian(span.Slice(extOffset + 2));
+      if (extOffset + ExtendedGemImgExtensionHeader.StructSize <= data.Length) {
+        var extHeader = ExtendedGemImgExtensionHeader.ReadFrom(span.Slice(extOffset, ExtendedGemImgExtensionHeader.StructSize));
 
-        if (marker1 == ExtendedGemImgHeader.XimgMarker1 && marker2 == ExtendedGemImgHeader.XimgMarker2) {
-          if (extOffset + 6 <= data.Length)
-            colorModel = (ExtendedGemImgColorModel)BinaryPrimitives.ReadInt16BigEndian(span.Slice(extOffset + 4));
+        if (extHeader.Marker1 == ExtendedGemImgHeader.XimgMarker1 && extHeader.Marker2 == ExtendedGemImgHeader.XimgMarker2) {
+          colorModel = (ExtendedGemImgColorModel)extHeader.ColorModel;
 
           // Read palette entries: each is 3 big-endian shorts (R, G, B in range 0-1000)
-          var palOffset = extOffset + 6;
+          var palOffset = extOffset + ExtendedGemImgExtensionHeader.StructSize;
           var availableWords = (dataOffset - palOffset) / 2;
           var palEntries = Math.Min(paletteCount, availableWords / 3);
           if (palEntries > 0) {

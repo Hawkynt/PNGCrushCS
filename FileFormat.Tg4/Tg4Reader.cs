@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.Tg4;
@@ -35,8 +34,9 @@ public static class Tg4Reader {
     if (data[0] != Tg4File.Magic[0] || data[1] != Tg4File.Magic[1] || data[2] != Tg4File.Magic[2] || data[3] != Tg4File.Magic[3])
       throw new InvalidDataException("Invalid TG4 magic bytes.");
 
-    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
-    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
+    var header = Tg4Header.ReadFrom(data);
+    var width = header.Width;
+    var height = header.Height;
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid TG4 dimensions: {width}x{height}.");
