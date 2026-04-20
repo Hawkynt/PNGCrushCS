@@ -1,0 +1,97 @@
+name: Build artifacts
+
+# Shared artifact-build block. Called by release.yml (tag push) and nightly.yml
+# (workflow_run on CI success).
+#
+# Two shippables, both net10.0-windows (so Windows host only):
+#   * Crush.Image    -- unified CLI (AssemblyName=crush.exe)
+#   * Crush.Viewer   -- WinForms GUI (500+ formats, zoom/pan/convert)
+#
+# CLAUDE.md references 11 per-format Crush.* CLIs that don't exist yet; when
+# added, extend the matrix to build each for win-x64.
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+      release-kind:
+        required: true
+        type: string
+      changelog-flag:
+        required: true
+        type: string
+      ref:
+        required: false
+        type: string
+        default: ""
+    outputs:
+      cli-artifact:
+        description: "CLI artifact name"
+        value: ${{ jobs.build.outputs.cli-artifact }}
+      ui-artifact:
+        description: "UI (viewer) artifact name"
+        value: ${{ jobs.build.outputs.ui-artifact }}
+
+jobs:
+  build:
+    runs-on: windows-latest
+    outputs:
+      cli-artifact: PNGCrushCS-cli-win-x64-${{ inputs.version }}
+      ui-artifact:  PNGCrushCS-Viewer-win-x64-${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.x
+            9.x
+            10.x
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Update CHANGELOG
+        shell: bash
+        run: node .github/workflows/scripts/update-changelog.mjs ${{ inputs.changelog-flag }}
+
+      - name: Stamp versions into csprojs
+        shell: bash
+        run: perl .github/workflows/scripts/version.pl --stamp
+
+      - name: Publish Crush.Image CLI (win-x64, single-file, self-contained)
+        run: dotnet publish Crush.Image/Crush.Image.csproj -r win-x64 -c Release --self-contained --nologo -p:Version=${{ inputs.version }} -p:PublishSingleFile=true
+
+      - name: Publish Crush.Viewer UI (win-x64, single-file, self-contained)
+        run: dotnet publish Crush.Viewer/Crush.Viewer.csproj -r win-x64 -c Release --self-contained --nologo -p:Version=${{ inputs.version }}
+
+      - name: Package CLI zip
+        shell: pwsh
+        run: |
+          $v = "${{ inputs.version }}"
+          $pubDir = "Crush.Image/bin/Release/net10.0-windows/win-x64/publish"
+          Compress-Archive -Path "$pubDir/*" -DestinationPath "PNGCrushCS-cli-win-x64-$v.zip"
+
+      - name: Package Viewer zip
+        shell: pwsh
+        run: |
+          $v = "${{ inputs.version }}"
+          $pubDir = "Crush.Viewer/bin/Release/net10.0-windows/win-x64/publish"
+          Compress-Archive -Path "$pubDir/*" -DestinationPath "PNGCrushCS-Viewer-win-x64-$v.zip"
+
+      - name: Upload CLI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PNGCrushCS-cli-win-x64-${{ inputs.version }}
+          path: PNGCrushCS-cli-win-x64-${{ inputs.version }}.zip
+
+      - name: Upload Viewer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PNGCrushCS-Viewer-win-x64-${{ inputs.version }}
+          path: PNGCrushCS-Viewer-win-x64-${{ inputs.version }}.zip

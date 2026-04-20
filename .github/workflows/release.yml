@@ -1,0 +1,70 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Manual release trigger'
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci.yml
+
+  version:
+    needs: test
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: v
+        run: |
+          V=$(perl .github/workflows/scripts/version.pl)
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "Resolved version: $V"
+
+  build:
+    needs: version
+    uses: ./.github/workflows/_build.yml
+    with:
+      version: ${{ needs.version.outputs.version }}
+      release-kind: release
+      changelog-flag: --release ${{ github.ref_name }}
+
+  publish:
+    needs: [version, build]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.cli-artifact }}
+          path: dist
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.ui-artifact }}
+          path: dist
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.version.outputs.version }}
+          name: v${{ needs.version.outputs.version }}
+          body: |
+            ## PNGCrushCS v${{ needs.version.outputs.version }}
+
+            - **CLI** (`crush.exe`) — unified image-format optimizer with cross-format conversion.
+            - **Viewer** — WinForms GUI supporting 500+ formats with zoom, pan, multi-image navigation, and format conversion.
+
+            Both ship as Windows self-contained single-files — no runtime installation required.
+          files: dist/*.zip
+          generate_release_notes: true

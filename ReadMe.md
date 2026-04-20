@@ -1,11 +1,13 @@
 # PNGCrushCS
 
+[![CI](https://github.com/Hawkynt/PNGCrushCS/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Hawkynt/PNGCrushCS/actions/workflows/ci.yml)
+[![Release](https://github.com/Hawkynt/PNGCrushCS/actions/workflows/release.yml/badge.svg)](https://github.com/Hawkynt/PNGCrushCS/actions/workflows/release.yml)
+[![Latest release](https://img.shields.io/github/v/release/Hawkynt/PNGCrushCS?label=release&sort=semver)](https://github.com/Hawkynt/PNGCrushCS/releases/latest)
+[![Latest nightly](https://img.shields.io/github/v/release/Hawkynt/PNGCrushCS?include_prereleases&label=nightly&sort=date)](https://github.com/Hawkynt/PNGCrushCS/releases?q=prerelease%3Atrue)
 ![License](https://img.shields.io/github/license/Hawkynt/PNGCrushCS)
 ![Language](https://img.shields.io/github/languages/top/Hawkynt/PNGCrushCS?color=purple)
 [![Last Commit](https://img.shields.io/github/last-commit/Hawkynt/PNGCrushCS?branch=main)![Activity](https://img.shields.io/github/commit-activity/y/Hawkynt/PNGCrushCS?branch=main)](https://github.com/Hawkynt/PNGCrushCS/commits/main)
-[![GitHub release](https://img.shields.io/github/v/release/Hawkynt/PNGCrushCS)](https://github.com/Hawkynt/PNGCrushCS/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/Hawkynt/PNGCrushCS/total)](https://github.com/Hawkynt/PNGCrushCS/releases)
-[![Build](https://github.com/Hawkynt/PNGCrushCS/actions/workflows/Build.yml/badge.svg)](https://github.com/Hawkynt/PNGCrushCS/actions/workflows/Build.yml)
 
 > A C# image optimization suite that reduces file sizes by exhaustively testing combinations of compression parameters and selecting the smallest valid result. Supports **PNG**, **GIF**, **TIFF**, **BMP**, **TGA**, **PCX**, **JPEG**, **ICO**, **CUR**, **ANI**, and **WebP** optimization through a shared architecture with a custom Zopfli-class DEFLATE encoder. Includes **542 file format libraries** covering modern, professional, retro, and exotic image formats with full pixel codec implementations for complex formats (WebP VP8/VP8L, JPEG 2000, JPEG XL, JPEG-LS, JPEG XR, HEIF/HEVC, AVIF/AV1, BPG, FLIF, JBIG2, DjVu, ECW).
 

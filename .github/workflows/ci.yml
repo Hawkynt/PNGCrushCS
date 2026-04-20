@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  # release.yml calls this via `uses: ./.github/workflows/ci.yml` so tag
+  # releases run the exact same test matrix as per-PR CI.
+  workflow_call: {}
+
+jobs:
+  test:
+    name: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0                          # version.pl needs full history
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.x
+            9.x
+            10.x
+
+      - name: Stamp versions into csprojs
+        shell: bash
+        run: perl .github/workflows/scripts/version.pl --stamp
+
+      - name: Restore
+        run: dotnet restore PngCrush.slnx
+
+      - name: Build
+        run: dotnet build PngCrush.slnx --configuration Release --no-restore
+
+      # Run everything except the heavy tiers on every PR. Regression and
+      # Performance tiers run only on nightly/release builds.
+      - name: Test (core + format suites)
+        run: dotnet test PngCrush.slnx --configuration Release --no-build --filter "TestCategory!=Regression&TestCategory!=Performance" --logger "trx;LogFileName=tests.trx"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.os }}
+          path: '**/TestResults/*.trx'
+
+  coverage:
+    name: coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.x
+            9.x
+            10.x
+
+      - name: Stamp versions into csprojs
+        run: perl .github/workflows/scripts/version.pl --stamp
+
+      - name: Test with coverage
+        # Collect coverage on the same filtered set as CI. Heavy tiers are
+        # intentionally excluded -- their runtime is disproportionate to
+        # the coverage they'd add.
+        run: dotnet test PngCrush.slnx --configuration Release --filter "TestCategory!=Regression&TestCategory!=Performance" --collect:"XPlat Code Coverage" --results-directory ./coverage
+
+      - name: Generate coverage report
+        run: |
+          dotnet tool install -g dotnet-reportgenerator-globaltool
+          reportgenerator -reports:./coverage/**/coverage.cobertura.xml -targetdir:./coverage/report -reporttypes:HtmlInline_AzurePipelines
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: ./coverage/report
