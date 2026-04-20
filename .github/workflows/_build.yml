@@ -7,8 +7,7 @@ name: Build artifacts
 #   * Crush.Image    -- unified CLI (AssemblyName=crush.exe)
 #   * Crush.Viewer   -- WinForms GUI (500+ formats, zoom/pan/convert)
 #
-# CLAUDE.md references 11 per-format Crush.* CLIs that don't exist yet; when
-# added, extend the matrix to build each for win-x64.
+# Depends on sibling AnythingToGif repo (Optimizer.Gif references it).
 on:
   workflow_call:
     inputs:
@@ -40,10 +39,19 @@ jobs:
       cli-artifact: PNGCrushCS-cli-win-x64-${{ inputs.version }}
       ui-artifact:  PNGCrushCS-Viewer-win-x64-${{ inputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout PNGCrushCS
+        uses: actions/checkout@v4
         with:
+          path: PNGCrushCS
           ref: ${{ inputs.ref || github.ref }}
           fetch-depth: 0
+
+      - name: Checkout AnythingToGif (sibling)
+        uses: actions/checkout@v4
+        with:
+          repository: Hawkynt/AnythingToGif
+          path: AnythingToGif
+          fetch-depth: 1
 
       - uses: actions/setup-dotnet@v4
         with:
@@ -58,20 +66,25 @@ jobs:
 
       - name: Update CHANGELOG
         shell: bash
+        working-directory: PNGCrushCS
         run: node .github/workflows/scripts/update-changelog.mjs ${{ inputs.changelog-flag }}
 
       - name: Stamp versions into csprojs
         shell: bash
+        working-directory: PNGCrushCS
         run: perl .github/workflows/scripts/version.pl --stamp
 
       - name: Publish Crush.Image CLI (win-x64, single-file, self-contained)
+        working-directory: PNGCrushCS
         run: dotnet publish Crush.Image/Crush.Image.csproj -r win-x64 -c Release --self-contained --nologo -p:Version=${{ inputs.version }} -p:PublishSingleFile=true
 
       - name: Publish Crush.Viewer UI (win-x64, single-file, self-contained)
+        working-directory: PNGCrushCS
         run: dotnet publish Crush.Viewer/Crush.Viewer.csproj -r win-x64 -c Release --self-contained --nologo -p:Version=${{ inputs.version }}
 
       - name: Package CLI zip
         shell: pwsh
+        working-directory: PNGCrushCS
         run: |
           $v = "${{ inputs.version }}"
           $pubDir = "Crush.Image/bin/Release/net10.0-windows/win-x64/publish"
@@ -79,6 +92,7 @@ jobs:
 
       - name: Package Viewer zip
         shell: pwsh
+        working-directory: PNGCrushCS
         run: |
           $v = "${{ inputs.version }}"
           $pubDir = "Crush.Viewer/bin/Release/net10.0-windows/win-x64/publish"
@@ -88,10 +102,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: PNGCrushCS-cli-win-x64-${{ inputs.version }}
-          path: PNGCrushCS-cli-win-x64-${{ inputs.version }}.zip
+          path: PNGCrushCS/PNGCrushCS-cli-win-x64-${{ inputs.version }}.zip
 
       - name: Upload Viewer artifact
         uses: actions/upload-artifact@v4
         with:
           name: PNGCrushCS-Viewer-win-x64-${{ inputs.version }}
-          path: PNGCrushCS-Viewer-win-x64-${{ inputs.version }}.zip
+          path: PNGCrushCS/PNGCrushCS-Viewer-win-x64-${{ inputs.version }}.zip

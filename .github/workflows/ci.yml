@@ -1,12 +1,14 @@
 name: CI
 
+# PNGCrushCS's Optimizer.Gif depends on the sibling repo `AnythingToGif`
+# (Hawkynt.GifFileFormat). We check out both side-by-side so the csproj's
+# `..\..\AnythingToGif\GifFileFormat\GifFileFormat.csproj` path resolves.
+
 on:
   push:
     branches: [main, master]
   pull_request:
     branches: [main, master]
-  # release.yml calls this via `uses: ./.github/workflows/ci.yml` so tag
-  # releases run the exact same test matrix as per-PR CI.
   workflow_call: {}
 
 jobs:
@@ -18,9 +20,18 @@ jobs:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout PNGCrushCS
+        uses: actions/checkout@v4
         with:
-          fetch-depth: 0                          # version.pl needs full history
+          path: PNGCrushCS
+          fetch-depth: 0
+
+      - name: Checkout AnythingToGif (sibling)
+        uses: actions/checkout@v4
+        with:
+          repository: Hawkynt/AnythingToGif
+          path: AnythingToGif
+          fetch-depth: 1
 
       - uses: actions/setup-dotnet@v4
         with:
@@ -31,33 +42,43 @@ jobs:
 
       - name: Stamp versions into csprojs
         shell: bash
+        working-directory: PNGCrushCS
         run: perl .github/workflows/scripts/version.pl --stamp
 
       - name: Restore
-        run: dotnet restore PngCrush.slnx
+        working-directory: PNGCrushCS
+        run: dotnet restore PngCrush.slnx -p:EnableWindowsTargeting=true
 
       - name: Build
-        run: dotnet build PngCrush.slnx --configuration Release --no-restore
+        working-directory: PNGCrushCS
+        run: dotnet build PngCrush.slnx --configuration Release --no-restore -p:EnableWindowsTargeting=true
 
-      # Run everything except the heavy tiers on every PR. Regression and
-      # Performance tiers run only on nightly/release builds.
       - name: Test (core + format suites)
-        run: dotnet test PngCrush.slnx --configuration Release --no-build --filter "TestCategory!=Regression&TestCategory!=Performance" --logger "trx;LogFileName=tests.trx"
+        working-directory: PNGCrushCS
+        run: dotnet test PngCrush.slnx --configuration Release --no-build -p:EnableWindowsTargeting=true --filter "TestCategory!=Regression&TestCategory!=Performance" --logger "trx;LogFileName=tests.trx"
 
-      - name: Upload test results
+      - uses: actions/upload-artifact@v4
         if: always()
-        uses: actions/upload-artifact@v4
         with:
           name: test-results-${{ matrix.os }}
-          path: '**/TestResults/*.trx'
+          path: 'PNGCrushCS/**/TestResults/*.trx'
 
   coverage:
-    name: coverage
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout PNGCrushCS
+        uses: actions/checkout@v4
         with:
+          path: PNGCrushCS
           fetch-depth: 0
+
+      - name: Checkout AnythingToGif (sibling)
+        uses: actions/checkout@v4
+        with:
+          repository: Hawkynt/AnythingToGif
+          path: AnythingToGif
+          fetch-depth: 1
+
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: |
@@ -65,16 +86,16 @@ jobs:
             9.x
             10.x
 
-      - name: Stamp versions into csprojs
+      - name: Stamp versions
+        working-directory: PNGCrushCS
         run: perl .github/workflows/scripts/version.pl --stamp
 
       - name: Test with coverage
-        # Collect coverage on the same filtered set as CI. Heavy tiers are
-        # intentionally excluded -- their runtime is disproportionate to
-        # the coverage they'd add.
-        run: dotnet test PngCrush.slnx --configuration Release --filter "TestCategory!=Regression&TestCategory!=Performance" --collect:"XPlat Code Coverage" --results-directory ./coverage
+        working-directory: PNGCrushCS
+        run: dotnet test PngCrush.slnx --configuration Release -p:EnableWindowsTargeting=true --filter "TestCategory!=Regression&TestCategory!=Performance" --collect:"XPlat Code Coverage" --results-directory ./coverage
 
       - name: Generate coverage report
+        working-directory: PNGCrushCS
         run: |
           dotnet tool install -g dotnet-reportgenerator-globaltool
           reportgenerator -reports:./coverage/**/coverage.cobertura.xml -targetdir:./coverage/report -reporttypes:HtmlInline_AzurePipelines
@@ -82,4 +103,4 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: coverage-report
-          path: ./coverage/report
+          path: PNGCrushCS/coverage/report
