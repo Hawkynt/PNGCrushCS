@@ -5,6 +5,7 @@ namespace FileFormat.SunIcon;
 
 /// <summary>In-memory representation of a Sun Icon (.icon) image.</summary>
 [FormatMagicBytes([0x2F, 0x2A, 0x20])]
+[FormatMimeType("image/x-sun-icon")]
 public readonly record struct SunIconFile : IImageFormatReader<SunIconFile>, IImageToRawImage<SunIconFile>, IImageFromRawImage<SunIconFile>, IImageFormatWriter<SunIconFile> {
 
   static string IImageFormatMetadata<SunIconFile>.PrimaryExtension => ".icon";

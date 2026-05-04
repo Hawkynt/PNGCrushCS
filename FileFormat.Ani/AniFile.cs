@@ -7,6 +7,7 @@ using FileFormat.Ico;
 namespace FileFormat.Ani;
 
 /// <summary>In-memory representation of an ANI animated cursor file.</summary>
+[FormatMimeType("application/x-navi-animation", "image/x-ani")]
 public sealed class AniFile : IImageFormatReader<AniFile>, IImageToRawImage<AniFile>, IImageFormatWriter<AniFile>, IMultiImageFileFormat<AniFile> {
 
   public required AniHeader Header { get; init; }

@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Avif;
 
 /// <summary>In-memory representation of an AVIF (AV1 Image File Format) image.</summary>
+[FormatMimeType("image/avif", "image/avif-sequence")]
 public readonly record struct AvifFile : IImageFormatReader<AvifFile>, IImageToRawImage<AvifFile>, IImageFromRawImage<AvifFile>, IImageFormatWriter<AvifFile> {
 
   static string IImageFormatMetadata<AvifFile>.PrimaryExtension => ".avif";

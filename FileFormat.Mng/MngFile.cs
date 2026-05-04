@@ -8,6 +8,7 @@ namespace FileFormat.Mng;
 
 /// <summary>In-memory representation of an MNG (VLC profile) animation.</summary>
 [FormatMagicBytes([0x8A, 0x4D, 0x4E, 0x47])]
+[FormatMimeType("video/x-mng", "image/x-mng")]
 public sealed class MngFile : IImageFormatReader<MngFile>, IImageToRawImage<MngFile>, IImageFormatWriter<MngFile>, IMultiImageFileFormat<MngFile> {
 
   static string IImageFormatMetadata<MngFile>.PrimaryExtension => ".mng";

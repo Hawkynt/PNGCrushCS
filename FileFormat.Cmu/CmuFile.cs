@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Cmu;
 
 /// <summary>In-memory representation of a CMU (CMU Window Manager Bitmap) image.</summary>
+[FormatMimeType("image/x-cmu-raster")]
 public readonly record struct CmuFile : IImageFormatReader<CmuFile>, IImageToRawImage<CmuFile>, IImageFromRawImage<CmuFile>, IImageFormatWriter<CmuFile> {
 
   static string IImageFormatMetadata<CmuFile>.PrimaryExtension => ".cmu";

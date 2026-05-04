@@ -5,6 +5,7 @@ using FileFormat.Core;
 namespace FileFormat.Fli;
 
 /// <summary>In-memory representation of a FLI/FLC animation file.</summary>
+[FormatMimeType("video/x-fli", "video/x-flc")]
 public sealed class FliFile : IImageFormatReader<FliFile>, IImageToRawImage<FliFile>, IImageFormatWriter<FliFile>, IMultiImageFileFormat<FliFile> {
 
   static string IImageFormatMetadata<FliFile>.PrimaryExtension => ".fli";

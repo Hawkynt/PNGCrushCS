@@ -39,6 +39,51 @@ jobs:
       release-kind: release
       changelog-flag: --release ${{ github.ref_name }}
 
+  nuget:
+    # Pack and publish the Hawkynt.FileFormats.Images public NuGet meta-package.
+    # Same versioning convention as everything else in the repo: csproj declares
+    # MAJOR.MINOR.PATCH, then version.pl --stamp appends .BUILD where BUILD is
+    # the git rev-list count, producing e.g. 1.0.0.234 at pack time.
+    needs: [version, test]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+
+      - name: Stamp version into csprojs
+        run: perl .github/workflows/scripts/version.pl --stamp
+
+      - name: Pack Hawkynt.FileFormats.Images
+        run: dotnet pack Hawkynt.FileFormats.Images/Hawkynt.FileFormats.Images.csproj -c Release -o ./packages --nologo
+
+      - name: Push to NuGet.org
+        env:
+          NUGET_TOKEN: ${{ secrets.NUGET_TOKEN }}
+        run: |
+          if [ -z "$NUGET_TOKEN" ]; then
+            echo "NUGET_TOKEN secret is not set; skipping push (PR / fork build)."
+            exit 0
+          fi
+          dotnet nuget push ./packages/Hawkynt.FileFormats.Images.*.nupkg \
+            --api-key "$NUGET_TOKEN" \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate
+
+      - name: Upload .nupkg as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hawkynt.FileFormats.Images-nupkg
+          path: ./packages/*.nupkg
+
   publish:
     needs: [version, build]
     if: startsWith(github.ref, 'refs/tags/')

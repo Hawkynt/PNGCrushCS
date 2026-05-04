@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Jpeg;
 
 /// <summary>In-memory representation of a JPEG image.</summary>
+[FormatMimeType("image/jpeg", "image/jpg", "image/pjpeg")]
 public readonly record struct JpegFile : IImageFormatReader<JpegFile>, IImageToRawImage<JpegFile>, IImageFromRawImage<JpegFile>, IImageFormatWriter<JpegFile> {
 
   static string IImageFormatMetadata<JpegFile>.PrimaryExtension => ".jpg";

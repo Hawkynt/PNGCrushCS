@@ -5,6 +5,7 @@ namespace FileFormat.Qoi;
 
 /// <summary>In-memory representation of a QOI image.</summary>
 [FormatMagicBytes([0x71, 0x6F, 0x69, 0x66])]
+[FormatMimeType("image/qoi", "image/x-qoi")]
 public readonly record struct QoiFile : IImageFormatReader<QoiFile>, IImageToRawImage<QoiFile>, IImageFromRawImage<QoiFile>, IImageFormatWriter<QoiFile> {
 
   static string IImageFormatMetadata<QoiFile>.PrimaryExtension => ".qoi";

@@ -5,6 +5,7 @@ namespace FileFormat.Farbfeld;
 
 /// <summary>In-memory representation of a Farbfeld image.</summary>
 [FormatMagicBytes([0x66, 0x61, 0x72, 0x62, 0x66, 0x65, 0x6C, 0x64])]
+[FormatMimeType("image/x-farbfeld")]
 public readonly record struct FarbfeldFile : IImageFormatReader<FarbfeldFile>, IImageToRawImage<FarbfeldFile>, IImageFromRawImage<FarbfeldFile>, IImageFormatWriter<FarbfeldFile> {
 
   static string IImageFormatMetadata<FarbfeldFile>.PrimaryExtension => ".ff";

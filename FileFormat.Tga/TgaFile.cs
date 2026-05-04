@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Tga;
 
 /// <summary>In-memory representation of a TGA image.</summary>
+[FormatMimeType("image/x-tga", "image/x-targa", "application/tga")]
 public readonly record struct TgaFile : IImageFormatReader<TgaFile>, IImageToRawImage<TgaFile>, IImageFromRawImage<TgaFile>, IImageFormatWriter<TgaFile> {
 
   static string IImageFormatMetadata<TgaFile>.PrimaryExtension => ".tga";

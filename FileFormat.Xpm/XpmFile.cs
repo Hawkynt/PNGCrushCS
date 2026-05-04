@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Xpm;
 
 /// <summary>In-memory representation of an XPM image.</summary>
+[FormatMimeType("image/x-xpixmap", "image/x-xpm")]
 public readonly record struct XpmFile : IImageFormatReader<XpmFile>, IImageToRawImage<XpmFile>, IImageFromRawImage<XpmFile>, IImageFormatWriter<XpmFile> {
 
   static string IImageFormatMetadata<XpmFile>.PrimaryExtension => ".xpm";

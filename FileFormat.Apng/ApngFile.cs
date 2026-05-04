@@ -6,6 +6,7 @@ using FileFormat.Png;
 namespace FileFormat.Apng;
 
 /// <summary>In-memory representation of an Animated PNG file.</summary>
+[FormatMimeType("image/apng", "image/x-apng")]
 public sealed class ApngFile : IImageFormatReader<ApngFile>, IImageToRawImage<ApngFile>, IImageFromRawImage<ApngFile>, IImageFormatWriter<ApngFile>, IMultiImageFileFormat<ApngFile> {
 
   static string IImageFormatMetadata<ApngFile>.PrimaryExtension => ".apng";

@@ -5,6 +5,7 @@ using FileFormat.Core;
 namespace FileFormat.Tiff;
 
 /// <summary>In-memory representation of a TIFF image.</summary>
+[FormatMimeType("image/tiff", "image/tif", "image/x-tiff")]
 public sealed class TiffFile : IImageFormatReader<TiffFile>, IImageToRawImage<TiffFile>, IImageFromRawImage<TiffFile>, IImageFormatWriter<TiffFile>, IMultiImageFileFormat<TiffFile> {
 
   static string IImageFormatMetadata<TiffFile>.PrimaryExtension => ".tiff";

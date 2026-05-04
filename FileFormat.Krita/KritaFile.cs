@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Krita;
 
 /// <summary>In-memory representation of a Krita (.kra) image.</summary>
+[FormatMimeType("application/x-krita")]
 public readonly record struct KritaFile : IImageFormatReader<KritaFile>, IImageToRawImage<KritaFile>, IImageFromRawImage<KritaFile>, IImageFormatWriter<KritaFile> {
 
   static string IImageFormatMetadata<KritaFile>.PrimaryExtension => ".kra";

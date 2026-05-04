@@ -7,6 +7,7 @@ namespace FileFormat.Exr;
 
 /// <summary>In-memory representation of an OpenEXR image.</summary>
 [FormatMagicBytes([0x76, 0x2F, 0x31, 0x01])]
+[FormatMimeType("image/x-exr", "image/aces")]
 public readonly record struct ExrFile : IImageFormatReader<ExrFile>, IImageToRawImage<ExrFile>, IImageFromRawImage<ExrFile>, IImageFormatWriter<ExrFile> {
 
   static string IImageFormatMetadata<ExrFile>.PrimaryExtension => ".exr";

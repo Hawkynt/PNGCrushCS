@@ -5,6 +5,7 @@ namespace FileFormat.SunRaster;
 
 /// <summary>In-memory representation of a Sun Raster image.</summary>
 [FormatMagicBytes([0x59, 0xA6, 0x6A, 0x95])]
+[FormatMimeType("image/x-sun-raster", "image/x-cmu-raster")]
 public readonly record struct SunRasterFile : IImageFormatReader<SunRasterFile>, IImageToRawImage<SunRasterFile>, IImageFromRawImage<SunRasterFile>, IImageFormatWriter<SunRasterFile> {
 
   static string IImageFormatMetadata<SunRasterFile>.PrimaryExtension => ".ras";

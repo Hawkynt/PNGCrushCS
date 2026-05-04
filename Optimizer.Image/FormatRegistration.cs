@@ -21,8 +21,9 @@ internal static partial class FormatRegistration {
 
   // --- Typed registration methods (called by generated code, zero reflection) ---
 
-  private static void _RegisterReader<T>(ImageFormat format, FormatRegistry.MagicSignature[] magic, int priority)
+  private static void _RegisterReader<T>(ImageFormat format, MagicSignature[] magic, int priority, string[] mimeTypes)
     where T : IImageFormatReader<T>, IImageToRawImage<T> {
+    _ = mimeTypes; // legacy registration ignores MIME (Optimizer.Image doesn't use it)
     Func<byte[], bool?>? matchSig = null;
     try {
       // Test if the type overrides MatchesSignature (returns non-null from the static virtual default)
@@ -48,8 +49,9 @@ internal static partial class FormatRegistration {
     FormatRegistry.Register(entry);
   }
 
-  private static void _RegisterReaderWriter<T>(ImageFormat format, FormatRegistry.MagicSignature[] magic, int priority)
+  private static void _RegisterReaderWriter<T>(ImageFormat format, MagicSignature[] magic, int priority, string[] mimeTypes)
     where T : IImageFormatReader<T>, IImageToRawImage<T>, IImageFromRawImage<T>, IImageFormatWriter<T> {
+    _ = mimeTypes; // legacy registration ignores MIME (Optimizer.Image doesn't use it)
     Func<byte[], bool?>? matchSig = null;
     try {
       matchSig = header => T.MatchesSignature(header);

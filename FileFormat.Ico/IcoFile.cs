@@ -11,6 +11,7 @@ namespace FileFormat.Ico;
 
 /// <summary>In-memory representation of an ICO file.</summary>
 [FormatMagicBytes([0x00, 0x00, 0x01, 0x00])]
+[FormatMimeType("image/vnd.microsoft.icon", "image/x-icon", "image/icon")]
 public sealed class IcoFile : IImageFormatReader<IcoFile>, IImageToRawImage<IcoFile>, IImageFormatWriter<IcoFile>, IMultiImageFileFormat<IcoFile> {
 
   static string IImageFormatMetadata<IcoFile>.PrimaryExtension => ".ico";

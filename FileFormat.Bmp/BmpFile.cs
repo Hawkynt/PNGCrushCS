@@ -5,6 +5,7 @@ namespace FileFormat.Bmp;
 
 /// <summary>In-memory representation of a BMP image.</summary>
 [FormatMagicBytes([0x42, 0x4D])]
+[FormatMimeType("image/bmp", "image/x-bmp", "image/x-ms-bmp")]
 public readonly record struct BmpFile : IImageFormatReader<BmpFile>, IImageToRawImage<BmpFile>, IImageFromRawImage<BmpFile>, IImageFormatWriter<BmpFile>, IImageInfoReader<BmpFile> {
 
   static string IImageFormatMetadata<BmpFile>.PrimaryExtension => ".bmp";

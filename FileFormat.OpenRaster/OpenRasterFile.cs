@@ -5,6 +5,7 @@ using FileFormat.Core;
 namespace FileFormat.OpenRaster;
 
 /// <summary>In-memory representation of an OpenRaster (.ora) image.</summary>
+[FormatMimeType("image/openraster")]
 public readonly record struct OpenRasterFile : IImageFormatReader<OpenRasterFile>, IImageToRawImage<OpenRasterFile>, IImageFromRawImage<OpenRasterFile>, IImageFormatWriter<OpenRasterFile> {
 
   static string IImageFormatMetadata<OpenRasterFile>.PrimaryExtension => ".ora";

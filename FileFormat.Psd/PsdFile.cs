@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Psd;
 
 /// <summary>In-memory representation of a PSD image (flat composite only).</summary>
+[FormatMimeType("image/vnd.adobe.photoshop", "application/x-photoshop", "image/x-psd")]
 public readonly record struct PsdFile : IImageFormatReader<PsdFile>, IImageToRawImage<PsdFile>, IImageFromRawImage<PsdFile>, IImageFormatWriter<PsdFile> {
 
   static string IImageFormatMetadata<PsdFile>.PrimaryExtension => ".psd";

@@ -6,6 +6,10 @@ using FileFormat.Core;
 
 namespace Optimizer.Image;
 
+/// <summary>Top-level magic-signature record (lifted out of <see cref="FormatRegistry"/> nested type
+/// so the source-generator's emitted unqualified <c>new MagicSignature(...)</c> resolves here).</summary>
+internal readonly record struct MagicSignature(byte[] Signature, int Offset, int MinHeaderLength);
+
 /// <summary>Data-driven registry mapping <see cref="ImageFormat"/> to format-specific operations. Zero runtime reflection — all registrations are source-generated.</summary>
 internal static class FormatRegistry {
 
@@ -27,7 +31,6 @@ internal static class FormatRegistry {
     Func<FileInfo, IReadOnlyList<RawImage>?>? LoadAllRawImages = null
   );
 
-  internal readonly record struct MagicSignature(byte[] Signature, int Offset, int MinHeaderLength);
 
   private static readonly Dictionary<ImageFormat, FormatEntry> _byFormat = new();
   private static readonly Dictionary<string, ImageFormat> _byExtension = new(StringComparer.OrdinalIgnoreCase);

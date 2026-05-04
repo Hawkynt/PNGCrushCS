@@ -1,0 +1,75 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>preview</LangVersion>
+    <RootNamespace>Hawkynt.FileFormats.Images</RootNamespace>
+    <AssemblyName>Hawkynt.FileFormats.Images</AssemblyName>
+
+    <!-- Tells the source generator to emit `ImageFormat` and `FormatRegistration` into our namespace. -->
+    <FileFormatRegistryNamespace>Hawkynt.FileFormats.Images</FileFormatRegistryNamespace>
+
+    <!-- NuGet packaging metadata -->
+    <PackageId>Hawkynt.FileFormats.Images</PackageId>
+    <!-- Last digit is auto-stamped at CI time by version.pl in stamp mode (matches the convention
+         used by every other csproj in the repo): MAJOR.MINOR.PATCH here, .BUILD appended at pack. -->
+    <Version>1.0.0</Version>
+    <Authors>Hawkynt</Authors>
+    <Description>Comprehensive pure-C# library for reading, writing, and detecting image file formats. Bundles ~540 format implementations (PNG, JPEG, GIF, BMP, TIFF, WebP, etc.) behind a single zero-reflection registry with magic-byte detection, MIME-type lookup, and stream-based detection.</Description>
+    <PackageTags>image;file-format;png;jpeg;gif;bmp;tiff;webp;codec;decoder;encoder;mime;detection</PackageTags>
+    <PackageLicenseExpression>LGPL-3.0-or-later</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/Hawkynt/PNGCrushCS</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IncludeBuildOutput>true</IncludeBuildOutput>
+
+    <!-- Bundle every transitively-referenced format DLL into the package's lib/ folder. -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);_AddAllReferencedAssembliesToPackage</TargetsForTfmSpecificContentInPackage>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+    <!-- Expose <FileFormatRegistryNamespace> to the source generator's AnalyzerConfigOptions. -->
+    <CompilerVisibleProperty Include="FileFormatRegistryNamespace" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Optimizer.Image" />
+    <InternalsVisibleTo Include="Hawkynt.FileFormats.Images.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- PrivateAssets="all" prevents these from showing up as NuGet dependencies of consumers.
+         Combined with the BundleProjectReferenceDlls target below, the DLLs are physically
+         copied into lib/ instead of declared as transitive dependencies. -->
+    <ProjectReference Include="..\FileFormat.Core\FileFormat.Core.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\FileFormat.Registry.Generator\FileFormat.Registry.Generator.csproj"
+                      OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <!-- Pull in every FileFormat.<Name> library via wildcard so the source generator sees them.
+       Excludes Core / Registry.Generator (already referenced explicitly above). -->
+  <ItemGroup>
+    <ProjectReference Include="..\FileFormat.*\FileFormat.*.csproj"
+                      Exclude="..\FileFormat.Core\FileFormat.Core.csproj;..\FileFormat.Core.Generators\FileFormat.Core.Generators.csproj;..\FileFormat.Registry.Generator\FileFormat.Registry.Generator.csproj"
+                      PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- Bundle every transitively-referenced project assembly into lib/<tfm>/ at pack time.
+       The trick: PrivateAssets="all" prevents NuGet from emitting them as dependencies,
+       so we have to explicitly add the resolved DLLs. Walks the build's ReferencePath items
+       (each ProjectReference resolves to a ReferencePath after build). -->
+  <Target Name="_AddAllReferencedAssembliesToPackage" DependsOnTargets="ResolveReferences">
+    <ItemGroup>
+      <_BundledRefs Include="@(ReferencePath)"
+                    Condition="'%(ReferencePath.ReferenceSourceTarget)' == 'ProjectReference' and '%(ReferencePath.Extension)' == '.dll'" />
+      <!-- Also include their pdbs if present, and Core (which we marked private) -->
+      <TfmSpecificPackageFile Include="@(_BundledRefs)" PackagePath="lib/$(TargetFramework)" />
+    </ItemGroup>
+    <Message Importance="high" Text="Bundling @(_BundledRefs->Count()) referenced project DLLs into lib/$(TargetFramework)" />
+  </Target>
+
+</Project>

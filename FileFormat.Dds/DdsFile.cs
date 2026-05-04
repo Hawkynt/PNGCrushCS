@@ -7,6 +7,7 @@ namespace FileFormat.Dds;
 
 /// <summary>In-memory representation of a DDS (DirectDraw Surface) file.</summary>
 [FormatMagicBytes([0x44, 0x44, 0x53, 0x20])]
+[FormatMimeType("image/vnd.ms-dds", "image/x-dds")]
 public readonly record struct DdsFile : IImageFormatReader<DdsFile>, IImageToRawImage<DdsFile>, IImageFormatWriter<DdsFile> {
 
   static string IImageFormatMetadata<DdsFile>.PrimaryExtension => ".dds";

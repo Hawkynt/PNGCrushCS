@@ -5,6 +5,7 @@ namespace FileFormat.Netpbm;
 
 /// <summary>In-memory representation of a Netpbm image (PBM/PGM/PPM/PAM).</summary>
 [FormatDetectionPriority(150)]
+[FormatMimeType("image/x-portable-anymap", "image/x-portable-bitmap", "image/x-portable-graymap", "image/x-portable-pixmap", "image/x-portable-arbitrarymap")]
 public readonly record struct NetpbmFile : IImageFormatReader<NetpbmFile>, IImageToRawImage<NetpbmFile>, IImageFromRawImage<NetpbmFile>, IImageFormatWriter<NetpbmFile> {
 
   static string IImageFormatMetadata<NetpbmFile>.PrimaryExtension => ".ppm";

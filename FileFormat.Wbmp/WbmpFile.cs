@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Wbmp;
 
 /// <summary>In-memory representation of a WBMP (Wireless Bitmap) image.</summary>
+[FormatMimeType("image/vnd.wap.wbmp")]
 public readonly record struct WbmpFile : IImageFormatReader<WbmpFile>, IImageToRawImage<WbmpFile>, IImageFromRawImage<WbmpFile>, IImageFormatWriter<WbmpFile> {
 
   static string IImageFormatMetadata<WbmpFile>.PrimaryExtension => ".wbmp";
