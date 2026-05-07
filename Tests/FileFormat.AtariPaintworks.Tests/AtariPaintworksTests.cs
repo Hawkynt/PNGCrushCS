@@ -133,7 +133,7 @@ public sealed class AtariPaintworksReaderTests {
     for (var i = 0; i < 16; ++i)
       palette[i] = (short)(i * 0x111 & 0x777);
 
-    var header = AtariPaintworksHeader.FromPalette(palette);
+    var header = new AtariPaintworksHeader(palette);
     header.WriteTo(data.AsSpan());
 
     for (var i = 0; i < 32000; ++i)
@@ -313,7 +313,7 @@ public sealed class AtariPaintworksHeaderTests {
     for (var i = 0; i < 16; ++i)
       palette[i] = (short)(i * 0x111 & 0x777);
 
-    var original = AtariPaintworksHeader.FromPalette(palette);
+    var original = new AtariPaintworksHeader(palette);
     Span<byte> buffer = stackalloc byte[AtariPaintworksHeader.StructSize];
     original.WriteTo(buffer);
     var parsed = AtariPaintworksHeader.ReadFrom(buffer);
@@ -331,27 +331,11 @@ public sealed class AtariPaintworksHeaderTests {
 
     var header = AtariPaintworksHeader.ReadFrom(data);
     Assert.Multiple(() => {
-      Assert.That(header.Palette0, Is.EqualTo(0x777));
-      Assert.That(header.Palette1, Is.EqualTo(0x700));
-      Assert.That(header.Palette2, Is.EqualTo(0x070));
-      Assert.That(header.Palette3, Is.EqualTo(0x007));
+      Assert.That(header.Palette[0], Is.EqualTo(0x777));
+      Assert.That(header.Palette[1], Is.EqualTo(0x700));
+      Assert.That(header.Palette[2], Is.EqualTo(0x070));
+      Assert.That(header.Palette[3], Is.EqualTo(0x007));
     });
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void GetFieldMap_CoversFullStructSize() {
-    var map = AtariPaintworksHeader.GetFieldMap();
-    var totalSize = map.Sum(f => f.Size);
-    Assert.That(totalSize, Is.EqualTo(AtariPaintworksHeader.StructSize));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void GetFieldMap_HasNoOverlaps() {
-    var map = AtariPaintworksHeader.GetFieldMap();
-    for (var i = 0; i < map.Length - 1; ++i)
-      Assert.That(map[i].Offset + map[i].Size, Is.LessThanOrEqualTo(map[i + 1].Offset), $"Field {map[i].Name} overlaps with {map[i + 1].Name}");
   }
 
   [Test]

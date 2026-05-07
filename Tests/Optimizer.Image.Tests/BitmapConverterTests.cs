@@ -1,4 +1,6 @@
+using System;
 using System.Drawing;
+using System.IO;
 using FileFormat.Bmp;
 using FileFormat.Core;
 using FileFormat.Farbfeld;

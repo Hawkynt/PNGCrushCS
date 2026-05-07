@@ -75,7 +75,7 @@ public sealed class DegasReaderTests {
     for (var i = 0; i < 16; ++i)
       palette[i] = (short)(i * 0x111 & 0x777);
 
-    var header = DegasHeader.FromPalette((short)resolution, palette);
+    var header = new DegasHeader((short)resolution, palette);
     header.WriteTo(data.AsSpan());
 
     for (var i = 0; i < 32000; ++i)

@@ -1,3 +1,6 @@
+using System;
+using System.IO;
+using System.Linq;
 using FileFormat.Core;
 using Optimizer.Image;
 

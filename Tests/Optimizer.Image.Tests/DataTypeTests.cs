@@ -1,3 +1,4 @@
+using System;
 using Optimizer.Image;
 
 namespace Optimizer.Image.Tests;

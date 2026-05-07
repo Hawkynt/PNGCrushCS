@@ -15,7 +15,7 @@ public sealed class DegasHeaderTests {
     for (var i = 0; i < 16; ++i)
       palette[i] = (short)(i * 0x111 & 0x777);
 
-    var original = DegasHeader.FromPalette(2, palette);
+    var original = new DegasHeader(2, palette);
     Span<byte> buffer = stackalloc byte[DegasHeader.StructSize];
     original.WriteTo(buffer);
     var parsed = DegasHeader.ReadFrom(buffer);
@@ -34,25 +34,11 @@ public sealed class DegasHeaderTests {
     var header = DegasHeader.ReadFrom(data);
     Assert.Multiple(() => {
       Assert.That(header.Resolution, Is.EqualTo(1));
-      Assert.That(header.Palette0, Is.EqualTo(0x777));
-      Assert.That(header.Palette1, Is.EqualTo(0x700));
-      Assert.That(header.Palette2, Is.EqualTo(0x070));
-      Assert.That(header.Palette3, Is.EqualTo(0x007));
+      Assert.That(header.Palette[0], Is.EqualTo(0x777));
+      Assert.That(header.Palette[1], Is.EqualTo(0x700));
+      Assert.That(header.Palette[2], Is.EqualTo(0x070));
+      Assert.That(header.Palette[3], Is.EqualTo(0x007));
     });
-  }
-
-  [Test]
-  public void GetFieldMap_CoversFullStructSize() {
-    var map = DegasHeader.GetFieldMap();
-    var totalSize = map.Sum(f => f.Size);
-    Assert.That(totalSize, Is.EqualTo(DegasHeader.StructSize));
-  }
-
-  [Test]
-  public void GetFieldMap_HasNoOverlaps() {
-    var map = DegasHeader.GetFieldMap();
-    for (var i = 0; i < map.Length - 1; ++i)
-      Assert.That(map[i].Offset + map[i].Size, Is.LessThanOrEqualTo(map[i + 1].Offset), $"Field {map[i].Name} overlaps with {map[i + 1].Name}");
   }
 
   [Test]
