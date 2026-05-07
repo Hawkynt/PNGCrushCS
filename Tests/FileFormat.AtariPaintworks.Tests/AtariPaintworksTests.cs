@@ -317,7 +317,10 @@ public sealed class AtariPaintworksHeaderTests {
     Span<byte> buffer = stackalloc byte[AtariPaintworksHeader.StructSize];
     original.WriteTo(buffer);
     var parsed = AtariPaintworksHeader.ReadFrom(buffer);
-    Assert.That(parsed, Is.EqualTo(original));
+    // Record-struct equality on `short[] Palette` is reference-based, so two
+    // round-tripped arrays with identical content compare unequal. Compare
+    // by element instead.
+    Assert.That(parsed.Palette, Is.EqualTo(original.Palette));
   }
 
   [Test]

@@ -19,7 +19,11 @@ public sealed class DegasHeaderTests {
     Span<byte> buffer = stackalloc byte[DegasHeader.StructSize];
     original.WriteTo(buffer);
     var parsed = DegasHeader.ReadFrom(buffer);
-    Assert.That(parsed, Is.EqualTo(original));
+    // Record-struct equality on `short[] Palette` is reference-based, so two
+    // round-tripped arrays with identical content compare unequal. Compare
+    // by element instead.
+    Assert.That(parsed.Resolution, Is.EqualTo(original.Resolution));
+    Assert.That(parsed.Palette, Is.EqualTo(original.Palette));
   }
 
   [Test]

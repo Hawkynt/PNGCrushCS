@@ -62,7 +62,10 @@ internal static class JxlVarDctSpecDecoder {
     int height,
     int bitDepth,
     GaborishParams? gaborishParams = null,
-    EpfParams? epfParams = null
+    EpfParams? epfParams = null,
+    float[]? dcQuant = null,
+    uint xQmScale = 3,
+    uint bQmScale = 2
   ) {
     ArgumentNullException.ThrowIfNull(reader);
     if (width <= 0)
@@ -156,13 +159,25 @@ internal static class JxlVarDctSpecDecoder {
     // modular decode we cannot advance past it. Bit positions UP TO this point
     // are now correctly aligned with libjxl.
     // ---------------------------------------------------------------
-    var globalScale = JxlFrameQuantizer.ReadGlobalScale(reader);
-    _ = globalScale; // not surfaced through JxlVarDctImage in first wave
+    // Read full QuantizerParams bundle (global_scale + quant_dc) and derive
+    // per-channel DC dequant scalars per libjxl quantizer.h:82-89:
+    //   inv_global_scale = kGlobalScaleDenom / global_scale = 65536 / global_scale
+    //   inv_quant_dc     = inv_global_scale / quant_dc
+    //   mul_dc[c]        = inv_quant_dc * dequant.DCQuant(c) = inv_quant_dc / kInvDCQuant[c]
+    // The dcQuant argument carries the per-channel DCQuant() values either
+    // from the bitstream (when DequantMatrices.DecodeDC's all_default=0) or
+    // from the libjxl defaults {1/4096, 1/512, 1/256}. When the caller passes
+    // null we synthesise the defaults.
+    var quantParams = JxlFrameQuantizer.ReadQuantizerParams(reader);
+    var dcQuantUsed = dcQuant ?? JxlFrameQuantizer.DefaultDcQuant;
+    var mulDc = new float[_NumXybChannels];
+    for (var c = 0; c < _NumXybChannels; ++c)
+      mulDc[c] = quantParams.InvQuantDc * dcQuantUsed[c];
 
     var blockCtxMap = JxlBlockContextMap.Decode(reader);
     _ = blockCtxMap; // not yet plumbed to AC coefficient decoder
 
-    JxlColorCorrelationMap.DecodeDc(reader);
+    var dcCorrelation = JxlColorCorrelationMap.DecodeDc(reader);
 
     // DC modular sub-image dimensions = (W/8) × (H/8) per channel × 3 channels.
     // libjxl `ModularFrameDecoder::DecodeGlobalInfo` reads the 1-bit
@@ -183,8 +198,9 @@ internal static class JxlVarDctSpecDecoder {
     // The empty ModularDecode call (group_id=0 nb_ch=0) that libjxl shows
     // first is for the DC group's 0-channel placeholder image — handled by
     // our DecodeGroup early-return-on-empty path.
-    var extraPrecision = reader.ReadBits(2);
-    _ = extraPrecision; // dequant scale = 1 / (1 << extra_precision); not yet wired
+    var extraPrecision = (int)reader.ReadBits(2);
+    // libjxl `DequantDC` multiplies DC by `mul = 1.0 / (1 << extra_precision)`.
+    var extraPrecisionMul = 1f / (1 << extraPrecision);
 
     var dcImage = JxlModularSpecDecoder.DecodeGroup(
       reader,
@@ -194,7 +210,6 @@ internal static class JxlVarDctSpecDecoder {
       bitDepth: bitDepth,
       globalTree: modularGlobalTree,
       globalEntropy: modularGlobalEntropy);
-    _ = dcImage; // wired to caller once DC dequant + chroma-from-luma are ready
 
     // ProcessDCGroup also issues an empty ModularDecode for ModularDC (group_id=2)
     // which is for non-default modular-in-VarDCT features. For typical XYB
@@ -228,7 +243,20 @@ internal static class JxlVarDctSpecDecoder {
     };
     var acMetadata = JxlModularSpecDecoder.DecodeGroupChannels(
       reader, acMetaChannels, bitDepth, modularGlobalTree, modularGlobalEntropy);
-    _ = acMetadata; // wired to AC strategy / cmap inversion in a follow-up
+
+    // Build per-block raw_quant_field from AC metadata (libjxl dec_modular.cc:
+    // `row_qf[ix] = 1 + max(0, min(kQuantMax-1, row_in_2[num]))`). Channel 2
+    // is row-major: row 0 = ACS strategy per block, row 1 = QF per block.
+    // Channel-2 width = `count` (number of distinct blocks; 1 for an 8x8
+    // single-block frame, dcGroupBlocksX*dcGroupBlocksY for fully-dense AC).
+    // For the first-wave (DCT8-only, no multi-block strategies), every block
+    // is its own count entry, in row-major scan order.
+    var perBlockQuant = new int[dcGroupBlocksX * dcGroupBlocksY];
+    var qfChannel = acMetadata.Channels[2];
+    for (var i = 0; i < perBlockQuant.Length; ++i) {
+      var qfRaw = i < count ? qfChannel.Pixels[count + i] : 0;
+      perBlockQuant[i] = 1 + Math.Max(0, Math.Min(255, qfRaw));
+    }
 
     // ---------------------------------------------------------------
     // Step 4: AC global section (libjxl `dec_frame.cc::ProcessACGlobal`).
@@ -338,8 +366,15 @@ internal static class JxlVarDctSpecDecoder {
         var (blocksX, blocksY) = _GroupBlockDims(gx, gy, width, height, groupSize);
         var strategies = groupStrategies[groupIdx];
 
-        // Step 5: LF block per channel — for DCT8 the LF is just DC.
-        var lfBlocks = _ReadLfBlocks(reader, blocksX, blocksY, strategies);
+        // Step 5: LF (DC) blocks per channel — built from the already-decoded
+        // dcImage modular sub-image (NOT re-read from the bitstream). The
+        // earlier _ReadLfBlocks variant tried to re-decode an LF modular
+        // sub-image at this point, which double-read the bitstream. libjxl
+        // computes DC + AC strictly once per group: DC during DecodeVarDCTDC,
+        // AC during DecodeGroupImpl. Per-group LF slice = the rectangle of
+        // dcImage covering this group's blocks.
+        var lfBlocks = _SliceLfBlocksFromDc(
+          dcImage, gx, gy, groupSize / _BlockDim, blocksX, blocksY);
 
         // Step 6: AC blocks per channel — non-DC coefficients per 8×8 cell.
         // Now uses the global BlockContextMap + per-frame AC entropy decoder
@@ -347,6 +382,14 @@ internal static class JxlVarDctSpecDecoder {
         var acBlocks = JxlAcDecoder.DecodeGroup(
           reader, acEntropy, strategies, blockCtxMap,
           blocksX, blocksY, _NumXybChannels);
+
+        // Inject DC values into AC blocks at scan position 0. The AC decoder
+        // skips position 0 (DC) per spec; combining LF DC with AC produces
+        // the full quantized coefficient block fed into dequant + IDCT.
+        for (var c = 0; c < _NumXybChannels; ++c) {
+          for (var i = 0; i < lfBlocks[c].Coefficients.Length; ++i)
+            acBlocks[c][i].Coefficients[0] = lfBlocks[c].Coefficients[i];
+        }
 
         groups[groupIdx] = new JxlVarDctGroup {
           X = gx * groupSize,
@@ -379,7 +422,15 @@ internal static class JxlVarDctSpecDecoder {
         groupIdx % numGroupsW, groupIdx / numGroupsW, width, height, groupSize
       );
       var strategies = groupStrategies[groupIdx];
-      _RenderGroup(group, strategies, blocksX, blocksY, quantTableSet, channels, width, height);
+      // Per-block AC dequant scale: libjxl `Quantizer::inv_quant_ac` =
+      // inv_global_scale / quant. dm multipliers = pow(1/1.25, qm_scale-2)
+      // per `dec_cache.h:RecomputeRowQuant`.
+      var xDmMul = MathF.Pow(1f / 1.25f, (int)xQmScale - 2);
+      var bDmMul = MathF.Pow(1f / 1.25f, (int)bQmScale - 2);
+      _RenderGroup(group, strategies, blocksX, blocksY, quantTableSet,
+        mulDc, extraPrecisionMul, dcCorrelation,
+        quantParams.InvGlobalScale, perBlockQuant, xDmMul, bDmMul,
+        channels, width, height);
     }
 
     // ---------------------------------------------------------------
@@ -458,6 +509,52 @@ internal static class JxlVarDctSpecDecoder {
     return JxlLfDecoder.DecodeGroup(reader, blocksX, blocksY, _NumXybChannels);
   }
 
+  /// <summary>Extract this group's per-channel DC slice from the frame's DC
+  /// modular sub-image. The DC sub-image covers the whole frame at block
+  /// resolution (one DC per 8×8 block); each VarDCT group occupies a
+  /// <c>groupBlocks × groupBlocks</c> rectangle within it.
+  ///
+  /// <para>libjxl stores the DC modular sub-image with channels permuted as
+  /// <c>image.channel[c &lt; 2 ? c ^ 1 : c]</c> (see
+  /// <c>dec_modular.cc::DecodeVarDCTDC</c>): storage order is <c>[Y, X, B]</c>
+  /// while the rest of our pipeline uses canonical XYB order <c>[X, Y, B]</c>.
+  /// We undo the permutation here so the returned LF blocks line up with the
+  /// AC blocks (which are already in canonical order via
+  /// <c>JxlAcDecoder.DecodeGroup</c>'s <c>{1,0,2}</c> traversal).</para></summary>
+  private static JxlLfBlock[] _SliceLfBlocksFromDc(
+    JxlModularImage dcImage,
+    int gx,
+    int gy,
+    int groupBlocks,
+    int blocksX,
+    int blocksY
+  ) {
+    var lfBlocks = new JxlLfBlock[_NumXybChannels];
+    var x0 = gx * groupBlocks;
+    var y0 = gy * groupBlocks;
+    for (var c = 0; c < _NumXybChannels; ++c) {
+      // Canonical c=0/1/2 (X/Y/B) ← modular sub-image index 1/0/2.
+      var srcChannel = c < 2 ? c ^ 1 : c;
+      var ch = dcImage.Channels[srcChannel];
+      var coeffs = new short[blocksX * blocksY];
+      for (var by = 0; by < blocksY; ++by)
+        for (var bx = 0; bx < blocksX; ++bx) {
+          var v = ch.Pixels[(y0 + by) * ch.Width + (x0 + bx)];
+          coeffs[by * blocksX + bx] = v switch {
+            > short.MaxValue => short.MaxValue,
+            < short.MinValue => short.MinValue,
+            _ => (short)v,
+          };
+        }
+      lfBlocks[c] = new JxlLfBlock {
+        Width = blocksX,
+        Height = blocksY,
+        Coefficients = coeffs,
+      };
+    }
+    return lfBlocks;
+  }
+
   // ===============================================================
   // Step 7+8+9: Dequantize → IDCT → place.
   // ===============================================================
@@ -472,10 +569,66 @@ internal static class JxlVarDctSpecDecoder {
     int blocksX,
     int blocksY,
     JxlQuantTableSet quantTableSet,
+    float[] mulDc,
+    float extraPrecisionMul,
+    JxlColorCorrelationMap.DcCorrelationFactors dcCorrelation,
+    float invGlobalScale,
+    int[] perBlockQuant,
+    float xDmMultiplier,
+    float bDmMultiplier,
     float[][] channels,
     int imageWidth,
     int imageHeight
   ) {
+    // Pre-compute the dequantized DC value per channel per block, applying the
+    // DC chroma-from-luma correction (libjxl `compressed_dc.cc::DequantDC`):
+    //   Y_dc = quant_y * mul_dc[Y] * extraPrecisionMul
+    //   X_dc = quant_x * mul_dc[X] * extraPrecisionMul + Y_dc * dc_factors[YtoX]
+    //   B_dc = quant_b * mul_dc[B] * extraPrecisionMul + Y_dc * dc_factors[YtoB]
+    // This must happen BEFORE per-channel IDCT because the cfl correction
+    // mixes Y into X/B and our IDCT is linear: applying it to the DC frequency
+    // coefficient is equivalent to applying it to the post-IDCT spatial DC.
+    var totalBlocks = blocksX * blocksY;
+    var dequantDc = new float[_NumXybChannels * totalBlocks];
+    const int xCh = 0, yCh = 1, bCh = 2;
+    for (var i = 0; i < totalBlocks; ++i) {
+      var qY = group.AcBlocks[yCh][i].Coefficients[0];
+      var qX = group.AcBlocks[xCh][i].Coefficients[0];
+      var qB = group.AcBlocks[bCh][i].Coefficients[0];
+      var yDc = qY * mulDc[yCh] * extraPrecisionMul;
+      dequantDc[yCh * totalBlocks + i] = yDc;
+      dequantDc[xCh * totalBlocks + i] = qX * mulDc[xCh] * extraPrecisionMul + yDc * dcCorrelation.YtoX;
+      dequantDc[bCh * totalBlocks + i] = qB * mulDc[bCh] * extraPrecisionMul + yDc * dcCorrelation.YtoB;
+    }
+
+    // Pre-pass: dequantize Y AC for all blocks so X and B can apply the
+    // chroma-from-luma `b_cc_mul * dequant_y + dequant_b_cc` mixing per
+    // libjxl `DequantLane`. For a fixture whose AC-metadata cmap channels
+    // (ytox_map, ytob_map) are zero, X uses `YtoXRatio(0) = 0` (no mixing)
+    // and B uses `YtoBRatio(0) = kYToBRatio = 1.0` (full Y added). For
+    // non-default cmap, the per-tile factor would be looked up here.
+    // First-wave assumes single-tile / all-zero cmap.
+    const float xCcMul = 0f;             // YtoXRatio(0) = 0
+    const float bCcMul = JxlColorCorrelationMap.DefaultYtoBRatio;  // = 1.0
+    var dequantedY = new float[totalBlocks][];
+    for (var by = 0; by < blocksY; ++by)
+      for (var bx = 0; bx < blocksX; ++bx) {
+        var blockIdx = by * blocksX + bx;
+        var strategy = strategies[by][bx];
+        if (strategy != JxlAcStrategyType.Dct8x8) continue;
+        var coeffBlock = group.AcBlocks[yCh][blockIdx];
+        var (blockW, blockH) = JxlVarDctIdct.BlockSize(strategy);
+        var blockArea = blockW * blockH;
+        var quantValue = perBlockQuant[blockIdx];
+        if (quantValue <= 0) quantValue = 1;
+        var scaled = invGlobalScale / quantValue * 1f; // Y dm_mul = 1
+        var table = quantTableSet.Tables[yCh];
+        var arr = new float[blockArea];
+        for (var i = 0; i < blockArea; ++i)
+          arr[i] = coeffBlock.Coefficients[i] * scaled * table.Weights[i];
+        dequantedY[blockIdx] = arr;
+      }
+
     for (var c = 0; c < _NumXybChannels; ++c) {
       for (var by = 0; by < blocksY; ++by) {
         for (var bx = 0; bx < blocksX; ++bx) {
@@ -485,28 +638,49 @@ internal static class JxlVarDctSpecDecoder {
           var (blockW, blockH) = JxlVarDctIdct.BlockSize(strategy);
           var blockArea = blockW * blockH;
 
-          // Step 5: dequantize. For DCT8 we use the per-channel quant table
-          // as-is. For other strategies we look up libjxl's per-strategy
-          // distance bands and build a strategy-sized table on the fly.
-          // libjxl ref: quant_weights.cc::QuantizerForStrategy uses the
-          // appropriate kQuantTable[required_size_x[t] * required_size_y[t]]
-          // entry; we mirror that with JxlVarDctQuant.DefaultsForStrategy.
+          // Step 5: dequantize AC coefficients with libjxl's full formula
+          //   pre_idct[k] = quantized[k] * (inv_global_scale / quant) *
+          //                 dm_multiplier * dequant_matrix[k]
+          // where inv_global_scale = kGlobalScaleDenom / global_scale and
+          // dm_multiplier = 1 (Y), xDmMultiplier (X), or bDmMultiplier (B).
           var dequantized = new float[blockArea];
           var strategyTables = strategy == JxlAcStrategyType.Dct8x8
             ? quantTableSet
             : (JxlVarDctQuant.DefaultsForStrategy(strategy) ?? quantTableSet);
           var table = strategyTables.Tables[c];
+          var quantValue = perBlockQuant[blockIdx];
+          if (quantValue <= 0) quantValue = 1;
+          var scaledDequant = invGlobalScale / quantValue
+            * (c == xCh ? xDmMultiplier : c == bCh ? bDmMultiplier : 1f);
           if (table.Width * table.Height == blockArea) {
-            JxlVarDctQuant.Dequantize(coeffBlock.Coefficients, table, dequantized);
+            for (var i = 0; i < blockArea; ++i)
+              dequantized[i] = coeffBlock.Coefficients[i] * scaledDequant * table.Weights[i];
           } else {
-            // Fallback: scale DCT8 table to block size by nearest-neighbour.
             for (var i = 0; i < blockArea; ++i) {
               var ty = (i / blockW) * 8 / Math.Max(1, blockH);
               var tx = (i % blockW) * 8 / Math.Max(1, blockW);
-              dequantized[i] = coeffBlock.Coefficients[i]
+              dequantized[i] = coeffBlock.Coefficients[i] * scaledDequant
                 * quantTableSet.Tables[c].Weights[ty * 8 + tx];
             }
           }
+
+          // Apply chroma-from-luma AC mixing: for X channel add x_cc_mul *
+          // dequant_y[k]; for B add b_cc_mul * dequant_y[k]. Y itself is
+          // unchanged. Skips when the per-block Y dequant wasn't computed
+          // (non-DCT8 strategies in the first wave).
+          if ((c == xCh || c == bCh) && dequantedY[blockIdx] != null) {
+            var yDeq = dequantedY[blockIdx];
+            var mix = c == xCh ? xCcMul : bCcMul;
+            if (mix != 0f) {
+              for (var i = 0; i < blockArea; ++i)
+                dequantized[i] += mix * yDeq[i];
+            }
+          }
+
+          // DC dequantization: overwrite position 0 with the pre-computed
+          // dequantized DC (uses mulDc[c] * extraPrecisionMul; includes cfl
+          // DC correction for X/B).
+          dequantized[0] = dequantDc[c * totalBlocks + blockIdx];
 
           // Step 6: inverse DCT. Output is BlockW×BlockH spatial samples
           // in float. Defers to JxlVarDctIdct.InverseAcStrategy.

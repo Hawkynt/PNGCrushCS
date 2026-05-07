@@ -84,27 +84,60 @@ internal sealed class JxlColorCorrelationMap {
   /// (<c>ceil(height / ColorTileDim)</c>).</summary>
   public int TilesHigh { get; init; }
 
+  /// <summary>libjxl <c>cms::kYToBRatio = 1.0f</c> from
+  /// <c>cms/opsin_params.h</c>. Default base for the Y→B correlation; the per-DC
+  /// addend <c>YtoBRatio(ytob_dc)</c> is added on top.</summary>
+  public const float DefaultYtoBRatio = 1.0f;
+
+  /// <summary>The pair of DC-level CfL factors (libjxl
+  /// <c>ColorCorrelation::DCFactors()</c>): <c>[YtoX_dc, 0, YtoB_dc, 0]</c>
+  /// stored in canonical XYB order. Index 0 is the Y→X correction applied
+  /// during DC dequant, index 2 is Y→B; indices 1 and 3 are unused (libjxl
+  /// keeps them as zero placeholders for the SIMD store).</summary>
+  public readonly record struct DcCorrelationFactors(float YtoX, float YtoB);
+
   /// <summary>libjxl <c>ColorCorrelation::DecodeDC</c>: reads the 1-bit
   /// <c>all_default</c> flag and, when 0, the four DC correlation parameters
-  /// (color factor, base X/B correlations, ytox/ytob DC offsets). For our
-  /// pipeline we currently only need the bit-stream advance — the parsed
-  /// values are not yet surfaced.</summary>
-  public static void DecodeDc(JxlBitReader r) {
+  /// (color factor, base X/B correlations, ytox/ytob DC offsets). Returns the
+  /// per-frame DC CfL factors used by <c>DequantDC</c>:
+  /// <list type="bullet">
+  ///   <item><c>YtoX = base_correlation_x + ytox_dc / color_factor</c></item>
+  ///   <item><c>YtoB = base_correlation_b + ytob_dc / color_factor</c></item>
+  /// </list>
+  /// Defaults: <c>color_factor=84</c>, <c>base_correlation_x=0</c>,
+  /// <c>base_correlation_b=kYToBRatio=1.0</c>, both <c>ytox/ytob_dc=0</c> →
+  /// <c>YtoX=0</c>, <c>YtoB=1.0</c>.</summary>
+  public static DcCorrelationFactors DecodeDc(JxlBitReader r) {
     ArgumentNullException.ThrowIfNull(r);
     var allDefault = r.ReadBool();
     if (allDefault)
-      return;
-    // Non-default DC scale params:
-    //   color_factor = U32(Val(84), Val(256), Val(2), Bits(8) + 0)
-    //   base_correlation_x = F16  (16 bits)
-    //   base_correlation_b = F16  (16 bits)
-    //   ytox_dc = 8 bits (signed offset from -128)
-    //   ytob_dc = 8 bits (signed offset from -128)
-    r.ReadU32(84, 0, 256, 0, 2, 0, 0, 8); // color_factor
-    r.ReadBits(16); // F16 base_correlation_x
-    r.ReadBits(16); // F16 base_correlation_b
-    r.ReadBits(8);  // ytox_dc
-    r.ReadBits(8);  // ytob_dc
+      return new DcCorrelationFactors(YtoX: 0f, YtoB: DefaultYtoBRatio);
+
+    var colorFactor = r.ReadU32(84, 0, 256, 0, 2, 0, 0, 8); // color_factor
+    if (colorFactor == 0)
+      throw new System.IO.InvalidDataException("ColorCorrelation.DecodeDc: color_factor must be non-zero.");
+    var baseCorrelationX = _ReadF16(r);
+    var baseCorrelationB = _ReadF16(r);
+    var ytoxDc = (sbyte)((int)r.ReadBits(8) - 128); // signed offset from -128
+    var ytobDc = (sbyte)((int)r.ReadBits(8) - 128);
+    var colorScale = 1f / colorFactor;
+    return new DcCorrelationFactors(
+      YtoX: baseCorrelationX + ytoxDc * colorScale,
+      YtoB: baseCorrelationB + ytobDc * colorScale);
+  }
+
+  /// <summary>Half-precision F16 reader (mirror of <c>JxlFrameQuantizer._ReadF16</c>).
+  /// Inlined here to keep <see cref="JxlColorCorrelationMap"/> self-contained.</summary>
+  private static float _ReadF16(JxlBitReader r) {
+    var bits = (ushort)r.ReadBits(16);
+    var sign = (bits >> 15) & 1;
+    var exp = (bits >> 10) & 0x1F;
+    var frac = bits & 0x3FF;
+    if (exp == 0) return sign != 0 ? -0f : 0f;
+    if (exp == 31) return frac == 0 ? (sign != 0 ? float.NegativeInfinity : float.PositiveInfinity) : float.NaN;
+    var mantissa = 1.0f + frac / 1024.0f;
+    var value = mantissa * MathF.Pow(2.0f, exp - 15);
+    return sign != 0 ? -value : value;
   }
 
   /// <summary>

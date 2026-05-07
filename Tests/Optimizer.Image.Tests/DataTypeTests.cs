@@ -9,7 +9,7 @@ public sealed class DataTypeTests {
   [Test]
   public void ImageFormat_HasExpectedCount() {
     var values = Enum.GetValues<ImageFormat>();
-    Assert.That(values, Has.Length.EqualTo(538));
+    Assert.That(values, Has.Length.EqualTo(540));
   }
 
   [Test]

@@ -175,26 +175,37 @@ internal readonly record struct JxlColorEncoding {
       return new() { AllDefault = true, WantIcc = false, ColorSpace = 0, WhitePoint = 1, Primaries = 1, TransferFunction = 13, RenderingIntent = 0 };
 
     var wantIcc = r.ReadBool();
-    var colorSpace = r.ReadU32(0, 0, 1, 0, 2, 0, 4, 0);   // selectors map to 0/1/2/4 directly
+    // libjxl encodes enum fields via `Enum`, which expands to
+    //   U32(Val(0), Val(1), BitsOffset(4, 2), BitsOffset(6, 18))
+    // i.e. selector 0 = 0, selector 1 = 1, selector 2 = 2..17 (4-bit payload),
+    // selector 3 = 18..81 (6-bit payload). Use the same shape for every Enum
+    // field below (ColorSpace, WhitePoint, Primaries, TransferFunction,
+    // RenderingIntent).
+    var colorSpace = _ReadEnum(r);
     var whitePoint = 1u;
     var primaries = 1u;
     var tf = 13u;
     var ri = 0u;
-    if (!wantIcc && colorSpace != 1) {  // not Gray, not ICC: read primaries
-      whitePoint = r.ReadU32(1, 0, 2, 0, 10, 0, 1, 2);
-      if (whitePoint == 2)
-        for (var i = 0; i < 2; ++i) _ReadCustomXy(r);
-      primaries = r.ReadU32(1, 0, 2, 0, 11, 0, 1, 2);
-      if (primaries == 2)
-        for (var i = 0; i < 6; ++i) _ReadCustomXy(r);
-    }
+    // libjxl `ColorEncoding::VisitFields`: when !WantICC, read white_point
+    // unless ImplicitWhitePoint (i.e. color_space == kXYB = 2). Read primaries
+    // only when HasPrimaries (color_space not in {kGray=1, kXYB=2}).
     if (!wantIcc) {
+      if (colorSpace != 2 /* kXYB has implicit white point */) {
+        whitePoint = _ReadEnum(r);
+        if (whitePoint == 0 /* kCustom */)
+          for (var i = 0; i < 2; ++i) _ReadCustomXy(r);
+      }
+      if (colorSpace != 1 /* kGray */ && colorSpace != 2 /* kXYB */) {
+        primaries = _ReadEnum(r);
+        if (primaries == 0 /* kCustom */)
+          for (var i = 0; i < 6; ++i) _ReadCustomXy(r);
+      }
       var hasGamma = r.ReadBool();
       if (hasGamma)
         tf = r.ReadBits(24);
       else
-        tf = r.ReadU32(1, 0, 8, 0, 13, 0, 1, 4);
-      ri = r.ReadU32(0, 0, 1, 0, 2, 0, 1, 2);
+        tf = _ReadEnum(r);
+      ri = _ReadEnum(r);
     }
     return new() {
       AllDefault = false, WantIcc = wantIcc, ColorSpace = colorSpace,
@@ -208,6 +219,14 @@ internal readonly record struct JxlColorEncoding {
     r.ReadU32(0, 19, 524288, 19, 1048576, 20, 2097152, 21);
     r.ReadU32(0, 19, 524288, 19, 1048576, 20, 2097152, 21);
   }
+
+  /// <summary>libjxl <c>Visitor::Enum</c> encoding (fields.h:208):
+  /// <c>U32(Val(0), Val(1), BitsOffset(4, 2), BitsOffset(6, 18))</c> i.e.
+  /// selector 0 → 0, selector 1 → 1, selector 2 → 2..17 (4-bit payload),
+  /// selector 3 → 18..81 (6-bit payload). Used for ColorSpace, WhitePoint,
+  /// Primaries, TransferFunction, RenderingIntent fields.</summary>
+  internal static uint _ReadEnum(JxlBitReader r) =>
+    r.ReadU32(0, 0, 1, 0, 2, 4, 18, 6);
 }
 
 /// <summary>Tone mapping bundle (§3.6.3). Always parsed when extra_fields is set.</summary>

@@ -106,6 +106,51 @@ internal static class JxlAcDecoder {
     206, 206, 206, 206, 206, 206, 206, 206, 206, 206, 206, 206,
   };
 
+  /// <summary>Natural-coefficient-order LUT for DCT8: scan-position k → natural
+  /// index <c>order[k]</c> within an 8×8 block (row-major y*8+x). Computed by
+  /// libjxl <c>AcStrategy::ComputeNaturalCoeffOrder</c> with covered_blocks=1.
+  /// For DCT8 this is the standard JPEG zigzag traversal.
+  /// libjxl ref: lib/jxl/ac_strategy.cc::CoeffOrderAndLut.</summary>
+  internal static readonly ushort[] Dct8NaturalOrder = _ComputeDct8NaturalOrder();
+
+  private static ushort[] _ComputeDct8NaturalOrder() {
+    // Mirrors libjxl `CoeffOrderAndLut<is_lut=false>` for the DCT8 case
+    // (cx=cy=1, kBlockDim=8). libjxl stores AC blocks in COLUMN-MAJOR
+    // ("Transposed") order: index `i*N + j` is (col=i, row=j). For our
+    // ROW-MAJOR IDCT (which expects index `y*N + x` to mean (row y, col x)),
+    // we transpose libjxl's natural index here: libjxl's `y*N + x` →
+    // our `x*N + y`. That way scan-to-spatial is identical to libjxl.
+    var order = new ushort[64];
+    var cx = 1; var cy = 1; const int kBlockDim = 8;
+    var cur = (ushort)(cx * cy);
+    for (var i = 0; i < cx * kBlockDim; i++) {
+      for (var j = 0; j <= i; j++) {
+        var x = j;
+        var y = i - j;
+        if ((i & 1) != 0) (x, y) = (y, x);
+        ushort val;
+        if (x < cx && y < cy)
+          val = (ushort)(y * cx + x);
+        else
+          val = cur++;
+        // Transposed natural index: libjxl writes to (col=y, row=x); for our
+        // row-major IDCT, that corresponds to (row=x, col=y) = x * N + y.
+        order[val] = (ushort)(x * cx * kBlockDim + y);
+      }
+    }
+    for (var ip = cx * kBlockDim - 1; ip > 0; ip--) {
+      var i = ip - 1;
+      for (var j = 0; j <= i; j++) {
+        var x = cx * kBlockDim - 1 - (i - j);
+        var y = cx * kBlockDim - 1 - j;
+        if ((i & 1) != 0) (x, y) = (y, x);
+        var val = cur++;
+        order[val] = (ushort)(x * cx * kBlockDim + y);
+      }
+    }
+    return order;
+  }
+
   // -------------------------------------------------------------------------
   // Public API
   // -------------------------------------------------------------------------
@@ -300,11 +345,11 @@ internal static class JxlAcDecoder {
       // magnitude ^ 0xFFFFFFFF = -magnitude - 1. When negSign=1: magnitude.
       var coeff = (int)(magnitude ^ (negSign - 1u));
 
-      // outBlock is in scan order; index k is the (k)th scan position.
-      // libjxl writes to `block.ptr16[order[k]]` because its blocks are kept
-      // in natural (un-zigzagged) order. We keep scan order — the downstream
-      // un-zigzag is a separate concern.
-      outBlock[k] += (short)coeff;
+      // libjxl `block.ptr16[order[k]] += coeff` — write to NATURAL-order
+      // position so the downstream IDCT (which expects natural order) sees
+      // coefficients at the correct frequency positions. For DCT8 the
+      // permutation is the JPEG zigzag (precomputed in Dct8NaturalOrder).
+      outBlock[Dct8NaturalOrder[k]] += (short)coeff;
 
       prev = uCoeff != 0 ? 1 : 0;
       nzeros -= prev;

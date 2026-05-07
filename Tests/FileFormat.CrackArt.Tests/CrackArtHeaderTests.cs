@@ -20,18 +20,22 @@ public sealed class CrackArtHeaderTests {
     Span<byte> buffer = stackalloc byte[CrackArtHeader.StructSize];
     original.WriteTo(buffer);
     var parsed = CrackArtHeader.ReadFrom(buffer);
-    Assert.That(parsed, Is.EqualTo(original));
+    // Record-struct equality on `short[] Palette` is reference-based, so two
+    // round-tripped arrays with identical content compare unequal. Compare
+    // by element instead.
+    Assert.That(parsed.Resolution, Is.EqualTo(original.Resolution));
+    Assert.That(parsed.Palette, Is.EqualTo(original.Palette));
   }
 
   [Test]
   [Category("Unit")]
   public void ReadFrom_ParsesKnownValues() {
     var data = new byte[CrackArtHeader.StructSize];
-    data[0] = 1; // Resolution = Medium
-    BinaryPrimitives.WriteInt16BigEndian(data.AsSpan(1), 0x777); // Palette[0] = white
-    BinaryPrimitives.WriteInt16BigEndian(data.AsSpan(3), 0x700); // Palette[1] = red
-    BinaryPrimitives.WriteInt16BigEndian(data.AsSpan(5), 0x070); // Palette[2] = green
-    BinaryPrimitives.WriteInt16BigEndian(data.AsSpan(7), 0x007); // Palette[3] = blue
+    BinaryPrimitives.WriteInt16BigEndian(data.AsSpan(0), 1);     // Resolution = Medium
+    BinaryPrimitives.WriteInt16BigEndian(data.AsSpan(2), 0x777); // Palette[0] = white
+    BinaryPrimitives.WriteInt16BigEndian(data.AsSpan(4), 0x700); // Palette[1] = red
+    BinaryPrimitives.WriteInt16BigEndian(data.AsSpan(6), 0x070); // Palette[2] = green
+    BinaryPrimitives.WriteInt16BigEndian(data.AsSpan(8), 0x007); // Palette[3] = blue
 
     var header = CrackArtHeader.ReadFrom(data);
     Assert.Multiple(() => {
@@ -45,7 +49,7 @@ public sealed class CrackArtHeaderTests {
 
   [Test]
   [Category("Unit")]
-  public void StructSize_Is33() {
-    Assert.That(CrackArtHeader.StructSize, Is.EqualTo(33));
+  public void StructSize_Is34() {
+    Assert.That(CrackArtHeader.StructSize, Is.EqualTo(34));
   }
 }

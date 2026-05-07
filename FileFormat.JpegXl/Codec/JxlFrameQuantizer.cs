@@ -77,51 +77,78 @@ internal static class JxlFrameQuantizer {
   /// perceptual interpretation is <c>kGlobalScaleDenom / global_scale</c>
   /// (libjxl <c>kGlobalScaleDenom = 1 &lt;&lt; 16 = 65536</c>); callers that
   /// need the float scale should perform that division themselves.</returns>
+  /// <summary>libjxl <c>kInvDCQuant</c> defaults from <c>quant_weights.h</c>:
+  /// the per-channel inverse DC quant scalars used when DC quant is at its
+  /// default (no per-frame override). XYB channel order: X=4096, Y=512, B=256.
+  /// </summary>
+  internal static readonly float[] DefaultInvDcQuant = { 4096f, 512f, 256f };
+
+  /// <summary>libjxl <c>kDCQuant = 1.0 / kInvDCQuant</c>.</summary>
+  internal static readonly float[] DefaultDcQuant = {
+    1f / DefaultInvDcQuant[0], 1f / DefaultInvDcQuant[1], 1f / DefaultInvDcQuant[2]
+  };
+
+  /// <summary>libjxl <c>kGlobalScaleDenom = 1 &lt;&lt; 16</c> from
+  /// <c>quantizer.h</c>. Used to convert <c>global_scale</c> to a float scale
+  /// (<c>global_scale_float = global_scale / kGlobalScaleDenom</c>).</summary>
+  internal const int GlobalScaleDenom = 1 << 16;
+
   /// <summary>
   /// Read the DC quantization preamble (libjxl
   /// <c>DequantMatrices::DecodeDC</c> in <c>quant_weights.cc</c>): 1 bit
   /// <c>all_default</c>, and if 0, three F16-encoded floats (one per color
-  /// channel). Skips the F16 payload bits without surfacing the values; the
-  /// first-wave decoder uses the default DC quantization table.
+  /// channel) representing the per-channel <c>DCQuant</c> values.
   /// </summary>
-  public static void ReadDcQuantization(JxlBitReader reader) {
+  /// <returns>Per-channel <c>DCQuant</c> values (X, Y, B). When the bitstream
+  /// signals <c>all_default = 1</c>, the libjxl defaults
+  /// <c>{1/4096, 1/512, 1/256}</c> are returned.</returns>
+  public static float[] ReadDcQuantization(JxlBitReader reader) {
     ArgumentNullException.ThrowIfNull(reader);
     var allDefault = reader.ReadBool();
     if (allDefault)
-      return;
-    // Three F16 values, 16 bits each (per F16Coder::Read). We don't decode
-    // them here — the orchestrator only needs the bit alignment.
+      return (float[])DefaultDcQuant.Clone();
+    var values = new float[3];
     for (var c = 0; c < 3; c++)
-      reader.ReadBits(16);
+      values[c] = _ReadF16(reader);
+    return values;
   }
 
-  public static int ReadGlobalScale(JxlBitReader reader) {
-    ArgumentNullException.ThrowIfNull(reader);
+  /// <summary>Bundled return value of <see cref="ReadQuantizerParams"/>:
+  /// the raw <c>global_scale</c> and <c>quant_dc</c> integers read from the
+  /// frame's QuantizerParams bundle, plus pre-computed derived quantities used
+  /// by the DC dequantization step.</summary>
+  public readonly record struct QuantizerParams(
+    int GlobalScale,
+    int QuantDc,
+    float InvGlobalScale,
+    float InvQuantDc
+  );
 
+  /// <summary>
+  /// Read the QuantizerParams bundle (libjxl <c>Quantizer::Decode</c>): two
+  /// U32 fields <c>global_scale</c> and <c>quant_dc</c>. Returns both alongside
+  /// the derived <c>inv_global_scale</c> and <c>inv_quant_dc</c> scalars.
+  /// </summary>
+  public static QuantizerParams ReadQuantizerParams(JxlBitReader reader) {
+    ArgumentNullException.ThrowIfNull(reader);
     // QuantizerParams::VisitFields (lib/jxl/quantizer.cc):
     //   visitor->U32(BitsOffset(11, 1), BitsOffset(11, 2049),
     //                BitsOffset(12, 4097), BitsOffset(16, 8193),
     //                /*default=*/1, &global_scale);
     //   visitor->U32(Val(16), BitsOffset(5, 1), BitsOffset(8, 1),
     //                BitsOffset(16, 1), /*default=*/1, &quant_dc);
-    //
-    // No `all_default` wrapper around the bundle — both U32s are always read.
-    // The U32 selector is 2 bits; the 4 alternatives are picked by the
-    // selector value 0..3.
     var globalScale = (int)reader.ReadU32(
-      c0: 1u, u0: 11u,        // selector 0: BitsOffset(11, 1)    → 1 + read(11)
-      c1: 2049u, u1: 11u,     // selector 1: BitsOffset(11, 2049) → 2049 + read(11)
-      c2: 4097u, u2: 12u,     // selector 2: BitsOffset(12, 4097) → 4097 + read(12)
-      c3: 8193u, u3: 16u);    // selector 3: BitsOffset(16, 8193) → 8193 + read(16)
-
-    // Consume `quant_dc` to leave the reader positioned correctly. We don't
-    // surface the value yet — first-wave callers don't use it. Encoding here
-    // is `Val(16) | BitsOffset(5, 1) | BitsOffset(8, 1) | BitsOffset(16, 1)`.
-    // `Val(16)` means selector 0 emits the literal 16 with no payload bits.
-    _ = _ReadQuantDc(reader);
-
-    return globalScale;
+      c0: 1u, u0: 11u,
+      c1: 2049u, u1: 11u,
+      c2: 4097u, u2: 12u,
+      c3: 8193u, u3: 16u);
+    var quantDc = (int)_ReadQuantDc(reader);
+    var invGlobalScale = (float)GlobalScaleDenom / globalScale;
+    var invQuantDc = invGlobalScale / quantDc;
+    return new QuantizerParams(globalScale, quantDc, invGlobalScale, invQuantDc);
   }
+
+  public static int ReadGlobalScale(JxlBitReader reader) => ReadQuantizerParams(reader).GlobalScale;
 
   /// <summary>
   /// Read the per-frame quantization-table set. Mirrors

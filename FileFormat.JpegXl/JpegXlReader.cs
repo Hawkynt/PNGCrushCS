@@ -264,13 +264,16 @@ public static class JpegXlReader {
           var numPasses = frameHeader.NumPasses;
           var numGroups = 1;
           _ = Codec.JxlFrameToc.Decode(reader!, numGroups: numGroups, numPasses: (int)numPasses);
-          Codec.JxlFrameQuantizer.ReadDcQuantization(reader!);
+          var dcQuant = Codec.JxlFrameQuantizer.ReadDcQuantization(reader!);
 
           var vardctImage = Codec.JxlVarDctSpecDecoder.Decode(
             reader!, width, height,
             bitDepth: (int)imageMeta.BitDepth.BitsPerSample,
             gaborishParams: frameHeader.GaborishParameters,
-            epfParams: frameHeader.EpfParameters);
+            epfParams: frameHeader.EpfParameters,
+            dcQuant: dcQuant,
+            xQmScale: frameHeader.XQmScale,
+            bQmScale: frameHeader.BQmScale);
           rawImage = vardctImage;
           return true;
         } catch (System.NotImplementedException) {

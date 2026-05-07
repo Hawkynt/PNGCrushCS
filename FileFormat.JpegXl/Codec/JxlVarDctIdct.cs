@@ -213,7 +213,7 @@ internal static class JxlVarDctIdct {
     // Pass 1: 1-D IDCT along each row (length = width).
     for (var y = 0; y < height; y++) {
       var rowOffset = y * width;
-      _Idct1D(coeffs, rowOffset, 1, rowBuf, 0, 1, width);
+      _LibjxlIdct1D(coeffs, rowOffset, rowBuf, 0, width);
       Array.Copy(rowBuf, 0, tmp, rowOffset, width);
     }
 
@@ -225,9 +225,184 @@ internal static class JxlVarDctIdct {
     for (var x = 0; x < width; x++) {
       // Gather column.
       for (var y = 0; y < height; y++) colBuf[y] = tmp[y * width + x];
-      _Idct1D(colBuf, 0, 1, colOut, 0, 1, height);
+      _LibjxlIdct1D(colBuf, 0, colOut, 0, height);
       // Scatter column.
       for (var y = 0; y < height; y++) outputPixels[y * width + x] = colOut[y];
+    }
+  }
+
+  /// <summary>libjxl-compatible 1-D IDCT (Lee/Loeffler fast DCT).
+  /// Direct C# port of <c>IDCT1DImpl&lt;N, SZ&gt;</c> + <c>CoeffBundle</c> from
+  /// <c>lib/jxl/dct-inl.h</c>. Uses <c>WcMultipliers&lt;N&gt;::kMultipliers[i] =
+  /// 1/(2*cos((i+0.5)*pi/N))</c> from <c>dct_scales.h</c>.
+  ///
+  /// <para>Coefficients are stored "scaled" by the encoder (forward DCT applies
+  /// 1/N): DC = block mean, AC scaled accordingly. The IDCT here recovers
+  /// spatial samples without any further normalization. For DC-only input
+  /// <c>[c, 0, ..., 0]</c> the output is a flat block of value <c>c</c>.</para>
+  ///
+  /// <para>Algorithm (top-down):
+  /// <list type="number">
+  ///   <item><c>ForwardEvenOdd</c>: split <c>from[]</c> into evens then odds in <c>tmp[]</c>.</item>
+  ///   <item>Recursive IDCT on the even half.</item>
+  ///   <item><c>BTranspose</c> on the odd half: cumulative-add backwards then ×sqrt(2) at index 0.</item>
+  ///   <item>Recursive IDCT on the odd half.</item>
+  ///   <item><c>MultiplyAndAdd</c>: combine evens with odds via W[i] multipliers
+  ///         producing a "butterfly" output where <c>out[i] = ev[i] + W[i]·od[i]</c>
+  ///         and <c>out[N-1-i] = ev[i] - W[i]·od[i]</c>.</item>
+  /// </list></para>
+  /// </summary>
+  internal static void _LibjxlIdct1D(float[] from, int fromOffset, float[] to, int toOffset, int n) {
+    if (n == 1) {
+      to[toOffset] = from[fromOffset];
+      return;
+    }
+    // Each recursion level uses N slots for its evens/odds + grows scratch
+    // by N (libjxl `tmp + N*SZ`). Total scratch up to base case (N=2):
+    // N + N + N/2 + N/4 + ... < 3N. Allocate 4N to be safe.
+    var tmp = new float[n * 4];
+    _LibjxlIdct1DStep(from, fromOffset, 1, to, toOffset, 1, n, tmp, 0);
+  }
+
+  private static void _LibjxlIdct1DStep(
+    float[] from, int fromOff, int fromStride,
+    float[] to, int toOff, int toStride,
+    int n, float[] tmpBuf, int tmpOff
+  ) {
+    if (n == 1) {
+      to[toOff] = from[fromOff];
+      return;
+    }
+    if (n == 2) {
+      var a = from[fromOff];
+      var b = from[fromOff + fromStride];
+      to[toOff] = a + b;
+      to[toOff + toStride] = a - b;
+      return;
+    }
+
+    var half = n / 2;
+
+    // Step 1: ForwardEvenOdd — split into evens (first half of tmp) and odds (second half).
+    for (var i = 0; i < half; i++)
+      tmpBuf[tmpOff + i] = from[fromOff + 2 * i * fromStride];
+    for (var i = half; i < n; i++)
+      tmpBuf[tmpOff + i] = from[fromOff + (2 * (i - half) + 1) * fromStride];
+
+    // Step 2: Recursive IDCT on the even half (tmpBuf[tmpOff..tmpOff+half]).
+    // Output goes back to the same range.
+    _LibjxlIdct1DStep(tmpBuf, tmpOff, 1, tmpBuf, tmpOff, 1, half, tmpBuf, tmpOff + n);
+
+    // Step 3: BTranspose on the odd half (tmpBuf[tmpOff+half..tmpOff+n]).
+    //   for i = N-1 down to 1: coeff[i] += coeff[i-1]
+    //   coeff[0] *= sqrt(2)
+    var oddOff = tmpOff + half;
+    for (var i = half - 1; i > 0; i--)
+      tmpBuf[oddOff + i] += tmpBuf[oddOff + i - 1];
+    tmpBuf[oddOff] *= _kSqrt2;
+
+    // Step 4: Recursive IDCT on the odd half.
+    _LibjxlIdct1DStep(tmpBuf, oddOff, 1, tmpBuf, oddOff, 1, half, tmpBuf, tmpOff + n);
+
+    // Step 5: MultiplyAndAdd — combine evens (ev[i] = tmpBuf[tmpOff + i])
+    // with odds (od[i] = tmpBuf[oddOff + i]) using W[i] = 1/(2*cos((i+0.5)*pi/N)).
+    //   out[i]       = ev[i] + W[i] * od[i]
+    //   out[N-1-i]   = ev[i] - W[i] * od[i]
+    var multipliers = _GetWcMultipliers(n);
+    for (var i = 0; i < half; i++) {
+      var ev = tmpBuf[tmpOff + i];
+      var od = tmpBuf[oddOff + i] * multipliers[i];
+      to[toOff + i * toStride] = ev + od;
+      to[toOff + (n - 1 - i) * toStride] = ev - od;
+    }
+  }
+
+  private const float _kSqrt2 = 1.41421356237309504880f;
+
+  /// <summary>libjxl <c>WcMultipliers&lt;N&gt;::kMultipliers[i] =
+  /// 1/(2*cos((i+0.5)*pi/N))</c> for i in [0, N/2). Computed on demand and
+  /// cached per N.</summary>
+  private static readonly System.Collections.Concurrent.ConcurrentDictionary<int, float[]> _wcMultipliersCache = new();
+  private static float[] _GetWcMultipliers(int n) =>
+    _wcMultipliersCache.GetOrAdd(n, static n => {
+      var half = n / 2;
+      var result = new float[half];
+      for (var i = 0; i < half; i++)
+        result[i] = (float)(1.0 / (2.0 * Math.Cos((i + 0.5) * Math.PI / n)));
+      return result;
+    });
+
+  /// <summary>libjxl-compatible 1-D forward DCT (paired with <see cref="_LibjxlIdct1D"/>).
+  /// Direct C# port of <c>DCT1DImpl&lt;N, SZ&gt;</c> + <c>StoreToBlockAndScale</c>
+  /// (the 1/N scaling) from <c>lib/jxl/dct-inl.h</c>.
+  ///
+  /// <para>Algorithm:
+  /// <list type="number">
+  ///   <item><c>AddReverse</c> on first/second halves: <c>tmp[i] = in[i] + in[N-1-i]</c>.</item>
+  ///   <item>Recursive forward DCT on the first half (in tmp).</item>
+  ///   <item><c>SubReverse</c>: <c>tmp[N/2+i] = in[i] - in[N-1-i]</c>.</item>
+  ///   <item><c>Multiply</c> the odd half by <c>WcMultipliers[i]</c>.</item>
+  ///   <item>Recursive forward DCT on the odd half.</item>
+  ///   <item><c>B</c> on the odd half: <c>coeff[0] = sqrt(2)·c[0] + c[1]</c>; for
+  ///         <c>i ∈ [1, N-1)</c>: <c>coeff[i] += coeff[i+1]</c>.</item>
+  ///   <item><c>InverseEvenOdd</c>: re-interleave (out[2i] = tmp[i], out[2i+1] = tmp[N/2+i]).</item>
+  ///   <item>Final scale by 1/N (from <c>StoreToBlockAndScale</c>).</item>
+  /// </list></para>
+  /// </summary>
+  internal static void _LibjxlDct1D(float[] from, int fromOff, float[] to, int toOff, int n) {
+    if (n == 1) { to[toOff] = from[fromOff]; return; }
+    var tmp = new float[n * 4];
+    Array.Copy(from, fromOff, tmp, 0, n);
+    _LibjxlDct1DStep(tmp, 0, 1, n, tmp, n);
+    var inv = 1.0f / n;
+    for (var i = 0; i < n; i++) to[toOff + i] = tmp[i] * inv;
+  }
+
+  private static void _LibjxlDct1DStep(
+    float[] mem, int memOff, int memStride,
+    int n, float[] tmpBuf, int tmpOff
+  ) {
+    if (n == 1) return;
+    if (n == 2) {
+      var a = mem[memOff];
+      var b = mem[memOff + memStride];
+      mem[memOff] = a + b;
+      mem[memOff + memStride] = a - b;
+      return;
+    }
+    var half = n / 2;
+
+    // Step 1: AddReverse — tmp[i] = mem[i] + mem[N-1-i] for i in 0..half.
+    for (var i = 0; i < half; i++)
+      tmpBuf[tmpOff + i] = mem[memOff + i * memStride] + mem[memOff + (n - 1 - i) * memStride];
+
+    // Step 2: forward DCT on the first half (in tmp), in-place.
+    _LibjxlDct1DStep(tmpBuf, tmpOff, 1, half, tmpBuf, tmpOff + n);
+
+    // Step 3: SubReverse — tmp[half+i] = mem[i] - mem[N-1-i].
+    for (var i = 0; i < half; i++)
+      tmpBuf[tmpOff + half + i] = mem[memOff + i * memStride] - mem[memOff + (n - 1 - i) * memStride];
+
+    // Step 4: Multiply odd half by W[i].
+    var multipliers = _GetWcMultipliers(n);
+    for (var i = 0; i < half; i++)
+      tmpBuf[tmpOff + half + i] *= multipliers[i];
+
+    // Step 5: forward DCT on the odd half.
+    _LibjxlDct1DStep(tmpBuf, tmpOff + half, 1, half, tmpBuf, tmpOff + n);
+
+    // Step 6: B on odd half: tmp[half] = sqrt(2)*tmp[half] + tmp[half+1];
+    //   for i in 1..half-1: tmp[half+i] += tmp[half+i+1].
+    var oddOff = tmpOff + half;
+    tmpBuf[oddOff] = _kSqrt2 * tmpBuf[oddOff] + tmpBuf[oddOff + 1];
+    for (var i = 1; i < half - 1; i++)
+      tmpBuf[oddOff + i] += tmpBuf[oddOff + i + 1];
+
+    // Step 7: InverseEvenOdd — interleave evens (tmp[0..half]) and odds (tmp[half..n])
+    // back into mem. out[2i] = even[i], out[2i+1] = odd[i].
+    for (var i = 0; i < half; i++) {
+      mem[memOff + (2 * i) * memStride] = tmpBuf[tmpOff + i];
+      mem[memOff + (2 * i + 1) * memStride] = tmpBuf[tmpOff + half + i];
     }
   }
 
@@ -731,7 +906,7 @@ internal static class JxlVarDctIdct {
     var tmp = new float[width * height];
     var rowBuf = new float[width];
     for (var y = 0; y < height; y++) {
-      _Dct1D(pixels, y * width, 1, rowBuf, 0, 1, width);
+      _LibjxlDct1D(pixels, y * width, rowBuf, 0, width);
       Array.Copy(rowBuf, 0, tmp, y * width, width);
     }
     // Pass 2: along columns.
@@ -739,7 +914,7 @@ internal static class JxlVarDctIdct {
     var colOut = new float[height];
     for (var x = 0; x < width; x++) {
       for (var y = 0; y < height; y++) colIn[y] = tmp[y * width + x];
-      _Dct1D(colIn, 0, 1, colOut, 0, 1, height);
+      _LibjxlDct1D(colIn, 0, colOut, 0, height);
       for (var y = 0; y < height; y++) outputCoeffs[y * width + x] = colOut[y];
     }
   }

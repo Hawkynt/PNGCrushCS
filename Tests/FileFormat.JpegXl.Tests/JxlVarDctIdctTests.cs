@@ -64,6 +64,54 @@ internal sealed class JxlVarDctIdctTests {
       Assert.That(output[i], Is.EqualTo(0.0f).Within(1e-5f));
   }
 
+  /// <summary>libjxl reference: for the dequantized block from
+  /// <c>test_16x16_vardct.jxl</c> Y channel block (0,0)
+  /// (DC=0.245310, AC[1]=-0.032954, AC[3]=-0.005027, AC[8]=-0.127462,
+  ///  AC[24]=-0.010419, rest=0), libjxl's TransposedScaledIDCT produces
+  /// spatial[0..7] in row 0 = (0.0046, 0.0467, 0.1080, 0.1667, 0.2207,
+  /// 0.2794, 0.3407, 0.3827).
+  ///
+  /// <para>Our <c>_InverseDct2D</c> with <c>2 * sum</c> AC factor produces a
+  /// VERY DIFFERENT spatial output (different sign + magnitude). This test
+  /// pins the discrepancy: when it fails, we know the IDCT scaling is
+  /// off; when it passes, AC dequant scale wiring is unblocked.</para>
+  /// </summary>
+  [Test]
+  public void InverseDct8x8_LibjxlPreIdctBlock_MatchesReferenceSpatial() {
+    // libjxl block stored TRANSPOSED (column-major): index i*8+j is (col i, row j).
+    // For our row-major IDCT we feed the transposed coefficient layout: what was
+    // libjxl natural[1] (its (col=0, row=1)) goes to our (row=1, col=0) = our
+    // natural[8]. Likewise libjxl natural[8] → our natural[1].
+    var coeffs = new float[64];
+    coeffs[0] = 0.245310f;     // DC same in both layouts
+    coeffs[8] = -0.032954f;    // libjxl[1] (col 0 row 1) → our (row 1 col 0) = idx 8
+    coeffs[24] = -0.005027f;   // libjxl[3] (col 0 row 3) → our (row 3 col 0) = idx 24
+    coeffs[1] = -0.127462f;    // libjxl[8] (col 1 row 0) → our (row 0 col 1) = idx 1
+    coeffs[3] = -0.010419f;    // libjxl[24] (col 3 row 0) → our (row 0 col 3) = idx 3
+    var output = new float[64];
+    JxlVarDctIdct.InverseDct8x8(coeffs, output);
+
+    // libjxl reference (per traced post-IDCT spatial values for row 0).
+    var libjxlRow0 = new[] {
+      0.004644f, 0.046685f, 0.107995f, 0.166709f,
+      0.220671f, 0.279385f, 0.340695f, 0.382736f
+    };
+
+    var sb = new System.Text.StringBuilder();
+    sb.AppendLine("idx | ours        | libjxl-ref  | diff");
+    for (var x = 0; x < 8; ++x) {
+      var diff = output[x] - libjxlRow0[x];
+      sb.AppendLine($"  {x} | {output[x],10:F6} | {libjxlRow0[x],10:F6} | {diff,9:F6}");
+    }
+    TestContext.Out.WriteLine(sb.ToString());
+
+    // Tight check: every pixel must be within 1e-3 of libjxl reference (small
+    // float drift from the bias adjustment we don't yet apply).
+    for (var x = 0; x < 8; ++x)
+      Assert.That(output[x], Is.EqualTo(libjxlRow0[x]).Within(1e-3f),
+        $"pixel {x}: ours={output[x]:F6}, libjxl={libjxlRow0[x]:F6}");
+  }
+
   // -----------------------------------------------------------------------
   // Round-trip forward → inverse (validates scaling consistency)
   // -----------------------------------------------------------------------
