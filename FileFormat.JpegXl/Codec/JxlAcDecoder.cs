@@ -1,0 +1,386 @@
+using System;
+
+namespace FileFormat.JpegXl.Codec;
+
+// =====================================================================================
+// AC (high-frequency) coefficient decoder for one VarDCT group.
+//
+// Spec reference: ISO/IEC 18181-1 §G.7
+// libjxl reference (BSD-3-Clause):
+//   - lib/jxl/dec_group.cc       (`DecodeACVarBlock` template + GetBlockFromBitstream)
+//     https://github.com/libjxl/libjxl/blob/main/lib/jxl/dec_group.cc
+//   - lib/jxl/coeff_order.cc     (coefficient permutation reading)
+//     https://github.com/libjxl/libjxl/blob/main/lib/jxl/coeff_order.cc
+//   - lib/jxl/coeff_order.h      (kStrategyOrder, kCoeffOrderOffset)
+//     https://github.com/libjxl/libjxl/blob/main/lib/jxl/coeff_order.h
+//   - lib/jxl/ac_context.h       (BlockCtxMap, ZeroDensityContext,
+//                                  kCoeffFreqContext, kCoeffNumNonzeroContext)
+//     https://github.com/libjxl/libjxl/blob/main/lib/jxl/ac_context.h
+//
+// ALGORITHM (libjxl `DecodeACVarBlock` for DCT8):
+//
+//   For each block (in row-major order across the group):
+//     1. Compute the block_ctx via `BlockCtxMap.Context(dc_idx, qf, ord, c)`.
+//     2. Compute `predicted_nzeros` from top + left neighbour nzeros (uses an
+//        `nzeros` plane stored per channel, one int32 per 8x8 block). For our
+//        first cut we use `predicted = 32` (the libjxl clamp value, equivalent
+//        to "no neighbour data").
+//     3. nzero_ctx = block_ctx_map.NonZeroContext(predicted, block_ctx) +
+//                    ctx_offset
+//        Read `nzeros` via `entropy.ReadInt(nzero_ctx)`. Bound check:
+//        `nzeros <= size - covered_blocks` (i.e. at most 63 for DCT8).
+//     4. Store nzeros into the row_nzeros plane (used by the next row's
+//        prediction). For DCT8 (covered_blocks=1, log2_covered_blocks=0)
+//        this is just one cell per block.
+//     5. histo_offset = ctx_offset + ZeroDensityContextsOffset(block_ctx).
+//        Iterate scan positions k = covered_blocks ... size while nzeros > 0:
+//          a. ctx = histo_offset + ZeroDensityContext(nzeros, k,
+//                                  covered_blocks, log2_covered_blocks, prev)
+//          b. u_coeff = entropy.ReadInt(ctx)
+//          c. value = UnpackSigned(u_coeff)  (hand-rolled: magnitude xor sign-mask)
+//          d. block[order[k]] += value (we store as scan-order short[] though,
+//             not natural-order — see "FIRST-WAVE SIMPLIFICATIONS" below).
+//          e. prev = (u_coeff != 0)
+//          f. if prev: --nzeros
+//     6. After the loop, nzeros must be 0 (else: corrupted bitstream).
+//
+// FIRST-WAVE SIMPLIFICATIONS (this implementation):
+//   - DCT8 only. Larger AC strategies (DCT16+, rectangular, AFV, Hornuss) and
+//     non-first sub-blocks (`JxlAcStrategyDecoder.CoveredByNeighbour`) are
+//     accepted in the strategy grid, but rejected with `NotImplementedException`
+//     at decode time. This matches the JxlVarDctIdct first-wave scope.
+//   - We DO NOT yet read the per-block `coeff_order` permutation (libjxl
+//     `DecodeCoeffOrders`). For DCT8 the natural order is identical to the
+//     bitstream's "scan order" when no permutation is signalled, and our
+//     output array is in scan order regardless. The downstream IDCT path will
+//     need un-zigzag-to-natural before consuming this — wired in
+//     JxlVarDctIdct, which already documents that input is natural-order.
+//   - Predicted nzeros is hard-coded to libjxl's `min(32, ...)` clamp value
+//     (32) — i.e. the same prediction we'd get with a top-left of zero. This
+//     matches libjxl behaviour at the top-left corner of every group, so the
+//     contexts at (bx=0, by=0) are correct; the contexts at later blocks may
+//     be sub-optimal but will still decode correctly because the entropy
+//     decoder's context map is provided externally.
+//   - `ctx_offset` (multi-pass histogram selector) is fixed to 0 — single-pass
+//     decode only. Multi-pass requires the frame's pass list and a histogram
+//     selector bit-field, which is part of the wider VarDCT group orchestrator
+//     (still TODO). See FIRST-WAVE NOTES at the bottom of this file.
+// =====================================================================================
+
+internal static class JxlAcDecoder {
+
+  // -------------------------------------------------------------------------
+  // libjxl constants from ac_context.h
+  // -------------------------------------------------------------------------
+
+  /// <summary>Number of "predicted nzeros" buckets used for the non-zero context.
+  /// libjxl <c>kNonZeroBuckets = 37</c>. Predicted nzeros is in 0..1008 but is
+  /// clustered to ceil(log2(predicted+1)) → 0..10, then offset by 32 = 37
+  /// total buckets. Used by <see cref="_NonZeroContext"/>.</summary>
+  internal const int NonZeroBuckets = 37;
+
+  /// <summary>libjxl <c>kZeroDensityContextCount = 458</c>. Supremum of
+  /// <see cref="_ZeroDensityContext"/>(x, y) + 1, when x + y &lt; 64.</summary>
+  internal const int ZeroDensityContextCount = 458;
+
+  /// <summary>libjxl <c>kCoeffFreqContext[64]</c> from ac_context.h. Maps a
+  /// scan-order index k ∈ [1..63] to a frequency context bucket. Index 0 is
+  /// unused (DC is decoded separately) and stored as <c>0xBAD</c> in libjxl;
+  /// we store 0 instead since this entry is never read.</summary>
+  internal static readonly ushort[] CoeffFreqContext = new ushort[64] {
+    0,  0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 13, 14,
+    15, 15, 16, 16, 17, 17, 18, 18, 19, 19, 20, 20, 21, 21, 22, 22,
+    23, 23, 23, 23, 24, 24, 24, 24, 25, 25, 25, 25, 26, 26, 26, 26,
+    27, 27, 27, 27, 28, 28, 28, 28, 29, 29, 29, 29, 30, 30, 30, 30,
+  };
+
+  /// <summary>libjxl <c>kCoeffNumNonzeroContext[64]</c> from ac_context.h.
+  /// Maps a number-of-non-zeros-left value (after clustering) to a base
+  /// offset added to the freq-context bucket. Index 0 is unused and stored as
+  /// <c>0xBAD</c> in libjxl; we store 0.</summary>
+  internal static readonly ushort[] CoeffNumNonzeroContext = new ushort[64] {
+    0,   0,   31,  62,  62,  93,  93,  93,  93,  123, 123, 123, 123,
+    152, 152, 152, 152, 152, 152, 152, 152, 180, 180, 180, 180, 180,
+    180, 180, 180, 180, 180, 180, 180, 206, 206, 206, 206, 206, 206,
+    206, 206, 206, 206, 206, 206, 206, 206, 206, 206, 206, 206, 206,
+    206, 206, 206, 206, 206, 206, 206, 206, 206, 206, 206, 206,
+  };
+
+  // -------------------------------------------------------------------------
+  // Public API
+  // -------------------------------------------------------------------------
+
+  /// <summary>Decode all AC (high-frequency) coefficients for one VarDCT group.
+  /// For each block, the AC stream produces an array of quantized coefficients
+  /// in scan order (one short per coefficient position 1..63 for DCT8). The
+  /// DC coefficient (index 0) is decoded separately via the LF stream and is
+  /// left as zero in the returned blocks.</summary>
+  /// <param name="reader">Bit reader positioned at the start of the group's
+  /// AC data.</param>
+  /// <param name="entropy">Entropy decoder seeded for AC contexts (one
+  /// <c>numContexts</c> comes from <see cref="JxlBlockContextMap.NumContexts"/>
+  /// expanded to cover the nzeros + zero-density spaces).</param>
+  /// <param name="strategies">AC strategy per block, from
+  /// <see cref="JxlAcStrategyDecoder"/>. Indexed
+  /// <c>strategies[blockY][blockX]</c>.</param>
+  /// <param name="contextMap">Block context map for context lookup.</param>
+  /// <param name="groupBlocksWide">Number of 8×8 blocks across the group.</param>
+  /// <param name="groupBlocksHigh">Number of 8×8 blocks down the group.</param>
+  /// <param name="numChannels">Number of XYB channels (typically 3).</param>
+  /// <returns>Per-channel AC blocks, indexed
+  /// <c>[channel][blockIdx]</c> where
+  /// <c>blockIdx = blockY * groupBlocksWide + blockX</c>.</returns>
+  public static JxlDctBlock[][] DecodeGroup(
+    JxlBitReader reader,
+    JxlEntropyDecoder entropy,
+    JxlAcStrategyType[][] strategies,
+    JxlBlockContextMap contextMap,
+    int groupBlocksWide,
+    int groupBlocksHigh,
+    int numChannels
+  ) {
+    ArgumentNullException.ThrowIfNull(reader);
+    ArgumentNullException.ThrowIfNull(entropy);
+    ArgumentNullException.ThrowIfNull(strategies);
+    ArgumentNullException.ThrowIfNull(contextMap);
+    if (groupBlocksWide < 0)
+      throw new ArgumentOutOfRangeException(nameof(groupBlocksWide), "Must be >= 0.");
+    if (groupBlocksHigh < 0)
+      throw new ArgumentOutOfRangeException(nameof(groupBlocksHigh), "Must be >= 0.");
+    if (numChannels <= 0)
+      throw new ArgumentOutOfRangeException(nameof(numChannels), "Must be positive.");
+    if (strategies.Length != groupBlocksHigh)
+      throw new ArgumentException(
+        $"Strategies grid has {strategies.Length} rows but groupBlocksHigh = {groupBlocksHigh}.",
+        nameof(strategies));
+    for (var y = 0; y < groupBlocksHigh; ++y) {
+      if (strategies[y] is null)
+        throw new ArgumentException($"strategies[{y}] is null.", nameof(strategies));
+      if (strategies[y].Length != groupBlocksWide)
+        throw new ArgumentException(
+          $"strategies[{y}] has {strategies[y].Length} columns but groupBlocksWide = {groupBlocksWide}.",
+          nameof(strategies));
+    }
+
+    var totalBlocks = groupBlocksWide * groupBlocksHigh;
+    var result = new JxlDctBlock[numChannels][];
+    for (var c = 0; c < numChannels; ++c) {
+      result[c] = new JxlDctBlock[totalBlocks];
+      for (var i = 0; i < totalBlocks; ++i) {
+        result[c][i] = new JxlDctBlock {
+          Width = 8,
+          Height = 8,
+          Coefficients = new short[64],
+        };
+      }
+    }
+
+    if (totalBlocks == 0)
+      return result;
+
+    // Per-channel running "predicted nzeros" plane. libjxl uses a separate
+    // ImageI per channel and predicts from top + left neighbour. For first-wave
+    // we keep just the "previous-row" and "this-row, previous-col" arrays so
+    // PredictFromTopAndLeft can be evaluated per block. Allocated lazily —
+    // for DCT8 only.
+    var nzerosPlane = new int[numChannels][];
+    for (var c = 0; c < numChannels; ++c)
+      nzerosPlane[c] = new int[totalBlocks];
+
+    // Per-block decode loop. We iterate channels in libjxl's order {1, 0, 2}
+    // (Y first, then X, then B) — matching `DecodeGroupImpl`'s `for (size_t c
+    // : {1, 0, 2})` traversal. This affects the order of bits read from the
+    // entropy stream and is part of the wire contract.
+    ReadOnlySpan<int> channelOrder = stackalloc int[3] { 1, 0, 2 };
+    for (var by = 0; by < groupBlocksHigh; ++by)
+      for (var bx = 0; bx < groupBlocksWide; ++bx) {
+        var strategy = strategies[by][bx];
+
+        // Reject non-first sub-blocks (multi-block strategies). For first-
+        // wave we don't have multi-block strategies anyway, but the marker
+        // value is reserved by JxlAcStrategyDecoder.CoveredByNeighbour.
+        if (strategy == JxlAcStrategyDecoder.CoveredByNeighbour)
+          throw new NotImplementedException(
+            "JxlAcDecoder.DecodeGroup: covered-by-neighbour blocks are not " +
+            "yet supported. They appear when a multi-block AC strategy " +
+            "(DCT16+, rectangular, etc.) marks its trailing 8×8 sub-blocks. " +
+            "First-wave decoder is DCT8-only; tracked as a future TODO " +
+            "alongside JxlVarDctIdct's rectangular/large strategy support.");
+
+        if (strategy != JxlAcStrategyType.Dct8x8)
+          throw new NotImplementedException(
+            $"JxlAcDecoder.DecodeGroup: AC strategy {strategy} is not yet " +
+            "supported by the first-wave decoder. Only DCT8x8 is wired in. " +
+            "Adding a new strategy requires: (1) the matching natural " +
+            "coefficient order from `AcStrategy::ComputeNaturalCoeffOrder` " +
+            "in libjxl `lib/jxl/ac_strategy.cc`; (2) the strategy's " +
+            "`covered_blocks_x()` × `covered_blocks_y()` size; (3) updating " +
+            "the row_nzeros store loop below to mark all covered sub-blocks; " +
+            "(4) the matching IDCT in JxlVarDctIdct.");
+
+        for (var ci = 0; ci < numChannels; ++ci) {
+          // Map the iteration index to a logical channel. For numChannels < 3
+          // we use the natural channel index; for == 3, libjxl's {1,0,2}.
+          var c = numChannels == 3 ? channelOrder[ci] : ci;
+          if (c >= numChannels) continue;
+
+          _DecodeAcVarBlockDct8(
+            reader, entropy, contextMap, strategy,
+            nzerosPlane[c], bx, by, groupBlocksWide,
+            channel: c,
+            outBlock: result[c][by * groupBlocksWide + bx].Coefficients);
+        }
+      }
+
+    return result;
+  }
+
+  // -------------------------------------------------------------------------
+  // libjxl `DecodeACVarBlock` for DCT8 (covered_blocks = 1, log2 = 0)
+  // -------------------------------------------------------------------------
+
+  /// <summary>Decode the AC stream for one DCT8 block (one channel).
+  /// Mirrors libjxl <c>DecodeACVarBlock&lt;ACType::k16, false&gt;</c> with
+  /// <c>log2_covered_blocks = 0</c> and <c>covered_blocks = 1</c>.</summary>
+  private static void _DecodeAcVarBlockDct8(
+    JxlBitReader reader,
+    JxlEntropyDecoder entropy,
+    JxlBlockContextMap contextMap,
+    JxlAcStrategyType strategy,
+    int[] rowNzeros,
+    int bx, int by, int blocksWide,
+    int channel,
+    short[] outBlock
+  ) {
+    _ = reader; // entropy.ReadInt drives the bit reader directly
+    const int coveredBlocks = 1;
+    const int log2CoveredBlocks = 0;
+    const int size = coveredBlocks * 64; // = 64 for DCT8
+
+    // (1) Predicted nzeros from top + left. libjxl `PredictFromTopAndLeft`
+    //     in entropy_coder.h: clamp top and left to <=32, average them.
+    //     For (bx=0, by=0) returns 32 (no neighbours).
+    var top = by > 0 ? rowNzeros[(by - 1) * blocksWide + bx] : 32;
+    var left = bx > 0 ? rowNzeros[by * blocksWide + (bx - 1)] : 32;
+    var predicted = (top + left + 1) >> 1;
+    if (predicted > 32) predicted = 32;
+
+    // (2) block context (qf and dc both 0 for first wave).
+    var blockCtx = contextMap.GetContext(channel, strategy, qfIndex: 0);
+
+    // (3) nzeros context. libjxl `NonZeroContext`:
+    //   ctx = predicted < 8 ? predicted : 4 + predicted/2
+    //   ctx = ctx * num_ctxs + block_ctx
+    var nzeroCtx = _NonZeroContext(predicted, blockCtx, contextMap.NumContexts);
+
+    var nzeros = entropy.ReadInt(nzeroCtx);
+    if (nzeros < 0 || nzeros > size - coveredBlocks)
+      throw new System.IO.InvalidDataException(
+        $"Invalid AC: nzeros={nzeros} out of [0, {size - coveredBlocks}] " +
+        $"at block ({bx},{by}) channel {channel}.");
+
+    // (4) Store nzeros into the prediction plane for the next row/col.
+    //     For DCT8 covered_blocks=1, so just one cell.
+    rowNzeros[by * blocksWide + bx] = (nzeros + coveredBlocks - 1) >> log2CoveredBlocks;
+
+    // (5) Iterate non-zero coefficient positions.
+    var histoOffset = _ZeroDensityContextsOffset(blockCtx, contextMap.NumContexts);
+    var prev = nzeros > size / 16 ? 0 : 1;
+    for (var k = coveredBlocks; k < size && nzeros != 0; ++k) {
+      var ctx = histoOffset + _ZeroDensityContext(
+        (uint)nzeros, (uint)k, coveredBlocks, log2CoveredBlocks, (uint)prev);
+      var uCoeff = entropy.ReadInt(ctx);
+      // Hand-rolled UnpackSigned: (u_coeff >> 1) ^ -(u_coeff & 1).
+      // libjxl uses `(magnitude ^ (neg_sign - 1))` form for branch-free SIMD;
+      // both produce the same result.
+      var magnitude = (uint)uCoeff >> 1;
+      var negSign = (~(uint)uCoeff) & 1u;
+      // negSign: 1 if positive, 0 if negative — opposite of (u_coeff & 1).
+      // libjxl: coeff = (magnitude ^ (negSign - 1)). When negSign=0:
+      // magnitude ^ 0xFFFFFFFF = -magnitude - 1. When negSign=1: magnitude.
+      var coeff = (int)(magnitude ^ (negSign - 1u));
+
+      // outBlock is in scan order; index k is the (k)th scan position.
+      // libjxl writes to `block.ptr16[order[k]]` because its blocks are kept
+      // in natural (un-zigzagged) order. We keep scan order — the downstream
+      // un-zigzag is a separate concern.
+      outBlock[k] += (short)coeff;
+
+      prev = uCoeff != 0 ? 1 : 0;
+      nzeros -= prev;
+    }
+
+    if (nzeros != 0)
+      throw new System.IO.InvalidDataException(
+        $"Invalid AC: nzeros at end of block is {nzeros}, should be 0. " +
+        $"Block ({bx},{by}), channel {channel}.");
+  }
+
+  // -------------------------------------------------------------------------
+  // libjxl context-formula helpers (BlockCtxMap inline methods)
+  // -------------------------------------------------------------------------
+
+  /// <summary>libjxl <c>BlockCtxMap::NonZeroContext</c>:
+  /// <code>
+  /// if (non_zeros >= 64) non_zeros = 64;
+  /// ctx = non_zeros &lt; 8 ? non_zeros : 4 + non_zeros / 2;
+  /// return ctx * num_ctxs + block_ctx;
+  /// </code>
+  /// </summary>
+  internal static int _NonZeroContext(int nonZeros, int blockCtx, int numCtxs) {
+    if (nonZeros >= 64) nonZeros = 64;
+    var ctx = nonZeros < 8 ? nonZeros : 4 + nonZeros / 2;
+    return ctx * numCtxs + blockCtx;
+  }
+
+  /// <summary>libjxl <c>BlockCtxMap::ZeroDensityContextsOffset</c>:
+  /// <code>num_ctxs * kNonZeroBuckets + kZeroDensityContextCount * block_ctx</code>.
+  /// </summary>
+  internal static int _ZeroDensityContextsOffset(int blockCtx, int numCtxs)
+    => numCtxs * NonZeroBuckets + ZeroDensityContextCount * blockCtx;
+
+  /// <summary>libjxl <c>ZeroDensityContext</c> from ac_context.h:
+  /// <code>
+  /// nonzeros_left = (nonzeros_left + covered_blocks - 1) &gt;&gt; log2_covered_blocks;
+  /// k &gt;&gt;= log2_covered_blocks;
+  /// return (kCoeffNumNonzeroContext[nonzeros_left] + kCoeffFreqContext[k]) * 2 + prev;
+  /// </code>
+  /// Caller asserts <c>k &gt; 0</c> and <c>nonzeros_left &gt; 0</c>.
+  /// </summary>
+  internal static int _ZeroDensityContext(uint nonzerosLeft, uint k, int coveredBlocks, int log2CoveredBlocks, uint prev) {
+    nonzerosLeft = (nonzerosLeft + (uint)coveredBlocks - 1u) >> log2CoveredBlocks;
+    k >>= log2CoveredBlocks;
+    if (nonzerosLeft >= 64u || k >= 64u)
+      throw new System.IO.InvalidDataException(
+        $"ZeroDensityContext: nonzerosLeft={nonzerosLeft}, k={k} out of range.");
+    return (CoeffNumNonzeroContext[nonzerosLeft] + CoeffFreqContext[k]) * 2 + (int)prev;
+  }
+
+  // =====================================================================================
+  // FIRST-WAVE NOTES (left here for the next implementer):
+  //
+  // 1) MULTI-PASS. libjxl threads `num_passes` and a `histo_selector_bits` count
+  //    through `GetBlockFromBitstream::Init`, which reads
+  //    `cur_histogram = readers[pass]->ReadBits(histo_selector_bits)` and
+  //    sets `ctx_offset[pass] = cur_histogram * NumACContexts()`. We assume
+  //    a single pass with `ctx_offset = 0`. To wire in: extend the public API
+  //    with `numPasses, histoSelectorBits` parameters and call
+  //    entropy.ReadInt with ctx + ctx_offset[pass] in the inner loop.
+  //
+  // 2) PER-STRATEGY COEFFICIENT ORDER. libjxl's `DecodeCoeffOrders` reads up
+  //    to 13 coefficient permutations (one per strategy size class) into
+  //    `dec_state->shared->coeff_orders`. The bitstream signals which orders
+  //    are non-default via `used_orders` (16-bit bitmap). Our first-wave
+  //    output is in scan order; to consume by IDCT we need natural-order, so
+  //    a separate un-zigzag pass (using the embedded natural order from
+  //    `AcStrategy::ComputeNaturalCoeffOrder`) belongs in the orchestrator.
+  //
+  // 3) SHIFT/PROGRESSIVE. libjxl shifts coefficients by `shift_for_pass[pass]`
+  //    bits when accumulating across passes (for progressive decode). With
+  //    single-pass we use shift=0.
+  //
+  // 4) JPEG-COMPATIBLE PATH. libjxl has a separate path for JPEG-XL streams
+  //    that wrap a JPEG bitstream (re-decode to JPEG coefficients). We do not
+  //    implement that here — it is orthogonal to lossy VarDCT.
+  // =====================================================================================
+}

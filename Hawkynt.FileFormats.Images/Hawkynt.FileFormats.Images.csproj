@@ -42,12 +42,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- PrivateAssets="all" prevents these from showing up as NuGet dependencies of consumers.
-         Combined with the BundleProjectReferenceDlls target below, the DLLs are physically
-         copied into lib/ instead of declared as transitive dependencies. -->
+    <!-- PrivateAssets="all" prevents these from showing up as broken NuGet dependencies
+         (the FileFormat.* projects don't ship as standalone packages on nuget.org).
+         Consumers see all types via the bundled DLLs in lib/$(TargetFramework). -->
     <ProjectReference Include="..\FileFormat.Core\FileFormat.Core.csproj" PrivateAssets="all" />
     <ProjectReference Include="..\FileFormat.Registry.Generator\FileFormat.Registry.Generator.csproj"
-                      OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+                      OutputItemType="Analyzer" ReferenceOutputAssembly="false"
+                      PrivateAssets="all" />
   </ItemGroup>
 
   <!-- Pull in every FileFormat.<Name> library via wildcard so the source generator sees them.
@@ -58,18 +59,34 @@
                       PrivateAssets="all" />
   </ItemGroup>
 
+  <!-- External NuGet packages that bundled FileFormat.* libraries depend on at runtime.
+       PrivateAssets="all" on the FileFormat.* refs above also hides their transitive
+       PackageReferences from this package's nuspec, so we re-declare them explicitly here.
+       These flow as transitive dependencies of the meta-package, which is the correct
+       behavior — consumers get them installed automatically. -->
+  <ItemGroup>
+    <PackageReference Include="BitMiracle.LibTiff.NET" Version="2.4.649" />
+    <PackageReference Include="BitMiracle.LibJpeg.NET" Version="1.5.324" />
+    <PackageReference Include="FrameworkExtensions.Backports" Version="1.0.0.256" />
+  </ItemGroup>
+
   <!-- Bundle every transitively-referenced project assembly into lib/<tfm>/ at pack time.
-       The trick: PrivateAssets="all" prevents NuGet from emitting them as dependencies,
-       so we have to explicitly add the resolved DLLs. Walks the build's ReferencePath items
-       (each ProjectReference resolves to a ReferencePath after build). -->
+       Walks the build's ReferencePath items (each ProjectReference resolves to a ReferencePath
+       after build) and adds the resolved .dll as a packed file. -->
   <Target Name="_AddAllReferencedAssembliesToPackage" DependsOnTargets="ResolveReferences">
     <ItemGroup>
       <_BundledRefs Include="@(ReferencePath)"
                     Condition="'%(ReferencePath.ReferenceSourceTarget)' == 'ProjectReference' and '%(ReferencePath.Extension)' == '.dll'" />
-      <!-- Also include their pdbs if present, and Core (which we marked private) -->
       <TfmSpecificPackageFile Include="@(_BundledRefs)" PackagePath="lib/$(TargetFramework)" />
     </ItemGroup>
     <Message Importance="high" Text="Bundling @(_BundledRefs->Count()) referenced project DLLs into lib/$(TargetFramework)" />
   </Target>
 
+  <!-- Strip FileFormat.* ProjectReferences from the generated nuspec's <dependencies> list.
+       We need MSBuild's project graph to flow them (so direct types like FileFormat.Apng.ApngFile
+       are visible to ProjectReference consumers of this package), but NuGet would otherwise
+       turn each one into a non-existent <dependency id="FileFormat.X" version="1.0.0" /> entry.
+       Their DLLs are bundled in lib/ via _AddAllReferencedAssembliesToPackage above; their
+       transitive PackageReferences (BitMiracle.LibTiff.NET, BitMiracle.LibJpeg.NET,
+       FrameworkExtensions.Backports, etc.) propagate naturally and remain in the nuspec. -->
 </Project>

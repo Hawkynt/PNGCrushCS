@@ -48,9 +48,18 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout PNGCrushCS
+        uses: actions/checkout@v4
         with:
+          path: PNGCrushCS
           fetch-depth: 0
+
+      - name: Checkout CompressionWorkbench (sibling)
+        uses: actions/checkout@v4
+        with:
+          repository: Hawkynt/CompressionWorkbench
+          path: CompressionWorkbench
+          fetch-depth: 1
 
       - uses: actions/setup-dotnet@v4
         with:
@@ -60,12 +69,15 @@ jobs:
             10.0.x
 
       - name: Stamp version into csprojs
+        working-directory: PNGCrushCS
         run: perl .github/workflows/scripts/version.pl --stamp
 
       - name: Pack Hawkynt.FileFormats.Images
+        working-directory: PNGCrushCS
         run: dotnet pack Hawkynt.FileFormats.Images/Hawkynt.FileFormats.Images.csproj -c Release -o ./packages --nologo
 
       - name: Push to NuGet.org
+        working-directory: PNGCrushCS
         env:
           NUGET_TOKEN: ${{ secrets.NUGET_TOKEN }}
         run: |
@@ -82,7 +94,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Hawkynt.FileFormats.Images-nupkg
-          path: ./packages/*.nupkg
+          path: PNGCrushCS/packages/*.nupkg
 
   publish:
     needs: [version, build]

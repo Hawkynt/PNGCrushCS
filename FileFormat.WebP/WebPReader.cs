@@ -76,6 +76,11 @@ public static class WebPReader {
       ? (chunks.TryGetValue(_CHUNK_VP8L, out var vp8lData) ? vp8lData : [])
       : (chunks.TryGetValue(_CHUNK_VP8, out var vp8Data) ? vp8Data : []);
 
+    // ALPH chunk (only present for VP8 lossy + alpha — lossless format carries alpha inline).
+    byte[]? alphaData = null;
+    if (!isLossless && chunks.TryGetValue(_CHUNK_ALPH, out var alph))
+      alphaData = _DecodeAlphChunk(alph, features.Width, features.Height);
+
     // Collect metadata chunks
     foreach (var chunk in riff.Chunks) {
       var id = chunk.Id.ToString();
@@ -87,8 +92,24 @@ public static class WebPReader {
       Features = features,
       ImageData = imageData,
       IsLossless = isLossless,
-      MetadataChunks = metadataChunks
+      MetadataChunks = metadataChunks,
+      AlphaData = alphaData,
     };
+  }
+
+  /// <summary>Decode an ALPH chunk into a flat alpha-plane byte buffer (one byte per pixel).
+  /// Currently supports compression method 0 (uncompressed). Method 1 (VP8L-encoded alpha)
+  /// returns null — caller treats absence of alphaData as opaque.</summary>
+  private static byte[]? _DecodeAlphChunk(byte[] data, int width, int height) {
+    if (data.Length < 1) return null;
+    var flagByte = data[0];
+    var compression = flagByte & 0x03;
+    if (compression != 0) return null; // method 1 (VP8L) decoding not implemented yet
+    var expectedLength = width * height;
+    if (data.Length < 1 + expectedLength) return null;
+    var alpha = new byte[expectedLength];
+    System.Buffer.BlockCopy(data, 1, alpha, 0, expectedLength);
+    return alpha;
   }
 
   public static WebPFile FromBytes(byte[] data) {

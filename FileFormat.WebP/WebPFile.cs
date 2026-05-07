@@ -16,6 +16,11 @@ public sealed class WebPFile : IImageFormatReader<WebPFile>, IImageToRawImage<We
   public bool IsLossless { get; init; }
   public List<(string ChunkId, byte[] Data)> MetadataChunks { get; init; } = [];
 
+  /// <summary>VP8 lossy alpha plane bytes (one byte per pixel, top-left origin, no padding).
+  /// Only meaningful when <see cref="IsLossless"/> is false and <see cref="WebPFeatures.HasAlpha"/>
+  /// is true. Lossless format already carries alpha inline. Stored in the ALPH chunk on emit.</summary>
+  public byte[]? AlphaData { get; init; }
+
   public static string PrimaryExtension => ".webp";
   public static string[] FileExtensions => [".webp", ".wep"];
   static WebPFile IImageFormatReader<WebPFile>.FromSpan(ReadOnlySpan<byte> data) => WebPReader.FromSpan(data);
@@ -50,6 +55,20 @@ public sealed class WebPFile : IImageFormatReader<WebPFile>, IImageToRawImage<We
 
     // VP8 lossy: ported from golang.org/x/image/vp8 (Nigel Tao's clean reference implementation).
     var rgb = Vp8Decoder.Decode(file.ImageData, w, h);
+
+    // If an ALPH chunk accompanied the VP8 lossy data, splice in the alpha plane and
+    // upgrade the output to Rgba32. Without ALPH, VP8 lossy is RGB-only.
+    if (file.Features.HasAlpha && file.AlphaData != null && file.AlphaData.Length == w * h) {
+      var rgba = new byte[w * h * 4];
+      for (var i = 0; i < w * h; ++i) {
+        rgba[i * 4 + 0] = rgb[i * 3 + 0];
+        rgba[i * 4 + 1] = rgb[i * 3 + 1];
+        rgba[i * 4 + 2] = rgb[i * 3 + 2];
+        rgba[i * 4 + 3] = file.AlphaData[i];
+      }
+      return new() { Width = w, Height = h, Format = PixelFormat.Rgba32, PixelData = rgba };
+    }
+
     return new() {
       Width = w,
       Height = h,
@@ -76,17 +95,45 @@ public sealed class WebPFile : IImageFormatReader<WebPFile>, IImageToRawImage<We
     };
   }
 
-  /// <summary>Encode as VP8 lossy at the given quality (0-100). Alpha is discarded.
-  /// Output is round-trip-decodable by <see cref="Vp8Decoder"/>. For pixel-perfect preservation
-  /// use <see cref="FromRawImage(RawImage)"/> which writes VP8L.</summary>
+  /// <summary>Encode as VP8 lossy at the given quality (0-100). Alpha is preserved losslessly
+  /// in an accompanying ALPH chunk (uncompressed method 0); the RGB plane goes through the
+  /// usual lossy VP8 path. Pixel-perfect decoding requires <see cref="FromRawImage(RawImage)"/>
+  /// (VP8L lossless), but RGBA-with-alpha now round-trips alpha bit-exactly even via the
+  /// lossy path.</summary>
   public static WebPFile FromRawImageLossy(RawImage image, int quality = 75) {
     ArgumentNullException.ThrowIfNull(image);
     var vp8Data = Vp8Encoder.Encode(image, quality);
+
+    byte[]? alphaData = null;
+    var hasAlpha = false;
+    if (image.Format == PixelFormat.Rgba32) {
+      alphaData = _ExtractAlphaPlane(image);
+      // Skip the ALPH chunk if every pixel is fully opaque — saves bytes and avoids
+      // marking the file as having alpha when it effectively doesn't.
+      hasAlpha = _AlphaHasTransparency(alphaData);
+      if (!hasAlpha) alphaData = null;
+    }
+
     return new() {
-      Features = new WebPFeatures(image.Width, image.Height, HasAlpha: false, IsLossless: false, IsAnimated: false),
+      Features = new WebPFeatures(image.Width, image.Height, hasAlpha, IsLossless: false, IsAnimated: false),
       ImageData = vp8Data,
       IsLossless = false,
+      AlphaData = alphaData,
     };
+  }
+
+  private static byte[] _ExtractAlphaPlane(RawImage image) {
+    var pixelCount = image.Width * image.Height;
+    var alpha = new byte[pixelCount];
+    for (var i = 0; i < pixelCount; ++i)
+      alpha[i] = image.PixelData[i * 4 + 3];
+    return alpha;
+  }
+
+  private static bool _AlphaHasTransparency(byte[] alpha) {
+    foreach (var a in alpha)
+      if (a != 0xFF) return true;
+    return false;
   }
 
   /// <summary>Convert RGBA byte array to ARGB uint array for VP8L encoder.</summary>

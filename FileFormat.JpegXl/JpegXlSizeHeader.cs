@@ -30,8 +30,9 @@ internal static class JpegXlSizeHeader {
 
     var reader = new BitReader(data);
 
-    // First bit: small flag
-    var small = reader.ReadBits(1) == 0;
+    // First bit: small flag. Per libjxl `headers.cc::SizeHeader::VisitFields`,
+    // bit value 1 = small (height divides by 8), bit value 0 = large.
+    var small = reader.ReadBits(1) == 1;
 
     if (small) {
       // small: 5-bit height_div8 (height = (val+1)*8), ratio from 3 bits
@@ -65,7 +66,7 @@ internal static class JpegXlSizeHeader {
     if (height >= 8 && height <= 256 && height % 8 == 0) {
       var ratio = _FindRatio(width, height);
       if (ratio > 0) {
-        writer.WriteBits(0, 1); // small=true (bit value 0)
+        writer.WriteBits(1, 1); // small=true (bit value 1, per libjxl spec)
         writer.WriteBits((uint)(height / 8 - 1), 5);
         writer.WriteBits((uint)ratio, 3);
         return writer.ToArray();
@@ -73,7 +74,7 @@ internal static class JpegXlSizeHeader {
     }
 
     // Large encoding
-    writer.WriteBits(1, 1); // small=false (bit value 1)
+    writer.WriteBits(0, 1); // small=false (bit value 0, per libjxl spec)
     _WriteU32(ref writer, height);
     var ratioLarge = _FindRatio(width, height);
     writer.WriteBits((uint)ratioLarge, 3);
@@ -103,13 +104,21 @@ internal static class JpegXlSizeHeader {
   ///   sel 2 => offset 1, 13 bits => value = 1..8192
   ///   sel 3 => offset 1, 18 bits => value = 1..262144
   /// </summary>
+  // Per libjxl `headers.cc::SizeHeader::VisitFields`, the u32 distribution for
+  // SizeHeader's height/width is:
+  //   U32(BitsOffset(9, 1), BitsOffset(13, 1), BitsOffset(18, 1), BitsOffset(30, 1))
+  // Each selector reads N bits then adds offset 1. So:
+  //   selector 0 → 1 + read 9 bits   (range 1..512)
+  //   selector 1 → 1 + read 13 bits  (range 1..8192)
+  //   selector 2 → 1 + read 18 bits  (range 1..262144)
+  //   selector 3 → 1 + read 30 bits  (range 1..1073741825)
   private static int _ReadU32(ref BitReader reader) {
     var selector = (int)reader.ReadBits(2);
     return selector switch {
-      0 => 1,
-      1 => 1 + (int)reader.ReadBits(9),
-      2 => 1 + (int)reader.ReadBits(13),
-      3 => 1 + (int)reader.ReadBits(18),
+      0 => 1 + (int)reader.ReadBits(9),
+      1 => 1 + (int)reader.ReadBits(13),
+      2 => 1 + (int)reader.ReadBits(18),
+      3 => 1 + (int)reader.ReadBits(30),
       _ => throw new InvalidOperationException("Unexpected u32 selector.")
     };
   }
@@ -118,23 +127,21 @@ internal static class JpegXlSizeHeader {
     if (value < 1)
       throw new ArgumentOutOfRangeException(nameof(value), "SizeHeader dimension must be >= 1.");
 
-    if (value == 1) {
-      writer.WriteBits(0, 2); // selector 0 => value = 1
-      return;
-    }
-
     var offset = value - 1;
     if (offset <= 511) {
-      writer.WriteBits(1, 2); // selector 1 => 9 bits
+      writer.WriteBits(0, 2); // selector 0 → 9 bits + 1
       writer.WriteBits((uint)offset, 9);
     } else if (offset <= 8191) {
-      writer.WriteBits(2, 2); // selector 2 => 13 bits
+      writer.WriteBits(1, 2); // selector 1 → 13 bits + 1
       writer.WriteBits((uint)offset, 13);
     } else if (offset <= 262143) {
-      writer.WriteBits(3, 2); // selector 3 => 18 bits
+      writer.WriteBits(2, 2); // selector 2 → 18 bits + 1
       writer.WriteBits((uint)offset, 18);
+    } else if ((uint)offset <= 0x3FFFFFFFu) {
+      writer.WriteBits(3, 2); // selector 3 → 30 bits + 1
+      writer.WriteBits((uint)offset, 30);
     } else
-      throw new ArgumentOutOfRangeException(nameof(value), $"SizeHeader dimension {value} too large (max 262144).");
+      throw new ArgumentOutOfRangeException(nameof(value), $"SizeHeader dimension {value} too large (max 2^30).");
   }
 
   private static int _GetWidthFromRatio(int ratio, int height) => ratio switch {

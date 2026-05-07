@@ -29,21 +29,35 @@ internal sealed class JxlAnsEncoder {
     ArgumentNullException.ThrowIfNull(dist);
 
     var freq = dist.Frequencies[symbol];
-    var cumFreq = dist.CumulativeFreqs[symbol];
-    var logBucket = dist.LogBucketSize;
-
     if (freq <= 0)
       throw new InvalidOperationException($"Symbol {symbol} has zero frequency.");
 
-    // Renormalize: output 16-bit chunks while state is too large
-    var maxState = (uint)((long)freq * (_RenormLowerBound >> logBucket) * (1 << 16) - 1);
+    // Renormalize: output 16-bit chunks while state would overflow on encode.
+    // Spec uses fixed AnsLogTabSize = 12 (table is always 4096 wide).
+    var maxState = (uint)((long)freq * (_RenormLowerBound >> AnsDistribution.AnsLogTabSize) * (1 << 16) - 1);
     while (_state > maxState) {
       _outputBits.Add((ushort)(_state & 0xFFFF));
       _state >>= 16;
     }
 
-    // rANS encode step
-    _state = (uint)((_state / freq << logBucket) + _state % freq + cumFreq);
+    // rANS encode step. Decoder formula:
+    //   res    = state mod 4096
+    //   (sym, offset, freq) = AliasTable.Lookup(res)
+    //   new_state = freq * (state >> 12) + offset
+    //
+    // Inverse (encoder): given new_state and chosen sym,
+    //   q = new_state / freq[sym]
+    //   o = new_state % freq[sym]                             // offset_within_freq
+    //   r = encoder_slot[sym][o]                              // recovered residue
+    //   old_state = (q << 12) | r                             // = q * 4096 + r
+    //
+    // The alias table is NOT in cumulative-frequency order, so we can't substitute
+    // r = cumFreq[sym] + o. The reverse-slot table built by AnsDistribution.EncoderSlot
+    // gives the exact inverse mapping per spec.
+    var q = _state / (uint)freq;
+    var o = (int)(_state % (uint)freq);
+    var r = (uint)dist.EncoderSlot(symbol, o);
+    _state = (q << AnsDistribution.AnsLogTabSize) | r;
   }
 
   /// <summary>

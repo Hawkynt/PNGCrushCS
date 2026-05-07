@@ -3,6 +3,18 @@
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
+
+    <!--
+      Mirror FileFormat.Jpeg.csproj's CW sibling detection so the test project's
+      #if CW_SIBLING guards fire in lockstep. Tests that exercise CW-linked
+      types compile out cleanly when the sibling is absent.
+    -->
+    <CwSiblingPresent>false</CwSiblingPresent>
+    <CwSiblingPresent Condition="Exists('$(MSBuildThisFileDirectory)..\..\..\CompressionWorkbench\Compression.Core\Compression.Core.csproj')">true</CwSiblingPresent>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(CwSiblingPresent)' == 'true'">
+    <DefineConstants>$(DefineConstants);CW_SIBLING</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

@@ -89,7 +89,26 @@ For per-project details, build commands, and the comprehensive list of public ty
 
 ## Build / test / run
 
+PNGCrushCS depends on two sibling repos checked out side-by-side. Clone them next to this one before building:
+
 ```bash
+# Working directory layout expected by csproj relative paths
+work/
+├─ PNGCrushCS/             # this repo
+├─ AnythingToGif/          # Optimizer.Gif → GifFileFormat
+└─ CompressionWorkbench/   # FileFormat.Jpeg + others link source files from Compression.Core
+
+# Clone all three
+git clone https://github.com/Hawkynt/PNGCrushCS.git
+git clone https://github.com/Hawkynt/AnythingToGif.git
+git clone https://github.com/Hawkynt/CompressionWorkbench.git
+```
+
+The cross-repo source links are conditional — when a sibling is absent the project falls back to its non-sibling code path, so consumers of the published NuGet package don't need either sibling. The clones are only required when **building from source**.
+
+```bash
+cd PNGCrushCS
+
 # Build
 dotnet build PngCrush.slnx -c Release
 
@@ -117,9 +136,8 @@ The format coverage of this project is inspired by the breadth of these tools:
 
 - **Windows-only optimizers** — `Optimizer.Png` and `Optimizer.Gif` use `System.Drawing.Common`. The `FileFormat.*` libraries and `Hawkynt.FileFormats.Images` package are cross-platform.
 - **16-bit precision** — full 16-bit pipeline is supported for read/write of scientific/HDR formats (FITS, EXR, DPX, Cineon, HDR, PFM, ENVI, PDS, Nifti, NRRD, BigTIFF, JPEG-LS, MRC, etc.). Optimizer pipelines remain 8-bit only.
-- **JPEG Chroma 4:2:2** — `BitMiracle.LibJpeg.NET` does not support 4:2:2; only 4:4:4 and 4:2:0 are encoded.
-- **VP8 lossy encoder** — keyframe-only output; advanced features (multi-pass, partition threading, alpha) are deferred.
-- **Codec subsets** — HEIF/AVIF/BPG decoders are I-frame only, single tile, YCbCr 4:2:0 8-bit. JPEG XL supports modular mode only. Camera RAW supports DNG lossless JPEG, Canon CR2, Nikon NEF, and Sony ARW2 — other manufacturer-specific compressions are future work.
+- **VP8 lossy encoder** — keyframe-only output; multi-pass rate control and partition threading are deferred. Alpha is preserved bit-exactly via the ALPH chunk (uncompressed method 0).
+- **Codec subsets** — HEIF/AVIF/BPG decoders are I-frame only, single tile, YCbCr 4:2:0 8-bit. JPEG XL: container (FF 0A signature, ftyp/jxlc/jxlp boxes) + SizeHeader + ImageMetadata + FrameHeader (ISO/IEC 18181-1 §3.6.2 / §3.6.3 / §3.6.5) are spec-conformant — real JPEG XL files are detected, dimensions extracted, image metadata (bit depth, color encoding, extra channels) and frame metadata (frame type, encoding mode, passes) parsed. Pixel codec (modular sub-codec body and VarDCT) is the remaining workstream — arbitrary real-world `.jxl` files won't decode their pixel data yet. Camera RAW supports DNG lossless JPEG, Canon CR2, Nikon NEF, and Sony ARW2 — other manufacturer-specific compressions are future work.
 - **Read-only formats** — PDF/PE-resource extraction is one-way; full authoring formats (PSD, XCF, PSB, ICNS, Xcursor, ECW, DjVu, JBIG2, FLIF) prioritize read support.
 
 ## License

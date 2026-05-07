@@ -1,8 +1,11 @@
 name: CI
 
-# PNGCrushCS's Optimizer.Gif depends on the sibling repo `AnythingToGif`
-# (Hawkynt.GifFileFormat). We check out both side-by-side so the csproj's
-# `..\..\AnythingToGif\GifFileFormat\GifFileFormat.csproj` path resolves.
+# PNGCrushCS depends on two sibling repos checked out side-by-side:
+#   * AnythingToGif       — Optimizer.Gif → ..\..\AnythingToGif\GifFileFormat\GifFileFormat.csproj
+#   * CompressionWorkbench — FileFormat.Jpeg (and friends) link individual source files via
+#                            <Compile Include="..\..\CompressionWorkbench\Compression.Core\..." />
+#                            (conditional — when sibling absent, the link is skipped and the
+#                            project falls back to its non-CW code path).
 
 on:
   push:
@@ -31,6 +34,13 @@ jobs:
         with:
           repository: Hawkynt/AnythingToGif
           path: AnythingToGif
+          fetch-depth: 1
+
+      - name: Checkout CompressionWorkbench (sibling)
+        uses: actions/checkout@v4
+        with:
+          repository: Hawkynt/CompressionWorkbench
+          path: CompressionWorkbench
           fetch-depth: 1
 
       - uses: actions/setup-dotnet@v4
@@ -77,6 +87,13 @@ jobs:
         with:
           repository: Hawkynt/AnythingToGif
           path: AnythingToGif
+          fetch-depth: 1
+
+      - name: Checkout CompressionWorkbench (sibling)
+        uses: actions/checkout@v4
+        with:
+          repository: Hawkynt/CompressionWorkbench
+          path: CompressionWorkbench
           fetch-depth: 1
 
       - uses: actions/setup-dotnet@v4

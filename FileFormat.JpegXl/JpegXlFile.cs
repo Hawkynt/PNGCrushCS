@@ -3,7 +3,28 @@ using FileFormat.Core;
 
 namespace FileFormat.JpegXl;
 
-/// <summary>In-memory representation of a JPEG XL image.</summary>
+/// <summary>In-memory representation of a JPEG XL image.
+///
+/// <para><b>Codec-scope honesty:</b> This implementation handles the JPEG XL
+/// <em>container</em> (FF 0A bare codestream signature, ISOBMFF jxl/jxlc/jxlp boxes,
+/// SizeHeader per ISO/IEC 18181-1 §3.6.2) in spec-conformant fashion — real JPEG XL
+/// files produced by libjxl will be detected and their dimensions correctly extracted.
+/// </para>
+///
+/// <para>However, the <em>pixel codec</em> (modular sub-codec frame payload, VarDCT)
+/// is not yet a spec-conformant implementation of ISO/IEC 18181-1. The current
+/// <c>JxlFrameEncoder</c>/<c>JxlFrameDecoder</c> use a simplified internal layout
+/// that round-trips between this library's own writer/reader but will NOT decode
+/// arbitrary real-world JPEG XL files, nor produce output that real JPEG XL viewers
+/// (libjxl, browsers, etc.) can decode. Pixel-perfect interop with real JPEG XL is
+/// a future workstream — track via the README "Limitations" section.</para>
+///
+/// <para>For the meantime, use this for: (1) detecting JPEG XL files by signature,
+/// (2) extracting dimensions from the SizeHeader of real JPEG XL files,
+/// (3) round-tripping through this library's own format. For (4) decoding
+/// arbitrary real-world JPEG XL pixel data — use libjxl via P/Invoke or a
+/// future spec-compliant codec.</para>
+/// </summary>
 public readonly record struct JpegXlFile : IImageFormatReader<JpegXlFile>, IImageToRawImage<JpegXlFile>, IImageFromRawImage<JpegXlFile>, IImageFormatWriter<JpegXlFile> {
 
   static string IImageFormatMetadata<JpegXlFile>.PrimaryExtension => ".jxl";
@@ -60,6 +81,7 @@ public readonly record struct JpegXlFile : IImageFormatReader<JpegXlFile>, IImag
       Height = image.Height,
       ComponentCount = componentCount,
       PixelData = image.PixelData[..],
+      Brand = "jxl ",
     };
   }
 }

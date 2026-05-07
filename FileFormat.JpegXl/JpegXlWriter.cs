@@ -10,7 +10,9 @@ public static class JpegXlWriter {
 
   public static byte[] ToBytes(JpegXlFile file) {
     ArgumentNullException.ThrowIfNull(file);
-    return Assemble(file.PixelData, file.Width, file.Height, file.ComponentCount, file.Brand);
+    // Default Brand when caller hasn't set one (e.g. from FromRawImage on older code paths)
+    var brand = string.IsNullOrEmpty(file.Brand) ? "jxl " : file.Brand;
+    return Assemble(file.PixelData, file.Width, file.Height, file.ComponentCount, brand);
   }
 
   internal static byte[] Assemble(byte[] pixelData, int width, int height, int componentCount, string brand) {

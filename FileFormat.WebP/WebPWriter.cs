@@ -11,6 +11,7 @@ public static class WebPWriter {
   private const string _CHUNK_VP8 = "VP8 ";
   private const string _CHUNK_VP8L = "VP8L";
   private const string _CHUNK_VP8X = "VP8X";
+  private const string _CHUNK_ALPH = "ALPH";
 
   public static byte[] ToBytes(WebPFile file) {
     ArgumentNullException.ThrowIfNull(file);
@@ -23,6 +24,11 @@ public static class WebPWriter {
 
     if (needsExtended) {
       chunks.Add(new RiffChunk { Id = _CHUNK_VP8X, Data = _BuildVp8XData(file) });
+
+      // ALPH chunk (alpha plane) must precede the VP8 image chunk per WebP spec.
+      // Only meaningful for VP8 lossy + alpha (lossless carries alpha inline).
+      if (file.Features.HasAlpha && !file.IsLossless && file.AlphaData != null)
+        chunks.Add(new RiffChunk { Id = _CHUNK_ALPH, Data = _BuildAlphData(file.AlphaData) });
 
       // Image data chunk
       chunks.Add(new RiffChunk {
@@ -43,6 +49,18 @@ public static class WebPWriter {
 
     var riffFile = new RiffFile { FormType = _FORM_TYPE, Chunks = chunks };
     return RiffWriter.ToBytes(riffFile);
+  }
+
+  // ALPH chunk = 1 flag byte + alpha-plane bytes.
+  // Flag byte layout: rsvd[2] | preprocessing[2] | filter[2] | compression[2]
+  // We use compression method 0 (uncompressed): the alpha bytes follow directly,
+  // one byte per pixel in row-major order. Method 1 (VP8L-encoded) compresses
+  // tighter but adds significant complexity — left as a future optimization.
+  private static byte[] _BuildAlphData(byte[] alphaPlane) {
+    var data = new byte[1 + alphaPlane.Length];
+    data[0] = 0; // compression=0, filter=0, preprocessing=0
+    System.Buffer.BlockCopy(alphaPlane, 0, data, 1, alphaPlane.Length);
+    return data;
   }
 
   private static byte[] _BuildVp8XData(WebPFile file) {

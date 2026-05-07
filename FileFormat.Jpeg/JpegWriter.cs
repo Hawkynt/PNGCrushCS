@@ -72,6 +72,14 @@ internal static class JpegWriter {
     bool optimizeHuffman,
     bool isGrayscale
   ) {
+    // 4:2:2 chroma subsampling is not implemented by BitMiracle.LibJpeg.NET, so route it
+    // through the pure-managed encoder. The managed path supports all subsampling modes
+    // identically, so we could route any mode there — but BitMiracle is the well-tested
+    // path, so we keep it for 4:4:4 and 4:2:0 to avoid behavioral churn.
+    if (subsampling == JpegSubsampling.Chroma422 && !isGrayscale)
+      return JpegManagedEncoder.Encode(
+        rgbPixelData, width, height, quality, mode, subsampling, optimizeHuffman, isGrayscale);
+
     using var outputStream = new MemoryStream();
 
     var cinfo = new jpeg_compress_struct();
@@ -86,7 +94,6 @@ internal static class JpegWriter {
     cinfo.jpeg_set_quality(quality, true);
 
     // Set subsampling (only for color images)
-    // NOTE: Chroma422 is not supported by BitMiracle.LibJpeg.NET (throws "Not implemented yet")
     if (!isGrayscale) {
       switch (subsampling) {
         case JpegSubsampling.Chroma444:

@@ -75,9 +75,12 @@ internal sealed class JxlBitReader {
   }
 
   /// <summary>
-  /// Read a JPEG XL U64 (variable-length uint64).
-  /// Encoding: read bits in groups; if the selector indicates more data follows,
-  /// continue reading additional bit groups.
+  /// Read a JPEG XL U64 (variable-length uint64). Encoding per ISO/IEC 18181-1 §3.4.1:
+  /// 2-bit selector, then variable payload.
+  /// Selector 0 -> 0; selector 1 -> 1 + u(4); selector 2 -> 17 + u(8); selector 3 -> u(12)
+  /// followed by, while the next continuation bit is 1, an additional 8-bit group placed
+  /// at the current shift (12, 20, 28, …, 52). When shift == 60, the final group is 4 bits
+  /// (since 60 + 4 = 64) and the loop terminates unconditionally afterwards.
   /// </summary>
   public ulong ReadU64() {
     var selector = ReadBits(2);
@@ -88,13 +91,15 @@ internal sealed class JxlBitReader {
     if (selector == 2)
       return 17 + ReadBits(8);
 
-    // selector == 3: read 12 bits, then optionally more in 8-bit groups
-    var result = ReadBits(12);
+    // selector == 3: read 12 bits, then continuation-prefixed 8-bit (or final 4-bit) groups.
+    var result = (ulong)ReadBits(12);
     var shift = 12;
-    while (shift < 60) {
-      if (!ReadBool())
+    while (ReadBool()) {
+      if (shift == 60) {
+        result |= (ulong)ReadBits(4) << shift;
         break;
-      result |= ReadBits(8) << shift;
+      }
+      result |= (ulong)ReadBits(8) << shift;
       shift += 8;
     }
     return result;
@@ -119,6 +124,60 @@ internal sealed class JxlBitReader {
     if (_bitsInBuffer >= n)
       return true;
     return (_data.Length - _bytePos) * 8 + _bitsInBuffer >= n;
+  }
+
+  /// <summary>Total number of bits still available in the source (buffered + unread bytes).</summary>
+  public long BitsAvailable => (long)_bitsInBuffer + (long)(_data.Length - _bytePos) * 8;
+
+  /// <summary>
+  /// Advance the bit position by <paramref name="bitCount"/> bits without decoding them.
+  /// Used to skip over opaque payloads (e.g., unknown extension bodies). If
+  /// <paramref name="bitCount"/> exceeds the remaining bits in the stream, the position
+  /// is clamped at end-of-stream and the actual number of bits skipped is returned. This
+  /// matches libjxl's <c>BitReader::SkipBits</c> over-read semantics — it is the caller's
+  /// responsibility to validate against EOF when the payload is meant to be consumable.
+  /// </summary>
+  public long Skip(long bitCount) {
+    if (bitCount <= 0)
+      return 0;
+
+    var remaining = bitCount;
+
+    // Drain the in-memory buffer first.
+    if (_bitsInBuffer > 0) {
+      var take = (int)Math.Min(remaining, _bitsInBuffer);
+      _buffer >>= take;
+      _bitsInBuffer -= take;
+      remaining -= take;
+      if (remaining == 0)
+        return bitCount;
+    }
+
+    // Buffer is now empty — skip whole bytes directly.
+    var bytesAvailable = _data.Length - _bytePos;
+    var wholeBytes = remaining / 8;
+    if (wholeBytes >= bytesAvailable) {
+      // Clamp at EOF: consume everything that's left.
+      var skipped = bitCount - remaining + (long)bytesAvailable * 8;
+      _bytePos = _data.Length;
+      _buffer = 0;
+      _bitsInBuffer = 0;
+      return skipped;
+    }
+
+    _bytePos += (int)wholeBytes;
+    remaining -= wholeBytes * 8;
+
+    // Refill and consume the trailing sub-byte remainder, if any.
+    _Refill();
+    if (remaining > 0) {
+      // remaining is < 8 here, and _Refill always loads at least 8 bits when data exists.
+      var take = (int)Math.Min(remaining, _bitsInBuffer);
+      _buffer >>= take;
+      _bitsInBuffer -= take;
+      remaining -= take;
+    }
+    return bitCount - remaining;
   }
 
   private void _EnsureBits(int n) {
