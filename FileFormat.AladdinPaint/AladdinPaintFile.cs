@@ -12,7 +12,9 @@ public readonly record struct AladdinPaintFile : IImageFormatReader<AladdinPaint
   static string IImageFormatMetadata<AladdinPaintFile>.PrimaryExtension => ".alp";
   static string[] IImageFormatMetadata<AladdinPaintFile>.FileExtensions => [".alp"];
   static AladdinPaintFile IImageFormatReader<AladdinPaintFile>.FromSpan(ReadOnlySpan<byte> data) => AladdinPaintReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<AladdinPaintFile>.Capabilities => FormatCapability.IndexedOnly;
+  static FormatCapability IImageFormatMetadata<AladdinPaintFile>.Capabilities => FormatCapability.IndexedOnly | FormatCapability.FixedResolution;
+  static IntegerRange[] IImageFormatMetadata<AladdinPaintFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
+  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<AladdinPaintFile>.AllowedDimensions => [(320, 200)];
   static byte[] IImageFormatWriter<AladdinPaintFile>.ToBytes(AladdinPaintFile file) => AladdinPaintWriter.ToBytes(file);
 
   /// <summary>Image width (always 320).</summary>

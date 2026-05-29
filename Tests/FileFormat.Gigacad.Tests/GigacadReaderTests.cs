@@ -192,8 +192,7 @@ public sealed class GigacadReaderTests {
   [Category("Unit")]
   public void DataType_DefaultPixelData_IsEmpty() {
     var file = new GigacadFile();
-    Assert.That(file.PixelData, Is.Not.Null);
-    Assert.That(file.PixelData, Is.Empty);
+    Assert.That(file.PixelData, Is.Null);
   }
 
   [Test]

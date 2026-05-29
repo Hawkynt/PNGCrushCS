@@ -19,6 +19,8 @@ public readonly record struct Spectrum512ExtFile : IImageFormatReader<Spectrum51
   static string IImageFormatMetadata<Spectrum512ExtFile>.PrimaryExtension => ".spx";
   static string[] IImageFormatMetadata<Spectrum512ExtFile>.FileExtensions => [".spx"];
   static Spectrum512ExtFile IImageFormatReader<Spectrum512ExtFile>.FromSpan(ReadOnlySpan<byte> data) => Spectrum512ExtReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<Spectrum512ExtFile>.Capabilities => FormatCapability.FixedResolution;
+  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<Spectrum512ExtFile>.AllowedDimensions => [(320, ScanlineCount)];
   static byte[] IImageFormatWriter<Spectrum512ExtFile>.ToBytes(Spectrum512ExtFile file) => Spectrum512ExtWriter.ToBytes(file);
 
   /// <summary>Image width (always 320).</summary>
@@ -66,7 +68,7 @@ public readonly record struct Spectrum512ExtFile : IImageFormatReader<Spectrum51
   public static Spectrum512ExtFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
     if (image.Format != PixelFormat.Rgb24)
-      throw new ArgumentException("RawImage must use PixelFormat.Rgb24.", nameof(image));
+      image = PixelConverter.Convert(image, PixelFormat.Rgb24);
     if (image.Width != 320)
       throw new ArgumentException("Spectrum 512 Extended images must be exactly 320 pixels wide.", nameof(image));
     if (image.Height != ScanlineCount)

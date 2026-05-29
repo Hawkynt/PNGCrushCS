@@ -60,7 +60,7 @@ public sealed class SunRasterRleCompressorTests {
 
     var compressed = SunRasterRleCompressor.Compress(data);
 
-    Assert.That(compressed, Is.Empty);
+    Assert.That(compressed, Has.Length.EqualTo(0));
   }
 
   [Test]

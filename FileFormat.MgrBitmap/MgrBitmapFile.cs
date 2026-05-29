@@ -10,6 +10,7 @@ public readonly record struct MgrBitmapFile : IImageFormatReader<MgrBitmapFile>,
   static string[] IImageFormatMetadata<MgrBitmapFile>.FileExtensions => [".mgr"];
   static MgrBitmapFile IImageFormatReader<MgrBitmapFile>.FromSpan(ReadOnlySpan<byte> data) => MgrBitmapReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<MgrBitmapFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static IntegerRange[] IImageFormatMetadata<MgrBitmapFile>.AllowedPaletteRanges => [2];
   static byte[] IImageFormatWriter<MgrBitmapFile>.ToBytes(MgrBitmapFile file) => MgrBitmapWriter.ToBytes(file);
 
   public int Width { get; init; }

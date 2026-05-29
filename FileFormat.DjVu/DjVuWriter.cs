@@ -37,19 +37,19 @@ public static class DjVuWriter {
     _WriteChunk(ms, "INFO", _BuildInfoData(file));
 
     // Write preserved raw chunks
-    foreach (var chunk in file.RawChunks)
+    foreach (var chunk in (file.RawChunks ?? []))
       _WriteChunk(ms, chunk.ChunkId, chunk.Data);
 
     // Write BG44 chunk with IW44 wavelet-encoded pixel data
-    if (file.PixelData.Length > 0) {
+    if ((file.PixelData ?? []).Length > 0) {
       try {
-        var iw44Data = Iw44Encoder.Encode(file.PixelData, file.Width, file.Height);
+        var iw44Data = Iw44Encoder.Encode((file.PixelData ?? []), file.Width, file.Height);
         _WriteChunk(ms, "BG44", iw44Data);
       } catch {
         // Fall back to raw pixel marker if encoding fails
-        var pm44Data = new byte[4 + file.PixelData.Length];
+        var pm44Data = new byte[4 + (file.PixelData ?? []).Length];
         _RawPixelMarker.CopyTo(pm44Data);
-        file.PixelData.AsSpan(0, file.PixelData.Length).CopyTo(pm44Data.AsSpan(4));
+        (file.PixelData ?? []).AsSpan(0, (file.PixelData ?? []).Length).CopyTo(pm44Data.AsSpan(4));
         _WriteChunk(ms, DjVuReader.PM44_CHUNK_ID, pm44Data);
       }
     }

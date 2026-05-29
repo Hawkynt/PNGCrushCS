@@ -8,7 +8,8 @@ public static class AutodeskCelWriter {
 
   public static byte[] ToBytes(AutodeskCelFile file) {
     ArgumentNullException.ThrowIfNull(file);
-    return Assemble(file.PixelData, file.Width, file.Height, file.XOffset, file.YOffset, file.BitsPerPixel, file.Compression, file.Palette);
+    var bpp = file.BitsPerPixel == 0 ? 8 : file.BitsPerPixel;
+    return Assemble(file.PixelData ?? Array.Empty<byte>(), file.Width, file.Height, file.XOffset, file.YOffset, bpp, file.Compression, file.Palette ?? Array.Empty<byte>());
   }
 
   internal static byte[] Assemble(byte[] pixelData, int width, int height, int xOffset, int yOffset, int bitsPerPixel, byte compression, byte[] palette) {

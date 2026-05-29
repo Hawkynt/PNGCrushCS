@@ -99,14 +99,14 @@ public sealed class HeaderFieldMapperTests {
   public void GetFieldMap_EmptyHeader_ReturnsEmptyArray() {
     var map = HeaderFieldMapper.GetFieldMap<EmptyHeader>();
 
-    Assert.That(map, Is.Empty);
+    Assert.That(map, Has.Length.EqualTo(0));
   }
 
   [Test]
   public void GetFieldMap_NoAttributes_ReturnsEmptyArray() {
     var map = HeaderFieldMapper.GetFieldMap<HeaderNoAttributes>();
 
-    Assert.That(map, Is.Empty);
+    Assert.That(map, Has.Length.EqualTo(0));
   }
 
   [Test]

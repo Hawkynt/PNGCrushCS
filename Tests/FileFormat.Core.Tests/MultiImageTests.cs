@@ -941,7 +941,7 @@ public sealed class MultiImageTests {
   public void ToRawImages_EmptyFile_ReturnsEmptyList() {
     var dcx = new DcxFile { Pages = [] };
     var images = _ToRawImages(dcx);
-    Assert.That(images, Is.Empty);
+    Assert.That(images, Has.Count.EqualTo(0));
   }
 
   [Test]

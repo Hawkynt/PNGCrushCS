@@ -19,6 +19,8 @@ public readonly record struct DaliSTFile : IImageFormatReader<DaliSTFile>, IImag
   static string[] IImageFormatMetadata<DaliSTFile>.FileExtensions => [".sd0", ".sd1", ".sd2"];
   static DaliSTFile IImageFormatReader<DaliSTFile>.FromSpan(ReadOnlySpan<byte> data) => DaliSTReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<DaliSTFile>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<DaliSTFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
+  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<DaliSTFile>.AllowedDimensions => [(320, 200), (640, 200), (640, 400)];
   static byte[] IImageFormatWriter<DaliSTFile>.ToBytes(DaliSTFile file) => DaliSTWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
@@ -64,10 +66,15 @@ public readonly record struct DaliSTFile : IImageFormatReader<DaliSTFile>, IImag
     if (image.Format != PixelFormat.Indexed8)
       throw new ArgumentException("RawImage must use PixelFormat.Indexed8.", nameof(image));
 
-    var resolution = image.PaletteCount switch {
-      <= 2 => DaliSTResolution.High,
-      <= 4 => DaliSTResolution.Medium,
-      _ => DaliSTResolution.Low
+    var resolution = (image.Width, image.Height) switch {
+      (640, 400) => DaliSTResolution.High,
+      (640, 200) => DaliSTResolution.Medium,
+      (320, 200) => DaliSTResolution.Low,
+      _ => image.PaletteCount switch {
+        <= 2 => DaliSTResolution.High,
+        <= 4 => DaliSTResolution.Medium,
+        _ => DaliSTResolution.Low
+      }
     };
 
     var numPlanes = resolution switch {

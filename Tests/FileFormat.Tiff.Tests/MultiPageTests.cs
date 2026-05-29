@@ -26,7 +26,7 @@ public sealed class MultiPageTests {
       Width = 4, Height = 4, SamplesPerPixel = 3, BitsPerSample = 8,
       PixelData = new byte[4 * 4 * 3], ColorMode = TiffColorMode.Rgb,
     };
-    Assert.That(file.Pages, Is.Empty);
+    Assert.That(file.Pages, Has.Count.EqualTo(0));
   }
 
   [Test]
@@ -147,7 +147,7 @@ public sealed class MultiPageTests {
       Assert.That(page.BitsPerSample, Is.EqualTo(0));
       Assert.That(page.PixelData, Is.Empty);
       Assert.That(page.ColorMap, Is.Null);
-      Assert.That(page.ColorMode, Is.EqualTo(TiffColorMode.Original));
+      Assert.That((int)page.ColorMode, Is.EqualTo(0));
     });
   }
 
@@ -320,7 +320,7 @@ public sealed class MultiPageTests {
     Assert.That(restored.SamplesPerPixel, Is.EqualTo(3));
     Assert.That(restored.BitsPerSample, Is.EqualTo(8));
     Assert.That(restored.PixelData, Is.EqualTo(pixelData));
-    Assert.That(restored.Pages, Is.Empty);
+    Assert.That(restored.Pages, Has.Count.EqualTo(0));
     Assert.That(TiffFile.ImageCount(restored), Is.EqualTo(1));
   }
 

@@ -142,7 +142,7 @@ public class DataTypeTests {
   [Test]
   public void PixelData_DefaultIsEmpty() {
     var file = new ZxNextFile();
-    Assert.That(file.PixelData, Is.Empty);
+    Assert.That(file.PixelData, Has.Length.EqualTo(0));
   }
 
   [Test]

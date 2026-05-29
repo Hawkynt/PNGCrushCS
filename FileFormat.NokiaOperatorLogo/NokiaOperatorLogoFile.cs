@@ -21,6 +21,7 @@ public readonly record struct NokiaOperatorLogoFile : IImageFormatReader<NokiaOp
   static string[] IImageFormatMetadata<NokiaOperatorLogoFile>.FileExtensions => [".nol"];
   static NokiaOperatorLogoFile IImageFormatReader<NokiaOperatorLogoFile>.FromSpan(ReadOnlySpan<byte> data) => NokiaOperatorLogoReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<NokiaOperatorLogoFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static IntegerRange[] IImageFormatMetadata<NokiaOperatorLogoFile>.AllowedPaletteRanges => [2];
   static byte[] IImageFormatWriter<NokiaOperatorLogoFile>.ToBytes(NokiaOperatorLogoFile file) => NokiaOperatorLogoWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
@@ -67,8 +68,8 @@ public readonly record struct NokiaOperatorLogoFile : IImageFormatReader<NokiaOp
   /// <summary>Creates a <see cref="NokiaOperatorLogoFile"/> from a <see cref="RawImage"/>.</summary>
   public static NokiaOperatorLogoFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Rgb24)
-      throw new ArgumentException($"Expected Rgb24 but got {image.Format}.", nameof(image));
+    if (image.Format != PixelFormat.Rgb24 && image.Format != PixelFormat.Indexed1)
+      throw new ArgumentException($"Expected Rgb24 or Indexed1 but got {image.Format}.", nameof(image));
     if (image.Width is < 1 or > 255 || image.Height is < 1 or > 255)
       throw new ArgumentException($"Dimensions must be 1-255, got {image.Width}x{image.Height}.", nameof(image));
 
@@ -76,6 +77,29 @@ public readonly record struct NokiaOperatorLogoFile : IImageFormatReader<NokiaOp
     var h = image.Height;
     var bytesPerRow = (w + 7) / 8;
     var pixelData = new byte[bytesPerRow * h];
+
+    if (image.Format == PixelFormat.Indexed1) {
+      // Indexed1 input: pixel index 1 -> palette entry 1. Determine which palette
+      // entry is "dark" (set bit) by inspecting the palette.
+      var pal = image.Palette ?? [0, 0, 0, 255, 255, 255];
+      var entry0Luma = pal.Length >= 3 ? (pal[0] + pal[1] + pal[2]) / 3 : 0;
+      var bitForIndex1 = entry0Luma >= 128 ? 1 : 0; // entry 0 light => index 1 is dark
+      var srcStride = (w + 7) / 8;
+      for (var y = 0; y < h; ++y) {
+        for (var x = 0; x < w; ++x) {
+          var srcByteIndex = y * srcStride + (x >> 3);
+          var srcBitIndex = 7 - (x & 7);
+          var idx = (image.PixelData[srcByteIndex] >> srcBitIndex) & 1;
+          var dark = idx == bitForIndex1;
+          if (dark) {
+            var dstByteIndex = y * bytesPerRow + (x >> 3);
+            var dstBitIndex = 7 - (x & 7);
+            pixelData[dstByteIndex] |= (byte)(1 << dstBitIndex);
+          }
+        }
+      }
+      return new() { Width = w, Height = h, PixelData = pixelData };
+    }
 
     for (var y = 0; y < h; ++y)
       for (var x = 0; x < w; ++x) {

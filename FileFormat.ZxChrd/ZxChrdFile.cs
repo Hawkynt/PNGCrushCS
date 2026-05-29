@@ -10,6 +10,7 @@ public readonly record struct ZxChrdFile : IImageFormatReader<ZxChrdFile>, IImag
   static string[] IImageFormatMetadata<ZxChrdFile>.FileExtensions => [".chr", ".chrd"];
   static ZxChrdFile IImageFormatReader<ZxChrdFile>.FromSpan(ReadOnlySpan<byte> data) => ZxChrdReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<ZxChrdFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static IntegerRange[] IImageFormatMetadata<ZxChrdFile>.AllowedPaletteRanges => [2];
   static byte[] IImageFormatWriter<ZxChrdFile>.ToBytes(ZxChrdFile file) => ZxChrdWriter.ToBytes(file);
 
   /// <summary>Number of characters in the font.</summary>

@@ -10,6 +10,7 @@ public readonly record struct BennetYeeFaceFile : IImageFormatReader<BennetYeeFa
   static string[] IImageFormatMetadata<BennetYeeFaceFile>.FileExtensions => [".ybm"];
   static BennetYeeFaceFile IImageFormatReader<BennetYeeFaceFile>.FromSpan(ReadOnlySpan<byte> data) => BennetYeeFaceReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<BennetYeeFaceFile>.Capabilities => FormatCapability.MonochromeOnly | FormatCapability.VariableResolution;
+  static IntegerRange[] IImageFormatMetadata<BennetYeeFaceFile>.AllowedPaletteRanges => [2];
   static byte[] IImageFormatWriter<BennetYeeFaceFile>.ToBytes(BennetYeeFaceFile file) => BennetYeeFaceWriter.ToBytes(file);
 
   public int Width { get; init; }

@@ -196,8 +196,7 @@ public sealed class DoodleAtariReaderTests {
   [Category("Unit")]
   public void DataType_DefaultPixelData_IsEmpty() {
     var file = new DoodleAtariFile();
-    Assert.That(file.PixelData, Is.Not.Null);
-    Assert.That(file.PixelData, Is.Empty);
+    Assert.That(file.PixelData, Is.Null);
   }
 
   [Test]

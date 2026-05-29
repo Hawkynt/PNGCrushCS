@@ -24,7 +24,7 @@ public sealed class RoundTripTests {
     Assert.That(restored.LoadAddress, Is.EqualTo(original.LoadAddress));
     Assert.That(restored.BitmapData, Is.EqualTo(original.BitmapData));
     Assert.That(restored.ScreenData, Is.EqualTo(original.ScreenData));
-    Assert.That(restored.TrailingData, Is.Empty);
+    Assert.That(restored.TrailingData, Has.Length.EqualTo(0));
   }
 
   [Test]

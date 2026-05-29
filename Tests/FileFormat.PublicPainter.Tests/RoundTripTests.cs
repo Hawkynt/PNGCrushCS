@@ -11,6 +11,8 @@ public sealed class RoundTripTests {
   [Category("Integration")]
   public void RoundTrip_AllZeros() {
     var original = new PublicPainterFile {
+      Width = PublicPainterFile.ImageWidth,
+      Height = PublicPainterFile.ImageHeight,
       PixelData = new byte[PublicPainterFile.DecompressedSize]
     };
 

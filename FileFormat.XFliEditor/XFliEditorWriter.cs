@@ -9,7 +9,7 @@ public static class XFliEditorWriter {
     ArgumentNullException.ThrowIfNull(file);
 
     // LoadAddress(2) + Bitmap(8000) + 8*Screen(8000) + Color(1000) + BackgroundColor(1) + TrailingData
-    var totalSize = XFliEditorFile.LoadAddressSize + XFliEditorFile.MinPayloadSize + 1 + file.TrailingData.Length;
+    var totalSize = XFliEditorFile.LoadAddressSize + XFliEditorFile.MinPayloadSize + 1 + (file.TrailingData ?? []).Length;
     var result = new byte[totalSize];
     var offset = 0;
 
@@ -19,7 +19,7 @@ public static class XFliEditorWriter {
     offset += XFliEditorFile.LoadAddressSize;
 
     // Bitmap data (8000 bytes)
-    file.BitmapData.AsSpan(0, XFliEditorFile.BitmapDataSize).CopyTo(result.AsSpan(offset));
+    (file.BitmapData ?? []).AsSpan(0, XFliEditorFile.BitmapDataSize).CopyTo(result.AsSpan(offset));
     offset += XFliEditorFile.BitmapDataSize;
 
     // 8 screen banks (8 x 1000 bytes)
@@ -29,7 +29,7 @@ public static class XFliEditorWriter {
     }
 
     // Color RAM (1000 bytes)
-    file.ColorData.AsSpan(0, XFliEditorFile.ColorDataSize).CopyTo(result.AsSpan(offset));
+    (file.ColorData ?? []).AsSpan(0, XFliEditorFile.ColorDataSize).CopyTo(result.AsSpan(offset));
     offset += XFliEditorFile.ColorDataSize;
 
     // Background color (1 byte)
@@ -37,8 +37,8 @@ public static class XFliEditorWriter {
     ++offset;
 
     // Trailing data
-    if (file.TrailingData.Length > 0)
-      file.TrailingData.AsSpan().CopyTo(result.AsSpan(offset));
+    if ((file.TrailingData ?? []).Length > 0)
+      (file.TrailingData ?? []).AsSpan().CopyTo(result.AsSpan(offset));
 
     return result;
   }

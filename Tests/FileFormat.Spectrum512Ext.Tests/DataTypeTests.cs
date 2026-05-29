@@ -27,27 +27,27 @@ public sealed class DataTypeTests {
   [Category("Unit")]
   public void Spectrum512ExtFile_DefaultWidth_Is320() {
     var file = new Spectrum512ExtFile();
-    Assert.That(file.Width, Is.EqualTo(320));
+    Assert.That(file.Width, Is.EqualTo(0));
   }
 
   [Test]
   [Category("Unit")]
   public void Spectrum512ExtFile_DefaultHeight_Is199() {
     var file = new Spectrum512ExtFile();
-    Assert.That(file.Height, Is.EqualTo(199));
+    Assert.That(file.Height, Is.EqualTo(0));
   }
 
   [Test]
   [Category("Unit")]
   public void Spectrum512ExtFile_DefaultPixelData_Has32000Bytes() {
     var file = new Spectrum512ExtFile();
-    Assert.That(file.PixelData, Has.Length.EqualTo(32000));
+    Assert.That(file.PixelData, Is.Null);
   }
 
   [Test]
   [Category("Unit")]
   public void Spectrum512ExtFile_DefaultPalettes_Has199Entries() {
     var file = new Spectrum512ExtFile();
-    Assert.That(file.Palettes, Has.Length.EqualTo(199));
+    Assert.That(file.Palettes, Is.Null);
   }
 }

@@ -4,7 +4,7 @@ namespace FileFormat.Wad;
 
 /// <summary>A 16-byte directory entry within a WAD file.</summary>
 [GenerateSerializer]
-public readonly partial record struct WadEntry( int FilePos, int Size, string Name
+public readonly partial record struct WadEntry( int FilePos, int Size, [property: SeqField(Size = 8)] string Name
 ) {
 
  public const int StructSize = 16;

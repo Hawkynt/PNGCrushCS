@@ -25,6 +25,7 @@ public readonly record struct AtariAnticModeFile : IImageFormatReader<AtariAntic
   static string[] IImageFormatMetadata<AtariAnticModeFile>.FileExtensions => [".ame", ".anm"];
   static AtariAnticModeFile IImageFormatReader<AtariAnticModeFile>.FromSpan(ReadOnlySpan<byte> data) => AtariAnticModeReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<AtariAnticModeFile>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<AtariAnticModeFile>.AllowedPaletteRanges => [new IntegerRange(2, 4)];
   static byte[] IImageFormatWriter<AtariAnticModeFile>.ToBytes(AtariAnticModeFile file) => AtariAnticModeWriter.ToBytes(file);
 
   /// <summary>Width in pixels (320 for Mode F, 160 for Mode E).</summary>

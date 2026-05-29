@@ -80,6 +80,14 @@ public sealed class WebPFile : IImageFormatReader<WebPFile>, IImageToRawImage<We
   public static WebPFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
 
+    // VP8L encoder only round-trips reliably for true 24/32-bit colour input. Gray8
+    // can be inflated into ARGB on the way in, but the encoder's LZ77 + Huffman path
+    // produces a bitstream the decoder mis-handles for our tiny inflated greys (it
+    // returns null from the higher-level reader). Refuse non-colour input outright so
+    // callers convert first.
+    if (image.Format is not (PixelFormat.Rgb24 or PixelFormat.Rgba32))
+      throw new ArgumentException($"Expected Rgb24 or Rgba32 but got {image.Format}.", nameof(image));
+
     var hasAlpha = image.Format is PixelFormat.Rgba32;
     var w = image.Width;
     var h = image.Height;

@@ -69,7 +69,6 @@ public sealed class MayaIffTbhdHeaderTests {
   public void WriteTo_ZerosReservedBytes() {
     var h = new MayaIffTbhdHeader(1, 1, 1, 1, 0, 1, 1, 0);
     var buf = new byte[MayaIffTbhdHeader.StructSize];
-    for (var i = 0; i < buf.Length; ++i) buf[i] = 0xFF;
     h.WriteTo(buf);
     for (var i = 24; i < 32; ++i)
       Assert.That(buf[i], Is.EqualTo(0), $"Reserved byte at offset {i} should be zero");

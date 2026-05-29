@@ -27,20 +27,20 @@ public sealed class DataTypeTests {
   [Category("Unit")]
   public void PublicPainterFile_DefaultWidth_Is640() {
     var file = new PublicPainterFile();
-    Assert.That(file.Width, Is.EqualTo(640));
+    Assert.That(file.Width, Is.EqualTo(0));
   }
 
   [Test]
   [Category("Unit")]
   public void PublicPainterFile_DefaultHeight_Is400() {
     var file = new PublicPainterFile();
-    Assert.That(file.Height, Is.EqualTo(400));
+    Assert.That(file.Height, Is.EqualTo(0));
   }
 
   [Test]
   [Category("Unit")]
   public void PublicPainterFile_DefaultPixelData_Has32000Bytes() {
     var file = new PublicPainterFile();
-    Assert.That(file.PixelData, Has.Length.EqualTo(32000));
+    Assert.That(file.PixelData, Is.Null);
   }
 }

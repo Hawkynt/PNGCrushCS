@@ -17,7 +17,10 @@ public readonly record struct NdsTextureFile : IImageFormatReader<NdsTextureFile
   static string IImageFormatMetadata<NdsTextureFile>.PrimaryExtension => ".nbfs";
   static string[] IImageFormatMetadata<NdsTextureFile>.FileExtensions => [".nbfs", ".nds"];
   static NdsTextureFile IImageFormatReader<NdsTextureFile>.FromSpan(ReadOnlySpan<byte> data) => NdsTextureReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<NdsTextureFile>.Capabilities => FormatCapability.IndexedOnly;
+  static FormatCapability IImageFormatMetadata<NdsTextureFile>.Capabilities => FormatCapability.IndexedOnly | FormatCapability.FixedResolution;
+  static IntegerRange[] IImageFormatMetadata<NdsTextureFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
+  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<NdsTextureFile>.AllowedDimensions =>
+    [(TilesPerRow * TileSize, new IntegerRange(TileSize, 8192, step: TileSize))];
   static byte[] IImageFormatWriter<NdsTextureFile>.ToBytes(NdsTextureFile file) => NdsTextureWriter.ToBytes(file);
 
   public int Width { get; init; }
@@ -30,8 +33,8 @@ public readonly record struct NdsTextureFile : IImageFormatReader<NdsTextureFile
       Width = file.Width,
       Height = file.Height,
       Format = PixelFormat.Indexed8,
-      PixelData = file.PixelData[..],
-      Palette = file.Palette[..],
+      PixelData = (file.PixelData ?? Array.Empty<byte>())[..],
+      Palette = (file.Palette ?? Array.Empty<byte>())[..],
       PaletteCount = PaletteColors,
     };
   }

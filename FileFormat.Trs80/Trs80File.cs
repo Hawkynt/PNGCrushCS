@@ -25,6 +25,7 @@ public readonly record struct Trs80File : IImageFormatReader<Trs80File>, IImageT
   static string[] IImageFormatMetadata<Trs80File>.FileExtensions => [".hr"];
   static Trs80File IImageFormatReader<Trs80File>.FromSpan(ReadOnlySpan<byte> data) => Trs80Reader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<Trs80File>.Capabilities => FormatCapability.MonochromeOnly;
+  static IntegerRange[] IImageFormatMetadata<Trs80File>.AllowedPaletteRanges => [2];
   static byte[] IImageFormatWriter<Trs80File>.ToBytes(Trs80File file) => Trs80Writer.ToBytes(file);
 
   /// <summary>Always 256.</summary>

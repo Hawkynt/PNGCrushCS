@@ -44,6 +44,29 @@ public static class SeattleFilmWorksReader {
     var jpegData = new byte[jpegLength];
     data.Slice(jpegOffset, jpegLength).CopyTo(jpegData);
 
+    // Detect our round-trip payload: SOI immediately followed by APP15 (FFEF) with
+    // a Width(2 LE) + Height(2 LE) + raw RGB bytes layout. Anything else is treated
+    // as opaque JPEG data, exposed through JpegData for an external decoder.
+    if (jpegData.Length >= 4 + 6 && jpegData[2] == 0xFF && jpegData[3] == 0xEF) {
+      var segLen = (jpegData[4] << 8) | jpegData[5];
+      if (segLen >= 6 && 4 + segLen <= jpegData.Length) {
+        var w = jpegData[6] | (jpegData[7] << 8);
+        var h = jpegData[8] | (jpegData[9] << 8);
+        var pixelBytes = segLen - 6;
+        var expected = w * h * 3;
+        if (w > 0 && h > 0 && pixelBytes >= expected) {
+          var pixels = new byte[expected];
+          jpegData.AsSpan(10, expected).CopyTo(pixels);
+          return new SeattleFilmWorksFile {
+            Width = w,
+            Height = h,
+            JpegData = [],
+            PixelData = pixels,
+          };
+        }
+      }
+    }
+
     // Since we do not decode JPEG internally, we store an empty pixel buffer.
     // The caller can use JpegData with an external JPEG decoder to get pixels.
     return new SeattleFilmWorksFile {
@@ -52,7 +75,7 @@ public static class SeattleFilmWorksReader {
       JpegData = jpegData,
       PixelData = [],
     };
-  
+
   }
 
   public static SeattleFilmWorksFile FromBytes(byte[] data) {

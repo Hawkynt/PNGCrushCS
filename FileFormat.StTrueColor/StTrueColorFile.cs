@@ -13,6 +13,8 @@ public readonly record struct StTrueColorFile : IImageFormatReader<StTrueColorFi
   static string IImageFormatMetadata<StTrueColorFile>.PrimaryExtension => ".stc";
   static string[] IImageFormatMetadata<StTrueColorFile>.FileExtensions => [".stc"];
   static StTrueColorFile IImageFormatReader<StTrueColorFile>.FromSpan(ReadOnlySpan<byte> data) => StTrueColorReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<StTrueColorFile>.Capabilities => FormatCapability.FixedResolution;
+  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<StTrueColorFile>.AllowedDimensions => [(_WIDTH, _HEIGHT)];
   static byte[] IImageFormatWriter<StTrueColorFile>.ToBytes(StTrueColorFile file) => StTrueColorWriter.ToBytes(file);
 
   /// <summary>Image width (always 320).</summary>
@@ -58,7 +60,7 @@ public readonly record struct StTrueColorFile : IImageFormatReader<StTrueColorFi
   public static StTrueColorFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
     if (image.Format != PixelFormat.Rgb24)
-      throw new ArgumentException("RawImage must use PixelFormat.Rgb24.", nameof(image));
+      image = PixelConverter.Convert(image, PixelFormat.Rgb24);
     if (image.Width != _WIDTH)
       throw new ArgumentException($"ST True Color images must be exactly {_WIDTH} pixels wide.", nameof(image));
     if (image.Height != _HEIGHT)

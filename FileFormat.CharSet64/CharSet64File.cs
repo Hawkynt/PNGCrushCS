@@ -40,6 +40,7 @@ public readonly record struct CharSet64File : IImageFormatReader<CharSet64File>,
   static string[] IImageFormatMetadata<CharSet64File>.FileExtensions => [".chr64"];
   static CharSet64File IImageFormatReader<CharSet64File>.FromSpan(ReadOnlySpan<byte> data) => CharSet64Reader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<CharSet64File>.Capabilities => FormatCapability.MonochromeOnly;
+  static IntegerRange[] IImageFormatMetadata<CharSet64File>.AllowedPaletteRanges => [2];
   static byte[] IImageFormatWriter<CharSet64File>.ToBytes(CharSet64File file) => CharSet64Writer.ToBytes(file);
 
   /// <summary>Always 128 (16 chars x 8 pixels).</summary>

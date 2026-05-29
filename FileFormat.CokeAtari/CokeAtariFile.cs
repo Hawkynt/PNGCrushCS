@@ -49,27 +49,53 @@ public readonly record struct CokeAtariFile : IImageFormatReader<CokeAtariFile>,
 
   public static CokeAtariFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Rgb24)
-      throw new ArgumentException($"Expected {PixelFormat.Rgb24} but got {image.Format}.", nameof(image));
 
-    var rgb24 = image.PixelData;
     var pixelCount = image.Width * image.Height;
     var rgb565 = new byte[pixelCount * 2];
 
-    for (var i = 0; i < pixelCount; ++i) {
-      var srcOffset = i * 3;
-      var r = rgb24[srcOffset];
-      var g = rgb24[srcOffset + 1];
-      var b = rgb24[srcOffset + 2];
+    if (image.Format == PixelFormat.Indexed1 || image.Format == PixelFormat.Indexed8) {
+      // Indexed inputs: resolve each pixel via the palette, then quantize to RGB565.
+      var palette = image.Palette ?? throw new ArgumentException("Indexed input requires a palette.", nameof(image));
+      var paletteCount = image.PaletteCount;
 
-      var r5 = (r >> 3) & 0x1F;
-      var g6 = (g >> 2) & 0x3F;
-      var b5 = (b >> 3) & 0x1F;
-      var packed = (ushort)((r5 << 11) | (g6 << 5) | b5);
+      if (image.Format == PixelFormat.Indexed1) {
+        var stride = (image.Width + 7) / 8;
+        for (var y = 0; y < image.Height; ++y)
+          for (var x = 0; x < image.Width; ++x) {
+            var b = image.PixelData[y * stride + (x >> 3)];
+            var idx = (b >> (7 - (x & 7))) & 1;
+            _WriteRgb565(rgb565, y * image.Width + x, palette, idx, paletteCount);
+          }
+      } else {
+        for (var i = 0; i < pixelCount; ++i)
+          _WriteRgb565(rgb565, i, palette, image.PixelData[i], paletteCount);
+      }
+    } else if (image.Format == PixelFormat.Rgb24) {
+      var rgb24 = image.PixelData;
+      for (var i = 0; i < pixelCount; ++i) {
+        var srcOffset = i * 3;
+        var r = rgb24[srcOffset];
+        var g = rgb24[srcOffset + 1];
+        var b = rgb24[srcOffset + 2];
 
-      var dstOffset = i * 2;
-      rgb565[dstOffset] = (byte)(packed >> 8);
-      rgb565[dstOffset + 1] = (byte)(packed & 0xFF);
+        // Refuse inputs that would round-trip lossily through RGB565 — high-bit replication on read
+        // means writer-readable values are limited to {value: (value >> 3) << 3 | (value >> 3) >> 2}.
+        var r5 = (r >> 3) & 0x1F;
+        var g6 = (g >> 2) & 0x3F;
+        var b5 = (b >> 3) & 0x1F;
+        var rReplicated = (byte)((r5 << 3) | (r5 >> 2));
+        var gReplicated = (byte)((g6 << 2) | (g6 >> 4));
+        var bReplicated = (byte)((b5 << 3) | (b5 >> 2));
+        if (rReplicated != r || gReplicated != g || bReplicated != b)
+          throw new ArgumentException($"Rgb24 input at pixel {i} cannot be losslessly stored in RGB565; use Indexed1/Indexed8 input with a compatible palette.", nameof(image));
+        var packed = (ushort)((r5 << 11) | (g6 << 5) | b5);
+
+        var dstOffset = i * 2;
+        rgb565[dstOffset] = (byte)(packed >> 8);
+        rgb565[dstOffset + 1] = (byte)(packed & 0xFF);
+      }
+    } else {
+      throw new ArgumentException($"Expected {PixelFormat.Rgb24}, {PixelFormat.Indexed1}, or {PixelFormat.Indexed8} but got {image.Format}.", nameof(image));
     }
 
     return new() {
@@ -77,5 +103,19 @@ public readonly record struct CokeAtariFile : IImageFormatReader<CokeAtariFile>,
       Height = image.Height,
       PixelData = rgb565,
     };
+  }
+
+  private static void _WriteRgb565(byte[] dst, int pixelIndex, byte[] palette, int paletteIdx, int paletteCount) {
+    if (paletteIdx >= paletteCount) paletteIdx = 0;
+    var r = palette[paletteIdx * 3];
+    var g = palette[paletteIdx * 3 + 1];
+    var b = palette[paletteIdx * 3 + 2];
+    var r5 = (r >> 3) & 0x1F;
+    var g6 = (g >> 2) & 0x3F;
+    var b5 = (b >> 3) & 0x1F;
+    var packed = (ushort)((r5 << 11) | (g6 << 5) | b5);
+    var dstOffset = pixelIndex * 2;
+    dst[dstOffset] = (byte)(packed >> 8);
+    dst[dstOffset + 1] = (byte)(packed & 0xFF);
   }
 }

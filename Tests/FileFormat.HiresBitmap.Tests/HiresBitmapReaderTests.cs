@@ -48,7 +48,7 @@ public sealed class HiresBitmapReaderTests {
 
     Assert.That(result.BitmapData.Length, Is.EqualTo(HiresBitmapFile.BitmapDataSize));
     Assert.That(result.ScreenData.Length, Is.EqualTo(HiresBitmapFile.ScreenDataSize));
-    Assert.That(result.TrailingData, Is.Empty);
+    Assert.That(result.TrailingData, Has.Length.EqualTo(0));
   }
 
   [Test]

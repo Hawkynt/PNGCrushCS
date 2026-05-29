@@ -30,8 +30,12 @@ public static class FaxG3Reader {
     if (data.Length < FaxG3File.HeaderSize)
       throw new InvalidDataException("Data too small for a valid FaxG3 file.");
 
-    var width = 1728;
-    var height = 2200;
+    var width = data[0] | (data[1] << 8);
+    var height = data[2] | (data[3] << 8);
+    if (width <= 0 || height <= 0) {
+      width = 1728;
+      height = 2200;
+    }
 
     var pixelBytes = (width + 7) / 8 * height;
     var pixelData = new byte[pixelBytes];
@@ -48,22 +52,6 @@ public static class FaxG3Reader {
 
   public static FaxG3File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < FaxG3File.HeaderSize)
-      throw new InvalidDataException("Data too small for a valid FaxG3 file.");
-
-    var width = 1728;
-    var height = 2200;
-
-    var pixelBytes = (width + 7) / 8 * height;
-    var pixelData = new byte[pixelBytes];
-    var available = Math.Min(pixelBytes, data.Length - FaxG3File.HeaderSize);
-    if (available > 0)
-      data.AsSpan(FaxG3File.HeaderSize, available).CopyTo(pixelData.AsSpan(0));
-
-    return new() {
-      Width = width,
-      Height = height,
-      PixelData = pixelData,
-    };
+    return FromSpan(data);
   }
 }

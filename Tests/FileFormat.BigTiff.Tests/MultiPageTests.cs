@@ -26,7 +26,7 @@ public sealed class MultiPageTests {
       Width = 4, Height = 4, SamplesPerPixel = 1, BitsPerSample = 8,
       PhotometricInterpretation = BigTiffFile.PhotometricMinIsBlack, PixelData = new byte[16],
     };
-    Assert.That(file.Pages, Is.Empty);
+    Assert.That(file.Pages, Has.Count.EqualTo(0));
   }
 
   [Test]
@@ -165,7 +165,7 @@ public sealed class MultiPageTests {
       Assert.That(page.Height, Is.EqualTo(0));
       Assert.That(page.SamplesPerPixel, Is.EqualTo(1));
       Assert.That(page.BitsPerSample, Is.EqualTo(8));
-      Assert.That(page.PhotometricInterpretation, Is.EqualTo(BigTiffFile.PhotometricMinIsBlack));
+      Assert.That(page.PhotometricInterpretation, Is.EqualTo(1));
       Assert.That(page.PixelData, Is.Empty);
     });
   }
@@ -380,7 +380,7 @@ public sealed class MultiPageTests {
     Assert.That(restored.SamplesPerPixel, Is.EqualTo(1));
     Assert.That(restored.BitsPerSample, Is.EqualTo(8));
     Assert.That(restored.PixelData, Is.EqualTo(pixelData));
-    Assert.That(restored.Pages, Is.Empty);
+    Assert.That(restored.Pages, Has.Count.EqualTo(0));
     Assert.That(BigTiffFile.ImageCount(restored), Is.EqualTo(1));
   }
 

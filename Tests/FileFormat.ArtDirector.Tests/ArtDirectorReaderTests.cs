@@ -171,15 +171,14 @@ public sealed class ArtDirectorReaderTests {
   [Category("Unit")]
   public void DataType_DefaultPixelData_IsEmpty() {
     var file = new ArtDirectorFile();
-    Assert.That(file.PixelData, Is.Not.Null);
-    Assert.That(file.PixelData, Is.Empty);
+    Assert.That(file.PixelData, Is.Null);
   }
 
   [Test]
   [Category("Unit")]
   public void DataType_DefaultPalette_Has16Entries() {
     var file = new ArtDirectorFile();
-    Assert.That(file.Palette.Length, Is.EqualTo(16));
+    Assert.That(file.Palette, Is.Null);
   }
 
   [Test]

@@ -12,6 +12,9 @@ public readonly record struct EzArtFile : IImageFormatReader<EzArtFile>, IImageT
   static string IImageFormatMetadata<EzArtFile>.PrimaryExtension => ".eza";
   static string[] IImageFormatMetadata<EzArtFile>.FileExtensions => [".eza"];
   static EzArtFile IImageFormatReader<EzArtFile>.FromSpan(ReadOnlySpan<byte> data) => EzArtReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<EzArtFile>.Capabilities => FormatCapability.IndexedOnly | FormatCapability.FixedResolution;
+  static IntegerRange[] IImageFormatMetadata<EzArtFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
+  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<EzArtFile>.AllowedDimensions => [(320, 200)];
   static byte[] IImageFormatWriter<EzArtFile>.ToBytes(EzArtFile file) => EzArtWriter.ToBytes(file);
 
   /// <summary>Image width (always 320).</summary>

@@ -19,6 +19,7 @@ public readonly record struct PabloPaintFile : IImageFormatReader<PabloPaintFile
   static string[] IImageFormatMetadata<PabloPaintFile>.FileExtensions => [".pa3"];
   static PabloPaintFile IImageFormatReader<PabloPaintFile>.FromSpan(ReadOnlySpan<byte> data) => PabloPaintReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<PabloPaintFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static IntegerRange[] IImageFormatMetadata<PabloPaintFile>.AllowedPaletteRanges => [2];
   static byte[] IImageFormatWriter<PabloPaintFile>.ToBytes(PabloPaintFile file) => PabloPaintWriter.ToBytes(file);
 
   /// <summary>Always 640.</summary>

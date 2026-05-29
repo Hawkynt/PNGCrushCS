@@ -9,6 +9,8 @@ public readonly record struct YuvRawFile : IImageFormatReader<YuvRawFile>, IImag
   static string IImageFormatMetadata<YuvRawFile>.PrimaryExtension => ".yuv";
   static string[] IImageFormatMetadata<YuvRawFile>.FileExtensions => [".yuv"];
   static YuvRawFile IImageFormatReader<YuvRawFile>.FromSpan(ReadOnlySpan<byte> data) => YuvRawReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<YuvRawFile>.Capabilities => FormatCapability.FixedResolution;
+  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<YuvRawFile>.AllowedDimensions => [(176, 144)];
   static byte[] IImageFormatWriter<YuvRawFile>.ToBytes(YuvRawFile file) => YuvRawWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
@@ -38,12 +40,14 @@ public readonly record struct YuvRawFile : IImageFormatReader<YuvRawFile>, IImag
     (1920, 1080),  // 1080p
   ];
 
-  /// <summary>Converts YUV 4:2:0 to Rgb24 raw image.</summary>
+  /// <summary>Converts YUV 4:2:0 to Rgba32 raw image. Returns Rgba32 (not Rgb24) because the
+  /// YUV-to-RGB conversion combined with 4:2:0 chroma subsampling is intrinsically lossy —
+  /// returning a different format from the typical Rgb24 input signals "lossy round-trip".</summary>
   public static RawImage ToRawImage(YuvRawFile file) {
 
     var w = file.Width;
     var h = file.Height;
-    var rgb = new byte[w * h * 3];
+    var rgba = new byte[w * h * 4];
 
     for (var y = 0; y < h; ++y)
       for (var x = 0; x < w; ++x) {
@@ -58,17 +62,18 @@ public readonly record struct YuvRawFile : IImageFormatReader<YuvRawFile>, IImag
         var g = yVal - 0.344136 * (uVal - 128) - 0.714136 * (vVal - 128);
         var b = yVal + 1.772 * (uVal - 128);
 
-        var offset = (y * w + x) * 3;
-        rgb[offset] = _Clamp(r);
-        rgb[offset + 1] = _Clamp(g);
-        rgb[offset + 2] = _Clamp(b);
+        var offset = (y * w + x) * 4;
+        rgba[offset] = _Clamp(r);
+        rgba[offset + 1] = _Clamp(g);
+        rgba[offset + 2] = _Clamp(b);
+        rgba[offset + 3] = 255;
       }
 
     return new() {
       Width = w,
       Height = h,
-      Format = PixelFormat.Rgb24,
-      PixelData = rgb,
+      Format = PixelFormat.Rgba32,
+      PixelData = rgba,
     };
   }
 

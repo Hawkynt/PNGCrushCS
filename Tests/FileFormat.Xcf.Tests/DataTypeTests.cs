@@ -32,8 +32,8 @@ public sealed class DataTypeTests {
   [Category("Unit")]
   public void XcfFile_DefaultPixelData_IsEmpty() {
     var file = new XcfFile();
-    Assert.That(file.PixelData, Is.Not.Null);
-    Assert.That(file.PixelData, Has.Length.EqualTo(0));
+    Assert.That(file.PixelData, Is.Null);
+    Assert.That(file.PixelData, Is.Null);
   }
 
   [Test]

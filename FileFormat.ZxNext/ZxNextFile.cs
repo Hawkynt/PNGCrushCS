@@ -10,7 +10,27 @@ public sealed class ZxNextFile :
 
   static string IImageFormatMetadata<ZxNextFile>.PrimaryExtension => ".nxt";
   static string[] IImageFormatMetadata<ZxNextFile>.FileExtensions => [".nxt"];
-  static FormatCapability IImageFormatMetadata<ZxNextFile>.Capabilities => FormatCapability.IndexedOnly;
+  static FormatCapability IImageFormatMetadata<ZxNextFile>.Capabilities => FormatCapability.IndexedOnly | FormatCapability.FixedResolution;
+  static IntegerRange[] IImageFormatMetadata<ZxNextFile>.AllowedPaletteRanges => [new IntegerRange(2, 256)];
+  static FixedPalette[] IImageFormatMetadata<ZxNextFile>.FixedPalettes => _FixedPalettes;
+  private static readonly FixedPalette[] _FixedPalettes = [_BuildFixedPalette()];
+  private static FixedPalette _BuildFixedPalette() {
+    var colors = new uint[256];
+    uint[] normalColors = [0x000000, 0x0000CD, 0xCD0000, 0xCD00CD, 0x00CD00, 0x00CDCD, 0xCDCD00, 0xCDCDCD];
+    uint[] brightColors = [0x000000, 0x0000FF, 0xFF0000, 0xFF00FF, 0x00FF00, 0x00FFFF, 0xFFFF00, 0xFFFFFF];
+    for (var i = 0; i < 8; ++i) colors[i] = normalColors[i];
+    for (var i = 0; i < 8; ++i) colors[i + 8] = brightColors[i];
+    for (var i = 16; i < 256; ++i) {
+      var r3 = (uint)((i >> 5) & 0x07);
+      var g3 = (uint)((i >> 2) & 0x07);
+      var b2 = (uint)(i & 0x03);
+      var r = (r3 * 255u / 7u) & 0xFFu;
+      var g = (g3 * 255u / 7u) & 0xFFu;
+      var b = (b2 * 255u / 3u) & 0xFFu;
+      colors[i] = (r << 16) | (g << 8) | b;
+    }
+    return new FixedPalette("ZX Spectrum Next (RGB332)", colors);
+  }
   static ZxNextFile IImageFormatReader<ZxNextFile>.FromSpan(ReadOnlySpan<byte> data) => ZxNextReader.FromSpan(data);
   static byte[] IImageFormatWriter<ZxNextFile>.ToBytes(ZxNextFile file) => ZxNextWriter.ToBytes(file);
 

@@ -28,6 +28,7 @@ public readonly record struct AtariDumpFile : IImageFormatReader<AtariDumpFile>,
   static string[] IImageFormatMetadata<AtariDumpFile>.FileExtensions => [".asd", ".adm"];
   static AtariDumpFile IImageFormatReader<AtariDumpFile>.FromSpan(ReadOnlySpan<byte> data) => AtariDumpReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<AtariDumpFile>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<AtariDumpFile>.AllowedPaletteRanges => [2];
   static byte[] IImageFormatWriter<AtariDumpFile>.ToBytes(AtariDumpFile file) => AtariDumpWriter.ToBytes(file);
 
   /// <summary>Image width in pixels. Default 320.</summary>

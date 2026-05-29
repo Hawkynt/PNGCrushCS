@@ -6,7 +6,7 @@ namespace FileFormat.BbcMicro;
 /// <summary>Reads BBC Micro screen memory dumps from bytes, streams, or file paths.</summary>
 public static class BbcMicroReader {
 
-  public static BbcMicroFile FromFile(FileInfo file, BbcMicroMode mode = BbcMicroMode.Mode1) {
+  public static BbcMicroFile FromFile(FileInfo file, BbcMicroMode mode = BbcMicroMode.Mode0) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
       throw new FileNotFoundException("BBC Micro screen file not found.", file.FullName);
@@ -14,7 +14,7 @@ public static class BbcMicroReader {
     return FromBytes(File.ReadAllBytes(file.FullName), mode);
   }
 
-  public static BbcMicroFile FromStream(Stream stream, BbcMicroMode mode = BbcMicroMode.Mode1) {
+  public static BbcMicroFile FromStream(Stream stream, BbcMicroMode mode = BbcMicroMode.Mode0) {
     ArgumentNullException.ThrowIfNull(stream);
     if (stream.CanSeek) {
       var data = new byte[stream.Length - stream.Position];
@@ -26,7 +26,7 @@ public static class BbcMicroReader {
     return FromSpan(ms.ToArray(), mode);
   }
 
-  public static BbcMicroFile FromSpan(ReadOnlySpan<byte> data, BbcMicroMode mode = BbcMicroMode.Mode1) {
+  public static BbcMicroFile FromSpan(ReadOnlySpan<byte> data, BbcMicroMode mode = BbcMicroMode.Mode0) {
     var expectedSize = BbcMicroFile.GetExpectedScreenSize(mode);
     if (data.Length < expectedSize)
       throw new InvalidDataException($"Data too small for a valid BBC Micro mode {(int)mode} screen dump. Expected {expectedSize} bytes, got {data.Length}.");
@@ -48,7 +48,7 @@ public static class BbcMicroReader {
     };
   }
 
-  public static BbcMicroFile FromBytes(byte[] data, BbcMicroMode mode = BbcMicroMode.Mode1) {
+  public static BbcMicroFile FromBytes(byte[] data, BbcMicroMode mode = BbcMicroMode.Mode0) {
     ArgumentNullException.ThrowIfNull(data);
     return FromSpan(data, mode);
   }

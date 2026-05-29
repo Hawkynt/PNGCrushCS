@@ -12,6 +12,8 @@ public sealed class AppleIIgsFile :
   static string IImageFormatMetadata<AppleIIgsFile>.PrimaryExtension => ".shr";
   static string[] IImageFormatMetadata<AppleIIgsFile>.FileExtensions => [".shr", ".c1", ".pic"];
   static AppleIIgsFile IImageFormatReader<AppleIIgsFile>.FromSpan(ReadOnlySpan<byte> data) => AppleIIgsReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<AppleIIgsFile>.Capabilities => FormatCapability.FixedResolution;
+  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<AppleIIgsFile>.AllowedDimensions => [(_MODE320_WIDTH, _HEIGHT)];
   static byte[] IImageFormatWriter<AppleIIgsFile>.ToBytes(AppleIIgsFile file) => AppleIIgsWriter.ToBytes(file);
 
   /// <summary>Image width in pixels (320 for Mode320, 640 for Mode640).</summary>

@@ -34,7 +34,7 @@ public readonly record struct IffAnimFile : IImageFormatReader<IffAnimFile>, IIm
   public static IffAnimFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
     if (image.Format != PixelFormat.Rgb24)
-      throw new ArgumentException($"Expected {PixelFormat.Rgb24} but got {image.Format}.", nameof(image));
+      image = PixelConverter.Convert(image, PixelFormat.Rgb24);
 
     return new() {
       Width = image.Width,

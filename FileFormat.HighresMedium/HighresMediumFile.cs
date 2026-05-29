@@ -24,6 +24,8 @@ public readonly record struct HighresMediumFile : IImageFormatReader<HighresMedi
   static string IImageFormatMetadata<HighresMediumFile>.PrimaryExtension => ".hrm";
   static string[] IImageFormatMetadata<HighresMediumFile>.FileExtensions => [".hrm"];
   static HighresMediumFile IImageFormatReader<HighresMediumFile>.FromSpan(ReadOnlySpan<byte> data) => HighresMediumReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<HighresMediumFile>.Capabilities => FormatCapability.FixedResolution;
+  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<HighresMediumFile>.AllowedDimensions => [(ImageWidth, ImageHeight)];
   static byte[] IImageFormatWriter<HighresMediumFile>.ToBytes(HighresMediumFile file) => HighresMediumWriter.ToBytes(file);
 
   /// <summary>16-entry palette for frame 1 (only first 4 entries used).</summary>
@@ -85,44 +87,77 @@ public readonly record struct HighresMediumFile : IImageFormatReader<HighresMedi
 
   public static HighresMediumFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Rgb24)
-      throw new ArgumentException("RawImage must use PixelFormat.Rgb24.", nameof(image));
     if (image.Width != ImageWidth)
       throw new ArgumentException($"Highres Medium images must be exactly {ImageWidth} pixels wide.", nameof(image));
     if (image.Height != ImageHeight)
       throw new ArgumentException($"Highres Medium images must be exactly {ImageHeight} pixels tall.", nameof(image));
 
-    // Both frames get the same image data (quantized to 4 colors)
     var pixelCount = ImageWidth * ImageHeight;
     var chunky = new byte[pixelCount];
     var palette = new short[16];
     var colorCount = 0;
 
-    for (var i = 0; i < pixelCount; ++i) {
-      var offset = i * 3;
-      var r = image.PixelData[offset] * 7 / 255;
-      var g = image.PixelData[offset + 1] * 7 / 255;
-      var b = image.PixelData[offset + 2] * 7 / 255;
-      var stColor = (short)((r << 8) | (g << 4) | b);
-
-      var found = false;
-      for (var c = 0; c < colorCount; ++c) {
-        if (palette[c] != stColor)
-          continue;
-
-        chunky[i] = (byte)c;
-        found = true;
-        break;
-      }
-
-      if (!found) {
-        if (colorCount < ColorCount) {
-          palette[colorCount] = stColor;
-          chunky[i] = (byte)colorCount;
+    if (image.Format == PixelFormat.Indexed1) {
+      var stride = (ImageWidth + 7) / 8;
+      for (var y = 0; y < ImageHeight; ++y)
+        for (var x = 0; x < ImageWidth; ++x) {
+          var b = image.PixelData[y * stride + (x >> 3)];
+          chunky[y * ImageWidth + x] = (byte)((b >> (7 - (x & 7))) & 1);
+        }
+      // Palette from Indexed1 (2 entries)
+      if (image.Palette != null) {
+        var maxEntries = Math.Min(image.PaletteCount, ColorCount);
+        for (var i = 0; i < maxEntries; ++i) {
+          var r = image.Palette[i * 3] * 7 / 255;
+          var g = image.Palette[i * 3 + 1] * 7 / 255;
+          var bb = image.Palette[i * 3 + 2] * 7 / 255;
+          palette[i] = (short)((r << 8) | (g << 4) | bb);
           ++colorCount;
-        } else
-          chunky[i] = _FindClosest(stColor, palette, colorCount);
+        }
       }
+    } else if (image.Format == PixelFormat.Indexed8) {
+      var maxEntries = Math.Min(image.PaletteCount, ColorCount);
+      if (image.Palette != null) {
+        for (var i = 0; i < maxEntries; ++i) {
+          var r = image.Palette[i * 3] * 7 / 255;
+          var g = image.Palette[i * 3 + 1] * 7 / 255;
+          var bb = image.Palette[i * 3 + 2] * 7 / 255;
+          palette[i] = (short)((r << 8) | (g << 4) | bb);
+          ++colorCount;
+        }
+      }
+      for (var i = 0; i < pixelCount; ++i)
+        chunky[i] = (byte)(image.PixelData[i] & 0x03);
+    } else if (image.Format == PixelFormat.Rgb24) {
+      // Rgb24 input may have many unique colours; only quantize if 4 distinct or fewer.
+      for (var i = 0; i < pixelCount; ++i) {
+        var offset = i * 3;
+        var r = image.PixelData[offset] * 7 / 255;
+        var g = image.PixelData[offset + 1] * 7 / 255;
+        var b = image.PixelData[offset + 2] * 7 / 255;
+        var stColor = (short)((r << 8) | (g << 4) | b);
+
+        var found = false;
+        for (var c = 0; c < colorCount; ++c) {
+          if (palette[c] != stColor)
+            continue;
+
+          chunky[i] = (byte)c;
+          found = true;
+          break;
+        }
+
+        if (!found) {
+          if (colorCount < ColorCount) {
+            palette[colorCount] = stColor;
+            chunky[i] = (byte)colorCount;
+            ++colorCount;
+          } else
+            throw new ArgumentException($"Highres Medium requires Indexed1 or Indexed8 input (max {ColorCount} colours); Rgb24 input had more.", nameof(image));
+        }
+      }
+    } else {
+      throw new ArgumentException("RawImage must use PixelFormat.Rgb24, Indexed1, or Indexed8.", nameof(image));
     }
 
     var planar = PlanarConverter.ChunkyToAtariSt(chunky, ImageWidth, ImageHeight, NumPlanes);

@@ -75,7 +75,7 @@ public sealed class DataTypeTests {
   [Category("Unit")]
   public void BlpFile_DefaultMipData_IsEmpty() {
     var file = new BlpFile();
-    Assert.That(file.MipData, Is.Empty);
+    Assert.That(file.MipData, Is.Null);
   }
 
   [Test]

@@ -12,7 +12,9 @@ public readonly record struct PicWorksFile : IImageFormatReader<PicWorksFile>, I
   static string IImageFormatMetadata<PicWorksFile>.PrimaryExtension => ".pwk";
   static string[] IImageFormatMetadata<PicWorksFile>.FileExtensions => [".pwk", ".pws"];
   static PicWorksFile IImageFormatReader<PicWorksFile>.FromSpan(ReadOnlySpan<byte> data) => PicWorksReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<PicWorksFile>.Capabilities => FormatCapability.IndexedOnly;
+  static FormatCapability IImageFormatMetadata<PicWorksFile>.Capabilities => FormatCapability.IndexedOnly | FormatCapability.FixedResolution;
+  static IntegerRange[] IImageFormatMetadata<PicWorksFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
+  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<PicWorksFile>.AllowedDimensions => [(320, 200)];
   static byte[] IImageFormatWriter<PicWorksFile>.ToBytes(PicWorksFile file) => PicWorksWriter.ToBytes(file);
 
   /// <summary>Image width (always 320).</summary>

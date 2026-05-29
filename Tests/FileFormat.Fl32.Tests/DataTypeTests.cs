@@ -32,7 +32,7 @@ public sealed class DataTypeTests {
       Assert.That(file.Width, Is.EqualTo(0));
       Assert.That(file.Height, Is.EqualTo(0));
       Assert.That(file.Channels, Is.EqualTo(0));
-      Assert.That(file.PixelData, Is.Empty);
+      Assert.That(file.PixelData, Is.Null);
     });
   }
 

@@ -16,6 +16,7 @@ public readonly record struct CrackFile : IImageFormatReader<CrackFile>, IImageT
   static string[] IImageFormatMetadata<CrackFile>.FileExtensions => [".ca2"];
   static CrackFile IImageFormatReader<CrackFile>.FromSpan(ReadOnlySpan<byte> data) => CrackReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<CrackFile>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<CrackFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
   static byte[] IImageFormatWriter<CrackFile>.ToBytes(CrackFile file) => CrackWriter.ToBytes(file);
 
   /// <summary>Image width (always 320).</summary>

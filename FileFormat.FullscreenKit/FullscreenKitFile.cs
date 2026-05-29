@@ -40,6 +40,7 @@ public readonly record struct FullscreenKitFile : IImageFormatReader<FullscreenK
   static string IImageFormatMetadata<FullscreenKitFile>.PrimaryExtension => ".kid";
   static string[] IImageFormatMetadata<FullscreenKitFile>.FileExtensions => [".kid"];
   static FullscreenKitFile IImageFormatReader<FullscreenKitFile>.FromSpan(ReadOnlySpan<byte> data) => FullscreenKitReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<FullscreenKitFile>.Capabilities => FormatCapability.IndexedOnly | FormatCapability.FixedResolution;
   static byte[] IImageFormatWriter<FullscreenKitFile>.ToBytes(FullscreenKitFile file) => FullscreenKitWriter.ToBytes(file);
 
   /// <summary>Image width (416 or 448).</summary>

@@ -16,6 +16,7 @@ public readonly record struct NokiaLogoFile : IImageFormatReader<NokiaLogoFile>,
   static string[] IImageFormatMetadata<NokiaLogoFile>.FileExtensions => [".nol", ".ngg"];
   static NokiaLogoFile IImageFormatReader<NokiaLogoFile>.FromSpan(ReadOnlySpan<byte> data) => NokiaLogoReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<NokiaLogoFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static IntegerRange[] IImageFormatMetadata<NokiaLogoFile>.AllowedPaletteRanges => [2];
   static byte[] IImageFormatWriter<NokiaLogoFile>.ToBytes(NokiaLogoFile file) => NokiaLogoWriter.ToBytes(file);
 
   public int Width => FixedWidth;

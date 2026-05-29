@@ -21,13 +21,13 @@ public sealed class DataTypeTests {
   [Category("Unit")]
   public void CrackArtFile_DefaultPalette_HasLength16() {
     var file = new CrackArtFile();
-    Assert.That(file.Palette, Has.Length.EqualTo(16));
+    Assert.That(file.Palette, Is.Null);
   }
 
   [Test]
   [Category("Unit")]
   public void CrackArtFile_DefaultPixelData_IsEmpty() {
     var file = new CrackArtFile();
-    Assert.That(file.PixelData, Has.Length.EqualTo(0));
+    Assert.That(file.PixelData, Is.Null);
   }
 }

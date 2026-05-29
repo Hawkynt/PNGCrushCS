@@ -31,6 +31,7 @@ public readonly record struct Sprite64File : IImageFormatReader<Sprite64File>, I
   static string[] IImageFormatMetadata<Sprite64File>.FileExtensions => [".s64", ".spr64"];
   static Sprite64File IImageFormatReader<Sprite64File>.FromSpan(ReadOnlySpan<byte> data) => Sprite64Reader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<Sprite64File>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<Sprite64File>.AllowedPaletteRanges => [2];
   static byte[] IImageFormatWriter<Sprite64File>.ToBytes(Sprite64File file) => Sprite64Writer.ToBytes(file);
 
   /// <summary>Always 24.</summary>

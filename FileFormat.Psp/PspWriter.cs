@@ -8,7 +8,10 @@ public static class PspWriter {
 
   public static byte[] ToBytes(PspFile file) {
     ArgumentNullException.ThrowIfNull(file);
-    return Assemble(file.PixelData, file.Width, file.Height, file.BitDepth, file.MajorVersion, file.MinorVersion);
+    var pixelData = file.PixelData ?? Array.Empty<byte>();
+    var bitDepth = file.BitDepth == 0 ? 24 : file.BitDepth;
+    var majorVersion = file.MajorVersion == 0 ? (ushort)5 : file.MajorVersion;
+    return Assemble(pixelData, file.Width, file.Height, bitDepth, majorVersion, file.MinorVersion);
   }
 
   internal static byte[] Assemble(byte[] pixelData, int width, int height, int bitDepth, ushort majorVersion, ushort minorVersion) {

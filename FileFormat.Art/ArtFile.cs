@@ -10,6 +10,7 @@ public readonly record struct ArtFile : IImageFormatReader<ArtFile>, IImageToRaw
   static string IImageFormatMetadata<ArtFile>.PrimaryExtension => ".art";
   static string[] IImageFormatMetadata<ArtFile>.FileExtensions => [".art"];
   static ArtFile IImageFormatReader<ArtFile>.FromSpan(ReadOnlySpan<byte> data) => ArtReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<ArtFile>.Capabilities => FormatCapability.IndexedOnly | FormatCapability.VariableResolution;
   static byte[] IImageFormatWriter<ArtFile>.ToBytes(ArtFile file) => ArtWriter.ToBytes(file);
   /// <summary>Starting tile number in the global tile index.</summary>
   public int TileStart { get; init; }

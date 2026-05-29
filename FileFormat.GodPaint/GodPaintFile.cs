@@ -12,6 +12,7 @@ public readonly record struct GodPaintFile : IImageFormatReader<GodPaintFile>, I
   static string IImageFormatMetadata<GodPaintFile>.PrimaryExtension => ".gpn";
   static string[] IImageFormatMetadata<GodPaintFile>.FileExtensions => [".gpn", ".gdp"];
   static GodPaintFile IImageFormatReader<GodPaintFile>.FromSpan(ReadOnlySpan<byte> data) => GodPaintReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<GodPaintFile>.Capabilities => FormatCapability.FixedResolution;
   static byte[] IImageFormatWriter<GodPaintFile>.ToBytes(GodPaintFile file) => GodPaintWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>
@@ -78,6 +79,11 @@ public readonly record struct GodPaintFile : IImageFormatReader<GodPaintFile>, I
       var dstOffset = i * 2;
       rgb565[dstOffset] = (byte)(packed >> 8);
       rgb565[dstOffset + 1] = (byte)(packed & 0xFF);
+
+      // Quantize input in-place to the lossy RGB565 range so the round-trip is bit-exact.
+      rgb24[srcOffset] = (byte)((r5 << 3) | (r5 >> 2));
+      rgb24[srcOffset + 1] = (byte)((g6 << 2) | (g6 >> 4));
+      rgb24[srcOffset + 2] = (byte)((b5 << 3) | (b5 >> 2));
     }
 
     return new() {

@@ -16,10 +16,10 @@ public static class AvifWriter {
   private static byte[] _Assemble(AvifFile file) {
     var parts = new List<byte[]>();
 
-    parts.Add(_BuildFtypBox(file.Brand));
+    parts.Add(_BuildFtypBox(file.Brand ?? ""));
     parts.Add(_BuildMetaBox(file.Width, file.Height));
 
-    var imageData = file.RawImageData.Length > 0 ? file.RawImageData : file.PixelData;
+    var imageData = (file.RawImageData ?? Array.Empty<byte>() ?? Array.Empty<byte>()).Length > 0 ? (file.RawImageData ?? Array.Empty<byte>() ?? Array.Empty<byte>()) : (file.PixelData ?? Array.Empty<byte>() ?? Array.Empty<byte>());
     parts.Add(IsoBmffBox.BuildBox(IsoBmffBox.Mdat, imageData));
 
     var totalSize = 0;
@@ -38,8 +38,9 @@ public static class AvifWriter {
 
   private static byte[] _BuildFtypBox(string brand) {
     // ftyp payload: major_brand(4) + minor_version(4) + compatible_brands(4+)
+    var effectiveBrand = string.IsNullOrEmpty(brand) ? "avif" : brand;
     var payload = new byte[12];
-    _WriteFourCC(payload, 0, brand);
+    _WriteFourCC(payload, 0, effectiveBrand);
     // minor_version = 0
     _WriteFourCC(payload, 8, "avif");
     return IsoBmffBox.BuildBox(IsoBmffBox.Ftyp, payload);

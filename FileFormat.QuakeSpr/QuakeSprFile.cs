@@ -55,14 +55,14 @@ public readonly record struct QuakeSprFile : IImageFormatReader<QuakeSprFile>, I
   /// <summary>Converts a Quake sprite to a <see cref="RawImage"/>. Returns Indexed8 with embedded palette.</summary>
   public static RawImage ToRawImage(QuakeSprFile file) {
 
-    var palette = file.Palette;
+    var palette = file.Palette ?? Array.Empty<byte>();
     var paletteCount = palette.Length / 3;
 
     return new() {
       Width = file.Width,
       Height = file.Height,
       Format = PixelFormat.Indexed8,
-      PixelData = file.PixelData[..],
+      PixelData = (file.PixelData ?? Array.Empty<byte>())[..],
       Palette = palette[..],
       PaletteCount = paletteCount,
     };

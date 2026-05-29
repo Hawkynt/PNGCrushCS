@@ -12,7 +12,7 @@ public static class MrcWriter {
   }
 
   internal static byte[] Assemble(MrcFile file) {
-    var extHeaderSize = file.ExtendedHeader.Length;
+    var extHeaderSize = (file.ExtendedHeader ?? Array.Empty<byte>()).Length;
     var totalSize = MrcFile.HeaderSize + extHeaderSize + file.PixelData.Length;
     var result = new byte[totalSize];
     var span = result.AsSpan();
@@ -41,7 +41,7 @@ public static class MrcWriter {
 
     // Extended header
     if (extHeaderSize > 0)
-      file.ExtendedHeader.AsSpan().CopyTo(span[MrcFile.HeaderSize..]);
+      (file.ExtendedHeader ?? Array.Empty<byte>()).AsSpan().CopyTo(span[MrcFile.HeaderSize..]);
 
     // Pixel data
     var dataOffset = MrcFile.HeaderSize + extHeaderSize;

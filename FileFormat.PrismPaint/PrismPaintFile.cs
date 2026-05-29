@@ -25,6 +25,7 @@ public readonly record struct PrismPaintFile : IImageFormatReader<PrismPaintFile
   static string[] IImageFormatMetadata<PrismPaintFile>.FileExtensions => [".pnt", ".tpi"];
   static PrismPaintFile IImageFormatReader<PrismPaintFile>.FromSpan(ReadOnlySpan<byte> data) => PrismPaintReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<PrismPaintFile>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<PrismPaintFile>.AllowedPaletteRanges => [new IntegerRange(2, 256)];
   static byte[] IImageFormatWriter<PrismPaintFile>.ToBytes(PrismPaintFile file) => PrismPaintWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>

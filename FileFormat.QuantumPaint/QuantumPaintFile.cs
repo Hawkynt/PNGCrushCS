@@ -28,6 +28,8 @@ public readonly record struct QuantumPaintFile : IImageFormatReader<QuantumPaint
   static string[] IImageFormatMetadata<QuantumPaintFile>.FileExtensions => [".pbx"];
   static QuantumPaintFile IImageFormatReader<QuantumPaintFile>.FromSpan(ReadOnlySpan<byte> data) => QuantumPaintReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<QuantumPaintFile>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<QuantumPaintFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
+  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<QuantumPaintFile>.AllowedDimensions => [(PixelWidth, PixelHeight)];
   static byte[] IImageFormatWriter<QuantumPaintFile>.ToBytes(QuantumPaintFile file) => QuantumPaintWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>

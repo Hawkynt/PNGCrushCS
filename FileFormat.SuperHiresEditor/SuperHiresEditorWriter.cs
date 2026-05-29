@@ -8,7 +8,7 @@ public static class SuperHiresEditorWriter {
   public static byte[] ToBytes(SuperHiresEditorFile file) {
     ArgumentNullException.ThrowIfNull(file);
 
-    var totalSize = SuperHiresEditorFile.LoadAddressSize + SuperHiresEditorFile.MinPayloadSize + file.TrailingData.Length;
+    var totalSize = SuperHiresEditorFile.LoadAddressSize + SuperHiresEditorFile.MinPayloadSize + (file.TrailingData ?? []).Length;
     var result = new byte[totalSize];
     var offset = 0;
 
@@ -34,8 +34,8 @@ public static class SuperHiresEditorWriter {
     offset += SuperHiresEditorFile.ScreenDataSize;
 
     // Trailing data
-    if (file.TrailingData.Length > 0)
-      file.TrailingData.AsSpan().CopyTo(result.AsSpan(offset));
+    if ((file.TrailingData ?? []).Length > 0)
+      (file.TrailingData ?? []).AsSpan().CopyTo(result.AsSpan(offset));
 
     return result;
   }

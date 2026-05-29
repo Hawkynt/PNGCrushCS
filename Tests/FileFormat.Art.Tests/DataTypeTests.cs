@@ -39,6 +39,6 @@ public sealed class DataTypeTests {
     var file = new ArtFile();
 
     Assert.That(file.TileStart, Is.EqualTo(0));
-    Assert.That(file.Tiles, Is.Empty);
+    Assert.That(file.Tiles, Is.Null);
   }
 }

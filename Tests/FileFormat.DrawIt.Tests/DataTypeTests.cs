@@ -27,14 +27,14 @@ public sealed class DataTypeTests {
   [Category("Unit")]
   public void DefaultPalette_IsEmpty() {
     var file = new DrawItFile();
-    Assert.That(file.Palette, Is.Empty);
+    Assert.That(file.Palette, Is.Null);
   }
 
   [Test]
   [Category("Unit")]
   public void DefaultPixelData_IsEmpty() {
     var file = new DrawItFile();
-    Assert.That(file.PixelData, Is.Empty);
+    Assert.That(file.PixelData, Is.Null);
   }
 
   [Test]

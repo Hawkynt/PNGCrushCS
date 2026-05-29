@@ -123,6 +123,52 @@ public sealed class RoundTripTests {
   }
 
   [Test]
+  [Category("Regression")]
+  public void ToRawImage_NoPaletteOnFile_FallsBackToDefaultPalette() {
+    // Regression: NES CHR file format doesn't store a palette. The reader returns a NesChrFile with no
+    // Palette set. ToRawImage must still produce a RawImage with a populated 4-entry palette so the
+    // viewer's PixelConverter doesn't IndexOutOfRange when reading saved .chr files.
+    var file = new NesChrFile {
+      Width = 128,
+      Height = 8,
+      PixelData = new byte[128 * 8],
+      // Palette intentionally left null/default
+    };
+
+    var raw = NesChrFile.ToRawImage(file);
+
+    Assert.That(raw.PaletteCount, Is.EqualTo(4));
+    Assert.That(raw.Palette, Is.Not.Null);
+    Assert.That(raw.Palette!.Length, Is.GreaterThanOrEqualTo(raw.PaletteCount * 3),
+      "Palette must have at least PaletteCount * 3 bytes for PixelConverter.IndexedToBgra to look up colours safely.");
+  }
+
+  [Test]
+  [Category("Regression")]
+  public void RoundTripThroughFile_ReadBackToRawImage_DoesNotThrow() {
+    // Full repro of the user's scenario: write a NES CHR file with 4-colour data, read it back from disk,
+    // convert to RawImage with index value 3 in pixels. Must not throw IndexOutOfRange.
+    var pixels = new byte[128 * 8];
+    for (var i = 0; i < pixels.Length; ++i) pixels[i] = (byte)(i % 4);
+
+    var bytes = NesChrWriter.ToBytes(new NesChrFile { Width = 128, Height = 8, PixelData = pixels });
+    var tempPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".chr");
+    try {
+      File.WriteAllBytes(tempPath, bytes);
+      var roundTripped = NesChrReader.FromFile(new FileInfo(tempPath));
+      var raw = NesChrFile.ToRawImage(roundTripped);
+
+      // Crucial: the RawImage must be self-consistent (palette length covers max pixel index used).
+      var maxIndex = 0;
+      foreach (var p in raw.PixelData!) if (p > maxIndex) maxIndex = p;
+      Assert.That(raw.Palette!.Length, Is.GreaterThan(maxIndex * 3),
+        $"Palette must cover max pixel index {maxIndex}");
+    } finally {
+      if (File.Exists(tempPath)) File.Delete(tempPath);
+    }
+  }
+
+  [Test]
   [Category("Integration")]
   public void RoundTrip_ViaRawImage() {
     var pixels = new byte[128 * 8];

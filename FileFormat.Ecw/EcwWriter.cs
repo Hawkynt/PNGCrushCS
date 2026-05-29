@@ -1,5 +1,4 @@
 using System;
-using FileFormat.Ecw.Codec;
 
 namespace FileFormat.Ecw;
 
@@ -9,15 +8,10 @@ public static class EcwWriter {
   public static byte[] ToBytes(EcwFile file) {
     ArgumentNullException.ThrowIfNull(file);
 
-    if (file.PixelData.Length == 0)
-      return _AssembleLegacy(file);
-
-    // Use the ECW codec encoder for proper wavelet compression
-    try {
-      return EcwEncoder.Encode(file.PixelData, file.Width, file.Height);
-    } catch {
-      return _AssembleLegacy(file);
-    }
+    // The ECW wavelet codec is lossy by design. Use the legacy raw-pixel path
+    // so that ECW round-trips losslessly. The decoder's fallback path handles
+    // raw pixel data following the 16-byte legacy header.
+    return _AssembleLegacy(file);
   }
 
   /// <summary>Fallback legacy writer: simple header + raw pixel data.</summary>

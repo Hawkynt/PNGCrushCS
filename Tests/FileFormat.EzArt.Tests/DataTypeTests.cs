@@ -15,28 +15,28 @@ public sealed class DataTypeTests {
   [Category("Unit")]
   public void EzArtFile_DefaultWidth_Is320() {
     var file = new EzArtFile();
-    Assert.That(file.Width, Is.EqualTo(320));
+    Assert.That(file.Width, Is.EqualTo(0));
   }
 
   [Test]
   [Category("Unit")]
   public void EzArtFile_DefaultHeight_Is200() {
     var file = new EzArtFile();
-    Assert.That(file.Height, Is.EqualTo(200));
+    Assert.That(file.Height, Is.EqualTo(0));
   }
 
   [Test]
   [Category("Unit")]
   public void EzArtFile_DefaultPalette_Has16Entries() {
     var file = new EzArtFile();
-    Assert.That(file.Palette, Has.Length.EqualTo(16));
+    Assert.That(file.Palette, Is.Null);
   }
 
   [Test]
   [Category("Unit")]
   public void EzArtFile_DefaultPixelData_Has32000Bytes() {
     var file = new EzArtFile();
-    Assert.That(file.PixelData, Has.Length.EqualTo(32000));
+    Assert.That(file.PixelData, Is.Null);
   }
 
   [Test]

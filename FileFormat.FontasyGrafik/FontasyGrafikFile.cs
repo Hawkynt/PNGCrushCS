@@ -22,6 +22,7 @@ public readonly record struct FontasyGrafikFile : IImageFormatReader<FontasyGraf
   static string[] IImageFormatMetadata<FontasyGrafikFile>.FileExtensions => [".bsg"];
   static FontasyGrafikFile IImageFormatReader<FontasyGrafikFile>.FromSpan(ReadOnlySpan<byte> data) => FontasyGrafikReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<FontasyGrafikFile>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<FontasyGrafikFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
   static byte[] IImageFormatWriter<FontasyGrafikFile>.ToBytes(FontasyGrafikFile file) => FontasyGrafikWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>

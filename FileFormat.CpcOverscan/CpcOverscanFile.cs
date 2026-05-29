@@ -10,6 +10,7 @@ public readonly record struct CpcOverscanFile : IImageFormatReader<CpcOverscanFi
   static string[] IImageFormatMetadata<CpcOverscanFile>.FileExtensions => [".cpo"];
   static CpcOverscanFile IImageFormatReader<CpcOverscanFile>.FromSpan(ReadOnlySpan<byte> data) => CpcOverscanReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<CpcOverscanFile>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<CpcOverscanFile>.AllowedPaletteRanges => [new IntegerRange(2, 4)];
   static byte[] IImageFormatWriter<CpcOverscanFile>.ToBytes(CpcOverscanFile file) => CpcOverscanWriter.ToBytes(file);
 
   /// <summary>Expected file size in bytes (two 16KB banks).</summary>

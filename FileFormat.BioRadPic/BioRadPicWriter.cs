@@ -8,16 +8,18 @@ public static class BioRadPicWriter {
   public static byte[] ToBytes(BioRadPicFile file) {
     ArgumentNullException.ThrowIfNull(file);
 
+    var pixelData = file.PixelData ?? Array.Empty<byte>();
     var bytesPerPixel = file.ByteFormat ? 1 : 2;
     var pixelDataSize = file.Width * file.Height * bytesPerPixel;
     var fileSize = BioRadPicHeader.StructSize + pixelDataSize;
     var result = new byte[fileSize];
     var span = result.AsSpan();
 
+    var npic = file.NumImages == 0 ? 1 : file.NumImages;
     var header = new BioRadPicHeader(
       Nx: (ushort)file.Width,
       Ny: (ushort)file.Height,
-      Npic: (ushort)file.NumImages,
+      Npic: (ushort)npic,
       Ramp1Min: file.Ramp1Min,
       Ramp1Max: file.Ramp1Max,
       Notes: file.Notes,
@@ -37,8 +39,8 @@ public static class BioRadPicWriter {
 
     header.WriteTo(span);
 
-    var copyLen = Math.Min(pixelDataSize, file.PixelData.Length);
-    file.PixelData.AsSpan(0, copyLen).CopyTo(result.AsSpan(BioRadPicHeader.StructSize));
+    var copyLen = Math.Min(pixelDataSize, pixelData.Length);
+    pixelData.AsSpan(0, copyLen).CopyTo(result.AsSpan(BioRadPicHeader.StructSize));
 
     return result;
   }

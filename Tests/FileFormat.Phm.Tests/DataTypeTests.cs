@@ -23,10 +23,10 @@ public sealed class DataTypeTests {
     Assert.Multiple(() => {
       Assert.That(file.Width, Is.EqualTo(0));
       Assert.That(file.Height, Is.EqualTo(0));
-      Assert.That(file.ColorMode, Is.EqualTo(PhmColorMode.Grayscale));
+      Assert.That((int)file.ColorMode, Is.EqualTo(0));
       Assert.That(file.Scale, Is.EqualTo(0f));
       Assert.That(file.IsLittleEndian, Is.False);
-      Assert.That(file.PixelData, Is.Empty);
+      Assert.That(file.PixelData, Is.Null);
     });
   }
 

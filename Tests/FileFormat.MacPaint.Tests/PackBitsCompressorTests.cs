@@ -11,7 +11,7 @@ public sealed class PackBitsCompressorTests {
   public void Compress_Empty_ReturnsEmpty() {
     var result = PackBitsCompressor.Compress([]);
 
-    Assert.That(result, Is.Empty);
+    Assert.That(result, Has.Length.EqualTo(0));
   }
 
   [Test]

@@ -12,6 +12,7 @@ public readonly record struct MagFile : IImageFormatReader<MagFile>, IImageToRaw
   static string[] IImageFormatMetadata<MagFile>.FileExtensions => [".mag", ".mki"];
   static MagFile IImageFormatReader<MagFile>.FromSpan(ReadOnlySpan<byte> data) => MagReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<MagFile>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<MagFile>.AllowedPaletteRanges => [new IntegerRange(2, 256)];
   static byte[] IImageFormatWriter<MagFile>.ToBytes(MagFile file) => MagWriter.ToBytes(file);
 
   public int Width { get; init; }

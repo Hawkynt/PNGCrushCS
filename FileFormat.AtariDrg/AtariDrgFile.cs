@@ -28,6 +28,7 @@ public readonly record struct AtariDrgFile : IImageFormatReader<AtariDrgFile>, I
   static string[] IImageFormatMetadata<AtariDrgFile>.FileExtensions => [".drg"];
   static AtariDrgFile IImageFormatReader<AtariDrgFile>.FromSpan(ReadOnlySpan<byte> data) => AtariDrgReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<AtariDrgFile>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<AtariDrgFile>.AllowedPaletteRanges => [new IntegerRange(2, 4)];
   static byte[] IImageFormatWriter<AtariDrgFile>.ToBytes(AtariDrgFile file) => AtariDrgWriter.ToBytes(file);
 
   /// <summary>Always 160.</summary>

@@ -24,7 +24,9 @@ public readonly record struct SnesTileFile : IImageFormatReader<SnesTileFile>, I
   static string IImageFormatMetadata<SnesTileFile>.PrimaryExtension => ".sfc";
   static string[] IImageFormatMetadata<SnesTileFile>.FileExtensions => [".sfc", ".snes"];
   static SnesTileFile IImageFormatReader<SnesTileFile>.FromSpan(ReadOnlySpan<byte> data) => SnesTileReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<SnesTileFile>.Capabilities => FormatCapability.IndexedOnly;
+  static FormatCapability IImageFormatMetadata<SnesTileFile>.Capabilities => FormatCapability.IndexedOnly | FormatCapability.FixedResolution;
+  static IntegerRange[] IImageFormatMetadata<SnesTileFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
+  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<SnesTileFile>.AllowedDimensions => [(FixedWidth, new IntegerRange(TileSize, 4096, TileSize))];
   static byte[] IImageFormatWriter<SnesTileFile>.ToBytes(SnesTileFile file) => SnesTileWriter.ToBytes(file);
 
   /// <summary>Image width in pixels (always 128).</summary>
@@ -44,8 +46,8 @@ public readonly record struct SnesTileFile : IImageFormatReader<SnesTileFile>, I
       Width = file.Width,
       Height = file.Height,
       Format = PixelFormat.Indexed8,
-      PixelData = file.PixelData[..],
-      Palette = file.Palette[..],
+      PixelData = (file.PixelData ?? Array.Empty<byte>())[..],
+      Palette = (file.Palette ?? Array.Empty<byte>())[..],
       PaletteCount = 16,
     };
   }

@@ -418,13 +418,25 @@ public sealed partial class HeaderSerializerGenerator : IIncrementalGenerator {
     );
   }
 
+  private static int _ComputeSeqFirstFieldOffset(HeaderModel model) {
+    foreach (var f in model.Fields) {
+      if (f.FieldOffset >= 0)
+        return f.FieldOffset;
+      return 0;
+    }
+    return 0;
+  }
+
   private static int _ComputeStructSize(List<FieldModel> fields, bool isSequential) {
     if (isSequential) {
-      // Sequential: sum all fixed-size fields
-      var total = 0;
-      foreach (var f in fields)
-        total += f.Size; // NullTermString fields have size 0, which is correct (variable-length)
-      return total;
+      // Sequential: track cursor position including [FieldOffset] jumps
+      var pos = 0;
+      foreach (var f in fields) {
+        if (f.FieldOffset >= 0)
+          pos = f.FieldOffset;
+        pos += f.IsNullTermString ? 0 : f.Size; // NullTermString fields have size 0, which is correct (variable-length)
+      }
+      return pos;
     }
 
     // Fixed-layout: max(offset + size)
@@ -1111,7 +1123,7 @@ public sealed partial class HeaderSerializerGenerator : IIncrementalGenerator {
     switch (f.TypeName) {
       case "byte[]":
       case "global::System.Byte[]":
-        sb.Append("this.").Append(f.Name).Append(".AsSpan().CopyTo(destination.Slice(").Append(f.Offset).Append(", ").Append(f.Size).Append("));");
+        sb.Append("if (this.").Append(f.Name).Append(" != null) this.").Append(f.Name).Append(".AsSpan().CopyTo(destination.Slice(").Append(f.Offset).Append(", ").Append(f.Size).Append("));");
         return;
       case "string":
       case "global::System.String":
@@ -1236,6 +1248,8 @@ public sealed partial class HeaderSerializerGenerator : IIncrementalGenerator {
       var pos = 0;
       for (var i = 0; i < model.Fields.Length; ++i) {
         var f = model.Fields[i];
+        if (f.FieldOffset >= 0)
+          pos = f.FieldOffset;
         if (i > 0) sb.Append(",");
         sb.AppendLine();
         sb.Append("    new(\"").Append(f.Name).Append("\", ").Append(pos).Append(", ").Append(f.Size).Append(")");
@@ -1791,6 +1805,17 @@ public sealed partial class HeaderSerializerGenerator : IIncrementalGenerator {
 
   private static void _GenerateSeqWriteTo(StringBuilder sb, HeaderModel model) {
     sb.AppendLine("  public void WriteTo(global::System.Span<byte> destination) {");
+
+    if (model.HasGaps) {
+      // Compute the byte range that fields actually cover to clear only trailing gaps.
+      // If the first field has a [FieldOffset], the preceding bytes belong to the caller.
+      var firstFieldStart = _ComputeSeqFirstFieldOffset(model);
+      if (model.FillByte != 0)
+        sb.Append("    destination.Slice(").Append(firstFieldStart).Append(", ").Append(model.StructSize - firstFieldStart).Append(").Fill(").Append(model.FillByte).AppendLine(");");
+      else
+        sb.Append("    destination.Slice(").Append(firstFieldStart).Append(", ").Append(model.StructSize - firstFieldStart).AppendLine(").Clear();");
+    }
+
     sb.AppendLine("    var _pos = 0;");
 
     foreach (var f in model.Fields) {

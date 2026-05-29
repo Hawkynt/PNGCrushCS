@@ -17,7 +17,9 @@ public readonly record struct NeoGeoSpriteFile : IImageFormatReader<NeoGeoSprite
   static string IImageFormatMetadata<NeoGeoSpriteFile>.PrimaryExtension => ".neo";
   static string[] IImageFormatMetadata<NeoGeoSpriteFile>.FileExtensions => [".neo", ".spr"];
   static NeoGeoSpriteFile IImageFormatReader<NeoGeoSpriteFile>.FromSpan(ReadOnlySpan<byte> data) => NeoGeoSpriteReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<NeoGeoSpriteFile>.Capabilities => FormatCapability.IndexedOnly;
+  static FormatCapability IImageFormatMetadata<NeoGeoSpriteFile>.Capabilities => FormatCapability.IndexedOnly | FormatCapability.FixedResolution;
+  static IntegerRange[] IImageFormatMetadata<NeoGeoSpriteFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
+  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<NeoGeoSpriteFile>.AllowedDimensions => [(TilesPerRow * TileSize, new IntegerRange(TileSize, 4096, TileSize))];
   static byte[] IImageFormatWriter<NeoGeoSpriteFile>.ToBytes(NeoGeoSpriteFile file) => NeoGeoSpriteWriter.ToBytes(file);
 
   public int Width { get; init; }
@@ -30,8 +32,8 @@ public readonly record struct NeoGeoSpriteFile : IImageFormatReader<NeoGeoSprite
       Width = file.Width,
       Height = file.Height,
       Format = PixelFormat.Indexed8,
-      PixelData = file.PixelData[..],
-      Palette = file.Palette[..],
+      PixelData = (file.PixelData ?? Array.Empty<byte>())[..],
+      Palette = (file.Palette ?? Array.Empty<byte>())[..],
       PaletteCount = PaletteColors,
     };
   }

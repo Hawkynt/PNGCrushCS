@@ -18,7 +18,7 @@ public static class PalmPdbWriter {
 
   public static byte[] ToBytes(PalmPdbFile file) {
     ArgumentNullException.ThrowIfNull(file);
-    return Assemble(file.PixelData, file.Width, file.Height, file.Name);
+    return Assemble(file.PixelData ?? Array.Empty<byte>(), file.Width, file.Height, file.Name ?? "");
   }
 
   internal static byte[] Assemble(byte[] pixelData, int width, int height, string name) {

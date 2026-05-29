@@ -13,6 +13,7 @@ public readonly record struct PrintMasterFile : IImageFormatReader<PrintMasterFi
   static string[] IImageFormatMetadata<PrintMasterFile>.FileExtensions => [".pm"];
   static PrintMasterFile IImageFormatReader<PrintMasterFile>.FromSpan(ReadOnlySpan<byte> data) => PrintMasterReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<PrintMasterFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static IntegerRange[] IImageFormatMetadata<PrintMasterFile>.AllowedPaletteRanges => [2];
   static byte[] IImageFormatWriter<PrintMasterFile>.ToBytes(PrintMasterFile file) => PrintMasterWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>

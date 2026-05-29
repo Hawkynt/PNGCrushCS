@@ -71,7 +71,7 @@ internal sealed class JxlFrameTocTests {
 
     Assert.That(toc, Is.Not.Null);
     Assert.That(toc.Permuted, Is.False);
-    Assert.That(toc.Permutation, Is.Empty);
+    Assert.That(toc.Permutation, Has.Length.EqualTo(0));
     Assert.That(toc.SectionSizes.Length, Is.EqualTo(1));
     Assert.That(toc.SectionOffsets.Length, Is.EqualTo(1));
     Assert.That(toc.SectionSizes[0], Is.EqualTo(42));

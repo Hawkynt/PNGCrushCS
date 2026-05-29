@@ -12,7 +12,7 @@ public sealed class PdfStreamDecoderTests {
   [Category("Unit")]
   public void DecodeFlateDecode_EmptyData_ReturnsInput() {
     var result = PdfStreamDecoder.DecodeFlateDecode([], null);
-    Assert.That(result, Is.Empty);
+    Assert.That(result, Has.Length.EqualTo(0));
   }
 
   [Test]
@@ -27,7 +27,7 @@ public sealed class PdfStreamDecoderTests {
   [Category("Unit")]
   public void DecodeAscii85_EmptyData_ReturnsEmpty() {
     var result = PdfStreamDecoder.DecodeAscii85([]);
-    Assert.That(result, Is.Empty);
+    Assert.That(result, Has.Length.EqualTo(0));
   }
 
   [Test]
@@ -50,7 +50,7 @@ public sealed class PdfStreamDecoderTests {
   [Category("Unit")]
   public void DecodeAsciiHex_EmptyData_ReturnsEmpty() {
     var result = PdfStreamDecoder.DecodeAsciiHex([]);
-    Assert.That(result, Is.Empty);
+    Assert.That(result, Has.Length.EqualTo(0));
   }
 
   [Test]
@@ -73,7 +73,7 @@ public sealed class PdfStreamDecoderTests {
   [Category("Unit")]
   public void DecodeRunLength_EmptyData_ReturnsEmpty() {
     var result = PdfStreamDecoder.DecodeRunLength([]);
-    Assert.That(result, Is.Empty);
+    Assert.That(result, Has.Length.EqualTo(0));
   }
 
   [Test]
@@ -81,7 +81,7 @@ public sealed class PdfStreamDecoderTests {
   public void DecodeRunLength_EodMarker_StopsDecoding() {
     var data = new byte[] { 128 };
     var result = PdfStreamDecoder.DecodeRunLength(data);
-    Assert.That(result, Is.Empty);
+    Assert.That(result, Has.Length.EqualTo(0));
   }
 
   [Test]
@@ -104,7 +104,7 @@ public sealed class PdfStreamDecoderTests {
   [Category("Unit")]
   public void DecodeLzw_EmptyData_ReturnsEmpty() {
     var result = PdfStreamDecoder.DecodeLzw([], null);
-    Assert.That(result, Is.Empty);
+    Assert.That(result, Has.Length.EqualTo(0));
   }
 
   [Test]
@@ -123,7 +123,7 @@ public sealed class PdfStreamDecoderTests {
       ["Filter"] = "FlateDecode",
     };
     var result = PdfStreamDecoder.Decode([], dict);
-    Assert.That(result, Is.Empty);
+    Assert.That(result, Has.Length.EqualTo(0));
   }
 
   [Test]

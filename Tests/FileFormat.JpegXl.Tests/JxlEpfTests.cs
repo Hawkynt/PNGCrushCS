@@ -260,9 +260,9 @@ internal sealed class JxlEpfTests {
     var p = new EpfParams();
     Assert.Multiple(() => {
       Assert.That(p.Iters, Is.EqualTo(0));
-      Assert.That(p.SigmaForModularX, Is.Empty);
-      Assert.That(p.SigmaForModularY, Is.Empty);
-      Assert.That(p.Sharpness, Is.Empty);
+      Assert.That(p.SigmaForModularX, Has.Length.EqualTo(0));
+      Assert.That(p.SigmaForModularY, Has.Length.EqualTo(0));
+      Assert.That(p.Sharpness, Has.Length.EqualTo(0));
     });
   }
 

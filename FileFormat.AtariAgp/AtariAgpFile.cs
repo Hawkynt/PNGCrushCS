@@ -19,6 +19,8 @@ public readonly record struct AtariAgpFile : IImageFormatReader<AtariAgpFile>, I
   static string[] IImageFormatMetadata<AtariAgpFile>.FileExtensions => [".agp"];
   static AtariAgpFile IImageFormatReader<AtariAgpFile>.FromSpan(ReadOnlySpan<byte> data) => AtariAgpReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<AtariAgpFile>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<AtariAgpFile>.AllowedPaletteRanges => [new IntegerRange(2, 4)];
+  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<AtariAgpFile>.AllowedDimensions => [(320, 192), (160, 96)];
   static byte[] IImageFormatWriter<AtariAgpFile>.ToBytes(AtariAgpFile file) => AtariAgpWriter.ToBytes(file);
 
   /// <summary>Width in pixels (320 for GR.8, 160 for GR.7).</summary>
@@ -88,16 +90,28 @@ public readonly record struct AtariAgpFile : IImageFormatReader<AtariAgpFile>, I
     };
   }
 
-  /// <summary>Creates an AGP image from an Indexed8 raw image.</summary>
+  /// <summary>Creates an AGP image from an Indexed1 or Indexed8 raw image.</summary>
   public static AtariAgpFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException($"Expected {PixelFormat.Indexed8} but got {image.Format}.", nameof(image));
+    if (image.Format != PixelFormat.Indexed8 && image.Format != PixelFormat.Indexed1)
+      throw new ArgumentException($"Expected {PixelFormat.Indexed8} or {PixelFormat.Indexed1} but got {image.Format}.", nameof(image));
 
     var mode = _InferMode(image.Width, image.Height);
     var pixelData = new byte[image.Width * image.Height];
-    var srcLen = Math.Min(image.PixelData.Length, pixelData.Length);
-    image.PixelData.AsSpan(0, srcLen).CopyTo(pixelData);
+    if (image.Format == PixelFormat.Indexed1) {
+      var stride = (image.Width + 7) / 8;
+      for (var y = 0; y < image.Height; ++y) {
+        var rowSrc = y * stride;
+        var rowDst = y * image.Width;
+        for (var x = 0; x < image.Width; ++x) {
+          var b = image.PixelData[rowSrc + (x >> 3)];
+          pixelData[rowDst + x] = (byte)((b >> (7 - (x & 7))) & 1);
+        }
+      }
+    } else {
+      var srcLen = Math.Min(image.PixelData.Length, pixelData.Length);
+      image.PixelData.AsSpan(0, srcLen).CopyTo(pixelData);
+    }
 
     return new() {
       Width = image.Width,

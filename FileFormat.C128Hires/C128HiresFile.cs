@@ -10,6 +10,7 @@ public readonly record struct C128HiresFile : IImageFormatReader<C128HiresFile>,
   static string[] IImageFormatMetadata<C128HiresFile>.FileExtensions => [".c1h"];
   static C128HiresFile IImageFormatReader<C128HiresFile>.FromSpan(ReadOnlySpan<byte> data) => C128HiresReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<C128HiresFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static IntegerRange[] IImageFormatMetadata<C128HiresFile>.AllowedPaletteRanges => [2];
   static byte[] IImageFormatWriter<C128HiresFile>.ToBytes(C128HiresFile file) => C128HiresWriter.ToBytes(file);
 
   /// <summary>Expected file size in bytes (40 * 25 * 8).</summary>

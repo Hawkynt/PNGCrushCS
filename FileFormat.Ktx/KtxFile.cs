@@ -8,7 +8,7 @@ namespace FileFormat.Ktx;
 /// <summary>In-memory representation of a KTX texture container.</summary>
 [FormatMagicBytes([0xAB, 0x4B, 0x54, 0x58, 0x20, 0x31, 0x31, 0xBB])]
 [FormatMagicBytes([0xAB, 0x4B, 0x54, 0x58, 0x20, 0x32, 0x30, 0xBB])]
-public readonly record struct KtxFile : IImageFormatReader<KtxFile>, IImageToRawImage<KtxFile>, IImageFormatWriter<KtxFile> {
+public readonly record struct KtxFile() : IImageFormatReader<KtxFile>, IImageToRawImage<KtxFile>, IImageFormatWriter<KtxFile> {
 
   static string IImageFormatMetadata<KtxFile>.PrimaryExtension => ".ktx";
   static string[] IImageFormatMetadata<KtxFile>.FileExtensions => [".ktx", ".ktx2"];
@@ -21,7 +21,7 @@ public readonly record struct KtxFile : IImageFormatReader<KtxFile>, IImageToRaw
   public int MipmapCount { get; init; }
   public int Faces { get; init; }
   public int ArrayElements { get; init; }
-  public IReadOnlyList<KtxMipLevel> MipLevels { get; init; }
+  public IReadOnlyList<KtxMipLevel> MipLevels { get; init; } = Array.Empty<KtxMipLevel>();
   public IReadOnlyList<KtxKeyValue>? KeyValues { get; init; }
 
   // KTX1 fields

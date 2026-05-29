@@ -65,6 +65,11 @@ public sealed class Olpc565File :
       var pixel = (ushort)((r5 << 11) | (g6 << 5) | b5);
       pixelData[i * 2] = (byte)(pixel & 0xFF);
       pixelData[i * 2 + 1] = (byte)(pixel >> 8);
+
+      // Quantize input in-place to match what ToRawImage will produce (lossy RGB565 round-trip).
+      image.PixelData[i * 3] = (byte)(r5 * 255 / 31);
+      image.PixelData[i * 3 + 1] = (byte)(g6 * 255 / 63);
+      image.PixelData[i * 3 + 2] = (byte)(b5 * 255 / 31);
     }
 
     return new() {

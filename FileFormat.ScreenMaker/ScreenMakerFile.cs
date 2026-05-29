@@ -10,6 +10,7 @@ public readonly record struct ScreenMakerFile : IImageFormatReader<ScreenMakerFi
   static string[] IImageFormatMetadata<ScreenMakerFile>.FileExtensions => [".smk"];
   static ScreenMakerFile IImageFormatReader<ScreenMakerFile>.FromSpan(ReadOnlySpan<byte> data) => ScreenMakerReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<ScreenMakerFile>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<ScreenMakerFile>.AllowedPaletteRanges => [new IntegerRange(2, 256)];
   static byte[] IImageFormatWriter<ScreenMakerFile>.ToBytes(ScreenMakerFile file) => ScreenMakerWriter.ToBytes(file);
 
   /// <summary>Size of the header in bytes (2 width + 2 height).</summary>

@@ -30,7 +30,7 @@ public readonly record struct FarbfeldFile : IImageFormatReader<FarbfeldFile>, I
   public static FarbfeldFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
     if (image.Format != PixelFormat.Rgba64)
-      throw new ArgumentException($"Expected {PixelFormat.Rgba64} but got {image.Format}.", nameof(image));
+      image = PixelConverter.Convert(image, PixelFormat.Rgba64);
 
     return new() {
       Width = image.Width,

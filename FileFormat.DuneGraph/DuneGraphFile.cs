@@ -34,6 +34,7 @@ public readonly record struct DuneGraphFile : IImageFormatReader<DuneGraphFile>,
   static string[] IImageFormatMetadata<DuneGraphFile>.FileExtensions => [".dg1", ".dc1"];
   static DuneGraphFile IImageFormatReader<DuneGraphFile>.FromSpan(ReadOnlySpan<byte> data) => DuneGraphReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<DuneGraphFile>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<DuneGraphFile>.AllowedPaletteRanges => [new IntegerRange(2, 256)];
   static byte[] IImageFormatWriter<DuneGraphFile>.ToBytes(DuneGraphFile file) => DuneGraphWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>

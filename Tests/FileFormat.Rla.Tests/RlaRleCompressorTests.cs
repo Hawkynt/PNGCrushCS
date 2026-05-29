@@ -59,7 +59,7 @@ public sealed class RlaRleCompressorTests {
 
     var compressed = RlaRleCompressor.Compress(scanline);
 
-    Assert.That(compressed, Is.Empty);
+    Assert.That(compressed, Has.Length.EqualTo(0));
   }
 
   [Test]

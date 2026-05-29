@@ -10,7 +10,7 @@ public sealed class Rgb8ByteRun1Tests {
   [Category("Unit")]
   public void Encode_EmptyInput_ReturnsEmpty() {
     var result = Rgb8ByteRun1Compressor.Encode(ReadOnlySpan<byte>.Empty);
-    Assert.That(result, Is.Empty);
+    Assert.That(result, Has.Length.EqualTo(0));
   }
 
   [Test]

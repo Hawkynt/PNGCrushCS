@@ -18,6 +18,18 @@ public readonly record struct PalmFile : IImageFormatReader<PalmFile>, IImageToR
   public byte[] PixelData { get; init; }
   public byte[]? Palette { get; init; }
 
+  private static readonly byte[] _Default8bppPalette = _MakeGrayRamp(256);
+  private static readonly byte[] _Default4bppPalette = _MakeGrayRamp(16);
+
+  private static byte[] _MakeGrayRamp(int entries) {
+    var p = new byte[entries * 3];
+    for (var i = 0; i < entries; ++i) {
+      var v = entries == 1 ? (byte)128 : (byte)(i * 255 / (entries - 1));
+      p[i * 3] = v; p[i * 3 + 1] = v; p[i * 3 + 2] = v;
+    }
+    return p;
+  }
+
   public static RawImage ToRawImage(PalmFile file) {
 
     return file.BitsPerPixel switch {
@@ -32,24 +44,24 @@ public readonly record struct PalmFile : IImageFormatReader<PalmFile>, IImageToR
         Height = file.Height,
         Format = PixelFormat.Indexed8,
         PixelData = file.PixelData[..],
-        Palette = file.Palette is { } p8 ? p8[..] : null,
-        PaletteCount = file.Palette is { } pal8 ? pal8.Length / 3 : 0,
+        Palette = file.Palette is { Length: >= 768 } p8 ? p8[..768] : _Default8bppPalette[..],
+        PaletteCount = 256,
       },
       4 => new() {
         Width = file.Width,
         Height = file.Height,
         Format = PixelFormat.Indexed4,
         PixelData = file.PixelData[..],
-        Palette = file.Palette is { } p4 ? p4[..] : null,
-        PaletteCount = file.Palette is { } pal4 ? pal4.Length / 3 : 0,
+        Palette = file.Palette is { Length: >= 48 } p4 ? p4[..48] : _Default4bppPalette[..],
+        PaletteCount = 16,
       },
       1 => new() {
         Width = file.Width,
         Height = file.Height,
         Format = PixelFormat.Indexed1,
         PixelData = file.PixelData[..],
-        Palette = file.Palette is { } p1 ? p1[..] : [255, 255, 255, 0, 0, 0],
-        PaletteCount = file.Palette is { } pal1 ? pal1.Length / 3 : 2,
+        Palette = file.Palette is { Length: >= 6 } p1 ? p1[..6] : [255, 255, 255, 0, 0, 0],
+        PaletteCount = 2,
       },
       _ => throw new ArgumentException($"Unsupported BitsPerPixel: {file.BitsPerPixel}", nameof(file))
     };

@@ -22,6 +22,12 @@ public readonly record struct AtariGraphics9File : IImageFormatReader<AtariGraph
   static string[] IImageFormatMetadata<AtariGraphics9File>.FileExtensions => [".gr9", ".g9"];
   static AtariGraphics9File IImageFormatReader<AtariGraphics9File>.FromSpan(ReadOnlySpan<byte> data) => AtariGraphics9Reader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<AtariGraphics9File>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<AtariGraphics9File>.AllowedPaletteRanges => [16];
+  static FixedPalette[] IImageFormatMetadata<AtariGraphics9File>.FixedPalettes => [
+    new FixedPalette("GTIA GR.9 16-step grayscale",
+      0x000000, 0x111111, 0x222222, 0x333333, 0x444444, 0x555555, 0x666666, 0x777777,
+      0x888888, 0x999999, 0xAAAAAA, 0xBBBBBB, 0xCCCCCC, 0xDDDDDD, 0xEEEEEE, 0xFFFFFF),
+  ];
   static byte[] IImageFormatWriter<AtariGraphics9File>.ToBytes(AtariGraphics9File file) => AtariGraphics9Writer.ToBytes(file);
 
   /// <summary>Always 80.</summary>
@@ -59,27 +65,49 @@ public readonly record struct AtariGraphics9File : IImageFormatReader<AtariGraph
     };
   }
 
-  /// <summary>Creates a Graphics 9 image from a Gray8 raw image (80x192). Quantizes to 16 levels.</summary>
+  /// <summary>Creates a Graphics 9 image from a raw image (80x192). Accepts Gray8 (quantized), Indexed1 (bit-packed), or Indexed8 (palette index).</summary>
   public static AtariGraphics9File FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Gray8)
-      throw new ArgumentException($"Expected {PixelFormat.Gray8} but got {image.Format}.", nameof(image));
     if (image.Width != PixelWidth || image.Height != PixelHeight)
       throw new ArgumentException($"Expected {PixelWidth}x{PixelHeight} but got {image.Width}x{image.Height}.", nameof(image));
 
     var pixelData = new byte[FileSize];
 
-    for (var y = 0; y < PixelHeight; ++y)
-      for (var x = 0; x < BytesPerLine; ++x) {
-        var srcIndex = y * PixelWidth + x * 2;
-        var left = image.PixelData[srcIndex] / 17;
-        var right = image.PixelData[srcIndex + 1] / 17;
+    if (image.Format == PixelFormat.Indexed1) {
+      var stride = (PixelWidth + 7) / 8;
+      for (var y = 0; y < PixelHeight; ++y)
+        for (var x = 0; x < BytesPerLine; ++x) {
+          var rowSrc = y * stride;
+          var x2 = x * 2;
+          var bLeft = image.PixelData[rowSrc + (x2 >> 3)];
+          var bRight = image.PixelData[rowSrc + ((x2 + 1) >> 3)];
+          var left = (bLeft >> (7 - (x2 & 7))) & 1;
+          var right = (bRight >> (7 - ((x2 + 1) & 7))) & 1;
+          pixelData[y * BytesPerLine + x] = (byte)((left << 4) | right);
+        }
+    } else if (image.Format == PixelFormat.Indexed8) {
+      for (var y = 0; y < PixelHeight; ++y)
+        for (var x = 0; x < BytesPerLine; ++x) {
+          var srcIndex = y * PixelWidth + x * 2;
+          var left = image.PixelData[srcIndex] & 0x0F;
+          var right = image.PixelData[srcIndex + 1] & 0x0F;
+          pixelData[y * BytesPerLine + x] = (byte)((left << 4) | right);
+        }
+    } else if (image.Format == PixelFormat.Gray8) {
+      for (var y = 0; y < PixelHeight; ++y)
+        for (var x = 0; x < BytesPerLine; ++x) {
+          var srcIndex = y * PixelWidth + x * 2;
+          var left = image.PixelData[srcIndex] / 17;
+          var right = image.PixelData[srcIndex + 1] / 17;
 
-        if (left > 15) left = 15;
-        if (right > 15) right = 15;
+          if (left > 15) left = 15;
+          if (right > 15) right = 15;
 
-        pixelData[y * BytesPerLine + x] = (byte)((left << 4) | right);
-      }
+          pixelData[y * BytesPerLine + x] = (byte)((left << 4) | right);
+        }
+    } else {
+      throw new ArgumentException($"Expected {PixelFormat.Gray8}, {PixelFormat.Indexed1}, or {PixelFormat.Indexed8} but got {image.Format}.", nameof(image));
+    }
 
     return new() { PixelData = pixelData };
   }

@@ -25,6 +25,7 @@ public readonly record struct AppleIIDhrFile : IImageFormatReader<AppleIIDhrFile
   static string[] IImageFormatMetadata<AppleIIDhrFile>.FileExtensions => [".dhr", ".a2d"];
   static AppleIIDhrFile IImageFormatReader<AppleIIDhrFile>.FromSpan(ReadOnlySpan<byte> data) => AppleIIDhrReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<AppleIIDhrFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static IntegerRange[] IImageFormatMetadata<AppleIIDhrFile>.AllowedPaletteRanges => [2];
   static byte[] IImageFormatWriter<AppleIIDhrFile>.ToBytes(AppleIIDhrFile file) => AppleIIDhrWriter.ToBytes(file);
 
   /// <summary>Always 560.</summary>

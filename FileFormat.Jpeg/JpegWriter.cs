@@ -1,6 +1,5 @@
-﻿using System;
+using System;
 using System.IO;
-using BitMiracle.LibJpeg.Classic;
 
 namespace FileFormat.Jpeg;
 
@@ -26,40 +25,11 @@ internal static class JpegWriter {
     bool optimizeHuffman,
     bool stripMetadata
   ) {
-    using var inputStream = new MemoryStream(inputJpeg);
-    using var outputStream = new MemoryStream();
+    // Decode to coefficient level using the pure-managed decoder pipeline.
+    var image = JpegManagedDecoder.DecodeToCoefficients(inputJpeg);
 
-    var srcInfo = new jpeg_decompress_struct();
-    srcInfo.jpeg_stdio_src(inputStream);
-    srcInfo.jpeg_read_header(true);
-
-    var coeffArrays = srcInfo.jpeg_read_coefficients();
-
-    var dstInfo = new jpeg_compress_struct();
-    dstInfo.jpeg_stdio_dest(outputStream);
-
-    srcInfo.jpeg_copy_critical_parameters(dstInfo);
-
-    // Set scan mode
-    if (mode == JpegMode.Progressive)
-      dstInfo.jpeg_simple_progression();
-
-    // Optimize Huffman tables
-    dstInfo.Optimize_coding = optimizeHuffman;
-
-    if (stripMetadata) {
-      // Write coefficients without copying markers
-      dstInfo.jpeg_write_coefficients(coeffArrays);
-    } else {
-      // Copy markers from source to destination
-      _CopyMarkers(srcInfo, dstInfo);
-      dstInfo.jpeg_write_coefficients(coeffArrays);
-    }
-
-    dstInfo.jpeg_finish_compress();
-    srcInfo.jpeg_finish_decompress();
-
-    return outputStream.ToArray();
+    // Re-emit as the target mode with the requested Huffman optimization.
+    return JpegCoefficientWriter.Write(image, mode, optimizeHuffman, stripMetadata);
   }
 
   public static byte[] LossyEncode(
@@ -71,76 +41,6 @@ internal static class JpegWriter {
     JpegSubsampling subsampling,
     bool optimizeHuffman,
     bool isGrayscale
-  ) {
-    // 4:2:2 chroma subsampling is not implemented by BitMiracle.LibJpeg.NET, so route it
-    // through the pure-managed encoder. The managed path supports all subsampling modes
-    // identically, so we could route any mode there — but BitMiracle is the well-tested
-    // path, so we keep it for 4:4:4 and 4:2:0 to avoid behavioral churn.
-    if (subsampling == JpegSubsampling.Chroma422 && !isGrayscale)
-      return JpegManagedEncoder.Encode(
-        rgbPixelData, width, height, quality, mode, subsampling, optimizeHuffman, isGrayscale);
-
-    using var outputStream = new MemoryStream();
-
-    var cinfo = new jpeg_compress_struct();
-    cinfo.jpeg_stdio_dest(outputStream);
-
-    cinfo.Image_width = width;
-    cinfo.Image_height = height;
-    cinfo.Input_components = isGrayscale ? 1 : 3;
-    cinfo.In_color_space = isGrayscale ? J_COLOR_SPACE.JCS_GRAYSCALE : J_COLOR_SPACE.JCS_RGB;
-
-    cinfo.jpeg_set_defaults();
-    cinfo.jpeg_set_quality(quality, true);
-
-    // Set subsampling (only for color images)
-    if (!isGrayscale) {
-      switch (subsampling) {
-        case JpegSubsampling.Chroma444:
-          cinfo.Component_info[0].H_samp_factor = 1;
-          cinfo.Component_info[0].V_samp_factor = 1;
-          cinfo.Component_info[1].H_samp_factor = 1;
-          cinfo.Component_info[1].V_samp_factor = 1;
-          cinfo.Component_info[2].H_samp_factor = 1;
-          cinfo.Component_info[2].V_samp_factor = 1;
-          break;
-        case JpegSubsampling.Chroma420:
-          cinfo.Component_info[0].H_samp_factor = 2;
-          cinfo.Component_info[0].V_samp_factor = 2;
-          cinfo.Component_info[1].H_samp_factor = 1;
-          cinfo.Component_info[1].V_samp_factor = 1;
-          cinfo.Component_info[2].H_samp_factor = 1;
-          cinfo.Component_info[2].V_samp_factor = 1;
-          break;
-      }
-    }
-
-    if (mode == JpegMode.Progressive)
-      cinfo.jpeg_simple_progression();
-
-    cinfo.Optimize_coding = optimizeHuffman;
-
-    cinfo.jpeg_start_compress(true);
-
-    var rowStride = width * (isGrayscale ? 1 : 3);
-    var rowBuffer = new byte[rowStride];
-
-    for (var y = 0; y < height; ++y) {
-      rgbPixelData.AsSpan(y * rowStride, rowStride).CopyTo(rowBuffer.AsSpan(0));
-      var rowPointer = new byte[][] { rowBuffer };
-      cinfo.jpeg_write_scanlines(rowPointer, 1);
-    }
-
-    cinfo.jpeg_finish_compress();
-
-    return outputStream.ToArray();
-  }
-
-  private static void _CopyMarkers(jpeg_decompress_struct srcInfo, jpeg_compress_struct dstInfo) {
-    // Save markers during read
-    foreach (var marker in srcInfo.Marker_list) {
-      if (marker.Data != null && marker.Data.Length > 0)
-        dstInfo.jpeg_write_marker(marker.Marker, marker.Data);
-    }
-  }
+  ) => JpegManagedEncoder.Encode(
+    rgbPixelData, width, height, quality, mode, subsampling, optimizeHuffman, isGrayscale);
 }

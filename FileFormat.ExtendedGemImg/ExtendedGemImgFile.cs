@@ -10,6 +10,7 @@ public readonly record struct ExtendedGemImgFile : IImageFormatReader<ExtendedGe
   static string[] IImageFormatMetadata<ExtendedGemImgFile>.FileExtensions => [".ximg"];
   static ExtendedGemImgFile IImageFormatReader<ExtendedGemImgFile>.FromSpan(ReadOnlySpan<byte> data) => ExtendedGemImgReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<ExtendedGemImgFile>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<ExtendedGemImgFile>.AllowedPaletteRanges => [new IntegerRange(2, 256)];
   static byte[] IImageFormatWriter<ExtendedGemImgFile>.ToBytes(ExtendedGemImgFile file) => ExtendedGemImgWriter.ToBytes(file);
 
   /// <summary>IMG version (typically 1).</summary>

@@ -9,6 +9,9 @@ public readonly record struct SamCoupeFile : IImageFormatReader<SamCoupeFile>, I
   static string IImageFormatMetadata<SamCoupeFile>.PrimaryExtension => ".sam";
   static string[] IImageFormatMetadata<SamCoupeFile>.FileExtensions => [".sam"];
   static SamCoupeFile IImageFormatReader<SamCoupeFile>.FromSpan(ReadOnlySpan<byte> data) => SamCoupeReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<SamCoupeFile>.Capabilities => FormatCapability.IndexedOnly | FormatCapability.FixedResolution;
+  static IntegerRange[] IImageFormatMetadata<SamCoupeFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
+  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<SamCoupeFile>.AllowedDimensions => [(256, 192), (512, 192)];
   static byte[] IImageFormatWriter<SamCoupeFile>.ToBytes(SamCoupeFile file) => SamCoupeWriter.ToBytes(file);
 
   /// <summary>Width in pixels (256 for Mode 4, 512 for Mode 3).</summary>
@@ -42,7 +45,11 @@ public readonly record struct SamCoupeFile : IImageFormatReader<SamCoupeFile>, I
     if (image.Height != 192)
       throw new ArgumentException("SAM Coupe images must be exactly 192 pixels tall.", nameof(image));
 
-    var mode = image.PaletteCount <= 4 ? SamCoupeMode.Mode3 : SamCoupeMode.Mode4;
+    var mode = image.Width switch {
+      512 => SamCoupeMode.Mode3,
+      256 => SamCoupeMode.Mode4,
+      _ => image.PaletteCount <= 4 ? SamCoupeMode.Mode3 : SamCoupeMode.Mode4,
+    };
 
     return mode switch {
       SamCoupeMode.Mode3 => _Mode3FromRawImage(image),

@@ -7,7 +7,7 @@ namespace FileFormat.G9b;
 /// Header: 3-byte magic "G9B" + 2-byte LE header size + 1-byte screen mode + 1-byte color mode + 2-byte LE width + 2-byte LE height + pixel data.
 /// </summary>
 [FormatMagicBytes([0x47, 0x39, 0x42])]
-public readonly record struct G9bFile : IImageFormatReader<G9bFile>, IImageToRawImage<G9bFile>, IImageFromRawImage<G9bFile>, IImageFormatWriter<G9bFile> {
+public readonly record struct G9bFile() : IImageFormatReader<G9bFile>, IImageToRawImage<G9bFile>, IImageFromRawImage<G9bFile>, IImageFormatWriter<G9bFile> {
 
   static string IImageFormatMetadata<G9bFile>.PrimaryExtension => ".g9b";
   static string[] IImageFormatMetadata<G9bFile>.FileExtensions => [".g9b"];
@@ -28,7 +28,7 @@ public readonly record struct G9bFile : IImageFormatReader<G9bFile>, IImageToRaw
   public byte ColorMode { get; init; }
 
   /// <summary>Header size as stored in the file (default 11).</summary>
-  public int HeaderSize { get; init; }
+  public int HeaderSize { get; init; } = G9bReader.DefaultHeaderSize;
 
   /// <summary>Raw pixel data.</summary>
   public byte[] PixelData { get; init; }

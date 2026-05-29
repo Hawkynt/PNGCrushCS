@@ -27,6 +27,8 @@ public readonly record struct PagefoxFile : IImageFormatReader<PagefoxFile>, IIm
   static string IImageFormatMetadata<PagefoxFile>.PrimaryExtension => ".pfx";
   static string[] IImageFormatMetadata<PagefoxFile>.FileExtensions => [".pfx"];
   static PagefoxFile IImageFormatReader<PagefoxFile>.FromSpan(ReadOnlySpan<byte> data) => PagefoxReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<PagefoxFile>.Capabilities => FormatCapability.MonochromeOnly | FormatCapability.FixedResolution;
+  static IntegerRange[] IImageFormatMetadata<PagefoxFile>.AllowedPaletteRanges => [2];
   static byte[] IImageFormatWriter<PagefoxFile>.ToBytes(PagefoxFile file) => PagefoxWriter.ToBytes(file);
 
   /// <summary>Always 640.</summary>

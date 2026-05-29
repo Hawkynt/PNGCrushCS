@@ -37,6 +37,8 @@ public static class AtariCompressedReader {
       throw new InvalidDataException($"Decompressed size mismatch: expected {AtariCompressedFile.DecompressedSize} bytes, got {decompressed.Length}.");
 
     return new AtariCompressedFile {
+      Width = AtariCompressedFile.DefaultWidth,
+      Height = AtariCompressedFile.DefaultHeight,
       PixelData = decompressed,
     };
   }

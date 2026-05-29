@@ -22,6 +22,7 @@ public readonly record struct SoftwareAutomationFile : IImageFormatReader<Softwa
   static string[] IImageFormatMetadata<SoftwareAutomationFile>.FileExtensions => [".sag", ".swa"];
   static SoftwareAutomationFile IImageFormatReader<SoftwareAutomationFile>.FromSpan(ReadOnlySpan<byte> data) => SoftwareAutomationReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<SoftwareAutomationFile>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<SoftwareAutomationFile>.AllowedPaletteRanges => [2];
   static byte[] IImageFormatWriter<SoftwareAutomationFile>.ToBytes(SoftwareAutomationFile file) => SoftwareAutomationWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>

@@ -10,6 +10,7 @@ public readonly record struct CpcSpriteFile : IImageFormatReader<CpcSpriteFile>,
   static string[] IImageFormatMetadata<CpcSpriteFile>.FileExtensions => [".cps"];
   static CpcSpriteFile IImageFormatReader<CpcSpriteFile>.FromSpan(ReadOnlySpan<byte> data) => CpcSpriteReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<CpcSpriteFile>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<CpcSpriteFile>.AllowedPaletteRanges => [new IntegerRange(2, 4)];
   static byte[] IImageFormatWriter<CpcSpriteFile>.ToBytes(CpcSpriteFile file) => CpcSpriteWriter.ToBytes(file);
 
   /// <summary>Expected file size in bytes (16 rows x 4 bytes per row).</summary>

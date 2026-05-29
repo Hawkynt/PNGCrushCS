@@ -10,6 +10,8 @@ public readonly record struct Spectrum512File : IImageFormatReader<Spectrum512Fi
   static string IImageFormatMetadata<Spectrum512File>.PrimaryExtension => ".spu";
   static string[] IImageFormatMetadata<Spectrum512File>.FileExtensions => [".spu"];
   static Spectrum512File IImageFormatReader<Spectrum512File>.FromSpan(ReadOnlySpan<byte> data) => Spectrum512Reader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<Spectrum512File>.Capabilities => FormatCapability.FixedResolution;
+  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<Spectrum512File>.AllowedDimensions => [(320, 199)];
   static byte[] IImageFormatWriter<Spectrum512File>.ToBytes(Spectrum512File file) => Spectrum512Writer.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
@@ -50,7 +52,7 @@ public readonly record struct Spectrum512File : IImageFormatReader<Spectrum512Fi
   public static Spectrum512File FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
     if (image.Format != PixelFormat.Rgb24)
-      throw new ArgumentException("RawImage must use PixelFormat.Rgb24.", nameof(image));
+      image = PixelConverter.Convert(image, PixelFormat.Rgb24);
     if (image.Width != 320)
       throw new ArgumentException("Spectrum 512 images must be exactly 320 pixels wide.", nameof(image));
     if (image.Height != 199)
@@ -58,12 +60,13 @@ public readonly record struct Spectrum512File : IImageFormatReader<Spectrum512Fi
 
     const int width = 320;
     const int height = 199;
+    const int paletteEntriesPerLine = 48;
     var palettes = new short[height][];
     var chunky = new byte[width * height];
 
     for (var y = 0; y < height; ++y) {
       var colorMap = new Dictionary<short, byte>();
-      var palette = new short[16];
+      var palette = new short[paletteEntriesPerLine];
       var colorCount = 0;
 
       for (var x = 0; x < width; ++x) {

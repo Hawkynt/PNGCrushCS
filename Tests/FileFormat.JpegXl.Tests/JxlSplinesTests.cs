@@ -239,7 +239,7 @@ internal sealed class JxlSplinesTests {
   public void SplineList_DefaultsToEmptySplines() {
     var list = new SplineList();
     Assert.That(list.Splines, Is.Not.Null);
-    Assert.That(list.Splines, Is.Empty);
+    Assert.That(list.Splines, Has.Length.EqualTo(0));
   }
 
   /// <summary>Spline defaults to empty arrays for all four DCT vectors and

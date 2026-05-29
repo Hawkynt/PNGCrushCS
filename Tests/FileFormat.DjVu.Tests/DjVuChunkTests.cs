@@ -88,7 +88,7 @@ public sealed class DjVuChunkTests {
   public void ParseChunks_EmptyData_ReturnsEmptyList() {
     var chunks = DjVuReader.ParseChunks([], 0, 0);
 
-    Assert.That(chunks, Is.Empty);
+    Assert.That(chunks, Has.Count.EqualTo(0));
   }
 
   [Test]
@@ -100,7 +100,7 @@ public sealed class DjVuChunkTests {
 
     var chunks = DjVuReader.ParseChunks(data, 0, data.Length);
 
-    Assert.That(chunks, Is.Empty);
+    Assert.That(chunks, Has.Count.EqualTo(0));
   }
 
   [Test]

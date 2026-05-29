@@ -25,6 +25,7 @@ public readonly record struct RamBrandtFile : IImageFormatReader<RamBrandtFile>,
   static string[] IImageFormatMetadata<RamBrandtFile>.FileExtensions => [".rmb", ".rbr"];
   static RamBrandtFile IImageFormatReader<RamBrandtFile>.FromSpan(ReadOnlySpan<byte> data) => RamBrandtReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<RamBrandtFile>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<RamBrandtFile>.AllowedPaletteRanges => [new IntegerRange(2, 4)];
   static byte[] IImageFormatWriter<RamBrandtFile>.ToBytes(RamBrandtFile file) => RamBrandtWriter.ToBytes(file);
 
   /// <summary>Always 160.</summary>

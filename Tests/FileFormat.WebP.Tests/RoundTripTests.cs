@@ -86,6 +86,6 @@ public sealed class RoundTripTests {
     var bytes = WebPWriter.ToBytes(original);
     var restored = WebPReader.FromBytes(bytes);
 
-    Assert.That(restored.MetadataChunks, Is.Empty);
+    Assert.That(restored.MetadataChunks, Has.Count.EqualTo(0));
   }
 }

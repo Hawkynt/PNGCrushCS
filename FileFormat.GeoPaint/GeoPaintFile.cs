@@ -18,7 +18,9 @@ public readonly record struct GeoPaintFile : IImageFormatReader<GeoPaintFile>, I
   static string IImageFormatMetadata<GeoPaintFile>.PrimaryExtension => ".geo";
   static string[] IImageFormatMetadata<GeoPaintFile>.FileExtensions => [".geo"];
   static GeoPaintFile IImageFormatReader<GeoPaintFile>.FromSpan(ReadOnlySpan<byte> data) => GeoPaintReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<GeoPaintFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static FormatCapability IImageFormatMetadata<GeoPaintFile>.Capabilities => FormatCapability.MonochromeOnly | FormatCapability.FixedResolution;
+  static IntegerRange[] IImageFormatMetadata<GeoPaintFile>.AllowedPaletteRanges => [2];
+  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<GeoPaintFile>.AllowedDimensions => [(FixedWidth, new IntegerRange(1, MaxHeight))];
   static byte[] IImageFormatWriter<GeoPaintFile>.ToBytes(GeoPaintFile file) => GeoPaintWriter.ToBytes(file);
 
   /// <summary>Always 640.</summary>
@@ -43,10 +45,10 @@ public readonly record struct GeoPaintFile : IImageFormatReader<GeoPaintFile>, I
 
   public static GeoPaintFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Width != FixedWidth)
-      throw new ArgumentException($"Expected width {FixedWidth} but got {image.Width}.", nameof(image));
     if (image.Format != PixelFormat.Indexed1)
       throw new ArgumentException("RawImage must use PixelFormat.Indexed1.", nameof(image));
+    if (image.Width != FixedWidth)
+      throw new ArgumentException($"Expected width {FixedWidth} but got {image.Width}.", nameof(image));
     if (image.Height < 1 || image.Height > MaxHeight)
       throw new ArgumentException($"Height must be 1..{MaxHeight} but got {image.Height}.", nameof(image));
 

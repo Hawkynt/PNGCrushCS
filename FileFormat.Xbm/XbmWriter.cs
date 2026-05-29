@@ -9,17 +9,22 @@ public static class XbmWriter {
   public static byte[] ToBytes(XbmFile file) {
     ArgumentNullException.ThrowIfNull(file);
 
+    // A null/empty Name would emit "#define _width N" which the reader's regex
+    // (which requires at least one identifier char before the underscore) cannot
+    // parse back. Substitute a default so round-tripping always works.
+    var name = string.IsNullOrEmpty(file.Name) ? "image" : file.Name;
+
     var sb = new StringBuilder();
-    sb.AppendLine($"#define {file.Name}_width {file.Width}");
-    sb.AppendLine($"#define {file.Name}_height {file.Height}");
+    sb.AppendLine($"#define {name}_width {file.Width}");
+    sb.AppendLine($"#define {name}_height {file.Height}");
 
     if (file.HotspotX.HasValue)
-      sb.AppendLine($"#define {file.Name}_x_hot {file.HotspotX.Value}");
+      sb.AppendLine($"#define {name}_x_hot {file.HotspotX.Value}");
 
     if (file.HotspotY.HasValue)
-      sb.AppendLine($"#define {file.Name}_y_hot {file.HotspotY.Value}");
+      sb.AppendLine($"#define {name}_y_hot {file.HotspotY.Value}");
 
-    sb.AppendLine($"static unsigned char {file.Name}_bits[] = {{");
+    sb.AppendLine($"static unsigned char {name}_bits[] = {{");
 
     var bytesPerRow = (file.Width + 7) / 8;
     var totalBytes = bytesPerRow * file.Height;

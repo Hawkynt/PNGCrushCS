@@ -10,7 +10,7 @@ public sealed class ByteRun1Tests {
   [Category("Unit")]
   public void Encode_EmptyData_ReturnsEmpty() {
     var result = ByteRun1Compressor.Encode(ReadOnlySpan<byte>.Empty);
-    Assert.That(result, Is.Empty);
+    Assert.That(result, Has.Length.EqualTo(0));
   }
 
   [Test]

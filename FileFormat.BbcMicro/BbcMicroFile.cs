@@ -9,6 +9,8 @@ public readonly record struct BbcMicroFile : IImageFormatReader<BbcMicroFile>, I
   static string IImageFormatMetadata<BbcMicroFile>.PrimaryExtension => ".bbc";
   static string[] IImageFormatMetadata<BbcMicroFile>.FileExtensions => [".bbc"];
   static BbcMicroFile IImageFormatReader<BbcMicroFile>.FromSpan(ReadOnlySpan<byte> data) => BbcMicroReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<BbcMicroFile>.Capabilities => FormatCapability.FixedResolution;
+  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<BbcMicroFile>.AllowedDimensions => [(640, FixedHeight)];
   static byte[] IImageFormatWriter<BbcMicroFile>.ToBytes(BbcMicroFile file) => BbcMicroWriter.ToBytes(file);
   /// <summary>Width in pixels (depends on mode: 640, 320, or 160).</summary>
   public int Width { get; init; }
@@ -147,13 +149,39 @@ public readonly record struct BbcMicroFile : IImageFormatReader<BbcMicroFile>, I
           break;
       }
 
+    var paletteCount = _GetColorCount(file.Mode);
+    var palette = _BuildDefaultPalette(paletteCount);
     return new() {
       Width = width,
       Height = height,
       Format = PixelFormat.Indexed8,
       PixelData = pixels,
-      PaletteCount = _GetColorCount(file.Mode),
+      Palette = palette,
+      PaletteCount = paletteCount,
     };
+  }
+
+  /// <summary>BBC Micro has 8 fixed colors; default palette repeats them to fill <paramref name="count"/>.</summary>
+  private static byte[] _BuildDefaultPalette(int count) {
+    // BBC Micro physical palette: black, red, green, yellow, blue, magenta, cyan, white
+    byte[] basePalette = [
+      0,   0,   0,   // 0 black
+      255, 0,   0,   // 1 red
+      0,   255, 0,   // 2 green
+      255, 255, 0,   // 3 yellow
+      0,   0,   255, // 4 blue
+      255, 0,   255, // 5 magenta
+      0,   255, 255, // 6 cyan
+      255, 255, 255, // 7 white
+    ];
+    var result = new byte[count * 3];
+    for (var i = 0; i < count; ++i) {
+      var src = (i % 8) * 3;
+      result[i * 3] = basePalette[src];
+      result[i * 3 + 1] = basePalette[src + 1];
+      result[i * 3 + 2] = basePalette[src + 2];
+    }
+    return result;
   }
 
   /// <summary>Creates a Mode 0 (1bpp, 640x256) BBC Micro screen dump from a <see cref="RawImage"/>. Pixels are thresholded at 128.</summary>

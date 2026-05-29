@@ -36,7 +36,13 @@ internal static class JpegManagedEncoder {
     byte[]? cbPlane = null;
     byte[]? crPlane = null;
     if (isGrayscale) {
-      yPlane = JpegColorConverter.RgbToGrayscale(rgbPixelData, width, height);
+      // The caller may supply single-channel Gray8 data (width*height bytes)
+      // or packed RGB24 data (width*height*3 bytes). Handle both.
+      var pixelCount = width * height;
+      if (rgbPixelData.Length == pixelCount)
+        yPlane = (byte[])rgbPixelData.Clone();
+      else
+        yPlane = JpegColorConverter.RgbToGrayscale(rgbPixelData, width, height);
     } else {
       var planes = JpegColorConverter.RgbToYCbCr(rgbPixelData, width, height);
       yPlane = planes[0]; cbPlane = planes[1]; crPlane = planes[2];

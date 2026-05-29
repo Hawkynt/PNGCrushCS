@@ -10,6 +10,7 @@ public readonly record struct HayesJtfaxFile : IImageFormatReader<HayesJtfaxFile
   static string[] IImageFormatMetadata<HayesJtfaxFile>.FileExtensions => [".jtf"];
   static HayesJtfaxFile IImageFormatReader<HayesJtfaxFile>.FromSpan(ReadOnlySpan<byte> data) => HayesJtfaxReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<HayesJtfaxFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static IntegerRange[] IImageFormatMetadata<HayesJtfaxFile>.AllowedPaletteRanges => [2];
   static byte[] IImageFormatWriter<HayesJtfaxFile>.ToBytes(HayesJtfaxFile file) => HayesJtfaxWriter.ToBytes(file);
 
   /// <summary>Magic bytes: "JT" (0x4A 0x54).</summary>

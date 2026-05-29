@@ -24,6 +24,9 @@ public readonly record struct SyntheticArtsFile : IImageFormatReader<SyntheticAr
   static string IImageFormatMetadata<SyntheticArtsFile>.PrimaryExtension => ".srt";
   static string[] IImageFormatMetadata<SyntheticArtsFile>.FileExtensions => [".srt"];
   static SyntheticArtsFile IImageFormatReader<SyntheticArtsFile>.FromSpan(ReadOnlySpan<byte> data) => SyntheticArtsReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<SyntheticArtsFile>.Capabilities => FormatCapability.IndexedOnly | FormatCapability.FixedResolution;
+  static IntegerRange[] IImageFormatMetadata<SyntheticArtsFile>.AllowedPaletteRanges => [new IntegerRange(2, 4)];
+  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<SyntheticArtsFile>.AllowedDimensions => [(ImageWidth, ImageHeight)];
   static byte[] IImageFormatWriter<SyntheticArtsFile>.ToBytes(SyntheticArtsFile file) => SyntheticArtsWriter.ToBytes(file);
 
   /// <summary>16-entry palette of Atari ST RGB values (0x0RGB, R/G/B in 0-7). Only the first 4 entries are used.</summary>

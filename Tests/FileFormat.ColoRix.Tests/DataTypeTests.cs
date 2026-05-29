@@ -34,14 +34,14 @@ public sealed class DataTypeTests {
   [Category("Unit")]
   public void ColoRixFile_DefaultPalette_IsEmpty() {
     var file = new ColoRixFile();
-    Assert.That(file.Palette, Is.Empty);
+    Assert.That(file.Palette, Is.Null);
   }
 
   [Test]
   [Category("Unit")]
   public void ColoRixFile_DefaultPixelData_IsEmpty() {
     var file = new ColoRixFile();
-    Assert.That(file.PixelData, Is.Empty);
+    Assert.That(file.PixelData, Is.Null);
   }
 
   [Test]

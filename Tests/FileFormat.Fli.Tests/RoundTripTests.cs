@@ -103,7 +103,7 @@ public sealed class RoundTripTests {
     var restored = FliReader.FromBytes(bytes);
 
     Assert.That(restored.Frames[0].Chunks[0].ChunkType, Is.EqualTo(FliChunkType.Black));
-    Assert.That(restored.Frames[0].Chunks[0].Data, Is.Empty);
+    Assert.That(restored.Frames[0].Chunks[0].Data, Has.Length.EqualTo(0));
   }
 
   [Test]

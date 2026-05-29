@@ -366,7 +366,7 @@ public sealed class JxlModularTransformsTests {
 
     var result = JxlModularTransforms.ReadAll(reader);
 
-    Assert.That(result, Is.Empty);
+    Assert.That(result, Has.Length.EqualTo(0));
   }
 
   /// <summary>Single RCT transform with begin_c=0, rct_type=0 (identity).</summary>

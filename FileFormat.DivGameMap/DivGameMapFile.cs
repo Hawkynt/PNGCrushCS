@@ -10,6 +10,7 @@ public readonly record struct DivGameMapFile : IImageFormatReader<DivGameMapFile
   static string[] IImageFormatMetadata<DivGameMapFile>.FileExtensions => [".fpg"];
   static DivGameMapFile IImageFormatReader<DivGameMapFile>.FromSpan(ReadOnlySpan<byte> data) => DivGameMapReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<DivGameMapFile>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<DivGameMapFile>.AllowedPaletteRanges => [new IntegerRange(2, 256)];
   static byte[] IImageFormatWriter<DivGameMapFile>.ToBytes(DivGameMapFile file) => DivGameMapWriter.ToBytes(file);
 
   /// <summary>Magic bytes: "fpg\x1A" (0x66 0x70 0x67 0x1A).</summary>

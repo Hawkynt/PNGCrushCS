@@ -14,6 +14,7 @@ public readonly record struct PocketPc2bpFile : IImageFormatReader<PocketPc2bpFi
   static string[] IImageFormatMetadata<PocketPc2bpFile>.FileExtensions => [".2bp"];
   static PocketPc2bpFile IImageFormatReader<PocketPc2bpFile>.FromSpan(ReadOnlySpan<byte> data) => PocketPc2bpReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<PocketPc2bpFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static IntegerRange[] IImageFormatMetadata<PocketPc2bpFile>.AllowedPaletteRanges => [2];
   static byte[] IImageFormatWriter<PocketPc2bpFile>.ToBytes(PocketPc2bpFile file) => PocketPc2bpWriter.ToBytes(file);
 
   public int Width { get; init; }

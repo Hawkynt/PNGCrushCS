@@ -69,8 +69,8 @@ public sealed class DataTypeTests {
     Assert.That(file.Height, Is.EqualTo(0));
     Assert.That(file.Bands, Is.EqualTo(0));
     Assert.That(file.StorageType, Is.EqualTo(ViffStorageType.Bit));
-    Assert.That(file.Comment, Is.EqualTo(""));
-    Assert.That(file.PixelData, Is.Empty);
+    Assert.That(file.Comment, Is.Null);
+    Assert.That(file.PixelData, Is.Null);
     Assert.That(file.MapData, Is.Null);
   }
 }

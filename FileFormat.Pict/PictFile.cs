@@ -21,6 +21,17 @@ public readonly record struct PictFile : IImageFormatReader<PictFile>, IImageToR
   /// <summary>Optional palette for indexed images (R,G,B triplets).</summary>
   public byte[]? Palette { get; init; }
 
+  private static readonly byte[] _DefaultPalette = _MakeGrayRamp(256);
+
+  private static byte[] _MakeGrayRamp(int entries) {
+    var p = new byte[entries * 3];
+    for (var i = 0; i < entries; ++i) {
+      var v = entries == 1 ? (byte)128 : (byte)(i * 255 / (entries - 1));
+      p[i * 3] = v; p[i * 3 + 1] = v; p[i * 3 + 2] = v;
+    }
+    return p;
+  }
+
   /// <summary>Converts this PICT file to a format-independent <see cref="RawImage"/>.</summary>
   public static RawImage ToRawImage(PictFile file) {
 
@@ -33,13 +44,14 @@ public readonly record struct PictFile : IImageFormatReader<PictFile>, IImageToR
       };
 
     // Indexed (8bpp)
+    var palette = file.Palette is { Length: >= 768 } p ? p[..768] : _DefaultPalette[..];
     return new() {
       Width = file.Width,
       Height = file.Height,
       Format = PixelFormat.Indexed8,
       PixelData = file.PixelData[..],
-      Palette = file.Palette is { } p ? p[..] : null,
-      PaletteCount = file.Palette is { } pal ? pal.Length / 3 : 0,
+      Palette = palette,
+      PaletteCount = 256,
     };
   }
 

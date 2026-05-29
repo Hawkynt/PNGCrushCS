@@ -11,6 +11,7 @@ public readonly record struct IffAcbmFile : IImageFormatReader<IffAcbmFile>, IIm
   static string[] IImageFormatMetadata<IffAcbmFile>.FileExtensions => [".acbm", ".iff"];
   static IffAcbmFile IImageFormatReader<IffAcbmFile>.FromSpan(ReadOnlySpan<byte> data) => IffAcbmReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<IffAcbmFile>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<IffAcbmFile>.AllowedPaletteRanges => [new IntegerRange(2, 256)];
 
   static bool? IImageFormatMetadata<IffAcbmFile>.MatchesSignature(ReadOnlySpan<byte> header)
     => header.Length >= 12 && header[0] == 0x46 && header[1] == 0x4F && header[2] == 0x52 && header[3] == 0x4D
@@ -51,8 +52,10 @@ public readonly record struct IffAcbmFile : IImageFormatReader<IffAcbmFile>, IIm
   /// <summary>Converts this ACBM file to a format-independent <see cref="RawImage"/>.</summary>
   public static RawImage ToRawImage(IffAcbmFile file) {
 
-    var palette = file.Palette.Length > 0 ? file.Palette[..] : null;
-    var paletteCount = palette != null ? palette.Length / 3 : 1 << file.NumPlanes;
+    var paletteCount = file.Palette is { Length: > 0 } ? file.Palette.Length / 3 : 1 << file.NumPlanes;
+    var palette = file.Palette is { Length: > 0 } p && p.Length >= paletteCount * 3
+      ? p[..]
+      : _MakeGrayRamp(paletteCount);
 
     return new() {
       Width = file.Width,
@@ -62,6 +65,15 @@ public readonly record struct IffAcbmFile : IImageFormatReader<IffAcbmFile>, IIm
       Palette = palette,
       PaletteCount = paletteCount,
     };
+  }
+
+  private static byte[] _MakeGrayRamp(int entries) {
+    var p = new byte[entries * 3];
+    for (var i = 0; i < entries; ++i) {
+      var v = entries == 1 ? (byte)128 : (byte)(i * 255 / (entries - 1));
+      p[i * 3] = v; p[i * 3 + 1] = v; p[i * 3 + 2] = v;
+    }
+    return p;
   }
 
   /// <summary>Creates an <see cref="IffAcbmFile"/> from a format-independent <see cref="RawImage"/>.</summary>

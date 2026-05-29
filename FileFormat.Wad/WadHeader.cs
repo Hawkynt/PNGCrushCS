@@ -4,7 +4,7 @@ namespace FileFormat.Wad;
 
 /// <summary>The 12-byte header at the start of every WAD file.</summary>
 [GenerateSerializer]
-[Filler(0, 4)]
+[Filler(0, 4, "Identification")]
 public readonly partial record struct WadHeader( byte Id1, byte Id2, byte Id3, byte Id4, int NumLumps, int DirectoryOffset
 ) {
 

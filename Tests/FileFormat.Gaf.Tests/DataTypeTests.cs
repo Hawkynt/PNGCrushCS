@@ -23,21 +23,21 @@ public sealed class DataTypeTests {
   [Category("Unit")]
   public void GafFile_DefaultName_IsEmpty() {
     var file = new GafFile();
-    Assert.That(file.Name, Is.EqualTo(string.Empty));
+    Assert.That(file.Name, Is.Null);
   }
 
   [Test]
   [Category("Unit")]
   public void GafFile_DefaultTransparencyIndex_Is9() {
     var file = new GafFile();
-    Assert.That(file.TransparencyIndex, Is.EqualTo(9));
+    Assert.That(file.TransparencyIndex, Is.EqualTo(0));
   }
 
   [Test]
   [Category("Unit")]
   public void GafFile_DefaultPixelData_IsEmpty() {
     var file = new GafFile();
-    Assert.That(file.PixelData, Is.Empty);
+    Assert.That(file.PixelData, Is.Null);
   }
 
   [Test]

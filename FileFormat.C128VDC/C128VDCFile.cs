@@ -10,6 +10,7 @@ public readonly record struct C128VDCFile : IImageFormatReader<C128VDCFile>, IIm
   static string[] IImageFormatMetadata<C128VDCFile>.FileExtensions => [".vdc", ".vdc3"];
   static C128VDCFile IImageFormatReader<C128VDCFile>.FromSpan(ReadOnlySpan<byte> data) => C128VDCReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<C128VDCFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static IntegerRange[] IImageFormatMetadata<C128VDCFile>.AllowedPaletteRanges => [2];
   static byte[] IImageFormatWriter<C128VDCFile>.ToBytes(C128VDCFile file) => C128VDCWriter.ToBytes(file);
 
   /// <summary>Expected file size in bytes (80 * 200).</summary>

@@ -5,7 +5,7 @@ namespace FileFormat.Gd2;
 
 /// <summary>In-memory representation of a libgd GD2 image.</summary>
 [FormatMagicBytes([0x67, 0x64, 0x32, 0x00])]
-public readonly record struct Gd2File : IImageFormatReader<Gd2File>, IImageToRawImage<Gd2File>, IImageFromRawImage<Gd2File>, IImageFormatWriter<Gd2File> {
+public readonly record struct Gd2File() : IImageFormatReader<Gd2File>, IImageToRawImage<Gd2File>, IImageFromRawImage<Gd2File>, IImageFormatWriter<Gd2File> {
 
   static string IImageFormatMetadata<Gd2File>.PrimaryExtension => ".gd2";
   static string[] IImageFormatMetadata<Gd2File>.FileExtensions => [".gd2"];
@@ -25,13 +25,13 @@ public readonly record struct Gd2File : IImageFormatReader<Gd2File>, IImageToRaw
   public int Height { get; init; }
 
   /// <summary>GD2 format version (typically 2).</summary>
-  public int Version { get; init; }
+  public int Version { get; init; } = 2;
 
   /// <summary>Chunk size used for tiled storage.</summary>
   public int ChunkSize { get; init; }
 
   /// <summary>Format code (1=raw, 2=compressed).</summary>
-  public int Format { get; init; }
+  public int Format { get; init; } = 1;
 
   /// <summary>Raw ARGB pixel data in GD2 byte order (4 bytes per pixel, big-endian, 7-bit alpha: 0=opaque, 127=transparent).</summary>
   public byte[] PixelData { get; init; }

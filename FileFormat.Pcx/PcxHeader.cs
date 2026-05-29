@@ -15,14 +15,14 @@ internal readonly partial record struct PcxHeader(
   short YMax,
   short HDpi,
   short VDpi,
-  byte[] EgaPalette,
+  [property: Repeat(48)] byte[] EgaPalette,
   byte Reserved,
   byte NumPlanes,
   short BytesPerLine,
   short PaletteInfo,
   short HScreenSize,
   short VScreenSize,
-  byte[] Padding
+  [property: Repeat(54)] byte[] Padding
 ) {
 
  public const int StructSize = 128;

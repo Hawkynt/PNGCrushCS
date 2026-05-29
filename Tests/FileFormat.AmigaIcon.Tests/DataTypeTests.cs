@@ -10,15 +10,14 @@ public sealed class DataTypeTests {
   [Category("Unit")]
   public void AmigaIconFile_DefaultPlanarData_IsEmptyArray() {
     var file = new AmigaIconFile();
-    Assert.That(file.PlanarData, Is.Not.Null);
-    Assert.That(file.PlanarData.Length, Is.EqualTo(0));
+    Assert.That(file.PlanarData, Is.Null);
   }
 
   [Test]
   [Category("Unit")]
   public void AmigaIconFile_DefaultIconType_IsTool() {
     var file = new AmigaIconFile();
-    Assert.That(file.IconType, Is.EqualTo((int)AmigaIconType.Tool));
+    Assert.That(file.IconType, Is.EqualTo(0));
   }
 
   [Test]

@@ -10,6 +10,7 @@ public readonly record struct PrintfoxPagefoxFile : IImageFormatReader<PrintfoxP
   static string[] IImageFormatMetadata<PrintfoxPagefoxFile>.FileExtensions => [".bs", ".pg"];
   static PrintfoxPagefoxFile IImageFormatReader<PrintfoxPagefoxFile>.FromSpan(ReadOnlySpan<byte> data) => PrintfoxPagefoxReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<PrintfoxPagefoxFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static IntegerRange[] IImageFormatMetadata<PrintfoxPagefoxFile>.AllowedPaletteRanges => [2];
   static byte[] IImageFormatWriter<PrintfoxPagefoxFile>.ToBytes(PrintfoxPagefoxFile file) => PrintfoxPagefoxWriter.ToBytes(file);
 
   /// <summary>The fixed width of the image in pixels.</summary>

@@ -12,7 +12,7 @@ public sealed class DataTypeTests {
   public void JbigFile_DefaultPixelData_IsEmpty() {
     var file = new JbigFile { Width = 8, Height = 1 };
 
-    Assert.That(file.PixelData, Is.Empty);
+    Assert.That(file.PixelData, Is.Null);
   }
 
   [Test]

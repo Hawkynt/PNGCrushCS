@@ -25,6 +25,7 @@ public readonly record struct AtariArtistFile : IImageFormatReader<AtariArtistFi
   static string[] IImageFormatMetadata<AtariArtistFile>.FileExtensions => [".aat"];
   static AtariArtistFile IImageFormatReader<AtariArtistFile>.FromSpan(ReadOnlySpan<byte> data) => AtariArtistReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<AtariArtistFile>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<AtariArtistFile>.AllowedPaletteRanges => [new IntegerRange(2, 4)];
   static byte[] IImageFormatWriter<AtariArtistFile>.ToBytes(AtariArtistFile file) => AtariArtistWriter.ToBytes(file);
 
   /// <summary>Always 160.</summary>

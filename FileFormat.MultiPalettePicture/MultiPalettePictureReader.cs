@@ -53,6 +53,8 @@ public static class MultiPalettePictureReader {
     }
 
     return new MultiPalettePictureFile {
+      Width = MultiPalettePictureFile.ImageWidth,
+      Height = MultiPalettePictureFile.ImageHeight,
       PixelData = pixelData,
       Palettes = palettes
     };
@@ -84,6 +86,8 @@ public static class MultiPalettePictureReader {
     }
 
     return new MultiPalettePictureFile {
+      Width = MultiPalettePictureFile.ImageWidth,
+      Height = MultiPalettePictureFile.ImageHeight,
       PixelData = pixelData,
       Palettes = palettes
     };

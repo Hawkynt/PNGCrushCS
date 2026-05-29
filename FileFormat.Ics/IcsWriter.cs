@@ -9,7 +9,11 @@ public static class IcsWriter {
 
   public static byte[] ToBytes(IcsFile file) {
     ArgumentNullException.ThrowIfNull(file);
-    return _Assemble(file);
+    // Default version to "2.0" if not set
+    var effectiveFile = string.IsNullOrEmpty(file.Version)
+      ? file with { Version = "2.0", PixelData = file.PixelData ?? Array.Empty<byte>() }
+      : file with { PixelData = file.PixelData ?? Array.Empty<byte>() };
+    return _Assemble(effectiveFile);
   }
 
   private static byte[] _Assemble(IcsFile file) {

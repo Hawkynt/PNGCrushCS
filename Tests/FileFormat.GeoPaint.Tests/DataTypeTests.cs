@@ -34,7 +34,7 @@ public sealed class DataTypeTests {
   [Category("Unit")]
   public void Default_PixelData_IsEmpty() {
     var file = new GeoPaintFile { Height = 0 };
-    Assert.That(file.PixelData, Is.Empty);
+    Assert.That(file.PixelData, Is.Null);
   }
 
   [Test]

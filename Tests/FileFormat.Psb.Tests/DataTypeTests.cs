@@ -40,9 +40,9 @@ public sealed class DataTypeTests {
     Assert.That(file.Height, Is.EqualTo(0));
     Assert.That(file.Channels, Is.EqualTo(0));
     Assert.That(file.Depth, Is.EqualTo(0));
-    Assert.That(file.ColorMode, Is.EqualTo(PsbColorMode.Bitmap));
-    Assert.That(file.PixelData, Is.Not.Null);
-    Assert.That(file.PixelData, Is.Empty);
+    Assert.That((int)file.ColorMode, Is.EqualTo(0));
+    Assert.That(file.PixelData, Is.Null);
+    Assert.That(file.PixelData, Is.Null);
     Assert.That(file.Palette, Is.Null);
     Assert.That(file.ImageResources, Is.Null);
     Assert.That(file.LayerMaskInfo, Is.Null);

@@ -61,7 +61,7 @@ public sealed class AliasPixRleCompressorTests {
   public void Compress_Empty_ReturnsEmpty() {
     var compressed = AliasPixRleCompressor.Compress([], 0, 0, 3);
 
-    Assert.That(compressed, Is.Empty);
+    Assert.That(compressed, Has.Length.EqualTo(0));
   }
 
   [Test]

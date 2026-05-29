@@ -9,6 +9,7 @@ public readonly record struct DrHaloFile : IImageFormatReader<DrHaloFile>, IImag
   static string IImageFormatMetadata<DrHaloFile>.PrimaryExtension => ".cut";
   static string[] IImageFormatMetadata<DrHaloFile>.FileExtensions => [".cut"];
   static DrHaloFile IImageFormatReader<DrHaloFile>.FromSpan(ReadOnlySpan<byte> data) => DrHaloReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<DrHaloFile>.Capabilities => FormatCapability.IndexedOnly | FormatCapability.VariableResolution;
   static byte[] IImageFormatWriter<DrHaloFile>.ToBytes(DrHaloFile file) => DrHaloWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }

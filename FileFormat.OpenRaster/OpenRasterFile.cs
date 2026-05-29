@@ -42,6 +42,7 @@ public readonly record struct OpenRasterFile : IImageFormatReader<OpenRasterFile
       Width = image.Width,
       Height = image.Height,
       PixelData = image.PixelData[..],
+      Layers = Array.Empty<OpenRasterLayer>(),
     };
   }
 }

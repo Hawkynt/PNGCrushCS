@@ -13,7 +13,7 @@ public sealed class MspRleCompressorTests {
 
     var compressed = MspRleCompressor.Compress(data);
 
-    Assert.That(compressed, Is.Empty);
+    Assert.That(compressed, Has.Length.EqualTo(0));
   }
 
   [Test]

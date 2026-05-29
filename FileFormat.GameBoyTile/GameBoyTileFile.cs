@@ -26,7 +26,16 @@ public readonly record struct GameBoyTileFile : IImageFormatReader<GameBoyTileFi
   static string IImageFormatMetadata<GameBoyTileFile>.PrimaryExtension => ".2bpp";
   static string[] IImageFormatMetadata<GameBoyTileFile>.FileExtensions => [".2bpp", ".cgb"];
   static GameBoyTileFile IImageFormatReader<GameBoyTileFile>.FromSpan(ReadOnlySpan<byte> data) => GameBoyTileReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<GameBoyTileFile>.Capabilities => FormatCapability.IndexedOnly;
+  static FormatCapability IImageFormatMetadata<GameBoyTileFile>.Capabilities => FormatCapability.IndexedOnly | FormatCapability.FixedResolution;
+  static IntegerRange[] IImageFormatMetadata<GameBoyTileFile>.AllowedPaletteRanges => [new IntegerRange(2, 4)];
+  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<GameBoyTileFile>.AllowedDimensions =>
+    [(TilesPerRow * TileSize, new IntegerRange(TileSize, 8192, step: TileSize))];
+  static FixedPalette[] IImageFormatMetadata<GameBoyTileFile>.FixedPalettes => [
+    new FixedPalette("DMG Classic",        0x9BBC0F, 0x8BAC0F, 0x306230, 0x0F380F),
+    new FixedPalette("Pocket grey",        0xFFFFFF, 0xAAAAAA, 0x555555, 0x000000),
+    new FixedPalette("Super Game Boy 2-A", 0xF8E8C8, 0xD89048, 0xA82820, 0x301850),
+    new FixedPalette("Game Boy Light",     0x00B582, 0x008C32, 0x00A55F, 0x004A4A),
+  ];
   static byte[] IImageFormatWriter<GameBoyTileFile>.ToBytes(GameBoyTileFile file) => GameBoyTileWriter.ToBytes(file);
 
   /// <summary>Image width in pixels (always 128 = 16 tiles x 8 pixels).</summary>
@@ -48,8 +57,8 @@ public readonly record struct GameBoyTileFile : IImageFormatReader<GameBoyTileFi
       Width = file.Width,
       Height = file.Height,
       Format = PixelFormat.Indexed8,
-      PixelData = file.PixelData[..],
-      Palette = file.Palette[..],
+      PixelData = (file.PixelData ?? Array.Empty<byte>())[..],
+      Palette = (file.Palette ?? Array.Empty<byte>())[..],
       PaletteCount = 4,
     };
   }

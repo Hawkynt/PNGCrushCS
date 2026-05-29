@@ -10,6 +10,7 @@ public readonly record struct CalamusFile : IImageFormatReader<CalamusFile>, IIm
   static string[] IImageFormatMetadata<CalamusFile>.FileExtensions => [".cpi", ".crg"];
   static CalamusFile IImageFormatReader<CalamusFile>.FromSpan(ReadOnlySpan<byte> data) => CalamusReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<CalamusFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static IntegerRange[] IImageFormatMetadata<CalamusFile>.AllowedPaletteRanges => [2];
   static byte[] IImageFormatWriter<CalamusFile>.ToBytes(CalamusFile file) => CalamusWriter.ToBytes(file);
 
   /// <summary>Magic bytes: "CALM" (0x43 0x41 0x4C 0x4D).</summary>

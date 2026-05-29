@@ -22,6 +22,7 @@ public readonly record struct FuntasticPaintFile : IImageFormatReader<FuntasticP
   static string[] IImageFormatMetadata<FuntasticPaintFile>.FileExtensions => [".fun8", ".ftp"];
   static FuntasticPaintFile IImageFormatReader<FuntasticPaintFile>.FromSpan(ReadOnlySpan<byte> data) => FuntasticPaintReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<FuntasticPaintFile>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<FuntasticPaintFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
   static byte[] IImageFormatWriter<FuntasticPaintFile>.ToBytes(FuntasticPaintFile file) => FuntasticPaintWriter.ToBytes(file);
 
   /// <summary>Always 80.</summary>
@@ -58,28 +59,52 @@ public readonly record struct FuntasticPaintFile : IImageFormatReader<FuntasticP
     };
   }
 
-  /// <summary>Creates a Fun*tastic Paint file from a platform-independent <see cref="RawImage"/>.</summary>
+  /// <summary>Creates a Fun*tastic Paint file from a platform-independent <see cref="RawImage"/>. Accepts Gray8, Indexed1, or Indexed8.</summary>
   public static FuntasticPaintFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Gray8)
-      throw new ArgumentException($"Expected {PixelFormat.Gray8} but got {image.Format}.", nameof(image));
     if (image.Width != FixedWidth || image.Height != FixedHeight)
       throw new ArgumentException($"Expected {FixedWidth}x{FixedHeight} but got {image.Width}x{image.Height}.", nameof(image));
 
     var pixelData = new byte[ExpectedFileSize];
 
-    for (var y = 0; y < FixedHeight; ++y)
-      for (var x = 0; x < FixedWidth; ++x) {
-        var shade = image.PixelData[y * FixedWidth + x] / 17;
-        if (shade > 15)
-          shade = 15;
+    if (image.Format == PixelFormat.Indexed1) {
+      var stride = (FixedWidth + 7) / 8;
+      for (var y = 0; y < FixedHeight; ++y)
+        for (var x = 0; x < FixedWidth; ++x) {
+          var b = image.PixelData[y * stride + (x >> 3)];
+          var shade = (b >> (7 - (x & 7))) & 1;
+          var byteIndex = y * BytesPerRow + x / 2;
+          if ((x & 1) == 0)
+            pixelData[byteIndex] |= (byte)(shade << 4);
+          else
+            pixelData[byteIndex] |= (byte)shade;
+        }
+    } else if (image.Format == PixelFormat.Indexed8) {
+      for (var y = 0; y < FixedHeight; ++y)
+        for (var x = 0; x < FixedWidth; ++x) {
+          var shade = image.PixelData[y * FixedWidth + x] & 0x0F;
+          var byteIndex = y * BytesPerRow + x / 2;
+          if ((x & 1) == 0)
+            pixelData[byteIndex] |= (byte)(shade << 4);
+          else
+            pixelData[byteIndex] |= (byte)shade;
+        }
+    } else if (image.Format == PixelFormat.Gray8) {
+      for (var y = 0; y < FixedHeight; ++y)
+        for (var x = 0; x < FixedWidth; ++x) {
+          var shade = image.PixelData[y * FixedWidth + x] / 17;
+          if (shade > 15)
+            shade = 15;
 
-        var byteIndex = y * BytesPerRow + x / 2;
-        if ((x & 1) == 0)
-          pixelData[byteIndex] |= (byte)(shade << 4);
-        else
-          pixelData[byteIndex] |= (byte)shade;
-      }
+          var byteIndex = y * BytesPerRow + x / 2;
+          if ((x & 1) == 0)
+            pixelData[byteIndex] |= (byte)(shade << 4);
+          else
+            pixelData[byteIndex] |= (byte)shade;
+        }
+    } else {
+      throw new ArgumentException($"Expected {PixelFormat.Gray8}, {PixelFormat.Indexed1}, or {PixelFormat.Indexed8} but got {image.Format}.", nameof(image));
+    }
 
     return new() { PixelData = pixelData };
   }

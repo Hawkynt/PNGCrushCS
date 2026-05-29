@@ -12,6 +12,8 @@ public readonly record struct HireslaceFile : IImageFormatReader<HireslaceFile>,
   static string IImageFormatMetadata<HireslaceFile>.PrimaryExtension => ".hle";
   static string[] IImageFormatMetadata<HireslaceFile>.FileExtensions => [".hle"];
   static HireslaceFile IImageFormatReader<HireslaceFile>.FromSpan(ReadOnlySpan<byte> data) => HireslaceReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<HireslaceFile>.Capabilities => FormatCapability.FixedResolution;
+  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<HireslaceFile>.AllowedDimensions => [(320, 200)];
   static byte[] IImageFormatWriter<HireslaceFile>.ToBytes(HireslaceFile file) => HireslaceWriter.ToBytes(file);
 
   /// <summary>Bitmap data size per frame in bytes (320x200 / 8 * 8 cell-ordered).</summary>

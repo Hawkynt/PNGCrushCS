@@ -20,6 +20,8 @@ public sealed class NeoGeoPocketFile : IImageFormatReader<NeoGeoPocketFile>, IIm
   public static string[] FileExtensions => [".ngp", ".ngpc"];
   static NeoGeoPocketFile IImageFormatReader<NeoGeoPocketFile>.FromSpan(ReadOnlySpan<byte> data) => NeoGeoPocketReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<NeoGeoPocketFile>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<NeoGeoPocketFile>.AllowedPaletteRanges => [new IntegerRange(2, 4)];
+  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<NeoGeoPocketFile>.AllowedDimensions => [(TilesPerRow * TileSize, new IntegerRange(TileSize, 4096, TileSize))];
   public static NeoGeoPocketFile FromFile(FileInfo file) => NeoGeoPocketReader.FromFile(file);
   public static NeoGeoPocketFile FromBytes(byte[] data) => NeoGeoPocketReader.FromBytes(data);
   public static NeoGeoPocketFile FromStream(Stream stream) => NeoGeoPocketReader.FromStream(stream);

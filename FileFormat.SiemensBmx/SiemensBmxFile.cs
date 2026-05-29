@@ -12,6 +12,7 @@ public readonly record struct SiemensBmxFile : IImageFormatReader<SiemensBmxFile
   static string[] IImageFormatMetadata<SiemensBmxFile>.FileExtensions => [".bmx"];
   static SiemensBmxFile IImageFormatReader<SiemensBmxFile>.FromSpan(ReadOnlySpan<byte> data) => SiemensBmxReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<SiemensBmxFile>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<SiemensBmxFile>.AllowedPaletteRanges => [new IntegerRange(2, 256)];
   static byte[] IImageFormatWriter<SiemensBmxFile>.ToBytes(SiemensBmxFile file) => SiemensBmxWriter.ToBytes(file);
 
   public int Width { get; init; }

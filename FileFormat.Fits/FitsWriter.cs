@@ -13,7 +13,7 @@ public static class FitsWriter {
 
   public static byte[] ToBytes(FitsFile file) {
     ArgumentNullException.ThrowIfNull(file);
-    return _Assemble(file.PixelData, file.Width, file.Height, file.Bitpix, file.Keywords);
+    return _Assemble(file.PixelData ?? [], file.Width, file.Height, file.Bitpix, file.Keywords ?? Array.Empty<FitsKeyword>());
   }
 
   private static byte[] _Assemble(

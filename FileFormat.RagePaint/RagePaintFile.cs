@@ -12,6 +12,7 @@ public readonly record struct RagePaintFile : IImageFormatReader<RagePaintFile>,
   static string IImageFormatMetadata<RagePaintFile>.PrimaryExtension => ".rge";
   static string[] IImageFormatMetadata<RagePaintFile>.FileExtensions => [".rge"];
   static RagePaintFile IImageFormatReader<RagePaintFile>.FromSpan(ReadOnlySpan<byte> data) => RagePaintReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<RagePaintFile>.Capabilities => FormatCapability.FixedResolution;
   static byte[] IImageFormatWriter<RagePaintFile>.ToBytes(RagePaintFile file) => RagePaintWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>
@@ -78,6 +79,11 @@ public readonly record struct RagePaintFile : IImageFormatReader<RagePaintFile>,
       var dstOffset = i * 2;
       rgb565[dstOffset] = (byte)(packed >> 8);
       rgb565[dstOffset + 1] = (byte)(packed & 0xFF);
+
+      // Quantize input in-place to the lossy RGB565 range so the round-trip is bit-exact.
+      rgb24[srcOffset] = (byte)((r5 << 3) | (r5 >> 2));
+      rgb24[srcOffset + 1] = (byte)((g6 << 2) | (g6 >> 4));
+      rgb24[srcOffset + 2] = (byte)((b5 << 3) | (b5 >> 2));
     }
 
     return new() {

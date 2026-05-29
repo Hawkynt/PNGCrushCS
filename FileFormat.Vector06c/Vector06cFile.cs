@@ -16,6 +16,7 @@ public readonly record struct Vector06cFile : IImageFormatReader<Vector06cFile>,
   static string[] IImageFormatMetadata<Vector06cFile>.FileExtensions => [".v06", ".scr"];
   static Vector06cFile IImageFormatReader<Vector06cFile>.FromSpan(ReadOnlySpan<byte> data) => Vector06cReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<Vector06cFile>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<Vector06cFile>.AllowedPaletteRanges => [new IntegerRange(2, 4)];
   static byte[] IImageFormatWriter<Vector06cFile>.ToBytes(Vector06cFile file) => Vector06cWriter.ToBytes(file);
 
   public int Width => FixedWidth;

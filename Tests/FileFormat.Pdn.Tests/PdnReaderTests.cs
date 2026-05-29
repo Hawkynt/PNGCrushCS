@@ -65,6 +65,7 @@ public sealed class PdnReaderTests {
     var bytes = PdnWriter.ToBytes(new PdnFile {
       Width = width,
       Height = height,
+      Version = 3,
       PixelData = pixelData,
     });
 

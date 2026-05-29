@@ -14,6 +14,7 @@ public readonly record struct PsionPicFile : IImageFormatReader<PsionPicFile>, I
   static string[] IImageFormatMetadata<PsionPicFile>.FileExtensions => [".ppic"];
   static PsionPicFile IImageFormatReader<PsionPicFile>.FromSpan(ReadOnlySpan<byte> data) => PsionPicReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<PsionPicFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static IntegerRange[] IImageFormatMetadata<PsionPicFile>.AllowedPaletteRanges => [2];
   static byte[] IImageFormatWriter<PsionPicFile>.ToBytes(PsionPicFile file) => PsionPicWriter.ToBytes(file);
 
   public int Width { get; init; }

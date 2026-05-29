@@ -10,6 +10,7 @@ public readonly record struct CoCoMaxFile : IImageFormatReader<CoCoMaxFile>, IIm
   static string[] IImageFormatMetadata<CoCoMaxFile>.FileExtensions => [".max"];
   static CoCoMaxFile IImageFormatReader<CoCoMaxFile>.FromSpan(ReadOnlySpan<byte> data) => CoCoMaxReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<CoCoMaxFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static IntegerRange[] IImageFormatMetadata<CoCoMaxFile>.AllowedPaletteRanges => [2];
   static byte[] IImageFormatWriter<CoCoMaxFile>.ToBytes(CoCoMaxFile file) => CoCoMaxWriter.ToBytes(file);
 
   /// <summary>Expected file size in bytes.</summary>

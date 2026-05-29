@@ -42,7 +42,10 @@ public readonly record struct PcEngineTileFile : IImageFormatReader<PcEngineTile
   static string IImageFormatMetadata<PcEngineTileFile>.PrimaryExtension => ".pce";
   static string[] IImageFormatMetadata<PcEngineTileFile>.FileExtensions => [".pce"];
   static PcEngineTileFile IImageFormatReader<PcEngineTileFile>.FromSpan(ReadOnlySpan<byte> data) => PcEngineTileReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<PcEngineTileFile>.Capabilities => FormatCapability.IndexedOnly;
+  static FormatCapability IImageFormatMetadata<PcEngineTileFile>.Capabilities => FormatCapability.IndexedOnly | FormatCapability.FixedResolution;
+  static IntegerRange[] IImageFormatMetadata<PcEngineTileFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
+  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<PcEngineTileFile>.AllowedDimensions =>
+    [(FixedWidth, new IntegerRange(TileSize, 8192, step: TileSize))];
   static byte[] IImageFormatWriter<PcEngineTileFile>.ToBytes(PcEngineTileFile file) => PcEngineTileWriter.ToBytes(file);
 
   /// <summary>Image width in pixels (always 128).</summary>
@@ -64,8 +67,8 @@ public readonly record struct PcEngineTileFile : IImageFormatReader<PcEngineTile
       Width = file.Width,
       Height = file.Height,
       Format = PixelFormat.Indexed8,
-      PixelData = file.PixelData[..],
-      Palette = file.Palette[..],
+      PixelData = (file.PixelData ?? Array.Empty<byte>())[..],
+      Palette = (file.Palette ?? Array.Empty<byte>())[..],
       PaletteCount = PaletteEntryCount,
     };
   }

@@ -79,7 +79,7 @@ public sealed class IsoBmffBoxTests {
     var box = IsoBmffBox.BuildBox(IsoBmffBox.Meta, []);
     var boxes = IsoBmffBox.ReadBoxes(box, 0, box.Length);
     Assert.That(boxes.Count, Is.EqualTo(1));
-    Assert.That(boxes[0].Data, Is.Empty);
+    Assert.That(boxes[0].Data, Has.Length.EqualTo(0));
   }
 
   [Test]

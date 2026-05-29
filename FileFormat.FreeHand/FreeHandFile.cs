@@ -16,6 +16,7 @@ public readonly record struct FreeHandFile : IImageFormatReader<FreeHandFile>, I
   static string[] IImageFormatMetadata<FreeHandFile>.FileExtensions => [".fhs"];
   static FreeHandFile IImageFormatReader<FreeHandFile>.FromSpan(ReadOnlySpan<byte> data) => FreeHandReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<FreeHandFile>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<FreeHandFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
   static byte[] IImageFormatWriter<FreeHandFile>.ToBytes(FreeHandFile file) => FreeHandWriter.ToBytes(file);
 
   /// <summary>Image width (always 320).</summary>

@@ -21,7 +21,7 @@ public static class QuakeSprWriter {
       BoundingRadius: file.BoundingRadius,
       MaxWidth: file.Width,
       MaxHeight: file.Height,
-      NumFrames: file.NumFrames,
+      NumFrames: file.NumFrames < 1 ? 1 : file.NumFrames,
       BeamLength: file.BeamLength,
       SyncType: file.SyncType
     );

@@ -57,6 +57,7 @@ public readonly record struct MiffFile : IImageFormatReader<MiffFile>, IImageToR
           Height = image.Height,
           Depth = 8,
           ColorClass = MiffColorClass.DirectClass,
+          Colorspace = "sRGB",
           Type = "TrueColor",
           PixelData = image.PixelData[..],
         };
@@ -66,6 +67,7 @@ public readonly record struct MiffFile : IImageFormatReader<MiffFile>, IImageToR
           Height = image.Height,
           Depth = 8,
           ColorClass = MiffColorClass.DirectClass,
+          Colorspace = "sRGB",
           Type = "TrueColorAlpha",
           PixelData = image.PixelData[..],
         };
@@ -75,6 +77,7 @@ public readonly record struct MiffFile : IImageFormatReader<MiffFile>, IImageToR
           Height = image.Height,
           Depth = 8,
           ColorClass = MiffColorClass.DirectClass,
+          Colorspace = "Gray",
           Type = "Grayscale",
           PixelData = image.PixelData[..],
         };
@@ -84,12 +87,22 @@ public readonly record struct MiffFile : IImageFormatReader<MiffFile>, IImageToR
           Height = image.Height,
           Depth = 8,
           ColorClass = MiffColorClass.PseudoClass,
+          Colorspace = "sRGB",
           Type = "TrueColor",
           PixelData = image.PixelData[..],
           Palette = image.Palette != null ? image.Palette[..] : null,
         };
       default:
-        throw new ArgumentException($"Unsupported pixel format for MIFF: {image.Format}", nameof(image));
+        image = PixelConverter.Convert(image, PixelFormat.Rgba32);
+        return new() {
+          Width = image.Width,
+          Height = image.Height,
+          Depth = 8,
+          ColorClass = MiffColorClass.DirectClass,
+          Colorspace = "sRGB",
+          Type = "TrueColorAlpha",
+          PixelData = image.PixelData[..],
+        };
     }
   }
 }

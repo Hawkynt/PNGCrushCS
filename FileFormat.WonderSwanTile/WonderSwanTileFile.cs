@@ -17,7 +17,9 @@ public readonly record struct WonderSwanTileFile : IImageFormatReader<WonderSwan
   static string IImageFormatMetadata<WonderSwanTileFile>.PrimaryExtension => ".wst";
   static string[] IImageFormatMetadata<WonderSwanTileFile>.FileExtensions => [".wst", ".ws"];
   static WonderSwanTileFile IImageFormatReader<WonderSwanTileFile>.FromSpan(ReadOnlySpan<byte> data) => WonderSwanTileReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<WonderSwanTileFile>.Capabilities => FormatCapability.IndexedOnly;
+  static FormatCapability IImageFormatMetadata<WonderSwanTileFile>.Capabilities => FormatCapability.IndexedOnly | FormatCapability.FixedResolution;
+  static IntegerRange[] IImageFormatMetadata<WonderSwanTileFile>.AllowedPaletteRanges => [new IntegerRange(2, 4)];
+  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<WonderSwanTileFile>.AllowedDimensions => [(TilesPerRow * TileSize, new IntegerRange(TileSize, 4096, TileSize))];
   static byte[] IImageFormatWriter<WonderSwanTileFile>.ToBytes(WonderSwanTileFile file) => WonderSwanTileWriter.ToBytes(file);
 
   public int Width { get; init; }
@@ -30,8 +32,8 @@ public readonly record struct WonderSwanTileFile : IImageFormatReader<WonderSwan
       Width = file.Width,
       Height = file.Height,
       Format = PixelFormat.Indexed8,
-      PixelData = file.PixelData[..],
-      Palette = file.Palette[..],
+      PixelData = (file.PixelData ?? Array.Empty<byte>())[..],
+      Palette = (file.Palette ?? Array.Empty<byte>())[..],
       PaletteCount = PaletteColors,
     };
   }

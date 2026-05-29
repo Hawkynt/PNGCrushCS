@@ -11,6 +11,8 @@ public sealed class RoundTripTests {
   [Category("Integration")]
   public void RoundTrip_AllZeros() {
     var original = new EzArtFile {
+      Width = 320,
+      Height = 200,
       Palette = new short[16],
       PixelData = new byte[32000]
     };

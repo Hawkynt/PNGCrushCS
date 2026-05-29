@@ -9,6 +9,7 @@ public readonly record struct TinyFile : IImageFormatReader<TinyFile>, IImageToR
   static string IImageFormatMetadata<TinyFile>.PrimaryExtension => ".tny";
   static string[] IImageFormatMetadata<TinyFile>.FileExtensions => [".tny", ".tn1", ".tn2", ".tn3"];
   static TinyFile IImageFormatReader<TinyFile>.FromSpan(ReadOnlySpan<byte> data) => TinyReader.FromSpan(data);
+  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<TinyFile>.AllowedDimensions => [(320, 200), (640, 200), (640, 400)];
   static byte[] IImageFormatWriter<TinyFile>.ToBytes(TinyFile file) => TinyWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
@@ -44,10 +45,15 @@ public readonly record struct TinyFile : IImageFormatReader<TinyFile>, IImageToR
     if (image.Format != PixelFormat.Indexed8)
       throw new ArgumentException("RawImage must use PixelFormat.Indexed8.", nameof(image));
 
-    var resolution = image.PaletteCount switch {
-      <= 2 => TinyResolution.High,
-      <= 4 => TinyResolution.Medium,
-      _ => TinyResolution.Low
+    var resolution = (image.Width, image.Height) switch {
+      (640, 400) => TinyResolution.High,
+      (640, 200) => TinyResolution.Medium,
+      (320, 200) => TinyResolution.Low,
+      _ => image.PaletteCount switch {
+        <= 2 => TinyResolution.High,
+        <= 4 => TinyResolution.Medium,
+        _ => TinyResolution.Low
+      }
     };
 
     var numPlanes = resolution switch {

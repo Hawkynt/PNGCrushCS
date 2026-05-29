@@ -138,8 +138,7 @@ public sealed class Spectrum512SmooshReaderTests {
   [Category("Unit")]
   public void DataType_DefaultRawData_IsEmpty() {
     var file = new Spectrum512SmooshFile();
-    Assert.That(file.RawData, Is.Not.Null);
-    Assert.That(file.RawData, Is.Empty);
+    Assert.That(file.RawData, Is.Null);
   }
 
   [Test]

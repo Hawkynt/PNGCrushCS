@@ -13,7 +13,7 @@ public sealed class WpgRleCompressorTests {
 
     var compressed = WpgRleCompressor.Compress(data);
 
-    Assert.That(compressed, Is.Empty);
+    Assert.That(compressed, Has.Length.EqualTo(0));
   }
 
   [Test]

@@ -20,6 +20,7 @@ public sealed class FmTownsFile : IImageFormatReader<FmTownsFile>, IImageToRawIm
   public static string[] FileExtensions => [".fmt"];
   static FmTownsFile IImageFormatReader<FmTownsFile>.FromSpan(ReadOnlySpan<byte> data) => FmTownsReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<FmTownsFile>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<FmTownsFile>.AllowedPaletteRanges => [new IntegerRange(2, 256)];
   public static FmTownsFile FromFile(FileInfo file) => FmTownsReader.FromFile(file);
   public static FmTownsFile FromBytes(byte[] data) => FmTownsReader.FromBytes(data);
   public static FmTownsFile FromStream(Stream stream) => FmTownsReader.FromStream(stream);

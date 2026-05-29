@@ -9,6 +9,8 @@ public readonly record struct CrackArtFile : IImageFormatReader<CrackArtFile>, I
   static string IImageFormatMetadata<CrackArtFile>.PrimaryExtension => ".ca1";
   static string[] IImageFormatMetadata<CrackArtFile>.FileExtensions => [".ca1", ".ca2", ".ca3"];
   static CrackArtFile IImageFormatReader<CrackArtFile>.FromSpan(ReadOnlySpan<byte> data) => CrackArtReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<CrackArtFile>.Capabilities => FormatCapability.IndexedOnly;
+  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<CrackArtFile>.AllowedDimensions => [(320, 200), (640, 200), (640, 400)];
   static byte[] IImageFormatWriter<CrackArtFile>.ToBytes(CrackArtFile file) => CrackArtWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
@@ -44,10 +46,15 @@ public readonly record struct CrackArtFile : IImageFormatReader<CrackArtFile>, I
     if (image.Format != PixelFormat.Indexed8)
       throw new ArgumentException("RawImage must use PixelFormat.Indexed8.", nameof(image));
 
-    var resolution = image.PaletteCount switch {
-      <= 2 => CrackArtResolution.High,
-      <= 4 => CrackArtResolution.Medium,
-      _ => CrackArtResolution.Low
+    var resolution = (image.Width, image.Height) switch {
+      (640, 400) => CrackArtResolution.High,
+      (640, 200) => CrackArtResolution.Medium,
+      (320, 200) => CrackArtResolution.Low,
+      _ => image.PaletteCount switch {
+        <= 2 => CrackArtResolution.High,
+        <= 4 => CrackArtResolution.Medium,
+        _ => CrackArtResolution.Low
+      }
     };
 
     var numPlanes = resolution switch {

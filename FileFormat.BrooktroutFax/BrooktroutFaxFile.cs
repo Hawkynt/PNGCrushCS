@@ -14,6 +14,7 @@ public readonly record struct BrooktroutFaxFile : IImageFormatReader<BrooktroutF
   static string[] IImageFormatMetadata<BrooktroutFaxFile>.FileExtensions => [".brk", ".301", ".brt"];
   static BrooktroutFaxFile IImageFormatReader<BrooktroutFaxFile>.FromSpan(ReadOnlySpan<byte> data) => BrooktroutFaxReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<BrooktroutFaxFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static IntegerRange[] IImageFormatMetadata<BrooktroutFaxFile>.AllowedPaletteRanges => [2];
   static byte[] IImageFormatWriter<BrooktroutFaxFile>.ToBytes(BrooktroutFaxFile file) => BrooktroutFaxWriter.ToBytes(file);
 
   public int Width { get; init; }

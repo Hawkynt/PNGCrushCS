@@ -19,7 +19,7 @@ namespace FileFormat.Fbm;
 /// </remarks>
 [GenerateSerializer, Endian(Endianness.Big)]
 [Filler(48, 208)]
-public readonly partial record struct FbmHeader( byte[] Magic, int Cols, int Rows, int Bands, int Bits, int PhysBits, int RowLen, int PlnLen, int ClrLen, double Aspect, string Title
+public readonly partial record struct FbmHeader( [property: Repeat(8)] byte[] Magic, int Cols, int Rows, int Bands, int Bits, int PhysBits, int RowLen, int PlnLen, int ClrLen, double Aspect, [property: SeqField(Size = 208)] string Title
 ) {
 
  public const int StructSize = 256;

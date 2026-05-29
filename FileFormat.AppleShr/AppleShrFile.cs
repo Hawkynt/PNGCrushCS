@@ -10,6 +10,7 @@ public readonly record struct AppleShrFile : IImageFormatReader<AppleShrFile>, I
   static string[] IImageFormatMetadata<AppleShrFile>.FileExtensions => [".shr"];
   static AppleShrFile IImageFormatReader<AppleShrFile>.FromSpan(ReadOnlySpan<byte> data) => AppleShrReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<AppleShrFile>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<AppleShrFile>.AllowedPaletteRanges => [new IntegerRange(2, 256)];
   static byte[] IImageFormatWriter<AppleShrFile>.ToBytes(AppleShrFile file) => AppleShrWriter.ToBytes(file);
 
   /// <summary>The fixed width of a Super Hi-Res image in pixels (320 mode).</summary>

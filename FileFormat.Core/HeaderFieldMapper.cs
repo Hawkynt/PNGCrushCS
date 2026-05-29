@@ -32,16 +32,14 @@ public static class HeaderFieldMapper {
     }
 
     // Always include [Filler] entries. Anonymous fillers are reported as padding; named
-    // ones are treated as composite fields and override any byte-level generated entries
-    // that fall inside their span (the grouped name is more useful to consumers).
+    // ones are treated as composite group fields that overlay (but do not replace) the
+    // individual byte-level generated entries inside their span.
     var fillers = type.GetCustomAttributes<FillerAttribute>().ToList();
     foreach (var filler in fillers) {
-      if (filler.Name != null) {
-        descriptors.RemoveAll(d => d.Offset >= filler.Offset && d.Offset + d.Size <= filler.Offset + filler.Size);
+      if (filler.Name != null)
         descriptors.Add(new(filler.Name, filler.Offset, filler.Size));
-      } else {
+      else
         descriptors.Add(new("(padding)", filler.Offset, filler.Size));
-      }
     }
 
     descriptors.Sort((a, b) => a.Offset.CompareTo(b.Offset));

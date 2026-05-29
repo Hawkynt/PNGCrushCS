@@ -438,7 +438,7 @@ public sealed class PixelConverterTests {
   public void Rgba32ToRgb24_EmptyInput() {
     var result = PixelConverter.Rgba32ToRgb24([], 0);
 
-    Assert.That(result, Is.Empty);
+    Assert.That(result, Has.Length.EqualTo(0));
   }
 
   [Test]

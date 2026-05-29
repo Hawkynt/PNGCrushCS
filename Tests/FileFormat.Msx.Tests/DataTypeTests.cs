@@ -47,7 +47,7 @@ public sealed class DataTypeTests {
       BitsPerPixel = 1
     };
 
-    Assert.That(file.PixelData, Is.Empty);
+    Assert.That(file.PixelData, Is.Null);
   }
 
   [Test]

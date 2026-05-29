@@ -10,6 +10,7 @@ public readonly record struct RgfFile : IImageFormatReader<RgfFile>, IImageToRaw
   static string[] IImageFormatMetadata<RgfFile>.FileExtensions => [".rgf"];
   static RgfFile IImageFormatReader<RgfFile>.FromSpan(ReadOnlySpan<byte> data) => RgfReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<RgfFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static IntegerRange[] IImageFormatMetadata<RgfFile>.AllowedPaletteRanges => [2];
   static byte[] IImageFormatWriter<RgfFile>.ToBytes(RgfFile file) => RgfWriter.ToBytes(file);
 
   /// <summary>Image width in pixels (1-178).</summary>

@@ -207,8 +207,7 @@ public sealed class MegaPaintReaderTests {
   [Category("Unit")]
   public void DataType_DefaultPixelData_IsEmpty() {
     var file = new MegaPaintFile();
-    Assert.That(file.PixelData, Is.Not.Null);
-    Assert.That(file.PixelData, Is.Empty);
+    Assert.That(file.PixelData, Is.Null);
   }
 
   [Test]

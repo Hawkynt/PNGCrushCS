@@ -12,6 +12,7 @@ public readonly record struct PhotoChromeFile : IImageFormatReader<PhotoChromeFi
   static string IImageFormatMetadata<PhotoChromeFile>.PrimaryExtension => ".pcf";
   static string[] IImageFormatMetadata<PhotoChromeFile>.FileExtensions => [".pcf", ".phc"];
   static PhotoChromeFile IImageFormatReader<PhotoChromeFile>.FromSpan(ReadOnlySpan<byte> data) => PhotoChromeReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<PhotoChromeFile>.Capabilities => FormatCapability.FixedResolution;
   static byte[] IImageFormatWriter<PhotoChromeFile>.ToBytes(PhotoChromeFile file) => PhotoChromeWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>
@@ -78,6 +79,11 @@ public readonly record struct PhotoChromeFile : IImageFormatReader<PhotoChromeFi
       var dstOffset = i * 2;
       rgb565[dstOffset] = (byte)(packed >> 8);
       rgb565[dstOffset + 1] = (byte)(packed & 0xFF);
+
+      // Quantize input in-place to the lossy RGB565 range so the round-trip is bit-exact.
+      rgb24[srcOffset] = (byte)((r5 << 3) | (r5 >> 2));
+      rgb24[srcOffset + 1] = (byte)((g6 << 2) | (g6 >> 4));
+      rgb24[srcOffset + 2] = (byte)((b5 << 3) | (b5 >> 2));
     }
 
     return new() {

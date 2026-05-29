@@ -12,7 +12,9 @@ public readonly record struct EscapePaintFile : IImageFormatReader<EscapePaintFi
   static string IImageFormatMetadata<EscapePaintFile>.PrimaryExtension => ".esp";
   static string[] IImageFormatMetadata<EscapePaintFile>.FileExtensions => [".esp"];
   static EscapePaintFile IImageFormatReader<EscapePaintFile>.FromSpan(ReadOnlySpan<byte> data) => EscapePaintReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<EscapePaintFile>.Capabilities => FormatCapability.IndexedOnly;
+  static FormatCapability IImageFormatMetadata<EscapePaintFile>.Capabilities => FormatCapability.IndexedOnly | FormatCapability.FixedResolution;
+  static IntegerRange[] IImageFormatMetadata<EscapePaintFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
+  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<EscapePaintFile>.AllowedDimensions => [(320, 200)];
   static byte[] IImageFormatWriter<EscapePaintFile>.ToBytes(EscapePaintFile file) => EscapePaintWriter.ToBytes(file);
 
   /// <summary>Image width (always 320).</summary>

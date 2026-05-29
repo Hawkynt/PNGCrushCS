@@ -20,6 +20,8 @@ public sealed class Atari2600File : IImageFormatReader<Atari2600File>, IImageToR
   public static string[] FileExtensions => [".a26", ".tia"];
   static Atari2600File IImageFormatReader<Atari2600File>.FromSpan(ReadOnlySpan<byte> data) => Atari2600Reader.FromSpan(data);
   public static FormatCapability Capabilities => FormatCapability.MonochromeOnly;
+  public static IntegerRange[] AllowedPaletteRanges => [2];
+  public static (IntegerRange Width, IntegerRange Height)[] AllowedDimensions => [(TilesPerRow * TileSize, new IntegerRange(TileSize, 4096, TileSize))];
   public static Atari2600File FromFile(FileInfo file) => Atari2600Reader.FromFile(file);
   public static Atari2600File FromBytes(byte[] data) => Atari2600Reader.FromBytes(data);
   public static Atari2600File FromStream(Stream stream) => Atari2600Reader.FromStream(stream);

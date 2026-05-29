@@ -27,7 +27,10 @@ public sealed record FormatEntry(
   Func<byte[], ImageInfo?>? ReadImageInfo = null,
   Func<FileInfo, int>? GetImageCount = null,
   Func<FileInfo, int, RawImage?>? LoadRawImageAtIndex = null,
-  Func<FileInfo, IReadOnlyList<RawImage>?>? LoadAllRawImages = null
+  Func<FileInfo, IReadOnlyList<RawImage>?>? LoadAllRawImages = null,
+  IntegerRange[]? AllowedPaletteRanges = null,
+  FixedPalette[]? FixedPalettes = null,
+  (IntegerRange Width, IntegerRange Height)[]? AllowedDimensions = null
 ) {
 
   /// <summary>The first/preferred MIME type, or <c>"application/octet-stream"</c> if none is registered.</summary>

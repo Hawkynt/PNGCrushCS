@@ -10,6 +10,9 @@ public readonly record struct Atari8BitFile : IImageFormatReader<Atari8BitFile>,
   static string[] IImageFormatMetadata<Atari8BitFile>.FileExtensions => [".gr7", ".gr8", ".gr9", ".gr15", ".hip", ".mic", ".int"];
   static Atari8BitFile IImageFormatReader<Atari8BitFile>.FromSpan(ReadOnlySpan<byte> data) => Atari8BitReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<Atari8BitFile>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<Atari8BitFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
+  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<Atari8BitFile>.AllowedDimensions =>
+    [(320, 192), (160, 192), (80, 192), (160, 96)];
   static byte[] IImageFormatWriter<Atari8BitFile>.ToBytes(Atari8BitFile file) => Atari8BitWriter.ToBytes(file);
 
   /// <summary>Width in pixels (depends on mode: 320, 160, or 80).</summary>
@@ -123,21 +126,38 @@ public readonly record struct Atari8BitFile : IImageFormatReader<Atari8BitFile>,
     };
   }
 
-  /// <summary>Creates an Atari 8-bit screen from a <see cref="RawImage"/>. Expects Indexed8 format.</summary>
+  /// <summary>Creates an Atari 8-bit screen from a <see cref="RawImage"/>. Accepts Indexed1 or Indexed8.</summary>
   public static Atari8BitFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException($"Expected {PixelFormat.Indexed8} but got {image.Format}.", nameof(image));
+    if (image.Format != PixelFormat.Indexed8 && image.Format != PixelFormat.Indexed1)
+      throw new ArgumentException($"Expected {PixelFormat.Indexed8} or {PixelFormat.Indexed1} but got {image.Format}.", nameof(image));
 
     var mode = _InferModeFromDimensions(image.Width, image.Height, image.PaletteCount);
+    var pixels = image.Format == PixelFormat.Indexed1
+      ? _ExpandIndexed1ToBytes(image.PixelData, image.Width, image.Height)
+      : image.PixelData[..];
 
     return new() {
       Width = image.Width,
       Height = image.Height,
       Mode = mode,
-      PixelData = image.PixelData[..],
+      PixelData = pixels,
       Palette = image.Palette != null ? image.Palette[..] : GetDefaultPalette(mode),
     };
+  }
+
+  private static byte[] _ExpandIndexed1ToBytes(byte[] packed, int width, int height) {
+    var stride = (width + 7) / 8;
+    var result = new byte[width * height];
+    for (var y = 0; y < height; ++y) {
+      var rowSrc = y * stride;
+      var rowDst = y * width;
+      for (var x = 0; x < width; ++x) {
+        var b = packed[rowSrc + (x >> 3)];
+        result[rowDst + x] = (byte)((b >> (7 - (x & 7))) & 1);
+      }
+    }
+    return result;
   }
 
   private static Atari8BitMode _InferModeFromDimensions(int width, int height, int paletteCount) {

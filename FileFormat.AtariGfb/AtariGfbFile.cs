@@ -22,6 +22,7 @@ public readonly record struct AtariGfbFile : IImageFormatReader<AtariGfbFile>, I
   static string[] IImageFormatMetadata<AtariGfbFile>.FileExtensions => [".gfb"];
   static AtariGfbFile IImageFormatReader<AtariGfbFile>.FromSpan(ReadOnlySpan<byte> data) => AtariGfbReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<AtariGfbFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static IntegerRange[] IImageFormatMetadata<AtariGfbFile>.AllowedPaletteRanges => [2];
   static byte[] IImageFormatWriter<AtariGfbFile>.ToBytes(AtariGfbFile file) => AtariGfbWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>

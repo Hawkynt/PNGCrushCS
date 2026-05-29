@@ -22,10 +22,23 @@ public readonly record struct Lss16File : IImageFormatReader<Lss16File>, IImageT
   /// <summary>Total palette size in bytes.</summary>
   internal const int PaletteSize = PaletteEntryCount * BytesPerPaletteEntry;
 
+  /// <summary>Default 16-entry grayscale ramp (6-bit VGA scale, 0-63) used when the source palette is missing or short.</summary>
+  private static readonly byte[] _DefaultPalette = _MakeGrayRamp(PaletteEntryCount);
+
+  private static byte[] _MakeGrayRamp(int entries) {
+    var p = new byte[entries * BytesPerPaletteEntry];
+    for (var i = 0; i < entries; ++i) {
+      var v = entries == 1 ? (byte)32 : (byte)(i * 63 / (entries - 1));
+      p[i * 3] = v; p[i * 3 + 1] = v; p[i * 3 + 2] = v;
+    }
+    return p;
+  }
+
   static string IImageFormatMetadata<Lss16File>.PrimaryExtension => ".lss";
   static string[] IImageFormatMetadata<Lss16File>.FileExtensions => [".lss", ".16"];
   static Lss16File IImageFormatReader<Lss16File>.FromSpan(ReadOnlySpan<byte> data) => Lss16Reader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<Lss16File>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<Lss16File>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
   static byte[] IImageFormatWriter<Lss16File>.ToBytes(Lss16File file) => Lss16Writer.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
@@ -42,9 +55,11 @@ public readonly record struct Lss16File : IImageFormatReader<Lss16File>, IImageT
 
   public static RawImage ToRawImage(Lss16File file) {
 
+    var srcPalette = file.Palette is { Length: > 0 } sp ? sp : _DefaultPalette;
     var expandedPalette = new byte[PaletteSize];
-    for (var i = 0; i < PaletteSize; ++i) {
-      var val = file.Palette[i] * 4;
+    var copyLen = Math.Min(PaletteSize, srcPalette.Length);
+    for (var i = 0; i < copyLen; ++i) {
+      var val = srcPalette[i] * 4;
       expandedPalette[i] = (byte)(val > 255 ? 255 : val);
     }
 

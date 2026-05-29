@@ -134,8 +134,7 @@ public sealed class Spectrum512CompReaderTests {
   [Category("Unit")]
   public void DataType_DefaultRawData_IsEmpty() {
     var file = new Spectrum512CompFile();
-    Assert.That(file.RawData, Is.Not.Null);
-    Assert.That(file.RawData, Is.Empty);
+    Assert.That(file.RawData, Is.Null);
   }
 
   [Test]

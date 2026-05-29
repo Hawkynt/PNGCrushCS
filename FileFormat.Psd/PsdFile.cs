@@ -27,6 +27,17 @@ public readonly record struct PsdFile : IImageFormatReader<PsdFile>, IImageToRaw
   public byte[]? ImageResources { get; init; }
   public byte[]? LayerMaskInfo { get; init; }
 
+  private static readonly byte[] _DefaultPalette = _MakeGrayRamp(256);
+
+  private static byte[] _MakeGrayRamp(int entries) {
+    var p = new byte[entries * 3];
+    for (var i = 0; i < entries; ++i) {
+      var v = entries == 1 ? (byte)128 : (byte)(i * 255 / (entries - 1));
+      p[i * 3] = v; p[i * 3 + 1] = v; p[i * 3 + 2] = v;
+    }
+    return p;
+  }
+
   public static RawImage ToRawImage(PsdFile file) {
     if (file.Depth != 8)
       throw new NotSupportedException($"Only Depth=8 is supported, got {file.Depth}.");
@@ -57,15 +68,17 @@ public readonly record struct PsdFile : IImageFormatReader<PsdFile>, IImageToRaw
           Format = PixelFormat.Rgba32,
           PixelData = _Deplanarize(file.PixelData, planeSize, 4),
         };
-      case PsdColorMode.Indexed when file.Palette != null:
+      case PsdColorMode.Indexed: {
+        var palette = file.Palette is { Length: >= 768 } p ? p[..768] : _DefaultPalette[..];
         return new() {
           Width = width,
           Height = height,
           Format = PixelFormat.Indexed8,
           PixelData = file.PixelData[..],
-          Palette = file.Palette[..],
-          PaletteCount = file.Palette.Length / 3,
+          Palette = palette,
+          PaletteCount = 256,
         };
+      }
       default:
         throw new NotSupportedException($"PSD color mode {file.ColorMode} with {file.Channels} channels is not supported.");
     }

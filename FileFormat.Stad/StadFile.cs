@@ -22,6 +22,7 @@ public readonly record struct StadFile : IImageFormatReader<StadFile>, IImageToR
   static string[] IImageFormatMetadata<StadFile>.FileExtensions => [".pac"];
   static StadFile IImageFormatReader<StadFile>.FromSpan(ReadOnlySpan<byte> data) => StadReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<StadFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static IntegerRange[] IImageFormatMetadata<StadFile>.AllowedPaletteRanges => [2];
   static byte[] IImageFormatWriter<StadFile>.ToBytes(StadFile file) => StadWriter.ToBytes(file);
 
   /// <summary>Always 640.</summary>

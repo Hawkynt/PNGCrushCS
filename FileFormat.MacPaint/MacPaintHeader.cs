@@ -5,7 +5,7 @@ namespace FileFormat.MacPaint;
 /// <summary>The 512-byte header at the start of every MacPaint file.</summary>
 [GenerateSerializer, Endian(Endianness.Big)]
 [Filler(4 + MacPaintHeader.PatternsSize, MacPaintHeader.PaddingSize)]
-internal readonly partial record struct MacPaintHeader( int Version, byte[] Patterns
+internal readonly partial record struct MacPaintHeader( int Version, [property: Repeat(304)] byte[] Patterns
 ) {
 
  public const int StructSize = 512;

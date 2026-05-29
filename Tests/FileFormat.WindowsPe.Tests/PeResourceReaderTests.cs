@@ -53,8 +53,8 @@ public sealed class PeResourceReaderTests {
     var pe = MinimalPeBuilder.BuildEmpty();
     var file = PeResourceReader.FromBytes(pe);
     Assert.Multiple(() => {
-      Assert.That(file.ImageResources, Is.Empty);
-      Assert.That(file.IconGroups, Is.Empty);
+      Assert.That(file.ImageResources, Has.Length.EqualTo(0));
+      Assert.That(file.IconGroups, Has.Length.EqualTo(0));
     });
   }
 
@@ -151,7 +151,7 @@ public sealed class PeResourceReaderTests {
     var pe = MinimalPeBuilder.BuildEmpty();
     using var ms = new MemoryStream(pe);
     var file = PeResourceReader.FromStream(ms);
-    Assert.That(file.ImageResources, Is.Empty);
+    Assert.That(file.ImageResources, Has.Length.EqualTo(0));
   }
 
   [Test]

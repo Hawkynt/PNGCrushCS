@@ -5,7 +5,7 @@ namespace FileFormat.Uhdr;
 /// <summary>The 16-byte header of a UHDR image: Magic(4 bytes "UHDR"), Version(ushort LE), Reserved(ushort LE), Width(uint32 LE), Height(uint32 LE).</summary>
 [GenerateSerializer]
 public readonly partial record struct UhdrHeader(
-  string Magic,
+  [property: SeqField(Size = 4)] string Magic,
   ushort Version,
   ushort Reserved,
   uint Width,

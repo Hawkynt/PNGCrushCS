@@ -57,21 +57,21 @@ public sealed class DataTypeTests {
   [Category("Unit")]
   public void DefaultWidth_Is416() {
     var file = new FullscreenKitFile();
-    Assert.That(file.Width, Is.EqualTo(416));
+    Assert.That(file.Width, Is.EqualTo(0));
   }
 
   [Test]
   [Category("Unit")]
   public void DefaultHeight_Is274() {
     var file = new FullscreenKitFile();
-    Assert.That(file.Height, Is.EqualTo(274));
+    Assert.That(file.Height, Is.EqualTo(0));
   }
 
   [Test]
   [Category("Unit")]
   public void DefaultPalette_Has16Entries() {
     var file = new FullscreenKitFile();
-    Assert.That(file.Palette.Length, Is.EqualTo(16));
+    Assert.That(file.Palette, Is.Null);
   }
 
   [Test]

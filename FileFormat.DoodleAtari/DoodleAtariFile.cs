@@ -13,6 +13,7 @@ public readonly record struct DoodleAtariFile : IImageFormatReader<DoodleAtariFi
   static string[] IImageFormatMetadata<DoodleAtariFile>.FileExtensions => [".doo"];
   static DoodleAtariFile IImageFormatReader<DoodleAtariFile>.FromSpan(ReadOnlySpan<byte> data) => DoodleAtariReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<DoodleAtariFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static IntegerRange[] IImageFormatMetadata<DoodleAtariFile>.AllowedPaletteRanges => [2];
   static byte[] IImageFormatWriter<DoodleAtariFile>.ToBytes(DoodleAtariFile file) => DoodleAtariWriter.ToBytes(file);
 
   /// <summary>Always 640.</summary>

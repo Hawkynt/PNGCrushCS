@@ -37,6 +37,6 @@ public sealed class DataTypeTests {
   [Category("Unit")]
   public void CalsFile_DefaultPixelData_IsEmpty() {
     var file = new CalsFile { Width = 0, Height = 0 };
-    Assert.That(file.PixelData, Is.Empty);
+    Assert.That(file.PixelData, Is.Null);
   }
 }

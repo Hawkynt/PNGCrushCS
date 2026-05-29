@@ -26,6 +26,7 @@ public sealed class AtariGraphics10File : IImageFormatReader<AtariGraphics10File
   static AtariGraphics10File IImageFormatReader<AtariGraphics10File>.FromSpan(ReadOnlySpan<byte> data) => AtariGraphics10Reader.FromSpan(data);
 
   static FormatCapability IImageFormatMetadata<AtariGraphics10File>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<AtariGraphics10File>.AllowedPaletteRanges => [9];
   static RawImage IImageToRawImage<AtariGraphics10File>.ToRawImage(AtariGraphics10File file) => ToRawImage(file);
   static byte[] IImageFormatWriter<AtariGraphics10File>.ToBytes(AtariGraphics10File file) => AtariGraphics10Writer.ToBytes(file);
 

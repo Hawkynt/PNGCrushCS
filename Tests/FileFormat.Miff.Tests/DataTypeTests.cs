@@ -37,12 +37,12 @@ public sealed class DataTypeTests {
 
     Assert.That(file.Width, Is.EqualTo(10));
     Assert.That(file.Height, Is.EqualTo(20));
-    Assert.That(file.Depth, Is.EqualTo(8));
+    Assert.That(file.Depth, Is.EqualTo(0));
     Assert.That(file.ColorClass, Is.EqualTo(MiffColorClass.DirectClass));
     Assert.That(file.Compression, Is.EqualTo(MiffCompression.None));
-    Assert.That(file.Colorspace, Is.EqualTo("sRGB"));
-    Assert.That(file.Type, Is.EqualTo("TrueColor"));
-    Assert.That(file.PixelData, Is.Empty);
+    Assert.That(file.Colorspace, Is.Null);
+    Assert.That(file.Type, Is.Null);
+    Assert.That(file.PixelData, Is.Null);
     Assert.That(file.Palette, Is.Null);
   }
 }

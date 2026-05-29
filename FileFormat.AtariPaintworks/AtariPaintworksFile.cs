@@ -10,6 +10,8 @@ public readonly record struct AtariPaintworksFile : IImageFormatReader<AtariPain
   static string[] IImageFormatMetadata<AtariPaintworksFile>.FileExtensions => [".cl0", ".cl1", ".cl2", ".pg0", ".pg1", ".pg2", ".pg3", ".sc0", ".sc1", ".sc2"];
   static AtariPaintworksFile IImageFormatReader<AtariPaintworksFile>.FromSpan(ReadOnlySpan<byte> data) => AtariPaintworksReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<AtariPaintworksFile>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<AtariPaintworksFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
+  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<AtariPaintworksFile>.AllowedDimensions => [(320, 200), (640, 200), (640, 400)];
   static byte[] IImageFormatWriter<AtariPaintworksFile>.ToBytes(AtariPaintworksFile file) => AtariPaintworksWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
@@ -55,10 +57,15 @@ public readonly record struct AtariPaintworksFile : IImageFormatReader<AtariPain
     if (image.Format != PixelFormat.Indexed8)
       throw new ArgumentException("RawImage must use PixelFormat.Indexed8.", nameof(image));
 
-    var resolution = image.PaletteCount switch {
-      <= 2 => AtariPaintworksResolution.High,
-      <= 4 => AtariPaintworksResolution.Medium,
-      _ => AtariPaintworksResolution.Low
+    var resolution = (image.Width, image.Height) switch {
+      (640, 400) => AtariPaintworksResolution.High,
+      (640, 200) => AtariPaintworksResolution.Medium,
+      (320, 200) => AtariPaintworksResolution.Low,
+      _ => image.PaletteCount switch {
+        <= 2 => AtariPaintworksResolution.High,
+        <= 4 => AtariPaintworksResolution.Medium,
+        _ => AtariPaintworksResolution.Low
+      }
     };
 
     var numPlanes = resolution switch {

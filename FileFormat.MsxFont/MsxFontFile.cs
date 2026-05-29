@@ -10,6 +10,7 @@ public readonly record struct MsxFontFile : IImageFormatReader<MsxFontFile>, IIm
   static string[] IImageFormatMetadata<MsxFontFile>.FileExtensions => [".fnt", ".mft"];
   static MsxFontFile IImageFormatReader<MsxFontFile>.FromSpan(ReadOnlySpan<byte> data) => MsxFontReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<MsxFontFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static IntegerRange[] IImageFormatMetadata<MsxFontFile>.AllowedPaletteRanges => [2];
   static byte[] IImageFormatWriter<MsxFontFile>.ToBytes(MsxFontFile file) => MsxFontWriter.ToBytes(file);
 
   /// <summary>Expected file size in bytes.</summary>

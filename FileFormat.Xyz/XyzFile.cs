@@ -11,6 +11,7 @@ public readonly record struct XyzFile : IImageFormatReader<XyzFile>, IImageToRaw
   static string[] IImageFormatMetadata<XyzFile>.FileExtensions => [".xyz"];
   static XyzFile IImageFormatReader<XyzFile>.FromSpan(ReadOnlySpan<byte> data) => XyzReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<XyzFile>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<XyzFile>.AllowedPaletteRanges => [256];
   static byte[] IImageFormatWriter<XyzFile>.ToBytes(XyzFile file) => XyzWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
@@ -25,13 +26,25 @@ public readonly record struct XyzFile : IImageFormatReader<XyzFile>, IImageToRaw
   /// <summary>8-bit indexed pixel data (width * height bytes).</summary>
   public byte[] PixelData { get; init; }
 
+  private static readonly byte[] _DefaultPalette = _MakeGrayRamp(256);
+
+  private static byte[] _MakeGrayRamp(int entries) {
+    var p = new byte[entries * 3];
+    for (var i = 0; i < entries; ++i) {
+      var v = entries == 1 ? (byte)128 : (byte)(i * 255 / (entries - 1));
+      p[i * 3] = v; p[i * 3 + 1] = v; p[i * 3 + 2] = v;
+    }
+    return p;
+  }
+
   public static RawImage ToRawImage(XyzFile file) {
+    var palette = file.Palette is { Length: >= 768 } p ? p[..768] : _DefaultPalette[..];
     return new() {
       Width = file.Width,
       Height = file.Height,
       Format = PixelFormat.Indexed8,
       PixelData = file.PixelData[..],
-      Palette = file.Palette[..],
+      Palette = palette,
       PaletteCount = 256,
     };
   }

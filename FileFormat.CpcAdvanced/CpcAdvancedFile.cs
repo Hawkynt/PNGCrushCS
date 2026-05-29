@@ -10,6 +10,7 @@ public readonly record struct CpcAdvancedFile : IImageFormatReader<CpcAdvancedFi
   static string[] IImageFormatMetadata<CpcAdvancedFile>.FileExtensions => [".cpa"];
   static CpcAdvancedFile IImageFormatReader<CpcAdvancedFile>.FromSpan(ReadOnlySpan<byte> data) => CpcAdvancedReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<CpcAdvancedFile>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<CpcAdvancedFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
   static byte[] IImageFormatWriter<CpcAdvancedFile>.ToBytes(CpcAdvancedFile file) => CpcAdvancedWriter.ToBytes(file);
 
   /// <summary>Expected file size in bytes.</summary>

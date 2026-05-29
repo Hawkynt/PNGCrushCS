@@ -109,7 +109,7 @@ public sealed class RoundTripTests {
     Assert.Multiple(() => {
       Assert.That(restored.Width, Is.EqualTo(0));
       Assert.That(restored.Height, Is.EqualTo(0));
-      Assert.That(restored.PixelData, Is.Empty);
+      Assert.That(restored.PixelData, Has.Length.EqualTo(0));
     });
   }
 }

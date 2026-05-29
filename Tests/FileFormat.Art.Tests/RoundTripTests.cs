@@ -74,7 +74,7 @@ public sealed class RoundTripTests {
     Assert.That(restored.Tiles, Has.Count.EqualTo(1));
     Assert.That(restored.Tiles[0].Width, Is.EqualTo(0));
     Assert.That(restored.Tiles[0].Height, Is.EqualTo(0));
-    Assert.That(restored.Tiles[0].PixelData, Is.Empty);
+    Assert.That(restored.Tiles[0].PixelData, Has.Length.EqualTo(0));
   }
 
   [Test]

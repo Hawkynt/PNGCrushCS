@@ -13,6 +13,7 @@ public readonly record struct MagicPainterFile : IImageFormatReader<MagicPainter
   static string[] IImageFormatMetadata<MagicPainterFile>.FileExtensions => [".mgp"];
   static MagicPainterFile IImageFormatReader<MagicPainterFile>.FromSpan(ReadOnlySpan<byte> data) => MagicPainterReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<MagicPainterFile>.Capabilities => FormatCapability.VariableResolution | FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<MagicPainterFile>.AllowedPaletteRanges => [new IntegerRange(2, 256)];
   static byte[] IImageFormatWriter<MagicPainterFile>.ToBytes(MagicPainterFile file) => MagicPainterWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>

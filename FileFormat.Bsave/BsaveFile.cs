@@ -10,6 +10,8 @@ public readonly record struct BsaveFile : IImageFormatReader<BsaveFile>, IImageT
   static string IImageFormatMetadata<BsaveFile>.PrimaryExtension => ".bsv";
   static string[] IImageFormatMetadata<BsaveFile>.FileExtensions => [".bsv"];
   static BsaveFile IImageFormatReader<BsaveFile>.FromSpan(ReadOnlySpan<byte> data) => BsaveReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<BsaveFile>.Capabilities => FormatCapability.FixedResolution;
+  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<BsaveFile>.AllowedDimensions => [(320, 200)];
   static byte[] IImageFormatWriter<BsaveFile>.ToBytes(BsaveFile file) => BsaveWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
@@ -199,7 +201,7 @@ public readonly record struct BsaveFile : IImageFormatReader<BsaveFile>, IImageT
     };
   }
 
-  // VGA 320x200x256: linear 8bpp -> Indexed8, no palette (hardware-defined)
+  // VGA 320x200x256: linear 8bpp -> Indexed8 with default VGA palette
   private static RawImage _Vga256ToRawImage(BsaveFile file) {
     const int width = 320;
     const int height = 200;
@@ -213,7 +215,53 @@ public readonly record struct BsaveFile : IImageFormatReader<BsaveFile>, IImageT
       Height = height,
       Format = PixelFormat.Indexed8,
       PixelData = pixels,
+      Palette = _DefaultVgaPalette,
       PaletteCount = 256,
     };
+  }
+
+  // Default VGA Mode 13h palette (256 RGB triplets). Indices 0..15 = EGA palette,
+  // 16..31 = grayscale ramp, 32..255 = standard VGA color cube + ramps.
+  // This is a synthesized approximation suitable for indexed-image round-tripping —
+  // the exact ROM palette is hardware-defined and not stored in BSAVE files.
+  private static readonly byte[] _DefaultVgaPalette = _BuildDefaultVgaPalette();
+
+  private static byte[] _BuildDefaultVgaPalette() {
+    var palette = new byte[256 * 3];
+    // 0..15: EGA palette
+    for (var i = 0; i < 16; ++i) {
+      palette[i * 3] = _EgaPalette[i * 3];
+      palette[i * 3 + 1] = _EgaPalette[i * 3 + 1];
+      palette[i * 3 + 2] = _EgaPalette[i * 3 + 2];
+    }
+    // 16..31: grayscale ramp
+    for (var i = 0; i < 16; ++i) {
+      var v = (byte)(i * 255 / 15);
+      var idx = (16 + i) * 3;
+      palette[idx] = v;
+      palette[idx + 1] = v;
+      palette[idx + 2] = v;
+    }
+    // 32..255: spread a 6x6x6 color cube + remaining grayscale
+    var pos = 32;
+    for (var r = 0; r < 6 && pos < 256; ++r)
+      for (var g = 0; g < 6 && pos < 256; ++g)
+        for (var b = 0; b < 6 && pos < 256; ++b) {
+          var idx = pos * 3;
+          palette[idx] = (byte)(r * 51);
+          palette[idx + 1] = (byte)(g * 51);
+          palette[idx + 2] = (byte)(b * 51);
+          ++pos;
+        }
+    // Fill remainder with grayscale ramp
+    while (pos < 256) {
+      var v = (byte)((pos - 248) * 32);
+      var idx = pos * 3;
+      palette[idx] = v;
+      palette[idx + 1] = v;
+      palette[idx + 2] = v;
+      ++pos;
+    }
+    return palette;
   }
 }

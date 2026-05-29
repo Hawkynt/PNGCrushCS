@@ -22,6 +22,7 @@ public readonly record struct AtariCADFile : IImageFormatReader<AtariCADFile>, I
   static string[] IImageFormatMetadata<AtariCADFile>.FileExtensions => [".acd"];
   static AtariCADFile IImageFormatReader<AtariCADFile>.FromSpan(ReadOnlySpan<byte> data) => AtariCADReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<AtariCADFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static IntegerRange[] IImageFormatMetadata<AtariCADFile>.AllowedPaletteRanges => [2];
   static byte[] IImageFormatWriter<AtariCADFile>.ToBytes(AtariCADFile file) => AtariCADWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>

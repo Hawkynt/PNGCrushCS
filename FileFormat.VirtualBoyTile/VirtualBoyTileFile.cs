@@ -17,7 +17,9 @@ public readonly record struct VirtualBoyTileFile : IImageFormatReader<VirtualBoy
   static string IImageFormatMetadata<VirtualBoyTileFile>.PrimaryExtension => ".vbt";
   static string[] IImageFormatMetadata<VirtualBoyTileFile>.FileExtensions => [".vbt", ".vb", ".vboy"];
   static VirtualBoyTileFile IImageFormatReader<VirtualBoyTileFile>.FromSpan(ReadOnlySpan<byte> data) => VirtualBoyTileReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<VirtualBoyTileFile>.Capabilities => FormatCapability.IndexedOnly;
+  static FormatCapability IImageFormatMetadata<VirtualBoyTileFile>.Capabilities => FormatCapability.IndexedOnly | FormatCapability.FixedResolution;
+  static IntegerRange[] IImageFormatMetadata<VirtualBoyTileFile>.AllowedPaletteRanges => [new IntegerRange(2, 4)];
+  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<VirtualBoyTileFile>.AllowedDimensions => [(TilesPerRow * TileSize, new IntegerRange(TileSize, 4096, TileSize))];
   static byte[] IImageFormatWriter<VirtualBoyTileFile>.ToBytes(VirtualBoyTileFile file) => VirtualBoyTileWriter.ToBytes(file);
 
   public int Width { get; init; }
@@ -30,8 +32,8 @@ public readonly record struct VirtualBoyTileFile : IImageFormatReader<VirtualBoy
       Width = file.Width,
       Height = file.Height,
       Format = PixelFormat.Indexed8,
-      PixelData = file.PixelData[..],
-      Palette = file.Palette[..],
+      PixelData = (file.PixelData ?? Array.Empty<byte>())[..],
+      Palette = (file.Palette ?? Array.Empty<byte>())[..],
       PaletteCount = PaletteColors,
     };
   }

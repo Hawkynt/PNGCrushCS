@@ -14,6 +14,8 @@ public readonly record struct FaxG3File : IImageFormatReader<FaxG3File>, IImageT
   static string[] IImageFormatMetadata<FaxG3File>.FileExtensions => [".g3"];
   static FaxG3File IImageFormatReader<FaxG3File>.FromSpan(ReadOnlySpan<byte> data) => FaxG3Reader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<FaxG3File>.Capabilities => FormatCapability.MonochromeOnly;
+  static IntegerRange[] IImageFormatMetadata<FaxG3File>.AllowedPaletteRanges => [2];
+  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<FaxG3File>.AllowedDimensions => [(new IntegerRange(8, 65535, 8), new IntegerRange(1, 65535))];
   static byte[] IImageFormatWriter<FaxG3File>.ToBytes(FaxG3File file) => FaxG3Writer.ToBytes(file);
 
   public int Width { get; init; }

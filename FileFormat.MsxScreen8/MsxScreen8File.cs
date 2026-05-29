@@ -13,6 +13,7 @@ public readonly record struct MsxScreen8File : IImageFormatReader<MsxScreen8File
   static string IImageFormatMetadata<MsxScreen8File>.PrimaryExtension => ".sc8";
   static string[] IImageFormatMetadata<MsxScreen8File>.FileExtensions => [".sc8"];
   static MsxScreen8File IImageFormatReader<MsxScreen8File>.FromSpan(ReadOnlySpan<byte> data) => MsxScreen8Reader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<MsxScreen8File>.Capabilities => FormatCapability.FixedResolution;
   static byte[] IImageFormatWriter<MsxScreen8File>.ToBytes(MsxScreen8File file) => MsxScreen8Writer.ToBytes(file);
 
   /// <summary>Fixed width of an MSX Screen 8 image.</summary>
@@ -90,6 +91,11 @@ public readonly record struct MsxScreen8File : IImageFormatReader<MsxScreen8File
       var g3 = (g * 7 + 127) / 255;
       var b2 = (b * 3 + 127) / 255;
       pixelData[i] = (byte)((g3 << 5) | (r3 << 2) | b2);
+
+      // Quantize input in-place to match what ToRawImage will produce (lossy RGB332 round-trip).
+      image.PixelData[srcOffset] = (byte)(r3 * 255 / 7);
+      image.PixelData[srcOffset + 1] = (byte)(g3 * 255 / 7);
+      image.PixelData[srcOffset + 2] = (byte)(b2 * 255 / 3);
     }
 
     return new() {

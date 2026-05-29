@@ -21,7 +21,9 @@ public readonly record struct AtariCompressedFile : IImageFormatReader<AtariComp
   static string IImageFormatMetadata<AtariCompressedFile>.PrimaryExtension => ".acr";
   static string[] IImageFormatMetadata<AtariCompressedFile>.FileExtensions => [".acr", ".acp"];
   static AtariCompressedFile IImageFormatReader<AtariCompressedFile>.FromSpan(ReadOnlySpan<byte> data) => AtariCompressedReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<AtariCompressedFile>.Capabilities => FormatCapability.IndexedOnly;
+  static FormatCapability IImageFormatMetadata<AtariCompressedFile>.Capabilities => FormatCapability.IndexedOnly | FormatCapability.FixedResolution;
+  static IntegerRange[] IImageFormatMetadata<AtariCompressedFile>.AllowedPaletteRanges => [2];
+  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<AtariCompressedFile>.AllowedDimensions => [(DefaultWidth, DefaultHeight)];
   static byte[] IImageFormatWriter<AtariCompressedFile>.ToBytes(AtariCompressedFile file) => AtariCompressedWriter.ToBytes(file);
 
   /// <summary>Width in pixels.</summary>
@@ -63,6 +65,6 @@ public readonly record struct AtariCompressedFile : IImageFormatReader<AtariComp
     var pixelData = new byte[DecompressedSize];
     image.PixelData.AsSpan(0, Math.Min(image.PixelData.Length, DecompressedSize)).CopyTo(pixelData);
 
-    return new() { PixelData = pixelData };
+    return new() { Width = image.Width, Height = image.Height, PixelData = pixelData };
   }
 }

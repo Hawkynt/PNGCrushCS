@@ -10,6 +10,7 @@ public readonly record struct HiresC64File : IImageFormatReader<HiresC64File>, I
   static string[] IImageFormatMetadata<HiresC64File>.FileExtensions => [".hir", ".hbm"];
   static HiresC64File IImageFormatReader<HiresC64File>.FromSpan(ReadOnlySpan<byte> data) => HiresC64Reader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<HiresC64File>.Capabilities => FormatCapability.MonochromeOnly;
+  static IntegerRange[] IImageFormatMetadata<HiresC64File>.AllowedPaletteRanges => [2];
   static byte[] IImageFormatWriter<HiresC64File>.ToBytes(HiresC64File file) => HiresC64Writer.ToBytes(file);
 
   /// <summary>The fixed width of a hires C64 image in pixels.</summary>

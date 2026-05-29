@@ -55,7 +55,7 @@ public sealed class MiffRleCompressorTests {
     var compressed = Array.Empty<byte>();
     var decompressed = MiffRleCompressor.Decompress(compressed, 3, 0);
 
-    Assert.That(decompressed, Is.Empty);
+    Assert.That(decompressed, Has.Length.EqualTo(0));
   }
 
   [Test]

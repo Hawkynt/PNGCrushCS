@@ -24,7 +24,7 @@ public sealed class DataTypeTests {
       PixelData = new float[3]
     };
 
-    Assert.That(file.Exposure, Is.EqualTo(1.0f));
+    Assert.That(file.Exposure, Is.EqualTo(0.0f));
   }
 
   [Test]
@@ -35,7 +35,7 @@ public sealed class DataTypeTests {
       Height = 0
     };
 
-    Assert.That(file.PixelData, Is.Empty);
+    Assert.That(file.PixelData, Is.Null);
   }
 
   [Test]

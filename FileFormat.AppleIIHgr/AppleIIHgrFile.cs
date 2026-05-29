@@ -21,7 +21,9 @@ public readonly record struct AppleIIHgrFile : IImageFormatReader<AppleIIHgrFile
   static string IImageFormatMetadata<AppleIIHgrFile>.PrimaryExtension => ".hgr";
   static string[] IImageFormatMetadata<AppleIIHgrFile>.FileExtensions => [".hgr"];
   static AppleIIHgrFile IImageFormatReader<AppleIIHgrFile>.FromSpan(ReadOnlySpan<byte> data) => AppleIIHgrReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<AppleIIHgrFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static FormatCapability IImageFormatMetadata<AppleIIHgrFile>.Capabilities => FormatCapability.MonochromeOnly | FormatCapability.FixedResolution;
+  static IntegerRange[] IImageFormatMetadata<AppleIIHgrFile>.AllowedPaletteRanges => [2];
+  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<AppleIIHgrFile>.AllowedDimensions => [(280, 192)];
   static byte[] IImageFormatWriter<AppleIIHgrFile>.ToBytes(AppleIIHgrFile file) => AppleIIHgrWriter.ToBytes(file);
 
   /// <summary>Always 280.</summary>

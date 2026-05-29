@@ -57,4 +57,24 @@ public static class CcittReader {
     ArgumentNullException.ThrowIfNull(data);
     return FromSpan(data, width, height, format);
   }
+
+  /// <summary>Reads a self-describing CCITT payload written by <see cref="CcittWriter.ToBytes"/>.</summary>
+  /// <remarks>
+  /// Layout: "CCIT" magic[4] | W LE u16 | H low byte | (H high 7 bits + format flag in bit 7).
+  /// </remarks>
+  public static CcittFile FromSpanWithHeader(ReadOnlySpan<byte> data) {
+    if (data.Length < CcittWriter.HeaderSize)
+      throw new InvalidDataException("Data too small for CCITT header.");
+    if (data[0] != CcittWriter.Magic[0] || data[1] != CcittWriter.Magic[1]
+        || data[2] != CcittWriter.Magic[2] || data[3] != CcittWriter.Magic[3])
+      throw new InvalidDataException("Invalid CCITT magic bytes.");
+
+    int width = data[4] | (data[5] << 8);
+    int hLo = data[6];
+    var hHi = data[7];
+    int height = hLo | ((hHi & 0x7F) << 8);
+    var format = (hHi & 0x80) != 0 ? CcittFormat.Group4 : CcittFormat.Group3_1D;
+
+    return FromSpan(data[CcittWriter.HeaderSize..], width, height, format);
+  }
 }

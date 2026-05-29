@@ -9,8 +9,8 @@ public static class PvrWriter {
   public static byte[] ToBytes(PvrFile file) {
     ArgumentNullException.ThrowIfNull(file);
 
-    var metadataSize = file.Metadata.Length;
-    var totalSize = PvrHeader.StructSize + metadataSize + file.CompressedData.Length;
+    var metadataSize = (file.Metadata ?? Array.Empty<byte>()).Length;
+    var totalSize = PvrHeader.StructSize + metadataSize + (file.CompressedData ?? Array.Empty<byte>()).Length;
 
     var header = new PvrHeader(
       PvrHeader.Magic,
@@ -31,10 +31,10 @@ public static class PvrWriter {
     header.WriteTo(result);
 
     if (metadataSize > 0)
-      file.Metadata.AsSpan(0, metadataSize).CopyTo(result.AsSpan(PvrHeader.StructSize));
+      (file.Metadata ?? Array.Empty<byte>()).AsSpan(0, metadataSize).CopyTo(result.AsSpan(PvrHeader.StructSize));
 
-    if (file.CompressedData.Length > 0)
-      file.CompressedData.AsSpan(0, file.CompressedData.Length).CopyTo(result.AsSpan(PvrHeader.StructSize + metadataSize));
+    if ((file.CompressedData ?? Array.Empty<byte>()).Length > 0)
+      (file.CompressedData ?? Array.Empty<byte>()).AsSpan(0, (file.CompressedData ?? Array.Empty<byte>()).Length).CopyTo(result.AsSpan(PvrHeader.StructSize + metadataSize));
 
     return result;
   }

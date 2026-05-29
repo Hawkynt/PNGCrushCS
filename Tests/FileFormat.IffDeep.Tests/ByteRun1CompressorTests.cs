@@ -13,7 +13,7 @@ public sealed class ByteRun1CompressorTests {
     var encoded = ByteRun1Compressor.Encode(original);
     var decoded = ByteRun1Compressor.Decode(encoded, 0);
 
-    Assert.That(decoded, Is.Empty);
+    Assert.That(decoded, Has.Length.EqualTo(0));
   }
 
   [Test]

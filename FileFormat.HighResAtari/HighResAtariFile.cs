@@ -22,6 +22,7 @@ public readonly record struct HighResAtariFile : IImageFormatReader<HighResAtari
   static string[] IImageFormatMetadata<HighResAtariFile>.FileExtensions => [".hra"];
   static HighResAtariFile IImageFormatReader<HighResAtariFile>.FromSpan(ReadOnlySpan<byte> data) => HighResAtariReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<HighResAtariFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static IntegerRange[] IImageFormatMetadata<HighResAtariFile>.AllowedPaletteRanges => [2];
   static byte[] IImageFormatWriter<HighResAtariFile>.ToBytes(HighResAtariFile file) => HighResAtariWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>

@@ -25,6 +25,7 @@ public readonly record struct MicroIllustratorA8File : IImageFormatReader<MicroI
   static string[] IImageFormatMetadata<MicroIllustratorA8File>.FileExtensions => [".mia"];
   static MicroIllustratorA8File IImageFormatReader<MicroIllustratorA8File>.FromSpan(ReadOnlySpan<byte> data) => MicroIllustratorA8Reader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<MicroIllustratorA8File>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<MicroIllustratorA8File>.AllowedPaletteRanges => [new IntegerRange(2, 4)];
   static byte[] IImageFormatWriter<MicroIllustratorA8File>.ToBytes(MicroIllustratorA8File file) => MicroIllustratorA8Writer.ToBytes(file);
 
   /// <summary>Always 160.</summary>

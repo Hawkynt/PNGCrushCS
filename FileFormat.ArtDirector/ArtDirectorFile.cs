@@ -5,7 +5,7 @@ using FileFormat.Core;
 namespace FileFormat.ArtDirector;
 
 /// <summary>In-memory representation of an Atari ST Art Director image (128-byte header + 32000 bytes planar data).</summary>
-public readonly record struct ArtDirectorFile : IImageFormatReader<ArtDirectorFile>, IImageToRawImage<ArtDirectorFile>, IImageFormatWriter<ArtDirectorFile> {
+public readonly record struct ArtDirectorFile() : IImageFormatReader<ArtDirectorFile>, IImageToRawImage<ArtDirectorFile>, IImageFormatWriter<ArtDirectorFile> {
 
   /// <summary>Header size in bytes.</summary>
   public const int HeaderSize = 128;
@@ -26,13 +26,14 @@ public readonly record struct ArtDirectorFile : IImageFormatReader<ArtDirectorFi
   static string[] IImageFormatMetadata<ArtDirectorFile>.FileExtensions => [".art"];
   static ArtDirectorFile IImageFormatReader<ArtDirectorFile>.FromSpan(ReadOnlySpan<byte> data) => ArtDirectorReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<ArtDirectorFile>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<ArtDirectorFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
   static byte[] IImageFormatWriter<ArtDirectorFile>.ToBytes(ArtDirectorFile file) => ArtDirectorWriter.ToBytes(file);
 
   /// <summary>Image width (depends on resolution).</summary>
-  public int Width { get; init; }
+  public int Width { get; init; } = 320;
 
   /// <summary>Image height (depends on resolution).</summary>
-  public int Height { get; init; }
+  public int Height { get; init; } = 200;
 
   /// <summary>Resolution: 0=low (320x200), 1=medium (640x200), 2=high (640x400).</summary>
   public short Resolution { get; init; }

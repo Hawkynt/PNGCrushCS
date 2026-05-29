@@ -58,7 +58,7 @@ public sealed class IsoBmffBoxTests {
   [Category("Unit")]
   public void ReadBoxes_EmptyData_ReturnsEmpty() {
     var boxes = IsoBmffBox.ReadBoxes([], 0, 0);
-    Assert.That(boxes, Is.Empty);
+    Assert.That(boxes, Has.Count.EqualTo(0));
   }
 
   [Test]
@@ -66,7 +66,7 @@ public sealed class IsoBmffBoxTests {
   public void ReadBoxes_InsufficientHeaderData_ReturnsEmpty() {
     var data = new byte[4]; // less than 8-byte header
     var boxes = IsoBmffBox.ReadBoxes(data, 0, data.Length);
-    Assert.That(boxes, Is.Empty);
+    Assert.That(boxes, Has.Count.EqualTo(0));
   }
 
   [Test]

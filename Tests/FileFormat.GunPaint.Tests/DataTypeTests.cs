@@ -34,7 +34,7 @@ public sealed class DataTypeTests {
   [Category("Unit")]
   public void GunPaintFile_DefaultRawData_IsEmpty() {
     var file = new GunPaintFile();
-    Assert.That(file.RawData, Is.Empty);
+    Assert.That(file.RawData, Is.Null);
   }
 
   [Test]

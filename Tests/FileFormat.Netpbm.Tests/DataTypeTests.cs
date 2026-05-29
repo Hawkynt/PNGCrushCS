@@ -32,8 +32,7 @@ public sealed class DataTypeTests {
       Channels = 3
     };
 
-    Assert.That(file.PixelData, Is.Not.Null);
-    Assert.That(file.PixelData, Is.Empty);
+    Assert.That(file.PixelData, Is.Null);
   }
 
   [Test]

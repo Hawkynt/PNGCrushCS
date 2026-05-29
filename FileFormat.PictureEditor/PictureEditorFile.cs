@@ -25,6 +25,7 @@ public readonly record struct PictureEditorFile : IImageFormatReader<PictureEdit
   static string[] IImageFormatMetadata<PictureEditorFile>.FileExtensions => [".ped"];
   static PictureEditorFile IImageFormatReader<PictureEditorFile>.FromSpan(ReadOnlySpan<byte> data) => PictureEditorReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<PictureEditorFile>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<PictureEditorFile>.AllowedPaletteRanges => [new IntegerRange(2, 4)];
   static byte[] IImageFormatWriter<PictureEditorFile>.ToBytes(PictureEditorFile file) => PictureEditorWriter.ToBytes(file);
 
   /// <summary>Always 160.</summary>

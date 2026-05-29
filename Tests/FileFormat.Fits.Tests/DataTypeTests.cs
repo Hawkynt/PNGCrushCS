@@ -51,7 +51,7 @@ public sealed class DataTypeTests {
     Assert.That(file.Width, Is.EqualTo(10));
     Assert.That(file.Height, Is.EqualTo(20));
     Assert.That(file.Bitpix, Is.EqualTo(FitsBitpix.UInt8));
-    Assert.That(file.Keywords, Is.Empty);
-    Assert.That(file.PixelData, Is.Empty);
+    Assert.That(file.Keywords, Is.Null);
+    Assert.That(file.PixelData, Is.Null);
   }
 }

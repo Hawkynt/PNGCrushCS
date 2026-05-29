@@ -39,7 +39,7 @@ public sealed class DataTypeTests {
     Assert.Multiple(() => {
       Assert.That(resource.ResourceType, Is.EqualTo(PeImageResourceType.Icon));
       Assert.That(resource.ResourceId, Is.EqualTo(0));
-      Assert.That(resource.Data, Is.Empty);
+      Assert.That(resource.Data, Is.Null);
       Assert.That(resource.FormatHint, Is.Null);
     });
   }
@@ -69,7 +69,7 @@ public sealed class DataTypeTests {
     Assert.Multiple(() => {
       Assert.That(group.GroupId, Is.EqualTo(0));
       Assert.That(group.IsCursor, Is.False);
-      Assert.That(group.IcoData, Is.Empty);
+      Assert.That(group.IcoData, Is.Null);
     });
   }
 
@@ -94,8 +94,8 @@ public sealed class DataTypeTests {
   public void PeResourceFile_Defaults_AreCorrect() {
     var file = new PeResourceFile();
     Assert.Multiple(() => {
-      Assert.That(file.IconGroups, Is.Empty);
-      Assert.That(file.ImageResources, Is.Empty);
+      Assert.That(file.IconGroups, Is.Null);
+      Assert.That(file.ImageResources, Is.Null);
     });
   }
 

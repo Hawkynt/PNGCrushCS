@@ -111,7 +111,7 @@ public sealed class AnalyzeReaderTests {
 
     var result = AnalyzeReader.FromBytes(data);
 
-    Assert.That(result.PixelData, Is.Empty);
+    Assert.That(result.PixelData, Has.Length.EqualTo(0));
   }
 
   // --- helpers ---

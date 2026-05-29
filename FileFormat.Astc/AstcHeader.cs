@@ -9,9 +9,9 @@ public readonly partial record struct AstcHeader(
   byte BlockDimX,
   byte BlockDimY,
   byte BlockDimZ,
-  int Width,
-  int Height,
-  int Depth
+  [property: TypeOverride(WireType.UInt24), SeqField(Size = 3)] int Width,
+  [property: TypeOverride(WireType.UInt24), SeqField(Size = 3)] int Height,
+  [property: TypeOverride(WireType.UInt24), SeqField(Size = 3)] int Depth
 ) {
 
  public const int StructSize = 16;

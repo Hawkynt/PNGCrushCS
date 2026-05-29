@@ -13,7 +13,7 @@ public readonly partial record struct DdsHeader(
  int PitchOrLinearSize,
  int Depth,
  int MipMapCount,
- [property: FieldOffset(72)] DdsPixelFormat PixelFormat,
+ [property: FieldOffset(72), SeqField(Size = 32)] DdsPixelFormat PixelFormat,
  int Caps,
  int Caps2,
  int Caps3,

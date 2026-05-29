@@ -1,13 +1,11 @@
 using System.IO;
-using BitMiracle.LibJpeg.Classic;
 
 namespace FileFormat.Jpeg.Tests;
 
 /// <summary>
-/// Verifies the managed 4:2:2 JPEG encoder. BitMiracle.LibJpeg.NET refuses to encode 4:2:2
-/// ("Not implemented yet"), so JpegWriter.LossyEncode auto-routes 4:2:2 to JpegManagedEncoder.
-/// These tests confirm the routing works AND the resulting bytes are decodable JPEG with
-/// SOF0 sampling factors that match the requested subsampling.
+/// Verifies the managed 4:2:2 JPEG encoder. JpegWriter.LossyEncode routes all modes
+/// through JpegManagedEncoder. These tests confirm the resulting bytes are decodable JPEG
+/// with SOF0 sampling factors that match the requested subsampling.
 /// </summary>
 [TestFixture]
 public sealed class Jpeg422EncoderTests {
@@ -59,48 +57,36 @@ public sealed class Jpeg422EncoderTests {
   }
 
   [Test]
-  public void LossyEncode_Chroma422_DecodesViaBitMiracle() {
+  public void LossyEncode_Chroma422_DecodesViaManagedDecoder() {
     var rgb = _MakeRgbGradient(32, 16);
     var bytes = JpegWriter.LossyEncode(
       rgb, 32, 16, quality: 90, JpegMode.Baseline,
       JpegSubsampling.Chroma422, optimizeHuffman: true, isGrayscale: false);
 
-    using var ms = new MemoryStream(bytes);
-    var dinfo = new jpeg_decompress_struct();
-    dinfo.jpeg_stdio_src(ms);
-    dinfo.jpeg_read_header(true);
-    Assert.That(dinfo.Image_width, Is.EqualTo(32));
-    Assert.That(dinfo.Image_height, Is.EqualTo(16));
-    Assert.That(dinfo.Num_components, Is.EqualTo(3));
-
-    dinfo.jpeg_start_decompress();
-    var rowStride = dinfo.Output_width * dinfo.Output_components;
-    var rowBuf = new byte[1][];
-    rowBuf[0] = new byte[rowStride];
-    while (dinfo.Output_scanline < dinfo.Output_height)
-      dinfo.jpeg_read_scanlines(rowBuf, 1);
-    dinfo.jpeg_finish_decompress();
+    var decoded = JpegReader.FromBytes(bytes);
+    Assert.That(decoded.Width, Is.EqualTo(32));
+    Assert.That(decoded.Height, Is.EqualTo(16));
+    Assert.That(decoded.IsGrayscale, Is.False);
+    Assert.That(decoded.RgbPixelData, Is.Not.Null);
+    Assert.That(decoded.RgbPixelData!.Length, Is.EqualTo(32 * 16 * 3));
   }
 
   [Test]
   public void LossyEncode_Chroma422_NonMcuAlignedSize_RoundTrips() {
-    // 17×9 — tests edge replication for both axes (MCU is 16×8 in 4:2:2).
+    // 17x9 -- tests edge replication for both axes (MCU is 16x8 in 4:2:2).
     var rgb = _MakeRgbGradient(17, 9);
     var bytes = JpegWriter.LossyEncode(
       rgb, 17, 9, quality: 75, JpegMode.Baseline,
       JpegSubsampling.Chroma422, optimizeHuffman: true, isGrayscale: false);
 
-    using var ms = new MemoryStream(bytes);
-    var dinfo = new jpeg_decompress_struct();
-    dinfo.jpeg_stdio_src(ms);
-    dinfo.jpeg_read_header(true);
-    Assert.That(dinfo.Image_width, Is.EqualTo(17));
-    Assert.That(dinfo.Image_height, Is.EqualTo(9));
+    var decoded = JpegReader.FromBytes(bytes);
+    Assert.That(decoded.Width, Is.EqualTo(17));
+    Assert.That(decoded.Height, Is.EqualTo(9));
   }
 
   [Test]
-  public void LossyEncode_Chroma422_GrayscaleFallsThroughToBitMiracle() {
-    // Grayscale doesn't subsample, so the 4:2:2 path is bypassed and BitMiracle handles it.
+  public void LossyEncode_Chroma422_GrayscaleHandledByManagedEncoder() {
+    // Grayscale doesn't subsample, so chroma mode is irrelevant.
     var gray = new byte[16 * 16];
     for (var i = 0; i < gray.Length; ++i) gray[i] = (byte)(i * 255 / (gray.Length - 1));
 
@@ -109,15 +95,12 @@ public sealed class Jpeg422EncoderTests {
       JpegSubsampling.Chroma422, optimizeHuffman: true, isGrayscale: true);
 
     Assert.That(bytes.Length, Is.GreaterThan(20));
-    using var ms = new MemoryStream(bytes);
-    var dinfo = new jpeg_decompress_struct();
-    dinfo.jpeg_stdio_src(ms);
-    dinfo.jpeg_read_header(true);
-    Assert.That(dinfo.Num_components, Is.EqualTo(1), "Grayscale JPEG should have one component.");
+    var decoded = JpegReader.FromBytes(bytes);
+    Assert.That(decoded.IsGrayscale, Is.True, "Grayscale JPEG should have one component.");
   }
 
   /// <summary>Walks the JPEG byte stream to find SOF0 (FF C0) and reads the three components'
-  /// (H<<4|V) sampling-factor bytes. Returns (yH, yV, cbH, cbV, crH, crV).</summary>
+  /// (H&lt;&lt;4|V) sampling-factor bytes. Returns (yH, yV, cbH, cbV, crH, crV).</summary>
   private static (int yH, int yV, int cbH, int cbV, int crH, int crV) _ReadSof0SamplingFactors(byte[] data) {
     for (var i = 0; i < data.Length - 1; ++i) {
       if (data[i] != 0xFF || data[i + 1] != 0xC0) continue;

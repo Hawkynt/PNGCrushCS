@@ -11,6 +11,7 @@ public readonly record struct CmuFile : IImageFormatReader<CmuFile>, IImageToRaw
   static string[] IImageFormatMetadata<CmuFile>.FileExtensions => [".cmu"];
   static CmuFile IImageFormatReader<CmuFile>.FromSpan(ReadOnlySpan<byte> data) => CmuReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<CmuFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static IntegerRange[] IImageFormatMetadata<CmuFile>.AllowedPaletteRanges => [2];
   static byte[] IImageFormatWriter<CmuFile>.ToBytes(CmuFile file) => CmuWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }

@@ -12,7 +12,9 @@ public readonly record struct PaintProFile : IImageFormatReader<PaintProFile>, I
   static string IImageFormatMetadata<PaintProFile>.PrimaryExtension => ".ppro";
   static string[] IImageFormatMetadata<PaintProFile>.FileExtensions => [".ppro"];
   static PaintProFile IImageFormatReader<PaintProFile>.FromSpan(ReadOnlySpan<byte> data) => PaintProReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<PaintProFile>.Capabilities => FormatCapability.IndexedOnly;
+  static FormatCapability IImageFormatMetadata<PaintProFile>.Capabilities => FormatCapability.IndexedOnly | FormatCapability.FixedResolution;
+  static IntegerRange[] IImageFormatMetadata<PaintProFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
+  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<PaintProFile>.AllowedDimensions => [(320, 200)];
   static byte[] IImageFormatWriter<PaintProFile>.ToBytes(PaintProFile file) => PaintProWriter.ToBytes(file);
 
   /// <summary>Image width (always 320).</summary>

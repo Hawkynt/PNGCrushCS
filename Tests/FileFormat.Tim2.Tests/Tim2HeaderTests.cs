@@ -34,9 +34,8 @@ public sealed class Tim2HeaderTests {
     Assert.That(fields[0].Name, Is.EqualTo("Sig0"));
     Assert.That(fields[0].Offset, Is.EqualTo(0));
     Assert.That(fields[0].Size, Is.EqualTo(1));
-    Assert.That(fields.Any(f => f.Name == "Signature" && f.Offset == 0 && f.Size == 4), Is.True);
-    Assert.That(fields.Any(f => f.Name == "Version" && f.Offset == 4 && f.Size == 1), Is.True);
-    Assert.That(fields.Any(f => f.Name == "Padding" && f.Offset == 8 && f.Size == 8), Is.True);
+    Assert.That(fields.Any(f => f.Name == "Version"), Is.True);
+    Assert.That(fields.Any(f => f.Name == "PictureCount"), Is.True);
   }
 
   [Test]

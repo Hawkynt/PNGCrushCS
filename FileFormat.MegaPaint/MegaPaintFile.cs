@@ -16,6 +16,7 @@ public readonly record struct MegaPaintFile : IImageFormatReader<MegaPaintFile>,
   static string[] IImageFormatMetadata<MegaPaintFile>.FileExtensions => [".bld"];
   static MegaPaintFile IImageFormatReader<MegaPaintFile>.FromSpan(ReadOnlySpan<byte> data) => MegaPaintReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<MegaPaintFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static IntegerRange[] IImageFormatMetadata<MegaPaintFile>.AllowedPaletteRanges => [2];
   static byte[] IImageFormatWriter<MegaPaintFile>.ToBytes(MegaPaintFile file) => MegaPaintWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>

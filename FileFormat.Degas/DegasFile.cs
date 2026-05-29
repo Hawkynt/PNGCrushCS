@@ -9,6 +9,9 @@ public readonly record struct DegasFile : IImageFormatReader<DegasFile>, IImageT
   static string IImageFormatMetadata<DegasFile>.PrimaryExtension => ".pi1";
   static string[] IImageFormatMetadata<DegasFile>.FileExtensions => [".pi1", ".pi2", ".pi3", ".pc1", ".pc2", ".pc3"];
   static DegasFile IImageFormatReader<DegasFile>.FromSpan(ReadOnlySpan<byte> data) => DegasReader.FromSpan(data);
+  static FormatCapability IImageFormatMetadata<DegasFile>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<DegasFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
+  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<DegasFile>.AllowedDimensions => [(320, 200), (640, 200), (640, 400)];
   static byte[] IImageFormatWriter<DegasFile>.ToBytes(DegasFile file) => DegasWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
@@ -45,10 +48,17 @@ public readonly record struct DegasFile : IImageFormatReader<DegasFile>, IImageT
     if (image.Format != PixelFormat.Indexed8)
       throw new ArgumentException("RawImage must use PixelFormat.Indexed8.", nameof(image));
 
-    var resolution = image.PaletteCount switch {
-      <= 2 => DegasResolution.High,
-      <= 4 => DegasResolution.Medium,
-      _ => DegasResolution.Low
+    // Resolve resolution from input dimensions when they match a valid Degas mode;
+    // otherwise infer from palette size.
+    var resolution = (image.Width, image.Height) switch {
+      (320, 200) => DegasResolution.Low,
+      (640, 200) => DegasResolution.Medium,
+      (640, 400) => DegasResolution.High,
+      _ => image.PaletteCount switch {
+        <= 2 => DegasResolution.High,
+        <= 4 => DegasResolution.Medium,
+        _ => DegasResolution.Low
+      }
     };
 
     var numPlanes = resolution switch {
@@ -64,7 +74,19 @@ public readonly record struct DegasFile : IImageFormatReader<DegasFile>, IImageT
       _ => (320, 200)
     };
 
-    var planar = PlanarConverter.ChunkyToAtariSt(image.PixelData, width, height, numPlanes);
+    // If supplied PixelData doesn't match target dimensions, pad/crop to fit.
+    var expectedPixels = width * height;
+    var srcPixels = image.PixelData ?? [];
+    byte[] adjustedPixels;
+    if (srcPixels.Length == expectedPixels) {
+      adjustedPixels = srcPixels;
+    } else {
+      adjustedPixels = new byte[expectedPixels];
+      var copy = Math.Min(srcPixels.Length, expectedPixels);
+      Array.Copy(srcPixels, adjustedPixels, copy);
+    }
+
+    var planar = PlanarConverter.ChunkyToAtariSt(adjustedPixels, width, height, numPlanes);
     var paletteCount = Math.Min(image.PaletteCount, 16);
     var stPalette = PlanarConverter.RgbToStPalette(image.Palette, paletteCount);
     var palette = new short[16];

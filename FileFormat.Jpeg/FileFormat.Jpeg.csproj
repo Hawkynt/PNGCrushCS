@@ -30,7 +30,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="BitMiracle.LibJpeg.NET" Version="1.5.324" />
     <!--
       Backports polyfills missing BCL features when needed (e.g. for older targets).
       Targeting net8.0 with LangVersion=preview means we get C#14/net10 syntactic sugar

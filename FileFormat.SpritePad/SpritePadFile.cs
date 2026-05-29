@@ -10,6 +10,7 @@ public readonly record struct SpritePadFile : IImageFormatReader<SpritePadFile>,
   static string[] IImageFormatMetadata<SpritePadFile>.FileExtensions => [".spd"];
   static SpritePadFile IImageFormatReader<SpritePadFile>.FromSpan(ReadOnlySpan<byte> data) => SpritePadReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<SpritePadFile>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<SpritePadFile>.AllowedPaletteRanges => [2];
   static byte[] IImageFormatWriter<SpritePadFile>.ToBytes(SpritePadFile file) => SpritePadWriter.ToBytes(file);
 
   /// <summary>Sprite width in pixels.</summary>

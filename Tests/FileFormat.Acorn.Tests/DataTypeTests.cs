@@ -25,7 +25,7 @@ public sealed class DataTypeTests {
   public void AcornFile_Defaults() {
     var file = new AcornFile();
 
-    Assert.That(file.Sprites, Is.Empty);
+    Assert.That(file.Sprites, Is.Null);
   }
 
   [Test]

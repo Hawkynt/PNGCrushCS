@@ -25,6 +25,7 @@ public readonly record struct CinemasterAtariFile : IImageFormatReader<Cinemaste
   static string[] IImageFormatMetadata<CinemasterAtariFile>.FileExtensions => [".cin8"];
   static CinemasterAtariFile IImageFormatReader<CinemasterAtariFile>.FromSpan(ReadOnlySpan<byte> data) => CinemasterAtariReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<CinemasterAtariFile>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<CinemasterAtariFile>.AllowedPaletteRanges => [2];
   static byte[] IImageFormatWriter<CinemasterAtariFile>.ToBytes(CinemasterAtariFile file) => CinemasterAtariWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>

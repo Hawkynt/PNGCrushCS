@@ -229,7 +229,7 @@ internal static class JpegMarkerParser {
     return image;
   }
 
-  private static void _ParseDhtDirect(byte[] data, int offset, int length, JpegHuffmanTable[] dcTables, JpegHuffmanTable[] acTables) {
+  internal static void _ParseDhtDirect(byte[] data, int offset, int length, JpegHuffmanTable[] dcTables, JpegHuffmanTable[] acTables) {
     var end = offset + length;
     while (offset < end) {
       var tcth = data[offset++];

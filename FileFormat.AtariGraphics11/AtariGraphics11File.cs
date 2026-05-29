@@ -22,6 +22,7 @@ public readonly record struct AtariGraphics11File : IImageFormatReader<AtariGrap
   static string[] IImageFormatMetadata<AtariGraphics11File>.FileExtensions => [".gr11", ".g11"];
   static AtariGraphics11File IImageFormatReader<AtariGraphics11File>.FromSpan(ReadOnlySpan<byte> data) => AtariGraphics11Reader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<AtariGraphics11File>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<AtariGraphics11File>.AllowedPaletteRanges => [16];
   static byte[] IImageFormatWriter<AtariGraphics11File>.ToBytes(AtariGraphics11File file) => AtariGraphics11Writer.ToBytes(file);
 
   /// <summary>Always 80.</summary>
@@ -59,27 +60,49 @@ public readonly record struct AtariGraphics11File : IImageFormatReader<AtariGrap
     };
   }
 
-  /// <summary>Creates a Graphics 11 image from a Gray8 raw image (80x192). Quantizes to 16 luminance levels.</summary>
+  /// <summary>Creates a Graphics 11 image from a raw image (80x192). Accepts Gray8 (quantized), Indexed1 (bit-packed), or Indexed8 (palette index).</summary>
   public static AtariGraphics11File FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Gray8)
-      throw new ArgumentException($"Expected {PixelFormat.Gray8} but got {image.Format}.", nameof(image));
     if (image.Width != PixelWidth || image.Height != PixelHeight)
       throw new ArgumentException($"Expected {PixelWidth}x{PixelHeight} but got {image.Width}x{image.Height}.", nameof(image));
 
     var pixelData = new byte[FileSize];
 
-    for (var y = 0; y < PixelHeight; ++y)
-      for (var x = 0; x < BytesPerLine; ++x) {
-        var srcIndex = y * PixelWidth + x * 2;
-        var left = image.PixelData[srcIndex] / 17;
-        var right = image.PixelData[srcIndex + 1] / 17;
+    if (image.Format == PixelFormat.Indexed1) {
+      var stride = (PixelWidth + 7) / 8;
+      for (var y = 0; y < PixelHeight; ++y)
+        for (var x = 0; x < BytesPerLine; ++x) {
+          var rowSrc = y * stride;
+          var x2 = x * 2;
+          var bLeft = image.PixelData[rowSrc + (x2 >> 3)];
+          var bRight = image.PixelData[rowSrc + ((x2 + 1) >> 3)];
+          var left = (bLeft >> (7 - (x2 & 7))) & 1;
+          var right = (bRight >> (7 - ((x2 + 1) & 7))) & 1;
+          pixelData[y * BytesPerLine + x] = (byte)((left << 4) | right);
+        }
+    } else if (image.Format == PixelFormat.Indexed8) {
+      for (var y = 0; y < PixelHeight; ++y)
+        for (var x = 0; x < BytesPerLine; ++x) {
+          var srcIndex = y * PixelWidth + x * 2;
+          var left = image.PixelData[srcIndex] & 0x0F;
+          var right = image.PixelData[srcIndex + 1] & 0x0F;
+          pixelData[y * BytesPerLine + x] = (byte)((left << 4) | right);
+        }
+    } else if (image.Format == PixelFormat.Gray8) {
+      for (var y = 0; y < PixelHeight; ++y)
+        for (var x = 0; x < BytesPerLine; ++x) {
+          var srcIndex = y * PixelWidth + x * 2;
+          var left = image.PixelData[srcIndex] / 17;
+          var right = image.PixelData[srcIndex + 1] / 17;
 
-        if (left > 15) left = 15;
-        if (right > 15) right = 15;
+          if (left > 15) left = 15;
+          if (right > 15) right = 15;
 
-        pixelData[y * BytesPerLine + x] = (byte)((left << 4) | right);
-      }
+          pixelData[y * BytesPerLine + x] = (byte)((left << 4) | right);
+        }
+    } else {
+      throw new ArgumentException($"Expected {PixelFormat.Gray8}, {PixelFormat.Indexed1}, or {PixelFormat.Indexed8} but got {image.Format}.", nameof(image));
+    }
 
     return new() { PixelData = pixelData };
   }

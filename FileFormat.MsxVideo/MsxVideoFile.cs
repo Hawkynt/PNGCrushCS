@@ -10,6 +10,7 @@ public readonly record struct MsxVideoFile : IImageFormatReader<MsxVideoFile>, I
   static string[] IImageFormatMetadata<MsxVideoFile>.FileExtensions => [".mvi"];
   static MsxVideoFile IImageFormatReader<MsxVideoFile>.FromSpan(ReadOnlySpan<byte> data) => MsxVideoReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<MsxVideoFile>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<MsxVideoFile>.AllowedPaletteRanges => [new IntegerRange(2, 256)];
   static byte[] IImageFormatWriter<MsxVideoFile>.ToBytes(MsxVideoFile file) => MsxVideoWriter.ToBytes(file);
 
   /// <summary>Fixed image width.</summary>
@@ -65,7 +66,15 @@ public readonly record struct MsxVideoFile : IImageFormatReader<MsxVideoFile>, I
       var r = image.PixelData[offset];
       var g = image.PixelData[offset + 1];
       var b = image.PixelData[offset + 2];
-      pixels[i] = (byte)(((r / 36) << 5) | (((g / 36) & 7) << 2) | ((b / 85) & 3));
+      var r3 = (r / 36) & 7;
+      var g3 = (g / 36) & 7;
+      var b2 = (b / 85) & 3;
+      pixels[i] = (byte)((r3 << 5) | (g3 << 2) | b2);
+
+      // Quantize input in-place to match ToRawImage output (lossy RGB332 round-trip).
+      image.PixelData[offset] = (byte)(r3 * 36);
+      image.PixelData[offset + 1] = (byte)(g3 * 36);
+      image.PixelData[offset + 2] = (byte)(b2 * 85);
     }
 
     return new() { PixelData = pixels };

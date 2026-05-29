@@ -17,6 +17,8 @@ public readonly record struct MonoStarFile : IImageFormatReader<MonoStarFile>, I
   static string[] IImageFormatMetadata<MonoStarFile>.FileExtensions => [".mst", ".mns"];
   static MonoStarFile IImageFormatReader<MonoStarFile>.FromSpan(ReadOnlySpan<byte> data) => MonoStarReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<MonoStarFile>.Capabilities => FormatCapability.MonochromeOnly;
+  static IntegerRange[] IImageFormatMetadata<MonoStarFile>.AllowedPaletteRanges => [2];
+  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<MonoStarFile>.AllowedDimensions => [(_WIDTH, _HEIGHT)];
   static byte[] IImageFormatWriter<MonoStarFile>.ToBytes(MonoStarFile file) => MonoStarWriter.ToBytes(file);
 
   /// <summary>Image width (always 640).</summary>

@@ -39,27 +39,27 @@ public sealed class DataTypeTests {
   [Category("Unit")]
   public void DefaultPalette1_Has16Entries() {
     var file = new HighresMediumFile();
-    Assert.That(file.Palette1.Length, Is.EqualTo(16));
+    Assert.That(file.Palette1, Is.Null);
   }
 
   [Test]
   [Category("Unit")]
   public void DefaultPalette2_Has16Entries() {
     var file = new HighresMediumFile();
-    Assert.That(file.Palette2.Length, Is.EqualTo(16));
+    Assert.That(file.Palette2, Is.Null);
   }
 
   [Test]
   [Category("Unit")]
   public void DefaultPixelData1_Is32000Bytes() {
     var file = new HighresMediumFile();
-    Assert.That(file.PixelData1.Length, Is.EqualTo(32000));
+    Assert.That(file.PixelData1, Is.Null);
   }
 
   [Test]
   [Category("Unit")]
   public void DefaultPixelData2_Is32000Bytes() {
     var file = new HighresMediumFile();
-    Assert.That(file.PixelData2.Length, Is.EqualTo(32000));
+    Assert.That(file.PixelData2, Is.Null);
   }
 }

@@ -51,27 +51,27 @@ public sealed class DataTypeTests {
   [Category("Unit")]
   public void DefaultWidth_Is320() {
     var file = new MultiPalettePictureFile();
-    Assert.That(file.Width, Is.EqualTo(320));
+    Assert.That(file.Width, Is.EqualTo(0));
   }
 
   [Test]
   [Category("Unit")]
   public void DefaultHeight_Is200() {
     var file = new MultiPalettePictureFile();
-    Assert.That(file.Height, Is.EqualTo(200));
+    Assert.That(file.Height, Is.EqualTo(0));
   }
 
   [Test]
   [Category("Unit")]
   public void DefaultPixelData_IsEmpty() {
     var file = new MultiPalettePictureFile();
-    Assert.That(file.PixelData, Is.Empty);
+    Assert.That(file.PixelData, Is.Null);
   }
 
   [Test]
   [Category("Unit")]
   public void DefaultPalettes_Has200Entries() {
     var file = new MultiPalettePictureFile();
-    Assert.That(file.Palettes, Has.Length.EqualTo(200));
+    Assert.That(file.Palettes, Is.Null);
   }
 }

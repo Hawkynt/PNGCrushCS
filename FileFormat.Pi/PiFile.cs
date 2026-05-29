@@ -12,11 +12,23 @@ public readonly record struct PiFile : IImageFormatReader<PiFile>, IImageToRawIm
   static string[] IImageFormatMetadata<PiFile>.FileExtensions => [".pi"];
   static PiFile IImageFormatReader<PiFile>.FromSpan(ReadOnlySpan<byte> data) => PiReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<PiFile>.Capabilities => FormatCapability.IndexedOnly;
+  static IntegerRange[] IImageFormatMetadata<PiFile>.AllowedPaletteRanges => [new IntegerRange(2, 256)];
   static byte[] IImageFormatWriter<PiFile>.ToBytes(PiFile file) => PiWriter.ToBytes(file);
 
   public int Width { get; init; }
   public int Height { get; init; }
   public byte[] PixelData { get; init; }
+
+  private static readonly byte[] _DefaultPalette = _MakeGrayRamp(256);
+
+  private static byte[] _MakeGrayRamp(int entries) {
+    var p = new byte[entries * 3];
+    for (var i = 0; i < entries; ++i) {
+      var v = entries == 1 ? (byte)128 : (byte)(i * 255 / (entries - 1));
+      p[i * 3] = v; p[i * 3 + 1] = v; p[i * 3 + 2] = v;
+    }
+    return p;
+  }
 
   public static RawImage ToRawImage(PiFile file) {
     return new() {
@@ -24,6 +36,8 @@ public readonly record struct PiFile : IImageFormatReader<PiFile>, IImageToRawIm
       Height = file.Height,
       Format = PixelFormat.Indexed8,
       PixelData = file.PixelData[..],
+      Palette = _DefaultPalette[..],
+      PaletteCount = 256,
     };
   }
 

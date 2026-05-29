@@ -9,7 +9,7 @@ public static class VicarWriter {
 
   public static byte[] ToBytes(VicarFile file) {
     ArgumentNullException.ThrowIfNull(file);
-    return Assemble(file.PixelData, file.Width, file.Height, file.Bands, file.PixelType, file.Organization, file.IntFormat, file.RealFormat, file.Labels);
+    return Assemble(file.PixelData ?? Array.Empty<byte>(), file.Width, file.Height, file.Bands, file.PixelType, file.Organization, file.IntFormat ?? "", file.RealFormat ?? "", file.Labels ?? new System.Collections.Generic.Dictionary<string,string>());
   }
 
   internal static byte[] Assemble(

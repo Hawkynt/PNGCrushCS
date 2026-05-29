@@ -22,6 +22,7 @@ public readonly record struct MicroPainter8File : IImageFormatReader<MicroPainte
   static string[] IImageFormatMetadata<MicroPainter8File>.FileExtensions => [".mpt8", ".mp8"];
   static MicroPainter8File IImageFormatReader<MicroPainter8File>.FromSpan(ReadOnlySpan<byte> data) => MicroPainter8Reader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<MicroPainter8File>.Capabilities => FormatCapability.MonochromeOnly;
+  static IntegerRange[] IImageFormatMetadata<MicroPainter8File>.AllowedPaletteRanges => [2];
   static byte[] IImageFormatWriter<MicroPainter8File>.ToBytes(MicroPainter8File file) => MicroPainter8Writer.ToBytes(file);
 
   /// <summary>Always 320.</summary>

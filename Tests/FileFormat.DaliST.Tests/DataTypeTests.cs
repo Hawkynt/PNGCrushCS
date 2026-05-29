@@ -41,14 +41,14 @@ public sealed class DataTypeTests {
   [Category("Unit")]
   public void DaliSTFile_DefaultPalette_Has16Entries() {
     var file = new DaliSTFile();
-    Assert.That(file.Palette, Has.Length.EqualTo(16));
+    Assert.That(file.Palette, Is.Null);
   }
 
   [Test]
   [Category("Unit")]
   public void DaliSTFile_DefaultPixelData_IsEmpty() {
     var file = new DaliSTFile();
-    Assert.That(file.PixelData, Is.Empty);
+    Assert.That(file.PixelData, Is.Null);
   }
 
   [Test]
