@@ -77,8 +77,6 @@ public readonly record struct MultiPalettePictureFile : IImageFormatReader<Multi
 
   public static MultiPalettePictureFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Rgb24)
-      throw new ArgumentException("RawImage must use PixelFormat.Rgb24.", nameof(image));
     if (image.Width != ImageWidth)
       throw new ArgumentException($"MPP images must be exactly {ImageWidth} pixels wide.", nameof(image));
     if (image.Height != ImageHeight)
@@ -87,32 +85,63 @@ public readonly record struct MultiPalettePictureFile : IImageFormatReader<Multi
     var palettes = new short[ImageHeight][];
     var chunky = new byte[ImageWidth * ImageHeight];
 
-    for (var y = 0; y < ImageHeight; ++y) {
-      var colorMap = new Dictionary<short, byte>();
-      var palette = new short[16];
-      var colorCount = 0;
-
-      for (var x = 0; x < ImageWidth; ++x) {
-        var offset = (y * ImageWidth + x) * 3;
-        var r = image.PixelData[offset] * 15 / 255;
-        var g = image.PixelData[offset + 1] * 15 / 255;
-        var b = image.PixelData[offset + 2] * 15 / 255;
-        var steColor = (short)((r << 8) | (g << 4) | b);
-
-        if (!colorMap.TryGetValue(steColor, out var idx)) {
-          if (colorCount < 16) {
-            idx = (byte)colorCount;
-            palette[colorCount] = steColor;
-            colorMap[steColor] = idx;
-            ++colorCount;
-          } else
-            idx = _FindClosestColor(steColor, palette, colorCount);
-        }
-
-        chunky[y * ImageWidth + x] = idx;
+    if (image.Format == PixelFormat.Indexed1 || image.Format == PixelFormat.Indexed8) {
+      var palette = image.Palette ?? throw new ArgumentException("Indexed input requires a palette.", nameof(image));
+      var paletteCount = Math.Min(image.PaletteCount, 16);
+      var stPalette = new short[16];
+      for (var i = 0; i < paletteCount; ++i) {
+        var r = palette[i * 3] * 15 / 255;
+        var g = palette[i * 3 + 1] * 15 / 255;
+        var b = palette[i * 3 + 2] * 15 / 255;
+        stPalette[i] = (short)((r << 8) | (g << 4) | b);
       }
 
-      palettes[y] = palette;
+      if (image.Format == PixelFormat.Indexed1) {
+        var stride = (ImageWidth + 7) / 8;
+        for (var y = 0; y < ImageHeight; ++y) {
+          for (var x = 0; x < ImageWidth; ++x) {
+            var b = image.PixelData[y * stride + (x >> 3)];
+            chunky[y * ImageWidth + x] = (byte)((b >> (7 - (x & 7))) & 1);
+          }
+          palettes[y] = (short[])stPalette.Clone();
+        }
+      } else {
+        for (var y = 0; y < ImageHeight; ++y) {
+          for (var x = 0; x < ImageWidth; ++x)
+            chunky[y * ImageWidth + x] = (byte)(image.PixelData[y * ImageWidth + x] & 0x0F);
+          palettes[y] = (short[])stPalette.Clone();
+        }
+      }
+    } else if (image.Format == PixelFormat.Rgb24) {
+      for (var y = 0; y < ImageHeight; ++y) {
+        var colorMap = new Dictionary<short, byte>();
+        var palette = new short[16];
+        var colorCount = 0;
+
+        for (var x = 0; x < ImageWidth; ++x) {
+          var offset = (y * ImageWidth + x) * 3;
+          var r = image.PixelData[offset] * 15 / 255;
+          var g = image.PixelData[offset + 1] * 15 / 255;
+          var b = image.PixelData[offset + 2] * 15 / 255;
+          var steColor = (short)((r << 8) | (g << 4) | b);
+
+          if (!colorMap.TryGetValue(steColor, out var idx)) {
+            if (colorCount < 16) {
+              idx = (byte)colorCount;
+              palette[colorCount] = steColor;
+              colorMap[steColor] = idx;
+              ++colorCount;
+            } else
+              throw new ArgumentException($"MPP requires no more than 16 distinct quantized colours per scanline; line {y} had more.", nameof(image));
+          }
+
+          chunky[y * ImageWidth + x] = idx;
+        }
+
+        palettes[y] = palette;
+      }
+    } else {
+      throw new ArgumentException("RawImage must use PixelFormat.Rgb24, Indexed1, or Indexed8.", nameof(image));
     }
 
     var planar = PlanarConverter.ChunkyToAtariSt(chunky, ImageWidth, ImageHeight, NumPlanes);

@@ -20,8 +20,20 @@ internal static class EnviHeaderParser {
     while (pos < data.Length) {
       // find end of current line
       var lineStart = pos;
-      while (pos < data.Length && data[pos] != (byte)'\n' && data[pos] != (byte)'\r')
+      var hasBinaryByte = false;
+      while (pos < data.Length && data[pos] != (byte)'\n' && data[pos] != (byte)'\r') {
+        var b = data[pos];
+        // ENVI headers are 7-bit ASCII; treat non-printable bytes (other than \t) as the start of pixel data.
+        if (b != (byte)'\t' && (b < 0x20 || b > 0x7E))
+          hasBinaryByte = true;
         ++pos;
+      }
+
+      // If this line contained binary bytes, it isn't header text — rewind and stop parsing.
+      if (hasBinaryByte) {
+        pos = lineStart;
+        break;
+      }
 
       var lineBytes = pos - lineStart;
       var rawLine = Encoding.ASCII.GetString(data, lineStart, lineBytes);

@@ -23,48 +23,6 @@ public sealed class DiagnoseRoundTrip {
   [Test]
   public void DiagnoseCcitt() => _Diagnose(ImageFormat.Ccitt);
 
-  [Test]
-  public void DiagnoseEnviDirect() {
-    var raw = _MakeGray8(32, 32);
-    var file = FileFormat.Envi.EnviFile.FromRawImage(raw);
-    var bytes = FileFormat.Envi.EnviWriter.ToBytes(file);
-    Console.WriteLine($"file.PixelData first 20: {string.Join(",", file.PixelData[..20])}");
-    Console.WriteLine($"Bytes first 110: {BitConverter.ToString(bytes, 0, Math.Min(110, bytes.Length))}");
-    var read = FileFormat.Envi.EnviReader.FromBytes(bytes);
-    Console.WriteLine($"Read W={read.Width} H={read.Height} Bands={read.Bands} DataType={read.DataType} Interleave={read.Interleave}");
-    Console.WriteLine($"Read pixelData len: {read.PixelData.Length}");
-    Console.WriteLine($"Read pixelData first 20: {string.Join(",", read.PixelData[..20])}");
-    var rawOut = FileFormat.Envi.EnviFile.ToRawImage(read);
-    Console.WriteLine($"RawOut Format: {rawOut.Format}, PixelData first 20: {string.Join(",", rawOut.PixelData[..20])}");
-  }
-
-  [Test]
-  public void DiagnoseEnvi() {
-    var entry = FormatRegistry.GetEntry(ImageFormat.Envi)!;
-    var raw = _MakeGray8(32, 32);
-    var bytes = entry.ConvertFromRawImage!(raw);
-    Console.WriteLine($"Saved {bytes.Length} bytes");
-    var tempFile = Path.Combine(Path.GetTempPath(), $"diag_{Guid.NewGuid():N}.hdr");
-    try {
-      File.WriteAllBytes(tempFile, bytes);
-      var loaded = entry.LoadRawImage!(new FileInfo(tempFile));
-      Console.WriteLine($"Loaded W={loaded?.Width} H={loaded?.Height} fmt={loaded?.Format} len={loaded?.PixelData?.Length}");
-      if (loaded?.PixelData != null) {
-        Console.WriteLine($"Expected first 20: {string.Join(",", raw.PixelData[..20])}");
-        Console.WriteLine($"Loaded first 20:   {string.Join(",", loaded.PixelData[..20])}");
-        // Compare byte-by-byte for first mismatch
-        for (var i = 0; i < Math.Min(loaded.PixelData.Length, raw.PixelData.Length); ++i) {
-          if (loaded.PixelData[i] != raw.PixelData[i]) {
-            Console.WriteLine($"First mismatch at index {i}: expected {raw.PixelData[i]} got {loaded.PixelData[i]}");
-            break;
-          }
-        }
-        // Show raw bytes around the header boundary
-        Console.WriteLine($"Bytes 100-130: {BitConverter.ToString(bytes, 100, Math.Min(30, bytes.Length - 100))}");
-      }
-    } finally { try { File.Delete(tempFile); } catch { } }
-  }
-
   private static void _Diagnose(ImageFormat format) {
     var entry = FormatRegistry.GetEntry(format)!;
 

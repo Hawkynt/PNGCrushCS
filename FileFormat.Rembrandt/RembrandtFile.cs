@@ -57,8 +57,6 @@ public readonly record struct RembrandtFile : IImageFormatReader<RembrandtFile>,
 
   public static RembrandtFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Rgb24)
-      throw new ArgumentException($"Expected {PixelFormat.Rgb24} but got {image.Format}.", nameof(image));
     if (image.Width <= 0 || image.Height <= 0)
       throw new ArgumentException($"Dimensions must be positive, got {image.Width}x{image.Height}.", nameof(image));
     if (image.Width > 65535 || image.Height > 65535)
@@ -67,20 +65,39 @@ public readonly record struct RembrandtFile : IImageFormatReader<RembrandtFile>,
     var pixelCount = image.Width * image.Height;
     var rgb565 = new byte[pixelCount * 2];
 
-    for (var i = 0; i < pixelCount; ++i) {
-      var srcOffset = i * 3;
-      var r = image.PixelData[srcOffset];
-      var g = image.PixelData[srcOffset + 1];
-      var b = image.PixelData[srcOffset + 2];
+    if (image.Format == PixelFormat.Indexed1 || image.Format == PixelFormat.Indexed8) {
+      var palette = image.Palette ?? throw new ArgumentException("Indexed input requires a palette.", nameof(image));
+      var paletteCount = image.PaletteCount;
+      if (image.Format == PixelFormat.Indexed1) {
+        var stride = (image.Width + 7) / 8;
+        for (var y = 0; y < image.Height; ++y)
+          for (var x = 0; x < image.Width; ++x) {
+            var b = image.PixelData[y * stride + (x >> 3)];
+            var idx = (b >> (7 - (x & 7))) & 1;
+            _WriteRgb565(rgb565, y * image.Width + x, palette, idx, paletteCount);
+          }
+      } else {
+        for (var i = 0; i < pixelCount; ++i)
+          _WriteRgb565(rgb565, i, palette, image.PixelData[i], paletteCount);
+      }
+    } else if (image.Format == PixelFormat.Rgb24) {
+      for (var i = 0; i < pixelCount; ++i) {
+        var srcOffset = i * 3;
+        var r = image.PixelData[srcOffset];
+        var g = image.PixelData[srcOffset + 1];
+        var b = image.PixelData[srcOffset + 2];
 
-      var r5 = (r >> 3) & 0x1F;
-      var g6 = (g >> 2) & 0x3F;
-      var b5 = (b >> 3) & 0x1F;
-      var packed = (ushort)((r5 << 11) | (g6 << 5) | b5);
+        var r5 = (r >> 3) & 0x1F;
+        var g6 = (g >> 2) & 0x3F;
+        var b5 = (b >> 3) & 0x1F;
+        var packed = (ushort)((r5 << 11) | (g6 << 5) | b5);
 
-      var dstOffset = i * 2;
-      rgb565[dstOffset] = (byte)(packed >> 8);
-      rgb565[dstOffset + 1] = (byte)(packed & 0xFF);
+        var dstOffset = i * 2;
+        rgb565[dstOffset] = (byte)(packed >> 8);
+        rgb565[dstOffset + 1] = (byte)(packed & 0xFF);
+      }
+    } else {
+      throw new ArgumentException($"Expected {PixelFormat.Rgb24}, {PixelFormat.Indexed1}, or {PixelFormat.Indexed8} but got {image.Format}.", nameof(image));
     }
 
     return new() {
@@ -88,5 +105,19 @@ public readonly record struct RembrandtFile : IImageFormatReader<RembrandtFile>,
       Height = image.Height,
       PixelData = rgb565,
     };
+  }
+
+  private static void _WriteRgb565(byte[] dst, int pixelIndex, byte[] palette, int paletteIdx, int paletteCount) {
+    if (paletteIdx >= paletteCount) paletteIdx = 0;
+    var r = palette[paletteIdx * 3];
+    var g = palette[paletteIdx * 3 + 1];
+    var b = palette[paletteIdx * 3 + 2];
+    var r5 = (r >> 3) & 0x1F;
+    var g6 = (g >> 2) & 0x3F;
+    var b5 = (b >> 3) & 0x1F;
+    var packed = (ushort)((r5 << 11) | (g6 << 5) | b5);
+    var dstOffset = pixelIndex * 2;
+    dst[dstOffset] = (byte)(packed >> 8);
+    dst[dstOffset + 1] = (byte)(packed & 0xFF);
   }
 }

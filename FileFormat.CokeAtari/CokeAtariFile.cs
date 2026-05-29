@@ -78,16 +78,9 @@ public readonly record struct CokeAtariFile : IImageFormatReader<CokeAtariFile>,
         var g = rgb24[srcOffset + 1];
         var b = rgb24[srcOffset + 2];
 
-        // Refuse inputs that would round-trip lossily through RGB565 — high-bit replication on read
-        // means writer-readable values are limited to {value: (value >> 3) << 3 | (value >> 3) >> 2}.
         var r5 = (r >> 3) & 0x1F;
         var g6 = (g >> 2) & 0x3F;
         var b5 = (b >> 3) & 0x1F;
-        var rReplicated = (byte)((r5 << 3) | (r5 >> 2));
-        var gReplicated = (byte)((g6 << 2) | (g6 >> 4));
-        var bReplicated = (byte)((b5 << 3) | (b5 >> 2));
-        if (rReplicated != r || gReplicated != g || bReplicated != b)
-          throw new ArgumentException($"Rgb24 input at pixel {i} cannot be losslessly stored in RGB565; use Indexed1/Indexed8 input with a compatible palette.", nameof(image));
         var packed = (ushort)((r5 << 11) | (g6 << 5) | b5);
 
         var dstOffset = i * 2;

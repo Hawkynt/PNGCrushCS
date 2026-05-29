@@ -31,6 +31,9 @@ public sealed class FormatRoundTripTests {
     ImageFormat.Jpeg, ImageFormat.Jpeg2000, ImageFormat.JpegXr, ImageFormat.JpegXl, ImageFormat.JpegLs,
     ImageFormat.Heif, ImageFormat.Avif, ImageFormat.WebP, ImageFormat.Bpg, ImageFormat.Wsq,
     ImageFormat.DjVu, ImageFormat.Flif,
+    // RGB565 — stores 5-6-5 bits per channel; 8-bit Rgb24 input loses low bits on quantize.
+    // Format unit tests for these explicitly exercise the lossy Rgb24 path.
+    ImageFormat.CokeAtari, ImageFormat.Rembrandt,
   ];
 
   public static IEnumerable<TestCaseData> WritableFormats() {
