@@ -36,11 +36,19 @@ public sealed class FormatRoundTripTests {
     ImageFormat.CokeAtari, ImageFormat.Rembrandt,
   ];
 
+  /// <summary>Formats whose on-disk payload deliberately lacks self-describing metadata (width/height/format
+  /// supplied externally). The generic round-trip path cannot exercise these — their own format-specific
+  /// unit tests cover the read/write API.</summary>
+  private static readonly HashSet<ImageFormat> _NoSelfDescribingMetadata = [
+    ImageFormat.Ccitt, // CCITT G3/G4: raw bitstream codec, no header
+  ];
+
   public static IEnumerable<TestCaseData> WritableFormats() {
     var seen = new HashSet<ImageFormat>();
     foreach (var entry in FormatRegistry.ConversionTargets) {
       if (entry.ConvertFromRawImage == null || entry.LoadRawImage == null) continue;
       if (entry.Format == ImageFormat.Unknown) continue;
+      if (_NoSelfDescribingMetadata.Contains(entry.Format)) continue;
       if (!seen.Add(entry.Format)) continue;
       yield return new TestCaseData(entry.Format).SetName($"RoundTrip_{entry.Name}");
     }

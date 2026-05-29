@@ -10,7 +10,7 @@ public sealed class CcittFile :
 
   static string IImageFormatMetadata<CcittFile>.PrimaryExtension => ".g3";
   static string[] IImageFormatMetadata<CcittFile>.FileExtensions => [".g3", ".g4", ".ccitt"];
-  static CcittFile IImageFormatReader<CcittFile>.FromSpan(ReadOnlySpan<byte> data) => CcittReader.FromSpanWithHeader(data);
+  static CcittFile IImageFormatReader<CcittFile>.FromSpan(ReadOnlySpan<byte> data) => throw new NotSupportedException("CCITT files require external width, height, and format parameters. Use CcittReader.FromBytes(byte[], int, int, CcittFormat) instead.");
   static FormatCapability IImageFormatMetadata<CcittFile>.Capabilities => FormatCapability.MonochromeOnly | FormatCapability.VariableResolution;
   static IntegerRange[] IImageFormatMetadata<CcittFile>.AllowedPaletteRanges => [2];
   static byte[] IImageFormatWriter<CcittFile>.ToBytes(CcittFile file) => CcittWriter.ToBytes(file);
