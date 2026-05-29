@@ -142,7 +142,7 @@ public sealed class PublicRegistryTests {
     var entry = FormatRegistry.GetEntry(ImageFormat.AccessFax);
     Assume.That(entry, Is.Not.Null);
     Assert.That(entry!.PrimaryMimeType, Is.EqualTo("application/octet-stream"));
-    Assert.That(entry.MimeTypes, Is.Empty);
+    Assert.That(entry.MimeTypes, Has.Length.EqualTo(0));
   }
 
   [Test]

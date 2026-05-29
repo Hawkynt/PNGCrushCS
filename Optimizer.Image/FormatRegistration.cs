@@ -43,7 +43,10 @@ internal static partial class FormatRegistration {
       Capabilities: T.Capabilities,
       MagicSignatures: magic,
       MatchesSignature: matchSig,
-      DetectionPriority: priority
+      DetectionPriority: priority,
+      AllowedPaletteRanges: T.AllowedPaletteRanges,
+      FixedPalettes: T.FixedPalettes,
+      AllowedDimensions: T.AllowedDimensions
     );
 
     FormatRegistry.Register(entry);
@@ -68,7 +71,10 @@ internal static partial class FormatRegistration {
       Capabilities: T.Capabilities,
       MagicSignatures: magic,
       MatchesSignature: matchSig,
-      DetectionPriority: priority
+      DetectionPriority: priority,
+      AllowedPaletteRanges: T.AllowedPaletteRanges,
+      FixedPalettes: T.FixedPalettes,
+      AllowedDimensions: T.AllowedDimensions
     );
 
     FormatRegistry.Register(entry);

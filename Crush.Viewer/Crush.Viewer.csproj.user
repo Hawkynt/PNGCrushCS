@@ -2,11 +2,26 @@
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup />
   <ItemGroup>
+    <Compile Update="AspectRatioCropDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="CanvasSizeDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="CropToSizeDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Update="ImagePanel.cs">
       <SubType>Component</SubType>
     </Compile>
     <Compile Update="MainForm.cs">
       <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="ResizeDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="ThumbnailStrip.cs">
+      <SubType>Component</SubType>
     </Compile>
   </ItemGroup>
 </Project>

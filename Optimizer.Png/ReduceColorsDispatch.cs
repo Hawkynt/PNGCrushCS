@@ -38,7 +38,7 @@ internal static class ReduceColorsDispatch {
     var method = typeof(BitmapQuantizationExtensions)
       .GetMethods(BindingFlags.Public | BindingFlags.Static)
       .First(m =>
-        m.Name == "ReduceColors"
+        m.Name == nameof(BitmapQuantizationExtensions.ReduceColors)
         && m.IsGenericMethod
         && m.GetGenericArguments().Length == 2
         && m.GetParameters().Length == 5

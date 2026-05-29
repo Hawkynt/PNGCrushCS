@@ -83,10 +83,18 @@ internal static class BitmapConverter {
   }
 
   /// <summary>Quantizes a <see cref="RawImage"/> to an indexed image with the specified max palette size using FrameworkExtensions quantizer/ditherer dispatch.</summary>
-  internal static RawImage QuantizeRawImage(RawImage source, int maxColors, string quantizerName = "Median Cut", string dithererName = "ErrorDiffusion_FloydSteinberg", bool isHighQuality = false) {
+  internal static RawImage QuantizeRawImage(
+    RawImage source,
+    int maxColors,
+    string quantizerName = "Median Cut",
+    string dithererName = "ErrorDiffusion_FloydSteinberg",
+    bool isHighQuality = false,
+    System.Collections.Generic.Dictionary<string, object?>? quantizerParams = null,
+    System.Collections.Generic.Dictionary<string, object?>? dithererParams = null
+  ) {
     ArgumentNullException.ThrowIfNull(source);
     using var bmp = RawImageToBitmap(source);
-    using var indexed = _DispatchReduceColors(bmp, quantizerName, dithererName, maxColors, isHighQuality);
+    using var indexed = ReduceColorsDispatch.ReduceColors(bmp, quantizerName, dithererName, maxColors, isHighQuality, quantizerParams, dithererParams);
 
     var width = indexed.Width;
     var height = indexed.Height;
@@ -119,8 +127,38 @@ internal static class BitmapConverter {
     try {
       var stride = bmpData.Stride;
       var indices = new byte[width * height];
-      for (var y = 0; y < height; ++y)
-        Marshal.Copy(bmpData.Scan0 + y * stride, indices, y * width, width);
+      var pixelFormat = indexed.PixelFormat;
+
+      // The quantizer may return 1bpp / 4bpp / 8bpp depending on palette size — unpack into a flat byte-per-pixel array.
+      if (pixelFormat == System.Drawing.Imaging.PixelFormat.Format8bppIndexed) {
+        // Straight copy, row by row (stride may have trailing padding bytes which we skip).
+        for (var y = 0; y < height; ++y)
+          Marshal.Copy(bmpData.Scan0 + y * stride, indices, y * width, width);
+      } else if (pixelFormat == System.Drawing.Imaging.PixelFormat.Format4bppIndexed) {
+        // Each byte holds two 4-bit pixels: high nibble = pixel 0, low nibble = pixel 1.
+        var row = new byte[stride];
+        for (var y = 0; y < height; ++y) {
+          Marshal.Copy(bmpData.Scan0 + y * stride, row, 0, stride);
+          for (var x = 0; x < width; ++x) {
+            var b = row[x >> 1];
+            indices[y * width + x] = (byte)(((x & 1) == 0 ? b >> 4 : b) & 0x0F);
+          }
+        }
+      } else if (pixelFormat == System.Drawing.Imaging.PixelFormat.Format1bppIndexed) {
+        // Each byte holds 8 pixels, MSB-first.
+        var row = new byte[stride];
+        for (var y = 0; y < height; ++y) {
+          Marshal.Copy(bmpData.Scan0 + y * stride, row, 0, stride);
+          for (var x = 0; x < width; ++x) {
+            var b = row[x >> 3];
+            indices[y * width + x] = (byte)((b >> (7 - (x & 7))) & 1);
+          }
+        }
+      } else {
+        // Unknown indexed format — fall back to naive copy and hope for the best.
+        for (var y = 0; y < height; ++y)
+          Marshal.Copy(bmpData.Scan0 + y * stride, indices, y * width, Math.Min(width, stride));
+      }
 
       return new() {
         Width = width,

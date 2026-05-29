@@ -15,6 +15,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Optimizer.Image\Optimizer.Image.csproj" />
     <ProjectReference Include="..\FileFormat.Core\FileFormat.Core.csproj" />
+    <ProjectReference Include="..\Hawkynt.ImageTransformUI\Hawkynt.ImageTransformUI.csproj" />
   </ItemGroup>
 
 </Project>

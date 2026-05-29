@@ -59,7 +59,7 @@ public sealed class FormatRegistryTests {
   [Category("Unit")]
   public void GetExtension_UnknownFormat_ReturnsEmpty() {
     var ext = FormatRegistry.GetExtension(ImageFormat.Unknown);
-    Assert.That(ext, Is.Empty);
+    Assert.That(ext, Has.Length.EqualTo(0));
   }
 
   [Test]
@@ -192,6 +192,6 @@ public sealed class FormatRegistryTests {
   [Category("Unit")]
   public void FormatCapability_HasExpectedCount() {
     var values = Enum.GetValues<FormatCapability>();
-    Assert.That(values, Has.Length.EqualTo(6));
+    Assert.That(values, Has.Length.EqualTo(7)); // None, VariableResolution, MonochromeOnly, IndexedOnly, HasDedicatedOptimizer, MultiImage, FixedResolution
   }
 }

@@ -69,7 +69,7 @@ public sealed class EndToEndTests {
 
     // Verify no metadata in result
     var restored = WebPReader.FromBytes(result.FileContents);
-    Assert.That(restored.MetadataChunks, Is.Empty);
+    Assert.That(restored.MetadataChunks, Has.Count.EqualTo(0));
   }
 
   [Test]

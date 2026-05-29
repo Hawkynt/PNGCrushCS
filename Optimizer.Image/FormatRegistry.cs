@@ -28,7 +28,10 @@ internal static class FormatRegistry {
     Func<byte[], ImageInfo?>? ReadImageInfo = null,
     Func<FileInfo, int>? GetImageCount = null,
     Func<FileInfo, int, RawImage?>? LoadRawImageAtIndex = null,
-    Func<FileInfo, IReadOnlyList<RawImage>?>? LoadAllRawImages = null
+    Func<FileInfo, IReadOnlyList<RawImage>?>? LoadAllRawImages = null,
+    IntegerRange[]? AllowedPaletteRanges = null,
+    FixedPalette[]? FixedPalettes = null,
+    (IntegerRange Width, IntegerRange Height)[]? AllowedDimensions = null
   );
 
 
