@@ -5,11 +5,13 @@
     <TargetFramework>net10.0-windows</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms>
     <Description>Image viewer supporting 500+ formats with zoom, pan, multi-image navigation, and format conversion.</Description>
-    <PublishSingleFile>true</PublishSingleFile>
+    <!-- Publish settings only apply on Windows. Linux CI (compile-only) skips them so the
+         WindowsForms runtime pack isn't required for the linux-x64 RID. -->
+    <PublishSingleFile Condition="'$(OS)' == 'Windows_NT'">true</PublishSingleFile>
     <!-- WinForms is not compatible with trimming (NETSDK1175) -->
-    <SelfContained>true</SelfContained>
-    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
-    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <SelfContained Condition="'$(OS)' == 'Windows_NT'">true</SelfContained>
+    <EnableCompressionInSingleFile Condition="'$(OS)' == 'Windows_NT'">true</EnableCompressionInSingleFile>
+    <IncludeNativeLibrariesForSelfExtract Condition="'$(OS)' == 'Windows_NT'">true</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
 
   <ItemGroup>
