@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.AmstradCpc\FileFormat.AmstradCpc.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.AmstradCpc\FileFormat.AmstradCpc.csproj" />
   </ItemGroup>
 
   <ItemGroup>

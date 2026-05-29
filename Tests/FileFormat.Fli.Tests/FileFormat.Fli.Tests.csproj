@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Fli\FileFormat.Fli.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Fli\FileFormat.Fli.csproj" />
   </ItemGroup>
 
   <ItemGroup>

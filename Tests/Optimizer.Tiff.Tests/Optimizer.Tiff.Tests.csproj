@@ -15,7 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Crush.TestUtilities\Crush.TestUtilities.csproj" />
-    <ProjectReference Include="..\..\Optimizer.Tiff\Optimizer.Tiff.csproj" />
+    <ProjectReference Include="..\..\Optimizers\Optimizer.Tiff\Optimizer.Tiff.csproj" />
   </ItemGroup>
 
 </Project>

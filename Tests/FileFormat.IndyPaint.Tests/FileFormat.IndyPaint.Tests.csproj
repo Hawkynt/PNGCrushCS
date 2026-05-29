@@ -9,6 +9,6 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.IndyPaint\FileFormat.IndyPaint.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.IndyPaint\FileFormat.IndyPaint.csproj" />
   </ItemGroup>
 </Project>

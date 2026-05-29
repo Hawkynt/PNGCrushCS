@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Zoomatic\FileFormat.Zoomatic.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Zoomatic\FileFormat.Zoomatic.csproj" />
   </ItemGroup>
 
   <ItemGroup>

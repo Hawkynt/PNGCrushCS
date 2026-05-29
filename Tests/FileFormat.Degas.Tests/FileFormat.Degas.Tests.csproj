@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Degas\FileFormat.Degas.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Degas\FileFormat.Degas.csproj" />
   </ItemGroup>
 
   <ItemGroup>

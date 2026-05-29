@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Pure C# Sun Icon image format reader and writer.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Optimizer.SunIcon" />
+    <InternalsVisibleTo Include="Optimizer.SunIcon.Tests" />
+    <InternalsVisibleTo Include="FileFormat.SunIcon.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../FileFormat.Core/FileFormat.Core.csproj" />
+  </ItemGroup>
+</Project>

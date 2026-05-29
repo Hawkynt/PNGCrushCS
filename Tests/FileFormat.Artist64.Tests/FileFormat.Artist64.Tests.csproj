@@ -11,7 +11,7 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Artist64\FileFormat.Artist64.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Artist64\FileFormat.Artist64.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="NUnit.Framework" />

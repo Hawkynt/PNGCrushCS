@@ -11,7 +11,7 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.ZxFlash\FileFormat.ZxFlash.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.ZxFlash\FileFormat.ZxFlash.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="NUnit.Framework" />

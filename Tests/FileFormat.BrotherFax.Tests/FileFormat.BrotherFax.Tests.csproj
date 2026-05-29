@@ -11,7 +11,7 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.BrotherFax\FileFormat.BrotherFax.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.BrotherFax\FileFormat.BrotherFax.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="NUnit.Framework" />

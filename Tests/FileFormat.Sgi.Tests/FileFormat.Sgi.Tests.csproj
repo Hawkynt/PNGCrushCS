@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Sgi\FileFormat.Sgi.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Sgi\FileFormat.Sgi.csproj" />
   </ItemGroup>
 
   <ItemGroup>

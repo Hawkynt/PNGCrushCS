@@ -11,7 +11,7 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.QuantelVpb\FileFormat.QuantelVpb.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.QuantelVpb\FileFormat.QuantelVpb.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="NUnit.Framework" />

@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Sixel\FileFormat.Sixel.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Sixel\FileFormat.Sixel.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Mcs\FileFormat.Mcs.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Mcs\FileFormat.Mcs.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Wbmp\FileFormat.Wbmp.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Wbmp\FileFormat.Wbmp.csproj" />
   </ItemGroup>
 
   <ItemGroup>

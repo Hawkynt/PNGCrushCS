@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.MsxScreen8\FileFormat.MsxScreen8.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.MsxScreen8\FileFormat.MsxScreen8.csproj" />
   </ItemGroup>
 
   <ItemGroup>

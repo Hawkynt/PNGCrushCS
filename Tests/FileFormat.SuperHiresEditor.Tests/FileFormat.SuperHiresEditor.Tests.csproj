@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.SuperHiresEditor\FileFormat.SuperHiresEditor.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.SuperHiresEditor\FileFormat.SuperHiresEditor.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -11,7 +11,7 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Jpeg2000\FileFormat.Jpeg2000.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Jpeg2000\FileFormat.Jpeg2000.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="NUnit.Framework" />

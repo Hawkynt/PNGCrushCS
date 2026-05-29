@@ -17,7 +17,7 @@
          used by every other csproj in the repo): MAJOR.MINOR.PATCH here, .BUILD appended at pack. -->
     <Version>1.0.0</Version>
     <Authors>Hawkynt</Authors>
-    <Description>Comprehensive pure-C# library for reading, writing, and detecting image file formats. Bundles ~540 format implementations (PNG, JPEG, GIF, BMP, TIFF, WebP, etc.) behind a single zero-reflection registry with magic-byte detection, MIME-type lookup, and stream-based detection.</Description>
+    <Description>Comprehensive pure-C# library for reading, writing, and detecting image file formats. Bundles format implementations (PNG, JPEG, GIF, BMP, TIFF, WebP, etc.) behind a single zero-reflection registry with magic-byte detection, MIME-type lookup, and stream-based detection.</Description>
     <PackageTags>image;file-format;png;jpeg;gif;bmp;tiff;webp;codec;decoder;encoder;mime;detection</PackageTags>
     <PackageLicenseExpression>LGPL-3.0-or-later</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/Hawkynt/PNGCrushCS</RepositoryUrl>
@@ -52,10 +52,9 @@
   </ItemGroup>
 
   <!-- Pull in every FileFormat.<Name> library via wildcard so the source generator sees them.
-       Excludes Core / Registry.Generator (already referenced explicitly above). -->
+       Format adapters live under ..\FileFormats\; Core / Registry.Generator stay at repo root. -->
   <ItemGroup>
-    <ProjectReference Include="..\FileFormat.*\FileFormat.*.csproj"
-                      Exclude="..\FileFormat.Core\FileFormat.Core.csproj;..\FileFormat.Core.Generators\FileFormat.Core.Generators.csproj;..\FileFormat.Registry.Generator\FileFormat.Registry.Generator.csproj"
+    <ProjectReference Include="..\FileFormats\FileFormat.*\FileFormat.*.csproj"
                       PrivateAssets="all" />
   </ItemGroup>
 

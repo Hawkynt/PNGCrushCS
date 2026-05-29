@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Pure C# CP8 grayscale image format reader and writer.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="FileFormat.Cp8Gray.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../FileFormat.Core/FileFormat.Core.csproj" />
+  </ItemGroup>
+</Project>

@@ -11,7 +11,7 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Ps2Txc\FileFormat.Ps2Txc.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Ps2Txc\FileFormat.Ps2Txc.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="NUnit.Framework" />

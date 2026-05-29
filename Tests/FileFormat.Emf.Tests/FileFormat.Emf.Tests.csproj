@@ -11,7 +11,7 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Emf\FileFormat.Emf.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Emf\FileFormat.Emf.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="NUnit.Framework" />

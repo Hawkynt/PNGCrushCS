@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.CfliDesigner\FileFormat.CfliDesigner.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.CfliDesigner\FileFormat.CfliDesigner.csproj" />
   </ItemGroup>
 
   <ItemGroup>

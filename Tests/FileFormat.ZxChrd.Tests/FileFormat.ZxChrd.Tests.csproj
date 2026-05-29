@@ -11,7 +11,7 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.ZxChrd\FileFormat.ZxChrd.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.ZxChrd\FileFormat.ZxChrd.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="NUnit.Framework" />

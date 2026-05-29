@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Wpg\FileFormat.Wpg.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Wpg\FileFormat.Wpg.csproj" />
   </ItemGroup>
 
   <ItemGroup>

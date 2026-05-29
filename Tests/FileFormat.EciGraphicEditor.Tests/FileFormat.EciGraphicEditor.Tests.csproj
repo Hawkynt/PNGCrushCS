@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.EciGraphicEditor\FileFormat.EciGraphicEditor.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.EciGraphicEditor\FileFormat.EciGraphicEditor.csproj" />
   </ItemGroup>
 
   <ItemGroup>

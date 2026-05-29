@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.ZxMultiArtist\FileFormat.ZxMultiArtist.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.ZxMultiArtist\FileFormat.ZxMultiArtist.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -11,6 +11,6 @@
     <PackageReference Include="NUnit3TestAdapter" Version="4.*" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.NeoGeoPocket\FileFormat.NeoGeoPocket.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.NeoGeoPocket\FileFormat.NeoGeoPocket.csproj" />
   </ItemGroup>
 </Project>

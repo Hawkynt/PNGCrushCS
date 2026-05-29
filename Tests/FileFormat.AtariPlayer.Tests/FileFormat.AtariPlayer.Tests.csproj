@@ -9,6 +9,6 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.AtariPlayer\FileFormat.AtariPlayer.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.AtariPlayer\FileFormat.AtariPlayer.csproj" />
   </ItemGroup>
 </Project>

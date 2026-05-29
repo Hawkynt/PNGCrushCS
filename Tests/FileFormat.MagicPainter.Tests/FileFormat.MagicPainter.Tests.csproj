@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.MagicPainter\FileFormat.MagicPainter.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.MagicPainter\FileFormat.MagicPainter.csproj" />
   </ItemGroup>
 
   <ItemGroup>

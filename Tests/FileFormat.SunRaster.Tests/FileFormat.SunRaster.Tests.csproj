@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.SunRaster\FileFormat.SunRaster.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.SunRaster\FileFormat.SunRaster.csproj" />
   </ItemGroup>
 
   <ItemGroup>

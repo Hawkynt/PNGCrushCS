@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.CrackArt\FileFormat.CrackArt.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.CrackArt\FileFormat.CrackArt.csproj" />
   </ItemGroup>
 
   <ItemGroup>

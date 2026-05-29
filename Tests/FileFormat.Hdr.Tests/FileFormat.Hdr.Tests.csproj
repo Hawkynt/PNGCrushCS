@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Hdr\FileFormat.Hdr.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Hdr\FileFormat.Hdr.csproj" />
   </ItemGroup>
 
   <ItemGroup>

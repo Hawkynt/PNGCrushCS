@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Pure C# Syslinux LSS16 splash screen image format reader and writer.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Optimizer.Lss16" />
+    <InternalsVisibleTo Include="Optimizer.Lss16.Tests" />
+    <InternalsVisibleTo Include="FileFormat.Lss16.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../FileFormat.Core/FileFormat.Core.csproj" />
+  </ItemGroup>
+</Project>

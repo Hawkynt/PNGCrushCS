@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Wad2\FileFormat.Wad2.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Wad2\FileFormat.Wad2.csproj" />
   </ItemGroup>
 
   <ItemGroup>

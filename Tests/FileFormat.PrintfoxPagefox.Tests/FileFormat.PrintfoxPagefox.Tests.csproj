@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.PrintfoxPagefox\FileFormat.PrintfoxPagefox.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.PrintfoxPagefox\FileFormat.PrintfoxPagefox.csproj" />
   </ItemGroup>
 
   <ItemGroup>

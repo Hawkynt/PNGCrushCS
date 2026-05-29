@@ -14,7 +14,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Crush.TestUtilities\Crush.TestUtilities.csproj" />
-    <ProjectReference Include="..\..\FileFormat.Jpeg\FileFormat.Jpeg.csproj" />
-    <ProjectReference Include="..\..\Optimizer.Jpeg\Optimizer.Jpeg.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Jpeg\FileFormat.Jpeg.csproj" />
+    <ProjectReference Include="..\..\Optimizers\Optimizer.Jpeg\Optimizer.Jpeg.csproj" />
   </ItemGroup>
 </Project>

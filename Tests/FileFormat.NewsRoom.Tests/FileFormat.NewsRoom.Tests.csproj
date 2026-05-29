@@ -11,7 +11,7 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.NewsRoom\FileFormat.NewsRoom.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.NewsRoom\FileFormat.NewsRoom.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="NUnit.Framework" />

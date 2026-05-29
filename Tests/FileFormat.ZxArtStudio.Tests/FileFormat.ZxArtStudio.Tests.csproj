@@ -11,7 +11,7 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.ZxArtStudio\FileFormat.ZxArtStudio.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.ZxArtStudio\FileFormat.ZxArtStudio.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="NUnit.Framework" />

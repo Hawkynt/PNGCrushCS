@@ -11,7 +11,7 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.SiemensBmx\FileFormat.SiemensBmx.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.SiemensBmx\FileFormat.SiemensBmx.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="NUnit.Framework" />

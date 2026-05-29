@@ -11,7 +11,7 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.AimGrayScale\FileFormat.AimGrayScale.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.AimGrayScale\FileFormat.AimGrayScale.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="NUnit.Framework" />

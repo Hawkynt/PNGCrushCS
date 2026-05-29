@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.RockyInterlace\FileFormat.RockyInterlace.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.RockyInterlace\FileFormat.RockyInterlace.csproj" />
   </ItemGroup>
 
   <ItemGroup>

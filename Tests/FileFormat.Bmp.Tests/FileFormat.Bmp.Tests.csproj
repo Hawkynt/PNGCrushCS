@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Bmp\FileFormat.Bmp.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Bmp\FileFormat.Bmp.csproj" />
   </ItemGroup>
 
   <ItemGroup>

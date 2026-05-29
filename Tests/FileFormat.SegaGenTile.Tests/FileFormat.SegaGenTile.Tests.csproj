@@ -11,7 +11,7 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.SegaGenTile\FileFormat.SegaGenTile.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.SegaGenTile\FileFormat.SegaGenTile.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="NUnit.Framework" />

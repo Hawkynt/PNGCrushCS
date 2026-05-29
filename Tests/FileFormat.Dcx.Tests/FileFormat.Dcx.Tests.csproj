@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Dcx\FileFormat.Dcx.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Dcx\FileFormat.Dcx.csproj" />
   </ItemGroup>
 
   <ItemGroup>

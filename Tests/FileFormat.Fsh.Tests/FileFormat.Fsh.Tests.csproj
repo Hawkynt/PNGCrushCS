@@ -11,7 +11,7 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Fsh\FileFormat.Fsh.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Fsh\FileFormat.Fsh.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="NUnit.Framework" />

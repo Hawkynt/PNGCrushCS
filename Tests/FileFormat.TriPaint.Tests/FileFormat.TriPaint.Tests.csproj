@@ -9,6 +9,6 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.TriPaint\FileFormat.TriPaint.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.TriPaint\FileFormat.TriPaint.csproj" />
   </ItemGroup>
 </Project>

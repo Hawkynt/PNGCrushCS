@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Pure C# IFF ANIM animation container file format reader and writer.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="FileFormat.IffAnim.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../FileFormat.Core/FileFormat.Core.csproj" />
+    <ProjectReference Include="..\FileFormat.Iff\FileFormat.Iff.csproj" />
+    <ProjectReference Include="..\FileFormat.Riff\FileFormat.Riff.csproj" />
+    <ProjectReference Include="..\FileFormat.Ilbm\FileFormat.Ilbm.csproj" />
+  </ItemGroup>
+</Project>

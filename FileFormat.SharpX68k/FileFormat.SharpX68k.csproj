@@ -1,8 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <RootNamespace>FileFormat.SharpX68k</RootNamespace>
-  </PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\FileFormat.Core\FileFormat.Core.csproj" />
-  </ItemGroup>
-</Project>

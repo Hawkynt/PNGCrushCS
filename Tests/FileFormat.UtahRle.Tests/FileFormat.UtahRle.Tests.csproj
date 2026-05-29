@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.UtahRle\FileFormat.UtahRle.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.UtahRle\FileFormat.UtahRle.csproj" />
   </ItemGroup>
 
   <ItemGroup>

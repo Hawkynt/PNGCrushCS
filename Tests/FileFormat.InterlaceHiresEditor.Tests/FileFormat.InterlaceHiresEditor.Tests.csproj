@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.InterlaceHiresEditor\FileFormat.InterlaceHiresEditor.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.InterlaceHiresEditor\FileFormat.InterlaceHiresEditor.csproj" />
   </ItemGroup>
 
   <ItemGroup>

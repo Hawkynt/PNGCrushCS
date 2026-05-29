@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.HiresFliCrest\FileFormat.HiresFliCrest.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.HiresFliCrest\FileFormat.HiresFliCrest.csproj" />
   </ItemGroup>
 
   <ItemGroup>

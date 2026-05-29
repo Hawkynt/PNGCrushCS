@@ -11,6 +11,6 @@
     <PackageReference Include="NUnit3TestAdapter" Version="4.*" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.SharpX68k\FileFormat.SharpX68k.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.SharpX68k\FileFormat.SharpX68k.csproj" />
   </ItemGroup>
 </Project>

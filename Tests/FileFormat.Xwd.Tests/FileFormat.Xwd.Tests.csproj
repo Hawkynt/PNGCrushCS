@@ -11,7 +11,7 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Xwd\FileFormat.Xwd.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Xwd\FileFormat.Xwd.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="NUnit.Framework" />

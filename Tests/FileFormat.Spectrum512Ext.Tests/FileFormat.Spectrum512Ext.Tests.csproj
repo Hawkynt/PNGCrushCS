@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Spectrum512Ext\FileFormat.Spectrum512Ext.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Spectrum512Ext\FileFormat.Spectrum512Ext.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Clp\FileFormat.Clp.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Clp\FileFormat.Clp.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -14,7 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Tiff\FileFormat.Tiff.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Tiff\FileFormat.Tiff.csproj" />
   </ItemGroup>
 
   <ItemGroup>

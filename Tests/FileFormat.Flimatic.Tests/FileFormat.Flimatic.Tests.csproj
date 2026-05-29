@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Flimatic\FileFormat.Flimatic.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Flimatic\FileFormat.Flimatic.csproj" />
   </ItemGroup>
 
   <ItemGroup>

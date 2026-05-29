@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.FaceSaver\FileFormat.FaceSaver.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.FaceSaver\FileFormat.FaceSaver.csproj" />
   </ItemGroup>
 
   <ItemGroup>

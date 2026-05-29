@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Dicom\FileFormat.Dicom.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Dicom\FileFormat.Dicom.csproj" />
   </ItemGroup>
 
   <ItemGroup>

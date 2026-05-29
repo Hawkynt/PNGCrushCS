@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>WebP optimization engine with metadata stripping and RIFF container rewriting.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Optimizer.WebP.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../FileFormats/FileFormat.WebP/FileFormat.WebP.csproj" />
+    <ProjectReference Include="../../Crush.Core/Crush.Core.csproj" />
+  </ItemGroup>
+</Project>

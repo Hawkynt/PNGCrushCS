@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Ccitt\FileFormat.Ccitt.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Ccitt\FileFormat.Ccitt.csproj" />
   </ItemGroup>
 
   <ItemGroup>

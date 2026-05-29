@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>ANI animated cursor file format optimizer.</Description>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Optimizer.Ani.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../FileFormats/FileFormat.Ani/FileFormat.Ani.csproj" />
+    <ProjectReference Include="../../FileFormats/FileFormat.Ico/FileFormat.Ico.csproj" />
+    <ProjectReference Include="../../Crush.Core/Crush.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Drawing.Common" Version="9.0.4" />
+  </ItemGroup>
+</Project>

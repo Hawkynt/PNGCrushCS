@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Ktx\FileFormat.Ktx.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Ktx\FileFormat.Ktx.csproj" />
   </ItemGroup>
 
   <ItemGroup>

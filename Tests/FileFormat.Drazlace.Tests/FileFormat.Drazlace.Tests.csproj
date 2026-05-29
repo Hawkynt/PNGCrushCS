@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Drazlace\FileFormat.Drazlace.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Drazlace\FileFormat.Drazlace.csproj" />
   </ItemGroup>
 
   <ItemGroup>

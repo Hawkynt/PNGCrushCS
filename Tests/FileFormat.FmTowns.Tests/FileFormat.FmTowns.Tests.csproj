@@ -11,6 +11,6 @@
     <PackageReference Include="NUnit3TestAdapter" Version="4.*" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.FmTowns\FileFormat.FmTowns.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.FmTowns\FileFormat.FmTowns.csproj" />
   </ItemGroup>
 </Project>

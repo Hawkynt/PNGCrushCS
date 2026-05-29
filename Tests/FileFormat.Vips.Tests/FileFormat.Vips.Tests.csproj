@@ -11,7 +11,7 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Vips\FileFormat.Vips.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Vips\FileFormat.Vips.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="NUnit.Framework" />

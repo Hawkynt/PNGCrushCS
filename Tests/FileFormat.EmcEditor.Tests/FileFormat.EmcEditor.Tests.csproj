@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.EmcEditor\FileFormat.EmcEditor.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.EmcEditor\FileFormat.EmcEditor.csproj" />
   </ItemGroup>
 
   <ItemGroup>

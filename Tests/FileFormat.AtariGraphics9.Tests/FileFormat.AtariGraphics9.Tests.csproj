@@ -9,6 +9,6 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.AtariGraphics9\FileFormat.AtariGraphics9.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.AtariGraphics9\FileFormat.AtariGraphics9.csproj" />
   </ItemGroup>
 </Project>

@@ -13,9 +13,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Ani\FileFormat.Ani.csproj" />
-    <ProjectReference Include="..\..\FileFormat.Ico\FileFormat.Ico.csproj" />
-    <ProjectReference Include="..\..\FileFormat.Png\FileFormat.Png.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Ani\FileFormat.Ani.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Ico\FileFormat.Ico.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Png\FileFormat.Png.csproj" />
   </ItemGroup>
 
   <ItemGroup>

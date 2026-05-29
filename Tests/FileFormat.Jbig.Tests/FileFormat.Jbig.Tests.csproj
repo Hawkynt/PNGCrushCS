@@ -11,7 +11,7 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Jbig\FileFormat.Jbig.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Jbig\FileFormat.Jbig.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="NUnit.Framework" />

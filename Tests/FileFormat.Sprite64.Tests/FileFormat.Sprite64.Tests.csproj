@@ -9,6 +9,6 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Sprite64\FileFormat.Sprite64.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Sprite64\FileFormat.Sprite64.csproj" />
   </ItemGroup>
 </Project>

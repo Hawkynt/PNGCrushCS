@@ -9,6 +9,6 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.HighResST\FileFormat.HighResST.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.HighResST\FileFormat.HighResST.csproj" />
   </ItemGroup>
 </Project>

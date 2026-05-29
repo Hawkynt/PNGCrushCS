@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Tiny\FileFormat.Tiny.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Tiny\FileFormat.Tiny.csproj" />
   </ItemGroup>
 
   <ItemGroup>

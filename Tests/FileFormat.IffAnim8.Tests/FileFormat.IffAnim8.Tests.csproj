@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.IffAnim8\FileFormat.IffAnim8.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.IffAnim8\FileFormat.IffAnim8.csproj" />
   </ItemGroup>
 
   <ItemGroup>

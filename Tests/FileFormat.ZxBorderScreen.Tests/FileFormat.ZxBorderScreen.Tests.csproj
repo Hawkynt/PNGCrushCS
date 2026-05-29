@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.ZxBorderScreen\FileFormat.ZxBorderScreen.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.ZxBorderScreen\FileFormat.ZxBorderScreen.csproj" />
   </ItemGroup>
 
   <ItemGroup>

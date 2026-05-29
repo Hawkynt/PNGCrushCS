@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.GunPaint\FileFormat.GunPaint.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.GunPaint\FileFormat.GunPaint.csproj" />
   </ItemGroup>
 
   <ItemGroup>

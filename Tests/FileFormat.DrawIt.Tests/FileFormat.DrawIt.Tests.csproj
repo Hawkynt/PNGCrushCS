@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.DrawIt\FileFormat.DrawIt.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.DrawIt\FileFormat.DrawIt.csproj" />
   </ItemGroup>
 
   <ItemGroup>

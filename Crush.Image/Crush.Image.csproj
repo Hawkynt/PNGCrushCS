@@ -12,7 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Optimizer.Image\Optimizer.Image.csproj" />
+    <ProjectReference Include="..\Optimizers\Optimizer.Image\Optimizer.Image.csproj" />
     <ProjectReference Include="..\Crush.Core\Crush.Core.csproj" />
   </ItemGroup>
 

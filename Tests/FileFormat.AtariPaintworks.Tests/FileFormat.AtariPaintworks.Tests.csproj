@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.AtariPaintworks\FileFormat.AtariPaintworks.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.AtariPaintworks\FileFormat.AtariPaintworks.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -27,7 +27,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Jpeg\FileFormat.Jpeg.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Jpeg\FileFormat.Jpeg.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -9,6 +9,6 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.ImageSysC64\FileFormat.ImageSysC64.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.ImageSysC64\FileFormat.ImageSysC64.csproj" />
   </ItemGroup>
 </Project>

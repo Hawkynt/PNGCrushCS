@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.UfliEditor\FileFormat.UfliEditor.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.UfliEditor\FileFormat.UfliEditor.csproj" />
   </ItemGroup>
 
   <ItemGroup>

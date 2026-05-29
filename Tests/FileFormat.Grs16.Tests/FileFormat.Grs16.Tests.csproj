@@ -11,7 +11,7 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Grs16\FileFormat.Grs16.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Grs16\FileFormat.Grs16.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="NUnit.Framework" />

@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.SamCoupe\FileFormat.SamCoupe.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.SamCoupe\FileFormat.SamCoupe.csproj" />
   </ItemGroup>
 
   <ItemGroup>

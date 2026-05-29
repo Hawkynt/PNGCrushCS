@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Art\FileFormat.Art.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Art\FileFormat.Art.csproj" />
   </ItemGroup>
 
   <ItemGroup>

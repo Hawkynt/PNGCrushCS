@@ -11,7 +11,7 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.SaracenPaint\FileFormat.SaracenPaint.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.SaracenPaint\FileFormat.SaracenPaint.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="NUnit.Framework" />

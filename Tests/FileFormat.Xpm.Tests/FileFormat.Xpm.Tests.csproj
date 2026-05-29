@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Xpm\FileFormat.Xpm.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Xpm\FileFormat.Xpm.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,0 +1,32 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0-windows</TargetFramework>
+
+        <Description>This package provides a PngOptimizer implementation.</Description>
+        <PackageReadmeFile>ReadMe.md</PackageReadmeFile>
+        <PackageProjectUrl>https://github.com/Hawkynt/PNGCrush</PackageProjectUrl>
+        <PackageTags>PngOptimizer;ImageCrush;Hawkynt</PackageTags>
+        <RepositoryUrl>https://github.com/Hawkynt/PNGCrush</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="Optimizer.Png.Tests" />
+        <InternalsVisibleTo Include="Optimizer.Image" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="../../Crush.Core/Crush.Core.csproj" />
+        <ProjectReference Include="../../FileFormats/FileFormat.Png/FileFormat.Png.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="FrameworkExtensions.Backports" Version="1.0.0.256" />
+        <PackageReference Include="FrameworkExtensions.Corlib" Version="1.0.2.459" />
+        <PackageReference Include="FrameworkExtensions.System.Drawing" Version="1.0.0.132" />
+        <PackageReference Include="System.Drawing.Common" Version="9.0.4" />
+    </ItemGroup>
+
+</Project>

@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Flip64\FileFormat.Flip64.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Flip64\FileFormat.Flip64.csproj" />
   </ItemGroup>
 
   <ItemGroup>

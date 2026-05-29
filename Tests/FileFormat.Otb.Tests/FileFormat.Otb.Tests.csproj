@@ -11,7 +11,7 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Otb\FileFormat.Otb.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Otb\FileFormat.Otb.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="NUnit.Framework" />

@@ -9,6 +9,6 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.ArtStudio8\FileFormat.ArtStudio8.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.ArtStudio8\FileFormat.ArtStudio8.csproj" />
   </ItemGroup>
 </Project>

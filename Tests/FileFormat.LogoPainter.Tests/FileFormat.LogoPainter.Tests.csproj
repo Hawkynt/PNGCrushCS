@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.LogoPainter\FileFormat.LogoPainter.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.LogoPainter\FileFormat.LogoPainter.csproj" />
   </ItemGroup>
 
   <ItemGroup>

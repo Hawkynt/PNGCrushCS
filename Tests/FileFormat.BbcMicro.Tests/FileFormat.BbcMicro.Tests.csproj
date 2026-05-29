@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.BbcMicro\FileFormat.BbcMicro.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.BbcMicro\FileFormat.BbcMicro.csproj" />
   </ItemGroup>
 
   <ItemGroup>

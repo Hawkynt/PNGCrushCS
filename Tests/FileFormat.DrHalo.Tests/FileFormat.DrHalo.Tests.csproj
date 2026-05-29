@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.DrHalo\FileFormat.DrHalo.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.DrHalo\FileFormat.DrHalo.csproj" />
   </ItemGroup>
 
   <ItemGroup>

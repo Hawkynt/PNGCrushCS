@@ -9,6 +9,6 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.OcsPics\FileFormat.OcsPics.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.OcsPics\FileFormat.OcsPics.csproj" />
   </ItemGroup>
 </Project>

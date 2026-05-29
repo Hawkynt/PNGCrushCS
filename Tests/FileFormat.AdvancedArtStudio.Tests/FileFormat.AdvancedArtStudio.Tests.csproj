@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.AdvancedArtStudio\FileFormat.AdvancedArtStudio.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.AdvancedArtStudio\FileFormat.AdvancedArtStudio.csproj" />
   </ItemGroup>
 
   <ItemGroup>

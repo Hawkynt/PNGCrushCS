@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Vtf\FileFormat.Vtf.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Vtf\FileFormat.Vtf.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -11,6 +11,6 @@
     <PackageReference Include="NUnit3TestAdapter" Version="4.*" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Atari2600\FileFormat.Atari2600.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Atari2600\FileFormat.Atari2600.csproj" />
   </ItemGroup>
 </Project>

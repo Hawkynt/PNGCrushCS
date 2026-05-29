@@ -13,8 +13,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Cur\FileFormat.Cur.csproj" />
-    <ProjectReference Include="..\..\FileFormat.Png\FileFormat.Png.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Cur\FileFormat.Cur.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Png\FileFormat.Png.csproj" />
   </ItemGroup>
 
   <ItemGroup>

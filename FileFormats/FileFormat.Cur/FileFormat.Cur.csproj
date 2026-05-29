@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Pure C# CUR (cursor) file format reader and writer.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Optimizer.Cur" />
+    <InternalsVisibleTo Include="Optimizer.Cur.Tests" />
+    <InternalsVisibleTo Include="FileFormat.Cur.Tests" />
+    <InternalsVisibleTo Include="FileFormat.Ani" />
+    <InternalsVisibleTo Include="FileFormat.Ani.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../FileFormat.Core/FileFormat.Core.csproj" />
+    <ProjectReference Include="..\FileFormat.Ico\FileFormat.Ico.csproj" />
+  </ItemGroup>
+</Project>

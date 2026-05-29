@@ -9,6 +9,6 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Cheese\FileFormat.Cheese.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Cheese\FileFormat.Cheese.csproj" />
   </ItemGroup>
 </Project>

@@ -11,7 +11,7 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Pdf\FileFormat.Pdf.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Pdf\FileFormat.Pdf.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="NUnit.Framework" />

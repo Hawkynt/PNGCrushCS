@@ -11,7 +11,7 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.AliasPix\FileFormat.AliasPix.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.AliasPix\FileFormat.AliasPix.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="NUnit.Framework" />

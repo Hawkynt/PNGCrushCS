@@ -9,6 +9,6 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.MicroIllustratorA8\FileFormat.MicroIllustratorA8.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.MicroIllustratorA8\FileFormat.MicroIllustratorA8.csproj" />
   </ItemGroup>
 </Project>

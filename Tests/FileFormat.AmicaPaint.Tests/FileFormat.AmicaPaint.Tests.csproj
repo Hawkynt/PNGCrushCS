@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.AmicaPaint\FileFormat.AmicaPaint.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.AmicaPaint\FileFormat.AmicaPaint.csproj" />
   </ItemGroup>
 
   <ItemGroup>

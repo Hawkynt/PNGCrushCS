@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Mlt\FileFormat.Mlt.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Mlt\FileFormat.Mlt.csproj" />
   </ItemGroup>
 
   <ItemGroup>

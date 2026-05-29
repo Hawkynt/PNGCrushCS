@@ -14,9 +14,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Optimizer.Ico\Optimizer.Ico.csproj" />
-    <ProjectReference Include="..\..\FileFormat.Ico\FileFormat.Ico.csproj" />
-    <ProjectReference Include="..\..\FileFormat.Png\FileFormat.Png.csproj" />
+    <ProjectReference Include="..\..\Optimizers\Optimizer.Ico\Optimizer.Ico.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Ico\FileFormat.Ico.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Png\FileFormat.Png.csproj" />
   </ItemGroup>
 
   <ItemGroup>

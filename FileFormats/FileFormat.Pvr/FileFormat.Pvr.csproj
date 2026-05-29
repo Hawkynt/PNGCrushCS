@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Pure C# PVR (PowerVR Texture v3) image format reader and writer.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Optimizer.Pvr" />
+    <InternalsVisibleTo Include="Optimizer.Pvr.Tests" />
+    <InternalsVisibleTo Include="FileFormat.Pvr.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../FileFormat.Core/FileFormat.Core.csproj" />
+    <ProjectReference Include="../../FileFormat.Core.Generators/FileFormat.Core.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\FileFormat.Pkm\FileFormat.Pkm.csproj" />
+  </ItemGroup>
+</Project>

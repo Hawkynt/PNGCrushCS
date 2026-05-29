@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.HiPicCreator\FileFormat.HiPicCreator.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.HiPicCreator\FileFormat.HiPicCreator.csproj" />
   </ItemGroup>
 
   <ItemGroup>

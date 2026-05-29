@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Pict\FileFormat.Pict.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Pict\FileFormat.Pict.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,0 +1,59 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>C# JPEG file format reader and writer.</Description>
+
+    <!--
+      Cross-repo source linking from the sibling CompressionWorkbench checkout.
+      We link individual .cs files (BitIO, Huffman, …) instead of taking a
+      <ProjectReference> because CompressionWorkbench transitively references
+      this repo's Hawkynt.FileFormats.Images, which would create a build cycle.
+      When the sibling is absent the linked files are skipped and the
+      CW_SIBLING define stays unset, so dependent code paths compile out
+      via #if CW_SIBLING. CI clones the sibling at the parallel path; consumers
+      installing the published NuGet do not need it.
+    -->
+    <CwSiblingPath>$(MSBuildThisFileDirectory)../../../CompressionWorkbench\Compression.Core</CwSiblingPath>
+    <CwSiblingPresent>false</CwSiblingPresent>
+    <CwSiblingPresent Condition="Exists('$(CwSiblingPath)\Compression.Core.csproj')">true</CwSiblingPresent>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Optimizer.Jpeg" />
+    <InternalsVisibleTo Include="Optimizer.Jpeg.Tests" />
+    <InternalsVisibleTo Include="FileFormat.Jpeg.Tests" />
+    <InternalsVisibleTo Include="FileFormat.Mpo" />
+    <InternalsVisibleTo Include="FileFormat.Mpo.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../FileFormat.Core/FileFormat.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      Backports polyfills missing BCL features when needed (e.g. for older targets).
+      Targeting net8.0 with LangVersion=preview means we get C#14/net10 syntactic sugar
+      for free; Backports fills in any types the compiler emits but the BCL lacks.
+    -->
+    <PackageReference Include="FrameworkExtensions.Backports" Version="1.0.0.256" />
+  </ItemGroup>
+
+  <!-- ============================================================
+       CompressionWorkbench source-linked compression building blocks.
+       Conditional on the sibling repo being checked out at ../../../CompressionWorkbench.
+       ============================================================ -->
+  <PropertyGroup Condition="'$(CwSiblingPresent)' == 'true'">
+    <DefineConstants>$(DefineConstants);CW_SIBLING</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(CwSiblingPresent)' == 'true'">
+    <!-- The CW sources assume ImplicitUsings; we have it disabled, so add the
+         minimum global usings their linked files need at project scope. These
+         are scoped to this conditional ItemGroup, so they vanish when the
+         sibling is absent. -->
+    <Using Include="System" />
+    <Using Include="System.IO" />
+
+    <!-- Link the bit-level I/O primitives (6 files, dep-free, only system usings). -->
+    <Compile Include="$(CwSiblingPath)\BitIO\*.cs" LinkBase="External\Cw\BitIO" />
+  </ItemGroup>
+</Project>

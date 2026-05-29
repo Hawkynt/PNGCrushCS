@@ -9,6 +9,6 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.ScreenBlaster\FileFormat.ScreenBlaster.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.ScreenBlaster\FileFormat.ScreenBlaster.csproj" />
   </ItemGroup>
 </Project>

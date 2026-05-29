@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.DaliST\FileFormat.DaliST.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.DaliST\FileFormat.DaliST.csproj" />
   </ItemGroup>
 
   <ItemGroup>

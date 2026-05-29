@@ -11,7 +11,7 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.SpotImage\FileFormat.SpotImage.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.SpotImage\FileFormat.SpotImage.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="NUnit.Framework" />

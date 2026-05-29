@@ -11,7 +11,7 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.SnesTile\FileFormat.SnesTile.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.SnesTile\FileFormat.SnesTile.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="NUnit.Framework" />

@@ -11,6 +11,6 @@
     <PackageReference Include="NUnit3TestAdapter" Version="4.*" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.CommodorePet\FileFormat.CommodorePet.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.CommodorePet\FileFormat.CommodorePet.csproj" />
   </ItemGroup>
 </Project>

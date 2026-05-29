@@ -19,7 +19,7 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.JpegXl\FileFormat.JpegXl.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.JpegXl\FileFormat.JpegXl.csproj" />
   </ItemGroup>
   <ItemGroup>
     <!-- Real JPEG XL files from libjxl's test corpus (libjxl/testdata on GitHub).

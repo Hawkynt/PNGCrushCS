@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.MultiPalettePicture\FileFormat.MultiPalettePicture.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.MultiPalettePicture\FileFormat.MultiPalettePicture.csproj" />
   </ItemGroup>
 
   <ItemGroup>

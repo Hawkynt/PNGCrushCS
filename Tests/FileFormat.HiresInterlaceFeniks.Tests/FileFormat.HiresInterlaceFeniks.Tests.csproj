@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.HiresInterlaceFeniks\FileFormat.HiresInterlaceFeniks.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.HiresInterlaceFeniks\FileFormat.HiresInterlaceFeniks.csproj" />
   </ItemGroup>
 
   <ItemGroup>

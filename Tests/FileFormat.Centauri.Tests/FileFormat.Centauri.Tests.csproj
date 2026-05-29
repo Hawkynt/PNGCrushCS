@@ -9,6 +9,6 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Centauri\FileFormat.Centauri.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Centauri\FileFormat.Centauri.csproj" />
   </ItemGroup>
 </Project>

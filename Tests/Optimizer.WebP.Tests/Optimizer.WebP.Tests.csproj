@@ -13,8 +13,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Optimizer.WebP\Optimizer.WebP.csproj" />
-    <ProjectReference Include="..\..\FileFormat.WebP\FileFormat.WebP.csproj" />
+    <ProjectReference Include="..\..\Optimizers\Optimizer.WebP\Optimizer.WebP.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.WebP\FileFormat.WebP.csproj" />
   </ItemGroup>
 
   <ItemGroup>

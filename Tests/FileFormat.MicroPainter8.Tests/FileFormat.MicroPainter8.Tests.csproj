@@ -9,6 +9,6 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.MicroPainter8\FileFormat.MicroPainter8.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.MicroPainter8\FileFormat.MicroPainter8.csproj" />
   </ItemGroup>
 </Project>

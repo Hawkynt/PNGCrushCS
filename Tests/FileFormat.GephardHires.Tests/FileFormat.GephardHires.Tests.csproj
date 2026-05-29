@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.GephardHires\FileFormat.GephardHires.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.GephardHires\FileFormat.GephardHires.csproj" />
   </ItemGroup>
 
   <ItemGroup>

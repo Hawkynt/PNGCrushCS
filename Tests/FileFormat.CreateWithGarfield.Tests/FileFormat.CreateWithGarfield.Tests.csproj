@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.CreateWithGarfield\FileFormat.CreateWithGarfield.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.CreateWithGarfield\FileFormat.CreateWithGarfield.csproj" />
   </ItemGroup>
 
   <ItemGroup>

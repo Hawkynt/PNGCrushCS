@@ -15,8 +15,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Png\FileFormat.Png.csproj" />
-    <ProjectReference Include="..\..\Optimizer.Png\Optimizer.Png.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Png\FileFormat.Png.csproj" />
+    <ProjectReference Include="..\..\Optimizers\Optimizer.Png\Optimizer.Png.csproj" />
   </ItemGroup>
 
   <ItemGroup>

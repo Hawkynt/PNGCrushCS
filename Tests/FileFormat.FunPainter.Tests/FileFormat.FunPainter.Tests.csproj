@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.FunPainter\FileFormat.FunPainter.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.FunPainter\FileFormat.FunPainter.csproj" />
   </ItemGroup>
 
   <ItemGroup>

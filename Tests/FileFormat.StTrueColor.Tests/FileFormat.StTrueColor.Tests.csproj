@@ -9,6 +9,6 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.StTrueColor\FileFormat.StTrueColor.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.StTrueColor\FileFormat.StTrueColor.csproj" />
   </ItemGroup>
 </Project>

@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Cineon\FileFormat.Cineon.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Cineon\FileFormat.Cineon.csproj" />
   </ItemGroup>
 
   <ItemGroup>

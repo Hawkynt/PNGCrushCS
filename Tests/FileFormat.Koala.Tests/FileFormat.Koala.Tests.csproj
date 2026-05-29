@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Koala\FileFormat.Koala.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Koala\FileFormat.Koala.csproj" />
   </ItemGroup>
 
   <ItemGroup>

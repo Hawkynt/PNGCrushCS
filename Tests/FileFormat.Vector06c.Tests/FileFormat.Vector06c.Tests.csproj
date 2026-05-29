@@ -11,7 +11,7 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Vector06c\FileFormat.Vector06c.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Vector06c\FileFormat.Vector06c.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="NUnit.Framework" />

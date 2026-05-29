@@ -11,7 +11,7 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.HighresMedium\FileFormat.HighresMedium.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.HighresMedium\FileFormat.HighresMedium.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="NUnit.Framework" />

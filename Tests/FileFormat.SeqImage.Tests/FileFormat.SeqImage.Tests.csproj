@@ -11,7 +11,7 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.SeqImage\FileFormat.SeqImage.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.SeqImage\FileFormat.SeqImage.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="NUnit.Framework" />

@@ -11,7 +11,7 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.OpenRaster\FileFormat.OpenRaster.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.OpenRaster\FileFormat.OpenRaster.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="NUnit.Framework" />

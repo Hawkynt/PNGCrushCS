@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.PublicPainter\FileFormat.PublicPainter.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.PublicPainter\FileFormat.PublicPainter.csproj" />
   </ItemGroup>
 
   <ItemGroup>

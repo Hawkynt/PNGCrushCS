@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Psd\FileFormat.Psd.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Psd\FileFormat.Psd.csproj" />
   </ItemGroup>
 
   <ItemGroup>

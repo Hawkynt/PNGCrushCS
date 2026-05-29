@@ -11,6 +11,6 @@
     <PackageReference Include="NUnit3TestAdapter" Version="4.*" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Enterprise128\FileFormat.Enterprise128.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Enterprise128\FileFormat.Enterprise128.csproj" />
   </ItemGroup>
 </Project>

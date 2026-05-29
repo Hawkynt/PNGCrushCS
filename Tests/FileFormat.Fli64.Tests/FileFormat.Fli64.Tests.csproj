@@ -9,6 +9,6 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Fli64\FileFormat.Fli64.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Fli64\FileFormat.Fli64.csproj" />
   </ItemGroup>
 </Project>

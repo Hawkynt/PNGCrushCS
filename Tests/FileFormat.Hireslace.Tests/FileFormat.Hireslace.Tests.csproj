@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Hireslace\FileFormat.Hireslace.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Hireslace\FileFormat.Hireslace.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.DrazPaint\FileFormat.DrazPaint.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.DrazPaint\FileFormat.DrazPaint.csproj" />
   </ItemGroup>
 
   <ItemGroup>

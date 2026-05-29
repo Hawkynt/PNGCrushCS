@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Exr\FileFormat.Exr.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Exr\FileFormat.Exr.csproj" />
   </ItemGroup>
 
   <ItemGroup>

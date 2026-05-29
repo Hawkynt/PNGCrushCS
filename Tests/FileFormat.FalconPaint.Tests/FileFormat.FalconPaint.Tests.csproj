@@ -9,6 +9,6 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.FalconPaint\FileFormat.FalconPaint.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.FalconPaint\FileFormat.FalconPaint.csproj" />
   </ItemGroup>
 </Project>

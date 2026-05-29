@@ -11,7 +11,7 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Im5Visilog\FileFormat.Im5Visilog.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Im5Visilog\FileFormat.Im5Visilog.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="NUnit.Framework" />

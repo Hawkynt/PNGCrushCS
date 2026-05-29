@@ -11,7 +11,7 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.ZxTricolor\FileFormat.ZxTricolor.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.ZxTricolor\FileFormat.ZxTricolor.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="NUnit.Framework" />

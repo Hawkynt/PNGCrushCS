@@ -9,6 +9,6 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.GodPaint\FileFormat.GodPaint.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.GodPaint\FileFormat.GodPaint.csproj" />
   </ItemGroup>
 </Project>

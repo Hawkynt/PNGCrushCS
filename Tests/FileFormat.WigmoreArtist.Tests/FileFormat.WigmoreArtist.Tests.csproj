@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.WigmoreArtist\FileFormat.WigmoreArtist.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.WigmoreArtist\FileFormat.WigmoreArtist.csproj" />
   </ItemGroup>
 
   <ItemGroup>

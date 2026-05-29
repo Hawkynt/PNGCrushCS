@@ -9,6 +9,6 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.Canvas\FileFormat.Canvas.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.Canvas\FileFormat.Canvas.csproj" />
   </ItemGroup>
 </Project>

@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.ExtendedGemImg\FileFormat.ExtendedGemImg.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.ExtendedGemImg\FileFormat.ExtendedGemImg.csproj" />
   </ItemGroup>
 
   <ItemGroup>

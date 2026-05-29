@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormat.EzArt\FileFormat.EzArt.csproj" />
+    <ProjectReference Include="..\..\FileFormats\FileFormat.EzArt\FileFormat.EzArt.csproj" />
   </ItemGroup>
 
   <ItemGroup>
