@@ -76,6 +76,10 @@ jobs:
         working-directory: PNGCrushCS
         run: dotnet pack Hawkynt.FileFormats.Images/Hawkynt.FileFormats.Images.csproj -c Release -o ./packages --nologo
 
+      - name: Pack Hawkynt.ImageTransformUI
+        working-directory: PNGCrushCS
+        run: dotnet pack Hawkynt.ImageTransformUI/Hawkynt.ImageTransformUI.csproj -c Release -o ./packages --nologo
+
       - name: Push to NuGet.org
         working-directory: PNGCrushCS
         env:
@@ -85,15 +89,17 @@ jobs:
             echo "NUGET_TOKEN secret is not set; skipping push (PR / fork build)."
             exit 0
           fi
-          dotnet nuget push ./packages/Hawkynt.FileFormats.Images.*.nupkg \
-            --api-key "$NUGET_TOKEN" \
-            --source https://api.nuget.org/v3/index.json \
-            --skip-duplicate
+          for pkg in ./packages/*.nupkg; do
+            dotnet nuget push "$pkg" \
+              --api-key "$NUGET_TOKEN" \
+              --source https://api.nuget.org/v3/index.json \
+              --skip-duplicate
+          done
 
       - name: Upload .nupkg as workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Hawkynt.FileFormats.Images-nupkg
+          name: nuget-packages
           path: PNGCrushCS/packages/*.nupkg
 
   publish:

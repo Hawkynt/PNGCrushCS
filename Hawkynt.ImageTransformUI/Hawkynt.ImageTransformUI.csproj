@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework />
+    <TargetFrameworks>net48;net8.0-windows;net10.0-windows</TargetFrameworks>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <UseWindowsForms>true</UseWindowsForms>
+
+    <!-- NuGet metadata -->
+    <PackageId>Hawkynt.ImageTransformUI</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>Hawkynt</Authors>
+    <Description>Shared WinForms UI for color reduction — quantizer/ditherer selection with live preview. Supports 40+ quantizers and 120+ ditherers from the FrameworkExtensions registry.</Description>
+    <PackageTags>winforms;ui;quantizer;ditherer;color-reduction;preview;image-processing</PackageTags>
+    <PackageLicenseExpression>LGPL-3.0-or-later</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/Hawkynt/PNGCrushCS</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FrameworkExtensions.Backports" Version="1.0.0.256" />
+    <PackageReference Include="FrameworkExtensions.System.Drawing" Version="1.0.0.132" />
+    <PackageReference Include="System.Drawing.Common" Version="9.0.4" />
+  </ItemGroup>
+
+</Project>

@@ -2187,6 +2187,8 @@
   <Project Path="Tests/Compression.Tests/Compression.Tests.csproj" />
   <Project Path="Crush.Core/Crush.Core.csproj" />
   <Project Path="Crush.Image/Crush.Image.csproj" />
+  <Project Path="Crush.Viewer/Crush.Viewer.csproj" />
+  <Project Path="Hawkynt.ImageTransformUI/Hawkynt.ImageTransformUI.csproj" />
   <Project Path="Crush.TestUtilities/Crush.TestUtilities.csproj" />
   <Project Path="FileFormat.Core/FileFormat.Core.csproj" />
   <Project Path="FileFormat.Core.Generators/FileFormat.Core.Generators.csproj" />
