@@ -15,8 +15,7 @@ public readonly record struct NokiaNlmFile : IImageFormatReader<NokiaNlmFile>, I
   static string IImageFormatMetadata<NokiaNlmFile>.PrimaryExtension => ".nlm";
   static string[] IImageFormatMetadata<NokiaNlmFile>.FileExtensions => [".nlm"];
   static NokiaNlmFile IImageFormatReader<NokiaNlmFile>.FromSpan(ReadOnlySpan<byte> data) => NokiaNlmReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<NokiaNlmFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static IntegerRange[] IImageFormatMetadata<NokiaNlmFile>.AllowedPaletteRanges => [2];
+  static VideoMode[] IImageFormatMetadata<NokiaNlmFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
   static byte[] IImageFormatWriter<NokiaNlmFile>.ToBytes(NokiaNlmFile file) => NokiaNlmWriter.ToBytes(file);
 
   public int Width => FixedWidth;

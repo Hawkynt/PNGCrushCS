@@ -18,9 +18,7 @@ public readonly record struct PublicPainterFile : IImageFormatReader<PublicPaint
   static string IImageFormatMetadata<PublicPainterFile>.PrimaryExtension => ".cmp";
   static string[] IImageFormatMetadata<PublicPainterFile>.FileExtensions => [".cmp"];
   static PublicPainterFile IImageFormatReader<PublicPainterFile>.FromSpan(ReadOnlySpan<byte> data) => PublicPainterReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<PublicPainterFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static IntegerRange[] IImageFormatMetadata<PublicPainterFile>.AllowedPaletteRanges => [2];
-  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<PublicPainterFile>.AllowedDimensions => [(ImageWidth, ImageHeight)];
+  static VideoMode[] IImageFormatMetadata<PublicPainterFile>.VideoModes => [new("Default", [(ImageWidth, ImageHeight)], [2])];
   static byte[] IImageFormatWriter<PublicPainterFile>.ToBytes(PublicPainterFile file) => PublicPainterWriter.ToBytes(file);
 
   /// <summary>Image width (always 640).</summary>

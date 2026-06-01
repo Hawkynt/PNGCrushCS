@@ -31,8 +31,7 @@ public readonly record struct MultiPalettePictureFile : IImageFormatReader<Multi
   static string IImageFormatMetadata<MultiPalettePictureFile>.PrimaryExtension => ".mpp";
   static string[] IImageFormatMetadata<MultiPalettePictureFile>.FileExtensions => [".mpp"];
   static MultiPalettePictureFile IImageFormatReader<MultiPalettePictureFile>.FromSpan(ReadOnlySpan<byte> data) => MultiPalettePictureReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<MultiPalettePictureFile>.Capabilities => FormatCapability.FixedResolution;
-  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<MultiPalettePictureFile>.AllowedDimensions => [(ImageWidth, ImageHeight)];
+  static VideoMode[] IImageFormatMetadata<MultiPalettePictureFile>.VideoModes => [new("Default", [(ImageWidth, ImageHeight)])];
   static byte[] IImageFormatWriter<MultiPalettePictureFile>.ToBytes(MultiPalettePictureFile file) => MultiPalettePictureWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>

@@ -11,8 +11,7 @@ public readonly record struct SffFile : IImageFormatReader<SffFile>, IImageToRaw
   static string IImageFormatMetadata<SffFile>.PrimaryExtension => ".sff";
   static string[] IImageFormatMetadata<SffFile>.FileExtensions => [".sff"];
   static SffFile IImageFormatReader<SffFile>.FromSpan(ReadOnlySpan<byte> data) => SffReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<SffFile>.Capabilities => FormatCapability.MonochromeOnly | FormatCapability.VariableResolution;
-  static IntegerRange[] IImageFormatMetadata<SffFile>.AllowedPaletteRanges => [2];
+  static VideoMode[] IImageFormatMetadata<SffFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
   static byte[] IImageFormatWriter<SffFile>.ToBytes(SffFile file) => SffWriter.ToBytes(file);
 
   /// <summary>File format version (typically 1).</summary>

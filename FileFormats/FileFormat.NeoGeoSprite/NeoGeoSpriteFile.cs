@@ -17,9 +17,7 @@ public readonly record struct NeoGeoSpriteFile : IImageFormatReader<NeoGeoSprite
   static string IImageFormatMetadata<NeoGeoSpriteFile>.PrimaryExtension => ".neo";
   static string[] IImageFormatMetadata<NeoGeoSpriteFile>.FileExtensions => [".neo", ".spr"];
   static NeoGeoSpriteFile IImageFormatReader<NeoGeoSpriteFile>.FromSpan(ReadOnlySpan<byte> data) => NeoGeoSpriteReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<NeoGeoSpriteFile>.Capabilities => FormatCapability.IndexedOnly | FormatCapability.FixedResolution;
-  static IntegerRange[] IImageFormatMetadata<NeoGeoSpriteFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
-  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<NeoGeoSpriteFile>.AllowedDimensions => [(TilesPerRow * TileSize, new IntegerRange(TileSize, 4096, TileSize))];
+  static VideoMode[] IImageFormatMetadata<NeoGeoSpriteFile>.VideoModes => [new("Default", [(TilesPerRow * TileSize, new IntegerRange(TileSize, 4096, TileSize))], [new IntegerRange(2, 16)])];
   static byte[] IImageFormatWriter<NeoGeoSpriteFile>.ToBytes(NeoGeoSpriteFile file) => NeoGeoSpriteWriter.ToBytes(file);
 
   public int Width { get; init; }

@@ -9,8 +9,9 @@ public readonly record struct GemImgFile : IImageFormatReader<GemImgFile>, IImag
   static string IImageFormatMetadata<GemImgFile>.PrimaryExtension => ".img";
   static string[] IImageFormatMetadata<GemImgFile>.FileExtensions => [".img"];
   static GemImgFile IImageFormatReader<GemImgFile>.FromSpan(ReadOnlySpan<byte> data) => GemImgReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<GemImgFile>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<GemImgFile>.AllowedPaletteRanges => [new IntegerRange(2, 256)];
+  static VideoMode[] IImageFormatMetadata<GemImgFile>.VideoModes => [
+    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 256)])
+  ];
   static byte[] IImageFormatWriter<GemImgFile>.ToBytes(GemImgFile file) => GemImgWriter.ToBytes(file);
   public int Version { get; init; }
   public int Width { get; init; }

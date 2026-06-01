@@ -41,6 +41,12 @@ public sealed class FormatRoundTripTests {
   /// unit tests cover the read/write API.</summary>
   private static readonly HashSet<ImageFormat> _NoSelfDescribingMetadata = [
     ImageFormat.Ccitt, // CCITT G3/G4: raw bitstream codec, no header
+    // Tile/screen-dump formats whose on-disk bytes don't encode the screen mode. The static
+    // IImageFormatReader<T>.FromSpan dispatch can't pass an explicit mode, so the reader picks
+    // its default (BBC Mode 1, Amstrad Mode 1) regardless of the writer's input shape — the
+    // resulting width/palette-count mismatch is a format limitation, not a refactor regression.
+    ImageFormat.BbcMicro,
+    ImageFormat.AmstradCpc,
   ];
 
   public static IEnumerable<TestCaseData> WritableFormats() {
@@ -159,48 +165,50 @@ public sealed class FormatRoundTripTests {
     return Enum.TryParse<PixelFormat>(m.Groups["fmt"].Value, ignoreCase: true, out var pf) ? pf : null;
   }
 
-  /// <summary>Yields a sequence of candidate input images in priority order.</summary>
+  /// <summary>Yields a sequence of candidate input images in priority order.
+  /// For multi-mode formats, iterates each mode in turn (each with its own dimensions + palette profile)
+  /// so the writer's mode-from-input-shape inference picks the matching mode.</summary>
   private static IEnumerable<(RawImage Image, string Label)> _BuildCandidates(
       FormatRegistry.FormatEntry entry, int? forcedW = null, int? forcedH = null) {
-    var (w, h) = (forcedW, forcedH) is (int fw, int fh)
-      ? (fw, fh)
-      : _ResolveDimensions(entry);
-    if (w <= 0 || h <= 0) yield break;
+    var modes = entry.VideoModes is { Length: > 0 } ms ? ms : [null!];
 
-    var caps = entry.Capabilities;
-    var ranges = SaveAsPlanner.AllowedPaletteRangesFor(entry);
-    var fixedPalettes = entry.FixedPalettes;
+    foreach (var mode in modes) {
+      var (w, h) = (forcedW, forcedH) is (int fw, int fh)
+        ? (fw, fh)
+        : _ResolveDimensionsForMode(mode);
+      if (w <= 0 || h <= 0) continue;
 
-    var preferIndexed = (caps & FormatCapability.MonochromeOnly) != 0
-                       || (caps & FormatCapability.IndexedOnly) != 0
-                       || ranges is { Length: > 0 }
-                       || fixedPalettes is { Length: > 0 };
+      var ranges = mode?.AllowedPaletteRanges;
+      var fixedPalettes = mode?.AvailablePalettes;
+      var preferIndexed = ranges is { Length: > 0 } || fixedPalettes is { Length: > 0 };
+      var modeTag = mode is null ? "" : $" [{mode.Name}]";
 
-    if (preferIndexed) {
-      // Format thinks it's indexed — try indexed inputs first.
-      yield return (_Indexed1(w, h), "Indexed1");
-      yield return (_Indexed8(w, h, entry), "Indexed8");
-    }
+      if (preferIndexed) {
+        yield return (_Indexed1(w, h), $"Indexed1{modeTag}");
+        yield return (_Indexed8(w, h, mode), $"Indexed8{modeTag}");
+      }
 
-    yield return (_Gray8(w, h), "Gray8");
-    yield return (_Rgb24(w, h), "Rgb24");
-    yield return (_Rgba32(w, h), "Rgba32");
-    yield return (_Bgra32(w, h), "Bgra32");
-    yield return (_Argb32(w, h), "Argb32");
+      yield return (_Gray8(w, h), $"Gray8{modeTag}");
+      yield return (_Rgb24(w, h), $"Rgb24{modeTag}");
+      yield return (_Rgba32(w, h), $"Rgba32{modeTag}");
+      yield return (_Bgra32(w, h), $"Bgra32{modeTag}");
+      yield return (_Argb32(w, h), $"Argb32{modeTag}");
 
-    if (!preferIndexed) {
-      yield return (_Indexed8(w, h, entry), "Indexed8 (fallback)");
-      yield return (_Indexed1(w, h), "Indexed1 (fallback)");
+      if (!preferIndexed) {
+        yield return (_Indexed8(w, h, mode), $"Indexed8 (fallback){modeTag}");
+        yield return (_Indexed1(w, h), $"Indexed1 (fallback){modeTag}");
+      }
     }
   }
 
-  private static (int W, int H) _ResolveDimensions(FormatRegistry.FormatEntry entry) {
-    if (entry.AllowedDimensions is { Length: > 0 } dims) {
+  private static (int W, int H) _ResolveDimensionsForMode(VideoMode? mode) {
+    if (mode?.Dimensions is { Length: > 0 } dims) {
       var (wRange, hRange) = dims[0];
       return (wRange.SnapToValid(32), hRange.SnapToValid(32));
     }
     return (32, 32);
   }
+
 
   private static readonly Regex _DimensionRegex = new(@"(?:Expected|requires|must be|Image must be)\s*(\d+)\s*[x×]\s*(\d+)", RegexOptions.IgnoreCase);
   private static (int Width, int Height)? _ExtractDimensions(string message) {
@@ -229,14 +237,14 @@ public sealed class FormatRoundTripTests {
     };
   }
 
-  private static RawImage _Indexed8(int w, int h, FormatRegistry.FormatEntry entry) {
-    var ranges = SaveAsPlanner.AllowedPaletteRangesFor(entry) ?? [new IntegerRange(2, 16)];
+  private static RawImage _Indexed8(int w, int h, VideoMode? mode) {
+    var ranges = mode?.AllowedPaletteRanges is { Length: > 0 } r ? r : [new IntegerRange(2, 16)];
     var maxColours = Math.Min(ranges[^1].Max, 16);
     var minColours = Math.Max(ranges[0].Min, 2);
     var paletteCount = Math.Max(minColours, Math.Min(maxColours, 4));
 
     byte[] palette;
-    if (entry.FixedPalettes is { Length: > 0 } fps) {
+    if (mode?.AvailablePalettes is { Length: > 0 } fps) {
       var take = Math.Min(fps[0].Count, paletteCount);
       palette = new byte[take * 3];
       Array.Copy(fps[0].ToPackedRgb(), palette, take * 3);

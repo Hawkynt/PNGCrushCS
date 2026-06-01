@@ -15,8 +15,7 @@ public readonly record struct OcsPicsFile : IImageFormatReader<OcsPicsFile>, IIm
   static string IImageFormatMetadata<OcsPicsFile>.PrimaryExtension => ".ocp";
   static string[] IImageFormatMetadata<OcsPicsFile>.FileExtensions => [".ocp", ".ocs"];
   static OcsPicsFile IImageFormatReader<OcsPicsFile>.FromSpan(ReadOnlySpan<byte> data) => OcsPicsReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<OcsPicsFile>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<OcsPicsFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
+  static VideoMode[] IImageFormatMetadata<OcsPicsFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 16)])];
   static byte[] IImageFormatWriter<OcsPicsFile>.ToBytes(OcsPicsFile file) => OcsPicsWriter.ToBytes(file);
 
   /// <summary>Image width (always 320).</summary>

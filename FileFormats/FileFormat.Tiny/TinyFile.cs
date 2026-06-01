@@ -9,7 +9,7 @@ public readonly record struct TinyFile : IImageFormatReader<TinyFile>, IImageToR
   static string IImageFormatMetadata<TinyFile>.PrimaryExtension => ".tny";
   static string[] IImageFormatMetadata<TinyFile>.FileExtensions => [".tny", ".tn1", ".tn2", ".tn3"];
   static TinyFile IImageFormatReader<TinyFile>.FromSpan(ReadOnlySpan<byte> data) => TinyReader.FromSpan(data);
-  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<TinyFile>.AllowedDimensions => [(320, 200), (640, 200), (640, 400)];
+  static VideoMode[] IImageFormatMetadata<TinyFile>.VideoModes => [new("Default", [(320, 200), (640, 200), (640, 400)])];
   static byte[] IImageFormatWriter<TinyFile>.ToBytes(TinyFile file) => TinyWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }

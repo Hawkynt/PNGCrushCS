@@ -18,9 +18,11 @@ public readonly record struct DaliSTFile : IImageFormatReader<DaliSTFile>, IImag
   static string IImageFormatMetadata<DaliSTFile>.PrimaryExtension => ".sd0";
   static string[] IImageFormatMetadata<DaliSTFile>.FileExtensions => [".sd0", ".sd1", ".sd2"];
   static DaliSTFile IImageFormatReader<DaliSTFile>.FromSpan(ReadOnlySpan<byte> data) => DaliSTReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<DaliSTFile>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<DaliSTFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
-  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<DaliSTFile>.AllowedDimensions => [(320, 200), (640, 200), (640, 400)];
+  static VideoMode[] IImageFormatMetadata<DaliSTFile>.VideoModes => [
+    new("Low resolution (320x200, 16 colours)", [(320, 200)], [new IntegerRange(2, 16)]),
+    new("Medium resolution (640x200, 4 colours)", [(640, 200)], [new IntegerRange(2, 4)]),
+    new("High resolution (640x400, monochrome)", [(640, 400)], [2])
+  ];
   static byte[] IImageFormatWriter<DaliSTFile>.ToBytes(DaliSTFile file) => DaliSTWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>

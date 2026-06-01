@@ -12,9 +12,7 @@ public readonly record struct ImagicPaintFile : IImageFormatReader<ImagicPaintFi
   static string IImageFormatMetadata<ImagicPaintFile>.PrimaryExtension => ".imp";
   static string[] IImageFormatMetadata<ImagicPaintFile>.FileExtensions => [".imp", ".igp"];
   static ImagicPaintFile IImageFormatReader<ImagicPaintFile>.FromSpan(ReadOnlySpan<byte> data) => ImagicPaintReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<ImagicPaintFile>.Capabilities => FormatCapability.IndexedOnly | FormatCapability.FixedResolution;
-  static IntegerRange[] IImageFormatMetadata<ImagicPaintFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
-  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<ImagicPaintFile>.AllowedDimensions => [(320, 200)];
+  static VideoMode[] IImageFormatMetadata<ImagicPaintFile>.VideoModes => [new("Default", [(320, 200)], [new IntegerRange(2, 16)])];
   static byte[] IImageFormatWriter<ImagicPaintFile>.ToBytes(ImagicPaintFile file) => ImagicPaintWriter.ToBytes(file);
 
   /// <summary>Image width (always 320).</summary>

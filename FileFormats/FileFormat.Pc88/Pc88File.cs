@@ -19,8 +19,7 @@ public sealed class Pc88File : IImageFormatReader<Pc88File>, IImageToRawImage<Pc
   public static string PrimaryExtension => ".pc8";
   public static string[] FileExtensions => [".pc8"];
   static Pc88File IImageFormatReader<Pc88File>.FromSpan(ReadOnlySpan<byte> data) => Pc88Reader.FromSpan(data);
-  public static FormatCapability Capabilities => FormatCapability.MonochromeOnly;
-  public static IntegerRange[] AllowedPaletteRanges => [2];
+  public static VideoMode[] VideoModes => [new("Default", [(ImageWidth, ImageHeight)], [2])];
   public static Pc88File FromFile(FileInfo file) => Pc88Reader.FromFile(file);
   public static Pc88File FromBytes(byte[] data) => Pc88Reader.FromBytes(data);
   public static Pc88File FromStream(Stream stream) => Pc88Reader.FromStream(stream);

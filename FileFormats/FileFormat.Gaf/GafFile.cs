@@ -10,8 +10,9 @@ public readonly record struct GafFile : IImageFormatReader<GafFile>, IImageToRaw
   static string IImageFormatMetadata<GafFile>.PrimaryExtension => ".gaf";
   static string[] IImageFormatMetadata<GafFile>.FileExtensions => [".gaf"];
   static GafFile IImageFormatReader<GafFile>.FromSpan(ReadOnlySpan<byte> data) => GafReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<GafFile>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<GafFile>.AllowedPaletteRanges => [new IntegerRange(2, 256)];
+  static VideoMode[] IImageFormatMetadata<GafFile>.VideoModes => [
+    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 256)])
+  ];
   static byte[] IImageFormatWriter<GafFile>.ToBytes(GafFile file) => GafWriter.ToBytes(file);
 
   /// <summary>Width of the first frame in pixels.</summary>

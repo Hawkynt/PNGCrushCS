@@ -13,7 +13,7 @@ public sealed class DcxFile : IImageFormatReader<DcxFile>, IImageToRawImage<DcxF
   static string IImageFormatMetadata<DcxFile>.PrimaryExtension => ".dcx";
   static string[] IImageFormatMetadata<DcxFile>.FileExtensions => [".dcx"];
   static DcxFile IImageFormatReader<DcxFile>.FromSpan(ReadOnlySpan<byte> data) => DcxReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<DcxFile>.Capabilities => FormatCapability.VariableResolution | FormatCapability.MultiImage;
+  static FormatCapability IImageFormatMetadata<DcxFile>.Capabilities => FormatCapability.MultiImage;
   static byte[] IImageFormatWriter<DcxFile>.ToBytes(DcxFile file) => DcxWriter.ToBytes(file);
   /// <summary>The PCX pages contained in this file.</summary>
   public IReadOnlyList<PcxFile> Pages { get; init; } = [];

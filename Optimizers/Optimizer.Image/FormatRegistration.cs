@@ -44,9 +44,7 @@ internal static partial class FormatRegistration {
       MagicSignatures: magic,
       MatchesSignature: matchSig,
       DetectionPriority: priority,
-      AllowedPaletteRanges: T.AllowedPaletteRanges,
-      FixedPalettes: T.FixedPalettes,
-      AllowedDimensions: T.AllowedDimensions
+      VideoModes: T.VideoModes
     );
 
     FormatRegistry.Register(entry);
@@ -72,9 +70,7 @@ internal static partial class FormatRegistration {
       MagicSignatures: magic,
       MatchesSignature: matchSig,
       DetectionPriority: priority,
-      AllowedPaletteRanges: T.AllowedPaletteRanges,
-      FixedPalettes: T.FixedPalettes,
-      AllowedDimensions: T.AllowedDimensions
+      VideoModes: T.VideoModes
     );
 
     FormatRegistry.Register(entry);
@@ -108,7 +104,7 @@ internal static partial class FormatRegistration {
       LoadRawImage: file => { try { return _LoadGifFrame(file, 0); } catch { return null; } },
       LoadRawImageFromBytes: bytes => null,
       ConvertFromRawImage: null,
-      Capabilities: FormatCapability.VariableResolution | FormatCapability.HasDedicatedOptimizer | FormatCapability.MultiImage,
+      Capabilities: FormatCapability.HasDedicatedOptimizer | FormatCapability.MultiImage,
       MagicSignatures: [new([0x47, 0x49, 0x46, 0x38], 0, 4)],
       MatchesSignature: null,
       DetectionPriority: 100,

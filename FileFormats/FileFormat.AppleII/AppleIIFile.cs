@@ -11,11 +11,8 @@ public sealed class AppleIIFile :
   static string IImageFormatMetadata<AppleIIFile>.PrimaryExtension => ".hgr";
   static string[] IImageFormatMetadata<AppleIIFile>.FileExtensions => [".hgr", ".dhgr"];
   static AppleIIFile IImageFormatReader<AppleIIFile>.FromSpan(ReadOnlySpan<byte> data) => AppleIIReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<AppleIIFile>.Capabilities => FormatCapability.MonochromeOnly | FormatCapability.FixedResolution;
-  static IntegerRange[] IImageFormatMetadata<AppleIIFile>.AllowedPaletteRanges => [2];
-  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<AppleIIFile>.AllowedDimensions => [
-    (280, 192),  // HGR
-    (560, 192),  // DHGR
+  static VideoMode[] IImageFormatMetadata<AppleIIFile>.VideoModes => [
+    new("HGR / DHGR", [(280, 192), (560, 192)], [2])
   ];
   static byte[] IImageFormatWriter<AppleIIFile>.ToBytes(AppleIIFile file) => AppleIIWriter.ToBytes(file);
   /// <summary>Width in pixels (280 for HGR, 560 for DHGR).</summary>

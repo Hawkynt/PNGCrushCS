@@ -13,8 +13,7 @@ public readonly record struct StTrueColorFile : IImageFormatReader<StTrueColorFi
   static string IImageFormatMetadata<StTrueColorFile>.PrimaryExtension => ".stc";
   static string[] IImageFormatMetadata<StTrueColorFile>.FileExtensions => [".stc"];
   static StTrueColorFile IImageFormatReader<StTrueColorFile>.FromSpan(ReadOnlySpan<byte> data) => StTrueColorReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<StTrueColorFile>.Capabilities => FormatCapability.FixedResolution;
-  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<StTrueColorFile>.AllowedDimensions => [(_WIDTH, _HEIGHT)];
+  static VideoMode[] IImageFormatMetadata<StTrueColorFile>.VideoModes => [new("Default", [(_WIDTH, _HEIGHT)])];
   static byte[] IImageFormatWriter<StTrueColorFile>.ToBytes(StTrueColorFile file) => StTrueColorWriter.ToBytes(file);
 
   /// <summary>Image width (always 320).</summary>

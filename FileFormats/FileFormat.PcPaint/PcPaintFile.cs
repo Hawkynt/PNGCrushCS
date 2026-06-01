@@ -18,8 +18,7 @@ public readonly record struct PcPaintFile : IImageFormatReader<PcPaintFile>, IIm
   static string IImageFormatMetadata<PcPaintFile>.PrimaryExtension => ".pic";
   static string[] IImageFormatMetadata<PcPaintFile>.FileExtensions => [".pic", ".clp"];
   static PcPaintFile IImageFormatReader<PcPaintFile>.FromSpan(ReadOnlySpan<byte> data) => PcPaintReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<PcPaintFile>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<PcPaintFile>.AllowedPaletteRanges => [new IntegerRange(2, 256)];
+  static VideoMode[] IImageFormatMetadata<PcPaintFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 256)])];
   static byte[] IImageFormatWriter<PcPaintFile>.ToBytes(PcPaintFile file) => PcPaintWriter.ToBytes(file);
 
   static bool? IImageFormatMetadata<PcPaintFile>.MatchesSignature(ReadOnlySpan<byte> header) {

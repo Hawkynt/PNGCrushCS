@@ -12,7 +12,6 @@ public readonly record struct PhotoChromeFile : IImageFormatReader<PhotoChromeFi
   static string IImageFormatMetadata<PhotoChromeFile>.PrimaryExtension => ".pcf";
   static string[] IImageFormatMetadata<PhotoChromeFile>.FileExtensions => [".pcf", ".phc"];
   static PhotoChromeFile IImageFormatReader<PhotoChromeFile>.FromSpan(ReadOnlySpan<byte> data) => PhotoChromeReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<PhotoChromeFile>.Capabilities => FormatCapability.FixedResolution;
   static byte[] IImageFormatWriter<PhotoChromeFile>.ToBytes(PhotoChromeFile file) => PhotoChromeWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>

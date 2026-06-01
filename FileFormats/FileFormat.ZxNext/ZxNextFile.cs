@@ -10,9 +10,7 @@ public sealed class ZxNextFile :
 
   static string IImageFormatMetadata<ZxNextFile>.PrimaryExtension => ".nxt";
   static string[] IImageFormatMetadata<ZxNextFile>.FileExtensions => [".nxt"];
-  static FormatCapability IImageFormatMetadata<ZxNextFile>.Capabilities => FormatCapability.IndexedOnly | FormatCapability.FixedResolution;
-  static IntegerRange[] IImageFormatMetadata<ZxNextFile>.AllowedPaletteRanges => [new IntegerRange(2, 256)];
-  static FixedPalette[] IImageFormatMetadata<ZxNextFile>.FixedPalettes => _FixedPalettes;
+  static VideoMode[] IImageFormatMetadata<ZxNextFile>.VideoModes => [new("Default", [(256, 192)], [new IntegerRange(2, 256)], _FixedPalettes)];
   private static readonly FixedPalette[] _FixedPalettes = [_BuildFixedPalette()];
   private static FixedPalette _BuildFixedPalette() {
     var colors = new uint[256];

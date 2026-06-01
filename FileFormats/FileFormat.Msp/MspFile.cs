@@ -11,8 +11,7 @@ public readonly record struct MspFile : IImageFormatReader<MspFile>, IImageToRaw
   static string IImageFormatMetadata<MspFile>.PrimaryExtension => ".msp";
   static string[] IImageFormatMetadata<MspFile>.FileExtensions => [".msp"];
   static MspFile IImageFormatReader<MspFile>.FromSpan(ReadOnlySpan<byte> data) => MspReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<MspFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static IntegerRange[] IImageFormatMetadata<MspFile>.AllowedPaletteRanges => [2];
+  static VideoMode[] IImageFormatMetadata<MspFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
   static byte[] IImageFormatWriter<MspFile>.ToBytes(MspFile file) => MspWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }

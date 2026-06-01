@@ -9,9 +9,7 @@ public readonly record struct MacPaintFile : IImageFormatReader<MacPaintFile>, I
   static string IImageFormatMetadata<MacPaintFile>.PrimaryExtension => ".mac";
   static string[] IImageFormatMetadata<MacPaintFile>.FileExtensions => [".mac", ".macp", ".pntg", ".pnt", ".paint", ".mpnt"];
   static MacPaintFile IImageFormatReader<MacPaintFile>.FromSpan(ReadOnlySpan<byte> data) => MacPaintReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<MacPaintFile>.Capabilities => FormatCapability.MonochromeOnly | FormatCapability.FixedResolution;
-  static IntegerRange[] IImageFormatMetadata<MacPaintFile>.AllowedPaletteRanges => [2];
-  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<MacPaintFile>.AllowedDimensions => [(576, 720)];
+  static VideoMode[] IImageFormatMetadata<MacPaintFile>.VideoModes => [new("Default", [(576, 720)], [2])];
   static byte[] IImageFormatWriter<MacPaintFile>.ToBytes(MacPaintFile file) => MacPaintWriter.ToBytes(file);
   /// <summary>Image width in pixels (always 576).</summary>
   public int Width { get; init; }

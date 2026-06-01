@@ -15,9 +15,7 @@ public readonly record struct Vic20File : IImageFormatReader<Vic20File>, IImageT
   static string IImageFormatMetadata<Vic20File>.PrimaryExtension => ".vic20";
   static string[] IImageFormatMetadata<Vic20File>.FileExtensions => [".vic20", ".prg"];
   static Vic20File IImageFormatReader<Vic20File>.FromSpan(ReadOnlySpan<byte> data) => Vic20Reader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<Vic20File>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<Vic20File>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
-  static FixedPalette[] IImageFormatMetadata<Vic20File>.FixedPalettes => _FixedPalettes;
+  static VideoMode[] IImageFormatMetadata<Vic20File>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 16)], _FixedPalettes)];
   private static readonly FixedPalette[] _FixedPalettes = [
     new FixedPalette("VIC-20",
       0x000000, 0xFFFFFF, 0xF00000, 0x00FFFF, 0x600060, 0x00A000, 0x0000F0, 0xD0D000,

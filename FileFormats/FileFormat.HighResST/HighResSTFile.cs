@@ -16,9 +16,7 @@ public readonly record struct HighResSTFile : IImageFormatReader<HighResSTFile>,
   static string IImageFormatMetadata<HighResSTFile>.PrimaryExtension => ".hst";
   static string[] IImageFormatMetadata<HighResSTFile>.FileExtensions => [".hst", ".hrs"];
   static HighResSTFile IImageFormatReader<HighResSTFile>.FromSpan(ReadOnlySpan<byte> data) => HighResSTReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<HighResSTFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static IntegerRange[] IImageFormatMetadata<HighResSTFile>.AllowedPaletteRanges => [2];
-  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<HighResSTFile>.AllowedDimensions => [(_WIDTH, _HEIGHT)];
+  static VideoMode[] IImageFormatMetadata<HighResSTFile>.VideoModes => [new("Default", [(_WIDTH, _HEIGHT)], [2])];
   static byte[] IImageFormatWriter<HighResSTFile>.ToBytes(HighResSTFile file) => HighResSTWriter.ToBytes(file);
 
   /// <summary>Image width (always 640).</summary>

@@ -11,7 +11,7 @@ public sealed class PdfFile : IImageFormatReader<PdfFile>, IImageToRawImage<PdfF
   static string IImageFormatMetadata<PdfFile>.PrimaryExtension => ".pdf";
   static string[] IImageFormatMetadata<PdfFile>.FileExtensions => [".pdf"];
   static PdfFile IImageFormatReader<PdfFile>.FromSpan(ReadOnlySpan<byte> data) => PdfReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<PdfFile>.Capabilities => FormatCapability.VariableResolution | FormatCapability.MultiImage;
+  static FormatCapability IImageFormatMetadata<PdfFile>.Capabilities => FormatCapability.MultiImage;
 
   static bool? IImageFormatMetadata<PdfFile>.MatchesSignature(ReadOnlySpan<byte> header) {
     if (header.Length < 4)

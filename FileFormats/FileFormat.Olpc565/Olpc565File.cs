@@ -10,7 +10,6 @@ public sealed class Olpc565File :
 
   static string IImageFormatMetadata<Olpc565File>.PrimaryExtension => ".565";
   static string[] IImageFormatMetadata<Olpc565File>.FileExtensions => [".565"];
-  static FormatCapability IImageFormatMetadata<Olpc565File>.Capabilities => FormatCapability.VariableResolution;
   static Olpc565File IImageFormatReader<Olpc565File>.FromSpan(ReadOnlySpan<byte> data) => Olpc565Reader.FromSpan(data);
   static byte[] IImageFormatWriter<Olpc565File>.ToBytes(Olpc565File file) => Olpc565Writer.ToBytes(file);
 

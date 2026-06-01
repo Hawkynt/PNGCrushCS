@@ -12,9 +12,7 @@ public readonly record struct ScreenBlasterFile : IImageFormatReader<ScreenBlast
   static string IImageFormatMetadata<ScreenBlasterFile>.PrimaryExtension => ".sbl";
   static string[] IImageFormatMetadata<ScreenBlasterFile>.FileExtensions => [".sbl"];
   static ScreenBlasterFile IImageFormatReader<ScreenBlasterFile>.FromSpan(ReadOnlySpan<byte> data) => ScreenBlasterReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<ScreenBlasterFile>.Capabilities => FormatCapability.IndexedOnly | FormatCapability.FixedResolution;
-  static IntegerRange[] IImageFormatMetadata<ScreenBlasterFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
-  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<ScreenBlasterFile>.AllowedDimensions => [(320, 200)];
+  static VideoMode[] IImageFormatMetadata<ScreenBlasterFile>.VideoModes => [new("Default", [(320, 200)], [new IntegerRange(2, 16)])];
   static byte[] IImageFormatWriter<ScreenBlasterFile>.ToBytes(ScreenBlasterFile file) => ScreenBlasterWriter.ToBytes(file);
 
   /// <summary>Image width (always 320).</summary>

@@ -9,9 +9,11 @@ public readonly record struct DegasFile : IImageFormatReader<DegasFile>, IImageT
   static string IImageFormatMetadata<DegasFile>.PrimaryExtension => ".pi1";
   static string[] IImageFormatMetadata<DegasFile>.FileExtensions => [".pi1", ".pi2", ".pi3", ".pc1", ".pc2", ".pc3"];
   static DegasFile IImageFormatReader<DegasFile>.FromSpan(ReadOnlySpan<byte> data) => DegasReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<DegasFile>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<DegasFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
-  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<DegasFile>.AllowedDimensions => [(320, 200), (640, 200), (640, 400)];
+  static VideoMode[] IImageFormatMetadata<DegasFile>.VideoModes => [
+    new("Low resolution (320x200, 16 colours)", [(320, 200)], [new IntegerRange(2, 16)]),
+    new("Medium resolution (640x200, 4 colours)", [(640, 200)], [new IntegerRange(2, 4)]),
+    new("High resolution (640x400, monochrome)", [(640, 400)], [2])
+  ];
   static byte[] IImageFormatWriter<DegasFile>.ToBytes(DegasFile file) => DegasWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }

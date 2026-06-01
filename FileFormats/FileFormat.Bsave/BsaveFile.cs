@@ -10,8 +10,9 @@ public readonly record struct BsaveFile : IImageFormatReader<BsaveFile>, IImageT
   static string IImageFormatMetadata<BsaveFile>.PrimaryExtension => ".bsv";
   static string[] IImageFormatMetadata<BsaveFile>.FileExtensions => [".bsv"];
   static BsaveFile IImageFormatReader<BsaveFile>.FromSpan(ReadOnlySpan<byte> data) => BsaveReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<BsaveFile>.Capabilities => FormatCapability.FixedResolution;
-  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<BsaveFile>.AllowedDimensions => [(320, 200)];
+  static VideoMode[] IImageFormatMetadata<BsaveFile>.VideoModes => [
+    new("Default", [(320, 200)])
+  ];
   static byte[] IImageFormatWriter<BsaveFile>.ToBytes(BsaveFile file) => BsaveWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }

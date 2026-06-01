@@ -12,9 +12,9 @@ public readonly record struct GfaPaintFile : IImageFormatReader<GfaPaintFile>, I
   static string IImageFormatMetadata<GfaPaintFile>.PrimaryExtension => ".gfp";
   static string[] IImageFormatMetadata<GfaPaintFile>.FileExtensions => [".gfp"];
   static GfaPaintFile IImageFormatReader<GfaPaintFile>.FromSpan(ReadOnlySpan<byte> data) => GfaPaintReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<GfaPaintFile>.Capabilities => FormatCapability.IndexedOnly | FormatCapability.FixedResolution;
-  static IntegerRange[] IImageFormatMetadata<GfaPaintFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
-  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<GfaPaintFile>.AllowedDimensions => [(320, 200)];
+  static VideoMode[] IImageFormatMetadata<GfaPaintFile>.VideoModes => [
+    new("Default", [(320, 200)], [new IntegerRange(2, 16)])
+  ];
   static byte[] IImageFormatWriter<GfaPaintFile>.ToBytes(GfaPaintFile file) => GfaPaintWriter.ToBytes(file);
 
   /// <summary>Image width (always 320).</summary>

@@ -30,8 +30,9 @@ public readonly record struct AtariPlayerFile : IImageFormatReader<AtariPlayerFi
   static string IImageFormatMetadata<AtariPlayerFile>.PrimaryExtension => ".pmg";
   static string[] IImageFormatMetadata<AtariPlayerFile>.FileExtensions => [".pmg", ".plm"];
   static AtariPlayerFile IImageFormatReader<AtariPlayerFile>.FromSpan(ReadOnlySpan<byte> data) => AtariPlayerReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<AtariPlayerFile>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<AtariPlayerFile>.AllowedPaletteRanges => [2];
+  static VideoMode[] IImageFormatMetadata<AtariPlayerFile>.VideoModes => [
+    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])
+  ];
   static byte[] IImageFormatWriter<AtariPlayerFile>.ToBytes(AtariPlayerFile file) => AtariPlayerWriter.ToBytes(file);
 
   /// <summary>Always 32.</summary>

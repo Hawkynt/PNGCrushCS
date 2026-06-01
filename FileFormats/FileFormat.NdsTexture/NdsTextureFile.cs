@@ -17,10 +17,8 @@ public readonly record struct NdsTextureFile : IImageFormatReader<NdsTextureFile
   static string IImageFormatMetadata<NdsTextureFile>.PrimaryExtension => ".nbfs";
   static string[] IImageFormatMetadata<NdsTextureFile>.FileExtensions => [".nbfs", ".nds"];
   static NdsTextureFile IImageFormatReader<NdsTextureFile>.FromSpan(ReadOnlySpan<byte> data) => NdsTextureReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<NdsTextureFile>.Capabilities => FormatCapability.IndexedOnly | FormatCapability.FixedResolution;
-  static IntegerRange[] IImageFormatMetadata<NdsTextureFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
-  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<NdsTextureFile>.AllowedDimensions =>
-    [(TilesPerRow * TileSize, new IntegerRange(TileSize, 8192, step: TileSize))];
+  static VideoMode[] IImageFormatMetadata<NdsTextureFile>.VideoModes =>
+    [new("Default", [(TilesPerRow * TileSize, new IntegerRange(TileSize, 8192, step: TileSize))], [new IntegerRange(2, 16)])];
   static byte[] IImageFormatWriter<NdsTextureFile>.ToBytes(NdsTextureFile file) => NdsTextureWriter.ToBytes(file);
 
   public int Width { get; init; }

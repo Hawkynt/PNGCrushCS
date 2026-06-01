@@ -122,6 +122,14 @@ internal sealed partial class MainForm : Form {
     view.DropDownItems.Add(new ToolStripMenuItem("Zoom &Out", _IconFromText("➖", menuColor), (_, _) => this._imagePanel.ZoomOut()) { ShortcutKeys = Keys.Control | Keys.OemMinus });
     view.DropDownItems.Add(new ToolStripMenuItem("&Fit to Window", _IconFromText("⬜", menuColor), (_, _) => this._imagePanel.FitToWindow()) { ShortcutKeys = Keys.Control | Keys.D0 });
     view.DropDownItems.Add(new ToolStripMenuItem("&Actual Size (1:1)", _IconFromText("1⃣", menuColor), (_, _) => this._imagePanel.ActualSize()) { ShortcutKeys = Keys.Control | Keys.D1 });
+    view.DropDownItems.Add(new ToolStripSeparator());
+    var filterToggle = new ToolStripMenuItem("Display &Filter (NTSC/PAL)", _IconFromText("📺", menuColor), (EventHandler?)null) {
+      Checked = true,
+      CheckOnClick = true,
+      ShortcutKeys = Keys.Control | Keys.F,
+    };
+    filterToggle.CheckedChanged += (_, _) => this._imagePanel.DisplayFilterEnabled = filterToggle.Checked;
+    view.DropDownItems.Add(filterToggle);
     menu.Items.Add(view);
 
     var transform = new ToolStripMenuItem("&Transform");
@@ -244,21 +252,36 @@ internal sealed partial class MainForm : Form {
       ? targets[selectedIndex]
       : FormatRegistry.GetEntry(FormatRegistry.DetectFromExtension(Path.GetExtension(dlg.FileName).ToLowerInvariant()));
 
-    if (targetEntry != null && SaveAsPlanner.NeedsResizePrompt(targetEntry)) {
-      // Check if the source is larger than some typical fixed-res format target
+    // VideoMode-aware path: when the target declares 2+ video modes, let the user pick one.
+    // Single-mode formats auto-pick. Formats that declare none (legacy/external) skip mode-specific steps.
+    VideoMode? pickedMode = null;
+    if (targetEntry?.VideoModes is { Length: > 0 } modes) {
+      if (modes.Length == 1) {
+        pickedMode = modes[0];
+      } else {
+        var pre = SaveAsPlanner.PickClosestMode(targetEntry, this._currentRawImage.Width, this._currentRawImage.Height)!;
+        var preIdx = Array.IndexOf(modes, pre);
+        using var modeDlg = new VideoModeDialog(modes, preIdx, this._currentRawImage.Width, this._currentRawImage.Height);
+        if (modeDlg.ShowDialog(this) != DialogResult.OK) return;
+        pickedMode = modeDlg.PickedMode;
+      }
+    }
+
+    // Resize prompt — only when the chosen mode doesn't cover the source dimensions.
+    if (pickedMode != null && SaveAsPlanner.NeedsResizePromptInMode(pickedMode, this._currentRawImage)) {
       var result = MessageBox.Show(
-        $"The target format does not support arbitrary resolutions.\nCurrent image: {this._currentRawImage.Width}x{this._currentRawImage.Height}\n\nWould you like to resize/crop first?\n\n" +
+        $"The target format requires specific dimensions.\nCurrent image: {this._currentRawImage.Width}x{this._currentRawImage.Height}\n\nWould you like to resize/crop first?\n\n" +
         "Yes = Open Resize dialog\nNo = Continue without resizing",
         "Fixed Resolution Format", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
       if (result == DialogResult.Yes) {
-        this._OpenResizeDialog(targetEntry.AllowedDimensions);
+        this._OpenResizeDialog(pickedMode.Dimensions);
         if (this._currentRawImage == null) return;
       }
     }
 
-    // Check if the target format imposes a palette-size constraint OR offers fixed palettes that the current image violates.
-    if (targetEntry != null) {
-      var plan = SaveAsPlanner.PlanReduction(targetEntry, this._currentRawImage);
+    // Colour reduction — derived entirely from the chosen mode's palette constraints.
+    if (pickedMode != null) {
+      var plan = SaveAsPlanner.PlanReductionInMode(pickedMode, this._currentRawImage);
       if (plan.NeedsReduction && !this._ApplyReduceColors(plan.AllowedRanges, plan.FixedPalettes))
         return;
     }
@@ -276,8 +299,9 @@ internal sealed partial class MainForm : Form {
           $"Saving failed: {convEx.Message}\n\nThis may be because the image has too many colors for the target format.\n\nWould you like to reduce colors and try again?",
           "Save As", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
         if (retry != DialogResult.Yes) return;
-        var retryRanges = SaveAsPlanner.AllowedPaletteRangesFor(targetEntry) ?? [new(2, 256)];
-        if (!this._ApplyReduceColors(retryRanges, targetEntry.FixedPalettes)) return;
+        var retryRanges = pickedMode?.AllowedPaletteRanges ?? [new(2, 256)];
+        var retryFixedPalettes = pickedMode?.AvailablePalettes;
+        if (!this._ApplyReduceColors(retryRanges, retryFixedPalettes)) return;
         File.WriteAllBytes(dlg.FileName, targetEntry.ConvertFromRawImage(this._currentRawImage));
         PaletteSidecar.TryWrite(dlg.FileName, this._currentRawImage);
       }
@@ -531,6 +555,14 @@ internal sealed partial class MainForm : Form {
       var oldBmp = this._currentBitmap;
       this._currentBitmap = bitmap;
       this._imagePanel.Image = this._currentBitmap;
+
+      // Apply VideoMode display hints (PixelAspectRatio + DisplayFilter) for the loaded format.
+      // When the format declares one or more modes, the first mode's hints drive the viewer's display.
+      var loadedEntry = FormatRegistry.GetEntry(format);
+      var loadedMode = loadedEntry?.VideoModes is { Length: > 0 } modes && rawImage != null
+        ? SaveAsPlanner.PickClosestMode(loadedEntry, rawImage.Width, rawImage.Height)
+        : null;
+      this._imagePanel.SetVideoModeHints(loadedMode?.PixelAspectRatio, loadedMode?.DisplayFilter ?? FileFormat.Core.DisplayFilter.None);
       oldBmp?.Dispose();
 
       this._imageCount = imageCount;

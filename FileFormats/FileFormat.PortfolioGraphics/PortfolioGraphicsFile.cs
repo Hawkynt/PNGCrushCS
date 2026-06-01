@@ -27,8 +27,7 @@ public readonly record struct PortfolioGraphicsFile : IImageFormatReader<Portfol
   static string IImageFormatMetadata<PortfolioGraphicsFile>.PrimaryExtension => ".pgf";
   static string[] IImageFormatMetadata<PortfolioGraphicsFile>.FileExtensions => [".pgf", ".pgc"];
   static PortfolioGraphicsFile IImageFormatReader<PortfolioGraphicsFile>.FromSpan(ReadOnlySpan<byte> data) => PortfolioGraphicsReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<PortfolioGraphicsFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static IntegerRange[] IImageFormatMetadata<PortfolioGraphicsFile>.AllowedPaletteRanges => [2];
+  static VideoMode[] IImageFormatMetadata<PortfolioGraphicsFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
   static byte[] IImageFormatWriter<PortfolioGraphicsFile>.ToBytes(PortfolioGraphicsFile file) => PortfolioGraphicsWriter.ToBytes(file);
 
   /// <summary>Always 240.</summary>

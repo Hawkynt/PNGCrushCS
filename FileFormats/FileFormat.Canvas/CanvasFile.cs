@@ -12,9 +12,9 @@ public readonly record struct CanvasFile : IImageFormatReader<CanvasFile>, IImag
   static string IImageFormatMetadata<CanvasFile>.PrimaryExtension => ".cvs";
   static string[] IImageFormatMetadata<CanvasFile>.FileExtensions => [".cvs"];
   static CanvasFile IImageFormatReader<CanvasFile>.FromSpan(ReadOnlySpan<byte> data) => CanvasReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<CanvasFile>.Capabilities => FormatCapability.IndexedOnly | FormatCapability.FixedResolution;
-  static IntegerRange[] IImageFormatMetadata<CanvasFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
-  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<CanvasFile>.AllowedDimensions => [(320, 200)];
+  static VideoMode[] IImageFormatMetadata<CanvasFile>.VideoModes => [
+    new("Default", [(320, 200)], [new IntegerRange(2, 16)])
+  ];
   static byte[] IImageFormatWriter<CanvasFile>.ToBytes(CanvasFile file) => CanvasWriter.ToBytes(file);
 
   /// <summary>Image width (always 320).</summary>

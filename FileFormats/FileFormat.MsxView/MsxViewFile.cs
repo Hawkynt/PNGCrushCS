@@ -9,8 +9,7 @@ public readonly record struct MsxViewFile : IImageFormatReader<MsxViewFile>, IIm
   static string IImageFormatMetadata<MsxViewFile>.PrimaryExtension => ".mvw";
   static string[] IImageFormatMetadata<MsxViewFile>.FileExtensions => [".mvw", ".msv"];
   static MsxViewFile IImageFormatReader<MsxViewFile>.FromSpan(ReadOnlySpan<byte> data) => MsxViewReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<MsxViewFile>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<MsxViewFile>.AllowedPaletteRanges => [new IntegerRange(2, 256)];
+  static VideoMode[] IImageFormatMetadata<MsxViewFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 256)])];
   static byte[] IImageFormatWriter<MsxViewFile>.ToBytes(MsxViewFile file) => MsxViewWriter.ToBytes(file);
 
   /// <summary>Fixed image width.</summary>

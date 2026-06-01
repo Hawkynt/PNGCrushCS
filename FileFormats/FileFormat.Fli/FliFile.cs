@@ -22,7 +22,7 @@ public sealed class FliFile : IImageFormatReader<FliFile>, IImageToRawImage<FliF
     return null;
   }
 
-  static FormatCapability IImageFormatMetadata<FliFile>.Capabilities => FormatCapability.VariableResolution | FormatCapability.MultiImage;
+  static FormatCapability IImageFormatMetadata<FliFile>.Capabilities => FormatCapability.MultiImage;
   static byte[] IImageFormatWriter<FliFile>.ToBytes(FliFile file) => FliWriter.ToBytes(file);
   public short Width { get; init; }
   public short Height { get; init; }

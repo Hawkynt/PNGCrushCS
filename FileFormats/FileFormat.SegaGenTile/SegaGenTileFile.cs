@@ -16,10 +16,8 @@ public readonly record struct SegaGenTileFile : IImageFormatReader<SegaGenTileFi
   static string IImageFormatMetadata<SegaGenTileFile>.PrimaryExtension => ".gen";
   static string[] IImageFormatMetadata<SegaGenTileFile>.FileExtensions => [".gen", ".sgd"];
   static SegaGenTileFile IImageFormatReader<SegaGenTileFile>.FromSpan(ReadOnlySpan<byte> data) => SegaGenTileReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<SegaGenTileFile>.Capabilities => FormatCapability.IndexedOnly | FormatCapability.FixedResolution;
-  static IntegerRange[] IImageFormatMetadata<SegaGenTileFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
-  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<SegaGenTileFile>.AllowedDimensions =>
-    [(FixedWidth, new IntegerRange(TileSize, 8192, step: TileSize))];
+  static VideoMode[] IImageFormatMetadata<SegaGenTileFile>.VideoModes =>
+    [new("Default", [(FixedWidth, new IntegerRange(TileSize, 8192, step: TileSize))], [new IntegerRange(2, 16)])];
   static byte[] IImageFormatWriter<SegaGenTileFile>.ToBytes(SegaGenTileFile file) => SegaGenTileWriter.ToBytes(file);
 
   public int Width { get; init; }

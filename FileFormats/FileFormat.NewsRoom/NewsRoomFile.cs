@@ -9,8 +9,7 @@ public readonly record struct NewsRoomFile : IImageFormatReader<NewsRoomFile>, I
   static string IImageFormatMetadata<NewsRoomFile>.PrimaryExtension => ".nsr";
   static string[] IImageFormatMetadata<NewsRoomFile>.FileExtensions => [".nsr"];
   static NewsRoomFile IImageFormatReader<NewsRoomFile>.FromSpan(ReadOnlySpan<byte> data) => NewsRoomReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<NewsRoomFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static IntegerRange[] IImageFormatMetadata<NewsRoomFile>.AllowedPaletteRanges => [2];
+  static VideoMode[] IImageFormatMetadata<NewsRoomFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
   static byte[] IImageFormatWriter<NewsRoomFile>.ToBytes(NewsRoomFile file) => NewsRoomWriter.ToBytes(file);
 
   /// <summary>Fixed image width: 320 pixels.</summary>

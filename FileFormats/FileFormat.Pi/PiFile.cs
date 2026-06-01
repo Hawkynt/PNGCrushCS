@@ -11,8 +11,7 @@ public readonly record struct PiFile : IImageFormatReader<PiFile>, IImageToRawIm
   static string IImageFormatMetadata<PiFile>.PrimaryExtension => ".pi";
   static string[] IImageFormatMetadata<PiFile>.FileExtensions => [".pi"];
   static PiFile IImageFormatReader<PiFile>.FromSpan(ReadOnlySpan<byte> data) => PiReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<PiFile>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<PiFile>.AllowedPaletteRanges => [new IntegerRange(2, 256)];
+  static VideoMode[] IImageFormatMetadata<PiFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 256)])];
   static byte[] IImageFormatWriter<PiFile>.ToBytes(PiFile file) => PiWriter.ToBytes(file);
 
   public int Width { get; init; }

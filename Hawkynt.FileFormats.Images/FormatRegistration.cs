@@ -40,9 +40,7 @@ internal static partial class FormatRegistration {
       LoadRawImage: file => { try { return FormatIO.Decode<T>(file); } catch { return null; } },
       LoadRawImageFromBytes: bytes => { try { return FormatIO.Decode<T>(bytes); } catch { return null; } },
       ConvertFromRawImage: null,
-      AllowedPaletteRanges: T.AllowedPaletteRanges,
-      FixedPalettes: T.FixedPalettes,
-      AllowedDimensions: T.AllowedDimensions);
+      VideoModes: T.VideoModes);
     FormatRegistry.Register(entry);
   }
 
@@ -64,9 +62,7 @@ internal static partial class FormatRegistration {
       LoadRawImage: file => { try { return FormatIO.Decode<T>(file); } catch { return null; } },
       LoadRawImageFromBytes: bytes => { try { return FormatIO.Decode<T>(bytes); } catch { return null; } },
       ConvertFromRawImage: raw => FormatIO.Encode<T>(raw),
-      AllowedPaletteRanges: T.AllowedPaletteRanges,
-      FixedPalettes: T.FixedPalettes,
-      AllowedDimensions: T.AllowedDimensions);
+      VideoModes: T.VideoModes);
     FormatRegistry.Register(entry);
   }
 

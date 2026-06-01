@@ -12,7 +12,6 @@ public readonly record struct SpeederFalconFile : IImageFormatReader<SpeederFalc
   static string IImageFormatMetadata<SpeederFalconFile>.PrimaryExtension => ".spf";
   static string[] IImageFormatMetadata<SpeederFalconFile>.FileExtensions => [".spf"];
   static SpeederFalconFile IImageFormatReader<SpeederFalconFile>.FromSpan(ReadOnlySpan<byte> data) => SpeederFalconReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<SpeederFalconFile>.Capabilities => FormatCapability.FixedResolution;
   static byte[] IImageFormatWriter<SpeederFalconFile>.ToBytes(SpeederFalconFile file) => SpeederFalconWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>

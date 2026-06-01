@@ -21,8 +21,9 @@ public readonly record struct FuntasticPaintFile : IImageFormatReader<FuntasticP
   static string IImageFormatMetadata<FuntasticPaintFile>.PrimaryExtension => ".fun8";
   static string[] IImageFormatMetadata<FuntasticPaintFile>.FileExtensions => [".fun8", ".ftp"];
   static FuntasticPaintFile IImageFormatReader<FuntasticPaintFile>.FromSpan(ReadOnlySpan<byte> data) => FuntasticPaintReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<FuntasticPaintFile>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<FuntasticPaintFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
+  static VideoMode[] IImageFormatMetadata<FuntasticPaintFile>.VideoModes => [
+    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 16)])
+  ];
   static byte[] IImageFormatWriter<FuntasticPaintFile>.ToBytes(FuntasticPaintFile file) => FuntasticPaintWriter.ToBytes(file);
 
   /// <summary>Always 80.</summary>

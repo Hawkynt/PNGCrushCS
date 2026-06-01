@@ -41,6 +41,53 @@ internal sealed class ImagePanel : Panel {
   /// <summary>Raised whenever the zoom factor changes.</summary>
   internal event Action<float>? ZoomChanged;
 
+  // ===== VideoMode-driven display hints =====
+  // PixelAspectRatio drives horizontal stretch (Atari ST 4:3 display from 320 logical px, NES 8:7, etc.).
+  // DisplayFilter applies a post-decode transform (NTSC composite, PAL, etc.) — cached in _filteredImage.
+  private FileFormat.Core.PixelAspectRatio? _pixelAspectRatio;
+  private FileFormat.Core.DisplayFilter _displayFilter = FileFormat.Core.DisplayFilter.None;
+  private bool _displayFilterEnabled = true;
+  private Bitmap? _filteredImage; // cached filter output; disposed when source changes
+  private float _xStretch = 1f;   // computed from PAR; applied to draw-rect width
+
+  /// <summary>Sets the format-declared display hints for the currently loaded image. Pass <c>null</c> to clear.</summary>
+  internal void SetVideoModeHints(FileFormat.Core.PixelAspectRatio? par, FileFormat.Core.DisplayFilter filter) {
+    this._pixelAspectRatio = par;
+    this._displayFilter = filter;
+    this._xStretch = par.HasValue ? (float)par.Value.Ratio : 1f;
+    this._InvalidateFilterCache();
+    this.Invalidate();
+  }
+
+  /// <summary>Toggles whether the <see cref="FileFormat.Core.DisplayFilter"/> is applied during paint.
+  /// When off, the raw pixel data is shown. Default: on.</summary>
+  [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+  internal bool DisplayFilterEnabled {
+    get => this._displayFilterEnabled;
+    set {
+      if (this._displayFilterEnabled == value) return;
+      this._displayFilterEnabled = value;
+      this._InvalidateFilterCache();
+      this.Invalidate();
+    }
+  }
+
+  private void _InvalidateFilterCache() {
+    if (this._filteredImage != null && !ReferenceEquals(this._filteredImage, this._image)) {
+      this._filteredImage.Dispose();
+    }
+    this._filteredImage = null;
+  }
+
+  private Bitmap? _CurrentDisplayBitmap() {
+    if (this._image == null) return null;
+    if (!this._displayFilterEnabled || this._displayFilter == FileFormat.Core.DisplayFilter.None)
+      return this._image;
+    if (this._filteredImage == null)
+      this._filteredImage = DisplayFilterPipeline.Apply(this._image, this._displayFilter);
+    return this._filteredImage;
+  }
+
   internal ImagePanel() {
     this.DoubleBuffered = true;
     this.SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
@@ -52,6 +99,7 @@ internal sealed class ImagePanel : Panel {
     get => this._image;
     set {
       this._image = value;
+      this._InvalidateFilterCache();
       this._autoFit = true;
       this.HideCropRect();
       this.FitToWindow();
@@ -362,14 +410,20 @@ internal sealed class ImagePanel : Panel {
       return;
 
     var g = e.Graphics;
-    var destRect = new RectangleF(this._offset.X, this._offset.Y, this._image.Width * this._zoom, this._image.Height * this._zoom);
+    var displayBitmap = this._CurrentDisplayBitmap()!;
+    // Apply PixelAspectRatio: stretch the destination's X axis.
+    var destRect = new RectangleF(
+      this._offset.X,
+      this._offset.Y,
+      this._image.Width * this._zoom * this._xStretch,
+      this._image.Height * this._zoom);
 
     _DrawCheckerboard(g, destRect);
 
     // Interpolation mode:
     // - NearestNeighbor at zoom >= 1.0 (pixel-perfect, no artifacts when viewing at actual size or zoomed in)
-    // - Bilinear at zoom < 1.0 (smooth downscale without ringing artifacts that bicubic introduces)
-    if (this._zoom >= 1f) {
+    // - Bilinear at zoom < 1.0 OR when PAR-stretching (avoids jaggy nearest-neighbor stretch)
+    if (this._zoom >= 1f && Math.Abs(this._xStretch - 1f) < 0.001f) {
       g.InterpolationMode = InterpolationMode.NearestNeighbor;
       g.PixelOffsetMode = PixelOffsetMode.Half;
     } else {
@@ -377,7 +431,7 @@ internal sealed class ImagePanel : Panel {
       g.PixelOffsetMode = PixelOffsetMode.HighQuality;
     }
 
-    g.DrawImage(this._image, destRect);
+    g.DrawImage(displayBitmap, destRect);
 
     // Draw crop overlay on top of the image
     if (this._cropVisible)

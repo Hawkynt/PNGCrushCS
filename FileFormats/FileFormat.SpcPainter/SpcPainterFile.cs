@@ -15,8 +15,7 @@ public readonly record struct SpcPainterFile : IImageFormatReader<SpcPainterFile
   static string IImageFormatMetadata<SpcPainterFile>.PrimaryExtension => ".spp";
   static string[] IImageFormatMetadata<SpcPainterFile>.FileExtensions => [".spp", ".spc2"];
   static SpcPainterFile IImageFormatReader<SpcPainterFile>.FromSpan(ReadOnlySpan<byte> data) => SpcPainterReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<SpcPainterFile>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<SpcPainterFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
+  static VideoMode[] IImageFormatMetadata<SpcPainterFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 16)])];
   static byte[] IImageFormatWriter<SpcPainterFile>.ToBytes(SpcPainterFile file) => SpcPainterWriter.ToBytes(file);
 
   /// <summary>Image width (always 320).</summary>

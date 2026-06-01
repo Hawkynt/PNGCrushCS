@@ -21,8 +21,9 @@ public readonly record struct AtariPictureFile : IImageFormatReader<AtariPicture
   static string IImageFormatMetadata<AtariPictureFile>.PrimaryExtension => ".apc";
   static string[] IImageFormatMetadata<AtariPictureFile>.FileExtensions => [".apc"];
   static AtariPictureFile IImageFormatReader<AtariPictureFile>.FromSpan(ReadOnlySpan<byte> data) => AtariPictureReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<AtariPictureFile>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<AtariPictureFile>.AllowedPaletteRanges => [2];
+  static VideoMode[] IImageFormatMetadata<AtariPictureFile>.VideoModes => [
+    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])
+  ];
   static byte[] IImageFormatWriter<AtariPictureFile>.ToBytes(AtariPictureFile file) => AtariPictureWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>

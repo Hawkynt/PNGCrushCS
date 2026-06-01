@@ -10,8 +10,7 @@ public readonly record struct XbmFile : IImageFormatReader<XbmFile>, IImageToRaw
   static string IImageFormatMetadata<XbmFile>.PrimaryExtension => ".xbm";
   static string[] IImageFormatMetadata<XbmFile>.FileExtensions => [".xbm"];
   static XbmFile IImageFormatReader<XbmFile>.FromSpan(ReadOnlySpan<byte> data) => XbmReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<XbmFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static IntegerRange[] IImageFormatMetadata<XbmFile>.AllowedPaletteRanges => [2];
+  static VideoMode[] IImageFormatMetadata<XbmFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
   static byte[] IImageFormatWriter<XbmFile>.ToBytes(XbmFile file) => XbmWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }

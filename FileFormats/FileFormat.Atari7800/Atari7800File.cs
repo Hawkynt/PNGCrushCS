@@ -19,8 +19,9 @@ public sealed class Atari7800File : IImageFormatReader<Atari7800File>, IImageToR
   public static string PrimaryExtension => ".a78";
   public static string[] FileExtensions => [".a78", ".a7800"];
   static Atari7800File IImageFormatReader<Atari7800File>.FromSpan(ReadOnlySpan<byte> data) => Atari7800Reader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<Atari7800File>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<Atari7800File>.AllowedPaletteRanges => [new IntegerRange(2, 4)];
+  static VideoMode[] IImageFormatMetadata<Atari7800File>.VideoModes => [
+    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 4)])
+  ];
   public static Atari7800File FromFile(FileInfo file) => Atari7800Reader.FromFile(file);
   public static Atari7800File FromBytes(byte[] data) => Atari7800Reader.FromBytes(data);
   public static Atari7800File FromStream(Stream stream) => Atari7800Reader.FromStream(stream);

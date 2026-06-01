@@ -9,8 +9,9 @@ public readonly record struct GammaFaxFile : IImageFormatReader<GammaFaxFile>, I
   static string IImageFormatMetadata<GammaFaxFile>.PrimaryExtension => ".gmf";
   static string[] IImageFormatMetadata<GammaFaxFile>.FileExtensions => [".gmf"];
   static GammaFaxFile IImageFormatReader<GammaFaxFile>.FromSpan(ReadOnlySpan<byte> data) => GammaFaxReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<GammaFaxFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static IntegerRange[] IImageFormatMetadata<GammaFaxFile>.AllowedPaletteRanges => [2];
+  static VideoMode[] IImageFormatMetadata<GammaFaxFile>.VideoModes => [
+    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])
+  ];
   static byte[] IImageFormatWriter<GammaFaxFile>.ToBytes(GammaFaxFile file) => GammaFaxWriter.ToBytes(file);
 
   /// <summary>Magic bytes: "GF" (0x47 0x46).</summary>

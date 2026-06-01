@@ -9,7 +9,6 @@ public readonly record struct CoCo3File : IImageFormatReader<CoCo3File>, IImageT
   static string IImageFormatMetadata<CoCo3File>.PrimaryExtension => ".cc3";
   static string[] IImageFormatMetadata<CoCo3File>.FileExtensions => [".cc3"];
   static CoCo3File IImageFormatReader<CoCo3File>.FromSpan(ReadOnlySpan<byte> data) => CoCo3Reader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<CoCo3File>.Capabilities => FormatCapability.IndexedOnly | FormatCapability.FixedResolution;
   static byte[] IImageFormatWriter<CoCo3File>.ToBytes(CoCo3File file) => CoCo3Writer.ToBytes(file);
 
   /// <summary>Expected file size in bytes (320 * 200 / 2).</summary>

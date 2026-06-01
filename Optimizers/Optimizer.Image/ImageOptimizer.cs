@@ -317,13 +317,25 @@ public sealed partial class ImageOptimizer {
     foreach (var entry in FormatRegistry.ConversionTargets) {
       if (entry.Format == originalFormat)
         continue;
-      if ((entry.Capabilities & FormatCapability.MonochromeOnly) != 0 && stats.UniqueColors > 2)
-        continue;
-      if ((entry.Capabilities & FormatCapability.IndexedOnly) != 0 && stats.UniqueColors > 256)
+      if (!_CanHoldColours(entry, stats.UniqueColors))
         continue;
 
       _AddRawImageConversion(candidates, entry.Format, entry.PrimaryExtension, entry.ConvertFromRawImage);
     }
+  }
+
+  /// <summary>True if at least one of the format's declared <see cref="VideoMode"/>s can hold an image
+  /// with the given unique-colour count. Modes without palette ranges are treated as full-colour (unrestricted).
+  /// Formats that declare no modes are considered unrestricted.</summary>
+  private static bool _CanHoldColours(FormatRegistry.FormatEntry entry, int uniqueColours) {
+    var modes = entry.VideoModes;
+    if (modes is null || modes.Length == 0) return true;
+    foreach (var mode in modes) {
+      if (mode.AllowedPaletteRanges is not { Length: > 0 } ranges) return true;
+      foreach (var range in ranges)
+        if (range.Max >= uniqueColours) return true;
+    }
+    return false;
   }
 
   private void _AddPngConversion(List<FormatCandidate> candidates, byte[] originalBytes) {

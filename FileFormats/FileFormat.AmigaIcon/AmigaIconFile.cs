@@ -10,7 +10,6 @@ public readonly record struct AmigaIconFile : IImageFormatReader<AmigaIconFile>,
   static string IImageFormatMetadata<AmigaIconFile>.PrimaryExtension => ".info";
   static string[] IImageFormatMetadata<AmigaIconFile>.FileExtensions => [".info"];
   static AmigaIconFile IImageFormatReader<AmigaIconFile>.FromSpan(ReadOnlySpan<byte> data) => AmigaIconReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<AmigaIconFile>.Capabilities => FormatCapability.IndexedOnly | FormatCapability.VariableResolution;
   static byte[] IImageFormatWriter<AmigaIconFile>.ToBytes(AmigaIconFile file) => AmigaIconWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>

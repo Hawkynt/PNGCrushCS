@@ -12,7 +12,6 @@ public readonly record struct IndyPaintFile : IImageFormatReader<IndyPaintFile>,
   static string IImageFormatMetadata<IndyPaintFile>.PrimaryExtension => ".ipn";
   static string[] IImageFormatMetadata<IndyPaintFile>.FileExtensions => [".ipn", ".idy"];
   static IndyPaintFile IImageFormatReader<IndyPaintFile>.FromSpan(ReadOnlySpan<byte> data) => IndyPaintReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<IndyPaintFile>.Capabilities => FormatCapability.FixedResolution;
   static byte[] IImageFormatWriter<IndyPaintFile>.ToBytes(IndyPaintFile file) => IndyPaintWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>

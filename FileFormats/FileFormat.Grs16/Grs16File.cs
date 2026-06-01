@@ -9,8 +9,9 @@ public readonly record struct Grs16File : IImageFormatReader<Grs16File>, IImageT
   static string IImageFormatMetadata<Grs16File>.PrimaryExtension => ".g16";
   static string[] IImageFormatMetadata<Grs16File>.FileExtensions => [".g16"];
   static Grs16File IImageFormatReader<Grs16File>.FromSpan(ReadOnlySpan<byte> data) => Grs16Reader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<Grs16File>.Capabilities => FormatCapability.FixedResolution;
-  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<Grs16File>.AllowedDimensions => [(DefaultWidth, new IntegerRange(1, 4096))];
+  static VideoMode[] IImageFormatMetadata<Grs16File>.VideoModes => [
+    new("Default", [(DefaultWidth, new IntegerRange(1, 4096))])
+  ];
   static byte[] IImageFormatWriter<Grs16File>.ToBytes(Grs16File file) => Grs16Writer.ToBytes(file);
 
   /// <summary>Minimum valid file size (at least one 16-bit pixel).</summary>

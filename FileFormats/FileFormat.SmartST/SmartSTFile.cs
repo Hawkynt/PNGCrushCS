@@ -12,7 +12,6 @@ public readonly record struct SmartSTFile : IImageFormatReader<SmartSTFile>, IIm
   static string IImageFormatMetadata<SmartSTFile>.PrimaryExtension => ".sst";
   static string[] IImageFormatMetadata<SmartSTFile>.FileExtensions => [".sst", ".sst2"];
   static SmartSTFile IImageFormatReader<SmartSTFile>.FromSpan(ReadOnlySpan<byte> data) => SmartSTReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<SmartSTFile>.Capabilities => FormatCapability.FixedResolution;
   static byte[] IImageFormatWriter<SmartSTFile>.ToBytes(SmartSTFile file) => SmartSTWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>

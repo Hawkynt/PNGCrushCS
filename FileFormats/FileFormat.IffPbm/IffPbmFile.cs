@@ -10,8 +10,7 @@ public readonly record struct IffPbmFile : IImageFormatReader<IffPbmFile>, IImag
   static string IImageFormatMetadata<IffPbmFile>.PrimaryExtension => ".lbm";
   static string[] IImageFormatMetadata<IffPbmFile>.FileExtensions => [".lbm", ".pbm"];
   static IffPbmFile IImageFormatReader<IffPbmFile>.FromSpan(ReadOnlySpan<byte> data) => IffPbmReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<IffPbmFile>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<IffPbmFile>.AllowedPaletteRanges => [new IntegerRange(2, 256)];
+  static VideoMode[] IImageFormatMetadata<IffPbmFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 256)])];
 
   static bool? IImageFormatMetadata<IffPbmFile>.MatchesSignature(ReadOnlySpan<byte> header)
     => header.Length >= 12 && header[0] == 0x46 && header[1] == 0x4F && header[2] == 0x52 && header[3] == 0x4D

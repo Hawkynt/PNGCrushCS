@@ -10,8 +10,7 @@ public readonly record struct WbmpFile : IImageFormatReader<WbmpFile>, IImageToR
   static string IImageFormatMetadata<WbmpFile>.PrimaryExtension => ".wbmp";
   static string[] IImageFormatMetadata<WbmpFile>.FileExtensions => [".wbmp"];
   static WbmpFile IImageFormatReader<WbmpFile>.FromSpan(ReadOnlySpan<byte> data) => WbmpReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<WbmpFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static IntegerRange[] IImageFormatMetadata<WbmpFile>.AllowedPaletteRanges => [2];
+  static VideoMode[] IImageFormatMetadata<WbmpFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
   static byte[] IImageFormatWriter<WbmpFile>.ToBytes(WbmpFile file) => WbmpWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }

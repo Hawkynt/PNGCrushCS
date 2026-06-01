@@ -12,8 +12,9 @@ public readonly record struct GigacadFile : IImageFormatReader<GigacadFile>, IIm
   static string IImageFormatMetadata<GigacadFile>.PrimaryExtension => ".gcd";
   static string[] IImageFormatMetadata<GigacadFile>.FileExtensions => [".gcd"];
   static GigacadFile IImageFormatReader<GigacadFile>.FromSpan(ReadOnlySpan<byte> data) => GigacadReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<GigacadFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static IntegerRange[] IImageFormatMetadata<GigacadFile>.AllowedPaletteRanges => [2];
+  static VideoMode[] IImageFormatMetadata<GigacadFile>.VideoModes => [
+    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])
+  ];
   static byte[] IImageFormatWriter<GigacadFile>.ToBytes(GigacadFile file) => GigacadWriter.ToBytes(file);
 
   /// <summary>Always 640.</summary>

@@ -10,8 +10,9 @@ public readonly record struct AwdFile : IImageFormatReader<AwdFile>, IImageToRaw
   static string IImageFormatMetadata<AwdFile>.PrimaryExtension => ".awd";
   static string[] IImageFormatMetadata<AwdFile>.FileExtensions => [".awd"];
   static AwdFile IImageFormatReader<AwdFile>.FromSpan(ReadOnlySpan<byte> data) => AwdReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<AwdFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static IntegerRange[] IImageFormatMetadata<AwdFile>.AllowedPaletteRanges => [2];
+  static VideoMode[] IImageFormatMetadata<AwdFile>.VideoModes => [
+    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])
+  ];
   static byte[] IImageFormatWriter<AwdFile>.ToBytes(AwdFile file) => AwdWriter.ToBytes(file);
 
   public int Width { get; init; }

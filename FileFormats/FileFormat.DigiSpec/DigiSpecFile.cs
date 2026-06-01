@@ -15,8 +15,9 @@ public readonly record struct DigiSpecFile : IImageFormatReader<DigiSpecFile>, I
   static string IImageFormatMetadata<DigiSpecFile>.PrimaryExtension => ".dgs";
   static string[] IImageFormatMetadata<DigiSpecFile>.FileExtensions => [".dgs"];
   static DigiSpecFile IImageFormatReader<DigiSpecFile>.FromSpan(ReadOnlySpan<byte> data) => DigiSpecReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<DigiSpecFile>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<DigiSpecFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
+  static VideoMode[] IImageFormatMetadata<DigiSpecFile>.VideoModes => [
+    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 16)])
+  ];
   static byte[] IImageFormatWriter<DigiSpecFile>.ToBytes(DigiSpecFile file) => DigiSpecWriter.ToBytes(file);
 
   /// <summary>Image width (always 320).</summary>

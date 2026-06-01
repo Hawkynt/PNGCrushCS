@@ -15,8 +15,7 @@ public readonly record struct MonoMagicFile : IImageFormatReader<MonoMagicFile>,
   static string IImageFormatMetadata<MonoMagicFile>.PrimaryExtension => ".mon";
   static string[] IImageFormatMetadata<MonoMagicFile>.FileExtensions => [".mon"];
   static MonoMagicFile IImageFormatReader<MonoMagicFile>.FromSpan(ReadOnlySpan<byte> data) => MonoMagicReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<MonoMagicFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static IntegerRange[] IImageFormatMetadata<MonoMagicFile>.AllowedPaletteRanges => [2];
+  static VideoMode[] IImageFormatMetadata<MonoMagicFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
   static byte[] IImageFormatWriter<MonoMagicFile>.ToBytes(MonoMagicFile file) => MonoMagicWriter.ToBytes(file);
 
   public int Width => FixedWidth;

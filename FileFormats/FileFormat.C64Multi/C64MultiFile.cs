@@ -9,8 +9,9 @@ public readonly record struct C64MultiFile : IImageFormatReader<C64MultiFile>, I
   static string IImageFormatMetadata<C64MultiFile>.PrimaryExtension => ".ocp";
   static string[] IImageFormatMetadata<C64MultiFile>.FileExtensions => [".ocp", ".hires", ".ami"];
   static C64MultiFile IImageFormatReader<C64MultiFile>.FromSpan(ReadOnlySpan<byte> data) => C64MultiReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<C64MultiFile>.Capabilities => FormatCapability.FixedResolution;
-  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<C64MultiFile>.AllowedDimensions => [(320, 200)];
+  static VideoMode[] IImageFormatMetadata<C64MultiFile>.VideoModes => [
+    new("Default", [(320, 200)])
+  ];
   static byte[] IImageFormatWriter<C64MultiFile>.ToBytes(C64MultiFile file) => C64MultiWriter.ToBytes(file);
 
   /// <summary>Size of the bitmap data section in bytes.</summary>

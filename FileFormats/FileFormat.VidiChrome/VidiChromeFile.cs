@@ -12,7 +12,6 @@ public readonly record struct VidiChromeFile : IImageFormatReader<VidiChromeFile
   static string IImageFormatMetadata<VidiChromeFile>.PrimaryExtension => ".vdc";
   static string[] IImageFormatMetadata<VidiChromeFile>.FileExtensions => [".vdc", ".vdc2"];
   static VidiChromeFile IImageFormatReader<VidiChromeFile>.FromSpan(ReadOnlySpan<byte> data) => VidiChromeReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<VidiChromeFile>.Capabilities => FormatCapability.FixedResolution;
   static byte[] IImageFormatWriter<VidiChromeFile>.ToBytes(VidiChromeFile file) => VidiChromeWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>

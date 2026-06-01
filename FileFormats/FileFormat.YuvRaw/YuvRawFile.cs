@@ -9,8 +9,7 @@ public readonly record struct YuvRawFile : IImageFormatReader<YuvRawFile>, IImag
   static string IImageFormatMetadata<YuvRawFile>.PrimaryExtension => ".yuv";
   static string[] IImageFormatMetadata<YuvRawFile>.FileExtensions => [".yuv"];
   static YuvRawFile IImageFormatReader<YuvRawFile>.FromSpan(ReadOnlySpan<byte> data) => YuvRawReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<YuvRawFile>.Capabilities => FormatCapability.FixedResolution;
-  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<YuvRawFile>.AllowedDimensions => [(176, 144)];
+  static VideoMode[] IImageFormatMetadata<YuvRawFile>.VideoModes => [new("Default", [(176, 144)])];
   static byte[] IImageFormatWriter<YuvRawFile>.ToBytes(YuvRawFile file) => YuvRawWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>

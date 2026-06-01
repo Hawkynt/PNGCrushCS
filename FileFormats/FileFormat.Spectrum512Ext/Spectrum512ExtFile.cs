@@ -19,8 +19,7 @@ public readonly record struct Spectrum512ExtFile : IImageFormatReader<Spectrum51
   static string IImageFormatMetadata<Spectrum512ExtFile>.PrimaryExtension => ".spx";
   static string[] IImageFormatMetadata<Spectrum512ExtFile>.FileExtensions => [".spx"];
   static Spectrum512ExtFile IImageFormatReader<Spectrum512ExtFile>.FromSpan(ReadOnlySpan<byte> data) => Spectrum512ExtReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<Spectrum512ExtFile>.Capabilities => FormatCapability.FixedResolution;
-  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<Spectrum512ExtFile>.AllowedDimensions => [(320, ScanlineCount)];
+  static VideoMode[] IImageFormatMetadata<Spectrum512ExtFile>.VideoModes => [new("Default", [(320, ScanlineCount)])];
   static byte[] IImageFormatWriter<Spectrum512ExtFile>.ToBytes(Spectrum512ExtFile file) => Spectrum512ExtWriter.ToBytes(file);
 
   /// <summary>Image width (always 320).</summary>

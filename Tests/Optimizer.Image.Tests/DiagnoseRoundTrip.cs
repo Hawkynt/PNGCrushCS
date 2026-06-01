@@ -27,7 +27,7 @@ public sealed class DiagnoseRoundTrip {
     var entry = FormatRegistry.GetEntry(format)!;
 
     var w = 32; var h = 32;
-    if (entry.AllowedDimensions is { Length: > 0 } dims) {
+    if (entry.VideoModes is { Length: > 0 } modes && modes[0].Dimensions is { Length: > 0 } dims) {
       w = dims[0].Width.SnapToValid(32);
       h = dims[0].Height.SnapToValid(32);
     }

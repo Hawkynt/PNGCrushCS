@@ -15,8 +15,9 @@ public readonly record struct C128File : IImageFormatReader<C128File>, IImageToR
   static string IImageFormatMetadata<C128File>.PrimaryExtension => ".c128";
   static string[] IImageFormatMetadata<C128File>.FileExtensions => [".c128", ".vdc"];
   static C128File IImageFormatReader<C128File>.FromSpan(ReadOnlySpan<byte> data) => C128Reader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<C128File>.Capabilities => FormatCapability.MonochromeOnly;
-  static IntegerRange[] IImageFormatMetadata<C128File>.AllowedPaletteRanges => [2];
+  static VideoMode[] IImageFormatMetadata<C128File>.VideoModes => [
+    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])
+  ];
   static byte[] IImageFormatWriter<C128File>.ToBytes(C128File file) => C128Writer.ToBytes(file);
 
   public int Width => FixedWidth;

@@ -15,8 +15,9 @@ public readonly record struct ElectronikaFile : IImageFormatReader<ElectronikaFi
   static string IImageFormatMetadata<ElectronikaFile>.PrimaryExtension => ".bk";
   static string[] IImageFormatMetadata<ElectronikaFile>.FileExtensions => [".bk", ".ekr"];
   static ElectronikaFile IImageFormatReader<ElectronikaFile>.FromSpan(ReadOnlySpan<byte> data) => ElectronikaReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<ElectronikaFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static IntegerRange[] IImageFormatMetadata<ElectronikaFile>.AllowedPaletteRanges => [2];
+  static VideoMode[] IImageFormatMetadata<ElectronikaFile>.VideoModes => [
+    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])
+  ];
   static byte[] IImageFormatWriter<ElectronikaFile>.ToBytes(ElectronikaFile file) => ElectronikaWriter.ToBytes(file);
 
   public int Width => FixedWidth;

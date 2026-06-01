@@ -30,8 +30,7 @@ public readonly record struct LogoSysFile : IImageFormatReader<LogoSysFile>, IIm
   static string IImageFormatMetadata<LogoSysFile>.PrimaryExtension => ".sys";
   static string[] IImageFormatMetadata<LogoSysFile>.FileExtensions => [".sys", ".logo"];
   static LogoSysFile IImageFormatReader<LogoSysFile>.FromSpan(ReadOnlySpan<byte> data) => LogoSysReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<LogoSysFile>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<LogoSysFile>.AllowedPaletteRanges => [256];
+  static VideoMode[] IImageFormatMetadata<LogoSysFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [256])];
   static byte[] IImageFormatWriter<LogoSysFile>.ToBytes(LogoSysFile file) => LogoSysWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>

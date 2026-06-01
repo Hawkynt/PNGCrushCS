@@ -54,6 +54,11 @@ public record class IntegerRange(int Min, int Max) {
 
   /// <summary>Implicit conversion from <see cref="int"/> — produces a single-point <see cref="FixedValue"/>.</summary>
   public static implicit operator IntegerRange(int value) => new FixedValue(value);
+
+  /// <summary>Unbounded positive range <c>[1, int.MaxValue]</c>. Used by formats with no dimension constraint
+  /// (PNG, BMP, etc.). UI consumers can treat <c>Max == int.MaxValue</c> as "no spinner cap" — clamp the spinner
+  /// to a usability ceiling like 16384 while still allowing text-entry of larger values.</summary>
+  public static readonly IntegerRange Any = new(1, int.MaxValue);
 }
 
 /// <summary>An <see cref="IntegerRange"/> with <c>Min == Max</c> — a single fixed value.</summary>

@@ -19,8 +19,9 @@ public readonly record struct ColoRixFile : IImageFormatReader<ColoRixFile>, IIm
   static string IImageFormatMetadata<ColoRixFile>.PrimaryExtension => ".rix";
   static string[] IImageFormatMetadata<ColoRixFile>.FileExtensions => [".rix", ".scx", ".sci"];
   static ColoRixFile IImageFormatReader<ColoRixFile>.FromSpan(ReadOnlySpan<byte> data) => ColoRixReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<ColoRixFile>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<ColoRixFile>.AllowedPaletteRanges => [256];
+  static VideoMode[] IImageFormatMetadata<ColoRixFile>.VideoModes => [
+    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [256])
+  ];
   static byte[] IImageFormatWriter<ColoRixFile>.ToBytes(ColoRixFile file) => ColoRixWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>

@@ -9,8 +9,9 @@ public readonly record struct GraphSaurusFile : IImageFormatReader<GraphSaurusFi
   static string IImageFormatMetadata<GraphSaurusFile>.PrimaryExtension => ".grs";
   static string[] IImageFormatMetadata<GraphSaurusFile>.FileExtensions => [".grs", ".sr5", ".sr7", ".sr8", ".srs"];
   static GraphSaurusFile IImageFormatReader<GraphSaurusFile>.FromSpan(ReadOnlySpan<byte> data) => GraphSaurusReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<GraphSaurusFile>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<GraphSaurusFile>.AllowedPaletteRanges => [new IntegerRange(2, 256)];
+  static VideoMode[] IImageFormatMetadata<GraphSaurusFile>.VideoModes => [
+    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 256)])
+  ];
   static byte[] IImageFormatWriter<GraphSaurusFile>.ToBytes(GraphSaurusFile file) => GraphSaurusWriter.ToBytes(file);
 
   /// <summary>Fixed image width.</summary>

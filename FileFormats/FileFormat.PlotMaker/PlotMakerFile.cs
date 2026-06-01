@@ -9,8 +9,7 @@ public readonly record struct PlotMakerFile : IImageFormatReader<PlotMakerFile>,
   static string IImageFormatMetadata<PlotMakerFile>.PrimaryExtension => ".plt";
   static string[] IImageFormatMetadata<PlotMakerFile>.FileExtensions => [".plt", ".plm2"];
   static PlotMakerFile IImageFormatReader<PlotMakerFile>.FromSpan(ReadOnlySpan<byte> data) => PlotMakerReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<PlotMakerFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static IntegerRange[] IImageFormatMetadata<PlotMakerFile>.AllowedPaletteRanges => [2];
+  static VideoMode[] IImageFormatMetadata<PlotMakerFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
   static byte[] IImageFormatWriter<PlotMakerFile>.ToBytes(PlotMakerFile file) => PlotMakerWriter.ToBytes(file);
 
   /// <summary>Size of the header in bytes (2 width + 2 height).</summary>

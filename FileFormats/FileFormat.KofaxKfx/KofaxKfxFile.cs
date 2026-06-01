@@ -13,8 +13,7 @@ public readonly record struct KofaxKfxFile : IImageFormatReader<KofaxKfxFile>, I
   static string IImageFormatMetadata<KofaxKfxFile>.PrimaryExtension => ".kfx";
   static string[] IImageFormatMetadata<KofaxKfxFile>.FileExtensions => [".kfx"];
   static KofaxKfxFile IImageFormatReader<KofaxKfxFile>.FromSpan(ReadOnlySpan<byte> data) => KofaxKfxReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<KofaxKfxFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static IntegerRange[] IImageFormatMetadata<KofaxKfxFile>.AllowedPaletteRanges => [2];
+  static VideoMode[] IImageFormatMetadata<KofaxKfxFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
   static byte[] IImageFormatWriter<KofaxKfxFile>.ToBytes(KofaxKfxFile file) => KofaxKfxWriter.ToBytes(file);
 
   public int Width { get; init; }

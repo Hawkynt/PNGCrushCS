@@ -19,8 +19,7 @@ public sealed class ThomsonFile : IImageFormatReader<ThomsonFile>, IImageToRawIm
   public static string PrimaryExtension => ".map";
   public static string[] FileExtensions => [".map"];
   static ThomsonFile IImageFormatReader<ThomsonFile>.FromSpan(ReadOnlySpan<byte> data) => ThomsonReader.FromSpan(data);
-  public static FormatCapability Capabilities => FormatCapability.MonochromeOnly;
-  public static IntegerRange[] AllowedPaletteRanges => [2];
+  public static VideoMode[] VideoModes => [new("Default", [(ImageWidth, ImageHeight)], [2])];
   public static ThomsonFile FromFile(FileInfo file) => ThomsonReader.FromFile(file);
   public static ThomsonFile FromBytes(byte[] data) => ThomsonReader.FromBytes(data);
   public static ThomsonFile FromStream(Stream stream) => ThomsonReader.FromStream(stream);

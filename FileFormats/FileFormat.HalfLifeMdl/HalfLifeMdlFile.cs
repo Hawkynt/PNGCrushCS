@@ -11,8 +11,7 @@ public readonly record struct HalfLifeMdlFile : IImageFormatReader<HalfLifeMdlFi
   static string IImageFormatMetadata<HalfLifeMdlFile>.PrimaryExtension => ".mdltex";
   static string[] IImageFormatMetadata<HalfLifeMdlFile>.FileExtensions => [".mdltex"];
   static HalfLifeMdlFile IImageFormatReader<HalfLifeMdlFile>.FromSpan(ReadOnlySpan<byte> data) => HalfLifeMdlReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<HalfLifeMdlFile>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<HalfLifeMdlFile>.AllowedPaletteRanges => [new IntegerRange(2, 256)];
+  static VideoMode[] IImageFormatMetadata<HalfLifeMdlFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 256)])];
   static byte[] IImageFormatWriter<HalfLifeMdlFile>.ToBytes(HalfLifeMdlFile file) => HalfLifeMdlWriter.ToBytes(file);
 
   public int Width { get; init; }

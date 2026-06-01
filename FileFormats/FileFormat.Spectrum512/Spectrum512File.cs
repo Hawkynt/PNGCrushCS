@@ -10,8 +10,7 @@ public readonly record struct Spectrum512File : IImageFormatReader<Spectrum512Fi
   static string IImageFormatMetadata<Spectrum512File>.PrimaryExtension => ".spu";
   static string[] IImageFormatMetadata<Spectrum512File>.FileExtensions => [".spu"];
   static Spectrum512File IImageFormatReader<Spectrum512File>.FromSpan(ReadOnlySpan<byte> data) => Spectrum512Reader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<Spectrum512File>.Capabilities => FormatCapability.FixedResolution;
-  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<Spectrum512File>.AllowedDimensions => [(320, 199)];
+  static VideoMode[] IImageFormatMetadata<Spectrum512File>.VideoModes => [new("Default", [(320, 199)])];
   static byte[] IImageFormatWriter<Spectrum512File>.ToBytes(Spectrum512File file) => Spectrum512Writer.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }

@@ -9,8 +9,11 @@ public readonly record struct CrackArtFile : IImageFormatReader<CrackArtFile>, I
   static string IImageFormatMetadata<CrackArtFile>.PrimaryExtension => ".ca1";
   static string[] IImageFormatMetadata<CrackArtFile>.FileExtensions => [".ca1", ".ca2", ".ca3"];
   static CrackArtFile IImageFormatReader<CrackArtFile>.FromSpan(ReadOnlySpan<byte> data) => CrackArtReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<CrackArtFile>.Capabilities => FormatCapability.IndexedOnly;
-  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<CrackArtFile>.AllowedDimensions => [(320, 200), (640, 200), (640, 400)];
+  static VideoMode[] IImageFormatMetadata<CrackArtFile>.VideoModes => [
+    new("Low resolution (320x200, 16 colours)", [(320, 200)], [16]),
+    new("Medium resolution (640x200, 4 colours)", [(640, 200)], [4]),
+    new("High resolution (640x400, monochrome)", [(640, 400)], [2])
+  ];
   static byte[] IImageFormatWriter<CrackArtFile>.ToBytes(CrackArtFile file) => CrackArtWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }

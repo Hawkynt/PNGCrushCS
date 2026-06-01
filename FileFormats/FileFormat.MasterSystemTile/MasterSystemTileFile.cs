@@ -42,10 +42,8 @@ public readonly record struct MasterSystemTileFile : IImageFormatReader<MasterSy
   static string IImageFormatMetadata<MasterSystemTileFile>.PrimaryExtension => ".sms";
   static string[] IImageFormatMetadata<MasterSystemTileFile>.FileExtensions => [".sms", ".gg"];
   static MasterSystemTileFile IImageFormatReader<MasterSystemTileFile>.FromSpan(ReadOnlySpan<byte> data) => MasterSystemTileReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<MasterSystemTileFile>.Capabilities => FormatCapability.IndexedOnly | FormatCapability.FixedResolution;
-  static IntegerRange[] IImageFormatMetadata<MasterSystemTileFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
-  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<MasterSystemTileFile>.AllowedDimensions =>
-    [(FixedWidth, new IntegerRange(TileSize, 8192, step: TileSize))];
+  static VideoMode[] IImageFormatMetadata<MasterSystemTileFile>.VideoModes =>
+    [new("Default", [(FixedWidth, new IntegerRange(TileSize, 8192, step: TileSize))], [new IntegerRange(2, 16)])];
   static byte[] IImageFormatWriter<MasterSystemTileFile>.ToBytes(MasterSystemTileFile file) => MasterSystemTileWriter.ToBytes(file);
 
   /// <summary>Image width in pixels (always 128).</summary>

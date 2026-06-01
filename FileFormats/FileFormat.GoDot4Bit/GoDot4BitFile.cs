@@ -9,8 +9,9 @@ public readonly record struct GoDot4BitFile : IImageFormatReader<GoDot4BitFile>,
   static string IImageFormatMetadata<GoDot4BitFile>.PrimaryExtension => ".4bt";
   static string[] IImageFormatMetadata<GoDot4BitFile>.FileExtensions => [".4bt", ".4bit"];
   static GoDot4BitFile IImageFormatReader<GoDot4BitFile>.FromSpan(ReadOnlySpan<byte> data) => GoDot4BitReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<GoDot4BitFile>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<GoDot4BitFile>.AllowedPaletteRanges => [16];
+  static VideoMode[] IImageFormatMetadata<GoDot4BitFile>.VideoModes => [
+    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [16])
+  ];
   static byte[] IImageFormatWriter<GoDot4BitFile>.ToBytes(GoDot4BitFile file) => GoDot4BitWriter.ToBytes(file);
 
   /// <summary>The fixed width of a GoDot 4-bit image in pixels.</summary>

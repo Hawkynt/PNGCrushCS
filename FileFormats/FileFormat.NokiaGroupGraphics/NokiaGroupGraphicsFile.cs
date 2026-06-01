@@ -9,8 +9,7 @@ public readonly record struct NokiaGroupGraphicsFile : IImageFormatReader<NokiaG
   static string IImageFormatMetadata<NokiaGroupGraphicsFile>.PrimaryExtension => ".ngg";
   static string[] IImageFormatMetadata<NokiaGroupGraphicsFile>.FileExtensions => [".ngg"];
   static NokiaGroupGraphicsFile IImageFormatReader<NokiaGroupGraphicsFile>.FromSpan(ReadOnlySpan<byte> data) => NokiaGroupGraphicsReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<NokiaGroupGraphicsFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static IntegerRange[] IImageFormatMetadata<NokiaGroupGraphicsFile>.AllowedPaletteRanges => [2];
+  static VideoMode[] IImageFormatMetadata<NokiaGroupGraphicsFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
   static byte[] IImageFormatWriter<NokiaGroupGraphicsFile>.ToBytes(NokiaGroupGraphicsFile file) => NokiaGroupGraphicsWriter.ToBytes(file);
 
   /// <summary>Magic bytes: "NGG" (0x4E 0x47 0x47).</summary>

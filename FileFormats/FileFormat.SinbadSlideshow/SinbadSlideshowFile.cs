@@ -27,9 +27,7 @@ public readonly record struct SinbadSlideshowFile : IImageFormatReader<SinbadSli
   static string IImageFormatMetadata<SinbadSlideshowFile>.PrimaryExtension => ".ssb";
   static string[] IImageFormatMetadata<SinbadSlideshowFile>.FileExtensions => [".ssb"];
   static SinbadSlideshowFile IImageFormatReader<SinbadSlideshowFile>.FromSpan(ReadOnlySpan<byte> data) => SinbadSlideshowReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<SinbadSlideshowFile>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<SinbadSlideshowFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
-  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<SinbadSlideshowFile>.AllowedDimensions => [(320, 200)];
+  static VideoMode[] IImageFormatMetadata<SinbadSlideshowFile>.VideoModes => [new("Default", [(320, 200)], [new IntegerRange(2, 16)])];
   static byte[] IImageFormatWriter<SinbadSlideshowFile>.ToBytes(SinbadSlideshowFile file) => SinbadSlideshowWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>

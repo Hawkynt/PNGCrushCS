@@ -22,8 +22,9 @@ public readonly record struct AutodeskCelFile : IImageFormatReader<AutodeskCelFi
   static string IImageFormatMetadata<AutodeskCelFile>.PrimaryExtension => ".cel";
   static string[] IImageFormatMetadata<AutodeskCelFile>.FileExtensions => [".cel"];
   static AutodeskCelFile IImageFormatReader<AutodeskCelFile>.FromSpan(ReadOnlySpan<byte> data) => AutodeskCelReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<AutodeskCelFile>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<AutodeskCelFile>.AllowedPaletteRanges => [new IntegerRange(2, 256)];
+  static VideoMode[] IImageFormatMetadata<AutodeskCelFile>.VideoModes => [
+    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 256)])
+  ];
   static byte[] IImageFormatWriter<AutodeskCelFile>.ToBytes(AutodeskCelFile file) => AutodeskCelWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>

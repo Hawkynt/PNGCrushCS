@@ -12,7 +12,6 @@ public readonly record struct GodPaintFile : IImageFormatReader<GodPaintFile>, I
   static string IImageFormatMetadata<GodPaintFile>.PrimaryExtension => ".gpn";
   static string[] IImageFormatMetadata<GodPaintFile>.FileExtensions => [".gpn", ".gdp"];
   static GodPaintFile IImageFormatReader<GodPaintFile>.FromSpan(ReadOnlySpan<byte> data) => GodPaintReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<GodPaintFile>.Capabilities => FormatCapability.FixedResolution;
   static byte[] IImageFormatWriter<GodPaintFile>.ToBytes(GodPaintFile file) => GodPaintWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>

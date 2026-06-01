@@ -19,8 +19,9 @@ public sealed class Enterprise128File : IImageFormatReader<Enterprise128File>, I
   public static string PrimaryExtension => ".ep";
   public static string[] FileExtensions => [".ep", ".elan"];
   static Enterprise128File IImageFormatReader<Enterprise128File>.FromSpan(ReadOnlySpan<byte> data) => Enterprise128Reader.FromSpan(data);
-  public static FormatCapability Capabilities => FormatCapability.MonochromeOnly;
-  public static IntegerRange[] AllowedPaletteRanges => [2];
+  public static VideoMode[] VideoModes => [
+    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])
+  ];
   public static Enterprise128File FromFile(FileInfo file) => Enterprise128Reader.FromFile(file);
   public static Enterprise128File FromBytes(byte[] data) => Enterprise128Reader.FromBytes(data);
   public static Enterprise128File FromStream(Stream stream) => Enterprise128Reader.FromStream(stream);

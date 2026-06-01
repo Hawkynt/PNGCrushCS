@@ -21,12 +21,12 @@ public readonly record struct AtariGraphics9File : IImageFormatReader<AtariGraph
   static string IImageFormatMetadata<AtariGraphics9File>.PrimaryExtension => ".gr9";
   static string[] IImageFormatMetadata<AtariGraphics9File>.FileExtensions => [".gr9", ".g9"];
   static AtariGraphics9File IImageFormatReader<AtariGraphics9File>.FromSpan(ReadOnlySpan<byte> data) => AtariGraphics9Reader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<AtariGraphics9File>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<AtariGraphics9File>.AllowedPaletteRanges => [16];
-  static FixedPalette[] IImageFormatMetadata<AtariGraphics9File>.FixedPalettes => [
-    new FixedPalette("GTIA GR.9 16-step grayscale",
-      0x000000, 0x111111, 0x222222, 0x333333, 0x444444, 0x555555, 0x666666, 0x777777,
-      0x888888, 0x999999, 0xAAAAAA, 0xBBBBBB, 0xCCCCCC, 0xDDDDDD, 0xEEEEEE, 0xFFFFFF),
+  static VideoMode[] IImageFormatMetadata<AtariGraphics9File>.VideoModes => [
+    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [16], [
+      new FixedPalette("GTIA GR.9 16-step grayscale",
+        0x000000, 0x111111, 0x222222, 0x333333, 0x444444, 0x555555, 0x666666, 0x777777,
+        0x888888, 0x999999, 0xAAAAAA, 0xBBBBBB, 0xCCCCCC, 0xDDDDDD, 0xEEEEEE, 0xFFFFFF),
+    ])
   ];
   static byte[] IImageFormatWriter<AtariGraphics9File>.ToBytes(AtariGraphics9File file) => AtariGraphics9Writer.ToBytes(file);
 

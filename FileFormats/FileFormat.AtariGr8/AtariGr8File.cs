@@ -21,8 +21,9 @@ public readonly record struct AtariGr8File : IImageFormatReader<AtariGr8File>, I
   static string IImageFormatMetadata<AtariGr8File>.PrimaryExtension => ".gr8";
   static string[] IImageFormatMetadata<AtariGr8File>.FileExtensions => [".gr8"];
   static AtariGr8File IImageFormatReader<AtariGr8File>.FromSpan(ReadOnlySpan<byte> data) => AtariGr8Reader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<AtariGr8File>.Capabilities => FormatCapability.MonochromeOnly;
-  static IntegerRange[] IImageFormatMetadata<AtariGr8File>.AllowedPaletteRanges => [2];
+  static VideoMode[] IImageFormatMetadata<AtariGr8File>.VideoModes => [
+    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])
+  ];
   static byte[] IImageFormatWriter<AtariGr8File>.ToBytes(AtariGr8File file) => AtariGr8Writer.ToBytes(file);
 
   /// <summary>Always 320.</summary>

@@ -18,9 +18,9 @@ public readonly record struct AtariAgpFile : IImageFormatReader<AtariAgpFile>, I
   static string IImageFormatMetadata<AtariAgpFile>.PrimaryExtension => ".agp";
   static string[] IImageFormatMetadata<AtariAgpFile>.FileExtensions => [".agp"];
   static AtariAgpFile IImageFormatReader<AtariAgpFile>.FromSpan(ReadOnlySpan<byte> data) => AtariAgpReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<AtariAgpFile>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<AtariAgpFile>.AllowedPaletteRanges => [new IntegerRange(2, 4)];
-  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<AtariAgpFile>.AllowedDimensions => [(320, 192), (160, 96)];
+  static VideoMode[] IImageFormatMetadata<AtariAgpFile>.VideoModes => [
+    new("Default", [(320, 192), (160, 96)], [new IntegerRange(2, 4)])
+  ];
   static byte[] IImageFormatWriter<AtariAgpFile>.ToBytes(AtariAgpFile file) => AtariAgpWriter.ToBytes(file);
 
   /// <summary>Width in pixels (320 for GR.8, 160 for GR.7).</summary>

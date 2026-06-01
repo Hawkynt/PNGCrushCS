@@ -10,8 +10,7 @@ public readonly record struct XpmFile : IImageFormatReader<XpmFile>, IImageToRaw
   static string IImageFormatMetadata<XpmFile>.PrimaryExtension => ".xpm";
   static string[] IImageFormatMetadata<XpmFile>.FileExtensions => [".xpm"];
   static XpmFile IImageFormatReader<XpmFile>.FromSpan(ReadOnlySpan<byte> data) => XpmReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<XpmFile>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<XpmFile>.AllowedPaletteRanges => [new IntegerRange(2, 256)];
+  static VideoMode[] IImageFormatMetadata<XpmFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 256)])];
   static byte[] IImageFormatWriter<XpmFile>.ToBytes(XpmFile file) => XpmWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }

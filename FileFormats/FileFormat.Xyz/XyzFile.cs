@@ -10,8 +10,7 @@ public readonly record struct XyzFile : IImageFormatReader<XyzFile>, IImageToRaw
   static string IImageFormatMetadata<XyzFile>.PrimaryExtension => ".xyz";
   static string[] IImageFormatMetadata<XyzFile>.FileExtensions => [".xyz"];
   static XyzFile IImageFormatReader<XyzFile>.FromSpan(ReadOnlySpan<byte> data) => XyzReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<XyzFile>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<XyzFile>.AllowedPaletteRanges => [256];
+  static VideoMode[] IImageFormatMetadata<XyzFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [256])];
   static byte[] IImageFormatWriter<XyzFile>.ToBytes(XyzFile file) => XyzWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>

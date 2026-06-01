@@ -14,7 +14,7 @@ public sealed class MngFile : IImageFormatReader<MngFile>, IImageToRawImage<MngF
   static string IImageFormatMetadata<MngFile>.PrimaryExtension => ".mng";
   static string[] IImageFormatMetadata<MngFile>.FileExtensions => [".mng"];
   static MngFile IImageFormatReader<MngFile>.FromSpan(ReadOnlySpan<byte> data) => MngReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<MngFile>.Capabilities => FormatCapability.VariableResolution | FormatCapability.MultiImage;
+  static FormatCapability IImageFormatMetadata<MngFile>.Capabilities => FormatCapability.MultiImage;
   static byte[] IImageFormatWriter<MngFile>.ToBytes(MngFile file) => MngWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }

@@ -15,8 +15,7 @@ public readonly record struct TurboViewFile : IImageFormatReader<TurboViewFile>,
   static string IImageFormatMetadata<TurboViewFile>.PrimaryExtension => ".tvw";
   static string[] IImageFormatMetadata<TurboViewFile>.FileExtensions => [".tvw", ".tbv"];
   static TurboViewFile IImageFormatReader<TurboViewFile>.FromSpan(ReadOnlySpan<byte> data) => TurboViewReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<TurboViewFile>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<TurboViewFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
+  static VideoMode[] IImageFormatMetadata<TurboViewFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 16)])];
   static byte[] IImageFormatWriter<TurboViewFile>.ToBytes(TurboViewFile file) => TurboViewWriter.ToBytes(file);
 
   /// <summary>Image width (always 320).</summary>

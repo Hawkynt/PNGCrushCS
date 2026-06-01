@@ -12,6 +12,9 @@ public readonly record struct BmpFile : IImageFormatReader<BmpFile>, IImageToRaw
   static string[] IImageFormatMetadata<BmpFile>.FileExtensions => [".bmp", ".dib", ".bga", ".rl4", ".rl8", ".vga", ".sys"];
   static BmpFile IImageFormatReader<BmpFile>.FromSpan(ReadOnlySpan<byte> data) => BmpReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<BmpFile>.Capabilities => FormatCapability.HasDedicatedOptimizer;
+  static VideoMode[] IImageFormatMetadata<BmpFile>.VideoModes => [
+    new("Default", [(IntegerRange.Any, IntegerRange.Any)])
+  ];
   static byte[] IImageFormatWriter<BmpFile>.ToBytes(BmpFile file) => BmpWriter.ToBytes(file);
 
   public static ImageInfo? ReadImageInfo(ReadOnlySpan<byte> header) {

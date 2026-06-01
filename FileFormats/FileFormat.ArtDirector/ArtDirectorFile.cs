@@ -25,8 +25,9 @@ public readonly record struct ArtDirectorFile() : IImageFormatReader<ArtDirector
   static string IImageFormatMetadata<ArtDirectorFile>.PrimaryExtension => ".art";
   static string[] IImageFormatMetadata<ArtDirectorFile>.FileExtensions => [".art"];
   static ArtDirectorFile IImageFormatReader<ArtDirectorFile>.FromSpan(ReadOnlySpan<byte> data) => ArtDirectorReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<ArtDirectorFile>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<ArtDirectorFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
+  static VideoMode[] IImageFormatMetadata<ArtDirectorFile>.VideoModes => [
+    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 16)])
+  ];
   static byte[] IImageFormatWriter<ArtDirectorFile>.ToBytes(ArtDirectorFile file) => ArtDirectorWriter.ToBytes(file);
 
   /// <summary>Image width (depends on resolution).</summary>

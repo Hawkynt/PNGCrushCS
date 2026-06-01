@@ -21,9 +21,9 @@ public readonly record struct AtariCompressedFile : IImageFormatReader<AtariComp
   static string IImageFormatMetadata<AtariCompressedFile>.PrimaryExtension => ".acr";
   static string[] IImageFormatMetadata<AtariCompressedFile>.FileExtensions => [".acr", ".acp"];
   static AtariCompressedFile IImageFormatReader<AtariCompressedFile>.FromSpan(ReadOnlySpan<byte> data) => AtariCompressedReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<AtariCompressedFile>.Capabilities => FormatCapability.IndexedOnly | FormatCapability.FixedResolution;
-  static IntegerRange[] IImageFormatMetadata<AtariCompressedFile>.AllowedPaletteRanges => [2];
-  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<AtariCompressedFile>.AllowedDimensions => [(DefaultWidth, DefaultHeight)];
+  static VideoMode[] IImageFormatMetadata<AtariCompressedFile>.VideoModes => [
+    new("Default", [(DefaultWidth, DefaultHeight)], [2])
+  ];
   static byte[] IImageFormatWriter<AtariCompressedFile>.ToBytes(AtariCompressedFile file) => AtariCompressedWriter.ToBytes(file);
 
   /// <summary>Width in pixels.</summary>

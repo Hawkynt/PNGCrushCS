@@ -24,8 +24,9 @@ public readonly record struct GraphicsMasterFile : IImageFormatReader<GraphicsMa
   static string IImageFormatMetadata<GraphicsMasterFile>.PrimaryExtension => ".gms";
   static string[] IImageFormatMetadata<GraphicsMasterFile>.FileExtensions => [".gms", ".gm8"];
   static GraphicsMasterFile IImageFormatReader<GraphicsMasterFile>.FromSpan(ReadOnlySpan<byte> data) => GraphicsMasterReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<GraphicsMasterFile>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<GraphicsMasterFile>.AllowedPaletteRanges => [new IntegerRange(2, 4)];
+  static VideoMode[] IImageFormatMetadata<GraphicsMasterFile>.VideoModes => [
+    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 4)])
+  ];
   static byte[] IImageFormatWriter<GraphicsMasterFile>.ToBytes(GraphicsMasterFile file) => GraphicsMasterWriter.ToBytes(file);
 
   /// <summary>Always 160.</summary>

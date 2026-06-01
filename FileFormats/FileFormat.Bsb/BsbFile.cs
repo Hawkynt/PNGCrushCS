@@ -9,8 +9,9 @@ public readonly record struct BsbFile : IImageFormatReader<BsbFile>, IImageToRaw
   static string IImageFormatMetadata<BsbFile>.PrimaryExtension => ".kap";
   static string[] IImageFormatMetadata<BsbFile>.FileExtensions => [".kap", ".bsb"];
   static BsbFile IImageFormatReader<BsbFile>.FromSpan(ReadOnlySpan<byte> data) => BsbReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<BsbFile>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<BsbFile>.AllowedPaletteRanges => [new IntegerRange(2, 128)];
+  static VideoMode[] IImageFormatMetadata<BsbFile>.VideoModes => [
+    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 128)])
+  ];
   static byte[] IImageFormatWriter<BsbFile>.ToBytes(BsbFile file) => BsbWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>

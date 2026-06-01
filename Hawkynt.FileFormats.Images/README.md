@@ -325,11 +325,67 @@ public sealed class RawImage {
 | Flag | Meaning |
 |---|---|
 | `None` | Default. |
-| `VariableResolution` | Supports any width/height (vs. fixed-size formats like Atari Degas 320×200). |
-| `MonochromeOnly` | 1bpp formats (XBM, WBMP, fax G3/G4). |
-| `IndexedOnly` | Always palette-based (Koala, GIF). |
 | `HasDedicatedOptimizer` | A `Crush.<Format>` optimizer exists in the parent repo. |
 | `MultiImage` | Multiple sub-images per file (TIFF pages, ICO entries, animated GIF/APNG, etc.). |
+
+Per-format constraints on dimensions, palette sizes, fixed palettes, pixel aspect ratio, and display
+filters live inside [`VideoMode`](#videomode-record) rather than on the capability enum. The Save-As
+flow asks the user to pick one of the format's declared `VideoMode`s, then derives the resize/colour-reduction
+prompts from the chosen mode.
+
+### `VideoMode` (record)
+
+```csharp
+public sealed record VideoMode(
+  string Name,
+  (IntegerRange Width, IntegerRange Height)[] Dimensions,  // coupled (W, H) tuples
+  IntegerRange[]? AllowedPaletteRanges = null,             // null = full-colour
+  FixedPalette[]? AvailablePalettes    = null,             // CGA variants, NES master, …
+  PixelAspectRatio? PixelAspectRatio   = null,             // null = square 1:1
+  DisplayFilter DisplayFilter          = DisplayFilter.None,
+  string? Description                  = null);
+```
+
+A format declares `static virtual VideoMode[] VideoModes` on `IImageFormatMetadata<TSelf>`. Each entry
+is one user-pickable choice. Examples:
+
+```csharp
+// PNG, BMP, QOI: single arbitrary-resolution full-colour mode (this is the default).
+static VideoMode[] VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)])];
+
+// Neochrome (Atari ST): three coupled modes with different colour depths.
+static VideoMode[] VideoModes => [
+  new("Low resolution",    [(320, 200)], [16]),
+  new("Medium resolution", [(640, 200)], [ 4]),
+  new("High resolution",   [(640, 400)], [ 2]),
+];
+
+// VGA Mode 13h / Mode X: multiple resolutions share one 256-colour palette profile.
+static VideoMode[] VideoModes => [
+  new("256-colour modes", [(320, 200), (320, 240), (360, 480)], [256]),
+  new("16-colour modes",  [(640, 400), (640, 480)],             [16]),
+];
+
+// CGA: 4-colour mode exposes four palette variants — handled as AvailablePalettes (not separate modes).
+static VideoMode[] VideoModes => [
+  new("4-colour",   [(320, 200)], [4], [_LowIntensity0, _HighIntensity0, _LowIntensity1, _HighIntensity1]),
+  new("Monochrome", [(640, 200)], [2], [_MonochromePalette]),
+];
+
+// NES CHR: master palette pool + NTSC composite display filter.
+static VideoMode[] VideoModes => [
+  new("Tilesheet (2bpp)",
+      dimensions: [(128, new IntegerRange(8, 8192, step: 8))],
+      allowedPaletteRanges: [new IntegerRange(2, 4)],
+      availablePalettes: [_NesMaster64],
+      pixelAspectRatio: (8, 7),
+      displayFilter: DisplayFilter.NtscComposite),
+];
+```
+
+Convention: multiple `(W, H)` pairs that share the same palette profile go in **one mode's** `Dimensions`
+array; multiple palette variants for the same dimensions go in **`AvailablePalettes`**. Fan out into separate
+modes only when dimensions OR palette-size profile actually differ.
 
 ### `ImageInfo` (readonly record struct)
 

@@ -9,9 +9,7 @@ public readonly record struct SamCoupeFile : IImageFormatReader<SamCoupeFile>, I
   static string IImageFormatMetadata<SamCoupeFile>.PrimaryExtension => ".sam";
   static string[] IImageFormatMetadata<SamCoupeFile>.FileExtensions => [".sam"];
   static SamCoupeFile IImageFormatReader<SamCoupeFile>.FromSpan(ReadOnlySpan<byte> data) => SamCoupeReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<SamCoupeFile>.Capabilities => FormatCapability.IndexedOnly | FormatCapability.FixedResolution;
-  static IntegerRange[] IImageFormatMetadata<SamCoupeFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
-  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<SamCoupeFile>.AllowedDimensions => [(256, 192), (512, 192)];
+  static VideoMode[] IImageFormatMetadata<SamCoupeFile>.VideoModes => [new("Default", [(256, 192), (512, 192)], [new IntegerRange(2, 16)])];
   static byte[] IImageFormatWriter<SamCoupeFile>.ToBytes(SamCoupeFile file) => SamCoupeWriter.ToBytes(file);
 
   /// <summary>Width in pixels (256 for Mode 4, 512 for Mode 3).</summary>

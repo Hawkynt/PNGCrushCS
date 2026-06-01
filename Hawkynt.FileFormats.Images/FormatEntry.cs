@@ -28,9 +28,7 @@ public sealed record FormatEntry(
   Func<FileInfo, int>? GetImageCount = null,
   Func<FileInfo, int, RawImage?>? LoadRawImageAtIndex = null,
   Func<FileInfo, IReadOnlyList<RawImage>?>? LoadAllRawImages = null,
-  IntegerRange[]? AllowedPaletteRanges = null,
-  FixedPalette[]? FixedPalettes = null,
-  (IntegerRange Width, IntegerRange Height)[]? AllowedDimensions = null
+  VideoMode[]? VideoModes = null
 ) {
 
   /// <summary>The first/preferred MIME type, or <c>"application/octet-stream"</c> if none is registered.</summary>

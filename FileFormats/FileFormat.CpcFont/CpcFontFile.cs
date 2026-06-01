@@ -9,8 +9,9 @@ public readonly record struct CpcFontFile : IImageFormatReader<CpcFontFile>, IIm
   static string IImageFormatMetadata<CpcFontFile>.PrimaryExtension => ".cpf";
   static string[] IImageFormatMetadata<CpcFontFile>.FileExtensions => [".cpf"];
   static CpcFontFile IImageFormatReader<CpcFontFile>.FromSpan(ReadOnlySpan<byte> data) => CpcFontReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<CpcFontFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static IntegerRange[] IImageFormatMetadata<CpcFontFile>.AllowedPaletteRanges => [2];
+  static VideoMode[] IImageFormatMetadata<CpcFontFile>.VideoModes => [
+    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])
+  ];
   static byte[] IImageFormatWriter<CpcFontFile>.ToBytes(CpcFontFile file) => CpcFontWriter.ToBytes(file);
 
   /// <summary>Expected file size in bytes.</summary>

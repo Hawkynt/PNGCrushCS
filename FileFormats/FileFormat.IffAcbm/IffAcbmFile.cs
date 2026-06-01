@@ -10,8 +10,7 @@ public readonly record struct IffAcbmFile : IImageFormatReader<IffAcbmFile>, IIm
   static string IImageFormatMetadata<IffAcbmFile>.PrimaryExtension => ".acbm";
   static string[] IImageFormatMetadata<IffAcbmFile>.FileExtensions => [".acbm", ".iff"];
   static IffAcbmFile IImageFormatReader<IffAcbmFile>.FromSpan(ReadOnlySpan<byte> data) => IffAcbmReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<IffAcbmFile>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<IffAcbmFile>.AllowedPaletteRanges => [new IntegerRange(2, 256)];
+  static VideoMode[] IImageFormatMetadata<IffAcbmFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 256)])];
 
   static bool? IImageFormatMetadata<IffAcbmFile>.MatchesSignature(ReadOnlySpan<byte> header)
     => header.Length >= 12 && header[0] == 0x46 && header[1] == 0x4F && header[2] == 0x52 && header[3] == 0x4D

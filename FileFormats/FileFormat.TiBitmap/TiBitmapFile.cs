@@ -13,8 +13,7 @@ public readonly record struct TiBitmapFile : IImageFormatReader<TiBitmapFile>, I
   static string IImageFormatMetadata<TiBitmapFile>.PrimaryExtension => ".8xi";
   static string[] IImageFormatMetadata<TiBitmapFile>.FileExtensions => [".8xi", ".89i"];
   static TiBitmapFile IImageFormatReader<TiBitmapFile>.FromSpan(ReadOnlySpan<byte> data) => TiBitmapReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<TiBitmapFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static IntegerRange[] IImageFormatMetadata<TiBitmapFile>.AllowedPaletteRanges => [2];
+  static VideoMode[] IImageFormatMetadata<TiBitmapFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
   static byte[] IImageFormatWriter<TiBitmapFile>.ToBytes(TiBitmapFile file) => TiBitmapWriter.ToBytes(file);
 
   public int Width { get; init; }

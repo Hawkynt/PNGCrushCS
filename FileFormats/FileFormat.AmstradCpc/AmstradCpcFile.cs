@@ -9,9 +9,11 @@ public readonly record struct AmstradCpcFile : IImageFormatReader<AmstradCpcFile
   static string IImageFormatMetadata<AmstradCpcFile>.PrimaryExtension => ".cpc";
   static string[] IImageFormatMetadata<AmstradCpcFile>.FileExtensions => [".cpc"];
   static AmstradCpcFile IImageFormatReader<AmstradCpcFile>.FromSpan(ReadOnlySpan<byte> data) => AmstradCpcReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<AmstradCpcFile>.Capabilities => FormatCapability.IndexedOnly | FormatCapability.FixedResolution;
-  static IntegerRange[] IImageFormatMetadata<AmstradCpcFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
-  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<AmstradCpcFile>.AllowedDimensions => [(320, 200), (160, 200), (640, 200)];
+  static VideoMode[] IImageFormatMetadata<AmstradCpcFile>.VideoModes => [
+    new("Mode 0 (160x200, 16 colours)", [(160, 200)], [16]),
+    new("Mode 1 (320x200, 4 colours)", [(320, 200)], [4]),
+    new("Mode 2 (640x200, 2 colours)", [(640, 200)], [2])
+  ];
   static byte[] IImageFormatWriter<AmstradCpcFile>.ToBytes(AmstradCpcFile file) => AmstradCpcWriter.ToBytes(file);
   /// <summary>Width in pixels (depends on mode: 160, 320, or 640).</summary>
   public int Width { get; init; }

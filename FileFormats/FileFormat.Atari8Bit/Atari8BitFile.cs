@@ -9,10 +9,9 @@ public readonly record struct Atari8BitFile : IImageFormatReader<Atari8BitFile>,
   static string IImageFormatMetadata<Atari8BitFile>.PrimaryExtension => ".gr8";
   static string[] IImageFormatMetadata<Atari8BitFile>.FileExtensions => [".gr7", ".gr8", ".gr9", ".gr15", ".hip", ".mic", ".int"];
   static Atari8BitFile IImageFormatReader<Atari8BitFile>.FromSpan(ReadOnlySpan<byte> data) => Atari8BitReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<Atari8BitFile>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<Atari8BitFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
-  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<Atari8BitFile>.AllowedDimensions =>
-    [(320, 192), (160, 192), (80, 192), (160, 96)];
+  static VideoMode[] IImageFormatMetadata<Atari8BitFile>.VideoModes => [
+    new("Default", [(320, 192), (160, 192), (80, 192), (160, 96)], [new IntegerRange(2, 16)])
+  ];
   static byte[] IImageFormatWriter<Atari8BitFile>.ToBytes(Atari8BitFile file) => Atari8BitWriter.ToBytes(file);
 
   /// <summary>Width in pixels (depends on mode: 320, 160, or 80).</summary>

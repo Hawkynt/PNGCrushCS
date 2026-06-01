@@ -21,8 +21,9 @@ public readonly record struct AtariGraphics11File : IImageFormatReader<AtariGrap
   static string IImageFormatMetadata<AtariGraphics11File>.PrimaryExtension => ".gr11";
   static string[] IImageFormatMetadata<AtariGraphics11File>.FileExtensions => [".gr11", ".g11"];
   static AtariGraphics11File IImageFormatReader<AtariGraphics11File>.FromSpan(ReadOnlySpan<byte> data) => AtariGraphics11Reader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<AtariGraphics11File>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<AtariGraphics11File>.AllowedPaletteRanges => [16];
+  static VideoMode[] IImageFormatMetadata<AtariGraphics11File>.VideoModes => [
+    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [16])
+  ];
   static byte[] IImageFormatWriter<AtariGraphics11File>.ToBytes(AtariGraphics11File file) => AtariGraphics11Writer.ToBytes(file);
 
   /// <summary>Always 80.</summary>

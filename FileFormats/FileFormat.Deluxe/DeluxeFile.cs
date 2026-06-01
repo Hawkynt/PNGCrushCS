@@ -12,9 +12,9 @@ public readonly record struct DeluxeFile : IImageFormatReader<DeluxeFile>, IImag
   static string IImageFormatMetadata<DeluxeFile>.PrimaryExtension => ".dps";
   static string[] IImageFormatMetadata<DeluxeFile>.FileExtensions => [".dps", ".dlx"];
   static DeluxeFile IImageFormatReader<DeluxeFile>.FromSpan(ReadOnlySpan<byte> data) => DeluxeReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<DeluxeFile>.Capabilities => FormatCapability.IndexedOnly | FormatCapability.FixedResolution;
-  static IntegerRange[] IImageFormatMetadata<DeluxeFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
-  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<DeluxeFile>.AllowedDimensions => [(320, 200)];
+  static VideoMode[] IImageFormatMetadata<DeluxeFile>.VideoModes => [
+    new("Default", [(320, 200)], [new IntegerRange(2, 16)])
+  ];
   static byte[] IImageFormatWriter<DeluxeFile>.ToBytes(DeluxeFile file) => DeluxeWriter.ToBytes(file);
 
   /// <summary>Image width (always 320).</summary>

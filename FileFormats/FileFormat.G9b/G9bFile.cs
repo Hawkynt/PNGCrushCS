@@ -12,7 +12,6 @@ public readonly record struct G9bFile() : IImageFormatReader<G9bFile>, IImageToR
   static string IImageFormatMetadata<G9bFile>.PrimaryExtension => ".g9b";
   static string[] IImageFormatMetadata<G9bFile>.FileExtensions => [".g9b"];
   static G9bFile IImageFormatReader<G9bFile>.FromSpan(ReadOnlySpan<byte> data) => G9bReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<G9bFile>.Capabilities => FormatCapability.VariableResolution;
   static byte[] IImageFormatWriter<G9bFile>.ToBytes(G9bFile file) => G9bWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>

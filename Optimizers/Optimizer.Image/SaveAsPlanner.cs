@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using FileFormat.Core;
 
@@ -11,6 +12,7 @@ namespace Optimizer.Image;
 /// <remarks>
 /// Extracted from the WinForms <c>MainForm._SaveAsDialog</c> so that it can be exercised by
 /// regression tests without spinning up the UI. All members are pure: no I/O, no UI, no shared state.
+/// All constraint information comes from the target format's <see cref="VideoMode"/> declarations.
 /// </remarks>
 internal static class SaveAsPlanner {
 
@@ -24,74 +26,97 @@ internal static class SaveAsPlanner {
     FixedPalette[]? FixedPalettes
   );
 
-  /// <summary>Returns the allowed palette-size ranges declared by <paramref name="entry"/>, or <c>null</c> if it imposes no constraint.</summary>
-  /// <remarks>
-  /// Preference order: the format's own <see cref="IImageFormatMetadata{TSelf}.AllowedPaletteRanges"/> declaration ➜
-  /// <see cref="FormatCapability.MonochromeOnly"/> ⇒ <c>[2]</c> ➜
-  /// <see cref="FormatCapability.IndexedOnly"/> ⇒ <c>[new IntegerRange(2, 256)]</c> ➜
-  /// <c>null</c> (no constraint).
-  /// </remarks>
-  internal static IntegerRange[]? AllowedPaletteRangesFor(FormatRegistry.FormatEntry entry) {
-    if (entry.AllowedPaletteRanges is { Length: > 0 } declared) return declared;
-    var caps = entry.Capabilities;
-    if ((caps & FormatCapability.MonochromeOnly) != 0) return [2];
-    if ((caps & FormatCapability.IndexedOnly) != 0) return [new IntegerRange(2, 256)];
-    return null;
+  /// <summary>Result of dimension-matching against a chosen mode.</summary>
+  internal readonly record struct PickedDimensions(int EntryIndex, int Width, int Height);
+
+  /// <summary>Returns the chosen mode (or auto-picks the closest one) for the source dimensions.</summary>
+  internal static VideoMode? PickClosestMode(FormatRegistry.FormatEntry entry, int srcW, int srcH) {
+    if (entry.VideoModes is not { Length: > 0 } modes) return null;
+    if (modes.Length == 1) return modes[0];
+
+    var bestIdx = 0;
+    var bestDist = double.PositiveInfinity;
+    for (var i = 0; i < modes.Length; ++i) {
+      foreach (var (w, h) in modes[i].Dimensions) {
+        var cw = (w.Min + w.Max) / 2.0;
+        var ch = (h.Min + h.Max) / 2.0;
+        var dw = srcW - cw;
+        var dh = srcH - ch;
+        var dist = dw * dw + dh * dh;
+        if (dist < bestDist) { bestDist = dist; bestIdx = i; }
+      }
+    }
+    return modes[bestIdx];
   }
 
-  /// <summary>
-  /// Determines whether the target format requires colour reduction for the given image,
-  /// and which constraints to apply.
-  /// </summary>
-  internal static ReductionPlan PlanReduction(FormatRegistry.FormatEntry entry, RawImage image) {
-    var fixedPalettes = entry.FixedPalettes;
-    var ranges = AllowedPaletteRangesFor(entry);
+  /// <summary>Snaps the source dimensions to the closest valid <c>(W, H)</c> pair within the chosen mode.</summary>
+  internal static PickedDimensions PickClosestDimensionsInMode(VideoMode mode, int srcW, int srcH) {
+    var bestIdx = 0;
+    var bestDist = double.PositiveInfinity;
+    for (var i = 0; i < mode.Dimensions.Length; ++i) {
+      var (w, h) = mode.Dimensions[i];
+      var cw = (w.Min + w.Max) / 2.0;
+      var ch = (h.Min + h.Max) / 2.0;
+      var dw = srcW - cw;
+      var dh = srcH - ch;
+      var dist = dw * dw + dh * dh;
+      if (dist < bestDist) { bestDist = dist; bestIdx = i; }
+    }
+    var (bw, bh) = mode.Dimensions[bestIdx];
+    return new(bestIdx, bw.SnapToValid(srcW), bh.SnapToValid(srcH));
+  }
 
-    // Fixed palettes always require reduction (the image must be dithered into one of them).
+  /// <summary>True when the source dimensions don't match any of the chosen mode's allowed (W, H) pairs.</summary>
+  internal static bool NeedsResizePromptInMode(VideoMode mode, RawImage source)
+    => !mode.MatchesDimensions(source.Width, source.Height);
+
+  /// <summary>Plans colour reduction for a chosen <see cref="VideoMode"/>.</summary>
+  internal static ReductionPlan PlanReductionInMode(VideoMode mode, RawImage image) {
+    var fixedPalettes = mode.AvailablePalettes;
+    var ranges = mode.AllowedPaletteRanges;
+
     if (fixedPalettes is { Length: > 0 })
       return new(NeedsReduction: true, AllowedRanges: ranges, FixedPalettes: fixedPalettes);
 
-    // No fixed palettes and no size constraint => no reduction needed.
-    if (ranges == null)
+    if (ranges is null || ranges.Length == 0)
       return new(NeedsReduction: false, AllowedRanges: null, FixedPalettes: null);
 
     var maxAllowed = ranges[ranges.Length - 1].Max;
     var isIndexed = image.Format is PixelFormat.Indexed1 or PixelFormat.Indexed4 or PixelFormat.Indexed8;
     var paletteEntryCount = image.Palette is { Length: > 0 } ? image.Palette.Length / 3 : int.MaxValue;
     var needsReduction = !isIndexed || paletteEntryCount > maxAllowed;
-
     return new(needsReduction, ranges, null);
   }
 
-  /// <summary>True when the format declares <see cref="FormatCapability.FixedResolution"/> —
-  /// i.e. the writer requires specific pixel dimensions (e.g. Apple II HGR = 280x192, NES tile = 8x8).
-  /// Used by the UI to decide whether to show a resize prompt before saving.</summary>
-  internal static bool NeedsResizePrompt(FormatRegistry.FormatEntry entry)
-    => (entry.Capabilities & FormatCapability.FixedResolution) != 0;
+  /// <summary>Returns the chosen mode's <see cref="VideoMode.Dimensions"/> for the resize dialog.
+  /// Returns <c>null</c> if no mode is provided.</summary>
+  internal static (IntegerRange Width, IntegerRange Height)[]? DimensionsForResizeDialog(VideoMode? mode)
+    => mode?.Dimensions;
 
-  /// <summary>Picks the <c>AllowedDimensions</c> entry whose centre is closest to <paramref name="sourceWidth"/>x<paramref name="sourceHeight"/>,
-  /// and snaps the source dimensions to valid values inside that entry. Returns the chosen entry index plus
-  /// the snapped (width, height). Returns <c>null</c> when the format has no dimension constraint.</summary>
+  /// <summary>Convenience entry: determines colour reduction for an image targeted at <paramref name="entry"/>.
+  /// Picks the closest <see cref="VideoMode"/> automatically.</summary>
+  internal static ReductionPlan PlanReduction(FormatRegistry.FormatEntry entry, RawImage image) {
+    var mode = PickClosestMode(entry, image.Width, image.Height);
+    return mode is null
+      ? new(NeedsReduction: false, AllowedRanges: null, FixedPalettes: null)
+      : PlanReductionInMode(mode, image);
+  }
+
+  /// <summary>True when the source dimensions don't match any allowed (W, H) of the closest <see cref="VideoMode"/>.
+  /// Returns false when the format has no modes.</summary>
+  internal static bool NeedsResizePrompt(FormatRegistry.FormatEntry entry, RawImage source) {
+    var mode = PickClosestMode(entry, source.Width, source.Height);
+    return mode is not null && NeedsResizePromptInMode(mode, source);
+  }
+
+  /// <summary>Picks the closest valid <c>(W, H)</c> entry across the format's <see cref="VideoMode"/>s
+  /// and snaps the source dimensions to it. Returns <c>null</c> when the format declares no modes.</summary>
   internal static (int EntryIndex, int Width, int Height)? PickClosestDimensions(
     FormatRegistry.FormatEntry entry, int sourceWidth, int sourceHeight
   ) {
-    var allowed = entry.AllowedDimensions;
-    if (allowed is null || allowed.Length == 0) return null;
-
-    var bestIdx = 0;
-    var bestDist = double.PositiveInfinity;
-    for (var i = 0; i < allowed.Length; ++i) {
-      var (w, h) = allowed[i];
-      // Distance from source to the centre of this option's W×H box.
-      var cw = (w.Min + w.Max) / 2.0;
-      var ch = (h.Min + h.Max) / 2.0;
-      var dw = sourceWidth - cw;
-      var dh = sourceHeight - ch;
-      var dist = dw * dw + dh * dh;
-      if (dist < bestDist) { bestDist = dist; bestIdx = i; }
-    }
-
-    var (bw, bh) = allowed[bestIdx];
-    return (bestIdx, bw.SnapToValid(sourceWidth), bh.SnapToValid(sourceHeight));
+    var mode = PickClosestMode(entry, sourceWidth, sourceHeight);
+    if (mode is null) return null;
+    var picked = PickClosestDimensionsInMode(mode, sourceWidth, sourceHeight);
+    return (picked.EntryIndex, picked.Width, picked.Height);
   }
 }

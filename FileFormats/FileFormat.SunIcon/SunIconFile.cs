@@ -11,8 +11,7 @@ public readonly record struct SunIconFile : IImageFormatReader<SunIconFile>, IIm
   static string IImageFormatMetadata<SunIconFile>.PrimaryExtension => ".icon";
   static string[] IImageFormatMetadata<SunIconFile>.FileExtensions => [".icon"];
   static SunIconFile IImageFormatReader<SunIconFile>.FromSpan(ReadOnlySpan<byte> data) => SunIconReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<SunIconFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static IntegerRange[] IImageFormatMetadata<SunIconFile>.AllowedPaletteRanges => [2];
+  static VideoMode[] IImageFormatMetadata<SunIconFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
   static byte[] IImageFormatWriter<SunIconFile>.ToBytes(SunIconFile file) => SunIconWriter.ToBytes(file);
 
   public int Width { get; init; }

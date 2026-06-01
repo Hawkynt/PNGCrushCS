@@ -17,9 +17,9 @@ public readonly record struct GbaTileFile : IImageFormatReader<GbaTileFile>, IIm
   static string IImageFormatMetadata<GbaTileFile>.PrimaryExtension => ".4bpp";
   static string[] IImageFormatMetadata<GbaTileFile>.FileExtensions => [".4bpp", ".gba"];
   static GbaTileFile IImageFormatReader<GbaTileFile>.FromSpan(ReadOnlySpan<byte> data) => GbaTileReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<GbaTileFile>.Capabilities => FormatCapability.IndexedOnly | FormatCapability.FixedResolution;
-  static IntegerRange[] IImageFormatMetadata<GbaTileFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
-  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<GbaTileFile>.AllowedDimensions => [(TilesPerRow * TileSize, new IntegerRange(TileSize, 4096, TileSize))];
+  static VideoMode[] IImageFormatMetadata<GbaTileFile>.VideoModes => [
+    new("Tilesheet (4bpp)", [(TilesPerRow * TileSize, new IntegerRange(TileSize, 4096, TileSize))], [new IntegerRange(2, 16)])
+  ];
   static byte[] IImageFormatWriter<GbaTileFile>.ToBytes(GbaTileFile file) => GbaTileWriter.ToBytes(file);
 
   public int Width { get; init; }

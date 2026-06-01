@@ -37,8 +37,7 @@ public readonly record struct Lss16File : IImageFormatReader<Lss16File>, IImageT
   static string IImageFormatMetadata<Lss16File>.PrimaryExtension => ".lss";
   static string[] IImageFormatMetadata<Lss16File>.FileExtensions => [".lss", ".16"];
   static Lss16File IImageFormatReader<Lss16File>.FromSpan(ReadOnlySpan<byte> data) => Lss16Reader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<Lss16File>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<Lss16File>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
+  static VideoMode[] IImageFormatMetadata<Lss16File>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 16)])];
   static byte[] IImageFormatWriter<Lss16File>.ToBytes(Lss16File file) => Lss16Writer.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>

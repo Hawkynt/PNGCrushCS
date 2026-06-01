@@ -10,8 +10,7 @@ public readonly record struct Jbig2File : IImageFormatReader<Jbig2File>, IImageT
   static string IImageFormatMetadata<Jbig2File>.PrimaryExtension => ".jb2";
   static string[] IImageFormatMetadata<Jbig2File>.FileExtensions => [".jb2", ".jbig2"];
   static Jbig2File IImageFormatReader<Jbig2File>.FromSpan(ReadOnlySpan<byte> data) => Jbig2Reader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<Jbig2File>.Capabilities => FormatCapability.MonochromeOnly;
-  static IntegerRange[] IImageFormatMetadata<Jbig2File>.AllowedPaletteRanges => [2];
+  static VideoMode[] IImageFormatMetadata<Jbig2File>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
   static byte[] IImageFormatWriter<Jbig2File>.ToBytes(Jbig2File file) => Jbig2Writer.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>

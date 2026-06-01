@@ -24,8 +24,7 @@ public readonly record struct HighresMediumFile : IImageFormatReader<HighresMedi
   static string IImageFormatMetadata<HighresMediumFile>.PrimaryExtension => ".hrm";
   static string[] IImageFormatMetadata<HighresMediumFile>.FileExtensions => [".hrm"];
   static HighresMediumFile IImageFormatReader<HighresMediumFile>.FromSpan(ReadOnlySpan<byte> data) => HighresMediumReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<HighresMediumFile>.Capabilities => FormatCapability.FixedResolution;
-  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<HighresMediumFile>.AllowedDimensions => [(ImageWidth, ImageHeight)];
+  static VideoMode[] IImageFormatMetadata<HighresMediumFile>.VideoModes => [new("Default", [(ImageWidth, ImageHeight)])];
   static byte[] IImageFormatWriter<HighresMediumFile>.ToBytes(HighresMediumFile file) => HighresMediumWriter.ToBytes(file);
 
   /// <summary>16-entry palette for frame 1 (only first 4 entries used).</summary>

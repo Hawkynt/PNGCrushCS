@@ -11,9 +11,7 @@ public readonly record struct HereticM8File : IImageFormatReader<HereticM8File>,
   static string IImageFormatMetadata<HereticM8File>.PrimaryExtension => ".m8";
   static string[] IImageFormatMetadata<HereticM8File>.FileExtensions => [".m8"];
   static HereticM8File IImageFormatReader<HereticM8File>.FromSpan(ReadOnlySpan<byte> data) => HereticM8Reader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<HereticM8File>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<HereticM8File>.AllowedPaletteRanges => [new IntegerRange(2, 256)];
-  static FixedPalette[] IImageFormatMetadata<HereticM8File>.FixedPalettes => _FixedPalettes;
+  static VideoMode[] IImageFormatMetadata<HereticM8File>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 256)], _FixedPalettes)];
   static byte[] IImageFormatWriter<HereticM8File>.ToBytes(HereticM8File file) => HereticM8Writer.ToBytes(file);
 
   private static readonly FixedPalette[] _FixedPalettes = [

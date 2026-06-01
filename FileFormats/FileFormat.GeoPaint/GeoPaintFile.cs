@@ -18,9 +18,9 @@ public readonly record struct GeoPaintFile : IImageFormatReader<GeoPaintFile>, I
   static string IImageFormatMetadata<GeoPaintFile>.PrimaryExtension => ".geo";
   static string[] IImageFormatMetadata<GeoPaintFile>.FileExtensions => [".geo"];
   static GeoPaintFile IImageFormatReader<GeoPaintFile>.FromSpan(ReadOnlySpan<byte> data) => GeoPaintReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<GeoPaintFile>.Capabilities => FormatCapability.MonochromeOnly | FormatCapability.FixedResolution;
-  static IntegerRange[] IImageFormatMetadata<GeoPaintFile>.AllowedPaletteRanges => [2];
-  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<GeoPaintFile>.AllowedDimensions => [(FixedWidth, new IntegerRange(1, MaxHeight))];
+  static VideoMode[] IImageFormatMetadata<GeoPaintFile>.VideoModes => [
+    new("Default", [(FixedWidth, new IntegerRange(1, MaxHeight))], [2])
+  ];
   static byte[] IImageFormatWriter<GeoPaintFile>.ToBytes(GeoPaintFile file) => GeoPaintWriter.ToBytes(file);
 
   /// <summary>Always 640.</summary>

@@ -90,18 +90,23 @@ public sealed class FormatRegistryTests {
 
   [Test]
   [Category("Unit")]
-  public void GetEntry_Wbmp_HasMonochromeCapability() {
+  public void GetEntry_Wbmp_DeclaresMonochromeMode() {
     var entry = FormatRegistry.GetEntry(ImageFormat.Wbmp);
     Assert.That(entry, Is.Not.Null);
-    Assert.That(entry!.Capabilities & FormatCapability.MonochromeOnly, Is.Not.EqualTo(FormatCapability.None));
+    Assert.That(entry!.VideoModes, Is.Not.Null.And.Length.GreaterThan(0));
+    var maxColours = entry.VideoModes!.SelectMany(m => m.AllowedPaletteRanges ?? []).Max(r => r.Max);
+    Assert.That(maxColours, Is.EqualTo(2));
   }
 
   [Test]
   [Category("Unit")]
-  public void GetEntry_Xpm_HasIndexedOnlyCapability() {
+  public void GetEntry_Xpm_DeclaresIndexedMode() {
     var entry = FormatRegistry.GetEntry(ImageFormat.Xpm);
     Assert.That(entry, Is.Not.Null);
-    Assert.That(entry!.Capabilities & FormatCapability.IndexedOnly, Is.Not.EqualTo(FormatCapability.None));
+    Assert.That(entry!.VideoModes, Is.Not.Null.And.Length.GreaterThan(0));
+    var modeRanges = entry.VideoModes!.SelectMany(m => m.AllowedPaletteRanges ?? []).ToArray();
+    Assert.That(modeRanges, Is.Not.Empty, "XPM should declare palette-size constraints");
+    Assert.That(modeRanges.Max(r => r.Max), Is.LessThanOrEqualTo(256));
   }
 
   [Test]
@@ -114,10 +119,13 @@ public sealed class FormatRegistryTests {
 
   [Test]
   [Category("Unit")]
-  public void GetEntry_Qoi_HasVariableResolutionCapability() {
+  public void GetEntry_Qoi_DeclaresUnconstrainedMode() {
     var entry = FormatRegistry.GetEntry(ImageFormat.Qoi);
     Assert.That(entry, Is.Not.Null);
-    Assert.That(entry!.Capabilities, Is.EqualTo(FormatCapability.VariableResolution));
+    Assert.That(entry!.VideoModes, Is.Not.Null.And.Length.GreaterThan(0));
+    var mode = entry.VideoModes![0];
+    Assert.That(mode.AllowedPaletteRanges, Is.Null.Or.Empty, "QOI is full-colour");
+    Assert.That(mode.Dimensions, Is.Not.Empty);
   }
 
   [Test]
@@ -192,6 +200,6 @@ public sealed class FormatRegistryTests {
   [Category("Unit")]
   public void FormatCapability_HasExpectedCount() {
     var values = Enum.GetValues<FormatCapability>();
-    Assert.That(values, Has.Length.EqualTo(7)); // None, VariableResolution, MonochromeOnly, IndexedOnly, HasDedicatedOptimizer, MultiImage, FixedResolution
+    Assert.That(values, Has.Length.EqualTo(3)); // None, HasDedicatedOptimizer, MultiImage (constraints moved to VideoMode)
   }
 }

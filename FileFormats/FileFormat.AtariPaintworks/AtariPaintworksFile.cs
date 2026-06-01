@@ -9,9 +9,11 @@ public readonly record struct AtariPaintworksFile : IImageFormatReader<AtariPain
   static string IImageFormatMetadata<AtariPaintworksFile>.PrimaryExtension => ".cl0";
   static string[] IImageFormatMetadata<AtariPaintworksFile>.FileExtensions => [".cl0", ".cl1", ".cl2", ".pg0", ".pg1", ".pg2", ".pg3", ".sc0", ".sc1", ".sc2"];
   static AtariPaintworksFile IImageFormatReader<AtariPaintworksFile>.FromSpan(ReadOnlySpan<byte> data) => AtariPaintworksReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<AtariPaintworksFile>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<AtariPaintworksFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
-  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<AtariPaintworksFile>.AllowedDimensions => [(320, 200), (640, 200), (640, 400)];
+  static VideoMode[] IImageFormatMetadata<AtariPaintworksFile>.VideoModes => [
+    new("Low resolution (320x200, 16 colours)", [(320, 200)], [new IntegerRange(2, 16)]),
+    new("Medium resolution (640x200, 4 colours)", [(640, 200)], [new IntegerRange(2, 4)]),
+    new("High resolution (640x400, monochrome)", [(640, 400)], [2])
+  ];
   static byte[] IImageFormatWriter<AtariPaintworksFile>.ToBytes(AtariPaintworksFile file) => AtariPaintworksWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>

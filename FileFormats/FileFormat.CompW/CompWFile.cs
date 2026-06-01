@@ -9,8 +9,9 @@ public readonly record struct CompWFile : IImageFormatReader<CompWFile>, IImageT
   static string IImageFormatMetadata<CompWFile>.PrimaryExtension => ".wlm";
   static string[] IImageFormatMetadata<CompWFile>.FileExtensions => [".wlm"];
   static CompWFile IImageFormatReader<CompWFile>.FromSpan(ReadOnlySpan<byte> data) => CompWReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<CompWFile>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<CompWFile>.AllowedPaletteRanges => [new IntegerRange(2, 256)];
+  static VideoMode[] IImageFormatMetadata<CompWFile>.VideoModes => [
+    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 256)])
+  ];
   static byte[] IImageFormatWriter<CompWFile>.ToBytes(CompWFile file) => CompWWriter.ToBytes(file);
 
   /// <summary>Magic bytes: "CW" (0x43 0x57).</summary>

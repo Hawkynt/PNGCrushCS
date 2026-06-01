@@ -9,8 +9,7 @@ public readonly record struct OtbFile : IImageFormatReader<OtbFile>, IImageToRaw
   static string IImageFormatMetadata<OtbFile>.PrimaryExtension => ".otb";
   static string[] IImageFormatMetadata<OtbFile>.FileExtensions => [".otb"];
   static OtbFile IImageFormatReader<OtbFile>.FromSpan(ReadOnlySpan<byte> data) => OtbReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<OtbFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static IntegerRange[] IImageFormatMetadata<OtbFile>.AllowedPaletteRanges => [2];
+  static VideoMode[] IImageFormatMetadata<OtbFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
   static byte[] IImageFormatWriter<OtbFile>.ToBytes(OtbFile file) => OtbWriter.ToBytes(file);
   /// <summary>Image width in pixels (1..255).</summary>
   public int Width { get; init; }

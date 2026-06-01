@@ -18,8 +18,9 @@ public readonly record struct DrawItFile : IImageFormatReader<DrawItFile>, IImag
   static string IImageFormatMetadata<DrawItFile>.PrimaryExtension => ".dit";
   static string[] IImageFormatMetadata<DrawItFile>.FileExtensions => [".dit"];
   static DrawItFile IImageFormatReader<DrawItFile>.FromSpan(ReadOnlySpan<byte> data) => DrawItReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<DrawItFile>.Capabilities => FormatCapability.IndexedOnly | FormatCapability.VariableResolution;
-  static IntegerRange[] IImageFormatMetadata<DrawItFile>.AllowedPaletteRanges => [new IntegerRange(2, 256)];
+  static VideoMode[] IImageFormatMetadata<DrawItFile>.VideoModes => [
+    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 256)])
+  ];
   static byte[] IImageFormatWriter<DrawItFile>.ToBytes(DrawItFile file) => DrawItWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>

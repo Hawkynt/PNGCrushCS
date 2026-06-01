@@ -11,9 +11,7 @@ public readonly record struct Wad2File : IImageFormatReader<Wad2File>, IImageToR
   static string IImageFormatMetadata<Wad2File>.PrimaryExtension => ".wad";
   static string[] IImageFormatMetadata<Wad2File>.FileExtensions => [".wad"];
   static Wad2File IImageFormatReader<Wad2File>.FromSpan(ReadOnlySpan<byte> data) => Wad2Reader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<Wad2File>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<Wad2File>.AllowedPaletteRanges => [new IntegerRange(2, 256)];
-  static FixedPalette[] IImageFormatMetadata<Wad2File>.FixedPalettes => _FixedPalettes;
+  static VideoMode[] IImageFormatMetadata<Wad2File>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 256)], _FixedPalettes)];
   static byte[] IImageFormatWriter<Wad2File>.ToBytes(Wad2File file) => Wad2Writer.ToBytes(file);
 
   private static readonly FixedPalette[] _FixedPalettes = [

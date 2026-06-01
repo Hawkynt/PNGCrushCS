@@ -9,8 +9,7 @@ public readonly record struct MsxSpriteFile : IImageFormatReader<MsxSpriteFile>,
   static string IImageFormatMetadata<MsxSpriteFile>.PrimaryExtension => ".spt";
   static string[] IImageFormatMetadata<MsxSpriteFile>.FileExtensions => [".spt"];
   static MsxSpriteFile IImageFormatReader<MsxSpriteFile>.FromSpan(ReadOnlySpan<byte> data) => MsxSpriteReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<MsxSpriteFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static IntegerRange[] IImageFormatMetadata<MsxSpriteFile>.AllowedPaletteRanges => [2];
+  static VideoMode[] IImageFormatMetadata<MsxSpriteFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
   static byte[] IImageFormatWriter<MsxSpriteFile>.ToBytes(MsxSpriteFile file) => MsxSpriteWriter.ToBytes(file);
 
   /// <summary>Expected file size in bytes.</summary>

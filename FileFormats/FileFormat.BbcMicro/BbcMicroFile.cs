@@ -9,12 +9,11 @@ public readonly record struct BbcMicroFile : IImageFormatReader<BbcMicroFile>, I
   static string IImageFormatMetadata<BbcMicroFile>.PrimaryExtension => ".bbc";
   static string[] IImageFormatMetadata<BbcMicroFile>.FileExtensions => [".bbc"];
   static BbcMicroFile IImageFormatReader<BbcMicroFile>.FromSpan(ReadOnlySpan<byte> data) => BbcMicroReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<BbcMicroFile>.Capabilities => FormatCapability.FixedResolution;
   // Mode1 (320×256) listed first since the reader defaults to Mode1 when no explicit mode is given.
-  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<BbcMicroFile>.AllowedDimensions => [
-    (320, FixedHeight),  // Mode1 (4 colours)
-    (640, FixedHeight),  // Mode0/Mode4 (2 colours)
-    (160, FixedHeight),  // Mode2/Mode5
+  static VideoMode[] IImageFormatMetadata<BbcMicroFile>.VideoModes => [
+    new("Mode 1 (320x256, 4 colours)", [(320, FixedHeight)], [4]),
+    new("Mode 0/4 (640x256, 2 colours)", [(640, FixedHeight)], [2]),
+    new("Mode 2/5 (160x256, 16 colours)", [(160, FixedHeight)], [16])
   ];
   static byte[] IImageFormatWriter<BbcMicroFile>.ToBytes(BbcMicroFile file) => BbcMicroWriter.ToBytes(file);
   /// <summary>Width in pixels (depends on mode: 640, 320, or 160).</summary>

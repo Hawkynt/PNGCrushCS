@@ -552,7 +552,8 @@ Three levels of metadata are available without domain-specific knowledge:
 // Available at compile time, no file needed
 T.PrimaryExtension    // ".qoi"
 T.FileExtensions      // [".qoi"]
-T.Capabilities        // FormatCapability.VariableResolution
+T.Capabilities        // FormatCapability.None (or HasDedicatedOptimizer | MultiImage)
+T.VideoModes          // VideoMode[] — coupled (dimensions, palette-size, palettes, PAR, filter) options
 ```
 
 **Level 2 — Header field map (static, zero cost):**
@@ -581,25 +582,52 @@ var info = FormatIO.ReadInfo<PngFile>(fileBytes);
 
 A metadata viewer tool can load any `FileFormat.*.dll`, enumerate types implementing the interfaces, and extract all three levels without understanding any codec.
 
-### 8. Capability Flags
+### 8. Capability Flags & Video Modes
 
 ```csharp
 [Flags]
 public enum FormatCapability {
   None                  = 0,
-  VariableResolution    = 1,   // Supports arbitrary dimensions
-  MonochromeOnly        = 2,   // Restricted to 1-bit
-  IndexedOnly           = 4,   // Restricted to palette-based
   HasDedicatedOptimizer = 8,   // Has an Optimizer.* project
   MultiImage            = 16,  // Contains multiple frames/pages
 }
 ```
 
-These flags let generic tools make decisions without format-specific code:
+Per-format constraints on dimensions, palette sizes, fixed palettes, pixel aspect ratio, and display
+filters live inside `VideoMode` records rather than as capability flags. Each format declares
+`static virtual VideoMode[] VideoModes` on `IImageFormatMetadata<TSelf>`:
 
-- A converter filters `ConversionTargets` to formats that support `VariableResolution`
-- A viewer enables frame navigation for formats with `MultiImage`
-- A "Save As" dialog excludes formats with `HasDedicatedOptimizer` (they have their own CLI)
+```csharp
+public sealed record VideoMode(
+  string Name,
+  (IntegerRange Width, IntegerRange Height)[] Dimensions,  // coupled (W, H) tuples
+  IntegerRange[]? AllowedPaletteRanges = null,             // null = full-colour
+  FixedPalette[]? AvailablePalettes    = null,             // CGA variants, NES master, …
+  PixelAspectRatio? PixelAspectRatio   = null,             // null = square 1:1
+  DisplayFilter DisplayFilter          = DisplayFilter.None,
+  string? Description                  = null);
+
+// PNG / BMP / QOI: arbitrary everything (default).
+static VideoMode[] VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)])];
+
+// Neochrome (Atari ST): three coupled (dimensions × palette-size) modes.
+static VideoMode[] VideoModes => [
+  new("Low resolution",    [(320, 200)], [16]),
+  new("Medium resolution", [(640, 200)], [ 4]),
+  new("High resolution",   [(640, 400)], [ 2]),
+];
+```
+
+Convention: multiple `(W, H)` pairs sharing the same palette profile go in one mode's `Dimensions` array;
+palette variants for the same dimensions go in `AvailablePalettes`. Fan out into separate modes only when
+the dimensions OR palette-size profile actually differs.
+
+These shapes let generic tools make decisions without format-specific code:
+
+- A converter filters `ConversionTargets` to formats whose `VideoModes` accept the source's colour count
+- A viewer enables frame navigation for formats with `MultiImage` capability
+- A "Save As" dialog excludes formats with `HasDedicatedOptimizer`, then shows a mode picker for any
+  remaining target whose `VideoModes.Length > 1`
 
 ## Project Structure
 

@@ -12,7 +12,7 @@ public sealed class ApngFile : IImageFormatReader<ApngFile>, IImageToRawImage<Ap
   static string IImageFormatMetadata<ApngFile>.PrimaryExtension => ".apng";
   static string[] IImageFormatMetadata<ApngFile>.FileExtensions => [".apng"];
   static ApngFile IImageFormatReader<ApngFile>.FromSpan(ReadOnlySpan<byte> data) => ApngReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<ApngFile>.Capabilities => FormatCapability.VariableResolution | FormatCapability.MultiImage;
+  static FormatCapability IImageFormatMetadata<ApngFile>.Capabilities => FormatCapability.MultiImage;
   static byte[] IImageFormatWriter<ApngFile>.ToBytes(ApngFile file) => ApngWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }

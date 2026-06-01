@@ -23,5 +23,8 @@
     <Compile Update="ThumbnailStrip.cs">
       <SubType>Component</SubType>
     </Compile>
+    <Compile Update="VideoModeDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
   </ItemGroup>
 </Project>

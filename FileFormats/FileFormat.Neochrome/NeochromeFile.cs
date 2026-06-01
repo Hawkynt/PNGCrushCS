@@ -9,9 +9,7 @@ public readonly record struct NeochromeFile : IImageFormatReader<NeochromeFile>,
   static string IImageFormatMetadata<NeochromeFile>.PrimaryExtension => ".neo";
   static string[] IImageFormatMetadata<NeochromeFile>.FileExtensions => [".neo"];
   static NeochromeFile IImageFormatReader<NeochromeFile>.FromSpan(ReadOnlySpan<byte> data) => NeochromeReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<NeochromeFile>.Capabilities => FormatCapability.IndexedOnly | FormatCapability.FixedResolution;
-  static IntegerRange[] IImageFormatMetadata<NeochromeFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
-  static (IntegerRange Width, IntegerRange Height)[] IImageFormatMetadata<NeochromeFile>.AllowedDimensions => [(320, 200)];
+  static VideoMode[] IImageFormatMetadata<NeochromeFile>.VideoModes => [new("Default", [(320, 200)], [new IntegerRange(2, 16)])];
   static byte[] IImageFormatWriter<NeochromeFile>.ToBytes(NeochromeFile file) => NeochromeWriter.ToBytes(file);
 
   /// <summary>Image width (always 320).</summary>

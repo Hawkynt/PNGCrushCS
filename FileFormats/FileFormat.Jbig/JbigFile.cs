@@ -9,8 +9,7 @@ public readonly record struct JbigFile : IImageFormatReader<JbigFile>, IImageToR
   static string IImageFormatMetadata<JbigFile>.PrimaryExtension => ".jbg";
   static string[] IImageFormatMetadata<JbigFile>.FileExtensions => [".jbg", ".bie", ".jbig"];
   static JbigFile IImageFormatReader<JbigFile>.FromSpan(ReadOnlySpan<byte> data) => JbigReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<JbigFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static IntegerRange[] IImageFormatMetadata<JbigFile>.AllowedPaletteRanges => [2];
+  static VideoMode[] IImageFormatMetadata<JbigFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
   static byte[] IImageFormatWriter<JbigFile>.ToBytes(JbigFile file) => JbigWriter.ToBytes(file);
 
   public int Width { get; init; }

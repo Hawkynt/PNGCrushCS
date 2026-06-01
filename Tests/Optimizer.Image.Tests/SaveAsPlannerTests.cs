@@ -7,7 +7,7 @@ namespace Optimizer.Image.Tests;
 
 /// <summary>
 /// Regression tests for <see cref="SaveAsPlanner"/> — verifies that the Save-As flow
-/// correctly determines colour-reduction and resize requirements from format metadata.
+/// correctly determines colour-reduction and resize requirements from format <see cref="VideoMode"/> metadata.
 /// </summary>
 [TestFixture]
 public sealed class SaveAsPlannerTests {
@@ -19,56 +19,61 @@ public sealed class SaveAsPlannerTests {
     PixelData = new byte[width * height * 4],
   };
 
-  private static RawImage _MakeIndexed8Image(int paletteEntries) => new() {
-    Width = 16,
-    Height = 16,
+  private static RawImage _MakeIndexed8Image(int paletteEntries, int width = 16, int height = 16) => new() {
+    Width = width,
+    Height = height,
     Format = PixelFormat.Indexed8,
-    PixelData = new byte[256],
+    PixelData = new byte[width * height],
     Palette = new byte[paletteEntries * 3],
     PaletteCount = paletteEntries,
   };
 
-  private static RawImage _MakeIndexed1Image() => new() {
-    Width = 16,
-    Height = 16,
+  private static RawImage _MakeIndexed1Image(int width = 16, int height = 16) => new() {
+    Width = width,
+    Height = height,
     Format = PixelFormat.Indexed1,
-    PixelData = new byte[32],
+    PixelData = new byte[(width + 7) / 8 * height],
     Palette = new byte[6], // 2 entries
     PaletteCount = 2,
   };
 
-  // -------------------- AllowedPaletteRangesFor --------------------
+  private static VideoMode _Mode(FormatRegistry.FormatEntry entry, int srcW = 64, int srcH = 64)
+    => SaveAsPlanner.PickClosestMode(entry, srcW, srcH)!;
+
+  // -------------------- Mode shape: palette constraints --------------------
 
   [Test]
   [Category("Unit")]
-  public void AllowedPaletteRangesFor_MonochromeFormat_Returns2() {
+  public void VideoMode_MonochromeFormat_PaletteRangeIs2() {
     var entry = FormatRegistry.GetEntry(ImageFormat.Xbm);
     Assert.That(entry, Is.Not.Null, "Xbm should be registered");
-    var ranges = SaveAsPlanner.AllowedPaletteRangesFor(entry!);
-    Assert.That(ranges, Is.Not.Null);
-    Assert.That(ranges!.Length, Is.EqualTo(1));
-    Assert.That(ranges[0].Min, Is.EqualTo(2));
-    Assert.That(ranges[0].Max, Is.EqualTo(2));
+    var mode = _Mode(entry!);
+    Assert.That(mode.AllowedPaletteRanges, Is.Not.Null.And.Not.Empty);
+    var ranges = mode.AllowedPaletteRanges!;
+    Assert.That(ranges[ranges.Length - 1].Max, Is.EqualTo(2));
   }
 
   [Test]
   [Category("Unit")]
-  public void AllowedPaletteRangesFor_AppleII_Returns2() {
+  public void VideoMode_AppleII_PaletteRangeIs2() {
     // Regression test: AppleII previously had no declaration; Save-As bypassed reduction.
     var entry = FormatRegistry.GetEntry(ImageFormat.AppleII);
     Assert.That(entry, Is.Not.Null);
-    var ranges = SaveAsPlanner.AllowedPaletteRangesFor(entry!);
-    Assert.That(ranges, Is.Not.Null, "AppleII must declare AllowedPaletteRanges so Save-As triggers reduction");
-    Assert.That(ranges![ranges.Length - 1].Max, Is.EqualTo(2));
+    var mode = _Mode(entry!);
+    Assert.That(mode.AllowedPaletteRanges, Is.Not.Null.And.Not.Empty,
+      "AppleII must declare palette ranges so Save-As triggers reduction");
+    var ranges = mode.AllowedPaletteRanges!;
+    Assert.That(ranges[ranges.Length - 1].Max, Is.EqualTo(2));
   }
 
   [Test]
   [Category("Unit")]
-  public void AllowedPaletteRangesFor_UnconstrainedFormat_ReturnsNull() {
+  public void VideoMode_UnconstrainedFormat_HasNoPaletteRange() {
     var entry = FormatRegistry.GetEntry(ImageFormat.Png);
     Assert.That(entry, Is.Not.Null);
-    var ranges = SaveAsPlanner.AllowedPaletteRangesFor(entry!);
-    Assert.That(ranges, Is.Null, "PNG accepts any palette size; no constraint should be returned");
+    var mode = _Mode(entry!);
+    Assert.That(mode.AllowedPaletteRanges, Is.Null.Or.Empty,
+      "PNG accepts any palette size; no constraint should be declared");
   }
 
   // -------------------- PlanReduction: RGB source --------------------
@@ -99,7 +104,7 @@ public sealed class SaveAsPlannerTests {
   public void PlanReduction_RgbSourceToAppleII_NeedsReductionWith2() {
     // Regression: this scenario previously bypassed reduction and crashed mid-write.
     var entry = FormatRegistry.GetEntry(ImageFormat.AppleII)!;
-    var plan = SaveAsPlanner.PlanReduction(entry, _MakeRgbaImage());
+    var plan = SaveAsPlanner.PlanReduction(entry, _MakeRgbaImage(280, 192));
     Assert.That(plan.NeedsReduction, Is.True);
     Assert.That(plan.AllowedRanges, Is.Not.Null);
     Assert.That(plan.AllowedRanges![plan.AllowedRanges.Length - 1].Max, Is.EqualTo(2));
@@ -121,8 +126,9 @@ public sealed class SaveAsPlannerTests {
   public void PlanReduction_Indexed1To8BitFormat_DoesNotNeedReduction() {
     // Indexed1 has 2 colours which fits even the strictest indexed-only target's max (256).
     var entry = FormatRegistry.GetEntry(ImageFormat.Bmp)!;
-    if (SaveAsPlanner.AllowedPaletteRangesFor(entry) == null)
-      Assert.Ignore("BMP doesn't declare AllowedPaletteRanges; test only meaningful for indexed-constrained formats");
+    var bmpMode = _Mode(entry);
+    if (bmpMode.AllowedPaletteRanges is null || bmpMode.AllowedPaletteRanges.Length == 0)
+      Assert.Ignore("BMP doesn't declare palette ranges; test only meaningful for indexed-constrained formats");
 
     var plan = SaveAsPlanner.PlanReduction(entry, _MakeIndexed1Image());
     Assert.That(plan.NeedsReduction, Is.False, "2-colour palette fits any indexed format");
@@ -132,11 +138,12 @@ public sealed class SaveAsPlannerTests {
   [Category("Unit")]
   public void PlanReduction_Indexed8WithFewerColors_DoesNotNeedReduction() {
     var entry = FormatRegistry.GetEntry(ImageFormat.Bmp)!;
-    if (SaveAsPlanner.AllowedPaletteRangesFor(entry) == null)
-      Assert.Ignore("BMP doesn't declare AllowedPaletteRanges; test only meaningful for indexed-constrained formats");
+    var bmpMode = _Mode(entry);
+    if (bmpMode.AllowedPaletteRanges is null || bmpMode.AllowedPaletteRanges.Length == 0)
+      Assert.Ignore("BMP doesn't declare palette ranges; test only meaningful for indexed-constrained formats");
 
     var plan = SaveAsPlanner.PlanReduction(entry, _MakeIndexed8Image(paletteEntries: 32));
-    Assert.That(plan.NeedsReduction, Is.False, "32 colours fits within any IndexedOnly target's 256-colour cap");
+    Assert.That(plan.NeedsReduction, Is.False, "32 colours fits within any indexed target's 256-colour cap");
   }
 
   // -------------------- PlanReduction: fixed palettes --------------------
@@ -145,7 +152,8 @@ public sealed class SaveAsPlannerTests {
   [Category("Unit")]
   public void PlanReduction_RgbSourceToDoom_NeedsReduction_WithFixedPalettes() {
     var entry = FormatRegistry.GetEntry(ImageFormat.DoomFlat)!;
-    Assert.That(entry.FixedPalettes, Is.Not.Null.And.Not.Empty,
+    var mode = _Mode(entry);
+    Assert.That(mode.AvailablePalettes, Is.Not.Null.And.Not.Empty,
       "DOOM must declare its PLAYPAL palette so the Save-As dialog can show it");
 
     var plan = SaveAsPlanner.PlanReduction(entry, _MakeRgbaImage());
@@ -170,7 +178,7 @@ public sealed class SaveAsPlannerTests {
   [Category("Unit")]
   public void NeedsResizePrompt_Png_False() {
     var entry = FormatRegistry.GetEntry(ImageFormat.Png)!;
-    Assert.That(SaveAsPlanner.NeedsResizePrompt(entry), Is.False, "PNG accepts any resolution");
+    Assert.That(SaveAsPlanner.NeedsResizePrompt(entry, _MakeRgbaImage()), Is.False, "PNG accepts any resolution");
   }
 
   [Test]
@@ -178,39 +186,44 @@ public sealed class SaveAsPlannerTests {
   public void NeedsResizePrompt_AppleII_True() {
     // Regression: AppleII previously had implicit VariableResolution and crashed when sizes mismatched.
     var entry = FormatRegistry.GetEntry(ImageFormat.AppleII)!;
-    Assert.That(SaveAsPlanner.NeedsResizePrompt(entry), Is.True, "AppleII requires specific HGR/DHGR dimensions");
+    // Use a deliberately wrong size so the chosen mode's MatchesDimensions returns false.
+    Assert.That(SaveAsPlanner.NeedsResizePrompt(entry, _MakeRgbaImage(100, 100)), Is.True,
+      "AppleII requires specific HGR/DHGR dimensions");
   }
 
   [Test]
   [Category("Unit")]
   public void NeedsResizePrompt_Xbm_False() {
-    // XBM has MonochromeOnly but variable resolution.
+    // XBM is monochrome but accepts arbitrary dimensions.
     var entry = FormatRegistry.GetEntry(ImageFormat.Xbm)!;
-    Assert.That(SaveAsPlanner.NeedsResizePrompt(entry), Is.False, "XBM is monochrome but accepts any dimensions");
+    Assert.That(SaveAsPlanner.NeedsResizePrompt(entry, _MakeRgbaImage(123, 77)), Is.False,
+      "XBM is monochrome but accepts any dimensions");
   }
 
   [Test]
   [Category("Unit")]
   public void NeedsResizePrompt_NesChr_True() {
-    // Regression: NES CHR's FromRawImage requires width==128 and height%8==0; user was getting
-    // "Saving failed: NES CHR requires width 128, got 1405" because FixedResolution wasn't declared.
+    // NES CHR FromRawImage requires width==128 and height%8==0.
     var entry = FormatRegistry.GetEntry(ImageFormat.NesChr)!;
-    Assert.That(SaveAsPlanner.NeedsResizePrompt(entry), Is.True, "NES CHR has fixed 128-pixel width; resize prompt must fire");
+    Assert.That(SaveAsPlanner.NeedsResizePrompt(entry, _MakeRgbaImage(1405, 1405)), Is.True,
+      "NES CHR has fixed 128-pixel width; resize prompt must fire");
   }
 
-  // -------------------- AllowedDimensions / PickClosestDimensions --------------------
+  // -------------------- VideoMode dimensions / PickClosestDimensions --------------------
 
   [Test]
   [Category("Unit")]
-  public void AllowedDimensions_AppleII_ListsHgrAndDhgr() {
+  public void VideoMode_AppleII_DeclaresHgrAndDhgrDimensions() {
+    // HGR and DHGR share the same palette profile (2-colour), so per the VideoMode convention
+    // they're coupled within a single mode's Dimensions array (not split into two modes).
     var entry = FormatRegistry.GetEntry(ImageFormat.AppleII)!;
-    Assert.That(entry.AllowedDimensions, Is.Not.Null);
-    Assert.That(entry.AllowedDimensions!.Length, Is.EqualTo(2));
-    var (w1, h1) = entry.AllowedDimensions[0];
-    var (w2, h2) = entry.AllowedDimensions[1];
-    Assert.That(w1.Min, Is.EqualTo(280)); Assert.That(w1.Max, Is.EqualTo(280));
-    Assert.That(w2.Min, Is.EqualTo(560)); Assert.That(w2.Max, Is.EqualTo(560));
-    Assert.That(h1.Min, Is.EqualTo(192)); Assert.That(h2.Min, Is.EqualTo(192));
+    Assert.That(entry.VideoModes, Is.Not.Null.And.Not.Empty);
+
+    var allDims = entry.VideoModes!.SelectMany(m => m.Dimensions).ToArray();
+    Assert.That(allDims.Any(d => d.Width.Min == 280 && d.Width.Max == 280 && d.Height.Min == 192), Is.True,
+      "HGR (280x192) should be declared");
+    Assert.That(allDims.Any(d => d.Width.Min == 560 && d.Width.Max == 560 && d.Height.Min == 192), Is.True,
+      "DHGR (560x192) should be declared");
   }
 
   [Test]
@@ -219,8 +232,7 @@ public sealed class SaveAsPlannerTests {
     var entry = FormatRegistry.GetEntry(ImageFormat.AppleII)!;
     var pick = SaveAsPlanner.PickClosestDimensions(entry, sourceWidth: 320, sourceHeight: 200);
     Assert.That(pick, Is.Not.Null);
-    Assert.That(pick!.Value.EntryIndex, Is.EqualTo(0), "320 is closer to 280 (HGR) than 560 (DHGR)");
-    Assert.That(pick.Value.Width, Is.EqualTo(280));
+    Assert.That(pick!.Value.Width, Is.EqualTo(280), "320 is closer to 280 (HGR) than 560 (DHGR)");
     Assert.That(pick.Value.Height, Is.EqualTo(192));
   }
 
@@ -230,8 +242,7 @@ public sealed class SaveAsPlannerTests {
     var entry = FormatRegistry.GetEntry(ImageFormat.AppleII)!;
     var pick = SaveAsPlanner.PickClosestDimensions(entry, sourceWidth: 800, sourceHeight: 600);
     Assert.That(pick, Is.Not.Null);
-    Assert.That(pick!.Value.EntryIndex, Is.EqualTo(1), "800 is closer to 560 (DHGR) than 280 (HGR)");
-    Assert.That(pick.Value.Width, Is.EqualTo(560));
+    Assert.That(pick!.Value.Width, Is.EqualTo(560), "800 is closer to 560 (DHGR) than 280 (HGR)");
   }
 
   [Test]
@@ -246,10 +257,12 @@ public sealed class SaveAsPlannerTests {
 
   [Test]
   [Category("Unit")]
-  public void PickClosestDimensions_Png_ReturnsNull() {
+  public void PickClosestDimensions_Png_ReturnsAnyAnyMode() {
     var entry = FormatRegistry.GetEntry(ImageFormat.Png)!;
-    Assert.That(SaveAsPlanner.PickClosestDimensions(entry, 100, 100), Is.Null,
-      "PNG has no dimension constraint");
+    var pick = SaveAsPlanner.PickClosestDimensions(entry, 100, 100);
+    Assert.That(pick, Is.Not.Null, "PNG declares a single unbounded mode");
+    Assert.That(pick!.Value.Width, Is.EqualTo(100));
+    Assert.That(pick.Value.Height, Is.EqualTo(100));
   }
 
   [Test]
@@ -277,76 +290,74 @@ public sealed class SaveAsPlannerTests {
     Assert.That(r.Contains(-1), Is.False);
   }
 
-  // -------------------- Cross-cutting: every fixed-resolution format must lack VariableResolution --------------------
+  // -------------------- Cross-cutting: declared palette ranges are well-formed --------------------
 
   [Test]
   [Category("Unit")]
-  public void AllFormatsThatThrowOnDimensions_HaveCapabilitiesWithoutVariableResolution() {
-    // Documentation-level: this test passes by inspection (other formats may need future fixes).
-    // For now we lock in the regression for AppleII as a known correct case.
-    var entry = FormatRegistry.GetEntry(ImageFormat.AppleII)!;
-    Assert.That((entry.Capabilities & FormatCapability.VariableResolution), Is.EqualTo((FormatCapability)0),
-      "Apple II HGR/DHGR has fixed dimensions; its capability flags must omit VariableResolution");
-  }
-
-  // -------------------- Cross-cutting: declared ranges are well-formed --------------------
-
-  [Test]
-  [Category("Unit")]
-  public void AllRegisteredFormats_HaveValidAllowedPaletteRanges() {
-    // Walk every registered format and assert any declared AllowedPaletteRanges is sorted, disjoint, and has Min<=Max.
+  public void AllRegisteredFormats_HaveValidVideoModePaletteRanges() {
+    // Walk every registered format and assert each declared mode's AllowedPaletteRanges
+    // is sorted, disjoint, and has Min<=Max.
     var formats = FormatRegistry.ConversionTargets.ToList();
     Assert.That(formats, Is.Not.Empty);
 
     foreach (var entry in formats) {
-      var ranges = entry.AllowedPaletteRanges;
-      if (ranges is null || ranges.Length == 0) continue;
+      if (entry.VideoModes is null) continue;
+      foreach (var mode in entry.VideoModes) {
+        var ranges = mode.AllowedPaletteRanges;
+        if (ranges is null || ranges.Length == 0) continue;
 
-      for (var i = 0; i < ranges.Length; ++i) {
-        Assert.That(ranges[i].Min, Is.LessThanOrEqualTo(ranges[i].Max),
-          $"{entry.Name}: range[{i}] Min={ranges[i].Min} > Max={ranges[i].Max}");
-        Assert.That(ranges[i].Min, Is.GreaterThanOrEqualTo(1),
-          $"{entry.Name}: range[{i}] Min must be >= 1");
-        if (i > 0)
-          Assert.That(ranges[i].Min, Is.GreaterThan(ranges[i - 1].Max),
-            $"{entry.Name}: ranges must be sorted and disjoint at index {i}");
+        for (var i = 0; i < ranges.Length; ++i) {
+          Assert.That(ranges[i].Min, Is.LessThanOrEqualTo(ranges[i].Max),
+            $"{entry.Name}/'{mode.Name}': range[{i}] Min={ranges[i].Min} > Max={ranges[i].Max}");
+          Assert.That(ranges[i].Min, Is.GreaterThanOrEqualTo(1),
+            $"{entry.Name}/'{mode.Name}': range[{i}] Min must be >= 1");
+          if (i > 0)
+            Assert.That(ranges[i].Min, Is.GreaterThan(ranges[i - 1].Max),
+              $"{entry.Name}/'{mode.Name}': ranges must be sorted and disjoint at index {i}");
+        }
       }
     }
   }
 
   [Test]
   [Category("Unit")]
-  public void AllRegisteredFormats_FixedPalettes_HaveNonEmptyColors() {
+  public void AllRegisteredFormats_AvailablePalettes_HaveNonEmptyColors() {
     var formats = FormatRegistry.ConversionTargets.ToList();
     foreach (var entry in formats) {
-      var fixedPalettes = entry.FixedPalettes;
-      if (fixedPalettes is null || fixedPalettes.Length == 0) continue;
+      if (entry.VideoModes is null) continue;
+      foreach (var mode in entry.VideoModes) {
+        var palettes = mode.AvailablePalettes;
+        if (palettes is null || palettes.Length == 0) continue;
 
-      foreach (var palette in fixedPalettes) {
-        Assert.That(palette.Name, Is.Not.Empty, $"{entry.Name}: fixed palette has empty name");
-        Assert.That(palette.HexColors, Is.Not.Empty, $"{entry.Name}: palette '{palette.Name}' is empty");
-        Assert.That(palette.Count, Is.EqualTo(palette.HexColors.Length));
+        foreach (var palette in palettes) {
+          Assert.That(palette.Name, Is.Not.Empty, $"{entry.Name}/'{mode.Name}': fixed palette has empty name");
+          Assert.That(palette.HexColors, Is.Not.Empty, $"{entry.Name}/'{mode.Name}': palette '{palette.Name}' is empty");
+          Assert.That(palette.Count, Is.EqualTo(palette.HexColors.Length));
+        }
       }
     }
   }
 
   [Test]
   [Category("Unit")]
-  public void AllRegisteredFormats_FixedPalettes_AtLeastMinAllowed() {
-    // A fixed palette can be either:
+  public void AllRegisteredFormats_AvailablePalettes_AtLeastMinAllowed() {
+    // A declared palette can be either:
     //   (a) "use as-is" (size matches AllowedPaletteRanges max — e.g. DOOM PLAYPAL = 256, max = 256), or
     //   (b) "master pool" (size > max — e.g. NES master = 64 entries, but max = 4 — user picks subset).
     // Either way, the palette must contain at least the minimum allowed count.
     var formats = FormatRegistry.ConversionTargets.ToList();
     foreach (var entry in formats) {
-      var fixedPalettes = entry.FixedPalettes;
-      var ranges = entry.AllowedPaletteRanges;
-      if (fixedPalettes is null || fixedPalettes.Length == 0 || ranges is null || ranges.Length == 0) continue;
+      if (entry.VideoModes is null) continue;
+      foreach (var mode in entry.VideoModes) {
+        var palettes = mode.AvailablePalettes;
+        var ranges = mode.AllowedPaletteRanges;
+        if (palettes is null || palettes.Length == 0 || ranges is null || ranges.Length == 0) continue;
 
-      var minAllowed = ranges[0].Min;
-      foreach (var palette in fixedPalettes)
-        Assert.That(palette.Count, Is.GreaterThanOrEqualTo(minAllowed),
-          $"{entry.Name}: fixed palette '{palette.Name}' has {palette.Count} entries, fewer than the minimum allowed {minAllowed}");
+        var minAllowed = ranges[0].Min;
+        foreach (var palette in palettes)
+          Assert.That(palette.Count, Is.GreaterThanOrEqualTo(minAllowed),
+            $"{entry.Name}/'{mode.Name}': palette '{palette.Name}' has {palette.Count} entries, fewer than the minimum allowed {minAllowed}");
+      }
     }
   }
 
@@ -355,11 +366,12 @@ public sealed class SaveAsPlannerTests {
   public void PlanReduction_NesChrToFixedPaletteFormat_UsesMasterPalette() {
     // Regression: NES CHR uses a 64-entry master palette with AllowedPaletteRanges=[(2,4)] — user picks 4 from 64.
     var entry = FormatRegistry.GetEntry(ImageFormat.NesChr)!;
-    Assert.That(entry.FixedPalettes, Is.Not.Null.And.Not.Empty);
-    Assert.That(entry.FixedPalettes![0].Count, Is.GreaterThan(entry.AllowedPaletteRanges![0].Max),
+    var mode = _Mode(entry, 128, 128);
+    Assert.That(mode.AvailablePalettes, Is.Not.Null.And.Not.Empty);
+    Assert.That(mode.AvailablePalettes![0].Count, Is.GreaterThan(mode.AllowedPaletteRanges![0].Max),
       "NES master palette should exceed the per-image colour limit; the dialog presents it as a subset pool");
 
-    var plan = SaveAsPlanner.PlanReduction(entry, _MakeRgbaImage());
+    var plan = SaveAsPlanner.PlanReduction(entry, _MakeRgbaImage(128, 128));
     Assert.That(plan.NeedsReduction, Is.True);
     Assert.That(plan.FixedPalettes, Is.Not.Null);
   }

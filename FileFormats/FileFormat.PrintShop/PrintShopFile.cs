@@ -30,8 +30,7 @@ public readonly record struct PrintShopFile : IImageFormatReader<PrintShopFile>,
   static string IImageFormatMetadata<PrintShopFile>.PrimaryExtension => ".psa";
   static string[] IImageFormatMetadata<PrintShopFile>.FileExtensions => [".psa", ".psb"];
   static PrintShopFile IImageFormatReader<PrintShopFile>.FromSpan(ReadOnlySpan<byte> data) => PrintShopReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<PrintShopFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static IntegerRange[] IImageFormatMetadata<PrintShopFile>.AllowedPaletteRanges => [2];
+  static VideoMode[] IImageFormatMetadata<PrintShopFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
   static byte[] IImageFormatWriter<PrintShopFile>.ToBytes(PrintShopFile file) => PrintShopWriter.ToBytes(file);
 
   /// <summary>Always 88.</summary>

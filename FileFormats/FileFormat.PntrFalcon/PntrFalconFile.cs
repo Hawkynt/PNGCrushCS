@@ -12,7 +12,6 @@ public readonly record struct PntrFalconFile : IImageFormatReader<PntrFalconFile
   static string IImageFormatMetadata<PntrFalconFile>.PrimaryExtension => ".pnf";
   static string[] IImageFormatMetadata<PntrFalconFile>.FileExtensions => [".pnf", ".pfl"];
   static PntrFalconFile IImageFormatReader<PntrFalconFile>.FromSpan(ReadOnlySpan<byte> data) => PntrFalconReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<PntrFalconFile>.Capabilities => FormatCapability.FixedResolution;
   static byte[] IImageFormatWriter<PntrFalconFile>.ToBytes(PntrFalconFile file) => PntrFalconWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>

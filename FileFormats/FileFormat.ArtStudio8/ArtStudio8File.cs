@@ -21,8 +21,9 @@ public readonly record struct ArtStudio8File : IImageFormatReader<ArtStudio8File
   static string IImageFormatMetadata<ArtStudio8File>.PrimaryExtension => ".as8";
   static string[] IImageFormatMetadata<ArtStudio8File>.FileExtensions => [".as8"];
   static ArtStudio8File IImageFormatReader<ArtStudio8File>.FromSpan(ReadOnlySpan<byte> data) => ArtStudio8Reader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<ArtStudio8File>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<ArtStudio8File>.AllowedPaletteRanges => [2];
+  static VideoMode[] IImageFormatMetadata<ArtStudio8File>.VideoModes => [
+    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])
+  ];
   static byte[] IImageFormatWriter<ArtStudio8File>.ToBytes(ArtStudio8File file) => ArtStudio8Writer.ToBytes(file);
 
   /// <summary>Always 320.</summary>

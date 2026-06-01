@@ -12,8 +12,7 @@ public readonly record struct IocaFile : IImageFormatReader<IocaFile>, IImageToR
   static string IImageFormatMetadata<IocaFile>.PrimaryExtension => ".ica";
   static string[] IImageFormatMetadata<IocaFile>.FileExtensions => [".ica", ".ioca"];
   static IocaFile IImageFormatReader<IocaFile>.FromSpan(ReadOnlySpan<byte> data) => IocaReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<IocaFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static IntegerRange[] IImageFormatMetadata<IocaFile>.AllowedPaletteRanges => [2];
+  static VideoMode[] IImageFormatMetadata<IocaFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
   static byte[] IImageFormatWriter<IocaFile>.ToBytes(IocaFile file) => IocaWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>

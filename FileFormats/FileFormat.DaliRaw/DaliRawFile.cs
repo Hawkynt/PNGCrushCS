@@ -21,8 +21,9 @@ public readonly record struct DaliRawFile : IImageFormatReader<DaliRawFile>, IIm
   static string IImageFormatMetadata<DaliRawFile>.PrimaryExtension => ".sd0";
   static string[] IImageFormatMetadata<DaliRawFile>.FileExtensions => [".sd0", ".sd1", ".sd2"];
   static DaliRawFile IImageFormatReader<DaliRawFile>.FromSpan(ReadOnlySpan<byte> data) => DaliRawReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<DaliRawFile>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<DaliRawFile>.AllowedPaletteRanges => [new IntegerRange(2, 16)];
+  static VideoMode[] IImageFormatMetadata<DaliRawFile>.VideoModes => [
+    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 16)])
+  ];
   static byte[] IImageFormatWriter<DaliRawFile>.ToBytes(DaliRawFile file) => DaliRawWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>

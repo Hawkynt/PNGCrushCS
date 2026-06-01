@@ -9,8 +9,7 @@ public readonly record struct MobyDickFile : IImageFormatReader<MobyDickFile>, I
   static string IImageFormatMetadata<MobyDickFile>.PrimaryExtension => ".mby";
   static string[] IImageFormatMetadata<MobyDickFile>.FileExtensions => [".mby", ".mbd"];
   static MobyDickFile IImageFormatReader<MobyDickFile>.FromSpan(ReadOnlySpan<byte> data) => MobyDickReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<MobyDickFile>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<MobyDickFile>.AllowedPaletteRanges => [new IntegerRange(2, 256)];
+  static VideoMode[] IImageFormatMetadata<MobyDickFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 256)])];
   static byte[] IImageFormatWriter<MobyDickFile>.ToBytes(MobyDickFile file) => MobyDickWriter.ToBytes(file);
 
   /// <summary>The fixed width of a Moby Dick image in pixels.</summary>

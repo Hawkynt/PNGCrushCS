@@ -9,8 +9,9 @@ public readonly record struct CalsFile() : IImageFormatReader<CalsFile>, IImageT
   static string IImageFormatMetadata<CalsFile>.PrimaryExtension => ".cal";
   static string[] IImageFormatMetadata<CalsFile>.FileExtensions => [".cal", ".cals", ".gp4"];
   static CalsFile IImageFormatReader<CalsFile>.FromSpan(ReadOnlySpan<byte> data) => CalsReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<CalsFile>.Capabilities => FormatCapability.MonochromeOnly | FormatCapability.VariableResolution;
-  static IntegerRange[] IImageFormatMetadata<CalsFile>.AllowedPaletteRanges => [2];
+  static VideoMode[] IImageFormatMetadata<CalsFile>.VideoModes => [
+    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])
+  ];
   static byte[] IImageFormatWriter<CalsFile>.ToBytes(CalsFile file) => CalsWriter.ToBytes(file);
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }

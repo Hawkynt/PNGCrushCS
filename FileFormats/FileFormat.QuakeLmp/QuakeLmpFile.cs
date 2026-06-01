@@ -11,9 +11,7 @@ public readonly record struct QuakeLmpFile : IImageFormatReader<QuakeLmpFile>, I
   static string IImageFormatMetadata<QuakeLmpFile>.PrimaryExtension => ".lmp";
   static string[] IImageFormatMetadata<QuakeLmpFile>.FileExtensions => [".lmp"];
   static QuakeLmpFile IImageFormatReader<QuakeLmpFile>.FromSpan(ReadOnlySpan<byte> data) => QuakeLmpReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<QuakeLmpFile>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<QuakeLmpFile>.AllowedPaletteRanges => [new IntegerRange(2, 256)];
-  static FixedPalette[] IImageFormatMetadata<QuakeLmpFile>.FixedPalettes => _FixedPalettes;
+  static VideoMode[] IImageFormatMetadata<QuakeLmpFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 256)], _FixedPalettes)];
   static byte[] IImageFormatWriter<QuakeLmpFile>.ToBytes(QuakeLmpFile file) => QuakeLmpWriter.ToBytes(file);
 
   private static readonly FixedPalette[] _FixedPalettes = [

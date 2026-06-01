@@ -13,8 +13,9 @@ public readonly record struct EdmicsC4File : IImageFormatReader<EdmicsC4File>, I
   static string IImageFormatMetadata<EdmicsC4File>.PrimaryExtension => ".c4";
   static string[] IImageFormatMetadata<EdmicsC4File>.FileExtensions => [".c4"];
   static EdmicsC4File IImageFormatReader<EdmicsC4File>.FromSpan(ReadOnlySpan<byte> data) => EdmicsC4Reader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<EdmicsC4File>.Capabilities => FormatCapability.MonochromeOnly;
-  static IntegerRange[] IImageFormatMetadata<EdmicsC4File>.AllowedPaletteRanges => [2];
+  static VideoMode[] IImageFormatMetadata<EdmicsC4File>.VideoModes => [
+    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])
+  ];
   static byte[] IImageFormatWriter<EdmicsC4File>.ToBytes(EdmicsC4File file) => EdmicsC4Writer.ToBytes(file);
 
   public int Width { get; init; }

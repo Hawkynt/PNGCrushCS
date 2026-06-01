@@ -15,8 +15,7 @@ public readonly record struct Zx81File : IImageFormatReader<Zx81File>, IImageToR
   static string IImageFormatMetadata<Zx81File>.PrimaryExtension => ".zx81";
   static string[] IImageFormatMetadata<Zx81File>.FileExtensions => [".zx81", ".p81"];
   static Zx81File IImageFormatReader<Zx81File>.FromSpan(ReadOnlySpan<byte> data) => Zx81Reader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<Zx81File>.Capabilities => FormatCapability.MonochromeOnly;
-  static IntegerRange[] IImageFormatMetadata<Zx81File>.AllowedPaletteRanges => [2];
+  static VideoMode[] IImageFormatMetadata<Zx81File>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
   static byte[] IImageFormatWriter<Zx81File>.ToBytes(Zx81File file) => Zx81Writer.ToBytes(file);
 
   public int Width => FixedWidth;

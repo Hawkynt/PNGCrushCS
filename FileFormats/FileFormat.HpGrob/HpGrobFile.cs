@@ -13,8 +13,7 @@ public readonly record struct HpGrobFile : IImageFormatReader<HpGrobFile>, IImag
   static string IImageFormatMetadata<HpGrobFile>.PrimaryExtension => ".grob";
   static string[] IImageFormatMetadata<HpGrobFile>.FileExtensions => [".grob", ".hp", ".gro2", ".gro4"];
   static HpGrobFile IImageFormatReader<HpGrobFile>.FromSpan(ReadOnlySpan<byte> data) => HpGrobReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<HpGrobFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static IntegerRange[] IImageFormatMetadata<HpGrobFile>.AllowedPaletteRanges => [2];
+  static VideoMode[] IImageFormatMetadata<HpGrobFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
   static byte[] IImageFormatWriter<HpGrobFile>.ToBytes(HpGrobFile file) => HpGrobWriter.ToBytes(file);
 
   public int Width { get; init; }

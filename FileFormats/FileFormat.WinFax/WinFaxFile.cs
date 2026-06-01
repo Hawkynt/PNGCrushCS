@@ -13,8 +13,7 @@ public readonly record struct WinFaxFile : IImageFormatReader<WinFaxFile>, IImag
   static string IImageFormatMetadata<WinFaxFile>.PrimaryExtension => ".fxs";
   static string[] IImageFormatMetadata<WinFaxFile>.FileExtensions => [".fxs", ".fxo", ".fxr", ".fxd", ".fxm"];
   static WinFaxFile IImageFormatReader<WinFaxFile>.FromSpan(ReadOnlySpan<byte> data) => WinFaxReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<WinFaxFile>.Capabilities => FormatCapability.MonochromeOnly;
-  static IntegerRange[] IImageFormatMetadata<WinFaxFile>.AllowedPaletteRanges => [2];
+  static VideoMode[] IImageFormatMetadata<WinFaxFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
   static byte[] IImageFormatWriter<WinFaxFile>.ToBytes(WinFaxFile file) => WinFaxWriter.ToBytes(file);
 
   public int Width { get; init; }

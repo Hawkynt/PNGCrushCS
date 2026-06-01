@@ -9,8 +9,7 @@ public readonly record struct NokiaPictureMessageFile : IImageFormatReader<Nokia
   static string IImageFormatMetadata<NokiaPictureMessageFile>.PrimaryExtension => ".npm";
   static string[] IImageFormatMetadata<NokiaPictureMessageFile>.FileExtensions => [".npm"];
   static NokiaPictureMessageFile IImageFormatReader<NokiaPictureMessageFile>.FromSpan(ReadOnlySpan<byte> data) => NokiaPictureMessageReader.FromSpan(data);
-  static FormatCapability IImageFormatMetadata<NokiaPictureMessageFile>.Capabilities => FormatCapability.MonochromeOnly | FormatCapability.VariableResolution;
-  static IntegerRange[] IImageFormatMetadata<NokiaPictureMessageFile>.AllowedPaletteRanges => [2];
+  static VideoMode[] IImageFormatMetadata<NokiaPictureMessageFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
   static byte[] IImageFormatWriter<NokiaPictureMessageFile>.ToBytes(NokiaPictureMessageFile file) => NokiaPictureMessageWriter.ToBytes(file);
 
   /// <summary>Image width in pixels (1..255).</summary>

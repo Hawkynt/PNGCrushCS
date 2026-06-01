@@ -13,6 +13,9 @@ public readonly record struct PngFile : IImageFormatReader<PngFile>, IImageToRaw
   static string[] IImageFormatMetadata<PngFile>.FileExtensions => [".png"];
   static PngFile IImageFormatReader<PngFile>.FromSpan(ReadOnlySpan<byte> data) => PngReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<PngFile>.Capabilities => FormatCapability.HasDedicatedOptimizer;
+  static VideoMode[] IImageFormatMetadata<PngFile>.VideoModes => [
+    new("Default", [(IntegerRange.Any, IntegerRange.Any)])
+  ];
   static byte[] IImageFormatWriter<PngFile>.ToBytes(PngFile file) => PngWriter.ToBytes(file);
   /// <summary>Image width in pixels</summary>
   public required int Width { get; init; }

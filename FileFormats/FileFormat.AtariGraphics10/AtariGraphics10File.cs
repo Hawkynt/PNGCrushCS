@@ -25,8 +25,9 @@ public sealed class AtariGraphics10File : IImageFormatReader<AtariGraphics10File
   static string[] IImageFormatMetadata<AtariGraphics10File>.FileExtensions => [".gr10", ".g10"];
   static AtariGraphics10File IImageFormatReader<AtariGraphics10File>.FromSpan(ReadOnlySpan<byte> data) => AtariGraphics10Reader.FromSpan(data);
 
-  static FormatCapability IImageFormatMetadata<AtariGraphics10File>.Capabilities => FormatCapability.IndexedOnly;
-  static IntegerRange[] IImageFormatMetadata<AtariGraphics10File>.AllowedPaletteRanges => [9];
+  static VideoMode[] IImageFormatMetadata<AtariGraphics10File>.VideoModes => [
+    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [9])
+  ];
   static RawImage IImageToRawImage<AtariGraphics10File>.ToRawImage(AtariGraphics10File file) => ToRawImage(file);
   static byte[] IImageFormatWriter<AtariGraphics10File>.ToBytes(AtariGraphics10File file) => AtariGraphics10Writer.ToBytes(file);
 
