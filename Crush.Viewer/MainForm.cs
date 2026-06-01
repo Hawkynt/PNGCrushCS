@@ -463,7 +463,7 @@ internal sealed partial class MainForm : Form {
 
     this._currentRawImage = BitmapConverter.QuantizeRawImage(
       this._currentRawImage, paletteSize, quantName, ditherName,
-      isHighQuality: false,
+      isHighQuality: true,  // match the preview path in ReduceColorsWindow (was false → save diverged from preview)
       quantizerParams: colorDlg.PickedQuantizerParams,
       dithererParams: colorDlg.PickedDithererParams
     );
