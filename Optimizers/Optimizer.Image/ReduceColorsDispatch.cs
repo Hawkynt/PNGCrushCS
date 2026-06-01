@@ -47,27 +47,58 @@ public static class ReduceColorsDispatch {
     return invoker(source, qInstance, dInstance, colorCount, isHighQuality);
   }
 
+  // Score-and-rank constructor picker. Critical for overloaded types like CustomPaletteQuantizer where one
+  // overload takes (byte,byte,byte)[] and another takes (byte,byte,byte,byte)[] — picking by param count alone
+  // silently picked the wrong overload, nulled the palette arg, and produced an empty default palette.
   private static object? _CreateWithParams(Type type, Dictionary<string, object?> paramValues) {
     var ctors = type.GetConstructors(BindingFlags.Public | BindingFlags.Instance);
     if (ctors.Length == 0) return null;
 
-    var bestCtor = ctors.OrderByDescending(c => c.GetParameters().Length).First();
-    var parameters = bestCtor.GetParameters();
-    if (parameters.Length == 0) return null;
+    var ranked = ctors
+      .Select(c => new { Ctor = c, Score = _ScoreCtor(c, paramValues) })
+      .Where(x => x.Score >= 0)
+      .OrderByDescending(x => x.Score)
+      .ThenByDescending(x => x.Ctor.GetParameters().Length)
+      .ToArray();
+    if (ranked.Length == 0) return null;
 
-    var args = new object?[parameters.Length];
-    for (var i = 0; i < parameters.Length; ++i) {
-      var p = parameters[i];
+    foreach (var entry in ranked) {
+      var parameters = entry.Ctor.GetParameters();
+      var args = new object?[parameters.Length];
+      var ok = true;
+      for (var i = 0; i < parameters.Length; ++i) {
+        var p = parameters[i];
+        if (p.Name != null && paramValues.TryGetValue(p.Name, out var value) && value != null) {
+          try { args[i] = _ConvertValue(value, p.ParameterType); }
+          catch { ok = false; break; }
+        } else {
+          args[i] = p.HasDefaultValue ? p.DefaultValue : (p.ParameterType.IsValueType ? Activator.CreateInstance(p.ParameterType) : null);
+        }
+      }
+      if (!ok) continue;
+      try { return entry.Ctor.Invoke(args); } catch { /* try next */ }
+    }
+    return null;
+  }
+
+  private static int _ScoreCtor(ConstructorInfo ctor, Dictionary<string, object?> paramValues) {
+    var parameters = ctor.GetParameters();
+    if (parameters.Length == 0) return 0;
+    var score = 0;
+    foreach (var p in parameters) {
       if (p.Name != null && paramValues.TryGetValue(p.Name, out var value) && value != null) {
-        try { args[i] = _ConvertValue(value, p.ParameterType); }
-        catch { args[i] = p.HasDefaultValue ? p.DefaultValue : (p.ParameterType.IsValueType ? Activator.CreateInstance(p.ParameterType) : null); }
-      } else {
-        args[i] = p.HasDefaultValue ? p.DefaultValue : (p.ParameterType.IsValueType ? Activator.CreateInstance(p.ParameterType) : null);
+        if (p.ParameterType.IsInstanceOfType(value)) {
+          score += 2;
+        } else if (p.ParameterType.IsEnum && value is string) {
+          score += 1;
+        } else if (value is IConvertible && (p.ParameterType.IsPrimitive || p.ParameterType == typeof(string) || p.ParameterType == typeof(decimal))) {
+          score += 1;
+        } else {
+          return -1;
+        }
       }
     }
-
-    try { return bestCtor.Invoke(args); }
-    catch { return null; }
+    return score;
   }
 
   private static object? _ConvertValue(object value, Type targetType) {

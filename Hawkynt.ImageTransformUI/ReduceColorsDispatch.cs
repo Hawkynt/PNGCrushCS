@@ -53,34 +53,63 @@ public static class ReduceColorsDispatch {
   }
 
   /// <summary>Attempts to create an instance of the given type using constructor parameters from the dictionary.</summary>
+  /// <remarks>Score every constructor by how many provided values can be assigned to its parameters by type
+  /// (without lossy <c>Convert.ChangeType</c>), then pick the best score. Critical for overloaded types like
+  /// <c>CustomPaletteQuantizer((byte,byte,byte)[])</c> vs <c>CustomPaletteQuantizer((byte,byte,byte,byte)[])</c>:
+  /// picking the wrong overload silently nulls the palette argument and the dispatcher falls back to a default
+  /// (empty) quantizer.</remarks>
   private static object? _CreateWithParams(Type type, Dictionary<string, object?> paramValues) {
     var ctors = type.GetConstructors(BindingFlags.Public | BindingFlags.Instance);
     if (ctors.Length == 0) return null;
 
-    // Find best matching constructor (most parameters matched)
-    var bestCtor = ctors.OrderByDescending(c => c.GetParameters().Length).First();
-    var parameters = bestCtor.GetParameters();
-    if (parameters.Length == 0) return null;
+    var ranked = ctors
+      .Select(c => new { Ctor = c, Score = _ScoreCtor(c, paramValues) })
+      .Where(x => x.Score >= 0)
+      .OrderByDescending(x => x.Score)
+      .ThenByDescending(x => x.Ctor.GetParameters().Length)
+      .ToArray();
+    if (ranked.Length == 0) return null;
 
-    var args = new object?[parameters.Length];
-    for (var i = 0; i < parameters.Length; ++i) {
-      var p = parameters[i];
-      if (p.Name != null && paramValues.TryGetValue(p.Name, out var value) && value != null) {
-        try {
-          args[i] = _ConvertValue(value, p.ParameterType);
-        } catch {
+    foreach (var entry in ranked) {
+      var parameters = entry.Ctor.GetParameters();
+      var args = new object?[parameters.Length];
+      var ok = true;
+      for (var i = 0; i < parameters.Length; ++i) {
+        var p = parameters[i];
+        if (p.Name != null && paramValues.TryGetValue(p.Name, out var value) && value != null) {
+          try { args[i] = _ConvertValue(value, p.ParameterType); }
+          catch { ok = false; break; }
+        } else {
           args[i] = p.HasDefaultValue ? p.DefaultValue : (p.ParameterType.IsValueType ? Activator.CreateInstance(p.ParameterType) : null);
         }
-      } else {
-        args[i] = p.HasDefaultValue ? p.DefaultValue : (p.ParameterType.IsValueType ? Activator.CreateInstance(p.ParameterType) : null);
+      }
+      if (!ok) continue;
+      try { return entry.Ctor.Invoke(args); } catch { /* try next */ }
+    }
+    return null;
+  }
+
+  /// <summary>Score a constructor: +2 per provided value whose type is directly assignable to the parameter type,
+  /// +1 per value that Convert.ChangeType might handle, 0 per default-only param. Returns -1 when a provided
+  /// value cannot be assigned at all (constructor unusable).</summary>
+  private static int _ScoreCtor(ConstructorInfo ctor, Dictionary<string, object?> paramValues) {
+    var parameters = ctor.GetParameters();
+    if (parameters.Length == 0) return 0;
+    var score = 0;
+    foreach (var p in parameters) {
+      if (p.Name != null && paramValues.TryGetValue(p.Name, out var value) && value != null) {
+        if (p.ParameterType.IsInstanceOfType(value)) {
+          score += 2; // exact match — strongly preferred
+        } else if (p.ParameterType.IsEnum && value is string) {
+          score += 1;
+        } else if (value is IConvertible && (p.ParameterType.IsPrimitive || p.ParameterType == typeof(string) || p.ParameterType == typeof(decimal))) {
+          score += 1;
+        } else {
+          return -1; // unassignable — skip this ctor
+        }
       }
     }
-
-    try {
-      return bestCtor.Invoke(args);
-    } catch {
-      return null;
-    }
+    return score;
   }
 
   private static object? _ConvertValue(object value, Type targetType) {
