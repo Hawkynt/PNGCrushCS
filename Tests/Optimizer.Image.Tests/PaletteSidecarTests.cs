@@ -41,14 +41,18 @@ public sealed class PaletteSidecarTests {
 
   [Test]
   [Category("Unit")]
-  public void TryWrite_IndexedWithPalette_WritesSidecar() {
+  public void TryWrite_IndexedWithPalette_WritesJascSidecar() {
     var palette = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 };
     var img = _MakeIndexed(palette);
     var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".tmp");
     try {
       Assert.That(PaletteSidecar.TryWrite(path, img), Is.True);
-      var written = File.ReadAllBytes(path + PaletteSidecar.SidecarSuffix);
-      Assert.That(written, Is.EqualTo(palette));
+      var written = File.ReadAllText(path + PaletteSidecar.SidecarSuffix);
+      Assert.That(written, Does.StartWith("JASC-PAL"));
+      Assert.That(written, Does.Contain("0100"));
+      Assert.That(written, Does.Contain("4"));   // count
+      Assert.That(written, Does.Contain("1 2 3"));
+      Assert.That(written, Does.Contain("10 11 12"));
     } finally {
       File.Delete(path + PaletteSidecar.SidecarSuffix);
     }
@@ -65,9 +69,12 @@ public sealed class PaletteSidecarTests {
     var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".tmp");
     try {
       Assert.That(PaletteSidecar.TryWrite(path, img), Is.True);
-      var written = File.ReadAllBytes(path + PaletteSidecar.SidecarSuffix);
-      Assert.That(written.Length, Is.EqualTo(12));
-      for (var i = 0; i < 12; ++i) Assert.That(written[i], Is.EqualTo(i));
+      // Read it back via Apply — the sidecar should yield exactly 4 entries.
+      var defaultImg = _MakeIndexed(new byte[] { 0, 0, 0, 1, 1, 1 });
+      var withSidecar = PaletteSidecar.Apply(path, defaultImg);
+      Assert.That(withSidecar.PaletteCount, Is.EqualTo(4));
+      Assert.That(withSidecar.Palette!.Length, Is.EqualTo(12));
+      for (var i = 0; i < 12; ++i) Assert.That(withSidecar.Palette[i], Is.EqualTo(i));
     } finally {
       File.Delete(path + PaletteSidecar.SidecarSuffix);
     }
@@ -84,23 +91,44 @@ public sealed class PaletteSidecarTests {
 
   [Test]
   [Category("Unit")]
-  public void Apply_SidecarExists_ReplacesPaletteAndCount() {
+  public void Apply_JascSidecarExists_ReplacesPaletteAndCount() {
     var original = new byte[] { 0, 0, 0, 255, 255, 255 };
-    var sidecar = new byte[] {
+    var expected = new byte[] {
       10, 20, 30,
       40, 50, 60,
       70, 80, 90,
       100, 110, 120,
     };
+    var jasc = "JASC-PAL\r\n0100\r\n4\r\n10 20 30\r\n40 50 60\r\n70 80 90\r\n100 110 120\r\n";
     var img = _MakeIndexed(original);
     var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".tmp");
     try {
-      File.WriteAllBytes(path + PaletteSidecar.SidecarSuffix, sidecar);
+      File.WriteAllText(path + PaletteSidecar.SidecarSuffix, jasc);
       var result = PaletteSidecar.Apply(path, img);
       Assert.That(result, Is.Not.SameAs(img));
-      Assert.That(result.Palette, Is.EqualTo(sidecar));
+      Assert.That(result.Palette, Is.EqualTo(expected));
       Assert.That(result.PaletteCount, Is.EqualTo(4));
       Assert.That(result.PixelData, Is.SameAs(img.PixelData), "Pixel data should not be re-allocated");
+    } finally {
+      File.Delete(path + PaletteSidecar.SidecarSuffix);
+    }
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void Apply_LegacyRawBinarySidecar_StillReadable() {
+    // Backwards-compat: pre-JASC sidecars were raw RGB binary. Apply should still accept them.
+    var legacy = new byte[] {
+      10, 20, 30,
+      40, 50, 60,
+    };
+    var img = _MakeIndexed(new byte[] { 0, 0, 0, 1, 1, 1 });
+    var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".tmp");
+    try {
+      File.WriteAllBytes(path + PaletteSidecar.SidecarSuffix, legacy);
+      var result = PaletteSidecar.Apply(path, img);
+      Assert.That(result.Palette, Is.EqualTo(legacy));
+      Assert.That(result.PaletteCount, Is.EqualTo(2));
     } finally {
       File.Delete(path + PaletteSidecar.SidecarSuffix);
     }
@@ -126,7 +154,7 @@ public sealed class PaletteSidecarTests {
     var img = _MakeIndexed(new byte[] { 0, 0, 0, 255, 255, 255 });
     var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".tmp");
     try {
-      // 7 bytes — not a multiple of 3, so invalid.
+      // 7 bytes — not a multiple of 3, doesn't start with JASC-PAL — invalid.
       File.WriteAllBytes(path + PaletteSidecar.SidecarSuffix, new byte[] { 1, 2, 3, 4, 5, 6, 7 });
       Assert.That(PaletteSidecar.Apply(path, img), Is.SameAs(img));
     } finally {
