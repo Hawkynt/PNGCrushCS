@@ -10,9 +10,112 @@ public readonly record struct BsaveFile : IImageFormatReader<BsaveFile>, IImageT
   static string IImageFormatMetadata<BsaveFile>.PrimaryExtension => ".bsv";
   static string[] IImageFormatMetadata<BsaveFile>.FileExtensions => [".bsv"];
   static BsaveFile IImageFormatReader<BsaveFile>.FromSpan(ReadOnlySpan<byte> data) => BsaveReader.FromSpan(data);
+  // Video modes the BSAVE format historically captured. Listed in approximate order of frequency.
+  //   SCREEN 1   → CGA 320x200 4-colour (6 palette variants — Palette 0/1 × low/high, plus "Mode 5")
+  //   SCREEN 1c  → SCREEN 1 viewed via NTSC composite (display filter only; on-disk bytes match SCREEN 1)
+  //   SCREEN 2   → CGA 640x200 monochrome
+  //   SCREEN 6c  → SCREEN 2 viewed via NTSC composite — produces apparent colour bleed from 1bpp data
+  //   SCREEN 9   → EGA 640x350 16-colour
+  //   SCREEN 13  → VGA Mode 13h 320x200 256-colour
+  //   160x100x16 → unofficial CGA tweak mode (40-col text mode with 2-line chars + half-block character)
+  // 320x200 appears in two modes (CGA-4 and VGA-256) — disambiguated by palette size at save time.
+  // "Composite" variants share the on-disk byte layout of their parent mode; only the display filter differs.
   static VideoMode[] IImageFormatMetadata<BsaveFile>.VideoModes => [
-    new("Default", [(320, 200)])
+    new("CGA SCREEN 1 (320x200, 4 colours)", [(320, 200)], [4], _CgaScreen1Palettes),
+    new("CGA SCREEN 1 composite (NTSC artefact display)", [(320, 200)], [4], _CgaScreen1Palettes,
+        displayFilter: DisplayFilter.NtscComposite,
+        description: "Same bytes as SCREEN 1 but rendered through an NTSC composite filter — gives the colour-bleed look classic games like King's Quest were authored against."),
+    new("CGA SCREEN 2 (640x200, monochrome)", [(640, 200)], [2], _CgaMonoPalettes),
+    new("CGA SCREEN 6 composite (640x200, NTSC artefact display)", [(640, 200)], [2], _CgaMonoPalettes,
+        displayFilter: DisplayFilter.NtscComposite,
+        description: "1bpp data viewed through NTSC composite — dot patterns demodulate to a 16-colour-ish artefact palette on real hardware."),
+    new("EGA SCREEN 9 (640x350, 16 colours)", [(640, 350)], [16], _EgaPaletteEntry),
+    new("VGA SCREEN 13 (320x200, 256 colours)", [(320, 200)], [256]),
+    new("CGA 160x100x16 (text-mode tweak)", [(160, 100)], [16], _CgaRgbiPaletteEntry,
+        description: "Unofficial mode produced by reprogramming the CGA into 40-column text mode with 2-line characters; each cell shows two stacked colours from the 16-colour RGBI palette."),
+    new("CGA 80x100x1024 (Reenigne composite tweak)", [(80, 100)], [1024], _Cga1024PaletteEntry,
+        displayFilter: DisplayFilter.NtscComposite,
+        description: "Trixter/Reenigne's CGA 1024-colour mode (int10h.org/blog/2015/04). 80-column text mode with CRTC re-programmed for 2-scanline characters using glyphs 0x55, 0x13, 0xB0, 0xB1 — 4 patterns × 16 fg × 16 bg = 1024 distinct cells. On real composite hardware each cell phase-shifts to a unique colour; the synthesised palette here mixes the RGBI fg/bg by the pattern's dot density and is approximate rather than NTSC-exact (no published LUT exists)."),
   ];
+
+  // ----- CGA palette variants (4 entries each) for SCREEN 1 mode -----
+
+  private static readonly FixedPalette[] _CgaScreen1Palettes = [
+    new FixedPalette("Palette 1 high intensity", 0x000000, 0x55FFFF, 0xFF55FF, 0xFFFFFF),
+    new FixedPalette("Palette 1 low intensity",  0x000000, 0x00AAAA, 0xAA00AA, 0xAAAAAA),
+    new FixedPalette("Palette 0 high intensity", 0x000000, 0x55FF55, 0xFF5555, 0xFFFF55),
+    new FixedPalette("Palette 0 low intensity",  0x000000, 0x00AA00, 0xAA0000, 0xAA5500),
+    new FixedPalette("Mode 5 high intensity",    0x000000, 0x55FFFF, 0xFF5555, 0xFFFFFF),
+    new FixedPalette("Mode 5 low intensity",     0x000000, 0x00AAAA, 0xAA0000, 0xAAAAAA),
+  ];
+
+  // ----- CGA monochrome SCREEN 2 — single palette variant; entry exists so the dialog still
+  //       shows the chosen foreground colour rather than hardcoding white.
+  private static readonly FixedPalette[] _CgaMonoPalettes = [
+    new FixedPalette("Black + White",       0x000000, 0xFFFFFF),
+    new FixedPalette("Black + Light Cyan",  0x000000, 0x55FFFF),
+    new FixedPalette("Black + Light Green", 0x000000, 0x55FF55),
+    new FixedPalette("Black + Amber",       0x000000, 0xFFAA00),
+  ];
+
+  // ----- Standard EGA 16-colour RGBI palette (also used as default for 160x100x16) -----
+  private static readonly FixedPalette[] _EgaPaletteEntry = [
+    new FixedPalette("EGA standard 16",
+      0x000000, 0x0000AA, 0x00AA00, 0x00AAAA, 0xAA0000, 0xAA00AA, 0xAA5500, 0xAAAAAA,
+      0x555555, 0x5555FF, 0x55FF55, 0x55FFFF, 0xFF5555, 0xFF55FF, 0xFFFF55, 0xFFFFFF),
+  ];
+
+  private static readonly FixedPalette[] _CgaRgbiPaletteEntry = [
+    new FixedPalette("CGA RGBI 16",
+      0x000000, 0x0000AA, 0x00AA00, 0x00AAAA, 0xAA0000, 0xAA00AA, 0xAA5500, 0xAAAAAA,
+      0x555555, 0x5555FF, 0x55FF55, 0x55FFFF, 0xFF5555, 0xFF55FF, 0xFFFF55, 0xFFFFFF),
+  ];
+
+  // ----- Synthesised 1024-entry palette for the CGA 80x100 Reenigne mode.
+  //       Layout: index = pattern * 256 + fg * 16 + bg, where:
+  //         pattern 0 = glyph 0x55 (50% density, phase A)
+  //         pattern 1 = glyph 0x13 (≈37% density, phase B)
+  //         pattern 2 = glyph 0xB0 (≈37% density, phase C)
+  //         pattern 3 = glyph 0xB1 (≈50% density, phase D)
+  //       Approximated by blending RGBI fg/bg at the pattern's dot ratio. The 4 patterns produce
+  //       perceptually distinct phase shifts on real composite hardware; here they only vary by
+  //       blend weight so the synthesised palette has visible — but not NTSC-exact — variation.
+  private static readonly FixedPalette[] _Cga1024PaletteEntry = [
+    new FixedPalette("CGA Reenigne 1024 (synthesised)", _Build1024PaletteHex()),
+  ];
+
+  internal static readonly byte[] _CgaCharGlyphs1024 = [0x55, 0x13, 0xB0, 0xB1];
+
+  private static uint[] _Build1024PaletteHex() {
+    // Approximate fg-density weights (out of 1.0) for the four dot-pattern glyphs (0x55, 0x13, 0xB0, 0xB1).
+    // Inlined rather than referencing a static field — this method is called during the static initialiser
+    // chain for _Cga1024PaletteEntry, so any sibling static referenced here may still be null.
+    double[] patternFgWeight = [0.50, 0.40, 0.60, 0.50];
+    // Source 16-colour RGBI palette (matches the RGBI table above).
+    uint[] rgbi = [
+      0x000000, 0x0000AA, 0x00AA00, 0x00AAAA, 0xAA0000, 0xAA00AA, 0xAA5500, 0xAAAAAA,
+      0x555555, 0x5555FF, 0x55FF55, 0x55FFFF, 0xFF5555, 0xFF55FF, 0xFFFF55, 0xFFFFFF,
+    ];
+    var hex = new uint[1024];
+    for (var pattern = 0; pattern < 4; ++pattern) {
+      var w = patternFgWeight[pattern];
+      for (var fg = 0; fg < 16; ++fg) {
+        var fr = (rgbi[fg] >> 16) & 0xFF;
+        var fgGrn = (rgbi[fg] >> 8) & 0xFF;
+        var fb = rgbi[fg] & 0xFF;
+        for (var bg = 0; bg < 16; ++bg) {
+          var br = (rgbi[bg] >> 16) & 0xFF;
+          var bgGrn = (rgbi[bg] >> 8) & 0xFF;
+          var bb = rgbi[bg] & 0xFF;
+          var r = (uint)System.Math.Round(fr * w + br * (1 - w));
+          var g = (uint)System.Math.Round(fgGrn * w + bgGrn * (1 - w));
+          var b = (uint)System.Math.Round(fb * w + bb * (1 - w));
+          hex[pattern * 256 + fg * 16 + bg] = (r << 16) | (g << 8) | b;
+        }
+      }
+    }
+    return hex;
+  }
   static byte[] IImageFormatWriter<BsaveFile>.ToBytes(BsaveFile file) => BsaveWriter.ToBytes(file);
   public int Width { get; init; }
   public int Height { get; init; }
@@ -45,43 +148,306 @@ public readonly record struct BsaveFile : IImageFormatReader<BsaveFile>, IImageT
       BsaveMode.Cga640x200x2 => _Cga2ToRawImage(file),
       BsaveMode.Ega640x350x16 => _Ega16ToRawImage(file),
       BsaveMode.Vga320x200x256 => _Vga256ToRawImage(file),
+      BsaveMode.Cga160x100x16 => _Cga160x100ToRawImage(file),
+      BsaveMode.Cga80x100x1024 => _Cga80x100x1024ToRawImage(file),
       _ => throw new ArgumentOutOfRangeException(nameof(file), file.Mode, "Unknown BSAVE mode.")
     };
   }
 
-  /// <summary>Creates a VGA Mode 13h (320x200x256) BSAVE from a <see cref="RawImage"/>. Input must be Indexed8 with a 256-color palette.</summary>
+  /// <summary>Creates a BSAVE screen dump from a <see cref="RawImage"/>. Dispatches by
+  /// (Width × Height × palette count) to the matching mode encoder. Input must be indexed (1/4/8 bpp)
+  /// with a palette small enough for the target mode.</summary>
   public static BsaveFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
 
-    var bgra = PixelConverter.Convert(image, PixelFormat.Bgra32);
-    var width = bgra.Width;
-    var height = bgra.Height;
-    var src = bgra.PixelData;
-
-    // Convert BGRA to grayscale indices for VGA Mode 13h (320x200x256)
-    const int vgaWidth = 320;
-    const int vgaHeight = 200;
-    var totalPixels = vgaWidth * vgaHeight;
-    var pixels = new byte[totalPixels];
-
-    for (var y = 0; y < vgaHeight; ++y)
-      for (var x = 0; x < vgaWidth; ++x) {
-        if (x < width && y < height) {
-          var srcIdx = (y * width + x) * 4;
-          var b = src[srcIdx];
-          var g = src[srcIdx + 1];
-          var r = src[srcIdx + 2];
-          // Map to VGA grayscale index (0-255)
-          pixels[y * vgaWidth + x] = (byte)((r * 77 + g * 150 + b * 29) >> 8);
-        }
-      }
-
-    return new() {
-      Width = vgaWidth,
-      Height = vgaHeight,
-      Mode = BsaveMode.Vga320x200x256,
-      PixelData = pixels,
+    var paletteCount = image.PaletteCount;
+    // Disambiguate 320×200 modes by palette size: 4 → CGA SCREEN 1, ≥256 → VGA SCREEN 13.
+    return (image.Width, image.Height) switch {
+      (320, 200) when paletteCount > 4 => _ToVga256(image),
+      (320, 200) => _ToCga4(image),
+      (640, 200) => _ToCga2(image),
+      (640, 350) => _ToEga16(image),
+      (160, 100) => _ToCga160x100(image),
+      (80, 100) => _ToCga80x100x1024(image),
+      _ => throw new ArgumentException(
+        $"BSAVE supports 320x200 (CGA/VGA), 640x200 (CGA mono), 640x350 (EGA), 160x100 (CGA tweak), or 80x100 (Reenigne 1024). Got {image.Width}x{image.Height}.",
+        nameof(image))
     };
+  }
+
+  private static BsaveFile _ToVga256(RawImage image) {
+    const int width = 320;
+    const int height = 200;
+    var src = _RequireIndexed(image, maxPalette: 256, modeName: "VGA SCREEN 13");
+    var pixels = new byte[width * height];
+    src.CopyTo(pixels, 0); // already byte-per-pixel linear
+    return new() {
+      Width = width, Height = height, Mode = BsaveMode.Vga320x200x256, PixelData = pixels,
+    };
+  }
+
+  private static BsaveFile _ToCga4(RawImage image) {
+    const int width = 320;
+    const int height = 200;
+    const int bytesPerLine = 80; // 320 / 4 pixels per byte
+    var src = _RequireIndexed(image, maxPalette: 4, modeName: "CGA SCREEN 1");
+    var pixels = new byte[0x4000]; // 16 KiB CGA frame: two 8000-byte banks
+    for (var y = 0; y < height; ++y) {
+      var bankOffset = (y & 1) == 0 ? 0 : 0x2000;
+      var lineOffset = bankOffset + (y >> 1) * bytesPerLine;
+      for (var byteCol = 0; byteCol < bytesPerLine; ++byteCol) {
+        byte b = 0;
+        for (var px = 0; px < 4; ++px) {
+          var x = byteCol * 4 + px;
+          var idx = src[y * width + x] & 3;
+          b |= (byte)(idx << (6 - px * 2));
+        }
+        pixels[lineOffset + byteCol] = b;
+      }
+    }
+    return new() {
+      Width = width, Height = height, Mode = BsaveMode.Cga320x200x4, PixelData = pixels,
+    };
+  }
+
+  private static BsaveFile _ToCga2(RawImage image) {
+    const int width = 640;
+    const int height = 200;
+    const int bytesPerLine = 80; // 640 / 8 pixels per byte
+    var src = _RequireIndexed(image, maxPalette: 2, modeName: "CGA SCREEN 2");
+    var pixels = new byte[0x4000];
+    for (var y = 0; y < height; ++y) {
+      var bankOffset = (y & 1) == 0 ? 0 : 0x2000;
+      var lineOffset = bankOffset + (y >> 1) * bytesPerLine;
+      for (var byteCol = 0; byteCol < bytesPerLine; ++byteCol) {
+        byte b = 0;
+        for (var bit = 0; bit < 8; ++bit) {
+          var x = byteCol * 8 + bit;
+          var on = (src[y * width + x] & 1) != 0;
+          if (on) b |= (byte)(1 << (7 - bit));
+        }
+        pixels[lineOffset + byteCol] = b;
+      }
+    }
+    return new() {
+      Width = width, Height = height, Mode = BsaveMode.Cga640x200x2, PixelData = pixels,
+    };
+  }
+
+  private static BsaveFile _ToEga16(RawImage image) {
+    const int width = 640;
+    const int height = 350;
+    const int bytesPerLine = 80; // 640 / 8 pixels per byte
+    const int planeSize = bytesPerLine * height; // 28000 per plane
+    var src = _RequireIndexed(image, maxPalette: 16, modeName: "EGA SCREEN 9");
+    var pixels = new byte[planeSize * 4];
+    for (var y = 0; y < height; ++y)
+      for (var byteCol = 0; byteCol < bytesPerLine; ++byteCol) {
+        byte p0 = 0, p1 = 0, p2 = 0, p3 = 0;
+        for (var bit = 0; bit < 8; ++bit) {
+          var x = byteCol * 8 + bit;
+          var idx = src[y * width + x];
+          var shift = 7 - bit;
+          if ((idx & 1) != 0) p0 |= (byte)(1 << shift);
+          if ((idx & 2) != 0) p1 |= (byte)(1 << shift);
+          if ((idx & 4) != 0) p2 |= (byte)(1 << shift);
+          if ((idx & 8) != 0) p3 |= (byte)(1 << shift);
+        }
+        var lineByteOffset = y * bytesPerLine + byteCol;
+        pixels[lineByteOffset] = p0;
+        pixels[lineByteOffset + planeSize] = p1;
+        pixels[lineByteOffset + planeSize * 2] = p2;
+        pixels[lineByteOffset + planeSize * 3] = p3;
+      }
+    return new() {
+      Width = width, Height = height, Mode = BsaveMode.Ega640x350x16, PixelData = pixels,
+    };
+  }
+
+  // 160x100x16: nibble-packed 4bpp linear data, 8000 bytes (160 * 100 / 2). High nibble = even col, low nibble = odd col.
+  private static BsaveFile _ToCga160x100(RawImage image) {
+    const int width = 160;
+    const int height = 100;
+    var src = _RequireIndexed(image, maxPalette: 16, modeName: "CGA 160x100x16");
+    var pixels = new byte[width * height / 2]; // 8000 bytes
+    for (var y = 0; y < height; ++y)
+      for (var col = 0; col < width / 2; ++col) {
+        var hi = src[y * width + col * 2] & 0x0F;
+        var lo = src[y * width + col * 2 + 1] & 0x0F;
+        pixels[y * (width / 2) + col] = (byte)((hi << 4) | lo);
+      }
+    return new() {
+      Width = width, Height = height, Mode = BsaveMode.Cga160x100x16, PixelData = pixels,
+    };
+  }
+
+  // 160x100x16 decoder: unpacks 8000 bytes of nibble-packed indices into 160x100 Indexed8.
+  private static RawImage _Cga160x100ToRawImage(BsaveFile file) {
+    const int width = 160;
+    const int height = 100;
+    var pixels = new byte[width * height];
+    var src = file.PixelData;
+    for (var y = 0; y < height; ++y)
+      for (var col = 0; col < width / 2; ++col) {
+        var srcOffset = y * (width / 2) + col;
+        if (srcOffset >= src.Length) continue;
+        var b = src[srcOffset];
+        pixels[y * width + col * 2] = (byte)((b >> 4) & 0x0F);
+        pixels[y * width + col * 2 + 1] = (byte)(b & 0x0F);
+      }
+    // Build RGB palette from the EGA RGBI 16-entry table.
+    var palette = new byte[16 * 3];
+    Buffer.BlockCopy(_EgaPalette, 0, palette, 0, 16 * 3);
+    return new() {
+      Width = width,
+      Height = height,
+      Format = PixelFormat.Indexed8,
+      PixelData = pixels,
+      Palette = palette,
+      PaletteCount = 16,
+    };
+  }
+
+  // 80x100x1024 (Reenigne mode): each pixel → text-mode (char, attr) cell.
+  //   pixel index = pattern * 256 + fg * 16 + bg  (decomposed from the synthesised 1024 palette)
+  //   char_byte   = _CgaCharGlyphs1024[pattern]   (one of {0x55, 0x13, 0xB0, 0xB1})
+  //   attr_byte   = (bg << 4) | fg                 (CGA text-mode attribute layout)
+  // 80 cols × 100 rows = 8000 cells × 2 bytes = 16000 bytes on disk.
+  private static BsaveFile _ToCga80x100x1024(RawImage image) {
+    const int width = 80;
+    const int height = 100;
+    if (!image.IsIndexed)
+      throw new ArgumentException(
+        "BSAVE 80x100x1024 requires an indexed image. Use the Save-As 'Reduce colours' step first.", nameof(image));
+    if (image.PaletteCount > 1024)
+      throw new ArgumentException(
+        $"BSAVE 80x100x1024 supports at most 1024 palette entries, got {image.PaletteCount}.", nameof(image));
+
+    // Source palette indices fit in a short (1024 < 65536); we still pass them through _RequireIndexed
+    // for sub-byte unpacking, then encode each as a (pattern, fg, bg) triple. For inputs with ≤256
+    // colours the encoder uses pattern=0 only — the user picks the high-bit patterns via the dialog.
+    var src = _RequireIndexedLarge(image, maxPalette: 1024, modeName: "80x100x1024");
+    var pixels = new byte[width * height * 2]; // 16000 bytes
+    for (var y = 0; y < height; ++y)
+      for (var x = 0; x < width; ++x) {
+        var idx = src[y * width + x];
+        var pattern = (idx >> 8) & 3;
+        var fg = (idx >> 4) & 0x0F;
+        var bg = idx & 0x0F;
+        var cellOffset = (y * width + x) * 2;
+        pixels[cellOffset] = _CgaCharGlyphs1024[pattern];
+        pixels[cellOffset + 1] = (byte)((bg << 4) | fg);
+      }
+    return new() {
+      Width = width, Height = height, Mode = BsaveMode.Cga80x100x1024, PixelData = pixels,
+    };
+  }
+
+  // Decoder: 16000-byte text-mode buffer → 80x100 Indexed8 with the synthesised 1024 palette.
+  private static RawImage _Cga80x100x1024ToRawImage(BsaveFile file) {
+    const int width = 80;
+    const int height = 100;
+    var src = file.PixelData;
+    var pixels = new byte[width * height];
+    // Note: PaletteCount=1024 won't fit in a single byte (PixelData is byte[]), so the decoded image
+    // packs the LOW 8 bits of the 10-bit index. This loses the pattern bits in the round-trip but
+    // keeps round-trip working for inputs that already had ≤256 colours (pattern 0). For full
+    // 1024-colour round-trip via the in-memory RawImage representation we'd need Indexed16 support,
+    // which RawImage doesn't have yet — call out as a known limitation.
+    for (var y = 0; y < height; ++y)
+      for (var x = 0; x < width; ++x) {
+        var cellOffset = (y * width + x) * 2;
+        if (cellOffset + 1 >= src.Length) continue;
+        var ch = src[cellOffset];
+        var attr = src[cellOffset + 1];
+        var fg = attr & 0x0F;
+        var bg = (attr >> 4) & 0x0F;
+        var pattern = System.Array.IndexOf(_CgaCharGlyphs1024, ch);
+        if (pattern < 0) pattern = 0;
+        var fullIdx = pattern * 256 + fg * 16 + bg;
+        pixels[y * width + x] = (byte)(fullIdx & 0xFF); // see note above
+      }
+    var palette = new byte[1024 * 3];
+    var palettePacked = _Build1024PaletteHex();
+    for (var i = 0; i < 1024; ++i) {
+      var c = palettePacked[i];
+      palette[i * 3] = (byte)((c >> 16) & 0xFF);
+      palette[i * 3 + 1] = (byte)((c >> 8) & 0xFF);
+      palette[i * 3 + 2] = (byte)(c & 0xFF);
+    }
+    return new() {
+      Width = width,
+      Height = height,
+      Format = PixelFormat.Indexed8,
+      PixelData = pixels,
+      Palette = palette,
+      PaletteCount = 1024,
+    };
+  }
+
+  /// <summary>Like <see cref="_RequireIndexed"/> but allows up to 1024 palette entries — needed for the Reenigne mode.
+  /// Source must already be byte-per-pixel (the dialog produces Indexed8 even when palette is large).</summary>
+  private static byte[] _RequireIndexedLarge(RawImage image, int maxPalette, string modeName) {
+    if (!image.IsIndexed)
+      throw new ArgumentException(
+        $"BSAVE {modeName} requires an indexed image. Use the Save-As 'Reduce colours' step first.", nameof(image));
+    if (image.PaletteCount > maxPalette)
+      throw new ArgumentException(
+        $"BSAVE {modeName} supports at most {maxPalette} palette entries, got {image.PaletteCount}.", nameof(image));
+
+    var src = image.PixelData ?? [];
+    return image.Format switch {
+      PixelFormat.Indexed8 => src,
+      PixelFormat.Indexed4 => _UnpackIndexed4(src, image.Width, image.Height),
+      PixelFormat.Indexed1 => _UnpackIndexed1(src, image.Width, image.Height),
+      _ => throw new ArgumentException($"Unexpected indexed format {image.Format}.", nameof(image)),
+    };
+  }
+
+  /// <summary>Converts the source to a flat Indexed8 byte array, validating that the palette fits in the target mode.
+  /// Unpacks sub-byte indexed formats (Indexed1/Indexed4) inline rather than going through
+  /// <see cref="PixelConverter"/> — that path can dispatch back through registered format writers and recurse.</summary>
+  private static byte[] _RequireIndexed(RawImage image, int maxPalette, string modeName) {
+    if (!image.IsIndexed)
+      throw new ArgumentException(
+        $"BSAVE {modeName} requires an indexed image. Use the Save-As 'Reduce colours' step to convert first.",
+        nameof(image));
+    if (image.PaletteCount > maxPalette)
+      throw new ArgumentException(
+        $"BSAVE {modeName} supports at most {maxPalette} palette entries, got {image.PaletteCount}.",
+        nameof(image));
+
+    var src = image.PixelData ?? [];
+    var w = image.Width;
+    var h = image.Height;
+    return image.Format switch {
+      PixelFormat.Indexed8 => src,
+      PixelFormat.Indexed4 => _UnpackIndexed4(src, w, h),
+      PixelFormat.Indexed1 => _UnpackIndexed1(src, w, h),
+      _ => throw new ArgumentException($"Unexpected indexed format {image.Format}.", nameof(image)),
+    };
+  }
+
+  private static byte[] _UnpackIndexed4(byte[] src, int width, int height) {
+    var stride = (width + 1) / 2;
+    var dst = new byte[width * height];
+    for (var y = 0; y < height; ++y)
+      for (var x = 0; x < width; ++x) {
+        var b = src[y * stride + (x >> 1)];
+        dst[y * width + x] = (byte)(((x & 1) == 0 ? b >> 4 : b) & 0x0F);
+      }
+    return dst;
+  }
+
+  private static byte[] _UnpackIndexed1(byte[] src, int width, int height) {
+    var stride = (width + 7) / 8;
+    var dst = new byte[width * height];
+    for (var y = 0; y < height; ++y)
+      for (var x = 0; x < width; ++x) {
+        var b = src[y * stride + (x >> 3)];
+        dst[y * width + x] = (byte)((b >> (7 - (x & 7))) & 1);
+      }
+    return dst;
   }
 
   // CGA 320x200x4: 2bpp, interleaved banks, map to CGA palette -> Rgb24

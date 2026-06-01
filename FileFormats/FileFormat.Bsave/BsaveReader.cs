@@ -65,13 +65,23 @@ public static class BsaveReader {
         return BsaveMode.Ega640x350x16;
     }
 
-    if (segment == 0xB800)
+    if (segment == 0xB800) {
+      // Exactly 16000 bytes → 80x100x1024 Reenigne mode (8000 char+attr cells, no padding).
+      // 16384 stays on the CGA-1 path because that's what standard SCREEN 1 dumps look like.
+      if (length == 16000)
+        return BsaveMode.Cga80x100x1024;
+      // 8000 bytes → 160x100x16 tweak mode (nibble-packed 4bpp).
+      if (length is 8000 or 8192)
+        return BsaveMode.Cga160x100x16;
       return BsaveMode.Cga320x200x4;
+    }
 
     // Default fallback based on data length
     return length switch {
       >= 64000 => BsaveMode.Vga320x200x256,
       >= 28000 => BsaveMode.Ega640x350x16,
+      16000 => BsaveMode.Cga80x100x1024,
+      8000 or 8192 => BsaveMode.Cga160x100x16,
       _ => BsaveMode.Cga320x200x4
     };
   }
