@@ -127,8 +127,8 @@ public sealed class ReduceColorsWindow : Form {
     _source = source ?? throw new ArgumentNullException(nameof(source));
 
     Text = "Reduce Colours";
-    Size = new Size(820, 560);
-    MinimumSize = new Size(700, 480);
+    Size = new Size(1240, 680);
+    MinimumSize = new Size(1000, 560);
     StartPosition = FormStartPosition.CenterParent;
     MinimizeBox = false;
     MaximizeBox = false;
@@ -136,13 +136,20 @@ public sealed class ReduceColorsWindow : Form {
     FormBorderStyle = FormBorderStyle.Sizable;
 
     // --- Layout: left column (controls) | right column (preview) ---
+    // Note: order matters — SplitterDistance/MinSize validation reads against the SplitContainer's current
+    // Width. An unparented SplitContainer defaults to ~150px wide, so we set an explicit Size first;
+    // Dock=Fill takes over once it's added to the form. Otherwise we'd hit InvalidOperationException
+    // ("SplitterDistance muss zwischen Panel1MinSize und Width - Panel2MinSize liegen").
     var splitContainer = new SplitContainer {
-      Dock = DockStyle.Fill,
+      Size = new Size(1200, 580),
       Orientation = Orientation.Vertical,
       FixedPanel = FixedPanel.Panel1,
-      SplitterDistance = 380,
       SplitterWidth = 6,
     };
+    splitContainer.Panel1MinSize = 560;
+    splitContainer.Panel2MinSize = 320;
+    splitContainer.SplitterDistance = 640;
+    splitContainer.Dock = DockStyle.Fill;
 
     // Left panel layout — the top section hosts EITHER the palette-size+quantizer UI
     // OR the fixed-palette dropdown (mutually exclusive).
