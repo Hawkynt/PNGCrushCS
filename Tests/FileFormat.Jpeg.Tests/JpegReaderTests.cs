@@ -49,6 +49,7 @@ public sealed class JpegReaderTests {
 
   [Test]
   [Category("Unit")]
+  [Platform("Win", Reason = "Builds the test JPEG through System.Drawing.Bitmap → GDI+ (Windows-only).")]
   public void FromBytes_ValidJpeg_ParsesCorrectly() {
     var jpegBytes = _CreateTestJpegBytes();
 
@@ -62,6 +63,7 @@ public sealed class JpegReaderTests {
 
   [Test]
   [Category("Unit")]
+  [Platform("Win", Reason = "Builds the test JPEG through System.Drawing.Bitmap → GDI+ (Windows-only).")]
   public void FromBytes_ValidJpeg_HasRgbPixelData() {
     const int width = 4;
     const int height = 4;

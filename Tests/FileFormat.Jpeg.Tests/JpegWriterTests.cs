@@ -85,6 +85,7 @@ public sealed class JpegWriterTests {
 
   [Test]
   [Category("Unit")]
+  [Platform("Win", Reason = "Builds the test JPEG through System.Drawing.Bitmap → GDI+ (Windows-only).")]
   public void LosslessTranscode_BaselineToProgressive_ProducesOutput() {
     var jpegBytes = _CreateTestJpegBytes();
 
