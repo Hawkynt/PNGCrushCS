@@ -111,6 +111,19 @@ internal static partial class FormatRegistration {
       (data, rules) => { try { return T.Rewrite(data, rules); } catch { return data; } });
   }
 
+  private static void _AugmentChunkPlanRewriter<T>(ImageFormat format) where T : IFormatChunkPlanRewriter<T> {
+    FormatRegistry.AugmentChunkPlanRewriter(
+      format,
+      (data, plan) => {
+        try { return T.ApplyPlan(data, plan); }
+        catch (Exception ex) {
+          return new ChunkRewriteResult {
+            Failures = [new ChunkRewriteFailure("Validate", "(file)", 0, ex.Message)],
+          };
+        }
+      });
+  }
+
   private static void _RegisterDetectionOnly() {
     // GIF uses external GifFileFormat library with its own type system (not IImageFormatReader)
     var gifEntry = new FormatRegistry.FormatEntry(

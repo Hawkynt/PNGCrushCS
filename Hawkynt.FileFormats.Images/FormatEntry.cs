@@ -30,7 +30,8 @@ public sealed record FormatEntry(
   Func<FileInfo, IReadOnlyList<RawImage>?>? LoadAllRawImages = null,
   VideoMode[]? VideoModes = null,
   Func<byte[], IReadOnlyList<ChunkSpan>>? EnumerateChunks = null,
-  Func<byte[], IReadOnlyList<ChunkRewriteRule>, byte[]>? RewriteChunks = null
+  Func<byte[], IReadOnlyList<ChunkRewriteRule>, byte[]>? RewriteChunks = null,
+  Func<byte[], ChunkRewritePlan, ChunkRewriteResult>? ApplyChunkPlan = null
 ) {
 
   /// <summary>The first/preferred MIME type, or <c>"application/octet-stream"</c> if none is registered.</summary>
@@ -50,4 +51,7 @@ public sealed record FormatEntry(
 
   /// <summary>True if this format can rewrite its chunk arrangement (re-order, remove, fuse) via <see cref="RewriteChunks"/>.</summary>
   public bool SupportsChunkRewrite => this.RewriteChunks != null;
+
+  /// <summary>True if this format accepts concrete placement plans with validation via <see cref="ApplyChunkPlan"/>.</summary>
+  public bool SupportsChunkPlanRewrite => this.ApplyChunkPlan != null;
 }

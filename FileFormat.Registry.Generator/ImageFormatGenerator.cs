@@ -18,6 +18,7 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
   private const string _IMAGE_INFO_READER = "FileFormat.Core.IImageInfoReader`1";
   private const string _FORMAT_CHUNK_LAYOUT = "FileFormat.Core.IFormatChunkLayout`1";
   private const string _FORMAT_CHUNK_REWRITER = "FileFormat.Core.IFormatChunkRewriter`1";
+  private const string _FORMAT_CHUNK_PLAN_REWRITER = "FileFormat.Core.IFormatChunkPlanRewriter`1";
   private const string _ADDITIONAL_IMAGE_FORMAT = "FileFormat.Core.AdditionalImageFormatAttribute";
   private const string _FORMAT_MAGIC_BYTES = "FileFormat.Core.FormatMagicBytesAttribute";
   private const string _FORMAT_DETECTION_PRIORITY = "FileFormat.Core.FormatDetectionPriorityAttribute";
@@ -51,6 +52,7 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
     var imageInfoReader = compilation.GetTypeByMetadataName(_IMAGE_INFO_READER);
     var formatChunkLayout = compilation.GetTypeByMetadataName(_FORMAT_CHUNK_LAYOUT);
     var formatChunkRewriter = compilation.GetTypeByMetadataName(_FORMAT_CHUNK_REWRITER);
+    var formatChunkPlanRewriter = compilation.GetTypeByMetadataName(_FORMAT_CHUNK_PLAN_REWRITER);
     var magicBytesAttr = compilation.GetTypeByMetadataName(_FORMAT_MAGIC_BYTES);
     var detectionPriorityAttr = compilation.GetTypeByMetadataName(_FORMAT_DETECTION_PRIORITY);
     var mimeTypeAttr = compilation.GetTypeByMetadataName(_FORMAT_MIME_TYPE);
@@ -77,6 +79,7 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
       var hasImageInfoReader = false;
       var hasChunkLayout = false;
       var hasChunkRewriter = false;
+      var hasChunkPlanRewriter = false;
 
       foreach (var iface in type.AllInterfaces) {
         if (!iface.IsGenericType)
@@ -107,6 +110,8 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
           hasChunkLayout = true;
         else if (formatChunkRewriter != null && SymbolEqualityComparer.Default.Equals(def, formatChunkRewriter))
           hasChunkRewriter = true;
+        else if (formatChunkPlanRewriter != null && SymbolEqualityComparer.Default.Equals(def, formatChunkPlanRewriter))
+          hasChunkPlanRewriter = true;
       }
 
       // Must implement at least one of the format interfaces
@@ -191,7 +196,8 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
         detectionPriority,
         mimeTypes.ToArray(),
         hasChunkLayout,
-        hasChunkRewriter
+        hasChunkRewriter,
+        hasChunkPlanRewriter
       ));
     }
 
@@ -352,6 +358,15 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
       sb.Append("    _AugmentChunkRewriter<").Append(format.FullTypeName).Append(">(ImageFormat.").Append(format.FormatId).AppendLine(");");
     }
 
+    sb.AppendLine();
+    sb.AppendLine("    // Chunk plan-rewriter registrations");
+    foreach (var format in formats) {
+      if (format.FullTypeName == null || !format.HasChunkPlanRewriter)
+        continue;
+
+      sb.Append("    _AugmentChunkPlanRewriter<").Append(format.FullTypeName).Append(">(ImageFormat.").Append(format.FormatId).AppendLine(");");
+    }
+
     sb.AppendLine("  }");
     sb.AppendLine("}");
 
@@ -395,6 +410,7 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
     public string[] MimeTypes { get; }
     public bool HasChunkLayout { get; }
     public bool HasChunkRewriter { get; }
+    public bool HasChunkPlanRewriter { get; }
 
     public FormatInfo(
       string formatId, string? fullTypeName,
@@ -405,7 +421,8 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
       int detectionPriority = 100,
       string[]? mimeTypes = null,
       bool hasChunkLayout = false,
-      bool hasChunkRewriter = false
+      bool hasChunkRewriter = false,
+      bool hasChunkPlanRewriter = false
     ) {
       FormatId = formatId;
       FullTypeName = fullTypeName;
@@ -420,6 +437,7 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
       MimeTypes = mimeTypes ?? Array.Empty<string>();
       HasChunkLayout = hasChunkLayout;
       HasChunkRewriter = hasChunkRewriter;
+      HasChunkPlanRewriter = hasChunkPlanRewriter;
     }
   }
 }

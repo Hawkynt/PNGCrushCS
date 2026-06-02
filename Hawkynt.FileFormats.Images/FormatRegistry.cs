@@ -78,6 +78,11 @@ public static class FormatRegistry {
     _byFormat[format] = existing with { RewriteChunks = rewriteChunks };
   }
 
+  internal static void AugmentChunkPlanRewriter(ImageFormat format, Func<byte[], ChunkRewritePlan, ChunkRewriteResult> applyChunkPlan) {
+    if (!_byFormat.TryGetValue(format, out var existing)) return;
+    _byFormat[format] = existing with { ApplyChunkPlan = applyChunkPlan };
+  }
+
   /// <summary>Builds the priority-sorted signature table after all registrations are complete.
   /// Called by <see cref="FormatRegistration.Initialize"/>.</summary>
   internal static void BuildSignatureTable() {
@@ -197,6 +202,52 @@ public static class FormatRegistry {
     var entry = GetEntry(format);
     if (entry?.RewriteChunks == null) return (byte[])data.Clone();
     return entry.RewriteChunks(data, rules);
+  }
+
+  /// <summary>
+  /// Applies a concrete <paramref name="plan"/> to <paramref name="data"/>. Unlike <see cref="RewriteChunks(byte[], IReadOnlyList{ChunkRewriteRule})"/>'s
+  /// best-effort by-name policy, this validates every directive against per-chunk
+  /// <see cref="ChunkSpan.AllowedZones"/> and <see cref="ChunkSpan.Mobility"/>: any rejected directive surfaces
+  /// in <see cref="ChunkRewriteResult.Failures"/> and the file is NOT rewritten (atomic — all or nothing).
+  /// <para/>
+  /// Callers should typically enumerate chunks first, inspect each one's <see cref="ChunkSpan.AllowedZones"/>
+  /// to know what's movable, build a <see cref="ChunkRewritePlan"/> that respects those constraints,
+  /// then submit it here.
+  /// </summary>
+  /// <example>
+  /// <code>
+  /// var bytes = File.ReadAllBytes("photo.png");
+  /// var chunks = FormatRegistry.EnumerateChunks(bytes);
+  ///
+  /// // Find every movable metadata chunk and request it land in PostData.
+  /// var placements = chunks
+  ///   .Where(c => c.Kind == ChunkKind.Metadata && (c.AllowedZones &amp; AllowedZones.PostData) != 0)
+  ///   .Select(c => new ChunkPlacementDirective(new ChunkReference(c.Name, c.Ordinal), ChunkZone.PostData))
+  ///   .ToArray();
+  ///
+  /// var result = FormatRegistry.ApplyChunkPlan(bytes, new ChunkRewritePlan { Placements = placements });
+  /// if (result.Success) File.WriteAllBytes("photo.png", result.Bytes!);
+  /// else foreach (var f in result.Failures)
+  ///   Console.WriteLine($"REJECTED {f.Operation} {f.ChunkName}#{f.Ordinal}: {f.Reason}");
+  /// </code>
+  /// </example>
+  public static ChunkRewriteResult ApplyChunkPlan(byte[] data, ChunkRewritePlan plan) {
+    if (data == null) return new ChunkRewriteResult { Failures = [new ChunkRewriteFailure("Validate", "(input)", 0, "data was null")] };
+    if (plan == null) return new ChunkRewriteResult { Failures = [new ChunkRewriteFailure("Validate", "(input)", 0, "plan was null")] };
+    var format = DetectFromBytes(data);
+    if (format == ImageFormat.Unknown)
+      return new ChunkRewriteResult { Failures = [new ChunkRewriteFailure("Detect", "(input)", 0, "Unrecognised format.")] };
+    return ApplyChunkPlan(format, data, plan);
+  }
+
+  /// <summary>Plan-based rewrite using an explicit format.</summary>
+  public static ChunkRewriteResult ApplyChunkPlan(ImageFormat format, byte[] data, ChunkRewritePlan plan) {
+    if (data == null) return new ChunkRewriteResult { Failures = [new ChunkRewriteFailure("Validate", "(input)", 0, "data was null")] };
+    if (plan == null) return new ChunkRewriteResult { Failures = [new ChunkRewriteFailure("Validate", "(input)", 0, "plan was null")] };
+    var entry = GetEntry(format);
+    if (entry?.ApplyChunkPlan == null)
+      return new ChunkRewriteResult { Failures = [new ChunkRewriteFailure("Capability", format.ToString(), 0, "Format does not support plan-based rewrite.")] };
+    return entry.ApplyChunkPlan(data, plan);
   }
 
   // ============================================================================================
