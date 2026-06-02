@@ -40,6 +40,39 @@ public enum ChunkMobility {
   Fusible = 1 << 2,
 }
 
+/// <summary>The format-structural zone a chunk lives in. Zones partition the file into ordered
+/// regions; legal positions for each chunk are expressed as zone membership rather than raw byte
+/// offsets so callers don't need to do offset arithmetic.</summary>
+public enum ChunkZone {
+  /// <summary>Magic-byte preamble (offset 0).</summary>
+  Signature,
+  /// <summary>Top-level header chunk(s) right after the signature (PNG IHDR, JPEG SOI+APP0).</summary>
+  Header,
+  /// <summary>Between header and the primary pixel/sample run — palettes, decoder hints, metadata
+  /// that the spec requires to be read upfront.</summary>
+  PreData,
+  /// <summary>The primary pixel/sample run itself (PNG IDAT, MP4 mdat). Position-locked as a block.</summary>
+  Data,
+  /// <summary>After the data run but before the footer — comments, trailing metadata.</summary>
+  PostData,
+  /// <summary>File terminator (PNG IEND, JPEG EOI).</summary>
+  Footer,
+}
+
+/// <summary>Bitmask of zones a chunk is permitted to occupy. Returned per-chunk by
+/// <see cref="IFormatChunkLayout{TSelf}.EnumerateChunks(ReadOnlySpan{byte})"/> so the caller can
+/// pre-check whether a desired move is legal before submitting it to a rewriter.</summary>
+[Flags]
+public enum AllowedZones {
+  None     = 0,
+  Signature = 1 << 0,
+  Header    = 1 << 1,
+  PreData   = 1 << 2,
+  Data      = 1 << 3,
+  PostData  = 1 << 4,
+  Footer    = 1 << 5,
+}
+
 /// <summary>One contiguous structural region of a format-file. Returned by
 /// <see cref="IFormatChunkLayout{TSelf}.EnumerateChunks(ReadOnlySpan{byte})"/>.</summary>
 /// <param name="Name">Format-specific identifier: PNG 4cc ("IHDR"), JPEG marker name ("SOI", "APP1"), etc.
@@ -50,13 +83,18 @@ public enum ChunkMobility {
 /// <param name="Mobility">What the rewriter is permitted to do with this chunk.</param>
 /// <param name="Ordinal">0-based index disambiguating chunks that share a <see cref="Name"/> (e.g. multiple
 /// PNG IDATs). Stable within one enumeration of the same byte stream.</param>
+/// <param name="CurrentZone">The zone this chunk currently occupies.</param>
+/// <param name="AllowedZones">Bitmask of zones the chunk may legally be moved to (always includes
+/// <see cref="CurrentZone"/>). Use this to pre-check whether a planned move is permitted.</param>
 public readonly record struct ChunkSpan(
   string Name,
   long Offset,
   long Length,
   ChunkKind Kind,
   ChunkMobility Mobility,
-  int Ordinal = 0
+  int Ordinal = 0,
+  ChunkZone CurrentZone = ChunkZone.PreData,
+  AllowedZones AllowedZones = AllowedZones.None
 );
 
 /// <summary>Implemented by formats that expose their byte-level internal structure for layout analysis,
