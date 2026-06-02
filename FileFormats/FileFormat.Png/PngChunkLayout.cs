@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using FileFormat.Core;
 
@@ -42,26 +43,48 @@ internal static class PngChunkLayout {
     for (var i = 0; i < _PngSignatureBytes.Length; ++i)
       if (data[i] != _PngSignatureBytes[i]) return result;
 
-    result.Add(new ChunkSpan(_Signature, 0, _PngSignatureBytes.Length, ChunkKind.Signature, ChunkMobility.Fixed));
+    result.Add(new ChunkSpan(
+      _Signature, 0, _PngSignatureBytes.Length, ChunkKind.Signature, ChunkMobility.Fixed,
+      Ordinal: 0, CurrentZone: ChunkZone.Signature, AllowedZones: AllowedZones.Signature));
 
     var ordinals = new Dictionary<string, int>(StringComparer.Ordinal);
     var pos = _PngSignatureBytes.Length;
 
+    // First pass: parse raw chunks
+    var raw = new List<(string Type, int Offset, int Total, int Ordinal, ChunkKind Kind, ChunkMobility Mobility, AllowedZones Allowed)>();
     while (pos + 12 <= data.Length) {
       var length = BinaryPrimitives.ReadUInt32BigEndian(data.Slice(pos, 4));
       if (length > int.MaxValue) break;
       var type = Encoding.ASCII.GetString(data.Slice(pos + 4, 4));
-      var total = 12 + (long)length; // 4 length + 4 type + data + 4 CRC
+      var total = 12 + (long)length;
       if (pos + total > data.Length) break;
 
       var ordinal = ordinals.TryGetValue(type, out var n) ? n : 0;
       ordinals[type] = ordinal + 1;
 
-      var (kind, mobility) = _Classify(type);
-      result.Add(new ChunkSpan(type, pos, total, kind, mobility, ordinal));
+      var (kind, mobility, allowed) = _Classify(type);
+      raw.Add((type, pos, (int)total, ordinal, kind, mobility, allowed));
 
       pos += (int)total;
       if (type == "IEND") break;
+    }
+
+    // Second pass: assign CurrentZone based on position relative to the first IDAT.
+    var firstIdatIdx = -1;
+    for (var i = 0; i < raw.Count; ++i)
+      if (raw[i].Type == "IDAT") { firstIdatIdx = i; break; }
+
+    for (var i = 0; i < raw.Count; ++i) {
+      var r = raw[i];
+      var zone = r.Type switch {
+        "IHDR" => ChunkZone.Header,
+        "IEND" => ChunkZone.Footer,
+        "IDAT" => ChunkZone.Data,
+        _ when firstIdatIdx >= 0 && i < firstIdatIdx => ChunkZone.PreData,
+        _ when firstIdatIdx >= 0 => ChunkZone.PostData,
+        _ => ChunkZone.PreData,
+      };
+      result.Add(new ChunkSpan(r.Type, r.Offset, r.Total, r.Kind, r.Mobility, r.Ordinal, zone, r.Allowed));
     }
 
     return result;
@@ -202,22 +225,163 @@ internal static class PngChunkLayout {
 
   // ---- chunk classification ----
 
-  private static (ChunkKind Kind, ChunkMobility Mobility) _Classify(string type) => type switch {
-    "IHDR" => (ChunkKind.Header, ChunkMobility.Fixed),
-    "PLTE" => (ChunkKind.Palette, ChunkMobility.Movable),
-    "IDAT" => (ChunkKind.PixelData, ChunkMobility.Movable | ChunkMobility.Fusible),
-    "IEND" => (ChunkKind.Footer, ChunkMobility.Fixed),
-    "iCCP" or "sRGB" or "gAMA" or "cHRM" or "sBIT" or "pHYs" or "tIME"
-      => (ChunkKind.ColorProfile, ChunkMobility.Movable | ChunkMobility.Removable),
+  // PNG-spec-accurate placement rules:
+  // - IHDR / IEND: position-locked
+  // - IDAT: only in Data zone (contiguous run)
+  // - PLTE, tRNS, bKGD, hIST, sPLT: must precede IDAT (PreData only)
+  // - Colour-profile / display hints (cHRM, gAMA, iCCP, sBIT, sRGB, pHYs): must precede IDAT (PreData only)
+  // - Text + timestamp + EXIF (tEXt, zTXt, iTXt, tIME, eXIf): no ordering constraint → PreData | PostData
+  // - Unknown ancillary: lenient → PreData | PostData
+  // - Unknown critical: strict → current zone only (we mark Fixed and don't touch)
+  private static (ChunkKind Kind, ChunkMobility Mobility, AllowedZones Allowed) _Classify(string type) => type switch {
+    "IHDR" => (ChunkKind.Header, ChunkMobility.Fixed, AllowedZones.Header),
+    "PLTE" => (ChunkKind.Palette, ChunkMobility.Movable, AllowedZones.PreData),
+    "IDAT" => (ChunkKind.PixelData, ChunkMobility.Movable | ChunkMobility.Fusible, AllowedZones.Data),
+    "IEND" => (ChunkKind.Footer, ChunkMobility.Fixed, AllowedZones.Footer),
+    "iCCP" or "sRGB" or "gAMA" or "cHRM" or "sBIT" or "pHYs"
+      => (ChunkKind.ColorProfile, ChunkMobility.Movable | ChunkMobility.Removable, AllowedZones.PreData),
     "tRNS" or "bKGD" or "hIST" or "sPLT"
-      => (ChunkKind.Metadata, ChunkMobility.Movable),
-    "tEXt" or "zTXt" or "iTXt" or "eXIf"
-      => (ChunkKind.Metadata, ChunkMobility.Movable | ChunkMobility.Removable),
+      => (ChunkKind.Metadata, ChunkMobility.Movable, AllowedZones.PreData),
+    "tEXt" or "zTXt" or "iTXt" or "tIME" or "eXIf"
+      => (ChunkKind.Metadata, ChunkMobility.Movable | ChunkMobility.Removable, AllowedZones.PreData | AllowedZones.PostData),
     _ when type.Length == 4 && char.IsUpper(type[0])
-      => (ChunkKind.Unknown, ChunkMobility.Fixed),
+      => (ChunkKind.Unknown, ChunkMobility.Fixed, AllowedZones.PreData),
     _ when type.Length == 4
-      => (ChunkKind.Metadata, ChunkMobility.Movable | ChunkMobility.Removable),
-    _ => (ChunkKind.Unknown, ChunkMobility.Fixed),
+      => (ChunkKind.Metadata, ChunkMobility.Movable | ChunkMobility.Removable, AllowedZones.PreData | AllowedZones.PostData),
+    _ => (ChunkKind.Unknown, ChunkMobility.Fixed, AllowedZones.None),
+  };
+
+  // ---- plan-based rewrite ----
+
+  public static ChunkRewriteResult ApplyPlan(ReadOnlySpan<byte> data, ChunkRewritePlan plan) {
+    var failures = new List<ChunkRewriteFailure>();
+    var chunks = Enumerate(data);
+    if (chunks.Count == 0) {
+      failures.Add(new ChunkRewriteFailure("Validate", "(file)", 0, "Not a valid PNG."));
+      return new ChunkRewriteResult { Failures = failures };
+    }
+
+    // Build a map of (Name, Ordinal) → ChunkSpan for lookup.
+    var byRef = new Dictionary<ChunkReference, ChunkSpan>();
+    foreach (var ch in chunks)
+      byRef[new ChunkReference(ch.Name, ch.Ordinal)] = ch;
+
+    // Validate placements.
+    var requestedZone = new Dictionary<ChunkReference, (ChunkZone Zone, int? Order)>();
+    foreach (var p in plan.Placements) {
+      if (!byRef.TryGetValue(p.Chunk, out var ch)) {
+        failures.Add(new ChunkRewriteFailure("Place", p.Chunk.Name, p.Chunk.Ordinal,
+          $"No chunk with name '{p.Chunk.Name}' and ordinal {p.Chunk.Ordinal} found."));
+        continue;
+      }
+      var asFlag = _ZoneToFlag(p.TargetZone);
+      if ((ch.AllowedZones & asFlag) == 0) {
+        failures.Add(new ChunkRewriteFailure("Place", p.Chunk.Name, p.Chunk.Ordinal,
+          $"Chunk '{p.Chunk.Name}' may not occupy zone {p.TargetZone}. Allowed: {ch.AllowedZones}."));
+        continue;
+      }
+      requestedZone[p.Chunk] = (p.TargetZone, p.OrderInZone);
+    }
+
+    // Validate removals.
+    var toRemove = new HashSet<ChunkReference>();
+    foreach (var r in plan.Remove) {
+      if (!byRef.TryGetValue(r, out var ch)) {
+        failures.Add(new ChunkRewriteFailure("Remove", r.Name, r.Ordinal,
+          $"No chunk with name '{r.Name}' and ordinal {r.Ordinal} found."));
+        continue;
+      }
+      if ((ch.Mobility & ChunkMobility.Removable) == 0) {
+        failures.Add(new ChunkRewriteFailure("Remove", r.Name, r.Ordinal,
+          $"Chunk '{r.Name}' is not removable (mobility: {ch.Mobility})."));
+        continue;
+      }
+      toRemove.Add(r);
+    }
+
+    // Validate fusions.
+    var fuseNames = new HashSet<string>(StringComparer.Ordinal);
+    foreach (var name in plan.Fuse) {
+      var instances = chunks.Where(c => c.Name == name).ToList();
+      if (instances.Count == 0) {
+        failures.Add(new ChunkRewriteFailure("Fuse", name, 0,
+          $"No chunks named '{name}' found."));
+        continue;
+      }
+      if (instances.Any(c => (c.Mobility & ChunkMobility.Fusible) == 0)) {
+        failures.Add(new ChunkRewriteFailure("Fuse", name, 0,
+          $"Chunk '{name}' is not fusible (mobility: {instances[0].Mobility})."));
+        continue;
+      }
+      fuseNames.Add(name);
+    }
+
+    if (failures.Count > 0)
+      return new ChunkRewriteResult { Failures = failures };
+
+    // Build buckets per zone using effective placements (requested or current).
+    var preData = new List<(ChunkSpan Ch, int? Order, int OriginalIdx)>();
+    var postData = new List<(ChunkSpan Ch, int? Order, int OriginalIdx)>();
+    var ihdr = default(ChunkSpan?);
+    var iend = default(ChunkSpan?);
+    var idats = new List<ChunkSpan>();
+
+    for (var i = 0; i < chunks.Count; ++i) {
+      var ch = chunks[i];
+      if (ch.Name == _Signature) continue;
+      if (toRemove.Contains(new ChunkReference(ch.Name, ch.Ordinal))) continue;
+      var key = new ChunkReference(ch.Name, ch.Ordinal);
+      var (effectiveZone, order) = requestedZone.TryGetValue(key, out var pz) ? pz : (ch.CurrentZone, (int?)null);
+
+      switch (effectiveZone) {
+        case ChunkZone.Header: ihdr = ch; break;
+        case ChunkZone.Footer: iend = ch; break;
+        case ChunkZone.Data: idats.Add(ch); break;
+        case ChunkZone.PreData: preData.Add((ch, order, i)); break;
+        case ChunkZone.PostData: postData.Add((ch, order, i)); break;
+        case ChunkZone.Signature: break; // signature stays fixed
+      }
+    }
+
+    if (ihdr == null) {
+      failures.Add(new ChunkRewriteFailure("Validate", "IHDR", 0, "IHDR missing after applying plan."));
+      return new ChunkRewriteResult { Failures = failures };
+    }
+
+    // Sort intra-zone: by Order (null last), then by original index.
+    static int Compare((ChunkSpan Ch, int? Order, int OriginalIdx) a, (ChunkSpan Ch, int? Order, int OriginalIdx) b) {
+      if (a.Order.HasValue && b.Order.HasValue) return a.Order.Value.CompareTo(b.Order.Value);
+      if (a.Order.HasValue) return -1;
+      if (b.Order.HasValue) return 1;
+      return a.OriginalIdx.CompareTo(b.OriginalIdx);
+    }
+    preData.Sort(Compare);
+    postData.Sort(Compare);
+
+    // Emit.
+    using var output = new System.IO.MemoryStream(data.Length);
+    output.Write(_PngSignatureBytes, 0, _PngSignatureBytes.Length);
+    _CopyChunkBytes(data, ihdr.Value, output);
+    foreach (var (ch, _, _) in preData) _CopyChunkBytes(data, ch, output);
+    if (fuseNames.Contains("IDAT") && idats.Count > 1)
+      _WriteFusedIdat(data, idats, output);
+    else
+      foreach (var ch in idats) _CopyChunkBytes(data, ch, output);
+    foreach (var (ch, _, _) in postData) _CopyChunkBytes(data, ch, output);
+    if (iend is { } e) _CopyChunkBytes(data, e, output);
+    else _WriteEmptyIend(output);
+
+    return new ChunkRewriteResult { Bytes = output.ToArray() };
+  }
+
+  private static AllowedZones _ZoneToFlag(ChunkZone zone) => zone switch {
+    ChunkZone.Signature => AllowedZones.Signature,
+    ChunkZone.Header => AllowedZones.Header,
+    ChunkZone.PreData => AllowedZones.PreData,
+    ChunkZone.Data => AllowedZones.Data,
+    ChunkZone.PostData => AllowedZones.PostData,
+    ChunkZone.Footer => AllowedZones.Footer,
+    _ => AllowedZones.None,
   };
 
   // ---- CRC-32 (PNG / ISO 3309) ----

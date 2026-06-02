@@ -9,7 +9,7 @@ namespace FileFormat.Png;
 [FormatMimeType("image/png", "image/x-png")]
 public readonly record struct PngFile :
   IImageFormatReader<PngFile>, IImageToRawImage<PngFile>, IImageFromRawImage<PngFile>, IImageFormatWriter<PngFile>,
-  IFormatChunkLayout<PngFile>, IFormatChunkRewriter<PngFile> {
+  IFormatChunkLayout<PngFile>, IFormatChunkRewriter<PngFile>, IFormatChunkPlanRewriter<PngFile> {
 
   static string IImageFormatMetadata<PngFile>.PrimaryExtension => ".png";
   static string[] IImageFormatMetadata<PngFile>.FileExtensions => [".png"];
@@ -25,6 +25,9 @@ public readonly record struct PngFile :
 
   static byte[] IFormatChunkRewriter<PngFile>.Rewrite(ReadOnlySpan<byte> data, IReadOnlyList<ChunkRewriteRule> rules)
     => PngChunkLayout.Rewrite(data, rules);
+
+  static ChunkRewriteResult IFormatChunkPlanRewriter<PngFile>.ApplyPlan(ReadOnlySpan<byte> data, ChunkRewritePlan plan)
+    => PngChunkLayout.ApplyPlan(data, plan);
   /// <summary>Image width in pixels</summary>
   public required int Width { get; init; }
 
