@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Pure C# reader and writer for NFO/DIZ files: raw CP437 text with box-drawing characters, line-wrapped to a fixed column count.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="FileFormat.Nfo.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../FileFormat.Core/FileFormat.Core.csproj" />
+    <ProjectReference Include="../FileFormat.TextMode/FileFormat.TextMode.csproj" />
+  </ItemGroup>
+</Project>

@@ -252,6 +252,41 @@ internal sealed partial class MainForm : Form {
       ? targets[selectedIndex]
       : FormatRegistry.GetEntry(FormatRegistry.DetectFromExtension(Path.GetExtension(dlg.FileName).ToLowerInvariant()));
 
+    // Text-mode formats (NFO/ANSI/XBIN) drive their own grid via the FontCodepageWindow picker
+    // instead of the VideoMode/resize/reduce pipeline. The picker captures font + codepage + cell
+    // grid; we resize the source to (cols*cellW)×(rows*cellH) and let the format writer quantize.
+    var ext = Path.GetExtension(dlg.FileName).ToLowerInvariant();
+    if (ext is ".nfo" or ".diz" or ".ans" or ".ansi" or ".xb" or ".xbin") {
+      using var fontDlg = new Hawkynt.ImageTransformUI.FontCodepageWindow();
+      var defaultCols = Math.Max(1, this._currentRawImage.Width / 8);
+      var defaultRows = Math.Max(1, this._currentRawImage.Height / 16);
+      fontDlg.SetDefaults(Math.Min(defaultCols, 200), Math.Min(defaultRows, 100));
+      if (fontDlg.ShowDialog(this) != DialogResult.OK) return;
+
+      if (fontDlg.PickedFont is not null)
+        FileFormat.TextMode.BitmapFont.Default = fontDlg.PickedFont;
+
+      var targetW = fontDlg.PickedColumns * FileFormat.TextMode.BitmapFont.Default.CellWidth;
+      var targetH = fontDlg.PickedRows * FileFormat.TextMode.BitmapFont.Default.CellHeight;
+      if (this._currentRawImage.Width != targetW || this._currentRawImage.Height != targetH)
+        this._currentRawImage = ImageTransformer.Resize(this._currentRawImage, targetW, targetH, ResizeMode.Stretch, InterpolationHint.Bilinear);
+      this._currentBitmap?.Dispose();
+      this._currentBitmap = BitmapConverter.RawImageToBitmap(this._currentRawImage);
+      this._imagePanel.Image = this._currentBitmap;
+
+      try {
+        if (targetEntry?.ConvertFromRawImage is null) {
+          MessageBox.Show($"Format '{targetEntry?.Name ?? ext}' does not support writing.", "Save As", MessageBoxButtons.OK, MessageBoxIcon.Error);
+          return;
+        }
+        File.WriteAllBytes(dlg.FileName, targetEntry.ConvertFromRawImage(this._currentRawImage));
+        this._formatLabel.Text = "Saved";
+      } catch (Exception ex) {
+        MessageBox.Show($"Save failed: {ex.Message}", "Save As", MessageBoxButtons.OK, MessageBoxIcon.Error);
+      }
+      return;
+    }
+
     // VideoMode-aware path: when the target declares 2+ video modes, let the user pick one.
     // Single-mode formats auto-pick. Formats that declare none (legacy/external) skip mode-specific steps.
     VideoMode? pickedMode = null;

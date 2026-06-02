@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Pure C# reader and writer for XBIN binary text-mode art (.xb): 11-byte header + optional palette/font/RLE image.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="FileFormat.XBin.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../FileFormat.Core/FileFormat.Core.csproj" />
+    <ProjectReference Include="../FileFormat.TextMode/FileFormat.TextMode.csproj" />
+  </ItemGroup>
+</Project>
