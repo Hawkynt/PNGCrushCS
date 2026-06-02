@@ -1,11 +1,14 @@
 using System;
+using System.Collections.Generic;
 using FileFormat.Core;
 
 namespace FileFormat.Jpeg;
 
 /// <summary>In-memory representation of a JPEG image.</summary>
 [FormatMimeType("image/jpeg", "image/jpg", "image/pjpeg")]
-public readonly record struct JpegFile : IImageFormatReader<JpegFile>, IImageToRawImage<JpegFile>, IImageFromRawImage<JpegFile>, IImageFormatWriter<JpegFile> {
+public readonly record struct JpegFile :
+  IImageFormatReader<JpegFile>, IImageToRawImage<JpegFile>, IImageFromRawImage<JpegFile>, IImageFormatWriter<JpegFile>,
+  IFormatChunkLayout<JpegFile>, IFormatChunkRewriter<JpegFile>, IFormatChunkPlanRewriter<JpegFile> {
 
   static string IImageFormatMetadata<JpegFile>.PrimaryExtension => ".jpg";
   static string[] IImageFormatMetadata<JpegFile>.FileExtensions => [".jpg", ".jpeg", ".jpe", ".jfif", ".jps", ".thm"];
@@ -17,6 +20,15 @@ public readonly record struct JpegFile : IImageFormatReader<JpegFile>, IImageToR
       ? true : null;
 
   static byte[] IImageFormatWriter<JpegFile>.ToBytes(JpegFile file) => JpegWriter.ToBytes(file);
+
+  static IEnumerable<ChunkSpan> IFormatChunkLayout<JpegFile>.EnumerateChunks(ReadOnlySpan<byte> data)
+    => JpegChunkLayout.Enumerate(data);
+
+  static byte[] IFormatChunkRewriter<JpegFile>.Rewrite(ReadOnlySpan<byte> data, IReadOnlyList<ChunkRewriteRule> rules)
+    => JpegChunkLayout.Rewrite(data, rules);
+
+  static ChunkRewriteResult IFormatChunkPlanRewriter<JpegFile>.ApplyPlan(ReadOnlySpan<byte> data, ChunkRewritePlan plan)
+    => JpegChunkLayout.ApplyPlan(data, plan);
   public int Width { get; init; }
   public int Height { get; init; }
   public bool IsGrayscale { get; init; }
