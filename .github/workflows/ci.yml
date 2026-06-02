@@ -1,7 +1,6 @@
 name: CI
 
-# PNGCrushCS depends on two sibling repos checked out side-by-side:
-#   * AnythingToGif       — Optimizer.Gif → ..\..\AnythingToGif\GifFileFormat\GifFileFormat.csproj
+# PNGCrushCS depends on one sibling repo checked out side-by-side:
 #   * CompressionWorkbench — FileFormat.Jpeg (and friends) link individual source files via
 #                            <Compile Include="..\..\CompressionWorkbench\Compression.Core\..." />
 #                            (conditional — when sibling absent, the link is skipped and the
@@ -28,13 +27,6 @@ jobs:
         with:
           path: PNGCrushCS
           fetch-depth: 0
-
-      - name: Checkout AnythingToGif (sibling)
-        uses: actions/checkout@v4
-        with:
-          repository: Hawkynt/AnythingToGif
-          path: AnythingToGif
-          fetch-depth: 1
 
       - name: Checkout CompressionWorkbench (sibling)
         uses: actions/checkout@v4
@@ -81,13 +73,6 @@ jobs:
         with:
           path: PNGCrushCS
           fetch-depth: 0
-
-      - name: Checkout AnythingToGif (sibling)
-        uses: actions/checkout@v4
-        with:
-          repository: Hawkynt/AnythingToGif
-          path: AnythingToGif
-          fetch-depth: 1
 
       - name: Checkout CompressionWorkbench (sibling)
         uses: actions/checkout@v4

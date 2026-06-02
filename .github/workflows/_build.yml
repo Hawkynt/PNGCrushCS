@@ -7,8 +7,7 @@ name: Build artifacts
 #   * Crush.Image    -- unified CLI (AssemblyName=crush.exe)
 #   * Crush.Viewer   -- WinForms GUI (500+ formats, zoom/pan/convert)
 #
-# Depends on sibling repos checked out side-by-side:
-#   * AnythingToGif       — Optimizer.Gif's GifFileFormat dependency.
+# Depends on one sibling repo checked out side-by-side:
 #   * CompressionWorkbench — FileFormat.Jpeg (and others) link source files from
 #                            ..\..\CompressionWorkbench\Compression.Core\* (conditional).
 on:
@@ -48,13 +47,6 @@ jobs:
           path: PNGCrushCS
           ref: ${{ inputs.ref || github.ref }}
           fetch-depth: 0
-
-      - name: Checkout AnythingToGif (sibling)
-        uses: actions/checkout@v4
-        with:
-          repository: Hawkynt/AnythingToGif
-          path: AnythingToGif
-          fetch-depth: 1
 
       - name: Checkout CompressionWorkbench (sibling)
         uses: actions/checkout@v4

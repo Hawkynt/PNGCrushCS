@@ -89,22 +89,20 @@ For per-project details, build commands, and the comprehensive list of public ty
 
 ## Build / test / run
 
-PNGCrushCS depends on two sibling repos checked out side-by-side. Clone them next to this one before building:
+PNGCrushCS optionally consumes one sibling repo. Clone it next to this one before building if you want the linked-source primitives:
 
 ```bash
 # Working directory layout expected by csproj relative paths
 work/
 ├─ PNGCrushCS/             # this repo
-├─ AnythingToGif/          # Optimizer.Gif → GifFileFormat
 └─ CompressionWorkbench/   # FileFormat.Jpeg + others link source files from Compression.Core
 
-# Clone all three
+# Clone both
 git clone https://github.com/Hawkynt/PNGCrushCS.git
-git clone https://github.com/Hawkynt/AnythingToGif.git
 git clone https://github.com/Hawkynt/CompressionWorkbench.git
 ```
 
-The cross-repo source links are conditional — when a sibling is absent the project falls back to its non-sibling code path, so consumers of the published NuGet package don't need either sibling. The clones are only required when **building from source**.
+The cross-repo source links are conditional — when the sibling is absent the project falls back to its non-sibling code path, so consumers of the published NuGet package don't need it. The clone is only required when **building from source** AND you want the CompressionWorkbench-enhanced paths.
 
 ```bash
 cd PNGCrushCS

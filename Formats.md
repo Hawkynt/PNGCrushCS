@@ -19,7 +19,7 @@ Cross-reference of implemented formats against four major image processing tools
 
 ## Implemented Formats
 
-All formats below have dedicated `FileFormat.*` libraries with both reader and writer implementations (except GIF, which uses an external `GifFileFormat` library).
+All formats below have dedicated `FileFormat.*` libraries with both reader and writer implementations.
 
 | Format                  | Extensions                                           | Description                      | Reader | Writer | Optimizer | Tom's | IM  | XnView | IrfanView |
 | ----------------------- | ---------------------------------------------------- | -------------------------------- | ------ | ------ | --------- | ----- | --- | ------ | --------- |
