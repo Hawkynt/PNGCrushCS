@@ -19,8 +19,32 @@ internal static class GifLzwCodec {
   private const int _MaxCodeBits = 12;
   private const int _MaxCodes = 1 << _MaxCodeBits;
 
-  public sealed record EncodeOptions(bool DeferClear = false) {
+  /// <summary>Compression strategy. <see cref="CompressionLevel.None"/> emits each pixel as a literal code
+  /// (largest output, useful as a baseline for testing or for downstream re-compression).
+  /// <see cref="CompressionLevel.Standard"/> is the default LZW path with periodic clears.
+  /// <see cref="CompressionLevel.Best"/> runs every reasonable Standard variant and keeps the smallest —
+  /// the GIF analogue of Zopfli's exhaustive deflate parameter search.</summary>
+  public enum CompressionLevel {
+    None,
+    Standard,
+    Best,
+  }
+
+  /// <summary>Encoder configuration. <see cref="DeferClear"/> only affects <see cref="CompressionLevel.Standard"/>;
+  /// <see cref="CompressionLevel.Best"/> overrides it by trying both values internally.</summary>
+  public sealed record EncodeOptions(CompressionLevel Level = CompressionLevel.Standard, bool DeferClear = false) {
     public static readonly EncodeOptions Default = new();
+
+    /// <summary>Each pixel encoded as a literal code with no dictionary growth — produces the largest output.</summary>
+    public static EncodeOptions NoCompression() => new(CompressionLevel.None);
+
+    /// <summary>Standard LZW with optional deferred-clear-code optimisation.</summary>
+    public static EncodeOptions StandardCompression(bool deferClear = false)
+      => new(CompressionLevel.Standard, deferClear);
+
+    /// <summary>Try every Standard variant (clear-now, deferred-clear) and keep the smallest output. ~2x the
+    /// encode cost; saves a few % on real-world frames where deferred-clear wins or loses unpredictably.</summary>
+    public static EncodeOptions BestEffort() => new(CompressionLevel.Best);
   }
 
   // ============================================================
@@ -40,18 +64,65 @@ internal static class GifLzwCodec {
     if (lzwMinCodeSize < 2 || lzwMinCodeSize > 8)
       throw new ArgumentOutOfRangeException(nameof(lzwMinCodeSize), "Must be 2..8.");
 
+    return options.Level switch {
+      CompressionLevel.None => _EncodeNoCompression(indexedPixels, lzwMinCodeSize),
+      CompressionLevel.Best => _EncodeBest(indexedPixels, lzwMinCodeSize),
+      _ => _EncodeStandard(indexedPixels, lzwMinCodeSize, options.DeferClear),
+    };
+  }
+
+  /// <summary>Emits each pixel as its own literal code, never referencing dictionary-extended codes.
+  /// The decoder still grows its dictionary per spec, so the encoder must track code-size growth
+  /// in lockstep and emit a Clear before the table would overflow.</summary>
+  private static byte[] _EncodeNoCompression(ReadOnlySpan<byte> indexedPixels, int lzwMinCodeSize) {
     var clearCode = 1 << lzwMinCodeSize;
     var eoiCode = clearCode + 1;
     var startCodeSize = lzwMinCodeSize + 1;
 
     using var ms = new MemoryStream();
     ms.WriteByte((byte)lzwMinCodeSize);
-
     using var bitOut = new _BitWriterSubBlocks(ms);
 
-    // Dictionary maps a (prefixCode << 8) | nextByte → assigned code. Implemented as a flat
-    // int[_MaxCodes * 256] sparse hash is overkill; a Dictionary is fine for the modest entry counts
-    // typical GIF frames produce.
+    var codeSize = startCodeSize;
+    var nextCode = eoiCode + 1;
+    var inRunSinceClear = false;
+
+    bitOut.Write(clearCode, codeSize);
+
+    for (var i = 0; i < indexedPixels.Length; ++i) {
+      bitOut.Write(indexedPixels[i], codeSize);
+
+      // Decoder side-effect: when prev >= 0 (i.e. not the first code after a clear) it allocates
+      // a new dictionary entry, then bumps codeSize when nextCode hits (1 << codeSize).
+      if (inRunSinceClear && nextCode < _MaxCodes) {
+        ++nextCode;
+        if (nextCode == (1 << codeSize) && codeSize < _MaxCodeBits) ++codeSize;
+      }
+      inRunSinceClear = true;
+
+      // If the next literal would push the decoder over the dictionary cap, reset.
+      if (nextCode >= _MaxCodes - 1 && i + 1 < indexedPixels.Length) {
+        bitOut.Write(clearCode, codeSize);
+        codeSize = startCodeSize;
+        nextCode = eoiCode + 1;
+        inRunSinceClear = false;
+      }
+    }
+    bitOut.Write(eoiCode, codeSize);
+    bitOut.Flush();
+    return ms.ToArray();
+  }
+
+  /// <summary>Standard LZW with optional deferred-clear-code optimisation.</summary>
+  private static byte[] _EncodeStandard(ReadOnlySpan<byte> indexedPixels, int lzwMinCodeSize, bool deferClear) {
+    var clearCode = 1 << lzwMinCodeSize;
+    var eoiCode = clearCode + 1;
+    var startCodeSize = lzwMinCodeSize + 1;
+
+    using var ms = new MemoryStream();
+    ms.WriteByte((byte)lzwMinCodeSize);
+    using var bitOut = new _BitWriterSubBlocks(ms);
+
     var dict = new Dictionary<int, int>();
     var codeSize = startCodeSize;
     var nextCode = eoiCode + 1;
@@ -67,24 +138,22 @@ internal static class GifLzwCodec {
     var w = (int)indexedPixels[0];
     for (var i = 1; i < indexedPixels.Length; ++i) {
       var k = indexedPixels[i];
-      var combined = (w << 9) | k; // 9 bits suffices for k since pixels are <= 8 bits; keep some headroom
+      var combined = (w << 9) | k;
       if (dict.TryGetValue(combined, out var existing)) {
         w = existing;
         continue;
       }
 
-      // Emit w, then add wK to dict.
       bitOut.Write(w, codeSize);
       if (nextCode < _MaxCodes) {
         dict[combined] = nextCode++;
         if (nextCode == (1 << codeSize) + 1 && codeSize < _MaxCodeBits) ++codeSize;
-      } else if (!options.DeferClear) {
+      } else if (!deferClear) {
         bitOut.Write(clearCode, codeSize);
         dict.Clear();
         codeSize = startCodeSize;
         nextCode = eoiCode + 1;
       }
-      // When DeferClear is set we just stop adding new entries and keep emitting against the existing table.
 
       w = k;
     }
@@ -93,6 +162,15 @@ internal static class GifLzwCodec {
     bitOut.Write(eoiCode, codeSize);
     bitOut.Flush();
     return ms.ToArray();
+  }
+
+  /// <summary>Tries every Standard variant and keeps the smallest output. Currently exhausts {clear-now,
+  /// defer-clear}; future Zopfli-style additions (e.g. multi-iteration dictionary seeding) would extend
+  /// the candidate list here without changing the API.</summary>
+  private static byte[] _EncodeBest(ReadOnlySpan<byte> pixels, int lzwMinCodeSize) {
+    var clearNow = _EncodeStandard(pixels, lzwMinCodeSize, deferClear: false);
+    var deferred = _EncodeStandard(pixels, lzwMinCodeSize, deferClear: true);
+    return deferred.Length < clearNow.Length ? deferred : clearNow;
   }
 
   // ============================================================

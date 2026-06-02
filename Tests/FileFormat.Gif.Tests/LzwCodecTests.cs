@@ -88,4 +88,67 @@ public sealed class LzwCodecTests {
     Assert.That(GifLzwCodec.Decode(msA, input.Length), Is.EqualTo(input));
     Assert.That(GifLzwCodec.Decode(msB, input.Length), Is.EqualTo(input));
   }
+
+  // ============================================================
+  // CompressionLevel tests
+  // ============================================================
+
+  [Test]
+  public void CompressionLevel_None_DecodesToSameInput() {
+    var input = new byte[256];
+    for (var i = 0; i < input.Length; ++i) input[i] = (byte)(i % 16);
+    var encoded = GifLzwCodec.Encode(input, 4, GifLzwCodec.EncodeOptions.NoCompression());
+    using var ms = new MemoryStream(encoded);
+    Assert.That(GifLzwCodec.Decode(ms, input.Length), Is.EqualTo(input));
+  }
+
+  [Test]
+  public void CompressionLevel_None_LargerThanStandardOnRepetitiveData() {
+    var input = new byte[2048];
+    for (var i = 0; i < input.Length; ++i) input[i] = (byte)(i % 4);
+    var noComp = GifLzwCodec.Encode(input, 2, GifLzwCodec.EncodeOptions.NoCompression());
+    var standard = GifLzwCodec.Encode(input, 2);
+    Assert.That(noComp.Length, Is.GreaterThan(standard.Length),
+      "no-compression should produce a larger stream than standard LZW on a highly redundant input");
+  }
+
+  [Test]
+  public void CompressionLevel_Standard_MatchesDefault() {
+    var rng = new Random(123);
+    var input = new byte[1024];
+    rng.NextBytes(input);
+    var defaultOpt = GifLzwCodec.Encode(input, 8);
+    var standardOpt = GifLzwCodec.Encode(input, 8, GifLzwCodec.EncodeOptions.StandardCompression());
+    Assert.That(standardOpt, Is.EqualTo(defaultOpt));
+  }
+
+  [Test]
+  public void CompressionLevel_Best_NeverLargerThanStandard() {
+    var rng = new Random(7);
+    var input = new byte[8192];
+    rng.NextBytes(input);
+    var best = GifLzwCodec.Encode(input, 8, GifLzwCodec.EncodeOptions.BestEffort());
+    var standard = GifLzwCodec.Encode(input, 8);
+    Assert.That(best.Length, Is.LessThanOrEqualTo(standard.Length),
+      "Best should pick the smallest of all Standard variants — at worst tied with the default");
+  }
+
+  [Test]
+  public void CompressionLevel_Best_RoundTrips() {
+    var rng = new Random(8);
+    var input = new byte[4096];
+    rng.NextBytes(input);
+    var encoded = GifLzwCodec.Encode(input, 8, GifLzwCodec.EncodeOptions.BestEffort());
+    using var ms = new MemoryStream(encoded);
+    Assert.That(GifLzwCodec.Decode(ms, input.Length), Is.EqualTo(input));
+  }
+
+  [Test]
+  public void EncodeOptions_FactoryMethods_ProduceExpectedLevels() {
+    Assert.That(GifLzwCodec.EncodeOptions.NoCompression().Level, Is.EqualTo(GifLzwCodec.CompressionLevel.None));
+    Assert.That(GifLzwCodec.EncodeOptions.StandardCompression().Level, Is.EqualTo(GifLzwCodec.CompressionLevel.Standard));
+    Assert.That(GifLzwCodec.EncodeOptions.StandardCompression(deferClear: true).DeferClear, Is.True);
+    Assert.That(GifLzwCodec.EncodeOptions.BestEffort().Level, Is.EqualTo(GifLzwCodec.CompressionLevel.Best));
+    Assert.That(GifLzwCodec.EncodeOptions.Default.Level, Is.EqualTo(GifLzwCodec.CompressionLevel.Standard));
+  }
 }
