@@ -5,6 +5,14 @@
     <TargetFramework>net10.0-windows</TargetFramework>
     <AssemblyName>crush</AssemblyName>
     <Description>Universal image format optimizer CLI.</Description>
+
+    <!-- Single-file publish config consumed by build/SingleFileBundle.targets. -->
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>false</SelfContained>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-x64</RuntimeIdentifier>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <!-- Every `dotnet build` automatically post-publishes to a single exe in the bin folder. -->
+    <EnableSingleFileBundle>true</EnableSingleFileBundle>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,5 +23,7 @@
     <ProjectReference Include="..\Optimizers\Optimizer.Image\Optimizer.Image.csproj" />
     <ProjectReference Include="..\Crush.Core\Crush.Core.csproj" />
   </ItemGroup>
+
+  <Import Project="..\build\SingleFileBundle.targets" />
 
 </Project>

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Pure C# reader and writer for the X BitMap (XBM) color extension: byte-per-pixel index data with an inline palette.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Optimizer.XbmColor" />
+    <InternalsVisibleTo Include="Optimizer.XbmColor.Tests" />
+    <InternalsVisibleTo Include="FileFormat.XbmColor.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../FileFormat.Core/FileFormat.Core.csproj" />
+  </ItemGroup>
+</Project>

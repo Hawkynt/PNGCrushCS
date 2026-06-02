@@ -10,8 +10,11 @@
     <PublishSingleFile Condition="'$(OS)' == 'Windows_NT'">true</PublishSingleFile>
     <!-- WinForms is not compatible with trimming (NETSDK1175) -->
     <SelfContained Condition="'$(OS)' == 'Windows_NT'">true</SelfContained>
+    <RuntimeIdentifier Condition="'$(OS)' == 'Windows_NT' And '$(RuntimeIdentifier)' == ''">win-x64</RuntimeIdentifier>
     <EnableCompressionInSingleFile Condition="'$(OS)' == 'Windows_NT'">true</EnableCompressionInSingleFile>
     <IncludeNativeLibrariesForSelfExtract Condition="'$(OS)' == 'Windows_NT'">true</IncludeNativeLibrariesForSelfExtract>
+    <!-- Every `dotnet build` automatically post-publishes to a single exe in the bin folder. -->
+    <EnableSingleFileBundle Condition="'$(OS)' == 'Windows_NT'">true</EnableSingleFileBundle>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,5 +22,7 @@
     <ProjectReference Include="..\FileFormat.Core\FileFormat.Core.csproj" />
     <ProjectReference Include="..\Hawkynt.ImageTransformUI\Hawkynt.ImageTransformUI.csproj" />
   </ItemGroup>
+
+  <Import Project="..\build\SingleFileBundle.targets" />
 
 </Project>
