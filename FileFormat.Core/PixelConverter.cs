@@ -27,6 +27,8 @@ public static class PixelConverter {
       (PixelFormat.Indexed4, PixelFormat.Bgra32) => Indexed4ToBgra(data, source.Palette ?? throw new InvalidOperationException("Palette required for indexed format"), totalPixels, source.AlphaTable),
       (PixelFormat.Indexed1, PixelFormat.Bgra32) => Indexed1ToBgra(data, source.Palette ?? throw new InvalidOperationException("Palette required for indexed format"), totalPixels, source.AlphaTable),
       (PixelFormat.Indexed16, PixelFormat.Bgra32) => Indexed16ToBgra(data, source.Palette ?? throw new InvalidOperationException("Palette required for indexed format"), totalPixels, source.AlphaTable),
+      (PixelFormat.Gray10, PixelFormat.Bgra32) => Gray10ToBgra(data, totalPixels),
+      (PixelFormat.Rgb30, PixelFormat.Bgra32) => Rgb30ToBgra(data, totalPixels),
       (PixelFormat.Rgba64, PixelFormat.Bgra32) => Rgba16BeToBgra(data, totalPixels),
       (PixelFormat.Rgb565, PixelFormat.Bgra32) => Rgb565ToBgra(data, totalPixels),
       (PixelFormat.Argb32, PixelFormat.Bgra32) => ArgbToBgra(data, totalPixels),
@@ -162,6 +164,50 @@ public static class PixelConverter {
       result[dst + 3] = alphaTable != null && idx < alphaTable.Length ? alphaTable[idx] : (byte)255;
     }
 
+    return result;
+  }
+
+  /// <summary>Converts 10-bit grayscale (16-bit little-endian container, values 0..1023) to BGRA.
+  /// Scales 10-bit to 8-bit with rounding so output values span the full 0..255 range; without this
+  /// the source's brightest pixel would render as ~25% intensity.</summary>
+  public static byte[] Gray10ToBgra(byte[] data, int totalPixels) {
+    var result = new byte[totalPixels * 4];
+    for (var i = 0; i < totalPixels; ++i) {
+      var src = i * 2;
+      if (src + 1 >= data.Length) break;
+      var v = data[src] | (data[src + 1] << 8);
+      if (v > 0x3FF) v = 0x3FF;
+      var g = (byte)((v * 255 + 511) / 1023);
+      var d = i * 4;
+      result[d]     = g;
+      result[d + 1] = g;
+      result[d + 2] = g;
+      result[d + 3] = 255;
+    }
+    return result;
+  }
+
+  /// <summary>Converts 32-bit packed Rgb30 (R10G10B10A2, DXGI/Vulkan layout) to BGRA. The 2-bit alpha
+  /// expands to 0/85/170/255; channels scale 10→8 with rounding.</summary>
+  public static byte[] Rgb30ToBgra(byte[] data, int totalPixels) {
+    var result = new byte[totalPixels * 4];
+    for (var i = 0; i < totalPixels; ++i) {
+      var src = i * 4;
+      if (src + 3 >= data.Length) break;
+      var w = (uint)data[src]
+            | ((uint)data[src + 1] << 8)
+            | ((uint)data[src + 2] << 16)
+            | ((uint)data[src + 3] << 24);
+      var r10 = (int)(w & 0x3FF);
+      var g10 = (int)((w >> 10) & 0x3FF);
+      var b10 = (int)((w >> 20) & 0x3FF);
+      var a2  = (int)((w >> 30) & 0x3);
+      var d = i * 4;
+      result[d]     = (byte)((b10 * 255 + 511) / 1023);
+      result[d + 1] = (byte)((g10 * 255 + 511) / 1023);
+      result[d + 2] = (byte)((r10 * 255 + 511) / 1023);
+      result[d + 3] = (byte)(a2 * 85); // 0→0, 1→85, 2→170, 3→255
+    }
     return result;
   }
 

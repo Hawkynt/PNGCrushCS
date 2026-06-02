@@ -81,6 +81,8 @@ public sealed class RawImage {
     PixelFormat.Rgba64 => 8,
     PixelFormat.Rgb48 => 6,
     PixelFormat.Rgb565 => 2,
+    PixelFormat.Gray10 => 2,
+    PixelFormat.Rgb30 => 4,
     _ => throw new ArgumentOutOfRangeException(nameof(format), format, null)
   };
 
@@ -101,6 +103,8 @@ public sealed class RawImage {
     PixelFormat.Rgba64 => 64,
     PixelFormat.Rgb48 => 48,
     PixelFormat.Rgb565 => 16,
+    PixelFormat.Gray10 => 16,  // 10 bits stored in a 16-bit container
+    PixelFormat.Rgb30 => 32,
     _ => throw new ArgumentOutOfRangeException(nameof(format), format, null)
   };
 }

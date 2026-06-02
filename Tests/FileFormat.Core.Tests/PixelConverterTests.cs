@@ -450,6 +450,65 @@ public sealed class PixelConverterTests {
   }
 
   [Test]
+  public void Gray10ToBgra_FullRangeValueScalesToWhite() {
+    // 10-bit max (1023) should render as 255 in 8-bit; mid (512) should land near 128.
+    byte[] data = [0xFF, 0x03, 0x00, 0x02]; // pixel 0 = 0x3FF (1023), pixel 1 = 0x200 (512)
+    var result = PixelConverter.Gray10ToBgra(data, 2);
+    Assert.That(result[0], Is.EqualTo(255));
+    Assert.That(result[1], Is.EqualTo(255));
+    Assert.That(result[2], Is.EqualTo(255));
+    Assert.That(result[3], Is.EqualTo(255));
+    // 512 * 255 / 1023 = 127.625 → with round-half-up 128
+    Assert.That(result[4], Is.EqualTo(128));
+    Assert.That(result[5], Is.EqualTo(128));
+    Assert.That(result[6], Is.EqualTo(128));
+  }
+
+  [Test]
+  public void Rgb30ToBgra_PacksAndUnpacksDxgiLayout() {
+    // R10=0x3FF, G10=0x200, B10=0x000, A2=3 → packed as A2(3)<<30 | B(0)<<20 | G(0x200)<<10 | R(0x3FF)
+    var packed = (3u << 30) | (0u << 20) | (0x200u << 10) | 0x3FFu;
+    byte[] data = [
+      (byte)(packed & 0xFF),
+      (byte)((packed >> 8) & 0xFF),
+      (byte)((packed >> 16) & 0xFF),
+      (byte)((packed >> 24) & 0xFF),
+    ];
+
+    var result = PixelConverter.Rgb30ToBgra(data, 1);
+    Assert.That(result[0], Is.EqualTo(0));     // B
+    Assert.That(result[1], Is.EqualTo(128));   // G (mid)
+    Assert.That(result[2], Is.EqualTo(255));   // R (max)
+    Assert.That(result[3], Is.EqualTo(255));   // A2=3 → 255
+  }
+
+  [Test]
+  public void Rgb30ToBgra_TwoBitAlphaExpandsCorrectly() {
+    // Test all 4 alpha values: 0/85/170/255
+    var alphas = new[] { 0u, 1u, 2u, 3u };
+    var expected = new byte[] { 0, 85, 170, 255 };
+    for (var i = 0; i < 4; ++i) {
+      var packed = alphas[i] << 30; // R=G=B=0
+      byte[] data = [
+        (byte)(packed & 0xFF),
+        (byte)((packed >> 8) & 0xFF),
+        (byte)((packed >> 16) & 0xFF),
+        (byte)((packed >> 24) & 0xFF),
+      ];
+      var result = PixelConverter.Rgb30ToBgra(data, 1);
+      Assert.That(result[3], Is.EqualTo(expected[i]), $"alpha bits {alphas[i]} should map to {expected[i]}");
+    }
+  }
+
+  [Test]
+  public void RawImage_Gray10AndRgb30_SizesAreCorrect() {
+    Assert.That(RawImage.BitsPerPixel(PixelFormat.Gray10), Is.EqualTo(16));
+    Assert.That(RawImage.BytesPerPixel(PixelFormat.Gray10), Is.EqualTo(2));
+    Assert.That(RawImage.BitsPerPixel(PixelFormat.Rgb30), Is.EqualTo(32));
+    Assert.That(RawImage.BytesPerPixel(PixelFormat.Rgb30), Is.EqualTo(4));
+  }
+
+  [Test]
   public void RawImage_Indexed16_IsIndexedAndBitsPerPixel() {
     var img = new RawImage {
       Width = 1, Height = 1, Format = PixelFormat.Indexed16,

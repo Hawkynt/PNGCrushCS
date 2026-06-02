@@ -6,8 +6,8 @@ namespace FileFormat.Core.Tests;
 public sealed class DataTypeTests {
 
   [Test]
-  public void PixelFormat_Has15Values() {
-    Assert.That(System.Enum.GetValues<PixelFormat>(), Has.Length.EqualTo(15));
+  public void PixelFormat_Has17Values() {
+    Assert.That(System.Enum.GetValues<PixelFormat>(), Has.Length.EqualTo(17));
   }
 
   [Test]
