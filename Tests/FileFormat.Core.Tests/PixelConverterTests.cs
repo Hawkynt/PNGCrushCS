@@ -407,6 +407,60 @@ public sealed class PixelConverterTests {
   }
 
   [Test]
+  public void Indexed16ToBgra_LittleEndianIndices_LookupBeyondByteRange() {
+    // 1024-entry palette: build distinct colours so we can verify high-bit indices resolve correctly.
+    var palette = new byte[1024 * 3];
+    for (var i = 0; i < 1024; ++i) {
+      palette[i * 3]     = (byte)(i & 0xFF);
+      palette[i * 3 + 1] = (byte)((i >> 8) & 0xFF);
+      palette[i * 3 + 2] = 0;
+    }
+    // Two pixels: indices 0x0123 (291) and 0x03FF (1023). Little-endian byte layout.
+    byte[] data = [0x23, 0x01, 0xFF, 0x03];
+
+    var result = PixelConverter.Indexed16ToBgra(data, palette, 2);
+
+    Assert.That(result, Has.Length.EqualTo(8));
+    // Pixel 0 → palette[291] = (R=0, G=1, B=35) → BGRA: B=35, G=1, R=0, A=255
+    Assert.That(result[0], Is.EqualTo(0));   // B
+    Assert.That(result[1], Is.EqualTo(1));   // G
+    Assert.That(result[2], Is.EqualTo(35));  // R
+    Assert.That(result[3], Is.EqualTo(255)); // A
+    // Pixel 1 → palette[1023] = (R=0, G=3, B=255)
+    Assert.That(result[4], Is.EqualTo(0));   // B
+    Assert.That(result[5], Is.EqualTo(3));   // G
+    Assert.That(result[6], Is.EqualTo(255)); // R
+    Assert.That(result[7], Is.EqualTo(255)); // A
+  }
+
+  [Test]
+  public void Indexed16ToBgra_OverflowIndex_ClampsToMax() {
+    // Small palette (4 entries). An out-of-range index should clamp to the last entry rather than crash.
+    byte[] palette = [
+      10, 20, 30,
+      40, 50, 60,
+      70, 80, 90,
+      100, 110, 120,
+    ];
+    byte[] data = [0xFF, 0xFF]; // index 65535
+    var result = PixelConverter.Indexed16ToBgra(data, palette, 1);
+    Assert.That(result[0], Is.EqualTo(120)); // B = palette[3 * 3 + 2]
+    Assert.That(result[1], Is.EqualTo(110)); // G
+    Assert.That(result[2], Is.EqualTo(100)); // R
+  }
+
+  [Test]
+  public void RawImage_Indexed16_IsIndexedAndBitsPerPixel() {
+    var img = new RawImage {
+      Width = 1, Height = 1, Format = PixelFormat.Indexed16,
+      PixelData = new byte[2], Palette = new byte[3], PaletteCount = 1,
+    };
+    Assert.That(img.IsIndexed, Is.True);
+    Assert.That(RawImage.BitsPerPixel(PixelFormat.Indexed16), Is.EqualTo(16));
+    Assert.That(RawImage.BytesPerPixel(PixelFormat.Indexed16), Is.EqualTo(2));
+  }
+
+  [Test]
   public void Indexed1ToBgra_WithAlphaTable_UsesAlphaFromTable() {
     byte[] palette = [0xFF, 0x00, 0x00, 0x00, 0xFF, 0x00];
     byte[] alphaTable = [0x20, 0xC0];

@@ -27,7 +27,7 @@ public sealed class RawImage {
   public byte[]? AlphaTable { get; init; }
 
   /// <summary>Whether this image uses an indexed pixel format.</summary>
-  public bool IsIndexed => Format is PixelFormat.Indexed8 or PixelFormat.Indexed4 or PixelFormat.Indexed1;
+  public bool IsIndexed => Format is PixelFormat.Indexed8 or PixelFormat.Indexed4 or PixelFormat.Indexed1 or PixelFormat.Indexed16;
 
   /// <summary>Whether this image has an alpha channel (format-based check with alpha table scan for indexed formats).</summary>
   public bool HasAlpha {
@@ -42,6 +42,7 @@ public sealed class RawImage {
         case PixelFormat.Indexed8:
         case PixelFormat.Indexed4:
         case PixelFormat.Indexed1:
+        case PixelFormat.Indexed16:
           if (AlphaTable == null)
             return false;
           foreach (var a in AlphaTable)
@@ -76,6 +77,7 @@ public sealed class RawImage {
     PixelFormat.Indexed8 => 1,
     PixelFormat.Indexed4 => 0,
     PixelFormat.Indexed1 => 0,
+    PixelFormat.Indexed16 => 2,
     PixelFormat.Rgba64 => 8,
     PixelFormat.Rgb48 => 6,
     PixelFormat.Rgb565 => 2,
@@ -95,6 +97,7 @@ public sealed class RawImage {
     PixelFormat.Indexed8 => 8,
     PixelFormat.Indexed4 => 4,
     PixelFormat.Indexed1 => 1,
+    PixelFormat.Indexed16 => 16,
     PixelFormat.Rgba64 => 64,
     PixelFormat.Rgb48 => 48,
     PixelFormat.Rgb565 => 16,

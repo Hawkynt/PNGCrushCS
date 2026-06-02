@@ -26,6 +26,7 @@ public static class PixelConverter {
       (PixelFormat.Indexed8, PixelFormat.Bgra32) => IndexedToBgra(data, source.Palette ?? throw new InvalidOperationException("Palette required for indexed format"), totalPixels, source.AlphaTable),
       (PixelFormat.Indexed4, PixelFormat.Bgra32) => Indexed4ToBgra(data, source.Palette ?? throw new InvalidOperationException("Palette required for indexed format"), totalPixels, source.AlphaTable),
       (PixelFormat.Indexed1, PixelFormat.Bgra32) => Indexed1ToBgra(data, source.Palette ?? throw new InvalidOperationException("Palette required for indexed format"), totalPixels, source.AlphaTable),
+      (PixelFormat.Indexed16, PixelFormat.Bgra32) => Indexed16ToBgra(data, source.Palette ?? throw new InvalidOperationException("Palette required for indexed format"), totalPixels, source.AlphaTable),
       (PixelFormat.Rgba64, PixelFormat.Bgra32) => Rgba16BeToBgra(data, totalPixels),
       (PixelFormat.Rgb565, PixelFormat.Bgra32) => Rgb565ToBgra(data, totalPixels),
       (PixelFormat.Argb32, PixelFormat.Bgra32) => ArgbToBgra(data, totalPixels),
@@ -156,6 +157,30 @@ public static class PixelConverter {
       var palOffset = idx * 3;
       var dst = i * 4;
       result[dst] = palette[palOffset + 2];
+      result[dst + 1] = palette[palOffset + 1];
+      result[dst + 2] = palette[palOffset];
+      result[dst + 3] = alphaTable != null && idx < alphaTable.Length ? alphaTable[idx] : (byte)255;
+    }
+
+    return result;
+  }
+
+  /// <summary>Converts 16-bit-indexed pixel data (2 bytes per pixel, little-endian indices) to BGRA.
+  /// Supports palettes of up to 65 536 entries — required for formats like the CGA Reenigne 1024-mode
+  /// or any &gt;256-colour indexed payload that would lose precision through Indexed8.</summary>
+  public static byte[] Indexed16ToBgra(byte[] indices, byte[] palette, int totalPixels, byte[]? alphaTable = null) {
+    var result = new byte[totalPixels * 4];
+    var maxIndex = palette.Length / 3 - 1;
+    if (maxIndex < 0) return result;
+
+    for (var i = 0; i < totalPixels; ++i) {
+      var src = i * 2;
+      if (src + 1 >= indices.Length) break;
+      int idx = indices[src] | (indices[src + 1] << 8);
+      if (idx > maxIndex) idx = maxIndex;
+      var palOffset = idx * 3;
+      var dst = i * 4;
+      result[dst]     = palette[palOffset + 2];
       result[dst + 1] = palette[palOffset + 1];
       result[dst + 2] = palette[palOffset];
       result[dst + 3] = alphaTable != null && idx < alphaTable.Length ? alphaTable[idx] : (byte)255;
