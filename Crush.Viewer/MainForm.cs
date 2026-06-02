@@ -123,13 +123,24 @@ internal sealed partial class MainForm : Form {
     view.DropDownItems.Add(new ToolStripMenuItem("&Fit to Window", _IconFromText("⬜", menuColor), (_, _) => this._imagePanel.FitToWindow()) { ShortcutKeys = Keys.Control | Keys.D0 });
     view.DropDownItems.Add(new ToolStripMenuItem("&Actual Size (1:1)", _IconFromText("1⃣", menuColor), (_, _) => this._imagePanel.ActualSize()) { ShortcutKeys = Keys.Control | Keys.D1 });
     view.DropDownItems.Add(new ToolStripSeparator());
-    var filterToggle = new ToolStripMenuItem("Display &Filter (NTSC/PAL)", _IconFromText("📺", menuColor), (EventHandler?)null) {
-      Checked = true,
-      CheckOnClick = true,
-      ShortcutKeys = Keys.Control | Keys.F,
-    };
-    filterToggle.CheckedChanged += (_, _) => this._imagePanel.DisplayFilterEnabled = filterToggle.Checked;
-    view.DropDownItems.Add(filterToggle);
+    var filterMenu = new ToolStripMenuItem("Display &Filter", _IconFromText("📺", menuColor));
+    ToolStripMenuItem _MakeFilterItem(string label, FileFormat.Core.DisplayFilter? override_, bool initial = false) {
+      var item = new ToolStripMenuItem(label) { CheckOnClick = false, Checked = initial };
+      item.Click += (_, _) => {
+        this._imagePanel.DisplayFilterOverride = override_;
+        foreach (ToolStripMenuItem sibling in filterMenu.DropDownItems)
+          sibling.Checked = ReferenceEquals(sibling, item);
+      };
+      return item;
+    }
+    filterMenu.DropDownItems.Add(_MakeFilterItem("&Format default", null, initial: true));
+    filterMenu.DropDownItems.Add(_MakeFilterItem("&Off (no filter)", FileFormat.Core.DisplayFilter.None));
+    filterMenu.DropDownItems.Add(_MakeFilterItem("NTSC &Composite", FileFormat.Core.DisplayFilter.NtscComposite));
+    filterMenu.DropDownItems.Add(_MakeFilterItem("NTSC &S-Video (stub)", FileFormat.Core.DisplayFilter.NtscSvideo));
+    filterMenu.DropDownItems.Add(_MakeFilterItem("&PAL (stub)", FileFormat.Core.DisplayFilter.Pal));
+    view.DropDownItems.Add(filterMenu);
+    view.DropDownItems.Add(new ToolStripSeparator());
+    view.DropDownItems.Add(new ToolStripMenuItem("Choose &Text-Mode Font…", _IconFromText("🆎", menuColor), (_, _) => this._OnPickTextModeFont()));
     menu.Items.Add(view);
 
     var transform = new ToolStripMenuItem("&Transform");
@@ -554,11 +565,35 @@ internal sealed partial class MainForm : Form {
     this._UpdateStatusBar();
   }
 
+  private void _OnPickTextModeFont() {
+    using var fontDlg = new Hawkynt.ImageTransformUI.FontCodepageWindow();
+    fontDlg.Text = "Choose text-mode font";
+    if (fontDlg.ShowDialog(this) != DialogResult.OK || fontDlg.PickedFont is null) return;
+    FileFormat.TextMode.BitmapFont.Default = fontDlg.PickedFont;
+    // Re-render: if a text-mode file is currently loaded, re-load it through the format pipeline so
+    // the new font's glyphs replace the rendered bitmap. Otherwise nothing visible changes.
+    if (this._currentFile is null) return;
+    var ext = this._currentFile.Extension.ToLowerInvariant();
+    if (ext is ".nfo" or ".diz" or ".ans" or ".ansi" or ".xb" or ".xbin")
+      this._LoadFile(this._currentFile);
+  }
+
   private async void _LoadFile(FileInfo file) {
     this._loadCts?.Cancel();
     this._loadCts?.Dispose();
     this._loadCts = new();
     var ct = this._loadCts.Token;
+
+    // Text-mode formats need a font to render — let the user pick one before parsing so the choice
+    // flows through to the format's ToRawImage (which reads BitmapFont.Default). User can cancel out
+    // and keep whatever font is currently active.
+    var ext = file.Extension.ToLowerInvariant();
+    if (ext is ".nfo" or ".diz" or ".ans" or ".ansi" or ".xb" or ".xbin") {
+      using var fontDlg = new Hawkynt.ImageTransformUI.FontCodepageWindow();
+      fontDlg.Text = $"Font for {file.Name}";
+      if (fontDlg.ShowDialog(this) == DialogResult.OK && fontDlg.PickedFont is not null)
+        FileFormat.TextMode.BitmapFont.Default = fontDlg.PickedFont;
+    }
 
     this._formatLabel.Text = $"Loading {file.Name}...";
     this.Enabled = false;

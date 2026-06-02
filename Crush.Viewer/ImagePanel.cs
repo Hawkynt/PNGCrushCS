@@ -46,7 +46,9 @@ internal sealed class ImagePanel : Panel {
   // DisplayFilter applies a post-decode transform (NTSC composite, PAL, etc.) — cached in _filteredImage.
   private FileFormat.Core.PixelAspectRatio? _pixelAspectRatio;
   private FileFormat.Core.DisplayFilter _displayFilter = FileFormat.Core.DisplayFilter.None;
-  private bool _displayFilterEnabled = true;
+  // User override: null = use the format-declared filter; non-null = force this filter regardless
+  // of the format (so the user can preview NTSC composite on a plain PNG, etc.).
+  private FileFormat.Core.DisplayFilter? _displayFilterOverride;
   private Bitmap? _filteredImage; // cached filter output; disposed when source changes
   private float _xStretch = 1f;   // computed from PAR; applied to draw-rect width
 
@@ -59,14 +61,14 @@ internal sealed class ImagePanel : Panel {
     this.Invalidate();
   }
 
-  /// <summary>Toggles whether the <see cref="FileFormat.Core.DisplayFilter"/> is applied during paint.
-  /// When off, the raw pixel data is shown. Default: on.</summary>
+  /// <summary>User override for the display filter. <c>null</c> ⇒ follow the format's declaration.
+  /// Set explicitly to force a filter regardless of format (useful for previewing NTSC on PNG, etc.).</summary>
   [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
-  internal bool DisplayFilterEnabled {
-    get => this._displayFilterEnabled;
+  internal FileFormat.Core.DisplayFilter? DisplayFilterOverride {
+    get => this._displayFilterOverride;
     set {
-      if (this._displayFilterEnabled == value) return;
-      this._displayFilterEnabled = value;
+      if (this._displayFilterOverride == value) return;
+      this._displayFilterOverride = value;
       this._InvalidateFilterCache();
       this.Invalidate();
     }
@@ -81,10 +83,10 @@ internal sealed class ImagePanel : Panel {
 
   private Bitmap? _CurrentDisplayBitmap() {
     if (this._image == null) return null;
-    if (!this._displayFilterEnabled || this._displayFilter == FileFormat.Core.DisplayFilter.None)
-      return this._image;
+    var effective = this._displayFilterOverride ?? this._displayFilter;
+    if (effective == FileFormat.Core.DisplayFilter.None) return this._image;
     if (this._filteredImage == null)
-      this._filteredImage = DisplayFilterPipeline.Apply(this._image, this._displayFilter);
+      this._filteredImage = DisplayFilterPipeline.Apply(this._image, effective);
     return this._filteredImage;
   }
 
