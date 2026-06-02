@@ -29,7 +29,9 @@ internal static class FormatRegistry {
     Func<FileInfo, int>? GetImageCount = null,
     Func<FileInfo, int, RawImage?>? LoadRawImageAtIndex = null,
     Func<FileInfo, IReadOnlyList<RawImage>?>? LoadAllRawImages = null,
-    VideoMode[]? VideoModes = null
+    VideoMode[]? VideoModes = null,
+    Func<byte[], IReadOnlyList<ChunkSpan>>? EnumerateChunks = null,
+    Func<byte[], IReadOnlyList<ChunkRewriteRule>, byte[]>? RewriteChunks = null
   );
 
 
@@ -95,6 +97,26 @@ internal static class FormatRegistry {
       return;
 
     _byFormat[format] = existing with { ReadImageInfo = readImageInfo };
+  }
+
+  internal static void AugmentChunkLayout(
+    ImageFormat format,
+    Func<byte[], IReadOnlyList<ChunkSpan>> enumerateChunks
+  ) {
+    if (!_byFormat.TryGetValue(format, out var existing))
+      return;
+
+    _byFormat[format] = existing with { EnumerateChunks = enumerateChunks };
+  }
+
+  internal static void AugmentChunkRewriter(
+    ImageFormat format,
+    Func<byte[], IReadOnlyList<ChunkRewriteRule>, byte[]> rewriteChunks
+  ) {
+    if (!_byFormat.TryGetValue(format, out var existing))
+      return;
+
+    _byFormat[format] = existing with { RewriteChunks = rewriteChunks };
   }
 
   /// <summary>Builds the sorted signature table after all registrations are complete.</summary>

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using FileFormat.Core;
 
 namespace Hawkynt.FileFormats.Images;
@@ -79,5 +80,22 @@ internal static partial class FormatRegistration {
     FormatRegistry.AugmentInfoReader(
       format,
       data => { try { return T.ReadImageInfo(data); } catch { return null; } });
+  }
+
+  private static void _AugmentChunkLayout<T>(ImageFormat format) where T : IFormatChunkLayout<T> {
+    FormatRegistry.AugmentChunkLayout(
+      format,
+      data => {
+        try {
+          var enumerated = T.EnumerateChunks(data);
+          return enumerated as IReadOnlyList<ChunkSpan> ?? new List<ChunkSpan>(enumerated);
+        } catch { return new List<ChunkSpan>(); }
+      });
+  }
+
+  private static void _AugmentChunkRewriter<T>(ImageFormat format) where T : IFormatChunkRewriter<T> {
+    FormatRegistry.AugmentChunkRewriter(
+      format,
+      (data, rules) => { try { return T.Rewrite(data, rules); } catch { return data; } });
   }
 }

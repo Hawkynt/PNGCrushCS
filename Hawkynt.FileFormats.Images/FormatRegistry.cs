@@ -68,6 +68,16 @@ public static class FormatRegistry {
     _byFormat[format] = existing with { ReadImageInfo = readImageInfo };
   }
 
+  internal static void AugmentChunkLayout(ImageFormat format, Func<byte[], IReadOnlyList<ChunkSpan>> enumerateChunks) {
+    if (!_byFormat.TryGetValue(format, out var existing)) return;
+    _byFormat[format] = existing with { EnumerateChunks = enumerateChunks };
+  }
+
+  internal static void AugmentChunkRewriter(ImageFormat format, Func<byte[], IReadOnlyList<ChunkRewriteRule>, byte[]> rewriteChunks) {
+    if (!_byFormat.TryGetValue(format, out var existing)) return;
+    _byFormat[format] = existing with { RewriteChunks = rewriteChunks };
+  }
+
   /// <summary>Builds the priority-sorted signature table after all registrations are complete.
   /// Called by <see cref="FormatRegistration.Initialize"/>.</summary>
   internal static void BuildSignatureTable() {
@@ -112,6 +122,82 @@ public static class FormatRegistry {
 
   /// <summary>Formats that support writing (encoding from <see cref="RawImage"/>).</summary>
   public static IEnumerable<FormatEntry> SupportedWriteFormats => _byFormat.Values.Where(e => e.SupportsWrite);
+
+  /// <summary>Formats that expose their byte-level chunk structure (PNG, JPEG, GIF, TIFF, MP4 atoms, ...).</summary>
+  public static IEnumerable<FormatEntry> SupportedChunkLayoutFormats => _byFormat.Values.Where(e => e.SupportsChunkLayout);
+
+  /// <summary>Formats that can rewrite their internal chunk arrangement (re-order, remove, fuse).</summary>
+  public static IEnumerable<FormatEntry> SupportedChunkRewriteFormats => _byFormat.Values.Where(e => e.SupportsChunkRewrite);
+
+  // ============================================================================================
+  // Public chunk-layout API — used by layout-analysis and metadata-rearrangement tools.
+  // ============================================================================================
+
+  /// <summary>
+  /// Enumerates the top-level structural chunks of <paramref name="data"/>. The format is auto-detected
+  /// from the bytes. Returns an empty list if the format isn't recognised or doesn't expose chunk layout.
+  /// </summary>
+  /// <example>
+  /// <code>
+  /// foreach (var chunk in FormatRegistry.EnumerateChunks(File.ReadAllBytes("photo.png")))
+  ///   Console.WriteLine($"{chunk.Name} @ {chunk.Offset} ({chunk.Length} bytes, {chunk.Kind}, {chunk.Mobility})");
+  /// </code>
+  /// </example>
+  public static IReadOnlyList<ChunkSpan> EnumerateChunks(byte[] data) {
+    if (data == null || data.Length == 0) return Array.Empty<ChunkSpan>();
+    var format = DetectFromBytes(data);
+    if (format == ImageFormat.Unknown) return Array.Empty<ChunkSpan>();
+    return EnumerateChunks(format, data);
+  }
+
+  /// <summary>
+  /// Enumerates the top-level structural chunks of <paramref name="data"/> using the specified format.
+  /// Skips auto-detection — useful when the caller already knows the format. Returns an empty list if
+  /// the format doesn't expose chunk layout.
+  /// </summary>
+  public static IReadOnlyList<ChunkSpan> EnumerateChunks(ImageFormat format, byte[] data) {
+    if (data == null || data.Length == 0) return Array.Empty<ChunkSpan>();
+    var entry = GetEntry(format);
+    if (entry?.EnumerateChunks == null) return Array.Empty<ChunkSpan>();
+    return entry.EnumerateChunks(data);
+  }
+
+  /// <summary>
+  /// Applies <paramref name="rules"/> to <paramref name="data"/> and returns the rewritten file bytes.
+  /// The format is auto-detected. Returns a copy of <paramref name="data"/> when the format isn't
+  /// recognised or doesn't support rewriting.
+  /// </summary>
+  /// <example>
+  /// <code>
+  /// // Move EXIF + tEXt metadata before IDAT, drop iTXt, fuse split IDATs.
+  /// var rewritten = FormatRegistry.RewriteChunks(File.ReadAllBytes("photo.png"), [
+  ///   new ChunkRewriteRule("eXIf", ChunkPlacement.BeforeData),
+  ///   new ChunkRewriteRule("tEXt", ChunkPlacement.BeforeData),
+  ///   new ChunkRewriteRule("iTXt", ChunkPlacement.Remove),
+  ///   new ChunkRewriteRule("IDAT", ChunkPlacement.Fuse),
+  /// ]);
+  /// File.WriteAllBytes("photo.png", rewritten);
+  /// </code>
+  /// </example>
+  public static byte[] RewriteChunks(byte[] data, IReadOnlyList<ChunkRewriteRule> rules) {
+    if (data == null) return Array.Empty<byte>();
+    if (rules == null || rules.Count == 0) return (byte[])data.Clone();
+    var format = DetectFromBytes(data);
+    if (format == ImageFormat.Unknown) return (byte[])data.Clone();
+    return RewriteChunks(format, data, rules);
+  }
+
+  /// <summary>
+  /// Applies <paramref name="rules"/> to <paramref name="data"/> using the specified format.
+  /// Returns a copy of <paramref name="data"/> when the format doesn't support rewriting.
+  /// </summary>
+  public static byte[] RewriteChunks(ImageFormat format, byte[] data, IReadOnlyList<ChunkRewriteRule> rules) {
+    if (data == null) return Array.Empty<byte>();
+    if (rules == null || rules.Count == 0) return (byte[])data.Clone();
+    var entry = GetEntry(format);
+    if (entry?.RewriteChunks == null) return (byte[])data.Clone();
+    return entry.RewriteChunks(data, rules);
+  }
 
   // ============================================================================================
   // Public detection API

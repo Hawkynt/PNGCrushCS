@@ -16,6 +16,8 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
   private const string _IMAGE_FORMAT_WRITER = "FileFormat.Core.IImageFormatWriter`1";
   private const string _MULTI_IMAGE_FILE_FORMAT = "FileFormat.Core.IMultiImageFileFormat`1";
   private const string _IMAGE_INFO_READER = "FileFormat.Core.IImageInfoReader`1";
+  private const string _FORMAT_CHUNK_LAYOUT = "FileFormat.Core.IFormatChunkLayout`1";
+  private const string _FORMAT_CHUNK_REWRITER = "FileFormat.Core.IFormatChunkRewriter`1";
   private const string _ADDITIONAL_IMAGE_FORMAT = "FileFormat.Core.AdditionalImageFormatAttribute";
   private const string _FORMAT_MAGIC_BYTES = "FileFormat.Core.FormatMagicBytesAttribute";
   private const string _FORMAT_DETECTION_PRIORITY = "FileFormat.Core.FormatDetectionPriorityAttribute";
@@ -47,6 +49,8 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
     var imageFormatWriter = compilation.GetTypeByMetadataName(_IMAGE_FORMAT_WRITER);
     var multiImageFileFormat = compilation.GetTypeByMetadataName(_MULTI_IMAGE_FILE_FORMAT);
     var imageInfoReader = compilation.GetTypeByMetadataName(_IMAGE_INFO_READER);
+    var formatChunkLayout = compilation.GetTypeByMetadataName(_FORMAT_CHUNK_LAYOUT);
+    var formatChunkRewriter = compilation.GetTypeByMetadataName(_FORMAT_CHUNK_REWRITER);
     var magicBytesAttr = compilation.GetTypeByMetadataName(_FORMAT_MAGIC_BYTES);
     var detectionPriorityAttr = compilation.GetTypeByMetadataName(_FORMAT_DETECTION_PRIORITY);
     var mimeTypeAttr = compilation.GetTypeByMetadataName(_FORMAT_MIME_TYPE);
@@ -71,6 +75,8 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
       var hasFormatWriter = false;
       var hasMultiImage = false;
       var hasImageInfoReader = false;
+      var hasChunkLayout = false;
+      var hasChunkRewriter = false;
 
       foreach (var iface in type.AllInterfaces) {
         if (!iface.IsGenericType)
@@ -97,6 +103,10 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
           hasMultiImage = true;
         else if (imageInfoReader != null && SymbolEqualityComparer.Default.Equals(def, imageInfoReader))
           hasImageInfoReader = true;
+        else if (formatChunkLayout != null && SymbolEqualityComparer.Default.Equals(def, formatChunkLayout))
+          hasChunkLayout = true;
+        else if (formatChunkRewriter != null && SymbolEqualityComparer.Default.Equals(def, formatChunkRewriter))
+          hasChunkRewriter = true;
       }
 
       // Must implement at least one of the format interfaces
@@ -179,7 +189,9 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
         hasImageInfoReader,
         magicSignatures.ToArray(),
         detectionPriority,
-        mimeTypes.ToArray()
+        mimeTypes.ToArray(),
+        hasChunkLayout,
+        hasChunkRewriter
       ));
     }
 
@@ -322,6 +334,24 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
       sb.Append("    _AugmentInfoReader<").Append(format.FullTypeName).Append(">(ImageFormat.").Append(format.FormatId).AppendLine(");");
     }
 
+    sb.AppendLine();
+    sb.AppendLine("    // Chunk-layout registrations");
+    foreach (var format in formats) {
+      if (format.FullTypeName == null || !format.HasChunkLayout)
+        continue;
+
+      sb.Append("    _AugmentChunkLayout<").Append(format.FullTypeName).Append(">(ImageFormat.").Append(format.FormatId).AppendLine(");");
+    }
+
+    sb.AppendLine();
+    sb.AppendLine("    // Chunk-rewriter registrations");
+    foreach (var format in formats) {
+      if (format.FullTypeName == null || !format.HasChunkRewriter)
+        continue;
+
+      sb.Append("    _AugmentChunkRewriter<").Append(format.FullTypeName).Append(">(ImageFormat.").Append(format.FormatId).AppendLine(");");
+    }
+
     sb.AppendLine("  }");
     sb.AppendLine("}");
 
@@ -363,6 +393,8 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
     public MagicBytesInfo[] MagicSignatures { get; }
     public int DetectionPriority { get; }
     public string[] MimeTypes { get; }
+    public bool HasChunkLayout { get; }
+    public bool HasChunkRewriter { get; }
 
     public FormatInfo(
       string formatId, string? fullTypeName,
@@ -371,7 +403,9 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
       bool hasImageInfoReader = false,
       MagicBytesInfo[]? magicSignatures = null,
       int detectionPriority = 100,
-      string[]? mimeTypes = null
+      string[]? mimeTypes = null,
+      bool hasChunkLayout = false,
+      bool hasChunkRewriter = false
     ) {
       FormatId = formatId;
       FullTypeName = fullTypeName;
@@ -384,6 +418,8 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
       MagicSignatures = magicSignatures ?? Array.Empty<MagicBytesInfo>();
       DetectionPriority = detectionPriority;
       MimeTypes = mimeTypes ?? Array.Empty<string>();
+      HasChunkLayout = hasChunkLayout;
+      HasChunkRewriter = hasChunkRewriter;
     }
   }
 }

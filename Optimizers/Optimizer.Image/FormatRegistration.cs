@@ -94,6 +94,23 @@ internal static partial class FormatRegistration {
     );
   }
 
+  private static void _AugmentChunkLayout<T>(ImageFormat format) where T : IFormatChunkLayout<T> {
+    FormatRegistry.AugmentChunkLayout(
+      format,
+      data => {
+        try {
+          var enumerated = T.EnumerateChunks(data);
+          return enumerated as IReadOnlyList<ChunkSpan> ?? new List<ChunkSpan>(enumerated);
+        } catch { return new List<ChunkSpan>(); }
+      });
+  }
+
+  private static void _AugmentChunkRewriter<T>(ImageFormat format) where T : IFormatChunkRewriter<T> {
+    FormatRegistry.AugmentChunkRewriter(
+      format,
+      (data, rules) => { try { return T.Rewrite(data, rules); } catch { return data; } });
+  }
+
   private static void _RegisterDetectionOnly() {
     // GIF uses external GifFileFormat library with its own type system (not IImageFormatReader)
     var gifEntry = new FormatRegistry.FormatEntry(

@@ -28,7 +28,9 @@ public sealed record FormatEntry(
   Func<FileInfo, int>? GetImageCount = null,
   Func<FileInfo, int, RawImage?>? LoadRawImageAtIndex = null,
   Func<FileInfo, IReadOnlyList<RawImage>?>? LoadAllRawImages = null,
-  VideoMode[]? VideoModes = null
+  VideoMode[]? VideoModes = null,
+  Func<byte[], IReadOnlyList<ChunkSpan>>? EnumerateChunks = null,
+  Func<byte[], IReadOnlyList<ChunkRewriteRule>, byte[]>? RewriteChunks = null
 ) {
 
   /// <summary>The first/preferred MIME type, or <c>"application/octet-stream"</c> if none is registered.</summary>
@@ -42,4 +44,10 @@ public sealed record FormatEntry(
 
   /// <summary>True if this format exposes multiple sub-images (animated GIF, multi-page TIFF, ICO sets, etc.).</summary>
   public bool SupportsMultiImage => this.GetImageCount != null;
+
+  /// <summary>True if this format exposes its byte-level chunk structure via <see cref="EnumerateChunks"/>.</summary>
+  public bool SupportsChunkLayout => this.EnumerateChunks != null;
+
+  /// <summary>True if this format can rewrite its chunk arrangement (re-order, remove, fuse) via <see cref="RewriteChunks"/>.</summary>
+  public bool SupportsChunkRewrite => this.RewriteChunks != null;
 }
