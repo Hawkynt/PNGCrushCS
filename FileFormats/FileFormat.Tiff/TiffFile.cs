@@ -6,7 +6,9 @@ namespace FileFormat.Tiff;
 
 /// <summary>In-memory representation of a TIFF image.</summary>
 [FormatMimeType("image/tiff", "image/tif", "image/x-tiff")]
-public sealed class TiffFile : IImageFormatReader<TiffFile>, IImageToRawImage<TiffFile>, IImageFromRawImage<TiffFile>, IImageFormatWriter<TiffFile>, IMultiImageFileFormat<TiffFile> {
+public sealed class TiffFile :
+  IImageFormatReader<TiffFile>, IImageToRawImage<TiffFile>, IImageFromRawImage<TiffFile>, IImageFormatWriter<TiffFile>,
+  IMultiImageFileFormat<TiffFile>, IFormatChunkLayout<TiffFile> {
 
   static string IImageFormatMetadata<TiffFile>.PrimaryExtension => ".tiff";
   static string[] IImageFormatMetadata<TiffFile>.FileExtensions => [".tif", ".tiff", ".ftf"];
@@ -24,6 +26,9 @@ public sealed class TiffFile : IImageFormatReader<TiffFile>, IImageToRawImage<Ti
   }
 
   static byte[] IImageFormatWriter<TiffFile>.ToBytes(TiffFile file) => TiffWriter.ToBytes(file);
+
+  static IEnumerable<ChunkSpan> IFormatChunkLayout<TiffFile>.EnumerateChunks(ReadOnlySpan<byte> data)
+    => TiffChunkLayout.Enumerate(data);
   public int Width { get; init; }
   public int Height { get; init; }
   public int SamplesPerPixel { get; init; }
