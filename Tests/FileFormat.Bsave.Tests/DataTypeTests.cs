@@ -34,6 +34,7 @@ public sealed class DataTypeTests {
   [Category("Unit")]
   public void BsaveMode_HasExpectedCount() {
     var values = Enum.GetValues<BsaveMode>();
-    Assert.That(values, Has.Length.EqualTo(4));
+    // 4 original modes + Cga160x100x16 + Cga80x100x1024 (Reenigne) added in the VideoMode refactor.
+    Assert.That(values, Has.Length.EqualTo(6));
   }
 }
