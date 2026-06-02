@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using FileFormat.Core;
 
 namespace FileFormat.Bmp;
@@ -6,7 +7,9 @@ namespace FileFormat.Bmp;
 /// <summary>In-memory representation of a BMP image.</summary>
 [FormatMagicBytes([0x42, 0x4D])]
 [FormatMimeType("image/bmp", "image/x-bmp", "image/x-ms-bmp")]
-public readonly record struct BmpFile : IImageFormatReader<BmpFile>, IImageToRawImage<BmpFile>, IImageFromRawImage<BmpFile>, IImageFormatWriter<BmpFile>, IImageInfoReader<BmpFile> {
+public readonly record struct BmpFile :
+  IImageFormatReader<BmpFile>, IImageToRawImage<BmpFile>, IImageFromRawImage<BmpFile>, IImageFormatWriter<BmpFile>,
+  IImageInfoReader<BmpFile>, IFormatChunkLayout<BmpFile> {
 
   static string IImageFormatMetadata<BmpFile>.PrimaryExtension => ".bmp";
   static string[] IImageFormatMetadata<BmpFile>.FileExtensions => [".bmp", ".dib", ".bga", ".rl4", ".rl8", ".vga", ".sys"];
@@ -16,6 +19,9 @@ public readonly record struct BmpFile : IImageFormatReader<BmpFile>, IImageToRaw
     new("Default", [(IntegerRange.Any, IntegerRange.Any)])
   ];
   static byte[] IImageFormatWriter<BmpFile>.ToBytes(BmpFile file) => BmpWriter.ToBytes(file);
+
+  static IEnumerable<ChunkSpan> IFormatChunkLayout<BmpFile>.EnumerateChunks(ReadOnlySpan<byte> data)
+    => BmpChunkLayout.Enumerate(data);
 
   public static ImageInfo? ReadImageInfo(ReadOnlySpan<byte> header) {
     if (header.Length < 26 || header[0] != 0x42 || header[1] != 0x4D)
