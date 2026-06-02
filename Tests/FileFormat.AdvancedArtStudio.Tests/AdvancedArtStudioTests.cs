@@ -35,6 +35,26 @@ public sealed class AdvancedArtStudioReaderTests {
 
   [Test]
   [Category("Unit")]
+  public void FromBytes_HiResLayout_ParsesAs320x200() {
+    var data = new byte[AdvancedArtStudioFile.HiResFileSize];
+    data[0] = 0x00; data[1] = 0x20;       // load address $2000
+    for (var i = 0; i < 8000; ++i) data[2 + i] = (byte)(i & 0xFF);
+    for (var i = 0; i < 1000; ++i) data[8002 + i] = (byte)((i % 16) << 4 | ((i + 1) % 16));
+    data[^1] = 0x06;                       // border colour in last byte
+
+    var result = AdvancedArtStudioReader.FromBytes(data);
+
+    Assert.That(result.IsHiRes, Is.True);
+    Assert.That(result.Width, Is.EqualTo(320));
+    Assert.That(result.Height, Is.EqualTo(200));
+    Assert.That(result.BitmapData.Length, Is.EqualTo(8000));
+    Assert.That(result.ScreenRam.Length, Is.EqualTo(1000));
+    Assert.That(result.ColorRam, Is.Empty);
+    Assert.That(result.BorderColor, Is.EqualTo(0x06));
+  }
+
+  [Test]
+  [Category("Unit")]
   public void FromBytes_ValidData_ParsesDimensions() {
     var data = TestHelpers._BuildValidFile(0x2000, 0x03, 0x01);
     var result = AdvancedArtStudioReader.FromBytes(data);
@@ -52,6 +72,33 @@ public sealed class AdvancedArtStudioReaderTests {
 
 [TestFixture]
 public sealed class AdvancedArtStudioRoundTripTests {
+
+  [Test]
+  [Category("Integration")]
+  public void RoundTrip_HiRes_AllFieldsPreserved() {
+    var bitmap = new byte[8000];
+    for (var i = 0; i < bitmap.Length; ++i) bitmap[i] = (byte)(i * 5 % 256);
+    var screen = new byte[1000];
+    for (var i = 0; i < screen.Length; ++i) screen[i] = (byte)((i * 11 + 1) & 0xFF);
+
+    var original = new AdvancedArtStudioFile {
+      IsHiRes = true,
+      LoadAddress = 0x2000,
+      BitmapData = bitmap,
+      ScreenRam = screen,
+      ColorRam = [],
+      BorderColor = 4,
+    };
+    var bytes = AdvancedArtStudioWriter.ToBytes(original);
+    Assert.That(bytes.Length, Is.EqualTo(AdvancedArtStudioFile.HiResFileSize));
+
+    var restored = AdvancedArtStudioReader.FromBytes(bytes);
+    Assert.That(restored.IsHiRes, Is.True);
+    Assert.That(restored.LoadAddress, Is.EqualTo(original.LoadAddress));
+    Assert.That(restored.BitmapData, Is.EqualTo(original.BitmapData));
+    Assert.That(restored.ScreenRam, Is.EqualTo(original.ScreenRam));
+    Assert.That(restored.BorderColor, Is.EqualTo(original.BorderColor));
+  }
 
   [Test]
   [Category("Integration")]

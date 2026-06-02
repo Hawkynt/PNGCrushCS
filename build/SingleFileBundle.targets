@@ -13,9 +13,11 @@
     Windows-only for now (WPF projects target net10.0-windows anyway; the CLI
     targets net10.0 but the RID defaults to win-x64).
   -->
+  <!-- Release-only: the bundle target deletes the per-RID subfolder that Visual Studio's Debug
+       launch profile expects, so Debug builds stay as a normal multi-file output for F5 debugging. -->
   <Target Name="PostBuildSingleFileBundle"
           AfterTargets="Build"
-          Condition="'$(EnableSingleFileBundle)' == 'true' And '$(_InSingleFileBundle)' != 'true' And '$(DesignTimeBuild)' != 'true' And '$(OS)' == 'Windows_NT'">
+          Condition="'$(EnableSingleFileBundle)' == 'true' And '$(Configuration)' == 'Release' And '$(_InSingleFileBundle)' != 'true' And '$(DesignTimeBuild)' != 'true' And '$(OS)' == 'Windows_NT'">
 
     <PropertyGroup>
       <_BundleTargetDir>$(MSBuildProjectDirectory)\$(BaseOutputPath.TrimEnd('\').TrimEnd('/'))\$(Configuration)\$(TargetFramework.TrimEnd('\').TrimEnd('/'))</_BundleTargetDir>
