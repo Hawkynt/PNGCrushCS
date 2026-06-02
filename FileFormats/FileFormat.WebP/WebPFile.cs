@@ -9,7 +9,9 @@ namespace FileFormat.WebP;
 
 /// <summary>In-memory representation of a WebP file with full VP8/VP8L pixel codec support.</summary>
 [FormatMimeType("image/webp")]
-public sealed class WebPFile : IImageFormatReader<WebPFile>, IImageToRawImage<WebPFile>, IImageFromRawImage<WebPFile>, IImageFormatWriter<WebPFile> {
+public sealed class WebPFile :
+  IImageFormatReader<WebPFile>, IImageToRawImage<WebPFile>, IImageFromRawImage<WebPFile>, IImageFormatWriter<WebPFile>,
+  IFormatChunkLayout<WebPFile>, IFormatChunkRewriter<WebPFile>, IFormatChunkPlanRewriter<WebPFile> {
 
   public required WebPFeatures Features { get; init; }
   public byte[] ImageData { get; init; } = [];
@@ -36,6 +38,15 @@ public sealed class WebPFile : IImageFormatReader<WebPFile>, IImageToRawImage<We
   public static WebPFile FromBytes(byte[] data) => WebPReader.FromBytes(data);
   public static WebPFile FromStream(Stream stream) => WebPReader.FromStream(stream);
   public static byte[] ToBytes(WebPFile file) => WebPWriter.ToBytes(file);
+
+  static IEnumerable<ChunkSpan> IFormatChunkLayout<WebPFile>.EnumerateChunks(ReadOnlySpan<byte> data)
+    => WebPChunkLayout.Enumerate(data);
+
+  static byte[] IFormatChunkRewriter<WebPFile>.Rewrite(ReadOnlySpan<byte> data, IReadOnlyList<ChunkRewriteRule> rules)
+    => WebPChunkLayout.Rewrite(data, rules);
+
+  static ChunkRewriteResult IFormatChunkPlanRewriter<WebPFile>.ApplyPlan(ReadOnlySpan<byte> data, ChunkRewritePlan plan)
+    => WebPChunkLayout.ApplyPlan(data, plan);
 
   public static RawImage ToRawImage(WebPFile file) {
     ArgumentNullException.ThrowIfNull(file);
