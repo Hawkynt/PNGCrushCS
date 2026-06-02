@@ -323,14 +323,14 @@ public readonly record struct BsaveFile : IImageFormatReader<BsaveFile>, IImageT
       throw new ArgumentException(
         $"BSAVE 80x100x1024 supports at most 1024 palette entries, got {image.PaletteCount}.", nameof(image));
 
-    // Source palette indices fit in a short (1024 < 65536); we still pass them through _RequireIndexed
-    // for sub-byte unpacking, then encode each as a (pattern, fg, bg) triple. For inputs with ≤256
-    // colours the encoder uses pattern=0 only — the user picks the high-bit patterns via the dialog.
-    var src = _RequireIndexedLarge(image, maxPalette: 1024, modeName: "80x100x1024");
+    // Read indices natively at their declared bit-depth so Indexed16 inputs preserve the high pattern
+    // bits. For Indexed8 inputs (≤256 colours) only pattern=0 is reachable; for Indexed16 inputs the
+    // full 10-bit (pattern × 256 + fg × 16 + bg) space round-trips losslessly.
+    var indices = _RequireIndices16(image, maxPalette: 1024, modeName: "80x100x1024");
     var pixels = new byte[width * height * 2]; // 16000 bytes
     for (var y = 0; y < height; ++y)
       for (var x = 0; x < width; ++x) {
-        var idx = src[y * width + x];
+        var idx = indices[y * width + x];
         var pattern = (idx >> 8) & 3;
         var fg = (idx >> 4) & 0x0F;
         var bg = idx & 0x0F;
@@ -343,17 +343,49 @@ public readonly record struct BsaveFile : IImageFormatReader<BsaveFile>, IImageT
     };
   }
 
-  // Decoder: 16000-byte text-mode buffer → 80x100 Indexed8 with the synthesised 1024 palette.
+  /// <summary>Returns a flat array of pixel-per-element 16-bit indices regardless of whether the source
+  /// image is Indexed1/4/8 (byte-per-pixel) or Indexed16 (two-byte-per-pixel little-endian).</summary>
+  private static int[] _RequireIndices16(RawImage image, int maxPalette, string modeName) {
+    if (!image.IsIndexed)
+      throw new ArgumentException(
+        $"BSAVE {modeName} requires an indexed image. Use the Save-As 'Reduce colours' step first.", nameof(image));
+    if (image.PaletteCount > maxPalette)
+      throw new ArgumentException(
+        $"BSAVE {modeName} supports at most {maxPalette} palette entries, got {image.PaletteCount}.", nameof(image));
+
+    var src = image.PixelData ?? [];
+    var w = image.Width;
+    var h = image.Height;
+    var result = new int[w * h];
+
+    if (image.Format == PixelFormat.Indexed16) {
+      for (var i = 0; i < result.Length; ++i) {
+        var p = i * 2;
+        if (p + 1 >= src.Length) break;
+        result[i] = src[p] | (src[p + 1] << 8);
+      }
+      return result;
+    }
+
+    var byteIdx = image.Format switch {
+      PixelFormat.Indexed8 => src,
+      PixelFormat.Indexed4 => _UnpackIndexed4(src, w, h),
+      PixelFormat.Indexed1 => _UnpackIndexed1(src, w, h),
+      _ => throw new ArgumentException($"Unexpected indexed format {image.Format}.", nameof(image)),
+    };
+    for (var i = 0; i < result.Length && i < byteIdx.Length; ++i)
+      result[i] = byteIdx[i];
+    return result;
+  }
+
+  // Decoder: 16000-byte text-mode buffer → 80x100 Indexed16 with the synthesised 1024 palette.
+  // Indexed16 stores each index as 2 bytes little-endian so the full 10-bit (pattern × 256 + fg × 16 + bg)
+  // value survives the round-trip — Indexed8 would mask off the pattern bits.
   private static RawImage _Cga80x100x1024ToRawImage(BsaveFile file) {
     const int width = 80;
     const int height = 100;
     var src = file.PixelData;
-    var pixels = new byte[width * height];
-    // Note: PaletteCount=1024 won't fit in a single byte (PixelData is byte[]), so the decoded image
-    // packs the LOW 8 bits of the 10-bit index. This loses the pattern bits in the round-trip but
-    // keeps round-trip working for inputs that already had ≤256 colours (pattern 0). For full
-    // 1024-colour round-trip via the in-memory RawImage representation we'd need Indexed16 support,
-    // which RawImage doesn't have yet — call out as a known limitation.
+    var pixels = new byte[width * height * 2];
     for (var y = 0; y < height; ++y)
       for (var x = 0; x < width; ++x) {
         var cellOffset = (y * width + x) * 2;
@@ -365,7 +397,9 @@ public readonly record struct BsaveFile : IImageFormatReader<BsaveFile>, IImageT
         var pattern = System.Array.IndexOf(_CgaCharGlyphs1024, ch);
         if (pattern < 0) pattern = 0;
         var fullIdx = pattern * 256 + fg * 16 + bg;
-        pixels[y * width + x] = (byte)(fullIdx & 0xFF); // see note above
+        var dst = (y * width + x) * 2;
+        pixels[dst]     = (byte)(fullIdx & 0xFF);
+        pixels[dst + 1] = (byte)((fullIdx >> 8) & 0xFF);
       }
     var palette = new byte[1024 * 3];
     var palettePacked = _Build1024PaletteHex();
@@ -378,7 +412,7 @@ public readonly record struct BsaveFile : IImageFormatReader<BsaveFile>, IImageT
     return new() {
       Width = width,
       Height = height,
-      Format = PixelFormat.Indexed8,
+      Format = PixelFormat.Indexed16,
       PixelData = pixels,
       Palette = palette,
       PaletteCount = 1024,
