@@ -7,7 +7,9 @@ namespace FileFormat.Png;
 /// <summary>Data model representing a PNG file</summary>
 [FormatMagicBytes([0x89, 0x50, 0x4E, 0x47])]
 [FormatMimeType("image/png", "image/x-png")]
-public readonly record struct PngFile : IImageFormatReader<PngFile>, IImageToRawImage<PngFile>, IImageFromRawImage<PngFile>, IImageFormatWriter<PngFile> {
+public readonly record struct PngFile :
+  IImageFormatReader<PngFile>, IImageToRawImage<PngFile>, IImageFromRawImage<PngFile>, IImageFormatWriter<PngFile>,
+  IFormatChunkLayout<PngFile>, IFormatChunkRewriter<PngFile> {
 
   static string IImageFormatMetadata<PngFile>.PrimaryExtension => ".png";
   static string[] IImageFormatMetadata<PngFile>.FileExtensions => [".png"];
@@ -17,6 +19,12 @@ public readonly record struct PngFile : IImageFormatReader<PngFile>, IImageToRaw
     new("Default", [(IntegerRange.Any, IntegerRange.Any)])
   ];
   static byte[] IImageFormatWriter<PngFile>.ToBytes(PngFile file) => PngWriter.ToBytes(file);
+
+  static IEnumerable<ChunkSpan> IFormatChunkLayout<PngFile>.EnumerateChunks(ReadOnlySpan<byte> data)
+    => PngChunkLayout.Enumerate(data);
+
+  static byte[] IFormatChunkRewriter<PngFile>.Rewrite(ReadOnlySpan<byte> data, IReadOnlyList<ChunkRewriteRule> rules)
+    => PngChunkLayout.Rewrite(data, rules);
   /// <summary>Image width in pixels</summary>
   public required int Width { get; init; }
 
