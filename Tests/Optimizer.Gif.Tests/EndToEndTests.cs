@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 using System.Threading;
-using Hawkynt.GifFileFormat;
+using FileFormat.Gif;
 using NUnit.Framework;
 
 namespace Optimizer.Gif.Tests;
@@ -100,8 +100,10 @@ public sealed class EndToEndTests {
       Assert.That(optimizedPixels.Length, Is.EqualTo(originalPixels.Length));
 
       for (var i = 0; i < originalPixels.Length; ++i) {
-        var origColor = originalPalette[originalPixels[i]].ToArgb();
-        var optColor = optimizedPalette![optimizedPixels[i]].ToArgb();
+        var oi = originalPixels[i];
+        var pi = optimizedPixels[i];
+        var origColor = (originalPalette![oi * 3] << 16) | (originalPalette[oi * 3 + 1] << 8) | originalPalette[oi * 3 + 2];
+        var optColor = (optimizedPalette![pi * 3] << 16) | (optimizedPalette[pi * 3 + 1] << 8) | optimizedPalette[pi * 3 + 2];
         Assert.That(optColor, Is.EqualTo(origColor), $"Color mismatch at pixel {i}");
       }
     } finally {

@@ -1,6 +1,6 @@
 using System;
 using System.IO;
-using Hawkynt.GifFileFormat;
+using FileFormat.Gif;
 using NUnit.Framework;
 
 namespace Optimizer.Gif.Tests;
@@ -145,7 +145,7 @@ public sealed class ReaderTests {
     try {
       var gif = Reader.FromFile(file);
 
-      Assert.That(gif.Version, Is.EqualTo("89a"));
+      Assert.That(gif.Version, Is.EqualTo(GifVersion.Gif89a));
       Assert.That(gif.LogicalScreenSize.Width, Is.EqualTo(4));
       Assert.That(gif.LogicalScreenSize.Height, Is.EqualTo(4));
       Assert.That(gif.Frames.Count, Is.EqualTo(1));
@@ -214,10 +214,10 @@ public sealed class ReaderTests {
       var gif = Reader.FromFile(file);
 
       Assert.That(gif.GlobalColorTable, Is.Not.Null);
-      Assert.That(gif.GlobalColorTable!.Length, Is.EqualTo(4));
-      Assert.That(gif.GlobalColorTable[0].R, Is.EqualTo(255));
-      Assert.That(gif.GlobalColorTable[0].G, Is.EqualTo(0));
-      Assert.That(gif.GlobalColorTable[0].B, Is.EqualTo(0));
+      Assert.That(gif.GlobalColorTable!.Length / 3, Is.EqualTo(4));
+      Assert.That(gif.GlobalColorTable[0], Is.EqualTo(255)); // R of entry 0
+      Assert.That(gif.GlobalColorTable[1], Is.EqualTo(0));   // G of entry 0
+      Assert.That(gif.GlobalColorTable[2], Is.EqualTo(0));   // B of entry 0
     } finally {
       file.Delete();
     }

@@ -1,7 +1,7 @@
 using System;
 using System.Drawing;
 using System.IO;
-using Hawkynt.GifFileFormat;
+using FileFormat.Gif;
 
 namespace Optimizer.Gif;
 

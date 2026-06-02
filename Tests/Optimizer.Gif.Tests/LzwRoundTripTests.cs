@@ -1,6 +1,6 @@
 using System;
 using System.IO;
-using Hawkynt.GifFileFormat;
+using FileFormat.Gif;
 using NUnit.Framework;
 
 namespace Optimizer.Gif.Tests;

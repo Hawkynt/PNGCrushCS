@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
-using Hawkynt.GifFileFormat;
+using FileFormat.Gif;
 
 namespace Optimizer.Gif;
 
@@ -17,11 +17,12 @@ internal static class GifFrameOptimizer {
     var mergedFrames = new List<Frame>();
     var current = gif.Frames[0];
     var accumulatedDelay = current.Delay;
+    var gctColors = PaletteAdapter.ToColors(gif.GlobalColorTable);
 
     for (var i = 1; i < gif.Frames.Count; ++i) {
       var next = gif.Frames[i];
 
-      if (_FramesAreIdentical(current, next, gif.GlobalColorTable)) {
+      if (_FramesAreIdentical(current, next, gctColors)) {
         accumulatedDelay = accumulatedDelay.Add(next.Delay);
         continue;
       }
@@ -36,18 +37,32 @@ internal static class GifFrameOptimizer {
     if (mergedFrames.Count == gif.Frames.Count)
       return gif;
 
-    return new GifFile(gif.Version, gif.LogicalScreenSize, gif.GlobalColorTable, gif.LoopCount,
-      gif.BackgroundColorIndex, mergedFrames);
+    return new GifFile {
+      Version = gif.Version,
+      LogicalScreenDescriptor = gif.LogicalScreenDescriptor,
+      GlobalColorTable = gif.GlobalColorTable,
+      LoopCount = gif.LoopCount,
+      Frames = mergedFrames,
+      Comments = gif.Comments,
+      ApplicationExtensions = gif.ApplicationExtensions,
+      PlainTextExtensions = gif.PlainTextExtensions,
+    };
   }
 
   private static bool _FramesAreIdentical(Frame a, Frame b, Color[]? globalColorTable) {
+    var lctA = a.LocalColorTable != null ? PaletteAdapter.ToColors(a.LocalColorTable) : null;
+    var lctB = b.LocalColorTable != null ? PaletteAdapter.ToColors(b.LocalColorTable) : null;
+    return _FramesAreIdenticalInner(a, b, lctA, lctB, globalColorTable);
+  }
+
+  private static bool _FramesAreIdenticalInner(Frame a, Frame b, Color[]? lctA, Color[]? lctB, Color[]? globalColorTable) {
     if (a.Position.X != b.Position.X || a.Position.Y != b.Position.Y)
       return false;
     if (a.Size.Width != b.Size.Width || a.Size.Height != b.Size.Height)
       return false;
 
-    var effectiveA = a.LocalColorTable ?? globalColorTable;
-    var effectiveB = b.LocalColorTable ?? globalColorTable;
+    var effectiveA = lctA ?? globalColorTable;
+    var effectiveB = lctB ?? globalColorTable;
 
     // Both must have a resolvable palette
     if (effectiveA == null || effectiveB == null)
@@ -113,8 +128,9 @@ internal static class GifFrameOptimizer {
       return frameCount == 0 ? [] : [FrameDisposalMethod.Unspecified];
 
     var disposals = new FrameDisposalMethod[frameCount];
-    var screenW = gif.LogicalScreenSize.Width;
-    var screenH = gif.LogicalScreenSize.Height;
+    var screenW = gif.LogicalScreenDescriptor.Width;
+    var screenH = gif.LogicalScreenDescriptor.Height;
+    var gctColors = PaletteAdapter.ToColors(gif.GlobalColorTable);
     var canvas = new byte[screenW * screenH];
     var canvasValid = new bool[screenW * screenH];
 
@@ -130,7 +146,8 @@ internal static class GifFrameOptimizer {
 
     for (var i = 0; i < frameCount; ++i) {
       var frame = gif.Frames[i];
-      var palette = frame.LocalColorTable ?? gif.GlobalColorTable;
+      var palette = frame.LocalColorTable != null ? PaletteAdapter.ToColors(frame.LocalColorTable) : gctColors;
+      if (palette.Length == 0) palette = null!;
 
       if (i == frameCount - 1 || palette == null) {
         disposals[i] = FrameDisposalMethod.Unspecified;
@@ -139,7 +156,8 @@ internal static class GifFrameOptimizer {
       }
 
       var nextFrame = gif.Frames[i + 1];
-      var nextPalette = nextFrame.LocalColorTable ?? gif.GlobalColorTable;
+      var nextPalette = nextFrame.LocalColorTable != null ? PaletteAdapter.ToColors(nextFrame.LocalColorTable) : gctColors;
+      if (nextPalette.Length == 0) nextPalette = null!;
 
       if (nextPalette == null) {
         disposals[i] = FrameDisposalMethod.DoNotDispose;
@@ -299,10 +317,10 @@ internal static class GifFrameOptimizer {
     int h = size.Height;
 
     // Find bounding box of non-transparent pixels
-    var top = h;
-    var bottom = 0;
-    var left = w;
-    var right = 0;
+    int top = h;
+    int bottom = 0;
+    int left = w;
+    int right = 0;
 
     for (var y = 0; y < h; ++y)
     for (var x = 0; x < w; ++x)
@@ -361,8 +379,8 @@ internal static class GifFrameOptimizer {
 
       // If next frame covers the entire canvas, current can use DoNotDispose
       if (next.Position is { X: 0, Y: 0 }
-          && next.Size.Width == gif.LogicalScreenSize.Width
-          && next.Size.Height == gif.LogicalScreenSize.Height)
+          && next.Size.Width == gif.LogicalScreenDescriptor.Width
+          && next.Size.Height == gif.LogicalScreenDescriptor.Height)
         disposals[i] = FrameDisposalMethod.DoNotDispose;
       else
         disposals[i] = FrameDisposalMethod.RestoreToBackground;
@@ -377,27 +395,28 @@ internal static class GifFrameOptimizer {
   /// </summary>
   public static Color[]? TryBuildGlobalColorTable(GifFile gif) {
     if (gif.Frames.Count == 0)
-      return gif.GlobalColorTable;
+      return gif.GlobalColorTable != null ? PaletteAdapter.ToColors(gif.GlobalColorTable) : null;
 
     // Collect all unique colors across all frame palettes
     var colorSet = new HashSet<int>();
 
     foreach (var frame in gif.Frames) {
-      var palette = frame.LocalColorTable ?? gif.GlobalColorTable;
-      if (palette == null)
+      var paletteBytes = frame.LocalColorTable ?? gif.GlobalColorTable;
+      if (paletteBytes == null)
         return null;
 
-      foreach (var c in palette)
-        colorSet.Add(c.ToArgb());
+      var entries = paletteBytes.Length / 3;
+      for (var i = 0; i < entries; ++i)
+        colorSet.Add((paletteBytes[i * 3] << 16) | (paletteBytes[i * 3 + 1] << 8) | paletteBytes[i * 3 + 2]);
     }
 
     if (colorSet.Count > 256)
       return null;
 
     var result = new Color[colorSet.Count];
-    var i = 0;
-    foreach (var argb in colorSet)
-      result[i++] = Color.FromArgb(argb);
+    var idx = 0;
+    foreach (var rgb in colorSet)
+      result[idx++] = Color.FromArgb((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF);
 
     return result;
   }

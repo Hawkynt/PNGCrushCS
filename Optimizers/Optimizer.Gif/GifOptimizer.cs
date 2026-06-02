@@ -7,7 +7,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Crush.Core;
-using Hawkynt.GifFileFormat;
+using FileFormat.Gif;
 
 namespace Optimizer.Gif;
 
@@ -191,11 +191,12 @@ public sealed class GifOptimizer {
       var frameCount = this._gif.Frames.Count;
       var assembledFrames = new AssembledFrame[frameCount];
 
+      var gctColors = PaletteAdapter.ToColors(this._gif.GlobalColorTable);
       for (var i = 0; i < frameCount; ++i) {
         var frame = frames != null ? frames[i] : this._gif.Frames[i];
-        var palette = frame.LocalColorTable ?? this._gif.GlobalColorTable;
+        var palette = frame.LocalColorTable != null ? PaletteAdapter.ToColors(frame.LocalColorTable) : gctColors;
 
-        if (palette == null)
+        if (palette.Length == 0)
           return null;
 
         var pixels = frame.IndexedPixels;
@@ -251,8 +252,8 @@ public sealed class GifOptimizer {
       }
 
       var assembled = new AssembledGif {
-        LogicalScreenSize = this._gif.LogicalScreenSize,
-        BackgroundColorIndex = this._gif.BackgroundColorIndex,
+        LogicalScreenSize = new Dimensions(this._gif.LogicalScreenDescriptor.Width, this._gif.LogicalScreenDescriptor.Height),
+        BackgroundColorIndex = this._gif.LogicalScreenDescriptor.BackgroundColorIndex,
         GlobalColorTable = globalColorTable,
         LoopCount = this._gif.LoopCount,
         Frames = assembledFrames

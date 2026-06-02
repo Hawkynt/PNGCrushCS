@@ -1,6 +1,6 @@
 using System;
 using System.Drawing;
-using Hawkynt.GifFileFormat;
+using FileFormat.Gif;
 
 namespace Optimizer.Gif;
 
@@ -19,8 +19,9 @@ internal static class GifFrameDifferencer {
     if (frames.Count <= 1)
       return [.. frames];
 
-    var screenW = gif.LogicalScreenSize.Width;
-    var screenH = gif.LogicalScreenSize.Height;
+    var screenW = gif.LogicalScreenDescriptor.Width;
+    var screenH = gif.LogicalScreenDescriptor.Height;
+    var gctColors = PaletteAdapter.ToColors(gif.GlobalColorTable);
 
     // Canvas tracks the composited state of the display
     var canvas = new byte[screenW * screenH];
@@ -31,7 +32,8 @@ internal static class GifFrameDifferencer {
 
     for (var i = 0; i < frames.Count; ++i) {
       var frame = frames[i];
-      var palette = frame.LocalColorTable ?? gif.GlobalColorTable;
+      var paletteColors = frame.LocalColorTable != null ? PaletteAdapter.ToColors(frame.LocalColorTable) : gctColors;
+      Color[]? palette = paletteColors.Length > 0 ? paletteColors : null;
 
       if (i == 0 || palette == null) {
         // First frame or no palette: output as-is, composite onto canvas
@@ -83,18 +85,20 @@ internal static class GifFrameDifferencer {
         diffPixels[frameIdx] = srcColorIdx;
       }
 
-      if (hasDiff)
-        result[i] = new Frame(
-          diffPixels,
-          frame.Size,
-          frame.Position,
-          newPalette != palette ? newPalette : frame.LocalColorTable,
-          frame.Delay,
-          frame.DisposalMethod,
-          transparentIdx,
-          frame.IsInterlaced
-        );
-      else
+      if (hasDiff) {
+        var newLct = newPalette != palette ? PaletteAdapter.ToBytes(newPalette) : frame.LocalColorTable;
+        result[i] = new Frame {
+          Left = frame.Left, Top = frame.Top, Width = frame.Width, Height = frame.Height,
+          PixelData = diffPixels,
+          LocalColorTable = newLct,
+          LocalColorTableSorted = frame.LocalColorTableSorted,
+          IsInterlaced = frame.IsInterlaced,
+          Delay = frame.Delay,
+          DisposalMethod = frame.DisposalMethod,
+          UserInputFlag = frame.UserInputFlag,
+          TransparentColorIndex = transparentIdx,
+        };
+      } else
         result[i] = frame;
 
       // Composite original (non-diffed) pixels onto canvas for next frame's reference

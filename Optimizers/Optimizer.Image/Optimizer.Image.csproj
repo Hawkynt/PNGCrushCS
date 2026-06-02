@@ -13,9 +13,6 @@
       <_Parameter1>Crush.Viewer</_Parameter1>
     </AssemblyAttribute>
     <AssemblyAttribute Include="FileFormat.Core.AdditionalImageFormat">
-      <_Parameter1>Gif</_Parameter1>
-    </AssemblyAttribute>
-    <AssemblyAttribute Include="FileFormat.Core.AdditionalImageFormat">
       <_Parameter1>Wad</_Parameter1>
     </AssemblyAttribute>
   </ItemGroup>
@@ -42,6 +39,7 @@
     <ProjectReference Include="..\Optimizer.Ani\Optimizer.Ani.csproj" />
     <ProjectReference Include="..\Optimizer.WebP\Optimizer.WebP.csproj" />
     <ProjectReference Include="../../FileFormats/FileFormat.WebP/FileFormat.WebP.csproj" />
+    <ProjectReference Include="../../FileFormats/FileFormat.Gif/FileFormat.Gif.csproj" />
     <ProjectReference Include="../../FileFormat.Core/FileFormat.Core.csproj" />
     <ProjectReference Include="../../FileFormats/FileFormat.Acorn/FileFormat.Acorn.csproj" />
     <ProjectReference Include="../../FileFormats/FileFormat.AliasPix/FileFormat.AliasPix.csproj" />

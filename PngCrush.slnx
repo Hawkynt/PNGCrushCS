@@ -1203,7 +1203,8 @@
     <Project Path="Tests/FileFormat.Atari2600.Tests/FileFormat.Atari2600.Tests.csproj" />
   </Folder>
   <Folder Name="/Gif/">
-    <Project Path="../AnythingToGif/GifFileFormat/GifFileFormat.csproj" />
+    <Project Path="FileFormats/FileFormat.Gif/FileFormat.Gif.csproj" />
+    <Project Path="Tests/FileFormat.Gif.Tests/FileFormat.Gif.Tests.csproj" />
     <Project Path="Optimizers/Optimizer.Gif/Optimizer.Gif.csproj" />
     <Project Path="Tests/Optimizer.Gif.Tests/Optimizer.Gif.Tests.csproj" />
   </Folder>

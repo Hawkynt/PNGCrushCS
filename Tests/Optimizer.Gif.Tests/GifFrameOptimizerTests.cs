@@ -1,7 +1,8 @@
 using System;
 using System.Drawing;
-using Hawkynt.GifFileFormat;
+using FileFormat.Gif;
 using NUnit.Framework;
+using Optimizer.Gif;
 
 namespace Optimizer.Gif.Tests;
 
@@ -121,10 +122,10 @@ public sealed class GifFrameOptimizerTests {
     var delay = TimeSpan.FromMilliseconds(100);
 
     var frames = new[] {
-      new Frame(pixels, size, new Offset(0, 0), palette, delay, FrameDisposalMethod.Unspecified, null, false),
-      new Frame((byte[])pixels.Clone(), size, new Offset(0, 0), palette, delay,
+      new Frame(pixels, size, new Offset(0, 0), PaletteAdapter.ToBytes(palette), delay, FrameDisposalMethod.Unspecified, null, false),
+      new Frame((byte[])pixels.Clone(), size, new Offset(0, 0), PaletteAdapter.ToBytes(palette), delay,
         FrameDisposalMethod.Unspecified, null, false),
-      new Frame((byte[])pixels.Clone(), size, new Offset(0, 0), palette, delay,
+      new Frame((byte[])pixels.Clone(), size, new Offset(0, 0), PaletteAdapter.ToBytes(palette), delay,
         FrameDisposalMethod.Unspecified, null, false)
     };
 
@@ -173,9 +174,9 @@ public sealed class GifFrameOptimizerTests {
     Array.Fill(pixels2, (byte)1); // all green
 
     var frames = new[] {
-      new Frame(pixels1, size, new Offset(0, 0), palette, TimeSpan.FromMilliseconds(100),
+      new Frame(pixels1, size, new Offset(0, 0), PaletteAdapter.ToBytes(palette), TimeSpan.FromMilliseconds(100),
         FrameDisposalMethod.Unspecified, null, false),
-      new Frame(pixels2, size, new Offset(0, 0), palette, TimeSpan.FromMilliseconds(100),
+      new Frame(pixels2, size, new Offset(0, 0), PaletteAdapter.ToBytes(palette), TimeSpan.FromMilliseconds(100),
         FrameDisposalMethod.Unspecified, null, false)
     };
 
@@ -202,9 +203,9 @@ public sealed class GifFrameOptimizerTests {
     Array.Fill(pixels, (byte)1);
 
     var frames = new[] {
-      new Frame((byte[])pixels.Clone(), size, new Offset(0, 0), palette, TimeSpan.FromMilliseconds(100),
+      new Frame((byte[])pixels.Clone(), size, new Offset(0, 0), PaletteAdapter.ToBytes(palette), TimeSpan.FromMilliseconds(100),
         FrameDisposalMethod.Unspecified, null, false),
-      new Frame((byte[])pixels.Clone(), size, new Offset(0, 0), palette, TimeSpan.FromMilliseconds(100),
+      new Frame((byte[])pixels.Clone(), size, new Offset(0, 0), PaletteAdapter.ToBytes(palette), TimeSpan.FromMilliseconds(100),
         FrameDisposalMethod.Unspecified, null, false)
     };
 
@@ -227,9 +228,9 @@ public sealed class GifFrameOptimizerTests {
       pixels[i] = 1; // all green
 
     var frames = new[] {
-      new Frame((byte[])pixels.Clone(), size, new Offset(0, 0), palette, TimeSpan.FromMilliseconds(100),
+      new Frame((byte[])pixels.Clone(), size, new Offset(0, 0), PaletteAdapter.ToBytes(palette), TimeSpan.FromMilliseconds(100),
         FrameDisposalMethod.DoNotDispose, null, false),
-      new Frame((byte[])pixels.Clone(), size, new Offset(0, 0), palette, TimeSpan.FromMilliseconds(100),
+      new Frame((byte[])pixels.Clone(), size, new Offset(0, 0), PaletteAdapter.ToBytes(palette), TimeSpan.FromMilliseconds(100),
         FrameDisposalMethod.DoNotDispose, null, false)
     };
 
@@ -260,9 +261,9 @@ public sealed class GifFrameOptimizerTests {
     }
 
     var frames = new[] {
-      new Frame(pixels1, size, new Offset(0, 0), palette, TimeSpan.FromMilliseconds(100),
+      new Frame(pixels1, size, new Offset(0, 0), PaletteAdapter.ToBytes(palette), TimeSpan.FromMilliseconds(100),
         FrameDisposalMethod.DoNotDispose, null, false),
-      new Frame(pixels2, size, new Offset(0, 0), palette, TimeSpan.FromMilliseconds(100),
+      new Frame(pixels2, size, new Offset(0, 0), PaletteAdapter.ToBytes(palette), TimeSpan.FromMilliseconds(100),
         FrameDisposalMethod.DoNotDispose, null, false)
     };
 
@@ -310,9 +311,9 @@ public sealed class GifFrameOptimizerTests {
     var pixelsB = new byte[] { 1, 0, 1, 0 }; // Red, Green, Red, Green (via swapped palette)
 
     var frames = new[] {
-      new Frame(pixelsA, size, new Offset(0, 0), paletteA, TimeSpan.FromMilliseconds(100),
+      new Frame(pixelsA, size, new Offset(0, 0), PaletteAdapter.ToBytes(paletteA), TimeSpan.FromMilliseconds(100),
         FrameDisposalMethod.Unspecified, null, false),
-      new Frame(pixelsB, size, new Offset(0, 0), paletteB, TimeSpan.FromMilliseconds(100),
+      new Frame(pixelsB, size, new Offset(0, 0), PaletteAdapter.ToBytes(paletteB), TimeSpan.FromMilliseconds(100),
         FrameDisposalMethod.Unspecified, null, false)
     };
 
@@ -334,11 +335,11 @@ public sealed class GifFrameOptimizerTests {
     var frames = new[] {
       new Frame((byte[])pixels.Clone(), size, new Offset(0, 0), null, TimeSpan.FromMilliseconds(100),
         FrameDisposalMethod.Unspecified, null, false),
-      new Frame((byte[])pixels.Clone(), size, new Offset(0, 0), (Color[])gct.Clone(),
+      new Frame((byte[])pixels.Clone(), size, new Offset(0, 0), PaletteAdapter.ToBytes((Color[])gct.Clone()),
         TimeSpan.FromMilliseconds(100), FrameDisposalMethod.Unspecified, null, false)
     };
 
-    var gif = new GifFile("89a", size, gct, LoopCount.NotSet, 0, frames);
+    var gif = new GifFile("89a", size, PaletteAdapter.ToBytes(gct), LoopCount.NotSet, 0, frames);
     var result = GifFrameOptimizer.DeduplicateFrames(gif);
 
     Assert.That(result.Frames.Count, Is.EqualTo(1));
@@ -354,9 +355,9 @@ public sealed class GifFrameOptimizerTests {
     var pixels = new byte[] { 0, 1, 0, 1 };
 
     var frames = new[] {
-      new Frame((byte[])pixels.Clone(), size, new Offset(0, 0), paletteA, TimeSpan.FromMilliseconds(100),
+      new Frame((byte[])pixels.Clone(), size, new Offset(0, 0), PaletteAdapter.ToBytes(paletteA), TimeSpan.FromMilliseconds(100),
         FrameDisposalMethod.Unspecified, null, false),
-      new Frame((byte[])pixels.Clone(), size, new Offset(0, 0), paletteB, TimeSpan.FromMilliseconds(100),
+      new Frame((byte[])pixels.Clone(), size, new Offset(0, 0), PaletteAdapter.ToBytes(paletteB), TimeSpan.FromMilliseconds(100),
         FrameDisposalMethod.Unspecified, null, false)
     };
 
@@ -378,7 +379,7 @@ public sealed class GifFrameOptimizerTests {
 
       frames[i] = new Frame(
         pixels, size, new Offset(0, 0),
-        [Color.Red, Color.Green, Color.Blue, Color.White],
+        PaletteAdapter.ToBytes(new[] { Color.Red, Color.Green, Color.Blue, Color.White }),
         TimeSpan.FromMilliseconds(100),
         FrameDisposalMethod.Unspecified,
         null, false

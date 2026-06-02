@@ -18,7 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../../../AnythingToGif/GifFileFormat/GifFileFormat.csproj" />
+    <ProjectReference Include="../../FileFormats/FileFormat.Gif/FileFormat.Gif.csproj" />
     <ProjectReference Include="../../Crush.Core/Crush.Core.csproj" />
   </ItemGroup>
 
