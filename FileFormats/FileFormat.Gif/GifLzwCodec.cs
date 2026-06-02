@@ -164,13 +164,199 @@ internal static class GifLzwCodec {
     return ms.ToArray();
   }
 
-  /// <summary>Tries every Standard variant and keeps the smallest output. Currently exhausts {clear-now,
-  /// defer-clear}; future Zopfli-style additions (e.g. multi-iteration dictionary seeding) would extend
-  /// the candidate list here without changing the API.</summary>
+  /// <summary>Tries every Standard variant plus the DP-optimal encoder, keeps the smallest output.
+  /// The DP path (ported from CompressionWorkbench's LzwEncoder.DpEncode) finds the lowest-bit-cost
+  /// code sequence by treating LZW as a shortest-path problem in a DAG of byte positions — it can
+  /// pick shorter matches that pay off downstream where the greedy encoder always grabs the longest.</summary>
   private static byte[] _EncodeBest(ReadOnlySpan<byte> pixels, int lzwMinCodeSize) {
     var clearNow = _EncodeStandard(pixels, lzwMinCodeSize, deferClear: false);
     var deferred = _EncodeStandard(pixels, lzwMinCodeSize, deferClear: true);
-    return deferred.Length < clearNow.Length ? deferred : clearNow;
+    var optimal = _EncodeOptimalDp(pixels, lzwMinCodeSize);
+    var best = clearNow;
+    if (deferred.Length < best.Length) best = deferred;
+    if (optimal != null && optimal.Length < best.Length) best = optimal;
+    return best;
+  }
+
+  /// <summary>DP-optimal LZW encoder — ported from CompressionWorkbench
+  /// (<c>Compression.Core/Dictionary/Lzw/LzwEncoder.cs:DpEncode</c>). Returns null if DP fails to
+  /// find a covering path (extremely rare but possible with degenerate inputs); callers should treat
+  /// null as "fall back to greedy".</summary>
+  /// <remarks>
+  /// Three passes:
+  /// <list type="number">
+  ///   <item>Greedy-trie pass — build a lookup of every (parent, child) → code that greedy LZW would
+  ///   allocate. Lets the DP phase know which longer matches will be available without simulating
+  ///   the full encoder.</item>
+  ///   <item>Bit-width precomputation — for each "k codes emitted so far" count, what's the current
+  ///   codeSize? Mirrors the decoder's nextCode/codeSize growth exactly.</item>
+  ///   <item>Forward DP — shortest-path cost[] over byte positions; edges of length 1..K where K is
+  ///   the longest greedy-trie match starting at this position.</item>
+  ///   <item>Traceback + re-encode — walk the optimal path, emit codes through the real trie (which
+  ///   may differ from the greedy trie because non-greedy choices change what gets added when).</item>
+  /// </list>
+  /// </remarks>
+  private static byte[]? _EncodeOptimalDp(ReadOnlySpan<byte> data, int lzwMinCodeSize) {
+    var n = data.Length;
+    if (n <= 2) return null; // not worth the overhead — fall back to greedy via Best's candidate list
+
+    var clearCode = 1 << lzwMinCodeSize;
+    var eoiCode = clearCode + 1;
+    var startCodeSize = lzwMinCodeSize + 1;
+    var firstUsable = eoiCode + 1;
+    var maxCode = _MaxCodes;
+
+    // --- Pass 1: greedy trie ---
+    var greedyTrie = new Dictionary<(int Parent, byte Child), int>();
+    {
+      var gNext = firstUsable;
+      var cur = (int)data[0];
+      for (var i = 1; i < n; ++i) {
+        var nb = data[i];
+        var key = (cur, nb);
+        if (greedyTrie.TryGetValue(key, out var ex))
+          cur = ex;
+        else {
+          if (gNext < maxCode) greedyTrie[key] = gNext++;
+          cur = nb;
+        }
+      }
+    }
+
+    // --- Pass 2: bit-width-after-k-codes lookup ---
+    var maxEntries = maxCode - firstUsable + 2;
+    var bitWidthCount = Math.Min(n + 1, maxEntries);
+    var bitWidthTable = new int[bitWidthCount];
+    {
+      var cb = startCodeSize;
+      var nc = firstUsable;
+      for (var k = 0; k < bitWidthCount; ++k) {
+        bitWidthTable[k] = cb;
+        if (k < 1 || nc >= maxCode) continue;
+        ++nc;
+        if (nc > (1 << cb) && cb < _MaxCodeBits) ++cb;
+      }
+    }
+
+    // --- Pass 3: forward DP ---
+    var cost = new double[n + 1];
+    var predLen = new int[n + 1];
+    var codesOnPath = new int[n + 1];
+    for (var i = 1; i <= n; ++i) cost[i] = double.MaxValue;
+
+    for (var i = 0; i < n; ++i) {
+      if (cost[i] == double.MaxValue) continue;
+      var k = codesOnPath[i];
+      var bits = bitWidthTable[Math.Min(k, bitWidthCount - 1)];
+      var edgeCost = cost[i] + bits;
+
+      if (edgeCost < cost[i + 1]) {
+        cost[i + 1] = edgeCost;
+        predLen[i + 1] = 1;
+        codesOnPath[i + 1] = k + 1;
+      }
+
+      var code = (int)data[i];
+      var p = i + 1;
+      while (p < n) {
+        if (!greedyTrie.TryGetValue((code, data[p]), out var nx)) break;
+        code = nx;
+        ++p;
+        if (!(edgeCost < cost[p])) continue;
+        cost[p] = edgeCost;
+        predLen[p] = p - i;
+        codesOnPath[p] = k + 1;
+      }
+    }
+
+    if (cost[n] == double.MaxValue) return null;
+
+    // --- Traceback ---
+    var matchLens = new List<int>();
+    var pos = n;
+    while (pos > 0) {
+      matchLens.Add(predLen[pos]);
+      pos -= predLen[pos];
+    }
+    matchLens.Reverse();
+
+    // --- Pass 4: re-encode through the actual trie guided by DP match lengths ---
+    using var ms = new MemoryStream();
+    ms.WriteByte((byte)lzwMinCodeSize);
+    using var bitOut = new _BitWriterSubBlocks(ms);
+
+    var currentBits = startCodeSize;
+    var trieNextCode = firstUsable;
+    var decoderNextCode = firstUsable;
+    var hasPrev = false;
+    var trie = new Dictionary<(int Parent, byte Child), int>();
+
+    bitOut.Write(clearCode, currentBits);
+
+    var dataPos = 0;
+    var dpIdx = 0;
+
+    while (dataPos < n) {
+      var desiredLen = dpIdx < matchLens.Count ? matchLens[dpIdx] : int.MaxValue;
+      ++dpIdx;
+
+      int bestCode = data[dataPos];
+      var bestLen = 1;
+      var cur = bestCode;
+      var desiredCode = desiredLen == 1 ? bestCode : -1;
+
+      for (var j = 1; dataPos + j < n; ++j) {
+        if (!trie.TryGetValue((cur, data[dataPos + j]), out var nx)) break;
+        cur = nx;
+        bestLen = j + 1;
+        bestCode = cur;
+        if (bestLen == desiredLen) desiredCode = cur;
+      }
+
+      int useLen, useCode;
+      if (desiredCode >= 0 && desiredLen <= bestLen) {
+        useLen = desiredLen;
+        useCode = desiredCode;
+      } else {
+        useLen = bestLen;
+        useCode = bestCode;
+      }
+
+      bitOut.Write(useCode, currentBits);
+
+      if (trieNextCode < maxCode && dataPos + useLen < n) {
+        var entryKey = (useCode, data[dataPos + useLen]);
+        if (trie.TryAdd(entryKey, trieNextCode)) ++trieNextCode;
+      }
+
+      if (hasPrev) {
+        if (decoderNextCode < maxCode) {
+          ++decoderNextCode;
+          if (decoderNextCode >= (1 << currentBits) && currentBits < _MaxCodeBits) ++currentBits;
+        } else {
+          bitOut.Write(clearCode, currentBits);
+          trie.Clear();
+          currentBits = startCodeSize;
+          trieNextCode = firstUsable;
+          decoderNextCode = firstUsable;
+          hasPrev = false;
+          dataPos += useLen;
+          continue;
+        }
+      }
+
+      hasPrev = true;
+      dataPos += useLen;
+    }
+
+    if (hasPrev && decoderNextCode < maxCode) {
+      ++decoderNextCode;
+      if (decoderNextCode >= (1 << currentBits) && currentBits < _MaxCodeBits) ++currentBits;
+    }
+
+    bitOut.Write(eoiCode, currentBits);
+    bitOut.Flush();
+    return ms.ToArray();
   }
 
   // ============================================================

@@ -144,6 +144,34 @@ public sealed class LzwCodecTests {
   }
 
   [Test]
+  public void CompressionLevel_Best_OnHighlyRedundantInput_BeatsStandard() {
+    // Construct input where greedy LZW makes locally-optimal but globally-suboptimal choices.
+    // A pattern with alternating overlapping substrings is a classic case where DP-optimal wins.
+    var input = new byte[16384];
+    for (var i = 0; i < input.Length; ++i)
+      input[i] = (byte)((i / 7 + i / 11) % 16);
+
+    var standard = GifLzwCodec.Encode(input, 4);
+    var best = GifLzwCodec.Encode(input, 4, GifLzwCodec.EncodeOptions.BestEffort());
+
+    using var ms = new MemoryStream(best);
+    Assert.That(GifLzwCodec.Decode(ms, input.Length), Is.EqualTo(input),
+      "Best output must round-trip identically");
+    Assert.That(best.Length, Is.LessThanOrEqualTo(standard.Length),
+      "Best must never be larger than Standard");
+  }
+
+  [Test]
+  public void CompressionLevel_Best_DpPathRoundTripsLargeInput() {
+    var rng = new Random(2024);
+    var input = new byte[32768];
+    rng.NextBytes(input);
+    var encoded = GifLzwCodec.Encode(input, 8, GifLzwCodec.EncodeOptions.BestEffort());
+    using var ms = new MemoryStream(encoded);
+    Assert.That(GifLzwCodec.Decode(ms, input.Length), Is.EqualTo(input));
+  }
+
+  [Test]
   public void EncodeOptions_FactoryMethods_ProduceExpectedLevels() {
     Assert.That(GifLzwCodec.EncodeOptions.NoCompression().Level, Is.EqualTo(GifLzwCodec.CompressionLevel.None));
     Assert.That(GifLzwCodec.EncodeOptions.StandardCompression().Level, Is.EqualTo(GifLzwCodec.CompressionLevel.Standard));
