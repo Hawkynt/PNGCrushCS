@@ -32,7 +32,16 @@
 
     <Message Importance="high" Text="[SingleFileBundle] Packing $(AssemblyName) ($(Configuration)) into a single executable (self-contained=$(_BundleSelfContained))…" />
 
-    <Exec Command='dotnet publish "$(MSBuildProjectFullPath)" -c $(Configuration) -r $(_BundleRid) --self-contained $(_BundleSelfContained) --no-build --no-restore -p:PublishSingleFile=true -p:_InSingleFileBundle=true -o "$(_BundleStagingDir)"'
+    <!-- Do NOT pass the no-build switch. On big solution builds (1100+ projects) MSBuild's parallel
+         scheduler can race and leave a transitive ProjectReference's DLL in the wrong configuration
+         folder (e.g. a single FileFormat library lands in bin/Debug/ while everything else is in
+         bin/Release/). When publish then runs with no-build it bails with DirectoryNotFoundException
+         trying to read the missing bin/Release/.../X.dll. Letting publish do its own incremental
+         build self-heals the race: projects already in Release are no-ops, the stragglers get
+         rebuilt into Release. no-restore stays because the outer Build already restored. The
+         recursion guard _InSingleFileBundle prevents the nested publish-build from re-firing this
+         bundle target. -->
+    <Exec Command='dotnet publish "$(MSBuildProjectFullPath)" -c $(Configuration) -r $(_BundleRid) --self-contained $(_BundleSelfContained) --no-restore -p:PublishSingleFile=true -p:_InSingleFileBundle=true -o "$(_BundleStagingDir)"'
           ConsoleToMSBuild="true"
           IgnoreExitCode="false" />
 
