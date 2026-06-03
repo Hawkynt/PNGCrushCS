@@ -59,6 +59,13 @@ jobs:
         working-directory: PNGCrushCS
         run: dotnet test PngCrush.slnx --configuration Release --no-build -p:EnableWindowsTargeting=true --filter "TestCategory!=Regression&TestCategory!=Performance" --logger "trx;LogFileName=tests.trx"
 
+      # Wall-clock performance tests are advisory — they run and report but a slow
+      # shared runner must not fail the build on a timing assertion.
+      - name: Performance tests (advisory)
+        working-directory: PNGCrushCS
+        continue-on-error: true
+        run: dotnet test PngCrush.slnx --configuration Release --no-build -p:EnableWindowsTargeting=true --filter "TestCategory=Performance" --logger "trx;LogFileName=perf-tests.trx"
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -1,26 +1,34 @@
 # PNGCrushCS
 
-[![CI](https://github.com/Hawkynt/PNGCrushCS/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Hawkynt/PNGCrushCS/actions/workflows/ci.yml)
-[![Release](https://github.com/Hawkynt/PNGCrushCS/actions/workflows/release.yml/badge.svg)](https://github.com/Hawkynt/PNGCrushCS/actions/workflows/release.yml)
-[![Latest release](https://img.shields.io/github/v/release/Hawkynt/PNGCrushCS?label=release&sort=semver)](https://github.com/Hawkynt/PNGCrushCS/releases/latest)
-[![Latest nightly](https://img.shields.io/github/v/release/Hawkynt/PNGCrushCS?include_prereleases&label=nightly&sort=date)](https://github.com/Hawkynt/PNGCrushCS/releases?q=prerelease%3Atrue)
-![License](https://img.shields.io/github/license/Hawkynt/PNGCrushCS)
-![Language](https://img.shields.io/github/languages/top/Hawkynt/PNGCrushCS?color=purple)
-[![Last Commit](https://img.shields.io/github/last-commit/Hawkynt/PNGCrushCS?branch=main)![Activity](https://img.shields.io/github/commit-activity/y/Hawkynt/PNGCrushCS?branch=main)](https://github.com/Hawkynt/PNGCrushCS/commits/main)
-[![Downloads](https://img.shields.io/github/downloads/Hawkynt/PNGCrushCS/total)](https://github.com/Hawkynt/PNGCrushCS/releases)
-[![NuGet: Hawkynt.FileFormats.Images](https://img.shields.io/nuget/v/Hawkynt.FileFormats.Images.svg?label=NuGet%3A%20Hawkynt.FileFormats.Images)](https://www.nuget.org/packages/Hawkynt.FileFormats.Images/)
+[![License](https://img.shields.io/github/license/Hawkynt/PNGCrushCS)](https://github.com/Hawkynt/PNGCrushCS/blob/main/LICENSE)
+[![Language](https://img.shields.io/github/languages/top/Hawkynt/PNGCrushCS?color=8957D5)](https://github.com/Hawkynt/PNGCrushCS)
 
-> A C# image suite that ships **(a)** a NuGet meta-package for reading, writing, and detecting **540+ image formats** in pure managed code, and **(b)** a CLI optimizer that exhaustively tries every valid encoding combination to produce the smallest lossless output for PNG, JPEG, GIF, TIFF, BMP, TGA, PCX, ICO, CUR, ANI, and WebP — backed by a custom Zopfli-class DEFLATE encoder.
+[![CI](https://github.com/Hawkynt/PNGCrushCS/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Hawkynt/PNGCrushCS/actions/workflows/ci.yml)
+![Last Commit](https://img.shields.io/github/last-commit/Hawkynt/PNGCrushCS?branch=main)
+![Activity](https://img.shields.io/github/commit-activity/m/Hawkynt/PNGCrushCS)
+
+[![Stars](https://img.shields.io/github/stars/Hawkynt/PNGCrushCS?color=FFD700)](https://github.com/Hawkynt/PNGCrushCS/stargazers)
+[![Forks](https://img.shields.io/github/forks/Hawkynt/PNGCrushCS?color=008080)](https://github.com/Hawkynt/PNGCrushCS/network/members)
+[![Issues](https://img.shields.io/github/issues/Hawkynt/PNGCrushCS)](https://github.com/Hawkynt/PNGCrushCS/issues)
+![Code Size](https://img.shields.io/github/languages/code-size/Hawkynt/PNGCrushCS?color=4CAF50)
+![Repo Size](https://img.shields.io/github/repo-size/Hawkynt/PNGCrushCS?color=FF9800)
+
+[![Release](https://img.shields.io/github/v/release/Hawkynt/PNGCrushCS?sort=semver)](https://github.com/Hawkynt/PNGCrushCS/releases/latest)
+[![Nightly](https://img.shields.io/github/v/release/Hawkynt/PNGCrushCS?include_prereleases=true&sort=date&label=nightly&color=FF9800)](https://github.com/Hawkynt/PNGCrushCS/releases)
+[![Downloads](https://img.shields.io/github/downloads/Hawkynt/PNGCrushCS/total)](https://github.com/Hawkynt/PNGCrushCS/releases)
+[![NuGet Images](https://img.shields.io/nuget/v/Hawkynt.FileFormats.Images?label=Images)](https://www.nuget.org/packages/Hawkynt.FileFormats.Images/)
+
+> A C# image suite that ships **(a)** a NuGet meta-package for reading, writing, and detecting a broad range of image formats in pure managed code, and **(b)** a CLI optimizer that exhaustively tries every valid encoding combination to produce the smallest lossless output for PNG, JPEG, GIF, TIFF, BMP, TGA, PCX, ICO, CUR, ANI, and WebP — backed by a custom Zopfli-class DEFLATE encoder.
 
 ## What's in this repository
 
 | Component | Description |
 |---|---|
-| **[`Hawkynt.FileFormats.Images`](Hawkynt.FileFormats.Images/README.md)** (NuGet) | Public meta-package: 540+ format reader/writers behind one zero-reflection static registry. **Start here if you just want to read/write images.** |
-| **`Crush.Image`** (CLI) | Single unified CLI that auto-detects input format and runs an exhaustive optimizer for 11 raster formats with optional cross-format conversion. |
+| **[`Hawkynt.FileFormats.Images`](Hawkynt.FileFormats.Images/README.md)** (NuGet) | Public meta-package: format reader/writers behind one zero-reflection static registry. **Start here if you just want to read/write images.** |
+| **`Crush.Image`** (CLI) | Single unified CLI that auto-detects input format and runs an exhaustive optimizer across its supported raster formats with optional cross-format conversion. |
 | **`Compression.Core`** | Pure RFC 1951 DEFLATE with Zopfli-class optimal parsing (Ultra: 2-pass DP, dual hash chain depths; Hyper: parallel hash chains, iterative refinement, block splitting). No platform dependencies. |
-| **`FileFormat.*`** (542 libraries) | Standalone reader/writer per format. Used by both the NuGet package and the CLI optimizers. |
-| **`Optimizer.*`** (11 libraries) | Per-format optimization engines. Each generates every valid combination of encoding parameters, compresses each in parallel, and keeps the smallest result. |
+| **`FileFormat.*`** (one library per format) | Standalone reader/writer per format. Used by both the NuGet package and the CLI optimizers. |
+| **`Optimizer.*`** (one engine per optimizable format) | Per-format optimization engines. Each generates every valid combination of encoding parameters, compresses each in parallel, and keeps the smallest result. |
 
 For the comprehensive **list of supported file formats** (read/write capabilities, MIME types, reference links), see the [`Hawkynt.FileFormats.Images` README](Hawkynt.FileFormats.Images/README.md#supported-formats).
 
@@ -67,15 +75,15 @@ Each per-format optimizer follows the same pipeline:
 ```
 Compression.Core   <-- FileFormat.Png  <-- Optimizer.Png
                    <-- FileFormat.Tiff <-- Optimizer.Tiff
-FileFormat.Core    <-- All 542 FileFormat.* libraries
+FileFormat.Core    <-- All FileFormat.* libraries
 FileFormat.Riff    <-- FileFormat.Ani, FileFormat.WebP
 FileFormat.Iff     <-- FileFormat.Ilbm, IffPbm, IffAcbm, IffDeep, IffRgb8, IffRgbn
 
 Hawkynt.FileFormats.Images  <-- (public NuGet — references everything below)
   - Source-generated FormatRegistry / ImageFormat enum
-  - Bundles all 540 FileFormat.*.dll into lib/net8.0/
+  - Bundles all FileFormat.*.dll into lib/net8.0/
 
-Crush.Core         <-- Crush.Image + 11 Optimizer.* libraries
+Crush.Core         <-- Crush.Image + the Optimizer.* libraries
 Optimizer.Image    <-- BitmapConverter, ImageFormatDetector (Windows-specific glue)
 ```
 
@@ -110,7 +118,7 @@ cd PNGCrushCS
 # Build
 dotnet build PngCrush.slnx -c Release
 
-# Run all tests in Tests/ (~557 test projects)
+# Run all tests in Tests/
 for proj in Tests/*/*.csproj; do dotnet test "$proj"; done
 
 # Run the unified CLI
