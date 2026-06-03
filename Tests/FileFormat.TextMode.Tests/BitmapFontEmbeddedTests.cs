@@ -46,8 +46,8 @@ public sealed class BitmapFontEmbeddedTests {
 
   [Test]
   [Category("Unit")]
-  public void All_HasSixEntries() {
-    Assert.That(BitmapFontEmbedded.All, Has.Length.EqualTo(6));
+  public void All_HasSevenEntries() {
+    Assert.That(BitmapFontEmbedded.All, Has.Length.EqualTo(7));
   }
 
   [Test]

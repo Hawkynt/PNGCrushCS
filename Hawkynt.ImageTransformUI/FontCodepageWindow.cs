@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Windows.Forms;
@@ -35,7 +36,48 @@ public sealed class FontCodepageWindow : Form {
   private readonly Button _loadFontButton;
   private readonly Button _okButton;
   private readonly Button _cancelButton;
-  private readonly PictureBox _previewBox;
+  private readonly _NearestNeighborPictureBox _previewBox;
+
+  /// <summary>PictureBox subclass that paints its <see cref="PictureBox.Image"/> with nearest-neighbor
+  /// interpolation centred and fit-to-box (replicating <see cref="PictureBoxSizeMode.Zoom"/>'s scaling
+  /// behaviour). Bitmap-font glyphs scale crisply pixel-on-pixel instead of bilinear-blurred.
+  /// Double-buffered + ResizeRedraw so dragging the splitter or the window edge re-renders cleanly
+  /// without leaving stale pixels around the scaled image.</summary>
+  private sealed class _NearestNeighborPictureBox : PictureBox {
+
+    public _NearestNeighborPictureBox() {
+      this.SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint
+                    | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+      this.DoubleBuffered = true;
+    }
+
+    protected override void OnPaintBackground(PaintEventArgs pevent) {
+      // Background is always cleared to BackColor inside OnPaint — skipping here avoids the default
+      // 2-step erase+paint that flickers during resize.
+    }
+
+    protected override void OnPaint(PaintEventArgs e) {
+      using (var bg = new SolidBrush(this.BackColor))
+        e.Graphics.FillRectangle(bg, this.ClientRectangle);
+
+      var img = this.Image;
+      if (img is null) return;
+      float bw = this.ClientSize.Width, bh = this.ClientSize.Height;
+      if (bw < 1 || bh < 1) return;
+
+      e.Graphics.InterpolationMode = InterpolationMode.NearestNeighbor;
+      e.Graphics.PixelOffsetMode = PixelOffsetMode.Half;
+      e.Graphics.SmoothingMode = SmoothingMode.None;
+      float iw = img.Width, ih = img.Height;
+      var scale = Math.Min(bw / iw, bh / ih);
+      var dw = iw * scale;
+      var dh = ih * scale;
+      if (dw < 1 || dh < 1) return;
+      var dx = (bw - dw) / 2;
+      var dy = (bh - dh) / 2;
+      e.Graphics.DrawImage(img, new RectangleF(dx, dy, dw, dh));
+    }
+  }
   private readonly Label _statusLabel;
 
   // Resolved BitmapFont for each (fontName, cellW, cellH) combo. System fonts are rasterised on
@@ -60,11 +102,14 @@ public sealed class FontCodepageWindow : Form {
 
   public FontCodepageWindow() {
     this.Text = "Font and code page";
-    this.Size = new Size(640, 440);
+    this.ClientSize = new Size(820, 560);
+    this.MinimumSize = new Size(640, 440);
     this.StartPosition = FormStartPosition.CenterParent;
-    this.FormBorderStyle = FormBorderStyle.FixedDialog;
-    this.MaximizeBox = false;
-    this.MinimizeBox = false;
+    // Sizable so the user can grow the preview area to give 8x16 fonts more room. The splitter
+    // between the controls and the preview can be dragged to balance them however they like.
+    this.FormBorderStyle = FormBorderStyle.Sizable;
+    this.MaximizeBox = true;
+    this.MinimizeBox = true;
 
     // Embedded era catalogue at the top of the dropdown (lazy-loaded — selecting one
     // triggers the deflate decompression in BitmapFontEmbedded).
@@ -79,12 +124,10 @@ public sealed class FontCodepageWindow : Form {
     foreach (var fam in systemFamilies) combined.Add(_SystemFontPrefix + fam);
     _allFontNames = combined.ToArray();
 
-    var leftPanel = new Panel { Dock = DockStyle.Left, Width = 300, Padding = new Padding(10) };
-    var rightPanel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(10) };
-
     var fontLabel = new Label { Text = "Font:", Top = 0, Left = 0, AutoSize = true };
     _fontCombo = new ComboBox {
       Top = 18, Left = 0, Width = 270, DropDownStyle = ComboBoxStyle.DropDownList, IntegralHeight = false, MaxDropDownItems = 20,
+      Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
     };
     _fontCombo.Items.AddRange(_allFontNames);
     _fontCombo.SelectedIndex = 0;
@@ -96,6 +139,7 @@ public sealed class FontCodepageWindow : Form {
     var cellSizeLabel = new Label { Text = "Cell size:", Top = 80, Left = 0, AutoSize = true };
     _cellSizeCombo = new ComboBox {
       Top = 98, Left = 0, Width = 270, DropDownStyle = ComboBoxStyle.DropDownList,
+      Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
     };
     foreach (var (_, _, lbl) in _CellSizes) _cellSizeCombo.Items.Add(lbl);
     _cellSizeCombo.SelectedIndex = 2; // 8x16 default
@@ -104,6 +148,7 @@ public sealed class FontCodepageWindow : Form {
     var codepageLabel = new Label { Text = "Code page:", Top = 130, Left = 0, AutoSize = true };
     _codepageCombo = new ComboBox {
       Top = 148, Left = 0, Width = 270, DropDownStyle = ComboBoxStyle.DropDownList,
+      Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
     };
     _codepageCombo.Items.AddRange(["CP437 (IBM PC original)", "CP850 (Western European)", "CP866 (Cyrillic)"]);
     _codepageCombo.SelectedIndex = 0;
@@ -122,26 +167,66 @@ public sealed class FontCodepageWindow : Form {
     _rowsInput.ValueChanged += (_, _) => this._UpdatePreview();
 
     _statusLabel = new Label {
-      Top = 240, Left = 0, Width = 280, Height = 100, AutoSize = false, ForeColor = Color.DarkGray,
+      Top = 240, Left = 0, AutoSize = false, ForeColor = Color.DarkGray,
+      Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
       Text = "Built-in is the procedural VGA-style font.\nAny installed system font can also be picked — TrueType\nmonospace fonts (Consolas, Cascadia Mono, Mxoldschool\nPC fonts) work best.",
     };
 
+    var leftPanel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(10) };
     leftPanel.Controls.AddRange([fontLabel, _fontCombo, _loadFontButton, cellSizeLabel, _cellSizeCombo, codepageLabel, _codepageCombo, colsLabel, _columnsInput, rowsLabel, _rowsInput, _statusLabel]);
-
-    var previewLabel = new Label { Text = "Preview:", Top = 0, Left = 0, AutoSize = true };
-    _previewBox = new PictureBox {
-      Top = 18, Left = 0, Width = 300, Height = 320, BorderStyle = BorderStyle.FixedSingle,
-      SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.Black,
+    // Status label fills the bottom of the left panel — set width once after layout so the anchor wires up.
+    leftPanel.Layout += (_, _) => {
+      _statusLabel.Width = leftPanel.ClientSize.Width - 20;
+      _statusLabel.Height = Math.Max(60, leftPanel.ClientSize.Height - _statusLabel.Top - 10);
     };
-    rightPanel.Controls.AddRange([previewLabel, _previewBox]);
 
-    _okButton = new Button { Text = "OK", DialogResult = DialogResult.OK, Top = 365, Left = 440, Width = 80 };
+    // Preview lives in the right panel — label at top, picture box fills the rest with Zoom mode
+    // so the 16×16 charset bitmap scales smoothly as the splitter / window grows.
+    var previewLabel = new Label { Text = "Character set (16 × 16 grid, all 256 code points):", Dock = DockStyle.Top, AutoSize = false, Height = 22 };
+    _previewBox = new _NearestNeighborPictureBox {
+      Dock = DockStyle.Fill, BorderStyle = BorderStyle.FixedSingle, BackColor = Color.Black,
+    };
+    var rightPanel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(10) };
+    rightPanel.Controls.Add(_previewBox);     // fills available space
+    rightPanel.Controls.Add(previewLabel);    // dock-top above the picture box
+
+    // SplitContainer: dragable boundary between left controls and right preview. The user can
+    // pull the splitter to grow either side; the preview's Zoom mode auto-rescales the bitmap.
+    // NOTE: do NOT set Panel1MinSize / Panel2MinSize in the object initializer — the SplitContainer's
+    // default Width is 150, so the (260 + 240) min-sizes would force SplitterDistance out of range
+    // and throw InvalidOperationException before the control gets a parent. Defer them to Load
+    // (after the form's Dock=Fill has stretched the splitter to the real client width).
+    var split = new SplitContainer {
+      Dock = DockStyle.Fill,
+      Orientation = Orientation.Vertical,
+      SplitterWidth = 6,
+      FixedPanel = FixedPanel.Panel1,
+    };
+    split.Panel1.Controls.Add(leftPanel);
+    split.Panel2.Controls.Add(rightPanel);
+    this.Load += (_, _) => {
+      try {
+        split.Panel1MinSize = 260;
+        split.Panel2MinSize = 240;
+        split.SplitterDistance = Math.Min(320, this.ClientSize.Width - split.Panel2MinSize - split.SplitterWidth);
+      } catch { /* ignored — splitter clamps itself */ }
+    };
+
+    // Bottom button strip — anchored Right so resize keeps OK/Cancel pinned.
+    var buttonStrip = new Panel { Dock = DockStyle.Bottom, Height = 48, Padding = new Padding(10, 8, 10, 8) };
+    _cancelButton = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, Width = 80, Anchor = AnchorStyles.Top | AnchorStyles.Right };
+    _okButton = new Button { Text = "OK",     DialogResult = DialogResult.OK,     Width = 80, Anchor = AnchorStyles.Top | AnchorStyles.Right };
     _okButton.Click += (_, _) => this._OnAccept();
-    _cancelButton = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, Top = 365, Left = 530, Width = 80 };
+    buttonStrip.Resize += (_, _) => {
+      _cancelButton.Location = new Point(buttonStrip.ClientSize.Width - _cancelButton.Width - 10, 8);
+      _okButton.Location     = new Point(_cancelButton.Left - _okButton.Width - 10, 8);
+    };
+    buttonStrip.Controls.AddRange([_cancelButton, _okButton]);
     this.AcceptButton = _okButton;
     this.CancelButton = _cancelButton;
 
-    this.Controls.AddRange([leftPanel, rightPanel, _okButton, _cancelButton]);
+    this.Controls.Add(split);
+    this.Controls.Add(buttonStrip);
 
     this._UpdatePreview();
   }
@@ -229,34 +314,43 @@ public sealed class FontCodepageWindow : Form {
     if (font is null) return;
     _statusLabel.ForeColor = Color.DarkGray;
 
-    // Render a CP437 sample so the user can see what their picks look like.
-    // Sample includes ASCII + box-drawing + shades + blocks — the regions NFO/ANSI exercise most.
-    byte[] sample = [
-      0x48, 0x65, 0x6C, 0x6C, 0x6F, 0x20, 0x57, 0x6F, 0x72, 0x6C, 0x64,
-      0,
-      0xC9, 0xCD, 0xCD, 0xCD, 0xCD, 0xCD, 0xCD, 0xCD, 0xBB, 0x20, 0x20,
-      0,
-      0xBA, 0x20, 0xB0, 0xB1, 0xB2, 0xDB, 0xDF, 0xDC, 0x20, 0xBA, 0x20,
-      0,
-      0xC8, 0xCD, 0xCD, 0xCD, 0xCD, 0xCD, 0xCD, 0xCD, 0xBC, 0x20, 0x20,
-    ];
-    var rows = 4;
-    var cols = 11;
+    // Full 16×16 CP437 character set — codepoint 0x00 (top-left) through 0xFF (bottom-right).
+    // Foreground 14 (yellow) on background 1 (blue) makes every glyph visible even when the
+    // codepoint is space.
+    const int rows = 16;
+    const int cols = 16;
     var cells = new TextCell[cols * rows];
-    var r = 0; var c = 0;
-    foreach (var b in sample) {
-      if (b == 0) { ++r; c = 0; continue; }
-      if (c < cols && r < rows) cells[r * cols + c] = new TextCell(b, Foreground: 14, Background: 1);
-      ++c;
-    }
     for (var i = 0; i < cells.Length; ++i)
-      if (cells[i].CodePoint == 0)
-        cells[i] = new TextCell(0x20, 7, 1);
+      cells[i] = new TextCell((byte)i, Foreground: 14, Background: 1);
 
     var screen = new TextScreen { ColumnCount = cols, RowCount = rows, Cells = cells, Font = font };
     var img = TextScreenRenderer.Render(screen, font);
+    var srcBmp = _RgbBytesToBitmap(img.Width, img.Height, img.PixelData);
+
+    // Stamp every cell into a destination bitmap with a 1-pixel gap between cells (filled with
+    // a desaturated grid colour). This gives clean dividers WITHOUT overdrawing the top scanline
+    // of each glyph the way a post-hoc DrawLine pass would.
+    const int gap = 1;
+    var cellW = font.CellWidth;
+    var cellH = font.CellHeight;
+    var dstW = cols * cellW + (cols - 1) * gap;
+    var dstH = rows * cellH + (rows - 1) * gap;
+    var dstBmp = new Bitmap(dstW, dstH, PixelFormat.Format24bppRgb);
+    using (var g = Graphics.FromImage(dstBmp)) {
+      g.Clear(Color.FromArgb(60, 80, 120));
+      g.InterpolationMode = InterpolationMode.NearestNeighbor;
+      g.PixelOffsetMode = PixelOffsetMode.Half;
+      for (var r = 0; r < rows; ++r)
+        for (var c = 0; c < cols; ++c) {
+          var srcRect = new Rectangle(c * cellW, r * cellH, cellW, cellH);
+          var dstRect = new Rectangle(c * (cellW + gap), r * (cellH + gap), cellW, cellH);
+          g.DrawImage(srcBmp, dstRect, srcRect, GraphicsUnit.Pixel);
+        }
+    }
+    srcBmp.Dispose();
+
     _previewBox.Image?.Dispose();
-    _previewBox.Image = _RgbBytesToBitmap(img.Width, img.Height, img.PixelData);
+    _previewBox.Image = dstBmp;
   }
 
   private static Bitmap _RgbBytesToBitmap(int width, int height, byte[] rgb) {

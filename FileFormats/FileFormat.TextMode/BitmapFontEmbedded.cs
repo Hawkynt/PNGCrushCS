@@ -31,28 +31,33 @@ public static class BitmapFontEmbedded {
   /// <summary>Amiga Topaz 8×16 — Workbench 1.x default.</summary>
   public static BitmapFont AmigaTopaz8x16 => _topaz.Value;
 
-  /// <summary>Commodore 64 PETSCII 8×8 — C64 character set.</summary>
-  public static BitmapFont C64Petscii8x8 => _petscii.Value;
+  /// <summary>Commodore 64 PETSCII 8×8, bank 0: uppercase letters + graphics characters.</summary>
+  public static BitmapFont C64PetsciiGraphics8x8 => _petsciiGfx.Value;
+
+  /// <summary>Commodore 64 PETSCII 8×8, bank 1: lowercase + uppercase letters (the "text" set).</summary>
+  public static BitmapFont C64PetsciiLowercase8x8 => _petsciiLo.Value;
 
   /// <summary>Atari 8-bit ATASCII 8×8 — Atari 400/800/XL/XE character set.</summary>
   public static BitmapFont AtariAtascii8x8 => _atascii.Value;
 
   /// <summary>All embedded fonts in display order, paired with a human-readable label for pickers.</summary>
   public static readonly (string Label, Func<BitmapFont> Get, int CellW, int CellH)[] All = [
-    ("IBM VGA 8×16",       () => IbmVga8x16,     8, 16),
-    ("IBM EGA 8×14",       () => IbmEga8x14,     8, 14),
-    ("IBM CGA 8×8",        () => IbmCga8x8,      8, 8),
-    ("Amiga Topaz 8×16",   () => AmigaTopaz8x16, 8, 16),
-    ("C64 PETSCII 8×8",    () => C64Petscii8x8,  8, 8),
-    ("Atari ATASCII 8×8",  () => AtariAtascii8x8, 8, 8),
+    ("IBM VGA 8×16",                 () => IbmVga8x16,             8, 16),
+    ("IBM EGA 8×14",                 () => IbmEga8x14,             8, 14),
+    ("IBM CGA 8×8",                  () => IbmCga8x8,              8, 8),
+    ("Amiga Topaz 8×16",             () => AmigaTopaz8x16,         8, 16),
+    ("C64 PETSCII (graphics) 8×8",   () => C64PetsciiGraphics8x8,  8, 8),
+    ("C64 PETSCII (lowercase) 8×8",  () => C64PetsciiLowercase8x8, 8, 8),
+    ("Atari ATASCII 8×8",            () => AtariAtascii8x8,        8, 8),
   ];
 
-  private static readonly Lazy<BitmapFont> _ibmVga  = new(() => _Load("ibm-vga-8x16.fnt.dfl",      8, 16));
-  private static readonly Lazy<BitmapFont> _ibmEga  = new(() => _Load("ibm-ega-8x14.fnt.dfl",      8, 14));
-  private static readonly Lazy<BitmapFont> _ibmCga  = new(() => _Load("ibm-cga-8x8.fnt.dfl",       8, 8));
-  private static readonly Lazy<BitmapFont> _topaz   = new(() => _Load("amiga-topaz-8x16.fnt.dfl",  8, 16));
-  private static readonly Lazy<BitmapFont> _petscii = new(() => _Load("c64-petscii-8x8.fnt.dfl",   8, 8));
-  private static readonly Lazy<BitmapFont> _atascii = new(() => _Load("atari-atascii-8x8.fnt.dfl", 8, 8));
+  private static readonly Lazy<BitmapFont> _ibmVga     = new(() => _Load("ibm-vga-8x16.fnt.dfl",       8, 16));
+  private static readonly Lazy<BitmapFont> _ibmEga     = new(() => _Load("ibm-ega-8x14.fnt.dfl",       8, 14));
+  private static readonly Lazy<BitmapFont> _ibmCga     = new(() => _Load("ibm-cga-8x8.fnt.dfl",        8, 8));
+  private static readonly Lazy<BitmapFont> _topaz      = new(() => _Load("amiga-topaz-8x16.fnt.dfl",   8, 16));
+  private static readonly Lazy<BitmapFont> _petsciiGfx = new(() => _Load("c64-petscii-8x8.fnt.dfl",    8, 8));
+  private static readonly Lazy<BitmapFont> _petsciiLo  = new(() => _Load("c64-petscii-lo-8x8.fnt.dfl", 8, 8));
+  private static readonly Lazy<BitmapFont> _atascii    = new(() => _Load("atari-atascii-8x8.fnt.dfl",  8, 8));
 
   private static BitmapFont _Load(string resourceName, int cellW, int cellH) {
     var asm = typeof(BitmapFontEmbedded).Assembly;

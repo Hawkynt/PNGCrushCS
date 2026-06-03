@@ -37,13 +37,17 @@ public static class EraFontGenerator {
     return cga;
   }
 
-  /// <summary>Amiga Topaz 8×16: VGA 8×16 with a 1-pixel horizontal double-strike for boldness.</summary>
+  /// <summary>Amiga Topaz 8×16: placeholder built from the real IBM VGA ROM with a horizontal double-strike
+  /// for boldness. Procedural VGA only defines ~140 glyphs (ASCII + box drawing + blocks), so deriving
+  /// from it would leave large swaths of the 256-glyph grid empty. Reading the embedded VGA ROM ensures
+  /// every code point has lit pixels until an authentic Topaz dump can be embedded.</summary>
   public static byte[] BuildAmigaTopaz8x16() {
-    var vga = ProceduralVgaFont.Build();
+    // BitmapFontEmbedded.IbmVga8x16 already lazy-loads the real ROM bytes from our embedded
+    // resources — reuse them so Topaz mirrors VGA's full glyph coverage with added boldness.
+    var vga = BitmapFontEmbedded.IbmVga8x16.GlyphData;
     var topaz = new byte[256 * 16];
     for (var i = 0; i < vga.Length; ++i) {
       var row = vga[i];
-      // Stretch each lit pixel one column right — preserves shape but adds boldness.
       topaz[i] = (byte)(row | (row >> 1));
     }
     return topaz;
