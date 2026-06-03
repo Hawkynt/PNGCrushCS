@@ -16,6 +16,9 @@
     <Project Path="Hawkynt.FileFormats.Images/Hawkynt.FileFormats.Images.csproj" />
     <Project Path="Hawkynt.ImageTransformUI/Hawkynt.ImageTransformUI.csproj" />
   </Folder>
+  <Folder Name="/Tools/">
+    <Project Path="Tools/FontBaker/FontBaker.csproj" />
+  </Folder>
   <Folder Name="/Crush/">
     <Project Path="Crush.Image/Crush.Image.csproj" />
     <Project Path="Crush.Viewer/Crush.Viewer.csproj" />

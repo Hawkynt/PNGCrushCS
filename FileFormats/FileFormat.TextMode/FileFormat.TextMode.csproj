@@ -25,4 +25,12 @@
     <PackageReference Include="System.Memory" Version="4.5.5" />
   </ItemGroup>
 
+  <!-- Era font catalogue: deflate-compressed glyph blobs baked by Tools/FontBaker.
+       LogicalName strips the path prefix so BitmapFontEmbedded._Load can find them by bare filename. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\Fonts\*.fnt.dfl">
+      <LogicalName>%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
 </Project>

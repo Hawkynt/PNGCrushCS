@@ -7,7 +7,7 @@ namespace FileFormat.TextMode;
 /// box-drawing primitives. Output: 4096 bytes (256 glyphs × 16 rows, 1 byte per row, MSB-leftmost).
 /// Not pixel-identical to the IBM VGA ROM, but covers everything needed for NFO/ANSI rendering.
 /// </summary>
-internal static class ProceduralVgaFont {
+public static class ProceduralVgaFont {
 
   public static byte[] Build() {
     var data = new byte[256 * 16];

@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>preview</LangVersion>
+    <Description>One-shot tool that procedurally generates the embedded font catalogue for FileFormat.TextMode and writes deflate-compressed blobs into Resources/Fonts/. Re-run when generators change.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\FileFormats\FileFormat.TextMode\FileFormat.TextMode.csproj" />
+  </ItemGroup>
+</Project>

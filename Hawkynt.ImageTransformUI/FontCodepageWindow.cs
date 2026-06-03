@@ -16,7 +16,8 @@ namespace Hawkynt.ImageTransformUI;
 /// </summary>
 public sealed class FontCodepageWindow : Form {
 
-  private const string _BuiltInName = "« Built-in VGA 8×16 »";
+  private const string _SystemFontPrefix = "[System] ";
+  private const string _EmbeddedFontPrefix = "[Embedded] ";
   private static readonly (int W, int H, string Label)[] _CellSizes = [
     (8, 8,  "8 × 8 (CGA mode)"),
     (8, 14, "8 × 14 (EGA)"),
@@ -41,7 +42,11 @@ public sealed class FontCodepageWindow : Form {
   // demand and cached here so re-selecting the same font is instant.
   private readonly Dictionary<string, BitmapFont> _fontCache = new();
 
-  // Names shown in the font combo: built-in first, then alphabetised system font families.
+  // Embedded font name → (accessor, natural cellW, cellH). Selecting an embedded font auto-snaps
+  // the cell-size combo to the font's natural dimensions so the preview always renders correctly.
+  private readonly Dictionary<string, (Func<BitmapFont> Get, int CellW, int CellH)> _embeddedAccessors = new();
+
+  // Names shown in the font combo: embedded era fonts first, then system fonts.
   private readonly string[] _allFontNames;
 
   /// <summary>The font the user picked (null until OK).</summary>
@@ -61,11 +66,17 @@ public sealed class FontCodepageWindow : Form {
     this.MaximizeBox = false;
     this.MinimizeBox = false;
 
-    _fontCache[_BuiltInName + "@8x16"] = BitmapFont.DefaultVga8x16;
+    // Embedded era catalogue at the top of the dropdown (lazy-loaded — selecting one
+    // triggers the deflate decompression in BitmapFontEmbedded).
+    var combined = new List<string>();
+    foreach (var (label, get, cellW, cellH) in BitmapFontEmbedded.All) {
+      var name = _EmbeddedFontPrefix + label;
+      combined.Add(name);
+      _embeddedAccessors[name] = (get, cellW, cellH);
+    }
 
     var systemFamilies = BitmapFontRasterizer.GetInstalledMonospaceFamilies();
-    var combined = new List<string>(systemFamilies.Length + 1) { _BuiltInName };
-    combined.AddRange(systemFamilies);
+    foreach (var fam in systemFamilies) combined.Add(_SystemFontPrefix + fam);
     _allFontNames = combined.ToArray();
 
     var leftPanel = new Panel { Dock = DockStyle.Left, Width = 300, Padding = new Padding(10) };
@@ -154,21 +165,20 @@ public sealed class FontCodepageWindow : Form {
   }
 
   private BitmapFont? _ResolveSelectedFont() {
-    var fontName = _fontCombo.SelectedItem as string ?? _BuiltInName;
+    var fontName = _fontCombo.SelectedItem as string ?? _allFontNames[0];
+
+    // Embedded era fonts override the cell-size combo with their natural dimensions.
+    if (_embeddedAccessors.TryGetValue(fontName, out var emb))
+      return emb.Get();
+
     var (cellW, cellH) = this._CurrentCellSize();
     var cacheKey = $"{fontName}@{cellW}x{cellH}";
     if (_fontCache.TryGetValue(cacheKey, out var cached)) return cached;
 
-    // Built-in is only valid at 8×16 (it's procedural at that size). For other cell sizes fall
-    // through to system-font rasterisation using "Consolas" as a sensible default.
     BitmapFont font;
     try {
-      if (fontName == _BuiltInName && cellW == 8 && cellH == 16) {
-        font = BitmapFont.DefaultVga8x16;
-      } else {
-        var familyName = fontName == _BuiltInName ? "Consolas" : fontName;
-        font = BitmapFontRasterizer.FromSystemFont(familyName, cellW, cellH);
-      }
+      var familyName = fontName.StartsWith(_SystemFontPrefix) ? fontName.Substring(_SystemFontPrefix.Length) : fontName;
+      font = BitmapFontRasterizer.FromSystemFont(familyName, cellW, cellH);
     } catch (Exception ex) {
       _statusLabel.Text = $"Failed to rasterise '{fontName}' at {cellW}×{cellH}: {ex.Message}";
       _statusLabel.ForeColor = Color.IndianRed;
@@ -180,7 +190,7 @@ public sealed class FontCodepageWindow : Form {
   }
 
   private void _OnAccept() {
-    this.PickedFont = this._ResolveSelectedFont() ?? BitmapFont.DefaultVga8x16;
+    this.PickedFont = this._ResolveSelectedFont() ?? BitmapFontEmbedded.IbmVga8x16;
     this.PickedCodepage = ((string)_codepageCombo.SelectedItem).Split(' ')[0];
     this.PickedColumns = (int)_columnsInput.Value;
     this.PickedRows = (int)_rowsInput.Value;
