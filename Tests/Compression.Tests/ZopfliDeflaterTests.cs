@@ -459,6 +459,7 @@ public sealed class ZopfliDeflaterTests {
 
   [Test]
   [Timeout(300000)]
+  [Category("Performance")]
   public void Compress_Hyper_RoundTrip_LargeData_64KB() {
     var original = new byte[65536];
     var rng = new Random(99999);
