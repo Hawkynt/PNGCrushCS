@@ -65,6 +65,7 @@ public sealed class RoundTripTests {
 
   [Test]
   [Category("Integration")]
+  [Platform("Win", Reason = "Builds the test JPEG through System.Drawing.Bitmap → GDI+ (Windows-only).")]
   public void RoundTrip_LosslessTranscode_DimensionsPreserved() {
     const int width = 8;
     const int height = 8;
@@ -79,6 +80,7 @@ public sealed class RoundTripTests {
 
   [Test]
   [Category("Integration")]
+  [Platform("Win", Reason = "Builds the test JPEG through System.Drawing.Bitmap → GDI+ (Windows-only).")]
   public void RoundTrip_LosslessTranscode_PreservesRawBytes() {
     var jpegBytes = _CreateTestJpegBytes();
 

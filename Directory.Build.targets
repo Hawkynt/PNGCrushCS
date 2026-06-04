@@ -5,4 +5,16 @@
     <IsTrimmable>false</IsTrimmable>
     <IsAotCompatible>false</IsAotCompatible>
   </PropertyGroup>
+
+  <!-- Hide Windows-TFM-only test projects (net*-windows) from `dotnet test` when the host
+       isn't Windows. dotnet test discovers test projects via IsTestProject=true; flipping it
+       off makes discovery skip them entirely, suppressing the
+         "Microsoft.WindowsDesktop.App version 10.0.0 not found … app-launch-failed"
+       warnings that Optimizer.Image.Tests and Optimizer.Png.Tests would otherwise print on
+       Ubuntu CI. The project still builds (so the slnx build stays clean cross-platform) —
+       only the test execution is skipped on non-Windows.
+       String contains check because MSBuild has no built-in EndsWith property function. -->
+  <PropertyGroup Condition="'$(IsTestProject)' == 'true' And '$(OS)' != 'Windows_NT' And $(TargetFramework.Contains('-windows'))">
+    <IsTestProject>false</IsTestProject>
+  </PropertyGroup>
 </Project>
