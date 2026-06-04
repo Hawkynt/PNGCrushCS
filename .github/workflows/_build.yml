@@ -81,13 +81,18 @@ jobs:
         working-directory: PNGCrushCS
         run: perl .github/workflows/scripts/version.pl --stamp
 
+      # EnableSingleFileBundle=false: our build/SingleFileBundle.targets convenience that
+      # produces a bundled exe after every `dotnet build` MUST be off during an outer
+      # `dotnet publish` — its post-build cleanup removes bin/.../<rid>/ which the outer
+      # publish's GenerateBundle needs (crush.runtimeconfig.json lives there). The outer
+      # publish itself produces the single-file exe via PublishSingleFile=true.
       - name: Publish Crush.Image CLI (win-x64, single-file, self-contained)
         working-directory: PNGCrushCS
-        run: dotnet publish Crush.Image/Crush.Image.csproj -r win-x64 -c Release --self-contained --nologo -p:Version=${{ inputs.version }} -p:PublishSingleFile=true
+        run: dotnet publish Crush.Image/Crush.Image.csproj -r win-x64 -c Release --self-contained --nologo -p:Version=${{ inputs.version }} -p:PublishSingleFile=true -p:EnableSingleFileBundle=false
 
       - name: Publish Crush.Viewer UI (win-x64, single-file, self-contained)
         working-directory: PNGCrushCS
-        run: dotnet publish Crush.Viewer/Crush.Viewer.csproj -r win-x64 -c Release --self-contained --nologo -p:Version=${{ inputs.version }}
+        run: dotnet publish Crush.Viewer/Crush.Viewer.csproj -r win-x64 -c Release --self-contained --nologo -p:Version=${{ inputs.version }} -p:EnableSingleFileBundle=false
 
       - name: Package CLI zip
         shell: pwsh
