@@ -32,7 +32,7 @@
 
 For the comprehensive **list of supported file formats** (read/write capabilities, MIME types, reference links), see the [`Hawkynt.FileFormats.Images` README](Hawkynt.FileFormats.Images/README.md#supported-formats).
 
-## CLI usage
+## 🚀 CLI usage
 
 ```bash
 # Auto-detect, try same-format optimization plus cross-format conversion, keep smallest
@@ -95,7 +95,7 @@ Optimizer.Image    <-- BitmapConverter, ImageFormatDetector (Windows-specific gl
 
 For per-project details, build commands, and the comprehensive list of public types, see [`CLAUDE.md`](CLAUDE.md).
 
-## Build / test / run
+## 🛠️ Build / test / run
 
 PNGCrushCS optionally consumes one sibling repo. Clone it next to this one before building if you want the linked-source primitives:
 
@@ -146,6 +146,13 @@ The format coverage of this project is inspired by the breadth of these tools:
 - **Codec subsets** — HEIF/AVIF/BPG decoders are I-frame only, single tile, YCbCr 4:2:0 8-bit. JPEG XL: container (FF 0A signature, ftyp/jxlc/jxlp boxes) + SizeHeader + ImageMetadata + FrameHeader (ISO/IEC 18181-1 §3.6.2 / §3.6.3 / §3.6.5) are spec-conformant — real JPEG XL files are detected, dimensions extracted, image metadata (bit depth, color encoding, extra channels) and frame metadata (frame type, encoding mode, passes) parsed. Pixel codec (modular sub-codec body and VarDCT) is the remaining workstream — arbitrary real-world `.jxl` files won't decode their pixel data yet. Camera RAW supports DNG lossless JPEG, Canon CR2, Nikon NEF, and Sony ARW2 — other manufacturer-specific compressions are future work.
 - **Read-only formats** — PDF/PE-resource extraction is one-way; full authoring formats (PSD, XCF, PSB, ICNS, Xcursor, ECW, DjVu, JBIG2, FLIF) prioritize read support.
 
-## License
+## ❤️ Support
 
-LGPL-3.0-or-later. See [LICENSE](LICENSE).
+If this project saves you time or money, consider supporting its development:
+
+[![GitHub Sponsors](https://img.shields.io/badge/GitHub-Sponsor-EA4AAA?logo=githubsponsors)](https://github.com/sponsors/Hawkynt)
+[![PayPal](https://img.shields.io/badge/PayPal-Donate-00457C?logo=paypal)](https://www.paypal.me/hawkynt)
+
+## 📜 License
+
+Licensed under LGPL-3.0-or-later — see [LICENSE](LICENSE).
