@@ -74,7 +74,7 @@ jobs:
           path: dist
 
       - name: Generate release notes (commit-prefix changelog)
-        run: node .github/workflows/scripts/update-changelog.mjs --nightly --notes CHANGES.md
+        run: node .github/workflows/scripts/update-changelog.mjs --nightly --notes-only --notes CHANGES.md
 
       - name: Delete same-date nightly if it exists
         env:
