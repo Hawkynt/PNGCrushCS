@@ -14,7 +14,7 @@
 ![Repo Size](https://img.shields.io/github/repo-size/Hawkynt/PNGCrushCS?color=FF9800)
 
 [![Release](https://img.shields.io/github/v/release/Hawkynt/PNGCrushCS?sort=semver)](https://github.com/Hawkynt/PNGCrushCS/releases/latest)
-[![Nightly](https://img.shields.io/github/v/release/Hawkynt/PNGCrushCS?include_prereleases=true&sort=date&label=nightly&color=FF9800)](https://github.com/Hawkynt/PNGCrushCS/releases)
+[![Nightly](https://img.shields.io/github/v/release/Hawkynt/PNGCrushCS?include_prereleases&sort=date&label=nightly&color=FF9800)](https://github.com/Hawkynt/PNGCrushCS/releases)
 [![Downloads](https://img.shields.io/github/downloads/Hawkynt/PNGCrushCS/total)](https://github.com/Hawkynt/PNGCrushCS/releases)
 [![NuGet Images](https://img.shields.io/nuget/v/Hawkynt.FileFormats.Images?label=Images)](https://www.nuget.org/packages/Hawkynt.FileFormats.Images/)
 
