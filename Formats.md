@@ -655,6 +655,23 @@ Counts are read from the generated `FormatRegistry` at runtime rather than maint
 | Formats in XnView (approx.)                 | 500+ input, 70 output  |
 | Formats in IrfanView (approx.)              | 84+ graphic formats    |
 
+### Coverage against RECOIL
+
+[RECOIL](https://recoil.sourceforge.net/) decodes 552 formats across 48 vintage platforms and is
+the reference implementation for that space. Its `recoil2png` doubles as our conformance oracle
+(see `Tests/Conformance.Recoil.Tests`).
+
+| Metric                                             | Count |
+| --------------------------------------------------- | ----- |
+| RECOIL formats                                      | 552   |
+| …we claim at least one of its extensions            | 294   |
+| …not covered at all                                 | 258   |
+
+Largest remaining clusters: Atari 8-bit (96), Atari ST/STE (32), Commodore 64 (28), ZX Spectrum
+(15), Atari Falcon (13), MSX2 (11). Only eight of the Atari 8-bit gaps decode as a plain
+fixed-size screen; the rest need per-format work, and because RECOIL is read-only every encoder
+also has to be derived and then verified by round-tripping through it.
+
 ### Third-party conformance
 
 Encoder output is cross-checked against an independent implementation: each writable format encodes

@@ -51,6 +51,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.SinbadSlideshow, "Sinbad Slideshow", 320, 200),
     new(ImageFormat.Spectrum512Ext, "Spectrum 512 extended", 320, 199),
     new(ImageFormat.SyntheticArts, "Synthetic Arts", 640, 200),
+    new(ImageFormat.MovieMakerBackground, "Movie Maker background", 320, 192),
   ];
 
   [Test]
