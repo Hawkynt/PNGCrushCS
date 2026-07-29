@@ -138,6 +138,6 @@ public sealed class ImageSignatureDetectionTests {
     var randomData = new byte[] { 0xDE, 0xAD, 0xBE, 0xEF, 0x01, 0x02, 0x03, 0x04 };
     var pe = MinimalPeBuilder.BuildWithEmbeddedImage(randomData);
     var file = PeResourceReader.FromBytes(pe);
-    Assert.That(file.ImageResources, Has.Length.EqualTo(0));
+    Assert.That(file.ImageResources, Has.Count.EqualTo(0));
   }
 }

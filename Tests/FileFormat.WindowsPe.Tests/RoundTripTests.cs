@@ -94,8 +94,8 @@ public sealed class RoundTripTests {
     var pe = MinimalPeBuilder.BuildEmpty();
     var file = PeResourceReader.FromBytes(pe);
     Assert.Multiple(() => {
-      Assert.That(file.ImageResources, Has.Length.EqualTo(0));
-      Assert.That(file.IconGroups, Has.Length.EqualTo(0));
+      Assert.That(file.ImageResources, Has.Count.EqualTo(0));
+      Assert.That(file.IconGroups, Has.Count.EqualTo(0));
     });
   }
 
