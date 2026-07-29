@@ -100,6 +100,9 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.MadStudio, "Mad Studio ANTIC 4", 320, 192, ".an4"),
     new(ImageFormat.HiResEditor, "Hires-Editor", 320, 200, ".het"),
     new(ImageFormat.HiResEditor, "Run Paint", 320, 200, ".rph"),
+    new(ImageFormat.AtariTools800, "AtariTools-800 players", 80, 240, ".4pl"),
+    new(ImageFormat.AtariTools800, "AtariTools-800 missiles", 32, 240, ".4mi"),
+    new(ImageFormat.AtariTools800, "AtariTools-800 players and missiles", 112, 240, ".4pm"),
   ];
 
   [Test]

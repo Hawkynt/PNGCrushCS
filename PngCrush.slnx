@@ -82,6 +82,7 @@
     <Project Path="FileFormats/FileFormat.AtariPicture/FileFormat.AtariPicture.csproj" />
     <Project Path="FileFormats/FileFormat.AtariPlayer/FileFormat.AtariPlayer.csproj" />
     <Project Path="FileFormats/FileFormat.AtariSif/FileFormat.AtariSif.csproj" />
+    <Project Path="FileFormats/FileFormat.AtariTools800/FileFormat.AtariTools800.csproj" />
     <Project Path="FileFormats/FileFormat.AtariTt/FileFormat.AtariTt.csproj" />
     <Project Path="FileFormats/FileFormat.AttGroup4/FileFormat.AttGroup4.csproj" />
     <Project Path="FileFormats/FileFormat.AutodeskCel/FileFormat.AutodeskCel.csproj" />
@@ -680,6 +681,7 @@
     <Project Path="Tests/FileFormat.AtariPicture.Tests/FileFormat.AtariPicture.Tests.csproj" />
     <Project Path="Tests/FileFormat.AtariPlayer.Tests/FileFormat.AtariPlayer.Tests.csproj" />
     <Project Path="Tests/FileFormat.AtariSif.Tests/FileFormat.AtariSif.Tests.csproj" />
+    <Project Path="Tests/FileFormat.AtariTools800.Tests/FileFormat.AtariTools800.Tests.csproj" />
     <Project Path="Tests/FileFormat.AtariTt.Tests/FileFormat.AtariTt.Tests.csproj" />
     <Project Path="Tests/FileFormat.AttGroup4.Tests/FileFormat.AttGroup4.Tests.csproj" />
     <Project Path="Tests/FileFormat.AutodeskCel.Tests/FileFormat.AutodeskCel.Tests.csproj" />
