@@ -234,10 +234,24 @@ internal sealed class Vp8LHuffmanTree {
 
     var metaTree = Build(codeLengthCodeLengths, 19);
 
+    // Optional max_symbol: when set, only that many code-length codes follow and the rest of the
+    // alphabet is implicitly unused.
+    int maxSymbol;
+    if (reader.ReadBits(1) == 1) {
+      var lengthBits = 2 + 2 * (int)reader.ReadBits(3);
+      maxSymbol = 2 + (int)reader.ReadBits(lengthBits);
+      if (maxSymbol > alphabetSize)
+        throw new InvalidOperationException($"max_symbol {maxSymbol} exceeds alphabet size {alphabetSize}.");
+    } else
+      maxSymbol = alphabetSize;
+
     var codeLengths = new int[alphabetSize];
     var prevCodeLength = 8;
     var i2 = 0;
     while (i2 < alphabetSize) {
+      if (maxSymbol-- == 0)
+        break;
+
       var symbol = metaTree.ReadSymbol(reader);
       switch (symbol) {
         case < 16:

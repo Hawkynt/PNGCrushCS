@@ -81,7 +81,7 @@ internal static class Vp8LDecoder {
 
     // Decode the main image into an array large enough for the final output
     var fullSize = width * height;
-    var pixels = _DecodeImageData(reader, effectiveWidth, effectiveHeight, fullSize);
+    var pixels = _DecodeImageData(reader, effectiveWidth, effectiveHeight, fullSize, allowMetaHuffman: true);
 
     // Apply inverse transforms in reverse order
     for (var i = transforms.Count - 1; i >= 0; --i) {
@@ -97,19 +97,27 @@ internal static class Vp8LDecoder {
 
   /// <summary>Read a sub-resolution image (used for transform data and meta-Huffman images).</summary>
   private static uint[] _ReadSubResolutionImage(Vp8LBitReader reader, int width, int height)
-    => _DecodeImageData(reader, width, height, width * height);
+    => _DecodeImageData(reader, width, height, width * height, allowMetaHuffman: false);
 
   /// <summary>Decode image data using Huffman-coded LZ77.</summary>
   /// <param name="reader">Bit reader positioned at the image data.</param>
   /// <param name="width">Image width (may be packed for color-indexed images).</param>
   /// <param name="height">Image height.</param>
   /// <param name="minArraySize">Minimum size of the output array (may be larger than width*height for color-indexed unpacking).</param>
-  private static uint[] _DecodeImageData(Vp8LBitReader reader, int width, int height, int minArraySize) {
+  private static uint[] _DecodeImageData(Vp8LBitReader reader, int width, int height, int minArraySize, bool allowMetaHuffman) {
     var numPixels = width * height;
     var pixels = new uint[Math.Max(numPixels, minArraySize)];
 
-    // Read whether meta-Huffman is used
-    var useMeta = reader.ReadBits(1);
+    // Field order per the VP8L bitstream: colour-cache info precedes the meta-Huffman flag, and
+    // sub-resolution images (transform data, the entropy image) carry no meta-Huffman flag at all.
+    var colorCacheBits = 0;
+    if (reader.ReadBits(1) == 1) {
+      colorCacheBits = (int)reader.ReadBits(4);
+      if (colorCacheBits < 1 || colorCacheBits > 11)
+        throw new InvalidOperationException($"Invalid color cache bits: {colorCacheBits}");
+    }
+
+    var useMeta = allowMetaHuffman ? reader.ReadBits(1) : 0u;
 
     int numHuffmanGroups;
     uint[]? metaImage = null;
@@ -140,15 +148,6 @@ internal static class Vp8LDecoder {
     // Blue: 256
     // Alpha: 256
     // Distance: 40
-
-    // Read color cache parameters
-    var colorCacheBits = 0;
-    var useColorCache = reader.ReadBits(1);
-    if (useColorCache == 1) {
-      colorCacheBits = (int)reader.ReadBits(4);
-      if (colorCacheBits < 1 || colorCacheBits > 11)
-        throw new InvalidOperationException($"Invalid color cache bits: {colorCacheBits}");
-    }
 
     var colorCacheSize = colorCacheBits > 0 ? 1 << colorCacheBits : 0;
     var greenAlphabetSize = 256 + 24 + colorCacheSize;
