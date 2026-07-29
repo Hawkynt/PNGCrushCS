@@ -107,6 +107,14 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.ZxRgb3, "ZX Spectrum RGB3", 256, 192, ".3"),
     new(ImageFormat.MsxScreen6, "MSX2 Screen 6", 512, 424, ".sc6"),
     new(ImageFormat.MonoStar, "MonoSTar object", 64, 48, ".obj"),
+    // The V9958's YJK family. RECOIL picks the palette-less reading from the extension alone, so
+    // .glc is the one we can hand it without a companion .PLA palette file beside it.
+    new(ImageFormat.MsxScreen10, "MSX2+ Screen 10", 256, 212, ".sca"),
+    new(ImageFormat.MsxScreen10, "MSX2+ Screen 10 as .scb", 256, 212, ".scb"),
+    new(ImageFormat.MsxGlYjk, "MSX2+ GL YJK", 256, 212, ".glc"),
+    new(ImageFormat.MsxGlYjk, "MSX2+ GL YJK as .gls", 256, 212, ".gls"),
+    new(ImageFormat.MsxGl6, "MSX2 GL6", 512, 424, ".gl6"),
+    new(ImageFormat.MsxGl6, "Dynamic Publisher stamp", 512, 424, ".stp"),
   ];
 
   [Test]
