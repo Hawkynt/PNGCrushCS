@@ -64,6 +64,8 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.KssPaint, "KSS-Paint", 320, 160),
     new(ImageFormat.GodPaint, "GodPaint", 320, 240, ".god"),
     new(ImageFormat.IndyPaint, "IndyPaint", 320, 240, ".tru"),
+    new(ImageFormat.TextureEditorMikey, "Texture Editor by Mikey", 320, 192),
+    new(ImageFormat.Mamut, "Mamut", 320, 192),
   ];
 
   [Test]
