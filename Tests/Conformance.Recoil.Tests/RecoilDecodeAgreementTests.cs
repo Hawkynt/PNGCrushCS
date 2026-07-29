@@ -59,6 +59,7 @@ public sealed class RecoilDecodeAgreementTests {
     // Both accepted lengths, and every character code including the inverse-video half.
     new("ASCII maker", ImageFormat.AsciiMaker, ".asc", () => _Monochrome(960)),
     new("ASCII maker, padded", ImageFormat.AsciiMaker, ".asc", () => _Monochrome(1024)),
+    new("PetDraw64", ImageFormat.PetDraw, ".pdr", () => _Monochrome(2029)),
   ];
 
   [Test]

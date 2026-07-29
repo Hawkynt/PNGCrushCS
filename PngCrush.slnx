@@ -398,6 +398,7 @@
     <Project Path="Tests/FileFormat.PcPaint.Tests/FileFormat.PcPaint.Tests.csproj" />
     <Project Path="Tests/FileFormat.Pcd.Tests/FileFormat.Pcd.Tests.csproj" />
     <Project Path="Tests/FileFormat.Pco16Bit.Tests/FileFormat.Pco16Bit.Tests.csproj" />
+    <Project Path="Tests/FileFormat.PetDraw.Tests/FileFormat.PetDraw.Tests.csproj" />
     <Project Path="Tests/FileFormat.Pcx.Tests/FileFormat.Pcx.Tests.csproj" />
     <Project Path="Tests/FileFormat.Pdf.Tests/FileFormat.Pdf.Tests.csproj" />
     <Project Path="Tests/FileFormat.Pdn.Tests/FileFormat.Pdn.Tests.csproj" />
