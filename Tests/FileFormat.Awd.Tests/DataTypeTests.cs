@@ -54,14 +54,20 @@ public sealed class DataTypeTests {
 
   [Test]
   [Category("Unit")]
-  public void AwdFile_FromRawImage_UnsupportedFormat_ThrowsArgumentException() {
+  public void AwdFile_FromRawImage_ConvertsUnsupportedFormat() {
+    // FromRawImage accepts any layout and converts; rejecting would make FormatRegistry.Write
+    // usable only for callers who already guessed the format's internal layout.
     var raw = new RawImage {
       Width = 8,
       Height = 1,
       Format = PixelFormat.Rgb24,
       PixelData = new byte[24],
     };
-    Assert.Throws<ArgumentException>(() => AwdFile.FromRawImage(raw));
+
+    var file = AwdFile.FromRawImage(raw);
+
+    Assert.That(file.Width, Is.EqualTo(8));
+    Assert.That(file.Height, Is.EqualTo(1));
   }
 
   [Test]

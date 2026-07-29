@@ -107,7 +107,9 @@ public sealed class DataTypeTests {
 
   [Test]
   [Category("Unit")]
-  public void GafFile_FromRawImage_RequiresIndexed8() {
+  public void GafFile_FromRawImage_ConvertsToIndexed8() {
+    // FromRawImage accepts any layout and converts; rejecting would make FormatRegistry.Write
+    // usable only for callers who already guessed the format's internal layout.
     var raw = new FileFormat.Core.RawImage {
       Width = 2,
       Height = 2,
@@ -115,7 +117,10 @@ public sealed class DataTypeTests {
       PixelData = new byte[12],
     };
 
-    Assert.Throws<System.ArgumentException>(() => GafFile.FromRawImage(raw));
+    var file = GafFile.FromRawImage(raw);
+
+    Assert.That(file.Width, Is.EqualTo(2));
+    Assert.That(file.Height, Is.EqualTo(2));
   }
 
   [Test]

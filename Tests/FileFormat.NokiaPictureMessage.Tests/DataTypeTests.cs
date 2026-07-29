@@ -52,7 +52,9 @@ public sealed class DataTypeTests {
 
   [Test]
   [Category("Unit")]
-  public void FromRawImage_WrongFormat_Throws() {
+  public void FromRawImage_WrongFormat_Converts() {
+    // FromRawImage accepts any layout and converts; rejecting would make FormatRegistry.Write
+    // usable only for callers who already guessed the format's internal layout.
     var raw = new RawImage {
       Width = 8,
       Height = 1,
@@ -60,7 +62,10 @@ public sealed class DataTypeTests {
       PixelData = new byte[24],
     };
 
-    Assert.Throws<System.ArgumentException>(() => NokiaPictureMessageFile.FromRawImage(raw));
+    var file = NokiaPictureMessageFile.FromRawImage(raw);
+
+    Assert.That(file.Width, Is.EqualTo(raw.Width));
+    Assert.That(file.Height, Is.EqualTo(raw.Height));
   }
 
   [Test]

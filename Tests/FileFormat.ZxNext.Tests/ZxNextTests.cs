@@ -154,9 +154,15 @@ public class DataTypeTests {
     => Assert.Throws<ArgumentNullException>(() => ZxNextFile.FromRawImage(null!));
 
   [Test]
-  public void FromRawImage_WrongFormat_ThrowsNotSupportedException() {
+  public void FromRawImage_WrongFormat_Converts() {
+    // FromRawImage accepts any layout and converts; rejecting would make FormatRegistry.Write
+    // usable only for callers who already guessed the format's internal layout.
     var raw = new RawImage { Width = 256, Height = 192, Format = PixelFormat.Rgb24, PixelData = new byte[256 * 192 * 3] };
-    Assert.Throws<NotSupportedException>(() => ZxNextFile.FromRawImage(raw));
+
+    var file = ZxNextFile.FromRawImage(raw);
+
+    Assert.That(file.Width, Is.EqualTo(raw.Width));
+    Assert.That(file.Height, Is.EqualTo(raw.Height));
   }
 
   [Test]

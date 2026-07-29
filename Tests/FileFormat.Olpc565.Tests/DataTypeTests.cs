@@ -77,7 +77,9 @@ public sealed class DataTypeTests {
 
   [Test]
   [Category("Unit")]
-  public void FromRawImage_WrongFormat_Throws() {
+  public void FromRawImage_WrongFormat_Converts() {
+    // FromRawImage accepts any layout and converts; rejecting would make FormatRegistry.Write
+    // usable only for callers who already guessed the format's internal layout.
     var raw = new RawImage {
       Width = 1,
       Height = 1,
@@ -87,6 +89,9 @@ public sealed class DataTypeTests {
       PaletteCount = 2,
     };
 
-    Assert.Throws<System.ArgumentException>(() => Olpc565File.FromRawImage(raw));
+    var file = Olpc565File.FromRawImage(raw);
+
+    Assert.That(file.Width, Is.EqualTo(raw.Width));
+    Assert.That(file.Height, Is.EqualTo(raw.Height));
   }
 }

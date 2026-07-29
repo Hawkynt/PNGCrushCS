@@ -72,7 +72,9 @@ public sealed class DataTypeTests {
 
   [Test]
   [Category("Unit")]
-  public void FromRawImage_WrongFormat_ThrowsArgumentException() {
+  public void FromRawImage_WrongFormat_Converts() {
+    // FromRawImage accepts any layout and converts; rejecting would make FormatRegistry.Write
+    // usable only for callers who already guessed the format's internal layout.
     var raw = new RawImage {
       Width = 1,
       Height = 1,
@@ -80,7 +82,10 @@ public sealed class DataTypeTests {
       PixelData = new byte[3]
     };
 
-    Assert.Throws<ArgumentException>(() => JbigFile.FromRawImage(raw));
+    var file = JbigFile.FromRawImage(raw);
+
+    Assert.That(file.Width, Is.EqualTo(1));
+    Assert.That(file.Height, Is.EqualTo(1));
   }
 
   [Test]

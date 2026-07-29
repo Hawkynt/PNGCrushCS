@@ -86,7 +86,9 @@ public sealed class DataTypeTests {
 
   [Test]
   [Category("Unit")]
-  public void SunIconFile_FromRawImage_WrongFormat_ThrowsArgumentException() {
+  public void SunIconFile_FromRawImage_WrongFormat_Converts() {
+    // FromRawImage accepts any layout and converts; rejecting would make FormatRegistry.Write
+    // usable only for callers who already guessed the format's internal layout.
     var raw = new FileFormat.Core.RawImage {
       Width = 8,
       Height = 1,
@@ -94,6 +96,9 @@ public sealed class DataTypeTests {
       PixelData = new byte[24]
     };
 
-    Assert.Throws<System.ArgumentException>(() => SunIconFile.FromRawImage(raw));
+    var file = SunIconFile.FromRawImage(raw);
+
+    Assert.That(file.Width, Is.EqualTo(raw.Width));
+    Assert.That(file.Height, Is.EqualTo(raw.Height));
   }
 }

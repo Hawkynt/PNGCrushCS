@@ -142,13 +142,19 @@ public sealed class BamFileTests {
   }
 
   [Test]
-  public void FromRawImage_WrongFormat_Throws() {
+  public void FromRawImage_WrongFormat_Converts() {
+    // FromRawImage accepts any layout and converts; rejecting would make FormatRegistry.Write
+    // usable only for callers who already guessed the format's internal layout.
     var raw = new RawImage {
       Width = 1, Height = 1,
       Format = PixelFormat.Rgb24,
       PixelData = new byte[3],
     };
-    Assert.Throws<ArgumentException>(() => BamFile.FromRawImage(raw));
+
+    var file = BamFile.FromRawImage(raw);
+
+    Assert.That(file.Width, Is.EqualTo(1));
+    Assert.That(file.Height, Is.EqualTo(1));
   }
 
   [Test]
