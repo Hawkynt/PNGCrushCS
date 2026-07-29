@@ -144,7 +144,8 @@ The format coverage of this project is inspired by the breadth of these tools:
 - **16-bit precision** — full 16-bit pipeline is supported for read/write of scientific/HDR formats (FITS, EXR, DPX, Cineon, HDR, PFM, ENVI, PDS, Nifti, NRRD, BigTIFF, JPEG-LS, MRC, etc.). Optimizer pipelines remain 8-bit only.
 - **VP8 lossy encoder** — keyframe-only output; multi-pass rate control and partition threading are deferred. Alpha is preserved bit-exactly via the ALPH chunk (uncompressed method 0).
 - **Codec subsets** — HEIF/AVIF/BPG decoders are I-frame only, single tile, YCbCr 4:2:0 8-bit. JPEG XL: container (FF 0A signature, ftyp/jxlc/jxlp boxes) + SizeHeader + ImageMetadata + FrameHeader (ISO/IEC 18181-1 §3.6.2 / §3.6.3 / §3.6.5) are spec-conformant — real JPEG XL files are detected, dimensions extracted, image metadata (bit depth, color encoding, extra channels) and frame metadata (frame type, encoding mode, passes) parsed. Pixel codec (modular sub-codec body and VarDCT) is the remaining workstream — arbitrary real-world `.jxl` files won't decode their pixel data yet. Camera RAW supports DNG lossless JPEG, Canon CR2, Nikon NEF, and Sony ARW2 — other manufacturer-specific compressions are future work.
-- **Read-only formats** — PDF/PE-resource extraction is one-way; full authoring formats (PSD, XCF, PSB, ICNS, Xcursor, ECW, DjVu, JBIG2, FLIF) prioritize read support.
+- **Read-only formats** — of 547 registered formats all 547 decode, but only 344 can encode an arbitrary image; the other 203 parse and re-serialize a file they read without being able to author one from pixel data. PDF/PE-resource extraction is one-way by nature. See [`Formats.md`](Formats.md) for the per-format breakdown.
+- **Third-party conformance** — of the 52 formats ImageMagick both reads and identifies, it decodes 47 of our encoder outputs at matching dimensions. EPS, Fax G3, Palm, RGF and RLA still produce output it rejects.
 
 ## ❤️ Support
 
