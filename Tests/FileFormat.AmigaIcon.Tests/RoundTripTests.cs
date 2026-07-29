@@ -198,9 +198,12 @@ public sealed class RoundTripTests {
     var rawImage = AmigaIconFile.ToRawImage(original);
     var restored = AmigaIconFile.FromRawImage(rawImage);
 
+    // FromRawImage always targets the Workbench 2.x palette, so it comes back at 3 bitplanes
+    // regardless of how few colours the source used — icons cannot carry a palette of their own.
+
     Assert.That(restored.Width, Is.EqualTo(original.Width));
     Assert.That(restored.Height, Is.EqualTo(original.Height));
-    Assert.That(restored.Depth, Is.EqualTo(original.Depth));
+    Assert.That(restored.Depth, Is.EqualTo(AmigaIconFile.Workbench2Depth));
 
     var originalChunky = AmigaIconFile._PlanarToChunky(original.PlanarData, width, height, depth);
     var restoredChunky = AmigaIconFile._PlanarToChunky(restored.PlanarData, restored.Width, restored.Height, restored.Depth);

@@ -43,7 +43,7 @@ public sealed class AmigaIconReaderTests {
   [Test]
   [Category("Unit")]
   public void FromBytes_InvalidMagic_ThrowsInvalidDataException() {
-    var data = new byte[78 + 4];
+    var data = new byte[AmigaIconFile.PlanarDataOffset + 4];
     data[0] = 0x00;
     data[1] = 0x00;
     Assert.Throws<InvalidDataException>(() => AmigaIconReader.FromBytes(data));
@@ -73,7 +73,7 @@ public sealed class AmigaIconReaderTests {
     var data = _BuildMinimalHeader(width, height, depth, planarDataSize: planarSize);
 
     // Set a known byte in the planar data
-    data[AmigaIconHeader.StructSize] = 0xAA;
+    data[AmigaIconFile.PlanarDataOffset] = 0xAA;
 
     var result = AmigaIconReader.FromBytes(data);
 
@@ -106,7 +106,7 @@ public sealed class AmigaIconReaderTests {
     var depth = 1;
     var planarSize = AmigaIconFile.PlanarDataSize(width, height, depth);
     var data = _BuildMinimalHeader(width, height, depth, planarDataSize: planarSize);
-    data[AmigaIconHeader.StructSize] = 0xFF;
+    data[AmigaIconFile.PlanarDataOffset] = 0xFF;
 
     using var ms = new MemoryStream(data);
     var result = AmigaIconReader.FromStream(ms);
@@ -134,20 +134,24 @@ public sealed class AmigaIconReaderTests {
     Assert.That(result.RawHeader[1], Is.EqualTo(0x10));
   }
 
-  private static byte[] _BuildMinimalHeader(int width, int height, int depth, int iconType = 3, ushort imageDataPointer = 1, int planarDataSize = -1) {
+  private static byte[] _BuildMinimalHeader(int width, int height, int depth, int iconType = 3, uint imageDataPointer = 1, int planarDataSize = -1) {
     if (planarDataSize < 0)
       planarDataSize = AmigaIconFile.PlanarDataSize(width, height, depth);
 
-    var data = new byte[AmigaIconHeader.StructSize + planarDataSize];
+    var data = new byte[AmigaIconFile.PlanarDataOffset + planarDataSize];
     var span = data.AsSpan();
 
     BinaryPrimitives.WriteUInt16BigEndian(span[0..], 0xE310);
     BinaryPrimitives.WriteUInt16BigEndian(span[2..], 1);
-    BinaryPrimitives.WriteInt16BigEndian(span[10..], (short)width);
-    BinaryPrimitives.WriteInt16BigEndian(span[12..], (short)height);
-    BinaryPrimitives.WriteInt16BigEndian(span[14..], (short)depth);
-    BinaryPrimitives.WriteUInt16BigEndian(span[16..], imageDataPointer);
-    span[54] = (byte)iconType;
+    span[AmigaIconHeader.IconTypeOffset] = (byte)iconType;
+    BinaryPrimitives.WriteUInt32BigEndian(span[AmigaIconHeader.PaletteSelectorOffset..], depth >= 3 ? 1u : 0u);
+
+    // Dimensions and depth live in the Image structure that follows the DiskObject.
+    var image = span[AmigaIconFile.ImageStructOffset..];
+    BinaryPrimitives.WriteInt16BigEndian(image[4..], (short)width);
+    BinaryPrimitives.WriteInt16BigEndian(image[6..], (short)height);
+    BinaryPrimitives.WriteInt16BigEndian(image[8..], (short)depth);
+    BinaryPrimitives.WriteUInt32BigEndian(image[10..], imageDataPointer);
 
     return data;
   }

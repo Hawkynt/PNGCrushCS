@@ -41,6 +41,26 @@ public readonly record struct AmigaIconFile : IImageFormatReader<AmigaIconFile>,
     0x3B, 0x67, 0xA2, // index 3: blue
   ];
 
+  /// <summary>The Workbench 2.x eight-colour icon palette. Icons cannot carry an arbitrary palette —
+  /// they render against whatever the Workbench screen is using — so writing one means mapping onto
+  /// this fixed set.</summary>
+  public static readonly byte[] Workbench2Palette = [
+    0x95, 0x95, 0x95, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0x3B, 0x67, 0xA2,
+    0x7B, 0x7B, 0x7B, 0xAF, 0xAF, 0xAF, 0xAA, 0x90, 0x7C, 0xFF, 0xA9, 0x97,
+  ];
+
+  /// <summary>Bitplane count matching <see cref="Workbench2Palette"/>.</summary>
+  public const int Workbench2Depth = 3;
+
+  /// <summary>Offset of the first Image structure, immediately after the 78-byte DiskObject.</summary>
+  public const int ImageStructOffset = 78;
+
+  /// <summary>Size of an Image structure.</summary>
+  public const int ImageStructSize = 20;
+
+  /// <summary>Offset of the planar bitmap, after the DiskObject and the Image structure.</summary>
+  public const int PlanarDataOffset = ImageStructOffset + ImageStructSize;
+
   /// <summary>Computes the number of bytes per plane row (word-aligned).</summary>
   internal static int BytesPerPlaneRow(int width) => ((width + 15) / 16) * 2;
 
@@ -64,23 +84,19 @@ public readonly record struct AmigaIconFile : IImageFormatReader<AmigaIconFile>,
 
   public static AmigaIconFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    image = image.EnsureFormat(PixelFormat.Indexed8);
-    if (image.Palette == null)
-      throw new ArgumentException("RawImage must have a palette.", nameof(image));
+    // Icons are drawn with the Workbench palette, so an arbitrary image is mapped onto it rather
+    // than carrying colours of its own. Readers only accept 2 or 3 bitplanes.
+    image = image.EnsureIndexed(PixelFormat.Indexed8, Workbench2Palette);
 
-    var maxIndex = _FindMaxIndex(image.PixelData);
-    var depth = _BitsNeeded(maxIndex);
-    if (depth < 1)
-      depth = 1;
-
-    var planar = _ChunkyToPlanar(image.PixelData, image.Width, image.Height, depth);
+    var planar = _ChunkyToPlanar(image.PixelData, image.Width, image.Height, Workbench2Depth);
 
     return new() {
       Width = image.Width,
       Height = image.Height,
-      Depth = depth,
+      Depth = Workbench2Depth,
+      IconType = (int)AmigaIconType.Project,
       PlanarData = planar,
-      Palette = image.Palette[..],
+      Palette = Workbench2Palette[..],
     };
   }
 

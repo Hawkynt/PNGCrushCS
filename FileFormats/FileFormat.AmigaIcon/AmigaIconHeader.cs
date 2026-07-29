@@ -20,6 +20,15 @@ public readonly partial record struct AmigaIconHeader {
  public const int StructSize = 78;
  public const ushort MagicValue = 0xE310;
 
+ /// <summary>Offset of the icon type byte.</summary>
+ public const int IconTypeOffset = 54;
+
+ /// <summary>Offset of the 32-bit palette selector: 0 = Workbench 1.x, 1 = Workbench 2.x.</summary>
+ public const int PaletteSelectorOffset = 44;
+
+ /// <summary>Offset of the 32-bit field that shifts the first Image structure when non-zero.</summary>
+ public const int ImageOffsetSelectorOffset = 66;
+
  [Field(0, 2, Endianness = Endianness.Big)] public ushort Magic { get; init; }
  [Field(2, 2, Endianness = Endianness.Big)] public ushort Version { get; init; }
  [Field(4, 2, Endianness = Endianness.Big)] public ushort NextGadget { get; init; }
