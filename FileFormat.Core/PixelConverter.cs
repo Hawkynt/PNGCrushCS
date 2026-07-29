@@ -608,7 +608,9 @@ public static class PixelConverter {
       var srcSpan = data.AsSpan();
       var dstSpan = result.AsSpan();
 
-      for (; i + 2 <= totalPixels && (i + 2) * 6 <= data.Length; i += 2) {
+      // The load pulls a full 16 bytes even though a pixel pair is only 12, so the guard has to
+      // reserve 16 — checking for 12 overruns the buffer on the final pair.
+      for (; i + 2 <= totalPixels && i * 6 + 16 <= data.Length; i += 2) {
         var vec = Vector128.Create(srcSpan.Slice(i * 6, 16));
         var bgra = Vector128.Shuffle(vec, extractMask) | alphaMask;
         // Write 8 bytes (2 BGRA pixels)
