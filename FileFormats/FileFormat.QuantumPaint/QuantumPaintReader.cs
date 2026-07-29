@@ -30,11 +30,11 @@ public static class QuantumPaintReader {
     if (data.Length < QuantumPaintFile.MinFileSize)
       throw new InvalidDataException($"Data too small for a valid QuantumPaint file: expected at least {QuantumPaintFile.MinFileSize} bytes, got {data.Length}.");
 
-    var header = QuantumPaintHeader.ReadFrom(data);
+    var header = QuantumPaintHeader.ReadFrom(data[QuantumPaintFile.PaletteOffset..]);
 
     return new QuantumPaintFile {
       Palette = header.Palette,
-      PixelData = data.Slice(QuantumPaintFile.PaletteSize, QuantumPaintFile.PixelDataSize).ToArray(),
+      PixelData = data.Slice(QuantumPaintFile.PixelDataOffset, QuantumPaintFile.PixelDataSize).ToArray(),
     };
   }
 

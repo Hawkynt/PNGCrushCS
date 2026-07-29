@@ -30,21 +30,15 @@ public static class CrackArtReader {
 
   public static CrackArtFile FromSpan(ReadOnlySpan<byte> data) {
 
-    if (data.Length < CrackArtHeader.StructSize)
-      throw new InvalidDataException("Data too small for a valid CrackArt file.");
+    if (!CrackArtHeader.TryRead(data, out var isCompressed, out var resolution))
+      throw new InvalidDataException("Not a CrackArt file: missing the 'CA' tag.");
 
-    var span = data;
-    var header = CrackArtHeader.ReadFrom(span);
-
-    var resolutionValue = header.Resolution;
-    if (resolutionValue > 2)
-      throw new InvalidDataException($"Invalid CrackArt resolution value: {resolutionValue}.");
-
-    var resolution = (CrackArtResolution)resolutionValue;
+    var header = new { Palette = CrackArtHeader.ReadPalette(data, resolution) };
+    var dataOffset = CrackArtHeader.GetDataOffset(resolution);
     var (width, height) = _GetDimensions(resolution);
 
-    var compressedData = new byte[data.Length - CrackArtHeader.StructSize];
-    data.Slice(CrackArtHeader.StructSize, compressedData.Length).CopyTo(compressedData.AsSpan(0));
+    var compressedData = new byte[data.Length - dataOffset];
+    data.Slice(dataOffset, compressedData.Length).CopyTo(compressedData.AsSpan(0));
     var pixelData = CrackArtCompressor.Decompress(compressedData, _DECOMPRESSED_PIXEL_DATA_SIZE);
 
     return new CrackArtFile {
@@ -58,21 +52,15 @@ public static class CrackArtReader {
 
   public static CrackArtFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < CrackArtHeader.StructSize)
-      throw new InvalidDataException("Data too small for a valid CrackArt file.");
+    if (!CrackArtHeader.TryRead(data, out var isCompressed, out var resolution))
+      throw new InvalidDataException("Not a CrackArt file: missing the 'CA' tag.");
 
-    var span = data.AsSpan();
-    var header = CrackArtHeader.ReadFrom(span);
-
-    var resolutionValue = header.Resolution;
-    if (resolutionValue > 2)
-      throw new InvalidDataException($"Invalid CrackArt resolution value: {resolutionValue}.");
-
-    var resolution = (CrackArtResolution)resolutionValue;
+    var header = new { Palette = CrackArtHeader.ReadPalette(data, resolution) };
+    var dataOffset = CrackArtHeader.GetDataOffset(resolution);
     var (width, height) = _GetDimensions(resolution);
 
-    var compressedData = new byte[data.Length - CrackArtHeader.StructSize];
-    data.AsSpan(CrackArtHeader.StructSize, compressedData.Length).CopyTo(compressedData.AsSpan(0));
+    var compressedData = new byte[data.Length - dataOffset];
+    data.AsSpan(dataOffset, compressedData.Length).CopyTo(compressedData.AsSpan(0));
     var pixelData = CrackArtCompressor.Decompress(compressedData, _DECOMPRESSED_PIXEL_DATA_SIZE);
 
     return new CrackArtFile {

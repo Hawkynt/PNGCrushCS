@@ -31,28 +31,20 @@ public static class HireslaceReader {
     if (data.Length < HireslaceFile.ExpectedFileSize)
       throw new InvalidDataException($"Hireslace file must be at least {HireslaceFile.ExpectedFileSize} bytes, got {data.Length}.");
 
-    var offset = 0;
+    // Load address (2 bytes LE), then four 8 KB slots: bitmap1, screen1, screen2, bitmap2.
+    var loadAddress = (ushort)(data[0] | (data[1] << 8));
 
-    // Load address (2 bytes LE)
-    var loadAddress = (ushort)(data[offset] | (data[offset + 1] << 8));
-    offset += HireslaceFile.LoadAddressSize;
-
-    // Frame 1: bitmap (8000) + screen (1000)
     var bitmap1 = new byte[HireslaceFile.BitmapDataSize];
-    data.Slice(offset, HireslaceFile.BitmapDataSize).CopyTo(bitmap1);
-    offset += HireslaceFile.BitmapDataSize;
+    data.Slice(HireslaceFile.Bitmap1Offset, HireslaceFile.BitmapDataSize).CopyTo(bitmap1);
 
     var screen1 = new byte[HireslaceFile.ScreenDataSize];
-    data.Slice(offset, HireslaceFile.ScreenDataSize).CopyTo(screen1);
-    offset += HireslaceFile.ScreenDataSize;
-
-    // Frame 2: bitmap (8000) + screen (1000)
-    var bitmap2 = new byte[HireslaceFile.BitmapDataSize];
-    data.Slice(offset, HireslaceFile.BitmapDataSize).CopyTo(bitmap2);
-    offset += HireslaceFile.BitmapDataSize;
+    data.Slice(HireslaceFile.Screen1Offset, HireslaceFile.ScreenDataSize).CopyTo(screen1);
 
     var screen2 = new byte[HireslaceFile.ScreenDataSize];
-    data.Slice(offset, HireslaceFile.ScreenDataSize).CopyTo(screen2);
+    data.Slice(HireslaceFile.Screen2Offset, HireslaceFile.ScreenDataSize).CopyTo(screen2);
+
+    var bitmap2 = new byte[HireslaceFile.BitmapDataSize];
+    data.Slice(HireslaceFile.Bitmap2Offset, HireslaceFile.BitmapDataSize).CopyTo(bitmap2);
 
     return new HireslaceFile {
       LoadAddress = loadAddress,
@@ -68,28 +60,20 @@ public static class HireslaceReader {
     if (data.Length < HireslaceFile.ExpectedFileSize)
       throw new InvalidDataException($"Hireslace file must be at least {HireslaceFile.ExpectedFileSize} bytes, got {data.Length}.");
 
-    var offset = 0;
+    // Load address (2 bytes LE), then four 8 KB slots: bitmap1, screen1, screen2, bitmap2.
+    var loadAddress = (ushort)(data[0] | (data[1] << 8));
 
-    // Load address (2 bytes LE)
-    var loadAddress = (ushort)(data[offset] | (data[offset + 1] << 8));
-    offset += HireslaceFile.LoadAddressSize;
-
-    // Frame 1: bitmap (8000) + screen (1000)
     var bitmap1 = new byte[HireslaceFile.BitmapDataSize];
-    data.AsSpan(offset, HireslaceFile.BitmapDataSize).CopyTo(bitmap1);
-    offset += HireslaceFile.BitmapDataSize;
+    data.AsSpan(HireslaceFile.Bitmap1Offset, HireslaceFile.BitmapDataSize).CopyTo(bitmap1);
 
     var screen1 = new byte[HireslaceFile.ScreenDataSize];
-    data.AsSpan(offset, HireslaceFile.ScreenDataSize).CopyTo(screen1);
-    offset += HireslaceFile.ScreenDataSize;
-
-    // Frame 2: bitmap (8000) + screen (1000)
-    var bitmap2 = new byte[HireslaceFile.BitmapDataSize];
-    data.AsSpan(offset, HireslaceFile.BitmapDataSize).CopyTo(bitmap2);
-    offset += HireslaceFile.BitmapDataSize;
+    data.AsSpan(HireslaceFile.Screen1Offset, HireslaceFile.ScreenDataSize).CopyTo(screen1);
 
     var screen2 = new byte[HireslaceFile.ScreenDataSize];
-    data.AsSpan(offset, HireslaceFile.ScreenDataSize).CopyTo(screen2);
+    data.AsSpan(HireslaceFile.Screen2Offset, HireslaceFile.ScreenDataSize).CopyTo(screen2);
+
+    var bitmap2 = new byte[HireslaceFile.BitmapDataSize];
+    data.AsSpan(HireslaceFile.Bitmap2Offset, HireslaceFile.BitmapDataSize).CopyTo(bitmap2);
 
     return new HireslaceFile {
       LoadAddress = loadAddress,

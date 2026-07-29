@@ -53,9 +53,9 @@ public sealed class QuantumPaintReaderTests {
   [Category("Unit")]
   public void FromBytes_ParsesPalette() {
     var data = _BuildMinimalQuantumPaint();
-    BinaryPrimitives.WriteInt16BigEndian(data.AsSpan(0), 0x0777);
-    BinaryPrimitives.WriteInt16BigEndian(data.AsSpan(2), 0x0700);
-    BinaryPrimitives.WriteInt16BigEndian(data.AsSpan(30), 0x0007);
+    BinaryPrimitives.WriteInt16BigEndian(data.AsSpan(QuantumPaintFile.PaletteOffset + 0), 0x0777);
+    BinaryPrimitives.WriteInt16BigEndian(data.AsSpan(QuantumPaintFile.PaletteOffset + 2), 0x0700);
+    BinaryPrimitives.WriteInt16BigEndian(data.AsSpan(QuantumPaintFile.PaletteOffset + 30), 0x0007);
 
     var result = QuantumPaintReader.FromBytes(data);
 
@@ -70,9 +70,9 @@ public sealed class QuantumPaintReaderTests {
   [Category("Unit")]
   public void FromBytes_ParsesPixelData() {
     var data = _BuildMinimalQuantumPaint();
-    data[32] = 0xAA;
-    data[33] = 0xBB;
-    data[32031] = 0xCC;
+    data[QuantumPaintFile.PixelDataOffset] = 0xAA;
+    data[QuantumPaintFile.PixelDataOffset + 1] = 0xBB;
+    data[QuantumPaintFile.PixelDataOffset + 31999] = 0xCC;
 
     var result = QuantumPaintReader.FromBytes(data);
 
@@ -100,16 +100,16 @@ public sealed class QuantumPaintReaderTests {
   [Category("Unit")]
   public void FromBytes_CopiesPixelData() {
     var data = _BuildMinimalQuantumPaint();
-    data[32] = 0x55;
+    data[QuantumPaintFile.PixelDataOffset] = 0x55;
     var result = QuantumPaintReader.FromBytes(data);
-    data[32] = 0x00;
+    data[QuantumPaintFile.PixelDataOffset] = 0x00;
     Assert.That(result.PixelData[0], Is.EqualTo(0x55));
   }
 
   private static byte[] _BuildMinimalQuantumPaint() {
-    var data = new byte[32032];
+    var data = new byte[QuantumPaintFile.MinFileSize];
     for (var i = 0; i < 32000; ++i)
-      data[32 + i] = (byte)(i * 7 % 256);
+      data[QuantumPaintFile.PixelDataOffset + i] = (byte)(i * 7 % 256);
     return data;
   }
 }

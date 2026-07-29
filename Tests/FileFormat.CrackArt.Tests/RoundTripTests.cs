@@ -40,11 +40,8 @@ public sealed class RoundTripTests {
   [Test]
   [Category("Integration")]
   public void RoundTrip_MediumRes_PreservesAllFields() {
-    var palette = new short[16];
-    palette[0] = 0x000;
-    palette[1] = 0x700;
-    palette[2] = 0x070;
-    palette[3] = 0x007;
+    // Medium resolution stores exactly 4 palette entries; anything beyond that has nowhere to go.
+    var palette = new short[] { 0x000, 0x700, 0x070, 0x007 };
 
     var pixelData = new byte[32000];
     for (var i = 0; i < pixelData.Length; ++i)
@@ -73,9 +70,8 @@ public sealed class RoundTripTests {
   [Test]
   [Category("Integration")]
   public void RoundTrip_HighRes_PreservesAllFields() {
-    var palette = new short[16];
-    palette[0] = 0x000;
-    palette[1] = 0x777;
+    // High resolution is monochrome and stores no palette at all.
+    var palette = System.Array.Empty<short>();
 
     var pixelData = new byte[32000];
     for (var i = 0; i < pixelData.Length; ++i)

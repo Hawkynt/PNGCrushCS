@@ -8,12 +8,12 @@ public static class CrackArtWriter {
   public static byte[] ToBytes(CrackArtFile file) {
     ArgumentNullException.ThrowIfNull(file);
 
-    var header = new CrackArtHeader((byte)file.Resolution, file.Palette);
     var compressedData = CrackArtCompressor.Compress(file.PixelData);
+    var dataOffset = CrackArtHeader.GetDataOffset(file.Resolution);
 
-    var result = new byte[CrackArtHeader.StructSize + compressedData.Length];
-    header.WriteTo(result.AsSpan());
-    compressedData.AsSpan(0, compressedData.Length).CopyTo(result.AsSpan(CrackArtHeader.StructSize));
+    var result = new byte[dataOffset + compressedData.Length];
+    CrackArtHeader.Write(result, isCompressed: true, file.Resolution, file.Palette);
+    compressedData.AsSpan().CopyTo(result.AsSpan(dataOffset));
 
     return result;
   }

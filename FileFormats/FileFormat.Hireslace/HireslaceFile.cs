@@ -25,7 +25,17 @@ public readonly record struct HireslaceFile : IImageFormatReader<HireslaceFile>,
   internal const int LoadAddressSize = 2;
 
   /// <summary>Total payload size: 2 + 8000 + 1000 + 8000 + 1000 = 18002.</summary>
-  internal const int ExpectedFileSize = LoadAddressSize + BitmapDataSize + ScreenDataSize + BitmapDataSize + ScreenDataSize;
+  /// <summary>Each section occupies a fixed 8 KB slot regardless of how much of it is used —
+  /// the file mirrors C64 memory pages, so the 8000-byte bitmaps and 1000-byte video matrices are
+  /// each padded out to 8192.</summary>
+  internal const int SlotSize = 8192;
+
+  internal const int Bitmap1Offset = LoadAddressSize;
+  internal const int Screen1Offset = Bitmap1Offset + SlotSize;
+  internal const int Screen2Offset = Screen1Offset + SlotSize;
+  internal const int Bitmap2Offset = Screen2Offset + SlotSize;
+
+  internal const int ExpectedFileSize = Bitmap2Offset + SlotSize;
 
   /// <summary>The fixed C64 16-color palette as 0xRRGGBB values.</summary>
   internal static readonly int[] C64Palette = [

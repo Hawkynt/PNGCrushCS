@@ -22,7 +22,18 @@ public readonly record struct QuantumPaintFile : IImageFormatReader<QuantumPaint
   internal const int PixelDataSize = 32000;
 
   /// <summary>Minimum file size (palette + pixel data).</summary>
-  internal const int MinFileSize = PaletteSize + PixelDataSize;
+  /// <summary>Offset of the first palette block. QuantumPaint stores a table of 48-byte blocks
+  /// between here and <see cref="PixelDataOffset"/>, each carrying 16 colours plus the scanline it
+  /// takes effect on, which is how the format changes palette part-way down the screen.</summary>
+  internal const int PaletteOffset = 128;
+
+  /// <summary>Offset of the scanline byte inside a palette block.</summary>
+  internal const int PaletteScanlineOffset = 33;
+
+  /// <summary>Bitmap offset; the palette table occupies everything before it.</summary>
+  internal const int PixelDataOffset = 512;
+
+  internal const int MinFileSize = PixelDataOffset + PixelDataSize;
 
   static string IImageFormatMetadata<QuantumPaintFile>.PrimaryExtension => ".pbx";
   static string[] IImageFormatMetadata<QuantumPaintFile>.FileExtensions => [".pbx"];
