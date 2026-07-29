@@ -9,6 +9,18 @@ public readonly record struct PublicPainterFile : IImageFormatReader<PublicPaint
   /// <summary>Decompressed bitmap size: 640x400 / 8 bits per byte = 32000 bytes.</summary>
   public const int DecompressedSize = 32000;
 
+  /// <summary>Offset of the escape byte that opens the file.</summary>
+  public const int EscapeOffset = 0;
+
+  /// <summary>Offset of the height selector: 0 means 400 lines, 200 means 800.</summary>
+  public const int HeightSelectorOffset = 1;
+
+  /// <summary>Height selector value for the standard 640x400 screen.</summary>
+  public const byte SingleHeightSelector = 0;
+
+  /// <summary>Offset of the compressed stream.</summary>
+  public const int StreamOffset = 2;
+
   /// <summary>Fixed image width.</summary>
   public const int ImageWidth = 640;
 

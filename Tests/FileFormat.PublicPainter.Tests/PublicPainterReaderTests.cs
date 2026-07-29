@@ -43,7 +43,7 @@ public sealed class PublicPainterReaderTests {
   [Category("Unit")]
   public void FromBytes_ValidCompressed_ParsesCorrectly() {
     var original = new byte[PublicPainterFile.DecompressedSize];
-    var compressed = PublicPainterCompressor.Compress(original);
+    var compressed = _BuildFile(original);
     var result = PublicPainterReader.FromBytes(compressed);
 
     Assert.Multiple(() => {
@@ -57,7 +57,7 @@ public sealed class PublicPainterReaderTests {
   [Category("Unit")]
   public void FromStream_ValidCompressed_ParsesCorrectly() {
     var original = new byte[PublicPainterFile.DecompressedSize];
-    var compressed = PublicPainterCompressor.Compress(original);
+    var compressed = _BuildFile(original);
     using var stream = new MemoryStream(compressed);
     var result = PublicPainterReader.FromStream(stream);
 
@@ -74,10 +74,23 @@ public sealed class PublicPainterReaderTests {
     for (var i = 0; i < original.Length; ++i)
       original[i] = 0xFF;
 
-    var compressed = PublicPainterCompressor.Compress(original);
+    var compressed = _BuildFile(original);
     var result = PublicPainterReader.FromBytes(compressed);
 
     for (var i = 0; i < PublicPainterFile.DecompressedSize; ++i)
       Assert.That(result.PixelData[i], Is.EqualTo(0xFF), $"Mismatch at byte {i}");
+  }
+
+  /// <summary>Wraps pixel data in the two-byte header the format requires: escape value, then the
+  /// height selector.</summary>
+  private static byte[] _BuildFile(byte[] pixels) {
+    var escape = PublicPainterCompressor.ChooseEscape(pixels);
+    var stream = PublicPainterCompressor.Compress(pixels, escape);
+
+    var file = new byte[PublicPainterFile.StreamOffset + stream.Length];
+    file[PublicPainterFile.EscapeOffset] = escape;
+    file[PublicPainterFile.HeightSelectorOffset] = PublicPainterFile.SingleHeightSelector;
+    stream.CopyTo(file.AsSpan(PublicPainterFile.StreamOffset));
+    return file;
   }
 }

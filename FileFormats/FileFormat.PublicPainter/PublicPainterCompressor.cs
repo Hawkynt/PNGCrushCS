@@ -3,86 +3,90 @@ using System.IO;
 
 namespace FileFormat.PublicPainter;
 
-/// <summary>Compressor/decompressor for Public Painter's byte-level RLE scheme.</summary>
+/// <summary>Compressor/decompressor for Public Painter's escape-byte RLE scheme.</summary>
 /// <remarks>
-/// If a byte has the high bit set, it's a run: count = byte &amp; 0x7F, value = next byte.
-/// Otherwise it's a literal: count = byte, followed by that many literal bytes.
+/// The first byte of the file names an escape value. In the stream, any byte other than the escape
+/// stands for itself; the escape introduces a run, followed by a repeat count minus one and the
+/// byte to repeat. A literal that happens to equal the escape therefore has to be written as a
+/// one-long run.
 /// </remarks>
 internal static class PublicPainterCompressor {
 
-  /// <summary>Decompresses Public Painter RLE data to the expected output size.</summary>
-  public static byte[] Decompress(ReadOnlySpan<byte> compressed, int expectedSize) {
-    var output = new byte[expectedSize];
-    var srcPos = 0;
-    var dstPos = 0;
+  /// <summary>Longest run a single command can express — the count is stored minus one.</summary>
+  private const int _MAX_RUN = 256;
 
-    while (dstPos < expectedSize && srcPos < compressed.Length) {
-      var control = compressed[srcPos++];
-      if ((control & 0x80) != 0) {
-        // Run-length: count = control & 0x7F, value = next byte
-        var count = control & 0x7F;
-        if (srcPos >= compressed.Length)
+  /// <summary>Runs shorter than this cost more to encode than to write out literally.</summary>
+  private const int _MIN_RUN = 3;
+
+  /// <summary>Decompresses a Public Painter stream to the expected output size.</summary>
+  /// <param name="compressed">The stream, starting at the first command byte.</param>
+  /// <param name="escape">The escape value declared by the file header.</param>
+  /// <param name="expectedSize">Number of bytes to produce.</param>
+  public static byte[] Decompress(ReadOnlySpan<byte> compressed, byte escape, int expectedSize) {
+    var output = new byte[expectedSize];
+    var source = 0;
+    var destination = 0;
+
+    while (destination < expectedSize && source < compressed.Length) {
+      var value = compressed[source++];
+      var count = 1;
+
+      if (value == escape) {
+        if (source + 1 >= compressed.Length)
           break;
 
-        var value = compressed[srcPos++];
-        var end = Math.Min(dstPos + count, expectedSize);
-        for (var i = dstPos; i < end; ++i)
-          output[i] = value;
-
-        dstPos = end;
-      } else {
-        // Literal: count = control, followed by that many bytes
-        var count = control;
-        var end = Math.Min(dstPos + count, expectedSize);
-        var available = Math.Min(count, compressed.Length - srcPos);
-        for (var i = 0; i < available && dstPos + i < end; ++i)
-          output[dstPos + i] = compressed[srcPos + i];
-
-        srcPos += available;
-        dstPos = end;
+        count = compressed[source++] + 1;
+        value = compressed[source++];
       }
+
+      var end = Math.Min(destination + count, expectedSize);
+      while (destination < end)
+        output[destination++] = value;
     }
 
     return output;
   }
 
-  /// <summary>Compresses data using Public Painter's byte-level RLE scheme.</summary>
-  public static byte[] Compress(ReadOnlySpan<byte> data) {
+  /// <summary>Picks an escape value, preferring one absent from the data so no literal needs escaping.</summary>
+  public static byte ChooseEscape(ReadOnlySpan<byte> data) {
+    Span<int> counts = stackalloc int[256];
+    foreach (var b in data)
+      ++counts[b];
+
+    var best = 0;
+    for (var candidate = 0; candidate < counts.Length; ++candidate) {
+      if (counts[candidate] == 0)
+        return (byte)candidate;
+
+      if (counts[candidate] < counts[best])
+        best = candidate;
+    }
+
+    return (byte)best;
+  }
+
+  /// <summary>Compresses data using the escape-byte scheme.</summary>
+  public static byte[] Compress(ReadOnlySpan<byte> data, byte escape) {
     using var ms = new MemoryStream();
-    var pos = 0;
 
-    while (pos < data.Length) {
-      // Check for a run of identical bytes
-      var runStart = pos;
-      while (pos + 1 < data.Length && data[pos] == data[pos + 1] && pos - runStart < 126)
-        ++pos;
+    var position = 0;
+    while (position < data.Length) {
+      var value = data[position];
 
-      var runLength = pos - runStart + 1;
-      ++pos;
+      var run = 1;
+      while (run < _MAX_RUN && position + run < data.Length && data[position + run] == value)
+        ++run;
 
-      if (runLength >= 3) {
-        // Emit as run
-        ms.WriteByte((byte)(0x80 | runLength));
-        ms.WriteByte(data[runStart]);
-      } else {
-        // Collect literals
-        var litStart = runStart;
-        pos = runStart;
+      // The escape value can never be written literally, however short the run.
+      if (run >= _MIN_RUN || value == escape) {
+        ms.WriteByte(escape);
+        ms.WriteByte((byte)(run - 1));
+        ms.WriteByte(value);
+      } else
+        for (var i = 0; i < run; ++i)
+          ms.WriteByte(value);
 
-        while (pos < data.Length) {
-          if (pos + 2 < data.Length && data[pos] == data[pos + 1] && data[pos] == data[pos + 2])
-            break;
-
-          ++pos;
-          if (pos - litStart >= 127)
-            break;
-        }
-
-        var litCount = pos - litStart;
-        ms.WriteByte((byte)litCount);
-        for (var i = 0; i < litCount; ++i)
-          ms.WriteByte(data[litStart + i]);
-      }
+      position += run;
     }
 
     return ms.ToArray();
