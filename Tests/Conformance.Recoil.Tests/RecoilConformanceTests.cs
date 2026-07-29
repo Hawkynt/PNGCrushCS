@@ -58,6 +58,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.Zoom4, "Zoom-4 graphics editor", 256, 256),
     new(ImageFormat.ZxFont, "8x8 font", 256, 64),
     new(ImageFormat.SamCoupeMode4, "Mode 4", 256, 192),
+    new(ImageFormat.KssPaint, "KSS-Paint", 320, 160),
   ];
 
   [Test]
