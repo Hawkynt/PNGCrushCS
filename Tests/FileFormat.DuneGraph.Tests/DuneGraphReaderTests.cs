@@ -43,13 +43,14 @@ public sealed class DuneGraphReaderTests {
   [Category("Unit")]
   public void FromBytes_UncompressedExactSize_Parses() {
     var data = new byte[DuneGraphFile.UncompressedFileSize];
+    DuneGraphFile.WriteHeader(data, DuneGraphFile.FixedWidth, DuneGraphFile.FixedHeight);
     // Set first palette entry: R=0xAA, G=0xBB, pad=0x00, B=0xCC
-    data[0] = 0xAA;
-    data[1] = 0xBB;
-    data[2] = 0x00;
-    data[3] = 0xCC;
+    data[DuneGraphFile.PaletteOffset + 0] = 0xAA;
+    data[DuneGraphFile.PaletteOffset + 1] = 0xBB;
+    data[DuneGraphFile.PaletteOffset + 2] = 0x00;
+    data[DuneGraphFile.PaletteOffset + 3] = 0xCC;
     // Set first pixel index
-    data[DuneGraphFile.PaletteDataSize] = 42;
+    data[DuneGraphFile.PixelDataOffset] = 42;
 
     var result = DuneGraphReader.FromBytes(data);
 
@@ -66,11 +67,12 @@ public sealed class DuneGraphReaderTests {
   [Category("Unit")]
   public void FromBytes_CompressedData_Parses() {
     // Build a compressed file: palette + RLE-compressed pixel data
-    var data = new byte[DuneGraphFile.PaletteDataSize + 3]; // palette + one RLE run
+    var data = new byte[DuneGraphFile.PixelDataOffset + 3]; // header + palette + one RLE run
+    DuneGraphFile.WriteHeader(data, DuneGraphFile.FixedWidth, DuneGraphFile.FixedHeight);
     // RLE: escape(0x00) + count(5) + value(0x42)
-    data[DuneGraphFile.PaletteDataSize] = 0x00;
-    data[DuneGraphFile.PaletteDataSize + 1] = 5;
-    data[DuneGraphFile.PaletteDataSize + 2] = 0x42;
+    data[DuneGraphFile.PixelDataOffset] = 0x00;
+    data[DuneGraphFile.PixelDataOffset + 1] = 5;
+    data[DuneGraphFile.PixelDataOffset + 2] = 0x42;
 
     var result = DuneGraphReader.FromBytes(data);
 
@@ -86,7 +88,8 @@ public sealed class DuneGraphReaderTests {
   [Category("Unit")]
   public void FromStream_UncompressedValid() {
     var data = new byte[DuneGraphFile.UncompressedFileSize];
-    data[DuneGraphFile.PaletteDataSize] = 0xAB;
+    DuneGraphFile.WriteHeader(data, DuneGraphFile.FixedWidth, DuneGraphFile.FixedHeight);
+    data[DuneGraphFile.PixelDataOffset] = 0xAB;
 
     using var ms = new MemoryStream(data);
     var result = DuneGraphReader.FromStream(ms);
@@ -100,10 +103,11 @@ public sealed class DuneGraphReaderTests {
   [Category("Unit")]
   public void FromBytes_CopiesInputData() {
     var data = new byte[DuneGraphFile.UncompressedFileSize];
-    data[DuneGraphFile.PaletteDataSize] = 0x42;
+    DuneGraphFile.WriteHeader(data, DuneGraphFile.FixedWidth, DuneGraphFile.FixedHeight);
+    data[DuneGraphFile.PixelDataOffset] = 0x42;
 
     var result = DuneGraphReader.FromBytes(data);
-    data[DuneGraphFile.PaletteDataSize] = 0x00;
+    data[DuneGraphFile.PixelDataOffset] = 0x00;
 
     Assert.That(result.PixelData[0], Is.EqualTo(0x42));
   }
@@ -112,11 +116,12 @@ public sealed class DuneGraphReaderTests {
   [Category("Unit")]
   public void FromBytes_FalconPaletteConversion_SkipsPaddingByte() {
     var data = new byte[DuneGraphFile.UncompressedFileSize];
+    DuneGraphFile.WriteHeader(data, DuneGraphFile.FixedWidth, DuneGraphFile.FixedHeight);
     // Entry 0: R=0x10, G=0x20, pad=0xFF, B=0x30
-    data[0] = 0x10;
-    data[1] = 0x20;
-    data[2] = 0xFF; // padding byte - should be ignored
-    data[3] = 0x30;
+    data[DuneGraphFile.PaletteOffset + 0] = 0x10;
+    data[DuneGraphFile.PaletteOffset + 1] = 0x20;
+    data[DuneGraphFile.PaletteOffset + 2] = 0xFF; // padding byte - should be ignored
+    data[DuneGraphFile.PaletteOffset + 3] = 0x30;
 
     var result = DuneGraphReader.FromBytes(data);
 

@@ -11,8 +11,7 @@ public static class CokeAtariWriter {
     var expectedPixelBytes = width * height * 2;
     var result = new byte[CokeAtariHeader.StructSize + expectedPixelBytes];
 
-    var header = new CokeAtariHeader((ushort)width, (ushort)height);
-    header.WriteTo(result.AsSpan());
+    CokeAtariHeader.Write(result, width, height);
 
     var copyLen = Math.Min(expectedPixelBytes, pixelData.Length);
     pixelData.AsSpan(0, copyLen).CopyTo(result.AsSpan(CokeAtariHeader.StructSize));

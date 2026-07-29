@@ -24,9 +24,10 @@ public static class DuneGraphWriter {
       file.PixelData.AsSpan(0, Math.Min(file.PixelData.Length, DuneGraphFile.PixelDataSize)).CopyTo(pixelBytes);
     }
 
-    var result = new byte[DuneGraphFile.PaletteDataSize + pixelBytes.Length];
-    falconPalette.AsSpan().CopyTo(result);
-    pixelBytes.AsSpan().CopyTo(result.AsSpan(DuneGraphFile.PaletteDataSize));
+    var result = new byte[DuneGraphFile.HeaderSize + DuneGraphFile.PaletteDataSize + pixelBytes.Length];
+    DuneGraphFile.WriteHeader(result, DuneGraphFile.FixedWidth, DuneGraphFile.FixedHeight);
+    falconPalette.AsSpan().CopyTo(result.AsSpan(DuneGraphFile.HeaderSize));
+    pixelBytes.AsSpan().CopyTo(result.AsSpan(DuneGraphFile.HeaderSize + DuneGraphFile.PaletteDataSize));
     return result;
   }
 

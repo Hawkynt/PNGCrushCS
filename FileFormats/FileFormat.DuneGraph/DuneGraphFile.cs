@@ -21,11 +21,45 @@ public readonly record struct DuneGraphFile : IImageFormatReader<DuneGraphFile>,
   /// <summary>Size of the raw palette section in bytes.</summary>
   public const int PaletteDataSize = PaletteEntryCount * BytesPerPaletteEntry;
 
+  /// <summary>The 8-byte header: the ASCII tag <c>DGU</c>, a format byte of 1, then width and
+  /// height as big-endian 16-bit values. The Falcon palette follows at
+  /// <see cref="HeaderSize"/> and pixel data after that.</summary>
+  public const int HeaderSize = 8;
+
+  /// <summary>Offset of the Falcon palette (immediately after the header).</summary>
+  public const int PaletteOffset = HeaderSize;
+
+  /// <summary>Offset of the pixel section (after header and palette).</summary>
+  public const int PixelDataOffset = HeaderSize + PaletteDataSize;
+
+  /// <summary>ASCII tag every DuneGraph file starts with, followed by a format byte of 1.</summary>
+  public static ReadOnlySpan<byte> Signature => "DGU\u0001"u8;
+
+  /// <summary>Writes the 8-byte header into <paramref name="destination"/>.</summary>
+  public static void WriteHeader(Span<byte> destination, int width, int height) {
+    Signature.CopyTo(destination);
+    destination[4] = (byte)(width >> 8);
+    destination[5] = (byte)width;
+    destination[6] = (byte)(height >> 8);
+    destination[7] = (byte)height;
+  }
+
+  /// <summary>Reads the 8-byte header; returns <c>false</c> when the tag does not match.</summary>
+  public static bool TryReadHeader(ReadOnlySpan<byte> data, out int width, out int height) {
+    width = height = 0;
+    if (data.Length < HeaderSize || !data[..Signature.Length].SequenceEqual(Signature))
+      return false;
+
+    width = (data[4] << 8) | data[5];
+    height = (data[6] << 8) | data[7];
+    return true;
+  }
+
   /// <summary>Size of uncompressed pixel data.</summary>
   public const int PixelDataSize = FixedWidth * FixedHeight;
 
   /// <summary>Expected size of an uncompressed .dg1 file.</summary>
-  public const int UncompressedFileSize = PaletteDataSize + PixelDataSize;
+  public const int UncompressedFileSize = HeaderSize + PaletteDataSize + PixelDataSize;
 
   /// <summary>The RLE escape byte used in .dc1 compressed files.</summary>
   internal const byte RleEscape = 0x00;

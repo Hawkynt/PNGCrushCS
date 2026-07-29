@@ -9,17 +9,11 @@ public static class RembrandtWriter {
     ArgumentNullException.ThrowIfNull(file);
 
     var expectedPixelBytes = file.Width * file.Height * 2;
-    var result = new byte[RembrandtFile.HeaderSize + expectedPixelBytes];
+    var result = new byte[RembrandtHeader.StructSize + expectedPixelBytes];
+    RembrandtHeader.Write(result, file.Width, file.Height);
 
-    // Write dimensions (BE u16)
-    result[0] = (byte)((file.Width >> 8) & 0xFF);
-    result[1] = (byte)(file.Width & 0xFF);
-    result[2] = (byte)((file.Height >> 8) & 0xFF);
-    result[3] = (byte)(file.Height & 0xFF);
-
-    // Write pixel data
     var copyLen = Math.Min(file.PixelData.Length, expectedPixelBytes);
-    file.PixelData.AsSpan(0, copyLen).CopyTo(result.AsSpan(RembrandtFile.HeaderSize));
+    file.PixelData.AsSpan(0, copyLen).CopyTo(result.AsSpan(RembrandtHeader.StructSize));
 
     return result;
   }

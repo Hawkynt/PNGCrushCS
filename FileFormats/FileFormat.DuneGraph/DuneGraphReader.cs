@@ -28,14 +28,17 @@ public static class DuneGraphReader {
 
   public static DuneGraphFile FromSpan(ReadOnlySpan<byte> data) {
 
-    if (data.Length < DuneGraphFile.PaletteDataSize + 1)
-      throw new InvalidDataException($"Data too small for a valid DuneGraph file (minimum {DuneGraphFile.PaletteDataSize + 1} bytes, got {data.Length}).");
+    if (!DuneGraphFile.TryReadHeader(data, out _, out _))
+      throw new InvalidDataException("Not a DuneGraph file: missing the 'DGU' tag.");
+
+    if (data.Length < DuneGraphFile.HeaderSize + DuneGraphFile.PaletteDataSize + 1)
+      throw new InvalidDataException($"Data too small for a valid DuneGraph file (minimum {DuneGraphFile.HeaderSize + DuneGraphFile.PaletteDataSize + 1} bytes, got {data.Length}).");
 
     // Convert Falcon palette to RGB
     var rgbPalette = new byte[DuneGraphFile.PaletteEntryCount * 3];
-    DuneGraphFile.ConvertFalconPaletteToRgb(data.Slice(0, DuneGraphFile.PaletteDataSize), rgbPalette);
+    DuneGraphFile.ConvertFalconPaletteToRgb(data.Slice(DuneGraphFile.HeaderSize, DuneGraphFile.PaletteDataSize), rgbPalette);
 
-    var pixelSection = data.Slice(DuneGraphFile.PaletteDataSize);
+    var pixelSection = data.Slice(DuneGraphFile.HeaderSize + DuneGraphFile.PaletteDataSize);
     var isUncompressed = data.Length == DuneGraphFile.UncompressedFileSize;
 
     byte[] pixelData;
@@ -59,14 +62,17 @@ public static class DuneGraphReader {
 
   public static DuneGraphFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < DuneGraphFile.PaletteDataSize + 1)
-      throw new InvalidDataException($"Data too small for a valid DuneGraph file (minimum {DuneGraphFile.PaletteDataSize + 1} bytes, got {data.Length}).");
+    if (!DuneGraphFile.TryReadHeader(data, out _, out _))
+      throw new InvalidDataException("Not a DuneGraph file: missing the 'DGU' tag.");
+
+    if (data.Length < DuneGraphFile.HeaderSize + DuneGraphFile.PaletteDataSize + 1)
+      throw new InvalidDataException($"Data too small for a valid DuneGraph file (minimum {DuneGraphFile.HeaderSize + DuneGraphFile.PaletteDataSize + 1} bytes, got {data.Length}).");
 
     // Convert Falcon palette to RGB
     var rgbPalette = new byte[DuneGraphFile.PaletteEntryCount * 3];
-    DuneGraphFile.ConvertFalconPaletteToRgb(data.AsSpan(0, DuneGraphFile.PaletteDataSize), rgbPalette);
+    DuneGraphFile.ConvertFalconPaletteToRgb(data.AsSpan(DuneGraphFile.HeaderSize, DuneGraphFile.PaletteDataSize), rgbPalette);
 
-    var pixelSection = data.AsSpan(DuneGraphFile.PaletteDataSize);
+    var pixelSection = data.AsSpan(DuneGraphFile.HeaderSize + DuneGraphFile.PaletteDataSize);
     var isUncompressed = data.Length == DuneGraphFile.UncompressedFileSize;
 
     byte[] pixelData;

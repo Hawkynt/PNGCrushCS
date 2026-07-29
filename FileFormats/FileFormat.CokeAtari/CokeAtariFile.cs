@@ -4,6 +4,8 @@ using FileFormat.Core;
 namespace FileFormat.CokeAtari;
 
 /// <summary>In-memory representation of a COKE Atari Falcon 16-bit true color (.tg1) image.</summary>
+// "COKE format." — the ASCII signature the original tools write at offset 0.
+[FormatMagicBytes([0x43, 0x4F, 0x4B, 0x45, 0x20, 0x66, 0x6F, 0x72, 0x6D, 0x61, 0x74, 0x2E])]
 public readonly record struct CokeAtariFile : IImageFormatReader<CokeAtariFile>, IImageToRawImage<CokeAtariFile>, IImageFromRawImage<CokeAtariFile>, IImageFormatWriter<CokeAtariFile> {
 
   static string IImageFormatMetadata<CokeAtariFile>.PrimaryExtension => ".tg1";
