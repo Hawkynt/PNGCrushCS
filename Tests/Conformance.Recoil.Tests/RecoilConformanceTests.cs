@@ -104,6 +104,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.AtariTools800, "AtariTools-800 missiles", 32, 240, ".4mi"),
     new(ImageFormat.AtariTools800, "AtariTools-800 players and missiles", 112, 240, ".4pm"),
     new(ImageFormat.AtariTools800Font, "AtariTools-800 character set", 128, 64, ".acs"),
+    new(ImageFormat.ZxRgb3, "ZX Spectrum RGB3", 256, 192, ".3"),
   ];
 
   [Test]

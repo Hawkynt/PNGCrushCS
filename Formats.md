@@ -550,6 +550,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | Zeiss BIVAS             | .dta                                                 | Zeiss BIVAS microscopy           | Y      | Y      | —         | —     | —   | —      | —         |
 | Zeiss LSM               | .lsm                                                 | Zeiss LSM confocal microscopy    | Y      | Y      | —         | —     | —   | —      | —         |
 | Zoomatic                | .zom                                                 | C64 Zoomatic multicolor art      | Y      | —      | —         | R     | —   | —      | —         |
+| ZX RGB3                 | .3                                                   | ZX Spectrum three-plane RGB      | Y      | Y      | —         | R     | —   | —      | —         |
 | ZX Art Studio           | .zas                                                 | ZX Spectrum Art Studio           | Y      | —      | —         | R     | —   | —      | —         |
 | ZX Border Multicolor    | .bmc4                                                | ZX Spectrum border multicolor    | Y      | —      | —         | R     | —   | —      | —         |
 | ZX Border Screen        | .bsc                                                 | ZX Spectrum border screen        | Y      | —      | —         | R     | —   | —      | —         |
@@ -675,14 +676,14 @@ Two different questions, two different answers:
 | ----------------------------------------------------------- | ----- | ------ |
 | Total formats                                              | 551   | 552    |
 | Modern/web/scientific formats (PNG, JPEG, WebP, AVIF, …)   | ~290  | 0      |
-| Of RECOIL's 552 vintage formats, covered                   | 371   | 552    |
+| Of RECOIL's 552 vintage formats, covered                   | 372   | 552    |
 
 So on breadth we are level, and on everything outside the retro catalogue we are the only one of
-the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 181
+the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 180
 formats.
 
 Largest remaining clusters: Atari 8-bit (60), Commodore 64 (25), Atari ST/STE (21), MSX2 (11),
-Atari Falcon (8), NEC PC-98 (7), ZX Spectrum (7). Atari TT is now fully covered. Only a handful decode as a plain fixed-size screen
+Atari Falcon (8), NEC PC-98 (7), ZX Spectrum (6). Atari TT is now fully covered. Only a handful decode as a plain fixed-size screen
 that the shared Atari primitives already cover; the rest carry their own containers or compression.
 RECOIL is a decoder only, so for each one the encoder has to be derived from its decoder and then
 proved by round-tripping back through it.

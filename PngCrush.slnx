@@ -601,6 +601,7 @@
     <Project Path="FileFormats/FileFormat.ZxNext/FileFormat.ZxNext.csproj" />
     <Project Path="FileFormats/FileFormat.ZxNextImage/FileFormat.ZxNextImage.csproj" />
     <Project Path="FileFormats/FileFormat.ZxPaintbrush/FileFormat.ZxPaintbrush.csproj" />
+    <Project Path="FileFormats/FileFormat.ZxRgb3/FileFormat.ZxRgb3.csproj" />
     <Project Path="FileFormats/FileFormat.ZxSpectrum/FileFormat.ZxSpectrum.csproj" />
     <Project Path="FileFormats/FileFormat.ZxTimex/FileFormat.ZxTimex.csproj" />
     <Project Path="FileFormats/FileFormat.ZxTricolor/FileFormat.ZxTricolor.csproj" />
@@ -1202,6 +1203,7 @@
     <Project Path="Tests/FileFormat.ZxNext.Tests/FileFormat.ZxNext.Tests.csproj" />
     <Project Path="Tests/FileFormat.ZxNextImage.Tests/FileFormat.ZxNextImage.Tests.csproj" />
     <Project Path="Tests/FileFormat.ZxPaintbrush.Tests/FileFormat.ZxPaintbrush.Tests.csproj" />
+    <Project Path="Tests/FileFormat.ZxRgb3.Tests/FileFormat.ZxRgb3.Tests.csproj" />
     <Project Path="Tests/FileFormat.ZxSpectrum.Tests/FileFormat.ZxSpectrum.Tests.csproj" />
     <Project Path="Tests/FileFormat.ZxTimex.Tests/FileFormat.ZxTimex.Tests.csproj" />
     <Project Path="Tests/FileFormat.ZxTricolor.Tests/FileFormat.ZxTricolor.Tests.csproj" />
