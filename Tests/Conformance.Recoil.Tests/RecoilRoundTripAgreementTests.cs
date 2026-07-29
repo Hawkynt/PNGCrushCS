@@ -95,8 +95,6 @@ public sealed class RecoilRoundTripAgreementTests {
   /// </remarks>
   private static readonly IReadOnlyDictionary<string, string> _KnownDisagreements =
     new Dictionary<string, string> {
-      ["MacPaint"] = "monochrome polarity inverted: we make a set bit white, RECOIL makes it black",
-      ["Public Painter"] = "monochrome polarity inverted, as MacPaint",
       ["MSX2 GL6"] = "no companion .PL6 palette exists; we fall back to black-on-white where RECOIL leaves the registers dark",
       ["CrackArt"] = "first pixel disagrees entirely — likely the palette is read from the wrong offset",
       ["DuneGraph"] = "off by six in the first channel, so the palette is widened by the wrong rule",

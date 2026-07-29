@@ -22,7 +22,8 @@ public readonly record struct MacPaintFile : IImageFormatReader<MacPaintFile>, I
   /// <summary>1bpp packed pixel data, 72 bytes per row x 720 rows = 51840 bytes.</summary>
   public byte[] PixelData { get; init; }
 
-  private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
+  // A set bit is ink, and the paper it sits on is white — so index 0 is the paper, not the ink.
+  private static readonly byte[] _BlackWhitePalette = [255, 255, 255, 0, 0, 0];
 
   public static RawImage ToRawImage(MacPaintFile file) => new() {
     Width = file.Width,

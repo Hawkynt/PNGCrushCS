@@ -42,7 +42,8 @@ public readonly record struct PublicPainterFile : IImageFormatReader<PublicPaint
   /// <summary>32000 bytes of 1bpp monochrome bitmap data (MSB first, 80 bytes per row).</summary>
   public byte[] PixelData { get; init; }
 
-  private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
+  // A set bit is ink, and the paper it sits on is white — so index 0 is the paper, not the ink.
+  private static readonly byte[] _BlackWhitePalette = [255, 255, 255, 0, 0, 0];
 
   public static RawImage ToRawImage(PublicPainterFile file) {
 
