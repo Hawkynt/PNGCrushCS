@@ -278,6 +278,7 @@
     <Project Path="FileFormats/FileFormat.HomeworldLif/FileFormat.HomeworldLif.csproj" />
     <Project Path="FileFormats/FileFormat.HpGrob/FileFormat.HpGrob.csproj" />
     <Project Path="FileFormats/FileFormat.Hrz/FileFormat.Hrz.csproj" />
+    <Project Path="FileFormats/FileFormat.IcDraw/FileFormat.IcDraw.csproj" />
     <Project Path="FileFormats/FileFormat.Icns/FileFormat.Icns.csproj" />
     <Project Path="FileFormats/FileFormat.Ico/FileFormat.Ico.csproj" />
     <Project Path="FileFormats/FileFormat.IconLibrary/FileFormat.IconLibrary.csproj" />
@@ -874,6 +875,7 @@
     <Project Path="Tests/FileFormat.HomeworldLif.Tests/FileFormat.HomeworldLif.Tests.csproj" />
     <Project Path="Tests/FileFormat.HpGrob.Tests/FileFormat.HpGrob.Tests.csproj" />
     <Project Path="Tests/FileFormat.Hrz.Tests/FileFormat.Hrz.Tests.csproj" />
+    <Project Path="Tests/FileFormat.IcDraw.Tests/FileFormat.IcDraw.Tests.csproj" />
     <Project Path="Tests/FileFormat.Icns.Tests/FileFormat.Icns.Tests.csproj" />
     <Project Path="Tests/FileFormat.Ico.Tests/FileFormat.Ico.Tests.csproj" />
     <Project Path="Tests/FileFormat.IconLibrary.Tests/FileFormat.IconLibrary.Tests.csproj" />
