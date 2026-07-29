@@ -1,32 +1,23 @@
-﻿using System;
+using System;
 
 namespace FileFormat.MonoStar;
 
-/// <summary>Assembles MonoStar file bytes from an in-memory representation.</summary>
+/// <summary>Assembles Atari ST MonoSTar object bytes.</summary>
 public static class MonoStarWriter {
 
-  private const int _HEADER_SIZE = 34;
-  private const int _PIXEL_DATA_SIZE = 32000;
-  private const int _FILE_SIZE = _HEADER_SIZE + _PIXEL_DATA_SIZE;
-
   public static byte[] ToBytes(MonoStarFile file) {
-    ArgumentNullException.ThrowIfNull(file);
+    var result = new byte[MonoStarFile.FileSizeFor(file.Width, file.Height)];
 
-    var result = new byte[_FILE_SIZE];
-    var span = result.AsSpan();
+    // Both dimensions go in one less than they are.
+    result[0] = (byte)((file.Width - 1) >> 8);
+    result[1] = (byte)((file.Width - 1) & 0xFF);
+    result[2] = (byte)((file.Height - 1) >> 8);
+    result[3] = (byte)((file.Height - 1) & 0xFF);
+    MonoStarFile.MonochromeMarker.CopyTo(result.AsSpan(4));
 
-    // 2-byte resolution big-endian (2 = high-res mono)
-    span[0] = 0;
-    span[1] = 2;
-
-    for (var i = 0; i < 16; ++i) {
-      var offset = 2 + i * 2;
-      var entry = file.Palette[i];
-      span[offset] = (byte)((entry >> 8) & 0xFF);
-      span[offset + 1] = (byte)(entry & 0xFF);
-    }
-
-    file.PixelData.AsSpan(0, Math.Min(_PIXEL_DATA_SIZE, file.PixelData.Length)).CopyTo(result.AsSpan(_HEADER_SIZE));
+    var data = file.BitmapData ?? [];
+    var length = result.Length - MonoStarFile.HeaderSize;
+    data.AsSpan(0, Math.Min(data.Length, length)).CopyTo(result.AsSpan(MonoStarFile.HeaderSize));
 
     return result;
   }

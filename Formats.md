@@ -348,6 +348,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | MSX Screen 2            | .sc2, .grp                                           | MSX Screen 2 (TMS9918)           | Y      | Y      | —         | R     | —   | —      | —         |
 | MSX Screen 5            | .sc5, .ge5                                           | MSX2 Screen 5 indexed            | Y      | —      | —         | R     | —   | —      | —         |
 | MSX2 Screen 6           | .sc6                                                 | MSX2 512x424 four colours        | Y      | Y      | —         | R     | —   | —      | —         |
+| MonoSTar object         | .obj                                                 | Atari ST monochrome object       | Y      | Y      | —         | R     | —   | —      | —         |
 | MSX Screen 8            | .sc8                                                 | MSX2 Screen 8 256-color          | Y      | —      | —         | R     | —   | —      | —         |
 | MSX Sprite              | .spt                                                 | MSX sprite pattern table         | Y      | —      | —         | —     | —   | —      | —         |
 | MSX Video               | .mvi                                                 | MSX2 Video screen capture        | Y      | Y      | —         | —     | —   | —      | —         |
@@ -677,10 +678,10 @@ Two different questions, two different answers:
 | ----------------------------------------------------------- | ----- | ------ |
 | Total formats                                              | 551   | 552    |
 | Modern/web/scientific formats (PNG, JPEG, WebP, AVIF, …)   | ~290  | 0      |
-| Of RECOIL's 552 vintage formats, covered                   | 374   | 552    |
+| Of RECOIL's 552 vintage formats, covered                   | 375   | 552    |
 
 So on breadth we are level, and on everything outside the retro catalogue we are the only one of
-the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 178
+the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 177
 formats.
 
 Largest remaining clusters: Atari 8-bit (60), Commodore 64 (25), Atari ST/STE (21), MSX2 (9),

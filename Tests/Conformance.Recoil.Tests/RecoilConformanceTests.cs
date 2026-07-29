@@ -106,6 +106,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.AtariTools800Font, "AtariTools-800 character set", 128, 64, ".acs"),
     new(ImageFormat.ZxRgb3, "ZX Spectrum RGB3", 256, 192, ".3"),
     new(ImageFormat.MsxScreen6, "MSX2 Screen 6", 512, 424, ".sc6"),
+    new(ImageFormat.MonoStar, "MonoSTar object", 64, 48, ".obj"),
   ];
 
   [Test]
