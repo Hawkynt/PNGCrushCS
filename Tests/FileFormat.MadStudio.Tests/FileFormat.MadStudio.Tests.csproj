@@ -1,9 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
-    <Description>Cross-validates our retro-format encoders against RECOIL, the reference decoder for 20th-century computer image formats.</Description>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,9 +13,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Hawkynt.FileFormats.Images\Hawkynt.FileFormats.Images.csproj" />
-    <ProjectReference Include="..\..\FileFormat.Core\FileFormat.Core.csproj" />
-    <ProjectReference Include="..\..\FileFormats\FileFormat.InterlaceCharacterEditor\FileFormat.InterlaceCharacterEditor.csproj" />
     <ProjectReference Include="..\..\FileFormats\FileFormat.MadStudio\FileFormat.MadStudio.csproj" />
   </ItemGroup>
 

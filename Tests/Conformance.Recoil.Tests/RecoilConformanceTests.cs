@@ -97,6 +97,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.IcDraw, "ICDRAW icon", 32, 32, ".ibi"),
     new(ImageFormat.IcDraw, "ICDRAW icon as .ib3", 32, 32, ".ib3"),
     new(ImageFormat.Ice, "Super IRG", 320, 192, ".irg"),
+    new(ImageFormat.MadStudio, "Mad Studio ANTIC 4", 320, 192, ".an4"),
   ];
 
   [Test]

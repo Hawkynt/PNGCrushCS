@@ -320,6 +320,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | MacPaint                | .mac, .pntg, .pnt, .paint, .mpnt, .macp              | Apple MacPaint monochrome        | Y      | Y      | —         | R     | —   | —      | —         |
 | MAG                     | .mag, .mki                                           | MAKI-chan Graphics (Japanese)    | Y      | Y      | —         | R     | —   | —      | —         |
 | Magic Painter           | .mgp                                                 | Magic Painter MGP image          | Y      | Y      | —         | R     | —   | —      | —         |
+| Mad Studio              | .an4, .an2, .an5, .gr1, .gr2                         | Atari 8-bit character screens     | Y      | Y      | —         | R     | —   | —      | —         |
 | Master System Tile      | .sms, .gg                                            | Sega Master System tile          | Y      | Y      | —         | —     | —   | —      | —         |
 | MATLAB                  | .mat                                                 | MATLAB image format              | Y      | Y      | —         | R     | —   | —      | —         |
 | Maya IFF                | .iff, .maya                                          | Maya IFF (FOR4/CIMG)             | Y      | Y      | —         | —     | —   | —      | —         |
@@ -672,13 +673,13 @@ Two different questions, two different answers:
 | ----------------------------------------------------------- | ----- | ------ |
 | Total formats                                              | 551   | 552    |
 | Modern/web/scientific formats (PNG, JPEG, WebP, AVIF, …)   | ~290  | 0      |
-| Of RECOIL's 552 vintage formats, covered                   | 360   | 552    |
+| Of RECOIL's 552 vintage formats, covered                   | 365   | 552    |
 
 So on breadth we are level, and on everything outside the retro catalogue we are the only one of
-the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 192
+the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 187
 formats.
 
-Largest remaining clusters: Atari 8-bit (69), Commodore 64 (27), Atari ST/STE (21), MSX2 (11),
+Largest remaining clusters: Atari 8-bit (64), Commodore 64 (27), Atari ST/STE (21), MSX2 (11),
 Atari Falcon (8), NEC PC-98 (7), ZX Spectrum (7). Atari TT is now fully covered. Only a handful decode as a plain fixed-size screen
 that the shared Atari primitives already cover; the rest carry their own containers or compression.
 RECOIL is a decoder only, so for each one the encoder has to be derived from its decoder and then

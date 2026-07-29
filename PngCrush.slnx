@@ -336,6 +336,7 @@
     <Project Path="FileFormats/FileFormat.Lss16/FileFormat.Lss16.csproj" />
     <Project Path="FileFormats/FileFormat.LucasFilm/FileFormat.LucasFilm.csproj" />
     <Project Path="FileFormats/FileFormat.MacPaint/FileFormat.MacPaint.csproj" />
+    <Project Path="FileFormats/FileFormat.MadStudio/FileFormat.MadStudio.csproj" />
     <Project Path="FileFormats/FileFormat.Mag/FileFormat.Mag.csproj" />
     <Project Path="FileFormats/FileFormat.MagicPainter/FileFormat.MagicPainter.csproj" />
     <Project Path="FileFormats/FileFormat.Mamut/FileFormat.Mamut.csproj" />
@@ -934,6 +935,7 @@
     <Project Path="Tests/FileFormat.Lss16.Tests/FileFormat.Lss16.Tests.csproj" />
     <Project Path="Tests/FileFormat.LucasFilm.Tests/FileFormat.LucasFilm.Tests.csproj" />
     <Project Path="Tests/FileFormat.MacPaint.Tests/FileFormat.MacPaint.Tests.csproj" />
+    <Project Path="Tests/FileFormat.MadStudio.Tests/FileFormat.MadStudio.Tests.csproj" />
     <Project Path="Tests/FileFormat.Mag.Tests/FileFormat.Mag.Tests.csproj" />
     <Project Path="Tests/FileFormat.MagicPainter.Tests/FileFormat.MagicPainter.Tests.csproj" />
     <Project Path="Tests/FileFormat.Mamut.Tests/FileFormat.Mamut.Tests.csproj" />
