@@ -75,6 +75,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.Ilbm, "DEGAS Elite block 1", 64, 64, ".bl1"),
     new(ImageFormat.Ilbm, "DEGAS Elite block 2", 64, 64, ".bl2"),
     new(ImageFormat.Ilbm, "DEGAS Elite block 3", 64, 64, ".bl3"),
+    new(ImageFormat.ZxNextImage, "256x192 format", 256, 192),
   ];
 
   [Test]
