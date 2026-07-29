@@ -351,6 +351,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | MSX2 GL6                | .gl6, .sh6, .stp                                     | MSX2 Screen 6 with sized header  | Y      | Y      | —         | R     | —   | —      | —         |
 | Botticelli              | .p4i                                                 | C16/Plus4 hires, multi and logo  | Y      | —      | —         | R     | —   | —      | —         |
 | MSX2 GL16               | .gl5, .sh5, .gl7, .sh7                               | Sized-header 16-colour Screen 5/7| Y      | Y      | —         | R     | —   | —      | —         |
+| SAM Coupe modes 1-3     | .ss1, .ss2, .ss3                                     | Spectrum-compatible, per-line and 2bpp screens | Y      | —      | —         | R     | —   | —      | —         |
 | MSX2+ Screen 10         | .sca, .scb                                           | 256x212 YJK plus 16-colour escape| Y      | Y      | —         | R     | —   | —      | —         |
 | MSX2+ GL YJK            | .glc, .gls, .shc, .gla, .glb, .sha, .shb             | Sized-header YJK, Screen 10/12   | Y      | Y      | —         | R     | —   | —      | —         |
 | MonoSTar object         | .obj                                                 | Atari ST monochrome object       | Y      | Y      | —         | R     | —   | —      | —         |
@@ -680,16 +681,16 @@ Two different questions, two different answers:
 
 | Metric                                                    | Us    | RECOIL |
 | ----------------------------------------------------------- | ----- | ------ |
-| Total formats                                              | 555   | 552    |
+| Total formats                                              | 556   | 552    |
 | Modern/web/scientific formats (PNG, JPEG, WebP, AVIF, …)   | ~290  | 0      |
-| Of RECOIL's 552 vintage formats, covered                   | 386   | 552    |
+| Of RECOIL's 552 vintage formats, covered                   | 389   | 552    |
 
 So on breadth we are level, and on everything outside the retro catalogue we are the only one of
-the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 166
+the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 163
 formats.
 
 Largest remaining clusters: Atari 8-bit (59), Commodore 64 (25), Atari ST/STE (19), Atari Falcon
-(8), NEC PC-98 (7), ZX Spectrum (6). Atari TT, the MSX2+ YJK modes and the Commodore 16/Plus4
+(8), NEC PC-98 (7), ZX Spectrum (6). SAM Coupe is now fully covered. Atari TT, the MSX2+ YJK modes and the Commodore 16/Plus4
 set are now fully covered. Formats we can only read are marked so in the table above and are
 proved against RECOIL by decoding the same bytes on both sides and comparing pixels, which is a
 stricter check than the write-side one. Only a handful decode as a plain fixed-size screen

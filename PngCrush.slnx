@@ -445,6 +445,7 @@
     <Project Path="Tests/FileFormat.RunPaint.Tests/FileFormat.RunPaint.Tests.csproj" />
     <Project Path="Tests/FileFormat.SamCoupe.Tests/FileFormat.SamCoupe.Tests.csproj" />
     <Project Path="Tests/FileFormat.SamCoupeMode4.Tests/FileFormat.SamCoupeMode4.Tests.csproj" />
+    <Project Path="Tests/FileFormat.SamCoupeScreen.Tests/FileFormat.SamCoupeScreen.Tests.csproj" />
     <Project Path="Tests/FileFormat.SaracenPaint.Tests/FileFormat.SaracenPaint.Tests.csproj" />
     <Project Path="Tests/FileFormat.SbigCcd.Tests/FileFormat.SbigCcd.Tests.csproj" />
     <Project Path="Tests/FileFormat.SciFax.Tests/FileFormat.SciFax.Tests.csproj" />

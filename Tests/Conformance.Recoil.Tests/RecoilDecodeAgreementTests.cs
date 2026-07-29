@@ -40,6 +40,14 @@ public sealed class RecoilDecodeAgreementTests {
     new("MSX2 SH5", ImageFormat.MsxGl16, ".sh5", () => _Gl16(32, 24)),
     new("MSX2 GL7", ImageFormat.MsxGl16, ".gl7", () => _Gl16(64, 48)),
     new("MSX2 SH7", ImageFormat.MsxGl16, ".sh7", () => _Gl16(96, 16)),
+    // Two of each: one plain, one whose interrupt list rewrites palette entries part-way down the
+    // screen, which is the only way to tell a correct interrupt walk from a skipped one.
+    new("SAM Coupe Mode 1", ImageFormat.SamCoupeScreen, ".ss1", () => _SamCoupe(1, interrupts: false)),
+    new("SAM Coupe Mode 1 with interrupts", ImageFormat.SamCoupeScreen, ".ss1", () => _SamCoupe(1, interrupts: true)),
+    new("SAM Coupe Mode 2", ImageFormat.SamCoupeScreen, ".ss2", () => _SamCoupe(2, interrupts: false)),
+    new("SAM Coupe Mode 2 with interrupts", ImageFormat.SamCoupeScreen, ".ss2", () => _SamCoupe(2, interrupts: true)),
+    new("SAM Coupe Mode 3", ImageFormat.SamCoupeScreen, ".ss3", () => _SamCoupe(3, interrupts: false)),
+    new("SAM Coupe Mode 3 with interrupts", ImageFormat.SamCoupeScreen, ".ss3", () => _SamCoupe(3, interrupts: true)),
   ];
 
   [Test]
@@ -90,6 +98,11 @@ public sealed class RecoilDecodeAgreementTests {
   /// be comparing two different questions.
   /// </remarks>
   private static RawImage? _DecodeOurs(Probe probe, byte[] bytes) {
+    if (probe.Format == ImageFormat.SamCoupeScreen)
+      return FileFormat.SamCoupeScreen.SamCoupeScreenFile.ToRawImage(
+        FileFormat.SamCoupeScreen.SamCoupeScreenReader.FromSpan(
+          bytes, FileFormat.SamCoupeScreen.SamCoupeScreenFile.ModeFromExtension(probe.Extension)));
+
     if (probe.Format == ImageFormat.MsxGl16)
       return FileFormat.MsxGl16.MsxGl16File.ToRawImage(
         FileFormat.MsxGl16.MsxGl16Reader.FromSpan(bytes, FileFormat.MsxGl16.MsxGl16File.ModeFromExtension(probe.Extension)));
@@ -138,6 +151,38 @@ public sealed class RecoilDecodeAgreementTests {
     for (var i = 4; i < data.Length; ++i)
       data[i] = (byte)(i * 11 + (i >> 4));
 
+    return data;
+  }
+
+  /// <summary>
+  /// A SAM Coupe screen with a filled bitmap, a full palette and optionally a run of line
+  /// interrupts spread down the picture.
+  /// </summary>
+  private static byte[] _SamCoupe(int mode, bool interrupts) {
+    var interruptOffset = mode switch { 1 => 6952, 2 => 14376, _ => 24616 };
+    var paletteOffset = interruptOffset - 40;
+
+    var records = interrupts ? new (byte Line, byte Entry, byte Color)[] {
+      (23, 0, 0x7F), (23, 5, 0x02), (79, 0, 0x24), (95, 12, 0x49), (150, 3, 0x76),
+    } : [];
+
+    var data = new byte[interruptOffset + records.Length * 4 + 1];
+    for (var i = 0; i < paletteOffset; ++i)
+      data[i] = (byte)(i * 37 + (i >> 6));
+
+    for (var i = 0; i < 16; ++i)
+      data[paletteOffset + i] = (byte)(i * 8 + 1);
+
+    var at = interruptOffset;
+    foreach (var (line, entry, color) in records) {
+      data[at] = line;
+      data[at + 1] = entry;
+      data[at + 2] = color;
+      data[at + 3] = 0;
+      at += 4;
+    }
+
+    data[at] = 0xFF;
     return data;
   }
 
