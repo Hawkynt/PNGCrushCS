@@ -14,10 +14,17 @@ public static class Commodore64Graphics {
   public const int ColorCount = 16;
 
   /// <summary>The fixed sixteen colours as 0xRRGGBB values, in hardware index order.</summary>
+  /// <remarks>
+  /// Measured from a VIC-II rather than idealised. The widely-copied table of round numbers
+  /// (0x880000 for red, 0xAAFFEE for cyan) is a reconstruction from the chip's documented voltage
+  /// levels and does not match a television: the real colours are duller, and the two greys are not
+  /// where an even ramp would put them. These are Pepto's measurements, which is what the reference
+  /// decoder uses, so our output and it agree exactly rather than approximately.
+  /// </remarks>
   public static ReadOnlySpan<int> HexColors => [
-    0x000000, 0xFFFFFF, 0x880000, 0xAAFFEE, 0xCC44CC, 0x00CC55,
-    0x0000AA, 0xEEEE77, 0xDD8855, 0x664400, 0xFF7777, 0x333333,
-    0x777777, 0xAAFF66, 0x0088FF, 0xBBBBBB
+    0x000000, 0xFFFFFF, 0x68372B, 0x70A4B2, 0x6F3D86, 0x588D43,
+    0x352879, 0xB8C76F, 0x6F4F25, 0x433900, 0x9A6759, 0x444444,
+    0x6C6C6C, 0x9AD284, 0x6C5EB5, 0x959595
   ];
 
   /// <summary>The palette as RGB triplets, ready for <see cref="RawImage.Palette"/>.</summary>
