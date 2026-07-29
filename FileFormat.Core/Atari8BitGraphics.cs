@@ -69,6 +69,45 @@ public static class Atari8BitGraphics {
   }
 
   /// <summary>
+  /// Unpacks an ANTIC mode F ("Graphics 9") row set into one luminance value (0..15) per logical
+  /// pixel. Mode 9 stores two nibbles per byte, and each nibble covers four screen pixels, so a
+  /// row of <paramref name="width"/> screen pixels occupies <c>width / 8</c> bytes.
+  /// </summary>
+  public static byte[] UnpackGr9(ReadOnlySpan<byte> data, int offset, int width, int rows) {
+    var bytesPerRow = width >> 3;
+    var pixels = new byte[width * rows];
+    for (var y = 0; y < rows; ++y)
+    for (var x = 0; x < width; ++x) {
+      var index = offset + y * bytesPerRow + (x >> 3);
+      if (index >= data.Length)
+        break;
+
+      // Nibbles run high first; each covers four consecutive pixels.
+      var shift = (~x & 4);
+      pixels[y * width + x] = (byte)((data[index] >> shift) & 15);
+    }
+
+    return pixels;
+  }
+
+  /// <summary>Packs luminance values (0..15) back into the Graphics 9 layout.</summary>
+  public static byte[] PackGr9(ReadOnlySpan<byte> pixels, int width, int rows) {
+    var bytesPerRow = width >> 3;
+    var data = new byte[bytesPerRow * rows];
+    for (var y = 0; y < rows; ++y)
+    for (var x = 0; x < width; x += 4) {
+      var source = y * width + x;
+      if (source >= pixels.Length)
+        break;
+
+      var shift = (~x & 4);
+      data[y * bytesPerRow + (x >> 3)] |= (byte)((pixels[source] & 15) << shift);
+    }
+
+    return data;
+  }
+
+  /// <summary>
   /// The 256-entry GTIA palette as RGB triplets, generated from the standard hue/luminance model
   /// rather than a captured table: the high nibble of a colour byte selects one of 15 hues on the
   /// NTSC colour burst (0 being grey), and the low nibble selects luminance.

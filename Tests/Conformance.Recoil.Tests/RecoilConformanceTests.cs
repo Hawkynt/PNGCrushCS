@@ -52,6 +52,8 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.Spectrum512Ext, "Spectrum 512 extended", 320, 199),
     new(ImageFormat.SyntheticArts, "Synthetic Arts", 640, 200),
     new(ImageFormat.MovieMakerBackground, "Movie Maker background", 320, 192),
+    new(ImageFormat.Graphics9Plus, "Graphics 9+", 320, 240),
+    new(ImageFormat.FloorDesigner, "Floor Designer", 256, 160),
   ];
 
   [Test]
