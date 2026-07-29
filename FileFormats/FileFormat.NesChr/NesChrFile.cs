@@ -104,8 +104,7 @@ public readonly record struct NesChrFile : IImageFormatReader<NesChrFile>, IImag
   /// <summary>Creates a NES CHR file from a platform-independent <see cref="RawImage"/>. Must be Indexed8 with at most 4 palette entries and width 128.</summary>
   public static NesChrFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException($"NES CHR requires Indexed8 pixel format, got {image.Format}.", nameof(image));
+    image = image.EnsureIndexed(PixelFormat.Indexed8, _DefaultPalette);
     if (image.Width != FixedWidth)
       throw new ArgumentException($"NES CHR requires width {FixedWidth}, got {image.Width}.", nameof(image));
     if (image.PaletteCount > 4)

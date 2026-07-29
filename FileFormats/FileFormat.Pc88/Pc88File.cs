@@ -40,8 +40,7 @@ public sealed class Pc88File : IImageFormatReader<Pc88File>, IImageToRawImage<Pc
 
   public static Pc88File FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed1)
-      throw new ArgumentException($"Expected Indexed1, got {image.Format}");
+    image = image.EnsureFormat(PixelFormat.Indexed1);
     if (image.Width != ImageWidth || image.Height != ImageHeight)
       throw new ArgumentException($"Expected {ImageWidth}x{ImageHeight}, got {image.Width}x{image.Height}");
     var pixels = image.PixelData[..];

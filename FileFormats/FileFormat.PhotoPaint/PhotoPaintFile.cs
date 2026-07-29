@@ -46,8 +46,7 @@ public readonly record struct PhotoPaintFile : IImageFormatReader<PhotoPaintFile
   /// <summary>Creates a PhotoPaint file from a <see cref="RawImage"/>. Must be Rgb24.</summary>
   public static PhotoPaintFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Rgb24)
-      throw new ArgumentException($"Expected {PixelFormat.Rgb24} but got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Rgb24);
 
     return new() {
       Width = image.Width,

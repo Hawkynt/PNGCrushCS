@@ -60,8 +60,7 @@ public readonly record struct PortfolioGraphicsFile : IImageFormatReader<Portfol
   /// <summary>Creates a Portfolio Graphics image from an Indexed1 raw image (240x64).</summary>
   public static PortfolioGraphicsFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed1)
-      throw new ArgumentException($"Expected {PixelFormat.Indexed1} but got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed1);
     if (image.Width != PixelWidth || image.Height != PixelHeight)
       throw new ArgumentException($"Expected {PixelWidth}x{PixelHeight} but got {image.Width}x{image.Height}.", nameof(image));
 

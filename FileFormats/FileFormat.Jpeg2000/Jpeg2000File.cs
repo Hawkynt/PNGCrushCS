@@ -41,16 +41,9 @@ public readonly record struct Jpeg2000File : IImageFormatReader<Jpeg2000File>, I
 
   public static Jpeg2000File FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    int componentCount;
-    byte[] pixelData;
-    if (image.Format == PixelFormat.Gray8) {
-      componentCount = 1;
-      pixelData = image.PixelData[..];
-    } else if (image.Format == PixelFormat.Rgb24) {
-      componentCount = 3;
-      pixelData = image.PixelData[..];
-    } else
-      throw new ArgumentException($"Expected {PixelFormat.Gray8} or {PixelFormat.Rgb24} but got {image.Format}.", nameof(image));
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Gray8);
+    var componentCount = image.Format == PixelFormat.Gray8 ? 1 : 3;
+    var pixelData = image.PixelData[..];
 
     return new() {
       Width = image.Width,

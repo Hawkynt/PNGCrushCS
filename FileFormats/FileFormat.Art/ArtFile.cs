@@ -35,8 +35,7 @@ public readonly record struct ArtFile : IImageFormatReader<ArtFile>, IImageToRaw
   /// <summary>Creates a single-tile ART file from an <see cref="RawImage"/>. Must be Indexed8.</summary>
   public static ArtFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException($"ART requires Indexed8 pixel format, got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed8);
 
     return new ArtFile {
       Tiles = [

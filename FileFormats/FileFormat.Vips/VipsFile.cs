@@ -56,6 +56,7 @@ public readonly record struct VipsFile : IImageFormatReader<VipsFile>, IImageToR
 
   public static VipsFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Gray8);
 
     return image.Format switch {
       PixelFormat.Gray8 => new() {

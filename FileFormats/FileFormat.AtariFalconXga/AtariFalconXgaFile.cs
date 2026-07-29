@@ -49,8 +49,7 @@ public readonly record struct AtariFalconXgaFile : IImageFormatReader<AtariFalco
 
   public static AtariFalconXgaFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Rgb24)
-      throw new ArgumentException($"Expected {PixelFormat.Rgb24} but got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Rgb24);
 
     var rgb24 = image.PixelData;
     var pixelCount = image.Width * image.Height;

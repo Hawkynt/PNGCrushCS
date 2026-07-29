@@ -83,6 +83,7 @@ public readonly record struct XwdFile : IImageFormatReader<XwdFile>, IImageToRaw
 
   public static XwdFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Bgra32, PixelFormat.Rgb24);
 
     var width = image.Width;
     var height = image.Height;

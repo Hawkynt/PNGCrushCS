@@ -37,6 +37,7 @@ public sealed class PdfFile : IImageFormatReader<PdfFile>, IImageToRawImage<PdfF
   /// <summary>Creates a single-image PDF from a <see cref="RawImage"/>.</summary>
   public static PdfFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Gray8);
     if (image.Format is not (PixelFormat.Rgb24 or PixelFormat.Gray8))
       throw new ArgumentException($"Expected Rgb24 or Gray8 but got {image.Format}.", nameof(image));
 

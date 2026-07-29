@@ -90,6 +90,7 @@ public readonly record struct IlbmFile : IImageFormatReader<IlbmFile>, IImageToR
   /// <summary>Creates an <see cref="IlbmFile"/> from a format-independent <see cref="RawImage"/>.</summary>
   public static IlbmFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Indexed8);
 
     byte[] pixelData;
     byte[]? palette;

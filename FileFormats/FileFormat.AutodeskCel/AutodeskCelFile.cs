@@ -64,8 +64,7 @@ public readonly record struct AutodeskCelFile : IImageFormatReader<AutodeskCelFi
 
   public static AutodeskCelFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException($"Expected {PixelFormat.Indexed8} but got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed8);
     if (image.PaletteCount > PaletteEntryCount)
       throw new ArgumentException($"Palette has {image.PaletteCount} entries but maximum is {PaletteEntryCount}.", nameof(image));
 

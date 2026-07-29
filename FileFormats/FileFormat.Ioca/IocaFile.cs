@@ -47,8 +47,7 @@ public readonly record struct IocaFile : IImageFormatReader<IocaFile>, IImageToR
   /// <summary>Creates an IOCA file from an Indexed1 raw image (monochrome).</summary>
   public static IocaFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed1)
-      throw new ArgumentException($"Expected {PixelFormat.Indexed1} but got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed1);
 
     var pixelData = image.PixelData[..];
 

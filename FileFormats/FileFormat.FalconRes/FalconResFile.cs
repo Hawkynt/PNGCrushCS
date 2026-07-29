@@ -55,8 +55,7 @@ public readonly record struct FalconResFile : IImageFormatReader<FalconResFile>,
 
   public static FalconResFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Rgb24)
-      throw new ArgumentException($"Expected {PixelFormat.Rgb24} but got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Rgb24);
     if (image.Width != 320 || image.Height != 240)
       throw new ArgumentException($"Expected 320x240 but got {image.Width}x{image.Height}.", nameof(image));
 

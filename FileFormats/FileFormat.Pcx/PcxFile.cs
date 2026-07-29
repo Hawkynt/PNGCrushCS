@@ -78,6 +78,9 @@ public readonly record struct PcxFile : IImageFormatReader<PcxFile>, IImageToRaw
   public static PcxFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
 
+    image = image.EnsureAnyFormat(
+      PixelFormat.Rgb24, PixelFormat.Indexed8, PixelFormat.Indexed4, PixelFormat.Indexed1);
+
     PcxColorMode colorMode;
     int bpp;
     byte[]? palette = null;

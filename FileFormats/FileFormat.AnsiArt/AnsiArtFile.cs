@@ -32,8 +32,7 @@ public readonly record struct AnsiArtFile : IImageFormatReader<AnsiArtFile>, IIm
 
   public static AnsiArtFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Rgb24)
-      throw new ArgumentException("ANSI quantizer expects PixelFormat.Rgb24 — convert first via PixelConverter.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Rgb24);
     var font = BitmapFont.Default;
     if (image.Width % font.CellWidth != 0 || image.Height % font.CellHeight != 0)
       throw new ArgumentException($"ANSI requires the source image to align to the {font.CellWidth}×{font.CellHeight} text-cell grid.", nameof(image));

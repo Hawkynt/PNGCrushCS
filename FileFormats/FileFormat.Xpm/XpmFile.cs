@@ -41,8 +41,7 @@ public readonly record struct XpmFile : IImageFormatReader<XpmFile>, IImageToRaw
 
   public static XpmFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException($"Expected {PixelFormat.Indexed8} but got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed8);
 
     int? transparentIndex = null;
     if (image.AlphaTable != null) {

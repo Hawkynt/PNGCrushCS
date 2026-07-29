@@ -54,8 +54,7 @@ public readonly record struct HighResAtariFile : IImageFormatReader<HighResAtari
   /// <summary>Creates a Hi-Res Paint image from an Indexed1 raw image (320x192).</summary>
   public static HighResAtariFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed1)
-      throw new ArgumentException($"Expected {PixelFormat.Indexed1} but got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed1);
     if (image.Width != PixelWidth || image.Height != PixelHeight)
       throw new ArgumentException($"Expected {PixelWidth}x{PixelHeight} but got {image.Width}x{image.Height}.", nameof(image));
 

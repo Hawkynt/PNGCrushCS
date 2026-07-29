@@ -35,6 +35,7 @@ public sealed class RiscOsSpriteFile : IImageFormatReader<RiscOsSpriteFile>, IIm
 
   public static RiscOsSpriteFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Indexed8, PixelFormat.Indexed1);
 
     byte[] pixels;
     if (image.Format == PixelFormat.Rgb24) {

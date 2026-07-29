@@ -86,6 +86,7 @@ public readonly record struct ViffFile : IImageFormatReader<ViffFile>, IImageToR
 
   public static ViffFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Gray8);
 
     switch (image.Format) {
       case PixelFormat.Gray8:

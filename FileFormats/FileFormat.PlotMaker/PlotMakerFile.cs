@@ -41,8 +41,7 @@ public readonly record struct PlotMakerFile : IImageFormatReader<PlotMakerFile>,
   /// <summary>Creates a Plot Maker image from a platform-independent <see cref="RawImage"/>. Requires Indexed1 format.</summary>
   public static PlotMakerFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed1)
-      throw new ArgumentException($"Expected {PixelFormat.Indexed1} but got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed1);
 
     return new() {
       Width = (ushort)image.Width,

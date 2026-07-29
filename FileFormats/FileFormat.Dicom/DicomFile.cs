@@ -52,6 +52,7 @@ public readonly record struct DicomFile : IImageFormatReader<DicomFile>, IImageT
 
   public static DicomFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Gray16, PixelFormat.Gray8);
 
     return image.Format switch {
       PixelFormat.Gray8 => new() {

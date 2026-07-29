@@ -33,8 +33,7 @@ public readonly record struct PsionPicFile : IImageFormatReader<PsionPicFile>, I
 
   public static PsionPicFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed1)
-      throw new ArgumentException("RawImage must use PixelFormat.Indexed1.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed1);
     return new() {
       Width = image.Width,
       Height = image.Height,

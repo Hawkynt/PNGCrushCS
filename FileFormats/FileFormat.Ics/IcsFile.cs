@@ -53,6 +53,7 @@ public readonly record struct IcsFile : IImageFormatReader<IcsFile>, IImageToRaw
 
   public static IcsFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Gray8);
 
     switch (image.Format) {
       case PixelFormat.Gray8:

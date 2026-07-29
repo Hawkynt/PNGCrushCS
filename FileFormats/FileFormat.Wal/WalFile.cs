@@ -35,8 +35,7 @@ public readonly record struct WalFile : IImageFormatReader<WalFile>, IImageToRaw
   /// <summary>Creates a WAL file from a <see cref="RawImage"/>. Must be Indexed8.</summary>
   public static WalFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException($"WAL requires Indexed8 pixel format, got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed8);
 
     return new WalFile {
       Name = "texture",

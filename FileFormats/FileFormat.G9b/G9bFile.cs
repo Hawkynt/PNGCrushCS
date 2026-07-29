@@ -45,6 +45,7 @@ public readonly record struct G9bFile() : IImageFormatReader<G9bFile>, IImageToR
   /// <summary>Creates a G9B image from a platform-independent <see cref="RawImage"/>.</summary>
   public static G9bFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Gray8);
 
     return image.Format switch {
       PixelFormat.Gray8 => _FromGray8(image),

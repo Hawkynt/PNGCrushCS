@@ -38,8 +38,7 @@ public readonly record struct SegaGenTileFile : IImageFormatReader<SegaGenTileFi
 
   public static SegaGenTileFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException($"Sega Genesis tile requires Indexed8 pixel format, got {image.Format}.", nameof(image));
+    image = image.EnsureIndexed(PixelFormat.Indexed8, _DefaultPalette);
     if (image.Width != FixedWidth)
       throw new ArgumentException($"Sega Genesis tile requires width {FixedWidth}, got {image.Width}.", nameof(image));
     if (image.PaletteCount > 16)

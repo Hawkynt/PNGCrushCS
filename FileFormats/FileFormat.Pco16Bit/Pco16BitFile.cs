@@ -53,6 +53,7 @@ public readonly record struct Pco16BitFile : IImageFormatReader<Pco16BitFile>, I
   /// <summary>Creates a PCO 16-bit grayscale file from a <see cref="RawImage"/>.</summary>
   public static Pco16BitFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Gray16, PixelFormat.Gray8);
 
     var pixelCount = image.Width * image.Height;
     var pixelData = new byte[pixelCount * 2];

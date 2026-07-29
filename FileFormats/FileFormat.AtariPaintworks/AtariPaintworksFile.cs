@@ -56,8 +56,7 @@ public readonly record struct AtariPaintworksFile : IImageFormatReader<AtariPain
 
   public static AtariPaintworksFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException("RawImage must use PixelFormat.Indexed8.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed8);
 
     var resolution = (image.Width, image.Height) switch {
       (640, 400) => AtariPaintworksResolution.High,

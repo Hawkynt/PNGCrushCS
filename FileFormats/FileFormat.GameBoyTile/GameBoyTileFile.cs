@@ -67,8 +67,7 @@ public readonly record struct GameBoyTileFile : IImageFormatReader<GameBoyTileFi
   /// <summary>Creates a Game Boy tile file from a <see cref="RawImage"/>. Must be Indexed8 with width 128.</summary>
   public static GameBoyTileFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException($"Game Boy tile data requires Indexed8 pixel format, got {image.Format}.", nameof(image));
+    image = image.EnsureIndexed(PixelFormat.Indexed8, _DefaultPalette);
     if (image.Width != TilesPerRow * TileSize)
       throw new ArgumentException($"Game Boy tile data requires width {TilesPerRow * TileSize}, got {image.Width}.", nameof(image));
 

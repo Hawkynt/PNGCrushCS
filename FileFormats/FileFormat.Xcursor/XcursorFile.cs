@@ -71,8 +71,7 @@ public readonly record struct XcursorFile : IImageFormatReader<XcursorFile>, IIm
   /// <summary>Creates an Xcursor image from a platform-independent <see cref="RawImage"/> with straight alpha, converting to premultiplied ARGB.</summary>
   public static XcursorFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Rgba32)
-      throw new ArgumentException($"Expected {PixelFormat.Rgba32} but got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Rgba32);
 
     var pixelCount = image.Width * image.Height;
     var argb = new byte[pixelCount * 4];

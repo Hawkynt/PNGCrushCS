@@ -74,8 +74,7 @@ public readonly record struct Lss16File : IImageFormatReader<Lss16File>, IImageT
 
   public static Lss16File FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException($"Expected {PixelFormat.Indexed8} but got {image.Format}.", nameof(image));
+    image = image.EnsureIndexed(PixelFormat.Indexed8, _DefaultPalette);
     if (image.PaletteCount > PaletteEntryCount)
       throw new ArgumentException($"LSS16 supports at most {PaletteEntryCount} palette entries, got {image.PaletteCount}.", nameof(image));
     if (image.Palette == null)

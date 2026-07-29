@@ -75,8 +75,7 @@ public readonly record struct MsxScreen8File : IImageFormatReader<MsxScreen8File
   /// <summary>Creates an MSX Screen 8 image from a platform-independent <see cref="RawImage"/>.</summary>
   public static MsxScreen8File FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Rgb24)
-      throw new ArgumentException($"RawImage must use Rgb24 format, got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Rgb24);
     if (image.Width != FixedWidth || image.Height != FixedHeight)
       throw new ArgumentException($"RawImage must be {FixedWidth}x{FixedHeight}, got {image.Width}x{image.Height}.", nameof(image));
 

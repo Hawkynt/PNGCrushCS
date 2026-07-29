@@ -34,8 +34,7 @@ public readonly record struct CsvImageFile : IImageFormatReader<CsvImageFile>, I
 
   public static CsvImageFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Gray8)
-      throw new ArgumentException($"Expected {PixelFormat.Gray8} but got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Gray8);
 
     return new() {
       Width = image.Width,

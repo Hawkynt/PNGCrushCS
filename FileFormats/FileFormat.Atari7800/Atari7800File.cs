@@ -42,8 +42,7 @@ public sealed class Atari7800File : IImageFormatReader<Atari7800File>, IImageToR
 
   public static Atari7800File FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException($"Expected Indexed8, got {image.Format}");
+    image = image.EnsureFormat(PixelFormat.Indexed8);
     if (image.Width != ImageWidth || image.Height != ImageHeight)
       throw new ArgumentException($"Expected {ImageWidth}x{ImageHeight}, got {image.Width}x{image.Height}");
     var pixels = image.PixelData[..];

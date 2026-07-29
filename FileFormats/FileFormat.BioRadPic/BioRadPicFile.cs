@@ -74,6 +74,7 @@ public readonly record struct BioRadPicFile : IImageFormatReader<BioRadPicFile>,
 
   public static BioRadPicFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Gray16, PixelFormat.Gray8);
 
     bool isByte;
     switch (image.Format) {

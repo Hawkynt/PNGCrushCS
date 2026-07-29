@@ -69,6 +69,7 @@ public readonly record struct PalmFile : IImageFormatReader<PalmFile>, IImageToR
 
   public static PalmFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Rgb565, PixelFormat.Indexed8, PixelFormat.Indexed1);
 
     switch (image.Format) {
       case PixelFormat.Indexed8:

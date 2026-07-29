@@ -41,8 +41,7 @@ public readonly record struct C16Plus4File : IImageFormatReader<C16Plus4File>, I
 
   public static C16Plus4File FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException($"Expected Indexed8 but got {image.Format}.", nameof(image));
+    image = image.EnsureIndexed(PixelFormat.Indexed8, _DefaultPalette);
     if (image.Width != FixedWidth || image.Height != FixedHeight)
       throw new ArgumentException($"Expected {FixedWidth}x{FixedHeight} but got {image.Width}x{image.Height}.", nameof(image));
 

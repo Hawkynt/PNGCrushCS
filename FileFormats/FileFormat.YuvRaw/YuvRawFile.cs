@@ -79,8 +79,7 @@ public readonly record struct YuvRawFile : IImageFormatReader<YuvRawFile>, IImag
   /// <summary>Creates a YUV 4:2:0 image from an Rgb24 raw image.</summary>
   public static YuvRawFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Rgb24)
-      throw new ArgumentException($"Expected {PixelFormat.Rgb24} but got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Rgb24);
 
     var w = image.Width;
     var h = image.Height;

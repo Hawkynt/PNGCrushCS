@@ -212,6 +212,7 @@ public readonly record struct AcornFile : IImageFormatReader<AcornFile>, IImageT
   /// <summary>Creates an <see cref="AcornFile"/> from a format-independent <see cref="RawImage"/>.</summary>
   public static AcornFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Indexed8);
 
     var width = image.Width;
     var height = image.Height;

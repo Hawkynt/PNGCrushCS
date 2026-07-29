@@ -49,8 +49,7 @@ public readonly record struct MonoStarFile : IImageFormatReader<MonoStarFile>, I
 
   public static MonoStarFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed1)
-      throw new ArgumentException("RawImage must use PixelFormat.Indexed1.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed1);
     if (image.Width != _WIDTH)
       throw new ArgumentException($"MonoStar images must be exactly {_WIDTH} pixels wide.", nameof(image));
     if (image.Height != _HEIGHT)

@@ -46,8 +46,7 @@ public readonly record struct MagicPainterFile : IImageFormatReader<MagicPainter
   /// <summary>Creates a Magic Painter image from a platform-independent <see cref="RawImage"/>.</summary>
   public static MagicPainterFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException("RawImage must use PixelFormat.Indexed8.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed8);
     if (image.Width < 1 || image.Width > 65535)
       throw new ArgumentOutOfRangeException(nameof(image), "MGP width must be in the range 1..65535.");
     if (image.Height < 1 || image.Height > 65535)

@@ -50,6 +50,7 @@ public readonly record struct DigiViewFile : IImageFormatReader<DigiViewFile>, I
   /// <summary>Creates a DigiView image from a platform-independent <see cref="RawImage"/>. Accepts Gray8 or Rgb24 formats.</summary>
   public static DigiViewFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Gray8);
 
     return image.Format switch {
       PixelFormat.Gray8 => new() {

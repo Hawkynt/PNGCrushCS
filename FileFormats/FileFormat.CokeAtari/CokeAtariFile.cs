@@ -49,6 +49,7 @@ public readonly record struct CokeAtariFile : IImageFormatReader<CokeAtariFile>,
 
   public static CokeAtariFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Indexed8, PixelFormat.Indexed1);
 
     var pixelCount = image.Width * image.Height;
     var rgb565 = new byte[pixelCount * 2];

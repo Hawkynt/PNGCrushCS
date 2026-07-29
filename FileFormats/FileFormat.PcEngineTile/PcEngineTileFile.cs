@@ -74,8 +74,7 @@ public readonly record struct PcEngineTileFile : IImageFormatReader<PcEngineTile
   /// <summary>Creates a PC Engine tile file from a platform-independent <see cref="RawImage"/>. Must be Indexed8 with at most 16 palette entries and width 128.</summary>
   public static PcEngineTileFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException($"PC Engine tile data requires Indexed8 pixel format, got {image.Format}.", nameof(image));
+    image = image.EnsureIndexed(PixelFormat.Indexed8, _DefaultPalette);
     if (image.Width != FixedWidth)
       throw new ArgumentException($"PC Engine tile data requires width {FixedWidth}, got {image.Width}.", nameof(image));
     if (image.PaletteCount > PaletteEntryCount)

@@ -31,8 +31,7 @@ public readonly record struct SixelFile : IImageFormatReader<SixelFile>, IImageT
 
   public static SixelFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException($"Expected {PixelFormat.Indexed8} but got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed8);
 
     return new() {
       Width = image.Width,

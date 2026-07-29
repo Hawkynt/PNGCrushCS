@@ -80,8 +80,7 @@ public readonly record struct CoCo3File : IImageFormatReader<CoCo3File>, IImageT
   /// <summary>Creates a CoCo 3 screen from an Indexed8 raw image (320x200).</summary>
   public static CoCo3File FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException($"Expected {PixelFormat.Indexed8} but got {image.Format}.", nameof(image));
+    image = image.EnsureIndexed(PixelFormat.Indexed8, _DefaultPalette);
     if (image.Width != PixelWidth || image.Height != PixelHeight)
       throw new ArgumentException($"Expected {PixelWidth}x{PixelHeight} but got {image.Width}x{image.Height}.", nameof(image));
 

@@ -58,6 +58,7 @@ public readonly record struct PictFile : IImageFormatReader<PictFile>, IImageToR
   /// <summary>Creates a <see cref="PictFile"/> from a format-independent <see cref="RawImage"/>.</summary>
   public static PictFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Indexed8);
 
     switch (image.Format) {
       case PixelFormat.Rgb24:

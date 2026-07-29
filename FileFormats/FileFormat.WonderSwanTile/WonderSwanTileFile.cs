@@ -38,8 +38,7 @@ public readonly record struct WonderSwanTileFile : IImageFormatReader<WonderSwan
 
   public static WonderSwanTileFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException($"WonderSwanTile tile data requires Indexed8 pixel format, got {image.Format}.", nameof(image));
+    image = image.EnsureIndexed(PixelFormat.Indexed8, _DefaultPalette);
     if (image.Width != TilesPerRow * TileSize)
       throw new ArgumentException($"WonderSwanTile tile data requires width {TilesPerRow * TileSize}, got {image.Width}.", nameof(image));
 

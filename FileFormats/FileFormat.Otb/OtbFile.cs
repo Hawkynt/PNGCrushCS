@@ -33,8 +33,7 @@ public readonly record struct OtbFile : IImageFormatReader<OtbFile>, IImageToRaw
 
   public static OtbFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed1)
-      throw new ArgumentException("RawImage must use PixelFormat.Indexed1.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed1);
     if (image.Width is < 1 or > 255)
       throw new ArgumentOutOfRangeException(nameof(image), "OTB width must be in the range 1..255.");
     if (image.Height is < 1 or > 255)

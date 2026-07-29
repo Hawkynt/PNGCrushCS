@@ -53,6 +53,7 @@ public sealed class DngFile : IImageFormatReader<DngFile>, IImageToRawImage<DngF
 
   public static DngFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Gray8);
     var (samplesPerPixel, bitsPerSample, photometric) = image.Format switch {
       PixelFormat.Gray8 => (1, 8, DngPhotometric.BlackIsZero),
       PixelFormat.Rgb24 => (3, 8, DngPhotometric.Rgb),

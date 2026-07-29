@@ -53,6 +53,7 @@ public readonly record struct JpegLsFile : IImageFormatReader<JpegLsFile>, IImag
 
   public static JpegLsFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Rgb48, PixelFormat.Gray16, PixelFormat.Gray8);
 
     int componentCount;
     int bitsPerSample;

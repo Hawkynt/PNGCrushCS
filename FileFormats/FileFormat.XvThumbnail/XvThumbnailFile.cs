@@ -49,6 +49,7 @@ public readonly record struct XvThumbnailFile : IImageFormatReader<XvThumbnailFi
   /// <summary>Creates an XV thumbnail from a platform-independent RGB24, Indexed1, or Indexed8 image.</summary>
   public static XvThumbnailFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Indexed8, PixelFormat.Indexed1);
 
     var pixelCount = image.Width * image.Height;
     var packed = new byte[pixelCount];

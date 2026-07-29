@@ -93,8 +93,7 @@ public readonly record struct CharSet64File : IImageFormatReader<CharSet64File>,
   /// <summary>Creates a C64 character set from an Indexed1 128x128 raw image.</summary>
   public static CharSet64File FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed1)
-      throw new ArgumentException($"Expected {PixelFormat.Indexed1} but got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed1);
     if (image.Width != PixelWidth || image.Height != PixelHeight)
       throw new ArgumentException($"Expected {PixelWidth}x{PixelHeight} but got {image.Width}x{image.Height}.", nameof(image));
 

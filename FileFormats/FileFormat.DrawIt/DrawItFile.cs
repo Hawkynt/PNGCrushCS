@@ -49,8 +49,7 @@ public readonly record struct DrawItFile : IImageFormatReader<DrawItFile>, IImag
 
   public static DrawItFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException("RawImage must use PixelFormat.Indexed8.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed8);
     if (image.Width is < 1 or > 65535)
       throw new ArgumentOutOfRangeException(nameof(image), "DrawIt width must be in the range 1..65535.");
     if (image.Height is < 1 or > 65535)

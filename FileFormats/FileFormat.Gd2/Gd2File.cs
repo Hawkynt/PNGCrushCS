@@ -72,8 +72,7 @@ public readonly record struct Gd2File() : IImageFormatReader<Gd2File>, IImageToR
 
   public static Gd2File FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Rgba32)
-      throw new ArgumentException($"Expected {PixelFormat.Rgba32} but got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Rgba32);
 
     var pixelCount = image.Width * image.Height;
     var gd2Pixels = new byte[pixelCount * 4];

@@ -38,6 +38,7 @@ public readonly record struct FbmFile : IImageFormatReader<FbmFile>, IImageToRaw
 
   public static FbmFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Gray8);
     if (image.Format is not (PixelFormat.Gray8 or PixelFormat.Rgb24))
       throw new ArgumentException($"Expected {PixelFormat.Gray8} or {PixelFormat.Rgb24} but got {image.Format}.", nameof(image));
 

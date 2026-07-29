@@ -86,8 +86,7 @@ public readonly record struct FullscreenKitFile : IImageFormatReader<FullscreenK
 
   public static FullscreenKitFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException("RawImage must use PixelFormat.Indexed8.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed8);
 
     var width = image.Width;
     var height = image.Height;

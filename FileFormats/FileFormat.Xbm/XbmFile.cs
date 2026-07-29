@@ -49,8 +49,7 @@ public readonly record struct XbmFile : IImageFormatReader<XbmFile>, IImageToRaw
 
   public static XbmFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed1)
-      throw new ArgumentException("RawImage must use PixelFormat.Indexed1.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed1);
 
     var lsb = new byte[image.PixelData.Length];
     for (var i = 0; i < image.PixelData.Length; ++i)

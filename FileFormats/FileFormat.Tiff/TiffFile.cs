@@ -149,6 +149,10 @@ public sealed class TiffFile :
   public static TiffFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
 
+    image = image.EnsureAnyFormat(
+      PixelFormat.Rgb24, PixelFormat.Rgb48, PixelFormat.Gray16, PixelFormat.Gray8,
+      PixelFormat.Indexed8, PixelFormat.Indexed1);
+
     int samplesPerPixel;
     int bitsPerSample;
     TiffColorMode colorMode;

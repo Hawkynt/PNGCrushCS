@@ -34,8 +34,7 @@ public readonly record struct SunIconFile : IImageFormatReader<SunIconFile>, IIm
 
   public static SunIconFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed1)
-      throw new ArgumentException("RawImage must use PixelFormat.Indexed1.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed1);
 
     return new() {
       Width = image.Width,

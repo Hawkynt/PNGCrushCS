@@ -48,8 +48,7 @@ public readonly record struct ImagicPaintFile : IImageFormatReader<ImagicPaintFi
 
   public static ImagicPaintFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException("RawImage must use PixelFormat.Indexed8.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed8);
     if (image.Width != 320)
       throw new ArgumentException("Imagic Paint images must be exactly 320 pixels wide.", nameof(image));
     if (image.Height != 200)

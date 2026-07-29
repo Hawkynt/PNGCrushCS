@@ -90,8 +90,7 @@ public readonly record struct DuneGraphFile : IImageFormatReader<DuneGraphFile>,
 
   public static DuneGraphFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException($"Expected {PixelFormat.Indexed8} but got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed8);
     if (image.Width != FixedWidth || image.Height != FixedHeight)
       throw new ArgumentException($"Expected {FixedWidth}x{FixedHeight} but got {image.Width}x{image.Height}.", nameof(image));
     if (image.Palette == null || image.Palette.Length < 3)

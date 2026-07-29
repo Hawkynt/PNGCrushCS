@@ -58,6 +58,7 @@ public readonly record struct SpotImageFile : IImageFormatReader<SpotImageFile>,
   /// <summary>Creates a SPOT image from a Gray8 or Rgb24 raw image.</summary>
   public static SpotImageFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Gray8);
     if (image.Format != PixelFormat.Gray8 && image.Format != PixelFormat.Rgb24)
       throw new ArgumentException($"Expected {PixelFormat.Gray8} or {PixelFormat.Rgb24} but got {image.Format}.", nameof(image));
 

@@ -105,8 +105,7 @@ public sealed class ZxNextFile :
   /// <summary>Creates a ZxNextFile from an Indexed8 RawImage.</summary>
   public static ZxNextFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new NotSupportedException($"ZxNextFile requires Indexed8 format, got {image.Format}.");
+    image = image.EnsureFormat(PixelFormat.Indexed8);
     if (image.Width != 256 || image.Height != 192)
       throw new NotSupportedException($"ZxNextFile requires 256x192 dimensions, got {image.Width}x{image.Height}.");
 

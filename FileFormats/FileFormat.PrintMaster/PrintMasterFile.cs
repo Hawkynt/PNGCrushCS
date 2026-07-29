@@ -47,8 +47,7 @@ public readonly record struct PrintMasterFile : IImageFormatReader<PrintMasterFi
   /// <summary>Creates a Print Master image from an Indexed1 raw image.</summary>
   public static PrintMasterFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed1)
-      throw new ArgumentException($"Expected {PixelFormat.Indexed1} but got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed1);
 
     var pixelData = image.PixelData[..];
 

@@ -39,6 +39,7 @@ public readonly record struct IffRgbnFile : IImageFormatReader<IffRgbnFile>, IIm
   /// <summary>Creates an <see cref="IffRgbnFile"/> from a format-independent <see cref="RawImage"/>. Accepts Rgb24, Indexed1, or Indexed8.</summary>
   public static IffRgbnFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Indexed8, PixelFormat.Indexed1);
 
     byte[] pixels;
     if (image.Format == PixelFormat.Rgb24) {

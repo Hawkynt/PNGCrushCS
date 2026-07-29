@@ -79,6 +79,7 @@ public readonly record struct ScitexCtFile : IImageFormatReader<ScitexCtFile>, I
   /// <summary>Creates a Scitex CT file from a platform-independent <see cref="RawImage"/>.</summary>
   public static ScitexCtFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Gray8);
 
     return image.Format switch {
       PixelFormat.Gray8 => new() {

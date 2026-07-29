@@ -67,6 +67,7 @@ public readonly record struct NokiaOperatorLogoFile : IImageFormatReader<NokiaOp
   /// <summary>Creates a <see cref="NokiaOperatorLogoFile"/> from a <see cref="RawImage"/>.</summary>
   public static NokiaOperatorLogoFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Indexed1);
     if (image.Format != PixelFormat.Rgb24 && image.Format != PixelFormat.Indexed1)
       throw new ArgumentException($"Expected Rgb24 or Indexed1 but got {image.Format}.", nameof(image));
     if (image.Width is < 1 or > 255 || image.Height is < 1 or > 255)

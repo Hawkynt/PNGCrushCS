@@ -29,13 +29,8 @@ public readonly record struct QoiFile : IImageFormatReader<QoiFile>, IImageToRaw
 
   public static QoiFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    QoiChannels channels;
-    if (image.Format == PixelFormat.Rgb24)
-      channels = QoiChannels.Rgb;
-    else if (image.Format == PixelFormat.Rgba32)
-      channels = QoiChannels.Rgba;
-    else
-      throw new ArgumentException($"Expected {PixelFormat.Rgb24} or {PixelFormat.Rgba32} but got {image.Format}.", nameof(image));
+    image = image.EnsureAnyFormat(PixelFormat.Rgba32, PixelFormat.Rgb24);
+    var channels = image.Format == PixelFormat.Rgb24 ? QoiChannels.Rgb : QoiChannels.Rgba;
 
     return new() {
       Width = image.Width,

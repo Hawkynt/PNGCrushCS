@@ -51,8 +51,7 @@ public readonly record struct SyntheticArtsFile : IImageFormatReader<SyntheticAr
 
   public static SyntheticArtsFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException("RawImage must use PixelFormat.Indexed8.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed8);
     if (image.Width != ImageWidth)
       throw new ArgumentException($"Synthetic Arts images must be exactly {ImageWidth} pixels wide.", nameof(image));
     if (image.Height != ImageHeight)

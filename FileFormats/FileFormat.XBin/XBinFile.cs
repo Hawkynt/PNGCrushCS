@@ -45,8 +45,7 @@ public readonly record struct XBinFile : IImageFormatReader<XBinFile>, IImageFor
 
   public static XBinFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Rgb24)
-      throw new ArgumentException("XBIN quantizer expects PixelFormat.Rgb24 — convert first via PixelConverter.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Rgb24);
     var font = BitmapFont.Default;
     if (image.Width % font.CellWidth != 0 || image.Height % font.CellHeight != 0)
       throw new ArgumentException($"XBIN requires the source image to align to the {font.CellWidth}×{font.CellHeight} text-cell grid.", nameof(image));

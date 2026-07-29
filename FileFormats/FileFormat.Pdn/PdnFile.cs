@@ -35,8 +35,7 @@ public readonly record struct PdnFile : IImageFormatReader<PdnFile>, IImageToRaw
 
   public static PdnFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Bgra32)
-      throw new ArgumentException($"Expected {PixelFormat.Bgra32} but got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Bgra32);
 
     return new() {
       Width = image.Width,

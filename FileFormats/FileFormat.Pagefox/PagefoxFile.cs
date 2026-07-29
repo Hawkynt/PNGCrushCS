@@ -65,8 +65,7 @@ public readonly record struct PagefoxFile : IImageFormatReader<PagefoxFile>, IIm
   /// <summary>Creates a Pagefox image from an Indexed1 640x200 raw image.</summary>
   public static PagefoxFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed1)
-      throw new ArgumentException($"Expected {PixelFormat.Indexed1} but got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed1);
     if (image.Width != PixelWidth || image.Height != PixelHeight)
       throw new ArgumentException($"Expected {PixelWidth}x{PixelHeight} but got {image.Width}x{image.Height}.", nameof(image));
 

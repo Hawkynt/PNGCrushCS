@@ -27,8 +27,7 @@ public readonly record struct AvsFile : IImageFormatReader<AvsFile>, IImageToRaw
 
   public static AvsFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Argb32)
-      throw new ArgumentException($"Expected {PixelFormat.Argb32} but got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Argb32);
 
     return new() {
       Width = image.Width,

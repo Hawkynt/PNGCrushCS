@@ -59,8 +59,7 @@ public readonly record struct ColoRixFile : IImageFormatReader<ColoRixFile>, IIm
   /// <summary>Creates a ColoRIX file from a <see cref="RawImage"/>. Must be Indexed8 with a 256-entry palette.</summary>
   public static ColoRixFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException($"ColoRIX requires Indexed8 pixel format, got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed8);
     if (image.Palette == null || image.Palette.Length < PaletteSize)
       throw new ArgumentException("ColoRIX requires a 256-entry RGB palette.", nameof(image));
 

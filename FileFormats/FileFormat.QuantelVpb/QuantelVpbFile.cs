@@ -49,8 +49,7 @@ public readonly record struct QuantelVpbFile : IImageFormatReader<QuantelVpbFile
 
   public static QuantelVpbFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Rgb24)
-      throw new ArgumentException($"Expected {PixelFormat.Rgb24} but got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Rgb24);
 
     return new() {
       Width = image.Width,

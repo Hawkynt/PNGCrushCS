@@ -46,8 +46,7 @@ public sealed class Olpc565File :
 
   public static Olpc565File FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Rgb24)
-      throw new ArgumentException($"Expected {PixelFormat.Rgb24} but got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Rgb24);
 
     var pixelCount = image.Width * image.Height;
     var pixelData = new byte[pixelCount * 2];

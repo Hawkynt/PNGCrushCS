@@ -45,8 +45,7 @@ public readonly record struct GeoPaintFile : IImageFormatReader<GeoPaintFile>, I
 
   public static GeoPaintFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed1)
-      throw new ArgumentException("RawImage must use PixelFormat.Indexed1.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed1);
     if (image.Width != FixedWidth)
       throw new ArgumentException($"Expected width {FixedWidth} but got {image.Width}.", nameof(image));
     if (image.Height < 1 || image.Height > MaxHeight)

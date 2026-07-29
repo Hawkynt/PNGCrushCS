@@ -57,8 +57,7 @@ public readonly record struct AtariCompressedFile : IImageFormatReader<AtariComp
   /// <summary>Creates an Atari Compressed Screen from an Indexed1 raw image (320x192).</summary>
   public static AtariCompressedFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed1)
-      throw new ArgumentException($"Expected {PixelFormat.Indexed1} but got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed1);
     if (image.Width != DefaultWidth || image.Height != DefaultHeight)
       throw new ArgumentException($"Expected {DefaultWidth}x{DefaultHeight} but got {image.Width}x{image.Height}.", nameof(image));
 

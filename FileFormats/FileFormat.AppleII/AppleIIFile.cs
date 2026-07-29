@@ -61,8 +61,7 @@ public sealed class AppleIIFile :
   public static AppleIIFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
 
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException("Only Indexed8 format is supported.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed8);
 
     if (image.PaletteCount > 2)
       throw new ArgumentException("At most 2 palette entries are supported.", nameof(image));

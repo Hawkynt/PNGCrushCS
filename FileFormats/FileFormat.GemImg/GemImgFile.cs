@@ -59,8 +59,7 @@ public readonly record struct GemImgFile : IImageFormatReader<GemImgFile>, IImag
   /// <summary>Creates a <see cref="GemImgFile"/> from a format-independent <see cref="RawImage"/>.</summary>
   public static GemImgFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException($"Expected {PixelFormat.Indexed8} but got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed8);
 
     var numPlanes = Math.Max(1, (int)Math.Ceiling(Math.Log2(Math.Max(image.PaletteCount, 2))));
     var planar = PlanarConverter.ChunkyToNonInterleavedPlanar(image.PixelData, image.Width, image.Height, numPlanes);

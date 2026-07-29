@@ -32,8 +32,7 @@ public readonly record struct KritaFile : IImageFormatReader<KritaFile>, IImageT
 
   public static KritaFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Rgba32)
-      throw new ArgumentException($"Expected {PixelFormat.Rgba32} but got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Rgba32);
 
     return new() {
       Width = image.Width,

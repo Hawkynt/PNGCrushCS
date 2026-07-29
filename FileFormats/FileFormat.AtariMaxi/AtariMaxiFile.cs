@@ -71,8 +71,7 @@ public readonly record struct AtariMaxiFile : IImageFormatReader<AtariMaxiFile>,
   /// <summary>Creates a Maxi file from a platform-independent <see cref="RawImage"/>.</summary>
   public static AtariMaxiFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException($"Expected {PixelFormat.Indexed8} but got {image.Format}.", nameof(image));
+    image = image.EnsureIndexed(PixelFormat.Indexed8, _DefaultPalette);
     if (image.Width != FixedWidth || image.Height != FixedHeight)
       throw new ArgumentException($"Expected {FixedWidth}x{FixedHeight} but got {image.Width}x{image.Height}.", nameof(image));
     if (image.PaletteCount > 4)

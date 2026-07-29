@@ -159,6 +159,7 @@ public sealed class BigTiffFile : IImageFormatReader<BigTiffFile>, IImageToRawIm
 
   public static BigTiffFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Rgb48, PixelFormat.Gray16, PixelFormat.Gray8);
 
     int samplesPerPixel;
     int bitsPerSample;

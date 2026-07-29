@@ -165,6 +165,7 @@ public readonly record struct SunRasterFile : IImageFormatReader<SunRasterFile>,
 
   public static SunRasterFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Bgra32, PixelFormat.Bgr24, PixelFormat.Gray8, PixelFormat.Indexed8, PixelFormat.Indexed1);
     var width = image.Width;
     var height = image.Height;
     switch (image.Format) {

@@ -35,6 +35,7 @@ public sealed class SharpX68kFile : IImageFormatReader<SharpX68kFile>, IImageToR
 
   public static SharpX68kFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Indexed8, PixelFormat.Indexed1);
 
     byte[] pixels;
     if (image.Format == PixelFormat.Rgb24) {

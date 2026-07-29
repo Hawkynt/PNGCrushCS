@@ -60,8 +60,7 @@ public readonly record struct QuantumPaintFile : IImageFormatReader<QuantumPaint
 
   public static QuantumPaintFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException("RawImage must use PixelFormat.Indexed8.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed8);
     if (image.Width != PixelWidth)
       throw new ArgumentException($"QuantumPaint images must be exactly {PixelWidth} pixels wide.", nameof(image));
     if (image.Height != PixelHeight)

@@ -50,13 +50,8 @@ public readonly record struct JpegFile :
   public static JpegFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
 
-    bool isGrayscale;
-    if (image.Format == PixelFormat.Gray8)
-      isGrayscale = true;
-    else if (image.Format == PixelFormat.Rgb24)
-      isGrayscale = false;
-    else
-      throw new ArgumentException($"Expected {PixelFormat.Rgb24} or {PixelFormat.Gray8} but got {image.Format}.", nameof(image));
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Gray8);
+    var isGrayscale = image.Format == PixelFormat.Gray8;
 
     return new() {
       Width = image.Width,

@@ -50,6 +50,7 @@ public readonly record struct IngrFile : IImageFormatReader<IngrFile>, IImageToR
 
   public static IngrFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Gray8);
 
     switch (image.Format) {
       case PixelFormat.Gray8:

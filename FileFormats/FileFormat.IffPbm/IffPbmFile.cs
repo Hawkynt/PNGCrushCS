@@ -49,8 +49,7 @@ public readonly record struct IffPbmFile : IImageFormatReader<IffPbmFile>, IImag
   public static IffPbmFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
 
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException($"Unsupported pixel format for IFF PBM: {image.Format}. Only Indexed8 is supported.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed8);
 
     return new() {
       Width = image.Width,

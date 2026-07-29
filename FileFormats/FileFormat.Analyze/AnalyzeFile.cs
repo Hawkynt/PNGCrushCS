@@ -47,6 +47,7 @@ public readonly record struct AnalyzeFile : IImageFormatReader<AnalyzeFile>, IIm
 
   public static AnalyzeFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Gray8);
     return image.Format switch {
       PixelFormat.Gray8 => new() {
         Width = image.Width,

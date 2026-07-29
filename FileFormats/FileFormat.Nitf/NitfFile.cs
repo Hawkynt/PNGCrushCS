@@ -57,6 +57,7 @@ public readonly record struct NitfFile : IImageFormatReader<NitfFile>, IImageToR
 
   public static NitfFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Gray8);
 
     return image.Format switch {
       PixelFormat.Gray8 => new() {

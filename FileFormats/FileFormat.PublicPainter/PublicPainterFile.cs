@@ -46,8 +46,7 @@ public readonly record struct PublicPainterFile : IImageFormatReader<PublicPaint
 
   public static PublicPainterFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed1)
-      throw new ArgumentException("RawImage must use PixelFormat.Indexed1.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed1);
     if (image.Width != ImageWidth)
       throw new ArgumentException($"Public Painter images must be exactly {ImageWidth} pixels wide.", nameof(image));
     if (image.Height != ImageHeight)

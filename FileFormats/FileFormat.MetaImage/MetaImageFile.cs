@@ -40,6 +40,7 @@ public readonly record struct MetaImageFile : IImageFormatReader<MetaImageFile>,
 
   public static MetaImageFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Gray8);
     return image.Format switch {
       PixelFormat.Gray8 => new() {
         Width = image.Width,

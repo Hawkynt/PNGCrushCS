@@ -71,8 +71,7 @@ public readonly record struct QuakeSprFile : IImageFormatReader<QuakeSprFile>, I
   /// <summary>Creates a Quake sprite from a <see cref="RawImage"/>. Must be Indexed8.</summary>
   public static QuakeSprFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException($"Quake SPR requires Indexed8 pixel format, got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed8);
 
     return new() {
       Width = image.Width,

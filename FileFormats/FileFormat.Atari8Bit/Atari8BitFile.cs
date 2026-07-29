@@ -128,6 +128,7 @@ public readonly record struct Atari8BitFile : IImageFormatReader<Atari8BitFile>,
   /// <summary>Creates an Atari 8-bit screen from a <see cref="RawImage"/>. Accepts Indexed1 or Indexed8.</summary>
   public static Atari8BitFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Indexed1);
     if (image.Format != PixelFormat.Indexed8 && image.Format != PixelFormat.Indexed1)
       throw new ArgumentException($"Expected {PixelFormat.Indexed8} or {PixelFormat.Indexed1} but got {image.Format}.", nameof(image));
 

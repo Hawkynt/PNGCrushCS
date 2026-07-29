@@ -67,8 +67,7 @@ public readonly record struct AtariDumpFile : IImageFormatReader<AtariDumpFile>,
   /// <summary>Creates a screen dump from an Indexed1 raw image (320x192).</summary>
   public static AtariDumpFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed1)
-      throw new ArgumentException($"Expected {PixelFormat.Indexed1} but got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed1);
     if (image.Width != DefaultWidth || image.Height != DefaultHeight)
       throw new ArgumentException($"Expected {DefaultWidth}x{DefaultHeight} but got {image.Width}x{image.Height}.", nameof(image));
 

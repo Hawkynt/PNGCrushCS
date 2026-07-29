@@ -70,6 +70,7 @@ public readonly record struct InterfileFile : IImageFormatReader<InterfileFile>,
 
   public static InterfileFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Gray16, PixelFormat.Gray8);
 
     switch (image.Format) {
       case PixelFormat.Gray8:

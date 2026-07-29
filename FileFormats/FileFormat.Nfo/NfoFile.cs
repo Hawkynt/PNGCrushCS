@@ -42,8 +42,7 @@ public readonly record struct NfoFile : IImageFormatReader<NfoFile>, IImageForma
 
   public static NfoFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Rgb24)
-      throw new ArgumentException($"NFO quantizer expects PixelFormat.Rgb24 (got {image.Format}). Convert first via PixelConverter.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Rgb24);
     var font = BitmapFont.Default;
     if (image.Width % font.CellWidth != 0 || image.Height % font.CellHeight != 0)
       throw new ArgumentException($"NFO requires the source image to align to the {font.CellWidth}×{font.CellHeight} text cell grid.", nameof(image));

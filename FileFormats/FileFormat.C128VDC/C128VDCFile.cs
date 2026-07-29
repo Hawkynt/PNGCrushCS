@@ -56,8 +56,7 @@ public readonly record struct C128VDCFile : IImageFormatReader<C128VDCFile>, IIm
   /// <summary>Creates a C128 VDC screen from an Indexed1 raw image (640x200).</summary>
   public static C128VDCFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed1)
-      throw new ArgumentException($"Expected {PixelFormat.Indexed1} but got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed1);
     if (image.Width != PixelWidth || image.Height != PixelHeight)
       throw new ArgumentException($"Expected {PixelWidth}x{PixelHeight} but got {image.Width}x{image.Height}.", nameof(image));
 

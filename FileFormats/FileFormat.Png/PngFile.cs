@@ -100,6 +100,11 @@ public readonly record struct PngFile :
   public static PngFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
 
+    image = image.EnsureAnyFormat(
+      PixelFormat.Rgba32, PixelFormat.Rgb24, PixelFormat.Rgba64, PixelFormat.Rgb48,
+      PixelFormat.GrayAlpha16, PixelFormat.Gray16, PixelFormat.Gray8,
+      PixelFormat.Indexed8, PixelFormat.Indexed4, PixelFormat.Indexed1);
+
     var (colorType, bitDepth) = _GetPngSettings(image.Format);
     var stride = _CalculateStride(image.Width, image.Format, bitDepth);
     var rows = _SplitIntoRows(image.PixelData, stride, image.Height);

@@ -28,8 +28,7 @@ public readonly record struct Q0File : IImageFormatReader<Q0File>, IImageToRawIm
 
   public static Q0File FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Rgb24)
-      throw new ArgumentException("RawImage must use PixelFormat.Rgb24.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Rgb24);
     return new() {
       Width = image.Width,
       Height = image.Height,

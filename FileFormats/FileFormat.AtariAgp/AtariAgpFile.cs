@@ -93,10 +93,11 @@ public readonly record struct AtariAgpFile : IImageFormatReader<AtariAgpFile>, I
   /// <summary>Creates an AGP image from an Indexed1 or Indexed8 raw image.</summary>
   public static AtariAgpFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8 && image.Format != PixelFormat.Indexed1)
-      throw new ArgumentException($"Expected {PixelFormat.Indexed8} or {PixelFormat.Indexed1} but got {image.Format}.", nameof(image));
-
     var mode = _InferMode(image.Width, image.Height);
+
+    // Graphics 7 is a 4-colour mode, so it must not be coerced down to the 2-colour Indexed1
+    // layout that Graphics 8 uses.
+    image = image.EnsureAnyFormat(mode == AtariAgpMode.Graphics7 ? PixelFormat.Indexed8 : PixelFormat.Indexed1);
     var pixelData = new byte[image.Width * image.Height];
     if (image.Format == PixelFormat.Indexed1) {
       var stride = (image.Width + 7) / 8;

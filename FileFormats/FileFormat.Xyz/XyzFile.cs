@@ -50,8 +50,7 @@ public readonly record struct XyzFile : IImageFormatReader<XyzFile>, IImageToRaw
 
   public static XyzFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException("RawImage must use PixelFormat.Indexed8.", nameof(image));
+    image = image.EnsureIndexed(PixelFormat.Indexed8, _DefaultPalette);
 
     if (image.Palette == null || image.Palette.Length < 768)
       throw new ArgumentException("RawImage must have a 256-entry RGB palette (768 bytes).", nameof(image));

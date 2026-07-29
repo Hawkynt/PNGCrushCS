@@ -71,8 +71,7 @@ public readonly record struct GafFile : IImageFormatReader<GafFile>, IImageToRaw
   /// <summary>Creates a GAF file from a <see cref="RawImage"/>. Must be Indexed8.</summary>
   public static GafFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException($"GAF requires Indexed8 pixel format, got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed8);
 
     return new GafFile {
       Width = image.Width,

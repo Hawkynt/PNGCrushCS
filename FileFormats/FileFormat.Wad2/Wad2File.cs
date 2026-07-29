@@ -85,8 +85,7 @@ public readonly record struct Wad2File : IImageFormatReader<Wad2File>, IImageToR
   /// <summary>Creates a single-texture WAD2 file from a <see cref="RawImage"/>. Must be Indexed8.</summary>
   public static Wad2File FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException($"WAD2 requires Indexed8 pixel format, got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed8);
 
     var w = image.Width;
     var h = image.Height;

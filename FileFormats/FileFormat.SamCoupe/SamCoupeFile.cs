@@ -38,8 +38,7 @@ public readonly record struct SamCoupeFile : IImageFormatReader<SamCoupeFile>, I
   public static SamCoupeFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
 
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException("RawImage must use PixelFormat.Indexed8.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed8);
     if (image.Height != 192)
       throw new ArgumentException("SAM Coupe images must be exactly 192 pixels tall.", nameof(image));
 

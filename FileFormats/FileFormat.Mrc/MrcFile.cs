@@ -172,6 +172,7 @@ public readonly record struct MrcFile : IImageFormatReader<MrcFile>, IImageToRaw
 
   public static MrcFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Gray16, PixelFormat.Gray8);
 
     switch (image.Format) {
       case PixelFormat.Gray8:

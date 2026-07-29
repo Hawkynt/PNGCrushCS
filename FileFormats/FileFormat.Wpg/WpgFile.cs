@@ -76,8 +76,7 @@ public readonly record struct WpgFile : IImageFormatReader<WpgFile>, IImageToRaw
   /// <summary>Creates a WPG file from a <see cref="RawImage"/>. Must be Indexed8.</summary>
   public static WpgFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException($"WPG requires Indexed8 pixel format, got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed8);
 
     int bpp;
     byte[] pixels;

@@ -35,8 +35,7 @@ public readonly record struct EcwFile : IImageFormatReader<EcwFile>, IImageToRaw
 
   public static EcwFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Rgb24)
-      throw new ArgumentException("RawImage must use PixelFormat.Rgb24.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Rgb24);
     return new() {
       Width = image.Width,
       Height = image.Height,

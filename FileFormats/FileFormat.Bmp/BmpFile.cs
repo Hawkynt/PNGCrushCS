@@ -117,6 +117,11 @@ public readonly record struct BmpFile :
   public static BmpFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
 
+    // The writer has no 32-bpp path, so alpha-bearing input lands on Bgr24 and loses transparency.
+    image = image.EnsureAnyFormat(
+      PixelFormat.Bgr24, PixelFormat.Rgb565, PixelFormat.Gray8,
+      PixelFormat.Indexed8, PixelFormat.Indexed4, PixelFormat.Indexed1);
+
     BmpColorMode colorMode;
     int bpp;
     byte[]? palette = null;

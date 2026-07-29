@@ -35,6 +35,7 @@ public readonly record struct AliasPixFile : IImageFormatReader<AliasPixFile>, I
 
   public static AliasPixFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Bgra32, PixelFormat.Bgr24);
 
     var bpp = image.Format switch {
       PixelFormat.Bgr24 => 24,

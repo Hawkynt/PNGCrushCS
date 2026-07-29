@@ -58,6 +58,7 @@ public readonly record struct ClpFile : IImageFormatReader<ClpFile>, IImageToRaw
 
   public static ClpFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Bgr24, PixelFormat.Indexed8);
 
     var width = image.Width;
     var height = image.Height;

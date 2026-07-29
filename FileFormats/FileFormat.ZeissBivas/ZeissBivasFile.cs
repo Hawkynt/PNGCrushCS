@@ -44,8 +44,7 @@ public readonly record struct ZeissBivasFile : IImageFormatReader<ZeissBivasFile
   /// <summary>Creates a Zeiss BIVAS image from a Gray8 raw image.</summary>
   public static ZeissBivasFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Gray8)
-      throw new ArgumentException($"Expected {PixelFormat.Gray8} but got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Gray8);
 
     var pixelData = image.PixelData[..];
 

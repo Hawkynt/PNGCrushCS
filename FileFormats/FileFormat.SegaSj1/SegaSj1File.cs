@@ -48,8 +48,7 @@ public readonly record struct SegaSj1File : IImageFormatReader<SegaSj1File>, IIm
   /// <summary>Creates a Sega SJ1 file from a <see cref="RawImage"/>. Accepts Rgb24.</summary>
   public static SegaSj1File FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Rgb24)
-      throw new ArgumentException($"Expected {PixelFormat.Rgb24} but got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Rgb24);
 
     return new() {
       Width = image.Width,

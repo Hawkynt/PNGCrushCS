@@ -54,8 +54,7 @@ public readonly record struct BsbFile : IImageFormatReader<BsbFile>, IImageToRaw
   /// <summary>Creates a BSB file from a <see cref="RawImage"/>. Must be Indexed8 format.</summary>
   public static BsbFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException($"BSB requires Indexed8 pixel format, got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed8);
     if (image.Palette == null || image.PaletteCount <= 0)
       throw new ArgumentException("BSB requires a palette.", nameof(image));
 

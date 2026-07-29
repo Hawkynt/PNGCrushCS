@@ -34,8 +34,7 @@ public readonly record struct Wad3File : IImageFormatReader<Wad3File>, IImageToR
   /// <summary>Creates a single-texture WAD3 file from a <see cref="RawImage"/>. Must be Indexed8 with palette.</summary>
   public static Wad3File FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException($"WAD3 requires Indexed8 pixel format, got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed8);
     if (image.Palette == null)
       throw new ArgumentException("WAD3 requires a palette.", nameof(image));
 

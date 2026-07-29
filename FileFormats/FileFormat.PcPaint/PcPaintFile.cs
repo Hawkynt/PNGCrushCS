@@ -77,8 +77,7 @@ public readonly record struct PcPaintFile : IImageFormatReader<PcPaintFile>, IIm
   /// <summary>Creates a PC Paint file from a <see cref="RawImage"/>. Must be Indexed8.</summary>
   public static PcPaintFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException($"PC Paint requires Indexed8 pixel format, got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed8);
     if (image.Palette == null || image.Palette.Length < 3)
       throw new ArgumentException("PC Paint requires an RGB palette.", nameof(image));
 

@@ -57,6 +57,7 @@ public readonly record struct RembrandtFile : IImageFormatReader<RembrandtFile>,
 
   public static RembrandtFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Indexed8, PixelFormat.Indexed1);
     if (image.Width <= 0 || image.Height <= 0)
       throw new ArgumentException($"Dimensions must be positive, got {image.Width}x{image.Height}.", nameof(image));
     if (image.Width > 65535 || image.Height > 65535)

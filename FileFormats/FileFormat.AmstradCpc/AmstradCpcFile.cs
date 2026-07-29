@@ -100,8 +100,7 @@ public readonly record struct AmstradCpcFile : IImageFormatReader<AmstradCpcFile
   public static AmstradCpcFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
 
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException("RawImage must use Indexed8 pixel format.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed8);
 
     if (image.Height != _FIXED_HEIGHT)
       throw new ArgumentException($"Height must be {_FIXED_HEIGHT}.", nameof(image));

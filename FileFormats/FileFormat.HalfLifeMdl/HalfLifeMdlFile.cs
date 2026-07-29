@@ -29,8 +29,7 @@ public readonly record struct HalfLifeMdlFile : IImageFormatReader<HalfLifeMdlFi
 
   public static HalfLifeMdlFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException("RawImage must use PixelFormat.Indexed8.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed8);
     return new() {
       Width = image.Width,
       Height = image.Height,

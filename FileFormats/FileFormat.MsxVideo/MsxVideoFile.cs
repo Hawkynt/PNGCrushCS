@@ -56,8 +56,7 @@ public readonly record struct MsxVideoFile : IImageFormatReader<MsxVideoFile>, I
     ArgumentNullException.ThrowIfNull(image);
     if (image.Width != FixedWidth || image.Height != FixedHeight)
       throw new ArgumentException($"Image must be {FixedWidth}x{FixedHeight}, got {image.Width}x{image.Height}.");
-    if (image.Format != PixelFormat.Rgb24)
-      throw new ArgumentException($"Image must be Rgb24 format, got {image.Format}.");
+    image = image.EnsureFormat(PixelFormat.Rgb24);
 
     var pixels = new byte[ExpectedFileSize];
     for (var i = 0; i < ExpectedFileSize; ++i) {

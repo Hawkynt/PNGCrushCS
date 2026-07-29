@@ -85,6 +85,7 @@ public readonly record struct VicarFile : IImageFormatReader<VicarFile>, IImageT
 
   public static VicarFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Gray8);
 
     switch (image.Format) {
       case PixelFormat.Gray8:

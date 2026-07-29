@@ -71,8 +71,7 @@ public readonly record struct C128HiresFile : IImageFormatReader<C128HiresFile>,
   /// <summary>Creates a C128 hires screen from an Indexed1 raw image (320x200).</summary>
   public static C128HiresFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed1)
-      throw new ArgumentException($"Expected {PixelFormat.Indexed1} but got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed1);
     if (image.Width != PixelWidth || image.Height != PixelHeight)
       throw new ArgumentException($"Expected {PixelWidth}x{PixelHeight} but got {image.Width}x{image.Height}.", nameof(image));
 

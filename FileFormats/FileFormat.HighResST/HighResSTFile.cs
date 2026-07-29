@@ -54,8 +54,7 @@ public readonly record struct HighResSTFile : IImageFormatReader<HighResSTFile>,
 
   public static HighResSTFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed1)
-      throw new ArgumentException("RawImage must use PixelFormat.Indexed1.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed1);
     if (image.Width != _WIDTH)
       throw new ArgumentException($"HighRes ST images must be exactly {_WIDTH} pixels wide.", nameof(image));
     if (image.Height != _HEIGHT)

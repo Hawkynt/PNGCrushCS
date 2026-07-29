@@ -40,8 +40,7 @@ public readonly record struct GbaTileFile : IImageFormatReader<GbaTileFile>, IIm
 
   public static GbaTileFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException($"GbaTile tile data requires Indexed8 pixel format, got {image.Format}.", nameof(image));
+    image = image.EnsureIndexed(PixelFormat.Indexed8, _DefaultPalette);
     if (image.Width != TilesPerRow * TileSize)
       throw new ArgumentException($"GbaTile tile data requires width {TilesPerRow * TileSize}, got {image.Width}.", nameof(image));
 

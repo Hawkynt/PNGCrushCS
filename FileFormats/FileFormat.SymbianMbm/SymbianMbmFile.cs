@@ -51,6 +51,7 @@ public readonly record struct SymbianMbmFile : IImageFormatReader<SymbianMbmFile
 
   public static SymbianMbmFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Gray8);
 
     return image.Format switch {
       PixelFormat.Gray8 => _FromGray8(image),

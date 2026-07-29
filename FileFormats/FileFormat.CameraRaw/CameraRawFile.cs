@@ -37,8 +37,7 @@ public readonly record struct CameraRawFile : IImageFormatReader<CameraRawFile>,
 
   public static CameraRawFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Rgb24)
-      throw new ArgumentException($"Pixel format {image.Format} is not supported by Camera RAW. Only Rgb24 is accepted.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Rgb24);
 
     return new() {
       Width = image.Width,

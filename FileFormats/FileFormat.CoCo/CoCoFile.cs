@@ -56,8 +56,7 @@ public readonly record struct CoCoFile : IImageFormatReader<CoCoFile>, IImageToR
   /// <summary>Creates a CoCo screen from an Indexed1 raw image (256x192).</summary>
   public static CoCoFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed1)
-      throw new ArgumentException($"Expected {PixelFormat.Indexed1} but got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed1);
     if (image.Width != PixelWidth || image.Height != PixelHeight)
       throw new ArgumentException($"Expected {PixelWidth}x{PixelHeight} but got {image.Width}x{image.Height}.", nameof(image));
 

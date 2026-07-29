@@ -76,8 +76,7 @@ public readonly record struct PrismPaintFile : IImageFormatReader<PrismPaintFile
 
   public static PrismPaintFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException($"Expected {PixelFormat.Indexed8} but got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed8);
     if (image.Width <= 0 || image.Height <= 0)
       throw new ArgumentException($"Dimensions must be positive, got {image.Width}x{image.Height}.", nameof(image));
     if (image.Width > 65535 || image.Height > 65535)

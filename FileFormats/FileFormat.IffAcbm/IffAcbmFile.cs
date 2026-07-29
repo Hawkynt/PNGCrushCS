@@ -79,8 +79,7 @@ public readonly record struct IffAcbmFile : IImageFormatReader<IffAcbmFile>, IIm
   public static IffAcbmFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
 
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException($"Unsupported pixel format for ACBM: {image.Format}", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed8);
 
     var pixelData = image.PixelData[..];
     var palette = image.Palette is { } p ? p[..] : [];

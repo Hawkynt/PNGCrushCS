@@ -36,8 +36,7 @@ public readonly record struct HrzFile :
 
   public static HrzFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Rgb24)
-      throw new ArgumentException($"Expected {PixelFormat.Rgb24} but got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Rgb24);
     if (image.Width != 256 || image.Height != 240)
       throw new ArgumentException($"Expected 256x240 but got {image.Width}x{image.Height}.", nameof(image));
 

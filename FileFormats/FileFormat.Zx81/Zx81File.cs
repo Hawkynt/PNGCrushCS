@@ -35,8 +35,7 @@ public readonly record struct Zx81File : IImageFormatReader<Zx81File>, IImageToR
 
   public static Zx81File FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed1)
-      throw new ArgumentException($"Expected Indexed1 but got {image.Format}.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed1);
     if (image.Width != FixedWidth || image.Height != FixedHeight)
       throw new ArgumentException($"Expected {FixedWidth}x{FixedHeight} but got {image.Width}x{image.Height}.", nameof(image));
 

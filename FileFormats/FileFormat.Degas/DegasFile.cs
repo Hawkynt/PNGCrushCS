@@ -47,8 +47,7 @@ public readonly record struct DegasFile : IImageFormatReader<DegasFile>, IImageT
 
   public static DegasFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException("RawImage must use PixelFormat.Indexed8.", nameof(image));
+    image = image.EnsureFormat(PixelFormat.Indexed8);
 
     // Resolve resolution from input dimensions when they match a valid Degas mode;
     // otherwise infer from palette size.

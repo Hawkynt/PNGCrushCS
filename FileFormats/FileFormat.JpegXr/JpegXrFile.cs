@@ -45,6 +45,7 @@ public readonly record struct JpegXrFile : IImageFormatReader<JpegXrFile>, IImag
 
   public static JpegXrFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Gray8);
     var componentCount = image.Format switch {
       PixelFormat.Gray8 => 1,
       PixelFormat.Rgb24 => 3,

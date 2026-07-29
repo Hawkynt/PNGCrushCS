@@ -42,8 +42,7 @@ public sealed class Enterprise128File : IImageFormatReader<Enterprise128File>, I
 
   public static Enterprise128File FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed1)
-      throw new ArgumentException($"Expected Indexed1, got {image.Format}");
+    image = image.EnsureFormat(PixelFormat.Indexed1);
     if (image.Width != ImageWidth || image.Height != ImageHeight)
       throw new ArgumentException($"Expected {ImageWidth}x{ImageHeight}, got {image.Width}x{image.Height}");
     var pixels = image.PixelData[..];

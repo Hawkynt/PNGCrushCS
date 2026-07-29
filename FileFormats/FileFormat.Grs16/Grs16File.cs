@@ -57,6 +57,7 @@ public readonly record struct Grs16File : IImageFormatReader<Grs16File>, IImageT
 
   public static Grs16File FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureAnyFormat(PixelFormat.Gray16, PixelFormat.Gray8);
 
     var pixelCount = image.Width * image.Height;
     var pixelData = new byte[pixelCount * 2];

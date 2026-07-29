@@ -52,8 +52,7 @@ public readonly record struct SnesTileFile : IImageFormatReader<SnesTileFile>, I
 
   public static SnesTileFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException($"SNES tile requires Indexed8 pixel format, got {image.Format}.", nameof(image));
+    image = image.EnsureIndexed(PixelFormat.Indexed8, _DefaultPalette);
     if (image.Width != FixedWidth)
       throw new ArgumentException($"SNES tile requires width {FixedWidth}, got {image.Width}.", nameof(image));
     if (image.PaletteCount > 16)

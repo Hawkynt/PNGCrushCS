@@ -94,6 +94,8 @@ public sealed class BpgFile : IImageFormatReader<BpgFile>, IImageToRawImage<BpgF
   /// <summary>Creates a BPG file from a <see cref="RawImage"/>.</summary>
   public static BpgFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    // Qualified: BpgFile declares its own PixelFormat property, which shadows the type name here.
+    image = image.EnsureAnyFormat(FileFormat.Core.PixelFormat.Rgb24, FileFormat.Core.PixelFormat.Gray8);
 
     return image.Format switch {
       Core.PixelFormat.Gray8 => new() {

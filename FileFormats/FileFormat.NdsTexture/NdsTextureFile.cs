@@ -39,8 +39,7 @@ public readonly record struct NdsTextureFile : IImageFormatReader<NdsTextureFile
 
   public static NdsTextureFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8)
-      throw new ArgumentException($"NdsTexture tile data requires Indexed8 pixel format, got {image.Format}.", nameof(image));
+    image = image.EnsureIndexed(PixelFormat.Indexed8, _DefaultPalette);
     if (image.Width != TilesPerRow * TileSize)
       throw new ArgumentException($"NdsTexture tile data requires width {TilesPerRow * TileSize}, got {image.Width}.", nameof(image));
 
