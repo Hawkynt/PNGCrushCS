@@ -67,6 +67,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.TextureEditorMikey, "Texture Editor by Mikey", 320, 192),
     new(ImageFormat.Mamut, "Mamut", 320, 192),
     new(ImageFormat.VidigPaint, "Vidig Paint", 320, 192),
+    new(ImageFormat.TurboRascal, "Turbo Rascal Syntax Error", 320, 200),
   ];
 
   [Test]
