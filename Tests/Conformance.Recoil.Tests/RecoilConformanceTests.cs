@@ -119,6 +119,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.MsxGl16, "MSX2 SH5", 256, 212, ".sh5"),
     new(ImageFormat.MadDesigner, "Mad Designer", 512, 256, ".mbg"),
     new(ImageFormat.AtariTxs, "Atari texture", 64, 64, ".txs"),
+    new(ImageFormat.Commodore64Font, "C64 8x8 font", 256, 64, ".64c"),
   ];
 
   [Test]

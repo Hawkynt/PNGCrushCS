@@ -136,6 +136,7 @@
     <Project Path="Tests/FileFormat.CoCoMax.Tests/FileFormat.CoCoMax.Tests.csproj" />
     <Project Path="Tests/FileFormat.CokeAtari.Tests/FileFormat.CokeAtari.Tests.csproj" />
     <Project Path="Tests/FileFormat.ColoRix.Tests/FileFormat.ColoRix.Tests.csproj" />
+    <Project Path="Tests/FileFormat.Commodore64Font.Tests/FileFormat.Commodore64Font.Tests.csproj" />
     <Project Path="Tests/FileFormat.CommodorePet.Tests/FileFormat.CommodorePet.Tests.csproj" />
     <Project Path="Tests/FileFormat.CompW.Tests/FileFormat.CompW.Tests.csproj" />
     <Project Path="Tests/FileFormat.ComputerEyes.Tests/FileFormat.ComputerEyes.Tests.csproj" />

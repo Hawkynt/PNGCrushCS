@@ -51,6 +51,9 @@ public sealed class RecoilDecodeAgreementTests {
     new("McPainter", ImageFormat.McPainter, ".mcp", _McPainter),
     new("Mad Designer", ImageFormat.MadDesigner, ".mbg", _MadDesigner),
     new("Atari texture", ImageFormat.AtariTxs, ".txs", _AtariTxs),
+    new("C64 8x8 font", ImageFormat.Commodore64Font, ".64c", () => _C64Font(2050, 0x00, 0x08)),
+    new("C64 8x8 font, short", ImageFormat.Commodore64Font, ".64c", () => _C64Font(1026, 0x00, 0x08)),
+    new("SEUCK font", ImageFormat.Commodore64Font, ".g", () => _C64Font(514, 66, 0x00)),
   ];
 
   [Test]
@@ -202,6 +205,16 @@ public sealed class RecoilDecodeAgreementTests {
 
     ReadOnlySpan<byte> registers = [0x0E, 0x46, 0x92, 0x00, 0x24, 0xDA, 0x68, 0x0C];
     registers.CopyTo(data.AsSpan(16000));
+
+    return data;
+  }
+
+  private static byte[] _C64Font(int length, byte low, byte high) {
+    var data = new byte[length];
+    data[0] = low;
+    data[1] = high;
+    for (var i = 2; i < length; ++i)
+      data[i] = (byte)(i * 43 + (i >> 3));
 
     return data;
   }
