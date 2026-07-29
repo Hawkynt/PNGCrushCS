@@ -7,9 +7,17 @@ namespace Optimizer.Image.Tests;
 public sealed class DataTypeTests {
 
   [Test]
-  public void ImageFormat_HasExpectedCount() {
+  public void ImageFormat_HasEveryFormatAndNoDuplicates() {
+    // Not a fixed count: the enum is generated from whichever format libraries are present, so a
+    // hard number fails on the commit that adds the next format rather than on anything being
+    // wrong -- which is how this sat at 540 while the enum had grown to 586. What actually has to
+    // hold is that the enum is well-formed: every member distinct, and Unknown present exactly once.
     var values = Enum.GetValues<ImageFormat>();
-    Assert.That(values, Has.Length.EqualTo(540));
+
+    Assert.That(values, Is.Not.Empty);
+    Assert.That(values, Is.Unique);
+    Assert.That(Enum.GetNames<ImageFormat>(), Is.Unique);
+    Assert.That(values, Does.Contain(ImageFormat.Unknown));
   }
 
   [Test]
