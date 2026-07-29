@@ -91,6 +91,9 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.Imagic, "Imagic", 320, 200, ".ic1"),
     new(ImageFormat.Imagic, "Imagic (medium)", 640, 200, ".ic2"),
     new(ImageFormat.Imagic, "Imagic (high)", 640, 400, ".ic3"),
+    new(ImageFormat.AtariTt, "TT Low", 640, 480, ".pi4"),
+    new(ImageFormat.AtariTt, "TT Low as .pi5", 640, 480, ".pi5"),
+    new(ImageFormat.AtariTt, "TT High", 1280, 960, ".pi6"),
   ];
 
   [Test]

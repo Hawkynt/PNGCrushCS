@@ -82,6 +82,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | Atari Player/Missile    | .pmg, .plm                                           | Atari 8-bit Player/Missile GFX   | Y      | Y      | —         | —     | —   | —      | —         |
 | Atari ST Dali            | .sd0, .sd1, .sd2                                    | Atari ST Dali planar image       | Y      | —      | —         | R     | —   | —      | —         |
 | Atari ST Paintworks     | .cl0, .cl1, .cl2, .pg0, .pg1, .pg2, .pg3             | Atari ST Paintworks/DeskPic      | Y      | Y      | —         | R     | —   | —      | —         |
+| Atari TT               | .pi5, .pi4, .pi6                                     | Atari TT low/medium/high         | Y      | Y      | —         | R     | —   | —      | —         |
 | Autodesk CEL            | .cel                                                 | Autodesk Animator CEL            | Y      | Y      | —         | R     | —   | —      | —         |
 | AVHRR Image             | .sst                                                 | NOAA satellite imagery           | Y      | Y      | —         | —     | —   | R      | —         |
 | AVIF                    | .avif                                                | AV1 Image File Format            | Y      | Y      | —         | —     | RW  | R      | R         |
@@ -669,14 +670,14 @@ Two different questions, two different answers:
 | ----------------------------------------------------------- | ----- | ------ |
 | Total formats                                              | 551   | 552    |
 | Modern/web/scientific formats (PNG, JPEG, WebP, AVIF, …)   | ~290  | 0      |
-| Of RECOIL's 552 vintage formats, covered                   | 350   | 552    |
+| Of RECOIL's 552 vintage formats, covered                   | 353   | 552    |
 
 So on breadth we are level, and on everything outside the retro catalogue we are the only one of
-the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 202
+the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 199
 formats.
 
 Largest remaining clusters: Atari 8-bit (74), Commodore 64 (27), Atari ST/STE (22), Atari Falcon
-(11), MSX2 (11), NEC PC-98 (7), ZX Spectrum (7). Only a handful decode as a plain fixed-size screen
+(11), MSX2 (11), NEC PC-98 (7), ZX Spectrum (7). Atari TT is now fully covered. Only a handful decode as a plain fixed-size screen
 that the shared Atari primitives already cover; the rest carry their own containers or compression.
 RECOIL is a decoder only, so for each one the encoder has to be derived from its decoder and then
 proved by round-tripping back through it.
