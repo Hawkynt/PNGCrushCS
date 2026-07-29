@@ -85,6 +85,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.SevenuP, "SevenuP", 256, 192),
     new(ImageFormat.ZxAttributesGigascreen, "Attributes Gigascreen", 256, 192),
     new(ImageFormat.LastWordFont, "The Last Word font", 128, 32),
+    new(ImageFormat.DaliCompressed, "Dali (compressed)", 320, 200, ".lpk"),
   ];
 
   [Test]
