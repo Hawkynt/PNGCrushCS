@@ -31,8 +31,11 @@ public static class PabloPaintReader {
     if (data.Length < PabloPaintFile.FileSize)
       throw new InvalidDataException($"Data too small for a valid Pablo Paint file: expected at least {PabloPaintFile.FileSize} bytes, got {data.Length}.");
 
-    var pixelData = new byte[PabloPaintFile.FileSize];
-    data.Slice(0, PabloPaintFile.FileSize).CopyTo(pixelData);
+    if (!data[..PabloPaintFile.Banner.Length].SequenceEqual(PabloPaintFile.Banner))
+      throw new InvalidDataException("Not a Pablo Paint file: missing the 'PABLO PACKED PICTURE' banner.");
+
+    var pixelData = new byte[PabloPaintFile.PixelDataSize];
+    data.Slice(PabloPaintFile.PixelDataOffset, PabloPaintFile.PixelDataSize).CopyTo(pixelData);
 
     return new PabloPaintFile { PixelData = pixelData };
     }
@@ -42,8 +45,11 @@ public static class PabloPaintReader {
     if (data.Length < PabloPaintFile.FileSize)
       throw new InvalidDataException($"Data too small for a valid Pablo Paint file: expected at least {PabloPaintFile.FileSize} bytes, got {data.Length}.");
 
-    var pixelData = new byte[PabloPaintFile.FileSize];
-    data.AsSpan(0, PabloPaintFile.FileSize).CopyTo(pixelData);
+    if (!data.AsSpan(0, PabloPaintFile.Banner.Length).SequenceEqual(PabloPaintFile.Banner))
+      throw new InvalidDataException("Not a Pablo Paint file: missing the 'PABLO PACKED PICTURE' banner.");
+
+    var pixelData = new byte[PabloPaintFile.PixelDataSize];
+    data.AsSpan(PabloPaintFile.PixelDataOffset, PabloPaintFile.PixelDataSize).CopyTo(pixelData);
 
     return new PabloPaintFile { PixelData = pixelData };
   }

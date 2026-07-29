@@ -44,7 +44,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.DuneGraph, "DuneGraph", 320, 200),
     new(ImageFormat.Hireslace, "Hireslace Editor", 320, 200),
     new(ImageFormat.MagicPainter, "Magic Painter", 320, 192),
-    new(ImageFormat.PabloPaint, "Pablo Paint 2.5", 320, 200),
+    new(ImageFormat.PabloPaint, "Pablo Paint 2.5", 640, 400),
     new(ImageFormat.PublicPainter, "Public Painter", 640, 400),
     new(ImageFormat.QuantumPaint, "QuantumPaint", 320, 200),
     new(ImageFormat.Rembrandt, "Rembrandt", 320, 200),

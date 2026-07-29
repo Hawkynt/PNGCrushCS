@@ -13,7 +13,27 @@ public readonly record struct PabloPaintFile : IImageFormatReader<PabloPaintFile
   internal const int PixelHeight = 400;
 
   /// <summary>Exact file size in bytes (640/8 * 400 = 32000).</summary>
-  internal const int FileSize = PixelWidth / 8 * PixelHeight;
+  /// <summary>Uncompressed bitmap size: one bit per pixel.</summary>
+  public const int PixelDataSize = PixelWidth / 8 * PixelHeight;
+
+  /// <summary>The ASCII banner Pablo Paint writes at the start of every file. The embedded "32036"
+  /// is the program's own byte count for what follows the banner, and readers match on it
+  /// verbatim.</summary>
+  public static ReadOnlySpan<byte> Banner => "PABLO PACKED PICTURE: Groupe CDND \r\n32036\r\n"u8;
+
+  /// <summary>Offset of the resolution byte, immediately after the banner.</summary>
+  public const int ResolutionOffset = 43;
+
+  /// <summary>Offset of the 32-byte palette.</summary>
+  internal const int PaletteOffset = 47;
+
+  /// <summary>Offset of the bitmap.</summary>
+  public const int PixelDataOffset = 79;
+
+  /// <summary>Atari ST high resolution — 640x400 monochrome, which is all Pablo Paint produces.</summary>
+  public const byte HighResolutionMode = 2;
+
+  public const int FileSize = PixelDataOffset + PixelDataSize;
 
   static string IImageFormatMetadata<PabloPaintFile>.PrimaryExtension => ".pa3";
   static string[] IImageFormatMetadata<PabloPaintFile>.FileExtensions => [".pa3"];

@@ -9,7 +9,18 @@ public static class PabloPaintWriter {
     ArgumentNullException.ThrowIfNull(file);
 
     var result = new byte[PabloPaintFile.FileSize];
-    file.PixelData.AsSpan(0, Math.Min(file.PixelData.Length, PabloPaintFile.FileSize)).CopyTo(result);
+
+    PabloPaintFile.Banner.CopyTo(result);
+    result[PabloPaintFile.ResolutionOffset] = PabloPaintFile.HighResolutionMode;
+
+    // Three fixed bytes sit between the resolution and the palette; readers check them.
+    result[44] = 0;
+    result[45] = 125;
+    result[46] = 36;
+
+    file.PixelData.AsSpan(0, Math.Min(file.PixelData.Length, PabloPaintFile.PixelDataSize))
+      .CopyTo(result.AsSpan(PabloPaintFile.PixelDataOffset));
+
     return result;
   }
 }

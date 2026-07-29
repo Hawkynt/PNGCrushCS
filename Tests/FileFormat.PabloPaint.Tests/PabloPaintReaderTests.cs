@@ -37,9 +37,9 @@ public sealed class PabloPaintReaderTests {
   [Test]
   [Category("Unit")]
   public void FromBytes_ExactSize_Parses() {
-    var data = new byte[32000];
-    data[0] = 0xFF;
-    data[31999] = 0xAA;
+    var data = _BuildPabloPaint(PabloPaintFile.FileSize);
+    data[PabloPaintFile.PixelDataOffset + 0] = 0xFF;
+    data[PabloPaintFile.PixelDataOffset + 31999] = 0xAA;
     var result = PabloPaintReader.FromBytes(data);
 
     Assert.Multiple(() => {
@@ -54,9 +54,9 @@ public sealed class PabloPaintReaderTests {
   [Test]
   [Category("Unit")]
   public void FromBytes_LargerThanExpected_ParsesFirstBytes() {
-    var data = new byte[33000];
-    data[0] = 0xBB;
-    data[32000] = 0xCC;
+    var data = _BuildPabloPaint(PabloPaintFile.FileSize + 1000);
+    data[PabloPaintFile.PixelDataOffset + 0] = 0xBB;
+    data[PabloPaintFile.PixelDataOffset + 32000] = 0xCC;
     var result = PabloPaintReader.FromBytes(data);
 
     Assert.Multiple(() => {
@@ -68,8 +68,8 @@ public sealed class PabloPaintReaderTests {
   [Test]
   [Category("Unit")]
   public void FromStream_ValidData_Parses() {
-    var data = new byte[32000];
-    data[42] = 0xDE;
+    var data = _BuildPabloPaint(PabloPaintFile.FileSize);
+    data[PabloPaintFile.PixelDataOffset + 42] = 0xDE;
     using var ms = new MemoryStream(data);
     var result = PabloPaintReader.FromStream(ms);
 
@@ -83,10 +83,21 @@ public sealed class PabloPaintReaderTests {
   [Test]
   [Category("Unit")]
   public void FromBytes_CopiesPixelData() {
-    var data = new byte[32000];
-    data[0] = 0x55;
+    var data = _BuildPabloPaint(PabloPaintFile.FileSize);
+    data[PabloPaintFile.PixelDataOffset + 0] = 0x55;
     var result = PabloPaintReader.FromBytes(data);
-    data[0] = 0x00;
+    data[PabloPaintFile.PixelDataOffset + 0] = 0x00;
     Assert.That(result.PixelData[0], Is.EqualTo(0x55));
+  }
+
+  /// <summary>A buffer carrying the banner header the reader validates, sized as requested.</summary>
+  private static byte[] _BuildPabloPaint(int length) {
+    var data = new byte[length];
+    PabloPaintFile.Banner.CopyTo(data);
+    data[PabloPaintFile.ResolutionOffset] = PabloPaintFile.HighResolutionMode;
+    data[44] = 0;
+    data[45] = 125;
+    data[46] = 36;
+    return data;
   }
 }
