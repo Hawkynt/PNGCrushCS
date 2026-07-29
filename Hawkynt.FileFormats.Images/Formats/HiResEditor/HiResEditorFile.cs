@@ -51,13 +51,6 @@ public readonly record struct HiResEditorFile
   /// <summary>Colours the machine offers.</summary>
   public const int ColorCount = 16;
 
-  /// <summary>The fixed C64 16-colour palette as 0xRRGGBB values.</summary>
-  private static readonly int[] _C64Palette = [
-    0x000000, 0xFFFFFF, 0x880000, 0xAAFFEE, 0xCC44CC, 0x00CC55,
-    0x0000AA, 0xEEEE77, 0xDD8855, 0x664400, 0xFF7777, 0x333333,
-    0x777777, 0xAAFF66, 0x0088FF, 0xBBBBBB
-  ];
-
   static string IImageFormatMetadata<HiResEditorFile>.PrimaryExtension => ".het";
   static string[] IImageFormatMetadata<HiResEditorFile>.FileExtensions => [".het", ".rph"];
   static HiResEditorFile IImageFormatReader<HiResEditorFile>.FromSpan(ReadOnlySpan<byte> data) => HiResEditorReader.FromSpan(data);
@@ -85,9 +78,9 @@ public readonly record struct HiResEditorFile
   internal static byte[] PaletteRgb() {
     var palette = new byte[ColorCount * 3];
     for (var i = 0; i < ColorCount; ++i) {
-      palette[i * 3] = (byte)((_C64Palette[i] >> 16) & 0xFF);
-      palette[i * 3 + 1] = (byte)((_C64Palette[i] >> 8) & 0xFF);
-      palette[i * 3 + 2] = (byte)(_C64Palette[i] & 0xFF);
+      palette[i * 3] = (byte)((Commodore64Graphics.HexColors[i] >> 16) & 0xFF);
+      palette[i * 3 + 1] = (byte)((Commodore64Graphics.HexColors[i] >> 8) & 0xFF);
+      palette[i * 3 + 2] = (byte)(Commodore64Graphics.HexColors[i] & 0xFF);
     }
 
     return palette;

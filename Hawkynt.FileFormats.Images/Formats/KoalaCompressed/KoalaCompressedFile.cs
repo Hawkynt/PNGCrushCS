@@ -38,13 +38,6 @@ public readonly record struct KoalaCompressedFile : IImageFormatReader<KoalaComp
   /// <summary>The RLE escape byte.</summary>
   internal const byte RleEscapeByte = 0xFE;
 
-  /// <summary>The fixed C64 16-color palette as 0xRRGGBB values.</summary>
-  private static readonly int[] _C64Palette = [
-    0x000000, 0xFFFFFF, 0x880000, 0xAAFFEE, 0xCC44CC, 0x00CC55,
-    0x0000AA, 0xEEEE77, 0xDD8855, 0x664400, 0xFF7777, 0x333333,
-    0x777777, 0xAAFF66, 0x0088FF, 0xBBBBBB
-  ];
-
   /// <summary>Image width, always 160.</summary>
   public int Width => FixedWidth;
 
@@ -67,43 +60,8 @@ public readonly record struct KoalaCompressedFile : IImageFormatReader<KoalaComp
   public byte BackgroundColor { get; init; }
 
   /// <summary>Converts this compressed Koala image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
-  public static RawImage ToRawImage(KoalaCompressedFile file) {
-
-    const int width = FixedWidth;
-    const int height = FixedHeight;
-    var rgb = new byte[width * height * 3];
-
-    for (var y = 0; y < height; ++y)
-      for (var x = 0; x < width; ++x) {
-        var cellX = x / 4;
-        var cellY = y / 8;
-        var cellIndex = cellY * 40 + cellX;
-        var byteInCell = y % 8;
-        var bitmapByte = file.BitmapData[cellIndex * 8 + byteInCell];
-        var pixelInByte = x % 4;
-        var bitValue = (bitmapByte >> ((3 - pixelInByte) * 2)) & 0x03;
-
-        var colorIndex = bitValue switch {
-          0 => file.BackgroundColor & 0x0F,
-          1 => (file.VideoMatrix[cellIndex] >> 4) & 0x0F,
-          2 => file.VideoMatrix[cellIndex] & 0x0F,
-          3 => file.ColorRam[cellIndex] & 0x0F,
-          _ => 0
-        };
-
-        var color = _C64Palette[colorIndex];
-        var offset = (y * width + x) * 3;
-        rgb[offset] = (byte)((color >> 16) & 0xFF);
-        rgb[offset + 1] = (byte)((color >> 8) & 0xFF);
-        rgb[offset + 2] = (byte)(color & 0xFF);
-      }
-
-    return new() {
-      Width = width,
-      Height = height,
-      Format = PixelFormat.Rgb24,
-      PixelData = rgb,
-    };
-  }
+  public static RawImage ToRawImage(KoalaCompressedFile file)
+    => Commodore64Graphics.DecodeMulticolor(
+      file.BitmapData, file.VideoMatrix, file.ColorRam, file.BackgroundColor, FixedWidth, FixedHeight);
 
 }

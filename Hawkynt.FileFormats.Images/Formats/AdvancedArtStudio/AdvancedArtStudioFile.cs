@@ -37,13 +37,6 @@ public readonly record struct AdvancedArtStudioFile : IImageFormatReader<Advance
   internal const int MulticolorTrailingSize = 16;
   internal const int HiResTrailingSize = 7;
 
-  /// <summary>Fixed C64 16-colour palette as 0xRRGGBB values.</summary>
-  private static readonly int[] _C64Palette = [
-    0x000000, 0xFFFFFF, 0x880000, 0xAAFFEE, 0xCC44CC, 0x00CC55,
-    0x0000AA, 0xEEEE77, 0xDD8855, 0x664400, 0xFF7777, 0x333333,
-    0x777777, 0xAAFF66, 0x0088FF, 0xBBBBBB
-  ];
-
   /// <summary><c>true</c> for the 320x200 hi-res variant; <c>false</c> for the 160x200 multicolor variant.</summary>
   public bool IsHiRes { get; init; }
 
@@ -114,7 +107,7 @@ public readonly record struct AdvancedArtStudioFile : IImageFormatReader<Advance
   }
 
   private static void _PutPixel(byte[] rgb, int pixelIndex, int colorIndex) {
-    var color = _C64Palette[colorIndex];
+    var color = Commodore64Graphics.HexColors[colorIndex];
     var o = pixelIndex * 3;
     rgb[o]     = (byte)((color >> 16) & 0xFF);
     rgb[o + 1] = (byte)((color >> 8) & 0xFF);

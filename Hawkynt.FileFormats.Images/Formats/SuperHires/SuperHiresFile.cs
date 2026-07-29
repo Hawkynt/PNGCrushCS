@@ -32,13 +32,6 @@ public readonly record struct SuperHiresFile : IImageFormatReader<SuperHiresFile
   /// <summary>Expected file size: 2 + 8000 + 1000 + 8000 + 1000 + 240 = 18242.</summary>
   public const int ExpectedFileSize = LoadAddressSize + BitmapDataSize + ScreenDataSize + BitmapDataSize + ScreenDataSize + PaddingSize;
 
-  /// <summary>The fixed C64 16-color palette as 0xRRGGBB values.</summary>
-  private static readonly int[] _C64Palette = [
-    0x000000, 0xFFFFFF, 0x880000, 0xAAFFEE, 0xCC44CC, 0x00CC55,
-    0x0000AA, 0xEEEE77, 0xDD8855, 0x664400, 0xFF7777, 0x333333,
-    0x777777, 0xAAFF66, 0x0088FF, 0xBBBBBB
-  ];
-
   /// <summary>C64 memory load address (2 bytes, little-endian).</summary>
   public ushort LoadAddress { get; init; }
 
@@ -86,8 +79,8 @@ public readonly record struct SuperHiresFile : IImageFormatReader<SuperHiresFile
           ? (screenByte2 >> 4) & 0x0F
           : screenByte2 & 0x0F;
 
-        var color1 = _C64Palette[colorIndex1];
-        var color2 = _C64Palette[colorIndex2];
+        var color1 = Commodore64Graphics.HexColors[colorIndex1];
+        var color2 = Commodore64Graphics.HexColors[colorIndex2];
 
         // Combine: same color = solid, different = average
         int r, g, b;

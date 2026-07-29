@@ -35,13 +35,6 @@ public readonly record struct ChampionsInterlaceFile : IImageFormatReader<Champi
   /// <summary>Minimum payload size (everything except load address).</summary>
   internal const int MinPayloadSize = FileSize - LoadAddressSize; // 19001
 
-  /// <summary>The fixed C64 16-color palette as 0xRRGGBB values.</summary>
-  private static readonly int[] _C64Palette = [
-    0x000000, 0xFFFFFF, 0x880000, 0xAAFFEE, 0xCC44CC, 0x00CC55,
-    0x0000AA, 0xEEEE77, 0xDD8855, 0x664400, 0xFF7777, 0x333333,
-    0x777777, 0xAAFF66, 0x0088FF, 0xBBBBBB
-  ];
-
   /// <summary>C64 memory load address (2 bytes, little-endian).</summary>
   public ushort LoadAddress { get; init; }
 
@@ -113,7 +106,7 @@ public readonly record struct ChampionsInterlaceFile : IImageFormatReader<Champi
       _ => 0
     };
 
-    return _C64Palette[colorIndex];
+    return Commodore64Graphics.HexColors[colorIndex];
   }
 
 }

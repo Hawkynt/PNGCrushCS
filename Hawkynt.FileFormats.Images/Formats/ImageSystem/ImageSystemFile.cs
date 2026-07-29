@@ -24,13 +24,6 @@ public readonly record struct ImageSystemFile : IImageFormatReader<ImageSystemFi
   /// <summary>Multicolor file size: same as Koala (2 + 8000 + 1000 + 1000 + 1) = 10003.</summary>
   public const int MulticolorFileSize = 10003;
 
-  /// <summary>The fixed C64 16-color palette as 0xRRGGBB values.</summary>
-  private static readonly int[] _C64Palette = [
-    0x000000, 0xFFFFFF, 0x880000, 0xAAFFEE, 0xCC44CC, 0x00CC55,
-    0x0000AA, 0xEEEE77, 0xDD8855, 0x664400, 0xFF7777, 0x333333,
-    0x777777, 0xAAFF66, 0x0088FF, 0xBBBBBB
-  ];
-
   static string IImageFormatMetadata<ImageSystemFile>.PrimaryExtension => ".ish";
   static string[] IImageFormatMetadata<ImageSystemFile>.FileExtensions => [".ish", ".ism"];
   static ImageSystemFile IImageFormatReader<ImageSystemFile>.FromSpan(ReadOnlySpan<byte> data) => ImageSystemReader.FromSpan(data);
@@ -87,7 +80,7 @@ public readonly record struct ImageSystemFile : IImageFormatReader<ImageSystemFi
           ? (screenByte >> 4) & 0x0F
           : screenByte & 0x0F;
 
-        var color = _C64Palette[colorIndex];
+        var color = Commodore64Graphics.HexColors[colorIndex];
         var offset = (y * width + x) * 3;
         rgb[offset] = (byte)((color >> 16) & 0xFF);
         rgb[offset + 1] = (byte)((color >> 8) & 0xFF);
@@ -122,7 +115,7 @@ public readonly record struct ImageSystemFile : IImageFormatReader<ImageSystemFi
           _ => 0
         };
 
-        var color = _C64Palette[colorIndex];
+        var color = Commodore64Graphics.HexColors[colorIndex];
         var offset = (y * width + x) * 3;
         rgb[offset] = (byte)((color >> 16) & 0xFF);
         rgb[offset + 1] = (byte)((color >> 8) & 0xFF);

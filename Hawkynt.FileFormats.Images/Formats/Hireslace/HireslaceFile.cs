@@ -37,13 +37,6 @@ public readonly record struct HireslaceFile : IImageFormatReader<HireslaceFile>,
 
   internal const int ExpectedFileSize = Bitmap2Offset + SlotSize;
 
-  /// <summary>The fixed C64 16-color palette as 0xRRGGBB values.</summary>
-  internal static readonly int[] C64Palette = [
-    0x000000, 0xFFFFFF, 0x880000, 0xAAFFEE, 0xCC44CC, 0x00CC55,
-    0x0000AA, 0xEEEE77, 0xDD8855, 0x664400, 0xFF7777, 0x333333,
-    0x777777, 0xAAFF66, 0x0088FF, 0xBBBBBB
-  ];
-
   /// <summary>Always 320.</summary>
   public int Width => 320;
 
@@ -179,7 +172,7 @@ public readonly record struct HireslaceFile : IImageFormatReader<HireslaceFile>,
           ? (screenByte >> 4) & 0x0F
           : screenByte & 0x0F;
 
-        var color = C64Palette[colorIndex];
+        var color = Commodore64Graphics.HexColors[colorIndex];
         var offset = (y * width + x) * 3;
         rgb[offset] = (byte)((color >> 16) & 0xFF);
         rgb[offset + 1] = (byte)((color >> 8) & 0xFF);
@@ -193,7 +186,7 @@ public readonly record struct HireslaceFile : IImageFormatReader<HireslaceFile>,
     var bestDist = int.MaxValue;
     var bestIdx = 0;
     for (var i = 0; i < 16; ++i) {
-      var c = C64Palette[i];
+      var c = Commodore64Graphics.HexColors[i];
       var cr = (c >> 16) & 0xFF;
       var cg = (c >> 8) & 0xFF;
       var cb = c & 0xFF;

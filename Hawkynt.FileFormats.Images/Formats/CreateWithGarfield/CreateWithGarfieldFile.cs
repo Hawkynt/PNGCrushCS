@@ -32,13 +32,6 @@ public readonly record struct CreateWithGarfieldFile : IImageFormatReader<Create
   /// <summary>Size of the border color byte.</summary>
   internal const int BorderColorSize = 1;
 
-  /// <summary>The fixed C64 16-color palette as 0xRRGGBB values.</summary>
-  private static readonly int[] _C64Palette = [
-    0x000000, 0xFFFFFF, 0x880000, 0xAAFFEE, 0xCC44CC, 0x00CC55,
-    0x0000AA, 0xEEEE77, 0xDD8855, 0x664400, 0xFF7777, 0x333333,
-    0x777777, 0xAAFF66, 0x0088FF, 0xBBBBBB
-  ];
-
   /// <summary>Image width, always 320.</summary>
   public int Width => FixedWidth;
 
@@ -58,40 +51,7 @@ public readonly record struct CreateWithGarfieldFile : IImageFormatReader<Create
   public byte BorderColor { get; init; }
 
   /// <summary>Converts this Create with Garfield image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
-  public static RawImage ToRawImage(CreateWithGarfieldFile file) {
-
-    const int width = FixedWidth;
-    const int height = FixedHeight;
-    var rgb = new byte[width * height * 3];
-
-    for (var y = 0; y < height; ++y)
-      for (var x = 0; x < width; ++x) {
-        var cellX = x / 8;
-        var cellY = y / 8;
-        var cellIndex = cellY * 40 + cellX;
-        var byteInCell = y % 8;
-        var bitmapByte = file.BitmapData[cellIndex * 8 + byteInCell];
-        var bitPosition = 7 - (x % 8);
-        var bitValue = (bitmapByte >> bitPosition) & 1;
-
-        var screenByte = file.ScreenRam[cellIndex];
-        var colorIndex = bitValue == 1
-          ? (screenByte >> 4) & 0x0F
-          : screenByte & 0x0F;
-
-        var color = _C64Palette[colorIndex];
-        var offset = (y * width + x) * 3;
-        rgb[offset] = (byte)((color >> 16) & 0xFF);
-        rgb[offset + 1] = (byte)((color >> 8) & 0xFF);
-        rgb[offset + 2] = (byte)(color & 0xFF);
-      }
-
-    return new() {
-      Width = width,
-      Height = height,
-      Format = PixelFormat.Rgb24,
-      PixelData = rgb,
-    };
-  }
+  public static RawImage ToRawImage(CreateWithGarfieldFile file)
+    => Commodore64Graphics.DecodeHires(file.BitmapData, file.ScreenRam, FixedWidth, FixedHeight);
 
 }

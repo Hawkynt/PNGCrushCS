@@ -50,13 +50,6 @@ public readonly record struct C128MultiFile : IImageFormatReader<C128MultiFile>,
   /// <summary>Background color index (0-15), stored in spare area.</summary>
   public byte BackgroundColor { get; init; }
 
-  /// <summary>The fixed C64/C128 16-color palette as 0xRRGGBB values.</summary>
-  private static readonly int[] _C64Palette = [
-    0x000000, 0xFFFFFF, 0x880000, 0xAAFFEE, 0xCC44CC, 0x00CC55,
-    0x0000AA, 0xEEEE77, 0xDD8855, 0x664400, 0xFF7777, 0x333333,
-    0x777777, 0xAAFF66, 0x0088FF, 0xBBBBBB
-  ];
-
   /// <summary>Converts the C128 multicolor image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(C128MultiFile file) {
 
@@ -82,7 +75,7 @@ public readonly record struct C128MultiFile : IImageFormatReader<C128MultiFile>,
           _ => 0
         };
 
-        var color = _C64Palette[colorIndex];
+        var color = Commodore64Graphics.HexColors[colorIndex];
         var offset = (y * PixelWidth + x) * 3;
         rgb[offset] = (byte)((color >> 16) & 0xFF);
         rgb[offset + 1] = (byte)((color >> 8) & 0xFF);

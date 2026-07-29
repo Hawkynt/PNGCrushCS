@@ -33,13 +33,6 @@ public readonly record struct RunPaintFile : IImageFormatReader<RunPaintFile>, I
   /// <summary>Size of the load address in bytes.</summary>
   internal const int LoadAddressSize = 2;
 
-  /// <summary>The fixed C64 16-color palette as 0xRRGGBB values.</summary>
-  private static readonly int[] _C64Palette = [
-    0x000000, 0xFFFFFF, 0x880000, 0xAAFFEE, 0xCC44CC, 0x00CC55,
-    0x0000AA, 0xEEEE77, 0xDD8855, 0x664400, 0xFF7777, 0x333333,
-    0x777777, 0xAAFF66, 0x0088FF, 0xBBBBBB
-  ];
-
   /// <summary>Image width, always 160.</summary>
   public int Width => FixedWidth;
 
@@ -86,7 +79,7 @@ public readonly record struct RunPaintFile : IImageFormatReader<RunPaintFile>, I
           _ => 0
         };
 
-        var color = _C64Palette[colorIndex];
+        var color = Commodore64Graphics.HexColors[colorIndex];
         var offset = (y * width + x) * 3;
         rgb[offset] = (byte)((color >> 16) & 0xFF);
         rgb[offset + 1] = (byte)((color >> 8) & 0xFF);
