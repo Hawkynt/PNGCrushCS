@@ -66,6 +66,28 @@ public static class MsxGraphics {
 
   private static int _Reduce3(byte value) => (value * 7 + 127) / 255;
 
+  /// <summary>
+  /// The sixteen colours an MSX2 starts up with, in the stored two-byte form.
+  /// </summary>
+  /// <remarks>
+  /// Several formats keep their palette in a companion file rather than in the picture. When that
+  /// file is absent — and for a picture handed over as bytes it always is — this is what the machine
+  /// would have been showing, so it is what the picture means.
+  /// </remarks>
+  public static ReadOnlySpan<byte> DefaultPalette => [
+    0, 0, 0, 0, 17, 6, 51, 7, 23, 1, 39, 3, 81, 1, 39, 6,
+    113, 1, 115, 3, 97, 6, 100, 6, 17, 4, 101, 2, 85, 5, 119, 7,
+  ];
+
+  /// <summary>Reads the nibble at an index, high half of each byte first.</summary>
+  public static int GetNibble(ReadOnlySpan<byte> data, int offset, int index) {
+    var position = offset + (index >> 1);
+    if (position >= data.Length)
+      return 0;
+
+    return (index & 1) == 0 ? data[position] >> 4 : data[position] & 15;
+  }
+
   /// <summary>Pixels one YJK group spans; the group shares a single pair of chroma components.</summary>
   public const int YjkGroupSize = 4;
 

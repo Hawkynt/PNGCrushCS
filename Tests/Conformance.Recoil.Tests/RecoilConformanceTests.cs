@@ -115,6 +115,8 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.MsxGlYjk, "MSX2+ GL YJK as .gls", 256, 212, ".gls"),
     new(ImageFormat.MsxGl6, "MSX2 GL6", 512, 424, ".gl6"),
     new(ImageFormat.MsxGl6, "Dynamic Publisher stamp", 512, 424, ".stp"),
+    new(ImageFormat.MsxGl16, "MSX2 GL5", 256, 212, ".gl5"),
+    new(ImageFormat.MsxGl16, "MSX2 SH5", 256, 212, ".sh5"),
   ];
 
   [Test]

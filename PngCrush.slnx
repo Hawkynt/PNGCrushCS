@@ -345,6 +345,7 @@
     <Project Path="Tests/FileFormat.MsxScreen10.Tests/FileFormat.MsxScreen10.Tests.csproj" />
     <Project Path="Tests/FileFormat.MsxGlYjk.Tests/FileFormat.MsxGlYjk.Tests.csproj" />
     <Project Path="Tests/FileFormat.MsxGl6.Tests/FileFormat.MsxGl6.Tests.csproj" />
+    <Project Path="Tests/FileFormat.MsxGl16.Tests/FileFormat.MsxGl16.Tests.csproj" />
     <Project Path="Tests/FileFormat.MsxScreen8.Tests/FileFormat.MsxScreen8.Tests.csproj" />
     <Project Path="Tests/FileFormat.MsxSprite.Tests/FileFormat.MsxSprite.Tests.csproj" />
     <Project Path="Tests/FileFormat.MsxVideo.Tests/FileFormat.MsxVideo.Tests.csproj" />

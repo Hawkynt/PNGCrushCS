@@ -34,6 +34,12 @@ public sealed class RecoilDecodeAgreementTests {
     new("Botticelli", ImageFormat.Botticelli, ".p4i", () => _Botticelli(multicolor: false)),
     new("Multi Botticelli", ImageFormat.Botticelli, ".p4i", () => _Botticelli(multicolor: true)),
     new("Botticelli logo", ImageFormat.Botticelli, ".p4i", _BotticelliLogo),
+    // No companion .PL5/.PL7 exists beside a temp file, so these also pin down that both sides fall
+    // back to the same MSX2 startup palette.
+    new("MSX2 GL5", ImageFormat.MsxGl16, ".gl5", () => _Gl16(64, 48)),
+    new("MSX2 SH5", ImageFormat.MsxGl16, ".sh5", () => _Gl16(32, 24)),
+    new("MSX2 GL7", ImageFormat.MsxGl16, ".gl7", () => _Gl16(64, 48)),
+    new("MSX2 SH7", ImageFormat.MsxGl16, ".sh7", () => _Gl16(96, 16)),
   ];
 
   [Test]
@@ -57,9 +63,7 @@ public sealed class RecoilDecodeAgreementTests {
 
     var theirs = _AsRgb(FormatRegistry.Read(png!));
 
-    var entry = FormatRegistry.GetEntry(probe.Format);
-    Assert.That(entry, Is.Not.Null, $"{probe.Format} is not registered");
-    var ours = _AsRgb(entry!.LoadRawImageFromBytes(bytes));
+    var ours = _AsRgb(_DecodeOurs(probe, bytes));
 
     Assert.Multiple(() => {
       Assert.That(ours.Width, Is.EqualTo(theirs.Width), "width");
@@ -75,6 +79,24 @@ public sealed class RecoilDecodeAgreementTests {
         $"{probe}: pixel {pixel % theirs.Width},{pixel / theirs.Width} channel {i % 3} — " +
         $"ours {ours.PixelData[i]}, RECOIL {theirs.PixelData[i]}");
     }
+  }
+
+  /// <summary>
+  /// Decodes with our reader, going through the extension-aware entry point where a format has one.
+  /// </summary>
+  /// <remarks>
+  /// A few of these formats keep the thing that decides how to read them in the file name rather
+  /// than the file. RECOIL dispatches on the extension too, so a comparison that ignored it would
+  /// be comparing two different questions.
+  /// </remarks>
+  private static RawImage? _DecodeOurs(Probe probe, byte[] bytes) {
+    if (probe.Format == ImageFormat.MsxGl16)
+      return FileFormat.MsxGl16.MsxGl16File.ToRawImage(
+        FileFormat.MsxGl16.MsxGl16Reader.FromSpan(bytes, FileFormat.MsxGl16.MsxGl16File.ModeFromExtension(probe.Extension)));
+
+    var entry = FormatRegistry.GetEntry(probe.Format);
+    Assert.That(entry, Is.Not.Null, $"{probe.Format} is not registered");
+    return entry!.LoadRawImageFromBytes(bytes);
   }
 
   private static RawImage _AsRgb(RawImage? image) {
@@ -102,6 +124,19 @@ public sealed class RecoilDecodeAgreementTests {
 
     for (var i = 0; i < 8000; ++i)
       data[2050 + i] = (byte)(i * 31 + (i >> 5));
+
+    return data;
+  }
+
+  /// <summary>A sized-header 16-colour picture whose nibbles walk every palette entry.</summary>
+  private static byte[] _Gl16(int width, int height) {
+    var data = new byte[4 + (width * height + 1) / 2];
+    data[0] = (byte)width;
+    data[1] = (byte)(width >> 8);
+    data[2] = (byte)height;
+    data[3] = (byte)(height >> 8);
+    for (var i = 4; i < data.Length; ++i)
+      data[i] = (byte)(i * 11 + (i >> 4));
 
     return data;
   }
