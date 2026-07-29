@@ -68,6 +68,13 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.Mamut, "Mamut", 320, 192),
     new(ImageFormat.VidigPaint, "Vidig Paint", 320, 192),
     new(ImageFormat.TurboRascal, "Turbo Rascal Syntax Error", 320, 200),
+    // The same ILBM writer under each extension RECOIL routes through its IFF decoder.
+    new(ImageFormat.Ilbm, "Hold-And-Modify 6", 64, 64, ".ham"),
+    new(ImageFormat.Ilbm, "Hold-And-Modify 8", 64, 64, ".ham8"),
+    new(ImageFormat.Ilbm, "Paint 256", 64, 64, ".256"),
+    new(ImageFormat.Ilbm, "DEGAS Elite block 1", 64, 64, ".bl1"),
+    new(ImageFormat.Ilbm, "DEGAS Elite block 2", 64, 64, ".bl2"),
+    new(ImageFormat.Ilbm, "DEGAS Elite block 3", 64, 64, ".bl3"),
   ];
 
   [Test]

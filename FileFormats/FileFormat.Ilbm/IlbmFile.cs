@@ -8,7 +8,7 @@ namespace FileFormat.Ilbm;
 public readonly record struct IlbmFile : IImageFormatReader<IlbmFile>, IImageToRawImage<IlbmFile>, IImageFromRawImage<IlbmFile>, IImageFormatWriter<IlbmFile> {
 
   static string IImageFormatMetadata<IlbmFile>.PrimaryExtension => ".lbm";
-  static string[] IImageFormatMetadata<IlbmFile>.FileExtensions => [".lbm", ".ilbm", ".iff"];
+  static string[] IImageFormatMetadata<IlbmFile>.FileExtensions => [".lbm", ".ilbm", ".iff", ".ham", ".ham8", ".256", ".bl1", ".bl2", ".bl3"];
   static IlbmFile IImageFormatReader<IlbmFile>.FromSpan(ReadOnlySpan<byte> data) => IlbmReader.FromSpan(data);
 
   static bool? IImageFormatMetadata<IlbmFile>.MatchesSignature(ReadOnlySpan<byte> header)
@@ -90,50 +90,14 @@ public readonly record struct IlbmFile : IImageFormatReader<IlbmFile>, IImageToR
   /// <summary>Creates an <see cref="IlbmFile"/> from a format-independent <see cref="RawImage"/>.</summary>
   public static IlbmFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Indexed8);
+    // ILBM is a planar indexed format, so anything else has to be reduced to a palette. The
+    // conversion handles both cases: an image already within 256 colours keeps them exactly,
+    // and a fuller one is quantized rather than refused.
+    image = image.EnsureFormat(PixelFormat.Indexed8);
 
-    byte[] pixelData;
-    byte[]? palette;
-    int numPlanes;
-
-    switch (image.Format) {
-      case PixelFormat.Indexed8:
-        pixelData = image.PixelData[..];
-        palette = image.Palette is { } p ? p[..] : null;
-        numPlanes = Math.Max(1, (int)Math.Ceiling(Math.Log2(Math.Max(image.PaletteCount, 2))));
-        break;
-      case PixelFormat.Rgb24:
-        // Quantize to indexed: collect unique colors up to 256
-        var colorMap = new System.Collections.Generic.Dictionary<int, byte>();
-        var indices = new byte[image.PixelData.Length / 3];
-        for (var i = 0; i < indices.Length; ++i) {
-          var r = image.PixelData[i * 3];
-          var g = image.PixelData[i * 3 + 1];
-          var b = image.PixelData[i * 3 + 2];
-          var key = (r << 16) | (g << 8) | b;
-          if (!colorMap.TryGetValue(key, out var idx)) {
-            if (colorMap.Count >= 256)
-              throw new ArgumentException("RGB24 image has more than 256 unique colors; quantization is not supported.", nameof(image));
-            idx = (byte)colorMap.Count;
-            colorMap[key] = idx;
-          }
-          indices[i] = idx;
-        }
-
-        var palData = new byte[colorMap.Count * 3];
-        foreach (var (key, idx) in colorMap) {
-          palData[idx * 3] = (byte)(key >> 16);
-          palData[idx * 3 + 1] = (byte)((key >> 8) & 0xFF);
-          palData[idx * 3 + 2] = (byte)(key & 0xFF);
-        }
-
-        pixelData = indices;
-        palette = palData;
-        numPlanes = Math.Max(1, (int)Math.Ceiling(Math.Log2(Math.Max(colorMap.Count, 2))));
-        break;
-      default:
-        throw new ArgumentException($"Unsupported pixel format for ILBM: {image.Format}", nameof(image));
-    }
+    var pixelData = image.PixelData[..];
+    var palette = image.Palette is { } p ? p[..] : null;
+    var numPlanes = Math.Max(1, (int)Math.Ceiling(Math.Log2(Math.Max(image.PaletteCount, 2))));
 
     return new() {
       Width = image.Width,
