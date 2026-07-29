@@ -76,6 +76,8 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.Ilbm, "DEGAS Elite block 2", 64, 64, ".bl2"),
     new(ImageFormat.Ilbm, "DEGAS Elite block 3", 64, 64, ".bl3"),
     new(ImageFormat.ZxNextImage, "256x192 format", 256, 192),
+    new(ImageFormat.TextureMaker0, "Texture Maker0 16x16x16", 64, 64),
+    new(ImageFormat.BbcMicroScreen, "Mode 4", 320, 256, ".bb4"),
   ];
 
   [Test]

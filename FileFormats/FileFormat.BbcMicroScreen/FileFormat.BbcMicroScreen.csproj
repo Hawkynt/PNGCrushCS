@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Pure C# reader and writer for BBC Micro screen dumps (.bb0/.bb1/.bb2/.bb4/.bb5).</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="FileFormat.BbcMicroScreen.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../FileFormat.Core/FileFormat.Core.csproj" />
+    <ProjectReference Include="../../FileFormat.Core.Generators/FileFormat.Core.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+</Project>
