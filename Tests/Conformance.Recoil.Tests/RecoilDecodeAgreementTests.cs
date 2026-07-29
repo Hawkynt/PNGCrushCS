@@ -48,6 +48,7 @@ public sealed class RecoilDecodeAgreementTests {
     new("SAM Coupe Mode 2 with interrupts", ImageFormat.SamCoupeScreen, ".ss2", () => _SamCoupe(2, interrupts: true)),
     new("SAM Coupe Mode 3", ImageFormat.SamCoupeScreen, ".ss3", () => _SamCoupe(3, interrupts: false)),
     new("SAM Coupe Mode 3 with interrupts", ImageFormat.SamCoupeScreen, ".ss3", () => _SamCoupe(3, interrupts: true)),
+    new("McPainter", ImageFormat.McPainter, ".mcp", _McPainter),
   ];
 
   [Test]
@@ -183,6 +184,23 @@ public sealed class RecoilDecodeAgreementTests {
     }
 
     data[at] = 0xFF;
+    return data;
+  }
+
+  /// <summary>
+  /// Two Graphics 15 fields that differ from each other, with two register sets that also differ —
+  /// so getting the field order, the scanline parity or the register rotation wrong all show up.
+  /// </summary>
+  private static byte[] _McPainter() {
+    var data = new byte[16008];
+    for (var i = 0; i < 8000; ++i) {
+      data[i] = (byte)(i * 29 + (i >> 5));
+      data[8000 + i] = (byte)(i * 53 + (i >> 3));
+    }
+
+    ReadOnlySpan<byte> registers = [0x0E, 0x46, 0x92, 0x00, 0x24, 0xDA, 0x68, 0x0C];
+    registers.CopyTo(data.AsSpan(16000));
+
     return data;
   }
 
