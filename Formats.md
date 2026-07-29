@@ -431,7 +431,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | QuantumPaint            | .pbx                                                 | Atari ST QuantumPaint 320x200   | Y      | Y      | —         | R     | —   | —      | —         |
 | Rage Paint              | .rge                                                 | Atari Falcon Rage Paint TC       | Y      | Y      | —         | R     | —   | —      | —         |
 | Rainbow Painter         | .rp                                                  | C64 Rainbow Painter              | Y      | —      | —         | RW    | —   | —      | —         |
-| Ram Brandt              | .rmb, .rbr                                           | Atari 8-bit Ram Brandt 160x192  | Y      | Y      | —         | R     | —   | —      | —         |
+| Ram Brandt              | .rm0, .rm1, .rm2, .rm3, .rm4                         | Atari 8-bit Ram Brandt 320x192   | Y      | Y      | —         | R     | —   | —      | —         |
 | Red Storm RSB           | .rsb                                                 | Red Storm Entertainment tex      | Y      | Y      | —         | —     | —   | —      | —         |
 | Rembrandt               | .tcp                                                 | Atari Falcon Rembrandt TC        | Y      | Y      | —         | R     | —   | —      | —         |
 | RGF                     | .rgf                                                 | LEGO Mindstorms EV3 graphic      | Y      | Y      | —         | RW    | —   | —      | —         |
@@ -667,17 +667,17 @@ Two different questions, two different answers:
 | ----------------------------------------------------------- | ----- | ------ |
 | Total formats                                              | 551   | 552    |
 | Modern/web/scientific formats (PNG, JPEG, WebP, AVIF, …)   | ~290  | 0      |
-| Of RECOIL's 552 vintage formats, covered                   | 297   | 552    |
+| Of RECOIL's 552 vintage formats, covered                   | 345   | 552    |
 
 So on breadth we are level, and on everything outside the retro catalogue we are the only one of
-the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 255
+the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 207
 formats.
 
-Largest remaining clusters: Atari 8-bit (92), Atari ST/STE (32), Commodore 64 (28), ZX Spectrum
-(15), Atari Falcon (13), MSX2 (11). Only a handful decode as a plain fixed-size screen that the
-shared Atari primitives already cover; the rest carry their own containers or compression. RECOIL
-is a decoder only, so for each one the encoder has to be derived from its decoder and then proved
-by round-tripping back through it.
+Largest remaining clusters: Atari 8-bit (76), Commodore 64 (27), Atari ST/STE (25), Atari Falcon
+(11), MSX2 (11), NEC PC-98 (7), ZX Spectrum (7). Only a handful decode as a plain fixed-size screen
+that the shared Atari primitives already cover; the rest carry their own containers or compression.
+RECOIL is a decoder only, so for each one the encoder has to be derived from its decoder and then
+proved by round-tripping back through it.
 
 ### Third-party conformance
 

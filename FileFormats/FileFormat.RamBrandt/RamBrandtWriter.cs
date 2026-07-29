@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace FileFormat.RamBrandt;
 
@@ -6,10 +6,17 @@ namespace FileFormat.RamBrandt;
 public static class RamBrandtWriter {
 
   public static byte[] ToBytes(RamBrandtFile file) {
-    ArgumentNullException.ThrowIfNull(file);
-
     var result = new byte[RamBrandtFile.ExpectedFileSize];
-    file.PixelData.AsSpan(0, Math.Min(file.PixelData.Length, RamBrandtFile.ExpectedFileSize)).CopyTo(result);
+
+    _Copy(file.BitmapData, result, 0, RamBrandtFile.BitmapDataSize);
+    _Copy(file.Colors, result, RamBrandtFile.ColorsOffset, RamBrandtFile.ColorCount);
+    _Copy(file.DisplayList, result, RamBrandtFile.DisplayListOffset, RamBrandtFile.DisplayListSize);
+
     return result;
+  }
+
+  private static void _Copy(byte[]? source, byte[] destination, int offset, int length) {
+    var data = source ?? [];
+    data.AsSpan(0, Math.Min(data.Length, length)).CopyTo(destination.AsSpan(offset));
   }
 }
