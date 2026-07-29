@@ -68,6 +68,52 @@ public static class Atari8BitGraphics {
     return data;
   }
 
+  /// <summary>Logical pixels across an ANTIC mode 8 ("Graphics 3") line.</summary>
+  public const int Gr3Width = 40;
+
+  /// <summary>Logical rows in a Graphics 3 screen.</summary>
+  public const int Gr3Height = 24;
+
+  /// <summary>Bytes per Graphics 3 row: 40 pixels at 2 bits each.</summary>
+  public const int Gr3BytesPerRow = Gr3Width / 4;
+
+  /// <summary>Size of a Graphics 3 screen.</summary>
+  public const int Gr3DataSize = Gr3BytesPerRow * Gr3Height;
+
+  /// <summary>Unpacks an ANTIC mode 8 screen into one byte per logical pixel (values 0..3).</summary>
+  /// <remarks>Mode 8 is the coarsest bitmap the hardware offers: 40x24 pixels, each drawn as an
+  /// 8x8 block, which is why a whole screen fits in 240 bytes.</remarks>
+  public static byte[] UnpackGr3(ReadOnlySpan<byte> data, int offset) {
+    var pixels = new byte[Gr3Width * Gr3Height];
+    for (var y = 0; y < Gr3Height; ++y)
+    for (var x = 0; x < Gr3Width; ++x) {
+      var index = offset + y * Gr3BytesPerRow + (x >> 2);
+      if (index >= data.Length)
+        break;
+
+      var shift = 6 - ((x & 3) << 1);
+      pixels[y * Gr3Width + x] = (byte)((data[index] >> shift) & 3);
+    }
+
+    return pixels;
+  }
+
+  /// <summary>Packs one byte per logical pixel (values 0..3) into the Graphics 3 layout.</summary>
+  public static byte[] PackGr3(ReadOnlySpan<byte> pixels) {
+    var data = new byte[Gr3DataSize];
+    for (var y = 0; y < Gr3Height; ++y)
+    for (var x = 0; x < Gr3Width; ++x) {
+      var source = y * Gr3Width + x;
+      if (source >= pixels.Length)
+        break;
+
+      var shift = 6 - ((x & 3) << 1);
+      data[y * Gr3BytesPerRow + (x >> 2)] |= (byte)((pixels[source] & 3) << shift);
+    }
+
+    return data;
+  }
+
   /// <summary>
   /// Unpacks an ANTIC mode F ("Graphics 9") row set into one luminance value (0..15) per logical
   /// pixel. Mode 9 stores two nibbles per byte, and each nibble covers four screen pixels, so a

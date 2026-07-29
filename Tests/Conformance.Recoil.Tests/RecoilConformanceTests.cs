@@ -80,6 +80,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.BbcMicroScreen, "Mode 4", 320, 256, ".bb4"),
     new(ImageFormat.ZxMulticolor, "Multicolor 8x1", 256, 192, ".mc"),
     new(ImageFormat.ZxAttributes, "Attributes", 256, 192),
+    new(ImageFormat.AtariGraphics3, "Mad Studio Graphics 3", 320, 192, ".gr3"),
   ];
 
   [Test]
