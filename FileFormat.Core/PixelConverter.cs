@@ -186,7 +186,13 @@ public static class PixelConverter {
     var result = new byte[totalPixels * 4];
     var maxIndex = palette.Length / 3 - 1;
 
-    for (var i = 0; i < totalPixels; ++i) {
+    // An empty palette leaves nothing to look up; returning transparent black beats indexing
+    // backwards off the front of the array.
+    if (maxIndex < 0)
+      return result;
+
+    var count = Math.Min(totalPixels, indices.Length);
+    for (var i = 0; i < count; ++i) {
       var idx = Math.Min(indices[i], maxIndex);
       var palOffset = idx * 3;
       var dst = i * 4;
@@ -536,9 +542,14 @@ public static class PixelConverter {
   public static byte[] Indexed4ToBgra(byte[] data, byte[] palette, int totalPixels, byte[]? alphaTable = null) {
     var result = new byte[totalPixels * 4];
     var maxIndex = palette.Length / 3 - 1;
+    if (maxIndex < 0)
+      return result;
 
     for (var i = 0; i < totalPixels; ++i) {
       var byteIndex = i >> 1;
+      if (byteIndex >= data.Length)
+        break;
+
       var idx = (i & 1) == 0 ? (data[byteIndex] >> 4) & 0x0F : data[byteIndex] & 0x0F;
       idx = Math.Min(idx, maxIndex);
       var palOffset = idx * 3;
@@ -556,9 +567,14 @@ public static class PixelConverter {
   public static byte[] Indexed1ToBgra(byte[] data, byte[] palette, int totalPixels, byte[]? alphaTable = null) {
     var result = new byte[totalPixels * 4];
     var maxIndex = palette.Length / 3 - 1;
+    if (maxIndex < 0)
+      return result;
 
     for (var i = 0; i < totalPixels; ++i) {
       var byteIndex = i >> 3;
+      if (byteIndex >= data.Length)
+        break;
+
       var bitIndex = 7 - (i & 7);
       var idx = (data[byteIndex] >> bitIndex) & 1;
       idx = Math.Min(idx, maxIndex);
