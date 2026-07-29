@@ -78,6 +78,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.ZxNextImage, "256x192 format", 256, 192),
     new(ImageFormat.TextureMaker0, "Texture Maker0 16x16x16", 64, 64),
     new(ImageFormat.BbcMicroScreen, "Mode 4", 320, 256, ".bb4"),
+    new(ImageFormat.ZxMulticolor, "Multicolor 8x1", 256, 192, ".mc"),
   ];
 
   [Test]
