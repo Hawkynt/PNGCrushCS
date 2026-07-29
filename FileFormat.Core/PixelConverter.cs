@@ -13,6 +13,10 @@ public static class PixelConverter {
     if (source.Format == target)
       return source;
 
+    // Indexed targets carry a palette, so they can't go through the byte[]-returning switch below.
+    if (target is PixelFormat.Indexed8 or PixelFormat.Indexed4 or PixelFormat.Indexed1 or PixelFormat.Indexed16)
+      return _ConvertToIndexed(source, target);
+
     var width = source.Width;
     var height = source.Height;
     var totalPixels = width * height;
@@ -52,6 +56,12 @@ public static class PixelConverter {
       (PixelFormat.Bgra32, PixelFormat.Rgb48) => BgraToRgb48(data, totalPixels),
       (PixelFormat.Bgra32, PixelFormat.Rgba64) => BgraToRgba64(data, totalPixels),
 
+      // Remaining hub exits. Without these the (Bgra32, target) pair falls through to
+      // _ConvertViaIntermediate, whose own hub leg is a no-op — which used to recurse forever.
+      (PixelFormat.Bgra32, PixelFormat.GrayAlpha16) => BgraToGrayAlpha16(data, totalPixels),
+      (PixelFormat.Bgra32, PixelFormat.Gray10) => BgraToGray10(data, totalPixels),
+      (PixelFormat.Bgra32, PixelFormat.Rgb30) => BgraToRgb30(data, totalPixels),
+
       // Direct 16↔16 routes (avoid lossy 8-bit hub)
       (PixelFormat.Rgb48, PixelFormat.Rgba64) => Rgb48ToRgba64(data, totalPixels),
       (PixelFormat.Rgba64, PixelFormat.Rgb48) => Rgba64ToRgb48(data, totalPixels),
@@ -82,11 +92,33 @@ public static class PixelConverter {
   }
 
   private static byte[] _ConvertViaIntermediate(RawImage source, PixelFormat target) {
+    // Reaching the fallback with a BGRA32 source means the (Bgra32, target) pair has no direct route.
+    // Recursing would convert BGRA32 to itself forever and overflow the stack, so refuse instead.
+    if (source.Format == PixelFormat.Bgra32)
+      throw new NotSupportedException($"No conversion route from {PixelFormat.Bgra32} to {target}.");
+
     var bgra = Convert(source, PixelFormat.Bgra32);
     if (target == PixelFormat.Bgra32)
       return bgra.PixelData;
 
     return Convert(bgra, target).PixelData;
+  }
+
+  /// <summary>Quantizes to an indexed format, producing the palette and alpha table alongside the indices.</summary>
+  private static RawImage _ConvertToIndexed(RawImage source, PixelFormat target) {
+    var bgra = source.Format == PixelFormat.Bgra32 ? source : Convert(source, PixelFormat.Bgra32);
+    var totalPixels = source.Width * source.Height;
+    var result = ColorQuantizer.Quantize(bgra.PixelData, totalPixels, ColorQuantizer.MaxColorsFor(target));
+
+    return new() {
+      Width = source.Width,
+      Height = source.Height,
+      Format = target,
+      PixelData = ColorQuantizer.PackIndices(result.Indices, target),
+      Palette = result.Palette,
+      PaletteCount = result.Count,
+      AlphaTable = result.AlphaTable,
+    };
   }
 
   private static readonly Vector128<byte> _BgrExpandMask = Vector128.Create((byte)0, 1, 2, 0xFF, 3, 4, 5, 0xFF, 6, 7, 8, 0xFF, 9, 10, 11, 0xFF);
@@ -317,6 +349,65 @@ public static class PixelConverter {
 
   /// <summary>Converts BGRA (4 bytes/pixel) to BGR (3 bytes/pixel), discarding alpha.</summary>
   public static byte[] BgraToBgr(byte[] data, int totalPixels) => _Compact4To3(data, totalPixels, _BgrCompactMask, 0, 1, 2);
+
+  /// <summary>Converts BGRA (4 bytes/pixel) to GrayAlpha16 (2 bytes/pixel: gray, alpha), using the same
+  /// luminance weights as <see cref="BgraToGray8"/> so the two stay consistent.</summary>
+  public static byte[] BgraToGrayAlpha16(byte[] data, int totalPixels) {
+    var result = new byte[totalPixels * 2];
+    for (var i = 0; i < totalPixels; ++i) {
+      var src = i * 4;
+      if (src + 3 >= data.Length)
+        break;
+
+      result[i * 2] = (byte)((data[src + 2] * 77 + data[src + 1] * 150 + data[src] * 29) >> 8);
+      result[i * 2 + 1] = data[src + 3];
+    }
+
+    return result;
+  }
+
+  /// <summary>Converts BGRA to 10-bit grayscale (16-bit little-endian container, values 0..1023).
+  /// Scales 8→10 bits so <see cref="Gray10ToBgra"/> recovers the original 8-bit value exactly.</summary>
+  public static byte[] BgraToGray10(byte[] data, int totalPixels) {
+    var result = new byte[totalPixels * 2];
+    for (var i = 0; i < totalPixels; ++i) {
+      var src = i * 4;
+      if (src + 3 >= data.Length)
+        break;
+
+      var gray = (data[src + 2] * 77 + data[src + 1] * 150 + data[src] * 29) >> 8;
+      var v = (gray * 1023 + 127) / 255;
+      result[i * 2] = (byte)v;
+      result[i * 2 + 1] = (byte)(v >> 8);
+    }
+
+    return result;
+  }
+
+  /// <summary>Converts BGRA to 32-bit packed Rgb30 (R10G10B10A2, DXGI/Vulkan layout). Alpha is reduced
+  /// to 2 bits — the format has no room for more — so it snaps to the nearest of 0/85/170/255.</summary>
+  public static byte[] BgraToRgb30(byte[] data, int totalPixels) {
+    var result = new byte[totalPixels * 4];
+    for (var i = 0; i < totalPixels; ++i) {
+      var src = i * 4;
+      if (src + 3 >= data.Length)
+        break;
+
+      var r10 = (uint)((data[src + 2] * 1023 + 127) / 255);
+      var g10 = (uint)((data[src + 1] * 1023 + 127) / 255);
+      var b10 = (uint)((data[src] * 1023 + 127) / 255);
+      var a2 = (uint)((data[src + 3] * 3 + 127) / 255);
+      var w = r10 | (g10 << 10) | (b10 << 20) | (a2 << 30);
+
+      var dst = i * 4;
+      result[dst] = (byte)w;
+      result[dst + 1] = (byte)(w >> 8);
+      result[dst + 2] = (byte)(w >> 16);
+      result[dst + 3] = (byte)(w >> 24);
+    }
+
+    return result;
+  }
 
   /// <summary>Converts BGRA (4 bytes/pixel) to 8-bit grayscale using luminance formula: (R*77 + G*150 + B*29) >> 8.</summary>
   public static byte[] BgraToGray8(byte[] data, int totalPixels) {
