@@ -66,6 +66,7 @@
     <Project Path="Tests/FileFormat.Art.Tests/FileFormat.Art.Tests.csproj" />
     <Project Path="Tests/FileFormat.ArtDirector.Tests/FileFormat.ArtDirector.Tests.csproj" />
     <Project Path="Tests/FileFormat.Artist64.Tests/FileFormat.Artist64.Tests.csproj" />
+    <Project Path="Tests/FileFormat.AsciiMaker.Tests/FileFormat.AsciiMaker.Tests.csproj" />
     <Project Path="Tests/FileFormat.Astc.Tests/FileFormat.Astc.Tests.csproj" />
     <Project Path="Tests/FileFormat.Atari2600.Tests/FileFormat.Atari2600.Tests.csproj" />
     <Project Path="Tests/FileFormat.Atari7800.Tests/FileFormat.Atari7800.Tests.csproj" />

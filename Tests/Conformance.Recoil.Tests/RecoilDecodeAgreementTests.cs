@@ -56,6 +56,9 @@ public sealed class RecoilDecodeAgreementTests {
     new("SEUCK font", ImageFormat.Commodore64Font, ".g", () => _C64Font(514, 66, 0x00)),
     new("PaintShop", ImageFormat.PaintShop, ".da4", () => _Monochrome(64000)),
     new("Handy Scanner", ImageFormat.HandyScanner, ".hs2", () => _Monochrome(105 * 120)),
+    // Both accepted lengths, and every character code including the inverse-video half.
+    new("ASCII maker", ImageFormat.AsciiMaker, ".asc", () => _Monochrome(960)),
+    new("ASCII maker, padded", ImageFormat.AsciiMaker, ".asc", () => _Monochrome(1024)),
   ];
 
   [Test]
