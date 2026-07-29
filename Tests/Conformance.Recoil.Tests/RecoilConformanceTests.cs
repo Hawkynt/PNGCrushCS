@@ -96,6 +96,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.AtariTt, "TT High", 1280, 960, ".pi6"),
     new(ImageFormat.IcDraw, "ICDRAW icon", 32, 32, ".ibi"),
     new(ImageFormat.IcDraw, "ICDRAW icon as .ib3", 32, 32, ".ib3"),
+    new(ImageFormat.Ice, "Super IRG", 320, 192, ".irg"),
   ];
 
   [Test]

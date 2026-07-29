@@ -310,6 +310,7 @@
     <Project Path="FileFormats/FileFormat.InterPainter/FileFormat.InterPainter.csproj" />
     <Project Path="FileFormats/FileFormat.Interfile/FileFormat.Interfile.csproj" />
     <Project Path="FileFormats/FileFormat.Interlace8/FileFormat.Interlace8.csproj" />
+    <Project Path="FileFormats/FileFormat.InterlaceCharacterEditor/FileFormat.InterlaceCharacterEditor.csproj" />
     <Project Path="FileFormats/FileFormat.InterlaceHiresEditor/FileFormat.InterlaceHiresEditor.csproj" />
     <Project Path="FileFormats/FileFormat.InterlaceStudio/FileFormat.InterlaceStudio.csproj" />
     <Project Path="FileFormats/FileFormat.Ioca/FileFormat.Ioca.csproj" />
@@ -907,6 +908,7 @@
     <Project Path="Tests/FileFormat.InterPainter.Tests/FileFormat.InterPainter.Tests.csproj" />
     <Project Path="Tests/FileFormat.Interfile.Tests/FileFormat.Interfile.Tests.csproj" />
     <Project Path="Tests/FileFormat.Interlace8.Tests/FileFormat.Interlace8.Tests.csproj" />
+    <Project Path="Tests/FileFormat.InterlaceCharacterEditor.Tests/FileFormat.InterlaceCharacterEditor.Tests.csproj" />
     <Project Path="Tests/FileFormat.InterlaceHiresEditor.Tests/FileFormat.InterlaceHiresEditor.Tests.csproj" />
     <Project Path="Tests/FileFormat.InterlaceStudio.Tests/FileFormat.InterlaceStudio.Tests.csproj" />
     <Project Path="Tests/FileFormat.Ioca.Tests/FileFormat.Ioca.Tests.csproj" />
