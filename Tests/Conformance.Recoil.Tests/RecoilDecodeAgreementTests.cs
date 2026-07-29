@@ -54,6 +54,8 @@ public sealed class RecoilDecodeAgreementTests {
     new("C64 8x8 font", ImageFormat.Commodore64Font, ".64c", () => _C64Font(2050, 0x00, 0x08)),
     new("C64 8x8 font, short", ImageFormat.Commodore64Font, ".64c", () => _C64Font(1026, 0x00, 0x08)),
     new("SEUCK font", ImageFormat.Commodore64Font, ".g", () => _C64Font(514, 66, 0x00)),
+    new("PaintShop", ImageFormat.PaintShop, ".da4", () => _Monochrome(64000)),
+    new("Handy Scanner", ImageFormat.HandyScanner, ".hs2", () => _Monochrome(105 * 120)),
   ];
 
   [Test]
@@ -205,6 +207,14 @@ public sealed class RecoilDecodeAgreementTests {
 
     ReadOnlySpan<byte> registers = [0x0E, 0x46, 0x92, 0x00, 0x24, 0xDA, 0x68, 0x0C];
     registers.CopyTo(data.AsSpan(16000));
+
+    return data;
+  }
+
+  private static byte[] _Monochrome(int length) {
+    var data = new byte[length];
+    for (var i = 0; i < length; ++i)
+      data[i] = (byte)(i * 47 + (i >> 7));
 
     return data;
   }

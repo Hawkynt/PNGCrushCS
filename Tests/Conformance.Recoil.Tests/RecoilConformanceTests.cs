@@ -120,6 +120,8 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.MadDesigner, "Mad Designer", 512, 256, ".mbg"),
     new(ImageFormat.AtariTxs, "Atari texture", 64, 64, ".txs"),
     new(ImageFormat.Commodore64Font, "C64 8x8 font", 256, 64, ".64c"),
+    new(ImageFormat.PaintShop, "PaintShop", 640, 800, ".da4"),
+    new(ImageFormat.HandyScanner, "Handy Scanner 2000 POSTERING", 840, 120, ".hs2"),
   ];
 
   [Test]

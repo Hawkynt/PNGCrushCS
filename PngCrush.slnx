@@ -387,6 +387,8 @@
     <Project Path="Tests/FileFormat.Pagefox.Tests/FileFormat.Pagefox.Tests.csproj" />
     <Project Path="Tests/FileFormat.PaintMagic.Tests/FileFormat.PaintMagic.Tests.csproj" />
     <Project Path="Tests/FileFormat.Palm.Tests/FileFormat.Palm.Tests.csproj" />
+    <Project Path="Tests/FileFormat.PaintShop.Tests/FileFormat.PaintShop.Tests.csproj" />
+    <Project Path="Tests/FileFormat.HandyScanner.Tests/FileFormat.HandyScanner.Tests.csproj" />
     <Project Path="Tests/FileFormat.PalmPdb.Tests/FileFormat.PalmPdb.Tests.csproj" />
     <Project Path="Tests/FileFormat.Paradox.Tests/FileFormat.Paradox.Tests.csproj" />
     <Project Path="Tests/FileFormat.Pat.Tests/FileFormat.Pat.Tests.csproj" />
