@@ -353,6 +353,8 @@ build one from pixel data they didn't read, so the registry reports them as read
 | MSX2 GL16               | .gl5, .sh5, .gl7, .sh7                               | Sized-header 16-colour Screen 5/7| Y      | Y      | —         | R     | —   | —      | —         |
 | SAM Coupe modes 1-3     | .ss1, .ss2, .ss3                                     | Spectrum-compatible, per-line and 2bpp screens | Y      | —      | —         | R     | —   | —      | —         |
 | McPainter               | .mcp                                                 | Atari 8-bit two-field Gr15 blend | Y      | —      | —         | R     | —   | —      | —         |
+| Mad Designer            | .mbg                                                 | Atari 8-bit 512x256 monochrome   | Y      | Y      | —         | R     | —   | —      | —         |
+| Atari texture           | .txs                                                 | 16x16 grey texture, drawn 64x64  | Y      | Y      | —         | R     | —   | —      | —         |
 | MSX2+ Screen 10         | .sca, .scb                                           | 256x212 YJK plus 16-colour escape| Y      | Y      | —         | R     | —   | —      | —         |
 | MSX2+ GL YJK            | .glc, .gls, .shc, .gla, .glb, .sha, .shb             | Sized-header YJK, Screen 10/12   | Y      | Y      | —         | R     | —   | —      | —         |
 | MonoSTar object         | .obj                                                 | Atari ST monochrome object       | Y      | Y      | —         | R     | —   | —      | —         |
@@ -682,15 +684,15 @@ Two different questions, two different answers:
 
 | Metric                                                    | Us    | RECOIL |
 | ----------------------------------------------------------- | ----- | ------ |
-| Total formats                                              | 557   | 552    |
+| Total formats                                              | 559   | 552    |
 | Modern/web/scientific formats (PNG, JPEG, WebP, AVIF, …)   | ~290  | 0      |
-| Of RECOIL's 552 vintage formats, covered                   | 390   | 552    |
+| Of RECOIL's 552 vintage formats, covered                   | 392   | 552    |
 
 So on breadth we are level, and on everything outside the retro catalogue we are the only one of
-the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 162
+the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 160
 formats.
 
-Largest remaining clusters: Atari 8-bit (58), Commodore 64 (25), Atari ST/STE (19), Atari Falcon
+Largest remaining clusters: Atari 8-bit (56), Commodore 64 (25), Atari ST/STE (19), Atari Falcon
 (8), NEC PC-98 (7), ZX Spectrum (6). SAM Coupe is now fully covered. Atari TT, the MSX2+ YJK modes and the Commodore 16/Plus4
 set are now fully covered. Formats we can only read are marked so in the table above and are
 proved against RECOIL by decoding the same bytes on both sides and comparing pixels, which is a

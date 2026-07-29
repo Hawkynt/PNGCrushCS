@@ -49,6 +49,8 @@ public sealed class RecoilDecodeAgreementTests {
     new("SAM Coupe Mode 3", ImageFormat.SamCoupeScreen, ".ss3", () => _SamCoupe(3, interrupts: false)),
     new("SAM Coupe Mode 3 with interrupts", ImageFormat.SamCoupeScreen, ".ss3", () => _SamCoupe(3, interrupts: true)),
     new("McPainter", ImageFormat.McPainter, ".mcp", _McPainter),
+    new("Mad Designer", ImageFormat.MadDesigner, ".mbg", _MadDesigner),
+    new("Atari texture", ImageFormat.AtariTxs, ".txs", _AtariTxs),
   ];
 
   [Test]
@@ -200,6 +202,25 @@ public sealed class RecoilDecodeAgreementTests {
 
     ReadOnlySpan<byte> registers = [0x0E, 0x46, 0x92, 0x00, 0x24, 0xDA, 0x68, 0x0C];
     registers.CopyTo(data.AsSpan(16000));
+
+    return data;
+  }
+
+  private static byte[] _MadDesigner() {
+    var data = new byte[16384];
+    for (var i = 0; i < data.Length; ++i)
+      data[i] = (byte)(i * 41 + (i >> 6));
+
+    return data;
+  }
+
+  private static byte[] _AtariTxs() {
+    var data = new byte[262];
+    ReadOnlySpan<byte> header = [0xFF, 0xFF, 0x00, 0x06, 0xFF, 0x06];
+    header.CopyTo(data);
+    // Every one of the sixteen values appears, so a wrong palette slice cannot pass.
+    for (var i = 0; i < 256; ++i)
+      data[6 + i] = (byte)((i * 7 + i / 16) & 15);
 
     return data;
   }

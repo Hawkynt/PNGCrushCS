@@ -117,6 +117,8 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.MsxGl6, "Dynamic Publisher stamp", 512, 424, ".stp"),
     new(ImageFormat.MsxGl16, "MSX2 GL5", 256, 212, ".gl5"),
     new(ImageFormat.MsxGl16, "MSX2 SH5", 256, 212, ".sh5"),
+    new(ImageFormat.MadDesigner, "Mad Designer", 512, 256, ".mbg"),
+    new(ImageFormat.AtariTxs, "Atari texture", 64, 64, ".txs"),
   ];
 
   [Test]

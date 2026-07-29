@@ -314,6 +314,8 @@
     <Project Path="Tests/FileFormat.Lss16.Tests/FileFormat.Lss16.Tests.csproj" />
     <Project Path="Tests/FileFormat.LucasFilm.Tests/FileFormat.LucasFilm.Tests.csproj" />
     <Project Path="Tests/FileFormat.MacPaint.Tests/FileFormat.MacPaint.Tests.csproj" />
+    <Project Path="Tests/FileFormat.MadDesigner.Tests/FileFormat.MadDesigner.Tests.csproj" />
+    <Project Path="Tests/FileFormat.AtariTxs.Tests/FileFormat.AtariTxs.Tests.csproj" />
     <Project Path="Tests/FileFormat.McPainter.Tests/FileFormat.McPainter.Tests.csproj" />
     <Project Path="Tests/FileFormat.MadStudio.Tests/FileFormat.MadStudio.Tests.csproj" />
     <Project Path="Tests/FileFormat.Mag.Tests/FileFormat.Mag.Tests.csproj" />
