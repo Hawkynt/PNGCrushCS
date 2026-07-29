@@ -7,7 +7,7 @@ namespace FileFormat.InterPaintHi;
 public readonly record struct InterPaintHiFile : IImageFormatReader<InterPaintHiFile>, IImageToRawImage<InterPaintHiFile>, IImageFormatWriter<InterPaintHiFile> {
 
   static string IImageFormatMetadata<InterPaintHiFile>.PrimaryExtension => ".iph";
-  static string[] IImageFormatMetadata<InterPaintHiFile>.FileExtensions => [".iph"];
+  static string[] IImageFormatMetadata<InterPaintHiFile>.FileExtensions => [".iph", ".hre"];
   static InterPaintHiFile IImageFormatReader<InterPaintHiFile>.FromSpan(ReadOnlySpan<byte> data) => InterPaintHiReader.FromSpan(data);
   static byte[] IImageFormatWriter<InterPaintHiFile>.ToBytes(InterPaintHiFile file) => InterPaintHiWriter.ToBytes(file);
 

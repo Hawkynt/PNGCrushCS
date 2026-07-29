@@ -11,4 +11,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\FileFormats\FileFormat.HiResEditor\FileFormat.HiResEditor.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Using Include="NUnit.Framework" />
+  </ItemGroup>
 </Project>

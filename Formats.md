@@ -252,7 +252,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | HF Image                | .hf                                                  | HF heightfield image             | Y      | Y      | —         | —     | —   | —      | —         |
 | Hi-Eddi                 | .hed                                                 | C64 Hi-Eddi                      | Y      | —      | —         | RW    | —   | —      | —         |
 | Hi-Pic Creator          | .hpc                                                 | C64 Hi-Pic Creator multicolor    | Y      | —      | —         | R     | —   | —      | —         |
-| Hi-Res Editor           | .hre                                                 | C64 Hires Editor 320x200        | Y      | —      | —         | R     | —   | —      | —         |
+| Hires-Editor            | .het, .rph                                           | C64 Hires-Editor / Run Paint     | Y      | Y      | —         | R     | —   | —      | —         |
 | Hi-Res Paint (Atari)    | .hra                                                 | Atari 8-bit Hi-Res 320x192      | Y      | Y      | —         | R     | —   | —      | —         |
 | Highres Medium          | .hrm                                                 | Atari ST interlaced 640x200      | Y      | Y      | —         | R     | —   | —      | —         |
 | HighRes ST              | .hst, .hrs                                           | Atari ST 640x400 monochrome     | Y      | Y      | —         | R     | —   | —      | —         |
@@ -286,7 +286,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | Imagic Paint            | .imp, .igp                                           | Atari ST Imagic Paint            | Y      | Y      | —         | R     | —   | —      | —         |
 | Imaging Fax             | .g3n                                                 | Imaging fax format               | Y      | —      | —         | —     | —   | —      | —         |
 | IndyPaint               | .ipn, .idy                                           | Atari Falcon IndyPaint           | Y      | Y      | —         | R     | —   | —      | —         |
-| Inter Paint Hires       | .iph                                                 | C64 Inter Paint hires            | Y      | —      | —         | RW    | —   | —      | —         |
+| Inter Paint Hires       | .iph, .hre                                           | C64 Inter Paint hires            | Y      | —      | —         | RW    | —   | —      | —         |
 | Inter Paint Multicolor  | .ipt                                                 | C64 Inter Paint multicolor       | Y      | —      | —         | R     | —   | —      | —         |
 | Interfile               | .hv                                                  | Nuclear medicine Interfile       | Y      | Y      | —         | —     | —   | —      | —         |
 | Intergraph              | .cit, .ingr                                          | Intergraph raster                | Y      | Y      | —         | —     | —   | —      | —         |
@@ -673,13 +673,13 @@ Two different questions, two different answers:
 | ----------------------------------------------------------- | ----- | ------ |
 | Total formats                                              | 551   | 552    |
 | Modern/web/scientific formats (PNG, JPEG, WebP, AVIF, …)   | ~290  | 0      |
-| Of RECOIL's 552 vintage formats, covered                   | 365   | 552    |
+| Of RECOIL's 552 vintage formats, covered                   | 367   | 552    |
 
 So on breadth we are level, and on everything outside the retro catalogue we are the only one of
-the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 187
+the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 185
 formats.
 
-Largest remaining clusters: Atari 8-bit (64), Commodore 64 (27), Atari ST/STE (21), MSX2 (11),
+Largest remaining clusters: Atari 8-bit (64), Commodore 64 (25), Atari ST/STE (21), MSX2 (11),
 Atari Falcon (8), NEC PC-98 (7), ZX Spectrum (7). Atari TT is now fully covered. Only a handful decode as a plain fixed-size screen
 that the shared Atari primitives already cover; the rest carry their own containers or compression.
 RECOIL is a decoder only, so for each one the encoder has to be derived from its decoder and then

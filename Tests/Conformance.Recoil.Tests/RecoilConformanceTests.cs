@@ -98,6 +98,8 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.IcDraw, "ICDRAW icon as .ib3", 32, 32, ".ib3"),
     new(ImageFormat.Ice, "Super IRG", 320, 192, ".irg"),
     new(ImageFormat.MadStudio, "Mad Studio ANTIC 4", 320, 192, ".an4"),
+    new(ImageFormat.HiResEditor, "Hires-Editor", 320, 200, ".het"),
+    new(ImageFormat.HiResEditor, "Run Paint", 320, 200, ".rph"),
   ];
 
   [Test]
