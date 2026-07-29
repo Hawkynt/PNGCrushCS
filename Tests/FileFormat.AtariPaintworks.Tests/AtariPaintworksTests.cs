@@ -47,7 +47,7 @@ public sealed class AtariPaintworksReaderTests {
   [Test]
   [Category("Unit")]
   public void FromBytes_TooSmallForPixelData_ThrowsInvalidDataException() {
-    var tooSmall = new byte[33]; // header but no pixel data
+    var tooSmall = new byte[AtariPaintworksFile.BitmapOffset + 1]; // header but almost no pixel data
     Assert.Throws<InvalidDataException>(() => AtariPaintworksReader.FromBytes(tooSmall));
   }
 
@@ -128,16 +128,17 @@ public sealed class AtariPaintworksReaderTests {
   }
 
   private static byte[] _BuildPaintworksFile() {
-    var data = new byte[32 + 32000];
+    var data = new byte[AtariPaintworksFile.FileSize];
     var palette = new short[16];
     for (var i = 0; i < 16; ++i)
       palette[i] = (short)(i * 0x111 & 0x777);
 
-    var header = new AtariPaintworksHeader(palette);
-    header.WriteTo(data.AsSpan());
+    new AtariPaintworksHeader(palette).WriteTo(data.AsSpan(AtariPaintworksFile.PaletteOffset));
+    AtariPaintworksFile.Signature.CopyTo(data.AsSpan(AtariPaintworksFile.SignatureOffset));
+    data[AtariPaintworksFile.FlagsOffset] = AtariPaintworksFile.LowResolutionFlags;
 
-    for (var i = 0; i < 32000; ++i)
-      data[32 + i] = (byte)(i & 0xFF);
+    for (var i = 0; i < AtariPaintworksFile.BitmapDataSize; ++i)
+      data[AtariPaintworksFile.BitmapOffset + i] = (byte)(i & 0xFF);
 
     return data;
   }

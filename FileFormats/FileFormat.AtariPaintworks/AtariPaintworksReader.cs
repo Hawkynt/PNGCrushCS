@@ -10,7 +10,7 @@ public static class AtariPaintworksReader {
   private const int _PIXEL_DATA_SIZE = 32000;
 
   /// <summary>Expected file size for a full screen file: 32-byte palette + 32000 bytes pixel data.</summary>
-  private const int _EXPECTED_FILE_SIZE = AtariPaintworksHeader.StructSize + _PIXEL_DATA_SIZE;
+  private const int _EXPECTED_FILE_SIZE = AtariPaintworksFile.FileSize;
 
   public static AtariPaintworksFile FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
@@ -34,21 +34,21 @@ public static class AtariPaintworksReader {
 
   public static AtariPaintworksFile FromSpan(ReadOnlySpan<byte> data) {
 
-    if (data.Length < AtariPaintworksHeader.StructSize)
+    if (data.Length < AtariPaintworksFile.BitmapOffset)
       throw new InvalidDataException("Data too small for a valid Atari Paintworks file.");
 
     if (data.Length < _EXPECTED_FILE_SIZE)
       throw new InvalidDataException($"Data too small: expected at least {_EXPECTED_FILE_SIZE} bytes for palette + screen data, got {data.Length}.");
 
     var span = data;
-    var header = AtariPaintworksHeader.ReadFrom(span);
+    var header = AtariPaintworksHeader.ReadFrom(span[AtariPaintworksFile.PaletteOffset..]);
 
     // Determine resolution from file size context; default to low res for standard 32032-byte files
     var resolution = _DetectResolution(data.Length);
     var (width, height) = _GetDimensions(resolution);
 
     var pixelData = new byte[_PIXEL_DATA_SIZE];
-    data.Slice(AtariPaintworksHeader.StructSize, _PIXEL_DATA_SIZE).CopyTo(pixelData.AsSpan(0));
+    data.Slice(AtariPaintworksFile.BitmapOffset, _PIXEL_DATA_SIZE).CopyTo(pixelData.AsSpan(0));
 
     return new AtariPaintworksFile {
       Width = width,
@@ -61,21 +61,21 @@ public static class AtariPaintworksReader {
 
   public static AtariPaintworksFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < AtariPaintworksHeader.StructSize)
+    if (data.Length < AtariPaintworksFile.BitmapOffset)
       throw new InvalidDataException("Data too small for a valid Atari Paintworks file.");
 
     if (data.Length < _EXPECTED_FILE_SIZE)
       throw new InvalidDataException($"Data too small: expected at least {_EXPECTED_FILE_SIZE} bytes for palette + screen data, got {data.Length}.");
 
     var span = data.AsSpan();
-    var header = AtariPaintworksHeader.ReadFrom(span);
+    var header = AtariPaintworksHeader.ReadFrom(span[AtariPaintworksFile.PaletteOffset..]);
 
     // Determine resolution from file size context; default to low res for standard 32032-byte files
     var resolution = _DetectResolution(data.Length);
     var (width, height) = _GetDimensions(resolution);
 
     var pixelData = new byte[_PIXEL_DATA_SIZE];
-    data.AsSpan(AtariPaintworksHeader.StructSize, _PIXEL_DATA_SIZE).CopyTo(pixelData.AsSpan(0));
+    data.AsSpan(AtariPaintworksFile.BitmapOffset, _PIXEL_DATA_SIZE).CopyTo(pixelData.AsSpan(0));
 
     return new AtariPaintworksFile {
       Width = width,
@@ -107,18 +107,18 @@ public static class AtariPaintworksReader {
   /// </summary>
   public static AtariPaintworksFile FromBytes(byte[] data, AtariPaintworksResolution resolution) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < AtariPaintworksHeader.StructSize)
+    if (data.Length < AtariPaintworksFile.BitmapOffset)
       throw new InvalidDataException("Data too small for a valid Atari Paintworks file.");
 
     if (data.Length < _EXPECTED_FILE_SIZE)
       throw new InvalidDataException($"Data too small: expected at least {_EXPECTED_FILE_SIZE} bytes for palette + screen data, got {data.Length}.");
 
     var span = data.AsSpan();
-    var header = AtariPaintworksHeader.ReadFrom(span);
+    var header = AtariPaintworksHeader.ReadFrom(span[AtariPaintworksFile.PaletteOffset..]);
     var (width, height) = _GetDimensions(resolution);
 
     var pixelData = new byte[_PIXEL_DATA_SIZE];
-    data.AsSpan(AtariPaintworksHeader.StructSize, _PIXEL_DATA_SIZE).CopyTo(pixelData.AsSpan(0));
+    data.AsSpan(AtariPaintworksFile.BitmapOffset, _PIXEL_DATA_SIZE).CopyTo(pixelData.AsSpan(0));
 
     return new AtariPaintworksFile {
       Width = width,

@@ -5,20 +5,18 @@ namespace FileFormat.AtariPaintworks;
 /// <summary>Assembles Atari ST Paintworks/GFA/DeskPic file bytes from an AtariPaintworksFile.</summary>
 public static class AtariPaintworksWriter {
 
-  /// <summary>Standard file size: 32-byte palette + 32000-byte pixel data.</summary>
-  private const int _FILE_SIZE = AtariPaintworksHeader.StructSize + 32000;
-
   public static byte[] ToBytes(AtariPaintworksFile file) {
     ArgumentNullException.ThrowIfNull(file);
 
-    var result = new byte[_FILE_SIZE];
+    var result = new byte[AtariPaintworksFile.FileSize];
     var span = result.AsSpan();
 
-    var header = new AtariPaintworksHeader(file.Palette);
-    header.WriteTo(span);
+    new AtariPaintworksHeader(file.Palette).WriteTo(span[AtariPaintworksFile.PaletteOffset..]);
+    AtariPaintworksFile.Signature.CopyTo(span[AtariPaintworksFile.SignatureOffset..]);
+    span[AtariPaintworksFile.FlagsOffset] = AtariPaintworksFile.LowResolutionFlags;
 
-    file.PixelData.AsSpan(0, Math.Min(32000, file.PixelData.Length))
-      .CopyTo(result.AsSpan(AtariPaintworksHeader.StructSize));
+    file.PixelData.AsSpan(0, Math.Min(AtariPaintworksFile.BitmapDataSize, file.PixelData.Length))
+      .CopyTo(span[AtariPaintworksFile.BitmapOffset..]);
 
     return result;
   }
