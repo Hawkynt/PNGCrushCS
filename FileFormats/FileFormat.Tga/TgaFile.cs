@@ -5,6 +5,10 @@ namespace FileFormat.Tga;
 
 /// <summary>In-memory representation of a TGA image.</summary>
 [FormatMimeType("image/x-tga", "image/x-targa", "application/tga")]
+// An uncompressed true-colour TGA header begins 00 00 02 00, which is exactly the CUR magic. The
+// TGA 2.0 footer is the more specific of the two, so it gets to answer first; the check returns
+// "no opinion" when the footer is absent, leaving CUR its normal chance.
+[FormatDetectionPriority(50)]
 public readonly record struct TgaFile : IImageFormatReader<TgaFile>, IImageToRawImage<TgaFile>, IImageFromRawImage<TgaFile>, IImageFormatWriter<TgaFile> {
 
   static string IImageFormatMetadata<TgaFile>.PrimaryExtension => ".tga";
@@ -12,6 +16,23 @@ public readonly record struct TgaFile : IImageFormatReader<TgaFile>, IImageToRaw
   static TgaFile IImageFormatReader<TgaFile>.FromSpan(ReadOnlySpan<byte> data) => TgaReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<TgaFile>.Capabilities => FormatCapability.HasDedicatedOptimizer;
   static byte[] IImageFormatWriter<TgaFile>.ToBytes(TgaFile file) => TgaWriter.ToBytes(file);
+
+  /// <summary>TGA carries no leading magic, so without this the format is undetectable from content
+  /// and callers are forced to go by extension. TGA 2.0 does end with a signature, which is
+  /// conclusive whenever the caller passes the whole file.</summary>
+  /// <remarks>Returns <c>null</c> (no opinion) rather than <c>false</c> for TGA 1.0 and for
+  /// header-only buffers, leaving other formats free to claim the data.</remarks>
+  static bool? IImageFormatMetadata<TgaFile>.MatchesSignature(ReadOnlySpan<byte> header)
+    => header.Length >= _FOOTER_LENGTH
+       && header[^_FOOTER_LENGTH..].StartsWith(_FOOTER_SIGNATURE)
+      ? true
+      : null;
+
+  /// <summary>"TRUEVISION-XFILE." followed by a NUL — the last 18 bytes of a TGA 2.0 file.</summary>
+  private static ReadOnlySpan<byte> _FOOTER_SIGNATURE =>
+    "TRUEVISION-XFILE.\0"u8;
+
+  private const int _FOOTER_LENGTH = 18;
   public int Width { get; init; }
   public int Height { get; init; }
   public int BitsPerPixel { get; init; }
@@ -74,6 +95,9 @@ public readonly record struct TgaFile : IImageFormatReader<TgaFile>, IImageToRaw
 
   public static TgaFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+
+    image = image.EnsureAnyFormat(
+      PixelFormat.Bgra32, PixelFormat.Bgr24, PixelFormat.Gray8, PixelFormat.Indexed8);
 
     TgaColorMode colorMode;
     int bpp;
