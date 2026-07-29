@@ -57,6 +57,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.AtariGrayscale9, "160x192 grayscale", 320, 192),
     new(ImageFormat.Zoom4, "Zoom-4 graphics editor", 256, 256),
     new(ImageFormat.ZxFont, "8x8 font", 256, 64),
+    new(ImageFormat.SamCoupeMode4, "Mode 4", 256, 192),
   ];
 
   [Test]
