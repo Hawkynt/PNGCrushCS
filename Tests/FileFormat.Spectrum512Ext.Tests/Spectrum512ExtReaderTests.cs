@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 using FileFormat.Spectrum512Ext;
 
@@ -72,30 +73,40 @@ public sealed class Spectrum512ExtReaderTests {
   [Category("Unit")]
   public void FromBytes_PixelDataPreserved() {
     var data = _BuildSpx();
-    data[0] = 0xAA;
-    data[1] = 0xBB;
-    data[31999] = 0xCC;
+    data[PixelStart] = 0xAA;
+    data[PixelStart + 1] = 0xBB;
+    data[PixelStart + Spectrum512ExtFile.PixelDataSize - Spectrum512ExtFile.BitmapLeadIn - 1] = 0xCC;
 
     var result = Spectrum512ExtReader.FromBytes(data);
 
     Assert.Multiple(() => {
       Assert.That(result.PixelData[0], Is.EqualTo(0xAA));
       Assert.That(result.PixelData[1], Is.EqualTo(0xBB));
-      Assert.That(result.PixelData[31999], Is.EqualTo(0xCC));
+      Assert.That(result.PixelData[Spectrum512ExtFile.PixelDataSize - Spectrum512ExtFile.BitmapLeadIn - 1], Is.EqualTo(0xCC));
     });
   }
 
+  /// <summary>Builds a stored (unpacked) SPX file: header, bitmap block, then the palette block.</summary>
   private static byte[] _BuildSpx() {
     var data = new byte[Spectrum512ExtFile.FileSize];
+    Spectrum512ExtFile.Signature.CopyTo(data);
+    BinaryPrimitives.WriteInt32BigEndian(
+      data.AsSpan(Spectrum512ExtFile.LengthFieldsOffset), Spectrum512ExtFile.PixelDataSize);
+    BinaryPrimitives.WriteInt32BigEndian(
+      data.AsSpan(Spectrum512ExtFile.LengthFieldsOffset + 4), Spectrum512ExtFile.PaletteDataSize);
 
-    for (var i = 0; i < 32000; ++i)
-      data[i] = (byte)(i & 0xFF);
+    var picture = PixelStart;
+    for (var i = 0; i < Spectrum512ExtFile.PixelDataSize - Spectrum512ExtFile.BitmapLeadIn; ++i)
+      data[picture + i] = (byte)(i & 0xFF);
 
-    for (var i = 32000; i < Spectrum512ExtFile.FileSize; i += 2) {
-      data[i] = (byte)(((i - 32000) / 2) >> 8 & 0x0F);
-      data[i + 1] = (byte)(((i - 32000) / 2) & 0xFF);
+    for (var i = 0; i < Spectrum512ExtFile.PaletteDataSize; i += 2) {
+      data[Spectrum512ExtFile.PaletteOffset + i] = (byte)((i / 2) >> 8 & 0x0F);
+      data[Spectrum512ExtFile.PaletteOffset + i + 1] = (byte)((i / 2) & 0xFF);
     }
 
     return data;
   }
+
+  /// <summary>Offset of the first byte of the picture, past the header and the lead-in scanline.</summary>
+  private const int PixelStart = Spectrum512ExtFile.BitmapOffset + Spectrum512ExtFile.BitmapLeadIn;
 }

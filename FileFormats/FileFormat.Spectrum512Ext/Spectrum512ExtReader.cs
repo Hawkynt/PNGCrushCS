@@ -7,7 +7,6 @@ namespace FileFormat.Spectrum512Ext;
 /// <summary>Reads Spectrum 512 Extended (.spx) files from bytes, streams, or file paths.</summary>
 public static class Spectrum512ExtReader {
 
-  private const int _PIXEL_DATA_SIZE = 32000;
 
   public static Spectrum512ExtFile FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
@@ -34,12 +33,12 @@ public static class Spectrum512ExtReader {
     if (data.Length != Spectrum512ExtFile.FileSize)
       throw new InvalidDataException($"SPX file must be exactly {Spectrum512ExtFile.FileSize} bytes, got {data.Length}.");
 
-    var pixelData = new byte[_PIXEL_DATA_SIZE];
-    data.Slice(0, _PIXEL_DATA_SIZE).CopyTo(pixelData.AsSpan(0));
+    var pixelData = new byte[Spectrum512ExtFile.PixelDataSize];
+    data.Slice(Spectrum512ExtFile.BitmapOffset + Spectrum512ExtFile.BitmapLeadIn, Spectrum512ExtFile.PixelDataSize - Spectrum512ExtFile.BitmapLeadIn).CopyTo(pixelData.AsSpan(0));
 
     var palettes = new short[Spectrum512ExtFile.ScanlineCount][];
     var span = data;
-    var paletteOffset = _PIXEL_DATA_SIZE;
+    var paletteOffset = Spectrum512ExtFile.PaletteOffset;
 
     for (var line = 0; line < Spectrum512ExtFile.ScanlineCount; ++line) {
       var palette = new short[Spectrum512ExtFile.PaletteEntriesPerLine];
@@ -63,12 +62,12 @@ public static class Spectrum512ExtReader {
     if (data.Length != Spectrum512ExtFile.FileSize)
       throw new InvalidDataException($"SPX file must be exactly {Spectrum512ExtFile.FileSize} bytes, got {data.Length}.");
 
-    var pixelData = new byte[_PIXEL_DATA_SIZE];
-    data.AsSpan(0, _PIXEL_DATA_SIZE).CopyTo(pixelData.AsSpan(0));
+    var pixelData = new byte[Spectrum512ExtFile.PixelDataSize];
+    data.AsSpan(Spectrum512ExtFile.BitmapOffset + Spectrum512ExtFile.BitmapLeadIn, Spectrum512ExtFile.PixelDataSize - Spectrum512ExtFile.BitmapLeadIn).CopyTo(pixelData.AsSpan(0));
 
     var palettes = new short[Spectrum512ExtFile.ScanlineCount][];
     var span = data.AsSpan();
-    var paletteOffset = _PIXEL_DATA_SIZE;
+    var paletteOffset = Spectrum512ExtFile.PaletteOffset;
 
     for (var line = 0; line < Spectrum512ExtFile.ScanlineCount; ++line) {
       var palette = new short[Spectrum512ExtFile.PaletteEntriesPerLine];

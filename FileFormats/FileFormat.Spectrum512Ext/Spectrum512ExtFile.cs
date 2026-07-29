@@ -8,7 +8,32 @@ namespace FileFormat.Spectrum512Ext;
 public readonly record struct Spectrum512ExtFile : IImageFormatReader<Spectrum512ExtFile>, IImageToRawImage<Spectrum512ExtFile>, IImageFromRawImage<Spectrum512ExtFile>, IImageFormatWriter<Spectrum512ExtFile> {
 
   /// <summary>Expected file size: 32000 bytes pixel data + 199 lines * 48 entries * 2 bytes = 51104 bytes.</summary>
-  public const int FileSize = 51104;
+  /// <summary>Bytes of Atari ST interleaved planar pixel data.</summary>
+  public const int PixelDataSize = 32000;
+
+  /// <summary>ASCII signature every SPX file starts with.</summary>
+  public static System.ReadOnlySpan<byte> Signature => "SPX"u8;
+
+  /// <summary>Offset of the two zero bytes that terminate the header's title field. Readers scan
+  /// from offset 10 until they have consumed two of them, which is what fixes the data offset.</summary>
+  public const int TitleTerminatorOffset = 10;
+
+  /// <summary>Offset of the big-endian bitmap and palette length fields.</summary>
+  public const int LengthFieldsOffset = 12;
+
+  /// <summary>Offset of the bitmap block.</summary>
+  public const int BitmapOffset = LengthFieldsOffset + 8;
+
+  /// <summary>The bitmap block opens with one unused 160-byte scanline before the picture.</summary>
+  public const int BitmapLeadIn = 160;
+
+  /// <summary>Offset of the per-scanline palette block.</summary>
+  public const int PaletteOffset = BitmapOffset + PixelDataSize;
+
+  /// <summary>Total palette size: 48 big-endian entries for each scanline.</summary>
+  public const int PaletteDataSize = ScanlineCount * PaletteEntriesPerLine * 2;
+
+  public const int FileSize = PaletteOffset + PaletteDataSize;
 
   /// <summary>Number of scanlines.</summary>
   public const int ScanlineCount = 199;

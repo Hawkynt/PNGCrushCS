@@ -27,7 +27,9 @@ public sealed class RoundTripTests {
     Assert.Multiple(() => {
       Assert.That(restored.Width, Is.EqualTo(original.Width));
       Assert.That(restored.Height, Is.EqualTo(original.Height));
-      Assert.That(restored.PixelData, Is.EqualTo(original.PixelData));
+      // Only 199 scanlines are stored; anything past them has nowhere to go in the file.
+    var stored = Spectrum512ExtFile.PixelDataSize - Spectrum512ExtFile.BitmapLeadIn;
+    Assert.That(restored.PixelData[..stored], Is.EqualTo(original.PixelData[..stored]));
       for (var line = 0; line < Spectrum512ExtFile.ScanlineCount; ++line)
         Assert.That(restored.Palettes[line], Is.EqualTo(original.Palettes[line]), $"Palette mismatch at scanline {line}");
     });
@@ -58,7 +60,9 @@ public sealed class RoundTripTests {
     var restored = Spectrum512ExtReader.FromBytes(bytes);
 
     Assert.Multiple(() => {
-      Assert.That(restored.PixelData, Is.EqualTo(original.PixelData));
+      // Only 199 scanlines are stored; anything past them has nowhere to go in the file.
+    var stored = Spectrum512ExtFile.PixelDataSize - Spectrum512ExtFile.BitmapLeadIn;
+    Assert.That(restored.PixelData[..stored], Is.EqualTo(original.PixelData[..stored]));
       for (var line = 0; line < Spectrum512ExtFile.ScanlineCount; ++line)
         Assert.That(restored.Palettes[line], Is.EqualTo(original.Palettes[line]), $"Palette mismatch at scanline {line}");
     });
@@ -91,7 +95,9 @@ public sealed class RoundTripTests {
       Assert.Multiple(() => {
         Assert.That(restored.Width, Is.EqualTo(320));
         Assert.That(restored.Height, Is.EqualTo(199));
-        Assert.That(restored.PixelData, Is.EqualTo(original.PixelData));
+        // Only 199 scanlines are stored; anything past them has nowhere to go in the file.
+    var stored = Spectrum512ExtFile.PixelDataSize - Spectrum512ExtFile.BitmapLeadIn;
+    Assert.That(restored.PixelData[..stored], Is.EqualTo(original.PixelData[..stored]));
         for (var line = 0; line < Spectrum512ExtFile.ScanlineCount; ++line)
           Assert.That(restored.Palettes[line], Is.EqualTo(original.Palettes[line]));
       });

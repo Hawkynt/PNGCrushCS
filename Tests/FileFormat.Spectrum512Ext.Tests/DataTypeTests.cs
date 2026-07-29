@@ -7,8 +7,9 @@ public sealed class DataTypeTests {
 
   [Test]
   [Category("Unit")]
-  public void Spectrum512ExtFile_FileSize_Is51104() {
-    Assert.That(Spectrum512ExtFile.FileSize, Is.EqualTo(51104));
+  public void Spectrum512ExtFile_FileSize_Is51124() {
+    // 20-byte header + 32000-byte bitmap block + 199 scanlines x 48 palette entries x 2 bytes.
+    Assert.That(Spectrum512ExtFile.FileSize, Is.EqualTo(51124));
   }
 
   [Test]
