@@ -2,25 +2,18 @@ using System;
 
 namespace FileFormat.DrawIt;
 
-/// <summary>Assembles DrawIt (DIT) file bytes from a DrawItFile.</summary>
+/// <summary>Assembles DrawIt (.dit) file bytes from a <see cref="DrawItFile"/>.</summary>
 public static class DrawItWriter {
 
   public static byte[] ToBytes(DrawItFile file) {
-    ArgumentNullException.ThrowIfNull(file);
+    var result = new byte[DrawItFile.FileSize];
 
-    var pixelCount = file.Width * file.Height;
-    var fileSize = DrawItHeader.StructSize + DrawItFile.PaletteDataSize + pixelCount;
-    var result = new byte[fileSize];
-    var span = result.AsSpan();
+    var bitmap = file.BitmapData ?? [];
+    bitmap.AsSpan(0, Math.Min(bitmap.Length, DrawItFile.BitmapDataSize)).CopyTo(result);
 
-    var header = new DrawItHeader((ushort)file.Width, (ushort)file.Height);
-    header.WriteTo(span);
-
-    file.Palette.AsSpan(0, Math.Min(file.Palette.Length, DrawItFile.PaletteDataSize))
-      .CopyTo(result.AsSpan(DrawItHeader.StructSize));
-
-    file.PixelData.AsSpan(0, Math.Min(file.PixelData.Length, pixelCount))
-      .CopyTo(result.AsSpan(DrawItHeader.StructSize + DrawItFile.PaletteDataSize));
+    var registers = file.ColorRegisters ?? [];
+    registers.AsSpan(0, Math.Min(registers.Length, FileFormat.Core.Atari8BitGraphics.ColorRegisterCount))
+      .CopyTo(result.AsSpan(DrawItFile.ColorRegisterOffset));
 
     return result;
   }

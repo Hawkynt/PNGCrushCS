@@ -3,7 +3,7 @@ using System.IO;
 
 namespace FileFormat.DrawIt;
 
-/// <summary>Reads DrawIt (DIT) files from bytes, streams, or file paths.</summary>
+/// <summary>Reads DrawIt (.dit) files from bytes, streams, or file paths.</summary>
 public static class DrawItReader {
 
   public static DrawItFile FromFile(FileInfo file) {
@@ -21,76 +21,31 @@ public static class DrawItReader {
       stream.ReadExactly(data);
       return FromBytes(data);
     }
+
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
     return FromBytes(ms.ToArray());
   }
 
   public static DrawItFile FromSpan(ReadOnlySpan<byte> data) {
+    // DrawIt has no signature — the fixed size is the only thing identifying it.
+    if (data.Length != DrawItFile.FileSize)
+      throw new InvalidDataException($"A DrawIt file is exactly {DrawItFile.FileSize} bytes, got {data.Length}.");
 
-    if (data.Length < DrawItHeader.StructSize)
-      throw new InvalidDataException("Data too small for a valid DrawIt file.");
+    var bitmap = new byte[DrawItFile.BitmapDataSize];
+    data[..DrawItFile.BitmapDataSize].CopyTo(bitmap);
 
-    var header = DrawItHeader.ReadFrom(data);
-    var width = (int)header.Width;
-    var height = (int)header.Height;
+    var registers = new byte[FileFormat.Core.Atari8BitGraphics.ColorRegisterCount];
+    data.Slice(DrawItFile.ColorRegisterOffset, registers.Length).CopyTo(registers);
 
-    if (width == 0)
-      throw new InvalidDataException("Invalid DrawIt width: must be greater than zero.");
-    if (height == 0)
-      throw new InvalidDataException("Invalid DrawIt height: must be greater than zero.");
-
-    var expectedSize = DrawItHeader.StructSize + DrawItFile.PaletteDataSize + width * height;
-    if (data.Length < expectedSize)
-      throw new InvalidDataException($"Data too small for DrawIt file: expected {expectedSize} bytes, got {data.Length}.");
-
-    var palette = new byte[DrawItFile.PaletteDataSize];
-    data.Slice(DrawItHeader.StructSize, DrawItFile.PaletteDataSize).CopyTo(palette.AsSpan(0));
-
-    var pixelDataOffset = DrawItHeader.StructSize + DrawItFile.PaletteDataSize;
-    var pixelCount = width * height;
-    var pixelData = new byte[pixelCount];
-    data.Slice(pixelDataOffset, pixelCount).CopyTo(pixelData.AsSpan(0));
-
-    return new DrawItFile {
-      Width = width,
-      Height = height,
-      Palette = palette,
-      PixelData = pixelData
+    return new() {
+      BitmapData = bitmap,
+      ColorRegisters = registers,
     };
-    }
+  }
 
   public static DrawItFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < DrawItHeader.StructSize)
-      throw new InvalidDataException("Data too small for a valid DrawIt file.");
-
-    var header = DrawItHeader.ReadFrom(data.AsSpan());
-    var width = (int)header.Width;
-    var height = (int)header.Height;
-
-    if (width == 0)
-      throw new InvalidDataException("Invalid DrawIt width: must be greater than zero.");
-    if (height == 0)
-      throw new InvalidDataException("Invalid DrawIt height: must be greater than zero.");
-
-    var expectedSize = DrawItHeader.StructSize + DrawItFile.PaletteDataSize + width * height;
-    if (data.Length < expectedSize)
-      throw new InvalidDataException($"Data too small for DrawIt file: expected {expectedSize} bytes, got {data.Length}.");
-
-    var palette = new byte[DrawItFile.PaletteDataSize];
-    data.AsSpan(DrawItHeader.StructSize, DrawItFile.PaletteDataSize).CopyTo(palette.AsSpan(0));
-
-    var pixelDataOffset = DrawItHeader.StructSize + DrawItFile.PaletteDataSize;
-    var pixelCount = width * height;
-    var pixelData = new byte[pixelCount];
-    data.AsSpan(pixelDataOffset, pixelCount).CopyTo(pixelData.AsSpan(0));
-
-    return new DrawItFile {
-      Width = width,
-      Height = height,
-      Palette = palette,
-      PixelData = pixelData
-    };
+    return FromSpan(data);
   }
 }
