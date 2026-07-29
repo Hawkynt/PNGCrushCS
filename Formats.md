@@ -550,7 +550,6 @@ build one from pixel data they didn't read, so the registry reports them as read
 | XV Thumbnail            | .xv                                                  | XV Visual Schnauzer thumb        | Y      | Y      | —         | RW    | —   | —      | —         |
 | XWD                     | .xwd                                                 | X Window Dump                    | Y      | Y      | —         | RW    | RW  | —      | —         |
 | XYZ                     | .xyz                                                 | RPG Maker XYZ indexed            | Y      | Y      | —         | —     | —   | —      | —         |
-| YJK Image               | .yjk                                                 | MSX2+ YJK color encoding         | Y      | —      | —         | —     | —   | —      | —         |
 | YUV Raw                 | .yuv                                                 | Raw YUV pixel data               | Y      | Y      | —         | —     | RW  | —      | RW        |
 | Zeiss BIVAS             | .dta                                                 | Zeiss BIVAS microscopy           | Y      | Y      | —         | —     | —   | —      | —         |
 | Zeiss LSM               | .lsm                                                 | Zeiss LSM confocal microscopy    | Y      | Y      | —         | —     | —   | —      | —         |
@@ -679,7 +678,7 @@ Two different questions, two different answers:
 
 | Metric                                                    | Us    | RECOIL |
 | ----------------------------------------------------------- | ----- | ------ |
-| Total formats                                              | 554   | 552    |
+| Total formats                                              | 553   | 552    |
 | Modern/web/scientific formats (PNG, JPEG, WebP, AVIF, …)   | ~290  | 0      |
 | Of RECOIL's 552 vintage formats, covered                   | 381   | 552    |
 

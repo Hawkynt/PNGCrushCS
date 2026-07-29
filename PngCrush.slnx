@@ -536,7 +536,6 @@
     <Project Path="Tests/FileFormat.XvThumbnail.Tests/FileFormat.XvThumbnail.Tests.csproj" />
     <Project Path="Tests/FileFormat.Xwd.Tests/FileFormat.Xwd.Tests.csproj" />
     <Project Path="Tests/FileFormat.Xyz.Tests/FileFormat.Xyz.Tests.csproj" />
-    <Project Path="Tests/FileFormat.YJKImage.Tests/FileFormat.YJKImage.Tests.csproj" />
     <Project Path="Tests/FileFormat.YuvRaw.Tests/FileFormat.YuvRaw.Tests.csproj" />
     <Project Path="Tests/FileFormat.ZeissBivas.Tests/FileFormat.ZeissBivas.Tests.csproj" />
     <Project Path="Tests/FileFormat.ZeissLsm.Tests/FileFormat.ZeissLsm.Tests.csproj" />
