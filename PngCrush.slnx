@@ -102,6 +102,7 @@
     <Project Path="Tests/FileFormat.BioRadPic.Tests/FileFormat.BioRadPic.Tests.csproj" />
     <Project Path="Tests/FileFormat.Blp.Tests/FileFormat.Blp.Tests.csproj" />
     <Project Path="Tests/FileFormat.Bmp.Tests/FileFormat.Bmp.Tests.csproj" />
+    <Project Path="Tests/FileFormat.Botticelli.Tests/FileFormat.Botticelli.Tests.csproj" />
     <Project Path="Tests/FileFormat.Bob.Tests/FileFormat.Bob.Tests.csproj" />
     <Project Path="Tests/FileFormat.Bpg.Tests/FileFormat.Bpg.Tests.csproj" />
     <Project Path="Tests/FileFormat.BrooktroutFax.Tests/FileFormat.BrooktroutFax.Tests.csproj" />

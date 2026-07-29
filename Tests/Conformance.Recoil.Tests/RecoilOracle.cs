@@ -68,6 +68,43 @@ internal static class RecoilOracle {
     }
   }
 
+  /// <summary>Runs the reference decoder and hands back the PNG it produced.</summary>
+  /// <returns>The PNG bytes, or null with the reason it failed.</returns>
+  /// <remarks>
+  /// This is the check that matters for a format we can only read: writing one and asking RECOIL to
+  /// accept it is not an option, so instead both sides decode the same bytes and the two pictures
+  /// are compared. Acceptance proves the container; agreement proves the pixels.
+  /// </remarks>
+  public static (byte[]? Png, string Output) TryDecodeToPng(string imagePath) {
+    var pngPath = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".png");
+    try {
+      using var process = Process.Start(new ProcessStartInfo {
+        FileName = ExecutablePath!,
+        ArgumentList = { "-o", pngPath, imagePath },
+        RedirectStandardOutput = true,
+        RedirectStandardError = true,
+        UseShellExecute = false,
+      })!;
+
+      var stdout = process.StandardOutput.ReadToEnd();
+      var stderr = process.StandardError.ReadToEnd();
+      if (!process.WaitForExit(30_000)) {
+        try { process.Kill(entireProcessTree: true); } catch { /* already gone */ }
+        return (null, "recoil2png timed out");
+      }
+
+      var output = string.Concat(stdout, stderr).Trim();
+      if (process.ExitCode != 0 || !File.Exists(pngPath))
+        return (null, output);
+
+      return (File.ReadAllBytes(pngPath), output);
+    } catch (Exception ex) {
+      return (null, $"{ex.GetType().Name}: {ex.Message}");
+    } finally {
+      try { File.Delete(pngPath); } catch { /* best effort */ }
+    }
+  }
+
   private static string? _Locate() {
     var configured = Environment.GetEnvironmentVariable("RECOIL2PNG");
     if (!string.IsNullOrWhiteSpace(configured) && File.Exists(configured))
