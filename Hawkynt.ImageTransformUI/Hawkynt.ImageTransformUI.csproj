@@ -30,7 +30,7 @@
 
   <ItemGroup>
     <!-- TextMode core is consumed by the FontCodepageWindow picker for live previews. -->
-    <ProjectReference Include="..\FileFormats\FileFormat.TextMode\FileFormat.TextMode.csproj" />
+    <ProjectReference Include="..\FileFormat.TextMode\FileFormat.TextMode.csproj" />
   </ItemGroup>
 
 </Project>

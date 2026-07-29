@@ -15,8 +15,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Optimizers\Optimizer.Cur\Optimizer.Cur.csproj" />
-    <ProjectReference Include="..\..\FileFormats\FileFormat.Cur\FileFormat.Cur.csproj" />
-    <ProjectReference Include="..\..\FileFormats\FileFormat.Png\FileFormat.Png.csproj" />
+    <ProjectReference Include="..\..\Hawkynt.FileFormats.Images\Hawkynt.FileFormats.Images.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Core\FileFormat.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

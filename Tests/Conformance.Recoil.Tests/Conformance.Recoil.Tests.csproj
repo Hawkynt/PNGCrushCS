@@ -17,8 +17,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Hawkynt.FileFormats.Images\Hawkynt.FileFormats.Images.csproj" />
     <ProjectReference Include="..\..\FileFormat.Core\FileFormat.Core.csproj" />
-    <ProjectReference Include="..\..\FileFormats\FileFormat.InterlaceCharacterEditor\FileFormat.InterlaceCharacterEditor.csproj" />
-    <ProjectReference Include="..\..\FileFormats\FileFormat.MadStudio\FileFormat.MadStudio.csproj" />
+    <ProjectReference Include="..\..\Hawkynt.FileFormats.Images\Hawkynt.FileFormats.Images.csproj" />
   </ItemGroup>
 
   <ItemGroup>

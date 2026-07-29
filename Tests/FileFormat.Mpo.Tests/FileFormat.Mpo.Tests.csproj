@@ -13,8 +13,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormats\FileFormat.Mpo\FileFormat.Mpo.csproj" />
-    <ProjectReference Include="..\..\FileFormats\FileFormat.Jpeg\FileFormat.Jpeg.csproj" />
+    <ProjectReference Include="..\..\Hawkynt.FileFormats.Images\Hawkynt.FileFormats.Images.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Core\FileFormat.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -25,10 +25,46 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeBuildOutput>true</IncludeBuildOutput>
 
-    <!-- Bundle every transitively-referenced format DLL into the package's lib/ folder. -->
+    <!-- Bundle the referenced support libraries into the package's lib/ folder. -->
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);_AddAllReferencedAssembliesToPackage</TargetsForTfmSpecificContentInPackage>
+
+    <!--
+      Cross-repo source linking from the sibling CompressionWorkbench checkout, for the JPEG XL
+      codec. We link individual .cs files (BitIO, Huffman, …) instead of taking a
+      <ProjectReference> because CompressionWorkbench transitively references this repo's
+      Hawkynt.FileFormats.Images, which would create a build cycle. When the sibling is absent the
+      linked files are skipped and the CW_SIBLING define stays unset, so dependent code paths
+      compile out via #if CW_SIBLING. CI clones the sibling at the parallel path; consumers
+      installing the published NuGet do not need it.
+    -->
+    <CwSiblingPath>$(MSBuildThisFileDirectory)..\..\CompressionWorkbench\Compression.Core</CwSiblingPath>
+    <CwSiblingPresent>false</CwSiblingPresent>
+    <CwSiblingPresent Condition="Exists('$(CwSiblingPath)\Hawkynt.Compression.Core.csproj')">true</CwSiblingPresent>
   </PropertyGroup>
+
+  <PropertyGroup Condition="'$(CwSiblingPresent)' == 'true'">
+    <DefineConstants>$(DefineConstants);CW_SIBLING</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(CwSiblingPresent)' == 'true'">
+    <!-- The CW sources assume ImplicitUsings; we have it disabled, so add the minimum global
+         usings their linked files need at project scope. -->
+    <Using Include="System" />
+    <Using Include="System.IO" />
+    <!-- Bit-level I/O primitives: 6 files, dep-free, only system usings. Provides
+         Compression.Core.BitIO.{BitReader, BitWriter, BitBuffer, BitOrder, IBitOrder,
+         BitHelpers}. -->
+    <Compile Include="$(CwSiblingPath)\BitIO\*.cs" LinkBase="External\Cw\BitIO" />
+    <!-- Canonical Huffman primitives. We avoid HuffmanTree (depends on
+         Compression.Core.DataStructures) and HuffmanBuildingBlock (depends on
+         Compression.Registry) — only the dep-free pieces link cleanly. -->
+    <Compile Include="$(CwSiblingPath)\Entropy\Huffman\CanonicalCodeAssigner.cs" LinkBase="External\Cw\Entropy\Huffman" />
+    <Compile Include="$(CwSiblingPath)\Entropy\Huffman\CanonicalHuffman.cs" LinkBase="External\Cw\Entropy\Huffman" />
+    <Compile Include="$(CwSiblingPath)\Entropy\Huffman\HuffmanDecoder.cs" LinkBase="External\Cw\Entropy\Huffman" />
+    <Compile Include="$(CwSiblingPath)\Entropy\Huffman\HuffmanEncoder.cs" LinkBase="External\Cw\Entropy\Huffman" />
+    <Compile Include="$(CwSiblingPath)\Entropy\Huffman\HuffmanNode.cs" LinkBase="External\Cw\Entropy\Huffman" />
+  </ItemGroup>
 
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
@@ -36,42 +72,46 @@
     <CompilerVisibleProperty Include="FileFormatRegistryNamespace" />
   </ItemGroup>
 
+  <!-- Every format used to be its own assembly and granted its own test project access to its
+       internals. The formats now share this one assembly, so the grants are reissued from here,
+       derived from the projects on disk rather than listed by hand. -->
   <ItemGroup>
-    <InternalsVisibleTo Include="Optimizer.Image" />
-    <InternalsVisibleTo Include="Hawkynt.FileFormats.Images.Tests" />
+    <_InternalsConsumer Include="..\Tests\*\*.csproj" />
+    <_InternalsConsumer Include="..\Optimizers\*\*.csproj" />
+    <InternalsVisibleTo Include="@(_InternalsConsumer->'%(Filename)'->Distinct())" />
   </ItemGroup>
 
   <ItemGroup>
     <!-- PrivateAssets="all" prevents these from showing up as broken NuGet dependencies
-         (the FileFormat.* projects don't ship as standalone packages on nuget.org).
-         Consumers see all types via the bundled DLLs in lib/$(TargetFramework). -->
+         (they don't ship as standalone packages on nuget.org). Consumers see all types via
+         the bundled DLLs in lib/$(TargetFramework). -->
     <ProjectReference Include="..\FileFormat.Core\FileFormat.Core.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\Compression.Core\Compression.Core.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\FileFormat.TextMode\FileFormat.TextMode.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\FileFormat.Core.Generators\FileFormat.Core.Generators.csproj"
+                      OutputItemType="Analyzer" ReferenceOutputAssembly="false"
+                      PrivateAssets="all" />
     <ProjectReference Include="..\FileFormat.Registry.Generator\FileFormat.Registry.Generator.csproj"
                       OutputItemType="Analyzer" ReferenceOutputAssembly="false"
                       PrivateAssets="all" />
   </ItemGroup>
 
-  <!-- Pull in every FileFormat.<Name> library via wildcard so the source generator sees them.
-       Format adapters live under ..\FileFormats\; Core / Registry.Generator stay at repo root. -->
-  <ItemGroup>
-    <ProjectReference Include="..\FileFormats\FileFormat.*\FileFormat.*.csproj"
-                      PrivateAssets="all" />
-  </ItemGroup>
-
-  <!-- External NuGet packages that bundled FileFormat.* libraries depend on at runtime.
-       PrivateAssets="all" on the FileFormat.* refs above also hides their transitive
-       PackageReferences from this package's nuspec, so we re-declare them explicitly here.
-       These flow as transitive dependencies of the meta-package, which is the correct
-       behavior — consumers get them installed automatically. -->
+  <!-- External packages the format sources under Formats\ depend on at runtime. These flow as
+       transitive dependencies of the package, which is the correct behavior — consumers get them
+       installed automatically. -->
   <ItemGroup>
     <PackageReference Include="BitMiracle.LibTiff.NET" Version="2.4.649" />
     <PackageReference Include="BitMiracle.LibJpeg.NET" Version="1.5.324" />
     <PackageReference Include="FrameworkExtensions.Backports" Version="1.0.0.256" />
+    <!-- 10.0.3, not the 9.0.4 the PNG-family projects used to pin: FrameworkExtensions.Backports
+         now sits in the same graph and requires it, and a downgrade is an error here. -->
+    <PackageReference Include="System.IO.Hashing" Version="10.0.3" />
   </ItemGroup>
 
-  <!-- Bundle every transitively-referenced project assembly into lib/<tfm>/ at pack time.
-       Walks the build's ReferencePath items (each ProjectReference resolves to a ReferencePath
-       after build) and adds the resolved .dll as a packed file. -->
+  <!-- Bundle every referenced project assembly into lib/<tfm>/ at pack time. Walks the build's
+       ReferencePath items (each ProjectReference resolves to a ReferencePath after build) and adds
+       the resolved .dll as a packed file, so FileFormat.Core, Compression.Core and
+       FileFormat.TextMode ship inside the package instead of as missing dependencies. -->
   <Target Name="_AddAllReferencedAssembliesToPackage" DependsOnTargets="ResolveReferences">
     <ItemGroup>
       <_BundledRefs Include="@(ReferencePath)"
@@ -81,11 +121,4 @@
     <Message Importance="high" Text="Bundling @(_BundledRefs->Count()) referenced project DLLs into lib/$(TargetFramework)" />
   </Target>
 
-  <!-- Strip FileFormat.* ProjectReferences from the generated nuspec's <dependencies> list.
-       We need MSBuild's project graph to flow them (so direct types like FileFormat.Apng.ApngFile
-       are visible to ProjectReference consumers of this package), but NuGet would otherwise
-       turn each one into a non-existent <dependency id="FileFormat.X" version="1.0.0" /> entry.
-       Their DLLs are bundled in lib/ via _AddAllReferencedAssembliesToPackage above; their
-       transitive PackageReferences (BitMiracle.LibTiff.NET, BitMiracle.LibJpeg.NET,
-       FrameworkExtensions.Backports, etc.) propagate naturally and remain in the nuspec. -->
 </Project>

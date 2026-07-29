@@ -14,7 +14,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Crush.TestUtilities\Crush.TestUtilities.csproj" />
-    <ProjectReference Include="..\..\FileFormats\FileFormat.Tga\FileFormat.Tga.csproj" />
+    <ProjectReference Include="..\..\Hawkynt.FileFormats.Images\Hawkynt.FileFormats.Images.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Core\FileFormat.Core.csproj" />
     <ProjectReference Include="..\..\Optimizers\Optimizer.Tga\Optimizer.Tga.csproj" />
   </ItemGroup>
 </Project>

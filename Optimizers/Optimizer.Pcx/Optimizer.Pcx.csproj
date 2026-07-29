@@ -10,7 +10,8 @@
 
   <ItemGroup>
     <ProjectReference Include="../../Crush.Core/Crush.Core.csproj" />
-    <ProjectReference Include="../../FileFormats/FileFormat.Pcx/FileFormat.Pcx.csproj" />
+    <ProjectReference Include="..\..\Hawkynt.FileFormats.Images\Hawkynt.FileFormats.Images.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Core\FileFormat.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

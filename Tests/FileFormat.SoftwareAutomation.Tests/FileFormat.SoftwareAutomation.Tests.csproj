@@ -9,6 +9,7 @@
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormats\FileFormat.SoftwareAutomation\FileFormat.SoftwareAutomation.csproj" />
+    <ProjectReference Include="..\..\Hawkynt.FileFormats.Images\Hawkynt.FileFormats.Images.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Core\FileFormat.Core.csproj" />
   </ItemGroup>
 </Project>

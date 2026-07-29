@@ -14,7 +14,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Crush.TestUtilities\Crush.TestUtilities.csproj" />
-    <ProjectReference Include="..\..\FileFormats\FileFormat.Pcx\FileFormat.Pcx.csproj" />
+    <ProjectReference Include="..\..\Hawkynt.FileFormats.Images\Hawkynt.FileFormats.Images.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Core\FileFormat.Core.csproj" />
     <ProjectReference Include="..\..\Optimizers\Optimizer.Pcx\Optimizer.Pcx.csproj" />
   </ItemGroup>
 </Project>

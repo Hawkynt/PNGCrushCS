@@ -13,7 +13,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormats\FileFormat.XBin\FileFormat.XBin.csproj" />
+    <ProjectReference Include="..\..\Hawkynt.FileFormats.Images\Hawkynt.FileFormats.Images.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Core\FileFormat.Core.csproj" />
+    <ProjectReference Include="..\..\FileFormat.TextMode\FileFormat.TextMode.csproj" />
   </ItemGroup>
 
   <ItemGroup>

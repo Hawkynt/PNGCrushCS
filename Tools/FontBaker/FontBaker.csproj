@@ -9,6 +9,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FileFormats\FileFormat.TextMode\FileFormat.TextMode.csproj" />
+    <ProjectReference Include="..\..\FileFormat.TextMode\FileFormat.TextMode.csproj" />
   </ItemGroup>
 </Project>

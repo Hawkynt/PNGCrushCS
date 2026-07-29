@@ -12,22 +12,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\FileFormat.Core\FileFormat.Core.csproj" />
-    <ProjectReference Include="..\..\FileFormats\FileFormat.Msp\FileFormat.Msp.csproj" />
-    <ProjectReference Include="..\..\FileFormats\FileFormat.Ico\FileFormat.Ico.csproj" />
-    <ProjectReference Include="..\..\FileFormats\FileFormat.Cur\FileFormat.Cur.csproj" />
-    <ProjectReference Include="..\..\FileFormats\FileFormat.Ani\FileFormat.Ani.csproj" />
-    <ProjectReference Include="..\..\FileFormats\FileFormat.Apng\FileFormat.Apng.csproj" />
-    <ProjectReference Include="..\..\FileFormats\FileFormat.Mng\FileFormat.Mng.csproj" />
-    <ProjectReference Include="..\..\FileFormats\FileFormat.Fli\FileFormat.Fli.csproj" />
-    <ProjectReference Include="..\..\FileFormats\FileFormat.Dcx\FileFormat.Dcx.csproj" />
-    <ProjectReference Include="..\..\FileFormats\FileFormat.Mpo\FileFormat.Mpo.csproj" />
-    <ProjectReference Include="..\..\FileFormats\FileFormat.Icns\FileFormat.Icns.csproj" />
-    <ProjectReference Include="..\..\FileFormats\FileFormat.Tiff\FileFormat.Tiff.csproj" />
-    <ProjectReference Include="..\..\FileFormats\FileFormat.BigTiff\FileFormat.BigTiff.csproj" />
-    <ProjectReference Include="..\..\FileFormats\FileFormat.Png\FileFormat.Png.csproj" />
-    <ProjectReference Include="..\..\FileFormats\FileFormat.Pcx\FileFormat.Pcx.csproj" />
-    <ProjectReference Include="..\..\FileFormats\FileFormat.Jpeg\FileFormat.Jpeg.csproj" />
-    <ProjectReference Include="..\..\FileFormats\FileFormat.Riff\FileFormat.Riff.csproj" />
+    <ProjectReference Include="..\..\Hawkynt.FileFormats.Images\Hawkynt.FileFormats.Images.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="NUnit.Framework" />
