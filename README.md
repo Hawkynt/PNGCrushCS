@@ -73,22 +73,26 @@ Each per-format optimizer follows the same pipeline:
 ## Architecture
 
 ```
-Compression.Core   <-- FileFormat.Png  <-- Optimizer.Png
-                   <-- FileFormat.Tiff <-- Optimizer.Tiff
-FileFormat.Core    <-- All FileFormat.* libraries
-FileFormat.Riff    <-- FileFormat.Ani, FileFormat.WebP
-FileFormat.Iff     <-- FileFormat.Ilbm, IffPbm, IffAcbm, IffDeep, IffRgb8, IffRgbn
+FileFormat.Core       contracts (RawImage, the static-abstract format interfaces) and the
+                      per-machine primitives formats share (Atari8BitGraphics,
+                      Commodore64Graphics, ZxSpectrumGraphics, PlanarConverter, …)
+Compression.Core      deflate / LZW / PackBits, used by the PNG, TIFF and JPEG XL codecs
+FileFormat.TextMode   text-screen model and bitmap fonts; multi-targeted because the
+                      WinForms UI consumes it on net48 as well
 
-Hawkynt.FileFormats.Images  <-- (public NuGet — references everything below)
-  - Source-generated FormatRegistry / ImageFormat enum
-  - Bundles all FileFormat.*.dll into lib/net8.0/
+Hawkynt.FileFormats.Images  <-- (public NuGet — every format lives here)
+  Formats/<Name>/           one folder and one namespace per format, one assembly for all
+  Source-generated FormatRegistry / ImageFormat enum over everything in the compilation
 
 Crush.Core         <-- Crush.Image + the Optimizer.* libraries
 Optimizer.Image    <-- BitmapConverter, ImageFormatDetector (Windows-specific glue)
 ```
 
 - **Compression.Core** — pure BCL, no platform dependencies, no native code.
-- **FileFormat.\*** — all target `net8.0`, no platform dependencies. Standalone reader/writer per format.
+- **Formats** — every format is a folder under `Hawkynt.FileFormats.Images/Formats/` with its
+  own namespace (`FileFormat.<Name>`), targeting `net8.0` with no platform dependencies. They
+  were once one assembly apiece; sharing a single assembly lets them share helpers without
+  making those helpers public.
 - **Optimizer.Png / Optimizer.Gif** — Windows-only (use `System.Drawing.Common`).
 - **Other Optimizer.\*** — `net8.0` with `EnableWindowsTargeting=true` for `System.Drawing.Common` pixel input.
 - **Crush.\* CLI apps** — `net9.0` (Windows-only for `Crush.Png` on `net10.0-windows`).

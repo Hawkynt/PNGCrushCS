@@ -5,7 +5,7 @@ How to build metadata-compatible file format libraries across any domain — ima
 ## Design Goals
 
 1. **Idiot-proof to implement** — the compiler enforces completeness; forget a method and it won't build
-2. **Easy to understand** — every format is one self-contained project, same file naming, same interface set
+2. **Easy to understand** — every format is one self-contained folder with its own namespace, same file naming, same interface set
 3. **No hand-written binary parsing** — source generator reads `[HeaderField]` annotations and emits `ReadFrom`/`WriteTo`
 4. **Metadata extraction without domain knowledge** — a hex editor, format detector, or metadata viewer can query any format's extensions, magic bytes, capabilities, and header field map without understanding pixels, samples, or codecs
 5. **Zero-cost abstraction** — all interface members are `static abstract`; dispatch resolves at compile time, no vtables, no boxing, no allocations
@@ -631,11 +631,16 @@ These shapes let generic tools make decisions without format-specific code:
 
 ## Project Structure
 
-### Per-Format Project
+### Per-Format Folder
+
+Each format is a folder with its own namespace. In this repo they all compile into the single
+`Hawkynt.FileFormats.Images` assembly under `Formats/<Fmt>/`; nothing about the pattern requires
+that, and a domain with a handful of formats may just as well give each one its own project.
+Sharing one assembly buys two things: helpers can be `internal` instead of public, and the
+registry generator sees every format in its own compilation rather than through references.
 
 ```
-FileFormat.<Fmt>/
-  FileFormat.<Fmt>.csproj    — references FileFormat.Core + FileFormat.Core.Generators (analyzer)
+Formats/<Fmt>/
   <Fmt>File.cs               — readonly record struct, implements interfaces, delegates to reader/writer
   <Fmt>Reader.cs             — static class: FromSpan(), FromFile(), FromStream(), FromBytes()
   <Fmt>Writer.cs             — static class: ToBytes()
@@ -646,6 +651,9 @@ FileFormat.<Fmt>/
 
 ### Minimal .csproj
 
+One project holds all the formats, so adding a format touches no build file at all — dropping the
+folder in is enough. The project it lands in references core and hooks up both generators:
+
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
@@ -655,11 +663,13 @@ FileFormat.<Fmt>/
     <ProjectReference Include="..\FileFormat.Core\FileFormat.Core.csproj" />
     <ProjectReference Include="..\FileFormat.Core.Generators\FileFormat.Core.Generators.csproj"
                       OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\FileFormat.Registry.Generator\FileFormat.Registry.Generator.csproj"
+                      OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
 </Project>
 ```
 
-`Directory.Build.props` provides `LangVersion`, `Nullable`, `ImplicitUsings`, `AllowUnsafeBlocks` — individual projects only specify `TargetFramework`.
+`Directory.Build.props` provides `LangVersion`, `Nullable`, `ImplicitUsings`, `AllowUnsafeBlocks`.
 
 ## Complete Example: Fixed-Layout Header (QCOW2 — Big-Endian Disk Image)
 
@@ -801,7 +811,7 @@ Both patterns are valid. The image pattern optimizes for zero-cost abstraction (
 
 Despite the interface style difference, these elements are identical:
 
-1. **One project per format** — `FileFormat.Compress/`, `FileFormat.Qoi/`
+1. **One folder and one namespace per format** — `FileFormat.Compress/`, `Formats/Qoi/`
 2. **Minimal .csproj** — references core + registry/generators only, everything else from `Directory.Build.props`
 3. **Magic byte detection** — `[FormatMagicBytes]` attribute or `MagicSignatures` property
 4. **Capability flags** — `FormatCapability` / `FormatCapabilities` enum
@@ -833,7 +843,7 @@ What stays constant across all domains:
 - `FormatCapability` flags for generic tooling
 - `FieldDescriptor[]` for metadata viewers
 - Source-generated registration (zero reflection)
-- One project per format, same file naming convention
+- One folder and namespace per format, same file naming convention
 
 ## What the Framework Owns vs. What You Own
 

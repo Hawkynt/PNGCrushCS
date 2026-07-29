@@ -14,7 +14,7 @@
 
 `System.Drawing.Common` ships with PNG/JPEG/GIF/BMP/TIFF; `ImageSharp` adds WebP and a handful more. Everything else — every retro computing format, every fax encoding, every GPU texture container, every obscure scientific or professional format — is left to the consumer to glue together format-by-format.
 
-This package is the union of every `FileFormat.*` library in [PNGCrushCS](https://github.com/Hawkynt/PNGCrushCS), exposed behind a single static registry generated at compile time. Each format is a fully native C# implementation — no native bindings, no platform restrictions (except TIFF via LibTiff.NET and JPEG via LibJpeg.NET, both managed wrappers).
+This package is the union of every format implementation in [PNGCrushCS](https://github.com/Hawkynt/PNGCrushCS) — one folder and one `FileFormat.<Name>` namespace apiece, all compiled into this one assembly — exposed behind a single static registry generated at compile time. Each format is a fully native C# implementation — no native bindings, no platform restrictions (except TIFF via LibTiff.NET and JPEG via LibJpeg.NET, both managed wrappers).
 
 Use it when you need to **detect what an arbitrary stream contains** and **decode it to a `RawImage`** without caring about the codec details.
 
@@ -24,7 +24,7 @@ Use it when you need to **detect what an arbitrary stream contains** and **decod
 dotnet add package Hawkynt.FileFormats.Images
 ```
 
-The package bundles all 540 format DLLs in `lib/net8.0/`. Total size ≈ 3.7 MB. Zero NuGet dependencies pulled into your project.
+All 582 formats live in one assembly in `lib/net8.0/`, alongside the three support libraries it builds on (`FileFormat.Core`, `Compression.Core`, `FileFormat.TextMode`). Total size ≈ 4.9 MB.
 
 ## Quick start
 
@@ -404,12 +404,12 @@ Lightweight metadata returned by `FormatEntry.ReadImageInfo` for formats that ex
 
 ## How auto-discovery works
 
-The `FileFormat.Registry.Generator` Roslyn source generator scans every referenced assembly at compile time for types implementing `IImageFormatReader<TSelf>`, `IImageFormatWriter<TSelf>`, `IImageToRawImage<TSelf>`, `IImageFromRawImage<TSelf>`, and `IMultiImageFileFormat<TSelf>`. It reads the type's `[FormatMagicBytes]`, `[FormatDetectionPriority]`, and `[FormatMimeType]` attributes, then emits:
+The `FileFormat.Registry.Generator` Roslyn source generator scans the compilation and every referenced assembly at compile time for types implementing `IImageFormatReader<TSelf>`, `IImageFormatWriter<TSelf>`, `IImageToRawImage<TSelf>`, `IImageFromRawImage<TSelf>`, and `IMultiImageFileFormat<TSelf>`. It reads the type's `[FormatMagicBytes]`, `[FormatDetectionPriority]`, and `[FormatMimeType]` attributes, then emits:
 
 1. The `ImageFormat` enum (one entry per discovered format).
 2. A `FormatRegistration.RegisterAll()` partial method that wires up function pointers to the format's `FromBytes`/`FromSpan`/`ToBytes`/`ToRawImage`/`FromRawImage` static methods.
 
-There is **no runtime reflection**. Adding a new format is purely additive: drop a new `FileFormat.<Name>` project in, ship one more DLL, and the next build extends the enum and registers the format with no code changes elsewhere.
+There is **no runtime reflection**. Adding a new format is purely additive: drop a new folder under `Formats/`, and the next build extends the enum and registers the format with no code changes elsewhere — not even a build file to edit.
 
 ## Stream detection internals
 
@@ -595,7 +595,7 @@ foreach (var entry in FormatRegistry.AllFormats.OrderBy(e => e.Name))
 - **Codec subsets** — HEIF/AVIF/BPG decoders are I-frame only, single tile, YCbCr 4:2:0 8-bit. **JPEG XL**: container + SizeHeader + ImageMetadata + FrameHeader (ISO/IEC 18181-1 §3.6.2 / §3.6.3 / §3.6.5) are spec-conformant — the all_default fast path that most libjxl-encoded files use is fully supported, and the non-default conditional plumbing (orientation, bit_depth, num_extra_channels, extra_channel_info, color_encoding, tone_mapping, frame_type, encoding flag) is in place. Pixel codec (modular sub-codec body and VarDCT) is the remaining workstream — arbitrary real-world `.jxl` files will not decode their pixels yet, but signature, dimensions, and image-level metadata are extracted correctly. Camera RAW supports DNG lossless JPEG, Canon CR2, Nikon NEF, Sony ARW2; other manufacturer-specific compressions are future work.
 - **Write coverage** — 344 of 547 formats implement `FromRawImage` and can encode an arbitrary image; `FormatRegistry.Write` returns `null` for the other 203. Those parse and re-serialize a file they read, but cannot author one from pixel data — this includes the authoring formats (PSD, XCF, PSB, ICNS, Xcursor, ECW, DjVu, JBIG2, FLIF) and most vintage/8-bit formats. Filter on `FormatEntry.SupportsWrite` rather than assuming.
 - **PDF / PE** — image extraction only. PDF rendering, page composition, vector graphics, and PE writing are out of scope.
-- **Bundle size** — `~3.7 MB` (540 small DLLs). If you only need a few formats, future per-format NuGet packages may be published.
+- **Bundle size** — `~4.9 MB`, four assemblies. There is no way to take only the formats you need; if that matters, per-format NuGet packages may be published in future.
 - **TFM** — targets `net8.0`. Older runtimes are not supported.
 
 ## License
@@ -604,4 +604,4 @@ LGPL-3.0-or-later. See [LICENSE](https://github.com/Hawkynt/PNGCrushCS/blob/main
 
 ## Contributing
 
-Issues and PRs welcome at <https://github.com/Hawkynt/PNGCrushCS>. Adding a new format is straightforward — see existing `FileFormat.<Name>` projects as templates. Adding a `[FormatMimeType("image/...")]` annotation to an existing format is a one-line PR.
+Issues and PRs welcome at <https://github.com/Hawkynt/PNGCrushCS>. Adding a new format is straightforward — see existing folders under `Formats/` as templates. Adding a `[FormatMimeType("image/...")]` annotation to an existing format is a one-line PR.
