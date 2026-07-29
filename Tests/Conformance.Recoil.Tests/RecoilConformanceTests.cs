@@ -66,6 +66,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.IndyPaint, "IndyPaint", 320, 240, ".tru"),
     new(ImageFormat.TextureEditorMikey, "Texture Editor by Mikey", 320, 192),
     new(ImageFormat.Mamut, "Mamut", 320, 192),
+    new(ImageFormat.VidigPaint, "Vidig Paint", 320, 192),
   ];
 
   [Test]

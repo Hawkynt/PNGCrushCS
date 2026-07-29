@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Atari 8-bit Vidig Paint (.rap) screens.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="FileFormat.VidigPaint.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../FileFormat.Core/FileFormat.Core.csproj" />
+    <ProjectReference Include="../../FileFormat.Core.Generators/FileFormat.Core.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+</Project>
