@@ -367,6 +367,7 @@
     <Project Path="FileFormats/FileFormat.MsxFont/FileFormat.MsxFont.csproj" />
     <Project Path="FileFormats/FileFormat.MsxScreen2/FileFormat.MsxScreen2.csproj" />
     <Project Path="FileFormats/FileFormat.MsxScreen5/FileFormat.MsxScreen5.csproj" />
+    <Project Path="FileFormats/FileFormat.MsxScreen6/FileFormat.MsxScreen6.csproj" />
     <Project Path="FileFormats/FileFormat.MsxScreen8/FileFormat.MsxScreen8.csproj" />
     <Project Path="FileFormats/FileFormat.MsxSprite/FileFormat.MsxSprite.csproj" />
     <Project Path="FileFormats/FileFormat.MsxVideo/FileFormat.MsxVideo.csproj" />
@@ -969,6 +970,7 @@
     <Project Path="Tests/FileFormat.MsxFont.Tests/FileFormat.MsxFont.Tests.csproj" />
     <Project Path="Tests/FileFormat.MsxScreen2.Tests/FileFormat.MsxScreen2.Tests.csproj" />
     <Project Path="Tests/FileFormat.MsxScreen5.Tests/FileFormat.MsxScreen5.Tests.csproj" />
+    <Project Path="Tests/FileFormat.MsxScreen6.Tests/FileFormat.MsxScreen6.Tests.csproj" />
     <Project Path="Tests/FileFormat.MsxScreen8.Tests/FileFormat.MsxScreen8.Tests.csproj" />
     <Project Path="Tests/FileFormat.MsxSprite.Tests/FileFormat.MsxSprite.Tests.csproj" />
     <Project Path="Tests/FileFormat.MsxVideo.Tests/FileFormat.MsxVideo.Tests.csproj" />
