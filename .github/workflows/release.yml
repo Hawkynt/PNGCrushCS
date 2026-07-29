@@ -20,6 +20,11 @@ env:
 jobs:
   test:
     uses: ./.github/workflows/ci.yml
+    with:
+      # Both OS legs still run the whole suite; only the coverage report is skipped. It takes about
+      # two hours on its own and every job below waits on this one, so a release spent longer
+      # producing a report than shipping the packages.
+      skip-coverage: true
 
   version:
     needs: test

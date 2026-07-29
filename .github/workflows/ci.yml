@@ -11,7 +11,18 @@ on:
     branches: [main, master]
   pull_request:
     branches: [main, master]
-  workflow_call: {}
+  workflow_call:
+    inputs:
+      skip-coverage:
+        description: >-
+          Leaves the coverage leg out. A release sets it, because the report costs about two hours
+          there and gates the package push behind it (see the job below). Phrased as "skip" rather
+          than "run" on purpose: a push or pull request supplies no inputs at all, and an expression
+          comparison casts both null and false to 0, so a "run: default true" flag would read as
+          false on exactly the events that should run it.
+        type: boolean
+        required: false
+        default: false
 
 # Force JavaScript-based actions (checkout, setup-dotnet, upload-artifact) to run on Node 24
 # instead of the deprecated Node 20 ahead of the 2026-06-16 hard cutover, until we bump each
@@ -79,7 +90,19 @@ jobs:
           path: 'PNGCrushCS/**/TestResults/*.trx'
 
   coverage:
+    # Skipped when the caller asks for it, which the release does. The two OS legs above run the same
+    # tests without instrumentation, so nothing is left unchecked by leaving this out of a release --
+    # only the report is, and a push or pull request still produces it.
+    #
+    # It costs a release about two hours. VSTest walks the 547 test projects one at a time, and since
+    # the per-format assemblies became a single Hawkynt.FileFormats.Images.dll each of them now pulls
+    # in the whole 4.9 MB of it and has it instrumented again: about 14 seconds of coverage setup per
+    # project to run tests that take 50 ms. Instrumenting only the assembly under test would fix it at
+    # the root and is worth doing; this just stops a report holding up a publish in the meantime.
+    if: ${{ !inputs['skip-coverage'] }}
     runs-on: ubuntu-latest
+    # A wedged report should not be able to sit on a six-hour default.
+    timeout-minutes: 150
     steps:
       - name: Checkout PNGCrushCS
         uses: actions/checkout@v4
