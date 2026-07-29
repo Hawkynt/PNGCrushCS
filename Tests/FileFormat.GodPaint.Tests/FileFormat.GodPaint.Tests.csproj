@@ -11,4 +11,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\FileFormats\FileFormat.GodPaint\FileFormat.GodPaint.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Using Include="NUnit.Framework" />
+  </ItemGroup>
 </Project>

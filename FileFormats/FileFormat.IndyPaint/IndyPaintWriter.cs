@@ -12,7 +12,17 @@ public static class IndyPaintWriter {
 
   internal static byte[] Assemble(byte[] pixelData) {
     var result = new byte[_EXPECTED_SIZE];
-    pixelData.AsSpan(0, Math.Min(pixelData.Length, _EXPECTED_SIZE)).CopyTo(result);
+
+    // "Indy" signature, then the dimensions big-endian; RGB565 pixels start at the header size.
+    IndyPaintFile.Signature.CopyTo(result);
+    result[IndyPaintFile.DimensionsOffset] = 320 >> 8;
+    result[IndyPaintFile.DimensionsOffset + 1] = 320 & 0xFF;
+    result[IndyPaintFile.DimensionsOffset + 2] = 240 >> 8;
+    result[IndyPaintFile.DimensionsOffset + 3] = 240 & 0xFF;
+
+    pixelData.AsSpan(0, Math.Min(pixelData.Length, IndyPaintFile.PixelDataSize))
+      .CopyTo(result.AsSpan(IndyPaintFile.HeaderSize));
+
     return result;
   }
 }

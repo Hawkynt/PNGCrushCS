@@ -7,10 +7,23 @@ namespace FileFormat.IndyPaint;
 public readonly record struct IndyPaintFile : IImageFormatReader<IndyPaintFile>, IImageToRawImage<IndyPaintFile>, IImageFromRawImage<IndyPaintFile>, IImageFormatWriter<IndyPaintFile> {
 
   /// <summary>The exact file size: 320 x 240 x 2 bytes per pixel.</summary>
-  public const int ExpectedFileSize = 320 * 240 * 2;
+  /// <summary>ASCII signature every IndyPaint file starts with.</summary>
+  public static ReadOnlySpan<byte> Signature => "Indy"u8;
+
+  /// <summary>Offset of the big-endian width/height pair.</summary>
+  public const int DimensionsOffset = 4;
+
+  /// <summary>Header size; pixel data starts here.</summary>
+  public const int HeaderSize = 256;
+
+  /// <summary>Pixel data size: 320 x 240 x 2 bytes per pixel.</summary>
+  public const int PixelDataSize = 320 * 240 * 2;
+
+  /// <summary>The exact file size.</summary>
+  public const int ExpectedFileSize = HeaderSize + PixelDataSize;
 
   static string IImageFormatMetadata<IndyPaintFile>.PrimaryExtension => ".ipn";
-  static string[] IImageFormatMetadata<IndyPaintFile>.FileExtensions => [".ipn", ".idy"];
+  static string[] IImageFormatMetadata<IndyPaintFile>.FileExtensions => [".ipn", ".idy", ".tru"];
   static IndyPaintFile IImageFormatReader<IndyPaintFile>.FromSpan(ReadOnlySpan<byte> data) => IndyPaintReader.FromSpan(data);
   static byte[] IImageFormatWriter<IndyPaintFile>.ToBytes(IndyPaintFile file) => IndyPaintWriter.ToBytes(file);
 

@@ -12,7 +12,16 @@ public static class GodPaintWriter {
 
   internal static byte[] Assemble(byte[] pixelData) {
     var result = new byte[_EXPECTED_SIZE];
-    pixelData.AsSpan(0, Math.Min(pixelData.Length, _EXPECTED_SIZE)).CopyTo(result);
+
+    // Two reserved bytes, then the dimensions big-endian; RGB565 pixels follow.
+    result[GodPaintFile.DimensionsOffset] = 320 >> 8;
+    result[GodPaintFile.DimensionsOffset + 1] = 320 & 0xFF;
+    result[GodPaintFile.DimensionsOffset + 2] = 240 >> 8;
+    result[GodPaintFile.DimensionsOffset + 3] = 240 & 0xFF;
+
+    pixelData.AsSpan(0, Math.Min(pixelData.Length, GodPaintFile.PixelDataSize))
+      .CopyTo(result.AsSpan(GodPaintFile.HeaderSize));
+
     return result;
   }
 }

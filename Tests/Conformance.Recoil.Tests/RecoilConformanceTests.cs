@@ -24,7 +24,10 @@ public sealed class RecoilConformanceTests {
   /// <param name="RecoilName">The format's name in RECOIL's <c>formats.xml</c>, for traceability.</param>
   /// <param name="Width">Native width RECOIL expects.</param>
   /// <param name="Height">Native height RECOIL expects.</param>
-  public readonly record struct Pairing(ImageFormat Format, string RecoilName, int Width, int Height) {
+  /// <param name="Extension">Extension to write the probe file under. RECOIL dispatches purely on
+  /// the extension, and it does not always use the same one we treat as primary — GodPaint is
+  /// <c>.gpn</c> here and <c>.god</c> there. Null means use our primary extension.</param>
+  public readonly record struct Pairing(ImageFormat Format, string RecoilName, int Width, int Height, string? Extension = null) {
     public override string ToString() => $"{this.Format} ({this.RecoilName})";
   }
 
@@ -59,6 +62,8 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.ZxFont, "8x8 font", 256, 64),
     new(ImageFormat.SamCoupeMode4, "Mode 4", 256, 192),
     new(ImageFormat.KssPaint, "KSS-Paint", 320, 160),
+    new(ImageFormat.GodPaint, "GodPaint", 320, 240, ".god"),
+    new(ImageFormat.IndyPaint, "IndyPaint", 320, 240, ".tru"),
   ];
 
   [Test]
@@ -79,7 +84,8 @@ public sealed class RecoilConformanceTests {
       return;
     }
 
-    var path = Path.Combine(Path.GetTempPath(), $"recoilconf_{pairing.Format}{entry.PrimaryExtension}");
+    var extension = pairing.Extension ?? entry.PrimaryExtension;
+    var path = Path.Combine(Path.GetTempPath(), $"recoilconf_{pairing.Format}{extension}");
     try {
       File.WriteAllBytes(path, encoded);
       var (decoded, output) = RecoilOracle.TryDecode(path);
