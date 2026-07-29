@@ -18,8 +18,8 @@ public sealed class CokeAtariWriterTests {
 
     var bytes = CokeAtariWriter.ToBytes(file);
 
-    var width = BinaryPrimitives.ReadUInt16BigEndian(bytes.AsSpan(0));
-    var height = BinaryPrimitives.ReadUInt16BigEndian(bytes.AsSpan(2));
+    var width = BinaryPrimitives.ReadUInt16BigEndian(bytes.AsSpan(CokeAtariHeader.DimensionsOffset));
+    var height = BinaryPrimitives.ReadUInt16BigEndian(bytes.AsSpan(CokeAtariHeader.DimensionsOffset + 2));
 
     Assert.That(width, Is.EqualTo(320));
     Assert.That(height, Is.EqualTo(200));

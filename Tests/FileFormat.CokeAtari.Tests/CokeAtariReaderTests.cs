@@ -11,8 +11,7 @@ public sealed class CokeAtariReaderTests {
   private static byte[] _MakeValidFile(ushort width, ushort height, byte fillByte = 0x00) {
     var pixelBytes = width * height * 2;
     var data = new byte[CokeAtariHeader.StructSize + pixelBytes];
-    BinaryPrimitives.WriteUInt16BigEndian(data.AsSpan(0), width);
-    BinaryPrimitives.WriteUInt16BigEndian(data.AsSpan(2), height);
+    CokeAtariHeader.Write(data, width, height);
     for (var i = CokeAtariHeader.StructSize; i < data.Length; ++i)
       data[i] = fillByte;
     return data;
@@ -54,6 +53,7 @@ public sealed class CokeAtariReaderTests {
   [Category("Unit")]
   public void FromBytes_ZeroWidth_ThrowsInvalidDataException() {
     var data = new byte[CokeAtariHeader.StructSize];
+    CokeAtariHeader.Write(data, 0, 0);
     BinaryPrimitives.WriteUInt16BigEndian(data.AsSpan(0), 0);
     BinaryPrimitives.WriteUInt16BigEndian(data.AsSpan(2), 10);
     Assert.Throws<InvalidDataException>(() => CokeAtariReader.FromBytes(data));
@@ -63,6 +63,7 @@ public sealed class CokeAtariReaderTests {
   [Category("Unit")]
   public void FromBytes_ZeroHeight_ThrowsInvalidDataException() {
     var data = new byte[CokeAtariHeader.StructSize];
+    CokeAtariHeader.Write(data, 0, 0);
     BinaryPrimitives.WriteUInt16BigEndian(data.AsSpan(0), 10);
     BinaryPrimitives.WriteUInt16BigEndian(data.AsSpan(2), 0);
     Assert.Throws<InvalidDataException>(() => CokeAtariReader.FromBytes(data));
@@ -72,6 +73,7 @@ public sealed class CokeAtariReaderTests {
   [Category("Unit")]
   public void FromBytes_TruncatedPixelData_ThrowsInvalidDataException() {
     var data = new byte[CokeAtariHeader.StructSize + 2];
+    CokeAtariHeader.Write(data, 1, 1);
     BinaryPrimitives.WriteUInt16BigEndian(data.AsSpan(0), 10);
     BinaryPrimitives.WriteUInt16BigEndian(data.AsSpan(2), 10);
     Assert.Throws<InvalidDataException>(() => CokeAtariReader.FromBytes(data));

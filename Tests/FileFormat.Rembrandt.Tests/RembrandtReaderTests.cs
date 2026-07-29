@@ -42,8 +42,10 @@ public sealed class RembrandtReaderTests {
   [Test]
   [Category("Unit")]
   public void FromBytes_ZeroDimensions_ThrowsInvalidDataException() {
+    // A valid header that declares a zero-sized image is still not decodable.
     var data = new byte[RembrandtFile.MinFileSize];
-    // width=0, height=0
+    RembrandtHeader.Write(data, 0, 0);
+
     Assert.Throws<InvalidDataException>(() => RembrandtReader.FromBytes(data));
   }
 
@@ -52,17 +54,12 @@ public sealed class RembrandtReaderTests {
   public void FromBytes_Valid320x240_Parses() {
     var width = 320;
     var height = 240;
-    var data = new byte[RembrandtFile.HeaderSize + width * height * 2];
-
-    // BE dimensions
-    data[0] = (byte)((width >> 8) & 0xFF);
-    data[1] = (byte)(width & 0xFF);
-    data[2] = (byte)((height >> 8) & 0xFF);
-    data[3] = (byte)(height & 0xFF);
+    var data = new byte[RembrandtHeader.StructSize + width * height * 2];
+    RembrandtHeader.Write(data, width, height);
 
     // First pixel: pure red RGB565 BE = 0xF800
-    data[4] = 0xF8;
-    data[5] = 0x00;
+    data[RembrandtHeader.StructSize + 0] = 0xF8;
+    data[RembrandtHeader.StructSize + 1] = 0x00;
 
     var result = RembrandtReader.FromBytes(data);
 
@@ -77,12 +74,8 @@ public sealed class RembrandtReaderTests {
   public void FromBytes_Valid640x480_Parses() {
     var width = 640;
     var height = 480;
-    var data = new byte[RembrandtFile.HeaderSize + width * height * 2];
-
-    data[0] = (byte)((width >> 8) & 0xFF);
-    data[1] = (byte)(width & 0xFF);
-    data[2] = (byte)((height >> 8) & 0xFF);
-    data[3] = (byte)(height & 0xFF);
+    var data = new byte[RembrandtHeader.StructSize + width * height * 2];
+    RembrandtHeader.Write(data, width, height);
 
     var result = RembrandtReader.FromBytes(data);
 
@@ -95,12 +88,9 @@ public sealed class RembrandtReaderTests {
   public void FromStream_Valid() {
     var width = 100;
     var height = 50;
-    var data = new byte[RembrandtFile.HeaderSize + width * height * 2];
-    data[0] = 0;
-    data[1] = (byte)width;
-    data[2] = 0;
-    data[3] = (byte)height;
-    data[4] = 0xAB;
+    var data = new byte[RembrandtHeader.StructSize + width * height * 2];
+    RembrandtHeader.Write(data, width, height);
+    data[RembrandtHeader.StructSize + 0] = 0xAB;
 
     using var ms = new MemoryStream(data);
     var result = RembrandtReader.FromStream(ms);
@@ -113,14 +103,18 @@ public sealed class RembrandtReaderTests {
   [Test]
   [Category("Unit")]
   public void FromBytes_DimensionsBigEndian() {
-    // 0x0140 = 320, 0x00F0 = 240
+    // 0x0140 = 320, 0x00F0 = 240 — stored big-endian at the header's dimension offset.
     var width = 320;
     var height = 240;
-    var data = new byte[RembrandtFile.HeaderSize + width * height * 2];
-    data[0] = 0x01;
-    data[1] = 0x40;
-    data[2] = 0x00;
-    data[3] = 0xF0;
+    var data = new byte[RembrandtHeader.StructSize + width * height * 2];
+    RembrandtHeader.Write(data, width, height);
+
+    Assert.Multiple(() => {
+      Assert.That(data[RembrandtHeader.DimensionsOffset], Is.EqualTo(0x01));
+      Assert.That(data[RembrandtHeader.DimensionsOffset + 1], Is.EqualTo(0x40));
+      Assert.That(data[RembrandtHeader.DimensionsOffset + 2], Is.EqualTo(0x00));
+      Assert.That(data[RembrandtHeader.DimensionsOffset + 3], Is.EqualTo(0xF0));
+    });
 
     var result = RembrandtReader.FromBytes(data);
 
