@@ -281,6 +281,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | IFF RGBN                | .rgbn, .iff                                          | IFF 13-bit RGB + genlock         | Y      | Y      | —         | R     | —   | —      | —         |
 | IM5 Visilog             | .im5                                                 | IM5 Visilog image                | Y      | —      | —         | —     | —   | —      | —         |
 | Image System            | .ish, .ism                                           | C64 Image System                 | Y      | —      | —         | RW    | —   | —      | —         |
+| Imagic                  | .ic1, .ic2, .ic3                                     | Atari ST Imagic compressed       | Y      | Y      | —         | R     | —   | —      | —         |
 | Imagic Paint            | .imp, .igp                                           | Atari ST Imagic Paint            | Y      | Y      | —         | R     | —   | —      | —         |
 | Imaging Fax             | .g3n                                                 | Imaging fax format               | Y      | —      | —         | —     | —   | —      | —         |
 | IndyPaint               | .ipn, .idy                                           | Atari Falcon IndyPaint           | Y      | Y      | —         | R     | —   | —      | —         |
@@ -668,13 +669,13 @@ Two different questions, two different answers:
 | ----------------------------------------------------------- | ----- | ------ |
 | Total formats                                              | 551   | 552    |
 | Modern/web/scientific formats (PNG, JPEG, WebP, AVIF, …)   | ~290  | 0      |
-| Of RECOIL's 552 vintage formats, covered                   | 345   | 552    |
+| Of RECOIL's 552 vintage formats, covered                   | 350   | 552    |
 
 So on breadth we are level, and on everything outside the retro catalogue we are the only one of
-the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 207
+the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 202
 formats.
 
-Largest remaining clusters: Atari 8-bit (76), Commodore 64 (27), Atari ST/STE (25), Atari Falcon
+Largest remaining clusters: Atari 8-bit (74), Commodore 64 (27), Atari ST/STE (22), Atari Falcon
 (11), MSX2 (11), NEC PC-98 (7), ZX Spectrum (7). Only a handful decode as a plain fixed-size screen
 that the shared Atari primitives already cover; the rest carry their own containers or compression.
 RECOIL is a decoder only, so for each one the encoder has to be derived from its decoder and then

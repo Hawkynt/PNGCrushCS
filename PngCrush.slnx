@@ -298,6 +298,7 @@
     <Project Path="FileFormats/FileFormat.Im5Visilog/FileFormat.Im5Visilog.csproj" />
     <Project Path="FileFormats/FileFormat.ImageSysC64/FileFormat.ImageSysC64.csproj" />
     <Project Path="FileFormats/FileFormat.ImageSystem/FileFormat.ImageSystem.csproj" />
+    <Project Path="FileFormats/FileFormat.Imagic/FileFormat.Imagic.csproj" />
     <Project Path="FileFormats/FileFormat.ImagicPaint/FileFormat.ImagicPaint.csproj" />
     <Project Path="FileFormats/FileFormat.ImagingFax/FileFormat.ImagingFax.csproj" />
     <Project Path="FileFormats/FileFormat.IndyPaint/FileFormat.IndyPaint.csproj" />
@@ -892,6 +893,7 @@
     <Project Path="Tests/FileFormat.Im5Visilog.Tests/FileFormat.Im5Visilog.Tests.csproj" />
     <Project Path="Tests/FileFormat.ImageSysC64.Tests/FileFormat.ImageSysC64.Tests.csproj" />
     <Project Path="Tests/FileFormat.ImageSystem.Tests/FileFormat.ImageSystem.Tests.csproj" />
+    <Project Path="Tests/FileFormat.Imagic.Tests/FileFormat.Imagic.Tests.csproj" />
     <Project Path="Tests/FileFormat.ImagicPaint.Tests/FileFormat.ImagicPaint.Tests.csproj" />
     <Project Path="Tests/FileFormat.ImagingFax.Tests/FileFormat.ImagingFax.Tests.csproj" />
     <Project Path="Tests/FileFormat.IndyPaint.Tests/FileFormat.IndyPaint.Tests.csproj" />

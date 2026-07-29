@@ -88,6 +88,9 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.DaliCompressed, "Dali (compressed)", 320, 200, ".lpk"),
     new(ImageFormat.RamBrandt, "Rambrandt", 320, 192, ".rm0"),
     new(ImageFormat.InterPainter, "InterPainter", 320, 200, ".inp"),
+    new(ImageFormat.Imagic, "Imagic", 320, 200, ".ic1"),
+    new(ImageFormat.Imagic, "Imagic (medium)", 640, 200, ".ic2"),
+    new(ImageFormat.Imagic, "Imagic (high)", 640, 400, ".ic3"),
   ];
 
   [Test]
