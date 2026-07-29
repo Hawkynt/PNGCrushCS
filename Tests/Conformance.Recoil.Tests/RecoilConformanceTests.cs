@@ -81,6 +81,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.ZxMulticolor, "Multicolor 8x1", 256, 192, ".mc"),
     new(ImageFormat.ZxAttributes, "Attributes", 256, 192),
     new(ImageFormat.AtariGraphics3, "Mad Studio Graphics 3", 320, 192, ".gr3"),
+    new(ImageFormat.Paradox, "Paradox", 320, 200),
   ];
 
   [Test]
