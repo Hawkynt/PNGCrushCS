@@ -7,8 +7,9 @@ public sealed class DataTypeTests {
 
   [Test]
   [Category("Unit")]
-  public void FileSize_Is32032() {
-    Assert.That(SyntheticArtsFile.FileSize, Is.EqualTo(32032));
+  public void FileSize_Is32038() {
+    // 32000 bitmap + "JHSy" + a 2-byte version field + 32-byte palette.
+    Assert.That(SyntheticArtsFile.FileSize, Is.EqualTo(32038));
   }
 
   [Test]

@@ -46,11 +46,11 @@ public static class DaliSTReader {
     if (data.Length < DaliSTFile.ExpectedFileSize)
       throw new InvalidDataException($"Data too small for a valid Dali ST file: expected {DaliSTFile.ExpectedFileSize} bytes, got {data.Length}.");
 
-    var header = DaliSTHeader.ReadFrom(data);
+    var header = DaliSTHeader.ReadFrom(data[DaliSTFile.PaletteOffset..]);
     var palette = header.Palette;
 
     var pixelData = new byte[DaliSTFile.PlanarDataSize];
-    data.Slice(DaliSTFile.PaletteSize, DaliSTFile.PlanarDataSize).CopyTo(pixelData);
+    data.Slice(DaliSTFile.HeaderSize, DaliSTFile.PlanarDataSize).CopyTo(pixelData);
 
     var (width, height) = _GetDimensions(resolution);
 

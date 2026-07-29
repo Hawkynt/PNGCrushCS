@@ -22,7 +22,11 @@ public readonly record struct SinbadSlideshowFile : IImageFormatReader<SinbadSli
   internal const int PixelDataSize = 32000;
 
   /// <summary>Exact file size (palette + pixel data).</summary>
-  internal const int FileSize = PaletteSize + PixelDataSize;
+  /// <summary>Offset of the 32-byte palette: it follows the bitmap rather than preceding it.</summary>
+  internal const int PaletteOffset = PixelDataSize;
+
+  /// <summary>Sinbad pads every file out to a fixed 32768 bytes.</summary>
+  internal const int FileSize = 32768;
 
   static string IImageFormatMetadata<SinbadSlideshowFile>.PrimaryExtension => ".ssb";
   static string[] IImageFormatMetadata<SinbadSlideshowFile>.FileExtensions => [".ssb"];

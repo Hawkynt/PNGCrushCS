@@ -10,9 +10,9 @@ public static class DaliSTWriter {
 
     var result = new byte[DaliSTFile.ExpectedFileSize];
 
-    new DaliSTHeader(file.Palette).WriteTo(result);
+    new DaliSTHeader(file.Palette).WriteTo(result.AsSpan(DaliSTFile.PaletteOffset));
 
-    file.PixelData.AsSpan(0, Math.Min(file.PixelData.Length, DaliSTFile.PlanarDataSize)).CopyTo(result.AsSpan(DaliSTFile.PaletteSize));
+    file.PixelData.AsSpan(0, Math.Min(file.PixelData.Length, DaliSTFile.PlanarDataSize)).CopyTo(result.AsSpan(DaliSTFile.HeaderSize));
 
     return result;
   }

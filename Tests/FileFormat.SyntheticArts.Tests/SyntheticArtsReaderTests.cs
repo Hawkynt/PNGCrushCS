@@ -56,10 +56,10 @@ public sealed class SyntheticArtsReaderTests {
   [Category("Unit")]
   public void FromBytes_ParsesPalette() {
     var data = _BuildMinimalFile();
-    BinaryPrimitives.WriteInt16BigEndian(data.AsSpan(0), 0x0777);
-    BinaryPrimitives.WriteInt16BigEndian(data.AsSpan(2), 0x0700);
-    BinaryPrimitives.WriteInt16BigEndian(data.AsSpan(4), 0x0070);
-    BinaryPrimitives.WriteInt16BigEndian(data.AsSpan(6), 0x0007);
+    BinaryPrimitives.WriteInt16BigEndian(data.AsSpan(SyntheticArtsFile.PaletteOffset + 0), 0x0777);
+    BinaryPrimitives.WriteInt16BigEndian(data.AsSpan(SyntheticArtsFile.PaletteOffset + 2), 0x0700);
+    BinaryPrimitives.WriteInt16BigEndian(data.AsSpan(SyntheticArtsFile.PaletteOffset + 4), 0x0070);
+    BinaryPrimitives.WriteInt16BigEndian(data.AsSpan(SyntheticArtsFile.PaletteOffset + 6), 0x0007);
 
     var result = SyntheticArtsReader.FromBytes(data);
 
@@ -75,9 +75,9 @@ public sealed class SyntheticArtsReaderTests {
   [Category("Unit")]
   public void FromBytes_CopiesPixelData() {
     var data = _BuildMinimalFile();
-    data[32] = 0xAA;
-    data[33] = 0xBB;
-    data[32031] = 0xCC;
+    data[0] = 0xAA;
+    data[1] = 0xBB;
+    data[31999] = 0xCC;
 
     var result = SyntheticArtsReader.FromBytes(data);
 
@@ -103,9 +103,11 @@ public sealed class SyntheticArtsReaderTests {
 
   private static byte[] _BuildMinimalFile() {
     var data = new byte[SyntheticArtsFile.FileSize];
-    for (var i = 0; i < 32000; ++i)
-      data[32 + i] = (byte)(i * 7 % 256);
+    for (var i = 0; i < SyntheticArtsFile.PixelDataSize; ++i)
+      data[i] = (byte)(i * 7 % 256);
 
+    SyntheticArtsFile.Tag.CopyTo(data.AsSpan(SyntheticArtsFile.TagOffset));
+    data[SyntheticArtsFile.TagOffset + 5] = 0x01;
     return data;
   }
 }

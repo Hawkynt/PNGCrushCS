@@ -53,9 +53,9 @@ public sealed class SinbadSlideshowReaderTests {
   [Category("Unit")]
   public void FromBytes_ParsesPalette() {
     var data = _BuildMinimalSinbad();
-    BinaryPrimitives.WriteInt16BigEndian(data.AsSpan(0), 0x0777);
-    BinaryPrimitives.WriteInt16BigEndian(data.AsSpan(2), 0x0700);
-    BinaryPrimitives.WriteInt16BigEndian(data.AsSpan(30), 0x0007);
+    BinaryPrimitives.WriteInt16BigEndian(data.AsSpan(SinbadSlideshowFile.PaletteOffset + 0), 0x0777);
+    BinaryPrimitives.WriteInt16BigEndian(data.AsSpan(SinbadSlideshowFile.PaletteOffset + 2), 0x0700);
+    BinaryPrimitives.WriteInt16BigEndian(data.AsSpan(SinbadSlideshowFile.PaletteOffset + 30), 0x0007);
 
     var result = SinbadSlideshowReader.FromBytes(data);
 
@@ -70,9 +70,9 @@ public sealed class SinbadSlideshowReaderTests {
   [Category("Unit")]
   public void FromBytes_ParsesPixelData() {
     var data = _BuildMinimalSinbad();
-    data[32] = 0xAA;
-    data[33] = 0xBB;
-    data[32031] = 0xCC;
+    data[0] = 0xAA;
+    data[1] = 0xBB;
+    data[31999] = 0xCC;
 
     var result = SinbadSlideshowReader.FromBytes(data);
 
@@ -100,16 +100,16 @@ public sealed class SinbadSlideshowReaderTests {
   [Category("Unit")]
   public void FromBytes_CopiesPixelData() {
     var data = _BuildMinimalSinbad();
-    data[32] = 0x55;
+    data[0] = 0x55;
     var result = SinbadSlideshowReader.FromBytes(data);
-    data[32] = 0x00;
+    data[0] = 0x00;
     Assert.That(result.PixelData[0], Is.EqualTo(0x55));
   }
 
   private static byte[] _BuildMinimalSinbad() {
-    var data = new byte[32032];
-    for (var i = 0; i < 32000; ++i)
-      data[32 + i] = (byte)(i * 7 % 256);
+    var data = new byte[SinbadSlideshowFile.FileSize];
+    for (var i = 0; i < SinbadSlideshowFile.PixelDataSize; ++i)
+      data[i] = (byte)(i * 7 % 256);
     return data;
   }
 }

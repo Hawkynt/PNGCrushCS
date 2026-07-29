@@ -8,10 +8,14 @@ public static class SyntheticArtsWriter {
   public static byte[] ToBytes(SyntheticArtsFile file) {
     ArgumentNullException.ThrowIfNull(file);
 
-    var header = new SyntheticArtsHeader(file.Palette);
     var result = new byte[SyntheticArtsFile.FileSize];
-    header.WriteTo(result.AsSpan());
-    file.PixelData.AsSpan(0, Math.Min(32000, file.PixelData.Length)).CopyTo(result.AsSpan(SyntheticArtsHeader.StructSize));
+
+    // Bitmap first; the "JHSy" tag, a 00 01 version field and the palette all follow it.
+    file.PixelData.AsSpan(0, Math.Min(SyntheticArtsFile.PixelDataSize, file.PixelData.Length)).CopyTo(result);
+    SyntheticArtsFile.Tag.CopyTo(result.AsSpan(SyntheticArtsFile.TagOffset));
+    result[SyntheticArtsFile.TagOffset + 4] = 0x00;
+    result[SyntheticArtsFile.TagOffset + 5] = 0x01;
+    new SyntheticArtsHeader(file.Palette).WriteTo(result.AsSpan(SyntheticArtsFile.PaletteOffset));
 
     return result;
   }

@@ -13,7 +13,13 @@ public readonly record struct DaliSTFile : IImageFormatReader<DaliSTFile>, IImag
   public const int PlanarDataSize = 32000;
 
   /// <summary>The exact file size: 32 + 32000 = 32032 bytes.</summary>
-  public const int ExpectedFileSize = PaletteSize + PlanarDataSize;
+  /// <summary>Offset of the 32-byte palette inside the header.</summary>
+  public const int PaletteOffset = 4;
+
+  /// <summary>Dali reserves a fixed 128-byte header; the bitmap starts immediately after it.</summary>
+  public const int HeaderSize = 128;
+
+  public const int ExpectedFileSize = HeaderSize + PlanarDataSize;
 
   static string IImageFormatMetadata<DaliSTFile>.PrimaryExtension => ".sd0";
   static string[] IImageFormatMetadata<DaliSTFile>.FileExtensions => [".sd0", ".sd1", ".sd2"];

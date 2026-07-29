@@ -30,11 +30,11 @@ public static class SinbadSlideshowReader {
     if (data.Length < SinbadSlideshowFile.FileSize)
       throw new InvalidDataException($"Data too small for a valid Sinbad Slideshow file: expected at least {SinbadSlideshowFile.FileSize} bytes, got {data.Length}.");
 
-    var header = SinbadSlideshowHeader.ReadFrom(data);
+    var header = SinbadSlideshowHeader.ReadFrom(data[SinbadSlideshowFile.PaletteOffset..]);
 
     return new SinbadSlideshowFile {
       Palette = header.Palette,
-      PixelData = data.Slice(SinbadSlideshowFile.PaletteSize, SinbadSlideshowFile.PixelDataSize).ToArray(),
+      PixelData = data[..SinbadSlideshowFile.PixelDataSize].ToArray(),
     };
   }
 

@@ -31,11 +31,11 @@ public static class SyntheticArtsReader {
     if (data.Length < SyntheticArtsFile.FileSize)
       throw new InvalidDataException($"Data too small for a valid Synthetic Arts file (expected {SyntheticArtsFile.FileSize} bytes, got {data.Length}).");
 
-    var header = SyntheticArtsHeader.ReadFrom(data);
+    var header = SyntheticArtsHeader.ReadFrom(data[SyntheticArtsFile.PaletteOffset..]);
     var palette = header.Palette;
 
     var pixelData = new byte[32000];
-    data.Slice(SyntheticArtsHeader.StructSize, 32000).CopyTo(pixelData);
+    data[..SyntheticArtsFile.PixelDataSize].CopyTo(pixelData);
 
     return new SyntheticArtsFile {
       Palette = palette,
@@ -48,11 +48,11 @@ public static class SyntheticArtsReader {
     if (data.Length < SyntheticArtsFile.FileSize)
       throw new InvalidDataException($"Data too small for a valid Synthetic Arts file (expected {SyntheticArtsFile.FileSize} bytes, got {data.Length}).");
 
-    var header = SyntheticArtsHeader.ReadFrom(data.AsSpan());
+    var header = SyntheticArtsHeader.ReadFrom(data.AsSpan(SyntheticArtsFile.PaletteOffset));
     var palette = header.Palette;
 
     var pixelData = new byte[32000];
-    data.AsSpan(SyntheticArtsHeader.StructSize, 32000).CopyTo(pixelData);
+    data.AsSpan(0, SyntheticArtsFile.PixelDataSize).CopyTo(pixelData);
 
     return new SyntheticArtsFile {
       Palette = palette,

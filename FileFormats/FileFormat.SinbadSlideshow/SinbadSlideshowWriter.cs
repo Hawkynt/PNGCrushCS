@@ -10,10 +10,11 @@ public static class SinbadSlideshowWriter {
 
     var result = new byte[SinbadSlideshowFile.FileSize];
 
-    new SinbadSlideshowHeader(file.Palette).WriteTo(result);
-
+    // Bitmap first, palette after it, then zero padding out to the fixed file size.
     file.PixelData.AsSpan(0, Math.Min(file.PixelData.Length, SinbadSlideshowFile.PixelDataSize))
-      .CopyTo(result.AsSpan(SinbadSlideshowFile.PaletteSize));
+      .CopyTo(result);
+
+    new SinbadSlideshowHeader(file.Palette).WriteTo(result.AsSpan(SinbadSlideshowFile.PaletteOffset));
 
     return result;
   }

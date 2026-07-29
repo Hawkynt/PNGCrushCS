@@ -21,8 +21,9 @@ public sealed class DataTypeTests {
 
   [Test]
   [Category("Unit")]
-  public void DaliSTFile_ExpectedFileSize_Is32032() {
-    Assert.That(DaliSTFile.ExpectedFileSize, Is.EqualTo(32032));
+  public void DaliSTFile_ExpectedFileSize_Is32128() {
+    // 128-byte header (palette at offset 4) + 32000 bitmap.
+    Assert.That(DaliSTFile.ExpectedFileSize, Is.EqualTo(32128));
   }
 
   [Test]

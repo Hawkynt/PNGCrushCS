@@ -7,7 +7,19 @@ namespace FileFormat.SyntheticArts;
 public readonly record struct SyntheticArtsFile : IImageFormatReader<SyntheticArtsFile>, IImageToRawImage<SyntheticArtsFile>, IImageFromRawImage<SyntheticArtsFile>, IImageFormatWriter<SyntheticArtsFile> {
 
   /// <summary>Total file size: 32-byte palette + 32000 bytes planar data.</summary>
-  public const int FileSize = SyntheticArtsHeader.StructSize + 32000;
+  /// <summary>Bitmap size in bytes; it occupies the start of the file.</summary>
+  public const int PixelDataSize = 32000;
+
+  /// <summary>ASCII tag written directly after the bitmap.</summary>
+  public static ReadOnlySpan<byte> Tag => "JHSy"u8;
+
+  /// <summary>Offset of the "JHSy" tag that follows the bitmap.</summary>
+  public const int TagOffset = PixelDataSize;
+
+  /// <summary>Offset of the 32-byte palette, after the tag and its two-byte version field.</summary>
+  public const int PaletteOffset = TagOffset + 6;
+
+  public const int FileSize = PaletteOffset + SyntheticArtsHeader.StructSize;
 
   /// <summary>Image width (always 640).</summary>
   public const int ImageWidth = 640;

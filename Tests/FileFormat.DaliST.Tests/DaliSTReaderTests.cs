@@ -94,8 +94,8 @@ public sealed class DaliSTReaderTests {
   [Category("Unit")]
   public void FromBytes_PreservesPaletteValues() {
     var data = _BuildDaliST();
-    BinaryPrimitives.WriteInt16BigEndian(data.AsSpan(0), 0x777);
-    BinaryPrimitives.WriteInt16BigEndian(data.AsSpan(2), 0x700);
+    BinaryPrimitives.WriteInt16BigEndian(data.AsSpan(DaliSTFile.PaletteOffset + 0), 0x777);
+    BinaryPrimitives.WriteInt16BigEndian(data.AsSpan(DaliSTFile.PaletteOffset + 2), 0x700);
 
     var result = DaliSTReader.FromBytes(data);
 
@@ -110,7 +110,7 @@ public sealed class DaliSTReaderTests {
   public void FromBytes_PreservesPixelData() {
     var data = _BuildDaliST();
     for (var i = 0; i < 32000; ++i)
-      data[32 + i] = (byte)(i & 0xFF);
+      data[DaliSTFile.HeaderSize + i] = (byte)(i & 0xFF);
 
     var result = DaliSTReader.FromBytes(data);
 
@@ -135,10 +135,10 @@ public sealed class DaliSTReaderTests {
   private static byte[] _BuildDaliST() {
     var data = new byte[DaliSTFile.ExpectedFileSize];
     for (var i = 0; i < 16; ++i)
-      BinaryPrimitives.WriteInt16BigEndian(data.AsSpan(i * 2), (short)(i * 0x111 & 0x777));
+      BinaryPrimitives.WriteInt16BigEndian(data.AsSpan(DaliSTFile.PaletteOffset + i * 2), (short)(i * 0x111 & 0x777));
 
-    for (var i = 0; i < 32000; ++i)
-      data[32 + i] = (byte)(i & 0xFF);
+    for (var i = 0; i < DaliSTFile.PlanarDataSize; ++i)
+      data[DaliSTFile.HeaderSize + i] = (byte)(i & 0xFF);
 
     return data;
   }
