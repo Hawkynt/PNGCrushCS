@@ -84,6 +84,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.Paradox, "Paradox", 320, 200),
     new(ImageFormat.SevenuP, "SevenuP", 256, 192),
     new(ImageFormat.ZxAttributesGigascreen, "Attributes Gigascreen", 256, 192),
+    new(ImageFormat.LastWordFont, "The Last Word font", 128, 32),
   ];
 
   [Test]
