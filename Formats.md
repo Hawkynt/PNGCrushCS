@@ -661,16 +661,23 @@ Counts are read from the generated `FormatRegistry` at runtime rather than maint
 the reference implementation for that space. Its `recoil2png` doubles as our conformance oracle
 (see `Tests/Conformance.Recoil.Tests`).
 
-| Metric                                             | Count |
-| --------------------------------------------------- | ----- |
-| RECOIL formats                                      | 552   |
-| …we claim at least one of its extensions            | 294   |
-| …not covered at all                                 | 258   |
+Two different questions, two different answers:
 
-Largest remaining clusters: Atari 8-bit (96), Atari ST/STE (32), Commodore 64 (28), ZX Spectrum
-(15), Atari Falcon (13), MSX2 (11). Only eight of the Atari 8-bit gaps decode as a plain
-fixed-size screen; the rest need per-format work, and because RECOIL is read-only every encoder
-also has to be derived and then verified by round-tripping through it.
+| Metric                                                    | Us    | RECOIL |
+| ----------------------------------------------------------- | ----- | ------ |
+| Total formats                                              | 551   | 552    |
+| Modern/web/scientific formats (PNG, JPEG, WebP, AVIF, …)   | ~290  | 0      |
+| Of RECOIL's 552 vintage formats, covered                   | 297   | 552    |
+
+So on breadth we are level, and on everything outside the retro catalogue we are the only one of
+the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 255
+formats.
+
+Largest remaining clusters: Atari 8-bit (92), Atari ST/STE (32), Commodore 64 (28), ZX Spectrum
+(15), Atari Falcon (13), MSX2 (11). Only a handful decode as a plain fixed-size screen that the
+shared Atari primitives already cover; the rest carry their own containers or compression. RECOIL
+is a decoder only, so for each one the encoder has to be derived from its decoder and then proved
+by round-tripping back through it.
 
 ### Third-party conformance
 
