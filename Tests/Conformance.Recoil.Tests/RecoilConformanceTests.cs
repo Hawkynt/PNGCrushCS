@@ -87,6 +87,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.LastWordFont, "The Last Word font", 128, 32),
     new(ImageFormat.DaliCompressed, "Dali (compressed)", 320, 200, ".lpk"),
     new(ImageFormat.RamBrandt, "Rambrandt", 320, 192, ".rm0"),
+    new(ImageFormat.InterPainter, "InterPainter", 320, 200, ".inp"),
   ];
 
   [Test]

@@ -291,6 +291,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | Interlace 8             | .int8                                                | Atari 8-bit interlace 320x192   | Y      | —      | —         | R     | —   | —      | —         |
 | Interlace Hires Editor  | .ihe                                                 | C64 Interlace Hires Editor       | Y      | —      | —         | R     | —   | —      | —         |
 | Interlace Studio        | .ist                                                 | C64 Interlace Studio MC          | Y      | —      | —         | R     | —   | —      | —         |
+| InterPainter            | .inp, .ing                                           | Atari 8-bit interlaced mode E    | Y      | Y      | —         | R     | —   | —      | —         |
 | IOCA                    | .ica, .ioca                                          | Image Object Content Arch.       | Y      | Y      | —         | —     | —   | —      | —         |
 | IPL                     | .ipl                                                 | Image Processing Library         | Y      | Y      | —         | —     | —   | —      | —         |
 | JBIG                    | .jbg, .bie, .jbig                                    | Joint Bi-level Image Group       | Y      | Y      | —         | RW    | RW  | RW     | —         |
