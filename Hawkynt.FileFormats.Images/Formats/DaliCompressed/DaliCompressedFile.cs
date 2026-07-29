@@ -58,9 +58,9 @@ public readonly record struct DaliCompressedFile
     for (var i = 0; i < colors; ++i) {
       var entry = (file.Palette[i * 2] << 8) | file.Palette[i * 2 + 1];
       // ST palette entries are three bits per channel, held in the low bits of each nibble.
-      palette[i * 3] = (byte)(((entry >> 8) & 7) * 255 / 7);
-      palette[i * 3 + 1] = (byte)(((entry >> 4) & 7) * 255 / 7);
-      palette[i * 3 + 2] = (byte)((entry & 7) * 255 / 7);
+      palette[i * 3] = ChannelScaling.Expand3(((entry >> 8) & 7));
+      palette[i * 3 + 1] = ChannelScaling.Expand3(((entry >> 4) & 7));
+      palette[i * 3 + 2] = ChannelScaling.Expand3((entry & 7));
     }
 
     var chunky = PlanarConverter.AtariStToChunky(file.ScreenData, width, height, planes);

@@ -200,9 +200,9 @@ public static class PlanarConverter {
       var r = (entry >> 8) & 0x07;
       var g = (entry >> 4) & 0x07;
       var b = entry & 0x07;
-      rgb[i * 3] = (byte)(r * 255 / 7);
-      rgb[i * 3 + 1] = (byte)(g * 255 / 7);
-      rgb[i * 3 + 2] = (byte)(b * 255 / 7);
+      rgb[i * 3] = ChannelScaling.Expand3(r);
+      rgb[i * 3 + 1] = ChannelScaling.Expand3(g);
+      rgb[i * 3 + 2] = ChannelScaling.Expand3(b);
     }
 
     return rgb;

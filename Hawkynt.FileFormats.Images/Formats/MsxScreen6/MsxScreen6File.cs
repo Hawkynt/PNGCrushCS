@@ -78,9 +78,9 @@ public readonly record struct MsxScreen6File
 
     for (var i = 0; i < ColorCount && i * 2 + 1 < palette.Length; ++i) {
       // Three bits per channel, red and blue sharing the first byte.
-      rgb[i * 3] = (byte)(((palette[i * 2] >> 4) & 7) * 255 / 7);
-      rgb[i * 3 + 1] = (byte)((palette[i * 2 + 1] & 7) * 255 / 7);
-      rgb[i * 3 + 2] = (byte)((palette[i * 2] & 7) * 255 / 7);
+      rgb[i * 3] = ChannelScaling.Expand3((palette[i * 2] >> 4) & 7);
+      rgb[i * 3 + 1] = ChannelScaling.Expand3(palette[i * 2 + 1] & 7);
+      rgb[i * 3 + 2] = ChannelScaling.Expand3(palette[i * 2] & 7);
     }
 
     return rgb;

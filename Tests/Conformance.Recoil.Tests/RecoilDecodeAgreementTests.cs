@@ -60,6 +60,9 @@ public sealed class RecoilDecodeAgreementTests {
     new("ASCII maker", ImageFormat.AsciiMaker, ".asc", () => _Monochrome(960)),
     new("ASCII maker, padded", ImageFormat.AsciiMaker, ".asc", () => _Monochrome(1024)),
     new("PetDraw64", ImageFormat.PetDraw, ".pdr", () => _Monochrome(2029)),
+    // Closes the palette audit: every attribute byte appears, so all sixteen ZX colours at both
+    // intensities are exercised in one probe.
+    new("ZX Spectrum screen", ImageFormat.ZxSpectrum, ".scr", () => _Monochrome(6912)),
   ];
 
   [Test]
