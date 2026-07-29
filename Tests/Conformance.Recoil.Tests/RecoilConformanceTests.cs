@@ -54,6 +54,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.MovieMakerBackground, "Movie Maker background", 320, 192),
     new(ImageFormat.Graphics9Plus, "Graphics 9+", 320, 240),
     new(ImageFormat.FloorDesigner, "Floor Designer", 256, 160),
+    new(ImageFormat.AtariGrayscale9, "160x192 grayscale", 320, 192),
   ];
 
   [Test]
