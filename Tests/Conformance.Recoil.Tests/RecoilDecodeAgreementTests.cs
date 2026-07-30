@@ -117,6 +117,7 @@ public sealed class RecoilDecodeAgreementTests {
     new("ImageLab greyscale", ImageFormat.ImageLabBw, ".b&w", () => _ImageLab(64, 48)),
     new("ImageLab greyscale as .b_w", ImageFormat.ImageLabBw, ".b_w", () => _ImageLab(120, 17)),
     new("Super Hires Studio", ImageFormat.SuperHiresStudio, ".shs", () => _Monochrome(14338)),
+    new("OD Font Editor", ImageFormat.OdFontEditor, ".odf", () => _Monochrome(1280)),
   ];
 
   [Test]
