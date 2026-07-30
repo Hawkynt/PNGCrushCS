@@ -97,6 +97,7 @@ public sealed class RecoilDecodeAgreementTests {
     new("Graph Saurus interlaced", ImageFormat.GraphSaurusInterlaced, ".sri", () => _Monochrome(108544)),
     new("GunPaint", ImageFormat.GunPaint, ".gun", () => _Monochrome(33602)),
     new("GunPaint as .ifl", ImageFormat.GunPaint, ".ifl", () => _Monochrome(33603)),
+    new("Print Shop graphic", ImageFormat.PrintShopIcon, ".psf", () => _Monochrome(572)),
   ];
 
   [Test]
