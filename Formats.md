@@ -78,7 +78,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | Atari Graphics 9        | .gr9, .g9, .g9s, .sfd                                            | Atari GTIA 16-shade grayscale    | Y      | Y      | —         | R     | —   | —      | —         |
 | Atari HR                | .hr                                                  | Atari 8-bit HR hires 320x192    | Y      | Y      | —         | R     | —   | —      | —         |
 | Atari Maxi              | .max8, .amx                                          | Atari 8-bit Maxi paint 160x192  | Y      | Y      | —         | R     | —   | —      | —         |
-| Atari Picture           | .apc                                                 | Atari 8-bit screen capture       | Y      | Y      | —         | —     | —   | —      | —         |
+| APAC (Any Point Any Color) | .apc, .apa, .plm, .aps                                                 | Atari 8-bit screen capture       | Y      | Y      | —         | —     | —   | —      | —         |
 | Atari Player/Missile    | .pmg, .plm                                           | Atari 8-bit Player/Missile GFX   | Y      | Y      | —         | —     | —   | —      | —         |
 | AtariTools-800 sprites  | .4pl, .4mi, .4pm                                     | Atari 8-bit player/missile dumps | Y      | Y      | —         | R     | —   | —      | —         |
 | AtariTools-800 charset  | .acs                                                 | Atari 8-bit ANTIC 4 character set | Y      | Y      | —         | R     | —   | —      | —         |
@@ -702,11 +702,6 @@ formats.
 One of our formats shares an extension with a RECOIL entry without being the same format and is
 excluded from the count rather than claimed: our `.hip` is a C64 picture where RECOIL's Hard
 Interlace Picture is Atari 8-bit, with an executable header and twice the frame data.
-
-Our `.apc` is a different case and is counted: APAC accepts exactly the length we read, so the
-extension is ours by right — but we decode it as a flat screen dump where APAC interleaves a
-Graphics 9 luminance frame with a Graphics 11 hue frame and blends them, which is the whole
-point of the format. That is a decoding defect, listed with the others, not a miscount.
 
 Largest remaining clusters: Atari 8-bit (56), Commodore 64 (23), Atari ST/STE (19), Atari Falcon
 (8), NEC PC-98 (7), ZX Spectrum (6). SAM Coupe is now fully covered. Atari TT, the MSX2+ YJK modes and the Commodore 16/Plus4
