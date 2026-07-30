@@ -104,6 +104,7 @@ public sealed class RecoilDecodeAgreementTests {
     new("Star Painter", ImageFormat.StarPainter, ".gr", () => _StarPainter(40, 25)),
     new("Star Painter, narrow", ImageFormat.StarPainter, ".cs", () => _StarPainter(12, 30)),
     new("Atari 16x16 font", ImageFormat.Atari16x16Font, ".sxs", _Sxs),
+    new("Interlaced Logo Editor", ImageFormat.InterlacedLogoEditor, ".ile", () => _Monochrome(4098)),
   ];
 
   [Test]
