@@ -142,6 +142,13 @@ public sealed class RecoilDecodeAgreementTests {
     new("SpecSCII", ImageFormat.SpecScii, ".zxs", _SpecScii),
     new("Stellar", ImageFormat.Stellar, ".stl", () => _Monochrome(3072)),
     new("Profi", ImageFormat.ProfiGrf, ".grf", _ProfiGrf),
+    new("MSX Screen 2", ImageFormat.MsxScreen2, ".sc2", () => _Bsave(112)),
+    new("MSX Screen 2 with sprites", ImageFormat.MsxScreen2, ".sc2", _MsxSpriteScreen),
+    new("MSX Screen 3", ImageFormat.MsxScreen3, ".sc3", () => _Bsave(22)),
+    new("MSX Screen 3, long", ImageFormat.MsxScreen3, ".sc3", () => _Bsave(65)),
+    new("MSX Screen 3 with sprites", ImageFormat.MsxScreen3, ".sc3", _MsxSpriteScreen),
+    new("MSX Screen 4", ImageFormat.MsxScreen4, ".sc4", () => _Bsave(112)),
+    new("MSX Screen 4 with sprites", ImageFormat.MsxScreen4, ".sc4", _MsxSpriteScreen),
   ];
 
   [Test]
@@ -621,6 +628,30 @@ public sealed class RecoilDecodeAgreementTests {
     var data = _Monochrome(30848);
     ReadOnlySpan<byte> signature = [0, 2, 240, 0, 4, 0, 128, 0, 1, 19];
     signature.CopyTo(data);
+
+    return data;
+  }
+
+  /// <summary>
+  /// A BSAVE screen large enough to carry the sprite plane, with attributes that place a handful of
+  /// sprites on screen rather than leaving them wherever the fill pattern puts them.
+  /// </summary>
+  private static byte[] _MsxSpriteScreen() {
+    var data = _Bsave(128);
+
+    // Both generations keep their attributes in a different corner, so seed both.
+    foreach (var attributes in (int[])[7 + 0x1B00, 7 + 0x1E00]) {
+      for (var sprite = 0; sprite < 8; ++sprite) {
+        var at = attributes + sprite * 4;
+        data[at] = (byte)(sprite * 20 + 8);
+        data[at + 1] = (byte)(sprite * 28 + 4);
+        data[at + 2] = (byte)(sprite * 4);
+        data[at + 3] = (byte)(sprite | (sprite << 4));
+      }
+
+      // The list has to end somewhere, or every remaining sprite competes for the line budget.
+      data[attributes + 8 * 4] = 216;
+    }
 
     return data;
   }
