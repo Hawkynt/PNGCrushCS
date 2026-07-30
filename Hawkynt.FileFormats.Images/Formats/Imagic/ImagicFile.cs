@@ -86,8 +86,13 @@ public readonly record struct ImagicFile
     var bitplanes = BitplanesFor(file.Resolution);
 
     var chunky = PlanarConverter.AtariStToChunky(file.ScreenData, width, height, bitplanes);
-    var count = Math.Min(1 << bitplanes, file.Palette.Length);
-    var palette = PlanarConverter.StPaletteToRgb(file.Palette.AsSpan(0, count));
+
+    // High resolution has no colours to choose: the ST's monochrome mode is ink on white paper and
+    // ignores the palette the file still carries, so honouring it here would tint the whole page.
+    var count = file.Resolution == ImagicResolution.High ? 2 : Math.Min(1 << bitplanes, file.Palette.Length);
+    var palette = file.Resolution == ImagicResolution.High
+      ? [255, 255, 255, 0, 0, 0]
+      : PlanarConverter.StPaletteToRgb(file.Palette.AsSpan(0, count));
 
     return new() {
       Width = width,

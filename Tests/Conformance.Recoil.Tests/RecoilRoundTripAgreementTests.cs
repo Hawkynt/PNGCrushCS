@@ -104,7 +104,6 @@ public sealed class RecoilRoundTripAgreementTests {
       ["Spectrum 512 extended"] = "our encoder fills sixteen of the forty-eight entries a line holds, so the two zones past the first are unwritten; the decoder reads all three correctly",
       ["CrackArt"] = "first pixel disagrees entirely — likely the palette is read from the wrong offset",
       ["The Last Word font"] = "off by eighteen deep inside the glyph area rather than at the first pixel",
-      ["Imagic (high)"] = "only the 640x400 variant disagrees; the other two Imagic modes match, so it is the high-resolution path alone",
     };
 
   private static RawImage _Sample(int width, int height) {
