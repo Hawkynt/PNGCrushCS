@@ -1,25 +1,52 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
-    <ImplicitUsings>disable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <LangVersion>preview</LangVersion>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
-    <Description>Tests for the public Hawkynt.FileFormats.Images registry, MIME lookup, and stream-based detection.</Description>
+    <Description>Unit tests for every image format, one assembly for all of them.</Description>
+
+    <!--
+      Mirrors FileFormat.JpegXl's cross-repo source link so its #if CW_SIBLING smoke tests fire in
+      lockstep with the code they exercise. Absent sibling, the define stays unset and those tests
+      compile out.
+    -->
+    <CwSiblingPath>$(MSBuildThisFileDirectory)..\..\..\CompressionWorkbench\Compression.Core</CwSiblingPath>
+    <CwSiblingPresent>false</CwSiblingPresent>
+    <CwSiblingPresent Condition="Exists('$(CwSiblingPath)\Hawkynt.Compression.Core.csproj')">true</CwSiblingPresent>
   </PropertyGroup>
+
+  <PropertyGroup Condition="'$(CwSiblingPresent)' == 'true'">
+    <DefineConstants>$(DefineConstants);CW_SIBLING</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
-    <Using Include="NUnit.Framework" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="NUnit" Version="4.3.2" />
-    <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.0" />
+    <PackageReference Include="NUnit" Version="4.3.2" />
+    <PackageReference Include="NUnit.Analyzers" Version="4.7.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
+    <!-- The JPEG tests compare against GDI+ decoding; nothing else here needs it. -->
+    <PackageReference Include="System.Drawing.Common" Version="9.0.4" />
   </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\Hawkynt.FileFormats.Images\Hawkynt.FileFormats.Images.csproj" />
-    <!-- FileFormat.Core is PrivateAssets in the package project to avoid transitive NuGet deps;
-         the test project references it directly so RawImage/PixelFormat/etc. are available. -->
     <ProjectReference Include="..\..\FileFormat.Core\FileFormat.Core.csproj" />
+    <ProjectReference Include="..\..\FileFormat.TextMode\FileFormat.TextMode.csproj" />
+    <ProjectReference Include="..\..\Compression.Core\Compression.Core.csproj" />
+  </ItemGroup>
+
+  <!-- Real JPEG XL files from libjxl's test corpus, validating our parsers against bitstreams a
+       reference encoder produced rather than only against synthetic round-trips. -->
+  <ItemGroup>
+    <None Include="Formats\JpegXl\Fixtures\*.jxl">
+      <!-- Linked to the output root: the tests look for Fixtures\ beside the assembly, which is
+           where they sat when JPEG XL had a project of its own. -->
+      <Link>Fixtures\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="NUnit.Framework" />
   </ItemGroup>
 </Project>
