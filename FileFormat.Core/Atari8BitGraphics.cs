@@ -206,6 +206,70 @@ public static class Atari8BitGraphics {
     return rgb;
   }
 
+  /// <summary>
+  /// Renders a Graphics 9 bitmap into a frame of GTIA colour bytes, writing every
+  /// <paramref name="frameStride"/>th pixel row.
+  /// </summary>
+  /// <remarks>
+  /// The stride is what makes this different from filling a frame outright: the formats that pair
+  /// Graphics 9 with a hue field write only every other row here and let the other mode fill the
+  /// rest, so the two halves of the picture interleave rather than overlay.
+  /// </remarks>
+  public static void DecodeGr9Into(
+    ReadOnlySpan<byte> data, int offset, int stride,
+    Span<byte> frame, int frameOffset, int frameStride, int width, int height, int background) {
+    for (var y = 0; y < height; ++y) {
+      for (var x = 0; x < width; ++x) {
+        var index = offset + (x >> 3);
+        // A nibble covers four screen pixels, high half of the byte first.
+        var luminance = index < data.Length ? (data[index] >> (~x & 4)) & 15 : 0;
+
+        var target = frameOffset + x;
+        if (target >= 0 && target < frame.Length)
+          frame[target] = (byte)(background | luminance);
+      }
+
+      offset += stride;
+      frameOffset += frameStride;
+    }
+  }
+
+  /// <summary>
+  /// Lays a Graphics 11 hue field over a frame that already holds Graphics 9 luminances, starting
+  /// at <paramref name="firstRow"/> and covering every other row.
+  /// </summary>
+  /// <remarks>
+  /// Graphics 11 is Graphics 9's opposite: a nibble per four pixels again, but naming a hue at one
+  /// fixed luminance instead of a luminance at one fixed hue. Neither is a picture on its own.
+  /// Shown on alternate scanlines and blurred together by the display, they are — which is the whole
+  /// idea behind the Atari's colour modes.
+  /// <para/>
+  /// A row that the hue field covers has no luminance of its own, so it takes the mean of its two
+  /// neighbours'; the row below it keeps its own and merely gains the hue. That asymmetry is what
+  /// makes the pair read as one picture rather than as stripes.
+  /// </remarks>
+  public static void BlendGr11Into(
+    ReadOnlySpan<byte> data, int offset, int stride, Span<byte> frame, int width, int height, int firstRow) {
+    for (var y = firstRow; y < height; y += 2) {
+      var frameOffset = y * width;
+
+      for (var x = 0; x < width; ++x) {
+        var index = offset + (x >> 3);
+        // The hue occupies the high nibble; the second of each pair of pixels shifts up into it.
+        var hue = index < data.Length ? (data[index] << (x & 4)) & 240 : 0;
+
+        var above = y == 0 ? 0 : frame[frameOffset - width + x] & 15;
+        var below = y == height - 1 ? 0 : frame[frameOffset + width + x] & 15;
+        frame[frameOffset + x] = (byte)(hue | ((above + below) >> 1));
+
+        if (y < height - 1)
+          frame[frameOffset + width + x] = (byte)(hue | (frame[frameOffset + width + x] & 15));
+      }
+
+      offset += stride;
+    }
+  }
+
   /// <summary>Colour registers an ANTIC mode 4 line draws from: the background and PF0 to PF3.</summary>
   public const int Gr12RegisterCount = 5;
 

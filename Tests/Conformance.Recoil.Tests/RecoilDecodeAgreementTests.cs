@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using FileFormat.Core;
+using FileFormat.TechnicolorDream;
 using Hawkynt.FileFormats.Images;
 
 namespace Conformance.Recoil.Tests;
@@ -132,6 +133,9 @@ public sealed class RecoilDecodeAgreementTests {
     new("Mad Studio ANTIC 4 tile", ImageFormat.MadStudioTile, ".tl4", _MadStudioTile),
     new("Larka Edytor Obiektow", ImageFormat.LarkaObjectEditor, ".leo", () => _Monochrome(2580)),
     new("Graph", ImageFormat.GraphLogo, ".all", _GraphLogo),
+    new("Technicolor Dream", ImageFormat.TechnicolorDream, ".lum", () => _Monochrome(4766)),
+    new("Bugbiter APAC239i", ImageFormat.BugbiterApac, ".bgp", () => _Bugbiter(0)),
+    new("Bugbiter APAC239i with a comment", ImageFormat.BugbiterApac, ".bgp", () => _Bugbiter(37)),
   ];
 
   [Test]
@@ -171,6 +175,53 @@ public sealed class RecoilDecodeAgreementTests {
       Assert.Fail(
         $"{probe}: pixel {pixel % theirs.Width},{pixel / theirs.Width} channel {i % 3} — " +
         $"ours {ours.PixelData[i]}, RECOIL {theirs.PixelData[i]}");
+    }
+  }
+
+  /// <summary>
+  /// Technicolor Dream keeps its hues in a second file, so the interesting half of the format is
+  /// invisible to a fixture that hands a decoder one buffer. This one lays both files down beside
+  /// each other, which is the only arrangement in which either is the picture the artist drew.
+  /// </summary>
+  [Test]
+  [Category("Conformance")]
+  public void TechnicolorDream_WithItsCompanion_MatchesRecoilPixelForPixel() {
+    RecoilOracle.RequireAvailable();
+
+    var directory = Path.Combine(Path.GetTempPath(), $"recoillum_{Guid.NewGuid():N}");
+    Directory.CreateDirectory(directory);
+
+    try {
+      var luminances = _Monochrome(4766);
+      var hues = _Monochrome(4766);
+      // A different fill, or the hue field would be the luminance field and a decoder that mixed
+      // the two up would still agree.
+      for (var i = 0; i < hues.Length; ++i)
+        hues[i] = (byte)(i * 113 + 29);
+
+      var picture = Path.Combine(directory, "dream.lum");
+      File.WriteAllBytes(picture, luminances);
+      File.WriteAllBytes(Path.Combine(directory, "dream.col"), hues);
+
+      var (png, output) = RecoilOracle.TryDecodeToPng(picture);
+      Assert.That(png, Is.Not.Null, $"RECOIL rejected the pair — {output}");
+
+      var theirs = _AsRgb(FormatRegistry.Read(png!));
+      var ours = _AsRgb(TechnicolorDreamFile.ToRawImage(TechnicolorDreamReader.FromFile(new(picture))));
+
+      Assert.That((ours.Width, ours.Height), Is.EqualTo((theirs.Width, theirs.Height)));
+
+      for (var i = 0; i < theirs.PixelData.Length; ++i) {
+        if (ours.PixelData[i] == theirs.PixelData[i])
+          continue;
+
+        var pixel = i / 3;
+        Assert.Fail(
+          $"pixel {pixel % theirs.Width},{pixel / theirs.Width} channel {i % 3} — " +
+          $"ours {ours.PixelData[i]}, RECOIL {theirs.PixelData[i]}");
+      }
+    } finally {
+      try { Directory.Delete(directory, true); } catch { /* best effort */ }
     }
   }
 
@@ -494,6 +545,26 @@ public sealed class RecoilDecodeAgreementTests {
     var data = _Monochrome(24 + banks * 1024 + 24 * 40 + 5);
     for (var row = 0; row < 24; ++row)
       data[row] = (byte)(row % banks);
+
+    return data;
+  }
+
+  /// <summary>
+  /// A Bugbiter APAC239i picture, optionally carrying a comment — which moves everything after it,
+  /// so a decoder that assumed fixed offsets passes the first case and fails the second.
+  /// </summary>
+  private static byte[] _Bugbiter(int textLength) {
+    var data = _Monochrome(19163 + textLength);
+    "BUGBITER_APAC239I_PICTURE_V1.0"u8.CopyTo(data);
+    data[30] = 255;
+    data[31] = 80;
+    data[32] = 239;
+    data[37] = (byte)textLength;
+    data[38] = (byte)(textLength >> 8);
+
+    var picture = 39 + textLength;
+    data[picture] = data[picture + 9562] = 88;
+    data[picture + 1] = data[picture + 9563] = 37;
 
     return data;
   }
