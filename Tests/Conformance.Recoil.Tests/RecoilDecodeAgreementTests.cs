@@ -94,6 +94,7 @@ public sealed class RecoilDecodeAgreementTests {
     // The height comes from the BSAVE end address, so both a full screen and a short one.
     new("Graph Saurus Screen 6", ImageFormat.GraphSaurus6, ".sr6", () => _Bsave(212)),
     new("Graph Saurus Screen 6, short", ImageFormat.GraphSaurus6, ".sr6", () => _Bsave(64)),
+    new("Graph Saurus interlaced", ImageFormat.GraphSaurusInterlaced, ".sri", () => _Monochrome(108544)),
   ];
 
   [Test]
