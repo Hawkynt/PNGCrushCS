@@ -151,6 +151,10 @@ public sealed class RecoilDecodeAgreementTests {
     new("MSX Screen 4 with sprites", ImageFormat.MsxScreen4, ".sc4", _MsxSpriteScreen),
     new("Color Computer P11", ImageFormat.CocoP11, ".p11", () => _CocoP11(3083)),
     new("Color Computer P11, long", ImageFormat.CocoP11, ".p11", () => _CocoP11(3243)),
+    new("BK monochrome", ImageFormat.BkScreen, ".bks", () => _Monochrome(16384)),
+    new("BK monochrome, two screens", ImageFormat.BkScreen, ".bks", () => _Monochrome(32768)),
+    new("BK colour", ImageFormat.BkScreen, ".bks", () => _BkColor(1)),
+    new("BK colour, two screens", ImageFormat.BkScreen, ".bks", () => _BkColor(2)),
   ];
 
   [Test]
@@ -665,6 +669,18 @@ public sealed class RecoilDecodeAgreementTests {
     data[1] = 12;
     data[3] = 14;
     data[4] = 0;
+
+    return data;
+  }
+
+  /// <summary>
+  /// A BK colour screen. Each frame's trailing byte names one of sixteen colour sets, and they are
+  /// deliberately different sets, so a decoder that used one frame's for both cannot agree.
+  /// </summary>
+  private static byte[] _BkColor(int frames) {
+    var data = _Monochrome(16384 * frames + frames);
+    for (var frame = 0; frame < frames; ++frame)
+      data[16384 * frames + frame] = (byte)(frame * 7 + 3);
 
     return data;
   }
