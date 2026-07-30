@@ -108,6 +108,7 @@ public sealed class RecoilDecodeAgreementTests {
     new("APAC as .mga", ImageFormat.AtariPicture, ".mga", () => _Monochrome(7856)),
     new("PETSCII BOT, small", ImageFormat.PetsciiBot, ".pbot", () => _Monochrome(70)),
     new("PETSCII BOT, large", ImageFormat.PetsciiBot, ".pbot", () => _Monochrome(384)),
+    new("Jet Graphics Planner", ImageFormat.JetGraphicsPlanner, ".jgp", _Jgp),
   ];
 
   [Test]
@@ -346,6 +347,18 @@ public sealed class RecoilDecodeAgreementTests {
   }
 
   /// <summary>Like the plain probe, but with the two leading zero bytes some writers add.</summary>
+  private static byte[] _Jgp() {
+    var data = new byte[2054];
+    data[0] = data[1] = 0xFF;
+    // A segment declaring exactly the 2048 bytes of glyph data.
+    data[2] = 0x00; data[3] = 0x20;
+    data[4] = 0xFF; data[5] = 0x27;
+    for (var i = 6; i < data.Length; ++i)
+      data[i] = (byte)(i * 83 + (i >> 3));
+
+    return data;
+  }
+
   private static byte[] _Sxs() {
     var data = new byte[1030];
     data[0] = data[1] = 0xFF;
