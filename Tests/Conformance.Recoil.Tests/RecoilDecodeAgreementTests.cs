@@ -84,6 +84,9 @@ public sealed class RecoilDecodeAgreementTests {
     new("Apac3 Linker-Viewer (SFDN)", ImageFormat.Apac3, ".app", () => _Sfdn(15872)),
     new("AtariTools-800 player", ImageFormat.Atari8Player, ".pla", () => _Monochrome(241)),
     new("HCB-editor", ImageFormat.HcbEditor, ".hcb", () => _Monochrome(12148)),
+    // Two screens back to back, the second starting where the first one's interrupt list ends.
+    new("SAM Coupe interlaced", ImageFormat.SamCoupeLce, ".lce", () => _Lce(interrupts: false)),
+    new("SAM Coupe interlaced with interrupts", ImageFormat.SamCoupeLce, ".lce", () => _Lce(interrupts: true)),
   ];
 
   [Test]
@@ -273,6 +276,37 @@ public sealed class RecoilDecodeAgreementTests {
     data[3] = (byte)(height >> 8);
     for (var i = 4; i < data.Length; ++i)
       data[i] = (byte)(i * 23 + (i >> 5));
+
+    return data;
+  }
+
+  /// <summary>Two mode 4 screens back to back, optionally each with a run of line interrupts.</summary>
+  private static byte[] _Lce(bool interrupts) {
+    var records = interrupts ? new (byte Line, byte Entry, byte Color)[] {
+      (23, 0, 0x7F), (79, 5, 0x02), (150, 12, 0x49),
+    } : [];
+
+    var screen = 24616 + records.Length * 4 + 1;
+    var data = new byte[screen * 2];
+
+    for (var s = 0; s < 2; ++s) {
+      var origin = s * screen;
+      for (var i = 0; i < 24576; ++i)
+        data[origin + i] = (byte)(i * (s == 0 ? 37 : 61) + (i >> 7));
+
+      for (var i = 0; i < 16; ++i)
+        data[origin + 24576 + i] = (byte)(i * 8 + 1 + s);
+
+      var at = origin + 24616;
+      foreach (var (line, entry, color) in records) {
+        data[at] = line;
+        data[at + 1] = entry;
+        data[at + 2] = color;
+        at += 4;
+      }
+
+      data[at] = 0xFF;
+    }
 
     return data;
   }
