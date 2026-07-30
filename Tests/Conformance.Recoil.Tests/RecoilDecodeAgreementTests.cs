@@ -106,6 +106,8 @@ public sealed class RecoilDecodeAgreementTests {
     new("Atari 16x16 font", ImageFormat.Atari16x16Font, ".sxs", _Sxs),
     new("Interlaced Logo Editor", ImageFormat.InterlacedLogoEditor, ".ile", () => _Monochrome(4098)),
     new("APAC as .mga", ImageFormat.AtariPicture, ".mga", () => _Monochrome(7856)),
+    new("PETSCII BOT, small", ImageFormat.PetsciiBot, ".pbot", () => _Monochrome(70)),
+    new("PETSCII BOT, large", ImageFormat.PetsciiBot, ".pbot", () => _Monochrome(384)),
   ];
 
   [Test]
