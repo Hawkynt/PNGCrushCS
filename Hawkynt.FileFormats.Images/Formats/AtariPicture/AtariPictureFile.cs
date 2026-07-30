@@ -3,66 +3,154 @@ using FileFormat.Core;
 
 namespace FileFormat.AtariPicture;
 
-/// <summary>In-memory representation of an Atari Picture generic screen capture (.apc) file.</summary>
-public readonly record struct AtariPictureFile : IImageFormatReader<AtariPictureFile>, IImageToRawImage<AtariPictureFile>, IImageFromRawImage<AtariPictureFile>, IImageFormatWriter<AtariPictureFile> {
+/// <summary>In-memory representation of an APAC "Any Point, Any Color" picture (.apa, .apc, .plm).</summary>
+/// <remarks>
+/// The Atari's GTIA offers sixteen luminances in one graphics mode and sixteen hues in another, and
+/// never both at once. APAC shows the two modes on alternate scanlines fast enough that they merge:
+/// a hue row and a luminance row become one line of colour, and the machine gains all 256 shades it
+/// can otherwise only pick sixteen of.
+/// <para/>
+/// Each stored row holds both halves — forty bytes of hue then forty of luminance — and covers two
+/// scanlines. The odd one takes the luminance as stored; the even one has none of its own and
+/// borrows the average of its neighbours, which is why an APAC picture is sharp in colour and soft
+/// in brightness.
+/// </remarks>
+public readonly record struct AtariPictureFile
+  : IImageFormatReader<AtariPictureFile>, IImageToRawImage<AtariPictureFile>,
+    IImageFromRawImage<AtariPictureFile>, IImageFormatWriter<AtariPictureFile> {
 
-  /// <summary>Exact file size: 40 bytes/row x 192 rows.</summary>
-  public const int ExpectedFileSize = 7680;
+  /// <summary>Displayed width.</summary>
+  public const int Width = 320;
 
-  /// <summary>Width in pixels.</summary>
-  internal const int PixelWidth = 320;
+  /// <summary>Displayed height.</summary>
+  public const int Height = 192;
 
-  /// <summary>Height in pixels.</summary>
-  internal const int PixelHeight = 192;
+  /// <summary>Stored rows; each covers two scanlines.</summary>
+  public const int SourceRows = Height / 2;
 
-  /// <summary>Bytes per row in the raw screen dump.</summary>
-  internal const int BytesPerRow = 40;
+  /// <summary>Logical pixels across a stored row; each covers four screen pixels.</summary>
+  public const int LogicalWidth = 80;
+
+  /// <summary>Bytes one half of a stored row occupies, at two logical pixels per byte.</summary>
+  public const int HalfStride = LogicalWidth / 2;
+
+  /// <summary>Bytes one stored row occupies: the hue half then the luminance half.</summary>
+  public const int RowStride = HalfStride * 2;
+
+  /// <summary>Offset of the hue half within a stored row.</summary>
+  public const int HueOffset = 0;
+
+  /// <summary>Offset of the luminance half within a stored row.</summary>
+  public const int LuminanceOffset = HalfStride;
+
+  /// <summary>Size of the picture data.</summary>
+  public const int FileSize = RowStride * SourceRows;
+
+  /// <summary>The size some files pad out to.</summary>
+  public const int PaddedFileSize = 7720;
 
   static string IImageFormatMetadata<AtariPictureFile>.PrimaryExtension => ".apc";
-  static string[] IImageFormatMetadata<AtariPictureFile>.FileExtensions => [".apc"];
+  static string[] IImageFormatMetadata<AtariPictureFile>.FileExtensions => [".apc", ".apa", ".plm", ".aps"];
   static AtariPictureFile IImageFormatReader<AtariPictureFile>.FromSpan(ReadOnlySpan<byte> data) => AtariPictureReader.FromSpan(data);
-  static VideoMode[] IImageFormatMetadata<AtariPictureFile>.VideoModes => [
-    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])
-  ];
   static byte[] IImageFormatWriter<AtariPictureFile>.ToBytes(AtariPictureFile file) => AtariPictureWriter.ToBytes(file);
+  static VideoMode[] IImageFormatMetadata<AtariPictureFile>.VideoModes => [
+    new("APAC", [(Width, Height)], [256])
+  ];
 
-  /// <summary>Always 320.</summary>
-  public int Width => PixelWidth;
-
-  /// <summary>Always 192.</summary>
-  public int Height => PixelHeight;
-
-  /// <summary>Raw 1bpp MSB-first screen data (7680 bytes).</summary>
+  /// <summary>The picture data, hue and luminance interleaved by row.</summary>
   public byte[] PixelData { get; init; }
 
-  private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
+  /// <summary>Reads one nibble; each covers four screen pixels, high half of a byte first.</summary>
+  private static int _Nibble(ReadOnlySpan<byte> data, int rowOffset, int logicalX) {
+    var index = rowOffset + (logicalX >> 1);
+    if (index >= data.Length)
+      return 0;
 
-  /// <summary>Converts this Atari Picture to an Indexed1 raw image (320x192, B&amp;W palette).</summary>
+    return (logicalX & 1) == 0 ? data[index] >> 4 : data[index] & 15;
+  }
+
   public static RawImage ToRawImage(AtariPictureFile file) {
+    var data = file.PixelData ?? [];
 
-    var pixelData = new byte[ExpectedFileSize];
-    file.PixelData.AsSpan(0, Math.Min(file.PixelData.Length, ExpectedFileSize)).CopyTo(pixelData);
+    // One GTIA colour byte per screen pixel: hue in the high nibble, luminance in the low one.
+    var frame = new byte[Width * Height];
+
+    // The odd scanlines carry the stored luminance.
+    for (var row = 0; row < SourceRows; ++row)
+    for (var x = 0; x < Width; ++x)
+      frame[(row * 2 + 1) * Width + x] = (byte)_Nibble(data, row * RowStride + LuminanceOffset, x >> 2);
+
+    for (var row = 0; row < SourceRows; ++row) {
+      var y = row * 2;
+      for (var x = 0; x < Width; ++x) {
+        var hue = (byte)(_Nibble(data, row * RowStride + HueOffset, x >> 2) << 4);
+
+        // An even scanline stores no luminance of its own, so it takes the average of the two
+        // around it — the top row having nothing above it, and the bottom nothing below.
+        var above = y == 0 ? 0 : frame[(y - 1) * Width + x] & 15;
+        var below = y == Height - 1 ? 0 : frame[(y + 1) * Width + x] & 15;
+        frame[y * Width + x] = (byte)(hue | ((above + below) >> 1));
+
+        if (y < Height - 1)
+          frame[(y + 1) * Width + x] = (byte)(hue | (frame[(y + 1) * Width + x] & 15));
+      }
+    }
 
     return new() {
-      Width = PixelWidth,
-      Height = PixelHeight,
-      Format = PixelFormat.Indexed1,
-      PixelData = pixelData,
-      Palette = _BlackWhitePalette[..],
-      PaletteCount = 2,
+      Width = Width,
+      Height = Height,
+      Format = PixelFormat.Indexed8,
+      PixelData = frame,
+      Palette = Atari8BitGraphics.CreatePalette(),
+      PaletteCount = 256,
     };
   }
 
-  /// <summary>Creates an Atari Picture from an Indexed1 raw image (320x192).</summary>
   public static AtariPictureFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    image = image.EnsureFormat(PixelFormat.Indexed1);
-    if (image.Width != PixelWidth || image.Height != PixelHeight)
-      throw new ArgumentException($"Expected {PixelWidth}x{PixelHeight} but got {image.Width}x{image.Height}.", nameof(image));
+    if (image.Width != Width || image.Height != Height)
+      throw new ArgumentException($"Expected {Width}x{Height} but got {image.Width}x{image.Height}.", nameof(image));
 
-    var pixelData = new byte[ExpectedFileSize];
-    image.PixelData.AsSpan(0, Math.Min(image.PixelData.Length, ExpectedFileSize)).CopyTo(pixelData);
+    var bgra = PixelConverter.Convert(image, PixelFormat.Bgra32);
+    var gtia = Atari8BitGraphics.Palette;
+    var data = new byte[FileSize];
 
-    return new() { PixelData = pixelData };
+    // A stored row owns two scanlines but only one hue and one luminance, so each is taken from
+    // the scanline that actually carries it: the hue from the pair, the luminance from the odd one.
+    for (var row = 0; row < SourceRows; ++row)
+    for (var logicalX = 0; logicalX < LogicalWidth; ++logicalX) {
+      var x = logicalX * 4;
+      var hue = _NearestColor(bgra.PixelData, gtia, (row * 2) * Width + x) >> 4;
+      var luminance = _NearestColor(bgra.PixelData, gtia, (row * 2 + 1) * Width + x) & 15;
+
+      _WriteNibble(data, row * RowStride + HueOffset, logicalX, hue);
+      _WriteNibble(data, row * RowStride + LuminanceOffset, logicalX, luminance);
+    }
+
+    return new() { PixelData = data };
+  }
+
+  private static void _WriteNibble(byte[] data, int rowOffset, int logicalX, int value) {
+    var index = rowOffset + (logicalX >> 1);
+    data[index] |= (byte)((logicalX & 1) == 0 ? value << 4 : value);
+  }
+
+  /// <summary>The GTIA colour byte closest to a pixel.</summary>
+  private static int _NearestColor(ReadOnlySpan<byte> bgra, ReadOnlySpan<byte> gtia, int pixel) {
+    int red = bgra[pixel * 4 + 2], green = bgra[pixel * 4 + 1], blue = bgra[pixel * 4];
+    var best = 0;
+    var bestDistance = int.MaxValue;
+
+    for (var i = 0; i < 256; ++i) {
+      int dr = gtia[i * 3] - red, dg = gtia[i * 3 + 1] - green, db = gtia[i * 3 + 2] - blue;
+      var distance = dr * dr + dg * dg + db * db;
+      if (distance >= bestDistance)
+        continue;
+
+      bestDistance = distance;
+      best = i;
+    }
+
+    return best;
   }
 }

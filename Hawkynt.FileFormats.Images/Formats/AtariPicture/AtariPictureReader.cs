@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using FileFormat.Core;
 
 namespace FileFormat.AtariPicture;
 
@@ -27,24 +28,27 @@ public static class AtariPictureReader {
   }
 
   public static AtariPictureFile FromSpan(ReadOnlySpan<byte> data) {
+    // An .aps file is these same bytes under the SFDN packer.
+    if (SfdnDecompressor.IsSfdn(data)) {
+      var unpacked = SfdnDecompressor.TryUnpack(data, AtariPictureFile.PaddedFileSize)
+        ?? throw new InvalidDataException("Not an APAC picture: the SFDN data does not unpack to a screen.");
 
-    if (data.Length != AtariPictureFile.ExpectedFileSize)
-      throw new InvalidDataException($"Invalid Atari Picture data size: expected exactly {AtariPictureFile.ExpectedFileSize} bytes, got {data.Length}.");
-
-    var pixelData = new byte[AtariPictureFile.ExpectedFileSize];
-    data.Slice(0, AtariPictureFile.ExpectedFileSize).CopyTo(pixelData);
-
-    return new AtariPictureFile { PixelData = pixelData };
+      return FromSpan((ReadOnlySpan<byte>)unpacked);
     }
+
+    // The padded size carries a short trailer the picture does not use.
+    if (data.Length != AtariPictureFile.FileSize && data.Length != AtariPictureFile.PaddedFileSize)
+      throw new InvalidDataException(
+        $"An APAC picture is {AtariPictureFile.FileSize} or {AtariPictureFile.PaddedFileSize} bytes, got {data.Length}.");
+
+    var pixelData = new byte[AtariPictureFile.FileSize];
+    data[..AtariPictureFile.FileSize].CopyTo(pixelData);
+
+    return new() { PixelData = pixelData };
+  }
 
   public static AtariPictureFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length != AtariPictureFile.ExpectedFileSize)
-      throw new InvalidDataException($"Invalid Atari Picture data size: expected exactly {AtariPictureFile.ExpectedFileSize} bytes, got {data.Length}.");
-
-    var pixelData = new byte[AtariPictureFile.ExpectedFileSize];
-    data.AsSpan(0, AtariPictureFile.ExpectedFileSize).CopyTo(pixelData);
-
-    return new AtariPictureFile { PixelData = pixelData };
+    return FromSpan(data);
   }
 }

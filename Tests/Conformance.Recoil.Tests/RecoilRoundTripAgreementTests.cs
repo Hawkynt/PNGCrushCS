@@ -101,7 +101,6 @@ public sealed class RecoilRoundTripAgreementTests {
   /// </remarks>
   private static readonly IReadOnlyDictionary<string, string> _KnownDisagreements =
     new Dictionary<string, string> {
-      ["Atari Picture"] = "we read .apc as a flat screen dump; APAC interleaves a Graphics 9 luminance frame with a Graphics 11 hue frame and blends them",
       ["CrackArt"] = "first pixel disagrees entirely — likely the palette is read from the wrong offset",
       ["DuneGraph"] = "off by six in the first channel, so the palette is widened by the wrong rule",
       ["The Last Word font"] = "off by eighteen deep inside the glyph area rather than at the first pixel",

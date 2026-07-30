@@ -1,15 +1,15 @@
-﻿using System;
+using System;
 
 namespace FileFormat.AtariPicture;
 
-/// <summary>Assembles Atari Picture bytes from an <see cref="AtariPictureFile"/>.</summary>
+/// <summary>Assembles APAC picture bytes.</summary>
 public static class AtariPictureWriter {
 
   public static byte[] ToBytes(AtariPictureFile file) {
-    ArgumentNullException.ThrowIfNull(file);
+    var result = new byte[AtariPictureFile.FileSize];
+    var data = file.PixelData ?? [];
+    data.AsSpan(0, Math.Min(data.Length, AtariPictureFile.FileSize)).CopyTo(result);
 
-    var result = new byte[AtariPictureFile.ExpectedFileSize];
-    file.PixelData.AsSpan(0, Math.Min(file.PixelData.Length, AtariPictureFile.ExpectedFileSize)).CopyTo(result);
     return result;
   }
 }

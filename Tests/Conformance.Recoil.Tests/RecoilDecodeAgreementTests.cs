@@ -72,6 +72,9 @@ public sealed class RecoilDecodeAgreementTests {
     new("Graphics 9 (SFDN)", ImageFormat.AtariGraphics9, ".g9s", () => _Sfdn(7680)),
     new("Graphics 9 (SFDN) as .sfd", ImageFormat.AtariGraphics9, ".sfd", () => _Sfdn(7680)),
     new("InterPainter (SFDN)", ImageFormat.InterPainter, ".ins", () => _Sfdn(16004)),
+    new("APAC", ImageFormat.AtariPicture, ".apc", () => _Monochrome(7680)),
+    new("APAC as .apa", ImageFormat.AtariPicture, ".apa", () => _Monochrome(7680)),
+    new("APAC (SFDN)", ImageFormat.AtariPicture, ".aps", () => _Sfdn(7720)),
   ];
 
   [Test]
