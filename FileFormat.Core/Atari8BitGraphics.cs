@@ -206,6 +206,86 @@ public static class Atari8BitGraphics {
     return rgb;
   }
 
+  /// <summary>Colour registers an ANTIC mode 4 line draws from: the background and PF0 to PF3.</summary>
+  public const int Gr12RegisterCount = 5;
+
+  /// <summary>
+  /// Renders one character row of an ANTIC mode 4 ("Graphics 12") screen into a frame of GTIA
+  /// colour bytes.
+  /// </summary>
+  /// <param name="characters">
+  /// One character code per cell, or empty to take the codes from the horizontal position — which
+  /// is how a font is displayed as a picture of itself.
+  /// </param>
+  /// <param name="registers">Background, PF0, PF1, PF2 and PF3, in that order.</param>
+  /// <param name="width">Screen pixels across. Each of the four per byte is drawn two wide.</param>
+  /// <param name="doubleLine">Whether each of the eight font rows covers two scanlines, as mode 5 does.</param>
+  /// <remarks>
+  /// Mode 4 is a text mode that spends two bits per pixel instead of one, so a character is four
+  /// pixels wide rather than eight and can show four colours. The fourth is bought rather than
+  /// given: setting a character code's high bit draws its pattern 3 from PF3 instead of PF2, which
+  /// costs half the character set to gain one colour per cell.
+  /// </remarks>
+  public static void DecodeGr12Line(
+    ReadOnlySpan<byte> characters, int charactersOffset, ReadOnlySpan<byte> font, int fontOffset,
+    ReadOnlySpan<byte> registers, Span<byte> frame, int frameOffset, int width, bool doubleLine) {
+    var rows = doubleLine ? 16 : 8;
+
+    for (var y = 0; y < rows; ++y) {
+      for (var x = 0; x < width; ++x) {
+        var character = x >> 3;
+        if (!characters.IsEmpty) {
+          var at = charactersOffset + character;
+          character = at >= 0 && at < characters.Length ? characters[at] : 0;
+        }
+
+        var index = fontOffset + ((character & 127) << 3) + (doubleLine ? y >> 1 : y);
+        var pattern = index >= 0 && index < font.Length ? (font[index] >> (~x & 6)) & 3 : 0;
+        var register = pattern == 3 && character >= 128 ? 4 : pattern;
+
+        var target = frameOffset + x;
+        if (target >= 0 && target < frame.Length)
+          frame[target] = (byte)(register < registers.Length ? registers[register] & 254 : 0);
+      }
+
+      frameOffset += width;
+    }
+  }
+
+  /// <summary>
+  /// Reads five colour registers stored as PF0, PF1, PF2, PF3 and then the background, and returns
+  /// them in the background-first order <see cref="DecodeGr12Line"/> takes.
+  /// </summary>
+  /// <remarks>
+  /// The two orders both occur in the wild — a file stores the registers in the order the hardware
+  /// wants them poked, while a pixel value indexes them with the background first — so which of the
+  /// two a given number means is worth naming rather than leaving to the reader.
+  /// </remarks>
+  public static byte[] ReadPf0123Bak(ReadOnlySpan<byte> data, int offset) {
+    var registers = new byte[Gr12RegisterCount];
+    for (var i = 0; i < Gr12RegisterCount; ++i) {
+      var at = offset + i;
+      registers[i == Gr12RegisterCount - 1 ? 0 : i + 1] = at >= 0 && at < data.Length ? data[at] : (byte)0;
+    }
+
+    return registers;
+  }
+
+  /// <summary>Turns a frame of GTIA colour bytes into RGB triplets.</summary>
+  public static byte[] ApplyPalette(ReadOnlySpan<byte> frame) {
+    var gtia = Palette;
+    var rgb = new byte[frame.Length * 3];
+
+    for (var i = 0; i < frame.Length; ++i) {
+      var entry = frame[i] * 3;
+      rgb[i * 3] = gtia[entry];
+      rgb[i * 3 + 1] = gtia[entry + 1];
+      rgb[i * 3 + 2] = gtia[entry + 2];
+    }
+
+    return rgb;
+  }
+
   /// <summary>
   /// Averages two frames channel by channel, which is what a display alternating between them
   /// looks like.

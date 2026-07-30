@@ -127,6 +127,11 @@ public sealed class RecoilDecodeAgreementTests {
     new("Mad Studio missile", ImageFormat.MadStudioMissile, ".msl", _MadStudioMissile),
     new("Blazing Paddles window", ImageFormat.BlazingPaddlesWindow, ".wnd", _BlazingPaddlesWindow),
     new("VertiZontal Interlacing", ImageFormat.VertiZontalInterlacing, ".vzi", () => _Monochrome(16000)),
+    new("Sketch-PadDles", ImageFormat.SketchPaddles, ".skp", () => _Monochrome(7680)),
+    new("Interlace Logo Designer", ImageFormat.InterlaceLogoDesigner, ".ild", () => _Monochrome(8195)),
+    new("Mad Studio ANTIC 4 tile", ImageFormat.MadStudioTile, ".tl4", _MadStudioTile),
+    new("Larka Edytor Obiektow", ImageFormat.LarkaObjectEditor, ".leo", () => _Monochrome(2580)),
+    new("Graph", ImageFormat.GraphLogo, ".all", _GraphLogo),
   ];
 
   [Test]
@@ -463,6 +468,32 @@ public sealed class RecoilDecodeAgreementTests {
     var data = _Monochrome(3072);
     data[0] = 63;
     data[1] = 40;
+
+    return data;
+  }
+
+  /// <summary>A Mad Studio tile set: a grid size, then nine bytes for each tile.</summary>
+  private static byte[] _MadStudioTile() {
+    const int columns = 3, rows = 4;
+    var data = _Monochrome(2 + columns * rows * 9);
+    data[0] = columns;
+    data[1] = rows;
+
+    return data;
+  }
+
+  /// <summary>
+  /// A Graph picture: per-row character set numbers, then the sets, the screen and the colours.
+  /// </summary>
+  /// <remarks>
+  /// Three sets, with the rows cycling through them, so a decoder that ignores the per-row bank
+  /// number draws the whole screen from one alphabet and cannot agree.
+  /// </remarks>
+  private static byte[] _GraphLogo() {
+    const int banks = 3;
+    var data = _Monochrome(24 + banks * 1024 + 24 * 40 + 5);
+    for (var row = 0; row < 24; ++row)
+      data[row] = (byte)(row % banks);
 
     return data;
   }
