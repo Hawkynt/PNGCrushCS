@@ -63,6 +63,7 @@ public sealed class RecoilDecodeAgreementTests {
     // Closes the palette audit: every attribute byte appears, so all sixteen ZX colours at both
     // intensities are exercised in one probe.
     new("ZX Spectrum screen", ImageFormat.ZxSpectrum, ".scr", () => _Monochrome(6912)),
+    new("Duo", ImageFormat.Duo, ".duo", () => _Monochrome(113600)),
   ];
 
   [Test]

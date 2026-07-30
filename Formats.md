@@ -360,6 +360,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | Handy Scanner 2000      | .hs2                                                 | 840-wide mono scan, any length   | Y      | Y      | —         | R     | —   | —      | —         |
 | ASCII maker             | .asc                                                 | Atari 8-bit Graphics 0 text page | Y      | —      | —         | R     | —   | —      | —         |
 | PetDraw64               | .pdr                                                 | C64 text screen, colour per cell | Y      | —      | —         | R     | —   | —      | —         |
+| Duo                     | .duo, .du1                                           | Atari ST 416x273 two-frame blend | Y      | —      | —         | R     | —   | —      | —         |
 | MSX2+ Screen 10         | .sca, .scb                                           | 256x212 YJK plus 16-colour escape| Y      | Y      | —         | R     | —   | —      | —         |
 | MSX2+ GL YJK            | .glc, .gls, .shc, .gla, .glb, .sha, .shb             | Sized-header YJK, Screen 10/12   | Y      | Y      | —         | R     | —   | —      | —         |
 | MonoSTar object         | .obj                                                 | Atari ST monochrome object       | Y      | Y      | —         | R     | —   | —      | —         |
@@ -689,12 +690,12 @@ Two different questions, two different answers:
 
 | Metric                                                    | Us    | RECOIL |
 | ----------------------------------------------------------- | ----- | ------ |
-| Total formats                                              | 564   | 552    |
+| Total formats                                              | 565   | 552    |
 | Modern/web/scientific formats (PNG, JPEG, WebP, AVIF, …)   | ~290  | 0      |
-| Of RECOIL's 552 vintage formats, covered                   | 398   | 552    |
+| Of RECOIL's 552 vintage formats, covered                   | 399   | 552    |
 
 So on breadth we are level, and on everything outside the retro catalogue we are the only one of
-the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 154
+the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 153
 formats.
 
 Largest remaining clusters: Atari 8-bit (56), Commodore 64 (23), Atari ST/STE (19), Atari Falcon
