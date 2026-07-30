@@ -142,13 +142,8 @@ public static class Atari8BitGraphics {
   /// average rounds down, matching what the reference decoder produces, so the two agree exactly
   /// rather than approximately.
   /// </remarks>
-  public static byte[] BlendFrames(ReadOnlySpan<byte> first, ReadOnlySpan<byte> second) {
-    var blended = new byte[first.Length];
-    for (var i = 0; i < blended.Length; ++i)
-      blended[i] = (byte)((first[i] & second[i]) + (((first[i] ^ second[i]) >> 1) & 0x7F));
-
-    return blended;
-  }
+  public static byte[] BlendFrames(ReadOnlySpan<byte> first, ReadOnlySpan<byte> second)
+    => FrameBlend.Average(first, second);
 
   /// <summary>Logical pixels across an ANTIC mode 8 ("Graphics 3") line.</summary>
   public const int Gr3Width = 40;

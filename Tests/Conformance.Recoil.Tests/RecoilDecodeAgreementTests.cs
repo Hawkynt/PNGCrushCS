@@ -87,6 +87,7 @@ public sealed class RecoilDecodeAgreementTests {
     // Two screens back to back, the second starting where the first one's interrupt list ends.
     new("SAM Coupe interlaced", ImageFormat.SamCoupeLce, ".lce", () => _Lce(interrupts: false)),
     new("SAM Coupe interlaced with interrupts", ImageFormat.SamCoupeLce, ".lce", () => _Lce(interrupts: true)),
+    new("Timex hi-res gigascreen", ImageFormat.TimexGigascreen, ".hrg", () => _Monochrome(24578)),
   ];
 
   [Test]
