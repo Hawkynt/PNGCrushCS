@@ -68,6 +68,42 @@ public static class Atari8BitGraphics {
     return data;
   }
 
+  /// <summary>Colour registers the GTIA offers: the border, three players and the playfield.</summary>
+  public const int RegisterCount = 9;
+
+  /// <summary>Entries a Graphics 10 pixel can select; nine registers fill all sixteen.</summary>
+  public const int Gr10EntryCount = 16;
+
+  /// <summary>
+  /// Expands the nine GTIA colour registers into the sixteen entries a Graphics 10 pixel indexes.
+  /// </summary>
+  /// <remarks>
+  /// A Graphics 10 pixel carries four bits but the chip has only nine registers to offer, so seven
+  /// of the sixteen entries are aliases: the background repeats across four of them and the four
+  /// playfield registers each appear a second time near the top. Treating the missing entries as
+  /// black instead — the obvious reading of a four-bit index against a nine-entry table — turns
+  /// every pixel that lands on an alias into a hole in the picture.
+  /// </remarks>
+  public static byte[] ExpandGr10Registers(ReadOnlySpan<byte> registers) {
+    var entries = new byte[Gr10EntryCount];
+    for (var register = 0; register < RegisterCount && register < registers.Length; ++register) {
+      // The low bit of a colour register does not reach the screen.
+      var value = (byte)(registers[register] & 254);
+      entries[register] = value;
+
+      switch (register) {
+        case >= 4 and <= 7:
+          entries[8 + register] = value;
+          break;
+        case 8:
+          entries[9] = entries[10] = entries[11] = value;
+          break;
+      }
+    }
+
+    return entries;
+  }
+
   /// <summary>Logical pixels across an ANTIC mode E ("Graphics 15") line.</summary>
   public const int Gr15Width = 160;
 

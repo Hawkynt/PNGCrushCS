@@ -79,6 +79,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | Atari HR                | .hr                                                  | Atari 8-bit HR hires 320x192    | Y      | Y      | —         | R     | —   | —      | —         |
 | Atari Maxi              | .max8, .amx                                          | Atari 8-bit Maxi paint 160x192  | Y      | Y      | —         | R     | —   | —      | —         |
 | APAC (Any Point Any Color) | .apc, .apa, .plm, .aps                                                 | Atari 8-bit screen capture       | Y      | Y      | —         | —     | —   | —      | —         |
+| Hard Interlace Picture  | .hip, .hps                                           | Atari 8-bit Gr9/Gr10 field blend | Y      | —      | —         | R     | —   | —      | —         |
 | Atari Player/Missile    | .pmg, .plm                                           | Atari 8-bit Player/Missile GFX   | Y      | Y      | —         | —     | —   | —      | —         |
 | AtariTools-800 sprites  | .4pl, .4mi, .4pm                                     | Atari 8-bit player/missile dumps | Y      | Y      | —         | R     | —   | —      | —         |
 | AtariTools-800 charset  | .acs                                                 | Atari 8-bit ANTIC 4 character set | Y      | Y      | —         | R     | —   | —      | —         |
@@ -693,15 +694,15 @@ Two different questions, two different answers:
 | ----------------------------------------------------------- | ----- | ------ |
 | Total formats                                              | 566   | 552    |
 | Modern/web/scientific formats (PNG, JPEG, WebP, AVIF, …)   | ~290  | 0      |
-| Of RECOIL's 552 vintage formats, covered                   | 402   | 552    |
+| Of RECOIL's 552 vintage formats, covered                   | 404   | 552    |
 
 So on breadth we are level, and on everything outside the retro catalogue we are the only one of
-the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 150
+the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 148
 formats.
 
-One of our formats shares an extension with a RECOIL entry without being the same format and is
-excluded from the count rather than claimed: our `.hip` is a C64 picture where RECOIL's Hard
-Interlace Picture is Atari 8-bit, with an executable header and twice the frame data.
+Two different formats claim `.hip`: a C64 picture of ours and the Atari 8-bit Hard Interlace
+Picture, which is now implemented alongside it. Both are read; the extension alone does not
+say which, so detection falls to content.
 
 Largest remaining clusters: Atari 8-bit (56), Commodore 64 (23), Atari ST/STE (19), Atari Falcon
 (8), NEC PC-98 (7), ZX Spectrum (6). SAM Coupe is now fully covered. Atari TT, the MSX2+ YJK modes and the Commodore 16/Plus4
