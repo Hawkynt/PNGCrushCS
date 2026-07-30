@@ -106,10 +106,11 @@ public readonly record struct Spectrum512ExtFile : IImageFormatReader<Spectrum51
 
       for (var x = 0; x < width; ++x) {
         var offset = (y * width + x) * 3;
-        var r = image.PixelData[offset] * 15 / 255;
-        var g = image.PixelData[offset + 1] * 15 / 255;
-        var b = image.PixelData[offset + 2] * 15 / 255;
-        var stColor = (short)((r << 8) | (g << 4) | b);
+        // Five bits a channel, in the scattered form the interlaced word keeps them.
+        var r = image.PixelData[offset] * 31 / 255;
+        var g = image.PixelData[offset + 1] * 31 / 255;
+        var b = image.PixelData[offset + 2] * 31 / 255;
+        var stColor = (short)AtariStGraphics.RgbToInterlacedColor(r, g, b);
 
         if (!colorMap.TryGetValue(stColor, out var index)) {
           if (colorCount < 16) {

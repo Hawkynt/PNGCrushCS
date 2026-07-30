@@ -101,7 +101,7 @@ public sealed class RecoilRoundTripAgreementTests {
   /// </remarks>
   private static readonly IReadOnlyDictionary<string, string> _KnownDisagreements =
     new Dictionary<string, string> {
-      ["Spectrum 512 extended"] = "one bit out in blue: the interlaced word puts a channel bit at position 12 and our encoder never sets it, so decoding is right and writing is not",
+      ["Spectrum 512 extended"] = "our encoder fills sixteen of the forty-eight entries a line holds, so the two zones past the first are unwritten; the decoder reads all three correctly",
       ["CrackArt"] = "first pixel disagrees entirely — likely the palette is read from the wrong offset",
       ["The Last Word font"] = "off by eighteen deep inside the glyph area rather than at the first pixel",
       ["Imagic (high)"] = "only the 640x400 variant disagrees; the other two Imagic modes match, so it is the high-resolution path alone",

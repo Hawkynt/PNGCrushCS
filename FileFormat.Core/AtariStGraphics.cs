@@ -77,6 +77,34 @@ public static class AtariStGraphics {
     return (rgb << 3) | ((rgb >> 2) & 0x070707);
   }
 
+  /// <summary>Packs five-bit channels back into an STE interlaced colour word.</summary>
+  /// <remarks>
+  /// The exact inverse of <see cref="InterlacedColorToRgb"/>. Each channel's top three bits sit
+  /// where an ordinary STE colour keeps its whole channel, and the two extra bits are tucked into
+  /// the word's spare positions — which is what lets the same sixteen bits mean one thing to a
+  /// machine that knows the trick and something close to it on one that does not.
+  /// </remarks>
+  public static int RgbToInterlacedColor(int red, int green, int blue) {
+    var word = 0;
+
+    // Red: bits 4..2 to 10..8, bit 1 to 11, bit 0 to 14.
+    word |= ((red >> 2) & 7) << 8;
+    word |= ((red >> 1) & 1) << 11;
+    word |= (red & 1) << 14;
+
+    // Green: bits 4..2 to 6..4, bit 1 to 7, bit 0 to 13.
+    word |= ((green >> 2) & 7) << 4;
+    word |= ((green >> 1) & 1) << 7;
+    word |= (green & 1) << 13;
+
+    // Blue: bits 4..2 to 2..0, bit 1 to 3, bit 0 to 12.
+    word |= (blue >> 2) & 7;
+    word |= ((blue >> 1) & 1) << 3;
+    word |= (blue & 1) << 12;
+
+    return word;
+  }
+
   /// <summary>Bytes one bitplane row occupies for a given width and plane count.</summary>
   public static int BytesPerRow(int width, int planes) => ((width + 15) >> 4) * planes * 2;
 
