@@ -693,16 +693,20 @@ Two different questions, two different answers:
 | ----------------------------------------------------------- | ----- | ------ |
 | Total formats                                              | 566   | 552    |
 | Modern/web/scientific formats (PNG, JPEG, WebP, AVIF, …)   | ~290  | 0      |
-| Of RECOIL's 552 vintage formats, covered                   | 401   | 552    |
+| Of RECOIL's 552 vintage formats, covered                   | 402   | 552    |
 
 So on breadth we are level, and on everything outside the retro catalogue we are the only one of
-the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 151
+the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 150
 formats.
 
-Two of our formats share an extension with a RECOIL entry without being the same format, and
-are excluded from the count rather than claimed: our `.hip` is a C64 picture where RECOIL's
-Hard Interlace Picture is Atari 8-bit, and our `.apc` is a 7680-byte raw dump where APAC is
-7720 bytes with a structure. Both remain open, along with their SFDN-packed variants.
+One of our formats shares an extension with a RECOIL entry without being the same format and is
+excluded from the count rather than claimed: our `.hip` is a C64 picture where RECOIL's Hard
+Interlace Picture is Atari 8-bit, with an executable header and twice the frame data.
+
+Our `.apc` is a different case and is counted: APAC accepts exactly the length we read, so the
+extension is ours by right — but we decode it as a flat screen dump where APAC interleaves a
+Graphics 9 luminance frame with a Graphics 11 hue frame and blends them, which is the whole
+point of the format. That is a decoding defect, listed with the others, not a miscount.
 
 Largest remaining clusters: Atari 8-bit (56), Commodore 64 (23), Atari ST/STE (19), Atari Falcon
 (8), NEC PC-98 (7), ZX Spectrum (6). SAM Coupe is now fully covered. Atari TT, the MSX2+ YJK modes and the Commodore 16/Plus4
