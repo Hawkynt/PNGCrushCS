@@ -36,15 +36,18 @@ public static class AtariPictureReader {
       return FromSpan((ReadOnlySpan<byte>)unpacked);
     }
 
-    // The padded size carries a short trailer the picture does not use.
-    if (data.Length != AtariPictureFile.FileSize && data.Length != AtariPictureFile.PaddedFileSize)
+    // The longer sizes carry a trailer the picture does not use; .mga is the same screen again.
+    if (data.Length != AtariPictureFile.FileSize
+        && data.Length != AtariPictureFile.PaddedFileSize
+        && data.Length != AtariPictureFile.TrailedFileSize)
       throw new InvalidDataException(
-        $"An APAC picture is {AtariPictureFile.FileSize} or {AtariPictureFile.PaddedFileSize} bytes, got {data.Length}.");
+        $"An APAC picture is {AtariPictureFile.FileSize}, {AtariPictureFile.PaddedFileSize} or {AtariPictureFile.TrailedFileSize} bytes, got {data.Length}.");
 
     var pixelData = new byte[AtariPictureFile.FileSize];
     data[..AtariPictureFile.FileSize].CopyTo(pixelData);
 
-    return new() { PixelData = pixelData };
+    // The .mga variant is the only one that puts luminance first, and its length says so.
+    return new() { PixelData = pixelData, HueFirst = data.Length != AtariPictureFile.TrailedFileSize };
   }
 
   public static AtariPictureFile FromBytes(byte[] data) {

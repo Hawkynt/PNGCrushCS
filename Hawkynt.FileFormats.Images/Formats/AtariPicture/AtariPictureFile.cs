@@ -49,8 +49,13 @@ public readonly record struct AtariPictureFile
   /// <summary>The size some files pad out to.</summary>
   public const int PaddedFileSize = 7720;
 
+  /// <summary>
+  /// The size the .mga variant comes in, which is the same picture with a longer trailer.
+  /// </summary>
+  public const int TrailedFileSize = 7856;
+
   static string IImageFormatMetadata<AtariPictureFile>.PrimaryExtension => ".apc";
-  static string[] IImageFormatMetadata<AtariPictureFile>.FileExtensions => [".apc", ".apa", ".plm", ".aps"];
+  static string[] IImageFormatMetadata<AtariPictureFile>.FileExtensions => [".apc", ".apa", ".plm", ".aps", ".mga"];
   static AtariPictureFile IImageFormatReader<AtariPictureFile>.FromSpan(ReadOnlySpan<byte> data) => AtariPictureReader.FromSpan(data);
   static byte[] IImageFormatWriter<AtariPictureFile>.ToBytes(AtariPictureFile file) => AtariPictureWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<AtariPictureFile>.VideoModes => [
@@ -59,6 +64,17 @@ public readonly record struct AtariPictureFile
 
   /// <summary>The picture data, hue and luminance interleaved by row.</summary>
   public byte[] PixelData { get; init; }
+
+  /// <summary>
+  /// Whether the hue half comes before the luminance half within a stored row.
+  /// </summary>
+  /// <remarks>
+  /// APAC puts the hue first; the .mga variant puts the luminance first. Nothing in the bytes says
+  /// which, and the two are the same length, so it comes from the extension by way of the file
+  /// size. Reading one as the other gives a picture with the right shape whose colour and
+  /// brightness have swapped roles.
+  /// </remarks>
+  public bool HueFirst { get; init; }
 
   /// <summary>Reads one nibble; each covers four screen pixels, high half of a byte first.</summary>
   private static int _Nibble(ReadOnlySpan<byte> data, int rowOffset, int logicalX) {
@@ -75,15 +91,18 @@ public readonly record struct AtariPictureFile
     // One GTIA colour byte per screen pixel: hue in the high nibble, luminance in the low one.
     var frame = new byte[Width * Height];
 
+    var hueHalf = file.HueFirst ? HueOffset : LuminanceOffset;
+    var luminanceHalf = file.HueFirst ? LuminanceOffset : HueOffset;
+
     // The odd scanlines carry the stored luminance.
     for (var row = 0; row < SourceRows; ++row)
     for (var x = 0; x < Width; ++x)
-      frame[(row * 2 + 1) * Width + x] = (byte)_Nibble(data, row * RowStride + LuminanceOffset, x >> 2);
+      frame[(row * 2 + 1) * Width + x] = (byte)_Nibble(data, row * RowStride + luminanceHalf, x >> 2);
 
     for (var row = 0; row < SourceRows; ++row) {
       var y = row * 2;
       for (var x = 0; x < Width; ++x) {
-        var hue = (byte)(_Nibble(data, row * RowStride + HueOffset, x >> 2) << 4);
+        var hue = (byte)(_Nibble(data, row * RowStride + hueHalf, x >> 2) << 4);
 
         // An even scanline stores no luminance of its own, so it takes the average of the two
         // around it — the top row having nothing above it, and the bottom nothing below.
@@ -123,11 +142,12 @@ public readonly record struct AtariPictureFile
       var hue = _NearestColor(bgra.PixelData, gtia, (row * 2) * Width + x) >> 4;
       var luminance = _NearestColor(bgra.PixelData, gtia, (row * 2 + 1) * Width + x) & 15;
 
+      // Writing always produces the APAC order, which is what our primary extension names.
       _WriteNibble(data, row * RowStride + HueOffset, logicalX, hue);
       _WriteNibble(data, row * RowStride + LuminanceOffset, logicalX, luminance);
     }
 
-    return new() { PixelData = data };
+    return new() { PixelData = data, HueFirst = true };
   }
 
   private static void _WriteNibble(byte[] data, int rowOffset, int logicalX, int value) {
