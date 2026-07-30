@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using FileFormat.Core;
 
 namespace FileFormat.MsxScreen2;
 
@@ -44,16 +45,25 @@ public static class MsxScreen2Reader {
     span[..MsxScreen2File.PatternGeneratorSize].CopyTo(patternGenerator);
 
     var colorTable = new byte[MsxScreen2File.ColorTableSize];
-    span.Slice(MsxScreen2File.PatternGeneratorSize, MsxScreen2File.ColorTableSize).CopyTo(colorTable);
+    span.Slice(MsxScreen2File.ColorTableOffset, MsxScreen2File.ColorTableSize).CopyTo(colorTable);
 
     var patternNameTable = new byte[MsxScreen2File.PatternNameTableSize];
-    span.Slice(MsxScreen2File.PatternGeneratorSize + MsxScreen2File.ColorTableSize, MsxScreen2File.PatternNameTableSize).CopyTo(patternNameTable);
+    span.Slice(MsxScreen2File.PatternNameTableOffset, MsxScreen2File.PatternNameTableSize).CopyTo(patternNameTable);
+
+    // Nothing marks a stored palette as present, so its own shape is the only evidence.
+    var palette = MsxGraphics.HasPaletteAt(span, MsxScreen2File.PaletteOffset)
+      ? span.Slice(MsxScreen2File.PaletteOffset, 32).ToArray()
+      : null;
 
     return new() {
       PatternGenerator = patternGenerator,
       ColorTable = colorTable,
       PatternNameTable = patternNameTable,
       HasBsaveHeader = hasBsave,
+      Palette = palette,
+      Vram = span.Length >= MsxScreen2File.SpriteVramSize
+        ? span[..MsxScreen2File.SpriteVramSize].ToArray()
+        : null,
     };
     }
 
@@ -74,16 +84,25 @@ public static class MsxScreen2Reader {
     span[..MsxScreen2File.PatternGeneratorSize].CopyTo(patternGenerator);
 
     var colorTable = new byte[MsxScreen2File.ColorTableSize];
-    span.Slice(MsxScreen2File.PatternGeneratorSize, MsxScreen2File.ColorTableSize).CopyTo(colorTable);
+    span.Slice(MsxScreen2File.ColorTableOffset, MsxScreen2File.ColorTableSize).CopyTo(colorTable);
 
     var patternNameTable = new byte[MsxScreen2File.PatternNameTableSize];
-    span.Slice(MsxScreen2File.PatternGeneratorSize + MsxScreen2File.ColorTableSize, MsxScreen2File.PatternNameTableSize).CopyTo(patternNameTable);
+    span.Slice(MsxScreen2File.PatternNameTableOffset, MsxScreen2File.PatternNameTableSize).CopyTo(patternNameTable);
+
+    // Nothing marks a stored palette as present, so its own shape is the only evidence.
+    var palette = MsxGraphics.HasPaletteAt(span, MsxScreen2File.PaletteOffset)
+      ? span.Slice(MsxScreen2File.PaletteOffset, 32).ToArray()
+      : null;
 
     return new() {
       PatternGenerator = patternGenerator,
       ColorTable = colorTable,
       PatternNameTable = patternNameTable,
       HasBsaveHeader = hasBsave,
+      Palette = palette,
+      Vram = span.Length >= MsxScreen2File.SpriteVramSize
+        ? span[..MsxScreen2File.SpriteVramSize].ToArray()
+        : null,
     };
   }
 }

@@ -3,11 +3,19 @@ using FileFormat.Core;
 
 namespace FileFormat.MsxScreen2;
 
-/// <summary>In-memory representation of an MSX Screen 2 (TMS9918) image.
-/// Layout: optional 7-byte BSAVE header (0xFE magic) + VRAM data.
-/// VRAM: Pattern generator table (6144 bytes) + Color table (6144 bytes) + Pattern name table (768 bytes) = 13056 bytes.
-/// 256x192, pattern-based 16 colors (TMS9918 palette).
-/// </summary>
+/// <summary>In-memory representation of an MSX Screen 2 (TMS9918) image (.sc2, .grp).</summary>
+/// <remarks>
+/// An optional seven-byte BSAVE header and then a copy of video memory. The three tables the mode
+/// needs do not sit one after another in it: the patterns start at 0x0000, the screen map at
+/// 0x1800 and the colours at 0x2000, with gaps between them that the sprite tables and anything
+/// else the program left there occupy. So the file is 14336 bytes of video memory rather than the
+/// 13056 the three tables add up to, and reading it as three consecutive blocks lands the last two
+/// in the wrong place.
+/// <para/>
+/// A picture is 256x192 built from 768 eight-by-eight patterns, and the colour table gives each of
+/// a pattern's eight rows its own foreground and background — which is what lets the mode look far
+/// less blocky than a character screen and still cost a byte a cell to place.
+/// </remarks>
 [FormatMagicBytes([0xFE])]
 public sealed class MsxScreen2File : IImageFormatReader<MsxScreen2File>, IImageToRawImage<MsxScreen2File>, IImageFormatWriter<MsxScreen2File> {
 
@@ -38,31 +46,32 @@ public sealed class MsxScreen2File : IImageFormatReader<MsxScreen2File>, IImageT
   /// <summary>Size of the pattern name table in bytes (32x24).</summary>
   internal const int PatternNameTableSize = 768;
 
+  /// <summary>Where the pattern generator table sits in video memory.</summary>
+  public const int PatternGeneratorOffset = 0x0000;
+
+  /// <summary>Where the pattern name table sits in video memory.</summary>
+  public const int PatternNameTableOffset = 0x1800;
+
+  /// <summary>Where the colour table sits in video memory.</summary>
+  public const int ColorTableOffset = 0x2000;
+
+  /// <summary>Where a stored MSX2 palette sits, in the gap after the sprite attributes.</summary>
+  public const int PaletteOffset = 0x1B80;
+
+  /// <summary>Where the sprite attributes sit in video memory.</summary>
+  public const int SpriteAttributeOffset = 0x1B00;
+
+  /// <summary>Where the sprite patterns sit in video memory.</summary>
+  public const int SpritePatternOffset = 0x3800;
+
+  /// <summary>Video memory a file carrying the sprite plane holds.</summary>
+  public const int SpriteVramSize = 0x4000;
+
   /// <summary>Total raw VRAM data size.</summary>
-  public const int VramDataSize = PatternGeneratorSize + ColorTableSize + PatternNameTableSize;
+  public const int VramDataSize = ColorTableOffset + ColorTableSize;
 
   /// <summary>Total file size with BSAVE header.</summary>
   public const int FileWithHeaderSize = BsaveHeaderSize + VramDataSize;
-
-  /// <summary>TMS9918 fixed 16-color palette as RGB triplets.</summary>
-  internal static readonly byte[] Tms9918Palette = [
-    0x00, 0x00, 0x00, // 0: transparent/black
-    0x00, 0x00, 0x00, // 1: black
-    0x21, 0xC8, 0x42, // 2: medium green
-    0x5E, 0xDC, 0x78, // 3: light green
-    0x54, 0x55, 0xED, // 4: dark blue
-    0x7D, 0x76, 0xFC, // 5: light blue
-    0xD4, 0x52, 0x4D, // 6: dark red
-    0x42, 0xEB, 0xF5, // 7: cyan
-    0xFC, 0x55, 0x54, // 8: medium red
-    0xFF, 0x79, 0x78, // 9: light red
-    0xD4, 0xC1, 0x54, // 10: dark yellow
-    0xE6, 0xCE, 0x80, // 11: light yellow
-    0x21, 0xB0, 0x3B, // 12: dark green
-    0xC9, 0x5B, 0xBA, // 13: magenta
-    0xCC, 0xCC, 0xCC, // 14: gray
-    0xFF, 0xFF, 0xFF, // 15: white
-  ];
 
   /// <summary>Image width, always 256.</summary>
   public int Width => FixedWidth;
@@ -81,6 +90,20 @@ public sealed class MsxScreen2File : IImageFormatReader<MsxScreen2File>, IImageT
 
   /// <summary>Whether the original data had a 7-byte BSAVE header.</summary>
   public bool HasBsaveHeader { get; init; }
+
+  /// <summary>
+  /// A stored MSX2 palette, or null when the file carried none and the chip's own colours apply.
+  /// </summary>
+  public byte[]? Palette { get; init; }
+
+  /// <summary>
+  /// Video memory as stored, kept only when the file reaches far enough to hold the sprite plane.
+  /// </summary>
+  /// <remarks>
+  /// The three tables above are the picture; sprites are drawn over it from two more that sit
+  /// elsewhere in memory, and the pattern one is past the end of a file that stops at the picture.
+  /// </remarks>
+  public byte[]? Vram { get; init; }
 
   /// <summary>Converts this MSX Screen 2 image to a platform-independent <see cref="RawImage"/> in Indexed8 format.</summary>
   public static RawImage ToRawImage(MsxScreen2File file) {
@@ -114,12 +137,16 @@ public sealed class MsxScreen2File : IImageFormatReader<MsxScreen2File>, IImageT
         }
       }
 
+    if (file.Vram is { } vram)
+      MsxGraphics.OverlaySprites(
+        vram, SpriteAttributeOffset, SpritePatternOffset, 2, pixels, FixedWidth, FixedHeight);
+
     return new() {
       Width = FixedWidth,
       Height = FixedHeight,
       Format = PixelFormat.Indexed8,
       PixelData = pixels,
-      Palette = (byte[])Tms9918Palette.Clone(),
+      Palette = file.Palette is { } stored ? MsxGraphics.PaletteToRgb(stored, 16) : MsxGraphics.Tms9918Palette.ToArray(),
       PaletteCount = 16,
     };
   }

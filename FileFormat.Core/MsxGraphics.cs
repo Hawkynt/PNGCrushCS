@@ -91,6 +91,135 @@ public static class MsxGraphics {
     0, 0, 0, 0x24, 0x92, 0x24, 0x24, 0xDB, 0x24, 0x6D, 0xFF, 0x6D,
   ];
 
+  /// <summary>
+  /// The sixteen colours a TMS9918 produces, as measured from hardware rather than idealised.
+  /// </summary>
+  /// <remarks>
+  /// The widely-copied table of round numbers — 0x21C842 for medium green, 0xFFFFFF for white — is
+  /// a reconstruction, and no television ever showed it. The chip generates its colours as
+  /// composite video directly rather than through a palette, so what comes out is neither
+  /// saturated nor neutral: black is not quite black, white is not quite white, and the greens sit
+  /// nowhere an even scheme would put them. These are the measured values, so our output and the
+  /// reference decoder's agree exactly rather than approximately.
+  /// </remarks>
+  public static ReadOnlySpan<byte> Tms9918Palette => [
+    0x00, 0x08, 0x00, 0x00, 0x04, 0x00, 0x3A, 0xBB, 0x43, 0x70, 0xD3, 0x77,
+    0x54, 0x59, 0xD7, 0x7B, 0x7B, 0xE8, 0xB3, 0x63, 0x4B, 0x61, 0xDF, 0xE7,
+    0xD4, 0x6A, 0x53, 0xF8, 0x8E, 0x77, 0xC7, 0xC7, 0x59, 0xD9, 0xD4, 0x81,
+    0x36, 0xA5, 0x3B, 0xB0, 0x6B, 0xAE, 0xC7, 0xD0, 0xC5, 0xFA, 0xFF, 0xF8,
+  ];
+
+  /// <summary>
+  /// Whether a stored V9938 palette sits at an offset, rather than whatever else happens to.
+  /// </summary>
+  /// <remarks>
+  /// Screen 2 files sometimes carry sixteen palette entries in otherwise unused video memory, which
+  /// upgrades a TMS9918 picture to an MSX2 one. Nothing marks them as present, so the only test is
+  /// that the bytes could be a palette at all: each entry uses three bits per channel in fixed
+  /// positions, so the bits outside them must be clear — and at least one entry must be non-zero,
+  /// since sixteen blacks are what unused memory looks like.
+  /// </remarks>
+  public static bool HasPaletteAt(ReadOnlySpan<byte> data, int offset) {
+    if (offset < 0 || offset + 32 > data.Length)
+      return false;
+
+    var ored = 0;
+    for (var i = 0; i < 16; ++i) {
+      int rb = data[offset + i * 2], g = data[offset + i * 2 + 1];
+      if ((rb & 136) != 0 || (g & 248) != 0)
+        return false;
+
+      ored |= rb | g;
+    }
+
+    return ored != 0;
+  }
+
+  /// <summary>
+  /// Draws the sprite plane over an already-rendered indexed screen.
+  /// </summary>
+  /// <param name="mode">The screen mode, which decides how sprites behave rather than how they look.</param>
+  /// <param name="attributesOffset">Offset of the 32 four-byte sprite attributes.</param>
+  /// <param name="patternsOffset">Offset of the sprite patterns.</param>
+  /// <remarks>
+  /// Two generations of sprite share these tables. On a TMS9918 a sprite has one colour and at most
+  /// four may share a scanline; the V9938 gives each of a sprite's sixteen rows its own colour byte,
+  /// held in a table 512 bytes below the attributes, allows eight per line, and adds a bit that lets
+  /// overlapping sprites combine their colours instead of the nearer one simply winning. The limits
+  /// are not decoration — a picture drawn on the hardware was composed against them, so a decoder
+  /// that ignores them shows sprites the machine would have dropped.
+  /// <para/>
+  /// The attribute list ends early at a sentinel vertical position, which differs between the two
+  /// generations because the V9938 screen is taller.
+  /// </remarks>
+  public static void OverlaySprites(
+    ReadOnlySpan<byte> data, int attributesOffset, int patternsOffset, int mode,
+    Span<byte> pixels, int width, int height) {
+    var advanced = mode >= 4;
+    var terminator = advanced ? 216 : 208;
+
+    for (var y = 0; y < height; ++y)
+    for (var x = 0; x < width; ++x) {
+      var color = 0;
+      var combining = false;
+      var remaining = advanced ? 8 : 4;
+
+      for (var sprite = 0; sprite < 32; ++sprite) {
+        var attribute = attributesOffset + (sprite << 2);
+        if (attribute + 3 >= data.Length)
+          break;
+
+        var spriteY = data[attribute];
+        if (spriteY == terminator)
+          break;
+
+        // A sprite's own top row is one below the stored position.
+        var row = (y - spriteY - 1) & 255;
+        if (row >= 16)
+          continue;
+
+        // The line's sprite budget is spent by every sprite that crosses it, drawn or not.
+        if (--remaining < 0)
+          break;
+
+        var flags = advanced
+          ? _At(data, attributesOffset - 512 + (sprite << 4) + row)
+          : data[attribute + 3];
+
+        if (!advanced || (flags & 64) == 0) {
+          if (color != 0)
+            break;
+
+          combining = true;
+        } else if (!combining)
+          continue;
+
+        var column = x - data[attribute + 1];
+        // The early-clock bit shifts a sprite left so it can enter from off screen.
+        if (flags >= 128)
+          column += 32;
+        if (column < 0 || column >= 16)
+          continue;
+
+        // A sixteen-wide sprite is four eight-by-eight patterns, the right half sixteen bytes on.
+        var pattern = patternsOffset + ((data[attribute + 2] & 252) << 3) + row + ((column & 8) << 1);
+        if (((_At(data, pattern) >> (~column & 7)) & 1) == 0)
+          continue;
+
+        color |= flags;
+        // Marks the pixel as drawn even where the sprite's colour is zero.
+        if (advanced)
+          color |= 16;
+      }
+
+      if (color != 0)
+        pixels[y * width + x] = (byte)(color & 15);
+    }
+  }
+
+  private static byte _At(ReadOnlySpan<byte> data, int offset)
+    => offset >= 0 && offset < data.Length ? data[offset] : (byte)0;
+
   /// <summary>Reads the nibble at an index, high half of each byte first.</summary>
   public static int GetNibble(ReadOnlySpan<byte> data, int offset, int index) {
     var position = offset + (index >> 1);

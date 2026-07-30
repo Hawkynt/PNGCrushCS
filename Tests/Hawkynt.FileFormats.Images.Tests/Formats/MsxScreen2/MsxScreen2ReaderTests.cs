@@ -97,7 +97,7 @@ public sealed class MsxScreen2ReaderTests {
   public void FromBytes_ColorTableDataPreserved() {
     var data = new byte[MsxScreen2File.VramDataSize];
     for (var i = 0; i < MsxScreen2File.ColorTableSize; ++i)
-      data[MsxScreen2File.PatternGeneratorSize + i] = (byte)(i * 5 % 256);
+      data[MsxScreen2File.ColorTableOffset + i] = (byte)(i * 5 % 256);
 
     var result = MsxScreen2Reader.FromBytes(data);
 
@@ -109,7 +109,7 @@ public sealed class MsxScreen2ReaderTests {
   [Category("Unit")]
   public void FromBytes_PatternNameTableDataPreserved() {
     var data = new byte[MsxScreen2File.VramDataSize];
-    var nameOffset = MsxScreen2File.PatternGeneratorSize + MsxScreen2File.ColorTableSize;
+    var nameOffset = MsxScreen2File.PatternNameTableOffset;
     for (var i = 0; i < MsxScreen2File.PatternNameTableSize; ++i)
       data[nameOffset + i] = (byte)(i * 7 % 256);
 

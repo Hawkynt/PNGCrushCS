@@ -26,14 +26,14 @@ public static class MsxScreen2Writer {
       result[6] = 0x00;
     }
 
-    var offset = headerLength;
-    patternGenerator.AsSpan(0, Math.Min(patternGenerator.Length, MsxScreen2File.PatternGeneratorSize)).CopyTo(result.AsSpan(offset));
-    offset += MsxScreen2File.PatternGeneratorSize;
-
-    colorTable.AsSpan(0, Math.Min(colorTable.Length, MsxScreen2File.ColorTableSize)).CopyTo(result.AsSpan(offset));
-    offset += MsxScreen2File.ColorTableSize;
-
-    patternNameTable.AsSpan(0, Math.Min(patternNameTable.Length, MsxScreen2File.PatternNameTableSize)).CopyTo(result.AsSpan(offset));
+    // The three tables sit where video memory puts them, not one after another.
+    var vram = result.AsSpan(headerLength);
+    patternGenerator.AsSpan(0, Math.Min(patternGenerator.Length, MsxScreen2File.PatternGeneratorSize))
+      .CopyTo(vram[MsxScreen2File.PatternGeneratorOffset..]);
+    patternNameTable.AsSpan(0, Math.Min(patternNameTable.Length, MsxScreen2File.PatternNameTableSize))
+      .CopyTo(vram[MsxScreen2File.PatternNameTableOffset..]);
+    colorTable.AsSpan(0, Math.Min(colorTable.Length, MsxScreen2File.ColorTableSize))
+      .CopyTo(vram[MsxScreen2File.ColorTableOffset..]);
 
     return result;
   }
