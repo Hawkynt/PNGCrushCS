@@ -103,6 +103,7 @@ public sealed class RecoilDecodeAgreementTests {
     // Size is in cells, so two shapes to show the header is read and not assumed.
     new("Star Painter", ImageFormat.StarPainter, ".gr", () => _StarPainter(40, 25)),
     new("Star Painter, narrow", ImageFormat.StarPainter, ".cs", () => _StarPainter(12, 30)),
+    new("Atari 16x16 font", ImageFormat.Atari16x16Font, ".sxs", _Sxs),
   ];
 
   [Test]
@@ -341,6 +342,18 @@ public sealed class RecoilDecodeAgreementTests {
   }
 
   /// <summary>Like the plain probe, but with the two leading zero bytes some writers add.</summary>
+  private static byte[] _Sxs() {
+    var data = new byte[1030];
+    data[0] = data[1] = 0xFF;
+    // An executable segment declaring exactly the 1024 bytes of glyph data.
+    data[2] = 0x00; data[3] = 0x20;
+    data[4] = 0xFF; data[5] = 0x23;
+    for (var i = 6; i < data.Length; ++i)
+      data[i] = (byte)(i * 73 + (i >> 4));
+
+    return data;
+  }
+
   private static byte[] _StarPainter(int columns, int rows) {
     var data = new byte[2 + columns * rows * 8];
     data[0] = (byte)columns;
