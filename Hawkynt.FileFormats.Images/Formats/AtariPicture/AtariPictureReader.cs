@@ -30,7 +30,9 @@ public static class AtariPictureReader {
   public static AtariPictureFile FromSpan(ReadOnlySpan<byte> data) {
     // An .aps file is these same bytes under the SFDN packer.
     if (SfdnDecompressor.IsSfdn(data)) {
-      var unpacked = SfdnDecompressor.TryUnpack(data, AtariPictureFile.PaddedFileSize)
+      // The packed variants unpack to different lengths — .aps to the padded size, .pls to the
+      // plain one — so take the length from the header rather than assuming either.
+      var unpacked = SfdnDecompressor.TryUnpack(data, SfdnDecompressor.UnpackedLength(data))
         ?? throw new InvalidDataException("Not an APAC picture: the SFDN data does not unpack to a screen.");
 
       return FromSpan((ReadOnlySpan<byte>)unpacked);

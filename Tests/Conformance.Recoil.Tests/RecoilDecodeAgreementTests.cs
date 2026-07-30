@@ -109,6 +109,7 @@ public sealed class RecoilDecodeAgreementTests {
     new("PETSCII BOT, small", ImageFormat.PetsciiBot, ".pbot", () => _Monochrome(70)),
     new("PETSCII BOT, large", ImageFormat.PetsciiBot, ".pbot", () => _Monochrome(384)),
     new("Jet Graphics Planner", ImageFormat.JetGraphicsPlanner, ".jgp", _Jgp),
+    new("Plama 256 (SFDN)", ImageFormat.AtariPicture, ".pls", () => _Sfdn(7680)),
   ];
 
   [Test]

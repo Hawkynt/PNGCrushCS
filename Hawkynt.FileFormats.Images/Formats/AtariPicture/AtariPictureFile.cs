@@ -55,7 +55,7 @@ public readonly record struct AtariPictureFile
   public const int TrailedFileSize = 7856;
 
   static string IImageFormatMetadata<AtariPictureFile>.PrimaryExtension => ".apc";
-  static string[] IImageFormatMetadata<AtariPictureFile>.FileExtensions => [".apc", ".apa", ".plm", ".aps", ".mga"];
+  static string[] IImageFormatMetadata<AtariPictureFile>.FileExtensions => [".apc", ".apa", ".plm", ".aps", ".mga", ".pls"];
   static AtariPictureFile IImageFormatReader<AtariPictureFile>.FromSpan(ReadOnlySpan<byte> data) => AtariPictureReader.FromSpan(data);
   static byte[] IImageFormatWriter<AtariPictureFile>.ToBytes(AtariPictureFile file) => AtariPictureWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<AtariPictureFile>.VideoModes => [

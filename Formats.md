@@ -78,7 +78,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | Atari Graphics 9        | .gr9, .g9, .g9s, .sfd                                            | Atari GTIA 16-shade grayscale    | Y      | Y      | —         | R     | —   | —      | —         |
 | Atari HR                | .hr                                                  | Atari 8-bit HR hires 320x192    | Y      | Y      | —         | R     | —   | —      | —         |
 | Atari Maxi              | .max8, .amx                                          | Atari 8-bit Maxi paint 160x192  | Y      | Y      | —         | R     | —   | —      | —         |
-| APAC (Any Point Any Color) | .apc, .apa, .plm, .aps, .mga                                                 | Atari 8-bit screen capture       | Y      | Y      | —         | —     | —   | —      | —         |
+| APAC (Any Point Any Color) | .apc, .apa, .plm, .aps, .mga, .pls                                                 | Atari 8-bit screen capture       | Y      | Y      | —         | —     | —   | —      | —         |
 | Hard Interlace Picture  | .hip, .hps                                           | Atari 8-bit Gr9/Gr10 field blend | Y      | —      | —         | R     | —   | —      | —         |
 | APAC 3                  | .ap3, .apv, .dgi, .dgp, .esc, .ilc, .pzm, .app, .ils | Atari 8-bit interlaced APAC      | Y      | —      | —         | R     | —   | —      | —         |
 | AtariTools-800 player   | .pla                                                 | Atari 8-bit single sprite        | Y      | Y      | —         | R     | —   | —      | —         |
@@ -711,10 +711,10 @@ Two different questions, two different answers:
 | ----------------------------------------------------------- | ----- | ------ |
 | Total formats                                              | 566   | 552    |
 | Modern/web/scientific formats (PNG, JPEG, WebP, AVIF, …)   | ~290  | 0      |
-| Of RECOIL's 552 vintage formats, covered                   | 425   | 552    |
+| Of RECOIL's 552 vintage formats, covered                   | 426   | 552    |
 
 So on breadth we are level, and on everything outside the retro catalogue we are the only one of
-the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 127
+the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 126
 formats.
 
 Two different formats claim `.hip`: a C64 picture of ours and the Atari 8-bit Hard Interlace
