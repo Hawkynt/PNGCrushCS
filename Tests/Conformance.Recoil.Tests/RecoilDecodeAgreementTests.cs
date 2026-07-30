@@ -155,6 +155,8 @@ public sealed class RecoilDecodeAgreementTests {
     new("BK monochrome, two screens", ImageFormat.BkScreen, ".bks", () => _Monochrome(32768)),
     new("BK colour", ImageFormat.BkScreen, ".bks", () => _BkColor(1)),
     new("BK colour, two screens", ImageFormat.BkScreen, ".bks", () => _BkColor(2)),
+    new("PC-98 EBD", ImageFormat.Pc98Ebd, ".ebd", () => _Ebd(false)),
+    new("PC-98 EBD with a widened palette", ImageFormat.Pc98Ebd, ".ebd", () => _Ebd(true)),
   ];
 
   [Test]
@@ -681,6 +683,20 @@ public sealed class RecoilDecodeAgreementTests {
     var data = _Monochrome(16384 * frames + frames);
     for (var frame = 0; frame < frames; ++frame)
       data[16384 * frames + frame] = (byte)(frame * 7 + 3);
+
+    return data;
+  }
+
+  /// <summary>
+  /// A PC-98 EBD picture. The palette is stored one of two ways and nothing says which, so one
+  /// probe uses bare nibbles and one uses channels already widened to eight bits.
+  /// </summary>
+  private static byte[] _Ebd(bool widened) {
+    var data = _Monochrome(48 + 320 * 200);
+    for (var i = 0; i < 48; ++i) {
+      var nibble = (i * 5 + 1) & 15;
+      data[i] = (byte)(widened ? nibble * 17 : nibble);
+    }
 
     return data;
   }
