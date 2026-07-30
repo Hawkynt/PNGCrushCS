@@ -56,7 +56,7 @@ public readonly record struct DuoFile
 
   public static RawImage ToRawImage(DuoFile file) {
     var data = file.Data ?? [];
-    var palette = _PaletteRgb(data);
+    var palette = AtariStGraphics.ReadPalette(data, 0, ColorCount);
 
     var first = _RenderFrame(data, FirstFrameOffset, palette);
     var second = _RenderFrame(data, SecondFrameOffset, palette);
@@ -69,39 +69,11 @@ public readonly record struct DuoFile
     };
   }
 
-  /// <summary>Reads the sixteen colours; each is one word holding three bits per channel.</summary>
-  private static byte[] _PaletteRgb(ReadOnlySpan<byte> data) {
-    var rgb = new byte[ColorCount * 3];
-    for (var i = 0; i < ColorCount && i * 2 + 1 < data.Length; ++i) {
-      int high = data[i * 2], low = data[i * 2 + 1];
-      rgb[i * 3] = ChannelScaling.Expand4(_Ste(high & 15));
-      rgb[i * 3 + 1] = ChannelScaling.Expand4(_Ste((low >> 4) & 15));
-      rgb[i * 3 + 2] = ChannelScaling.Expand4(_Ste(low & 15));
-    }
-
-    return rgb;
-  }
-
-  /// <summary>
-  /// Reorders an STE colour nibble. The STE widened the ST's three-bit channels to four, and put
-  /// the new bit at the bottom of the word rather than the top so that an ST picture still reads
-  /// correctly on the newer machine — which means the stored bits are rotated, not simply extended.
-  /// </summary>
-  private static int _Ste(int value) => ((value & 7) << 1) | ((value >> 3) & 1);
-
   /// <summary>Unpacks one bitplane frame straight to RGB.</summary>
   private static byte[] _RenderFrame(ReadOnlySpan<byte> data, int offset, ReadOnlySpan<byte> palette) {
     var planar = offset + FrameSize <= data.Length ? data.Slice(offset, FrameSize) : default;
     var indices = planar.IsEmpty ? new byte[Width * Height] : PlanarConverter.AtariStToChunky(planar, Width, Height, Planes);
 
-    var rgb = new byte[Width * Height * 3];
-    for (var i = 0; i < indices.Length; ++i) {
-      var entry = (indices[i] & (ColorCount - 1)) * 3;
-      rgb[i * 3] = palette[entry];
-      rgb[i * 3 + 1] = palette[entry + 1];
-      rgb[i * 3 + 2] = palette[entry + 2];
-    }
-
-    return rgb;
+    return AtariStGraphics.ToRgb(indices, palette, ColorCount);
   }
 }

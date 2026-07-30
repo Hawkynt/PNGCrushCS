@@ -64,6 +64,7 @@ public sealed class RecoilDecodeAgreementTests {
     // intensities are exercised in one probe.
     new("ZX Spectrum screen", ImageFormat.ZxSpectrum, ".scr", () => _Monochrome(6912)),
     new("Duo", ImageFormat.Duo, ".duo", () => _Monochrome(113600)),
+    new("Duo medium", ImageFormat.DuoMedium, ".du2", () => _Monochrome(113576)),
   ];
 
   [Test]
