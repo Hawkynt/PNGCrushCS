@@ -102,7 +102,6 @@ public sealed class RecoilRoundTripAgreementTests {
   private static readonly IReadOnlyDictionary<string, string> _KnownDisagreements =
     new Dictionary<string, string> {
       ["CrackArt"] = "first pixel disagrees entirely — likely the palette is read from the wrong offset",
-      ["DuneGraph"] = "off by six in the first channel, so the palette is widened by the wrong rule",
       ["The Last Word font"] = "off by eighteen deep inside the glyph area rather than at the first pixel",
       ["Spectrum 512"] = "per-scanline palette timing differs; ours changes a scanline early or late",
       ["Spectrum 512 extended"] = "as Spectrum 512, and doubled — 17 against 34 suggests a channel widened twice",

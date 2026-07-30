@@ -110,13 +110,19 @@ public readonly record struct DuneGraphFile : IImageFormatReader<DuneGraphFile>,
     }
   }
 
+  /// <summary>Bitplanes the Falcon's 256-colour mode uses.</summary>
+  public const int Planes = 8;
+
   public static RawImage ToRawImage(DuneGraphFile file) {
+    // The pixel section is eight bitplanes interleaved by word, the way every Atari display stores
+    // them — not one byte per pixel, which it is the same size as and looks plausible as.
+    var chunky = PlanarConverter.AtariStToChunky(file.PixelData ?? [], FixedWidth, FixedHeight, Planes);
 
     return new() {
       Width = FixedWidth,
       Height = FixedHeight,
       Format = PixelFormat.Indexed8,
-      PixelData = file.PixelData[..],
+      PixelData = chunky,
       Palette = file.Palette[..],
       PaletteCount = PaletteEntryCount,
     };
@@ -135,7 +141,7 @@ public readonly record struct DuneGraphFile : IImageFormatReader<DuneGraphFile>,
 
     return new() {
       Palette = palette,
-      PixelData = image.PixelData[..],
+      PixelData = PlanarConverter.ChunkyToAtariSt(image.PixelData, FixedWidth, FixedHeight, Planes),
     };
   }
 }
