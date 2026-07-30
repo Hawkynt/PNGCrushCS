@@ -61,8 +61,8 @@ public readonly record struct InterlacedLogoEditorFile
       c64.AsSpan(color * 3, 3).CopyTo(palette.AsSpan(i * 3));
     }
 
-    var first = _RenderField(data, FirstFieldOffset, 0, palette);
-    var second = _RenderField(data, SecondFieldOffset, SecondFieldShift, palette);
+    var first = Commodore64Graphics.DecodeFourColor(data, FirstFieldOffset, 0, Width, Height, palette);
+    var second = Commodore64Graphics.DecodeFourColor(data, SecondFieldOffset, SecondFieldShift, Width, Height, palette);
 
     return new() {
       Width = Width,
@@ -70,27 +70,6 @@ public readonly record struct InterlacedLogoEditorFile
       Format = PixelFormat.Rgb24,
       PixelData = FrameBlend.Average(first, second),
     };
-  }
-
-  private static byte[] _RenderField(ReadOnlySpan<byte> data, int offset, int shift, ReadOnlySpan<byte> palette) {
-    var rgb = new byte[Width * Height * 3];
-
-    for (var y = 0; y < Height; ++y)
-    for (var x = 0; x < Width; ++x) {
-      var source = x - shift;
-      // Two bits a pixel in the C64's cell layout; a displaced field starts on colour zero.
-      var index = source < 0
-        ? 0
-        : (_At(data, offset + (y & ~7) * 40 + (source & ~7) + (y & 7)) >> (~source & 6)) & 3;
-
-      var entry = index * 3;
-      var target = (y * Width + x) * 3;
-      rgb[target] = palette[entry];
-      rgb[target + 1] = palette[entry + 1];
-      rgb[target + 2] = palette[entry + 2];
-    }
-
-    return rgb;
   }
 
   private static byte _At(ReadOnlySpan<byte> data, int offset)

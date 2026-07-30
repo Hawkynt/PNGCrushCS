@@ -152,6 +152,42 @@ public static class Commodore64Graphics {
     rgb[offset + 2] = (byte)color;
   }
 
+  /// <summary>
+  /// Decodes a four-colour bitmap in the C64's cell layout into RGB triplets.
+  /// </summary>
+  /// <param name="shift">
+  /// How far left the picture sits. Interlaced formats displace their second field by a pixel, and
+  /// the column that falls off the left has nothing to show but colour zero.
+  /// </param>
+  /// <remarks>
+  /// Two bits a pixel against four freely chosen colours, with no per-cell attributes at all — the
+  /// whole screen shares one set. Several logo editors use it because a logo needs few colours and
+  /// gains more from being able to place them anywhere than from having more of them.
+  /// </remarks>
+  public static byte[] DecodeFourColor(
+    ReadOnlySpan<byte> data, int offset, int shift, int width, int height, ReadOnlySpan<byte> palette) {
+    var rgb = new byte[width * height * 3];
+
+    for (var y = 0; y < height; ++y)
+    for (var x = 0; x < width; ++x) {
+      var source = x - shift;
+      var index = 0;
+      if (source >= 0) {
+        var at = offset + (y & ~7) * Columns + (source & ~7) + (y & 7);
+        var b = at >= 0 && at < data.Length ? data[at] : 0;
+        index = (b >> (~source & 6)) & 3;
+      }
+
+      var entry = index * 3;
+      var target = (y * width + x) * 3;
+      rgb[target] = palette[entry];
+      rgb[target + 1] = palette[entry + 1];
+      rgb[target + 2] = palette[entry + 2];
+    }
+
+    return rgb;
+  }
+
   /// <summary>The index of the colour closest to a given one, by squared distance in RGB.</summary>
   public static int FindNearestColorIndex(byte red, byte green, byte blue) {
     var best = 0;
