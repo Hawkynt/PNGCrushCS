@@ -90,6 +90,7 @@ public sealed class RecoilDecodeAgreementTests {
     new("Timex hi-res gigascreen", ImageFormat.TimexGigascreen, ".hrg", () => _Monochrome(24578)),
     new("Fuckpaint", ImageFormat.Fuckpaint, ".fp", () => _Monochrome(19266)),
     new("Super-hires Editor II", ImageFormat.SuperHiresEditor2, ".sh2", () => _Monochrome(14770)),
+    new("Super-hires Editor I", ImageFormat.SuperHiresEditor1, ".sh1", () => _Monochrome(14770)),
   ];
 
   [Test]
