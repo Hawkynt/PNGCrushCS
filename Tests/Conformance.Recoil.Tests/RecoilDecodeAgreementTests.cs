@@ -91,6 +91,9 @@ public sealed class RecoilDecodeAgreementTests {
     new("Fuckpaint", ImageFormat.Fuckpaint, ".fp", () => _Monochrome(19266)),
     new("Super-hires Editor II", ImageFormat.SuperHiresEditor2, ".sh2", () => _Monochrome(14770)),
     new("Super-hires Editor I", ImageFormat.SuperHiresEditor1, ".sh1", () => _Monochrome(14770)),
+    // The height comes from the BSAVE end address, so both a full screen and a short one.
+    new("Graph Saurus Screen 6", ImageFormat.GraphSaurus6, ".sr6", () => _Bsave(212)),
+    new("Graph Saurus Screen 6, short", ImageFormat.GraphSaurus6, ".sr6", () => _Bsave(64)),
   ];
 
   [Test]
@@ -311,6 +314,19 @@ public sealed class RecoilDecodeAgreementTests {
 
       data[at] = 0xFF;
     }
+
+    return data;
+  }
+
+  /// <summary>A BSAVE-headed Screen 6 picture of a chosen number of stored rows.</summary>
+  private static byte[] _Bsave(int rows) {
+    var end = (rows << 7) - 1;
+    var data = new byte[7 + (rows << 7)];
+    data[0] = 0xFE;
+    data[3] = (byte)end;
+    data[4] = (byte)(end >> 8);
+    for (var i = 7; i < data.Length; ++i)
+      data[i] = (byte)(i * 59 + (i >> 6));
 
     return data;
   }

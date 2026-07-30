@@ -79,6 +79,18 @@ public static class MsxGraphics {
     113, 1, 115, 3, 97, 6, 100, 6, 17, 4, 101, 2, 85, 5, 119, 7,
   ];
 
+  /// <summary>
+  /// The four colours a Screen 6 picture shows when no companion palette sits beside it.
+  /// </summary>
+  /// <remarks>
+  /// Black and three greens — what the machine starts up with. Formats that keep their palette in a
+  /// separate file all fall back to this, so it is not a per-format default but a property of the
+  /// screen mode.
+  /// </remarks>
+  public static ReadOnlySpan<byte> Screen6DefaultPaletteRgb => [
+    0, 0, 0, 0x24, 0x92, 0x24, 0x24, 0xDB, 0x24, 0x6D, 0xFF, 0x6D,
+  ];
+
   /// <summary>Reads the nibble at an index, high half of each byte first.</summary>
   public static int GetNibble(ReadOnlySpan<byte> data, int offset, int index) {
     var position = offset + (index >> 1);

@@ -70,7 +70,7 @@ public readonly record struct MsxGl6File
   /// </remarks>
   private static byte[] _DefaultPaletteRgb(MsxGl6Kind kind) => kind == MsxGl6Kind.Stamp
     ? [255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    : [0, 0, 0, 0x24, 0x92, 0x24, 0x24, 0xDB, 0x24, 0x6D, 0xFF, 0x6D];
+    : MsxGraphics.Screen6DefaultPaletteRgb.ToArray();
 
   public static RawImage ToRawImage(MsxGl6File file) {
     var data = file.PixelData ?? [];
