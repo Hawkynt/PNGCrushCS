@@ -100,6 +100,28 @@ public static class MsxGraphics {
     return (index & 1) == 0 ? data[position] >> 4 : data[position] & 15;
   }
 
+  /// <summary>
+  /// The fixed 256 colours of Screen 8, as RGB triplets.
+  /// </summary>
+  /// <remarks>
+  /// Screen 8 spends its byte per pixel on the colour directly rather than on a palette index, so
+  /// there is nothing to store and nothing to choose: three bits of green, three of red and two of
+  /// blue. Blue getting only two is why the four blue levels are 0, 2, 4 and 7 rather than an even
+  /// ramp — the hardware picks values that keep greys grey.
+  /// </remarks>
+  public static byte[] Screen8Palette() {
+    ReadOnlySpan<byte> blues = [0, 2, 4, 7];
+    var palette = new byte[256 * 3];
+
+    for (var c = 0; c < 256; ++c) {
+      palette[c * 3] = _Expand3((c >> 2) & 7);
+      palette[c * 3 + 1] = _Expand3((c >> 5) & 7);
+      palette[c * 3 + 2] = _Expand3(blues[c & 3]);
+    }
+
+    return palette;
+  }
+
   /// <summary>Pixels one YJK group spans; the group shares a single pair of chroma components.</summary>
   public const int YjkGroupSize = 4;
 

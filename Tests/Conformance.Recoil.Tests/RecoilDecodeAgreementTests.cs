@@ -110,6 +110,8 @@ public sealed class RecoilDecodeAgreementTests {
     new("PETSCII BOT, large", ImageFormat.PetsciiBot, ".pbot", () => _Monochrome(384)),
     new("Jet Graphics Planner", ImageFormat.JetGraphicsPlanner, ".jgp", _Jgp),
     new("Plama 256 (SFDN)", ImageFormat.AtariPicture, ".pls", () => _Sfdn(7680)),
+    new("MSX2 GL8", ImageFormat.MsxGl8, ".gl8", () => _Gl8(64, 48)),
+    new("MSX2 SH8", ImageFormat.MsxGl8, ".sh8", () => _Gl8(96, 16)),
   ];
 
   [Test]
@@ -287,6 +289,19 @@ public sealed class RecoilDecodeAgreementTests {
     data[6] = 1;
     // The high nibble of the first packed byte is the starting value; the rest stay zero.
     data[22] = 0x50;
+
+    return data;
+  }
+
+  private static byte[] _Gl8(int width, int height) {
+    var data = new byte[4 + width * height];
+    data[0] = (byte)width;
+    data[1] = (byte)(width >> 8);
+    data[2] = (byte)height;
+    data[3] = (byte)(height >> 8);
+    // Every one of the 256 colours appears, so a wrong palette cannot pass.
+    for (var i = 4; i < data.Length; ++i)
+      data[i] = (byte)(i - 4);
 
     return data;
   }
