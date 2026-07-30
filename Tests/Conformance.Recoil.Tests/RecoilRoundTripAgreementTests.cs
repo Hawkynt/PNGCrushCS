@@ -101,8 +101,8 @@ public sealed class RecoilRoundTripAgreementTests {
   /// </remarks>
   private static readonly IReadOnlyDictionary<string, string> _KnownDisagreements =
     new Dictionary<string, string> {
+      ["CrackArt"] = "our writer always compresses, and our RLE and the reference's disagree — the two decoders read the same bytes to different pictures, so the fault is in the compressor rather than anything on the read path",
       ["Spectrum 512 extended"] = "our encoder fills sixteen of the forty-eight entries a line holds, so the two zones past the first are unwritten; the decoder reads all three correctly",
-      ["CrackArt"] = "first pixel disagrees entirely — likely the palette is read from the wrong offset",
     };
 
   private static RawImage _Sample(int width, int height) {

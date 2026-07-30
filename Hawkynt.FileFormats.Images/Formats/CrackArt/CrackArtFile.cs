@@ -32,7 +32,16 @@ public readonly record struct CrackArtFile : IImageFormatReader<CrackArtFile>, I
 
     var chunky = PlanarConverter.AtariStToChunky(file.PixelData, file.Width, file.Height, numPlanes);
     var paletteCount = Math.Min(1 << numPlanes, file.Palette.Length);
-    var rgb = PlanarConverter.StPaletteToRgb(file.Palette.AsSpan(0, paletteCount));
+
+    // Back to the stored words so the shared reader can tell an ST palette from an STE one; three
+    // bits a channel against four is not something the entry count or position reveals.
+    var stored = new byte[paletteCount * AtariStGraphics.PaletteEntrySize];
+    for (var i = 0; i < paletteCount; ++i) {
+      stored[i * 2] = (byte)(file.Palette[i] >> 8);
+      stored[i * 2 + 1] = (byte)file.Palette[i];
+    }
+
+    var rgb = AtariStGraphics.ReadPalette(stored, 0, paletteCount);
 
     return new() {
       Width = file.Width,
