@@ -86,6 +86,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | SAM Coupe interlaced    | .lce                                                 | Two mode 4 screens, interleaved  | Y      | —      | —         | R     | —   | —      | —         |
 | Timex hi-res gigascreen | .hrg                                                 | Two 512x384 screens, averaged    | Y      | —      | —         | R     | —   | —      | —         |
 | Fuckpaint               | .fp                                                  | C64 two fields, one pixel apart  | Y      | —      | —         | R     | —   | —      | —         |
+| Super-hires Editor II   | .sh2                                                 | C64 hires with sprite overlay    | Y      | —      | —         | R     | —   | —      | —         |
 | Atari Player/Missile    | .pmg, .plm                                           | Atari 8-bit Player/Missile GFX   | Y      | Y      | —         | —     | —   | —      | —         |
 | AtariTools-800 sprites  | .4pl, .4mi, .4pm                                     | Atari 8-bit player/missile dumps | Y      | Y      | —         | R     | —   | —      | —         |
 | AtariTools-800 charset  | .acs                                                 | Atari 8-bit ANTIC 4 character set | Y      | Y      | —         | R     | —   | —      | —         |
@@ -700,10 +701,10 @@ Two different questions, two different answers:
 | ----------------------------------------------------------- | ----- | ------ |
 | Total formats                                              | 566   | 552    |
 | Modern/web/scientific formats (PNG, JPEG, WebP, AVIF, …)   | ~290  | 0      |
-| Of RECOIL's 552 vintage formats, covered                   | 412   | 552    |
+| Of RECOIL's 552 vintage formats, covered                   | 413   | 552    |
 
 So on breadth we are level, and on everything outside the retro catalogue we are the only one of
-the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 140
+the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 139
 formats.
 
 Two different formats claim `.hip`: a C64 picture of ours and the Atari 8-bit Hard Interlace
