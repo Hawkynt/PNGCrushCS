@@ -136,6 +136,9 @@ public sealed class RecoilDecodeAgreementTests {
     new("Technicolor Dream", ImageFormat.TechnicolorDream, ".lum", () => _Monochrome(4766)),
     new("Bugbiter APAC239i", ImageFormat.BugbiterApac, ".bgp", () => _Bugbiter(0)),
     new("Bugbiter APAC239i with a comment", ImageFormat.BugbiterApac, ".bgp", () => _Bugbiter(37)),
+    new("Star Painter font", ImageFormat.StarPainterFont, ".zs", _StarPainterFont),
+    new("Art Studio window", ImageFormat.ArtStudioWindow, ".mwi", () => _ArtStudioWindow(0, 0)),
+    new("Art Studio window, offset into its cells", ImageFormat.ArtStudioWindow, ".mwi", () => _ArtStudioWindow(2, 3)),
   ];
 
   [Test]
@@ -565,6 +568,33 @@ public sealed class RecoilDecodeAgreementTests {
     var picture = 39 + textLength;
     data[picture] = data[picture + 9562] = 88;
     data[picture + 1] = data[picture + 9563] = 37;
+
+    return data;
+  }
+
+  /// <summary>A Star Painter character set, which is identified only by its load address.</summary>
+  private static byte[] _StarPainterFont() {
+    var data = _Monochrome(1026);
+    data[0] = 0xB0;
+    data[1] = 0xF0;
+
+    return data;
+  }
+
+  /// <summary>
+  /// An Art Studio window. The offsets into the first cell are what make the stored length depend
+  /// on more than the dimensions, so one probe starts on a cell boundary and one does not.
+  /// </summary>
+  private static byte[] _ArtStudioWindow(int left, int top) {
+    const int width = 48, height = 40;
+    var cellsPerRow = ((width * 2 + 7) >> 3) + (left != 0 ? 1 : 0);
+    var rows = ((height + 7) >> 3) + (top != 0 ? 1 : 0);
+
+    var data = _Monochrome(5 + rows * cellsPerRow * 10);
+    data[1] = (byte)left;
+    data[2] = (byte)top;
+    data[3] = width;
+    data[4] = height;
 
     return data;
   }
