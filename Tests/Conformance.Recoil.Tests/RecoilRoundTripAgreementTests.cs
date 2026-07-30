@@ -101,10 +101,9 @@ public sealed class RecoilRoundTripAgreementTests {
   /// </remarks>
   private static readonly IReadOnlyDictionary<string, string> _KnownDisagreements =
     new Dictionary<string, string> {
+      ["Spectrum 512 extended"] = "one bit out in blue: the interlaced word puts a channel bit at position 12 and our encoder never sets it, so decoding is right and writing is not",
       ["CrackArt"] = "first pixel disagrees entirely — likely the palette is read from the wrong offset",
       ["The Last Word font"] = "off by eighteen deep inside the glyph area rather than at the first pixel",
-      ["Spectrum 512"] = "per-scanline palette timing differs; ours changes a scanline early or late",
-      ["Spectrum 512 extended"] = "as Spectrum 512, and doubled — 17 against 34 suggests a channel widened twice",
       ["Imagic (high)"] = "only the 640x400 variant disagrees; the other two Imagic modes match, so it is the high-resolution path alone",
     };
 

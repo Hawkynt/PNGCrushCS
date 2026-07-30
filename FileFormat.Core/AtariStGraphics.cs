@@ -59,6 +59,24 @@ public static class AtariStGraphics {
   /// <summary>Rotates an STE nibble, whose least significant bit is stored highest.</summary>
   private static int _SteChannel(int value) => ((value & 7) << 1) | ((value >> 3) & 1);
 
+  /// <summary>
+  /// Expands an STE interlaced colour word — the form Spectrum 512's extended files store — into
+  /// packed 0xRRGGBB.
+  /// </summary>
+  /// <remarks>
+  /// The extended format shows two frames and averages them, which buys a bit of precision per
+  /// channel over the STE's four. The extra bit is not appended: the word's bits are scattered so
+  /// that the same sixteen bits still read as an ordinary STE colour on hardware that knows nothing
+  /// about the trick. Unpacking is therefore a shuffle rather than a shift, and reading it as a
+  /// plain four-bit-per-channel value halves every channel.
+  /// </remarks>
+  public static int InterlacedColorToRgb(int word) {
+    var rgb = ((word & 0x0700) << 10) | ((word & 0x0870) << 6) | ((word & 0x4087) << 2)
+      | ((word & 0x2000) >> 5) | ((word & 0x0008) >> 2) | ((word & 0x1000) >> 12);
+
+    return (rgb << 3) | ((rgb >> 2) & 0x070707);
+  }
+
   /// <summary>Bytes one bitplane row occupies for a given width and plane count.</summary>
   public static int BytesPerRow(int width, int planes) => ((width + 15) >> 4) * planes * 2;
 

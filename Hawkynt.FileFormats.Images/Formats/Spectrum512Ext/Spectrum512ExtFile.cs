@@ -69,15 +69,12 @@ public readonly record struct Spectrum512ExtFile : IImageFormatReader<Spectrum51
     for (var y = 0; y < height; ++y) {
       var palette = file.Palettes[y];
       for (var x = 0; x < width; ++x) {
-        var index = chunky[y * width + x];
-        var entry = palette[index] & 0x0FFF;
-        var r = (entry >> 8) & 0x0F;
-        var g = (entry >> 4) & 0x0F;
-        var b = entry & 0x0F;
+        var entry = palette[FileFormat.Spectrum512.Spectrum512File.PaletteEntryFor(chunky[y * width + x], x)];
+        var color = AtariStGraphics.InterlacedColorToRgb(entry & 0xFFFF);
         var offset = (y * width + x) * 3;
-        rgb[offset] = (byte)(r * 255 / 15);
-        rgb[offset + 1] = (byte)(g * 255 / 15);
-        rgb[offset + 2] = (byte)(b * 255 / 15);
+        rgb[offset] = (byte)(color >> 16);
+        rgb[offset + 1] = (byte)(color >> 8);
+        rgb[offset + 2] = (byte)color;
       }
     }
 

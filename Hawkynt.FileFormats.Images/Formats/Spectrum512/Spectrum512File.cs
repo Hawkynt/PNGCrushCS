@@ -18,6 +18,29 @@ public readonly record struct Spectrum512File : IImageFormatReader<Spectrum512Fi
   public byte[] PixelData { get; init; }
   public short[][] Palettes { get; init; }
 
+  /// <summary>Colours one scanline can name; sixteen at a time, in three overlapping zones.</summary>
+  public const int PaletteEntriesPerLine = 48;
+
+  /// <summary>
+  /// The palette entry a pixel reads, given its four-bit index and where it sits on the scanline.
+  /// </summary>
+  /// <remarks>
+  /// This is the whole format. The ST shows sixteen colours at once, but its palette registers can
+  /// be rewritten while a scanline is being drawn, so Spectrum 512 stores three sets of sixteen per
+  /// line and switches between them partway across. What makes it more than three fixed thirds is
+  /// that each colour switches at its own position — a register cannot be reloaded until the beam
+  /// has passed the pixels still using it, and the registers are reloaded in index order, so the
+  /// boundary for index <c>c</c> falls ten pixels further right for each step, nudged by six for
+  /// the odd ones. Reading it as fixed thirds puts a sixth of the picture in the wrong colours.
+  /// </remarks>
+  public static int PaletteEntryFor(int index, int x) {
+    var boundary = index * 10 + 1 - (index & 1) * 6;
+
+    return x >= boundary + 160 ? index + 32
+      : x >= boundary ? index + 16
+      : index;
+  }
+
   public static RawImage ToRawImage(Spectrum512File file) {
 
     const int width = 320;
@@ -28,15 +51,11 @@ public readonly record struct Spectrum512File : IImageFormatReader<Spectrum512Fi
     for (var y = 0; y < height; ++y) {
       var palette = file.Palettes[y];
       for (var x = 0; x < width; ++x) {
-        var index = chunky[y * width + x];
-        var entry = palette[index] & 0x0FFF;
-        var r = (entry >> 8) & 0x07;
-        var g = (entry >> 4) & 0x07;
-        var b = entry & 0x07;
+        var entry = palette[PaletteEntryFor(chunky[y * width + x], x)] & 0x0FFF;
         var offset = (y * width + x) * 3;
-        rgb[offset] = (byte)(r * 255 / 7);
-        rgb[offset + 1] = (byte)(g * 255 / 7);
-        rgb[offset + 2] = (byte)(b * 255 / 7);
+        rgb[offset] = ChannelScaling.Expand3((entry >> 8) & 7);
+        rgb[offset + 1] = ChannelScaling.Expand3((entry >> 4) & 7);
+        rgb[offset + 2] = ChannelScaling.Expand3(entry & 7);
       }
     }
 
