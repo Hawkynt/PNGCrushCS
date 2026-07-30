@@ -149,6 +149,8 @@ public sealed class RecoilDecodeAgreementTests {
     new("MSX Screen 3 with sprites", ImageFormat.MsxScreen3, ".sc3", _MsxSpriteScreen),
     new("MSX Screen 4", ImageFormat.MsxScreen4, ".sc4", () => _Bsave(112)),
     new("MSX Screen 4 with sprites", ImageFormat.MsxScreen4, ".sc4", _MsxSpriteScreen),
+    new("Color Computer P11", ImageFormat.CocoP11, ".p11", () => _CocoP11(3083)),
+    new("Color Computer P11, long", ImageFormat.CocoP11, ".p11", () => _CocoP11(3243)),
   ];
 
   [Test]
@@ -652,6 +654,17 @@ public sealed class RecoilDecodeAgreementTests {
       // The list has to end somewhere, or every remaining sprite competes for the line budget.
       data[attributes + 8 * 4] = 216;
     }
+
+    return data;
+  }
+
+  /// <summary>A P11 picture, which is identified only by four bytes of its header.</summary>
+  private static byte[] _CocoP11(int length) {
+    var data = _Monochrome(length);
+    data[0] = 0;
+    data[1] = 12;
+    data[3] = 14;
+    data[4] = 0;
 
     return data;
   }
