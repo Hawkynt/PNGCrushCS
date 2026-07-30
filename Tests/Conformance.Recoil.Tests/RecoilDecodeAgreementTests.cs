@@ -98,6 +98,8 @@ public sealed class RecoilDecodeAgreementTests {
     new("GunPaint", ImageFormat.GunPaint, ".gun", () => _Monochrome(33602)),
     new("GunPaint as .ifl", ImageFormat.GunPaint, ".ifl", () => _Monochrome(33603)),
     new("Print Shop graphic", ImageFormat.PrintShopIcon, ".psf", () => _Monochrome(572)),
+    new("ColorSTar", ImageFormat.ColorStar, ".bil", () => _Monochrome(32032)),
+    new("ColorSTar, prefixed", ImageFormat.ColorStar, ".bil", () => _Prefixed(32034)),
   ];
 
   [Test]
@@ -331,6 +333,14 @@ public sealed class RecoilDecodeAgreementTests {
     data[4] = (byte)(end >> 8);
     for (var i = 7; i < data.Length; ++i)
       data[i] = (byte)(i * 59 + (i >> 6));
+
+    return data;
+  }
+
+  /// <summary>Like the plain probe, but with the two leading zero bytes some writers add.</summary>
+  private static byte[] _Prefixed(int length) {
+    var data = _Monochrome(length);
+    data[0] = data[1] = 0;
 
     return data;
   }
