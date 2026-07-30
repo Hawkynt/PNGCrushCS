@@ -114,6 +114,8 @@ public sealed class RecoilDecodeAgreementTests {
     new("MSX2 SH8", ImageFormat.MsxGl8, ".sh8", () => _Gl8(96, 16)),
     new("Atari FontMaker", ImageFormat.AtariFontMaker, ".fn2", () => _Monochrome(2048)),
     new("Centauri Logo-Editor", ImageFormat.CentauriLogoEditor, ".cle", () => _Monochrome(8194)),
+    new("ImageLab greyscale", ImageFormat.ImageLabBw, ".b&w", () => _ImageLab(64, 48)),
+    new("ImageLab greyscale as .b_w", ImageFormat.ImageLabBw, ".b_w", () => _ImageLab(120, 17)),
   ];
 
   [Test]
@@ -291,6 +293,20 @@ public sealed class RecoilDecodeAgreementTests {
     data[6] = 1;
     // The high nibble of the first packed byte is the starting value; the rest stay zero.
     data[22] = 0x50;
+
+    return data;
+  }
+
+  private static byte[] _ImageLab(int width, int height) {
+    var data = new byte[10 + width * height];
+    "B&W256"u8.CopyTo(data);
+    // Big-endian dimensions, so a byte-swapped reading would give a different picture entirely.
+    data[6] = (byte)(width >> 8);
+    data[7] = (byte)width;
+    data[8] = (byte)(height >> 8);
+    data[9] = (byte)height;
+    for (var i = 10; i < data.Length; ++i)
+      data[i] = (byte)(i - 10);
 
     return data;
   }
