@@ -167,6 +167,46 @@ public static class Atari8BitGraphics {
   }
 
   /// <summary>
+  /// Renders a Graphics 9 bitmap of any size to RGB: one luminance per pixel against a fixed hue.
+  /// </summary>
+  /// <param name="background">
+  /// The colour register the luminances sit in. Its hue is what they are shades of; the mode's
+  /// sixteen values replace the register's own luminance rather than adding to it.
+  /// </param>
+  /// <param name="shift">
+  /// How far the picture is displaced horizontally. Formats that interlace two Graphics 9 fields
+  /// offset them against each other by a pixel, which is what lets the pair resolve detail finer
+  /// than either field's four-pixel-wide nibbles.
+  /// </param>
+  public static byte[] DecodeGr9Frame(
+    ReadOnlySpan<byte> data, int offset, int stride, int width, int height, int background, int shift) {
+    var gtia = Palette;
+    var rgb = new byte[width * height * 3];
+
+    for (var y = 0; y < height; ++y) {
+      var rowOffset = offset + y * stride;
+      for (var x = 0; x < width; ++x) {
+        var source = x + shift;
+        var luminance = 0;
+        if (source >= 0 && source < width) {
+          var index = rowOffset + (source >> 3);
+          // A nibble covers four screen pixels, high half of the byte first.
+          if (index < data.Length)
+            luminance = (data[index] >> (~source & 4)) & 15;
+        }
+
+        var entry = ((background | luminance) & 0xFF) * 3;
+        var target = (y * width + x) * 3;
+        rgb[target] = gtia[entry];
+        rgb[target + 1] = gtia[entry + 1];
+        rgb[target + 2] = gtia[entry + 2];
+      }
+    }
+
+    return rgb;
+  }
+
+  /// <summary>
   /// Averages two frames channel by channel, which is what a display alternating between them
   /// looks like.
   /// </summary>

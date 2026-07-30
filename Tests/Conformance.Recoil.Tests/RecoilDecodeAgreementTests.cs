@@ -120,10 +120,13 @@ public sealed class RecoilDecodeAgreementTests {
     new("OD Font Editor", ImageFormat.OdFontEditor, ".odf", () => _Monochrome(1280)),
     new("Vertical Hires Interlace", ImageFormat.VerticalHiresInterlace, ".vhi", () => _Monochrome(17389)),
     new("Vertical Hires Interlace, packed", ImageFormat.VerticalHiresInterlace, ".vhi", _VhiPacked),
-    new("AtariTools-800 missile", ImageFormat.Atari8Missile, ".mis", () => _Monochrome(61)),
+    new("AtariTools-800 missile", ImageFormat.Atari8Missile, ".mis", _Atari8Missile),
     new("SlideShow for VBXE", ImageFormat.VbxeSlideShow, ".dap", () => _Monochrome(77568)),
     new("HR2", ImageFormat.AtariHr2, ".hr2", () => _Monochrome(16006)),
     new("Interlace Graphics Editor", ImageFormat.InterlaceGraphicsEditor, ".ige", _Ige),
+    new("Mad Studio missile", ImageFormat.MadStudioMissile, ".msl", _MadStudioMissile),
+    new("Blazing Paddles window", ImageFormat.BlazingPaddlesWindow, ".wnd", _BlazingPaddlesWindow),
+    new("VertiZontal Interlacing", ImageFormat.VertiZontalInterlacing, ".vzi", () => _Monochrome(16000)),
   ];
 
   [Test]
@@ -428,6 +431,38 @@ public sealed class RecoilDecodeAgreementTests {
     var data = _Monochrome(6160);
     ReadOnlySpan<byte> signature = [0xFF, 0xFF, 0xF6, 0xA3, 0xFF, 0xBB, 0xFF, 0x5F];
     signature.CopyTo(data);
+
+    return data;
+  }
+
+  /// <summary>
+  /// An AtariTools-800 missile. The colour byte has to be something other than black: with the
+  /// missile the same colour as what it sits on, a comparison passes whatever the shape decodes to.
+  /// </summary>
+  private static byte[] _Atari8Missile() {
+    var data = _Monochrome(61);
+    data[0] = 0x28;
+
+    return data;
+  }
+
+  /// <summary>A Mad Studio missile: a height, a colour, then rows using only their low two bits.</summary>
+  private static byte[] _MadStudioMissile() {
+    const int height = 20;
+    var data = new byte[2 + height];
+    data[0] = height;
+    data[1] = 0x28;
+    for (var y = 0; y < height; ++y)
+      data[2 + y] = (byte)(y % 4);
+
+    return data;
+  }
+
+  /// <summary>A Blazing Paddles window: a size in the first two bytes, then a buffer's worth of bitmap.</summary>
+  private static byte[] _BlazingPaddlesWindow() {
+    var data = _Monochrome(3072);
+    data[0] = 63;
+    data[1] = 40;
 
     return data;
   }
