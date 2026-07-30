@@ -13,6 +13,9 @@ namespace FileFormat.Core;
 /// </remarks>
 public static class ChannelScaling {
 
+  /// <summary>Widens a two-bit channel, as the blue of a G3R3B2 byte stores it.</summary>
+  public static byte Expand2(int value) => (byte)((value << 6) | (value << 4) | (value << 2) | value);
+
   /// <summary>Widens a three-bit channel, as the Atari ST and MSX V9938 store it.</summary>
   public static byte Expand3(int value) => (byte)((value << 5) | (value << 2) | (value >> 1));
 

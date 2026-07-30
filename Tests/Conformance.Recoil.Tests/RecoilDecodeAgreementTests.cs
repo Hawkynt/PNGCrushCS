@@ -139,6 +139,9 @@ public sealed class RecoilDecodeAgreementTests {
     new("Star Painter font", ImageFormat.StarPainterFont, ".zs", _StarPainterFont),
     new("Art Studio window", ImageFormat.ArtStudioWindow, ".mwi", () => _ArtStudioWindow(0, 0)),
     new("Art Studio window, offset into its cells", ImageFormat.ArtStudioWindow, ".mwi", () => _ArtStudioWindow(2, 3)),
+    new("SpecSCII", ImageFormat.SpecScii, ".zxs", _SpecScii),
+    new("Stellar", ImageFormat.Stellar, ".stl", () => _Monochrome(3072)),
+    new("Profi", ImageFormat.ProfiGrf, ".grf", _ProfiGrf),
   ];
 
   [Test]
@@ -595,6 +598,29 @@ public sealed class RecoilDecodeAgreementTests {
     data[2] = (byte)top;
     data[3] = width;
     data[4] = height;
+
+    return data;
+  }
+
+  /// <summary>A SpecSCII picture, whose cells must all name characters the set holds.</summary>
+  private static byte[] _SpecScii() {
+    var data = _Monochrome(2452);
+    "ZX_SSCII"u8.CopyTo(data);
+    data[8] = 148;
+    data[9] = 9;
+    data[10] = data[11] = 0;
+
+    for (var cell = 0; cell < 768; ++cell)
+      data[908 + cell] = (byte)(cell % 112);
+
+    return data;
+  }
+
+  /// <summary>A Profi picture, which is identified only by its ten-byte header.</summary>
+  private static byte[] _ProfiGrf() {
+    var data = _Monochrome(30848);
+    ReadOnlySpan<byte> signature = [0, 2, 240, 0, 4, 0, 128, 0, 1, 19];
+    signature.CopyTo(data);
 
     return data;
   }
