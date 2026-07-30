@@ -78,6 +78,10 @@ public sealed class RecoilDecodeAgreementTests {
     // 16009 bytes is 200 rows of two fields plus the nine colour registers.
     new("Hard Interlace Picture", ImageFormat.AtariHardInterlace, ".hip", () => _Monochrome(16009)),
     new("Hard Interlace Picture (SFDN)", ImageFormat.AtariHardInterlace, ".hps", () => _Sfdn(16009)),
+    new("APAC 3", ImageFormat.Apac3, ".ap3", () => _Monochrome(15360)),
+    new("APAC 3, long form", ImageFormat.Apac3, ".apv", () => _Monochrome(15872)),
+    new("APAC 3 (SFDN)", ImageFormat.Apac3, ".ils", () => _Sfdn(15360)),
+    new("Apac3 Linker-Viewer (SFDN)", ImageFormat.Apac3, ".app", () => _Sfdn(15872)),
   ];
 
   [Test]
