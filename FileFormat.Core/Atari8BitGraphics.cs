@@ -133,6 +133,40 @@ public static class Atari8BitGraphics {
   }
 
   /// <summary>
+  /// Renders a Graphics 15 bitmap of any size to RGB, given the four registers it draws from.
+  /// </summary>
+  /// <param name="registers">Background, PF0, PF1 and PF2, in that order.</param>
+  /// <param name="width">Screen pixels across. Each logical pixel is drawn two of them wide.</param>
+  /// <remarks>
+  /// The mode is the same everywhere it appears, but the frame size is not: editors that interlace
+  /// two Graphics 15 screens choose their own width and height, so this works in screen pixels and
+  /// takes the row stride rather than assuming the forty bytes a full-width screen uses.
+  /// </remarks>
+  public static byte[] DecodeGr15Frame(
+    ReadOnlySpan<byte> data, int offset, int stride, int width, int height, ReadOnlySpan<byte> registers) {
+    var gtia = Palette;
+    var rgb = new byte[width * height * 3];
+
+    for (var y = 0; y < height; ++y) {
+      var rowOffset = offset + y * stride;
+      for (var x = 0; x < width; ++x) {
+        var index = rowOffset + (x >> 3);
+        // Two bits per logical pixel, four logical pixels to a byte, each drawn two pixels wide.
+        var pixel = index < data.Length ? (data[index] >> (~x & 6)) & 3 : 0;
+        var color = pixel < registers.Length ? registers[pixel] & 254 : 0;
+
+        var entry = color * 3;
+        var target = (y * width + x) * 3;
+        rgb[target] = gtia[entry];
+        rgb[target + 1] = gtia[entry + 1];
+        rgb[target + 2] = gtia[entry + 2];
+      }
+    }
+
+    return rgb;
+  }
+
+  /// <summary>
   /// Averages two frames channel by channel, which is what a display alternating between them
   /// looks like.
   /// </summary>
@@ -230,11 +264,6 @@ public static class Atari8BitGraphics {
     return data;
   }
 
-  /// <summary>
-  /// The 256-entry GTIA palette as RGB triplets, generated from the standard hue/luminance model
-  /// rather than a captured table: the high nibble of a colour byte selects one of 15 hues on the
-  /// NTSC colour burst (0 being grey), and the low nibble selects luminance.
-  /// </summary>
   /// <summary>
   /// The 256 colours the GTIA produces, as measured from hardware rather than computed.
   /// </summary>

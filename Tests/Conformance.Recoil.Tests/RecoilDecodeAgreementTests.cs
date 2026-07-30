@@ -120,6 +120,10 @@ public sealed class RecoilDecodeAgreementTests {
     new("OD Font Editor", ImageFormat.OdFontEditor, ".odf", () => _Monochrome(1280)),
     new("Vertical Hires Interlace", ImageFormat.VerticalHiresInterlace, ".vhi", () => _Monochrome(17389)),
     new("Vertical Hires Interlace, packed", ImageFormat.VerticalHiresInterlace, ".vhi", _VhiPacked),
+    new("AtariTools-800 missile", ImageFormat.Atari8Missile, ".mis", () => _Monochrome(61)),
+    new("SlideShow for VBXE", ImageFormat.VbxeSlideShow, ".dap", () => _Monochrome(77568)),
+    new("HR2", ImageFormat.AtariHr2, ".hr2", () => _Monochrome(16006)),
+    new("Interlace Graphics Editor", ImageFormat.InterlaceGraphicsEditor, ".ige", _Ige),
   ];
 
   [Test]
@@ -415,6 +419,15 @@ public sealed class RecoilDecodeAgreementTests {
     data[1] = (byte)rows;
     for (var i = 2; i < data.Length; ++i)
       data[i] = (byte)(i * 67 + (i >> 5));
+
+    return data;
+  }
+
+  /// <summary>An Interlace Graphics Editor picture, which is identified only by its load header.</summary>
+  private static byte[] _Ige() {
+    var data = _Monochrome(6160);
+    ReadOnlySpan<byte> signature = [0xFF, 0xFF, 0xF6, 0xA3, 0xFF, 0xBB, 0xFF, 0x5F];
+    signature.CopyTo(data);
 
     return data;
   }
