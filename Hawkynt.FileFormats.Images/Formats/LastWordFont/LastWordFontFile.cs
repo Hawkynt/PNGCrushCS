@@ -31,8 +31,28 @@ public readonly record struct LastWordFontFile
   /// <summary>Total file size.</summary>
   public const int FileSize = GlyphCount * GlyphHeight;
 
-  /// <summary>Background and foreground, matching the colours the text mode defaults to.</summary>
-  private static ReadOnlySpan<byte> _Palette => [0x00, 0x00, 0x00, 0xDC, 0xDC, 0xDC];
+  /// <summary>GTIA colour of the background register Graphics 0 draws from.</summary>
+  public const byte BackgroundColor = 0;
+
+  /// <summary>GTIA colour of the foreground register; only its luminance reaches the screen.</summary>
+  public const byte ForegroundColor = 14;
+
+  /// <summary>
+  /// The two colours the text mode draws with, taken from the GTIA table rather than written out.
+  /// </summary>
+  /// <remarks>
+  /// These were once literals, and the literals encoded a palette that has since been corrected —
+  /// so they stayed subtly wrong after the table was fixed and nothing pointed at them. Deriving
+  /// them keeps the two in step.
+  /// </remarks>
+  private static byte[] _PaletteRgb() {
+    var gtia = Atari8BitGraphics.Palette;
+    var palette = new byte[6];
+    gtia.Slice(BackgroundColor * 3, 3).CopyTo(palette);
+    gtia.Slice(ForegroundColor * 3, 3).CopyTo(palette.AsSpan(3));
+
+    return palette;
+  }
 
   static string IImageFormatMetadata<LastWordFontFile>.PrimaryExtension => ".f80";
   static string[] IImageFormatMetadata<LastWordFontFile>.FileExtensions => [".f80"];
@@ -66,7 +86,7 @@ public readonly record struct LastWordFontFile
       Height = SheetHeight,
       Format = PixelFormat.Indexed8,
       PixelData = pixels,
-      Palette = _Palette.ToArray(),
+      Palette = _PaletteRgb(),
       PaletteCount = 2,
     };
   }
