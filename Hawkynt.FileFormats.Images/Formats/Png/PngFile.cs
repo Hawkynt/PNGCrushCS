@@ -74,6 +74,8 @@ public readonly record struct PngFile :
     // For indexed with BitDepth 2, unpack to 8-bit indices
     if (file.ColorType == PngColorType.Palette && file.BitDepth == 2)
       pixelData = _Unpack2BitTo8Bit(pixelData, file.Width, file.Height);
+    else if (format is PixelFormat.Indexed1 or PixelFormat.Indexed4)
+      pixelData = _RemoveRowPadding(pixelData, file.Width, file.Height, file.BitDepth);
 
     byte[]? palette = null;
     var paletteCount = 0;
@@ -107,7 +109,10 @@ public readonly record struct PngFile :
 
     var (colorType, bitDepth) = _GetPngSettings(image.Format);
     var stride = _CalculateStride(image.Width, image.Format, bitDepth);
-    var rows = _SplitIntoRows(image.PixelData, stride, image.Height);
+    var pixelData = image.Format is PixelFormat.Indexed1 or PixelFormat.Indexed4
+      ? _AddRowPadding(image.PixelData, image.Width, image.Height, bitDepth)
+      : image.PixelData;
+    var rows = _SplitIntoRows(pixelData, stride, image.Height);
 
     byte[]? palette = null;
     var paletteCount = 0;
@@ -191,6 +196,64 @@ public readonly record struct PngFile :
     }
 
     return rows;
+  }
+
+  /// <summary>
+  /// Restacks sub-byte rows from the byte-aligned layout PNG stores them in to the continuous one
+  /// <see cref="RawImage"/> uses.
+  /// </summary>
+  /// <remarks>
+  /// PNG starts every row on a byte boundary; a <see cref="RawImage"/> in a sub-byte format runs
+  /// its indices straight on across the whole picture, which is what <see cref="PixelConverter"/>
+  /// and <see cref="ColorQuantizer.PackIndices"/> both expect. The two agree for any width that is
+  /// a multiple of eight pixels — which is nearly every picture, and why this went unnoticed — and
+  /// diverge by the padding bits for the rest, throwing every row after the first out of step.
+  /// </remarks>
+  private static byte[] _RemoveRowPadding(byte[] padded, int width, int height, int bitsPerPixel) {
+    var paddedStride = (width * bitsPerPixel + 7) / 8;
+    if (paddedStride * 8 == width * bitsPerPixel)
+      return padded;
+
+    var result = new byte[(width * height * bitsPerPixel + 7) / 8];
+    var mask = (1 << bitsPerPixel) - 1;
+
+    for (var y = 0; y < height; ++y)
+    for (var x = 0; x < width; ++x) {
+      var sourceBit = y * paddedStride * 8 + x * bitsPerPixel;
+      var sourceByte = sourceBit >> 3;
+      if (sourceByte >= padded.Length)
+        return result;
+
+      var value = (padded[sourceByte] >> (8 - bitsPerPixel - (sourceBit & 7))) & mask;
+      var targetBit = (y * width + x) * bitsPerPixel;
+      result[targetBit >> 3] |= (byte)(value << (8 - bitsPerPixel - (targetBit & 7)));
+    }
+
+    return result;
+  }
+
+  /// <summary>Restacks continuous sub-byte rows into the byte-aligned layout PNG stores.</summary>
+  private static byte[] _AddRowPadding(byte[] continuous, int width, int height, int bitsPerPixel) {
+    var paddedStride = (width * bitsPerPixel + 7) / 8;
+    if (paddedStride * 8 == width * bitsPerPixel)
+      return continuous;
+
+    var result = new byte[paddedStride * height];
+    var mask = (1 << bitsPerPixel) - 1;
+
+    for (var y = 0; y < height; ++y)
+    for (var x = 0; x < width; ++x) {
+      var sourceBit = (y * width + x) * bitsPerPixel;
+      var sourceByte = sourceBit >> 3;
+      if (sourceByte >= continuous.Length)
+        return result;
+
+      var value = (continuous[sourceByte] >> (8 - bitsPerPixel - (sourceBit & 7))) & mask;
+      var targetBit = y * paddedStride * 8 + x * bitsPerPixel;
+      result[targetBit >> 3] |= (byte)(value << (8 - bitsPerPixel - (targetBit & 7)));
+    }
+
+    return result;
   }
 
   private static byte[] _Unpack2BitTo8Bit(byte[] packed, int width, int height) {
