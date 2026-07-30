@@ -39,7 +39,7 @@ public readonly record struct InterPainterFile
   public const int BlendCount = ColorCount * (ColorCount + 1) / 2;
 
   static string IImageFormatMetadata<InterPainterFile>.PrimaryExtension => ".inp";
-  static string[] IImageFormatMetadata<InterPainterFile>.FileExtensions => [".inp", ".ing"];
+  static string[] IImageFormatMetadata<InterPainterFile>.FileExtensions => [".inp", ".ing", ".ins"];
   static InterPainterFile IImageFormatReader<InterPainterFile>.FromSpan(ReadOnlySpan<byte> data) => InterPainterReader.FromSpan(data);
   static byte[] IImageFormatWriter<InterPainterFile>.ToBytes(InterPainterFile file) => InterPainterWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<InterPainterFile>.VideoModes => [

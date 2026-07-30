@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using FileFormat.Core;
 
 namespace FileFormat.InterPainter;
 
@@ -28,6 +29,14 @@ public static class InterPainterReader {
   }
 
   public static InterPainterFile FromSpan(ReadOnlySpan<byte> data) {
+    // An .ins file is these same bytes under the SFDN packer; unpack and there is one format left.
+    if (SfdnDecompressor.IsSfdn(data)) {
+      var unpacked = SfdnDecompressor.TryUnpack(data, InterPainterFile.FileSize)
+        ?? throw new InvalidDataException("Not an InterPainter picture: the SFDN data does not unpack to a screen.");
+
+      return FromSpan((ReadOnlySpan<byte>)unpacked);
+    }
+
     // Some files carry a few trailing bytes of loader data, which readers ignore.
     if (data.Length < InterPainterFile.FileSize)
       throw new InvalidDataException($"An InterPainter file is at least {InterPainterFile.FileSize} bytes, got {data.Length}.");

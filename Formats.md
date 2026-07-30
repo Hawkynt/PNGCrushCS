@@ -75,7 +75,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | Atari Grafik            | .pcp                                                 | Atari graphics format            | Y      | —      | —         | —     | —   | —      | —         |
 | Atari Graphics 10       | .gr10, .g10                                          | Atari GTIA 9-color mode          | Y      | —      | —         | R     | —   | —      | —         |
 | Atari Graphics 11       | .gr11, .g11                                          | Atari GTIA 16-luminance mode     | Y      | Y      | —         | R     | —   | —      | —         |
-| Atari Graphics 9        | .gr9, .g9                                            | Atari GTIA 16-shade grayscale    | Y      | Y      | —         | R     | —   | —      | —         |
+| Atari Graphics 9        | .gr9, .g9, .g9s, .sfd                                            | Atari GTIA 16-shade grayscale    | Y      | Y      | —         | R     | —   | —      | —         |
 | Atari HR                | .hr                                                  | Atari 8-bit HR hires 320x192    | Y      | Y      | —         | R     | —   | —      | —         |
 | Atari Maxi              | .max8, .amx                                          | Atari 8-bit Maxi paint 160x192  | Y      | Y      | —         | R     | —   | —      | —         |
 | Atari Picture           | .apc                                                 | Atari 8-bit screen capture       | Y      | Y      | —         | —     | —   | —      | —         |
@@ -296,7 +296,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | Interlace Hires Editor  | .ihe                                                 | C64 Interlace Hires Editor       | Y      | —      | —         | R     | —   | —      | —         |
 | Interlace Studio        | .ist                                                 | C64 Interlace Studio MC          | Y      | —      | —         | R     | —   | —      | —         |
 | Interlace Char. Editor  | .irg, .ir2, .icn, .imn, .ipc                         | Atari 8-bit ICE interlaced       | Y      | Y      | —         | R     | —   | —      | —         |
-| InterPainter            | .inp, .ing                                           | Atari 8-bit interlaced mode E    | Y      | Y      | —         | R     | —   | —      | —         |
+| InterPainter            | .inp, .ing, .ins                                           | Atari 8-bit interlaced mode E    | Y      | Y      | —         | R     | —   | —      | —         |
 | ICDRAW icon             | .ibi, .ib3                                           | Atari Falcon ICDRAW icon         | Y      | Y      | —         | R     | —   | —      | —         |
 | IOCA                    | .ica, .ioca                                          | Image Object Content Arch.       | Y      | Y      | —         | —     | —   | —      | —         |
 | IPL                     | .ipl                                                 | Image Processing Library         | Y      | Y      | —         | —     | —   | —      | —         |
@@ -693,10 +693,10 @@ Two different questions, two different answers:
 | ----------------------------------------------------------- | ----- | ------ |
 | Total formats                                              | 566   | 552    |
 | Modern/web/scientific formats (PNG, JPEG, WebP, AVIF, …)   | ~290  | 0      |
-| Of RECOIL's 552 vintage formats, covered                   | 400   | 552    |
+| Of RECOIL's 552 vintage formats, covered                   | 402   | 552    |
 
 So on breadth we are level, and on everything outside the retro catalogue we are the only one of
-the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 152
+the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 150
 formats.
 
 Largest remaining clusters: Atari 8-bit (56), Commodore 64 (23), Atari ST/STE (19), Atari Falcon

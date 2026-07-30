@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using FileFormat.Core;
 
 namespace FileFormat.AtariGraphics9;
 
@@ -28,6 +29,15 @@ public static class AtariGraphics9Reader {
 
   public static AtariGraphics9File FromSpan(ReadOnlySpan<byte> data) {
 
+    // The .g9s and .sfd files are these same bytes under the SFDN packer, so unpack first and
+    // then there is only one format to read.
+    if (SfdnDecompressor.IsSfdn(data)) {
+      var unpacked = SfdnDecompressor.TryUnpack(data, AtariGraphics9File.FileSize)
+        ?? throw new InvalidDataException("Not an Atari Graphics 9 picture: the SFDN data does not unpack to a screen.");
+
+      return new() { PixelData = unpacked };
+    }
+
     if (data.Length != AtariGraphics9File.FileSize)
       throw new InvalidDataException($"Invalid Atari Graphics 9 data size: expected exactly {AtariGraphics9File.FileSize} bytes, got {data.Length}.");
 
@@ -39,12 +49,6 @@ public static class AtariGraphics9Reader {
 
   public static AtariGraphics9File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length != AtariGraphics9File.FileSize)
-      throw new InvalidDataException($"Invalid Atari Graphics 9 data size: expected exactly {AtariGraphics9File.FileSize} bytes, got {data.Length}.");
-
-    var pixelData = new byte[AtariGraphics9File.FileSize];
-    data.AsSpan(0, AtariGraphics9File.FileSize).CopyTo(pixelData);
-
-    return new AtariGraphics9File { PixelData = pixelData };
+    return FromSpan(data);
   }
 }

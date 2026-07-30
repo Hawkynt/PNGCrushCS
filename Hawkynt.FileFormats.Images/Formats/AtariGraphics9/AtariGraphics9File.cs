@@ -16,10 +16,11 @@ public readonly record struct AtariGraphics9File : IImageFormatReader<AtariGraph
   internal const int BytesPerLine = 40;
 
   /// <summary>Exact file size in bytes (40 bytes/line x 192 lines).</summary>
+  /// <summary>Size of the picture once unpacked; the SFDN variants pack these same bytes.</summary>
   internal const int FileSize = BytesPerLine * PixelHeight;
 
   static string IImageFormatMetadata<AtariGraphics9File>.PrimaryExtension => ".gr9";
-  static string[] IImageFormatMetadata<AtariGraphics9File>.FileExtensions => [".gr9", ".g9"];
+  static string[] IImageFormatMetadata<AtariGraphics9File>.FileExtensions => [".gr9", ".g9", ".g9s", ".sfd"];
   static AtariGraphics9File IImageFormatReader<AtariGraphics9File>.FromSpan(ReadOnlySpan<byte> data) => AtariGraphics9Reader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<AtariGraphics9File>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [16], [
