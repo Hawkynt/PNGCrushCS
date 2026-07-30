@@ -83,6 +83,7 @@ public sealed class RecoilDecodeAgreementTests {
     new("APAC 3 (SFDN)", ImageFormat.Apac3, ".ils", () => _Sfdn(15360)),
     new("Apac3 Linker-Viewer (SFDN)", ImageFormat.Apac3, ".app", () => _Sfdn(15872)),
     new("AtariTools-800 player", ImageFormat.Atari8Player, ".pla", () => _Monochrome(241)),
+    new("HCB-editor", ImageFormat.HcbEditor, ".hcb", () => _Monochrome(12148)),
   ];
 
   [Test]
