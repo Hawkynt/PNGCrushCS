@@ -118,6 +118,8 @@ public sealed class RecoilDecodeAgreementTests {
     new("ImageLab greyscale as .b_w", ImageFormat.ImageLabBw, ".b_w", () => _ImageLab(120, 17)),
     new("Super Hires Studio", ImageFormat.SuperHiresStudio, ".shs", () => _Monochrome(14338)),
     new("OD Font Editor", ImageFormat.OdFontEditor, ".odf", () => _Monochrome(1280)),
+    new("Vertical Hires Interlace", ImageFormat.VerticalHiresInterlace, ".vhi", () => _Monochrome(17389)),
+    new("Vertical Hires Interlace, packed", ImageFormat.VerticalHiresInterlace, ".vhi", _VhiPacked),
   ];
 
   [Test]
@@ -430,6 +432,56 @@ public sealed class RecoilDecodeAgreementTests {
       data[i] = (byte)(i * 47 + (i >> 7));
 
     return data;
+  }
+
+  /// <summary>
+  /// A packed Vertical Hires Interlace picture: two header bytes, then literal and repeated runs.
+  /// </summary>
+  /// <remarks>
+  /// The payload deliberately alternates between stretches of one repeated byte and stretches of
+  /// varying ones, so the greedy encoder below has to emit both kinds of run and both are exercised
+  /// on the way back in. Without the flat stretches every run would be a literal one and the repeat
+  /// path would go untested.
+  /// </remarks>
+  private static byte[] _VhiPacked() {
+    const int unpackedLength = 17384;
+    var unpacked = new byte[unpackedLength];
+    for (var i = 0; i < unpackedLength; ++i)
+      unpacked[i] = (i / 97) % 3 == 0 ? (byte)((i / 97) & 15) : (byte)(i * 47 + (i >> 7));
+
+    var packed = new List<byte> { 0, 0 };
+    for (var at = 0; at < unpackedLength;) {
+      var run = 1;
+      while (run < 256 && at + run < unpackedLength && unpacked[at + run] == unpacked[at])
+        ++run;
+
+      if (run >= 4) {
+        packed.Add(1);
+        packed.Add((byte)(run & 255));
+        packed.Add(unpacked[at]);
+        at += run;
+        continue;
+      }
+
+      var literal = 0;
+      while (literal < 256 && at + literal < unpackedLength) {
+        var same = 1;
+        while (same < 4 && at + literal + same < unpackedLength && unpacked[at + literal + same] == unpacked[at + literal])
+          ++same;
+
+        if (same >= 4)
+          break;
+
+        ++literal;
+      }
+
+      packed.Add(0);
+      packed.Add((byte)(literal & 255));
+      packed.AddRange(unpacked.AsSpan(at, literal).ToArray());
+      at += literal;
+    }
+
+    return packed.ToArray();
   }
 
   private static byte[] _C64Font(int length, byte low, byte high) {
