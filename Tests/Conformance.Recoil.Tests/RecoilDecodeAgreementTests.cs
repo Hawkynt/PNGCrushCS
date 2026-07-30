@@ -100,6 +100,9 @@ public sealed class RecoilDecodeAgreementTests {
     new("Print Shop graphic", ImageFormat.PrintShopIcon, ".psf", () => _Monochrome(572)),
     new("ColorSTar", ImageFormat.ColorStar, ".bil", () => _Monochrome(32032)),
     new("ColorSTar, prefixed", ImageFormat.ColorStar, ".bil", () => _Prefixed(32034)),
+    // Size is in cells, so two shapes to show the header is read and not assumed.
+    new("Star Painter", ImageFormat.StarPainter, ".gr", () => _StarPainter(40, 25)),
+    new("Star Painter, narrow", ImageFormat.StarPainter, ".cs", () => _StarPainter(12, 30)),
   ];
 
   [Test]
@@ -338,6 +341,16 @@ public sealed class RecoilDecodeAgreementTests {
   }
 
   /// <summary>Like the plain probe, but with the two leading zero bytes some writers add.</summary>
+  private static byte[] _StarPainter(int columns, int rows) {
+    var data = new byte[2 + columns * rows * 8];
+    data[0] = (byte)columns;
+    data[1] = (byte)rows;
+    for (var i = 2; i < data.Length; ++i)
+      data[i] = (byte)(i * 67 + (i >> 5));
+
+    return data;
+  }
+
   private static byte[] _Prefixed(int length) {
     var data = _Monochrome(length);
     data[0] = data[1] = 0;
