@@ -77,7 +77,9 @@ public sealed class MagicPainterTests {
     Assert.Multiple(() => {
       Assert.That(raw.Width, Is.EqualTo(MagicPainterFile.DisplayWidth));
       Assert.That(raw.Height, Is.EqualTo(MagicPainterFile.DisplayHeight));
-      Assert.That(raw.PaletteCount, Is.EqualTo(MagicPainterFile.ColorCount));
+      // Colour, not indices: the rainbow rewrites a register on every stored row, so no single
+      // palette describes the picture.
+      Assert.That(raw.Format, Is.EqualTo(PixelFormat.Rgb24));
     });
   }
 
@@ -97,5 +99,22 @@ public sealed class MagicPainterTests {
 
     Assert.That(MagicPainterWriter.ToBytes(MagicPainterFile.FromRawImage(raw)),
       Has.Length.EqualTo(MagicPainterFile.FileSize));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void TheRainbowRampsOneRegisterDownTheScreen() {
+    Assert.Multiple(() => {
+      // 0 names the background, 1 to 3 name PF0 to PF2, and anything else means no rainbow at all.
+      Assert.That(MagicPainterFile.RainbowRegister(0), Is.EqualTo(Atari8BitGraphics.BackgroundRegisterIndex));
+      Assert.That(MagicPainterFile.RainbowRegister(1), Is.Zero);
+      Assert.That(MagicPainterFile.RainbowRegister(3), Is.EqualTo(2));
+      Assert.That(MagicPainterFile.RainbowRegister(255), Is.EqualTo(-1));
+
+      // One shade per scanline from 16, and the hardware ignores the low bit.
+      Assert.That(MagicPainterFile.RainbowColor(0), Is.EqualTo(16));
+      Assert.That(MagicPainterFile.RainbowColor(1), Is.EqualTo(16));
+      Assert.That(MagicPainterFile.RainbowColor(2), Is.EqualTo(18));
+    });
   }
 }

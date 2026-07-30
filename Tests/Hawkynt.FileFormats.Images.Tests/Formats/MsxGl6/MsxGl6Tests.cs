@@ -76,12 +76,30 @@ public sealed class MsxGl6Tests {
   }
 
   [Test]
-  public void WithoutAPalette_TheDefaultIsBlackOnWhite() {
-    var decoded = MsxGl6File.ToRawImage(new() { Width = 8, Height = 2, PixelData = new byte[4], Palette = [] });
+  public void WithoutAPalette_TheDefaultDependsOnWhatTheFileIs() {
+    var stamp = MsxGl6File.ToRawImage(
+      new() { Width = 8, Height = 2, Kind = MsxGl6Kind.Stamp, PixelData = new byte[4], Palette = [] });
+    var picture = MsxGl6File.ToRawImage(
+      new() { Width = 8, Height = 2, Kind = MsxGl6Kind.Picture, PixelData = new byte[4], Palette = [] });
 
     Assert.Multiple(() => {
-      Assert.That(decoded.Palette![..3], Is.EqualTo(new byte[] { 255, 255, 255 }));
-      Assert.That(decoded.Palette![3..6], Is.EqualTo(new byte[] { 0, 0, 0 }));
+      // A stamp never has a companion palette: black on white paper.
+      Assert.That(stamp.Palette![..3], Is.EqualTo(new byte[] { 255, 255, 255 }));
+      Assert.That(stamp.Palette![3..6], Is.EqualTo(new byte[] { 0, 0, 0 }));
+
+      // A picture expects one, and without it the machine is still showing what Screen 6 starts
+      // up with — black and three greens.
+      Assert.That(picture.Palette![..3], Is.EqualTo(new byte[] { 0, 0, 0 }));
+      Assert.That(picture.Palette![3..6], Is.EqualTo(new byte[] { 0x24, 0x92, 0x24 }));
+    });
+  }
+
+  [Test]
+  public void KindFromExtension_OnlyAStampIsAStamp() {
+    Assert.Multiple(() => {
+      Assert.That(MsxGl6File.KindFromExtension(".stp"), Is.EqualTo(MsxGl6Kind.Stamp));
+      Assert.That(MsxGl6File.KindFromExtension(".gl6"), Is.EqualTo(MsxGl6Kind.Picture));
+      Assert.That(MsxGl6File.KindFromExtension(".SH6"), Is.EqualTo(MsxGl6Kind.Picture));
     });
   }
 

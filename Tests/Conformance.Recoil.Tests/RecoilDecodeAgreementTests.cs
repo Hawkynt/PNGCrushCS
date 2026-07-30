@@ -65,6 +65,9 @@ public sealed class RecoilDecodeAgreementTests {
     new("ZX Spectrum screen", ImageFormat.ZxSpectrum, ".scr", () => _Monochrome(6912)),
     new("Duo", ImageFormat.Duo, ".duo", () => _Monochrome(113600)),
     new("Duo medium", ImageFormat.DuoMedium, ".du2", () => _Monochrome(113576)),
+    // Both kinds, which differ only in what they show without a companion palette.
+    new("MSX2 GL6 picture", ImageFormat.MsxGl6, ".gl6", () => _Gl6(64, 24)),
+    new("Dynamic Publisher stamp", ImageFormat.MsxGl6, ".stp", () => _Gl6(64, 24)),
   ];
 
   [Test]
@@ -119,6 +122,10 @@ public sealed class RecoilDecodeAgreementTests {
       return FileFormat.SamCoupeScreen.SamCoupeScreenFile.ToRawImage(
         FileFormat.SamCoupeScreen.SamCoupeScreenReader.FromSpan(
           bytes, FileFormat.SamCoupeScreen.SamCoupeScreenFile.ModeFromExtension(probe.Extension)));
+
+    if (probe.Format == ImageFormat.MsxGl6)
+      return FileFormat.MsxGl6.MsxGl6File.ToRawImage(
+        FileFormat.MsxGl6.MsxGl6Reader.FromSpan(bytes, FileFormat.MsxGl6.MsxGl6File.KindFromExtension(probe.Extension)));
 
     if (probe.Format == ImageFormat.MsxGl16)
       return FileFormat.MsxGl16.MsxGl16File.ToRawImage(
@@ -216,6 +223,18 @@ public sealed class RecoilDecodeAgreementTests {
 
     ReadOnlySpan<byte> registers = [0x0E, 0x46, 0x92, 0x00, 0x24, 0xDA, 0x68, 0x0C];
     registers.CopyTo(data.AsSpan(16000));
+
+    return data;
+  }
+
+  private static byte[] _Gl6(int width, int height) {
+    var data = new byte[4 + (width * height + 3) / 4];
+    data[0] = (byte)width;
+    data[1] = (byte)(width >> 8);
+    data[2] = (byte)height;
+    data[3] = (byte)(height >> 8);
+    for (var i = 4; i < data.Length; ++i)
+      data[i] = (byte)(i * 23 + (i >> 5));
 
     return data;
   }

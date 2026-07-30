@@ -53,8 +53,24 @@ public readonly record struct MsxGl6File
   /// </summary>
   public byte[] Palette { get; init; }
 
-  /// <summary>Black on white, which is what a file without a companion palette draws with.</summary>
-  private static byte[] _DefaultPaletteRgb() => [255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  /// <summary>Which of the two this file is.</summary>
+  public MsxGl6Kind Kind { get; init; }
+
+  /// <summary>Which kind an extension names.</summary>
+  public static MsxGl6Kind KindFromExtension(string extension)
+    => extension.ToLowerInvariant() == ".stp" ? MsxGl6Kind.Stamp : MsxGl6Kind.Picture;
+
+  /// <summary>
+  /// The colours a file draws with when no companion palette is beside it.
+  /// </summary>
+  /// <remarks>
+  /// A stamp never has a companion and is simply black on white paper. A picture expects one, and
+  /// when it is missing the machine is still showing the four colours Screen 6 starts up with —
+  /// black and three greens — so that, not white paper, is what the picture means.
+  /// </remarks>
+  private static byte[] _DefaultPaletteRgb(MsxGl6Kind kind) => kind == MsxGl6Kind.Stamp
+    ? [255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    : [0, 0, 0, 0x24, 0x92, 0x24, 0x24, 0xDB, 0x24, 0x6D, 0xFF, 0x6D];
 
   public static RawImage ToRawImage(MsxGl6File file) {
     var data = file.PixelData ?? [];
@@ -76,7 +92,7 @@ public readonly record struct MsxGl6File
       Height = height,
       Format = PixelFormat.Indexed8,
       PixelData = pixels,
-      Palette = stored.Length > 0 ? MsxGraphics.PaletteToRgb(stored, ColorCount) : _DefaultPaletteRgb(),
+      Palette = stored.Length > 0 ? MsxGraphics.PaletteToRgb(stored, ColorCount) : _DefaultPaletteRgb(file.Kind),
       PaletteCount = ColorCount,
     };
   }

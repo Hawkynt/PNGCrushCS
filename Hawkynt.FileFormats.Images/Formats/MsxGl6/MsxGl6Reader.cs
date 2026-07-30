@@ -12,7 +12,8 @@ public static class MsxGl6Reader {
     if (!file.Exists)
       throw new FileNotFoundException("GL6 picture not found.", file.FullName);
 
-    return FromBytes(File.ReadAllBytes(file.FullName));
+    // Only here is the extension available, and it is what says which defaults apply.
+    return FromSpan(File.ReadAllBytes(file.FullName), MsxGl6File.KindFromExtension(file.Extension));
   }
 
   public static MsxGl6File FromStream(Stream stream) {
@@ -28,7 +29,9 @@ public static class MsxGl6Reader {
     return FromBytes(ms.ToArray());
   }
 
-  public static MsxGl6File FromSpan(ReadOnlySpan<byte> data) {
+  public static MsxGl6File FromSpan(ReadOnlySpan<byte> data) => FromSpan(data, MsxGl6Kind.Picture);
+
+  public static MsxGl6File FromSpan(ReadOnlySpan<byte> data, MsxGl6Kind kind) {
     if (data.Length < MsxGl6File.HeaderSize + 1)
       throw new InvalidDataException($"A GL6 picture is at least {MsxGl6File.HeaderSize + 1} bytes, got {data.Length}.");
 
@@ -44,7 +47,7 @@ public static class MsxGl6Reader {
     var pixels = new byte[size];
     data.Slice(MsxGl6File.HeaderSize, size).CopyTo(pixels);
 
-    return new() { Width = width, Height = height, PixelData = pixels, Palette = [] };
+    return new() { Width = width, Height = height, Kind = kind, PixelData = pixels, Palette = [] };
   }
 
   public static MsxGl6File FromBytes(byte[] data) {

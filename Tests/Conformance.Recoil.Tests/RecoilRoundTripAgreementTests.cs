@@ -63,7 +63,13 @@ public sealed class RecoilRoundTripAgreementTests {
       Assert.Ignore($"{pairing}: known decoder disagreement — {reason}");
 
     var theirs = PixelConverter.Convert(FormatRegistry.Read(png!)!, PixelFormat.Rgb24);
-    var mine = entry.LoadRawImageFromBytes(encoded);
+    // A couple of formats put the thing that decides how to read them in the file name rather than
+    // the file, and RECOIL dispatches on the extension too — so reading by bytes alone would be
+    // comparing two different questions.
+    var mine = extension.ToLowerInvariant() == ".stp"
+      ? FileFormat.MsxGl6.MsxGl6File.ToRawImage(
+          FileFormat.MsxGl6.MsxGl6Reader.FromSpan(encoded, FileFormat.MsxGl6.MsxGl6Kind.Stamp))
+      : entry.LoadRawImageFromBytes(encoded);
     if (mine == null)
       Assert.Fail($"{pairing}: we cannot read back what we just wrote");
 
@@ -95,10 +101,8 @@ public sealed class RecoilRoundTripAgreementTests {
   /// </remarks>
   private static readonly IReadOnlyDictionary<string, string> _KnownDisagreements =
     new Dictionary<string, string> {
-      ["MSX2 GL6"] = "no companion .PL6 palette exists; we fall back to black-on-white where RECOIL leaves the registers dark",
       ["CrackArt"] = "first pixel disagrees entirely — likely the palette is read from the wrong offset",
       ["DuneGraph"] = "off by six in the first channel, so the palette is widened by the wrong rule",
-      ["Magic Painter"] = "off by six in the first channel, as DuneGraph",
       ["The Last Word font"] = "off by eighteen deep inside the glyph area rather than at the first pixel",
       ["Spectrum 512"] = "per-scanline palette timing differs; ours changes a scanline early or late",
       ["Spectrum 512 extended"] = "as Spectrum 512, and doubled — 17 against 34 suggests a channel widened twice",

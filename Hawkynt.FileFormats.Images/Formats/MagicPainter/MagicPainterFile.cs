@@ -59,30 +59,62 @@ public readonly record struct MagicPainterFile : IImageFormatReader<MagicPainter
   /// <summary>Colour-cycling effect selector; preserved but not applied.</summary>
   public byte Rainbow { get; init; }
 
+  /// <summary>
+  /// The colour register the rainbow drives, as an index into our PF0-PF3-then-background block, or
+  /// -1 when the file asks for no rainbow at all.
+  /// </summary>
+  /// <remarks>
+  /// A value of 0 means the background; 1 to 3 mean PF0 to PF2. Anything else — and most pictures
+  /// store 255 — leaves every register alone for the whole screen.
+  /// </remarks>
+  public static int RainbowRegister(byte rainbow) => rainbow switch {
+    0 => Atari8BitGraphics.BackgroundRegisterIndex,
+    1 or 2 or 3 => rainbow - 1,
+    _ => -1,
+  };
+
+  /// <summary>The colour the rainbow gives a stored row.</summary>
+  /// <remarks>
+  /// A ramp of one shade per scanline, starting at 16 and losing its low bit because the hardware
+  /// ignores it. Over 96 rows it climbs through six hues, which is what makes it a rainbow rather
+  /// than a gradient.
+  /// </remarks>
+  public static byte RainbowColor(int row) => (byte)((16 + row) & 254);
+
   public static RawImage ToRawImage(MagicPainterFile file) {
     var pixels = Atari8BitGraphics.UnpackGr7(file.BitmapData, 0, BitmapHeight);
-    var gtia = Atari8BitGraphics.CreatePalette();
+    var gtia = Atari8BitGraphics.Palette;
+    var registers = file.ColorRegisters ?? [];
+    var rainbow = RainbowRegister(file.Rainbow);
 
-    var palette = new byte[ColorCount * 3];
-    for (var value = 0; value < ColorCount; ++value) {
-      var register = Atari8BitGraphics.RegisterForPixel(value);
-      var colorByte = register < file.ColorRegisters.Length ? file.ColorRegisters[register] : (byte)0;
-      Array.Copy(gtia, colorByte * 3, palette, value * 3, 3);
+    // The rainbow rewrites one register on every stored row, so no single palette describes the
+    // picture and it has to come out as colour rather than as indices.
+    var rgb = new byte[DisplayWidth * DisplayHeight * 3];
+    Span<byte> row = stackalloc byte[Atari8BitGraphics.ColorRegisterCount];
+
+    for (var y = 0; y < BitmapHeight; ++y) {
+      for (var i = 0; i < row.Length; ++i)
+        row[i] = (byte)(i < registers.Length ? registers[i] & 254 : 0);
+
+      if (rainbow >= 0)
+        row[rainbow] = RainbowColor(y);
+
+      for (var x = 0; x < BitmapWidth; ++x) {
+        var register = Atari8BitGraphics.RegisterForPixel(pixels[y * BitmapWidth + x]);
+        var source = row[register] * 3;
+
+        // Each logical pixel covers two screen pixels each way.
+        for (var dy = 0; dy < 2; ++dy)
+        for (var dx = 0; dx < 2; ++dx) {
+          var target = ((y * 2 + dy) * DisplayWidth + x * 2 + dx) * 3;
+          rgb[target] = gtia[source];
+          rgb[target + 1] = gtia[source + 1];
+          rgb[target + 2] = gtia[source + 2];
+        }
+      }
     }
 
-    var scaled = new byte[DisplayWidth * DisplayHeight];
-    for (var y = 0; y < DisplayHeight; ++y)
-    for (var x = 0; x < DisplayWidth; ++x)
-      scaled[y * DisplayWidth + x] = pixels[(y >> 1) * BitmapWidth + (x >> 1)];
-
-    return new() {
-      Width = DisplayWidth,
-      Height = DisplayHeight,
-      Format = PixelFormat.Indexed8,
-      PixelData = scaled,
-      Palette = palette,
-      PaletteCount = ColorCount,
-    };
+    return new() { Width = DisplayWidth, Height = DisplayHeight, Format = PixelFormat.Rgb24, PixelData = rgb };
   }
 
   public static MagicPainterFile FromRawImage(RawImage image) {
