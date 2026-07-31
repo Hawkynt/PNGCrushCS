@@ -283,7 +283,126 @@ public sealed class RecoilDecodeAgreementTests {
     new("Loadstar", ImageFormat.ShapeTableFileType, ".shp", () => _Monochrome(10018)),
     new("Shape table, packed hires", ImageFormat.ShapeTableFileType, ".shp", () => _PackedShapes(128)),
     new("Shape table, packed multicolour", ImageFormat.ShapeTableFileType, ".shp", () => _PackedShapes(0)),
+    new("CHR$, one field", ImageFormat.ChrDollar, ".ch$", () => _ChrDollar(1)),
+    new("CHR$, two fields", ImageFormat.ChrDollar, ".ch$", () => _ChrDollar(2)),
+    new("Big font", ImageFormat.ZxBigFont, ".chx", _BigFont),
+    new("Trefi, screen only", ImageFormat.ZxTrefiBorderScreen, ".bsp", () => _Trefi(0)),
+    new("Trefi, two screens", ImageFormat.ZxTrefiBorderScreen, ".bsp", () => _Trefi(128)),
+    new("Trefi, with border", ImageFormat.ZxTrefiBorderScreen, ".bsp", () => _Trefi(64)),
+    new("Trefi, two bordered", ImageFormat.ZxTrefiBorderScreen, ".bsp", () => _Trefi(192)),
   ];
+
+  /// <summary>A CHR$ font: a signature, three dimensions and then cells of bitmap plus attribute.</summary>
+  private static byte[] _ChrDollar(int fields) {
+    const int columns = 6, rows = 5;
+    var data = new byte[7 + rows * columns * fields * 9];
+    "chr$"u8.CopyTo(data);
+    data[4] = columns;
+    data[5] = rows;
+    data[6] = (byte)(fields * 9);
+
+    for (var i = 0; i * 9 + 8 < data.Length - 7; ++i) {
+      for (var y = 0; y < 8; ++y)
+        data[7 + i * 9 + y] = (byte)(i * 37 + y * 11);
+
+      // Both intensities and both a lit and an unlit half, so ink, paper and bright all matter.
+      data[7 + i * 9 + 8] = (byte)(i * 23 & 0x7F);
+    }
+
+    return data;
+  }
+
+  /// <summary>
+  /// A big font: an offset table of 256 entries, most of them absent, and characters of differing
+  /// sizes so that the sheet is laid out at the largest and the rest are padded.
+  /// </summary>
+  private static byte[] _BigFont() {
+    var offsets = new int[256];
+    var body = new System.Collections.Generic.List<byte>();
+    var at = 5 + 256 * 2;
+
+    (int Columns, int Rows, int Transparent)[] characters = [
+      (3, 2, 0), (1, 1, 0), (2, 3, 1), (3, 3, 0), (1, 2, 1),
+    ];
+
+    for (var i = 0; i < characters.Length; ++i) {
+      var (columns, rows, transparent) = characters[i];
+
+      // Spread them out so absent characters, and the chequer that stands in for them, are covered.
+      offsets[i * 7] = at + body.Count;
+      body.Add((byte)transparent);
+      body.Add((byte)columns);
+      body.Add((byte)rows);
+
+      for (var cell = 0; cell < rows * columns; ++cell) {
+        for (var y = 0; y < 8; ++y)
+          body.Add((byte)(i * 53 + cell * 17 + y * 7));
+
+        if (transparent == 0)
+          body.Add((byte)(i * 29 + cell * 11 & 0x7F));
+      }
+    }
+
+    var data = new byte[at + body.Count];
+    "CHX"u8.CopyTo(data);
+    for (var i = 0; i < 256; ++i) {
+      data[5 + i * 2] = (byte)offsets[i];
+      data[6 + i * 2] = (byte)(offsets[i] >> 8);
+    }
+
+    body.CopyTo(data, at);
+
+    return data;
+  }
+
+  /// <summary>A Trefi border screen in whichever of its four shapes the flag byte asks for.</summary>
+  private static byte[] _Trefi(int flags) {
+    const int screenSize = 6912;
+    var bordered = (flags & 64) != 0;
+    var fields = (flags & 128) != 0 ? 2 : 1;
+    var header = 70 + (bordered && fields == 2 ? 2 : 0);
+
+    var border = new System.Collections.Generic.List<byte>();
+    if (bordered) {
+      // 304 lines of runs, each line using all four ways a length can be written: the fixed twelve,
+      // a length in the following byte, one of the lengths the selector carries itself, and the
+      // zero that means the colour holds to the end of the line.
+      for (var field = 0; field < fields; ++field)
+      for (var line = 0; line < 304; ++line) {
+        border.Add((byte)((line + field) % 7 + 1 | 2 << 3));
+        border.Add((byte)((line * 3 + field) % 7 + 1 | 1 << 3));
+        border.Add(40);
+        border.Add((byte)((line * 2 + field) % 7 + 1 | (3 + line % 29) << 3));
+        border.Add((byte)((line * 5 + field) % 7 + 1));
+      }
+    }
+
+    var perField = border.Count / Math.Max(fields, 1);
+    var data = new byte[header + screenSize * fields + border.Count];
+    data[3] = (byte)flags;
+
+    for (var field = 0; field < fields; ++field) {
+      var at = header + screenSize * field;
+      for (var i = 0; i < 6144; ++i)
+        data[at + i] = (byte)(i * 37 + field * 91);
+
+      for (var i = 0; i < 768; ++i)
+        data[at + 6144 + i] = (byte)((i * 23 + field * 17) & 0x7F);
+    }
+
+    if (!bordered)
+      return data;
+
+    var borderAt = header + screenSize * fields;
+    border.CopyTo(data, borderAt);
+
+    if (fields == 2) {
+      data[70] = (byte)(borderAt + perField);
+      data[71] = (byte)((borderAt + perField) >> 8);
+    }
+
+    return data;
+  }
 
   [Test]
   [Category("Conformance")]

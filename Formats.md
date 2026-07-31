@@ -182,6 +182,9 @@ build one from pixel data they didn't read, so the registry reports them as read
 | UIMG                    | .bp1, .bp2, .bp4, .c01, .c02, .c04                   | Any Atari palette and pixel form | Y      | —      | —         | R     | —   | —      | —         |
 | PL4                     | .pl4                                                 | Two ST screens in an LZ4 frame   | Y      | —      | —         | R     | —   | —      | —         |
 | Shape table             | .shp                                                 | Four programs, one extension     | Y      | —      | —         | R     | —   | —      | —         |
+| CHR$                    | .ch$                                                 | Spectrum font with its colours   | Y      | —      | —         | R     | —   | —      | —         |
+| Big font                | .chx                                                 | Characters of any size in cells  | Y      | —      | —         | R     | —   | —      | —         |
+| Border Screen by Trefi  | .bsp                                                 | Screen and border, one or two    | Y      | —      | —         | R     | —   | —      | —         |
 | Atari Player/Missile    | .pmg, .plm                                           | Atari 8-bit Player/Missile GFX   | Y      | Y      | —         | —     | —   | —      | —         |
 | AtariTools-800 sprites  | .4pl, .4mi, .4pm                                     | Atari 8-bit player/missile dumps | Y      | Y      | —         | R     | —   | —      | —         |
 | AtariTools-800 charset  | .acs                                                 | Atari 8-bit ANTIC 4 character set | Y      | Y      | —         | R     | —   | —      | —         |
@@ -794,12 +797,12 @@ Two different questions, two different answers:
 
 | Metric                                                    | Us    | RECOIL |
 | ----------------------------------------------------------- | ----- | ------ |
-| Total formats                                              | 647   | 552    |
+| Total formats                                              | 650   | 552    |
 | Modern/web/scientific formats (PNG, JPEG, WebP, AVIF, …)   | ~290  | 0      |
-| Of RECOIL's 552 vintage formats, covered                   | 517   | 552    |
+| Of RECOIL's 552 vintage formats, covered                   | 520   | 552    |
 
 So on breadth we are level, and on everything outside the retro catalogue we are the only one of
-the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 35
+the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 32
 formats.
 
 Two different formats claim `.hip`: a C64 picture of ours and the Atari 8-bit Hard Interlace
@@ -820,7 +823,7 @@ read, because implementing one and calling the extension covered would have clai
 formats for the work of one.
 
 Largest remaining clusters: Atari 8-bit (56), Commodore 64 (23), Atari ST/STE (19), Atari Falcon
-(8), NEC PC-98 (7), ZX Spectrum (6). SAM Coupe is now fully covered. Atari TT, the MSX2+ YJK modes and the Commodore 16/Plus4
+(8), NEC PC-98 (7), ZX Spectrum (3). SAM Coupe is now fully covered. Atari TT, the MSX2+ YJK modes and the Commodore 16/Plus4
 set are now fully covered. Formats we can only read are marked so in the table above and are
 proved against RECOIL by decoding the same bytes on both sides and comparing pixels, which is a
 stricter check than the write-side one. Only a handful decode as a plain fixed-size screen

@@ -45,6 +45,20 @@ public static class ZxSpectrumGraphics {
     return bright * 8 + color;
   }
 
+  /// <summary>The colour an attribute byte names, as 0xRRGGBB.</summary>
+  public static int HexColor(byte attribute, bool inkSet) {
+    var entry = ColorIndex(attribute, inkSet) * 3;
+    return (Palette[entry] << 16) | (Palette[entry + 1] << 8) | Palette[entry + 2];
+  }
+
+  /// <summary>Writes the colour an attribute byte names as an RGB triplet.</summary>
+  public static void WriteRgb(Span<byte> target, int offset, byte attribute, bool inkSet) {
+    var entry = ColorIndex(attribute, inkSet) * 3;
+    target[offset] = Palette[entry];
+    target[offset + 1] = Palette[entry + 1];
+    target[offset + 2] = Palette[entry + 2];
+  }
+
   /// <summary>Builds an attribute byte from an ink and paper index.</summary>
   public static byte Attribute(int ink, int paper) {
     var bright = ink >= 8 || paper >= 8 ? 1 : 0;
