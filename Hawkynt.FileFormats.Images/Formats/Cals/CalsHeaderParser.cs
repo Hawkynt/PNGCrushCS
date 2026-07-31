@@ -4,17 +4,24 @@ using System.Text;
 
 namespace FileFormat.Cals;
 
-/// <summary>Parses and formats CALS 768-byte text headers (6 records x 128 bytes each).</summary>
+/// <summary>Parses and formats CALS Type 1 text headers (16 records x 128 bytes each).</summary>
+/// <remarks>
+/// The header is 2048 bytes and the image data begins straight after it. Only the first six records
+/// were read, which stopped short of "rpelcnt" — the field carrying the image's dimensions, and the
+/// eighth record in every file a standards-conforming writer produces — so those files were rejected
+/// as having no dimensions at all. Reading 768 bytes also put the start of the pixel data 1280 bytes
+/// too early.
+/// </remarks>
 internal static class CalsHeaderParser {
 
   /// <summary>Total header size in bytes.</summary>
-  internal const int HeaderSize = 768;
+  internal const int HeaderSize = 2048;
 
   /// <summary>Size of each record in the header.</summary>
   private const int _RECORD_SIZE = 128;
 
   /// <summary>Number of records in the header.</summary>
-  private const int _RECORD_COUNT = 6;
+  private const int _RECORD_COUNT = HeaderSize / _RECORD_SIZE;
 
   /// <summary>Parses a 768-byte CALS header into key-value pairs.</summary>
   internal static Dictionary<string, string> Parse(byte[] headerData) {
@@ -36,27 +43,34 @@ internal static class CalsHeaderParser {
     return result;
   }
 
-  /// <summary>Builds a 768-byte header from a <see cref="CalsFile"/>.</summary>
+  /// <summary>Builds a 2048-byte header from a <see cref="CalsFile"/>.</summary>
+  /// <remarks>
+  /// One field to a record, which is what the format calls for. What stood here packed four extra
+  /// fields into the spare space of records 2 to 5 behind NUL separators — a private arrangement
+  /// nothing else would have read, and unnecessary once all sixteen records are available.
+  /// </remarks>
   internal static byte[] Format(CalsFile file) {
     var header = new byte[HeaderSize];
-
-    // Fill with spaces
     for (var i = 0; i < HeaderSize; ++i)
       header[i] = (byte)' ';
 
     _WriteRecord(header, 0, $"srcdocid: {file.SrcDocId}");
     _WriteRecord(header, 1, $"dstdocid: {file.DstDocId}");
-    _WriteRecord(header, 2, $"txtfilid: ");
-    _WriteRecord(header, 3, $"figid: ");
-    _WriteRecord(header, 4, $"srcgph: ");
-    _WriteRecord(header, 5, $"doccls: ");
+    _WriteRecord(header, 2, "txtfilid: NONE");
+    _WriteRecord(header, 3, "figid: NONE");
+    _WriteRecord(header, 4, "srcgph: NONE");
+    _WriteRecord(header, 5, "doccls: NONE");
+    _WriteRecord(header, 6, "rtype: 1");
+    // The standard field is a pair of angles, which is what another CALS reader will look for.
+    _WriteRecord(header, 7, "rorient: 000,270");
+    _WriteRecord(header, 8, $"rpelcnt: {file.Width:000000},{file.Height:000000}");
+    _WriteRecord(header, 9, $"rdensty: {file.Dpi:0000}");
+    _WriteRecord(header, 10, "notes: NONE");
 
-    // Embed key fields into remaining space of records
-    // We use records 2-5 to embed rtype, rpelcnt, rdensty, orient after the standard field
-    _AppendToRecord(header, 2, $"rtype: 1");
-    _AppendToRecord(header, 3, $"rpelcnt: {file.Width},{file.Height}");
-    _AppendToRecord(header, 4, $"rdensty: {file.Dpi}");
-    _AppendToRecord(header, 5, $"orient: {file.Orientation}");
+    // "orient" is this library's own, and not a CALS field — but there are five spare records and
+    // the portrait/landscape distinction it carries has nowhere else to go, since rorient records
+    // rotation angles rather than page shape.
+    _WriteRecord(header, 11, $"orient: {file.Orientation}");
 
     return header;
   }
@@ -69,30 +83,6 @@ internal static class CalsHeaderParser {
     Array.Copy(bytes, 0, header, offset, len);
     header[offset + _RECORD_SIZE - 2] = (byte)'\r';
     header[offset + _RECORD_SIZE - 1] = (byte)'\n';
-  }
-
-  /// <summary>Appends an additional key-value pair into the unused space of a record after a null separator.</summary>
-  private static void _AppendToRecord(byte[] header, int recordIndex, string text) {
-    var offset = recordIndex * _RECORD_SIZE;
-
-    // Find end of existing content (first space-padded area before CR LF)
-    var contentEnd = offset;
-    for (var i = offset; i < offset + _RECORD_SIZE - 2; ++i) {
-      if (header[i] != (byte)' ')
-        contentEnd = i + 1;
-    }
-
-    // Insert null separator then the additional field
-    if (contentEnd < offset + _RECORD_SIZE - 2) {
-      header[contentEnd] = 0;
-      ++contentEnd;
-    }
-
-    var fieldBytes = Encoding.ASCII.GetBytes(text);
-    var available = offset + _RECORD_SIZE - 2 - contentEnd;
-    var copyLen = Math.Min(fieldBytes.Length, available);
-    if (copyLen > 0)
-      Array.Copy(fieldBytes, 0, header, contentEnd, copyLen);
   }
 
   /// <summary>Extracts all key-value pairs from a 768-byte header, including embedded fields separated by null bytes.</summary>
