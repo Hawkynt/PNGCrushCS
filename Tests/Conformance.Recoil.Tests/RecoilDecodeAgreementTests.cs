@@ -386,7 +386,100 @@ public sealed class RecoilDecodeAgreementTests {
     new("Screen 12, whole memory", ImageFormat.MsxScc, ".scc", () => _MsxScc(1)),
     new("Screen 12, packed", ImageFormat.MsxScc, ".scc", () => _MsxScc(2)),
     new("Screen 12, with sprites", ImageFormat.MsxScc, ".scc", () => _MsxScc(3)),
+    new("MIG, screen 5", ImageFormat.MsxMig, ".mig", () => _MsxMig(5, false)),
+    new("MIG, screen 7", ImageFormat.MsxMig, ".mig", () => _MsxMig(7, false)),
+    new("MIG, screen 8", ImageFormat.MsxMig, ".mig", () => _MsxMig(8, false)),
+    new("MIG, screen 12", ImageFormat.MsxMig, ".mig", () => _MsxMig(12, false)),
+    new("MIG, screen 8 interlaced", ImageFormat.MsxMig, ".mig", () => _MsxMig(8, true)),
   ];
+
+  /// <summary>
+  /// A MIG picture: a compressed list of records — register writes, a palette and the screen — from
+  /// which the graphics mode has to be worked out rather than read.
+  /// </summary>
+  private static byte[] _MsxMig(int screen, bool interlaced) {
+    // The mode bits live in three registers; these are the values that add up to each mode.
+    var (register0, pages) = screen switch {
+      5 => (6, 106),
+      7 => (10, 212),
+      8 => (14, 212),
+      _ => (14, 212),
+    };
+
+    var register25 = screen == 12 ? 8 : 0;
+
+    var records = new System.Collections.Generic.List<byte> {
+      0, 4,
+      0, (byte)register0, 14,
+      1, 0, 24,
+      25, (byte)register25, 24,
+      9, (byte)(interlaced ? 12 : 0), 12,
+    };
+
+    // A palette, which only the indexed modes actually consult.
+    records.AddRange([1, 0, 16]);
+    for (var i = 0; i < 16; ++i)
+      records.AddRange([(byte)(((i * 3 % 8) << 4) | (i % 8)), (byte)((i * 5) % 8)]);
+
+    void Screen(int seed) {
+      records.AddRange([2, 0, 0, 0, 0, (byte)pages, 0]);
+      for (var i = 0; i < pages * 256; ++i)
+        records.Add((byte)(i * 37 + (i >> 8) * 11 + seed));
+    }
+
+    Screen(0);
+    if (interlaced)
+      Screen(97);
+
+    // One byte follows the last screen, which the length check accounts for.
+    records.Add(0);
+
+    // The bits and the bytes share one stream: a flag byte is taken whenever eight bits have been
+    // used, wherever the reader happens to be by then, so the emitter has to interleave them the
+    // same way the reader does.
+    var body = new System.Collections.Generic.List<byte>();
+    var emitted = 0;
+    var flag = -1;
+
+    void PutBit(int bit) {
+      if (emitted % 8 == 0) {
+        flag = body.Count;
+        body.Add(0);
+      }
+
+      if (bit != 0)
+        body[flag] |= (byte)(1 << (7 - emitted % 8));
+
+      ++emitted;
+    }
+
+    foreach (var value in records) {
+      PutBit(0);
+      body.Add(value);
+    }
+
+    // The unpacker has no end marker of its own: what ends it is a match whose length needs
+    // sixteen bits to describe, followed by the file running out four bytes later.
+    PutBit(1);
+    body.Add(0);
+    for (var i = 0; i < 16; ++i)
+      PutBit(1);
+
+    PutBit(0);
+    for (var i = 0; i < 16; ++i)
+      PutBit(0);
+
+    var data = new byte[15 + body.Count];
+    "MSXMIG"u8.CopyTo(data);
+    var declared = data.Length - 6;
+    data[6] = (byte)declared;
+    data[7] = (byte)(declared >> 8);
+    data[8] = (byte)(declared >> 16);
+    data[9] = (byte)(declared >> 24);
+    body.CopyTo(data, 15);
+
+    return data;
+  }
 
   /// <summary>An MSX2+ Screen 12 picture in one of the four shapes a BSAVE image can take.</summary>
   private static byte[] _MsxScc(int kind) {
