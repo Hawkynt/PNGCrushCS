@@ -67,6 +67,18 @@ public abstract class GtiaRenderer {
     this._playerSize[player] = (byte)(size == 2 ? 1 : size + 1);
   }
 
+  /// <summary>
+  /// Sets one player's width as a count of doublings rather than through the register's encoding.
+  /// </summary>
+  /// <remarks>
+  /// The register spends two bits on three widths, so one of its four values is a duplicate. A
+  /// format that stores the width directly is storing the count, not the register.
+  /// </remarks>
+  public void SetPlayerWidth(int player, int width) => this._playerSize[player] = (byte)width;
+
+  /// <summary>Sets one missile's width as a count of doublings.</summary>
+  public void SetMissileWidth(int missile, int width) => this._missileSize[missile] = (byte)width;
+
   /// <summary>Sets all four missiles' widths from one register.</summary>
   public void SetMissileSizes(int value) {
     for (var i = 0; i < SpriteCount; ++i) {

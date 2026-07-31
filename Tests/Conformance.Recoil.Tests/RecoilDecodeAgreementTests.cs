@@ -265,6 +265,9 @@ public sealed class RecoilDecodeAgreementTests {
     new("Graph2Font MCH with sprites", ImageFormat.Graph2FontMch, ".mch", () => _Mch(30833, 4, 1)),
     new("Graph2Font MCH in hi-res", ImageFormat.Graph2FontMch, ".mch", () => _Mch(12000, 0)),
     new("Graph2Font MCH in a GTIA mode", ImageFormat.Graph2FontMch, ".mch", () => _Mch(30833, 24, 1)),
+    new("Graph2Font", ImageFormat.Graph2Font, ".g2f", () => _G2f(40, false)),
+    new("Graph2Font, narrow", ImageFormat.Graph2Font, ".g2f", () => _G2f(32, false)),
+    new("Graph2Font, compressed", ImageFormat.Graph2Font, ".g2f", () => _G2f(40, true)),
   ];
 
   [Test]
@@ -2724,6 +2727,55 @@ public sealed class RecoilDecodeAgreementTests {
     data[0] = (byte)(mode | character);
 
     return data;
+  }
+
+  /// <summary>
+  /// A Graph2Font project. It stores every register the display uses for every scanline as plain
+  /// tables, so most of the file is those tables and the picture is nowhere in it.
+  /// </summary>
+  private static byte[] _G2f(int columns, bool compressed) {
+    var fonts = 1;
+    var fontsOffset = 3 + 30 * columns;
+    var fontNumberOffset = fontsOffset + fonts * 1024;
+    var length = fontNumberOffset + 153724;
+
+    var data = _Monochrome(length);
+    data[0] = (byte)columns;
+    data[1] = 0;
+    data[2] = (byte)(fonts - 1);
+
+    // Character arrangement 2 is the one that carries no raster program to check.
+    data[fontNumberOffset + 147679] = 2;
+
+    for (var row = 0; row < 30; ++row) {
+      data[fontNumberOffset + row] = 0;
+      // Alternate the display mode down the screen so more than one path is exercised.
+      // The parentheses are not decoration: a switch expression binds tighter than the remainder,
+      // so "row % 3 switch" would take the remainder against the switch's own result.
+      data[fontNumberOffset + 153694 + row] = (byte)((row % 3) switch { 0 => 1, 1 => 2, _ => 4 });
+    }
+
+    // Every scanline names one of five priority arrangements and two sprite widths.
+    for (var y = 0; y < 240; ++y) {
+      var sprite = fontNumberOffset + 2334 + (y << 1);
+      for (var i = 0; i < 4; ++i) {
+        data[sprite + (i << 10) + 1] = (byte)((y % 5) << 4 | (i % 2 == 0 ? 1 : 2));
+        data[sprite + 512 + (i << 10) + 1] = (byte)((y % 5) << 4 | 1);
+      }
+
+      data[sprite + 1025] = (byte)((y % 4) << 4);
+    }
+
+    if (!compressed)
+      return data;
+
+    using var packed = new MemoryStream();
+    packed.Write(System.Text.Encoding.ASCII.GetBytes("G2FZLIB"));
+    using (var deflate = new System.IO.Compression.ZLibStream(
+             packed, System.IO.Compression.CompressionLevel.Fastest, leaveOpen: true))
+      deflate.Write(data);
+
+    return packed.ToArray();
   }
 
   private static byte[] _Prefixed(int length) {
