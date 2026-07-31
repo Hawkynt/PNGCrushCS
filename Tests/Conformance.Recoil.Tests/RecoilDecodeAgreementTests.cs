@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using FileFormat.Core;
+using FileFormat.Hp48Grob;
 using FileFormat.AmstradMode5;
 using FileFormat.ColrObjectEditor;
 using FileFormat.PerfectPix;
@@ -304,7 +305,133 @@ public sealed class RecoilDecodeAgreementTests {
     new("Apple Preferred, 320 mode", ImageFormat.ApplePreferred, ".32k", () => _ApplePreferred(false, false)),
     new("Apple Preferred, 640 mode", ImageFormat.ApplePreferred, ".32k", () => _ApplePreferred(true, false)),
     new("Apple Preferred, MULTIPAL", ImageFormat.ApplePreferred, ".32k", () => _ApplePreferred(false, true)),
+    new("GROB, binary", ImageFormat.Hp48Grob, ".grb", () => _Grob(false)),
+    new("GROB, serial text", ImageFormat.Hp48Grob, ".gro", () => _Grob(true)),
+    new("ComputerEyes, colour", ImageFormat.ComputerEyesSt, ".ce3", () => _ComputerEyesSt(0)),
+    new("ComputerEyes, hi-res colour", ImageFormat.ComputerEyesSt, ".ce3", () => _ComputerEyesSt(1)),
+    new("ComputerEyes, grey", ImageFormat.ComputerEyesSt, ".ce3", () => _ComputerEyesSt(2)),
+    new("Fun with Art", ImageFormat.FunWithArt, ".fwa", _FunWithArt),
   ];
+
+  /// <summary>
+  /// A Fun with Art picture: the program's saved workspace, a display list, the bitmap, and one
+  /// 6502 interrupt routine for every line that changes colour.
+  /// </summary>
+  private static byte[] _FunWithArt() {
+    var routines = new System.Collections.Generic.List<byte>();
+    var interrupts = new bool[192];
+
+    for (var y = 0; y < 192; ++y) {
+      // Every third line changes colour, so both branches of the display list walk are covered and
+      // the routines are not all the same length.
+      if (y % 3 != 0)
+        continue;
+
+      interrupts[y] = true;
+
+      // PHA, TXA, PHA, LDA #n, STA $D40A — the fixed opening every routine has.
+      routines.AddRange([72, 138, 72, 169, (byte)(y * 7), 141, 10, 212]);
+
+      // One to three colour writes, some reloading the accumulator and some reusing it.
+      routines.AddRange([141, 22, 208]);
+      if (y % 6 == 0)
+        routines.AddRange([169, (byte)(y * 11), 141, 23, 208]);
+      if (y % 9 == 0)
+        routines.AddRange([169, (byte)(y * 13), 141, 26, 208]);
+
+      // JSR to the program's exit.
+      routines.AddRange([32, 202, 6]);
+    }
+
+    var data = new byte[7960 + routines.Count];
+    data[0] = 254;
+    data[1] = 254;
+
+    // Background, then PF0, PF1 and PF2 as the picture starts.
+    data[2] = 0x0E;
+    data[3] = 0x24;
+    data[4] = 0x86;
+    data[5] = 0xC8;
+
+    data[6] = data[7] = data[8] = 112;
+    data[11] = 80;
+    data[115] = 96;
+    data[205] = 65;
+
+    var at = 9;
+    for (var y = 0; y < 192; ++y) {
+      // The list is in two halves, each opening with the address of the bitmap it draws from.
+      var loadsAddress = at is 9 or 113;
+      data[at] = (byte)((loadsAddress ? 78 : 14) | (interrupts[y] ? 128 : 0));
+      at += loadsAddress ? 3 : 1;
+    }
+
+    for (var i = 262; i < 7958; ++i)
+      data[i] = (byte)(i * 37 + (i >> 6));
+
+    data[7958] = (byte)routines.Count;
+    data[7959] = (byte)(routines.Count >> 8);
+    routines.CopyTo(data, 7960);
+
+    return data;
+  }
+
+  /// <summary>An HP 48 graphics object, in whichever of its two forms is asked for.</summary>
+  private static byte[] _Grob(bool text) {
+    const int width = 131, height = 37;
+    var stride = (width + 7) >> 3;
+
+    var bitmap = new byte[stride * height];
+    for (var i = 0; i < bitmap.Length; ++i)
+      bitmap[i] = (byte)(i * 37 + (i >> 3));
+
+    if (text) {
+      var built = new System.Text.StringBuilder(Hp48GrobFile.TextSignature);
+      built.Append(width).Append(' ').Append(height).Append('\r');
+      foreach (var b in bitmap)
+        built.Append($"{b:X2}");
+
+      return System.Text.Encoding.ASCII.GetBytes(built.ToString());
+    }
+
+    var data = new byte[18 + bitmap.Length];
+    "HPHP48-"u8.CopyTo(data);
+    data[7] = (byte)'A';
+    data[8] = 30;
+    data[9] = 43;
+
+    // The object's size is counted in nibbles from just past this field, so it depends on itself.
+    var nibbles = data.Length * 2 - 21;
+    data[10] = (byte)(nibbles << 4);
+    data[11] = (byte)(nibbles >> 4);
+    data[12] = (byte)(nibbles >> 12);
+    data[13] = (byte)height;
+    data[14] = (byte)(height >> 8);
+    data[15] = (byte)(((height >> 16) & 15) | ((width & 15) << 4));
+    data[16] = (byte)(width >> 4);
+    data[17] = (byte)(width >> 12);
+    bitmap.CopyTo(data, 18);
+
+    return data;
+  }
+
+  /// <summary>A ComputerEyes ST capture, stored a column at a time as the digitiser wrote it.</summary>
+  private static byte[] _ComputerEyesSt(int mode) {
+    var data = new byte[mode == 0 ? 192022 : 256022];
+    "EYES"u8.CopyTo(data);
+    data[5] = (byte)mode;
+
+    // Every mode reserves part of each byte or word, and a value outside that range is rejected
+    // rather than masked, so the fill has to stay inside it.
+    for (var i = 22; i < data.Length; ++i)
+      data[i] = mode switch {
+        0 => (byte)(i * 37 & 63),
+        1 => (byte)((i & 1) == 0 ? i * 29 & 127 : i * 53),
+        _ => (byte)(i * 41 % 192),
+      };
+
+    return data;
+  }
 
   /// <summary>A 3200-colour picture written out as it sits in memory: bitmap, then 200 palettes.</summary>
   private static byte[] _AppleSh3() {
