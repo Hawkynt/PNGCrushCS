@@ -5,6 +5,7 @@ using FileFormat.Core;
 using FileFormat.AmstradMode5;
 using FileFormat.ColrObjectEditor;
 using FileFormat.PerfectPix;
+using FileFormat.Picasso;
 using FileFormat.OcpArtStudioWindow;
 using FileFormat.TechnicolorDream;
 using Hawkynt.FileFormats.Images;
@@ -367,6 +368,56 @@ public sealed class RecoilDecodeAgreementTests {
 
       var theirs = _AsRgb(FormatRegistry.Read(png!));
       var ours = _AsRgb(ColrObjectEditorFile.ToRawImage(ColrObjectEditorReader.FromFile(new(picture))));
+
+      Assert.That((ours.Width, ours.Height), Is.EqualTo((theirs.Width, theirs.Height)));
+
+      for (var i = 0; i < theirs.PixelData.Length; ++i) {
+        if (ours.PixelData[i] == theirs.PixelData[i])
+          continue;
+
+        var pixel = i / 3;
+        Assert.Fail(
+          $"pixel {pixel % theirs.Width},{pixel / theirs.Width} channel {i % 3} — " +
+          $"ours {ours.PixelData[i]}, RECOIL {theirs.PixelData[i]}");
+      }
+    } finally {
+      try { Directory.Delete(directory, true); } catch { /* best effort */ }
+    }
+  }
+
+  /// <summary>
+  /// A Picasso bitmap holds only its two screen-wide colours; the per-cell one is in the .pic1
+  /// beside it, and every cell of that has to be marked multicoloured.
+  /// </summary>
+  [Test]
+  [Category("Conformance")]
+  public void Picasso_WithItsColours_MatchesRecoilPixelForPixel() {
+    RecoilOracle.RequireAvailable();
+
+    var directory = Path.Combine(Path.GetTempPath(), $"recoilpic_{Guid.NewGuid():N}");
+    Directory.CreateDirectory(directory);
+
+    try {
+      var bitmap = _Monochrome(3890);
+      bitmap[0] = 0;
+      bitmap[1] = 13;
+      bitmap[3876] = 150;
+      bitmap[3877] = 23;
+      bitmap[3879] = 140;
+
+      var colors = _Monochrome(244);
+      for (var cell = 0; cell < 242; ++cell)
+        colors[2 + cell] = (byte)(8 | (cell % 8));
+
+      var picture = Path.Combine(directory, "art.pic0");
+      File.WriteAllBytes(picture, bitmap);
+      File.WriteAllBytes(Path.Combine(directory, "art.pic1"), colors);
+
+      var (png, output) = RecoilOracle.TryDecodeToPng(picture);
+      Assert.That(png, Is.Not.Null, $"RECOIL rejected the pair — {output}");
+
+      var theirs = _AsRgb(FormatRegistry.Read(png!));
+      var ours = _AsRgb(PicassoFile.ToRawImage(PicassoReader.FromFile(new(picture))));
 
       Assert.That((ours.Width, ours.Height), Is.EqualTo((theirs.Width, theirs.Height)));
 
