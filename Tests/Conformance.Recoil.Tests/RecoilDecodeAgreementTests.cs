@@ -167,6 +167,14 @@ public sealed class RecoilDecodeAgreementTests {
     new("SAM Coupe mode 3", ImageFormat.SamCoupeSsx, ".ssx", () => _Monochrome(24580)),
     new("SAM Coupe mode 4", ImageFormat.SamCoupeSsx, ".ssx", () => _Monochrome(24592)),
     new("SAM Coupe rendered", ImageFormat.SamCoupeSsx, ".ssx", _SamCoupeChunky),
+    new("PI8 in Graphics 15", ImageFormat.AtariPi8, ".pi8", () => _Monochrome(7680)),
+    new("PI8 in Graphics 8", ImageFormat.AtariPi8, ".pi8", () => _Monochrome(7685)),
+    new("PI8 in Graphics 8, as an executable", ImageFormat.AtariPi8, ".pi8", _Pi8Executable),
+    new("PI9 in Graphics 9", ImageFormat.AtariPi9, ".pi9", () => _Monochrome(7684)),
+    new("PI9 in Graphics 9, padded", ImageFormat.AtariPi9, ".pi9", () => _Monochrome(7936)),
+    new("PI9 in APAC", ImageFormat.AtariPi9, ".pi9", () => _Monochrome(7720)),
+    new("PI9 on a Falcon", ImageFormat.AtariPi9, ".pi9", () => _Monochrome(65024)),
+    new("PI9 on a Falcon, taller", ImageFormat.AtariPi9, ".pi9", () => _Monochrome(77824)),
   ];
 
   [Test]
@@ -792,6 +800,23 @@ public sealed class RecoilDecodeAgreementTests {
     var data = _Monochrome(98304);
     for (var i = 0; i < data.Length; ++i)
       data[i] &= 127;
+
+    return data;
+  }
+
+  /// <summary>
+  /// A PI8 picture wrapped in an Atari executable header, which is only a header when the address
+  /// range it declares accounts for the rest of the file — so the picture is a row shorter.
+  /// </summary>
+  private static byte[] _Pi8Executable() {
+    var data = _Monochrome(7685);
+    var start = 0x4000;
+    var end = start + 7685 - 6 - 1;
+    data[0] = data[1] = 0xFF;
+    data[2] = (byte)start;
+    data[3] = (byte)(start >> 8);
+    data[4] = (byte)end;
+    data[5] = (byte)(end >> 8);
 
     return data;
   }
