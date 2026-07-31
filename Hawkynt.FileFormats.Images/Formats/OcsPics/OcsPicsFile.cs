@@ -12,8 +12,10 @@ public readonly record struct OcsPicsFile : IImageFormatReader<OcsPicsFile>, IIm
   private const int _HEIGHT = 200;
   private const int _NUM_PLANES = 4;
 
-  static string IImageFormatMetadata<OcsPicsFile>.PrimaryExtension => ".ocp";
-  static string[] IImageFormatMetadata<OcsPicsFile>.FileExtensions => [".ocp", ".ocs"];
+  static string IImageFormatMetadata<OcsPicsFile>.PrimaryExtension => ".ocs";
+    // Not .ocp: that extension is the C64 Advanced Art Studio's, a 10018-byte multicolour screen
+  // this format can never read, and claiming it gave detection a chance to pick the wrong one.
+  static string[] IImageFormatMetadata<OcsPicsFile>.FileExtensions => [".ocs"];
   static OcsPicsFile IImageFormatReader<OcsPicsFile>.FromSpan(ReadOnlySpan<byte> data) => OcsPicsReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<OcsPicsFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 16)])];
   static byte[] IImageFormatWriter<OcsPicsFile>.ToBytes(OcsPicsFile file) => OcsPicsWriter.ToBytes(file);

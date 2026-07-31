@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.InterPaintMc;
 
 /// <summary>In-memory representation of a Commodore 64 InterPaint Multicolor image.</summary>
-public readonly record struct InterPaintMcFile : IImageFormatReader<InterPaintMcFile>, IImageToRawImage<InterPaintMcFile>, IImageFormatWriter<InterPaintMcFile> {
+public readonly record struct InterPaintMcFile : IImageFormatReader<InterPaintMcFile>, IImageToRawImage<InterPaintMcFile>, IImageFromRawImage<InterPaintMcFile>, IImageFormatWriter<InterPaintMcFile> {
 
   static string IImageFormatMetadata<InterPaintMcFile>.PrimaryExtension => ".ipt";
   static string[] IImageFormatMetadata<InterPaintMcFile>.FileExtensions => [".ipt"];
@@ -58,4 +58,23 @@ public readonly record struct InterPaintMcFile : IImageFormatReader<InterPaintMc
     => Commodore64Graphics.DecodeMulticolor(
       file.BitmapData, file.VideoMatrix, file.ColorRam, file.BackgroundColor, FixedWidth, FixedHeight);
 
+  /// <summary>Builds a screen, choosing three of the machine's colours for every character cell.</summary>
+  public static InterPaintMcFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(FixedWidth, FixedHeight);
+    var bitmap = new byte[BitmapDataSize];
+    var matrix = new byte[VideoMatrixSize];
+    var colors = new byte[ColorRamSize];
+    var background = Commodore64Graphics.EncodeMulticolor(
+      rgb.PixelData, FixedWidth, FixedHeight, bitmap, matrix, colors);
+
+    return new() {
+      LoadAddress = 0x4000,
+      BitmapData = bitmap,
+      VideoMatrix = matrix,
+      ColorRam = colors,
+      BackgroundColor = background,
+    };
+  }
 }
