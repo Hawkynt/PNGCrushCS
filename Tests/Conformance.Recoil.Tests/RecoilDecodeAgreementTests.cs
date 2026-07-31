@@ -369,7 +369,79 @@ public sealed class RecoilDecodeAgreementTests {
     new("PhotoChrome, palette stored", ImageFormat.PhotoChromePcs, ".pcs", () => _PhotoChromePcs(2)),
     new("Z's Staff Kid98", ImageFormat.ZsStaffKid98, ".zim", () => _ZsStaffKid98(true)),
     new("Z's Staff Kid98, default palette", ImageFormat.ZsStaffKid98, ".zim", () => _ZsStaffKid98(false)),
+    new("Art Master 88, PC-88", ImageFormat.ArtMaster88, ".arv", () => _ArtMaster88(200, 3)),
+    new("Art Master 88, PC-98 three planes", ImageFormat.ArtMaster88, ".arv", () => _ArtMaster88(400, 3)),
+    new("Art Master 88, PC-98 four planes", ImageFormat.ArtMaster88, ".arv", () => _ArtMaster88(400, 4)),
   ];
+
+  /// <summary>An Art Master 88 picture in one of its two forms.</summary>
+  private static byte[] _ArtMaster88(int height, int planes) {
+    var body = new System.Collections.Generic.List<byte>(new byte[40]);
+    "SS_SIF    0.0"u8.CopyTo(System.Runtime.InteropServices.CollectionsMarshal.AsSpan(body));
+
+    body[16] = (byte)'I';
+    body[17] = (byte)(height == 400 ? 'R' : ' ');
+    body[18] = (byte)'B';
+    body[19] = (byte)'B';
+    body[20] = (byte)'R';
+    body[21] = (byte)'G';
+    body[24] = 128;
+    body[25] = 2;
+    body[26] = (byte)height;
+    body[27] = (byte)(height >> 8);
+
+    // The comment chunk, which carries its own length and is stepped over.
+    body.AddRange([6, 0, 1, 2, 3, 4]);
+
+    if (height == 400) {
+      var length = planes == 3 ? 50 : 98;
+      body.Add((byte)length);
+      body.Add(0);
+      for (var c = 0; c < 1 << planes; ++c)
+        body.AddRange([(byte)(c % 16), 0, (byte)((c * 5) % 16), 0, (byte)((c * 11) % 16), 0]);
+    }
+
+    // The bitmap chunk, likewise skipped.
+    body.AddRange([4, 0, 9, 9]);
+
+    var planeLength = height * 80;
+    for (var plane = 0; plane < planes; ++plane) {
+      var written = 0;
+      var index = 0;
+
+      // What the decoder would take as a run marker: the value it last saw, or nothing at all
+      // straight after a run.
+      var escape = -1;
+
+      while (written < planeLength) {
+        var left = planeLength - written;
+        var value = (byte)(plane * 37 + index * 53);
+
+        // A value that already equals the marker would begin a run rather than stand for itself.
+        if (value == escape)
+          value ^= 1;
+
+        // A run is the value twice and then how many copies it stands for in all, so the first of
+        // the two is an ordinary literal and the second is what marks it.
+        if ((index & 3) == 3 && left >= 4) {
+          var run = Math.Min(left, 60);
+          body.Add(value);
+          body.Add(value);
+          body.Add((byte)run);
+          written += run;
+          escape = -1;
+        } else {
+          body.Add(value);
+          ++written;
+          escape = value;
+        }
+
+        ++index;
+      }
+    }
+
+    return body.ToArray();
+  }
 
   /// <summary>
   /// A Z's Staff Kid98 picture: a header, an optional palette, and a list of horizontal runs whose

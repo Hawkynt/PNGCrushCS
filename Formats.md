@@ -208,6 +208,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | Canvas raster           | .ful                                                 | Palette per band, runs plus rest | Y      | —      | —         | R     | —   | —      | —         |
 | PhotoChrome compressed  | .pcs                                                 | Palette reloaded mid-scanline    | Y      | —      | —         | R     | —   | —      | —         |
 | Z's Staff Kid98         | .zim                                                 | Runs, nested flags, differenced  | Y      | —      | —         | R     | —   | —      | —         |
+| Art Master 88           | .arv                                                 | PC-88 or PC-98, runs by repeat   | Y      | —      | —         | R     | —   | —      | —         |
 | Atari Player/Missile    | .pmg, .plm                                           | Atari 8-bit Player/Missile GFX   | Y      | Y      | —         | —     | —   | —      | —         |
 | AtariTools-800 sprites  | .4pl, .4mi, .4pm                                     | Atari 8-bit player/missile dumps | Y      | Y      | —         | R     | —   | —      | —         |
 | AtariTools-800 charset  | .acs                                                 | Atari 8-bit ANTIC 4 character set | Y      | Y      | —         | R     | —   | —      | —         |
@@ -820,12 +821,12 @@ Two different questions, two different answers:
 
 | Metric                                                    | Us    | RECOIL |
 | ----------------------------------------------------------- | ----- | ------ |
-| Total formats                                              | 673   | 552    |
+| Total formats                                              | 674   | 552    |
 | Modern/web/scientific formats (PNG, JPEG, WebP, AVIF, …)   | ~290  | 0      |
-| Of RECOIL's 552 vintage formats, covered                   | 544   | 552    |
+| Of RECOIL's 552 vintage formats, covered                   | 545   | 552    |
 
 So on breadth we are level, and on everything outside the retro catalogue we are the only one of
-the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 8
+the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 7
 formats.
 
 Four of the entries now covered needed a character generator ROM: they store character codes and
