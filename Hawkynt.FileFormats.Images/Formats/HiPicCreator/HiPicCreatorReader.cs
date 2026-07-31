@@ -44,17 +44,6 @@ public static class HiPicCreatorReader {
 
   public static HiPicCreatorFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < HiPicCreatorFile.LoadAddressSize + HiPicCreatorFile.MinPayloadSize)
-      throw new InvalidDataException($"Data too small for a valid Hi-Pic Creator file (expected at least {HiPicCreatorFile.LoadAddressSize + HiPicCreatorFile.MinPayloadSize} bytes, got {data.Length}).");
-
-    var loadAddress = (ushort)(data[0] | (data[1] << 8));
-
-    var rawData = new byte[data.Length - HiPicCreatorFile.LoadAddressSize];
-    data.AsSpan(HiPicCreatorFile.LoadAddressSize, rawData.Length).CopyTo(rawData.AsSpan(0));
-
-    return new() {
-      LoadAddress = loadAddress,
-      RawData = rawData,
-    };
+    return FromSpan(data);
   }
 }

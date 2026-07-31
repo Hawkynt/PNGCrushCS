@@ -34,6 +34,7 @@ public sealed class RecoilConformanceTests {
   /// <summary>Formats implemented on both sides, with the dimensions RECOIL decodes them at.</summary>
   public static readonly Pairing[] Pairings = [
     new(ImageFormat.Doodle, "Doodle", 320, 200),
+    new(ImageFormat.HiPicCreator, "Hi-Pic Creator", 320, 200),
     new(ImageFormat.CDUPaint, "CDU-Paint", 160, 200),
     new(ImageFormat.Cheese, "Cheese", 160, 200),
     new(ImageFormat.FacePainter, "Face Painter", 160, 200),

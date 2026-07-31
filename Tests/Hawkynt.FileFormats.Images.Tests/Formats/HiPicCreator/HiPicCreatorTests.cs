@@ -39,10 +39,11 @@ public sealed class HiPicCreatorReaderTests {
     var data = TestHelpers._BuildValidHpcData(0x4000);
     var result = HiPicCreatorReader.FromBytes(data);
 
-    Assert.That(result.Width, Is.EqualTo(160));
+    // A high-resolution screen: 320 across, and the payload is a bitmap and a video matrix.
+    Assert.That(result.Width, Is.EqualTo(320));
     Assert.That(result.Height, Is.EqualTo(200));
     Assert.That(result.LoadAddress, Is.EqualTo(0x4000));
-    Assert.That(result.RawData.Length, Is.GreaterThanOrEqualTo(10000));
+    Assert.That(result.RawData.Length, Is.GreaterThanOrEqualTo(9000));
   }
 }
 

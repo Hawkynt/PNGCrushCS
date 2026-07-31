@@ -3,16 +3,21 @@ using FileFormat.Core;
 
 namespace FileFormat.HiPicCreator;
 
-/// <summary>In-memory representation of a C64 Hi-Pic Creator multicolor image.</summary>
-public readonly record struct HiPicCreatorFile : IImageFormatReader<HiPicCreatorFile>, IImageToRawImage<HiPicCreatorFile>, IImageFormatWriter<HiPicCreatorFile> {
+/// <summary>In-memory representation of a C64 Hi-Pic Creator picture (.hpc).</summary>
+/// <remarks>
+/// A high-resolution screen, not a multicolour one: 320 pixels across, one bit a pixel, with the
+/// video matrix naming the two colours each cell may show. The load address comes first, the bitmap
+/// after it, and the matrix after the bitmap's eight thousand bytes.
+/// </remarks>
+public readonly record struct HiPicCreatorFile : IImageFormatReader<HiPicCreatorFile>, IImageToRawImage<HiPicCreatorFile>, IImageFromRawImage<HiPicCreatorFile>, IImageFormatWriter<HiPicCreatorFile> {
 
   static string IImageFormatMetadata<HiPicCreatorFile>.PrimaryExtension => ".hpc";
   static string[] IImageFormatMetadata<HiPicCreatorFile>.FileExtensions => [".hpc"];
   static HiPicCreatorFile IImageFormatReader<HiPicCreatorFile>.FromSpan(ReadOnlySpan<byte> data) => HiPicCreatorReader.FromSpan(data);
   static byte[] IImageFormatWriter<HiPicCreatorFile>.ToBytes(HiPicCreatorFile file) => HiPicCreatorWriter.ToBytes(file);
 
-  /// <summary>The fixed width of the image in pixels.</summary>
-  public const int FixedWidth = 160;
+  /// <summary>The fixed width of the picture in pixels.</summary>
+  public const int FixedWidth = 320;
 
   /// <summary>The fixed height of the image in pixels.</summary>
   public const int FixedHeight = 200;
@@ -30,9 +35,18 @@ public readonly record struct HiPicCreatorFile : IImageFormatReader<HiPicCreator
   internal const int ColorRamSize = 1000;
 
   /// <summary>Minimum payload size in bytes (bitmap + screen + color).</summary>
-  internal const int MinPayloadSize = BitmapSize + ScreenRamSize + ColorRamSize;
+  internal const int MinPayloadSize = BitmapSize + ScreenRamSize;
 
-  /// <summary>Image width, always 160.</summary>
+  /// <summary>Where the bitmap starts.</summary>
+  public const int BitmapOffset = LoadAddressSize;
+
+  /// <summary>Where the video matrix starts.</summary>
+  public const int VideoMatrixOffset = BitmapOffset + BitmapSize;
+
+  /// <summary>The size a file written from a picture takes.</summary>
+  public const int ExpectedFileSize = VideoMatrixOffset + ScreenRamSize;
+
+  /// <summary>Picture width, always 320.</summary>
   public int Width => FixedWidth;
 
   /// <summary>Image height, always 200.</summary>
@@ -44,55 +58,30 @@ public readonly record struct HiPicCreatorFile : IImageFormatReader<HiPicCreator
   /// <summary>Raw payload data (entire file content after load address).</summary>
   public byte[] RawData { get; init; }
 
-  /// <summary>Converts this Hi-Pic Creator image to a platform-independent <see cref="RawImage"/> in Rgb24 format using multicolor decode.</summary>
   public static RawImage ToRawImage(HiPicCreatorFile file) {
+    var data = file.RawData ?? [];
+    var bitmap = data.AsSpan(0, Math.Min(data.Length, BitmapSize));
+    var matrix = data.Length > BitmapSize ? data.AsSpan(BitmapSize) : [];
 
-    const int width = FixedWidth;
-    const int height = FixedHeight;
-    var rgb = new byte[width * height * 3];
+    var padded = new byte[BitmapSize];
+    bitmap.CopyTo(padded);
+    var screen = new byte[ScreenRamSize];
+    matrix[..Math.Min(matrix.Length, ScreenRamSize)].CopyTo(screen);
 
-    var hasScreen = file.RawData.Length >= BitmapSize + ScreenRamSize;
-    var hasColor = file.RawData.Length >= BitmapSize + ScreenRamSize + ColorRamSize;
+    return Commodore64Graphics.DecodeHires(padded, screen, FixedWidth, FixedHeight);
+  }
 
-    for (var y = 0; y < height; ++y)
-      for (var x = 0; x < width; ++x) {
-        var cellX = x / 4;
-        var cellY = y / 8;
-        var cellIndex = cellY * 40 + cellX;
-        var byteInCell = y % 8;
-        var bitmapOffset = cellIndex * 8 + byteInCell;
-        var bitmapByte = bitmapOffset < file.RawData.Length ? file.RawData[bitmapOffset] : (byte)0;
-        var pixelInByte = x % 4;
-        var bitValue = (bitmapByte >> ((3 - pixelInByte) * 2)) & 0x03;
+  /// <summary>Builds a screen, choosing two of the machine's colours for every character cell.</summary>
+  public static HiPicCreatorFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
 
-        int colorIndex;
-        if (hasScreen) {
-          var screenByte = file.RawData[BitmapSize + cellIndex];
-          var colorByte = hasColor ? file.RawData[BitmapSize + ScreenRamSize + cellIndex] : (byte)0;
+    var rgb = image.SampleTo(FixedWidth, FixedHeight);
+    var payload = new byte[BitmapSize + ScreenRamSize];
+    Commodore64Graphics.EncodeHires(
+      rgb.PixelData, FixedWidth, FixedHeight,
+      payload.AsSpan(0, BitmapSize), payload.AsSpan(BitmapSize, ScreenRamSize));
 
-          colorIndex = bitValue switch {
-            0 => 0,
-            1 => (screenByte >> 4) & 0x0F,
-            2 => screenByte & 0x0F,
-            3 => colorByte & 0x0F,
-            _ => 0
-          };
-        } else
-          colorIndex = bitValue != 0 ? 1 : 0;
-
-        var color = Commodore64Graphics.HexColors[colorIndex];
-        var offset = (y * width + x) * 3;
-        rgb[offset] = (byte)((color >> 16) & 0xFF);
-        rgb[offset + 1] = (byte)((color >> 8) & 0xFF);
-        rgb[offset + 2] = (byte)(color & 0xFF);
-      }
-
-    return new() {
-      Width = width,
-      Height = height,
-      Format = PixelFormat.Rgb24,
-      PixelData = rgb,
-    };
+    return new() { LoadAddress = 0x4000, RawData = payload };
   }
 
 }
