@@ -40,6 +40,12 @@ public sealed class LosslessWriterTests {
     /// <summary>At most sixteen distinct colours, on a grid of four bits a channel.</summary>
     SixteenColors,
 
+    /// <summary>At most sixteen distinct colours, on the Atari ST's grid of three bits a channel.</summary>
+    SixteenStColors,
+
+    /// <summary>Shades of grey, which is what a picture with no colour in it is.</summary>
+    Grayscale,
+
     /// <summary>A picture made of the ZX81's own character shapes.</summary>
     Zx81Glyphs,
 
@@ -72,6 +78,10 @@ public sealed class LosslessWriterTests {
   }
 
   private static readonly Case[] _Cases = [
+    new("Dali", ImageFormat.DaliST, Palette.SixteenStColors, 320, 200),
+    new("CP8 grayscale", ImageFormat.Cp8Gray, Palette.Grayscale, 64, 64),
+    new("MGR bitmap", ImageFormat.MgrBitmap, Palette.Monochrome, 100, 30),
+    new("MGR bitmap, whole bytes across", ImageFormat.MgrBitmap, Palette.Monochrome, 64, 16),
     // The three character-set sheets whose every bit is one pixel and every pixel one bit; Star
     // Painter is not among them because its sheet has fifteen cells past the end of the set, and
     // whatever is drawn in those is not stored anywhere.
@@ -185,6 +195,24 @@ public sealed class LosslessWriterTests {
           rgb[at] = (byte)((index * 3 % 16) * 17);
           rgb[at + 1] = (byte)((index * 5 % 16) * 17);
           rgb[at + 2] = (byte)((index * 7 % 16) * 17);
+          break;
+        }
+
+        // Sixteen colours on the ST's three-bit grid, widened the way the hardware does. This is
+        // the case that would have caught the palette narrowing losing levels 1, 3 and 5.
+        case Palette.SixteenStColors: {
+          var index = (x / 9 + row / 7) % 16;
+          rgb[at] = FileFormat.Core.ChannelScaling.Expand3(index * 3 % 8);
+          rgb[at + 1] = FileFormat.Core.ChannelScaling.Expand3(index * 5 % 8);
+          rgb[at + 2] = FileFormat.Core.ChannelScaling.Expand3(index * 7 % 8);
+          break;
+        }
+
+        // Grey, and grey the way a luminance is worked out rather than any three equal channels,
+        // so a format storing one byte a pixel gives back the byte it was handed.
+        case Palette.Grayscale: {
+          var value = (byte)((x * 7 + row * 13) & 255);
+          rgb[at] = rgb[at + 1] = rgb[at + 2] = value;
           break;
         }
 

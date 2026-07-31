@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.MgrBitmap;
 
 /// <summary>In-memory representation of an MGR (MGR Window Manager) bitmap image.</summary>
-public readonly record struct MgrBitmapFile : IImageFormatReader<MgrBitmapFile>, IImageToRawImage<MgrBitmapFile>, IImageFormatWriter<MgrBitmapFile> {
+public readonly record struct MgrBitmapFile : IImageFormatReader<MgrBitmapFile>, IImageToRawImage<MgrBitmapFile>, IImageFromRawImage<MgrBitmapFile>, IImageFormatWriter<MgrBitmapFile> {
 
   static string IImageFormatMetadata<MgrBitmapFile>.PrimaryExtension => ".mgr";
   static string[] IImageFormatMetadata<MgrBitmapFile>.FileExtensions => [".mgr"];
@@ -21,14 +21,52 @@ public readonly record struct MgrBitmapFile : IImageFormatReader<MgrBitmapFile>,
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
   public static RawImage ToRawImage(MgrBitmapFile file) {
+    // A row is padded out to a whole byte, so the bits are not one unbroken stream and cannot be
+    // handed over as such — at any width that is not a multiple of eight the padding would be read
+    // as picture and every row after the first would start in the wrong place.
+    var stride = (file.Width + 7) / 8;
+    var data = file.PixelData ?? [];
+    var pixels = new byte[file.Width * file.Height];
+
+    for (var y = 0; y < file.Height; ++y)
+    for (var x = 0; x < file.Width; ++x) {
+      var at = y * stride + (x >> 3);
+      pixels[y * file.Width + x] = (byte)(at < data.Length ? (data[at] >> (~x & 7)) & 1 : 0);
+    }
+
     return new() {
       Width = file.Width,
       Height = file.Height,
-      Format = PixelFormat.Indexed1,
-      PixelData = file.PixelData[..],
+      Format = PixelFormat.Indexed8,
+      PixelData = pixels,
       Palette = _BlackWhitePalette[..],
       PaletteCount = 2,
     };
+  }
+
+  /// <summary>Builds a bitmap from a picture, at whatever size the picture already is.</summary>
+  /// <remarks>
+  /// The header carries the dimensions as text, so unlike most of the machine formats here there
+  /// is nothing to sample to — the picture keeps its own size and only its colours are reduced.
+  /// </remarks>
+  public static MgrBitmapFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width < 1 || image.Height < 1)
+      throw new ArgumentException("A picture needs at least one pixel.", nameof(image));
+
+    var set = GlyphSheet.Sample(image, image.Width, image.Height);
+    var stride = (image.Width + 7) / 8;
+    var bitmap = new byte[stride * image.Height];
+
+    for (var y = 0; y < image.Height; ++y)
+    for (var x = 0; x < image.Width; ++x) {
+      if (!set[y * image.Width + x])
+        continue;
+
+      bitmap[y * stride + (x >> 3)] |= (byte)(1 << (~x & 7));
+    }
+
+    return new() { Width = image.Width, Height = image.Height, PixelData = bitmap };
   }
 
 }
