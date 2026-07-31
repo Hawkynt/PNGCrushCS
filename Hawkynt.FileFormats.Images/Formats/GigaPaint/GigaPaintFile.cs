@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.GigaPaint;
 
 /// <summary>In-memory representation of a GigaPaint hires image.</summary>
-public readonly record struct GigaPaintFile : IImageFormatReader<GigaPaintFile>, IImageToRawImage<GigaPaintFile>, IImageFormatWriter<GigaPaintFile> {
+public readonly record struct GigaPaintFile : IImageFormatReader<GigaPaintFile>, IImageToRawImage<GigaPaintFile>, IImageFromRawImage<GigaPaintFile>, IImageFormatWriter<GigaPaintFile> {
 
   static string IImageFormatMetadata<GigaPaintFile>.PrimaryExtension => ".gih";
   static string[] IImageFormatMetadata<GigaPaintFile>.FileExtensions => [".gih", ".gig"];
@@ -23,8 +23,15 @@ public readonly record struct GigaPaintFile : IImageFormatReader<GigaPaintFile>,
   /// <summary>Minimum bitmap data size in the payload.</summary>
   internal const int MinBitmapSize = 8000;
 
-  /// <summary>Size of the screen RAM section in bytes.</summary>
-  internal const int ScreenRamSize = 1000;
+  /// <summary>The size of a file: the load address and the bitmap, and nothing else.</summary>
+  public const int ExpectedFileSize = LoadAddressSize + MinBitmapSize;
+
+  /// <summary>
+  /// The attribute every cell uses. There is no video matrix — the screen is one bit a pixel in the
+  /// same two colours throughout, and they are the other way round from most of the machine's
+  /// formats: a set bit is black ink, an unset one the white paper under it.
+  /// </summary>
+  public const byte Attribute = 0x01;
 
   /// <summary>Image width, always 320.</summary>
   public int Width => FixedWidth;
@@ -38,48 +45,34 @@ public readonly record struct GigaPaintFile : IImageFormatReader<GigaPaintFile>,
   /// <summary>Raw payload data (entire file content after load address).</summary>
   public byte[] RawData { get; init; }
 
-  /// <summary>Converts this GigaPaint image to a platform-independent <see cref="RawImage"/> in Rgb24 format using simplified hires decode.</summary>
   public static RawImage ToRawImage(GigaPaintFile file) {
+    var data = file.RawData ?? [];
+    var bitmap = new byte[MinBitmapSize];
+    data.AsSpan(0, Math.Min(data.Length, MinBitmapSize)).CopyTo(bitmap);
 
-    const int width = FixedWidth;
-    const int height = FixedHeight;
-    var rgb = new byte[width * height * 3];
+    var screen = new byte[Commodore64Graphics.Columns * (FixedHeight / Commodore64Graphics.CellHeight)];
+    Array.Fill(screen, Attribute);
 
-    var hasScreen = file.RawData.Length >= MinBitmapSize + ScreenRamSize;
+    return Commodore64Graphics.DecodeHires(bitmap, screen, FixedWidth, FixedHeight);
+  }
 
-    for (var y = 0; y < height; ++y)
-      for (var x = 0; x < width; ++x) {
-        var cellX = x / 8;
-        var cellY = y / 8;
-        var cellIndex = cellY * 40 + cellX;
-        var byteInCell = y % 8;
-        var bitmapOffset = cellIndex * 8 + byteInCell;
-        var bitmapByte = bitmapOffset < file.RawData.Length ? file.RawData[bitmapOffset] : (byte)0;
-        var bitPosition = 7 - (x % 8);
-        var bitValue = (bitmapByte >> bitPosition) & 1;
+  /// <summary>Builds a screen from a picture, as black ink on white paper.</summary>
+  public static GigaPaintFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
 
-        int colorIndex;
-        if (hasScreen) {
-          var screenByte = file.RawData[MinBitmapSize + cellIndex];
-          colorIndex = bitValue == 1
-            ? (screenByte >> 4) & 0x0F
-            : screenByte & 0x0F;
-        } else
-          colorIndex = bitValue == 1 ? 1 : 0;
+    // A set bit is the ink here, so the sample is taken the dark way round.
+    var set = GlyphSheet.Sample(image, FixedWidth, FixedHeight, setWhenBright: false);
+    var bitmap = new byte[MinBitmapSize];
 
-        var color = Commodore64Graphics.HexColors[colorIndex];
-        var offset = (y * width + x) * 3;
-        rgb[offset] = (byte)((color >> 16) & 0xFF);
-        rgb[offset + 1] = (byte)((color >> 8) & 0xFF);
-        rgb[offset + 2] = (byte)(color & 0xFF);
-      }
+    for (var y = 0; y < FixedHeight; ++y)
+    for (var x = 0; x < FixedWidth; ++x) {
+      if (!set[y * FixedWidth + x])
+        continue;
 
-    return new() {
-      Width = width,
-      Height = height,
-      Format = PixelFormat.Rgb24,
-      PixelData = rgb,
-    };
+      bitmap[(y / 8 * Commodore64Graphics.Columns + x / 8) * 8 + y % 8] |= (byte)(1 << (~x & 7));
+    }
+
+    return new() { LoadAddress = 0x2000, RawData = bitmap };
   }
 
 }

@@ -36,6 +36,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.Doodle, "Doodle", 320, 200),
     new(ImageFormat.HiPicCreator, "Hi-Pic Creator", 320, 200),
     new(ImageFormat.HiresC64, "Hires-Bitmap", 320, 200, ".hbm"),
+    new(ImageFormat.GigaPaint, "Run Paint", 320, 200, ".gih"),
     new(ImageFormat.CDUPaint, "CDU-Paint", 160, 200),
     new(ImageFormat.Cheese, "Cheese", 160, 200),
     new(ImageFormat.FacePainter, "Face Painter", 160, 200),
