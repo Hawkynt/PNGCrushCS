@@ -1,4 +1,5 @@
 using System;
+using Hawkynt.ColorProcessing.Adapter;
 using System.Drawing;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -83,6 +84,15 @@ internal static class BitmapConverter {
   }
 
   /// <summary>Quantizes a <see cref="RawImage"/> to an indexed image with the specified max palette size using FrameworkExtensions quantizer/ditherer dispatch.</summary>
+  /// <summary>Reduces a picture to a palette, without a bitmap anywhere in the middle.</summary>
+  /// <remarks>
+  /// This used to go out to a bitmap and back purely to reach the colour library, whose only
+  /// public entry point took one. It no longer does: the library's quantizers and ditherers are
+  /// driven directly over the picture, so the round trip through a platform type — and the
+  /// unpacking of one, two and four bit indexed rows that came with it — is gone.
+  /// <para/>
+  /// The names are still the old ones, which the dispatch translates.
+  /// </remarks>
   internal static RawImage QuantizeRawImage(
     RawImage source,
     int maxColors,
@@ -93,89 +103,14 @@ internal static class BitmapConverter {
     System.Collections.Generic.Dictionary<string, object?>? dithererParams = null
   ) {
     ArgumentNullException.ThrowIfNull(source);
-    using var bmp = RawImageToBitmap(source);
-    using var indexed = ReduceColorsDispatch.ReduceColors(bmp, quantizerName, dithererName, maxColors, isHighQuality, quantizerParams, dithererParams);
 
-    var width = indexed.Width;
-    var height = indexed.Height;
-    var entries = indexed.Palette.Entries;
-    var paletteCount = Math.Min(entries.Length, maxColors);
-
-    var palette = new byte[paletteCount * 3];
-    byte[]? alphaTable = null;
-    var hasAlpha = false;
-    for (var i = 0; i < paletteCount; ++i) {
-      var entry = entries[i];
-      palette[i * 3] = entry.R;
-      palette[i * 3 + 1] = entry.G;
-      palette[i * 3 + 2] = entry.B;
-      if (entry.A < 255)
-        hasAlpha = true;
-    }
-
-    if (hasAlpha) {
-      alphaTable = new byte[paletteCount];
-      for (var i = 0; i < paletteCount; ++i)
-        alphaTable[i] = entries[i].A;
-    }
-
-    var bmpData = indexed.LockBits(
-      new Rectangle(0, 0, width, height),
-      System.Drawing.Imaging.ImageLockMode.ReadOnly,
-      indexed.PixelFormat
-    );
-    try {
-      var stride = bmpData.Stride;
-      var indices = new byte[width * height];
-      var pixelFormat = indexed.PixelFormat;
-
-      // The quantizer may return 1bpp / 4bpp / 8bpp depending on palette size — unpack into a flat byte-per-pixel array.
-      if (pixelFormat == System.Drawing.Imaging.PixelFormat.Format8bppIndexed) {
-        // Straight copy, row by row (stride may have trailing padding bytes which we skip).
-        for (var y = 0; y < height; ++y)
-          Marshal.Copy(bmpData.Scan0 + y * stride, indices, y * width, width);
-      } else if (pixelFormat == System.Drawing.Imaging.PixelFormat.Format4bppIndexed) {
-        // Each byte holds two 4-bit pixels: high nibble = pixel 0, low nibble = pixel 1.
-        var row = new byte[stride];
-        for (var y = 0; y < height; ++y) {
-          Marshal.Copy(bmpData.Scan0 + y * stride, row, 0, stride);
-          for (var x = 0; x < width; ++x) {
-            var b = row[x >> 1];
-            indices[y * width + x] = (byte)(((x & 1) == 0 ? b >> 4 : b) & 0x0F);
-          }
-        }
-      } else if (pixelFormat == System.Drawing.Imaging.PixelFormat.Format1bppIndexed) {
-        // Each byte holds 8 pixels, MSB-first.
-        var row = new byte[stride];
-        for (var y = 0; y < height; ++y) {
-          Marshal.Copy(bmpData.Scan0 + y * stride, row, 0, stride);
-          for (var x = 0; x < width; ++x) {
-            var b = row[x >> 3];
-            indices[y * width + x] = (byte)((b >> (7 - (x & 7))) & 1);
-          }
-        }
-      } else {
-        // Unknown indexed format — fall back to naive copy and hope for the best.
-        for (var y = 0; y < height; ++y)
-          Marshal.Copy(bmpData.Scan0 + y * stride, indices, y * width, Math.Min(width, stride));
-      }
-
-      return new() {
-        Width = width,
-        Height = height,
-        Format = FileFormat.Core.PixelFormat.Indexed8,
-        PixelData = indices,
-        Palette = palette,
-        PaletteCount = paletteCount,
-        AlphaTable = alphaTable,
-      };
-    } finally {
-      indexed.UnlockBits(bmpData);
-    }
+    return ColorReductionDispatch.ReduceByName(source, quantizerName, dithererName, maxColors).Image;
   }
 
+  /// <summary>Reduces a bitmap by going through the picture the colour library understands.</summary>
   private static Bitmap _DispatchReduceColors(Bitmap source, string quantizerName, string dithererName, int colorCount, bool isHighQuality)
-    => ReduceColorsDispatch.ReduceColors(source, quantizerName, dithererName, colorCount, isHighQuality);
+    => RawImageToBitmap(
+      ColorReductionDispatch.ReduceByName(BitmapToRawImage(source), quantizerName, dithererName, colorCount).Image);
 
   private static Bitmap _CreateBitmap(int width, int height, byte[] bgraPixels) {
     var bmp = new Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);

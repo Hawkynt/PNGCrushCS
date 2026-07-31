@@ -30,5 +30,8 @@
         <PackageReference Include="FrameworkExtensions.System.Drawing" Version="1.0.0.132" />
         <PackageReference Include="System.Drawing.Common" Version="9.0.4" />
     </ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\..\Hawkynt.ColorProcessing.Adapter\Hawkynt.ColorProcessing.Adapter.csproj" />
+    </ItemGroup>
 
 </Project>

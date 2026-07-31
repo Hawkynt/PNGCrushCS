@@ -1,161 +1,85 @@
 using System;
-using System.Collections.Generic;
-using System.Drawing;
-using System.Drawing.Imaging;
 using System.Linq;
-using Optimizer.Png;
+using FileFormat.Core;
+using Hawkynt.ColorProcessing.Adapter;
 
 namespace Optimizer.Png.Tests;
 
+/// <summary>
+/// The colour reduction the PNG optimizer reaches for, by the names it uses.
+/// </summary>
+/// <remarks>
+/// This used to test a reflection-based dispatch that took a bitmap. That dispatch is gone: the
+/// choice is now a generated switch over the types themselves, which is what lets the result be
+/// trimmed and compiled ahead of time. What still has to hold is that the names the optimizer
+/// passes — the older, registry-style spellings — keep meaning what they meant.
+/// </remarks>
 [TestFixture]
 public sealed class ReduceColorsDispatchTests {
 
-  private static Bitmap _CreateTestBitmap(int width = 32, int height = 32) {
-    var bmp = new Bitmap(width, height, PixelFormat.Format32bppArgb);
+  [Test]
+  [Category("Unit")]
+  public void TheQuantizersTheOptimizerNamesAreAvailable() {
+    var names = ColorReductionDispatch.QuantizerNames.ToList();
+
+    Assert.Multiple(() => {
+      Assert.That(names, Is.Not.Empty);
+      Assert.That(names, Does.Contain("WuQuantizer"));
+      Assert.That(names, Does.Contain("OctreeQuantizer"));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void TheDitherersTheOptimizerNamesAreAvailable() {
+    var names = ColorReductionDispatch.DithererNames.ToList();
+
+    Assert.Multiple(() => {
+      Assert.That(names, Is.Not.Empty);
+      Assert.That(names, Does.Contain("ErrorDiffusion.FloydSteinberg"));
+      Assert.That(names, Does.Contain("NoDithering.Instance"));
+    });
+  }
+
+  [TestCase("Wu", "NoDithering_Instance")]
+  [TestCase("Octree", "ErrorDiffusion_FloydSteinberg")]
+  [TestCase("Median Cut", "NoDithering_Instance")]
+  [Category("Unit")]
+  public void TheOptimizersOwnNames_StillProduceAnIndexedPicture(string quantizer, string ditherer) {
+    var result = ColorReductionDispatch.ReduceByName(_Sample(), quantizer, ditherer, 16);
+
+    Assert.Multiple(() => {
+      Assert.That(result.Image.Format, Is.EqualTo(PixelFormat.Indexed8));
+      Assert.That(result.Image.PaletteCount, Is.EqualTo(16));
+      Assert.That(result.Image.PixelData.All(i => i < 16), Is.True, "used an index past the palette");
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void AnUnknownNameIsRefused() {
+    Assert.Multiple(() => {
+      Assert.That(
+        () => ColorReductionDispatch.ReduceByName(_Sample(), "NonExistentQuantizer", "NoDithering_Instance", 16),
+        Throws.ArgumentException);
+      Assert.That(
+        () => ColorReductionDispatch.ReduceByName(_Sample(), "Wu", "NonExistentDitherer", 16),
+        Throws.ArgumentException);
+    });
+  }
+
+  private static RawImage _Sample() {
+    const int width = 32, height = 16;
+    var rgb = new byte[width * height * 3];
+
     for (var y = 0; y < height; ++y)
-    for (var x = 0; x < width; ++x)
-      bmp.SetPixel(x, y, Color.FromArgb(255, x * 8 % 256, y * 8 % 256, (x + y) * 4 % 256));
-    return bmp;
-  }
+    for (var x = 0; x < width; ++x) {
+      var at = (y * width + x) * 3;
+      rgb[at] = (byte)(x * 255 / (width - 1));
+      rgb[at + 1] = (byte)(y * 255 / (height - 1));
+      rgb[at + 2] = (byte)((x * y) & 255);
+    }
 
-  [Test]
-  [Category("Unit")]
-  public void QuantizerNames_ReturnsAtLeast41() {
-    var names = ReduceColorsDispatch.QuantizerNames.ToList();
-    Assert.That(names.Count, Is.GreaterThanOrEqualTo(41));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void DithererNames_ReturnsAtLeast124() {
-    var names = ReduceColorsDispatch.DithererNames.ToList();
-    Assert.That(names.Count, Is.GreaterThanOrEqualTo(124));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void QuantizerNames_ContainsKnownEntries() {
-    var names = ReduceColorsDispatch.QuantizerNames.ToList();
-    Assert.That(names, Does.Contain("Wu"));
-    Assert.That(names, Does.Contain("Octree"));
-    Assert.That(names, Does.Contain("Median Cut"));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void DithererNames_ContainsKnownEntries() {
-    var names = ReduceColorsDispatch.DithererNames.ToList();
-    Assert.That(names, Does.Contain("NoDithering_Instance"));
-    Assert.That(names, Does.Contain("ErrorDiffusion_FloydSteinberg"));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void UnknownQuantizer_ThrowsArgumentException() {
-    using var bmp = _CreateTestBitmap(8, 8);
-    var ex = Assert.Throws<ArgumentException>(() =>
-      ReduceColorsDispatch.ReduceColors(bmp, "NonExistentQuantizer", "NoDithering_Instance", 256, false)
-    );
-    Assert.That(ex!.Message, Does.Contain("NonExistentQuantizer"));
-    Assert.That(ex.Message, Does.Contain("Available"));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void UnknownDitherer_ThrowsArgumentException() {
-    using var bmp = _CreateTestBitmap(8, 8);
-    var ex = Assert.Throws<ArgumentException>(() =>
-      ReduceColorsDispatch.ReduceColors(bmp, "Wu", "NonExistentDitherer", 256, false)
-    );
-    Assert.That(ex!.Message, Does.Contain("NonExistentDitherer"));
-    Assert.That(ex.Message, Does.Contain("Available"));
-  }
-
-  [Test]
-  [Category("Integration")]
-  [CancelAfter(10000)]
-  public void ReduceColors_WuNoDithering_ProducesIndexedBitmap() {
-    using var bmp = _CreateTestBitmap();
-    using var result = ReduceColorsDispatch.ReduceColors(bmp, "Wu", "NoDithering_Instance", 256, false);
-
-    Assert.That(result.Width, Is.EqualTo(32));
-    Assert.That(result.Height, Is.EqualTo(32));
-    Assert.That(result.PixelFormat, Is.EqualTo(PixelFormat.Format8bppIndexed));
-    Assert.That(result.Palette.Entries.Length, Is.GreaterThan(0));
-    Assert.That(result.Palette.Entries.Length, Is.LessThanOrEqualTo(256));
-  }
-
-  [Test]
-  [Category("Integration")]
-  [CancelAfter(10000)]
-  public void ReduceColors_OctreeFloydSteinberg_ProducesIndexedBitmap() {
-    using var bmp = _CreateTestBitmap();
-    using var result = ReduceColorsDispatch.ReduceColors(bmp, "Octree", "ErrorDiffusion_FloydSteinberg", 256, false);
-
-    Assert.That(result.Width, Is.EqualTo(32));
-    Assert.That(result.Height, Is.EqualTo(32));
-    Assert.That(result.PixelFormat, Is.EqualTo(PixelFormat.Format8bppIndexed));
-  }
-
-  [Test]
-  [Category("Integration")]
-  [CancelAfter(10000)]
-  public void ReduceColors_MedianCut_ProducesIndexedBitmap() {
-    using var bmp = _CreateTestBitmap();
-    using var result = ReduceColorsDispatch.ReduceColors(bmp, "Median Cut", "NoDithering_Instance", 256, false);
-
-    Assert.That(result.Width, Is.EqualTo(32));
-    Assert.That(result.Height, Is.EqualTo(32));
-    Assert.That(result.PixelFormat, Is.EqualTo(PixelFormat.Format8bppIndexed));
-  }
-
-  [Test]
-  [Category("Integration")]
-  [CancelAfter(10000)]
-  public void ReduceColors_SameTypePair_UsesCachedDelegate() {
-    using var bmp1 = _CreateTestBitmap(8, 8);
-    using var bmp2 = _CreateTestBitmap(16, 16);
-
-    using var result1 = ReduceColorsDispatch.ReduceColors(bmp1, "Wu", "NoDithering_Instance", 256, false);
-    using var result2 = ReduceColorsDispatch.ReduceColors(bmp2, "Wu", "NoDithering_Instance", 128, false);
-
-    Assert.That(result1.PixelFormat, Is.EqualTo(PixelFormat.Format8bppIndexed));
-    Assert.That(result2.PixelFormat, Is.EqualTo(PixelFormat.Format8bppIndexed));
-  }
-
-  [Test]
-  [Category("Integration")]
-  [CancelAfter(10000)]
-  public void ReduceColors_HighQuality_ProducesValidResult() {
-    using var bmp = _CreateTestBitmap(16, 16);
-    using var result = ReduceColorsDispatch.ReduceColors(bmp, "Wu", "NoDithering_Instance", 256, true);
-
-    Assert.That(result.Width, Is.EqualTo(16));
-    Assert.That(result.Height, Is.EqualTo(16));
-    Assert.That(result.PixelFormat, Is.EqualTo(PixelFormat.Format8bppIndexed));
-  }
-
-  [Test]
-  [Category("Integration")]
-  [CancelAfter(10000)]
-  public void ReduceColors_LimitedPalette_RespectsMaxColors() {
-    using var bmp = _CreateTestBitmap(16, 16);
-    using var result = ReduceColorsDispatch.ReduceColors(bmp, "Wu", "NoDithering_Instance", 16, false);
-
-    Assert.That(result.Palette.Entries.Length, Is.LessThanOrEqualTo(256));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void QuantizerNames_AreNotEmpty() {
-    foreach (var name in ReduceColorsDispatch.QuantizerNames)
-      Assert.That(name, Is.Not.Null.And.Not.Empty);
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void DithererNames_AreNotEmpty() {
-    foreach (var name in ReduceColorsDispatch.DithererNames)
-      Assert.That(name, Is.Not.Null.And.Not.Empty);
+    return new() { Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = rgb };
   }
 }

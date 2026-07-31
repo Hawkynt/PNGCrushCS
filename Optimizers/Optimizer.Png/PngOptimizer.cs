@@ -3,6 +3,7 @@ using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using Hawkynt.ColorProcessing.Adapter;
 using System.Drawing.Imaging;
 using System.IO;
 using System.IO.Compression;
@@ -799,9 +800,18 @@ public sealed partial class PngOptimizer {
     }
   }
 
+  /// <summary>
+  /// Reduces a bitmap by going through the picture the colour library understands.
+  /// </summary>
+  /// <remarks>
+  /// The library's own entry point used to take a bitmap and be reached by reflection, which could
+  /// neither be trimmed nor compiled ahead of time. It is now a generated switch over the types
+  /// themselves, and the bitmap is only the shape this caller still speaks in.
+  /// </remarks>
   private static Bitmap _DispatchReduceColors(Bitmap source, string quantizerName, string dithererName,
     int colorCount, bool isHighQuality)
-    => ReduceColorsDispatch.ReduceColors(source, quantizerName, dithererName, colorCount, isHighQuality);
+    => _ToBitmap(
+      ColorReductionDispatch.ReduceByName(_ToRawImage(source), quantizerName, dithererName, colorCount).Image);
 
   /// <summary>Sort palette entries: non-opaque first by frequency desc, then opaque by frequency desc</summary>
   private static void _FrequencySortPaletteWithAlpha(ArgbPixel[] pixels, int width, int height, bool includeAlpha,
@@ -1038,5 +1048,56 @@ public sealed partial class PngOptimizer {
     };
 
     return new ZLibStream(baseStream, level, true);
+  }
+
+  /// <summary>Reads a bitmap into the platform-independent picture the colour library takes.</summary>
+  private static FileFormat.Core.RawImage _ToRawImage(Bitmap source) {
+    var width = source.Width;
+    var height = source.Height;
+    var pixels = new byte[width * height * 4];
+    var data = source.LockBits(
+      new Rectangle(0, 0, width, height), ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+
+    try {
+      for (var y = 0; y < height; ++y)
+        System.Runtime.InteropServices.Marshal.Copy(
+          data.Scan0 + y * data.Stride, pixels, y * width * 4, width * 4);
+    } finally {
+      source.UnlockBits(data);
+    }
+
+    return new() {
+      Width = width,
+      Height = height,
+      Format = FileFormat.Core.PixelFormat.Bgra32,
+      PixelData = pixels,
+    };
+  }
+
+  /// <summary>Writes an indexed picture back out as the bitmap this caller still speaks in.</summary>
+  private static Bitmap _ToBitmap(FileFormat.Core.RawImage image) {
+    var bitmap = new Bitmap(image.Width, image.Height, System.Drawing.Imaging.PixelFormat.Format8bppIndexed);
+    var palette = bitmap.Palette;
+
+    for (var i = 0; i < palette.Entries.Length; ++i) {
+      var entry = i * 3;
+      palette.Entries[i] = entry + 2 < image.Palette.Length
+        ? Color.FromArgb(255, image.Palette[entry], image.Palette[entry + 1], image.Palette[entry + 2])
+        : Color.Black;
+    }
+
+    bitmap.Palette = palette;
+
+    var data = bitmap.LockBits(
+      new Rectangle(0, 0, image.Width, image.Height), ImageLockMode.WriteOnly, bitmap.PixelFormat);
+    try {
+      for (var y = 0; y < image.Height; ++y)
+        System.Runtime.InteropServices.Marshal.Copy(
+          image.PixelData, y * image.Width, data.Scan0 + y * data.Stride, image.Width);
+    } finally {
+      bitmap.UnlockBits(data);
+    }
+
+    return bitmap;
   }
 }
