@@ -1,15 +1,15 @@
-﻿using System;
+using System;
 using System.IO;
 
 namespace FileFormat.ImageSystem;
 
-/// <summary>Reads C64 Image System images from bytes, streams, or file paths.</summary>
+/// <summary>Reads Image System pictures from bytes, streams, or file paths.</summary>
 public static class ImageSystemReader {
 
   public static ImageSystemFile FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
-      throw new FileNotFoundException("Image System file not found.", file.FullName);
+      throw new FileNotFoundException("Picture not found.", file.FullName);
 
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
@@ -19,80 +19,58 @@ public static class ImageSystemReader {
     if (stream.CanSeek) {
       var data = new byte[stream.Length - stream.Position];
       stream.ReadExactly(data);
-      return FromBytes(data);
+      return FromSpan(data);
     }
+
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
+    return FromSpan(ms.ToArray());
   }
 
+  /// <summary>The length is the whole of the identification: the two forms have no signature.</summary>
   public static ImageSystemFile FromSpan(ReadOnlySpan<byte> data) {
+    var loadAddress = data.Length >= 2 ? (ushort)(data[0] | (data[1] << 8)) : (ushort)0;
 
-    if (data.Length == ImageSystemFile.HiresFileSize)
-      return _ParseHires(data);
+    switch (data.Length) {
+      case ImageSystemFile.HiresFileSize: {
+        var bitmap = new byte[ImageSystemFile.BitmapDataSize];
+        data.Slice(ImageSystemFile.HiresBitmapOffset, ImageSystemFile.BitmapDataSize).CopyTo(bitmap);
 
-    if (data.Length == ImageSystemFile.MulticolorFileSize)
-      return _ParseMulticolor(data);
+        var matrix = new byte[ImageSystemFile.VideoMatrixSize];
+        data.Slice(ImageSystemFile.HiresVideoMatrixOffset, ImageSystemFile.VideoMatrixSize).CopyTo(matrix);
 
-    throw new InvalidDataException(
-      $"Invalid Image System data size: expected {ImageSystemFile.HiresFileSize} (hires) or {ImageSystemFile.MulticolorFileSize} (multicolor) bytes, got {data.Length}.");
-  
+        return new() { IsHires = true, LoadAddress = loadAddress, BitmapData = bitmap, VideoMatrix = matrix };
+      }
+
+      case ImageSystemFile.MulticolorFileSize: {
+        var bitmap = new byte[ImageSystemFile.BitmapDataSize];
+        data.Slice(ImageSystemFile.MulticolorBitmapOffset, ImageSystemFile.BitmapDataSize).CopyTo(bitmap);
+
+        var matrix = new byte[ImageSystemFile.VideoMatrixSize];
+        data.Slice(ImageSystemFile.MulticolorVideoMatrixOffset, ImageSystemFile.VideoMatrixSize).CopyTo(matrix);
+
+        var colors = new byte[ImageSystemFile.ColorRamSize];
+        data.Slice(ImageSystemFile.MulticolorColorRamOffset, ImageSystemFile.ColorRamSize).CopyTo(colors);
+
+        return new() {
+          IsHires = false,
+          LoadAddress = loadAddress,
+          BitmapData = bitmap,
+          VideoMatrix = matrix,
+          ColorRam = colors,
+          BackgroundColor = data[ImageSystemFile.MulticolorBackgroundOffset],
+        };
+      }
+
+      default:
+        throw new InvalidDataException(
+          $"Invalid Image System file size (expected {ImageSystemFile.HiresFileSize} or "
+          + $"{ImageSystemFile.MulticolorFileSize} bytes, got {data.Length}).");
+    }
   }
 
   public static ImageSystemFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     return FromSpan(data);
-  }
-
-  private static ImageSystemFile _ParseHires(ReadOnlySpan<byte> data) {
-    var loadAddress = (ushort)(data[0] | (data[1] << 8));
-
-    var bitmapData = new byte[ImageSystemFile.BitmapDataSize];
-    data.Slice(ImageSystemFile.LoadAddressSize, ImageSystemFile.BitmapDataSize).CopyTo(bitmapData);
-
-    var screenData = new byte[ImageSystemFile.ScreenDataSize];
-    data.Slice(ImageSystemFile.LoadAddressSize + ImageSystemFile.BitmapDataSize, ImageSystemFile.ScreenDataSize).CopyTo(screenData);
-
-    // Border color byte follows screen data
-    var borderColorOffset = ImageSystemFile.LoadAddressSize + ImageSystemFile.BitmapDataSize + ImageSystemFile.ScreenDataSize;
-    var bgColor = borderColorOffset < data.Length ? data[borderColorOffset] : (byte)0;
-
-    return new() {
-      Width = 320,
-      Height = 200,
-      IsHires = true,
-      LoadAddress = loadAddress,
-      BitmapData = bitmapData,
-      ScreenData = screenData,
-      ColorData = null,
-      BackgroundColor = bgColor,
-    };
-  }
-
-  private static ImageSystemFile _ParseMulticolor(ReadOnlySpan<byte> data) {
-    var loadAddress = (ushort)(data[0] | (data[1] << 8));
-
-    var bitmapData = new byte[ImageSystemFile.BitmapDataSize];
-    data.Slice(ImageSystemFile.LoadAddressSize, ImageSystemFile.BitmapDataSize).CopyTo(bitmapData);
-
-    var screenData = new byte[ImageSystemFile.ScreenDataSize];
-    data.Slice(ImageSystemFile.LoadAddressSize + ImageSystemFile.BitmapDataSize, ImageSystemFile.ScreenDataSize).CopyTo(screenData);
-
-    var colorData = new byte[ImageSystemFile.ColorDataSize];
-    data.Slice(ImageSystemFile.LoadAddressSize + ImageSystemFile.BitmapDataSize + ImageSystemFile.ScreenDataSize, ImageSystemFile.ColorDataSize).CopyTo(colorData);
-
-    var bgColorOffset = ImageSystemFile.LoadAddressSize + ImageSystemFile.BitmapDataSize + ImageSystemFile.ScreenDataSize + ImageSystemFile.ColorDataSize;
-    var bgColor = bgColorOffset < data.Length ? data[bgColorOffset] : (byte)0;
-
-    return new() {
-      Width = 160,
-      Height = 200,
-      IsHires = false,
-      LoadAddress = loadAddress,
-      BitmapData = bitmapData,
-      ScreenData = screenData,
-      ColorData = colorData,
-      BackgroundColor = bgColor,
-    };
   }
 }

@@ -5,116 +5,105 @@ using FileFormat.ImageSystem;
 
 namespace FileFormat.ImageSystem.Tests;
 
+/// <summary>
+/// Image System's two file layouts, which are told apart by length alone and put their sections in
+/// different places — the high-resolution one spreads the bitmap over eight whole pages, the
+/// multicolour one leads with the colour RAM.
+/// </summary>
 [TestFixture]
-public sealed class ImageSystemReaderTests {
+public sealed class ImageSystemTests {
 
   [Test]
   [Category("Unit")]
-  public void FromFile_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => ImageSystemReader.FromFile(null!));
-  }
+  public void FromBytes_Null_ThrowsArgumentNullException()
+    => Assert.Throws<ArgumentNullException>(() => ImageSystemReader.FromBytes(null!));
 
   [Test]
   [Category("Unit")]
-  public void FromFile_Missing_ThrowsFileNotFoundException() {
-    var missing = new FileInfo(Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".ish"));
-    Assert.Throws<FileNotFoundException>(() => ImageSystemReader.FromFile(missing));
-  }
+  public void FromBytes_UnknownSize_ThrowsInvalidDataException()
+    => Assert.Throws<InvalidDataException>(() => ImageSystemReader.FromBytes(new byte[9009]));
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => ImageSystemReader.FromBytes(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromBytes_WrongSize_ThrowsInvalidDataException() {
-    Assert.Throws<InvalidDataException>(() => ImageSystemReader.FromBytes(new byte[1000]));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromBytes_Hires_Parses() {
-    var data = new byte[9009];
-    data[0] = 0x00; data[1] = 0x20; // load address 0x2000
+  public void Hires_EachSectionReadFromItsOwnOffset() {
+    var data = new byte[ImageSystemFile.HiresFileSize];
+    data[ImageSystemFile.HiresBitmapOffset] = 0xAB;
+    data[ImageSystemFile.HiresVideoMatrixOffset] = 0x12;
 
     var result = ImageSystemReader.FromBytes(data);
 
-    Assert.That(result.Width, Is.EqualTo(320));
-    Assert.That(result.Height, Is.EqualTo(200));
-    Assert.That(result.IsHires, Is.True);
-    Assert.That(result.LoadAddress, Is.EqualTo(0x2000));
-    Assert.That(result.ColorData, Is.Null);
+    Assert.Multiple(() => {
+      Assert.That(result.IsHires, Is.True);
+      Assert.That(result.Width, Is.EqualTo(320));
+      Assert.That(result.Height, Is.EqualTo(200));
+      Assert.That(result.BitmapData[0], Is.EqualTo(0xAB));
+      Assert.That(result.VideoMatrix[0], Is.EqualTo(0x12));
+    });
   }
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_Multicolor_Parses() {
-    var data = new byte[10003];
-    data[0] = 0x00; data[1] = 0x60; // load address 0x6000
+  public void Multicolor_EachSectionReadFromItsOwnOffset() {
+    var data = new byte[ImageSystemFile.MulticolorFileSize];
+    data[ImageSystemFile.MulticolorBitmapOffset] = 0xAB;
+    data[ImageSystemFile.MulticolorVideoMatrixOffset] = 0x12;
+    data[ImageSystemFile.MulticolorColorRamOffset] = 0x34;
+    data[ImageSystemFile.MulticolorBackgroundOffset] = 0x06;
 
     var result = ImageSystemReader.FromBytes(data);
 
-    Assert.That(result.Width, Is.EqualTo(160));
-    Assert.That(result.Height, Is.EqualTo(200));
-    Assert.That(result.IsHires, Is.False);
-    Assert.That(result.LoadAddress, Is.EqualTo(0x6000));
-    Assert.That(result.ColorData, Is.Not.Null);
+    Assert.Multiple(() => {
+      Assert.That(result.IsHires, Is.False);
+      Assert.That(result.Width, Is.EqualTo(160));
+      Assert.That(result.BitmapData[0], Is.EqualTo(0xAB));
+      Assert.That(result.VideoMatrix[0], Is.EqualTo(0x12));
+      Assert.That(result.ColorRam![0], Is.EqualTo(0x34));
+      Assert.That(result.BackgroundColor, Is.EqualTo(0x06));
+    });
+  }
+
+  [TestCase(true)]
+  [TestCase(false)]
+  [Category("Unit")]
+  public void RoundTrip_PreservesEverySection(bool hires) {
+    var size = hires ? ImageSystemFile.HiresFileSize : ImageSystemFile.MulticolorFileSize;
+    var data = new byte[size];
+    data[0] = 0x00;
+    data[1] = 0x40;
+
+    var bitmapOffset = hires ? ImageSystemFile.HiresBitmapOffset : ImageSystemFile.MulticolorBitmapOffset;
+    for (var i = 0; i < ImageSystemFile.BitmapDataSize; ++i)
+      data[bitmapOffset + i] = (byte)(i % 251);
+
+    var original = ImageSystemReader.FromBytes(data);
+    var reread = ImageSystemReader.FromBytes(ImageSystemWriter.ToBytes(original));
+
+    Assert.Multiple(() => {
+      Assert.That(reread.IsHires, Is.EqualTo(original.IsHires));
+      Assert.That(reread.LoadAddress, Is.EqualTo(original.LoadAddress));
+      Assert.That(reread.BitmapData, Is.EqualTo(original.BitmapData));
+      Assert.That(reread.VideoMatrix, Is.EqualTo(original.VideoMatrix));
+      Assert.That(reread.BackgroundColor, Is.EqualTo(original.BackgroundColor));
+    });
+  }
+
+  /// <summary>Writing a picture gives the multicolour form, which is the one holding more colour.</summary>
+  [Test]
+  [Category("Unit")]
+  public void FromRawImage_WritesTheMulticolorForm() {
+    var rgb = new byte[160 * 200 * 3];
+    for (var i = 0; i < rgb.Length; i += 3) {
+      var color = Commodore64Graphics.HexColors[i / 3 % 16];
+      rgb[i] = (byte)(color >> 16);
+      rgb[i + 1] = (byte)(color >> 8);
+      rgb[i + 2] = (byte)color;
+    }
+
+    var source = new RawImage { Width = 160, Height = 200, Format = PixelFormat.Rgb24, PixelData = rgb };
+
+    var written = ImageSystemWriter.ToBytes(ImageSystemFile.FromRawImage(source));
+
+    Assert.That(written, Has.Length.EqualTo(ImageSystemFile.MulticolorFileSize));
+    Assert.That(ImageSystemReader.FromBytes(written).IsHires, Is.False);
   }
 }
-
-[TestFixture]
-public sealed class RoundTripTests {
-
-  [Test]
-  [Category("Integration")]
-  public void RoundTrip_Hires_PreservesData() {
-    var bitmapData = new byte[8000];
-    bitmapData[0] = 0xFF;
-    var screenData = new byte[1000];
-    screenData[0] = 0x12;
-
-    var original = new ImageSystemFile {
-      Width = 320, Height = 200, IsHires = true,
-      LoadAddress = 0x2000,
-      BitmapData = bitmapData, ScreenData = screenData,
-      BackgroundColor = 5,
-    };
-
-    var bytes = ImageSystemWriter.ToBytes(original);
-    var restored = ImageSystemReader.FromBytes(bytes);
-
-    Assert.That(restored.IsHires, Is.True);
-    Assert.That(restored.LoadAddress, Is.EqualTo(0x2000));
-    Assert.That(restored.BitmapData, Is.EqualTo(original.BitmapData));
-    Assert.That(restored.ScreenData, Is.EqualTo(original.ScreenData));
-    Assert.That(restored.BackgroundColor, Is.EqualTo(5));
-  }
-
-  [Test]
-  [Category("Integration")]
-  public void RoundTrip_Multicolor_PreservesData() {
-    var bitmapData = new byte[8000];
-    bitmapData[0] = 0xAA;
-    var screenData = new byte[1000];
-    var colorData = new byte[1000];
-    colorData[0] = 0x0F;
-
-    var original = new ImageSystemFile {
-      Width = 160, Height = 200, IsHires = false,
-      LoadAddress = 0x6000,
-      BitmapData = bitmapData, ScreenData = screenData,
-      ColorData = colorData, BackgroundColor = 3,
-    };
-
-    var bytes = ImageSystemWriter.ToBytes(original);
-    var restored = ImageSystemReader.FromBytes(bytes);
-
-    Assert.That(restored.IsHires, Is.False);
-    Assert.That(restored.BitmapData, Is.EqualTo(original.BitmapData));
-    Assert.That(restored.ColorData, Is.EqualTo(original.ColorData));
-    Assert.That(restored.BackgroundColor, Is.EqualTo(3));
-  }
-}
-

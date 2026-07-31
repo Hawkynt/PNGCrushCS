@@ -3,125 +3,108 @@ using FileFormat.Core;
 
 namespace FileFormat.ImageSystem;
 
-/// <summary>In-memory representation of a C64 Image System image (ISH hires / ISM multicolor).</summary>
-public readonly record struct ImageSystemFile : IImageFormatReader<ImageSystemFile>, IImageToRawImage<ImageSystemFile>, IImageFormatWriter<ImageSystemFile> {
-
-  /// <summary>Size of bitmap data section.</summary>
-  internal const int BitmapDataSize = 8000;
-
-  /// <summary>Size of screen RAM section.</summary>
-  internal const int ScreenDataSize = 1000;
-
-  /// <summary>Size of color RAM section (multicolor only).</summary>
-  internal const int ColorDataSize = 1000;
-
-  /// <summary>Size of load address.</summary>
-  internal const int LoadAddressSize = 2;
-
-  /// <summary>Hires file size: 2 + 8000 + 1000 + 7 padding = 9009.</summary>
-  public const int HiresFileSize = 9009;
-
-  /// <summary>Multicolor file size: same as Koala (2 + 8000 + 1000 + 1000 + 1) = 10003.</summary>
-  public const int MulticolorFileSize = 10003;
+/// <summary>In-memory representation of a C64 Image System picture (.ish hires, .ism multicolour).</summary>
+/// <remarks>
+/// Two formats behind one program, told apart by their length. The high-resolution one lays the
+/// bitmap out across eight whole pages and puts the video matrix after them; the multicolour one
+/// puts the colour RAM first, the bitmap after its page, and the matrix last.
+/// </remarks>
+public readonly record struct ImageSystemFile
+  : IImageFormatReader<ImageSystemFile>, IImageToRawImage<ImageSystemFile>,
+    IImageFromRawImage<ImageSystemFile>, IImageFormatWriter<ImageSystemFile> {
 
   static string IImageFormatMetadata<ImageSystemFile>.PrimaryExtension => ".ish";
   static string[] IImageFormatMetadata<ImageSystemFile>.FileExtensions => [".ish", ".ism"];
-  static ImageSystemFile IImageFormatReader<ImageSystemFile>.FromSpan(ReadOnlySpan<byte> data) => ImageSystemReader.FromSpan(data);
-  static byte[] IImageFormatWriter<ImageSystemFile>.ToBytes(ImageSystemFile file) => ImageSystemWriter.ToBytes(file);
+  static ImageSystemFile IImageFormatReader<ImageSystemFile>.FromSpan(ReadOnlySpan<byte> data)
+    => ImageSystemReader.FromSpan(data);
+  static byte[] IImageFormatWriter<ImageSystemFile>.ToBytes(ImageSystemFile file)
+    => ImageSystemWriter.ToBytes(file);
+  static VideoMode[] IImageFormatMetadata<ImageSystemFile>.VideoModes => [
+    new("Hires", [(320, 200)], [16]),
+    new("Multicolour", [(160, 200)], [16]),
+  ];
 
-  /// <summary>Image width in pixels (320 for hires, 160 for multicolor).</summary>
-  public int Width { get; init; }
+  /// <summary>Size of the bitmap in bytes.</summary>
+  public const int BitmapDataSize = 8000;
 
-  /// <summary>Image height in pixels, always 200.</summary>
-  public int Height { get; init; }
+  /// <summary>Size of the video matrix in bytes.</summary>
+  public const int VideoMatrixSize = 1000;
 
-  /// <summary>Whether this is a hires (true) or multicolor (false) image.</summary>
+  /// <summary>Size of the colour RAM in bytes.</summary>
+  public const int ColorRamSize = 1000;
+
+  /// <summary>The exact size of a high-resolution file.</summary>
+  public const int HiresFileSize = 9194;
+
+  /// <summary>Where a high-resolution file keeps its bitmap.</summary>
+  public const int HiresBitmapOffset = 2;
+
+  /// <summary>Where a high-resolution file keeps its matrix, after the bitmap's eight pages.</summary>
+  public const int HiresVideoMatrixOffset = 8194;
+
+  /// <summary>The exact size of a multicolour file.</summary>
+  public const int MulticolorFileSize = 10218;
+
+  /// <summary>Where a multicolour file keeps its bitmap.</summary>
+  public const int MulticolorBitmapOffset = 1026;
+
+  /// <summary>Where a multicolour file keeps its matrix.</summary>
+  public const int MulticolorVideoMatrixOffset = 9218;
+
+  /// <summary>Where a multicolour file keeps its colour RAM, which comes first.</summary>
+  public const int MulticolorColorRamOffset = 2;
+
+  /// <summary>Where a multicolour file keeps its background register.</summary>
+  public const int MulticolorBackgroundOffset = 9217;
+
+  /// <summary>Picture width: 320 for hires, 160 for multicolour.</summary>
+  public int Width => this.IsHires ? 320 : 160;
+
+  /// <summary>Picture height, always 200.</summary>
+  public int Height => 200;
+
+  /// <summary>Whether this is a high-resolution picture rather than a multicolour one.</summary>
   public bool IsHires { get; init; }
 
   /// <summary>C64 memory load address (2 bytes, little-endian).</summary>
   public ushort LoadAddress { get; init; }
 
-  /// <summary>Bitmap data (8000 bytes).</summary>
+  /// <summary>Bitmap data.</summary>
   public byte[] BitmapData { get; init; }
 
-  /// <summary>Screen RAM (1000 bytes).</summary>
-  public byte[] ScreenData { get; init; }
+  /// <summary>Video matrix.</summary>
+  public byte[] VideoMatrix { get; init; }
 
-  /// <summary>Color RAM (1000 bytes, multicolor only; null for hires).</summary>
-  public byte[]? ColorData { get; init; }
+  /// <summary>Colour RAM; unused by the high-resolution form.</summary>
+  public byte[]? ColorRam { get; init; }
 
-  /// <summary>Background color index (0-15).</summary>
+  /// <summary>The colour shown behind pattern 00 in a multicolour picture.</summary>
   public byte BackgroundColor { get; init; }
 
-  /// <summary>Converts this Image System file to an Rgb24 raw image.</summary>
-  public static RawImage ToRawImage(ImageSystemFile file) {
-    return file.IsHires ? _HiresToRawImage(file) : _MultiToRawImage(file);
-  }
+  public static RawImage ToRawImage(ImageSystemFile file)
+    => file.IsHires
+      ? Commodore64Graphics.DecodeHires(file.BitmapData, file.VideoMatrix, 320, 200)
+      : Commodore64Graphics.DecodeMulticolor(
+          file.BitmapData, file.VideoMatrix, file.ColorRam ?? new byte[ColorRamSize],
+          file.BackgroundColor, 160, 200);
 
-  private static RawImage _HiresToRawImage(ImageSystemFile file) {
-    const int width = 320;
-    const int height = 200;
-    var rgb = new byte[width * height * 3];
+  /// <summary>Builds a multicolour screen, which is the form that holds the most colour.</summary>
+  public static ImageSystemFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
 
-    for (var y = 0; y < height; ++y)
-      for (var x = 0; x < width; ++x) {
-        var cellX = x / 8;
-        var cellY = y / 8;
-        var cellIndex = cellY * 40 + cellX;
-        var byteInCell = y % 8;
-        var bitmapByte = cellIndex * 8 + byteInCell < file.BitmapData.Length
-          ? file.BitmapData[cellIndex * 8 + byteInCell]
-          : (byte)0;
-        var bitPosition = 7 - (x % 8);
-        var bitValue = (bitmapByte >> bitPosition) & 1;
+    var rgb = image.SampleTo(160, 200);
+    var bitmap = new byte[BitmapDataSize];
+    var matrix = new byte[VideoMatrixSize];
+    var colors = new byte[ColorRamSize];
+    var background = Commodore64Graphics.EncodeMulticolor(rgb.PixelData, 160, 200, bitmap, matrix, colors);
 
-        var screenByte = cellIndex < file.ScreenData.Length ? file.ScreenData[cellIndex] : (byte)0;
-        var colorIndex = bitValue == 1
-          ? (screenByte >> 4) & 0x0F
-          : screenByte & 0x0F;
-
-        var color = Commodore64Graphics.HexColors[colorIndex];
-        var offset = (y * width + x) * 3;
-        rgb[offset] = (byte)((color >> 16) & 0xFF);
-        rgb[offset + 1] = (byte)((color >> 8) & 0xFF);
-        rgb[offset + 2] = (byte)(color & 0xFF);
-      }
-
-    return new() { Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = rgb };
-  }
-
-  private static RawImage _MultiToRawImage(ImageSystemFile file) {
-    const int width = 160;
-    const int height = 200;
-    var rgb = new byte[width * height * 3];
-
-    for (var y = 0; y < height; ++y)
-      for (var x = 0; x < width; ++x) {
-        var cellX = x / 4;
-        var cellY = y / 8;
-        var cellIndex = cellY * 40 + cellX;
-        var byteInCell = y % 8;
-        var bitmapByte = cellIndex * 8 + byteInCell < file.BitmapData.Length
-          ? file.BitmapData[cellIndex * 8 + byteInCell]
-          : (byte)0;
-        var pixelInByte = x % 4;
-        var bitValue = (bitmapByte >> ((3 - pixelInByte) * 2)) & 0x03;
-
-        var colorIndex = bitValue switch {
-          0 => file.BackgroundColor & 0x0F,
-          1 => cellIndex < file.ScreenData.Length ? (file.ScreenData[cellIndex] >> 4) & 0x0F : 0,
-          2 => cellIndex < file.ScreenData.Length ? file.ScreenData[cellIndex] & 0x0F : 0,
-          3 => file.ColorData != null && cellIndex < file.ColorData.Length ? file.ColorData[cellIndex] & 0x0F : 0,
-          _ => 0
-        };
-
-        var color = Commodore64Graphics.HexColors[colorIndex];
-        var offset = (y * width + x) * 3;
-        rgb[offset] = (byte)((color >> 16) & 0xFF);
-        rgb[offset + 1] = (byte)((color >> 8) & 0xFF);
-        rgb[offset + 2] = (byte)(color & 0xFF);
-      }
-
-    return new() { Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = rgb };
+    return new() {
+      IsHires = false,
+      LoadAddress = 0x4000,
+      BitmapData = bitmap,
+      VideoMatrix = matrix,
+      ColorRam = colors,
+      BackgroundColor = background,
+    };
   }
 }
