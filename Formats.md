@@ -186,13 +186,13 @@ build one from pixel data they didn't read, so the registry reports them as read
 | Big font                | .chx                                                 | Characters of any size in cells  | Y      | —      | —         | R     | —   | —      | —         |
 | Border Screen by Trefi  | .bsp                                                 | Screen and border, one or two    | Y      | —      | —         | R     | —   | —      | —         |
 | Falcon Fuckpaint        | .pi4, .pi7, .pi9                                     | Falcon palette and eight planes  | Y      | —      | —         | R     | —   | —      | —         |
-| DEGAS Elite icon        | .icn                                                 | An icon exported as C source     | Y      | —      | —         | R     | —   | —      | —         |
+| DEGAS Elite icon        | .icn                                                 | An icon exported as C source     | Y      | Y      | —         | R     | —   | —      | —         |
 | ColorSTar object        | .obj                                                 | Clipping, mono or sixteen colours | Y     | —      | —         | R     | —   | —      | —         |
 | Tobias Richter Slideshow | .pci                                                | Overscan, a palette every line   | Y      | —      | —         | R     | —   | —      | —         |
 | SAMAR Hi-res + colours  | .shc                                                 | Two fields, six colour zones each | Y     | —      | —         | R     | —   | —      | —         |
 | Apple Preferred Format  | .32k                                                 | Named chunks, packed, MULTIPAL   | Y      | —      | —         | R     | —   | —      | —         |
 | 3200 colours, unpacked  | .sh3, .3200                                          | Bitmap then 200 palettes         | Y      | —      | —         | R     | —   | —      | —         |
-| HP 48 GROB              | .grb, .gro                                           | Binary nibbles, or serial text   | Y      | —      | —         | R     | —   | —      | —         |
+| HP 48 GROB              | .grb, .gro                                           | Binary nibbles, or serial text   | Y      | Y      | —         | R     | —   | —      | —         |
 | ComputerEyes ST         | .ce3                                                 | Digitiser output, three modes    | Y      | —      | —         | R     | —   | —      | —         |
 | Fun with Art            | .fwa                                                 | Colours as 6502 interrupt code   | Y      | —      | —         | R     | —   | —      | —         |
 | Interlace Char. Editor  | .ice, .icn                                           | 33 pairings of two graphics modes | Y     | —      | —         | R     | —   | —      | —         |
@@ -200,7 +200,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | Kitty                   | .kty, .kt4                                           | Tiles and where to put them      | Y      | —      | —         | R     | —   | —      | —         |
 | I Paint                 | .ip                                                  | C128 80-column, colour optional  | Y      | —      | —         | R     | —   | —      | —         |
 | Mapletown Network NL3   | .nl3                                                 | Printable characters only        | Y      | —      | —         | R     | —   | —      | —         |
-| Printfox                | .gb                                                  | Cell by cell, black on white     | Y      | —      | —         | R     | —   | —      | —         |
+| Printfox                | .gb                                                  | Cell by cell, black on white     | Y      | Y      | —         | R     | —   | —      | —         |
 | Semi-Graphic logos      | .sge                                                 | Text screen, four patched glyphs | Y      | —      | —         | R     | —   | —      | —         |
 | Dir Logo Maker          | .dlm                                                 | A logo in a directory listing    | Y      | —      | —         | R     | —   | —      | —         |
 | ZXpaintyONE             | .zp1                                                 | ZX81 screen as hexadecimal text  | Y      | —      | —         | R     | —   | —      | —         |
@@ -211,7 +211,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | Art Master 88           | .arv                                                 | PC-88 or PC-98, runs by repeat   | Y      | —      | —         | R     | —   | —      | —         |
 | XLD4                    | .q4                                                  | Dictionary over base-17 runs     | Y      | —      | —         | R     | —   | —      | —         |
 | LdPic                   | .bbg                                                 | BBC Micro, five modes, bit-packed | Y     | —      | —         | R     | —   | —      | —         |
-| True-colour GEM image   | .timg                                                | 24 bitplanes, or whole pixels    | Y      | —      | —         | R     | —   | —      | —         |
+| True-colour GEM image   | .timg                                                | 24 bitplanes, or whole pixels    | Y      | Y      | —         | R     | —   | —      | —         |
 | MSX2+ Screen 12         | .scc                                                 | YJK, packed or with sprites      | Y      | —      | —         | R     | —   | —      | —         |
 | MSX MIG                 | .mig                                                 | Register replay, mode inferred   | Y      | —      | —         | R     | —   | —      | —         |
 | Mapletown Network ML1   | .ml1                                                 | Runs and chains, not a bitmap    | Y      | —      | —         | R     | —   | —      | —         |

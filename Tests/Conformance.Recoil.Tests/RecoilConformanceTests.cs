@@ -33,6 +33,10 @@ public sealed class RecoilConformanceTests {
 
   /// <summary>Formats implemented on both sides, with the dimensions RECOIL decodes them at.</summary>
   public static readonly Pairing[] Pairings = [
+    new(ImageFormat.Hp48Grob, "HP 48 GROB", 131, 37),
+    new(ImageFormat.DegasIcon, "DEGAS Elite icon", 37, 23),
+    new(ImageFormat.Printfox, "Printfox", 88, 40),
+    new(ImageFormat.TrueColorImg, "True-colour GEM image", 96, 40),
     new(ImageFormat.Degas, "DEGAS", 320, 200),
     new(ImageFormat.MacPaint, "MacPaint", 576, 720),
     new(ImageFormat.Neochrome, "NEOchrome", 320, 200),

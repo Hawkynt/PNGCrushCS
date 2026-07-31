@@ -14,12 +14,14 @@ namespace FileFormat.DegasIcon;
 /// told apart by whether the file parses as C.
 /// </remarks>
 public readonly record struct DegasIconFile
-  : IImageFormatReader<DegasIconFile>, IImageToRawImage<DegasIconFile> {
+  : IImageFormatReader<DegasIconFile>, IImageToRawImage<DegasIconFile>,
+    IImageFromRawImage<DegasIconFile>, IImageFormatWriter<DegasIconFile> {
 
   static string IImageFormatMetadata<DegasIconFile>.PrimaryExtension => ".icn";
   static string[] IImageFormatMetadata<DegasIconFile>.FileExtensions => [".icn"];
   static DegasIconFile IImageFormatReader<DegasIconFile>.FromSpan(ReadOnlySpan<byte> data)
     => DegasIconReader.FromSpan(data);
+  static byte[] IImageFormatWriter<DegasIconFile>.ToBytes(DegasIconFile file) => DegasIconWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<DegasIconFile>.VideoModes => [
     new("Atari ST", [(new(1, 255), new(1, 255))], [2])
   ];
@@ -54,5 +56,33 @@ public readonly record struct DegasIconFile
       Palette = [255, 255, 255, 0, 0, 0],
       PaletteCount = 2,
     };
+  }
+
+  /// <summary>Builds an icon from a picture, taking anything darker than mid grey as ink.</summary>
+  /// <remarks>
+  /// The format is one bit a pixel on a white ground, so a colour picture is reduced by brightness.
+  /// The dimensions are the tight limit here: an icon is at most 255 by 255, that being what the
+  /// <c>#define</c>s can express.
+  /// </remarks>
+  public static DegasIconFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width is < 1 or > 255 || image.Height is < 1 or > 255)
+      throw new ArgumentException($"An icon is at most 255x255, got {image.Width}x{image.Height}.", nameof(image));
+
+    var rgb = PixelConverter.Convert(image, PixelFormat.Rgb24);
+    var stride = (image.Width + 15) >> 4 << 1;
+    var bitmap = new byte[stride * image.Height];
+
+    for (var y = 0; y < image.Height; ++y)
+    for (var x = 0; x < image.Width; ++x) {
+      var source = (y * image.Width + x) * 3;
+      var luminance = rgb.PixelData[source] * 77 + rgb.PixelData[source + 1] * 150 + rgb.PixelData[source + 2] * 29;
+      if (luminance >= 128 * 256)
+        continue;
+
+      bitmap[y * stride + (x >> 3)] |= (byte)(1 << (~x & 7));
+    }
+
+    return new() { Width = image.Width, Height = image.Height, Bitmap = bitmap };
   }
 }

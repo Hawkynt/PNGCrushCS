@@ -17,7 +17,8 @@ namespace FileFormat.Hp48Grob;
 /// 4, 5, 6, 7, 0, 1, 2, 3.
 /// </remarks>
 public readonly record struct Hp48GrobFile
-  : IImageFormatReader<Hp48GrobFile>, IImageToRawImage<Hp48GrobFile> {
+  : IImageFormatReader<Hp48GrobFile>, IImageToRawImage<Hp48GrobFile>,
+    IImageFromRawImage<Hp48GrobFile>, IImageFormatWriter<Hp48GrobFile> {
 
   /// <summary>Where the binary form's bitmap starts.</summary>
   public const int BinaryBitmapOffset = 18;
@@ -29,6 +30,7 @@ public readonly record struct Hp48GrobFile
   static string[] IImageFormatMetadata<Hp48GrobFile>.FileExtensions => [".grb", ".gro"];
   static Hp48GrobFile IImageFormatReader<Hp48GrobFile>.FromSpan(ReadOnlySpan<byte> data)
     => Hp48GrobReader.FromSpan(data);
+  static byte[] IImageFormatWriter<Hp48GrobFile>.ToBytes(Hp48GrobFile file) => Hp48GrobWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<Hp48GrobFile>.VideoModes => [
     new("HP 48", [(IntegerRange.Any, IntegerRange.Any)], [2])
   ];
@@ -65,5 +67,33 @@ public readonly record struct Hp48GrobFile
       Palette = [255, 255, 255, 0, 0, 0],
       PaletteCount = 2,
     };
+  }
+
+  /// <summary>Builds an object from a picture, taking anything darker than mid grey as ink.</summary>
+  /// <remarks>
+  /// The calculator's display is one bit a pixel and has no palette, so a colour picture has to be
+  /// reduced to lit and unlit somehow. A threshold on brightness is the only choice that does not
+  /// need a dither, and a dither on a screen this small is worse than the banding it removes.
+  /// </remarks>
+  public static Hp48GrobFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width < 1 || image.Height < 1)
+      throw new ArgumentException("A graphics object needs at least one pixel.", nameof(image));
+
+    var rgb = PixelConverter.Convert(image, PixelFormat.Rgb24);
+    var stride = (image.Width + 7) >> 3;
+    var bitmap = new byte[stride * image.Height];
+
+    for (var y = 0; y < image.Height; ++y)
+    for (var x = 0; x < image.Width; ++x) {
+      var source = (y * image.Width + x) * 3;
+      var luminance = rgb.PixelData[source] * 77 + rgb.PixelData[source + 1] * 150 + rgb.PixelData[source + 2] * 29;
+      if (luminance >= 128 * 256)
+        continue;
+
+      bitmap[y * stride + (x >> 3)] |= (byte)(1 << (x & 7));
+    }
+
+    return new() { Bitmap = bitmap, Width = image.Width, Height = image.Height };
   }
 }

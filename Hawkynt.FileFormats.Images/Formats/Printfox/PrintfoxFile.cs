@@ -15,7 +15,8 @@ namespace FileFormat.Printfox;
 /// before it.
 /// </remarks>
 public readonly record struct PrintfoxFile
-  : IImageFormatReader<PrintfoxFile>, IImageToRawImage<PrintfoxFile> {
+  : IImageFormatReader<PrintfoxFile>, IImageToRawImage<PrintfoxFile>,
+    IImageFromRawImage<PrintfoxFile>, IImageFormatWriter<PrintfoxFile> {
 
   /// <summary>Pixels a character cell covers, each way.</summary>
   public const int CellSize = 8;
@@ -24,6 +25,7 @@ public readonly record struct PrintfoxFile
   static string[] IImageFormatMetadata<PrintfoxFile>.FileExtensions => [".gb"];
   static PrintfoxFile IImageFormatReader<PrintfoxFile>.FromSpan(ReadOnlySpan<byte> data)
     => PrintfoxReader.FromSpan(data);
+  static byte[] IImageFormatWriter<PrintfoxFile>.ToBytes(PrintfoxFile file) => PrintfoxWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<PrintfoxFile>.VideoModes => [
     new("Commodore 64", [(new(8, 2040), new(8, 2040))], [2])
   ];
@@ -66,5 +68,38 @@ public readonly record struct PrintfoxFile
       Palette = [255, 255, 255, 0, 0, 0],
       PaletteCount = 2,
     };
+  }
+
+  /// <summary>Builds a picture from an image, taking anything darker than mid grey as ink.</summary>
+  /// <remarks>
+  /// The picture is stored cell by cell, so the width and height are rounded up to whole cells and
+  /// whatever the image does not reach stays white — the same thing the program itself would have
+  /// left there.
+  /// </remarks>
+  public static PrintfoxFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width < 1 || image.Height < 1)
+      throw new ArgumentException("A picture needs at least one pixel.", nameof(image));
+
+    var columns = (image.Width + CellSize - 1) / CellSize;
+    var rows = (image.Height + CellSize - 1) / CellSize;
+    if (columns > 255 || rows > 255)
+      throw new ArgumentException($"A block is at most 255 cells each way, got {columns}x{rows}.", nameof(image));
+
+    var rgb = PixelConverter.Convert(image, PixelFormat.Rgb24);
+    var cells = new byte[rows * columns * CellSize];
+
+    for (var y = 0; y < image.Height; ++y)
+    for (var x = 0; x < image.Width; ++x) {
+      var source = (y * image.Width + x) * 3;
+      var luminance = rgb.PixelData[source] * 77 + rgb.PixelData[source + 1] * 150 + rgb.PixelData[source + 2] * 29;
+      if (luminance >= 128 * 256)
+        continue;
+
+      var cell = (y / CellSize * columns + x / CellSize) * CellSize + y % CellSize;
+      cells[cell] |= (byte)(1 << (7 - x % CellSize));
+    }
+
+    return new() { Columns = columns, Rows = rows, Cells = cells };
   }
 }

@@ -14,12 +14,14 @@ namespace FileFormat.TrueColorImg;
 /// marker. It is the only part of the format that looks like a true-colour format.
 /// </remarks>
 public readonly record struct TrueColorImgFile
-  : IImageFormatReader<TrueColorImgFile>, IImageToRawImage<TrueColorImgFile> {
+  : IImageFormatReader<TrueColorImgFile>, IImageToRawImage<TrueColorImgFile>,
+    IImageFromRawImage<TrueColorImgFile>, IImageFormatWriter<TrueColorImgFile> {
 
   static string IImageFormatMetadata<TrueColorImgFile>.PrimaryExtension => ".timg";
   static string[] IImageFormatMetadata<TrueColorImgFile>.FileExtensions => [".timg"];
   static TrueColorImgFile IImageFormatReader<TrueColorImgFile>.FromSpan(ReadOnlySpan<byte> data)
     => TrueColorImgReader.FromSpan(data);
+  static byte[] IImageFormatWriter<TrueColorImgFile>.ToBytes(TrueColorImgFile file) => TrueColorImgWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<TrueColorImgFile>.VideoModes => [
     new("Atari Falcon", [(IntegerRange.Any, IntegerRange.Any)], [16777216])
   ];
@@ -39,4 +41,19 @@ public readonly record struct TrueColorImgFile
     Format = PixelFormat.Rgb24,
     PixelData = file.Pixels ?? new byte[file.Width * file.Height * 3],
   };
+
+  /// <summary>Builds a picture from an image, which needs no reduction at all.</summary>
+  /// <remarks>
+  /// The chunky variant stores three whole bytes a pixel, so this is the rare case of a vintage
+  /// format that can hold anything a modern one can and needs no palette, no dither and no choice.
+  /// </remarks>
+  public static TrueColorImgFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width is < 1 or > 65535 || image.Height is < 1 or > 65535)
+      throw new ArgumentException($"A picture is at most 65535 each way, got {image.Width}x{image.Height}.", nameof(image));
+
+    var rgb = PixelConverter.Convert(image, PixelFormat.Rgb24);
+
+    return new() { Width = image.Width, Height = image.Height, Pixels = rgb.PixelData[..] };
+  }
 }
