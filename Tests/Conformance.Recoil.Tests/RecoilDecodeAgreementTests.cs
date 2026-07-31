@@ -367,7 +367,115 @@ public sealed class RecoilDecodeAgreementTests {
     new("PhotoChrome, both differences", ImageFormat.PhotoChromePcs, ".pcs", () => _PhotoChromePcs(4)),
     new("PhotoChrome, bitmap stored", ImageFormat.PhotoChromePcs, ".pcs", () => _PhotoChromePcs(1)),
     new("PhotoChrome, palette stored", ImageFormat.PhotoChromePcs, ".pcs", () => _PhotoChromePcs(2)),
+    new("Z's Staff Kid98", ImageFormat.ZsStaffKid98, ".zim", () => _ZsStaffKid98(true)),
+    new("Z's Staff Kid98, default palette", ImageFormat.ZsStaffKid98, ".zim", () => _ZsStaffKid98(false)),
   ];
+
+  /// <summary>
+  /// A Z's Staff Kid98 picture: a header, an optional palette, and a list of horizontal runs whose
+  /// four planes are packed by nested flags and differenced twice.
+  /// </summary>
+  private static byte[] _ZsStaffKid98(bool palette) {
+    const int width = 320, height = 200;
+    var body = new System.Collections.Generic.List<byte>(new byte[512]);
+    "FORMAT-A"u8.CopyTo(System.Runtime.InteropServices.CollectionsMarshal.AsSpan(body));
+
+    // No directory, so the header follows the fixed part directly.
+    var header = new byte[24];
+    var storedWidth = width - 1;
+    var storedHeight = height - 1;
+    header[4] = (byte)storedWidth;
+    header[5] = (byte)(storedWidth >> 8);
+    header[6] = (byte)storedHeight;
+    header[7] = (byte)(storedHeight >> 8);
+    header[20] = 1;
+
+    // The two bytes before the palette say whether there is one.
+    header[22] = (byte)(palette ? 1 : 0);
+    body.AddRange(header);
+
+    if (palette) {
+      for (var c = 0; c < 16; ++c)
+        body.AddRange([(byte)(c * 17), (byte)(c * 13), (byte)(c * 7), 0]);
+    }
+
+    // The run list's own directory, which the decoder skips.
+    body.AddRange([2, 0, 0, 0, 0, 0]);
+
+    void Word(System.Collections.Generic.List<byte> into, int value) {
+      into.Add((byte)value);
+      into.Add((byte)(value >> 8));
+    }
+
+    for (var run = 0; run < 24; ++run) {
+      var length = 40 + run * 3;
+      var size = (length + 7) / 8 * 4;
+      size = (size + 3) & ~3;
+
+      // The planes, before the two differencing passes the decoder undoes.
+      var planes = new byte[size];
+      for (var i = 0; i < size; ++i)
+        planes[i] = (byte)(run * 31 + i * 17);
+
+      // Some bytes are left out entirely and read back as zero, which is what the flags are for.
+      var present = new bool[size];
+      for (var i = 0; i < size; ++i)
+        present[i] = (i + run) % 5 != 0;
+
+      var differenced = new byte[size];
+      for (var i = 0; i < size; ++i)
+        differenced[i] = present[i] ? planes[i] : (byte)0;
+
+      // The flags, three levels of them, each level saying which of the next level's bytes follow.
+      var flags3 = new byte[64];
+      for (var i = 0; i < size; ++i) {
+        if (differenced[i] != 0 || present[i])
+          flags3[i >> 3] |= (byte)(1 << (~i & 7));
+      }
+
+      var flags2 = new byte[8];
+      for (var i = 0; i < 64; ++i) {
+        if (flags3[i] != 0)
+          flags2[i >> 3] |= (byte)(1 << (~i & 7));
+      }
+
+      byte flags1 = 0;
+      for (var i = 0; i < 8; ++i) {
+        if (flags2[i] != 0)
+          flags1 |= (byte)(1 << (~i & 7));
+      }
+
+      var packed = new System.Collections.Generic.List<byte> { flags1 };
+      for (var i = 0; i < 8; ++i) {
+        if (((flags1 >> (~i & 7)) & 1) != 0)
+          packed.Add(flags2[i]);
+      }
+
+      for (var i = 0; i < 64; ++i) {
+        if (((flags2[i >> 3] >> (~i & 7)) & 1) != 0)
+          packed.Add(flags3[i]);
+      }
+
+      for (var i = 0; i < size; ++i) {
+        if (((flags3[i >> 3] >> (~i & 7)) & 1) != 0)
+          packed.Add(differenced[i]);
+      }
+
+      Word(body, length);
+      Word(body, run * 7 % (width - length));
+      Word(body, run * 8);
+      Word(body, packed.Count + 2);
+      Word(body, size);
+      body.AddRange(packed);
+    }
+
+    Word(body, 0);
+
+    // The last run must not reach the end of the file, since a run is bounded by what follows it.
+    body.AddRange(new byte[8]);
+
+    return body.ToArray();
+  }
 
   /// <summary>
   /// A PhotoChrome picture: one or two fields, each a run-length block of bitmap and a block of
