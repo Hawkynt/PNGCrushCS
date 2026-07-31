@@ -96,6 +96,32 @@ public abstract class GtiaRenderer {
   /// <summary>Sets a missile's horizontal position.</summary>
   public void SetMissileHpos(int missile, int value) => this._missileHpos[missile] = (byte)value;
 
+  /// <summary>
+  /// Loads the colour registers from a table with one entry per scanline, in the order Graph2Font
+  /// and its relatives store them.
+  /// </summary>
+  /// <remarks>
+  /// Those formats store the background first and the playfield before the players, which is the
+  /// order a person would list them rather than the order the chip numbers them — except in the
+  /// nine-colour GTIA mode, where the registers are used as one flat set and the two orders
+  /// coincide.
+  /// </remarks>
+  public void SetTabulatedColors(ReadOnlySpan<byte> data, int offset, int stride, int count, int gtiaMode) {
+    ReadOnlySpan<byte> order = [8, 4, 5, 6, 7, 0, 1, 2, 3];
+
+    for (var i = 0; i < count; ++i) {
+      var at = offset + i * stride;
+      var value = at >= 0 && at < data.Length ? data[at] : 0;
+      this.Colors[(gtiaMode & 192) == 128 ? i : order[i]] = (byte)(value & 254);
+    }
+  }
+
+  /// <summary>Sets all four players' widths from one register.</summary>
+  public void SetPlayerSizes(int value) {
+    for (var i = 0; i < SpriteCount; ++i)
+      this.SetPlayerSize(i, value >> (i << 1));
+  }
+
   /// <summary>Sets one player's shape for the current scanline.</summary>
   public void SetPlayerGraphics(int player, int value) => this._playerGraphics[player] = (byte)value;
 

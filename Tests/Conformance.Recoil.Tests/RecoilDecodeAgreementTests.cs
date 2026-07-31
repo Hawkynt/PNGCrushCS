@@ -261,6 +261,10 @@ public sealed class RecoilDecodeAgreementTests {
     new("GED, missiles as a fifth colour", ImageFormat.GedPicture, ".ged", () => _Ged(3, 16)),
     new("PowerGraphics, forty columns", ImageFormat.PowerGraphics, ".pgr", () => _PowerGraphics(50)),
     new("PowerGraphics, thirty-two columns", ImageFormat.PowerGraphics, ".pgr", () => _PowerGraphics(49)),
+    new("Graph2Font MCH", ImageFormat.Graph2FontMch, ".mch", () => _Mch(12000, 4)),
+    new("Graph2Font MCH with sprites", ImageFormat.Graph2FontMch, ".mch", () => _Mch(30833, 4, 1)),
+    new("Graph2Font MCH in hi-res", ImageFormat.Graph2FontMch, ".mch", () => _Mch(12000, 0)),
+    new("Graph2Font MCH in a GTIA mode", ImageFormat.Graph2FontMch, ".mch", () => _Mch(30833, 24, 1)),
   ];
 
   [Test]
@@ -2702,6 +2706,22 @@ public sealed class RecoilDecodeAgreementTests {
       data[program++] = (byte)(128 | 32 | 26);
       data[program++] = (byte)(y * 3);
     }
+
+    return data;
+  }
+
+  /// <summary>
+  /// A Graph2Font MCH picture. Its length alone says how wide it is and whether it carries sprites,
+  /// and one byte says which display mode — so the shapes it can take are combinations of the two.
+  /// </summary>
+  /// <param name="character">
+  /// Which character mode. Two of the three also carry a raster program, and a file with sprites
+  /// and a raster program is an animation rather than a picture — so the probes that carry sprites
+  /// use the one mode that cannot have one.
+  /// </param>
+  private static byte[] _Mch(int length, int mode, int character = 2) {
+    var data = _Monochrome(length);
+    data[0] = (byte)(mode | character);
 
     return data;
   }
