@@ -350,7 +350,103 @@ public sealed class RecoilDecodeAgreementTests {
     new("Kitty, short tiles", ImageFormat.Kitty, ".kty", () => _Kitty(0)),
     new("Kitty, tall tiles", ImageFormat.Kitty, ".kt4", () => _Kitty(1)),
     new("Kitty, two-half tiles", ImageFormat.Kitty, ".kty", () => _Kitty(2)),
+    new("I Paint, monochrome", ImageFormat.IPaint, ".ip", () => _IPaint(false)),
+    new("I Paint, colour", ImageFormat.IPaint, ".ip", () => _IPaint(true)),
+    new("Mapletown NL3", ImageFormat.MapletownNl3, ".nl3", _MapletownNl3),
   ];
+
+  /// <summary>An I Paint picture: a header, a run-length bitmap and optionally a run-length colour map.</summary>
+  private static byte[] _IPaint(bool color) {
+    const int columns = 37, height = 53;
+    var body = new System.Collections.Generic.List<byte> { 0, 0 };
+    body.AddRange("BRUS"u8.ToArray());
+    body.AddRange([4, 0, 0, 0, 1, 2, columns, (byte)height, (byte)(height >> 8), 0, 0, 0]);
+
+    void Pack(int count, int seed) {
+      for (var written = 0; written < count;) {
+        var left = count - written;
+
+        // Alternate runs of one repeated byte and runs of literals, so both commands are covered.
+        if ((written / 20 & 1) == 0) {
+          var run = Math.Min(left, 100);
+          body.Add((byte)(128 | run));
+          body.Add((byte)(seed * 31 + written));
+          written += run;
+        } else {
+          var run = Math.Min(left, 20);
+          body.Add((byte)run);
+          for (var i = 0; i < run; ++i)
+            body.Add((byte)(seed * 17 + written + i));
+
+          written += run;
+        }
+      }
+    }
+
+    Pack(height * columns, 1);
+
+    if (!color)
+      return body.ToArray();
+
+    body.AddRange("COLR"u8.ToArray());
+    for (var block = 0; block < (height + 7) / 8; ++block)
+      Pack(columns * 2, block + 2);
+
+    return body.ToArray();
+  }
+
+  /// <summary>
+  /// A Mapletown NL3 picture, every byte of which has to be a character a bulletin board would
+  /// carry unaltered.
+  /// </summary>
+  private static byte[] _MapletownNl3() {
+    var body = new System.Collections.Generic.List<byte>();
+
+    // The alphabet: printable ASCII first, then the half-width Japanese range, some of it written
+    // as the three-byte sequences the format uses for characters a plain byte cannot carry.
+    void Write(int value) {
+      switch (value) {
+        case < 95: body.Add((byte)(value + 32)); break;
+
+        // Two three-byte sequences, one for each half of the range above ASCII; which of the two a
+        // character takes is fixed by its code, not free.
+        case < 127: body.AddRange([0xEF, 0xBD, (byte)(value + 65)]); break;
+        case < 159: body.AddRange([0xEF, 0xBE, (byte)(value + 1)]); break;
+        case 159: body.Add(253); break;
+        default: body.Add(254); break;
+      }
+    }
+
+    for (var i = 0; i < 64; ++i) {
+      // Nine levels a channel, so a colour is a number below 729 split across two characters.
+      var color = (i % 9) * 81 + ((i / 9) % 9) * 9 + (i * 5 % 9);
+      Write(color & 127);
+      Write(color >> 7);
+    }
+
+    var written = 0;
+    var index = 0;
+    while (written < 160 * 100) {
+      var left = 160 * 100 - written;
+
+      // A short command is one pixel, a long one carries a length that is at least two.
+      if ((index & 3) == 0 || left < 2) {
+        Write(index % 64);
+        ++written;
+      } else {
+        var run = Math.Min(left, 40 + index % 17);
+        Write(64 | (index % 64));
+        Write(run - 2);
+        written += run;
+      }
+
+      ++index;
+    }
+
+    body.Add((byte)'\n');
+
+    return body.ToArray();
+  }
 
   /// <summary>
   /// A Kitty picture: blocks of one tile and the rectangles and positions it fills, then a fill of
