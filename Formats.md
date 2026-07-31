@@ -131,7 +131,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | RAG-D                   | .rag, .ragc                                          | Falcon, 1-8 planes or true colour | Y     | —      | —         | R     | —   | —      | —         |
 | SAM Coupe screen dump   | .ssx                                                 | Any of four modes, or rendered   | Y      | —      | —         | R     | —   | —      | —         |
 | C.O.L.R. Object Editor  | .mur (+ .pal)                                        | Bitmap, colours in a second file | Y      | —      | —         | R     | —   | —      | —         |
-| PI8                     | .pi8                                                 | Graphics 15 or Graphics 8        | Y      | —      | —         | R     | —   | —      | —         |
+| PI8                     | .pi8                                                 | Graphics 15 or Graphics 8        | Y      | Y      | —         | R     | —   | —      | —         |
 | PI9                     | .pi9                                                 | Graphics 9, APAC or Falcon       | Y      | Y      | —         | R     | —   | —      | —         |
 | ZZ_ROUGH                | .rgh                                                 | Dali packing, length as text     | Y      | —      | —         | R     | —   | —      | —         |
 | Taquart Interlace       | .tip                                                 | Three fields sharing one hue set | Y      | —      | —         | R     | —   | —      | —         |

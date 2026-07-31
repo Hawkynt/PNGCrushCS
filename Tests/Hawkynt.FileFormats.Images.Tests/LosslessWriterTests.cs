@@ -64,6 +64,9 @@ public sealed class LosslessWriterTests {
     /// <summary>The Atari's sixteen greys, four screen pixels to each.</summary>
     AtariGreys,
 
+    /// <summary>The two colours a Graphics 8 screen shows, which are not black and white.</summary>
+    AtariMonochrome,
+
     /// <summary>Anything.</summary>
     Full,
   }
@@ -88,6 +91,7 @@ public sealed class LosslessWriterTests {
     new("LdPic", ImageFormat.LdPic, Palette.OneBitChannelsWide, 320, 256),
     new("Mapletown NL3", ImageFormat.MapletownNl3, Palette.SixtyFourColors, 160, 100),
     new("Graphics 9", ImageFormat.AtariPi9, Palette.AtariGreys, 320, 192),
+    new("Graphics 8", ImageFormat.AtariPi8, Palette.AtariMonochrome, 320, 192),
   ];
 
   private static IEnumerable<TestCaseData> Cases() {
@@ -255,6 +259,18 @@ public sealed class LosslessWriterTests {
           rgb[at] = grey[level * 3];
           rgb[at + 1] = grey[level * 3 + 1];
           rgb[at + 2] = grey[level * 3 + 2];
+          break;
+        }
+
+        // The mode's own two colours, taken from the palette rather than assumed to be black and
+        // white — the foreground is the background's hue at another luminance.
+        case Palette.AtariMonochrome: {
+          var gtia = FileFormat.Core.Atari8BitGraphics.Palette;
+          var ink = (x / 3 + row / 5) % 2 == 0 || (x % 7 == 3 && row % 4 != 1);
+          var entry = (ink ? ((0 & 240) | (14 & 14)) : 0) * 3;
+          rgb[at] = gtia[entry];
+          rgb[at + 1] = gtia[entry + 1];
+          rgb[at + 2] = gtia[entry + 2];
           break;
         }
 
