@@ -36,6 +36,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.Hp48Grob, "HP 48 GROB", 131, 37),
     new(ImageFormat.Kitty, "Kitty", 640, 400),
     new(ImageFormat.ArtMaster88, "Art Master 88", 640, 400),
+    new(ImageFormat.MsxScc, "MSX2+ Screen 12", 256, 212),
     new(ImageFormat.DegasIcon, "DEGAS Elite icon", 37, 23),
     new(ImageFormat.Printfox, "Printfox", 88, 40),
     new(ImageFormat.TrueColorImg, "True-colour GEM image", 96, 40),

@@ -212,7 +212,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | XLD4                    | .q4                                                  | Dictionary over base-17 runs     | Y      | —      | —         | R     | —   | —      | —         |
 | LdPic                   | .bbg                                                 | BBC Micro, five modes, bit-packed | Y     | —      | —         | R     | —   | —      | —         |
 | True-colour GEM image   | .timg                                                | 24 bitplanes, or whole pixels    | Y      | Y      | —         | R     | —   | —      | —         |
-| MSX2+ Screen 12         | .scc                                                 | YJK, packed or with sprites      | Y      | —      | —         | R     | —   | —      | —         |
+| MSX2+ Screen 12         | .scc                                                 | YJK, packed or with sprites      | Y      | Y      | —         | R     | —   | —      | —         |
 | MSX MIG                 | .mig                                                 | Register replay, mode inferred   | Y      | —      | —         | R     | —   | —      | —         |
 | Mapletown Network ML1   | .ml1                                                 | Runs and chains, not a bitmap    | Y      | —      | —         | R     | —   | —      | —         |
 | Mapletown Network MX1   | .mx1                                                 | The same as text, several images | Y      | —      | —         | R     | —   | —      | —         |

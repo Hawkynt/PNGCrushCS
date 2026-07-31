@@ -16,7 +16,8 @@ namespace FileFormat.MsxScc;
 /// packed, which a different leading byte announces.
 /// </remarks>
 public readonly record struct MsxSccFile
-  : IImageFormatReader<MsxSccFile>, IImageToRawImage<MsxSccFile> {
+  : IImageFormatReader<MsxSccFile>, IImageToRawImage<MsxSccFile>,
+    IImageFromRawImage<MsxSccFile>, IImageFormatWriter<MsxSccFile> {
 
   /// <summary>Pixels across.</summary>
   public const int Width = 256;
@@ -40,6 +41,7 @@ public readonly record struct MsxSccFile
   static string[] IImageFormatMetadata<MsxSccFile>.FileExtensions => [".scc"];
   static MsxSccFile IImageFormatReader<MsxSccFile>.FromSpan(ReadOnlySpan<byte> data)
     => MsxSccReader.FromSpan(data);
+  static byte[] IImageFormatWriter<MsxSccFile>.ToBytes(MsxSccFile file) => MsxSccWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<MsxSccFile>.VideoModes => [
     new("MSX2+ Screen 12", [(Width, new(192, 212))], [19268])
   ];
@@ -88,5 +90,41 @@ public readonly record struct MsxSccFile
     }
 
     return new() { Width = Width, Height = file.Height, Format = PixelFormat.Rgb24, PixelData = rgb };
+  }
+
+  /// <summary>Rows a whole video memory holds.</summary>
+  public const int StoredRows = 212;
+
+  /// <summary>Builds a picture from an image, scaled to the machine's screen and coded as YJK.</summary>
+  /// <remarks>
+  /// YJK keeps a luma for every pixel but only one chroma pair for every four, so a picture put
+  /// through it comes back with its edges intact and its colour smeared four pixels wide. That is
+  /// not a defect of the encoding but what the machine's memory holds, and it is why photographs
+  /// suit this mode and flat-coloured drawings do not.
+  /// </remarks>
+  public static MsxSccFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width < 1 || image.Height < 1)
+      throw new ArgumentException("A picture needs at least one pixel.", nameof(image));
+
+    var rgb = PixelConverter.Convert(image, PixelFormat.Rgb24);
+    var screen = new byte[54279];
+    var row = new byte[Width * 3];
+
+    for (var y = 0; y < StoredRows; ++y) {
+      var sourceY = image.Height == StoredRows ? y : y * image.Height / StoredRows;
+
+      for (var x = 0; x < Width; ++x) {
+        var sourceX = image.Width == Width ? x : x * image.Width / Width;
+        var source = (sourceY * image.Width + sourceX) * 3;
+        row[x * 3] = rgb.PixelData[source];
+        row[x * 3 + 1] = rgb.PixelData[source + 1];
+        row[x * 3 + 2] = rgb.PixelData[source + 2];
+      }
+
+      MsxGraphics.EncodeYjkRow(row, Width, false, screen.AsSpan(ScreenOffset + (y << 8), Width));
+    }
+
+    return new() { Screen = screen, Height = StoredRows, Sprites = [] };
   }
 }

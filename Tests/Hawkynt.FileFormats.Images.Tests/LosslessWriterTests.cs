@@ -37,6 +37,9 @@ public sealed class LosslessWriterTests {
     /// <summary>The eight corners of the colour cube, which is one bit a channel.</summary>
     OneBitChannels,
 
+    /// <summary>At most sixteen distinct colours, on a grid of four bits a channel.</summary>
+    SixteenColors,
+
     /// <summary>Anything.</summary>
     Full,
   }
@@ -130,6 +133,16 @@ public sealed class LosslessWriterTests {
           rgb[at + 1] = (byte)((x / 7 + row) % 2 == 0 ? 255 : 0);
           rgb[at + 2] = (byte)((x + row / 11) % 2 == 0 ? 255 : 0);
           break;
+
+        // Sixteen colours drawn from the four-bit grid the palette stores, so a picture using no
+        // more than the format holds must come back exactly.
+        case Palette.SixteenColors: {
+          var index = (x / 9 + row / 7) % 16;
+          rgb[at] = (byte)((index * 3 % 16) * 17);
+          rgb[at + 1] = (byte)((index * 5 % 16) * 17);
+          rgb[at + 2] = (byte)((index * 7 % 16) * 17);
+          break;
+        }
 
         default:
           rgb[at] = (byte)(x * 37 + row);
