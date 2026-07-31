@@ -216,6 +216,8 @@ public sealed class RecoilDecodeAgreementTests {
     new("Trzmiel, stored", ImageFormat.TrzmielCompressed, ".cpr", () => _Trzmiel(0)),
     new("Trzmiel, packed by column", ImageFormat.TrzmielCompressed, ".cpr", () => _Trzmiel(1)),
     new("Trzmiel, packed linearly", ImageFormat.TrzmielCompressed, ".cpr", () => _Trzmiel(2)),
+    new("Grass' Slideshow", ImageFormat.GrassSlideshow, ".hpm", () => _GrassSlideshow(81)),
+    new("Grass' Slideshow, unnamed palette", ImageFormat.GrassSlideshow, ".hpm", () => _GrassSlideshow(200)),
   ];
 
   [Test]
@@ -1473,6 +1475,36 @@ public sealed class RecoilDecodeAgreementTests {
 
       written += left;
     }
+
+    return body.ToArray();
+  }
+
+  /// <summary>
+  /// A Grass' Slideshow picture. The byte after the packed screen names one of the program's own
+  /// register sets, so one probe names a set and one names nothing and falls back to a grey ramp.
+  /// </summary>
+  private static byte[] _GrassSlideshow(int palette) {
+    var body = new System.Collections.Generic.List<byte>();
+    var fill = 0;
+
+    for (var written = 0; written < 7680;) {
+      var left = 7680 - written;
+
+      if (left >= 200) {
+        body.AddRange([0, (byte)(fill++ * 37), 200]);
+        written += 200;
+        continue;
+      }
+
+      var literals = Math.Min(left, 60);
+      body.Add((byte)literals);
+      for (var i = 0; i < literals; ++i)
+        body.Add((byte)(fill++ * 29 + i));
+
+      written += literals;
+    }
+
+    body.Add((byte)palette);
 
     return body.ToArray();
   }
