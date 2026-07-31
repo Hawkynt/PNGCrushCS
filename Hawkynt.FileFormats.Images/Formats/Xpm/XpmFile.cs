@@ -4,6 +4,12 @@ using FileFormat.Core;
 namespace FileFormat.Xpm;
 
 /// <summary>In-memory representation of an XPM image.</summary>
+/// <remarks>
+/// The signature is the literal "/* XPM */" every XPM opens with. It used to declare none at all,
+/// so an XPM could only ever be found by its extension — and Sun Icon, whose signature was the bare
+/// "/* " of a C comment, claimed it first and then could not read it.
+/// </remarks>
+[FormatMagicBytes([0x2F, 0x2A, 0x20, 0x58, 0x50, 0x4D, 0x20, 0x2A, 0x2F])]
 [FormatMimeType("image/x-xpixmap", "image/x-xpm")]
 public readonly record struct XpmFile : IImageFormatReader<XpmFile>, IImageToRawImage<XpmFile>, IImageFromRawImage<XpmFile>, IImageFormatWriter<XpmFile> {
 

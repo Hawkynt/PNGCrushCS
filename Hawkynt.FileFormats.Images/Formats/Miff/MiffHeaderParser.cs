@@ -15,39 +15,21 @@ internal static class MiffHeaderParser {
     var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
     var text = Encoding.ASCII.GetString(data);
 
-    // Find the terminator line ":" followed by newline and 0x1A
-    var offset = 0;
-    var foundTerminator = false;
-
-    while (offset < text.Length) {
-      var lineEnd = text.IndexOf('\n', offset);
-      if (lineEnd < 0)
-        lineEnd = text.Length;
-
-      var line = text.Substring(offset, lineEnd - offset).TrimEnd('\r');
-      offset = lineEnd + 1;
-
-      if (line == ":") {
-        foundTerminator = true;
-        break;
-      }
-
-      var eqIdx = line.IndexOf('=');
-      if (eqIdx > 0) {
-        var key = line.Substring(0, eqIdx).Trim();
-        var value = line.Substring(eqIdx + 1).Trim();
-        result[key] = value;
-      }
-    }
-
-    if (!foundTerminator)
+    // The header ends with the four bytes "\f\n:\x1A" — a colon on its own line, then Ctrl-Z. What
+    // was looked for instead was a *line* equal to ":", which never matches: the colon is followed
+    // immediately by the 0x1A and the image's binary data, not by a newline, so the "line" holding it
+    // is the colon plus whatever bytes ran to the next 0x0A. Anchoring on the colon-then-0x1A pair is
+    // also what keeps the search off the colons inside values such as "date:create=...".
+    var (terminator, afterTerminator) = _IndexOfTerminator(data);
+    if (terminator < 0)
       throw new InvalidDataException("MIFF header terminator ':' not found.");
 
-    // The 0x1A byte follows the terminator line
-    if (offset < data.Length && data[offset] == _TERMINATOR_BYTE)
-      ++offset;
+    dataOffset = afterTerminator;
 
-    dataOffset = offset;
+    // Attributes are whitespace-separated, not one to a line: "columns=37 rows=23 depth=8" is three
+    // of them. Reading a line as a single key=value made every attribute after the first part of the
+    // one before it, so "columns" came out as "37 rows=23 depth=8".
+    _ParseAttributes(text.AsSpan(0, terminator), result);
     return result;
   }
 
@@ -79,5 +61,84 @@ internal static class MiffHeaderParser {
     result[headerBytes.Length] = _TERMINATOR_BYTE;
 
     return result;
+  }
+
+  /// <summary>
+  /// Where the header's closing colon sits and where the pixels start after it, or (-1, -1).
+  /// </summary>
+  /// <remarks>
+  /// The colon has to be the one that ends the header rather than one inside a value — attributes
+  /// such as "date:create=..." are full of them — so it is only accepted where it stands at the start
+  /// of a line and is followed by the 0x1A that closes the header. Writers differ on what sits
+  /// between the two: ImageMagick puts the 0x1A straight after the colon, while this library's own
+  /// writer puts a newline in first, and both are read here.
+  /// </remarks>
+  private static (int Colon, int Data) _IndexOfTerminator(byte[] data) {
+    for (var i = 0; i < data.Length; ++i) {
+      if (data[i] != (byte)':')
+        continue;
+
+      if (i > 0 && data[i - 1] is not ((byte)'\n' or (byte)'\f'))
+        continue;
+
+      var j = i + 1;
+      while (j < data.Length && data[j] is (byte)'\r' or (byte)'\n')
+        ++j;
+
+      if (j < data.Length && data[j] == _TERMINATOR_BYTE)
+        return (i, j + 1);
+    }
+
+    return (-1, -1);
+  }
+
+  /// <summary>
+  /// Reads the header's whitespace-separated key=value attributes.
+  /// </summary>
+  /// <remarks>
+  /// A value wrapped in braces may contain spaces and newlines — that is how a comment or a profile
+  /// is carried — so those are read to their closing brace rather than to the next space.
+  /// </remarks>
+  private static void _ParseAttributes(ReadOnlySpan<char> header, Dictionary<string, string> into) {
+    var i = 0;
+    while (i < header.Length) {
+      while (i < header.Length && char.IsWhiteSpace(header[i]))
+        ++i;
+
+      var keyStart = i;
+      while (i < header.Length && header[i] != '=' && !char.IsWhiteSpace(header[i]))
+        ++i;
+
+      if (i >= header.Length || header[i] != '=' || i == keyStart) {
+        // Not an attribute; skip to the next whitespace and try again.
+        while (i < header.Length && !char.IsWhiteSpace(header[i]))
+          ++i;
+
+        continue;
+      }
+
+      var key = header[keyStart..i].ToString();
+      ++i; // '='
+
+      string value;
+      if (i < header.Length && header[i] == '{') {
+        var close = header[i..].IndexOf('}');
+        if (close < 0) {
+          value = header[(i + 1)..].ToString();
+          i = header.Length;
+        } else {
+          value = header.Slice(i + 1, close - 1).ToString();
+          i += close + 1;
+        }
+      } else {
+        var valueStart = i;
+        while (i < header.Length && !char.IsWhiteSpace(header[i]))
+          ++i;
+
+        value = header[valueStart..i].ToString();
+      }
+
+      into[key] = value;
+    }
   }
 }
