@@ -193,6 +193,9 @@ public sealed class RecoilDecodeAgreementTests {
     new("DEGAS Elite brush", ImageFormat.DegasBrush, ".bru", _DegasBrush),
     new("Atari Image Manager", ImageFormat.AtariImageManager, ".im", () => _Monochrome(16384)),
     new("Atari Image Manager, large", ImageFormat.AtariImageManager, ".im", () => _Monochrome(65536)),
+    new("Grafix", ImageFormat.Grafix, ".grx", () => _Grafix(320, 200, 16)),
+    new("Grafix, monochrome", ImageFormat.Grafix, ".grx", () => _Grafix(640, 400, 2)),
+    new("Grafix, packed", ImageFormat.Grafix, ".grx", _PackedGrafix),
   ];
 
   [Test]
@@ -1017,6 +1020,138 @@ public sealed class RecoilDecodeAgreementTests {
       data[i] = (byte)((i * 7 + (i >> 3)) & 1);
 
     return data;
+  }
+
+  /// <summary>An unpacked Grafix picture, whose header is 1586 bytes for a VDI palette of 96.</summary>
+  private static byte[] _Grafix(int width, int height, int colors) {
+    var planes = colors switch { 2 => 1, 4 => 2, 16 => 4, _ => 8 };
+    var stride = ((width + 15) >> 4) * planes * 2;
+    var bitmapLength = stride * height;
+
+    var data = _Monochrome(1586 + bitmapLength);
+    System.Text.Encoding.ASCII.GetBytes("GRXP").CopyTo(data, 0);
+    data[4] = data[5] = 1;
+    data[28] = 0;
+    data[29] = 0;
+    data[30] = (byte)(width >> 8);
+    data[31] = (byte)width;
+    data[32] = (byte)(height >> 8);
+    data[33] = (byte)height;
+    data[34] = (byte)(colors >> 8);
+    data[35] = (byte)colors;
+
+    // Intensities are per thousand, so the stored words have to stay in range to mean anything.
+    for (var i = 0; i < colors * 6; i += 2) {
+      var thousandths = (i * 97) % 1001;
+      data[36 + i] = (byte)(thousandths >> 8);
+      data[37 + i] = (byte)thousandths;
+    }
+
+    data[1574] = (byte)(bitmapLength >> 24);
+    data[1575] = (byte)(bitmapLength >> 16);
+    data[1576] = (byte)(bitmapLength >> 8);
+    data[1577] = (byte)bitmapLength;
+
+    return data;
+  }
+
+  /// <summary>
+  /// A packed Grafix picture, encoded here rather than taken from a fixture.
+  /// </summary>
+  /// <remarks>
+  /// The stream is literals with the two control codes where the dictionary demands them, plus one
+  /// back-reference so the copy loop is exercised too. Nine-bit codes can only name entries below
+  /// 512 and the dictionary grows by one per code, so a widening code has to be emitted before it
+  /// reaches that — which is the part of the format a probe of literals alone would never reach.
+  /// </remarks>
+  private static byte[] _PackedGrafix() {
+    var width = 320;
+    var height = 200;
+    var colors = 16;
+    var planes = 4;
+    var stride = ((width + 15) >> 4) * planes * 2;
+    var bitmapLength = stride * height;
+    var half = bitmapLength >> 1;
+
+    var first = _EncodeGrafixHalf(half, 0);
+    var second = _EncodeGrafixHalf(bitmapLength - half, 1);
+
+    var data = new byte[1586 + first.Length + second.Length];
+    System.Text.Encoding.ASCII.GetBytes("GRXP").CopyTo(data, 0);
+    data[4] = data[5] = 1;
+    data[29] = 1;
+    data[30] = (byte)(width >> 8);
+    data[31] = (byte)width;
+    data[32] = (byte)(height >> 8);
+    data[33] = (byte)height;
+    data[34] = (byte)(colors >> 8);
+    data[35] = (byte)colors;
+
+    for (var i = 0; i < colors * 6; i += 2) {
+      var thousandths = (i * 97) % 1001;
+      data[36 + i] = (byte)(thousandths >> 8);
+      data[37 + i] = (byte)thousandths;
+    }
+
+    foreach (var (offset, value) in ((int, int)[])[(1574, bitmapLength), (1578, first.Length), (1582, second.Length)]) {
+      data[offset] = (byte)(value >> 24);
+      data[offset + 1] = (byte)(value >> 16);
+      data[offset + 2] = (byte)(value >> 8);
+      data[offset + 3] = (byte)value;
+    }
+
+    first.CopyTo(data, 1586);
+    second.CopyTo(data, 1586 + first.Length);
+
+    return data;
+  }
+
+  /// <summary>Encodes one half of a packed Grafix picture into exactly the codes it needs.</summary>
+  private static byte[] _EncodeGrafixHalf(int length, int seed) {
+    var bytes = new System.Collections.Generic.List<byte>();
+    int bits = 0, bitsCount = 0, codes = 258, codeBits = 9;
+
+    void Emit(int code) {
+      bits |= code << bitsCount;
+      bitsCount += codeBits;
+      while (bitsCount >= 8) {
+        bytes.Add((byte)bits);
+        bits >>= 8;
+        bitsCount -= 8;
+      }
+    }
+
+    for (var written = 0; written < length;) {
+      // Every emitted code adds a dictionary entry, and a nine-bit code cannot name entry 512.
+      if (codes == (1 << codeBits)) {
+        if (codeBits == 9) {
+          Emit(256);
+          codeBits = 10;
+        } else {
+          Emit(257);
+          codes = 258;
+          codeBits = 9;
+        }
+
+        continue;
+      }
+
+      // Entry 258 spans the first two bytes written, so naming it emits exactly two.
+      if (written == 64 && length - written >= 2) {
+        Emit(258);
+        written += 2;
+      } else {
+        Emit((byte)(written * 47 + seed * 13 + (written >> 7)));
+        ++written;
+      }
+
+      ++codes;
+    }
+
+    if (bitsCount > 0)
+      bytes.Add((byte)bits);
+
+    return bytes.ToArray();
   }
 
   private static byte[] _Prefixed(int length) {
