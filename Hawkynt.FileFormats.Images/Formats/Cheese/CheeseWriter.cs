@@ -9,35 +9,17 @@ public static class CheeseWriter {
     ArgumentNullException.ThrowIfNull(file);
 
     var result = new byte[CheeseFile.ExpectedFileSize];
-    var offset = 0;
 
-    // Load address (2 bytes, little-endian)
-    result[offset] = (byte)(file.LoadAddress & 0xFF);
-    result[offset + 1] = (byte)(file.LoadAddress >> 8);
-    offset += CheeseFile.LoadAddressSize;
+    result[0] = (byte)(file.LoadAddress & 0xFF);
+    result[1] = (byte)(file.LoadAddress >> 8);
 
-    // Bitmap data (8000 bytes)
-    file.BitmapData.AsSpan(0, CheeseFile.BitmapDataSize).CopyTo(result.AsSpan(offset));
-    offset += CheeseFile.BitmapDataSize;
-
-    // Video matrix (1000 bytes)
-    file.VideoMatrix.AsSpan(0, CheeseFile.VideoMatrixSize).CopyTo(result.AsSpan(offset));
-    offset += CheeseFile.VideoMatrixSize;
-
-    // Color RAM (1000 bytes)
-    file.ColorRam.AsSpan(0, CheeseFile.ColorRamSize).CopyTo(result.AsSpan(offset));
-    offset += CheeseFile.ColorRamSize;
-
-    // Border color (1 byte)
-    result[offset] = file.BorderColor;
-    ++offset;
-
-    // Background color (1 byte)
-    result[offset] = file.BackgroundColor;
-    ++offset;
-
-    // Padding (14 bytes)
-    file.Padding.AsSpan(0, CheeseFile.PaddingSize).CopyTo(result.AsSpan(offset));
+    file.BitmapData.AsSpan(0, Math.Min(file.BitmapData.Length, CheeseFile.BitmapDataSize))
+      .CopyTo(result.AsSpan(CheeseFile.BitmapOffset));
+    file.VideoMatrix.AsSpan(0, Math.Min(file.VideoMatrix.Length, CheeseFile.VideoMatrixSize))
+      .CopyTo(result.AsSpan(CheeseFile.VideoMatrixOffset));
+    file.ColorRam.AsSpan(0, Math.Min(file.ColorRam.Length, CheeseFile.ColorRamSize))
+      .CopyTo(result.AsSpan(CheeseFile.ColorRamOffset));
+    result[CheeseFile.BackgroundOffset] = file.BackgroundColor;
 
     return result;
   }

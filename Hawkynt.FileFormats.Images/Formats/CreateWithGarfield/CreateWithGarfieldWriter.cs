@@ -9,19 +9,17 @@ public static class CreateWithGarfieldWriter {
     ArgumentNullException.ThrowIfNull(file);
 
     var result = new byte[CreateWithGarfieldFile.ExpectedFileSize];
-    var offset = 0;
 
-    result[offset] = (byte)(file.LoadAddress & 0xFF);
-    result[offset + 1] = (byte)(file.LoadAddress >> 8);
-    offset += CreateWithGarfieldFile.LoadAddressSize;
+    result[0] = (byte)(file.LoadAddress & 0xFF);
+    result[1] = (byte)(file.LoadAddress >> 8);
 
-    file.BitmapData.AsSpan(0, Math.Min(file.BitmapData.Length, CreateWithGarfieldFile.BitmapDataSize)).CopyTo(result.AsSpan(offset));
-    offset += CreateWithGarfieldFile.BitmapDataSize;
-
-    file.ScreenRam.AsSpan(0, Math.Min(file.ScreenRam.Length, CreateWithGarfieldFile.ScreenRamSize)).CopyTo(result.AsSpan(offset));
-    offset += CreateWithGarfieldFile.ScreenRamSize;
-
-    result[offset] = file.BorderColor;
+    file.BitmapData.AsSpan(0, Math.Min(file.BitmapData.Length, CreateWithGarfieldFile.BitmapDataSize))
+      .CopyTo(result.AsSpan(CreateWithGarfieldFile.BitmapOffset));
+    file.VideoMatrix.AsSpan(0, Math.Min(file.VideoMatrix.Length, CreateWithGarfieldFile.VideoMatrixSize))
+      .CopyTo(result.AsSpan(CreateWithGarfieldFile.VideoMatrixOffset));
+    file.ColorRam.AsSpan(0, Math.Min(file.ColorRam.Length, CreateWithGarfieldFile.ColorRamSize))
+      .CopyTo(result.AsSpan(CreateWithGarfieldFile.ColorRamOffset));
+    result[CreateWithGarfieldFile.BackgroundOffset] = file.BackgroundColor;
 
     return result;
   }

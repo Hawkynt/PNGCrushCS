@@ -54,11 +54,12 @@ public sealed class CreateWithGarfieldReaderTests {
 
     var result = CreateWithGarfieldReader.FromBytes(data);
 
-    Assert.That(result.Width, Is.EqualTo(320));
+    Assert.That(result.Width, Is.EqualTo(160));
     Assert.That(result.Height, Is.EqualTo(200));
     Assert.That(result.LoadAddress, Is.EqualTo(0x6000));
     Assert.That(result.BitmapData.Length, Is.EqualTo(8000));
-    Assert.That(result.ScreenRam.Length, Is.EqualTo(1000));
+    Assert.That(result.VideoMatrix.Length, Is.EqualTo(1000));
+    Assert.That(result.ColorRam.Length, Is.EqualTo(1000));
   }
 
   [Test]
@@ -88,13 +89,13 @@ public sealed class CreateWithGarfieldReaderTests {
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_BorderColor_ParsedCorrectly() {
+  public void FromBytes_BackgroundColor_ParsedCorrectly() {
     var data = new byte[CreateWithGarfieldFile.ExpectedFileSize];
-    data[9002] = 0x06; // border color at offset 2+8000+1000
+    data[CreateWithGarfieldFile.BackgroundOffset] = 0x06;
 
     var result = CreateWithGarfieldReader.FromBytes(data);
 
-    Assert.That(result.BorderColor, Is.EqualTo(0x06));
+    Assert.That(result.BackgroundColor, Is.EqualTo(0x06));
   }
 
   [Test]
@@ -107,7 +108,7 @@ public sealed class CreateWithGarfieldReaderTests {
     using var ms = new MemoryStream(data);
     var result = CreateWithGarfieldReader.FromStream(ms);
 
-    Assert.That(result.Width, Is.EqualTo(320));
+    Assert.That(result.Width, Is.EqualTo(160));
     Assert.That(result.Height, Is.EqualTo(200));
     Assert.That(result.LoadAddress, Is.EqualTo(0x6000));
   }
@@ -130,8 +131,9 @@ public sealed class CreateWithGarfieldRoundTripTests {
     var original = new CreateWithGarfieldFile {
       LoadAddress = 0x6000,
       BitmapData = bitmapData,
-      ScreenRam = screenRam,
-      BorderColor = 0x06,
+      VideoMatrix = screenRam,
+      ColorRam = screenRam,
+      BackgroundColor = 0x06,
     };
 
     var bytes = CreateWithGarfieldWriter.ToBytes(original);
@@ -141,8 +143,9 @@ public sealed class CreateWithGarfieldRoundTripTests {
     Assert.That(restored.Height, Is.EqualTo(original.Height));
     Assert.That(restored.LoadAddress, Is.EqualTo(original.LoadAddress));
     Assert.That(restored.BitmapData, Is.EqualTo(original.BitmapData));
-    Assert.That(restored.ScreenRam, Is.EqualTo(original.ScreenRam));
-    Assert.That(restored.BorderColor, Is.EqualTo(original.BorderColor));
+    Assert.That(restored.VideoMatrix, Is.EqualTo(original.VideoMatrix));
+    Assert.That(restored.ColorRam, Is.EqualTo(original.ColorRam));
+    Assert.That(restored.BackgroundColor, Is.EqualTo(original.BackgroundColor));
   }
 
   [Test]
@@ -151,8 +154,9 @@ public sealed class CreateWithGarfieldRoundTripTests {
     var original = new CreateWithGarfieldFile {
       LoadAddress = 0x4000,
       BitmapData = new byte[8000],
-      ScreenRam = new byte[1000],
-      BorderColor = 0,
+      VideoMatrix = new byte[1000],
+      ColorRam = new byte[1000],
+      BackgroundColor = 0,
     };
 
     var bytes = CreateWithGarfieldWriter.ToBytes(original);
@@ -173,8 +177,9 @@ public sealed class CreateWithGarfieldRoundTripTests {
     var original = new CreateWithGarfieldFile {
       LoadAddress = 0xFFFF,
       BitmapData = bitmapData,
-      ScreenRam = screenRam,
-      BorderColor = 0x0F,
+      VideoMatrix = screenRam,
+      ColorRam = screenRam,
+      BackgroundColor = 0x0F,
     };
 
     var bytes = CreateWithGarfieldWriter.ToBytes(original);
@@ -182,8 +187,9 @@ public sealed class CreateWithGarfieldRoundTripTests {
 
     Assert.That(restored.LoadAddress, Is.EqualTo(0xFFFF));
     Assert.That(restored.BitmapData, Is.EqualTo(original.BitmapData));
-    Assert.That(restored.ScreenRam, Is.EqualTo(original.ScreenRam));
-    Assert.That(restored.BorderColor, Is.EqualTo(0x0F));
+    Assert.That(restored.VideoMatrix, Is.EqualTo(original.VideoMatrix));
+    Assert.That(restored.ColorRam, Is.EqualTo(original.ColorRam));
+    Assert.That(restored.BackgroundColor, Is.EqualTo(0x0F));
   }
 
   [Test]
@@ -192,31 +198,33 @@ public sealed class CreateWithGarfieldRoundTripTests {
     var original = new CreateWithGarfieldFile {
       LoadAddress = 0x6000,
       BitmapData = new byte[8000],
-      ScreenRam = new byte[1000],
-      BorderColor = 0,
+      VideoMatrix = new byte[1000],
+      ColorRam = new byte[1000],
+      BackgroundColor = 0,
     };
 
     var bytes = CreateWithGarfieldWriter.ToBytes(original);
     var restored = CreateWithGarfieldReader.FromBytes(bytes);
 
-    Assert.That(restored.Width, Is.EqualTo(320));
+    Assert.That(restored.Width, Is.EqualTo(160));
     Assert.That(restored.Height, Is.EqualTo(200));
   }
 
   [Test]
   [Category("Integration")]
-  public void RoundTrip_BorderColorPreserved() {
+  public void RoundTrip_BackgroundColorPreserved() {
     var original = new CreateWithGarfieldFile {
       LoadAddress = 0x6000,
       BitmapData = new byte[8000],
-      ScreenRam = new byte[1000],
-      BorderColor = 0x0E,
+      VideoMatrix = new byte[1000],
+      ColorRam = new byte[1000],
+      BackgroundColor = 0x0E,
     };
 
     var bytes = CreateWithGarfieldWriter.ToBytes(original);
     var restored = CreateWithGarfieldReader.FromBytes(bytes);
 
-    Assert.That(restored.BorderColor, Is.EqualTo(0x0E));
+    Assert.That(restored.BackgroundColor, Is.EqualTo(0x0E));
   }
 }
 

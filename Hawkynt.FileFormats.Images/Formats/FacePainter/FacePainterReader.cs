@@ -34,27 +34,25 @@ public static class FacePainterReader {
     if (data.Length != FacePainterFile.ExpectedFileSize)
       throw new InvalidDataException($"Invalid Face Painter file size (expected {FacePainterFile.ExpectedFileSize} bytes, got {data.Length}).");
 
-    var offset = 0;
-
-    var loadAddress = (ushort)(data[offset] | (data[offset + 1] << 8));
-    offset += FacePainterFile.LoadAddressSize;
+    var loadAddress = (ushort)(data[0] | (data[1] << 8));
 
     var bitmapData = new byte[FacePainterFile.BitmapDataSize];
-    data.Slice(offset, FacePainterFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
-    offset += FacePainterFile.BitmapDataSize;
+    data.Slice(FacePainterFile.BitmapOffset, FacePainterFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
 
     var videoMatrix = new byte[FacePainterFile.VideoMatrixSize];
-    data.Slice(offset, FacePainterFile.VideoMatrixSize).CopyTo(videoMatrix.AsSpan(0));
-    offset += FacePainterFile.VideoMatrixSize;
+    data.Slice(FacePainterFile.VideoMatrixOffset, FacePainterFile.VideoMatrixSize).CopyTo(videoMatrix.AsSpan(0));
 
     var colorRam = new byte[FacePainterFile.ColorRamSize];
-    data.Slice(offset, FacePainterFile.ColorRamSize).CopyTo(colorRam.AsSpan(0));
+    data.Slice(FacePainterFile.ColorRamOffset, FacePainterFile.ColorRamSize).CopyTo(colorRam.AsSpan(0));
+
+    var backgroundColor = data[FacePainterFile.BackgroundOffset];
 
     return new() {
       LoadAddress = loadAddress,
       BitmapData = bitmapData,
       VideoMatrix = videoMatrix,
       ColorRam = colorRam,
+      BackgroundColor = backgroundColor,
     };
     }
 

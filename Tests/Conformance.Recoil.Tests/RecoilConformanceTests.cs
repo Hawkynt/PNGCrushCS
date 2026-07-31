@@ -35,6 +35,9 @@ public sealed class RecoilConformanceTests {
   public static readonly Pairing[] Pairings = [
     new(ImageFormat.Doodle, "Doodle", 320, 200),
     new(ImageFormat.CDUPaint, "CDU-Paint", 160, 200),
+    new(ImageFormat.Cheese, "Cheese", 160, 200),
+    new(ImageFormat.FacePainter, "Face Painter", 160, 200),
+    new(ImageFormat.CreateWithGarfield, "Create with Garfield", 160, 200),
     new(ImageFormat.DolphinEd, "Dolphin Ed", 160, 200),
     new(ImageFormat.Artist64, "Wigmore Artist 64", 160, 200),
     new(ImageFormat.HiEddi, "Hi-Eddi", 320, 200),

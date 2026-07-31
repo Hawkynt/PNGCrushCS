@@ -27,106 +27,32 @@ public static class CheeseReader {
   }
 
   public static CheeseFile FromSpan(ReadOnlySpan<byte> data) {
-
-    if (data.Length < CheeseFile.ExpectedFileSize)
-      throw new InvalidDataException($"Data too small for a valid Cheese file (expected {CheeseFile.ExpectedFileSize} bytes, got {data.Length}).");
-
     if (data.Length != CheeseFile.ExpectedFileSize)
-      throw new InvalidDataException($"Invalid Cheese file size (expected {CheeseFile.ExpectedFileSize} bytes, got {data.Length}).");
+      throw new InvalidDataException(
+        $"Invalid Cheese file size (expected {{CheeseFile.ExpectedFileSize}} bytes, got {{data.Length}}).");
 
-    var offset = 0;
+    var loadAddress = (ushort)(data[0] | (data[1] << 8));
 
-    // Load address (2 bytes, little-endian)
-    var loadAddress = (ushort)(data[offset] | (data[offset + 1] << 8));
-    offset += CheeseFile.LoadAddressSize;
-
-    // Bitmap data (8000 bytes)
     var bitmapData = new byte[CheeseFile.BitmapDataSize];
-    data.Slice(offset, CheeseFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
-    offset += CheeseFile.BitmapDataSize;
+    data.Slice(CheeseFile.BitmapOffset, CheeseFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
 
-    // Video matrix (1000 bytes)
     var videoMatrix = new byte[CheeseFile.VideoMatrixSize];
-    data.Slice(offset, CheeseFile.VideoMatrixSize).CopyTo(videoMatrix.AsSpan(0));
-    offset += CheeseFile.VideoMatrixSize;
+    data.Slice(CheeseFile.VideoMatrixOffset, CheeseFile.VideoMatrixSize).CopyTo(videoMatrix.AsSpan(0));
 
-    // Color RAM (1000 bytes)
     var colorRam = new byte[CheeseFile.ColorRamSize];
-    data.Slice(offset, CheeseFile.ColorRamSize).CopyTo(colorRam.AsSpan(0));
-    offset += CheeseFile.ColorRamSize;
-
-    // Border color (1 byte)
-    var borderColor = data[offset];
-    ++offset;
-
-    // Background color (1 byte)
-    var backgroundColor = data[offset];
-    ++offset;
-
-    // Padding (14 bytes)
-    var padding = new byte[CheeseFile.PaddingSize];
-    data.Slice(offset, CheeseFile.PaddingSize).CopyTo(padding.AsSpan(0));
+    data.Slice(CheeseFile.ColorRamOffset, CheeseFile.ColorRamSize).CopyTo(colorRam.AsSpan(0));
 
     return new() {
       LoadAddress = loadAddress,
       BitmapData = bitmapData,
       VideoMatrix = videoMatrix,
       ColorRam = colorRam,
-      BorderColor = borderColor,
-      BackgroundColor = backgroundColor,
-      Padding = padding,
+      BackgroundColor = data[CheeseFile.BackgroundOffset],
     };
-    }
+  }
 
   public static CheeseFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < CheeseFile.ExpectedFileSize)
-      throw new InvalidDataException($"Data too small for a valid Cheese file (expected {CheeseFile.ExpectedFileSize} bytes, got {data.Length}).");
-
-    if (data.Length != CheeseFile.ExpectedFileSize)
-      throw new InvalidDataException($"Invalid Cheese file size (expected {CheeseFile.ExpectedFileSize} bytes, got {data.Length}).");
-
-    var offset = 0;
-
-    // Load address (2 bytes, little-endian)
-    var loadAddress = (ushort)(data[offset] | (data[offset + 1] << 8));
-    offset += CheeseFile.LoadAddressSize;
-
-    // Bitmap data (8000 bytes)
-    var bitmapData = new byte[CheeseFile.BitmapDataSize];
-    data.AsSpan(offset, CheeseFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
-    offset += CheeseFile.BitmapDataSize;
-
-    // Video matrix (1000 bytes)
-    var videoMatrix = new byte[CheeseFile.VideoMatrixSize];
-    data.AsSpan(offset, CheeseFile.VideoMatrixSize).CopyTo(videoMatrix.AsSpan(0));
-    offset += CheeseFile.VideoMatrixSize;
-
-    // Color RAM (1000 bytes)
-    var colorRam = new byte[CheeseFile.ColorRamSize];
-    data.AsSpan(offset, CheeseFile.ColorRamSize).CopyTo(colorRam.AsSpan(0));
-    offset += CheeseFile.ColorRamSize;
-
-    // Border color (1 byte)
-    var borderColor = data[offset];
-    ++offset;
-
-    // Background color (1 byte)
-    var backgroundColor = data[offset];
-    ++offset;
-
-    // Padding (14 bytes)
-    var padding = new byte[CheeseFile.PaddingSize];
-    data.AsSpan(offset, CheeseFile.PaddingSize).CopyTo(padding.AsSpan(0));
-
-    return new() {
-      LoadAddress = loadAddress,
-      BitmapData = bitmapData,
-      VideoMatrix = videoMatrix,
-      ColorRam = colorRam,
-      BorderColor = borderColor,
-      BackgroundColor = backgroundColor,
-      Padding = padding,
-    };
+    return FromSpan(data);
   }
 }

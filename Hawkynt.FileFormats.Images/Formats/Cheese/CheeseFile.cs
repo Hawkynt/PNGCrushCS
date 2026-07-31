@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Cheese;
 
 /// <summary>In-memory representation of a Commodore 64 Cheese paint image.</summary>
-public readonly record struct CheeseFile : IImageFormatReader<CheeseFile>, IImageToRawImage<CheeseFile>, IImageFormatWriter<CheeseFile> {
+public readonly record struct CheeseFile : IImageFormatReader<CheeseFile>, IImageToRawImage<CheeseFile>, IImageFromRawImage<CheeseFile>, IImageFormatWriter<CheeseFile> {
 
   static string IImageFormatMetadata<CheeseFile>.PrimaryExtension => ".che";
   static string[] IImageFormatMetadata<CheeseFile>.FileExtensions => [".che", ".chs"];
@@ -18,13 +18,30 @@ public readonly record struct CheeseFile : IImageFormatReader<CheeseFile>, IImag
   public const int FixedHeight = 200;
 
   /// <summary>The expected total file size in bytes (2 + 8000 + 1000 + 1000 + 1 + 1 + 14).</summary>
-  public const int ExpectedFileSize = 10018;
+  public const int ExpectedFileSize = 20482;
 
   /// <summary>Size of the load address in bytes.</summary>
   internal const int LoadAddressSize = 2;
 
   /// <summary>Size of the bitmap data section in bytes.</summary>
   internal const int BitmapDataSize = 8000;
+
+  /// <summary>Where the bitmap starts.</summary>
+  /// <remarks>
+  /// The bitmap is given far more room than a screen needs — the file reserves two whole sets of
+  /// pages for it — so the video matrix does not begin until 16898, well past the eight thousand
+  /// bytes the picture actually occupies.
+  /// </remarks>
+  public const int BitmapOffset = 2;
+
+  /// <summary>Where the video matrix starts.</summary>
+  public const int VideoMatrixOffset = 16898;
+
+  /// <summary>Where the colour RAM starts.</summary>
+  public const int ColorRamOffset = 18434;
+
+  /// <summary>Where the shared background register sits.</summary>
+  public const int BackgroundOffset = 20479;
 
   /// <summary>Size of the video matrix section in bytes.</summary>
   internal const int VideoMatrixSize = 1000;
@@ -67,4 +84,24 @@ public readonly record struct CheeseFile : IImageFormatReader<CheeseFile>, IImag
     => Commodore64Graphics.DecodeMulticolor(
       file.BitmapData, file.VideoMatrix, file.ColorRam, file.BackgroundColor, FixedWidth, FixedHeight);
 
+  /// <summary>Builds a screen, choosing three of the machine's colours for every character cell.</summary>
+  public static CheeseFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(FixedWidth, FixedHeight);
+    var bitmap = new byte[BitmapDataSize];
+    var matrix = new byte[VideoMatrixSize];
+    var colors = new byte[ColorRamSize];
+    var background = Commodore64Graphics.EncodeMulticolor(
+      rgb.PixelData, FixedWidth, FixedHeight, bitmap, matrix, colors);
+
+    return new() {
+      LoadAddress = 0x4000,
+      BitmapData = bitmap,
+      VideoMatrix = matrix,
+      ColorRam = colors,
+      BackgroundColor = background,
+      BorderColor = background,
+    };
+  }
 }

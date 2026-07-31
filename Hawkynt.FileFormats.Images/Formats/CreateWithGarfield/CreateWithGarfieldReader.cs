@@ -27,64 +27,32 @@ public static class CreateWithGarfieldReader {
   }
 
   public static CreateWithGarfieldFile FromSpan(ReadOnlySpan<byte> data) {
-
-    if (data.Length < CreateWithGarfieldFile.ExpectedFileSize)
-      throw new InvalidDataException($"Data too small for a valid Create with Garfield file (expected {CreateWithGarfieldFile.ExpectedFileSize} bytes, got {data.Length}).");
-
     if (data.Length != CreateWithGarfieldFile.ExpectedFileSize)
-      throw new InvalidDataException($"Invalid Create with Garfield file size (expected {CreateWithGarfieldFile.ExpectedFileSize} bytes, got {data.Length}).");
+      throw new InvalidDataException(
+        $"Invalid Create with Garfield file size (expected {{CreateWithGarfieldFile.ExpectedFileSize}} bytes, got {{data.Length}}).");
 
-    var offset = 0;
-
-    var loadAddress = (ushort)(data[offset] | (data[offset + 1] << 8));
-    offset += CreateWithGarfieldFile.LoadAddressSize;
+    var loadAddress = (ushort)(data[0] | (data[1] << 8));
 
     var bitmapData = new byte[CreateWithGarfieldFile.BitmapDataSize];
-    data.Slice(offset, CreateWithGarfieldFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
-    offset += CreateWithGarfieldFile.BitmapDataSize;
+    data.Slice(CreateWithGarfieldFile.BitmapOffset, CreateWithGarfieldFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
 
-    var screenRam = new byte[CreateWithGarfieldFile.ScreenRamSize];
-    data.Slice(offset, CreateWithGarfieldFile.ScreenRamSize).CopyTo(screenRam.AsSpan(0));
-    offset += CreateWithGarfieldFile.ScreenRamSize;
+    var videoMatrix = new byte[CreateWithGarfieldFile.VideoMatrixSize];
+    data.Slice(CreateWithGarfieldFile.VideoMatrixOffset, CreateWithGarfieldFile.VideoMatrixSize).CopyTo(videoMatrix.AsSpan(0));
 
-    var borderColor = data[offset];
+    var colorRam = new byte[CreateWithGarfieldFile.ColorRamSize];
+    data.Slice(CreateWithGarfieldFile.ColorRamOffset, CreateWithGarfieldFile.ColorRamSize).CopyTo(colorRam.AsSpan(0));
 
     return new() {
       LoadAddress = loadAddress,
       BitmapData = bitmapData,
-      ScreenRam = screenRam,
-      BorderColor = borderColor,
+      VideoMatrix = videoMatrix,
+      ColorRam = colorRam,
+      BackgroundColor = data[CreateWithGarfieldFile.BackgroundOffset],
     };
-    }
+  }
 
   public static CreateWithGarfieldFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < CreateWithGarfieldFile.ExpectedFileSize)
-      throw new InvalidDataException($"Data too small for a valid Create with Garfield file (expected {CreateWithGarfieldFile.ExpectedFileSize} bytes, got {data.Length}).");
-
-    if (data.Length != CreateWithGarfieldFile.ExpectedFileSize)
-      throw new InvalidDataException($"Invalid Create with Garfield file size (expected {CreateWithGarfieldFile.ExpectedFileSize} bytes, got {data.Length}).");
-
-    var offset = 0;
-
-    var loadAddress = (ushort)(data[offset] | (data[offset + 1] << 8));
-    offset += CreateWithGarfieldFile.LoadAddressSize;
-
-    var bitmapData = new byte[CreateWithGarfieldFile.BitmapDataSize];
-    data.AsSpan(offset, CreateWithGarfieldFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
-    offset += CreateWithGarfieldFile.BitmapDataSize;
-
-    var screenRam = new byte[CreateWithGarfieldFile.ScreenRamSize];
-    data.AsSpan(offset, CreateWithGarfieldFile.ScreenRamSize).CopyTo(screenRam.AsSpan(0));
-    offset += CreateWithGarfieldFile.ScreenRamSize;
-
-    var borderColor = data[offset];
-
-    return new() {
-      LoadAddress = loadAddress,
-      BitmapData = bitmapData,
-      ScreenRam = screenRam,
-      BorderColor = borderColor,
-    };
+    return FromSpan(data);
   }
 }

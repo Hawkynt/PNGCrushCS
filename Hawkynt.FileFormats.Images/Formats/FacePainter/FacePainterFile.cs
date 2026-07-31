@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.FacePainter;
 
 /// <summary>In-memory representation of a Commodore 64 Face Painter multicolor image.</summary>
-public readonly record struct FacePainterFile : IImageFormatReader<FacePainterFile>, IImageToRawImage<FacePainterFile>, IImageFormatWriter<FacePainterFile> {
+public readonly record struct FacePainterFile : IImageFormatReader<FacePainterFile>, IImageToRawImage<FacePainterFile>, IImageFromRawImage<FacePainterFile>, IImageFormatWriter<FacePainterFile> {
 
   static string IImageFormatMetadata<FacePainterFile>.PrimaryExtension => ".fpt";
   static string[] IImageFormatMetadata<FacePainterFile>.FileExtensions => [".fpt"];
@@ -18,10 +18,22 @@ public readonly record struct FacePainterFile : IImageFormatReader<FacePainterFi
   public const int FixedHeight = 200;
 
   /// <summary>The expected total file size in bytes (2 + 8000 + 1000 + 1000).</summary>
-  public const int ExpectedFileSize = 10002;
+  public const int ExpectedFileSize = 10004;
 
   /// <summary>Size of the bitmap data section in bytes.</summary>
   internal const int BitmapDataSize = 8000;
+
+  /// <summary>Where the bitmap starts.</summary>
+  public const int BitmapOffset = 2;
+
+  /// <summary>Where the video matrix starts.</summary>
+  public const int VideoMatrixOffset = 8002;
+
+  /// <summary>Where the colour RAM starts.</summary>
+  public const int ColorRamOffset = 9002;
+
+  /// <summary>Where the shared background register sits.</summary>
+  public const int BackgroundOffset = 10002;
 
   /// <summary>Size of the video matrix section in bytes.</summary>
   internal const int VideoMatrixSize = 1000;
@@ -51,9 +63,30 @@ public readonly record struct FacePainterFile : IImageFormatReader<FacePainterFi
   public byte[] ColorRam { get; init; }
 
   /// <summary>Converts this Face Painter image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
+  /// <summary>The colour shown behind pattern 00, which the file stores after the colour RAM.</summary>
+  public byte BackgroundColor { get; init; }
+
   public static RawImage ToRawImage(FacePainterFile file)
     => Commodore64Graphics.DecodeMulticolor(
-      // Pattern 00 is always black here: neither format stores a background register.
-      file.BitmapData, file.VideoMatrix, file.ColorRam, 0, FixedWidth, FixedHeight);
+      file.BitmapData, file.VideoMatrix, file.ColorRam, file.BackgroundColor, FixedWidth, FixedHeight);
 
+  /// <summary>Builds a screen, choosing three of the machine's colours for every character cell.</summary>
+  public static FacePainterFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(FixedWidth, FixedHeight);
+    var bitmap = new byte[BitmapDataSize];
+    var matrix = new byte[VideoMatrixSize];
+    var colors = new byte[ColorRamSize];
+    var background = Commodore64Graphics.EncodeMulticolor(
+      rgb.PixelData, FixedWidth, FixedHeight, bitmap, matrix, colors);
+
+    return new() {
+      LoadAddress = 0x4000,
+      BitmapData = bitmap,
+      VideoMatrix = matrix,
+      ColorRam = colors,
+      BackgroundColor = background,
+    };
+  }
 }
