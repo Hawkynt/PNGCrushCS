@@ -211,6 +211,8 @@ public sealed class RecoilDecodeAgreementTests {
     new("MINIPAINT", ImageFormat.MiniPaint, ".mg", _MiniPaint),
     new("PaintShop, compressed", ImageFormat.PaintShopCompressed, ".psc", () => _PaintShop(false)),
     new("PaintShop, stored", ImageFormat.PaintShopCompressed, ".psc", () => _PaintShop(true)),
+    new("Kompresor do Animatora", ImageFormat.AnimatorCompressor, ".kpr", () => _Animator(4, 5, 3, 24)),
+    new("Kompresor do Animatora, one frame", ImageFormat.AnimatorCompressor, ".kpr", () => _Animator(1, 8, 8, 40)),
   ];
 
   [Test]
@@ -1392,6 +1394,35 @@ public sealed class RecoilDecodeAgreementTests {
     body.Add(255);
 
     return body.ToArray();
+  }
+
+  /// <summary>
+  /// A Kompresor do Animatora animation. The map names tiles that must all exist, so the counts and
+  /// the tile block have to agree — and being an Atari executable is the only signature there is,
+  /// which means the declared block has to account for the file exactly.
+  /// </summary>
+  private static byte[] _Animator(int frames, int columns, int rows, int tileCount) {
+    var map = frames * columns * rows;
+    var length = 11 + map + tileCount * 8;
+
+    var data = _Monochrome(length);
+    data[0] = data[1] = 0xFF;
+
+    var start = 0x4000;
+    var end = start + length - 6 - 1;
+    data[2] = (byte)start;
+    data[3] = (byte)(start >> 8);
+    data[4] = (byte)end;
+    data[5] = (byte)(end >> 8);
+
+    data[8] = (byte)frames;
+    data[9] = (byte)columns;
+    data[10] = (byte)rows;
+
+    for (var i = 0; i < map; ++i)
+      data[11 + i] = (byte)(i % tileCount);
+
+    return data;
   }
 
   private static byte[] _Prefixed(int length) {
