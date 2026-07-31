@@ -347,7 +347,87 @@ public sealed class RecoilDecodeAgreementTests {
     new("ICE mode 37", ImageFormat.AtariIce, ".ice", () => _AtariIce(37, 1027)),
     new("ICE mode 5, long", ImageFormat.AtariIce, ".ice", () => _AtariIce(5, 2066)),
     new("ICE PCIN+", ImageFormat.IcePcinPlus, ".ip2", _IcePcinPlus),
+    new("Kitty, short tiles", ImageFormat.Kitty, ".kty", () => _Kitty(0)),
+    new("Kitty, tall tiles", ImageFormat.Kitty, ".kt4", () => _Kitty(1)),
+    new("Kitty, two-half tiles", ImageFormat.Kitty, ".kty", () => _Kitty(2)),
   ];
+
+  /// <summary>
+  /// A Kitty picture: blocks of one tile and the rectangles and positions it fills, then a fill of
+  /// whatever is left.
+  /// </summary>
+  private static byte[] _Kitty(int mode) {
+    var body = new System.Collections.Generic.List<byte>();
+    var tileSize = mode < 2 ? 3 : 6;
+
+    void Tile(int seed) {
+      for (var i = 0; i < tileSize; ++i)
+        body.Add((byte)(seed * 37 + i * 53));
+    }
+
+    // Three blocks, so the fill has something left to do but not the whole picture.
+    for (var block = 0; block < 3; ++block) {
+      body.Add((byte)mode);
+      Tile(block + 1);
+
+      // A rectangle with both extents, one that is a single row, and one that is a single column.
+      var top = block * 12;
+      body.AddRange([(byte)((top * 160 + 5) >> 8), (byte)(top * 160 + 5), 40, (byte)(top + 4)]);
+
+      var rowStart = (top + 6) * 160 + 10;
+      body.AddRange([(byte)(64 | (rowStart >> 8)), (byte)rowStart, 90]);
+
+      var columnStart = (top + 8) * 160 + 100;
+      body.AddRange([(byte)(128 | (columnStart >> 8)), (byte)columnStart, (byte)(top + 11)]);
+      body.Add(255);
+
+      // Then a few single positions.
+      for (var i = 0; i < 4; ++i)
+        body.AddRange([(byte)(120 + i * 5), (byte)(block * 12 + i)]);
+
+      body.Add(255);
+    }
+
+    body.Add(255);
+
+    // Everything still blank is filled in scan order, so the count has to be exact.
+    var drawn = _KittyDrawnCount(mode);
+    var fillTileSize = mode == 0 ? 3 : 6;
+    for (var i = 0; i < 160 * 100 - drawn; ++i)
+    for (var j = 0; j < fillTileSize; ++j)
+      body.Add((byte)(i * 29 + j * 71));
+
+    return body.ToArray();
+  }
+
+  /// <summary>How many of a Kitty probe's tiles the blocks above have already covered.</summary>
+  private static int _KittyDrawnCount(int mode) {
+    var drawn = new bool[160 * 100];
+
+    for (var block = 0; block < 3; ++block) {
+      var top = block * 12;
+      for (var y = top; y <= top + 4; ++y)
+      for (var x = 5; x <= 40; ++x)
+        drawn[y * 160 + x] = true;
+
+      for (var x = 10; x <= 90; ++x)
+        drawn[(top + 6) * 160 + x] = true;
+
+      for (var y = top + 8; y <= top + 11; ++y)
+        drawn[y * 160 + 100] = true;
+
+      for (var i = 0; i < 4; ++i)
+        drawn[(block * 12 + i) * 160 + 120 + i * 5] = true;
+    }
+
+    var count = 0;
+    foreach (var cell in drawn) {
+      if (cell)
+        ++count;
+    }
+
+    return count;
+  }
 
   /// <summary>
   /// An Interlace Character Editor file in one of its thirty-three mode pairings, which the first
