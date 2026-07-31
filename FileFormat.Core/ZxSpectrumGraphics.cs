@@ -64,4 +64,82 @@ public static class ZxSpectrumGraphics {
     var bright = ink >= 8 || paper >= 8 ? 1 : 0;
     return (byte)((bright << 6) | (((paper & 7)) << 3) | (ink & 7));
   }
+
+  /// <summary>
+  /// Chooses the attribute and the eight bitmap bytes that come closest to one character cell.
+  /// </summary>
+  /// <param name="rgb">The picture, three bytes a pixel.</param>
+  /// <param name="width">Pixels across the picture.</param>
+  /// <param name="left">The cell's leftmost column.</param>
+  /// <param name="top">The cell's topmost row.</param>
+  /// <param name="bits">Receives the cell's eight rows, a bit a pixel, ink where set.</param>
+  /// <remarks>
+  /// This is the whole of what makes a Spectrum picture a Spectrum picture. A cell may show two
+  /// colours out of fifteen and no more, and the two must agree about brightness — the bright bit
+  /// belongs to the cell, not to either colour — so the choice is over 128 pairs rather than over
+  /// all 240. Trying every pair is cheaper than any cleverness: it is 128 comparisons against 64
+  /// pixels, and it is exact.
+  /// <para/>
+  /// No error is diffused across a cell boundary. A dither would spread a colour into a cell that
+  /// cannot show it, and the attribute clash that results is worse than the banding it fixes —
+  /// which is why Spectrum artists dithered within a cell and never across one.
+  /// </remarks>
+  public static byte ChooseCell(ReadOnlySpan<byte> rgb, int width, int left, int top, Span<byte> bits) {
+    var best = (byte)0;
+    var bestCost = long.MaxValue;
+    Span<byte> bestBits = stackalloc byte[8];
+
+    for (var bright = 0; bright < 2; ++bright)
+    for (var ink = 0; ink < 8; ++ink)
+    for (var paper = 0; paper < 8; ++paper) {
+      var inkEntry = (bright * 8 + ink) * 3;
+      var paperEntry = (bright * 8 + paper) * 3;
+      var cost = 0L;
+      Span<byte> pattern = stackalloc byte[8];
+
+      for (var y = 0; y < 8; ++y) {
+        var value = 0;
+        for (var x = 0; x < 8; ++x) {
+          var at = ((top + y) * width + left + x) * 3;
+          if (at + 2 >= rgb.Length)
+            continue;
+
+          var inkCost = _Distance(rgb, at, inkEntry);
+          var paperCost = _Distance(rgb, at, paperEntry);
+
+          if (inkCost <= paperCost) {
+            value |= 1 << (7 - x);
+            cost += inkCost;
+          } else
+            cost += paperCost;
+        }
+
+        pattern[y] = (byte)value;
+      }
+
+      if (cost >= bestCost)
+        continue;
+
+      bestCost = cost;
+      best = Attribute(bright * 8 + ink, bright * 8 + paper);
+      pattern.CopyTo(bestBits);
+
+      if (cost == 0)
+        goto done;
+    }
+
+    done:
+    bestBits.CopyTo(bits);
+
+    return best;
+  }
+
+  /// <summary>How far a pixel is from a palette entry, weighted the way the eye weights it.</summary>
+  private static long _Distance(ReadOnlySpan<byte> rgb, int pixel, int entry) {
+    long dr = rgb[pixel] - Palette[entry];
+    long dg = rgb[pixel + 1] - Palette[entry + 1];
+    long db = rgb[pixel + 2] - Palette[entry + 2];
+
+    return dr * dr * 77 + dg * dg * 150 + db * db * 29;
+  }
 }

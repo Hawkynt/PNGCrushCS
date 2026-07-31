@@ -182,9 +182,9 @@ build one from pixel data they didn't read, so the registry reports them as read
 | UIMG                    | .bp1, .bp2, .bp4, .c01, .c02, .c04                   | Any Atari palette and pixel form | Y      | —      | —         | R     | —   | —      | —         |
 | PL4                     | .pl4                                                 | Two ST screens in an LZ4 frame   | Y      | —      | —         | R     | —   | —      | —         |
 | Shape table             | .shp                                                 | Four programs, one extension     | Y      | —      | —         | R     | —   | —      | —         |
-| CHR$                    | .ch$                                                 | Spectrum font with its colours   | Y      | —      | —         | R     | —   | —      | —         |
+| CHR$                    | .ch$                                                 | Spectrum font with its colours   | Y      | Y      | —         | R     | —   | —      | —         |
 | Big font                | .chx                                                 | Characters of any size in cells  | Y      | —      | —         | R     | —   | —      | —         |
-| Border Screen by Trefi  | .bsp                                                 | Screen and border, one or two    | Y      | —      | —         | R     | —   | —      | —         |
+| Border Screen by Trefi  | .bsp                                                 | Screen and border, one or two    | Y      | Y      | —         | R     | —   | —      | —         |
 | Falcon Fuckpaint        | .pi4, .pi7, .pi9                                     | Falcon palette and eight planes  | Y      | —      | —         | R     | —   | —      | —         |
 | DEGAS Elite icon        | .icn                                                 | An icon exported as C source     | Y      | Y      | —         | R     | —   | —      | —         |
 | ColorSTar object        | .obj                                                 | Clipping, mono or sixteen colours | Y     | —      | —         | R     | —   | —      | —         |

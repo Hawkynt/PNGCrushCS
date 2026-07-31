@@ -17,7 +17,8 @@ namespace FileFormat.ZxTrefiBorderScreen;
 /// abandons it rather than carrying it over.
 /// </remarks>
 public readonly record struct ZxTrefiBorderScreenFile
-  : IImageFormatReader<ZxTrefiBorderScreenFile>, IImageToRawImage<ZxTrefiBorderScreenFile> {
+  : IImageFormatReader<ZxTrefiBorderScreenFile>, IImageToRawImage<ZxTrefiBorderScreenFile>,
+    IImageFromRawImage<ZxTrefiBorderScreenFile>, IImageFormatWriter<ZxTrefiBorderScreenFile> {
 
   /// <summary>Bytes one field's bitmap and attributes occupy.</summary>
   public const int ScreenSize = 6912;
@@ -41,6 +42,8 @@ public readonly record struct ZxTrefiBorderScreenFile
   static string[] IImageFormatMetadata<ZxTrefiBorderScreenFile>.FileExtensions => [".bsp"];
   static ZxTrefiBorderScreenFile IImageFormatReader<ZxTrefiBorderScreenFile>.FromSpan(ReadOnlySpan<byte> data)
     => ZxTrefiBorderScreenReader.FromSpan(data);
+  static byte[] IImageFormatWriter<ZxTrefiBorderScreenFile>.ToBytes(ZxTrefiBorderScreenFile file)
+    => ZxTrefiBorderScreenWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<ZxTrefiBorderScreenFile>.VideoModes => [
     new("ZX Spectrum", [(IntegerRange.Any, IntegerRange.Any)], [15])
   ];
@@ -142,5 +145,54 @@ public readonly record struct ZxTrefiBorderScreenFile
     red = ZxSpectrumGraphics.Palette[entry];
     green = ZxSpectrumGraphics.Palette[entry + 1];
     blue = ZxSpectrumGraphics.Palette[entry + 2];
+  }
+
+  /// <summary>Builds a screen from a picture, a character cell at a time.</summary>
+  /// <remarks>
+  /// The display file is not in scanline order — it is addressed as third, then row within the
+  /// third, then scanline within the row — so a picture written to it linearly comes out sheared
+  /// into three bands. The attributes are in ordinary order, which is the one thing about the
+  /// Spectrum's memory map that is not surprising.
+  /// </remarks>
+  public static ZxTrefiBorderScreenFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width < 1 || image.Height < 1)
+      throw new ArgumentException("A screen needs at least one pixel.", nameof(image));
+
+    var rgb = PixelConverter.Convert(image, PixelFormat.Rgb24);
+    var width = ZxSpectrumGraphics.ScreenWidth;
+    var height = ZxSpectrumGraphics.ScreenHeight;
+    var scaled = new byte[width * height * 3];
+
+    for (var y = 0; y < height; ++y)
+    for (var x = 0; x < width; ++x) {
+      var sourceX = image.Width == width ? x : x * image.Width / width;
+      var sourceY = image.Height == height ? y : y * image.Height / height;
+      var source = (sourceY * image.Width + sourceX) * 3;
+      var target = (y * width + x) * 3;
+
+      scaled[target] = rgb.PixelData[source];
+      scaled[target + 1] = rgb.PixelData[source + 1];
+      scaled[target + 2] = rgb.PixelData[source + 2];
+    }
+
+    var data = new byte[FirstBitmapOffset + ScreenSize];
+    var bits = new byte[8];
+
+    for (var row = 0; row < height / 8; ++row)
+    for (var column = 0; column < width / 8; ++column) {
+      var attribute = ZxSpectrumGraphics.ChooseCell(scaled, width, column * 8, row * 8, bits);
+      data[FirstBitmapOffset + ZxSpectrumGraphics.BitmapSize + row * (width / 8) + column] = attribute;
+
+      for (var y = 0; y < 8; ++y)
+        data[FirstBitmapOffset + ZxSpectrumGraphics.LineOffset(row * 8 + y) + column] = bits[y];
+    }
+
+    return new() {
+      Data = data,
+      Width = width,
+      Height = height,
+      Fields = [(FirstBitmapOffset, -1)],
+    };
   }
 }

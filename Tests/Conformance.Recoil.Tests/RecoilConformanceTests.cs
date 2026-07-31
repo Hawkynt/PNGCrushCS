@@ -38,6 +38,8 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.ArtMaster88, "Art Master 88", 640, 400),
     new(ImageFormat.MsxScc, "MSX2+ Screen 12", 256, 212),
     new(ImageFormat.ZxPaintyOne, "ZXpaintyONE", 256, 192),
+    new(ImageFormat.ChrDollar, "CHR$", 96, 64),
+    new(ImageFormat.ZxTrefiBorderScreen, "Border Screen by Trefi", 256, 192),
     new(ImageFormat.SemiGraphicLogo, "Semi-Graphic logos", 320, 192),
     new(ImageFormat.DirLogoMaker, "Dir Logo Maker", 88, 128),
     new(ImageFormat.DegasIcon, "DEGAS Elite icon", 37, 23),

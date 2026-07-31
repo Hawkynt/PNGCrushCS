@@ -49,6 +49,9 @@ public sealed class LosslessWriterTests {
     /// <summary>A picture made of the machine's own character shapes, unpatched.</summary>
     AtariRomGlyphs,
 
+    /// <summary>Two of the Spectrum's colours per character cell, which is all a cell may show.</summary>
+    ZxAttributes,
+
     /// <summary>Anything.</summary>
     Full,
   }
@@ -66,6 +69,8 @@ public sealed class LosslessWriterTests {
     new("ZXpaintyONE", ImageFormat.ZxPaintyOne, Palette.Zx81Glyphs, 256, 192),
     new("Semi-Graphic logos", ImageFormat.SemiGraphicLogo, Palette.AtariGlyphs, 320, 192),
     new("Dir Logo Maker", ImageFormat.DirLogoMaker, Palette.AtariRomGlyphs, 88, 128),
+    new("CHR$", ImageFormat.ChrDollar, Palette.ZxAttributes, 96, 64),
+    new("Border Screen by Trefi", ImageFormat.ZxTrefiBorderScreen, Palette.ZxAttributes, 256, 192),
   ];
 
   private static IEnumerable<TestCaseData> Cases() {
@@ -178,6 +183,21 @@ public sealed class LosslessWriterTests {
             : (FileFormat.Core.Atari8BitGraphics.ApplyPalette([14])[0], (byte)0);
 
           rgb[at] = rgb[at + 1] = rgb[at + 2] = lit != 0 ? ink : paper;
+          break;
+        }
+
+        // Two colours a cell and no more, so the picture is within what an attribute can hold —
+        // and the two are chosen to share brightness, which the hardware requires of them.
+        case Palette.ZxAttributes: {
+          var cell = (x / 8) + (row / 8) * 3;
+          var bright = cell % 2;
+          var ink = (bright * 8 + cell % 8) * 3;
+          var paper = (bright * 8 + (cell * 5 + 3) % 8) * 3;
+          var entry = (x / 2 + row / 3) % 2 == 0 ? ink : paper;
+
+          rgb[at] = FileFormat.Core.ZxSpectrumGraphics.Palette[entry];
+          rgb[at + 1] = FileFormat.Core.ZxSpectrumGraphics.Palette[entry + 1];
+          rgb[at + 2] = FileFormat.Core.ZxSpectrumGraphics.Palette[entry + 2];
           break;
         }
 

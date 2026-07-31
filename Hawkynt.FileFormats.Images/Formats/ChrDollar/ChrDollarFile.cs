@@ -13,7 +13,8 @@ namespace FileFormat.ChrDollar;
 /// between two versions of itself.
 /// </remarks>
 public readonly record struct ChrDollarFile
-  : IImageFormatReader<ChrDollarFile>, IImageToRawImage<ChrDollarFile> {
+  : IImageFormatReader<ChrDollarFile>, IImageToRawImage<ChrDollarFile>,
+    IImageFromRawImage<ChrDollarFile>, IImageFormatWriter<ChrDollarFile> {
 
   /// <summary>Bytes a single-field cell occupies: eight rows of bitmap and one attribute.</summary>
   public const int BytesPerCell = 9;
@@ -25,6 +26,7 @@ public readonly record struct ChrDollarFile
   static string[] IImageFormatMetadata<ChrDollarFile>.FileExtensions => [".ch$"];
   static ChrDollarFile IImageFormatReader<ChrDollarFile>.FromSpan(ReadOnlySpan<byte> data)
     => ChrDollarReader.FromSpan(data);
+  static byte[] IImageFormatWriter<ChrDollarFile>.ToBytes(ChrDollarFile file) => ChrDollarWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<ChrDollarFile>.VideoModes => [
     new("ZX Spectrum", [(IntegerRange.Any, IntegerRange.Any)], [15])
   ];
@@ -72,5 +74,45 @@ public readonly record struct ChrDollarFile
       Format = PixelFormat.Rgb24,
       PixelData = fields.Length == 1 ? fields[0] : FrameBlend.Average(fields[0], fields[1]),
     };
+  }
+
+  /// <summary>Builds a font from a picture, a character cell at a time.</summary>
+  /// <remarks>
+  /// One field rather than two. Two fields exist to show colours a cell cannot hold by flickering
+  /// between them, which needs a decision about what to trade for what — and a picture written as
+  /// one field is a picture, where a badly chosen pair of fields is a flicker.
+  /// <para/>
+  /// The size is rounded up to whole cells, since a cell is the smallest thing the format has.
+  /// </remarks>
+  public static ChrDollarFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width < 1 || image.Height < 1)
+      throw new ArgumentException("A font needs at least one pixel.", nameof(image));
+
+    var columns = (image.Width + 7) / 8;
+    var rows = (image.Height + 7) / 8;
+    if (columns > 255 || rows > 255)
+      throw new ArgumentException($"A font is at most 255 cells each way, got {columns}x{rows}.", nameof(image));
+
+    var rgb = PixelConverter.Convert(image, PixelFormat.Rgb24);
+
+    // The picture is padded out to whole cells so a cell at the edge has something to match.
+    var width = columns * 8;
+    var padded = new byte[width * rows * 8 * 3];
+    for (var y = 0; y < image.Height; ++y)
+      rgb.PixelData.AsSpan(y * image.Width * 3, image.Width * 3).CopyTo(padded.AsSpan(y * width * 3));
+
+    var cells = new byte[rows * columns * BytesPerCell];
+    var at = 0;
+    var bits = new byte[8];
+
+    for (var row = 0; row < rows; ++row)
+    for (var column = 0; column < columns; ++column, at += BytesPerCell) {
+      var attribute = ZxSpectrumGraphics.ChooseCell(padded, width, column * 8, row * 8, bits);
+      bits.CopyTo(cells, at);
+      cells[at + 8] = attribute;
+    }
+
+    return new() { Columns = columns, Rows = rows, Frames = 1, Cells = cells };
   }
 }
