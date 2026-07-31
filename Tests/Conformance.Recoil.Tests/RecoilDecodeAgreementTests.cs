@@ -276,6 +276,8 @@ public sealed class RecoilDecodeAgreementTests {
     new("UIMG true colour, two bytes", ImageFormat.Uimg, ".c02", () => _Uimg(0, 16, 2)),
     new("UIMG true colour, three bytes", ImageFormat.Uimg, ".c04", () => _Uimg(0, 24, 3)),
     new("UIMG true colour, four bytes", ImageFormat.Uimg, ".c04", () => _Uimg(0, 32, 4)),
+    new("PL4", ImageFormat.Pl4Picture, ".pl4", () => _Pl4(false)),
+    new("PL4, stored blocks", ImageFormat.Pl4Picture, ".pl4", () => _Pl4(true)),
   ];
 
   [Test]
@@ -2864,6 +2866,50 @@ public sealed class RecoilDecodeAgreementTests {
     data[13] = (byte)height;
 
     return data;
+  }
+
+  /// <summary>
+  /// A PL4 picture, packed here into an LZ4 frame. One probe stores its blocks outright and one
+  /// compresses them, since the two take different paths through the frame reader.
+  /// </summary>
+  private static byte[] _Pl4(bool stored) {
+    var unpacked = _Monochrome(64070);
+    unpacked[0] = unpacked[1] = 0;
+    unpacked[32036] = unpacked[32037] = 0;
+
+    var body = new System.Collections.Generic.List<byte> { 4, 34, 77, 24, 64, 112, 0 };
+
+    for (var at = 0; at < unpacked.Length;) {
+      var take = Math.Min(16384, unpacked.Length - at);
+
+      if (stored) {
+        var size = take | int.MinValue;
+        body.AddRange([(byte)size, (byte)(size >> 8), (byte)(size >> 16), (byte)(size >> 24)]);
+        body.AddRange(unpacked[at..(at + take)]);
+        at += take;
+        continue;
+      }
+
+      // One sequence of literals and no match. A literals-only sequence has to be the last in its
+      // block, so the whole block is one token however long its run is.
+      var block = new System.Collections.Generic.List<byte> { 15 << 4 };
+      var remaining = take - 15;
+      while (remaining >= 255) {
+        block.Add(255);
+        remaining -= 255;
+      }
+
+      block.Add((byte)remaining);
+      block.AddRange(unpacked[at..(at + take)]);
+
+      body.AddRange([(byte)block.Count, (byte)(block.Count >> 8), (byte)(block.Count >> 16), (byte)(block.Count >> 24)]);
+      body.AddRange(block);
+      at += take;
+    }
+
+    body.AddRange([0, 0, 0, 0]);
+
+    return body.ToArray();
   }
 
   private static byte[] _Prefixed(int length) {
