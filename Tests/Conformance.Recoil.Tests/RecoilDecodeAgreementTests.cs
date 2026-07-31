@@ -254,6 +254,8 @@ public sealed class RecoilDecodeAgreementTests {
     new("Boogie Down Paint, oldest", ImageFormat.BoogieDownPaint, ".bdp", () => _Bdp(0)),
     new("Boogie Down Paint, with a loader", ImageFormat.BoogieDownPaint, ".bdp", () => _Bdp(1)),
     new("Boogie Down Paint 5.00", ImageFormat.BoogieDownPaint, ".bdp", () => _Bdp(2)),
+    new("Hard Color Map", ImageFormat.HardColorMap, ".hcm", () => _Hcm(0)),
+    new("Hard Color Map, the other arrangement", ImageFormat.HardColorMap, ".hcm", () => _Hcm(2)),
   ];
 
   [Test]
@@ -2612,6 +2614,19 @@ public sealed class RecoilDecodeAgreementTests {
 
       ++written;
     }
+  }
+
+  /// <summary>
+  /// A Hard Color Map picture. Its two arrangements differ in both the priority ranking and which
+  /// sprite lands on the left, so each is a different picture from the same bytes.
+  /// </summary>
+  private static byte[] _Hcm(int arrangement) {
+    var data = _Monochrome(8208);
+    System.Text.Encoding.ASCII.GetBytes("HCMA8").CopyTo(data, 0);
+    data[5] = 1;
+    data[6] = (byte)arrangement;
+
+    return data;
   }
 
   private static byte[] _Prefixed(int length) {
