@@ -259,6 +259,8 @@ public sealed class RecoilDecodeAgreementTests {
     new("GED", ImageFormat.GedPicture, ".ged", () => _Ged(0, 0)),
     new("GED, latest timing", ImageFormat.GedPicture, ".ged", () => _Ged(7, 0)),
     new("GED, missiles as a fifth colour", ImageFormat.GedPicture, ".ged", () => _Ged(3, 16)),
+    new("PowerGraphics, forty columns", ImageFormat.PowerGraphics, ".pgr", () => _PowerGraphics(50)),
+    new("PowerGraphics, thirty-two columns", ImageFormat.PowerGraphics, ".pgr", () => _PowerGraphics(49)),
   ];
 
   [Test]
@@ -2648,6 +2650,58 @@ public sealed class RecoilDecodeAgreementTests {
     // The free register write per scanline must address something the chip has.
     for (var y = 0; y < 200; ++y)
       data[206 + y] = (byte)(y % 28);
+
+    return data;
+  }
+
+  /// <summary>
+  /// A PowerGraphics picture: a display list saying what ANTIC fetches for each of 240 scanlines,
+  /// and a raster program per line saying which register to write and after how many cycles.
+  /// </summary>
+  private static byte[] _PowerGraphics(int dmaControl) {
+    var length = 8192;
+    var data = _Monochrome(length);
+
+    data[0] = data[1] = 0xFF;
+    data[2] = 6;
+    data[3] = 130;
+    var start = 6 | (130 << 8);
+    var end = start + length - 6 - 1;
+    data[4] = (byte)end;
+    data[5] = (byte)(end >> 8);
+
+    System.Text.Encoding.ASCII.GetBytes("PowerGFX").CopyTo(data, 8);
+    data[774] = (byte)dmaControl;
+
+    // The raster program sits after everything the header and tables occupy.
+    var raster = 1600;
+    data[6] = (byte)((33280 + raster) & 255);
+    data[7] = (byte)((33280 + raster) >> 8);
+
+    // A display list of 240 lines: each names a mode and, at the start of a block, an address.
+    var at = 16;
+    var screen = 33280 + 3000;
+    for (var y = 0; y < 240; ++y) {
+      if (y % 8 == 0) {
+        data[at++] = 78;
+        data[at++] = (byte)(screen & 255);
+        data[at++] = (byte)(screen >> 8);
+      } else
+        data[at++] = 14;
+    }
+
+    // One raster program per scanline: a few register writes and then a terminator.
+    var program = raster;
+    for (var y = 0; y < 240; ++y) {
+      for (var write = 0; write < 3; ++write) {
+        data[program++] = (byte)(32 | (18 + write));
+        data[program++] = (byte)(y * 7 + write * 40);
+      }
+
+      // The high bit ends the line's program.
+      data[program++] = (byte)(128 | 32 | 26);
+      data[program++] = (byte)(y * 3);
+    }
 
     return data;
   }
