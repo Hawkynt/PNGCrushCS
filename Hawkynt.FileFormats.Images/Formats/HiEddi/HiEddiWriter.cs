@@ -9,16 +9,15 @@ public static class HiEddiWriter {
     ArgumentNullException.ThrowIfNull(file);
 
     var result = new byte[HiEddiFile.ExpectedFileSize];
-    var offset = 0;
 
-    result[offset] = (byte)(file.LoadAddress & 0xFF);
-    result[offset + 1] = (byte)(file.LoadAddress >> 8);
-    offset += HiEddiFile.LoadAddressSize;
+    result[0] = (byte)(file.LoadAddress & 0xFF);
+    result[1] = (byte)(file.LoadAddress >> 8);
 
-    file.BitmapData.AsSpan(0, HiEddiFile.BitmapDataSize).CopyTo(result.AsSpan(offset));
-    offset += HiEddiFile.BitmapDataSize;
-
-    file.ScreenRam.AsSpan(0, HiEddiFile.ScreenRamSize).CopyTo(result.AsSpan(offset));
+    // The matrix follows the bitmap's eight whole pages, not its eight thousand used bytes.
+    file.BitmapData.AsSpan(0, Math.Min(file.BitmapData.Length, HiEddiFile.BitmapDataSize))
+      .CopyTo(result.AsSpan(HiEddiFile.BitmapOffset));
+    file.ScreenRam.AsSpan(0, Math.Min(file.ScreenRam.Length, HiEddiFile.ScreenRamSize))
+      .CopyTo(result.AsSpan(HiEddiFile.ScreenRamOffset));
 
     return result;
   }

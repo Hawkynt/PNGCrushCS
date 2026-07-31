@@ -76,8 +76,11 @@ public sealed class DoodleReaderTests {
   [Category("Unit")]
   public void FromBytes_BitmapData_CopiedCorrectly() {
     var data = new byte[DoodleFile.ExpectedFileSize];
-    data[2] = 0xAB;
-    data[8001] = 0xCD;
+
+    // The video matrix comes first and occupies a whole page, so the bitmap starts at 1026 rather
+    // than straight after the load address.
+    data[DoodleFile.BitmapOffset] = 0xAB;
+    data[DoodleFile.BitmapOffset + DoodleFile.BitmapDataSize - 1] = 0xCD;
 
     var result = DoodleReader.FromBytes(data);
 

@@ -205,4 +205,79 @@ public static class Commodore64Graphics {
 
     return best;
   }
+
+  /// <summary>
+  /// Encodes a high-resolution screen: one bit a pixel choosing between the two colours a cell's
+  /// video matrix byte names, foreground in the high nibble.
+  /// </summary>
+  /// <remarks>
+  /// A cell may show two of the sixteen colours and no more, so which two is the whole of the
+  /// decision. Every pair is tried and the one with the least total error kept — a hundred and
+  /// twenty pairs over sixty-four pixels, which is cheap and exact. Choosing the two commonest
+  /// colours instead is faster and wrong: in a cell holding three near-identical shades and one
+  /// contrasting mark, the mark is rare and the frequency count discards it, which is the pixel
+  /// most visible to anyone looking at the picture.
+  /// </remarks>
+  public static void EncodeHires(
+    ReadOnlySpan<byte> rgb, int width, int height, Span<byte> bitmap, Span<byte> screenRam) {
+    Span<int> indices = stackalloc int[CellHeight * 8];
+
+    for (var top = 0; top < height; top += CellHeight)
+    for (var left = 0; left < width; left += 8) {
+      for (var y = 0; y < CellHeight; ++y)
+      for (var x = 0; x < 8; ++x) {
+        var at = ((top + y) * width + left + x) * 3;
+        indices[y * 8 + x] = FindNearestColorIndex(rgb[at], rgb[at + 1], rgb[at + 2]);
+      }
+
+      var (foreground, background) = _ChoosePair(indices);
+
+      var cell = top / CellHeight * Columns + left / 8;
+      for (var y = 0; y < CellHeight; ++y) {
+        var row = 0;
+        for (var x = 0; x < 8; ++x)
+          if (_Distance(indices[y * 8 + x], foreground) <= _Distance(indices[y * 8 + x], background))
+            row |= 1 << (7 - x);
+
+        bitmap[cell * CellHeight + y] = (byte)row;
+      }
+
+      screenRam[cell] = (byte)((foreground << 4) | background);
+    }
+  }
+
+  /// <summary>The two colours that between them describe a cell with the least total error.</summary>
+  private static (int Foreground, int Background) _ChoosePair(ReadOnlySpan<int> indices) {
+    int bestForeground = 0, bestBackground = 0;
+    var bestError = long.MaxValue;
+
+    for (var first = 0; first < ColorCount; ++first)
+    for (var second = 0; second <= first; ++second) {
+      long error = 0;
+      foreach (var index in indices)
+        error += Math.Min(_Distance(index, first), _Distance(index, second));
+
+      if (error >= bestError)
+        continue;
+
+      bestError = error;
+      bestForeground = first;
+      bestBackground = second;
+    }
+
+    return (bestForeground, bestBackground);
+  }
+
+  /// <summary>Squared distance in RGB between two of the machine's colours.</summary>
+  private static int _Distance(int left, int right) {
+    if (left == right)
+      return 0;
+
+    int a = HexColors[left], b = HexColors[right];
+    int dr = ((a >> 16) & 0xFF) - ((b >> 16) & 0xFF);
+    int dg = ((a >> 8) & 0xFF) - ((b >> 8) & 0xFF);
+    int db = (a & 0xFF) - (b & 0xFF);
+
+    return dr * dr + dg * dg + db * db;
+  }
 }

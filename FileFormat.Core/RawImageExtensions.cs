@@ -94,4 +94,36 @@ public static class RawImageExtensions {
 
     return true;
   }
+
+  /// <summary>Samples a picture to a fixed size, as three bytes a pixel.</summary>
+  /// <remarks>
+  /// Most of the machines here have one screen size and no other, so a picture of any other size has
+  /// to be brought to theirs before anything else can happen. Nearest neighbour, deliberately: what
+  /// follows is a reduction to a handful of colours, and smoothing the source first only invents
+  /// shades that then have to be quantised away again.
+  /// </remarks>
+  public static RawImage SampleTo(this RawImage image, int width, int height) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width < 1 || image.Height < 1)
+      throw new ArgumentException("A picture needs at least one pixel.", nameof(image));
+
+    var source = PixelConverter.Convert(image, PixelFormat.Rgb24);
+    if (source.Width == width && source.Height == height)
+      return source;
+
+    var rgb = new byte[width * height * 3];
+    for (var y = 0; y < height; ++y) {
+      var sourceY = y * image.Height / height;
+
+      for (var x = 0; x < width; ++x) {
+        var from = (sourceY * image.Width + x * image.Width / width) * 3;
+        var to = (y * width + x) * 3;
+        rgb[to] = source.PixelData[from];
+        rgb[to + 1] = source.PixelData[from + 1];
+        rgb[to + 2] = source.PixelData[from + 2];
+      }
+    }
+
+    return new() { Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = rgb };
+  }
 }

@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.HiEddi;
 
 /// <summary>In-memory representation of a HiEddi C64 hires image (Doodle layout).</summary>
-public readonly record struct HiEddiFile : IImageFormatReader<HiEddiFile>, IImageToRawImage<HiEddiFile>, IImageFormatWriter<HiEddiFile> {
+public readonly record struct HiEddiFile : IImageFormatReader<HiEddiFile>, IImageToRawImage<HiEddiFile>, IImageFromRawImage<HiEddiFile>, IImageFormatWriter<HiEddiFile> {
 
   static string IImageFormatMetadata<HiEddiFile>.PrimaryExtension => ".hed";
   static string[] IImageFormatMetadata<HiEddiFile>.FileExtensions => [".hed"];
@@ -25,6 +25,15 @@ public readonly record struct HiEddiFile : IImageFormatReader<HiEddiFile>, IImag
   internal const int LoadAddressSize = 2;
   internal const int PaddingSize = 216;
 
+  /// <summary>Offset of the bitmap.</summary>
+  public const int BitmapOffset = LoadAddressSize;
+
+  /// <summary>
+  /// Offset of the video matrix. The bitmap occupies the whole eight pages the machine gives it,
+  /// which is 8192 bytes rather than the 8000 a screen uses, so the matrix begins after the pages.
+  /// </summary>
+  public const int ScreenRamOffset = 8194;
+
   /// <summary>Image width, always 320.</summary>
   public int Width => FixedWidth;
 
@@ -44,4 +53,19 @@ public readonly record struct HiEddiFile : IImageFormatReader<HiEddiFile>, IImag
   public static RawImage ToRawImage(HiEddiFile file)
     => Commodore64Graphics.DecodeHires(file.BitmapData, file.ScreenRam, FixedWidth, FixedHeight);
 
+  /// <summary>Builds a screen, choosing two of the machine's colours for every character cell.</summary>
+  /// <remarks>
+  /// The picture is reduced cell by cell because that is the constraint the hardware imposes: eight
+  /// pixels by eight may show two colours and no more, and which two is decided for that cell alone.
+  /// </remarks>
+  public static HiEddiFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(FixedWidth, FixedHeight);
+    var bitmap = new byte[BitmapDataSize];
+    var screen = new byte[ScreenRamSize];
+    Commodore64Graphics.EncodeHires(rgb.PixelData, FixedWidth, FixedHeight, bitmap, screen);
+
+    return new() { LoadAddress = 0x4000, BitmapData = bitmap, ScreenRam = screen };
+  }
 }

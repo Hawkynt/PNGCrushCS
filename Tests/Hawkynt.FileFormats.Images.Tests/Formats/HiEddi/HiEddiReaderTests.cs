@@ -84,11 +84,12 @@ public sealed class HiEddiReaderTests {
     data[0] = (byte)(loadAddress & 0xFF);
     data[1] = (byte)(loadAddress >> 8);
 
-    for (var i = 0; i < 8000; ++i)
-      data[2 + i] = (byte)(i % 256);
+    for (var i = 0; i < HiEddiFile.BitmapDataSize; ++i)
+      data[HiEddiFile.BitmapOffset + i] = (byte)(i % 256);
 
-    for (var i = 0; i < 1000; ++i)
-      data[8002 + i] = (byte)((i % 15) << 4 | ((i + 1) % 15));
+    // The bitmap takes eight whole pages, so the matrix starts at 8194 rather than at 8002.
+    for (var i = 0; i < HiEddiFile.ScreenRamSize; ++i)
+      data[HiEddiFile.ScreenRamOffset + i] = (byte)((i % 15) << 4 | ((i + 1) % 15));
 
     return data;
   }

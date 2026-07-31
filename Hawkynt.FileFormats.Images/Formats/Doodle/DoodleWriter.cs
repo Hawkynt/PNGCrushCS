@@ -9,18 +9,15 @@ public static class DoodleWriter {
     ArgumentNullException.ThrowIfNull(file);
 
     var result = new byte[DoodleFile.ExpectedFileSize];
-    var offset = 0;
 
-    result[offset] = (byte)(file.LoadAddress & 0xFF);
-    result[offset + 1] = (byte)(file.LoadAddress >> 8);
-    offset += DoodleFile.LoadAddressSize;
+    result[0] = (byte)(file.LoadAddress & 0xFF);
+    result[1] = (byte)(file.LoadAddress >> 8);
 
-    file.BitmapData.AsSpan(0, Math.Min(file.BitmapData.Length, DoodleFile.BitmapDataSize)).CopyTo(result.AsSpan(offset));
-    offset += DoodleFile.BitmapDataSize;
-
-    file.ScreenRam.AsSpan(0, Math.Min(file.ScreenRam.Length, DoodleFile.ScreenRamSize)).CopyTo(result.AsSpan(offset));
-
-    // Padding (216 bytes) remains as zeros
+    // The video matrix comes first and the bitmap after its page, not after its thousand bytes.
+    file.ScreenRam.AsSpan(0, Math.Min(file.ScreenRam.Length, DoodleFile.ScreenRamSize))
+      .CopyTo(result.AsSpan(DoodleFile.ScreenRamOffset));
+    file.BitmapData.AsSpan(0, Math.Min(file.BitmapData.Length, DoodleFile.BitmapDataSize))
+      .CopyTo(result.AsSpan(DoodleFile.BitmapOffset));
 
     return result;
   }
