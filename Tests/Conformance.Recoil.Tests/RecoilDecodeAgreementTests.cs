@@ -221,6 +221,8 @@ public sealed class RecoilDecodeAgreementTests {
     new("XL-Paint, marked", ImageFormat.XlPaint, ".xlp", () => _XlPaint(true, 192)),
     new("XL-Paint, unmarked 200 rows", ImageFormat.XlPaint, ".xlp", () => _XlPaint(false, 200)),
     new("XL-Paint, unmarked 192 rows", ImageFormat.XlPaint, ".xlp", () => _XlPaint(false, 192)),
+    new("DelmPaint", ImageFormat.DelmPaint, ".del", () => _DelmPaint(2)),
+    new("DelmPaint, four quadrants", ImageFormat.DelmPaint, ".dph", () => _DelmPaint(10)),
   ];
 
   [Test]
@@ -380,6 +382,10 @@ public sealed class RecoilDecodeAgreementTests {
     if (probe.Format == ImageFormat.MsxGl16)
       return FileFormat.MsxGl16.MsxGl16File.ToRawImage(
         FileFormat.MsxGl16.MsxGl16Reader.FromSpan(bytes, FileFormat.MsxGl16.MsxGl16File.ModeFromExtension(probe.Extension)));
+
+    if (probe.Format == ImageFormat.DelmPaint)
+      return FileFormat.DelmPaint.DelmPaintFile.ToRawImage(
+        FileFormat.DelmPaint.DelmPaintReader.FromBytes(bytes, probe.Extension));
 
     if (probe.Format == ImageFormat.RagD)
       return FileFormat.RagD.RagDFile.ToRawImage(FileFormat.RagD.RagDReader.FromBytes(bytes, probe.Extension));
@@ -1556,6 +1562,75 @@ public sealed class RecoilDecodeAgreementTests {
     }
 
     return body.ToArray();
+  }
+
+  /// <summary>
+  /// A DelmPaint picture. Every block names its own escape byte, default value and stride, and a
+  /// stride of zero means the block is that default all the way through — so one block of each
+  /// kind appears, including one the stream contributes nothing to at all.
+  /// </summary>
+  private static byte[] _DelmPaint(int blocks) {
+    var lengths = new System.Collections.Generic.List<byte>();
+    var bodies = new System.Collections.Generic.List<byte>();
+
+    // The last block of the small form is the file's remainder and so is not counted.
+    var total = blocks == 2 ? blocks + 1 : blocks;
+
+    for (var block = 0; block < total; ++block) {
+      var body = new System.Collections.Generic.List<byte>();
+
+      if (block == 1) {
+        // A stride of zero: the whole block is the default value and nothing else is stored.
+        body.AddRange([0xFE, (byte)(block * 7 + 3), 0, 0]);
+      } else {
+        const byte escape = 0xFE;
+        body.AddRange([escape, (byte)(block * 11), 0, 1]);
+
+        var fill = block * 31;
+        for (var written = 0; written < 32000;) {
+          var left = 32000 - written;
+
+          if (left >= 4096) {
+            // A long run, counted in two bytes.
+            body.AddRange([escape, 1, 0x0F, 0xFF, (byte)(fill++ * 13)]);
+            written += 4096;
+            continue;
+          }
+
+          if (left >= 64) {
+            // A short run, and then one of the default value.
+            body.AddRange([escape, 0, 31, (byte)(fill++ * 17)]);
+            written += 32;
+
+            body.AddRange([escape, 2, 0, 31]);
+            written += 32;
+            continue;
+          }
+
+          // Literals, with the escape doubled where it stands for itself.
+          var value = (byte)(fill++ * 23 + written);
+          body.Add(value);
+          if (value == escape)
+            body.Add(escape);
+
+          ++written;
+        }
+      }
+
+      if (block < blocks) {
+        lengths.AddRange([
+          (byte)(body.Count >> 24), (byte)(body.Count >> 16), (byte)(body.Count >> 8), (byte)body.Count,
+        ]);
+      }
+
+      bodies.AddRange(body);
+    }
+
+    var data = new byte[lengths.Count + bodies.Count];
+    lengths.CopyTo(data, 0);
+    bodies.CopyTo(data, lengths.Count);
+
+    return data;
   }
 
   private static byte[] _Prefixed(int length) {
