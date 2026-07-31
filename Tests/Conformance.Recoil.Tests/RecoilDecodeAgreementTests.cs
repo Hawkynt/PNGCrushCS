@@ -373,7 +373,91 @@ public sealed class RecoilDecodeAgreementTests {
     new("Art Master 88, PC-98 three planes", ImageFormat.ArtMaster88, ".arv", () => _ArtMaster88(400, 3)),
     new("Art Master 88, PC-98 four planes", ImageFormat.ArtMaster88, ".arv", () => _ArtMaster88(400, 4)),
     new("XLD4", ImageFormat.Xld4, ".q4", _Xld4),
+    new("LdPic, mode 0", ImageFormat.LdPic, ".bbg", () => _LdPic(0)),
+    new("LdPic, mode 1", ImageFormat.LdPic, ".bbg", () => _LdPic(1)),
+    new("LdPic, mode 2", ImageFormat.LdPic, ".bbg", () => _LdPic(2)),
+    new("LdPic, mode 4", ImageFormat.LdPic, ".bbg", () => _LdPic(4)),
+    new("LdPic, mode 5", ImageFormat.LdPic, ".bbg", () => _LdPic(5)),
   ];
+
+  /// <summary>
+  /// An LdPic picture: a bit stream whose own field widths it declares, unpacking a screen column
+  /// by column at a stride it also declares.
+  /// </summary>
+  private static byte[] _LdPic(int mode) {
+    const int valueBits = 6, countBits = 5, step = 8;
+    var size = mode >= 4 ? 10240 : 20480;
+
+    var bits = new System.Collections.Generic.List<byte>();
+    var held = 0;
+    var used = 0;
+
+    // Bits go into a byte from the top down, but a field's own bits go in from the bottom up.
+    void Bit(int bit) {
+      held = (held << 1) | bit;
+      if (++used != 8)
+        return;
+
+      bits.Add((byte)held);
+      held = 0;
+      used = 0;
+    }
+
+    void Field(int value, int count) {
+      for (var i = 0; i < count; ++i)
+        Bit((value >> i) & 1);
+    }
+
+    Field(valueBits, 8);
+    Field(mode, 8);
+
+    // Sixteen logical colours, written from the last backwards.
+    for (var i = 15; i >= 0; --i)
+      Field((i * 5 + 3) & 15, 4);
+
+    Field(step, 8);
+    Field(countBits, 8);
+
+    // The screen is visited column by column, so the values follow that order rather than the
+    // screen's own.
+    var screen = new byte[size];
+    for (var i = 0; i < size; ++i)
+      screen[i] = (byte)((i * 37 + (i >> 6)) & ((1 << valueBits) - 1));
+
+    // Make some stretches flat so that runs are worth writing, and the run branch is covered.
+    for (var i = 0; i < size; ++i) {
+      if (i % 700 < 200)
+        screen[i] = (byte)((i / 700) & ((1 << valueBits) - 1));
+    }
+
+    var order = new System.Collections.Generic.List<byte>();
+    for (var column = step - 1; column >= 0; --column) {
+      for (var at = column; at < size; at += step)
+        order.Add(screen[at]);
+    }
+
+    for (var i = 0; i < order.Count;) {
+      var run = 1;
+      while (run < (1 << countBits) - 1 && i + run < order.Count && order[i + run] == order[i])
+        ++run;
+
+      if (run == 1) {
+        Bit(0);
+        Field(order[i], valueBits);
+      } else {
+        Bit(1);
+        Field(run, countBits);
+        Field(order[i], valueBits);
+      }
+
+      i += run;
+    }
+
+    while (used != 0)
+      Bit(0);
+
+    return bits.ToArray();
+  }
 
   /// <summary>
   /// An XLD4 picture: a palette chunk and eight picture chunks, each a dictionary-coded stream of
