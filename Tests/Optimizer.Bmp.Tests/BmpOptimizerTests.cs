@@ -14,7 +14,7 @@ public sealed class BmpOptimizerTests {
   [Category("Unit")]
   public void Constructor_ValidBitmap_DoesNotThrow() {
     using var bmp = TestBitmapFactory.CreateTestBitmap();
-    Assert.DoesNotThrow(() => _ = new BmpOptimizer(bmp));
+    Assert.DoesNotThrow(() => _ = new BmpOptimizer(bmp.ToRawImage()));
   }
 
   [Test]
@@ -28,7 +28,7 @@ public sealed class BmpOptimizerTests {
   [CancelAfter(30000)]
   public void OptimizeAsync_DefaultOptions_ProducesResult() {
     using var bmp = TestBitmapFactory.CreateTestBitmap();
-    var optimizer = new BmpOptimizer(bmp, new BmpOptimizationOptions(
+    var optimizer = new BmpOptimizer(bmp.ToRawImage(), new BmpOptimizationOptions(
       Compressions: [BmpCompression.None],
       RowOrders: [BmpRowOrder.BottomUp]
     ));
@@ -65,7 +65,7 @@ public sealed class BmpOptimizerTests {
   [CancelAfter(30000)]
   public void OptimizeAsync_GrayscaleImage_DetectsGrayscale() {
     using var bmp = TestBitmapFactory.CreateTestBitmap(8, 8, true);
-    var optimizer = new BmpOptimizer(bmp, new BmpOptimizationOptions(
+    var optimizer = new BmpOptimizer(bmp.ToRawImage(), new BmpOptimizationOptions(
       Compressions: [BmpCompression.None],
       RowOrders: [BmpRowOrder.BottomUp],
       AutoSelectColorMode: true
@@ -84,7 +84,7 @@ public sealed class BmpOptimizerTests {
     for (var x = 0; x < 8; ++x)
       bmp.SetPixel(x, y, (x + y) % 2 == 0 ? Color.Red : Color.Blue);
 
-    var optimizer = new BmpOptimizer(bmp, new BmpOptimizationOptions(
+    var optimizer = new BmpOptimizer(bmp.ToRawImage(), new BmpOptimizationOptions(
       Compressions: [BmpCompression.None],
       RowOrders: [BmpRowOrder.BottomUp],
       AutoSelectColorMode: true

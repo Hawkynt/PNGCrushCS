@@ -17,7 +17,7 @@ public sealed class EndToEndTests {
   [CancelAfter(30000)]
   public void Optimize_WriteThenReadBack_ProducesValidBmp() {
     using var bmp = TestBitmapFactory.CreateTestBitmap(16, 16);
-    var optimizer = new BmpOptimizer(bmp, new BmpOptimizationOptions(
+    var optimizer = new BmpOptimizer(bmp.ToRawImage(), new BmpOptimizationOptions(
       Compressions: [BmpCompression.None],
       RowOrders: [BmpRowOrder.BottomUp]
     ));
@@ -41,7 +41,7 @@ public sealed class EndToEndTests {
     for (var x = 0; x < 32; ++x)
       bmp.SetPixel(x, y, Color.Red);
 
-    var optimizer = new BmpOptimizer(bmp, new BmpOptimizationOptions(
+    var optimizer = new BmpOptimizer(bmp.ToRawImage(), new BmpOptimizationOptions(
       Compressions: [BmpCompression.None, BmpCompression.Rle8],
       RowOrders: [BmpRowOrder.BottomUp],
       AutoSelectColorMode: true
@@ -54,7 +54,7 @@ public sealed class EndToEndTests {
   [Test]
   public void OptimizeAsync_CancellationRequested_ThrowsOperationCanceledException() {
     using var bmp = TestBitmapFactory.CreateTestBitmap(16, 16);
-    var optimizer = new BmpOptimizer(bmp, new BmpOptimizationOptions(
+    var optimizer = new BmpOptimizer(bmp.ToRawImage(), new BmpOptimizationOptions(
       Compressions: [BmpCompression.None],
       RowOrders: [BmpRowOrder.BottomUp]
     ));
@@ -97,7 +97,7 @@ public sealed class EndToEndTests {
                BmpColorMode.Palette8, BmpColorMode.Palette4, BmpColorMode.Palette1,
                BmpColorMode.Grayscale8
              }) {
-      var optimizer = new BmpOptimizer(bmp, new BmpOptimizationOptions(
+      var optimizer = new BmpOptimizer(bmp.ToRawImage(), new BmpOptimizationOptions(
         ColorModes: [colorMode],
         Compressions: [BmpCompression.None],
         RowOrders: [BmpRowOrder.BottomUp],
@@ -115,7 +115,7 @@ public sealed class EndToEndTests {
   [CancelAfter(30000)]
   public void Optimize_Rgb24_WriteThenReadBack_PixelEquality() {
     using var bmp = TestBitmapFactory.CreateTestBitmap(8, 8);
-    var optimizer = new BmpOptimizer(bmp, new BmpOptimizationOptions(
+    var optimizer = new BmpOptimizer(bmp.ToRawImage(), new BmpOptimizationOptions(
       ColorModes: [BmpColorMode.Rgb24],
       Compressions: [BmpCompression.None],
       RowOrders: [BmpRowOrder.BottomUp],
