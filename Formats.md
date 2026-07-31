@@ -132,7 +132,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | SAM Coupe screen dump   | .ssx                                                 | Any of four modes, or rendered   | Y      | —      | —         | R     | —   | —      | —         |
 | C.O.L.R. Object Editor  | .mur (+ .pal)                                        | Bitmap, colours in a second file | Y      | —      | —         | R     | —   | —      | —         |
 | PI8                     | .pi8                                                 | Graphics 15 or Graphics 8        | Y      | —      | —         | R     | —   | —      | —         |
-| PI9                     | .pi9                                                 | Graphics 9, APAC or Falcon       | Y      | —      | —         | R     | —   | —      | —         |
+| PI9                     | .pi9                                                 | Graphics 9, APAC or Falcon       | Y      | Y      | —         | R     | —   | —      | —         |
 | ZZ_ROUGH                | .rgh                                                 | Dali packing, length as text     | Y      | —      | —         | R     | —   | —      | —         |
 | Taquart Interlace       | .tip                                                 | Three fields sharing one hue set | Y      | —      | —         | R     | —   | —      | —         |
 | VDC BitMap              | .vbm, .bm                                            | C128 eighty-column monochrome    | Y      | —      | —         | R     | —   | —      | —         |

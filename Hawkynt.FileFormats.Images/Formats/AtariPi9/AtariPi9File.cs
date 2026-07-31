@@ -14,7 +14,8 @@ namespace FileFormat.AtariPi9;
 /// lengths mean the same 7680-byte screen.
 /// </remarks>
 public readonly record struct AtariPi9File
-  : IImageFormatReader<AtariPi9File>, IImageToRawImage<AtariPi9File> {
+  : IImageFormatReader<AtariPi9File>, IImageToRawImage<AtariPi9File>,
+    IImageFromRawImage<AtariPi9File>, IImageFormatWriter<AtariPi9File> {
 
   /// <summary>Size of the Graphics 9 screen inside the file, whatever the file's own size.</summary>
   public const int Gr9Size = 7680;
@@ -35,6 +36,7 @@ public readonly record struct AtariPi9File
   static string[] IImageFormatMetadata<AtariPi9File>.FileExtensions => [".pi9"];
   static AtariPi9File IImageFormatReader<AtariPi9File>.FromSpan(ReadOnlySpan<byte> data)
     => AtariPi9Reader.FromSpan(data);
+  static byte[] IImageFormatWriter<AtariPi9File>.ToBytes(AtariPi9File file) => AtariPi9Writer.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<AtariPi9File>.VideoModes => [
     new("Graphics 9", [(320, IntegerRange.Any)], [16]),
     new("APAC", [(320, 192)], [256]),
@@ -94,5 +96,64 @@ public readonly record struct AtariPi9File
             data, file.BitmapOffset, 40, file.Width, file.Height, 0, 0),
         };
     }
+  }
+
+  /// <summary>Pixels one stored nibble covers.</summary>
+  public const int Gr9PixelsPerNibble = 4;
+
+  /// <summary>Bytes one Graphics 9 row occupies.</summary>
+  public const int Gr9Stride = 40;
+
+  /// <summary>Builds a plain Graphics 9 screen, which is sixteen greys and nothing else.</summary>
+  /// <remarks>
+  /// Graphics 9 spends all four of a pixel's bits on brightness and none on hue, so the whole
+  /// screen is one colour at sixteen levels — greys, since the background register is left at
+  /// nought. It is the only Atari mode that can show a photograph without dithering, and it pays
+  /// for that with a nibble covering four screen pixels: 320 across, but eighty of them distinct.
+  /// </remarks>
+  public static AtariPi9File FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width < 1 || image.Height < 1)
+      throw new ArgumentException("A picture needs at least one pixel.", nameof(image));
+
+    const int width = 320, height = 192;
+    var nibbles = width / Gr9PixelsPerNibble;
+    var rgb = PixelConverter.Convert(image, PixelFormat.Rgb24);
+    var greys = Atari8BitGraphics.Palette;
+    var data = new byte[Gr9Size];
+
+    for (var y = 0; y < height; ++y) {
+      var sourceY = image.Height == height ? y : y * image.Height / height;
+
+      for (var n = 0; n < nibbles; ++n) {
+        var x = n * Gr9PixelsPerNibble;
+        var sourceX = image.Width == width ? x : x * image.Width / width;
+        var source = (sourceY * image.Width + sourceX) * 3;
+
+        // The sixteen greys are not an even ramp — they are what the chip produces — so the level
+        // is chosen by distance rather than by arithmetic.
+        var best = 0;
+        var bestDistance = int.MaxValue;
+        for (var level = 0; level < 16; ++level) {
+          var entry = level * 3;
+          int dr = greys[entry] - rgb.PixelData[source];
+          int dg = greys[entry + 1] - rgb.PixelData[source + 1];
+          int db = greys[entry + 2] - rgb.PixelData[source + 2];
+          var distance = dr * dr * 77 + dg * dg * 150 + db * db * 29;
+
+          if (distance >= bestDistance)
+            continue;
+
+          bestDistance = distance;
+          best = level;
+        }
+
+        // Two nibbles a byte, the leftmost pair of pixels in the high half.
+        var at = y * Gr9Stride + (n >> 1);
+        data[at] |= (byte)(best << ((n & 1) == 0 ? 4 : 0));
+      }
+    }
+
+    return new() { Data = data, Width = width, Height = height, Kind = AtariPi9Kind.Graphics9, BitmapOffset = 0 };
   }
 }

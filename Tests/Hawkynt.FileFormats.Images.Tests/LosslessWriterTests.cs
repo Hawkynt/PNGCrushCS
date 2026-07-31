@@ -61,6 +61,9 @@ public sealed class LosslessWriterTests {
     /// <summary>At most sixty-four colours, each channel on a grid of nine levels.</summary>
     SixtyFourColors,
 
+    /// <summary>The Atari's sixteen greys, four screen pixels to each.</summary>
+    AtariGreys,
+
     /// <summary>Anything.</summary>
     Full,
   }
@@ -84,6 +87,7 @@ public sealed class LosslessWriterTests {
     new("3201", ImageFormat.Apple3201, Palette.SixteenPerLine, 320, 200),
     new("LdPic", ImageFormat.LdPic, Palette.OneBitChannelsWide, 320, 256),
     new("Mapletown NL3", ImageFormat.MapletownNl3, Palette.SixtyFourColors, 160, 100),
+    new("Graphics 9", ImageFormat.AtariPi9, Palette.AtariGreys, 320, 192),
   ];
 
   private static IEnumerable<TestCaseData> Cases() {
@@ -240,6 +244,17 @@ public sealed class LosslessWriterTests {
           rgb[at] = (byte)((index % 9) * 255 / 8);
           rgb[at + 1] = (byte)(((index / 9) % 9) * 255 / 8);
           rgb[at + 2] = (byte)(((index * 5) % 9) * 255 / 8);
+          break;
+        }
+
+        // The chip's own sixteen greys, held across each group of four columns since that is what
+        // one stored nibble covers.
+        case Palette.AtariGreys: {
+          var level = (x / 4 + row / 3) % 16;
+          var grey = FileFormat.Core.Atari8BitGraphics.Palette;
+          rgb[at] = grey[level * 3];
+          rgb[at + 1] = grey[level * 3 + 1];
+          rgb[at + 2] = grey[level * 3 + 2];
           break;
         }
 

@@ -43,6 +43,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.Apple3201, "3201", 320, 200),
     new(ImageFormat.LdPic, "LdPic", 320, 256),
     new(ImageFormat.MapletownNl3, "Mapletown NL3", 160, 100),
+    new(ImageFormat.AtariPi9, "Graphics 9", 320, 192),
     new(ImageFormat.ZxTrefiBorderScreen, "Border Screen by Trefi", 256, 192),
     new(ImageFormat.SemiGraphicLogo, "Semi-Graphic logos", 320, 192),
     new(ImageFormat.DirLogoMaker, "Dir Logo Maker", 88, 128),
