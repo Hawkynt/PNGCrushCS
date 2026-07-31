@@ -391,7 +391,173 @@ public sealed class RecoilDecodeAgreementTests {
     new("MIG, screen 8", ImageFormat.MsxMig, ".mig", () => _MsxMig(8, false)),
     new("MIG, screen 12", ImageFormat.MsxMig, ".mig", () => _MsxMig(12, false)),
     new("MIG, screen 8 interlaced", ImageFormat.MsxMig, ".mig", () => _MsxMig(8, true)),
+    new("Mapletown ML1, ordered palette", ImageFormat.MapletownMl1, ".ml1", () => _Mapletown(0)),
+    new("Mapletown ML1, named palette", ImageFormat.MapletownMl1, ".ml1", () => _Mapletown(1)),
+    new("Mapletown ML1, coded indices", ImageFormat.MapletownMl1, ".ml1", () => _Mapletown(2)),
+    new("Mapletown MX1, one image", ImageFormat.MapletownMx1, ".mx1", () => _MapletownMx1(1)),
+    new("Mapletown MX1, stacked", ImageFormat.MapletownMx1, ".mx1", () => _MapletownMx1(3)),
+    new("Mapletown MX1, four tiles", ImageFormat.MapletownMx1, ".mx1", () => _MapletownMx1(4)),
   ];
+
+  /// <summary>
+  /// The alphabet MX1 writes its bits in, seven to a character: printable ASCII less the six a
+  /// quoting layer might touch, and then part of the half-width Japanese range to make 128 up.
+  /// </summary>
+  private static byte[] _Mx1Alphabet() {
+    var alphabet = new byte[128];
+    var next = 0;
+
+    for (var c = 0; c < 256 && next < 128; ++c) {
+      if (c is (>= '!' and <= '~') and not ('"' or '\'' or ',' or '@' or '\\' or '`') || c is >= 161 and <= 200)
+        alphabet[next++] = (byte)c;
+    }
+
+    return alphabet;
+  }
+
+  /// <summary>An MX1 file: one or more ML1 images written as printable characters.</summary>
+  private static byte[] _MapletownMx1(int images) {
+    var alphabet = _Mx1Alphabet();
+    var body = new System.Collections.Generic.List<byte>();
+
+    for (var image = 0; image < images; ++image) {
+      // Each image is announced by a marked line, which also realigns the bit stream.
+      body.AddRange(System.Text.Encoding.ASCII.GetBytes($"@@@ image {image} (24 lines) @@@\r\n"));
+
+      // The same bits an ML1 file would hold, repacked seven to a character.
+      var bits = _Mapletown(0);
+      var pending = 0;
+      var held = 0;
+
+      foreach (var b in bits) {
+        for (var i = 7; i >= 0; --i) {
+          held = (held << 1) | ((b >> i) & 1);
+          if (++pending != 7)
+            continue;
+
+          body.Add(alphabet[held]);
+          held = 0;
+          pending = 0;
+        }
+      }
+
+      if (pending > 0)
+        body.Add(alphabet[held << (7 - pending)]);
+
+      body.AddRange("\r\n"u8.ToArray());
+    }
+
+    return body.ToArray();
+  }
+
+  /// <summary>
+  /// A Mapletown picture: horizontal runs of colour, with chains walking down the picture ahead of
+  /// the scan to lay an outline the runs then stop at.
+  /// </summary>
+  private static byte[] _Mapletown(int mode) {
+    const int width = 64, height = 48;
+    var body = new System.Collections.Generic.List<byte>();
+    var emitted = 0;
+
+    void Bit(int bit) {
+      if (emitted % 8 == 0)
+        body.Add(0);
+
+      if (bit != 0)
+        body[^1] |= (byte)(1 << (7 - emitted % 8));
+
+      ++emitted;
+    }
+
+    void Bits(int value, int count) {
+      for (var i = count - 1; i >= 0; --i)
+        Bit((value >> i) & 1);
+    }
+
+    // A length says how wide it is first, as that many ones before a zero.
+    void Length(int value) {
+      // A width of b covers the values from 2^b - 1 to 2^(b+1) - 2, so the width is the position
+      // of the top bit of one more than the value.
+      var bits = 1;
+      while (1 << (bits + 1) <= value + 1)
+        ++bits;
+
+      for (var i = 1; i < bits; ++i)
+        Bit(1);
+
+      Bit(0);
+      Bits(value - (1 << bits) + 1, bits);
+    }
+
+    Bits(unchecked((int)825241626), 32);
+    Bits(0, 32);
+    Bits(0, 16);
+    Bits(0, 16);
+    Bits(0, 16);
+    Bits(width - 1, 16);
+    Bits(height - 1, 16);
+
+    // A block describing the drawing program's state, which the decoder skips.
+    for (var i = 0; i < 624; ++i)
+      Bit(0);
+
+    Bits(mode, 2);
+
+    var lastColor = mode == 0 ? 127 : 40;
+    if (mode > 0)
+      Bits(lastColor, 7);
+
+    for (var i = 0; i <= lastColor; ++i) {
+      // Two of the modes name the entry they are filling; the third fills them in order.
+      if (mode > 0)
+        Bits((i * 3) % 128, 7);
+
+      Bits((i * 17) % 729, 10);
+    }
+
+    var painted = 0;
+    var index = 0;
+    while (painted < width * height) {
+      var run = Math.Min(width * height - painted, 3 + (index * 7) % 29);
+      Length(run);
+
+      var color = (index * 5) % (lastColor + 1);
+      if (mode == 2)
+        Length(color + 1);
+      else
+        Bits(color, 7);
+
+      // A chain every so often, laying a stroke down the picture from where the run starts.
+      var row = painted / width;
+      var steps = index % 6 == 3 && row + 6 < height ? 5 : 0;
+      if (steps == 0)
+        Bit(0);
+      else {
+        Bit(1);
+        for (var step = 0; step < steps; ++step) {
+          // Straight down, or a sidestep of one or two.
+          switch (step % 4) {
+            case 0: Bit(0); break;
+            case 1: Bit(1); Bits(0, 2); break;
+            case 2: Bit(1); Bits(1, 2); break;
+            default: Bit(1); Bits(3, 2); Bit(0); break;
+          }
+        }
+
+        // Two says the chain has finished.
+        Bit(1);
+        Bits(2, 2);
+      }
+
+      painted += run;
+      ++index;
+    }
+
+    // The picture ends with a length naming one more than the number of pixels.
+    Length(width * height + 1);
+
+    return body.ToArray();
+  }
 
   /// <summary>
   /// A MIG picture: a compressed list of records — register writes, a palette and the screen — from

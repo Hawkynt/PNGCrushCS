@@ -214,6 +214,8 @@ build one from pixel data they didn't read, so the registry reports them as read
 | True-colour GEM image   | .timg                                                | 24 bitplanes, or whole pixels    | Y      | —      | —         | R     | —   | —      | —         |
 | MSX2+ Screen 12         | .scc                                                 | YJK, packed or with sprites      | Y      | —      | —         | R     | —   | —      | —         |
 | MSX MIG                 | .mig                                                 | Register replay, mode inferred   | Y      | —      | —         | R     | —   | —      | —         |
+| Mapletown Network ML1   | .ml1                                                 | Runs and chains, not a bitmap    | Y      | —      | —         | R     | —   | —      | —         |
+| Mapletown Network MX1   | .mx1                                                 | The same as text, several images | Y      | —      | —         | R     | —   | —      | —         |
 | Atari Player/Missile    | .pmg, .plm                                           | Atari 8-bit Player/Missile GFX   | Y      | Y      | —         | —     | —   | —      | —         |
 | AtariTools-800 sprites  | .4pl, .4mi, .4pm                                     | Atari 8-bit player/missile dumps | Y      | Y      | —         | R     | —   | —      | —         |
 | AtariTools-800 charset  | .acs                                                 | Atari 8-bit ANTIC 4 character set | Y      | Y      | —         | R     | —   | —      | —         |
@@ -826,13 +828,14 @@ Two different questions, two different answers:
 
 | Metric                                                    | Us    | RECOIL |
 | ----------------------------------------------------------- | ----- | ------ |
-| Total formats                                              | 679   | 552    |
+| Total formats                                              | 681   | 552    |
 | Modern/web/scientific formats (PNG, JPEG, WebP, AVIF, …)   | ~290  | 0      |
-| Of RECOIL's 552 vintage formats, covered                   | 550   | 552    |
+| Of RECOIL's 552 vintage formats, covered                   | 552   | 552    |
 
 So on breadth we are level, and on everything outside the retro catalogue we are the only one of
-the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 2
-formats.
+So on breadth we are ahead, and on the retro catalogue we are now level: every one of RECOIL's
+552 entries is read here, and every one of them was checked against RECOIL itself rather than
+against our own writer.
 
 Four of the entries now covered needed a character generator ROM: they store character codes and
 nothing else, so the font is not something the file names but something the reader has to already
