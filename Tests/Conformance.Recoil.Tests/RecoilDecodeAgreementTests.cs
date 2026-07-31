@@ -4,6 +4,7 @@ using System.IO;
 using FileFormat.Core;
 using FileFormat.AmstradMode5;
 using FileFormat.ColrObjectEditor;
+using FileFormat.PerfectPix;
 using FileFormat.OcpArtStudioWindow;
 using FileFormat.TechnicolorDream;
 using Hawkynt.FileFormats.Images;
@@ -381,6 +382,98 @@ public sealed class RecoilDecodeAgreementTests {
     } finally {
       try { Directory.Delete(directory, true); } catch { /* best effort */ }
     }
+  }
+
+  /// <summary>
+  /// Perfect Pix keeps its two fields in .odd and .eve beside the head file, which holds no picture
+  /// at all — only the size, the mode and the colours the fields share.
+  /// </summary>
+  [TestCase((byte)3)]
+  [TestCase((byte)4)]
+  [TestCase((byte)5)]
+  [Category("Conformance")]
+  public void PerfectPix_WithItsFields_MatchesRecoilPixelForPixel(byte mode) {
+    RecoilOracle.RequireAvailable();
+
+    var directory = Path.Combine(Path.GetTempPath(), $"recoilpph_{Guid.NewGuid():N}");
+    Directory.CreateDirectory(directory);
+
+    try {
+      var width = 160;
+      var height = 100;
+      var head = _PerfectPixHead(mode, width, height);
+
+      var picture = Path.Combine(directory, "pic.pph");
+      File.WriteAllBytes(picture, head);
+      File.WriteAllBytes(Path.Combine(directory, "pic.odd"), _Monochrome(height * (width >> 2)));
+
+      var even = _Monochrome(height * (width >> 2));
+      for (var i = 0; i < even.Length; ++i)
+        even[i] = (byte)(i * 113 + 29);
+
+      File.WriteAllBytes(Path.Combine(directory, "pic.eve"), even);
+
+      var (png, output) = RecoilOracle.TryDecodeToPng(picture);
+      Assert.That(png, Is.Not.Null, $"RECOIL rejected mode {mode} — {output}");
+
+      var theirs = _AsRgb(FormatRegistry.Read(png!));
+      var ours = _AsRgb(PerfectPixFile.ToRawImage(PerfectPixReader.FromFile(new(picture))));
+
+      Assert.That((ours.Width, ours.Height), Is.EqualTo((theirs.Width, theirs.Height)));
+
+      for (var i = 0; i < theirs.PixelData.Length; ++i) {
+        if (ours.PixelData[i] == theirs.PixelData[i])
+          continue;
+
+        var pixel = i / 3;
+        Assert.Fail(
+          $"mode {mode}: pixel {pixel % theirs.Width},{pixel / theirs.Width} channel {i % 3} — " +
+          $"ours {ours.PixelData[i]}, RECOIL {theirs.PixelData[i]}");
+      }
+    } finally {
+      try { Directory.Delete(directory, true); } catch { /* best effort */ }
+    }
+  }
+
+  /// <summary>
+  /// A Perfect Pix head file. The striped mode's size follows from how many palettes it carries,
+  /// and each but the last is followed by the number of rows it covers.
+  /// </summary>
+  private static byte[] _PerfectPixHead(byte mode, int width, int height) {
+    if (mode != 5) {
+      var wide = new byte[22];
+      wide[0] = mode;
+      wide[1] = (byte)width;
+      wide[2] = (byte)(width >> 8);
+      wide[3] = (byte)height;
+      wide[4] = (byte)(height >> 8);
+      wide[5] = 1;
+      for (var i = 0; i < 16; ++i)
+        wide[6 + i] = (byte)(i * 5 % 27);
+
+      return wide;
+    }
+
+    // Four palettes: the first three each state how many rows they cover, the last runs to the end.
+    var palettes = 4;
+    var data = new byte[(1 + palettes) * 5];
+    data[0] = mode;
+    data[1] = (byte)width;
+    data[2] = (byte)(width >> 8);
+    data[3] = (byte)height;
+    data[4] = (byte)(height >> 8);
+    data[5] = (byte)palettes;
+
+    var at = 6;
+    for (var palette = 0; palette < palettes; ++palette) {
+      for (var i = 0; i < 4; ++i)
+        data[at++] = (byte)((palette * 7 + i * 3) % 27);
+
+      if (at < data.Length)
+        data[at++] = 20;
+    }
+
+    return data;
   }
 
   /// <summary>

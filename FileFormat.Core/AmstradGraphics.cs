@@ -53,6 +53,37 @@ public static class AmstradGraphics {
   }
 
   /// <summary>
+  /// The palette index a mode 1 pixel selects, given its byte already shifted into place.
+  /// </summary>
+  /// <remarks>
+  /// Mode 1 spreads four pixels across a byte the same way mode 0 spreads two: a pixel's two bits
+  /// sit four apart rather than side by side, so the Gate Array's shift-left-per-pixel brings both
+  /// into the positions it reads without any rearranging.
+  /// </remarks>
+  public static int Mode1Index(int b) => ((b & 1) << 1) | ((b >> 4) & 1);
+
+  /// <summary>
+  /// The colours the firmware names, which are three levels a channel rather than a table.
+  /// </summary>
+  /// <remarks>
+  /// The firmware numbers colours by counting rather than by hardware value: a number is a
+  /// three-digit base-three figure whose digits are green, red and blue. That gives 27 of them, of
+  /// which the hardware can show every one — the two duplicate entries in its own table are what
+  /// the extra five hardware values cost.
+  /// </remarks>
+  public static bool TryFirmwareColor(int value, Span<byte> rgb) {
+    if (value > 26)
+      return false;
+
+    ReadOnlySpan<byte> levels = [0, 128, 255];
+    rgb[0] = levels[value / 3 % 3];
+    rgb[1] = levels[value / 9];
+    rgb[2] = levels[value % 3];
+
+    return true;
+  }
+
+  /// <summary>
   /// The palette index a mode 0 pixel selects, given the byte holding it and which of the two it is.
   /// </summary>
   /// <remarks>
