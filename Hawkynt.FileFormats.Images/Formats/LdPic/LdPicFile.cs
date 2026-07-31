@@ -15,7 +15,8 @@ namespace FileFormat.LdPic;
 /// layout, so that a flat area of screen becomes a run rather than a stripe.
 /// </remarks>
 public readonly record struct LdPicFile
-  : IImageFormatReader<LdPicFile>, IImageToRawImage<LdPicFile> {
+  : IImageFormatReader<LdPicFile>, IImageToRawImage<LdPicFile>,
+    IImageFromRawImage<LdPicFile>, IImageFormatWriter<LdPicFile> {
 
   /// <summary>
   /// The BBC Micro's eight colours, which are the corners of the colour cube and nothing else.
@@ -30,6 +31,7 @@ public readonly record struct LdPicFile
   static string[] IImageFormatMetadata<LdPicFile>.FileExtensions => [".bbg"];
   static LdPicFile IImageFormatReader<LdPicFile>.FromSpan(ReadOnlySpan<byte> data)
     => LdPicReader.FromSpan(data);
+  static byte[] IImageFormatWriter<LdPicFile>.ToBytes(LdPicFile file) => LdPicWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<LdPicFile>.VideoModes => [
     new("BBC Micro", [(320, 256), (640, 512)], [16])
   ];
@@ -91,4 +93,63 @@ public readonly record struct LdPicFile
 
   private static int _FourBit(int value)
     => ((value >> 3) & 8) + ((value >> 2) & 4) + ((value >> 1) & 2) + (value & 1);
+
+  /// <summary>Builds a picture in mode 2, which is the machine's most colourful.</summary>
+  /// <remarks>
+  /// The BBC Micro's eight colours are the corners of the colour cube and nothing between, so a
+  /// picture is reduced to those; the mode that shows all eight has half the horizontal resolution
+  /// of the ones that show fewer, which is the trade the machine offers and there is no way round
+  /// it. Every logical pixel is drawn twice, so the picture is still 320 across.
+  /// </remarks>
+  public static LdPicFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width < 1 || image.Height < 1)
+      throw new ArgumentException("A picture needs at least one pixel.", nameof(image));
+
+    const int mode = 2, logical = 160, height = 256, stride = 80;
+    var rgb = PixelConverter.Convert(image, PixelFormat.Rgb24);
+
+    // The sixteen logical entries name the eight physical colours twice over, so an index and its
+    // eighth-neighbour are the same colour and only the low three bits matter.
+    var colors = new byte[16 * 3];
+    for (var i = 0; i < 16; ++i) {
+      var color = Palette[i & 7];
+      colors[i * 3] = (byte)(color >> 16);
+      colors[i * 3 + 1] = (byte)(color >> 8);
+      colors[i * 3 + 2] = (byte)color;
+    }
+
+    var line = new byte[logical * 3];
+    var screen = new byte[20480];
+
+    for (var y = 0; y < height; ++y) {
+      var sourceY = image.Height == height ? y : y * image.Height / height;
+
+      for (var x = 0; x < logical; ++x) {
+        // A logical pixel covers two of the picture's, so it takes the leftmost of the pair.
+        var sourceX = image.Width == logical * 2 ? x * 2 : x * 2 * image.Width / (logical * 2);
+        var source = (sourceY * image.Width + Math.Min(sourceX, image.Width - 1)) * 3;
+
+        line[x * 3] = rgb.PixelData[source];
+        line[x * 3 + 1] = rgb.PixelData[source + 1];
+        line[x * 3 + 2] = rgb.PixelData[source + 2];
+      }
+
+      var indices = PaletteQuantizer.Quantize(line, logical, 1, colors, 8);
+
+      for (var x = 0; x < logical; ++x) {
+        var at = (y & ~7) * stride + ((x & ~1) << 2) + (y & 7);
+        var shift = ~x & 1;
+
+        // The four bits of an index are two apart in the byte, the machine having shifted one
+        // plane out of each pair.
+        for (var plane = 0; plane < 4; ++plane) {
+          if (((indices[x] >> plane) & 1) != 0)
+            screen[at] |= (byte)(1 << (shift + plane * 2));
+        }
+      }
+    }
+
+    return new() { Screen = screen, Mode = mode, LogicalColors = colors };
+  }
 }

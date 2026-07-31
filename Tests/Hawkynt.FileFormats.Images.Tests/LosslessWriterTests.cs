@@ -55,6 +55,9 @@ public sealed class LosslessWriterTests {
     /// <summary>At most sixteen colours on any one scanline, each on a four-bit grid.</summary>
     SixteenPerLine,
 
+    /// <summary>The eight cube corners, at half the horizontal resolution.</summary>
+    OneBitChannelsWide,
+
     /// <summary>Anything.</summary>
     Full,
   }
@@ -76,6 +79,7 @@ public sealed class LosslessWriterTests {
     new("Border Screen by Trefi", ImageFormat.ZxTrefiBorderScreen, Palette.ZxAttributes, 256, 192),
     new("3200 colours, unpacked", ImageFormat.AppleSh3, Palette.SixteenPerLine, 320, 200),
     new("3201", ImageFormat.Apple3201, Palette.SixteenPerLine, 320, 200),
+    new("LdPic", ImageFormat.LdPic, Palette.OneBitChannelsWide, 320, 256),
   ];
 
   private static IEnumerable<TestCaseData> Cases() {
@@ -213,6 +217,16 @@ public sealed class LosslessWriterTests {
           rgb[at] = (byte)(((index * 3 + row) % 16) * 17);
           rgb[at + 1] = (byte)(((index * 5 + row / 3) % 16) * 17);
           rgb[at + 2] = (byte)(((index * 7 + row / 7) % 16) * 17);
+          break;
+        }
+
+        // The same eight colours, but a pixel pair always agreeing, since the mode that shows all
+        // eight draws every logical pixel twice.
+        case Palette.OneBitChannelsWide: {
+          var wide = x & ~1;
+          rgb[at] = (byte)((wide / 6 + row / 3) % 2 == 0 ? 255 : 0);
+          rgb[at + 1] = (byte)((wide / 8 + row) % 2 == 0 ? 255 : 0);
+          rgb[at + 2] = (byte)((wide / 2 + row / 11) % 2 == 0 ? 255 : 0);
           break;
         }
 

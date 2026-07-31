@@ -41,6 +41,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.ChrDollar, "CHR$", 96, 64),
     new(ImageFormat.AppleSh3, "3200 colours", 320, 200),
     new(ImageFormat.Apple3201, "3201", 320, 200),
+    new(ImageFormat.LdPic, "LdPic", 320, 256),
     new(ImageFormat.ZxTrefiBorderScreen, "Border Screen by Trefi", 256, 192),
     new(ImageFormat.SemiGraphicLogo, "Semi-Graphic logos", 320, 192),
     new(ImageFormat.DirLogoMaker, "Dir Logo Maker", 88, 128),

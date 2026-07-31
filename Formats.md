@@ -210,7 +210,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | Z's Staff Kid98         | .zim                                                 | Runs, nested flags, differenced  | Y      | —      | —         | R     | —   | —      | —         |
 | Art Master 88           | .arv                                                 | PC-88 or PC-98, runs by repeat   | Y      | Y      | —         | R     | —   | —      | —         |
 | XLD4                    | .q4                                                  | Dictionary over base-17 runs     | Y      | —      | —         | R     | —   | —      | —         |
-| LdPic                   | .bbg                                                 | BBC Micro, five modes, bit-packed | Y     | —      | —         | R     | —   | —      | —         |
+| LdPic                   | .bbg                                                 | BBC Micro, five modes, bit-packed | Y     | Y      | —         | R     | —   | —      | —         |
 | True-colour GEM image   | .timg                                                | 24 bitplanes, or whole pixels    | Y      | Y      | —         | R     | —   | —      | —         |
 | MSX2+ Screen 12         | .scc                                                 | YJK, packed or with sprites      | Y      | Y      | —         | R     | —   | —      | —         |
 | MSX MIG                 | .mig                                                 | Register replay, mode inferred   | Y      | —      | —         | R     | —   | —      | —         |
