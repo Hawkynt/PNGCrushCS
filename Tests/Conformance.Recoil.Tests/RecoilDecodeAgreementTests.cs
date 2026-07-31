@@ -249,6 +249,7 @@ public sealed class RecoilDecodeAgreementTests {
     new("SHF-XL Edit, packed", ImageFormat.ShfXlEdit, ".shx", _PackedShx),
     new("Commodore Grafix", ImageFormat.CommodoreGrafix, ".cgx", () => _Grafix(3, 2, 4, 3)),
     new("Commodore Grafix, one frame", ImageFormat.CommodoreGrafix, ".cgx", () => _Grafix(1, 1, 8, 8)),
+    new("3201", ImageFormat.Apple3201, ".3201", _Apple3201),
   ];
 
   [Test]
@@ -2392,6 +2393,59 @@ public sealed class RecoilDecodeAgreementTests {
     data[6] = (byte)(length >> 16);
     data[7] = (byte)(length >> 24);
     body.CopyTo(data, 8);
+
+    return data;
+  }
+
+  /// <summary>
+  /// A 3201 picture. Its packing has three kinds of command and the probe uses all of them: a run
+  /// of literals, a byte repeated, and a four-byte pattern repeated.
+  /// </summary>
+  private static byte[] _Apple3201() {
+    var body = new System.Collections.Generic.List<byte>();
+    var fill = 0;
+
+    for (var written = 0; written < 32000;) {
+      var left = 32000 - written;
+
+      // A four-byte pattern, whose count is multiplied by four.
+      if (left >= 64) {
+        body.Add(128 + 15);
+        for (var i = 0; i < 4; ++i)
+          body.Add((byte)(fill++ * 37 + i));
+
+        written += 64;
+        continue;
+      }
+
+      if (left >= 16) {
+        // One byte repeated, then a run of literals.
+        body.AddRange([64 + 7, (byte)(fill++ * 53)]);
+        written += 8;
+
+        body.Add(7);
+        for (var i = 0; i < 8; ++i)
+          body.Add((byte)(fill++ * 29 + i));
+
+        written += 8;
+        continue;
+      }
+
+      body.Add((byte)(left - 1));
+      for (var i = 0; i < left; ++i)
+        body.Add((byte)(fill++ * 11 + i));
+
+      written += left;
+    }
+
+    var data = new byte[6404 + body.Count];
+    ReadOnlySpan<byte> signature = [193, 208, 208, 0];
+    signature.CopyTo(data);
+
+    for (var i = 4; i < 6404; ++i)
+      data[i] = (byte)(i * 47 + (i >> 6));
+
+    body.CopyTo(data, 6404);
 
     return data;
   }
