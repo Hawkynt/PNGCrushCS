@@ -32,8 +32,17 @@ public static class AtariStGraphics {
   }
 
   /// <summary>Reads a stored palette as RGB triplets, in whichever of the two forms it is in.</summary>
-  public static byte[] ReadPalette(ReadOnlySpan<byte> data, int offset, int colors) {
-    var ste = IsStePalette(data, offset, colors);
+  public static byte[] ReadPalette(ReadOnlySpan<byte> data, int offset, int colors)
+    => ReadPalette(data, offset, colors, IsStePalette(data, offset, colors));
+
+  /// <summary>Reads a stored palette as RGB triplets in the form the caller has already settled.</summary>
+  /// <remarks>
+  /// A picture that changes its palette every scanline holds one machine's worth of colours across
+  /// all of them, so which form they are in has to be decided from the whole set at once. Deciding
+  /// it per line would read a line whose colours happen to fit in three bits as an ST palette in the
+  /// middle of an STE picture, and shift every channel.
+  /// </remarks>
+  public static byte[] ReadPalette(ReadOnlySpan<byte> data, int offset, int colors, bool ste) {
     var rgb = new byte[colors * 3];
 
     for (var i = 0; i < colors; ++i) {

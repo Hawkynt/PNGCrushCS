@@ -297,7 +297,48 @@ public sealed class RecoilDecodeAgreementTests {
     new("DEGAS Elite icon, whole words", ImageFormat.DegasIcon, ".icn", () => _DegasIcon(32, 8)),
     new("ColorSTar object, mono", ImageFormat.ColorStarObject, ".obj", () => _ColorStarObject(0)),
     new("ColorSTar object, colour", ImageFormat.ColorStarObject, ".obj", () => _ColorStarObject(4)),
+    new("Tobias Richter, ST palettes", ImageFormat.TobiasRichterSlideshow, ".pci", () => _TobiasRichter(false)),
+    new("Tobias Richter, STE palettes", ImageFormat.TobiasRichterSlideshow, ".pci", () => _TobiasRichter(true)),
+    new("SAMAR hi-res with colour map", ImageFormat.SamarHiresMap, ".shc", _Samar),
   ];
+
+  /// <summary>
+  /// A Tobias Richter slideshow picture: two fields of four whole-picture bitplanes, then a
+  /// sixteen-colour palette for every one of the 556 scanlines.
+  /// </summary>
+  private static byte[] _TobiasRichter(bool ste) {
+    const int paletteOffset = 97856;
+    var data = new byte[115648];
+
+    for (var i = 0; i < paletteOffset; ++i)
+      data[i] = (byte)(i * 37 + (i >> 9));
+
+    for (var line = 0; line < 556; ++line)
+    for (var color = 0; color < 16; ++color) {
+      var at = paletteOffset + (line * 16 + color) * 2;
+
+      // An ST palette has three bits a channel and an STE four, the extra bit sitting below the
+      // other three; a picture in which no entry uses it is read as an ST one.
+      data[at] = (byte)((line + color) & 7 | (ste && (line + color) % 5 == 0 ? 8 : 0));
+      data[at + 1] = (byte)((color * 17 + line) & 0x77 | (ste && (color + line) % 3 == 0 ? 0x88 : 0));
+    }
+
+    return data;
+  }
+
+  /// <summary>A SAMAR picture: two hi-res bitmaps and the colour registers each line steps through.</summary>
+  private static byte[] _Samar() {
+    var data = new byte[17920];
+
+    for (var i = 0; i < 15360; ++i)
+      data[i] = (byte)(i * 53 + (i >> 7));
+
+    // Both maps hold a colour for every zone of every line, plus one that carries into the next.
+    for (var i = 15360; i < data.Length; ++i)
+      data[i] = (byte)(i * 29 & 254);
+
+    return data;
+  }
 
   /// <summary>A Falcon Fuckpaint picture: a 256-colour palette and then eight bitplanes.</summary>
   private static byte[] _FalconFuckpaint(int width, int height) {
