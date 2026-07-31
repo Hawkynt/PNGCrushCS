@@ -126,4 +126,25 @@ public static class RawImageExtensions {
 
     return new() { Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = rgb };
   }
+
+  /// <summary>The picture as packed 0xAARRGGBB values, one per pixel, row by row.</summary>
+  /// <remarks>
+  /// This is the shape a UI toolkit wants when it hands pixels to the platform: one integer a pixel
+  /// in the machine's own order, rather than a byte array whose channel order has to be agreed. It
+  /// is deliberately not a platform type — the caller decides what to build from it, so a picture
+  /// can reach a screen without this project knowing which toolkit is drawing it.
+  /// </remarks>
+  public static int[] ToPackedArgb(this RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var bgra = PixelConverter.Convert(image, PixelFormat.Bgra32).PixelData;
+    var packed = new int[image.Width * image.Height];
+
+    for (var i = 0; i < packed.Length; ++i) {
+      var at = i * 4;
+      packed[i] = (bgra[at + 3] << 24) | (bgra[at + 2] << 16) | (bgra[at + 1] << 8) | bgra[at];
+    }
+
+    return packed;
+  }
 }
