@@ -45,7 +45,7 @@ public static class Atari16x16FontReader {
     var glyphs = new byte[Atari16x16FontFile.GlyphDataSize];
     data.Slice(Atari16x16FontFile.HeaderSize, Atari16x16FontFile.GlyphDataSize).CopyTo(glyphs);
 
-    return new() { GlyphData = glyphs };
+    return new() { GlyphData = glyphs, LoadAddress = start };
   }
 
   public static Atari16x16FontFile FromBytes(byte[] data) {

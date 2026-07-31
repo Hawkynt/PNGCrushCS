@@ -72,6 +72,12 @@ public sealed class LosslessWriterTests {
   }
 
   private static readonly Case[] _Cases = [
+    // The three character-set sheets whose every bit is one pixel and every pixel one bit; Star
+    // Painter is not among them because its sheet has fifteen cells past the end of the set, and
+    // whatever is drawn in those is not stored anywhere.
+    new("Atari FontMaker double set", ImageFormat.AtariFontMaker, Palette.AtariMonochrome, 256, 64),
+    new("OD Font Editor set", ImageFormat.OdFontEditor, Palette.AtariMonochrome, 256, 40),
+    new("16x16 font", ImageFormat.Atari16x16Font, Palette.AtariMonochrome, 256, 32),
     new("HP 48 graphics object", ImageFormat.Hp48Grob, Palette.Monochrome, 131, 37),
     new("HP 48, whole bytes across", ImageFormat.Hp48Grob, Palette.Monochrome, 64, 12),
     new("DEGAS Elite icon", ImageFormat.DegasIcon, Palette.Monochrome, 37, 23),

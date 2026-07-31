@@ -33,6 +33,10 @@ public sealed class RecoilConformanceTests {
 
   /// <summary>Formats implemented on both sides, with the dimensions RECOIL decodes them at.</summary>
   public static readonly Pairing[] Pairings = [
+    new(ImageFormat.AtariFontMaker, "Atari FontMaker", 256, 64),
+    new(ImageFormat.OdFontEditor, "OD Font Editor", 256, 40),
+    new(ImageFormat.Atari16x16Font, "16x16 font", 256, 32),
+    new(ImageFormat.StarPainterFont, "Star Painter font", 256, 32),
     new(ImageFormat.Hp48Grob, "HP 48 GROB", 131, 37),
     new(ImageFormat.Kitty, "Kitty", 640, 400),
     new(ImageFormat.ArtMaster88, "Art Master 88", 640, 400),

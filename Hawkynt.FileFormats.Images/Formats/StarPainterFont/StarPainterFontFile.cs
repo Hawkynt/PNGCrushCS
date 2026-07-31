@@ -15,7 +15,8 @@ namespace FileFormat.StarPainterFont;
 /// fifteen cells past the end of the set stay blank.
 /// </remarks>
 public readonly record struct StarPainterFontFile
-  : IImageFormatReader<StarPainterFontFile>, IImageToRawImage<StarPainterFontFile> {
+  : IImageFormatReader<StarPainterFontFile>, IImageToRawImage<StarPainterFontFile>,
+    IImageFromRawImage<StarPainterFontFile>, IImageFormatWriter<StarPainterFontFile> {
 
   /// <summary>Pixels across: thirty-two characters.</summary>
   public const int Width = 256;
@@ -45,6 +46,8 @@ public readonly record struct StarPainterFontFile
   static string[] IImageFormatMetadata<StarPainterFontFile>.FileExtensions => [".zs"];
   static StarPainterFontFile IImageFormatReader<StarPainterFontFile>.FromSpan(ReadOnlySpan<byte> data)
     => StarPainterFontReader.FromSpan(data);
+  static byte[] IImageFormatWriter<StarPainterFontFile>.ToBytes(StarPainterFontFile file)
+    => StarPainterFontWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<StarPainterFontFile>.VideoModes => [
     new("Character set", [(Width, Height)], [2])
   ];
@@ -77,5 +80,32 @@ public readonly record struct StarPainterFontFile
       Palette = (byte[])_Palette.Clone(),
       PaletteCount = 2,
     };
+  }
+
+  /// <summary>Reads the sheet back into the set's records.</summary>
+  /// <remarks>
+  /// A record is nine bytes and only eight of them are the shape, so writing has to step by nine
+  /// and touch eight — the ninth is the editor's own and stays as it was. The fifteen cells past
+  /// the hundred and thirteenth character are not part of the set and whatever is drawn in them is
+  /// dropped, which is the one thing this cannot carry.
+  /// </remarks>
+  public static StarPainterFontFile FromRawImage(RawImage image) {
+    var set = GlyphSheet.Sample(image, Width, Height);
+    var data = new byte[FileSize];
+    Signature.CopyTo(data);
+
+    for (var y = 0; y < Height; ++y)
+    for (var x = 0; x < Width; ++x) {
+      if (!set[y * Width + x])
+        continue;
+
+      var character = (y >> 3) * Columns + (x >> 3);
+      if (character >= CharacterCount)
+        continue;
+
+      data[CharactersOffset + character * CharacterLength + (y & 7)] |= (byte)(1 << (~x & 7));
+    }
+
+    return new() { Data = data };
   }
 }

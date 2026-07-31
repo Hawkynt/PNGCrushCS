@@ -14,7 +14,16 @@ namespace FileFormat.Atari16x16Font;
 /// and only four rows deep.
 /// </remarks>
 public readonly record struct Atari16x16FontFile
-  : IImageFormatReader<Atari16x16FontFile>, IImageToRawImage<Atari16x16FontFile> {
+  : IImageFormatReader<Atari16x16FontFile>, IImageToRawImage<Atari16x16FontFile>,
+    IImageFromRawImage<Atari16x16FontFile>, IImageFormatWriter<Atari16x16FontFile> {
+
+  /// <summary>Where the machine is told to load the character set.</summary>
+  /// <remarks>
+  /// A character set has to start on a page boundary the hardware can point ANTIC at, and this is
+  /// the one the file names. Nothing about the picture depends on it, but keeping it means a file
+  /// read and written back is the file that came in.
+  /// </remarks>
+  public const int DefaultLoadAddress = 0x8000;
 
   /// <summary>Size of the Atari executable header the file opens with.</summary>
   public const int HeaderSize = 6;
@@ -50,12 +59,17 @@ public readonly record struct Atari16x16FontFile
   static string[] IImageFormatMetadata<Atari16x16FontFile>.FileExtensions => [".sxs"];
   static Atari16x16FontFile IImageFormatReader<Atari16x16FontFile>.FromSpan(ReadOnlySpan<byte> data)
     => Atari16x16FontReader.FromSpan(data);
+  static byte[] IImageFormatWriter<Atari16x16FontFile>.ToBytes(Atari16x16FontFile file)
+    => Atari16x16FontWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<Atari16x16FontFile>.VideoModes => [
     new("16x16 font", [(Width, Height)], [2])
   ];
 
   /// <summary>The glyph data, eight bytes a glyph.</summary>
   public byte[] GlyphData { get; init; }
+
+  /// <summary>The address the executable header names, kept so a file survives a round trip.</summary>
+  public int LoadAddress { get; init; }
 
   /// <summary>
   /// Which stored glyph belongs at a position on the sheet.
@@ -97,5 +111,31 @@ public readonly record struct Atari16x16FontFile
       Palette = palette,
       PaletteCount = 2,
     };
+  }
+
+  /// <summary>Reads the sheet back into the set, reshuffling the quarters into their stored order.</summary>
+  /// <remarks>
+  /// The sheet shows each large glyph's four quarters side by side, which is not the order the file
+  /// keeps them in; writing therefore walks the sheet and sends each cell to the glyph
+  /// <see cref="GlyphAt"/> names, which is the same map the reader follows and so undoes it exactly.
+  /// </remarks>
+  public static Atari16x16FontFile FromRawImage(RawImage image) {
+    var set = GlyphSheet.Sample(image, Width, Height);
+    var font = new byte[GlyphDataSize];
+
+    for (var y = 0; y < Height; ++y)
+    for (var x = 0; x < Width; ++x) {
+      var character = GlyphAt(y / GlyphHeight * Columns + (x >> 3));
+
+      // The code's top bit inverts the glyph, so an inverted cell stores the opposite of what it
+      // shows. Nothing on this sheet is inverted, but following the reader's rule costs nothing.
+      var inverted = (character >> 7) & 1;
+      if (((set[y * Width + x] ? 1 : 0) ^ inverted) == 0)
+        continue;
+
+      font[(character & (GlyphCount - 1)) * GlyphHeight + y % GlyphHeight] |= (byte)(1 << (~x & 7));
+    }
+
+    return new() { GlyphData = font, LoadAddress = DefaultLoadAddress };
   }
 }

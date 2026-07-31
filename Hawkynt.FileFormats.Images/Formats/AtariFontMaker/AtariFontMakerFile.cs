@@ -14,7 +14,8 @@ namespace FileFormat.AtariFontMaker;
 /// luminance from the foreground.
 /// </remarks>
 public readonly record struct AtariFontMakerFile
-  : IImageFormatReader<AtariFontMakerFile>, IImageToRawImage<AtariFontMakerFile> {
+  : IImageFormatReader<AtariFontMakerFile>, IImageToRawImage<AtariFontMakerFile>,
+    IImageFromRawImage<AtariFontMakerFile>, IImageFormatWriter<AtariFontMakerFile> {
 
   /// <summary>Total file size: two character sets.</summary>
   public const int FileSize = 2048;
@@ -44,6 +45,8 @@ public readonly record struct AtariFontMakerFile
   static string[] IImageFormatMetadata<AtariFontMakerFile>.FileExtensions => [".fn2"];
   static AtariFontMakerFile IImageFormatReader<AtariFontMakerFile>.FromSpan(ReadOnlySpan<byte> data)
     => AtariFontMakerReader.FromSpan(data);
+  static byte[] IImageFormatWriter<AtariFontMakerFile>.ToBytes(AtariFontMakerFile file)
+    => AtariFontMakerWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<AtariFontMakerFile>.VideoModes => [
     new("Double character set", [(Width, Height)], [2])
   ];
@@ -86,5 +89,27 @@ public readonly record struct AtariFontMakerFile
       Palette = palette,
       PaletteCount = 2,
     };
+  }
+
+  /// <summary>Reads the sheet back into two character sets.</summary>
+  /// <remarks>
+  /// Every bit of the file is one pixel of the sheet and every pixel is one bit, so this loses
+  /// nothing a two-colour picture of the right size carries — the interleaving of the two sets down
+  /// the bands is a reordering, not a discarding.
+  /// </remarks>
+  public static AtariFontMakerFile FromRawImage(RawImage image) {
+    var set = GlyphSheet.Sample(image, Width, Height);
+    var font = new byte[FileSize];
+
+    for (var y = 0; y < Height; ++y)
+    for (var x = 0; x < Width; ++x) {
+      if (!set[y * Width + x])
+        continue;
+
+      var (which, character) = GlyphAt(y / GlyphHeight, x >> 3);
+      font[which * SetSize + (character & 127) * GlyphHeight + y % GlyphHeight] |= (byte)(1 << (~x & 7));
+    }
+
+    return new() { GlyphData = font };
   }
 }

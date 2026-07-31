@@ -13,7 +13,8 @@ namespace FileFormat.OdFontEditor;
 /// Shown as thirty-two glyphs across and four bands down, in the two colours the text mode uses.
 /// </remarks>
 public readonly record struct OdFontEditorFile
-  : IImageFormatReader<OdFontEditorFile>, IImageToRawImage<OdFontEditorFile> {
+  : IImageFormatReader<OdFontEditorFile>, IImageToRawImage<OdFontEditorFile>,
+    IImageFromRawImage<OdFontEditorFile>, IImageFormatWriter<OdFontEditorFile> {
 
   /// <summary>Scanlines one glyph spans.</summary>
   public const int GlyphHeight = 10;
@@ -46,6 +47,8 @@ public readonly record struct OdFontEditorFile
   static string[] IImageFormatMetadata<OdFontEditorFile>.FileExtensions => [".odf"];
   static OdFontEditorFile IImageFormatReader<OdFontEditorFile>.FromSpan(ReadOnlySpan<byte> data)
     => OdFontEditorReader.FromSpan(data);
+  static byte[] IImageFormatWriter<OdFontEditorFile>.ToBytes(OdFontEditorFile file)
+    => OdFontEditorWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<OdFontEditorFile>.VideoModes => [
     new("Character set", [(Width, Height)], [2])
   ];
@@ -78,5 +81,21 @@ public readonly record struct OdFontEditorFile
       Palette = palette,
       PaletteCount = 2,
     };
+  }
+
+  /// <summary>Reads the sheet back into a character set ten scanlines deep.</summary>
+  public static OdFontEditorFile FromRawImage(RawImage image) {
+    var set = GlyphSheet.Sample(image, Width, Height);
+    var font = new byte[FileSize];
+
+    for (var y = 0; y < Height; ++y)
+    for (var x = 0; x < Width; ++x) {
+      if (!set[y * Width + x])
+        continue;
+
+      font[y / GlyphHeight * BandSize + (x >> 3) * GlyphHeight + y % GlyphHeight] |= (byte)(1 << (~x & 7));
+    }
+
+    return new() { GlyphData = font };
   }
 }
