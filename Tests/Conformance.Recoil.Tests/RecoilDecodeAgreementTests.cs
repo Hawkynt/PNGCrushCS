@@ -208,6 +208,7 @@ public sealed class RecoilDecodeAgreementTests {
     new("SymbOS graphic", ImageFormat.SymbOsGraphic, ".sgx", () => _SymbOs(false)),
     new("SymbOS graphic, sixteen colours", ImageFormat.SymbOsGraphic, ".sgx", () => _SymbOs(true)),
     new("SEUCK sprites", ImageFormat.SeuckSprites, ".a", _Seuck),
+    new("MINIPAINT", ImageFormat.MiniPaint, ".mg", _MiniPaint),
   ];
 
   [Test]
@@ -1305,6 +1306,21 @@ public sealed class RecoilDecodeAgreementTests {
     var data = _Monochrome(8130);
     data[0] = 66;
     data[1] = 0;
+
+    return data;
+  }
+
+  /// <summary>
+  /// A MINIPAINT picture. Its cell colours deliberately span both halves of the nibble range, so
+  /// both the two-colour and the four-colour reading of the bitmap are exercised.
+  /// </summary>
+  private static byte[] _MiniPaint() {
+    var data = _Monochrome(4097);
+    ReadOnlySpan<byte> signature = [241, 16, 12, 18, 216, 7, 158, 32, (byte)'8', (byte)'5', (byte)'8', (byte)'4', 0, 0, 0];
+    signature.CopyTo(data);
+
+    for (var cell = 0; cell < 12 * 10; ++cell)
+      data[3857 + cell] = (byte)(cell * 37 + (cell >> 3));
 
     return data;
   }
