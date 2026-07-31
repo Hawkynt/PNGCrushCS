@@ -9,7 +9,10 @@ public static class HiresC64Writer {
     ArgumentNullException.ThrowIfNull(file);
 
     var result = new byte[HiresC64File.ExpectedFileSize];
-    file.BitmapData.AsSpan(0, Math.Min(file.BitmapData.Length, HiresC64File.ExpectedFileSize)).CopyTo(result.AsSpan(0));
+    result[0] = (byte)(file.LoadAddress & 0xFF);
+    result[1] = (byte)(file.LoadAddress >> 8);
+    file.BitmapData.AsSpan(0, Math.Min(file.BitmapData.Length, HiresC64File.BitmapDataSize))
+      .CopyTo(result.AsSpan(HiresC64File.BitmapOffset));
 
     return result;
   }

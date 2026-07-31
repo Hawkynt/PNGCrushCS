@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.HiresC64;
 
 /// <summary>In-memory representation of a Commodore 64 bare hires monochrome bitmap.</summary>
-public readonly record struct HiresC64File : IImageFormatReader<HiresC64File>, IImageToRawImage<HiresC64File>, IImageFormatWriter<HiresC64File> {
+public readonly record struct HiresC64File : IImageFormatReader<HiresC64File>, IImageToRawImage<HiresC64File>, IImageFromRawImage<HiresC64File>, IImageFormatWriter<HiresC64File> {
 
   static string IImageFormatMetadata<HiresC64File>.PrimaryExtension => ".hir";
   static string[] IImageFormatMetadata<HiresC64File>.FileExtensions => [".hir", ".hbm"];
@@ -19,7 +19,20 @@ public readonly record struct HiresC64File : IImageFormatReader<HiresC64File>, I
   public const int FixedHeight = 200;
 
   /// <summary>The expected total file size in bytes (8000 bytes raw bitmap).</summary>
-  public const int ExpectedFileSize = 8000;
+  public const int ExpectedFileSize = 8002;
+
+  /// <summary>Size of the bitmap.</summary>
+  public const int BitmapDataSize = 8000;
+
+  /// <summary>Where the bitmap starts, after the load address every C64 file carries.</summary>
+  public const int BitmapOffset = 2;
+
+  /// <summary>
+  /// The attribute every cell uses. There is no video matrix in this format at all — the screen is
+  /// one bit a pixel and the same two colours throughout, white over black, so the pair is fixed
+  /// rather than stored.
+  /// </summary>
+  public const byte Attribute = 0x10;
 
   /// <summary>Image width, always 320.</summary>
   public int Width => FixedWidth;
@@ -62,4 +75,28 @@ public readonly record struct HiresC64File : IImageFormatReader<HiresC64File>, I
     };
   }
 
+  /// <summary>C64 memory load address (2 bytes, little-endian).</summary>
+  public ushort LoadAddress { get; init; }
+
+  /// <summary>Builds a monochrome screen from a picture.</summary>
+  /// <remarks>
+  /// There are no colours to choose: the format shows white over black and nothing else, so this is
+  /// a threshold rather than a quantisation.
+  /// </remarks>
+  public static HiresC64File FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var set = GlyphSheet.Sample(image, FixedWidth, FixedHeight);
+    var bitmap = new byte[BitmapDataSize];
+
+    for (var y = 0; y < FixedHeight; ++y)
+    for (var x = 0; x < FixedWidth; ++x) {
+      if (!set[y * FixedWidth + x])
+        continue;
+
+      bitmap[(y / 8 * 40 + x / 8) * 8 + y % 8] |= (byte)(1 << (~x & 7));
+    }
+
+    return new() { LoadAddress = 0x2000, BitmapData = bitmap };
+  }
 }

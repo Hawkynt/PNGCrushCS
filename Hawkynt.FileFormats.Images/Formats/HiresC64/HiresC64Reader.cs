@@ -27,34 +27,21 @@ public static class HiresC64Reader {
   }
 
   public static HiresC64File FromSpan(ReadOnlySpan<byte> data) {
-
-    if (data.Length < HiresC64File.ExpectedFileSize)
-      throw new InvalidDataException($"Data too small for a valid hires C64 file (expected {HiresC64File.ExpectedFileSize} bytes, got {data.Length}).");
-
     if (data.Length != HiresC64File.ExpectedFileSize)
-      throw new InvalidDataException($"Invalid hires C64 file size (expected {HiresC64File.ExpectedFileSize} bytes, got {data.Length}).");
+      throw new InvalidDataException(
+        $"Invalid hires C64 file size (expected {HiresC64File.ExpectedFileSize} bytes, got {data.Length}).");
 
-    var bitmapData = new byte[HiresC64File.ExpectedFileSize];
-    data.Slice(0, HiresC64File.ExpectedFileSize).CopyTo(bitmapData.AsSpan(0));
+    var bitmap = new byte[HiresC64File.BitmapDataSize];
+    data.Slice(HiresC64File.BitmapOffset, HiresC64File.BitmapDataSize).CopyTo(bitmap.AsSpan(0));
 
     return new() {
-      BitmapData = bitmapData,
+      LoadAddress = (ushort)(data[0] | (data[1] << 8)),
+      BitmapData = bitmap,
     };
-    }
+  }
 
   public static HiresC64File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < HiresC64File.ExpectedFileSize)
-      throw new InvalidDataException($"Data too small for a valid hires C64 file (expected {HiresC64File.ExpectedFileSize} bytes, got {data.Length}).");
-
-    if (data.Length != HiresC64File.ExpectedFileSize)
-      throw new InvalidDataException($"Invalid hires C64 file size (expected {HiresC64File.ExpectedFileSize} bytes, got {data.Length}).");
-
-    var bitmapData = new byte[HiresC64File.ExpectedFileSize];
-    data.AsSpan(0, HiresC64File.ExpectedFileSize).CopyTo(bitmapData.AsSpan(0));
-
-    return new() {
-      BitmapData = bitmapData,
-    };
+    return FromSpan(data);
   }
 }

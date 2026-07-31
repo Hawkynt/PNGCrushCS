@@ -41,15 +41,16 @@ public sealed class HiresC64ReaderTests {
   [Test]
   [Category("Unit")]
   public void FromBytes_WrongSize_ThrowsInvalidDataException() {
-    Assert.Throws<InvalidDataException>(() => HiresC64Reader.FromBytes(new byte[8001]));
+    Assert.Throws<InvalidDataException>(() => HiresC64Reader.FromBytes(new byte[8000]));
   }
 
   [Test]
   [Category("Unit")]
   public void FromBytes_ValidParsesCorrectly() {
+    // The bitmap starts after the two-byte load address, not at the head of the file.
     var data = new byte[HiresC64File.ExpectedFileSize];
-    data[0] = 0xAB;
-    data[7999] = 0xCD;
+    data[HiresC64File.BitmapOffset] = 0xAB;
+    data[HiresC64File.BitmapOffset + HiresC64File.BitmapDataSize - 1] = 0xCD;
 
     var result = HiresC64Reader.FromBytes(data);
 
@@ -64,7 +65,7 @@ public sealed class HiresC64ReaderTests {
   [Category("Unit")]
   public void FromStream_ValidParsesCorrectly() {
     var data = new byte[HiresC64File.ExpectedFileSize];
-    data[0] = 0xAB;
+    data[HiresC64File.BitmapOffset] = 0xAB;
 
     using var ms = new MemoryStream(data);
     var result = HiresC64Reader.FromStream(ms);
