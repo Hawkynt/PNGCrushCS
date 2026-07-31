@@ -223,6 +223,7 @@ public sealed class RecoilDecodeAgreementTests {
     new("XL-Paint, unmarked 192 rows", ImageFormat.XlPaint, ".xlp", () => _XlPaint(false, 192)),
     new("DelmPaint", ImageFormat.DelmPaint, ".del", () => _DelmPaint(2)),
     new("DelmPaint, four quadrants", ImageFormat.DelmPaint, ".dph", () => _DelmPaint(10)),
+    new("D-GRAPH, compressed", ImageFormat.DGraphCompressed, ".p3c", _DGraph),
   ];
 
   [Test]
@@ -1577,51 +1578,13 @@ public sealed class RecoilDecodeAgreementTests {
     var total = blocks == 2 ? blocks + 1 : blocks;
 
     for (var block = 0; block < total; ++block) {
-      var body = new System.Collections.Generic.List<byte>();
+      // One block says only "the default value, all of it" and carries no stream at all.
+      var body = block == 1 ? (byte[])[0xFE, (byte)(block * 7 + 3), 0, 0] : _CaBlock(block);
 
-      if (block == 1) {
-        // A stride of zero: the whole block is the default value and nothing else is stored.
-        body.AddRange([0xFE, (byte)(block * 7 + 3), 0, 0]);
-      } else {
-        const byte escape = 0xFE;
-        body.AddRange([escape, (byte)(block * 11), 0, 1]);
-
-        var fill = block * 31;
-        for (var written = 0; written < 32000;) {
-          var left = 32000 - written;
-
-          if (left >= 4096) {
-            // A long run, counted in two bytes.
-            body.AddRange([escape, 1, 0x0F, 0xFF, (byte)(fill++ * 13)]);
-            written += 4096;
-            continue;
-          }
-
-          if (left >= 64) {
-            // A short run, and then one of the default value.
-            body.AddRange([escape, 0, 31, (byte)(fill++ * 17)]);
-            written += 32;
-
-            body.AddRange([escape, 2, 0, 31]);
-            written += 32;
-            continue;
-          }
-
-          // Literals, with the escape doubled where it stands for itself.
-          var value = (byte)(fill++ * 23 + written);
-          body.Add(value);
-          if (value == escape)
-            body.Add(escape);
-
-          ++written;
-        }
-      }
-
-      if (block < blocks) {
+      if (block < blocks)
         lengths.AddRange([
-          (byte)(body.Count >> 24), (byte)(body.Count >> 16), (byte)(body.Count >> 8), (byte)body.Count,
+          (byte)(body.Length >> 24), (byte)(body.Length >> 16), (byte)(body.Length >> 8), (byte)body.Length,
         ]);
-      }
 
       bodies.AddRange(body);
     }
@@ -1631,6 +1594,75 @@ public sealed class RecoilDecodeAgreementTests {
     bodies.CopyTo(data, lengths.Count);
 
     return data;
+  }
+
+  /// <summary>
+  /// A compressed D-GRAPH picture. Each block's length is written as decimal text before it, and
+  /// the second length sits where the first block's stream stopped — so the two lengths have to be
+  /// measured rather than guessed, and the file cannot be assembled back to front.
+  /// </summary>
+  private static byte[] _DGraph() {
+    var first = _CaBlock(0);
+    var second = _CaBlock(1);
+
+    var head = System.Text.Encoding.ASCII.GetBytes($"{first.Length}\r\n");
+    var middle = System.Text.Encoding.ASCII.GetBytes($"{second.Length}\r\n");
+
+    var data = new byte[head.Length + 32 + first.Length + middle.Length + second.Length];
+    var at = 0;
+    head.CopyTo(data, at);
+    at += head.Length;
+
+    // The palette, sixteen ST colour words.
+    for (var i = 0; i < 16; ++i) {
+      data[at + i * 2] = (byte)((i * 3) & 7);
+      data[at + i * 2 + 1] = (byte)(((i * 5) & 7) << 4 | ((i * 7) & 7));
+    }
+
+    at += 32;
+    first.CopyTo(data, at);
+    at += first.Length;
+    middle.CopyTo(data, at);
+    at += middle.Length;
+    second.CopyTo(data, at);
+
+    return data;
+  }
+
+  /// <summary>One block of the ST packers' shared encoding, using every command it has.</summary>
+  private static byte[] _CaBlock(int seed) {
+    const byte escape = 0xFE;
+    var body = new System.Collections.Generic.List<byte> { escape, (byte)(seed * 11), 0, 1 };
+    var fill = seed * 31;
+
+    for (var written = 0; written < 32000;) {
+      var left = 32000 - written;
+
+      if (left >= 4096) {
+        body.AddRange([escape, 1, 0x0F, 0xFF, (byte)(fill++ * 13)]);
+        written += 4096;
+        continue;
+      }
+
+      // A counted run of one value, then a run of the block's own default. The latter's count is
+      // two bytes and a high byte of zero means the whole block, so 257 is the shortest it says.
+      if (left >= 32 + 257) {
+        body.AddRange([escape, 0, 31, (byte)(fill++ * 17)]);
+        written += 32;
+        body.AddRange([escape, 2, 1, 0]);
+        written += 257;
+        continue;
+      }
+
+      var value = (byte)(fill++ * 23 + written);
+      body.Add(value);
+      if (value == escape)
+        body.Add(escape);
+
+      ++written;
+    }
+
+    return body.ToArray();
   }
 
   private static byte[] _Prefixed(int length) {

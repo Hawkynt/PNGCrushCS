@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using FileFormat.Core;
 
 namespace FileFormat.DelmPaint;
 
@@ -57,117 +58,24 @@ public static class DelmPaintReader {
     if (at >= data.Length)
       throw new InvalidDataException("A DelmPaint picture's block table fills the whole file.");
 
+    var rle = new AtariStCaRle(data, at);
+
     for (var block = 0; block < blocks; ++block) {
       var end = at + _BigEndian(data, block << 2);
       if (end > data.Length || end < at)
         throw new InvalidDataException($"Block {block} of a DelmPaint picture runs past the end.");
 
-      _UnpackBlock(data, ref at, end, unpacked, block * DelmPaintFile.BlockSize);
+      rle.Position = at;
+      rle.UnpackBlock(unpacked, block * DelmPaintFile.BlockSize, DelmPaintFile.BlockSize, end);
       at = end;
     }
 
+    // The small form has one further block after the two it counts, holding the remainder.
     if (blocks != _SMALL_BLOCKS)
       return;
 
-    _UnpackBlock(data, ref at, data.Length, unpacked, blocks * DelmPaintFile.BlockSize);
-  }
-
-  /// <summary>
-  /// Unpacks one block, whose own four-byte head names the escape byte, a default value and the
-  /// stride the block is laid out in.
-  /// </summary>
-  /// <remarks>
-  /// A stride of zero is not a degenerate case but a shorthand: the block is the default value all
-  /// the way through and the stream contributes nothing at all, which is what an empty screen or a
-  /// solid background costs.
-  /// </remarks>
-  private static void _UnpackBlock(ReadOnlySpan<byte> data, ref int at, int end, Span<byte> unpacked, int target) {
-    if (at > end - 4)
-      throw new InvalidDataException("A DelmPaint block is too short to name its own encoding.");
-
-    var escape = data[at];
-    var fill = data[at + 1];
-    var stride = (data[at + 2] << 8) | data[at + 3];
-    if (stride >= DelmPaintFile.BlockSize)
-      throw new InvalidDataException($"A DelmPaint block's stride of {stride} exceeds the block.");
-
-    at += 4;
-
-    var remaining = 0;
-    var value = 0;
-    if (stride == 0) {
-      remaining = DelmPaintFile.BlockSize;
-      value = fill;
-      stride = 1;
-    }
-
-    for (var column = 0; column < stride; ++column)
-    for (var position = column; position < DelmPaintFile.BlockSize; position += stride) {
-      while (remaining == 0)
-        _ReadCommand(data, ref at, end, escape, fill, ref remaining, ref value);
-
-      --remaining;
-      unpacked[target + position] = (byte)value;
-    }
-  }
-
-  private static void _ReadCommand(
-    ReadOnlySpan<byte> data, ref int at, int end, byte escape, byte fill, ref int remaining, ref int value) {
-    if (at >= end)
-      throw new InvalidDataException("A DelmPaint block ends before it has filled itself.");
-
-    var b = data[at++];
-    if (b != escape) {
-      remaining = 1;
-      value = b;
-      return;
-    }
-
-    if (at >= end)
-      throw new InvalidDataException("A DelmPaint escape has nothing after it.");
-
-    var kind = data[at++];
-    // The escape doubled stands for itself, which is what keeps it usable as a literal.
-    if (kind == escape) {
-      remaining = 1;
-      value = kind;
-      return;
-    }
-
-    if (at >= end)
-      throw new InvalidDataException("A DelmPaint command has no count.");
-
-    var count = data[at++];
-
-    switch (kind) {
-      case 0:
-        remaining = count + 1;
-        value = _Next(data, ref at, end);
-        break;
-
-      case 1:
-        remaining = ((count << 8) | _Next(data, ref at, end)) + 1;
-        value = _Next(data, ref at, end);
-        break;
-
-      case 2:
-        // A high byte of zero means the whole block rather than a run of 256.
-        remaining = count == 0 ? DelmPaintFile.BlockSize : ((count << 8) | _Next(data, ref at, end)) + 1;
-        value = fill;
-        break;
-
-      default:
-        remaining = kind + 1;
-        value = count;
-        break;
-    }
-  }
-
-  private static byte _Next(ReadOnlySpan<byte> data, ref int at, int end) {
-    if (at >= end)
-      throw new InvalidDataException("A DelmPaint command runs past its block.");
-
-    return data[at++];
+    rle.Position = at;
+    rle.UnpackBlock(unpacked, blocks * DelmPaintFile.BlockSize, DelmPaintFile.BlockSize, data.Length);
   }
 
   private static int _BigEndian(ReadOnlySpan<byte> data, int offset)
