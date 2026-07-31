@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using FileFormat.Core;
 
 namespace FileFormat.Apple3201;
 
@@ -34,41 +35,17 @@ public static class Apple3201Reader {
     return new() { Data = data.ToArray(), Bitmap = _Unpack(data) };
   }
 
-  /// <summary>
-  /// Unpacks Apple's PackBytes, whose command byte says both how many bytes follow and how far to
-  /// step back between them.
-  /// </summary>
-  /// <remarks>
-  /// The top two bits choose a stride of nothing, one, or four: nothing gives a run of literals,
-  /// one gives a byte repeated, and four gives a four-byte pattern repeated — which is exactly what
-  /// a dither or a run of identical pixels in a four-byte-aligned bitmap produces. The two long
-  /// forms multiply the count by four, so a screen of one colour costs two bytes for every 256.
-  /// </remarks>
+  /// <summary>Unpacks the whole bitmap, which is one PackBytes stream from end to end.</summary>
   private static byte[] _Unpack(ReadOnlySpan<byte> data) {
     var unpacked = new byte[Apple3201File.Stride * Apple3201File.Height];
-    var at = Apple3201File.BitmapOffset;
-    var count = 1;
-    var stride = 0;
+    var stream = new PackBytesStream(Apple3201File.BitmapOffset);
 
     for (var target = 0; target < unpacked.Length; ++target) {
-      if (--count == 0) {
-        if (at >= data.Length)
-          throw new InvalidDataException("A 3201 picture ends before its picture does.");
+      var value = stream.ReadByte(data);
+      if (value < 0)
+        throw new InvalidDataException("A 3201 picture ends before its picture does.");
 
-        var command = data[at++];
-        count = (command & 63) + 1;
-        if (command >= 128)
-          count <<= 2;
-
-        ReadOnlySpan<int> strides = [0, 1, 4, 1];
-        stride = strides[command >> 6];
-      } else if (stride != 0 && (count & (stride - 1)) == 0)
-        at -= stride;
-
-      if (at >= data.Length)
-        throw new InvalidDataException("A 3201 picture's stream runs past the end of the file.");
-
-      unpacked[target] = data[at++];
+      unpacked[target] = (byte)value;
     }
 
     return unpacked;

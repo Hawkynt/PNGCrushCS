@@ -300,7 +300,116 @@ public sealed class RecoilDecodeAgreementTests {
     new("Tobias Richter, ST palettes", ImageFormat.TobiasRichterSlideshow, ".pci", () => _TobiasRichter(false)),
     new("Tobias Richter, STE palettes", ImageFormat.TobiasRichterSlideshow, ".pci", () => _TobiasRichter(true)),
     new("SAMAR hi-res with colour map", ImageFormat.SamarHiresMap, ".shc", _Samar),
+    new("Unpacked 3200 colours", ImageFormat.AppleSh3, ".sh3", _AppleSh3),
+    new("Apple Preferred, 320 mode", ImageFormat.ApplePreferred, ".32k", () => _ApplePreferred(false, false)),
+    new("Apple Preferred, 640 mode", ImageFormat.ApplePreferred, ".32k", () => _ApplePreferred(true, false)),
+    new("Apple Preferred, MULTIPAL", ImageFormat.ApplePreferred, ".32k", () => _ApplePreferred(false, true)),
   ];
+
+  /// <summary>A 3200-colour picture written out as it sits in memory: bitmap, then 200 palettes.</summary>
+  private static byte[] _AppleSh3() {
+    var data = new byte[38400];
+
+    for (var i = 0; i < 32000; ++i)
+      data[i] = (byte)(i * 37 + (i >> 6));
+
+    for (var i = 32000; i < data.Length; ++i)
+      data[i] = (byte)(i * 53 + (i >> 4));
+
+    return data;
+  }
+
+  /// <summary>
+  /// An Apple Preferred Format picture: a MAIN chunk of palettes, a scanline directory and a
+  /// PackBytes bitmap, optionally followed by a MULTIPAL chunk of a palette per line.
+  /// </summary>
+  private static byte[] _ApplePreferred(bool wide, bool multipal) {
+    const int height = 200;
+    var width = wide ? 640 : 320;
+    var bytesPerLine = wide ? width >> 2 : width >> 1;
+    const int paletteCount = 4;
+    var directoryOffset = 17 + paletteCount * 32;
+
+    var packed = new System.Collections.Generic.List<byte>();
+    var lineLengths = new int[height];
+
+    for (var y = 0; y < height; ++y) {
+      var before = packed.Count;
+
+      for (var written = 0; written < bytesPerLine;) {
+        var left = bytesPerLine - written;
+
+        // A run of one repeated byte, a four-byte pattern repeated, then literals — so all three
+        // of PackBytes' strides are exercised on every line.
+        if (left >= 16 && written == 0) {
+          packed.Add(0x43);
+          packed.Add((byte)(y * 7));
+          written += 4;
+        } else if (left >= 16 && written == 4) {
+          packed.Add(0x83);
+          packed.AddRange([(byte)(y + 1), (byte)(y + 2), (byte)(y + 3), (byte)(y + 4)]);
+          written += 16;
+        } else {
+          var run = Math.Min(left, 20);
+          packed.Add((byte)(run - 1));
+          for (var i = 0; i < run; ++i)
+            packed.Add((byte)(y * 11 + written + i));
+
+          written += run;
+        }
+      }
+
+      lineLengths[y] = packed.Count - before;
+    }
+
+    var bitmapOffset = directoryOffset + height * 4;
+    var mainLength = bitmapOffset + packed.Count;
+    var data = new byte[mainLength + (multipal ? 6415 : 0)];
+
+    data[0] = (byte)mainLength;
+    data[1] = (byte)(mainLength >> 8);
+    data[2] = (byte)(mainLength >> 16);
+    data[3] = (byte)(mainLength >> 24);
+    data[4] = 4;
+    "MAIN"u8.CopyTo(data.AsSpan(5));
+    data[9] = (byte)(wide ? 128 : 0);
+    data[11] = (byte)width;
+    data[12] = (byte)(width >> 8);
+    data[13] = paletteCount;
+
+    for (var i = 0; i < paletteCount * 16; ++i) {
+      data[15 + i * 2] = (byte)(i * 29);
+      data[16 + i * 2] = (byte)(i * 17);
+    }
+
+    data[directoryOffset - 2] = (byte)height;
+    data[directoryOffset - 1] = (byte)(height >> 8);
+
+    for (var y = 0; y < height; ++y) {
+      var entry = directoryOffset + y * 4;
+      data[entry] = (byte)lineLengths[y];
+      data[entry + 1] = (byte)(lineLengths[y] >> 8);
+      data[entry + 2] = (byte)((wide ? 128 : 0) | y % paletteCount);
+    }
+
+    packed.CopyTo(data, bitmapOffset);
+
+    if (!multipal)
+      return data;
+
+    data[mainLength] = 6415 & 255;
+    data[mainLength + 1] = 6415 >> 8;
+    data[mainLength + 4] = 8;
+    "MULTIPAL"u8.CopyTo(data.AsSpan(mainLength + 5));
+    data[mainLength + 13] = height;
+
+    for (var i = 0; i < height * 16; ++i) {
+      data[mainLength + 15 + i * 2] = (byte)(i * 41);
+      data[mainLength + 16 + i * 2] = (byte)(i * 23);
+    }
+
+    return data;
+  }
 
   /// <summary>
   /// A Tobias Richter slideshow picture: two fields of four whole-picture bitplanes, then a

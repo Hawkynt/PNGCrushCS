@@ -190,6 +190,8 @@ build one from pixel data they didn't read, so the registry reports them as read
 | ColorSTar object        | .obj                                                 | Clipping, mono or sixteen colours | Y     | —      | —         | R     | —   | —      | —         |
 | Tobias Richter Slideshow | .pci                                                | Overscan, a palette every line   | Y      | —      | —         | R     | —   | —      | —         |
 | SAMAR Hi-res + colours  | .shc                                                 | Two fields, six colour zones each | Y     | —      | —         | R     | —   | —      | —         |
+| Apple Preferred Format  | .32k                                                 | Named chunks, packed, MULTIPAL   | Y      | —      | —         | R     | —   | —      | —         |
+| 3200 colours, unpacked  | .sh3, .3200                                          | Bitmap then 200 palettes         | Y      | —      | —         | R     | —   | —      | —         |
 | Atari Player/Missile    | .pmg, .plm                                           | Atari 8-bit Player/Missile GFX   | Y      | Y      | —         | —     | —   | —      | —         |
 | AtariTools-800 sprites  | .4pl, .4mi, .4pm                                     | Atari 8-bit player/missile dumps | Y      | Y      | —         | R     | —   | —      | —         |
 | AtariTools-800 charset  | .acs                                                 | Atari 8-bit ANTIC 4 character set | Y      | Y      | —         | R     | —   | —      | —         |
@@ -802,12 +804,12 @@ Two different questions, two different answers:
 
 | Metric                                                    | Us    | RECOIL |
 | ----------------------------------------------------------- | ----- | ------ |
-| Total formats                                              | 655   | 552    |
+| Total formats                                              | 657   | 552    |
 | Modern/web/scientific formats (PNG, JPEG, WebP, AVIF, …)   | ~290  | 0      |
-| Of RECOIL's 552 vintage formats, covered                   | 525   | 552    |
+| Of RECOIL's 552 vintage formats, covered                   | 527   | 552    |
 
 So on breadth we are level, and on everything outside the retro catalogue we are the only one of
-the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 27
+the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 25
 formats.
 
 Two different formats claim `.hip`: a C64 picture of ours and the Atari 8-bit Hard Interlace
