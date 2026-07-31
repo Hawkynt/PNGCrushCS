@@ -217,12 +217,17 @@ public static class Atari8BitGraphics {
   /// </remarks>
   public static void DecodeGr9Into(
     ReadOnlySpan<byte> data, int offset, int stride,
-    Span<byte> frame, int frameOffset, int frameStride, int width, int height, int background) {
+    Span<byte> frame, int frameOffset, int frameStride, int width, int height, int background, int shift = 0) {
     for (var y = 0; y < height; ++y) {
       for (var x = 0; x < width; ++x) {
-        var index = offset + (x >> 3);
-        // A nibble covers four screen pixels, high half of the byte first.
-        var luminance = index < data.Length ? (data[index] >> (~x & 4)) & 15 : 0;
+        var source = x + shift;
+        var luminance = 0;
+        if (source >= 0 && source < width) {
+          var index = offset + (source >> 3);
+          // A nibble covers four screen pixels, high half of the byte first.
+          if (index < data.Length)
+            luminance = (data[index] >> (~source & 4)) & 15;
+        }
 
         var target = frameOffset + x;
         if (target >= 0 && target < frame.Length)
@@ -249,11 +254,13 @@ public static class Atari8BitGraphics {
   /// makes the pair read as one picture rather than as stripes.
   /// </remarks>
   public static void BlendGr11Into(
-    ReadOnlySpan<byte> data, int offset, int stride, Span<byte> frame, int width, int height, int firstRow) {
+    ReadOnlySpan<byte> data, int offset, int stride, Span<byte> frame, int width, int height, int firstRow,
+    int leftSkip = 0) {
     for (var y = firstRow; y < height; y += 2) {
-      var frameOffset = y * width;
+      // The hue field sits leftSkip pixels left of the luminance one it is laid over.
+      var frameOffset = y * width - leftSkip;
 
-      for (var x = 0; x < width; ++x) {
+      for (var x = leftSkip; x < width; ++x) {
         var index = offset + (x >> 3);
         // The hue occupies the high nibble; the second of each pair of pixels shifts up into it.
         var hue = index < data.Length ? (data[index] << (x & 4)) & 240 : 0;
@@ -266,7 +273,42 @@ public static class Atari8BitGraphics {
           frame[frameOffset + width + x] = (byte)(hue | (frame[frameOffset + width + x] & 15));
       }
 
+      // The pixels the displacement pushed off the right of this row have nothing behind them.
+      frame.Slice(frameOffset + width, leftSkip).Clear();
       offset += stride;
+    }
+  }
+
+  /// <summary>
+  /// Renders a Graphics 10 bitmap into a frame of GTIA colour bytes, writing every
+  /// <paramref name="frameStride"/>th pixel row.
+  /// </summary>
+  /// <param name="entries">The sixteen entries the nine registers fill, as
+  /// <see cref="ExpandGr10Registers"/> produces them.</param>
+  /// <param name="leftSkip">How far right the mode's own timing pushes the picture.</param>
+  /// <remarks>
+  /// Graphics 10 starts two pixels later than the modes it is interlaced with — a consequence of
+  /// how the chip fetches its first byte, and something a picture drawn on the hardware expects
+  /// rather than something to correct. The columns that fall off the left take the border colour.
+  /// </remarks>
+  public static void DecodeGr10Into(
+    ReadOnlySpan<byte> data, int offset, Span<byte> frame, int frameOffset, int frameStride,
+    int width, int height, ReadOnlySpan<byte> entries, int leftSkip = 0) {
+    frameOffset += 2 - leftSkip;
+
+    for (var y = 0; y < height; ++y) {
+      var x = leftSkip - 2;
+      for (; x < 0; ++x)
+        frame[frameOffset + x] = entries[0];
+
+      for (; x < width + leftSkip - 2; ++x) {
+        var index = offset + (x >> 3);
+        var pixel = index < data.Length ? (data[index] >> (~x & 4)) & 15 : 0;
+        frame[frameOffset + x] = entries[pixel];
+      }
+
+      offset += width >> 3;
+      frameOffset += frameStride;
     }
   }
 

@@ -176,6 +176,8 @@ public sealed class RecoilDecodeAgreementTests {
     new("PI9 on a Falcon", ImageFormat.AtariPi9, ".pi9", () => _Monochrome(65024)),
     new("PI9 on a Falcon, taller", ImageFormat.AtariPi9, ".pi9", () => _Monochrome(77824)),
     new("ZZ_ROUGH", ImageFormat.ZzRough, ".rgh", _ZzRough),
+    new("Taquart Interlace Picture", ImageFormat.TaquartInterlace, ".tip", () => _Tip(160, 119)),
+    new("Taquart Interlace Picture, narrow", ImageFormat.TaquartInterlace, ".tip", () => _Tip(64, 40)),
   ];
 
   [Test]
@@ -838,6 +840,22 @@ public sealed class RecoilDecodeAgreementTests {
     var counts = header.Length + 32;
     for (var i = 0; i < countLength; ++i)
       data[counts + i] = run;
+
+    return data;
+  }
+
+  /// <summary>A Taquart Interlace Picture: three fields of equal length behind a five-byte header.</summary>
+  private static byte[] _Tip(int width, int height) {
+    var fieldLength = (width >> 2) * height;
+    var data = _Monochrome(9 + 3 * fieldLength);
+
+    "TIP"u8.CopyTo(data);
+    data[3] = 1;
+    data[4] = 0;
+    data[5] = (byte)width;
+    data[6] = (byte)height;
+    data[7] = (byte)fieldLength;
+    data[8] = (byte)(fieldLength >> 8);
 
     return data;
   }
