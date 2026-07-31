@@ -207,6 +207,43 @@ public static class Atari8BitGraphics {
   }
 
   /// <summary>
+  /// Renders a Graphics 15 bitmap into a frame of GTIA colour bytes, writing every
+  /// <paramref name="frameStride"/>th pixel row.
+  /// </summary>
+  /// <param name="registers">Background, PF0, PF1 and PF2, in that order.</param>
+  public static void DecodeGr15Into(
+    ReadOnlySpan<byte> data, int offset, int stride, Span<byte> frame, int frameOffset, int frameStride,
+    int width, int height, ReadOnlySpan<byte> registers) {
+    for (var y = 0; y < height; ++y) {
+      for (var x = 0; x < width; ++x) {
+        var index = offset + (x >> 3);
+        var pixel = index < data.Length ? (data[index] >> (~x & 6)) & 3 : 0;
+
+        var target = frameOffset + x;
+        if (target >= 0 && target < frame.Length)
+          frame[target] = (byte)(pixel < registers.Length ? registers[pixel] & 254 : 0);
+      }
+
+      offset += stride;
+      frameOffset += frameStride;
+    }
+  }
+
+  /// <summary>
+  /// Reads four colour registers stored as PF0, PF1, PF2 and then the background, and returns them
+  /// in the background-first order the Graphics 15 helpers take.
+  /// </summary>
+  public static byte[] ReadPf012Bak(ReadOnlySpan<byte> data, int offset) {
+    var registers = new byte[Gr15RegisterCount];
+    for (var i = 0; i < Gr15RegisterCount; ++i) {
+      var at = offset + i;
+      registers[i == Gr15RegisterCount - 1 ? 0 : i + 1] = at >= 0 && at < data.Length ? data[at] : (byte)0;
+    }
+
+    return registers;
+  }
+
+  /// <summary>
   /// Renders a Graphics 9 bitmap into a frame of GTIA colour bytes, writing every
   /// <paramref name="frameStride"/>th pixel row.
   /// </summary>

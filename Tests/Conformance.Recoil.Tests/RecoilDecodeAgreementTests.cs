@@ -187,6 +187,9 @@ public sealed class RecoilDecodeAgreementTests {
     new("PMG Designer, one row", ImageFormat.PmgDesigner, ".pmd", () => _PmgDesigner(2, 2, 2, 16)),
     new("Ludek Maker", ImageFormat.LudekMaker, ".ldm", () => _LudekMaker(19)),
     new("Ludek Maker, one row", ImageFormat.LudekMaker, ".ldm", () => _LudekMaker(6)),
+    new("Daisy-Dot font", ImageFormat.DaisyDotFont, ".nlq", _DaisyDot),
+    new("Atari Graphics Studio, interleaved", ImageFormat.AtariGraphicsStudio, ".ags", () => _Ags(11, 40, 96)),
+    new("Atari Graphics Studio, quadrupled", ImageFormat.AtariGraphicsStudio, ".ags", () => _Ags(19, 40, 48)),
   ];
 
   [Test]
@@ -965,6 +968,41 @@ public sealed class RecoilDecodeAgreementTests {
 
     data[23] = 0;
     data[24] = (byte)shapes;
+
+    return data;
+  }
+
+  /// <summary>
+  /// A Daisy-Dot font. Characters are variable width with no index, so their widths vary across the
+  /// ninety-one on purpose — a decoder that assumed a fixed stride would drift into the next one.
+  /// </summary>
+  private static byte[] _DaisyDot() {
+    var body = new System.Collections.Generic.List<byte>();
+    for (var i = 0; i < 91; ++i) {
+      var width = i % 19 + 1;
+      body.Add((byte)width);
+      for (var column = 0; column < width * 2; ++column)
+        body.Add((byte)(i * 31 + column * 13));
+
+      body.Add(155);
+    }
+
+    var data = new byte[19 + body.Count];
+    System.Text.Encoding.ASCII.GetBytes("DAISY-DOT NLQ FONT").CopyTo(data, 0);
+    data[18] = 155;
+    body.CopyTo(data, 19);
+
+    return data;
+  }
+
+  /// <summary>An Atari Graphics Studio picture, whose mode byte picks between two unrelated screens.</summary>
+  private static byte[] _Ags(int mode, int stored, int rows) {
+    var data = _Monochrome(16 + (stored * rows << 1));
+    System.Text.Encoding.ASCII.GetBytes("AGS").CopyTo(data, 0);
+    data[3] = (byte)mode;
+    data[4] = (byte)stored;
+    data[5] = (byte)rows;
+    data[6] = (byte)(rows >> 8);
 
     return data;
   }
