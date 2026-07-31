@@ -250,6 +250,7 @@ public sealed class RecoilDecodeAgreementTests {
     new("Commodore Grafix", ImageFormat.CommodoreGrafix, ".cgx", () => _Grafix(3, 2, 4, 3)),
     new("Commodore Grafix, one frame", ImageFormat.CommodoreGrafix, ".cgx", () => _Grafix(1, 1, 8, 8)),
     new("3201", ImageFormat.Apple3201, ".3201", _Apple3201),
+    new("Anime 4ever", ImageFormat.Anime4Ever, ".a4r", _Anime4Ever),
   ];
 
   [Test]
@@ -2448,6 +2449,63 @@ public sealed class RecoilDecodeAgreementTests {
     body.CopyTo(data, 6404);
 
     return data;
+  }
+
+  /// <summary>
+  /// An Anime 4ever picture, encoded here. Its flags are packed two levels deep — eight command
+  /// flags to a byte, and eight of those bytes governed by one byte of their own — so the probe has
+  /// to interleave three streams in the order the decoder consumes them.
+  /// </summary>
+  private static byte[] _Anime4Ever() {
+    // Each command is a flag and the bytes that follow it.
+    var commands = new System.Collections.Generic.List<(int Flag, byte[] Bytes)>();
+
+    var start = 19984 - 128 + 512;
+    commands.Add((1, [0, (byte)start, (byte)(start >> 8), 0]));
+
+    for (var written = 1; written < 10240;) {
+      var left = 10240 - written;
+
+      if (left >= 64 && (written & 15) == 0) {
+        // A reference to the byte just written, repeated: distance one, count sixty-four.
+        commands.Add((1, [1, 62]));
+        written += 64;
+        continue;
+      }
+
+      commands.Add((0, [(byte)(written * 29 + (written >> 6))]));
+      ++written;
+    }
+
+    commands.Add((1, [1, 0]));
+
+    var body = new System.Collections.Generic.List<byte>();
+
+    for (var group = 0; group < commands.Count; group += 64) {
+      // One outer byte governs eight inner ones; a set bit means the inner byte is present.
+      var groups = Math.Min(8, (commands.Count - group + 7) / 8);
+      var outer = 0;
+      for (var i = 0; i < 8; ++i)
+        outer = (outer << 1) | (i < groups ? 1 : 0);
+
+      body.Add((byte)outer);
+
+      for (var i = 0; i < groups; ++i) {
+        var first = group + i * 8;
+        var count = Math.Min(8, commands.Count - first);
+
+        var inner = 0;
+        for (var bit = 0; bit < 8; ++bit)
+          inner = (inner << 1) | (bit < count ? commands[first + bit].Flag : 0);
+
+        body.Add((byte)inner);
+
+        for (var bit = 0; bit < count; ++bit)
+          body.AddRange(commands[first + bit].Bytes);
+      }
+    }
+
+    return body.ToArray();
   }
 
   private static byte[] _Prefixed(int length) {
