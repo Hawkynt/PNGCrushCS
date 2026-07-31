@@ -15,7 +15,8 @@ namespace FileFormat.MsxScreen3;
 /// </remarks>
 [FormatMagicBytes([0xFE])]
 public readonly record struct MsxScreen3File
-  : IImageFormatReader<MsxScreen3File>, IImageToRawImage<MsxScreen3File> {
+  : IImageFormatReader<MsxScreen3File>, IImageToRawImage<MsxScreen3File>,
+    IImageFromRawImage<MsxScreen3File>, IImageFormatWriter<MsxScreen3File> {
 
   /// <summary>Pixels across.</summary>
   public const int Width = 256;
@@ -47,6 +48,9 @@ public readonly record struct MsxScreen3File
   /// <summary>Size of a file that carries the sprite plane as well.</summary>
   public const int SpriteFileSize = 16391;
 
+  /// <summary>Bytes the screen map occupies: thirty-two cells across, twenty-four down.</summary>
+  public const int ScreenMapSize = 32 * 24;
+
   /// <summary>Smallest file the mode can be read from.</summary>
   public const int MinimumFileSize = 1543;
 
@@ -54,6 +58,8 @@ public readonly record struct MsxScreen3File
   static string[] IImageFormatMetadata<MsxScreen3File>.FileExtensions => [".sc3"];
   static MsxScreen3File IImageFormatReader<MsxScreen3File>.FromSpan(ReadOnlySpan<byte> data)
     => MsxScreen3Reader.FromSpan(data);
+  static byte[] IImageFormatWriter<MsxScreen3File>.ToBytes(MsxScreen3File file)
+    => MsxScreen3Writer.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<MsxScreen3File>.VideoModes => [
     new("Screen 3", [(Width, Height)], [16])
   ];
@@ -98,4 +104,73 @@ public readonly record struct MsxScreen3File
 
   private static byte _At(ReadOnlySpan<byte> data, int offset)
     => offset >= 0 && offset < data.Length ? data[offset] : (byte)0;
+
+  /// <summary>Builds a screen of four-by-four blocks, each one of the chip's sixteen colours.</summary>
+  /// <remarks>
+  /// The awkward part is the pattern table, which holds 256 patterns of eight bytes for 768 cells —
+  /// far too few to give each cell its own. It works out because a cell only ever uses two of its
+  /// pattern's eight bytes, and which two depends on the cell's row: rows cycle through the four
+  /// byte-pairs, so four cell rows can share one pattern without ever colliding.
+  /// <para/>
+  /// Naming the pattern <c>(row / 4) * 32 + column</c> makes that sharing exact: cells that share a
+  /// pattern are always four rows apart, which is precisely the spacing that puts them in different
+  /// bytes. It needs 192 of the 256 patterns and no cell compromises with another.
+  /// </remarks>
+  public static MsxScreen3File FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(Width, Height);
+    var palette = MsxGraphics.Tms9918Palette;
+    var data = new byte[LongFileSize];
+
+    for (var row = 0; row < 24; ++row)
+    for (var column = 0; column < 32; ++column) {
+      var pattern = row / 4 * 32 + column;
+      data[PatternOffset + ScreenMapOffset + row * 32 + column] = (byte)pattern;
+
+      // Two bytes a cell, one per band of four scanlines, and two blocks packed into each.
+      for (var band = 0; band < 2; ++band) {
+        var top = row * 8 + band * 4;
+        var left = _Block(rgb.PixelData, palette, column * 8, top);
+        var right = _Block(rgb.PixelData, palette, column * 8 + 4, top);
+
+        data[PatternOffset + (pattern << 3) + ((row * 2 + band) & 7)] = (byte)((left << 4) | right);
+      }
+    }
+
+    return new() { Data = data };
+  }
+
+  /// <summary>The colour closest to the average of one four-by-four block.</summary>
+  private static int _Block(ReadOnlySpan<byte> rgb, ReadOnlySpan<byte> palette, int left, int top) {
+    long red = 0, green = 0, blue = 0;
+    for (var y = 0; y < BlockSize; ++y)
+    for (var x = 0; x < BlockSize; ++x) {
+      var at = ((top + y) * Width + left + x) * 3;
+      red += rgb[at];
+      green += rgb[at + 1];
+      blue += rgb[at + 2];
+    }
+
+    const int pixels = BlockSize * BlockSize;
+    red /= pixels;
+    green /= pixels;
+    blue /= pixels;
+
+    var best = 1;
+    var bestCost = long.MaxValue;
+
+    // Entry 0 is transparent rather than a colour, so it is not a candidate.
+    for (var entry = 1; entry < 16; ++entry) {
+      long dr = red - palette[entry * 3], dg = green - palette[entry * 3 + 1], db = blue - palette[entry * 3 + 2];
+      var cost = dr * dr * 77 + dg * dg * 150 + db * db * 29;
+      if (cost >= bestCost)
+        continue;
+
+      bestCost = cost;
+      best = entry;
+    }
+
+    return best;
+  }
 }
