@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.IO.Compression;
 using System.Reflection;
 
 namespace FileFormat.Core;
@@ -32,13 +33,18 @@ public static class CharacterRoms {
   /// </remarks>
   public static ReadOnlySpan<byte> Zx81 => _zx81 ??= _Load("zx81.fnt", 512);
 
+  /// <summary>
+  /// Reads one font out of the assembly. They are stored deflated because a character set is half
+  /// empty space and half repeated edges, which halves.
+  /// </summary>
   private static byte[] _Load(string name, int size) {
     using var stream = typeof(CharacterRoms).GetTypeInfo().Assembly
                          .GetManifestResourceStream($"FileFormat.Core.Roms.{name}")
                        ?? throw new InvalidOperationException($"The {name} character set is missing from the assembly.");
 
+    using var inflated = new DeflateStream(stream, CompressionMode.Decompress);
     var data = new byte[size];
-    stream.ReadExactly(data);
+    inflated.ReadExactly(data);
 
     return data;
   }

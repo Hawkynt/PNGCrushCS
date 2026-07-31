@@ -361,7 +361,89 @@ public sealed class RecoilDecodeAgreementTests {
     new("ZXpaintyONE", ImageFormat.ZxPaintyOne, ".zp1", _ZxPaintyOne),
     new("Sinclair BASIC", ImageFormat.SinclairBasic, ".p", () => _SinclairBasic(false)),
     new("Sinclair BASIC, scrolling line", ImageFormat.SinclairBasic, ".p", () => _SinclairBasic(true)),
+    new("Canvas raster, 320", ImageFormat.CanvasRaster, ".ful", () => _CanvasRaster(0)),
+    new("Canvas raster, 640", ImageFormat.CanvasRaster, ".ful", () => _CanvasRaster(1)),
   ];
+
+  /// <summary>
+  /// A Canvas raster picture: a table saying which bands carry a palette, those palettes written
+  /// backwards, and a screen stored as runs plus whatever the runs missed.
+  /// </summary>
+  private static byte[] _CanvasRaster(int mode) {
+    var bitplanes = 4 >> mode;
+
+    // Most bands change palette, but not all, so both branches of the backwards walk are covered.
+    var hasPalette = new bool[50];
+    for (var band = 0; band < 50; ++band)
+      hasPalette[band] = band == 0 || band % 5 != 3;
+
+    var withPalette = 0;
+    for (var band = 1; band < 50; ++band) {
+      if (hasPalette[band])
+        ++withPalette;
+    }
+
+    var cursor = 896 + withPalette * 48;
+    var runs = new System.Collections.Generic.List<byte>();
+    var filled = new bool[16000];
+
+    // A handful of runs, one of them long enough to need the count's high byte. A run's start is a
+    // group index that the plane count multiplies, so the four-plane mode bounds how high it goes.
+    for (var i = 0; i < 12; ++i) {
+      var start = i * 250;
+      var count = i == 3 ? 400 : 20 + i;
+
+      runs.AddRange([(byte)(count >> 8), (byte)count, (byte)(start >> 8), (byte)start]);
+      for (var j = 0; j < bitplanes * 2; ++j)
+        runs.Add((byte)(i * 31 + j * 17));
+
+      for (var group = start * bitplanes; group <= (start + count) * bitplanes; group += bitplanes) {
+        if (group < 16000)
+          filled[group] = true;
+      }
+    }
+
+    runs.AddRange([255, 255, 0, 0]);
+    for (var j = 0; j < bitplanes * 2; ++j)
+      runs.Add(0);
+
+    var rest = new System.Collections.Generic.List<byte>();
+    var seed = 0;
+    for (var group = 0; group < 16000; group += bitplanes) {
+      if (filled[group])
+        continue;
+
+      for (var j = 0; j < bitplanes * 2; ++j)
+        rest.Add((byte)(seed * 37 + j * 53));
+
+      ++seed;
+    }
+
+    var headerAt = cursor + 608;
+    var data = new byte[headerAt + 34 + runs.Count + rest.Count];
+
+    for (var band = 0; band < 50; ++band) {
+      if (hasPalette[band])
+        continue;
+
+      data[band * 2] = 255;
+      data[band * 2 + 1] = 255;
+    }
+
+    // The first band's palette is the last one written, so filling from the end matches the order
+    // the decoder reads them in.
+    for (var i = 896; i < cursor; ++i)
+      data[i] = (byte)(i * 29 & 7);
+
+    for (var i = 848; i < 896; ++i)
+      data[i] = (byte)(i * 13 & 7);
+
+    data[headerAt + 33] = (byte)mode;
+    runs.CopyTo(data, headerAt + 34);
+    rest.CopyTo(data, headerAt + 34 + runs.Count);
+
+    return data;
+  }
 
   /// <summary>A Semi-Graphic logos screen: 960 character codes and nothing else.</summary>
   private static byte[] _SemiGraphicLogo() {
