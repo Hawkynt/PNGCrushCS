@@ -212,9 +212,13 @@ public static class PlanarConverter {
   public static short[] RgbToStPalette(ReadOnlySpan<byte> rgb, int count) {
     var palette = new short[count];
     for (var i = 0; i < count; ++i) {
-      var r = rgb[i * 3] * 7 / 255;
-      var g = rgb[i * 3 + 1] * 7 / 255;
-      var b = rgb[i * 3 + 2] * 7 / 255;
+      // Rounded, not truncated. The channel is widened by repeating its bits, so level 3 comes out
+      // as 109 rather than the 109.3 an exact division would give — and truncating 109 back lands
+      // on 2. Levels 1, 3 and 5 all come back one step low that way, which no round trip through
+      // a second decoder can show, both decoders reading the same wrong palette alike.
+      var r = (rgb[i * 3] * 7 + 127) / 255;
+      var g = (rgb[i * 3 + 1] * 7 + 127) / 255;
+      var b = (rgb[i * 3 + 2] * 7 + 127) / 255;
       palette[i] = (short)((r << 8) | (g << 4) | b);
     }
 
