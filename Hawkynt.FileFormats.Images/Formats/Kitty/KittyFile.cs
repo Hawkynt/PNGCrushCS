@@ -14,7 +14,8 @@ namespace FileFormat.Kitty;
 /// that gives a tile four rows instead of two.
 /// </remarks>
 public readonly record struct KittyFile
-  : IImageFormatReader<KittyFile>, IImageToRawImage<KittyFile> {
+  : IImageFormatReader<KittyFile>, IImageToRawImage<KittyFile>,
+    IImageFromRawImage<KittyFile>, IImageFormatWriter<KittyFile> {
 
   /// <summary>Pixels across.</summary>
   public const int Width = 640;
@@ -35,6 +36,7 @@ public readonly record struct KittyFile
   static string[] IImageFormatMetadata<KittyFile>.FileExtensions => [".kty", ".kt4"];
   static KittyFile IImageFormatReader<KittyFile>.FromSpan(ReadOnlySpan<byte> data)
     => KittyReader.FromSpan(data);
+  static byte[] IImageFormatWriter<KittyFile>.ToBytes(KittyFile file) => KittyWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<KittyFile>.VideoModes => [
     new("PC-88 VA", [(Width, Height)], [8])
   ];
@@ -48,4 +50,33 @@ public readonly record struct KittyFile
     Format = PixelFormat.Rgb24,
     PixelData = file.Pixels ?? new byte[Width * Height * 3],
   };
+
+  /// <summary>Builds a picture from an image, which is scaled to the machine's fixed screen.</summary>
+  /// <remarks>
+  /// The size is not negotiable — the format has no field for it — so a picture of any other size
+  /// is stretched to fit rather than refused. Colour is one bit a channel, so the eight corners of
+  /// the colour cube are all there is; a picture already using only those comes back unchanged.
+  /// </remarks>
+  public static KittyFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width < 1 || image.Height < 1)
+      throw new ArgumentException("A picture needs at least one pixel.", nameof(image));
+
+    var rgb = PixelConverter.Convert(image, PixelFormat.Rgb24);
+    var pixels = new byte[Width * Height * 3];
+
+    for (var y = 0; y < Height; ++y)
+    for (var x = 0; x < Width; ++x) {
+      var sourceX = image.Width == Width ? x : x * image.Width / Width;
+      var sourceY = image.Height == Height ? y : y * image.Height / Height;
+      var source = (sourceY * image.Width + sourceX) * 3;
+      var target = (y * Width + x) * 3;
+
+      pixels[target] = rgb.PixelData[source];
+      pixels[target + 1] = rgb.PixelData[source + 1];
+      pixels[target + 2] = rgb.PixelData[source + 2];
+    }
+
+    return new() { Pixels = pixels };
+  }
 }

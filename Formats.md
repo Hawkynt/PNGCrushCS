@@ -197,7 +197,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | Fun with Art            | .fwa                                                 | Colours as 6502 interrupt code   | Y      | —      | —         | R     | —   | —      | —         |
 | Interlace Char. Editor  | .ice, .icn                                           | 33 pairings of two graphics modes | Y     | —      | —         | R     | —   | —      | —         |
 | ICE PCIN+               | .ip2                                                 | Screen in two modes at once      | Y      | —      | —         | R     | —   | —      | —         |
-| Kitty                   | .kty, .kt4                                           | Tiles and where to put them      | Y      | —      | —         | R     | —   | —      | —         |
+| Kitty                   | .kty, .kt4                                           | Tiles and where to put them      | Y      | Y      | —         | R     | —   | —      | —         |
 | I Paint                 | .ip                                                  | C128 80-column, colour optional  | Y      | —      | —         | R     | —   | —      | —         |
 | Mapletown Network NL3   | .nl3                                                 | Printable characters only        | Y      | —      | —         | R     | —   | —      | —         |
 | Printfox                | .gb                                                  | Cell by cell, black on white     | Y      | Y      | —         | R     | —   | —      | —         |
