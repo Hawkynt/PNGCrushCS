@@ -205,6 +205,8 @@ public sealed class RecoilDecodeAgreementTests {
     new("Cranach monochrome", ImageFormat.CranachPaint, ".esm", () => _Cranach(1, 200, 150)),
     new("Cranach palette", ImageFormat.CranachPaint, ".esm", () => _Cranach(8, 160, 100)),
     new("Cranach true colour", ImageFormat.CranachPaint, ".esm", () => _Cranach(24, 64, 48)),
+    new("SymbOS graphic", ImageFormat.SymbOsGraphic, ".sgx", () => _SymbOs(false)),
+    new("SymbOS graphic, sixteen colours", ImageFormat.SymbOsGraphic, ".sgx", () => _SymbOs(true)),
   ];
 
   [Test]
@@ -1261,6 +1263,40 @@ public sealed class RecoilDecodeAgreementTests {
     data[11] = (byte)depth;
 
     return data;
+  }
+
+  /// <summary>
+  /// A SymbOS graphic of two rows of two chunks each. Rows are separated by a marker and must come
+  /// to the same width, so a decoder that ignored the marker would run them together.
+  /// </summary>
+  private static byte[] _SymbOs(bool wide) {
+    var body = new System.Collections.Generic.List<byte>();
+    var fill = 0;
+
+    void Chunk(int chunkWidth, int chunkHeight) {
+      if (wide) {
+        var stride = (chunkWidth + 1) >> 1;
+        body.AddRange([64, 5, (byte)stride, (byte)(stride >> 8), (byte)chunkWidth, (byte)(chunkWidth >> 8),
+          (byte)chunkHeight, (byte)(chunkHeight >> 8)]);
+        for (var i = 0; i < stride * chunkHeight; ++i)
+          body.Add((byte)(fill++ * 47 + (fill >> 5)));
+      } else {
+        var stride = (chunkWidth + 3) >> 2;
+        body.AddRange([(byte)stride, (byte)chunkWidth, (byte)chunkHeight]);
+        for (var i = 0; i < stride * chunkHeight; ++i)
+          body.Add((byte)(fill++ * 47 + (fill >> 5)));
+      }
+    }
+
+    Chunk(40, 24);
+    Chunk(24, 24);
+    body.AddRange([255, 0, 0]);
+    Chunk(32, 16);
+    Chunk(32, 16);
+    // No marker after the last row: its width is what the file's own width is checked against.
+    body.AddRange([0, 0, 0, 0]);
+
+    return body.ToArray();
   }
 
   private static byte[] _Prefixed(int length) {
