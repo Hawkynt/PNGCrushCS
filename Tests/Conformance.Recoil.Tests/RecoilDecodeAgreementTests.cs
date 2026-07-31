@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using FileFormat.Core;
+using FileFormat.AmstradMode5;
 using FileFormat.ColrObjectEditor;
 using FileFormat.OcpArtStudioWindow;
 using FileFormat.TechnicolorDream;
@@ -365,6 +366,50 @@ public sealed class RecoilDecodeAgreementTests {
 
       var theirs = _AsRgb(FormatRegistry.Read(png!));
       var ours = _AsRgb(ColrObjectEditorFile.ToRawImage(ColrObjectEditorReader.FromFile(new(picture))));
+
+      Assert.That((ours.Width, ours.Height), Is.EqualTo((theirs.Width, theirs.Height)));
+
+      for (var i = 0; i < theirs.PixelData.Length; ++i) {
+        if (ours.PixelData[i] == theirs.PixelData[i])
+          continue;
+
+        var pixel = i / 3;
+        Assert.Fail(
+          $"pixel {pixel % theirs.Width},{pixel / theirs.Width} channel {i % 3} — " +
+          $"ours {ours.PixelData[i]}, RECOIL {theirs.PixelData[i]}");
+      }
+    } finally {
+      try { Directory.Delete(directory, true); } catch { /* best effort */ }
+    }
+  }
+
+  /// <summary>
+  /// A Mode 5 file holds only colours; its bitmap is in the .gfx beside it, so the pair is the
+  /// only arrangement in which either is a picture.
+  /// </summary>
+  [Test]
+  [Category("Conformance")]
+  public void AmstradMode5_WithItsBitmap_MatchesRecoilPixelForPixel() {
+    RecoilOracle.RequireAvailable();
+
+    var directory = Path.Combine(Path.GetTempPath(), $"recoilcm5_{Guid.NewGuid():N}");
+    Directory.CreateDirectory(directory);
+
+    try {
+      // Every colour byte must name one of the thirty-two the Gate Array can make.
+      var colors = _Monochrome(2049);
+      for (var i = 0; i < colors.Length; ++i)
+        colors[i] = (byte)(64 + (i * 7 + (i >> 5)) % 32);
+
+      var picture = Path.Combine(directory, "pic.cm5");
+      File.WriteAllBytes(picture, colors);
+      File.WriteAllBytes(Path.Combine(directory, "pic.gfx"), _Monochrome(18432));
+
+      var (png, output) = RecoilOracle.TryDecodeToPng(picture);
+      Assert.That(png, Is.Not.Null, $"RECOIL rejected the pair — {output}");
+
+      var theirs = _AsRgb(FormatRegistry.Read(png!));
+      var ours = _AsRgb(AmstradMode5File.ToRawImage(AmstradMode5Reader.FromFile(new(picture))));
 
       Assert.That((ours.Width, ours.Height), Is.EqualTo((theirs.Width, theirs.Height)));
 
