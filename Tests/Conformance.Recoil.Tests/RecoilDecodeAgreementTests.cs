@@ -196,6 +196,11 @@ public sealed class RecoilDecodeAgreementTests {
     new("Grafix", ImageFormat.Grafix, ".grx", () => _Grafix(320, 200, 16)),
     new("Grafix, monochrome", ImageFormat.Grafix, ".grx", () => _Grafix(640, 400, 2)),
     new("Grafix, packed", ImageFormat.Grafix, ".grx", _PackedGrafix),
+    new("InShape monochrome", ImageFormat.InShape, ".iim", () => _InShape(0, 200, 150)),
+    new("InShape greyscale", ImageFormat.InShape, ".iim", () => _InShape(1, 160, 100)),
+    new("InShape true colour", ImageFormat.InShape, ".iim", () => _InShape(4, 64, 48)),
+    new("InShape true colour, padded", ImageFormat.InShape, ".iim", () => _InShape(5, 64, 48)),
+    new("Picworks", ImageFormat.AtariPicworks, ".cp3", _Picworks),
   ];
 
   [Test]
@@ -1152,6 +1157,72 @@ public sealed class RecoilDecodeAgreementTests {
       bytes.Add((byte)bits);
 
     return bytes.ToArray();
+  }
+
+  /// <summary>An InShape picture in one of its four forms.</summary>
+  private static byte[] _InShape(int mode, int width, int height) {
+    var count = width * height;
+    var pixels = mode switch {
+      0 => ((width + 7) >> 3) * height,
+      1 => count,
+      4 => count * 3,
+      _ => count * 4,
+    };
+
+    var data = _Monochrome(16 + pixels);
+    System.Text.Encoding.ASCII.GetBytes("IS_IMAGE").CopyTo(data, 0);
+    data[8] = 0;
+    data[9] = (byte)mode;
+    data[12] = (byte)(width >> 8);
+    data[13] = (byte)width;
+    data[14] = (byte)(height >> 8);
+    data[15] = (byte)height;
+
+    return data;
+  }
+
+  /// <summary>
+  /// A Picworks picture. Its runs work in eight-byte groups, and whatever they leave unaccounted
+  /// for is stored plainly at the end — so the counts have to add up to less than the screen.
+  /// </summary>
+  private static byte[] _Picworks() {
+    const int groups = 32000 / 8;
+    const int pairs = 120;
+    var literalGroups = 10;
+    var repeatedGroups = 6;
+
+    var counts = new byte[(1 + pairs) * 4];
+    counts[0] = (byte)(pairs >> 8);
+    counts[1] = (byte)pairs;
+
+    var values = new System.Collections.Generic.List<byte>();
+    var covered = 0;
+    for (var pair = 0; pair < pairs; ++pair) {
+      var at = (pair + 1) * 4;
+      counts[at] = (byte)(literalGroups >> 8);
+      counts[at + 1] = (byte)literalGroups;
+      counts[at + 2] = (byte)(repeatedGroups >> 8);
+      counts[at + 3] = (byte)repeatedGroups;
+
+      for (var i = 0; i < literalGroups * 8; ++i)
+        values.Add((byte)(pair * 29 + i * 11));
+
+      for (var i = 0; i < 8; ++i)
+        values.Add((byte)(pair * 53 + i));
+
+      covered += (literalGroups + repeatedGroups) * 8;
+    }
+
+    Assert.That(covered, Is.LessThan(groups * 8), "the runs must leave a tail to store plainly");
+
+    var tail = groups * 8 - covered;
+    var data = new byte[counts.Length + values.Count + tail];
+    counts.CopyTo(data, 0);
+    values.CopyTo(data, counts.Length);
+    for (var i = 0; i < tail; ++i)
+      data[counts.Length + values.Count + i] = (byte)(i * 47 + (i >> 7));
+
+    return data;
   }
 
   private static byte[] _Prefixed(int length) {
