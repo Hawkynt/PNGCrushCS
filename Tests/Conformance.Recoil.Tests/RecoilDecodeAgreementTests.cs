@@ -157,6 +157,10 @@ public sealed class RecoilDecodeAgreementTests {
     new("BK colour, two screens", ImageFormat.BkScreen, ".bks", () => _BkColor(2)),
     new("PC-98 EBD", ImageFormat.Pc98Ebd, ".ebd", () => _Ebd(false)),
     new("PC-98 EBD with a widened palette", ImageFormat.Pc98Ebd, ".ebd", () => _Ebd(true)),
+    new("RAG-D, four planes", ImageFormat.RagD, ".rag", () => _RagD(4, 32)),
+    new("RAG-D, eight planes", ImageFormat.RagD, ".rag", () => _RagD(8, 1024)),
+    new("RAG-D, true colour", ImageFormat.RagD, ".rag", () => _RagD(16, 1024)),
+    new("Music Compile 2 chunky", ImageFormat.RagD, ".ragc", () => _RagD(8, 1024)),
   ];
 
   [Test]
@@ -267,6 +271,9 @@ public sealed class RecoilDecodeAgreementTests {
     if (probe.Format == ImageFormat.MsxGl16)
       return FileFormat.MsxGl16.MsxGl16File.ToRawImage(
         FileFormat.MsxGl16.MsxGl16Reader.FromSpan(bytes, FileFormat.MsxGl16.MsxGl16File.ModeFromExtension(probe.Extension)));
+
+    if (probe.Format == ImageFormat.RagD)
+      return FileFormat.RagD.RagDFile.ToRawImage(FileFormat.RagD.RagDReader.FromBytes(bytes, probe.Extension));
 
     var entry = FormatRegistry.GetEntry(probe.Format);
     Assert.That(entry, Is.Not.Null, $"{probe.Format} is not registered");
@@ -697,6 +704,30 @@ public sealed class RecoilDecodeAgreementTests {
       var nibble = (i * 5 + 1) & 15;
       data[i] = (byte)(widened ? nibble * 17 : nibble);
     }
+
+    return data;
+  }
+
+  /// <summary>
+  /// A RAG-D picture. Eight bitplanes and one byte a pixel occupy exactly the same space, so the
+  /// same bytes stand in for both and only the extension separates them.
+  /// </summary>
+  private static byte[] _RagD(int planes, int paletteLength) {
+    const int width = 64, height = 40;
+    var bitmap = planes == 16 ? width * height * 2 : height * (width >> 3) * planes;
+    var data = _Monochrome(30 + paletteLength + bitmap);
+
+    "RAG-D!"u8.CopyTo(data);
+    data[6] = data[7] = 0;
+    data[12] = (byte)(width >> 8);
+    data[13] = (byte)width;
+    data[14] = (byte)((height - 1) >> 8);
+    data[15] = (byte)(height - 1);
+    data[16] = 0;
+    data[17] = (byte)planes;
+    data[18] = data[19] = 0;
+    data[20] = (byte)(paletteLength >> 8);
+    data[21] = (byte)paletteLength;
 
     return data;
   }

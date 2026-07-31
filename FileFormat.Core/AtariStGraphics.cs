@@ -108,6 +108,61 @@ public static class AtariStGraphics {
   /// <summary>Bytes one bitplane row occupies for a given width and plane count.</summary>
   public static int BytesPerRow(int width, int planes) => ((width + 15) >> 4) * planes * 2;
 
+  /// <summary>Unpacks word-interleaved bitplanes into one palette index per pixel.</summary>
+  /// <param name="stride">Bytes one row of the picture occupies across all its planes.</param>
+  /// <remarks>
+  /// The planes interleave every sixteen pixels rather than every scanline or not at all: a row is
+  /// a run of words, the first word of each group belonging to plane 0, the second to plane 1 and so
+  /// on. That is what the hardware's shift registers wanted, and it is why a bitplane picture cannot
+  /// be read as either a chunky one or a set of separate planes.
+  /// </remarks>
+  public static byte[] UnpackBitplanes(
+    ReadOnlySpan<byte> data, int offset, int stride, int planes, int width, int height) {
+    var indices = new byte[width * height];
+
+    for (var y = 0; y < height; ++y) {
+      var rowOffset = offset + y * stride;
+      for (var x = 0; x < width; ++x) {
+        // The word this pixel is in, then the byte within it.
+        var at = rowOffset + ((x >> 3) & ~1) * planes + ((x >> 3) & 1);
+        var index = 0;
+        for (var plane = 0; plane < planes; ++plane) {
+          var source = at + plane * 2;
+          if (source < data.Length && ((data[source] >> (~x & 7)) & 1) != 0)
+            index |= 1 << plane;
+        }
+
+        indices[y * width + x] = (byte)index;
+      }
+    }
+
+    return indices;
+  }
+
+  /// <summary>Reads a Falcon palette, which stores four bytes a colour with the third unused.</summary>
+  public static byte[] ReadFalconPalette(ReadOnlySpan<byte> data, int offset, int colors) {
+    var palette = new byte[colors * 3];
+    for (var i = 0; i < colors; ++i) {
+      var entry = offset + (i << 2);
+      if (entry + 3 >= data.Length)
+        break;
+
+      palette[i * 3] = data[entry];
+      palette[i * 3 + 1] = data[entry + 1];
+      palette[i * 3 + 2] = data[entry + 3];
+    }
+
+    return palette;
+  }
+
+  /// <summary>Converts a Falcon true-colour pixel, which packs 5-6-5 bits into a big-endian word.</summary>
+  public static void FalconTrueColorToRgb(ReadOnlySpan<byte> data, int offset, Span<byte> rgb) {
+    var word = offset + 1 < data.Length ? (data[offset] << 8) | data[offset + 1] : 0;
+    rgb[0] = ChannelScaling.Expand5(word >> 11);
+    rgb[1] = ChannelScaling.Expand6((word >> 5) & 63);
+    rgb[2] = ChannelScaling.Expand5(word & 31);
+  }
+
   /// <summary>Maps an indexed frame through a palette into RGB triplets.</summary>
   public static byte[] ToRgb(ReadOnlySpan<byte> indices, ReadOnlySpan<byte> palette, int colors) {
     var rgb = new byte[indices.Length * 3];
