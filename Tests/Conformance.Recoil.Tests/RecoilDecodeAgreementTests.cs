@@ -218,6 +218,9 @@ public sealed class RecoilDecodeAgreementTests {
     new("Trzmiel, packed linearly", ImageFormat.TrzmielCompressed, ".cpr", () => _Trzmiel(2)),
     new("Grass' Slideshow", ImageFormat.GrassSlideshow, ".hpm", () => _GrassSlideshow(81)),
     new("Grass' Slideshow, unnamed palette", ImageFormat.GrassSlideshow, ".hpm", () => _GrassSlideshow(200)),
+    new("XL-Paint, marked", ImageFormat.XlPaint, ".xlp", () => _XlPaint(true, 192)),
+    new("XL-Paint, unmarked 200 rows", ImageFormat.XlPaint, ".xlp", () => _XlPaint(false, 200)),
+    new("XL-Paint, unmarked 192 rows", ImageFormat.XlPaint, ".xlp", () => _XlPaint(false, 192)),
   ];
 
   [Test]
@@ -1505,6 +1508,52 @@ public sealed class RecoilDecodeAgreementTests {
     }
 
     body.Add((byte)palette);
+
+    return body.ToArray();
+  }
+
+  /// <summary>
+  /// An XL-Paint picture. The unmarked form says nothing about its height, so its stream has to
+  /// fill exactly one of the two lengths — which is what a probe of each is for.
+  /// </summary>
+  private static byte[] _XlPaint(bool marked, int height) {
+    var body = new System.Collections.Generic.List<byte>();
+    if (marked) {
+      body.AddRange(System.Text.Encoding.ASCII.GetBytes("XLPC"));
+      body.AddRange([2, 6, 10, 0]);
+    } else
+      body.AddRange([2, 6, 10, 0]);
+
+    var fill = 0;
+    for (var written = 0; written < height * 80;) {
+      var left = height * 80 - written;
+
+      // A long repeated run, through the escape that spends fourteen bits on the count.
+      if (left >= 300) {
+        body.AddRange([128 + 64 + 1, 44, (byte)(fill++ * 37)]);
+        written += 300;
+        continue;
+      }
+
+      // A short repeated run and then a run of literals.
+      if (left >= 12) {
+        body.AddRange([128 + 6, (byte)(fill++ * 53)]);
+        written += 6;
+
+        body.Add(6);
+        for (var i = 0; i < 6; ++i)
+          body.Add((byte)(fill++ * 29 + i));
+
+        written += 6;
+        continue;
+      }
+
+      body.Add((byte)left);
+      for (var i = 0; i < left; ++i)
+        body.Add((byte)(fill++ * 11 + i));
+
+      written += left;
+    }
 
     return body.ToArray();
   }
