@@ -251,6 +251,9 @@ public sealed class RecoilDecodeAgreementTests {
     new("Commodore Grafix, one frame", ImageFormat.CommodoreGrafix, ".cgx", () => _Grafix(1, 1, 8, 8)),
     new("3201", ImageFormat.Apple3201, ".3201", _Apple3201),
     new("Anime 4ever", ImageFormat.Anime4Ever, ".a4r", _Anime4Ever),
+    new("Boogie Down Paint, oldest", ImageFormat.BoogieDownPaint, ".bdp", () => _Bdp(0)),
+    new("Boogie Down Paint, with a loader", ImageFormat.BoogieDownPaint, ".bdp", () => _Bdp(1)),
+    new("Boogie Down Paint 5.00", ImageFormat.BoogieDownPaint, ".bdp", () => _Bdp(2)),
   ];
 
   [Test]
@@ -276,9 +279,15 @@ public sealed class RecoilDecodeAgreementTests {
 
     var ours = _AsRgb(_DecodeOurs(probe, bytes));
 
-    // Sizes are allowed to differ, as in the round-trip fixture: RECOIL reports several modes at
-    // their displayed size where we report the stored one — Graphics 9 is 80 logical pixels here
-    // and 320 screen pixels there — and neither is wrong. Reported rather than passed silently.
+    // Where RECOIL reports exactly twice our width it is counting screen pixels and we are counting
+    // the picture's own — a C64 multicolour pixel is two screen pixels wide. Doubling ours is exact
+    // rather than a resample, so the two can still be compared pixel for pixel.
+    if (theirs.Width == ours.Width * 2 && theirs.Height == ours.Height)
+      ours = _DoubleWidth(ours);
+
+    // Any other difference is a genuine disagreement about what the format says, and there are
+    // modes where neither answer is wrong — Graphics 9 is 80 logical pixels here and 320 screen
+    // pixels there. Reported rather than passed silently.
     if (ours.Width != theirs.Width || ours.Height != theirs.Height)
       Assert.Ignore($"{probe}: sizes differ — ours {ours.Width}x{ours.Height}, RECOIL {theirs.Width}x{theirs.Height}");
 
@@ -708,6 +717,22 @@ public sealed class RecoilDecodeAgreementTests {
     var entry = FormatRegistry.GetEntry(probe.Format);
     Assert.That(entry, Is.Not.Null, $"{probe.Format} is not registered");
     return entry!.LoadRawImageFromBytes(bytes);
+  }
+
+  /// <summary>Repeats every column, which is what a display showing double-width pixels does.</summary>
+  private static RawImage _DoubleWidth(RawImage image) {
+    var doubled = new byte[image.PixelData.Length * 2];
+    for (var i = 0; i < image.Width * image.Height; ++i) {
+      image.PixelData.AsSpan(i * 3, 3).CopyTo(doubled.AsSpan(i * 6));
+      image.PixelData.AsSpan(i * 3, 3).CopyTo(doubled.AsSpan(i * 6 + 3));
+    }
+
+    return new() {
+      Width = image.Width * 2,
+      Height = image.Height,
+      Format = image.Format,
+      PixelData = doubled,
+    };
   }
 
   private static RawImage _AsRgb(RawImage? image) {
@@ -2506,6 +2531,87 @@ public sealed class RecoilDecodeAgreementTests {
     }
 
     return body.ToArray();
+  }
+
+  /// <summary>
+  /// A Boogie Down Paint picture in one of its three encodings. The oldest has no header at all —
+  /// every byte is a command — so it is recognised by the other two failing to match.
+  /// </summary>
+  private static byte[] _Bdp(int form) {
+    var body = new System.Collections.Generic.List<byte> { 0, 0 };
+    var fill = 0;
+
+    switch (form) {
+      case 0:
+        for (var written = 0; written < 10001;) {
+          var left = 10001 - written;
+
+          if (left >= 300) {
+            body.AddRange([255, 0, (byte)(fill++ * 37)]);
+            written += 256;
+            continue;
+          }
+
+          var literals = Math.Min(left, 40);
+          body.AddRange([254, (byte)literals, (byte)(literals >> 8)]);
+          for (var i = 0; i < literals; ++i)
+            body.Add((byte)(fill++ * 29 + i));
+
+          written += literals;
+        }
+
+        return body.ToArray();
+
+      case 1: {
+        const byte escape = 0x9B;
+        body.AddRange([2, 4, 16, 54, 48, 48, escape, 0]);
+        _BdpEscaped(body, escape, -1);
+
+        return body.ToArray();
+      }
+
+      default: {
+        const byte shortEscape = 0x9B, longEscape = 0x9C;
+        body.AddRange(System.Text.Encoding.ASCII.GetBytes("BDP 5.00"));
+        body.Add(shortEscape);
+        body.Add(longEscape);
+        _BdpEscaped(body, shortEscape, longEscape);
+
+        return body.ToArray();
+      }
+    }
+  }
+
+  /// <summary>
+  /// Fills a Boogie Down Paint stream whose escapes the file names, writing any literal that
+  /// happens to be an escape as a run of one.
+  /// </summary>
+  private static void _BdpEscaped(System.Collections.Generic.List<byte> body, byte shortEscape, int longEscape) {
+    var fill = 0;
+
+    for (var written = 0; written < 10001;) {
+      var left = 10001 - written;
+
+      if (longEscape >= 0 && left >= 400) {
+        body.AddRange([(byte)longEscape, 0x90, 1, (byte)(fill++ * 37)]);
+        written += 400;
+        continue;
+      }
+
+      if (left >= 60) {
+        body.AddRange([shortEscape, 50, (byte)(fill++ * 53)]);
+        written += 50;
+        continue;
+      }
+
+      var value = (byte)(fill++ * 29 + written);
+      if (value == shortEscape || (longEscape >= 0 && value == longEscape))
+        body.AddRange([shortEscape, 1, value]);
+      else
+        body.Add(value);
+
+      ++written;
+    }
   }
 
   private static byte[] _Prefixed(int length) {
