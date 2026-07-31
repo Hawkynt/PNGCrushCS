@@ -228,6 +228,11 @@ public sealed class RecoilDecodeAgreementTests {
     new("Champions' Interlace, no colours", ImageFormat.AtariChampionsInterlace, ".cin", () => _Monochrome(15360)),
     new("Champions' Interlace, one colour set", ImageFormat.AtariChampionsInterlace, ".cin", () => _Monochrome(16004)),
     new("Champions' Interlace, compressed", ImageFormat.AtariChampionsInterlace, ".cci", _Cci),
+    new("CharPad, characters only", ImageFormat.CharPad, ".ctm", () => _CharPad(0, false, false, false)),
+    new("CharPad, tiles", ImageFormat.CharPad, ".ctm", () => _CharPad(0, true, false, false)),
+    new("CharPad, tiles with implied characters", ImageFormat.CharPad, ".ctm", () => _CharPad(0, true, true, false)),
+    new("CharPad, colour per tile", ImageFormat.CharPad, ".ctm", () => _CharPad(1, true, false, true)),
+    new("CharPad, colour per character", ImageFormat.CharPad, ".ctm", () => _CharPad(2, false, false, true)),
   ];
 
   [Test]
@@ -1709,6 +1714,55 @@ public sealed class RecoilDecodeAgreementTests {
     Stream(1024);
 
     return body.ToArray();
+  }
+
+  /// <summary>
+  /// A CharPad project. The three places a foreground colour can come from and the two ways a tile
+  /// names its characters change where everything after the character set sits, so each
+  /// combination is a different file layout rather than a different reading of one.
+  /// </summary>
+  private static byte[] _CharPad(int colorMethod, bool tiles, bool implied, bool multi) {
+    var characters = 48;
+    var tileCount = tiles ? 12 : 0;
+    var tileWidth = tiles ? 2 : 1;
+    var tileHeight = tiles ? 2 : 1;
+    var mapWidth = 5;
+    var mapHeight = 4;
+
+    var tilesOffset = 20 + characters * 9;
+    var tileColorsOffset = implied ? tilesOffset : tilesOffset + tileCount * (tileWidth * tileHeight * 2);
+    var mapOffset = colorMethod == 1 ? tileColorsOffset + tileCount : tileColorsOffset;
+    var length = mapOffset + mapWidth * mapHeight * 2;
+
+    var data = _Monochrome(length);
+    System.Text.Encoding.ASCII.GetBytes("CTM").CopyTo(data, 0);
+    data[3] = 5;
+    data[8] = (byte)colorMethod;
+    data[9] = (byte)((tiles ? 1 : 0) | (implied ? 2 : 0) | (multi ? 4 : 0));
+    data[10] = (byte)(characters - 1);
+    data[11] = 0;
+    data[12] = (byte)(tiles ? tileCount - 1 : 0);
+    data[13] = 0;
+    data[14] = (byte)tileWidth;
+    data[15] = (byte)tileHeight;
+    data[16] = (byte)mapWidth;
+    data[17] = 0;
+    data[18] = (byte)mapHeight;
+    data[19] = 0;
+
+    // Every tile slot must name a character the set holds, and every map entry a tile that exists.
+    if (tiles && !implied)
+      for (var slot = 0; slot < tileCount * tileWidth * tileHeight; ++slot) {
+        data[tilesOffset + slot * 2] = (byte)(slot % characters);
+        data[tilesOffset + slot * 2 + 1] = 0;
+      }
+
+    for (var entry = 0; entry < mapWidth * mapHeight; ++entry) {
+      data[mapOffset + entry * 2] = (byte)(entry % (tiles ? tileCount : characters));
+      data[mapOffset + entry * 2 + 1] = 0;
+    }
+
+    return data;
   }
 
   private static byte[] _Prefixed(int length) {
