@@ -17,7 +17,7 @@ namespace FileFormat.MsxScreen2;
 /// less blocky than a character screen and still cost a byte a cell to place.
 /// </remarks>
 [FormatMagicBytes([0xFE])]
-public sealed class MsxScreen2File : IImageFormatReader<MsxScreen2File>, IImageToRawImage<MsxScreen2File>, IImageFormatWriter<MsxScreen2File> {
+public sealed class MsxScreen2File : IImageFormatReader<MsxScreen2File>, IImageToRawImage<MsxScreen2File>, IImageFromRawImage<MsxScreen2File>, IImageFormatWriter<MsxScreen2File> {
 
   static string IImageFormatMetadata<MsxScreen2File>.PrimaryExtension => ".sc2";
   static string[] IImageFormatMetadata<MsxScreen2File>.FileExtensions => [".sc2", ".grp"];
@@ -151,4 +151,92 @@ public sealed class MsxScreen2File : IImageFormatReader<MsxScreen2File>, IImageT
     };
   }
 
+  /// <summary>Builds a screen, choosing two of the chip's colours for every row of every cell.</summary>
+  /// <remarks>
+  /// The name table holds 768 cells and the three banks hold 256 patterns each — exactly one
+  /// pattern per cell — so every cell can be given its own rather than sharing. That turns the
+  /// encoding into an independent choice per cell and removes the pattern-reuse problem entirely.
+  /// <para/>
+  /// Within a cell the constraint is finer than a Spectrum's: each of the eight rows carries its
+  /// own foreground and background, so a row of eight pixels may show two colours. The pair is
+  /// chosen per row by trying all 120 of them, which is exact at that size.
+  /// </remarks>
+  public static MsxScreen2File FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(FixedWidth, FixedHeight);
+    var palette = MsxGraphics.Tms9918Palette;
+
+    var patterns = new byte[PatternGeneratorSize];
+    var colors = new byte[ColorTableSize];
+    var names = new byte[PatternNameTableSize];
+
+    for (var cellRow = 0; cellRow < 24; ++cellRow)
+    for (var cellColumn = 0; cellColumn < 32; ++cellColumn) {
+      // Identity naming: cell n of a bank uses pattern n of that bank.
+      var pattern = (cellRow % 8) * 32 + cellColumn;
+      names[cellRow * 32 + cellColumn] = (byte)pattern;
+
+      var at = cellRow / 8 * 2048 + pattern * 8;
+
+      for (var row = 0; row < 8; ++row) {
+        var y = cellRow * 8 + row;
+        var (foreground, background, bits) = _ChooseRow(rgb.PixelData, palette, cellColumn * 8, y);
+
+        patterns[at + row] = bits;
+        colors[at + row] = (byte)((foreground << 4) | background);
+      }
+    }
+
+    return new() {
+      PatternGenerator = patterns,
+      ColorTable = colors,
+      PatternNameTable = names,
+      HasBsaveHeader = true,
+    };
+  }
+
+  /// <summary>The two colours that describe one row of eight pixels with the least total error.</summary>
+  private static (int Foreground, int Background, byte Bits) _ChooseRow(
+    ReadOnlySpan<byte> rgb, ReadOnlySpan<byte> palette, int left, int y) {
+    int bestForeground = 1, bestBackground = 1, bestBits = 0;
+    var bestCost = long.MaxValue;
+
+    for (var foreground = 0; foreground < 16; ++foreground)
+    for (var background = 0; background <= foreground; ++background) {
+      var cost = 0L;
+      var bits = 0;
+
+      for (var x = 0; x < 8; ++x) {
+        var at = (y * FixedWidth + left + x) * 3;
+        var toForeground = _Distance(rgb, at, palette, foreground);
+        var toBackground = _Distance(rgb, at, palette, background);
+
+        if (toForeground <= toBackground) {
+          bits |= 1 << (7 - x);
+          cost += toForeground;
+        } else
+          cost += toBackground;
+      }
+
+      if (cost >= bestCost)
+        continue;
+
+      bestCost = cost;
+      bestForeground = foreground;
+      bestBackground = background;
+      bestBits = bits;
+    }
+
+    return (bestForeground, bestBackground, (byte)bestBits);
+  }
+
+  /// <summary>How far a pixel is from a palette entry, weighted the way the eye weights it.</summary>
+  private static long _Distance(ReadOnlySpan<byte> rgb, int pixel, ReadOnlySpan<byte> palette, int entry) {
+    long dr = rgb[pixel] - palette[entry * 3];
+    long dg = rgb[pixel + 1] - palette[entry * 3 + 1];
+    long db = rgb[pixel + 2] - palette[entry * 3 + 2];
+
+    return dr * dr * 77 + dg * dg * 150 + db * db * 29;
+  }
 }
