@@ -389,7 +389,8 @@ internal sealed partial class MainForm : Form {
     if (dlg.Mode == ResizeMode.CropRegion) {
       this._currentRawImage = ImageTransformer.Crop(this._currentRawImage, new(dlg.CropX, dlg.CropY, dlg.CropWidth, dlg.CropHeight));
     } else {
-      this._currentRawImage = ImageTransformer.Resize(this._currentRawImage, dlg.TargetWidth, dlg.TargetHeight, dlg.Mode, dlg.Interpolation, dlg.LetterboxColor);
+      this._currentRawImage = ImageTransformer.Resize(this._currentRawImage, dlg.TargetWidth, dlg.TargetHeight, dlg.Mode, dlg.Interpolation,
+        Rgba32.FromArgb(dlg.LetterboxColor.A, dlg.LetterboxColor.R, dlg.LetterboxColor.G, dlg.LetterboxColor.B));
     }
 
     this._currentBitmap?.Dispose();
@@ -462,7 +463,8 @@ internal sealed partial class MainForm : Form {
     using var dlg = new CanvasSizeDialog(this._currentRawImage.Width, this._currentRawImage.Height);
     if (dlg.ShowDialog(this) != DialogResult.OK) return;
 
-    this._currentRawImage = ImageTransformer.ExtendCanvas(this._currentRawImage, dlg.TargetWidth, dlg.TargetHeight, dlg.Anchor, dlg.FillColor);
+    this._currentRawImage = ImageTransformer.ExtendCanvas(this._currentRawImage, dlg.TargetWidth, dlg.TargetHeight, dlg.Anchor,
+      Rgba32.FromArgb(dlg.FillColor.A, dlg.FillColor.R, dlg.FillColor.G, dlg.FillColor.B));
     this._currentBitmap?.Dispose();
     this._currentBitmap = BitmapConverter.RawImageToBitmap(this._currentRawImage);
     this._imagePanel.Image = this._currentBitmap;
@@ -545,7 +547,8 @@ internal sealed partial class MainForm : Form {
     }
 
     // Step 1: Crop
-    this._currentRawImage = ImageTransformer.Crop(this._currentRawImage, cropRegion);
+    this._currentRawImage = ImageTransformer.Crop(this._currentRawImage,
+      new PixelRect(cropRegion.X, cropRegion.Y, cropRegion.Width, cropRegion.Height));
 
     // Step 2: Resize to target dimensions if requested
     if (this._cropResizeAfter && this._cropTargetWidth > 0 && this._cropTargetHeight > 0) {

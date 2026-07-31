@@ -1,7 +1,4 @@
 using System;
-using System.Drawing;
-using System.Drawing.Drawing2D;
-using System.Drawing.Imaging;
 using FileFormat.Core;
 
 namespace Optimizer.Image;
@@ -82,7 +79,7 @@ public static class ImageTransformer {
   /// <param name="hint">The interpolation algorithm to use. Defaults to <see cref="InterpolationHint.Bicubic"/>.</param>
   /// <param name="letterboxColor">Background color for letterboxed areas when using <see cref="ResizeMode.Fit"/>. Defaults to transparent black.</param>
   /// <returns>A new BGRA32 <see cref="RawImage"/> with the requested dimensions.</returns>
-  public static RawImage Resize(RawImage source, int targetWidth, int targetHeight, ResizeMode mode, InterpolationHint hint = InterpolationHint.Bicubic, Color? letterboxColor = null) {
+  public static RawImage Resize(RawImage source, int targetWidth, int targetHeight, ResizeMode mode, InterpolationHint hint = InterpolationHint.Bicubic, Rgba32? letterboxColor = null) {
     ArgumentNullException.ThrowIfNull(source);
     if (targetWidth <= 0)
       throw new ArgumentOutOfRangeException(nameof(targetWidth), targetWidth, "Target width must be greater than zero.");
@@ -92,50 +89,58 @@ public static class ImageTransformer {
     if (mode == ResizeMode.CropRegion)
       throw new ArgumentException("Use Crop() for CropRegion mode.", nameof(mode));
 
-    using var srcBmp = BitmapConverter.RawImageToBitmap(source);
-    using var dstBmp = new Bitmap(targetWidth, targetHeight, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-    using var g = Graphics.FromImage(dstBmp);
+    var resampling = _MapInterpolation(hint);
 
-    g.PixelOffsetMode = PixelOffsetMode.HighQuality;
-    g.InterpolationMode = _MapInterpolation(hint);
-    g.CompositingQuality = CompositingQuality.HighQuality;
-    g.SmoothingMode = SmoothingMode.HighQuality;
+    // Stretching is the whole target, so there is nothing to place it in.
+    if (mode == ResizeMode.Stretch)
+      return ImageResampler.Resample(source, targetWidth, targetHeight, resampling);
 
-    switch (mode) {
-      case ResizeMode.Stretch:
-        g.DrawImage(srcBmp, 0, 0, targetWidth, targetHeight);
-        break;
+    // Fit shrinks until the picture is inside the target; Fill grows until it covers it. Both then
+    // sit centred, which is the only placement either mode offers.
+    var scaleX = targetWidth / (double)source.Width;
+    var scaleY = targetHeight / (double)source.Height;
+    var scale = mode == ResizeMode.Fit ? Math.Min(scaleX, scaleY) : Math.Max(scaleX, scaleY);
 
-      case ResizeMode.Fit: {
-        var fill = letterboxColor ?? Color.FromArgb(0, 0, 0, 0);
-        using var brush = new SolidBrush(fill);
-        g.FillRectangle(brush, 0, 0, targetWidth, targetHeight);
+    var scaledWidth = Math.Max(1, (int)(source.Width * scale));
+    var scaledHeight = Math.Max(1, (int)(source.Height * scale));
+    var scaled = ImageResampler.Resample(source, scaledWidth, scaledHeight, resampling);
 
-        var scaleX = targetWidth / (float)source.Width;
-        var scaleY = targetHeight / (float)source.Height;
-        var scale = Math.Min(scaleX, scaleY);
-        var fitW = (int)(source.Width * scale);
-        var fitH = (int)(source.Height * scale);
-        var offsetX = (targetWidth - fitW) / 2;
-        var offsetY = (targetHeight - fitH) / 2;
-        g.DrawImage(srcBmp, offsetX, offsetY, fitW, fitH);
-        break;
+    var offsetX = (targetWidth - scaledWidth) / 2;
+    var offsetY = (targetHeight - scaledHeight) / 2;
+
+    var fill = letterboxColor ?? Rgba32.Transparent;
+    var target = new byte[targetWidth * targetHeight * 4];
+
+    // Only Fit leaves anything of the background showing; Fill covers it entirely.
+    if (mode == ResizeMode.Fit && (fill.B | fill.G | fill.R | fill.A) != 0)
+      for (var i = 0; i < target.Length; i += 4) {
+        target[i] = fill.B;
+        target[i + 1] = fill.G;
+        target[i + 2] = fill.R;
+        target[i + 3] = fill.A;
       }
 
-      case ResizeMode.Fill: {
-        var scaleX = targetWidth / (float)source.Width;
-        var scaleY = targetHeight / (float)source.Height;
-        var scale = Math.Max(scaleX, scaleY);
-        var fillW = (int)(source.Width * scale);
-        var fillH = (int)(source.Height * scale);
-        var offsetX = (targetWidth - fillW) / 2;
-        var offsetY = (targetHeight - fillH) / 2;
-        g.DrawImage(srcBmp, offsetX, offsetY, fillW, fillH);
-        break;
+    for (var y = 0; y < scaledHeight; ++y) {
+      var destinationY = offsetY + y;
+      if (destinationY < 0 || destinationY >= targetHeight)
+        continue;
+
+      for (var x = 0; x < scaledWidth; ++x) {
+        var destinationX = offsetX + x;
+        if (destinationX < 0 || destinationX >= targetWidth)
+          continue;
+
+        scaled.PixelData.AsSpan((y * scaledWidth + x) * 4, 4)
+          .CopyTo(target.AsSpan((destinationY * targetWidth + destinationX) * 4, 4));
       }
     }
 
-    return BitmapConverter.BitmapToRawImage(dstBmp);
+    return new() {
+      Width = targetWidth,
+      Height = targetHeight,
+      Format = PixelFormat.Bgra32,
+      PixelData = target,
+    };
   }
 
   /// <summary>
@@ -146,7 +151,7 @@ public static class ImageTransformer {
   /// <param name="source">The source image to crop.</param>
   /// <param name="region">The rectangle to extract. Clamped to source bounds.</param>
   /// <returns>A new BGRA32 <see cref="RawImage"/> containing only the cropped pixels.</returns>
-  public static RawImage Crop(RawImage source, Rectangle region) {
+  public static RawImage Crop(RawImage source, PixelRect region) {
     ArgumentNullException.ThrowIfNull(source);
 
     var bgra = source.ToBgra32();
@@ -328,7 +333,7 @@ public static class ImageTransformer {
   /// <param name="anchor">Where to place the source image on the new canvas.</param>
   /// <param name="fillColor">The color to fill the new canvas area with.</param>
   /// <returns>A new BGRA32 <see cref="RawImage"/> with the extended canvas.</returns>
-  public static RawImage ExtendCanvas(RawImage source, int newWidth, int newHeight, AnchorPosition anchor, Color fillColor) {
+  public static RawImage ExtendCanvas(RawImage source, int newWidth, int newHeight, AnchorPosition anchor, Rgba32 fillColor) {
     ArgumentNullException.ThrowIfNull(source);
     if (newWidth < 1)
       throw new ArgumentOutOfRangeException(nameof(newWidth), newWidth, "New width must be at least 1.");
@@ -398,10 +403,9 @@ public static class ImageTransformer {
     _ => ((dstW - srcW) / 2, (dstH - srcH) / 2),
   };
 
-  private static InterpolationMode _MapInterpolation(InterpolationHint hint) => hint switch {
-    InterpolationHint.NearestNeighbor => InterpolationMode.NearestNeighbor,
-    InterpolationHint.Bilinear => InterpolationMode.HighQualityBilinear,
-    InterpolationHint.Bicubic => InterpolationMode.HighQualityBicubic,
-    _ => InterpolationMode.HighQualityBicubic,
+  private static Resampling _MapInterpolation(InterpolationHint hint) => hint switch {
+    InterpolationHint.NearestNeighbor => Resampling.Nearest,
+    InterpolationHint.Bilinear => Resampling.Bilinear,
+    _ => Resampling.Bicubic,
   };
 }
