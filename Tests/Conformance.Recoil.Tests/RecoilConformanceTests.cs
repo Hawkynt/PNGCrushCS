@@ -41,6 +41,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.AdvancedArtStudio, "Advanced Art Studio", 160, 200),
     new(ImageFormat.PaintMagic, "Paint Magic", 160, 200),
     new(ImageFormat.InterPaintMc, "InterPaint multicolour", 160, 200),
+    new(ImageFormat.ZxSpectrum, "ZX Spectrum screen", 256, 192, ".scr"),
     new(ImageFormat.Picasso64, "Picasso 64", 160, 200),
     new(ImageFormat.RainbowPainter, "Rainbow Painter", 160, 200),
     new(ImageFormat.SaracenPaint, "Saracen Paint", 160, 200),

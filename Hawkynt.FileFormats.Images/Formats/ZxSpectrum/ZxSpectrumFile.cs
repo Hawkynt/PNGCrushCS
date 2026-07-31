@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.ZxSpectrum;
 
 /// <summary>In-memory representation of a ZX Spectrum screen (6912 bytes: 6144 bitmap + 768 attributes).</summary>
-public readonly record struct ZxSpectrumFile : IImageFormatReader<ZxSpectrumFile>, IImageToRawImage<ZxSpectrumFile>, IImageFormatWriter<ZxSpectrumFile> {
+public readonly record struct ZxSpectrumFile : IImageFormatReader<ZxSpectrumFile>, IImageToRawImage<ZxSpectrumFile>, IImageFromRawImage<ZxSpectrumFile>, IImageFormatWriter<ZxSpectrumFile> {
 
   static string IImageFormatMetadata<ZxSpectrumFile>.PrimaryExtension => ".scr";
   static string[] IImageFormatMetadata<ZxSpectrumFile>.FileExtensions => [".scr", ".$s", ".$c", ".!s"];
@@ -73,4 +73,37 @@ public readonly record struct ZxSpectrumFile : IImageFormatReader<ZxSpectrumFile
     };
   }
 
+  /// <summary>Builds a screen, choosing two colours for every eight-by-eight cell.</summary>
+  /// <remarks>
+  /// A Spectrum cell shows one ink and one paper and nothing else, so the whole of the encoding is
+  /// which pair. Every one of the 128 available pairs is tried against the cell's sixty-four pixels
+  /// and the cheapest kept — exact, and cheaper than any cleverness at that size.
+  /// <para/>
+  /// No error is diffused across a cell boundary. Spreading it would push a colour into a cell that
+  /// cannot show it, and the attribute clash that follows looks worse than the banding it fixes,
+  /// which is why Spectrum artists dithered inside a cell and never across one.
+  /// </remarks>
+  public static ZxSpectrumFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    const int width = 256, height = 192, columns = width / 8;
+    var rgb = image.SampleTo(width, height);
+
+    var bitmap = new byte[width * height / 8];
+    var attributes = new byte[columns * (height / 8)];
+    Span<byte> bits = stackalloc byte[8];
+
+    for (var top = 0; top < height; top += 8)
+    for (var left = 0; left < width; left += 8) {
+      attributes[top / 8 * columns + left / 8] =
+        ZxSpectrumGraphics.ChooseCell(rgb.PixelData, width, left, top, bits);
+
+      // The bitmap is kept in plain row order here; the writer is what interleaves it back into the
+      // thirds the hardware addresses.
+      for (var y = 0; y < 8; ++y)
+        bitmap[(top + y) * columns + left / 8] = bits[y];
+    }
+
+    return new() { BitmapData = bitmap, AttributeData = attributes };
+  }
 }

@@ -102,6 +102,7 @@ public sealed class LosslessWriterTests {
     new("Dir Logo Maker", ImageFormat.DirLogoMaker, Palette.AtariRomGlyphs, 88, 128),
     new("CHR$", ImageFormat.ChrDollar, Palette.ZxAttributes, 96, 64),
     new("Border Screen by Trefi", ImageFormat.ZxTrefiBorderScreen, Palette.ZxAttributes, 256, 192),
+    new("ZX Spectrum screen", ImageFormat.ZxSpectrum, Palette.ZxAttributes, 256, 192),
     new("3200 colours, unpacked", ImageFormat.AppleSh3, Palette.SixteenPerLine, 320, 200),
     new("3201", ImageFormat.Apple3201, Palette.SixteenPerLine, 320, 200),
     new("LdPic", ImageFormat.LdPic, Palette.OneBitChannelsWide, 320, 256),
