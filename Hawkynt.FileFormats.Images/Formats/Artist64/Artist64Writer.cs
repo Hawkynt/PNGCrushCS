@@ -9,21 +9,17 @@ public static class Artist64Writer {
     ArgumentNullException.ThrowIfNull(file);
 
     var result = new byte[Artist64File.ExpectedFileSize];
-    var offset = 0;
 
-    result[offset] = (byte)(file.LoadAddress & 0xFF);
-    result[offset + 1] = (byte)(file.LoadAddress >> 8);
-    offset += Artist64File.LoadAddressSize;
+    result[0] = (byte)(file.LoadAddress & 0xFF);
+    result[1] = (byte)(file.LoadAddress >> 8);
 
-    file.BitmapData.AsSpan(0, Math.Min(file.BitmapData.Length, Artist64File.BitmapDataSize)).CopyTo(result.AsSpan(offset));
-    offset += Artist64File.BitmapDataSize;
-
-    file.VideoMatrix.AsSpan(0, Math.Min(file.VideoMatrix.Length, Artist64File.VideoMatrixSize)).CopyTo(result.AsSpan(offset));
-    offset += Artist64File.VideoMatrixSize;
-
-    file.ColorRam.AsSpan(0, Math.Min(file.ColorRam.Length, Artist64File.ColorRamSize)).CopyTo(result.AsSpan(offset));
-
-    // Trailing 240 bytes padding remain as zeros
+    file.BitmapData.AsSpan(0, Math.Min(file.BitmapData.Length, Artist64File.BitmapDataSize))
+      .CopyTo(result.AsSpan(Artist64File.BitmapOffset));
+    file.VideoMatrix.AsSpan(0, Math.Min(file.VideoMatrix.Length, Artist64File.VideoMatrixSize))
+      .CopyTo(result.AsSpan(Artist64File.VideoMatrixOffset));
+    file.ColorRam.AsSpan(0, Math.Min(file.ColorRam.Length, Artist64File.ColorRamSize))
+      .CopyTo(result.AsSpan(Artist64File.ColorRamOffset));
+    result[Artist64File.BackgroundOffset] = file.BackgroundColor;
 
     return result;
   }

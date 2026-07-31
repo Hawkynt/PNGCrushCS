@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.DolphinEd;
 
 /// <summary>In-memory representation of a Dolphin Ed C64 multicolor image (Koala layout).</summary>
-public readonly record struct DolphinEdFile : IImageFormatReader<DolphinEdFile>, IImageToRawImage<DolphinEdFile>, IImageFormatWriter<DolphinEdFile> {
+public readonly record struct DolphinEdFile : IImageFormatReader<DolphinEdFile>, IImageToRawImage<DolphinEdFile>, IImageFromRawImage<DolphinEdFile>, IImageFormatWriter<DolphinEdFile> {
 
   static string IImageFormatMetadata<DolphinEdFile>.PrimaryExtension => ".dol";
   static string[] IImageFormatMetadata<DolphinEdFile>.FileExtensions => [".dol"];
@@ -18,9 +18,24 @@ public readonly record struct DolphinEdFile : IImageFormatReader<DolphinEdFile>,
   public const int FixedHeight = 200;
 
   /// <summary>The expected total file size in bytes (2 + 8000 + 1000 + 1000 + 1).</summary>
-  public const int ExpectedFileSize = 10003;
+  public const int ExpectedFileSize = 10242;
 
   internal const int BitmapDataSize = 8000;
+
+  /// <summary>Where the bitmap starts.</summary>
+  /// The colour RAM comes first, then the video matrix a page later, then the bitmap after another
+  /// page — so the three sections are in the reverse of the order most C64 formats use, each on its
+  /// own page boundary rather than packed against the one before.
+  public const int BitmapOffset = 2050;
+
+  /// <summary>Where the video matrix starts.</summary>
+  public const int VideoMatrixOffset = 1026;
+
+  /// <summary>Where the colour RAM starts.</summary>
+  public const int ColorRamOffset = 2;
+
+  /// <summary>Where the shared background register sits.</summary>
+  public const int BackgroundOffset = 2026;
   internal const int VideoMatrixSize = 1000;
   internal const int ColorRamSize = 1000;
   internal const int LoadAddressSize = 2;
@@ -51,4 +66,26 @@ public readonly record struct DolphinEdFile : IImageFormatReader<DolphinEdFile>,
     => Commodore64Graphics.DecodeMulticolor(
       file.BitmapData, file.VideoMatrix, file.ColorRam, file.BackgroundColor, FixedWidth, FixedHeight);
 
+  /// <summary>Builds a screen, choosing three of the machine's colours for every character cell.</summary>
+  /// <remarks>
+  /// The colour behind pattern 00 is one register the whole screen shares, so it is spent on
+  /// whichever colour appears most often — every cell gets it free either way.
+  /// </remarks>
+  public static DolphinEdFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(FixedWidth, FixedHeight);
+    var bitmap = new byte[BitmapDataSize];
+    var matrix = new byte[VideoMatrixSize];
+    var colors = new byte[ColorRamSize];
+    var background = Commodore64Graphics.EncodeMulticolor(
+      rgb.PixelData, FixedWidth, FixedHeight, bitmap, matrix, colors, -1);
+
+    return new() {
+      LoadAddress = 0x4000,
+      BitmapData = bitmap,
+      VideoMatrix = matrix,
+      ColorRam = colors, BackgroundColor = background,
+    };
+  }
 }

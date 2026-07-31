@@ -280,4 +280,122 @@ public static class Commodore64Graphics {
 
     return dr * dr + dg * dg + db * db;
   }
+
+  /// <summary>
+  /// Encodes a standard multicolour screen: two bits a pixel, the video matrix holding two of the
+  /// cell's colours and the colour RAM a third, with pattern 00 taken from the shared background.
+  /// </summary>
+  /// <remarks>
+  /// Three of the four colours a cell shows are its own; the fourth is one register the whole screen
+  /// shares. That register is chosen first, and chosen as the colour that appears most often across
+  /// the picture — every cell gets it free, so spending it on a common colour leaves all three of
+  /// each cell's own entries for what varies.
+  /// <para/>
+  /// Within a cell the search is over the colours actually present rather than all sixteen. A cell
+  /// is thirty-two pixels and can hold at most that many distinct colours, usually far fewer, and a
+  /// colour that appears nowhere in the cell cannot reduce its error.
+  /// </remarks>
+  /// <param name="fixedBackground">
+  /// The background register to use, or -1 to choose one. Some formats have no register to store it
+  /// in and always show black behind pattern 00, and those must be told so rather than left to pick.
+  /// </param>
+  /// <returns>The background register the whole screen shares.</returns>
+  public static byte EncodeMulticolor(
+    ReadOnlySpan<byte> rgb, int width, int height,
+    Span<byte> bitmap, Span<byte> videoMatrix, Span<byte> colorRam, int fixedBackground = -1) {
+    var indices = new int[width * height];
+    Span<int> totals = stackalloc int[ColorCount];
+
+    for (var i = 0; i < indices.Length; ++i) {
+      indices[i] = FindNearestColorIndex(rgb[i * 3], rgb[i * 3 + 1], rgb[i * 3 + 2]);
+      ++totals[indices[i]];
+    }
+
+    var background = 0;
+    if (fixedBackground >= 0)
+      background = fixedBackground & 0x0F;
+    else
+      for (var i = 1; i < ColorCount; ++i)
+        if (totals[i] > totals[background])
+          background = i;
+
+    Span<int> cell = stackalloc int[CellHeight * 4];
+    Span<int> present = stackalloc int[ColorCount];
+    Span<int> chosen = stackalloc int[3];
+
+    for (var top = 0; top < height; top += CellHeight)
+    for (var left = 0; left < width; left += 4) {
+      for (var y = 0; y < CellHeight; ++y)
+      for (var x = 0; x < 4; ++x)
+        cell[y * 4 + x] = indices[(top + y) * width + left + x];
+
+      var count = 0;
+      foreach (var index in cell) {
+        var seen = false;
+        for (var i = 0; i < count && !seen; ++i)
+          seen = present[i] == index;
+
+        if (!seen)
+          present[count++] = index;
+      }
+
+      _ChooseTriple(cell, present[..count], background, chosen);
+
+      var at = top / CellHeight * Columns + left / 4;
+      for (var y = 0; y < CellHeight; ++y) {
+        var row = 0;
+        for (var x = 0; x < 4; ++x)
+          row |= _Pattern(cell[y * 4 + x], background, chosen) << ((3 - x) * 2);
+
+        bitmap[at * CellHeight + y] = (byte)row;
+      }
+
+      videoMatrix[at] = (byte)((chosen[0] << 4) | chosen[1]);
+      colorRam[at] = (byte)chosen[2];
+    }
+
+    return (byte)background;
+  }
+
+  /// <summary>Which of the four available colours describes a pixel with the least error.</summary>
+  private static int _Pattern(int index, int background, ReadOnlySpan<int> chosen) {
+    var pattern = 0;
+    var best = _Distance(index, background);
+
+    for (var i = 0; i < 3; ++i) {
+      var distance = _Distance(index, chosen[i]);
+      if (distance >= best)
+        continue;
+
+      best = distance;
+      pattern = i + 1;
+    }
+
+    return pattern;
+  }
+
+  /// <summary>The three colours that, beside the shared background, describe a cell best.</summary>
+  private static void _ChooseTriple(
+    ReadOnlySpan<int> cell, ReadOnlySpan<int> present, int background, Span<int> chosen) {
+    chosen[0] = chosen[1] = chosen[2] = background;
+
+    var bestError = long.MaxValue;
+    for (var a = 0; a < present.Length; ++a)
+    for (var b = a; b < present.Length; ++b)
+    for (var c = b; c < present.Length; ++c) {
+      long error = 0;
+      foreach (var index in cell)
+        error += Math.Min(
+          _Distance(index, background),
+          Math.Min(_Distance(index, present[a]), Math.Min(_Distance(index, present[b]), _Distance(index, present[c]))));
+
+      if (error >= bestError)
+        continue;
+
+      bestError = error;
+      chosen[0] = present[a];
+      chosen[1] = present[b];
+      chosen[2] = present[c];
+    }
+  }
 }

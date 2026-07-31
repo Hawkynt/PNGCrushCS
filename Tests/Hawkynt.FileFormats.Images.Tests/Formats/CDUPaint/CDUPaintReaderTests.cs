@@ -74,8 +74,8 @@ public sealed class CDUPaintReaderTests {
   [Category("Unit")]
   public void FromBytes_BitmapData_CopiedCorrectly() {
     var data = _BuildValidFile(0x6000, 0x00);
-    data[2] = 0xAB;
-    data[8001] = 0xCD;
+    data[CDUPaintFile.BitmapOffset] = 0xAB;
+    data[CDUPaintFile.BitmapOffset + CDUPaintFile.BitmapDataSize - 1] = 0xCD;
 
     var result = CDUPaintReader.FromBytes(data);
 
@@ -134,16 +134,17 @@ public sealed class CDUPaintReaderTests {
     data[0] = (byte)(loadAddress & 0xFF);
     data[1] = (byte)(loadAddress >> 8);
 
-    for (var i = 0; i < 8000; ++i)
-      data[2 + i] = (byte)(i % 256);
+    // The three sections are not packed against one another; each starts where the format puts it.
+    for (var i = 0; i < CDUPaintFile.BitmapDataSize; ++i)
+      data[CDUPaintFile.BitmapOffset + i] = (byte)(i % 256);
 
-    for (var i = 0; i < 1000; ++i)
-      data[8002 + i] = (byte)(i % 16);
+    for (var i = 0; i < CDUPaintFile.VideoMatrixSize; ++i)
+      data[CDUPaintFile.VideoMatrixOffset + i] = (byte)(i % 16);
 
-    for (var i = 0; i < 1000; ++i)
-      data[9002 + i] = (byte)((i + 3) % 16);
+    for (var i = 0; i < CDUPaintFile.ColorRamSize; ++i)
+      data[CDUPaintFile.ColorRamOffset + i] = (byte)((i + 3) % 16);
 
-    data[10002] = backgroundColor;
+    data[CDUPaintFile.BackgroundOffset] = backgroundColor;
 
     return data;
   }

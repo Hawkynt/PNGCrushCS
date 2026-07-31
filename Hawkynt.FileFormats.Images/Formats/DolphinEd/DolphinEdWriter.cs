@@ -9,22 +9,17 @@ public static class DolphinEdWriter {
     ArgumentNullException.ThrowIfNull(file);
 
     var result = new byte[DolphinEdFile.ExpectedFileSize];
-    var offset = 0;
 
-    result[offset] = (byte)(file.LoadAddress & 0xFF);
-    result[offset + 1] = (byte)(file.LoadAddress >> 8);
-    offset += DolphinEdFile.LoadAddressSize;
+    result[0] = (byte)(file.LoadAddress & 0xFF);
+    result[1] = (byte)(file.LoadAddress >> 8);
 
-    file.BitmapData.AsSpan(0, DolphinEdFile.BitmapDataSize).CopyTo(result.AsSpan(offset));
-    offset += DolphinEdFile.BitmapDataSize;
-
-    file.VideoMatrix.AsSpan(0, DolphinEdFile.VideoMatrixSize).CopyTo(result.AsSpan(offset));
-    offset += DolphinEdFile.VideoMatrixSize;
-
-    file.ColorRam.AsSpan(0, DolphinEdFile.ColorRamSize).CopyTo(result.AsSpan(offset));
-    offset += DolphinEdFile.ColorRamSize;
-
-    result[offset] = file.BackgroundColor;
+    file.BitmapData.AsSpan(0, Math.Min(file.BitmapData.Length, DolphinEdFile.BitmapDataSize))
+      .CopyTo(result.AsSpan(DolphinEdFile.BitmapOffset));
+    file.VideoMatrix.AsSpan(0, Math.Min(file.VideoMatrix.Length, DolphinEdFile.VideoMatrixSize))
+      .CopyTo(result.AsSpan(DolphinEdFile.VideoMatrixOffset));
+    file.ColorRam.AsSpan(0, Math.Min(file.ColorRam.Length, DolphinEdFile.ColorRamSize))
+      .CopyTo(result.AsSpan(DolphinEdFile.ColorRamOffset));
+    result[DolphinEdFile.BackgroundOffset] = file.BackgroundColor;
 
     return result;
   }

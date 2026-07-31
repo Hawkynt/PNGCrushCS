@@ -34,6 +34,9 @@ public sealed class RecoilConformanceTests {
   /// <summary>Formats implemented on both sides, with the dimensions RECOIL decodes them at.</summary>
   public static readonly Pairing[] Pairings = [
     new(ImageFormat.Doodle, "Doodle", 320, 200),
+    new(ImageFormat.CDUPaint, "CDU-Paint", 160, 200),
+    new(ImageFormat.DolphinEd, "Dolphin Ed", 160, 200),
+    new(ImageFormat.Artist64, "Wigmore Artist 64", 160, 200),
     new(ImageFormat.HiEddi, "Hi-Eddi", 320, 200),
     new(ImageFormat.AtariFontMaker, "Atari FontMaker", 256, 64),
     new(ImageFormat.OdFontEditor, "OD Font Editor", 256, 40),

@@ -74,17 +74,29 @@ public sealed class RecoilRoundTripAgreementTests {
       Assert.Fail($"{pairing}: we cannot read back what we just wrote");
 
     var ours = PixelConverter.Convert(mine!, PixelFormat.Rgb24);
-    if (ours.Width != theirs.Width || ours.Height != theirs.Height)
+
+    // A wide-pixel mode is one picture drawn two ways. The C64's multicolour modes are 160 pixels
+    // across and RECOIL hands them back at 320, each pixel twice, because that is the shape of the
+    // screen they are shown on; we hand back the 160 the format actually stores. Comparing those
+    // through the doubling is the same comparison, and skipping it instead — which is what happened
+    // before — left every multicolour format checked only for "RECOIL agrees this is a file".
+    if (ours.Height != theirs.Height || theirs.Width % ours.Width != 0)
       Assert.Ignore($"{pairing}: sizes differ — ours {ours.Width}x{ours.Height}, RECOIL {theirs.Width}x{theirs.Height}");
 
+    var scale = theirs.Width / ours.Width;
     for (var i = 0; i < theirs.PixelData.Length; ++i) {
-      if (ours.PixelData[i] == theirs.PixelData[i])
+      var channel = i % 3;
+      var pixel = i / 3;
+      var x = pixel % theirs.Width / scale;
+      var y = pixel / theirs.Width;
+      var at = (y * ours.Width + x) * 3 + channel;
+
+      if (ours.PixelData[at] == theirs.PixelData[i])
         continue;
 
-      var pixel = i / 3;
       Assert.Fail(
-        $"{pairing}: pixel {pixel % theirs.Width},{pixel / theirs.Width} channel {i % 3} — " +
-        $"ours {ours.PixelData[i]}, RECOIL {theirs.PixelData[i]}");
+        $"{pairing}: pixel {pixel % theirs.Width},{y} channel {channel} — " +
+        $"ours {ours.PixelData[at]}, RECOIL {theirs.PixelData[i]}");
     }
   }
 

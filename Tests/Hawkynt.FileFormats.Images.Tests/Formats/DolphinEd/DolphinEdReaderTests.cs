@@ -88,16 +88,17 @@ public sealed class DolphinEdReaderTests {
     data[0] = (byte)(loadAddress & 0xFF);
     data[1] = (byte)(loadAddress >> 8);
 
-    for (var i = 0; i < 8000; ++i)
-      data[2 + i] = (byte)(i % 256);
+    // The three sections are not packed against one another; each starts where the format puts it.
+    for (var i = 0; i < DolphinEdFile.BitmapDataSize; ++i)
+      data[DolphinEdFile.BitmapOffset + i] = (byte)(i % 256);
 
-    for (var i = 0; i < 1000; ++i)
-      data[8002 + i] = (byte)(i % 16);
+    for (var i = 0; i < DolphinEdFile.VideoMatrixSize; ++i)
+      data[DolphinEdFile.VideoMatrixOffset + i] = (byte)(i % 16);
 
-    for (var i = 0; i < 1000; ++i)
-      data[9002 + i] = (byte)((i + 3) % 16);
+    for (var i = 0; i < DolphinEdFile.ColorRamSize; ++i)
+      data[DolphinEdFile.ColorRamOffset + i] = (byte)((i + 3) % 16);
 
-    data[10002] = backgroundColor;
+    data[DolphinEdFile.BackgroundOffset] = backgroundColor;
 
     return data;
   }
