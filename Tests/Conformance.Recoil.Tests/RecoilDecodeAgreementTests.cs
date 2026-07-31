@@ -378,7 +378,125 @@ public sealed class RecoilDecodeAgreementTests {
     new("LdPic, mode 2", ImageFormat.LdPic, ".bbg", () => _LdPic(2)),
     new("LdPic, mode 4", ImageFormat.LdPic, ".bbg", () => _LdPic(4)),
     new("LdPic, mode 5", ImageFormat.LdPic, ".bbg", () => _LdPic(5)),
+    new("True-colour IMG, chunky", ImageFormat.TrueColorImg, ".timg", () => _TrueColorImg(0)),
+    new("True-colour IMG, 15 planes", ImageFormat.TrueColorImg, ".timg", () => _TrueColorImg(15)),
+    new("True-colour IMG, 16 planes", ImageFormat.TrueColorImg, ".timg", () => _TrueColorImg(16)),
+    new("True-colour IMG, 24 planes", ImageFormat.TrueColorImg, ".timg", () => _TrueColorImg(24)),
   ];
+
+  /// <summary>A true-colour GEM bit image, either chunky or in fifteen, sixteen or twenty-four planes.</summary>
+  private static byte[] _TrueColorImg(int bitplanes) {
+    const int width = 96, height = 40, patternLength = 4;
+    var header = new System.Collections.Generic.List<byte>();
+
+    void Word(int value) {
+      header.Add((byte)(value >> 8));
+      header.Add((byte)value);
+    }
+
+    var headerLength = bitplanes == 0 ? 18 : 28;
+    Word(1);
+    Word(headerLength >> 1);
+    Word(bitplanes == 0 ? 24 : bitplanes);
+    Word(patternLength);
+    Word(372);
+    Word(372);
+    Word(width);
+    Word(height);
+
+    if (bitplanes == 0) {
+      header.AddRange([0, 3]);
+
+      var chunky = new System.Collections.Generic.List<byte>(header);
+      var written = 0;
+      var seed = 0;
+      while (written < width * height) {
+        var run = Math.Min(width * height - written, 40 + seed % 30);
+        chunky.Add(128);
+        chunky.Add((byte)run);
+        for (var i = 0; i < run; ++i)
+          chunky.AddRange([(byte)(seed * 7 + i), (byte)(seed * 13 + i * 3), (byte)(seed * 29 + i * 5)]);
+
+        written += run;
+        ++seed;
+      }
+
+      return chunky.ToArray();
+    }
+
+    header.AddRange("TIMG"u8.ToArray());
+
+    // Sixteen planes spends its spare bit on green; the other two forms are even.
+    var channel = (byte)(bitplanes == 24 ? 8 : 5);
+    var green = (byte)(bitplanes == 16 ? 6 : channel);
+    header.AddRange([0, 3, 0, channel, 0, green, 0, channel]);
+
+    var body = new System.Collections.Generic.List<byte>(header);
+    var bytesPerPlane = (width + 7) / 8;
+    var stride = bitplanes * bytesPerPlane;
+
+    for (var y = 0; y < height;) {
+      // Every fifth row stands for three, which is the only compression across rows.
+      var repeat = y % 5 == 0 && y + 3 <= height ? 3 : 1;
+      if (repeat > 1)
+        body.AddRange([0, 0, 255, (byte)repeat]);
+
+      var line = new byte[stride];
+      for (var i = 0; i < stride; ++i)
+        line[i] = (byte)(y * 31 + i * 17);
+
+      // Make some of the line solid so the solid-run branch is covered.
+      for (var i = 0; i < stride; ++i) {
+        if (i % 23 < 9)
+          line[i] = (byte)(i % 46 < 9 ? 0 : 255);
+      }
+
+      var at = 0;
+      while (at < stride) {
+        var left = stride - at;
+
+        // A solid run of one of the two values the coder can write without spelling them out.
+        var solid = 1;
+        while (solid < Math.Min(left, 127) && line[at + solid] == line[at])
+          ++solid;
+
+        if (solid >= 3 && (line[at] == 0 || line[at] == 255)) {
+          body.Add((byte)(solid | (line[at] == 255 ? 128 : 0)));
+          at += solid;
+          continue;
+        }
+
+        // A pattern repeated, which rewinds over its own bytes rather than storing them again.
+        if (left >= patternLength * 3) {
+          var repeats = true;
+          for (var i = patternLength; i < patternLength * 3 && repeats; ++i)
+            repeats = line[at + i] == line[at + i % patternLength];
+
+          if (repeats) {
+            body.Add(0);
+            body.Add(3);
+            for (var i = 0; i < patternLength; ++i)
+              body.Add(line[at + i]);
+
+            at += patternLength * 3;
+            continue;
+          }
+        }
+
+        var run = Math.Min(left, 60);
+        body.Add(128);
+        body.Add((byte)run);
+        for (var i = 0; i < run; ++i)
+          body.Add(line[at + i]);
+
+        at += run;
+      }
+
+      y += repeat;
+    }
+
+    return body.ToArray();
+  }
 
   /// <summary>
   /// An LdPic picture: a bit stream whose own field widths it declares, unpacking a screen column
