@@ -15,7 +15,8 @@ namespace FileFormat.VdcBitmap;
 /// not to use as literals.
 /// </remarks>
 public readonly record struct VdcBitmapFile
-  : IImageFormatReader<VdcBitmapFile>, IImageToRawImage<VdcBitmapFile> {
+  : IImageFormatReader<VdcBitmapFile>, IImageToRawImage<VdcBitmapFile>,
+    IImageFromRawImage<VdcBitmapFile>, IImageFormatWriter<VdcBitmapFile> {
 
   /// <summary>The three bytes every file starts with.</summary>
   public static ReadOnlySpan<byte> Signature => [(byte)'B', (byte)'M', 0xCB];
@@ -33,6 +34,8 @@ public readonly record struct VdcBitmapFile
   static string[] IImageFormatMetadata<VdcBitmapFile>.FileExtensions => [".vbm", ".bm"];
   static VdcBitmapFile IImageFormatReader<VdcBitmapFile>.FromSpan(ReadOnlySpan<byte> data)
     => VdcBitmapReader.FromSpan(data);
+  static byte[] IImageFormatWriter<VdcBitmapFile>.ToBytes(VdcBitmapFile file)
+    => VdcBitmapWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<VdcBitmapFile>.VideoModes => [
     new("VDC", [(IntegerRange.Any, IntegerRange.Any)], [2])
   ];
@@ -72,5 +75,32 @@ public readonly record struct VdcBitmapFile
       Palette = [background, background, background, ink, ink, ink],
       PaletteCount = 2,
     };
+  }
+
+  /// <summary>Builds a bitmap at whatever size the picture already is.</summary>
+  /// <remarks>
+  /// The header carries the dimensions, so unlike most of the machine formats here there is nothing
+  /// to sample to — the picture keeps its own size and only its colours are reduced. A set bit is
+  /// the ink, and the ink is black, so the threshold is taken the dark way round.
+  /// </remarks>
+  public static VdcBitmapFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width is < 1 or > 0xFFFF || image.Height is < 1 or > 0xFFFF)
+      throw new ArgumentException(
+        $"A VDC BitMap is at most 65535x65535, got {image.Width}x{image.Height}.", nameof(image));
+
+    var set = GlyphSheet.Sample(image, image.Width, image.Height, setWhenBright: false);
+    var stride = (image.Width + 7) >> 3;
+    var bitmap = new byte[stride * image.Height];
+
+    for (var y = 0; y < image.Height; ++y)
+    for (var x = 0; x < image.Width; ++x) {
+      if (!set[y * image.Width + x])
+        continue;
+
+      bitmap[y * stride + (x >> 3)] |= (byte)(1 << (~x & 7));
+    }
+
+    return new() { Bitmap = bitmap, Width = image.Width, Height = image.Height, InkIsBlack = true };
   }
 }

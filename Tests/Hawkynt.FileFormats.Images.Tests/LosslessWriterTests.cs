@@ -82,6 +82,8 @@ public sealed class LosslessWriterTests {
     new("PC-98 EBD", ImageFormat.Pc98Ebd, Palette.SixteenColors, 640, 400),
     new("CP8 grayscale", ImageFormat.Cp8Gray, Palette.Grayscale, 64, 64),
     new("MGR bitmap", ImageFormat.MgrBitmap, Palette.Monochrome, 100, 30),
+    new("VDC BitMap", ImageFormat.VdcBitmap, Palette.Monochrome, 101, 37),
+    new("VDC BitMap, whole bytes across", ImageFormat.VdcBitmap, Palette.Monochrome, 64, 16),
     new("MGR bitmap, whole bytes across", ImageFormat.MgrBitmap, Palette.Monochrome, 64, 16),
     // The three character-set sheets whose every bit is one pixel and every pixel one bit; Star
     // Painter is not among them because its sheet has fifteen cells past the end of the set, and
