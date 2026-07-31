@@ -148,14 +148,54 @@ public static class HeifReader {
 
   private static void _ParseIpcoBox(byte[] data, ref int width, ref int height, ref byte[]? hvcCData) {
     var subBoxes = IsoBmffBox.ReadBoxes(data, 0, data.Length);
+    var clapWidth = 0;
+    var clapHeight = 0;
+
     foreach (var box in subBoxes) {
       if (box.Type == IsoBmffBox.Ispe && box.Data.Length >= 12) {
         width = (int)BinaryPrimitives.ReadUInt32BigEndian(box.Data.AsSpan(4));
         height = (int)BinaryPrimitives.ReadUInt32BigEndian(box.Data.AsSpan(8));
+      } else if (box.Type == IsoBmffBox.Clap) {
+        _ReadCleanAperture(box.Data, out clapWidth, out clapHeight);
       } else if (box.Type == IsoBmffBox.HvcC) {
         hvcCData = box.Data;
       }
     }
+
+    // The clean aperture wins where there is one. `ispe` is the size of the picture as stored, which
+    // an encoder pads out to whole coding blocks — a 37x23 still is kept in a 64x64 one — and `clap`
+    // is the window within it that is the actual image. Reading only `ispe` is why such a file
+    // reported the padded size, and every HEIF written by ImageMagick is one.
+    if (clapWidth > 0 && clapHeight > 0 && clapWidth <= width && clapHeight <= height) {
+      width = clapWidth;
+      height = clapHeight;
+    }
+  }
+
+  /// <summary>
+  /// The CleanApertureBox's dimensions, each stored as a rational.
+  /// </summary>
+  /// <remarks>
+  /// Eight 32-bit values: width numerator and denominator, height numerator and denominator, then a
+  /// horizontal and vertical offset that are signed and measured from the centre. Only the sizes are
+  /// taken here — the offsets say where the window sits, which matters for cropping pixels but not
+  /// for reporting how big the image is.
+  /// </remarks>
+  private static void _ReadCleanAperture(byte[] data, out int width, out int height) {
+    width = 0;
+    height = 0;
+    if (data.Length < 16)
+      return;
+
+    var widthN = (int)BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(0));
+    var widthD = (int)BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(4));
+    var heightN = (int)BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(8));
+    var heightD = (int)BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(12));
+    if (widthD <= 0 || heightD <= 0 || widthN <= 0 || heightN <= 0)
+      return;
+
+    width = widthN / widthD;
+    height = heightN / heightD;
   }
 
   private static IsoBmffBox? _FindBox(List<IsoBmffBox> boxes, string type) {

@@ -29,6 +29,9 @@ internal readonly struct IsoBmffBox {
   internal const string Ipco = "ipco";
   internal const string Ipma = "ipma";
   internal const string Ispe = "ispe";
+
+  /// <summary>CleanApertureBox — the visible rectangle within a larger coded one.</summary>
+  internal const string Clap = "clap";
   internal const string HvcC = "hvcC";
   internal const string Mdat = "mdat";
 
