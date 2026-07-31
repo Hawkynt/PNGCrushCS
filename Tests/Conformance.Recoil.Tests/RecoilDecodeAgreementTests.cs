@@ -201,6 +201,10 @@ public sealed class RecoilDecodeAgreementTests {
     new("InShape true colour", ImageFormat.InShape, ".iim", () => _InShape(4, 64, 48)),
     new("InShape true colour, padded", ImageFormat.InShape, ".iim", () => _InShape(5, 64, 48)),
     new("Picworks", ImageFormat.AtariPicworks, ".cp3", _Picworks),
+    new("Best Paint", ImageFormat.BestPaint, ".bp", _BestPaint),
+    new("Cranach monochrome", ImageFormat.CranachPaint, ".esm", () => _Cranach(1, 200, 150)),
+    new("Cranach palette", ImageFormat.CranachPaint, ".esm", () => _Cranach(8, 160, 100)),
+    new("Cranach true colour", ImageFormat.CranachPaint, ".esm", () => _Cranach(24, 64, 48)),
   ];
 
   [Test]
@@ -1221,6 +1225,40 @@ public sealed class RecoilDecodeAgreementTests {
     values.CopyTo(data, counts.Length);
     for (var i = 0; i < tail; ++i)
       data[counts.Length + values.Count + i] = (byte)(i * 47 + (i >> 7));
+
+    return data;
+  }
+
+  /// <summary>
+  /// A Best Paint picture. Only the lower half of the VIC-20's palette can be a foreground, so the
+  /// cell colours are masked to it — a higher one makes the file malformed rather than merely odd.
+  /// </summary>
+  private static byte[] _BestPaint() {
+    var data = _Monochrome(4083);
+    data[0] = 0;
+    data[1] = 17;
+    for (var cell = 0; cell < 12 * 20; ++cell)
+      data[3842 + cell] = (byte)(cell % 8);
+
+    return data;
+  }
+
+  /// <summary>A TmS Cranach Paint picture at one of its three depths.</summary>
+  private static byte[] _Cranach(int depth, int width, int height) {
+    var count = width * height;
+    var pixels = depth switch { 1 => ((width + 7) >> 3) * height, 8 => count, _ => count * 3 };
+
+    var data = _Monochrome(812 + pixels);
+    System.Text.Encoding.ASCII.GetBytes("TMS").CopyTo(data, 0);
+    data[3] = 0;
+    data[4] = 3;
+    data[5] = 44;
+    data[6] = (byte)(width >> 8);
+    data[7] = (byte)width;
+    data[8] = (byte)(height >> 8);
+    data[9] = (byte)height;
+    data[10] = 0;
+    data[11] = (byte)depth;
 
     return data;
   }
