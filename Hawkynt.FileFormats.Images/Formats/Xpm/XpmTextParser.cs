@@ -65,13 +65,19 @@ internal static class XpmTextParser {
         transparentIndex = i;
         // Leave palette entry as 0,0,0 for transparent
       } else if (colorValue.StartsWith('#')) {
-        var hex = colorValue[1..];
-        if (hex.Length == 6) {
-          palette[i * 3] = byte.Parse(hex[..2], NumberStyles.HexNumber, CultureInfo.InvariantCulture);
-          palette[i * 3 + 1] = byte.Parse(hex[2..4], NumberStyles.HexNumber, CultureInfo.InvariantCulture);
-          palette[i * 3 + 2] = byte.Parse(hex[4..6], NumberStyles.HexNumber, CultureInfo.InvariantCulture);
-        } else
+        // XPM allows a hex triple at several widths — 4, 8, 12 and 16 bits a channel — and only the
+        // 8-bit one was read. The wider ones are taken from their most significant byte.
+        if (!_TryParseHex(colorValue[1..], out var r, out var g, out var b))
           throw new InvalidOperationException($"Unsupported hex color format: {colorValue}");
+
+        palette[i * 3] = r;
+        palette[(i * 3) + 1] = g;
+        palette[(i * 3) + 2] = b;
+      } else if (XpmColorNames.TryGet(colorValue, out var named, out var namedG, out var namedB)) {
+        // A name from X11's colour database, which is what an XPM writer reaches for first.
+        palette[i * 3] = named;
+        palette[(i * 3) + 1] = namedG;
+        palette[(i * 3) + 2] = namedB;
       } else
         throw new InvalidOperationException($"Unsupported color value: {colorValue}");
 
@@ -156,5 +162,39 @@ internal static class XpmTextParser {
 
     var name = text[(starIdx + 1)..endIdx].Trim();
     return name.Length > 0 ? name : "image";
+  }
+
+  /// <summary>A hex triple at any of the widths XPM permits: 4, 8, 12 or 16 bits a channel.</summary>
+  private static bool _TryParseHex(string hex, out byte r, out byte g, out byte b) {
+    r = g = b = 0;
+    if (hex.Length % 3 != 0)
+      return false;
+
+    var perChannel = hex.Length / 3;
+    if (perChannel is < 1 or > 4)
+      return false;
+
+    if (!_TryChannel(hex.AsSpan(0, perChannel), out r)
+        || !_TryChannel(hex.AsSpan(perChannel, perChannel), out g)
+        || !_TryChannel(hex.AsSpan(perChannel * 2, perChannel), out b))
+      return false;
+
+    return true;
+  }
+
+  /// <summary>One channel, scaled to eight bits from whatever width it was written at.</summary>
+  private static bool _TryChannel(ReadOnlySpan<char> text, out byte value) {
+    value = 0;
+    if (!ushort.TryParse(text, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var raw))
+      return false;
+
+    value = text.Length switch {
+      1 => (byte)((raw << 4) | raw),   // #RGB doubles each nibble
+      2 => (byte)raw,
+      3 => (byte)(raw >> 4),
+      _ => (byte)(raw >> 8),
+    };
+
+    return true;
   }
 }
