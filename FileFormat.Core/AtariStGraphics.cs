@@ -139,6 +139,52 @@ public static class AtariStGraphics {
     return indices;
   }
 
+  /// <summary>
+  /// Reads a GEM VDI palette: six bytes a colour, three big-endian words of intensity per thousand.
+  /// </summary>
+  /// <remarks>
+  /// VDI numbers its colours by what they are for rather than by where they sit in hardware — white
+  /// is colour 1 because it is the usual background, and black is the highest index. So the entries
+  /// have to be permuted back into hardware order before a bitplane index can find them, and the
+  /// permutation is not a rotation or a reversal but a table.
+  /// </remarks>
+  public static byte[] ReadVdiPalette(ReadOnlySpan<byte> data, int offset, int colors, int planes) {
+    var palette = new byte[colors * 3];
+
+    for (var i = 0; i < colors; ++i) {
+      var entry = offset + i * 6;
+      if (entry + 5 >= data.Length)
+        break;
+
+      var target = VdiToHardwareIndex(i, planes) * 3;
+      for (var channel = 0; channel < 3; ++channel) {
+        var thousandths = (data[entry + channel * 2] << 8) | data[entry + channel * 2 + 1];
+        palette[target + channel] = (byte)(thousandths < 1000 ? thousandths * 255 / 1000 : 255);
+      }
+    }
+
+    return palette;
+  }
+
+  /// <summary>Where a VDI colour number sits in hardware order.</summary>
+  public static int VdiToHardwareIndex(int index, int planes) => index switch {
+    1 => (1 << planes) - 1,
+    2 => 1,
+    3 => 2,
+    5 => 6,
+    6 => 3,
+    7 => 5,
+    8 => 7,
+    9 => 8,
+    10 => 9,
+    11 => 10,
+    13 => 14,
+    14 => 11,
+    15 => 13,
+    255 => 15,
+    _ => index,
+  };
+
   /// <summary>Reads a Falcon palette, which stores four bytes a colour with the third unused.</summary>
   public static byte[] ReadFalconPalette(ReadOnlySpan<byte> data, int offset, int colors) {
     var palette = new byte[colors * 3];

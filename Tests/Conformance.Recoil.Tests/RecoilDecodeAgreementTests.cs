@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using FileFormat.Core;
+using FileFormat.ColrObjectEditor;
 using FileFormat.TechnicolorDream;
 using Hawkynt.FileFormats.Images;
 
@@ -161,6 +162,11 @@ public sealed class RecoilDecodeAgreementTests {
     new("RAG-D, eight planes", ImageFormat.RagD, ".rag", () => _RagD(8, 1024)),
     new("RAG-D, true colour", ImageFormat.RagD, ".rag", () => _RagD(16, 1024)),
     new("Music Compile 2 chunky", ImageFormat.RagD, ".ragc", () => _RagD(8, 1024)),
+    new("SAM Coupe mode 1", ImageFormat.SamCoupeSsx, ".ssx", () => _Monochrome(6928)),
+    new("SAM Coupe mode 2", ImageFormat.SamCoupeSsx, ".ssx", () => _Monochrome(12304)),
+    new("SAM Coupe mode 3", ImageFormat.SamCoupeSsx, ".ssx", () => _Monochrome(24580)),
+    new("SAM Coupe mode 4", ImageFormat.SamCoupeSsx, ".ssx", () => _Monochrome(24592)),
+    new("SAM Coupe rendered", ImageFormat.SamCoupeSsx, ".ssx", _SamCoupeChunky),
   ];
 
   [Test]
@@ -233,6 +239,55 @@ public sealed class RecoilDecodeAgreementTests {
 
       var theirs = _AsRgb(FormatRegistry.Read(png!));
       var ours = _AsRgb(TechnicolorDreamFile.ToRawImage(TechnicolorDreamReader.FromFile(new(picture))));
+
+      Assert.That((ours.Width, ours.Height), Is.EqualTo((theirs.Width, theirs.Height)));
+
+      for (var i = 0; i < theirs.PixelData.Length; ++i) {
+        if (ours.PixelData[i] == theirs.PixelData[i])
+          continue;
+
+        var pixel = i / 3;
+        Assert.Fail(
+          $"pixel {pixel % theirs.Width},{pixel / theirs.Width} channel {i % 3} — " +
+          $"ours {ours.PixelData[i]}, RECOIL {theirs.PixelData[i]}");
+      }
+    } finally {
+      try { Directory.Delete(directory, true); } catch { /* best effort */ }
+    }
+  }
+
+  /// <summary>
+  /// A C.O.L.R. object is a bare bitmap whose colours live in a .pal file beside it, and the
+  /// reference decoder refuses the picture outright without one — so this is the only arrangement
+  /// in which the format decodes at all.
+  /// </summary>
+  [Test]
+  [Category("Conformance")]
+  public void ColrObject_WithItsPalette_MatchesRecoilPixelForPixel() {
+    RecoilOracle.RequireAvailable();
+
+    var directory = Path.Combine(Path.GetTempPath(), $"recoilmur_{Guid.NewGuid():N}");
+    Directory.CreateDirectory(directory);
+
+    try {
+      // Intensities per thousand, so the values have to stay under 1000 to mean anything but white.
+      var palette = new byte[96];
+      for (var i = 0; i < 16; ++i)
+      for (var channel = 0; channel < 3; ++channel) {
+        var thousandths = (i * 61 + channel * 211) % 1001;
+        palette[i * 6 + channel * 2] = (byte)(thousandths >> 8);
+        palette[i * 6 + channel * 2 + 1] = (byte)thousandths;
+      }
+
+      var picture = Path.Combine(directory, "object.mur");
+      File.WriteAllBytes(picture, _Monochrome(32000));
+      File.WriteAllBytes(Path.Combine(directory, "object.pal"), palette);
+
+      var (png, output) = RecoilOracle.TryDecodeToPng(picture);
+      Assert.That(png, Is.Not.Null, $"RECOIL rejected the pair — {output}");
+
+      var theirs = _AsRgb(FormatRegistry.Read(png!));
+      var ours = _AsRgb(ColrObjectEditorFile.ToRawImage(ColrObjectEditorReader.FromFile(new(picture))));
 
       Assert.That((ours.Width, ours.Height), Is.EqualTo((theirs.Width, theirs.Height)));
 
@@ -728,6 +783,15 @@ public sealed class RecoilDecodeAgreementTests {
     data[18] = data[19] = 0;
     data[20] = (byte)(paletteLength >> 8);
     data[21] = (byte)paletteLength;
+
+    return data;
+  }
+
+  /// <summary>A rendered SAM Coupe dump, whose every byte must name one of the 128 colours.</summary>
+  private static byte[] _SamCoupeChunky() {
+    var data = _Monochrome(98304);
+    for (var i = 0; i < data.Length; ++i)
+      data[i] &= 127;
 
     return data;
   }
