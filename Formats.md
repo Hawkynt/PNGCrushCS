@@ -191,7 +191,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | Tobias Richter Slideshow | .pci                                                | Overscan, a palette every line   | Y      | —      | —         | R     | —   | —      | —         |
 | SAMAR Hi-res + colours  | .shc                                                 | Two fields, six colour zones each | Y     | —      | —         | R     | —   | —      | —         |
 | Apple Preferred Format  | .32k                                                 | Named chunks, packed, MULTIPAL   | Y      | —      | —         | R     | —   | —      | —         |
-| 3200 colours, unpacked  | .sh3, .3200                                          | Bitmap then 200 palettes         | Y      | —      | —         | R     | —   | —      | —         |
+| 3200 colours, unpacked  | .sh3, .3200                                          | Bitmap then 200 palettes         | Y      | Y      | —         | R     | —   | —      | —         |
 | HP 48 GROB              | .grb, .gro                                           | Binary nibbles, or serial text   | Y      | Y      | —         | R     | —   | —      | —         |
 | ComputerEyes ST         | .ce3                                                 | Digitiser output, three modes    | Y      | —      | —         | R     | —   | —      | —         |
 | Fun with Art            | .fwa                                                 | Colours as 6502 interrupt code   | Y      | —      | —         | R     | —   | —      | —         |

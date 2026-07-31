@@ -52,6 +52,9 @@ public sealed class LosslessWriterTests {
     /// <summary>Two of the Spectrum's colours per character cell, which is all a cell may show.</summary>
     ZxAttributes,
 
+    /// <summary>At most sixteen colours on any one scanline, each on a four-bit grid.</summary>
+    SixteenPerLine,
+
     /// <summary>Anything.</summary>
     Full,
   }
@@ -71,6 +74,7 @@ public sealed class LosslessWriterTests {
     new("Dir Logo Maker", ImageFormat.DirLogoMaker, Palette.AtariRomGlyphs, 88, 128),
     new("CHR$", ImageFormat.ChrDollar, Palette.ZxAttributes, 96, 64),
     new("Border Screen by Trefi", ImageFormat.ZxTrefiBorderScreen, Palette.ZxAttributes, 256, 192),
+    new("3200 colours, unpacked", ImageFormat.AppleSh3, Palette.SixteenPerLine, 320, 200),
   ];
 
   private static IEnumerable<TestCaseData> Cases() {
@@ -198,6 +202,16 @@ public sealed class LosslessWriterTests {
           rgb[at] = FileFormat.Core.ZxSpectrumGraphics.Palette[entry];
           rgb[at + 1] = FileFormat.Core.ZxSpectrumGraphics.Palette[entry + 1];
           rgb[at + 2] = FileFormat.Core.ZxSpectrumGraphics.Palette[entry + 2];
+          break;
+        }
+
+        // Sixteen colours a line and a different sixteen on the next, which is what a per-line
+        // palette buys — and far more than sixteen across the picture.
+        case Palette.SixteenPerLine: {
+          var index = (x / 5 + row) % 16;
+          rgb[at] = (byte)(((index * 3 + row) % 16) * 17);
+          rgb[at + 1] = (byte)(((index * 5 + row / 3) % 16) * 17);
+          rgb[at + 2] = (byte)(((index * 7 + row / 7) % 16) * 17);
           break;
         }
 
