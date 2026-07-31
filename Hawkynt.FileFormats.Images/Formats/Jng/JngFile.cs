@@ -1,5 +1,7 @@
 using System;
 using FileFormat.Core;
+using FileFormat.Jpeg;
+using System.IO;
 
 namespace FileFormat.Jng;
 
@@ -35,8 +37,46 @@ public readonly record struct JngFile : IImageFormatReader<JngFile>, IImageToRaw
   /// <summary>Concatenated alpha channel data from all JDAA or IDAT chunks, or null if no alpha.</summary>
   public byte[]? AlphaData { get; init; }
 
+  /// <summary>Decodes the JNG's JPEG payload, and its alpha channel where it has one.</summary>
+  /// <remarks>
+  /// This used to refuse outright, saying JPEG decoding "is not available in this library" and
+  /// pointing at FileFormat.Jpeg — which is in this same assembly and has been all along. So every
+  /// JNG failed for want of a call that was one line away.
+  ///
+  /// A JNG's colour data is a whole JPEG stream, and its alpha, when present, is either a second
+  /// greyscale JPEG (JDAA) or PNG-style deflate (IDAT). The first is decoded here; the second still
+  /// is not, and now says so precisely rather than as a blanket refusal.
+  /// </remarks>
   public static RawImage ToRawImage(JngFile file) {
-    throw new NotSupportedException("JNG conversion requires JPEG decoding which is not available in this library. Use FileFormat.Jpeg to decode JpegData first.");
+    if (file.JpegData is not { Length: > 0 })
+      throw new InvalidDataException("JNG carries no JDAT image data.");
+
+    var colour = JpegFile.ToRawImage(JpegReader.FromBytes(file.JpegData)).EnsureFormat(PixelFormat.Rgb24);
+    if (file.AlphaData is not { Length: > 0 })
+      return colour;
+
+    if (file.AlphaCompression != JngAlphaCompression.Jpeg)
+      throw new NotSupportedException(
+        "JNG alpha stored as PNG deflate (IDAT) is not supported yet; only a JPEG-coded alpha channel (JDAA) is.");
+
+    var alpha = JpegFile.ToRawImage(JpegReader.FromBytes(file.AlphaData)).EnsureFormat(PixelFormat.Rgb24);
+    var pixels = new byte[colour.Width * colour.Height * 4];
+    for (var i = 0; i < colour.Width * colour.Height; ++i) {
+      pixels[i * 4] = colour.PixelData[i * 3];
+      pixels[(i * 4) + 1] = colour.PixelData[(i * 3) + 1];
+      pixels[(i * 4) + 2] = colour.PixelData[(i * 3) + 2];
+
+      // The alpha image is greyscale, so any one of its channels is the value.
+      var at = i * 3;
+      pixels[(i * 4) + 3] = at < alpha.PixelData.Length ? alpha.PixelData[at] : (byte)255;
+    }
+
+    return new() {
+      Width = colour.Width,
+      Height = colour.Height,
+      Format = PixelFormat.Rgba32,
+      PixelData = pixels,
+    };
   }
 
 }
