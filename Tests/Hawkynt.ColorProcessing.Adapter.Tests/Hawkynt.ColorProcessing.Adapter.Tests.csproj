@@ -12,6 +12,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Hawkynt.ColorProcessing.Adapter\Hawkynt.ColorProcessing.Adapter.csproj" />
     <ProjectReference Include="..\..\FileFormat.Core\FileFormat.Core.csproj" />
+    <ProjectReference Include="..\..\Hawkynt.ColorProcessing.Adapter.Generators\Hawkynt.ColorProcessing.Adapter.Generators.csproj"
+                      OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="NUnit.Framework" />

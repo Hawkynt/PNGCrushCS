@@ -10,6 +10,7 @@
     <Project Path="Crush.TestUtilities/Crush.TestUtilities.csproj" />
     <Project Path="FileFormat.Core.Generators/FileFormat.Core.Generators.csproj" />
     <Project Path="FileFormat.Core/FileFormat.Core.csproj" />
+    <Project Path="Hawkynt.ColorProcessing.Adapter.Generators/Hawkynt.ColorProcessing.Adapter.Generators.csproj" />
     <Project Path="Hawkynt.ColorProcessing.Adapter/Hawkynt.ColorProcessing.Adapter.csproj" />
     <Project Path="FileFormat.TextMode/FileFormat.TextMode.csproj" />
     <Project Path="FileFormat.Registry.Generator/FileFormat.Registry.Generator.csproj" />

@@ -9,6 +9,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\FileFormat.Core\FileFormat.Core.csproj" />
+    <ProjectReference Include="..\Hawkynt.ColorProcessing.Adapter.Generators\Hawkynt.ColorProcessing.Adapter.Generators.csproj"
+                      OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <!-- The package's netcoreapp3.1 asset carries the whole of Hawkynt.ColorProcessing and is not
