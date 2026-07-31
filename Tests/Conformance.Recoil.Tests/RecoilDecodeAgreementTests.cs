@@ -555,6 +555,53 @@ public sealed class RecoilDecodeAgreementTests {
   }
 
   /// <summary>
+  /// A vertical scroll is nothing but a list of file names, so the pair — the list and the projects
+  /// it names — is the only arrangement in which it is a picture at all.
+  /// </summary>
+  [TestCase(1)]
+  [TestCase(3)]
+  [Category("Conformance")]
+  public void Graph2FontScroll_WithItsProjects_MatchesRecoilPixelForPixel(int frames) {
+    RecoilOracle.RequireAvailable();
+
+    var directory = Path.Combine(Path.GetTempPath(), $"recoilvsc_{Guid.NewGuid():N}");
+    Directory.CreateDirectory(directory);
+
+    try {
+      var list = new System.Text.StringBuilder();
+      for (var i = 0; i < frames; ++i) {
+        var name = $"part{i}.g2f";
+        list.Append(name).Append("\r\n");
+        File.WriteAllBytes(Path.Combine(directory, name), _G2f(40, false));
+      }
+
+      var scroll = Path.Combine(directory, "scroll.vsc");
+      File.WriteAllBytes(scroll, System.Text.Encoding.ASCII.GetBytes(list.ToString()));
+
+      var (png, output) = RecoilOracle.TryDecodeToPng(scroll);
+      Assert.That(png, Is.Not.Null, $"RECOIL rejected the scroll — {output}");
+
+      var theirs = _AsRgb(FormatRegistry.Read(png!));
+      var ours = _AsRgb(FileFormat.Graph2FontScroll.Graph2FontScrollFile.ToRawImage(
+        FileFormat.Graph2FontScroll.Graph2FontScrollReader.FromFile(new(scroll))));
+
+      Assert.That((ours.Width, ours.Height), Is.EqualTo((theirs.Width, theirs.Height)));
+
+      for (var i = 0; i < theirs.PixelData.Length; ++i) {
+        if (ours.PixelData[i] == theirs.PixelData[i])
+          continue;
+
+        var pixel = i / 3;
+        Assert.Fail(
+          $"pixel {pixel % theirs.Width},{pixel / theirs.Width} channel {i % 3} — " +
+          $"ours {ours.PixelData[i]}, RECOIL {theirs.PixelData[i]}");
+      }
+    } finally {
+      try { Directory.Delete(directory, true); } catch { /* best effort */ }
+    }
+  }
+
+  /// <summary>
   /// A Mode 5 file holds only colours; its bitmap is in the .gfx beside it, so the pair is the
   /// only arrangement in which either is a picture.
   /// </summary>
