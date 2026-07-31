@@ -59,7 +59,7 @@ public sealed class EndToEndTests {
     for (var x = 0; x < 16; ++x)
       bmp.SetPixel(x, y, Color.FromArgb(255, x * 16, y * 16, 128));
 
-    var optimizer = new JpegOptimizer(bmp, new JpegOptimizationOptions(
+    var optimizer = new JpegOptimizer(bmp.ToRawImage(), new JpegOptimizationOptions(
       AllowLossy: true,
       MinQuality: 75,
       Qualities: [80, 90],
@@ -81,7 +81,7 @@ public sealed class EndToEndTests {
     for (var x = 0; x < 8; ++x)
       bmp.SetPixel(x, y, Color.Red);
 
-    var optimizer = new JpegOptimizer(bmp, new JpegOptimizationOptions(
+    var optimizer = new JpegOptimizer(bmp.ToRawImage(), new JpegOptimizationOptions(
       AllowLossy: true,
       Qualities: [90]
     ));
@@ -119,7 +119,7 @@ public sealed class EndToEndTests {
       bmp.SetPixel(x, y, Color.FromArgb(255, x * 16, y * 16, 128));
 
     foreach (var sub in new[] { JpegSubsampling.Chroma444, JpegSubsampling.Chroma420 }) {
-      var optimizer = new JpegOptimizer(bmp, new JpegOptimizationOptions(
+      var optimizer = new JpegOptimizer(bmp.ToRawImage(), new JpegOptimizationOptions(
         AllowLossy: true,
         Modes: [JpegMode.Baseline],
         Qualities: [85],

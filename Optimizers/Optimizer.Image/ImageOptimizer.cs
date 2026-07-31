@@ -367,7 +367,7 @@ public sealed partial class ImageOptimizer {
     candidates.Add(new(ImageFormat.Tga, ".tga", async (ct, p) => {
       using var bmp = _LoadBitmap();
       var opts = _options.TgaOptions ?? new();
-      var optimizer = new TgaOptimizer(bmp, opts);
+      var optimizer = new TgaOptimizer(BitmapConverter.BitmapToRawImage(bmp), opts);
       var result = await optimizer.OptimizeAsync(ct, p);
       return result.FileContents;
     }));
@@ -377,7 +377,7 @@ public sealed partial class ImageOptimizer {
     candidates.Add(new(ImageFormat.Pcx, ".pcx", async (ct, p) => {
       using var bmp = _LoadBitmap();
       var opts = _options.PcxOptions ?? new();
-      var optimizer = new PcxOptimizer(bmp, opts);
+      var optimizer = new PcxOptimizer(BitmapConverter.BitmapToRawImage(bmp), opts);
       var result = await optimizer.OptimizeAsync(ct, p);
       return result.FileContents;
     }));
@@ -387,7 +387,7 @@ public sealed partial class ImageOptimizer {
     candidates.Add(new(ImageFormat.Tiff, ".tiff", async (ct, p) => {
       using var bmp = _LoadBitmap();
       var opts = _options.TiffOptions ?? new();
-      var optimizer = new TiffOptimizer(bmp, opts);
+      var optimizer = new TiffOptimizer(BitmapConverter.BitmapToRawImage(bmp), opts);
       var result = await optimizer.OptimizeAsync(ct, p);
       return result.FileContents;
     }));
@@ -412,7 +412,7 @@ public sealed partial class ImageOptimizer {
     candidates.Add(new(ImageFormat.Jpeg, ".jpg", async (ct, p) => {
       using var bmp = _LoadBitmap();
       var opts = _options.JpegOptions ?? new(AllowLossy: true);
-      var optimizer = new JpegOptimizer(bmp, opts);
+      var optimizer = new JpegOptimizer(BitmapConverter.BitmapToRawImage(bmp), opts);
       var result = await optimizer.OptimizeAsync(ct, p);
       return result.FileContents;
     }));

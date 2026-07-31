@@ -14,7 +14,7 @@ public sealed class JpegOptimizerTests {
   [Category("Unit")]
   public void Constructor_ValidBitmap_DoesNotThrow() {
     using var bmp = TestBitmapFactory.CreateTestBitmap();
-    Assert.DoesNotThrow(() => _ = new JpegOptimizer(bmp));
+    Assert.DoesNotThrow(() => _ = new JpegOptimizer(bmp.ToRawImage()));
   }
 
   [Test]
@@ -28,7 +28,7 @@ public sealed class JpegOptimizerTests {
   [CancelAfter(30000)]
   public void OptimizeAsync_LossyMode_ProducesResult() {
     using var bmp = TestBitmapFactory.CreateTestBitmap();
-    var optimizer = new JpegOptimizer(bmp, new JpegOptimizationOptions(
+    var optimizer = new JpegOptimizer(bmp.ToRawImage(), new JpegOptimizationOptions(
       AllowLossy: true,
       MinQuality: 75,
       Qualities: [85],

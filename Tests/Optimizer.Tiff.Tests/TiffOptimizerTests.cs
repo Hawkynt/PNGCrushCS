@@ -14,7 +14,7 @@ public sealed class TiffOptimizerTests {
   [Category("Unit")]
   public void Constructor_ValidBitmap_DoesNotThrow() {
     using var bmp = TestBitmapFactory.CreateTestBitmap();
-    Assert.DoesNotThrow(() => _ = new TiffOptimizer(bmp));
+    Assert.DoesNotThrow(() => _ = new TiffOptimizer(bmp.ToRawImage()));
   }
 
   [Test]
@@ -28,7 +28,7 @@ public sealed class TiffOptimizerTests {
   [CancelAfter(30000)]
   public void OptimizeAsync_DefaultOptions_ProducesResult() {
     using var bmp = TestBitmapFactory.CreateTestBitmap();
-    var optimizer = new TiffOptimizer(bmp, new TiffOptimizationOptions(
+    var optimizer = new TiffOptimizer(bmp.ToRawImage(), new TiffOptimizationOptions(
       [TiffCompression.None, TiffCompression.Deflate],
       [TiffPredictor.None],
       [8]
@@ -45,7 +45,7 @@ public sealed class TiffOptimizerTests {
   [CancelAfter(30000)]
   public void OptimizeAsync_PackBits_ProducesResult() {
     using var bmp = TestBitmapFactory.CreateTestBitmap();
-    var optimizer = new TiffOptimizer(bmp, new TiffOptimizationOptions(
+    var optimizer = new TiffOptimizer(bmp.ToRawImage(), new TiffOptimizationOptions(
       [TiffCompression.PackBits],
       [TiffPredictor.None],
       [8]
@@ -62,7 +62,7 @@ public sealed class TiffOptimizerTests {
   [CancelAfter(30000)]
   public void OptimizeAsync_LZW_ProducesResult() {
     using var bmp = TestBitmapFactory.CreateTestBitmap();
-    var optimizer = new TiffOptimizer(bmp, new TiffOptimizationOptions(
+    var optimizer = new TiffOptimizer(bmp.ToRawImage(), new TiffOptimizationOptions(
       [TiffCompression.Lzw],
       [TiffPredictor.None],
       [8]
@@ -110,7 +110,7 @@ public sealed class TiffOptimizerTests {
     for (var x = 0; x < 16; ++x)
       bmp.SetPixel(x, y, x == 0 && y == 0 ? rare : dominant);
 
-    var optimizer = new TiffOptimizer(bmp, new TiffOptimizationOptions(
+    var optimizer = new TiffOptimizer(bmp.ToRawImage(), new TiffOptimizationOptions(
       [TiffCompression.None],
       [TiffPredictor.None],
       [16],
@@ -136,7 +136,7 @@ public sealed class TiffOptimizerTests {
     for (var x = 0; x < 32; ++x)
       bmp.SetPixel(x, y, colors[(x + y) % colors.Length]);
 
-    var optimizer = new TiffOptimizer(bmp, new TiffOptimizationOptions(
+    var optimizer = new TiffOptimizer(bmp.ToRawImage(), new TiffOptimizationOptions(
       [TiffCompression.Deflate],
       [TiffPredictor.None],
       [32],
@@ -207,8 +207,8 @@ public sealed class TiffOptimizerTests {
       DynamicStripSizing: true
     );
 
-    var fixedResult = new TiffOptimizer(bmp, fixedOpt).OptimizeAsync().AsTask().Result;
-    var dynamicResult = new TiffOptimizer(bmp, dynamicOpt).OptimizeAsync().AsTask().Result;
+    var fixedResult = new TiffOptimizer(bmp.ToRawImage(), fixedOpt).OptimizeAsync().AsTask().Result;
+    var dynamicResult = new TiffOptimizer(bmp.ToRawImage(), dynamicOpt).OptimizeAsync().AsTask().Result;
 
     Assert.That(dynamicResult.CompressedSize, Is.LessThanOrEqualTo(fixedResult.CompressedSize),
       $"Dynamic={dynamicResult.CompressedSize} vs Fixed={fixedResult.CompressedSize}");
@@ -270,7 +270,7 @@ public sealed class TiffOptimizerTests {
   [CancelAfter(30000)]
   public void OptimizeAsync_Tiled_ProducesValidResult() {
     using var bmp = TestBitmapFactory.CreateTestBitmap(64, 64);
-    var optimizer = new TiffOptimizer(bmp, new TiffOptimizationOptions(
+    var optimizer = new TiffOptimizer(bmp.ToRawImage(), new TiffOptimizationOptions(
       [TiffCompression.Deflate],
       [TiffPredictor.None],
       TryTiles: true,
@@ -290,7 +290,7 @@ public sealed class TiffOptimizerTests {
   [CancelAfter(30000)]
   public void OptimizeAsync_TiledAndStripBoth_PicksSmallest() {
     using var bmp = TestBitmapFactory.CreateTestBitmap(64, 64);
-    var optimizer = new TiffOptimizer(bmp, new TiffOptimizationOptions(
+    var optimizer = new TiffOptimizer(bmp.ToRawImage(), new TiffOptimizationOptions(
       [TiffCompression.Deflate],
       [TiffPredictor.None],
       TryTiles: true,

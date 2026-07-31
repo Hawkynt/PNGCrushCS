@@ -14,7 +14,7 @@ public sealed class PcxOptimizerTests {
   [Category("Unit")]
   public void Constructor_ValidBitmap_DoesNotThrow() {
     using var bmp = TestBitmapFactory.CreateTestBitmap();
-    Assert.DoesNotThrow(() => _ = new PcxOptimizer(bmp));
+    Assert.DoesNotThrow(() => _ = new PcxOptimizer(bmp.ToRawImage()));
   }
 
   [Test]
@@ -28,7 +28,7 @@ public sealed class PcxOptimizerTests {
   [CancelAfter(30000)]
   public void OptimizeAsync_DefaultOptions_ProducesResult() {
     using var bmp = TestBitmapFactory.CreateTestBitmap();
-    var optimizer = new PcxOptimizer(bmp, new PcxOptimizationOptions(
+    var optimizer = new PcxOptimizer(bmp.ToRawImage(), new PcxOptimizationOptions(
       PlaneConfigs: [PcxPlaneConfig.SeparatePlanes],
       PaletteOrders: [PcxPaletteOrder.Original]
     ));

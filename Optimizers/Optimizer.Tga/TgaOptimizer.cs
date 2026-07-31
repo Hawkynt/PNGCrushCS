@@ -1,14 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Drawing;
-using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Crush.Core;
 using FileFormat.Tga;
+using FileFormat.Core;
+using Hawkynt.FileFormats.Images;
 
 namespace Optimizer.Tga;
 
@@ -21,7 +21,7 @@ public sealed class TgaOptimizer {
   private readonly int _uniqueColors;
   private readonly int _width;
 
-  public TgaOptimizer(Bitmap image, TgaOptimizationOptions? options = null) {
+  public TgaOptimizer(RawImage image, TgaOptimizationOptions? options = null) {
     ArgumentNullException.ThrowIfNull(image);
     this._options = options ?? new TgaOptimizationOptions();
     this._width = image.Width;
@@ -36,8 +36,10 @@ public sealed class TgaOptimizer {
     if (!file.Exists)
       throw new FileNotFoundException("TGA file not found.", file.FullName);
 
-    using var bmp = new Bitmap(file.FullName);
-    return new TgaOptimizer(bmp, options);
+    var image = FormatRegistry.GetEntry(ImageFormat.Tga)?.LoadRawImage(file)
+      ?? throw new InvalidDataException($"Not a readable TGA file: {{file.FullName}}.");
+
+    return new TgaOptimizer(image, options);
   }
 
   public async ValueTask<TgaOptimizationResult> OptimizeAsync(CancellationToken cancellationToken = default,
@@ -250,7 +252,7 @@ public sealed class TgaOptimizer {
   }
 
   private static void _ExtractPixelData(
-    Bitmap image,
+    RawImage image,
     out byte[] argbPixelData,
     out bool isGrayscale,
     out int uniqueColors,
@@ -260,16 +262,18 @@ public sealed class TgaOptimizer {
     var height = image.Height;
     argbPixelData = new byte[width * height * 4]; // R, G, B, A
 
-    var data = image.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.ReadOnly,
-      PixelFormat.Format32bppArgb);
-    try {
+    // Blue, green, red, alpha — the same order the platform bitmap laid out, so the loop below is
+    // unchanged from when this read a locked bitmap.
+    var source = PixelConverter.Convert(image, PixelFormat.Bgra32).PixelData;
+    {
       var colorSet = new HashSet<int>();
       isGrayscale = true;
       hasAlpha = false;
 
       unsafe {
+        fixed (byte* pinned = source)
         for (var y = 0; y < height; ++y) {
-          var row = (byte*)data.Scan0 + y * data.Stride;
+          var row = pinned + y * width * 4;
           for (var x = 0; x < width; ++x) {
             var b = row[x * 4];
             var g = row[x * 4 + 1];
@@ -290,8 +294,6 @@ public sealed class TgaOptimizer {
       }
 
       uniqueColors = colorSet.Count;
-    } finally {
-      image.UnlockBits(data);
     }
   }
 }

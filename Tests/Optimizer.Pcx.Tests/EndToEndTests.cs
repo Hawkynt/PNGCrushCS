@@ -17,7 +17,7 @@ public sealed class EndToEndTests {
   [CancelAfter(30000)]
   public void Optimize_ProducesValidPcx() {
     using var bmp = TestBitmapFactory.CreateTestBitmap(16, 16);
-    var optimizer = new PcxOptimizer(bmp, new PcxOptimizationOptions(
+    var optimizer = new PcxOptimizer(bmp.ToRawImage(), new PcxOptimizationOptions(
       PlaneConfigs: [PcxPlaneConfig.SeparatePlanes],
       PaletteOrders: [PcxPaletteOrder.Original]
     ));
@@ -37,7 +37,7 @@ public sealed class EndToEndTests {
     for (var x = 0; x < 16; ++x)
       bmp.SetPixel(x, y, (x + y) % 2 == 0 ? Color.Red : Color.Blue);
 
-    var optimizer = new PcxOptimizer(bmp, new PcxOptimizationOptions(
+    var optimizer = new PcxOptimizer(bmp.ToRawImage(), new PcxOptimizationOptions(
       AutoSelectColorMode: true
     ));
 
@@ -54,7 +54,7 @@ public sealed class EndToEndTests {
     for (var x = 0; x < 8; ++x)
       bmp.SetPixel(x, y, Color.White);
 
-    var optimizer = new PcxOptimizer(bmp, new PcxOptimizationOptions(
+    var optimizer = new PcxOptimizer(bmp.ToRawImage(), new PcxOptimizationOptions(
       AutoSelectColorMode: true
     ));
 
@@ -65,7 +65,7 @@ public sealed class EndToEndTests {
   [Test]
   public void OptimizeAsync_CancellationRequested_ThrowsOperationCanceledException() {
     using var bmp = TestBitmapFactory.CreateTestBitmap(16, 16);
-    var optimizer = new PcxOptimizer(bmp, new PcxOptimizationOptions(
+    var optimizer = new PcxOptimizer(bmp.ToRawImage(), new PcxOptimizationOptions(
       PlaneConfigs: [PcxPlaneConfig.SeparatePlanes],
       PaletteOrders: [PcxPaletteOrder.Original]
     ));
@@ -102,7 +102,7 @@ public sealed class EndToEndTests {
     for (var x = 0; x < 8; ++x)
       bmp.SetPixel(x, y, Color.FromArgb(255, x * 32, y * 32, 0));
 
-    var optimizer = new PcxOptimizer(bmp, new PcxOptimizationOptions(
+    var optimizer = new PcxOptimizer(bmp.ToRawImage(), new PcxOptimizationOptions(
       ColorModes: [PcxColorMode.Indexed8],
       PlaneConfigs: [PcxPlaneConfig.SinglePlane],
       PaletteOrders: [PcxPaletteOrder.FrequencySorted],

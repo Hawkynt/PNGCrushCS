@@ -1,14 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Drawing;
-using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Crush.Core;
 using FileFormat.Jpeg;
+using FileFormat.Core;
+using Hawkynt.FileFormats.Images;
 
 namespace Optimizer.Jpeg;
 
@@ -20,7 +20,7 @@ public sealed class JpegOptimizer {
   private readonly int _width;
   private readonly int _height;
 
-  public JpegOptimizer(Bitmap image, JpegOptimizationOptions? options = null) {
+  public JpegOptimizer(RawImage image, JpegOptimizationOptions? options = null) {
     ArgumentNullException.ThrowIfNull(image);
     this._options = options ?? new JpegOptimizationOptions();
     this._width = image.Width;
@@ -29,7 +29,7 @@ public sealed class JpegOptimizer {
     _ExtractPixelData(image, out this._rgbPixelData, out this._isGrayscale);
   }
 
-  private JpegOptimizer(byte[] jpegBytes, Bitmap image, JpegOptimizationOptions? options) {
+  private JpegOptimizer(byte[] jpegBytes, RawImage image, JpegOptimizationOptions? options) {
     ArgumentNullException.ThrowIfNull(image);
     this._inputJpegBytes = jpegBytes;
     this._options = options ?? new JpegOptimizationOptions();
@@ -45,8 +45,10 @@ public sealed class JpegOptimizer {
       throw new FileNotFoundException("JPEG file not found.", file.FullName);
 
     var jpegBytes = File.ReadAllBytes(file.FullName);
-    using var bmp = new Bitmap(file.FullName);
-    return new JpegOptimizer(jpegBytes, bmp, options);
+    var image = FormatRegistry.GetEntry(ImageFormat.Jpeg)?.LoadRawImage(file)
+      ?? throw new InvalidDataException($"Not a readable JPEG file: {{file.FullName}}.");
+
+    return new JpegOptimizer(jpegBytes, image, options);
   }
 
   public async ValueTask<JpegOptimizationResult> OptimizeAsync(CancellationToken cancellationToken = default,
@@ -170,18 +172,20 @@ public sealed class JpegOptimizer {
     }
   }
 
-  private static void _ExtractPixelData(Bitmap image, out byte[] rgbPixelData, out bool isGrayscale) {
+  private static void _ExtractPixelData(RawImage image, out byte[] rgbPixelData, out bool isGrayscale) {
     var width = image.Width;
     var height = image.Height;
     rgbPixelData = new byte[width * height * 3];
 
-    var data = image.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.ReadOnly,
-      PixelFormat.Format32bppArgb);
-    try {
+    // Blue, green, red, alpha — the same order the platform bitmap laid out, so the loop below is
+    // unchanged from when this read a locked bitmap.
+    var source = PixelConverter.Convert(image, PixelFormat.Bgra32).PixelData;
+    {
       isGrayscale = true;
       unsafe {
+        fixed (byte* pinned = source)
         for (var y = 0; y < height; ++y) {
-          var row = (byte*)data.Scan0 + y * data.Stride;
+          var row = pinned + y * width * 4;
           for (var x = 0; x < width; ++x) {
             var b = row[x * 4];
             var g = row[x * 4 + 1];
@@ -195,8 +199,6 @@ public sealed class JpegOptimizer {
           }
         }
       }
-    } finally {
-      image.UnlockBits(data);
     }
   }
 }

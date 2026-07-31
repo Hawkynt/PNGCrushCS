@@ -1,14 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Drawing;
-using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Crush.Core;
 using FileFormat.Pcx;
+using FileFormat.Core;
+using Hawkynt.FileFormats.Images;
 
 namespace Optimizer.Pcx;
 
@@ -20,7 +20,7 @@ public sealed class PcxOptimizer {
   private readonly int _uniqueColors;
   private readonly int _width;
 
-  public PcxOptimizer(Bitmap image, PcxOptimizationOptions? options = null) {
+  public PcxOptimizer(RawImage image, PcxOptimizationOptions? options = null) {
     ArgumentNullException.ThrowIfNull(image);
     this._options = options ?? new PcxOptimizationOptions();
     this._width = image.Width;
@@ -34,8 +34,10 @@ public sealed class PcxOptimizer {
     if (!file.Exists)
       throw new FileNotFoundException("PCX file not found.", file.FullName);
 
-    using var bmp = new Bitmap(file.FullName);
-    return new PcxOptimizer(bmp, options);
+    var image = FormatRegistry.GetEntry(ImageFormat.Pcx)?.LoadRawImage(file)
+      ?? throw new InvalidDataException($"Not a readable PCX file: {{file.FullName}}.");
+
+    return new PcxOptimizer(image, options);
   }
 
   public async ValueTask<PcxOptimizationResult> OptimizeAsync(CancellationToken cancellationToken = default,
@@ -279,7 +281,7 @@ public sealed class PcxOptimizer {
   }
 
   private static void _ExtractPixelData(
-    Bitmap image,
+    RawImage image,
     out byte[] argbPixelData,
     out bool isGrayscale,
     out int uniqueColors
@@ -288,15 +290,17 @@ public sealed class PcxOptimizer {
     var height = image.Height;
     argbPixelData = new byte[width * height * 4];
 
-    var data = image.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.ReadOnly,
-      PixelFormat.Format32bppArgb);
-    try {
+    // Blue, green, red, alpha — the same order the platform bitmap laid out, so the loop below is
+    // unchanged from when this read a locked bitmap.
+    var source = PixelConverter.Convert(image, PixelFormat.Bgra32).PixelData;
+    {
       var colorSet = new HashSet<int>();
       isGrayscale = true;
 
       unsafe {
+        fixed (byte* pinned = source)
         for (var y = 0; y < height; ++y) {
-          var row = (byte*)data.Scan0 + y * data.Stride;
+          var row = pinned + y * width * 4;
           for (var x = 0; x < width; ++x) {
             var b = row[x * 4];
             var g = row[x * 4 + 1];
@@ -314,8 +318,6 @@ public sealed class PcxOptimizer {
       }
 
       uniqueColors = colorSet.Count;
-    } finally {
-      image.UnlockBits(data);
     }
   }
 }

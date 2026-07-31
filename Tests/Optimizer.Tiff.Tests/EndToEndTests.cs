@@ -18,7 +18,7 @@ public sealed class EndToEndTests {
   [CancelAfter(30000)]
   public void Optimize_WriteThenReadBack_ProducesValidTiff() {
     using var bmp = TestBitmapFactory.CreateTestBitmap(16, 16);
-    var optimizer = new TiffOptimizer(bmp, new TiffOptimizationOptions(
+    var optimizer = new TiffOptimizer(bmp.ToRawImage(), new TiffOptimizationOptions(
       [TiffCompression.None, TiffCompression.Deflate],
       [TiffPredictor.None],
       [16]
@@ -42,7 +42,7 @@ public sealed class EndToEndTests {
   [CancelAfter(30000)]
   public void Optimize_MultipleCompressions_PicksSmallest() {
     using var bmp = TestBitmapFactory.CreateTestBitmap(32, 32);
-    var optimizer = new TiffOptimizer(bmp, new TiffOptimizationOptions(
+    var optimizer = new TiffOptimizer(bmp.ToRawImage(), new TiffOptimizationOptions(
       [TiffCompression.None, TiffCompression.PackBits, TiffCompression.Lzw, TiffCompression.Deflate],
       [TiffPredictor.None],
       [32]
@@ -66,7 +66,7 @@ public sealed class EndToEndTests {
       bmp.SetPixel(x, y, Color.FromArgb(255, g, g, g));
     }
 
-    var optimizer = new TiffOptimizer(bmp, new TiffOptimizationOptions(
+    var optimizer = new TiffOptimizer(bmp.ToRawImage(), new TiffOptimizationOptions(
       [TiffCompression.Deflate],
       [TiffPredictor.None],
       [8],
@@ -82,7 +82,7 @@ public sealed class EndToEndTests {
   [CancelAfter(30000)]
   public void Optimize_Tiled_WriteThenReadBack_ProducesValidTiff() {
     using var bmp = TestBitmapFactory.CreateTestBitmap(64, 64);
-    var optimizer = new TiffOptimizer(bmp, new TiffOptimizationOptions(
+    var optimizer = new TiffOptimizer(bmp.ToRawImage(), new TiffOptimizationOptions(
       [TiffCompression.Deflate],
       [TiffPredictor.None],
       TryTiles: true,
@@ -112,7 +112,7 @@ public sealed class EndToEndTests {
   [Test]
   public void OptimizeAsync_CancellationRequested_ThrowsOperationCanceledException() {
     using var bmp = TestBitmapFactory.CreateTestBitmap(16, 16);
-    var optimizer = new TiffOptimizer(bmp, new TiffOptimizationOptions(
+    var optimizer = new TiffOptimizer(bmp.ToRawImage(), new TiffOptimizationOptions(
       [TiffCompression.Deflate],
       [TiffPredictor.None],
       [16]
@@ -149,7 +149,7 @@ public sealed class EndToEndTests {
 
     foreach (var compression in new[]
                { TiffCompression.None, TiffCompression.PackBits, TiffCompression.Lzw, TiffCompression.Deflate }) {
-      var optimizer = new TiffOptimizer(bmp, new TiffOptimizationOptions(
+      var optimizer = new TiffOptimizer(bmp.ToRawImage(), new TiffOptimizationOptions(
         [compression],
         [TiffPredictor.None],
         [8],

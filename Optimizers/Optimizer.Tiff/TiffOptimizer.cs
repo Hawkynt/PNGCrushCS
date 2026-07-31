@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Drawing;
-using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -10,6 +8,8 @@ using System.Threading.Tasks;
 using BitMiracle.LibTiff.Classic;
 using Crush.Core;
 using FileFormat.Tiff;
+using FileFormat.Core;
+using Hawkynt.FileFormats.Images;
 
 namespace Optimizer.Tiff;
 
@@ -27,7 +27,7 @@ public sealed class TiffOptimizer {
   private readonly int _uniqueColors;
   private readonly int _width;
 
-  public TiffOptimizer(Bitmap image, TiffOptimizationOptions? options = null) {
+  public TiffOptimizer(RawImage image, TiffOptimizationOptions? options = null) {
     ArgumentNullException.ThrowIfNull(image);
     this._options = options ?? new TiffOptimizationOptions();
     this._width = image.Width;
@@ -46,8 +46,10 @@ public sealed class TiffOptimizer {
     if (!file.Exists)
       throw new FileNotFoundException("TIFF file not found.", file.FullName);
 
-    using var bmp = new Bitmap(file.FullName);
-    return new TiffOptimizer(bmp, options);
+    var image = FormatRegistry.GetEntry(ImageFormat.Tiff)?.LoadRawImage(file)
+      ?? throw new InvalidDataException($"Not a readable TIFF file: {file.FullName}.");
+
+    return new TiffOptimizer(image, options);
   }
 
   public async ValueTask<TiffOptimizationResult> OptimizeAsync(CancellationToken cancellationToken = default,
@@ -349,7 +351,7 @@ public sealed class TiffOptimizer {
   }
 
   private static void _ExtractPixelData(
-    Bitmap image,
+    RawImage image,
     out byte[] pixelData,
     out int samplesPerPixel,
     out int bitsPerSample,
@@ -362,55 +364,46 @@ public sealed class TiffOptimizer {
     var height = image.Height;
     colorMap = null;
 
-    if (image.PixelFormat == PixelFormat.Format8bppIndexed) {
+    // An indexed picture already is what a palette TIFF stores — indices and a colour table — so
+    // there is nothing to unpack, only to copy.
+    if (image.Format == PixelFormat.Indexed8 && image.Palette is { Length: > 0 }) {
       samplesPerPixel = 1;
       bitsPerSample = 8;
       photometric = (ushort)Photometric.PALETTE;
+
+      var entries = image.PaletteCount > 0 ? image.PaletteCount : image.Palette.Length / 3;
+      colorMap = new byte[entries * 3];
+      image.Palette.AsSpan(0, Math.Min(image.Palette.Length, colorMap.Length)).CopyTo(colorMap);
+
       pixelData = new byte[width * height];
+      image.PixelData.AsSpan(0, Math.Min(image.PixelData.Length, pixelData.Length)).CopyTo(pixelData);
 
-      var palette = image.Palette.Entries;
-      colorMap = new byte[palette.Length * 3];
-      for (var i = 0; i < palette.Length; ++i) {
-        colorMap[i * 3] = palette[i].R;
-        colorMap[i * 3 + 1] = palette[i].G;
-        colorMap[i * 3 + 2] = palette[i].B;
-      }
-
-      var data = image.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.ReadOnly,
-        PixelFormat.Format8bppIndexed);
-      try {
-        unsafe {
-          for (var y = 0; y < height; ++y) {
-            var row = (byte*)data.Scan0 + y * data.Stride;
-            Array.Copy(new ReadOnlySpan<byte>(row, width).ToArray(), 0, pixelData, y * width, width);
-          }
-        }
-      } finally {
-        image.UnlockBits(data);
-      }
-
-      // Count unique colors
       var colorSet = new HashSet<int>();
-      foreach (var idx in pixelData)
-        if (idx < palette.Length)
-          colorSet.Add(palette[idx].ToArgb());
+      foreach (var index in pixelData)
+        if (index < entries)
+          colorSet.Add((colorMap[index * 3] << 16) | (colorMap[index * 3 + 1] << 8) | colorMap[index * 3 + 2]);
+
       uniqueColors = colorSet.Count;
-      isGrayscale = palette.All(c => c.R == c.G && c.G == c.B);
+
+      isGrayscale = true;
+      for (var i = 0; i < entries && isGrayscale; ++i)
+        isGrayscale = colorMap[i * 3] == colorMap[i * 3 + 1] && colorMap[i * 3 + 1] == colorMap[i * 3 + 2];
     } else {
       samplesPerPixel = 3;
       bitsPerSample = 8;
       photometric = (ushort)Photometric.RGB;
       pixelData = new byte[width * height * 3];
 
-      var data = image.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.ReadOnly,
-        PixelFormat.Format32bppArgb);
-      try {
+      // Blue, green, red, alpha — the order the platform bitmap laid out, so the loop is unchanged.
+      var source = PixelConverter.Convert(image, PixelFormat.Bgra32).PixelData;
+      {
         var colorSet = new HashSet<int>();
         isGrayscale = true;
 
         unsafe {
+          fixed (byte* pinned = source)
           for (var y = 0; y < height; ++y) {
-            var row = (byte*)data.Scan0 + y * data.Stride;
+            var row = pinned + y * width * 4;
             for (var x = 0; x < width; ++x) {
               var b = row[x * 4];
               var g = row[x * 4 + 1];
@@ -427,8 +420,6 @@ public sealed class TiffOptimizer {
         }
 
         uniqueColors = colorSet.Count;
-      } finally {
-        image.UnlockBits(data);
       }
     }
   }

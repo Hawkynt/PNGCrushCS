@@ -17,7 +17,7 @@ public sealed class EndToEndTests {
   [CancelAfter(30000)]
   public void Optimize_WriteThenReadBack_ProducesValidTga() {
     using var bmp = TestBitmapFactory.CreateTestBitmap(16, 16);
-    var optimizer = new TgaOptimizer(bmp, new TgaOptimizationOptions(
+    var optimizer = new TgaOptimizer(bmp.ToRawImage(), new TgaOptimizationOptions(
       Compressions: [TgaCompression.None],
       Origins: [TgaOrigin.TopLeft]
     ));
@@ -48,8 +48,8 @@ public sealed class EndToEndTests {
       AutoSelectColorMode: false
     );
 
-    var noneResult = new TgaOptimizer(bmp, noneOpt).OptimizeAsync().AsTask().Result;
-    var rleResult = new TgaOptimizer(bmp, rleOpt).OptimizeAsync().AsTask().Result;
+    var noneResult = new TgaOptimizer(bmp.ToRawImage(), noneOpt).OptimizeAsync().AsTask().Result;
+    var rleResult = new TgaOptimizer(bmp.ToRawImage(), rleOpt).OptimizeAsync().AsTask().Result;
 
     Assert.That(rleResult.CompressedSize, Is.LessThan(noneResult.CompressedSize),
       "RLE should compress solid color better than no compression");
@@ -64,7 +64,7 @@ public sealed class EndToEndTests {
     for (var x = 0; x < 16; ++x)
       bmp.SetPixel(x, y, Color.Blue);
 
-    var optimizer = new TgaOptimizer(bmp, new TgaOptimizationOptions(
+    var optimizer = new TgaOptimizer(bmp.ToRawImage(), new TgaOptimizationOptions(
       Compressions: [TgaCompression.None, TgaCompression.Rle],
       Origins: [TgaOrigin.TopLeft],
       AutoSelectColorMode: true
@@ -77,7 +77,7 @@ public sealed class EndToEndTests {
   [Test]
   public void OptimizeAsync_CancellationRequested_ThrowsOperationCanceledException() {
     using var bmp = TestBitmapFactory.CreateTestBitmap(16, 16);
-    var optimizer = new TgaOptimizer(bmp, new TgaOptimizationOptions(
+    var optimizer = new TgaOptimizer(bmp.ToRawImage(), new TgaOptimizationOptions(
       Compressions: [TgaCompression.None],
       Origins: [TgaOrigin.TopLeft]
     ));
@@ -119,7 +119,7 @@ public sealed class EndToEndTests {
                TgaColorMode.Rgba32, TgaColorMode.Rgb24,
                TgaColorMode.Grayscale8, TgaColorMode.Indexed8
              }) {
-      var optimizer = new TgaOptimizer(bmp, new TgaOptimizationOptions(
+      var optimizer = new TgaOptimizer(bmp.ToRawImage(), new TgaOptimizationOptions(
         ColorModes: [colorMode],
         Compressions: [TgaCompression.None],
         Origins: [TgaOrigin.TopLeft],

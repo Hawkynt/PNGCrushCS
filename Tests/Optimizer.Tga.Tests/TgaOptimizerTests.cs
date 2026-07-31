@@ -14,7 +14,7 @@ public sealed class TgaOptimizerTests {
   [Category("Unit")]
   public void Constructor_ValidBitmap_DoesNotThrow() {
     using var bmp = TestBitmapFactory.CreateTestBitmap();
-    Assert.DoesNotThrow(() => _ = new TgaOptimizer(bmp));
+    Assert.DoesNotThrow(() => _ = new TgaOptimizer(bmp.ToRawImage()));
   }
 
   [Test]
@@ -28,7 +28,7 @@ public sealed class TgaOptimizerTests {
   [CancelAfter(30000)]
   public void OptimizeAsync_DefaultOptions_ProducesResult() {
     using var bmp = TestBitmapFactory.CreateTestBitmap();
-    var optimizer = new TgaOptimizer(bmp, new TgaOptimizationOptions(
+    var optimizer = new TgaOptimizer(bmp.ToRawImage(), new TgaOptimizationOptions(
       Compressions: [TgaCompression.None],
       Origins: [TgaOrigin.TopLeft]
     ));
@@ -65,7 +65,7 @@ public sealed class TgaOptimizerTests {
   [CancelAfter(30000)]
   public void OptimizeAsync_GrayscaleImage_DetectsGrayscale() {
     using var bmp = TestBitmapFactory.CreateTestBitmap(8, 8, true);
-    var optimizer = new TgaOptimizer(bmp, new TgaOptimizationOptions(
+    var optimizer = new TgaOptimizer(bmp.ToRawImage(), new TgaOptimizationOptions(
       Compressions: [TgaCompression.None],
       Origins: [TgaOrigin.TopLeft],
       AutoSelectColorMode: true
