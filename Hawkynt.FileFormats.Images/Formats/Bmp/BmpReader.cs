@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.Bmp;
@@ -26,9 +27,12 @@ public static class BmpReader {
     return FromBytes(ms.ToArray());
   }
 
+  /// <summary>BITMAPCOREHEADER — the 12-byte header OS/2 1.x and Windows 2.0 wrote.</summary>
+  private const int _CoreHeaderSize = 12;
+
   public static BmpFile FromSpan(ReadOnlySpan<byte> data) {
 
-    if (data.Length < BitmapFileHeader.StructSize + BitmapInfoHeader.StructSize)
+    if (data.Length < BitmapFileHeader.StructSize + _CoreHeaderSize)
       throw new InvalidDataException("Data too small for a valid BMP file.");
 
     // BITMAPFILEHEADER (14 bytes)
@@ -38,10 +42,37 @@ public static class BmpReader {
 
     var pixelDataOffset = fileHeader.PixelDataOffset;
 
-    // BITMAPINFOHEADER (40 bytes minimum)
-    var infoHeader = BitmapInfoHeader.ReadFrom(data[BitmapFileHeader.StructSize..]);
-    if (infoHeader.HeaderSize < BitmapInfoHeader.StructSize)
-      throw new InvalidDataException($"Unsupported BMP header size: {infoHeader.HeaderSize}.");
+    // BITMAPINFOHEADER (40 bytes) or the 12-byte BITMAPCOREHEADER that OS/2 1.x and Windows 2.0
+    // wrote — still what a tool emits when asked for "BMP2", and previously rejected outright for
+    // being shorter than 40. Its dimensions are 16-bit and its palette entries are three bytes rather
+    // than four, so it is read into the same shape as its successor and the palette stride follows.
+    var declaredSize = BinaryPrimitives.ReadInt32LittleEndian(data[BitmapFileHeader.StructSize..]);
+    var isCore = declaredSize == _CoreHeaderSize;
+    var paletteEntrySize = isCore ? 3 : 4;
+
+    BitmapInfoHeader infoHeader;
+    if (isCore) {
+      var core = data[BitmapFileHeader.StructSize..];
+      infoHeader = new BitmapInfoHeader(
+        HeaderSize: _CoreHeaderSize,
+        Width: BinaryPrimitives.ReadInt16LittleEndian(core[4..]),
+        Height: BinaryPrimitives.ReadInt16LittleEndian(core[6..]),
+        Planes: BinaryPrimitives.ReadInt16LittleEndian(core[8..]),
+        BitsPerPixel: BinaryPrimitives.ReadInt16LittleEndian(core[10..]),
+        Compression: 0,
+        ImageSize: 0,
+        XPixelsPerMeter: 0,
+        YPixelsPerMeter: 0,
+        ColorsUsed: 0,
+        ImportantColors: 0);
+    } else {
+      if (data.Length < BitmapFileHeader.StructSize + BitmapInfoHeader.StructSize)
+        throw new InvalidDataException("Data too small for a valid BMP file.");
+
+      infoHeader = BitmapInfoHeader.ReadFrom(data[BitmapFileHeader.StructSize..]);
+      if (infoHeader.HeaderSize < BitmapInfoHeader.StructSize)
+        throw new InvalidDataException($"Unsupported BMP header size: {infoHeader.HeaderSize}.");
+    }
 
     var width = infoHeader.Width;
     var rawHeight = infoHeader.Height;
@@ -68,7 +99,7 @@ public static class BmpReader {
         palette[i * 3] = data[paletteOffset + 2];     // R (from BGR+reserved)
         palette[i * 3 + 1] = data[paletteOffset + 1]; // G
         palette[i * 3 + 2] = data[paletteOffset];     // B
-        paletteOffset += 4;
+        paletteOffset += paletteEntrySize;
       }
     }
 
