@@ -2,9 +2,7 @@ using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Drawing;
 using Hawkynt.ColorProcessing.Adapter;
-using System.Drawing.Imaging;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -13,36 +11,33 @@ using System.Threading;
 using System.Threading.Tasks;
 using Compression.Core;
 using Crush.Core;
-using Hawkynt.ColorProcessing;
-using Hawkynt.ColorProcessing.Dithering;
-using Hawkynt.ColorProcessing.Quantization;
-using Hawkynt.Drawing;
 using FileFormat.Png;
+using FileFormat.Core;
 
 namespace Optimizer.Png;
 
 /// <summary>Main class for PNG optimization</summary>
 public sealed partial class PngOptimizer {
-  private readonly ArgbPixel[] _imageBitmapPixelData;
+  private readonly ArgbPixel[] _imagePixelData;
   private readonly int _imageHeight;
   private readonly ImageStats _imageStats;
   private readonly int _imageWidth;
   private readonly PngOptimizationOptions _options;
   private readonly PngChunkReader? _preservedChunks;
-  private readonly Bitmap _sourceImage;
+  private readonly RawImage _source;
 
   /// <summary>Constructor for the PNG optimizer</summary>
-  public PngOptimizer(Bitmap image, PngOptimizationOptions? options = null)
+  public PngOptimizer(RawImage image, PngOptimizationOptions? options = null)
     : this(image, null, options) { }
 
   /// <summary>Constructor with optional original PNG bytes for chunk preservation</summary>
-  public PngOptimizer(Bitmap image, byte[]? originalPngBytes, PngOptimizationOptions? options = null) {
+  public PngOptimizer(RawImage image, byte[]? originalPngBytes, PngOptimizationOptions? options = null) {
     ArgumentNullException.ThrowIfNull(image);
     this._options = options ?? new PngOptimizationOptions();
-    this._sourceImage = image;
+    this._source = image;
     this._imageWidth = image.Width;
     this._imageHeight = image.Height;
-    (this._imageStats, this._imageBitmapPixelData) = _ExtractImageData(image);
+    (this._imageStats, this._imagePixelData) = _ExtractImageData(image);
 
     if (this._options.PreserveAncillaryChunks && originalPngBytes != null)
       this._preservedChunks = PngChunkReader.Parse(originalPngBytes);
@@ -206,8 +201,13 @@ public sealed partial class PngOptimizer {
     return results;
   }
 
-  /// <summary>Extract pixel data and image statistics from bitmap</summary>
-  private static unsafe (ImageStats, ArgbPixel[]) _ExtractImageData(Bitmap image) {
+  /// <summary>Extract pixel data and image statistics from a picture</summary>
+  /// <remarks>
+  /// <see cref="ArgbPixel"/> is blue, green, red, alpha in that order, which is exactly what
+  /// <see cref="PixelFormat.Bgra32"/> lays out — so once the picture is in that format the copy is a
+  /// reinterpretation rather than a conversion, and no channel can be swapped on the way.
+  /// </remarks>
+  private static (ImageStats, ArgbPixel[]) _ExtractImageData(RawImage image) {
     var uniqueArgbColors = new HashSet<uint>();
     var uniqueRgbColors = new HashSet<uint>();
     var hasAlpha = false;
@@ -215,37 +215,25 @@ public sealed partial class PngOptimizer {
 
     var width = image.Width;
     var height = image.Height;
+    var bgra = PixelConverter.Convert(image, PixelFormat.Bgra32);
     var result = new ArgbPixel[width * height];
 
-    var bmpData = image.LockBits(
-      new Rectangle(0, 0, width, height),
-      ImageLockMode.ReadOnly,
-      PixelFormat.Format32bppArgb);
+    for (var i = 0; i < result.Length; ++i) {
+      var at = i * 4;
+      var pixel = new ArgbPixel {
+        B = bgra.PixelData[at],
+        G = bgra.PixelData[at + 1],
+        R = bgra.PixelData[at + 2],
+        A = bgra.PixelData[at + 3],
+      };
 
-    try {
-      var stride = bmpData.Stride;
-      var scan0 = bmpData.Scan0;
+      var rawValue = ((uint)pixel.A << 24) | ((uint)pixel.R << 16) | ((uint)pixel.G << 8) | pixel.B;
+      uniqueArgbColors.Add(rawValue);
+      uniqueRgbColors.Add(rawValue & 0x00FFFFFFu);
 
-      fixed (ArgbPixel* resultPtr = result) {
-        var rowOffset = (byte*)(void*)scan0;
-        var destPtr = resultPtr;
-
-        for (var y = 0; y < height; ++y, rowOffset += stride) {
-          var currentRowOffset = rowOffset;
-          for (var x = 0; x < width; ++x, currentRowOffset += 4, ++destPtr) {
-            var pixelValue = *(ArgbPixel*)currentRowOffset;
-            var rawValue = *(uint*)currentRowOffset;
-            uniqueArgbColors.Add(rawValue);
-            uniqueRgbColors.Add(rawValue & 0x00FFFFFFu);
-
-            *destPtr = pixelValue;
-            hasAlpha |= pixelValue.A < 255;
-            isGrayscale &= pixelValue.R == pixelValue.G && pixelValue.G == pixelValue.B;
-          }
-        }
-      }
-    } finally {
-      image.UnlockBits(bmpData);
+      result[i] = pixel;
+      hasAlpha |= pixel.A < 255;
+      isGrayscale &= pixel.R == pixel.G && pixel.G == pixel.B;
     }
 
     // Detect binary transparency: all alpha values are 0 or 255, all transparent
@@ -516,7 +504,7 @@ public sealed partial class PngOptimizer {
         byte packed = 0;
 
         for (var bit = 0; bit < pixelsPerByte && x + bit < width; ++bit) {
-          var pixel = this._imageBitmapPixelData[sourceOffset++];
+          var pixel = this._imagePixelData[sourceOffset++];
           var gray = (pixel.R * 77 + pixel.G * 150 + pixel.B * 29 + 128) >> 8;
           var quantized = (gray * maxValue + 127) / 255;
           packed |= (byte)((quantized & maxValue) << (8 - bitDepth * (bit + 1)));
@@ -533,7 +521,7 @@ public sealed partial class PngOptimizer {
     for (var y = 0; y < height; ++y) {
       var scanline = result[y];
       for (var x = 0; x < width; ++x, ++sourceOffset) {
-        var pixel = this._imageBitmapPixelData[sourceOffset];
+        var pixel = this._imagePixelData[sourceOffset];
         var b = pixel.B;
         var g = pixel.G;
         var r = pixel.R;
@@ -590,7 +578,7 @@ public sealed partial class PngOptimizer {
     var pixelIndex = 0;
     for (var y = 0; y < height; ++y)
     for (var x = 0; x < width; ++x) {
-      var pixel = this._imageBitmapPixelData[pixelIndex++];
+      var pixel = this._imagePixelData[pixelIndex++];
       var colorKey = includeAlpha
         ? ((long)pixel.A << 24) | ((long)pixel.R << 16) | ((long)pixel.G << 8) | pixel.B
         : ((long)pixel.R << 16) | ((long)pixel.G << 8) | pixel.B;
@@ -618,7 +606,7 @@ public sealed partial class PngOptimizer {
 
     // Frequency-sort with two-tier sorting: non-opaque first (by freq desc), then opaque (by freq desc)
     if (actualPaletteCount > 1)
-      _FrequencySortPaletteWithAlpha(this._imageBitmapPixelData, width, height, includeAlpha, uniqueColors,
+      _FrequencySortPaletteWithAlpha(this._imagePixelData, width, height, includeAlpha, uniqueColors,
         paletteRgba);
 
     // Build output palette (RGB only) and tRNS (alpha values)
@@ -658,7 +646,7 @@ public sealed partial class PngOptimizer {
 
       if (bitDepth == 8)
         for (var x = 0; x < width; ++x) {
-          var pixel = this._imageBitmapPixelData[pixelIndex++];
+          var pixel = this._imagePixelData[pixelIndex++];
           var colorKey = includeAlpha
             ? ((long)pixel.A << 24) | ((long)pixel.R << 16) | ((long)pixel.G << 8) | pixel.B
             : ((long)pixel.R << 16) | ((long)pixel.G << 8) | pixel.B;
@@ -670,7 +658,7 @@ public sealed partial class PngOptimizer {
           byte packed = 0;
 
           for (var bit = 0; bit < pixelsPerByte && x + bit < width; ++bit) {
-            var pixel = this._imageBitmapPixelData[pixelIndex++];
+            var pixel = this._imagePixelData[pixelIndex++];
             var colorKey = includeAlpha
               ? ((long)pixel.A << 24) | ((long)pixel.R << 16) | ((long)pixel.G << 8) | pixel.B
               : ((long)pixel.R << 16) | ((long)pixel.G << 8) | pixel.B;
@@ -708,7 +696,7 @@ public sealed partial class PngOptimizer {
   /// <summary>Quantize pixel data using median-cut algorithm for lossy palette reduction</summary>
   private void _QuantizeWithMedianCut(int width, int height, int maxColors, bool includeAlpha, out byte[] palette,
     out byte[]? tRNS, out int actualPaletteCount, byte[][] result) {
-    var quantizer = new MedianCutQuantizer(this._imageBitmapPixelData, width * height, maxColors, includeAlpha);
+    var quantizer = new MedianCutQuantizer(this._imagePixelData, width * height, maxColors, includeAlpha);
     var (paletteRgba, actualCount) = quantizer.Quantize();
     actualPaletteCount = actualCount;
 
@@ -741,77 +729,63 @@ public sealed partial class PngOptimizer {
     for (var y = 0; y < height; ++y) {
       var scanline = result[y];
       for (var x = 0; x < width; ++x)
-        scanline[x] = (byte)quantizer.FindNearest(this._imageBitmapPixelData[pixelIndex++]);
+        scanline[x] = (byte)quantizer.FindNearest(this._imagePixelData[pixelIndex++]);
     }
   }
 
-  /// <summary>Quantize pixel data using FrameworkExtensions quantizer/ditherer pair</summary>
+  /// <summary>Quantize pixel data using the generated quantizer/ditherer dispatch</summary>
+  /// <remarks>
+  /// The colour library hands back an indexed picture: one byte a pixel and a palette of RGB
+  /// triplets, with any per-entry alpha in its own table. That is what a PNG palette chunk wants,
+  /// so nothing has to be unpacked from a bitmap to get at it.
+  /// </remarks>
   private void _QuantizeWithFrameworkExtensions(int width, int height, int maxColors, bool includeAlpha,
     QuantizerDithererCombo combo, out byte[] palette, out byte[]? tRNS, out int actualPaletteCount, byte[][] result) {
-    using var indexed = _DispatchReduceColors(this._sourceImage, combo.QuantizerName, combo.DithererName, maxColors,
-      this._options.IsHighQualityQuantization);
+    var indexed = ColorReductionDispatch
+      .ReduceByName(this._source, combo.QuantizerName, combo.DithererName, maxColors).Image;
 
-    // Extract palette from indexed bitmap
-    var entries = indexed.Palette.Entries;
-    actualPaletteCount = Math.Min(entries.Length, maxColors);
+    var entries = indexed.Palette ?? [];
+    var alphas = indexed.AlphaTable;
+    actualPaletteCount = Math.Min(indexed.PaletteCount, maxColors);
+
     palette = new byte[maxColors * 3];
     var paletteRgba = new List<(byte R, byte G, byte B, byte A)>(actualPaletteCount);
     for (var i = 0; i < actualPaletteCount; ++i) {
-      var entry = entries[i];
-      palette[i * 3] = entry.R;
-      palette[i * 3 + 1] = entry.G;
-      palette[i * 3 + 2] = entry.B;
-      paletteRgba.Add((entry.R, entry.G, entry.B, entry.A));
+      var entry = i * 3;
+      var red = entry < entries.Length ? entries[entry] : (byte)0;
+      var green = entry + 1 < entries.Length ? entries[entry + 1] : (byte)0;
+      var blue = entry + 2 < entries.Length ? entries[entry + 2] : (byte)0;
+      var alpha = alphas != null && i < alphas.Length ? alphas[i] : (byte)255;
+
+      palette[i * 3] = red;
+      palette[i * 3 + 1] = green;
+      palette[i * 3 + 2] = blue;
+      paletteRgba.Add((red, green, blue, alpha));
     }
 
-    // Build tRNS chunk if any entry has non-255 alpha
+    // A tRNS chunk runs from the first entry to the last one that is not fully opaque, so only the
+    // position of the last matters.
     tRNS = null;
     if (includeAlpha) {
       var lastNonOpaque = -1;
       for (var i = 0; i < actualPaletteCount; ++i)
-        if (entries[i].A < 255)
+        if (paletteRgba[i].A < 255)
           lastNonOpaque = i;
 
       if (lastNonOpaque >= 0) {
         tRNS = new byte[lastNonOpaque + 1];
         for (var i = 0; i <= lastNonOpaque; ++i)
-          tRNS[i] = entries[i].A;
+          tRNS[i] = paletteRgba[i].A;
       }
     }
 
-    // Extract pixel indices from indexed bitmap
-    var bmpData = indexed.LockBits(
-      new Rectangle(0, 0, width, height),
-      ImageLockMode.ReadOnly,
-      indexed.PixelFormat);
-    try {
-      unsafe {
-        var scan0 = (byte*)bmpData.Scan0;
-        var stride = bmpData.Stride;
-        for (var y = 0; y < height; ++y) {
-          var row = scan0 + y * stride;
-          var scanline = result[y];
-          for (var x = 0; x < width; ++x)
-            scanline[x] = row[x];
-        }
-      }
-    } finally {
-      indexed.UnlockBits(bmpData);
+    for (var y = 0; y < height; ++y) {
+      var scanline = result[y];
+      var row = y * indexed.Width;
+      for (var x = 0; x < width; ++x)
+        scanline[x] = indexed.PixelData[row + x];
     }
   }
-
-  /// <summary>
-  /// Reduces a bitmap by going through the picture the colour library understands.
-  /// </summary>
-  /// <remarks>
-  /// The library's own entry point used to take a bitmap and be reached by reflection, which could
-  /// neither be trimmed nor compiled ahead of time. It is now a generated switch over the types
-  /// themselves, and the bitmap is only the shape this caller still speaks in.
-  /// </remarks>
-  private static Bitmap _DispatchReduceColors(Bitmap source, string quantizerName, string dithererName,
-    int colorCount, bool isHighQuality)
-    => _ToBitmap(
-      ColorReductionDispatch.ReduceByName(_ToRawImage(source), quantizerName, dithererName, colorCount).Image);
 
   /// <summary>Sort palette entries: non-opaque first by frequency desc, then opaque by frequency desc</summary>
   private static void _FrequencySortPaletteWithAlpha(ArgbPixel[] pixels, int width, int height, bool includeAlpha,
@@ -1050,54 +1024,5 @@ public sealed partial class PngOptimizer {
     return new ZLibStream(baseStream, level, true);
   }
 
-  /// <summary>Reads a bitmap into the platform-independent picture the colour library takes.</summary>
-  private static FileFormat.Core.RawImage _ToRawImage(Bitmap source) {
-    var width = source.Width;
-    var height = source.Height;
-    var pixels = new byte[width * height * 4];
-    var data = source.LockBits(
-      new Rectangle(0, 0, width, height), ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
 
-    try {
-      for (var y = 0; y < height; ++y)
-        System.Runtime.InteropServices.Marshal.Copy(
-          data.Scan0 + y * data.Stride, pixels, y * width * 4, width * 4);
-    } finally {
-      source.UnlockBits(data);
-    }
-
-    return new() {
-      Width = width,
-      Height = height,
-      Format = FileFormat.Core.PixelFormat.Bgra32,
-      PixelData = pixels,
-    };
-  }
-
-  /// <summary>Writes an indexed picture back out as the bitmap this caller still speaks in.</summary>
-  private static Bitmap _ToBitmap(FileFormat.Core.RawImage image) {
-    var bitmap = new Bitmap(image.Width, image.Height, System.Drawing.Imaging.PixelFormat.Format8bppIndexed);
-    var palette = bitmap.Palette;
-
-    for (var i = 0; i < palette.Entries.Length; ++i) {
-      var entry = i * 3;
-      palette.Entries[i] = entry + 2 < image.Palette.Length
-        ? Color.FromArgb(255, image.Palette[entry], image.Palette[entry + 1], image.Palette[entry + 2])
-        : Color.Black;
-    }
-
-    bitmap.Palette = palette;
-
-    var data = bitmap.LockBits(
-      new Rectangle(0, 0, image.Width, image.Height), ImageLockMode.WriteOnly, bitmap.PixelFormat);
-    try {
-      for (var y = 0; y < image.Height; ++y)
-        System.Runtime.InteropServices.Marshal.Copy(
-          image.PixelData, y * image.Width, data.Scan0 + y * data.Stride, image.Width);
-    } finally {
-      bitmap.UnlockBits(data);
-    }
-
-    return bitmap;
-  }
 }

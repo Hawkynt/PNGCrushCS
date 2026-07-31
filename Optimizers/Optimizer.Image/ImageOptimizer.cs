@@ -143,7 +143,7 @@ public sealed partial class ImageOptimizer {
         candidates.Add(new(ImageFormat.Png, ".png", async (ct, p) => {
           using var bmp = _LoadBitmap();
           var opts = _options.PngOptions ?? new();
-          var optimizer = new PngOptimizer(bmp, originalBytes, opts);
+          var optimizer = new PngOptimizer(BitmapConverter.BitmapToRawImage(bmp), originalBytes, opts);
           var result = await optimizer.OptimizeAsync(ct, p);
           return result.FileContents;
         }));
@@ -342,7 +342,7 @@ public sealed partial class ImageOptimizer {
     candidates.Add(new(ImageFormat.Png, ".png", async (ct, p) => {
       using var bmp = _LoadBitmap();
       var opts = _options.PngOptions ?? new();
-      var optimizer = new PngOptimizer(bmp, opts);
+      var optimizer = new PngOptimizer(BitmapConverter.BitmapToRawImage(bmp), opts);
       var result = await optimizer.OptimizeAsync(ct, p);
       return result.FileContents;
     }));

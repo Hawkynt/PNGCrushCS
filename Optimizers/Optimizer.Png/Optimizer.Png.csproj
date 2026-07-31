@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net10.0-windows</TargetFramework>
+        <TargetFramework>net10.0</TargetFramework>
 
         <Description>This package provides a PngOptimizer implementation.</Description>
         <PackageReadmeFile>ReadMe.md</PackageReadmeFile>
@@ -27,8 +27,6 @@
     <ItemGroup>
         <PackageReference Include="FrameworkExtensions.Backports" Version="1.0.0.256" />
         <PackageReference Include="FrameworkExtensions.Corlib" Version="1.0.2.459" />
-        <PackageReference Include="FrameworkExtensions.System.Drawing" Version="1.0.0.132" />
-        <PackageReference Include="System.Drawing.Common" Version="9.0.4" />
     </ItemGroup>
     <ItemGroup>
         <ProjectReference Include="..\..\Hawkynt.ColorProcessing.Adapter\Hawkynt.ColorProcessing.Adapter.csproj" />

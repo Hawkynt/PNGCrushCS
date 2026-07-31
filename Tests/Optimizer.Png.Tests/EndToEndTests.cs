@@ -73,7 +73,7 @@ public sealed class EndToEndTests {
       MaxParallelTasks = 1
     };
 
-    var optimizer = new PngOptimizer(bmp, options);
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), options);
     var result = await optimizer.OptimizeAsync();
 
     Assert.That(result.FileContents, Is.Not.Null);
@@ -94,7 +94,7 @@ public sealed class EndToEndTests {
       MaxParallelTasks = 1
     };
 
-    var optimizer = new PngOptimizer(bmp, options);
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), options);
     var result = await optimizer.OptimizeAsync();
 
     using var ms = new MemoryStream(result.FileContents);
@@ -123,7 +123,7 @@ public sealed class EndToEndTests {
       MaxParallelTasks = 1
     };
 
-    var optimizer = new PngOptimizer(bmp, options);
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), options);
     var result = await optimizer.OptimizeAsync();
 
     Assert.That(result.ColorMode, Is.EqualTo(PngColorType.RGB));
@@ -141,7 +141,7 @@ public sealed class EndToEndTests {
       MaxParallelTasks = 1
     };
 
-    var optimizer = new PngOptimizer(bmp, options);
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), options);
     var result = await optimizer.OptimizeAsync();
 
     Assert.That(result.ColorMode, Is.AnyOf(PngColorType.Palette, PngColorType.Grayscale));
@@ -159,7 +159,7 @@ public sealed class EndToEndTests {
       MaxParallelTasks = 1
     };
 
-    var optimizer = new PngOptimizer(bmp, options);
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), options);
     var result = await optimizer.OptimizeAsync();
 
     Assert.That(result.ColorMode, Is.EqualTo(PngColorType.Grayscale));
@@ -177,7 +177,7 @@ public sealed class EndToEndTests {
       MaxParallelTasks = 1
     };
 
-    var optimizer = new PngOptimizer(bmp, options);
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), options);
     var result = await optimizer.OptimizeAsync();
 
     using var ms = new MemoryStream(result.FileContents);
@@ -205,7 +205,7 @@ public sealed class EndToEndTests {
       MaxParallelTasks = 2
     };
 
-    var optimizer = new PngOptimizer(bmp, options);
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), options);
     var result = await optimizer.OptimizeAsync();
 
     Assert.That(result.FileContents.Length, Is.GreaterThan(0));
@@ -223,7 +223,7 @@ public sealed class EndToEndTests {
       MaxParallelTasks = 1
     };
 
-    var optimizer = new PngOptimizer(bmp, options);
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), options);
     var result = await optimizer.OptimizeAsync();
 
     VerifyPngSignature(result.FileContents);
@@ -259,7 +259,7 @@ public sealed class EndToEndTests {
       MaxParallelTasks = Environment.ProcessorCount
     };
 
-    var optimizer = new PngOptimizer(bmp, options);
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), options);
     var result = await optimizer.OptimizeAsync();
 
     Assert.That(result.FileContents.Length, Is.GreaterThan(0));
@@ -284,7 +284,7 @@ public sealed class EndToEndTests {
       MaxParallelTasks = 1
     };
 
-    var optimizer = new PngOptimizer(bmp, options);
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), options);
     var result = await optimizer.OptimizeAsync();
 
     VerifyPngSignature(result.FileContents);
@@ -301,7 +301,7 @@ public sealed class EndToEndTests {
       MaxParallelTasks = 1
     };
 
-    var optimizer = new PngOptimizer(bmp, options);
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), options);
     var result = await optimizer.OptimizeAsync();
 
     Assert.That(result.ColorMode, Is.AnyOf(PngColorType.RGB, PngColorType.RGBA));
@@ -317,7 +317,7 @@ public sealed class EndToEndTests {
       MaxParallelTasks = 1
     };
 
-    var optimizer = new PngOptimizer(bmp, options);
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), options);
     var result = await optimizer.OptimizeAsync();
 
     Assert.That(result.FileContents.Length, Is.GreaterThan(0));
@@ -335,7 +335,7 @@ public sealed class EndToEndTests {
       MaxParallelTasks = 1
     };
 
-    var optimizer = new PngOptimizer(bmp, options);
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), options);
     var result = await optimizer.OptimizeAsync();
 
     if (result.ColorMode == PngColorType.Palette) {
@@ -355,7 +355,7 @@ public sealed class EndToEndTests {
       MaxParallelTasks = 1
     };
 
-    var optimizer = new PngOptimizer(bmp, options);
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), options);
     var result = await optimizer.OptimizeAsync();
 
     if (result.ColorMode == PngColorType.Palette) {
@@ -381,7 +381,7 @@ public sealed class EndToEndTests {
         MaxParallelTasks = 1
       };
 
-      var optimizer = new PngOptimizer(bmp, options);
+      var optimizer = new PngOptimizer(bmp.ToRawImage(), options);
       var result = await optimizer.OptimizeAsync();
 
       if (result.ColorMode == PngColorType.Palette) {
@@ -405,7 +405,7 @@ public sealed class EndToEndTests {
       MaxParallelTasks = 1
     };
 
-    var optimizer = new PngOptimizer(bmp, options);
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), options);
     var result = await optimizer.OptimizeAsync();
 
     Assert.That(result.ColorMode, Is.EqualTo(PngColorType.Palette));
@@ -437,8 +437,8 @@ public sealed class EndToEndTests {
       MaxParallelTasks = 1
     };
 
-    var paletteResult = await new PngOptimizer(bmp, paletteOptions).OptimizeAsync();
-    var rgbaResult = await new PngOptimizer(bmp, rgbaOptions).OptimizeAsync();
+    var paletteResult = await new PngOptimizer(bmp.ToRawImage(), paletteOptions).OptimizeAsync();
+    var rgbaResult = await new PngOptimizer(bmp.ToRawImage(), rgbaOptions).OptimizeAsync();
 
     Assert.That(paletteResult.CompressedSize, Is.LessThan(rgbaResult.CompressedSize),
       "Palette+tRNS should be smaller than RGBA for few-color alpha image");
@@ -455,7 +455,7 @@ public sealed class EndToEndTests {
       MaxParallelTasks = 1
     };
 
-    var optimizer = new PngOptimizer(bmp, options);
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), options);
     var result = await optimizer.OptimizeAsync();
 
     var trnsLength = FindChunkDataLength(result.FileContents, "tRNS");
@@ -485,7 +485,7 @@ public sealed class EndToEndTests {
         MaxParallelTasks = 1
       };
 
-      var optimizer = new PngOptimizer(bmp, options);
+      var optimizer = new PngOptimizer(bmp.ToRawImage(), options);
       var result = await optimizer.OptimizeAsync();
 
       if (result.ColorMode == PngColorType.Palette) {
@@ -511,7 +511,7 @@ public sealed class EndToEndTests {
       MaxParallelTasks = 1
     };
 
-    var optimizer = new PngOptimizer(bmp, options);
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), options);
     var result = await optimizer.OptimizeAsync();
 
     using var ms = new MemoryStream(result.FileContents);
@@ -547,8 +547,8 @@ public sealed class EndToEndTests {
       MaxParallelTasks = 1
     };
 
-    var defaultResult = await new PngOptimizer(bmp, defaultOptions).OptimizeAsync();
-    var maxResult = await new PngOptimizer(bmp, maxOptions).OptimizeAsync();
+    var defaultResult = await new PngOptimizer(bmp.ToRawImage(), defaultOptions).OptimizeAsync();
+    var maxResult = await new PngOptimizer(bmp.ToRawImage(), maxOptions).OptimizeAsync();
 
     Assert.That(maxResult.CompressedSize, Is.LessThanOrEqualTo(defaultResult.CompressedSize));
   }
@@ -564,7 +564,7 @@ public sealed class EndToEndTests {
       MaxParallelTasks = 1
     };
 
-    var optimizer = new PngOptimizer(bmp, options);
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), options);
     var result = await optimizer.OptimizeAsync();
 
     Assert.That(result.FilterStrategy, Is.EqualTo(FilterStrategy.BruteForce));
@@ -595,8 +595,8 @@ public sealed class EndToEndTests {
       MaxParallelTasks = 1
     };
 
-    var singleResult = await new PngOptimizer(bmp, singleOptions).OptimizeAsync();
-    var bruteResult = await new PngOptimizer(bmp, bruteOptions).OptimizeAsync();
+    var singleResult = await new PngOptimizer(bmp.ToRawImage(), singleOptions).OptimizeAsync();
+    var bruteResult = await new PngOptimizer(bmp.ToRawImage(), bruteOptions).OptimizeAsync();
 
     Assert.That(bruteResult.CompressedSize, Is.LessThanOrEqualTo(singleResult.CompressedSize));
   }
@@ -620,8 +620,8 @@ public sealed class EndToEndTests {
       MaxParallelTasks = 1
     };
 
-    var defaultResult = await new PngOptimizer(bmp, defaultOptions).OptimizeAsync();
-    var maxResult = await new PngOptimizer(bmp, maxOptions).OptimizeAsync();
+    var defaultResult = await new PngOptimizer(bmp.ToRawImage(), defaultOptions).OptimizeAsync();
+    var maxResult = await new PngOptimizer(bmp.ToRawImage(), maxOptions).OptimizeAsync();
 
     Assert.That(maxResult.CompressedSize, Is.Not.EqualTo(defaultResult.CompressedSize));
   }
@@ -638,7 +638,7 @@ public sealed class EndToEndTests {
       EnableTwoPhaseOptimization = false
     };
 
-    var optimizer = new PngOptimizer(bmp, options);
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), options);
     var result = await optimizer.OptimizeAsync();
 
     VerifyPngSignature(result.FileContents);
@@ -671,7 +671,7 @@ public sealed class EndToEndTests {
       MaxParallelTasks = 1
     };
 
-    var optimizer = new PngOptimizer(bmp, options);
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), options);
     var result = await optimizer.OptimizeAsync();
 
     VerifyPngSignature(result.FileContents);
@@ -717,8 +717,8 @@ public sealed class EndToEndTests {
         MaxParallelTasks = 1
       };
 
-      var maxResult = await new PngOptimizer(bmp, maxOptions).OptimizeAsync();
-      var ultraResult = await new PngOptimizer(bmp, ultraOptions).OptimizeAsync();
+      var maxResult = await new PngOptimizer(bmp.ToRawImage(), maxOptions).OptimizeAsync();
+      var ultraResult = await new PngOptimizer(bmp.ToRawImage(), ultraOptions).OptimizeAsync();
 
       Assert.That(ultraResult.CompressedSize, Is.LessThanOrEqualTo(maxResult.CompressedSize),
         $"Ultra={ultraResult.CompressedSize} should be <= Maximum={maxResult.CompressedSize}");
@@ -745,8 +745,8 @@ public sealed class EndToEndTests {
       MaxParallelTasks = 1
     };
 
-    var ultraResult = await new PngOptimizer(bmp, ultraOptions).OptimizeAsync();
-    var hyperResult = await new PngOptimizer(bmp, hyperOptions).OptimizeAsync();
+    var ultraResult = await new PngOptimizer(bmp.ToRawImage(), ultraOptions).OptimizeAsync();
+    var hyperResult = await new PngOptimizer(bmp.ToRawImage(), hyperOptions).OptimizeAsync();
 
     Assert.That(hyperResult.CompressedSize, Is.LessThanOrEqualTo(ultraResult.CompressedSize),
       $"Hyper={hyperResult.CompressedSize} should be <= Ultra={ultraResult.CompressedSize}");
@@ -765,7 +765,7 @@ public sealed class EndToEndTests {
       MaxParallelTasks = 1
     };
 
-    var optimizer = new PngOptimizer(bmp, options);
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), options);
     var result = await optimizer.OptimizeAsync();
 
     VerifyPngSignature(result.FileContents);
@@ -820,7 +820,7 @@ public sealed class EndToEndTests {
       FilterStrategies: [FilterStrategy.SingleFilter],
       AutoSelectColorMode: true
     );
-    var optimizer = new PngOptimizer(bmp, options);
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), options);
     var result = optimizer.OptimizeAsync().AsTask().Result;
 
     Assert.That(result.FileContents.Length, Is.GreaterThan(0));
@@ -840,7 +840,7 @@ public sealed class EndToEndTests {
     for (var x = 0; x < 4; ++x)
       bmp.SetPixel(x, y, Color.FromArgb(128, 100, 150, 200)); // semi-transparent
 
-    var optimizer = new PngOptimizer(bmp);
+    var optimizer = new PngOptimizer(bmp.ToRawImage());
     var result = optimizer.OptimizeAsync().AsTask().Result;
     // Should not be RGB mode since we have semi-transparency
     Assert.That(result.ColorMode, Is.Not.EqualTo(PngColorType.RGB).Or.EqualTo(PngColorType.RGBA));
@@ -904,7 +904,7 @@ public sealed class EndToEndTests {
       PreserveAncillaryChunks: true
     );
 
-    var optimizer = new PngOptimizer(bmp, pngWithText, opts);
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), pngWithText, opts);
     var result = optimizer.OptimizeAsync().AsTask().Result;
 
     // Verify tEXt chunk is in the output
@@ -1021,7 +1021,7 @@ public sealed class EndToEndTests {
         DeflateMethods = [DeflateMethod.Default],
         MaxParallelTasks = 1
       };
-      var optimizer = new PngOptimizer(bmp, options);
+      var optimizer = new PngOptimizer(bmp.ToRawImage(), options);
       var result = await optimizer.OptimizeAsync();
 
       Assert.That(result.FileContents.Length, Is.GreaterThan(0));
@@ -1066,7 +1066,7 @@ public sealed class EndToEndTests {
         DeflateMethods = [DeflateMethod.Default],
         MaxParallelTasks = 1
       };
-      var optimizer = new PngOptimizer(bmp, options);
+      var optimizer = new PngOptimizer(bmp.ToRawImage(), options);
       var result = await optimizer.OptimizeAsync();
 
       // The result could be Grayscale or GrayscaleAlpha — both are valid
@@ -1091,7 +1091,7 @@ public sealed class EndToEndTests {
       DeflateMethods = [DeflateMethod.Fastest],
       MaxParallelTasks = 1
     };
-    var optimizer = new PngOptimizer(bmp, options);
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), options);
 
     var reports = new List<OptimizationProgress>();
     IProgress<OptimizationProgress> progressReporter = new SynchronousProgress<OptimizationProgress>(reports.Add);
@@ -1113,7 +1113,7 @@ public sealed class EndToEndTests {
       DeflateMethods = [DeflateMethod.Default, DeflateMethod.Maximum],
       MaxParallelTasks = 1
     };
-    var optimizer = new PngOptimizer(bmp, options);
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), options);
 
     using var cts = new CancellationTokenSource();
     cts.Cancel();

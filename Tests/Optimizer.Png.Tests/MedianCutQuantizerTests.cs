@@ -163,7 +163,7 @@ public sealed class MedianCutQuantizerTests {
       MaxParallelTasks = 1
     };
 
-    var optimizer = new PngOptimizer(bmp, options);
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), options);
     var result = await optimizer.OptimizeAsync();
 
     Assert.That(result.FileContents.Length, Is.GreaterThan(0));
@@ -188,7 +188,7 @@ public sealed class MedianCutQuantizerTests {
       MaxParallelTasks = 1
     };
 
-    var optimizer = new PngOptimizer(bmp, options);
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), options);
     var result = await optimizer.OptimizeAsync();
 
     Assert.That(result.ColorMode, Is.Not.EqualTo(PngColorType.Palette),
@@ -207,7 +207,7 @@ public sealed class MedianCutQuantizerTests {
       MaxParallelTasks = 1
     };
 
-    var optimizer = new PngOptimizer(bmp, options);
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), options);
     var result = await optimizer.OptimizeAsync();
 
     // If palette was chosen, verify quantization error is bounded

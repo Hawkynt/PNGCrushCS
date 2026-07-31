@@ -69,7 +69,7 @@ public sealed class RegressionTests {
         MaxParallelTasks = 1
       };
 
-      var optimizer = new PngOptimizer(bmp, options);
+      var optimizer = new PngOptimizer(bmp.ToRawImage(), options);
       var result = await optimizer.OptimizeAsync();
 
       Assert.That(result.FileContents.Length, Is.GreaterThan(0));
@@ -99,7 +99,7 @@ public sealed class RegressionTests {
         MaxParallelTasks = 1
       };
 
-      var optimizer = new PngOptimizer(bmp, options);
+      var optimizer = new PngOptimizer(bmp.ToRawImage(), options);
       var result = await optimizer.OptimizeAsync();
 
       using var ms = new MemoryStream(result.FileContents);

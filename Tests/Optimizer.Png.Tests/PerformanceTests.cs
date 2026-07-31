@@ -31,7 +31,7 @@ public sealed class PerformanceTests {
       MaxParallelTasks = Environment.ProcessorCount
     };
 
-    var optimizer = new PngOptimizer(bmp, options);
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), options);
     var result = await optimizer.OptimizeAsync();
 
     Assert.That(result.CompressedSize, Is.GreaterThan(0));

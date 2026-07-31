@@ -83,7 +83,7 @@ public sealed class Adam7Tests {
       MaxParallelTasks = 1
     };
 
-    var optimizer = new PngOptimizer(bmp, options);
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), options);
     var result = await optimizer.OptimizeAsync();
 
     // Force the interlaced result
@@ -97,7 +97,7 @@ public sealed class Adam7Tests {
         DeflateMethods = [DeflateMethod.Default],
         MaxParallelTasks = 1
       };
-      optimizer = new PngOptimizer(bmp, opts2);
+      optimizer = new PngOptimizer(bmp.ToRawImage(), opts2);
       result = await optimizer.OptimizeAsync();
     }
 
@@ -131,7 +131,7 @@ public sealed class Adam7Tests {
       MaxParallelTasks = 1
     };
 
-    var optimizer = new PngOptimizer(bmp, options);
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), options);
     var result = await optimizer.OptimizeAsync();
 
     VerifyPngSignature(result.FileContents);
@@ -154,7 +154,7 @@ public sealed class Adam7Tests {
       MaxParallelTasks = 1
     };
 
-    var optimizer = new PngOptimizer(bmp, options);
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), options);
     var result = await optimizer.OptimizeAsync();
 
     VerifyPngSignature(result.FileContents);
@@ -179,7 +179,7 @@ public sealed class Adam7Tests {
       MaxParallelTasks = 1
     };
 
-    var optimizer = new PngOptimizer(bmp, options);
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), options);
     var result = await optimizer.OptimizeAsync();
 
     VerifyPngSignature(result.FileContents);

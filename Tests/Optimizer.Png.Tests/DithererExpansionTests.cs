@@ -96,7 +96,7 @@ public sealed class DithererExpansionTests {
   [CancelAfter(30000)]
   public void Optimize_WuNoDithering_ProducesValidOutput() {
     using var bmp = _CreateColorfulBitmap();
-    var optimizer = new PngOptimizer(bmp, new PngOptimizationOptions(
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), new PngOptimizationOptions(
       true,
       false,
       false,
@@ -118,7 +118,7 @@ public sealed class DithererExpansionTests {
   [CancelAfter(30000)]
   public void Optimize_OctreeFloydSteinberg_ProducesValidOutput() {
     using var bmp = _CreateColorfulBitmap();
-    var optimizer = new PngOptimizer(bmp, new PngOptimizationOptions(
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), new PngOptimizationOptions(
       true,
       false,
       false,
@@ -140,7 +140,7 @@ public sealed class DithererExpansionTests {
   [CancelAfter(30000)]
   public void Optimize_MedianCutAtkinson_ProducesValidOutput() {
     using var bmp = _CreateGradientBitmap();
-    var optimizer = new PngOptimizer(bmp, new PngOptimizationOptions(
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), new PngOptimizationOptions(
       true,
       false,
       false,
@@ -161,7 +161,7 @@ public sealed class DithererExpansionTests {
   [CancelAfter(30000)]
   public void Optimize_Bayer4x4_ProducesValidOutput() {
     using var bmp = _CreateGradientBitmap();
-    var optimizer = new PngOptimizer(bmp, new PngOptimizationOptions(
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), new PngOptimizationOptions(
       true,
       false,
       false,
@@ -182,7 +182,7 @@ public sealed class DithererExpansionTests {
   [CancelAfter(30000)]
   public void Optimize_NeuquantQuantizer_ProducesValidOutput() {
     using var bmp = _CreateColorfulBitmap(32, 32);
-    var optimizer = new PngOptimizer(bmp, new PngOptimizationOptions(
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), new PngOptimizationOptions(
       true,
       false,
       false,
@@ -203,7 +203,7 @@ public sealed class DithererExpansionTests {
   [CancelAfter(30000)]
   public void Optimize_PngQuantQuantizer_ProducesValidOutput() {
     using var bmp = _CreateColorfulBitmap(32, 32);
-    var optimizer = new PngOptimizer(bmp, new PngOptimizationOptions(
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), new PngOptimizationOptions(
       true,
       false,
       false,
@@ -224,7 +224,7 @@ public sealed class DithererExpansionTests {
   [CancelAfter(30000)]
   public void Optimize_MultipleCombos_ProducesValidOutput() {
     using var bmp = _CreateGradientBitmap();
-    var optimizer = new PngOptimizer(bmp, new PngOptimizationOptions(
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), new PngOptimizationOptions(
       true,
       false,
       false,
@@ -246,7 +246,7 @@ public sealed class DithererExpansionTests {
   [CancelAfter(30000)]
   public void Optimize_HighQuality_ProducesValidOutput() {
     using var bmp = _CreateGradientBitmap();
-    var optimizer = new PngOptimizer(bmp, new PngOptimizationOptions(
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), new PngOptimizationOptions(
       true,
       false,
       false,
@@ -268,7 +268,7 @@ public sealed class DithererExpansionTests {
   [CancelAfter(30000)]
   public void Optimize_DitheringResult_IsReadablePng() {
     using var bmp = _CreateColorfulBitmap(32, 32);
-    var optimizer = new PngOptimizer(bmp, new PngOptimizationOptions(
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), new PngOptimizationOptions(
       true,
       false,
       false,
@@ -323,7 +323,7 @@ public sealed class DithererExpansionTests {
   [TestCase("PngQuant")]
   public void UnknownDitherer_ThrowsArgumentException(string quantizer) {
     using var bmp = _CreateColorfulBitmap(32, 32);
-    var optimizer = new PngOptimizer(bmp, new PngOptimizationOptions(
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), new PngOptimizationOptions(
       true,
       false,
       false,
@@ -342,7 +342,7 @@ public sealed class DithererExpansionTests {
   [Category("Unit")]
   public void UnknownQuantizer_ThrowsArgumentException() {
     using var bmp = _CreateColorfulBitmap(32, 32);
-    var optimizer = new PngOptimizer(bmp, new PngOptimizationOptions(
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), new PngOptimizationOptions(
       true,
       false,
       false,
@@ -362,7 +362,7 @@ public sealed class DithererExpansionTests {
   [CancelAfter(30000)]
   public void Optimize_SierraErrorDiffusion_ProducesValidOutput() {
     using var bmp = _CreateGradientBitmap();
-    var optimizer = new PngOptimizer(bmp, new PngOptimizationOptions(
+    var optimizer = new PngOptimizer(bmp.ToRawImage(), new PngOptimizationOptions(
       true,
       false,
       false,
