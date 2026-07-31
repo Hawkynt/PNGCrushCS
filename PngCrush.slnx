@@ -10,6 +10,7 @@
     <Project Path="Crush.TestUtilities/Crush.TestUtilities.csproj" />
     <Project Path="FileFormat.Core.Generators/FileFormat.Core.Generators.csproj" />
     <Project Path="FileFormat.Core/FileFormat.Core.csproj" />
+    <Project Path="Hawkynt.ColorProcessing.Adapter/Hawkynt.ColorProcessing.Adapter.csproj" />
     <Project Path="FileFormat.TextMode/FileFormat.TextMode.csproj" />
     <Project Path="FileFormat.Registry.Generator/FileFormat.Registry.Generator.csproj" />
   </Folder>
@@ -41,6 +42,7 @@
   <Folder Name="/Tests/">
     <Project Path="Tests/Compression.Tests/Compression.Tests.csproj" />
     <Project Path="Tests/Conformance.Recoil.Tests/Conformance.Recoil.Tests.csproj" />
+    <Project Path="Tests/Hawkynt.ColorProcessing.Adapter.Tests/Hawkynt.ColorProcessing.Adapter.Tests.csproj" />
     <Project Path="Tests/Hawkynt.FileFormats.Images.Tests/Hawkynt.FileFormats.Images.Tests.csproj" />
     <Project Path="Tests/EndToEnd.Tests/EndToEnd.Tests.csproj" />
     <Project Path="Tests/Optimizer.Ani.Tests/Optimizer.Ani.Tests.csproj" />

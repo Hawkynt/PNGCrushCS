@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="NUnit" Version="4.2.2" />
+    <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Hawkynt.ColorProcessing.Adapter\Hawkynt.ColorProcessing.Adapter.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Core\FileFormat.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="NUnit.Framework" />
+  </ItemGroup>
+
+  <!-- A Reference is not transitive the way a PackageReference is, so the test has to name the
+       colour library too in order to name a ditherer at compile time. -->
+  <ItemGroup>
+    <Reference Include="System.Drawing.Extensions">
+      <HintPath>$(NuGetPackageRoot)frameworkextensions.system.drawing/1.0.0.132/lib/netcoreapp3.1/System.Drawing.Extensions.dll</HintPath>
+    </Reference>
+
+    <!-- The netcoreapp3.1 asset of Backports, not the net8.0 one. The colour library was compiled
+         against the older target, where the polyfills its inner loops call are real types; on a
+         modern runtime those APIs exist in the framework, so that build of Backports drops them and
+         the calls fail to bind at run time. Pinning the asset keeps the two in step. -->
+    <Reference Include="Backports">
+      <HintPath>$(NuGetPackageRoot)frameworkextensions.backports/1.0.0.256/lib/netcoreapp3.1/Backports.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+</Project>
