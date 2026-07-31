@@ -40,6 +40,15 @@ public sealed class LosslessWriterTests {
     /// <summary>At most sixteen distinct colours, on a grid of four bits a channel.</summary>
     SixteenColors,
 
+    /// <summary>A picture made of the ZX81's own character shapes.</summary>
+    Zx81Glyphs,
+
+    /// <summary>A picture made of the shapes the Semi-Graphic logos editor draws with.</summary>
+    AtariGlyphs,
+
+    /// <summary>A picture made of the machine's own character shapes, unpatched.</summary>
+    AtariRomGlyphs,
+
     /// <summary>Anything.</summary>
     Full,
   }
@@ -54,6 +63,9 @@ public sealed class LosslessWriterTests {
     new("True-colour GEM image, one row", ImageFormat.TrueColorImg, Palette.Full, 300, 1),
     new("Kitty", ImageFormat.Kitty, Palette.OneBitChannels, 640, 400),
     new("Art Master 88", ImageFormat.ArtMaster88, Palette.OneBitChannels, 640, 400, PairedRows: true),
+    new("ZXpaintyONE", ImageFormat.ZxPaintyOne, Palette.Zx81Glyphs, 256, 192),
+    new("Semi-Graphic logos", ImageFormat.SemiGraphicLogo, Palette.AtariGlyphs, 320, 192),
+    new("Dir Logo Maker", ImageFormat.DirLogoMaker, Palette.AtariRomGlyphs, 88, 128),
   ];
 
   private static IEnumerable<TestCaseData> Cases() {
@@ -141,6 +153,31 @@ public sealed class LosslessWriterTests {
           rgb[at] = (byte)((index * 3 % 16) * 17);
           rgb[at + 1] = (byte)((index * 5 % 16) * 17);
           rgb[at + 2] = (byte)((index * 7 % 16) * 17);
+          break;
+        }
+
+        // A picture the format can hold by construction: it is what its own shapes draw. Anything
+        // else would be testing how good the match is, which is a judgement, not a fact.
+        case Palette.Zx81Glyphs or Palette.AtariGlyphs or Palette.AtariRomGlyphs: {
+          var glyphs = palette == Palette.Zx81Glyphs ? 64 : 128;
+          ReadOnlySpan<byte> font = palette switch {
+            Palette.Zx81Glyphs => FileFormat.Core.CharacterRoms.Zx81,
+            Palette.AtariGlyphs => FileFormat.SemiGraphicLogo.SemiGraphicLogoFile.CreateFont(),
+            _ => FileFormat.Core.CharacterRoms.Atari8,
+          };
+
+          var code = ((x / 8) * 7 + (row / 8) * 13) % (glyphs * 2);
+          var inverse = code >= glyphs ? 255 : 0;
+          var bits = font[((code % glyphs) << 3) + (row & 7)] ^ inverse;
+          var lit = (bits >> (7 - x % 8)) & 1;
+
+          // The two machines disagree about what a set bit shows and about what their own white
+          // is: the ZX81's is white, and the Atari's brightest grey is a little short of it.
+          var (ink, paper) = palette == Palette.Zx81Glyphs
+            ? ((byte)0, (byte)255)
+            : (FileFormat.Core.Atari8BitGraphics.ApplyPalette([14])[0], (byte)0);
+
+          rgb[at] = rgb[at + 1] = rgb[at + 2] = lit != 0 ? ink : paper;
           break;
         }
 

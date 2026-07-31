@@ -81,4 +81,73 @@ public static class CharacterRoms {
       }
     }
   }
+
+  /// <summary>
+  /// Chooses, for every character cell of a picture, the glyph that comes closest to it.
+  /// </summary>
+  /// <param name="wanted">
+  /// One byte a pixel, non-zero where the glyph's bit should be set. Which of the two values is ink
+  /// depends on the machine, so the caller resolves that before asking.
+  /// </param>
+  /// <param name="glyphs">How many shapes the set holds before the inverting bit is counted.</param>
+  /// <remarks>
+  /// A screen of character codes cannot show an arbitrary picture: every cell has to be one of the
+  /// shapes somebody drew, so encoding is a search rather than a conversion. The search is
+  /// exhaustive because it can afford to be — a few hundred shapes against a few hundred cells is
+  /// nothing — and exact where the picture was made of those shapes in the first place, which is
+  /// the case that matters, since these formats were only ever written by programs that drew with
+  /// them.
+  /// <para/>
+  /// The high bit of a code inverts a shape rather than selecting another, so every glyph is tried
+  /// both ways and the set is effectively twice its stated size.
+  /// </remarks>
+  public static byte[] MatchGlyphs(
+    ReadOnlySpan<byte> wanted, int columns, int rows, ReadOnlySpan<byte> font, int glyphs) {
+    var width = columns * 8;
+    var codes = new byte[columns * rows];
+
+    for (var row = 0; row < rows; ++row)
+    for (var column = 0; column < columns; ++column) {
+      // The cell as eight bytes, so a glyph can be compared to it a row at a time.
+      var cell = new byte[8];
+      for (var y = 0; y < 8; ++y) {
+        var value = 0;
+        for (var x = 0; x < 8; ++x) {
+          var at = (row * 8 + y) * width + column * 8 + x;
+          if (at < wanted.Length && wanted[at] != 0)
+            value |= 1 << (7 - x);
+        }
+
+        cell[y] = (byte)value;
+      }
+
+      var best = 0;
+      var bestCost = int.MaxValue;
+
+      for (var glyph = 0; glyph < glyphs; ++glyph)
+      for (var inverse = 0; inverse < 2; ++inverse) {
+        var cost = 0;
+        for (var y = 0; y < 8; ++y) {
+          var at = (glyph << 3) + y;
+          var bits = at < font.Length ? font[at] : 0;
+          if (inverse != 0)
+            bits ^= 255;
+
+          cost += System.Numerics.BitOperations.PopCount((uint)(byte)(bits ^ cell[y]));
+        }
+
+        if (cost >= bestCost)
+          continue;
+
+        bestCost = cost;
+        best = glyph | (inverse << 7);
+        if (cost == 0)
+          break;
+      }
+
+      codes[row * columns + column] = (byte)best;
+    }
+
+    return codes;
+  }
 }

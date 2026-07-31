@@ -201,9 +201,9 @@ build one from pixel data they didn't read, so the registry reports them as read
 | I Paint                 | .ip                                                  | C128 80-column, colour optional  | Y      | —      | —         | R     | —   | —      | —         |
 | Mapletown Network NL3   | .nl3                                                 | Printable characters only        | Y      | —      | —         | R     | —   | —      | —         |
 | Printfox                | .gb                                                  | Cell by cell, black on white     | Y      | Y      | —         | R     | —   | —      | —         |
-| Semi-Graphic logos      | .sge                                                 | Text screen, four patched glyphs | Y      | —      | —         | R     | —   | —      | —         |
-| Dir Logo Maker          | .dlm                                                 | A logo in a directory listing    | Y      | —      | —         | R     | —   | —      | —         |
-| ZXpaintyONE             | .zp1                                                 | ZX81 screen as hexadecimal text  | Y      | —      | —         | R     | —   | —      | —         |
+| Semi-Graphic logos      | .sge                                                 | Text screen, four patched glyphs | Y      | Y      | —         | R     | —   | —      | —         |
+| Dir Logo Maker          | .dlm                                                 | A logo in a directory listing    | Y      | Y      | —         | R     | —   | —      | —         |
+| ZXpaintyONE             | .zp1                                                 | ZX81 screen as hexadecimal text  | Y      | Y      | —         | R     | —   | —      | —         |
 | Sinclair BASIC          | .p                                                   | A program that draws a picture   | Y      | —      | —         | R     | —   | —      | —         |
 | Canvas raster           | .ful                                                 | Palette per band, runs plus rest | Y      | —      | —         | R     | —   | —      | —         |
 | PhotoChrome compressed  | .pcs                                                 | Palette reloaded mid-scanline    | Y      | —      | —         | R     | —   | —      | —         |
