@@ -278,6 +278,11 @@ public sealed class RecoilDecodeAgreementTests {
     new("UIMG true colour, four bytes", ImageFormat.Uimg, ".c04", () => _Uimg(0, 32, 4)),
     new("PL4", ImageFormat.Pl4Picture, ".pl4", () => _Pl4(false)),
     new("PL4, stored blocks", ImageFormat.Pl4Picture, ".pl4", () => _Pl4(true)),
+    new("Blazing Paddles shapes", ImageFormat.ShapeTableFileType, ".shp", _Vectors),
+    new("Movie Maker shapes", ImageFormat.ShapeTableFileType, ".shp", () => _Monochrome(4384)),
+    new("Loadstar", ImageFormat.ShapeTableFileType, ".shp", () => _Monochrome(10018)),
+    new("Shape table, packed hires", ImageFormat.ShapeTableFileType, ".shp", () => _PackedShapes(128)),
+    new("Shape table, packed multicolour", ImageFormat.ShapeTableFileType, ".shp", () => _PackedShapes(0)),
   ];
 
   [Test]
@@ -2908,6 +2913,84 @@ public sealed class RecoilDecodeAgreementTests {
     }
 
     body.AddRange([0, 0, 0, 0]);
+
+    return body.ToArray();
+  }
+
+  /// <summary>
+  /// A Blazing Paddles shape table: 128 addresses and then the drawing instructions they point at,
+  /// each shape a run of moves closed by a stop.
+  /// </summary>
+  private static byte[] _Vectors() {
+    var data = new byte[1024];
+    var shapes = 24;
+    var at = 256;
+
+    for (var i = 0; i < shapes; ++i) {
+      var address = 31744 + at;
+      data[i * 2] = (byte)address;
+      data[i * 2 + 1] = (byte)(address >> 8);
+
+      // A small closed figure, drawn with the pen down and then lifted for the last leg.
+      foreach (var control in (byte[])[0x30, 0x33, 0x21, 0x26, 0x10]) {
+        data[at++] = control;
+      }
+
+      data[at++] = 8;
+    }
+
+    // Every remaining address points at the stop that follows the last shape.
+    var end = 31744 + at - 1;
+    for (var i = shapes; i < 128; ++i) {
+      data[i * 2] = (byte)end;
+      data[i * 2 + 1] = (byte)(end >> 8);
+    }
+
+    return data;
+  }
+
+  /// <summary>
+  /// A packed shape table. The third byte says which program wrote it and where its escape byte
+  /// and stream begin, so it is the whole of the identification.
+  /// </summary>
+  private static byte[] _PackedShapes(int kind) {
+    const byte escape = 0xB7;
+    var body = new System.Collections.Generic.List<byte> { 0, 0, (byte)kind };
+    var fill = 0;
+
+    if (kind == 0) {
+      body.Add(escape);
+      body.Add(0);
+    } else
+      body.Add(escape);
+
+    void Stream(int length, byte streamEscape) {
+      for (var written = 0; written < length;) {
+        var left = length - written;
+
+        if (streamEscape != 0 && left >= 200) {
+          body.AddRange([streamEscape, 200, (byte)(fill++ * 37)]);
+          written += 200;
+          continue;
+        }
+
+        var value = (byte)(fill++ * 29 + written);
+        if (value == streamEscape)
+          body.AddRange([streamEscape, 1, value]);
+        else
+          body.Add(value);
+
+        ++written;
+      }
+    }
+
+    // The bitmap, then the colour map under an escape of zero, then — for the multicolour form —
+    // the video matrix under an escape of 255. Each section's length is fixed by the mode.
+    Stream(8000, escape);
+    Stream(1000, 0);
+
+    if (kind == 0)
+      Stream(1000, 255);
 
     return body.ToArray();
   }
