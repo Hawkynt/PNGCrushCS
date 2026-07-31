@@ -170,7 +170,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | Perfect Pix             | .pph (+ .odd, .eve)                                  | Two fields in two files          | Y      | —      | —         | R     | —   | —      | —         |
 | Picasso                 | .pic0 (+ .pic1)                                      | VIC-20, bitmap and colours apart | Y      | —      | —         | R     | —   | —      | —         |
 | Commodore Grafix        | .cgx                                                 | C64 frames in a RIFF container   | Y      | —      | —         | R     | —   | —      | —         |
-| 3201                    | .3201                                                | IIGS, a palette per scanline     | Y      | —      | —         | R     | —   | —      | —         |
+| 3201                    | .3201                                                | IIGS, a palette per scanline     | Y      | Y      | —         | R     | —   | —      | —         |
 | Anime 4ever             | .a4r                                                 | Graphics 9, packed to an address | Y      | —      | —         | R     | —   | —      | —         |
 | Boogie Down Paint       | .bdp                                                 | Packed Koala, three encodings    | Y      | —      | —         | R     | —   | —      | —         |
 | Hard Color Map          | .hcm                                                 | Sprites repositioned mid-scanline | Y     | —      | —         | R     | —   | —      | —         |

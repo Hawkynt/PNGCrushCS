@@ -13,7 +13,8 @@ namespace FileFormat.Apple3201;
 /// palette is stored in reverse order, which is how the hardware's registers are addressed.
 /// </remarks>
 public readonly record struct Apple3201File
-  : IImageFormatReader<Apple3201File>, IImageToRawImage<Apple3201File> {
+  : IImageFormatReader<Apple3201File>, IImageToRawImage<Apple3201File>,
+    IImageFromRawImage<Apple3201File>, IImageFormatWriter<Apple3201File> {
 
   /// <summary>Pixels across.</summary>
   public const int Width = 320;
@@ -43,6 +44,7 @@ public readonly record struct Apple3201File
   static string[] IImageFormatMetadata<Apple3201File>.FileExtensions => [".3201"];
   static Apple3201File IImageFormatReader<Apple3201File>.FromSpan(ReadOnlySpan<byte> data)
     => Apple3201Reader.FromSpan(data);
+  static byte[] IImageFormatWriter<Apple3201File>.ToBytes(Apple3201File file) => Apple3201Writer.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<Apple3201File>.VideoModes => [
     new("3200 colours", [(Width, Height)], [3200])
   ];
@@ -93,5 +95,77 @@ public readonly record struct Apple3201File
       palette[c * 3 + 1] = ChannelScaling.Expand4(gb >> 4);
       palette[c * 3 + 2] = ChannelScaling.Expand4(gb & 15);
     }
+  }
+
+  /// <summary>Builds a picture, choosing a fresh sixteen colours for every scanline.</summary>
+  /// <remarks>
+  /// The same picture the unpacked form holds, so the same choice is made: sixteen colours a line,
+  /// picked from that line, which is exact for a line with no more once its colours are on the
+  /// four-bit grid the palette stores.
+  /// </remarks>
+  public static Apple3201File FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width < 1 || image.Height < 1)
+      throw new ArgumentException("A picture needs at least one pixel.", nameof(image));
+
+    var rgb = PixelConverter.Convert(image, PixelFormat.Rgb24);
+    var data = new byte[PalettesOffset + Height * PaletteSize];
+    var bitmap = new byte[Stride * Height];
+    var line = new byte[Width * 3];
+
+    Signature.CopyTo(data);
+
+    for (var y = 0; y < Height; ++y) {
+      var sourceY = image.Height == Height ? y : y * image.Height / Height;
+
+      for (var x = 0; x < Width; ++x) {
+        var sourceX = image.Width == Width ? x : x * image.Width / Width;
+        var source = (sourceY * image.Width + sourceX) * 3;
+
+        for (var channel = 0; channel < 3; ++channel)
+          line[x * 3 + channel] = (byte)((rgb.PixelData[source + channel] + 8) / 17 * 17);
+      }
+
+      var palette = _ChooseLinePalette(line);
+      var indices = PaletteQuantizer.Quantize(line, Width, 1, palette, ColorCount);
+
+      for (var x = 0; x < Width; x += 2)
+        bitmap[y * Stride + (x >> 1)] = (byte)((indices[x] << 4) | indices[x + 1]);
+
+      // The entries go in last first, the hardware's registers being addressed downwards.
+      var at = PalettesOffset + y * PaletteSize;
+      for (var i = 0; i < ColorCount; ++i) {
+        var entry = at + ((i ^ (ColorCount - 1)) << 1);
+        data[entry] = (byte)(((palette[i * 3 + 1] / 17) << 4) | (palette[i * 3 + 2] / 17));
+        data[entry + 1] = (byte)(palette[i * 3] / 17);
+      }
+    }
+
+    return new() { Data = data, Bitmap = bitmap };
+  }
+
+  /// <summary>Picks the sixteen commonest colours of one line.</summary>
+  private static byte[] _ChooseLinePalette(ReadOnlySpan<byte> line) {
+    var counts = new System.Collections.Generic.Dictionary<int, int>();
+    for (var i = 0; i + 2 < line.Length; i += 3) {
+      var key = (line[i] << 16) | (line[i + 1] << 8) | line[i + 2];
+      counts[key] = counts.TryGetValue(key, out var seen) ? seen + 1 : 1;
+    }
+
+    var chosen = new System.Collections.Generic.List<int>(counts.Keys);
+    chosen.Sort((a, b) => {
+      var byCount = counts[b].CompareTo(counts[a]);
+
+      return byCount != 0 ? byCount : a.CompareTo(b);
+    });
+
+    var palette = new byte[ColorCount * 3];
+    for (var i = 0; i < ColorCount && i < chosen.Count; ++i) {
+      palette[i * 3] = (byte)(chosen[i] >> 16);
+      palette[i * 3 + 1] = (byte)(chosen[i] >> 8);
+      palette[i * 3 + 2] = (byte)chosen[i];
+    }
+
+    return palette;
   }
 }
