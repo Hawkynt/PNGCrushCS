@@ -247,6 +247,8 @@ public sealed class RecoilDecodeAgreementTests {
     new("UIFLI-editor", ImageFormat.UifliEditor, ".uif", _Uifli),
     new("SHF-XL Edit", ImageFormat.ShfXlEdit, ".shx", () => _Monochrome(15362)),
     new("SHF-XL Edit, packed", ImageFormat.ShfXlEdit, ".shx", _PackedShx),
+    new("Commodore Grafix", ImageFormat.CommodoreGrafix, ".cgx", () => _Grafix(3, 2, 4, 3)),
+    new("Commodore Grafix, one frame", ImageFormat.CommodoreGrafix, ".cgx", () => _Grafix(1, 1, 8, 8)),
   ];
 
   [Test]
@@ -2346,6 +2348,50 @@ public sealed class RecoilDecodeAgreementTests {
 
     var data = new byte[2 + backwards.Count];
     backwards.CopyTo(data, 2);
+
+    return data;
+  }
+
+  /// <summary>
+  /// A Commodore Grafix file: a RIFF wrapper with a format chunk, a metadata chunk a decoder must
+  /// step over, and the frames.
+  /// </summary>
+  private static byte[] _Grafix(int matrixColumns, int matrixRows, int frameColumns, int frameRows) {
+    var characters = frameColumns * frameRows;
+    var frameLength = characters * 10 + 2;
+    var frames = matrixColumns * matrixRows;
+
+    var body = new System.Collections.Generic.List<byte>(System.Text.Encoding.ASCII.GetBytes("CGFX"));
+
+    var format = new byte[12];
+    format[0] = (byte)matrixRows;
+    format[1] = (byte)matrixColumns;
+    format[4] = (byte)frames;
+    format[8] = (byte)frameRows;
+    format[9] = (byte)frameColumns;
+    format[10] = 4;
+    format[11] = 0;
+
+    void Chunk(string kind, byte[] payload) {
+      body.AddRange(System.Text.Encoding.ASCII.GetBytes(kind));
+      body.AddRange([
+        (byte)payload.Length, (byte)(payload.Length >> 8), (byte)(payload.Length >> 16), (byte)(payload.Length >> 24),
+      ]);
+      body.AddRange(payload);
+    }
+
+    Chunk("FRMT", format);
+    Chunk("META", _Monochrome(17));
+    Chunk("DATA", _Monochrome(frames * frameLength));
+
+    var data = new byte[8 + body.Count];
+    System.Text.Encoding.ASCII.GetBytes("RIFF").CopyTo(data, 0);
+    var length = body.Count;
+    data[4] = (byte)length;
+    data[5] = (byte)(length >> 8);
+    data[6] = (byte)(length >> 16);
+    data[7] = (byte)(length >> 24);
+    body.CopyTo(data, 8);
 
     return data;
   }
