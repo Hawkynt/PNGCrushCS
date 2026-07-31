@@ -213,6 +213,9 @@ public sealed class RecoilDecodeAgreementTests {
     new("PaintShop, stored", ImageFormat.PaintShopCompressed, ".psc", () => _PaintShop(true)),
     new("Kompresor do Animatora", ImageFormat.AnimatorCompressor, ".kpr", () => _Animator(4, 5, 3, 24)),
     new("Kompresor do Animatora, one frame", ImageFormat.AnimatorCompressor, ".kpr", () => _Animator(1, 8, 8, 40)),
+    new("Trzmiel, stored", ImageFormat.TrzmielCompressed, ".cpr", () => _Trzmiel(0)),
+    new("Trzmiel, packed by column", ImageFormat.TrzmielCompressed, ".cpr", () => _Trzmiel(1)),
+    new("Trzmiel, packed linearly", ImageFormat.TrzmielCompressed, ".cpr", () => _Trzmiel(2)),
   ];
 
   [Test]
@@ -1423,6 +1426,55 @@ public sealed class RecoilDecodeAgreementTests {
       data[11 + i] = (byte)(i % tileCount);
 
     return data;
+  }
+
+  /// <summary>
+  /// A Trzmiel picture in one of its three forms. The packed ones use every kind of command the
+  /// encoding has: repeated runs, literal runs, and the escape that takes a two-byte count.
+  /// </summary>
+  private static byte[] _Trzmiel(int type) {
+    if (type == 0) {
+      var stored = _Monochrome(1 + 7680);
+      stored[0] = 0;
+
+      return stored;
+    }
+
+    var body = new System.Collections.Generic.List<byte> { (byte)type };
+    var fill = 0;
+
+    for (var written = 0; written < 7680;) {
+      var left = 7680 - written;
+
+      // A long repeated run, through the two-byte escape.
+      if (left >= 400) {
+        body.AddRange([0, 1, 0x90, (byte)(fill++ * 37)]);
+        written += 400;
+        continue;
+      }
+
+      // A short repeated run.
+      if (left >= 9) {
+        body.AddRange([5, (byte)(fill++ * 53)]);
+        written += 5;
+
+        // A run of literals.
+        body.Add(128 + 4);
+        for (var i = 0; i < 4; ++i)
+          body.Add((byte)(fill++ * 29 + i));
+
+        written += 4;
+        continue;
+      }
+
+      body.Add((byte)(128 + left));
+      for (var i = 0; i < left; ++i)
+        body.Add((byte)(fill++ * 11 + i));
+
+      written += left;
+    }
+
+    return body.ToArray();
   }
 
   private static byte[] _Prefixed(int length) {
