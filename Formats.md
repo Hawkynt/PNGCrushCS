@@ -185,6 +185,9 @@ build one from pixel data they didn't read, so the registry reports them as read
 | CHR$                    | .ch$                                                 | Spectrum font with its colours   | Y      | —      | —         | R     | —   | —      | —         |
 | Big font                | .chx                                                 | Characters of any size in cells  | Y      | —      | —         | R     | —   | —      | —         |
 | Border Screen by Trefi  | .bsp                                                 | Screen and border, one or two    | Y      | —      | —         | R     | —   | —      | —         |
+| Falcon Fuckpaint        | .pi4, .pi7, .pi9                                     | Falcon palette and eight planes  | Y      | —      | —         | R     | —   | —      | —         |
+| DEGAS Elite icon        | .icn                                                 | An icon exported as C source     | Y      | —      | —         | R     | —   | —      | —         |
+| ColorSTar object        | .obj                                                 | Clipping, mono or sixteen colours | Y     | —      | —         | R     | —   | —      | —         |
 | Atari Player/Missile    | .pmg, .plm                                           | Atari 8-bit Player/Missile GFX   | Y      | Y      | —         | —     | —   | —      | —         |
 | AtariTools-800 sprites  | .4pl, .4mi, .4pm                                     | Atari 8-bit player/missile dumps | Y      | Y      | —         | R     | —   | —      | —         |
 | AtariTools-800 charset  | .acs                                                 | Atari 8-bit ANTIC 4 character set | Y      | Y      | —         | R     | —   | —      | —         |
@@ -797,17 +800,23 @@ Two different questions, two different answers:
 
 | Metric                                                    | Us    | RECOIL |
 | ----------------------------------------------------------- | ----- | ------ |
-| Total formats                                              | 650   | 552    |
+| Total formats                                              | 653   | 552    |
 | Modern/web/scientific formats (PNG, JPEG, WebP, AVIF, …)   | ~290  | 0      |
-| Of RECOIL's 552 vintage formats, covered                   | 520   | 552    |
+| Of RECOIL's 552 vintage formats, covered                   | 523   | 552    |
 
 So on breadth we are level, and on everything outside the retro catalogue we are the only one of
-the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 32
+the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 29
 formats.
 
 Two different formats claim `.hip`: a C64 picture of ours and the Atari 8-bit Hard Interlace
 Picture, which is now implemented alongside it. Both are read; the extension alone does not
 say which, so detection falls to content.
+
+The same happened with `.pi4`, where two unrelated programs are both called Fuckpaint — a
+Commodore 64 one writing interlaced multicolour screens and a Falcon one writing a palette
+and eight bitplanes. Only the C64 one was implemented. `.icn` and `.obj` were the same story
+against the ICE character editor and MonoSTar, and all three counted as covered when nothing
+here could read the format the catalogue named.
 
 The same happened with `.cin`. Two unrelated programs are called Champions' Interlace, one on
 the C64 and one on the Atari 8-bit, and only the C64 one was implemented — so the retro

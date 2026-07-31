@@ -290,7 +290,97 @@ public sealed class RecoilDecodeAgreementTests {
     new("Trefi, two screens", ImageFormat.ZxTrefiBorderScreen, ".bsp", () => _Trefi(128)),
     new("Trefi, with border", ImageFormat.ZxTrefiBorderScreen, ".bsp", () => _Trefi(64)),
     new("Trefi, two bordered", ImageFormat.ZxTrefiBorderScreen, ".bsp", () => _Trefi(192)),
+    new("Fuckpaint, 320x200", ImageFormat.FalconFuckpaint, ".pi4", () => _FalconFuckpaint(320, 200)),
+    new("Fuckpaint, 320x240", ImageFormat.FalconFuckpaint, ".pi7", () => _FalconFuckpaint(320, 240)),
+    new("Fuckpaint, 640x480", ImageFormat.FalconFuckpaint, ".pi9", () => _FalconFuckpaint(640, 480)),
+    new("DEGAS Elite icon", ImageFormat.DegasIcon, ".icn", () => _DegasIcon(37, 23)),
+    new("DEGAS Elite icon, whole words", ImageFormat.DegasIcon, ".icn", () => _DegasIcon(32, 8)),
+    new("ColorSTar object, mono", ImageFormat.ColorStarObject, ".obj", () => _ColorStarObject(0)),
+    new("ColorSTar object, colour", ImageFormat.ColorStarObject, ".obj", () => _ColorStarObject(4)),
   ];
+
+  /// <summary>A Falcon Fuckpaint picture: a 256-colour palette and then eight bitplanes.</summary>
+  private static byte[] _FalconFuckpaint(int width, int height) {
+    var data = new byte[1024 + width * height];
+
+    for (var i = 0; i < 256; ++i) {
+      data[i * 4] = (byte)(i * 7);
+      data[i * 4 + 1] = (byte)(255 - i);
+      data[i * 4 + 2] = 0xEE;
+      data[i * 4 + 3] = (byte)(i * 29);
+    }
+
+    for (var i = 0; i < width * height; ++i)
+      data[1024 + i] = (byte)(i * 37 + (i >> 8));
+
+    return data;
+  }
+
+  /// <summary>A DEGAS Elite icon, which is a fragment of C source rather than a binary file.</summary>
+  private static byte[] _DegasIcon(int width, int height) {
+    var words = (width + 15) >> 4;
+    var text = new System.Text.StringBuilder();
+
+    // The parser needs something before the first token, and the exporter always wrote a comment.
+    text.Append("/* icon */\n");
+    text.Append($"#define ICON_W 0x{width:X}\n");
+    text.Append($"#define ICON_H 0x{height:X}\n");
+    text.Append($"#define ICONSIZE 0x{words * height:X}\n");
+    text.Append("int image[ICONSIZE] = {");
+
+    for (var i = 0; i < words * height; ++i) {
+      if (i > 0)
+        text.Append(',');
+
+      // A comment between the words, since the parser accepts one anywhere a space may go.
+      text.Append(i % 8 == 7 ? "\n\t/* row */ 0x" : " 0x");
+      text.Append($"{(i * 30011 + 7) & 0xFFFF:X}");
+    }
+
+    text.Append("\n};\n");
+
+    return System.Text.Encoding.ASCII.GetBytes(text.ToString());
+  }
+
+  /// <summary>A ColorSTar object, monochrome or in sixteen colours written as decimal text.</summary>
+  private static byte[] _ColorStarObject(int bitplanes) {
+    const int width = 37, height = 11;
+    var stride = (width + 15) >> 4 << 1;
+
+    if (bitplanes == 0) {
+      var mono = new byte[6 + stride * height];
+      mono[0] = (byte)((width - 1) >> 8);
+      mono[1] = (byte)(width - 1);
+      mono[2] = (byte)((height - 1) >> 8);
+      mono[3] = (byte)(height - 1);
+
+      // The two bytes that say "monochrome" are where a coloured object starts its palette text.
+      mono[4] = 0;
+      mono[5] = 1;
+
+      for (var i = 6; i < mono.Length; ++i)
+        mono[i] = (byte)(i * 53);
+
+      return mono;
+    }
+
+    var header = new System.Collections.Generic.List<byte>();
+    for (var i = 0; i < 16; ++i) {
+      // Three channels of three bits, four bits apart, so the number prints as three octal digits.
+      var value = (i & 7) << 8 | (15 - i & 7) << 4 | (i * 3 & 7);
+      header.AddRange(System.Text.Encoding.ASCII.GetBytes(value.ToString()));
+      header.AddRange("\r\n"u8.ToArray());
+    }
+
+    header.AddRange([(byte)((width - 1) >> 8), (byte)(width - 1), 0, (byte)(height - 1), 0, 4]);
+
+    var data = new byte[header.Count + stride * 4 * height];
+    header.CopyTo(data);
+    for (var i = header.Count; i < data.Length; ++i)
+      data[i] = (byte)(i * 47 + (i >> 5));
+
+    return data;
+  }
 
   /// <summary>A CHR$ font: a signature, three dimensions and then cells of bitmap plus attribute.</summary>
   private static byte[] _ChrDollar(int fields) {
