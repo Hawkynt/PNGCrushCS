@@ -175,6 +175,7 @@ public sealed class RecoilDecodeAgreementTests {
     new("PI9 in APAC", ImageFormat.AtariPi9, ".pi9", () => _Monochrome(7720)),
     new("PI9 on a Falcon", ImageFormat.AtariPi9, ".pi9", () => _Monochrome(65024)),
     new("PI9 on a Falcon, taller", ImageFormat.AtariPi9, ".pi9", () => _Monochrome(77824)),
+    new("ZZ_ROUGH", ImageFormat.ZzRough, ".rgh", _ZzRough),
   ];
 
   [Test]
@@ -817,6 +818,26 @@ public sealed class RecoilDecodeAgreementTests {
     data[3] = (byte)(start >> 8);
     data[4] = (byte)end;
     data[5] = (byte)(end >> 8);
+
+    return data;
+  }
+
+  /// <summary>
+  /// A ZZ_ROUGH picture: the count stream's length written as decimal text, then the palette and
+  /// the two streams. The counts avoid zero, which would be a run that never advances.
+  /// </summary>
+  private static byte[] _ZzRough() {
+    // The traversal visits 8000 four-byte groups, so the counts have to add up to exactly that or
+    // the decoder runs off one end of the file or the other.
+    const int run = 10, countLength = 8000 / run;
+    var header = System.Text.Encoding.ASCII.GetBytes($"(c)F.MARCHAL{countLength}\r\n");
+
+    var data = _Monochrome(header.Length + 32 + countLength + countLength * 4 + 8);
+    header.CopyTo(data, 0);
+
+    var counts = header.Length + 32;
+    for (var i = 0; i < countLength; ++i)
+      data[counts + i] = run;
 
     return data;
   }
