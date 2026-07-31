@@ -236,6 +236,8 @@ public sealed class RecoilDecodeAgreementTests {
     new("AMOS sprites", ImageFormat.AmosBank, ".abk", () => _AmosSprites("AmSp")),
     new("AMOS icons", ImageFormat.AmosBank, ".abk", () => _AmosSprites("AmIc")),
     new("AMOS packed screen", ImageFormat.AmosBank, ".abk", _AmosScreen),
+    new("Super Hires FLI, with sprites", ImageFormat.SuperHiresFli, ".shf", () => _Monochrome(15874)),
+    new("Super Hires FLI, packed", ImageFormat.SuperHiresFli, ".shf", _PackedShf),
   ];
 
   [Test]
@@ -1895,6 +1897,43 @@ public sealed class RecoilDecodeAgreementTests {
     points.CopyTo(data, pointsOffset);
 
     return data;
+  }
+
+  /// <summary>
+  /// A packed Super Hires FLI picture. Its escape byte is named by the file, so the probe picks one
+  /// and then has to write that byte as a run of one wherever it occurs as a literal.
+  /// </summary>
+  private static byte[] _PackedShf() {
+    const byte escape = 0xC7;
+    var body = new System.Collections.Generic.List<byte> { 0, 0, escape };
+    var fill = 0;
+
+    for (var written = 0; written < 8170;) {
+      var left = 8170 - written;
+
+      // A run of the longest kind, which the count of zero stands for.
+      if (left >= 256) {
+        body.AddRange([escape, 0, (byte)(fill++ * 37)]);
+        written += 256;
+        continue;
+      }
+
+      if (left >= 40) {
+        body.AddRange([escape, 40, (byte)(fill++ * 53)]);
+        written += 40;
+        continue;
+      }
+
+      var value = (byte)(fill++ * 29 + written);
+      if (value == escape)
+        body.AddRange([escape, 1, value]);
+      else
+        body.Add(value);
+
+      ++written;
+    }
+
+    return body.ToArray();
   }
 
   private static byte[] _Prefixed(int length) {
