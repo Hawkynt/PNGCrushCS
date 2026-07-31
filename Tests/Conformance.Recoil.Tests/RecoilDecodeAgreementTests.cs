@@ -353,7 +353,58 @@ public sealed class RecoilDecodeAgreementTests {
     new("I Paint, monochrome", ImageFormat.IPaint, ".ip", () => _IPaint(false)),
     new("I Paint, colour", ImageFormat.IPaint, ".ip", () => _IPaint(true)),
     new("Mapletown NL3", ImageFormat.MapletownNl3, ".nl3", _MapletownNl3),
+    new("Printfox screen", ImageFormat.Printfox, ".gb", () => _Printfox('B')),
+    new("Printfox double screen", ImageFormat.Printfox, ".gb", () => _Printfox('G')),
+    new("Printfox block", ImageFormat.Printfox, ".gb", () => _Printfox('P')),
   ];
+
+  /// <summary>A Printfox picture in whichever of its three kinds the leading letter names.</summary>
+  private static byte[] _Printfox(char kind) {
+    var (columns, rows) = kind switch {
+      'B' => (40, 25),
+      'G' => (80, 50),
+      _ => (23, 17),
+    };
+
+    var body = new System.Collections.Generic.List<byte> { (byte)kind };
+    if (kind == 'P') {
+      body.Add((byte)rows);
+      body.Add((byte)columns);
+      body.AddRange("PROBE"u8.ToArray());
+      body.Add(0);
+    }
+
+    var count = rows * columns * 8;
+    var written = 0;
+    var seed = 0;
+
+    while (written < count) {
+      var left = count - written;
+
+      // Alternate literals with runs, and make one run the longest the kind can express, since the
+      // two kinds count their lengths differently.
+      if ((seed & 3) == 3) {
+        var run = Math.Min(left, kind == 'P' ? 256 : 400);
+        body.Add(155);
+        body.Add((byte)run);
+        if (kind != 'P')
+          body.Add((byte)(run >> 8));
+
+        body.Add((byte)(seed * 37 + 1));
+        written += run;
+      } else {
+        var value = (byte)(seed * 29 + written);
+
+        // The escape byte cannot stand for itself, so where the pattern lands on it, nudge it.
+        body.Add(value == 155 ? (byte)156 : value);
+        ++written;
+      }
+
+      ++seed;
+    }
+
+    return body.ToArray();
+  }
 
   /// <summary>An I Paint picture: a header, a run-length bitmap and optionally a run-length colour map.</summary>
   private static byte[] _IPaint(bool color) {
