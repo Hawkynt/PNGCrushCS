@@ -190,6 +190,9 @@ public sealed class RecoilDecodeAgreementTests {
     new("Daisy-Dot font", ImageFormat.DaisyDotFont, ".nlq", _DaisyDot),
     new("Atari Graphics Studio, interleaved", ImageFormat.AtariGraphicsStudio, ".ags", () => _Ags(11, 40, 96)),
     new("Atari Graphics Studio, quadrupled", ImageFormat.AtariGraphicsStudio, ".ags", () => _Ags(19, 40, 48)),
+    new("DEGAS Elite brush", ImageFormat.DegasBrush, ".bru", _DegasBrush),
+    new("Atari Image Manager", ImageFormat.AtariImageManager, ".im", () => _Monochrome(16384)),
+    new("Atari Image Manager, large", ImageFormat.AtariImageManager, ".im", () => _Monochrome(65536)),
   ];
 
   [Test]
@@ -1003,6 +1006,15 @@ public sealed class RecoilDecodeAgreementTests {
     data[4] = (byte)stored;
     data[5] = (byte)rows;
     data[6] = (byte)(rows >> 8);
+
+    return data;
+  }
+
+  /// <summary>A DEGAS Elite brush, whose every byte must be exactly zero or one.</summary>
+  private static byte[] _DegasBrush() {
+    var data = new byte[64];
+    for (var i = 0; i < data.Length; ++i)
+      data[i] = (byte)((i * 7 + (i >> 3)) & 1);
 
     return data;
   }
