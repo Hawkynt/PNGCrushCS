@@ -44,6 +44,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.ZxSpectrum, "ZX Spectrum screen", 256, 192, ".scr"),
     new(ImageFormat.MsxScreen2, "MSX Screen 2", 256, 192, ".sc2"),
     new(ImageFormat.MsxScreen3, "MSX Screen 3", 256, 192, ".sc3"),
+    new(ImageFormat.Pc98Ebd, "PC-98 EBD", 640, 400, ".ebd"),
     new(ImageFormat.Picasso64, "Picasso 64", 160, 200),
     new(ImageFormat.RainbowPainter, "Rainbow Painter", 160, 200),
     new(ImageFormat.SaracenPaint, "Saracen Paint", 160, 200),

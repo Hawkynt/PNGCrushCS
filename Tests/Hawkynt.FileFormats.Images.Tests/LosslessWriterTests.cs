@@ -79,6 +79,7 @@ public sealed class LosslessWriterTests {
 
   private static readonly Case[] _Cases = [
     new("Dali", ImageFormat.DaliST, Palette.SixteenStColors, 320, 200),
+    new("PC-98 EBD", ImageFormat.Pc98Ebd, Palette.SixteenColors, 640, 400),
     new("CP8 grayscale", ImageFormat.Cp8Gray, Palette.Grayscale, 64, 64),
     new("MGR bitmap", ImageFormat.MgrBitmap, Palette.Monochrome, 100, 30),
     new("MGR bitmap, whole bytes across", ImageFormat.MgrBitmap, Palette.Monochrome, 64, 16),
