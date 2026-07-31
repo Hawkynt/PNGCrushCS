@@ -22,8 +22,15 @@ public sealed class CineonFile :
 
   /// <summary>Converts a Cineon image to a 16-bit <see cref="RawImage"/> by scaling 10-bit values to Rgb48.</summary>
   public static RawImage ToRawImage(CineonFile file) {
+    // 10 bits a sample packed three to a 32-bit word is the classic Cineon and what the code below
+    // reads, but the format allows 8, 12 and 16 as well, and 8 is what a modern writer produces for
+    // an ordinary 8-bit source. Those were refused outright; they are simply unpacked samples.
+    if (file.BitsPerSample is 8 or 16)
+      return _FromWholeSamples(file);
+
     if (file.BitsPerSample != 10)
-      throw new NotSupportedException($"Cineon bit depth {file.BitsPerSample} is not supported; only 10-bit is implemented.");
+      throw new NotSupportedException(
+        $"Cineon bit depth {file.BitsPerSample} is not supported; 8, 10 and 16 are.");
 
     var width = file.Width;
     var height = file.Height;
@@ -87,6 +94,42 @@ public sealed class CineonFile :
       Orientation = 0,
       ImageDataOffset = 0,
       PixelData = packed,
+    };
+  }
+
+  /// <summary>
+  /// The depths whose samples sit on byte boundaries — 8 and 16 bits — read straight out as RGB.
+  /// </summary>
+  /// <remarks>
+  /// Cineon is big-endian, so a 16-bit sample is already in the order Rgb48 wants; an 8-bit one is
+  /// scaled up to it so every depth leaves this type in the same format.
+  /// </remarks>
+  private static RawImage _FromWholeSamples(CineonFile file) {
+    var pixelCount = file.Width * file.Height;
+    var source = file.PixelData;
+    var result = new byte[pixelCount * 6];
+    var bytesPerSample = file.BitsPerSample / 8;
+
+    for (var i = 0; i < pixelCount; ++i) {
+      for (var channel = 0; channel < 3; ++channel) {
+        var at = ((i * 3) + channel) * bytesPerSample;
+        ushort value;
+        if (bytesPerSample == 1)
+          value = (ushort)(at < source.Length ? source[at] * 257 : 0); // 0..255 over the full range
+        else
+          value = at + 1 < source.Length ? (ushort)((source[at] << 8) | source[at + 1]) : (ushort)0;
+
+        var target = (i * 6) + (channel * 2);
+        result[target] = (byte)(value >> 8);
+        result[target + 1] = (byte)value;
+      }
+    }
+
+    return new() {
+      Width = file.Width,
+      Height = file.Height,
+      Format = PixelFormat.Rgb48,
+      PixelData = result,
     };
   }
 }

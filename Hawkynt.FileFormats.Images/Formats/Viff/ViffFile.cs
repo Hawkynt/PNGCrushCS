@@ -53,8 +53,18 @@ public readonly record struct ViffFile : IImageFormatReader<ViffFile>, IImageToR
 
   public static RawImage ToRawImage(ViffFile file) {
 
+    // A one-bit-a-pixel VIFF is an ordinary bitmap and what a writer produces for a two-colour image,
+    // but only Byte storage was handled — so those were refused rather than unpacked.
+    if (file.StorageType == ViffStorageType.Bit && file.Bands == 1)
+      return new() {
+        Width = file.Width,
+        Height = file.Height,
+        Format = PixelFormat.Gray8,
+        PixelData = _UnpackBits(file.PixelData, file.Width, file.Height),
+      };
+
     if (file.StorageType != ViffStorageType.Byte)
-      throw new ArgumentException($"Only Byte storage is supported for conversion, got {file.StorageType}.", nameof(file));
+      throw new ArgumentException($"Only Bit and Byte storage are supported for conversion, got {file.StorageType}.", nameof(file));
 
     if (file.Bands == 1)
       return new() {
@@ -119,5 +129,20 @@ public readonly record struct ViffFile : IImageFormatReader<ViffFile>, IImageToR
       default:
         throw new ArgumentException($"Unsupported pixel format for VIFF: {image.Format}", nameof(image));
     }
+  }
+
+  /// <summary>Expands a packed one-bit-a-pixel plane to one grey byte a pixel.</summary>
+  /// <remarks>Rows are padded to a whole byte, and a set bit is white.</remarks>
+  private static byte[] _UnpackBits(byte[] packed, int width, int height) {
+    var stride = (width + 7) / 8;
+    var pixels = new byte[width * height];
+    for (var y = 0; y < height; ++y)
+      for (var x = 0; x < width; ++x) {
+        var at = (y * stride) + (x >> 3);
+        var bit = at < packed.Length && ((packed[at] >> (7 - (x & 7))) & 1) != 0;
+        pixels[(y * width) + x] = bit ? (byte)255 : (byte)0;
+      }
+
+    return pixels;
   }
 }
