@@ -61,19 +61,27 @@ public static class WpgReader {
 
       if (sizeByte < 0xFF) {
         recordSize = sizeByte;
-      } else if (sizeByte == 0xFF) {
+      } else {
+        // 0xFF introduces a 16-bit length — unless its top bit is set, which means the length is
+        // 32-bit and this word holds only its high half. Reading the word as the length regardless
+        // turned a 56-byte bitmap record into a claimed 32768 bytes, and put the bitmap sub-header
+        // two bytes early: width, height and depth each came out as the field before them, so an
+        // 8-bit image reported 23 bits a pixel — 23 being its height.
         if (offset + 2 > data.Length)
           break;
 
-        recordSize = BinaryPrimitives.ReadUInt16LittleEndian(data[offset..]);
+        var word = BinaryPrimitives.ReadUInt16LittleEndian(data[offset..]);
         offset += 2;
-      } else {
-        // 0xFE: 4-byte size
-        if (offset + 4 > data.Length)
-          break;
 
-        recordSize = BinaryPrimitives.ReadUInt32LittleEndian(data[offset..]);
-        offset += 4;
+        if ((word & 0x8000) == 0) {
+          recordSize = word;
+        } else {
+          if (offset + 2 > data.Length)
+            break;
+
+          recordSize = ((uint)(word & 0x7FFF) << 16) | BinaryPrimitives.ReadUInt16LittleEndian(data[offset..]);
+          offset += 2;
+        }
       }
 
       var recordEnd = offset + (int)recordSize;
