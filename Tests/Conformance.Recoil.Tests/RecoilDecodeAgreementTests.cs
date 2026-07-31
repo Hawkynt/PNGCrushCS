@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using FileFormat.Core;
 using FileFormat.ColrObjectEditor;
+using FileFormat.OcpArtStudioWindow;
 using FileFormat.TechnicolorDream;
 using Hawkynt.FileFormats.Images;
 
@@ -379,6 +380,103 @@ public sealed class RecoilDecodeAgreementTests {
     } finally {
       try { Directory.Delete(directory, true); } catch { /* best effort */ }
     }
+  }
+
+  /// <summary>
+  /// An OCP Art Studio window stores no colours at all, so without the .pal beside it there is no
+  /// picture — the reference decoder refuses it outright, and so does ours.
+  /// </summary>
+  [TestCase(false)]
+  [TestCase(true)]
+  [Category("Conformance")]
+  public void OcpWindow_WithItsPalette_MatchesRecoilPixelForPixel(bool packed) {
+    RecoilOracle.RequireAvailable();
+
+    var directory = Path.Combine(Path.GetTempPath(), $"recoilwin_{Guid.NewGuid():N}");
+    Directory.CreateDirectory(directory);
+
+    try {
+      var picture = Path.Combine(directory, "clip.win");
+      File.WriteAllBytes(picture, _OcpWindow(packed));
+      File.WriteAllBytes(Path.Combine(directory, "clip.pal"), _OcpPalette());
+
+      var (png, output) = RecoilOracle.TryDecodeToPng(picture);
+      Assert.That(png, Is.Not.Null, $"RECOIL rejected the pair — {output}");
+
+      var theirs = _AsRgb(FormatRegistry.Read(png!));
+      var ours = _AsRgb(OcpArtStudioWindowFile.ToRawImage(OcpArtStudioWindowReader.FromFile(new(picture))));
+
+      Assert.That((ours.Width, ours.Height), Is.EqualTo((theirs.Width, theirs.Height)));
+
+      for (var i = 0; i < theirs.PixelData.Length; ++i) {
+        if (ours.PixelData[i] == theirs.PixelData[i])
+          continue;
+
+        var pixel = i / 3;
+        Assert.Fail(
+          $"pixel {pixel % theirs.Width},{pixel / theirs.Width} channel {i % 3} — " +
+          $"ours {ours.PixelData[i]}, RECOIL {theirs.PixelData[i]}");
+      }
+    } finally {
+      try { Directory.Delete(directory, true); } catch { /* best effort */ }
+    }
+  }
+
+  /// <summary>
+  /// A companion palette: a mode byte and then sixteen colours twelve bytes apart, each biased by
+  /// 64 so it stays a printable value.
+  /// </summary>
+  private static byte[] _OcpPalette() {
+    var data = _Monochrome(239);
+    data[0] = 0;
+    for (var i = 0; i < 16; ++i)
+      data[3 + i * 12] = (byte)(64 + i * 2);
+
+    return data;
+  }
+
+  /// <summary>
+  /// An OCP window, whose size is in its last five bytes. The packed form stores its runs in named
+  /// blocks that the coding runs on across, so a run may be counted against one and finish in the
+  /// next — which the probe does on purpose.
+  /// </summary>
+  private static byte[] _OcpWindow(bool packed) {
+    var width = 96;
+    var height = 40;
+    var stride = (width + 7) >> 3;
+    var bitmap = new byte[stride * height];
+    for (var i = 0; i < bitmap.Length; ++i)
+      bitmap[i] = (byte)(i * 47 + (i >> 5));
+
+    var body = new System.Collections.Generic.List<byte>();
+
+    if (!packed)
+      body.AddRange(bitmap);
+    else {
+      var at = 0;
+      while (at < bitmap.Length) {
+        // Blocks of a fixed length, so runs straddle their boundaries rather than aligning to them.
+        var block = Math.Min(200, bitmap.Length - at);
+        body.AddRange([(byte)'M', (byte)'J', (byte)'H', (byte)block, (byte)(block >> 8)]);
+
+        for (var written = 0; written < block;) {
+          var left = block - written;
+          if (left >= 6) {
+            body.AddRange([1, 6, bitmap[at + written]]);
+            written += 6;
+          } else {
+            body.Add(bitmap[at + written]);
+            ++written;
+          }
+        }
+
+        at += block;
+      }
+    }
+
+    body.AddRange([0, (byte)width, (byte)(width >> 8), (byte)height, 0]);
+
+    return body.ToArray();
   }
 
   /// <summary>
