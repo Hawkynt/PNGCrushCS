@@ -224,6 +224,10 @@ public sealed class RecoilDecodeAgreementTests {
     new("DelmPaint", ImageFormat.DelmPaint, ".del", () => _DelmPaint(2)),
     new("DelmPaint, four quadrants", ImageFormat.DelmPaint, ".dph", () => _DelmPaint(10)),
     new("D-GRAPH, compressed", ImageFormat.DGraphCompressed, ".p3c", _DGraph),
+    new("Champions' Interlace, per-row colours", ImageFormat.AtariChampionsInterlace, ".cin", () => _Monochrome(16384)),
+    new("Champions' Interlace, no colours", ImageFormat.AtariChampionsInterlace, ".cin", () => _Monochrome(15360)),
+    new("Champions' Interlace, one colour set", ImageFormat.AtariChampionsInterlace, ".cin", () => _Monochrome(16004)),
+    new("Champions' Interlace, compressed", ImageFormat.AtariChampionsInterlace, ".cci", _Cci),
   ];
 
   [Test]
@@ -383,6 +387,10 @@ public sealed class RecoilDecodeAgreementTests {
     if (probe.Format == ImageFormat.MsxGl16)
       return FileFormat.MsxGl16.MsxGl16File.ToRawImage(
         FileFormat.MsxGl16.MsxGl16Reader.FromSpan(bytes, FileFormat.MsxGl16.MsxGl16File.ModeFromExtension(probe.Extension)));
+
+    if (probe.Format == ImageFormat.AtariChampionsInterlace)
+      return FileFormat.AtariChampionsInterlace.AtariChampionsInterlaceFile.ToRawImage(
+        FileFormat.AtariChampionsInterlace.AtariChampionsInterlaceReader.FromBytes(bytes));
 
     if (probe.Format == ImageFormat.DelmPaint)
       return FileFormat.DelmPaint.DelmPaintFile.ToRawImage(
@@ -1661,6 +1669,44 @@ public sealed class RecoilDecodeAgreementTests {
 
       ++written;
     }
+
+    return body.ToArray();
+  }
+
+  /// <summary>
+  /// A compressed Champions' Interlace picture: four streams, each preceded by four bytes the
+  /// decoder steps over, and each unpacking to a length of its own.
+  /// </summary>
+  private static byte[] _Cci() {
+    var body = new System.Collections.Generic.List<byte>(System.Text.Encoding.ASCII.GetBytes("CIN 1.2 "));
+    var fill = 0;
+
+    void Stream(int length) {
+      body.AddRange([0, 0, 0, 0]);
+
+      for (var written = 0; written < length;) {
+        var left = length - written;
+
+        if (left >= 128) {
+          // A repeated run, counted from one rather than zero.
+          body.AddRange([(byte)(127 + 100), (byte)(fill++ * 37)]);
+          written += 100;
+          continue;
+        }
+
+        var literals = Math.Min(left, 28);
+        body.Add((byte)(literals - 1));
+        for (var i = 0; i < literals; ++i)
+          body.Add((byte)(fill++ * 29 + i));
+
+        written += literals;
+      }
+    }
+
+    Stream(3840);
+    Stream(3840);
+    Stream(7680);
+    Stream(1024);
 
     return body.ToArray();
   }
