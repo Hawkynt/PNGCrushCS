@@ -256,6 +256,9 @@ public sealed class RecoilDecodeAgreementTests {
     new("Boogie Down Paint 5.00", ImageFormat.BoogieDownPaint, ".bdp", () => _Bdp(2)),
     new("Hard Color Map", ImageFormat.HardColorMap, ".hcm", () => _Hcm(0)),
     new("Hard Color Map, the other arrangement", ImageFormat.HardColorMap, ".hcm", () => _Hcm(2)),
+    new("GED", ImageFormat.GedPicture, ".ged", () => _Ged(0, 0)),
+    new("GED, latest timing", ImageFormat.GedPicture, ".ged", () => _Ged(7, 0)),
+    new("GED, missiles as a fifth colour", ImageFormat.GedPicture, ".ged", () => _Ged(3, 16)),
   ];
 
   [Test]
@@ -2625,6 +2628,26 @@ public sealed class RecoilDecodeAgreementTests {
     System.Text.Encoding.ASCII.GetBytes("HCMA8").CopyTo(data, 0);
     data[5] = 1;
     data[6] = (byte)arrangement;
+
+    return data;
+  }
+
+  /// <summary>
+  /// A GED picture. The timing decides where its six colour changes land across the scanline, and
+  /// one priority bit decides whether the missiles follow their players or line up as a fifth
+  /// playfield colour — so both are worth a probe.
+  /// </summary>
+  private static byte[] _Ged(int cycle, int priority) {
+    var data = _Monochrome(11302);
+    ReadOnlySpan<byte> signature = [255, 255, 48, 83, 79, 127];
+    signature.CopyTo(data);
+
+    data[3292] = (byte)priority;
+    data[3300] = (byte)cycle;
+
+    // The free register write per scanline must address something the chip has.
+    for (var y = 0; y < 200; ++y)
+      data[206 + y] = (byte)(y % 28);
 
     return data;
   }
