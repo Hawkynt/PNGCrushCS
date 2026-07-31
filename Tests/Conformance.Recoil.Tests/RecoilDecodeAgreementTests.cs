@@ -209,6 +209,8 @@ public sealed class RecoilDecodeAgreementTests {
     new("SymbOS graphic, sixteen colours", ImageFormat.SymbOsGraphic, ".sgx", () => _SymbOs(true)),
     new("SEUCK sprites", ImageFormat.SeuckSprites, ".a", _Seuck),
     new("MINIPAINT", ImageFormat.MiniPaint, ".mg", _MiniPaint),
+    new("PaintShop, compressed", ImageFormat.PaintShopCompressed, ".psc", () => _PaintShop(false)),
+    new("PaintShop, stored", ImageFormat.PaintShopCompressed, ".psc", () => _PaintShop(true)),
   ];
 
   [Test]
@@ -1323,6 +1325,73 @@ public sealed class RecoilDecodeAgreementTests {
       data[3857 + cell] = (byte)(cell * 37 + (cell >> 3));
 
     return data;
+  }
+
+  /// <summary>
+  /// A PaintShop picture, either stored outright or with every one of its line commands used at
+  /// least once — including both lengths of the repeat, which is the only part that reads back
+  /// what it has already written.
+  /// </summary>
+  private static byte[] _PaintShop(bool stored) {
+    var width = 320;
+    var height = 400;
+    var stride = (width + 7) >> 3;
+
+    var head = new byte[14];
+    System.Text.Encoding.ASCII.GetBytes("tm89").CopyTo(head, 0);
+    head[8] = 2;
+    head[9] = 1;
+    head[10] = (byte)((width - 1) >> 8);
+    head[11] = (byte)(width - 1);
+    head[12] = (byte)((height - 1) >> 8);
+    head[13] = (byte)(height - 1);
+
+    var body = new System.Collections.Generic.List<byte>(head);
+
+    if (stored) {
+      body.Add(99);
+      for (var i = 0; i < stride * height; ++i)
+        body.Add((byte)(i * 47 + (i >> 7)));
+
+      body.Add(255);
+
+      return body.ToArray();
+    }
+
+    for (var line = 0; line < height;) {
+      // A literal line first, so the repeats below have something to read back.
+      body.Add(110);
+      for (var i = 0; i < stride; ++i)
+        body.Add((byte)(line * 31 + i * 11));
+
+      ++line;
+
+      foreach (var command in (byte[])[0, 200, 100, 102]) {
+        if (line >= height)
+          break;
+
+        body.Add(command);
+        if (command == 100)
+          body.Add((byte)(line * 17));
+        else if (command == 102) {
+          body.Add((byte)(line * 13));
+          body.Add((byte)(line * 29));
+        }
+
+        ++line;
+      }
+
+      if (line < height) {
+        var repeat = Math.Min(4, height - line);
+        body.Add(10);
+        body.Add((byte)(repeat - 1));
+        line += repeat;
+      }
+    }
+
+    body.Add(255);
+
+    return body.ToArray();
   }
 
   private static byte[] _Prefixed(int length) {
