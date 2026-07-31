@@ -372,7 +372,121 @@ public sealed class RecoilDecodeAgreementTests {
     new("Art Master 88, PC-88", ImageFormat.ArtMaster88, ".arv", () => _ArtMaster88(200, 3)),
     new("Art Master 88, PC-98 three planes", ImageFormat.ArtMaster88, ".arv", () => _ArtMaster88(400, 3)),
     new("Art Master 88, PC-98 four planes", ImageFormat.ArtMaster88, ".arv", () => _ArtMaster88(400, 4)),
+    new("XLD4", ImageFormat.Xld4, ".q4", _Xld4),
   ];
+
+  /// <summary>
+  /// An XLD4 picture: a palette chunk and eight picture chunks, each a dictionary-coded stream of
+  /// seventeen symbols which themselves carry a run-length coding.
+  /// </summary>
+  private static byte[] _Xld4() {
+    var body = new System.Collections.Generic.List<byte>(new byte[16]);
+    body[2] = 2;
+    body[11] = (byte)'M';
+    body[12] = (byte)'A';
+    body[13] = (byte)'J';
+    body[14] = (byte)'Y';
+    body[15] = (byte)'O';
+
+    // Every symbol is written as a literal code, so the dictionary is built but never used — which
+    // still exercises the width growth, the codes needing five bits from the start.
+    static byte[] Encode(System.Collections.Generic.List<int> symbols) {
+      var bytes = new System.Collections.Generic.List<byte>();
+      var bits = 0;
+      var held = 0;
+      var width = 3;
+
+      void Put(int value, int count) {
+        for (var i = count - 1; i >= 0; --i) {
+          held = (held << 1) | ((value >> i) & 1);
+          if (++bits != 8)
+            continue;
+
+          bytes.Add((byte)held);
+          held = 0;
+          bits = 0;
+        }
+      }
+
+      // A code of one is the instruction to read the next one a bit wider.
+      while (width < 5) {
+        Put(1, width);
+        ++width;
+      }
+
+      foreach (var symbol in symbols)
+        Put(symbol + 2, width);
+
+      // A code of zero ends the chunk.
+      Put(0, width);
+      if (bits > 0)
+        bytes.Add((byte)(held << (8 - bits)));
+
+      return bytes.ToArray();
+    }
+
+    void Chunk(System.Collections.Generic.List<int> symbols, int pixels) {
+      var packed = Encode(symbols);
+      body.AddRange([(byte)packed.Length, (byte)(packed.Length >> 8), 0, 0,
+                     (byte)(pixels >> 1), (byte)(pixels >> 9)]);
+      body.AddRange(System.Array.ConvertAll(packed, b => b));
+    }
+
+    // The palette: two symbols a channel, three channels, sixteen colours.
+    var paletteSymbols = new System.Collections.Generic.List<int>();
+    for (var i = 0; i < 16; ++i)
+    for (var channel = 0; channel < 3; ++channel) {
+      paletteSymbols.Add((i + channel) % 16);
+      paletteSymbols.Add((i * 5 + channel * 3) % 16);
+    }
+
+    Chunk(paletteSymbols, 0);
+
+    for (var chunk = 0; chunk < 8; ++chunk) {
+      var symbols = new System.Collections.Generic.List<int>();
+      var written = 0;
+      var index = 0;
+
+      while (written < 32000) {
+        var left = 32000 - written;
+
+        switch (index % 3) {
+          // A colour standing for itself.
+          case 0:
+            symbols.Add((chunk + index) % 16);
+            ++written;
+            break;
+
+          // A run of whatever colour was last named, its length two digits in base seventeen and
+          // its high digit not zero, since a zero there would mean the colour changes instead.
+          case 1: {
+            var run = Math.Min(left, 17 + index % 40);
+            symbols.AddRange([16, run / 17, run % 17]);
+            written += run;
+            break;
+          }
+
+          // A run that names its colour first, which is the only way to write a short one.
+          default: {
+            var run = Math.Min(left, 3 + index % 13);
+            symbols.AddRange([16, 0, (chunk * 3 + index) % 16, run / 17, run % 17]);
+            written += run;
+            break;
+          }
+        }
+
+        ++index;
+      }
+
+      Chunk(symbols, 32000);
+    }
+
+    var data = body.ToArray();
+    data[8] = (byte)data.Length;
+    data[9] = (byte)(data.Length >> 8);
+
+    return data;
+  }
 
   /// <summary>An Art Master 88 picture in one of its two forms.</summary>
   private static byte[] _ArtMaster88(int height, int planes) {
