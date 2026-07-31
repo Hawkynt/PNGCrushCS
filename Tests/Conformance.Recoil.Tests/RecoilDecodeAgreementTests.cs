@@ -233,6 +233,9 @@ public sealed class RecoilDecodeAgreementTests {
     new("CharPad, tiles with implied characters", ImageFormat.CharPad, ".ctm", () => _CharPad(0, true, true, false)),
     new("CharPad, colour per tile", ImageFormat.CharPad, ".ctm", () => _CharPad(1, true, false, true)),
     new("CharPad, colour per character", ImageFormat.CharPad, ".ctm", () => _CharPad(2, false, false, true)),
+    new("AMOS sprites", ImageFormat.AmosBank, ".abk", () => _AmosSprites("AmSp")),
+    new("AMOS icons", ImageFormat.AmosBank, ".abk", () => _AmosSprites("AmIc")),
+    new("AMOS packed screen", ImageFormat.AmosBank, ".abk", _AmosScreen),
   ];
 
   [Test]
@@ -1761,6 +1764,135 @@ public sealed class RecoilDecodeAgreementTests {
       data[mapOffset + entry * 2] = (byte)(entry % (tiles ? tileCount : characters));
       data[mapOffset + entry * 2 + 1] = 0;
     }
+
+    return data;
+  }
+
+  /// <summary>
+  /// An AMOS sprite bank. Sprites sit side by side and the palette closes the file, so where the
+  /// palette lands is what confirms the sprites were walked correctly.
+  /// </summary>
+  private static byte[] _AmosSprites(string kind) {
+    var body = new System.Collections.Generic.List<byte>(System.Text.Encoding.ASCII.GetBytes(kind));
+    var sprites = 3;
+    body.AddRange([(byte)(sprites >> 8), (byte)sprites]);
+
+    var fill = 0;
+    for (var sprite = 0; sprite < sprites; ++sprite) {
+      var words = sprite + 1;
+      var spriteHeight = 24;
+      var planes = 4;
+      body.AddRange([
+        (byte)(words >> 8), (byte)words,
+        (byte)(spriteHeight >> 8), (byte)spriteHeight,
+        0, (byte)planes, 0, 0, 0, 0,
+      ]);
+
+      for (var i = 0; i < words * 2 * spriteHeight * planes; ++i)
+        body.Add((byte)(fill++ * 47 + (fill >> 6)));
+    }
+
+    for (var i = 0; i < 64; ++i)
+      body.Add((byte)(i * 37));
+
+    return body.ToArray();
+  }
+
+  /// <summary>
+  /// A packed AMOS screen, encoded here. Its control stream is itself compressed, so the probe has
+  /// to build all three streams in step rather than emit a picture and a flag per byte.
+  /// </summary>
+  private static byte[] _AmosScreen() {
+    var width = 4;
+    var lumps = 3;
+    var lumpLines = 8;
+    var planes = 2;
+    var height = lumps * lumpLines;
+
+    // The three streams, built by running the decoder's own loop forwards.
+    var pic = new System.Collections.Generic.List<byte>();
+    var rle = new System.Collections.Generic.List<byte>();
+    var points = new System.Collections.Generic.List<byte>();
+
+    var rleByte = 0;
+    var rleCount = 0;
+    var pointsByte = 0;
+    var pointsCount = 0;
+    var fill = 0;
+
+    void PushPoint(int bit) {
+      pointsByte = (pointsByte << 1) | bit;
+      if (++pointsCount != 8)
+        return;
+
+      points.Add((byte)pointsByte);
+      pointsByte = 0;
+      pointsCount = 0;
+    }
+
+    void PushRle(int bit) {
+      rleByte = (rleByte << 1) | bit;
+      if (++rleCount != 8)
+        return;
+
+      rle.Add((byte)rleByte);
+      // Every control byte here is a fresh one rather than a continuation.
+      PushPoint(1);
+      rleByte = 0;
+      rleCount = 0;
+    }
+
+    var total = planes * lumps * width * lumpLines;
+    for (var i = 0; i < total; ++i) {
+      // Take a new picture byte every fifth output byte, repeating the last otherwise.
+      var fresh = i % 5 == 0;
+      PushRle(fresh ? 1 : 0);
+      if (fresh)
+        pic.Add((byte)(fill++ * 29 + (fill >> 4)));
+    }
+
+    while (rleCount != 0)
+      PushRle(0);
+
+    while (pointsCount != 0)
+      PushPoint(1);
+
+    // The first picture byte sits in the header, and the first control byte is consumed at once.
+    var head = new byte[135];
+    System.Text.Encoding.ASCII.GetBytes("AmBk").CopyTo(head, 0);
+    System.Text.Encoding.ASCII.GetBytes("Pac.Pic").CopyTo(head, 12);
+    head[110] = 6;
+    head[111] = 7;
+    head[112] = 25;
+    head[113] = 99;
+    head[118] = (byte)(width >> 8);
+    head[119] = (byte)width;
+    head[120] = (byte)(lumps >> 8);
+    head[121] = (byte)lumps;
+    head[122] = (byte)(lumpLines >> 8);
+    head[123] = (byte)lumpLines;
+    head[124] = 0;
+    head[125] = (byte)planes;
+
+    for (var i = 0; i < 64; ++i)
+      head[46 + i] = (byte)(i * 41);
+
+    var rleOffset = 135 + pic.Count;
+    var pointsOffset = rleOffset + rle.Count;
+    foreach (var (offset, value) in ((int, int)[])[(126, rleOffset - 110), (130, pointsOffset - 110)]) {
+      head[offset] = (byte)(value >> 24);
+      head[offset + 1] = (byte)(value >> 16);
+      head[offset + 2] = (byte)(value >> 8);
+      head[offset + 3] = (byte)value;
+    }
+
+    head[134] = 0;
+
+    var data = new byte[pointsOffset + points.Count];
+    head.CopyTo(data, 0);
+    pic.CopyTo(data, 135);
+    rle.CopyTo(data, rleOffset);
+    points.CopyTo(data, pointsOffset);
 
     return data;
   }
