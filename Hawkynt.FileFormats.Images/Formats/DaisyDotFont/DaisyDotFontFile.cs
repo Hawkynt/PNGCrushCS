@@ -16,7 +16,8 @@ namespace FileFormat.DaisyDotFont;
 /// own character order, which is why the codes skip.
 /// </remarks>
 public readonly record struct DaisyDotFontFile
-  : IImageFormatReader<DaisyDotFontFile>, IImageToRawImage<DaisyDotFontFile> {
+  : IImageFormatReader<DaisyDotFontFile>, IImageToRawImage<DaisyDotFontFile>,
+    IImageFromRawImage<DaisyDotFontFile>, IImageFormatWriter<DaisyDotFontFile> {
 
   /// <summary>The text every file starts with.</summary>
   public const string Signature = "DAISY-DOT NLQ FONT";
@@ -55,6 +56,8 @@ public readonly record struct DaisyDotFontFile
   static string[] IImageFormatMetadata<DaisyDotFontFile>.FileExtensions => [".nlq"];
   static DaisyDotFontFile IImageFormatReader<DaisyDotFontFile>.FromSpan(ReadOnlySpan<byte> data)
     => DaisyDotFontReader.FromSpan(data);
+  static byte[] IImageFormatWriter<DaisyDotFontFile>.ToBytes(DaisyDotFontFile file)
+    => DaisyDotFontWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<DaisyDotFontFile>.VideoModes => [
     new("Font", [(Width, Height)], [2])
   ];
@@ -93,5 +96,49 @@ public readonly record struct DaisyDotFontFile
       Format = PixelFormat.Rgb24,
       PixelData = Atari8BitGraphics.ApplyPalette(frame),
     };
+  }
+
+  /// <summary>Which character code a position in the sheet carries.</summary>
+  /// <remarks>The codes run 0 to 63, skip one, then 65 to 90, and end at 92.</remarks>
+  public static int CodeAt(int index) => index < 64 ? index : index < 90 ? index + 1 : 92;
+
+  /// <summary>Builds a font from the sheet, every character at the format's widest.</summary>
+  /// <remarks>
+  /// Characters are variable width and stored one after another with no index, so a reader reaches
+  /// the ninety-first only through the ninety before it. Writing them all at the maximum width
+  /// costs a little space and removes the question entirely: nothing has to be measured, and a
+  /// character that happens to be blank on its right is simply blank there.
+  /// <para/>
+  /// A character's two passes interleave by row — even rows in the first, odd in the second — and
+  /// within a byte the bits run down the column from the top rather than across.
+  /// </remarks>
+  public static DaisyDotFontFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var set = GlyphSheet.Sample(image, Width, Height);
+    var record = (MaxCharacterWidth + 1) * 2;
+    var data = new byte[CharactersOffset + CharacterCount * record];
+    DaisyDotFontWriter.WriteHeader(data);
+
+    for (var i = 0; i < CharacterCount; ++i) {
+      var offset = CharactersOffset + i * record;
+      data[offset] = MaxCharacterWidth;
+
+      var code = CodeAt(i);
+      var left = (code & 15) * CellWidth;
+      var top = code & 240;
+
+      for (var y = 0; y < CellHeight; ++y)
+      for (var x = 0; x < MaxCharacterWidth; ++x) {
+        if (!set[(top + y) * Width + left + x])
+          continue;
+
+        data[offset + 1 + (y & 1) * MaxCharacterWidth + x] |= (byte)(1 << (7 - (y >> 1)));
+      }
+
+      data[offset + record - 1] = Terminator;
+    }
+
+    return new() { Data = data };
   }
 }
