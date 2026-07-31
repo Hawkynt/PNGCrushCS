@@ -312,6 +312,41 @@ public static class Atari8BitGraphics {
     }
   }
 
+  /// <summary>
+  /// Draws one player's shape into a frame of GTIA colour bytes: eight bits a scanline, each drawn
+  /// two pixels wide.
+  /// </summary>
+  /// <param name="combine">
+  /// Whether a lit pixel adds its colour to what is already there rather than replacing it. That is
+  /// how two players overlapping make a third colour the registers never held — the chip ORs their
+  /// values together, so the editors that store players in pairs are drawing three colours from
+  /// two.
+  /// </param>
+  public static void DrawPlayerInto(
+    ReadOnlySpan<byte> data, int offset, int color, Span<byte> frame, int frameOffset, int stride, int height,
+    bool combine) {
+    color &= 254;
+
+    for (var y = 0; y < height; ++y) {
+      var at = offset + y;
+      var bits = at >= 0 && at < data.Length ? data[at] : 0;
+
+      for (var x = 0; x < 8; ++x) {
+        if (((bits >> (7 - x)) & 1) == 0)
+          continue;
+
+        var target = frameOffset + x * 2;
+        if (target < 0 || target + 1 >= frame.Length)
+          continue;
+
+        frame[target] = (byte)(combine ? frame[target] | color : color);
+        frame[target + 1] = frame[target];
+      }
+
+      frameOffset += stride;
+    }
+  }
+
   /// <summary>Colour registers an ANTIC mode 4 line draws from: the background and PF0 to PF3.</summary>
   public const int Gr12RegisterCount = 5;
 

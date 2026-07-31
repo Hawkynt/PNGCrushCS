@@ -181,6 +181,12 @@ public sealed class RecoilDecodeAgreementTests {
     new("VDC BitMap version 2", ImageFormat.VdcBitmap, ".vbm", () => _Vbm(2, false)),
     new("VDC BitMap version 3", ImageFormat.VdcBitmap, ".vbm", () => _Vbm(3, false)),
     new("VDC BitMap version 3, packed", ImageFormat.VdcBitmap, ".vbm", () => _Vbm(3, true)),
+    new("Atari Player Editor", ImageFormat.AtariPlayerEditor, ".apl", () => _PlayerEditor(9, 24, 5)),
+    new("Atari Player Editor, one frame", ImageFormat.AtariPlayerEditor, ".apl", () => _PlayerEditor(1, 48, 0)),
+    new("PMG Designer", ImageFormat.PmgDesigner, ".pmd", () => _PmgDesigner(4, 3, 5, 21)),
+    new("PMG Designer, one row", ImageFormat.PmgDesigner, ".pmd", () => _PmgDesigner(2, 2, 2, 16)),
+    new("Ludek Maker", ImageFormat.LudekMaker, ".ldm", () => _LudekMaker(19)),
+    new("Ludek Maker, one row", ImageFormat.LudekMaker, ".ldm", () => _LudekMaker(6)),
   ];
 
   [Test]
@@ -917,6 +923,48 @@ public sealed class RecoilDecodeAgreementTests {
     data[13] = 0xF4;
     data[16] = data[17] = 0;
     body.CopyTo(data, 18);
+
+    return data;
+  }
+
+  /// <summary>An Atari Player Editor sheet, whose size is fixed however few frames it holds.</summary>
+  private static byte[] _PlayerEditor(int frames, int height, int gap) {
+    var data = _Monochrome(1677);
+    ReadOnlySpan<byte> signature = [154, 248, 57, 33];
+    signature.CopyTo(data);
+    data[4] = (byte)frames;
+    data[5] = (byte)height;
+    data[6] = (byte)gap;
+
+    return data;
+  }
+
+  /// <summary>
+  /// A PMG Designer sheet. One row and several rows are laid out to different widths, so both are
+  /// worth a probe.
+  /// </summary>
+  private static byte[] _PmgDesigner(int sprites, int shapesX, int shapesY, int height) {
+    var shapes = shapesX * shapesY;
+    var data = _Monochrome(11 + sprites * shapes * height);
+    ReadOnlySpan<byte> signature = [240, 237, 228];
+    signature.CopyTo(data);
+    data[7] = (byte)sprites;
+    data[8] = (byte)shapesX;
+    data[9] = (byte)shapesY;
+    data[10] = (byte)height;
+
+    return data;
+  }
+
+  /// <summary>A Ludek Maker sheet, identified by its title written with every high bit set.</summary>
+  private static byte[] _LudekMaker(int shapes) {
+    var data = _Monochrome(281 + shapes * 120);
+    const string title = "Ludek Maker data file";
+    for (var i = 0; i < title.Length; ++i)
+      data[i] = (byte)(title[i] + 128);
+
+    data[23] = 0;
+    data[24] = (byte)shapes;
 
     return data;
   }
