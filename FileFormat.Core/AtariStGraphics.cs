@@ -65,6 +65,22 @@ public static class AtariStGraphics {
     return rgb;
   }
 
+  /// <summary>Reads one stored colour as 0xRRGGBB, in whichever of the two forms the caller names.</summary>
+  public static int ColorAt(ReadOnlySpan<byte> data, int offset, bool ste) {
+    if (offset + 1 >= data.Length)
+      return 0;
+
+    int high = data[offset], low = data[offset + 1];
+    if (!ste)
+      return (ChannelScaling.Expand3(high & 7) << 16)
+             | (ChannelScaling.Expand3((low >> 4) & 7) << 8)
+             | ChannelScaling.Expand3(low & 7);
+
+    return (ChannelScaling.Expand4(_SteChannel(high & 15)) << 16)
+           | (ChannelScaling.Expand4(_SteChannel((low >> 4) & 15)) << 8)
+           | ChannelScaling.Expand4(_SteChannel(low & 15));
+  }
+
   /// <summary>Rotates an STE nibble, whose least significant bit is stored highest.</summary>
   private static int _SteChannel(int value) => ((value & 7) << 1) | ((value >> 3) & 1);
 

@@ -363,7 +363,95 @@ public sealed class RecoilDecodeAgreementTests {
     new("Sinclair BASIC, scrolling line", ImageFormat.SinclairBasic, ".p", () => _SinclairBasic(true)),
     new("Canvas raster, 320", ImageFormat.CanvasRaster, ".ful", () => _CanvasRaster(0)),
     new("Canvas raster, 640", ImageFormat.CanvasRaster, ".ful", () => _CanvasRaster(1)),
+    new("PhotoChrome, one field", ImageFormat.PhotoChromePcs, ".pcs", () => _PhotoChromePcs(0)),
+    new("PhotoChrome, both differences", ImageFormat.PhotoChromePcs, ".pcs", () => _PhotoChromePcs(4)),
+    new("PhotoChrome, bitmap stored", ImageFormat.PhotoChromePcs, ".pcs", () => _PhotoChromePcs(1)),
+    new("PhotoChrome, palette stored", ImageFormat.PhotoChromePcs, ".pcs", () => _PhotoChromePcs(2)),
   ];
+
+  /// <summary>
+  /// A PhotoChrome picture: one or two fields, each a run-length block of bitmap and a block of
+  /// palette words.
+  /// </summary>
+  private static byte[] _PhotoChromePcs(int flags) {
+    var body = new System.Collections.Generic.List<byte> { 1, 64, 0, 200, (byte)flags, 0 };
+
+    void Block(int count, bool words, int seed) {
+      var commands = new System.Collections.Generic.List<byte>();
+      var written = 0;
+      var index = 0;
+
+      while (written < count) {
+        var left = count - written;
+
+        void Value(int at) {
+          if (words)
+            commands.Add((byte)((seed * 7 + at) & 7));
+
+          commands.Add((byte)(seed * 31 + at * 17));
+        }
+
+        switch (index & 3) {
+          // A short run of one value.
+          case 0: {
+            var run = Math.Min(left, 100);
+            commands.Add((byte)run);
+            Value(written);
+            written += run;
+            break;
+          }
+
+          // A short run of literals, counted downwards from 256.
+          case 1: {
+            var run = Math.Min(left, 60);
+            commands.Add((byte)(256 - run));
+            for (var i = 0; i < run; ++i)
+              Value(written + i);
+
+            written += run;
+            break;
+          }
+
+          // A long run of one value, its length written as a word.
+          case 2: {
+            var run = Math.Min(left, 900);
+            commands.AddRange([0, (byte)(run >> 8), (byte)run]);
+            Value(written);
+            written += run;
+            break;
+          }
+
+          // A long run of literals.
+          default: {
+            var run = Math.Min(left, 300);
+            commands.AddRange([1, (byte)(run >> 8), (byte)run]);
+            for (var i = 0; i < run; ++i)
+              Value(written + i);
+
+            written += run;
+            break;
+          }
+        }
+
+        ++index;
+      }
+
+      body.Add((byte)(index >> 8));
+      body.Add((byte)index);
+      body.AddRange(commands);
+    }
+
+    Block(32000, false, 1);
+    Block(19136 / 2, true, 2);
+
+    if (flags == 0)
+      return body.ToArray();
+
+    Block(32000, false, 3);
+    Block(19136 / 2, true, 4);
+
+    return body.ToArray();
+  }
 
   /// <summary>
   /// A Canvas raster picture: a table saying which bands carry a palette, those palettes written
