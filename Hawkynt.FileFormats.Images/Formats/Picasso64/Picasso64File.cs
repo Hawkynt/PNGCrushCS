@@ -3,103 +3,99 @@ using FileFormat.Core;
 
 namespace FileFormat.Picasso64;
 
-/// <summary>In-memory representation of a Commodore 64 Picasso 64 multicolor image.</summary>
-public readonly record struct Picasso64File : IImageFormatReader<Picasso64File>, IImageToRawImage<Picasso64File>, IImageFormatWriter<Picasso64File> {
+/// <summary>In-memory representation of a Commodore 64 Picasso 64 picture (.p64).</summary>
+/// <remarks>
+/// A standard multicolour screen: two bits a pixel, the video matrix holding two of each cell's
+/// colours and the colour RAM a third, with pattern 00 taken from the one register the whole screen
+/// shares. The picture is 160 across rather than 320 — multicolour buys its third colour per cell
+/// with half the horizontal resolution.
+/// <para/>
+/// The colour RAM comes first, the video matrix a page later and the bitmap after another, each on its own page boundary.
+/// </remarks>
+public readonly record struct Picasso64File
+  : IImageFormatReader<Picasso64File>, IImageToRawImage<Picasso64File>,
+    IImageFromRawImage<Picasso64File>, IImageFormatWriter<Picasso64File> {
 
   static string IImageFormatMetadata<Picasso64File>.PrimaryExtension => ".p64";
   static string[] IImageFormatMetadata<Picasso64File>.FileExtensions => [".p64"];
   static Picasso64File IImageFormatReader<Picasso64File>.FromSpan(ReadOnlySpan<byte> data) => Picasso64Reader.FromSpan(data);
   static byte[] IImageFormatWriter<Picasso64File>.ToBytes(Picasso64File file) => Picasso64Writer.ToBytes(file);
+  static VideoMode[] IImageFormatMetadata<Picasso64File>.VideoModes => [
+    new("Multicolour", [(FixedWidth, FixedHeight)], [16])
+  ];
 
-  /// <summary>The fixed width of a Picasso 64 image in pixels.</summary>
+  /// <summary>The fixed width of the picture in pixels.</summary>
   public const int FixedWidth = 160;
 
-  /// <summary>The fixed height of a Picasso 64 image in pixels.</summary>
+  /// <summary>The fixed height of the picture in pixels.</summary>
   public const int FixedHeight = 200;
 
-  /// <summary>The expected total file size in bytes (2 + 8000 + 1000 + 1000 + 1 + 1 + 46).</summary>
+  /// <summary>The exact file size.</summary>
   public const int ExpectedFileSize = 10050;
 
-  /// <summary>Size of the bitmap data section in bytes.</summary>
-  internal const int BitmapDataSize = 8000;
+  /// <summary>Size of the bitmap in bytes.</summary>
+  public const int BitmapDataSize = 8000;
 
-  /// <summary>Size of the screen RAM section in bytes.</summary>
-  internal const int ScreenRamSize = 1000;
+  /// <summary>Size of the video matrix in bytes.</summary>
+  public const int VideoMatrixSize = 1000;
 
-  /// <summary>Size of the color RAM section in bytes.</summary>
-  internal const int ColorRamSize = 1000;
+  /// <summary>Size of the colour RAM in bytes.</summary>
+  public const int ColorRamSize = 1000;
 
-  /// <summary>Size of the load address in bytes.</summary>
-  internal const int LoadAddressSize = 2;
+  /// <summary>Where the bitmap starts.</summary>
+  public const int BitmapOffset = 2050;
 
-  /// <summary>Size of the extra data section in bytes.</summary>
-  internal const int ExtraDataSize = 46;
+  /// <summary>Where the video matrix starts.</summary>
+  public const int VideoMatrixOffset = 1026;
 
-  /// <summary>Image width, always 160.</summary>
+  /// <summary>Where the colour RAM starts.</summary>
+  public const int ColorRamOffset = 2;
+
+  /// <summary>Where the shared background register sits, or -1 if the file has none.</summary>
+  public const int BackgroundOffset = 2049;
+
+  /// <summary>Picture width, always 160.</summary>
   public int Width => FixedWidth;
 
-  /// <summary>Image height, always 200.</summary>
+  /// <summary>Picture height, always 200.</summary>
   public int Height => FixedHeight;
 
   /// <summary>C64 memory load address (2 bytes, little-endian).</summary>
   public ushort LoadAddress { get; init; }
 
-  /// <summary>Multicolor bitmap data (8000 bytes, 2 bits per pixel).</summary>
+  /// <summary>Bitmap data, two bits a pixel within 4x8 cells.</summary>
   public byte[] BitmapData { get; init; }
 
-  /// <summary>Screen RAM (1000 bytes, upper/lower nybble = 2 colors per cell).</summary>
-  public byte[] ScreenRam { get; init; }
+  /// <summary>Video matrix: two of each cell's colours, one per nibble.</summary>
+  public byte[] VideoMatrix { get; init; }
 
-  /// <summary>Color RAM (1000 bytes, lower nybble = 3rd color per cell).</summary>
+  /// <summary>Colour RAM: the third colour of each cell.</summary>
   public byte[] ColorRam { get; init; }
 
-  /// <summary>Background color index (0-15).</summary>
+  /// <summary>The colour shown behind pattern 00, shared by the whole screen.</summary>
   public byte BackgroundColor { get; init; }
 
-  /// <summary>Border color index (0-15).</summary>
-  public byte BorderColor { get; init; }
+  public static RawImage ToRawImage(Picasso64File file)
+    => Commodore64Graphics.DecodeMulticolor(
+      file.BitmapData, file.VideoMatrix, file.ColorRam, file.BackgroundColor, FixedWidth, FixedHeight);
 
-  /// <summary>Extra data (46 bytes of format-specific metadata).</summary>
-  public byte[] ExtraData { get; init; }
+  /// <summary>Builds a screen, choosing three of the machine's colours for every character cell.</summary>
+  public static Picasso64File FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
 
-  /// <summary>Converts this Picasso 64 image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
-  public static RawImage ToRawImage(Picasso64File file) {
-
-    const int width = FixedWidth;
-    const int height = FixedHeight;
-    var rgb = new byte[width * height * 3];
-
-    for (var y = 0; y < height; ++y)
-      for (var x = 0; x < width; ++x) {
-        var cellX = x / 4;
-        var cellY = y / 8;
-        var cellIndex = cellY * 40 + cellX;
-        var byteInCell = y % 8;
-        var bitmapByte = file.BitmapData[cellIndex * 8 + byteInCell];
-        var pixelInByte = x % 4;
-        var bitValue = (bitmapByte >> ((3 - pixelInByte) * 2)) & 0x03;
-
-        var colorIndex = bitValue switch {
-          0 => file.BackgroundColor & 0x0F,
-          1 => (file.ScreenRam[cellIndex] >> 4) & 0x0F,
-          2 => file.ScreenRam[cellIndex] & 0x0F,
-          3 => file.ColorRam[cellIndex] & 0x0F,
-          _ => 0
-        };
-
-        var color = Commodore64Graphics.HexColors[colorIndex];
-        var offset = (y * width + x) * 3;
-        rgb[offset] = (byte)((color >> 16) & 0xFF);
-        rgb[offset + 1] = (byte)((color >> 8) & 0xFF);
-        rgb[offset + 2] = (byte)(color & 0xFF);
-      }
+    var rgb = image.SampleTo(FixedWidth, FixedHeight);
+    var bitmap = new byte[BitmapDataSize];
+    var matrix = new byte[VideoMatrixSize];
+    var colors = new byte[ColorRamSize];
+    var background = Commodore64Graphics.EncodeMulticolor(
+      rgb.PixelData, FixedWidth, FixedHeight, bitmap, matrix, colors, BackgroundOffset < 0 ? 0 : -1);
 
     return new() {
-      Width = width,
-      Height = height,
-      Format = PixelFormat.Rgb24,
-      PixelData = rgb,
+      LoadAddress = 0x4000,
+      BitmapData = bitmap,
+      VideoMatrix = matrix,
+      ColorRam = colors,
+      BackgroundColor = background,
     };
   }
-
 }

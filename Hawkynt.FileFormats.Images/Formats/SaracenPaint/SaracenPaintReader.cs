@@ -3,13 +3,13 @@ using System.IO;
 
 namespace FileFormat.SaracenPaint;
 
-/// <summary>Reads Saracen Paint C64 hires files from bytes, streams, or file paths.</summary>
+/// <summary>Reads Saracen Paint pictures from bytes, streams, or file paths.</summary>
 public static class SaracenPaintReader {
 
   public static SaracenPaintFile FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
-      throw new FileNotFoundException("Saracen Paint file not found.", file.FullName);
+      throw new FileNotFoundException("Picture not found.", file.FullName);
 
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
@@ -19,66 +19,39 @@ public static class SaracenPaintReader {
     if (stream.CanSeek) {
       var data = new byte[stream.Length - stream.Position];
       stream.ReadExactly(data);
-      return FromBytes(data);
+      return FromSpan(data);
     }
+
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
+    return FromSpan(ms.ToArray());
   }
 
   public static SaracenPaintFile FromSpan(ReadOnlySpan<byte> data) {
-
-    if (data.Length < SaracenPaintFile.ExpectedFileSize)
-      throw new InvalidDataException($"Data too small for a valid Saracen Paint file (expected {SaracenPaintFile.ExpectedFileSize} bytes, got {data.Length}).");
-
     if (data.Length != SaracenPaintFile.ExpectedFileSize)
-      throw new InvalidDataException($"Invalid Saracen Paint file size (expected {SaracenPaintFile.ExpectedFileSize} bytes, got {data.Length}).");
+      throw new InvalidDataException(
+        $"Invalid Saracen Paint file size (expected {SaracenPaintFile.ExpectedFileSize} bytes, got {data.Length}).");
 
-    var offset = 0;
+    var bitmap = new byte[SaracenPaintFile.BitmapDataSize];
+    data.Slice(SaracenPaintFile.BitmapOffset, SaracenPaintFile.BitmapDataSize).CopyTo(bitmap.AsSpan(0));
 
-    var loadAddress = (ushort)(data[offset] | (data[offset + 1] << 8));
-    offset += SaracenPaintFile.LoadAddressSize;
+    var matrix = new byte[SaracenPaintFile.VideoMatrixSize];
+    data.Slice(SaracenPaintFile.VideoMatrixOffset, SaracenPaintFile.VideoMatrixSize).CopyTo(matrix.AsSpan(0));
 
-    // Layout: loadAddress(2) + screenRam(1000) + bitmapData(8000) + padding(7)
-    var screenRam = new byte[SaracenPaintFile.ScreenRamSize];
-    data.Slice(offset, SaracenPaintFile.ScreenRamSize).CopyTo(screenRam.AsSpan(0));
-    offset += SaracenPaintFile.ScreenRamSize;
-
-    var bitmapData = new byte[SaracenPaintFile.BitmapDataSize];
-    data.Slice(offset, SaracenPaintFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
+    var colors = new byte[SaracenPaintFile.ColorRamSize];
+    data.Slice(SaracenPaintFile.ColorRamOffset, SaracenPaintFile.ColorRamSize).CopyTo(colors.AsSpan(0));
 
     return new() {
-      LoadAddress = loadAddress,
-      ScreenRam = screenRam,
-      BitmapData = bitmapData,
+      LoadAddress = (ushort)(data[0] | (data[1] << 8)),
+      BitmapData = bitmap,
+      VideoMatrix = matrix,
+      ColorRam = colors,
+      BackgroundColor = SaracenPaintFile.BackgroundOffset < 0 ? (byte)0 : data[SaracenPaintFile.BackgroundOffset],
     };
-    }
+  }
 
   public static SaracenPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < SaracenPaintFile.ExpectedFileSize)
-      throw new InvalidDataException($"Data too small for a valid Saracen Paint file (expected {SaracenPaintFile.ExpectedFileSize} bytes, got {data.Length}).");
-
-    if (data.Length != SaracenPaintFile.ExpectedFileSize)
-      throw new InvalidDataException($"Invalid Saracen Paint file size (expected {SaracenPaintFile.ExpectedFileSize} bytes, got {data.Length}).");
-
-    var offset = 0;
-
-    var loadAddress = (ushort)(data[offset] | (data[offset + 1] << 8));
-    offset += SaracenPaintFile.LoadAddressSize;
-
-    // Layout: loadAddress(2) + screenRam(1000) + bitmapData(8000) + padding(7)
-    var screenRam = new byte[SaracenPaintFile.ScreenRamSize];
-    data.AsSpan(offset, SaracenPaintFile.ScreenRamSize).CopyTo(screenRam.AsSpan(0));
-    offset += SaracenPaintFile.ScreenRamSize;
-
-    var bitmapData = new byte[SaracenPaintFile.BitmapDataSize];
-    data.AsSpan(offset, SaracenPaintFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
-
-    return new() {
-      LoadAddress = loadAddress,
-      ScreenRam = screenRam,
-      BitmapData = bitmapData,
-    };
+    return FromSpan(data);
   }
 }

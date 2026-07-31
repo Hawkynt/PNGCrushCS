@@ -1,33 +1,29 @@
-﻿using System;
+using System;
 
 namespace FileFormat.Picasso64;
 
-/// <summary>Assembles Commodore 64 Picasso 64 file bytes from a Picasso64File.</summary>
+/// <summary>Assembles Picasso 64 picture bytes from a <see cref="Picasso64File"/>.</summary>
 public static class Picasso64Writer {
 
   public static byte[] ToBytes(Picasso64File file) {
-    ArgumentNullException.ThrowIfNull(file);
-
     var result = new byte[Picasso64File.ExpectedFileSize];
-    var offset = 0;
 
-    result[offset] = (byte)(file.LoadAddress & 0xFF);
-    result[offset + 1] = (byte)(file.LoadAddress >> 8);
-    offset += Picasso64File.LoadAddressSize;
+    result[0] = (byte)(file.LoadAddress & 0xFF);
+    result[1] = (byte)(file.LoadAddress >> 8);
 
-    file.BitmapData.AsSpan(0, Picasso64File.BitmapDataSize).CopyTo(result.AsSpan(offset));
-    offset += Picasso64File.BitmapDataSize;
+    var bitmap = file.BitmapData ?? [];
+    var matrix = file.VideoMatrix ?? [];
+    var colors = file.ColorRam ?? [];
 
-    file.ScreenRam.AsSpan(0, Picasso64File.ScreenRamSize).CopyTo(result.AsSpan(offset));
-    offset += Picasso64File.ScreenRamSize;
+    bitmap.AsSpan(0, Math.Min(bitmap.Length, Picasso64File.BitmapDataSize))
+      .CopyTo(result.AsSpan(Picasso64File.BitmapOffset));
+    matrix.AsSpan(0, Math.Min(matrix.Length, Picasso64File.VideoMatrixSize))
+      .CopyTo(result.AsSpan(Picasso64File.VideoMatrixOffset));
+    colors.AsSpan(0, Math.Min(colors.Length, Picasso64File.ColorRamSize))
+      .CopyTo(result.AsSpan(Picasso64File.ColorRamOffset));
 
-    file.ColorRam.AsSpan(0, Picasso64File.ColorRamSize).CopyTo(result.AsSpan(offset));
-    offset += Picasso64File.ColorRamSize;
-
-    result[offset++] = file.BackgroundColor;
-    result[offset++] = file.BorderColor;
-
-    file.ExtraData.AsSpan(0, Math.Min(file.ExtraData.Length, Picasso64File.ExtraDataSize)).CopyTo(result.AsSpan(offset));
+    if (Picasso64File.BackgroundOffset >= 0)
+      result[Picasso64File.BackgroundOffset] = file.BackgroundColor;
 
     return result;
   }

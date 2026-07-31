@@ -3,13 +3,13 @@ using System.IO;
 
 namespace FileFormat.Picasso64;
 
-/// <summary>Reads Commodore 64 Picasso 64 files from bytes, streams, or file paths.</summary>
+/// <summary>Reads Picasso 64 pictures from bytes, streams, or file paths.</summary>
 public static class Picasso64Reader {
 
   public static Picasso64File FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
-      throw new FileNotFoundException("Picasso 64 file not found.", file.FullName);
+      throw new FileNotFoundException("Picture not found.", file.FullName);
 
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
@@ -19,94 +19,39 @@ public static class Picasso64Reader {
     if (stream.CanSeek) {
       var data = new byte[stream.Length - stream.Position];
       stream.ReadExactly(data);
-      return FromBytes(data);
+      return FromSpan(data);
     }
+
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
+    return FromSpan(ms.ToArray());
   }
 
   public static Picasso64File FromSpan(ReadOnlySpan<byte> data) {
-
-    if (data.Length < Picasso64File.ExpectedFileSize)
-      throw new InvalidDataException($"Data too small for a valid Picasso 64 file (expected {Picasso64File.ExpectedFileSize} bytes, got {data.Length}).");
-
     if (data.Length != Picasso64File.ExpectedFileSize)
-      throw new InvalidDataException($"Invalid Picasso 64 file size (expected {Picasso64File.ExpectedFileSize} bytes, got {data.Length}).");
+      throw new InvalidDataException(
+        $"Invalid Picasso 64 file size (expected {Picasso64File.ExpectedFileSize} bytes, got {data.Length}).");
 
-    var offset = 0;
+    var bitmap = new byte[Picasso64File.BitmapDataSize];
+    data.Slice(Picasso64File.BitmapOffset, Picasso64File.BitmapDataSize).CopyTo(bitmap.AsSpan(0));
 
-    var loadAddress = (ushort)(data[offset] | (data[offset + 1] << 8));
-    offset += Picasso64File.LoadAddressSize;
+    var matrix = new byte[Picasso64File.VideoMatrixSize];
+    data.Slice(Picasso64File.VideoMatrixOffset, Picasso64File.VideoMatrixSize).CopyTo(matrix.AsSpan(0));
 
-    var bitmapData = new byte[Picasso64File.BitmapDataSize];
-    data.Slice(offset, Picasso64File.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
-    offset += Picasso64File.BitmapDataSize;
-
-    var screenRam = new byte[Picasso64File.ScreenRamSize];
-    data.Slice(offset, Picasso64File.ScreenRamSize).CopyTo(screenRam.AsSpan(0));
-    offset += Picasso64File.ScreenRamSize;
-
-    var colorRam = new byte[Picasso64File.ColorRamSize];
-    data.Slice(offset, Picasso64File.ColorRamSize).CopyTo(colorRam.AsSpan(0));
-    offset += Picasso64File.ColorRamSize;
-
-    var backgroundColor = data[offset++];
-    var borderColor = data[offset++];
-
-    var extraData = new byte[Picasso64File.ExtraDataSize];
-    data.Slice(offset, Picasso64File.ExtraDataSize).CopyTo(extraData.AsSpan(0));
+    var colors = new byte[Picasso64File.ColorRamSize];
+    data.Slice(Picasso64File.ColorRamOffset, Picasso64File.ColorRamSize).CopyTo(colors.AsSpan(0));
 
     return new() {
-      LoadAddress = loadAddress,
-      BitmapData = bitmapData,
-      ScreenRam = screenRam,
-      ColorRam = colorRam,
-      BackgroundColor = backgroundColor,
-      BorderColor = borderColor,
-      ExtraData = extraData,
+      LoadAddress = (ushort)(data[0] | (data[1] << 8)),
+      BitmapData = bitmap,
+      VideoMatrix = matrix,
+      ColorRam = colors,
+      BackgroundColor = Picasso64File.BackgroundOffset < 0 ? (byte)0 : data[Picasso64File.BackgroundOffset],
     };
-    }
+  }
 
   public static Picasso64File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < Picasso64File.ExpectedFileSize)
-      throw new InvalidDataException($"Data too small for a valid Picasso 64 file (expected {Picasso64File.ExpectedFileSize} bytes, got {data.Length}).");
-
-    if (data.Length != Picasso64File.ExpectedFileSize)
-      throw new InvalidDataException($"Invalid Picasso 64 file size (expected {Picasso64File.ExpectedFileSize} bytes, got {data.Length}).");
-
-    var offset = 0;
-
-    var loadAddress = (ushort)(data[offset] | (data[offset + 1] << 8));
-    offset += Picasso64File.LoadAddressSize;
-
-    var bitmapData = new byte[Picasso64File.BitmapDataSize];
-    data.AsSpan(offset, Picasso64File.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
-    offset += Picasso64File.BitmapDataSize;
-
-    var screenRam = new byte[Picasso64File.ScreenRamSize];
-    data.AsSpan(offset, Picasso64File.ScreenRamSize).CopyTo(screenRam.AsSpan(0));
-    offset += Picasso64File.ScreenRamSize;
-
-    var colorRam = new byte[Picasso64File.ColorRamSize];
-    data.AsSpan(offset, Picasso64File.ColorRamSize).CopyTo(colorRam.AsSpan(0));
-    offset += Picasso64File.ColorRamSize;
-
-    var backgroundColor = data[offset++];
-    var borderColor = data[offset++];
-
-    var extraData = new byte[Picasso64File.ExtraDataSize];
-    data.AsSpan(offset, Picasso64File.ExtraDataSize).CopyTo(extraData.AsSpan(0));
-
-    return new() {
-      LoadAddress = loadAddress,
-      BitmapData = bitmapData,
-      ScreenRam = screenRam,
-      ColorRam = colorRam,
-      BackgroundColor = backgroundColor,
-      BorderColor = borderColor,
-      ExtraData = extraData,
-    };
+    return FromSpan(data);
   }
 }

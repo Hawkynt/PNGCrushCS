@@ -3,13 +3,13 @@ using System.IO;
 
 namespace FileFormat.RainbowPainter;
 
-/// <summary>Reads Commodore 64 Rainbow Painter files from bytes, streams, or file paths.</summary>
+/// <summary>Reads Rainbow Painter pictures from bytes, streams, or file paths.</summary>
 public static class RainbowPainterReader {
 
   public static RainbowPainterFile FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
-      throw new FileNotFoundException("Rainbow Painter file not found.", file.FullName);
+      throw new FileNotFoundException("Picture not found.", file.FullName);
 
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
@@ -19,82 +19,39 @@ public static class RainbowPainterReader {
     if (stream.CanSeek) {
       var data = new byte[stream.Length - stream.Position];
       stream.ReadExactly(data);
-      return FromBytes(data);
+      return FromSpan(data);
     }
+
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
+    return FromSpan(ms.ToArray());
   }
 
   public static RainbowPainterFile FromSpan(ReadOnlySpan<byte> data) {
-
-    if (data.Length < RainbowPainterFile.ExpectedFileSize)
-      throw new InvalidDataException($"Data too small for a valid Rainbow Painter file (expected {RainbowPainterFile.ExpectedFileSize} bytes, got {data.Length}).");
-
     if (data.Length != RainbowPainterFile.ExpectedFileSize)
-      throw new InvalidDataException($"Invalid Rainbow Painter file size (expected {RainbowPainterFile.ExpectedFileSize} bytes, got {data.Length}).");
+      throw new InvalidDataException(
+        $"Invalid Rainbow Painter file size (expected {RainbowPainterFile.ExpectedFileSize} bytes, got {data.Length}).");
 
-    var offset = 0;
+    var bitmap = new byte[RainbowPainterFile.BitmapDataSize];
+    data.Slice(RainbowPainterFile.BitmapOffset, RainbowPainterFile.BitmapDataSize).CopyTo(bitmap.AsSpan(0));
 
-    var loadAddress = (ushort)(data[offset] | (data[offset + 1] << 8));
-    offset += RainbowPainterFile.LoadAddressSize;
+    var matrix = new byte[RainbowPainterFile.VideoMatrixSize];
+    data.Slice(RainbowPainterFile.VideoMatrixOffset, RainbowPainterFile.VideoMatrixSize).CopyTo(matrix.AsSpan(0));
 
-    var bitmapData = new byte[RainbowPainterFile.BitmapDataSize];
-    data.Slice(offset, RainbowPainterFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
-    offset += RainbowPainterFile.BitmapDataSize;
-
-    var videoMatrix = new byte[RainbowPainterFile.VideoMatrixSize];
-    data.Slice(offset, RainbowPainterFile.VideoMatrixSize).CopyTo(videoMatrix.AsSpan(0));
-    offset += RainbowPainterFile.VideoMatrixSize;
-
-    var colorRam = new byte[RainbowPainterFile.ColorRamSize];
-    data.Slice(offset, RainbowPainterFile.ColorRamSize).CopyTo(colorRam.AsSpan(0));
-    offset += RainbowPainterFile.ColorRamSize;
-
-    var backgroundColor = data[offset];
+    var colors = new byte[RainbowPainterFile.ColorRamSize];
+    data.Slice(RainbowPainterFile.ColorRamOffset, RainbowPainterFile.ColorRamSize).CopyTo(colors.AsSpan(0));
 
     return new() {
-      LoadAddress = loadAddress,
-      BitmapData = bitmapData,
-      VideoMatrix = videoMatrix,
-      ColorRam = colorRam,
-      BackgroundColor = backgroundColor,
+      LoadAddress = (ushort)(data[0] | (data[1] << 8)),
+      BitmapData = bitmap,
+      VideoMatrix = matrix,
+      ColorRam = colors,
+      BackgroundColor = RainbowPainterFile.BackgroundOffset < 0 ? (byte)0 : data[RainbowPainterFile.BackgroundOffset],
     };
-    }
+  }
 
   public static RainbowPainterFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < RainbowPainterFile.ExpectedFileSize)
-      throw new InvalidDataException($"Data too small for a valid Rainbow Painter file (expected {RainbowPainterFile.ExpectedFileSize} bytes, got {data.Length}).");
-
-    if (data.Length != RainbowPainterFile.ExpectedFileSize)
-      throw new InvalidDataException($"Invalid Rainbow Painter file size (expected {RainbowPainterFile.ExpectedFileSize} bytes, got {data.Length}).");
-
-    var offset = 0;
-
-    var loadAddress = (ushort)(data[offset] | (data[offset + 1] << 8));
-    offset += RainbowPainterFile.LoadAddressSize;
-
-    var bitmapData = new byte[RainbowPainterFile.BitmapDataSize];
-    data.AsSpan(offset, RainbowPainterFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
-    offset += RainbowPainterFile.BitmapDataSize;
-
-    var videoMatrix = new byte[RainbowPainterFile.VideoMatrixSize];
-    data.AsSpan(offset, RainbowPainterFile.VideoMatrixSize).CopyTo(videoMatrix.AsSpan(0));
-    offset += RainbowPainterFile.VideoMatrixSize;
-
-    var colorRam = new byte[RainbowPainterFile.ColorRamSize];
-    data.AsSpan(offset, RainbowPainterFile.ColorRamSize).CopyTo(colorRam.AsSpan(0));
-    offset += RainbowPainterFile.ColorRamSize;
-
-    var backgroundColor = data[offset];
-
-    return new() {
-      LoadAddress = loadAddress,
-      BitmapData = bitmapData,
-      VideoMatrix = videoMatrix,
-      ColorRam = colorRam,
-      BackgroundColor = backgroundColor,
-    };
+    return FromSpan(data);
   }
 }

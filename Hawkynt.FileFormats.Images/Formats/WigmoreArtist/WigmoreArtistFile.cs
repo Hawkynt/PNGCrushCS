@@ -3,86 +3,99 @@ using FileFormat.Core;
 
 namespace FileFormat.WigmoreArtist;
 
-/// <summary>In-memory representation of a C64 Wigmore Artist (.wig) hires art image.</summary>
-public readonly record struct WigmoreArtistFile : IImageFormatReader<WigmoreArtistFile>, IImageToRawImage<WigmoreArtistFile>, IImageFormatWriter<WigmoreArtistFile> {
+/// <summary>In-memory representation of a Commodore 64 Wigmore Artist picture (.wig).</summary>
+/// <remarks>
+/// A standard multicolour screen: two bits a pixel, the video matrix holding two of each cell's
+/// colours and the colour RAM a third, with pattern 00 taken from the one register the whole screen
+/// shares. The picture is 160 across rather than 320 — multicolour buys its third colour per cell
+/// with half the horizontal resolution.
+/// <para/>
+/// A multicolour screen rather than a high-resolution one, with each section on its own page boundary and the background register in the very last byte.
+/// </remarks>
+public readonly record struct WigmoreArtistFile
+  : IImageFormatReader<WigmoreArtistFile>, IImageToRawImage<WigmoreArtistFile>,
+    IImageFromRawImage<WigmoreArtistFile>, IImageFormatWriter<WigmoreArtistFile> {
 
   static string IImageFormatMetadata<WigmoreArtistFile>.PrimaryExtension => ".wig";
   static string[] IImageFormatMetadata<WigmoreArtistFile>.FileExtensions => [".wig"];
   static WigmoreArtistFile IImageFormatReader<WigmoreArtistFile>.FromSpan(ReadOnlySpan<byte> data) => WigmoreArtistReader.FromSpan(data);
   static byte[] IImageFormatWriter<WigmoreArtistFile>.ToBytes(WigmoreArtistFile file) => WigmoreArtistWriter.ToBytes(file);
+  static VideoMode[] IImageFormatMetadata<WigmoreArtistFile>.VideoModes => [
+    new("Multicolour", [(FixedWidth, FixedHeight)], [16])
+  ];
 
-  /// <summary>The fixed width of the image in pixels.</summary>
-  public const int FixedWidth = 320;
+  /// <summary>The fixed width of the picture in pixels.</summary>
+  public const int FixedWidth = 160;
 
-  /// <summary>The fixed height of the image in pixels.</summary>
+  /// <summary>The fixed height of the picture in pixels.</summary>
   public const int FixedHeight = 200;
 
-  /// <summary>Size of the load address in bytes.</summary>
-  internal const int LoadAddressSize = 2;
+  /// <summary>The exact file size.</summary>
+  public const int ExpectedFileSize = 10242;
 
-  /// <summary>Size of the bitmap data section in bytes.</summary>
-  internal const int BitmapDataSize = 8000;
+  /// <summary>Size of the bitmap in bytes.</summary>
+  public const int BitmapDataSize = 8000;
 
-  /// <summary>Size of the screen RAM section in bytes.</summary>
-  internal const int ScreenRamSize = 1000;
+  /// <summary>Size of the video matrix in bytes.</summary>
+  public const int VideoMatrixSize = 1000;
 
-  /// <summary>Minimum payload size in bytes (bitmap + screen).</summary>
-  internal const int MinPayloadSize = BitmapDataSize + ScreenRamSize;
+  /// <summary>Size of the colour RAM in bytes.</summary>
+  public const int ColorRamSize = 1000;
 
-  /// <summary>Image width, always 320.</summary>
+  /// <summary>Where the bitmap starts.</summary>
+  public const int BitmapOffset = 2;
+
+  /// <summary>Where the video matrix starts.</summary>
+  public const int VideoMatrixOffset = 8194;
+
+  /// <summary>Where the colour RAM starts.</summary>
+  public const int ColorRamOffset = 9218;
+
+  /// <summary>Where the shared background register sits, or -1 if the file has none.</summary>
+  public const int BackgroundOffset = 10241;
+
+  /// <summary>Picture width, always 160.</summary>
   public int Width => FixedWidth;
 
-  /// <summary>Image height, always 200.</summary>
+  /// <summary>Picture height, always 200.</summary>
   public int Height => FixedHeight;
 
   /// <summary>C64 memory load address (2 bytes, little-endian).</summary>
   public ushort LoadAddress { get; init; }
 
-  /// <summary>Raw payload data (entire file content after load address).</summary>
-  public byte[] RawData { get; init; }
+  /// <summary>Bitmap data, two bits a pixel within 4x8 cells.</summary>
+  public byte[] BitmapData { get; init; }
 
-  /// <summary>Converts this Wigmore Artist image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
-  public static RawImage ToRawImage(WigmoreArtistFile file) {
+  /// <summary>Video matrix: two of each cell's colours, one per nibble.</summary>
+  public byte[] VideoMatrix { get; init; }
 
-    const int width = FixedWidth;
-    const int height = FixedHeight;
-    var rgb = new byte[width * height * 3];
+  /// <summary>Colour RAM: the third colour of each cell.</summary>
+  public byte[] ColorRam { get; init; }
 
-    var hasScreen = file.RawData.Length >= BitmapDataSize + ScreenRamSize;
+  /// <summary>The colour shown behind pattern 00, shared by the whole screen.</summary>
+  public byte BackgroundColor { get; init; }
 
-    for (var y = 0; y < height; ++y)
-      for (var x = 0; x < width; ++x) {
-        var cellX = x / 8;
-        var cellY = y / 8;
-        var cellIndex = cellY * 40 + cellX;
-        var byteInCell = y % 8;
-        var bitmapOffset = cellIndex * 8 + byteInCell;
-        var bitmapByte = bitmapOffset < file.RawData.Length ? file.RawData[bitmapOffset] : (byte)0;
-        var bitPosition = 7 - (x % 8);
-        var bitValue = (bitmapByte >> bitPosition) & 1;
+  public static RawImage ToRawImage(WigmoreArtistFile file)
+    => Commodore64Graphics.DecodeMulticolor(
+      file.BitmapData, file.VideoMatrix, file.ColorRam, file.BackgroundColor, FixedWidth, FixedHeight);
 
-        int colorIndex;
-        if (hasScreen) {
-          var screenByte = file.RawData[BitmapDataSize + cellIndex];
-          colorIndex = bitValue == 1
-            ? (screenByte >> 4) & 0x0F
-            : screenByte & 0x0F;
-        } else
-          colorIndex = bitValue == 1 ? 1 : 0;
+  /// <summary>Builds a screen, choosing three of the machine's colours for every character cell.</summary>
+  public static WigmoreArtistFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
 
-        var color = Commodore64Graphics.HexColors[colorIndex];
-        var offset = (y * width + x) * 3;
-        rgb[offset] = (byte)((color >> 16) & 0xFF);
-        rgb[offset + 1] = (byte)((color >> 8) & 0xFF);
-        rgb[offset + 2] = (byte)(color & 0xFF);
-      }
+    var rgb = image.SampleTo(FixedWidth, FixedHeight);
+    var bitmap = new byte[BitmapDataSize];
+    var matrix = new byte[VideoMatrixSize];
+    var colors = new byte[ColorRamSize];
+    var background = Commodore64Graphics.EncodeMulticolor(
+      rgb.PixelData, FixedWidth, FixedHeight, bitmap, matrix, colors, BackgroundOffset < 0 ? 0 : -1);
 
     return new() {
-      Width = width,
-      Height = height,
-      Format = PixelFormat.Rgb24,
-      PixelData = rgb,
+      LoadAddress = 0x4000,
+      BitmapData = bitmap,
+      VideoMatrix = matrix,
+      ColorRam = colors,
+      BackgroundColor = background,
     };
   }
-
 }
