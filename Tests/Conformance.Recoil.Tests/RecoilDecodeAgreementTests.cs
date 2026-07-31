@@ -268,6 +268,14 @@ public sealed class RecoilDecodeAgreementTests {
     new("Graph2Font", ImageFormat.Graph2Font, ".g2f", () => _G2f(40, false)),
     new("Graph2Font, narrow", ImageFormat.Graph2Font, ".g2f", () => _G2f(32, false)),
     new("Graph2Font, compressed", ImageFormat.Graph2Font, ".g2f", () => _G2f(40, true)),
+    new("UIMG bitplanes, ST palette", ImageFormat.Uimg, ".bp1", () => _Uimg(1, 4, 0)),
+    new("UIMG bitplanes, Falcon palette", ImageFormat.Uimg, ".bp1", () => _Uimg(3, 8, 0)),
+    new("UIMG bytes", ImageFormat.Uimg, ".c01", () => _Uimg(1, 8, 1)),
+    new("UIMG packed without rows, two bits", ImageFormat.Uimg, ".bp1", () => _Uimg(1, 2, 255)),
+    new("UIMG packed without rows, nibbles", ImageFormat.Uimg, ".bp1", () => _Uimg(1, 4, 255)),
+    new("UIMG true colour, two bytes", ImageFormat.Uimg, ".c02", () => _Uimg(0, 16, 2)),
+    new("UIMG true colour, three bytes", ImageFormat.Uimg, ".c04", () => _Uimg(0, 24, 3)),
+    new("UIMG true colour, four bytes", ImageFormat.Uimg, ".c04", () => _Uimg(0, 32, 4)),
   ];
 
   [Test]
@@ -2823,6 +2831,39 @@ public sealed class RecoilDecodeAgreementTests {
       deflate.Write(data);
 
     return packed.ToArray();
+  }
+
+  /// <summary>
+  /// A UIMG picture. Its header names a palette kind, a depth and an arrangement, and the file's
+  /// own length has to agree with all three — so each combination is a different length as well as
+  /// a different reading.
+  /// </summary>
+  private static byte[] _Uimg(int palette, int depth, int chunk) {
+    var width = 64;
+    var height = 40;
+    var count = width * height;
+
+    ReadOnlySpan<byte> unit = [0, 2, 2, 4];
+    var bitmapOffset = 14 + (unit[palette] << depth);
+
+    var length = chunk switch {
+      0 or 255 => bitmapOffset + (count >> 3) * depth,
+      1 => bitmapOffset + count,
+      _ => 14 + count * chunk,
+    };
+
+    var data = _Monochrome(length);
+    System.Text.Encoding.ASCII.GetBytes("UIMG").CopyTo(data, 0);
+    data[6] = 0;
+    data[7] = (byte)palette;
+    data[8] = (byte)depth;
+    data[9] = (byte)chunk;
+    data[10] = (byte)(width >> 8);
+    data[11] = (byte)width;
+    data[12] = (byte)(height >> 8);
+    data[13] = (byte)height;
+
+    return data;
   }
 
   private static byte[] _Prefixed(int length) {
