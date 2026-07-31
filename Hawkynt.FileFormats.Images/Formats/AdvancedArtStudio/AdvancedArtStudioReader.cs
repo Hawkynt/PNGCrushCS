@@ -65,10 +65,11 @@ public static class AdvancedArtStudioReader {
       };
     }
 
-    var colorRam = data.Slice(offset, AdvancedArtStudioFile.ColorRamSize).ToArray();
-    offset += AdvancedArtStudioFile.ColorRamSize;
-    var backgroundColor = data[offset];
-    var borderColor = data[offset + 1];
+    var colorRam = data
+      .Slice(AdvancedArtStudioFile.MulticolorColorRamOffset, AdvancedArtStudioFile.ColorRamSize)
+      .ToArray();
+    var backgroundColor = data[AdvancedArtStudioFile.MulticolorBackgroundOffset];
+    var borderColor = data[AdvancedArtStudioFile.MulticolorBackgroundOffset + 1];
 
     return new AdvancedArtStudioFile {
       IsHiRes = false,

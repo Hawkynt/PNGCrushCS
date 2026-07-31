@@ -21,11 +21,13 @@ public static class AdvancedArtStudioWriter {
     file.ScreenRam.AsSpan(0, AdvancedArtStudioFile.ScreenRamSize).CopyTo(result.AsSpan(offset));
     offset += AdvancedArtStudioFile.ScreenRamSize;
 
-    file.ColorRam.AsSpan(0, AdvancedArtStudioFile.ColorRamSize).CopyTo(result.AsSpan(offset));
-    offset += AdvancedArtStudioFile.ColorRamSize;
+    // The colour RAM does not follow the matrix directly: a sixteen-byte block sits between them,
+    // and the background and border registers live at the front of it.
+    file.ColorRam.AsSpan(0, AdvancedArtStudioFile.ColorRamSize)
+      .CopyTo(result.AsSpan(AdvancedArtStudioFile.MulticolorColorRamOffset));
 
-    result[offset] = file.BackgroundColor;
-    result[offset + 1] = file.BorderColor;
+    result[AdvancedArtStudioFile.MulticolorBackgroundOffset] = file.BackgroundColor;
+    result[AdvancedArtStudioFile.MulticolorBackgroundOffset + 1] = file.BorderColor;
     return result;
   }
 

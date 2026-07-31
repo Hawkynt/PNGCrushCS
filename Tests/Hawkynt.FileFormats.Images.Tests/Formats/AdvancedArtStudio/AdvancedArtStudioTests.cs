@@ -142,17 +142,19 @@ file class TestHelpers {
     data[0] = (byte)(loadAddress & 0xFF);
     data[1] = (byte)(loadAddress >> 8);
 
-    for (var i = 0; i < 8000; ++i)
-      data[2 + i] = (byte)(i % 256);
+    for (var i = 0; i < AdvancedArtStudioFile.BitmapDataSize; ++i)
+      data[AdvancedArtStudioFile.BitmapOffset + i] = (byte)(i % 256);
 
-    for (var i = 0; i < 1000; ++i)
-      data[8002 + i] = (byte)(i % 16);
+    for (var i = 0; i < AdvancedArtStudioFile.ScreenRamSize; ++i)
+      data[AdvancedArtStudioFile.VideoMatrixOffset + i] = (byte)(i % 16);
 
-    for (var i = 0; i < 1000; ++i)
-      data[9002 + i] = (byte)((i + 3) % 16);
+    // The colour RAM does not follow the matrix directly — a sixteen-byte block sits between them
+    // with the two registers at its front.
+    for (var i = 0; i < AdvancedArtStudioFile.ColorRamSize; ++i)
+      data[AdvancedArtStudioFile.MulticolorColorRamOffset + i] = (byte)((i + 3) % 16);
 
-    data[10002] = backgroundColor;
-    data[10003] = borderColor;
+    data[AdvancedArtStudioFile.MulticolorBackgroundOffset] = backgroundColor;
+    data[AdvancedArtStudioFile.MulticolorBackgroundOffset + 1] = borderColor;
 
     return data;
   }

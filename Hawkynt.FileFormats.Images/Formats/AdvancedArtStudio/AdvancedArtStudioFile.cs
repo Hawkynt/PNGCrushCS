@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.AdvancedArtStudio;
 
 /// <summary>Advanced Art Studio (.ocp) C64 image. Supports both multicolor and hi-res screen layouts.</summary>
-public readonly record struct AdvancedArtStudioFile : IImageFormatReader<AdvancedArtStudioFile>, IImageToRawImage<AdvancedArtStudioFile>, IImageFormatWriter<AdvancedArtStudioFile> {
+public readonly record struct AdvancedArtStudioFile : IImageFormatReader<AdvancedArtStudioFile>, IImageToRawImage<AdvancedArtStudioFile>, IImageFromRawImage<AdvancedArtStudioFile>, IImageFormatWriter<AdvancedArtStudioFile> {
 
   static string IImageFormatMetadata<AdvancedArtStudioFile>.PrimaryExtension => ".ocp";
   static string[] IImageFormatMetadata<AdvancedArtStudioFile>.FileExtensions => [".ocp"];
@@ -34,6 +34,21 @@ public readonly record struct AdvancedArtStudioFile : IImageFormatReader<Advance
   internal const int ScreenRamSize = 1000;
   internal const int ColorRamSize = 1000;
   internal const int LoadAddressSize = 2;
+  /// <summary>Where the bitmap starts.</summary>
+  public const int BitmapOffset = LoadAddressSize;
+
+  /// <summary>Where the video matrix starts.</summary>
+  public const int VideoMatrixOffset = BitmapOffset + BitmapDataSize;
+
+  /// <summary>
+  /// Where the shared background register sits. It is not at the end of the file: a sixteen-byte
+  /// block sits between the video matrix and the colour RAM, and the register lives inside it.
+  /// </summary>
+  public const int MulticolorBackgroundOffset = 9003;
+
+  /// <summary>Where the colour RAM starts, after that block.</summary>
+  public const int MulticolorColorRamOffset = 9018;
+
   internal const int MulticolorTrailingSize = 16;
   internal const int HiResTrailingSize = 7;
 
@@ -112,5 +127,27 @@ public readonly record struct AdvancedArtStudioFile : IImageFormatReader<Advance
     rgb[o]     = (byte)((color >> 16) & 0xFF);
     rgb[o + 1] = (byte)((color >> 8) & 0xFF);
     rgb[o + 2] = (byte)(color & 0xFF);
+  }
+
+  /// <summary>Builds a multicolour screen, which is the form that holds the most colour.</summary>
+  public static AdvancedArtStudioFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(MulticolorWidth, FixedHeight);
+    var bitmap = new byte[BitmapDataSize];
+    var matrix = new byte[ScreenRamSize];
+    var colors = new byte[ColorRamSize];
+    var background = Commodore64Graphics.EncodeMulticolor(
+      rgb.PixelData, MulticolorWidth, FixedHeight, bitmap, matrix, colors);
+
+    return new() {
+      IsHiRes = false,
+      LoadAddress = 0x2000,
+      BitmapData = bitmap,
+      ScreenRam = matrix,
+      ColorRam = colors,
+      BackgroundColor = background,
+      BorderColor = background,
+    };
   }
 }
