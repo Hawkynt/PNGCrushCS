@@ -4,6 +4,7 @@ using System.Linq;
 using FileFormat.Core;
 using Hawkynt.ColorProcessing.Adapter;
 using Hawkynt.ColorProcessing.Dithering;
+using Hawkynt.ColorProcessing.Quantization;
 
 namespace Hawkynt.ColorProcessing.Adapter.Tests;
 
@@ -108,5 +109,50 @@ public sealed class RawImageQuantizationTests {
     }
 
     return new() { Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = rgb };
+  }
+
+  /// <summary>
+  /// The library's own quantizers, choosing a palette and placing it, with no bitmap anywhere.
+  /// </summary>
+  /// <remarks>
+  /// This is the half that needed the newer package: the entry point from a quantizer to its
+  /// palette was internal in 1.0.0.132 and public from 1.0.1.142 on, so before that upgrade no
+  /// caller outside the assembly could reach it at all.
+  /// </remarks>
+  [TestCaseSource(nameof(Quantizers))]
+  [Category("Unit")]
+  public void Quantizer_ChoosesAPaletteAndFillsIt(string name, Func<RawImage, int, RawImage> reduce) {
+    var source = _Gradient(64, 32);
+
+    var reduced = reduce(source, 8);
+
+    Assert.Multiple(() => {
+      Assert.That(reduced.Width, Is.EqualTo(64), name);
+      Assert.That(reduced.Height, Is.EqualTo(32), name);
+      Assert.That(reduced.PaletteCount, Is.EqualTo(8), name);
+      Assert.That(reduced.PixelData.All(i => i < 8), Is.True, $"{name}: used an index past the palette");
+
+      // A grey ramp through eight colours has to use more than one of them.
+      Assert.That(reduced.PixelData.Distinct().Count(), Is.GreaterThan(1), $"{name}: came out flat");
+    });
+  }
+
+  private static IEnumerable<TestCaseData> Quantizers() {
+    yield return new TestCaseData(
+      "Octree",
+      (Func<RawImage, int, RawImage>)((i, c) =>
+        RawImageQuantization.Reduce(i, default(OctreeQuantizer), ErrorDiffusion.FloydSteinberg, c)));
+    yield return new TestCaseData(
+      "Wu",
+      (Func<RawImage, int, RawImage>)((i, c) =>
+        RawImageQuantization.Reduce(i, default(WuQuantizer), ErrorDiffusion.FloydSteinberg, c)));
+    yield return new TestCaseData(
+      "MedianCut",
+      (Func<RawImage, int, RawImage>)((i, c) =>
+        RawImageQuantization.Reduce(i, default(MedianCutQuantizer), OrderedDitherer.Bayer4x4, c)));
+    yield return new TestCaseData(
+      "Uniform, undithered",
+      (Func<RawImage, int, RawImage>)((i, c) =>
+        RawImageQuantization.Reduce(i, default(UniformQuantizer), default(NoDithering), c)));
   }
 }

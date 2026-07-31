@@ -17,7 +17,7 @@
        framework, which would force the whole build back onto Windows. -->
   <ItemGroup>
     <Reference Include="System.Drawing.Extensions">
-      <HintPath>$(NuGetPackageRoot)frameworkextensions.system.drawing/1.0.0.132/lib/netcoreapp3.1/System.Drawing.Extensions.dll</HintPath>
+      <HintPath>$(NuGetPackageRoot)frameworkextensions.system.drawing/1.0.1.1347/lib/netcoreapp3.1/System.Drawing.Extensions.dll</HintPath>
       <Private>true</Private>
     </Reference>
 
@@ -26,7 +26,7 @@
          modern runtime those APIs exist in the framework, so that build of Backports drops them and
          the calls fail to bind at run time. Pinning the asset keeps the two in step. -->
     <Reference Include="Backports">
-      <HintPath>$(NuGetPackageRoot)frameworkextensions.backports/1.0.0.256/lib/netcoreapp3.1/Backports.dll</HintPath>
+      <HintPath>$(NuGetPackageRoot)frameworkextensions.backports/1.0.0.1347/lib/netcoreapp3.1/Backports.dll</HintPath>
       <Private>true</Private>
     </Reference>
   </ItemGroup>
