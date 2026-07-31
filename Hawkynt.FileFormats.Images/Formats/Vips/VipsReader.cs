@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.Vips;
@@ -34,17 +35,36 @@ public static class VipsReader {
     if (data.Length < VipsHeader.StructSize)
       throw new InvalidDataException("Data too small for a valid VIPS file.");
 
-    var header = VipsHeader.ReadFrom(data.Slice(0, VipsHeader.StructSize));
+    // VIPS records its byte order in the magic itself rather than in a flag: the four bytes read
+    // big-endian are 0x08F2A6B6 in a file written on a big-endian machine, and the same four read
+    // little-endian in one written on a little-endian machine. Both are ordinary VIPS files. Only one
+    // order was ever tried, so every file of the other kind was rejected as having a corrupt magic —
+    // and the error even printed the two values as though they were unrelated.
+    var isBigEndian = BinaryPrimitives.ReadInt32BigEndian(data) == VipsHeader.MagicValue;
+    if (!isBigEndian && BinaryPrimitives.ReadInt32LittleEndian(data) != VipsHeader.MagicValue)
+      throw new InvalidDataException(
+        $"Invalid VIPS magic: expected 0x{VipsHeader.MagicValue:X8} in either byte order, "
+        + $"got 0x{BinaryPrimitives.ReadInt32BigEndian(data):X8}.");
 
-    if (header.Magic != VipsHeader.MagicValue)
-      throw new InvalidDataException($"Invalid VIPS magic: expected 0x{VipsHeader.MagicValue:X8}, got 0x{header.Magic:X8}.");
+    var width = _ReadInt32(data, 4, isBigEndian);
+    var height = _ReadInt32(data, 8, isBigEndian);
+    var bands = _ReadInt32(data, 12, isBigEndian);
 
-    if (header.Width <= 0)
-      throw new InvalidDataException($"Invalid VIPS width: {header.Width}.");
-    if (header.Height <= 0)
-      throw new InvalidDataException($"Invalid VIPS height: {header.Height}.");
-    if (header.Bands <= 0)
-      throw new InvalidDataException($"Invalid VIPS band count: {header.Bands}.");
+    if (width <= 0)
+      throw new InvalidDataException($"Invalid VIPS width: {width}.");
+    if (height <= 0)
+      throw new InvalidDataException($"Invalid VIPS height: {height}.");
+    if (bands <= 0)
+      throw new InvalidDataException($"Invalid VIPS band count: {bands}.");
+
+    var header = new VipsHeader(
+      VipsHeader.MagicValue, width, height, bands,
+      _ReadInt32(data, 16, isBigEndian), _ReadInt32(data, 20, isBigEndian),
+      _ReadInt32(data, 24, isBigEndian), _ReadInt32(data, 28, isBigEndian),
+      0f, 0f,
+      _ReadInt32(data, 40, isBigEndian), _ReadInt32(data, 44, isBigEndian),
+      _ReadInt32(data, 48, isBigEndian),
+      0, 0, 0, 0);
 
     var bandFormat = (VipsBandFormat)header.BandFormat;
     if (bandFormat != VipsBandFormat.UChar)
@@ -66,6 +86,12 @@ public static class VipsReader {
       PixelData = pixelData,
     };
     }
+
+  /// <summary>One 32-bit header field, in whichever order this file was written in.</summary>
+  private static int _ReadInt32(ReadOnlySpan<byte> data, int offset, bool isBigEndian)
+    => isBigEndian
+      ? BinaryPrimitives.ReadInt32BigEndian(data[offset..])
+      : BinaryPrimitives.ReadInt32LittleEndian(data[offset..]);
 
   public static VipsFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

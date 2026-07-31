@@ -11,7 +11,7 @@ namespace FileFormat.SunIcon;
 public static class SunIconReader {
 
   private const int _MINIMUM_SIZE = 10;
-  private const string _MAGIC = "/* ";
+  private const string _MAGIC = "/* Format_version=";
 
   private static readonly Regex _HeaderFieldRegex = new(
     @"(\w+)\s*=\s*(\d+)",
