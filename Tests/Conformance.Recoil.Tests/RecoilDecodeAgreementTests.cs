@@ -238,6 +238,9 @@ public sealed class RecoilDecodeAgreementTests {
     new("AMOS packed screen", ImageFormat.AmosBank, ".abk", _AmosScreen),
     new("Super Hires FLI, with sprites", ImageFormat.SuperHiresFli, ".shf", () => _Monochrome(15874)),
     new("Super Hires FLI, packed", ImageFormat.SuperHiresFli, ".shf", _PackedShf),
+    new("Extend Super Hires", ImageFormat.ExtendSuperHires, ".esh", _Esh),
+    new("Extend Super Hires, packed", ImageFormat.ExtendSuperHires, ".esh", _PackedEsh),
+    new("UIFLI-editor", ImageFormat.UifliEditor, ".uif", _Uifli),
   ];
 
   [Test]
@@ -1934,6 +1937,86 @@ public sealed class RecoilDecodeAgreementTests {
     }
 
     return body.ToArray();
+  }
+
+  /// <summary>An Extend Super Hires picture stored outright, marked by a zero third byte.</summary>
+  private static byte[] _Esh() {
+    var data = _Monochrome(20454);
+    data[2] = 0;
+
+    return data;
+  }
+
+  /// <summary>
+  /// A packed Extend Super Hires picture. Its counts are the seven low bits exactly, so a command
+  /// of 0 or 128 does nothing — the probe avoids both rather than relying on that.
+  /// </summary>
+  private static byte[] _PackedEsh() {
+    var body = new System.Collections.Generic.List<byte> { 0, 0, 1 };
+    var fill = 0;
+
+    for (var written = 3; written < 20452;) {
+      var left = 20452 - written;
+
+      if (left >= 127) {
+        body.AddRange([128 + 127, (byte)(fill++ * 37)]);
+        written += 127;
+        continue;
+      }
+
+      var literals = Math.Min(left, 40);
+      body.Add((byte)literals);
+      for (var i = 0; i < literals; ++i)
+        body.Add((byte)(fill++ * 29 + i));
+
+      written += literals;
+    }
+
+    return body.ToArray();
+  }
+
+  /// <summary>
+  /// A UIFLI picture, whose packing runs backwards — the last byte of the file is the first one
+  /// read — so the probe builds its commands and then reverses the whole stream.
+  /// </summary>
+  private static byte[] _Uifli() {
+    const byte escape = 0xB3;
+    var backwards = new System.Collections.Generic.List<byte>();
+    var fill = 0;
+
+    for (var written = 0; written < 32576;) {
+      var left = 32576 - written;
+
+      // In reading order a run is escape, count, value; the count of zero stands for 256.
+      if (left >= 256) {
+        backwards.AddRange([escape, 0, (byte)(fill++ * 37)]);
+        written += 256;
+        continue;
+      }
+
+      if (left >= 50) {
+        backwards.AddRange([escape, 50, (byte)(fill++ * 53)]);
+        written += 50;
+        continue;
+      }
+
+      var value = (byte)(fill++ * 29 + written);
+      if (value == escape)
+        backwards.AddRange([escape, 1, value]);
+      else
+        backwards.Add(value);
+
+      ++written;
+    }
+
+    // The reader starts at the end, so the commands go into the file in reverse.
+    backwards.Reverse();
+
+    var data = new byte[3 + backwards.Count];
+    data[2] = escape;
+    backwards.CopyTo(data, 3);
+
+    return data;
   }
 
   private static byte[] _Prefixed(int length) {
