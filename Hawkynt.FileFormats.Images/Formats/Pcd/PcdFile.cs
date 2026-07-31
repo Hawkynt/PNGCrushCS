@@ -10,7 +10,16 @@ public readonly record struct PcdFile : IImageFormatReader<PcdFile>, IImageToRaw
   internal const int PreambleSize = 2048;
 
   /// <summary>The magic identifier at offset 2048.</summary>
-  internal static readonly byte[] Magic = "PCD_IPI\0"u8.ToArray();
+  /// <summary>
+  /// The seven characters that identify a Photo CD image pac at offset 2048.
+  /// </summary>
+  /// <remarks>
+  /// It used to include a trailing NUL, making it eight bytes — but the byte after "PCD_IPI" is a
+  /// specification version, 0x06 in the files a writer produces today, not a terminator. So a
+  /// perfectly ordinary Photo CD was rejected for having the wrong magic at the one offset where its
+  /// magic was sitting correctly.
+  /// </remarks>
+  internal static readonly byte[] Magic = "PCD_IPI"u8.ToArray();
 
   /// <summary>Total header size: preamble + magic + 2 x uint16 dimensions.</summary>
   internal const int HeaderSize = PreambleSize + 8 + 4;
