@@ -58,6 +58,9 @@ public sealed class LosslessWriterTests {
     /// <summary>The eight cube corners, at half the horizontal resolution.</summary>
     OneBitChannelsWide,
 
+    /// <summary>At most sixty-four colours, each channel on a grid of nine levels.</summary>
+    SixtyFourColors,
+
     /// <summary>Anything.</summary>
     Full,
   }
@@ -80,6 +83,7 @@ public sealed class LosslessWriterTests {
     new("3200 colours, unpacked", ImageFormat.AppleSh3, Palette.SixteenPerLine, 320, 200),
     new("3201", ImageFormat.Apple3201, Palette.SixteenPerLine, 320, 200),
     new("LdPic", ImageFormat.LdPic, Palette.OneBitChannelsWide, 320, 256),
+    new("Mapletown NL3", ImageFormat.MapletownNl3, Palette.SixtyFourColors, 160, 100),
   ];
 
   private static IEnumerable<TestCaseData> Cases() {
@@ -227,6 +231,15 @@ public sealed class LosslessWriterTests {
           rgb[at] = (byte)((wide / 6 + row / 3) % 2 == 0 ? 255 : 0);
           rgb[at + 1] = (byte)((wide / 8 + row) % 2 == 0 ? 255 : 0);
           rgb[at + 2] = (byte)((wide / 2 + row / 11) % 2 == 0 ? 255 : 0);
+          break;
+        }
+
+        // Sixty-four colours drawn from the nine-level grid the palette stores.
+        case Palette.SixtyFourColors: {
+          var index = (x / 3 + row / 2) % 64;
+          rgb[at] = (byte)((index % 9) * 255 / 8);
+          rgb[at + 1] = (byte)(((index / 9) % 9) * 255 / 8);
+          rgb[at + 2] = (byte)(((index * 5) % 9) * 255 / 8);
           break;
         }
 
