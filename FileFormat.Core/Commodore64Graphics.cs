@@ -299,10 +299,17 @@ public static class Commodore64Graphics {
   /// The background register to use, or -1 to choose one. Some formats have no register to store it
   /// in and always show black behind pattern 00, and those must be told so rather than left to pick.
   /// </param>
+  /// <param name="fixedThirdColor">
+  /// The colour pattern 11 must use everywhere, or -1 to let each cell choose its own. A few formats
+  /// have no colour RAM at all and keep a single entry for the whole screen, and those must be told
+  /// so — letting the cells choose freely and then collapsing the result afterwards would throw away
+  /// the choice rather than make it.
+  /// </param>
   /// <returns>The background register the whole screen shares.</returns>
   public static byte EncodeMulticolor(
     ReadOnlySpan<byte> rgb, int width, int height,
-    Span<byte> bitmap, Span<byte> videoMatrix, Span<byte> colorRam, int fixedBackground = -1) {
+    Span<byte> bitmap, Span<byte> videoMatrix, Span<byte> colorRam,
+    int fixedBackground = -1, int fixedThirdColor = -1) {
     var indices = new int[width * height];
     Span<int> totals = stackalloc int[ColorCount];
 
@@ -339,7 +346,7 @@ public static class Commodore64Graphics {
           present[count++] = index;
       }
 
-      _ChooseTriple(cell, present[..count], background, chosen);
+      _ChooseTriple(cell, present[..count], background, chosen, fixedThirdColor);
 
       var at = top / CellHeight * Columns + left / 4;
       for (var y = 0; y < CellHeight; ++y) {
@@ -376,26 +383,33 @@ public static class Commodore64Graphics {
 
   /// <summary>The three colours that, beside the shared background, describe a cell best.</summary>
   private static void _ChooseTriple(
-    ReadOnlySpan<int> cell, ReadOnlySpan<int> present, int background, Span<int> chosen) {
-    chosen[0] = chosen[1] = chosen[2] = background;
+    ReadOnlySpan<int> cell, ReadOnlySpan<int> present, int background, Span<int> chosen,
+    int fixedThirdColor) {
+    chosen[0] = chosen[1] = background;
+    chosen[2] = fixedThirdColor >= 0 ? fixedThirdColor : background;
 
     var bestError = long.MaxValue;
     for (var a = 0; a < present.Length; ++a)
-    for (var b = a; b < present.Length; ++b)
-    for (var c = b; c < present.Length; ++c) {
-      long error = 0;
-      foreach (var index in cell)
-        error += Math.Min(
-          _Distance(index, background),
-          Math.Min(_Distance(index, present[a]), Math.Min(_Distance(index, present[b]), _Distance(index, present[c]))));
+    for (var b = a; b < present.Length; ++b) {
+      // The third entry is either the cell's to pick or the screen's, already decided.
+      var last = fixedThirdColor >= 0 ? b : present.Length - 1;
+      for (var c = b; c <= last; ++c) {
+        var third = fixedThirdColor >= 0 ? fixedThirdColor : present[c];
 
-      if (error >= bestError)
-        continue;
+        long error = 0;
+        foreach (var index in cell)
+          error += Math.Min(
+            _Distance(index, background),
+            Math.Min(_Distance(index, present[a]), Math.Min(_Distance(index, present[b]), _Distance(index, third))));
 
-      bestError = error;
-      chosen[0] = present[a];
-      chosen[1] = present[b];
-      chosen[2] = present[c];
+        if (error >= bestError)
+          continue;
+
+        bestError = error;
+        chosen[0] = present[a];
+        chosen[1] = present[b];
+        chosen[2] = third;
+      }
     }
   }
 }

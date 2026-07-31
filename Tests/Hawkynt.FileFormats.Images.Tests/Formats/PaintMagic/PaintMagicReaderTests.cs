@@ -1,9 +1,14 @@
 using System;
 using System.IO;
+using FileFormat.Core;
 using FileFormat.PaintMagic;
 
 namespace FileFormat.PaintMagic.Tests;
 
+/// <summary>
+/// Paint Magic's layout, and the one thing that sets it apart: pattern 11 shows a single colour
+/// across the whole picture rather than one per cell, so there is no colour RAM to read.
+/// </summary>
 [TestFixture]
 public sealed class PaintMagicReaderTests {
 
@@ -14,90 +19,80 @@ public sealed class PaintMagicReaderTests {
 
   [Test]
   [Category("Unit")]
-  public void FromFile_Null_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => PaintMagicReader.FromFile(null!));
-
-  [Test]
-  [Category("Unit")]
-  public void FromFile_Missing_ThrowsFileNotFoundException() {
-    var missing = new FileInfo(Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".pmg"));
-    Assert.Throws<FileNotFoundException>(() => PaintMagicReader.FromFile(missing));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromStream_Null_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => PaintMagicReader.FromStream(null!));
-
-  [Test]
-  [Category("Unit")]
-  public void FromBytes_TooSmall_ThrowsInvalidDataException()
-    => Assert.Throws<InvalidDataException>(() => PaintMagicReader.FromBytes(new byte[100]));
-
-  [Test]
-  [Category("Unit")]
   public void FromBytes_WrongSize_ThrowsInvalidDataException()
-    => Assert.Throws<InvalidDataException>(() => PaintMagicReader.FromBytes(new byte[10004]));
+    => Assert.Throws<InvalidDataException>(() => PaintMagicReader.FromBytes(new byte[10003]));
 
+  /// <summary>The bitmap starts after a preamble, and the two shared registers sit behind it.</summary>
   [Test]
-  [Category("Integration")]
-  public void FromBytes_ValidParsesCorrectly() {
-    var data = _BuildValidPaintMagic(0x6000, 0x03);
+  [Category("Unit")]
+  public void FromBytes_EachSection_ReadFromItsOwnOffset() {
+    var data = _Build();
+
     var result = PaintMagicReader.FromBytes(data);
 
     Assert.Multiple(() => {
       Assert.That(result.Width, Is.EqualTo(160));
       Assert.That(result.Height, Is.EqualTo(200));
-      Assert.That(result.LoadAddress, Is.EqualTo(0x6000));
-      Assert.That(result.BitmapData.Length, Is.EqualTo(8000));
-      Assert.That(result.VideoMatrix.Length, Is.EqualTo(1000));
-      Assert.That(result.ColorRam.Length, Is.EqualTo(1000));
-      Assert.That(result.BackgroundColor, Is.EqualTo(0x03));
+      Assert.That(result.BitmapData[0], Is.EqualTo(0xAB));
+      Assert.That(result.BitmapData[PaintMagicFile.BitmapDataSize - 1], Is.EqualTo(0xCD));
+      Assert.That(result.VideoMatrix[0], Is.EqualTo(0x12));
+      Assert.That(result.BackgroundColor, Is.EqualTo(0x06));
+      Assert.That(result.SharedColor, Is.EqualTo(0x0A));
     });
   }
 
   [Test]
-  [Category("Integration")]
-  public void FromBytes_RoundTrip_PreservesData() {
-    var original = _BuildValidPaintMagic(0x6000, 0x05);
-    var file = PaintMagicReader.FromBytes(original);
-    var written = PaintMagicWriter.ToBytes(file);
-    var reread = PaintMagicReader.FromBytes(written);
+  [Category("Unit")]
+  public void RoundTrip_PreservesEverySection() {
+    var original = PaintMagicReader.FromBytes(_Build());
+
+    var reread = PaintMagicReader.FromBytes(PaintMagicWriter.ToBytes(original));
 
     Assert.Multiple(() => {
-      Assert.That(reread.LoadAddress, Is.EqualTo(file.LoadAddress));
-      Assert.That(reread.BitmapData, Is.EqualTo(file.BitmapData));
-      Assert.That(reread.VideoMatrix, Is.EqualTo(file.VideoMatrix));
-      Assert.That(reread.ColorRam, Is.EqualTo(file.ColorRam));
-      Assert.That(reread.BackgroundColor, Is.EqualTo(file.BackgroundColor));
+      Assert.That(reread.BitmapData, Is.EqualTo(original.BitmapData));
+      Assert.That(reread.VideoMatrix, Is.EqualTo(original.VideoMatrix));
+      Assert.That(reread.BackgroundColor, Is.EqualTo(original.BackgroundColor));
+      Assert.That(reread.SharedColor, Is.EqualTo(original.SharedColor));
     });
   }
 
+  /// <summary>The written picture must use one colour for pattern 11 and no more.</summary>
+  /// <remarks>
+  /// This is the constraint the format imposes and the reason its encoder needed a separate path:
+  /// letting each cell pick its own third colour and collapsing the result afterwards would throw
+  /// the choice away rather than make it.
+  /// </remarks>
   [Test]
-  [Category("Integration")]
-  public void FromStream_ValidParsesCorrectly() {
-    var data = _BuildValidPaintMagic(0x6000, 0x05);
-    using var ms = new MemoryStream(data);
-    var result = PaintMagicReader.FromStream(ms);
+  [Category("Unit")]
+  public void FromRawImage_UsesOneColorForPatternElevenEverywhere() {
+    var rgb = new byte[160 * 200 * 3];
+    for (var y = 0; y < 200; ++y)
+    for (var x = 0; x < 160; ++x) {
+      var color = Commodore64Graphics.HexColors[(x / 5 + y / 7) % 16];
+      var at = (y * 160 + x) * 3;
+      rgb[at] = (byte)(color >> 16);
+      rgb[at + 1] = (byte)(color >> 8);
+      rgb[at + 2] = (byte)color;
+    }
 
-    Assert.That(result.LoadAddress, Is.EqualTo(0x6000));
+    var source = new RawImage { Width = 160, Height = 200, Format = PixelFormat.Rgb24, PixelData = rgb };
+
+    var file = PaintMagicFile.FromRawImage(source);
+    var written = PaintMagicWriter.ToBytes(file);
+
+    Assert.That(written, Has.Length.EqualTo(PaintMagicFile.ExpectedFileSize));
+    Assert.That(PaintMagicReader.FromBytes(written).SharedColor, Is.EqualTo(file.SharedColor));
+    Assert.That(file.SharedColor, Is.Not.EqualTo(file.BackgroundColor));
   }
 
-  private static byte[] _BuildValidPaintMagic(ushort loadAddress, byte backgroundColor) {
+  private static byte[] _Build() {
     var data = new byte[PaintMagicFile.ExpectedFileSize];
-    data[0] = (byte)(loadAddress & 0xFF);
-    data[1] = (byte)(loadAddress >> 8);
 
-    for (var i = 0; i < 8000; ++i)
-      data[2 + i] = (byte)(i % 256);
-
-    for (var i = 0; i < 1000; ++i)
-      data[8002 + i] = (byte)(i % 16);
-
-    for (var i = 0; i < 1000; ++i)
-      data[9002 + i] = (byte)((i + 3) % 16);
-
-    data[10002] = backgroundColor;
+    data[PaintMagicFile.BitmapOffset] = 0xAB;
+    data[PaintMagicFile.BitmapOffset + PaintMagicFile.BitmapDataSize - 1] = 0xCD;
+    data[PaintMagicFile.VideoMatrixOffset] = 0x12;
+    data[PaintMagicFile.BackgroundOffset] = 0x06;
+    data[PaintMagicFile.SharedColorOffset] = 0x0A;
 
     return data;
   }

@@ -1,30 +1,23 @@
-﻿using System;
+using System;
 
 namespace FileFormat.PaintMagic;
 
-/// <summary>Assembles Paint Magic C64 multicolor file bytes from a PaintMagicFile.</summary>
+/// <summary>Assembles Paint Magic picture bytes from a <see cref="PaintMagicFile"/>.</summary>
 public static class PaintMagicWriter {
 
   public static byte[] ToBytes(PaintMagicFile file) {
-    ArgumentNullException.ThrowIfNull(file);
-
     var result = new byte[PaintMagicFile.ExpectedFileSize];
-    var offset = 0;
 
-    result[offset] = (byte)(file.LoadAddress & 0xFF);
-    result[offset + 1] = (byte)(file.LoadAddress >> 8);
-    offset += PaintMagicFile.LoadAddressSize;
+    var bitmap = file.BitmapData ?? [];
+    var matrix = file.VideoMatrix ?? [];
 
-    file.BitmapData.AsSpan(0, PaintMagicFile.BitmapDataSize).CopyTo(result.AsSpan(offset));
-    offset += PaintMagicFile.BitmapDataSize;
+    bitmap.AsSpan(0, Math.Min(bitmap.Length, PaintMagicFile.BitmapDataSize))
+      .CopyTo(result.AsSpan(PaintMagicFile.BitmapOffset));
+    matrix.AsSpan(0, Math.Min(matrix.Length, PaintMagicFile.VideoMatrixSize))
+      .CopyTo(result.AsSpan(PaintMagicFile.VideoMatrixOffset));
 
-    file.VideoMatrix.AsSpan(0, PaintMagicFile.VideoMatrixSize).CopyTo(result.AsSpan(offset));
-    offset += PaintMagicFile.VideoMatrixSize;
-
-    file.ColorRam.AsSpan(0, PaintMagicFile.ColorRamSize).CopyTo(result.AsSpan(offset));
-    offset += PaintMagicFile.ColorRamSize;
-
-    result[offset] = file.BackgroundColor;
+    result[PaintMagicFile.BackgroundOffset] = file.BackgroundColor;
+    result[PaintMagicFile.SharedColorOffset] = file.SharedColor;
 
     return result;
   }
