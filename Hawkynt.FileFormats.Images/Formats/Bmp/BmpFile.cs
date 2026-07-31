@@ -23,14 +23,35 @@ public readonly record struct BmpFile :
   static IEnumerable<ChunkSpan> IFormatChunkLayout<BmpFile>.EnumerateChunks(ReadOnlySpan<byte> data)
     => BmpChunkLayout.Enumerate(data);
 
+  /// <summary>
+  /// Reads the dimensions cheaply, from either DIB header.
+  /// </summary>
+  /// <remarks>
+  /// The 12-byte BITMAPCOREHEADER states its width, height and bit count in 16 bits apiece, where
+  /// the 40-byte BITMAPINFOHEADER uses 32. Reading the newer layout regardless made a 37x23 core
+  /// bitmap measure 1507365 wide — a caller that refuses to decode anything enormous therefore
+  /// rejected it as a decompression bomb, which is what foileBrowser did with it.
+  /// </remarks>
   public static ImageInfo? ReadImageInfo(ReadOnlySpan<byte> header) {
     if (header.Length < 26 || header[0] != 0x42 || header[1] != 0x4D)
       return null;
 
-    var width = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(header[18..]);
-    var height = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(header[22..]);
+    var headerSize = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(header[14..]);
+    int width, height, bpp;
+    if (headerSize == 12) {
+      width = System.Buffers.Binary.BinaryPrimitives.ReadInt16LittleEndian(header[18..]);
+      height = System.Buffers.Binary.BinaryPrimitives.ReadInt16LittleEndian(header[20..]);
+      bpp = System.Buffers.Binary.BinaryPrimitives.ReadInt16LittleEndian(header[24..]);
+    } else {
+      if (header.Length < 30)
+        return null;
+
+      width = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(header[18..]);
+      height = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(header[22..]);
+      bpp = System.Buffers.Binary.BinaryPrimitives.ReadInt16LittleEndian(header[28..]);
+    }
+
     if (height < 0) height = -height;
-    var bpp = System.Buffers.Binary.BinaryPrimitives.ReadInt16LittleEndian(header[28..]);
 
     return new(width, height, bpp, bpp switch {
       1 => "Monochrome",
