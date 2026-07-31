@@ -241,6 +241,8 @@ public sealed class RecoilDecodeAgreementTests {
     new("Extend Super Hires", ImageFormat.ExtendSuperHires, ".esh", _Esh),
     new("Extend Super Hires, packed", ImageFormat.ExtendSuperHires, ".esh", _PackedEsh),
     new("UIFLI-editor", ImageFormat.UifliEditor, ".uif", _Uifli),
+    new("SHF-XL Edit", ImageFormat.ShfXlEdit, ".shx", () => _Monochrome(15362)),
+    new("SHF-XL Edit, packed", ImageFormat.ShfXlEdit, ".shx", _PackedShx),
   ];
 
   [Test]
@@ -2015,6 +2017,48 @@ public sealed class RecoilDecodeAgreementTests {
     var data = new byte[3 + backwards.Count];
     data[2] = escape;
     backwards.CopyTo(data, 3);
+
+    return data;
+  }
+
+  /// <summary>
+  /// A packed SHF-XL picture. Its escape byte is the last byte of the file, which follows from the
+  /// packing running backwards — the first thing a backwards reader meets is the last thing written.
+  /// </summary>
+  private static byte[] _PackedShx() {
+    const byte escape = 0x5D;
+    // Reading order, which the file then stores reversed: the escape is read before any command.
+    var backwards = new System.Collections.Generic.List<byte> { escape };
+    var fill = 0;
+
+    for (var written = 0; written < 9168;) {
+      var left = 9168 - written;
+
+      if (left >= 256) {
+        backwards.AddRange([escape, 0, (byte)(fill++ * 37)]);
+        written += 256;
+        continue;
+      }
+
+      if (left >= 30) {
+        backwards.AddRange([escape, 30, (byte)(fill++ * 53)]);
+        written += 30;
+        continue;
+      }
+
+      var value = (byte)(fill++ * 29 + written);
+      if (value == escape)
+        backwards.AddRange([escape, 1, value]);
+      else
+        backwards.Add(value);
+
+      ++written;
+    }
+
+    backwards.Reverse();
+
+    var data = new byte[2 + backwards.Count];
+    backwards.CopyTo(data, 2);
 
     return data;
   }
