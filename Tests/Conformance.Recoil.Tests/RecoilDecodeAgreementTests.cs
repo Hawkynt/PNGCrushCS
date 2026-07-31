@@ -178,6 +178,9 @@ public sealed class RecoilDecodeAgreementTests {
     new("ZZ_ROUGH", ImageFormat.ZzRough, ".rgh", _ZzRough),
     new("Taquart Interlace Picture", ImageFormat.TaquartInterlace, ".tip", () => _Tip(160, 119)),
     new("Taquart Interlace Picture, narrow", ImageFormat.TaquartInterlace, ".tip", () => _Tip(64, 40)),
+    new("VDC BitMap version 2", ImageFormat.VdcBitmap, ".vbm", () => _Vbm(2, false)),
+    new("VDC BitMap version 3", ImageFormat.VdcBitmap, ".vbm", () => _Vbm(3, false)),
+    new("VDC BitMap version 3, packed", ImageFormat.VdcBitmap, ".vbm", () => _Vbm(3, true)),
   ];
 
   [Test]
@@ -856,6 +859,64 @@ public sealed class RecoilDecodeAgreementTests {
     data[6] = (byte)height;
     data[7] = (byte)fieldLength;
     data[8] = (byte)(fieldLength >> 8);
+
+    return data;
+  }
+
+  /// <summary>
+  /// A VDC BitMap. Version 3's five escape bytes are chosen by the file, so the packed probe names
+  /// values it then avoids as literals and exercises all five kinds of run.
+  /// </summary>
+  private static byte[] _Vbm(int version, bool packed) {
+    const int width = 80, height = 50;
+    var stride = (width + 7) >> 3;
+
+    if (version == 2) {
+      var raw = _Monochrome(8 + stride * height);
+      raw[0] = (byte)'B';
+      raw[1] = (byte)'M';
+      raw[2] = 0xCB;
+      raw[3] = 2;
+      raw[4] = (byte)(width >> 8);
+      raw[5] = (byte)width;
+      raw[6] = (byte)(height >> 8);
+      raw[7] = (byte)height;
+
+      return raw;
+    }
+
+    var body = new System.Collections.Generic.List<byte>();
+    if (packed) {
+      // Run of a named value, run of zeros, run of ones, a pair of each, then literals.
+      for (var i = 0; i < stride * height / 12 + 1; ++i) {
+        body.AddRange([0xF0, (byte)(i * 37), 3]);
+        body.AddRange([0xF1, 2]);
+        body.AddRange([0xF2, 2]);
+        body.Add(0xF3);
+        body.Add(0xF4);
+        body.Add((byte)(i * 91));
+      }
+    } else
+      for (var i = 0; i < stride * height; ++i)
+        body.Add((byte)(i * 47 + (i >> 7)));
+
+    var data = new byte[18 + body.Count];
+    data[0] = (byte)'B';
+    data[1] = (byte)'M';
+    data[2] = 0xCB;
+    data[3] = 3;
+    data[4] = (byte)(width >> 8);
+    data[5] = (byte)width;
+    data[6] = (byte)(height >> 8);
+    data[7] = (byte)height;
+    data[8] = (byte)(packed ? 1 : 0);
+    data[9] = 0xF0;
+    data[10] = 0xF1;
+    data[11] = 0xF2;
+    data[12] = 0xF3;
+    data[13] = 0xF4;
+    data[16] = data[17] = 0;
+    body.CopyTo(data, 18);
 
     return data;
   }
