@@ -356,7 +356,125 @@ public sealed class RecoilDecodeAgreementTests {
     new("Printfox screen", ImageFormat.Printfox, ".gb", () => _Printfox('B')),
     new("Printfox double screen", ImageFormat.Printfox, ".gb", () => _Printfox('G')),
     new("Printfox block", ImageFormat.Printfox, ".gb", () => _Printfox('P')),
+    new("Semi-Graphic logos", ImageFormat.SemiGraphicLogo, ".sge", _SemiGraphicLogo),
+    new("Dir Logo Maker", ImageFormat.DirLogoMaker, ".dlm", _DirLogoMaker),
+    new("ZXpaintyONE", ImageFormat.ZxPaintyOne, ".zp1", _ZxPaintyOne),
+    new("Sinclair BASIC", ImageFormat.SinclairBasic, ".p", () => _SinclairBasic(false)),
+    new("Sinclair BASIC, scrolling line", ImageFormat.SinclairBasic, ".p", () => _SinclairBasic(true)),
   ];
+
+  /// <summary>A Semi-Graphic logos screen: 960 character codes and nothing else.</summary>
+  private static byte[] _SemiGraphicLogo() {
+    var data = new byte[960];
+
+    // Include the four codes the editor patches, so the patched shapes are actually drawn.
+    for (var i = 0; i < data.Length; ++i)
+      data[i] = i % 40 < 8 ? (byte)(91 + i % 8) : (byte)(i * 37 + (i >> 5));
+
+    return data;
+  }
+
+  /// <summary>A Dir Logo Maker logo: sixteen directory entries with eleven-character names.</summary>
+  private static byte[] _DirLogoMaker() {
+    var data = new byte[256];
+
+    for (var i = 0; i < data.Length; ++i)
+      data[i] = (byte)(i * 29 + (i >> 4) * 7);
+
+    return data;
+  }
+
+  /// <summary>A ZXpaintyONE picture: 768 character codes as hexadecimal text.</summary>
+  private static byte[] _ZxPaintyOne() {
+    var text = new System.Text.StringBuilder();
+    for (var i = 0; i < 768; ++i)
+      text.Append($"{(i * 37 + (i >> 5)) & 0xFF:X2}");
+
+    return System.Text.Encoding.ASCII.GetBytes(text.ToString());
+  }
+
+  /// <summary>
+  /// A saved ZX81 program of the one shape these pictures take: PRINT AT and a string per row, and
+  /// optionally the LET, IF, FOR, POKE and NEXT that scroll a line along the bottom.
+  /// </summary>
+  private static byte[] _SinclairBasic(bool scrolling) {
+    var program = new System.Collections.Generic.List<byte>();
+
+    void Line(System.Collections.Generic.IEnumerable<byte> tokens) {
+      var body = new System.Collections.Generic.List<byte>(tokens) { 118 };
+
+      // A line number, then the length of what follows it, then the statement.
+      program.Add(0);
+      program.Add((byte)(program.Count / 3 + 1));
+      program.Add((byte)body.Count);
+      program.Add((byte)(body.Count >> 8));
+      program.AddRange(body);
+    }
+
+    // A number is typed as digits and then repeated as a five-byte float; only the float is read.
+    static byte[] Number(int value) {
+      var digits = new System.Collections.Generic.List<byte>();
+      foreach (var c in value.ToString())
+        digits.Add((byte)(28 + c - '0'));
+
+      var exponent = 144;
+      var mantissa = value;
+      while (mantissa != 0 && (mantissa & 0x8000) == 0) {
+        mantissa <<= 1;
+        --exponent;
+      }
+
+      if (value == 0)
+        return [.. digits, 126, 0, 0, 0, 0, 0];
+
+      return [.. digits, 126, (byte)exponent, (byte)((mantissa >> 8) & 127), (byte)mantissa, 0, 0];
+    }
+
+    for (var row = 0; row < 20; ++row) {
+      var line = new System.Collections.Generic.List<byte> { 245, 193 };
+      line.AddRange(Number(row));
+      line.Add(26);
+      line.AddRange(Number(row % 12));
+      line.Add(0);
+      line.Add(11);
+
+      // Character codes below 64; the ones above 128 would be the inverted half. A code equal to
+      // the quote would close the string, so it is written as the escape that stands for one.
+      for (var i = 0; i < 18; ++i) {
+        var code = (row * 7 + i * 3) % 64;
+        line.Add((byte)(code == 11 ? 192 : code));
+      }
+
+      line.Add(11);
+      Line(line);
+    }
+
+    if (scrolling) {
+      var text = new System.Collections.Generic.List<byte> { 241, 38, 13, 20, 11 };
+      for (var i = 0; i < 30; ++i) {
+        var code = (i * 5 + 3) % 64;
+        text.Add((byte)(code == 11 ? 192 : code));
+      }
+
+      text.Add(11);
+      Line(text);
+
+      Line([241, 56, 20, .. Number(3), 21, 211, .. Number(16400), 21, .. Number(256), 23, 211, .. Number(16401)]);
+      Line([241, 41, 20, .. Number(727), 21, 211, .. Number(16396), 21, .. Number(256), 23, 211, .. Number(16397)]);
+      Line([250, 198, 38, 13, 221, .. Number(64), 222, 227]);
+      Line([235, 43, 20, .. Number(0), 223, .. Number(63)]);
+      Line([244, 41, 21, 43, 21, 16, 43, 18, .. Number(31), 17, 26, 211, 16, 56, 21, 43, 17]);
+      Line([243, 43]);
+    }
+
+    // The reader will not look at a line unless eight bytes follow it, so the end-of-program marker
+    // needs that much after it — which a real saved file has, its variables area sitting there.
+    var data = new byte[116 + program.Count + 8];
+    program.CopyTo(data, 116);
+    data[116 + program.Count] = 118;
+
+    return data;
+  }
 
   /// <summary>A Printfox picture in whichever of its three kinds the leading letter names.</summary>
   private static byte[] _Printfox(char kind) {

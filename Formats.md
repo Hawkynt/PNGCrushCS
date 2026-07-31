@@ -201,6 +201,10 @@ build one from pixel data they didn't read, so the registry reports them as read
 | I Paint                 | .ip                                                  | C128 80-column, colour optional  | Y      | —      | —         | R     | —   | —      | —         |
 | Mapletown Network NL3   | .nl3                                                 | Printable characters only        | Y      | —      | —         | R     | —   | —      | —         |
 | Printfox                | .gb                                                  | Cell by cell, black on white     | Y      | —      | —         | R     | —   | —      | —         |
+| Semi-Graphic logos      | .sge                                                 | Text screen, four patched glyphs | Y      | —      | —         | R     | —   | —      | —         |
+| Dir Logo Maker          | .dlm                                                 | A logo in a directory listing    | Y      | —      | —         | R     | —   | —      | —         |
+| ZXpaintyONE             | .zp1                                                 | ZX81 screen as hexadecimal text  | Y      | —      | —         | R     | —   | —      | —         |
+| Sinclair BASIC          | .p                                                   | A program that draws a picture   | Y      | —      | —         | R     | —   | —      | —         |
 | Atari Player/Missile    | .pmg, .plm                                           | Atari 8-bit Player/Missile GFX   | Y      | Y      | —         | —     | —   | —      | —         |
 | AtariTools-800 sprites  | .4pl, .4mi, .4pm                                     | Atari 8-bit player/missile dumps | Y      | Y      | —         | R     | —   | —      | —         |
 | AtariTools-800 charset  | .acs                                                 | Atari 8-bit ANTIC 4 character set | Y      | Y      | —         | R     | —   | —      | —         |
@@ -813,13 +817,18 @@ Two different questions, two different answers:
 
 | Metric                                                    | Us    | RECOIL |
 | ----------------------------------------------------------- | ----- | ------ |
-| Total formats                                              | 666   | 552    |
+| Total formats                                              | 670   | 552    |
 | Modern/web/scientific formats (PNG, JPEG, WebP, AVIF, …)   | ~290  | 0      |
-| Of RECOIL's 552 vintage formats, covered                   | 537   | 552    |
+| Of RECOIL's 552 vintage formats, covered                   | 541   | 552    |
 
 So on breadth we are level, and on everything outside the retro catalogue we are the only one of
-the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 15
+the two that covers it — but RECOIL is still ahead on the vintage set it specialises in, by 11
 formats.
+
+Four of the entries now covered needed a character generator ROM: they store character codes and
+nothing else, so the font is not something the file names but something the reader has to already
+know. The Atari 8-bit and ZX81 fonts are embedded under `FileFormat.Core/Roms`, which that
+directory's README explains.
 
 Two different formats claim `.hip`: a C64 picture of ours and the Atari 8-bit Hard Interlace
 Picture, which is now implemented alongside it. Both are read; the extension alone does not

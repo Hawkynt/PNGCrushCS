@@ -13,4 +13,10 @@
     <ProjectReference Include="..\FileFormat.Core.Generators\FileFormat.Core.Generators.csproj"
                       OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Character generator ROMs. A handful of formats store nothing but character codes and are
+         undecodable without the font the machine drew them with. -->
+    <EmbeddedResource Include="Roms\atari8.fnt" LogicalName="FileFormat.Core.Roms.atari8.fnt" />
+    <EmbeddedResource Include="Roms\zx81.fnt" LogicalName="FileFormat.Core.Roms.zx81.fnt" />
+  </ItemGroup>
 </Project>
