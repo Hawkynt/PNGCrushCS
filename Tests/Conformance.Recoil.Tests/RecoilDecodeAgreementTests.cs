@@ -207,6 +207,7 @@ public sealed class RecoilDecodeAgreementTests {
     new("Cranach true colour", ImageFormat.CranachPaint, ".esm", () => _Cranach(24, 64, 48)),
     new("SymbOS graphic", ImageFormat.SymbOsGraphic, ".sgx", () => _SymbOs(false)),
     new("SymbOS graphic, sixteen colours", ImageFormat.SymbOsGraphic, ".sgx", () => _SymbOs(true)),
+    new("SEUCK sprites", ImageFormat.SeuckSprites, ".a", _Seuck),
   ];
 
   [Test]
@@ -1297,6 +1298,15 @@ public sealed class RecoilDecodeAgreementTests {
     body.AddRange([0, 0, 0, 0]);
 
     return body.ToArray();
+  }
+
+  /// <summary>A SEUCK sprite set, identified by two bytes and its length.</summary>
+  private static byte[] _Seuck() {
+    var data = _Monochrome(8130);
+    data[0] = 66;
+    data[1] = 0;
+
+    return data;
   }
 
   private static byte[] _Prefixed(int length) {
