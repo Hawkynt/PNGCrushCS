@@ -16,7 +16,8 @@ namespace FileFormat.ArtMaster88;
 /// repeats in it is the same size as the data.
 /// </remarks>
 public readonly record struct ArtMaster88File
-  : IImageFormatReader<ArtMaster88File>, IImageToRawImage<ArtMaster88File> {
+  : IImageFormatReader<ArtMaster88File>, IImageToRawImage<ArtMaster88File>,
+    IImageFromRawImage<ArtMaster88File>, IImageFormatWriter<ArtMaster88File> {
 
   /// <summary>Pixels across, in both forms.</summary>
   public const int Width = 640;
@@ -31,6 +32,7 @@ public readonly record struct ArtMaster88File
   static string[] IImageFormatMetadata<ArtMaster88File>.FileExtensions => [".arv"];
   static ArtMaster88File IImageFormatReader<ArtMaster88File>.FromSpan(ReadOnlySpan<byte> data)
     => ArtMaster88Reader.FromSpan(data);
+  static byte[] IImageFormatWriter<ArtMaster88File>.ToBytes(ArtMaster88File file) => ArtMaster88Writer.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<ArtMaster88File>.VideoModes => [
     new("PC-88", [(Width, Height)], [8]),
     new("PC-98", [(Width, Height)], [16]),
@@ -83,5 +85,45 @@ public readonly record struct ArtMaster88File
     }
 
     return new() { Width = Width, Height = Height, Format = PixelFormat.Rgb24, PixelData = rgb };
+  }
+
+  /// <summary>Builds a picture from an image, scaled to the machine's fixed screen.</summary>
+  /// <remarks>
+  /// The PC-88 form has no size field and no palette: 640 by 400 with one bit a channel, so the
+  /// eight corners of the colour cube are all it holds. Its two hundred stored rows are each shown
+  /// twice, which is why only every other row of the picture is kept.
+  /// </remarks>
+  public static ArtMaster88File FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width < 1 || image.Height < 1)
+      throw new ArgumentException("A picture needs at least one pixel.", nameof(image));
+
+    var rgb = PixelConverter.Convert(image, PixelFormat.Rgb24);
+    var planes = new byte[3][];
+    for (var i = 0; i < 3; ++i)
+      planes[i] = new byte[200 * BytesPerRow];
+
+    for (var y = 0; y < 200; ++y)
+    for (var x = 0; x < Width; ++x) {
+      var sourceX = image.Width == Width ? x : x * image.Width / Width;
+      var sourceY = image.Height == Height ? y * 2 : y * 2 * image.Height / Height;
+      var source = (sourceY * image.Width + sourceX) * 3;
+
+      var at = y * BytesPerRow + (x >> 3);
+      var bit = (byte)(1 << (7 - (x & 7)));
+
+      // The planes are the channels, in the order green, blue, red — which is why the picture's
+      // own order has to be permuted rather than copied.
+      if (rgb.PixelData[source] >= 128)
+        planes[1][at] |= bit;
+
+      if (rgb.PixelData[source + 1] >= 128)
+        planes[2][at] |= bit;
+
+      if (rgb.PixelData[source + 2] >= 128)
+        planes[0][at] |= bit;
+    }
+
+    return new() { StoredHeight = 200, Planes = planes, Palette = [] };
   }
 }

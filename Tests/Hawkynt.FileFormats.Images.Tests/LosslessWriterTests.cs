@@ -20,7 +20,13 @@ namespace Hawkynt.FileFormats.Images.Tests;
 public sealed class LosslessWriterTests {
 
   /// <summary>A format that loses nothing, and the pictures it is expected to hold exactly.</summary>
-  public sealed record Case(string Name, ImageFormat Format, Palette Palette, int Width, int Height);
+  /// <param name="PairedRows">
+  /// Whether the format stores half the rows and shows each twice. A picture whose row pairs differ
+  /// cannot survive that, so the sample is made with matching pairs — which keeps the test about
+  /// the encoding rather than about a halving nobody disputes.
+  /// </param>
+  public sealed record Case(
+    string Name, ImageFormat Format, Palette Palette, int Width, int Height, bool PairedRows = false);
 
   /// <summary>What the format can hold, and therefore what the picture given to it is built from.</summary>
   public enum Palette {
@@ -44,6 +50,7 @@ public sealed class LosslessWriterTests {
     new("True-colour GEM image", ImageFormat.TrueColorImg, Palette.Full, 96, 40),
     new("True-colour GEM image, one row", ImageFormat.TrueColorImg, Palette.Full, 300, 1),
     new("Kitty", ImageFormat.Kitty, Palette.OneBitChannels, 640, 400),
+    new("Art Master 88", ImageFormat.ArtMaster88, Palette.OneBitChannels, 640, 400, PairedRows: true),
   ];
 
   private static IEnumerable<TestCaseData> Cases() {
@@ -54,7 +61,7 @@ public sealed class LosslessWriterTests {
   [TestCaseSource(nameof(Cases))]
   [Category("Unit")]
   public void Written_ReadsBackUnchanged(Case one) {
-    var source = _Sample(one.Palette, one.Width, one.Height);
+    var source = _Sample(one.Palette, one.Width, one.Height, one.PairedRows);
 
     var bytes = FormatRegistry.Write(source, one.Format);
     Assert.That(bytes, Is.Not.Null.And.Not.Empty, $"{one.Name}: produced no bytes");
@@ -96,18 +103,22 @@ public sealed class LosslessWriterTests {
   /// A picture already within what the format holds: black and white for the one-bit formats, and
   /// full colour for the ones that carry whole pixels.
   /// </summary>
-  private static RawImage _Sample(Palette palette, int width, int height) {
+  private static RawImage _Sample(Palette palette, int width, int height, bool pairedRows = false) {
     var rgb = new byte[width * height * 3];
 
     for (var y = 0; y < height; ++y)
     for (var x = 0; x < width; ++x) {
       var at = (y * width + x) * 3;
 
+      // Where the format halves the rows, the two of a pair have to agree or nothing could hold
+      // them; the pattern is drawn from the even row of each pair.
+      var row = pairedRows ? y & ~1 : y;
+
       switch (palette) {
         // A pattern with runs in it and single pixels between them, so a run-length writer is
         // exercised on both and a stuck bit shows up as a shape rather than a shade.
         case Palette.Monochrome: {
-          var ink = (x / 3 + y / 5) % 2 == 0 || (x % 7 == 3 && y % 4 != 1);
+          var ink = (x / 3 + row / 5) % 2 == 0 || (x % 7 == 3 && row % 4 != 1);
           rgb[at] = rgb[at + 1] = rgb[at + 2] = (byte)(ink ? 0 : 255);
           break;
         }
@@ -115,15 +126,15 @@ public sealed class LosslessWriterTests {
         // Each channel fully on or fully off, and the three varying independently so a swapped
         // pair of channels cannot pass.
         case Palette.OneBitChannels:
-          rgb[at] = (byte)((x / 5 + y / 3) % 2 == 0 ? 255 : 0);
-          rgb[at + 1] = (byte)((x / 7 + y) % 2 == 0 ? 255 : 0);
-          rgb[at + 2] = (byte)((x + y / 11) % 2 == 0 ? 255 : 0);
+          rgb[at] = (byte)((x / 5 + row / 3) % 2 == 0 ? 255 : 0);
+          rgb[at + 1] = (byte)((x / 7 + row) % 2 == 0 ? 255 : 0);
+          rgb[at + 2] = (byte)((x + row / 11) % 2 == 0 ? 255 : 0);
           break;
 
         default:
-          rgb[at] = (byte)(x * 37 + y);
-          rgb[at + 1] = (byte)(y * 53 + x * 3);
-          rgb[at + 2] = (byte)(x * y + 17);
+          rgb[at] = (byte)(x * 37 + row);
+          rgb[at + 1] = (byte)(row * 53 + x * 3);
+          rgb[at + 2] = (byte)(x * row + 17);
           break;
       }
     }

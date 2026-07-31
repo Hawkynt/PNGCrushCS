@@ -208,7 +208,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | Canvas raster           | .ful                                                 | Palette per band, runs plus rest | Y      | —      | —         | R     | —   | —      | —         |
 | PhotoChrome compressed  | .pcs                                                 | Palette reloaded mid-scanline    | Y      | —      | —         | R     | —   | —      | —         |
 | Z's Staff Kid98         | .zim                                                 | Runs, nested flags, differenced  | Y      | —      | —         | R     | —   | —      | —         |
-| Art Master 88           | .arv                                                 | PC-88 or PC-98, runs by repeat   | Y      | —      | —         | R     | —   | —      | —         |
+| Art Master 88           | .arv                                                 | PC-88 or PC-98, runs by repeat   | Y      | Y      | —         | R     | —   | —      | —         |
 | XLD4                    | .q4                                                  | Dictionary over base-17 runs     | Y      | —      | —         | R     | —   | —      | —         |
 | LdPic                   | .bbg                                                 | BBC Micro, five modes, bit-packed | Y     | —      | —         | R     | —   | —      | —         |
 | True-colour GEM image   | .timg                                                | 24 bitplanes, or whole pixels    | Y      | Y      | —         | R     | —   | —      | —         |
