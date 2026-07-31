@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using FileFormat.Gif;
 using NUnit.Framework;
+using FileFormat.Core;
 
 namespace Optimizer.Gif.Tests;
 
@@ -32,7 +33,7 @@ public sealed class ReaderTests {
     writer.Write((byte)0); // bg color index
     writer.Write((byte)0); // pixel aspect ratio
 
-    // Global Color Table (4 entries)
+    // Global Rgba32 Table (4 entries)
     writer.Write(new byte[] { 255, 0, 0 }); // Red
     writer.Write(new byte[] { 0, 255, 0 }); // Green
     writer.Write(new byte[] { 0, 0, 255 }); // Blue

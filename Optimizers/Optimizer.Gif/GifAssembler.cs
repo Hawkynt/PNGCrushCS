@@ -1,7 +1,7 @@
 using System;
-using System.Drawing;
 using System.IO;
 using FileFormat.Gif;
+using FileFormat.Core;
 
 namespace Optimizer.Gif;
 
@@ -47,7 +47,7 @@ internal static class GifAssembler {
 
   private static void _WriteHeader(BinaryWriter writer) => writer.Write("GIF89a"u8);
 
-  private static void _WriteLogicalScreenDescriptor(BinaryWriter writer, Dimensions size, byte bgIndex, Color[]? gct) {
+  private static void _WriteLogicalScreenDescriptor(BinaryWriter writer, Dimensions size, byte bgIndex, Rgba32[]? gct) {
     writer.Write(size.Width);
     writer.Write(size.Height);
 
@@ -62,7 +62,7 @@ internal static class GifAssembler {
     writer.Write((byte)0); // pixel aspect ratio
   }
 
-  private static void _WriteColorTable(BinaryWriter writer, Color[] colorTable) {
+  private static void _WriteColorTable(BinaryWriter writer, Rgba32[] colorTable) {
     var tableSize = 1 << (_GetColorTableSizeBits(colorTable.Length) + 1);
     for (var i = 0; i < tableSize; ++i)
       if (i < colorTable.Length) {
@@ -100,7 +100,7 @@ internal static class GifAssembler {
     writer.Write(BLOCK_TERMINATOR);
   }
 
-  private static void _WriteImageDescriptor(BinaryWriter writer, Dimensions size, Offset position, Color[]? lct) {
+  private static void _WriteImageDescriptor(BinaryWriter writer, Dimensions size, Offset position, Rgba32[]? lct) {
     writer.Write(IMAGE_SEPARATOR);
     writer.Write(position.X);
     writer.Write(position.Y);

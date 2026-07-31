@@ -1,3 +1,4 @@
+using FileFormat.Core;
 namespace Optimizer.Gif;
 
 public readonly record struct GifOptimizationCombo(

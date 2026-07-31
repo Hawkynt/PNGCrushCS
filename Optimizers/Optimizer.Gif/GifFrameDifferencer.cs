@@ -1,6 +1,6 @@
 using System;
-using System.Drawing;
 using FileFormat.Gif;
+using FileFormat.Core;
 
 namespace Optimizer.Gif;
 
@@ -33,7 +33,7 @@ internal static class GifFrameDifferencer {
     for (var i = 0; i < frames.Count; ++i) {
       var frame = frames[i];
       var paletteColors = frame.LocalColorTable != null ? PaletteAdapter.ToColors(frame.LocalColorTable) : gctColors;
-      Color[]? palette = paletteColors.Length > 0 ? paletteColors : null;
+      Rgba32[]? palette = paletteColors.Length > 0 ? paletteColors : null;
 
       if (i == 0 || palette == null) {
         // First frame or no palette: output as-is, composite onto canvas
@@ -110,16 +110,16 @@ internal static class GifFrameDifferencer {
   }
 
   /// <summary>Ensure a transparent index exists in the palette.</summary>
-  internal static (byte transparentIdx, Color[] palette) _EnsureTransparentIndex(Color[] palette,
+  internal static (byte transparentIdx, Rgba32[] palette) _EnsureTransparentIndex(Rgba32[] palette,
     byte? existingTransparentIdx) {
     if (existingTransparentIdx.HasValue)
       return (existingTransparentIdx.Value, palette);
 
     // Try to find an unused slot or add one
     if (palette.Length < 256) {
-      var newPalette = new Color[palette.Length + 1];
+      var newPalette = new Rgba32[palette.Length + 1];
       Array.Copy(palette, newPalette, palette.Length);
-      newPalette[palette.Length] = Color.FromArgb(0, 0, 0, 0);
+      newPalette[palette.Length] = Rgba32.FromArgb(0, 0, 0, 0);
       return ((byte)palette.Length, newPalette);
     }
 
@@ -128,7 +128,7 @@ internal static class GifFrameDifferencer {
     return (255, palette);
   }
 
-  private static void _CompositeOntoCanvas(byte[] canvas, bool[] canvasValid, Frame frame, Color[]? palette,
+  private static void _CompositeOntoCanvas(byte[] canvas, bool[] canvasValid, Frame frame, Rgba32[]? palette,
     int screenW) {
     if (palette == null)
       return;
@@ -159,7 +159,7 @@ internal static class GifFrameDifferencer {
     }
   }
 
-  private static void _ApplyDisposal(byte[] canvas, bool[] canvasValid, Frame frame, Color[]? palette, int screenW,
+  private static void _ApplyDisposal(byte[] canvas, bool[] canvasValid, Frame frame, Rgba32[]? palette, int screenW,
     int screenH) {
     switch (frame.DisposalMethod) {
       case FrameDisposalMethod.RestoreToBackground: {

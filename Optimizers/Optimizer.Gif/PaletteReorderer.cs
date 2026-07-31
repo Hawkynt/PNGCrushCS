@@ -1,11 +1,11 @@
 using System;
-using System.Drawing;
 using System.Linq;
+using FileFormat.Core;
 
 namespace Optimizer.Gif;
 
 internal static class PaletteReorderer {
-  public static (Color[] newPalette, byte[] remapTable) Reorder(Color[] palette, byte[] pixels,
+  public static (Rgba32[] newPalette, byte[] remapTable) Reorder(Rgba32[] palette, byte[] pixels,
     PaletteReorderStrategy strategy) {
     return strategy switch {
       PaletteReorderStrategy.Original => (palette, _IdentityRemap(palette.Length)),
@@ -33,7 +33,7 @@ internal static class PaletteReorderer {
     return remap;
   }
 
-  private static (Color[] newPalette, byte[] remapTable) _FrequencySort(Color[] palette, byte[] pixels) {
+  private static (Rgba32[] newPalette, byte[] remapTable) _FrequencySort(Rgba32[] palette, byte[] pixels) {
     var freq = new int[palette.Length];
     foreach (var p in pixels)
       if (p < freq.Length)
@@ -45,7 +45,7 @@ internal static class PaletteReorderer {
     return _BuildRemappedResult(palette, indices);
   }
 
-  private static (Color[] newPalette, byte[] remapTable) _LuminanceSort(Color[] palette) {
+  private static (Rgba32[] newPalette, byte[] remapTable) _LuminanceSort(Rgba32[] palette) {
     var indices = Enumerable.Range(0, palette.Length).ToArray();
     Array.Sort(indices, (a, b) => {
       var lumA = 0.299 * palette[a].R + 0.587 * palette[a].G + 0.114 * palette[a].B;
@@ -56,7 +56,7 @@ internal static class PaletteReorderer {
     return _BuildRemappedResult(palette, indices);
   }
 
-  private static (Color[] newPalette, byte[] remapTable) _SpatialLocalitySort(Color[] palette, byte[] pixels) {
+  private static (Rgba32[] newPalette, byte[] remapTable) _SpatialLocalitySort(Rgba32[] palette, byte[] pixels) {
     // Order palette entries by first-occurrence position in pixel stream
     var firstOccurrence = new int[palette.Length];
     Array.Fill(firstOccurrence, int.MaxValue);
@@ -71,7 +71,7 @@ internal static class PaletteReorderer {
     return _BuildRemappedResult(palette, indices);
   }
 
-  private static (Color[] newPalette, byte[] remapTable) _LzwRunAwareSort(Color[] palette, byte[] pixels) {
+  private static (Rgba32[] newPalette, byte[] remapTable) _LzwRunAwareSort(Rgba32[] palette, byte[] pixels) {
     // Build adjacency weights: which palette indices appear next to each other most often
     var adjacency = new int[palette.Length, palette.Length];
     for (var i = 1; i < pixels.Length; ++i) {
@@ -127,7 +127,7 @@ internal static class PaletteReorderer {
     return _BuildRemappedResult(palette, order);
   }
 
-  private static (Color[] newPalette, byte[] remapTable) _HilbertCurveSort(Color[] palette) {
+  private static (Rgba32[] newPalette, byte[] remapTable) _HilbertCurveSort(Rgba32[] palette) {
     var indices = Enumerable.Range(0, palette.Length).ToArray();
     Array.Sort(indices, (a, b) => {
       var hA = _RgbToHilbert(palette[a].R, palette[a].G, palette[a].B);
@@ -138,7 +138,7 @@ internal static class PaletteReorderer {
     return _BuildRemappedResult(palette, indices);
   }
 
-  private static (Color[] newPalette, byte[] remapTable) _CompressionOptimizedSort(Color[] palette, byte[] pixels) {
+  private static (Rgba32[] newPalette, byte[] remapTable) _CompressionOptimizedSort(Rgba32[] palette, byte[] pixels) {
     // Try each heuristic ordering and pick the one that produces the smallest LZW output
     var candidates = new[] {
       PaletteReorderStrategy.FrequencySorted,
@@ -148,7 +148,7 @@ internal static class PaletteReorderer {
       PaletteReorderStrategy.HilbertCurve
     };
 
-    Color[]? bestPalette = null;
+    Rgba32[]? bestPalette = null;
     byte[]? bestRemap = null;
     var bestSize = int.MaxValue;
 
@@ -168,8 +168,8 @@ internal static class PaletteReorderer {
     return bestPalette != null ? (bestPalette, bestRemap!) : (palette, _IdentityRemap(palette.Length));
   }
 
-  private static (Color[] newPalette, byte[] remapTable) _BuildRemappedResult(Color[] palette, int[] newOrder) {
-    var newPalette = new Color[palette.Length];
+  private static (Rgba32[] newPalette, byte[] remapTable) _BuildRemappedResult(Rgba32[] palette, int[] newOrder) {
+    var newPalette = new Rgba32[palette.Length];
     var remapTable = new byte[palette.Length];
 
     for (var newIndex = 0; newIndex < newOrder.Length; ++newIndex) {

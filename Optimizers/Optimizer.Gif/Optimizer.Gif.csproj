@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
 
     <Description>GIF optimization engine with palette reordering, LZW re-encoding, and frame optimization.</Description>
     <PackageReadmeFile>ReadMe.md</PackageReadmeFile>
@@ -10,7 +10,6 @@
     <RepositoryUrl>https://github.com/Hawkynt/PNGCrush</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
-    <EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>
 
   <ItemGroup>
@@ -21,10 +20,6 @@
     <ProjectReference Include="..\..\Hawkynt.FileFormats.Images\Hawkynt.FileFormats.Images.csproj" />
     <ProjectReference Include="..\..\FileFormat.Core\FileFormat.Core.csproj" />
     <ProjectReference Include="../../Crush.Core/Crush.Core.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="System.Drawing.Common" Version="9.0.4" />
   </ItemGroup>
 
 </Project>

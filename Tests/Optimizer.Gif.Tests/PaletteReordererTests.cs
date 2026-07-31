@@ -1,17 +1,17 @@
 using System;
-using System.Drawing;
 using System.Linq;
 using NUnit.Framework;
+using FileFormat.Core;
 
 namespace Optimizer.Gif.Tests;
 
 [TestFixture]
 public sealed class PaletteReordererTests {
-  private static readonly Color[] _TestPalette = [
-    Color.FromArgb(255, 255, 0, 0),
-    Color.FromArgb(255, 0, 255, 0),
-    Color.FromArgb(255, 0, 0, 255),
-    Color.FromArgb(255, 255, 255, 255)
+  private static readonly Rgba32[] _TestPalette = [
+    Rgba32.FromArgb(255, 255, 0, 0),
+    Rgba32.FromArgb(255, 0, 255, 0),
+    Rgba32.FromArgb(255, 0, 0, 255),
+    Rgba32.FromArgb(255, 255, 255, 255)
   ];
 
   private static readonly byte[] _TestPixels = [0, 1, 2, 3, 0, 0, 1, 1, 2, 2, 3, 3, 0, 1, 2, 3];
@@ -65,7 +65,7 @@ public sealed class PaletteReordererTests {
     for (var i = 0; i < _TestPixels.Length; ++i) {
       var originalColor = _TestPalette[_TestPixels[i]].ToArgb();
       var remappedColor = newPalette[remapped[i]].ToArgb();
-      Assert.That(remappedColor, Is.EqualTo(originalColor), $"Color mismatch at pixel {i}");
+      Assert.That(remappedColor, Is.EqualTo(originalColor), $"Rgba32 mismatch at pixel {i}");
     }
   }
 
@@ -76,7 +76,7 @@ public sealed class PaletteReordererTests {
     var (newPalette, _) = PaletteReorderer.Reorder(_TestPalette, pixels, PaletteReorderStrategy.FrequencySorted);
 
     // Index 2 (Blue) is most frequent (4 times), should be first
-    Assert.That(newPalette[0].ToArgb(), Is.EqualTo(Color.Blue.ToArgb()));
+    Assert.That(newPalette[0].ToArgb(), Is.EqualTo(Rgba32.Blue.ToArgb()));
   }
 
   [Test]

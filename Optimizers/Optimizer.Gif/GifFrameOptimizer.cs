@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Drawing;
 using FileFormat.Gif;
+using FileFormat.Core;
 
 namespace Optimizer.Gif;
 
@@ -49,13 +49,13 @@ internal static class GifFrameOptimizer {
     };
   }
 
-  private static bool _FramesAreIdentical(Frame a, Frame b, Color[]? globalColorTable) {
+  private static bool _FramesAreIdentical(Frame a, Frame b, Rgba32[]? globalColorTable) {
     var lctA = a.LocalColorTable != null ? PaletteAdapter.ToColors(a.LocalColorTable) : null;
     var lctB = b.LocalColorTable != null ? PaletteAdapter.ToColors(b.LocalColorTable) : null;
     return _FramesAreIdenticalInner(a, b, lctA, lctB, globalColorTable);
   }
 
-  private static bool _FramesAreIdenticalInner(Frame a, Frame b, Color[]? lctA, Color[]? lctB, Color[]? globalColorTable) {
+  private static bool _FramesAreIdenticalInner(Frame a, Frame b, Rgba32[]? lctA, Rgba32[]? lctB, Rgba32[]? globalColorTable) {
     if (a.Position.X != b.Position.X || a.Position.Y != b.Position.Y)
       return false;
     if (a.Size.Width != b.Size.Width || a.Size.Height != b.Size.Height)
@@ -202,7 +202,7 @@ internal static class GifFrameOptimizer {
     return disposals;
   }
 
-  private static void _CompositeFrame(byte[] canvas, bool[] canvasValid, Frame frame, Color[]? palette,
+  private static void _CompositeFrame(byte[] canvas, bool[] canvasValid, Frame frame, Rgba32[]? palette,
     int screenW, int screenH) {
     if (palette == null)
       return;
@@ -261,7 +261,7 @@ internal static class GifFrameOptimizer {
   }
 
   private static int _ComputeDiffCompressedSize(byte[] canvas, bool[] canvasValid, Frame nextFrame,
-    Color[] nextPalette, int screenW, int screenH) {
+    Rgba32[] nextPalette, int screenW, int screenH) {
     var fw = nextFrame.Size.Width;
     var fh = nextFrame.Size.Height;
     var fx = nextFrame.Position.X;
@@ -393,7 +393,7 @@ internal static class GifFrameOptimizer {
   ///   Determines whether a global color table can be used for all frames.
   ///   Returns null if frames use incompatible palettes.
   /// </summary>
-  public static Color[]? TryBuildGlobalColorTable(GifFile gif) {
+  public static Rgba32[]? TryBuildGlobalColorTable(GifFile gif) {
     if (gif.Frames.Count == 0)
       return gif.GlobalColorTable != null ? PaletteAdapter.ToColors(gif.GlobalColorTable) : null;
 
@@ -413,10 +413,10 @@ internal static class GifFrameOptimizer {
     if (colorSet.Count > 256)
       return null;
 
-    var result = new Color[colorSet.Count];
+    var result = new Rgba32[colorSet.Count];
     var idx = 0;
     foreach (var rgb in colorSet)
-      result[idx++] = Color.FromArgb((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF);
+      result[idx++] = Rgba32.FromArgb((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF);
 
     return result;
   }

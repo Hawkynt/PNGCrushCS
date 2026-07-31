@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using FileFormat.Core;
 
 namespace Optimizer.Gif;
 

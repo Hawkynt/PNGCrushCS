@@ -1,8 +1,8 @@
 using System;
-using System.Drawing;
 using FileFormat.Gif;
 using NUnit.Framework;
 using Optimizer.Gif;
+using FileFormat.Core;
 
 namespace Optimizer.Gif.Tests;
 
@@ -118,7 +118,7 @@ public sealed class GifFrameOptimizerTests {
   public void DeduplicateFrames_IdenticalConsecutive_MergesDelay() {
     var pixels = new byte[] { 1, 2, 3, 4 };
     var size = new Dimensions(2, 2);
-    var palette = new[] { Color.Red, Color.Green, Color.Blue, Color.White };
+    var palette = new[] { Rgba32.Red, Rgba32.Green, Rgba32.Blue, Rgba32.White };
     var delay = TimeSpan.FromMilliseconds(100);
 
     var frames = new[] {
@@ -166,7 +166,7 @@ public sealed class GifFrameOptimizerTests {
     // RestoreToBackground means canvas cleared, also all changed
     // Result should not crash and should pick a valid disposal
     var size = new Dimensions(4, 4);
-    var palette = new[] { Color.Red, Color.Green, Color.Blue, Color.White };
+    var palette = new[] { Rgba32.Red, Rgba32.Green, Rgba32.Blue, Rgba32.White };
 
     var pixels1 = new byte[16];
     Array.Fill(pixels1, (byte)0); // all red
@@ -198,7 +198,7 @@ public sealed class GifFrameOptimizerTests {
   public void CompressionAwareDisposal_IdenticalFrames_PicksDoNotDispose() {
     // Two identical frames: DoNotDispose is optimal since next frame's diff is all transparent
     var size = new Dimensions(4, 4);
-    var palette = new[] { Color.Red, Color.Green, Color.Blue, Color.White };
+    var palette = new[] { Rgba32.Red, Rgba32.Green, Rgba32.Blue, Rgba32.White };
     var pixels = new byte[16];
     Array.Fill(pixels, (byte)1);
 
@@ -222,7 +222,7 @@ public sealed class GifFrameOptimizerTests {
   [Category("Unit")]
   public void ComputeDiffs_IdenticalFrames_AllTransparentExceptFirst() {
     var size = new Dimensions(4, 4);
-    var palette = new[] { Color.Red, Color.Green, Color.Blue, Color.White };
+    var palette = new[] { Rgba32.Red, Rgba32.Green, Rgba32.Blue, Rgba32.White };
     var pixels = new byte[16];
     for (var i = 0; i < pixels.Length; ++i)
       pixels[i] = 1; // all green
@@ -251,7 +251,7 @@ public sealed class GifFrameOptimizerTests {
   [Category("Unit")]
   public void ComputeDiffs_CompletelyDifferentFrames_NoChange() {
     var size = new Dimensions(4, 4);
-    var palette = new[] { Color.Red, Color.Green, Color.Blue, Color.White };
+    var palette = new[] { Rgba32.Red, Rgba32.Green, Rgba32.Blue, Rgba32.White };
 
     var pixels1 = new byte[16];
     var pixels2 = new byte[16];
@@ -279,20 +279,20 @@ public sealed class GifFrameOptimizerTests {
   [Test]
   [Category("Unit")]
   public void EnsureTransparentIndex_NoExisting_ReservesSlot() {
-    var palette = new[] { Color.Red, Color.Green, Color.Blue };
+    var palette = new[] { Rgba32.Red, Rgba32.Green, Rgba32.Blue };
     var (idx, newPalette) = GifFrameDifferencer._EnsureTransparentIndex(palette, null);
 
     Assert.That(idx, Is.EqualTo(3)); // appended after existing 3 entries
     Assert.That(newPalette.Length, Is.EqualTo(4));
-    Assert.That(newPalette[0], Is.EqualTo(Color.Red));
-    Assert.That(newPalette[1], Is.EqualTo(Color.Green));
-    Assert.That(newPalette[2], Is.EqualTo(Color.Blue));
+    Assert.That(newPalette[0], Is.EqualTo(Rgba32.Red));
+    Assert.That(newPalette[1], Is.EqualTo(Rgba32.Green));
+    Assert.That(newPalette[2], Is.EqualTo(Rgba32.Blue));
   }
 
   [Test]
   [Category("Unit")]
   public void EnsureTransparentIndex_Existing_ReturnsExisting() {
-    var palette = new[] { Color.Red, Color.Green, Color.Blue };
+    var palette = new[] { Rgba32.Red, Rgba32.Green, Rgba32.Blue };
     var (idx, newPalette) = GifFrameDifferencer._EnsureTransparentIndex(palette, 1);
 
     Assert.That(idx, Is.EqualTo(1));
@@ -305,8 +305,8 @@ public sealed class GifFrameOptimizerTests {
   [Category("Regression")]
   public void DeduplicateFrames_SwappedPalettes_SameVisual_Deduplicates() {
     var size = new Dimensions(2, 2);
-    var paletteA = new[] { Color.Red, Color.Green };
-    var paletteB = new[] { Color.Green, Color.Red };
+    var paletteA = new[] { Rgba32.Red, Rgba32.Green };
+    var paletteB = new[] { Rgba32.Green, Rgba32.Red };
     var pixelsA = new byte[] { 0, 1, 0, 1 }; // Red, Green, Red, Green
     var pixelsB = new byte[] { 1, 0, 1, 0 }; // Red, Green, Red, Green (via swapped palette)
 
@@ -328,14 +328,14 @@ public sealed class GifFrameOptimizerTests {
   [Category("Regression")]
   public void DeduplicateFrames_GctVsLct_SameColors_Deduplicates() {
     var size = new Dimensions(2, 2);
-    var gct = new[] { Color.Red, Color.Green, Color.Blue, Color.White };
+    var gct = new[] { Rgba32.Red, Rgba32.Green, Rgba32.Blue, Rgba32.White };
     var pixels = new byte[] { 0, 1, 2, 3 };
 
     // Frame 0 uses GCT (null LCT), Frame 1 uses identical LCT
     var frames = new[] {
       new Frame((byte[])pixels.Clone(), size, new Offset(0, 0), null, TimeSpan.FromMilliseconds(100),
         FrameDisposalMethod.Unspecified, null, false),
-      new Frame((byte[])pixels.Clone(), size, new Offset(0, 0), PaletteAdapter.ToBytes((Color[])gct.Clone()),
+      new Frame((byte[])pixels.Clone(), size, new Offset(0, 0), PaletteAdapter.ToBytes((Rgba32[])gct.Clone()),
         TimeSpan.FromMilliseconds(100), FrameDisposalMethod.Unspecified, null, false)
     };
 
@@ -350,8 +350,8 @@ public sealed class GifFrameOptimizerTests {
   [Category("Regression")]
   public void DeduplicateFrames_SwappedPalettes_DifferentVisual_DoesNotDeduplicate() {
     var size = new Dimensions(2, 2);
-    var paletteA = new[] { Color.Red, Color.Green };
-    var paletteB = new[] { Color.Green, Color.Blue };
+    var paletteA = new[] { Rgba32.Red, Rgba32.Green };
+    var paletteB = new[] { Rgba32.Green, Rgba32.Blue };
     var pixels = new byte[] { 0, 1, 0, 1 };
 
     var frames = new[] {
@@ -379,7 +379,7 @@ public sealed class GifFrameOptimizerTests {
 
       frames[i] = new Frame(
         pixels, size, new Offset(0, 0),
-        PaletteAdapter.ToBytes(new[] { Color.Red, Color.Green, Color.Blue, Color.White }),
+        PaletteAdapter.ToBytes(new[] { Rgba32.Red, Rgba32.Green, Rgba32.Blue, Rgba32.White }),
         TimeSpan.FromMilliseconds(100),
         FrameDisposalMethod.Unspecified,
         null, false

@@ -1,13 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Crush.Core;
 using FileFormat.Gif;
+using FileFormat.Core;
 
 namespace Optimizer.Gif;
 
@@ -204,7 +204,7 @@ public sealed class GifOptimizer {
         var size = frame.Size;
         var disposal = optimizedDisposals != null ? optimizedDisposals[i] : frame.DisposalMethod;
         var transparentIndex = frame.TransparentColorIndex;
-        Color[]? localColorTable;
+        Rgba32[]? localColorTable;
 
         // Apply palette reordering
         if (combo.PaletteStrategy != PaletteReorderStrategy.Original) {
@@ -265,7 +265,7 @@ public sealed class GifOptimizer {
     }
   }
 
-  private static byte[] _BuildGctRemap(Color[] source, Color[] target) {
+  private static byte[] _BuildGctRemap(Rgba32[] source, Rgba32[] target) {
     var remap = new byte[source.Length];
     for (var i = 0; i < source.Length; ++i) {
       var best = 0;
