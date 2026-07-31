@@ -311,7 +311,70 @@ public sealed class RecoilDecodeAgreementTests {
     new("ComputerEyes, hi-res colour", ImageFormat.ComputerEyesSt, ".ce3", () => _ComputerEyesSt(1)),
     new("ComputerEyes, grey", ImageFormat.ComputerEyesSt, ".ce3", () => _ComputerEyesSt(2)),
     new("Fun with Art", ImageFormat.FunWithArt, ".fwa", _FunWithArt),
+    new("ICE mode 0", ImageFormat.AtariIce, ".ice", () => _AtariIce(0, 2053)),
+    new("ICE mode 1", ImageFormat.AtariIce, ".ice", () => _AtariIce(1, 2054)),
+    new("ICE mode 2", ImageFormat.AtariIce, ".ice", () => _AtariIce(2, 2058)),
+    new("ICE mode 3", ImageFormat.AtariIce, ".ice", () => _AtariIce(3, 2055)),
+    new("ICE mode 4", ImageFormat.AtariIce, ".ice", () => _AtariIce(4, 2058)),
+    new("ICE mode 5", ImageFormat.AtariIce, ".ice", () => _AtariIce(5, 2065)),
+    new("ICE mode 6", ImageFormat.AtariIce, ".ice", () => _AtariIce(6, 2051)),
+    new("ICE mode 7", ImageFormat.AtariIce, ".ice", () => _AtariIce(7, 2051)),
+    new("ICE mode 8", ImageFormat.AtariIce, ".ice", () => _AtariIce(8, 2058)),
+    new("ICE mode 9", ImageFormat.AtariIce, ".ice", () => _AtariIce(9, 2058)),
+    new("ICE mode 10", ImageFormat.AtariIce, ".ice", () => _AtariIce(10, 2051)),
+    new("ICE mode 11", ImageFormat.AtariIce, ".ice", () => _AtariIce(11, 2051)),
+    new("ICE mode 12", ImageFormat.AtariIce, ".ice", () => _AtariIce(12, 2051)),
+    new("ICE mode 13", ImageFormat.AtariIce, ".ice", () => _AtariIce(13, 2059)),
+    new("ICE mode 14", ImageFormat.AtariIce, ".ice", () => _AtariIce(14, 2054)),
+    new("ICE mode 15", ImageFormat.AtariIce, ".ice", () => _AtariIce(15, 2054)),
+    new("ICE mode 16", ImageFormat.AtariIce, ".ice", () => _AtariIce(16, 2058)),
+    new("ICE mode 17", ImageFormat.AtariIce, ".ice", () => _AtariIce(17, 2054)),
+    new("ICE mode 18", ImageFormat.AtariIce, ".ice", () => _AtariIce(18, 2054)),
+    new("ICE mode 19", ImageFormat.AtariIce, ".ice", () => _AtariIce(19, 2058)),
+    new("ICE mode 22", ImageFormat.AtariIce, ".ice", () => _AtariIce(22, 2058)),
+    new("ICE mode 23", ImageFormat.AtariIce, ".ice", () => _AtariIce(23, 2065)),
+    new("ICE mode 24", ImageFormat.AtariIce, ".ice", () => _AtariIce(24, 2051)),
+    new("ICE mode 25", ImageFormat.AtariIce, ".ice", () => _AtariIce(25, 2051)),
+    new("ICE mode 26", ImageFormat.AtariIce, ".ice", () => _AtariIce(26, 2058)),
+    new("ICE mode 27", ImageFormat.AtariIce, ".ice", () => _AtariIce(27, 2058)),
+    new("ICE mode 28", ImageFormat.AtariIce, ".ice", () => _AtariIce(28, 2051)),
+    new("ICE mode 31", ImageFormat.AtariIce, ".ice", () => _AtariIce(31, 1032)),
+    new("ICE mode 32", ImageFormat.AtariIce, ".ice", () => _AtariIce(32, 1038)),
+    new("ICE mode 33", ImageFormat.AtariIce, ".ice", () => _AtariIce(33, 1027)),
+    new("ICE mode 34", ImageFormat.AtariIce, ".ice", () => _AtariIce(34, 1027)),
+    new("ICE mode 35", ImageFormat.AtariIce, ".ice", () => _AtariIce(35, 1032)),
+    new("ICE mode 36", ImageFormat.AtariIce, ".ice", () => _AtariIce(36, 1032)),
+    new("ICE mode 37", ImageFormat.AtariIce, ".ice", () => _AtariIce(37, 1027)),
+    new("ICE mode 5, long", ImageFormat.AtariIce, ".ice", () => _AtariIce(5, 2066)),
+    new("ICE PCIN+", ImageFormat.IcePcinPlus, ".ip2", _IcePcinPlus),
   ];
+
+  /// <summary>
+  /// An Interlace Character Editor file in one of its thirty-three mode pairings, which the first
+  /// byte names and the length confirms.
+  /// </summary>
+  private static byte[] _AtariIce(int mode, int length) {
+    var data = new byte[length];
+    data[0] = (byte)mode;
+
+    // The header is colour registers and the rest a character set; both want varied content, and
+    // no byte of either is constrained.
+    for (var i = 1; i < length; ++i)
+      data[i] = (byte)(i * 37 + (i >> 5) * 11);
+
+    return data;
+  }
+
+  /// <summary>An ICE PCIN+ picture: a screen of character codes and two character sets.</summary>
+  private static byte[] _IcePcinPlus() {
+    var data = new byte[17358];
+    data[0] = 1;
+
+    for (var i = 1; i < data.Length; ++i)
+      data[i] = (byte)(i * 53 + (i >> 6) * 7);
+
+    return data;
+  }
 
   /// <summary>
   /// A Fun with Art picture: the program's saved workspace, a display list, the bitmap, and one
