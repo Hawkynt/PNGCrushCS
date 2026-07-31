@@ -382,7 +382,117 @@ public sealed class RecoilDecodeAgreementTests {
     new("True-colour IMG, 15 planes", ImageFormat.TrueColorImg, ".timg", () => _TrueColorImg(15)),
     new("True-colour IMG, 16 planes", ImageFormat.TrueColorImg, ".timg", () => _TrueColorImg(16)),
     new("True-colour IMG, 24 planes", ImageFormat.TrueColorImg, ".timg", () => _TrueColorImg(24)),
+    new("Screen 12, 192 rows", ImageFormat.MsxScc, ".scc", () => _MsxScc(0)),
+    new("Screen 12, whole memory", ImageFormat.MsxScc, ".scc", () => _MsxScc(1)),
+    new("Screen 12, packed", ImageFormat.MsxScc, ".scc", () => _MsxScc(2)),
+    new("Screen 12, with sprites", ImageFormat.MsxScc, ".scc", () => _MsxScc(3)),
   ];
+
+  /// <summary>An MSX2+ Screen 12 picture in one of the four shapes a BSAVE image can take.</summary>
+  private static byte[] _MsxScc(int kind) {
+    static void Header(byte[] data, int end) {
+      data[0] = 254;
+      data[3] = (byte)end;
+      data[4] = (byte)(end >> 8);
+    }
+
+    static void Fill(byte[] data, int from, int to, int seed) {
+      for (var i = from; i < to; ++i)
+        data[i] = (byte)(i * 37 + (i >> 7) * 11 + seed);
+    }
+
+    switch (kind) {
+      // Only the visible screen, which the end address declares.
+      case 0: {
+        var data = new byte[49159];
+        Header(data, 49151);
+        Fill(data, 7, data.Length, 0);
+        return data;
+      }
+
+      // The whole of video memory.
+      case 1: {
+        var data = new byte[54279];
+        Header(data, 54279 - 8);
+        Fill(data, 7, data.Length, 1);
+        return data;
+      }
+
+      // The same, run-length packed, which a different leading byte announces.
+      case 2: {
+        var screen = new byte[54279];
+        Fill(screen, 7, screen.Length, 2);
+
+        // Some stretches flat, so both the short and the long run are written.
+        for (var i = 7; i < screen.Length; ++i) {
+          if (i % 900 < 300)
+            screen[i] = (byte)((i / 900) & 255);
+        }
+
+        var body = new System.Collections.Generic.List<byte>();
+        for (var i = 7; i < screen.Length;) {
+          var run = 1;
+          while (run < 256 && i + run < screen.Length && screen[i + run] == screen[i])
+            ++run;
+
+          if (run == 1 && screen[i] > 15) {
+            body.Add(screen[i]);
+            ++i;
+            continue;
+          }
+
+          if (run <= 15) {
+            body.Add((byte)run);
+            body.Add(screen[i]);
+          } else {
+            body.Add(0);
+            body.Add((byte)(run & 255));
+            body.Add(screen[i]);
+          }
+
+          i += run;
+        }
+
+        var data = new byte[7 + body.Count];
+        data[0] = 253;
+        data[3] = (byte)body.Count;
+        data[4] = (byte)(body.Count >> 8);
+        body.CopyTo(data, 7);
+
+        return data;
+      }
+
+      // Video memory with the sprite tables after it, which are drawn over the picture.
+      default: {
+        var data = new byte[64167];
+        Header(data, 54279 - 8);
+        Fill(data, 7, 61447, 3);
+
+        // Thirty-two sprites, most of them past the terminator so the early exit is covered.
+        for (var sprite = 0; sprite < 32; ++sprite) {
+          var at = 64007 + sprite * 4;
+          data[at] = (byte)(sprite < 6 ? sprite * 30 + 8 : 216);
+          data[at + 1] = (byte)(sprite * 37 % 240);
+          data[at + 2] = (byte)(sprite * 4);
+          data[at + 3] = 0;
+        }
+
+        // The per-line colour table a Screen 12 sprite uses, sixteen bytes to a sprite.
+        for (var i = 63495; i < 64007; ++i)
+          data[i] = (byte)((i * 13) & 0x4F);
+
+        for (var i = 61447; i < 63495; ++i)
+          data[i] = (byte)(i * 29 + (i >> 4));
+
+        for (var i = 0; i < 16; ++i) {
+          data[64135 + i * 2] = (byte)(((i * 3) % 8 << 4) | ((i * 5) % 8));
+          data[64136 + i * 2] = (byte)((i * 7) % 8);
+        }
+
+        return data;
+      }
+    }
+  }
 
   /// <summary>A true-colour GEM bit image, either chunky or in fifteen, sixteen or twenty-four planes.</summary>
   private static byte[] _TrueColorImg(int bitplanes) {
