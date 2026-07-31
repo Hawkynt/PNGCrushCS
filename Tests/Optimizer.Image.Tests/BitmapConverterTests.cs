@@ -1,5 +1,4 @@
 using System;
-using System.Drawing;
 using System.IO;
 using FileFormat.Bmp;
 using FileFormat.Core;
@@ -42,11 +41,11 @@ public sealed class BitmapConverterTests {
     };
     var fi = _WriteTempFile(TgaWriter.ToBytes(file), ".tga");
 
-    using var bmp = BitmapConverter.LoadBitmap(fi, ImageFormat.Tga);
+    var bmp = BitmapConverter.LoadRawImage(fi, ImageFormat.Tga)!;
 
     Assert.That(bmp.Width, Is.EqualTo(2));
     Assert.That(bmp.Height, Is.EqualTo(1));
-    var p0 = bmp.GetPixel(0, 0);
+    var p0 = _At(bmp, 0, 0);
     Assert.That(p0.B, Is.EqualTo(0));
     Assert.That(p0.G, Is.EqualTo(128));
     Assert.That(p0.R, Is.EqualTo(255));
@@ -64,9 +63,9 @@ public sealed class BitmapConverterTests {
     };
     var fi = _WriteTempFile(TgaWriter.ToBytes(file), ".tga");
 
-    using var bmp = BitmapConverter.LoadBitmap(fi, ImageFormat.Tga);
+    var bmp = BitmapConverter.LoadRawImage(fi, ImageFormat.Tga)!;
 
-    var p = bmp.GetPixel(0, 0);
+    var p = _At(bmp, 0, 0);
     Assert.That(p.B, Is.EqualTo(10));
     Assert.That(p.G, Is.EqualTo(20));
     Assert.That(p.R, Is.EqualTo(30));
@@ -85,9 +84,9 @@ public sealed class BitmapConverterTests {
     };
     var fi = _WriteTempFile(TgaWriter.ToBytes(file), ".tga");
 
-    using var bmp = BitmapConverter.LoadBitmap(fi, ImageFormat.Tga);
+    var bmp = BitmapConverter.LoadRawImage(fi, ImageFormat.Tga)!;
 
-    var p = bmp.GetPixel(0, 0);
+    var p = _At(bmp, 0, 0);
     Assert.That(p.R, Is.EqualTo(100));
     Assert.That(p.G, Is.EqualTo(100));
     Assert.That(p.B, Is.EqualTo(100));
@@ -109,13 +108,13 @@ public sealed class BitmapConverterTests {
     };
     var fi = _WriteTempFile(TgaWriter.ToBytes(file), ".tga");
 
-    using var bmp = BitmapConverter.LoadBitmap(fi, ImageFormat.Tga);
+    var bmp = BitmapConverter.LoadRawImage(fi, ImageFormat.Tga)!;
 
-    var p0 = bmp.GetPixel(0, 0);
+    var p0 = _At(bmp, 0, 0);
     Assert.That(p0.R, Is.EqualTo(255));
     Assert.That(p0.G, Is.EqualTo(0));
     Assert.That(p0.B, Is.EqualTo(0));
-    var p1 = bmp.GetPixel(1, 0);
+    var p1 = _At(bmp, 1, 0);
     Assert.That(p1.R, Is.EqualTo(0));
     Assert.That(p1.G, Is.EqualTo(255));
     Assert.That(p1.B, Is.EqualTo(0));
@@ -132,11 +131,11 @@ public sealed class BitmapConverterTests {
     };
     var fi = _WriteTempFile(PcxWriter.ToBytes(file), ".pcx");
 
-    using var bmp = BitmapConverter.LoadBitmap(fi, ImageFormat.Pcx);
+    var bmp = BitmapConverter.LoadRawImage(fi, ImageFormat.Pcx)!;
 
     Assert.That(bmp.Width, Is.EqualTo(1));
     Assert.That(bmp.Height, Is.EqualTo(1));
-    var p = bmp.GetPixel(0, 0);
+    var p = _At(bmp, 0, 0);
     Assert.That(p.R, Is.EqualTo(200));
     Assert.That(p.G, Is.EqualTo(100));
     Assert.That(p.B, Is.EqualTo(50));
@@ -156,9 +155,9 @@ public sealed class BitmapConverterTests {
     };
     var fi = _WriteTempFile(PcxWriter.ToBytes(file), ".pcx");
 
-    using var bmp = BitmapConverter.LoadBitmap(fi, ImageFormat.Pcx);
+    var bmp = BitmapConverter.LoadRawImage(fi, ImageFormat.Pcx)!;
 
-    var p = bmp.GetPixel(0, 0);
+    var p = _At(bmp, 0, 0);
     Assert.That(p.R, Is.EqualTo(0));
     Assert.That(p.G, Is.EqualTo(0));
     Assert.That(p.B, Is.EqualTo(255));
@@ -175,9 +174,9 @@ public sealed class BitmapConverterTests {
     };
     var fi = _WriteTempFile(QoiWriter.ToBytes(file), ".qoi");
 
-    using var bmp = BitmapConverter.LoadBitmap(fi, ImageFormat.Qoi);
+    var bmp = BitmapConverter.LoadRawImage(fi, ImageFormat.Qoi)!;
 
-    var p = bmp.GetPixel(0, 0);
+    var p = _At(bmp, 0, 0);
     Assert.That(p.R, Is.EqualTo(255));
     Assert.That(p.G, Is.EqualTo(0));
     Assert.That(p.B, Is.EqualTo(128));
@@ -195,9 +194,9 @@ public sealed class BitmapConverterTests {
     };
     var fi = _WriteTempFile(QoiWriter.ToBytes(file), ".qoi");
 
-    using var bmp = BitmapConverter.LoadBitmap(fi, ImageFormat.Qoi);
+    var bmp = BitmapConverter.LoadRawImage(fi, ImageFormat.Qoi)!;
 
-    var p = bmp.GetPixel(0, 0);
+    var p = _At(bmp, 0, 0);
     Assert.That(p.R, Is.EqualTo(100));
     Assert.That(p.G, Is.EqualTo(150));
     Assert.That(p.B, Is.EqualTo(200));
@@ -217,49 +216,13 @@ public sealed class BitmapConverterTests {
     };
     var fi = _WriteTempFile(FarbfeldWriter.ToBytes(file), ".ff");
 
-    using var bmp = BitmapConverter.LoadBitmap(fi, ImageFormat.Farbfeld);
+    var bmp = BitmapConverter.LoadRawImage(fi, ImageFormat.Farbfeld)!;
 
-    var p = bmp.GetPixel(0, 0);
+    var p = _At(bmp, 0, 0);
     Assert.That(p.R, Is.EqualTo(0xFF));
     Assert.That(p.G, Is.EqualTo(0x80));
     Assert.That(p.B, Is.EqualTo(0x40));
     Assert.That(p.A, Is.EqualTo(0xC0));
-  }
-
-  [Test]
-  public void LoadBitmap_Png_UsesGdiPlusFallback() {
-    var tempPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.png");
-    _tempFile = tempPath;
-    using (var img = new Bitmap(3, 2, System.Drawing.Imaging.PixelFormat.Format32bppArgb)) {
-      img.SetPixel(0, 0, Color.Red);
-      img.Save(tempPath, System.Drawing.Imaging.ImageFormat.Png);
-    }
-
-    using var bmp = BitmapConverter.LoadBitmap(new FileInfo(tempPath), ImageFormat.Png);
-
-    Assert.That(bmp.Width, Is.EqualTo(3));
-    Assert.That(bmp.Height, Is.EqualTo(2));
-    var p = bmp.GetPixel(0, 0);
-    Assert.That(p.R, Is.EqualTo(255));
-    Assert.That(p.G, Is.EqualTo(0));
-    Assert.That(p.B, Is.EqualTo(0));
-  }
-
-  [Test]
-  public void LoadBitmap_Bmp_UsesGdiPlusFallback() {
-    var tempPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.bmp");
-    _tempFile = tempPath;
-    using (var img = new Bitmap(2, 2, System.Drawing.Imaging.PixelFormat.Format24bppRgb)) {
-      img.SetPixel(1, 0, Color.Blue);
-      img.Save(tempPath, System.Drawing.Imaging.ImageFormat.Bmp);
-    }
-
-    using var bmp = BitmapConverter.LoadBitmap(new FileInfo(tempPath), ImageFormat.Bmp);
-
-    Assert.That(bmp.Width, Is.EqualTo(2));
-    Assert.That(bmp.Height, Is.EqualTo(2));
-    var p = bmp.GetPixel(1, 0);
-    Assert.That(p.B, Is.EqualTo(255));
   }
 
   [Test]
@@ -279,79 +242,16 @@ public sealed class BitmapConverterTests {
     };
     var fi = _WriteTempFile(TgaWriter.ToBytes(file), ".tga");
 
-    using var bmp = BitmapConverter.LoadBitmap(fi, ImageFormat.Tga);
+    var bmp = BitmapConverter.LoadRawImage(fi, ImageFormat.Tga)!;
 
     Assert.That(bmp.Width, Is.EqualTo(2));
     Assert.That(bmp.Height, Is.EqualTo(2));
-    var p00 = bmp.GetPixel(0, 0);
+    var p00 = _At(bmp, 0, 0);
     Assert.That(p00.B, Is.EqualTo(255));
     Assert.That(p00.A, Is.EqualTo(255));
-    var p10 = bmp.GetPixel(1, 0);
+    var p10 = _At(bmp, 1, 0);
     Assert.That(p10.G, Is.EqualTo(255));
     Assert.That(p10.A, Is.EqualTo(128));
-  }
-
-  [Test]
-  public void RawImageToBitmap_Bgra32_ProducesCorrectBitmap() {
-    var raw = new RawImage {
-      Width = 2,
-      Height = 2,
-      Format = FileFormat.Core.PixelFormat.Bgra32,
-      PixelData = [
-        255, 0, 0, 255,     // B=255, G=0, R=0, A=255
-        0, 255, 0, 255,     // B=0, G=255, R=0, A=255
-        0, 0, 255, 255,     // B=0, G=0, R=255, A=255
-        128, 128, 128, 200   // B=128, G=128, R=128, A=200
-      ]
-    };
-
-    using var bmp = BitmapConverter.RawImageToBitmap(raw);
-
-    Assert.That(bmp.Width, Is.EqualTo(2));
-    Assert.That(bmp.Height, Is.EqualTo(2));
-    var p00 = bmp.GetPixel(0, 0);
-    Assert.That(p00.R, Is.EqualTo(0));
-    Assert.That(p00.G, Is.EqualTo(0));
-    Assert.That(p00.B, Is.EqualTo(255));
-    Assert.That(p00.A, Is.EqualTo(255));
-    var p10 = bmp.GetPixel(1, 0);
-    Assert.That(p10.R, Is.EqualTo(0));
-    Assert.That(p10.G, Is.EqualTo(255));
-    Assert.That(p10.B, Is.EqualTo(0));
-    var p01 = bmp.GetPixel(0, 1);
-    Assert.That(p01.R, Is.EqualTo(255));
-    Assert.That(p01.G, Is.EqualTo(0));
-    Assert.That(p01.B, Is.EqualTo(0));
-    var p11 = bmp.GetPixel(1, 1);
-    Assert.That(p11.R, Is.EqualTo(128));
-    Assert.That(p11.A, Is.EqualTo(200));
-  }
-
-  [Test]
-  public void BitmapToRawImage_RoundTrip_PreservesPixels() {
-    using var bmp = new Bitmap(2, 2, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-    bmp.SetPixel(0, 0, Color.FromArgb(255, 255, 0, 0));
-    bmp.SetPixel(1, 0, Color.FromArgb(255, 0, 255, 0));
-    bmp.SetPixel(0, 1, Color.FromArgb(255, 0, 0, 255));
-    bmp.SetPixel(1, 1, Color.FromArgb(128, 64, 32, 16));
-
-    var raw = BitmapConverter.BitmapToRawImage(bmp);
-
-    Assert.Multiple(() => {
-      Assert.That(raw.Width, Is.EqualTo(2));
-      Assert.That(raw.Height, Is.EqualTo(2));
-      Assert.That(raw.Format, Is.EqualTo(FileFormat.Core.PixelFormat.Bgra32));
-      Assert.That(raw.PixelData.Length, Is.EqualTo(2 * 2 * 4));
-    });
-
-    Assert.That(raw.PixelData[0], Is.EqualTo(0));   // B of (255, 0, 0)
-    Assert.That(raw.PixelData[1], Is.EqualTo(0));   // G
-    Assert.That(raw.PixelData[2], Is.EqualTo(255)); // R
-    Assert.That(raw.PixelData[3], Is.EqualTo(255)); // A
-    Assert.That(raw.PixelData[4], Is.EqualTo(0));   // B of (0, 255, 0)
-    Assert.That(raw.PixelData[5], Is.EqualTo(255)); // G
-    Assert.That(raw.PixelData[6], Is.EqualTo(0));   // R
-    Assert.That(raw.PixelData[7], Is.EqualTo(255)); // A
   }
 
   [Test]
@@ -407,5 +307,13 @@ public sealed class BitmapConverterTests {
       Assert.That(result.Width, Is.EqualTo(width));
       Assert.That(result.Height, Is.EqualTo(height));
     });
+  }
+
+  /// <summary>One pixel of a picture, as red, green, blue and alpha.</summary>
+  private static (byte R, byte G, byte B, byte A) _At(RawImage image, int x, int y) {
+    var bgra = PixelConverter.Convert(image, FileFormat.Core.PixelFormat.Bgra32);
+    var at = (y * image.Width + x) * 4;
+
+    return (bgra.PixelData[at + 2], bgra.PixelData[at + 1], bgra.PixelData[at], bgra.PixelData[at + 3]);
   }
 }

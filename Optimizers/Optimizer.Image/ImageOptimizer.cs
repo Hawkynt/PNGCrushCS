@@ -1,7 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Drawing;
+using FileFormat.Core;
+using FileFormats = Hawkynt.FileFormats.Images;
 using System.IO;
 using System.Runtime.Intrinsics;
 using System.Threading;
@@ -141,9 +142,9 @@ public sealed partial class ImageOptimizer {
     switch (format) {
       case ImageFormat.Png:
         candidates.Add(new(ImageFormat.Png, ".png", async (ct, p) => {
-          using var bmp = _LoadBitmap();
+          var image = _LoadRawImageOrThrow();
           var opts = _options.PngOptions ?? new();
-          var optimizer = new PngOptimizer(BitmapConverter.BitmapToRawImage(bmp), originalBytes, opts);
+          var optimizer = new PngOptimizer(image, originalBytes, opts);
           var result = await optimizer.OptimizeAsync(ct, p);
           return result.FileContents;
         }));
@@ -340,9 +341,9 @@ public sealed partial class ImageOptimizer {
 
   private void _AddPngConversion(List<FormatCandidate> candidates, byte[] originalBytes) {
     candidates.Add(new(ImageFormat.Png, ".png", async (ct, p) => {
-      using var bmp = _LoadBitmap();
+      var image = _LoadRawImageOrThrow();
       var opts = _options.PngOptions ?? new();
-      var optimizer = new PngOptimizer(BitmapConverter.BitmapToRawImage(bmp), opts);
+      var optimizer = new PngOptimizer(image, opts);
       var result = await optimizer.OptimizeAsync(ct, p);
       return result.FileContents;
     }));
@@ -350,8 +351,8 @@ public sealed partial class ImageOptimizer {
 
   private void _AddBmpConversion(List<FormatCandidate> candidates) {
     candidates.Add(new(ImageFormat.Bmp, ".bmp", async (ct, p) => {
-      using var bmp = _LoadBitmap();
-      var tempFile = _SaveAsTempFormat(bmp, System.Drawing.Imaging.ImageFormat.Bmp, ".bmp");
+      var image = _LoadRawImageOrThrow();
+      var tempFile = _SaveAsTempFormat(image, FileFormats.ImageFormat.Bmp, ".bmp");
       try {
         var opts = _options.BmpOptions ?? new();
         var optimizer = BmpOptimizer.FromFile(tempFile, opts);
@@ -365,9 +366,9 @@ public sealed partial class ImageOptimizer {
 
   private void _AddTgaConversion(List<FormatCandidate> candidates) {
     candidates.Add(new(ImageFormat.Tga, ".tga", async (ct, p) => {
-      using var bmp = _LoadBitmap();
+      var image = _LoadRawImageOrThrow();
       var opts = _options.TgaOptions ?? new();
-      var optimizer = new TgaOptimizer(BitmapConverter.BitmapToRawImage(bmp), opts);
+      var optimizer = new TgaOptimizer(image, opts);
       var result = await optimizer.OptimizeAsync(ct, p);
       return result.FileContents;
     }));
@@ -375,9 +376,9 @@ public sealed partial class ImageOptimizer {
 
   private void _AddPcxConversion(List<FormatCandidate> candidates) {
     candidates.Add(new(ImageFormat.Pcx, ".pcx", async (ct, p) => {
-      using var bmp = _LoadBitmap();
+      var image = _LoadRawImageOrThrow();
       var opts = _options.PcxOptions ?? new();
-      var optimizer = new PcxOptimizer(BitmapConverter.BitmapToRawImage(bmp), opts);
+      var optimizer = new PcxOptimizer(image, opts);
       var result = await optimizer.OptimizeAsync(ct, p);
       return result.FileContents;
     }));
@@ -385,9 +386,9 @@ public sealed partial class ImageOptimizer {
 
   private void _AddTiffConversion(List<FormatCandidate> candidates) {
     candidates.Add(new(ImageFormat.Tiff, ".tiff", async (ct, p) => {
-      using var bmp = _LoadBitmap();
+      var image = _LoadRawImageOrThrow();
       var opts = _options.TiffOptions ?? new();
-      var optimizer = new TiffOptimizer(BitmapConverter.BitmapToRawImage(bmp), opts);
+      var optimizer = new TiffOptimizer(image, opts);
       var result = await optimizer.OptimizeAsync(ct, p);
       return result.FileContents;
     }));
@@ -395,8 +396,8 @@ public sealed partial class ImageOptimizer {
 
   private void _AddGifConversion(List<FormatCandidate> candidates) {
     candidates.Add(new(ImageFormat.Gif, ".gif", async (ct, p) => {
-      using var bmp = _LoadBitmap();
-      var tempFile = _SaveAsTempFormat(bmp, System.Drawing.Imaging.ImageFormat.Gif, ".gif");
+      var image = _LoadRawImageOrThrow();
+      var tempFile = _SaveAsTempFormat(image, FileFormats.ImageFormat.Gif, ".gif");
       try {
         var opts = _options.GifOptions ?? new();
         var optimizer = GifOptimizer.FromFile(tempFile, opts);
@@ -410,9 +411,9 @@ public sealed partial class ImageOptimizer {
 
   private void _AddJpegConversion(List<FormatCandidate> candidates) {
     candidates.Add(new(ImageFormat.Jpeg, ".jpg", async (ct, p) => {
-      using var bmp = _LoadBitmap();
+      var image = _LoadRawImageOrThrow();
       var opts = _options.JpegOptions ?? new(AllowLossy: true);
-      var optimizer = new JpegOptimizer(BitmapConverter.BitmapToRawImage(bmp), opts);
+      var optimizer = new JpegOptimizer(image, opts);
       var result = await optimizer.OptimizeAsync(ct, p);
       return result.FileContents;
     }));
@@ -420,7 +421,7 @@ public sealed partial class ImageOptimizer {
 
   private void _AddQoiConversion(List<FormatCandidate> candidates) {
     candidates.Add(new(ImageFormat.Qoi, ".qoi", (_, _) => {
-      var raw = _LoadRawImageOrFromBitmap();
+      var raw = _LoadRawImageOrThrow();
       var bgra = raw.ToBgra32();
       var totalPixels = raw.Width * raw.Height;
       var hasAlpha = _HasAlpha(bgra, totalPixels);
@@ -459,7 +460,7 @@ public sealed partial class ImageOptimizer {
 
   private void _AddFarbfeldConversion(List<FormatCandidate> candidates) {
     candidates.Add(new(ImageFormat.Farbfeld, ".ff", (_, _) => {
-      var raw = _LoadRawImageOrFromBitmap();
+      var raw = _LoadRawImageOrThrow();
       var bgra = raw.ToBgra32();
       var totalPixels = raw.Width * raw.Height;
       var pixelData = new byte[totalPixels * 8];
@@ -487,34 +488,43 @@ public sealed partial class ImageOptimizer {
     Func<FileFormat.Core.RawImage, byte[]> convert
   ) {
     candidates.Add(new(format, ext, (_, _) => {
-      var raw = _LoadRawImageOrFromBitmap();
+      var raw = _LoadRawImageOrThrow();
       var bytes = convert(raw);
       return ValueTask.FromResult<byte[]?>(bytes);
     }));
   }
 
-  private Bitmap _LoadBitmap()
-    => _fileBytes != null
-      ? BitmapConverter.LoadBitmap(_fileBytes, _detectedFormat)
-      : BitmapConverter.LoadBitmap(_inputFile, _detectedFormat);
 
   private FileFormat.Core.RawImage? _LoadRawImage()
     => _cachedRawImage ??= _fileBytes != null
       ? BitmapConverter.LoadRawImage(_fileBytes, _detectedFormat)
       : BitmapConverter.LoadRawImage(_inputFile, _detectedFormat);
 
-  private FileFormat.Core.RawImage _LoadRawImageOrFromBitmap() {
-    var raw = _LoadRawImage();
-    if (raw != null)
-      return raw;
+  /// <summary>The picture, or a clear failure — every caller here needs one and cannot go on without.</summary>
+  /// <remarks>
+  /// This used to fall back to letting the platform decode the file when our own reader declined.
+  /// There is nothing to fall back to now, and nothing that needs one: the readers in this project
+  /// cover more formats than GDI+ does, and a format neither can read is a failure either way.
+  /// </remarks>
+  private FileFormat.Core.RawImage _LoadRawImageOrThrow()
+    => _LoadRawImage()
+       ?? throw new InvalidDataException(
+         $"Could not read {_inputFile?.FullName ?? "the input"} as {_detectedFormat}.");
 
-    using var bmp = _LoadBitmap();
-    return _cachedRawImage = BitmapConverter.BitmapToRawImage(bmp);
-  }
+  /// <summary>Writes the picture out in another format, for an optimizer that reads from a file.</summary>
+  /// <remarks>
+  /// A couple of the optimizers take a path rather than a picture, so there has to be a file for
+  /// them to open. It is written with this project's own encoder rather than the platform's, which
+  /// is both one less native dependency and the encoder whose output the matching reader is tested
+  /// against.
+  /// </remarks>
+  private static FileInfo _SaveAsTempFormat(RawImage image, FileFormats.ImageFormat format, string extension) {
+    var bytes = FileFormats.FormatRegistry.Write(image, format)
+      ?? throw new InvalidOperationException($"No writer is registered for {format}.");
 
-  private static FileInfo _SaveAsTempFormat(Bitmap bmp, System.Drawing.Imaging.ImageFormat format, string extension) {
     var tempPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}{extension}");
-    bmp.Save(tempPath, format);
+    File.WriteAllBytes(tempPath, bytes);
+
     return new FileInfo(tempPath);
   }
 
@@ -552,7 +562,7 @@ public sealed partial class ImageOptimizer {
   }
 
   private ImageStats _AnalyzeImage() {
-    var raw = _LoadRawImageOrFromBitmap();
+    var raw = _LoadRawImageOrThrow();
     var bgra = raw.ToBgra32();
     var totalPixels = raw.Width * raw.Height;
     var uniqueColors = new HashSet<int>();

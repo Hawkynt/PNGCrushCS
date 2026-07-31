@@ -1,95 +1,32 @@
 using System;
-using Hawkynt.ColorProcessing.Adapter;
-using System.Drawing;
 using System.IO;
-using System.Runtime.InteropServices;
 using FileFormat.Core;
-using Optimizer.Png;
+using Hawkynt.ColorProcessing.Adapter;
 
 namespace Optimizer.Image;
 
-/// <summary>Loads image files into <see cref="Bitmap"/> or <see cref="RawImage"/> with universal format dispatch covering 86+ formats.</summary>
+/// <summary>Reading a file into a picture, and reducing one to a palette.</summary>
+/// <remarks>
+/// This used to be the bridge to the platform's bitmap type as well. It is not any more: nothing in
+/// this project needs one, and the half that did has moved to the viewer, which is the only thing
+/// that has to put pixels on a screen.
+/// </remarks>
 internal static class BitmapConverter {
 
-  /// <summary>Loads an image file as a <see cref="RawImage"/> using format-specific readers. Returns null if the format is unsupported or reading fails.</summary>
+  /// <summary>Loads an image file as a <see cref="RawImage"/>. Null if the format has no reader.</summary>
   internal static RawImage? LoadRawImage(FileInfo file, ImageFormat format)
     => FormatRegistry.GetEntry(format)?.LoadRawImage(file);
 
-  /// <summary>Loads an image from pre-read bytes as a <see cref="RawImage"/>. Returns null if the format is unsupported or reading fails.</summary>
+  /// <summary>Loads an image from bytes as a <see cref="RawImage"/>. Null if the format has no reader.</summary>
   internal static RawImage? LoadRawImage(byte[] data, ImageFormat format)
     => FormatRegistry.GetEntry(format)?.LoadRawImageFromBytes(data);
 
-  /// <summary>Converts a <see cref="RawImage"/> to a GDI+ <see cref="Bitmap"/> in BGRA32 format.</summary>
-  internal static Bitmap RawImageToBitmap(RawImage raw) {
-    ArgumentNullException.ThrowIfNull(raw);
-    var bgra = raw.ToBgra32();
-    return _CreateBitmap(raw.Width, raw.Height, bgra);
-  }
-
-  /// <summary>Extracts pixel data from a GDI+ <see cref="Bitmap"/> as a BGRA32 <see cref="RawImage"/>.</summary>
-  internal static RawImage BitmapToRawImage(Bitmap bmp) {
-    ArgumentNullException.ThrowIfNull(bmp);
-    var width = bmp.Width;
-    var height = bmp.Height;
-    var bmpData = bmp.LockBits(
-      new Rectangle(0, 0, width, height),
-      System.Drawing.Imaging.ImageLockMode.ReadOnly,
-      System.Drawing.Imaging.PixelFormat.Format32bppArgb
-    );
-    try {
-      var stride = bmpData.Stride;
-      var rowBytes = width * 4;
-      var bgra = new byte[rowBytes * height];
-      if (stride == rowBytes)
-        Marshal.Copy(bmpData.Scan0, bgra, 0, bgra.Length);
-      else
-        for (var y = 0; y < height; ++y)
-          Marshal.Copy(bmpData.Scan0 + y * stride, bgra, y * rowBytes, rowBytes);
-
-      return new() {
-        Width = width,
-        Height = height,
-        Format = FileFormat.Core.PixelFormat.Bgra32,
-        PixelData = bgra,
-      };
-    } finally {
-      bmp.UnlockBits(bmpData);
-    }
-  }
-
-  /// <summary>Loads an image file as a <see cref="Bitmap"/>. Tries format-specific RawImage readers first, falls back to GDI+.</summary>
-  internal static Bitmap LoadBitmap(FileInfo file, ImageFormat format) {
-    var raw = LoadRawImage(file, format);
-    if (raw != null)
-      return RawImageToBitmap(raw);
-
-    // GDI+ fallback for formats without dedicated readers (GIF, etc.)
-    return new(file.FullName);
-  }
-
-  /// <summary>Loads an image from pre-read bytes as a <see cref="Bitmap"/>. Tries format-specific readers first, falls back to GDI+ via temp file.</summary>
-  internal static Bitmap LoadBitmap(byte[] data, ImageFormat format) {
-    var raw = LoadRawImage(data, format);
-    if (raw != null)
-      return RawImageToBitmap(raw);
-
-    // GDI+ fallback: write to temp file, load via GDI+
-    var tmp = Path.GetTempFileName();
-    try {
-      File.WriteAllBytes(tmp, data);
-      return new(tmp);
-    } finally {
-      try { File.Delete(tmp); } catch { /* best effort */ }
-    }
-  }
-
-  /// <summary>Quantizes a <see cref="RawImage"/> to an indexed image with the specified max palette size using FrameworkExtensions quantizer/ditherer dispatch.</summary>
   /// <summary>Reduces a picture to a palette, without a bitmap anywhere in the middle.</summary>
   /// <remarks>
-  /// This used to go out to a bitmap and back purely to reach the colour library, whose only
-  /// public entry point took one. It no longer does: the library's quantizers and ditherers are
-  /// driven directly over the picture, so the round trip through a platform type — and the
-  /// unpacking of one, two and four bit indexed rows that came with it — is gone.
+  /// This used to go out to a bitmap and back purely to reach the colour library, whose only public
+  /// entry point took one. It no longer does: the library's quantizers and ditherers are driven
+  /// directly over the picture, so the round trip through a platform type — and the unpacking of
+  /// one, two and four bit indexed rows that came with it — is gone.
   /// <para/>
   /// The names are still the old ones, which the dispatch translates.
   /// </remarks>
@@ -105,32 +42,5 @@ internal static class BitmapConverter {
     ArgumentNullException.ThrowIfNull(source);
 
     return ColorReductionDispatch.ReduceByName(source, quantizerName, dithererName, maxColors).Image;
-  }
-
-  /// <summary>Reduces a bitmap by going through the picture the colour library understands.</summary>
-  private static Bitmap _DispatchReduceColors(Bitmap source, string quantizerName, string dithererName, int colorCount, bool isHighQuality)
-    => RawImageToBitmap(
-      ColorReductionDispatch.ReduceByName(BitmapToRawImage(source), quantizerName, dithererName, colorCount).Image);
-
-  private static Bitmap _CreateBitmap(int width, int height, byte[] bgraPixels) {
-    var bmp = new Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-    var bmpData = bmp.LockBits(
-      new Rectangle(0, 0, width, height),
-      System.Drawing.Imaging.ImageLockMode.WriteOnly,
-      System.Drawing.Imaging.PixelFormat.Format32bppArgb
-    );
-    try {
-      var stride = bmpData.Stride;
-      var rowBytes = width * 4;
-      if (stride == rowBytes)
-        Marshal.Copy(bgraPixels, 0, bmpData.Scan0, bgraPixels.Length);
-      else
-        for (var y = 0; y < height; ++y)
-          Marshal.Copy(bgraPixels, y * rowBytes, bmpData.Scan0 + y * stride, rowBytes);
-    } finally {
-      bmp.UnlockBits(bmpData);
-    }
-
-    return bmp;
   }
 }

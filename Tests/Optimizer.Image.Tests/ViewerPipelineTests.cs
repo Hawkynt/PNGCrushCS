@@ -97,11 +97,12 @@ public sealed class ViewerPipelineTests {
     for (var i = 0; i < raw.PixelData.Length; ++i)
       raw.PixelData[i] = (byte)i;
 
-    var bmp = BitmapConverter.RawImageToBitmap(raw);
-    Assert.That(bmp, Is.Not.Null);
-    Assert.That(bmp.Width, Is.EqualTo(4));
-    Assert.That(bmp.Height, Is.EqualTo(3));
-    bmp.Dispose();
+    var drawable = PixelConverter.Convert(raw, FileFormat.Core.PixelFormat.Bgra32);
+    Assert.Multiple(() => {
+      Assert.That(drawable.Width, Is.EqualTo(4));
+      Assert.That(drawable.Height, Is.EqualTo(3));
+      Assert.That(drawable.PixelData, Has.Length.EqualTo(4 * 3 * 4));
+    });
   }
 
   // ── Step 4: FormatRegistry entry lookup ──────────────────────────────────
@@ -146,11 +147,10 @@ public sealed class ViewerPipelineTests {
       var raw = BitmapConverter.LoadRawImage(file, fmt);
       Assert.That(raw, Is.Not.Null);
 
-      // Step 3: Convert to bitmap
-      var bmp = BitmapConverter.RawImageToBitmap(raw!);
-      Assert.That(bmp, Is.Not.Null);
-      Assert.That(bmp.Width, Is.EqualTo(8));
-      Assert.That(bmp.Height, Is.EqualTo(6));
+      // Step 3: bring it to the layout a screen wants
+      var drawable = PixelConverter.Convert(raw!, FileFormat.Core.PixelFormat.Bgra32);
+      Assert.That(drawable.Width, Is.EqualTo(8));
+      Assert.That(drawable.Height, Is.EqualTo(6));
 
       // Step 4: Get format entry (for multi-image check)
       var entry = FormatRegistry.GetEntry(fmt);
@@ -159,8 +159,6 @@ public sealed class ViewerPipelineTests {
       // Step 5: Check image count (single-image format)
       var count = entry?.GetImageCount?.Invoke(file) ?? 0;
       Assert.That(count, Is.EqualTo(0)); // BAM is not multi-image
-
-      bmp.Dispose();
     } finally {
       File.Delete(tempPath);
     }

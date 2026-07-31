@@ -282,7 +282,7 @@ internal sealed partial class MainForm : Form {
       if (this._currentRawImage.Width != targetW || this._currentRawImage.Height != targetH)
         this._currentRawImage = ImageTransformer.Resize(this._currentRawImage, targetW, targetH, ResizeMode.Stretch, InterpolationHint.Bilinear);
       this._currentBitmap?.Dispose();
-      this._currentBitmap = BitmapConverter.RawImageToBitmap(this._currentRawImage);
+      this._currentBitmap = BitmapBridge.ToBitmap(this._currentRawImage);
       this._imagePanel.Image = this._currentBitmap;
 
       try {
@@ -394,7 +394,7 @@ internal sealed partial class MainForm : Form {
     }
 
     this._currentBitmap?.Dispose();
-    this._currentBitmap = BitmapConverter.RawImageToBitmap(this._currentRawImage);
+    this._currentBitmap = BitmapBridge.ToBitmap(this._currentRawImage);
     this._imagePanel.Image = this._currentBitmap;
     this._UpdateStatusBar();
   }
@@ -442,7 +442,7 @@ internal sealed partial class MainForm : Form {
 
     this._currentRawImage = ImageTransformer.Rotate(this._currentRawImage, angle);
     this._currentBitmap?.Dispose();
-    this._currentBitmap = BitmapConverter.RawImageToBitmap(this._currentRawImage);
+    this._currentBitmap = BitmapBridge.ToBitmap(this._currentRawImage);
     this._imagePanel.Image = this._currentBitmap;
     this._UpdateStatusBar();
   }
@@ -452,7 +452,7 @@ internal sealed partial class MainForm : Form {
 
     this._currentRawImage = ImageTransformer.Flip(this._currentRawImage, direction);
     this._currentBitmap?.Dispose();
-    this._currentBitmap = BitmapConverter.RawImageToBitmap(this._currentRawImage);
+    this._currentBitmap = BitmapBridge.ToBitmap(this._currentRawImage);
     this._imagePanel.Image = this._currentBitmap;
     this._UpdateStatusBar();
   }
@@ -466,7 +466,7 @@ internal sealed partial class MainForm : Form {
     this._currentRawImage = ImageTransformer.ExtendCanvas(this._currentRawImage, dlg.TargetWidth, dlg.TargetHeight, dlg.Anchor,
       Rgba32.FromArgb(dlg.FillColor.A, dlg.FillColor.R, dlg.FillColor.G, dlg.FillColor.B));
     this._currentBitmap?.Dispose();
-    this._currentBitmap = BitmapConverter.RawImageToBitmap(this._currentRawImage);
+    this._currentBitmap = BitmapBridge.ToBitmap(this._currentRawImage);
     this._imagePanel.Image = this._currentBitmap;
     this._UpdateStatusBar();
   }
@@ -483,7 +483,7 @@ internal sealed partial class MainForm : Form {
   /// <returns>True if the user applied a reduction, false if cancelled.</returns>
   private bool _ApplyReduceColors(IntegerRange[]? allowedRanges, FixedPalette[]? fixedPalettes) {
     if (this._currentRawImage == null) return false;
-    using var bmp = BitmapConverter.RawImageToBitmap(this._currentRawImage);
+    using var bmp = BitmapBridge.ToBitmap(this._currentRawImage);
     using var colorDlg = new Hawkynt.ImageTransformUI.ReduceColorsWindow(bmp);
 
     // Apply BOTH constraints when both are declared (e.g. NES: master palette of 64 + per-image
@@ -516,7 +516,7 @@ internal sealed partial class MainForm : Form {
       dithererParams: colorDlg.PickedDithererParams
     );
     this._currentBitmap?.Dispose();
-    this._currentBitmap = BitmapConverter.RawImageToBitmap(this._currentRawImage);
+    this._currentBitmap = BitmapBridge.ToBitmap(this._currentRawImage);
     this._imagePanel.Image = this._currentBitmap;
     this._UpdateStatusBar();
     return true;
@@ -558,7 +558,7 @@ internal sealed partial class MainForm : Form {
     }
 
     this._currentBitmap?.Dispose();
-    this._currentBitmap = BitmapConverter.RawImageToBitmap(this._currentRawImage);
+    this._currentBitmap = BitmapBridge.ToBitmap(this._currentRawImage);
     this._imagePanel.Image = this._currentBitmap;
     this._UpdateStatusBar();
   }
@@ -611,7 +611,7 @@ internal sealed partial class MainForm : Form {
         // the default palette with the saved one. Lets formats like NES CHR (which don't store
         // a palette on-disk) round-trip the colours the user picked at save time.
         if (raw != null) raw = PaletteSidecar.Apply(file.FullName, raw);
-        var bmp = raw != null ? BitmapConverter.RawImageToBitmap(raw) : BitmapConverter.LoadBitmap(file, fmt);
+        var bmp = raw != null ? BitmapBridge.ToBitmap(raw) : BitmapBridge.LoadBitmap(file, fmt);
         var entry = FormatRegistry.GetEntry(fmt);
         var count = entry?.GetImageCount?.Invoke(file) ?? 0;
         if (count < 2) count = 0;
@@ -669,7 +669,7 @@ internal sealed partial class MainForm : Form {
 
     this._currentRawImage = raw;
     var oldBmp = this._currentBitmap;
-    this._currentBitmap = BitmapConverter.RawImageToBitmap(raw);
+    this._currentBitmap = BitmapBridge.ToBitmap(raw);
     this._imagePanel.Image = this._currentBitmap;
     oldBmp?.Dispose();
 
@@ -689,7 +689,7 @@ internal sealed partial class MainForm : Form {
         try {
           var raw = entry?.LoadRawImageAtIndex?.Invoke(file, i);
           if (raw == null) return null;
-          using var bmp = BitmapConverter.RawImageToBitmap(raw);
+          using var bmp = BitmapBridge.ToBitmap(raw);
           var scale = Math.Min(64f / bmp.Width, 64f / bmp.Height);
           var thumb = new Bitmap(Math.Max(1, (int)(bmp.Width * scale)), Math.Max(1, (int)(bmp.Height * scale)));
           using (var g = Graphics.FromImage(thumb)) {
