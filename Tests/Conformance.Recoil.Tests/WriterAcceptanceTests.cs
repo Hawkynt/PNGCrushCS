@@ -117,7 +117,7 @@ public sealed class WriterAcceptanceTests {
         // Both tools, not the first that has an opinion. Where two of them know an extension and
         // mean different formats by it, one turning the file down says only that it meant the other
         // format; the file is readable if either reads it.
-        var verdicts = new[] { _AskRecoil(path), _AskImageMagick(path), _AskXnView(path) }
+        var verdicts = new[] { _AskRecoil(path), _AskImageMagick(path), _AskXnView(path), _AskIrfanView(path) }
           .Where(v => v != null).ToArray();
         if (verdicts.Length == 0)
           continue;
@@ -144,7 +144,8 @@ public sealed class WriterAcceptanceTests {
   private static bool _Known(string extension)
     => _RecoilExtensions.Value.Contains(extension)
       || _ImageMagickExtensions.Value.Contains(extension)
-      || XnViewOracle.Extensions.Contains(extension);
+      || XnViewOracle.Extensions.Contains(extension)
+      || IrfanViewOracle.Extensions.Contains(extension);
 
   /// <summary>The sizes a format says it takes, most likely first.</summary>
   /// <remarks>
@@ -251,8 +252,20 @@ public sealed class WriterAcceptanceTests {
     return (decoded, $"RECOIL rejected it — {output}");
   }
 
+  private static (bool Accepted, string Reason)? _AskIrfanView(string path) {
+    if (!IrfanViewOracle.Available || !IrfanViewOracle.Extensions.Contains(Path.GetExtension(path)))
+      return null;
+
+    var (decoded, output) = IrfanViewOracle.TryDecode(path);
+
+    return (decoded, $"IrfanView rejected it — {output}");
+  }
+
   private static (bool Accepted, string Reason)? _AskXnView(string path) {
-    if (XnViewOracle.ExecutablePath == null || !XnViewOracle.Extensions.Contains(Path.GetExtension(path)))
+    // Asked for every extension, not only the catalogued ones. Its catalogue is older than the
+    // binary and misses formats it reads perfectly well — DNG among them — and its own message for
+    // a format it cannot load tells the two cases apart better than a stale list does.
+    if (XnViewOracle.ExecutablePath == null)
       return null;
 
     var (decoded, output) = XnViewOracle.TryDecode(path);
