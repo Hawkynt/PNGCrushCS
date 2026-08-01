@@ -15,7 +15,8 @@ namespace FileFormat.AtariPicworks;
 /// the two streams are read at different speeds rather than interleaved.
 /// </remarks>
 public readonly record struct AtariPicworksFile
-  : IImageFormatReader<AtariPicworksFile>, IImageToRawImage<AtariPicworksFile> {
+  : IImageFormatReader<AtariPicworksFile>, IImageToRawImage<AtariPicworksFile>,
+    IImageFromRawImage<AtariPicworksFile>, IImageFormatWriter<AtariPicworksFile> {
 
   /// <summary>Pixels across.</summary>
   public const int Width = 640;
@@ -29,10 +30,15 @@ public readonly record struct AtariPicworksFile
   /// <summary>Bytes the packing works in.</summary>
   public const int GroupSize = 8;
 
+  /// <summary>Where the packed streams begin when the file names no runs.</summary>
+  public const int CountsOffset = 4;
+
   static string IImageFormatMetadata<AtariPicworksFile>.PrimaryExtension => ".cp3";
   static string[] IImageFormatMetadata<AtariPicworksFile>.FileExtensions => [".cp3"];
   static AtariPicworksFile IImageFormatReader<AtariPicworksFile>.FromSpan(ReadOnlySpan<byte> data)
     => AtariPicworksReader.FromSpan(data);
+  static byte[] IImageFormatWriter<AtariPicworksFile>.ToBytes(AtariPicworksFile file)
+    => AtariPicworksWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<AtariPicworksFile>.VideoModes => [
     new("Doodle", [(Width, Height)], [2])
   ];
@@ -60,5 +66,25 @@ public readonly record struct AtariPicworksFile
       Palette = [255, 255, 255, 0, 0, 0],
       PaletteCount = 2,
     };
+  }
+
+  /// <summary>Builds a monochrome screen, which for this format is a threshold and nothing more.</summary>
+  public static AtariPicworksFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    // A set bit is the ink, and the ink is black on the white the palette names first.
+    var set = GlyphSheet.Sample(image, Width, Height, setWhenBright: false);
+    var stride = Width / 8;
+    var screen = new byte[ScreenSize];
+
+    for (var y = 0; y < Height; ++y)
+    for (var x = 0; x < Width; ++x) {
+      if (!set[y * Width + x])
+        continue;
+
+      screen[y * stride + (x >> 3)] |= (byte)(1 << (~x & 7));
+    }
+
+    return new() { ScreenData = screen };
   }
 }
