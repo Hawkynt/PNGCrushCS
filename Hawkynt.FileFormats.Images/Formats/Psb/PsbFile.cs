@@ -69,7 +69,7 @@ public readonly record struct PsbFile : IImageFormatReader<PsbFile>, IImageToRaw
           PixelData = _Deplanarize(file.PixelData, planeSize, 4),
         };
       case PsbColorMode.Indexed: {
-        var palette = file.Palette is { Length: >= 768 } p ? p[..768] : _DefaultPalette[..];
+        var palette = file.Palette is { Length: >= 768 } p ? _PaletteFromPlanar(p) : _DefaultPalette[..];
         return new() {
           Width = width,
           Height = height,
@@ -127,11 +127,53 @@ public readonly record struct PsbFile : IImageFormatReader<PsbFile>, IImageToRaw
           Depth = 8,
           ColorMode = PsbColorMode.Indexed,
           PixelData = image.PixelData[..],
-          Palette = image.Palette != null ? image.Palette[..] : null,
+          Palette = _PaletteToPlanar(image.Palette, image.PaletteCount),
         };
       default:
         throw new ArgumentException($"Pixel format {image.Format} is not supported by PSB.", nameof(image));
     }
+  }
+
+  /// <summary>
+  /// Turns a Photoshop colour table into the RGB triplets a <see cref="RawImage"/> palette is made of.
+  /// </summary>
+  /// <remarks>
+  /// Photoshop stores the table a channel at a time — 256 reds, then 256 greens, then 256 blues —
+  /// the same way it stores the pixels. Handed straight on as triplets it made entry 0 the first
+  /// three reds and entry 1 the next three, so an indexed file came back in shades of red: the
+  /// four-colour test image arrived as four reds.
+  /// </remarks>
+  private static byte[] _PaletteFromPlanar(byte[] planar) {
+    var palette = new byte[768];
+    for (var i = 0; i < 256; ++i) {
+      palette[i * 3] = planar[i];
+      palette[(i * 3) + 1] = planar[256 + i];
+      palette[(i * 3) + 2] = planar[512 + i];
+    }
+
+    return palette;
+  }
+
+  /// <summary>Lays an RGB-triplet palette out the way Photoshop's colour table is stored.</summary>
+  /// <remarks>
+  /// Always the full 768 bytes, however few entries are in use: the colour mode section of an indexed
+  /// PSD is that size or the file is malformed. Passing a shorter one through unchanged left the
+  /// header claiming an indexed image with no table at all, which Photoshop and ImageMagick alike
+  /// refuse with "improper image header".
+  /// </remarks>
+  private static byte[] _PaletteToPlanar(byte[]? palette, int count) {
+    var planar = new byte[768];
+    if (palette is null)
+      return planar;
+
+    var entries = Math.Min(count > 0 ? count : palette.Length / 3, Math.Min(256, palette.Length / 3));
+    for (var i = 0; i < entries; ++i) {
+      planar[i] = palette[i * 3];
+      planar[256 + i] = palette[(i * 3) + 1];
+      planar[512 + i] = palette[(i * 3) + 2];
+    }
+
+    return planar;
   }
 
   private static byte[] _Deplanarize(byte[] planar, int planeSize, int channels) {
