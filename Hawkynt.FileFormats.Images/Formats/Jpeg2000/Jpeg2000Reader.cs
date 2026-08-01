@@ -353,6 +353,7 @@ public static class Jpeg2000Reader {
     // Step 2: Tier-1 decoding of each code-block + assembly into component coefficient planes
     var subbands = SubbandInfo.ComputeSubbands(width, height, levels);
     var pixelData = new byte[width * height * componentCount];
+    var planes = new int[componentCount][,];
 
     for (var c = 0; c < componentCount; ++c) {
       var plane = new int[height, width];
@@ -397,20 +398,62 @@ public static class Jpeg2000Reader {
 
       // Step 4: Inverse DWT (already exists)
       Jp2Wavelet.InverseMultiLevel(plane, width, height, levels);
+      planes[c] = plane;
+    }
 
-      // Step 5: Extract pixels with level shift and clamping
-      var shift = tile.BitsPerComponent > 1 ? 1 << (tile.BitsPerComponent - 1) : 0;
-      var maxVal = (1 << tile.BitsPerComponent) - 1;
+    // Step 5: undo the multiple-component transform, which mixes the three planes together and so
+    // cannot be done inside the per-component loop above.
+    if (tile.UseMct && componentCount >= 3)
+      _InverseReversibleColorTransform(planes, width, height);
+
+    // Step 6: level shift, clamp and interleave.
+    var shift = tile.BitsPerComponent > 1 ? 1 << (tile.BitsPerComponent - 1) : 0;
+    var maxVal = (1 << tile.BitsPerComponent) - 1;
+    for (var c = 0; c < componentCount; ++c) {
+      var plane = planes[c];
       for (var y = 0; y < height; ++y)
         for (var x = 0; x < width; ++x) {
           var val = plane[y, x] + shift;
           if (val < 0) val = 0;
           else if (val > maxVal) val = maxVal;
-          pixelData[(y * width + x) * componentCount + c] = (byte)val;
+          pixelData[((y * width) + x) * componentCount + c] = (byte)val;
         }
     }
 
     return pixelData;
+  }
+
+  /// <summary>
+  /// Undoes the reversible colour transform that the COD marker's MCT flag announces.
+  /// </summary>
+  /// <remarks>
+  /// The flag was read and stored and then never acted on, in either direction: an encoder that used
+  /// the transform — which is every encoder writing reversible JPEG 2000, since it is what makes the
+  /// format's lossless mode worth using — handed over three planes this reader passed straight out as
+  /// though they were red, green and blue. A red square arrived as (0, 128, 128), those being its
+  /// luminance and two flat difference planes. The writer had the mirror fault, claiming the transform
+  /// in its header while writing untransformed colour, so the two agreed with each other and with
+  /// nothing else.
+  /// <para/>
+  /// From ISO/IEC 15444-1 Annex G: G is recovered first because the other two are differences from
+  /// it. The shift is arithmetic so that it floors on negative values, which is what the specification
+  /// asks for and what makes the transform reversible.
+  /// </remarks>
+  private static void _InverseReversibleColorTransform(int[][,] planes, int width, int height) {
+    var y0 = planes[0];
+    var y1 = planes[1];
+    var y2 = planes[2];
+
+    for (var y = 0; y < height; ++y)
+      for (var x = 0; x < width; ++x) {
+        var green = y0[y, x] - ((y1[y, x] + y2[y, x]) >> 2);
+        y0[y, x] = y2[y, x] + green; // red
+        y1[y, x] = y1[y, x] + green; // blue
+        y2[y, x] = green;
+      }
+
+    // The planes come out in R, B, G order above; put them back as R, G, B.
+    (planes[1], planes[2]) = (planes[2], planes[1]);
   }
 
   /// <summary>Backward-compatible simplified format: raw big-endian int32 wavelet coefficients per component.</summary>

@@ -68,8 +68,13 @@ internal static class JpegManagedDecoder {
 
     byte[] rgbPixelData;
     if (isGrayscale) {
-      var yPlane = _CropPlane(planes[0], componentData[0].WidthInBlocks * 8, componentData[0].HeightInBlocks * 8, width, height);
-      rgbPixelData = JpegColorConverter.GrayscaleToRgb(yPlane, width, height);
+      // A single-component JPEG stays one byte a pixel. It used to be expanded to RGB triples here
+      // while JpegFile.ToRawImage went on reporting the buffer as Gray8, so every consumer read three
+      // bytes' worth of image for each pixel it wanted: the picture came out sheared, each row
+      // showing pixels from a third of the way down the one above. The two ends of the format now
+      // agree that grey means grey — which is also what the encoder has always assumed of this field.
+      rgbPixelData = _CropPlane(
+        planes[0], componentData[0].WidthInBlocks * 8, componentData[0].HeightInBlocks * 8, width, height);
     } else {
       // Crop each plane to its actual pixel dimensions, then upsample to full resolution.
       var yCompW = componentData[0].WidthInBlocks * 8;

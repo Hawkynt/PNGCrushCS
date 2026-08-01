@@ -308,14 +308,26 @@ public static class Jpeg2000Writer {
     var subbands = SubbandInfo.ComputeSubbands(width, height, levels);
     var allCodeBlocks = new List<CodeBlockData>();
 
+    // The COD marker this writer emits says the multiple-component transform is in use whenever there
+    // are three components or more, so the samples have to actually go through it. They did not: the
+    // flag was written over untransformed colour, which every other decoder then un-transformed and
+    // got nonsense from. The planes are prepared together here because the transform mixes them.
+    var shift = file.BitsPerComponent > 1 ? 1 << (file.BitsPerComponent - 1) : 0;
+    var sourcePlanes = new int[componentCount][,];
     for (var c = 0; c < componentCount; ++c) {
-      var plane = new int[height, width];
-
-      // Extract component plane with DC level shift
-      var shift = file.BitsPerComponent > 1 ? 1 << (file.BitsPerComponent - 1) : 0;
+      var source = new int[height, width];
       for (var y = 0; y < height; ++y)
         for (var x = 0; x < width; ++x)
-          plane[y, x] = file.PixelData[(y * width + x) * componentCount + c] - shift;
+          source[y, x] = file.PixelData[((y * width) + x) * componentCount + c] - shift;
+
+      sourcePlanes[c] = source;
+    }
+
+    if (componentCount >= 3)
+      _ForwardReversibleColorTransform(sourcePlanes, width, height);
+
+    for (var c = 0; c < componentCount; ++c) {
+      var plane = sourcePlanes[c];
 
       // Forward DWT
       Jp2Wavelet.ForwardMultiLevel(plane, width, height, levels);
@@ -372,5 +384,28 @@ public static class Jpeg2000Writer {
     };
 
     return Tier2Encoder.AssemblePackets(allCodeBlocks, tileInfo);
+  }
+
+  /// <summary>
+  /// Applies the reversible colour transform the COD marker announces (ISO/IEC 15444-1 Annex G).
+  /// </summary>
+  /// <remarks>The exact inverse of what <c>Jpeg2000Reader</c> undoes, so the two round-trip.</remarks>
+  private static void _ForwardReversibleColorTransform(int[][,] planes, int width, int height) {
+    var red = planes[0];
+    var green = planes[1];
+    var blue = planes[2];
+
+    for (var y = 0; y < height; ++y)
+      for (var x = 0; x < width; ++x) {
+        var r = red[y, x];
+        var g = green[y, x];
+        var b = blue[y, x];
+
+        red[y, x] = (r + (2 * g) + b) >> 2; // Y0
+        green[y, x] = b - g;                // Y1
+        blue[y, x] = r - g;                 // Y2
+      }
+
+    // Y0, Y1, Y2 now sit in the red, green and blue slots, which is the order they are coded in.
   }
 }
