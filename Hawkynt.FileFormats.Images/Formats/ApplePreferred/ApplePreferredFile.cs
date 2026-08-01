@@ -30,7 +30,7 @@ public readonly record struct ApplePreferredFile
   public const int MultipalChunkSize = 6415;
 
   static string IImageFormatMetadata<ApplePreferredFile>.PrimaryExtension => ".32k";
-  static string[] IImageFormatMetadata<ApplePreferredFile>.FileExtensions => [".32k"];
+  static string[] IImageFormatMetadata<ApplePreferredFile>.FileExtensions => [".32k", ".gs", ".iigs"];
   static ApplePreferredFile IImageFormatReader<ApplePreferredFile>.FromSpan(ReadOnlySpan<byte> data)
     => ApplePreferredReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<ApplePreferredFile>.VideoModes => [

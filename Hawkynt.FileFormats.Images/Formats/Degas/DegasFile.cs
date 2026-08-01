@@ -7,7 +7,7 @@ namespace FileFormat.Degas;
 public readonly record struct DegasFile : IImageFormatReader<DegasFile>, IImageToRawImage<DegasFile>, IImageFromRawImage<DegasFile>, IImageFormatWriter<DegasFile> {
 
   static string IImageFormatMetadata<DegasFile>.PrimaryExtension => ".pi1";
-  static string[] IImageFormatMetadata<DegasFile>.FileExtensions => [".pi1", ".pi2", ".pi3", ".pc1", ".pc2", ".pc3"];
+  static string[] IImageFormatMetadata<DegasFile>.FileExtensions => [".pi1", ".pi2", ".pi3", ".pc1", ".pc2", ".pc3", ".suh"];
   static DegasFile IImageFormatReader<DegasFile>.FromSpan(ReadOnlySpan<byte> data) => DegasReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<DegasFile>.VideoModes => [
     new("Low resolution (320x200, 16 colours)", [(320, 200)], [new IntegerRange(2, 16)]),
