@@ -12,15 +12,11 @@ public static class CalsWriter {
 
   internal static byte[] Assemble(CalsFile file) {
     var header = CalsHeaderParser.Format(file);
-    var bytesPerRow = (file.Width + 7) / 8;
-    var expectedPixelBytes = bytesPerRow * file.Height;
-    var fileSize = CalsHeaderParser.HeaderSize + expectedPixelBytes;
+    var compressed = FileFormat.Ccitt.CcittG4Encoder.Encode(file.PixelData, file.Width, file.Height);
 
-    var result = new byte[fileSize];
+    var result = new byte[CalsHeaderParser.HeaderSize + compressed.Length];
     header.AsSpan(0, CalsHeaderParser.HeaderSize).CopyTo(result.AsSpan(0));
-
-    var copyLen = Math.Min(expectedPixelBytes, file.PixelData.Length);
-    file.PixelData.AsSpan(0, copyLen).CopyTo(result.AsSpan(CalsHeaderParser.HeaderSize));
+    compressed.CopyTo(result.AsSpan(CalsHeaderParser.HeaderSize));
 
     return result;
   }

@@ -37,8 +37,13 @@ public readonly record struct CalsFile() : IImageFormatReader<CalsFile>, IImageT
   /// <summary>Destination document identifier.</summary>
   public string DstDocId { get; init; } = "NONE";
 
-  /// <summary>A set bit is black, which is what the fax coding underneath this counts in.</summary>
-  private static readonly byte[] _BlackWhitePalette = [255, 255, 255, 0, 0, 0];
+  /// <summary>A set bit is white here, which is the opposite of what the fax coding counts in.</summary>
+  /// <remarks>
+  /// The Group 4 coding underneath calls a set bit black, as a fax does — but a CALS raster is
+  /// defined the other way about, so what the coding calls a white run is ink on the page. Getting
+  /// this backwards gives a clean negative and nothing else.
+  /// </remarks>
+  private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
   public static RawImage ToRawImage(CalsFile file) => new() {
     Width = file.Width,
@@ -56,7 +61,7 @@ public readonly record struct CalsFile() : IImageFormatReader<CalsFile>, IImageT
       Width = image.Width,
       Height = image.Height,
       Dpi = 200,
-      PixelData = BilevelRows.Pack(BilevelRows.Threshold(image, setWhenDark: true), image.Width, image.Height),
+      PixelData = BilevelRows.Pack(BilevelRows.Threshold(image, setWhenDark: false), image.Width, image.Height),
     };
   }
 }
