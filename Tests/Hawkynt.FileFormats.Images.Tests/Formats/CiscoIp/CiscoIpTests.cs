@@ -1,73 +1,101 @@
 using System;
 using System.IO;
-using FileFormat.CiscoIp;
+using System.Text;
 using FileFormat.Core;
 
 namespace FileFormat.CiscoIp.Tests;
 
+/// <summary>
+/// A Cisco IP Phone image, which is a small XML document rather than a binary file.
+/// </summary>
+/// <remarks>
+/// The phone fetches one over HTTP and reads the picture out of it as hexadecimal text at two bits
+/// a pixel, those two bits being the four shades its screen has. What was written here before was
+/// eighty bytes of binary header and 24-bit pixels — a shape nothing would open.
+/// <para/>
+/// The layout came from a document a conversion service produced on request, and was checked by
+/// sending our own back to it.
+/// </remarks>
 [TestFixture]
-public class CiscoIpReaderTests {
+public sealed class CiscoIpTests {
 
-  [Test]
-  public void FromFile_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => CiscoIpReader.FromFile(null!));
+  private static RawImage _Picture(int width, int height) {
+    var pixels = new byte[width * height * 3];
+    for (var y = 0; y < height; ++y)
+    for (var x = 0; x < width; ++x) {
+      var level = (byte)(x * 3 / Math.Max(1, width - 1) * 85);
+      var at = (y * width + x) * 3;
+      pixels[at] = pixels[at + 1] = pixels[at + 2] = level;
+    }
 
-  [Test]
-  public void FromFile_MissingFile_ThrowsFileNotFoundException()
-    => Assert.Throws<FileNotFoundException>(() => CiscoIpReader.FromFile(new FileInfo("nonexistent.bin")));
-
-  [Test]
-  public void FromBytes_NullData_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => CiscoIpReader.FromBytes(null!));
-
-  [Test]
-  public void FromBytes_TooSmall_ThrowsInvalidDataException()
-    => Assert.Throws<InvalidDataException>(() => CiscoIpReader.FromBytes(new byte[79]));
-
-  [Test]
-  public void FromBytes_ValidHeader_Succeeds() {
-    var data = new byte[80 + 320 * 240 * 3];
-    data[0] = 64;
-    data[1] = 1;
-    data[4] = 240; data[5] = 0;
-    var result = CiscoIpReader.FromBytes(data);
-    Assert.That(result.Width, Is.GreaterThan(0));
-    Assert.That(result.Height, Is.GreaterThan(0));
+    return new() { Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = pixels };
   }
 
   [Test]
-  public void FromStream_NullStream_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => CiscoIpReader.FromStream(null!));
+  [Category("Unit")]
+  public void Written_IsADocumentAndNotABinaryFile() {
+    var text = Encoding.ASCII.GetString(CiscoIpWriter.ToBytes(CiscoIpFile.FromRawImage(_Picture(64, 48))));
+
+    Assert.Multiple(() => {
+      Assert.That(text, Does.StartWith("<CiscoIPPhoneImage>"));
+      Assert.That(text, Does.Contain("<Width>64</Width>"));
+      Assert.That(text, Does.Contain("<Height>48</Height>"));
+      Assert.That(text, Does.Contain("<Depth>2</Depth>"), "two bits give the four shades the screen has");
+      Assert.That(text, Does.Contain("<Data>"));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void Written_SpendsExactlyTwoBitsAPixel() {
+    var text = Encoding.ASCII.GetString(CiscoIpWriter.ToBytes(CiscoIpFile.FromRawImage(_Picture(64, 48))));
+    var data = text[(text.IndexOf("<Data>", StringComparison.Ordinal) + 6)..text.IndexOf("</Data>", StringComparison.Ordinal)];
+
+    // Sixteen bytes a row for sixty-four pixels, and two hexadecimal characters a byte.
+    Assert.That(data.Trim(), Has.Length.EqualTo(16 * 48 * 2));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void Read_TakesItsSizeFromTheDocument() {
+    var document = "<CiscoIPPhoneImage><Title>t</Title><LocationX>3</LocationX><LocationY>4</LocationY>"
+      + "<Width>4</Width><Height>2</Height><Depth>2</Depth><Data>" + new string('0', 2 * 2 * 2) + "</Data></CiscoIPPhoneImage>";
+
+    var file = CiscoIpReader.FromBytes(Encoding.ASCII.GetBytes(document));
+
+    Assert.Multiple(() => {
+      Assert.That(file.Width, Is.EqualTo(4));
+      Assert.That(file.Height, Is.EqualTo(2));
+      Assert.That(file.Title, Is.EqualTo("t"));
+      Assert.That(file.LocationX, Is.EqualTo(3));
+      Assert.That(file.LocationY, Is.EqualTo(4));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void Read_RefusesSomethingThatIsNotOne()
+    => Assert.Throws<InvalidDataException>(() => CiscoIpReader.FromBytes(Encoding.ASCII.GetBytes("<html/>")));
+
+  [Test]
+  [Category("Unit")]
+  public void Read_RefusesADocumentWhoseDataIsShortOfItsSize() {
+    var document = "<CiscoIPPhoneImage><Width>64</Width><Height>48</Height><Depth>2</Depth>"
+      + "<Data>0000</Data></CiscoIPPhoneImage>";
+
+    Assert.Throws<InvalidDataException>(() => CiscoIpReader.FromBytes(Encoding.ASCII.GetBytes(document)));
+  }
+
+  [Test]
+  [Category("Integration")]
+  public void RoundTrip_KeepsThePicture() {
+    var original = CiscoIpFile.FromRawImage(_Picture(64, 48));
+    var restored = CiscoIpReader.FromBytes(CiscoIpWriter.ToBytes(original));
+
+    Assert.Multiple(() => {
+      Assert.That(restored.Width, Is.EqualTo(64));
+      Assert.That(restored.Height, Is.EqualTo(48));
+      Assert.That(restored.PixelData, Is.EqualTo(original.PixelData));
+    });
+  }
 }
-
-[TestFixture]
-public class RoundTripTests {
-
-  [Test]
-  public void RoundTrip_PixelDataPreserved() {
-    var file = new CiscoIpFile {
-      Width = 320,
-      Height = 240,
-      PixelData = new byte[320 * 240 * 3],
-    };
-    for (var i = 0; i < file.PixelData.Length; ++i)
-      file.PixelData[i] = (byte)(i & 0xFF);
-    var bytes = CiscoIpWriter.ToBytes(file);
-    var file2 = CiscoIpReader.FromBytes(bytes);
-    Assert.That(file2.PixelData, Is.EqualTo(file.PixelData));
-  }
-
-  [Test]
-  public void RoundTrip_ViaRawImage() {
-    var file = new CiscoIpFile {
-      Width = 320,
-      Height = 240,
-      PixelData = new byte[320 * 240 * 3],
-    };
-    var raw = CiscoIpFile.ToRawImage(file);
-    Assert.That(raw.Format, Is.EqualTo(PixelFormat.Rgb24));
-    var file2 = CiscoIpFile.FromRawImage(raw);
-    Assert.That(file2.PixelData, Is.EqualTo(file.PixelData));
-  }
-}
-
