@@ -74,8 +74,8 @@ public sealed class TiffFile :
         break;
       case 1 when page.BitsPerSample == 8 && page.ColorMap != null:
         format = PixelFormat.Indexed8;
-        palette = _ConvertTiffColorMap(page.ColorMap);
-        paletteCount = page.ColorMap.Length / 6;
+        palette = page.ColorMap;
+        paletteCount = page.ColorMap.Length / 3;
         break;
       case 1 when page.BitsPerSample == 8:
         format = PixelFormat.Gray8;
@@ -118,8 +118,8 @@ public sealed class TiffFile :
         break;
       case 1 when file.BitsPerSample == 8 && file.ColorMap != null:
         format = PixelFormat.Indexed8;
-        palette = _ConvertTiffColorMap(file.ColorMap);
-        paletteCount = file.ColorMap.Length / 6;
+        palette = file.ColorMap;
+        paletteCount = file.ColorMap.Length / 3;
         break;
       case 1 when file.BitsPerSample == 8:
         format = PixelFormat.Gray8;
@@ -183,7 +183,7 @@ public sealed class TiffFile :
         samplesPerPixel = 1;
         bitsPerSample = 8;
         colorMode = TiffColorMode.Palette;
-        colorMap = _ConvertToTiffColorMap(image.Palette, image.PaletteCount);
+        colorMap = _PaddedPalette(image.Palette, image.PaletteCount);
         break;
       case PixelFormat.Indexed1:
         samplesPerPixel = 1;
@@ -205,36 +205,20 @@ public sealed class TiffFile :
     };
   }
 
-  /// <summary>Converts TIFF ColorMap (16-bit interleaved R,G,B arrays) to RGB triplet palette.</summary>
-  private static byte[] _ConvertTiffColorMap(byte[] colorMap) {
-    var entryCount = colorMap.Length / 6;
-    var palette = new byte[entryCount * 3];
-    for (var i = 0; i < entryCount; ++i) {
-      // TIFF ColorMap: all reds (16-bit LE), then all greens, then all blues
-      palette[i * 3] = colorMap[i * 2 + 1];
-      palette[i * 3 + 1] = colorMap[entryCount * 2 + i * 2 + 1];
-      palette[i * 3 + 2] = colorMap[entryCount * 4 + i * 2 + 1];
-    }
-
-    return palette;
-  }
-
-  /// <summary>Converts RGB triplet palette to TIFF ColorMap format (16-bit interleaved R,G,B arrays).</summary>
-  private static byte[] _ConvertToTiffColorMap(byte[]? palette, int paletteCount) {
+  /// <summary>The palette as many entries as the sample depth can address, in RGB triplets.</summary>
+  /// <remarks>
+  /// <see cref="ColorMap"/> holds RGB triplets — that is what the reader puts there, and what both
+  /// writers expect to find. A pair of conversions sat on either side of it turning triplets into the
+  /// format's own channel-block layout and back, so a palette written out was laid out twice and read
+  /// in as though it had not been laid out at all: every colour came from somewhere else in the table.
+  /// </remarks>
+  private static byte[] _PaddedPalette(byte[]? palette, int paletteCount) {
     if (palette == null)
       throw new ArgumentException("Palette must not be null for indexed images.");
 
-    var colorMap = new byte[paletteCount * 6];
-    for (var i = 0; i < paletteCount; ++i) {
-      // TIFF ColorMap: all reds (16-bit LE), then all greens, then all blues
-      colorMap[i * 2] = 0;
-      colorMap[i * 2 + 1] = palette[i * 3];
-      colorMap[paletteCount * 2 + i * 2] = 0;
-      colorMap[paletteCount * 2 + i * 2 + 1] = palette[i * 3 + 1];
-      colorMap[paletteCount * 4 + i * 2] = 0;
-      colorMap[paletteCount * 4 + i * 2 + 1] = palette[i * 3 + 2];
-    }
-
-    return colorMap;
+    var entries = Math.Max(paletteCount, 1);
+    var padded = new byte[entries * 3];
+    palette.AsSpan(0, Math.Min(palette.Length, padded.Length)).CopyTo(padded);
+    return padded;
   }
 }

@@ -58,14 +58,19 @@ public sealed class RoundTripTests {
     Assert.That(restored.PixelData, Is.EqualTo(original.PixelData));
   }
 
+  /// <summary>
+  /// <see cref="TiffFile.ColorMap"/> holds RGB triplets — that is what the reader puts there and what
+  /// the writers expect. A pair of conversions used to sit on either side of it, turning triplets into
+  /// the format's own channel-block layout on the way out and back on the way in, so a palette was
+  /// laid out twice and read as though it had not been laid out at all. Every colour then came from
+  /// somewhere else in the table, which the round trip could not see because both halves agreed.
+  /// </summary>
   [Test]
   [Category("Integration")]
   public void RoundTrip_Palette() {
     var colorMap = new byte[256 * 3];
-    colorMap[0] = 255; colorMap[1] = 0; colorMap[2] = 0;
-    colorMap[3] = 0; colorMap[4] = 255; colorMap[5] = 0;
-    colorMap[6] = 0; colorMap[7] = 0; colorMap[8] = 255;
-    colorMap[9] = 255; colorMap[10] = 255; colorMap[11] = 0;
+    byte[] colours = [255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 0];
+    colours.CopyTo(colorMap, 0);
 
     var pixelData = new byte[4 * 4];
     for (var i = 0; i < pixelData.Length; ++i)
@@ -81,21 +86,24 @@ public sealed class RoundTripTests {
       ColorMode = TiffColorMode.Palette
     };
 
-    var bytes = TiffWriter.ToBytes(original);
-    var restored = TiffReader.FromBytes(bytes);
+    var restored = TiffReader.FromBytes(TiffWriter.ToBytes(original));
 
-    Assert.That(restored.Width, Is.EqualTo(4));
-    Assert.That(restored.Height, Is.EqualTo(4));
-    Assert.That(restored.SamplesPerPixel, Is.EqualTo(1));
-    Assert.That(restored.BitsPerSample, Is.EqualTo(8));
-    Assert.That(restored.PixelData, Is.EqualTo(original.PixelData));
-    Assert.That(restored.ColorMap, Is.Not.Null);
-    Assert.That(restored.ColorMap![0], Is.EqualTo(255));
-    Assert.That(restored.ColorMap[1], Is.EqualTo(0));
-    Assert.That(restored.ColorMap[2], Is.EqualTo(0));
-    Assert.That(restored.ColorMap[3], Is.EqualTo(0));
-    Assert.That(restored.ColorMap[4], Is.EqualTo(255));
-    Assert.That(restored.ColorMap[5], Is.EqualTo(0));
+    Assert.Multiple(() => {
+      Assert.That(restored.Width, Is.EqualTo(4));
+      Assert.That(restored.Height, Is.EqualTo(4));
+      Assert.That(restored.SamplesPerPixel, Is.EqualTo(1));
+      Assert.That(restored.BitsPerSample, Is.EqualTo(8));
+      Assert.That(restored.PixelData, Is.EqualTo(original.PixelData));
+      Assert.That(restored.ColorMap![..12], Is.EqualTo(colours), "the table comes back as it went in");
+    });
+
+    var rgb = TiffFile.ToRawImage(restored).ToRgb24();
+    Assert.Multiple(() => {
+      Assert.That(rgb[..3], Is.EqualTo(new byte[] { 255, 0, 0 }), "entry 0");
+      Assert.That(rgb[3..6], Is.EqualTo(new byte[] { 0, 255, 0 }), "entry 1");
+      Assert.That(rgb[6..9], Is.EqualTo(new byte[] { 0, 0, 255 }), "entry 2");
+      Assert.That(rgb[9..12], Is.EqualTo(new byte[] { 255, 255, 0 }), "entry 3");
+    });
   }
 
   [Test]
