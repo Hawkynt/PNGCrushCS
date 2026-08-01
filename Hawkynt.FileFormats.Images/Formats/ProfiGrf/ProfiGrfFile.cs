@@ -15,7 +15,8 @@ namespace FileFormat.ProfiGrf;
 /// than in a plane of their own.
 /// </remarks>
 public readonly record struct ProfiGrfFile
-  : IImageFormatReader<ProfiGrfFile>, IImageToRawImage<ProfiGrfFile> {
+  : IImageFormatReader<ProfiGrfFile>, IImageToRawImage<ProfiGrfFile>,
+    IImageFromRawImage<ProfiGrfFile>, IImageFormatWriter<ProfiGrfFile> {
 
   /// <summary>Pixels across.</summary>
   public const int Width = 512;
@@ -48,6 +49,8 @@ public readonly record struct ProfiGrfFile
   static string[] IImageFormatMetadata<ProfiGrfFile>.FileExtensions => [".grf"];
   static ProfiGrfFile IImageFormatReader<ProfiGrfFile>.FromSpan(ReadOnlySpan<byte> data)
     => ProfiGrfReader.FromSpan(data);
+  static byte[] IImageFormatWriter<ProfiGrfFile>.ToBytes(ProfiGrfFile file)
+    => ProfiGrfWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<ProfiGrfFile>.VideoModes => [
     new("Profi", [(Width, Height)], [ColorCount])
   ];
@@ -88,5 +91,122 @@ public readonly record struct ProfiGrfFile
       Palette = palette,
       PaletteCount = ColorCount,
     };
+  }
+
+  /// <summary>Builds a picture, choosing sixteen colours and then two of them per group of eight.</summary>
+  /// <remarks>
+  /// The attribute is shaped like a Spectrum's — an ink and a paper, each with its own brightness
+  /// bit — but the sixteen colours it indexes are the file's own rather than the hardware's, so the
+  /// palette is chosen first and the pairs afterwards.
+  /// <para/>
+  /// Only half the rows are stored; each is shown twice. The picture is sampled at the row that is
+  /// actually kept rather than averaged with the one that is not, since averaging would blur a
+  /// pair of rows that the hardware was never going to show separately.
+  /// </remarks>
+  public static ProfiGrfFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(Width, Height);
+    var snapped = new byte[Width * StoredRows * 3];
+
+    // Green and red carry three bits each and blue only two, so the grid is not the same in every
+    // channel and a colour has to be snapped to its own.
+    for (var row = 0; row < StoredRows; ++row)
+    for (var x = 0; x < Width; ++x) {
+      var from = (row * 2 * Width + x) * 3;
+      var to = (row * Width + x) * 3;
+      snapped[to] = ChannelScaling.Expand3((rgb.PixelData[from] * 7 + 127) / 255);
+      snapped[to + 1] = ChannelScaling.Expand3((rgb.PixelData[from + 1] * 7 + 127) / 255);
+      snapped[to + 2] = ChannelScaling.Expand2((rgb.PixelData[from + 2] * 3 + 127) / 255);
+    }
+
+    var palette = _ChoosePalette(snapped);
+    var data = new byte[FileSize];
+
+    for (var i = 0; i < ColorCount; ++i)
+      data[PaletteOffset + i] = (byte)(
+        ((palette[i * 3 + 1] * 7 + 127) / 255 << 5)
+        | ((palette[i * 3] * 7 + 127) / 255 << 2)
+        | (palette[i * 3 + 2] * 3 + 127) / 255);
+
+    for (var row = 0; row < StoredRows; ++row)
+    for (var group = 0; group < Width / 8; ++group) {
+      var (ink, paper, bits) = _ChooseGroup(snapped, palette, group * 8, row);
+      var at = BitmapOffset + row * Stride + group * 2;
+
+      data[at] = bits;
+      data[at + 1] = (byte)(((paper >> 3) << 7) | ((ink >> 3) << 6) | ((paper & 7) << 3) | (ink & 7));
+    }
+
+    return new() { Data = data };
+  }
+
+  /// <summary>The two palette entries that describe one group of eight pixels with the least error.</summary>
+  private static (int Ink, int Paper, byte Bits) _ChooseGroup(
+    ReadOnlySpan<byte> rgb, ReadOnlySpan<byte> palette, int left, int row) {
+    int bestInk = 0, bestPaper = 0, bestBits = 0;
+    var bestCost = long.MaxValue;
+
+    for (var ink = 0; ink < ColorCount; ++ink)
+    for (var paper = 0; paper <= ink; ++paper) {
+      var cost = 0L;
+      var bits = 0;
+
+      for (var x = 0; x < 8; ++x) {
+        var at = (row * Width + left + x) * 3;
+        var toInk = _Distance(rgb, at, palette, ink);
+        var toPaper = _Distance(rgb, at, palette, paper);
+
+        if (toInk <= toPaper) {
+          bits |= 1 << (7 - x);
+          cost += toInk;
+        } else
+          cost += toPaper;
+      }
+
+      if (cost >= bestCost)
+        continue;
+
+      bestCost = cost;
+      bestInk = ink;
+      bestPaper = paper;
+      bestBits = bits;
+    }
+
+    return (bestInk, bestPaper, (byte)bestBits);
+  }
+
+  private static long _Distance(ReadOnlySpan<byte> rgb, int pixel, ReadOnlySpan<byte> palette, int entry) {
+    long dr = rgb[pixel] - palette[entry * 3];
+    long dg = rgb[pixel + 1] - palette[entry * 3 + 1];
+    long db = rgb[pixel + 2] - palette[entry * 3 + 2];
+
+    return dr * dr * 77 + dg * dg * 150 + db * db * 29;
+  }
+
+  /// <summary>Picks the commonest colours, which is exact for a picture with no more than sixteen.</summary>
+  private static byte[] _ChoosePalette(ReadOnlySpan<byte> rgb) {
+    var counts = new System.Collections.Generic.Dictionary<int, int>();
+    for (var i = 0; i + 2 < rgb.Length; i += 3) {
+      var key = (rgb[i] << 16) | (rgb[i + 1] << 8) | rgb[i + 2];
+      counts[key] = counts.TryGetValue(key, out var seen) ? seen + 1 : 1;
+    }
+
+    var chosen = new System.Collections.Generic.List<int>(counts.Keys);
+    chosen.Sort((a, b) => {
+      var byCount = counts[b].CompareTo(counts[a]);
+
+      // Ties break on the colour itself, so the result does not depend on dictionary order.
+      return byCount != 0 ? byCount : a.CompareTo(b);
+    });
+
+    var palette = new byte[ColorCount * 3];
+    for (var i = 0; i < ColorCount && i < chosen.Count; ++i) {
+      palette[i * 3] = (byte)(chosen[i] >> 16);
+      palette[i * 3 + 1] = (byte)(chosen[i] >> 8);
+      palette[i * 3 + 2] = (byte)chosen[i];
+    }
+
+    return palette;
   }
 }
