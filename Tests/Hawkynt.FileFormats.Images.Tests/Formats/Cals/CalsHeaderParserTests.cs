@@ -20,7 +20,7 @@ public sealed class CalsHeaderParserTests {
     var fields = CalsHeaderParser.ParseAll(header);
 
     Assert.That(fields.ContainsKey("rpelcnt"), Is.True);
-    Assert.That(fields["rpelcnt"], Is.EqualTo("1024,768"));
+    Assert.That(fields["rpelcnt"], Is.EqualTo("001024,000768"));
   }
 
   [Test]
@@ -37,12 +37,12 @@ public sealed class CalsHeaderParserTests {
     var fields = CalsHeaderParser.ParseAll(header);
 
     Assert.That(fields.ContainsKey("rdensty"), Is.True);
-    Assert.That(fields["rdensty"], Is.EqualTo("300"));
+    Assert.That(fields["rdensty"], Is.EqualTo("0300"));
   }
 
   [Test]
   [Category("Unit")]
-  public void Format_Produces768Bytes() {
+  public void Format_ProducesTheSpecifiedHeaderSize() {
     var file = new CalsFile {
       Width = 8,
       Height = 1,
@@ -51,6 +51,7 @@ public sealed class CalsHeaderParserTests {
 
     var header = CalsHeaderParser.Format(file);
 
-    Assert.That(header.Length, Is.EqualTo(768));
+    // Sixteen records of 128 bytes, which is what the specification fixes it at.
+    Assert.That(header.Length, Is.EqualTo(2048));
   }
 }

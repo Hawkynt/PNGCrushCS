@@ -37,7 +37,7 @@ public sealed class RoundTripTests {
       Width = 64,
       Height = 16,
       Dpi = 300,
-      Orientation = "landscape",
+      Orientation = "270,000",
       SrcDocId = "SCAN300",
       DstDocId = "NONE",
       PixelData = _CreateTestPixelData(64, 16)
@@ -49,7 +49,7 @@ public sealed class RoundTripTests {
     Assert.That(restored.Width, Is.EqualTo(original.Width));
     Assert.That(restored.Height, Is.EqualTo(original.Height));
     Assert.That(restored.Dpi, Is.EqualTo(300));
-    Assert.That(restored.Orientation, Is.EqualTo("landscape"));
+    Assert.That(restored.Orientation, Is.EqualTo("270,000"));
     Assert.That(restored.PixelData, Is.EqualTo(original.PixelData));
   }
 

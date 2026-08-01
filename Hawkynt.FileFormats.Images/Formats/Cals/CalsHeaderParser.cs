@@ -4,17 +4,23 @@ using System.Text;
 
 namespace FileFormat.Cals;
 
-/// <summary>Parses and formats CALS 768-byte text headers (6 records x 128 bytes each).</summary>
+/// <summary>Parses and formats CALS text headers: sixteen records of 128 bytes each.</summary>
+/// <remarks>
+/// The header is a fixed 2048 bytes of <c>keyword: value</c> lines, one to a record, blank-padded.
+/// This used to read six of them and write the rest of the fields into the unused tails of those
+/// six, after a null byte — which no other tool looks at, so the files were readable only here and
+/// every file written anywhere else was rejected for the size field it plainly contained.
+/// </remarks>
 internal static class CalsHeaderParser {
 
   /// <summary>Total header size in bytes.</summary>
-  internal const int HeaderSize = 768;
+  internal const int HeaderSize = 2048;
 
   /// <summary>Size of each record in the header.</summary>
   private const int _RECORD_SIZE = 128;
 
   /// <summary>Number of records in the header.</summary>
-  private const int _RECORD_COUNT = 6;
+  private const int _RECORD_COUNT = HeaderSize / _RECORD_SIZE;
 
   /// <summary>Parses a 768-byte CALS header into key-value pairs.</summary>
   internal static Dictionary<string, string> Parse(byte[] headerData) {
@@ -44,19 +50,18 @@ internal static class CalsHeaderParser {
     for (var i = 0; i < HeaderSize; ++i)
       header[i] = (byte)' ';
 
+    // One field to a record, in the order the specification lists them.
     _WriteRecord(header, 0, $"srcdocid: {file.SrcDocId}");
     _WriteRecord(header, 1, $"dstdocid: {file.DstDocId}");
-    _WriteRecord(header, 2, $"txtfilid: ");
-    _WriteRecord(header, 3, $"figid: ");
-    _WriteRecord(header, 4, $"srcgph: ");
-    _WriteRecord(header, 5, $"doccls: ");
-
-    // Embed key fields into remaining space of records
-    // We use records 2-5 to embed rtype, rpelcnt, rdensty, orient after the standard field
-    _AppendToRecord(header, 2, $"rtype: 1");
-    _AppendToRecord(header, 3, $"rpelcnt: {file.Width},{file.Height}");
-    _AppendToRecord(header, 4, $"rdensty: {file.Dpi}");
-    _AppendToRecord(header, 5, $"orient: {file.Orientation}");
+    _WriteRecord(header, 2, "txtfilid: NONE");
+    _WriteRecord(header, 3, "figid: NONE");
+    _WriteRecord(header, 4, "srcgph: NONE");
+    _WriteRecord(header, 5, "doccls: NONE");
+    _WriteRecord(header, 6, "rtype: 1");
+    _WriteRecord(header, 7, $"rorient: {file.Orientation}");
+    _WriteRecord(header, 8, $"rpelcnt: {file.Width:D6},{file.Height:D6}");
+    _WriteRecord(header, 9, $"rdensty: {file.Dpi:D4}");
+    _WriteRecord(header, 10, "notes: NONE");
 
     return header;
   }

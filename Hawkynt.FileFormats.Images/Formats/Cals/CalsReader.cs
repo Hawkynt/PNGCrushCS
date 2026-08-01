@@ -58,9 +58,11 @@ public static class CalsReader {
     if (fields.TryGetValue("rdensty", out var densityStr) && int.TryParse(densityStr.Trim(), out var parsedDpi))
       dpi = parsedDpi;
 
-    var orientation = "portrait";
-    if (fields.TryGetValue("orient", out var orientStr) && !string.IsNullOrWhiteSpace(orientStr))
-      orientation = orientStr.Trim().ToLowerInvariant();
+    // The keyword is rorient, and its value is the pair of angles the rows and columns run at —
+    // not a word. Looking for "orient" found nothing in any file written elsewhere.
+    var orientation = CalsFile.DefaultOrientation;
+    if (fields.TryGetValue("rorient", out var orientStr) && !string.IsNullOrWhiteSpace(orientStr))
+      orientation = orientStr.Trim();
 
     var srcDocId = "NONE";
     if (fields.TryGetValue("srcdocid", out var srcId) && !string.IsNullOrWhiteSpace(srcId))
@@ -122,9 +124,11 @@ public static class CalsReader {
     if (fields.TryGetValue("rdensty", out var densityStr) && int.TryParse(densityStr.Trim(), out var parsedDpi))
       dpi = parsedDpi;
 
-    var orientation = "portrait";
-    if (fields.TryGetValue("orient", out var orientStr) && !string.IsNullOrWhiteSpace(orientStr))
-      orientation = orientStr.Trim().ToLowerInvariant();
+    // The keyword is rorient, and its value is the pair of angles the rows and columns run at —
+    // not a word. Looking for "orient" found nothing in any file written elsewhere.
+    var orientation = CalsFile.DefaultOrientation;
+    if (fields.TryGetValue("rorient", out var orientStr) && !string.IsNullOrWhiteSpace(orientStr))
+      orientation = orientStr.Trim();
 
     var srcDocId = "NONE";
     if (fields.TryGetValue("srcdocid", out var srcId) && !string.IsNullOrWhiteSpace(srcId))

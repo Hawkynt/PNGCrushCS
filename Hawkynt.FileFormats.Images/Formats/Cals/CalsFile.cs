@@ -22,8 +22,11 @@ public readonly record struct CalsFile() : IImageFormatReader<CalsFile>, IImageT
   /// <summary>Dots per inch (typically 200, 300, or 400).</summary>
   public int Dpi { get; init; } = 200;
 
-  /// <summary>Orientation: "portrait" or "landscape".</summary>
-  public string Orientation { get; init; } = "portrait";
+  /// <summary>The angles the rows and the columns run at, as the <c>rorient</c> record states them.</summary>
+  public string Orientation { get; init; } = DefaultOrientation;
+
+  /// <summary>Rows left to right, columns top to bottom, which is how a picture is normally stored.</summary>
+  public const string DefaultOrientation = "000,270";
 
   /// <summary>1bpp packed pixel data, MSB first, ceil(width/8) bytes per row.</summary>
   public byte[] PixelData { get; init; }
@@ -34,26 +37,26 @@ public readonly record struct CalsFile() : IImageFormatReader<CalsFile>, IImageT
   /// <summary>Destination document identifier.</summary>
   public string DstDocId { get; init; } = "NONE";
 
-  private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
+  /// <summary>A set bit is black, which is what the fax coding underneath this counts in.</summary>
+  private static readonly byte[] _BlackWhitePalette = [255, 255, 255, 0, 0, 0];
 
   public static RawImage ToRawImage(CalsFile file) => new() {
     Width = file.Width,
     Height = file.Height,
-    Format = PixelFormat.Indexed1,
-    PixelData = file.PixelData[..],
+    Format = PixelFormat.Indexed8,
+    PixelData = BilevelRows.Unpack(file.PixelData, file.Width, file.Height),
     Palette = _BlackWhitePalette[..],
     PaletteCount = 2,
   };
 
   public static CalsFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    image = image.EnsureFormat(PixelFormat.Indexed1);
 
     return new() {
       Width = image.Width,
       Height = image.Height,
       Dpi = 200,
-      PixelData = image.PixelData[..],
+      PixelData = BilevelRows.Pack(BilevelRows.Threshold(image, setWhenDark: true), image.Width, image.Height),
     };
   }
 }

@@ -14,9 +14,11 @@ public sealed class DataTypeTests {
 
   [Test]
   [Category("Unit")]
-  public void CalsFile_DefaultOrientation_IsPortrait() {
+  public void CalsFile_DefaultOrientation_RunsRowsLeftToRight() {
     var file = new CalsFile { Width = 8, Height = 1, PixelData = new byte[1] };
-    Assert.That(file.Orientation, Is.EqualTo("portrait"));
+
+    // The record holds the two angles the rows and columns run at, not a word.
+    Assert.That(file.Orientation, Is.EqualTo("000,270"));
   }
 
   [Test]
