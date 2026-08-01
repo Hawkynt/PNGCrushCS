@@ -77,6 +77,43 @@ public sealed class JpegXlSizeHeaderConformanceTests {
     });
   }
 
+  /// <summary>
+  /// The first two SizeHeader bytes of a 40x24 image as libjxl writes it, via ImageMagick.
+  /// </summary>
+  /// <remarks>
+  /// 40:24 is 5:3, which is not one of the seven ratios the small header can name, so the encoder
+  /// writes ratio 0 and then spells the width out — five more bits of eighths, the same way it just
+  /// spelled out the height. The decoder read the ratio, saw 0, and returned the height as the
+  /// width, so this file measured 24x24; it also left the bit reader three bits short of where the
+  /// image metadata begins. Round-trip tests could not see it, because nothing was writing this form
+  /// either.
+  /// </remarks>
+  [Test]
+  [Category("Unit")]
+  public void Decode_SpecBytes_ForSmall_40x24_WithNoNameableRatio() {
+    var (w, h, _) = JpegXlSizeHeader.Decode([0x05, 0xC8]);
+    Assert.Multiple(() => {
+      Assert.That(w, Is.EqualTo(40));
+      Assert.That(h, Is.EqualTo(24));
+    });
+  }
+
+  /// <summary>The width spelled out in the small header is five bits, so it stops at 256.</summary>
+  [Test]
+  [Category("Unit")]
+  [TestCase(40, 24)]
+  [TestCase(32, 24)]
+  [TestCase(24, 40)]
+  [TestCase(8, 256)]
+  [TestCase(256, 8)]
+  public void Encode_ThenDecode_SmallWithNoNameableRatio(int width, int height) {
+    var (w, h, _) = JpegXlSizeHeader.Decode(JpegXlSizeHeader.Encode(width, height));
+    Assert.Multiple(() => {
+      Assert.That(w, Is.EqualTo(width));
+      Assert.That(h, Is.EqualTo(height));
+    });
+  }
+
   // ============================================================
   // Full codestream-prefix tests: 0xFF 0x0A signature + SizeHeader.
   // This is the leading byte sequence of every real JPEG XL file.

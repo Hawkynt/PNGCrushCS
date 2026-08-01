@@ -39,7 +39,15 @@ internal static class JpegXlSizeHeader {
       var heightDiv8 = (int)reader.ReadBits(5);
       var height = (heightDiv8 + 1) * 8;
       var ratio = (int)reader.ReadBits(3);
-      var width = _GetWidthFromRatio(ratio, height);
+
+      // Ratio 0 means the width is spelled out rather than derived, and in the small header it is
+      // spelled out the same way the height was: five bits of eighths. Skipping that read left the
+      // width equal to the height — a 40x24 image measured 24x24 — and left the bit reader short of
+      // where the next header begins.
+      var width = ratio == 0
+        ? ((int)reader.ReadBits(5) + 1) * 8
+        : _GetWidthFromRatio(ratio, height);
+
       return (width, height, reader.BytesConsumed);
     }
 
@@ -69,6 +77,17 @@ internal static class JpegXlSizeHeader {
         writer.WriteBits(1, 1); // small=true (bit value 1, per libjxl spec)
         writer.WriteBits((uint)(height / 8 - 1), 5);
         writer.WriteBits((uint)ratio, 3);
+        return writer.ToArray();
+      }
+
+      // No ratio fits, but a width that is itself a multiple of eight still belongs in the small
+      // header — ratio 0 followed by five bits of eighths. This is what libjxl writes for a 40x24
+      // image, and what the reader above now expects.
+      if (width >= 8 && width <= 256 && width % 8 == 0) {
+        writer.WriteBits(1, 1);
+        writer.WriteBits((uint)(height / 8 - 1), 5);
+        writer.WriteBits(0, 3);
+        writer.WriteBits((uint)(width / 8 - 1), 5);
         return writer.ToArray();
       }
     }
