@@ -13,7 +13,8 @@ namespace FileFormat.CocoP11;
 /// is rounded down to an even number before it reaches the bitmap.
 /// </remarks>
 public readonly record struct CocoP11File
-  : IImageFormatReader<CocoP11File>, IImageToRawImage<CocoP11File> {
+  : IImageFormatReader<CocoP11File>, IImageToRawImage<CocoP11File>,
+    IImageFromRawImage<CocoP11File>, IImageFormatWriter<CocoP11File> {
 
   /// <summary>Screen pixels across.</summary>
   public const int Width = 256;
@@ -42,6 +43,8 @@ public readonly record struct CocoP11File
   static string[] IImageFormatMetadata<CocoP11File>.FileExtensions => [".p11"];
   static CocoP11File IImageFormatReader<CocoP11File>.FromSpan(ReadOnlySpan<byte> data)
     => CocoP11Reader.FromSpan(data);
+  static byte[] IImageFormatWriter<CocoP11File>.ToBytes(CocoP11File file)
+    => CocoP11Writer.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<CocoP11File>.VideoModes => [
     new("P11", [(Width, Height)], [4])
   ];
@@ -69,5 +72,61 @@ public readonly record struct CocoP11File
       Palette = Palette.ToArray(),
       PaletteCount = 4,
     };
+  }
+
+  /// <summary>Writes the five bytes a reader identifies the format by.</summary>
+  public static void WriteHeader(Span<byte> data) {
+    data[0] = 0;
+    data[1] = 12;
+    data[3] = 14;
+    data[4] = 0;
+  }
+
+  /// <summary>Builds a picture in the four colours the hardware fixes.</summary>
+  /// <remarks>
+  /// There is no palette to choose: the four are in the chip. A pixel is two screen pixels wide and
+  /// two scanlines tall, so each is read at its top-left corner rather than averaged over the four
+  /// it covers — averaging would mix colours the hardware has no way to show between.
+  /// </remarks>
+  public static CocoP11File FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(Width, Height);
+    var data = new byte[FileSize];
+    WriteHeader(data);
+
+    for (var row = 0; row < Height / 2; ++row)
+    for (var column = 0; column < Stride; ++column) {
+      var value = 0;
+      for (var pixel = 0; pixel < 4; ++pixel) {
+        var at = (row * 2 * Width + column * 8 + pixel * 2) * 3;
+        value |= _Nearest(rgb.PixelData, at) << (6 - pixel * 2);
+      }
+
+      data[BitmapOffset + row * Stride + column] = (byte)value;
+    }
+
+    return new() { Data = data };
+  }
+
+  /// <summary>Which of the four fixed colours a pixel is closest to.</summary>
+  private static int _Nearest(ReadOnlySpan<byte> rgb, int pixel) {
+    var best = 0;
+    var bestCost = long.MaxValue;
+
+    for (var entry = 0; entry < 4; ++entry) {
+      long dr = rgb[pixel] - Palette[entry * 3];
+      long dg = rgb[pixel + 1] - Palette[entry * 3 + 1];
+      long db = rgb[pixel + 2] - Palette[entry * 3 + 2];
+      var cost = dr * dr * 77 + dg * dg * 150 + db * db * 29;
+
+      if (cost >= bestCost)
+        continue;
+
+      bestCost = cost;
+      best = entry;
+    }
+
+    return best;
   }
 }
