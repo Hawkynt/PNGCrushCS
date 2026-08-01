@@ -18,7 +18,15 @@ public readonly record struct FitsFile : IImageFormatReader<FitsFile>, IImageToR
   public IReadOnlyList<FitsKeyword> Keywords { get; init; }
   public byte[] PixelData { get; init; }
 
-  /// <summary>Converts this FITS image to a <see cref="RawImage"/>, preserving 16-bit precision where possible.</summary>
+  /// <summary>
+  /// Converts this FITS image to a <see cref="RawImage"/>, preserving 16-bit precision where possible.
+  /// </summary>
+  /// <remarks>
+  /// FITS puts its first row at the bottom of the picture — the origin is bottom-left, as it is for
+  /// the telescopes the format was written for. The rows were being copied straight across, so every
+  /// FITS image came out upside down. That is invisible to any check that compares an image's size,
+  /// since a flipped picture is exactly as big as the one it flips.
+  /// </remarks>
   public static RawImage ToRawImage(FitsFile file) {
     var width = file.Width;
     var height = file.Height;
@@ -29,6 +37,7 @@ public readonly record struct FitsFile : IImageFormatReader<FitsFile>, IImageToR
       case FitsBitpix.UInt8: {
         var result = new byte[pixelCount];
         Buffer.BlockCopy(src, 0, result, 0, Math.Min(src.Length, pixelCount));
+        result = _FlipRows(result, width, height, 1);
         var palette = _BuildGrayscalePalette();
         return new() {
           Width = width,
@@ -40,7 +49,7 @@ public readonly record struct FitsFile : IImageFormatReader<FitsFile>, IImageToR
         };
       }
       case FitsBitpix.Int16: {
-        var result = _Int16ToGray16BigEndian(src, pixelCount);
+        var result = _FlipRows(_Int16ToGray16BigEndian(src, pixelCount), width, height, 2);
         return new() {
           Width = width,
           Height = height,
@@ -49,7 +58,7 @@ public readonly record struct FitsFile : IImageFormatReader<FitsFile>, IImageToR
         };
       }
       case FitsBitpix.Int32: {
-        var result = _NormalizeInt32ToGray16BigEndian(src, pixelCount);
+        var result = _FlipRows(_NormalizeInt32ToGray16BigEndian(src, pixelCount), width, height, 2);
         return new() {
           Width = width,
           Height = height,
@@ -58,7 +67,7 @@ public readonly record struct FitsFile : IImageFormatReader<FitsFile>, IImageToR
         };
       }
       case FitsBitpix.Float32: {
-        var result = _NormalizeFloat32ToGray16BigEndian(src, pixelCount);
+        var result = _FlipRows(_NormalizeFloat32ToGray16BigEndian(src, pixelCount), width, height, 2);
         return new() {
           Width = width,
           Height = height,
@@ -67,7 +76,7 @@ public readonly record struct FitsFile : IImageFormatReader<FitsFile>, IImageToR
         };
       }
       case FitsBitpix.Float64: {
-        var result = _NormalizeFloat64ToGray16BigEndian(src, pixelCount);
+        var result = _FlipRows(_NormalizeFloat64ToGray16BigEndian(src, pixelCount), width, height, 2);
         return new() {
           Width = width,
           Height = height,
@@ -105,11 +114,13 @@ public readonly record struct FitsFile : IImageFormatReader<FitsFile>, IImageToR
         result[si + 1] = (byte)(signed & 0xFF);
       }
 
+      // Written bottom row first, which is what the reader above now expects and what any other
+      // FITS reader expects too.
       return new() {
         Width = width,
         Height = height,
         Bitpix = FitsBitpix.Int16,
-        PixelData = result,
+        PixelData = _FlipRows(result, width, height, 2),
       };
     }
 
@@ -130,7 +141,7 @@ public readonly record struct FitsFile : IImageFormatReader<FitsFile>, IImageToR
         Width = width,
         Height = height,
         Bitpix = FitsBitpix.UInt8,
-        PixelData = gray,
+        PixelData = _FlipRows(gray, width, height, 1),
       };
     }
   }
@@ -293,5 +304,25 @@ public readonly record struct FitsFile : IImageFormatReader<FitsFile>, IImageToR
     }
 
     return palette;
+  }
+
+  /// <summary>Turns a row-major buffer the other way up.</summary>
+  /// <remarks>FITS counts its rows from the bottom; a <see cref="RawImage"/> counts from the top.</remarks>
+  private static byte[] _FlipRows(byte[] pixels, int width, int height, int bytesPerPixel) {
+    var stride = width * bytesPerPixel;
+    if (stride <= 0 || height <= 0)
+      return pixels;
+
+    var flipped = new byte[pixels.Length];
+    for (var y = 0; y < height; ++y) {
+      var from = y * stride;
+      var to = (height - 1 - y) * stride;
+      if (from + stride > pixels.Length || to + stride > flipped.Length)
+        break;
+
+      Buffer.BlockCopy(pixels, from, flipped, to, stride);
+    }
+
+    return flipped;
   }
 }
