@@ -36,6 +36,9 @@ public readonly record struct XwdFile : IImageFormatReader<XwdFile>, IImageToRaw
   /// <summary>Raw colormap data: 12 bytes per entry (pixel u32 BE, red u16 BE, green u16 BE, blue u16 BE, flags u8, padding u8).</summary>
   public byte[]? Colormap { get; init; }
 
+  /// <summary>X's name for least-significant-byte-first, in the byte-order and bit-order fields.</summary>
+  private const uint _LsbFirst = 0;
+
   public static RawImage ToRawImage(XwdFile file) {
 
     var width = file.Width;
@@ -88,6 +91,11 @@ public readonly record struct XwdFile : IImageFormatReader<XwdFile>, IImageToRaw
     var width = image.Width;
     var height = image.Height;
 
+    // A true-colour dump has to say how its pixels are laid out, and the fields that say so were all
+    // being left at zero: no bitmap unit, no padding, and no channel masks at all. A reader has
+    // nothing to work from then — an X visual with no masks describes no colour — and both ImageMagick
+    // and the X clients answer with "improper image header". The masks below describe the bytes this
+    // writer actually emits, read back in the byte order it declares.
     switch (image.Format) {
       case PixelFormat.Bgra32:
         return new() {
@@ -96,9 +104,17 @@ public readonly record struct XwdFile : IImageFormatReader<XwdFile>, IImageToRaw
           BitsPerPixel = 32,
           BytesPerLine = width * 4,
           PixmapFormat = XwdPixmapFormat.ZPixmap,
-          PixmapDepth = 32,
+          PixmapDepth = 24, // the alpha byte is padding, not a plane the visual describes
           VisualClass = XwdVisualClass.TrueColor,
           BitsPerRgb = 8,
+          ByteOrder = _LsbFirst,
+          BitmapUnit = 32,
+          BitmapBitOrder = _LsbFirst,
+          BitmapPad = 32,
+          // Little-endian over the bytes B, G, R, A.
+          RedMask = 0x00FF0000,
+          GreenMask = 0x0000FF00,
+          BlueMask = 0x000000FF,
           PixelData = image.PixelData[..],
         };
       case PixelFormat.Rgb24:
@@ -111,6 +127,14 @@ public readonly record struct XwdFile : IImageFormatReader<XwdFile>, IImageToRaw
           PixmapDepth = 24,
           VisualClass = XwdVisualClass.TrueColor,
           BitsPerRgb = 8,
+          ByteOrder = _LsbFirst,
+          BitmapUnit = 8,
+          BitmapBitOrder = _LsbFirst,
+          BitmapPad = 8,
+          // Little-endian over the bytes R, G, B.
+          RedMask = 0x000000FF,
+          GreenMask = 0x0000FF00,
+          BlueMask = 0x00FF0000,
           PixelData = image.PixelData[..],
         };
       default:
