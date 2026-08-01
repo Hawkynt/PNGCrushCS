@@ -25,6 +25,7 @@ public static class UtahRleWriter {
       flags,
       (byte)file.NumChannels,
       8,
+      0,
       0
     );
 

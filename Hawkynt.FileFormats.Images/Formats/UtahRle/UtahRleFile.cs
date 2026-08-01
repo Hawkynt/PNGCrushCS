@@ -54,11 +54,15 @@ public readonly record struct UtahRleFile : IImageFormatReader<UtahRleFile>, IIm
   public static UtahRleFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
 
+    // Three channels or one. A fourth would be alpha, which the format carries as a flag and an
+    // extra plane rather than as a fourth colour — declaring four colour channels without that flag
+    // describes a picture no reader has a shape for, which is what this used to do.
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Gray8);
+
     var channels = image.Format switch {
       PixelFormat.Gray8 => 1,
       PixelFormat.Rgb24 => 3,
-      PixelFormat.Rgba32 => 4,
-      _ => throw new ArgumentException($"Unsupported pixel format for Utah RLE: {image.Format}. Expected Gray8, Rgb24, or Rgba32.", nameof(image)),
+      _ => throw new ArgumentException($"Unsupported pixel format for Utah RLE: {image.Format}. Expected Gray8 or Rgb24.", nameof(image)),
     };
 
     return new() {

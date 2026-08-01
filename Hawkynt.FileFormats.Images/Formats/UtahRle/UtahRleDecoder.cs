@@ -3,100 +3,115 @@ using System;
 namespace FileFormat.UtahRle;
 
 /// <summary>Decodes Utah RLE scanline opcodes to interleaved pixel data.</summary>
+/// <remarks>
+/// Every instruction is two bytes: a command and one operand. Setting bit six of the command says
+/// the operand did not fit, and a sixteen-bit count follows instead. Counts are stored one less
+/// than they are, and rows run up the picture rather than down — the origin of one of these is its
+/// bottom left corner.
+/// </remarks>
 internal static class UtahRleDecoder {
 
-  private const byte _OPCODE_SKIP_LINES = 1;
-  private const byte _OPCODE_SET_COLOR = 2;
-  private const byte _OPCODE_SKIP_PIXELS = 3;
-  private const byte _OPCODE_BYTE_DATA = 5;
-  private const byte _OPCODE_RUN_DATA = 6;
-  private const byte _OPCODE_EOF = 7;
+  private const byte _OpSkipLines = 1;
+  private const byte _OpSetColor = 2;
+  private const byte _OpSkipPixels = 3;
+  private const byte _OpByteData = 5;
+  private const byte _OpRunData = 6;
+  private const byte _OpEof = 7;
 
-  public static byte[] Decode(ReadOnlySpan<byte> data, int width, int height, int numChannels, byte[]? background) {
+  /// <summary>Set on a command whose count needed more than the one operand byte.</summary>
+  private const byte _Long = 0x40;
+
+  /// <param name="background">
+  /// What the picture stands on where nothing is drawn. A file may state one or say it has none,
+  /// in which case the untouched parts stay at zero.
+  /// </param>
+  public static byte[] Decode(
+    ReadOnlySpan<byte> data, int width, int height, int numChannels, byte[]? background = null) {
     var pixelData = new byte[width * height * numChannels];
 
-    if (background != null)
-      _FillBackground(pixelData, width, height, numChannels, background);
+    if (background is { Length: > 0 })
+      for (var i = 0; i < pixelData.Length; ++i)
+        pixelData[i] = background[i % numChannels % background.Length];
 
-    var offset = 0;
-    var currentChannel = 0;
-    var currentLine = 0;
-    var currentPixel = 0;
+    var at = 0;
+    var channel = 0;
+    var row = 0;
+    var column = 0;
 
-    while (offset < data.Length) {
-      var raw = data[offset++];
-      var highBits = raw >> 6;
-      int opcode;
-      int count;
+    while (at + 1 < data.Length) {
+      var command = data[at];
+      var opcode = command & 0x3F;
+      int operand;
 
-      if (highBits != 0) {
-        // Short form: high 2 bits = opcode (1-3), low 6 bits = count
-        opcode = highBits;
-        count = raw & 0x3F;
-      } else {
-        // Long form: low 6 bits = opcode (5-7), count is 16-bit LE in next 2 bytes
-        opcode = raw & 0x3F;
-        if (offset + 1 >= data.Length)
+      if ((command & _Long) != 0) {
+        if (at + 3 >= data.Length)
           break;
 
-        count = data[offset] | (data[offset + 1] << 8);
-        offset += 2;
+        operand = data[at + 2] | (data[at + 3] << 8);
+        at += 4;
+      } else {
+        operand = data[at + 1];
+        at += 2;
       }
 
       switch (opcode) {
-        case _OPCODE_SKIP_LINES:
-          currentLine += count;
-          currentPixel = 0;
-          break;
+        case _OpSkipLines:
+          row += operand;
+          column = 0;
+          continue;
 
-        case _OPCODE_SET_COLOR:
-          currentChannel = count;
-          currentPixel = 0;
-          break;
+        case _OpSetColor:
+          channel = operand;
+          column = 0;
+          continue;
 
-        case _OPCODE_SKIP_PIXELS:
-          currentPixel += count;
-          break;
+        case _OpSkipPixels:
+          column += operand;
+          continue;
 
-        case _OPCODE_BYTE_DATA:
-          for (var i = 0; i < count && offset < data.Length; ++i) {
-            var pixelIndex = currentLine * width + currentPixel;
-            if (pixelIndex < width * height && currentChannel < numChannels)
-              pixelData[pixelIndex * numChannels + currentChannel] = data[offset];
+        case _OpByteData: {
+          // The count is one less than the number of bytes, and the run is padded to an even length.
+          var count = operand + 1;
+          for (var i = 0; i < count && at < data.Length; ++i, ++at, ++column)
+            _Put(pixelData, width, height, numChannels, row, column, channel, data[at]);
 
-            ++offset;
-            ++currentPixel;
-          }
+          if ((count & 1) != 0)
+            ++at;
 
-          break;
+          continue;
+        }
 
-        case _OPCODE_RUN_DATA:
-          if (offset >= data.Length)
+        case _OpRunData: {
+          if (at >= data.Length)
             break;
 
-          var runValue = data[offset++];
-          for (var i = 0; i < count; ++i) {
-            var pixelIndex = currentLine * width + currentPixel;
-            if (pixelIndex < width * height && currentChannel < numChannels)
-              pixelData[pixelIndex * numChannels + currentChannel] = runValue;
+          var value = data[at];
+          at += 2;
 
-            ++currentPixel;
-          }
+          var count = operand + 1;
+          for (var i = 0; i < count; ++i, ++column)
+            _Put(pixelData, width, height, numChannels, row, column, channel, value);
 
-          break;
+          continue;
+        }
 
-        case _OPCODE_EOF:
+        case _OpEof:
           return pixelData;
       }
+
+      break;
     }
 
     return pixelData;
   }
 
-  private static void _FillBackground(byte[] pixelData, int width, int height, int numChannels, byte[] background) {
-    for (var y = 0; y < height; ++y)
-      for (var x = 0; x < width; ++x)
-        for (var c = 0; c < numChannels && c < background.Length; ++c)
-          pixelData[(y * width + x) * numChannels + c] = background[c];
+  /// <summary>Places one sample, counting rows from the bottom of the picture.</summary>
+  private static void _Put(
+    byte[] pixels, int width, int height, int channels, int row, int column, int channel, byte value) {
+    if (column < 0 || column >= width || row < 0 || row >= height || channel < 0 || channel >= channels)
+      return;
+
+    var y = height - 1 - row;
+    pixels[(y * width + column) * channels + channel] = value;
   }
 }
