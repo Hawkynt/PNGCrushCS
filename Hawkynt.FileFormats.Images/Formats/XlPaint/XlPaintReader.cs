@@ -34,8 +34,10 @@ public static class XlPaintReader {
         && Encoding.ASCII.GetString(data[..XlPaintFile.Signature.Length]) == XlPaintFile.Signature) {
       // A marked file says where its picture starts and how tall it is; anything the stream does
       // not reach stays black rather than being an error.
-      var marked = new byte[16000];
-      _TryUnpack(data, 8, marked, 192 * 2 * XlPaintFile.Stride);
+      // Sized to the picture rather than to the largest one there is, so the length of the array
+      // says how tall the picture is instead of merely being big enough.
+      var marked = new byte[192 * 2 * XlPaintFile.Stride];
+      _TryUnpack(data, 8, marked, marked.Length);
 
       return new() { ScreenData = marked, Height = 192, Registers = Atari8BitGraphics.ReadPf012Bak(data, 4) };
     }
@@ -46,8 +48,8 @@ public static class XlPaintReader {
     // Unmarked files say nothing about their height, so the only test is which length the stream
     // fills exactly — 200 rows first, because a 192-row picture cannot fill the longer one.
     foreach (var height in (int[])[200, 192]) {
-      var screens = new byte[16000];
-      if (!_TryUnpack(data, 4, screens, height * 2 * XlPaintFile.Stride))
+      var screens = new byte[height * 2 * XlPaintFile.Stride];
+      if (!_TryUnpack(data, 4, screens, screens.Length))
         continue;
 
       return new() { ScreenData = screens, Height = height, Registers = Atari8BitGraphics.ReadPf012Bak(data, 0) };

@@ -60,6 +60,13 @@ public sealed class WriterAcceptanceTests {
     [ImageFormat.AtariSif] =
       "the reference tool reads .sif as a 2048-byte character dump shown at 256 by 32, which is "
       + "neither this layout nor this size",
+    [ImageFormat.AtariPlayer] = "the reference tool reads .pmg as a Paint Magic C64 picture, which is a different format",
+    [ImageFormat.C16Plus4] = "the reference tool reads .c16 as a universal image, which is a different format",
+    [ImageFormat.CameraRaw] = "the reference tool reads .raw as a ZX81 or Atari screen dump, neither of which this is",
+    [ImageFormat.MonoMagic] = "the reference tool reads .mon as a C64 high-resolution picture, which is a different format",
+    [ImageFormat.Mrc] = "the reference tool reads .map as an Envision character set, which is a different format",
+    [ImageFormat.Thomson] = "the reference tool reads .map as an Envision character set, which is a different format",
+    [ImageFormat.PhotoPaint] = "the reference tool reads .cpt as the Canvas compressed picture, which is a different format",
   };
 
   private static IEnumerable<TestCaseData> Writable() {
