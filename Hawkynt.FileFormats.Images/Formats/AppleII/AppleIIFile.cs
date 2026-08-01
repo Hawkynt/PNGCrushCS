@@ -61,10 +61,7 @@ public sealed class AppleIIFile :
   public static AppleIIFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
 
-    image = image.EnsureFormat(PixelFormat.Indexed8);
-
-    if (image.PaletteCount > 2)
-      throw new ArgumentException("At most 2 palette entries are supported.", nameof(image));
+    image = image.EnsureIndexedAtMost(2);
 
     if (image.Height != _HEIGHT)
       throw new ArgumentException($"Height must be {_HEIGHT}.", nameof(image));

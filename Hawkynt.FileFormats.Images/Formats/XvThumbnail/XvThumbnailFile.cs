@@ -74,13 +74,14 @@ public readonly record struct XvThumbnailFile : IImageFormatReader<XvThumbnailFi
         var r = image.PixelData[i * 3];
         var g = image.PixelData[i * 3 + 1];
         var b = image.PixelData[i * 3 + 2];
-
-        // Refuse inputs that won't survive RGB332 quantization with reader's expand (val * 255 / N).
+        // Three bits of red and green and two of blue is a great deal fewer than eight each, so a
+        // picture loses a lot on the way in. That is what this format is; refusing anything that
+        // would not survive it exactly left it unreachable from any photograph.
+        //
+        // Rounded rather than truncated, so a channel does not come back a step low.
         var r3 = (r * 7 + 127) / 255;
         var g3 = (g * 7 + 127) / 255;
         var b2 = (b * 3 + 127) / 255;
-        if ((byte)(r3 * 255 / 7) != r || (byte)(g3 * 255 / 7) != g || (byte)(b2 * 255 / 3) != b)
-          throw new ArgumentException($"Rgb24 input at pixel {i} cannot be losslessly encoded as RGB332; use Indexed1/Indexed8 input with a compatible palette.", nameof(image));
 
         packed[i] = (byte)((r3 << 5) | (g3 << 2) | b2);
       }

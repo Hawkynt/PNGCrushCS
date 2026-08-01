@@ -43,15 +43,10 @@ public readonly record struct IffRgbnFile : IImageFormatReader<IffRgbnFile>, IIm
 
     byte[] pixels;
     if (image.Format == PixelFormat.Rgb24) {
-      // Refuse inputs that cannot be losslessly stored as 4-bit per channel.
-      var src = image.PixelData;
-      for (var i = 0; i < src.Length; ++i) {
-        var v = src[i];
-        // 8-bit values that survive 4-bit quantization with high-bit replication are exactly multiples of 17.
-        if (v % 17 != 0)
-          throw new ArgumentException($"Rgb24 input cannot be losslessly stored as 4-bit per channel; use Indexed1/Indexed8 input with a compatible palette.", nameof(image));
-      }
-      pixels = src[..];
+      // Four bits a channel is fewer than eight, so a picture loses a little on the way in. That is
+      // what converting to this format means; refusing anything that would not survive it exactly —
+      // which is what this used to do — leaves the format unreachable from a photograph.
+      pixels = image.PixelData[..];
     } else if (image.Format == PixelFormat.Indexed1 || image.Format == PixelFormat.Indexed8) {
       var palette = image.Palette ?? throw new ArgumentException("Indexed input requires a palette.", nameof(image));
       var paletteCount = image.PaletteCount;

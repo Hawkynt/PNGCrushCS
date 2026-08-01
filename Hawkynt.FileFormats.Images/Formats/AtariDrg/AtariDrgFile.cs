@@ -68,11 +68,9 @@ public readonly record struct AtariDrgFile : IImageFormatReader<AtariDrgFile>, I
   /// <summary>Creates a DRG screen dump from an Indexed8 raw image (160x192, max 4 colors).</summary>
   public static AtariDrgFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    image = image.EnsureFormat(PixelFormat.Indexed8);
+    image = image.EnsureIndexedAtMost(ColorCount);
     if (image.Width != PixelWidth || image.Height != PixelHeight)
       throw new ArgumentException($"Expected {PixelWidth}x{PixelHeight} but got {image.Width}x{image.Height}.", nameof(image));
-    if (image.PaletteCount > ColorCount)
-      throw new ArgumentException($"Expected at most {ColorCount} palette entries but got {image.PaletteCount}.", nameof(image));
 
     var pixelData = new byte[PixelWidth * PixelHeight];
     var srcLen = Math.Min(image.PixelData.Length, pixelData.Length);

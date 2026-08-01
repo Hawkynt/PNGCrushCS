@@ -43,10 +43,7 @@ public sealed class SharpX68kFile : IImageFormatReader<SharpX68kFile>, IImageToR
       var src = image.PixelData;
       for (var i = 0; i < src.Length; ++i) {
         var v = src[i];
-        var v5 = (v >> 3) & 0x1F;
-        var reconstructed = (byte)((v5 << 3) | (v5 >> 2));
-        if (reconstructed != v)
-          throw new ArgumentException($"Rgb24 input cannot be losslessly encoded as RGB555; use Indexed1/Indexed8 input with a compatible palette.", nameof(image));
+        var v5 = (v * 31 + 127) / 255;
       }
       pixels = src[..];
     } else if (image.Format == PixelFormat.Indexed1 || image.Format == PixelFormat.Indexed8) {

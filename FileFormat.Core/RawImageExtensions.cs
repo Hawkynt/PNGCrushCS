@@ -38,6 +38,37 @@ public static class RawImageExtensions {
   /// <param name="format">Target indexed pixel format.</param>
   /// <param name="palette">The format's fixed palette as RGB triplets.</param>
   /// <param name="alphaTable">Optional per-entry alpha; entries default to opaque when omitted.</param>
+  /// <summary>Reduces a picture to at most a given number of colours, choosing them from it.</summary>
+  /// <remarks>
+  /// Converting to an indexed format alone gives whatever palette the picture needs, which is often
+  /// 256 — and a format holding two or four then has to refuse it. Refusing is the wrong answer for
+  /// something whose job is converting between formats: the caller asked for this format, and the
+  /// format's limit is a fact about it rather than a fault in the picture.
+  /// </remarks>
+  public static RawImage EnsureIndexedAtMost(this RawImage image, int colors) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var indexed = image.EnsureFormat(PixelFormat.Indexed8);
+    if (indexed.PaletteCount <= colors)
+      return indexed;
+
+    var quantized = ColorQuantizer.Quantize(
+      PixelConverter.Convert(image, PixelFormat.Bgra32).PixelData, image.Width * image.Height, colors);
+
+    var indices = new byte[image.Width * image.Height];
+    for (var i = 0; i < indices.Length; ++i)
+      indices[i] = (byte)quantized.Indices[i];
+
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      Format = PixelFormat.Indexed8,
+      PixelData = indices,
+      Palette = quantized.Palette,
+      PaletteCount = Math.Min(colors, quantized.Palette.Length / 3),
+    };
+  }
+
   public static RawImage EnsureIndexed(this RawImage image, PixelFormat format, byte[] palette, byte[]? alphaTable = null) {
     ArgumentNullException.ThrowIfNull(image);
     ArgumentNullException.ThrowIfNull(palette);

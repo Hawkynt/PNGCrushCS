@@ -39,16 +39,10 @@ public sealed class RiscOsSpriteFile : IImageFormatReader<RiscOsSpriteFile>, IIm
 
     byte[] pixels;
     if (image.Format == PixelFormat.Rgb24) {
-      // Refuse inputs that wouldn't round-trip cleanly through RGB555 (with high-bit replication).
-      var src = image.PixelData;
-      for (var i = 0; i < src.Length; ++i) {
-        var v = src[i];
-        var v5 = (v >> 3) & 0x1F;
-        var reconstructed = (byte)((v5 << 3) | (v5 >> 2));
-        if (reconstructed != v)
-          throw new ArgumentException($"Rgb24 input cannot be losslessly encoded as RGB555; use Indexed1/Indexed8 input with a compatible palette.", nameof(image));
-      }
-      pixels = src[..];
+      // Five bits a channel is fewer than eight, so the picture loses a little on the way in. That
+      // is what converting to this format means; refusing anything that would not survive it
+      // exactly — which is what this used to do — leaves the format unreachable from a photograph.
+      pixels = image.PixelData[..];
     } else if (image.Format == PixelFormat.Indexed1 || image.Format == PixelFormat.Indexed8) {
       var palette = image.Palette ?? throw new ArgumentException("Indexed input requires a palette.", nameof(image));
       var paletteCount = image.PaletteCount;

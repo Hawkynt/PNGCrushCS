@@ -68,11 +68,9 @@ public readonly record struct AtariGr7File : IImageFormatReader<AtariGr7File>, I
   /// <summary>Creates a GR.7 screen dump from an Indexed8 raw image (160x96, max 4 colors).</summary>
   public static AtariGr7File FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    image = image.EnsureFormat(PixelFormat.Indexed8);
+    image = image.EnsureIndexedAtMost(ColorCount);
     if (image.Width != PixelWidth || image.Height != PixelHeight)
       throw new ArgumentException($"Expected {PixelWidth}x{PixelHeight} but got {image.Width}x{image.Height}.", nameof(image));
-    if (image.PaletteCount > ColorCount)
-      throw new ArgumentException($"Expected at most {ColorCount} palette entries but got {image.PaletteCount}.", nameof(image));
 
     var pixelData = new byte[PixelWidth * PixelHeight];
     var srcLen = Math.Min(image.PixelData.Length, pixelData.Length);
