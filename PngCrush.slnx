@@ -35,6 +35,7 @@
     <Project Path="Optimizers/Optimizer.Image/Optimizer.Image.csproj" />
     <Project Path="Optimizers/Optimizer.Jpeg/Optimizer.Jpeg.csproj" />
     <Project Path="Optimizers/Optimizer.Pcx/Optimizer.Pcx.csproj" />
+    <Project Path="Optimizers/Optimizer.Sgi/Optimizer.Sgi.csproj" />
     <Project Path="Optimizers/Optimizer.Png/Optimizer.Png.csproj" />
     <Project Path="Optimizers/Optimizer.Tga/Optimizer.Tga.csproj" />
     <Project Path="Optimizers/Optimizer.Tiff/Optimizer.Tiff.csproj" />
@@ -54,6 +55,7 @@
     <Project Path="Tests/Optimizer.Image.Tests/Optimizer.Image.Tests.csproj" />
     <Project Path="Tests/Optimizer.Jpeg.Tests/Optimizer.Jpeg.Tests.csproj" />
     <Project Path="Tests/Optimizer.Pcx.Tests/Optimizer.Pcx.Tests.csproj" />
+    <Project Path="Tests/Optimizer.Sgi.Tests/Optimizer.Sgi.Tests.csproj" />
     <Project Path="Tests/Optimizer.Png.Tests/Optimizer.Png.Tests.csproj" />
     <Project Path="Tests/Optimizer.Tga.Tests/Optimizer.Tga.Tests.csproj" />
     <Project Path="Tests/Optimizer.Tiff.Tests/Optimizer.Tiff.Tests.csproj" />

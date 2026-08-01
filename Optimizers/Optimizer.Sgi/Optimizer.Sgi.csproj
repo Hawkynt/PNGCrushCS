@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Unlike the older optimizers this one never touches System.Drawing: it works on the library's
+       own RawImage, so it builds and runs anywhere the format code does. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Optimizer.Sgi.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Hawkynt.FileFormats.Images\Hawkynt.FileFormats.Images.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Core\FileFormat.Core.csproj" />
+  </ItemGroup>
+
+</Project>
