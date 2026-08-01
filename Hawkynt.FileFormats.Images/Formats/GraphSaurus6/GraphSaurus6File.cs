@@ -15,7 +15,8 @@ namespace FileFormat.GraphSaurus6;
 /// </remarks>
 [FormatMagicBytes([0xFE])]
 public readonly record struct GraphSaurus6File
-  : IImageFormatReader<GraphSaurus6File>, IImageToRawImage<GraphSaurus6File> {
+  : IImageFormatReader<GraphSaurus6File>, IImageToRawImage<GraphSaurus6File>,
+    IImageFromRawImage<GraphSaurus6File>, IImageFormatWriter<GraphSaurus6File> {
 
   /// <summary>Stored pixels per row.</summary>
   public const int Width = 512;
@@ -36,6 +37,8 @@ public readonly record struct GraphSaurus6File
   static string[] IImageFormatMetadata<GraphSaurus6File>.FileExtensions => [".sr6"];
   static GraphSaurus6File IImageFormatReader<GraphSaurus6File>.FromSpan(ReadOnlySpan<byte> data)
     => GraphSaurus6Reader.FromSpan(data);
+  static byte[] IImageFormatWriter<GraphSaurus6File>.ToBytes(GraphSaurus6File file)
+    => GraphSaurus6Writer.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<GraphSaurus6File>.VideoModes => [
     new("Screen 6", [(Width, IntegerRange.Any)], [ColorCount])
   ];
@@ -67,5 +70,55 @@ public readonly record struct GraphSaurus6File
       Palette = MsxGraphics.Screen6DefaultPaletteRgb.ToArray(),
       PaletteCount = ColorCount,
     };
+  }
+
+  /// <summary>Builds a picture in the four colours the machine starts up showing.</summary>
+  /// <remarks>
+  /// The palette lives in a companion file rather than this one, so a picture written alone means
+  /// whatever the machine powers on with — black and three greens. Those are the four this encodes
+  /// against, since writing against colours the file cannot carry would only look right until it
+  /// was opened somewhere else.
+  /// <para/>
+  /// Screen 6 buys its 512 pixels a line by halving the vertical resolution, so a stored row is
+  /// drawn on two scanlines and is read from the upper of the pair rather than averaged.
+  /// </remarks>
+  public static GraphSaurus6File FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var stored = MaxHeight / 2;
+    var rgb = image.SampleTo(Width, stored * 2);
+    var palette = MsxGraphics.Screen6DefaultPaletteRgb;
+    var pixels = new byte[stored * BytesPerRow];
+
+    for (var row = 0; row < stored; ++row)
+    for (var x = 0; x < Width; ++x) {
+      var at = (row * 2 * Width + x) * 3;
+      var index = row * Width + x;
+
+      pixels[index >> 2] |= (byte)(_Nearest(rgb.PixelData, at, palette) << ((~index & 3) << 1));
+    }
+
+    return new() { StoredHeight = stored, PixelData = pixels };
+  }
+
+  /// <summary>Which of the four colours a pixel is closest to.</summary>
+  private static int _Nearest(ReadOnlySpan<byte> rgb, int pixel, ReadOnlySpan<byte> palette) {
+    var best = 0;
+    var bestCost = long.MaxValue;
+
+    for (var entry = 0; entry < ColorCount; ++entry) {
+      long dr = rgb[pixel] - palette[entry * 3];
+      long dg = rgb[pixel + 1] - palette[entry * 3 + 1];
+      long db = rgb[pixel + 2] - palette[entry * 3 + 2];
+      var cost = dr * dr * 77 + dg * dg * 150 + db * db * 29;
+
+      if (cost >= bestCost)
+        continue;
+
+      bestCost = cost;
+      best = entry;
+    }
+
+    return best;
   }
 }
