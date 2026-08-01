@@ -25,7 +25,7 @@ public sealed class CineonWriterTests {
 
   [Test]
   [Category("Unit")]
-  public void ToBytes_HeaderSize_Is1024() {
+  public void ToBytes_PutsThePixelsPastBothHeaderParts() {
     var file = new CineonFile {
       Width = 2,
       Height = 2,
@@ -36,12 +36,12 @@ public sealed class CineonWriterTests {
     var bytes = CineonWriter.ToBytes(file);
 
     var dataOffset = BinaryPrimitives.ReadInt32BigEndian(bytes.AsSpan(4));
-    Assert.That(dataOffset, Is.EqualTo(CineonHeader.StructSize));
+    Assert.That(dataOffset, Is.EqualTo(CineonHeader.ImageDataStart));
   }
 
   [Test]
   [Category("Unit")]
-  public void ToBytes_DataOffset_Is1024() {
+  public void ToBytes_DataOffset_Is2048() {
     var file = new CineonFile {
       Width = 2,
       Height = 2,
@@ -52,7 +52,9 @@ public sealed class CineonWriterTests {
     var bytes = CineonWriter.ToBytes(file);
 
     var dataOffset = BinaryPrimitives.ReadInt32BigEndian(bytes.AsSpan(4));
-    Assert.That(dataOffset, Is.EqualTo(1024));
+    // 1024 is the generic header alone; the image descriptor that follows it says how many channels
+    // there are, so pixels written at 1024 land on top of it.
+    Assert.That(dataOffset, Is.EqualTo(2048));
   }
 
   [Test]

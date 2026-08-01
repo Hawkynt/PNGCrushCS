@@ -21,16 +21,22 @@ public static class CineonWriter {
     int bitsPerSample,
     byte orientation
   ) {
-    var dataOffset = CineonHeader.StructSize;
+    // The pixels start after both halves of the header, not after the generic one: writing them at
+    // 1024 laid them over the image descriptor, which is where a reader looks to find out how many
+    // channels there are and how wide they run.
+    var dataOffset = CineonHeader.ImageDataStart;
     var fileSize = dataOffset + pixelData.Length;
     var result = new byte[fileSize];
     var span = result.AsSpan();
+
+    var maxData = (1 << bitsPerSample) - 1;
+    const float maxDensity = 2.046f; // the printing density reference white stands at
 
     var header = new CineonHeader(
       CineonHeader.MagicNumber,
       dataOffset,
       CineonHeader.StructSize,
-      0,
+      CineonHeader.ImageDataStart - CineonHeader.StructSize,
       0,
       fileSize,
       "V4.5",
@@ -38,7 +44,7 @@ public static class CineonWriter {
       string.Empty,
       string.Empty,
       orientation,
-      1,
+      3, // red, green and blue, each with its own element record below
       0,
       0,
       (byte)bitsPerSample,
@@ -46,8 +52,26 @@ public static class CineonWriter {
       height,
       0f,
       0f,
-      1023f,
-      2.046f
+      maxData,
+      maxDensity,
+      0,
+      0,
+      (byte)bitsPerSample,
+      width,
+      height,
+      0f,
+      0f,
+      maxData,
+      maxDensity,
+      0,
+      0,
+      (byte)bitsPerSample,
+      width,
+      height,
+      0f,
+      0f,
+      maxData,
+      maxDensity
     );
 
     header.WriteTo(span);

@@ -24,7 +24,25 @@ public sealed class CineonHeaderTests {
       "2024:01:15",
       "10:30:00",
       0,
-      1,
+      3,
+      0,
+      0,
+      10,
+      640,
+      480,
+      0f,
+      0f,
+      1023f,
+      2.046f,
+      0,
+      0,
+      10,
+      640,
+      480,
+      0f,
+      0f,
+      1023f,
+      2.046f,
       0,
       0,
       10,
@@ -62,6 +80,12 @@ public sealed class CineonHeaderTests {
       Assert.That(parsed.MinQuantity, Is.EqualTo(original.MinQuantity));
       Assert.That(parsed.MaxData, Is.EqualTo(original.MaxData));
       Assert.That(parsed.MaxQuantity, Is.EqualTo(original.MaxQuantity));
+      Assert.That(parsed.BitsPerSampleGreen, Is.EqualTo(original.BitsPerSampleGreen));
+      Assert.That(parsed.PixelsPerLineGreen, Is.EqualTo(original.PixelsPerLineGreen));
+      Assert.That(parsed.LinesPerElementGreen, Is.EqualTo(original.LinesPerElementGreen));
+      Assert.That(parsed.BitsPerSampleBlue, Is.EqualTo(original.BitsPerSampleBlue));
+      Assert.That(parsed.PixelsPerLineBlue, Is.EqualTo(original.PixelsPerLineBlue));
+      Assert.That(parsed.LinesPerElementBlue, Is.EqualTo(original.LinesPerElementBlue));
     });
   }
 
