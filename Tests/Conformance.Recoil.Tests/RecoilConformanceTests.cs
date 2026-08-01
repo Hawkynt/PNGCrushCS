@@ -48,6 +48,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.MsxScreen4, "MSX Screen 4", 256, 192, ".sc4"),
     new(ImageFormat.DaisyDotFont, "Daisy-Dot NLQ font", 320, 96, ".nlq"),
     new(ImageFormat.ProfiGrf, "Profi GRF", 512, 480, ".grf"),
+    new(ImageFormat.MadStudioTile, "Mad Studio ANTIC 4 tile", 32, 40, ".tl4"),
     new(ImageFormat.Picasso64, "Picasso 64", 160, 200),
     new(ImageFormat.RainbowPainter, "Rainbow Painter", 160, 200),
     new(ImageFormat.SaracenPaint, "Saracen Paint", 160, 200),
