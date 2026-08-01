@@ -113,44 +113,52 @@ internal static class JpegColorConverter {
   }
 
   /// <summary>Upsamples a component plane by the given factors (nearest-neighbor).</summary>
+  /// <summary>Brings a subsampled component plane back up to the picture's size.</summary>
+  /// <remarks>
+  /// Chrominance is usually stored at half resolution, and how it is brought back matters more than
+  /// it sounds. Repeating each sample across the block it covers — which is what this used to do —
+  /// leaves a visible step at every block boundary and puts colour up to a couple of dozen levels
+  /// away from where every other decoder puts it.
+  /// <para/>
+  /// What they do instead is a triangle filter: each output takes three parts of the sample it sits
+  /// on and one part of the neighbour it sits nearer. The weights below are the integer form of
+  /// that, edges included, so the result matches rather than merely being smoother.
+  /// </remarks>
   public static byte[] Upsample(byte[] plane, int inWidth, int inHeight, int outWidth, int outHeight) {
     if (inWidth == outWidth && inHeight == outHeight)
       return (byte[])plane.Clone();
 
     var result = new byte[outWidth * outHeight];
 
-    // Fast path: 2x horizontal upsampling (4:2:2 → 4:4:4)
-    if (outWidth == inWidth * 2 && outHeight == inHeight) {
-      for (var y = 0; y < inHeight; ++y) {
-        var srcOff = y * inWidth;
-        var dstOff = y * outWidth;
-        for (var x = 0; x < inWidth; ++x) {
-          var v = plane[srcOff + x];
-          result[dstOff + x * 2] = v;
-          result[dstOff + x * 2 + 1] = v;
-        }
-      }
+    // A picture whose size is not a whole number of blocks leaves the chroma plane a little larger
+    // than half: eight by four carries a thirteen by seven picture. So the test is that doubling
+    // covers the output rather than matching it exactly, and the extra columns are simply not
+    // written — which is what cropping the doubled plane amounts to.
+    if (_Doubles(inWidth, outWidth) && outHeight == inHeight) {
+      for (var y = 0; y < inHeight; ++y)
+        _TriangleAcross(plane, y * inWidth, inWidth, result, y * outWidth, outWidth, 1);
+
       return result;
     }
 
-    // Fast path: 2x both (4:2:0 → 4:4:4)
-    if (outWidth == inWidth * 2 && outHeight == inHeight * 2) {
-      for (var y = 0; y < inHeight; ++y) {
-        var srcOff = y * inWidth;
-        var dstOff1 = (y * 2) * outWidth;
-        var dstOff2 = (y * 2 + 1) * outWidth;
-        for (var x = 0; x < inWidth; ++x) {
-          var v = plane[srcOff + x];
-          result[dstOff1 + x * 2] = v;
-          result[dstOff1 + x * 2 + 1] = v;
-          result[dstOff2 + x * 2] = v;
-          result[dstOff2 + x * 2 + 1] = v;
-        }
+    if (_Doubles(inWidth, outWidth) && _Doubles(inHeight, outHeight)) {
+      // Vertically the same filter applies, so each output row is three parts of the row it sits on
+      // and one of the row it sits nearer. Both are folded into one pass over the columns.
+      var column = new int[inWidth];
+
+      for (var oy = 0; oy < outHeight; ++oy) {
+        var near = Math.Min(oy >> 1, inHeight - 1);
+        var far = Math.Clamp((oy & 1) == 0 ? near - 1 : near + 1, 0, inHeight - 1);
+
+        for (var x = 0; x < inWidth; ++x)
+          column[x] = 3 * plane[near * inWidth + x] + plane[far * inWidth + x];
+
+        _TriangleAcross(column, 0, inWidth, result, oy * outWidth, outWidth, 4);
       }
+
       return result;
     }
 
-    // General case
     for (var oy = 0; oy < outHeight; ++oy) {
       var sy = Math.Min(oy * inHeight / outHeight, inHeight - 1);
       for (var ox = 0; ox < outWidth; ++ox) {
@@ -161,6 +169,46 @@ internal static class JpegColorConverter {
 
     return result;
   }
+
+  /// <summary>Whether doubling the input covers the output without overshooting a whole sample.</summary>
+  private static bool _Doubles(int input, int output) => output > input && output <= input * 2;
+
+  /// <summary>Doubles one row with the triangle filter, replicating past either end.</summary>
+  /// <param name="scale">
+  /// What the incoming values are already multiplied by, so the shift can take both passes out at
+  /// once when the vertical filter has already been applied.
+  /// </param>
+  private static void _TriangleAcross(
+    ReadOnlySpan<byte> source, int from, int count, byte[] target, int to, int width, int scale)
+    => _TriangleAcross(_Widen(source, from, count), 0, count, target, to, width, scale);
+
+  private static int[] _Widen(ReadOnlySpan<byte> source, int from, int count) {
+    var widened = new int[count];
+    for (var i = 0; i < count; ++i)
+      widened[i] = source[from + i];
+
+    return widened;
+  }
+
+  private static void _TriangleAcross(
+    ReadOnlySpan<int> source, int from, int count, byte[] target, int to, int width, int scale) {
+    var shift = scale == 1 ? 2 : 4;
+    var evenBias = scale == 1 ? 2 : 8;
+    var oddBias = scale == 1 ? 1 : 7;
+
+    for (var x = 0; x < count; ++x) {
+      var here = source[from + x] * 3;
+      var left = source[from + Math.Max(x - 1, 0)];
+      var right = source[from + Math.Min(x + 1, count - 1)];
+
+      var even = to + x * 2;
+      if (even < to + width)
+        target[even] = (byte)((here + left + evenBias) >> shift);
+      if (even + 1 < to + width)
+        target[even + 1] = (byte)((here + right + oddBias) >> shift);
+    }
+  }
+
 
   /// <summary>Gets the chroma H/V sampling factors for a given subsampling mode.</summary>
   public static (int hFactor, int vFactor) GetChromaFactors(JpegSubsampling subsampling) => subsampling switch {
