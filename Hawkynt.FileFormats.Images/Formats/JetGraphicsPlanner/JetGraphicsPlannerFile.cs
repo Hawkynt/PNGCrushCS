@@ -15,7 +15,11 @@ namespace FileFormat.JetGraphicsPlanner;
 /// sheet looks different from the first even where the shapes repeat.
 /// </remarks>
 public readonly record struct JetGraphicsPlannerFile
-  : IImageFormatReader<JetGraphicsPlannerFile>, IImageToRawImage<JetGraphicsPlannerFile> {
+  : IImageFormatReader<JetGraphicsPlannerFile>, IImageToRawImage<JetGraphicsPlannerFile>,
+    IImageFromRawImage<JetGraphicsPlannerFile>, IImageFormatWriter<JetGraphicsPlannerFile> {
+
+  static byte[] IImageFormatWriter<JetGraphicsPlannerFile>.ToBytes(JetGraphicsPlannerFile file)
+    => JetGraphicsPlannerWriter.ToBytes(file);
 
   /// <summary>Size of the Atari executable header the file opens with.</summary>
   public const int HeaderSize = 6;
@@ -94,5 +98,53 @@ public readonly record struct JetGraphicsPlannerFile
     }
 
     return new() { Width = Width, Height = Height, Format = PixelFormat.Rgb24, PixelData = pixels };
+  }
+
+  /// <summary>Builds a font, treating the picture as the sheet of glyphs it is shown as.</summary>
+  /// <remarks>
+  /// What this holds is a character set rather than a picture, and what a viewer shows is all of it
+  /// laid out at once — thirty-two characters across and eight bands down. So writing a picture is
+  /// writing the glyphs that would display as it, which is exact: every logical pixel is its own two
+  /// bits, and the bands are simply four separate pages of memory rather than a stride.
+  /// </remarks>
+  public static JetGraphicsPlannerFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(Width, Height).PixelData;
+    var gtia = Atari8BitGraphics.Palette;
+    var glyphs = new byte[GlyphDataSize];
+
+    for (var y = 0; y < Height; ++y) {
+      var origin = BandOffset(y / GlyphHeight);
+
+      for (var x = 0; x < Width; x += 2) {
+        var value = _NearestRegister(rgb, gtia, x, y);
+        var index = origin + ((x >> 3) << 3) + (y % GlyphHeight);
+        if (index < glyphs.Length)
+          glyphs[index] |= (byte)(value << (~x & 6));
+      }
+    }
+
+    return new() { GlyphData = glyphs };
+  }
+
+  /// <summary>Which of the four registers a pair of screen pixels should take.</summary>
+  private static int _NearestRegister(ReadOnlySpan<byte> rgb, ReadOnlySpan<byte> gtia, int x, int y) {
+    var at = (y * Width + x) * 3;
+    var best = 0;
+    var bestCost = long.MaxValue;
+
+    for (var candidate = 0; candidate < Registers.Length; ++candidate) {
+      var entry = Registers[candidate] * 3;
+      long dr = rgb[at] - gtia[entry], dg = rgb[at + 1] - gtia[entry + 1], db = rgb[at + 2] - gtia[entry + 2];
+      var cost = dr * dr + dg * dg + db * db;
+      if (cost >= bestCost)
+        continue;
+
+      bestCost = cost;
+      best = candidate;
+    }
+
+    return best;
   }
 }
