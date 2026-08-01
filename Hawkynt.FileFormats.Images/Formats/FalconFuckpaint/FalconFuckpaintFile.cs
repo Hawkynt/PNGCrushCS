@@ -14,7 +14,8 @@ namespace FileFormat.FalconFuckpaint;
 /// distinguishes them.
 /// </remarks>
 public readonly record struct FalconFuckpaintFile
-  : IImageFormatReader<FalconFuckpaintFile>, IImageToRawImage<FalconFuckpaintFile> {
+  : IImageFormatReader<FalconFuckpaintFile>, IImageToRawImage<FalconFuckpaintFile>,
+    IImageFromRawImage<FalconFuckpaintFile>, IImageFormatWriter<FalconFuckpaintFile> {
 
   /// <summary>Colours the palette holds.</summary>
   public const int ColorCount = 256;
@@ -29,6 +30,8 @@ public readonly record struct FalconFuckpaintFile
   static string[] IImageFormatMetadata<FalconFuckpaintFile>.FileExtensions => [".pi4", ".pi7", ".pi9"];
   static FalconFuckpaintFile IImageFormatReader<FalconFuckpaintFile>.FromSpan(ReadOnlySpan<byte> data)
     => FalconFuckpaintReader.FromSpan(data);
+  static byte[] IImageFormatWriter<FalconFuckpaintFile>.ToBytes(FalconFuckpaintFile file)
+    => FalconFuckpaintWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<FalconFuckpaintFile>.VideoModes => [
     new("Falcon", [(320, 200), (320, 240), (640, 480)], [ColorCount])
   ];
@@ -54,5 +57,52 @@ public readonly record struct FalconFuckpaintFile
       Palette = AtariStGraphics.ReadFalconPalette(data, 0, ColorCount),
       PaletteCount = ColorCount,
     };
+  }
+
+  /// <summary>Builds a picture at whichever of the three sizes the source is nearest.</summary>
+  /// <remarks>
+  /// There is no header to state a size, so only the three lengths the format has are writable — a
+  /// picture of any other size is sampled to the nearest of them rather than written to a length
+  /// nothing can read.
+  /// </remarks>
+  public static FalconFuckpaintFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var (width, height) = _NearestSize(image.Width, image.Height);
+    var rgb = image.SampleTo(width, height);
+
+    var quantized = ColorQuantizer.Quantize(
+      PixelConverter.Convert(rgb, PixelFormat.Bgra32).PixelData, width * height, ColorCount);
+
+    var palette = quantized.Palette;
+    var indices = new byte[width * height];
+    for (var i = 0; i < indices.Length; ++i)
+      indices[i] = (byte)quantized.Indices[i];
+
+    var data = new byte[PaletteSize + width * height];
+    AtariStGraphics.WriteFalconPalette(palette, ColorCount, data.AsSpan(0, PaletteSize));
+    AtariStGraphics.PackBitplanes(indices, width, Bitplanes, width, height)
+      .CopyTo(data.AsSpan(PaletteSize));
+
+    return new() { Data = data, Width = width, Height = height };
+  }
+
+  /// <summary>The three sizes a Fuckpaint picture can be.</summary>
+  public static readonly (int Width, int Height)[] Sizes = [(320, 200), (320, 240), (640, 480)];
+
+  private static (int Width, int Height) _NearestSize(int width, int height) {
+    var best = Sizes[0];
+    var bestCost = int.MaxValue;
+
+    foreach (var size in Sizes) {
+      var cost = Math.Abs(size.Width - width) + Math.Abs(size.Height - height);
+      if (cost >= bestCost)
+        continue;
+
+      bestCost = cost;
+      best = size;
+    }
+
+    return best;
   }
 }

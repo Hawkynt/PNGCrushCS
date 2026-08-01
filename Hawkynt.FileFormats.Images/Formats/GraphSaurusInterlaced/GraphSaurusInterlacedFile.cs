@@ -13,7 +13,11 @@ namespace FileFormat.GraphSaurusInterlaced;
 /// starts up showing, which is the sixteen colours an MSX2 boots with.
 /// </remarks>
 public readonly record struct GraphSaurusInterlacedFile
-  : IImageFormatReader<GraphSaurusInterlacedFile>, IImageToRawImage<GraphSaurusInterlacedFile> {
+  : IImageFormatReader<GraphSaurusInterlacedFile>, IImageToRawImage<GraphSaurusInterlacedFile>,
+    IImageFromRawImage<GraphSaurusInterlacedFile>, IImageFormatWriter<GraphSaurusInterlacedFile> {
+
+  static byte[] IImageFormatWriter<GraphSaurusInterlacedFile>.ToBytes(GraphSaurusInterlacedFile file)
+    => GraphSaurusInterlacedWriter.ToBytes(file);
 
   /// <summary>Picture width.</summary>
   public const int Width = 512;
@@ -57,5 +61,25 @@ public readonly record struct GraphSaurusInterlacedFile
       Palette = MsxGraphics.PaletteToRgb(MsxGraphics.DefaultPalette, ColorCount),
       PaletteCount = ColorCount,
     };
+  }
+
+  /// <summary>Builds a picture against the machine's fixed sixteen colours.</summary>
+  /// <remarks>
+  /// There is no palette in the file — the colours are the ones the machine has — so the picture is
+  /// matched to those rather than to a set chosen for it.
+  /// </remarks>
+  public static GraphSaurusInterlacedFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(Width, Height);
+    var palette = MsxGraphics.PaletteToRgb(MsxGraphics.DefaultPalette, ColorCount);
+    var indices = PaletteQuantizer.Quantize(rgb.PixelData, Width, Height, palette, ColorCount);
+
+    var data = new byte[FileSize];
+    for (var y = 0; y < Height; ++y)
+    for (var x = 0; x < Width; ++x)
+      MsxGraphics.SetNibble(data, y * BytesPerRow, x, indices[y * Width + x]);
+
+    return new() { PixelData = data };
   }
 }

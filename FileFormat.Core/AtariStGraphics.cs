@@ -164,6 +164,51 @@ public static class AtariStGraphics {
     return indices;
   }
 
+  /// <summary>Packs indices back into interleaved bitplanes, the exact inverse of the unpacking.</summary>
+  /// <remarks>
+  /// The interleave is by word, not by row: sixteen pixels of plane zero, then the same sixteen of
+  /// plane one, and so on, before the next sixteen pixels begin. Writing plane by plane instead
+  /// gives a picture that is unmistakably the right one and unmistakably wrong, which is why this
+  /// is derived from the reader rather than written again from the description.
+  /// </remarks>
+  public static byte[] PackBitplanes(
+    ReadOnlySpan<byte> indices, int stride, int planes, int width, int height) {
+    var data = new byte[stride * height];
+
+    for (var y = 0; y < height; ++y) {
+      var rowOffset = y * stride;
+      for (var x = 0; x < width; ++x) {
+        var index = indices[y * width + x];
+        var at = rowOffset + ((x >> 3) & ~1) * planes + ((x >> 3) & 1);
+
+        for (var plane = 0; plane < planes; ++plane) {
+          if ((index & (1 << plane)) == 0)
+            continue;
+
+          var target = at + plane * 2;
+          if (target < data.Length)
+            data[target] |= (byte)(1 << (~x & 7));
+        }
+      }
+    }
+
+    return data;
+  }
+
+  /// <summary>Writes a Falcon palette: four bytes a colour, of which the third is unused.</summary>
+  public static void WriteFalconPalette(ReadOnlySpan<byte> palette, int colors, Span<byte> target) {
+    for (var i = 0; i < colors; ++i) {
+      var entry = i << 2;
+      if (entry + 3 >= target.Length)
+        return;
+
+      target[entry] = i * 3 < palette.Length ? palette[i * 3] : (byte)0;
+      target[entry + 1] = i * 3 + 1 < palette.Length ? palette[i * 3 + 1] : (byte)0;
+      target[entry + 2] = 0;
+      target[entry + 3] = i * 3 + 2 < palette.Length ? palette[i * 3 + 2] : (byte)0;
+    }
+  }
+
   /// <summary>
   /// Reads a GEM VDI palette: six bytes a colour, three big-endian words of intensity per thousand.
   /// </summary>

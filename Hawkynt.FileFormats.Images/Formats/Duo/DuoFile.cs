@@ -15,7 +15,10 @@ namespace FileFormat.Duo;
 /// why the size is fixed here rather than read from a header the file does not have.
 /// </remarks>
 public readonly record struct DuoFile
-  : IImageFormatReader<DuoFile>, IImageToRawImage<DuoFile> {
+  : IImageFormatReader<DuoFile>, IImageToRawImage<DuoFile>,
+    IImageFromRawImage<DuoFile>, IImageFormatWriter<DuoFile> {
+
+  static byte[] IImageFormatWriter<DuoFile>.ToBytes(DuoFile file) => DuoWriter.ToBytes(file);
 
   /// <summary>Picture width, past the normal border.</summary>
   public const int Width = 416;
@@ -75,5 +78,39 @@ public readonly record struct DuoFile
     var indices = planar.IsEmpty ? new byte[Width * Height] : PlanarConverter.AtariStToChunky(planar, Width, Height, Planes);
 
     return AtariStGraphics.ToRgb(indices, palette, ColorCount);
+  }
+
+  /// <summary>Builds a picture, putting the same field in both halves.</summary>
+  /// <remarks>
+  /// The format shows two fields in quick succession and the eye averages them, which is how sixteen
+  /// hardware colours become more. Going the other way, a single picture has no second field to
+  /// recover — so both hold the same one, whose average is itself. That gives back exactly what was
+  /// written and uses none of the extra colour the trick was for, which is the honest trade rather
+  /// than inventing a difference between the fields.
+  /// </remarks>
+  public static DuoFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(Width, Height);
+    var quantized = ColorQuantizer.Quantize(
+      PixelConverter.Convert(rgb, PixelFormat.Bgra32).PixelData, Width * Height, ColorCount);
+
+    var indices = new byte[Width * Height];
+    for (var i = 0; i < indices.Length; ++i)
+      indices[i] = (byte)quantized.Indices[i];
+
+    var data = new byte[FileSize];
+
+    var stPalette = PlanarConverter.RgbToStPalette(quantized.Palette, ColorCount);
+    for (var i = 0; i < ColorCount; ++i) {
+      data[i * 2] = (byte)(stPalette[i] >> 8);
+      data[i * 2 + 1] = (byte)stPalette[i];
+    }
+
+    var planar = PlanarConverter.ChunkyToAtariSt(indices, Width, Height, Planes);
+    planar.AsSpan(0, Math.Min(planar.Length, FrameSize)).CopyTo(data.AsSpan(FirstFrameOffset));
+    planar.AsSpan(0, Math.Min(planar.Length, FrameSize)).CopyTo(data.AsSpan(SecondFrameOffset));
+
+    return new() { Data = data };
   }
 }

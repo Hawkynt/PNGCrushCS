@@ -40,6 +40,17 @@ public static class MsxGraphics {
   private static byte _Expand5(int value) => (byte)((value << 3) | (value >> 2));
 
   /// <summary>Converts a stored V9938 palette to RGB triplets.</summary>
+  /// <summary>Writes one four-bit pixel, high nibble first, which is the order they are read in.</summary>
+  public static void SetNibble(Span<byte> data, int offset, int index, int value) {
+    var position = offset + (index >> 1);
+    if (position >= data.Length)
+      return;
+
+    data[position] = (index & 1) == 0
+      ? (byte)((data[position] & 0x0F) | ((value & 15) << 4))
+      : (byte)((data[position] & 0xF0) | (value & 15));
+  }
+
   public static byte[] PaletteToRgb(ReadOnlySpan<byte> palette, int colors) {
     var rgb = new byte[colors * 3];
     for (var i = 0; i < colors && i * PaletteEntrySize + 1 < palette.Length; ++i) {
