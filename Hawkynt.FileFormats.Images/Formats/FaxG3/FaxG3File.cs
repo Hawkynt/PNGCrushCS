@@ -8,6 +8,12 @@ public readonly record struct FaxG3File : IImageFormatReader<FaxG3File>, IImageT
 
   internal const int HeaderSize = 6;
 
+  /// <summary>The scan line a fax uses at standard resolution, in pixels.</summary>
+  public const int StandardWidth = 1728;
+
+  /// <summary>As many rows as a page could hold; decoding stops when the coding runs out.</summary>
+  public const int MaximumRows = 4400;
+
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
   static string IImageFormatMetadata<FaxG3File>.PrimaryExtension => ".g3";

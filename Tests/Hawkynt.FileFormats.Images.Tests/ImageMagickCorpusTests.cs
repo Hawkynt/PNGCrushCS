@@ -53,6 +53,8 @@ public sealed class ImageMagickCorpusTests {
     [".rgb"] = "headerless samples: nothing in the file gives its size",
     [".rgba"] = "headerless samples: nothing in the file gives its size",
     [".yuv"] = "headerless samples: nothing in the file gives its size",
+    [".g3"] = "a bare fax stream states no page size; we take the fax scan line and the reference tool an A4 page",
+    [".g4"] = "a bare fax stream states no page size; we take the fax scan line and the reference tool an A4 page",
     [".eps"] = "PostScript, which needs an interpreter rather than a decoder",
     [".epi"] = "PostScript, which needs an interpreter rather than a decoder",
     [".epsf"] = "PostScript, which needs an interpreter rather than a decoder",

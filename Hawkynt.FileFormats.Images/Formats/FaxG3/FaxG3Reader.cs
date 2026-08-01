@@ -30,23 +30,21 @@ public static class FaxG3Reader {
     if (data.Length < FaxG3File.HeaderSize)
       throw new InvalidDataException("Data too small for a valid FaxG3 file.");
 
-    var width = data[0] | (data[1] << 8);
-    var height = data[2] | (data[3] << 8);
-    if (width <= 0 || height <= 0) {
-      width = 1728;
-      height = 2200;
-    }
+    // Nothing in a bare fax stream says how wide the page is, so the standard scan line is assumed
+    // and the rows are counted by decoding until the coding runs out. Reading a size out of the
+    // first four bytes, as this used to, reads two Huffman codes as a page size.
+    var pixelData = FileFormat.Ccitt.CcittG3Decoder.Decode(
+      data.ToArray(), FaxG3File.StandardWidth, FaxG3File.MaximumRows, out var height);
 
-    var pixelBytes = (width + 7) / 8 * height;
-    var pixelData = new byte[pixelBytes];
-    var available = Math.Min(pixelBytes, data.Length - FaxG3File.HeaderSize);
-    if (available > 0)
-      data.Slice(FaxG3File.HeaderSize, available).CopyTo(pixelData.AsSpan(0));
+    if (height <= 0)
+      throw new InvalidDataException("No fax rows could be decoded.");
+
+    var stride = (FaxG3File.StandardWidth + 7) / 8;
 
     return new() {
-      Width = width,
+      Width = FaxG3File.StandardWidth,
       Height = height,
-      PixelData = pixelData,
+      PixelData = pixelData[..(stride * height)],
     };
     }
 

@@ -26,7 +26,11 @@ internal static class CcittG4Decoder {
   private const int _ModeVerticalBase = 2;
 
   /// <summary>Decodes Group 4 compressed bytes to 1bpp pixel data.</summary>
-  internal static byte[] Decode(byte[] compressedData, int width, int height) {
+  internal static byte[] Decode(byte[] compressedData, int width, int height)
+    => Decode(compressedData, width, height, out _);
+
+  /// <summary>Decodes, reporting how many rows the coding actually held.</summary>
+  internal static byte[] Decode(byte[] compressedData, int width, int height, out int rowsDecoded) {
     var bytesPerRow = (width + 7) / 8;
     var pixelData = new byte[bytesPerRow * height];
     var reader = new _BitReader(compressedData);
@@ -39,12 +43,15 @@ internal static class CcittG4Decoder {
     // The imaginary line above the first row is all white, so it never changes.
     var referenceCount = 0;
 
+    rowsDecoded = 0;
+
     for (var row = 0; row < height; ++row) {
       var codingCount = _DecodeLine(reader, coding, reference, referenceCount, width);
       if (codingCount < 0)
         break;
 
       _WriteRow(pixelData, row * bytesPerRow, coding, codingCount, width);
+      rowsDecoded = row + 1;
 
       Array.Copy(coding, reference, codingCount);
       referenceCount = codingCount;
