@@ -15,7 +15,10 @@ namespace FileFormat.McPainter;
 /// blended colours are not registers and cannot be named by an index.
 /// </remarks>
 public readonly record struct McPainterFile
-  : IImageFormatReader<McPainterFile>, IImageToRawImage<McPainterFile> {
+  : IImageFormatReader<McPainterFile>, IImageToRawImage<McPainterFile>,
+    IImageFromRawImage<McPainterFile>, IImageFormatWriter<McPainterFile> {
+
+  static byte[] IImageFormatWriter<McPainterFile>.ToBytes(McPainterFile file) => McPainterWriter.ToBytes(file);
 
   /// <summary>Displayed width; each of the 160 logical pixels is drawn two wide.</summary>
   public const int Width = Atari8BitGraphics.Gr15Width * 2;
@@ -103,5 +106,33 @@ public readonly record struct McPainterFile
     }
 
     return rgb;
+  }
+
+  /// <summary>Builds a picture with both fields and both register sets the same.</summary>
+  /// <remarks>
+  /// The trick this format plays is that one set of registers applies to the even scanlines of one
+  /// field and the odd scanlines of the other, so the two fields show different colours in the same
+  /// places and the eye averages them. A single picture gives nothing to put in the second set —
+  /// what colour a pixel would have had in the field it is not in is not recoverable from the
+  /// average alone. So both sets are the same and both fields are the same, the swap then does
+  /// nothing, and the picture comes back exactly as written with none of the extra colour used.
+  /// </remarks>
+  public static McPainterFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(Width, Height);
+    var registers = Atari8BitGraphics.ChooseGr15Registers(
+      PixelConverter.Convert(rgb, PixelFormat.Bgra32).PixelData, Width * Height, RegistersPerSet);
+
+    var field = Atari8BitGraphics.PackGr15Frame(
+      rgb.PixelData, Atari8BitGraphics.Gr15BytesPerRow, Width, Height, registers);
+
+    var data = new byte[FileSize];
+    field.AsSpan(0, Math.Min(field.Length, FieldSize)).CopyTo(data.AsSpan(0));
+    field.AsSpan(0, Math.Min(field.Length, FieldSize)).CopyTo(data.AsSpan(SecondFieldOffset));
+    registers.CopyTo(data.AsSpan(ColorsOffset));
+    registers.CopyTo(data.AsSpan(ColorsOffset + RegistersPerSet));
+
+    return new() { Data = data };
   }
 }
