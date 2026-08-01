@@ -16,7 +16,7 @@ namespace FileFormat.Core;
 public static class BilevelRows {
 
   /// <summary>How many bytes one row of a given width takes.</summary>
-  public static int Stride(int width) => (width + 7) >> 3;
+  public static int Stride(int width) => PackedRows.Stride(width, 1);
 
   /// <summary>Spreads byte-padded rows of bits to one index a pixel.</summary>
   /// <param name="packed">The rows, each starting on a byte boundary.</param>
@@ -26,22 +26,8 @@ public static class BilevelRows {
   /// Whether the leftmost pixel of a byte is its top bit. True for most formats; X bitmaps and the
   /// things that copied them fill from the bottom bit instead.
   /// </param>
-  public static byte[] Unpack(ReadOnlySpan<byte> packed, int width, int height, bool mostSignificantFirst = true) {
-    var stride = Stride(width);
-    var pixels = new byte[width * height];
-
-    for (var y = 0; y < height; ++y)
-    for (var x = 0; x < width; ++x) {
-      var at = y * stride + (x >> 3);
-      if (at >= packed.Length)
-        return pixels;
-
-      var shift = mostSignificantFirst ? 7 - (x & 7) : x & 7;
-      pixels[y * width + x] = (byte)((packed[at] >> shift) & 1);
-    }
-
-    return pixels;
-  }
+  public static byte[] Unpack(ReadOnlySpan<byte> packed, int width, int height, bool mostSignificantFirst = true)
+    => PackedRows.Unpack(packed, width, height, 1, mostSignificantFirst: mostSignificantFirst);
 
   /// <summary>Reduces a picture to one bit a pixel by brightness.</summary>
   /// <param name="image">The picture to reduce.</param>
@@ -62,20 +48,6 @@ public static class BilevelRows {
 
   /// <summary>Packs one index a pixel back into byte-padded rows.</summary>
   /// <remarks>Any index other than zero counts as set, so an eight-bit mask packs as well as a bit.</remarks>
-  public static byte[] Pack(ReadOnlySpan<byte> pixels, int width, int height, bool mostSignificantFirst = true) {
-    var stride = Stride(width);
-    var packed = new byte[stride * height];
-
-    for (var y = 0; y < height; ++y)
-    for (var x = 0; x < width; ++x) {
-      var from = y * width + x;
-      if (from >= pixels.Length || pixels[from] == 0)
-        continue;
-
-      var shift = mostSignificantFirst ? 7 - (x & 7) : x & 7;
-      packed[y * stride + (x >> 3)] |= (byte)(1 << shift);
-    }
-
-    return packed;
-  }
+  public static byte[] Pack(ReadOnlySpan<byte> pixels, int width, int height, bool mostSignificantFirst = true)
+    => PackedRows.Pack(pixels, width, height, 1, mostSignificantFirst: mostSignificantFirst);
 }

@@ -15,7 +15,8 @@ public static class PalmWriter {
       file.BitsPerPixel,
       file.Compression,
       file.TransparentIndex,
-      file.Palette
+      file.Palette,
+      file.BytesPerRow
     );
   }
 
@@ -26,14 +27,14 @@ public static class PalmWriter {
     int bitsPerPixel,
     PalmCompression compression,
     byte transparentIndex = 0,
-    byte[]? palette = null
+    byte[]? palette = null,
+    int bytesPerRowOverride = 0
   ) {
     using var ms = new MemoryStream();
 
-    var bytesPerRow = (ushort)((width * bitsPerPixel + 7) / 8);
-    // Pad bytesPerRow to 2-byte boundary (Palm spec: word-aligned)
-    if ((bytesPerRow & 1) != 0)
-      ++bytesPerRow;
+    // The picture already carries its stride when it came from a file or from FromRawImage; only a
+    // hand-built one needs it worked out, and Palm wants rows on a word boundary.
+    var bytesPerRow = (ushort)(bytesPerRowOverride > 0 ? bytesPerRowOverride : PalmFile.RowStride(width, bitsPerPixel));
 
     var hasPalette = palette != null && palette.Length > 0;
     var hasTransparency = transparentIndex != 0 || (hasPalette && bitsPerPixel <= 8);

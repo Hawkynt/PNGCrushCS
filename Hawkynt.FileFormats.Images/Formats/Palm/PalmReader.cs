@@ -85,6 +85,7 @@ public static class PalmReader {
       BitsPerPixel = bitsPerPixel,
       Compression = compression,
       TransparentIndex = transparentIndex,
+      BytesPerRow = bytesPerRow,
       PixelData = pixelData,
       Palette = palette
     };
@@ -165,6 +166,7 @@ public static class PalmReader {
       BitsPerPixel = bitsPerPixel,
       Compression = compression,
       TransparentIndex = transparentIndex,
+      BytesPerRow = bytesPerRow,
       PixelData = pixelData,
       Palette = palette
     };

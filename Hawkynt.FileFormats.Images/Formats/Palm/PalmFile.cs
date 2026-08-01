@@ -16,6 +16,9 @@ public readonly record struct PalmFile : IImageFormatReader<PalmFile>, IImageToR
   public PalmCompression Compression { get; init; }
   public byte TransparentIndex { get; init; }
   public byte[] PixelData { get; init; }
+
+  /// <summary>Bytes from one row to the next, which the file states and need not be the tightest.</summary>
+  public int BytesPerRow { get; init; }
   public byte[]? Palette { get; init; }
 
   private static readonly byte[] _Default8bppPalette = _MakeGrayRamp(256);
@@ -38,19 +41,6 @@ public readonly record struct PalmFile : IImageFormatReader<PalmFile>, IImageToR
     return p;
   }
 
-  private static byte[] _Unpack2Bpp(byte[] packed, int width, int height) {
-    var stride = (width + 3) / 4;
-    var pixels = new byte[width * height];
-
-    for (var y = 0; y < height; ++y)
-    for (var x = 0; x < width; ++x) {
-      var at = y * stride + (x >> 2);
-      pixels[y * width + x] = at < packed.Length ? (byte)((packed[at] >> (6 - ((x & 3) << 1))) & 3) : (byte)0;
-    }
-
-    return pixels;
-  }
-
   public static RawImage ToRawImage(PalmFile file) {
 
     return file.BitsPerPixel switch {
@@ -58,13 +48,13 @@ public readonly record struct PalmFile : IImageFormatReader<PalmFile>, IImageToR
         Width = file.Width,
         Height = file.Height,
         Format = PixelFormat.Rgb565,
-        PixelData = file.PixelData[..],
+        PixelData = PackedRows.Compact(file.PixelData, file.Width, file.Height, 2, file.BytesPerRow),
       },
       8 => new() {
         Width = file.Width,
         Height = file.Height,
         Format = PixelFormat.Indexed8,
-        PixelData = file.PixelData[..],
+        PixelData = PackedRows.Compact(file.PixelData, file.Width, file.Height, 1, file.BytesPerRow),
         Palette = file.Palette is { Length: >= 768 } p8 ? p8[..768] : _Default8bppPalette[..],
         PaletteCount = 256,
       },
@@ -73,23 +63,23 @@ public readonly record struct PalmFile : IImageFormatReader<PalmFile>, IImageToR
         Width = file.Width,
         Height = file.Height,
         Format = PixelFormat.Indexed8,
-        PixelData = _Unpack2Bpp(file.PixelData, file.Width, file.Height),
+        PixelData = PackedRows.Unpack(file.PixelData, file.Width, file.Height, 2, file.BytesPerRow),
         Palette = file.Palette is { Length: >= 12 } p2 ? p2[..12] : _Default2bppPalette[..],
         PaletteCount = 4,
       },
       4 => new() {
         Width = file.Width,
         Height = file.Height,
-        Format = PixelFormat.Indexed4,
-        PixelData = file.PixelData[..],
+        Format = PixelFormat.Indexed8,
+        PixelData = PackedRows.Unpack(file.PixelData, file.Width, file.Height, 4, file.BytesPerRow),
         Palette = file.Palette is { Length: >= 48 } p4 ? p4[..48] : _Default4bppPalette[..],
         PaletteCount = 16,
       },
       1 => new() {
         Width = file.Width,
         Height = file.Height,
-        Format = PixelFormat.Indexed1,
-        PixelData = file.PixelData[..],
+        Format = PixelFormat.Indexed8,
+        PixelData = PackedRows.Unpack(file.PixelData, file.Width, file.Height, 1, file.BytesPerRow),
         Palette = file.Palette is { Length: >= 6 } p1 ? p1[..6] : [255, 255, 255, 0, 0, 0],
         PaletteCount = 2,
       },
@@ -97,9 +87,18 @@ public readonly record struct PalmFile : IImageFormatReader<PalmFile>, IImageToR
     };
   }
 
+  /// <summary>The row stride Palm wants: the tightest that fits, rounded up to a whole word.</summary>
+  public static int RowStride(int width, int bitsPerPixel) => (width * bitsPerPixel + 15) / 16 * 2;
+
   public static PalmFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
     image = image.EnsureAnyFormat(PixelFormat.Rgb565, PixelFormat.Indexed8, PixelFormat.Indexed1);
+
+    var stride = RowStride(image.Width, image.Format switch {
+      PixelFormat.Rgb565 => 16,
+      PixelFormat.Indexed1 => 1,
+      _ => 8,
+    });
 
     switch (image.Format) {
       case PixelFormat.Indexed8:
@@ -108,7 +107,8 @@ public readonly record struct PalmFile : IImageFormatReader<PalmFile>, IImageToR
           Height = image.Height,
           BitsPerPixel = 8,
           Compression = PalmCompression.None,
-          PixelData = image.PixelData[..],
+          BytesPerRow = stride,
+          PixelData = _Spread(image.PixelData, image.Width, image.Height, 1, stride),
           Palette = image.Palette is { } p8 ? p8[..] : null,
         };
       case PixelFormat.Indexed1:
@@ -117,7 +117,9 @@ public readonly record struct PalmFile : IImageFormatReader<PalmFile>, IImageToR
           Height = image.Height,
           BitsPerPixel = 1,
           Compression = PalmCompression.None,
-          PixelData = image.PixelData[..],
+          BytesPerRow = stride,
+          PixelData = PackedRows.Pack(
+            BilevelRows.Threshold(image, setWhenDark: true), image.Width, image.Height, 1, stride),
           Palette = image.Palette is { } p1 ? p1[..] : null,
         };
       case PixelFormat.Rgb565:
@@ -126,10 +128,26 @@ public readonly record struct PalmFile : IImageFormatReader<PalmFile>, IImageToR
           Height = image.Height,
           BitsPerPixel = 16,
           Compression = PalmCompression.None,
-          PixelData = image.PixelData[..],
+          BytesPerRow = stride,
+          PixelData = _Spread(image.PixelData, image.Width, image.Height, 2, stride),
         };
       default:
         throw new ArgumentException($"Unsupported pixel format for Palm: {image.Format}", nameof(image));
     }
+  }
+
+  /// <summary>Lays tight rows of whole bytes out at a wider stride.</summary>
+  private static byte[] _Spread(byte[] tight, int width, int height, int bytesPerPixel, int stride) {
+    var rowBytes = width * bytesPerPixel;
+    var result = new byte[stride * height];
+    for (var y = 0; y < height; ++y) {
+      var from = y * rowBytes;
+      if (from + rowBytes > tight.Length)
+        break;
+
+      Array.Copy(tight, from, result, y * stride, rowBytes);
+    }
+
+    return result;
   }
 }
