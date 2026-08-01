@@ -17,7 +17,8 @@ namespace FileFormat.BkScreen;
 /// more than a monochrome one.
 /// </remarks>
 public readonly record struct BkScreenFile
-  : IImageFormatReader<BkScreenFile>, IImageToRawImage<BkScreenFile> {
+  : IImageFormatReader<BkScreenFile>, IImageToRawImage<BkScreenFile>,
+    IImageFromRawImage<BkScreenFile>, IImageFormatWriter<BkScreenFile> {
 
   /// <summary>Size of one screen's worth of video memory.</summary>
   public const int ScreenSize = 16384;
@@ -61,6 +62,8 @@ public readonly record struct BkScreenFile
   static string[] IImageFormatMetadata<BkScreenFile>.FileExtensions => [".bks"];
   static BkScreenFile IImageFormatReader<BkScreenFile>.FromSpan(ReadOnlySpan<byte> data)
     => BkScreenReader.FromSpan(data);
+  static byte[] IImageFormatWriter<BkScreenFile>.ToBytes(BkScreenFile file)
+    => BkScreenWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<BkScreenFile>.VideoModes => [
     new("Monochrome", [(MonochromeWidth, Height)], [2]),
     new("Colour", [(ColorWidth, ColorHeight)], [4]),
@@ -114,4 +117,74 @@ public readonly record struct BkScreenFile
 
   private static byte _At(ReadOnlySpan<byte> data, int offset)
     => offset >= 0 && offset < data.Length ? data[offset] : (byte)0;
+
+  /// <summary>Builds a colour screen, choosing one of the sixteen four-colour sets.</summary>
+  /// <remarks>
+  /// The hardware does not let a picture name its own colours: it picks one of sixteen fixed sets
+  /// and every pixel then names an entry within it. So the set is chosen first, by trying all
+  /// sixteen against the whole picture — a per-pixel choice cannot recover from the wrong set, and
+  /// there are few enough of them to settle it exactly.
+  /// <para/>
+  /// A single frame rather than two. The pair exists to be shown on alternate fields and read as
+  /// their average, which is a way of faking colours the sets do not hold; that is a judgement
+  /// about flicker this has no basis to make on a caller's behalf.
+  /// </remarks>
+  public static BkScreenFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(ColorWidth, ColorHeight);
+    var set = _ChooseSet(rgb.PixelData);
+    var data = new byte[ScreenSize + 1];
+
+    for (var index = 0; index < ColorWidth * ColorHeight; ++index)
+      data[index >> 2] |= (byte)(_Nearest(rgb.PixelData, index * 3, set) << ((index & 3) << 1));
+
+    data[ScreenSize] = (byte)set;
+
+    return new() { Data = data, IsColor = true, Frames = 1 };
+  }
+
+  /// <summary>Which of the sixteen sets describes the whole picture with the least total error.</summary>
+  private static int _ChooseSet(ReadOnlySpan<byte> rgb) {
+    var best = 0;
+    var bestCost = long.MaxValue;
+
+    for (var set = 0; set < PaletteCount; ++set) {
+      var cost = 0L;
+      for (var pixel = 0; pixel + 2 < rgb.Length; pixel += 3)
+        cost += _CostOf(rgb, pixel, set).Error;
+
+      if (cost >= bestCost)
+        continue;
+
+      bestCost = cost;
+      best = set;
+    }
+
+    return best;
+  }
+
+  private static int _Nearest(ReadOnlySpan<byte> rgb, int pixel, int set) => _CostOf(rgb, pixel, set).Choice;
+
+  /// <summary>Which entry of a set a pixel is closest to, and by how much.</summary>
+  private static (int Choice, long Error) _CostOf(ReadOnlySpan<byte> rgb, int pixel, int set) {
+    var best = 0;
+    var bestCost = long.MaxValue;
+
+    for (var entry = 0; entry < 4; ++entry) {
+      var at = (set * 4 + entry) * 3;
+      long dr = rgb[pixel] - Palettes[at];
+      long dg = rgb[pixel + 1] - Palettes[at + 1];
+      long db = rgb[pixel + 2] - Palettes[at + 2];
+      var cost = dr * dr * 77 + dg * dg * 150 + db * db * 29;
+
+      if (cost >= bestCost)
+        continue;
+
+      bestCost = cost;
+      best = entry;
+    }
+
+    return (best, bestCost);
+  }
 }
