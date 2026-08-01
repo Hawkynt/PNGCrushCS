@@ -14,7 +14,10 @@ namespace FileFormat.Uimg;
 /// for the bytes a pixel takes — which is how a program could pick a file without opening it.
 /// </remarks>
 public readonly record struct UimgFile
-  : IImageFormatReader<UimgFile>, IImageToRawImage<UimgFile> {
+  : IImageFormatReader<UimgFile>, IImageToRawImage<UimgFile>,
+    IImageFromRawImage<UimgFile>, IImageFormatWriter<UimgFile> {
+
+  static byte[] IImageFormatWriter<UimgFile>.ToBytes(UimgFile file) => UimgWriter.ToBytes(file);
 
   /// <summary>The text every file starts with.</summary>
   public const string Signature = "UIMG";
@@ -135,5 +138,26 @@ public readonly record struct UimgFile
 
         return indices;
     }
+  }
+
+  /// <summary>Builds a picture in the twenty-four-bit arrangement, which keeps every colour.</summary>
+  public static UimgFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.EnsureFormat(PixelFormat.Rgb24);
+    var pixels = rgb.Width * rgb.Height;
+    var data = new byte[PaletteOffset + pixels * UimgWriter.TrueColor24];
+    rgb.PixelData.AsSpan(0, Math.Min(rgb.PixelData.Length, pixels * UimgWriter.TrueColor24))
+      .CopyTo(data.AsSpan(PaletteOffset));
+
+    return new() {
+      Width = rgb.Width,
+      Height = rgb.Height,
+      Depth = UimgWriter.TrueColor24 << 3,
+      PaletteKind = 0,
+      Chunk = UimgWriter.TrueColor24,
+      BitmapOffset = PaletteOffset,
+      Data = data,
+    };
   }
 }
