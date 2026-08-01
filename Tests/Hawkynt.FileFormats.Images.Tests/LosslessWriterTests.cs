@@ -81,6 +81,7 @@ public sealed class LosslessWriterTests {
     new("Dali", ImageFormat.DaliST, Palette.SixteenStColors, 320, 200),
     new("PC-98 EBD", ImageFormat.Pc98Ebd, Palette.SixteenColors, 640, 400),
     new("CP8 grayscale", ImageFormat.Cp8Gray, Palette.Grayscale, 64, 64),
+    new("Raw Workshop", ImageFormat.RawWorkshop, Palette.Grayscale, 320, 200),
     new("MGR bitmap", ImageFormat.MgrBitmap, Palette.Monochrome, 100, 30),
     new("VDC BitMap", ImageFormat.VdcBitmap, Palette.Monochrome, 101, 37),
     new("VDC BitMap, whole bytes across", ImageFormat.VdcBitmap, Palette.Monochrome, 64, 16),
