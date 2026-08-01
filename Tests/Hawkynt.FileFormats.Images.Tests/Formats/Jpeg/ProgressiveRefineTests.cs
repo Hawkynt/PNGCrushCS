@@ -36,14 +36,18 @@ public sealed class ProgressiveRefineTests {
 
   /// <summary>KNOWN DEFECT, in the progressive writer.</summary>
   /// <remarks>
-  /// Our decoder agrees with ImageMagick to within 5 of 255 on a progressive file ImageMagick
-  /// wrote, so the reading side is close to right. A picture written progressively here and read
-  /// back differs from the same picture written baseline by up to 226, which puts the fault in the
-  /// writer. Left visible rather than deleted.
+  /// Confirmed to be the writer and not the reader: our decoder agrees with ImageMagick to within
+  /// 5 of 255 on a progressive file ImageMagick wrote, while ImageMagick reads a progressive file
+  /// we wrote at a mean of 35 of 255 away from the picture that went in.
+  /// <para/>
+  /// One fault in that path is fixed — the first AC pass shifted the two's complement rather than
+  /// the magnitude, sending a coefficient of -1 to -1 where it belongs at zero — and a second
+  /// remains somewhere in the refinement scans. The scan script itself checks out: each band is
+  /// first coded before it is refined, and each refinement lowers the approximation by exactly one.
   /// </remarks>
   [Test]
+  [Ignore("The progressive writer is wrong: ImageMagick reads our own output at a mean of 35 of 255.")]
   [Category("Integration")]
-  [Ignore("The progressive writer is wrong; the reading side is covered by the measurements in this fixture's summary.")]
   public void Progressive_RoundTripsWithinWhatTheCodecCosts() {
     var original = _Picture(129, 97);
     var jpeg = JpegWriter.LossyEncode(
@@ -65,8 +69,8 @@ public sealed class ProgressiveRefineTests {
 
   /// <summary>KNOWN DEFECT, in the progressive writer. See above.</summary>
   [Test]
+  [Ignore("The progressive writer is wrong: the same picture written both ways differs by up to 255.")]
   [Category("Integration")]
-  [Ignore("The progressive writer is wrong: the same picture written both ways differs by up to 226.")]
   public void Progressive_AgreesWithTheBaselineFormOfTheSamePicture() {
     // The two forms carry the same coefficients by different routes, so they must land within the
     // same place. A refinement scan that overwrites a coefficient shows up here as whole rows of a

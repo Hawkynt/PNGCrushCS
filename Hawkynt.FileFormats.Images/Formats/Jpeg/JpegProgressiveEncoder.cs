@@ -103,7 +103,12 @@ internal static class JpegProgressiveEncoder {
         var zeroRun = 0;
 
         for (var k = ss; k <= se; ++k) {
-          var value = block.Coefficients[k] >> al;
+          // The point transform drops the low bits of the magnitude, not of the two's complement.
+          // Shifting arithmetically instead sends -1 to -1 where it should send it to zero, so every
+          // small negative coefficient was written as a non-zero one and the picture drifted.
+          var coefficient = (int)block.Coefficients[k];
+          var magnitude = (coefficient < 0 ? -coefficient : coefficient) >> al;
+          var value = coefficient < 0 ? -magnitude : magnitude;
           if (value == 0) {
             ++zeroRun;
             continue;
