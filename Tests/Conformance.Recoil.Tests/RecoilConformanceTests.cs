@@ -61,6 +61,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.ColrObjectEditor, "COLR Object Editor", 320, 200, ".mur"),
     new(ImageFormat.AmstradMode5, "Amstrad Mode 5", 288, 256, ".cm5"),
     new(ImageFormat.Picasso, "Picasso", 176, 176, ".pic0"),
+    new(ImageFormat.TechnicolorDream, "Technicolor Dream", 320, 238, ".lum"),
     new(ImageFormat.Doodle, "Doodle", 320, 200),
     new(ImageFormat.HiPicCreator, "Hi-Pic Creator", 320, 200),
     new(ImageFormat.HiresC64, "Hires-Bitmap", 320, 200, ".hbm"),
