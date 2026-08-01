@@ -20,8 +20,9 @@ public static class WpgWriter {
       Magic2: WpgHeader.MagicByte2,
       Magic3: WpgHeader.MagicByte3,
       Magic4: WpgHeader.MagicByte4,
+      DataOffset: WpgHeader.StructSize,
       ProductType: 1,
-      FileType: 1,
+      FileType: WpgHeader.GraphicFileType,
       MajorVersion: 1,
       MinorVersion: 0,
       EncryptionKey: 0,
@@ -53,8 +54,14 @@ public static class WpgWriter {
     // BitmapType1 record
     ms.WriteByte((byte)WpgRecordType.BitmapType1);
 
+    // A type 1 bitmap record is run-length coded — that is what the record type means, and there is
+    // no flag to say otherwise. The rows were being written raw, which every other reader answers
+    // with "unable to decompress"; this one read them back only because it guessed from the length.
+    var stride = ((width * bitsPerPixel) + 7) / 8;
+    var compressed = WpgRleCompressor.CompressRows(pixelData, stride, height);
+
     // Bitmap sub-header: width(2) + height(2) + depth(2) + xdpi(2) + ydpi(2) = 10 bytes + pixel data
-    var bitmapSize = WpgBitmapSubHeader.StructSize + pixelData.Length;
+    var bitmapSize = WpgBitmapSubHeader.StructSize + compressed.Length;
     _WriteRecordSize(ms, bitmapSize);
 
     var bmpSub = new WpgBitmapSubHeader((ushort)width, (ushort)height, (ushort)bitsPerPixel, 96, 96);
@@ -62,8 +69,7 @@ public static class WpgWriter {
     bmpSub.WriteTo(bmpSubBuf);
     ms.Write(bmpSubBuf);
 
-    // Uncompressed pixel data
-    ms.Write(pixelData, 0, pixelData.Length);
+    ms.Write(compressed, 0, compressed.Length);
 
     // EndWpg record (type 16, size 0)
     ms.WriteByte((byte)WpgRecordType.EndWpg);

@@ -39,7 +39,10 @@ public static class WpgReader {
     var header = WpgHeader.ReadFrom(data);
 
     // Scan records after header
-    var offset = WpgHeader.StructSize;
+    // The header says where the records begin; older writers put them straight after it.
+    var offset = header.DataOffset >= WpgHeader.StructSize && header.DataOffset < (uint)data.Length
+      ? (int)header.DataOffset
+      : WpgHeader.StructSize;
     int width = 0, height = 0, bitsPerPixel = 0;
     byte[]? pixelData = null;
     byte[]? palette = null;
