@@ -14,7 +14,8 @@ namespace FileFormat.Botticelli;
 /// colour areas at all and draws from four fixed colours.
 /// </remarks>
 public readonly record struct BotticelliFile
-  : IImageFormatReader<BotticelliFile>, IImageToRawImage<BotticelliFile> {
+  : IImageFormatReader<BotticelliFile>, IImageToRawImage<BotticelliFile>,
+    IImageFromRawImage<BotticelliFile>, IImageFormatWriter<BotticelliFile> {
 
   /// <summary>Size of a full screen.</summary>
   public const int ScreenFileSize = 10050;
@@ -64,6 +65,7 @@ public readonly record struct BotticelliFile
   static string IImageFormatMetadata<BotticelliFile>.PrimaryExtension => ".p4i";
   static string[] IImageFormatMetadata<BotticelliFile>.FileExtensions => [".p4i"];
   static BotticelliFile IImageFormatReader<BotticelliFile>.FromSpan(ReadOnlySpan<byte> data) => BotticelliReader.FromSpan(data);
+  static byte[] IImageFormatWriter<BotticelliFile>.ToBytes(BotticelliFile file) => BotticelliWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<BotticelliFile>.VideoModes => [
     new("Botticelli", [(ScreenWidth, ScreenHeight)], [121]),
     new("Multi Botticelli", [(ScreenWidth, ScreenHeight)], [121]),
@@ -149,4 +151,83 @@ public readonly record struct BotticelliFile
   private static byte _Color(int luminance, int hue) => (byte)Commodore16Graphics.ColorIndex(luminance, hue);
 
   private static byte _At(ReadOnlySpan<byte> data, int offset) => offset < data.Length ? data[offset] : (byte)0;
+
+  /// <summary>Fits a picture into two TED colours a cell.</summary>
+  /// <remarks>
+  /// A cell's two colours are chosen from what is in it: the most common colour and the one furthest
+  /// from it, which between them span the cell better than the two most common would when a cell
+  /// holds a gradient. Each is then split back into the luminance and hue the two areas hold.
+  /// </remarks>
+  public static BotticelliFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var indexed = image
+      .SampleTo(ScreenWidth, ScreenHeight)
+      .EnsureIndexed(PixelFormat.Indexed8, Commodore16Graphics.CreatePalette());
+
+    var data = new byte[ScreenFileSize];
+
+    // Where a Plus/4 loads it. Nothing reads this, but a file without it is not one the machine
+    // could have saved.
+    data[0] = 0x00;
+    data[1] = 0x18;
+
+    Span<int> frequency = stackalloc int[Commodore16Graphics.ColorCount];
+    var palette = Commodore16Graphics.CreatePalette();
+
+    for (var cellY = 0; cellY < ScreenHeight / 8; ++cellY)
+    for (var cellX = 0; cellX < Columns; ++cellX) {
+      frequency.Clear();
+      for (var y = 0; y < 8; ++y)
+      for (var x = 0; x < 8; ++x)
+        ++frequency[indexed.PixelData[(cellY * 8 + y) * ScreenWidth + cellX * 8 + x]
+          % Commodore16Graphics.ColorCount];
+
+      var background = 0;
+      for (var i = 1; i < Commodore16Graphics.ColorCount; ++i)
+        if (frequency[i] > frequency[background])
+          background = i;
+
+      var foreground = background;
+      var furthest = -1;
+      for (var i = 0; i < Commodore16Graphics.ColorCount; ++i) {
+        if (frequency[i] == 0)
+          continue;
+
+        var distance = _Distance(palette, i, background);
+        if (distance <= furthest)
+          continue;
+
+        furthest = distance;
+        foreground = i;
+      }
+
+      var cell = cellY * Columns + cellX;
+      // Luminance is three bits and hue four; the foreground takes the low half of one byte and the
+      // high half of the other, which is what puts a cell's two colours in two bytes rather than four.
+      data[LuminanceOffset + cell] = (byte)(((background >> 4) << 4) | (foreground >> 4));
+      data[HueOffset + cell] = (byte)(((foreground & 15) << 4) | (background & 15));
+
+      for (var y = 0; y < 8; ++y) {
+        byte bits = 0;
+        for (var x = 0; x < 8; ++x) {
+          var index = indexed.PixelData[(cellY * 8 + y) * ScreenWidth + cellX * 8 + x]
+            % Commodore16Graphics.ColorCount;
+          if (_Distance(palette, index, foreground) < _Distance(palette, index, background))
+            bits |= (byte)(1 << (7 - x));
+        }
+
+        data[BitmapOffset + _CellOffset(cellX * 8, cellY * 8 + y)] = bits;
+      }
+    }
+
+    return new() { Mode = BotticelliMode.Hires, Data = data };
+  }
+
+  private static int _Distance(ReadOnlySpan<byte> palette, int a, int b) {
+    int dr = palette[a * 3] - palette[b * 3];
+    int dg = palette[a * 3 + 1] - palette[b * 3 + 1];
+    int db = palette[a * 3 + 2] - palette[b * 3 + 2];
+    return dr * dr + dg * dg + db * db;
+  }
 }

@@ -14,7 +14,8 @@ namespace FileFormat.Brus;
 /// above it repeats the next byte that many times less 128.
 /// </remarks>
 public readonly record struct BrusFile
-  : IImageFormatReader<BrusFile>, IImageToRawImage<BrusFile> {
+  : IImageFormatReader<BrusFile>, IImageToRawImage<BrusFile>,
+    IImageFromRawImage<BrusFile>, IImageFormatWriter<BrusFile> {
 
   /// <summary>The text a file carries at offset two.</summary>
   public const string Signature = "BRUS";
@@ -39,6 +40,7 @@ public readonly record struct BrusFile
   static string IImageFormatMetadata<BrusFile>.PrimaryExtension => ".brus";
   static string[] IImageFormatMetadata<BrusFile>.FileExtensions => [".brus"];
   static BrusFile IImageFormatReader<BrusFile>.FromSpan(ReadOnlySpan<byte> data) => BrusReader.FromSpan(data);
+  static byte[] IImageFormatWriter<BrusFile>.ToBytes(BrusFile file) => BrusWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<BrusFile>.VideoModes => [
     new("VDC", [(new IntegerRange(8, MaxColumns * 8), new IntegerRange(1, MaxHeight))], [16])
   ];
@@ -88,5 +90,77 @@ public readonly record struct BrusFile
     }
 
     return new() { Width = width, Height = file.Height, Format = PixelFormat.Rgb24, PixelData = rgb };
+  }
+
+  /// <summary>Fits a picture into one ink and one paper per cell, per band of eight rows.</summary>
+  /// <remarks>
+  /// The colours refresh only every eight rows and are indexed by row parity, so a cell's two rows
+  /// of each parity share an entry. Both halves of a band are given the same pair here: a picture
+  /// that came from elsewhere has no reason to alternate, and writing two different pairs would
+  /// make every other row wrong rather than every other row better.
+  /// </remarks>
+  public static BrusFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var columns = Math.Clamp((image.Width + 7) / 8, 1, MaxColumns);
+    var height = Math.Clamp(image.Height, 1, MaxHeight);
+    var width = columns * 8;
+
+    var indexed = image.SampleTo(width, height).EnsureIndexed(PixelFormat.Indexed8, Palette.ToArray());
+    var bitmap = new byte[columns * height];
+    var bands = (height + 7) >> 3;
+    var colors = new byte[bands * (columns << 1)];
+
+    Span<int> frequency = stackalloc int[16];
+    for (var band = 0; band < bands; ++band)
+    for (var column = 0; column < columns; ++column) {
+      frequency.Clear();
+      var top = band * 8;
+      var bottom = Math.Min(top + 8, height);
+
+      for (var y = top; y < bottom; ++y)
+      for (var x = column * 8; x < column * 8 + 8; ++x)
+        ++frequency[indexed.PixelData[y * width + x] & 15];
+
+      int paper = 0, ink = 0;
+      for (var i = 0; i < 16; ++i) {
+        if (frequency[i] > frequency[paper]) {
+          ink = paper;
+          paper = i;
+        } else if (i != paper && frequency[i] > frequency[ink])
+          ink = i;
+      }
+
+      var entry = (byte)((paper << 4) | ink);
+      colors[band * (columns << 1) + column] = entry;
+      colors[band * (columns << 1) + columns + column] = entry;
+
+      for (var y = top; y < bottom; ++y) {
+        byte bits = 0;
+        for (var x = 0; x < 8; ++x)
+          if (_Nearer(indexed.PixelData[y * width + column * 8 + x] & 15, ink, paper))
+            bits |= (byte)(1 << (7 - x));
+
+        bitmap[y * columns + column] = bits;
+      }
+    }
+
+    return new() { Columns = columns, Height = height, Bitmap = bitmap, Colors = colors };
+  }
+
+  private static bool _Nearer(int index, int ink, int paper) {
+    if (index == ink)
+      return true;
+    if (index == paper)
+      return false;
+
+    return _Distance(index, ink) < _Distance(index, paper);
+  }
+
+  private static int _Distance(int a, int b) {
+    int dr = Palette[a * 3] - Palette[b * 3];
+    int dg = Palette[a * 3 + 1] - Palette[b * 3 + 1];
+    int db = Palette[a * 3 + 2] - Palette[b * 3 + 2];
+    return dr * dr + dg * dg + db * db;
   }
 }

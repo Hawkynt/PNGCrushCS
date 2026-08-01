@@ -11,7 +11,8 @@ namespace FileFormat.Grafix;
 /// run it twice.
 /// </remarks>
 public readonly record struct GrafixFile
-  : IImageFormatReader<GrafixFile>, IImageToRawImage<GrafixFile> {
+  : IImageFormatReader<GrafixFile>, IImageToRawImage<GrafixFile>,
+    IImageFromRawImage<GrafixFile>, IImageFormatWriter<GrafixFile> {
 
   /// <summary>The text every file starts with.</summary>
   public const string Signature = "GRXP";
@@ -26,6 +27,7 @@ public readonly record struct GrafixFile
   static string[] IImageFormatMetadata<GrafixFile>.FileExtensions => [".grx"];
   static GrafixFile IImageFormatReader<GrafixFile>.FromSpan(ReadOnlySpan<byte> data)
     => GrafixReader.FromSpan(data);
+  static byte[] IImageFormatWriter<GrafixFile>.ToBytes(GrafixFile file) => GrafixWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<GrafixFile>.VideoModes => [
     new("Grafix", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 256)])
   ];
@@ -55,4 +57,32 @@ public readonly record struct GrafixFile
     Palette = file.Palette,
     PaletteCount = 1 << file.Planes,
   };
+
+  /// <summary>Writes sixteen colours over four bitplanes, at whatever size the picture is.</summary>
+  /// <remarks>
+  /// The format takes one, two, four or eight planes. Four is where the trade turns: sixteen chosen
+  /// colours cover an ordinary picture far better than four, and 256 costs twice the space for
+  /// colours a sixteen-entry palette already approximates once the entries are chosen from the
+  /// picture rather than fixed.
+  /// </remarks>
+  public static GrafixFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    const int planes = 4;
+    const int colors = 1 << planes;
+
+    var indexed = image.EnsureIndexedAtMost(colors);
+    var palette = new byte[colors * 3];
+    (indexed.Palette ?? []).AsSpan(0, Math.Min(colors * 3, indexed.Palette?.Length ?? 0)).CopyTo(palette);
+
+    return new() {
+      Width = indexed.Width,
+      Height = indexed.Height,
+      Planes = planes,
+      Palette = palette,
+      Bitmap = AtariStGraphics.PackBitplanes(
+        indexed.PixelData, AtariStGraphics.BytesPerRow(indexed.Width, planes), planes,
+        indexed.Width, indexed.Height),
+    };
+  }
 }
