@@ -7,7 +7,7 @@ namespace FileFormat.Tiny;
 public readonly record struct TinyFile : IImageFormatReader<TinyFile>, IImageToRawImage<TinyFile>, IImageFromRawImage<TinyFile>, IImageFormatWriter<TinyFile> {
 
   static string IImageFormatMetadata<TinyFile>.PrimaryExtension => ".tny";
-  static string[] IImageFormatMetadata<TinyFile>.FileExtensions => [".tny", ".tn1", ".tn2", ".tn3"];
+  static string[] IImageFormatMetadata<TinyFile>.FileExtensions => [".tny", ".tn1", ".tn2", ".tn3", ".tn4", ".tn5", ".tn6"];
   static TinyFile IImageFormatReader<TinyFile>.FromSpan(ReadOnlySpan<byte> data) => TinyReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<TinyFile>.VideoModes => [new("Default", [(320, 200), (640, 200), (640, 400)])];
   static byte[] IImageFormatWriter<TinyFile>.ToBytes(TinyFile file) => TinyWriter.ToBytes(file);

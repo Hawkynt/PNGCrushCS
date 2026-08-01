@@ -49,7 +49,7 @@ public readonly record struct AsciiMakerFile
   public const byte ForegroundColor = 14;
 
   static string IImageFormatMetadata<AsciiMakerFile>.PrimaryExtension => ".asc";
-  static string[] IImageFormatMetadata<AsciiMakerFile>.FileExtensions => [".asc"];
+  static string[] IImageFormatMetadata<AsciiMakerFile>.FileExtensions => [".asc", ".gr0"];
   static AsciiMakerFile IImageFormatReader<AsciiMakerFile>.FromSpan(ReadOnlySpan<byte> data) => AsciiMakerReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<AsciiMakerFile>.VideoModes => [
     new("Graphics 0", [(Width, Height)], [2])

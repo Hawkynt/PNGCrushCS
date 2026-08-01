@@ -7,7 +7,7 @@ namespace FileFormat.FliGraph;
 public readonly record struct FliGraphFile : IImageFormatReader<FliGraphFile>, IImageToRawImage<FliGraphFile>, IImageFormatWriter<FliGraphFile> {
 
   static string IImageFormatMetadata<FliGraphFile>.PrimaryExtension => ".flg";
-  static string[] IImageFormatMetadata<FliGraphFile>.FileExtensions => [".flg"];
+  static string[] IImageFormatMetadata<FliGraphFile>.FileExtensions => [".flg", ".bml"];
   static FliGraphFile IImageFormatReader<FliGraphFile>.FromSpan(ReadOnlySpan<byte> data) => FliGraphReader.FromSpan(data);
   static byte[] IImageFormatWriter<FliGraphFile>.ToBytes(FliGraphFile file) => FliGraphWriter.ToBytes(file);
 

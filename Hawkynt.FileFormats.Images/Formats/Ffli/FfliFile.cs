@@ -7,7 +7,7 @@ namespace FileFormat.Ffli;
 public readonly record struct FfliFile : IImageFormatReader<FfliFile>, IImageToRawImage<FfliFile>, IImageFormatWriter<FfliFile> {
 
   static string IImageFormatMetadata<FfliFile>.PrimaryExtension => ".ffli";
-  static string[] IImageFormatMetadata<FfliFile>.FileExtensions => [".ffli"];
+  static string[] IImageFormatMetadata<FfliFile>.FileExtensions => [".ffli", ".ffl"];
   static FfliFile IImageFormatReader<FfliFile>.FromSpan(ReadOnlySpan<byte> data) => FfliReader.FromSpan(data);
   static byte[] IImageFormatWriter<FfliFile>.ToBytes(FfliFile file) => FfliWriter.ToBytes(file);
 

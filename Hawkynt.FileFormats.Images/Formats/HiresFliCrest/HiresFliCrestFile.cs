@@ -7,7 +7,7 @@ namespace FileFormat.HiresFliCrest;
 public readonly record struct HiresFliCrestFile : IImageFormatReader<HiresFliCrestFile>, IImageToRawImage<HiresFliCrestFile>, IImageFormatWriter<HiresFliCrestFile> {
 
   static string IImageFormatMetadata<HiresFliCrestFile>.PrimaryExtension => ".hfc";
-  static string[] IImageFormatMetadata<HiresFliCrestFile>.FileExtensions => [".hfc"];
+  static string[] IImageFormatMetadata<HiresFliCrestFile>.FileExtensions => [".hfc", ".hfd"];
   static HiresFliCrestFile IImageFormatReader<HiresFliCrestFile>.FromSpan(ReadOnlySpan<byte> data) => HiresFliCrestReader.FromSpan(data);
   static byte[] IImageFormatWriter<HiresFliCrestFile>.ToBytes(HiresFliCrestFile file) => HiresFliCrestWriter.ToBytes(file);
 

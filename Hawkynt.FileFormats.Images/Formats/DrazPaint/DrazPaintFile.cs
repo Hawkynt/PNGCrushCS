@@ -8,7 +8,7 @@ namespace FileFormat.DrazPaint;
 public readonly record struct DrazPaintFile : IImageFormatReader<DrazPaintFile>, IImageToRawImage<DrazPaintFile>, IImageFormatWriter<DrazPaintFile> {
 
   static string IImageFormatMetadata<DrazPaintFile>.PrimaryExtension => ".drz";
-  static string[] IImageFormatMetadata<DrazPaintFile>.FileExtensions => [".drz"];
+  static string[] IImageFormatMetadata<DrazPaintFile>.FileExtensions => [".drz", ".drp"];
   static DrazPaintFile IImageFormatReader<DrazPaintFile>.FromSpan(ReadOnlySpan<byte> data) => DrazPaintReader.FromSpan(data);
   static byte[] IImageFormatWriter<DrazPaintFile>.ToBytes(DrazPaintFile file) => DrazPaintWriter.ToBytes(file);
 

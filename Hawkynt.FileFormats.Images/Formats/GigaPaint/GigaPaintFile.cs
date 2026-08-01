@@ -7,7 +7,7 @@ namespace FileFormat.GigaPaint;
 public readonly record struct GigaPaintFile : IImageFormatReader<GigaPaintFile>, IImageToRawImage<GigaPaintFile>, IImageFromRawImage<GigaPaintFile>, IImageFormatWriter<GigaPaintFile> {
 
   static string IImageFormatMetadata<GigaPaintFile>.PrimaryExtension => ".gih";
-  static string[] IImageFormatMetadata<GigaPaintFile>.FileExtensions => [".gih", ".gig"];
+  static string[] IImageFormatMetadata<GigaPaintFile>.FileExtensions => [".gih", ".gig", ".rpo"];
   static GigaPaintFile IImageFormatReader<GigaPaintFile>.FromSpan(ReadOnlySpan<byte> data) => GigaPaintReader.FromSpan(data);
   static byte[] IImageFormatWriter<GigaPaintFile>.ToBytes(GigaPaintFile file) => GigaPaintWriter.ToBytes(file);
 

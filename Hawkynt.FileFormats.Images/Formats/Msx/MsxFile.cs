@@ -7,7 +7,7 @@ namespace FileFormat.Msx;
 public readonly record struct MsxFile : IImageFormatReader<MsxFile>, IImageToRawImage<MsxFile>, IImageFormatWriter<MsxFile> {
 
   static string IImageFormatMetadata<MsxFile>.PrimaryExtension => ".sc5";
-  static string[] IImageFormatMetadata<MsxFile>.FileExtensions => [".sc2", ".sc5", ".sc7", ".sc8"];
+  static string[] IImageFormatMetadata<MsxFile>.FileExtensions => [".sc2", ".sc5", ".sc7", ".sc8", ".ge7", ".ge8"];
   static MsxFile IImageFormatReader<MsxFile>.FromSpan(ReadOnlySpan<byte> data) => MsxReader.FromSpan(data);
   static byte[] IImageFormatWriter<MsxFile>.ToBytes(MsxFile file) => MsxWriter.ToBytes(file);
 

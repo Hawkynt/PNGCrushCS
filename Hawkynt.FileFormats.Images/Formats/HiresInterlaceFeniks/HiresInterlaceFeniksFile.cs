@@ -7,7 +7,7 @@ namespace FileFormat.HiresInterlaceFeniks;
 public readonly record struct HiresInterlaceFeniksFile : IImageFormatReader<HiresInterlaceFeniksFile>, IImageToRawImage<HiresInterlaceFeniksFile>, IImageFormatWriter<HiresInterlaceFeniksFile> {
 
   static string IImageFormatMetadata<HiresInterlaceFeniksFile>.PrimaryExtension => ".hlf";
-  static string[] IImageFormatMetadata<HiresInterlaceFeniksFile>.FileExtensions => [".hlf"];
+  static string[] IImageFormatMetadata<HiresInterlaceFeniksFile>.FileExtensions => [".hlf", ".hie"];
   static HiresInterlaceFeniksFile IImageFormatReader<HiresInterlaceFeniksFile>.FromSpan(ReadOnlySpan<byte> data) => HiresInterlaceFeniksReader.FromSpan(data);
   static byte[] IImageFormatWriter<HiresInterlaceFeniksFile>.ToBytes(HiresInterlaceFeniksFile file) => HiresInterlaceFeniksWriter.ToBytes(file);
 
