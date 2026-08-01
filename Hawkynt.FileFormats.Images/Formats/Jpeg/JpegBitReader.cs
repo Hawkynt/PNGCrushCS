@@ -95,6 +95,13 @@ internal sealed class JpegBitReader {
   }
 
   /// <summary>Checks if a restart marker is at the current byte position. If so, consumes it.</summary>
+  /// <remarks>
+  /// Reaching a restart marker ends the entropy data as far as <see cref="_NextByte"/> is concerned,
+  /// so it raises the end-of-data flag — and stepping over the marker has to lower it again. Leaving
+  /// it raised made every Huffman decode after the first restart return zero, so a picture came out
+  /// correct as far as its first restart and constant from there on. Any file with a restart
+  /// interval was affected, which is most of what cameras write.
+  /// </remarks>
   public bool TryConsumeRestart(int expectedRstIndex) {
     AlignToByte();
     // Look for 0xFF RST marker
@@ -103,6 +110,7 @@ internal sealed class JpegBitReader {
         var marker = this._data[this._pos + 1];
         if (JpegMarker.IsRst(marker)) {
           this._pos += 2;
+          this._atEnd = false;
           return (marker & 0x07) == (expectedRstIndex & 0x07);
         }
 
