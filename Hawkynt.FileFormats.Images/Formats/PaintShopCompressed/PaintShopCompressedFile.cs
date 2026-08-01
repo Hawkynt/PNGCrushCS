@@ -15,7 +15,11 @@ namespace FileFormat.PaintShopCompressed;
 /// line repeated, and a repeated line is already free.
 /// </remarks>
 public readonly record struct PaintShopCompressedFile
-  : IImageFormatReader<PaintShopCompressedFile>, IImageToRawImage<PaintShopCompressedFile> {
+  : IImageFormatReader<PaintShopCompressedFile>, IImageToRawImage<PaintShopCompressedFile>,
+    IImageFromRawImage<PaintShopCompressedFile>, IImageFormatWriter<PaintShopCompressedFile> {
+
+  static byte[] IImageFormatWriter<PaintShopCompressedFile>.ToBytes(PaintShopCompressedFile file)
+    => PaintShopCompressedWriter.ToBytes(file);
 
   /// <summary>The text every file starts with.</summary>
   public const string Signature = "tm89";
@@ -62,6 +66,30 @@ public readonly record struct PaintShopCompressedFile
       PixelData = pixels,
       Palette = [255, 255, 255, 0, 0, 0],
       PaletteCount = 2,
+    };
+  }
+
+  /// <summary>The largest picture the two-byte sizes and the program between them allow.</summary>
+  public const int MaximumWidth = 640;
+
+  /// <summary>Rows the format allows at most.</summary>
+  public const int MaximumHeight = 400;
+
+  /// <summary>Builds a bilevel picture, which is all this format holds.</summary>
+  public static PaintShopCompressedFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var width = Math.Min(image.Width, MaximumWidth);
+    var height = Math.Min(image.Height, MaximumHeight);
+    if (width < 1 || height < 1)
+      throw new ArgumentOutOfRangeException(nameof(image), "A picture needs at least one pixel.");
+
+    var scaled = image.Width == width && image.Height == height ? image : image.SampleTo(width, height);
+
+    return new() {
+      Width = width,
+      Height = height,
+      Bitmap = BilevelRows.Pack(BilevelRows.Threshold(scaled, setWhenDark: true), width, height),
     };
   }
 }

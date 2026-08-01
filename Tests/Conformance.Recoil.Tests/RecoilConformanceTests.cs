@@ -53,6 +53,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.ZzRough, "ZZ_ROUGH", 320, 200, ".rgh"),
     new(ImageFormat.TrzmielCompressed, "Trzmiel", 320, 192, ".cpr"),
     new(ImageFormat.DGraphCompressed, "D-GRAPH", 320, 200, ".p3c"),
+    new(ImageFormat.PaintShopCompressed, "PaintShop packed", 640, 400, ".psc"),
     new(ImageFormat.Doodle, "Doodle", 320, 200),
     new(ImageFormat.HiPicCreator, "Hi-Pic Creator", 320, 200),
     new(ImageFormat.HiresC64, "Hires-Bitmap", 320, 200, ".hbm"),
