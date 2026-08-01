@@ -28,8 +28,16 @@ public static class CoCoMaxReader {
 
   public static CoCoMaxFile FromSpan(ReadOnlySpan<byte> data) {
 
-    if (data.Length != CoCoMaxFile.ExpectedFileSize)
-      throw new InvalidDataException($"Invalid CoCoMax data size: expected exactly {CoCoMaxFile.ExpectedFileSize} bytes, got {data.Length}.");
+    var legal = false;
+    foreach (var size in CoCoMaxFile.LegalSizes)
+      legal |= data.Length == size;
+
+    if (!legal)
+      throw new InvalidDataException($"A CoCoMax picture is 6154, 6155, 6272 or 7168 bytes, got {data.Length}.");
+
+    // Four lengths and no signature, so the header is most of the identification.
+    if (data[0] != 0 || data[1] != 24 || data[2] > 1 || data[3] != 14 || data[4] != 0)
+      throw new InvalidDataException("Not a CoCoMax picture: the header does not match.");
 
     var rawData = new byte[CoCoMaxFile.ExpectedFileSize];
     data.Slice(0, CoCoMaxFile.ExpectedFileSize).CopyTo(rawData);
@@ -39,8 +47,16 @@ public static class CoCoMaxReader {
 
   public static CoCoMaxFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length != CoCoMaxFile.ExpectedFileSize)
-      throw new InvalidDataException($"Invalid CoCoMax data size: expected exactly {CoCoMaxFile.ExpectedFileSize} bytes, got {data.Length}.");
+    var legal = false;
+    foreach (var size in CoCoMaxFile.LegalSizes)
+      legal |= data.Length == size;
+
+    if (!legal)
+      throw new InvalidDataException($"A CoCoMax picture is 6154, 6155, 6272 or 7168 bytes, got {data.Length}.");
+
+    // Four lengths and no signature, so the header is most of the identification.
+    if (data[0] != 0 || data[1] != 24 || data[2] > 1 || data[3] != 14 || data[4] != 0)
+      throw new InvalidDataException("Not a CoCoMax picture: the header does not match.");
 
     var rawData = new byte[CoCoMaxFile.ExpectedFileSize];
     data.AsSpan(0, CoCoMaxFile.ExpectedFileSize).CopyTo(rawData);

@@ -42,51 +42,59 @@ public sealed class CoCoMaxReaderTests {
   [Test]
   [Category("Unit")]
   public void FromBytes_TooLarge_ThrowsInvalidDataException() {
-    var tooLarge = new byte[6145];
+    var tooLarge = new byte[6156];
     Assert.Throws<InvalidDataException>(() => CoCoMaxReader.FromBytes(tooLarge));
   }
 
   [Test]
   [Category("Unit")]
   public void FromBytes_ExactSize_Parses() {
-    var data = new byte[6144];
-    data[0] = 0x3F;
-    data[1] = 0x2A;
-    data[6143] = 0xAB;
+    var data = _Valid();
+    data[CoCoMaxFile.BitmapOffset + 0] = 0x3F;
+    data[CoCoMaxFile.BitmapOffset + 1] = 0x2A;
+    data[CoCoMaxFile.BitmapOffset + CoCoMaxFile.BitmapSize - 1] = 0xAB;
 
     var result = CoCoMaxReader.FromBytes(data);
 
     Assert.That(result.Width, Is.EqualTo(256));
     Assert.That(result.Height, Is.EqualTo(192));
-    Assert.That(result.RawData.Length, Is.EqualTo(6144));
-    Assert.That(result.RawData[0], Is.EqualTo(0x3F));
-    Assert.That(result.RawData[1], Is.EqualTo(0x2A));
-    Assert.That(result.RawData[6143], Is.EqualTo(0xAB));
+    Assert.That(result.RawData.Length, Is.EqualTo(CoCoMaxFile.ExpectedFileSize));
+    Assert.That(result.RawData[CoCoMaxFile.BitmapOffset + 0], Is.EqualTo(0x3F));
+    Assert.That(result.RawData[CoCoMaxFile.BitmapOffset + 1], Is.EqualTo(0x2A));
+    Assert.That(result.RawData[CoCoMaxFile.BitmapOffset + CoCoMaxFile.BitmapSize - 1], Is.EqualTo(0xAB));
   }
 
   [Test]
   [Category("Unit")]
   public void FromStream_Valid() {
-    var data = new byte[6144];
-    data[0] = 0xAB;
+    var data = _Valid();
+    data[CoCoMaxFile.BitmapOffset + 0] = 0xAB;
 
     using var ms = new MemoryStream(data);
     var result = CoCoMaxReader.FromStream(ms);
 
     Assert.That(result.Width, Is.EqualTo(256));
     Assert.That(result.Height, Is.EqualTo(192));
-    Assert.That(result.RawData[0], Is.EqualTo(0xAB));
+    Assert.That(result.RawData[CoCoMaxFile.BitmapOffset + 0], Is.EqualTo(0xAB));
   }
 
   [Test]
   [Category("Unit")]
   public void FromBytes_CopiesData_NotReference() {
-    var data = new byte[6144];
-    data[0] = 0xFF;
+    var data = _Valid();
+    data[CoCoMaxFile.BitmapOffset + 0] = 0xFF;
 
     var result = CoCoMaxReader.FromBytes(data);
-    data[0] = 0x00;
+    data[CoCoMaxFile.BitmapOffset + 0] = 0x00;
 
-    Assert.That(result.RawData[0], Is.EqualTo(0xFF));
+    Assert.That(result.RawData[CoCoMaxFile.BitmapOffset + 0], Is.EqualTo(0xFF));
+  }
+
+  /// <summary>A file of the smallest legal length, carrying the header a reader checks.</summary>
+  private static byte[] _Valid() {
+    var data = new byte[CoCoMaxFile.ExpectedFileSize];
+    CoCoMaxFile.WriteHeader(data);
+
+    return data;
   }
 }

@@ -3,19 +3,43 @@ using FileFormat.Core;
 
 namespace FileFormat.CoCoMax;
 
-/// <summary>In-memory representation of a CoCoMax paint program image (6144 bytes: 256x192 mono).</summary>
+/// <summary>In-memory representation of a CoCoMax picture (.max, .p41).</summary>
+/// <remarks>
+/// A Colour Computer screen, monochrome despite the machine's name: 256 by 192 at one bit a pixel.
+/// The picture does not start at the head of the file — five bytes of header come first, and four
+/// lengths are legal, the bytes past the picture being whatever the program's buffer happened to
+/// hold.
+/// </remarks>
 public readonly record struct CoCoMaxFile : IImageFormatReader<CoCoMaxFile>, IImageToRawImage<CoCoMaxFile>, IImageFromRawImage<CoCoMaxFile>, IImageFormatWriter<CoCoMaxFile> {
 
   static string IImageFormatMetadata<CoCoMaxFile>.PrimaryExtension => ".max";
-  static string[] IImageFormatMetadata<CoCoMaxFile>.FileExtensions => [".max"];
+  static string[] IImageFormatMetadata<CoCoMaxFile>.FileExtensions => [".max", ".p41"];
   static CoCoMaxFile IImageFormatReader<CoCoMaxFile>.FromSpan(ReadOnlySpan<byte> data) => CoCoMaxReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<CoCoMaxFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])
   ];
   static byte[] IImageFormatWriter<CoCoMaxFile>.ToBytes(CoCoMaxFile file) => CoCoMaxWriter.ToBytes(file);
 
-  /// <summary>Expected file size in bytes.</summary>
-  internal const int ExpectedFileSize = 6144;
+  /// <summary>Offset of the bitmap, after the header the program wrote.</summary>
+  public const int BitmapOffset = 5;
+
+  /// <summary>Bytes of bitmap the picture occupies.</summary>
+  public const int BitmapSize = BytesPerRow * PixelHeight;
+
+  /// <summary>The size a file written from a picture takes, which is the smallest legal one.</summary>
+  public const int ExpectedFileSize = 6154;
+
+  /// <summary>The lengths a file may be; the picture is the same in all of them.</summary>
+  public static ReadOnlySpan<int> LegalSizes => [6154, 6155, 6272, 7168];
+
+  /// <summary>Writes the five bytes a reader identifies the format by.</summary>
+  public static void WriteHeader(Span<byte> data) {
+    data[0] = 0;
+    data[1] = 24;
+    data[2] = 0;
+    data[3] = 14;
+    data[4] = 0;
+  }
 
   /// <summary>Image width in pixels.</summary>
   internal const int PixelWidth = 256;
@@ -32,7 +56,7 @@ public readonly record struct CoCoMaxFile : IImageFormatReader<CoCoMaxFile>, IIm
   /// <summary>Always 192.</summary>
   public int Height => PixelHeight;
 
-  /// <summary>Raw pixel data (6144 bytes: 1bpp MSB-first, 32 bytes per row, 192 rows).</summary>
+  /// <summary>The whole file, header and all, because the picture does not begin at its start.</summary>
   public byte[] RawData { get; init; }
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
@@ -40,8 +64,11 @@ public readonly record struct CoCoMaxFile : IImageFormatReader<CoCoMaxFile>, IIm
   /// <summary>Converts the CoCoMax screen to an Indexed1 raw image (256x192, B&amp;W palette).</summary>
   public static RawImage ToRawImage(CoCoMaxFile file) {
 
-    var pixelData = new byte[BytesPerRow * PixelHeight];
-    file.RawData.AsSpan(0, Math.Min(file.RawData.Length, pixelData.Length)).CopyTo(pixelData);
+    var data = file.RawData ?? [];
+    var pixelData = new byte[BitmapSize];
+    var available = Math.Max(0, Math.Min(data.Length - BitmapOffset, BitmapSize));
+    if (available > 0)
+      data.AsSpan(BitmapOffset, available).CopyTo(pixelData);
 
     return new() {
       Width = PixelWidth,
@@ -61,7 +88,8 @@ public readonly record struct CoCoMaxFile : IImageFormatReader<CoCoMaxFile>, IIm
       throw new ArgumentException($"Expected {PixelWidth}x{PixelHeight} but got {image.Width}x{image.Height}.", nameof(image));
 
     var rawData = new byte[ExpectedFileSize];
-    image.PixelData.AsSpan(0, Math.Min(image.PixelData.Length, ExpectedFileSize)).CopyTo(rawData);
+    WriteHeader(rawData);
+    image.PixelData.AsSpan(0, Math.Min(image.PixelData.Length, BitmapSize)).CopyTo(rawData.AsSpan(BitmapOffset));
 
     return new CoCoMaxFile { RawData = rawData };
   }
