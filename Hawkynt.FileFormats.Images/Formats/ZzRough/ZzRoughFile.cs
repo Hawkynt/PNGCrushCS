@@ -16,7 +16,10 @@ namespace FileFormat.ZzRough;
 /// is one screen chunk, and a vertical run of them is what a flat-coloured area actually produces.
 /// </remarks>
 public readonly record struct ZzRoughFile
-  : IImageFormatReader<ZzRoughFile>, IImageToRawImage<ZzRoughFile> {
+  : IImageFormatReader<ZzRoughFile>, IImageToRawImage<ZzRoughFile>,
+    IImageFromRawImage<ZzRoughFile>, IImageFormatWriter<ZzRoughFile> {
+
+  static byte[] IImageFormatWriter<ZzRoughFile>.ToBytes(ZzRoughFile file) => ZzRoughWriter.ToBytes(file);
 
   /// <summary>Pixels across.</summary>
   public const int Width = 320;
@@ -59,4 +62,30 @@ public readonly record struct ZzRoughFile
     Palette = AtariStGraphics.ReadPalette(file.Palette ?? [], 0, ColorCount),
     PaletteCount = ColorCount,
   };
+
+  /// <summary>Builds a picture in the sixteen colours the machine can show at this resolution.</summary>
+  public static ZzRoughFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(Width, Height);
+    var quantized = ColorQuantizer.Quantize(
+      PixelConverter.Convert(rgb, PixelFormat.Bgra32).PixelData, Width * Height, ColorCount);
+
+    var indices = new byte[Width * Height];
+    for (var i = 0; i < indices.Length; ++i)
+      indices[i] = (byte)quantized.Indices[i];
+
+    var palette = new byte[PaletteSize];
+    var stPalette = PlanarConverter.RgbToStPalette(quantized.Palette, ColorCount);
+    for (var i = 0; i < ColorCount; ++i) {
+      palette[i * 2] = (byte)(stPalette[i] >> 8);
+      palette[i * 2 + 1] = (byte)stPalette[i];
+    }
+
+    return new() {
+      ScreenData = AtariStGraphics.PackBitplanes(
+        indices, AtariStGraphics.BytesPerRow(Width, Planes), Planes, Width, Height),
+      Palette = palette,
+    };
+  }
 }

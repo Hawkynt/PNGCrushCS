@@ -50,6 +50,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.BestPaint, "Best Paint", 160, 192, ".bp"),
     new(ImageFormat.AtariHr2, "HR2", 320, 200, ".hr2"),
     new(ImageFormat.Anime4Ever, "Anime 4ever", 320, 256, ".a4r"),
+    new(ImageFormat.ZzRough, "ZZ_ROUGH", 320, 200, ".rgh"),
     new(ImageFormat.Doodle, "Doodle", 320, 200),
     new(ImageFormat.HiPicCreator, "Hi-Pic Creator", 320, 200),
     new(ImageFormat.HiresC64, "Hires-Bitmap", 320, 200, ".hbm"),
