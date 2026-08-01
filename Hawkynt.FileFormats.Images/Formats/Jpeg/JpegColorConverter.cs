@@ -54,52 +54,17 @@ internal static class JpegColorConverter {
     var pixelCount = width * height;
     var rgb = new byte[pixelCount * 3];
 
+    // Every pixel goes through the integer path below.
+    //
+    // There used to be an SSE2 loop in front of it that was wrong for any colour worth the name. It
+    // did its arithmetic in 16-bit lanes with MultiplyLow, but the coefficients make that overflow:
+    // Cr-128 reaches 128 and the red coefficient is 359, so the product reaches 45952 where a short
+    // stops at 32767 — and the green path overflowed again when its two terms were added. The low
+    // sixteen bits of an overflowed product are noise, so strongly coloured pixels decoded to
+    // nonsense while near-neutral ones came out fine. That is why a photograph looked plausible and a
+    // flat red square did not.
     var i = 0;
 
-    // SIMD path: process 8 pixels at a time using SSE2
-    if (Sse2.IsSupported && pixelCount >= 8) {
-      var bias128 = Vector128.Create((short)128);
-      var zero = Vector128<short>.Zero;
-      var max255 = Vector128.Create((short)255);
-
-      // Fixed-point coefficients (Q16)
-      var crToR = Vector128.Create((short)((91881 + 128) >> 8));   // ≈359
-      var cbToG = Vector128.Create((short)((22554 + 128) >> 8));   // ≈88
-      var crToG = Vector128.Create((short)((46802 + 128) >> 8));   // ≈183
-      var cbToB = Vector128.Create((short)((116130 + 128) >> 8));  // ≈454
-
-      for (; i <= pixelCount - 8; i += 8) {
-        // Load 8 bytes and widen to 16-bit
-        var yVec = Sse2.UnpackLow(Vector128.Create(yPlane[i], yPlane[i + 1], yPlane[i + 2], yPlane[i + 3], yPlane[i + 4], yPlane[i + 5], yPlane[i + 6], yPlane[i + 7], 0, 0, 0, 0, 0, 0, 0, 0).AsByte(), Vector128<byte>.Zero).AsInt16();
-        var cbVec = Sse2.Subtract(Sse2.UnpackLow(Vector128.Create(cbPlane[i], cbPlane[i + 1], cbPlane[i + 2], cbPlane[i + 3], cbPlane[i + 4], cbPlane[i + 5], cbPlane[i + 6], cbPlane[i + 7], 0, 0, 0, 0, 0, 0, 0, 0).AsByte(), Vector128<byte>.Zero).AsInt16(), bias128);
-        var crVec = Sse2.Subtract(Sse2.UnpackLow(Vector128.Create(crPlane[i], crPlane[i + 1], crPlane[i + 2], crPlane[i + 3], crPlane[i + 4], crPlane[i + 5], crPlane[i + 6], crPlane[i + 7], 0, 0, 0, 0, 0, 0, 0, 0).AsByte(), Vector128<byte>.Zero).AsInt16(), bias128);
-
-        // R = Y + (91881 * Cr >> 16) ≈ Y + (Cr * 359 >> 8)
-        var rVec = Sse2.Add(yVec, Sse2.ShiftRightArithmetic(Sse2.MultiplyHigh(crVec, crToR), 0));
-        rVec = Sse2.Add(yVec, Sse2.ShiftRightArithmetic(Sse2.MultiplyLow(crVec, crToR), 8));
-
-        // G = Y - ((22554 * Cb + 46802 * Cr) >> 16) ≈ Y - ((Cb * 88 + Cr * 183) >> 8)
-        var gVec = Sse2.Subtract(yVec, Sse2.ShiftRightArithmetic(Sse2.Add(Sse2.MultiplyLow(cbVec, cbToG), Sse2.MultiplyLow(crVec, crToG)), 8));
-
-        // B = Y + (116130 * Cb >> 16) ≈ Y + (Cb * 454 >> 8)
-        var bVec = Sse2.Add(yVec, Sse2.ShiftRightArithmetic(Sse2.MultiplyLow(cbVec, cbToB), 8));
-
-        // Clamp to [0, 255]
-        rVec = Sse2.Max(zero, Sse2.Min(max255, rVec));
-        gVec = Sse2.Max(zero, Sse2.Min(max255, gVec));
-        bVec = Sse2.Max(zero, Sse2.Min(max255, bVec));
-
-        // Interleave and store as RGB24
-        var offset = i * 3;
-        for (var j = 0; j < 8; ++j) {
-          rgb[offset + j * 3] = (byte)rVec.GetElement(j);
-          rgb[offset + j * 3 + 1] = (byte)gVec.GetElement(j);
-          rgb[offset + j * 3 + 2] = (byte)bVec.GetElement(j);
-        }
-      }
-    }
-
-    // Scalar fallback for remaining pixels
     for (; i < pixelCount; ++i) {
       var yVal = yPlane[i];
       var cbVal = cbPlane[i] - 128;
