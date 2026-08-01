@@ -101,9 +101,12 @@ public readonly record struct MsxScreen8File : IImageFormatReader<MsxScreen8File
       image.PixelData[srcOffset + 2] = (byte)(b2 * 255 / 3);
     }
 
+    // With the BSAVE header, always. A bare 54272-byte dump is what the video memory holds, not what
+    // a file holds: nothing that reads Screen 8 pictures will take one without the seven bytes that
+    // say where in memory it belongs.
     return new() {
       PixelData = pixelData,
-      HasBsaveHeader = false,
+      HasBsaveHeader = true,
     };
   }
 }

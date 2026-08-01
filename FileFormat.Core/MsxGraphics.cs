@@ -51,6 +51,17 @@ public static class MsxGraphics {
       : (byte)((data[position] & 0xF0) | (value & 15));
   }
 
+  /// <summary>The sixteen colours a V9938 powers up with, as stored palette entries.</summary>
+  /// <remarks>
+  /// A picture whose palette file is missing draws in these. They are not a grey ramp or an even
+  /// spread: entry one is transparent-black, and the rest are the TMS9918's colours carried over so
+  /// that older software kept looking the way it always had.
+  /// </remarks>
+  public static ReadOnlySpan<byte> Msx2DefaultPalette => [
+    0, 0, 0, 0, 17, 6, 51, 7, 23, 1, 39, 3, 81, 1, 39, 6,
+    113, 1, 115, 3, 97, 6, 100, 6, 17, 4, 101, 2, 85, 5, 119, 7,
+  ];
+
   public static byte[] PaletteToRgb(ReadOnlySpan<byte> palette, int colors) {
     var rgb = new byte[colors * 3];
     for (var i = 0; i < colors && i * PaletteEntrySize + 1 < palette.Length; ++i) {
