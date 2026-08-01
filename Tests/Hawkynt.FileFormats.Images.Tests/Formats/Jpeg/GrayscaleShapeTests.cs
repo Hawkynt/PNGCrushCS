@@ -57,21 +57,8 @@ public sealed class GrayscaleShapeTests {
     });
   }
 
-  /// <summary>
-  /// KNOWN DEFECT, in the writer rather than the reader.
-  /// </summary>
-  /// <remarks>
-  /// A grey picture written here comes back as near-white whatever went in, and ImageMagick reads
-  /// our output the same way — so the file is wrong, not our reading of it. It is not the Huffman
-  /// optimiser: writing with the standard tables gives an equally wrong file. The headers are
-  /// self-consistent — one component at 1x1, one quantisation table, one scan — so the fault lies
-  /// in what the single-component path puts in the entropy data.
-  /// <para/>
-  /// Left visible rather than deleted: this is what a grey JPEG out of this project does today.
-  /// </remarks>
   [Test]
   [Category("Integration")]
-  [Ignore("The grey writer produces a near-white picture; the reading side of this is fixed and covered above.")]
   public void RoundTrip_KeepsAGreyPicture() {
     // Bands eight rows deep, so the transform's own grid can hold them: a ramp that steps every row
     // is smoothed by any lossy codec, and testing against that measures the codec rather than the

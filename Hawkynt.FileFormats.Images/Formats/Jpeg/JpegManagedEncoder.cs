@@ -154,7 +154,7 @@ internal static class JpegManagedEncoder {
         var coefficients = data.Blocks[by][bx].Coefficients;
         for (var k = 0; k < 64; ++k) {
           var natIdx = JpegZigZag.Order[k];
-          coefficients[k] = JpegQuantizer.Quantize(dctBuf[natIdx], quantNatural[natIdx]);
+          coefficients[k] = JpegQuantizer.QuantizeDctOutput(dctBuf[natIdx], quantNatural[natIdx]);
         }
       }
 

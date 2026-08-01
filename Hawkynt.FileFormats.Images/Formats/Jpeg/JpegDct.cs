@@ -293,14 +293,8 @@ internal static class JpegDct {
 
     ForwardDct(block);
 
-    // Quantize
-    for (var i = 0; i < 64; ++i) {
-      var q = quantTable[i];
-      // Use rounding division
-      if (block[i] >= 0)
-        coefficients[i] = (short)((block[i] + (q >> 1)) / q);
-      else
-        coefficients[i] = (short)(-((-block[i] + (q >> 1)) / q));
-    }
+    // The transform leaves its output scaled up by eight, so the divisor carries that factor too.
+    for (var i = 0; i < 64; ++i)
+      coefficients[i] = JpegQuantizer.QuantizeDctOutput(block[i], quantTable[i]);
   }
 }
