@@ -7,7 +7,7 @@ namespace FileFormat.Doodle;
 public readonly record struct DoodleFile : IImageFormatReader<DoodleFile>, IImageToRawImage<DoodleFile>, IImageFromRawImage<DoodleFile>, IImageFormatWriter<DoodleFile> {
 
   static string IImageFormatMetadata<DoodleFile>.PrimaryExtension => ".dd";
-  static string[] IImageFormatMetadata<DoodleFile>.FileExtensions => [".dd"];
+  static string[] IImageFormatMetadata<DoodleFile>.FileExtensions => [".dd", ".ddp"];
   static DoodleFile IImageFormatReader<DoodleFile>.FromSpan(ReadOnlySpan<byte> data) => DoodleReader.FromSpan(data);
   static byte[] IImageFormatWriter<DoodleFile>.ToBytes(DoodleFile file) => DoodleWriter.ToBytes(file);
 

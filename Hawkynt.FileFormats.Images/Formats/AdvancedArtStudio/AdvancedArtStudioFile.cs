@@ -7,7 +7,7 @@ namespace FileFormat.AdvancedArtStudio;
 public readonly record struct AdvancedArtStudioFile : IImageFormatReader<AdvancedArtStudioFile>, IImageToRawImage<AdvancedArtStudioFile>, IImageFromRawImage<AdvancedArtStudioFile>, IImageFormatWriter<AdvancedArtStudioFile> {
 
   static string IImageFormatMetadata<AdvancedArtStudioFile>.PrimaryExtension => ".ocp";
-  static string[] IImageFormatMetadata<AdvancedArtStudioFile>.FileExtensions => [".ocp"];
+  static string[] IImageFormatMetadata<AdvancedArtStudioFile>.FileExtensions => [".ocp", ".mpi", ".mpic"];
   static AdvancedArtStudioFile IImageFormatReader<AdvancedArtStudioFile>.FromSpan(ReadOnlySpan<byte> data) => AdvancedArtStudioReader.FromSpan(data);
   static byte[] IImageFormatWriter<AdvancedArtStudioFile>.ToBytes(AdvancedArtStudioFile file) => AdvancedArtStudioWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<AdvancedArtStudioFile>.VideoModes => [

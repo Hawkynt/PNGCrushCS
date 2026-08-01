@@ -12,7 +12,7 @@ namespace FileFormat.HiPicCreator;
 public readonly record struct HiPicCreatorFile : IImageFormatReader<HiPicCreatorFile>, IImageToRawImage<HiPicCreatorFile>, IImageFromRawImage<HiPicCreatorFile>, IImageFormatWriter<HiPicCreatorFile> {
 
   static string IImageFormatMetadata<HiPicCreatorFile>.PrimaryExtension => ".hpc";
-  static string[] IImageFormatMetadata<HiPicCreatorFile>.FileExtensions => [".hpc"];
+  static string[] IImageFormatMetadata<HiPicCreatorFile>.FileExtensions => [".hpc", ".aas"];
   static HiPicCreatorFile IImageFormatReader<HiPicCreatorFile>.FromSpan(ReadOnlySpan<byte> data) => HiPicCreatorReader.FromSpan(data);
   static byte[] IImageFormatWriter<HiPicCreatorFile>.ToBytes(HiPicCreatorFile file) => HiPicCreatorWriter.ToBytes(file);
 

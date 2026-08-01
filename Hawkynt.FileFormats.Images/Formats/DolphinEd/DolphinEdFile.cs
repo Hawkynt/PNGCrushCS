@@ -7,7 +7,7 @@ namespace FileFormat.DolphinEd;
 public readonly record struct DolphinEdFile : IImageFormatReader<DolphinEdFile>, IImageToRawImage<DolphinEdFile>, IImageFromRawImage<DolphinEdFile>, IImageFormatWriter<DolphinEdFile> {
 
   static string IImageFormatMetadata<DolphinEdFile>.PrimaryExtension => ".dol";
-  static string[] IImageFormatMetadata<DolphinEdFile>.FileExtensions => [".dol"];
+  static string[] IImageFormatMetadata<DolphinEdFile>.FileExtensions => [".dol", ".bed"];
   static DolphinEdFile IImageFormatReader<DolphinEdFile>.FromSpan(ReadOnlySpan<byte> data) => DolphinEdReader.FromSpan(data);
   static byte[] IImageFormatWriter<DolphinEdFile>.ToBytes(DolphinEdFile file) => DolphinEdWriter.ToBytes(file);
 

@@ -7,7 +7,7 @@ namespace FileFormat.InterPaintMc;
 public readonly record struct InterPaintMcFile : IImageFormatReader<InterPaintMcFile>, IImageToRawImage<InterPaintMcFile>, IImageFromRawImage<InterPaintMcFile>, IImageFormatWriter<InterPaintMcFile> {
 
   static string IImageFormatMetadata<InterPaintMcFile>.PrimaryExtension => ".ipt";
-  static string[] IImageFormatMetadata<InterPaintMcFile>.FileExtensions => [".ipt"];
+  static string[] IImageFormatMetadata<InterPaintMcFile>.FileExtensions => [".ipt", ".lre"];
   static InterPaintMcFile IImageFormatReader<InterPaintMcFile>.FromSpan(ReadOnlySpan<byte> data) => InterPaintMcReader.FromSpan(data);
   static byte[] IImageFormatWriter<InterPaintMcFile>.ToBytes(InterPaintMcFile file) => InterPaintMcWriter.ToBytes(file);
 

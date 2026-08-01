@@ -17,7 +17,7 @@ public readonly record struct Picasso64File
     IImageFromRawImage<Picasso64File>, IImageFormatWriter<Picasso64File> {
 
   static string IImageFormatMetadata<Picasso64File>.PrimaryExtension => ".p64";
-  static string[] IImageFormatMetadata<Picasso64File>.FileExtensions => [".p64"];
+  static string[] IImageFormatMetadata<Picasso64File>.FileExtensions => [".p64", ".fly"];
   static Picasso64File IImageFormatReader<Picasso64File>.FromSpan(ReadOnlySpan<byte> data) => Picasso64Reader.FromSpan(data);
   static byte[] IImageFormatWriter<Picasso64File>.ToBytes(Picasso64File file) => Picasso64Writer.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<Picasso64File>.VideoModes => [

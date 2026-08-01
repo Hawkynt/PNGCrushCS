@@ -7,7 +7,7 @@ namespace FileFormat.FacePainter;
 public readonly record struct FacePainterFile : IImageFormatReader<FacePainterFile>, IImageToRawImage<FacePainterFile>, IImageFromRawImage<FacePainterFile>, IImageFormatWriter<FacePainterFile> {
 
   static string IImageFormatMetadata<FacePainterFile>.PrimaryExtension => ".fpt";
-  static string[] IImageFormatMetadata<FacePainterFile>.FileExtensions => [".fpt"];
+  static string[] IImageFormatMetadata<FacePainterFile>.FileExtensions => [".fpt", ".fcp"];
   static FacePainterFile IImageFormatReader<FacePainterFile>.FromSpan(ReadOnlySpan<byte> data) => FacePainterReader.FromSpan(data);
   static byte[] IImageFormatWriter<FacePainterFile>.ToBytes(FacePainterFile file) => FacePainterWriter.ToBytes(file);
 

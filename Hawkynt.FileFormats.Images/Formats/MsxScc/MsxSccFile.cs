@@ -38,7 +38,7 @@ public readonly record struct MsxSccFile
   public const int SpritePaletteOffset = 64135;
 
   static string IImageFormatMetadata<MsxSccFile>.PrimaryExtension => ".scc";
-  static string[] IImageFormatMetadata<MsxSccFile>.FileExtensions => [".scc"];
+  static string[] IImageFormatMetadata<MsxSccFile>.FileExtensions => [".scc", ".yjk"];
   static MsxSccFile IImageFormatReader<MsxSccFile>.FromSpan(ReadOnlySpan<byte> data)
     => MsxSccReader.FromSpan(data);
   static byte[] IImageFormatWriter<MsxSccFile>.ToBytes(MsxSccFile file) => MsxSccWriter.ToBytes(file);
