@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace FileFormat.EpaBios;
 
@@ -6,9 +6,15 @@ namespace FileFormat.EpaBios;
 public static class EpaBiosWriter {
 
   public static byte[] ToBytes(EpaBiosFile file) {
-    ArgumentNullException.ThrowIfNull(file);
-    var result = new byte[EpaBiosFile.FileSize];
-    file.PixelData.AsSpan(0, Math.Min(file.PixelData.Length, EpaBiosFile.FileSize)).CopyTo(result);
+    var result = new byte[EpaBiosFile.SizeOf(file.Columns, file.Rows)];
+    result[0] = (byte)file.Columns;
+    result[1] = (byte)file.Rows;
+
+    file.Attributes.CopyTo(result.AsSpan(2));
+    file.Glyphs.CopyTo(result.AsSpan(2 + file.Attributes.Length));
+
+    // The trailer is left as it is found: nothing reads it, and a BIOS that writes one puts its own
+    // second logo there rather than anything derivable from the picture.
     return result;
   }
 }

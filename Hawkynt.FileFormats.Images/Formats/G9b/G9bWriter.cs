@@ -6,37 +6,31 @@ namespace FileFormat.G9b;
 public static class G9bWriter {
 
   public static byte[] ToBytes(G9bFile file) {
-    ArgumentNullException.ThrowIfNull(file);
+    var palette = file.Palette ?? [];
+    var result = new byte[G9bFile.FixedHeaderSize + palette.Length + file.Stride * file.Height];
 
-    var headerSize = file.HeaderSize;
-    var totalSize = headerSize + file.PixelData.Length;
-    var result = new byte[totalSize];
-
-    // Magic "G9B"
-    result[0] = G9bReader.Magic[0];
-    result[1] = G9bReader.Magic[1];
-    result[2] = G9bReader.Magic[2];
-
-    // Header size (2 bytes LE)
-    result[3] = (byte)(headerSize & 0xFF);
-    result[4] = (byte)((headerSize >> 8) & 0xFF);
-
-    // Screen mode
-    result[5] = (byte)file.ScreenMode;
-
-    // Color mode
+    result[0] = (byte)'G';
+    result[1] = (byte)'9';
+    result[2] = (byte)'B';
+    result[3] = G9bFile.Version;
+    result[4] = 0;
+    result[5] = (byte)file.Depth;
     result[6] = file.ColorMode;
+    result[7] = (byte)(palette.Length / 3);
+    result[8] = (byte)file.Width;
+    result[9] = (byte)(file.Width >> 8);
+    result[10] = (byte)file.Height;
+    result[11] = (byte)(file.Height >> 8);
 
-    // Width (2 bytes LE)
-    result[7] = (byte)(file.Width & 0xFF);
-    result[8] = (byte)((file.Width >> 8) & 0xFF);
+    // Stored as it lies. The packed form saves space on pictures with long runs and costs a decoder
+    // that has none here; a reader that handles both will take this one.
+    result[12] = 0;
 
-    // Height (2 bytes LE)
-    result[9] = (byte)(file.Height & 0xFF);
-    result[10] = (byte)((file.Height >> 8) & 0xFF);
+    palette.CopyTo(result.AsSpan(G9bFile.FixedHeaderSize));
 
-    // Pixel data
-    file.PixelData.AsSpan(0, file.PixelData.Length).CopyTo(result.AsSpan(headerSize));
+    var bitmap = file.PixelData ?? [];
+    var length = Math.Min(result.Length - file.BitmapOffset, bitmap.Length);
+    bitmap.AsSpan(0, length).CopyTo(result.AsSpan(file.BitmapOffset));
 
     return result;
   }

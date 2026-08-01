@@ -26,22 +26,30 @@ public static class EpaBiosReader {
   }
 
   public static EpaBiosFile FromSpan(ReadOnlySpan<byte> data) {
+    if (data.Length < 2)
+      throw new InvalidDataException("Too short to state its cell counts.");
 
-    if (data.Length != EpaBiosFile.FileSize)
-      throw new InvalidDataException($"Invalid EpaBios data size: expected exactly {EpaBiosFile.FileSize} bytes, got {data.Length}.");
+    int columns = data[0], rows = data[1];
+    if (columns is 0 or > EpaBiosFile.MaxColumns || rows is 0 or > EpaBiosFile.MaxRows)
+      throw new InvalidDataException($"A BIOS logo is at most {EpaBiosFile.MaxColumns} by {EpaBiosFile.MaxRows} cells; this one says {columns} by {rows}.");
 
-    var pixelData = new byte[EpaBiosFile.FileSize];
-    data.Slice(0, EpaBiosFile.FileSize).CopyTo(pixelData);
-    return new() { PixelData = pixelData };
-    }
+    // The length follows from the cell counts, so it is what tells a logo apart from anything else
+    // whose first two bytes happen to be small numbers.
+    var expected = EpaBiosFile.SizeOf(columns, rows);
+    if (data.Length != expected)
+      throw new InvalidDataException($"{columns} by {rows} cells is {expected} bytes; this file is {data.Length}.");
+
+    var cells = columns * rows;
+    return new() {
+      Columns = columns,
+      Rows = rows,
+      Attributes = data.Slice(2, cells).ToArray(),
+      Glyphs = data.Slice(2 + cells, cells * EpaBiosFile.CellHeight).ToArray(),
+    };
+  }
 
   public static EpaBiosFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length != EpaBiosFile.FileSize)
-      throw new InvalidDataException($"Invalid EpaBios data size: expected exactly {EpaBiosFile.FileSize} bytes, got {data.Length}.");
-
-    var pixelData = new byte[EpaBiosFile.FileSize];
-    data.AsSpan(0, EpaBiosFile.FileSize).CopyTo(pixelData);
-    return new() { PixelData = pixelData };
+    return FromSpan(data);
   }
 }

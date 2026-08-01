@@ -6,14 +6,7 @@ namespace FileFormat.G9b;
 /// <summary>Reads V9990 GFX9000 (.g9b) files from bytes, streams, or file paths.</summary>
 public static class G9bReader {
 
-  /// <summary>Magic bytes "G9B".</summary>
   internal static readonly byte[] Magic = [0x47, 0x39, 0x42];
-
-  /// <summary>Minimum header size: 3 (magic) + 2 (header size) + 1 (screen mode) + 1 (color mode) + 2 (width) + 2 (height) = 11.</summary>
-  internal const int MinHeaderSize = 11;
-
-  /// <summary>Default header size.</summary>
-  internal const int DefaultHeaderSize = 11;
 
   public static G9bFile FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
@@ -36,96 +29,46 @@ public static class G9bReader {
   }
 
   public static G9bFile FromSpan(ReadOnlySpan<byte> data) {
+    if (data.Length < G9bFile.FixedHeaderSize + 1)
+      throw new InvalidDataException("Too short to be a G9B file.");
 
-    if (data.Length < MinHeaderSize)
-      throw new InvalidDataException($"G9B file must be at least {MinHeaderSize} bytes, got {data.Length}.");
+    if (data[0] != Magic[0] || data[1] != Magic[1] || data[2] != Magic[2]
+        || data[3] != G9bFile.Version || data[4] != 0)
+      throw new InvalidDataException("Not a G9B file.");
 
-    if (data[0] != Magic[0] || data[1] != Magic[1] || data[2] != Magic[2])
-      throw new InvalidDataException("Invalid G9B magic bytes.");
+    var depth = data[5];
+    if (depth is not (2 or 4 or 8 or 16))
+      throw new InvalidDataException($"A G9B pixel is 2, 4, 8 or 16 bits, not {depth}.");
 
-    var headerSize = data[3] | (data[4] << 8);
-    if (headerSize < MinHeaderSize)
-      throw new InvalidDataException($"G9B header size must be at least {MinHeaderSize}, got {headerSize}.");
-    if (data.Length < headerSize)
-      throw new InvalidDataException($"G9B file too small for declared header size {headerSize}, got {data.Length} bytes.");
+    var entries = data[7];
+    var headerLength = G9bFile.FixedHeaderSize + entries * 3;
+    var width = data[8] | (data[9] << 8);
+    var height = data[10] | (data[11] << 8);
+    if (width <= 0 || height <= 0)
+      throw new InvalidDataException($"A G9B states no size: {width}x{height}.");
 
-    var screenMode = data[5];
-    var colorMode = data[6];
-    var width = data[7] | (data[8] << 8);
-    var height = data[9] | (data[10] << 8);
+    // The packed form is a bitstream this reader does not carry, and reading its bytes as pixels
+    // would give a picture rather than an error, which is worse than refusing.
+    if (data[12] != 0)
+      throw new InvalidDataException("A packed G9B is not read here yet.");
 
-    if (width == 0)
-      throw new InvalidDataException("Invalid G9B width: must be greater than zero.");
-    if (height == 0)
-      throw new InvalidDataException("Invalid G9B height: must be greater than zero.");
+    var stride = (width * depth + 7) >> 3;
+    if (data.Length < headerLength + stride * height)
+      throw new InvalidDataException(
+        $"{width}x{height} at {depth} bits needs {headerLength + stride * height} bytes; this file is {data.Length}.");
 
-    var bytesPerPixel = screenMode switch {
-      (byte)G9bScreenMode.Indexed8 => 1,
-      (byte)G9bScreenMode.Rgb555 => 2,
-      _ => throw new InvalidDataException($"Unsupported G9B screen mode: {screenMode}.")
-    };
-
-    var expectedPixelDataSize = width * height * bytesPerPixel;
-    if (data.Length < headerSize + expectedPixelDataSize)
-      throw new InvalidDataException($"G9B file too small: expected {headerSize + expectedPixelDataSize} bytes, got {data.Length}.");
-
-    var pixelData = new byte[expectedPixelDataSize];
-    data.Slice(headerSize, expectedPixelDataSize).CopyTo(pixelData);
-
-    return new G9bFile {
+    return new() {
       Width = width,
       Height = height,
-      ScreenMode = (G9bScreenMode)screenMode,
-      ColorMode = colorMode,
-      HeaderSize = headerSize,
-      PixelData = pixelData,
+      Depth = depth,
+      ColorMode = data[6],
+      Palette = data.Slice(G9bFile.FixedHeaderSize, entries * 3).ToArray(),
+      PixelData = data.Slice(headerLength, stride * height).ToArray(),
     };
-    }
+  }
 
   public static G9bFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < MinHeaderSize)
-      throw new InvalidDataException($"G9B file must be at least {MinHeaderSize} bytes, got {data.Length}.");
-
-    if (data[0] != Magic[0] || data[1] != Magic[1] || data[2] != Magic[2])
-      throw new InvalidDataException("Invalid G9B magic bytes.");
-
-    var headerSize = data[3] | (data[4] << 8);
-    if (headerSize < MinHeaderSize)
-      throw new InvalidDataException($"G9B header size must be at least {MinHeaderSize}, got {headerSize}.");
-    if (data.Length < headerSize)
-      throw new InvalidDataException($"G9B file too small for declared header size {headerSize}, got {data.Length} bytes.");
-
-    var screenMode = data[5];
-    var colorMode = data[6];
-    var width = data[7] | (data[8] << 8);
-    var height = data[9] | (data[10] << 8);
-
-    if (width == 0)
-      throw new InvalidDataException("Invalid G9B width: must be greater than zero.");
-    if (height == 0)
-      throw new InvalidDataException("Invalid G9B height: must be greater than zero.");
-
-    var bytesPerPixel = screenMode switch {
-      (byte)G9bScreenMode.Indexed8 => 1,
-      (byte)G9bScreenMode.Rgb555 => 2,
-      _ => throw new InvalidDataException($"Unsupported G9B screen mode: {screenMode}.")
-    };
-
-    var expectedPixelDataSize = width * height * bytesPerPixel;
-    if (data.Length < headerSize + expectedPixelDataSize)
-      throw new InvalidDataException($"G9B file too small: expected {headerSize + expectedPixelDataSize} bytes, got {data.Length}.");
-
-    var pixelData = new byte[expectedPixelDataSize];
-    data.AsSpan(headerSize, expectedPixelDataSize).CopyTo(pixelData);
-
-    return new G9bFile {
-      Width = width,
-      Height = height,
-      ScreenMode = (G9bScreenMode)screenMode,
-      ColorMode = colorMode,
-      HeaderSize = headerSize,
-      PixelData = pixelData,
-    };
+    return FromSpan(data);
   }
 }
