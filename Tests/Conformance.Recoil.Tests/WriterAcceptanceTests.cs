@@ -67,6 +67,12 @@ public sealed class WriterAcceptanceTests {
     [ImageFormat.Mrc] = "the reference tool reads .map as an Envision character set, which is a different format",
     [ImageFormat.Thomson] = "the reference tool reads .map as an Envision character set, which is a different format",
     [ImageFormat.PhotoPaint] = "the reference tool reads .cpt as the Canvas compressed picture, which is a different format",
+    [ImageFormat.Cel] =
+      ".cel belongs to three unrelated programs: this is the paper-doll cell of KiSS, and the tool "
+      + "means the Atari ST one, which is now a format of its own here",
+    [ImageFormat.AutodeskCel] =
+      ".cel belongs to three unrelated programs: this is the Animator's frame, and the tool means "
+      + "the Atari ST one, which is now a format of its own here",
   };
 
   private static IEnumerable<TestCaseData> Writable() {

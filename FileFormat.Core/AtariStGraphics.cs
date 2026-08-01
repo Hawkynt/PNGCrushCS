@@ -314,4 +314,27 @@ public static class AtariStGraphics {
 
     return rgb;
   }
+
+  /// <summary>Writes a palette in the plain ST form: three bits a channel in a big-endian word.</summary>
+  /// <remarks>
+  /// The inverse of <see cref="ReadPalette(ReadOnlySpan{byte},int,int,bool)"/> for the form the ST
+  /// itself used, before the STE widened each channel to four bits. Scaling rather than shifting is
+  /// what keeps white at white: the top of a three-bit channel is seven, and seven eighths of 255 is
+  /// not 255.
+  /// </remarks>
+  public static void WritePalette(ReadOnlySpan<byte> palette, int colors, Span<byte> target) {
+    for (var i = 0; i < colors; ++i) {
+      var entry = i * 3;
+      if (entry + 2 >= palette.Length || i * 2 + 1 >= target.Length)
+        return;
+
+      var red = palette[entry] * 7 / 255;
+      var green = palette[entry + 1] * 7 / 255;
+      var blue = palette[entry + 2] * 7 / 255;
+      var word = (red << 8) | (green << 4) | blue;
+
+      target[i * 2] = (byte)(word >> 8);
+      target[i * 2 + 1] = (byte)word;
+    }
+  }
 }
