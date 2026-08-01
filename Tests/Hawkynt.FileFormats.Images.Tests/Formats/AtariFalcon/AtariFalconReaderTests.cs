@@ -7,7 +7,7 @@ namespace FileFormat.AtariFalcon.Tests;
 [TestFixture]
 public sealed class AtariFalconReaderTests {
 
-  private const int _EXPECTED_SIZE = 320 * 240 * 2;
+  private const int _EXPECTED_SIZE = AtariFalconFile.ExpectedFileSize;
 
   [Test]
   [Category("Unit")]
@@ -58,8 +58,8 @@ public sealed class AtariFalconReaderTests {
 
     var result = AtariFalconReader.FromBytes(data);
 
-    Assert.That(result.Width, Is.EqualTo(320));
-    Assert.That(result.Height, Is.EqualTo(240));
+    Assert.That(result.Width, Is.EqualTo(AtariFalconFile.PixelWidth));
+    Assert.That(result.Height, Is.EqualTo(AtariFalconFile.PixelHeight));
     Assert.That(result.PixelData.Length, Is.EqualTo(_EXPECTED_SIZE));
     Assert.That(result.PixelData[0], Is.EqualTo(0xFF));
     Assert.That(result.PixelData[1], Is.EqualTo(0x80));
@@ -75,8 +75,8 @@ public sealed class AtariFalconReaderTests {
     using var ms = new MemoryStream(data);
     var result = AtariFalconReader.FromStream(ms);
 
-    Assert.That(result.Width, Is.EqualTo(320));
-    Assert.That(result.Height, Is.EqualTo(240));
+    Assert.That(result.Width, Is.EqualTo(AtariFalconFile.PixelWidth));
+    Assert.That(result.Height, Is.EqualTo(AtariFalconFile.PixelHeight));
     Assert.That(result.PixelData[0], Is.EqualTo(0xAB));
   }
 

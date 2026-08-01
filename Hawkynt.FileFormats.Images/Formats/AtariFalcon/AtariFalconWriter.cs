@@ -5,7 +5,7 @@ namespace FileFormat.AtariFalcon;
 /// <summary>Assembles Atari Falcon true-color screen dump bytes from pixel data.</summary>
 public static class AtariFalconWriter {
 
-  /// <summary>The exact file size of a valid Atari Falcon screen dump (320 x 240 x 2 bytes).</summary>
+  /// <summary>The exact file size of a valid Atari Falcon screen dump (two bytes a pixel).</summary>
   private const int _EXPECTED_SIZE = AtariFalconFile.ExpectedFileSize;
 
   public static byte[] ToBytes(AtariFalconFile file) => Assemble(file.PixelData);

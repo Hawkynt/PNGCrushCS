@@ -6,11 +6,11 @@ namespace FileFormat.AtariFalcon.Tests;
 [TestFixture]
 public sealed class AtariFalconWriterTests {
 
-  private const int _EXPECTED_SIZE = 320 * 240 * 2;
+  private const int _EXPECTED_SIZE = AtariFalconFile.ExpectedFileSize;
 
   [Test]
   [Category("Unit")]
-  public void ToBytes_Produces153600Bytes() {
+  public void ToBytes_ProducesTheExactFileSize() {
     var file = new AtariFalconFile {
       PixelData = new byte[_EXPECTED_SIZE]
     };

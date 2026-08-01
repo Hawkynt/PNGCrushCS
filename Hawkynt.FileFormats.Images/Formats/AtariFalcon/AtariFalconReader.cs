@@ -6,7 +6,7 @@ namespace FileFormat.AtariFalcon;
 /// <summary>Reads Atari Falcon true-color screen dumps from bytes, streams, or file paths.</summary>
 public static class AtariFalconReader {
 
-  /// <summary>The exact file size of a valid Atari Falcon screen dump (320 x 240 x 2 bytes).</summary>
+  /// <summary>The exact file size of a valid Atari Falcon screen dump (two bytes a pixel).</summary>
   private const int _EXPECTED_SIZE = AtariFalconFile.ExpectedFileSize;
 
   public static AtariFalconFile FromFile(FileInfo file) {

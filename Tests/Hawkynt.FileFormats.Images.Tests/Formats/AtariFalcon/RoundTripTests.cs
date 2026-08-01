@@ -8,7 +8,7 @@ namespace FileFormat.AtariFalcon.Tests;
 [TestFixture]
 public sealed class RoundTripTests {
 
-  private const int _EXPECTED_SIZE = 320 * 240 * 2;
+  private const int _EXPECTED_SIZE = AtariFalconFile.ExpectedFileSize;
 
   [Test]
   [Category("Integration")]
@@ -46,8 +46,8 @@ public sealed class RoundTripTests {
     var bytes = AtariFalconWriter.ToBytes(original);
     var restored = AtariFalconReader.FromBytes(bytes);
 
-    Assert.That(restored.Width, Is.EqualTo(320));
-    Assert.That(restored.Height, Is.EqualTo(240));
+    Assert.That(restored.Width, Is.EqualTo(AtariFalconFile.PixelWidth));
+    Assert.That(restored.Height, Is.EqualTo(AtariFalconFile.PixelHeight));
     Assert.That(restored.PixelData, Is.EqualTo(original.PixelData));
   }
 
@@ -82,14 +82,14 @@ public sealed class RoundTripTests {
   [Category("Integration")]
   public void RoundTrip_ViaRawImage_PureRed() {
     // Create an image with pixel (0,0) = pure red
-    var rgb24 = new byte[320 * 240 * 3];
+    var rgb24 = new byte[AtariFalconFile.PixelWidth * AtariFalconFile.PixelHeight * 3];
     rgb24[0] = 255;
     rgb24[1] = 0;
     rgb24[2] = 0;
 
     var raw = new RawImage {
-      Width = 320,
-      Height = 240,
+      Width = AtariFalconFile.PixelWidth,
+      Height = AtariFalconFile.PixelHeight,
       Format = PixelFormat.Rgb24,
       PixelData = rgb24,
     };
@@ -106,14 +106,14 @@ public sealed class RoundTripTests {
   [Test]
   [Category("Integration")]
   public void RoundTrip_ViaRawImage_PureGreen() {
-    var rgb24 = new byte[320 * 240 * 3];
+    var rgb24 = new byte[AtariFalconFile.PixelWidth * AtariFalconFile.PixelHeight * 3];
     rgb24[0] = 0;
     rgb24[1] = 255;
     rgb24[2] = 0;
 
     var raw = new RawImage {
-      Width = 320,
-      Height = 240,
+      Width = AtariFalconFile.PixelWidth,
+      Height = AtariFalconFile.PixelHeight,
       Format = PixelFormat.Rgb24,
       PixelData = rgb24,
     };
@@ -130,14 +130,14 @@ public sealed class RoundTripTests {
   [Test]
   [Category("Integration")]
   public void RoundTrip_ViaRawImage_PureBlue() {
-    var rgb24 = new byte[320 * 240 * 3];
+    var rgb24 = new byte[AtariFalconFile.PixelWidth * AtariFalconFile.PixelHeight * 3];
     rgb24[0] = 0;
     rgb24[1] = 0;
     rgb24[2] = 255;
 
     var raw = new RawImage {
-      Width = 320,
-      Height = 240,
+      Width = AtariFalconFile.PixelWidth,
+      Height = AtariFalconFile.PixelHeight,
       Format = PixelFormat.Rgb24,
       PixelData = rgb24,
     };
@@ -155,14 +155,14 @@ public sealed class RoundTripTests {
   public void RoundTrip_ViaRawImage_Rgb565Precision() {
     // Verify RGB565 round-trip for a value that loses precision
     // R=200 => 200>>3 = 25 => (25<<3)|(25>>2) = 200+6 = 206
-    var rgb24 = new byte[320 * 240 * 3];
+    var rgb24 = new byte[AtariFalconFile.PixelWidth * AtariFalconFile.PixelHeight * 3];
     rgb24[0] = 200;
     rgb24[1] = 100;
     rgb24[2] = 50;
 
     var raw = new RawImage {
-      Width = 320,
-      Height = 240,
+      Width = AtariFalconFile.PixelWidth,
+      Height = AtariFalconFile.PixelHeight,
       Format = PixelFormat.Rgb24,
       PixelData = rgb24,
     };
@@ -181,7 +181,7 @@ public sealed class RoundTripTests {
   [Test]
   [Category("Integration")]
   public void RoundTrip_ViaRawImage_Gradient() {
-    var rgb24 = new byte[320 * 240 * 3];
+    var rgb24 = new byte[AtariFalconFile.PixelWidth * AtariFalconFile.PixelHeight * 3];
     for (var i = 0; i < 320 * 240; ++i) {
       rgb24[i * 3] = (byte)(i % 256);
       rgb24[i * 3 + 1] = (byte)((i * 2) % 256);
@@ -189,8 +189,8 @@ public sealed class RoundTripTests {
     }
 
     var raw = new RawImage {
-      Width = 320,
-      Height = 240,
+      Width = AtariFalconFile.PixelWidth,
+      Height = AtariFalconFile.PixelHeight,
       Format = PixelFormat.Rgb24,
       PixelData = rgb24,
     };
@@ -198,10 +198,10 @@ public sealed class RoundTripTests {
     var file = AtariFalconFile.FromRawImage(raw);
     var rawBack = AtariFalconFile.ToRawImage(file);
 
-    Assert.That(rawBack.Width, Is.EqualTo(320));
-    Assert.That(rawBack.Height, Is.EqualTo(240));
+    Assert.That(rawBack.Width, Is.EqualTo(AtariFalconFile.PixelWidth));
+    Assert.That(rawBack.Height, Is.EqualTo(AtariFalconFile.PixelHeight));
     Assert.That(rawBack.Format, Is.EqualTo(PixelFormat.Rgb24));
-    Assert.That(rawBack.PixelData.Length, Is.EqualTo(320 * 240 * 3));
+    Assert.That(rawBack.PixelData.Length, Is.EqualTo(AtariFalconFile.PixelWidth * AtariFalconFile.PixelHeight * 3));
   }
 
   [Test]
