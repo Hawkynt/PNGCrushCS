@@ -39,11 +39,27 @@ public readonly record struct JpegFile :
     if (file.RgbPixelData == null)
       throw new ArgumentException("RgbPixelData must not be null. Ensure the JPEG was decoded before conversion.", nameof(file));
 
+    // The decoder spreads a grey picture to three equal channels, so the data is RGB whatever the
+    // picture was. Declaring it Gray8 while handing over triplets made every grey JPEG come out
+    // stretched three times across and cut to its left third — the values were right, so nothing
+    // that looked only at pixel zero could see it.
+    if (!file.IsGrayscale)
+      return new() {
+        Width = file.Width,
+        Height = file.Height,
+        Format = PixelFormat.Rgb24,
+        PixelData = file.RgbPixelData[..],
+      };
+
+    var gray = new byte[file.Width * file.Height];
+    for (var i = 0; i < gray.Length && i * 3 < file.RgbPixelData.Length; ++i)
+      gray[i] = file.RgbPixelData[i * 3];
+
     return new() {
       Width = file.Width,
       Height = file.Height,
-      Format = file.IsGrayscale ? PixelFormat.Gray8 : PixelFormat.Rgb24,
-      PixelData = file.RgbPixelData[..],
+      Format = PixelFormat.Gray8,
+      PixelData = gray,
     };
   }
 
