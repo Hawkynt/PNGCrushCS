@@ -42,21 +42,12 @@ public sealed class ImageMagickCorpusTests {
       Assert.Ignore("Set IMAGEMAGICK_CORPUS to a directory of reference samples.");
 
     var extension = Path.GetExtension(path!);
-    var format = FormatRegistry.DetectFromExtension(extension);
-    if (format == ImageFormat.Unknown)
+    if (FormatRegistry.DetectCandidatesFromExtension(extension).Count == 0)
       Assert.Ignore($"{extension} is not registered.");
 
-    var entry = FormatRegistry.GetEntry(format);
-    if (entry?.LoadRawImage == null)
-      Assert.Ignore($"{format} has no reader.");
-
-    RawImage? image;
-    try {
-      image = entry.LoadRawImage(new FileInfo(path!));
-    } catch (Exception failure) {
-      Assert.Fail($"{extension}: {failure.GetType().Name}: {failure.Message}");
-      return;
-    }
+    // Read the way a caller would, which tries magic bytes and then every format the extension
+    // names — an extension shared by several formats resolves only by trying them.
+    var image = FormatRegistry.Read(new FileInfo(path!));
 
     Assert.That(image, Is.Not.Null, $"{extension}: reader returned nothing");
     Assert.Multiple(() => {

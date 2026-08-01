@@ -20,6 +20,26 @@ public static class FormatRegistry {
 
   private static readonly Dictionary<ImageFormat, FormatEntry> _byFormat = new();
   private static readonly Dictionary<string, ImageFormat> _byExtension = new(StringComparer.OrdinalIgnoreCase);
+
+  /// <summary>Every format that claims an extension, in registration order.</summary>
+  /// <remarks>
+  /// An extension does not name a format. Fifty-odd of them here are claimed by two or more — .pbm
+  /// is both an Amiga IFF chunk and a Netpbm bitmap, .iff is six different things — and keeping
+  /// only the first meant every other reader for that extension was unreachable, however correct
+  /// it was. Holding all of them lets a caller try each against the actual bytes, which is what
+  /// tells them apart.
+  /// </remarks>
+  private static readonly Dictionary<string, List<ImageFormat>> _candidatesByExtension = new(StringComparer.OrdinalIgnoreCase);
+
+  private static void _AddExtension(string extension, ImageFormat format) {
+    _byExtension.TryAdd(extension, format);
+
+    if (!_candidatesByExtension.TryGetValue(extension, out var candidates))
+      _candidatesByExtension[extension] = candidates = [];
+
+    if (!candidates.Contains(format))
+      candidates.Add(format);
+  }
   private static readonly Dictionary<string, ImageFormat> _byMimeType = new(StringComparer.OrdinalIgnoreCase);
   private static SignatureEntry[] _signatureEntries = Array.Empty<SignatureEntry>();
   private static readonly List<SignatureEntry> _detectionOnlyEntries = new();
@@ -38,14 +58,14 @@ public static class FormatRegistry {
 
   internal static void Register(FormatEntry entry) {
     if (entry.Format != ImageFormat.Unknown) _byFormat.TryAdd(entry.Format, entry);
-    foreach (var ext in entry.AllExtensions) _byExtension.TryAdd(ext, entry.Format);
+    foreach (var ext in entry.AllExtensions) _AddExtension(ext, entry.Format);
     foreach (var mime in entry.MimeTypes) _byMimeType.TryAdd(mime, entry.Format);
   }
 
   internal static void RegisterDetectionOnly(
     ImageFormat format, string name, string[] extensions, string[] mimeTypes,
     MagicSignature[] magicSignatures, Func<byte[], bool?>? matchesSignature, int detectionPriority) {
-    foreach (var ext in extensions) _byExtension.TryAdd(ext, format);
+    foreach (var ext in extensions) _AddExtension(ext, format);
     foreach (var mime in mimeTypes) _byMimeType.TryAdd(mime, format);
     _detectionOnlyEntries.Add(new(format, magicSignatures, matchesSignature, detectionPriority));
   }
@@ -261,6 +281,20 @@ public static class FormatRegistry {
     return _byExtension.GetValueOrDefault(key);
   }
 
+  /// <summary>Every format that claims an extension, most-recently-registered last.</summary>
+  /// <remarks>
+  /// Use this rather than <see cref="DetectFromExtension"/> when the bytes are available: an
+  /// extension shared by several formats can only be resolved by trying them.
+  /// </remarks>
+  public static IReadOnlyList<ImageFormat> DetectCandidatesFromExtension(string extension) {
+    if (string.IsNullOrEmpty(extension))
+      return [];
+
+    var key = extension[0] == '.' ? extension : "." + extension;
+
+    return _candidatesByExtension.GetValueOrDefault(key) ?? (IReadOnlyList<ImageFormat>)[];
+  }
+
   /// <summary>Identify a format from a MIME type string (e.g. <c>"image/png"</c>). Case-insensitive.</summary>
   public static ImageFormat DetectFromMimeType(string mimeType) {
     if (string.IsNullOrEmpty(mimeType)) return ImageFormat.Unknown;
@@ -319,9 +353,21 @@ public static class FormatRegistry {
   /// <summary>Read a file of any supported format, returning a platform-independent <see cref="RawImage"/>.
   /// Returns <c>null</c> if the format isn't recognized or decoding fails.</summary>
   public static RawImage? Read(FileInfo file) {
-    var fmt = DetectFromFile(file);
-    var entry = GetEntry(fmt);
-    return entry?.LoadRawImage(file);
+    if (file == null || !file.Exists)
+      return null;
+
+    // Magic bytes first: they describe the file rather than its name.
+    var byMagic = DetectFromBytes(File.ReadAllBytes(file.FullName));
+    if (byMagic != ImageFormat.Unknown && GetEntry(byMagic)?.LoadRawImage(file) is { } decoded)
+      return decoded;
+
+    // Then every format the extension names, in turn. One extension can belong to several formats
+    // that share nothing, so the only way to tell them apart is to let each try the bytes.
+    foreach (var candidate in DetectCandidatesFromExtension(file.Extension))
+      if (GetEntry(candidate)?.LoadRawImage(file) is { } image)
+        return image;
+
+    return null;
   }
 
   /// <summary>Read raw bytes of any supported format, returning a <see cref="RawImage"/>.
