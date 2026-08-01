@@ -25,26 +25,29 @@ internal static class MiffHeaderParser {
         lineEnd = text.Length;
 
       var line = text.Substring(offset, lineEnd - offset).TrimEnd('\r');
-      offset = lineEnd + 1;
 
-      if (line == ":") {
+      // The header ends at a colon, and the colon is not alone on its line: a writer emits a form
+      // feed, a newline, the colon and then the control byte, with the samples following it
+      // immediately. Looking for a line equal to ":" therefore reads the colon together with the
+      // whole binary payload and never matches.
+      var colon = line.IndexOf(':');
+      if (colon >= 0 && line[..colon].TrimEnd('\f', ' ', '\t').Length == 0) {
+        offset += colon + 1;
         foundTerminator = true;
         break;
       }
 
-      var eqIdx = line.IndexOf('=');
-      if (eqIdx > 0) {
-        var key = line.Substring(0, eqIdx).Trim();
-        var value = line.Substring(eqIdx + 1).Trim();
-        result[key] = value;
-      }
+      offset = lineEnd + 1;
+
+      _ReadFields(line, result);
     }
 
     if (!foundTerminator)
       throw new InvalidDataException("MIFF header terminator ':' not found.");
 
-    // The 0x1A byte follows the terminator line
-    if (offset < data.Length && data[offset] == _TERMINATOR_BYTE)
+    // What follows the colon varies: a writer may put the control byte straight after it, or end
+    // the line first. Skipping either leaves the samples in both cases.
+    while (offset < data.Length && data[offset] is (byte)'\r' or (byte)'\n' or _TERMINATOR_BYTE)
       ++offset;
 
     dataOffset = offset;
@@ -79,5 +82,50 @@ internal static class MiffHeaderParser {
     result[headerBytes.Length] = _TERMINATOR_BYTE;
 
     return result;
+  }
+
+  /// <summary>Reads every key and value on one header line.</summary>
+  /// <remarks>
+  /// A line carries as many pairs as fit — <c>columns=13 rows=7 depth=16</c> is one line, not
+  /// three — so a parser that splits on the first equals sign takes the rest of the line as one
+  /// value and loses every field after the first.
+  /// <para/>
+  /// A value ordinarily runs to the next space, but one wrapped in braces may contain them, which
+  /// is how a comment or a text chunk is carried.
+  /// </remarks>
+  private static void _ReadFields(string line, Dictionary<string, string> into) {
+    var at = 0;
+    while (at < line.Length) {
+      while (at < line.Length && char.IsWhiteSpace(line[at]))
+        ++at;
+
+      var keyStart = at;
+      while (at < line.Length && line[at] != '=' && !char.IsWhiteSpace(line[at]))
+        ++at;
+
+      if (at >= line.Length || line[at] != '=' || at == keyStart)
+        return;
+
+      var key = line[keyStart..at];
+      ++at;
+
+      string value;
+      if (at < line.Length && line[at] == '{') {
+        var close = line.IndexOf('}', at);
+        if (close < 0)
+          return;
+
+        value = line[(at + 1)..close];
+        at = close + 1;
+      } else {
+        var valueStart = at;
+        while (at < line.Length && !char.IsWhiteSpace(line[at]))
+          ++at;
+
+        value = line[valueStart..at];
+      }
+
+      into[key] = value;
+    }
   }
 }
