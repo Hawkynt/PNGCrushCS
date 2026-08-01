@@ -57,6 +57,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.Uimg, "UIMG", 320, 200, ".bp1"),
     new(ImageFormat.McPainter, "McPainter", 320, 200, ".mcp"),
     new(ImageFormat.JetGraphicsPlanner, "Jet Graphics Planner", 256, 64, ".jgp"),
+    new(ImageFormat.AsciiMaker, "ASCII maker", 320, 192, ".asc"),
     new(ImageFormat.Doodle, "Doodle", 320, 200),
     new(ImageFormat.HiPicCreator, "Hi-Pic Creator", 320, 200),
     new(ImageFormat.HiresC64, "Hires-Bitmap", 320, 200, ".hbm"),

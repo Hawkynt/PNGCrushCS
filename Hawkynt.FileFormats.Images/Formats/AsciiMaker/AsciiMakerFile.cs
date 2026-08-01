@@ -16,7 +16,10 @@ namespace FileFormat.AsciiMaker;
 /// luminance 14.
 /// </remarks>
 public readonly record struct AsciiMakerFile
-  : IImageFormatReader<AsciiMakerFile>, IImageToRawImage<AsciiMakerFile> {
+  : IImageFormatReader<AsciiMakerFile>, IImageToRawImage<AsciiMakerFile>,
+    IImageFromRawImage<AsciiMakerFile>, IImageFormatWriter<AsciiMakerFile> {
+
+  static byte[] IImageFormatWriter<AsciiMakerFile>.ToBytes(AsciiMakerFile file) => AsciiMakerWriter.ToBytes(file);
 
   /// <summary>Characters across.</summary>
   public const int Columns = 40;
@@ -97,5 +100,41 @@ public readonly record struct AsciiMakerFile
       Palette = palette,
       PaletteCount = 2,
     };
+  }
+
+  /// <summary>Builds a screen out of the character set, using its inverses as well.</summary>
+  /// <remarks>
+  /// A code's top bit inverts the glyph it names, which doubles what the set can draw for nothing.
+  /// Rather than matching against the hundred and twenty-eight shapes and then deciding separately
+  /// whether to invert, the inverses are built as shapes of their own — the code that comes out of
+  /// the match is then already the byte the file wants.
+  /// <para/>
+  /// The two colours are fixed by the mode rather than chosen, so all that is decided is which side
+  /// of the pair each pixel falls on.
+  /// </remarks>
+  public static AsciiMakerFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var wanted = BilevelRows.Threshold(image.SampleTo(Width, Height), setWhenDark: !_ForegroundIsDark());
+    var withInverses = new byte[GlyphCount * 2 * GlyphHeight];
+
+    Font[..(GlyphCount * GlyphHeight)].CopyTo(withInverses);
+    for (var i = 0; i < GlyphCount * GlyphHeight; ++i)
+      withInverses[GlyphCount * GlyphHeight + i] = (byte)~Font[i];
+
+    return new() {
+      Characters = CharacterRoms.MatchGlyphs(wanted, Columns, Rows, withInverses, GlyphCount * 2),
+    };
+  }
+
+  /// <summary>Whether the colour a set bit draws is the darker of the two.</summary>
+  private static bool _ForegroundIsDark() {
+    var gtia = Atari8BitGraphics.Palette;
+    var (background, foreground) = Colors;
+
+    var backgroundLevel = gtia[background * 3] + gtia[background * 3 + 1] + gtia[background * 3 + 2];
+    var foregroundLevel = gtia[foreground * 3] + gtia[foreground * 3 + 1] + gtia[foreground * 3 + 2];
+
+    return foregroundLevel < backgroundLevel;
   }
 }
