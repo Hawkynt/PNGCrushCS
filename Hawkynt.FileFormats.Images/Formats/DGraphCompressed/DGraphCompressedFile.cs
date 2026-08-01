@@ -15,7 +15,11 @@ namespace FileFormat.DGraphCompressed;
 /// interlacing buys the mixtures between sixteen colours rather than more of them.
 /// </remarks>
 public readonly record struct DGraphCompressedFile
-  : IImageFormatReader<DGraphCompressedFile>, IImageToRawImage<DGraphCompressedFile> {
+  : IImageFormatReader<DGraphCompressedFile>, IImageToRawImage<DGraphCompressedFile>,
+    IImageFromRawImage<DGraphCompressedFile>, IImageFormatWriter<DGraphCompressedFile> {
+
+  static byte[] IImageFormatWriter<DGraphCompressedFile>.ToBytes(DGraphCompressedFile file)
+    => DGraphCompressedWriter.ToBytes(file);
 
   /// <summary>Pixels across.</summary>
   public const int Width = 320;
@@ -65,5 +69,35 @@ public readonly record struct DGraphCompressedFile
       Format = PixelFormat.Rgb24,
       PixelData = FrameBlend.Average(first, second),
     };
+  }
+
+  /// <summary>Builds a picture, putting the same screen in both blocks.</summary>
+  public static DGraphCompressedFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(Width, Height);
+    var quantized = ColorQuantizer.Quantize(
+      PixelConverter.Convert(rgb, PixelFormat.Bgra32).PixelData, Width * Height, ColorCount);
+
+    var indices = new byte[Width * Height];
+    for (var i = 0; i < indices.Length; ++i)
+      indices[i] = (byte)quantized.Indices[i];
+
+    var palette = new byte[PaletteSize];
+    var stPalette = PlanarConverter.RgbToStPalette(quantized.Palette, ColorCount);
+    for (var i = 0; i < ColorCount; ++i) {
+      palette[i * 2] = (byte)(stPalette[i] >> 8);
+      palette[i * 2 + 1] = (byte)stPalette[i];
+    }
+
+    var screen = AtariStGraphics.PackBitplanes(
+      indices, AtariStGraphics.BytesPerRow(Width, Planes), Planes, Width, Height);
+
+    var screens = new byte[ScreenSize * 2];
+    var length = Math.Min(screen.Length, ScreenSize);
+    screen.AsSpan(0, length).CopyTo(screens);
+    screen.AsSpan(0, length).CopyTo(screens.AsSpan(ScreenSize));
+
+    return new() { ScreenData = screens, Palette = palette };
   }
 }
