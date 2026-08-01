@@ -17,7 +17,14 @@ public readonly record struct HdrFile : IImageFormatReader<HdrFile>, IImageToRaw
   public float Exposure { get; init; }
   public float[] PixelData { get; init; }
 
-  /// <summary>Converts this HDR image to a 16-bit <see cref="RawImage"/> using Reinhard tone mapping with exposure.</summary>
+  /// <summary>Converts this HDR image to a 16-bit <see cref="RawImage"/>, scaled by the file's exposure.</summary>
+  /// <remarks>
+  /// This used to put a Reinhard curve over the result, which halves everything at full scale and
+  /// darkens the rest by varying amounts — a picture that should have come out fully blue came out
+  /// half blue. Tone mapping is a decision about how to show a high range on a low one, and it is
+  /// not the decoder's to make: what the file holds is radiance, and anything above the range is
+  /// clipped rather than rolled off. A caller that wants a curve can apply one to the result.
+  /// </remarks>
   public static RawImage ToRawImage(HdrFile file) {
     var width = file.Width;
     var height = file.Height;
@@ -30,8 +37,7 @@ public readonly record struct HdrFile : IImageFormatReader<HdrFile>, IImageToRaw
       var di = i * 6;
       for (var c = 0; c < 3; ++c) {
         var v = Math.Max(src[si + c] * exposure, 0f);
-        var mapped = v / (1f + v);
-        var u16 = (ushort)Math.Clamp(mapped * 65535f, 0, 65535);
+        var u16 = (ushort)Math.Clamp(v * 65535f, 0, 65535);
         result[di + c * 2] = (byte)(u16 >> 8);
         result[di + c * 2 + 1] = (byte)u16;
       }

@@ -21,6 +21,56 @@ public sealed class CineonFile :
   public byte[] PixelData { get; init; } = [];
 
   /// <summary>Converts a Cineon image to a 16-bit <see cref="RawImage"/> by scaling 10-bit values to Rgb48.</summary>
+  /// <summary>Reference white: the code that stands for a fully exposed frame.</summary>
+  private const int _ReferenceWhite = 685;
+
+  /// <summary>Reference black: below this the negative holds nothing.</summary>
+  private const int _ReferenceBlack = 95;
+
+  /// <summary>
+  /// How many codes it takes to move one decade of density: 0.002 density a code over a gamma of
+  /// 0.6, which is 300 codes for a factor of ten in light.
+  /// </summary>
+  private const double _CodesPerDecade = 300.0;
+
+  private static readonly ushort[] _DensityToDisplay = _BuildDensityTable();
+
+  /// <summary>Turns one printing-density code into a display-referred sample.</summary>
+  /// <remarks>
+  /// A Cineon file holds printing density off a film negative, not light: the codes are logarithmic,
+  /// and the reference white sits at 685 rather than at the top of the range. Scaling them straight
+  /// on to the output — which is what this used to do — leaves the picture squashed into the middle
+  /// of the range with its contrast flattened, and no amount of looking at it alone shows that up.
+  /// </remarks>
+  private static ushort _FromPrintingDensity(int code)
+    => _DensityToDisplay[Math.Clamp(code, 0, 1023)];
+
+  private static ushort[] _BuildDensityTable() {
+    var table = new ushort[1024];
+
+    // The density at reference black is not zero light, so the range is rescaled to put it there.
+    // Without that the darkest part of a picture sits a visible step above black.
+    var atBlack = Math.Pow(10.0, (_ReferenceBlack - _ReferenceWhite) / _CodesPerDecade);
+    var span = 1.0 - atBlack;
+
+    for (var code = _ReferenceBlack; code < table.Length; ++code) {
+      var linear = (Math.Pow(10.0, (code - _ReferenceWhite) / _CodesPerDecade) - atBlack) / span;
+      table[code] = (ushort)Math.Clamp(_ToDisplay(linear) * 65535.0 + 0.5, 0, 65535);
+    }
+
+    return table;
+  }
+
+  /// <summary>The sRGB transfer, which is what everything else in this tree holds.</summary>
+  private static double _ToDisplay(double linear) {
+    if (linear <= 0.0)
+      return 0.0;
+    if (linear >= 1.0)
+      return 1.0;
+
+    return linear <= 0.0031308 ? linear * 12.92 : 1.055 * Math.Pow(linear, 1.0 / 2.4) - 0.055;
+  }
+
   public static RawImage ToRawImage(CineonFile file) {
     // Ten bits packed three to a word is what the format was made for, but eight and sixteen are
     // both written in practice and neither needs unpacking — the samples are already whole bytes.
@@ -39,9 +89,9 @@ public sealed class CineonFile :
     for (var i = 0; i < pixelCount; ++i) {
       var offset = i * 4;
       var word = (uint)(src[offset] << 24 | src[offset + 1] << 16 | src[offset + 2] << 8 | src[offset + 3]);
-      var r = (ushort)(((word >> 22) & 0x3FF) * 65535 / 1023);
-      var g = (ushort)(((word >> 12) & 0x3FF) * 65535 / 1023);
-      var b = (ushort)(((word >> 2) & 0x3FF) * 65535 / 1023);
+      var r = _FromPrintingDensity((int)((word >> 22) & 0x3FF));
+      var g = _FromPrintingDensity((int)((word >> 12) & 0x3FF));
+      var b = _FromPrintingDensity((int)((word >> 2) & 0x3FF));
       var di = i * 6;
       result[di] = (byte)(r >> 8);
       result[di + 1] = (byte)r;
@@ -101,19 +151,34 @@ public sealed class CineonFile :
   /// two bits left over. Eight and sixteen need none of that, so they are read straight; the format
   /// stores the wide ones most significant byte first, whatever the machine.
   /// </remarks>
+  /// <summary>Reads the depths whose samples are already whole bytes, density and all.</summary>
+  /// <remarks>
+  /// The codes are printing density whatever their width, so they go through the same curve as the
+  /// packed ten-bit ones — scaled into that range first, since the curve is defined against it.
+  /// </remarks>
   private static RawImage _FromWholeBytes(CineonFile file) {
     var count = file.Width * file.Height * 3;
-    var bytesPerSample = file.BitsPerSample / 8;
     var source = file.PixelData;
-    var pixels = new byte[count * bytesPerSample];
+    var isDeep = file.BitsPerSample == 16;
+    var pixels = new byte[count * 2];
 
-    var available = Math.Min(pixels.Length, source.Length);
-    source.AsSpan(0, available).CopyTo(pixels);
+    for (var i = 0; i < count; ++i) {
+      var at = isDeep ? i * 2 : i;
+      if (at + (isDeep ? 1 : 0) >= source.Length)
+        break;
+
+      var raw = isDeep ? (source[at] << 8) | source[at + 1] : source[at];
+      var code = raw * 1023 / (isDeep ? 65535 : 255);
+      var value = _FromPrintingDensity(code);
+
+      pixels[i * 2] = (byte)(value >> 8);
+      pixels[i * 2 + 1] = (byte)value;
+    }
 
     return new() {
       Width = file.Width,
       Height = file.Height,
-      Format = bytesPerSample == 2 ? PixelFormat.Rgb48 : PixelFormat.Rgb24,
+      Format = PixelFormat.Rgb48,
       PixelData = pixels,
     };
   }
