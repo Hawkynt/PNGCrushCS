@@ -28,7 +28,7 @@ public readonly record struct AtariGr7File : IImageFormatReader<AtariGr7File>, I
   static string[] IImageFormatMetadata<AtariGr7File>.FileExtensions => [".gr7"];
   static AtariGr7File IImageFormatReader<AtariGr7File>.FromSpan(ReadOnlySpan<byte> data) => AtariGr7Reader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<AtariGr7File>.VideoModes => [
-    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 4)])
+    new("Default", [(160, 96)], [new IntegerRange(2, 4)])
   ];
   static byte[] IImageFormatWriter<AtariGr7File>.ToBytes(AtariGr7File file) => AtariGr7Writer.ToBytes(file);
 

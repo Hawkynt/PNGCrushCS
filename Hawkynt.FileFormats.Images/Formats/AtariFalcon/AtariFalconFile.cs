@@ -12,6 +12,11 @@ public readonly record struct AtariFalconFile : IImageFormatReader<AtariFalconFi
   static string IImageFormatMetadata<AtariFalconFile>.PrimaryExtension => ".ftc";
   static string[] IImageFormatMetadata<AtariFalconFile>.FileExtensions => [".ftc"];
   static AtariFalconFile IImageFormatReader<AtariFalconFile>.FromSpan(ReadOnlySpan<byte> data) => AtariFalconReader.FromSpan(data);
+
+  /// <summary>The one size this format holds, which its writer accepts and no other.</summary>
+  static VideoMode[] IImageFormatMetadata<AtariFalconFile>.VideoModes => [
+    new("Default", [(320, 240)]),
+  ];
   static byte[] IImageFormatWriter<AtariFalconFile>.ToBytes(AtariFalconFile file) => AtariFalconWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>

@@ -10,7 +10,7 @@ public readonly record struct CoCoFile : IImageFormatReader<CoCoFile>, IImageToR
   static string[] IImageFormatMetadata<CoCoFile>.FileExtensions => [".coc"];
   static CoCoFile IImageFormatReader<CoCoFile>.FromSpan(ReadOnlySpan<byte> data) => CoCoReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<CoCoFile>.VideoModes => [
-    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])
+    new("Default", [(256, 192)], [2])
   ];
   static byte[] IImageFormatWriter<CoCoFile>.ToBytes(CoCoFile file) => CoCoWriter.ToBytes(file);
 

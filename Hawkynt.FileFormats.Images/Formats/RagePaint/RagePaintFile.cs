@@ -12,6 +12,11 @@ public readonly record struct RagePaintFile : IImageFormatReader<RagePaintFile>,
   static string IImageFormatMetadata<RagePaintFile>.PrimaryExtension => ".rge";
   static string[] IImageFormatMetadata<RagePaintFile>.FileExtensions => [".rge"];
   static RagePaintFile IImageFormatReader<RagePaintFile>.FromSpan(ReadOnlySpan<byte> data) => RagePaintReader.FromSpan(data);
+
+  /// <summary>The one size this format holds, which its writer accepts and no other.</summary>
+  static VideoMode[] IImageFormatMetadata<RagePaintFile>.VideoModes => [
+    new("Default", [(320, 240)]),
+  ];
   static byte[] IImageFormatWriter<RagePaintFile>.ToBytes(RagePaintFile file) => RagePaintWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>

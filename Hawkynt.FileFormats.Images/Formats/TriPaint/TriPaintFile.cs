@@ -12,6 +12,11 @@ public readonly record struct TriPaintFile : IImageFormatReader<TriPaintFile>, I
   static string IImageFormatMetadata<TriPaintFile>.PrimaryExtension => ".tpf";
   static string[] IImageFormatMetadata<TriPaintFile>.FileExtensions => [".tpf"];
   static TriPaintFile IImageFormatReader<TriPaintFile>.FromSpan(ReadOnlySpan<byte> data) => TriPaintReader.FromSpan(data);
+
+  /// <summary>The one size this format holds, which its writer accepts and no other.</summary>
+  static VideoMode[] IImageFormatMetadata<TriPaintFile>.VideoModes => [
+    new("Default", [(320, 240)]),
+  ];
   static byte[] IImageFormatWriter<TriPaintFile>.ToBytes(TriPaintFile file) => TriPaintWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>

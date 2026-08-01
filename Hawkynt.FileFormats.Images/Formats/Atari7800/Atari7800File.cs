@@ -20,7 +20,7 @@ public sealed class Atari7800File : IImageFormatReader<Atari7800File>, IImageToR
   public static string[] FileExtensions => [".a78", ".a7800"];
   static Atari7800File IImageFormatReader<Atari7800File>.FromSpan(ReadOnlySpan<byte> data) => Atari7800Reader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<Atari7800File>.VideoModes => [
-    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 4)])
+    new("Default", [(160, 240)], [new IntegerRange(2, 4)])
   ];
   public static Atari7800File FromFile(FileInfo file) => Atari7800Reader.FromFile(file);
   public static Atari7800File FromBytes(byte[] data) => Atari7800Reader.FromBytes(data);

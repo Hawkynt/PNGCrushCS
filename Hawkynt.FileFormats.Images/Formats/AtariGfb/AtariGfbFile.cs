@@ -22,7 +22,7 @@ public readonly record struct AtariGfbFile : IImageFormatReader<AtariGfbFile>, I
   static string[] IImageFormatMetadata<AtariGfbFile>.FileExtensions => [".gfb"];
   static AtariGfbFile IImageFormatReader<AtariGfbFile>.FromSpan(ReadOnlySpan<byte> data) => AtariGfbReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<AtariGfbFile>.VideoModes => [
-    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])
+    new("Default", [(320, 192)], [2])
   ];
   static byte[] IImageFormatWriter<AtariGfbFile>.ToBytes(AtariGfbFile file) => AtariGfbWriter.ToBytes(file);
 

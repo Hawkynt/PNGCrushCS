@@ -15,7 +15,7 @@ public readonly record struct JupiterAceFile : IImageFormatReader<JupiterAceFile
   static string IImageFormatMetadata<JupiterAceFile>.PrimaryExtension => ".jac";
   static string[] IImageFormatMetadata<JupiterAceFile>.FileExtensions => [".jac", ".ace"];
   static JupiterAceFile IImageFormatReader<JupiterAceFile>.FromSpan(ReadOnlySpan<byte> data) => JupiterAceReader.FromSpan(data);
-  static VideoMode[] IImageFormatMetadata<JupiterAceFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
+  static VideoMode[] IImageFormatMetadata<JupiterAceFile>.VideoModes => [new("Default", [(256, 192)], [2])];
   static byte[] IImageFormatWriter<JupiterAceFile>.ToBytes(JupiterAceFile file) => JupiterAceWriter.ToBytes(file);
 
   public int Width => FixedWidth;

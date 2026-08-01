@@ -22,7 +22,7 @@ public readonly record struct AtariAnimationFile : IImageFormatReader<AtariAnima
   static string[] IImageFormatMetadata<AtariAnimationFile>.FileExtensions => [".aan"];
   static AtariAnimationFile IImageFormatReader<AtariAnimationFile>.FromSpan(ReadOnlySpan<byte> data) => AtariAnimationReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<AtariAnimationFile>.VideoModes => [
-    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])
+    new("Default", [(320, 192)], [2])
   ];
   static byte[] IImageFormatWriter<AtariAnimationFile>.ToBytes(AtariAnimationFile file) => AtariAnimationWriter.ToBytes(file);
 

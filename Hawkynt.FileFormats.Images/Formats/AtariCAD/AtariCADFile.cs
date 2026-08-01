@@ -22,7 +22,7 @@ public readonly record struct AtariCADFile : IImageFormatReader<AtariCADFile>, I
   static string[] IImageFormatMetadata<AtariCADFile>.FileExtensions => [".acd"];
   static AtariCADFile IImageFormatReader<AtariCADFile>.FromSpan(ReadOnlySpan<byte> data) => AtariCADReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<AtariCADFile>.VideoModes => [
-    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])
+    new("Default", [(320, 192)], [2])
   ];
   static byte[] IImageFormatWriter<AtariCADFile>.ToBytes(AtariCADFile file) => AtariCADWriter.ToBytes(file);
 

@@ -16,7 +16,7 @@ public readonly record struct EpaBiosFile : IImageFormatReader<EpaBiosFile>, IIm
   static string[] IImageFormatMetadata<EpaBiosFile>.FileExtensions => [".epa"];
   static EpaBiosFile IImageFormatReader<EpaBiosFile>.FromSpan(ReadOnlySpan<byte> data) => EpaBiosReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<EpaBiosFile>.VideoModes => [
-    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [16])
+    new("Default", [(136, 84)], [16])
   ];
   static byte[] IImageFormatWriter<EpaBiosFile>.ToBytes(EpaBiosFile file) => EpaBiosWriter.ToBytes(file);
 

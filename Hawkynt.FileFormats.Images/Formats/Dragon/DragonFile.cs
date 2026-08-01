@@ -16,7 +16,7 @@ public readonly record struct DragonFile : IImageFormatReader<DragonFile>, IImag
   static string[] IImageFormatMetadata<DragonFile>.FileExtensions => [".dgn"];
   static DragonFile IImageFormatReader<DragonFile>.FromSpan(ReadOnlySpan<byte> data) => DragonReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<DragonFile>.VideoModes => [
-    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])
+    new("Default", [(256, 192)], [2])
   ];
   static byte[] IImageFormatWriter<DragonFile>.ToBytes(DragonFile file) => DragonWriter.ToBytes(file);
 

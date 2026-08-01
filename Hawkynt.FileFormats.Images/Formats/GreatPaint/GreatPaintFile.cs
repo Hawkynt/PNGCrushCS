@@ -25,7 +25,7 @@ public readonly record struct GreatPaintFile : IImageFormatReader<GreatPaintFile
   static string[] IImageFormatMetadata<GreatPaintFile>.FileExtensions => [".gpt"];
   static GreatPaintFile IImageFormatReader<GreatPaintFile>.FromSpan(ReadOnlySpan<byte> data) => GreatPaintReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<GreatPaintFile>.VideoModes => [
-    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 4)])
+    new("Default", [(160, 192)], [new IntegerRange(2, 4)])
   ];
   static byte[] IImageFormatWriter<GreatPaintFile>.ToBytes(GreatPaintFile file) => GreatPaintWriter.ToBytes(file);
 

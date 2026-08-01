@@ -12,6 +12,11 @@ public readonly record struct FalconResFile : IImageFormatReader<FalconResFile>,
   static string IImageFormatMetadata<FalconResFile>.PrimaryExtension => ".frs";
   static string[] IImageFormatMetadata<FalconResFile>.FileExtensions => [".frs"];
   static FalconResFile IImageFormatReader<FalconResFile>.FromSpan(ReadOnlySpan<byte> data) => FalconResReader.FromSpan(data);
+
+  /// <summary>The one size this format holds, which its writer accepts and no other.</summary>
+  static VideoMode[] IImageFormatMetadata<FalconResFile>.VideoModes => [
+    new("Default", [(320, 240)]),
+  ];
   static byte[] IImageFormatWriter<FalconResFile>.ToBytes(FalconResFile file) => FalconResWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>

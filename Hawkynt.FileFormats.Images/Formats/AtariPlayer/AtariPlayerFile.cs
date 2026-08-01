@@ -31,7 +31,7 @@ public readonly record struct AtariPlayerFile : IImageFormatReader<AtariPlayerFi
   static string[] IImageFormatMetadata<AtariPlayerFile>.FileExtensions => [".pmg", ".plm"];
   static AtariPlayerFile IImageFormatReader<AtariPlayerFile>.FromSpan(ReadOnlySpan<byte> data) => AtariPlayerReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<AtariPlayerFile>.VideoModes => [
-    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])
+    new("Default", [(32, 256)], [2])
   ];
   static byte[] IImageFormatWriter<AtariPlayerFile>.ToBytes(AtariPlayerFile file) => AtariPlayerWriter.ToBytes(file);
 

@@ -16,7 +16,7 @@ public readonly record struct DoomFlatFile : IImageFormatReader<DoomFlatFile>, I
   static string[] IImageFormatMetadata<DoomFlatFile>.FileExtensions => [".flat"];
   static DoomFlatFile IImageFormatReader<DoomFlatFile>.FromSpan(ReadOnlySpan<byte> data) => DoomFlatReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<DoomFlatFile>.VideoModes => [
-    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [256], _FixedPalettes)
+    new("Default", [(64, 64)], [256], _FixedPalettes)
   ];
   static byte[] IImageFormatWriter<DoomFlatFile>.ToBytes(DoomFlatFile file) => DoomFlatWriter.ToBytes(file);
 

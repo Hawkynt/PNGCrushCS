@@ -15,7 +15,7 @@ public readonly record struct NokiaLogoFile : IImageFormatReader<NokiaLogoFile>,
   static string IImageFormatMetadata<NokiaLogoFile>.PrimaryExtension => ".nol";
   static string[] IImageFormatMetadata<NokiaLogoFile>.FileExtensions => [".nol", ".ngg"];
   static NokiaLogoFile IImageFormatReader<NokiaLogoFile>.FromSpan(ReadOnlySpan<byte> data) => NokiaLogoReader.FromSpan(data);
-  static VideoMode[] IImageFormatMetadata<NokiaLogoFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
+  static VideoMode[] IImageFormatMetadata<NokiaLogoFile>.VideoModes => [new("Default", [(72, 14)], [2])];
   static byte[] IImageFormatWriter<NokiaLogoFile>.ToBytes(NokiaLogoFile file) => NokiaLogoWriter.ToBytes(file);
 
   public int Width => FixedWidth;

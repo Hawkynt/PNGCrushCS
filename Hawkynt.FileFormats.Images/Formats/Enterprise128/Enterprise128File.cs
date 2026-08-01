@@ -20,7 +20,7 @@ public sealed class Enterprise128File : IImageFormatReader<Enterprise128File>, I
   public static string[] FileExtensions => [".ep", ".elan"];
   static Enterprise128File IImageFormatReader<Enterprise128File>.FromSpan(ReadOnlySpan<byte> data) => Enterprise128Reader.FromSpan(data);
   public static VideoMode[] VideoModes => [
-    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])
+    new("Default", [(512, 256)], [2])
   ];
   public static Enterprise128File FromFile(FileInfo file) => Enterprise128Reader.FromFile(file);
   public static Enterprise128File FromBytes(byte[] data) => Enterprise128Reader.FromBytes(data);

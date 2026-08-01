@@ -13,6 +13,11 @@ public readonly record struct HrzFile :
   static string IImageFormatMetadata<HrzFile>.PrimaryExtension => ".hrz";
   static string[] IImageFormatMetadata<HrzFile>.FileExtensions => [".hrz"];
   static HrzFile IImageFormatReader<HrzFile>.FromSpan(ReadOnlySpan<byte> data) => HrzReader.FromSpan(data);
+
+  /// <summary>The one size this format holds, which its writer accepts and no other.</summary>
+  static VideoMode[] IImageFormatMetadata<HrzFile>.VideoModes => [
+    new("Default", [(256, 240)]),
+  ];
   static byte[] IImageFormatWriter<HrzFile>.ToBytes(HrzFile file) => HrzWriter.ToBytes(file);
 
   /// <summary>Always 256.</summary>

@@ -25,6 +25,11 @@ public readonly record struct IndyPaintFile : IImageFormatReader<IndyPaintFile>,
   static string IImageFormatMetadata<IndyPaintFile>.PrimaryExtension => ".ipn";
   static string[] IImageFormatMetadata<IndyPaintFile>.FileExtensions => [".ipn", ".idy", ".tru"];
   static IndyPaintFile IImageFormatReader<IndyPaintFile>.FromSpan(ReadOnlySpan<byte> data) => IndyPaintReader.FromSpan(data);
+
+  /// <summary>The one size this format holds, which its writer accepts and no other.</summary>
+  static VideoMode[] IImageFormatMetadata<IndyPaintFile>.VideoModes => [
+    new("Default", [(320, 240)]),
+  ];
   static byte[] IImageFormatWriter<IndyPaintFile>.ToBytes(IndyPaintFile file) => IndyPaintWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>

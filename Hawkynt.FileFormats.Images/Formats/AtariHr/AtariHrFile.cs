@@ -22,7 +22,7 @@ public readonly record struct AtariHrFile : IImageFormatReader<AtariHrFile>, IIm
   static string[] IImageFormatMetadata<AtariHrFile>.FileExtensions => [".hr"];
   static AtariHrFile IImageFormatReader<AtariHrFile>.FromSpan(ReadOnlySpan<byte> data) => AtariHrReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<AtariHrFile>.VideoModes => [
-    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])
+    new("Default", [(320, 192)], [2])
   ];
   static byte[] IImageFormatWriter<AtariHrFile>.ToBytes(AtariHrFile file) => AtariHrWriter.ToBytes(file);
 

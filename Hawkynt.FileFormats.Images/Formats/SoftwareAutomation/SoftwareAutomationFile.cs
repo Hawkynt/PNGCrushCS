@@ -21,7 +21,7 @@ public readonly record struct SoftwareAutomationFile : IImageFormatReader<Softwa
   static string IImageFormatMetadata<SoftwareAutomationFile>.PrimaryExtension => ".sag";
   static string[] IImageFormatMetadata<SoftwareAutomationFile>.FileExtensions => [".sag", ".swa"];
   static SoftwareAutomationFile IImageFormatReader<SoftwareAutomationFile>.FromSpan(ReadOnlySpan<byte> data) => SoftwareAutomationReader.FromSpan(data);
-  static VideoMode[] IImageFormatMetadata<SoftwareAutomationFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
+  static VideoMode[] IImageFormatMetadata<SoftwareAutomationFile>.VideoModes => [new("Default", [(320, 192)], [2])];
   static byte[] IImageFormatWriter<SoftwareAutomationFile>.ToBytes(SoftwareAutomationFile file) => SoftwareAutomationWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>

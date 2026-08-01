@@ -12,6 +12,11 @@ public readonly record struct FalconPaintFile : IImageFormatReader<FalconPaintFi
   static string IImageFormatMetadata<FalconPaintFile>.PrimaryExtension => ".fpn";
   static string[] IImageFormatMetadata<FalconPaintFile>.FileExtensions => [".fpn"];
   static FalconPaintFile IImageFormatReader<FalconPaintFile>.FromSpan(ReadOnlySpan<byte> data) => FalconPaintReader.FromSpan(data);
+
+  /// <summary>The one size this format holds, which its writer accepts and no other.</summary>
+  static VideoMode[] IImageFormatMetadata<FalconPaintFile>.VideoModes => [
+    new("Default", [(320, 240)]),
+  ];
   static byte[] IImageFormatWriter<FalconPaintFile>.ToBytes(FalconPaintFile file) => FalconPaintWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>

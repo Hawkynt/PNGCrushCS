@@ -9,6 +9,11 @@ public readonly record struct ZxMulticolorFile : IImageFormatReader<ZxMulticolor
   static string IImageFormatMetadata<ZxMulticolorFile>.PrimaryExtension => ".mlt";
   static string[] IImageFormatMetadata<ZxMulticolorFile>.FileExtensions => [".mlt", ".mc"];
   static ZxMulticolorFile IImageFormatReader<ZxMulticolorFile>.FromSpan(ReadOnlySpan<byte> data) => ZxMulticolorReader.FromSpan(data);
+
+  /// <summary>The one size this format holds, which its writer accepts and no other.</summary>
+  static VideoMode[] IImageFormatMetadata<ZxMulticolorFile>.VideoModes => [
+    new("Default", [(256, 192)]),
+  ];
   static byte[] IImageFormatWriter<ZxMulticolorFile>.ToBytes(ZxMulticolorFile file) => ZxMulticolorWriter.ToBytes(file);
 
   /// <summary>ZX Spectrum normal palette (bright=0).</summary>

@@ -16,7 +16,7 @@ public readonly record struct ElectronikaFile : IImageFormatReader<ElectronikaFi
   static string[] IImageFormatMetadata<ElectronikaFile>.FileExtensions => [".bk", ".ekr"];
   static ElectronikaFile IImageFormatReader<ElectronikaFile>.FromSpan(ReadOnlySpan<byte> data) => ElectronikaReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<ElectronikaFile>.VideoModes => [
-    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])
+    new("Default", [(512, 256)], [2])
   ];
   static byte[] IImageFormatWriter<ElectronikaFile>.ToBytes(ElectronikaFile file) => ElectronikaWriter.ToBytes(file);
 

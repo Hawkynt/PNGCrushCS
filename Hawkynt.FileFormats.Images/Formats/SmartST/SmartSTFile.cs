@@ -12,6 +12,11 @@ public readonly record struct SmartSTFile : IImageFormatReader<SmartSTFile>, IIm
   static string IImageFormatMetadata<SmartSTFile>.PrimaryExtension => ".sst";
   static string[] IImageFormatMetadata<SmartSTFile>.FileExtensions => [".sst", ".sst2"];
   static SmartSTFile IImageFormatReader<SmartSTFile>.FromSpan(ReadOnlySpan<byte> data) => SmartSTReader.FromSpan(data);
+
+  /// <summary>The one size this format holds, which its writer accepts and no other.</summary>
+  static VideoMode[] IImageFormatMetadata<SmartSTFile>.VideoModes => [
+    new("Default", [(320, 240)]),
+  ];
   static byte[] IImageFormatWriter<SmartSTFile>.ToBytes(SmartSTFile file) => SmartSTWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>

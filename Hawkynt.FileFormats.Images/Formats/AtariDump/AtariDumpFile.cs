@@ -28,7 +28,7 @@ public readonly record struct AtariDumpFile : IImageFormatReader<AtariDumpFile>,
   static string[] IImageFormatMetadata<AtariDumpFile>.FileExtensions => [".asd", ".adm"];
   static AtariDumpFile IImageFormatReader<AtariDumpFile>.FromSpan(ReadOnlySpan<byte> data) => AtariDumpReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<AtariDumpFile>.VideoModes => [
-    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])
+    new("Default", [(320, 192)], [2])
   ];
   static byte[] IImageFormatWriter<AtariDumpFile>.ToBytes(AtariDumpFile file) => AtariDumpWriter.ToBytes(file);
 

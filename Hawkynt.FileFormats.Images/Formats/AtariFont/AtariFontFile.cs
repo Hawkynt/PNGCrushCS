@@ -37,7 +37,7 @@ public readonly record struct AtariFontFile : IImageFormatReader<AtariFontFile>,
   static string[] IImageFormatMetadata<AtariFontFile>.FileExtensions => [".fnt8"];
   static AtariFontFile IImageFormatReader<AtariFontFile>.FromSpan(ReadOnlySpan<byte> data) => AtariFontReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<AtariFontFile>.VideoModes => [
-    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])
+    new("Default", [(128, 64)], [2])
   ];
   static byte[] IImageFormatWriter<AtariFontFile>.ToBytes(AtariFontFile file) => AtariFontWriter.ToBytes(file);
 

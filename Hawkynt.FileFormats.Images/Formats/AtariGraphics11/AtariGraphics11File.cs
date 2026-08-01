@@ -22,7 +22,7 @@ public readonly record struct AtariGraphics11File : IImageFormatReader<AtariGrap
   static string[] IImageFormatMetadata<AtariGraphics11File>.FileExtensions => [".gr11", ".g11"];
   static AtariGraphics11File IImageFormatReader<AtariGraphics11File>.FromSpan(ReadOnlySpan<byte> data) => AtariGraphics11Reader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<AtariGraphics11File>.VideoModes => [
-    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [16])
+    new("Default", [(80, 192)], [16])
   ];
   static byte[] IImageFormatWriter<AtariGraphics11File>.ToBytes(AtariGraphics11File file) => AtariGraphics11Writer.ToBytes(file);
 

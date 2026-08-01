@@ -40,7 +40,7 @@ public readonly record struct CharSet64File : IImageFormatReader<CharSet64File>,
   static string[] IImageFormatMetadata<CharSet64File>.FileExtensions => [".chr64"];
   static CharSet64File IImageFormatReader<CharSet64File>.FromSpan(ReadOnlySpan<byte> data) => CharSet64Reader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<CharSet64File>.VideoModes => [
-    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])
+    new("Default", [(128, 128)], [2])
   ];
   static byte[] IImageFormatWriter<CharSet64File>.ToBytes(CharSet64File file) => CharSet64Writer.ToBytes(file);
 

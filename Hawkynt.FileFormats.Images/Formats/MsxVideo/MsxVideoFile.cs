@@ -9,7 +9,7 @@ public readonly record struct MsxVideoFile : IImageFormatReader<MsxVideoFile>, I
   static string IImageFormatMetadata<MsxVideoFile>.PrimaryExtension => ".mvi";
   static string[] IImageFormatMetadata<MsxVideoFile>.FileExtensions => [".mvi"];
   static MsxVideoFile IImageFormatReader<MsxVideoFile>.FromSpan(ReadOnlySpan<byte> data) => MsxVideoReader.FromSpan(data);
-  static VideoMode[] IImageFormatMetadata<MsxVideoFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 256)])];
+  static VideoMode[] IImageFormatMetadata<MsxVideoFile>.VideoModes => [new("Default", [(256, 212)], [new IntegerRange(2, 256)])];
   static byte[] IImageFormatWriter<MsxVideoFile>.ToBytes(MsxVideoFile file) => MsxVideoWriter.ToBytes(file);
 
   /// <summary>Fixed image width.</summary>

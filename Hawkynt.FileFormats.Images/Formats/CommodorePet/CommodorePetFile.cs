@@ -20,7 +20,7 @@ public sealed class CommodorePetFile : IImageFormatReader<CommodorePetFile>, IIm
   public static string[] FileExtensions => [".pet"];
   static CommodorePetFile IImageFormatReader<CommodorePetFile>.FromSpan(ReadOnlySpan<byte> data) => CommodorePetReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<CommodorePetFile>.VideoModes => [
-    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 256)])
+    new("Default", [(40, 25)], [new IntegerRange(2, 256)])
   ];
   public static CommodorePetFile FromFile(FileInfo file) => CommodorePetReader.FromFile(file);
   public static CommodorePetFile FromBytes(byte[] data) => CommodorePetReader.FromBytes(data);

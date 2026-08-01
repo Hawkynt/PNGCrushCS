@@ -25,7 +25,7 @@ public readonly record struct AtariMaxiFile : IImageFormatReader<AtariMaxiFile>,
   static string[] IImageFormatMetadata<AtariMaxiFile>.FileExtensions => [".max8", ".amx"];
   static AtariMaxiFile IImageFormatReader<AtariMaxiFile>.FromSpan(ReadOnlySpan<byte> data) => AtariMaxiReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<AtariMaxiFile>.VideoModes => [
-    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 4)])
+    new("Default", [(160, 192)], [new IntegerRange(2, 4)])
   ];
   static byte[] IImageFormatWriter<AtariMaxiFile>.ToBytes(AtariMaxiFile file) => AtariMaxiWriter.ToBytes(file);
 
