@@ -7,7 +7,9 @@ namespace FileFormat.HiresC64;
 public readonly record struct HiresC64File : IImageFormatReader<HiresC64File>, IImageToRawImage<HiresC64File>, IImageFromRawImage<HiresC64File>, IImageFormatWriter<HiresC64File> {
 
   static string IImageFormatMetadata<HiresC64File>.PrimaryExtension => ".hir";
-  static string[] IImageFormatMetadata<HiresC64File>.FileExtensions => [".hir", ".hbm"];
+    // .hpi as well: the reference decoder tries this format first for it and only falls through to
+  // Hi-Pic Creator, and one extension resolves to one format here.
+  static string[] IImageFormatMetadata<HiresC64File>.FileExtensions => [".hir", ".hbm", ".hpi"];
   static HiresC64File IImageFormatReader<HiresC64File>.FromSpan(ReadOnlySpan<byte> data) => HiresC64Reader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<HiresC64File>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
   static byte[] IImageFormatWriter<HiresC64File>.ToBytes(HiresC64File file) => HiresC64Writer.ToBytes(file);
