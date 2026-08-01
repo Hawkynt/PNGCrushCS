@@ -63,6 +63,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.Blazon, "Blazon", 160, 200, ".bpl"),
     new(ImageFormat.CoCoMax, "CocoMax", 256, 192, ".p41"),
     new(ImageFormat.AtariPicworks, "Picworks", 640, 400, ".cp3"),
+    new(ImageFormat.TechnicolorDream, "Technicolor Dream", 320, 238, ".lum"),
     new(ImageFormat.RawWorkshop, "Raw Workshop", 320, 200, ".rwl"),
     new(ImageFormat.Picasso64, "Picasso 64", 160, 200),
     new(ImageFormat.RainbowPainter, "Rainbow Painter", 160, 200),

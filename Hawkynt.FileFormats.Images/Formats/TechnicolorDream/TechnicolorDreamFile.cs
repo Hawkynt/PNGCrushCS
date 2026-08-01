@@ -15,7 +15,8 @@ namespace FileFormat.TechnicolorDream;
 /// up automatically; reading it from bytes cannot, because there is nowhere to look.
 /// </remarks>
 public readonly record struct TechnicolorDreamFile
-  : IImageFormatReader<TechnicolorDreamFile>, IImageToRawImage<TechnicolorDreamFile> {
+  : IImageFormatReader<TechnicolorDreamFile>, IImageToRawImage<TechnicolorDreamFile>,
+    IImageFromRawImage<TechnicolorDreamFile>, IImageFormatWriter<TechnicolorDreamFile> {
 
   /// <summary>Screen pixels across.</summary>
   public const int Width = 320;
@@ -39,6 +40,8 @@ public readonly record struct TechnicolorDreamFile
   static string[] IImageFormatMetadata<TechnicolorDreamFile>.FileExtensions => [".lum"];
   static TechnicolorDreamFile IImageFormatReader<TechnicolorDreamFile>.FromSpan(ReadOnlySpan<byte> data)
     => TechnicolorDreamReader.FromSpan(data);
+  static byte[] IImageFormatWriter<TechnicolorDreamFile>.ToBytes(TechnicolorDreamFile file)
+    => TechnicolorDreamWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<TechnicolorDreamFile>.VideoModes => [
     new("Technicolor Dream", [(Width, Height)], [256])
   ];
@@ -70,5 +73,47 @@ public readonly record struct TechnicolorDreamFile
       Format = PixelFormat.Rgb24,
       PixelData = Atari8BitGraphics.ApplyPalette(frame),
     };
+  }
+
+  /// <summary>Builds the luminance half, which is a grey picture in sixteen levels.</summary>
+  /// <remarks>
+  /// Only the greys are written. The hues belong to a companion file, and inventing one would be
+  /// writing a second file nobody asked for — so what this produces is what a .lum holds, which the
+  /// format is content to treat as a picture on its own.
+  /// <para/>
+  /// Each stored row is shown twice, so it is read from the upper of the pair; a nibble covers four
+  /// screen pixels and is read at the leftmost of them rather than averaged.
+  /// </remarks>
+  public static TechnicolorDreamFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(Width, Height);
+    var gtia = Atari8BitGraphics.Palette;
+    var data = new byte[FileSize];
+
+    for (var row = 0; row < StoredRows; ++row)
+    for (var x = 0; x < Width; x += 4) {
+      var at = (row * 2 * Width + x) * 3;
+
+      var best = 0;
+      var bestCost = long.MaxValue;
+      for (var luminance = 0; luminance < 16; ++luminance) {
+        var entry = luminance * 3;
+        long dr = rgb.PixelData[at] - gtia[entry];
+        long dg = rgb.PixelData[at + 1] - gtia[entry + 1];
+        long db = rgb.PixelData[at + 2] - gtia[entry + 2];
+        var cost = dr * dr * 77 + dg * dg * 150 + db * db * 29;
+
+        if (cost >= bestCost)
+          continue;
+
+        bestCost = cost;
+        best = luminance;
+      }
+
+      data[FieldOffset + row * Stride + (x >> 3)] |= (byte)(best << (~x & 4));
+    }
+
+    return new() { Luminances = data };
   }
 }
