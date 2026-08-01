@@ -17,9 +17,13 @@ internal static class JbigContext {
   /// pixel at (-1, -2) and the reader never looks at MX or MY, so any file whose encoder moved it
   /// decodes against the wrong neighbour from the very first pixel.
   /// <para/>
-  /// The reference sample here says MX=8, MY=0: eight pixels to the left on the current row. Until
-  /// this table is built from the header rather than written out, files from other encoders will not
-  /// decode, and the ones this library writes will only be read back by itself.
+  /// The reference sample here says MX=8, MY=0: eight pixels to the left on the current row.
+  /// <para/>
+  /// Wiring that up is not on its own the fix. Substituting the header's position into each of the
+  /// ten slots in turn and decoding the reference sample gives between 108 and 138 wrong samples out
+  /// of 273 — no better than leaving it fixed, and for a two-colour picture that is close to noise.
+  /// So the context formation or the arithmetic coder underneath is wrong as well, and the adaptive
+  /// pixel is the second thing to fix rather than the first. That search is worth not repeating.
   /// </remarks>
   internal static readonly (int dx, int dy)[] Template0Positions = [
     ( 1, -2),  // bit 9
