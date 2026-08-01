@@ -48,6 +48,13 @@ public static class AtariGraphicsStudioReader {
     if (width == 0 || height == 0)
       throw new InvalidDataException($"An Atari Graphics Studio picture is not {width}x{height}.");
 
+    // Both forms reserve two fields' worth whichever they use, so the length follows from the
+    // header alone — and checking it is most of what separates this from any other file saying AGS.
+    var expected = AtariGraphicsStudioFile.BitmapOffset + (stored * rows << 1);
+    if (data.Length != expected)
+      throw new InvalidDataException(
+        $"A {width}x{height} Atari Graphics Studio picture is {expected} bytes, got {data.Length}.");
+
     return new() { Data = data.ToArray(), Mode = data[3], Width = width, Height = height };
   }
 

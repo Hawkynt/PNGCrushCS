@@ -59,6 +59,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.HcbEditor, "HCB Editor", 296, 200, ".hcb"),
     new(ImageFormat.BlazingPaddlesWindow, "Blazing Paddles window", 120, 192, ".wnd"),
     new(ImageFormat.ArtStudioWindow, "Art Studio window", 160, 200, ".mwi"),
+    new(ImageFormat.AtariGraphicsStudio, "Atari Graphics Studio", 320, 192, ".ags"),
     new(ImageFormat.Picasso64, "Picasso 64", 160, 200),
     new(ImageFormat.RainbowPainter, "Rainbow Painter", 160, 200),
     new(ImageFormat.SaracenPaint, "Saracen Paint", 160, 200),
