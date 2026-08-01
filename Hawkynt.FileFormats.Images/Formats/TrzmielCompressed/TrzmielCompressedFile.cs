@@ -13,7 +13,11 @@ namespace FileFormat.TrzmielCompressed;
 /// set one black, so the picture is ink on paper rather than light on a dark screen.
 /// </remarks>
 public readonly record struct TrzmielCompressedFile
-  : IImageFormatReader<TrzmielCompressedFile>, IImageToRawImage<TrzmielCompressedFile> {
+  : IImageFormatReader<TrzmielCompressedFile>, IImageToRawImage<TrzmielCompressedFile>,
+    IImageFromRawImage<TrzmielCompressedFile>, IImageFormatWriter<TrzmielCompressedFile> {
+
+  static byte[] IImageFormatWriter<TrzmielCompressedFile>.ToBytes(TrzmielCompressedFile file)
+    => TrzmielCompressedWriter.ToBytes(file);
 
   /// <summary>Pixels across.</summary>
   public const int Width = 320;
@@ -71,5 +75,32 @@ public readonly record struct TrzmielCompressedFile
       Palette = palette,
       PaletteCount = 2,
     };
+  }
+
+  /// <summary>Builds a picture in the two colours the mode has, which are fixed rather than chosen.</summary>
+  public static TrzmielCompressedFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(Width, Height).PixelData;
+    var gtia = Atari8BitGraphics.Palette;
+    var screen = new byte[ScreenSize];
+
+    for (var y = 0; y < Height; ++y)
+    for (var x = 0; x < Width; ++x) {
+      var at = (y * Width + x) * 3;
+      if (_Distance(rgb, at, gtia, Foreground) >= _Distance(rgb, at, gtia, Background))
+        continue;
+
+      screen[y * Stride + (x >> 3)] |= (byte)(1 << (~x & 7));
+    }
+
+    return new() { ScreenData = screen };
+  }
+
+  private static long _Distance(ReadOnlySpan<byte> rgb, int at, ReadOnlySpan<byte> gtia, int color) {
+    var entry = color * 3;
+    long dr = rgb[at] - gtia[entry], dg = rgb[at + 1] - gtia[entry + 1], db = rgb[at + 2] - gtia[entry + 2];
+
+    return dr * dr + dg * dg + db * db;
   }
 }
