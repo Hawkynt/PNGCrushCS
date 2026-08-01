@@ -9,8 +9,13 @@ namespace FileFormat.Fbm;
 /// of what this produces, which is it parsing a binary 3 as characters. Probing established that a
 /// text header is accepted and that <c>rowlen</c> is the length of one plane's row rather than of
 /// all of them together, so the picture is stored plane by plane and not interleaved; what has not
-/// been established is where the pixels begin, and guessing at that would swap one wrong layout for
-/// another.
+/// been established is where the pixels begin. Probing for it blind did not converge: at every data
+/// offset tried, the one tool that reads these renders the picture grey and shows none of the values
+/// put in, so the header is wrong somewhere the probe cannot see.
+/// <para/>
+/// There is no reference to deduce it from either — ImageMagick has no coder for it, the conversion
+/// service cannot write one, and the public sample archive has none. Until a real file turns up this
+/// stays as it is rather than being guessed at again.
 /// <para/>
 /// Layout:
 /// 0-7: magic "%bitmap\0" (8 bytes)
