@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using FileFormat.Core;
 using FileFormat.Iff;
 
 namespace FileFormat.IffRgbn;
@@ -7,35 +8,18 @@ namespace FileFormat.IffRgbn;
 /// <summary>Assembles IFF RGBN file bytes from an <see cref="IffRgbnFile"/>.</summary>
 public static class IffRgbnWriter {
 
-  private const byte _NUM_PLANES = 13;
+  private const byte _NUM_PLANES = AmigaRgbRuns.RgbnBitplanes;
 
   public static byte[] ToBytes(IffRgbnFile file) {
     ArgumentNullException.ThrowIfNull(file);
 
     var width = file.Width;
     var height = file.Height;
-    var pixelCount = width * height;
 
-    // Encode pixels: quantize to 4-bit channels, no RLE (repeat=0), genlock=0
-    var bodyData = new byte[pixelCount * 2];
-    for (var i = 0; i < pixelCount; ++i) {
-      var srcOffset = i * 3;
-      byte r = 0, g = 0, b = 0;
-      if (srcOffset + 2 < file.PixelData.Length) {
-        r = file.PixelData[srcOffset];
-        g = file.PixelData[srcOffset + 1];
-        b = file.PixelData[srcOffset + 2];
-      }
-
-      // Quantize 8-bit to 4-bit with rounding: (val + 8) / 17, clamped to 0..15
-      var r4 = (byte)Math.Min((r + 8) / 17, 15);
-      var g4 = (byte)Math.Min((g + 8) / 17, 15);
-      var b4 = (byte)Math.Min((b + 8) / 17, 15);
-
-      var dstOffset = i * 2;
-      bodyData[dstOffset] = (byte)((r4 << 4) | g4);
-      bodyData[dstOffset + 1] = (byte)(b4 << 4); // genlock=0, repeat=0
-    }
+    // The run count lives in each unit's low bits, and a zero there does not mean "one pixel" — it
+    // means the count follows in another byte. Writing zero everywhere, which is what this did,
+    // makes every unit swallow the next one as its length.
+    var bodyData = AmigaRgbRuns.Pack(file.PixelData, width, height, deep: false);
 
     var bmhdChunkSize = 8 + RgbnBmhdChunk.StructSize;
     var bodyChunkSize = 8 + bodyData.Length + (bodyData.Length & 1);
@@ -57,7 +41,7 @@ public static class IffRgbnWriter {
       0,
       _NUM_PLANES,
       0,
-      0,
+      AmigaRgbRuns.CompressionMethod,
       0,
       0,
       1,

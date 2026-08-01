@@ -2,6 +2,7 @@
 using System.Buffers.Binary;
 using System.IO;
 using System.Text;
+using FileFormat.Core;
 
 namespace FileFormat.IffRgbn;
 
@@ -85,30 +86,10 @@ public static class IffRgbnReader {
     var header = bmhd.Value;
     var width = (int)header.Width;
     var height = (int)header.Height;
-    var pixelCount = width * height;
-    var rgb24 = new byte[pixelCount * 3];
-
-    var dstIndex = 0;
-    var srcIndex = 0;
-    while (dstIndex < pixelCount && srcIndex + 1 < body.Length) {
-      var hi = body[srcIndex];
-      var lo = body[srcIndex + 1];
-      srcIndex += 2;
-
-      var r = (byte)((hi >> 4) * 17);
-      var g = (byte)((hi & 0x0F) * 17);
-      var b = (byte)((lo >> 4) * 17);
-      var repeat = lo & 0x07;
-      var count = repeat > 0 ? repeat + 1 : 1;
-
-      for (var i = 0; i < count && dstIndex < pixelCount; ++i) {
-        var off = dstIndex * 3;
-        rgb24[off] = r;
-        rgb24[off + 1] = g;
-        rgb24[off + 2] = b;
-        ++dstIndex;
-      }
-    }
+    // A run count of zero is not one pixel: it says the count follows in a byte of its own, and a
+    // zero there in turn says a sixteen-bit count follows. Reading it as one, which is what this
+    // did, drops every long run to a single pixel and leaves the picture short.
+    var rgb24 = AmigaRgbRuns.Unpack(body, width, height, deep: false);
 
     return new IffRgbnFile {
       Width = width,

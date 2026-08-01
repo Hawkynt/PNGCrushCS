@@ -47,7 +47,7 @@ public readonly record struct IffRgb8File : IImageFormatReader<IffRgb8File>, IIm
     return new() {
       Width = image.Width,
       Height = image.Height,
-      Compression = IffRgb8Compression.ByteRun1,
+      Compression = IffRgb8Compression.ColorRuns,
       PixelData = image.PixelData[..],
     };
   }

@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using FileFormat.Core;
 using FileFormat.Iff;
 
 namespace FileFormat.IffRgb8;
@@ -7,32 +8,14 @@ namespace FileFormat.IffRgb8;
 /// <summary>Assembles IFF RGB8 file bytes from an <see cref="IffRgb8File"/>.</summary>
 public static class IffRgb8Writer {
 
-  private const byte _NUM_PLANES = 25;
+  private const byte _NUM_PLANES = AmigaRgbRuns.Rgb8Bitplanes;
 
   public static byte[] ToBytes(IffRgb8File file) {
     ArgumentNullException.ThrowIfNull(file);
 
     var width = file.Width;
     var height = file.Height;
-    var pixelCount = width * height;
-
-    // Convert RGB24 to 4-byte groups (R, G, B, 0)
-    var rgbx = new byte[pixelCount * 4];
-    for (var i = 0; i < pixelCount; ++i) {
-      var srcOffset = i * 3;
-      var dstOffset = i * 4;
-      if (srcOffset + 2 < file.PixelData.Length) {
-        rgbx[dstOffset] = file.PixelData[srcOffset];
-        rgbx[dstOffset + 1] = file.PixelData[srcOffset + 1];
-        rgbx[dstOffset + 2] = file.PixelData[srcOffset + 2];
-      }
-      rgbx[dstOffset + 3] = 0; // pad byte
-    }
-
-    // Optionally compress
-    var bodyData = file.Compression == IffRgb8Compression.ByteRun1
-      ? Rgb8ByteRun1Compressor.Encode(rgbx)
-      : rgbx;
+    var bodyData = AmigaRgbRuns.Pack(file.PixelData, width, height, deep: true);
 
     // Calculate sizes
     var bmhdChunkSize = 8 + Rgb8BmhdChunk.StructSize; // ID(4) + size(4) + data(20)
@@ -58,7 +41,7 @@ public static class IffRgb8Writer {
       0,
       _NUM_PLANES,
       0,
-      (byte)file.Compression,
+      AmigaRgbRuns.CompressionMethod,
       0,
       0,
       1,

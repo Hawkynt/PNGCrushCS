@@ -8,6 +8,15 @@ namespace FileFormat.IffDeep;
 /// <summary>Assembles IFF DEEP file bytes from an <see cref="IffDeepFile"/>.</summary>
 public static class IffDeepWriter {
 
+  /// <summary>The component types DPEL names, red through alpha.</summary>
+  private const byte _Red = 1;
+
+  private const byte _Green = 2;
+
+  private const byte _Blue = 3;
+
+  private const byte _Alpha = 4;
+
   public static byte[] ToBytes(IffDeepFile file) {
     ArgumentNullException.ThrowIfNull(file);
 
@@ -23,38 +32,28 @@ public static class IffDeepWriter {
     else
       bodyData = file.PixelData;
 
-    // Build DPEL data: 3 color elements + optional alpha element
+    // DPEL names each component in turn: how many there are, then a type and a bit count for each.
+    // The count was missing here and every type was written as zero, which names no component at
+    // all — so the chunk described a picture of nothing whatever the pixels held.
     var dpelElementCount = hasAlpha ? 4 : 3;
-    var dpelData = new byte[dpelElementCount * 4];
+    var dpelData = new byte[4 + dpelElementCount * 4];
     var dpelSpan = dpelData.AsSpan();
-    // R element
-    BinaryPrimitives.WriteUInt16BigEndian(dpelSpan, 0);     // type = color
-    BinaryPrimitives.WriteUInt16BigEndian(dpelSpan[2..], 8); // 8 bits
-    // G element
-    BinaryPrimitives.WriteUInt16BigEndian(dpelSpan[4..], 0);
-    BinaryPrimitives.WriteUInt16BigEndian(dpelSpan[6..], 8);
-    // B element
-    BinaryPrimitives.WriteUInt16BigEndian(dpelSpan[8..], 0);
-    BinaryPrimitives.WriteUInt16BigEndian(dpelSpan[10..], 8);
-    if (hasAlpha) {
-      // A element
-      BinaryPrimitives.WriteUInt16BigEndian(dpelSpan[12..], 1); // type = alpha
-      BinaryPrimitives.WriteUInt16BigEndian(dpelSpan[14..], 8);
+    BinaryPrimitives.WriteUInt32BigEndian(dpelSpan, (uint)dpelElementCount);
+
+    ReadOnlySpan<byte> types = [_Red, _Green, _Blue, _Alpha];
+    for (var i = 0; i < dpelElementCount; ++i) {
+      BinaryPrimitives.WriteUInt16BigEndian(dpelSpan[(4 + i * 4)..], types[i]);
+      BinaryPrimitives.WriteUInt16BigEndian(dpelSpan[(6 + i * 4)..], 8);
     }
 
-    // Calculate chunk sizes
-    var dgblChunkSize = 8 + 8; // ID(4) + size(4) + data(8)
+    var dgblChunkSize = 8 + 8;
     var dpelChunkSize = 8 + dpelData.Length + (dpelData.Length & 1);
     var bodyChunkSize = 8 + bodyData.Length + (bodyData.Length & 1);
-    var formDataSize = 4 + dgblChunkSize + dpelChunkSize + bodyChunkSize; // "DEEP" + chunks
-    var totalSize = 8 + formDataSize; // "FORM" + size + data
+    var formDataSize = 4 + dgblChunkSize + dpelChunkSize + bodyChunkSize;
 
-    using var ms = new MemoryStream(totalSize);
+    using var ms = new MemoryStream(8 + formDataSize);
 
-    // FORM header
     _WriteChunkHeader(ms, "FORM", formDataSize);
-
-    // Form type
     ms.Write("DEEP"u8);
 
     // DGBL chunk
@@ -62,7 +61,10 @@ public static class IffDeepWriter {
     _WriteUInt16BigEndian(ms, (ushort)width);
     _WriteUInt16BigEndian(ms, (ushort)height);
     _WriteUInt16BigEndian(ms, (ushort)file.Compression);
-    _WriteUInt16BigEndian(ms, (ushort)dpelElementCount);
+
+    // The last word of DGBL is the pixel aspect, not the component count: square pixels are 1 to 1.
+    ms.WriteByte(1);
+    ms.WriteByte(1);
 
     // DPEL chunk
     _WriteChunkHeader(ms, "DPEL", dpelData.Length);
@@ -70,8 +72,9 @@ public static class IffDeepWriter {
     if ((dpelData.Length & 1) != 0)
       ms.WriteByte(0);
 
-    // BODY chunk
-    _WriteChunkHeader(ms, "BODY", bodyData.Length);
+    // The pixels go in DBOD. A chunk named BODY is the ILBM name and a DEEP reader passes over it,
+    // leaving a file with a header and no picture.
+    _WriteChunkHeader(ms, "DBOD", bodyData.Length);
     ms.Write(bodyData);
     if ((bodyData.Length & 1) != 0)
       ms.WriteByte(0);

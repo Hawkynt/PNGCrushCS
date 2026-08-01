@@ -92,17 +92,10 @@ public static class IffRgb8Reader {
     var height = (int)header.Height;
     var compression = (IffRgb8Compression)header.Compression;
 
-    // Each pixel is 4 bytes (R, G, B, pad) in the BODY
-    var expectedBodySize = width * height * 4;
-
-    // Decompress BODY if needed
-    var rawPixelData = compression == IffRgb8Compression.ByteRun1
-      ? Rgb8ByteRun1Compressor.Decode(body, expectedBodySize)
-      : body;
-
-    // Convert from 4-byte groups (R, G, B, pad) to RGB24 (R, G, B)
-    var pixelCount = width * height;
-    var rgb24 = PixelConverter.Rgba32ToRgb24(rawPixelData, pixelCount);
+    // Every unit states a colour and a run length, so the body is not a bitmap that a byte-level
+    // scheme could have packed; reading it as one gave a picture only because the writer had made
+    // the same mistake.
+    var rgb24 = AmigaRgbRuns.Unpack(body, width, height, deep: true);
 
     return new IffRgb8File {
       Width = width,
