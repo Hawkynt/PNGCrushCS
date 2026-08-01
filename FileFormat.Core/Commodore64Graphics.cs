@@ -164,6 +164,32 @@ public static class Commodore64Graphics {
   /// whole screen shares one set. Several logo editors use it because a logo needs few colours and
   /// gains more from being able to place them anywhere than from having more of them.
   /// </remarks>
+  /// <summary>Packs a picture into a four-colour bitmap, the inverse of decoding one.</summary>
+  /// <remarks>
+  /// Two bits a pixel, and the bytes run down each character cell before moving to the next — which
+  /// is why the address mixes the row's low three bits in at the bottom rather than multiplying by
+  /// a stride. A pixel is drawn two wide, so only every other column is stored.
+  /// </remarks>
+  public static byte[] PackFourColor(
+    ReadOnlySpan<byte> indices, int offset, int shift, int width, int height, int size) {
+    var data = new byte[size];
+
+    for (var y = 0; y < height; ++y)
+    for (var x = 0; x < width; ++x) {
+      var source = x - shift;
+      if (source < 0)
+        continue;
+
+      var at = offset + (y & ~7) * Columns + (source & ~7) + (y & 7);
+      if (at < 0 || at >= data.Length)
+        continue;
+
+      data[at] |= (byte)((indices[y * width + x] & 3) << (~source & 6));
+    }
+
+    return data;
+  }
+
   public static byte[] DecodeFourColor(
     ReadOnlySpan<byte> data, int offset, int shift, int width, int height, ReadOnlySpan<byte> palette) {
     var rgb = new byte[width * height * 3];

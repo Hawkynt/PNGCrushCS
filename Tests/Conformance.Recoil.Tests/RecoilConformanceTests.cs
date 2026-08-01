@@ -41,6 +41,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.DuoMedium, "Duo medium", 832, 546, ".du2"),
     new(ImageFormat.VertiZontalInterlacing, "VertiZontal Interlacing", 320, 200, ".vzi"),
     new(ImageFormat.Stellar, "Stellar", 256, 192, ".stl"),
+    new(ImageFormat.InterlacedLogoEditor, "Interlaced Logo Editor", 320, 48, ".ile"),
     new(ImageFormat.Doodle, "Doodle", 320, 200),
     new(ImageFormat.HiPicCreator, "Hi-Pic Creator", 320, 200),
     new(ImageFormat.HiresC64, "Hires-Bitmap", 320, 200, ".hbm"),

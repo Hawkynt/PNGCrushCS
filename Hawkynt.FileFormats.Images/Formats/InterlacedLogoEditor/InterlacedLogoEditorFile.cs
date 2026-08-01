@@ -13,7 +13,11 @@ namespace FileFormat.InterlacedLogoEditor;
 /// rather than four — it is the border register, which on the VIC-II has only eight values.
 /// </remarks>
 public readonly record struct InterlacedLogoEditorFile
-  : IImageFormatReader<InterlacedLogoEditorFile>, IImageToRawImage<InterlacedLogoEditorFile> {
+  : IImageFormatReader<InterlacedLogoEditorFile>, IImageToRawImage<InterlacedLogoEditorFile>,
+    IImageFromRawImage<InterlacedLogoEditorFile>, IImageFormatWriter<InterlacedLogoEditorFile> {
+
+  static byte[] IImageFormatWriter<InterlacedLogoEditorFile>.ToBytes(InterlacedLogoEditorFile file)
+    => InterlacedLogoEditorWriter.ToBytes(file);
 
   /// <summary>Picture width.</summary>
   public const int Width = 320;
@@ -74,4 +78,66 @@ public readonly record struct InterlacedLogoEditorFile
 
   private static byte _At(ReadOnlySpan<byte> data, int offset)
     => offset >= 0 && offset < data.Length ? data[offset] : (byte)0;
+
+  /// <summary>Builds a logo with the same field in both halves.</summary>
+  /// <remarks>
+  /// The second field is displaced by one pixel, so writing the two identically means each output
+  /// pixel averages the stored positions on either side of it — the result is very slightly softened
+  /// horizontally rather than exactly what was written. A pair of fields averaging to a given
+  /// picture is not determined by that picture.
+  /// <para/>
+  /// The fourth register is the border, which the machine gives only eight values rather than
+  /// sixteen, so it is chosen from that half alone.
+  /// </remarks>
+  public static InterlacedLogoEditorFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(Width, Height);
+    var c64 = Commodore64Graphics.CreatePalette();
+
+    var quantized = ColorQuantizer.Quantize(
+      PixelConverter.Convert(rgb, PixelFormat.Bgra32).PixelData, Width * Height, ColorCount);
+
+    var registers = new byte[ColorCount];
+    var palette = new byte[ColorCount * 3];
+    for (var i = 0; i < ColorCount; ++i) {
+      var entry = i * 3;
+      registers[i] = _NearestC64(
+        c64, i < 3 ? 16 : 8, quantized.Palette[entry], quantized.Palette[entry + 1], quantized.Palette[entry + 2]);
+      c64.AsSpan(registers[i] * 3, 3).CopyTo(palette.AsSpan(entry));
+    }
+
+    // Re-match against the colours the machine actually has, not the ones the reduction asked for.
+    var indices = PaletteQuantizer.Quantize(rgb.PixelData, Width, Height, palette, ColorCount);
+
+    // Six rows of cells, forty across, eight bytes down each: the bitmap a field needs.
+    var fieldSize = Height / 8 * Commodore64Graphics.Columns * 8;
+    var field = Commodore64Graphics.PackFourColor(indices, 0, 0, Width, Height, fieldSize);
+
+    var data = new byte[FileSize];
+    field.CopyTo(data.AsSpan(FirstFieldOffset, fieldSize));
+    field.CopyTo(data.AsSpan(SecondFieldOffset, fieldSize));
+    registers.CopyTo(data.AsSpan(ColorsOffset));
+
+    return new() { Data = data };
+  }
+
+  /// <summary>The machine colour nearest a given one, within however many it is allowed.</summary>
+  private static byte _NearestC64(ReadOnlySpan<byte> c64, int available, int red, int green, int blue) {
+    byte best = 0;
+    var bestCost = int.MaxValue;
+
+    for (var candidate = 0; candidate < available; ++candidate) {
+      var entry = candidate * 3;
+      int dr = red - c64[entry], dg = green - c64[entry + 1], db = blue - c64[entry + 2];
+      var cost = dr * dr + dg * dg + db * db;
+      if (cost >= bestCost)
+        continue;
+
+      bestCost = cost;
+      best = (byte)candidate;
+    }
+
+    return best;
+  }
 }
