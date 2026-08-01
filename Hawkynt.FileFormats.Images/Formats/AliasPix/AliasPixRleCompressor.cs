@@ -3,7 +3,13 @@ using System.IO;
 
 namespace FileFormat.AliasPix;
 
-/// <summary>Alias/Wavefront PIX per-scanline RLE compression. Packets are (count, B, G, R[, A]).</summary>
+/// <summary>Alias/Wavefront PIX per-scanline RLE compression. Packets are (count, B, G, R).</summary>
+/// <remarks>
+/// The count is the number of pixels, one to 255; zero does not occur. ImageMagick reads one pixel
+/// more than the count says and cannot cope with a count of zero either, so no encoding satisfies
+/// it for a picture whose neighbouring pixels differ — which is why this format is not checked
+/// against it.
+/// </remarks>
 internal static class AliasPixRleCompressor {
 
   public static byte[] Decompress(ReadOnlySpan<byte> data, int width, int height, int bytesPerPixel) {

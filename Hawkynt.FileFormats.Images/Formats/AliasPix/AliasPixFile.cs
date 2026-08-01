@@ -21,8 +21,8 @@ public readonly record struct AliasPixFile : IImageFormatReader<AliasPixFile>, I
 
     var format = file.BitsPerPixel switch {
       24 => PixelFormat.Bgr24,
-      32 => PixelFormat.Bgra32,
-      _ => throw new ArgumentException($"Unsupported BitsPerPixel: {file.BitsPerPixel}", nameof(file))
+      8 => PixelFormat.Gray8,
+      _ => throw new ArgumentException($"An Alias PIX pixel is 8 or 24 bits, not {file.BitsPerPixel}", nameof(file))
     };
 
     return new() {
@@ -35,11 +35,14 @@ public readonly record struct AliasPixFile : IImageFormatReader<AliasPixFile>, I
 
   public static AliasPixFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    image = image.EnsureAnyFormat(PixelFormat.Bgra32, PixelFormat.Bgr24);
+    // Twenty-four bits or eight, and nothing else. A thirty-two bit depth was being written for any
+    // picture that arrived with an alpha channel, which is a depth the format does not have — the
+    // header alone was enough to make the file unreadable, whatever followed it.
+    image = image.EnsureAnyFormat(PixelFormat.Bgr24, PixelFormat.Gray8);
 
     var bpp = image.Format switch {
       PixelFormat.Bgr24 => 24,
-      PixelFormat.Bgra32 => 32,
+      PixelFormat.Gray8 => 8,
       _ => throw new ArgumentException($"Unsupported pixel format for AliasPix: {image.Format}", nameof(image))
     };
 

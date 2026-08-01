@@ -36,44 +36,33 @@ public static class ScitexCtReader {
     if (data.Length < ScitexCtHeader.StructSize)
       throw new InvalidDataException("Data too small for a valid Scitex CT file.");
 
-    var sig = Encoding.ASCII.GetString(data.Slice(0, 2));
-    if (sig != "CT")
-      throw new InvalidDataException($"Invalid Scitex CT signature: expected 'CT', got '{sig}'.");
+    if (!ScitexCtHeader.IsContinuousTone(data))
+      throw new InvalidDataException("Not a Scitex continuous-tone file: no CT at offset 80.");
 
-    var header = ScitexCtHeader.ReadFrom(data);
+    var (width, height, mode) = ScitexCtHeader.Read(data);
+    if (width <= 0 || height <= 0)
+      throw new InvalidDataException($"A Scitex CT states no size: {width}x{height}.");
 
-    var width = header.Width;
-    var height = header.Height;
-
-    if (width <= 0)
-      throw new InvalidDataException($"Invalid Scitex CT width: {width}.");
-    if (height <= 0)
-      throw new InvalidDataException($"Invalid Scitex CT height: {height}.");
-
-    var channels = header.ColorMode switch {
+    var channels = mode switch {
       ScitexCtColorMode.Grayscale => 1,
       ScitexCtColorMode.Rgb => 3,
-      ScitexCtColorMode.Cmyk => 4,
-      _ => throw new InvalidDataException($"Unknown Scitex CT color mode: {(int)header.ColorMode}.")
+      _ => 4,
     };
 
-    var expectedPixelBytes = width * height * channels;
+    var expected = width * height * channels;
+    if (data.Length < ScitexCtHeader.StructSize + expected)
+      throw new InvalidDataException(
+        $"{width}x{height} in {channels} separations needs {ScitexCtHeader.StructSize + expected} bytes; this file is {data.Length}.");
 
-    if (data.Length < ScitexCtHeader.StructSize + expectedPixelBytes)
-      throw new InvalidDataException($"Data too small for pixel data: expected {ScitexCtHeader.StructSize + expectedPixelBytes} bytes, got {data.Length}.");
-
-    var pixelData = new byte[expectedPixelBytes];
-    data.Slice(ScitexCtHeader.StructSize, expectedPixelBytes).CopyTo(pixelData.AsSpan(0));
-
-    return new ScitexCtFile {
+    return new() {
       Width = width,
       Height = height,
-      BitsPerComponent = header.BitsPerComponent,
-      ColorMode = header.ColorMode,
-      HResolution = header.HResolution,
-      VResolution = header.VResolution,
-      Description = header.Description,
-      PixelData = pixelData
+      BitsPerComponent = 8,
+      ColorMode = mode,
+      HResolution = 300,
+      VResolution = 300,
+      Description = string.Empty,
+      PixelData = data.Slice(ScitexCtHeader.StructSize, expected).ToArray(),
     };
   }
 }

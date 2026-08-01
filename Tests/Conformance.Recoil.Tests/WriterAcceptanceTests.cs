@@ -39,6 +39,14 @@ public sealed class WriterAcceptanceTests {
     [ImageFormat.PalmPdb] = "the reference tool reads .pdb as the ImageViewer variant, which is a different record layout",
     [ImageFormat.Art] = ".art belongs to several unrelated programs and the tool means another one",
     [ImageFormat.FirstPublisher] = ".art belongs to several unrelated programs and the tool means another one",
+    [ImageFormat.AliasPix] =
+      "the reference tool reads one pixel more than each run states and cannot take a run of one at "
+      + "all, so it rejects any picture whose neighbouring pixels differ, however it is encoded",
+    [ImageFormat.MatLab] =
+      "the reference tool cannot read the .mat files it writes itself, so its verdict is about its "
+      + "own reader rather than about ours",
+    [ImageFormat.XvThumbnail] = "the reference tool reads .xv as Khoros VIFF, which is a different format",
+    [ImageFormat.PrintShop] = "the reference tool reads .psb as the large Photoshop format, which is a different one",
   };
 
   private static IEnumerable<TestCaseData> Writable() {
