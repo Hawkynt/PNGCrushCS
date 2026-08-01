@@ -98,4 +98,58 @@ public static class AmstradGraphics {
 
     return ((b & 1) << 3) | ((b >> 2) & 4) | ((b >> 1) & 2) | ((b >> 6) & 1);
   }
+
+  /// <summary>Places two palette indices in one mode 0 byte, the inverse of reading them.</summary>
+  /// <remarks>
+  /// Derived from <see cref="Mode0Index"/> bit for bit rather than written again from the
+  /// description: the interleaving has no pattern worth remembering, and the two halves only agree
+  /// if one is the other read backwards.
+  /// </remarks>
+  public static byte Mode0Byte(int first, int second) {
+    var b = 0;
+    for (var bit = 0; bit < 4; ++bit) {
+      // Where a bit of each index lands follows from where reading takes it from.
+      if ((first & (1 << bit)) != 0)
+        b |= 1 << _Mode0BitPosition(bit, false);
+
+      if ((second & (1 << bit)) != 0)
+        b |= 1 << _Mode0BitPosition(bit, true);
+    }
+
+    return (byte)b;
+  }
+
+  /// <summary>Which bit of the byte holds a given bit of a given one of the two pixels.</summary>
+  private static int _Mode0BitPosition(int bit, bool second) {
+    // Reading takes bit 3 from position 0, bit 2 from 4, bit 1 from 2 and bit 0 from 6, with the
+    // first pixel's byte shifted right one first — so the first pixel sits one place higher.
+    var position = bit switch {
+      3 => 0,
+      2 => 4,
+      1 => 2,
+      _ => 6,
+    };
+
+    return second ? position : position + 1;
+  }
+
+  /// <summary>The firmware colour nearest a given one.</summary>
+  public static byte NearestFirmwareColor(int red, int green, int blue) {
+    Span<byte> rgb = stackalloc byte[3];
+    byte best = 0;
+    var bestCost = int.MaxValue;
+
+    for (var candidate = 0; candidate <= 26; ++candidate) {
+      TryFirmwareColor(candidate, rgb);
+      int dr = red - rgb[0], dg = green - rgb[1], db = blue - rgb[2];
+      var cost = dr * dr + dg * dg + db * db;
+      if (cost >= bestCost)
+        continue;
+
+      bestCost = cost;
+      best = (byte)candidate;
+    }
+
+    return best;
+  }
 }

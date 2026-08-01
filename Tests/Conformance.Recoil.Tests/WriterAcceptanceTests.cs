@@ -187,12 +187,16 @@ public sealed class WriterAcceptanceTests {
     if (catalogue == null || !File.Exists(catalogue))
       return found;
 
+    // An entry may carry attributes — <ext skip="uwp">PPH</ext> — so the opening tag is matched up
+    // to its closing bracket rather than literally. Matching "<ext>" alone hid every such format in
+    // the unjudgeable bucket, which is the one place a missing verdict looks like a decision.
     foreach (var line in File.ReadLines(catalogue))
-    for (var at = line.IndexOf("<ext>", StringComparison.Ordinal); at >= 0;
-         at = line.IndexOf("<ext>", at + 1, StringComparison.Ordinal)) {
-      var end = line.IndexOf("</ext>", at, StringComparison.Ordinal);
-      if (end > at)
-        found.Add("." + line[(at + 5)..end].ToLowerInvariant());
+    for (var at = line.IndexOf("<ext", StringComparison.Ordinal); at >= 0;
+         at = line.IndexOf("<ext", at + 1, StringComparison.Ordinal)) {
+      var opens = line.IndexOf('>', at);
+      var end = opens < 0 ? -1 : line.IndexOf("</ext>", opens, StringComparison.Ordinal);
+      if (end > opens)
+        found.Add("." + line[(opens + 1)..end].ToLowerInvariant());
     }
 
     return found;
