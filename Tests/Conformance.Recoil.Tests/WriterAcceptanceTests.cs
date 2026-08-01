@@ -86,14 +86,17 @@ public sealed class WriterAcceptanceTests {
 
         written = true;
 
-        var judged = _AskRecoil(path) ?? _AskImageMagick(path);
-        if (judged == null)
+        // Both tools, not the first that has an opinion. Where two of them know an extension and
+        // mean different formats by it, one turning the file down says only that it meant the other
+        // format; the file is readable if either reads it.
+        var verdicts = new[] { _AskRecoil(path), _AskImageMagick(path) }.Where(v => v != null).ToArray();
+        if (verdicts.Length == 0)
           continue;
 
-        if (judged.Value.Accepted)
+        if (verdicts.Any(v => v!.Value.Accepted))
           return;
 
-        rejected ??= $"at {width}x{height} as {extension}, {judged.Value.Reason}";
+        rejected ??= $"at {width}x{height} as {extension}, {string.Join(" and ", verdicts.Select(v => v!.Value.Reason))}";
       }
 
       if (rejected != null)

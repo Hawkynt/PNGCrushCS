@@ -30,10 +30,8 @@ public static class PortfolioGraphicsReader {
   }
 
   public static PortfolioGraphicsFile FromSpan(ReadOnlySpan<byte> data) {
-    if (data.Length < PortfolioGraphicsFile.PgfHeaderSize + PortfolioGraphicsFile.PixelDataSize)
-      return _ParsePgc(data);
-    return _ParsePgf(data);
-  
+    // A full screen's worth of bytes is the screen; anything else is the run-length form.
+    return data.Length == PortfolioGraphicsFile.PgfFileSize ? _ParsePgf(data) : _ParsePgc(data);
   }
 
   public static PortfolioGraphicsFile FromBytes(byte[] data) {
@@ -42,11 +40,10 @@ public static class PortfolioGraphicsReader {
   }
 
   private static PortfolioGraphicsFile _ParsePgf(ReadOnlySpan<byte> data) {
-    if (data.Length < PortfolioGraphicsFile.PgfHeaderSize + PortfolioGraphicsFile.PixelDataSize)
-      throw new InvalidDataException($"PGF data too small: expected at least {PortfolioGraphicsFile.PgfHeaderSize + PortfolioGraphicsFile.PixelDataSize} bytes, got {data.Length}.");
+    if (data.Length < PortfolioGraphicsFile.PixelDataSize)
+      throw new InvalidDataException($"PGF data too small: expected {PortfolioGraphicsFile.PixelDataSize} bytes, got {data.Length}.");
 
-    var pixelData = new byte[PortfolioGraphicsFile.PixelDataSize];
-    data.Slice(PortfolioGraphicsFile.PgfHeaderSize, PortfolioGraphicsFile.PixelDataSize).CopyTo(pixelData);
+    var pixelData = data[..PortfolioGraphicsFile.PixelDataSize].ToArray();
     return new() { PixelData = pixelData };
   }
 

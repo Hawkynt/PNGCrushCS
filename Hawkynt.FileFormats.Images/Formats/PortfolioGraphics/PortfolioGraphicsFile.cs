@@ -18,11 +18,11 @@ public readonly record struct PortfolioGraphicsFile : IImageFormatReader<Portfol
   /// <summary>Total pixel data size in bytes.</summary>
   internal const int PixelDataSize = BytesPerRow * PixelHeight;
 
-  /// <summary>PGF header size.</summary>
-  internal const int PgfHeaderSize = 8;
-
-  /// <summary>PGF fixed file size.</summary>
-  internal const int PgfFileSize = 3848;
+  /// <summary>
+  /// The one length a PGF has. Nothing precedes the bitmap: the screen is a fixed size, so there is
+  /// nothing for a header to say.
+  /// </summary>
+  internal const int PgfFileSize = PixelDataSize;
 
   static string IImageFormatMetadata<PortfolioGraphicsFile>.PrimaryExtension => ".pgf";
   static string[] IImageFormatMetadata<PortfolioGraphicsFile>.FileExtensions => [".pgf", ".pgc"];
@@ -39,7 +39,11 @@ public readonly record struct PortfolioGraphicsFile : IImageFormatReader<Portfol
   /// <summary>Packed 1bpp pixel data (1920 bytes).</summary>
   public byte[] PixelData { get; init; }
 
-  private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
+  /// <summary>
+  /// Paper first, then ink. The Portfolio's screen is reflective, so a set bit is a dark pixel —
+  /// building the palette the other way round shows every picture as its own negative.
+  /// </summary>
+  private static readonly byte[] _BlackWhitePalette = [255, 255, 255, 0, 0, 0];
 
   /// <summary>Converts the Portfolio Graphics image to an Indexed1 raw image.</summary>
   public static RawImage ToRawImage(PortfolioGraphicsFile file) {
