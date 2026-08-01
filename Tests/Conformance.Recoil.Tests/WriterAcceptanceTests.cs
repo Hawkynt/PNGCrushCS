@@ -47,6 +47,19 @@ public sealed class WriterAcceptanceTests {
       + "own reader rather than about ours",
     [ImageFormat.XvThumbnail] = "the reference tool reads .xv as Khoros VIFF, which is a different format",
     [ImageFormat.PrintShop] = "the reference tool reads .psb as the large Photoshop format, which is a different one",
+    [ImageFormat.TrsPix] = "the reference tool reads .pix as a Falcon or CoCoMax picture, neither of which this is",
+    [ImageFormat.MasterSystemTile] = "the reference tool reads .gg as a packed Koala picture, which is a different format",
+    [ImageFormat.NesChr] = "the reference tool reads .chr as Blazing Paddles vectors, which is a different format",
+    [ImageFormat.NeoGeoSprite] = "the reference tool reads .neo as Atari NEOchrome, which is a different format",
+    [ImageFormat.HighResST] = "the reference tool reads .hrs as an Oric screen, which is a different format",
+    [ImageFormat.KofaxKfx] = "the reference tool reads .kfx as a raw Atari screen dump, which is a different format",
+    [ImageFormat.Clp] = "the reference tool reads .clp as a GoDot or CoCo clip, neither of which this is",
+    [ImageFormat.PcPaint] = ".pic belongs to a dozen unrelated programs and the tool means none of ours by it",
+    [ImageFormat.SoftImage] = ".pic belongs to a dozen unrelated programs and the tool means none of ours by it",
+    [ImageFormat.BioRadPic] = ".pic belongs to a dozen unrelated programs and the tool means none of ours by it",
+    [ImageFormat.AtariSif] =
+      "the reference tool reads .sif as a 2048-byte character dump shown at 256 by 32, which is "
+      + "neither this layout nor this size",
   };
 
   private static IEnumerable<TestCaseData> Writable() {
