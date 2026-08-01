@@ -209,7 +209,11 @@ public static class Jpeg2000Writer {
     ++pos;
     BinaryPrimitives.WriteUInt16BigEndian(data.AsSpan(pos), 1); // Number of layers
     pos += 2;
-    data[pos] = file.ComponentCount >= 3 ? (byte)1 : (byte)0; // MCT
+    // No component transform. This used to declare one and then not perform it, so the three planes
+    // went out as plain colours while the header said they were a luminance and two differences —
+    // anything else reading the file would undo a transform that was never done and get colours
+    // that are wrong everywhere. Saying nothing is what is actually true of these bytes.
+    data[pos] = 0; // MCT
     ++pos;
     data[pos] = (byte)file.DecompositionLevels;
     ++pos;
@@ -367,7 +371,7 @@ public static class Jpeg2000Writer {
       CodeBlockWidth = cbWidth,
       CodeBlockHeight = cbHeight,
       Layers = 1,
-      UseMct = componentCount >= 3,
+      UseMct = false,
       BitsPerComponent = file.BitsPerComponent,
     };
 

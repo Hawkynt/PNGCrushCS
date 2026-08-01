@@ -350,12 +350,26 @@ public static class Jpeg2000Reader {
     // Step 1: Tier-2 packet parsing
     var codeBlocks = Tier2Decoder.ParsePackets(tileData, 0, tileData.Length, tile);
 
+    // The packet parser here does not implement the tag-tree signalling that says which code-blocks
+    // a layer includes and how many bit-planes of each are zero; it assumes the arrangement our own
+    // encoder writes. Against a codestream from anything else it recovers no coefficients at all,
+    // and the picture that falls out is a uniform mid-grey — the level shift and nothing else.
+    //
+    // Returning that would be claiming to have read the file. Saying so is the honest answer until
+    // the parser is finished.
+    if (codeBlocks.TrueForAll(block => block.CompressedData.Length == 0 || block.NumCodingPasses == 0))
+      throw new NotSupportedException(
+        "This JPEG 2000 codestream uses packet signalling the Tier-2 parser does not implement, so no "
+        + "coefficients could be recovered. Only codestreams written by this library can be read.");
+
     // Step 2: Tier-1 decoding of each code-block + assembly into component coefficient planes
     var subbands = SubbandInfo.ComputeSubbands(width, height, levels);
     var pixelData = new byte[width * height * componentCount];
 
+    var planes = new int[componentCount][,];
+
     for (var c = 0; c < componentCount; ++c) {
-      var plane = new int[height, width];
+      var plane = planes[c] = new int[height, width];
 
       // Decode each code-block and place coefficients into the subband region
       foreach (var cb in codeBlocks) {
@@ -397,21 +411,61 @@ public static class Jpeg2000Reader {
 
       // Step 4: Inverse DWT (already exists)
       Jp2Wavelet.InverseMultiLevel(plane, width, height, levels);
+    }
 
-      // Step 5: Extract pixels with level shift and clamping
-      var shift = tile.BitsPerComponent > 1 ? 1 << (tile.BitsPerComponent - 1) : 0;
-      var maxVal = (1 << tile.BitsPerComponent) - 1;
+    // Step 5: Undo the component transform, which the codestream states and this used to parse and
+    // then ignore. It leaves the three planes as luminance and two differences rather than as
+    // colours, so a picture without it is recognisable and wrongly coloured throughout.
+    if (tile.UseMct && componentCount >= 3)
+      _InverseReversibleComponentTransform(planes, width, height);
+
+    for (var c = 0; c < componentCount; ++c) {
+      var plane = planes[c];
+
+      // Step 6: Extract pixels with level shift and clamping
+      //
+      // The samples are as deep as the codestream says, and it commonly says sixteen — a tool that
+      // works internally in sixteen bits writes sixteen. Casting that to a byte keeps the bottom
+      // eight, which is not a darker picture but a meaningless one: a full-scale blue lands on 0.
+      // So the range is brought down to a byte, by taking the top bits when it is deeper and by
+      // repeating them when it is shallower.
+      var levelShift = tile.BitsPerComponent > 1 ? 1 << (tile.BitsPerComponent - 1) : 0;
+      var maxVal = tile.BitsPerComponent >= 31 ? int.MaxValue : (1 << tile.BitsPerComponent) - 1;
       for (var y = 0; y < height; ++y)
         for (var x = 0; x < width; ++x) {
-          var val = plane[y, x] + shift;
+          var val = plane[y, x] + levelShift;
           if (val < 0) val = 0;
           else if (val > maxVal) val = maxVal;
-          pixelData[(y * width + x) * componentCount + c] = (byte)val;
+          pixelData[(y * width + x) * componentCount + c] = _ToByte(val, tile.BitsPerComponent);
         }
     }
 
     return pixelData;
   }
+
+  /// <summary>Undoes the reversible colour transform, which pairs with the 5/3 wavelet.</summary>
+  /// <remarks>
+  /// It is exactly invertible in integers, which is the point of it: green comes back from the
+  /// luminance and the two differences, and the other two from green.
+  /// </remarks>
+  private static void _InverseReversibleComponentTransform(int[][,] planes, int width, int height) {
+    for (var y = 0; y < height; ++y)
+    for (var x = 0; x < width; ++x) {
+      int y0 = planes[0][y, x], y1 = planes[1][y, x], y2 = planes[2][y, x];
+
+      var green = y0 - ((y1 + y2) >> 2);
+      planes[0][y, x] = y2 + green;
+      planes[1][y, x] = green;
+      planes[2][y, x] = y1 + green;
+    }
+  }
+
+  /// <summary>Brings one sample of a stated depth down to a byte.</summary>
+  private static byte _ToByte(int value, int bits) => bits switch {
+    8 => (byte)value,
+    > 8 => (byte)(value >> (bits - 8)),
+    _ => (byte)(value * 255 / ((1 << bits) - 1)),
+  };
 
   /// <summary>Backward-compatible simplified format: raw big-endian int32 wavelet coefficients per component.</summary>
   private static byte[] _DecodeSimplified(byte[] tileData, int width, int height, int componentCount, int levels) {
