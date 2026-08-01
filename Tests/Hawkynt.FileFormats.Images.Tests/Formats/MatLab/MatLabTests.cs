@@ -26,14 +26,22 @@ public class MatLabReaderTests {
 
   [Test]
   public void FromBytes_ValidHeader_Succeeds() {
-    var data = new byte[128 + 64 * 64 * 3];
-    data[0] = 64;
-    data[1] = 0;
-    data[4] = 64; data[5] = 0;
-    var result = MatLabReader.FromBytes(data);
-    Assert.That(result.Width, Is.GreaterThan(0));
-    Assert.That(result.Height, Is.GreaterThan(0));
+    // Built through the writer rather than by hand. Nothing about the picture sits at a fixed
+    // offset here — the file is a chain of tagged elements — so a hand-built fixture can only agree
+    // with a reader that invented the same layout, which is what both used to do.
+    var written = MatLabWriter.ToBytes(new() { Width = 64, Height = 64, PixelData = new byte[64 * 64 * 3] });
+
+    var result = MatLabReader.FromBytes(written);
+
+    Assert.Multiple(() => {
+      Assert.That(result.Width, Is.EqualTo(64));
+      Assert.That(result.Height, Is.EqualTo(64));
+    });
   }
+
+  [Test]
+  public void FromBytes_NoByteOrderMark_ThrowsInvalidDataException()
+    => Assert.Throws<InvalidDataException>(() => MatLabReader.FromBytes(new byte[256]));
 
   [Test]
   public void FromStream_NullStream_ThrowsArgumentNullException()
