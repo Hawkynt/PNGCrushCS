@@ -64,14 +64,10 @@ internal static class XpmTextParser {
       if (string.Equals(colorValue, _TRANSPARENT, StringComparison.OrdinalIgnoreCase)) {
         transparentIndex = i;
         // Leave palette entry as 0,0,0 for transparent
-      } else if (colorValue.StartsWith('#')) {
-        var hex = colorValue[1..];
-        if (hex.Length == 6) {
-          palette[i * 3] = byte.Parse(hex[..2], NumberStyles.HexNumber, CultureInfo.InvariantCulture);
-          palette[i * 3 + 1] = byte.Parse(hex[2..4], NumberStyles.HexNumber, CultureInfo.InvariantCulture);
-          palette[i * 3 + 2] = byte.Parse(hex[4..6], NumberStyles.HexNumber, CultureInfo.InvariantCulture);
-        } else
-          throw new InvalidOperationException($"Unsupported hex color format: {colorValue}");
+      } else if (XpmColorNames.TryResolve(colorValue, out var red, out var green, out var blue)) {
+        palette[i * 3] = red;
+        palette[i * 3 + 1] = green;
+        palette[i * 3 + 2] = blue;
       } else
         throw new InvalidOperationException($"Unsupported color value: {colorValue}");
 

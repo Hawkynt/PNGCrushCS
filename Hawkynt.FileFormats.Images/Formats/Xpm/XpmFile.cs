@@ -8,7 +8,9 @@ namespace FileFormat.Xpm;
 public readonly record struct XpmFile : IImageFormatReader<XpmFile>, IImageToRawImage<XpmFile>, IImageFromRawImage<XpmFile>, IImageFormatWriter<XpmFile> {
 
   static string IImageFormatMetadata<XpmFile>.PrimaryExtension => ".xpm";
-  static string[] IImageFormatMetadata<XpmFile>.FileExtensions => [".xpm"];
+    // .picon as well: a "personal icon" is an XPM, magic and all — the name says what it is for,
+  // not what it is.
+  static string[] IImageFormatMetadata<XpmFile>.FileExtensions => [".xpm", ".picon"];
   static XpmFile IImageFormatReader<XpmFile>.FromSpan(ReadOnlySpan<byte> data) => XpmReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<XpmFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 256)])];
   static byte[] IImageFormatWriter<XpmFile>.ToBytes(XpmFile file) => XpmWriter.ToBytes(file);
