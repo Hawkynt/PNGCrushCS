@@ -343,13 +343,17 @@ public sealed class ImageFormatDetectorTests {
     Assert.That(ImageFormatDetector.DetectFromExtension(file), Is.EqualTo(ImageFormat.Ingr));
   }
 
+  /// <remarks>
+  /// A PDB is a Palm database of any kind, and the type at offset 60 is what says this one holds a
+  /// picture: vIMG, the Palm Image Viewer. "Img " was looked for instead, which nothing writes.
+  /// </remarks>
   [Test]
   public void DetectFromSignature_PalmPdbMagic_ReturnsPalmPdb() {
     var header = new byte[64];
-    header[60] = 0x49; // I
-    header[61] = 0x6D; // m
-    header[62] = 0x67; // g
-    header[63] = 0x20; // (space)
+    header[60] = 0x76; // v
+    header[61] = 0x49; // I
+    header[62] = 0x4D; // M
+    header[63] = 0x47; // G
     Assert.That(ImageFormatDetector.DetectFromSignature(header), Is.EqualTo(ImageFormat.PalmPdb));
   }
 
