@@ -44,6 +44,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.InterlacedLogoEditor, "Interlaced Logo Editor", 320, 48, ".ile"),
     new(ImageFormat.MiniPaint, "Mini Paint", 160, 192, ".mg"),
     new(ImageFormat.PetDraw, "PetDraw64", 320, 200, ".pdr"),
+    new(ImageFormat.SpecScii, "SpecScii", 256, 192, ".zxs"),
     new(ImageFormat.Doodle, "Doodle", 320, 200),
     new(ImageFormat.HiPicCreator, "Hi-Pic Creator", 320, 200),
     new(ImageFormat.HiresC64, "Hires-Bitmap", 320, 200, ".hbm"),

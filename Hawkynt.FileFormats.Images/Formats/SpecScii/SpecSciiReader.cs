@@ -38,6 +38,14 @@ public static class SpecSciiReader {
     for (var cell = 0; cell < SpecSciiFile.Columns * SpecSciiFile.Rows; ++cell)
       if (data[SpecSciiFile.ScreenOffset + cell] >= SpecSciiFile.CharacterCount)
         throw new InvalidDataException($"Cell {cell} names a character the set does not hold.");
+    var stated = data[SpecSciiFile.LengthOffset]
+                 | (data[SpecSciiFile.LengthOffset + 1] << 8)
+                 | (data[SpecSciiFile.LengthOffset + 2] << 16)
+                 | (data[SpecSciiFile.LengthOffset + 3] << 24);
+    if (stated != SpecSciiFile.FileSize)
+      throw new InvalidDataException(
+        $"A ZX_SSCII screen states its length as {stated} rather than {SpecSciiFile.FileSize}.");
+
 
     return new() { Data = data.ToArray() };
   }
