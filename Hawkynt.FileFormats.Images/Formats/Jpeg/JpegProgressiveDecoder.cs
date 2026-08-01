@@ -228,21 +228,31 @@ internal static class JpegProgressiveDecoder {
             continue;
           }
 
-          // s == 1: new non-zero coefficient
-          // Skip r zero coefficients, refining non-zeros along the way
-          for (var i = 0; i < r && k2 <= se;) {
+          // A new coefficient goes at the r-th zero counting from here — and the walk to it has to
+          // carry on past any non-zero it meets, refining each. Stopping after r zeros and writing
+          // wherever that landed overwrites a coefficient that was already there, which is what this
+          // did: whole rows of a block came out wrong wherever a refinement scan met that case.
+          var target = r;
+          var placed = false;
+          while (k2 <= se) {
             if (block.Coefficients[k2] != 0) {
               var bit = reader.ReadBit();
               if (bit != 0)
                 if ((block.Coefficients[k2] & p1) == 0)
                   block.Coefficients[k2] += (short)(block.Coefficients[k2] > 0 ? p1 : m1);
-            } else
-              ++i;
+            } else {
+              if (target == 0) {
+                placed = true;
+                break;
+              }
+
+              --target;
+            }
 
             ++k2;
           }
 
-          if (k2 > se)
+          if (!placed)
             break;
 
           var sign = reader.ReadBit();
