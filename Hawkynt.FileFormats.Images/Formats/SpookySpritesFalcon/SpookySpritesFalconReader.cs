@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Text;
 
 namespace FileFormat.SpookySpritesFalcon;
 
@@ -27,27 +28,22 @@ public static class SpookySpritesFalconReader {
   }
 
   public static SpookySpritesFalconFile FromSpan(ReadOnlySpan<byte> data) {
-
-    if (data.Length < SpookySpritesFalconHeader.StructSize)
-      throw new InvalidDataException("Data too small for a valid Spooky Sprites Falcon file.");
+    if (data.Length < SpookySpritesFalconHeader.StructSize
+        || Encoding.ASCII.GetString(data[..4]) != SpookySpritesFalconHeader.Signature)
+      throw new InvalidDataException("Not a Spooky Sprites picture.");
 
     var header = SpookySpritesFalconHeader.ReadFrom(data);
-    var width = (int)header.Width;
-    var height = (int)header.Height;
-
+    int width = header.Width, height = header.Height;
     if (width == 0 || height == 0)
-      throw new InvalidDataException("Spooky Sprites Falcon image dimensions must be non-zero.");
+      throw new InvalidDataException($"A Spooky Sprites picture states no size: {width}x{height}.");
 
-    var compressedData = data.Slice(SpookySpritesFalconHeader.StructSize);
-    var pixelCount = width * height;
-    var pixelData = SpookySpritesFalconRleCompressor.Decompress(compressedData, pixelCount);
-
-    return new SpookySpritesFalconFile {
+    return new() {
       Width = width,
       Height = height,
-      PixelData = pixelData,
+      PixelData = SpookySpritesFalconRleCompressor.Decompress(
+        data[SpookySpritesFalconHeader.StructSize..], width * height),
     };
-    }
+  }
 
   public static SpookySpritesFalconFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
