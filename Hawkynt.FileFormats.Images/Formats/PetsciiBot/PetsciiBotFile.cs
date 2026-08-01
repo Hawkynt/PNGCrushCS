@@ -15,7 +15,10 @@ namespace FileFormat.PetsciiBot;
 /// to have a letter's name.
 /// </remarks>
 public readonly record struct PetsciiBotFile
-  : IImageFormatReader<PetsciiBotFile>, IImageToRawImage<PetsciiBotFile> {
+  : IImageFormatReader<PetsciiBotFile>, IImageToRawImage<PetsciiBotFile>,
+    IImageFromRawImage<PetsciiBotFile>, IImageFormatWriter<PetsciiBotFile> {
+
+  static byte[] IImageFormatWriter<PetsciiBotFile>.ToBytes(PetsciiBotFile file) => PetsciiBotWriter.ToBytes(file);
 
   /// <summary>Pixels a character cell spans in each direction.</summary>
   public const int CellSize = 8;
@@ -88,4 +91,78 @@ public readonly record struct PetsciiBotFile
 
   private static byte _At(ReadOnlySpan<byte> data, int offset)
     => offset >= 0 && offset < data.Length ? data[offset] : (byte)0;
+
+  /// <summary>Builds a picture at whichever of the two shapes the source is nearer.</summary>
+  /// <remarks>
+  /// Only two sizes exist and nothing in the file states one, so a picture of any other shape is
+  /// sampled to the nearer rather than written to a length nothing can read.
+  /// <para/>
+  /// Everything a character does not draw is black — there is no background colour to choose — so a
+  /// cell's own colour is simply the best match for the part of it that is not.
+  /// </remarks>
+  public static PetsciiBotFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var large = Math.Abs(image.Width - LargeColumns * CellSize) + Math.Abs(image.Height - LargeRows * CellSize)
+                <= Math.Abs(image.Width - SmallColumns * CellSize) + Math.Abs(image.Height - SmallRows * CellSize);
+
+    var columns = large ? LargeColumns : SmallColumns;
+    var rows = large ? LargeRows : SmallRows;
+    int width = columns * CellSize, height = rows * CellSize;
+
+    var rgb = image.SampleTo(width, height).PixelData;
+    var c64 = Commodore64Graphics.CreatePalette();
+    var cells = columns * rows;
+
+    var wanted = new byte[width * height];
+    var data = new byte[cells * 2];
+
+    for (var row = 0; row < rows; ++row)
+    for (var column = 0; column < columns; ++column) {
+      var ink = _ChooseInk(rgb, c64, width, column * CellSize, row * CellSize);
+      data[row * columns + column] = ink;
+
+      for (var y = 0; y < CellSize; ++y)
+      for (var x = 0; x < CellSize; ++x) {
+        var pixel = (row * CellSize + y) * width + column * CellSize + x;
+        var at = pixel * 3;
+        wanted[pixel] = (byte)(_Distance(rgb, at, c64, ink) < _Distance(rgb, at, c64, 0) ? 1 : 0);
+      }
+    }
+
+    CharacterRoms.MatchGlyphs(wanted, columns, rows, Font, GlyphCount).AsSpan(0, cells).CopyTo(data.AsSpan(cells));
+
+    return new() { Columns = columns, Rows = rows, Data = data };
+  }
+
+  /// <summary>The colour a cell draws in, black being what it is drawn over.</summary>
+  private static byte _ChooseInk(ReadOnlySpan<byte> rgb, ReadOnlySpan<byte> c64, int width, int x0, int y0) {
+    byte best = 0;
+    var bestCost = long.MaxValue;
+
+    for (byte candidate = 0; candidate < Commodore64Graphics.ColorCount; ++candidate) {
+      long cost = 0;
+
+      for (var y = y0; y < y0 + CellSize; ++y)
+      for (var x = x0; x < x0 + CellSize; ++x) {
+        var at = (y * width + x) * 3;
+        cost += Math.Min(_Distance(rgb, at, c64, candidate), _Distance(rgb, at, c64, 0));
+      }
+
+      if (cost >= bestCost)
+        continue;
+
+      bestCost = cost;
+      best = candidate;
+    }
+
+    return best;
+  }
+
+  private static long _Distance(ReadOnlySpan<byte> rgb, int at, ReadOnlySpan<byte> c64, int color) {
+    var entry = color * 3;
+    long dr = rgb[at] - c64[entry], dg = rgb[at + 1] - c64[entry + 1], db = rgb[at + 2] - c64[entry + 2];
+
+    return dr * dr + dg * dg + db * db;
+  }
 }
