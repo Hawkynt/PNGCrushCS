@@ -55,14 +55,24 @@ public sealed class FormatRoundTripTests {
 
   // --- Fixed-size formats ---
 
+  /// <summary>
+  /// HRZ is fixed at 256x240 and stores six bits a channel, so eight-bit samples cannot survive the
+  /// trip exactly.
+  /// </summary>
+  /// <remarks>
+  /// This used to be asserted at zero tolerance and passed, because the reader handed the six-bit
+  /// samples out untouched and the writer put them back the same way — a loop that was wrong in both
+  /// directions and so agreed with itself, while every HRZ decoded at a quarter of its brightness.
+  /// With the samples scaled properly the round trip is off by at most the quantisation the format
+  /// imposes: three, the largest gap between two values six bits apart.
+  /// </remarks>
   [Test]
   public void Hrz_Rgb24_RoundTrip() {
-    // HRZ is fixed 256x240
     var data = new byte[256 * 240 * 4];
     new Random(42).NextBytes(data);
     for (var i = 3; i < data.Length; i += 4) data[i] = 255;
     var raw = new RawImage { Width = 256, Height = 240, Format = PixelFormat.Rgba32, PixelData = data };
-    _AssertRoundTrip<HrzFile>(raw, PixelFormat.Rgb24);
+    _AssertRoundTrip<HrzFile>(raw, PixelFormat.Rgb24, tolerance: 3);
   }
 
   // --- Cross-format chain ---
