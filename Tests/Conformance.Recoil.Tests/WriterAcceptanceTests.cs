@@ -119,8 +119,21 @@ public sealed class WriterAcceptanceTests {
         // format; the file is readable if either reads it.
         var verdicts = new[] { _AskRecoil(path), _AskImageMagick(path), _AskXnView(path), _AskIrfanView(path) }
           .Where(v => v != null).ToArray();
-        if (verdicts.Length == 0)
+
+        // The service is somebody else's machine and every question costs it work, so it is asked
+        // only where no installed tool has an opinion — which is exactly where its answer is worth
+        // having.
+        if (verdicts.Length == 0) {
+          var remote = _AskTomsEditor(path);
+          if (remote == null)
+            continue;
+
+          if (remote.Value.Accepted)
+            return;
+
+          rejected ??= $"at {width}x{height} as {extension}, {remote.Value.Reason}";
           continue;
+        }
 
         if (verdicts.Any(v => v!.Value.Accepted))
           return;
@@ -145,7 +158,8 @@ public sealed class WriterAcceptanceTests {
     => _RecoilExtensions.Value.Contains(extension)
       || _ImageMagickExtensions.Value.Contains(extension)
       || XnViewOracle.Extensions.Contains(extension)
-      || IrfanViewOracle.Extensions.Contains(extension);
+      || IrfanViewOracle.Extensions.Contains(extension)
+      || (TomsEditorOracle.Enabled && TomsEditorOracle.Extensions.Contains(extension));
 
   /// <summary>The sizes a format says it takes, most likely first.</summary>
   /// <remarks>
@@ -250,6 +264,15 @@ public sealed class WriterAcceptanceTests {
     var (decoded, output) = RecoilOracle.TryDecode(path);
 
     return (decoded, $"RECOIL rejected it — {output}");
+  }
+
+  private static (bool Accepted, string Reason)? _AskTomsEditor(string path) {
+    if (!TomsEditorOracle.Enabled || !TomsEditorOracle.Extensions.Contains(Path.GetExtension(path)))
+      return null;
+
+    var (decoded, output) = TomsEditorOracle.TryDecode(path);
+
+    return (decoded, $"Tom's Editor rejected it — {output}");
   }
 
   private static (bool Accepted, string Reason)? _AskIrfanView(string path) {

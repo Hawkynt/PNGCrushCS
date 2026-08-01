@@ -1,67 +1,102 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
-using FileFormat.NokiaLogo;
+using System.Text;
 using FileFormat.Core;
 
 namespace FileFormat.NokiaLogo.Tests;
 
+/// <summary>
+/// A Nokia operator logo: twenty bytes of header, then a character a pixel.
+/// </summary>
+/// <remarks>
+/// The body is text — the letter zero or the letter one — not bits. It is an extravagant way to
+/// store a two-colour picture and it is what the format does.
+/// <para/>
+/// The layout here came from a file a conversion service produced on request, and was checked by
+/// sending our own output back to it. What was here before had no header at all and was locked to
+/// 72 by 14; neither was real.
+/// </remarks>
 [TestFixture]
-public class NokiaLogoReaderTests {
+public sealed class NokiaLogoTests {
 
-  [Test]
-  public void FromFile_NullFile_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => NokiaLogoReader.FromFile(null!));
-
-  [Test]
-  public void FromFile_MissingFile_ThrowsFileNotFoundException()
-    => Assert.Throws<FileNotFoundException>(() => NokiaLogoReader.FromFile(new FileInfo("nonexistent.bin")));
-
-  [Test]
-  public void FromBytes_NullData_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => NokiaLogoReader.FromBytes(null!));
-
-  [Test]
-  public void FromBytes_TooSmall_ThrowsInvalidDataException()
-    => Assert.Throws<InvalidDataException>(() => NokiaLogoReader.FromBytes(new byte[1]));
-
-  [Test]
-  public void FromBytes_ExactSize_Succeeds() {
-    var data = new byte[131];
-    var result = NokiaLogoReader.FromBytes(data);
-    Assert.That(result.Width, Is.EqualTo(72));
-    Assert.That(result.Height, Is.EqualTo(14));
-  }
-
-  [Test]
-  public void FromStream_NullStream_ThrowsArgumentNullException()
-    => Assert.Throws<ArgumentNullException>(() => NokiaLogoReader.FromStream(null!));
-}
-
-[TestFixture]
-public class RoundTripTests {
-
-  [Test]
-  public void RoundTrip_AllBytes_Preserved() {
-    var original = new byte[131];
-    for (var i = 0; i < original.Length; ++i)
-      original[i] = (byte)(i * 7 & 0xFF);
-    var file = NokiaLogoReader.FromBytes(original);
-    var written = NokiaLogoWriter.ToBytes(file);
-    Assert.That(written, Is.EqualTo(original));
-  }
-
-  [Test]
-  public void RoundTrip_ViaFile() {
-    var original = new byte[131];
-    var tmp = Path.GetTempFileName();
-    try {
-      File.WriteAllBytes(tmp, original);
-      var file = NokiaLogoReader.FromFile(new FileInfo(tmp));
-      var written = NokiaLogoWriter.ToBytes(file);
-      Assert.That(written, Is.EqualTo(original));
-    } finally {
-      File.Delete(tmp);
+  private static RawImage _Picture(int width, int height) {
+    var pixels = new byte[width * height * 3];
+    for (var y = 0; y < height; ++y)
+    for (var x = 0; x < width; ++x) {
+      var ink = (x / 4 + y / 4) % 2 == 0;
+      var at = (y * width + x) * 3;
+      pixels[at] = pixels[at + 1] = pixels[at + 2] = (byte)(ink ? 0 : 255);
     }
+
+    return new() { Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = pixels };
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void Written_HasTheHeaderTheFormatStates() {
+    var bytes = NokiaLogoWriter.ToBytes(NokiaLogoFile.FromRawImage(_Picture(72, 14)));
+
+    Assert.Multiple(() => {
+      Assert.That(Encoding.ASCII.GetString(bytes, 0, 3), Is.EqualTo("NOL"));
+      Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(bytes.AsSpan(10)), Is.EqualTo(72));
+      Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(bytes.AsSpan(12)), Is.EqualTo(14));
+      Assert.That(bytes, Has.Length.EqualTo(20 + 72 * 14));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void Written_SpendsACharacterAPixelRatherThanABit() {
+    var bytes = NokiaLogoWriter.ToBytes(NokiaLogoFile.FromRawImage(_Picture(8, 2)));
+
+    for (var i = 20; i < bytes.Length; ++i)
+      Assert.That(bytes[i], Is.AnyOf((byte)'0', (byte)'1'), $"byte {i}");
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void Read_TakesAnySizeTheHeaderStates() {
+    var data = new byte[20 + 640 * 480];
+    Encoding.ASCII.GetBytes("NOL").CopyTo(data, 0);
+    BinaryPrimitives.WriteUInt16LittleEndian(data.AsSpan(10), 640);
+    BinaryPrimitives.WriteUInt16LittleEndian(data.AsSpan(12), 480);
+    Array.Fill(data, (byte)'0', 20, 640 * 480);
+
+    var file = NokiaLogoReader.FromBytes(data);
+
+    Assert.Multiple(() => {
+      Assert.That(file.Width, Is.EqualTo(640), "the size is not fixed at the operator-logo one");
+      Assert.That(file.Height, Is.EqualTo(480));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void Read_RefusesSomethingElse()
+    => Assert.Throws<InvalidDataException>(() => NokiaLogoReader.FromBytes(new byte[64]));
+
+  [Test]
+  [Category("Unit")]
+  public void Read_RefusesAFileShorterThanItsHeaderClaims() {
+    var data = new byte[20 + 100];
+    Encoding.ASCII.GetBytes("NOL").CopyTo(data, 0);
+    BinaryPrimitives.WriteUInt16LittleEndian(data.AsSpan(10), 640);
+    BinaryPrimitives.WriteUInt16LittleEndian(data.AsSpan(12), 480);
+
+    Assert.Throws<InvalidDataException>(() => NokiaLogoReader.FromBytes(data));
+  }
+
+  [Test]
+  [Category("Integration")]
+  public void RoundTrip_KeepsEveryPixel() {
+    var original = NokiaLogoFile.FromRawImage(_Picture(72, 14));
+    var restored = NokiaLogoReader.FromBytes(NokiaLogoWriter.ToBytes(original));
+
+    Assert.Multiple(() => {
+      Assert.That(restored.Width, Is.EqualTo(72));
+      Assert.That(restored.Height, Is.EqualTo(14));
+      Assert.That(restored.PixelData, Is.EqualTo(original.PixelData));
+    });
   }
 }
-

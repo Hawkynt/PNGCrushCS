@@ -1,5 +1,7 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
+using System.Text;
 
 namespace FileFormat.NokiaLogo;
 
@@ -9,7 +11,8 @@ public static class NokiaLogoReader {
   public static NokiaLogoFile FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
-      throw new FileNotFoundException("NokiaLogo file not found.", file.FullName);
+      throw new FileNotFoundException("Logo not found.", file.FullName);
+
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
@@ -18,30 +21,39 @@ public static class NokiaLogoReader {
     if (stream.CanSeek) {
       var data = new byte[stream.Length - stream.Position];
       stream.ReadExactly(data);
-      return FromBytes(data);
+      return FromSpan(data);
     }
+
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
+    return FromSpan(ms.ToArray());
   }
 
   public static NokiaLogoFile FromSpan(ReadOnlySpan<byte> data) {
+    if (data.Length < NokiaLogoFile.HeaderSize
+        || Encoding.ASCII.GetString(data[..NokiaLogoFile.Signature.Length]) != NokiaLogoFile.Signature)
+      throw new InvalidDataException("Not a Nokia operator logo.");
 
-    if (data.Length != NokiaLogoFile.FileSize)
-      throw new InvalidDataException($"Invalid NokiaLogo data size: expected exactly {NokiaLogoFile.FileSize} bytes, got {data.Length}.");
+    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[NokiaLogoFile.WidthOffset..]);
+    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[NokiaLogoFile.HeightOffset..]);
+    if (width == 0 || height == 0)
+      throw new InvalidDataException($"A Nokia logo states no size: {width}x{height}.");
 
-    var pixelData = new byte[NokiaLogoFile.FileSize];
-    data.Slice(0, NokiaLogoFile.FileSize).CopyTo(pixelData);
-    return new() { PixelData = pixelData };
-    }
+    var pixels = width * height;
+    if (data.Length < NokiaLogoFile.HeaderSize + pixels)
+      throw new InvalidDataException(
+        $"{width}x{height} needs {NokiaLogoFile.HeaderSize + pixels} bytes; this file is {data.Length}.");
+
+    // The body is text: anything that is not the letter zero counts as ink.
+    var indices = new byte[pixels];
+    for (var i = 0; i < pixels; ++i)
+      indices[i] = (byte)(data[NokiaLogoFile.HeaderSize + i] == '0' ? 0 : 1);
+
+    return new() { Width = width, Height = height, PixelData = indices };
+  }
 
   public static NokiaLogoFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length != NokiaLogoFile.FileSize)
-      throw new InvalidDataException($"Invalid NokiaLogo data size: expected exactly {NokiaLogoFile.FileSize} bytes, got {data.Length}.");
-
-    var pixelData = new byte[NokiaLogoFile.FileSize];
-    data.AsSpan(0, NokiaLogoFile.FileSize).CopyTo(pixelData);
-    return new() { PixelData = pixelData };
+    return FromSpan(data);
   }
 }
