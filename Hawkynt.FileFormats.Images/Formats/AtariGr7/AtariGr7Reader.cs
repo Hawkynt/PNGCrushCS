@@ -1,4 +1,5 @@
 using System;
+using FileFormat.Core;
 using System.IO;
 
 namespace FileFormat.AtariGr7;
@@ -27,16 +28,18 @@ public static class AtariGr7Reader {
   }
 
   public static AtariGr7File FromSpan(ReadOnlySpan<byte> data) {
-    if (data.Length < AtariGr7File.FileSize)
-      throw new InvalidDataException($"Data too small for Atari GR.7 screen dump. Expected {AtariGr7File.FileSize} bytes, got {data.Length}.");
+    // A whole number of rows and then the four colour registers, which is why the length leaves a
+    // remainder of four rather than none.
     if (data.Length != AtariGr7File.FileSize)
-      throw new InvalidDataException($"Invalid Atari GR.7 screen dump size. Expected exactly {AtariGr7File.FileSize} bytes, got {data.Length}.");
+      throw new InvalidDataException(
+        $"An Atari GR.7 screen is {AtariGr7File.FileSize} bytes — its rows and then four registers — got {data.Length}.");
 
     var pixelData = _UnpackPixels(data);
 
     return new AtariGr7File {
       PixelData = pixelData,
-      Palette = AtariGr7File.DefaultPalette[..],
+      // The registers the file states rather than a set assumed for it.
+      Palette = _ReadRegisters(data),
     };
   }
 
@@ -59,5 +62,19 @@ public static class AtariGr7Reader {
       }
 
     return pixels;
+  }
+
+  /// <summary>Turns the four trailing registers into the colours they name.</summary>
+  private static byte[] _ReadRegisters(ReadOnlySpan<byte> data) {
+    var gtia = Atari8BitGraphics.Palette;
+    var palette = new byte[AtariGr7File.RegisterCount * 3];
+    var at = AtariGr7File.BytesPerRow * AtariGr7File.PixelHeight;
+
+    for (var i = 0; i < AtariGr7File.RegisterCount; ++i) {
+      var entry = (data[at + i] & 254) * 3;
+      gtia.Slice(entry, 3).CopyTo(palette.AsSpan(i * 3));
+    }
+
+    return palette;
   }
 }

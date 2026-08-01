@@ -22,7 +22,15 @@ public readonly record struct AtariGr7File : IImageFormatReader<AtariGr7File>, I
   internal const int ColorCount = 4;
 
   /// <summary>Exact file size in bytes (40 x 96 = 3840).</summary>
-  internal const int FileSize = BytesPerRow * PixelHeight;
+  /// <summary>The four colour registers that follow the rows: background, then the three playfields.</summary>
+  /// <remarks>
+  /// They are a trailer rather than a header, which is why the length of one of these files is four
+  /// more than a whole number of rows. A file written without them is the right picture at a length
+  /// nothing recognises — the check every reader makes is on that remainder.
+  /// </remarks>
+  internal const int RegisterCount = 4;
+
+  internal const int FileSize = BytesPerRow * PixelHeight + RegisterCount;
 
   static string IImageFormatMetadata<AtariGr7File>.PrimaryExtension => ".gr7";
   static string[] IImageFormatMetadata<AtariGr7File>.FileExtensions => [".gr7"];

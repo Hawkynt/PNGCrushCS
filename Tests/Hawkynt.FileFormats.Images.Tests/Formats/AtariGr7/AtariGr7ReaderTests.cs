@@ -49,7 +49,7 @@ public sealed class AtariGr7ReaderTests {
   [Test]
   [Category("Unit")]
   public void FromBytes_ExactSize_Parses() {
-    var data = new byte[3840];
+    var data = new byte[AtariGr7File.FileSize];
     data[0] = 0b11100100;
 
     var result = AtariGr7Reader.FromBytes(data);
@@ -62,7 +62,7 @@ public sealed class AtariGr7ReaderTests {
   [Test]
   [Category("Unit")]
   public void FromBytes_UnpacksPixels_Correctly() {
-    var data = new byte[3840];
+    var data = new byte[AtariGr7File.FileSize];
     data[0] = 0b11100100;
 
     var result = AtariGr7Reader.FromBytes(data);
@@ -76,7 +76,7 @@ public sealed class AtariGr7ReaderTests {
   [Test]
   [Category("Unit")]
   public void FromBytes_HasDefaultPalette() {
-    var data = new byte[3840];
+    var data = new byte[AtariGr7File.FileSize];
 
     var result = AtariGr7Reader.FromBytes(data);
 
@@ -87,7 +87,7 @@ public sealed class AtariGr7ReaderTests {
   [Test]
   [Category("Unit")]
   public void FromStream_Valid() {
-    var data = new byte[3840];
+    var data = new byte[AtariGr7File.FileSize];
     data[0] = 0xFF;
 
     using var ms = new MemoryStream(data);
@@ -100,7 +100,7 @@ public sealed class AtariGr7ReaderTests {
   [Test]
   [Category("Unit")]
   public void FromBytes_AllZeroByte_UnpacksToZeros() {
-    var data = new byte[3840];
+    var data = new byte[AtariGr7File.FileSize];
 
     var result = AtariGr7Reader.FromBytes(data);
 
@@ -113,7 +113,7 @@ public sealed class AtariGr7ReaderTests {
   [Test]
   [Category("Unit")]
   public void FromBytes_AllMaxByte_UnpacksToThrees() {
-    var data = new byte[3840];
+    var data = new byte[AtariGr7File.FileSize];
     data[0] = 0xFF;
 
     var result = AtariGr7Reader.FromBytes(data);
