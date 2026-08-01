@@ -49,8 +49,13 @@ public sealed class ProgressiveRefineTests {
   /// <item>Not the scan structure: the scans, their bands and their approximations read back correctly.</item>
   /// <item>Not the coefficients: the baseline writer shares them and lands at a mean of 2.96.</item>
   /// <item>Not the reader: it takes ImageMagick's progressive files to within 5 of 255.</item>
+  /// <item>Not the interleaved first DC scan: written alone it is right to a mean of 3.65, which is
+  /// all a picture of block averages can be.</item>
+  /// <item>Not the luma AC scans: a grey picture, which has only those, comes out at a mean of 4.99
+  /// against its own baseline's 4.24.</item>
   /// </list>
-  /// So it is in what the first-pass DC or AC scan puts in the entropy data.
+  /// What is left is the two chroma AC scans, which are the only part a grey picture does not
+  /// exercise and a DC-only one does not reach.
   /// </remarks>
   [Test]
   [Ignore("The progressive writer is wrong: ImageMagick reads our own output at a mean of 35 of 255.")]
