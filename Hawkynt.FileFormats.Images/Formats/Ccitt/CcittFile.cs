@@ -10,7 +10,7 @@ public sealed class CcittFile :
   IImageFromRawImage<CcittFile>, IImageFormatWriter<CcittFile> {
 
   static string IImageFormatMetadata<CcittFile>.PrimaryExtension => ".g3";
-  static string[] IImageFormatMetadata<CcittFile>.FileExtensions => [".g3", ".g4", ".ccitt"];
+  static string[] IImageFormatMetadata<CcittFile>.FileExtensions => [".g3", ".g4", ".ccitt", ".fax"];
   static CcittFile IImageFormatReader<CcittFile>.FromSpan(ReadOnlySpan<byte> data) => ReadBareStream(data);
   static VideoMode[] IImageFormatMetadata<CcittFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])
