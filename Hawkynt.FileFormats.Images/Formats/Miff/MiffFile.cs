@@ -21,7 +21,30 @@ public readonly record struct MiffFile : IImageFormatReader<MiffFile>, IImageToR
   public byte[] PixelData { get; init; }
   public byte[]? Palette { get; init; }
 
+  /// <summary>Takes the top byte of each sample when the file stores more than eight bits.</summary>
+  /// <remarks>
+  /// The header states a depth, and it is routinely sixteen or thirty-two — the reference tool writes
+  /// sixteen by default. Reading those bytes as though each were a sample does not fail; it produces
+  /// a picture of the right size in which every other value is a low byte, which looks like noise
+  /// laid over the picture rather than like a misread.
+  /// <para/>
+  /// The top byte is taken rather than the sample rounded, because rounding can carry a sample past
+  /// the neighbour it is meant to stay below.
+  /// </remarks>
+  private static byte[] _NarrowSamples(byte[] data, int depth) {
+    if (depth <= 8)
+      return data[..];
+
+    var step = depth / 8;
+    var narrowed = new byte[data.Length / step];
+    for (var i = 0; i < narrowed.Length; ++i)
+      narrowed[i] = data[i * step];
+
+    return narrowed;
+  }
+
   public static RawImage ToRawImage(MiffFile file) {
+    var pixelData = _NarrowSamples(file.PixelData, file.Depth);
 
     if (file.ColorClass == MiffColorClass.PseudoClass && file.Palette != null)
       return new() {
@@ -43,7 +66,7 @@ public readonly record struct MiffFile : IImageFormatReader<MiffFile>, IImageToR
       Width = file.Width,
       Height = file.Height,
       Format = format,
-      PixelData = file.PixelData[..],
+      PixelData = pixelData,
     };
   }
 

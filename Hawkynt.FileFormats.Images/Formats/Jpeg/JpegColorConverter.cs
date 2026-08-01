@@ -50,57 +50,23 @@ internal static class JpegColorConverter {
   }
 
   /// <summary>Converts YCbCr component planes back to packed RGB24.</summary>
+  /// <remarks>
+  /// This was eight pixels at a time through SSE2, and the vectorised form was wrong. The fixed-point
+  /// coefficients are up to 454, and the products were taken in sixteen-bit lanes: a chroma sample
+  /// 126 away from neutral gives 57204, which does not fit in a signed short and wraps to a negative
+  /// number. The result then clamped to the opposite end of the range.
+  /// <para/>
+  /// That is invisible on anything muted — the middle of a picture came out exactly right — and
+  /// turns saturated colour inside out. A fully blue pixel decoded as black. Since the products
+  /// genuinely need more than sixteen bits, the vector form cannot carry them without widening to
+  /// thirty-two-bit lanes, at which point it is doing two pixels at a time and the entropy decoding
+  /// this sits behind dominates anyway. So it does the arithmetic once, in a width that holds it.
+  /// </remarks>
   public static byte[] YCbCrToRgb(byte[] yPlane, byte[] cbPlane, byte[] crPlane, int width, int height) {
     var pixelCount = width * height;
     var rgb = new byte[pixelCount * 3];
 
-    var i = 0;
-
-    // SIMD path: process 8 pixels at a time using SSE2
-    if (Sse2.IsSupported && pixelCount >= 8) {
-      var bias128 = Vector128.Create((short)128);
-      var zero = Vector128<short>.Zero;
-      var max255 = Vector128.Create((short)255);
-
-      // Fixed-point coefficients (Q16)
-      var crToR = Vector128.Create((short)((91881 + 128) >> 8));   // ≈359
-      var cbToG = Vector128.Create((short)((22554 + 128) >> 8));   // ≈88
-      var crToG = Vector128.Create((short)((46802 + 128) >> 8));   // ≈183
-      var cbToB = Vector128.Create((short)((116130 + 128) >> 8));  // ≈454
-
-      for (; i <= pixelCount - 8; i += 8) {
-        // Load 8 bytes and widen to 16-bit
-        var yVec = Sse2.UnpackLow(Vector128.Create(yPlane[i], yPlane[i + 1], yPlane[i + 2], yPlane[i + 3], yPlane[i + 4], yPlane[i + 5], yPlane[i + 6], yPlane[i + 7], 0, 0, 0, 0, 0, 0, 0, 0).AsByte(), Vector128<byte>.Zero).AsInt16();
-        var cbVec = Sse2.Subtract(Sse2.UnpackLow(Vector128.Create(cbPlane[i], cbPlane[i + 1], cbPlane[i + 2], cbPlane[i + 3], cbPlane[i + 4], cbPlane[i + 5], cbPlane[i + 6], cbPlane[i + 7], 0, 0, 0, 0, 0, 0, 0, 0).AsByte(), Vector128<byte>.Zero).AsInt16(), bias128);
-        var crVec = Sse2.Subtract(Sse2.UnpackLow(Vector128.Create(crPlane[i], crPlane[i + 1], crPlane[i + 2], crPlane[i + 3], crPlane[i + 4], crPlane[i + 5], crPlane[i + 6], crPlane[i + 7], 0, 0, 0, 0, 0, 0, 0, 0).AsByte(), Vector128<byte>.Zero).AsInt16(), bias128);
-
-        // R = Y + (91881 * Cr >> 16) ≈ Y + (Cr * 359 >> 8)
-        var rVec = Sse2.Add(yVec, Sse2.ShiftRightArithmetic(Sse2.MultiplyHigh(crVec, crToR), 0));
-        rVec = Sse2.Add(yVec, Sse2.ShiftRightArithmetic(Sse2.MultiplyLow(crVec, crToR), 8));
-
-        // G = Y - ((22554 * Cb + 46802 * Cr) >> 16) ≈ Y - ((Cb * 88 + Cr * 183) >> 8)
-        var gVec = Sse2.Subtract(yVec, Sse2.ShiftRightArithmetic(Sse2.Add(Sse2.MultiplyLow(cbVec, cbToG), Sse2.MultiplyLow(crVec, crToG)), 8));
-
-        // B = Y + (116130 * Cb >> 16) ≈ Y + (Cb * 454 >> 8)
-        var bVec = Sse2.Add(yVec, Sse2.ShiftRightArithmetic(Sse2.MultiplyLow(cbVec, cbToB), 8));
-
-        // Clamp to [0, 255]
-        rVec = Sse2.Max(zero, Sse2.Min(max255, rVec));
-        gVec = Sse2.Max(zero, Sse2.Min(max255, gVec));
-        bVec = Sse2.Max(zero, Sse2.Min(max255, bVec));
-
-        // Interleave and store as RGB24
-        var offset = i * 3;
-        for (var j = 0; j < 8; ++j) {
-          rgb[offset + j * 3] = (byte)rVec.GetElement(j);
-          rgb[offset + j * 3 + 1] = (byte)gVec.GetElement(j);
-          rgb[offset + j * 3 + 2] = (byte)bVec.GetElement(j);
-        }
-      }
-    }
-
-    // Scalar fallback for remaining pixels
-    for (; i < pixelCount; ++i) {
+    for (var i = 0; i < pixelCount; ++i) {
       var yVal = yPlane[i];
       var cbVal = cbPlane[i] - 128;
       var crVal = crPlane[i] - 128;
