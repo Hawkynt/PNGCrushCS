@@ -8,7 +8,7 @@ namespace FileFormat.Ilbm;
 public readonly record struct IlbmFile : IImageFormatReader<IlbmFile>, IImageToRawImage<IlbmFile>, IImageFromRawImage<IlbmFile>, IImageFormatWriter<IlbmFile> {
 
   static string IImageFormatMetadata<IlbmFile>.PrimaryExtension => ".lbm";
-  static string[] IImageFormatMetadata<IlbmFile>.FileExtensions => [".lbm", ".ilbm", ".iff", ".ham", ".ham8", ".256", ".bl1", ".bl2", ".bl3"];
+  static string[] IImageFormatMetadata<IlbmFile>.FileExtensions => [".lbm", ".ilbm", ".iff", ".ham", ".ham6", ".ham8", ".256", ".ap2", ".beam", ".dct", ".dr", ".mp", ".bl1", ".bl2", ".bl3"];
   static IlbmFile IImageFormatReader<IlbmFile>.FromSpan(ReadOnlySpan<byte> data) => IlbmReader.FromSpan(data);
 
   static bool? IImageFormatMetadata<IlbmFile>.MatchesSignature(ReadOnlySpan<byte> header)

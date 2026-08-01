@@ -23,7 +23,7 @@ public readonly record struct UimgFile
   public const int PaletteOffset = 14;
 
   static string IImageFormatMetadata<UimgFile>.PrimaryExtension => ".bp1";
-  static string[] IImageFormatMetadata<UimgFile>.FileExtensions => [".bp1", ".bp2", ".bp4", ".c01", ".c02", ".c04"];
+  static string[] IImageFormatMetadata<UimgFile>.FileExtensions => [".bp1", ".bp2", ".bp4", ".bp6", ".bp8", ".c01", ".c02", ".c04", ".c06", ".c08", ".c24", ".c32"];
   static UimgFile IImageFormatReader<UimgFile>.FromSpan(ReadOnlySpan<byte> data) => UimgReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<UimgFile>.VideoModes => [
     new("UIMG", [(IntegerRange.Any, IntegerRange.Any)], [16777216])
