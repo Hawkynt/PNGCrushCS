@@ -56,6 +56,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.LarkaObjectEditor, "Larka object", 256, 64, ".leo"),
     new(ImageFormat.GraphSaurus6, "Graph Saurus Screen 6", 512, 212, ".sr6"),
     new(ImageFormat.BkScreen, "BK colour screen", 256, 256, ".bks"),
+    new(ImageFormat.HcbEditor, "HCB Editor", 296, 200, ".hcb"),
     new(ImageFormat.Picasso64, "Picasso 64", 160, 200),
     new(ImageFormat.RainbowPainter, "Rainbow Painter", 160, 200),
     new(ImageFormat.SaracenPaint, "Saracen Paint", 160, 200),
