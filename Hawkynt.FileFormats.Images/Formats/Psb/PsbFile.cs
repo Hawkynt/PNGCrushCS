@@ -39,8 +39,14 @@ public readonly record struct PsbFile : IImageFormatReader<PsbFile>, IImageToRaw
   }
 
   public static RawImage ToRawImage(PsbFile file) {
+    // A sixteen-bit document is ordinary rather than exotic — a scanner or a colour-managed edit
+    // produces one — so it is narrowed to the byte carrying the magnitude rather than refused. The
+    // format stores samples most significant byte first, whatever the machine.
+    if (file.Depth == 16)
+      file = file with { Depth = 8, PixelData = _NarrowSamples(file.PixelData) };
+
     if (file.Depth != 8)
-      throw new NotSupportedException($"Only Depth=8 is supported, got {file.Depth}.");
+      throw new NotSupportedException($"Only 8- and 16-bit depths are supported, got {file.Depth}.");
 
     var width = file.Width;
     var height = file.Height;
@@ -148,5 +154,19 @@ public readonly record struct PsbFile : IImageFormatReader<PsbFile>, IImageToRaw
       for (var c = 0; c < channels; ++c)
         result[c * planeSize + i] = interleaved[i * channels + c];
     return result;
+  }
+
+  /// <summary>Narrows sixteen-bit samples to eight, keeping the high byte.</summary>
+  /// <remarks>
+  /// The low byte is dropped rather than rounded into the high one: the difference is under half a
+  /// level at eight bits, and dropping cannot carry a sample past its neighbour the way rounding
+  /// can.
+  /// </remarks>
+  private static byte[] _NarrowSamples(ReadOnlySpan<byte> data) {
+    var narrowed = new byte[data.Length / 2];
+    for (var i = 0; i < narrowed.Length; ++i)
+      narrowed[i] = data[i * 2];
+
+    return narrowed;
   }
 }

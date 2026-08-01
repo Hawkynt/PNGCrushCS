@@ -22,8 +22,13 @@ public sealed class CineonFile :
 
   /// <summary>Converts a Cineon image to a 16-bit <see cref="RawImage"/> by scaling 10-bit values to Rgb48.</summary>
   public static RawImage ToRawImage(CineonFile file) {
+    // Ten bits packed three to a word is what the format was made for, but eight and sixteen are
+    // both written in practice and neither needs unpacking — the samples are already whole bytes.
+    if (file.BitsPerSample is 8 or 16)
+      return _FromWholeBytes(file);
+
     if (file.BitsPerSample != 10)
-      throw new NotSupportedException($"Cineon bit depth {file.BitsPerSample} is not supported; only 10-bit is implemented.");
+      throw new NotSupportedException($"Cineon bit depth {file.BitsPerSample} is not supported; 8, 10 and 16 are.");
 
     var width = file.Width;
     var height = file.Height;
@@ -87,6 +92,29 @@ public sealed class CineonFile :
       Orientation = 0,
       ImageDataOffset = 0,
       PixelData = packed,
+    };
+  }
+
+  /// <summary>Builds a picture from samples that already occupy whole bytes.</summary>
+  /// <remarks>
+  /// The packing is what makes ten bits awkward — three samples share a thirty-two bit word with
+  /// two bits left over. Eight and sixteen need none of that, so they are read straight; the format
+  /// stores the wide ones most significant byte first, whatever the machine.
+  /// </remarks>
+  private static RawImage _FromWholeBytes(CineonFile file) {
+    var count = file.Width * file.Height * 3;
+    var bytesPerSample = file.BitsPerSample / 8;
+    var source = file.PixelData;
+    var pixels = new byte[count * bytesPerSample];
+
+    var available = Math.Min(pixels.Length, source.Length);
+    source.AsSpan(0, available).CopyTo(pixels);
+
+    return new() {
+      Width = file.Width,
+      Height = file.Height,
+      Format = bytesPerSample == 2 ? PixelFormat.Rgb48 : PixelFormat.Rgb24,
+      PixelData = pixels,
     };
   }
 }
