@@ -3,82 +3,109 @@ using System;
 namespace FileFormat.Ccitt;
 
 /// <summary>Decodes CCITT Group 4 (T.6) compressed data to raw 1bpp scanlines.</summary>
+/// <remarks>
+/// A line is held as its changing elements — the positions where it switches colour — rather than as
+/// pixels, because that is what T.6 codes against. Every line is described relative to the one above
+/// it, and the three modes all answer the same question: where does the next colour change go,
+/// given where the reference line changes.
+///
+/// The previous implementation worked on pixels and looked for "the first pixel of the opposite
+/// colour" instead of the first *change* to the opposite colour, which is a different position
+/// entirely on any line that is not a single run. It also read white runs out of the black Huffman
+/// table in horizontal mode, and filled without clamping, so a run that reached the right-hand edge
+/// walked off the end of the scanline.
+/// </remarks>
 internal static class CcittG4Decoder {
 
-  /// <summary>Decodes Group 4 compressed bytes to 1bpp pixel data.</summary>
+  private const int _MODE_PASS = 0;
+  private const int _MODE_HORIZONTAL = 1;
+  private const int _MODE_VERTICAL_0 = 2;
+
+  /// <summary>Vertical mode places a1 this far from b1, indexed by mode - <see cref="_MODE_VERTICAL_0"/>.</summary>
+  private static readonly int[] _VERTICAL_OFFSETS = [0, -1, 1, -2, 2, -3, 3];
+
+  /// <summary>Decodes Group 4 compressed bytes to 1bpp pixel data, where a set bit is black.</summary>
   internal static byte[] Decode(byte[] compressedData, int width, int height) {
+    ArgumentNullException.ThrowIfNull(compressedData);
+    if (width <= 0 || height <= 0)
+      return [];
+
     var bytesPerRow = (width + 7) / 8;
     var pixelData = new byte[bytesPerRow * height];
     var reader = new _BitReader(compressedData);
 
-    // Reference line starts as all-white imaginary line
-    var refLine = new byte[bytesPerRow];
-    var codingLine = new byte[bytesPerRow];
+    // The line above the first is imaginary and all white, which is a line with no changes at all.
+    var refChanges = new int[width + 2];
+    var curChanges = new int[width + 2];
+    var refCount = 0;
 
     for (var row = 0; row < height; ++row) {
-      Array.Clear(codingLine, 0, bytesPerRow);
-      _DecodeLine(reader, codingLine, refLine, width);
-      Array.Copy(codingLine, 0, pixelData, row * bytesPerRow, bytesPerRow);
-      Array.Copy(codingLine, refLine, bytesPerRow);
+      var curCount = _DecodeLine(reader, refChanges, refCount, curChanges, width);
+      if (curCount < 0)
+        break; // EOFB, or the data ran out: whatever is left stays white
+
+      CcittChangingElements.Render(curChanges, curCount, pixelData, row * bytesPerRow, width);
+      (refChanges, curChanges) = (curChanges, refChanges);
+      refCount = curCount;
     }
 
     return pixelData;
   }
 
-  private static void _DecodeLine(_BitReader reader, byte[] codingLine, byte[] refLine, int width) {
+  /// <summary>Decodes one line into <paramref name="curChanges"/>, returning how many it wrote, or -1 to stop.</summary>
+  private static int _DecodeLine(_BitReader reader, int[] refChanges, int refCount, int[] curChanges, int width) {
+    // a0 starts just off the left edge, on an imaginary white pixel, so the first change may be at 0.
     var a0 = -1;
-    var a0Color = false; // false = white
+    var white = true;
+    var count = 0;
 
     while (a0 < width) {
       var mode = _ReadMode(reader);
       if (mode < 0)
-        return;
+        return count > 0 ? count : -1;
+
+      var b1Index = CcittChangingElements.NextOfOppositeColour(refChanges, refCount, a0, white);
+      var b1 = b1Index < refCount ? refChanges[b1Index] : width;
+      var b2 = b1Index + 1 < refCount ? refChanges[b1Index + 1] : width;
 
       switch (mode) {
-        case 0: { // Pass mode
-          var b1 = _FindChangingElement(refLine, a0 < 0 ? 0 : a0, width, a0Color);
-          var b2 = b1 < width ? _FindChangingElement(refLine, b1, width, !a0Color) : width;
-          if (a0Color)
-            _SetBlackPixels(codingLine, a0 < 0 ? 0 : a0, b2 - (a0 < 0 ? 0 : a0));
+        case _MODE_PASS:
+          // The run on this line carries on past b2, so nothing changes colour here.
           a0 = b2;
           break;
-        }
-        case 1: { // Horizontal mode
-          var runA = _DecodeRunLength(reader, !a0Color); // same color as a0
-          var runB = _DecodeRunLength(reader, a0Color);  // opposite color
-          var startPos = a0 < 0 ? 0 : a0;
-          if (!a0Color) {
-            // a0 is white, first run is white (skip), second run is black
-            _SetBlackPixels(codingLine, startPos + runA, runB);
-          } else {
-            // a0 is black, first run is black, second run is white (skip)
-            _SetBlackPixels(codingLine, startPos, runA);
-          }
-          a0 = startPos + runA + runB;
+
+        case _MODE_HORIZONTAL: {
+          // Two runs are spelled out: the first in a0's own colour, the second in the other.
+          var start = a0 < 0 ? 0 : a0;
+          var run1 = _DecodeRunLength(reader, isBlack: !white);
+          var run2 = _DecodeRunLength(reader, isBlack: white);
+          if (run1 < 0 || run2 < 0)
+            return count > 0 ? count : -1;
+
+          var a1 = Math.Min(start + run1, width);
+          var a2 = Math.Min(a1 + run2, width);
+          curChanges[count++] = a1;
+          curChanges[count++] = a2;
+          a0 = a2; // two runs bring the colour back to where it started
           break;
         }
-        default: { // Vertical mode (mode - 2 gives offset index)
-          var verticalIndex = mode - 2;
-          var diff = verticalIndex switch {
-            0 => 0,
-            1 => -1,
-            2 => 1,
-            3 => -2,
-            4 => 2,
-            5 => -3,
-            6 => 3,
-            _ => 0
-          };
-          var b1 = _FindChangingElement(refLine, a0 < 0 ? 0 : a0, width, a0Color);
-          var a1 = Math.Max(0, Math.Min(b1 + diff, width));
-          if (a0Color)
-            _SetBlackPixels(codingLine, a0 < 0 ? 0 : a0, a1 - (a0 < 0 ? 0 : a0));
+
+        default: {
+          var a1 = Math.Clamp(b1 + _VERTICAL_OFFSETS[mode - _MODE_VERTICAL_0], 0, width);
+          curChanges[count++] = a1;
           a0 = a1;
-          a0Color = !a0Color;
+          white = !white;
           break;
         }
       }
+
+      // A well-formed line cannot change colour more often than it has pixels; a malformed one
+      // must not be allowed to run off the end of the array.
+      if (count > width)
+        break;
     }
+
+    return count;
   }
 
   /// <summary>Reads the next mode from the bitstream. Returns: 0=pass, 1=horizontal, 2-8=vertical modes.</summary>
@@ -153,29 +180,29 @@ internal static class CcittG4Decoder {
     return -1;
   }
 
+  /// <summary>Reads a full run: any number of make-up codes followed by one terminating code.</summary>
   private static int _DecodeRunLength(_BitReader reader, bool isBlack) {
     var totalRun = 0;
 
     while (true) {
       var code = _DecodeNextCode(reader, isBlack);
       if (code < 0)
-        return totalRun;
+        return -1;
 
       totalRun += code;
       if (code < 64)
-        break;
+        return totalRun; // terminating codes are 0..63 and end the run
     }
-
-    return totalRun;
   }
 
   private static int _DecodeNextCode(_BitReader reader, bool isBlack) {
     var termTable = isBlack ? CcittHuffmanTable.BlackTerminating : CcittHuffmanTable.WhiteTerminating;
     var makeUpTable = isBlack ? CcittHuffmanTable.BlackMakeUp : CcittHuffmanTable.WhiteMakeUp;
+    var sharedTable = CcittHuffmanTable.SharedMakeUp;
 
     var accumulated = 0;
     var bitsRead = 0;
-    var maxBits = 13;
+    const int maxBits = 13; // the longest code in any of the tables is a 13-bit black make-up
 
     while (bitsRead < maxBits) {
       var bit = reader.ReadBit();
@@ -192,30 +219,14 @@ internal static class CcittG4Decoder {
       for (var i = 0; i < makeUpTable.Length; ++i)
         if (makeUpTable[i].BitLength == bitsRead && makeUpTable[i].Code == accumulated)
           return (i + 1) * 64;
+
+      // Runs of 1792 and above share one table between the two colours.
+      for (var i = 0; i < sharedTable.Length; ++i)
+        if (sharedTable[i].BitLength == bitsRead && sharedTable[i].Code == accumulated)
+          return 1792 + (i * 64);
     }
 
     return -1;
-  }
-
-  private static int _FindChangingElement(byte[] line, int start, int width, bool currentColor) {
-    for (var x = start; x < width; ++x) {
-      var byteIndex = x >> 3;
-      var bitIndex = 7 - (x & 7);
-      var isBlack = ((line[byteIndex] >> bitIndex) & 1) != 0;
-      if (isBlack != currentColor)
-        return x;
-    }
-
-    return width;
-  }
-
-  private static void _SetBlackPixels(byte[] line, int start, int count) {
-    for (var i = 0; i < count; ++i) {
-      var px = start + i;
-      var byteIndex = px >> 3;
-      var bitIndex = 7 - (px & 7);
-      line[byteIndex] |= (byte)(1 << bitIndex);
-    }
   }
 
   private sealed class _BitReader(byte[] data) {

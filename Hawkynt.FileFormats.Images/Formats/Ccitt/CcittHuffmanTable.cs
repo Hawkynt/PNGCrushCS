@@ -201,6 +201,30 @@ internal static class CcittHuffmanTable {
     (0b0000001100101, 13), // 1728
   ];
 
+  /// <summary>
+  /// Extended make-up codes for run lengths 1792, 1856, ..., 2560. Each entry is (code, bitLength).
+  /// </summary>
+  /// <remarks>
+  /// Unlike the tables above, these are shared: the same code means the same run length whether the
+  /// run is white or black. Only lines wider than 1728 pixels can reach them, which is why nothing
+  /// noticed they were missing.
+  /// </remarks>
+  internal static readonly (int Code, int BitLength)[] SharedMakeUp = [
+    (0b00000001000, 11),  // 1792
+    (0b00000001100, 11),  // 1856
+    (0b00000001101, 11),  // 1920
+    (0b000000010010, 12), // 1984
+    (0b000000010011, 12), // 2048
+    (0b000000010100, 12), // 2112
+    (0b000000010101, 12), // 2176
+    (0b000000010110, 12), // 2240
+    (0b000000010111, 12), // 2304
+    (0b000000011100, 12), // 2368
+    (0b000000011101, 12), // 2432
+    (0b000000011110, 12), // 2496
+    (0b000000011111, 12), // 2560
+  ];
+
   /// <summary>EOL marker: 000000000001 (12 bits).</summary>
   internal const int EolCode = 0b000000000001;
   internal const int EolBitLength = 12;

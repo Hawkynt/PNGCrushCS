@@ -25,7 +25,11 @@ public readonly record struct CalsFile() : IImageFormatReader<CalsFile>, IImageT
   /// <summary>Orientation: "portrait" or "landscape".</summary>
   public string Orientation { get; init; } = "portrait";
 
-  /// <summary>1bpp packed pixel data, MSB first, ceil(width/8) bytes per row.</summary>
+  /// <summary>
+  /// Uncompressed 1bpp pixel data, MSB first, ceil(width/8) bytes per row, each bit an index into
+  /// the black-then-white palette. On disk this is Group 4 compressed; the reader expands it and the
+  /// writer packs it back.
+  /// </summary>
   public byte[] PixelData { get; init; }
 
   /// <summary>Source document identifier.</summary>
@@ -34,6 +38,12 @@ public readonly record struct CalsFile() : IImageFormatReader<CalsFile>, IImageT
   /// <summary>Destination document identifier.</summary>
   public string DstDocId { get; init; } = "NONE";
 
+  /// <summary>
+  /// Index 0 is black and index 1 is white, which is the opposite way round from the fax coding the
+  /// pixels arrive in: what Group 4 calls a white run is black ink on a CALS page. Checked both ways
+  /// against ImageMagick — a mostly-white image with one small black square compresses to a stream
+  /// whose one *black* run is the background.
+  /// </summary>
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
   public static RawImage ToRawImage(CalsFile file) => new() {
@@ -47,7 +57,11 @@ public readonly record struct CalsFile() : IImageFormatReader<CalsFile>, IImageT
 
   public static CalsFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    image = image.EnsureFormat(PixelFormat.Indexed1);
+
+    // The palette is fixed by the format, so the indices have to be built against it. A generic
+    // quantizer picks its own two entries and may well order them the other way, and the bits it
+    // produces then mean the opposite of what a CALS reader will take them for.
+    image = image.EnsureIndexed(PixelFormat.Indexed1, _BlackWhitePalette);
 
     return new() {
       Width = image.Width,

@@ -1,4 +1,5 @@
 ﻿using System;
+using FileFormat.Ccitt;
 
 namespace FileFormat.Cals;
 
@@ -14,13 +15,17 @@ public static class CalsWriter {
     var header = CalsHeaderParser.Format(file);
     var bytesPerRow = (file.Width + 7) / 8;
     var expectedPixelBytes = bytesPerRow * file.Height;
-    var fileSize = CalsHeaderParser.HeaderSize + expectedPixelBytes;
 
-    var result = new byte[fileSize];
+    // A type 1 raster is Group 4 by definition, so the pixels are compressed on the way out. The
+    // uncompressed bits were being written straight through, which produced files no CALS reader
+    // could make sense of — and that this one could only read back because it made the same mistake.
+    var pixels = new byte[expectedPixelBytes];
+    file.PixelData.AsSpan(0, Math.Min(expectedPixelBytes, file.PixelData.Length)).CopyTo(pixels);
+    var compressed = CcittG4Encoder.Encode(pixels, file.Width, file.Height);
+
+    var result = new byte[CalsHeaderParser.HeaderSize + compressed.Length];
     header.AsSpan(0, CalsHeaderParser.HeaderSize).CopyTo(result.AsSpan(0));
-
-    var copyLen = Math.Min(expectedPixelBytes, file.PixelData.Length);
-    file.PixelData.AsSpan(0, copyLen).CopyTo(result.AsSpan(CalsHeaderParser.HeaderSize));
+    compressed.CopyTo(result.AsSpan(CalsHeaderParser.HeaderSize));
 
     return result;
   }
