@@ -53,6 +53,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.CocoP11, "CoCo P11", 256, 192, ".p11"),
     new(ImageFormat.SketchPaddles, "Sketch-PadDles", 320, 192, ".skp"),
     new(ImageFormat.CentauriLogoEditor, "Centauri logo", 320, 200, ".cle"),
+    new(ImageFormat.LarkaObjectEditor, "Larka object", 256, 64, ".leo"),
     new(ImageFormat.Picasso64, "Picasso 64", 160, 200),
     new(ImageFormat.RainbowPainter, "Rainbow Painter", 160, 200),
     new(ImageFormat.SaracenPaint, "Saracen Paint", 160, 200),
