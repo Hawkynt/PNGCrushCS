@@ -40,7 +40,16 @@ public sealed record FormatEntry(
   /// length, an unsupported depth and a file that is not this format at all are the same answer,
   /// and telling them apart is most of the work of fixing a reader.
   /// </remarks>
-  Func<FileInfo, RawImage?>? LoadRawImageOrThrow = null
+  Func<FileInfo, RawImage?>? LoadRawImageOrThrow = null,
+
+  /// <summary>Writes a picture to a file, with whatever else that format keeps beside it.</summary>
+  /// <remarks>
+  /// A few formats keep their palette in a separate file and nothing can open the main one without
+  /// it. Encoding returns a single array of bytes and so has nowhere to put that, which is why the
+  /// write that names a file comes through here instead — and why it encodes once rather than
+  /// letting the two halves each read the picture again.
+  /// </remarks>
+  Action<RawImage, FileInfo>? WriteToFile = null
 ) {
 
   /// <summary>The first/preferred MIME type, or <c>"application/octet-stream"</c> if none is registered.</summary>
@@ -51,6 +60,7 @@ public sealed record FormatEntry(
 
   /// <summary>True if this format can encode from a <see cref="RawImage"/>.</summary>
   public bool SupportsWrite => this.ConvertFromRawImage != null;
+
 
   /// <summary>True if this format exposes multiple sub-images (animated GIF, multi-page TIFF, ICO sets, etc.).</summary>
   public bool SupportsMultiImage => this.GetImageCount != null;

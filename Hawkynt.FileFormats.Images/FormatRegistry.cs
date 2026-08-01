@@ -393,6 +393,29 @@ public static class FormatRegistry {
     return entry?.ConvertFromRawImage?.Invoke(image);
   }
 
+  /// <summary>Encode a <see cref="RawImage"/> to a file, with whatever else belongs beside it.</summary>
+  /// <remarks>
+  /// A handful of formats keep their palette in a companion file and cannot be opened without it.
+  /// Writing through the byte array alone leaves that behind, so a caller with somewhere to put it
+  /// should come this way rather than writing the array itself.
+  /// </remarks>
+  public static bool Write(RawImage image, ImageFormat format, FileInfo target) {
+    ArgumentNullException.ThrowIfNull(target);
+
+    var entry = GetEntry(format);
+    if (entry?.WriteToFile == null)
+      return Write(image, format) is { } bytes && _WriteAll(target, bytes);
+
+    entry.WriteToFile(image, target);
+
+    return true;
+  }
+
+  private static bool _WriteAll(FileInfo target, byte[] bytes) {
+    File.WriteAllBytes(target.FullName, bytes);
+    return true;
+  }
+
   /// <summary>Encode a <see cref="RawImage"/> directly into a stream. Returns <c>true</c> on success.</summary>
   public static bool Write(RawImage image, ImageFormat format, Stream output) {
     var bytes = Write(image, format);

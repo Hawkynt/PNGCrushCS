@@ -255,6 +255,29 @@ public static class AtariStGraphics {
     _ => index,
   };
 
+  /// <summary>Writes a GEM VDI palette, the inverse of reading one.</summary>
+  /// <remarks>
+  /// VDI numbers its colours by what they are for rather than by where they sit in hardware, so the
+  /// entries have to be permuted on the way out exactly as they are permuted on the way in — and the
+  /// permutation is a table rather than a rotation. Each channel is an intensity per thousand in a
+  /// big-endian word, so the byte is scaled rather than repeated.
+  /// </remarks>
+  public static void WriteVdiPalette(ReadOnlySpan<byte> palette, int colors, int planes, Span<byte> target) {
+    for (var i = 0; i < colors; ++i) {
+      var entry = i * 6;
+      if (entry + 5 >= target.Length)
+        return;
+
+      var source = VdiToHardwareIndex(i, planes) * 3;
+      for (var channel = 0; channel < 3; ++channel) {
+        var value = source + channel < palette.Length ? palette[source + channel] : 0;
+        var thousandths = value * 1000 / 255;
+        target[entry + channel * 2] = (byte)(thousandths >> 8);
+        target[entry + channel * 2 + 1] = (byte)thousandths;
+      }
+    }
+  }
+
   /// <summary>Reads a Falcon palette, which stores four bytes a colour with the third unused.</summary>
   public static byte[] ReadFalconPalette(ReadOnlySpan<byte> data, int offset, int colors) {
     var palette = new byte[colors * 3];

@@ -34,8 +34,16 @@ public static class FormatIO {
   public static RawImage Decode<T>(Stream stream) where T : IImageFormatReader<T>, IImageToRawImage<T>
     => _ReadFromStream<T, RawImage>(stream, static (span) => T.ToRawImage(T.FromSpan(span)));
 
-  public static RawImage Decode<T>(FileInfo file) where T : IImageFormatReader<T>, IImageToRawImage<T>
-    => _ReadFromFile<RawImage>(file, static (span) => T.ToRawImage(T.FromSpan(span)));
+  public static RawImage Decode<T>(FileInfo file) where T : IImageFormatReader<T>, IImageToRawImage<T> {
+    ArgumentNullException.ThrowIfNull(file);
+    if (!file.Exists)
+      throw new FileNotFoundException("File not found.", file.FullName);
+
+    // Through the read that names a file rather than the one that takes bytes, so a format keeping
+    // its palette beside the picture can find it. Going by bytes returns whatever the file can
+    // describe alone, which for those formats is not the picture that was written.
+    return T.ToRawImage(T.FromFile(file));
+  }
 
   // --- Write ---
 
@@ -52,6 +60,20 @@ public static class FormatIO {
 
   public static void Encode<T>(RawImage image, Stream stream) where T : IImageFromRawImage<T>, IImageFormatWriter<T>
     => stream.Write(T.ToBytes(T.FromRawImage(image)));
+
+  /// <summary>Writes a picture to a file, with whatever else that format keeps beside it.</summary>
+  /// <remarks>
+  /// The encoding happens once and the companion is written from its result rather than from the
+  /// picture again. That matters where the two have to agree on something chosen rather than
+  /// derived — a colour reduction run twice can settle differently, and then the palette beside the
+  /// file describes colours the file does not use.
+  /// </remarks>
+  public static void WriteToFile<T>(RawImage image, FileInfo target)
+    where T : IImageFromRawImage<T>, IImageFormatWriter<T> {
+    var file = T.FromRawImage(image);
+    File.WriteAllBytes(target.FullName, T.ToBytes(file));
+    T.WriteCompanions(file, target);
+  }
 
   // --- Metadata ---
 

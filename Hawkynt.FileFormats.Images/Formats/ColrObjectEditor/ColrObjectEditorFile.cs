@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.ColrObjectEditor;
@@ -15,7 +16,11 @@ namespace FileFormat.ColrObjectEditor;
 /// them.
 /// </remarks>
 public readonly record struct ColrObjectEditorFile
-  : IImageFormatReader<ColrObjectEditorFile>, IImageToRawImage<ColrObjectEditorFile> {
+  : IImageFormatReader<ColrObjectEditorFile>, IImageToRawImage<ColrObjectEditorFile>,
+    IImageFromRawImage<ColrObjectEditorFile>, IImageFormatWriter<ColrObjectEditorFile> {
+
+  static byte[] IImageFormatWriter<ColrObjectEditorFile>.ToBytes(ColrObjectEditorFile file)
+    => ColrObjectEditorWriter.ToBytes(file);
 
   /// <summary>Pixels across.</summary>
   public const int Width = 320;
@@ -39,6 +44,10 @@ public readonly record struct ColrObjectEditorFile
   static string[] IImageFormatMetadata<ColrObjectEditorFile>.FileExtensions => [".mur"];
   static ColrObjectEditorFile IImageFormatReader<ColrObjectEditorFile>.FromSpan(ReadOnlySpan<byte> data)
     => ColrObjectEditorReader.FromSpan(data);
+
+  /// <summary>Reads the drawing and the palette beside it, which it cannot be shown without.</summary>
+  static ColrObjectEditorFile IImageFormatReader<ColrObjectEditorFile>.FromFile(FileInfo file)
+    => ColrObjectEditorReader.FromFile(file);
   static VideoMode[] IImageFormatMetadata<ColrObjectEditorFile>.VideoModes => [
     new("Object", [(Width, Height)], [ColorCount])
   ];
@@ -75,8 +84,43 @@ public readonly record struct ColrObjectEditorFile
     return palette;
   }
 
-  // No writer. The colours live in a separate 96-byte file, and the reference decoder will not open
-  // a drawing without one — but everything that writes here returns a single byte array, so there is
-  // nowhere for the companion to go. A drawing on its own would be a file no tool could read, which
-  // is worse than not offering to write it.
+  /// <summary>The extension the colours live under, beside the drawing.</summary>
+  public const string CompanionExtension = ".pal";
+
+  /// <summary>Builds a drawing. The colours it needs are written beside it, not in it.</summary>
+  /// <remarks>
+  /// This format keeps its sixteen colours in a file of its own, and nothing will open the drawing
+  /// without one — so a writer that emits only the drawing produces something no tool can read. The
+  /// companion goes out through the write that names a file; taking the bytes alone is not enough
+  /// for this format, which is the whole reason that path exists.
+  /// </remarks>
+  public static ColrObjectEditorFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(Width, Height);
+    var quantized = ColorQuantizer.Quantize(
+      PixelConverter.Convert(rgb, PixelFormat.Bgra32).PixelData, Width * Height, ColorCount);
+
+    var indices = new byte[Width * Height];
+    for (var i = 0; i < indices.Length; ++i)
+      indices[i] = (byte)quantized.Indices[i];
+
+    // The palette is carried on the file rather than recomputed when the companion is written: the
+    // reduction is a choice, not a derivation, and running it twice can settle differently — which
+    // would leave the palette beside the drawing describing colours the drawing does not use.
+    return new() {
+      Data = AtariStGraphics.PackBitplanes(indices, Width / 8 * Planes, Planes, Width, Height),
+      Palette = quantized.Palette,
+    };
+  }
+
+  /// <summary>Writes the palette file the drawing cannot be read without.</summary>
+  static void IImageFormatWriter<ColrObjectEditorFile>.WriteCompanions(ColrObjectEditorFile file, FileInfo target) {
+    ArgumentNullException.ThrowIfNull(target);
+
+    var vdi = new byte[PaletteFileSize];
+    AtariStGraphics.WriteVdiPalette(file.Palette ?? [], ColorCount, Planes, vdi);
+
+    File.WriteAllBytes(Path.ChangeExtension(target.FullName, CompanionExtension), vdi);
+  }
 }

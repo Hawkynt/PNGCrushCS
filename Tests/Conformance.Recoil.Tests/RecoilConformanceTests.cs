@@ -58,6 +58,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.McPainter, "McPainter", 320, 200, ".mcp"),
     new(ImageFormat.JetGraphicsPlanner, "Jet Graphics Planner", 256, 64, ".jgp"),
     new(ImageFormat.AsciiMaker, "ASCII maker", 320, 192, ".asc"),
+    new(ImageFormat.ColrObjectEditor, "COLR Object Editor", 320, 200, ".mur"),
     new(ImageFormat.Doodle, "Doodle", 320, 200),
     new(ImageFormat.HiPicCreator, "Hi-Pic Creator", 320, 200),
     new(ImageFormat.HiresC64, "Hires-Bitmap", 320, 200, ".hbm"),
@@ -225,9 +226,11 @@ public sealed class RecoilConformanceTests {
     Assert.That(entry, Is.Not.Null, $"{pairing.Format} is not registered");
     Assert.That(entry!.SupportsWrite, Is.True, $"{pairing.Format} has no encoder");
 
+    var sample = _Sample(pairing.Width, pairing.Height);
+
     byte[] encoded;
     try {
-      encoded = entry.ConvertFromRawImage!(_Sample(pairing.Width, pairing.Height));
+      encoded = entry.ConvertFromRawImage!(sample);
     } catch (Exception ex) {
       Assert.Fail($"{pairing}: encoding {pairing.Width}x{pairing.Height} threw {ex.GetType().Name}: {ex.Message}");
       return;
@@ -236,12 +239,19 @@ public sealed class RecoilConformanceTests {
     var extension = pairing.Extension ?? entry.PrimaryExtension;
     var path = Path.Combine(Path.GetTempPath(), $"recoilconf_{pairing.Format}{extension}");
     try {
-      File.WriteAllBytes(path, encoded);
+      // Through the write that names a file, so a format keeping its palette beside the picture puts
+      // that there too. Writing the byte array alone would leave it behind, and the reference decoder
+      // would turn the file down for something the writer had in fact produced.
+      Assert.That(
+        FormatRegistry.Write(sample, pairing.Format, new FileInfo(path)), Is.True,
+        $"{pairing}: the registry declined to write a format it says it can");
+
       var (decoded, output) = RecoilOracle.TryDecode(path);
       Assert.That(decoded, Is.True,
         $"{pairing}: RECOIL rejected our {encoded.Length}-byte output — {output}");
     } finally {
-      try { File.Delete(path); } catch { /* best effort */ }
+      foreach (var written in Directory.GetFiles(Path.GetTempPath(), $"recoilconf_{pairing.Format}.*"))
+        try { File.Delete(written); } catch { /* best effort */ }
     }
   }
 

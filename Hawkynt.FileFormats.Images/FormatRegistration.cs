@@ -65,7 +65,8 @@ internal static partial class FormatRegistration {
       LoadRawImageFromBytes: bytes => { try { return FormatIO.Decode<T>(bytes); } catch { return null; } },
       ConvertFromRawImage: raw => FormatIO.Encode<T>(raw),
       VideoModes: T.VideoModes,
-      LoadRawImageOrThrow: FormatIO.Decode<T>);
+      LoadRawImageOrThrow: FormatIO.Decode<T>,
+      WriteToFile: FormatIO.WriteToFile<T>);
     FormatRegistry.Register(entry);
   }
 

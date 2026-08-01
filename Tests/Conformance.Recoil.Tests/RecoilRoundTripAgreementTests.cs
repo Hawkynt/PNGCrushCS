@@ -38,9 +38,11 @@ public sealed class RecoilRoundTripAgreementTests {
     if (!entry!.SupportsWrite)
       Assert.Ignore($"{pairing} has no encoder");
 
+    var sample = _Sample(pairing.Width, pairing.Height);
+
     byte[] encoded;
     try {
-      encoded = entry.ConvertFromRawImage!(_Sample(pairing.Width, pairing.Height));
+      encoded = entry.ConvertFromRawImage!(sample);
     } catch (Exception ex) {
       Assert.Ignore($"{pairing}: encoding threw {ex.GetType().Name} — covered by the acceptance test");
       return;
@@ -50,11 +52,20 @@ public sealed class RecoilRoundTripAgreementTests {
     var path = Path.Combine(Path.GetTempPath(), $"recoilrt_{Guid.NewGuid():N}{extension}");
     byte[]? png;
     string output;
+    RawImage? readBack;
     try {
-      File.WriteAllBytes(path, encoded);
+      // Through the write that names a file, so a format keeping its palette beside the picture puts
+      // that there too rather than leaving the reference decoder without it.
+      FormatRegistry.Write(sample, pairing.Format, new FileInfo(path));
       (png, output) = RecoilOracle.TryDecodeToPng(path);
+
+      // And read back from the file for the same reason: by bytes alone, a drawing whose colours
+      // live beside it comes back in the grey ramp its reader falls back on, and the comparison
+      // would be measuring that rather than the writer.
+      readBack = entry.LoadRawImage(new FileInfo(path));
     } finally {
-      try { File.Delete(path); } catch { /* best effort */ }
+      foreach (var written in Directory.GetFiles(Path.GetTempPath(), Path.GetFileNameWithoutExtension(path) + ".*"))
+        try { File.Delete(written); } catch { /* best effort */ }
     }
 
     Assert.That(png, Is.Not.Null, $"{pairing}: RECOIL rejected our output — {output}");
@@ -69,7 +80,7 @@ public sealed class RecoilRoundTripAgreementTests {
     var mine = extension.ToLowerInvariant() == ".stp"
       ? FileFormat.MsxGl6.MsxGl6File.ToRawImage(
           FileFormat.MsxGl6.MsxGl6Reader.FromSpan(encoded, FileFormat.MsxGl6.MsxGl6Kind.Stamp))
-      : entry.LoadRawImageFromBytes(encoded);
+      : readBack ?? entry.LoadRawImageFromBytes(encoded);
     if (mine == null)
       Assert.Fail($"{pairing}: we cannot read back what we just wrote");
 
