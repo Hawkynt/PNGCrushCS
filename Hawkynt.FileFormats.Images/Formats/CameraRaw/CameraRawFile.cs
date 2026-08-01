@@ -7,7 +7,15 @@ namespace FileFormat.CameraRaw;
 public readonly record struct CameraRawFile : IImageFormatReader<CameraRawFile>, IImageToRawImage<CameraRawFile>, IImageFromRawImage<CameraRawFile>, IImageFormatWriter<CameraRawFile> {
 
   static string IImageFormatMetadata<CameraRawFile>.PrimaryExtension => ".cr2";
-  static string[] IImageFormatMetadata<CameraRawFile>.FileExtensions => [".cr2", ".nef", ".arw", ".orf", ".rw2", ".pef", ".raf", ".raw", ".srw", ".dcs"];
+  /// <summary>
+  /// The names raw files come under. All but the Fujifilm one are TIFF containers, so a file is
+  /// readable here whether or not its sensor data is in a compression this understands — the
+  /// preview inside it is a picture either way.
+  /// </summary>
+  static string[] IImageFormatMetadata<CameraRawFile>.FileExtensions => [
+    ".cr2", ".nef", ".arw", ".orf", ".rw2", ".pef", ".raf", ".raw", ".srw", ".dcs",
+    ".dcr", ".kdc", ".srf", ".sr2", ".mos", ".3fr", ".mef", ".nrw", ".rwl", ".erf", ".iiq",
+  ];
   static CameraRawFile IImageFormatReader<CameraRawFile>.FromSpan(ReadOnlySpan<byte> data) => CameraRawReader.FromSpan(data);
   static byte[] IImageFormatWriter<CameraRawFile>.ToBytes(CameraRawFile file) => CameraRawWriter.ToBytes(file);
 

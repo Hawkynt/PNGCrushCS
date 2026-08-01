@@ -22,6 +22,12 @@ internal static class RawTiffParser {
   internal const ushort TAG_STRIP_BYTE_COUNTS = 279;
   internal const ushort TAG_SUB_IFDS = 330;
 
+  /// <summary>Where a JPEG preview begins, for the older tags that state it outside the strips.</summary>
+  internal const ushort TAG_JPEG_INTERCHANGE_FORMAT = 513;
+
+  /// <summary>How long that preview is.</summary>
+  internal const ushort TAG_JPEG_INTERCHANGE_FORMAT_LENGTH = 514;
+
   // CFA / DNG tag IDs
   internal const ushort TAG_CFA_REPEAT_PATTERN_DIM = 33421;
   internal const ushort TAG_CFA_PATTERN = 33422;
@@ -64,6 +70,12 @@ internal static class RawTiffParser {
 
     // Canon CR2 slice info
     public int[]? SliceInfo;
+
+    /// <summary>Offset of a JPEG preview stated outside the strips, or zero.</summary>
+    public uint JpegOffset;
+
+    /// <summary>Its length.</summary>
+    public uint JpegLength;
 
     public bool HasCfa => CfaPattern is { Length: >= 4 } && CfaRepeatCols == 2 && CfaRepeatRows == 2;
   }
@@ -182,6 +194,12 @@ internal static class RawTiffParser {
             break;
           case TAG_CANON_SLICE_INFO:
             ifd.SliceInfo = ReadIntArray(data, type, count, valueOffset, isLittleEndian);
+            break;
+          case TAG_JPEG_INTERCHANGE_FORMAT:
+            ifd.JpegOffset = ReadTagValue(data, type, count, valueOffset, isLittleEndian);
+            break;
+          case TAG_JPEG_INTERCHANGE_FORMAT_LENGTH:
+            ifd.JpegLength = ReadTagValue(data, type, count, valueOffset, isLittleEndian);
             break;
           case TAG_SUB_IFDS: {
             var subIfdOffsets = ReadTagArray(data, type, count, valueOffset, isLittleEndian);

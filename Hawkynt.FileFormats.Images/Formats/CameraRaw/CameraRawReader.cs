@@ -2,7 +2,9 @@ using System;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Collections.Generic;
 using System.Text;
+using FileFormat.Jpeg;
 using FileFormat.Core;
 
 namespace FileFormat.CameraRaw;
@@ -153,8 +155,22 @@ public static class CameraRawReader {
       .OrderByDescending(img => (long)img.Width * img.Height)
       .FirstOrDefault();
 
-    if (bestImage == null)
-      throw new InvalidDataException("No uncompressed image found in Camera RAW file IFD chain.");
+    if (bestImage == null) {
+      // Most raw files carry no uncompressed picture at all: their previews are JPEG, and that is
+      // what every viewer shows when the sensor data is in a compression it cannot undo. Refusing
+      // the file outright throws away a picture the file plainly contains.
+      var preview = _LargestJpegPreview(data, images, isLittleEndian);
+      if (preview != null)
+        return new() {
+          Width = preview.Width,
+          Height = preview.Height,
+          PixelData = preview.PixelData,
+          Manufacturer = manufacturer,
+          Model = model,
+        };
+
+      throw new InvalidDataException("No uncompressed image and no JPEG preview in Camera RAW file IFD chain.");
+    }
 
     var bytesPerPixel = bestImage.SamplesPerPixel * (bestImage.BitsPerSample / 8);
     var totalPixelBytes = bestImage.Width * bestImage.Height * bytesPerPixel;
@@ -170,6 +186,57 @@ public static class CameraRawReader {
       Manufacturer = manufacturer,
       Model = model,
     };
+  }
+
+  /// <summary>The largest JPEG the file carries, decoded, or null when it carries none.</summary>
+  /// <remarks>
+  /// A raw states its preview in one of two ways: the old pair of tags that give an offset and a
+  /// length outright, or a strip whose compression says JPEG. Both are tried, and the largest of
+  /// what turns up wins — a file often holds a thumbnail as well as a full-size preview, and the
+  /// thumbnail is not what anybody wants to see.
+  /// </remarks>
+  private static RawImage? _LargestJpegPreview(
+    byte[] data, IEnumerable<RawTiffParser.IfdImage> images, bool isLittleEndian) {
+    RawImage? best = null;
+
+    foreach (var image in images) {
+      foreach (var (offset, length) in _JpegRanges(image)) {
+        if (offset <= 0 || length <= 0 || offset + length > data.Length)
+          continue;
+
+        // A JPEG starts with the start-of-image marker; anything else is a tag pointing elsewhere.
+        if (data[offset] != 0xFF || data[offset + 1] != 0xD8)
+          continue;
+
+        RawImage decoded;
+        try {
+          decoded = JpegFile.ToRawImage(JpegReader.FromSpan(data.AsSpan(offset, length)));
+        } catch (Exception) {
+          // A preview that will not decode is not a reason to fail the file; another may.
+          continue;
+        }
+
+        if (best == null || (long)decoded.Width * decoded.Height > (long)best.Width * best.Height)
+          best = decoded;
+      }
+    }
+
+    return best == null ? null : PixelConverter.Convert(best, PixelFormat.Rgb24);
+  }
+
+  /// <summary>Where an IFD says its JPEG data is, by either of the two conventions.</summary>
+  private static IEnumerable<(int Offset, int Length)> _JpegRanges(RawTiffParser.IfdImage image) {
+    if (image.JpegOffset > 0 && image.JpegLength > 0)
+      yield return ((int)image.JpegOffset, (int)image.JpegLength);
+
+    // Compression 6 is the old JPEG tag and 7 the one that replaced it; both mean the strips hold
+    // a JPEG stream rather than samples.
+    if (image.Compression is not (6 or 7) || image.StripOffsets is not { Length: > 0 } offsets
+        || image.StripByteCounts is not { Length: > 0 } counts)
+      yield break;
+
+    for (var i = 0; i < offsets.Length && i < counts.Length; ++i)
+      yield return ((int)offsets[i], (int)counts[i]);
   }
 
   /// <summary>Demosaic CFA raw sensor data from an IFD with Bayer pattern information. Supports compressed CFA data.</summary>
