@@ -81,41 +81,39 @@ public readonly record struct XwdFile : IImageFormatReader<XwdFile>, IImageToRaw
     }
   }
 
+  /// <summary>Builds a window dump, stating where in each pixel the colours are.</summary>
+  /// <remarks>
+  /// The masks are the point of the format: it dumps whatever the display happened to hold, so a
+  /// reader learns the channel order from them rather than from a name. Leaving them zero — which is
+  /// what this used to do — describes a picture whose colours are nowhere, and a reader that checks
+  /// them refuses the file. The other fields the X server records about the display have to be
+  /// stated for the same reason.
+  /// </remarks>
   public static XwdFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    image = image.EnsureAnyFormat(PixelFormat.Bgra32, PixelFormat.Rgb24);
+    image = image.EnsureFormat(PixelFormat.Rgb24);
 
-    var width = image.Width;
-    var height = image.Height;
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      BitsPerPixel = 24,
+      BytesPerLine = image.Width * 3,
+      PixmapFormat = XwdPixmapFormat.ZPixmap,
+      PixmapDepth = 24,
+      VisualClass = XwdVisualClass.TrueColor,
+      BitsPerRgb = 8,
 
-    switch (image.Format) {
-      case PixelFormat.Bgra32:
-        return new() {
-          Width = width,
-          Height = height,
-          BitsPerPixel = 32,
-          BytesPerLine = width * 4,
-          PixmapFormat = XwdPixmapFormat.ZPixmap,
-          PixmapDepth = 32,
-          VisualClass = XwdVisualClass.TrueColor,
-          BitsPerRgb = 8,
-          PixelData = image.PixelData[..],
-        };
-      case PixelFormat.Rgb24:
-        return new() {
-          Width = width,
-          Height = height,
-          BitsPerPixel = 24,
-          BytesPerLine = width * 3,
-          PixmapFormat = XwdPixmapFormat.ZPixmap,
-          PixmapDepth = 24,
-          VisualClass = XwdVisualClass.TrueColor,
-          BitsPerRgb = 8,
-          PixelData = image.PixelData[..],
-        };
-      default:
-        throw new ArgumentException($"Pixel format {image.Format} is not supported by XWD.", nameof(image));
-    }
+      // Bytes in the order they are read, which is what puts red in the top eight bits of a pixel.
+      ByteOrder = 1,
+      BitmapBitOrder = 1,
+      BitmapUnit = 8,
+      BitmapPad = 8,
+      RedMask = 0xFF0000,
+      GreenMask = 0x00FF00,
+      BlueMask = 0x0000FF,
+
+      PixelData = image.PixelData[..],
+    };
   }
 
   private static byte[] _StripRowPadding(byte[] data, int srcStride, int dstStride, int height) {

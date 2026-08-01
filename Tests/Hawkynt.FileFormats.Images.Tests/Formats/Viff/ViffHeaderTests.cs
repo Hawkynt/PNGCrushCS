@@ -44,7 +44,7 @@ public sealed class ViffHeaderTests {
       MapSubRowSize: 0,
       MapEnable: 0,
       MapsPerCycle: 0,
-      ColorSpaceModel: (uint)ViffColorSpaceModel.Rgb,
+      ColorSpaceModel: (uint)ViffColorSpaceModel.GenericRgb,
       SpareInt1: 0,
       SpareInt2: 0
     );

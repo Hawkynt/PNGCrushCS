@@ -26,8 +26,19 @@ namespace Conformance.Recoil.Tests;
 public sealed class WriterAcceptanceTests {
 
   /// <summary>Formats whose output cannot be judged this way, each for a stated reason.</summary>
+  /// <remarks>
+  /// Mostly extensions two unrelated formats share. A reference tool that knows the name but means
+  /// something else by it turns our file down for being what it is, which says nothing about the
+  /// writer — measuring the coincidence rather than the format.
+  /// </remarks>
   private static readonly Dictionary<ImageFormat, string> _NotJudgeable = new() {
     [ImageFormat.Ccitt] = "a bare fax stream states no page size, so a decoder picks its own and the sizes never match",
+    [ImageFormat.SunIcon] = "the reference tool reads .icon as the Microsoft one, which is a different format",
+    [ImageFormat.Analyze] = "the reference tool reads .hdr as Radiance, which is a different format",
+    [ImageFormat.Envi] = "the reference tool reads .hdr as Radiance, which is a different format",
+    [ImageFormat.PalmPdb] = "the reference tool reads .pdb as the ImageViewer variant, which is a different record layout",
+    [ImageFormat.Art] = ".art belongs to several unrelated programs and the tool means another one",
+    [ImageFormat.FirstPublisher] = ".art belongs to several unrelated programs and the tool means another one",
   };
 
   private static IEnumerable<TestCaseData> Writable() {

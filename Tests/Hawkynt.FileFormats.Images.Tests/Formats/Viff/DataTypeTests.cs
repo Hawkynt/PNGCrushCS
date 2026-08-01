@@ -46,19 +46,21 @@ public sealed class DataTypeTests {
   [Test]
   [Category("Unit")]
   public void ViffColorSpaceModel_HasExpectedValues() {
+    // Plain RGB is fifteen; two is a chromaticity space. Getting that wrong writes a file anything
+    // checking the field turns away.
     Assert.That((uint)ViffColorSpaceModel.None, Is.EqualTo(0u));
-    Assert.That((uint)ViffColorSpaceModel.Ntsc, Is.EqualTo(1u));
-    Assert.That((uint)ViffColorSpaceModel.Rgb, Is.EqualTo(2u));
-    Assert.That((uint)ViffColorSpaceModel.Cmy, Is.EqualTo(3u));
-    Assert.That((uint)ViffColorSpaceModel.Spectral, Is.EqualTo(4u));
-    Assert.That((uint)ViffColorSpaceModel.Generic, Is.EqualTo(5u));
+    Assert.That((uint)ViffColorSpaceModel.NtscRgb, Is.EqualTo(1u));
+    Assert.That((uint)ViffColorSpaceModel.NtscCieXy, Is.EqualTo(2u));
+    Assert.That((uint)ViffColorSpaceModel.GenericRgb, Is.EqualTo(15u));
+    Assert.That((uint)ViffColorSpaceModel.NtscXyz, Is.EqualTo(3u));
+    Assert.That((uint)ViffColorSpaceModel.Cmy, Is.EqualTo(10u));
   }
 
   [Test]
   [Category("Unit")]
   public void ViffColorSpaceModel_HasExpectedCount() {
     var values = Enum.GetValues<ViffColorSpaceModel>();
-    Assert.That(values.Length, Is.EqualTo(6));
+    Assert.That(values.Length, Is.EqualTo(16));
   }
 
   [Test]

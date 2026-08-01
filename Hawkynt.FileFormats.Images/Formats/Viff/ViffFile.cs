@@ -117,7 +117,7 @@ public readonly record struct ViffFile : IImageFormatReader<ViffFile>, IImageToR
           Height = image.Height,
           Bands = 3,
           StorageType = ViffStorageType.Byte,
-          ColorSpaceModel = ViffColorSpaceModel.Rgb,
+          ColorSpaceModel = ViffColorSpaceModel.GenericRgb,
           PixelData = bandSeq,
         };
       }
