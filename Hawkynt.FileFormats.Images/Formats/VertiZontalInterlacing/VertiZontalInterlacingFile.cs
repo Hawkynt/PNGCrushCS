@@ -12,7 +12,11 @@ namespace FileFormat.VertiZontalInterlacing;
 /// the luminance steps at the same time.
 /// </remarks>
 public readonly record struct VertiZontalInterlacingFile
-  : IImageFormatReader<VertiZontalInterlacingFile>, IImageToRawImage<VertiZontalInterlacingFile> {
+  : IImageFormatReader<VertiZontalInterlacingFile>, IImageToRawImage<VertiZontalInterlacingFile>,
+    IImageFromRawImage<VertiZontalInterlacingFile>, IImageFormatWriter<VertiZontalInterlacingFile> {
+
+  static byte[] IImageFormatWriter<VertiZontalInterlacingFile>.ToBytes(VertiZontalInterlacingFile file)
+    => VertiZontalInterlacingWriter.ToBytes(file);
 
   /// <summary>Pixels across.</summary>
   public const int Width = 320;
@@ -56,5 +60,35 @@ public readonly record struct VertiZontalInterlacingFile
       Format = PixelFormat.Rgb24,
       PixelData = FrameBlend.Average(first, second),
     };
+  }
+
+  /// <summary>Builds a picture, putting the same field in both halves.</summary>
+  /// <remarks>
+  /// Graphics 9 has sixteen luminances of one hue and no colour at all, so the picture is reduced to
+  /// its brightness. Both fields hold the same rows.
+  /// <para/>
+  /// The two are read a pixel either side of centre, which is the whole point of the mode — the
+  /// displacement is what puts detail between the stored positions. Writing them identically means
+  /// each output pixel averages the two stored positions next to it, so the result comes back very
+  /// slightly softened across every fourth column rather than exactly as written. Recovering a pair
+  /// of fields that average to a given picture is not determined by that picture, and guessing one
+  /// would be inventing detail.
+  /// </remarks>
+  public static VertiZontalInterlacingFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(Width, Height);
+    var luminance = new byte[Width * Height];
+    for (var i = 0; i < luminance.Length; ++i) {
+      var at = i * 3;
+      luminance[i] = (byte)((rgb.PixelData[at] * 77 + rgb.PixelData[at + 1] * 150 + rgb.PixelData[at + 2] * 29) >> 12);
+    }
+
+    var field = Atari8BitGraphics.PackGr9(luminance, Width, Height);
+    var data = new byte[FileSize];
+    field.AsSpan(0, Math.Min(field.Length, SecondFieldOffset)).CopyTo(data.AsSpan(FirstFieldOffset));
+    field.AsSpan(0, Math.Min(field.Length, SecondFieldOffset)).CopyTo(data.AsSpan(SecondFieldOffset));
+
+    return new() { Data = data };
   }
 }

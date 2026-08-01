@@ -74,4 +74,9 @@ public readonly record struct ColrObjectEditorFile
 
     return palette;
   }
+
+  // No writer. The colours live in a separate 96-byte file, and the reference decoder will not open
+  // a drawing without one — but everything that writes here returns a single byte array, so there is
+  // nowhere for the companion to go. A drawing on its own would be a file no tool could read, which
+  // is worse than not offering to write it.
 }
