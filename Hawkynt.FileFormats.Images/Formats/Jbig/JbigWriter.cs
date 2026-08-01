@@ -61,7 +61,10 @@ public static class JbigWriter {
     var prev1 = new byte[width];
     var prev2 = new byte[width];
 
-    const int tpContext = 0x01E3;
+    // The documented context for the pseudo-pixel, matching what the reader now uses. It is a fixed
+    // number rather than a derived one, so a wrong value is not obviously wrong: it merely shares
+    // statistics with whichever real context has that index.
+    const int tpContext = 0x0E5;
 
     byte[] prevLine = new byte[width];
     var ltp = false;

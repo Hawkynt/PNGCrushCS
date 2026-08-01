@@ -10,6 +10,17 @@ internal static class JbigContext {
 
   /// <summary>Template 0 pixel positions relative to the current pixel (dx, dy).
   /// Positions are listed from bit 9 (MSB) to bit 0 (LSB) of the context word.</summary>
+  /// <remarks>
+  /// One of these is not fixed. The format lets an encoder move a single pixel of the template to
+  /// wherever it found the most correlation, and says where it put it in the header — the MX and MY
+  /// fields, which are read as a position relative to the current pixel. This table hardcodes that
+  /// pixel at (-1, -2) and the reader never looks at MX or MY, so any file whose encoder moved it
+  /// decodes against the wrong neighbour from the very first pixel.
+  /// <para/>
+  /// The reference sample here says MX=8, MY=0: eight pixels to the left on the current row. Until
+  /// this table is built from the header rather than written out, files from other encoders will not
+  /// decode, and the ones this library writes will only be read back by itself.
+  /// </remarks>
   internal static readonly (int dx, int dy)[] Template0Positions = [
     ( 1, -2),  // bit 9
     ( 0, -2),  // bit 8

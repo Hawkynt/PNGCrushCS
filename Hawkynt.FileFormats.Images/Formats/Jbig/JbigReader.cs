@@ -60,7 +60,10 @@ public static class JbigReader {
     var pixelData = new byte[bytesPerRow * height];
 
     var dataArray = data.ToArray();
-    _Decode(dataArray, JbigHeader.StructSize, dataArray.Length - JbigHeader.StructSize, width, height, l0, tpbon, pixelData);
+    var lrltwo = (header.Options & JbigHeader.OptionLRLTWO) != 0;
+    _Decode(
+      dataArray, JbigHeader.StructSize, dataArray.Length - JbigHeader.StructSize, width, height, l0, tpbon, lrltwo,
+      pixelData);
 
     return new JbigFile {
       Width = width,
@@ -69,7 +72,8 @@ public static class JbigReader {
     };
   }
 
-  private static void _Decode(byte[] data, int offset, int length, int width, int height, int l0, bool tpbon, byte[] pixelData) {
+  private static void _Decode(
+    byte[] data, int offset, int length, int width, int height, int l0, bool tpbon, bool lrltwo, byte[] pixelData) {
     var bytesPerRow = (width + 7) / 8;
     var states = new int[JbigContext.ContextCount];
     var mps = new int[JbigContext.ContextCount];
@@ -78,20 +82,25 @@ public static class JbigReader {
     var prev1 = new byte[width];
     var prev2 = new byte[width];
 
-    // TPBON context index (context for detecting typical line)
-    const int tpContext = 0x01E3; // typical prediction context marker
+    // The pseudo-pixel that says whether a line repeats the one above is coded in a context of its
+    // own, and which one depends on how many lines the template looks back over: 0x0E5 for the
+    // three-line template, 0x195 for the two-line one. It is a fixed number rather than something
+    // derived, so a wrong one is not obviously wrong — it simply shares statistics with whatever
+    // real context happens to have that index, and the picture decodes into noise a few lines in.
+    var tpContext = lrltwo ? 0x195 : 0x0E5;
 
     var dataPos = offset;
     var stripeStart = 0;
 
+    // The arithmetic coder is flushed and restarted at every stripe boundary, and that much this
+    // had right. What it also did was clear the context statistics there — and those are what the
+    // coder has learnt about the picture so far. They carry over: a stripe is a place to resume,
+    // not a fresh picture. Clearing them makes every stripe after the first decode against a coder
+    // that has forgotten everything, so the top of the picture comes out and the rest degrades.
     while (stripeStart < height) {
       var stripeEnd = Math.Min(stripeStart + l0, height);
       var stripeDataLen = _FindStripeEnd(data, dataPos, offset + length);
       var decoder = new ArithmeticCoder.Decoder(data, dataPos, stripeDataLen);
-
-      // Reset states for each stripe
-      Array.Clear(states);
-      Array.Clear(mps);
 
       var ltp = false;
       for (var y = stripeStart; y < stripeEnd; ++y) {
