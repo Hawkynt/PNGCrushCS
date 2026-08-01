@@ -61,8 +61,13 @@ public sealed class PalmReaderTests {
     Assert.That(result.Width, Is.EqualTo(8));
     Assert.That(result.Height, Is.EqualTo(2));
     Assert.That(result.BitsPerPixel, Is.EqualTo(1));
+
+    // Palm keeps its rows on whole words, so this file spends two bytes on a row that needs one.
+    // What comes back is the row without that slack, because nothing downstream knows about a stride
+    // — the second row starts at 1, not at 2.
+    Assert.That(result.PixelData, Has.Length.EqualTo(2));
     Assert.That(result.PixelData[0], Is.EqualTo(0xFF));
-    Assert.That(result.PixelData[2], Is.EqualTo(0xAA));
+    Assert.That(result.PixelData[1], Is.EqualTo(0xAA));
   }
 
   [Test]

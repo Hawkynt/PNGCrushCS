@@ -77,13 +77,32 @@ public static class PalmWriter {
       }
     }
 
-    // Write pixel data
+    // Rows go out padded to the whole word the header promises, whatever stride they arrived in.
+    var padded = _WithRowPadding(pixelData, ((width * bitsPerPixel) + 7) / 8, bytesPerRow, height);
+
     if (compression == PalmCompression.Rle) {
-      var compressed = PalmRleCompressor.Compress(pixelData, bytesPerRow, height);
+      var compressed = PalmRleCompressor.Compress(padded, bytesPerRow, height);
       ms.Write(compressed);
     } else
-      ms.Write(pixelData, 0, Math.Min(pixelData.Length, bytesPerRow * height));
+      ms.Write(padded, 0, Math.Min(padded.Length, bytesPerRow * height));
 
     return ms.ToArray();
+  }
+
+  /// <summary>Puts each row back on the whole-word boundary a Palm bitmap keeps them on.</summary>
+  private static byte[] _WithRowPadding(byte[] pixelData, int usedRow, int storedRow, int height) {
+    if (storedRow <= usedRow)
+      return pixelData;
+
+    var result = new byte[storedRow * height];
+    for (var y = 0; y < height; ++y) {
+      var from = y * usedRow;
+      if (from + usedRow > pixelData.Length)
+        break;
+
+      pixelData.AsSpan(from, usedRow).CopyTo(result.AsSpan(y * storedRow));
+    }
+
+    return result;
   }
 }
