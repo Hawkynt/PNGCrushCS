@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Jng;
@@ -35,8 +36,46 @@ public readonly record struct JngFile : IImageFormatReader<JngFile>, IImageToRaw
   /// <summary>Concatenated alpha channel data from all JDAA or IDAT chunks, or null if no alpha.</summary>
   public byte[]? AlphaData { get; init; }
 
+  /// <summary>Decodes the picture, and the alpha beside it when the file carries one.</summary>
+  /// <remarks>
+  /// A JNG is a JPEG in a PNG's clothing: the chunk structure and the alpha come from PNG, the
+  /// picture itself is JPEG. That is the whole point of the format — it exists so a photograph can
+  /// have a real alpha channel — so decoding one means decoding a JPEG, which this project already
+  /// does. Refusing on that ground refused the format for a dependency it already had.
+  /// <para/>
+  /// Alpha carried as a greyscale JPEG is decoded the same way; carried as PNG image data it is
+  /// left alone, since that path needs the PNG filter chain rather than a second decoder.
+  /// </remarks>
   public static RawImage ToRawImage(JngFile file) {
-    throw new NotSupportedException("JNG conversion requires JPEG decoding which is not available in this library. Use FileFormat.Jpeg to decode JpegData first.");
+    var jpeg = file.JpegData ?? [];
+    if (jpeg.Length == 0)
+      throw new InvalidDataException("A JNG carries no JPEG data.");
+
+    var picture = PixelConverter.Convert(
+      FileFormat.Jpeg.JpegFile.ToRawImage(FileFormat.Jpeg.JpegReader.FromBytes(jpeg)), PixelFormat.Rgb24);
+
+    if (file.AlphaCompression != JngAlphaCompression.Jpeg || file.AlphaData is not { Length: > 0 } alphaData)
+      return picture;
+
+    // The alpha arrives as its own greyscale JPEG of the same size, one sample a pixel.
+    var alpha = PixelConverter.Convert(
+      FileFormat.Jpeg.JpegFile.ToRawImage(FileFormat.Jpeg.JpegReader.FromBytes(alphaData)), PixelFormat.Rgb24);
+
+    var count = picture.Width * picture.Height;
+    var rgba = new byte[count * 4];
+    for (var i = 0; i < count; ++i) {
+      rgba[i * 4] = picture.PixelData[i * 3];
+      rgba[i * 4 + 1] = picture.PixelData[i * 3 + 1];
+      rgba[i * 4 + 2] = picture.PixelData[i * 3 + 2];
+      rgba[i * 4 + 3] = i * 3 < alpha.PixelData.Length ? alpha.PixelData[i * 3] : (byte)255;
+    }
+
+    return new() {
+      Width = picture.Width,
+      Height = picture.Height,
+      Format = PixelFormat.Rgba32,
+      PixelData = rgba,
+    };
   }
 
 }
