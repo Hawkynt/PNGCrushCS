@@ -36,10 +36,37 @@ public sealed class ImageMagickCorpusTests {
       yield return new TestCaseData(file).SetName($"{{m}}({Path.GetExtension(file)})");
   }
 
+  /// <summary>
+  /// Extensions where the reference tool writes something other than what we read, or a format we
+  /// knowingly do not implement. Each is a decision rather than an oversight, so each carries why.
+  /// </summary>
+  /// <remarks>
+  /// Sharing an extension does not make two things the same format. The reference tool writes its
+  /// own textual report to <c>.info</c> and a directory listing to <c>.vid</c>; ours are the Amiga
+  /// icon and the video-frame formats of the same names. Counting those as failures would measure
+  /// the coincidence, not the reader.
+  /// </remarks>
+  private static readonly Dictionary<string, string> _NotOurs = new(StringComparer.OrdinalIgnoreCase) {
+    [".info"] = "the reference tool writes its identify report here, not a picture",
+    [".vid"] = "the reference tool writes a directory of thumbnails, not a picture",
+    [".map"] = "a bare palette with no picture and no header",
+    [".rgb"] = "headerless samples: nothing in the file gives its size",
+    [".rgba"] = "headerless samples: nothing in the file gives its size",
+    [".yuv"] = "headerless samples: nothing in the file gives its size",
+    [".eps"] = "PostScript, which needs an interpreter rather than a decoder",
+    [".epi"] = "PostScript, which needs an interpreter rather than a decoder",
+    [".epsf"] = "PostScript, which needs an interpreter rather than a decoder",
+    [".epsi"] = "PostScript, which needs an interpreter rather than a decoder",
+    [".ept"] = "PostScript with a preview, which needs an interpreter for the picture itself",
+  };
+
   [TestCaseSource(nameof(Samples))]
   public void SampleWrittenByAnotherTool_Decodes(string? path) {
     if (path == null)
       Assert.Ignore("Set IMAGEMAGICK_CORPUS to a directory of reference samples.");
+
+    if (_NotOurs.TryGetValue(Path.GetExtension(path!), out var why))
+      Assert.Ignore(why);
 
     var extension = Path.GetExtension(path!);
     if (FormatRegistry.DetectCandidatesFromExtension(extension).Count == 0)
