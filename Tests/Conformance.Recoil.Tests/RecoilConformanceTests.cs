@@ -47,6 +47,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.SpecScii, "SpecScii", 256, 192, ".zxs"),
     new(ImageFormat.PetsciiBot, "PETSCII BOT", 96, 128, ".pbot"),
     new(ImageFormat.TimexGigascreen, "Timex gigascreen", 512, 384, ".hrg"),
+    new(ImageFormat.BestPaint, "Best Paint", 160, 192, ".bp"),
     new(ImageFormat.Doodle, "Doodle", 320, 200),
     new(ImageFormat.HiPicCreator, "Hi-Pic Creator", 320, 200),
     new(ImageFormat.HiresC64, "Hires-Bitmap", 320, 200, ".hbm"),
