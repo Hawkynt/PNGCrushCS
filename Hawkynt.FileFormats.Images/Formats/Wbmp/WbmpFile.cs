@@ -23,20 +23,20 @@ public readonly record struct WbmpFile : IImageFormatReader<WbmpFile>, IImageToR
   public static RawImage ToRawImage(WbmpFile file) => new() {
     Width = file.Width,
     Height = file.Height,
-    Format = PixelFormat.Indexed1,
-    PixelData = file.PixelData[..],
+    Format = PixelFormat.Indexed8,
+    PixelData = BilevelRows.Unpack(file.PixelData, file.Width, file.Height),
     Palette = _BlackWhitePalette[..],
     PaletteCount = 2,
   };
 
   public static WbmpFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    image = image.EnsureFormat(PixelFormat.Indexed1);
 
     return new() {
       Width = image.Width,
       Height = image.Height,
-      PixelData = image.PixelData[..],
+      PixelData = BilevelRows.Pack(
+        BilevelRows.Threshold(image, setWhenDark: false), image.Width, image.Height),
     };
   }
 }

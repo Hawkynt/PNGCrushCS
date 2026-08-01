@@ -20,20 +20,24 @@ public readonly record struct OtbFile : IImageFormatReader<OtbFile>, IImageToRaw
   /// <summary>1bpp packed pixel data, MSB first, ceil(width/8) bytes per row.</summary>
   public byte[] PixelData { get; init; }
 
-  private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
+  /// <summary>Index zero is paper, index one is ink.</summary>
+  /// <remarks>
+  /// A set bit means a dot was drawn, not that the pixel is lit. Reading it the other way gives a
+  /// negative of the picture, which round-trips through our own writer perfectly well.
+  /// </remarks>
+  private static readonly byte[] _BlackWhitePalette = [255, 255, 255, 0, 0, 0];
 
   public static RawImage ToRawImage(OtbFile file) => new() {
     Width = file.Width,
     Height = file.Height,
-    Format = PixelFormat.Indexed1,
-    PixelData = file.PixelData[..],
+    Format = PixelFormat.Indexed8,
+    PixelData = BilevelRows.Unpack(file.PixelData, file.Width, file.Height),
     Palette = _BlackWhitePalette[..],
     PaletteCount = 2,
   };
 
   public static OtbFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    image = image.EnsureFormat(PixelFormat.Indexed1);
     if (image.Width is < 1 or > 255)
       throw new ArgumentOutOfRangeException(nameof(image), "OTB width must be in the range 1..255.");
     if (image.Height is < 1 or > 255)
@@ -42,7 +46,7 @@ public readonly record struct OtbFile : IImageFormatReader<OtbFile>, IImageToRaw
     return new() {
       Width = image.Width,
       Height = image.Height,
-      PixelData = image.PixelData[..],
+      PixelData = BilevelRows.Pack(BilevelRows.Threshold(image, setWhenDark: true), image.Width, image.Height),
     };
   }
 }

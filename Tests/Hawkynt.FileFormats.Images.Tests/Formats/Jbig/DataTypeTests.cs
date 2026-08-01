@@ -90,7 +90,7 @@ public sealed class DataTypeTests {
 
   [Test]
   [Category("Unit")]
-  public void ToRawImage_ProducesIndexed1() {
+  public void ToRawImage_SpreadsRowsToOneIndexPerPixel() {
     var file = new JbigFile {
       Width = 8,
       Height = 1,
@@ -99,7 +99,7 @@ public sealed class DataTypeTests {
 
     var raw = JbigFile.ToRawImage(file);
 
-    Assert.That(raw.Format, Is.EqualTo(PixelFormat.Indexed1));
+    Assert.That(raw.Format, Is.EqualTo(PixelFormat.Indexed8));
     Assert.That(raw.PaletteCount, Is.EqualTo(2));
     Assert.That(raw.Palette, Is.Not.Null);
     Assert.That(raw.Palette!.Length, Is.EqualTo(6));
@@ -127,7 +127,7 @@ public sealed class DataTypeTests {
 
   [Test]
   [Category("Unit")]
-  public void ToRawImage_ClonesPixelData() {
+  public void ToRawImage_DoesNotHandBackTheFilesOwnBuffer() {
     var pixelData = new byte[] { 0xAA };
     var file = new JbigFile {
       Width = 8,
@@ -138,7 +138,7 @@ public sealed class DataTypeTests {
     var raw = JbigFile.ToRawImage(file);
 
     Assert.That(raw.PixelData, Is.Not.SameAs(pixelData));
-    Assert.That(raw.PixelData, Is.EqualTo(pixelData));
+    Assert.That(raw.PixelData, Is.EqualTo(new byte[] { 1, 0, 1, 0, 1, 0, 1, 0 }));
   }
 
   private static string _GetPrimaryExtension<T>() where T : IImageFormatMetadata<T>

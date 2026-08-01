@@ -21,7 +21,12 @@ public readonly record struct XbmFile : IImageFormatReader<XbmFile>, IImageToRaw
   /// <summary>1bpp packed pixel data, LSB-first within each byte, ceil(width/8) bytes per row.</summary>
   public byte[] PixelData { get; init; }
 
-  private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
+  /// <summary>Index zero is paper, index one is ink.</summary>
+  /// <remarks>
+  /// A set bit means a dot was drawn, not that the pixel is lit. Reading it the other way gives a
+  /// negative of the picture, which round-trips through our own writer perfectly well.
+  /// </remarks>
+  private static readonly byte[] _BlackWhitePalette = [255, 255, 255, 0, 0, 0];
 
   private static byte _ReverseBits(byte b) {
     var result = 0;
@@ -32,34 +37,24 @@ public readonly record struct XbmFile : IImageFormatReader<XbmFile>, IImageToRaw
     return (byte)result;
   }
 
-  public static RawImage ToRawImage(XbmFile file) {
-    var msb = new byte[file.PixelData.Length];
-    for (var i = 0; i < file.PixelData.Length; ++i)
-      msb[i] = _ReverseBits(file.PixelData[i]);
-
-    return new() {
-      Width = file.Width,
-      Height = file.Height,
-      Format = PixelFormat.Indexed1,
-      PixelData = msb,
-      Palette = _BlackWhitePalette[..],
-      PaletteCount = 2,
-    };
-  }
+  public static RawImage ToRawImage(XbmFile file) => new() {
+    Width = file.Width,
+    Height = file.Height,
+    Format = PixelFormat.Indexed8,
+    PixelData = BilevelRows.Unpack(file.PixelData, file.Width, file.Height, mostSignificantFirst: false),
+    Palette = _BlackWhitePalette[..],
+    PaletteCount = 2,
+  };
 
   public static XbmFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    image = image.EnsureFormat(PixelFormat.Indexed1);
-
-    var lsb = new byte[image.PixelData.Length];
-    for (var i = 0; i < image.PixelData.Length; ++i)
-      lsb[i] = _ReverseBits(image.PixelData[i]);
 
     return new() {
       Width = image.Width,
       Height = image.Height,
       Name = "image",
-      PixelData = lsb,
+      PixelData = BilevelRows.Pack(
+        BilevelRows.Threshold(image, setWhenDark: true), image.Width, image.Height, mostSignificantFirst: false),
     };
   }
 }
