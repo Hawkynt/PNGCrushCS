@@ -25,14 +25,25 @@ public class IplReaderTests {
     => Assert.Throws<InvalidDataException>(() => IplReader.FromBytes(new byte[15]));
 
   [Test]
+  public void FromBytes_WrongMagic_ThrowsInvalidDataException()
+    => Assert.Throws<InvalidDataException>(() => IplReader.FromBytes(new byte[64]));
+
+  [Test]
   public void FromBytes_ValidHeader_Succeeds() {
-    var data = new byte[16 + 320 * 240 * 3];
-    data[0] = 64;
-    data[1] = 1;
-    data[4] = 240; data[5] = 0;
-    var result = IplReader.FromBytes(data);
-    Assert.That(result.Width, Is.GreaterThan(0));
-    Assert.That(result.Height, Is.GreaterThan(0));
+    // Built the way the format states rather than by hand: the tags identify it, and the sizes sit
+    // behind them at fixed offsets.
+    var file = IplFile.FromRawImage(new() {
+      Width = 320, Height = 240, Format = PixelFormat.Rgb24, PixelData = new byte[320 * 240 * 3],
+    });
+
+    var result = IplReader.FromBytes(IplWriter.ToBytes(file));
+
+    Assert.Multiple(() => {
+      Assert.That(result.Width, Is.EqualTo(320));
+      Assert.That(result.Height, Is.EqualTo(240));
+      Assert.That(result.Channels, Is.EqualTo(3));
+      Assert.That(result.SampleBits, Is.EqualTo(8));
+    });
   }
 
   [Test]
@@ -48,6 +59,8 @@ public class RoundTripTests {
     var file = new IplFile {
       Width = 320,
       Height = 240,
+      Channels = 3,
+      SampleBits = 8,
       PixelData = new byte[320 * 240 * 3],
     };
     for (var i = 0; i < file.PixelData.Length; ++i)
@@ -62,6 +75,8 @@ public class RoundTripTests {
     var file = new IplFile {
       Width = 320,
       Height = 240,
+      Channels = 3,
+      SampleBits = 8,
       PixelData = new byte[320 * 240 * 3],
     };
     var raw = IplFile.ToRawImage(file);

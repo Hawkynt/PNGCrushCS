@@ -1,15 +1,18 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
+using System.Text;
 
 namespace FileFormat.Ipl;
 
-/// <summary>Reads IPL Image Sequence frame files from bytes, streams, or file paths.</summary>
+/// <summary>Reads IPLab images from bytes, streams, or file paths.</summary>
 public static class IplReader {
 
   public static IplFile FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
-      throw new FileNotFoundException("Ipl file not found.", file.FullName);
+      throw new FileNotFoundException("IPL file not found.", file.FullName);
+
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
@@ -20,68 +23,67 @@ public static class IplReader {
       stream.ReadExactly(data);
       return FromBytes(data);
     }
+
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
     return FromBytes(ms.ToArray());
   }
 
   public static IplFile FromSpan(ReadOnlySpan<byte> data) {
-
     if (data.Length < IplFile.HeaderSize)
-      throw new InvalidDataException("Data too small for a valid Ipl file.");
+      throw new InvalidDataException("Data too small for a valid IPLab file.");
 
-    var width = data[0] | (data[1] << 8);
-    var height = data[2] | (data[3] << 8);
-    if (width == 0) width = data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24);
-    if (width <= 0 || width > 65535) width = 320;
+    var magic = Encoding.ASCII.GetString(data[..4]);
+    var isBigEndian = magic == IplFile.MotorolaMagic;
+    if (!isBigEndian && magic != IplFile.IntelMagic)
+      throw new InvalidDataException($"Not an IPLab file: magic '{magic}'.");
 
-    if (16 >= 8) {
-      height = data[4] | (data[5] << 8);
-      if (height <= 0 || height > 65535) height = 240;
-    } else if (height <= 0 || height > 65535) {
-      height = 240;
-    }
+    if (Encoding.ASCII.GetString(data[8..12]) != IplFile.Version)
+      throw new InvalidDataException($"Unsupported IPLab version '{Encoding.ASCII.GetString(data[8..12])}'.");
 
-    var pixelBytes = width * height * 3;
-    var pixelData = new byte[pixelBytes];
-    var available = Math.Min(pixelBytes, data.Length - IplFile.HeaderSize);
-    if (available > 0)
-      data.Slice(IplFile.HeaderSize, available).CopyTo(pixelData.AsSpan(0));
+    if (Encoding.ASCII.GetString(data[12..16]) != IplFile.DataTag)
+      throw new InvalidDataException($"IPLab file does not open with its picture: tag '{Encoding.ASCII.GetString(data[12..16])}'.");
+
+    var width = _Read(data, 20, isBigEndian);
+    var height = _Read(data, 24, isBigEndian);
+    var channels = _Read(data, 28, isBigEndian);
+    var type = _Read(data, 40, isBigEndian);
+
+    if (width <= 0 || height <= 0)
+      throw new InvalidDataException($"Invalid IPLab size {width}x{height}.");
+    if (channels is <= 0 or > 4)
+      throw new InvalidDataException($"An IPLab picture of {channels} channels is not one this reads.");
+
+    // The type names the width of a sample. Only the two integer widths are pictures; the rest are
+    // measurements that would need a range to be meaningful.
+    var sampleBits = type switch {
+      0 => 8,
+      1 => 16,
+      _ => throw new InvalidDataException($"IPLab sample type {type} is not one this reads."),
+    };
+
+    var expected = width * height * channels * (sampleBits / 8);
+    var available = data.Length - IplFile.HeaderSize;
+    if (available < expected)
+      throw new InvalidDataException($"An IPLab {width}x{height} needs {expected} bytes of planes, but {available} follow.");
 
     return new() {
       Width = width,
       Height = height,
-      PixelData = pixelData,
+      Channels = channels,
+      SampleBits = sampleBits,
+      IsBigEndian = isBigEndian,
+      PixelData = data.Slice(IplFile.HeaderSize, expected).ToArray(),
     };
-    }
+  }
+
+  private static int _Read(ReadOnlySpan<byte> data, int offset, bool isBigEndian)
+    => isBigEndian
+      ? BinaryPrimitives.ReadInt32BigEndian(data[offset..])
+      : BinaryPrimitives.ReadInt32LittleEndian(data[offset..]);
 
   public static IplFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < IplFile.HeaderSize)
-      throw new InvalidDataException("Data too small for a valid Ipl file.");
-
-    var width = data[0] | (data[1] << 8);
-    var height = data[2] | (data[3] << 8);
-    if (width == 0) width = data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24);
-    if (width <= 0 || width > 65535) width = 320;
-
-    if (16 >= 8) {
-      height = data[4] | (data[5] << 8);
-      if (height <= 0 || height > 65535) height = 240;
-    } else if (height <= 0 || height > 65535) {
-      height = 240;
-    }
-
-    var pixelBytes = width * height * 3;
-    var pixelData = new byte[pixelBytes];
-    var available = Math.Min(pixelBytes, data.Length - IplFile.HeaderSize);
-    if (available > 0)
-      data.AsSpan(IplFile.HeaderSize, available).CopyTo(pixelData.AsSpan(0));
-
-    return new() {
-      Width = width,
-      Height = height,
-      PixelData = pixelData,
-    };
+    return FromSpan(data);
   }
 }
