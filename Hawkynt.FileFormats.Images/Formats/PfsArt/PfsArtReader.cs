@@ -46,7 +46,7 @@ public static class PfsArtReader {
       var row = PfsArtFile.HeaderSize + (y * stride);
       for (var x = 0; x < width; ++x) {
         var set = (data[row + (x >> 3)] >> (7 - (x & 7)) & 1) != 0;
-        pixels[(y * width) + x] = set ? (byte)0 : (byte)255; // a set bit is ink
+        pixels[(y * width) + x] = set ? (byte)255 : (byte)0; // a clear bit is ink
       }
     }
 

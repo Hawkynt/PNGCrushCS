@@ -32,7 +32,11 @@ public readonly record struct SunRasterFile : IImageFormatReader<SunRasterFile>,
         return new() {
           Width = width,
           Height = height,
-          Format = PixelFormat.Bgr24,
+          // The type field says which way round the channels are: RT_FORMAT_RGB carries them as
+          // red-green-blue, every other type as blue-green-red. Blue-green-red was assumed for all of
+          // them, so an RT_FORMAT_RGB file — which is what a modern writer produces — came out with
+          // its reds and blues exchanged.
+          Format = file.Compression == SunRasterCompression.Rgb ? PixelFormat.Rgb24 : PixelFormat.Bgr24,
           PixelData = stripped,
         };
       }

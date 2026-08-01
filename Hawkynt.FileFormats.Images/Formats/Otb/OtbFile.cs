@@ -20,7 +20,16 @@ public readonly record struct OtbFile : IImageFormatReader<OtbFile>, IImageToRaw
   /// <summary>1bpp packed pixel data, MSB first, ceil(width/8) bytes per row.</summary>
   public byte[] PixelData { get; init; }
 
-  private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
+  /// <summary>
+  /// Index 0 is the background and index 1 the ink, so a set bit draws black.
+  /// </summary>
+  /// <remarks>
+  /// The two were the other way round, which turned every image of this format into its own negative:
+  /// the bits a writer sets to mark ink were being painted white and the blank background black.
+  /// Nothing that only checked an image's size would notice, since a negative is exactly as big as
+  /// the picture it inverts.
+  /// </remarks>
+  private static readonly byte[] _BlackWhitePalette = [255, 255, 255, 0, 0, 0];
 
   public static RawImage ToRawImage(OtbFile file) => new() {
     Width = file.Width,
