@@ -9,7 +9,7 @@ namespace FileFormat.XvThumbnail;
 public readonly record struct XvThumbnailFile : IImageFormatReader<XvThumbnailFile>, IImageToRawImage<XvThumbnailFile>, IImageFromRawImage<XvThumbnailFile>, IImageFormatWriter<XvThumbnailFile> {
 
   static string IImageFormatMetadata<XvThumbnailFile>.PrimaryExtension => ".xv";
-  static string[] IImageFormatMetadata<XvThumbnailFile>.FileExtensions => [".xv"];
+  static string[] IImageFormatMetadata<XvThumbnailFile>.FileExtensions => [".xv", ".p7"];
   static XvThumbnailFile IImageFormatReader<XvThumbnailFile>.FromSpan(ReadOnlySpan<byte> data) => XvThumbnailReader.FromSpan(data);
   static byte[] IImageFormatWriter<XvThumbnailFile>.ToBytes(XvThumbnailFile file) => XvThumbnailWriter.ToBytes(file);
 
