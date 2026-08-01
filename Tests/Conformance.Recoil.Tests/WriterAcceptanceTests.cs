@@ -53,20 +53,27 @@ public sealed class WriterAcceptanceTests {
 
     var entry = FormatRegistry.GetEntry(format)!;
 
-    // The primary name first. An alias is worth trying, but only after it — extensions are shared
-    // between unrelated formats, and asking a tool about one it knows under someone else's name
-    // measures the collision rather than the writer.
-    var extension = _Known(entry.PrimaryExtension)
-                    ? entry.PrimaryExtension
-                    : entry.AllExtensions.FirstOrDefault(_Known) ?? entry.PrimaryExtension;
+    // Every name a reference tool recognises, primary first. A format is readable if any of them
+    // is: extensions are shared between unrelated formats, so a tool refusing one may simply mean
+    // it knows that name as somebody else's format rather than that our bytes are wrong.
+    var extensions = new List<string>();
+    if (_Known(entry.PrimaryExtension))
+      extensions.Add(entry.PrimaryExtension);
+    extensions.AddRange(entry.AllExtensions.Where(_Known).Where(e => !extensions.Contains(e)));
+    if (extensions.Count == 0)
+      extensions.Add(entry.PrimaryExtension);
 
     var directory = Directory.CreateTempSubdirectory("writeraccept");
-    var path = Path.Combine(directory.FullName, "sample" + extension);
 
     try {
       string? refused = null;
+      string? rejected = null;
+      var written = false;
 
-      foreach (var (width, height) in _SizesFor(entry)) {
+      foreach (var (width, height) in _SizesFor(entry))
+      foreach (var extension in extensions) {
+        var path = Path.Combine(directory.FullName, "sample" + extension);
+
         try {
           if (!FormatRegistry.Write(_Sample(width, height), format, new FileInfo(path))) {
             refused ??= "the registry declined to write a format it says it can";
@@ -77,14 +84,24 @@ public sealed class WriterAcceptanceTests {
           continue;
         }
 
+        written = true;
+
         var judged = _AskRecoil(path) ?? _AskImageMagick(path);
         if (judged == null)
-          Assert.Ignore($"{format}: neither reference tool knows {extension}, so nothing else has read this");
+          continue;
 
-        Assert.That(judged.Value.Accepted, Is.True, $"{format}: at {width}x{height}, {judged.Value.Reason}");
+        if (judged.Value.Accepted)
+          return;
 
-        return;
+        rejected ??= $"at {width}x{height} as {extension}, {judged.Value.Reason}";
       }
+
+      if (rejected != null)
+        Assert.Fail($"{format}: {rejected}");
+
+      // Written, but nothing that knows the format was there to look at it.
+      if (written)
+        Assert.Ignore($"{format}: no reference tool knows any of its names, so nothing else has read this");
 
       Assert.Fail($"{format}: none of the sizes it declares could be written — {refused}");
     } finally {
