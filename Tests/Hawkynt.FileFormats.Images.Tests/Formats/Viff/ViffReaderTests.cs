@@ -58,11 +58,11 @@ public sealed class ViffReaderTests {
     var data = new byte[ViffHeader.StructSize + pixelBytes];
 
     data[0] = ViffHeader.Magic;
-    data[4] = 0x02; // little-endian
-    BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(520), (uint)width);
-    BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(524), (uint)height);
-    BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(528), (uint)bands);
-    BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(596), (uint)ViffStorageType.Byte);
+    data[4] = ViffHeader.IeeeByteOrder; // which is big-endian, and what every file says
+    BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(520), (uint)width);
+    BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(524), (uint)height);
+    BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(560), (uint)bands);
+    BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(564), (uint)ViffStorageType.Byte);
 
     for (var i = 0; i < pixelBytes; ++i)
       data[ViffHeader.StructSize + i] = (byte)(i * 17);
@@ -88,11 +88,11 @@ public sealed class ViffReaderTests {
     var data = new byte[ViffHeader.StructSize + pixelBytes];
 
     data[0] = ViffHeader.Magic;
-    data[4] = 0x02;
-    BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(520), (uint)width);
-    BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(524), (uint)height);
-    BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(528), (uint)bands);
-    BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(596), (uint)ViffStorageType.Byte);
+    data[4] = ViffHeader.IeeeByteOrder;
+    BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(520), (uint)width);
+    BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(524), (uint)height);
+    BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(560), (uint)bands);
+    BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(564), (uint)ViffStorageType.Byte);
     data[ViffHeader.StructSize] = 0xAA;
     data[ViffHeader.StructSize + 1] = 0xBB;
     data[ViffHeader.StructSize + 2] = 0xCC;
@@ -112,11 +112,11 @@ public sealed class ViffReaderTests {
   public void FromBytes_CommentPreserved() {
     var data = new byte[ViffHeader.StructSize + 4];
     data[0] = ViffHeader.Magic;
-    data[4] = 0x02;
-    BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(520), 2);
-    BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(524), 2);
-    BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(528), 1);
-    BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(596), (uint)ViffStorageType.Byte);
+    data[4] = ViffHeader.IeeeByteOrder;
+    BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(520), 2);
+    BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(524), 2);
+    BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(560), 1);
+    BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(564), (uint)ViffStorageType.Byte);
 
     var comment = "Test comment";
     var commentBytes = System.Text.Encoding.ASCII.GetBytes(comment);

@@ -37,7 +37,9 @@ public static class ViffReader {
     var header = ViffHeader.ReadFrom(data);
     var width = (int)header.RowSize;
     var height = (int)header.ColSize;
-    var bands = (int)header.SubRowSize;
+    // The band count is its own field. This used to read the sub-row size, which is zero in every
+    // file written by anything, so a colour picture was taken for a single grey plane.
+    var bands = (int)header.NumDataBands;
 
     if (width <= 0)
       throw new InvalidDataException($"Invalid VIFF width: {width}.");
@@ -51,8 +53,8 @@ public static class ViffReader {
 
     // Read map data if enabled
     byte[]? mapData = null;
-    if (header.MapEnable != 0 && header.MapRowSize > 0 && header.MapColSize > 0) {
-      var mapBytesPerElement = _GetMapBytesPerElement((ViffMapType)header.MapType);
+    if (header.MapScheme != 0 && header.MapRowSize > 0 && header.MapColSize > 0) {
+      var mapBytesPerElement = _GetMapBytesPerElement((ViffMapType)header.MapStorageType);
       var mapBytes = (int)(header.MapRowSize * header.MapColSize * mapBytesPerElement);
       if (offset + mapBytes <= data.Length) {
         mapData = new byte[mapBytes];
@@ -78,7 +80,7 @@ public static class ViffReader {
       Comment = header.Comment,
       PixelData = pixelData,
       MapData = mapData,
-      MapType = (ViffMapType)header.MapType,
+      MapType = (ViffMapType)header.MapStorageType,
       MapRowSize = (int)header.MapRowSize,
       MapColSize = (int)header.MapColSize,
       MapStorageType = (ViffStorageType)header.MapStorageType
@@ -96,7 +98,9 @@ public static class ViffReader {
     var header = ViffHeader.ReadFrom(data.AsSpan());
     var width = (int)header.RowSize;
     var height = (int)header.ColSize;
-    var bands = (int)header.SubRowSize;
+    // The band count is its own field. This used to read the sub-row size, which is zero in every
+    // file written by anything, so a colour picture was taken for a single grey plane.
+    var bands = (int)header.NumDataBands;
 
     if (width <= 0)
       throw new InvalidDataException($"Invalid VIFF width: {width}.");
@@ -110,8 +114,8 @@ public static class ViffReader {
 
     // Read map data if enabled
     byte[]? mapData = null;
-    if (header.MapEnable != 0 && header.MapRowSize > 0 && header.MapColSize > 0) {
-      var mapBytesPerElement = _GetMapBytesPerElement((ViffMapType)header.MapType);
+    if (header.MapScheme != 0 && header.MapRowSize > 0 && header.MapColSize > 0) {
+      var mapBytesPerElement = _GetMapBytesPerElement((ViffMapType)header.MapStorageType);
       var mapBytes = (int)(header.MapRowSize * header.MapColSize * mapBytesPerElement);
       if (offset + mapBytes <= data.Length) {
         mapData = new byte[mapBytes];
@@ -137,7 +141,7 @@ public static class ViffReader {
       Comment = header.Comment,
       PixelData = pixelData,
       MapData = mapData,
-      MapType = (ViffMapType)header.MapType,
+      MapType = (ViffMapType)header.MapStorageType,
       MapRowSize = (int)header.MapRowSize,
       MapColSize = (int)header.MapColSize,
       MapStorageType = (ViffStorageType)header.MapStorageType

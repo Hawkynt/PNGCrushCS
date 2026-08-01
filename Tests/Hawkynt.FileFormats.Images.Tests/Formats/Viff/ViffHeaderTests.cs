@@ -26,27 +26,27 @@ public sealed class ViffHeaderTests {
       Comment: "Round-trip test",
       RowSize: 320,
       ColSize: 240,
-      SubRowSize: 3,
+      SubRowSize: 0,
       StartX: 1.0f,
       StartY: 2.0f,
-      PixelSize: 0.5f,
-      Location: 0,
-      Padding: 0,
-      FileSpare: 0,
-      MapType: 0,
+      PixelSizeX: 0.5f,
+      PixelSizeY: 0.25f,
+      LocationType: 1,
+      LocationDim: 0,
+      NumberOfImages: 1,
+      NumDataBands: 3,
+      DataStorageType: (uint)ViffStorageType.Byte,
+      DataEncodeScheme: 0,
+      MapScheme: 0,
+      MapStorageType: 0,
       MapRowSize: 0,
       MapColSize: 0,
       MapSubRowSize: 0,
-      MapStorageType: 0,
-      MapRowSizePad: 0,
       MapEnable: 0,
       MapsPerCycle: 0,
       ColorSpaceModel: (uint)ViffColorSpaceModel.Rgb,
-      IsBand: 1,
-      DataStorageType: (uint)ViffStorageType.Byte,
-      DataEncode: 0,
-      MapScheme0: 0f,
-      MapScheme1: 0f
+      SpareInt1: 0,
+      SpareInt2: 0
     );
 
     var buffer = new byte[ViffHeader.StructSize];
@@ -56,13 +56,14 @@ public sealed class ViffHeaderTests {
     Assert.That(parsed.Identifier, Is.EqualTo(original.Identifier));
     Assert.That(parsed.RowSize, Is.EqualTo(original.RowSize));
     Assert.That(parsed.ColSize, Is.EqualTo(original.ColSize));
-    Assert.That(parsed.SubRowSize, Is.EqualTo(original.SubRowSize));
+    Assert.That(parsed.NumDataBands, Is.EqualTo(original.NumDataBands));
     Assert.That(parsed.DataStorageType, Is.EqualTo(original.DataStorageType));
     Assert.That(parsed.ColorSpaceModel, Is.EqualTo(original.ColorSpaceModel));
     Assert.That(parsed.Comment, Is.EqualTo(original.Comment));
     Assert.That(parsed.StartX, Is.EqualTo(original.StartX));
     Assert.That(parsed.StartY, Is.EqualTo(original.StartY));
-    Assert.That(parsed.PixelSize, Is.EqualTo(original.PixelSize));
+    Assert.That(parsed.PixelSizeX, Is.EqualTo(original.PixelSizeX));
+    Assert.That(parsed.PixelSizeY, Is.EqualTo(original.PixelSizeY));
   }
 
   [Test]
