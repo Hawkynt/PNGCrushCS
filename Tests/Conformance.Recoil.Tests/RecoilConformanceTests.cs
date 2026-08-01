@@ -38,6 +38,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.GraphSaurusInterlaced, "Graph Saurus interlaced", 512, 424, ".sri"),
     new(ImageFormat.InterlaceLogoDesigner, "Interlace Logo Designer", 256, 128, ".ild"),
     new(ImageFormat.InterlaceGraphicsEditor, "Interlace Graphics Editor", 256, 96, ".ige"),
+    new(ImageFormat.DuoMedium, "Duo medium", 832, 546, ".du2"),
     new(ImageFormat.Doodle, "Doodle", 320, 200),
     new(ImageFormat.HiPicCreator, "Hi-Pic Creator", 320, 200),
     new(ImageFormat.HiresC64, "Hires-Bitmap", 320, 200, ".hbm"),

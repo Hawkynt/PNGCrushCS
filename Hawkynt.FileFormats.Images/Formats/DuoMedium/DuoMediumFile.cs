@@ -13,7 +13,10 @@ namespace FileFormat.DuoMedium;
 /// scanlines and a 273-row picture is 546 scanlines tall.
 /// </remarks>
 public readonly record struct DuoMediumFile
-  : IImageFormatReader<DuoMediumFile>, IImageToRawImage<DuoMediumFile> {
+  : IImageFormatReader<DuoMediumFile>, IImageToRawImage<DuoMediumFile>,
+    IImageFromRawImage<DuoMediumFile>, IImageFormatWriter<DuoMediumFile> {
+
+  static byte[] IImageFormatWriter<DuoMediumFile>.ToBytes(DuoMediumFile file) => DuoMediumWriter.ToBytes(file);
 
   /// <summary>Picture width.</summary>
   public const int Width = 832;
@@ -86,5 +89,37 @@ public readonly record struct DuoMediumFile
     }
 
     return rgb;
+  }
+
+  /// <summary>Builds a picture, putting the same field in both halves.</summary>
+  /// <remarks>
+  /// Each stored row is drawn twice, so the picture is taken at half its displayed height and the
+  /// doubling left to the reader. Both fields hold the same rows, whose average is themselves.
+  /// </remarks>
+  public static DuoMediumFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(Width, StoredHeight);
+    var quantized = ColorQuantizer.Quantize(
+      PixelConverter.Convert(rgb, PixelFormat.Bgra32).PixelData, Width * StoredHeight, ColorCount);
+
+    var indices = new byte[Width * StoredHeight];
+    for (var i = 0; i < indices.Length; ++i)
+      indices[i] = (byte)quantized.Indices[i];
+
+    var data = new byte[MinFileSize];
+
+    var stPalette = PlanarConverter.RgbToStPalette(quantized.Palette, ColorCount);
+    for (var i = 0; i < ColorCount; ++i) {
+      data[i * 2] = (byte)(stPalette[i] >> 8);
+      data[i * 2 + 1] = (byte)stPalette[i];
+    }
+
+    var planar = PlanarConverter.ChunkyToAtariSt(indices, Width, StoredHeight, Planes);
+    var length = Math.Min(planar.Length, FrameSize);
+    planar.AsSpan(0, length).CopyTo(data.AsSpan(FirstFrameOffset));
+    planar.AsSpan(0, length).CopyTo(data.AsSpan(FirstFrameOffset + FrameSize));
+
+    return new() { Data = data };
   }
 }
