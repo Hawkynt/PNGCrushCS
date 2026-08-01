@@ -13,6 +13,11 @@ public readonly record struct MsxScreen8File : IImageFormatReader<MsxScreen8File
   static string IImageFormatMetadata<MsxScreen8File>.PrimaryExtension => ".sc8";
   static string[] IImageFormatMetadata<MsxScreen8File>.FileExtensions => [".sc8"];
   static MsxScreen8File IImageFormatReader<MsxScreen8File>.FromSpan(ReadOnlySpan<byte> data) => MsxScreen8Reader.FromSpan(data);
+
+  /// <summary>The size this format holds, which its writer requires and no other.</summary>
+  static VideoMode[] IImageFormatMetadata<MsxScreen8File>.VideoModes => [
+    new("Default", [(256, 212)]),
+  ];
   static byte[] IImageFormatWriter<MsxScreen8File>.ToBytes(MsxScreen8File file) => MsxScreen8Writer.ToBytes(file);
 
   /// <summary>Fixed width of an MSX Screen 8 image.</summary>

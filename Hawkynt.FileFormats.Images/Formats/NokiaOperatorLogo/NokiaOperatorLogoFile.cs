@@ -20,7 +20,7 @@ public readonly record struct NokiaOperatorLogoFile : IImageFormatReader<NokiaOp
   static string IImageFormatMetadata<NokiaOperatorLogoFile>.PrimaryExtension => ".nol";
   static string[] IImageFormatMetadata<NokiaOperatorLogoFile>.FileExtensions => [".nol"];
   static NokiaOperatorLogoFile IImageFormatReader<NokiaOperatorLogoFile>.FromSpan(ReadOnlySpan<byte> data) => NokiaOperatorLogoReader.FromSpan(data);
-  static VideoMode[] IImageFormatMetadata<NokiaOperatorLogoFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
+  static VideoMode[] IImageFormatMetadata<NokiaOperatorLogoFile>.VideoModes => [new("Default", [(72, 14)], [2])];
   static byte[] IImageFormatWriter<NokiaOperatorLogoFile>.ToBytes(NokiaOperatorLogoFile file) => NokiaOperatorLogoWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>

@@ -63,6 +63,10 @@ public readonly record struct FuntasticPaintFile : IImageFormatReader<FuntasticP
   /// <summary>Creates a Fun*tastic Paint file from a platform-independent <see cref="RawImage"/>. Accepts Gray8, Indexed1, or Indexed8.</summary>
   public static FuntasticPaintFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    // Converted rather than refused. Every other writer here takes whatever picture it is
+    // handed and does what the format needs; one that insists the caller reduce first pushes
+    // that work onto anything converting between formats, which is most of what this is for.
+    image = image.EnsureAnyFormat(PixelFormat.Gray8, PixelFormat.Indexed8, PixelFormat.Indexed1);
     if (image.Width != FixedWidth || image.Height != FixedHeight)
       throw new ArgumentException($"Expected {FixedWidth}x{FixedHeight} but got {image.Width}x{image.Height}.", nameof(image));
 

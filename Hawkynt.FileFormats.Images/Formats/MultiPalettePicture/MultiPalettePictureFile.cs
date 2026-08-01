@@ -76,6 +76,10 @@ public readonly record struct MultiPalettePictureFile : IImageFormatReader<Multi
 
   public static MultiPalettePictureFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    // Converted rather than refused. Every other writer here takes whatever picture it is
+    // handed and does what the format needs; one that insists the caller reduce first pushes
+    // that work onto anything converting between formats, which is most of what this is for.
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Indexed8, PixelFormat.Indexed1);
     if (image.Width != ImageWidth)
       throw new ArgumentException($"MPP images must be exactly {ImageWidth} pixels wide.", nameof(image));
     if (image.Height != ImageHeight)
