@@ -270,9 +270,10 @@ public sealed class WriterAcceptanceTests {
     if (!TomsEditorOracle.Enabled || !TomsEditorOracle.Extensions.Contains(Path.GetExtension(path)))
       return null;
 
-    var (decoded, output) = TomsEditorOracle.TryDecode(path);
+    if (TomsEditorOracle.TryDecode(path) is not { } verdict)
+      return null;
 
-    return (decoded, $"Tom's Editor rejected it — {output}");
+    return (verdict.Decoded, $"Tom's Editor rejected it — {verdict.Output}");
   }
 
   private static (bool Accepted, string Reason)? _AskIrfanView(string path) {

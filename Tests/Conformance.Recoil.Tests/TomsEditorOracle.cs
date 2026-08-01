@@ -73,10 +73,21 @@ internal static class TomsEditorOracle {
     return found;
   }
 
+  /// <summary>What the service says when the day's free conversions are used up.</summary>
+  /// <remarks>
+  /// It is a free service with a daily limit, and once that is reached every answer becomes the same
+  /// refusal whatever was sent. Reading those as verdicts would mark every remaining format as a
+  /// broken writer on the strength of a quota, so they are reported as no answer at all.
+  /// </remarks>
+  private const string _QuotaMessage = "daily use limit";
+
+  /// <summary>Whether the service has stopped answering for the day.</summary>
+  public static bool Exhausted { get; private set; }
+
   /// <summary>Sends a file and asks for it back as a PNG, returning whether it could.</summary>
-  public static (bool Decoded, string Output) TryDecode(string path) {
-    if (_Client.Value is not { } client)
-      return (false, "not enabled");
+  public static (bool Decoded, string Output)? TryDecode(string path) {
+    if (_Client.Value is not { } client || Exhausted)
+      return null;
 
     try {
       Thread.Sleep(_Courtesy);
@@ -87,6 +98,11 @@ internal static class TomsEditorOracle {
 
       var uploaded = client.PostAsync(_Root + "ajax/upload.php", content).GetAwaiter().GetResult();
       var uploadBody = uploaded.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+      if (uploadBody.Contains(_QuotaMessage, StringComparison.OrdinalIgnoreCase)) {
+        Exhausted = true;
+        return null;
+      }
+
       if (!_Succeeded(uploadBody))
         return (false, "the upload was refused: " + _Message(uploadBody));
 
@@ -99,6 +115,11 @@ internal static class TomsEditorOracle {
       var converted = client
         .GetStringAsync($"{_Root}ajax/convert.php?fname={name}&ext=PNG")
         .GetAwaiter().GetResult();
+
+      if (converted.Contains(_QuotaMessage, StringComparison.OrdinalIgnoreCase)) {
+        Exhausted = true;
+        return null;
+      }
 
       return (_Succeeded(converted), _Message(converted));
     } catch (Exception failure) {
