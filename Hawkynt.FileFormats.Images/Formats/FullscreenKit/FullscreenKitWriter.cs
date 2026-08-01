@@ -1,19 +1,34 @@
 using System;
+using System.IO;
+using System.Text;
 
 namespace FileFormat.FullscreenKit;
 
-/// <summary>Assembles Fullscreen Construction Kit (.kid) file bytes from an in-memory representation.</summary>
+/// <summary>Assembles a Fullscreen Construction Kit picture: two marker bytes, the palette, the bitplanes.</summary>
 public static class FullscreenKitWriter {
 
   public static byte[] ToBytes(FullscreenKitFile file) {
     ArgumentNullException.ThrowIfNull(file);
 
-    var header = new FullscreenKitHeader(file.Palette);
-    var totalSize = FullscreenKitHeader.StructSize + file.PixelData.Length;
-    var result = new byte[totalSize];
-    header.WriteTo(result.AsSpan());
-    file.PixelData.AsSpan(0, file.PixelData.Length).CopyTo(result.AsSpan(FullscreenKitHeader.StructSize));
+    var result = new byte[FullscreenKitFile.FileSize];
+    Encoding.ASCII.GetBytes(FullscreenKitFile.Signature).CopyTo(result.AsSpan(0));
+
+    var palette = file.Palette ?? [];
+    for (var i = 0; i < FullscreenKitFile.ColorCount; ++i) {
+      var value = i < palette.Length ? palette[i] : (short)0;
+      result[FullscreenKitFile.PaletteOffset + i * 2] = (byte)(value >> 8);
+      result[FullscreenKitFile.PaletteOffset + i * 2 + 1] = (byte)value;
+    }
+
+    var pixels = file.PixelData ?? [];
+    pixels.AsSpan(0, Math.Min(pixels.Length, FullscreenKitFile.FileSize - FullscreenKitFile.BitmapOffset))
+      .CopyTo(result.AsSpan(FullscreenKitFile.BitmapOffset));
 
     return result;
+  }
+
+  public static void ToFile(FullscreenKitFile file, FileInfo target) {
+    ArgumentNullException.ThrowIfNull(target);
+    File.WriteAllBytes(target.FullName, ToBytes(file));
   }
 }

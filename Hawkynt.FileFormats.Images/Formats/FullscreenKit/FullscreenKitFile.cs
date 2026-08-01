@@ -13,37 +13,44 @@ public readonly record struct FullscreenKitFile : IImageFormatReader<FullscreenK
   /// <summary>Number of usable palette colors (always 16 for 4 planes).</summary>
   public const int ColorCount = 16;
 
-  /// <summary>Primary variant: 416x274.</summary>
-  public const int PrimaryWidth = 416;
+  /// <summary>Pixels across, which is the full overscan width rather than the visible one.</summary>
+  /// <remarks>
+  /// This was written as two variants, 416 by 274 and 448 by 272, and the format has neither. It is
+  /// 448 by 274, and a row reserves six bytes more than its pixels need — so a file is 63054 bytes
+  /// and neither of the two lengths this used to accept.
+  /// </remarks>
+  public const int PixelWidth = 448;
 
-  /// <summary>Primary variant: 416x274.</summary>
-  public const int PrimaryHeight = 274;
+  /// <summary>Rows.</summary>
+  public const int PixelHeight = 274;
 
-  /// <summary>Alternate variant: 448x272.</summary>
-  public const int AlternateWidth = 448;
+  /// <summary>Bytes from one row of bitplanes to the next, which is wider than the pixels need.</summary>
+  public const int Stride = 230;
 
-  /// <summary>Alternate variant: 448x272.</summary>
-  public const int AlternateHeight = 272;
+  /// <summary>The two characters a file begins with.</summary>
+  public const string Signature = "KD";
 
-  /// <summary>File size for the 416x274 variant: 32 + 208*274 = 57024.</summary>
-  public const int PrimaryFileSize = FullscreenKitHeader.StructSize + PrimaryPixelDataSize;
+  /// <summary>Where the palette sits: straight after the signature.</summary>
+  public const int PaletteOffset = 2;
 
-  /// <summary>File size for the 448x272 variant: 32 + 224*272 = 60960.</summary>
-  public const int AlternateFileSize = FullscreenKitHeader.StructSize + AlternatePixelDataSize;
+  /// <summary>Where the bitplanes start.</summary>
+  public const int BitmapOffset = PaletteOffset + ColorCount * 2;
 
-  /// <summary>Pixel data size for 416x274: (416/16)*4*2*274 = 56992.</summary>
-  internal const int PrimaryPixelDataSize = (PrimaryWidth / 16) * NumPlanes * 2 * PrimaryHeight;
-
-  /// <summary>Pixel data size for 448x272: (448/16)*4*2*272 = 60928.</summary>
-  internal const int AlternatePixelDataSize = (AlternateWidth / 16) * NumPlanes * 2 * AlternateHeight;
+  /// <summary>The exact length of a file.</summary>
+  public const int FileSize = BitmapOffset + Stride * PixelHeight;
 
   static string IImageFormatMetadata<FullscreenKitFile>.PrimaryExtension => ".kid";
   static string[] IImageFormatMetadata<FullscreenKitFile>.FileExtensions => [".kid"];
   static FullscreenKitFile IImageFormatReader<FullscreenKitFile>.FromSpan(ReadOnlySpan<byte> data) => FullscreenKitReader.FromSpan(data);
 
   /// <summary>The size this format holds, which its writer requires and no other.</summary>
+  /// <summary>Both overscan shapes the program produces, since the reader takes either.</summary>
+  /// <remarks>
+  /// Only the first was declared, so anything asking what this format can be written as was told
+  /// half the answer — and the half it was told is not the one a reference decoder recognises.
+  /// </remarks>
   static VideoMode[] IImageFormatMetadata<FullscreenKitFile>.VideoModes => [
-    new("Default", [(416, 274)]),
+    new("Overscan", [(PixelWidth, PixelHeight)], [ColorCount]),
   ];
   static byte[] IImageFormatWriter<FullscreenKitFile>.ToBytes(FullscreenKitFile file) => FullscreenKitWriter.ToBytes(file);
 
@@ -60,22 +67,9 @@ public readonly record struct FullscreenKitFile : IImageFormatReader<FullscreenK
   public byte[] PixelData { get; init; }
 
   /// <summary>Detects dimensions from the pixel data size after subtracting the palette header.</summary>
-  internal static (int Width, int Height) DetectDimensions(int dataLength) {
-    var pixelBytes = dataLength - FullscreenKitHeader.StructSize;
-    if (pixelBytes == PrimaryPixelDataSize)
-      return (PrimaryWidth, PrimaryHeight);
-    if (pixelBytes == AlternatePixelDataSize)
-      return (AlternateWidth, AlternateHeight);
-
-    throw new InvalidDataException(
-      $"Unrecognized Fullscreen Kit file size: {dataLength} bytes. " +
-      $"Expected {PrimaryFileSize} (416x274) or {AlternateFileSize} (448x272)."
-    );
-  }
-
   public static RawImage ToRawImage(FullscreenKitFile file) {
 
-    var chunky = PlanarConverter.AtariStToChunky(file.PixelData, file.Width, file.Height, NumPlanes);
+    var chunky = AtariStGraphics.UnpackBitplanes(file.PixelData, 0, Stride, NumPlanes, file.Width, file.Height);
     var paletteCount = Math.Min(ColorCount, file.Palette.Length);
     var rgb = PlanarConverter.StPaletteToRgb(file.Palette.AsSpan(0, paletteCount));
 
@@ -91,19 +85,17 @@ public readonly record struct FullscreenKitFile : IImageFormatReader<FullscreenK
 
   public static FullscreenKitFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    image = image.EnsureFormat(PixelFormat.Indexed8);
+    image = image.EnsureIndexedAtMost(ColorCount);
 
     var width = image.Width;
     var height = image.Height;
 
-    // Validate dimensions match one of the supported variants
-    if (!((width == PrimaryWidth && height == PrimaryHeight) || (width == AlternateWidth && height == AlternateHeight)))
+    if (width != PixelWidth || height != PixelHeight)
       throw new ArgumentException(
-        $"Fullscreen Kit images must be {PrimaryWidth}x{PrimaryHeight} or {AlternateWidth}x{AlternateHeight}.",
-        nameof(image)
-      );
+        $"A Fullscreen Kit picture is {PixelWidth}x{PixelHeight}, got {width}x{height}.", nameof(image));
 
-    var planar = PlanarConverter.ChunkyToAtariSt(image.PixelData, width, height, NumPlanes);
+    // Packed at the file's own row stride, which reserves six bytes a row beyond the pixels.
+    var planar = AtariStGraphics.PackBitplanes(image.PixelData, Stride, NumPlanes, width, height);
     var paletteCount = Math.Min(image.PaletteCount, 16);
     var stPalette = PlanarConverter.RgbToStPalette(image.Palette, paletteCount);
     var palette = new short[16];
