@@ -166,6 +166,87 @@ public static class Atari8BitGraphics {
     return rgb;
   }
 
+  /// <summary>The GTIA colour nearest a given one, as the byte a colour register holds.</summary>
+  /// <remarks>
+  /// Only even values are returned: the registers ignore their low bit, so an odd one would be
+  /// written and read back as its neighbour.
+  /// </remarks>
+  public static byte NearestRegister(int red, int green, int blue) {
+    var gtia = Palette;
+    byte best = 0;
+    var bestCost = int.MaxValue;
+
+    for (var candidate = 0; candidate < 256; candidate += 2) {
+      var entry = candidate * 3;
+      int dr = red - gtia[entry], dg = green - gtia[entry + 1], db = blue - gtia[entry + 2];
+      var cost = dr * dr + dg * dg + db * db;
+      if (cost >= bestCost)
+        continue;
+
+      bestCost = cost;
+      best = (byte)candidate;
+    }
+
+    return best;
+  }
+
+  /// <summary>Chooses the registers a Graphics 15 frame should draw from for a given picture.</summary>
+  public static byte[] ChooseGr15Registers(ReadOnlySpan<byte> bgra, int pixels, int count) {
+    var quantized = ColorQuantizer.Quantize(bgra.ToArray(), pixels, count);
+    var registers = new byte[count];
+
+    for (var i = 0; i < count; ++i) {
+      var entry = i * 3;
+      registers[i] = entry + 2 < quantized.Palette.Length
+        ? NearestRegister(quantized.Palette[entry], quantized.Palette[entry + 1], quantized.Palette[entry + 2])
+        : (byte)0;
+    }
+
+    return registers;
+  }
+
+  /// <summary>Packs a picture into a Graphics 15 frame, the inverse of decoding one.</summary>
+  /// <param name="registers">Background, PF0, PF1 and PF2, in that order.</param>
+  /// <remarks>
+  /// Each logical pixel is drawn two screen pixels wide, so only every other column is stored; the
+  /// one taken is the first of each pair, which is what decoding puts back in both.
+  /// </remarks>
+  public static byte[] PackGr15Frame(
+    ReadOnlySpan<byte> rgb, int stride, int width, int height, ReadOnlySpan<byte> registers) {
+    var gtia = Palette;
+    var data = new byte[stride * height];
+
+    for (var y = 0; y < height; ++y) {
+      var rowOffset = y * stride;
+      for (var x = 0; x < width; ++x) {
+        var source = (y * width + x) * 3;
+        if (source + 2 >= rgb.Length)
+          break;
+
+        var best = 0;
+        var bestCost = int.MaxValue;
+        for (var candidate = 0; candidate < registers.Length; ++candidate) {
+          var entry = (registers[candidate] & 254) * 3;
+          var dr = rgb[source] - gtia[entry];
+          var dg = rgb[source + 1] - gtia[entry + 1];
+          var db = rgb[source + 2] - gtia[entry + 2];
+          var cost = dr * dr + dg * dg + db * db;
+          if (cost >= bestCost)
+            continue;
+
+          bestCost = cost;
+          best = candidate;
+        }
+
+        var index = rowOffset + (x >> 3);
+        if (index < data.Length)
+          data[index] |= (byte)(best << (~x & 6));
+      }
+    }
+
+    return data;
+  }
+
   /// <summary>
   /// Renders a Graphics 9 bitmap of any size to RGB: one luminance per pixel against a fixed hue.
   /// </summary>

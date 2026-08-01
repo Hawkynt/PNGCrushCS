@@ -11,7 +11,11 @@ namespace FileFormat.InterlaceLogoDesigner;
 /// enough for a logo, which is all the program was for.
 /// </remarks>
 public readonly record struct InterlaceLogoDesignerFile
-  : IImageFormatReader<InterlaceLogoDesignerFile>, IImageToRawImage<InterlaceLogoDesignerFile> {
+  : IImageFormatReader<InterlaceLogoDesignerFile>, IImageToRawImage<InterlaceLogoDesignerFile>,
+    IImageFromRawImage<InterlaceLogoDesignerFile>, IImageFormatWriter<InterlaceLogoDesignerFile> {
+
+  static byte[] IImageFormatWriter<InterlaceLogoDesignerFile>.ToBytes(InterlaceLogoDesignerFile file)
+    => InterlaceLogoDesignerWriter.ToBytes(file);
 
   /// <summary>Screen pixels across.</summary>
   public const int Width = 256;
@@ -57,5 +61,25 @@ public readonly record struct InterlaceLogoDesignerFile
       Format = PixelFormat.Rgb24,
       PixelData = FrameBlend.Average(first, second),
     };
+  }
+
+  /// <summary>Builds a picture, putting the same field in both halves.</summary>
+  /// <remarks>
+  /// Both fields draw from the same four registers and neither is displaced, so two identical ones
+  /// average to themselves and the picture comes back exactly as written. What it does not do is use
+  /// the extra colours interlacing two different fields would give, which needs a second picture
+  /// this does not have.
+  /// </remarks>
+  public static InterlaceLogoDesignerFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(Width, Height);
+    var field = Atari8BitGraphics.PackGr15Frame(rgb.PixelData, Stride, Width, Height, Registers);
+
+    var data = new byte[FileSize];
+    field.AsSpan(0, Math.Min(field.Length, SecondFieldOffset)).CopyTo(data.AsSpan(FirstFieldOffset));
+    field.AsSpan(0, Math.Min(field.Length, FileSize - SecondFieldOffset)).CopyTo(data.AsSpan(SecondFieldOffset));
+
+    return new() { Data = data };
   }
 }

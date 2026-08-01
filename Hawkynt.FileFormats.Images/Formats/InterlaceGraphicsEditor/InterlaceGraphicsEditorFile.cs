@@ -12,7 +12,11 @@ namespace FileFormat.InterlaceGraphicsEditor;
 /// </remarks>
 [FormatMagicBytes([0xFF, 0xFF, 0xF6, 0xA3, 0xFF, 0xBB, 0xFF, 0x5F])]
 public readonly record struct InterlaceGraphicsEditorFile
-  : IImageFormatReader<InterlaceGraphicsEditorFile>, IImageToRawImage<InterlaceGraphicsEditorFile> {
+  : IImageFormatReader<InterlaceGraphicsEditorFile>, IImageToRawImage<InterlaceGraphicsEditorFile>,
+    IImageFromRawImage<InterlaceGraphicsEditorFile>, IImageFormatWriter<InterlaceGraphicsEditorFile> {
+
+  static byte[] IImageFormatWriter<InterlaceGraphicsEditorFile>.ToBytes(InterlaceGraphicsEditorFile file)
+    => InterlaceGraphicsEditorWriter.ToBytes(file);
 
   /// <summary>Screen pixels across; each of the 128 logical pixels is drawn two wide.</summary>
   public const int Width = 256;
@@ -80,5 +84,30 @@ public readonly record struct InterlaceGraphicsEditorFile
       registers[i] = data[offset + i];
 
     return registers;
+  }
+
+  /// <summary>Builds a picture with the same registers and the same field in both halves.</summary>
+  /// <remarks>
+  /// The two fields normally carry different colours, and averaging them is what puts more on the
+  /// screen than four. A single picture gives no second set to average against, so both halves hold
+  /// the same one and the result is exactly what was written.
+  /// </remarks>
+  public static InterlaceGraphicsEditorFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(Width, Height);
+    var registers = Atari8BitGraphics.ChooseGr15Registers(
+      PixelConverter.Convert(rgb, PixelFormat.Bgra32).PixelData, Width * Height, RegisterCount);
+
+    var field = Atari8BitGraphics.PackGr15Frame(rgb.PixelData, Stride, Width, Height, registers);
+    var data = new byte[FileSize];
+    Signature.CopyTo(data.AsSpan(0));
+
+    registers.CopyTo(data.AsSpan(FirstRegisterOffset));
+    registers.CopyTo(data.AsSpan(SecondRegisterOffset));
+    field.CopyTo(data.AsSpan(FirstBitmapOffset));
+    field.CopyTo(data.AsSpan(SecondBitmapOffset));
+
+    return new() { Data = data };
   }
 }
