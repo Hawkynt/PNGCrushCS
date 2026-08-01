@@ -88,7 +88,7 @@ public readonly record struct SgiFile : IImageFormatReader<SgiFile>, IImageToRaw
           BytesPerChannel = 1,
           Compression = SgiCompression.None,
           ColorMode = SgiColorMode.Normal,
-          PixelData = src[..],
+          PixelData = _FlipRows(src, width, height, 1),
         };
       case PixelFormat.Gray16:
         return new() {
@@ -98,7 +98,7 @@ public readonly record struct SgiFile : IImageFormatReader<SgiFile>, IImageToRaw
           BytesPerChannel = 2,
           Compression = SgiCompression.None,
           ColorMode = SgiColorMode.Normal,
-          PixelData = src[..],
+          PixelData = _FlipRows(src, width, height, 2),
         };
       case PixelFormat.Rgb24:
         return new() {
@@ -185,14 +185,17 @@ public readonly record struct SgiFile : IImageFormatReader<SgiFile>, IImageToRaw
     return result;
   }
 
+  /// <summary>Splits packed pixels into channel planes, writing the bottom row first.</summary>
+  /// <remarks>The mirror of <see cref="_Deplanarize"/>, so what is written reads back the same way up.</remarks>
   private static byte[] _Planarize(byte[] interleaved, int width, int height, int channels) {
     var planeSize = width * height;
     var result = new byte[planeSize * channels];
     for (var y = 0; y < height; ++y)
       for (var x = 0; x < width; ++x) {
-        var pixelIndex = y * width + x;
+        var source = (y * width) + x;
+        var target = ((height - 1 - y) * width) + x;
         for (var c = 0; c < channels; ++c)
-          result[c * planeSize + pixelIndex] = interleaved[pixelIndex * channels + c];
+          result[(c * planeSize) + target] = interleaved[(source * channels) + c];
       }
     return result;
   }
@@ -203,10 +206,11 @@ public readonly record struct SgiFile : IImageFormatReader<SgiFile>, IImageToRaw
     var result = new byte[pixelCount * channels * 2];
     for (var y = 0; y < height; ++y)
       for (var x = 0; x < width; ++x) {
-        var pixelIndex = y * width + x;
+        var pixelIndex = (y * width) + x;
+        var targetIndex = ((height - 1 - y) * width) + x;
         for (var c = 0; c < channels; ++c) {
-          var srcOffset = (pixelIndex * channels + c) * 2;
-          var dstOffset = c * planeSize + pixelIndex * 2;
+          var srcOffset = ((pixelIndex * channels) + c) * 2;
+          var dstOffset = (c * planeSize) + (targetIndex * 2);
           result[dstOffset]     = interleaved[srcOffset];
           result[dstOffset + 1] = interleaved[srcOffset + 1];
         }
