@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.TechnicolorDream;
@@ -40,6 +41,10 @@ public readonly record struct TechnicolorDreamFile
   static string[] IImageFormatMetadata<TechnicolorDreamFile>.FileExtensions => [".lum"];
   static TechnicolorDreamFile IImageFormatReader<TechnicolorDreamFile>.FromSpan(ReadOnlySpan<byte> data)
     => TechnicolorDreamReader.FromSpan(data);
+
+  /// <summary>Reads the file together with the companion it cannot be shown without.</summary>
+  static TechnicolorDreamFile IImageFormatReader<TechnicolorDreamFile>.FromFile(FileInfo file)
+    => TechnicolorDreamReader.FromFile(file);
   static byte[] IImageFormatWriter<TechnicolorDreamFile>.ToBytes(TechnicolorDreamFile file)
     => TechnicolorDreamWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<TechnicolorDreamFile>.VideoModes => [

@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.OcpArtStudioWindow;
@@ -29,6 +30,10 @@ public readonly record struct OcpArtStudioWindowFile
   static string[] IImageFormatMetadata<OcpArtStudioWindowFile>.FileExtensions => [".win"];
   static OcpArtStudioWindowFile IImageFormatReader<OcpArtStudioWindowFile>.FromSpan(ReadOnlySpan<byte> data)
     => OcpArtStudioWindowReader.FromSpan(data);
+
+  /// <summary>Reads the file together with the companion it cannot be shown without.</summary>
+  static OcpArtStudioWindowFile IImageFormatReader<OcpArtStudioWindowFile>.FromFile(FileInfo file)
+    => OcpArtStudioWindowReader.FromFile(file);
   static VideoMode[] IImageFormatMetadata<OcpArtStudioWindowFile>.VideoModes => [
     new("Window", [(new IntegerRange(1, 640), new IntegerRange(1, 200))], [ColorCount])
   ];

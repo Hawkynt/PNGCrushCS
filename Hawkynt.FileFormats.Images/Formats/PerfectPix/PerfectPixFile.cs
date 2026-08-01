@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.PerfectPix;
@@ -36,6 +37,10 @@ public readonly record struct PerfectPixFile
   static string[] IImageFormatMetadata<PerfectPixFile>.FileExtensions => [".pph"];
   static PerfectPixFile IImageFormatReader<PerfectPixFile>.FromSpan(ReadOnlySpan<byte> data)
     => PerfectPixReader.FromSpan(data);
+
+  /// <summary>Reads the file together with the companion it cannot be shown without.</summary>
+  static PerfectPixFile IImageFormatReader<PerfectPixFile>.FromFile(FileInfo file)
+    => PerfectPixReader.FromFile(file);
   static VideoMode[] IImageFormatMetadata<PerfectPixFile>.VideoModes => [
     new("Perfect Pix", [(new IntegerRange(4, 384), new IntegerRange(1, 272))], [WideColorCount])
   ];

@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Picasso;
@@ -47,6 +48,10 @@ public readonly record struct PicassoFile
   static string[] IImageFormatMetadata<PicassoFile>.FileExtensions => [".pic0"];
   static PicassoFile IImageFormatReader<PicassoFile>.FromSpan(ReadOnlySpan<byte> data)
     => PicassoReader.FromSpan(data);
+
+  /// <summary>Reads the file together with the companion it cannot be shown without.</summary>
+  static PicassoFile IImageFormatReader<PicassoFile>.FromFile(FileInfo file)
+    => PicassoReader.FromFile(file);
   static VideoMode[] IImageFormatMetadata<PicassoFile>.VideoModes => [
     new("Picasso", [(Size, Size)], [Vic20Graphics.ColorCount])
   ];
