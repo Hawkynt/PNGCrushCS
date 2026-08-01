@@ -19,6 +19,9 @@ internal static class JpegMarker {
   // Quantization table
   public const byte DQT = 0xDB;
 
+  /// <summary>The segment Adobe writes to say what was done to a four-component picture.</summary>
+  public const byte APP14 = 0xEE;
+
   // Restart interval
   public const byte DRI = 0xDD;
 

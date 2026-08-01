@@ -67,7 +67,24 @@ internal static class JpegManagedDecoder {
     var height = frame.Height;
 
     byte[] rgbPixelData;
-    if (isGrayscale) {
+    if (frame.Components.Length == 4) {
+      // Four planes are ink, not colour. Taking the first three as luma and chroma and dropping the
+      // fourth — which is what happened before — throws the black plate away.
+      var cropped = new byte[4][];
+      for (var i = 0; i < 4; ++i) {
+        var compW = componentData[i].WidthInBlocks * 8;
+        var compH = componentData[i].HeightInBlocks * 8;
+        var actualW = (width * frame.Components[i].HSamplingFactor + maxH - 1) / maxH;
+        var actualH = (height * frame.Components[i].VSamplingFactor + maxV - 1) / maxV;
+        var plane = _CropPlane(planes[i], compW, compH, actualW, actualH);
+        cropped[i] = actualW == width && actualH == height
+          ? plane
+          : JpegColorConverter.Upsample(plane, actualW, actualH, width, height);
+      }
+
+      rgbPixelData = JpegColorConverter.YcckOrCmykToRgb(
+        cropped[0], cropped[1], cropped[2], cropped[3], width, height, _AdobeTransform(image));
+    } else if (isGrayscale) {
       var yPlane = _CropPlane(planes[0], componentData[0].WidthInBlocks * 8, componentData[0].HeightInBlocks * 8, width, height);
       rgbPixelData = JpegColorConverter.GrayscaleToRgb(yPlane, width, height);
     } else {
@@ -102,6 +119,26 @@ internal static class JpegManagedDecoder {
       RgbPixelData = rgbPixelData,
       RawJpegBytes = dataArray
     };
+  }
+
+  /// <summary>
+  /// What an Adobe segment says was done to the four planes before they were stored.
+  /// </summary>
+  /// <remarks>
+  /// The byte sits last in an APP14 segment beginning with the word Adobe. A file without one is
+  /// taken as untransformed, which is what the specification's own fallback is.
+  /// </remarks>
+  private static int _AdobeTransform(JpegImage image) {
+    foreach (var segment in image.MarkerSegments) {
+      if (segment.Marker != JpegMarker.APP14 || segment.Data.Length < 12)
+        continue;
+
+      if (segment.Data[0] == 'A' && segment.Data[1] == 'd' && segment.Data[2] == 'o'
+          && segment.Data[3] == 'b' && segment.Data[4] == 'e')
+        return segment.Data[^1];
+    }
+
+    return JpegColorConverter.AdobeTransformNone;
   }
 
   /// <summary>Decodes a JPEG to the coefficient level (no IDCT / color conversion).

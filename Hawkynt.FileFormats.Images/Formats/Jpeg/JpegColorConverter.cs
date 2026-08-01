@@ -217,4 +217,62 @@ internal static class JpegColorConverter {
     JpegSubsampling.Chroma420 => (2, 2),
     _ => (1, 1)
   };
+
+  /// <summary>
+  /// The transform an Adobe four-component file states in its APP14 segment.
+  /// </summary>
+  /// <remarks>
+  /// Zero means the four planes are ink amounts already; two means they were carried as luma and
+  /// two chroma differences with the key alongside, exactly as a colour picture is, and have to be
+  /// brought back before they mean anything.
+  /// </remarks>
+  public const int AdobeTransformNone = 0;
+
+  public const int AdobeTransformYcck = 2;
+
+  /// <summary>Converts a four-component Adobe picture to RGB.</summary>
+  /// <remarks>
+  /// Adobe stores ink amounts inverted — a stored 255 means no ink — and the two transforms differ
+  /// in how far that survives. Undoing the luma-chroma step of a YCCK file yields the ink amounts
+  /// the right way up again, while its key plane stays inverted; an untransformed file has all four
+  /// planes inverted. Treating both alike leaves one of them a negative of itself.
+  /// <para/>
+  /// Reading the first three planes as a colour picture and dropping the fourth, which is what this
+  /// used to do, loses the black plate entirely and leaves every dark area pale.
+  /// </remarks>
+  public static byte[] YcckOrCmykToRgb(
+    byte[] c, byte[] m, byte[] y, byte[] k, int width, int height, int transform) {
+    var count = width * height;
+    var rgb = new byte[count * 3];
+
+    for (var i = 0; i < count; ++i) {
+      int red, green, blue;
+
+      if (transform == AdobeTransformYcck) {
+        // The first three planes are luma and chroma; undoing that gives the ink amounts the right
+        // way up, so each has to be turned back into the light it leaves.
+        var luma = c[i];
+        var cb = m[i] - 128;
+        var cr = y[i] - 128;
+        red = 255 - _Clamp(luma + ((91881 * cr) >> 16));
+        green = 255 - _Clamp(luma - ((22554 * cb + 46802 * cr) >> 16));
+        blue = 255 - _Clamp(luma + ((116130 * cb) >> 16));
+      } else {
+        // Already inverted, so the stored value is the light rather than the ink.
+        red = c[i];
+        green = m[i];
+        blue = y[i];
+      }
+
+      // The key plane is inverted in both forms, so it scales directly.
+      var key = k[i];
+      rgb[i * 3] = (byte)(red * key / 255);
+      rgb[i * 3 + 1] = (byte)(green * key / 255);
+      rgb[i * 3 + 2] = (byte)(blue * key / 255);
+    }
+
+    return rgb;
+  }
+
+  private static int _Clamp(int value) => value < 0 ? 0 : value > 255 ? 255 : value;
 }
