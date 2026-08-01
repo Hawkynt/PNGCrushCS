@@ -21,7 +21,7 @@ public readonly record struct ViffFile : IImageFormatReader<ViffFile>, IImageToR
   /// <summary>Image height in pixels (ColSize).</summary>
   public int Height { get; init; }
 
-  /// <summary>Number of data bands (SubRowSize).</summary>
+  /// <summary>Number of data bands: 1 for greyscale or paletted, 3 for RGB.</summary>
   public int Bands { get; init; }
 
   /// <summary>Pixel data storage type.</summary>
@@ -33,23 +33,23 @@ public readonly record struct ViffFile : IImageFormatReader<ViffFile>, IImageToR
   /// <summary>512-byte ASCII comment from the header.</summary>
   public string Comment { get; init; }
 
-  /// <summary>Raw pixel data bytes (band-interleaved).</summary>
+  /// <summary>Raw pixel data bytes (band-sequential: a whole plane at a time, not interleaved).</summary>
   public byte[] PixelData { get; init; }
 
-  /// <summary>Optional color map data.</summary>
+  /// <summary>Optional color map data, band-sequential like the pixels.</summary>
   public byte[]? MapData { get; init; }
 
-  /// <summary>Color map type.</summary>
+  /// <summary>Whether the color map applies, and how.</summary>
+  public ViffMapScheme MapScheme { get; init; }
+
+  /// <summary>Element type of the color map.</summary>
   public ViffMapType MapType { get; init; }
 
-  /// <summary>Number of map rows.</summary>
+  /// <summary>Channels in the color map: 3 for an RGB palette, 1 for a grey ramp.</summary>
   public int MapRowSize { get; init; }
 
-  /// <summary>Number of map columns.</summary>
+  /// <summary>Entries in the color map.</summary>
   public int MapColSize { get; init; }
-
-  /// <summary>Map storage type.</summary>
-  public ViffStorageType MapStorageType { get; init; }
 
   public static RawImage ToRawImage(ViffFile file) {
 
@@ -66,13 +66,29 @@ public readonly record struct ViffFile : IImageFormatReader<ViffFile>, IImageToR
     if (file.StorageType != ViffStorageType.Byte)
       throw new ArgumentException($"Only Bit and Byte storage are supported for conversion, got {file.StorageType}.", nameof(file));
 
-    if (file.Bands == 1)
+    if (file.Bands == 1) {
+
+      // One band plus a map is a paletted image, which is what ImageMagick writes whenever the
+      // picture has few enough colours. Read as bare greys the indices came out as near-black
+      // nonsense, so a four-colour image decoded to a four-shade one.
+      var palette = _BuildPalette(file);
+      if (palette != null)
+        return new() {
+          Width = file.Width,
+          Height = file.Height,
+          Format = PixelFormat.Indexed8,
+          PixelData = file.PixelData[..],
+          Palette = palette,
+          PaletteCount = 256,
+        };
+
       return new() {
         Width = file.Width,
         Height = file.Height,
         Format = PixelFormat.Gray8,
         PixelData = file.PixelData[..],
       };
+    }
 
     if (file.Bands == 3) {
       var pixelCount = file.Width * file.Height;
@@ -96,9 +112,25 @@ public readonly record struct ViffFile : IImageFormatReader<ViffFile>, IImageToR
 
   public static ViffFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Gray8);
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Gray8, PixelFormat.Indexed8);
 
     switch (image.Format) {
+      case PixelFormat.Indexed8: {
+        var (map, entries) = _BuildMap(image);
+        return new() {
+          Width = image.Width,
+          Height = image.Height,
+          Bands = 1,
+          StorageType = ViffStorageType.Byte,
+          ColorSpaceModel = ViffColorSpaceModel.None,
+          PixelData = image.PixelData[..],
+          MapData = map,
+          MapScheme = ViffMapScheme.OnePerBand,
+          MapType = ViffMapType.Byte,
+          MapRowSize = 3,
+          MapColSize = entries,
+        };
+      }
       case PixelFormat.Gray8:
         return new() {
           Width = image.Width,
@@ -122,13 +154,61 @@ public readonly record struct ViffFile : IImageFormatReader<ViffFile>, IImageToR
           Height = image.Height,
           Bands = 3,
           StorageType = ViffStorageType.Byte,
-          ColorSpaceModel = ViffColorSpaceModel.Rgb,
+          ColorSpaceModel = ViffColorSpaceModel.GenericRgb,
           PixelData = bandSeq,
         };
       }
       default:
         throw new ArgumentException($"Unsupported pixel format for VIFF: {image.Format}", nameof(image));
     }
+  }
+
+  /// <summary>Turns a VIFF colour map into a 256-entry RGB palette, or returns null when there is none.</summary>
+  /// <remarks>
+  /// The map is stored the way the pixels are — one plane per channel, not one triplet per entry — so
+  /// the reds all come first. Only byte entries are handled: wider ones would need the file's byte
+  /// order, which is spent by the time the map reaches here, and nothing in the wild writes them.
+  /// </remarks>
+  private static byte[]? _BuildPalette(ViffFile file) {
+    if (file.MapScheme == ViffMapScheme.None || file.MapType != ViffMapType.Byte)
+      return null;
+    if (file.MapData is not { Length: > 0 } map || file.MapColSize <= 0)
+      return null;
+    if (file.MapRowSize is not (1 or 3))
+      return null;
+
+    var entries = Math.Min(file.MapColSize, 256);
+    var palette = new byte[256 * 3];
+    var green = file.MapRowSize == 3 ? file.MapColSize : 0;
+    var blue = file.MapRowSize == 3 ? file.MapColSize * 2 : 0;
+    for (var i = 0; i < entries; ++i) {
+      if (blue + i >= map.Length)
+        break;
+
+      palette[i * 3] = map[i];
+      palette[i * 3 + 1] = map[green + i];
+      palette[i * 3 + 2] = map[blue + i];
+    }
+
+    return palette;
+  }
+
+  /// <summary>Lays an RGB palette out band-sequentially, the way a VIFF colour map is stored.</summary>
+  private static (byte[] Map, int Entries) _BuildMap(RawImage image) {
+    var entries = image.PaletteCount > 0 ? Math.Min(image.PaletteCount, 256) : 256;
+    var palette = image.Palette ?? [];
+    var map = new byte[entries * 3];
+    for (var i = 0; i < entries; ++i) {
+      var at = i * 3;
+      if (at + 2 >= palette.Length)
+        break;
+
+      map[i] = palette[at];
+      map[entries + i] = palette[at + 1];
+      map[entries * 2 + i] = palette[at + 2];
+    }
+
+    return (map, entries);
   }
 
   /// <summary>Expands a packed one-bit-a-pixel plane to one grey byte a pixel.</summary>

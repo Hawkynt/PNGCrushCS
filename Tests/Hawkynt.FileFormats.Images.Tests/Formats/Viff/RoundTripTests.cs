@@ -103,7 +103,7 @@ public sealed class RoundTripTests {
       Height = height,
       Bands = bands,
       StorageType = ViffStorageType.Byte,
-      ColorSpaceModel = ViffColorSpaceModel.Rgb,
+      ColorSpaceModel = ViffColorSpaceModel.GenericRgb,
       PixelData = pixelData
     };
 
@@ -113,7 +113,7 @@ public sealed class RoundTripTests {
     Assert.That(restored.Width, Is.EqualTo(original.Width));
     Assert.That(restored.Height, Is.EqualTo(original.Height));
     Assert.That(restored.Bands, Is.EqualTo(bands));
-    Assert.That(restored.ColorSpaceModel, Is.EqualTo(ViffColorSpaceModel.Rgb));
+    Assert.That(restored.ColorSpaceModel, Is.EqualTo(ViffColorSpaceModel.GenericRgb));
     Assert.That(restored.PixelData, Is.EqualTo(original.PixelData));
   }
 
@@ -179,10 +179,10 @@ public sealed class RoundTripTests {
       StorageType = ViffStorageType.Byte,
       PixelData = new byte[16],
       MapData = mapData,
+      MapScheme = ViffMapScheme.OnePerBand,
       MapType = ViffMapType.Byte,
-      MapRowSize = 256,
-      MapColSize = 3,
-      MapStorageType = ViffStorageType.Byte
+      MapRowSize = 3,     // channels
+      MapColSize = 256    // entries
     };
 
     var bytes = ViffWriter.ToBytes(original);
@@ -190,7 +190,8 @@ public sealed class RoundTripTests {
 
     Assert.That(restored.MapData, Is.Not.Null);
     Assert.That(restored.MapData, Is.EqualTo(original.MapData));
-    Assert.That(restored.MapRowSize, Is.EqualTo(256));
-    Assert.That(restored.MapColSize, Is.EqualTo(3));
+    Assert.That(restored.MapScheme, Is.EqualTo(ViffMapScheme.OnePerBand));
+    Assert.That(restored.MapRowSize, Is.EqualTo(3));
+    Assert.That(restored.MapColSize, Is.EqualTo(256));
   }
 }
