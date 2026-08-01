@@ -6,8 +6,29 @@ namespace FileFormat.EzArt;
 /// <summary>In-memory representation of an EZ-Art Professional image (Atari ST, 320x200, 16 colors).</summary>
 public readonly record struct EzArtFile : IImageFormatReader<EzArtFile>, IImageToRawImage<EzArtFile>, IImageFromRawImage<EzArtFile>, IImageFormatWriter<EzArtFile> {
 
-  /// <summary>Expected file size: 32 bytes palette + 32000 bytes pixel data.</summary>
-  public const int FileSize = 32032;
+  /// <summary>Bytes before the packed screen.</summary>
+  public const int HeaderSize = 44;
+
+  /// <summary>The four bytes every file starts with.</summary>
+  public static ReadOnlySpan<byte> Signature => [(byte)'E', (byte)'Z', 0, 200];
+
+  /// <summary>Where the palette sits.</summary>
+  public const int PaletteOffset = 4;
+
+  /// <summary>Colours a low-resolution screen draws from.</summary>
+  public const int PaletteColors = 16;
+
+  /// <summary>Bitplanes it spends.</summary>
+  public const int Planes = 4;
+
+  /// <summary>Pixels across.</summary>
+  public const int ScreenWidth = 320;
+
+  /// <summary>Rows.</summary>
+  public const int ScreenHeight = 200;
+
+  /// <summary>Bytes the unpacked screen takes.</summary>
+  public const int ScreenSize = 32000;
 
   static string IImageFormatMetadata<EzArtFile>.PrimaryExtension => ".eza";
   static string[] IImageFormatMetadata<EzArtFile>.FileExtensions => [".eza"];

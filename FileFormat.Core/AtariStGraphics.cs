@@ -337,4 +337,49 @@ public static class AtariStGraphics {
       target[i * 2 + 1] = (byte)word;
     }
   }
+
+  /// <summary>
+  /// Reorders a word-interleaved bitmap into the plane-row-major order the packed formats stream.
+  /// </summary>
+  /// <remarks>
+  /// The screen keeps its planes interleaved every sixteen pixels, but a format that compresses one
+  /// streams each plane's row whole — the two orders differ, and packing the screen as it lies gives
+  /// a stream that decompresses to the right length and the wrong picture.
+  /// </remarks>
+  public static byte[] ToPlaneRows(ReadOnlySpan<byte> interleaved, int width, int height, int planes) {
+    var perPlane = ((width + 15) >> 4) << 1;
+    var stride = planes * perPlane;
+    var result = new byte[stride * height];
+    var at = 0;
+
+    for (var y = 0; y < height; ++y)
+    for (var plane = 0; plane < planes; ++plane)
+    for (var w = plane << 1; w < stride; w += planes << 1)
+    for (var x = 0; x < 2; ++x) {
+      var from = y * stride + w + x;
+      result[at++] = from < interleaved.Length ? interleaved[from] : (byte)0;
+    }
+
+    return result;
+  }
+
+  /// <summary>Puts plane-row-major bytes back into the interleaved layout.</summary>
+  public static byte[] FromPlaneRows(ReadOnlySpan<byte> planeRows, int width, int height, int planes) {
+    var perPlane = ((width + 15) >> 4) << 1;
+    var stride = planes * perPlane;
+    var result = new byte[stride * height];
+    var at = 0;
+
+    for (var y = 0; y < height; ++y)
+    for (var plane = 0; plane < planes; ++plane)
+    for (var w = plane << 1; w < stride; w += planes << 1)
+    for (var x = 0; x < 2; ++x) {
+      if (at >= planeRows.Length)
+        return result;
+
+      result[y * stride + w + x] = planeRows[at++];
+    }
+
+    return result;
+  }
 }

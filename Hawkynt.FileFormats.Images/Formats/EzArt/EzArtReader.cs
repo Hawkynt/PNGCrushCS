@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using FileFormat.Core;
 
 namespace FileFormat.EzArt;
 
@@ -31,42 +32,30 @@ public static class EzArtReader {
   }
 
   public static EzArtFile FromSpan(ReadOnlySpan<byte> data) {
+    if (data.Length < EzArtFile.HeaderSize
+        || !data[..EzArtFile.Signature.Length].SequenceEqual(EzArtFile.Signature))
+      throw new InvalidDataException("Not an EZ-Art picture.");
 
-    if (data.Length < EzArtFile.FileSize)
-      throw new InvalidDataException($"Data too small for a valid EZ-Art file (expected {EzArtFile.FileSize} bytes, got {data.Length}).");
+    var palette = new short[EzArtFile.PaletteColors];
+    for (var i = 0; i < palette.Length; ++i)
+      palette[i] = (short)((data[EzArtFile.PaletteOffset + i * 2] << 8)
+        | data[EzArtFile.PaletteOffset + i * 2 + 1]);
 
+    // The screen is streamed a plane-row at a time and packed as one run; it has to be unpacked and
+    // then put back into the interleaved order the display reads.
+    var planeRows = PackBits.Unpack(data[EzArtFile.HeaderSize..], EzArtFile.ScreenSize);
 
-    var header = EzArtHeader.ReadFrom(data);
-    var palette = header.Palette;
-
-    var pixelData = new byte[_PIXEL_DATA_SIZE];
-    data.Slice(_PALETTE_SIZE, _PIXEL_DATA_SIZE).CopyTo(pixelData.AsSpan(0));
-
-    return new EzArtFile {
-      Width = 320,
-      Height = 200,
+    return new() {
+      Width = EzArtFile.ScreenWidth,
+      Height = EzArtFile.ScreenHeight,
       Palette = palette,
-      PixelData = pixelData,
+      PixelData = AtariStGraphics.FromPlaneRows(
+        planeRows, EzArtFile.ScreenWidth, EzArtFile.ScreenHeight, EzArtFile.Planes),
     };
-    }
+  }
 
   public static EzArtFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < EzArtFile.FileSize)
-      throw new InvalidDataException($"Data too small for a valid EZ-Art file (expected {EzArtFile.FileSize} bytes, got {data.Length}).");
-
-
-    var header = EzArtHeader.ReadFrom(data);
-    var palette = header.Palette;
-
-    var pixelData = new byte[_PIXEL_DATA_SIZE];
-    data.AsSpan(_PALETTE_SIZE, _PIXEL_DATA_SIZE).CopyTo(pixelData.AsSpan(0));
-
-    return new EzArtFile {
-      Width = 320,
-      Height = 200,
-      Palette = palette,
-      PixelData = pixelData,
-    };
+    return FromSpan(data);
   }
 }
