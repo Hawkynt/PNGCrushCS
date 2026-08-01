@@ -8,15 +8,12 @@ public static class AtariFalconXgaWriter {
   public static byte[] ToBytes(AtariFalconXgaFile file) => Assemble(file.PixelData, file.Width, file.Height);
 
   internal static byte[] Assemble(byte[] pixelData, int width, int height) {
-    var expectedPixelBytes = width * height * 2;
-    var result = new byte[AtariFalconXgaHeader.StructSize + expectedPixelBytes];
+    // Nothing precedes the samples, so the file must come out at exactly one of the two lengths the
+    // format has; any other length names no size and cannot be read back.
+    _ = AtariFalconXgaFile.SizeOf(width * height * 2);
 
-    var header = new AtariFalconXgaHeader((ushort)width, (ushort)height);
-    header.WriteTo(result.AsSpan());
-
-    var copyLen = Math.Min(expectedPixelBytes, pixelData.Length);
-    pixelData.AsSpan(0, copyLen).CopyTo(result.AsSpan(AtariFalconXgaHeader.StructSize));
-
+    var result = new byte[width * height * 2];
+    pixelData.AsSpan(0, Math.Min(result.Length, pixelData.Length)).CopyTo(result);
     return result;
   }
 }

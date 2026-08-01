@@ -36,6 +36,18 @@ public readonly record struct C64MultiFile : IImageFormatReader<C64MultiFile>, I
   internal const int HiresPaddingSize = 6;
 
   /// <summary>Multicolor padding after background color byte.</summary>
+  /// <summary>Where the background colour sits, a byte after the screen rather than at the end.</summary>
+  /// <remarks>
+  /// The order is bitmap, screen, then sixteen bytes of which the second is the background, and only
+  /// then the colour RAM. Writing the colour RAM straight after the screen puts it sixteen bytes
+  /// early and leaves the background at the far end of the file, which is a picture in the right
+  /// shape drawn in whatever the last kilobyte happened to be.
+  /// </remarks>
+  internal const int MultiBackgroundOffset = 9003;
+
+  /// <summary>Where the colour RAM starts.</summary>
+  internal const int MultiColorOffset = 9018;
+
   internal const int MultiPaddingSize = 15;
 
   /// <summary>Image width in pixels (320 for hires, 160 for multicolor).</summary>
@@ -73,88 +85,34 @@ public readonly record struct C64MultiFile : IImageFormatReader<C64MultiFile>, I
   }
 
   /// <summary>Creates an Art Studio Hires (320x200, 1bpp) C64 image from a <see cref="RawImage"/>. Each 8x8 cell picks the two most-common C64 colors.</summary>
+  /// <summary>Builds a multicolour screen, which is what the extension this is written under means.</summary>
+  /// <remarks>
+  /// This used to produce the high-resolution variant whatever it was asked for — a different length
+  /// and a different layout from the one .ocp names, so nothing that knew the extension would open
+  /// it. Multicolour is also the more capable of the two: three colours a cell against two, bought
+  /// with half the horizontal resolution.
+  /// </remarks>
   public static C64MultiFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
 
-    var bgra = PixelConverter.Convert(image, PixelFormat.Bgra32);
-    var srcWidth = bgra.Width;
-    var srcHeight = bgra.Height;
-    var src = bgra.PixelData;
-
-    const int width = 320;
+    const int width = 160;
     const int height = 200;
-    const int cellsX = 40; // 320/8
-    const int cellsY = 25; // 200/8
-    var bitmapData = new byte[BitmapDataSize]; // 8000
-    var screenData = new byte[ScreenDataSize]; // 1000
 
-    for (var cy = 0; cy < cellsY; ++cy)
-      for (var cx = 0; cx < cellsX; ++cx) {
-        // Find the two most common C64 palette colors in this 8x8 cell
-        Span<int> freq = stackalloc int[16];
-        freq.Clear();
-
-        for (var py = 0; py < 8; ++py)
-          for (var px = 0; px < 8; ++px) {
-            var x = cx * 8 + px;
-            var y = cy * 8 + py;
-            byte r = 0, g = 0, b = 0;
-            if (x < srcWidth && y < srcHeight) {
-              var si = (y * srcWidth + x) * 4;
-              b = src[si]; g = src[si + 1]; r = src[si + 2];
-            }
-
-            ++freq[_FindNearestC64Color(r, g, b)];
-          }
-
-        // Pick top 2 colors
-        var fg = 0;
-        var bg = 0;
-        var maxFreq = -1;
-        var secondFreq = -1;
-        for (var i = 0; i < 16; ++i)
-          if (freq[i] > maxFreq) {
-            secondFreq = maxFreq;
-            bg = fg;
-            maxFreq = freq[i];
-            fg = i;
-          } else if (freq[i] > secondFreq) {
-            secondFreq = freq[i];
-            bg = i;
-          }
-
-        var cellIndex = cy * cellsX + cx;
-        screenData[cellIndex] = (byte)((fg << 4) | (bg & 0x0F));
-
-        // Encode bitmap: 1 = fg, 0 = bg
-        for (var py = 0; py < 8; ++py) {
-          byte bitmapByte = 0;
-          for (var px = 0; px < 8; ++px) {
-            var x = cx * 8 + px;
-            var y = cy * 8 + py;
-            byte r = 0, g = 0, b2 = 0;
-            if (x < srcWidth && y < srcHeight) {
-              var si = (y * srcWidth + x) * 4;
-              b2 = src[si]; g = src[si + 1]; r = src[si + 2];
-            }
-
-            var nearest = _FindNearestC64Color(r, g, b2);
-            if (nearest == fg)
-              bitmapByte |= (byte)(1 << (7 - px));
-          }
-
-          bitmapData[cellIndex * 8 + py] = bitmapByte;
-        }
-      }
+    var rgb = image.SampleTo(width, height);
+    var bitmap = new byte[BitmapDataSize];
+    var screen = new byte[ScreenDataSize];
+    var colors = new byte[ColorDataSize];
+    var background = Commodore64Graphics.EncodeMulticolor(rgb.PixelData, width, height, bitmap, screen, colors);
 
     return new() {
       Width = width,
       Height = height,
-      Format = C64MultiFormat.ArtStudioHires,
-      LoadAddress = 0x2000,
-      BitmapData = bitmapData,
-      ScreenData = screenData,
-      BackgroundColor = 0,
+      Format = C64MultiFormat.ArtStudioMulti,
+      LoadAddress = 0x4000,
+      BitmapData = bitmap,
+      ScreenData = screen,
+      ColorData = colors,
+      BackgroundColor = background,
     };
   }
 

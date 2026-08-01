@@ -96,13 +96,11 @@ public static class C64MultiReader {
     data.Slice(offset, C64MultiFile.ScreenDataSize).CopyTo(screenData);
     offset += C64MultiFile.ScreenDataSize;
 
-    // Color RAM (1000 bytes)
+    // Both at the places the format puts them rather than one after the other.
     var colorData = new byte[C64MultiFile.ColorDataSize];
-    data.Slice(offset, C64MultiFile.ColorDataSize).CopyTo(colorData);
-    offset += C64MultiFile.ColorDataSize;
+    data.Slice(C64MultiFile.MultiColorOffset, C64MultiFile.ColorDataSize).CopyTo(colorData);
 
-    // Background color (1 byte)
-    var backgroundColor = data[offset];
+    var backgroundColor = data[C64MultiFile.MultiBackgroundOffset];
 
     return new() {
       Width = 160,

@@ -56,14 +56,13 @@ public static class C64MultiWriter {
     file.ScreenData.AsSpan(0, C64MultiFile.ScreenDataSize).CopyTo(result.AsSpan(offset));
     offset += C64MultiFile.ScreenDataSize;
 
-    // Color RAM (1000 bytes)
-    if (file.ColorData != null)
-      file.ColorData.AsSpan(0, C64MultiFile.ColorDataSize).CopyTo(result.AsSpan(offset));
-    offset += C64MultiFile.ColorDataSize;
+    // The background sits a byte into the gap that follows the screen, and the colour RAM only
+    // after that gap — not straight after the screen.
+    result[C64MultiFile.MultiBackgroundOffset] = file.BackgroundColor;
 
-    // Background color (1 byte)
-    result[offset] = file.BackgroundColor;
-    // Remaining 15 bytes are padding (zero-initialized by new byte[])
+    if (file.ColorData != null)
+      file.ColorData.AsSpan(0, C64MultiFile.ColorDataSize)
+        .CopyTo(result.AsSpan(C64MultiFile.MultiColorOffset));
 
     return result;
   }

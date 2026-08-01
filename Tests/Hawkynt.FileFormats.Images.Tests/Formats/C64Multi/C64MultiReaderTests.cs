@@ -136,10 +136,12 @@ public sealed class C64MultiReaderTests {
     for (var i = 0; i < 1000; ++i)
       data[8002 + i] = (byte)(i % 16);
 
+    // The colour RAM sits sixteen bytes after the screen, not straight after it, and the background
+    // is the second byte of that gap rather than the last byte of the file.
     for (var i = 0; i < 1000; ++i)
-      data[9002 + i] = (byte)((i + 3) % 16);
+      data[C64MultiFile.MultiColorOffset + i] = (byte)((i + 3) % 16);
 
-    data[10002] = backgroundColor;
+    data[C64MultiFile.MultiBackgroundOffset] = backgroundColor;
 
     return data;
   }
