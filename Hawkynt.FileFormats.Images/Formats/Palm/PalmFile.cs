@@ -20,14 +20,35 @@ public readonly record struct PalmFile : IImageFormatReader<PalmFile>, IImageToR
 
   private static readonly byte[] _Default8bppPalette = _MakeGrayRamp(256);
   private static readonly byte[] _Default4bppPalette = _MakeGrayRamp(16);
+  private static readonly byte[] _Default2bppPalette = _MakeGrayRamp(4);
 
+  /// <summary>The grey ramp a picture without a colour table is drawn with.</summary>
+  /// <remarks>
+  /// It runs backwards: index zero is white and the top index black. That is what the machine did —
+  /// the display was reflective, so a bit that was "on" meant ink, and the ramp counts up into the
+  /// dark. Building it the other way turns every such picture into its own negative, which the
+  /// one-bit case already had right and the deeper ones did not.
+  /// </remarks>
   private static byte[] _MakeGrayRamp(int entries) {
     var p = new byte[entries * 3];
     for (var i = 0; i < entries; ++i) {
-      var v = entries == 1 ? (byte)128 : (byte)(i * 255 / (entries - 1));
+      var v = entries == 1 ? (byte)128 : (byte)((entries - 1 - i) * 255 / (entries - 1));
       p[i * 3] = v; p[i * 3 + 1] = v; p[i * 3 + 2] = v;
     }
     return p;
+  }
+
+  private static byte[] _Unpack2Bpp(byte[] packed, int width, int height) {
+    var stride = (width + 3) / 4;
+    var pixels = new byte[width * height];
+
+    for (var y = 0; y < height; ++y)
+    for (var x = 0; x < width; ++x) {
+      var at = y * stride + (x >> 2);
+      pixels[y * width + x] = at < packed.Length ? (byte)((packed[at] >> (6 - ((x & 3) << 1))) & 3) : (byte)0;
+    }
+
+    return pixels;
   }
 
   public static RawImage ToRawImage(PalmFile file) {
@@ -46,6 +67,15 @@ public readonly record struct PalmFile : IImageFormatReader<PalmFile>, IImageToR
         PixelData = file.PixelData[..],
         Palette = file.Palette is { Length: >= 768 } p8 ? p8[..768] : _Default8bppPalette[..],
         PaletteCount = 256,
+      },
+      // Two bits a pixel has no packed format here, so it is spread to a byte each on the way out.
+      2 => new() {
+        Width = file.Width,
+        Height = file.Height,
+        Format = PixelFormat.Indexed8,
+        PixelData = _Unpack2Bpp(file.PixelData, file.Width, file.Height),
+        Palette = file.Palette is { Length: >= 12 } p2 ? p2[..12] : _Default2bppPalette[..],
+        PaletteCount = 4,
       },
       4 => new() {
         Width = file.Width,

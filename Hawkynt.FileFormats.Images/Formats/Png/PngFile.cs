@@ -71,8 +71,10 @@ public readonly record struct PngFile :
     var format = _GetPixelFormat(file.ColorType, file.BitDepth);
     var pixelData = _FlattenRows(file.PixelData);
 
+    if (file.ColorType == PngColorType.Grayscale && file.BitDepth < 8)
+      pixelData = _UnpackGray(pixelData, file.Width, file.Height, file.BitDepth);
     // For indexed with BitDepth 2, unpack to 8-bit indices
-    if (file.ColorType == PngColorType.Palette && file.BitDepth == 2)
+    else if (file.ColorType == PngColorType.Palette && file.BitDepth == 2)
       pixelData = _Unpack2BitTo8Bit(pixelData, file.Width, file.Height);
     else if (format is PixelFormat.Indexed1 or PixelFormat.Indexed4)
       pixelData = _RemoveRowPadding(pixelData, file.Width, file.Height, file.BitDepth);
@@ -137,8 +139,41 @@ public readonly record struct PngFile :
     };
   }
 
+  /// <summary>Spreads packed grey samples to a byte each, widening each to the full range.</summary>
+  /// <remarks>
+  /// The widening repeats the sample's bits rather than scaling it — one bit becomes 0 or 255, two
+  /// bits step 0/85/170/255, four bits step by 17. Multiplying by 255 and dividing instead leaves
+  /// the top of the range short, which is the difference between white and nearly white.
+  /// </remarks>
+  private static byte[] _UnpackGray(byte[] packed, int width, int height, int bitDepth) {
+    var stride = (width * bitDepth + 7) / 8;
+    var pixels = new byte[width * height];
+    var perByte = 8 / bitDepth;
+    var mask = (1 << bitDepth) - 1;
+
+    for (var y = 0; y < height; ++y)
+    for (var x = 0; x < width; ++x) {
+      var at = y * stride + x / perByte;
+      if (at >= packed.Length)
+        break;
+
+      var shift = 8 - bitDepth - (x % perByte) * bitDepth;
+      var value = (packed[at] >> shift) & mask;
+
+      pixels[y * width + x] = bitDepth switch {
+        1 => value != 0 ? (byte)255 : (byte)0,
+        2 => ChannelScaling.Expand2(value),
+        _ => ChannelScaling.Expand4(value),
+      };
+    }
+
+    return pixels;
+  }
+
   private static PixelFormat _GetPixelFormat(PngColorType colorType, int bitDepth) => colorType switch {
-    PngColorType.Grayscale when bitDepth == 8 => PixelFormat.Gray8,
+    // Grey below a byte is widened on the way out rather than carried packed: there is no packed
+    // grey format here, and a bilevel PNG is common enough that refusing it is not an option.
+    PngColorType.Grayscale when bitDepth is 1 or 2 or 4 or 8 => PixelFormat.Gray8,
     PngColorType.Grayscale when bitDepth == 16 => PixelFormat.Gray16,
     PngColorType.GrayscaleAlpha when bitDepth == 8 => PixelFormat.GrayAlpha16,
     PngColorType.RGB when bitDepth == 8 => PixelFormat.Rgb24,

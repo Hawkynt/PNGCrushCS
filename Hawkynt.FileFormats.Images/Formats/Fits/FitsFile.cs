@@ -18,11 +18,32 @@ public readonly record struct FitsFile : IImageFormatReader<FitsFile>, IImageToR
   public IReadOnlyList<FitsKeyword> Keywords { get; init; }
   public byte[] PixelData { get; init; }
 
+  /// <summary>How many bytes one sample takes for a given data type.</summary>
+  internal static int BytesPerSample(FitsBitpix bitpix) => Math.Abs((int)bitpix) / 8;
+
+  /// <summary>Turns the rows the right way up.</summary>
+  /// <remarks>
+  /// FITS puts the origin at the bottom left, as the mathematics it was built for does, so the first
+  /// row in the file is the bottom of the picture. Taking the rows in file order gives a picture
+  /// that is upside down and otherwise perfectly plausible.
+  /// </remarks>
+  internal static byte[] FlipRows(byte[] pixels, int width, int height, int bytesPerSample) {
+    var stride = width * bytesPerSample;
+    var result = new byte[stride * height];
+    for (var y = 0; y < height; ++y) {
+      var from = (height - 1 - y) * stride;
+      if (from + stride <= pixels.Length)
+        Array.Copy(pixels, from, result, y * stride, stride);
+    }
+
+    return result;
+  }
+
   /// <summary>Converts this FITS image to a <see cref="RawImage"/>, preserving 16-bit precision where possible.</summary>
   public static RawImage ToRawImage(FitsFile file) {
     var width = file.Width;
     var height = file.Height;
-    var src = file.PixelData;
+    var src = FlipRows(file.PixelData, width, height, BytesPerSample(file.Bitpix));
     var pixelCount = width * height;
 
     switch (file.Bitpix) {
@@ -109,7 +130,7 @@ public readonly record struct FitsFile : IImageFormatReader<FitsFile>, IImageToR
         Width = width,
         Height = height,
         Bitpix = FitsBitpix.Int16,
-        PixelData = result,
+        PixelData = FlipRows(result, width, height, 2),
       };
     }
 
@@ -130,7 +151,7 @@ public readonly record struct FitsFile : IImageFormatReader<FitsFile>, IImageToR
         Width = width,
         Height = height,
         Bitpix = FitsBitpix.UInt8,
-        PixelData = gray,
+        PixelData = FlipRows(gray, width, height, 1),
       };
     }
   }

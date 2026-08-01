@@ -11,7 +11,7 @@ public static class SunRasterWriter {
     file.Width,
     file.Height,
     file.Depth,
-    file.Compression,
+    file.Type,
     file.Palette,
     file.PaletteColorCount
   );
@@ -21,7 +21,7 @@ public static class SunRasterWriter {
     int width,
     int height,
     int depth,
-    SunRasterCompression compression,
+    SunRasterType rasterType,
     byte[]? palette = null,
     int paletteColorCount = 0
   ) {
@@ -34,7 +34,7 @@ public static class SunRasterWriter {
 
     // Prepare pixel data
     byte[] outputPixelData;
-    if (compression == SunRasterCompression.Rle)
+    if (rasterType == SunRasterType.ByteEncoded)
       outputPixelData = SunRasterRleCompressor.Compress(pixelData);
     else
       outputPixelData = pixelData;
@@ -46,7 +46,7 @@ public static class SunRasterWriter {
       Height: height,
       Depth: depth,
       Length: outputPixelData.Length,
-      Type: (int)compression,
+      Type: (int)rasterType,
       MapType: mapType,
       MapLength: mapLength
     );

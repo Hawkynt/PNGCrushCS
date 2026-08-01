@@ -32,14 +32,14 @@ public readonly record struct SgiFile : IImageFormatReader<SgiFile>, IImageToRaw
           Width = width,
           Height = height,
           Format = PixelFormat.Gray8,
-          PixelData = file.PixelData[..],
+          PixelData = _FlipRows(file.PixelData, width, height, 1),
         };
       case 1 when bpc == 2:
         return new() {
           Width = width,
           Height = height,
           Format = PixelFormat.Gray16,
-          PixelData = file.PixelData[..],
+          PixelData = _FlipRows(file.PixelData, width, height, 2),
         };
       case 3 when bpc == 1:
         return new() {
@@ -88,7 +88,7 @@ public readonly record struct SgiFile : IImageFormatReader<SgiFile>, IImageToRaw
           BytesPerChannel = 1,
           Compression = SgiCompression.None,
           ColorMode = SgiColorMode.Normal,
-          PixelData = src[..],
+          PixelData = _FlipRows(src, width, height, 1),
         };
       case PixelFormat.Gray16:
         return new() {
@@ -98,7 +98,7 @@ public readonly record struct SgiFile : IImageFormatReader<SgiFile>, IImageToRaw
           BytesPerChannel = 2,
           Compression = SgiCompression.None,
           ColorMode = SgiColorMode.Normal,
-          PixelData = src[..],
+          PixelData = _FlipRows(src, width, height, 2),
         };
       case PixelFormat.Rgb24:
         return new() {
@@ -145,14 +145,29 @@ public readonly record struct SgiFile : IImageFormatReader<SgiFile>, IImageToRaw
     }
   }
 
+  /// <summary>Turns the file's rows the right way up.</summary>
+  /// <remarks>
+  /// SGI stores the bottom row first, which is the convention of the machines it came from. Reading
+  /// the rows in file order gives a picture that is upside down without being obviously broken —
+  /// exactly the kind of wrongness that survives a round trip through our own writer.
+  /// </remarks>
+  private static byte[] _FlipRows(byte[] pixels, int width, int height, int bytesPerPixel) {
+    var stride = width * bytesPerPixel;
+    var result = new byte[stride * height];
+    for (var y = 0; y < height; ++y)
+      Array.Copy(pixels, (height - 1 - y) * stride, result, y * stride, stride);
+
+    return result;
+  }
+
   private static byte[] _Deplanarize(byte[] planar, int width, int height, int channels) {
     var planeSize = width * height;
     var result = new byte[planeSize * channels];
     for (var y = 0; y < height; ++y)
       for (var x = 0; x < width; ++x) {
-        var pixelIndex = y * width + x;
+        var pixelIndex = (height - 1 - y) * width + x;
         for (var c = 0; c < channels; ++c)
-          result[pixelIndex * channels + c] = planar[c * planeSize + pixelIndex];
+          result[(y * width + x) * channels + c] = planar[c * planeSize + pixelIndex];
       }
     return result;
   }
@@ -163,10 +178,10 @@ public readonly record struct SgiFile : IImageFormatReader<SgiFile>, IImageToRaw
     var result = new byte[pixelCount * channels * 2];
     for (var y = 0; y < height; ++y)
       for (var x = 0; x < width; ++x) {
-        var pixelIndex = y * width + x;
+        var pixelIndex = (height - 1 - y) * width + x;
         for (var c = 0; c < channels; ++c) {
           var srcOffset = c * planeSize + pixelIndex * 2;
-          var dstOffset = (pixelIndex * channels + c) * 2;
+          var dstOffset = ((y * width + x) * channels + c) * 2;
           result[dstOffset]     = planar[srcOffset];
           result[dstOffset + 1] = planar[srcOffset + 1];
         }
@@ -179,9 +194,9 @@ public readonly record struct SgiFile : IImageFormatReader<SgiFile>, IImageToRaw
     var result = new byte[planeSize * channels];
     for (var y = 0; y < height; ++y)
       for (var x = 0; x < width; ++x) {
-        var pixelIndex = y * width + x;
+        var pixelIndex = (height - 1 - y) * width + x;
         for (var c = 0; c < channels; ++c)
-          result[c * planeSize + pixelIndex] = interleaved[pixelIndex * channels + c];
+          result[c * planeSize + pixelIndex] = interleaved[(y * width + x) * channels + c];
       }
     return result;
   }
@@ -192,9 +207,9 @@ public readonly record struct SgiFile : IImageFormatReader<SgiFile>, IImageToRaw
     var result = new byte[pixelCount * channels * 2];
     for (var y = 0; y < height; ++y)
       for (var x = 0; x < width; ++x) {
-        var pixelIndex = y * width + x;
+        var pixelIndex = (height - 1 - y) * width + x;
         for (var c = 0; c < channels; ++c) {
-          var srcOffset = (pixelIndex * channels + c) * 2;
+          var srcOffset = ((y * width + x) * channels + c) * 2;
           var dstOffset = c * planeSize + pixelIndex * 2;
           result[dstOffset]     = interleaved[srcOffset];
           result[dstOffset + 1] = interleaved[srcOffset + 1];

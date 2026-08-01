@@ -21,7 +21,7 @@ public readonly record struct AaiFile : IImageFormatReader<AaiFile>, IImageToRaw
     return new() {
       Width = file.Width,
       Height = file.Height,
-      Format = PixelFormat.Rgba32,
+      Format = PixelFormat.Bgra32,
       PixelData = file.PixelData[..],
     };
   }

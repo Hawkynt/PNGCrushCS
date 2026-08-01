@@ -59,21 +59,28 @@ public static class WpgReader {
       ++offset;
       uint recordSize;
 
-      if (sizeByte < 0xFF) {
+      if (sizeByte < 0xFF)
         recordSize = sizeByte;
-      } else if (sizeByte == 0xFF) {
+      else {
         if (offset + 2 > data.Length)
           break;
 
-        recordSize = BinaryPrimitives.ReadUInt16LittleEndian(data[offset..]);
+        // 0xFF escapes to a word, and the word's top bit escapes again to a second word holding the
+        // low half. The lengths that need the long form are rare, so the two shorter forms are what
+        // a file is usually made of — but a bitmap of any size takes the long one, and reading its
+        // marker word as the length puts every field after it in the wrong place.
+        var word = BinaryPrimitives.ReadUInt16LittleEndian(data[offset..]);
         offset += 2;
-      } else {
-        // 0xFE: 4-byte size
-        if (offset + 4 > data.Length)
-          break;
 
-        recordSize = BinaryPrimitives.ReadUInt32LittleEndian(data[offset..]);
-        offset += 4;
+        if ((word & 0x8000) == 0)
+          recordSize = word;
+        else {
+          if (offset + 2 > data.Length)
+            break;
+
+          recordSize = (uint)((word & 0x7FFF) << 16) | BinaryPrimitives.ReadUInt16LittleEndian(data[offset..]);
+          offset += 2;
+        }
       }
 
       var recordEnd = offset + (int)recordSize;

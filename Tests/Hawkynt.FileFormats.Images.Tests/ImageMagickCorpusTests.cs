@@ -102,5 +102,73 @@ public sealed class ImageMagickCorpusTests {
       Assert.That(image.Height, Is.GreaterThan(0), $"{extension}: no height");
       Assert.That(image.PixelData, Is.Not.Null.And.Not.Empty, $"{extension}: no pixels");
     });
+
+    _CompareWithReference(path!, extension, image!);
   }
+
+  /// <summary>Checks our pixels against the ones the reference tool got from the same file.</summary>
+  /// <remarks>
+  /// Opening a file is the weaker half of reading it. A palette read backwards, a channel widened by
+  /// division rather than bit repetition, rows off by one — none of those throw, and every one of
+  /// them has shipped here before. The corpus therefore carries the reference tool's own decode of
+  /// each sample as a PNG beside it, and the two are compared pixel for pixel.
+  /// </remarks>
+  private static void _CompareWithReference(string path, string extension, RawImage ours) {
+    var reference = new FileInfo(path + ".ref.png");
+    if (!reference.Exists)
+      return;
+
+    var theirs = FormatRegistry.Read(reference);
+    if (theirs == null) {
+      Assert.Warn($"{extension}: the reference decode beside it could not be read");
+      return;
+    }
+
+    Assert.That(
+      (ours.Width, ours.Height), Is.EqualTo((theirs.Width, theirs.Height)),
+      $"{extension}: we read {ours.Width}x{ours.Height} where the reference tool read {theirs.Width}x{theirs.Height}");
+
+    var a = PixelConverter.Convert(ours, PixelFormat.Bgra32).PixelData;
+    var b = PixelConverter.Convert(theirs, PixelFormat.Bgra32).PixelData;
+
+    int worst = 0, differing = 0;
+    var at = -1;
+    for (var i = 0; i < a.Length && i < b.Length; ++i) {
+      // Alpha is skipped: the reference decodes are written without it, so a format carrying one
+      // would be compared against a channel the reference simply does not have.
+      if ((i & 3) == 3)
+        continue;
+
+      var delta = Math.Abs(a[i] - b[i]);
+      if (delta <= _ChannelTolerance)
+        continue;
+
+      ++differing;
+      if (delta <= worst)
+        continue;
+
+      worst = delta;
+      at = i >> 2;
+    }
+
+    if (differing == 0)
+      return;
+
+    var pixels = Math.Min(a.Length, b.Length) / 4;
+    Assert.Fail(
+      $"{extension}: {differing} of {pixels * 3} channel samples differ from the reference decode, "
+      + $"worst by {worst} at pixel {at % ours.Width},{at / ours.Width} "
+      + $"(ours {a[at * 4 + 2]},{a[at * 4 + 1]},{a[at * 4]} vs {b[at * 4 + 2]},{b[at * 4 + 1]},{b[at * 4]})");
+  }
+
+  /// <summary>
+  /// How far a channel may sit from the reference before it counts as a disagreement.
+  /// </summary>
+  /// <remarks>
+  /// Not zero, because the two sides round differently where a format stores fewer than eight bits a
+  /// channel, and because a lossy codec decoded by two implementations is allowed to differ in the
+  /// last step. It is small enough that a palette in the wrong order, an inverted ramp or a shifted
+  /// row cannot hide under it.
+  /// </remarks>
+  private const int _ChannelTolerance = 4;
 }

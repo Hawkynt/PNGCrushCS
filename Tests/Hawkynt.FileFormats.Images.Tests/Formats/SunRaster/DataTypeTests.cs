@@ -8,13 +8,18 @@ public sealed class DataTypeTests {
 
   [Test]
   [Category("Unit")]
-  public void SunRasterCompression_HasExpectedValues() {
-    Assert.That((int)SunRasterCompression.None, Is.EqualTo(0));
-    Assert.That((int)SunRasterCompression.Rle, Is.EqualTo(1));
-    Assert.That((int)SunRasterCompression.Experimental, Is.EqualTo(2));
+  public void SunRasterType_HasExpectedValues() {
+    Assert.That((int)SunRasterType.Old, Is.EqualTo(0));
+    Assert.That((int)SunRasterType.Standard, Is.EqualTo(1));
+    Assert.That((int)SunRasterType.ByteEncoded, Is.EqualTo(2));
+    Assert.That((int)SunRasterType.FormatRgb, Is.EqualTo(3));
 
-    var values = Enum.GetValues<SunRasterCompression>();
-    Assert.That(values, Has.Length.EqualTo(3));
+    Assert.That((int)SunRasterType.FormatTiff, Is.EqualTo(4));
+    Assert.That((int)SunRasterType.FormatIff, Is.EqualTo(5));
+    Assert.That((int)SunRasterType.Experimental, Is.EqualTo(0xFFFF));
+
+    var values = Enum.GetValues<SunRasterType>();
+    Assert.That(values, Has.Length.EqualTo(7));
   }
 
   [Test]

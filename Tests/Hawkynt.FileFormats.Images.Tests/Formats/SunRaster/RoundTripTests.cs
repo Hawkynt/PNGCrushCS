@@ -21,7 +21,7 @@ public sealed class RoundTripTests {
       Depth = 24,
       PixelData = pixelData,
       ColorMode = SunRasterColorMode.Rgb24,
-      Compression = SunRasterCompression.None
+      Type = SunRasterType.Standard
     };
 
     var bytes = SunRasterWriter.ToBytes(original);
@@ -54,7 +54,7 @@ public sealed class RoundTripTests {
       Palette = palette,
       PaletteColorCount = 4,
       ColorMode = SunRasterColorMode.Palette8,
-      Compression = SunRasterCompression.None
+      Type = SunRasterType.Standard
     };
 
     var bytes = SunRasterWriter.ToBytes(original);
@@ -80,7 +80,7 @@ public sealed class RoundTripTests {
       Depth = 1,
       PixelData = pixelData,
       ColorMode = SunRasterColorMode.Monochrome,
-      Compression = SunRasterCompression.None
+      Type = SunRasterType.Standard
     };
 
     var bytes = SunRasterWriter.ToBytes(original);
@@ -108,7 +108,7 @@ public sealed class RoundTripTests {
       Depth = 24,
       PixelData = pixelData,
       ColorMode = SunRasterColorMode.Rgb24,
-      Compression = SunRasterCompression.Rle
+      Type = SunRasterType.ByteEncoded
     };
 
     var bytes = SunRasterWriter.ToBytes(original);
@@ -117,7 +117,7 @@ public sealed class RoundTripTests {
     Assert.That(restored.Width, Is.EqualTo(original.Width));
     Assert.That(restored.Height, Is.EqualTo(original.Height));
     Assert.That(restored.Depth, Is.EqualTo(24));
-    Assert.That(restored.Compression, Is.EqualTo(SunRasterCompression.Rle));
+    Assert.That(restored.Type, Is.EqualTo(SunRasterType.ByteEncoded));
     Assert.That(restored.PixelData, Is.EqualTo(original.PixelData));
   }
 
@@ -134,7 +134,7 @@ public sealed class RoundTripTests {
       Depth = 32,
       PixelData = pixelData,
       ColorMode = SunRasterColorMode.Rgb32,
-      Compression = SunRasterCompression.None
+      Type = SunRasterType.Standard
     };
 
     var bytes = SunRasterWriter.ToBytes(original);
@@ -163,7 +163,7 @@ public sealed class RoundTripTests {
       Depth = 24,
       PixelData = pixelData,
       ColorMode = SunRasterColorMode.Rgb24,
-      Compression = SunRasterCompression.None
+      Type = SunRasterType.Standard
     };
 
     var bytes = SunRasterWriter.ToBytes(original);
@@ -193,7 +193,7 @@ public sealed class RoundTripTests {
       Palette = palette,
       PaletteColorCount = 3,
       ColorMode = SunRasterColorMode.Palette8,
-      Compression = SunRasterCompression.Rle
+      Type = SunRasterType.ByteEncoded
     };
 
     var bytes = SunRasterWriter.ToBytes(original);

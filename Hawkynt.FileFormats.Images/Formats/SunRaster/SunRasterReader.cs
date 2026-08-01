@@ -76,8 +76,8 @@ public static class SunRasterReader {
     var expectedSize = paddedBytesPerRow * height;
 
     byte[] pixelData;
-    var compression = (SunRasterCompression)type;
-    if (compression == SunRasterCompression.Rle)
+    var rasterType = (SunRasterType)type;
+    if (rasterType == SunRasterType.ByteEncoded)
       pixelData = SunRasterRleCompressor.Decompress(rawPixelData, expectedSize);
     else {
       pixelData = new byte[expectedSize];
@@ -90,7 +90,7 @@ public static class SunRasterReader {
       Width = width,
       Height = height,
       Depth = depth,
-      Compression = compression,
+      Type = rasterType,
       ColorMode = colorMode,
       PixelData = pixelData,
       Palette = palette,

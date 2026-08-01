@@ -50,16 +50,9 @@ public static class PalmReader {
 
     // Read optional color table
     byte[]? palette = null;
-    if (header.HasColorTable) {
-      if (offset + 2 > data.Length)
-        throw new InvalidDataException("Data too small for color table header.");
-
+    if (_HasUsableColorTable(header, data, offset, bytesPerRow * height)) {
       var numEntries = (data[offset] << 8) | data[offset + 1];
       offset += 2;
-
-      var entrySize = 4; // index(1) + r(1) + g(1) + b(1)
-      if (offset + numEntries * entrySize > data.Length)
-        throw new InvalidDataException("Data too small for color table entries.");
 
       palette = new byte[numEntries * 3];
       for (var i = 0; i < numEntries; ++i) {
@@ -97,6 +90,22 @@ public static class PalmReader {
     };
     }
 
+  /// <summary>Whether a colour table really follows the header, rather than merely being announced.</summary>
+  /// <remarks>
+  /// The flag cannot be taken at its word. ImageMagick sets it on every bitmap it writes and then
+  /// puts the pixels straight after the header, so believing it reads the first two rows as a count
+  /// — which comes out in the tens of thousands and takes the rest of the file with it. A table has
+  /// at most 256 entries and has to leave room for the picture, so both are checked before use.
+  /// </remarks>
+  private static bool _HasUsableColorTable(PalmHeader header, ReadOnlySpan<byte> data, int offset, int pixelBytes) {
+    if (!header.HasColorTable || offset + 2 > data.Length)
+      return false;
+
+    var entries = (data[offset] << 8) | data[offset + 1];
+
+    return entries is > 0 and <= 256 && offset + 2 + entries * 4 + pixelBytes <= data.Length;
+  }
+
   public static PalmFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < PalmHeader.StructSize)
@@ -121,16 +130,9 @@ public static class PalmReader {
 
     // Read optional color table
     byte[]? palette = null;
-    if (header.HasColorTable) {
-      if (offset + 2 > data.Length)
-        throw new InvalidDataException("Data too small for color table header.");
-
+    if (_HasUsableColorTable(header, data, offset, bytesPerRow * height)) {
       var numEntries = (data[offset] << 8) | data[offset + 1];
       offset += 2;
-
-      var entrySize = 4; // index(1) + r(1) + g(1) + b(1)
-      if (offset + numEntries * entrySize > data.Length)
-        throw new InvalidDataException("Data too small for color table entries.");
 
       palette = new byte[numEntries * 3];
       for (var i = 0; i < numEntries; ++i) {

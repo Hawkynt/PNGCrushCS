@@ -20,8 +20,9 @@ public static class WpgWriter {
       Magic2: WpgHeader.MagicByte2,
       Magic3: WpgHeader.MagicByte3,
       Magic4: WpgHeader.MagicByte4,
-      ProductType: 1,
-      FileType: 1,
+      DataOffset: WpgHeader.RecordsOffset,
+      ProductType: WpgHeader.WordPerfect,
+      FileType: WpgHeader.GraphicFileType,
       MajorVersion: 1,
       MinorVersion: 0,
       EncryptionKey: 0,
@@ -31,9 +32,17 @@ public static class WpgWriter {
     header.WriteTo(headerBuf);
     ms.Write(headerBuf, 0, headerBuf.Length);
 
-    // StartWpg record (type 15, size 0)
+    // Start of the graphic: the precision the coordinates are in, the version, and the size the
+    // records that follow are drawn at. An empty one is enough for our own reader, which takes the
+    // size off the bitmap, but not for anything that lays the records out before reading them.
     ms.WriteByte((byte)WpgRecordType.StartWpg);
-    ms.WriteByte(0); // size = 0
+    _WriteRecordSize(ms, 6);
+    ms.WriteByte(1);
+    ms.WriteByte(0);
+    ms.WriteByte((byte)width);
+    ms.WriteByte((byte)(width >> 8));
+    ms.WriteByte((byte)height);
+    ms.WriteByte((byte)(height >> 8));
 
     // ColorMap record (if palette present)
     if (palette is { Length: > 0 }) {
@@ -72,19 +81,29 @@ public static class WpgWriter {
     return ms.ToArray();
   }
 
+  /// <summary>Writes a record length in whichever of the three forms it fits.</summary>
+  /// <remarks>
+  /// A word with its top bit set is the marker for the long form, so a length from 0x8000 up cannot
+  /// use the word form even though it fits in one — it has to go long or it reads back as a marker.
+  /// </remarks>
   private static void _WriteRecordSize(MemoryStream ms, int size) {
     if (size < 0xFF) {
       ms.WriteByte((byte)size);
-    } else if (size <= 0xFFFF) {
-      ms.WriteByte(0xFF);
-      ms.WriteByte((byte)(size & 0xFF));
-      ms.WriteByte((byte)(size >> 8));
-    } else {
-      ms.WriteByte(0xFE);
-      ms.WriteByte((byte)(size & 0xFF));
-      ms.WriteByte((byte)((size >> 8) & 0xFF));
-      ms.WriteByte((byte)((size >> 16) & 0xFF));
-      ms.WriteByte((byte)((size >> 24) & 0xFF));
+      return;
     }
+
+    ms.WriteByte(0xFF);
+
+    if (size < 0x8000) {
+      ms.WriteByte((byte)size);
+      ms.WriteByte((byte)(size >> 8));
+      return;
+    }
+
+    var high = (size >> 16) | 0x8000;
+    ms.WriteByte((byte)high);
+    ms.WriteByte((byte)(high >> 8));
+    ms.WriteByte((byte)size);
+    ms.WriteByte((byte)(size >> 8));
   }
 }

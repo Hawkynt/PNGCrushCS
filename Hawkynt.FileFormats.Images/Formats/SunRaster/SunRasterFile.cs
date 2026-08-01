@@ -15,7 +15,10 @@ public readonly record struct SunRasterFile : IImageFormatReader<SunRasterFile>,
   public int Width { get; init; }
   public int Height { get; init; }
   public int Depth { get; init; }
-  public SunRasterCompression Compression { get; init; }
+  public SunRasterType Type { get; init; }
+
+  /// <summary>Whether the channels are stored red first rather than blue first.</summary>
+  public bool IsRgbOrder => this.Type == SunRasterType.FormatRgb;
   public SunRasterColorMode ColorMode { get; init; }
   public byte[] PixelData { get; init; }
   public byte[]? Palette { get; init; }
@@ -32,7 +35,7 @@ public readonly record struct SunRasterFile : IImageFormatReader<SunRasterFile>,
         return new() {
           Width = width,
           Height = height,
-          Format = PixelFormat.Bgr24,
+          Format = file.IsRgbOrder ? PixelFormat.Rgb24 : PixelFormat.Bgr24,
           PixelData = stripped,
         };
       }
@@ -43,12 +46,15 @@ public readonly record struct SunRasterFile : IImageFormatReader<SunRasterFile>,
         var stripped = _StripRowPadding(file.PixelData, bytesPerRow, paddedBytesPerRow, height);
         var pixels = file.Width * file.Height;
         var result = new byte[pixels * 4];
+        // The pad byte comes first either way; only the three that follow change order.
+        var blue = file.IsRgbOrder ? 3 : 1;
+        var red = file.IsRgbOrder ? 1 : 3;
         for (var i = 0; i < pixels; ++i) {
           var src = i * 4;
           var dst = i * 4;
-          result[dst]     = stripped[src + 1]; // B
+          result[dst]     = stripped[src + blue];
           result[dst + 1] = stripped[src + 2]; // G
-          result[dst + 2] = stripped[src + 3]; // R
+          result[dst + 2] = stripped[src + red];
           result[dst + 3] = stripped[src];     // A (was pad byte)
         }
         return new() {
@@ -177,7 +183,7 @@ public readonly record struct SunRasterFile : IImageFormatReader<SunRasterFile>,
           Width = width,
           Height = height,
           Depth = 24,
-          Compression = SunRasterCompression.None,
+          Type = SunRasterType.Standard,
           ColorMode = SunRasterColorMode.Rgb24,
           PixelData = padded,
         };
@@ -201,7 +207,7 @@ public readonly record struct SunRasterFile : IImageFormatReader<SunRasterFile>,
           Width = width,
           Height = height,
           Depth = 32,
-          Compression = SunRasterCompression.None,
+          Type = SunRasterType.Standard,
           ColorMode = SunRasterColorMode.Rgb32,
           PixelData = padded,
         };
@@ -214,7 +220,7 @@ public readonly record struct SunRasterFile : IImageFormatReader<SunRasterFile>,
           Width = width,
           Height = height,
           Depth = 8,
-          Compression = SunRasterCompression.None,
+          Type = SunRasterType.Standard,
           ColorMode = SunRasterColorMode.Palette8,
           PixelData = padded,
           Palette = image.Palette,
@@ -229,7 +235,7 @@ public readonly record struct SunRasterFile : IImageFormatReader<SunRasterFile>,
           Width = width,
           Height = height,
           Depth = 1,
-          Compression = SunRasterCompression.None,
+          Type = SunRasterType.Standard,
           ColorMode = SunRasterColorMode.Monochrome,
           PixelData = padded,
         };
@@ -249,7 +255,7 @@ public readonly record struct SunRasterFile : IImageFormatReader<SunRasterFile>,
           Width = width,
           Height = height,
           Depth = 8,
-          Compression = SunRasterCompression.None,
+          Type = SunRasterType.Standard,
           ColorMode = SunRasterColorMode.Palette8,
           PixelData = padded,
           Palette = palette,
