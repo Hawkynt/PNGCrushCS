@@ -4,6 +4,14 @@ namespace FileFormat.Fbm;
 
 /// <summary>The 256-byte header of a CMU Fuzzy Bitmap (FBM) file.</summary>
 /// <remarks>
+/// KNOWN WRONG, and not yet corrected. Every field here is written as a big-endian integer, and the
+/// format writes them as fixed-width decimal text instead — XnView says "invalid number of planes"
+/// of what this produces, which is it parsing a binary 3 as characters. Probing established that a
+/// text header is accepted and that <c>rowlen</c> is the length of one plane's row rather than of
+/// all of them together, so the picture is stored plane by plane and not interleaved; what has not
+/// been established is where the pixels begin, and guessing at that would swap one wrong layout for
+/// another.
+/// <para/>
 /// Layout:
 /// 0-7: magic "%bitmap\0" (8 bytes)
 /// 8-11: cols (int32 BE)
