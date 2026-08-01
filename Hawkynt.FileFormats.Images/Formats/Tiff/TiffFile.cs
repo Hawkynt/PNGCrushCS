@@ -37,6 +37,9 @@ public sealed class TiffFile :
   public byte[]? ColorMap { get; init; }
   public TiffColorMode ColorMode { get; init; }
 
+  /// <summary>Whether a wide sample's high byte comes first, which the file's first two bytes say.</summary>
+  public bool IsBigEndian { get; init; }
+
   /// <summary>Additional pages beyond the first IFD. Empty for single-page TIFFs.</summary>
   public IReadOnlyList<TiffPage> Pages { get; init; } = [];
 
@@ -102,6 +105,29 @@ public sealed class TiffFile :
     };
   }
 
+  /// <summary>Builds a picture from a file whose samples are sixteen bits wide.</summary>
+  private static RawImage _FromDeepSamples(TiffFile file, PixelFormat format) => new() {
+    Width = file.Width,
+    Height = file.Height,
+    Format = format,
+    PixelData = _NarrowSamples(file.PixelData, file.IsBigEndian),
+  };
+
+  /// <summary>Narrows sixteen-bit samples to eight, keeping the byte the magnitude lives in.</summary>
+  /// <remarks>
+  /// A deep TIFF is ordinary rather than exotic — a scanner or a camera writes one by default — so
+  /// refusing it refuses a large share of real files. The low byte is dropped rather than rounded
+  /// into the high one: the difference is under half a level at eight bits, and dropping it cannot
+  /// carry a sample past its neighbour the way rounding can.
+  /// </remarks>
+  private static byte[] _NarrowSamples(ReadOnlySpan<byte> data, bool isBigEndian) {
+    var narrowed = new byte[data.Length / 2];
+    for (var i = 0; i < narrowed.Length; ++i)
+      narrowed[i] = data[i * 2 + (isBigEndian ? 0 : 1)];
+
+    return narrowed;
+  }
+
   public static RawImage ToRawImage(TiffFile file) {
     ArgumentNullException.ThrowIfNull(file);
 
@@ -127,6 +153,10 @@ public sealed class TiffFile :
       case 1 when file.BitsPerSample == 16:
         format = PixelFormat.Gray16;
         break;
+      case 3 when file.BitsPerSample == 16:
+        return _FromDeepSamples(file, PixelFormat.Rgb24);
+      case 4 when file.BitsPerSample == 16:
+        return _FromDeepSamples(file, PixelFormat.Rgba32);
       case 1 when file.BitsPerSample == 1:
         format = PixelFormat.Indexed1;
         palette = [0, 0, 0, 255, 255, 255];

@@ -201,6 +201,7 @@ internal static class TiffBinaryReader {
       PixelData = pixelData,
       ColorMap = colorMap,
       ColorMode = colorMode,
+      IsBigEndian = be,
     };
 
     return (file, nextIfdOffset);
