@@ -52,9 +52,14 @@ public readonly record struct ViffFile : IImageFormatReader<ViffFile>, IImageToR
   public ViffStorageType MapStorageType { get; init; }
 
   public static RawImage ToRawImage(ViffFile file) {
+    // One bit a pixel is how a scanned page or a mask is stored, and it is a packing rather than a
+    // different kind of picture — eight pixels to a byte, most significant first. Unpacking it into
+    // bytes leaves everything below unchanged.
+    if (file.StorageType == ViffStorageType.Bit)
+      file = file with { StorageType = ViffStorageType.Byte, PixelData = _UnpackBits(file) };
 
     if (file.StorageType != ViffStorageType.Byte)
-      throw new ArgumentException($"Only Byte storage is supported for conversion, got {file.StorageType}.", nameof(file));
+      throw new ArgumentException($"Only Bit and Byte storage are supported for conversion, got {file.StorageType}.", nameof(file));
 
     if (file.Bands == 1)
       return new() {
@@ -119,5 +124,28 @@ public readonly record struct ViffFile : IImageFormatReader<ViffFile>, IImageToR
       default:
         throw new ArgumentException($"Unsupported pixel format for VIFF: {image.Format}", nameof(image));
     }
+  }
+
+  /// <summary>Spreads one-bit samples into one byte each, black for a set bit.</summary>
+  /// <remarks>
+  /// Rows start on a byte boundary, so a width that is not a multiple of eight leaves spare bits at
+  /// the end of each row that are padding rather than picture — reading straight through would
+  /// shift every row after the first.
+  /// </remarks>
+  private static byte[] _UnpackBits(ViffFile file) {
+    var stride = (file.Width + 7) >> 3;
+    var packed = file.PixelData ?? [];
+    var unpacked = new byte[file.Width * file.Height * Math.Max(1, file.Bands)];
+
+    for (var band = 0; band < Math.Max(1, file.Bands); ++band)
+    for (var y = 0; y < file.Height; ++y)
+    for (var x = 0; x < file.Width; ++x) {
+      var at = (band * file.Height + y) * stride + (x >> 3);
+      var set = at < packed.Length && ((packed[at] >> (~x & 7)) & 1) != 0;
+
+      unpacked[(band * file.Height + y) * file.Width + x] = (byte)(set ? 0 : 255);
+    }
+
+    return unpacked;
   }
 }
