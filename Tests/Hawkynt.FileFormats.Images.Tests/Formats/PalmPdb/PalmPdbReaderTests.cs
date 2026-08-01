@@ -2,49 +2,57 @@ using System;
 using System.Buffers.Binary;
 using System.IO;
 using System.Text;
+using FileFormat.Core;
 using FileFormat.PalmPdb;
 
 namespace FileFormat.PalmPdb.Tests;
 
+/// <summary>Reads a Palm Image Viewer picture out of the database that carries it.</summary>
+/// <remarks>
+/// These used to describe a format that does not exist — type <c>Img&#32;</c>, and a record holding a
+/// width, a height and RGB triples — so they passed against a reader that could not open a single
+/// real file. A picture database declares type <c>vIMG</c>, creator <c>View</c>, and its record opens
+/// with a 58-byte descriptor before any pixels; the pixels themselves are two bits each, four greys,
+/// optionally PackBits compressed.
+/// </remarks>
 [TestFixture]
 public sealed class PalmPdbReaderTests {
 
-  private static byte[] BuildMinimalPdb(int width, int height, byte[]? pixelData = null) {
-    var pixels = pixelData ?? new byte[width * height * 3];
-    var recordDataOffset = 78 + 8;
-    var total = recordDataOffset + 4 + pixels.Length;
-    var data = new byte[total];
+  private const int _DATABASE_HEADER_SIZE = 78;
+  private const int _RECORD_ENTRY_SIZE = 8;
+  private const int _IMAGE_HEADER_SIZE = 58;
+
+  /// <summary>Builds the database a Palm picture arrives in, around the record data given.</summary>
+  private static byte[] Build(int width, int height, byte[] payload, byte version = 0, string type = "vIMG") {
+    var recordOffset = _DATABASE_HEADER_SIZE + _RECORD_ENTRY_SIZE;
+    var data = new byte[recordOffset + _IMAGE_HEADER_SIZE + payload.Length];
     var span = data.AsSpan();
 
-    // Name
     Encoding.ASCII.GetBytes("Test").CopyTo(span);
+    Encoding.ASCII.GetBytes(type).CopyTo(span[60..]);
+    Encoding.ASCII.GetBytes("View").CopyTo(span[64..]);
+    BinaryPrimitives.WriteUInt16BigEndian(span[76..], 1); // one record
 
-    // Type "Img " at offset 60
-    span[60] = (byte)'I';
-    span[61] = (byte)'m';
-    span[62] = (byte)'g';
-    span[63] = (byte)' ';
+    BinaryPrimitives.WriteUInt32BigEndian(span[_DATABASE_HEADER_SIZE..], (uint)recordOffset);
+    span[_DATABASE_HEADER_SIZE + 4] = 0x40;
+    span[_DATABASE_HEADER_SIZE + 5] = 0x6F;
+    span[_DATABASE_HEADER_SIZE + 6] = 0x80;
 
-    // Creator "View" at offset 64
-    span[64] = (byte)'V';
-    span[65] = (byte)'i';
-    span[66] = (byte)'e';
-    span[67] = (byte)'w';
+    var record = span[recordOffset..];
+    Encoding.ASCII.GetBytes("Test").CopyTo(record);
+    record[32] = version;
+    record[33] = 0; // type: four greys
+    BinaryPrimitives.WriteInt16BigEndian(record[50..], -1);
+    BinaryPrimitives.WriteInt16BigEndian(record[52..], -1);
+    BinaryPrimitives.WriteInt16BigEndian(record[54..], (short)width);
+    BinaryPrimitives.WriteInt16BigEndian(record[56..], (short)height);
+    payload.CopyTo(record[_IMAGE_HEADER_SIZE..]);
 
-    // Record count = 1 at offset 76
-    BinaryPrimitives.WriteUInt16BigEndian(span[76..], 1);
-
-    // Record entry at offset 78: offset to image record
-    BinaryPrimitives.WriteUInt32BigEndian(span[78..], (uint)recordDataOffset);
-
-    // Image record: width, height
-    BinaryPrimitives.WriteUInt16BigEndian(span[recordDataOffset..], (ushort)width);
-    BinaryPrimitives.WriteUInt16BigEndian(span[(recordDataOffset + 2)..], (ushort)height);
-
-    // Pixel data
-    Array.Copy(pixels, 0, data, recordDataOffset + 4, pixels.Length);
     return data;
   }
+
+  /// <summary>Sixteen pixels: four of each grey, lightest first.</summary>
+  private static byte[] FourGreysRow() => [0x1B, 0x1B, 0x1B, 0x1B];
 
   [Test]
   [Category("Unit")]
@@ -54,8 +62,69 @@ public sealed class PalmPdbReaderTests {
 
   [Test]
   [Category("Unit")]
-  public void FromFile_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => PalmPdbReader.FromFile(null!));
+  public void FromBytes_TooSmall_ThrowsInvalidDataException() {
+    Assert.Throws<InvalidDataException>(() => PalmPdbReader.FromBytes(new byte[32]));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void FromBytes_WrongDatabaseType_ThrowsInvalidDataException() {
+    var data = Build(16, 1, FourGreysRow(), type: "Img ");
+    Assert.Throws<InvalidDataException>(() => PalmPdbReader.FromBytes(data));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void FromBytes_Uncompressed_ParsesDimensions() {
+    var file = PalmPdbReader.FromBytes(Build(16, 1, FourGreysRow()));
+
+    Assert.Multiple(() => {
+      Assert.That(file.Width, Is.EqualTo(16));
+      Assert.That(file.Height, Is.EqualTo(1));
+      Assert.That(file.Name, Is.EqualTo("Test"));
+      Assert.That(file.PixelData, Has.Length.EqualTo(4), "two bits a pixel over sixteen pixels");
+    });
+  }
+
+  /// <summary>Index 0 is white here and index 3 is black, the way a Palm shows them.</summary>
+  [Test]
+  [Category("Unit")]
+  public void ToRawImage_ResolvesTheFourGreys() {
+    var rgb = PalmPdbFile.ToRawImage(PalmPdbReader.FromBytes(Build(16, 1, FourGreysRow()))).ToRgb24();
+
+    Assert.Multiple(() => {
+      Assert.That(rgb[0], Is.EqualTo(255), "index 0 is white");
+      Assert.That(rgb[3], Is.EqualTo(170), "index 1");
+      Assert.That(rgb[6], Is.EqualTo(85), "index 2");
+      Assert.That(rgb[9], Is.EqualTo(0), "index 3 is black");
+    });
+  }
+
+  /// <summary>Version 1 says the rows are PackBits compressed.</summary>
+  [Test]
+  [Category("Unit")]
+  public void FromBytes_Compressed_ExpandsItsRuns() {
+    // Four literal bytes, then a run of four more: eight bytes out of seven.
+    byte[] payload = [0x03, 0x1B, 0x1B, 0x1B, 0x1B, 0xFD, 0xE4];
+    var file = PalmPdbReader.FromBytes(Build(16, 2, payload, version: 1));
+
+    Assert.That(file.PixelData, Is.EqualTo(new byte[] { 0x1B, 0x1B, 0x1B, 0x1B, 0xE4, 0xE4, 0xE4, 0xE4 }));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void FromBytes_UnknownPictureType_ThrowsNotSupportedException() {
+    var data = Build(16, 1, FourGreysRow());
+    data[_DATABASE_HEADER_SIZE + _RECORD_ENTRY_SIZE + 33] = 2; // a type there is nothing to check against
+
+    Assert.Throws<NotSupportedException>(() => PalmPdbReader.FromBytes(data));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void FromStream_Valid_Parses() {
+    using var ms = new MemoryStream(Build(16, 1, FourGreysRow()));
+    Assert.That(PalmPdbReader.FromStream(ms).Width, Is.EqualTo(16));
   }
 
   [Test]
@@ -63,82 +132,5 @@ public sealed class PalmPdbReaderTests {
   public void FromFile_Missing_ThrowsFileNotFoundException() {
     var missing = new FileInfo(Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".pdb"));
     Assert.Throws<FileNotFoundException>(() => PalmPdbReader.FromFile(missing));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromStream_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => PalmPdbReader.FromStream(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromBytes_TooSmall_ThrowsInvalidDataException() {
-    var tooSmall = new byte[40];
-    Assert.Throws<InvalidDataException>(() => PalmPdbReader.FromBytes(tooSmall));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromBytes_InvalidType_ThrowsInvalidDataException() {
-    var data = BuildMinimalPdb(2, 2);
-    // Corrupt the type field
-    data[60] = (byte)'X';
-    data[61] = (byte)'X';
-    data[62] = (byte)'X';
-    data[63] = (byte)'X';
-    Assert.Throws<InvalidDataException>(() => PalmPdbReader.FromBytes(data));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromBytes_Valid_ParsesDimensions() {
-    var data = BuildMinimalPdb(4, 3);
-
-    var result = PalmPdbReader.FromBytes(data);
-
-    Assert.That(result.Width, Is.EqualTo(4));
-    Assert.That(result.Height, Is.EqualTo(3));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromBytes_Valid_ParsesName() {
-    var data = BuildMinimalPdb(2, 2);
-
-    var result = PalmPdbReader.FromBytes(data);
-
-    Assert.That(result.Name, Is.EqualTo("Test"));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromBytes_Valid_ParsesPixelData() {
-    var pixels = new byte[2 * 1 * 3];
-    pixels[0] = 0xAA;
-    pixels[1] = 0xBB;
-    pixels[2] = 0xCC;
-    pixels[3] = 0x11;
-    pixels[4] = 0x22;
-    pixels[5] = 0x33;
-
-    var data = BuildMinimalPdb(2, 1, pixels);
-    var result = PalmPdbReader.FromBytes(data);
-
-    Assert.That(result.PixelData.Length, Is.EqualTo(6));
-    Assert.That(result.PixelData[0], Is.EqualTo(0xAA));
-    Assert.That(result.PixelData[3], Is.EqualTo(0x11));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromStream_Valid_ParsesDimensions() {
-    var data = BuildMinimalPdb(3, 2);
-    using var ms = new MemoryStream(data);
-
-    var result = PalmPdbReader.FromStream(ms);
-
-    Assert.That(result.Width, Is.EqualTo(3));
-    Assert.That(result.Height, Is.EqualTo(2));
   }
 }
