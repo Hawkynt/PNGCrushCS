@@ -31,7 +31,16 @@ public sealed record FormatEntry(
   VideoMode[]? VideoModes = null,
   Func<byte[], IReadOnlyList<ChunkSpan>>? EnumerateChunks = null,
   Func<byte[], IReadOnlyList<ChunkRewriteRule>, byte[]>? RewriteChunks = null,
-  Func<byte[], ChunkRewritePlan, ChunkRewriteResult>? ApplyChunkPlan = null
+  Func<byte[], ChunkRewritePlan, ChunkRewriteResult>? ApplyChunkPlan = null,
+
+  /// <summary>Reads a file and lets the reason for a failure out.</summary>
+  /// <remarks>
+  /// <see cref="LoadRawImage"/> answers null for every kind of failure, which is convenient for a
+  /// caller that only wants a picture and useless for one asking why there isn't one. A wrong
+  /// length, an unsupported depth and a file that is not this format at all are the same answer,
+  /// and telling them apart is most of the work of fixing a reader.
+  /// </remarks>
+  Func<FileInfo, RawImage?>? LoadRawImageOrThrow = null
 ) {
 
   /// <summary>The first/preferred MIME type, or <c>"application/octet-stream"</c> if none is registered.</summary>

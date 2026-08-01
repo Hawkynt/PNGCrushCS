@@ -26,7 +26,17 @@ public readonly record struct VipsFile : IImageFormatReader<VipsFile>, IImageToR
   /// <summary>Raw pixel data (Bands bytes per pixel for UChar).</summary>
   public byte[] PixelData { get; init; }
 
+  /// <summary>Whether the file was written in the other byte order, which its magic says.</summary>
+  public bool IsSwapped { get; init; }
+
   public static RawImage ToRawImage(VipsFile file) {
+    // A sixteen-bit band is ordinary rather than exotic: anything that has been through a scanner
+    // or a colour-managed pipeline carries one. It is narrowed to the byte the magnitude lives in,
+    // which depends on the order the file declares.
+    if (file.BandFormat is VipsBandFormat.UShort or VipsBandFormat.Short) {
+      var narrowed = _Narrow(file.PixelData ?? [], file.IsSwapped);
+      file = file with { BandFormat = VipsBandFormat.UChar, PixelData = narrowed };
+    }
 
     if (file.BandFormat != VipsBandFormat.UChar)
       throw new NotSupportedException($"Only UChar band format is supported, got {file.BandFormat}.");
@@ -77,4 +87,12 @@ public readonly record struct VipsFile : IImageFormatReader<VipsFile>, IImageToR
     };
   }
 
+  /// <summary>Narrows sixteen-bit samples to eight, keeping the byte that carries the magnitude.</summary>
+  private static byte[] _Narrow(ReadOnlySpan<byte> data, bool isSwapped) {
+    var narrowed = new byte[data.Length / 2];
+    for (var i = 0; i < narrowed.Length; ++i)
+      narrowed[i] = data[i * 2 + (isSwapped ? 0 : 1)];
+
+    return narrowed;
+  }
 }

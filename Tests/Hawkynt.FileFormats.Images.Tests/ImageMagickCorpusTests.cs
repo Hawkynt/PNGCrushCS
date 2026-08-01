@@ -74,7 +74,27 @@ public sealed class ImageMagickCorpusTests {
 
     // Read the way a caller would, which tries magic bytes and then every format the extension
     // names — an extension shared by several formats resolves only by trying them.
-    var image = FormatRegistry.Read(new FileInfo(path!));
+    var file = new FileInfo(path!);
+    var image = FormatRegistry.Read(file);
+
+    // On failure, ask each candidate again without the null-on-error wrapper, so the report says
+    // what went wrong rather than only that something did.
+    if (image == null) {
+      var reasons = new List<string>();
+      foreach (var candidate in FormatRegistry.DetectCandidatesFromExtension(extension)) {
+        var reader = FormatRegistry.GetEntry(candidate)?.LoadRawImageOrThrow;
+        if (reader == null)
+          continue;
+
+        try {
+          reader(file);
+        } catch (Exception failure) {
+          reasons.Add($"{candidate}: {failure.GetType().Name}: {failure.Message}");
+        }
+      }
+
+      Assert.Fail($"{extension}: {(reasons.Count > 0 ? string.Join(" | ", reasons) : "no reader accepted it")}");
+    }
 
     Assert.That(image, Is.Not.Null, $"{extension}: reader returned nothing");
     Assert.Multiple(() => {
