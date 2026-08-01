@@ -40,10 +40,17 @@ public sealed class ProgressiveRefineTests {
   /// 5 of 255 on a progressive file ImageMagick wrote, while ImageMagick reads a progressive file
   /// we wrote at a mean of 35 of 255 away from the picture that went in.
   /// <para/>
-  /// One fault in that path is fixed — the first AC pass shifted the two's complement rather than
-  /// the magnitude, sending a coefficient of -1 to -1 where it belongs at zero — and a second
-  /// remains somewhere in the refinement scans. The scan script itself checks out: each band is
-  /// first coded before it is refined, and each refinement lowers the approximation by exactly one.
+  /// Two faults in that path are fixed: the first AC pass shifted the two's complement rather than
+  /// the magnitude, sending a coefficient of -1 to -1 where it belongs at zero, and the frequency
+  /// counter that builds the Huffman tables shifted the other way from the encoder that then used
+  /// them. A third remains, and these rule things out rather than guess at it:
+  /// <list type="bullet">
+  /// <item>Not the refinement scans: a script with no refinement at all is wrong by the same amount.</item>
+  /// <item>Not the scan structure: the scans, their bands and their approximations read back correctly.</item>
+  /// <item>Not the coefficients: the baseline writer shares them and lands at a mean of 2.96.</item>
+  /// <item>Not the reader: it takes ImageMagick's progressive files to within 5 of 255.</item>
+  /// </list>
+  /// So it is in what the first-pass DC or AC scan puts in the entropy data.
   /// </remarks>
   [Test]
   [Ignore("The progressive writer is wrong: ImageMagick reads our own output at a mean of 35 of 255.")]

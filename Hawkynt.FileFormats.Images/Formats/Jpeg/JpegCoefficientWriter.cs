@@ -216,9 +216,15 @@ internal static class JpegCoefficientWriter {
         for (var by = 0; by < compData.HeightInBlocks; ++by)
           for (var bx = 0; bx < compData.WidthInBlocks; ++bx) {
             var block = compData.Blocks[by][bx];
+            // The same point transform the encoder applies, which drops the low bits of the
+            // magnitude rather than of the two's complement. Counting one way and emitting the
+            // other builds a table missing the very symbols the encoder then asks it for.
             var shifted = new short[64];
-            for (var i = 0; i < 64; ++i)
-              shifted[i] = (short)(block.Coefficients[i] >> al);
+            for (var i = 0; i < 64; ++i) {
+              int coefficient = block.Coefficients[i];
+              var magnitude = (coefficient < 0 ? -coefficient : coefficient) >> al;
+              shifted[i] = (short)(coefficient < 0 ? -magnitude : magnitude);
+            }
             JpegHuffmanEncoder.CountAcFrequencies(acFreqs[scanComp.AcTableId], shifted, scan.SpectralStart, scan.SpectralEnd);
           }
       }
