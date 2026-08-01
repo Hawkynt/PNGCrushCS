@@ -7,7 +7,7 @@ namespace FileFormat.WorldportFax;
 public readonly record struct WorldportFaxFile : IImageFormatReader<WorldportFaxFile>, IImageToRawImage<WorldportFaxFile>, IImageFormatWriter<WorldportFaxFile> {
 
   static string IImageFormatMetadata<WorldportFaxFile>.PrimaryExtension => ".wpf";
-  static string[] IImageFormatMetadata<WorldportFaxFile>.FileExtensions => [".wpf"];
+  static string[] IImageFormatMetadata<WorldportFaxFile>.FileExtensions => [".wpf", ".wfx"];
   static WorldportFaxFile IImageFormatReader<WorldportFaxFile>.FromSpan(ReadOnlySpan<byte> data) => WorldportFaxReader.FromSpan(data);
   static byte[] IImageFormatWriter<WorldportFaxFile>.ToBytes(WorldportFaxFile file) => WorldportFaxWriter.ToBytes(file);
 

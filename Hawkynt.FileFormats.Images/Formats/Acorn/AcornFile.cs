@@ -8,7 +8,7 @@ namespace FileFormat.Acorn;
 public readonly record struct AcornFile : IImageFormatReader<AcornFile>, IImageToRawImage<AcornFile>, IImageFromRawImage<AcornFile>, IImageFormatWriter<AcornFile> {
 
   static string IImageFormatMetadata<AcornFile>.PrimaryExtension => ".spr";
-  static string[] IImageFormatMetadata<AcornFile>.FileExtensions => [".spr"];
+  static string[] IImageFormatMetadata<AcornFile>.FileExtensions => [".spr", ".acorn"];
   static AcornFile IImageFormatReader<AcornFile>.FromSpan(ReadOnlySpan<byte> data) => AcornReader.FromSpan(data);
   static byte[] IImageFormatWriter<AcornFile>.ToBytes(AcornFile file) => AcornWriter.ToBytes(file);
   /// <summary>Sprites contained in this file.</summary>
