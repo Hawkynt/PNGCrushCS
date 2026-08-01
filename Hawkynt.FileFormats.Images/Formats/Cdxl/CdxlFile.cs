@@ -62,8 +62,10 @@ public readonly record struct CdxlFile : IImageFormatReader<CdxlFile>, IImageFor
 
   public static CdxlFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != PixelFormat.Indexed8 || image.Palette is null)
-      throw new ArgumentException("CDXL requires an indexed RawImage with a palette.", nameof(image));
+    // Reduced rather than refused: asking the caller to hand over an already-indexed picture
+    // makes converting into this format someone else's problem, which is the one thing a
+    // converter cannot delegate.
+    image = image.EnsureIndexedAtMost(256);
 
     var paletteCount = image.PaletteCount > 0 ? image.PaletteCount : image.Palette.Length / 3;
     var planes = _BitPlanesForColours(paletteCount);

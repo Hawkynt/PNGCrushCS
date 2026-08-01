@@ -316,10 +316,10 @@ public readonly record struct BsaveFile : IImageFormatReader<BsaveFile>, IImageT
   private static BsaveFile _ToCga80x100x1024(RawImage image) {
     const int width = 80;
     const int height = 100;
-    if (!image.IsIndexed)
-      throw new ArgumentException(
-        "BSAVE 80x100x1024 requires an indexed image. Use the Save-As 'Reduce colours' step first.", nameof(image));
-    if (image.PaletteCount > 1024)
+    // Reduced rather than refused: asking the caller to hand over an already-indexed picture
+    // makes converting into this format someone else's problem, which is the one thing a
+    // converter cannot delegate.
+    image = image.EnsureIndexedAtMost(16);
       throw new ArgumentException(
         $"BSAVE 80x100x1024 supports at most 1024 palette entries, got {image.PaletteCount}.", nameof(image));
 
@@ -346,10 +346,10 @@ public readonly record struct BsaveFile : IImageFormatReader<BsaveFile>, IImageT
   /// <summary>Returns a flat array of pixel-per-element 16-bit indices regardless of whether the source
   /// image is Indexed1/4/8 (byte-per-pixel) or Indexed16 (two-byte-per-pixel little-endian).</summary>
   private static int[] _RequireIndices16(RawImage image, int maxPalette, string modeName) {
-    if (!image.IsIndexed)
-      throw new ArgumentException(
-        $"BSAVE {modeName} requires an indexed image. Use the Save-As 'Reduce colours' step first.", nameof(image));
-    if (image.PaletteCount > maxPalette)
+    // Reduced rather than refused: asking the caller to hand over an already-indexed picture
+    // makes converting into this format someone else's problem, which is the one thing a
+    // converter cannot delegate.
+    image = image.EnsureIndexedAtMost(16);
       throw new ArgumentException(
         $"BSAVE {modeName} supports at most {maxPalette} palette entries, got {image.PaletteCount}.", nameof(image));
 
@@ -422,10 +422,10 @@ public readonly record struct BsaveFile : IImageFormatReader<BsaveFile>, IImageT
   /// <summary>Like <see cref="_RequireIndexed"/> but allows up to 1024 palette entries — needed for the Reenigne mode.
   /// Source must already be byte-per-pixel (the dialog produces Indexed8 even when palette is large).</summary>
   private static byte[] _RequireIndexedLarge(RawImage image, int maxPalette, string modeName) {
-    if (!image.IsIndexed)
-      throw new ArgumentException(
-        $"BSAVE {modeName} requires an indexed image. Use the Save-As 'Reduce colours' step first.", nameof(image));
-    if (image.PaletteCount > maxPalette)
+    // Reduced rather than refused: asking the caller to hand over an already-indexed picture
+    // makes converting into this format someone else's problem, which is the one thing a
+    // converter cannot delegate.
+    image = image.EnsureIndexedAtMost(16);
       throw new ArgumentException(
         $"BSAVE {modeName} supports at most {maxPalette} palette entries, got {image.PaletteCount}.", nameof(image));
 
@@ -442,10 +442,10 @@ public readonly record struct BsaveFile : IImageFormatReader<BsaveFile>, IImageT
   /// Unpacks sub-byte indexed formats (Indexed1/Indexed4) inline rather than going through
   /// <see cref="PixelConverter"/> — that path can dispatch back through registered format writers and recurse.</summary>
   private static byte[] _RequireIndexed(RawImage image, int maxPalette, string modeName) {
-    if (!image.IsIndexed)
-      throw new ArgumentException(
-        $"BSAVE {modeName} requires an indexed image. Use the Save-As 'Reduce colours' step to convert first.",
-        nameof(image));
+    // Reduced rather than refused: asking the caller to hand over an already-indexed picture
+    // makes converting into this format someone else's problem, which is the one thing a
+    // converter cannot delegate.
+    image = image.EnsureIndexedAtMost(16);
     if (image.PaletteCount > maxPalette)
       throw new ArgumentException(
         $"BSAVE {modeName} supports at most {maxPalette} palette entries, got {image.PaletteCount}.",

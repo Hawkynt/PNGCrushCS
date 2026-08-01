@@ -65,12 +65,17 @@ public readonly record struct AtariSifFile : IImageFormatReader<AtariSifFile>, I
 
   public static AtariSifFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    var (mode, bpp) = (image.Width, image.Height, image.Format) switch {
-      (160, 96,  PixelFormat.Indexed8) => ((byte)8,  2),
-      (320, 192, PixelFormat.Indexed1) => ((byte)9,  1),
-      (160, 192, PixelFormat.Indexed8) => ((byte)15, 2),
-      _ => throw new ArgumentException($"Unsupported Atari SIF geometry {image.Width}x{image.Height} {image.Format}.", nameof(image)),
+    // The size picks the mode, and the mode decides how many colours it has room for. Which pixel
+    // format that needs is this writer's business rather than the caller's, so the picture is
+    // converted into it instead of being turned away for arriving as anything else.
+    var (mode, bpp) = (image.Width, image.Height) switch {
+      (160, 96) => ((byte)8, 2),
+      (320, 192) => ((byte)9, 1),
+      (160, 192) => ((byte)15, 2),
+      _ => throw new ArgumentException($"Unsupported Atari SIF geometry {image.Width}x{image.Height}.", nameof(image)),
     };
+
+    image = bpp == 1 ? image.EnsureFormat(PixelFormat.Indexed1) : image.EnsureIndexedAtMost(1 << bpp);
     if (bpp == 1)
       return new() { Width = image.Width, Height = image.Height, AnticMode = mode, PixelData = (byte[])image.PixelData.Clone() };
 

@@ -74,15 +74,18 @@ public readonly record struct TrsPixFile : IImageFormatReader<TrsPixFile>, IImag
 
   public static TrsPixFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    var mode = image switch {
-      { Width: 320, Height: 192, Format: PixelFormat.Indexed1 } => (byte)0,
-      { Width: 320, Height: 192, Format: PixelFormat.Indexed8 } => (byte)1,
-      { Width: 640, Height: 192, Format: PixelFormat.Indexed1 } => (byte)2,
-      { Width: 640, Height: 192, Format: PixelFormat.Indexed8 } => (byte)3,
-      _ => throw new ArgumentException($"Unsupported TRS-80 PIX geometry {image.Width}x{image.Height} {image.Format}.", nameof(image)),
-    };
+    // Both widths come in a two-colour and a four-colour mode. Which one a picture wants is a
+    // property of the picture rather than something the caller has to state, so it is decided here
+    // and the picture converted into it.
+    if (image.Width is not (320 or 640) || image.Height != 192)
+      throw new ArgumentException($"Unsupported TRS-80 PIX geometry {image.Width}x{image.Height}.", nameof(image));
 
-    var bpp = mode is 0 or 2 ? 1 : 2;
+    var wide = image.Width == 640;
+    var indexed = image.EnsureIndexedAtMost(4);
+    var bpp = indexed.PaletteCount <= 2 ? 1 : 2;
+
+    image = bpp == 1 ? indexed.EnsureFormat(PixelFormat.Indexed1) : indexed;
+    var mode = (byte)((wide ? 2 : 0) + (bpp == 1 ? 0 : 1));
     var rowBytes = (image.Width * bpp + 7) >> 3;
     if (bpp == 1) {
       return new() { Mode = mode, PixelData = (byte[])image.PixelData.Clone() };
