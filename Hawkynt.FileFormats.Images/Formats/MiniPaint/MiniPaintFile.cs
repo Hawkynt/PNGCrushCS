@@ -16,7 +16,10 @@ namespace FileFormat.MiniPaint;
 /// so the same bitmap can read either way round.
 /// </remarks>
 public readonly record struct MiniPaintFile
-  : IImageFormatReader<MiniPaintFile>, IImageToRawImage<MiniPaintFile> {
+  : IImageFormatReader<MiniPaintFile>, IImageToRawImage<MiniPaintFile>,
+    IImageFromRawImage<MiniPaintFile>, IImageFormatWriter<MiniPaintFile> {
+
+  static byte[] IImageFormatWriter<MiniPaintFile>.ToBytes(MiniPaintFile file) => MiniPaintWriter.ToBytes(file);
 
   /// <summary>Pixels across.</summary>
   public const int Width = 160;
@@ -96,5 +99,167 @@ public readonly record struct MiniPaintFile
       Palette = Vic20Graphics.CreatePalette(),
       PaletteCount = Vic20Graphics.ColorCount,
     };
+  }
+
+  /// <summary>Pixels across a colour area, which is half of what the cell byte covers.</summary>
+  private const int _AreaWidth = 8;
+
+  /// <summary>Rows down a colour area.</summary>
+  private const int _AreaHeight = 16;
+
+  /// <summary>Builds a picture in the four-colour mode, which is the one that uses the whole palette.</summary>
+  /// <remarks>
+  /// Every eight-by-sixteen area chooses one colour of its own; three more are shared by the whole
+  /// picture, and two of those come from a register with only eight values rather than sixteen. The
+  /// shared three are picked first from a reduction of the whole picture, and each area then takes
+  /// whichever of the eight it can have suits its own pixels best.
+  /// <para/>
+  /// Areas can also be written in a two-colour mode that halves the horizontal detail for a colour
+  /// less; this always takes the four-colour one, which every area can use.
+  /// </remarks>
+  public static MiniPaintFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(Width, Height).PixelData;
+    var vic = Vic20Graphics.CreatePalette();
+
+    var quantized = ColorQuantizer.Quantize(
+      PixelConverter.Convert(image.SampleTo(Width, Height), PixelFormat.Bgra32).PixelData,
+      Width * Height, 4);
+
+    // Index 1 comes from a three-bit register, so it is the one confined to the first eight colours.
+    var background = _Nearest(vic, 16, quantized.Palette, 0);
+    var auxiliary = _Nearest(vic, 8, quantized.Palette, 1);
+    var ink = _Nearest(vic, 16, quantized.Palette, 2);
+
+    var data = new byte[FileSize];
+    Signature.CopyTo(data.AsSpan(0));
+    data[InkOffset] = (byte)(ink << 4);
+
+    // The high nibble is the background, the low three bits the auxiliary, and bit 3 says which way
+    // round a two-colour area reads — irrelevant here, since none is written.
+    data[ControlOffset] = (byte)((background << 4) | auxiliary);
+
+    Span<byte> colors = stackalloc byte[4];
+    colors[0] = background;
+    colors[1] = auxiliary;
+    colors[3] = ink;
+
+    for (var areaY = 0; areaY < Height / _AreaHeight; ++areaY)
+    for (var areaX = 0; areaX < Width / _AreaWidth; ++areaX) {
+      var x0 = areaX * _AreaWidth;
+      var y0 = areaY * _AreaHeight;
+
+      var own = _ChooseAreaColor(rgb, vic, colors, x0, y0);
+      colors[2] = own;
+
+      // Two areas share a cell byte: the left one takes the low nibble, the right one the high.
+      var cell = ColorsOffset + areaY * 10 + (x0 >> 4);
+      data[cell] |= (byte)((own | 8) << ((areaX & 1) << 2));
+
+      for (var y = y0; y < y0 + _AreaHeight; ++y)
+      for (var x = x0; x < x0 + _AreaWidth; x += 2) {
+        var index = _NearestOfFour(rgb, vic, colors, x, y);
+        data[BitmapOffset + (x >> 3) * Height + y] |= (byte)(index << (~x & 6));
+      }
+    }
+
+    return new() { Data = data };
+  }
+
+  /// <summary>The colour an area should own, given the three it has to share.</summary>
+  private static byte _ChooseAreaColor(
+    ReadOnlySpan<byte> rgb, ReadOnlySpan<byte> vic, Span<byte> colors, int x0, int y0) {
+    byte best = 0;
+    var bestCost = long.MaxValue;
+
+    Span<byte> trial = stackalloc byte[4];
+    colors.CopyTo(trial);
+
+    for (byte candidate = 0; candidate < 8; ++candidate) {
+      trial[2] = candidate;
+      long cost = 0;
+
+      for (var y = y0; y < y0 + _AreaHeight; ++y)
+      for (var x = x0; x < x0 + _AreaWidth; x += 2)
+        cost += _PairCost(rgb, vic, trial, x, y);
+
+      if (cost >= bestCost)
+        continue;
+
+      bestCost = cost;
+      best = candidate;
+    }
+
+    return best;
+  }
+
+  /// <summary>Which of the four colours a pixel pair should take.</summary>
+  private static int _NearestOfFour(
+    ReadOnlySpan<byte> rgb, ReadOnlySpan<byte> vic, ReadOnlySpan<byte> colors, int x, int y) {
+    var (red, green, blue) = _PairAverage(rgb, x, y);
+    var best = 0;
+    var bestCost = long.MaxValue;
+
+    for (var i = 0; i < 4; ++i) {
+      var entry = colors[i] * 3;
+      long dr = red - vic[entry], dg = green - vic[entry + 1], db = blue - vic[entry + 2];
+      var cost = dr * dr + dg * dg + db * db;
+      if (cost >= bestCost)
+        continue;
+
+      bestCost = cost;
+      best = i;
+    }
+
+    return best;
+  }
+
+  /// <summary>How far the best of the four sits from a pixel pair.</summary>
+  private static long _PairCost(
+    ReadOnlySpan<byte> rgb, ReadOnlySpan<byte> vic, ReadOnlySpan<byte> colors, int x, int y) {
+    var (red, green, blue) = _PairAverage(rgb, x, y);
+    var bestCost = long.MaxValue;
+
+    for (var i = 0; i < 4; ++i) {
+      var entry = colors[i] * 3;
+      long dr = red - vic[entry], dg = green - vic[entry + 1], db = blue - vic[entry + 2];
+      var cost = dr * dr + dg * dg + db * db;
+      if (cost < bestCost)
+        bestCost = cost;
+    }
+
+    return bestCost;
+  }
+
+  /// <summary>The mean of the two pixels one stored value covers.</summary>
+  private static (int Red, int Green, int Blue) _PairAverage(ReadOnlySpan<byte> rgb, int x, int y) {
+    var left = (y * Width + x) * 3;
+    var right = left + 3;
+
+    return (
+      (rgb[left] + rgb[right]) >> 1,
+      (rgb[left + 1] + rgb[right + 1]) >> 1,
+      (rgb[left + 2] + rgb[right + 2]) >> 1);
+  }
+
+  /// <summary>The machine colour nearest one entry of a reduction, within however many are allowed.</summary>
+  private static byte _Nearest(ReadOnlySpan<byte> vic, int available, ReadOnlySpan<byte> palette, int index) {
+    int red = palette[index * 3], green = palette[index * 3 + 1], blue = palette[index * 3 + 2];
+    byte best = 0;
+    var bestCost = int.MaxValue;
+
+    for (var candidate = 0; candidate < available; ++candidate) {
+      var entry = candidate * 3;
+      int dr = red - vic[entry], dg = green - vic[entry + 1], db = blue - vic[entry + 2];
+      var cost = dr * dr + dg * dg + db * db;
+      if (cost >= bestCost)
+        continue;
+
+      bestCost = cost;
+      best = (byte)candidate;
+    }
+
+    return best;
   }
 }
