@@ -204,4 +204,32 @@ internal static class CcittHuffmanTable {
   /// <summary>EOL marker: 000000000001 (12 bits).</summary>
   internal const int EolCode = 0b000000000001;
   internal const int EolBitLength = 12;
+
+  /// <summary>
+  /// The make-up codes for runs of 1792 and longer, which both colours share.
+  /// </summary>
+  /// <remarks>
+  /// These were missing altogether. A colour's own make-up codes stop at 1728, so any run longer
+  /// than 1791 had no code that matched and the decoder gave up on the line — and on a page any
+  /// wider than about 1800 pixels that happens almost at once, which is why a 4824-wide CALS raster
+  /// came back entirely blank while reporting no trouble.
+  /// <para/>
+  /// Unlike the per-colour tables these carry their run length rather than implying it from the
+  /// position, the steps not being a plain multiple of the index.
+  /// </remarks>
+  internal static readonly (int Code, int BitLength, int RunLength)[] SharedMakeUp = [
+    (0b00000001000, 11, 1792),
+    (0b00000001100, 11, 1856),
+    (0b00000001101, 11, 1920),
+    (0b000000010010, 12, 1984),
+    (0b000000010011, 12, 2048),
+    (0b000000010100, 12, 2112),
+    (0b000000010101, 12, 2176),
+    (0b000000010110, 12, 2240),
+    (0b000000010111, 12, 2304),
+    (0b000000011100, 12, 2368),
+    (0b000000011101, 12, 2432),
+    (0b000000011110, 12, 2496),
+    (0b000000011111, 12, 2560),
+  ];
 }

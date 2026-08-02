@@ -278,6 +278,11 @@ internal static class CcittG4Decoder {
       for (var i = 0; i < makeUpTable.Length; ++i)
         if (makeUpTable[i].BitLength == bitsRead && makeUpTable[i].Code == accumulated)
           return (i + 1) * 64;
+
+      // Runs of 1792 and longer are coded the same way whatever the colour.
+      for (var i = 0; i < CcittHuffmanTable.SharedMakeUp.Length; ++i)
+        if (CcittHuffmanTable.SharedMakeUp[i].BitLength == bitsRead && CcittHuffmanTable.SharedMakeUp[i].Code == accumulated)
+          return CcittHuffmanTable.SharedMakeUp[i].RunLength;
     }
 
     return -1;
