@@ -12,7 +12,16 @@ internal static class HamDecoder {
   /// <param name="height">Image height in pixels.</param>
   /// <param name="numPlanes">Number of bitplanes (6 for HAM6, 8 for HAM8).</param>
   /// <returns>RGB pixel data (3 bytes per pixel).</returns>
-  public static byte[] Decode(byte[] indexedData, byte[] palette, int width, int height, int numPlanes) {
+  public static byte[] Decode(byte[] indexedData, byte[] palette, int width, int height, int numPlanes)
+    => Decode(indexedData, palette, width, height, numPlanes, 0);
+
+  /// <summary>Decodes HAM pixel data, optionally against a palette that changes down the screen.</summary>
+  /// <param name="perScanline">
+  /// Colours each scanline's palette holds, or zero when one palette serves the whole picture. A
+  /// sliced picture states fewer palettes than it has lines when the display is interlaced, in which
+  /// case each serves two.
+  /// </param>
+  public static byte[] Decode(byte[] indexedData, byte[] palette, int width, int height, int numPlanes, int perScanline) {
     ArgumentNullException.ThrowIfNull(indexedData);
     ArgumentNullException.ThrowIfNull(palette);
 
@@ -25,15 +34,20 @@ internal static class HamDecoder {
     // black. The two are usually close enough to pass unnoticed, and differ in exactly the first one
     // or two pixels of every row — the holding carries the border colour in until something modifies
     // each channel in turn.
-    byte startR = 0, startG = 0, startB = 0;
-    if (palette.Length >= 3) {
-      startR = palette[0];
-      startG = palette[1];
-      startB = palette[2];
-    }
+    var slices = perScanline > 0 ? palette.Length / (perScanline * 3) : 0;
 
     for (var y = 0; y < height; ++y) {
-      byte r = startR, g = startG, b = startB;
+      // A sliced picture states one palette a line, or one per two when the display is interlaced.
+      var at = slices == 0 ? 0
+        : (slices >= height ? y : y * slices / height) * perScanline * 3;
+
+      byte r = 0, g = 0, b = 0;
+      if (at + 2 < palette.Length) {
+        r = palette[at];
+        g = palette[at + 1];
+        b = palette[at + 2];
+      }
+
       var rowOffset = y * width;
 
       for (var x = 0; x < width; ++x) {
@@ -43,7 +57,7 @@ internal static class HamDecoder {
 
         switch (control) {
           case 0: // Use palette color
-            var palOffset = value * 3;
+            var palOffset = at + value * 3;
             if (palOffset + 2 < palette.Length) {
               r = palette[palOffset];
               g = palette[palOffset + 1];

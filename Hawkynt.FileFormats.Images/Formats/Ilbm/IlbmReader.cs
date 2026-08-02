@@ -58,6 +58,7 @@ public static class IlbmReader {
     byte[]? body = null;
     uint camg = 0;
 
+    byte[]? scanlinePalettes = null;
     var offset = 12; // skip FORM header + form type
     var endOffset = Math.Min(8 + formSize, data.Length);
 
@@ -83,6 +84,25 @@ public static class IlbmReader {
           if (chunkSize >= 4)
             camg = BinaryPrimitives.ReadUInt32BigEndian(data[chunkDataOffset..]);
           break;
+        // Sliced HAM: a version word, then sixteen twelve-bit colours for each scanline. Without it
+        // a SHAM picture is decoded against the one CMAP and drifts further out with every line.
+        case "SHAM":
+        case "CTBL": {
+          var start = chunkId == "SHAM" ? 2 : 0;
+          var words = (chunkSize - start) / 2;
+          if (words < IlbmFile.SlicedPaletteEntries)
+            break;
+
+          scanlinePalettes = new byte[words * 3];
+          for (var i = 0; i < words; ++i) {
+            var colour = BinaryPrimitives.ReadUInt16BigEndian(data[(chunkDataOffset + start + i * 2)..]);
+            scanlinePalettes[i * 3] = (byte)((colour >> 8 & 0x0F) * 0x11);
+            scanlinePalettes[i * 3 + 1] = (byte)((colour >> 4 & 0x0F) * 0x11);
+            scanlinePalettes[i * 3 + 2] = (byte)((colour & 0x0F) * 0x11);
+          }
+
+          break;
+        }
         case "BODY":
           body = new byte[chunkSize];
           data.Slice(chunkDataOffset, chunkSize).CopyTo(body);
@@ -130,6 +150,7 @@ public static class IlbmReader {
       PageHeight = header.PageHeight,
       PixelData = pixelData,
       Palette = cmap,
+      ScanlinePalettes = scanlinePalettes,
       ViewportMode = camg
     };
   }

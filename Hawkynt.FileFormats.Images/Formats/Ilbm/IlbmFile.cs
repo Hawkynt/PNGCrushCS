@@ -29,8 +29,23 @@ public readonly record struct IlbmFile : IImageFormatReader<IlbmFile>, IImageToR
   public byte[] PixelData { get; init; }
   public byte[]? Palette { get; init; }
 
+  /// <summary>
+  /// One palette a scanline, sixteen colours each as RGB triplets, when the file carries a SHAM
+  /// chunk — otherwise null.
+  /// </summary>
+  /// <remarks>
+  /// Sliced HAM changes the palette as the beam travels down the screen, which is how a machine with
+  /// sixteen registers shows a picture with hundreds of colours in it. Decoding it against the single
+  /// CMAP instead, as this did, gets the first line about right and drifts further out with every
+  /// line after.
+  /// </remarks>
+  public byte[]? ScanlinePalettes { get; init; }
+
   /// <summary>CAMG viewport mode bits (from the Amiga display hardware).</summary>
   public uint ViewportMode { get; init; }
+
+  /// <summary>Colours a sliced palette holds for each scanline.</summary>
+  internal const int SlicedPaletteEntries = 16;
 
   /// <summary>Whether the image uses Hold-And-Modify mode (HAM6 or HAM8).</summary>
   public bool IsHam => (ViewportMode & 0x800) != 0;
@@ -43,7 +58,9 @@ public readonly record struct IlbmFile : IImageFormatReader<IlbmFile>, IImageToR
 
     // HAM mode: decode indexed data to RGB via HamDecoder
     if (file.IsHam && file.Palette is { } hamPalette) {
-      var rgb = HamDecoder.Decode(file.PixelData, hamPalette, file.Width, file.Height, file.NumPlanes);
+      var rgb = file.ScanlinePalettes is { } sliced
+        ? HamDecoder.Decode(file.PixelData, sliced, file.Width, file.Height, file.NumPlanes, SlicedPaletteEntries)
+        : HamDecoder.Decode(file.PixelData, hamPalette, file.Width, file.Height, file.NumPlanes);
       return new() {
         Width = file.Width,
         Height = file.Height,
