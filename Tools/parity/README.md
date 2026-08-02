@@ -45,12 +45,15 @@ nonsense:
   the same picture at an integer multiple of another's size is not a disagreement about the picture.
 - `same picture, other colours` counts decodes that agree on every pixel and differ only in what RGB
   each of the machine's colours is drawn as. What a hardware colour "is" was measured off a CRT
-  rather than defined, and nobody measured the same; against RECOIL this is 111 samples, which
-  counted as disagreements buried the 61 that are genuinely different pictures.
+  rather than defined, and nobody measured the same; against RECOIL this is 121 samples, which
+  counted as disagreements buried the 44 that are genuinely different pictures. It also covers the
+  case where one tool's palette holds the same colour twice, so a picture that distinguishes them
+  comes back with one fewer — allowed for a single pair only, since a decode collapsed to one flat
+  colour would otherwise map consistently onto anything.
 
 ## Where the remaining differences with RECOIL are
 
-Fifty-two samples are genuinely different pictures rather than different shades. There is no cluster
+Forty-four samples are genuinely different pictures rather than different shades. There is no cluster
 left: the largest group sharing a decoder is two, and most are one apiece. Nine were closed by
 finding shared causes — four ways an IFF states a palette that changes down the screen, and the
 inverse-video register in every Interlace Character Editor mode — and that exhausted the families
@@ -60,9 +63,9 @@ By the shape of the difference:
 
 | shape | samples |
 |---|---|
-| same size, several colours wrong at once | 21 |
 | geometry differs in a way that is not a clean multiple | 21 |
-| RECOIL draws twice the width | 8 |
+| same size, several colours wrong at once | 15 |
+| RECOIL draws twice the width | 6 |
 | RECOIL draws twice the height | 2 |
 
 What is worth knowing before starting on any of them: **none is a single constant colour offset any

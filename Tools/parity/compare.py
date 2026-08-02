@@ -127,6 +127,7 @@ def same_picture_different_palette(a, b):
         return False
 
     forward, backward = {}, {}
+    merged = False
     for y in range(bh):
         row = y * ky * aw
         for x in range(bw):
@@ -136,7 +137,14 @@ def same_picture_different_palette(a, b):
             if forward.setdefault(ours, theirs) != theirs:
                 return False
             if backward.setdefault(theirs, ours) != ours:
-                return False
+                # One tool drawing two of the other's colours identically still agrees about the
+                # picture: the arrangement is the same and one palette simply has a duplicate in it.
+                merged = True
+
+    # Allowing that at all is a risk — a decode of one flat colour maps consistently onto anything —
+    # so it is allowed only where a single pair is involved, not where a picture has collapsed.
+    if merged and len(forward) - len(set(forward.values())) > 1:
+        return False
 
     return True
 
