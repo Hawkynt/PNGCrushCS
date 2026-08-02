@@ -303,7 +303,10 @@ public sealed class WriterAcceptanceTests {
     // Its catalogue is the Windows build's; this one lacks some of those readers and says so with
     // one message for every format it cannot load. That is it declining to judge rather than
     // judging, and counting it as a rejection would blame the writer for the tool's build.
-    if (!decoded && output.Contains("Don't know how to read", StringComparison.OrdinalIgnoreCase))
+    // Two ways of saying the same thing: the first for a format this build has no reader for, the
+    // second for one whose reader is present but not licensed here. Neither is about our bytes.
+    if (!decoded && (output.Contains("Don't know how to read", StringComparison.OrdinalIgnoreCase)
+        || output.Contains("Contact your dealer", StringComparison.OrdinalIgnoreCase)))
       return null;
 
     return (decoded, $"XnView rejected it — {output}");
