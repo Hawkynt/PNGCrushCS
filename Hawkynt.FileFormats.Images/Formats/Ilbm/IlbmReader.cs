@@ -87,7 +87,9 @@ public static class IlbmReader {
         // Sliced HAM: a version word, then sixteen twelve-bit colours for each scanline. Without it
         // a SHAM picture is decoded against the one CMAP and drifts further out with every line.
         case "SHAM":
-        case "CTBL": {
+        case "CTBL":
+        case "BEAM": {
+          // The same table under three names; only SHAM puts a version word in front of it.
           var start = chunkId == "SHAM" ? 2 : 0;
           var words = (chunkSize - start) / 2;
           if (words < IlbmFile.SlicedPaletteEntries)

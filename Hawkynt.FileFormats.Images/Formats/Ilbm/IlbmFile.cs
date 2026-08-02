@@ -69,6 +69,36 @@ public readonly record struct IlbmFile : IImageFormatReader<IlbmFile>, IImageToR
       };
     }
 
+    // A palette that changes down the screen is not only a HAM thing: Dynamic HiRes states one per
+    // scanline for an ordinary sixteen-colour picture, and rendering those against the single CMAP
+    // gets the colours of all but the first few lines wrong.
+    if (!file.IsHam && file.ScanlinePalettes is { } perLine) {
+      var slices = perLine.Length / (SlicedPaletteEntries * 3);
+      var rgb = new byte[file.Width * file.Height * 3];
+      for (var y = 0; y < file.Height; ++y) {
+        var line = slices == 0 ? 0 : (slices >= file.Height ? y : y * slices / file.Height);
+        var paletteAt = line * SlicedPaletteEntries * 3;
+        for (var x = 0; x < file.Width; ++x) {
+          var index = file.PixelData[y * file.Width + x] % SlicedPaletteEntries;
+          var from = paletteAt + index * 3;
+          var to = (y * file.Width + x) * 3;
+          if (from + 2 >= perLine.Length)
+            continue;
+
+          rgb[to] = perLine[from];
+          rgb[to + 1] = perLine[from + 1];
+          rgb[to + 2] = perLine[from + 2];
+        }
+      }
+
+      return new() {
+        Width = file.Width,
+        Height = file.Height,
+        Format = PixelFormat.Rgb24,
+        PixelData = rgb,
+      };
+    }
+
     // EHB mode: expand 32-entry palette to 64 entries (entries 32..63 = half brightness)
     if (file.IsEhb && file.Palette is { } ehbPalette) {
       var basePaletteCount = Math.Min(ehbPalette.Length / 3, 32);
