@@ -29,6 +29,43 @@ public readonly record struct NetpbmFile : IImageFormatReader<NetpbmFile>, IImag
   public byte[] PixelData { get; init; }
   public string? TupleType { get; init; }
 
+  /// <summary>
+  /// Stretches samples stated against a maximum other than the full range of their width.
+  /// </summary>
+  /// <remarks>
+  /// A Netpbm file names the largest value its samples take, and it is not obliged to be 255 or
+  /// 65535 — one here states 1023, which is ten bits kept in sixteen. Handing those back as though
+  /// they filled the sixteen makes the picture sixteen times too dark, which is what happened.
+  /// </remarks>
+  private static byte[] _StretchToFullRange(byte[] samples, int maxValue, bool sixteenBit) {
+    if (maxValue <= 0)
+      return samples;
+
+    if (sixteenBit) {
+      if (maxValue == ushort.MaxValue)
+        return samples;
+
+      var stretched = new byte[samples.Length];
+      for (var at = 0; at + 1 < samples.Length; at += 2) {
+        var value = (samples[at] << 8) | samples[at + 1];
+        var full = Math.Min(ushort.MaxValue, value * ushort.MaxValue / maxValue);
+        stretched[at] = (byte)(full >> 8);
+        stretched[at + 1] = (byte)full;
+      }
+
+      return stretched;
+    }
+
+    if (maxValue == byte.MaxValue)
+      return samples;
+
+    var result = new byte[samples.Length];
+    for (var i = 0; i < samples.Length; ++i)
+      result[i] = (byte)Math.Min(byte.MaxValue, samples[i] * byte.MaxValue / maxValue);
+
+    return result;
+  }
+
   public static RawImage ToRawImage(NetpbmFile file) {
     var width = file.Width;
     var height = file.Height;
@@ -59,13 +96,13 @@ public readonly record struct NetpbmFile : IImageFormatReader<NetpbmFile>, IImag
             Width = width,
             Height = height,
             Format = PixelFormat.Gray8,
-            PixelData = src[..],
+            PixelData = _StretchToFullRange(src[..], maxValue, false),
           };
         return new() {
           Width = width,
           Height = height,
           Format = PixelFormat.Gray16,
-          PixelData = src[..],
+          PixelData = _StretchToFullRange(src[..], maxValue, true),
         };
       case NetpbmFormat.PpmAscii:
       case NetpbmFormat.PpmBinary:
@@ -74,13 +111,13 @@ public readonly record struct NetpbmFile : IImageFormatReader<NetpbmFile>, IImag
             Width = width,
             Height = height,
             Format = PixelFormat.Rgb24,
-            PixelData = src[..],
+            PixelData = _StretchToFullRange(src[..], maxValue, false),
           };
         return new() {
           Width = width,
           Height = height,
           Format = PixelFormat.Rgb48,
-          PixelData = src[..],
+          PixelData = _StretchToFullRange(src[..], maxValue, true),
         };
       case NetpbmFormat.Pam:
         switch (channels) {
@@ -90,20 +127,20 @@ public readonly record struct NetpbmFile : IImageFormatReader<NetpbmFile>, IImag
                 Width = width,
                 Height = height,
                 Format = PixelFormat.Gray8,
-                PixelData = src[..],
+                PixelData = _StretchToFullRange(src[..], maxValue, false),
               };
             return new() {
               Width = width,
               Height = height,
               Format = PixelFormat.Gray16,
-              PixelData = src[..],
+              PixelData = _StretchToFullRange(src[..], maxValue, true),
             };
           case 2:
             return new() {
               Width = width,
               Height = height,
               Format = PixelFormat.GrayAlpha16,
-              PixelData = src[..],
+              PixelData = _StretchToFullRange(src[..], maxValue, false),
             };
           case 3:
             if (maxValue <= 255)
@@ -111,13 +148,13 @@ public readonly record struct NetpbmFile : IImageFormatReader<NetpbmFile>, IImag
                 Width = width,
                 Height = height,
                 Format = PixelFormat.Rgb24,
-                PixelData = src[..],
+                PixelData = _StretchToFullRange(src[..], maxValue, false),
               };
             return new() {
               Width = width,
               Height = height,
               Format = PixelFormat.Rgb48,
-              PixelData = src[..],
+              PixelData = _StretchToFullRange(src[..], maxValue, true),
             };
           case 4:
             if (maxValue <= 255)
@@ -125,13 +162,13 @@ public readonly record struct NetpbmFile : IImageFormatReader<NetpbmFile>, IImag
                 Width = width,
                 Height = height,
                 Format = PixelFormat.Rgba32,
-                PixelData = src[..],
+                PixelData = _StretchToFullRange(src[..], maxValue, false),
               };
             return new() {
               Width = width,
               Height = height,
               Format = PixelFormat.Rgba64,
-              PixelData = src[..],
+              PixelData = _StretchToFullRange(src[..], maxValue, true),
             };
           default:
             throw new NotSupportedException($"PAM with {channels} channels is not supported.");
