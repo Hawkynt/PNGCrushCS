@@ -27,6 +27,22 @@ public readonly record struct PcxFile : IImageFormatReader<PcxFile>, IImageToRaw
   public PcxColorMode ColorMode { get; init; }
   public PcxPlaneConfig PlaneConfig { get; init; }
 
+  /// <summary>The two colours the header names, or null where it names none.</summary>
+  private static byte[]? _StatedPair(byte[]? palette) {
+    if (palette is not { Length: >= 6 })
+      return null;
+
+    // Both entries the same is not a choice of colours; it is an unfilled header.
+    var same = true;
+    for (var i = 0; i < 3; ++i)
+      if (palette[i] != palette[i + 3]) {
+        same = false;
+        break;
+      }
+
+    return same ? null : [palette[0], palette[1], palette[2], palette[3], palette[4], palette[5]];
+  }
+
   public static RawImage ToRawImage(PcxFile file) {
 
     var mode = file.ColorMode;
@@ -58,7 +74,12 @@ public readonly record struct PcxFile : IImageFormatReader<PcxFile>, IImageToRaw
         break;
       case PcxColorMode.Monochrome:
         format = PixelFormat.Indexed1;
-        palette = [0, 0, 0, 255, 255, 255];
+
+        // The file states its two colours in the header, and they are not always paper and ink —
+        // amber on black was a common enough choice. They were ignored here and a fixed pair used
+        // instead; the stated pair is used now, and the fixed one only where the header says
+        // nothing, which is what a file leaving both entries black amounts to.
+        palette = _StatedPair(file.Palette) ?? [0, 0, 0, 255, 255, 255];
         paletteCount = 2;
         break;
       default:
