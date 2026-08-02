@@ -1,6 +1,8 @@
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using FileFormat.Riff;
 
 namespace FileFormat.WebP;
@@ -16,6 +18,30 @@ public static class WebPReader {
   private const string _CHUNK_ICCP = "ICCP";
   private const string _CHUNK_EXIF = "EXIF";
   private const string _CHUNK_XMP = "XMP ";
+
+  /// <summary>The chunk one frame of an animation sits in.</summary>
+  private const string _CHUNK_ANMF = "ANMF";
+
+  /// <summary>
+  /// Bytes of frame description before an animation frame's own chunks: where it sits, how big it
+  /// is, how long it lasts, and how it is blended.
+  /// </summary>
+  private const int _ANMF_HEADER_SIZE = 16;
+
+  /// <summary>Lifts a frame's own chunks out of its ANMF wrapper into the file's own lookup.</summary>
+  private static void _AddFrameChunks(byte[] frame, Dictionary<string, byte[]> chunks) {
+    var at = _ANMF_HEADER_SIZE;
+    while (at + 8 <= frame.Length) {
+      var id = Encoding.ASCII.GetString(frame, at, 4);
+      var length = BinaryPrimitives.ReadInt32LittleEndian(frame.AsSpan(at + 4));
+      if (length < 0 || at + 8 + length > frame.Length)
+        break;
+
+      // The frame's own size wins over the canvas, which is why these are set rather than added to.
+      chunks[id] = frame[(at + 8)..(at + 8 + length)];
+      at += 8 + length + (length & 1);
+    }
+  }
 
   private static readonly HashSet<string> _MetadataChunkIds = [_CHUNK_ICCP, _CHUNK_EXIF, _CHUNK_XMP];
 
@@ -49,6 +75,13 @@ public static class WebPReader {
       throw new InvalidDataException($"Invalid WebP form type: expected '{_FORM_TYPE}', got '{riff.FormType}'.");
 
     var chunks = _BuildChunkLookup(riff.Chunks);
+
+    // An animation keeps its pictures inside ANMF chunks rather than at the top level, so a file
+    // holding seventeen frames looked to this like a file holding none. The first frame is the one
+    // shown before anything moves, and is what every still viewer draws.
+    if (!chunks.ContainsKey(_CHUNK_VP8L) && !chunks.ContainsKey(_CHUNK_VP8)
+        && chunks.TryGetValue(_CHUNK_ANMF, out var firstFrame))
+      _AddFrameChunks(firstFrame, chunks);
 
     var hasVp8X = chunks.ContainsKey(_CHUNK_VP8X);
     var hasVp8L = chunks.ContainsKey(_CHUNK_VP8L);
