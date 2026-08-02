@@ -104,6 +104,43 @@ def same_picture(a, b):
     return True
 
 
+def same_picture_different_palette(a, b):
+    """Whether two decodes draw the same picture in different colours.
+
+    Two tools can agree on every pixel of a machine's screen and still render it differently, because
+    what RGB a hardware colour "is" was measured rather than defined and nobody measured the same.
+    That shows up as every colour of one decode corresponding to exactly one colour of the other, and
+    it is a difference of opinion about a CRT rather than a fault in either decoder — so counting it
+    the same as a wrong picture buries the wrong pictures among a hundred that are right.
+    """
+    aw, ah, ap = a
+    bw, bh, bp = b
+    if aw * ah < bw * bh:
+        aw, ah, ap, bw, bh, bp = bw, bh, bp, aw, ah, ap
+    if bw == 0 or bh == 0 or aw % bw or ah % bh:
+        return False
+
+    kx, ky = aw // bw, ah // bh
+    if not (1 <= kx <= 4 and 1 <= ky <= 4):
+        return False
+    if len(ap) < aw * ah * 3 or len(bp) < bw * bh * 3:
+        return False
+
+    forward, backward = {}, {}
+    for y in range(bh):
+        row = y * ky * aw
+        for x in range(bw):
+            at = (row + x * kx) * 3
+            bt = (y * bw + x) * 3
+            ours, theirs = ap[at : at + 3], bp[bt : bt + 3]
+            if forward.setdefault(ours, theirs) != theirs:
+                return False
+            if backward.setdefault(theirs, ours) != ours:
+                return False
+
+    return True
+
+
 def main(root):
     ours_dir = os.path.join(root, "ours")
     if not os.path.isdir(ours_dir):
@@ -134,11 +171,14 @@ def main(root):
                 blockers[key].append((name, "we cannot read it"))
             elif same_picture(ours, theirs):
                 counts[(key, "both read, we agree")] += 1
+            elif same_picture_different_palette(ours, theirs):
+                counts[(key, "same picture, other colours")] += 1
             else:
                 counts[(key, "both read, we differ")] += 1
                 blockers[key].append((name, "we differ from it"))
 
-    order = ["both read, we agree", "both read, we differ", "it reads, we cannot", "only we read it"]
+    order = ["both read, we agree", "same picture, other colours", "both read, we differ",
+             "it reads, we cannot", "only we read it"]
     for key, label in present:
         print("\n=== against %s" % label)
         for line in order:

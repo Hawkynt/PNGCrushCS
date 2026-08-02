@@ -35,7 +35,7 @@ IrfanView is much the slowest — it runs under Wine and pays a process start pe
 sample can be a file the other tool has misidentified, which has happened with all three. The
 per-extension breakdown at the end is there to be looked at, not totalled.
 
-Two corrections are built into the comparison, both because leaving them out produced confident
+Three distinctions are built into the comparison, each because leaving it out produced confident
 nonsense:
 
 - A PNG of four bits a channel gives a PPM stating maxval 15, whose samples run 0-15. Compared
@@ -43,6 +43,10 @@ nonsense:
   writes.
 - These machines had non-square pixels and the tools disagree on correcting for it, so one drawing
   the same picture at an integer multiple of another's size is not a disagreement about the picture.
+- `same picture, other colours` counts decodes that agree on every pixel and differ only in what RGB
+  each of the machine's colours is drawn as. What a hardware colour "is" was measured off a CRT
+  rather than defined, and nobody measured the same; against RECOIL this is 111 samples, which
+  counted as disagreements buried the 61 that are genuinely different pictures.
 
 ## Decodes that succeed and are still wrong
 
