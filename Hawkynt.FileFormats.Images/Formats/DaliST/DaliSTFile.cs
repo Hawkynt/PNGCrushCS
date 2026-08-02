@@ -24,6 +24,18 @@ public readonly record struct DaliSTFile : IImageFormatReader<DaliSTFile>, IImag
   static string IImageFormatMetadata<DaliSTFile>.PrimaryExtension => ".sd0";
   static string[] IImageFormatMetadata<DaliSTFile>.FileExtensions => [".sd0", ".sd1", ".sd2"];
   static DaliSTFile IImageFormatReader<DaliSTFile>.FromSpan(ReadOnlySpan<byte> data) => DaliSTReader.FromSpan(data);
+
+  /// <summary>
+  /// Reads a named file, which is the only way the resolution can be known.
+  /// </summary>
+  /// <remarks>
+  /// Nothing inside one of these says which of the three screens it is; only the extension does,
+  /// <c>.sd0</c>, <c>.sd1</c> and <c>.sd2</c> for low, medium and high. The reader has always known
+  /// that, but only the by-bytes entry was wired up here, and that one assumes low — so a high
+  /// resolution picture came back 320 by 200 instead of 640 by 400, drawn from the wrong part of
+  /// its own data.
+  /// </remarks>
+  static DaliSTFile IImageFormatReader<DaliSTFile>.FromFile(FileInfo file) => DaliSTReader.FromFile(file);
   static VideoMode[] IImageFormatMetadata<DaliSTFile>.VideoModes => [
     new("Low resolution (320x200, 16 colours)", [(320, 200)], [new IntegerRange(2, 16)]),
     new("Medium resolution (640x200, 4 colours)", [(640, 200)], [new IntegerRange(2, 4)]),
@@ -57,7 +69,9 @@ public readonly record struct DaliSTFile : IImageFormatReader<DaliSTFile>, IImag
 
     var chunky = PlanarConverter.AtariStToChunky(file.PixelData, file.Width, file.Height, numPlanes);
     var paletteCount = Math.Min(1 << numPlanes, file.Palette.Length);
-    var rgb = PlanarConverter.StPaletteToRgb(file.Palette.AsSpan(0, paletteCount));
+
+    // One plane is the monochrome screen, which takes no colours from the file; see the helper.
+    var rgb = AtariStGraphics.ScreenPalette(file.Palette.AsSpan(0, paletteCount), numPlanes);
 
     return new() {
       Width = file.Width,
@@ -65,7 +79,7 @@ public readonly record struct DaliSTFile : IImageFormatReader<DaliSTFile>, IImag
       Format = PixelFormat.Indexed8,
       PixelData = chunky,
       Palette = rgb,
-      PaletteCount = paletteCount,
+      PaletteCount = rgb.Length / 3,
     };
   }
 

@@ -18,7 +18,28 @@ public static class AtariStGraphics {
   /// bits an ST would never have set. A file that happens to use only the eight ST levels reads the
   /// same either way, so guessing wrong is harmless exactly when it is undetectable.
   /// </remarks>
-  public static bool IsStePalette(ReadOnlySpan<byte> data, int offset, int colors) {
+/// <summary>
+  /// The two colours a high-resolution screen draws: paper then ink.
+  /// </summary>
+  /// <remarks>
+  /// The machine's palette registers do not colour the monochrome screen, so whatever a file happens
+  /// to leave in them is not the ink. Reading them anyway is a mistake several of these formats made
+  /// independently — TINY, Paintworks and Dali all painted a black-and-white picture in whatever
+  /// colour was left behind, one of them in red.
+  /// </remarks>
+  public static byte[] MonochromePalette() => [255, 255, 255, 0, 0, 0];
+
+  /// <summary>
+  /// The palette to draw a screen with, given how many bitplanes it has.
+  /// </summary>
+  /// <remarks>
+  /// One plane is the monochrome screen and takes no colours from the file; the others take theirs
+  /// from the words it stores.
+  /// </remarks>
+  public static byte[] ScreenPalette(ReadOnlySpan<short> storedPalette, int planes)
+    => planes == 1 ? MonochromePalette() : PlanarConverter.StPaletteToRgb(storedPalette);
+
+    public static bool IsStePalette(ReadOnlySpan<byte> data, int offset, int colors) {
     for (var i = 0; i < colors; ++i) {
       var entry = offset + i * PaletteEntrySize;
       if (entry + 1 >= data.Length)

@@ -41,7 +41,10 @@ public readonly record struct CrackArtFile : IImageFormatReader<CrackArtFile>, I
       stored[i * 2 + 1] = (byte)file.Palette[i];
     }
 
-    var rgb = AtariStGraphics.ReadPalette(stored, 0, paletteCount);
+    // One plane is the monochrome screen, which takes no colours from the file at all.
+    var rgb = numPlanes == 1
+      ? AtariStGraphics.MonochromePalette()
+      : AtariStGraphics.ReadPalette(stored, 0, paletteCount);
 
     return new() {
       Width = file.Width,
@@ -49,7 +52,7 @@ public readonly record struct CrackArtFile : IImageFormatReader<CrackArtFile>, I
       Format = PixelFormat.Indexed8,
       PixelData = chunky,
       Palette = rgb,
-      PaletteCount = paletteCount,
+      PaletteCount = rgb.Length / 3,
     };
   }
 

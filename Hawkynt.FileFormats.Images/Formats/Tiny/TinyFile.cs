@@ -17,9 +17,6 @@ public readonly record struct TinyFile : IImageFormatReader<TinyFile>, IImageToR
   public short[] Palette { get; init; }
   public byte[] PixelData { get; init; }
 
-  /// <summary>What a monochrome screen draws: paper then ink.</summary>
-  private static readonly byte[] _MONOCHROME = [255, 255, 255, 0, 0, 0];
-
   public static RawImage ToRawImage(TinyFile file) {
 
     var numPlanes = file.Resolution switch {
@@ -32,12 +29,8 @@ public readonly record struct TinyFile : IImageFormatReader<TinyFile>, IImageToR
     var chunky = PlanarConverter.AtariStToChunky(file.PixelData, file.Width, file.Height, numPlanes);
     var paletteCount = Math.Min(1 << numPlanes, file.Palette.Length);
 
-    // High resolution is a monochrome screen: the Atari's palette registers do not colour it, and a
-    // file that leaves something else in them — this one holds red in the second — is still black on
-    // white. Reading the stored palette here paints the ink whatever happens to have been left there.
-    var rgb = file.Resolution == TinyResolution.High
-      ? _MONOCHROME
-      : PlanarConverter.StPaletteToRgb(file.Palette.AsSpan(0, paletteCount));
+    // One plane is the monochrome screen, which takes no colours from the file; see the helper.
+    var rgb = AtariStGraphics.ScreenPalette(file.Palette.AsSpan(0, paletteCount), numPlanes);
 
     return new() {
       Width = file.Width,
@@ -45,7 +38,7 @@ public readonly record struct TinyFile : IImageFormatReader<TinyFile>, IImageToR
       Format = PixelFormat.Indexed8,
       PixelData = chunky,
       Palette = rgb,
-      PaletteCount = paletteCount,
+      PaletteCount = rgb.Length / 3,
     };
   }
 

@@ -37,9 +37,9 @@ public static class CrackArtReader {
     var dataOffset = CrackArtHeader.GetDataOffset(resolution);
     var (width, height) = _GetDimensions(resolution);
 
-    var compressedData = new byte[data.Length - dataOffset];
-    data.Slice(dataOffset, compressedData.Length).CopyTo(compressedData.AsSpan(0));
-    var pixelData = CrackArtCompressor.Decompress(compressedData, _DECOMPRESSED_PIXEL_DATA_SIZE);
+    var stored = new byte[data.Length - dataOffset];
+    data.Slice(dataOffset, stored.Length).CopyTo(stored.AsSpan(0));
+    var pixelData = _ScreenFrom(stored, isCompressed);
 
     return new CrackArtFile {
       Width = width,
@@ -59,9 +59,9 @@ public static class CrackArtReader {
     var dataOffset = CrackArtHeader.GetDataOffset(resolution);
     var (width, height) = _GetDimensions(resolution);
 
-    var compressedData = new byte[data.Length - dataOffset];
-    data.AsSpan(dataOffset, compressedData.Length).CopyTo(compressedData.AsSpan(0));
-    var pixelData = CrackArtCompressor.Decompress(compressedData, _DECOMPRESSED_PIXEL_DATA_SIZE);
+    var stored = new byte[data.Length - dataOffset];
+    data.AsSpan(dataOffset, stored.Length).CopyTo(stored.AsSpan(0));
+    var pixelData = _ScreenFrom(stored, isCompressed);
 
     return new CrackArtFile {
       Width = width,
@@ -72,7 +72,25 @@ public static class CrackArtReader {
     };
   }
 
-  private static (int Width, int Height) _GetDimensions(CrackArtResolution resolution) => resolution switch {
+/// <summary>
+  /// Returns the screen the file holds, unpacking it only if the file says it is packed.
+  /// </summary>
+  /// <remarks>
+  /// The header carries a flag saying whether the picture is packed, and it was read and then
+  /// thrown away: everything was run through the unpacker, so a file storing its screen plainly —
+  /// which is what the flag being clear means — was unpacked as though it were not, and came out as
+  /// noise. Half the pictures this format can hold could not be opened.
+  /// </remarks>
+  private static byte[] _ScreenFrom(byte[] stored, bool isCompressed) {
+    if (isCompressed)
+      return CrackArtCompressor.Decompress(stored, _DECOMPRESSED_PIXEL_DATA_SIZE);
+
+    var screen = new byte[_DECOMPRESSED_PIXEL_DATA_SIZE];
+    stored.AsSpan(0, Math.Min(stored.Length, screen.Length)).CopyTo(screen.AsSpan(0));
+    return screen;
+  }
+
+    private static (int Width, int Height) _GetDimensions(CrackArtResolution resolution) => resolution switch {
     CrackArtResolution.Low => (320, 200),
     CrackArtResolution.Medium => (640, 200),
     CrackArtResolution.High => (640, 400),
