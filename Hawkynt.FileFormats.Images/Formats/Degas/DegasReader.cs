@@ -52,6 +52,7 @@ public static class DegasReader {
       var compressedData = new byte[data.Length - DegasHeader.StructSize];
       data.Slice(DegasHeader.StructSize, compressedData.Length).CopyTo(compressedData.AsSpan(0));
       pixelData = PackBitsCompressor.Decompress(compressedData, _UNCOMPRESSED_PIXEL_DATA_SIZE);
+      pixelData = _InterleavePlaneRows(pixelData, width, resolution);
     } else {
       if (data.Length < DegasHeader.StructSize + _UNCOMPRESSED_PIXEL_DATA_SIZE)
         throw new InvalidDataException("Data too small for uncompressed DEGAS file.");
@@ -75,7 +76,44 @@ public static class DegasReader {
     return FromSpan(data);
   }
 
-  private static (int Width, int Height) _GetDimensions(DegasResolution resolution) => resolution switch {
+/// <summary>
+  /// Turns a packed picture's plane-row-major scanlines into the word-interleaved screen.
+  /// </summary>
+  /// <remarks>
+  /// An uncompressed DEGAS holds the machine's screen as it stands, four planes interleaved a word
+  /// at a time. A packed one does not: it stores each scanline as one whole plane row after another,
+  /// which unpacks to the same number of bytes in a different arrangement. Using it as it comes
+  /// leaves the picture in roughly the right colours with every group of sixteen pixels drawn from
+  /// four unrelated places.
+  /// </remarks>
+  private static byte[] _InterleavePlaneRows(byte[] data, int width, DegasResolution resolution) {
+    var planes = resolution switch {
+      DegasResolution.Low => 4,
+      DegasResolution.Medium => 2,
+      _ => 1,
+    };
+
+    if (planes == 1)
+      return data;
+
+    var wordsPerPlaneRow = (width + 15) / 16;
+    var bytesPerRow = wordsPerPlaneRow * 2 * planes;
+    var rows = data.Length / bytesPerRow;
+    var result = new byte[data.Length];
+
+    for (var row = 0; row < rows; ++row)
+    for (var plane = 0; plane < planes; ++plane)
+    for (var word = 0; word < wordsPerPlaneRow; ++word) {
+      var from = row * bytesPerRow + plane * wordsPerPlaneRow * 2 + word * 2;
+      var to = row * bytesPerRow + (word * planes + plane) * 2;
+      result[to] = data[from];
+      result[to + 1] = data[from + 1];
+    }
+
+    return result;
+  }
+
+    private static (int Width, int Height) _GetDimensions(DegasResolution resolution) => resolution switch {
     DegasResolution.Low => (320, 200),
     DegasResolution.Medium => (640, 200),
     DegasResolution.High => (640, 400),

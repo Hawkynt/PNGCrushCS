@@ -33,7 +33,10 @@ public readonly record struct DegasFile : IImageFormatReader<DegasFile>, IImageT
 
     var chunky = PlanarConverter.AtariStToChunky(file.PixelData, file.Width, file.Height, numPlanes);
     var paletteCount = Math.Min(1 << numPlanes, file.Palette.Length);
-    var rgb = PlanarConverter.StPaletteToRgb(file.Palette.AsSpan(0, paletteCount));
+
+    // One plane is the monochrome screen, which the machine does not colour from these registers;
+    // see the helper. This is the fifth Atari format found reading them anyway.
+    var rgb = AtariStGraphics.ScreenPalette(file.Palette.AsSpan(0, paletteCount), numPlanes);
 
     return new() {
       Width = file.Width,
