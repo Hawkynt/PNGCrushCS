@@ -62,20 +62,25 @@ public readonly record struct IceFile
   }
 
   /// <summary>Renders one frame as an Atari colour byte per displayed pixel.</summary>
-  private static byte[] _RenderFrame(IceFile file, byte[] characters, int frame, byte[] colors, IceFrameKind kind) {
+  private static byte[] _RenderFrame(IceFile file, byte[] characters, int frame, byte[] colors, IceFrameKind kind, byte? inverse = null) {
     var font = file.FontData ?? [];
     var result = new byte[IceLayout.DisplayWidth * IceLayout.DisplayHeight];
 
     for (var y = 0; y < IceLayout.DisplayHeight; ++y)
     for (var col = 0; col < IceLayout.Columns; ++col) {
       var index = (y >> 3) * IceLayout.Columns + col;
-      var glyph = _GlyphByte(font, frame, index < characters.Length ? characters[index] : 0, y);
+      var character = index < characters.Length ? characters[index] : 0;
+      var glyph = _GlyphByte(font, frame, character, y);
       var target = y * IceLayout.DisplayWidth + (col << 3);
 
       if (kind == IceFrameKind.Graphics12) {
-        // Two bits per pixel, each drawn two screen pixels wide.
-        for (var x = 0; x < 8; ++x)
-          result[target + x] = colors[(glyph >> (~x & 6)) & 3];
+        // Two bits per pixel, each drawn two screen pixels wide. A character with bit 7 set draws
+        // its highest value from the inverse register rather than the third playfield one.
+        var highest = (character & 128) != 0 && inverse is { } other ? other : colors[3];
+        for (var x = 0; x < 8; ++x) {
+          var value = (glyph >> (~x & 6)) & 3;
+          result[target + x] = value == 3 ? highest : colors[value];
+        }
 
         continue;
       }
@@ -93,7 +98,7 @@ public readonly record struct IceFile
   public static RawImage ToRawImage(IceFile file) {
     var header = file.Header ?? [];
     var kind = IceLayout.SecondFrameKind(file.Mode);
-    var first = _RenderFrame(file, file.Characters1 ?? [], 0, IceLayout.FirstFrameColors(file.Mode, header), IceFrameKind.Graphics12);
+    var first = _RenderFrame(file, file.Characters1 ?? [], 0, IceLayout.FirstFrameColors(file.Mode, header), IceFrameKind.Graphics12, IceLayout.InverseColor(file.Mode, header));
     var second = _RenderFrame(file, file.Characters2 ?? [], 1, IceLayout.SecondFrameColors(file.Mode, header), kind);
 
     var gtia = Atari8BitGraphics.CreatePalette();

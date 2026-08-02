@@ -102,6 +102,25 @@ public static class IceLayout {
     _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unknown Interlace Character Editor mode."),
   };
 
+  /// <summary>
+  /// The register a mode 4 frame draws for its highest value when the character asks for the
+  /// inverse set, or null where the mode does not have a separate one.
+  /// </summary>
+  /// <remarks>
+  /// A character with bit 7 set draws its three-valued pixels from PF3 instead of PF2. The bit was
+  /// masked out of the font index, which is right, and then nothing was done with it — so every
+  /// inverse character came out in the wrong colour.
+  /// <para/>
+  /// Only PCIN is given one here, because that is where the register could be established: in the
+  /// sample every differing pixel is ours plus 116 in red, our value comes from a register whose red
+  /// is 233, and the colour RECOIL draws works out to 0, 30, 48 against the 0, 31, 48 of the
+  /// register after it. The other modes are left alone rather than guessed at.
+  /// </remarks>
+  public static byte? InverseColor(IceMode mode, ReadOnlySpan<byte> header) => mode switch {
+    IceMode.Pcin => _At(header, 8),
+    _ => null,
+  };
+
   /// <summary>The Atari colour byte the second frame draws for each of its values.</summary>
   public static byte[] SecondFrameColors(IceMode mode, ReadOnlySpan<byte> header) {
     switch (mode) {
