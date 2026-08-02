@@ -44,10 +44,14 @@ public static class MsxScreen5Reader {
     var pixelData = new byte[MsxScreen5File.PixelDataSize];
     span[..MsxScreen5File.PixelDataSize].CopyTo(pixelData);
 
+    // The palette is the last thing in the file, not the thirty-two bytes that follow the pixels.
+    // Screen 5 shows 212 lines of a page that holds more, so a saved page runs past what is drawn
+    // and the palette sits after all of it — reading at the end of the drawn part picks up picture
+    // data and paints the whole thing in it.
     byte[]? palette = null;
     if (rawLength >= MsxScreen5File.FullDataSize) {
       palette = new byte[MsxScreen5File.PaletteSize];
-      span.Slice(MsxScreen5File.PixelDataSize, MsxScreen5File.PaletteSize).CopyTo(palette);
+      span[^MsxScreen5File.PaletteSize..].CopyTo(palette);
     }
 
     return new() {
@@ -74,10 +78,14 @@ public static class MsxScreen5Reader {
     var pixelData = new byte[MsxScreen5File.PixelDataSize];
     span[..MsxScreen5File.PixelDataSize].CopyTo(pixelData);
 
+    // The palette is the last thing in the file, not the thirty-two bytes that follow the pixels.
+    // Screen 5 shows 212 lines of a page that holds more, so a saved page runs past what is drawn
+    // and the palette sits after all of it — reading at the end of the drawn part picks up picture
+    // data and paints the whole thing in it.
     byte[]? palette = null;
     if (rawLength >= MsxScreen5File.FullDataSize) {
       palette = new byte[MsxScreen5File.PaletteSize];
-      span.Slice(MsxScreen5File.PixelDataSize, MsxScreen5File.PaletteSize).CopyTo(palette);
+      span[^MsxScreen5File.PaletteSize..].CopyTo(palette);
     }
 
     return new() {

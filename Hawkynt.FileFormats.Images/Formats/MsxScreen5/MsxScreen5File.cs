@@ -98,28 +98,27 @@ public readonly record struct MsxScreen5File : IImageFormatReader<MsxScreen5File
       Height = FixedHeight,
       Format = PixelFormat.Indexed8,
       PixelData = pixels,
-      Palette = _ConvertMsx2Palette(file.Palette),
+      // A file need not carry a palette, and many do not; the machine's own is what it would have
+      // been drawn with. Handing back none at all left the picture with no colours to be drawn in,
+      // which is not a decode.
+      Palette = _ConvertMsx2Palette(file.Palette) ?? _ConvertMsx2Palette(DefaultMsx2Palette),
       PaletteCount = 16,
     };
   }
 
   /// <summary>Converts MSX V9938 palette (16 entries x 2 bytes: 0RRR0BBB, 00000GGG) to RGB triplets.</summary>
-  internal static byte[]? _ConvertMsx2Palette(byte[]? msxPalette) {
-    if (msxPalette == null || msxPalette.Length < PaletteSize)
-      return null;
-
-    var rgb = new byte[16 * 3];
-    for (var i = 0; i < 16; ++i) {
-      var byte0 = msxPalette[i * 2];
-      var byte1 = msxPalette[i * 2 + 1];
-      var r = (byte0 >> 4) & 0x07;
-      var b = byte0 & 0x07;
-      var g = byte1 & 0x07;
-      rgb[i * 3] = (byte)(r * 255 / 7);
-      rgb[i * 3 + 1] = (byte)(g * 255 / 7);
-      rgb[i * 3 + 2] = (byte)(b * 255 / 7);
-    }
-
-    return rgb;
-  }
+  /// <summary>
+  /// Turns the machine's palette into whole bytes a channel.
+  /// </summary>
+  /// <remarks>
+  /// This was a second copy of what <see cref="MsxGraphics.PaletteToRgb"/> already does, and the two
+  /// widened a three-bit channel differently: dividing by seven and truncating gives 145 for a value
+  /// of four where repeating the bits gives 146. One step in 255 is invisible, but it is the whole
+  /// of the difference between this and every other decoder, and there is no reason to keep two
+  /// answers to the same question.
+  /// </remarks>
+  internal static byte[]? _ConvertMsx2Palette(byte[]? msxPalette)
+    => msxPalette == null || msxPalette.Length < PaletteSize
+      ? null
+      : MsxGraphics.PaletteToRgb(msxPalette, 16);
 }
