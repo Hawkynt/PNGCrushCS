@@ -52,25 +52,6 @@ public static class PicWorksReader {
 
   public static PicWorksFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < PicWorksHeader.StructSize)
-      throw new InvalidDataException("Data too small for a valid PicWorks file.");
-
-    if (data.Length < PicWorksFile.FileSize)
-      throw new InvalidDataException($"Data too small for the expected {PicWorksFile.FileSize}-byte PicWorks file.");
-
-    var span = data.AsSpan();
-    var header = PicWorksHeader.ReadFrom(span);
-    var palette = header.Palette;
-
-    var pixelData = new byte[32000];
-    data.AsSpan(PicWorksHeader.StructSize, 32000).CopyTo(pixelData.AsSpan(0));
-
-    return new PicWorksFile {
-      Width = 320,
-      Height = 200,
-      Resolution = (ushort)header.Resolution,
-      Palette = palette,
-      PixelData = pixelData
-    };
+    return FromSpan(data);
   }
 }

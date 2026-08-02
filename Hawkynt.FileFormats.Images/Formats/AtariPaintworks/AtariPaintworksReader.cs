@@ -78,28 +78,7 @@ public static class AtariPaintworksReader {
 
   public static AtariPaintworksFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < AtariPaintworksFile.BitmapOffset)
-      throw new InvalidDataException("Data too small for a valid Atari Paintworks file.");
-
-    if (data.Length != _EXPECTED_FILE_SIZE)
-      throw new InvalidDataException(_WrongLengthReason(data));
-
-    var span = data.AsSpan();
-    var header = AtariPaintworksHeader.ReadFrom(span[AtariPaintworksFile.PaletteOffset..]);
-
-    var resolution = _DetectResolution(data);
-    var (width, height) = _GetDimensions(resolution);
-
-    var pixelData = new byte[_PIXEL_DATA_SIZE];
-    data.AsSpan(AtariPaintworksFile.BitmapOffset, _PIXEL_DATA_SIZE).CopyTo(pixelData.AsSpan(0));
-
-    return new AtariPaintworksFile {
-      Width = width,
-      Height = height,
-      Resolution = resolution,
-      Palette = header.Palette,
-      PixelData = pixelData
-    };
+    return FromSpan(data);
   }
 
   /// <summary>

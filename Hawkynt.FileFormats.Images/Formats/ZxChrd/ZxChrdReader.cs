@@ -44,14 +44,6 @@ public static class ZxChrdReader {
 
   public static ZxChrdFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length != FileSize)
-      throw new InvalidDataException($"ZX Spectrum character set file must be exactly {FileSize} bytes, got {data.Length}.");
-
-    var charData = new byte[FileSize];
-    data.AsSpan(0, FileSize).CopyTo(charData);
-
-    return new ZxChrdFile {
-      CharacterData = charData,
-    };
+    return FromSpan(data);
   }
 }

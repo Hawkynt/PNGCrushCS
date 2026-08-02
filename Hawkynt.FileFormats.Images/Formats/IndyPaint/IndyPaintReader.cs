@@ -44,14 +44,6 @@ public static class IndyPaintReader {
 
   public static IndyPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length != _EXPECTED_SIZE)
-      throw new InvalidDataException($"Invalid IndyPaint data size: expected exactly {_EXPECTED_SIZE} bytes, got {data.Length}.");
-
-    var pixelData = new byte[IndyPaintFile.PixelDataSize];
-    data.AsSpan(IndyPaintFile.HeaderSize, IndyPaintFile.PixelDataSize).CopyTo(pixelData);
-
-    return new IndyPaintFile {
-      PixelData = pixelData
-    };
+    return FromSpan(data);
   }
 }

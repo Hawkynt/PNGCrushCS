@@ -41,14 +41,6 @@ public static class PrintfoxPagefoxReader {
 
   public static PrintfoxPagefoxFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < PrintfoxPagefoxFile.MinDataSize)
-      throw new InvalidDataException($"Data too small for a valid Printfox/Pagefox file (expected at least {PrintfoxPagefoxFile.MinDataSize} bytes, got {data.Length}).");
-
-    var rawData = new byte[data.Length];
-    data.AsSpan(0, data.Length).CopyTo(rawData);
-
-    return new() {
-      RawData = rawData,
-    };
+    return FromSpan(data);
   }
 }

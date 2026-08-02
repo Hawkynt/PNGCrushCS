@@ -2,16 +2,16 @@ using System;
 using System.Collections.Generic;
 using FileFormat.Core;
 
-// A note for anyone correcting a reader: 197 of them carry two copies of their parse, one taking a
-// span and one taking a byte array, rather than the second calling the first. A correction applied
-// to one copy leaves the other as it was, and which copy the registry reaches depends on whether the
-// caller had a file name or only bytes — so the same file can decode two different ways depending on
-// how it was opened.
+// A note for anyone correcting a reader: a reader used to be able to keep two copies of its parse,
+// one taking a span and one taking a byte array, with the second not calling the first. A correction
+// applied to one copy left the other as it was, and which copy the registry reached depended on
+// whether the caller had a file name or only bytes — so the same file could decode two ways
+// depending on how it was opened. The Prism Paint size fix half-landed exactly that way: the corpus
+// reported the file perfect because it is read by name, while the tests calling the by-bytes entry
+// failed against a reader that looked correct.
 //
-// This is not hypothetical: the Prism Paint size fix went into one copy this way, the corpus
-// reported the file perfect because it is read by name, and four tests calling the by-bytes entry
-// failed while pointing at a reader that looked correct. Before changing a reader, check whether it
-// has a second copy.
+// 195 readers were consolidated so the by-bytes entry forwards to the by-span one. Keep it that way:
+// a second copy is a correction waiting to be applied to only half of it.
 
 namespace Hawkynt.FileFormats.Images;
 

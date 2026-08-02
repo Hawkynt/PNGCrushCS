@@ -44,17 +44,6 @@ public static class NufliEditorReader {
 
   public static NufliEditorFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < NufliEditorFile.LoadAddressSize + NufliEditorFile.MinPayloadSize)
-      throw new InvalidDataException($"Data too small for a valid NUFLI file (expected at least {NufliEditorFile.LoadAddressSize + NufliEditorFile.MinPayloadSize} bytes, got {data.Length}).");
-
-    var loadAddress = (ushort)(data[0] | (data[1] << 8));
-
-    var rawData = new byte[data.Length - NufliEditorFile.LoadAddressSize];
-    data.AsSpan(NufliEditorFile.LoadAddressSize, rawData.Length).CopyTo(rawData.AsSpan(0));
-
-    return new() {
-      LoadAddress = loadAddress,
-      RawData = rawData,
-    };
+    return FromSpan(data);
   }
 }

@@ -52,25 +52,6 @@ public static class CanvasReader {
 
   public static CanvasFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < CanvasHeader.StructSize)
-      throw new InvalidDataException("Data too small for a valid Canvas ST file.");
-
-    if (data.Length < CanvasFile.FileSize)
-      throw new InvalidDataException($"Data too small for the expected {CanvasFile.FileSize}-byte Canvas ST file.");
-
-    var span = data.AsSpan();
-    var header = CanvasHeader.ReadFrom(span);
-    var palette = header.Palette;
-
-    var pixelData = new byte[32000];
-    data.AsSpan(CanvasHeader.StructSize, 32000).CopyTo(pixelData.AsSpan(0));
-
-    return new CanvasFile {
-      Width = 320,
-      Height = 200,
-      Resolution = (ushort)header.Resolution,
-      Palette = palette,
-      PixelData = pixelData
-    };
+    return FromSpan(data);
   }
 }

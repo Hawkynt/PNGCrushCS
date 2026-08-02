@@ -44,17 +44,6 @@ public static class HiresManagerReader {
 
   public static HiresManagerFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < HiresManagerFile.LoadAddressSize + HiresManagerFile.MinPayloadSize)
-      throw new InvalidDataException($"Data too small for a valid Hires Manager file (expected at least {HiresManagerFile.LoadAddressSize + HiresManagerFile.MinPayloadSize} bytes, got {data.Length}).");
-
-    var loadAddress = (ushort)(data[0] | (data[1] << 8));
-
-    var rawData = new byte[data.Length - HiresManagerFile.LoadAddressSize];
-    data.AsSpan(HiresManagerFile.LoadAddressSize, rawData.Length).CopyTo(rawData.AsSpan(0));
-
-    return new() {
-      LoadAddress = loadAddress,
-      RawData = rawData,
-    };
+    return FromSpan(data);
   }
 }

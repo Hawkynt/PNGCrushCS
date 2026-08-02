@@ -64,37 +64,6 @@ public static class EggPaintReader {
 
   public static EggPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < EggPaintFile.ExpectedFileSize)
-      throw new InvalidDataException($"Data too small for a valid Egg Paint file (expected {EggPaintFile.ExpectedFileSize} bytes, got {data.Length}).");
-
-    if (data.Length != EggPaintFile.ExpectedFileSize)
-      throw new InvalidDataException($"Invalid Egg Paint file size (expected {EggPaintFile.ExpectedFileSize} bytes, got {data.Length}).");
-
-    var offset = 0;
-
-    var loadAddress = (ushort)(data[offset] | (data[offset + 1] << 8));
-    offset += EggPaintFile.LoadAddressSize;
-
-    var bitmapData = new byte[EggPaintFile.BitmapDataSize];
-    data.AsSpan(offset, EggPaintFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
-    offset += EggPaintFile.BitmapDataSize;
-
-    var videoMatrix = new byte[EggPaintFile.VideoMatrixSize];
-    data.AsSpan(offset, EggPaintFile.VideoMatrixSize).CopyTo(videoMatrix.AsSpan(0));
-    offset += EggPaintFile.VideoMatrixSize;
-
-    var colorRam = new byte[EggPaintFile.ColorRamSize];
-    data.AsSpan(offset, EggPaintFile.ColorRamSize).CopyTo(colorRam.AsSpan(0));
-    offset += EggPaintFile.ColorRamSize;
-
-    var backgroundColor = data[offset];
-
-    return new() {
-      LoadAddress = loadAddress,
-      BitmapData = bitmapData,
-      VideoMatrix = videoMatrix,
-      ColorRam = colorRam,
-      BackgroundColor = backgroundColor,
-    };
+    return FromSpan(data);
   }
 }

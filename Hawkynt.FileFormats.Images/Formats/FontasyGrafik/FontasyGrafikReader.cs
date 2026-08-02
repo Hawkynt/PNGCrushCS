@@ -45,18 +45,6 @@ public static class FontasyGrafikReader {
 
   public static FontasyGrafikFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < FontasyGrafikFile.ExpectedFileSize)
-      throw new InvalidDataException($"Data too small for a valid Fontasy Grafik file: expected at least {FontasyGrafikFile.ExpectedFileSize} bytes, got {data.Length}.");
-
-    var header = FontasyGrafikHeader.ReadFrom(data);
-    var palette = header.Palette;
-
-    var pixelData = new byte[FontasyGrafikFile.PlanarDataSize];
-    data.AsSpan(FontasyGrafikFile.PaletteSize + FontasyGrafikFile.PaddingSize, FontasyGrafikFile.PlanarDataSize).CopyTo(pixelData.AsSpan(0));
-
-    return new FontasyGrafikFile {
-      Palette = palette,
-      PixelData = pixelData
-    };
+    return FromSpan(data);
   }
 }

@@ -100,74 +100,7 @@ public static class TimReader {
 
   public static TimFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < TimHeader.StructSize)
-      throw new InvalidDataException("Data too small for a valid TIM file.");
-
-    var span = data.AsSpan();
-    var header = TimHeader.ReadFrom(span);
-    if (header.Magic != TimHeader.ExpectedMagic)
-      throw new InvalidDataException($"Invalid TIM magic: 0x{header.Magic:X8}, expected 0x{TimHeader.ExpectedMagic:X8}.");
-
-    var bpp = header.Bpp;
-    var hasClut = header.HasClut;
-    var offset = TimHeader.StructSize;
-
-    byte[]? clutData = null;
-    int clutX = 0, clutY = 0, clutWidth = 0, clutHeight = 0;
-
-    if (hasClut) {
-      if (offset + TimBlockHeader.StructSize > data.Length)
-        throw new InvalidDataException("Data too small for CLUT block header.");
-
-      var clutBlock = TimBlockHeader.ReadFrom(span[offset..]);
-      clutX = clutBlock.X;
-      clutY = clutBlock.Y;
-      clutWidth = clutBlock.Width;
-      clutHeight = clutBlock.Height;
-      offset += TimBlockHeader.StructSize;
-
-      var clutDataSize = (int)clutBlock.BlockSize - TimBlockHeader.StructSize;
-      if (clutDataSize < 0 || offset + clutDataSize > data.Length)
-        throw new InvalidDataException("Invalid CLUT block size.");
-
-      clutData = new byte[clutDataSize];
-      data.AsSpan(offset, clutDataSize).CopyTo(clutData.AsSpan(0));
-      offset += clutDataSize;
-    }
-
-    if (offset + TimBlockHeader.StructSize > data.Length)
-      throw new InvalidDataException("Data too small for image block header.");
-
-    var imageBlock = TimBlockHeader.ReadFrom(span[offset..]);
-    var imageX = imageBlock.X;
-    var imageY = imageBlock.Y;
-    var vramWidth = imageBlock.Width;
-    var imageHeight = imageBlock.Height;
-    offset += TimBlockHeader.StructSize;
-
-    var pixelDataSize = (int)imageBlock.BlockSize - TimBlockHeader.StructSize;
-    if (pixelDataSize < 0 || offset + pixelDataSize > data.Length)
-      throw new InvalidDataException("Invalid image block size.");
-
-    var pixelData = new byte[pixelDataSize];
-    data.AsSpan(offset, pixelDataSize).CopyTo(pixelData.AsSpan(0));
-
-    var realWidth = _VramWidthToPixels(vramWidth, bpp);
-
-    return new TimFile {
-      Width = realWidth,
-      Height = imageHeight,
-      Bpp = bpp,
-      HasClut = hasClut,
-      ClutData = clutData,
-      ClutX = clutX,
-      ClutY = clutY,
-      ClutWidth = clutWidth,
-      ClutHeight = clutHeight,
-      ImageX = imageX,
-      ImageY = imageY,
-      PixelData = pixelData
-    };
+    return FromSpan(data);
   }
 
   private static int _VramWidthToPixels(int vramWidth, TimBpp bpp) => bpp switch {

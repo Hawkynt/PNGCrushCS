@@ -41,14 +41,6 @@ public static class GigacadReader {
 
   public static GigacadFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length != GigacadFile.ExpectedFileSize)
-      throw new InvalidDataException($"Invalid GigaCAD data size: expected exactly {GigacadFile.ExpectedFileSize} bytes, got {data.Length}.");
-
-    var pixelData = new byte[GigacadFile.ExpectedFileSize];
-    data.AsSpan(0, GigacadFile.ExpectedFileSize).CopyTo(pixelData);
-
-    return new GigacadFile {
-      PixelData = pixelData
-    };
+    return FromSpan(data);
   }
 }

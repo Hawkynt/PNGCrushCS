@@ -41,14 +41,6 @@ public static class Spectrum512SmooshReader {
 
   public static Spectrum512SmooshFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < Spectrum512SmooshFile.MinFileSize)
-      throw new InvalidDataException($"Data too small for a valid SPS file: expected at least {Spectrum512SmooshFile.MinFileSize} bytes, got {data.Length}.");
-
-    var rawData = new byte[data.Length];
-    data.AsSpan(0, data.Length).CopyTo(rawData);
-
-    return new Spectrum512SmooshFile {
-      RawData = rawData
-    };
+    return FromSpan(data);
   }
 }

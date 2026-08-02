@@ -52,25 +52,6 @@ public static class DeluxeReader {
 
   public static DeluxeFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < DeluxeHeader.StructSize)
-      throw new InvalidDataException("Data too small for a valid Deluxe Paint ST file.");
-
-    if (data.Length < DeluxeFile.FileSize)
-      throw new InvalidDataException($"Data too small for the expected {DeluxeFile.FileSize}-byte Deluxe Paint ST file.");
-
-    var span = data.AsSpan();
-    var header = DeluxeHeader.ReadFrom(span);
-    var palette = header.Palette;
-
-    var pixelData = new byte[32000];
-    data.AsSpan(DeluxeHeader.StructSize, 32000).CopyTo(pixelData.AsSpan(0));
-
-    return new DeluxeFile {
-      Width = 320,
-      Height = 200,
-      Resolution = (ushort)header.Resolution,
-      Palette = palette,
-      PixelData = pixelData
-    };
+    return FromSpan(data);
   }
 }

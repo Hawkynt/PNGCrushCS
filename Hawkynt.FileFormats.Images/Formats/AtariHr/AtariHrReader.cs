@@ -41,14 +41,6 @@ public static class AtariHrReader {
 
   public static AtariHrFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < AtariHrFile.FileSize)
-      throw new InvalidDataException($"Data too small for Atari HR screen dump. Expected {AtariHrFile.FileSize} bytes, got {data.Length}.");
-    if (data.Length != AtariHrFile.FileSize)
-      throw new InvalidDataException($"Invalid Atari HR screen dump size. Expected exactly {AtariHrFile.FileSize} bytes, got {data.Length}.");
-
-    var rawData = new byte[AtariHrFile.FileSize];
-    data.AsSpan(0, AtariHrFile.FileSize).CopyTo(rawData);
-
-    return new AtariHrFile { RawData = rawData };
+    return FromSpan(data);
   }
 }

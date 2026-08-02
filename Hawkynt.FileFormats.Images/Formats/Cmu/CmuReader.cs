@@ -58,31 +58,6 @@ public static class CmuReader {
 
   public static CmuFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < CmuHeader.StructSize)
-      throw new InvalidDataException("Data too small for a valid CMU file.");
-
-    var header = CmuHeader.ReadFrom(data.AsSpan());
-    var width = header.Width;
-    var height = header.Height;
-
-    if (width <= 0)
-      throw new InvalidDataException($"Invalid CMU width: {width}.");
-    if (height <= 0)
-      throw new InvalidDataException($"Invalid CMU height: {height}.");
-
-    var bytesPerRow = (width + 7) / 8;
-    var expectedPixelBytes = bytesPerRow * height;
-
-    if (data.Length < CmuHeader.StructSize + expectedPixelBytes)
-      throw new InvalidDataException($"Data too small for pixel data: expected {CmuHeader.StructSize + expectedPixelBytes} bytes, got {data.Length}.");
-
-    var pixelData = new byte[expectedPixelBytes];
-    data.AsSpan(CmuHeader.StructSize, expectedPixelBytes).CopyTo(pixelData.AsSpan(0));
-
-    return new CmuFile {
-      Width = width,
-      Height = height,
-      PixelData = pixelData
-    };
+    return FromSpan(data);
   }
 }

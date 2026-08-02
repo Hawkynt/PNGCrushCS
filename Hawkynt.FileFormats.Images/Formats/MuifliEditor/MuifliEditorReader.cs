@@ -44,17 +44,6 @@ public static class MuifliEditorReader {
 
   public static MuifliEditorFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < MuifliEditorFile.LoadAddressSize + MuifliEditorFile.MinPayloadSize)
-      throw new InvalidDataException($"Data too small for a valid MUIFLI Editor file (expected at least {MuifliEditorFile.LoadAddressSize + MuifliEditorFile.MinPayloadSize} bytes, got {data.Length}).");
-
-    var loadAddress = (ushort)(data[0] | (data[1] << 8));
-
-    var rawData = new byte[data.Length - MuifliEditorFile.LoadAddressSize];
-    data.AsSpan(MuifliEditorFile.LoadAddressSize, rawData.Length).CopyTo(rawData.AsSpan(0));
-
-    return new() {
-      LoadAddress = loadAddress,
-      RawData = rawData,
-    };
+    return FromSpan(data);
   }
 }

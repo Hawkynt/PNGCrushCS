@@ -44,17 +44,6 @@ public static class PixelPerfectReader {
 
   public static PixelPerfectFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < PixelPerfectFile.LoadAddressSize + PixelPerfectFile.MinBitmapSize)
-      throw new InvalidDataException($"Data too small for a valid Pixel Perfect file (expected at least {PixelPerfectFile.LoadAddressSize + PixelPerfectFile.MinBitmapSize} bytes, got {data.Length}).");
-
-    var loadAddress = (ushort)(data[0] | (data[1] << 8));
-
-    var rawData = new byte[data.Length - PixelPerfectFile.LoadAddressSize];
-    data.AsSpan(PixelPerfectFile.LoadAddressSize, rawData.Length).CopyTo(rawData.AsSpan(0));
-
-    return new() {
-      LoadAddress = loadAddress,
-      RawData = rawData,
-    };
+    return FromSpan(data);
   }
 }

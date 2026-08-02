@@ -44,14 +44,6 @@ public static class GodPaintReader {
 
   public static GodPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length != _EXPECTED_SIZE)
-      throw new InvalidDataException($"Invalid GodPaint data size: expected exactly {_EXPECTED_SIZE} bytes, got {data.Length}.");
-
-    var pixelData = new byte[GodPaintFile.PixelDataSize];
-    data.AsSpan(GodPaintFile.HeaderSize, GodPaintFile.PixelDataSize).CopyTo(pixelData);
-
-    return new GodPaintFile {
-      PixelData = pixelData
-    };
+    return FromSpan(data);
   }
 }

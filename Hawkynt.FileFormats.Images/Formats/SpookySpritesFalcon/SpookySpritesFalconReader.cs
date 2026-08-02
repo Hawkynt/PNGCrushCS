@@ -47,24 +47,6 @@ public static class SpookySpritesFalconReader {
 
   public static SpookySpritesFalconFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < SpookySpritesFalconHeader.StructSize)
-      throw new InvalidDataException("Data too small for a valid Spooky Sprites Falcon file.");
-
-    var header = SpookySpritesFalconHeader.ReadFrom(data.AsSpan());
-    var width = (int)header.Width;
-    var height = (int)header.Height;
-
-    if (width == 0 || height == 0)
-      throw new InvalidDataException("Spooky Sprites Falcon image dimensions must be non-zero.");
-
-    var compressedData = data.AsSpan(SpookySpritesFalconHeader.StructSize);
-    var pixelCount = width * height;
-    var pixelData = SpookySpritesFalconRleCompressor.Decompress(compressedData, pixelCount);
-
-    return new SpookySpritesFalconFile {
-      Width = width,
-      Height = height,
-      PixelData = pixelData,
-    };
+    return FromSpan(data);
   }
 }

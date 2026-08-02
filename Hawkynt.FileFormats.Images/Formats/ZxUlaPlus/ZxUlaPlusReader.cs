@@ -76,31 +76,6 @@ public static class ZxUlaPlusReader {
 
   public static ZxUlaPlusFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length != FileSize)
-      throw new InvalidDataException($"ZX Spectrum ULAplus file must be exactly {FileSize} bytes, got {data.Length}.");
-
-    var linearBitmap = new byte[BitmapSize];
-
-    // Deinterleave from ZX Spectrum memory layout to linear row order
-    for (var y = 0; y < RowCount; ++y) {
-      var third = y / 64;
-      var characterRow = (y % 64) / 8;
-      var pixelLine = y % 8;
-      var srcOffset = third * 2048 + pixelLine * 256 + characterRow * BytesPerRow;
-      var dstOffset = y * BytesPerRow;
-      data.AsSpan(srcOffset, BytesPerRow).CopyTo(linearBitmap.AsSpan(dstOffset));
-    }
-
-    var attributes = new byte[AttributeSize];
-    data.AsSpan(BitmapSize, AttributeSize).CopyTo(attributes.AsSpan(0));
-
-    var palette = new byte[PaletteSize];
-    data.AsSpan(BitmapSize + AttributeSize, PaletteSize).CopyTo(palette.AsSpan(0));
-
-    return new ZxUlaPlusFile {
-      BitmapData = linearBitmap,
-      AttributeData = attributes,
-      PaletteData = palette,
-    };
+    return FromSpan(data);
   }
 }

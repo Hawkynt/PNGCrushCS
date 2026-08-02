@@ -52,25 +52,6 @@ public static class GfaPaintReader {
 
   public static GfaPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < GfaPaintHeader.StructSize)
-      throw new InvalidDataException("Data too small for a valid GFA Paint file.");
-
-    if (data.Length < GfaPaintFile.FileSize)
-      throw new InvalidDataException($"Data too small for the expected {GfaPaintFile.FileSize}-byte GFA Paint file.");
-
-    var span = data.AsSpan();
-    var header = GfaPaintHeader.ReadFrom(span);
-    var palette = header.Palette;
-
-    var pixelData = new byte[32000];
-    data.AsSpan(GfaPaintHeader.StructSize, 32000).CopyTo(pixelData.AsSpan(0));
-
-    return new GfaPaintFile {
-      Width = 320,
-      Height = 200,
-      Resolution = (ushort)header.Resolution,
-      Palette = palette,
-      PixelData = pixelData
-    };
+    return FromSpan(data);
   }
 }

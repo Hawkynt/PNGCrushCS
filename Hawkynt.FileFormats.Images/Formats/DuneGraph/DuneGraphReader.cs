@@ -62,36 +62,7 @@ public static class DuneGraphReader {
 
   public static DuneGraphFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (!DuneGraphFile.TryReadHeader(data, out _, out _))
-      throw new InvalidDataException("Not a DuneGraph file: missing the 'DGU' tag.");
-
-    if (data.Length < DuneGraphFile.HeaderSize + DuneGraphFile.PaletteDataSize + 1)
-      throw new InvalidDataException($"Data too small for a valid DuneGraph file (minimum {DuneGraphFile.HeaderSize + DuneGraphFile.PaletteDataSize + 1} bytes, got {data.Length}).");
-
-    // Convert Falcon palette to RGB
-    var rgbPalette = new byte[DuneGraphFile.PaletteEntryCount * 3];
-    DuneGraphFile.ConvertFalconPaletteToRgb(data.AsSpan(DuneGraphFile.HeaderSize, DuneGraphFile.PaletteDataSize), rgbPalette);
-
-    var pixelSection = data.AsSpan(DuneGraphFile.HeaderSize + DuneGraphFile.PaletteDataSize);
-    var isUncompressed = data.Length == DuneGraphFile.UncompressedFileSize;
-
-    byte[] pixelData;
-    bool isCompressed;
-
-    if (isUncompressed) {
-      pixelData = new byte[DuneGraphFile.PixelDataSize];
-      pixelSection.Slice(0, DuneGraphFile.PixelDataSize).CopyTo(pixelData);
-      isCompressed = false;
-    } else {
-      pixelData = _DecompressRle(pixelSection);
-      isCompressed = true;
-    }
-
-    return new DuneGraphFile {
-      IsCompressed = isCompressed,
-      Palette = rgbPalette,
-      PixelData = pixelData,
-    };
+    return FromSpan(data);
   }
 
   /// <summary>Decompresses DuneGraph RLE: escape byte 0x00 followed by count and value for runs; non-zero bytes are literal.</summary>

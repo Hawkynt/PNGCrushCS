@@ -42,15 +42,6 @@ public static class PabloPaintReader {
 
   public static PabloPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < PabloPaintFile.FileSize)
-      throw new InvalidDataException($"Data too small for a valid Pablo Paint file: expected at least {PabloPaintFile.FileSize} bytes, got {data.Length}.");
-
-    if (!data.AsSpan(0, PabloPaintFile.Banner.Length).SequenceEqual(PabloPaintFile.Banner))
-      throw new InvalidDataException("Not a Pablo Paint file: missing the 'PABLO PACKED PICTURE' banner.");
-
-    var pixelData = new byte[PabloPaintFile.PixelDataSize];
-    data.AsSpan(PabloPaintFile.PixelDataOffset, PabloPaintFile.PixelDataSize).CopyTo(pixelData);
-
-    return new PabloPaintFile { PixelData = pixelData };
+    return FromSpan(data);
   }
 }

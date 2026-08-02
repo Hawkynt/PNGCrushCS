@@ -61,32 +61,6 @@ public static class NeochromeReader {
 
   public static NeochromeFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < NeochromeHeader.StructSize)
-      throw new InvalidDataException("Data too small for a valid NEOchrome file.");
-
-    if (data.Length < _ExpectedFileSize)
-      throw new InvalidDataException("Data too small for the expected 32128-byte NEOchrome file.");
-
-    var span = data.AsSpan();
-    var header = NeochromeHeader.ReadFrom(span);
-    var palette = header.GetPalette();
-
-    var pixelData = new byte[32000];
-    data.AsSpan(NeochromeHeader.StructSize, 32000).CopyTo(pixelData.AsSpan(0));
-
-    return new NeochromeFile {
-      Width = 320,
-      Height = 200,
-      Flag = header.Flag,
-      Palette = palette,
-      AnimSpeed = header.AnimSpeed,
-      AnimDirection = header.AnimDirection,
-      AnimSteps = header.AnimSteps,
-      AnimXOffset = header.AnimXOffset,
-      AnimYOffset = header.AnimYOffset,
-      AnimWidth = header.AnimWidth,
-      AnimHeight = header.AnimHeight,
-      PixelData = pixelData
-    };
+    return FromSpan(data);
   }
 }

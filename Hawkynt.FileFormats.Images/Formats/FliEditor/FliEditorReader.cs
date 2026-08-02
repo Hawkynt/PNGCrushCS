@@ -44,17 +44,6 @@ public static class FliEditorReader {
 
   public static FliEditorFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < FliEditorFile.LoadAddressSize + FliEditorFile.MinPayloadSize)
-      throw new InvalidDataException($"Data too small for a valid FLI Editor file (expected at least {FliEditorFile.LoadAddressSize + FliEditorFile.MinPayloadSize} bytes, got {data.Length}).");
-
-    var loadAddress = (ushort)(data[0] | (data[1] << 8));
-
-    var rawData = new byte[data.Length - FliEditorFile.LoadAddressSize];
-    data.AsSpan(FliEditorFile.LoadAddressSize, rawData.Length).CopyTo(rawData.AsSpan(0));
-
-    return new() {
-      LoadAddress = loadAddress,
-      RawData = rawData,
-    };
+    return FromSpan(data);
   }
 }

@@ -44,17 +44,6 @@ public static class RockyInterlaceReader {
 
   public static RockyInterlaceFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < RockyInterlaceFile.LoadAddressSize + RockyInterlaceFile.MinPayloadSize)
-      throw new InvalidDataException($"Data too small for a valid Rocky Interlace file (expected at least {RockyInterlaceFile.LoadAddressSize + RockyInterlaceFile.MinPayloadSize} bytes, got {data.Length}).");
-
-    var loadAddress = (ushort)(data[0] | (data[1] << 8));
-
-    var rawData = new byte[data.Length - RockyInterlaceFile.LoadAddressSize];
-    data.AsSpan(RockyInterlaceFile.LoadAddressSize, rawData.Length).CopyTo(rawData.AsSpan(0));
-
-    return new() {
-      LoadAddress = loadAddress,
-      RawData = rawData,
-    };
+    return FromSpan(data);
   }
 }

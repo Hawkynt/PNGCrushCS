@@ -51,24 +51,6 @@ public static class CokeAtariReader {
 
   public static CokeAtariFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (!CokeAtariHeader.TryRead(data, out var width, out var height))
-      throw new InvalidDataException("Not a COKE file: missing the 'COKE format.' signature.");
-
-    if (width == 0 || height == 0)
-      throw new InvalidDataException("COKE image dimensions must be non-zero.");
-
-    var expectedPixelBytes = width * height * 2;
-    var available = data.Length - CokeAtariHeader.StructSize;
-    if (available < expectedPixelBytes)
-      throw new InvalidDataException($"Data too small for pixel data: expected {CokeAtariHeader.StructSize + expectedPixelBytes} bytes, got {data.Length}.");
-
-    var pixelData = new byte[expectedPixelBytes];
-    data.AsSpan(CokeAtariHeader.StructSize, expectedPixelBytes).CopyTo(pixelData);
-
-    return new CokeAtariFile {
-      Width = width,
-      Height = height,
-      PixelData = pixelData,
-    };
+    return FromSpan(data);
   }
 }

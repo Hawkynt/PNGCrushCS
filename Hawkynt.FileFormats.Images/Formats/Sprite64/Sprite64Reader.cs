@@ -46,19 +46,6 @@ public static class Sprite64Reader {
 
   public static Sprite64File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < Sprite64File.ExpectedFileSize)
-      throw new InvalidDataException($"C64 sprite file too small (got {data.Length} bytes, expected {Sprite64File.ExpectedFileSize}).");
-
-    // Sprite pixel data (63 bytes)
-    var spriteData = new byte[Sprite64File.SpriteDataSize];
-    data.AsSpan(0, Sprite64File.SpriteDataSize).CopyTo(spriteData.AsSpan(0));
-
-    // Mode byte (byte 63)
-    var modeByte = data[Sprite64File.SpriteDataSize];
-
-    return new() {
-      SpriteData = spriteData,
-      ModeByte = modeByte,
-    };
+    return FromSpan(data);
   }
 }

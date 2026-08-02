@@ -62,35 +62,6 @@ public static class FunPhotorReader {
 
   public static FunPhotorFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length != FunPhotorFile.ExpectedFileSize)
-      throw new InvalidDataException($"Fun Photor file must be exactly {FunPhotorFile.ExpectedFileSize} bytes, got {data.Length}.");
-
-    var offset = 0;
-
-    var loadAddress = (ushort)(data[offset] | (data[offset + 1] << 8));
-    offset += FunPhotorFile.LoadAddressSize;
-
-    var bitmapData = new byte[FunPhotorFile.BitmapDataSize];
-    data.AsSpan(offset, FunPhotorFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
-    offset += FunPhotorFile.BitmapDataSize;
-
-    var screenData = new byte[FunPhotorFile.ScreenDataSize];
-    data.AsSpan(offset, FunPhotorFile.ScreenDataSize).CopyTo(screenData.AsSpan(0));
-    offset += FunPhotorFile.ScreenDataSize;
-
-    var colorData = new byte[FunPhotorFile.ColorDataSize];
-    data.AsSpan(offset, FunPhotorFile.ColorDataSize).CopyTo(colorData.AsSpan(0));
-    offset += FunPhotorFile.ColorDataSize;
-
-    var reserved = new byte[FunPhotorFile.ReservedSize];
-    data.AsSpan(offset, FunPhotorFile.ReservedSize).CopyTo(reserved.AsSpan(0));
-
-    return new() {
-      LoadAddress = loadAddress,
-      BitmapData = bitmapData,
-      ScreenData = screenData,
-      ColorData = colorData,
-      Reserved = reserved,
-    };
+    return FromSpan(data);
   }
 }

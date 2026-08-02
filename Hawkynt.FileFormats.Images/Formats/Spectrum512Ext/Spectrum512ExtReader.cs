@@ -59,30 +59,6 @@ public static class Spectrum512ExtReader {
 
   public static Spectrum512ExtFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length != Spectrum512ExtFile.FileSize)
-      throw new InvalidDataException($"SPX file must be exactly {Spectrum512ExtFile.FileSize} bytes, got {data.Length}.");
-
-    var pixelData = new byte[Spectrum512ExtFile.PixelDataSize];
-    data.AsSpan(Spectrum512ExtFile.BitmapOffset + Spectrum512ExtFile.BitmapLeadIn, Spectrum512ExtFile.PixelDataSize - Spectrum512ExtFile.BitmapLeadIn).CopyTo(pixelData.AsSpan(0));
-
-    var palettes = new short[Spectrum512ExtFile.ScanlineCount][];
-    var span = data.AsSpan();
-    var paletteOffset = Spectrum512ExtFile.PaletteOffset;
-
-    for (var line = 0; line < Spectrum512ExtFile.ScanlineCount; ++line) {
-      var palette = new short[Spectrum512ExtFile.PaletteEntriesPerLine];
-      for (var entry = 0; entry < Spectrum512ExtFile.PaletteEntriesPerLine; ++entry) {
-        var offset = paletteOffset + (line * Spectrum512ExtFile.PaletteEntriesPerLine + entry) * 2;
-        palette[entry] = BinaryPrimitives.ReadInt16BigEndian(span[offset..]);
-      }
-      palettes[line] = palette;
-    }
-
-    return new Spectrum512ExtFile {
-      Width = 320,
-      Height = Spectrum512ExtFile.ScanlineCount,
-      PixelData = pixelData,
-      Palettes = palettes
-    };
+    return FromSpan(data);
   }
 }

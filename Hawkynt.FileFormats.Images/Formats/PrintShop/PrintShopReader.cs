@@ -46,19 +46,6 @@ public static class PrintShopReader {
 
   public static PrintShopFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-
-    if (data.Length == PrintShopFile.PsbFileSize) {
-      var pixelData = new byte[PrintShopFile.PixelDataSize];
-      data.AsSpan(PrintShopFile.PsbHeaderSize, PrintShopFile.PixelDataSize).CopyTo(pixelData.AsSpan(0));
-      return new() { PixelData = pixelData, IsFormatB = true };
-    }
-
-    if (data.Length == PrintShopFile.PsaFileSize) {
-      var pixelData = new byte[PrintShopFile.PixelDataSize];
-      data.AsSpan(0, PrintShopFile.PixelDataSize).CopyTo(pixelData);
-      return new() { PixelData = pixelData, IsFormatB = false };
-    }
-
-    throw new InvalidDataException($"Invalid Print Shop data size: expected {PrintShopFile.PsaFileSize} (PSA) or {PrintShopFile.PsbFileSize} (PSB) bytes, got {data.Length}.");
+    return FromSpan(data);
   }
 }

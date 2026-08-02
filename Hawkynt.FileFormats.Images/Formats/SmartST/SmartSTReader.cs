@@ -44,14 +44,6 @@ public static class SmartSTReader {
 
   public static SmartSTFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length != _EXPECTED_SIZE)
-      throw new InvalidDataException($"Invalid Smart ST data size: expected exactly {_EXPECTED_SIZE} bytes, got {data.Length}.");
-
-    var pixelData = new byte[_EXPECTED_SIZE];
-    data.AsSpan(0, _EXPECTED_SIZE).CopyTo(pixelData);
-
-    return new SmartSTFile {
-      PixelData = pixelData
-    };
+    return FromSpan(data);
   }
 }

@@ -44,17 +44,6 @@ public static class BfliReader {
 
   public static BfliFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < BfliFile.LoadAddressSize + BfliFile.MinBitmapSize)
-      throw new InvalidDataException($"Data too small for a valid BFLI file (expected at least {BfliFile.LoadAddressSize + BfliFile.MinBitmapSize} bytes, got {data.Length}).");
-
-    var loadAddress = (ushort)(data[0] | (data[1] << 8));
-
-    var rawData = new byte[data.Length - BfliFile.LoadAddressSize];
-    data.AsSpan(BfliFile.LoadAddressSize, rawData.Length).CopyTo(rawData.AsSpan(0));
-
-    return new() {
-      LoadAddress = loadAddress,
-      RawData = rawData,
-    };
+    return FromSpan(data);
   }
 }

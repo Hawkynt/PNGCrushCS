@@ -44,17 +44,6 @@ public static class Flip64Reader {
 
   public static Flip64File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < Flip64File.LoadAddressSize + Flip64File.MinPayloadSize)
-      throw new InvalidDataException($"Data too small for a valid Flip file (expected at least {Flip64File.LoadAddressSize + Flip64File.MinPayloadSize} bytes, got {data.Length}).");
-
-    var loadAddress = (ushort)(data[0] | (data[1] << 8));
-
-    var rawData = new byte[data.Length - Flip64File.LoadAddressSize];
-    data.AsSpan(Flip64File.LoadAddressSize, rawData.Length).CopyTo(rawData.AsSpan(0));
-
-    return new() {
-      LoadAddress = loadAddress,
-      RawData = rawData,
-    };
+    return FromSpan(data);
   }
 }

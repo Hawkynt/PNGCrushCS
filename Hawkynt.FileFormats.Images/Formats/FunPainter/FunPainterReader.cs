@@ -44,17 +44,6 @@ public static class FunPainterReader {
 
   public static FunPainterFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < FunPainterFile.LoadAddressSize + FunPainterFile.MinBitmapSize)
-      throw new InvalidDataException($"Data too small for a valid Fun Painter file (expected at least {FunPainterFile.LoadAddressSize + FunPainterFile.MinBitmapSize} bytes, got {data.Length}).");
-
-    var loadAddress = (ushort)(data[0] | (data[1] << 8));
-
-    var rawData = new byte[data.Length - FunPainterFile.LoadAddressSize];
-    data.AsSpan(FunPainterFile.LoadAddressSize, rawData.Length).CopyTo(rawData.AsSpan(0));
-
-    return new() {
-      LoadAddress = loadAddress,
-      RawData = rawData,
-    };
+    return FromSpan(data);
   }
 }

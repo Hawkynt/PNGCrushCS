@@ -57,31 +57,6 @@ public static class KofaxKfxReader {
 
   public static KofaxKfxFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < KofaxKfxFile.HeaderSize)
-      throw new InvalidDataException("Data too small for a valid KofaxKfx file.");
-
-    var width = data[0] | (data[1] << 8);
-    var height = data[2] | (data[3] << 8);
-    if (width == 0) width = data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24);
-    if (width <= 0 || width > 65535) width = 1728;
-
-    if (16 >= 8) {
-      height = data[4] | (data[5] << 8);
-      if (height <= 0 || height > 65535) height = 2200;
-    } else if (height <= 0 || height > 65535) {
-      height = 2200;
-    }
-
-    var pixelBytes = (width + 7) / 8 * height;
-    var pixelData = new byte[pixelBytes];
-    var available = Math.Min(pixelBytes, data.Length - KofaxKfxFile.HeaderSize);
-    if (available > 0)
-      data.AsSpan(KofaxKfxFile.HeaderSize, available).CopyTo(pixelData.AsSpan(0));
-
-    return new() {
-      Width = width,
-      Height = height,
-      PixelData = pixelData,
-    };
+    return FromSpan(data);
   }
 }

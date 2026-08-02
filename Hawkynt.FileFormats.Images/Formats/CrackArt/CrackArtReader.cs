@@ -52,24 +52,7 @@ public static class CrackArtReader {
 
   public static CrackArtFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (!CrackArtHeader.TryRead(data, out var isCompressed, out var resolution))
-      throw new InvalidDataException("Not a CrackArt file: missing the 'CA' tag.");
-
-    var header = new { Palette = CrackArtHeader.ReadPalette(data, resolution) };
-    var dataOffset = CrackArtHeader.GetDataOffset(resolution);
-    var (width, height) = _GetDimensions(resolution);
-
-    var stored = new byte[data.Length - dataOffset];
-    data.AsSpan(dataOffset, stored.Length).CopyTo(stored.AsSpan(0));
-    var pixelData = _ScreenFrom(stored, isCompressed);
-
-    return new CrackArtFile {
-      Width = width,
-      Height = height,
-      Resolution = resolution,
-      Palette = header.Palette,
-      PixelData = pixelData
-    };
+    return FromSpan(data);
   }
 
 /// <summary>

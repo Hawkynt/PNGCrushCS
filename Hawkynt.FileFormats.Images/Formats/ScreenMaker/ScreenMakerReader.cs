@@ -66,39 +66,6 @@ public static class ScreenMakerReader {
 
   public static ScreenMakerFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < ScreenMakerFile.HeaderSize + ScreenMakerFile.PaletteDataSize)
-      throw new InvalidDataException($"Data too small for a valid Screen Maker file (minimum {ScreenMakerFile.HeaderSize + ScreenMakerFile.PaletteDataSize} bytes, got {data.Length}).");
-
-    var width = (ushort)(data[0] | (data[1] << 8));
-    var height = (ushort)(data[2] | (data[3] << 8));
-
-    if (width == 0)
-      throw new InvalidDataException("Invalid Screen Maker width: 0.");
-    if (height == 0)
-      throw new InvalidDataException("Invalid Screen Maker height: 0.");
-
-    var pixelCount = width * height;
-    var expectedSize = ScreenMakerFile.HeaderSize + ScreenMakerFile.PaletteDataSize + pixelCount;
-
-    if (data.Length < expectedSize)
-      throw new InvalidDataException($"Data too small for pixel data: expected {expectedSize} bytes, got {data.Length}.");
-
-    var offset = ScreenMakerFile.HeaderSize;
-
-    // Palette (768 bytes)
-    var palette = new byte[ScreenMakerFile.PaletteDataSize];
-    data.AsSpan(offset, ScreenMakerFile.PaletteDataSize).CopyTo(palette.AsSpan(0));
-    offset += ScreenMakerFile.PaletteDataSize;
-
-    // Pixel data (width x height bytes)
-    var pixelData = new byte[pixelCount];
-    data.AsSpan(offset, pixelCount).CopyTo(pixelData.AsSpan(0));
-
-    return new() {
-      Width = width,
-      Height = height,
-      Palette = palette,
-      PixelData = pixelData,
-    };
+    return FromSpan(data);
   }
 }

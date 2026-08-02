@@ -46,19 +46,6 @@ public static class PublicPainterReader {
 
   public static PublicPainterFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < 2)
-      throw new InvalidDataException("Data too small for a valid Public Painter file.");
-
-    if (data.Length < PublicPainterFile.StreamOffset)
-      throw new InvalidDataException("Data too small for a valid Public Painter file.");
-
-    var pixelData = PublicPainterCompressor.Decompress(
-      data.AsSpan(PublicPainterFile.StreamOffset), data[PublicPainterFile.EscapeOffset], PublicPainterFile.DecompressedSize);
-
-    return new PublicPainterFile {
-      Width = PublicPainterFile.ImageWidth,
-      Height = PublicPainterFile.ImageHeight,
-      PixelData = pixelData,
-    };
+    return FromSpan(data);
   }
 }

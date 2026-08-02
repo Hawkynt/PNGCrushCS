@@ -44,14 +44,6 @@ public static class FalconResReader {
 
   public static FalconResFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length != _EXPECTED_SIZE)
-      throw new InvalidDataException($"Invalid Falcon Res data size: expected exactly {_EXPECTED_SIZE} bytes, got {data.Length}.");
-
-    var pixelData = new byte[_EXPECTED_SIZE];
-    data.AsSpan(0, _EXPECTED_SIZE).CopyTo(pixelData);
-
-    return new FalconResFile {
-      PixelData = pixelData
-    };
+    return FromSpan(data);
   }
 }

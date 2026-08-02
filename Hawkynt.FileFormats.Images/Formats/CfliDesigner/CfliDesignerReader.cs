@@ -44,17 +44,6 @@ public static class CfliDesignerReader {
 
   public static CfliDesignerFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < CfliDesignerFile.LoadAddressSize + CfliDesignerFile.MinPayloadSize)
-      throw new InvalidDataException($"Data too small for a valid CFLI file (expected at least {CfliDesignerFile.LoadAddressSize + CfliDesignerFile.MinPayloadSize} bytes, got {data.Length}).");
-
-    var loadAddress = (ushort)(data[0] | (data[1] << 8));
-
-    var rawData = new byte[data.Length - CfliDesignerFile.LoadAddressSize];
-    data.AsSpan(CfliDesignerFile.LoadAddressSize, rawData.Length).CopyTo(rawData.AsSpan(0));
-
-    return new() {
-      LoadAddress = loadAddress,
-      RawData = rawData,
-    };
+    return FromSpan(data);
   }
 }

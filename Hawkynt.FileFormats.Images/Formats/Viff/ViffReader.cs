@@ -89,63 +89,7 @@ public static class ViffReader {
 
   public static ViffFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < ViffHeader.StructSize)
-      throw new InvalidDataException($"Data too small for a valid VIFF file: expected at least {ViffHeader.StructSize} bytes, got {data.Length}.");
-
-    if (data[0] != ViffHeader.Magic)
-      throw new InvalidDataException($"Invalid VIFF magic byte: expected 0x{ViffHeader.Magic:X2}, got 0x{data[0]:X2}.");
-
-    var header = ViffHeader.ReadFrom(data.AsSpan());
-    var width = (int)header.RowSize;
-    var height = (int)header.ColSize;
-    // The band count is its own field. This used to read the sub-row size, which is zero in every
-    // file written by anything, so a colour picture was taken for a single grey plane.
-    var bands = (int)header.NumDataBands;
-
-    if (width <= 0)
-      throw new InvalidDataException($"Invalid VIFF width: {width}.");
-    if (height <= 0)
-      throw new InvalidDataException($"Invalid VIFF height: {height}.");
-    if (bands <= 0)
-      bands = 1;
-
-    var bytesPerElement = _GetBytesPerElement((ViffStorageType)header.DataStorageType);
-    var offset = ViffHeader.StructSize;
-
-    // Read map data if enabled
-    byte[]? mapData = null;
-    if (header.MapScheme != 0 && header.MapRowSize > 0 && header.MapColSize > 0) {
-      var mapBytesPerElement = _GetMapBytesPerElement((ViffMapType)header.MapStorageType);
-      var mapBytes = (int)(header.MapRowSize * header.MapColSize * mapBytesPerElement);
-      if (offset + mapBytes <= data.Length) {
-        mapData = new byte[mapBytes];
-        data.AsSpan(offset, mapBytes).CopyTo(mapData.AsSpan(0));
-        offset += mapBytes;
-      }
-    }
-
-    // Read pixel data
-    var pixelBytes = width * height * bands * bytesPerElement;
-    var available = data.Length - offset;
-    var copyLen = Math.Min(pixelBytes, available);
-    var pixelData = new byte[pixelBytes];
-    if (copyLen > 0)
-      data.AsSpan(offset, copyLen).CopyTo(pixelData.AsSpan(0));
-
-    return new ViffFile {
-      Width = width,
-      Height = height,
-      Bands = bands,
-      StorageType = (ViffStorageType)header.DataStorageType,
-      ColorSpaceModel = (ViffColorSpaceModel)header.ColorSpaceModel,
-      Comment = header.Comment,
-      PixelData = pixelData,
-      MapData = mapData,
-      MapType = (ViffMapType)header.MapStorageType,
-      MapRowSize = (int)header.MapRowSize,
-      MapColSize = (int)header.MapColSize,
-      MapStorageType = (ViffStorageType)header.MapStorageType
-    };
+    return FromSpan(data);
   }
 
   private static int _GetBytesPerElement(ViffStorageType storageType) => storageType switch {

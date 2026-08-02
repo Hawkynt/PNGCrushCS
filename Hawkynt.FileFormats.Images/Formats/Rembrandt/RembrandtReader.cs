@@ -52,25 +52,6 @@ public static class RembrandtReader {
 
   public static RembrandtFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (!RembrandtHeader.TryRead(data, out var width, out var height))
-      throw new InvalidDataException("Not a Rembrandt file: missing the 'TRUECOLR'/'PICT' header.");
-
-    if (width == 0 || height == 0)
-      throw new InvalidDataException($"Invalid Rembrandt dimensions: {width}x{height}.");
-
-    // Read pixel data
-    var pixelOffset = RembrandtHeader.StructSize;
-    var expectedPixelBytes = width * height * 2;
-    var available = data.Length - pixelOffset;
-    var copyLen = Math.Min(expectedPixelBytes, available);
-
-    var pixelData = new byte[expectedPixelBytes];
-    data.AsSpan(pixelOffset, copyLen).CopyTo(pixelData);
-
-    return new RembrandtFile {
-      Width = width,
-      Height = height,
-      PixelData = pixelData,
-    };
+    return FromSpan(data);
   }
 }

@@ -44,17 +44,6 @@ public static class FfliReader {
 
   public static FfliFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < FfliFile.LoadAddressSize + FfliFile.MinPayloadSize)
-      throw new InvalidDataException($"Data too small for a valid FFLI file (expected at least {FfliFile.LoadAddressSize + FfliFile.MinPayloadSize} bytes, got {data.Length}).");
-
-    var loadAddress = (ushort)(data[0] | (data[1] << 8));
-
-    var rawData = new byte[data.Length - FfliFile.LoadAddressSize];
-    data.AsSpan(FfliFile.LoadAddressSize, rawData.Length).CopyTo(rawData.AsSpan(0));
-
-    return new() {
-      LoadAddress = loadAddress,
-      RawData = rawData,
-    };
+    return FromSpan(data);
   }
 }

@@ -45,18 +45,6 @@ public static class SyntheticArtsReader {
 
   public static SyntheticArtsFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < SyntheticArtsFile.FileSize)
-      throw new InvalidDataException($"Data too small for a valid Synthetic Arts file (expected {SyntheticArtsFile.FileSize} bytes, got {data.Length}).");
-
-    var header = SyntheticArtsHeader.ReadFrom(data.AsSpan(SyntheticArtsFile.PaletteOffset));
-    var palette = header.Palette;
-
-    var pixelData = new byte[32000];
-    data.AsSpan(0, SyntheticArtsFile.PixelDataSize).CopyTo(pixelData);
-
-    return new SyntheticArtsFile {
-      Palette = palette,
-      PixelData = pixelData,
-    };
+    return FromSpan(data);
   }
 }

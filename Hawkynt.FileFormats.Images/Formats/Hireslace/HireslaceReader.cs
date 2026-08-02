@@ -57,30 +57,6 @@ public static class HireslaceReader {
 
   public static HireslaceFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < HireslaceFile.ExpectedFileSize)
-      throw new InvalidDataException($"Hireslace file must be at least {HireslaceFile.ExpectedFileSize} bytes, got {data.Length}.");
-
-    // Load address (2 bytes LE), then four 8 KB slots: bitmap1, screen1, screen2, bitmap2.
-    var loadAddress = (ushort)(data[0] | (data[1] << 8));
-
-    var bitmap1 = new byte[HireslaceFile.BitmapDataSize];
-    data.AsSpan(HireslaceFile.Bitmap1Offset, HireslaceFile.BitmapDataSize).CopyTo(bitmap1);
-
-    var screen1 = new byte[HireslaceFile.ScreenDataSize];
-    data.AsSpan(HireslaceFile.Screen1Offset, HireslaceFile.ScreenDataSize).CopyTo(screen1);
-
-    var screen2 = new byte[HireslaceFile.ScreenDataSize];
-    data.AsSpan(HireslaceFile.Screen2Offset, HireslaceFile.ScreenDataSize).CopyTo(screen2);
-
-    var bitmap2 = new byte[HireslaceFile.BitmapDataSize];
-    data.AsSpan(HireslaceFile.Bitmap2Offset, HireslaceFile.BitmapDataSize).CopyTo(bitmap2);
-
-    return new HireslaceFile {
-      LoadAddress = loadAddress,
-      Bitmap1 = bitmap1,
-      Screen1 = screen1,
-      Bitmap2 = bitmap2,
-      Screen2 = screen2,
-    };
+    return FromSpan(data);
   }
 }
