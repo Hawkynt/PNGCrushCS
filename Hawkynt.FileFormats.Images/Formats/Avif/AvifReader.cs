@@ -8,6 +8,25 @@ using FileFormat.Avif.Codec;
 namespace FileFormat.Avif;
 
 /// <summary>Reads AVIF files from bytes, streams, or file paths.</summary>
+/// <remarks>
+/// KNOWN WRONG on every real file tried, and recorded here rather than in a note nobody reads.
+///
+/// Three AVIF samples decode to the right size and the wrong picture: the mean error a channel is
+/// 107, 127 and 127 of 255 against ImageMagick, which agrees with XnView exactly on all three. The
+/// container is read correctly — the sizes match to the pixel — so the fault is inside the AV1
+/// decoder under <c>Codec</c> rather than in this file.
+///
+/// It is left in place rather than made to refuse, which is the opposite of what was done for JPEG
+/// XR the same day, and the difference is worth stating. There the picture came out of a fallback
+/// that copied the compressed bytes into it, and the round-trip tests passed only because the writer
+/// stored pixels the same way; there was nothing to keep. Here there are three thousand lines of a
+/// real decoder — entropy coding, transforms, intra prediction, loop filtering — which may be close
+/// to right, and throwing that away on the strength of three files would be the more destructive
+/// mistake.
+///
+/// What is needed is somebody stepping through one of those three against a reference decoder, not a
+/// judgement from the outside.
+/// </remarks>
 public static class AvifReader {
 
   private const int _MIN_FILE_SIZE = 12;
