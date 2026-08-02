@@ -1,6 +1,9 @@
 using System;
+using FileFormat.Core;
 using System.Buffers.Binary;
 using System.IO;
+
+using FileFormat.Jpeg;
 
 namespace FileFormat.Pict;
 
@@ -95,6 +98,14 @@ public static class PictReader {
           (pixelData, palette, bitsPerPixel) = _ReadPackBitsRect(data.ToArray(), ref offset, width, height);
           break;
 
+        case PictOpcode.CompressedQuickTime: {
+          var decoded = _ReadCompressedQuickTime(data, offset);
+          if (decoded == null)
+            goto done;
+
+          return decoded.Value;
+        }
+
         default:
           if (!_TrySkipOpcode(data, ref offset, opcode))
             goto done;
@@ -110,6 +121,50 @@ public static class PictReader {
       BitsPerPixel = bitsPerPixel,
       PixelData = pixelData ?? [],
       Palette = palette
+    };
+  }
+
+  /// <summary>Fields between the compressed-picture opcode and the image description it carries.</summary>
+  /// <remarks>
+  /// The payload length, then a version word, a 36-byte transformation matrix, the size and bounds of
+  /// a matte, the transfer mode, the source rectangle, the accuracy and the mask size — sixty-eight
+  /// bytes of drawing instructions before the description of what is being drawn.
+  /// </remarks>
+  private const int _QUICKTIME_DESCRIPTION_OFFSET = 4 + 2 + 36 + 4 + 8 + 2 + 8 + 4 + 4;
+
+  /// <summary>The compressor a QuickTime picture names when its data is a JPEG stream.</summary>
+  private static ReadOnlySpan<byte> _CompressorJpeg => "jpeg"u8;
+
+  /// <summary>
+  /// Reads a picture QuickDraw does not draw itself but hands to a codec, when that codec is one we
+  /// have.
+  /// </summary>
+  /// <remarks>
+  /// Two of the three QuickDraw pictures in the corpus are this, and both are JPEG — which the
+  /// QuickTime image file reader already had to learn, the same description structure inside a
+  /// different container. Returning null leaves the caller to end the picture as it did before, so a
+  /// codec we do not have is no worse than it was.
+  /// </remarks>
+  private static PictFile? _ReadCompressedQuickTime(ReadOnlySpan<byte> data, int offset) {
+    var at = offset + _QUICKTIME_DESCRIPTION_OFFSET;
+    if (at + 8 > data.Length)
+      return null;
+
+    var describedLength = BinaryPrimitives.ReadInt32BigEndian(data[at..]);
+    if (describedLength < 8 || at + describedLength > data.Length)
+      return null;
+
+    if (!data.Slice(at + 4, 4).SequenceEqual(_CompressorJpeg))
+      return null;
+
+    var stream = data[(at + describedLength)..].ToArray();
+    var picture = JpegFile.ToRawImage(JpegReader.FromBytes(stream)).EnsureFormat(PixelFormat.Rgb24);
+
+    return new PictFile {
+      Width = picture.Width,
+      Height = picture.Height,
+      BitsPerPixel = 24,
+      PixelData = picture.PixelData,
     };
   }
 

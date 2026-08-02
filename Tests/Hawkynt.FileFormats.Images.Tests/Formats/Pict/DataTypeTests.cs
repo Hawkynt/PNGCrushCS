@@ -14,8 +14,9 @@ public sealed class DataTypeTests {
     Assert.That((ushort)PictOpcode.PackBitsRect, Is.EqualTo(0x0098));
     Assert.That((ushort)PictOpcode.DirectBitsRect, Is.EqualTo(0x009A));
     Assert.That((ushort)PictOpcode.EndOfPicture, Is.EqualTo(0x00FF));
+    Assert.That((ushort)PictOpcode.CompressedQuickTime, Is.EqualTo(0x8200));
 
     var values = Enum.GetValues<PictOpcode>();
-    Assert.That(values, Has.Length.EqualTo(5));
+    Assert.That(values, Has.Length.EqualTo(6));
   }
 }
