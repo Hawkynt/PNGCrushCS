@@ -261,8 +261,23 @@ public static class PictReader {
     return (pixelData, 24);
   }
 
+  /// <summary>
+  /// Refuses a record that runs past the end of the file instead of reading past it.
+  /// </summary>
+  /// <remarks>
+  /// Every field here was read without asking whether it was there. A QuickDraw picture whose
+  /// records this does not follow correctly — and there are several kinds it does not — walked off
+  /// the end and threw an index out of range, which tells a caller nothing except that something
+  /// inside broke.
+  /// </remarks>
+  private static void _Need(byte[] data, int offset, int count) {
+    if (offset < 0 || count < 0 || offset + count > data.Length)
+      throw new InvalidDataException($"A QuickDraw record wants {count} bytes at {offset}; the picture is {data.Length} long.");
+  }
+
   private static (byte[] pixelData, byte[] palette, int bitsPerPixel) _ReadPackBitsRect(byte[] data, ref int offset, int width, int height) {
     // Read PixMap record
+    _Need(data, offset, 2 + 44 + 8);
     var rowBytesRaw = BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(offset));
     var rowBytes = rowBytesRaw & 0x3FFF;
     offset += 2;
@@ -278,6 +293,8 @@ public static class PictReader {
     var ctSize = BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(offset));
     offset += 2;
     var numColors = ctSize + 1;
+
+    _Need(data, offset, numColors * 8);
 
     var palette = new byte[numColors * 3];
     for (var i = 0; i < numColors; ++i) {
