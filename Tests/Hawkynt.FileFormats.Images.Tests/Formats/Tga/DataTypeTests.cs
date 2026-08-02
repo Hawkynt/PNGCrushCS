@@ -14,7 +14,8 @@ public sealed class DataTypeTests {
     Assert.That((int)TgaColorMode.Rgb24, Is.EqualTo(2));
     Assert.That((int)TgaColorMode.Grayscale8, Is.EqualTo(3));
     Assert.That((int)TgaColorMode.Indexed8, Is.EqualTo(4));
-    Assert.That(Enum.GetValues<TgaColorMode>(), Has.Length.EqualTo(5));
+    Assert.That((int)TgaColorMode.Rgb16_555, Is.EqualTo(5));
+    Assert.That(Enum.GetValues<TgaColorMode>(), Has.Length.EqualTo(6));
   }
 
   [Test]

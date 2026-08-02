@@ -50,6 +50,7 @@ public readonly record struct TgaFile : IImageFormatReader<TgaFile>, IImageToRaw
       mode = file.BitsPerPixel switch {
         32 => TgaColorMode.Rgba32,
         24 => TgaColorMode.Rgb24,
+        15 or 16 => TgaColorMode.Rgb16_555,
         8 when file.Palette != null => TgaColorMode.Indexed8,
         _ => TgaColorMode.Grayscale8
       };
@@ -73,6 +74,9 @@ public readonly record struct TgaFile : IImageFormatReader<TgaFile>, IImageToRaw
         palette = file.Palette;
         paletteCount = file.PaletteColorCount;
         break;
+      case TgaColorMode.Rgb16_555:
+        format = PixelFormat.Rgb24;
+        break;
       default:
         throw new ArgumentException($"Unsupported TgaColorMode: {mode}", nameof(file));
     }
@@ -83,6 +87,10 @@ public readonly record struct TgaFile : IImageFormatReader<TgaFile>, IImageToRaw
       ? _FlipRows(file.PixelData, stride, file.Height)
       : file.PixelData;
 
+    // Five bits a channel packed into a word, which nothing downstream reads as it stands.
+    if (mode == TgaColorMode.Rgb16_555)
+      pixelData = _Expand555(pixelData, file.Width * file.Height);
+
     return new RawImage {
       Width = file.Width,
       Height = file.Height,
@@ -91,6 +99,23 @@ public readonly record struct TgaFile : IImageFormatReader<TgaFile>, IImageToRaw
       Palette = palette,
       PaletteCount = paletteCount
     };
+  }
+
+  /// <summary>Widens packed five-five-five words into whole bytes a channel.</summary>
+  private static byte[] _Expand555(byte[] packed, int pixels) {
+    var rgb = new byte[pixels * 3];
+    for (var i = 0; i < pixels; ++i) {
+      var at = i * 2;
+      if (at + 1 >= packed.Length)
+        break;
+
+      var word = packed[at] | (packed[at + 1] << 8);
+      rgb[i * 3] = ChannelScaling.Expand5((word >> 10) & 0x1F);
+      rgb[i * 3 + 1] = ChannelScaling.Expand5((word >> 5) & 0x1F);
+      rgb[i * 3 + 2] = ChannelScaling.Expand5(word & 0x1F);
+    }
+
+    return rgb;
   }
 
   public static TgaFile FromRawImage(RawImage image) {

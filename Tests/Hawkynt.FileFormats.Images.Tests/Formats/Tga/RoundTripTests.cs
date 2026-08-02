@@ -176,7 +176,12 @@ public sealed class RoundTripTests {
     var bytes = TgaWriter.ToBytes(original);
     var restored = TgaReader.FromBytes(bytes);
 
-    Assert.That(restored.Origin, Is.EqualTo(TgaOrigin.BottomLeft));
-    Assert.That(restored.PixelData, Is.EqualTo(original.PixelData));
+    Assert.Multiple(() => {
+      // The reader turns a bottom-up file the right way up and then says so. It used to report the
+      // file's own origin while holding rows it had already reordered, and the conversion to a raw
+      // image turned them over a second time — which put every bottom-up picture back upside down.
+      Assert.That(restored.Origin, Is.EqualTo(TgaOrigin.TopLeft));
+      Assert.That(restored.PixelData, Is.EqualTo(original.PixelData), "the rows come back as they went in");
+    });
   }
 }

@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using FileFormat.Core;
 
 namespace FileFormat.Tga;
 
@@ -58,17 +59,23 @@ public static class TgaReader {
       paletteColorCount = colorMapLength;
       palette = new byte[paletteColorCount * 3];
 
+      // A map entry is either three bytes or more, one channel each, or a single word holding five
+      // bits a channel. The word kind used to be stepped over without being read, which left the
+      // whole palette black and every picture using one with it — and those are common, being what
+      // the earliest Targa boards stored.
       for (var i = 0; i < paletteColorCount; ++i) {
         if (entryBytes >= 3) {
-          var b = data[offset];
-          var g = data[offset + 1];
-          var r = data[offset + 2];
-          palette[i * 3] = r;
-          palette[i * 3 + 1] = g;
-          palette[i * 3 + 2] = b;
-          offset += entryBytes;
-        } else
-          offset += entryBytes;
+          palette[i * 3] = data[offset + 2];
+          palette[i * 3 + 1] = data[offset + 1];
+          palette[i * 3 + 2] = data[offset];
+        } else if (entryBytes == 2) {
+          var packed = data[offset] | (data[offset + 1] << 8);
+          palette[i * 3] = ChannelScaling.Expand5((packed >> 10) & 0x1F);
+          palette[i * 3 + 1] = ChannelScaling.Expand5((packed >> 5) & 0x1F);
+          palette[i * 3 + 2] = ChannelScaling.Expand5(packed & 0x1F);
+        }
+
+        offset += entryBytes;
       }
     }
 
@@ -110,7 +117,12 @@ public static class TgaReader {
       rawPixelData.AsSpan(0, Math.Min(rawPixelData.Length, pixelData.Length)).CopyTo(pixelData.AsSpan(0));
     }
 
-    // Reorder rows to top-down order if origin is bottom-left
+    // Reorder rows to top-down order if origin is bottom-left.
+    //
+    // Having done so the file no longer describes what is held here, so the origin is recorded as
+    // top-left below. Leaving it as it was made the conversion to a raw image turn the rows over a
+    // second time, which put every bottom-up picture back upside down — and most Targa files are
+    // bottom-up, that being the default the descriptor byte means when it says nothing.
     if (origin == TgaOrigin.BottomLeft) {
       var rowBytes = width * bytesPerPixel;
       var reordered = new byte[pixelData.Length];
@@ -121,6 +133,7 @@ public static class TgaReader {
       }
 
       pixelData = reordered;
+      origin = TgaOrigin.TopLeft;
     }
 
     return new TgaFile {
@@ -141,7 +154,7 @@ public static class TgaReader {
     return FromSpan(data);
   }
 
-  private static TgaColorMode _DetectColorMode(int baseType, int bitsPerPixel, byte[]? palette, int paletteColorCount, int alphaBits) {
+private static TgaColorMode _DetectColorMode(int baseType, int bitsPerPixel, byte[]? palette, int paletteColorCount, int alphaBits) {
     // baseType: 1 = color-mapped, 2 = true-color, 3 = grayscale
     if (baseType == 3)
       return TgaColorMode.Grayscale8;
@@ -154,6 +167,9 @@ public static class TgaReader {
 
     if (bitsPerPixel == 24)
       return TgaColorMode.Rgb24;
+
+    if (bitsPerPixel is 15 or 16)
+      return TgaColorMode.Rgb16_555;
 
     return TgaColorMode.Original;
   }
