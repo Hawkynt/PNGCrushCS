@@ -1,4 +1,5 @@
 ﻿using System;
+using FileFormat.Core;
 using System.Buffers.Binary;
 using System.IO;
 using System.Text;
@@ -73,6 +74,7 @@ public static class IffPbmReader {
         case "CMAP":
           cmap = new byte[chunkSize];
           span.Slice(chunkDataOffset, chunkSize).CopyTo(cmap);
+          AmigaColourMap.WidenIfFourBit(cmap);
           break;
         case "BODY":
           body = new byte[chunkSize];

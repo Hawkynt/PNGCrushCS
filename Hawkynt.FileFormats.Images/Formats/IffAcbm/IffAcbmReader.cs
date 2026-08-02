@@ -1,4 +1,5 @@
 using System;
+using FileFormat.Core;
 using System.Buffers.Binary;
 using System.IO;
 using System.Text;
@@ -91,6 +92,7 @@ public static class IffAcbmReader {
         case "CMAP":
           cmap = new byte[chunkSize];
           data.Slice(chunkDataOffset, chunkSize).CopyTo(cmap);
+          AmigaColourMap.WidenIfFourBit(cmap);
           break;
         case "ABIT":
           abit = new byte[chunkSize];
