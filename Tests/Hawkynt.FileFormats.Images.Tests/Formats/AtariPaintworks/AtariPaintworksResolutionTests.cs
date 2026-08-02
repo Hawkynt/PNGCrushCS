@@ -105,11 +105,38 @@ public sealed class AtariPaintworksResolutionTests {
 
   [Test]
   [Category("Unit")]
-  public void Read_SaysACompressedFileIsCompressedAndNotTooSmall() {
-    var data = _Picture(0, 0)[..5000];
-    var failure = Assert.Throws<System.IO.InvalidDataException>(() => AtariPaintworksReader.FromBytes(data));
+  public void Read_ExpandsAPackedPicture() {
+    // A byte under 128 repeats the one after it that many times; 128 or more introduces that many
+    // bytes less 128, taken as they stand. A whole 640 by 400 monochrome screen of set bits is
+    // therefore 32000 divided into runs of at most 127.
+    var packed = new System.Collections.Generic.List<byte>(_Picture(2, 0)[..AtariPaintworksFile.BitmapOffset]);
+    packed[AtariPaintworksFile.FlagsOffset] |= 0x02;
+    for (var written = 0; written < 32000; written += 100) {
+      packed.Add(100);
+      packed.Add(0xFF);
+    }
 
-    Assert.That(failure!.Message, Does.Contain("compressed"));
+    var file = AtariPaintworksReader.FromBytes(packed.ToArray());
+
+    Assert.Multiple(() => {
+      Assert.That(file.Width, Is.EqualTo(640));
+      Assert.That(file.Height, Is.EqualTo(400));
+      Assert.That(file.PixelData, Has.Length.EqualTo(32000));
+      Assert.That(file.PixelData, Is.All.EqualTo(0xFF));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void Read_RefusesAPackedPictureThatRunsOutEarly() {
+    var packed = new System.Collections.Generic.List<byte>(_Picture(2, 0)[..AtariPaintworksFile.BitmapOffset]);
+    packed[AtariPaintworksFile.FlagsOffset] |= 0x02;
+    packed.Add(100);
+    packed.Add(0xFF);
+
+    var failure = Assert.Throws<System.IO.InvalidDataException>(() => AtariPaintworksReader.FromBytes(packed.ToArray()));
+
+    Assert.That(failure!.Message, Does.Contain("ran out"));
   }
 
   [Test]

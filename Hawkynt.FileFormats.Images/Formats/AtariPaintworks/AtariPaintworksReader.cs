@@ -67,12 +67,68 @@ public static class AtariPaintworksReader {
     return $"An uncompressed Atari Paintworks picture is exactly {_EXPECTED_FILE_SIZE} bytes; this file is {data.Length}.";
   }
 
+  /// <summary>Whether the file carries the signature that marks it as one of these.</summary>
+  private static bool _HasSignature(ReadOnlySpan<byte> data)
+    => data.Length > AtariPaintworksFile.SignatureOffset + AtariPaintworksFile.Signature.Length
+       && data.Slice(AtariPaintworksFile.SignatureOffset, AtariPaintworksFile.Signature.Length).SequenceEqual(AtariPaintworksFile.Signature);
+
+  /// <summary>Bitplanes each resolution spends.</summary>
+  private static int _PlaneCount(AtariPaintworksResolution resolution) => resolution switch {
+    AtariPaintworksResolution.Low => 4,
+    AtariPaintworksResolution.Medium => 2,
+    _ => 1,
+  };
+
+  /// <summary>
+  /// Expands the packed screen: a byte under 128 repeats the byte after it that many times, and one
+  /// of 128 or more is followed by that many bytes less 128, taken as they stand.
+  /// </summary>
+  /// <remarks>
+  /// Established by decoding a file whose picture was already known: the packed form of a 640 by 400
+  /// monochrome screen opens 0x50 0xFF, and the screen it stands for opens with exactly eighty bytes
+  /// of 0xFF, which is one row. Every one of the six packed samples expands to precisely the screen
+  /// its flags describe on that reading, and the first of them matches RECOIL to the byte.
+  /// <para/>
+  /// It is not PackBits, which was tried in four conventions and decodes none of them — the counts
+  /// there are one less than they are here, and the roles of the two ranges are the other way round.
+  /// </remarks>
+  private static byte[] _Unpack(ReadOnlySpan<byte> packed, int wanted) {
+    var result = new byte[wanted];
+    var written = 0;
+    var at = 0;
+
+    while (at < packed.Length && written < wanted) {
+      var control = packed[at++];
+      if (control < 128) {
+        if (at >= packed.Length)
+          break;
+
+        var value = packed[at++];
+        var run = Math.Min(control, wanted - written);
+        result.AsSpan(written, run).Fill(value);
+        written += run;
+        continue;
+      }
+
+      var literal = Math.Min(control - 128, Math.Min(packed.Length - at, wanted - written));
+      packed.Slice(at, literal).CopyTo(result.AsSpan(written));
+      at += literal;
+      written += literal;
+    }
+
+    if (written < wanted)
+      throw new InvalidDataException($"A packed Atari Paintworks picture states {wanted} bytes of screen; this one ran out after {written}.");
+
+    return result;
+  }
+
   public static AtariPaintworksFile FromSpan(ReadOnlySpan<byte> data) {
 
     if (data.Length < AtariPaintworksFile.BitmapOffset)
       throw new InvalidDataException("Data too small for a valid Atari Paintworks file.");
 
-    if (data.Length != _EXPECTED_FILE_SIZE)
+    var compressed = data.Length != _EXPECTED_FILE_SIZE;
+    if (compressed && !_HasSignature(data))
       throw new InvalidDataException(_WrongLengthReason(data));
 
     var span = data;
@@ -81,8 +137,15 @@ public static class AtariPaintworksReader {
     var resolution = _DetectResolution(data);
     var (width, height) = _GetDimensions(resolution);
 
-    var pixelData = new byte[_PIXEL_DATA_SIZE];
-    data.Slice(AtariPaintworksFile.BitmapOffset, _PIXEL_DATA_SIZE).CopyTo(pixelData.AsSpan(0));
+    // A picture may be one screenful or two; bit 1 of the flags is what says which, and the taller
+    // ones are documents that scroll rather than anything the screen shows at once.
+    if (compressed && (data[AtariPaintworksFile.FlagsOffset] & 0x02) == 0)
+      height *= 2;
+
+    var wanted = width / 8 * _PlaneCount(resolution) * height;
+    var pixelData = compressed
+      ? _Unpack(data[AtariPaintworksFile.BitmapOffset..], wanted)
+      : data.Slice(AtariPaintworksFile.BitmapOffset, _PIXEL_DATA_SIZE).ToArray();
 
     return new AtariPaintworksFile {
       Width = width,
