@@ -41,7 +41,26 @@ public readonly record struct FunPainterFile : IImageFormatReader<FunPainterFile
   /// <summary>Raw payload data (entire file content after load address).</summary>
   public byte[] RawData { get; init; }
 
-  /// <summary>Converts this Fun Painter image to a platform-independent <see cref="RawImage"/> in Rgb24 format using simplified multicolor decode.</summary>
+  /// <summary>
+  /// Converts this Fun Painter image to a platform-independent <see cref="RawImage"/> in Rgb24
+  /// format using simplified multicolor decode.
+  /// </summary>
+  /// <remarks>
+  /// KNOWN WRONG in at least two ways, measured rather than supposed.
+  /// <list type="bullet">
+  /// <item>The payload begins with the fourteen letters <c>FUNPAINT (MT) </c> and they are not
+  /// stepped over: the first fourteen bytes of what is read as bitmap are that text.</item>
+  /// <item>Fun Paint switches its video matrix every scanline, and this reads one screen for the
+  /// whole picture, so seven scanlines in eight take their colours from the wrong place.</item>
+  /// </list>
+  /// Correcting either does not help: stepping over the signature, using the per-scanline banks, and
+  /// both together all score about a tenth of the sampled pixels against RECOIL, which is what
+  /// chance gives. The byte after the signature is nought and the one after that 0x21, so the
+  /// payload is most likely packed and none of the three readings can be right until that is undone.
+  /// <para/>
+  /// RECOIL draws 109 distinct colours here against the 16 the machine owns, so the file also holds
+  /// two pictures shown one after the other to blend — see <c>Commodore64Graphics</c>.
+  /// </remarks>
   public static RawImage ToRawImage(FunPainterFile file) {
 
     const int width = FixedWidth;
