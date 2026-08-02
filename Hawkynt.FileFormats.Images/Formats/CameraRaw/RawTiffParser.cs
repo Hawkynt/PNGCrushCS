@@ -93,11 +93,25 @@ internal static class RawTiffParser {
   }
 
   /// <summary>Validates the TIFF magic number (42).</summary>
+  /// <summary>
+  /// Accepts the magic numbers the camera makers put where TIFF puts 42.
+  /// </summary>
+  /// <remarks>
+  /// A raw file is a TIFF in every respect except this word, which several makers changed so that
+  /// ordinary TIFF readers would not open it: Olympus writes 0x4F52, Panasonic 0x0055. Requiring 42
+  /// refused both outright, though the directories behind the word are as readable as any other's.
+  /// </remarks>
   internal static void ValidateMagic(byte[] data, bool isLittleEndian) {
     var magic = ReadUInt16(data, 2, isLittleEndian);
-    if (magic != 42)
+    if (magic is not (42 or _OLYMPUS_MAGIC or _PANASONIC_MAGIC))
       throw new System.IO.InvalidDataException($"Invalid TIFF magic number: expected 42, got {magic}.");
   }
+
+  /// <summary>What Olympus writes where TIFF writes 42.</summary>
+  private const ushort _OLYMPUS_MAGIC = 0x4F52;
+
+  /// <summary>What Panasonic writes there.</summary>
+  private const ushort _PANASONIC_MAGIC = 0x0055;
 
   /// <summary>Reads the first IFD offset from the TIFF header.</summary>
   internal static int ReadFirstIfdOffset(byte[] data, bool isLittleEndian) {
