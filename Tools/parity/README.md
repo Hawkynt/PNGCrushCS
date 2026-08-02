@@ -58,7 +58,21 @@ here draws.
 It is a floor, not a ceiling: it catches sizes that are obviously impossible, and a reader can still
 be wrong within plausible bounds. Only the format's own validation catches those.
 
-## What it does not cover
+## Tom's Editor
 
-Tom's Editor is a web service with a request quota, so it cannot be swept over a corpus and is not
-part of this. It stays a spot-check.
+```sh
+Tools/parity/toms-coverage.sh
+```
+
+It is a web service with a daily conversion limit, so it cannot be swept over a corpus the way an
+installed tool can. Its catalogue page costs nothing against that limit though, and answers the
+coverage half on its own.
+
+As measured: it lists 574 dotted tokens against our 1113 extensions, and of the 77 it lists that we
+do not, most are not raster formats — page words the regex catches, ImageMagick's pseudo-formats
+(`.gray`, `.png24`), vector and page-description formats, fonts, video, and braille embossing. What
+is left is six: `.crw`, `.mrw` and `.x3f` camera raw, `.sid` and `.mrsid` wavelet, and `.sr7`.
+
+The other half — whether we decode those formats the way it does — needs a conversion apiece, and
+the limit stops that after a handful. Run the conformance suite with `TOMSEDITOR` set to spend the
+day's allowance on formats no installed tool can judge.

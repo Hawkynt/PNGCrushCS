@@ -5,9 +5,28 @@ using System.Text;
 using FileFormat.Core;
 using Hawkynt.FileFormats.Images;
 
-if (args.Length < 2) {
+if (args.Length < 1) {
   Console.Error.WriteLine("usage: Decode <sample directory> <output directory>");
   Console.Error.WriteLine("       Decode --implausible <sample directory>");
+  Console.Error.WriteLine("       Decode --extensions");
+  return 2;
+}
+
+// Every extension anything here claims, for comparing against a tool that publishes a list rather
+// than being installable — which is the only way to measure one that runs as somebody's web service.
+if (args[0] == "--extensions") {
+  foreach (var extension in FormatRegistry.AllFormats
+             .SelectMany(entry => entry.AllExtensions ?? Array.Empty<string>())
+             .Select(x => x.ToLowerInvariant())
+             .Distinct()
+             .OrderBy(x => x, StringComparer.Ordinal))
+    Console.WriteLine(extension);
+
+  return 0;
+}
+
+if (args.Length < 2) {
+  Console.Error.WriteLine("usage: Decode <sample directory> <output directory>");
   return 2;
 }
 
