@@ -95,6 +95,13 @@ internal sealed class JpegBitReader {
   }
 
   /// <summary>Checks if a restart marker is at the current byte position. If so, consumes it.</summary>
+  /// <remarks>
+  /// Reaching the marker is what ends the run of bits before it, so the reader is sitting at the end
+  /// of the data by the time this is called; stepping over the marker has to lift that. It did not,
+  /// so a file written with restart intervals decoded its first interval and then read zeros for
+  /// every bit after — the whole picture came out one flat mid-grey, whatever was in it. Cameras
+  /// write restart intervals as a matter of course.
+  /// </remarks>
   public bool TryConsumeRestart(int expectedRstIndex) {
     AlignToByte();
     // Look for 0xFF RST marker
@@ -103,6 +110,7 @@ internal sealed class JpegBitReader {
         var marker = this._data[this._pos + 1];
         if (JpegMarker.IsRst(marker)) {
           this._pos += 2;
+          this._atEnd = false; // there is data again on the far side of it
           return (marker & 0x07) == (expectedRstIndex & 0x07);
         }
 
