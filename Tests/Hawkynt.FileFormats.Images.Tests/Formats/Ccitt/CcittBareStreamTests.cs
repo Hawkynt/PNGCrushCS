@@ -86,6 +86,25 @@ public sealed class CcittBareStreamTests {
 
   [Test]
   [Category("Unit")]
+  public void FaxCodingInsideItsOwnContainerIsRefused() {
+    // A ZyXEL fax puts a header of its own in front of the coding. Read as though the coding began
+    // at the first byte, the header itself decoded to four lines of nothing and reported no trouble.
+    var data = new byte[512];
+    System.Text.Encoding.ASCII.GetBytes("ZyXEL").CopyTo(data, 0);
+
+    Assert.Throws<System.IO.InvalidDataException>(() => CcittFile.ReadBareStream(data));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void BareCodingIsStillRead() {
+    var data = _Bits(_Eol + "0111" + "11" + _Eol);
+
+    Assert.That(CcittFile.ReadBareStream(data).Width, Is.EqualTo(4));
+  }
+
+  [Test]
+  [Category("Unit")]
   public void SomethingWithNoCodingAtAllIsRefused()
     => Assert.Throws<System.IO.InvalidDataException>(() => CcittFile.ReadBareStream(Array.Empty<byte>()));
 }

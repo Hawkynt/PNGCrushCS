@@ -53,6 +53,15 @@ public sealed class CcittFile :
     if (data.Length < 1)
       throw new InvalidDataException("Data too small for valid CCITT compressed data.");
 
+    // Some files carry fax coding inside a container of their own. Reading one as though the coding
+    // began at its first byte turns the header into rows: a ZyXEL fax decoded to four lines of
+    // nothing and reported no trouble. What sits after such a header is not read here, so the file
+    // is refused rather than half-decoded.
+    foreach (var container in _KnownContainers)
+      if (data.Length > container.Length && data[..container.Length].SequenceEqual(container))
+        throw new InvalidDataException(
+          "This is fax coding inside a container that states its own header, which is not read here; only bare coding is.");
+
     // Which of the two codings a bare stream holds is not stated either, and the extension is no
     // guide — tools write Group 3 coding to a .g4 quite happily. Group 3 marks its line ends and
     // Group 4 has no such code at all, so a leading run of eleven zeros settles it.
@@ -82,7 +91,12 @@ public sealed class CcittFile :
     };
   }
 
-  /// <summary>Whether the stream opens with a Group 3 end-of-line marker, allowing for fill.</summary>
+/// <summary>Signatures of containers that carry fax coding behind a header of their own.</summary>
+  private static ReadOnlySpan<byte> ZyxelSignature => "ZyXEL"u8;
+
+  private static byte[][] _KnownContainers => [ZyxelSignature.ToArray()];
+
+    /// <summary>Whether the stream opens with a Group 3 end-of-line marker, allowing for fill.</summary>
   private static bool _StartsWithEndOfLine(ReadOnlySpan<byte> data) {
     var zeros = 0;
 
