@@ -203,7 +203,8 @@ public readonly record struct KtxFile() : IImageFormatReader<KtxFile>, IImageToR
       // ASTC (0x93B0..0x93BD covers 4x4 through 12x12)
       case >= 0x93B0 and <= 0x93BD:
         var (blockW, blockH) = _AstcBlockSizeFromGlFormat(file.GlInternalFormat);
-        AstcBlockDecoder.DecodeImage(data, width, height, blockW, blockH, output);
+        if (AstcBlockDecoder.DecodeImage(data, width, height, blockW, blockH, output) is var undecoded and > 0)
+          throw new NotSupportedException($"This KTX picture is ASTC using block modes that are not decoded here ({undecoded} of its blocks).");
         break;
 
       default:
@@ -320,7 +321,8 @@ public readonly record struct KtxFile() : IImageFormatReader<KtxFile>, IImageToR
       // ASTC (VkFormat 159..184 covers 4x4 through 12x12, UNORM and SRGB variants)
       case >= 159 and <= 184:
         var (blockW, blockH) = _AstcBlockSizeFromVkFormat(file.VkFormat);
-        AstcBlockDecoder.DecodeImage(data, width, height, blockW, blockH, output);
+        if (AstcBlockDecoder.DecodeImage(data, width, height, blockW, blockH, output) is var undecoded and > 0)
+          throw new NotSupportedException($"This KTX picture is ASTC using block modes that are not decoded here ({undecoded} of its blocks).");
         break;
 
       default:

@@ -4,55 +4,50 @@ namespace FileFormat.Core.BlockDecoders;
 
 /// <summary>
 /// Decodes ASTC-compressed texture blocks (16 bytes per variable-size block).
-/// Currently handles void-extent blocks (single-color fill) and produces a magenta/black
-/// checkerboard placeholder for all other block types.
 /// </summary>
 /// <remarks>
-/// TODO: Full ASTC decoding requires integer sequence encoding (quints/trits/bits),
-/// weight grid interpolation, multi-partition support, dual-plane modes, and
-/// color endpoint decoding. This simplified decoder covers void-extent blocks
-/// and provides a visible placeholder for unsupported modes.
+/// Only void-extent blocks — the ones holding a single colour — are decoded. Everything else needs
+/// the whole of ASTC: integer sequences in trits and quints, a weight grid to interpolate, several
+/// partitions, dual-plane modes and endpoint decoding. None of that is here.
+/// <para/>
+/// What it used to do with a block it could not read was fill it with magenta and say nothing, so a
+/// picture came back looking decoded and the caller had no way to tell. A file of ordinary ASTC came
+/// out as a magenta sheet that counted as a success, which is worse than refusing it: converting one
+/// would have written the magenta out as though it were the picture. The count of blocks it could
+/// not read is now returned, and the callers refuse the file.
 /// </remarks>
 public static class AstcBlockDecoder {
 
-  /// <summary>Decodes a single 16-byte ASTC block into RGBA pixel data for a block of the given dimensions.</summary>
-  public static void DecodeBlock(ReadOnlySpan<byte> block, int blockWidth, int blockHeight, Span<byte> output) {
+  /// <summary>Decodes a single 16-byte ASTC block, returning whether it could.</summary>
+  public static bool DecodeBlock(ReadOnlySpan<byte> block, int blockWidth, int blockHeight, Span<byte> output) {
     var pixelCount = blockWidth * blockHeight;
 
     // Void-extent detection: bits [7:2] all set in byte 0 indicates a void-extent block (2D)
-    if ((block[0] & 0xFC) == 0xFC) {
-      // Void-extent block: RGBA16 values at bytes 8-15 (little-endian), take high byte for 8-bit
-      var r = block[9];
-      var g = block[11];
-      var b = block[13];
-      var a = block[15];
+    if ((block[0] & 0xFC) != 0xFC)
+      return false;
 
-      for (var i = 0; i < pixelCount; ++i) {
-        var offset = i * 4;
-        output[offset] = r;
-        output[offset + 1] = g;
-        output[offset + 2] = b;
-        output[offset + 3] = a;
-      }
+    // Void-extent block: RGBA16 values at bytes 8-15 (little-endian), take high byte for 8-bit
+    var r = block[9];
+    var g = block[11];
+    var b = block[13];
+    var a = block[15];
 
-      return;
-    }
-
-    // Non-void-extent: output magenta/black checkerboard as a placeholder for unimplemented modes
     for (var i = 0; i < pixelCount; ++i) {
-      var x = i % blockWidth;
-      var y = i / blockWidth;
-      var checker = (x + y) & 1;
       var offset = i * 4;
-      output[offset] = checker == 0 ? (byte)255 : (byte)0;
-      output[offset + 1] = 0;
-      output[offset + 2] = checker == 0 ? (byte)255 : (byte)0;
-      output[offset + 3] = 255;
+      output[offset] = r;
+      output[offset + 1] = g;
+      output[offset + 2] = b;
+      output[offset + 3] = a;
     }
+
+    return true;
   }
 
-  /// <summary>Decodes a full ASTC image from compressed data into RGBA pixel data.</summary>
-  public static void DecodeImage(ReadOnlySpan<byte> data, int width, int height, int blockWidth, int blockHeight, Span<byte> output) {
+  /// <summary>
+  /// Decodes a full ASTC image, returning how many blocks it could not read.
+  /// </summary>
+  /// <returns>Zero when the whole picture was decoded; otherwise the number of blocks left undone.</returns>
+  public static int DecodeImage(ReadOnlySpan<byte> data, int width, int height, int blockWidth, int blockHeight, Span<byte> output) {
     var blockPixelCount = blockWidth * blockHeight;
     var blockPixelBytes = blockPixelCount * 4;
 
@@ -64,14 +59,18 @@ public static class AstcBlockDecoder {
     var blocksX = (width + blockWidth - 1) / blockWidth;
     var blocksY = (height + blockHeight - 1) / blockHeight;
     var blockIndex = 0;
+    var undecoded = 0;
 
     for (var by = 0; by < blocksY; ++by) {
       for (var bx = 0; bx < blocksX; ++bx) {
         var blockOffset = blockIndex * 16;
         if (blockOffset + 16 > data.Length)
-          return;
+          return undecoded + (blocksY - by) * blocksX - bx;
 
-        DecodeBlock(data.Slice(blockOffset, 16), blockWidth, blockHeight, blockPixels);
+        if (!DecodeBlock(data.Slice(blockOffset, 16), blockWidth, blockHeight, blockPixels)) {
+          ++undecoded;
+          blockPixels.Clear();
+        }
 
         var px = bx * blockWidth;
         var py = by * blockHeight;
@@ -88,5 +87,7 @@ public static class AstcBlockDecoder {
         ++blockIndex;
       }
     }
+
+    return undecoded;
   }
 }

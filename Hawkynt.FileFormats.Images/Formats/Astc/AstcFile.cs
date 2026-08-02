@@ -28,7 +28,11 @@ public readonly record struct AstcFile : IImageFormatReader<AstcFile>, IImageToR
     var width = file.Width;
     var height = file.Height;
     var output = new byte[width * height * 4];
-    AstcBlockDecoder.DecodeImage(file.CompressedData, width, height, file.BlockDimX, file.BlockDimY, output);
+    // Only the single-colour blocks are decodable here; a file using the rest of ASTC is refused
+    // rather than returned as the magenta placeholder that used to stand in for it.
+    var undecoded = AstcBlockDecoder.DecodeImage(file.CompressedData, width, height, file.BlockDimX, file.BlockDimY, output);
+    if (undecoded > 0)
+      throw new NotSupportedException($"This ASTC picture uses block modes that are not decoded here ({undecoded} of its blocks).");
 
     return new RawImage {
       Width = width,

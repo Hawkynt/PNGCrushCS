@@ -46,7 +46,8 @@ public readonly record struct PvrFile : IImageFormatReader<PvrFile>, IImageToRaw
         Etc2Decoder.DecodeEtc2RgbaImage(file.CompressedData, width, height, output);
         break;
       case Pvr.PvrPixelFormat.ASTC_4x4:
-        AstcBlockDecoder.DecodeImage(file.CompressedData, width, height, 4, 4, output);
+        if (AstcBlockDecoder.DecodeImage(file.CompressedData, width, height, 4, 4, output) is var undecoded and > 0)
+          throw new NotSupportedException($"This PVR picture is ASTC using block modes that are not decoded here ({undecoded} of its blocks).");
         break;
       case Pvr.PvrPixelFormat.PVRTC_2BPP_RGB:
       case Pvr.PvrPixelFormat.PVRTC_2BPP_RGBA:
