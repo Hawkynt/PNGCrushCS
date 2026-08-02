@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.Bmp;
@@ -26,9 +27,12 @@ public static class BmpReader {
     return FromBytes(ms.ToArray());
   }
 
+  /// <summary>The length of the OS/2 BITMAPCOREHEADER, which is what marks a file as that older kind.</summary>
+  private const int CORE_HEADER_SIZE = 12;
+
   public static BmpFile FromSpan(ReadOnlySpan<byte> data) {
 
-    if (data.Length < BitmapFileHeader.StructSize + BitmapInfoHeader.StructSize)
+    if (data.Length < BitmapFileHeader.StructSize + CORE_HEADER_SIZE)
       throw new InvalidDataException("Data too small for a valid BMP file.");
 
     // BITMAPFILEHEADER (14 bytes)
@@ -38,23 +42,40 @@ public static class BmpReader {
 
     var pixelDataOffset = fileHeader.PixelDataOffset;
 
-    // BITMAPINFOHEADER (40 bytes minimum)
-    var infoHeader = BitmapInfoHeader.ReadFrom(data[BitmapFileHeader.StructSize..]);
-    if (infoHeader.HeaderSize < BitmapInfoHeader.StructSize)
-      throw new InvalidDataException($"Unsupported BMP header size: {infoHeader.HeaderSize}.");
+    // The first field of the second header states its own length, and that is what says which of
+    // the two shapes follows: 12 is the OS/2 one, anything from 40 up is the Windows one.
+    var headerSize = BinaryPrimitives.ReadInt32LittleEndian(data[BitmapFileHeader.StructSize..]);
 
-    var width = infoHeader.Width;
-    var rawHeight = infoHeader.Height;
+    int width, rawHeight, bitsPerPixel, bmpCompression, colorsUsed, paletteEntrySize;
+    if (headerSize == CORE_HEADER_SIZE) {
+      // BITMAPCOREHEADER: the sizes are 16-bit, there is no compression or colour count, and the
+      // palette that follows is three bytes an entry rather than four.
+      var core = data[(BitmapFileHeader.StructSize + 4)..];
+      width = BinaryPrimitives.ReadUInt16LittleEndian(core);
+      rawHeight = BinaryPrimitives.ReadUInt16LittleEndian(core[2..]);
+      bitsPerPixel = BinaryPrimitives.ReadUInt16LittleEndian(core[6..]);
+      bmpCompression = 0;
+      colorsUsed = 0;
+      paletteEntrySize = 3;
+    } else {
+      if (headerSize < BitmapInfoHeader.StructSize || data.Length < BitmapFileHeader.StructSize + BitmapInfoHeader.StructSize)
+        throw new InvalidDataException($"Unsupported BMP header size: {headerSize}.");
+
+      var infoHeader = BitmapInfoHeader.ReadFrom(data[BitmapFileHeader.StructSize..]);
+      width = infoHeader.Width;
+      rawHeight = infoHeader.Height;
+      bitsPerPixel = infoHeader.BitsPerPixel;
+      bmpCompression = infoHeader.Compression;
+      colorsUsed = infoHeader.ColorsUsed;
+      paletteEntrySize = 4;
+    }
+
     var rowOrder = rawHeight < 0 ? BmpRowOrder.TopDown : BmpRowOrder.BottomUp;
     var height = Math.Abs(rawHeight);
 
-    var bitsPerPixel = infoHeader.BitsPerPixel;
-    var bmpCompression = infoHeader.Compression;
-    var colorsUsed = infoHeader.ColorsUsed;
-
     // Skip any extra header bytes + BITFIELDS masks
-    var paletteStart = BitmapFileHeader.StructSize + infoHeader.HeaderSize;
-    if (bmpCompression == 3 && infoHeader.HeaderSize == BitmapInfoHeader.StructSize)
+    var paletteStart = BitmapFileHeader.StructSize + headerSize;
+    if (bmpCompression == 3 && headerSize == BitmapInfoHeader.StructSize)
       paletteStart += 12; // 3 x 4-byte masks
 
     // Read palette
@@ -62,13 +83,19 @@ public static class BmpReader {
     var paletteColorCount = 0;
     if (bitsPerPixel <= 8) {
       paletteColorCount = colorsUsed > 0 ? colorsUsed : 1 << bitsPerPixel;
+
+      // A file may state more entries than it carries; keep to what is actually there.
+      var available = (pixelDataOffset > paletteStart ? pixelDataOffset - paletteStart : data.Length - paletteStart) / paletteEntrySize;
+      if (available > 0 && paletteColorCount > available)
+        paletteColorCount = available;
+
       palette = new byte[paletteColorCount * 3];
       var paletteOffset = paletteStart;
       for (var i = 0; i < paletteColorCount; ++i) {
         palette[i * 3] = data[paletteOffset + 2];     // R (from BGR+reserved)
         palette[i * 3 + 1] = data[paletteOffset + 1]; // G
         palette[i * 3 + 2] = data[paletteOffset];     // B
-        paletteOffset += 4;
+        paletteOffset += paletteEntrySize;
       }
     }
 
