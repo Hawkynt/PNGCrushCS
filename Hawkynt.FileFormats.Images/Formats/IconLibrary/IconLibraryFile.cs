@@ -23,16 +23,17 @@ public readonly record struct IconLibraryFile : IImageFormatReader<IconLibraryFi
   /// <summary>Raw file data.</summary>
   public byte[] RawData { get; init; }
 
-  /// <summary>Converts to a placeholder Rgb24 raw image.</summary>
-  public static RawImage ToRawImage(IconLibraryFile file) {
-
-    var pixelData = new byte[file.Width * file.Height * 3];
-    return new() {
-      Width = file.Width,
-      Height = file.Height,
-      Format = PixelFormat.Rgb24,
-      PixelData = pixelData,
-    };
-  }
+  /// <summary>
+  /// Refuses the file, the icons inside one of these not being read here.
+  /// </summary>
+  /// <remarks>
+  /// An icon library is an executable carrying icons as resources, and pulling them out means
+  /// walking its resource tables. That is not done here; what was returned instead was a picture of
+  /// the right size with every pixel black, which counts as a decode and cannot be told from one.
+  /// A picture that is the right shape and entirely wrong is worse than none, because nothing
+  /// downstream has any way to notice.
+  /// </remarks>
+  public static RawImage ToRawImage(IconLibraryFile file)
+    => throw new NotSupportedException("The icons inside an icon library are not read here; only the file itself is recognised.");
 
 }

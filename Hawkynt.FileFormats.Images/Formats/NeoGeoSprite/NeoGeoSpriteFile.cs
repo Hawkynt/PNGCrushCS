@@ -14,8 +14,18 @@ public readonly record struct NeoGeoSpriteFile : IImageFormatReader<NeoGeoSprite
 
   private static readonly byte[] _DefaultPalette = [0, 0, 0, 0, 0, 170, 0, 170, 0, 0, 170, 170, 170, 0, 0, 170, 0, 170, 170, 85, 0, 170, 170, 170, 85, 85, 85, 85, 85, 255, 85, 255, 85, 85, 255, 255, 255, 85, 85, 255, 85, 255, 255, 255, 85, 255, 255, 255];
 
-  static string IImageFormatMetadata<NeoGeoSpriteFile>.PrimaryExtension => ".neo";
-  static string[] IImageFormatMetadata<NeoGeoSpriteFile>.FileExtensions => [".neo", ".spr"];
+  /// <summary>
+  /// The extension these carry.
+  /// </summary>
+  /// <remarks>
+  /// It used to claim <c>.neo</c> as well, which belongs to NEOchrome. This format has no header at
+  /// all — it takes anything whose length divides by the size of a tile — and a NEOchrome picture is
+  /// 32128 bytes, which is 251 of them. So every NEOchrome file opened as a sheet of sprites 128 by
+  /// 504, and because it was tried first the format that could actually have checked the file never
+  /// got to see it.
+  /// </remarks>
+  static string IImageFormatMetadata<NeoGeoSpriteFile>.PrimaryExtension => ".spr";
+  static string[] IImageFormatMetadata<NeoGeoSpriteFile>.FileExtensions => [".spr"];
   static NeoGeoSpriteFile IImageFormatReader<NeoGeoSpriteFile>.FromSpan(ReadOnlySpan<byte> data) => NeoGeoSpriteReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<NeoGeoSpriteFile>.VideoModes => [new("Default", [(TilesPerRow * TileSize, new IntegerRange(TileSize, 4096, TileSize))], [new IntegerRange(2, 16)])];
   static byte[] IImageFormatWriter<NeoGeoSpriteFile>.ToBytes(NeoGeoSpriteFile file) => NeoGeoSpriteWriter.ToBytes(file);
