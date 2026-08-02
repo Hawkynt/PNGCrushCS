@@ -74,6 +74,29 @@ solvable, because doubling the offset gives the difference between two registers
 at fault. Every remaining sample shows between seven and sixteen distinct offsets, so several things
 are wrong at once in each, and the arithmetic that worked will not.
 
+## Which read gaps are worth attempting
+
+Sixty-two samples are read by RECOIL and not by us. They are not equally tractable, and the cheap
+test for it is whether the file's length matches an uncompressed picture at the size RECOIL draws:
+
+```sh
+# length - small header == width * height * bpp / 8, for bpp in 1, 2, 4, 8, 24
+```
+
+Twenty-one of the sixty-two match that. The rest are compressed, or stored at a size nothing in the
+file states, and each needs its coding worked out before anything else.
+
+What has come out of attempting them, which is the more useful half:
+
+- A **coding** yields to arithmetic. Reconstruct the picture the other tool draws, and the file has to
+  be a coding of exactly those bytes — that gave up the Atari Paintworks packing, the ICE inverse
+  register, and the Mad Studio default colours, each verified to the byte.
+- An **ordering** does not. There is nothing to invert: either the scan pattern is recognised or it is
+  not. ComputerEyes and MAG both stalled there, and in both the first pixel of the wrong guess is
+  exact, which is what makes them tempting.
+- A file with **no header** cannot be verified from one sample. `.cut` decodes at 96 by 99 to the
+  pixel, but nothing in it states either number, so a reader would be a guess dressed as a fact.
+
 ## Decodes that succeed and are still wrong
 
 ```sh
