@@ -163,17 +163,20 @@ public readonly record struct KtxFile() : IImageFormatReader<KtxFile>, IImageToR
       // ETC2 RGB
       case 0x9274: // GL_COMPRESSED_RGB8_ETC2
       case 0x9275: // GL_COMPRESSED_SRGB8_ETC2
-        Etc2Decoder.DecodeEtc2RgbImage(data, width, height, output);
+        if (Etc2Decoder.DecodeEtc2RgbImage(data, width, height, output) is var undecodedDecodeEtc2RgbImage and > 0)
+          throw new NotSupportedException($"This picture uses the ETC2 arrangements that are not decoded here ({undecodedDecodeEtc2RgbImage} of its blocks).");
         break;
 
       // ETC2 punchthrough alpha
       case 0x9276: // GL_COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2
-        Etc2Decoder.DecodeEtc2RgbA1Image(data, width, height, output);
+        if (Etc2Decoder.DecodeEtc2RgbA1Image(data, width, height, output) is var undecodedDecodeEtc2RgbA1Image and > 0)
+          throw new NotSupportedException($"This picture uses the ETC2 arrangements that are not decoded here ({undecodedDecodeEtc2RgbA1Image} of its blocks).");
         break;
 
       // ETC2 RGBA
       case 0x9278: // GL_COMPRESSED_RGBA8_ETC2_EAC
-        Etc2Decoder.DecodeEtc2RgbaImage(data, width, height, output);
+        if (Etc2Decoder.DecodeEtc2RgbaImage(data, width, height, output) is var undecodedDecodeEtc2RgbaImage and > 0)
+          throw new NotSupportedException($"This picture uses the ETC2 arrangements that are not decoded here ({undecodedDecodeEtc2RgbaImage} of its blocks).");
         break;
 
       // EAC R11
@@ -277,19 +280,22 @@ public readonly record struct KtxFile() : IImageFormatReader<KtxFile>, IImageToR
       // ETC2 RGB
       case 149: // VK_FORMAT_ETC2_R8G8B8_UNORM_BLOCK
       case 150: // VK_FORMAT_ETC2_R8G8B8_SRGB_BLOCK
-        Etc2Decoder.DecodeEtc2RgbImage(data, width, height, output);
+        if (Etc2Decoder.DecodeEtc2RgbImage(data, width, height, output) is var undecodedDecodeEtc2RgbImage and > 0)
+          throw new NotSupportedException($"This picture uses the ETC2 arrangements that are not decoded here ({undecodedDecodeEtc2RgbImage} of its blocks).");
         break;
 
       // ETC2 punchthrough alpha
       case 151: // VK_FORMAT_ETC2_R8G8B8A1_UNORM_BLOCK
       case 152: // VK_FORMAT_ETC2_R8G8B8A1_SRGB_BLOCK
-        Etc2Decoder.DecodeEtc2RgbA1Image(data, width, height, output);
+        if (Etc2Decoder.DecodeEtc2RgbA1Image(data, width, height, output) is var undecodedDecodeEtc2RgbA1Image and > 0)
+          throw new NotSupportedException($"This picture uses the ETC2 arrangements that are not decoded here ({undecodedDecodeEtc2RgbA1Image} of its blocks).");
         break;
 
       // ETC2 RGBA
       case 153: // VK_FORMAT_ETC2_R8G8B8A8_UNORM_BLOCK
       case 154: // VK_FORMAT_ETC2_R8G8B8A8_SRGB_BLOCK
-        Etc2Decoder.DecodeEtc2RgbaImage(data, width, height, output);
+        if (Etc2Decoder.DecodeEtc2RgbaImage(data, width, height, output) is var undecodedDecodeEtc2RgbaImage and > 0)
+          throw new NotSupportedException($"This picture uses the ETC2 arrangements that are not decoded here ({undecodedDecodeEtc2RgbaImage} of its blocks).");
         break;
 
       // EAC R11
