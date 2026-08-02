@@ -68,9 +68,9 @@ public readonly record struct MsxScreen8File : IImageFormatReader<MsxScreen8File
       var r = (b >> 2) & 0x07;
       var bl = b & 0x03;
       var dstOffset = i * 3;
-      rgb[dstOffset] = (byte)(r * 255 / 7);
-      rgb[dstOffset + 1] = (byte)(g * 255 / 7);
-      rgb[dstOffset + 2] = (byte)(bl * 255 / 3);
+      rgb[dstOffset] = MsxGraphics.Expand3(r);
+      rgb[dstOffset + 1] = MsxGraphics.Expand3(g);
+      rgb[dstOffset + 2] = MsxGraphics.Expand2(bl);
     }
 
     return new() {

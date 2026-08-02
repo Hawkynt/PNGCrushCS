@@ -33,8 +33,34 @@ public static class MsxGraphics {
     data[4] = (byte)(endAddress >> 8);
   }
 
-  /// <summary>Expands one of the palette's three-bit channels to eight bits.</summary>
-  private static byte _Expand3(int value) => (byte)((value << 5) | (value << 2) | (value >> 1));
+  /// <summary>
+  /// Expands one of the palette's three-bit channels to eight bits.
+  /// </summary>
+  /// <remarks>
+  /// By repeating the bits, which is what carries seven to 255 and four to 146. Dividing by seven
+  /// and truncating gives 145 for the same input, and that one step is the whole of the difference
+  /// from every other decoder. Three formats did it that way, each having worked it out afresh.
+  /// </remarks>
+  public static byte Expand3(int value) => (byte)((value << 5) | (value << 2) | (value >> 1));
+
+  /// <summary>
+  /// Expands Screen 8's two-bit blue channel to eight bits.
+  /// </summary>
+  /// <remarks>
+  /// Blue has two bits where red and green have three, and the machine does not give it a scale of
+  /// its own: it lifts the value onto the three-bit one through 0, 2, 4, 7. The last step is larger
+  /// than the others so that the brightest blue still reaches 255 and white is white — doubling
+  /// throughout would stop at 219 and leave the whole picture short of it.
+  /// <para/>
+  /// Repeating the two bits instead, which looks like the obvious thing, gives 85 and 170 and puts
+  /// every blue a little too high.
+  /// </remarks>
+  public static byte Expand2(int value) => Expand3(_TwoBitBlue[value & 3]);
+
+  /// <summary>Where each of the two-bit blues sits on the three-bit scale.</summary>
+  private static ReadOnlySpan<int> _TwoBitBlue => [0, 2, 4, 7];
+
+  private static byte _Expand3(int value) => Expand3(value);
 
   /// <summary>Expands one of YJK's five-bit channels to eight bits.</summary>
   private static byte _Expand5(int value) => (byte)((value << 3) | (value >> 2));

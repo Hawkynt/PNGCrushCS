@@ -189,9 +189,9 @@ public readonly record struct MsxFile : IImageFormatReader<MsxFile>, IImageToRaw
       var r = (b >> 2) & 0x07;
       var bl = b & 0x03;
       var dstOffset = i * 3;
-      rgb[dstOffset] = (byte)(r * 255 / 7);
-      rgb[dstOffset + 1] = (byte)(g * 255 / 7);
-      rgb[dstOffset + 2] = (byte)(bl * 255 / 3);
+      rgb[dstOffset] = MsxGraphics.Expand3(r);
+      rgb[dstOffset + 1] = MsxGraphics.Expand3(g);
+      rgb[dstOffset + 2] = MsxGraphics.Expand2(bl);
     }
 
     return new() {
@@ -214,9 +214,9 @@ public readonly record struct MsxFile : IImageFormatReader<MsxFile>, IImageToRaw
       var r = (byte0 >> 4) & 0x07;
       var b = byte0 & 0x07;
       var g = byte1 & 0x07;
-      rgb[i * 3] = (byte)(r * 255 / 7);
-      rgb[i * 3 + 1] = (byte)(g * 255 / 7);
-      rgb[i * 3 + 2] = (byte)(b * 255 / 7);
+      rgb[i * 3] = MsxGraphics.Expand3(r);
+      rgb[i * 3 + 1] = MsxGraphics.Expand3(g);
+      rgb[i * 3 + 2] = MsxGraphics.Expand3(b);
     }
 
     return rgb;
