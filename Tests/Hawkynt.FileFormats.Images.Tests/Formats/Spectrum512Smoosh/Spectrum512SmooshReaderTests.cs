@@ -79,18 +79,23 @@ public sealed class Spectrum512SmooshReaderTests {
 
   [Test]
   [Category("Unit")]
-  public void ToRawImage_ReturnsBlackStubImage() {
+  /// <summary>
+  /// A picture that has not been decoded is refused rather than returned black.
+  /// </summary>
+  /// <remarks>
+  /// This used to assert the black picture, which is what the reader returned: the right size, every
+  /// pixel nought, and nothing anywhere marking it as undecoded. That counted as a decode, so
+  /// converting one of these would have written the black out as though it were the picture.
+  /// <para/>
+  /// The packing keeps a palette per scanline and codes the two apart from one another, and none of
+  /// that is implemented here.
+  /// </remarks>
+  public void ToRawImage_RefusesWhatItCannotDecode() {
     var file = new Spectrum512SmooshFile {
       RawData = new byte[10]
     };
 
-    var raw = Spectrum512SmooshFile.ToRawImage(file);
-
-    Assert.That(raw.Width, Is.EqualTo(320));
-    Assert.That(raw.Height, Is.EqualTo(199));
-    Assert.That(raw.Format, Is.EqualTo(FileFormat.Core.PixelFormat.Rgb24));
-    Assert.That(raw.PixelData.Length, Is.EqualTo(320 * 199 * 3));
-    Assert.That(raw.PixelData[0], Is.EqualTo(0));
+    Assert.Throws<NotSupportedException>(() => Spectrum512SmooshFile.ToRawImage(file));
   }
   [Test]
   [Category("Integration")]

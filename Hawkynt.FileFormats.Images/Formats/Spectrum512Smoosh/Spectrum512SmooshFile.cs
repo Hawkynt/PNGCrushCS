@@ -3,7 +3,7 @@ using FileFormat.Core;
 
 namespace FileFormat.Spectrum512Smoosh;
 
-/// <summary>In-memory representation of an Atari ST Spectrum 512 Smooshed (SPS) image (320x199, 512 colors). Stub implementation.</summary>
+/// <summary>In-memory representation of an Atari ST Spectrum 512 Smooshed (SPS) image (320x199, 512 colors).</summary>
 public readonly record struct Spectrum512SmooshFile : IImageFormatReader<Spectrum512SmooshFile>, IImageToRawImage<Spectrum512SmooshFile>, IImageFormatWriter<Spectrum512SmooshFile> {
 
   /// <summary>Minimum file size for validation.</summary>
@@ -23,19 +23,18 @@ public readonly record struct Spectrum512SmooshFile : IImageFormatReader<Spectru
   /// <summary>The raw smooshed data bytes.</summary>
   public byte[] RawData { get; init; }
 
-  public static RawImage ToRawImage(Spectrum512SmooshFile file) {
-
-    // Stub: the smoosh decompression format is complex; return a black image
-    const int width = 320;
-    const int height = 199;
-    var rgb = new byte[width * height * 3];
-
-    return new() {
-      Width = width,
-      Height = height,
-      Format = PixelFormat.Rgb24,
-      PixelData = rgb,
-    };
-  }
+  /// <summary>
+  /// Refuses the picture, the smooshed packing not being decoded here.
+  /// </summary>
+  /// <remarks>
+  /// What this used to return was a black picture of the right size, and nothing marked it as
+  /// anything else — so a file that had not been decoded at all counted as a decode, and converting
+  /// one would have written the black out as though it were the picture.
+  /// <para/>
+  /// The packing keeps a palette per scanline and codes the two apart from one another; none of that
+  /// is implemented, and saying so is the only honest answer until it is.
+  /// </remarks>
+  public static RawImage ToRawImage(Spectrum512SmooshFile file)
+    => throw new NotSupportedException("A smooshed Spectrum 512 picture is not decoded here; only the file itself is recognised.");
 
 }

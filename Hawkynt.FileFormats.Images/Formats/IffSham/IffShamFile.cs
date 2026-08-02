@@ -29,20 +29,16 @@ public readonly record struct IffShamFile : IImageFormatReader<IffShamFile>, IIm
   /// <summary>Raw file data.</summary>
   public byte[] RawData { get; init; }
 
-  /// <summary>Converts this SHAM image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
-  public static RawImage ToRawImage(IffShamFile file) {
-
-    var width = file.Width;
-    var height = file.Height;
-    var rgb = new byte[width * height * 3];
-
-    // Simplified: produce a black image since full SHAM decode requires complex per-scanline palette handling
-    return new() {
-      Width = width,
-      Height = height,
-      Format = PixelFormat.Rgb24,
-      PixelData = rgb,
-    };
-  }
+  /// <summary>
+  /// Refuses the picture, SHAM's per-scanline palettes not being decoded here.
+  /// </summary>
+  /// <remarks>
+  /// What this used to return was a black picture of the right size, and nothing marked it as
+  /// anything else — so a file that had not been decoded at all counted as a decode. The whole point
+  /// of SHAM is that the palette changes from one scanline to the next, so a decode that ignores
+  /// that has not read the picture in any sense.
+  /// </remarks>
+  public static RawImage ToRawImage(IffShamFile file)
+    => throw new NotSupportedException("A SHAM picture is not decoded here; only the file itself is recognised.");
 
 }
