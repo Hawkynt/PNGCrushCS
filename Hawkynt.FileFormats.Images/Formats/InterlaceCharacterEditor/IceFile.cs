@@ -98,8 +98,8 @@ public readonly record struct IceFile
   public static RawImage ToRawImage(IceFile file) {
     var header = file.Header ?? [];
     var kind = IceLayout.SecondFrameKind(file.Mode);
-    var first = _RenderFrame(file, file.Characters1 ?? [], 0, IceLayout.FirstFrameColors(file.Mode, header), IceFrameKind.Graphics12, IceLayout.InverseColor(file.Mode, header));
-    var second = _RenderFrame(file, file.Characters2 ?? [], 1, IceLayout.SecondFrameColors(file.Mode, header), kind);
+    var first = _RenderFrame(file, file.Characters1 ?? [], 0, IceLayout.FirstFrameColors(file.Mode, header), IceFrameKind.Graphics12, IceLayout.InverseColor(file.Mode, header, 0));
+    var second = _RenderFrame(file, file.Characters2 ?? [], 1, IceLayout.SecondFrameColors(file.Mode, header), kind, IceLayout.InverseColor(file.Mode, header, 1));
 
     var gtia = Atari8BitGraphics.CreatePalette();
 

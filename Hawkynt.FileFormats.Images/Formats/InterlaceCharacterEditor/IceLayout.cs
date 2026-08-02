@@ -104,20 +104,27 @@ public static class IceLayout {
 
   /// <summary>
   /// The register a mode 4 frame draws for its highest value when the character asks for the
-  /// inverse set, or null where the mode does not have a separate one.
+  /// inverse set, or null where that frame is not a mode 4 one.
   /// </summary>
   /// <remarks>
   /// A character with bit 7 set draws its three-valued pixels from PF3 instead of PF2. The bit was
   /// masked out of the font index, which is right, and then nothing was done with it — so every
   /// inverse character came out in the wrong colour.
   /// <para/>
-  /// Only PCIN is given one here, because that is where the register could be established: in the
-  /// sample every differing pixel is ours plus 116 in red, our value comes from a register whose red
-  /// is 233, and the colour RECOIL draws works out to 0, 30, 48 against the 0, 31, 48 of the
-  /// register after it. The other modes are left alone rather than guessed at.
+  /// Which register that is was derived from the samples rather than reasoned about, after reasoning
+  /// about it gave the wrong answer once. In each case every differing pixel is ours plus a fixed
+  /// amount, doubling that amount gives the difference between two registers, and the register it
+  /// points at is the one straight after the value-3 register — PF3 following PF2, as the hardware
+  /// says, but established by measurement.
   /// </remarks>
-  public static byte? InverseColor(IceMode mode, ReadOnlySpan<byte> header) => mode switch {
-    IceMode.Pcin => _At(header, 8),
+  public static byte? InverseColor(IceMode mode, ReadOnlySpan<byte> header, int frame) => mode switch {
+    // Both frames share one set of registers, so both take the same inverse one.
+    IceMode.SuperIrg => _At(header, 5),
+    // The registers come in pairs, the first frame taking the even byte of each.
+    IceMode.SuperIrg2 => _At(header, frame == 0 ? 8 : 9),
+    // Only the first frame is a mode 4 one; the second is a GTIA mode with no inverse set.
+    IceMode.Min or IceMode.Cin => frame == 0 ? _At(header, 5) : null,
+    IceMode.Pcin => frame == 0 ? _At(header, 8) : null,
     _ => null,
   };
 
