@@ -50,26 +50,26 @@ nonsense:
 
 ## Where the remaining differences with RECOIL are
 
-Sixty-one samples are genuinely different pictures rather than different shades. Grouped by the
-decoder that produced them, so the work is schedulable rather than a list of filenames:
+Fifty-two samples are genuinely different pictures rather than different shades. There is no cluster
+left: the largest group sharing a decoder is two, and most are one apiece. Nine were closed by
+finding shared causes — four ways an IFF states a palette that changes down the screen, and the
+inverse-video register in every Interlace Character Editor mode — and that exhausted the families
+that had one.
 
-| decoder | samples | what is wrong |
-|---|---|---|
-| ILBM | 7 | Amiga display modes we decode as plain bitplanes |
-| ICE | 4 | |
-| UIMG, Pixel Perfect, Fun Painter | 2 each | |
-| twenty-odd others | 1 each | |
+By the shape of the difference:
 
-What was established while looking:
+| shape | samples |
+|---|---|
+| same size, several colours wrong at once | 21 |
+| geometry differs in a way that is not a clean multiple | 21 |
+| RECOIL draws twice the width | 8 |
+| RECOIL draws twice the height | 2 |
 
-- `.dct` and `.dctv` come out two rows taller than RECOIL's, which looks like control data it drops —
-  it is not. Aligning on any row offset leaves under 1% of pixels matching, because DCTV carries
-  colour as a modulation across neighbouring pixels and we read it as an ordinary ILBM.
-- The C64 multicolour formats that come out 160 wide against RECOIL's 320 are not a scaling
-  difference either. Sampling its every other column, at any alignment, matches 2% to 18% — the
-  content differs, not the width.
-- `.fp2` renders 16 colours here and 90 in RECOIL, which is it blending two interlaced frames. That
-  is a display choice rather than a decode fault, but it is not one the comparison can see past.
+What is worth knowing before starting on any of them: **none is a single constant colour offset any
+more.** That shape — every differing pixel out by the same amount — is what made the ICE modes
+solvable, because doubling the offset gives the difference between two registers and names the one
+at fault. Every remaining sample shows between seven and sixteen distinct offsets, so several things
+are wrong at once in each, and the arithmetic that worked will not.
 
 ## Decodes that succeed and are still wrong
 
