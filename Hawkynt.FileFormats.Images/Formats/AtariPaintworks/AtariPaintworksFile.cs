@@ -22,6 +22,9 @@ public readonly record struct AtariPaintworksFile : IImageFormatReader<AtariPain
   /// <summary>Flags for an uncompressed 320x200 low-resolution screen.</summary>
   public const byte LowResolutionFlags = 0x01;
 
+  /// <summary>The bit the flags byte sets for the monochrome screen.</summary>
+  public const byte HighResolutionFlag = 0x20;
+
   /// <summary>Offset of the bitmap.</summary>
   public const int BitmapOffset = 128;
 

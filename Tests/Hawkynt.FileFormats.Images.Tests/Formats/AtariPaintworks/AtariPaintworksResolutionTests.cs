@@ -111,4 +111,31 @@ public sealed class AtariPaintworksResolutionTests {
 
     Assert.That(failure!.Message, Does.Contain("compressed"));
   }
+
+  [Test]
+  [Category("Integration")]
+  public void Written_StatesTheResolutionItWasGiven() {
+    // The resolution was never written at all, so every file said nought — the lowest — and a
+    // monochrome picture came back as a sixteen-colour one from any other reader.
+    var high = AtariPaintworksWriter.ToBytes(AtariPaintworksReader.FromBytes(_Picture(2, 0)));
+    var low = AtariPaintworksWriter.ToBytes(AtariPaintworksReader.FromBytes(_Picture(0, 0)));
+
+    Assert.Multiple(() => {
+      Assert.That(high[3], Is.EqualTo(2), "the long word the file opens with");
+      Assert.That(low[3], Is.Zero);
+      Assert.That(high[63] & 0x20, Is.EqualTo(0x20), "and the flags byte other readers go by");
+      Assert.That(low[63] & 0x20, Is.Zero);
+    });
+  }
+
+  [Test]
+  [Category("Integration")]
+  public void WrittenAndReadBackKeepsTheResolution() {
+    foreach (var resolution in new[] { 0, 1, 2 }) {
+      var restored = AtariPaintworksReader.FromBytes(
+        AtariPaintworksWriter.ToBytes(AtariPaintworksReader.FromBytes(_Picture(resolution, 0))));
+
+      Assert.That((int)restored.Resolution, Is.EqualTo(resolution), $"resolution {resolution}");
+    }
+  }
 }
