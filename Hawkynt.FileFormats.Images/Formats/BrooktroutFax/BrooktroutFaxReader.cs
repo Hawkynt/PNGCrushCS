@@ -1,6 +1,8 @@
 using System;
 using System.IO;
 
+using FileFormat.Ccitt;
+
 namespace FileFormat.BrooktroutFax;
 
 /// <summary>Reads Brooktrout 301 fax image files from bytes, streams, or file paths.</summary>
@@ -28,30 +30,26 @@ public static class BrooktroutFaxReader {
   public static BrooktroutFaxFile FromSpan(ReadOnlySpan<byte> data) {
 
     if (data.Length < BrooktroutFaxFile.HeaderSize)
-      throw new InvalidDataException("Data too small for a valid BrooktroutFax file.");
+      throw new InvalidDataException("Data too small for a valid Brooktrout fax.");
 
-    var width = data[0] | (data[1] << 8);
-    var height = data[2] | (data[3] << 8);
-    if (width == 0) width = data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24);
-    if (width <= 0 || width > 65535) width = 1728;
+    if (!data[..BrooktroutFaxFile.Signature.Length].SequenceEqual(BrooktroutFaxFile.Signature))
+      throw new InvalidDataException("Not a Brooktrout fax: it does not begin with BB 01.");
 
-    if (32 >= 8) {
-      height = data[4] | (data[5] << 8);
-      if (height <= 0 || height > 65535) height = 2200;
-    } else if (height <= 0 || height > 65535) {
-      height = 2200;
-    }
+    // The size used to be read from offsets 0 and 4 — the signature and the resolution — and a field
+    // that came out wrong was replaced with 1728 by 2200 rather than refusing the file.
+    var width = data[BrooktroutFaxFile.WidthOffset] | (data[BrooktroutFaxFile.WidthOffset + 1] << 8);
+    var height = data[BrooktroutFaxFile.HeightOffset] | (data[BrooktroutFaxFile.HeightOffset + 1] << 8);
+    if (width <= 0 || height <= 0)
+      throw new InvalidDataException($"A Brooktrout fax states {width}x{height}, which is no size.");
 
-    var pixelBytes = (width + 7) / 8 * height;
-    var pixelData = new byte[pixelBytes];
-    // Padding what the file does not contain turns a misread size into a picture: a header taken
-    // from the wrong offset asked for millions of pixels, the few hundred bytes present were
-    // copied in, and the rest was zeros reported as a successful read.
-    var available = data.Length - BrooktroutFaxFile.HeaderSize;
-    if (available < pixelBytes)
-      throw new InvalidDataException($"Expected {pixelBytes} bytes of pixel data, got {available}.");
+    // The page is fax-coded and begins with a synchronising code on the boundary past the header.
+    var coded = data[BrooktroutFaxFile.HeaderSize..].ToArray();
+    var oneDimensional = CcittG3Decoder.Decode(coded, width, height, out var g3Rows);
+    var twoDimensional = CcittG4Decoder.Decode(coded, width, height, out var g4Rows);
 
-    data.Slice(BrooktroutFaxFile.HeaderSize, pixelBytes).CopyTo(pixelData.AsSpan(0));
+    var pixelData = g4Rows > g3Rows ? twoDimensional : oneDimensional;
+    if (Math.Max(g3Rows, g4Rows) <= 0)
+      throw new InvalidDataException("A Brooktrout page decoded to no scanlines at all.");
 
     return new() {
       Width = width,

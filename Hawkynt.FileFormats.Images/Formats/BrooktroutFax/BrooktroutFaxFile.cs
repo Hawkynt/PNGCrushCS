@@ -6,9 +6,20 @@ namespace FileFormat.BrooktroutFax;
 /// <summary>In-memory representation of a Brooktrout 301 fax image image.</summary>
 public readonly record struct BrooktroutFaxFile : IImageFormatReader<BrooktroutFaxFile>, IImageToRawImage<BrooktroutFaxFile>, IImageFromRawImage<BrooktroutFaxFile>, IImageFormatWriter<BrooktroutFaxFile> {
 
-  internal const int HeaderSize = 32;
+  /// <summary>The two bytes every one of these begins with.</summary>
+  internal static ReadOnlySpan<byte> Signature => [0xBB, 0x01];
 
-  private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
+  /// <summary>Offset of the width, as a 16-bit little-endian count of pixels.</summary>
+  internal const int WidthOffset = 9;
+
+  /// <summary>Offset of the height, in the same shape.</summary>
+  internal const int HeightOffset = 45;
+
+  /// <summary>Bytes before the coded page, which begins on a fixed boundary.</summary>
+  internal const int HeaderSize = 128;
+
+  /// <summary>White first: a fax states paper as zero, not ink.</summary>
+  private static readonly byte[] _BlackWhitePalette = [255, 255, 255, 0, 0, 0];
 
   static string IImageFormatMetadata<BrooktroutFaxFile>.PrimaryExtension => ".brk";
   static string[] IImageFormatMetadata<BrooktroutFaxFile>.FileExtensions => [".brk", ".301", ".brt"];
