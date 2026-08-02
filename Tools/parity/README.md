@@ -96,6 +96,23 @@ they may be right, they may be JPEG XR. That is not a claim that they are broken
 "741 formats" and "240 formats shown to work" are different statements, and only the second is
 evidence.
 
+## Getting more samples
+
+```sh
+Tools/parity/fetch-samples.sh < list-of-format-directories
+```
+
+The corpus was the limit on what could be said, so it was widened: 345 further samples covering 320
+extensions the old one had none of. What they show is worth stating plainly, because it moves the
+answer the wrong way.
+
+Of those 345, a third-party tool reads 83. We agree with 10 of them, differ on 9, and **cannot read
+64**. So widening the corpus by half found sixty-four new gaps and ten new agreements.
+
+That is the honest shape of it: the old corpus was drawn largely from formats we already read, and
+72% coverage against it was not 72% coverage of the formats that exist. Anyone quoting a coverage
+figure should say which corpus it is against.
+
 ## Which read gaps are worth attempting
 
 Sixty-two samples are read by RECOIL and not by us. They are not equally tractable, and the cheap
