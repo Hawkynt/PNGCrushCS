@@ -37,8 +37,12 @@ public static class MadStudioReader {
   }
 
   public static MadStudioFile FromSpan(ReadOnlySpan<byte> data, MadStudioMode mode) {
+    // The five colour registers sit at the end of the modes that put them after the characters, and
+    // a file may simply stop before them — two samples here do, and every other reader shows them in
+    // the mode's own default colours rather than refusing the file.
     var expected = MadStudioLayout.FileSizeFor(mode);
-    if (data.Length != expected)
+    var withoutColors = MadStudioLayout.ColorsFollowCharacters(mode) ? expected - MadStudioLayout.ColorCount : expected;
+    if (data.Length != expected && data.Length != withoutColors)
       throw new InvalidDataException($"A Mad Studio {mode} screen is {expected} bytes, got {data.Length}.");
 
     var headerSize = MadStudioLayout.HeaderSizeFor(mode);
@@ -52,9 +56,13 @@ public static class MadStudioReader {
 
     var colors = Array.Empty<byte>();
     if (mode != MadStudioMode.Antic2) {
-      colors = new byte[MadStudioLayout.ColorCount];
+      // What the machine powers up with, which is what a file that stops before its registers is
+      // shown in: black behind, then the orange, green and blue the operating system sets. Read off
+      // RECOIL's rendering of two such files, where all three land on a colour byte exactly.
+      colors = [0x00, 0x28, 0xCA, 0x94, 0x46];
       var offset = MadStudioLayout.ColorsFollowCharacters(mode) ? headerSize + mapSize : 2;
-      data.Slice(offset, MadStudioLayout.ColorCount).CopyTo(colors);
+      if (offset + MadStudioLayout.ColorCount <= data.Length)
+        data.Slice(offset, MadStudioLayout.ColorCount).CopyTo(colors);
     }
 
     return new() { Mode = mode, Characters = characters, Colors = colors };
