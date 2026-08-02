@@ -39,10 +39,15 @@ public static class PrintMasterReader {
 
     var width = widthBytes * 8;
     var pixelDataSize = widthBytes * height;
-    var pixelData = new byte[pixelDataSize];
-    var available = Math.Min(data.Length - PrintMasterFile.HeaderSize, pixelDataSize);
-    if (available > 0)
-      data.Slice(PrintMasterFile.HeaderSize, available).CopyTo(pixelData.AsSpan(0));
+
+    // Nothing marks one of these, so the length is the whole of the check. Padding what the file did
+    // not contain let anything named .pm through: a file beginning "VIEW" read those four letters as
+    // a size and came back as 150192 by 22341, a third of a billion pixels from seven kilobytes.
+    var available = data.Length - PrintMasterFile.HeaderSize;
+    if (available < pixelDataSize)
+      throw new InvalidDataException($"A Print Master picture of {width}x{height} needs {pixelDataSize} bytes of pixel data; this file has {available}.");
+
+    var pixelData = data.Slice(PrintMasterFile.HeaderSize, pixelDataSize).ToArray();
 
     return new() { Width = width, Height = height, PixelData = pixelData };
     }

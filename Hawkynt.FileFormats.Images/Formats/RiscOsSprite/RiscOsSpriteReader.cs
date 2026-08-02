@@ -36,8 +36,17 @@ public static class RiscOsSpriteReader {
       throw new InvalidDataException($"Invalid dimensions: {width}x{height}");
 
     var pixelCount = width * height;
+
+    // Stopping at the end of the file and leaving the rest black let anything named .spr through: a
+    // sprite archive beginning "\x01\x00 Sprite File" read those bytes as a size and came back as
+    // 1 by 21280, a column of pixels the file never held.
+    var needed = pixelCount * 2;
+    var available = data.Length - RiscOsSpriteFile.HeaderSize;
+    if (available < needed)
+      throw new InvalidDataException($"A sprite of {width}x{height} needs {needed} bytes of pixel data; this file has {available}.");
+
     var pixelData = new byte[pixelCount * 3];
-    for (var i = 0; i < pixelCount && RiscOsSpriteFile.HeaderSize + i * 2 + 1 < data.Length; ++i) {
+    for (var i = 0; i < pixelCount; ++i) {
       var offset = RiscOsSpriteFile.HeaderSize + i * 2;
       var rgb555 = (ushort)(data[offset] | (data[offset + 1] << 8));
       var r5 = (rgb555 >> 10) & 0x1F;
