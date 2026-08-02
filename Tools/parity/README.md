@@ -74,6 +74,28 @@ solvable, because doubling the offset gives the difference between two registers
 at fault. Every remaining sample shows between seven and sixteen distinct offsets, so several things
 are wrong at once in each, and the arithmetic that worked will not.
 
+## How many formats are actually supported
+
+The registry lists 741 formats and claims to read all of them. That number means much less than it
+looks, and JPEG XR is why it is worth saying so: it parsed containers, decoded nothing, and was
+counted the whole time. Its round-trip tests passed because the writer stored pixels and the reader
+had a fallback that copied compressed bytes back out — two halves of the same misunderstanding
+agreeing with each other.
+
+Counting instead by what can be shown, over the 320 formats that have a sample here:
+
+| | formats |
+|---|---|
+| verified against a third-party tool | 240 |
+| decode, but disagree with the tool | 57 |
+| decode, but no tool here reads the file to check against | 22 |
+| refuse their own samples | 1 |
+
+The other 421 registered formats have no sample in this corpus at all. Nothing is known about them —
+they may be right, they may be JPEG XR. That is not a claim that they are broken; it is a claim that
+"741 formats" and "240 formats shown to work" are different statements, and only the second is
+evidence.
+
 ## Which read gaps are worth attempting
 
 Sixty-two samples are read by RECOIL and not by us. They are not equally tractable, and the cheap
