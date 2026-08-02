@@ -116,6 +116,19 @@ public static class BmpReader {
     if (compression == BmpCompression.Rle8) {
       pixelData = RleCompressor.DecompressRle8(rawPixelData, width, height);
     } else {
+      // KNOWN WRONG for at least one uncompressed 1-bit file, and worth saying so here because BMP is
+      // the last format anyone would think to doubt.
+      //
+      // A 196 by 228 one-bit BMP with a two-entry palette decodes here to 71% of the pixels XnView
+      // and ImageMagick agree on — and those two agree with each other exactly, so the picture is not
+      // in question. The errors run both ways, six thousand pixels black that should be white and six
+      // thousand the reverse, scattered rather than shifted, so it is not the row order, the padding,
+      // the palette or the bit order within a byte; each of those was tried against the file and
+      // ruled out. Reading the file by hand bottom-up with a set bit as white reproduces the other
+      // two exactly, which is what this code appears to do.
+      //
+      // Left recorded rather than guessed at. Whoever picks it up should start from the sample rather
+      // than from this loop, since the loop reads correctly to inspection.
       var bytesPerRow = (width * bitsPerPixel + 7) / 8;
       var paddedBytesPerRow = (bytesPerRow + 3) & ~3;
       pixelData = new byte[bytesPerRow * height];
