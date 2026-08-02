@@ -131,6 +131,17 @@ public static class IceLayout {
       }
 
       case IceMode.Pcin: {
+        // KNOWN INCOMPLETE. Four real files decode 86 to 93 per cent of their pixels against RECOIL,
+        // and the difference was narrowed to this table: in every pixel that differs RECOIL draws
+        // register 1, which is black in the sample, where the ninth register is taken here. That
+        // register holds 0x92, a colour whose red is 232, and averaging it against a frame
+        // contributing nothing gives exactly the 116 that appears in our output and not in RECOIL's.
+        // Our picture ends up two colours short of the 32 the sample holds.
+        //
+        // Whether the ninth register should not be reached at all, or the pixel value that reaches
+        // it is computed wrongly a step earlier, is not settled — so nothing is changed here on a
+        // guess. The measurement is left for whoever has the mode documented.
+        //
         // The nine GTIA registers in order, indexed straight by the pixel value.
         var colors = new byte[9];
         colors[0] = _At(header, 1);
