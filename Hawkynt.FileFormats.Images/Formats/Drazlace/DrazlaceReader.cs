@@ -26,6 +26,26 @@ public static class DrazlaceReader {
     return FromBytes(ms.ToArray());
   }
 
+  /// <summary>
+  /// KNOWN WRONG. Reads the file, but not as a real Drazlace picture is laid out.
+  /// </summary>
+  /// <remarks>
+  /// A real file was measured and this does not match it in three ways, each read off the bytes
+  /// rather than guessed:
+  /// <list type="bullet">
+  /// <item>the load address is followed by the thirteen letters <c>DRAZLACE! 1.0</c>, which are not
+  /// stepped over here and go into the unpacker as though they were picture;</item>
+  /// <item>the byte after those letters is what the packing escapes on — 0xCB in the sample — and
+  /// zero is assumed instead;</item>
+  /// <item>what the packing expands to is 18001 bytes, two bitmaps either side of one screen plus a
+  /// colour map and the background. The 19001 demanded here counts a second screen, and sharing one
+  /// screen between the two bitmaps is the whole of what laces them together.</item>
+  /// </list>
+  /// Correcting all three still does not give the picture RECOIL draws — it goes from stripes to
+  /// blocks in roughly the right colours — so at least one more thing is wrong and the corrections
+  /// are not applied, rather than leaving the format half-changed against a writer that would then
+  /// disagree with it. The measurements are here so the next attempt starts from them.
+  /// </remarks>
   public static DrazlaceFile FromSpan(ReadOnlySpan<byte> data) {
 
     if (data.Length < DrazlaceFile.LoadAddressSize + 1)
