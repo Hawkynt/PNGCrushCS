@@ -13,7 +13,9 @@ public sealed class MsxGl6Tests {
 
   /// <summary>Four flat colours in vertical bands, so quantisation has an exact answer.</summary>
   private static RawImage _Bands() {
-    ReadOnlySpan<byte> colors = [0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255];
+    // The file states no palette, so the four Screen 6 colours are the only ones it can tell apart —
+    // black, red, green and blue would land on two of them and the bands would stop being four.
+    var colors = MsxGraphics.Screen6DefaultPaletteRgb;
     var data = new byte[_WIDTH * _DISPLAY_HEIGHT * 3];
     for (var y = 0; y < _DISPLAY_HEIGHT; ++y)
     for (var x = 0; x < _WIDTH; ++x) {

@@ -109,8 +109,13 @@ public readonly record struct MsxGl6File
     };
   }
 
-  public static MsxGl6File FromRawImage(RawImage image) {
+  public static MsxGl6File FromRawImage(RawImage image) => FromRawImage(image, ".gl6");
+
+  /// <summary>Encodes a picture, the extension saying whether it is a stamp or a screen.</summary>
+  public static MsxGl6File FromRawImage(RawImage image, string extension) {
     ArgumentNullException.ThrowIfNull(image);
+
+    var kind = KindFromExtension(extension ?? string.Empty);
     if (image.Width < 1 || image.Height < 2 || image.Width > MaxDimension || image.Height > MaxDimension)
       throw new ArgumentException($"A GL6 picture is at most {MaxDimension}x{MaxDimension}, got {image.Width}x{image.Height}.", nameof(image));
 
@@ -118,8 +123,9 @@ public readonly record struct MsxGl6File
     if ((image.Height & 1) != 0)
       throw new ArgumentException($"A GL6 picture has an even height; got {image.Height}.", nameof(image));
 
-    var bgra = PixelConverter.Convert(image, PixelFormat.Bgra32);
-    var quantized = ColorQuantizer.Quantize(bgra.PixelData, image.Width * image.Height, ColorCount);
+    // The file has nowhere to state a palette, so a reader falls back to the fixed one for its kind —
+    // colours chosen freely here would be written as indices meaning something else entirely.
+    var indexed = image.EnsureIndexed(PixelFormat.Indexed8, _DefaultPaletteRgb(kind));
     var stored = image.Height / 2;
     var data = new byte[PixelDataSizeFor(image.Width, stored)];
 
@@ -127,15 +133,16 @@ public readonly record struct MsxGl6File
     for (var y = 0; y < stored; ++y)
     for (var x = 0; x < image.Width; ++x) {
       var offset = y * image.Width + x;
-      var index = quantized.Indices[y * 2 * image.Width + x] & 3;
+      var index = indexed.PixelData[y * 2 * image.Width + x] & 3;
       data[offset / PixelsPerByte] |= (byte)(index << ((~offset & 3) << 1));
     }
 
     return new() {
       Width = image.Width,
       Height = stored,
+      Kind = kind,
       PixelData = data,
-      Palette = MsxGraphics.PaletteFromRgb(quantized.Palette, quantized.Count, ColorCount),
+      Palette = [],
     };
   }
 }

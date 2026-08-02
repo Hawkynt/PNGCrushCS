@@ -109,8 +109,11 @@ public readonly record struct MsxGl16File
     if (image.Height % scale != 0)
       throw new ArgumentException($"A Screen 7 picture has an even height; got {image.Height}.", nameof(image));
 
-    var bgra = PixelConverter.Convert(image, PixelFormat.Bgra32);
-    var quantized = ColorQuantizer.Quantize(bgra.PixelData, image.Width * image.Height, ColorCount);
+    // The file is a four-byte header and pixels, with nowhere to state a palette — so a reader has
+    // only the machine's own sixteen colours to go by. Choosing colours freely and writing indices
+    // into them, as this did, left every index naming a different colour than it was picked for.
+    var machine = MsxGraphics.PaletteToRgb(MsxGraphics.DefaultPalette, ColorCount);
+    var indexed = image.EnsureIndexed(PixelFormat.Indexed8, machine);
     var stored = image.Height / scale;
     var data = new byte[PixelDataSizeFor(image.Width, stored)];
 
@@ -118,7 +121,7 @@ public readonly record struct MsxGl16File
     for (var y = 0; y < stored; ++y)
     for (var x = 0; x < image.Width; ++x) {
       var index = y * image.Width + x;
-      var color = quantized.Indices[y * scale * image.Width + x] & 15;
+      var color = indexed.PixelData[y * scale * image.Width + x] & 15;
       data[index >> 1] |= (byte)((index & 1) == 0 ? color << 4 : color);
     }
 
@@ -127,7 +130,7 @@ public readonly record struct MsxGl16File
       Height = stored,
       Mode = mode,
       PixelData = data,
-      Palette = MsxGraphics.PaletteFromRgb(quantized.Palette, quantized.Count, ColorCount),
+      Palette = [],
     };
   }
 }
