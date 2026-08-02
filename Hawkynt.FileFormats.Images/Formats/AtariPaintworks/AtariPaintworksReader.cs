@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.AtariPaintworks;
@@ -57,8 +58,7 @@ public static class AtariPaintworksReader {
     var span = data;
     var header = AtariPaintworksHeader.ReadFrom(span[AtariPaintworksFile.PaletteOffset..]);
 
-    // Determine resolution from file size context; default to low res for standard 32032-byte files
-    var resolution = _DetectResolution(data.Length);
+    var resolution = _DetectResolution(data);
     var (width, height) = _GetDimensions(resolution);
 
     var pixelData = new byte[_PIXEL_DATA_SIZE];
@@ -84,8 +84,7 @@ public static class AtariPaintworksReader {
     var span = data.AsSpan();
     var header = AtariPaintworksHeader.ReadFrom(span[AtariPaintworksFile.PaletteOffset..]);
 
-    // Determine resolution from file size context; default to low res for standard 32032-byte files
-    var resolution = _DetectResolution(data.Length);
+    var resolution = _DetectResolution(data);
     var (width, height) = _GetDimensions(resolution);
 
     var pixelData = new byte[_PIXEL_DATA_SIZE];
@@ -101,13 +100,20 @@ public static class AtariPaintworksReader {
   }
 
   /// <summary>
-  ///   Detects resolution from the file size. All variants store 32 bytes palette + 32000 bytes pixel data = 32032 bytes.
-  ///   Without additional metadata, resolution defaults to low (most common for Paintworks).
-  ///   Subclasses or callers may override based on the file extension.
+  /// Reads the resolution the file states.
   /// </summary>
-  private static AtariPaintworksResolution _DetectResolution(int fileSize) =>
-    // Standard files are exactly 32032 bytes; default to low resolution
-    AtariPaintworksResolution.Low;
+  /// <remarks>
+  /// This used to be answered from the file's length, which cannot say: the screen is the same 32000
+  /// bytes in all three resolutions, so every file measured the same and every one was called low.
+  /// A 640 by 400 picture therefore came back 320 by 200 and drew from the wrong half of its own
+  /// data. The resolution is the long word the file opens with.
+  /// </remarks>
+  private static AtariPaintworksResolution _DetectResolution(ReadOnlySpan<byte> data)
+    => BinaryPrimitives.ReadInt32BigEndian(data) switch {
+      1 => AtariPaintworksResolution.Medium,
+      2 => AtariPaintworksResolution.High,
+      _ => AtariPaintworksResolution.Low,
+    };
 
   private static (int Width, int Height) _GetDimensions(AtariPaintworksResolution resolution) => resolution switch {
     AtariPaintworksResolution.Low => (320, 200),

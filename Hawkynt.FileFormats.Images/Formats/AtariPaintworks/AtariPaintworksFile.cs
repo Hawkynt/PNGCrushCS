@@ -57,6 +57,9 @@ public readonly record struct AtariPaintworksFile : IImageFormatReader<AtariPain
   /// <summary>Atari ST word-interleaved planar pixel data (32000 bytes for full screen).</summary>
   public byte[] PixelData { get; init; }
 
+  /// <summary>What a monochrome screen draws: paper then ink.</summary>
+  private static readonly byte[] _MONOCHROME = [255, 255, 255, 0, 0, 0];
+
   public static RawImage ToRawImage(AtariPaintworksFile file) {
 
     var numPlanes = file.Resolution switch {
@@ -68,7 +71,12 @@ public readonly record struct AtariPaintworksFile : IImageFormatReader<AtariPain
 
     var chunky = PlanarConverter.AtariStToChunky(file.PixelData, file.Width, file.Height, numPlanes);
     var paletteCount = Math.Min(1 << numPlanes, file.Palette.Length);
-    var rgb = PlanarConverter.StPaletteToRgb(file.Palette.AsSpan(0, paletteCount));
+
+    // High resolution is a monochrome screen: the Atari's palette registers do not colour it, so
+    // whatever the file happens to leave in them is not the ink.
+    var rgb = file.Resolution == AtariPaintworksResolution.High
+      ? _MONOCHROME
+      : PlanarConverter.StPaletteToRgb(file.Palette.AsSpan(0, paletteCount));
 
     return new() {
       Width = file.Width,
