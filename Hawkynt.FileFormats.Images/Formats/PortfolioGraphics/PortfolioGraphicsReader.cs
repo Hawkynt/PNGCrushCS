@@ -73,6 +73,6 @@ public static class PortfolioGraphicsReader {
 
     var pixelData = new byte[PortfolioGraphicsFile.PixelDataSize];
     output.CopyTo(0, pixelData, 0, PortfolioGraphicsFile.PixelDataSize);
-    return new() { PixelData = pixelData };
+    return new() { PixelData = pixelData, Compressed = true };
   }
 }

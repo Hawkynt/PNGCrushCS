@@ -130,6 +130,10 @@ public readonly record struct IceFile
 
   public static IceFile FromRawImage(RawImage image) => FromRawImage(image, IceMode.SuperIrg);
 
+  /// <summary>Encodes for the mode the extension names rather than always for Super IRG.</summary>
+  public static IceFile FromRawImage(RawImage image, string extension)
+    => FromRawImage(image, IceReader.ModeFromExtension(extension ?? string.Empty));
+
   /// <summary>Encodes a picture in a chosen one of the five formats.</summary>
   public static IceFile FromRawImage(RawImage image, IceMode mode) {
     ArgumentNullException.ThrowIfNull(image);

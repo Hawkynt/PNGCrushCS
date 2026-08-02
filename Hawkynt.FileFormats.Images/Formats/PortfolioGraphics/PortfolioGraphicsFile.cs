@@ -51,6 +51,9 @@ public readonly record struct PortfolioGraphicsFile : IImageFormatReader<Portfol
   /// <summary>Packed 1bpp pixel data (1920 bytes).</summary>
   public byte[] PixelData { get; init; }
 
+  /// <summary>Whether the bytes are run-length coded, which is what separates a PGC from a PGF.</summary>
+  public bool Compressed { get; init; }
+
   /// <summary>
   /// Paper first, then ink. The Portfolio's screen is reflective, so a set bit is a dark pixel —
   /// building the palette the other way round shows every picture as its own negative.
@@ -74,14 +77,23 @@ public readonly record struct PortfolioGraphicsFile : IImageFormatReader<Portfol
   }
 
   /// <summary>Creates a Portfolio Graphics image from an Indexed1 raw image (240x64).</summary>
-  public static PortfolioGraphicsFile FromRawImage(RawImage image) {
+  public static PortfolioGraphicsFile FromRawImage(RawImage image) => FromRawImage(image, ".pgf");
+
+  /// <summary>Creates the image in the shape the extension names: PGC is coded, PGF is not.</summary>
+  /// <remarks>
+  /// The two hold the same picture and differ only in whether it is run-length coded, so a PGC
+  /// written as plain bytes came back decoded as though those bytes were codes.
+  /// </remarks>
+  public static PortfolioGraphicsFile FromRawImage(RawImage image, string extension) {
     ArgumentNullException.ThrowIfNull(image);
+
+    var compressed = string.Equals(extension, ".pgc", StringComparison.OrdinalIgnoreCase);
     image = image.EnsureFormat(PixelFormat.Indexed1);
     if (image.Width != PixelWidth || image.Height != PixelHeight)
       throw new ArgumentException($"Expected {PixelWidth}x{PixelHeight} but got {image.Width}x{image.Height}.", nameof(image));
 
     var pixelData = new byte[PixelDataSize];
     image.PixelData.AsSpan(0, Math.Min(image.PixelData.Length, PixelDataSize)).CopyTo(pixelData);
-    return new() { PixelData = pixelData };
+    return new() { PixelData = pixelData, Compressed = compressed };
   }
 }

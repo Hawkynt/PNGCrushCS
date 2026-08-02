@@ -87,11 +87,18 @@ public readonly record struct DaliCompressedFile
     };
   }
 
-  public static DaliCompressedFile FromRawImage(RawImage image) {
+  public static DaliCompressedFile FromRawImage(RawImage image) => FromRawImage(image, ".lpk");
+
+  /// <summary>Encodes at the resolution the extension names.</summary>
+  /// <remarks>
+  /// Low is the only one that carries a colour picture and was written whatever the file was called,
+  /// so an <c>.hpk</c> held a 320 by 200 screen in four planes that every reader takes as 640 by 400
+  /// in one.
+  /// </remarks>
+  public static DaliCompressedFile FromRawImage(RawImage image, string extension) {
     ArgumentNullException.ThrowIfNull(image);
 
-    // Low resolution is the only mode that can carry a colour picture, so it is the target.
-    const DaliResolution resolution = DaliResolution.Low;
+    var resolution = DaliCompressedReader.ResolutionFromExtension(extension ?? string.Empty);
     var (width, height, planes) = _Geometry(resolution);
     if (image.Width != width || image.Height != height)
       throw new ArgumentException($"Expected {width}x{height} but got {image.Width}x{image.Height}.", nameof(image));

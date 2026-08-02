@@ -92,6 +92,10 @@ public readonly record struct MsxGlYjkFile
 
   public static MsxGlYjkFile FromRawImage(RawImage image) => FromRawImage(image, MsxGlYjkMode.Screen12);
 
+  /// <summary>Encodes for the screen the extension names rather than always for Screen 12.</summary>
+  public static MsxGlYjkFile FromRawImage(RawImage image, string extension)
+    => FromRawImage(image, ModeFromExtension(extension ?? string.Empty));
+
   /// <summary>Encodes a picture under a chosen one of the two YJK readings.</summary>
   public static MsxGlYjkFile FromRawImage(RawImage image, MsxGlYjkMode mode) {
     ArgumentNullException.ThrowIfNull(image);

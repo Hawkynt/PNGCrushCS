@@ -100,6 +100,10 @@ public readonly record struct MadStudioFile
 
   public static MadStudioFile FromRawImage(RawImage image) => FromRawImage(image, MadStudioMode.Antic4);
 
+  /// <summary>Encodes for the mode the extension names rather than always for ANTIC 4.</summary>
+  public static MadStudioFile FromRawImage(RawImage image, string extension)
+    => FromRawImage(image, MadStudioLayout.ModeFromExtension(extension ?? string.Empty));
+
   /// <summary>Encodes a picture in a chosen one of the five character modes.</summary>
   public static MadStudioFile FromRawImage(RawImage image, MadStudioMode mode) {
     ArgumentNullException.ThrowIfNull(image);

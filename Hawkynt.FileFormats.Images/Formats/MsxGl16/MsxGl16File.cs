@@ -96,6 +96,10 @@ public readonly record struct MsxGl16File
 
   public static MsxGl16File FromRawImage(RawImage image) => FromRawImage(image, MsxGl16Mode.Screen5);
 
+  /// <summary>Encodes for the screen the extension names rather than always for Screen 5.</summary>
+  public static MsxGl16File FromRawImage(RawImage image, string extension)
+    => FromRawImage(image, ModeFromExtension(extension ?? string.Empty));
+
   /// <summary>Encodes a picture for a chosen one of the two screens.</summary>
   public static MsxGl16File FromRawImage(RawImage image, MsxGl16Mode mode) {
     ArgumentNullException.ThrowIfNull(image);

@@ -12,7 +12,7 @@ public static class DaliCompressedReader {
       throw new FileNotFoundException("Dali screen not found.", file.FullName);
 
     // Only the extension says which resolution the screen is in.
-    return FromSpan(File.ReadAllBytes(file.FullName), _ResolutionFromExtension(file.Extension));
+    return FromSpan(File.ReadAllBytes(file.FullName), ResolutionFromExtension(file.Extension));
   }
 
   public static DaliCompressedFile FromStream(Stream stream) {
@@ -75,7 +75,8 @@ public static class DaliCompressedReader {
     return value;
   }
 
-  private static DaliResolution _ResolutionFromExtension(string extension) => extension.ToLowerInvariant() switch {
+  /// <summary>The resolution an extension names; the writer needs the same answer the reader gives.</summary>
+  internal static DaliResolution ResolutionFromExtension(string extension) => extension.ToLowerInvariant() switch {
     ".mpk" => DaliResolution.Medium,
     ".hpk" => DaliResolution.High,
     _ => DaliResolution.Low,
