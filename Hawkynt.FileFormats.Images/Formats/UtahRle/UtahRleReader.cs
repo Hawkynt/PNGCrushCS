@@ -53,12 +53,22 @@ public static class UtahRleReader {
         background[i] = data[offset++];
     }
 
-    // Skip color map if present
-    if (header.NumColorMapChannels > 0 && offset + 2 <= data.Length) {
-      var mapLength = BinaryPrimitives.ReadInt16LittleEndian(data[offset..]);
-      offset += 2;
-      offset += mapLength * header.NumColorMapChannels;
+    // Skip the colour map, whose size the header already states: one channel holds two to the
+    // power the last byte names, and every entry is a word. It used to be read as though a length
+    // preceded the map in the stream, which is not how the format says it.
+    if (header.NumColorMapChannels > 0)
+      offset += header.NumColorMapChannels * (1 << header.ColorMapLengthLog2) * 2;
+
+    // Skip the comment block, which was not skipped at all: the picture then began wherever the
+    // text happened to end, so a file carrying one — and most do, it being where the credits go —
+    // decoded from the middle of a sentence.
+    if ((flags & _COMMENT) != 0 && offset + 2 <= data.Length) {
+      var commentLength = BinaryPrimitives.ReadUInt16LittleEndian(data[offset..]);
+      offset += 2 + commentLength + (commentLength & 1);
     }
+
+    if (offset > data.Length)
+      throw new InvalidDataException("A Utah RLE picture states more header than the file holds.");
 
     // Decode scanline data
     var scanlineData = data[offset..];
@@ -75,7 +85,10 @@ public static class UtahRleReader {
     };
     }
 
-  public static UtahRleFile FromBytes(byte[] data) {
+/// <summary>The flag saying a comment block follows the header.</summary>
+  private const int _COMMENT = 0x08;
+
+    public static UtahRleFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     return FromSpan(data);
   }
