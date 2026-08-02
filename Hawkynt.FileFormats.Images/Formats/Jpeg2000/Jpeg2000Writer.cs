@@ -30,6 +30,27 @@ public static class Jpeg2000Writer {
   /// <summary>J2K EOC marker: End of Codestream.</summary>
   private const ushort _EOC = 0xFFD9;
 
+  /// <summary>
+  /// KNOWN WRONG. Writes a JP2 container whose codestream no other decoder reads as this picture.
+  /// </summary>
+  /// <remarks>
+  /// The container is well formed — ImageMagick opens the file and reports the right size — but what
+  /// sits inside it is raw wavelet coefficients as big-endian int32, which is this library's own
+  /// invention and not what the standard codes. Handed a 32 by 24 gradient, ImageMagick reads the
+  /// file back with not one of its 768 pixels matching, an average error of 64 in 255. The picture
+  /// opens, and it is a different picture.
+  /// <para/>
+  /// That is worse than a file which fails to open, and it is only invisible from inside this
+  /// library, whose reader accepts the same invention on the way back in — so every round-trip test
+  /// passes while nothing else on earth reads what was written.
+  /// <para/>
+  /// There is an EBCOT encoder beside this one, <see cref="ToBytesEbcot"/>, which is what the
+  /// standard actually wants. It is not used because it is wrong in a different way: OpenJPEG
+  /// rejects its output outright with a packet length longer than the codeblock it belongs to. Of
+  /// the two, that at least fails loudly.
+  /// <para/>
+  /// Until one of them is right this format should not be offered for conversion.
+  /// </remarks>
   public static byte[] ToBytes(Jpeg2000File file) {
     ArgumentNullException.ThrowIfNull(file);
     var codestream = _BuildCodestream(file);
