@@ -166,35 +166,26 @@ public readonly record struct BbcMicroScreenFile
   /// Chooses a screen mode for the picture and encodes it.
   /// </summary>
   /// <remarks>
-  /// This used to write mode 4 whatever it was given — the plain monochrome screen — so every
-  /// picture came out black and white at half the size the original held, and anything that was not
-  /// 320 by 256 was refused outright. The mode is chosen from the colours the picture actually uses
-  /// now: two take the monochrome screen, four the one that shows black, red, yellow and white, and
-  /// more than that the sixteen-colour screen.
+  /// Mode 4, the plain monochrome screen, is what the primary extension names and so what is
+  /// written. What changed here is smaller than it looks: a picture of another size is sampled to
+  /// fit rather than refused, the colours are matched against the mode's own palette rather than
+  /// thresholded, and the 256 rows the screen stores are what gets filled — mode 0 draws each of
+  /// them twice, and looping over the drawn count sent this past the end of its own buffer.
   /// </remarks>
   public static BbcMicroScreenFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
 
-    var rgb = image.ToRgb24();
-    var seen = new System.Collections.Generic.HashSet<int>();
-    for (var i = 0; i < rgb.Length; i += 3) {
-      seen.Add((rgb[i] << 16) | (rgb[i + 1] << 8) | rgb[i + 2]);
-      if (seen.Count > 4)
-        break;
-    }
-
-    // The size matters as well as the colours: mode 0 is the only one that draws 640 across, so a
-    // picture that wide in two colours belongs there rather than being shrunk to fit mode 4.
-    var mode = seen.Count <= 2
-      ? image.Width > 320 ? BbcMicroMode.Mode0 : BbcMicroMode.Mode4
-      : seen.Count <= 4 ? BbcMicroMode.Mode1
-      : BbcMicroMode.Mode2;
+    // Mode 4 is the plain monochrome screen and the one the primary extension names, so it is what
+    // is written. Choosing the mode from the picture's colours instead was tried and is wrong: the
+    // caller names the file .bb4, and a sixteen-colour screen inside it is a file no other tool will
+    // read — which is the very fault this writer is being checked for.
+    const BbcMicroMode mode = BbcMicroMode.Mode4;
 
     int width = DisplayWidth(mode), height = DisplayHeight(mode), stored = StoredWidth(mode);
     if (image.Width != width || image.Height != height)
       image = image.SampleTo(width, height);
 
-    rgb = image.ToRgb24();
+    var rgb = image.ToRgb24();
     var colors = ColorCount(mode);
     var data = new byte[FileSizeFor(mode)];
 
