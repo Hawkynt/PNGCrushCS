@@ -172,14 +172,19 @@ public readonly record struct BbcMicroScreenFile
   /// thresholded, and the 256 rows the screen stores are what gets filled — mode 0 draws each of
   /// them twice, and looping over the drawn count sent this past the end of its own buffer.
   /// </remarks>
-  public static BbcMicroScreenFile FromRawImage(RawImage image) {
+  public static BbcMicroScreenFile FromRawImage(RawImage image) => FromRawImage(image, ".bb4");
+
+  /// <summary>Encodes the picture as the screen mode the extension names.</summary>
+  /// <remarks>
+  /// Choosing the mode from the picture's colours instead was tried and is wrong: the caller names
+  /// the file, and a sixteen-colour screen inside a <c>.bb4</c> is a file no other tool will read —
+  /// which is the very fault this writer is being checked for. The extension is the caller saying
+  /// which mode it wants, so it is what decides.
+  /// </remarks>
+  public static BbcMicroScreenFile FromRawImage(RawImage image, string extension) {
     ArgumentNullException.ThrowIfNull(image);
 
-    // Mode 4 is the plain monochrome screen and the one the primary extension names, so it is what
-    // is written. Choosing the mode from the picture's colours instead was tried and is wrong: the
-    // caller names the file .bb4, and a sixteen-colour screen inside it is a file no other tool will
-    // read — which is the very fault this writer is being checked for.
-    const BbcMicroMode mode = BbcMicroMode.Mode4;
+    var mode = BbcMicroScreenReader.ModeFromExtension(extension ?? string.Empty);
 
     int width = DisplayWidth(mode), height = DisplayHeight(mode), stored = StoredWidth(mode);
     if (image.Width != width || image.Height != height)

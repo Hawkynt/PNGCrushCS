@@ -12,7 +12,7 @@ public static class BbcMicroScreenReader {
       throw new FileNotFoundException("BBC Micro screen not found.", file.FullName);
 
     // Only the extension distinguishes a 20480-byte mode 0 dump from mode 1 or 2.
-    return FromBytes(File.ReadAllBytes(file.FullName), _ModeFromExtension(file.Extension));
+    return FromBytes(File.ReadAllBytes(file.FullName), ModeFromExtension(file.Extension));
   }
 
   public static BbcMicroScreenFile FromStream(Stream stream) {
@@ -60,7 +60,8 @@ public static class BbcMicroScreenReader {
     return FromSpan(data, mode);
   }
 
-  private static BbcMicroMode _ModeFromExtension(string extension) => extension.ToLowerInvariant() switch {
+  /// <summary>The mode an extension names; the writer needs the same answer the reader gives.</summary>
+  internal static BbcMicroMode ModeFromExtension(string extension) => extension.ToLowerInvariant() switch {
     ".bb0" => BbcMicroMode.Mode0,
     ".bb1" => BbcMicroMode.Mode1,
     ".bb2" => BbcMicroMode.Mode2,
