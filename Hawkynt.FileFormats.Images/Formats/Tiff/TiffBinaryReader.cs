@@ -191,6 +191,13 @@ internal static class TiffBinaryReader {
       }
     }
 
+    // A min-is-white picture stores nought for white, which is the opposite of everything
+    // downstream. The tag was read and then ignored — the two photometric kinds were folded into one
+    // colour mode — so every fax, and every scan saved this way, came back as its own negative.
+    if (photometric == TiffConstants.PhotometricMinIsWhite && samplesPerPixel == 1 && bitsPerSample is 1 or 8)
+      for (var i = 0; i < pixelData.Length; ++i)
+        pixelData[i] = (byte)~pixelData[i];
+
     var colorMode = _DetectColorMode(photometric, samplesPerPixel, bitsPerSample);
 
     var file = new TiffFile {
