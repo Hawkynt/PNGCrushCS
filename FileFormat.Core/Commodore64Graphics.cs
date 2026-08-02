@@ -108,6 +108,19 @@ public static class Commodore64Graphics {
   /// inside the cell rather than being fixed. Short files are common — the trailing banks are
   /// simply absent — so everything past the bitmap is read defensively and a truncated file
   /// degrades to a two-colour silhouette rather than throwing.
+  /// <para/>
+  /// KNOWN INCOMPLETE for the interlaced kinds. Several formats that call this store two pictures
+  /// and show them one after the other fast enough to blend, which is how they hold more colours
+  /// than the machine has: RECOIL draws 109 distinct colours for a FunPainter II sample where this
+  /// draws the 16 the hardware owns, because only the first picture is decoded. Seven samples in the
+  /// corpus are affected — bfli, bml, eci, ffli, fp2, fun and pp — and each format puts its second
+  /// picture in its own place, so the blending cannot be done here without knowing which format is
+  /// calling.
+  /// <para/>
+  /// Their geometry is settled: RECOIL drops the leftmost 24 pixels, which FLI cannot control, and
+  /// shows each remaining multicolour pixel twice, so a 160 by 200 decode becomes 296 by 200. Undoing
+  /// that puts our output and RECOIL's byte for byte alongside each other, which is how the colour
+  /// difference above was measured.
   /// </remarks>
   public static RawImage DecodeFliMulticolor(
     ReadOnlySpan<byte> data, int width, int height,
