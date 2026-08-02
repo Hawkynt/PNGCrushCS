@@ -36,6 +36,17 @@ public static class BsaveReader {
     if (header.Magic != BsaveHeader.MagicValue)
       throw new InvalidDataException($"Invalid BSAVE magic byte: expected 0x{BsaveHeader.MagicValue:X2}, got 0x{header.Magic:X2}.");
 
+    // One byte is not a signature. The header also states how long the saved block is, and a real
+    // file carries that many bytes after it; checking only the byte claimed every file that happened
+    // to begin with 0xFD — among them a VBXE slide show whose first dozen bytes are all 0xFD, which
+    // then came back 320 by 200 instead of the 320 by 240 it holds.
+    // A real file carries exactly the block it states — the sample here says 7836 and holds 7836.
+    // A trailer of a few bytes is tolerated; anything further apart is not this format.
+    var stated = header.Length;
+    var carried = data.Length - BsaveHeader.StructSize;
+    if (stated > 0 && (carried < stated || carried > stated + BsaveHeader.StructSize))
+      throw new InvalidDataException($"A BSAVE block states {stated} bytes and the file carries {carried}, so this is not one.");
+
     var mode = _DetectMode(header.Segment, header.Length);
     var (width, height) = _GetDimensions(mode);
 
