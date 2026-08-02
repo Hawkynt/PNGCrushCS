@@ -113,6 +113,30 @@ That is the honest shape of it: the old corpus was drawn largely from formats we
 72% coverage against it was not 72% coverage of the formats that exist. Anyone quoting a coverage
 figure should say which corpus it is against.
 
+## Camera raw, and why comparing it is not like comparing a picture
+
+Widening the corpus turned up eleven camera raw samples, and they need reading differently from the
+rest. A raw file holds sensor readings, not a picture: what a tool shows is either an embedded
+preview the camera made, or the tool's own demosaicing of the sensor. Two tools disagreeing about a
+raw is the normal case, not a fault.
+
+Where we stand, after making four of them readable:
+
+| file | we show | XnView shows | why |
+|---|---|---|---|
+| Olympus ORF | 3360x2504 | 2504x3340 | it crops to the active area and turns the picture upright |
+| Panasonic RW2 | 1920x1440 | 4016x3016 | it demosaics; we show the embedded preview |
+| Pentax PEF | 3008x2000 | 3040x2024 | same, and it crops differently |
+| Fujifilm RAF | 1440x960 | 3032x2035 | same |
+| Nikon NEF | 3904x2616 | 3900x2616 | agreed but for the crop |
+| Sony ARW | 4928x3280 | 4928x3280 | both demosaic, and differ by 110 of 255 a channel |
+| Epson ERF, Kodak KDC | small thumbnail | full picture | no JPEG anywhere in them; the full picture is sensor data |
+| Kodak DCR | refused | full picture | carries JPEGs, none of which decode here |
+
+The Sony line is the one to be careful about. Both tools demosaic and the results differ enormously,
+because white balance, the colour matrix and the gamma curve are all choices rather than facts. That
+is not evidence either is wrong, and it is why a raw cannot be scored the way a PNG can.
+
 ## Which read gaps are worth attempting
 
 Sixty-two samples are read by RECOIL and not by us. They are not equally tractable, and the cheap
