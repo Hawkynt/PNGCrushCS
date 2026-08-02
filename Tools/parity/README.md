@@ -86,6 +86,16 @@ test for it is whether the file's length matches an uncompressed picture at the 
 Twenty-one of the sixty-two match that. The rest are compressed, or stored at a size nothing in the
 file states, and each needs its coding worked out before anything else.
 
+That filter is necessary and nowhere near sufficient. Eleven of the twenty-one were then read at the
+layout their length implies and checked against RECOIL's rendering: ten decode to a single colour
+where RECOIL draws two or more, which is to say they do not decode at all. A matching length says
+only that the arithmetic is possible.
+
+The trap in measuring this is worth stating, because it has now appeared three times in different
+guises. Scoring a candidate by how consistently each stored value maps to one of the other tool's
+colours reads as 98% agreement when a picture is mostly black and every value maps to black. The
+guard is to require as many distinct colours out as the picture actually has in it.
+
 What has come out of attempting them, which is the more useful half:
 
 - A **coding** yields to arithmetic. Reconstruct the picture the other tool draws, and the file has to
