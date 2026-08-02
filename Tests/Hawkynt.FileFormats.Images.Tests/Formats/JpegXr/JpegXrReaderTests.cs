@@ -147,7 +147,8 @@ public sealed class JpegXrReaderTests {
     // Header
     data[0] = (byte)'I';
     data[1] = (byte)'I';
-    BinaryPrimitives.WriteUInt16LittleEndian(span[2..], 0xBC01);
+    // The bytes a real file has here are 0xBC then 0x01, which as a little-endian word is 0x01BC.
+    BinaryPrimitives.WriteUInt16LittleEndian(span[2..], 0x01BC);
     BinaryPrimitives.WriteUInt32LittleEndian(span[4..], (uint)ifdOffset);
 
     // IFD

@@ -11,7 +11,21 @@ public static class JpegXrReader {
   private const int _MIN_FILE_SIZE = 14;
 
   /// <summary>JPEG XR magic number (replaces TIFF's 0x002A).</summary>
-  internal const ushort JPEGXR_MAGIC = 0xBC01;
+  /// <summary>
+  /// The two bytes after the byte order, as the little-endian word they form.
+  /// </summary>
+  /// <remarks>
+  /// A real file has 0xBC then 0x01, and the container states itself little-endian — so the word is
+  /// 0x01BC. It was written here as 0xBC01, which puts the bytes the other way round; the writer
+  /// made the same swap, so the two agreed with each other and no file from anywhere else would open.
+  /// </remarks>
+  internal const ushort JPEGXR_MAGIC = 0x01BC;
+
+  /// <summary>
+  /// KNOWN INCOMPLETE, past the magic. A real file now gets as far as the directory and stops there
+  /// for want of the tag naming where its image data begins — the container is right and what it
+  /// points at is not yet read. What follows is a working subset rather than the whole of JPEG XR.
+  /// </summary>
 
   public static JpegXrFile FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);

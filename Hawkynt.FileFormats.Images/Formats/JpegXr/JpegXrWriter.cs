@@ -4,7 +4,7 @@ using FileFormat.JpegXr.Codec;
 
 namespace FileFormat.JpegXr;
 
-/// <summary>Assembles JPEG XR file bytes using the TIFF-like container with II byte order and 0xBC01 magic.</summary>
+/// <summary>Assembles JPEG XR file bytes using the TIFF-like container with II byte order and the 0x01BC magic.</summary>
 public static class JpegXrWriter {
 
   /// <summary>Number of IFD entries we write: PixelFormat, ImageWidth, ImageHeight, ImageOffset, ImageByteCount.</summary>
@@ -20,7 +20,7 @@ public static class JpegXrWriter {
     var compressedData = JxrEncoder.Encode(pixelData, width, height, componentCount);
 
     // Layout:
-    // [0..7]     Header (8 bytes): "II" + 0xBC01 magic + IFD offset
+    // [0..7]     Header (8 bytes): "II" + the 0x01BC magic + IFD offset
     // [8..N]     IFD: 2-byte count + entries (12 bytes each) + 4-byte next IFD offset (0)
     // [N..]      Compressed image data
 
