@@ -11,7 +11,11 @@ namespace FileFormat.MsxScreen10;
 /// what makes it usable for pictures with flat, exact areas next to photographic ones. The palette
 /// sits near the end of the video page, well past the bitmap.
 /// </remarks>
-[FormatMagicBytes([0xFE])]
+// The byte 0xFE opens every BSAVE file the MSX writes, whichever screen mode it holds, so it says
+// what the container is and nothing about which of these formats this is. Nine of them declared it
+// as their magic, and the registry consults magic before extension — so whichever it happened to
+// reach first took every MSX picture. A Screen 5 file, 256 by 212, was being opened as a Screen 6
+// one and drawn 512 by 424. The extension is what tells these apart, and it is what decides now.
 public readonly record struct MsxScreen10File
   : IImageFormatReader<MsxScreen10File>, IImageToRawImage<MsxScreen10File>,
     IImageFromRawImage<MsxScreen10File>, IImageFormatWriter<MsxScreen10File> {

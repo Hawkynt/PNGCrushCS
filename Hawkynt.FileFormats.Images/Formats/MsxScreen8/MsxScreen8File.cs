@@ -7,7 +7,11 @@ namespace FileFormat.MsxScreen8;
 /// Layout: optional 7-byte BSAVE header (0xFE magic) + pixel data (54272 bytes, 8bpp GGGRRRBB).
 /// 256x212, 256 colors direct color, each byte encodes G(3)-R(3)-B(2).
 /// </summary>
-[FormatMagicBytes([0xFE])]
+// The byte 0xFE opens every BSAVE file the MSX writes, whichever screen mode it holds, so it says
+// what the container is and nothing about which of these formats this is. Nine of them declared it
+// as their magic, and the registry consults magic before extension — so whichever it happened to
+// reach first took every MSX picture. A Screen 5 file, 256 by 212, was being opened as a Screen 6
+// one and drawn 512 by 424. The extension is what tells these apart, and it is what decides now.
 public readonly record struct MsxScreen8File : IImageFormatReader<MsxScreen8File>, IImageToRawImage<MsxScreen8File>, IImageFromRawImage<MsxScreen8File>, IImageFormatWriter<MsxScreen8File> {
 
   static string IImageFormatMetadata<MsxScreen8File>.PrimaryExtension => ".sc8";

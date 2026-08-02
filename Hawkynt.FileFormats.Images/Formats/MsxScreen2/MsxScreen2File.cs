@@ -16,7 +16,11 @@ namespace FileFormat.MsxScreen2;
 /// a pattern's eight rows its own foreground and background — which is what lets the mode look far
 /// less blocky than a character screen and still cost a byte a cell to place.
 /// </remarks>
-[FormatMagicBytes([0xFE])]
+// The byte 0xFE opens every BSAVE file the MSX writes, whichever screen mode it holds, so it says
+// what the container is and nothing about which of these formats this is. Nine of them declared it
+// as their magic, and the registry consults magic before extension — so whichever it happened to
+// reach first took every MSX picture. A Screen 5 file, 256 by 212, was being opened as a Screen 6
+// one and drawn 512 by 424. The extension is what tells these apart, and it is what decides now.
 public sealed class MsxScreen2File : IImageFormatReader<MsxScreen2File>, IImageToRawImage<MsxScreen2File>, IImageFromRawImage<MsxScreen2File>, IImageFormatWriter<MsxScreen2File> {
 
   static string IImageFormatMetadata<MsxScreen2File>.PrimaryExtension => ".sc2";
