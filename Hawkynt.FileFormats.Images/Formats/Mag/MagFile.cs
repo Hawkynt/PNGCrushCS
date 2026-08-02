@@ -30,14 +30,20 @@ namespace FileFormat.Mag;
 ///     strongest evidence the container is right.</item>
 ///   <item>A code of zero takes the next two bytes from the pixel data; anything else repeats two
 ///     bytes from earlier in the picture.</item>
-///   <item>Nine of the fifteen codes are plain copies and their sources are settled, each verified
-///     against XnView on every use where the source itself was right — 1 and 2 repeat the two bytes
-///     two to the left, 5 the row above, 7 and 8 two rows above, 10 and 11 four, 13 and 14 eight;
-///     the pairs differ by two bytes of horizontal offset.</item>
-///   <item>Codes 3, 4, 6, 9, 12 and 15 are <b>not</b> plain copies. Every horizontal offset up to 64
-///     bytes and every vertical one up to 18 rows was tried against each, and none falls below about
-///     a third wrong — while the nine above reach exactly none. Whatever those six mean, it is not
-///     "repeat from here", and that is the thing left to find.</item>
+///   <item>Nine codes are plain copies and their sources are settled. Asking only whether the source
+///     region shows the same four pixels as the target, on every use, in the other tool's rendering
+///     — which needs no decoding and so cannot be led astray by an earlier mistake — each of these
+///     agrees on every single use: 2 repeats the two bytes two to the left, 3 six to the left, 5 the
+///     row above, 7 and 8 two rows above, 10 and 11 four rows, 13 and 14 eight; where there are two,
+///     they differ by two bytes horizontally.</item>
+///   <item>Code 1 is the commonest by far, 15176 uses against a few hundred for most, and is
+///     <b>not</b> settled. Two bytes to the left agrees on 94.64% of its uses and nothing does
+///     better, so it is nearly that and not quite — an exception inside it, or another meaning
+///     altogether.</item>
+///   <item>Codes 4, 6, 9, 12 and 15 are <b>not</b> copies. Every horizontal offset to 128 bytes and
+///     vertical to 32 rows was tried against each; the best reach 64% to 74% where the nine above
+///     reach 100%. Whatever those five mean, it is not "repeat from here", and they and code 1 are
+///     what is left to find.</item>
 ///   <item>With the nine settled and the six approximated, 87% of pixels come out right. That is not
 ///     shippable: a decoder wrong in one pixel in eight is the fault this reader is being fixed for,
 ///     so it refuses instead.</item>
