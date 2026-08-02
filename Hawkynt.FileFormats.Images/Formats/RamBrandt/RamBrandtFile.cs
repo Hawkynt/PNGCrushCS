@@ -261,13 +261,32 @@ public readonly record struct RamBrandtFile : IImageFormatReader<RamBrandtFile>,
   /// Written as Graphics 7 with one palette for the whole picture: the display-list tables are left
   /// zeroed, which every reader takes as "no palette changes".
   /// </remarks>
-  public static RamBrandtFile FromRawImage(RawImage image) {
+  public static RamBrandtFile FromRawImage(RawImage image) => FromRawImage(image, ".rm0");
+
+  /// <summary>Creates a Ram Brandt screen in the mode the extension names.</summary>
+  /// <remarks>
+  /// All five share one size and one layout, so the extension is the whole of the difference. Always
+  /// writing Graphics 7 meant a file named <c>.rm2</c> held mode 7 bytes that its own reader, and
+  /// every other, then took as mode 10.
+  /// </remarks>
+  public static RamBrandtFile FromRawImage(RawImage image, string extension) {
     ArgumentNullException.ThrowIfNull(image);
+
+    var mode = RamBrandtReader.ModeFromExtension(extension ?? string.Empty);
+    return mode == RamBrandtMode.Graphics7 || mode == RamBrandtMode.Graphics15
+      ? _FromRawImagePlayfield(image, mode)
+      : _FromRawImageGtiaNibble(image, mode);
+  }
+
+  /// <summary>Encodes the two-bit playfield modes, 7 and 15.</summary>
+  private static RamBrandtFile _FromRawImagePlayfield(RawImage image, RamBrandtMode mode) {
     if (image.Width != DisplayWidth || image.Height != DisplayHeight)
       throw new ArgumentException($"Expected {DisplayWidth}x{DisplayHeight} but got {image.Width}x{image.Height}.", nameof(image));
 
     // Reduce to the four colours mode D can show, then express those as GTIA colour registers.
-    var indexed = image.EnsureFormat(PixelFormat.Indexed4);
+    // Reducing to Indexed4 instead asks for sixteen, and the twelve that do not fit were then read
+    // as colour 0 — a picture of any variety came back as one register with three unused.
+    var indexed = image.EnsureIndexedAtMost(Graphics7ColorCount);
     var palette = indexed.Palette ?? [];
     var gtia = Atari8BitGraphics.CreatePalette();
 
@@ -275,14 +294,14 @@ public readonly record struct RamBrandtFile : IImageFormatReader<RamBrandtFile>,
     for (var value = 0; value < Graphics7ColorCount && value < indexed.PaletteCount; ++value)
       colors[_ColorIndex(value)] = Atari8BitGraphics.FindNearestColorByte(gtia, palette[value * 3], palette[value * 3 + 1], palette[value * 3 + 2]);
 
-    // Collapse the displayed image back to the stored 160x96 grid, sampling each 2x2 block once.
-    var rows = StoredRows(RamBrandtMode.Graphics7);
+    // Collapse the displayed image back to the stored grid, sampling one pixel a block. Graphics 7
+    // stores 96 rows drawn twice each; Graphics 15 stores all 192.
+    var rows = StoredRows(mode);
+    var rowHeight = DisplayHeight / rows;
     var pixels = new byte[Atari8BitGraphics.Gr7Width * rows];
     for (var y = 0; y < rows; ++y)
     for (var x = 0; x < Atari8BitGraphics.Gr7Width; ++x) {
-      var source = y * 2 * DisplayWidth + x * 2;
-      var packed = indexed.PixelData[source >> 1];
-      var index = (source & 1) == 0 ? (packed >> 4) & 0x0F : packed & 0x0F;
+      var index = indexed.PixelData[y * rowHeight * DisplayWidth + x * 2];
       pixels[y * Atari8BitGraphics.Gr7Width + x] = (byte)(index < Graphics7ColorCount ? index : 0);
     }
 
@@ -290,10 +309,111 @@ public readonly record struct RamBrandtFile : IImageFormatReader<RamBrandtFile>,
     Atari8BitGraphics.PackGr7(pixels, rows).CopyTo(bitmap, 0);
 
     return new() {
-      Mode = RamBrandtMode.Graphics7,
+      Mode = mode,
       BitmapData = bitmap,
       Colors = colors,
       DisplayList = new byte[DisplayListSize],
     };
+  }
+
+  /// <summary>Stored pixels a row holds in the nibble modes, each drawn four screen pixels wide.</summary>
+  private const int NibbleWidth = 80;
+
+  /// <summary>Encodes the four-bit GTIA modes, 9, 10 and 11.</summary>
+  /// <remarks>
+  /// Mode 10 spends its nibble on a register outright. Modes 9 and 11 split a colour in two: the
+  /// nibble carries one half for every pixel and the background register carries the other half for
+  /// the whole screen, so the register is chosen first by trying all sixteen and keeping whichever
+  /// leaves the least error.
+  /// </remarks>
+  private static RamBrandtFile _FromRawImageGtiaNibble(RawImage image, RamBrandtMode mode) {
+    if (image.Width != DisplayWidth || image.Height != DisplayHeight)
+      throw new ArgumentException($"Expected {DisplayWidth}x{DisplayHeight} but got {image.Width}x{image.Height}.", nameof(image));
+
+    var gtia = Atari8BitGraphics.CreatePalette();
+    var colors = new byte[ColorCount];
+    var nibbles = new byte[NibbleWidth * DisplayHeight];
+
+    if (mode == RamBrandtMode.Graphics10) {
+      var indexed = image.EnsureIndexedAtMost(ColorCount);
+      var palette = indexed.Palette ?? [];
+      for (var i = 0; i < ColorCount && i < indexed.PaletteCount; ++i)
+        colors[i] = Atari8BitGraphics.FindNearestColorByte(gtia, palette[i * 3], palette[i * 3 + 1], palette[i * 3 + 2]);
+
+      for (var y = 0; y < DisplayHeight; ++y)
+      for (var x = 0; x < NibbleWidth; ++x) {
+        var index = indexed.PixelData[y * DisplayWidth + x * 4];
+        nibbles[y * NibbleWidth + x] = (byte)(index < ColorCount ? index : 0);
+      }
+    } else {
+      var bgra = PixelConverter.Convert(image, PixelFormat.Bgra32).PixelData;
+      var luminanceNibble = mode == RamBrandtMode.Graphics9;
+
+      var best = (byte)0;
+      var bestError = long.MaxValue;
+      for (var candidate = 0; candidate < 16; ++candidate) {
+        // Mode 9 keeps the hue in the register and spends the nibble on luminance; 11 is the reverse.
+        var register = (byte)(luminanceNibble ? candidate << 4 : candidate << 1);
+        var error = _ChooseNibbles(bgra, gtia, register, luminanceNibble, null);
+        if (error >= bestError)
+          continue;
+
+        bestError = error;
+        best = register;
+      }
+
+      colors[8] = best;
+      _ChooseNibbles(bgra, gtia, best, luminanceNibble, nibbles);
+    }
+
+    var bitmap = new byte[BitmapDataSize];
+    for (var y = 0; y < DisplayHeight; ++y)
+    for (var x = 0; x < NibbleWidth; ++x) {
+      var value = nibbles[y * NibbleWidth + x] & 15;
+      bitmap[y * BytesPerRow + (x >> 1)] |= (byte)((x & 1) == 0 ? value << 4 : value);
+    }
+
+    return new() {
+      Mode = mode,
+      BitmapData = bitmap,
+      Colors = colors,
+      DisplayList = new byte[DisplayListSize],
+    };
+  }
+
+  /// <summary>
+  /// Picks the closest nibble for every stored pixel under a given register, returning the total
+  /// error and, when asked, the nibbles themselves.
+  /// </summary>
+  private static long _ChooseNibbles(byte[] bgra, byte[] gtia, byte register, bool luminanceNibble, byte[]? chosen) {
+    Span<int> candidates = stackalloc int[16];
+    for (var n = 0; n < 16; ++n)
+      candidates[n] = luminanceNibble ? register | n : n == 0 ? register & 240 : register | (n << 4);
+
+    var total = 0L;
+    for (var y = 0; y < DisplayHeight; ++y)
+    for (var x = 0; x < NibbleWidth; ++x) {
+      var at = (y * DisplayWidth + x * 4) * 4;
+      int blue = bgra[at], green = bgra[at + 1], red = bgra[at + 2];
+
+      var pick = 0;
+      var closest = int.MaxValue;
+      for (var n = 0; n < 16; ++n) {
+        var entry = candidates[n] * 3;
+        int dr = gtia[entry] - red, dg = gtia[entry + 1] - green, db = gtia[entry + 2] - blue;
+        var distance = dr * dr + dg * dg + db * db;
+        if (distance >= closest)
+          continue;
+
+        closest = distance;
+        pick = n;
+      }
+
+      total += closest;
+      if (chosen != null)
+        chosen[y * NibbleWidth + x] = (byte)pick;
+    }
+
+    return total;
   }
 }

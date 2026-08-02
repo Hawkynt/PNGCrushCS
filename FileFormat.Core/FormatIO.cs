@@ -70,7 +70,7 @@ public static class FormatIO {
   /// </remarks>
   public static void WriteToFile<T>(RawImage image, FileInfo target)
     where T : IImageFromRawImage<T>, IImageFormatWriter<T> {
-    var file = T.FromRawImage(image);
+    var file = T.FromRawImage(image, target.Extension);
     File.WriteAllBytes(target.FullName, T.ToBytes(file));
     T.WriteCompanions(file, target);
   }
