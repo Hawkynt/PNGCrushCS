@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.RagD;
@@ -36,6 +37,17 @@ public readonly record struct RagDFile
   static string[] IImageFormatMetadata<RagDFile>.FileExtensions => [".rag", ".ragc"];
   static RagDFile IImageFormatReader<RagDFile>.FromSpan(ReadOnlySpan<byte> data)
     => RagDReader.FromSpan(data);
+
+  /// <summary>
+  /// Reads a named file, the extension being what its reader needs.
+  /// </summary>
+  /// <remarks>
+  /// The reader takes the extension into account and only the by-bytes entry was wired up here,
+  /// so the registry could never reach it: whatever the extension would have settled was decided
+  /// by a default instead. Ten formats carried this, each one otherwise found only when a sample
+  /// happened to expose it.
+  /// </remarks>
+  static RagDFile IImageFormatReader<RagDFile>.FromFile(FileInfo file) => RagDReader.FromFile(file);
   static VideoMode[] IImageFormatMetadata<RagDFile>.VideoModes => [
     new("RAG-D", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 65536)])
   ];

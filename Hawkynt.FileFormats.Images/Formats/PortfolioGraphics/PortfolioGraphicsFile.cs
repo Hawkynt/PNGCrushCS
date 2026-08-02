@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.PortfolioGraphics;
@@ -27,6 +28,17 @@ public readonly record struct PortfolioGraphicsFile : IImageFormatReader<Portfol
   static string IImageFormatMetadata<PortfolioGraphicsFile>.PrimaryExtension => ".pgf";
   static string[] IImageFormatMetadata<PortfolioGraphicsFile>.FileExtensions => [".pgf", ".pgc"];
   static PortfolioGraphicsFile IImageFormatReader<PortfolioGraphicsFile>.FromSpan(ReadOnlySpan<byte> data) => PortfolioGraphicsReader.FromSpan(data);
+
+  /// <summary>
+  /// Reads a named file, the extension being what its reader needs.
+  /// </summary>
+  /// <remarks>
+  /// The reader takes the extension into account and only the by-bytes entry was wired up here,
+  /// so the registry could never reach it: whatever the extension would have settled was decided
+  /// by a default instead. Ten formats carried this, each one otherwise found only when a sample
+  /// happened to expose it.
+  /// </remarks>
+  static PortfolioGraphicsFile IImageFormatReader<PortfolioGraphicsFile>.FromFile(FileInfo file) => PortfolioGraphicsReader.FromFile(file);
   static VideoMode[] IImageFormatMetadata<PortfolioGraphicsFile>.VideoModes => [new("Default", [(240, 64)], [2])];
   static byte[] IImageFormatWriter<PortfolioGraphicsFile>.ToBytes(PortfolioGraphicsFile file) => PortfolioGraphicsWriter.ToBytes(file);
 

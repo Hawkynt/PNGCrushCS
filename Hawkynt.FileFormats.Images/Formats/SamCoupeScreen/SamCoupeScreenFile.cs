@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using FileFormat.Core;
 using FileFormat.SamCoupeMode4;
 
@@ -66,6 +67,17 @@ public readonly record struct SamCoupeScreenFile
   static string[] IImageFormatMetadata<SamCoupeScreenFile>.FileExtensions => [".ss1", ".ss2", ".ss3"];
   static SamCoupeScreenFile IImageFormatReader<SamCoupeScreenFile>.FromSpan(ReadOnlySpan<byte> data)
     => SamCoupeScreenReader.FromSpan(data);
+
+  /// <summary>
+  /// Reads a named file, the extension being what its reader needs.
+  /// </summary>
+  /// <remarks>
+  /// The reader takes the extension into account and only the by-bytes entry was wired up here,
+  /// so the registry could never reach it: whatever the extension would have settled was decided
+  /// by a default instead. Ten formats carried this, each one otherwise found only when a sample
+  /// happened to expose it.
+  /// </remarks>
+  static SamCoupeScreenFile IImageFormatReader<SamCoupeScreenFile>.FromFile(FileInfo file) => SamCoupeScreenReader.FromFile(file);
   static VideoMode[] IImageFormatMetadata<SamCoupeScreenFile>.VideoModes => [
     new("Mode 1", [(256, ScreenHeight)], [PaletteSize]),
     new("Mode 2", [(256, ScreenHeight)], [PaletteSize]),

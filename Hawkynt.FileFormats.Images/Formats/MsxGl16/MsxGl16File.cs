@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.MsxGl16;
@@ -29,6 +30,17 @@ public readonly record struct MsxGl16File
   static string IImageFormatMetadata<MsxGl16File>.PrimaryExtension => ".gl5";
   static string[] IImageFormatMetadata<MsxGl16File>.FileExtensions => [".gl5", ".sh5", ".gl7", ".sh7"];
   static MsxGl16File IImageFormatReader<MsxGl16File>.FromSpan(ReadOnlySpan<byte> data) => MsxGl16Reader.FromSpan(data);
+
+  /// <summary>
+  /// Reads a named file, the extension being what its reader needs.
+  /// </summary>
+  /// <remarks>
+  /// The reader takes the extension into account and only the by-bytes entry was wired up here,
+  /// so the registry could never reach it: whatever the extension would have settled was decided
+  /// by a default instead. Ten formats carried this, each one otherwise found only when a sample
+  /// happened to expose it.
+  /// </remarks>
+  static MsxGl16File IImageFormatReader<MsxGl16File>.FromFile(FileInfo file) => MsxGl16Reader.FromFile(file);
   static byte[] IImageFormatWriter<MsxGl16File>.ToBytes(MsxGl16File file) => MsxGl16Writer.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<MsxGl16File>.VideoModes => [
     new("Screen 5", [(256, 212)], [ColorCount]),

@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Globalization;
 using System.Text;
 using FileFormat.Core;
@@ -25,6 +26,17 @@ public readonly record struct DaliCompressedFile
   static string[] IImageFormatMetadata<DaliCompressedFile>.FileExtensions => [".lpk", ".mpk", ".hpk"];
   static DaliCompressedFile IImageFormatReader<DaliCompressedFile>.FromSpan(ReadOnlySpan<byte> data)
     => DaliCompressedReader.FromSpan(data);
+
+  /// <summary>
+  /// Reads a named file, the extension being what its reader needs.
+  /// </summary>
+  /// <remarks>
+  /// The reader takes the extension into account and only the by-bytes entry was wired up here,
+  /// so the registry could never reach it: whatever the extension would have settled was decided
+  /// by a default instead. Ten formats carried this, each one otherwise found only when a sample
+  /// happened to expose it.
+  /// </remarks>
+  static DaliCompressedFile IImageFormatReader<DaliCompressedFile>.FromFile(FileInfo file) => DaliCompressedReader.FromFile(file);
   static byte[] IImageFormatWriter<DaliCompressedFile>.ToBytes(DaliCompressedFile file)
     => DaliCompressedWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<DaliCompressedFile>.VideoModes => [

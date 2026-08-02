@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using FileFormat.Core;
 using FileFormat.TextMode;
 
@@ -22,6 +23,17 @@ public readonly record struct MadStudioFile
   static string IImageFormatMetadata<MadStudioFile>.PrimaryExtension => ".an4";
   static string[] IImageFormatMetadata<MadStudioFile>.FileExtensions => [".an4", ".an2", ".an5", ".gr1", ".gr2"];
   static MadStudioFile IImageFormatReader<MadStudioFile>.FromSpan(ReadOnlySpan<byte> data) => MadStudioReader.FromSpan(data);
+
+  /// <summary>
+  /// Reads a named file, the extension being what its reader needs.
+  /// </summary>
+  /// <remarks>
+  /// The reader takes the extension into account and only the by-bytes entry was wired up here,
+  /// so the registry could never reach it: whatever the extension would have settled was decided
+  /// by a default instead. Ten formats carried this, each one otherwise found only when a sample
+  /// happened to expose it.
+  /// </remarks>
+  static MadStudioFile IImageFormatReader<MadStudioFile>.FromFile(FileInfo file) => MadStudioReader.FromFile(file);
   static byte[] IImageFormatWriter<MadStudioFile>.ToBytes(MadStudioFile file) => MadStudioWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<MadStudioFile>.VideoModes => [
     new("ANTIC 4", [(MadStudioLayout.DisplayWidth, MadStudioLayout.DisplayHeight)], [MadStudioLayout.ColorCount]),

@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.MsxGl6;
@@ -30,6 +31,17 @@ public readonly record struct MsxGl6File
   static string IImageFormatMetadata<MsxGl6File>.PrimaryExtension => ".gl6";
   static string[] IImageFormatMetadata<MsxGl6File>.FileExtensions => [".gl6", ".sh6", ".stp"];
   static MsxGl6File IImageFormatReader<MsxGl6File>.FromSpan(ReadOnlySpan<byte> data) => MsxGl6Reader.FromSpan(data);
+
+  /// <summary>
+  /// Reads a named file, the extension being what its reader needs.
+  /// </summary>
+  /// <remarks>
+  /// The reader takes the extension into account and only the by-bytes entry was wired up here,
+  /// so the registry could never reach it: whatever the extension would have settled was decided
+  /// by a default instead. Ten formats carried this, each one otherwise found only when a sample
+  /// happened to expose it.
+  /// </remarks>
+  static MsxGl6File IImageFormatReader<MsxGl6File>.FromFile(FileInfo file) => MsxGl6Reader.FromFile(file);
   static byte[] IImageFormatWriter<MsxGl6File>.ToBytes(MsxGl6File file) => MsxGl6Writer.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<MsxGl6File>.VideoModes => [
     new("Screen 6", [(512, 424)], [ColorCount])

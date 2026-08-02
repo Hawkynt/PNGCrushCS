@@ -50,6 +50,17 @@ public readonly record struct RamBrandtFile : IImageFormatReader<RamBrandtFile>,
   static string IImageFormatMetadata<RamBrandtFile>.PrimaryExtension => ".rm0";
   static string[] IImageFormatMetadata<RamBrandtFile>.FileExtensions => [".rm0", ".rm1", ".rm2", ".rm3", ".rm4"];
   static RamBrandtFile IImageFormatReader<RamBrandtFile>.FromSpan(ReadOnlySpan<byte> data) => RamBrandtReader.FromSpan(data);
+
+  /// <summary>
+  /// Reads a named file, the extension being what its reader needs.
+  /// </summary>
+  /// <remarks>
+  /// The reader takes the extension into account and only the by-bytes entry was wired up here,
+  /// so the registry could never reach it: whatever the extension would have settled was decided
+  /// by a default instead. Ten formats carried this, each one otherwise found only when a sample
+  /// happened to expose it.
+  /// </remarks>
+  static RamBrandtFile IImageFormatReader<RamBrandtFile>.FromFile(FileInfo file) => RamBrandtReader.FromFile(file);
   static byte[] IImageFormatWriter<RamBrandtFile>.ToBytes(RamBrandtFile file) => RamBrandtWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<RamBrandtFile>.VideoModes => [
     new("Graphics 7", [(DisplayWidth, DisplayHeight)], [Graphics7ColorCount]),

@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.DelmPaint;
@@ -40,6 +41,17 @@ public readonly record struct DelmPaintFile
   static string[] IImageFormatMetadata<DelmPaintFile>.FileExtensions => [".del", ".dph"];
   static DelmPaintFile IImageFormatReader<DelmPaintFile>.FromSpan(ReadOnlySpan<byte> data)
     => DelmPaintReader.FromSpan(data);
+
+  /// <summary>
+  /// Reads a named file, the extension being what its reader needs.
+  /// </summary>
+  /// <remarks>
+  /// The reader takes the extension into account and only the by-bytes entry was wired up here,
+  /// so the registry could never reach it: whatever the extension would have settled was decided
+  /// by a default instead. Ten formats carried this, each one otherwise found only when a sample
+  /// happened to expose it.
+  /// </remarks>
+  static DelmPaintFile IImageFormatReader<DelmPaintFile>.FromFile(FileInfo file) => DelmPaintReader.FromFile(file);
   static VideoMode[] IImageFormatMetadata<DelmPaintFile>.VideoModes => [
     new("DelmPaint", [(QuadrantWidth, QuadrantHeight), (QuadrantWidth * 2, QuadrantHeight * 2)], [ColorCount])
   ];

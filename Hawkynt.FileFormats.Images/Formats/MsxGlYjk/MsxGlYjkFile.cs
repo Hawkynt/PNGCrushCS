@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.MsxGlYjk;
@@ -29,6 +30,17 @@ public readonly record struct MsxGlYjkFile
   static string IImageFormatMetadata<MsxGlYjkFile>.PrimaryExtension => ".glc";
   static string[] IImageFormatMetadata<MsxGlYjkFile>.FileExtensions => [".glc", ".gls", ".shc", ".gla", ".glb", ".sha", ".shb"];
   static MsxGlYjkFile IImageFormatReader<MsxGlYjkFile>.FromSpan(ReadOnlySpan<byte> data) => MsxGlYjkReader.FromSpan(data);
+
+  /// <summary>
+  /// Reads a named file, the extension being what its reader needs.
+  /// </summary>
+  /// <remarks>
+  /// The reader takes the extension into account and only the by-bytes entry was wired up here,
+  /// so the registry could never reach it: whatever the extension would have settled was decided
+  /// by a default instead. Ten formats carried this, each one otherwise found only when a sample
+  /// happened to expose it.
+  /// </remarks>
+  static MsxGlYjkFile IImageFormatReader<MsxGlYjkFile>.FromFile(FileInfo file) => MsxGlYjkReader.FromFile(file);
   static byte[] IImageFormatWriter<MsxGlYjkFile>.ToBytes(MsxGlYjkFile file) => MsxGlYjkWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<MsxGlYjkFile>.VideoModes => [
     new("Screen 12", [(256, 212)], [19268]),
