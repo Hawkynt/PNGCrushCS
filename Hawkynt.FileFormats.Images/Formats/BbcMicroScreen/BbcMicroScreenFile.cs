@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.BbcMicroScreen;
@@ -28,6 +29,18 @@ public readonly record struct BbcMicroScreenFile
   static string[] IImageFormatMetadata<BbcMicroScreenFile>.FileExtensions => [".bb4", ".bb0", ".bb1", ".bb2", ".bb5"];
   static BbcMicroScreenFile IImageFormatReader<BbcMicroScreenFile>.FromSpan(ReadOnlySpan<byte> data)
     => BbcMicroScreenReader.FromSpan(data);
+
+  /// <summary>
+  /// Reads a named file, which is the only way the mode can be known.
+  /// </summary>
+  /// <remarks>
+  /// A 20480-byte dump is mode 0, mode 1 or mode 2 and nothing inside it says which; only the
+  /// extension does. The reader has always known that and only the by-bytes entry was wired up here,
+  /// so every file took the monochrome reading — a 320 by 256 picture of four colours came back 640
+  /// by 512 in black and white.
+  /// </remarks>
+  static BbcMicroScreenFile IImageFormatReader<BbcMicroScreenFile>.FromFile(FileInfo file)
+    => BbcMicroScreenReader.FromFile(file);
   static byte[] IImageFormatWriter<BbcMicroScreenFile>.ToBytes(BbcMicroScreenFile file)
     => BbcMicroScreenWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<BbcMicroScreenFile>.VideoModes => [
@@ -104,14 +117,26 @@ public readonly record struct BbcMicroScreenFile
     _ => ((c & 8) << 3) | ((c & 4) << 2) | ((c & 2) << 1) | (c & 1),
   };
 
+  /// <summary>The physical colours a four-colour screen starts with: black, red, yellow, white.</summary>
+  private static ReadOnlySpan<int> _FourColourDefaults => [0, 1, 3, 7];
+
   public static RawImage ToRawImage(BbcMicroScreenFile file) {
     var mode = file.Mode;
     int width = DisplayWidth(mode), height = DisplayHeight(mode), stored = StoredWidth(mode);
     var colors = ColorCount(mode);
 
+    // Which physical colour each logical one starts on. Two colours are black and white; four are
+    // black, red, yellow and white, which is not the first four of the physical list — taking them
+    // in order gives green where yellow belongs and yellow where white does.
     var palette = new byte[colors * 3];
     for (var i = 0; i < colors; ++i) {
-      var source = (colors == 2 ? (i == 0 ? 0 : 7) : i & 7) * 3;
+      var physical = colors switch {
+        2 => i == 0 ? 0 : 7,
+        4 => _FourColourDefaults[i & 3],
+        _ => i & 7,
+      };
+
+      var source = physical * 3;
       palette[i * 3] = _Palette[source];
       palette[i * 3 + 1] = _Palette[source + 1];
       palette[i * 3 + 2] = _Palette[source + 2];
