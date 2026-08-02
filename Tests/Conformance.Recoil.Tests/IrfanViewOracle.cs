@@ -28,22 +28,21 @@ internal static class IrfanViewOracle {
   public static bool Available => ExecutablePath != null && _Prefix != null && Directory.Exists(_Prefix);
 
   /// <summary>
-  /// The extensions it reads, from the list its own documentation carries.
+  /// The extensions it reads, established by giving it a valid file of each and seeing which come
+  /// back.
   /// </summary>
   /// <remarks>
-  /// Unlike the other tools this one ships no machine-readable catalogue, so the set is stated here.
-  /// It is deliberately the formats IrfanView reads without a plugin plus those the standard plugin
-  /// pack adds — naming one it cannot open would turn every such format into a writer that produces
-  /// unreadable files, which is the measurement error this whole fixture exists to avoid.
+  /// Almost everything IrfanView is famous for reading comes from a separate plugin pack, and a bare
+  /// installation has none of it. A hand-written list of what the program supports therefore
+  /// overstates what this copy of it supports by a factor of ten — and every format on that list it
+  /// cannot load reports the same failure as a corrupt file, so the whole difference lands on our
+  /// writers as if they were broken.
+  /// <para/>
+  /// So this is the set it was actually observed to read: each was written by another tool, handed
+  /// over, and came back. Adding to it means repeating that, not consulting the documentation.
   /// </remarks>
   public static IReadOnlySet<string> Extensions { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase) {
-    ".bmp", ".dib", ".gif", ".jpg", ".jpeg", ".jpe", ".png", ".tif", ".tiff", ".tga", ".pcx",
-    ".ico", ".cur", ".ani", ".wbmp", ".ppm", ".pgm", ".pbm", ".pnm", ".ras", ".sun", ".sgi",
-    ".rgb", ".bw", ".xbm", ".xpm", ".wmf", ".emf", ".psd", ".pdd", ".dds", ".exr", ".hdr",
-    ".jp2", ".j2k", ".jpc", ".jpf", ".jpx", ".pict", ".pct", ".pic", ".iff", ".lbm", ".ilbm",
-    ".cut", ".g3", ".fax", ".dcx", ".mag", ".pcd", ".qtif", ".sff", ".sfw", ".wad", ".webp",
-    ".xcf", ".flif", ".heic", ".avif", ".jxl", ".b3d", ".crw", ".cr2", ".nef", ".dng", ".arw",
-    ".orf", ".raf", ".rw2", ".pef", ".srf", ".dcr", ".kdc", ".x3f", ".mrw", ".erf", ".mef",
+    ".bmp", ".gif", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".tga", ".ppm", ".psd",
   };
 
   /// <summary>Asks it to convert a file, returning whether it could.</summary>
