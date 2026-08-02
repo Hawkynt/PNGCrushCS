@@ -94,6 +94,17 @@ public sealed class AtariPaintworksResolutionTests {
 
   [Test]
   [Category("Unit")]
+  public void Read_RefusesAFileLongerThanAnUncompressedOne() {
+    // A 32331-byte sample carrying a 331-byte header used to be taken as one of these and drawn
+    // from the wrong 32000 bytes; an uncompressed picture is exactly 32128 and nothing else is.
+    var data = new byte[32331];
+    _Picture(2, 0).AsSpan(0, 128).CopyTo(data);
+
+    Assert.Throws<System.IO.InvalidDataException>(() => AtariPaintworksReader.FromBytes(data));
+  }
+
+  [Test]
+  [Category("Unit")]
   public void Read_SaysACompressedFileIsCompressedAndNotTooSmall() {
     var data = _Picture(0, 0)[..5000];
     var failure = Assert.Throws<System.IO.InvalidDataException>(() => AtariPaintworksReader.FromBytes(data));

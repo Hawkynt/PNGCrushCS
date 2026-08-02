@@ -41,19 +41,22 @@ public static class AtariPaintworksReader {
   /// same palette, and is simply shorter — so calling it "too small" pointed at the wrong thing
   /// entirely, as though the file were damaged rather than in a form this does not decode.
   /// </remarks>
-  private static string _ShortFileReason(ReadOnlySpan<byte> data)
-    => data.Length > AtariPaintworksFile.SignatureOffset + AtariPaintworksFile.Signature.Length
-       && data.Slice(AtariPaintworksFile.SignatureOffset, AtariPaintworksFile.Signature.Length).SequenceEqual(AtariPaintworksFile.Signature)
-      ? $"This is a compressed Atari Paintworks picture ({data.Length} bytes against the {_EXPECTED_FILE_SIZE} an uncompressed one takes), which is not decoded here."
-      : $"Data too small: expected at least {_EXPECTED_FILE_SIZE} bytes for palette + screen data, got {data.Length}.";
+  private static string _WrongLengthReason(ReadOnlySpan<byte> data) {
+    if (data.Length > AtariPaintworksFile.SignatureOffset + AtariPaintworksFile.Signature.Length
+        && data.Slice(AtariPaintworksFile.SignatureOffset, AtariPaintworksFile.Signature.Length).SequenceEqual(AtariPaintworksFile.Signature)
+        && data.Length < _EXPECTED_FILE_SIZE)
+      return $"This is a compressed Atari Paintworks picture ({data.Length} bytes against the {_EXPECTED_FILE_SIZE} an uncompressed one takes), which is not decoded here.";
+
+    return $"An uncompressed Atari Paintworks picture is exactly {_EXPECTED_FILE_SIZE} bytes; this file is {data.Length}.";
+  }
 
   public static AtariPaintworksFile FromSpan(ReadOnlySpan<byte> data) {
 
     if (data.Length < AtariPaintworksFile.BitmapOffset)
       throw new InvalidDataException("Data too small for a valid Atari Paintworks file.");
 
-    if (data.Length < _EXPECTED_FILE_SIZE)
-      throw new InvalidDataException(_ShortFileReason(data));
+    if (data.Length != _EXPECTED_FILE_SIZE)
+      throw new InvalidDataException(_WrongLengthReason(data));
 
     var span = data;
     var header = AtariPaintworksHeader.ReadFrom(span[AtariPaintworksFile.PaletteOffset..]);
@@ -78,8 +81,8 @@ public static class AtariPaintworksReader {
     if (data.Length < AtariPaintworksFile.BitmapOffset)
       throw new InvalidDataException("Data too small for a valid Atari Paintworks file.");
 
-    if (data.Length < _EXPECTED_FILE_SIZE)
-      throw new InvalidDataException(_ShortFileReason(data));
+    if (data.Length != _EXPECTED_FILE_SIZE)
+      throw new InvalidDataException(_WrongLengthReason(data));
 
     var span = data.AsSpan();
     var header = AtariPaintworksHeader.ReadFrom(span[AtariPaintworksFile.PaletteOffset..]);
@@ -130,8 +133,8 @@ public static class AtariPaintworksReader {
     if (data.Length < AtariPaintworksFile.BitmapOffset)
       throw new InvalidDataException("Data too small for a valid Atari Paintworks file.");
 
-    if (data.Length < _EXPECTED_FILE_SIZE)
-      throw new InvalidDataException(_ShortFileReason(data));
+    if (data.Length != _EXPECTED_FILE_SIZE)
+      throw new InvalidDataException(_WrongLengthReason(data));
 
     var span = data.AsSpan();
     var header = AtariPaintworksHeader.ReadFrom(span[AtariPaintworksFile.PaletteOffset..]);
