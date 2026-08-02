@@ -86,6 +86,41 @@ public sealed class RawImage {
     _ => throw new ArgumentOutOfRangeException(nameof(format), format, null)
   };
 
+  /// <summary>
+  /// The fewest bytes a picture of this size and format could possibly be held in.
+  /// </summary>
+  /// <remarks>
+  /// Deliberately the loosest bound there is: the samples packed end to end with no padding at all.
+  /// Some formats pad every row out to a whole byte and some do not, and this is not the place to
+  /// decide which — a bound that assumed padding would call a tightly packed picture short, which is
+  /// what a four-bit PNG of an odd width is.
+  /// </remarks>
+  public long MinimumPixelDataLength => ((long)this.Width * this.Height * BitsPerPixel(this.Format) + 7) / 8;
+
+  /// <summary>
+  /// Whether the picture carries enough samples to fill the size it states.
+  /// </summary>
+  /// <remarks>
+  /// A decoder that gives up part way can return a picture whose dimensions and contents disagree —
+  /// one JPEG XL file came back stating 1024 by 1024 with sixty-seven bytes behind it, and a BPG and
+  /// a PICT came back stating their full size with nothing behind them at all. That is worse than
+  /// returning nothing: it counts as a decode, and anything that reads the picture by its stated
+  /// size runs off the end of the buffer or draws whatever happens to follow it.
+  /// </remarks>
+  public bool HasEnoughPixelData {
+    get {
+      if (this.Width <= 0 || this.Height <= 0)
+        return false;
+
+      try {
+        return this.PixelData != null && this.PixelData.LongLength >= this.MinimumPixelDataLength;
+      } catch (ArgumentOutOfRangeException) {
+        // A format this does not measure cannot be checked, so it is not called short.
+        return true;
+      }
+    }
+  }
+
   /// <summary>Computes the number of bits per pixel for the given format.</summary>
   public static int BitsPerPixel(PixelFormat format) => format switch {
     PixelFormat.Bgra32 => 32,

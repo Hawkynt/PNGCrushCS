@@ -358,13 +358,13 @@ public static class FormatRegistry {
 
     // Magic bytes first: they describe the file rather than its name.
     var byMagic = DetectFromBytes(File.ReadAllBytes(file.FullName));
-    if (byMagic != ImageFormat.Unknown && GetEntry(byMagic)?.LoadRawImage(file) is { } decoded)
+    if (byMagic != ImageFormat.Unknown && GetEntry(byMagic)?.LoadRawImage(file) is { } decoded && decoded.HasEnoughPixelData)
       return decoded;
 
     // Then every format the extension names, in turn. One extension can belong to several formats
     // that share nothing, so the only way to tell them apart is to let each try the bytes.
     foreach (var candidate in DetectCandidatesFromExtension(file.Extension))
-      if (GetEntry(candidate)?.LoadRawImage(file) is { } image)
+      if (GetEntry(candidate)?.LoadRawImage(file) is { } image && image.HasEnoughPixelData)
         return image;
 
     return null;
@@ -375,7 +375,9 @@ public static class FormatRegistry {
   public static RawImage? Read(byte[] data) {
     var fmt = DetectFromBytes(data);
     var entry = GetEntry(fmt);
-    return entry?.LoadRawImageFromBytes(data);
+
+    // A picture that cannot fill the size it states is not a decode; see RawImage.HasEnoughPixelData.
+    return entry?.LoadRawImageFromBytes(data) is { } image && image.HasEnoughPixelData ? image : null;
   }
 
   /// <summary>Read a stream of any supported format. Reads the stream's full contents into memory

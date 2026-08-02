@@ -56,11 +56,28 @@ public readonly record struct JpegXlFile : IImageFormatReader<JpegXlFile>, IImag
   /// <summary>ISOBMFF brand string (default "jxl ").</summary>
   public string Brand { get; init; }
 
+  /// <summary>
+  /// Turns a decoded JPEG XL picture into a raw image.
+  /// </summary>
+  /// <remarks>
+  /// The decoder falls back to a placeholder whenever it meets a part of the format it does not
+  /// implement, and that placeholder does not always carry a full picture's worth of samples — one
+  /// real file came back stating 1024 by 1024 with sixty-seven bytes behind it. A picture whose size
+  /// and contents disagree is worse than no picture: anything reading it by its stated size runs off
+  /// the end of the buffer or draws whatever follows. So the two are checked against each other, and
+  /// a file that cannot fill its own dimensions is refused.
+  /// </remarks>
   public static RawImage ToRawImage(JpegXlFile file) {
+    var format = file.ComponentCount == 1 ? PixelFormat.Gray8 : PixelFormat.Rgb24;
+    var needed = (long)file.Width * file.Height * (file.ComponentCount == 1 ? 1 : 3);
+    if (file.PixelData.Length < needed)
+      throw new NotSupportedException(
+        $"This JPEG XL picture was not decoded: {file.Width}x{file.Height} needs {needed} bytes and only {file.PixelData.Length} came back.");
+
     return new() {
       Width = file.Width,
       Height = file.Height,
-      Format = file.ComponentCount == 1 ? PixelFormat.Gray8 : PixelFormat.Rgb24,
+      Format = format,
       PixelData = file.PixelData[..],
     };
   }
