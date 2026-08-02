@@ -62,7 +62,7 @@ internal static class Tier2Decoder {
             zeroBitPlanes = _ReadZeroBitPlanes(reader, tile.BitsPerComponent);
 
           // Read compressed data length
-          var dataLen = _ReadDataLength(reader);
+          var dataLen = _ReadDataLength(reader, numPasses);
           if (dataLen <= 0)
             continue;
 
@@ -123,14 +123,33 @@ internal static class Tier2Decoder {
     return count;
   }
 
-  /// <summary>Read the data length for a code-block contribution (length prefix coding).</summary>
-  private static int _ReadDataLength(BitReader reader) {
+  /// <summary>
+  /// Read the data length for a code-block contribution (length prefix coding).
+  /// </summary>
+  /// <remarks>
+  /// The field is Lblock bits wide plus one for every doubling of the coding-pass count, and that
+  /// second term was missing from both halves here. Since they were missing it together they agreed
+  /// with each other perfectly and with no other decoder at all: OpenJPEG reads a length far longer
+  /// than the code-block it belongs to and refuses the file.
+  /// </remarks>
+  private static int _ReadDataLength(BitReader reader, int numPasses) {
     // Read length indicator: number of extra bits as unary, then the length bits
     var lblock = 3; // Initial Lblock value
     // Read extra bits indicator
     while (reader.ReadBit() != 0)
       ++lblock;
 
-    return reader.ReadBits(lblock);
+    return reader.ReadBits(lblock + FloorLog2(numPasses));
+  }
+
+  /// <summary>How many times the pass count can be halved, which widens the length field.</summary>
+  internal static int FloorLog2(int value) {
+    var bits = 0;
+    while (value > 1) {
+      value >>= 1;
+      ++bits;
+    }
+
+    return bits;
   }
 }

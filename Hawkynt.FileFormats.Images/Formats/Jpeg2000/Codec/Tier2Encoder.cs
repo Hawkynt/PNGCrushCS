@@ -44,7 +44,7 @@ internal static class Tier2Encoder {
               if (layer == 0)
                 _WriteZeroBitPlanes(writer, cb.ZeroBitPlanes);
 
-              _WriteDataLength(writer, cb.CompressedData.Length);
+              _WriteDataLength(writer, cb.CompressedData.Length, cb.NumCodingPasses);
             }
         }
       }
@@ -119,11 +119,25 @@ internal static class Tier2Encoder {
     writer.WriteBit(1);
   }
 
-  /// <summary>Write data length with length indicator prefix.</summary>
-  private static void _WriteDataLength(BitWriter writer, int dataLength) {
+  /// <summary>
+  /// Write data length with length indicator prefix.
+  /// </summary>
+  /// <remarks>
+  /// The field is Lblock bits wide plus one for every doubling of the coding-pass count. That second
+  /// term was missing, and missing from the matching reader too, so the two agreed with each other
+  /// and with nothing else — OpenJPEG reads a length far longer than the code-block it belongs to.
+  /// </remarks>
+  private static void _WriteDataLength(BitWriter writer, int dataLength, int numPasses) {
     // Determine how many bits needed
+    var fromPasses = Tier2Decoder.FloorLog2(numPasses);
+
+    // Enough bits to hold the length, then Lblock raised until it and the pass term together reach.
+    var needed = 1;
+    while (dataLength >= (1 << needed))
+      ++needed;
+
     var lblock = 3;
-    while (dataLength >= (1 << lblock))
+    while (lblock + fromPasses < needed)
       ++lblock;
 
     // Write extra bits indicator (lblock - 3 ones followed by a zero)
@@ -133,6 +147,6 @@ internal static class Tier2Encoder {
     writer.WriteBit(0);
 
     // Write the length value
-    writer.WriteBits(dataLength, lblock);
+    writer.WriteBits(dataLength, lblock + fromPasses);
   }
 }

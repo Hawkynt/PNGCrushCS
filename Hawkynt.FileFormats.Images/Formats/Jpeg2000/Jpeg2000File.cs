@@ -10,7 +10,7 @@ public readonly record struct Jpeg2000File : IImageFormatReader<Jpeg2000File>, I
   static string IImageFormatMetadata<Jpeg2000File>.PrimaryExtension => ".jp2";
   static string[] IImageFormatMetadata<Jpeg2000File>.FileExtensions => [".jp2", ".j2k", ".j2c", ".jpx", ".jpc", ".jpf", ".jpt", ".jpm"];
   static Jpeg2000File IImageFormatReader<Jpeg2000File>.FromSpan(ReadOnlySpan<byte> data) => Jpeg2000Reader.FromSpan(data);
-  static byte[] IImageFormatWriter<Jpeg2000File>.ToBytes(Jpeg2000File file) => Jpeg2000Writer.ToBytes(file);
+  static byte[] IImageFormatWriter<Jpeg2000File>.ToBytes(Jpeg2000File file) => Jpeg2000Writer.ToBytesEbcot(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }

@@ -31,27 +31,21 @@ public static class Jpeg2000Writer {
   private const ushort _EOC = 0xFFD9;
 
   /// <summary>
-  /// KNOWN WRONG. Writes a JP2 container whose codestream no other decoder reads as this picture.
+  /// KNOWN WRONG, and no longer what the format writes. Kept for reading files this once produced.
   /// </summary>
   /// <remarks>
   /// The container is well formed — ImageMagick opens the file and reports the right size — but what
-  /// sits inside it is raw wavelet coefficients as big-endian int32, which is this library's own
-  /// invention and not what the standard codes. Handed a 32 by 24 gradient, ImageMagick reads the
-  /// file back with not one of its 768 pixels matching, an average error of 64 in 255. The picture
-  /// opens, and it is a different picture.
+  /// sits inside it is raw wavelet coefficients as big-endian int32, this library's own invention
+  /// rather than what the standard codes. Handed a 32 by 24 gradient, ImageMagick reads the file
+  /// back with not one of its 768 pixels matching, an average error of 64 in 255: the picture opens,
+  /// and it is a different picture.
   /// <para/>
-  /// That is worse than a file which fails to open, and it is only invisible from inside this
-  /// library, whose reader accepts the same invention on the way back in — so every round-trip test
-  /// passes while nothing else on earth reads what was written.
-  /// <para/>
-  /// There is an EBCOT encoder beside this one, <see cref="ToBytesEbcot"/>, which is what the
-  /// standard actually wants. It is not used because it is wrong in a different way: OpenJPEG
-  /// rejects its output outright with a packet length longer than the codeblock it belongs to. Of
-  /// the two, that at least fails loudly.
-  /// <para/>
-  /// Until one of them is right this format should not be offered for conversion.
+  /// That is worse than a file which fails to open, and it was invisible from inside this library,
+  /// whose reader accepts the same invention coming back — so every round-trip test passed while
+  /// nothing else read what was written. The format now writes through <see cref="ToBytesEbcot"/>
+  /// instead, which is refused by other decoders rather than misread by them.
   /// </remarks>
-  public static byte[] ToBytes(Jpeg2000File file) {
+    public static byte[] ToBytes(Jpeg2000File file) {
     ArgumentNullException.ThrowIfNull(file);
     var codestream = _BuildCodestream(file);
     return _BuildJp2Container(file, codestream);
@@ -62,7 +56,22 @@ public static class Jpeg2000Writer {
     return _BuildCodestream(file);
   }
 
-  /// <summary>Encode using the EBCOT pipeline (Tier-1/Tier-2 arithmetic coding). May produce spec-compliant JPEG 2000 bitstreams.</summary>
+  /// <summary>
+  /// Encode using the EBCOT pipeline (Tier-1/Tier-2 arithmetic coding), which is what the format
+  /// writes.
+  /// </summary>
+  /// <remarks>
+  /// STILL INCOMPLETE, but incomplete in the way that fails loudly rather than quietly. The length
+  /// field in a packet header is now the width the standard states — Lblock plus one bit for every
+  /// doubling of the coding-pass count — where before both this and the matching reader left the
+  /// second term out and so agreed only with each other.
+  /// <para/>
+  /// What remains is the packet header's shape: the standard signals which code-blocks a packet
+  /// includes, and how many bit-planes of each are zero, through tag trees, and both are written
+  /// here as plain values instead. <c>TagTree</c> sits unused beside this file. Until that is done
+  /// OpenJPEG refuses the output, reading a length longer than the code-block it belongs to — which
+  /// is at least a refusal and not a wrong picture.
+  /// </remarks>
   internal static byte[] ToBytesEbcot(Jpeg2000File file) {
     ArgumentNullException.ThrowIfNull(file);
     var codestream = _BuildCodestreamEbcot(file);
