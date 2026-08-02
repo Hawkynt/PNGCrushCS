@@ -2,6 +2,17 @@ using System;
 using System.Collections.Generic;
 using FileFormat.Core;
 
+// A note for anyone correcting a reader: 197 of them carry two copies of their parse, one taking a
+// span and one taking a byte array, rather than the second calling the first. A correction applied
+// to one copy leaves the other as it was, and which copy the registry reaches depends on whether the
+// caller had a file name or only bytes — so the same file can decode two different ways depending on
+// how it was opened.
+//
+// This is not hypothetical: the Prism Paint size fix went into one copy this way, the corpus
+// reported the file perfect because it is read by name, and four tests calling the by-bytes entry
+// failed while pointing at a reader that looked correct. Before changing a reader, check whether it
+// has a second copy.
+
 namespace Hawkynt.FileFormats.Images;
 
 /// <summary>
