@@ -21,8 +21,19 @@ internal static class HamDecoder {
     var controlMask = (1 << controlBits) - 1; // 0x0F for HAM6, 0x3F for HAM8
     var shift = 8 - controlBits; // 4 for HAM6, 2 for HAM8
 
+    // A scanline starts from the background colour, which is the palette's first entry, and not from
+    // black. The two are usually close enough to pass unnoticed, and differ in exactly the first one
+    // or two pixels of every row — the holding carries the border colour in until something modifies
+    // each channel in turn.
+    byte startR = 0, startG = 0, startB = 0;
+    if (palette.Length >= 3) {
+      startR = palette[0];
+      startG = palette[1];
+      startB = palette[2];
+    }
+
     for (var y = 0; y < height; ++y) {
-      byte r = 0, g = 0, b = 0;
+      byte r = startR, g = startG, b = startB;
       var rowOffset = y * width;
 
       for (var x = 0; x < width; ++x) {
