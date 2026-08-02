@@ -48,6 +48,29 @@ nonsense:
   rather than defined, and nobody measured the same; against RECOIL this is 111 samples, which
   counted as disagreements buried the 61 that are genuinely different pictures.
 
+## Where the remaining differences with RECOIL are
+
+Sixty-one samples are genuinely different pictures rather than different shades. Grouped by the
+decoder that produced them, so the work is schedulable rather than a list of filenames:
+
+| decoder | samples | what is wrong |
+|---|---|---|
+| ILBM | 7 | Amiga display modes we decode as plain bitplanes |
+| ICE | 4 | |
+| UIMG, Pixel Perfect, Fun Painter | 2 each | |
+| twenty-odd others | 1 each | |
+
+What was established while looking:
+
+- `.dct` and `.dctv` come out two rows taller than RECOIL's, which looks like control data it drops —
+  it is not. Aligning on any row offset leaves under 1% of pixels matching, because DCTV carries
+  colour as a modulation across neighbouring pixels and we read it as an ordinary ILBM.
+- The C64 multicolour formats that come out 160 wide against RECOIL's 320 are not a scaling
+  difference either. Sampling its every other column, at any alignment, matches 2% to 18% — the
+  content differs, not the width.
+- `.fp2` renders 16 colours here and 90 in RECOIL, which is it blending two interlaced frames. That
+  is a display choice rather than a decode fault, but it is not one the comparison can see past.
+
 ## Decodes that succeed and are still wrong
 
 ```sh
