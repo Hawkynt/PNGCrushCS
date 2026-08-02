@@ -107,6 +107,27 @@ What has come out of attempting them, which is the more useful half:
 - A file with **no header** cannot be verified from one sample. `.cut` decodes at 96 by 99 to the
   pixel, but nothing in it states either number, so a reader would be a guess dressed as a fact.
 
+## What is left against IrfanView
+
+Five samples, the smallest gap of the three installed tools, and every one now identified:
+
+| sample | what it really is |
+|---|---|
+| `.fpr` | four bytes, then a complete PNG at 76 by 105 — which is what IrfanView draws |
+| `.hpi` | its own format behind a PNG-like signature, `89 48 50 49`, and compressed |
+| `.mif` | likewise, `MIMG` with chunks named as PNG names them |
+| `.psf` | `FSPA`, stating 922 wide and 24 bits a pixel in plain little-endian, and compressed |
+| `.pict` | a QuickDraw picture using records this does not follow |
+
+None is a missing format in the sense of nobody having written one — three are compressed formats of
+their own, and the `.fpr` is a PNG wearing four bytes of hat.
+
+That last is deliberately not read. Teaching the PNG reader to find its signature a few bytes in
+would open this file and put the most used format in the library at risk of claiming anything that
+merely contains a PNG. One sample is not worth that, and no other reader can be given the rule
+either without knowing whether a Fun Photor file legitimately wraps a PNG or this one is simply
+misnamed.
+
 ## Decodes that succeed and are still wrong
 
 ```sh
