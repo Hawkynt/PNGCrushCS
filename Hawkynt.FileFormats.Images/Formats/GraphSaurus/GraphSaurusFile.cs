@@ -20,6 +20,15 @@ public readonly record struct GraphSaurusFile : IImageFormatReader<GraphSaurusFi
   static string IImageFormatMetadata<GraphSaurusFile>.PrimaryExtension => ".sr5";
   static string[] IImageFormatMetadata<GraphSaurusFile>.FileExtensions => [".sr5", ".grs", ".sr8", ".srs"];
   static GraphSaurusFile IImageFormatReader<GraphSaurusFile>.FromSpan(ReadOnlySpan<byte> data) => GraphSaurusReader.FromSpan(data);
+
+  /// <summary>
+  /// Reads a named file, which is the only way the palette beside it and the Screen 12 name are seen.
+  /// </summary>
+  /// <remarks>
+  /// Only the by-bytes entry was wired up, so the registry could never reach the reader that takes a
+  /// name — the companion palette went unread and a .srs came back as Screen 8.
+  /// </remarks>
+  static GraphSaurusFile IImageFormatReader<GraphSaurusFile>.FromFile(FileInfo file) => GraphSaurusReader.FromFile(file);
   static VideoMode[] IImageFormatMetadata<GraphSaurusFile>.VideoModes => [
     new("Screen 5", [(256, 212)], [16]),
     new("Screen 8", [(256, 212)], [256]),
@@ -50,6 +59,17 @@ public readonly record struct GraphSaurusFile : IImageFormatReader<GraphSaurusFi
   /// <summary>Whether the file spends eight bits a pixel rather than four.</summary>
   public bool IsScreen8 { get; init; }
 
+  /// <summary>
+  /// Whether the picture is a Screen 12 one, whose bytes are the V9958's YJK rather than indices.
+  /// </summary>
+  /// <remarks>
+  /// It is exactly as long as a Screen 8 picture, so the length cannot tell them apart and the
+  /// extension is what does: <c>.srs</c> against <c>.sr8</c>. Read as Screen 8 the sample came out in
+  /// 256 colours where RECOIL draws 2269, which is the giveaway — YJK carries far more colour than a
+  /// byte of index can.
+  /// </remarks>
+  public bool IsYjk { get; init; }
+
   /// <summary>The bitmap as stored, at the mode's stride.</summary>
   public byte[] PixelData { get; init; }
 
@@ -63,15 +83,39 @@ public readonly record struct GraphSaurusFile : IImageFormatReader<GraphSaurusFi
   public int Stride => this.IsScreen8 ? Screen8Stride : Screen5Stride;
 
   /// <summary>Which mode a file of a given length is.</summary>
-  internal static bool ScreenEightAt(int length) => length switch {
-    HeaderSize + FixedHeight * Screen5Stride => false,
-    HeaderSize + FixedHeight * Screen8Stride => true,
-    _ => throw new InvalidDataException(
-      $"A Graph Saurus screen is {HeaderSize + FixedHeight * Screen5Stride} or "
-      + $"{HeaderSize + FixedHeight * Screen8Stride} bytes; this one is {length}."),
-  };
+  /// <summary>
+  /// Which screen a file of this length holds, taking a length at or above a screen's as that screen.
+  /// </summary>
+  /// <remarks>
+  /// Requiring the length exactly refused two samples that carry a byte or so past the end of the
+  /// picture — a BSAVE file states where its data stops and nothing says the file may not go on a
+  /// little further. Both are read by every other tool.
+  /// </remarks>
+  internal static bool ScreenEightAt(int length) {
+    var five = HeaderSize + FixedHeight * Screen5Stride;
+    var eight = HeaderSize + FixedHeight * Screen8Stride;
 
-  public static RawImage ToRawImage(GraphSaurusFile file) => file.IsScreen8
+    if (length >= eight && length < eight + TrailingSlack)
+      return true;
+    if (length >= five && length < five + TrailingSlack)
+      return false;
+
+    throw new InvalidDataException($"A Graph Saurus screen is {five} or {eight} bytes; this one is {length}.");
+  }
+
+  /// <summary>
+  /// How far past the end of the picture a file may go and still be one of these.
+  /// </summary>
+  /// <remarks>
+  /// Two samples carry a byte or so beyond it and were refused for being the wrong length. Anything
+  /// further off is not padding but a different picture, and a length halfway between the two
+  /// screens is still refused — which is what the test for it asks.
+  /// </remarks>
+  private const int TrailingSlack = 128;
+
+  public static RawImage ToRawImage(GraphSaurusFile file) => file.IsYjk
+    ? _DecodeYjk(file)
+    : file.IsScreen8
     ? new() {
       Width = FixedWidth,
       Height = FixedHeight,
@@ -95,6 +139,29 @@ public readonly record struct GraphSaurusFile : IImageFormatReader<GraphSaurusFi
   /// clean primary; Screen 5 gets sixteen of the 512 the palette can name. For a picture that came
   /// from elsewhere the free choice is worth more than the count.
   /// </remarks>
+  /// <summary>Decodes a Screen 12 picture, four pixels at a time sharing one pair of chroma values.</summary>
+  private static RawImage _DecodeYjk(GraphSaurusFile file) {
+    var pixels = file.PixelData ?? [];
+    var rgb = new byte[FixedWidth * FixedHeight * 3];
+
+    for (var y = 0; y < FixedHeight; ++y) {
+      var at = y * Screen8Stride;
+      if (at + Screen8Stride > pixels.Length)
+        break;
+
+      MsxGraphics.DecodeYjkRow(
+        pixels.AsSpan(at, Screen8Stride), FixedWidth, usePalette: false, default,
+        rgb.AsSpan(y * FixedWidth * 3, FixedWidth * 3));
+    }
+
+    return new() {
+      Width = FixedWidth,
+      Height = FixedHeight,
+      Format = PixelFormat.Rgb24,
+      PixelData = rgb,
+    };
+  }
+
   public static GraphSaurusFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
 

@@ -12,7 +12,10 @@ public static class GraphSaurusReader {
     if (!file.Exists)
       throw new FileNotFoundException("Graph Saurus file not found.", file.FullName);
 
-    var parsed = FromBytes(File.ReadAllBytes(file.FullName));
+    // Screen 12 is the same length as Screen 8, so only the name says which this is.
+    var parsed = FromBytes(File.ReadAllBytes(file.FullName)) with {
+      IsYjk = string.Equals(file.Extension, ".srs", StringComparison.OrdinalIgnoreCase),
+    };
 
     // The palette sits in its own file. Without it a Screen 5 picture still decodes, in the sixteen
     // colours the chip starts with — which is what the machine itself would show.

@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.InterlaceCharacterEditor;
@@ -27,6 +28,14 @@ public readonly record struct IceFile
   static string IImageFormatMetadata<IceFile>.PrimaryExtension => ".irg";
   static string[] IImageFormatMetadata<IceFile>.FileExtensions => [".irg", ".ir2", ".icn", ".imn", ".ipc"];
   static IceFile IImageFormatReader<IceFile>.FromSpan(ReadOnlySpan<byte> data) => IceReader.FromSpan(data);
+
+  /// <summary>Reads a named file, the name being something this format needs.</summary>
+  /// <remarks>
+  /// Only the by-bytes entry was wired up, so the registry could never reach it.
+  /// The mode follows from the length here, so nothing is wrong today, but the extension states it
+  /// outright and is the better authority if two modes ever share a size.
+  /// </remarks>
+  static IceFile IImageFormatReader<IceFile>.FromFile(FileInfo file) => IceReader.FromFile(file);
   static byte[] IImageFormatWriter<IceFile>.ToBytes(IceFile file) => IceWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<IceFile>.VideoModes => [
     new("Super IRG", [(IceLayout.DisplayWidth, IceLayout.DisplayHeight)], [16]),

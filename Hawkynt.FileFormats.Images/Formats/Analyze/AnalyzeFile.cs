@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Analyze;
@@ -9,6 +10,14 @@ public readonly record struct AnalyzeFile : IImageFormatReader<AnalyzeFile>, IIm
   static string IImageFormatMetadata<AnalyzeFile>.PrimaryExtension => ".hdr";
   static string[] IImageFormatMetadata<AnalyzeFile>.FileExtensions => [".hdr", ".img"];
   static AnalyzeFile IImageFormatReader<AnalyzeFile>.FromSpan(ReadOnlySpan<byte> data) => AnalyzeReader.FromSpan(data);
+
+  /// <summary>Reads a named file, the name being something this format needs.</summary>
+  /// <remarks>
+  /// Only the by-bytes entry was wired up, so the registry could never reach it.
+  /// The picture is in a companion .img beside the header file, which only the reader that takes a
+  /// name can find — wired through bytes alone it had nothing to decode.
+  /// </remarks>
+  static AnalyzeFile IImageFormatReader<AnalyzeFile>.FromFile(FileInfo file) => AnalyzeReader.FromFile(file);
   static byte[] IImageFormatWriter<AnalyzeFile>.ToBytes(AnalyzeFile file) => AnalyzeWriter.ToBytes(file);
 
   static bool? IImageFormatMetadata<AnalyzeFile>.MatchesSignature(ReadOnlySpan<byte> header) {
