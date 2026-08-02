@@ -231,7 +231,12 @@ public static class CameraRawReader {
       }
     }
 
-    best ??= _LargestJpegInTheFile(data);
+    // Running this only when the directories named nothing was too timid: several files name a
+    // thumbnail and keep the real preview somewhere the walk does not reach, so a 160 by 120 picture
+    // was returned for a file holding one of 3900 by 2616. Both are searched and the larger wins.
+    var loose = _LargestJpegInTheFile(data);
+    if (loose != null && (best == null || (long)loose.Width * loose.Height > (long)best.Width * best.Height))
+      best = loose;
 
     return best == null ? null : PixelConverter.Convert(best, PixelFormat.Rgb24);
   }
