@@ -58,10 +58,18 @@ public sealed class CrackArtCompressorTests {
 
   [Test]
   [Category("Unit")]
-  public void Compress_Empty_ReturnsEmpty() {
+  /// <summary>
+  /// A packed stream always carries its escape byte, even with nothing to say.
+  /// </summary>
+  /// <remarks>
+  /// This used to expect nothing at all, which came from reading the coding as PackBits: that one
+  /// has no preamble and can be empty, and CrackArt's names its escape byte before anything else.
+  /// A stream with no preamble cannot be read back.
+  /// </remarks>
+  public void Compress_Empty_StillNamesItsEscape() {
     var result = CrackArtCompressor.Compress([]);
 
-    Assert.That(result, Has.Length.EqualTo(0));
+    Assert.That(result, Has.Length.EqualTo(CrackArtCompressor.PreambleSize));
   }
 
   [Test]
