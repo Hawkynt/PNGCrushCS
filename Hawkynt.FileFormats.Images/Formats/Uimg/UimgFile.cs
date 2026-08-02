@@ -53,6 +53,29 @@ public readonly record struct UimgFile
   /// <summary>Offset of the pixels.</summary>
   public int BitmapOffset { get; init; }
 
+  /// <summary>
+  /// Reads a palette of four bits a channel packed one word an entry.
+  /// </summary>
+  /// <remarks>
+  /// Each nibble is repeated to fill its byte, so 0xF becomes 255 and 0x0 stays 0, which is what
+  /// keeps white white.
+  /// </remarks>
+  private static byte[] _ReadRgb444(ReadOnlySpan<byte> data, int offset, int colors) {
+    var palette = new byte[colors * 3];
+    for (var i = 0; i < colors; ++i) {
+      var at = offset + i * 2;
+      if (at + 1 >= data.Length)
+        break;
+
+      var word = (data[at] << 8) | data[at + 1];
+      palette[i * 3] = (byte)((word >> 8 & 0xF) * 0x11);
+      palette[i * 3 + 1] = (byte)((word >> 4 & 0xF) * 0x11);
+      palette[i * 3 + 2] = (byte)((word & 0xF) * 0x11);
+    }
+
+    return palette;
+  }
+
   public static RawImage ToRawImage(UimgFile file) {
     var data = file.Data ?? [];
     var count = file.Width * file.Height;
@@ -86,9 +109,16 @@ public readonly record struct UimgFile
     }
 
     var colors = 1 << file.Depth;
-    var palette = file.PaletteKind == 3
-      ? AtariStGraphics.ReadFalconPalette(data, PaletteOffset, colors)
-      : AtariStGraphics.ReadPalette(data, PaletteOffset, colors);
+
+    // The header names which of three kinds of palette follows, and only one of them is the Atari's.
+    // All three were being read as the Atari's, which puts every channel of a plain twelve-bit
+    // palette in the wrong place: the words 0123 025a 047b 089c are the colours 112233, 2255aa,
+    // 4477bb and 8899cc, and were coming out as a green picture where a blue one belonged.
+    var palette = file.PaletteKind switch {
+      3 => AtariStGraphics.ReadFalconPalette(data, PaletteOffset, colors),
+      2 => _ReadRgb444(data, PaletteOffset, colors),
+      _ => AtariStGraphics.ReadPalette(data, PaletteOffset, colors),
+    };
 
     return new() {
       Width = file.Width,
