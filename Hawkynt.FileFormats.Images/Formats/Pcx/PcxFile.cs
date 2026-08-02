@@ -14,8 +14,21 @@ public readonly record struct PcxFile : IImageFormatReader<PcxFile>, IImageToRaw
   static FormatCapability IImageFormatMetadata<PcxFile>.Capabilities => FormatCapability.HasDedicatedOptimizer;
   static byte[] IImageFormatWriter<PcxFile>.ToBytes(PcxFile file) => PcxWriter.ToBytes(file);
 
+  /// <summary>
+  /// Recognises a PCX, which states no more of a signature than one byte.
+  /// </summary>
+  /// <remarks>
+  /// A leading 0x0A and a version under six is not much to go on, and it claimed a file that merely
+  /// began that way — an AutoDesk drawing, whose thumbnail is a BMP a hundred bytes in. The two
+  /// fields after the version rule it out at no cost: the encoding is none or run-length, and the
+  /// depth is one of four values, where that file states nought for both.
+  /// </remarks>
   static bool? IImageFormatMetadata<PcxFile>.MatchesSignature(ReadOnlySpan<byte> header)
-    => header.Length >= 2 && header[0] == 0x0A && header[1] <= 5
+    => header.Length >= 4
+       && header[0] == 0x0A
+       && header[1] <= 5
+       && header[2] <= 1
+       && header[3] is 1 or 2 or 4 or 8
       ? true : null;
 
   public int Width { get; init; }
