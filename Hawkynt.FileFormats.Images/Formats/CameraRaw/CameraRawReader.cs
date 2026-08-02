@@ -221,7 +221,47 @@ public static class CameraRawReader {
       }
     }
 
+    best ??= _LargestJpegInTheFile(data);
+
     return best == null ? null : PixelConverter.Convert(best, PixelFormat.Rgb24);
+  }
+
+  /// <summary>How many start-of-image markers are worth trying before giving up.</summary>
+  /// <remarks>
+  /// A raw file is megabytes of sensor data and the byte pair that starts a JPEG turns up in it by
+  /// chance, so this stops after a handful rather than attempting a decode at every hit.
+  /// </remarks>
+  private const int _JPEG_CANDIDATE_LIMIT = 12;
+
+  /// <summary>
+  /// The largest JPEG anywhere in the file, when the directories name none.
+  /// </summary>
+  /// <remarks>
+  /// Panasonic, Pentax and Kodak each put their preview behind a tag of their own that the directory
+  /// walk here does not know, so a file plainly holding a picture reported holding none. Rather than
+  /// learn each maker's tag one at a time, this looks for the picture itself: every start-of-image
+  /// marker is a candidate, whichever decodes largest wins, and one that does not decode costs
+  /// nothing.
+  /// </remarks>
+  private static RawImage? _LargestJpegInTheFile(byte[] data) {
+    RawImage? best = null;
+    var tried = 0;
+
+    for (var at = 0; at + 3 < data.Length && tried < _JPEG_CANDIDATE_LIMIT; ++at) {
+      if (data[at] != 0xFF || data[at + 1] != 0xD8 || data[at + 2] != 0xFF)
+        continue;
+
+      ++tried;
+      try {
+        var decoded = JpegFile.ToRawImage(JpegReader.FromSpan(data.AsSpan(at)));
+        if (best == null || (long)decoded.Width * decoded.Height > (long)best.Width * best.Height)
+          best = decoded;
+      } catch (Exception) {
+        // Two bytes that merely look like a marker; the next candidate may be the picture.
+      }
+    }
+
+    return best;
   }
 
   /// <summary>Where an IFD says its JPEG data is, by either of the two conventions.</summary>
