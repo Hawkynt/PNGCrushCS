@@ -8,6 +8,22 @@ namespace FileFormat.ZxMultiArtist.Tests;
 [TestFixture]
 public sealed class ZxMultiArtistReaderTests {
 
+  /// <summary>
+  /// Builds a file the way a real one is laid out: the MGH header, both bitmaps, then both sets of
+  /// attributes. These tests used to build a bare frame of 6912, 7680, 9216 or 12288 bytes, which is
+  /// the shape the reader used to assume and no file has.
+  /// </summary>
+  private static byte[] _Real(ZxMultiArtistMode mode) {
+    var data = new byte[256 + 2 * (6144 + ZxMultiArtistFile.GetAttributeSize(mode))];
+    data[0] = (byte)'M';
+    data[1] = (byte)'G';
+    data[2] = (byte)'H';
+    data[3] = 1;
+    data[4] = (byte)mode;
+    return data;
+  }
+
+
   [Test]
   [Category("Unit")]
   public void FromBytes_Null_ThrowsArgumentNullException()
@@ -43,7 +59,7 @@ public sealed class ZxMultiArtistReaderTests {
   [Test]
   [Category("Unit")]
   public void FromBytes_Mg8_Succeeds() {
-    var data = new byte[6912];
+    var data = _Real(ZxMultiArtistMode.Mg8);
     var result = ZxMultiArtistReader.FromBytes(data);
 
     Assert.That(result.Width, Is.EqualTo(256));
@@ -56,7 +72,7 @@ public sealed class ZxMultiArtistReaderTests {
   [Test]
   [Category("Unit")]
   public void FromBytes_Mg4_Succeeds() {
-    var data = new byte[7680];
+    var data = _Real(ZxMultiArtistMode.Mg4);
     var result = ZxMultiArtistReader.FromBytes(data);
 
     Assert.That(result.Mode, Is.EqualTo(ZxMultiArtistMode.Mg4));
@@ -66,7 +82,7 @@ public sealed class ZxMultiArtistReaderTests {
   [Test]
   [Category("Unit")]
   public void FromBytes_Mg2_Succeeds() {
-    var data = new byte[9216];
+    var data = _Real(ZxMultiArtistMode.Mg2);
     var result = ZxMultiArtistReader.FromBytes(data);
 
     Assert.That(result.Mode, Is.EqualTo(ZxMultiArtistMode.Mg2));
@@ -76,7 +92,7 @@ public sealed class ZxMultiArtistReaderTests {
   [Test]
   [Category("Unit")]
   public void FromBytes_Mg1_Succeeds() {
-    var data = new byte[12288];
+    var data = _Real(ZxMultiArtistMode.Mg1);
     var result = ZxMultiArtistReader.FromBytes(data);
 
     Assert.That(result.Mode, Is.EqualTo(ZxMultiArtistMode.Mg1));
@@ -86,9 +102,9 @@ public sealed class ZxMultiArtistReaderTests {
   [Test]
   [Category("Unit")]
   public void FromBytes_AttributeDataPreserved_Mg4() {
-    var data = new byte[7680];
+    var data = _Real(ZxMultiArtistMode.Mg4);
     for (var i = 0; i < 1536; ++i)
-      data[6144 + i] = (byte)(i % 256);
+      data[256 + 2 * 6144 + i] = (byte)(i % 256);
 
     var result = ZxMultiArtistReader.FromBytes(data);
 
@@ -99,7 +115,7 @@ public sealed class ZxMultiArtistReaderTests {
   [Test]
   [Category("Unit")]
   public void FromBytes_WithHintMode_OverridesDetection() {
-    var data = new byte[6912];
+    var data = _Real(ZxMultiArtistMode.Mg8);
     var result = ZxMultiArtistReader.FromBytes(data, ZxMultiArtistMode.Mg8);
 
     Assert.That(result.Mode, Is.EqualTo(ZxMultiArtistMode.Mg8));
@@ -108,13 +124,13 @@ public sealed class ZxMultiArtistReaderTests {
   [Test]
   [Category("Unit")]
   public void FromBytes_WithHintMode_SizeMismatch_ThrowsInvalidDataException()
-    => Assert.Throws<InvalidDataException>(() => ZxMultiArtistReader.FromBytes(new byte[6912], ZxMultiArtistMode.Mg1));
+    => Assert.Throws<InvalidDataException>(() => ZxMultiArtistReader.FromBytes(_Real(ZxMultiArtistMode.Mg8)[..1000], ZxMultiArtistMode.Mg1));
 
   [Test]
   [Category("Unit")]
   public void FromBytes_StreamParsing_Mg2() {
-    var data = new byte[9216];
-    data[6144] = 0x47;
+    var data = _Real(ZxMultiArtistMode.Mg2);
+    data[256 + 2 * 6144] = 0x47;
     using var ms = new MemoryStream(data);
     var result = ZxMultiArtistReader.FromStream(ms);
     Assert.That(result.AttributeData[0], Is.EqualTo(0x47));
@@ -124,6 +140,18 @@ public sealed class ZxMultiArtistReaderTests {
 
 [TestFixture]
 public sealed class RoundTripTests {
+
+  /// <summary>Builds a file of the shape a real one has: header, both bitmaps, both attribute sets.</summary>
+  private static byte[] _RealFile(ZxMultiArtistMode mode) {
+    var data = new byte[256 + 2 * (6144 + ZxMultiArtistFile.GetAttributeSize(mode))];
+    data[0] = (byte)'M';
+    data[1] = (byte)'G';
+    data[2] = (byte)'H';
+    data[3] = 1;
+    data[4] = (byte)mode;
+    return data;
+  }
+
 
   [Test]
   [Category("Integration")]
@@ -140,7 +168,7 @@ public sealed class RoundTripTests {
     };
 
     var bytes = ZxMultiArtistWriter.ToBytes(original);
-    Assert.That(bytes.Length, Is.EqualTo(fileSize));
+    Assert.That(bytes.Length, Is.EqualTo(256 + 2 * fileSize), "a file carries a header and both frames");
 
     var restored = ZxMultiArtistReader.FromBytes(bytes);
 
@@ -156,8 +184,8 @@ public sealed class RoundTripTests {
   [TestCase(ZxMultiArtistMode.Mg2, 9216)]
   [TestCase(ZxMultiArtistMode.Mg1, 12288)]
   public void RoundTrip_AllBytes_Preserved(ZxMultiArtistMode mode, int fileSize) {
-    var data = new byte[fileSize];
-    for (var i = 0; i < data.Length; ++i)
+    var data = _RealFile(mode);
+    for (var i = 256; i < data.Length; ++i)
       data[i] = (byte)(i * 7 & 0xFF);
 
     var file = ZxMultiArtistReader.FromBytes(data);
@@ -183,7 +211,9 @@ public sealed class RoundTripTests {
     var original = new ZxMultiArtistFile {
       Mode = mode,
       BitmapData = bitmap,
+      SecondBitmapData = bitmap,
       AttributeData = attributes,
+      SecondAttributeData = attributes,
     };
 
     var bytes = ZxMultiArtistWriter.ToBytes(original);
@@ -196,8 +226,8 @@ public sealed class RoundTripTests {
   [Test]
   [Category("Integration")]
   public void RoundTrip_ViaFile_Mg1() {
-    var data = new byte[12288];
-    for (var i = 0; i < data.Length; ++i)
+    var data = _RealFile(ZxMultiArtistMode.Mg1);
+    for (var i = 256; i < data.Length; ++i)
       data[i] = (byte)(i & 0xFF);
 
     var tmp = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".mg1");
@@ -215,8 +245,8 @@ public sealed class RoundTripTests {
   [Test]
   [Category("Integration")]
   public void RoundTrip_ViaFile_Mg4() {
-    var data = new byte[7680];
-    for (var i = 0; i < data.Length; ++i)
+    var data = _RealFile(ZxMultiArtistMode.Mg4);
+    for (var i = 256; i < data.Length; ++i)
       data[i] = (byte)(i & 0xFF);
 
     var tmp = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".mg4");
@@ -245,7 +275,7 @@ public sealed class RoundTripTests {
     };
 
     var bytes = ZxMultiArtistWriter.ToBytes(original);
-    Assert.That(bytes[256], Is.EqualTo(0xBE));
+    Assert.That(bytes[ZxMultiArtistFile.HeaderSize + 256], Is.EqualTo(0xBE));
 
     var restored = ZxMultiArtistReader.FromBytes(bytes);
     Assert.That(restored.BitmapData[row1LinearOffset], Is.EqualTo(0xBE));

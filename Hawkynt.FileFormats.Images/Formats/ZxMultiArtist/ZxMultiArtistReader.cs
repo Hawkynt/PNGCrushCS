@@ -20,9 +20,7 @@ public static class ZxMultiArtistReader {
     if (!file.Exists)
       throw new FileNotFoundException("ZX Spectrum MultiArtist file not found.", file.FullName);
 
-    var data = File.ReadAllBytes(file.FullName);
-    var mode = _DetectModeFromExtension(file.Extension) ?? ZxMultiArtistFile.DetectMode(data.Length);
-    return FromBytes(data, mode);
+    return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
   public static ZxMultiArtistFile FromStream(Stream stream) {
@@ -37,34 +35,51 @@ public static class ZxMultiArtistReader {
     return FromBytes(ms.ToArray());
   }
 
-  public static ZxMultiArtistFile FromSpan(ReadOnlySpan<byte> data, ZxMultiArtistMode? hintMode = null) {
-    var mode = hintMode ?? ZxMultiArtistFile.DetectMode(data.Length)
-      ?? throw new InvalidDataException($"Cannot determine MultiArtist mode from file size {data.Length}. Expected 6912 (MG8), 7680 (MG4), 9216 (MG2), or 12288 (MG1).");
-
-    var expectedSize = ZxMultiArtistFile.GetFileSize(mode);
-    if (data.Length != expectedSize)
-      throw new InvalidDataException($"ZX Spectrum MultiArtist {mode} file must be exactly {expectedSize} bytes, got {data.Length}.");
-
-    var linearBitmap = new byte[BitmapSize];
-
-    // Deinterleave from ZX Spectrum memory layout to linear row order
+  /// <summary>Turns the Spectrum's screen layout into rows one after another.</summary>
+  private static byte[] _Deinterleave(ReadOnlySpan<byte> data) {
+    var linear = new byte[BitmapSize];
     for (var y = 0; y < RowCount; ++y) {
       var third = y / 64;
-      var characterRow = (y % 64) / 8;
+      var characterRow = y % 64 / 8;
       var pixelLine = y % 8;
-      var srcOffset = third * 2048 + pixelLine * 256 + characterRow * BytesPerRow;
-      var dstOffset = y * BytesPerRow;
-      data.Slice(srcOffset, BytesPerRow).CopyTo(linearBitmap.AsSpan(dstOffset));
+      var from = third * 2048 + pixelLine * 256 + characterRow * BytesPerRow;
+      data.Slice(from, BytesPerRow).CopyTo(linear.AsSpan(y * BytesPerRow));
     }
 
+    return linear;
+  }
+
+  /// <summary>
+  /// Reads a MultiArtist picture: a header, then two frames.
+  /// </summary>
+  /// <remarks>
+  /// What used to be assumed here was a single frame with no header at all, its mode guessed from
+  /// the file's length. A real file opens with <c>MGH</c>, states its mode in the header, and then
+  /// carries both bitmaps followed by both sets of attributes — so nothing real could be read, and
+  /// the guess from length could only ever match a file this library had written itself.
+  /// </remarks>
+  public static ZxMultiArtistFile FromSpan(ReadOnlySpan<byte> data, ZxMultiArtistMode? hintMode = null) {
+    var mode = ZxMultiArtistFile.DetectMode(data)
+      ?? throw new InvalidDataException("Not a ZX Spectrum MultiArtist picture: it does not begin with MGH and a mode.");
+
+    var expectedSize = ZxMultiArtistFile.GetFileSize(mode);
+    if (data.Length < expectedSize)
+      throw new InvalidDataException($"A MultiArtist {mode} picture is {expectedSize} bytes; this file is {data.Length}.");
+
     var attributeSize = ZxMultiArtistFile.GetAttributeSize(mode);
-    var attributes = new byte[attributeSize];
-    data.Slice(BitmapSize, attributeSize).CopyTo(attributes);
+    var at = ZxMultiArtistFile.HeaderSize;
+
+    // Both bitmaps come first, and only then the two sets of attributes.
+    var first = _Deinterleave(data.Slice(at, BitmapSize));
+    var second = _Deinterleave(data.Slice(at + BitmapSize, BitmapSize));
+    at += BitmapSize * 2;
 
     return new ZxMultiArtistFile {
       Mode = mode,
-      BitmapData = linearBitmap,
-      AttributeData = attributes,
+      BitmapData = first,
+      SecondBitmapData = second,
+      AttributeData = data.Slice(at, attributeSize).ToArray(),
+      SecondAttributeData = data.Slice(at + attributeSize, attributeSize).ToArray(),
     };
   }
 

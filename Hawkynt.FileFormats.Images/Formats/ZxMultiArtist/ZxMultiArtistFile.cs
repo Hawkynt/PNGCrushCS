@@ -49,8 +49,14 @@ public sealed class ZxMultiArtistFile : IImageFormatReader<ZxMultiArtistFile>, I
   /// <summary>Attribute data. Size depends on mode: MG1=6144, MG2=3072, MG4=1536, MG8=768.</summary>
   public byte[] AttributeData { get; init; } = [];
 
+  /// <summary>The bitmap of the second frame, which is shown alternately with the first.</summary>
+  public byte[] SecondBitmapData { get; init; } = [];
+
+  /// <summary>The attributes of the second frame.</summary>
+  public byte[] SecondAttributeData { get; init; } = [];
+
   /// <summary>Returns the attribute data size for a given mode.</summary>
-  internal static int GetAttributeSize(ZxMultiArtistMode mode) => mode switch {
+  public static int GetAttributeSize(ZxMultiArtistMode mode) => mode switch {
     ZxMultiArtistMode.Mg1 => 6144, // 32 * 192
     ZxMultiArtistMode.Mg2 => 3072, // 32 * 96
     ZxMultiArtistMode.Mg4 => 1536, // 32 * 48
@@ -58,19 +64,71 @@ public sealed class ZxMultiArtistFile : IImageFormatReader<ZxMultiArtistFile>, I
     _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Invalid MultiArtist mode.")
   };
 
-  /// <summary>Returns the total file size for a given mode.</summary>
-  internal static int GetFileSize(ZxMultiArtistMode mode) => 6144 + GetAttributeSize(mode);
+  /// <summary>Bytes one frame's bitmap takes.</summary>
+  internal const int BitmapSize = 6144;
 
-  /// <summary>Tries to detect the mode from a file size. Returns null if no mode matches.</summary>
-  internal static ZxMultiArtistMode? DetectMode(int fileSize) => fileSize switch {
-    12288 => ZxMultiArtistMode.Mg1,
-    9216 => ZxMultiArtistMode.Mg2,
-    7680 => ZxMultiArtistMode.Mg4,
-    6912 => ZxMultiArtistMode.Mg8,
-    _ => null
-  };
+  /// <summary>The three letters every one of these begins with.</summary>
+  internal static ReadOnlySpan<byte> Signature => "MGH"u8;
 
-  /// <summary>Converts this MultiArtist image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
+  /// <summary>Bytes of header before the picture, nearly all of them unused.</summary>
+  public const int HeaderSize = 256;
+
+  /// <summary>
+  /// Returns the total file size for a given mode.
+  /// </summary>
+  /// <remarks>
+  /// A file carries two frames, not one: two bitmaps first and then the two sets of attributes that
+  /// go with them. What used to be assumed here was a single headerless frame, which is a shape no
+  /// file has.
+  /// </remarks>
+  internal static int GetFileSize(ZxMultiArtistMode mode) => HeaderSize + 2 * (BitmapSize + GetAttributeSize(mode));
+
+  /// <summary>The mode the header names, or null if this is not one of these at all.</summary>
+  internal static ZxMultiArtistMode? DetectMode(ReadOnlySpan<byte> data) {
+    if (data.Length < HeaderSize || !data[..3].SequenceEqual(Signature))
+      return null;
+
+    return data[4] switch {
+      1 => ZxMultiArtistMode.Mg1,
+      2 => ZxMultiArtistMode.Mg2,
+      4 => ZxMultiArtistMode.Mg4,
+      8 => ZxMultiArtistMode.Mg8,
+      _ => null,
+    };
+  }
+
+  /// <summary>Draws one frame into the given buffer.</summary>
+  private static void _DrawFrame(byte[] bitmap, byte[] attributes, int cellHeight, byte[] target) {
+    const int width = 256;
+    const int height = 192;
+    var attributeRows = attributes.Length / 32;
+
+    for (var y = 0; y < height; ++y)
+    for (var x = 0; x < width; ++x) {
+      var bit = (bitmap[y * 32 + x / 8] >> (7 - x % 8)) & 1;
+      var attribute = attributes[Math.Min(y / cellHeight, attributeRows - 1) * 32 + x / 8];
+      var palette = (attribute >> 6 & 1) == 1 ? BrightPalette : NormalPalette;
+      var color = palette[bit == 1 ? attribute & 7 : attribute >> 3 & 7];
+
+      var offset = (y * width + x) * 3;
+      target[offset] = (byte)(color >> 16 & 0xFF);
+      target[offset + 1] = (byte)(color >> 8 & 0xFF);
+      target[offset + 2] = (byte)(color & 0xFF);
+    }
+  }
+
+  /// <summary>
+  /// Converts this MultiArtist image to a platform-independent <see cref="RawImage"/> in Rgb24 format.
+  /// </summary>
+  /// <remarks>
+  /// The picture is two frames the machine shows one after the other fast enough to blend, which is
+  /// how it shows more colours in a cell than the hardware allows. Only the first was drawn here,
+  /// which is half the picture and the wrong colours everywhere the two differ, so the two are
+  /// averaged.
+  /// <para/>
+  /// Checked against RECOIL on real files: the <c>.mg2</c>, <c>.mg4</c> and <c>.mg8</c> samples come
+  /// back byte-identical.
+  /// </remarks>
   public static RawImage ToRawImage(ZxMultiArtistFile file) {
     ArgumentNullException.ThrowIfNull(file);
 
@@ -78,29 +136,14 @@ public sealed class ZxMultiArtistFile : IImageFormatReader<ZxMultiArtistFile>, I
     const int height = 192;
     var cellHeight = (int)file.Mode;
     var rgb = new byte[width * height * 3];
+    _DrawFrame(file.BitmapData, file.AttributeData, cellHeight, rgb);
 
-    for (var y = 0; y < height; ++y)
-      for (var x = 0; x < width; ++x) {
-        var byteIndex = y * 32 + x / 8;
-        var bitPosition = 7 - (x % 8);
-        var bitValue = (file.BitmapData[byteIndex] >> bitPosition) & 1;
-
-        var cellX = x / 8;
-        var attrRow = y / cellHeight;
-        var attrCols = 32;
-        var attribute = file.AttributeData[attrRow * attrCols + cellX];
-        var bright = (attribute >> 6) & 1;
-        var paper = (attribute >> 3) & 0x07;
-        var ink = attribute & 0x07;
-
-        var palette = bright == 1 ? BrightPalette : NormalPalette;
-        var color = palette[bitValue == 1 ? ink : paper];
-
-        var offset = (y * width + x) * 3;
-        rgb[offset] = (byte)((color >> 16) & 0xFF);
-        rgb[offset + 1] = (byte)((color >> 8) & 0xFF);
-        rgb[offset + 2] = (byte)(color & 0xFF);
-      }
+    if (file.SecondBitmapData.Length == BitmapSize && file.SecondAttributeData.Length == file.AttributeData.Length) {
+      var second = new byte[rgb.Length];
+      _DrawFrame(file.SecondBitmapData, file.SecondAttributeData, cellHeight, second);
+      for (var i = 0; i < rgb.Length; ++i)
+        rgb[i] = (byte)((rgb[i] + second[i]) / 2);
+    }
 
     return new() {
       Width = width,
