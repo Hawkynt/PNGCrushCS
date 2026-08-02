@@ -6,6 +6,32 @@ namespace FileFormat.Pict;
 /// <summary>In-memory representation of a PICT image (raster subset).</summary>
 public readonly record struct PictFile : IImageFormatReader<PictFile>, IImageToRawImage<PictFile>, IImageFromRawImage<PictFile>, IImageFormatWriter<PictFile> {
 
+  /// <summary>Bytes of Macintosh file header before the picture itself.</summary>
+  private const int _MAC_HEADER_SIZE = 512;
+
+  /// <summary>Where the version 2 opcode sits: past the header, the size word and the bounds.</summary>
+  private const int _VERSION_OPCODE_OFFSET = _MAC_HEADER_SIZE + 10;
+
+  /// <summary>
+  /// Recognises a QuickDraw picture by the opcode that opens it rather than by its name.
+  /// </summary>
+  /// <remarks>
+  /// These carry no signature at offset zero — a Macintosh file header of 512 bytes comes first, and
+  /// it is whatever the creating program left there. So detection fell back to the extension, and
+  /// two of these in the corpus are named .16 and .jpg, which sent them to readers for a Sinclair
+  /// screen and a JPEG. Both refused, and the picture went unread by anything.
+  /// <para/>
+  /// Version 2 opens 0x0011 0x02FF after the size word and the bounds rectangle, which is specific
+  /// enough to name the format and is checked here.
+  /// </remarks>
+  static bool? IImageFormatMetadata<PictFile>.MatchesSignature(ReadOnlySpan<byte> header) {
+    if (header.Length < _VERSION_OPCODE_OFFSET + 4)
+      return null;
+
+    var at = header[_VERSION_OPCODE_OFFSET..];
+    return at[0] == 0x00 && at[1] == 0x11 && at[2] == 0x02 && at[3] == 0xFF ? true : null;
+  }
+
   static string IImageFormatMetadata<PictFile>.PrimaryExtension => ".pict";
   static string[] IImageFormatMetadata<PictFile>.FileExtensions => [".pict", ".pct"];
   static PictFile IImageFormatReader<PictFile>.FromSpan(ReadOnlySpan<byte> data) => PictReader.FromSpan(data);
