@@ -72,21 +72,32 @@ public sealed class BbcMicroScreenTests {
 
   [Test]
   [Category("Unit")]
-  public void FromRawImage_ProducesAMode4Screen() {
-    var width = BbcMicroScreenFile.DisplayWidth(BbcMicroMode.Mode4);
-    var height = BbcMicroScreenFile.DisplayHeight(BbcMicroMode.Mode4);
-    var data = new byte[width * height * 4];
-    for (var i = 0; i < data.Length; i += 4) {
-      data[i] = data[i + 1] = data[i + 2] = (byte)(i % 251);
-      data[i + 3] = 255;
+  /// <summary>
+  /// The mode is chosen from the picture's colours and size.
+  /// </summary>
+  /// <remarks>
+  /// This used to assert mode 4 for everything, which is what the encoder wrote whatever it was
+  /// given: every picture came out black and white at half the bytes the original held, and RECOIL
+  /// would not read one back. The mode now follows the picture — two colours take the monochrome
+  /// screen, four the one showing black, red, yellow and white, and more the sixteen-colour screen.
+  /// </remarks>
+  public void FromRawImage_ChoosesTheModeTheColoursCallFor() {
+    static RawImage Picture(int width, int height, int colours) {
+      var data = new byte[width * height * 4];
+      for (var i = 0; i < data.Length; i += 4) {
+        var shade = (byte)(i / 4 % colours * (255 / Math.Max(1, colours - 1)));
+        data[i] = data[i + 1] = data[i + 2] = shade;
+        data[i + 3] = 255;
+      }
+
+      return new() { Width = width, Height = height, Format = PixelFormat.Rgba32, PixelData = data };
     }
 
-    var raw = new RawImage { Width = width, Height = height, Format = PixelFormat.Rgba32, PixelData = data };
-    var file = BbcMicroScreenFile.FromRawImage(raw);
-
     Assert.Multiple(() => {
-      Assert.That(file.Mode, Is.EqualTo(BbcMicroMode.Mode4));
-      Assert.That(BbcMicroScreenWriter.ToBytes(file), Has.Length.EqualTo(BbcMicroScreenFile.FileSizeFor(BbcMicroMode.Mode4)));
+      Assert.That(BbcMicroScreenFile.FromRawImage(Picture(320, 256, 2)).Mode, Is.EqualTo(BbcMicroMode.Mode4));
+      Assert.That(BbcMicroScreenFile.FromRawImage(Picture(320, 256, 8)).Mode, Is.EqualTo(BbcMicroMode.Mode2));
+      Assert.That(BbcMicroScreenFile.FromRawImage(Picture(640, 512, 2)).Mode, Is.EqualTo(BbcMicroMode.Mode0),
+        "only mode 0 draws 640 across");
     });
   }
 }

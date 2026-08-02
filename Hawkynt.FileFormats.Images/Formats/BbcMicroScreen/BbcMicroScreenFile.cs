@@ -162,27 +162,80 @@ public readonly record struct BbcMicroScreenFile
     };
   }
 
+/// <summary>
+  /// Chooses a screen mode for the picture and encodes it.
+  /// </summary>
+  /// <remarks>
+  /// This used to write mode 4 whatever it was given — the plain monochrome screen — so every
+  /// picture came out black and white at half the size the original held, and anything that was not
+  /// 320 by 256 was refused outright. The mode is chosen from the colours the picture actually uses
+  /// now: two take the monochrome screen, four the one that shows black, red, yellow and white, and
+  /// more than that the sixteen-colour screen.
+  /// </remarks>
   public static BbcMicroScreenFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
 
-    // Mode 4 is the plain 320x256 monochrome screen and the natural conversion target.
-    const BbcMicroMode mode = BbcMicroMode.Mode4;
+    var rgb = image.ToRgb24();
+    var seen = new System.Collections.Generic.HashSet<int>();
+    for (var i = 0; i < rgb.Length; i += 3) {
+      seen.Add((rgb[i] << 16) | (rgb[i + 1] << 8) | rgb[i + 2]);
+      if (seen.Count > 4)
+        break;
+    }
+
+    // The size matters as well as the colours: mode 0 is the only one that draws 640 across, so a
+    // picture that wide in two colours belongs there rather than being shrunk to fit mode 4.
+    var mode = seen.Count <= 2
+      ? image.Width > 320 ? BbcMicroMode.Mode0 : BbcMicroMode.Mode4
+      : seen.Count <= 4 ? BbcMicroMode.Mode1
+      : BbcMicroMode.Mode2;
+
     int width = DisplayWidth(mode), height = DisplayHeight(mode), stored = StoredWidth(mode);
     if (image.Width != width || image.Height != height)
-      throw new ArgumentException($"Expected {width}x{height} but got {image.Width}x{image.Height}.", nameof(image));
+      image = image.SampleTo(width, height);
 
-    var grey = PixelConverter.Convert(image, PixelFormat.Gray8);
+    rgb = image.ToRgb24();
+    var colors = ColorCount(mode);
     var data = new byte[FileSizeFor(mode)];
 
-    for (var y = 0; y < height; ++y)
+    // The screen always holds 256 rows however many the mode draws — mode 0 shows each of them
+    // twice — so the rows written are the stored ones and the picture is sampled to suit.
+    for (var y = 0; y < ScreenRows; ++y)
     for (var x = 0; x < stored; ++x) {
-      if (grey.PixelData[y * width + x * width / stored] < 128)
+      var sample = (y * height / ScreenRows * width + x * width / stored) * 3;
+      var index = _NearestLogicalColor(rgb[sample], rgb[sample + 1], rgb[sample + 2], mode, colors);
+      if (index == 0)
         continue;
 
       var (offset, shift) = _Locate(mode, x, y);
-      data[offset] |= (byte)(_Scatter(mode, 1) << shift);
+      data[offset] |= (byte)(_Scatter(mode, index) << shift);
     }
 
     return new() { Mode = mode, ScreenData = data };
+  }
+
+  /// <summary>The logical colour of the mode whose physical entry is nearest the given one.</summary>
+  private static int _NearestLogicalColor(byte red, byte green, byte blue, BbcMicroMode mode, int colors) {
+    var best = 0;
+    var bestDistance = int.MaxValue;
+    for (var i = 0; i < colors; ++i) {
+      var physical = colors switch {
+        2 => i == 0 ? 0 : 7,
+        4 => _FourColourDefaults[i & 3],
+        _ => i & 7,
+      } * 3;
+
+      var dr = _Palette[physical] - red;
+      var dg = _Palette[physical + 1] - green;
+      var db = _Palette[physical + 2] - blue;
+      var distance = dr * dr + dg * dg + db * db;
+      if (distance >= bestDistance)
+        continue;
+
+      bestDistance = distance;
+      best = i;
+    }
+
+    return best;
   }
 }
