@@ -116,19 +116,6 @@ public static class BmpReader {
     if (compression == BmpCompression.Rle8) {
       pixelData = RleCompressor.DecompressRle8(rawPixelData, width, height);
     } else {
-      // KNOWN WRONG for at least one uncompressed 1-bit file, and worth saying so here because BMP is
-      // the last format anyone would think to doubt.
-      //
-      // A 196 by 228 one-bit BMP with a two-entry palette decodes here to 71% of the pixels XnView
-      // and ImageMagick agree on — and those two agree with each other exactly, so the picture is not
-      // in question. The errors run both ways, six thousand pixels black that should be white and six
-      // thousand the reverse, scattered rather than shifted, so it is not the row order, the padding,
-      // the palette or the bit order within a byte; each of those was tried against the file and
-      // ruled out. Reading the file by hand bottom-up with a set bit as white reproduces the other
-      // two exactly, which is what this code appears to do.
-      //
-      // Left recorded rather than guessed at. Whoever picks it up should start from the sample rather
-      // than from this loop, since the loop reads correctly to inspection.
       var bytesPerRow = (width * bitsPerPixel + 7) / 8;
       var paddedBytesPerRow = (bytesPerRow + 3) & ~3;
       pixelData = new byte[bytesPerRow * height];
@@ -141,6 +128,13 @@ public static class BmpReader {
       }
       // After de-ordering, data is in top-down order
       rowOrder = BmpRowOrder.TopDown;
+
+      // A RawImage in a sub-byte format runs its indices straight on across the picture, where BMP
+      // starts every row on a byte boundary. The two agree for any width that is a multiple of eight
+      // pixels, which is nearly every picture — and diverge by the padding bits for the rest, putting
+      // every row after the first further out of step than the one above it. A 196 by 228 one-bit
+      // file came out 71% right against XnView and ImageMagick, which agree with each other exactly.
+      pixelData = _RemoveRowPadding(pixelData, width, height, bitsPerPixel);
     }
 
     return new BmpFile {
@@ -159,6 +153,33 @@ public static class BmpReader {
   public static BmpFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     return FromSpan(data);
+  }
+
+  /// <summary>Restacks sub-byte rows from BMP's byte-aligned layout to the continuous one.</summary>
+  private static byte[] _RemoveRowPadding(byte[] padded, int width, int height, int bitsPerPixel) {
+    if (bitsPerPixel >= 8)
+      return padded;
+
+    var paddedStride = (width * bitsPerPixel + 7) / 8;
+    if (paddedStride * 8 == width * bitsPerPixel)
+      return padded;
+
+    var result = new byte[(width * height * bitsPerPixel + 7) / 8];
+    var mask = (1 << bitsPerPixel) - 1;
+
+    for (var y = 0; y < height; ++y)
+    for (var x = 0; x < width; ++x) {
+      var sourceBit = y * paddedStride * 8 + x * bitsPerPixel;
+      var sourceByte = sourceBit >> 3;
+      if (sourceByte >= padded.Length)
+        return result;
+
+      var value = (padded[sourceByte] >> (8 - bitsPerPixel - (sourceBit & 7))) & mask;
+      var targetBit = (y * width + x) * bitsPerPixel;
+      result[targetBit >> 3] |= (byte)(value << (8 - bitsPerPixel - (targetBit & 7)));
+    }
+
+    return result;
   }
 
   private static BmpColorMode _DetectColorMode(int bitsPerPixel, int bmpCompression, byte[]? palette, int paletteColorCount) {
