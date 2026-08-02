@@ -51,6 +51,24 @@ public readonly record struct ClpFile : IImageFormatReader<ClpFile>, IImageToRaw
           PaletteCount = file.Palette.Length / 4,
         };
       }
+      // Four and one bit a pixel follow the same rules as eight — rows padded to a multiple of four
+      // bytes and written bottom upwards — and were simply never written out, so a clipboard picture
+      // in sixteen colours was refused for a depth the format plainly has.
+      case 4 when file.Palette != null:
+      case 1 when file.Palette != null: {
+        var rowBytes = (width * file.BitsPerPixel + 7) / 8;
+        var stride = (rowBytes + 3) & ~3;
+        var pixels = _StripPaddingAndFlip(file.PixelData, stride, rowBytes, height);
+        var palette = PixelConverter.BgraToRgb(file.Palette, file.Palette.Length / 4);
+        return new() {
+          Width = width,
+          Height = height,
+          Format = file.BitsPerPixel == 4 ? PixelFormat.Indexed4 : PixelFormat.Indexed1,
+          PixelData = pixels,
+          Palette = palette,
+          PaletteCount = file.Palette.Length / 4,
+        };
+      }
       default:
         throw new NotSupportedException($"CLP with {file.BitsPerPixel} bits per pixel is not supported.");
     }
