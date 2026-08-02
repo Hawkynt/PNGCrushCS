@@ -27,23 +27,32 @@ public static class CommodorePetReader {
 
   public static CommodorePetFile FromSpan(ReadOnlySpan<byte> data) {
 
-    if (data.Length < CommodorePetFile.FileSize)
-      throw new InvalidDataException($"Data too small: {data.Length} bytes, expected 1000.");
+    // A saved screen opens with the address it loads to, then the cells, then one colour each.
+    var at = data.Length >= CommodorePetFile.LoadAddressSize + CommodorePetFile.CellCount * 2
+      ? CommodorePetFile.LoadAddressSize
+      : 0;
 
-    var pixelData = new byte[CommodorePetFile.ImageWidth * CommodorePetFile.ImageHeight];
-    data.Slice(0, pixelData.Length).CopyTo(pixelData.AsSpan(0));
+    if (data.Length < at + CommodorePetFile.CellCount)
+      throw new InvalidDataException($"Data too small: {data.Length} bytes, expected at least {CommodorePetFile.CellCount}.");
 
-    return new CommodorePetFile { PixelData = pixelData };
-    }
+    var codes = new byte[CommodorePetFile.CellCount];
+    data.Slice(at, codes.Length).CopyTo(codes.AsSpan(0));
+
+    // The colours are the last thing in the file and run to its end, which is what places them:
+    // some of these carry a few bytes between the two areas, so counting forward from the screen
+    // lands short.
+    var colors = new byte[CommodorePetFile.CellCount];
+    var colorsAt = data.Length - CommodorePetFile.CellCount;
+    if (colorsAt >= at + CommodorePetFile.CellCount)
+      data.Slice(colorsAt, colors.Length).CopyTo(colors.AsSpan(0));
+    else
+      colors.AsSpan().Fill(1); // nothing said, so the machine's own default
+
+    return new CommodorePetFile { PixelData = codes, CellColors = colors };
+  }
 
   public static CommodorePetFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < CommodorePetFile.FileSize)
-      throw new InvalidDataException($"Data too small: {data.Length} bytes, expected 1000.");
-
-    var pixelData = new byte[CommodorePetFile.ImageWidth * CommodorePetFile.ImageHeight];
-    data.AsSpan(0, pixelData.Length).CopyTo(pixelData.AsSpan(0));
-
-    return new CommodorePetFile { PixelData = pixelData };
+    return FromSpan(data);
   }
 }
