@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace FileFormat.Bob;
 
@@ -6,22 +6,18 @@ namespace FileFormat.Bob;
 public static class BobWriter {
 
   public static byte[] ToBytes(BobFile file) {
-    ArgumentNullException.ThrowIfNull(file);
-    var pixelBytes = file.PixelData.Length;
-    var fileSize = BobFile.HeaderSize + pixelBytes;
-    var result = new byte[fileSize];
+    var pixels = file.PixelData ?? [];
+    var result = new byte[BobFile.PixelOffset + file.Width * file.Height];
 
-    result[0] = (byte)(file.Width & 0xFF);
-    result[1] = (byte)((file.Width >> 8) & 0xFF);
-    if (8 >= 8) {
-      result[4] = (byte)(file.Height & 0xFF);
-      result[5] = (byte)((file.Height >> 8) & 0xFF);
-    } else {
-      result[2] = (byte)(file.Height & 0xFF);
-      result[3] = (byte)((file.Height >> 8) & 0xFF);
-    }
+    result[0] = (byte)file.Width;
+    result[1] = (byte)(file.Width >> 8);
+    result[2] = (byte)file.Height;
+    result[3] = (byte)(file.Height >> 8);
 
-    file.PixelData.AsSpan(0, Math.Min(pixelBytes, file.PixelData.Length)).CopyTo(result.AsSpan(BobFile.HeaderSize));
+    var palette = file.Palette ?? [];
+    palette.AsSpan(0, Math.Min(palette.Length, BobFile.PaletteSize)).CopyTo(result.AsSpan(BobFile.HeaderSize));
+    pixels.AsSpan(0, Math.Min(pixels.Length, result.Length - BobFile.PixelOffset)).CopyTo(result.AsSpan(BobFile.PixelOffset));
+
     return result;
   }
 }

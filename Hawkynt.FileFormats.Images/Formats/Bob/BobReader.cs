@@ -27,31 +27,30 @@ public static class BobReader {
 
   public static BobFile FromSpan(ReadOnlySpan<byte> data) {
 
-    if (data.Length < BobFile.HeaderSize)
+    if (data.Length < BobFile.PixelOffset)
       throw new InvalidDataException("Data too small for a valid Bob file.");
 
     var width = data[0] | (data[1] << 8);
     var height = data[2] | (data[3] << 8);
-    if (width == 0) width = data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24);
-    if (width <= 0 || width > 65535) width = 320;
+    if (width <= 0 || height <= 0)
+      throw new InvalidDataException($"A Bob picture states {width}x{height}, which is no size.");
 
-    if (8 >= 8) {
-      height = data[4] | (data[5] << 8);
-      if (height <= 0 || height > 65535) height = 200;
-    } else if (height <= 0 || height > 65535) {
-      height = 200;
-    }
+    // Nothing in the file says it is one of these, so the length is the whole of the check: an
+    // indexed picture of the stated size behind a palette comes to exactly this and nothing else
+    // does. Substituting a default size when it did not, as this used to, turns a file of some other
+    // format into a picture of invented dimensions rather than refusing it.
+    var expected = BobFile.SizeOf(width, height);
+    if (data.Length != expected)
+      throw new InvalidDataException($"A Bob picture of {width}x{height} is {expected} bytes; this file is {data.Length}.");
 
-    var pixelBytes = width * height * 3;
-    var pixelData = new byte[pixelBytes];
-    var available = Math.Min(pixelBytes, data.Length - BobFile.HeaderSize);
-    if (available > 0)
-      data.Slice(BobFile.HeaderSize, available).CopyTo(pixelData);
+    var palette = data.Slice(BobFile.HeaderSize, BobFile.PaletteSize).ToArray();
+    var pixelData = data.Slice(BobFile.PixelOffset, width * height).ToArray();
 
     return new() {
       Width = width,
       Height = height,
       PixelData = pixelData,
+      Palette = palette,
     };
   }
 
