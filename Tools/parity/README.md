@@ -44,6 +44,20 @@ nonsense:
 - These machines had non-square pixels and the tools disagree on correcting for it, so one drawing
   the same picture at an integer multiple of another's size is not a disagreement about the picture.
 
+## Decodes that succeed and are still wrong
+
+```sh
+dotnet run --project Tools/parity/Decode -- --implausible "$samples"
+```
+
+A reader taking its size from the wrong offset still reports success. One 6998-byte sample was read
+as 150192 by 22341 — three and a third billion pixels — and nothing downstream questions it, so a
+viewer asked to open that file tries to allocate for it. This lists decodes stating a size no format
+here draws.
+
+It is a floor, not a ceiling: it catches sizes that are obviously impossible, and a reader can still
+be wrong within plausible bounds. Only the format's own validation catches those.
+
 ## What it does not cover
 
 Tom's Editor is a web service with a request quota, so it cannot be swept over a corpus and is not

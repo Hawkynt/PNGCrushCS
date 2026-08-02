@@ -7,7 +7,39 @@ using Hawkynt.FileFormats.Images;
 
 if (args.Length < 2) {
   Console.Error.WriteLine("usage: Decode <sample directory> <output directory>");
+  Console.Error.WriteLine("       Decode --implausible <sample directory>");
   return 2;
+}
+
+// Reading a file is not the same as reading it correctly. A reader that takes its size from the
+// wrong offset still reports success, and the size it invents can be enormous — one sample of 6998
+// bytes was read as three and a third billion pixels. Nothing downstream questions that, so a viewer
+// asked to open it tries to allocate for it. This lists the decodes whose stated size cannot be
+// squared with the file it came from.
+if (args[0] == "--implausible") {
+  var suspect = 0;
+  foreach (var path in Directory.GetFiles(args[1]).OrderBy(x => x, StringComparer.Ordinal)) {
+    var candidate = new FileInfo(path);
+    RawImage? decoded;
+    try {
+      decoded = FormatRegistry.Read(candidate);
+    } catch (Exception) {
+      continue;
+    }
+
+    if (decoded == null || decoded.Width <= 0 || decoded.Height <= 0)
+      continue;
+
+    // No format here draws a picture wider or taller than this, and none of the real ones come close.
+    if (decoded.Width <= 20000 && decoded.Height <= 20000)
+      continue;
+
+    ++suspect;
+    Console.WriteLine($"{candidate.Name}\t{decoded.Width}x{decoded.Height}\tfrom {candidate.Length} bytes");
+  }
+
+  Console.WriteLine($"{suspect} decode(s) stated a size the file cannot hold");
+  return suspect == 0 ? 0 : 1;
 }
 
 var samples = args[0];
