@@ -8,12 +8,32 @@ namespace FileFormat.IffMultiPalette.Tests;
 [TestFixture]
 public sealed class RoundTripTests {
 
+  /// <summary>
+  /// Wraps a payload in the container one of these actually has: FORM, the MPAL kind, and a BMHD
+  /// stating a size.
+  /// </summary>
+  /// <remarks>
+  /// These tests used to hand the reader a bare array of bytes, because the reader took anything at
+  /// all that was twelve bytes or longer and invented a size when it found no header. A file with
+  /// neither is not one of these, and is now refused.
+  /// </remarks>
+  private static byte[] _Wrapped(byte[] payload, int width = 320, int height = 200) {
+    var head = _CreateDataWithBmhd(width, height);
+    var data = new byte[head.Length + payload.Length];
+    head.CopyTo(data, 0);
+    payload.CopyTo(data, head.Length);
+    return data;
+  }
+
+
   [Test]
   [Category("Integration")]
   public void RoundTrip_MinimalData_PreservesRawData() {
-    var rawData = new byte[24];
-    for (var i = 0; i < rawData.Length; ++i)
-      rawData[i] = (byte)(i % 256);
+    var payload = new byte[24];
+    for (var i = 0; i < payload.Length; ++i)
+      payload[i] = (byte)(i % 256);
+
+    var rawData = _Wrapped(payload);
 
     var original = new IffMultiPaletteFile {
       Width = 320,
@@ -51,9 +71,11 @@ public sealed class RoundTripTests {
   [Test]
   [Category("Integration")]
   public void RoundTrip_LargerData_PreservesAllBytes() {
-    var rawData = new byte[1024];
-    for (var i = 0; i < rawData.Length; ++i)
-      rawData[i] = (byte)((i * 13 + 7) % 256);
+    var payload = new byte[1024];
+    for (var i = 0; i < payload.Length; ++i)
+      payload[i] = (byte)((i * 13 + 7) % 256);
+
+    var rawData = _Wrapped(payload);
 
     var original = new IffMultiPaletteFile {
       Width = 320,
@@ -118,7 +140,7 @@ public sealed class RoundTripTests {
   [Test]
   [Category("Integration")]
   public void RoundTrip_AllZeros_PreservesData() {
-    var rawData = new byte[IffMultiPaletteFile.MinFileSize];
+    var rawData = _Wrapped(new byte[IffMultiPaletteFile.MinFileSize]);
 
     var original = new IffMultiPaletteFile {
       Width = 320,
@@ -135,9 +157,9 @@ public sealed class RoundTripTests {
   [Test]
   [Category("Integration")]
   public void RoundTrip_AllOnes_PreservesData() {
-    var rawData = new byte[IffMultiPaletteFile.MinFileSize];
-    for (var i = 0; i < rawData.Length; ++i)
-      rawData[i] = 0xFF;
+    var payload = new byte[IffMultiPaletteFile.MinFileSize];
+    Array.Fill(payload, (byte)0xFF);
+    var rawData = _Wrapped(payload);
 
     var original = new IffMultiPaletteFile {
       Width = 320,

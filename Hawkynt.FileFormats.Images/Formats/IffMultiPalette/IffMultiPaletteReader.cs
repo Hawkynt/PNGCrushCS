@@ -31,25 +31,37 @@ public static class IffMultiPaletteReader {
     return FromSpan(data);
   }
 
+  /// <summary>
+  /// Reads a Multi-Palette picture.
+  /// </summary>
+  /// <remarks>
+  /// This used to take anything at all that was twelve bytes or longer: there was no check that the
+  /// file is an IFF one, and where no bitmap header could be found it invented a size and returned a
+  /// picture of it. So an unrelated 129-byte file opened as a blank 320 by 200 page and counted as a
+  /// decode, while the format that could have read it never saw it.
+  /// <para/>
+  /// One of these is an IFF file, so it begins with FORM, and it carries its size in a BMHD chunk.
+  /// Without both there is nothing here to read.
+  /// </remarks>
   public static IffMultiPaletteFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < IffMultiPaletteFile.MinFileSize)
       throw new InvalidDataException($"Invalid Multi-Palette data: expected at least {IffMultiPaletteFile.MinFileSize} bytes, got {data.Length}.");
 
-    var width = IffMultiPaletteFile.DefaultWidth;
-    var height = IffMultiPaletteFile.DefaultHeight;
+    if (!data[..4].SequenceEqual("FORM"u8))
+      throw new InvalidDataException("Not a Multi-Palette picture: an IFF file begins with FORM.");
 
-    _TryParseBmhd(data, out width, out height);
-
-    var rawData = data.ToArray();
+    if (!_TryParseBmhd(data, out var width, out var height))
+      throw new InvalidDataException("Not a Multi-Palette picture: it carries no BMHD chunk to state its size.");
 
     return new() {
       Width = width,
       Height = height,
-      RawData = rawData,
+      RawData = data.ToArray(),
     };
   }
 
-  private static void _TryParseBmhd(ReadOnlySpan<byte> data, out int width, out int height) {
+  /// <returns>Whether a bitmap header was found and stated a size.</returns>
+  private static bool _TryParseBmhd(ReadOnlySpan<byte> data, out int width, out int height) {
     width = IffMultiPaletteFile.DefaultWidth;
     height = IffMultiPaletteFile.DefaultHeight;
 
@@ -59,17 +71,16 @@ public static class IffMultiPaletteReader {
 
       var offset = i + 8;
       if (offset + 4 > data.Length)
-        return;
+        return false;
 
       width = (data[offset] << 8) | data[offset + 1];
       height = (data[offset + 2] << 8) | data[offset + 3];
 
-      if (width <= 0 || height <= 0) {
-        width = IffMultiPaletteFile.DefaultWidth;
-        height = IffMultiPaletteFile.DefaultHeight;
-      }
-
-      return;
+      // A header stating nothing usable is not a size, and inventing one in its place is what put
+      // blank pages where a refusal belonged.
+      return width > 0 && height > 0;
     }
+
+    return false;
   }
 }

@@ -41,21 +41,24 @@ public sealed class IffMultiPaletteReaderTests {
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_MinimalValid_ReturnsDefaultDimensions() {
+  /// <summary>
+  /// A dozen bytes that are not an IFF file are not a picture.
+  /// </summary>
+  /// <remarks>
+  /// This used to expect a default size back. The reader took anything twelve bytes or longer and
+  /// invented dimensions when it found no bitmap header, so unrelated files opened as blank pages
+  /// and counted as decodes — and the format that could have read them never got to see them.
+  /// </remarks>
+  public void FromBytes_TwelveArbitraryBytesAreRefused() {
     var data = _CreateMinimalValidData();
 
-    var result = IffMultiPaletteReader.FromBytes(data);
-
-    Assert.Multiple(() => {
-      Assert.That(result.Width, Is.EqualTo(IffMultiPaletteFile.DefaultWidth));
-      Assert.That(result.Height, Is.EqualTo(IffMultiPaletteFile.DefaultHeight));
-    });
+    Assert.Throws<InvalidDataException>(() => IffMultiPaletteReader.FromBytes(data));
   }
 
   [Test]
   [Category("Unit")]
   public void FromBytes_ValidData_CopiesRawData() {
-    var data = _CreateMinimalValidData();
+    var data = _CreateDataWithBmhd(64, 48);
 
     var result = IffMultiPaletteReader.FromBytes(data);
 
