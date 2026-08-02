@@ -91,9 +91,9 @@ public sealed class TinyReaderTests {
     });
   }
 
+  /// <summary>Builds a file the way a real one is laid out: header, both lengths, then both blocks.</summary>
   private static byte[] _BuildTiny(TinyResolution resolution, int planeCount, int wordsPerPlane) {
-    var pixelData = new byte[planeCount * wordsPerPlane * 2];
-    var compressed = TinyCompressor.Compress(pixelData, planeCount, wordsPerPlane);
+    var (control, data) = TinyCompressor.Compress(new byte[32000]);
 
     using var ms = new MemoryStream();
     ms.WriteByte((byte)resolution);
@@ -104,7 +104,12 @@ public sealed class TinyReaderTests {
       ms.Write(buf);
     }
 
-    ms.Write(compressed);
+    BinaryPrimitives.WriteUInt16BigEndian(buf, (ushort)control.Length);
+    ms.Write(buf);
+    BinaryPrimitives.WriteUInt16BigEndian(buf, (ushort)(data.Length / 2));
+    ms.Write(buf);
+    ms.Write(control);
+    ms.Write(data);
     return ms.ToArray();
   }
 }
