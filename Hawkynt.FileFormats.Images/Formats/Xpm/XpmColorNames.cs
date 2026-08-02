@@ -92,6 +92,31 @@ public static class XpmColorNames {
 
   /// <summary>The X11 names a picture is realistically written with, as 0xRRGGBB.</summary>
   private static readonly Dictionary<string, int> _Named = new(StringComparer.OrdinalIgnoreCase) {
+    // The rest of the X11 table, added because a picture naming DarkSlateGray was refused
+    // outright — a reader that knows sixty of the names knows none of the files that use the
+    // other eighty.
+    ["aliceblue"] = 0xF0F8FF, ["antiquewhite"] = 0xFAEBD7, ["blanchedalmond"] = 0xFFEBCD,
+    ["blueviolet"] = 0x8A2BE2, ["burlywood"] = 0xDEB887, ["cornflowerblue"] = 0x6495ED,
+    ["darkcyan"] = 0x008B8B, ["darkgoldenrod"] = 0xB8860B, ["darkmagenta"] = 0x8B008B,
+    ["darkolivegreen"] = 0x556B2F, ["darkorchid"] = 0x9932CC, ["darksalmon"] = 0xE9967A,
+    ["darkseagreen"] = 0x8FBC8F, ["darkslateblue"] = 0x483D8B, ["darkslategray"] = 0x2F4F4F,
+    ["darkslategrey"] = 0x2F4F4F, ["darkturquoise"] = 0x00CED1, ["darkviolet"] = 0x9400D3,
+    ["deeppink"] = 0xFF1493, ["deepskyblue"] = 0x00BFFF, ["dodgerblue"] = 0x1E90FF,
+    ["floralwhite"] = 0xFFFAF0, ["ghostwhite"] = 0xF8F8FF, ["indianred"] = 0xCD5C5C,
+    ["khaki1"] = 0xFFF68F, ["lavenderblush"] = 0xFFF0F5, ["lawngreen"] = 0x7CFC00,
+    ["lemonchiffon"] = 0xFFFACD, ["lightcoral"] = 0xF08080, ["lightcyan"] = 0xE0FFFF,
+    ["lightgoldenrod"] = 0xEEDD82, ["lightgoldenrodyellow"] = 0xFAFAD2, ["lightgreen"] = 0x90EE90,
+    ["lightpink"] = 0xFFB6C1, ["lightsalmon"] = 0xFFA07A, ["lightseagreen"] = 0x20B2AA,
+    ["lightskyblue"] = 0x87CEFA, ["lightslateblue"] = 0x8470FF, ["lightslategray"] = 0x778899,
+    ["lightslategrey"] = 0x778899, ["lightsteelblue"] = 0xB0C4DE, ["lightyellow"] = 0xFFFFE0,
+    ["mediumaquamarine"] = 0x66CDAA, ["mediumorchid"] = 0xBA55D3, ["mediumpurple"] = 0x9370DB,
+    ["mediumseagreen"] = 0x3CB371, ["mediumslateblue"] = 0x7B68EE, ["mediumspringgreen"] = 0x00FA9A,
+    ["mediumturquoise"] = 0x48D1CC, ["mediumvioletred"] = 0xC71585, ["mintcream"] = 0xF5FFFA,
+    ["moccasin"] = 0xFFE4B5, ["navajowhite"] = 0xFFDEAD, ["oldlace"] = 0xFDF5E6,
+    ["orangered"] = 0xFF4500, ["palegoldenrod"] = 0xEEE8AA, ["palegreen"] = 0x98FB98,
+    ["paleturquoise"] = 0xAFEEEE, ["palevioletred"] = 0xDB7093, ["papayawhip"] = 0xFFEFD5,
+    ["powderblue"] = 0xB0E0E6, ["saddlebrown"] = 0x8B4513, ["sandybrown"] = 0xF4A460,
+    ["whitesmoke"] = 0xF5F5F5,
     ["black"] = 0x000000, ["white"] = 0xFFFFFF, ["red"] = 0xFF0000, ["green"] = 0x00FF00,
     ["blue"] = 0x0000FF, ["cyan"] = 0x00FFFF, ["magenta"] = 0xFF00FF, ["yellow"] = 0xFFFF00,
     ["gray"] = 0xBEBEBE, ["grey"] = 0xBEBEBE, ["darkgray"] = 0xA9A9A9, ["darkgrey"] = 0xA9A9A9,
