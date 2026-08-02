@@ -139,6 +139,31 @@ public static class PcxReader {
       palette = new byte[6];
       egaPalette.AsSpan(0, Math.Min(6, egaPalette.Length)).CopyTo(palette);
       paletteColorCount = 2;
+    } else if (numPlanes == 4 && bitsPerPixel == 1) {
+      // Four planes of one bit each, which is how a sixteen-colour EGA screen was saved and how a
+      // great many PCX files in the wild are written. There was no case for it, so such a file fell
+      // through to being handed back as undecoded scanlines — the right size and the wrong picture.
+      colorMode = PcxColorMode.Indexed8;
+      planeConfig = PcxPlaneConfig.SeparatePlanes;
+      pixelData = new byte[width * height];
+
+      for (var y = 0; y < height; ++y) {
+        var scanlineBase = y * totalBytesPerScanline;
+        for (var x = 0; x < width; ++x) {
+          var index = 0;
+          for (var plane = 0; plane < numPlanes; ++plane) {
+            var at = scanlineBase + plane * bytesPerLine + (x >> 3);
+            if (at < decodedScanlines.Length && (decodedScanlines[at] >> (7 - (x & 7)) & 1) != 0)
+              index |= 1 << plane;
+          }
+
+          pixelData[y * width + x] = (byte)index;
+        }
+      }
+
+      palette = new byte[48];
+      egaPalette.AsSpan(0, 48).CopyTo(palette);
+      paletteColorCount = 16;
     } else {
       colorMode = PcxColorMode.Original;
       planeConfig = numPlanes > 1 ? PcxPlaneConfig.SeparatePlanes : PcxPlaneConfig.SinglePlane;
