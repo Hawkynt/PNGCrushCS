@@ -11,7 +11,7 @@ public readonly record struct SoftImageFile : IImageFormatReader<SoftImageFile>,
   internal const uint Magic = 0x5380F634;
 
   /// <summary>Size of the fixed header in bytes.</summary>
-  internal const int HeaderSize = 100;
+  internal const int HeaderSize = SoftImageHeader.StructSize;
 
   /// <summary>Size of the comment field in bytes.</summary>
   internal const int CommentSize = 80;
