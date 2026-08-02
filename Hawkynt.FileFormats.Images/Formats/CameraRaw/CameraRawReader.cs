@@ -113,13 +113,23 @@ public static class CameraRawReader {
       }
     }
 
-    return new() {
-      Width = 0,
-      Height = 0,
-      PixelData = [],
-      Manufacturer = CameraRawManufacturer.Fujifilm,
-      Model = "Fujifilm",
-    };
+    // The offset table may point at a JPEG rather than a TIFF, and ours does. Only the TIFF case was
+    // handled, so the reader fell through to returning a picture nought wide and nought tall — which
+    // is not a refusal, and was caught downstream only because a picture must hold its own pixels.
+    if (jpegOffset > 0 && jpegLength > 0 && jpegOffset + jpegLength <= data.Length
+        && data[jpegOffset] == 0xFF && data[jpegOffset + 1] == 0xD8) {
+      var preview = JpegFile.ToRawImage(JpegReader.FromSpan(data.AsSpan(jpegOffset, jpegLength)));
+      var rgb = PixelConverter.Convert(preview, PixelFormat.Rgb24);
+      return new() {
+        Width = rgb.Width,
+        Height = rgb.Height,
+        PixelData = rgb.PixelData,
+        Manufacturer = CameraRawManufacturer.Fujifilm,
+        Model = "Fujifilm",
+      };
+    }
+
+    throw new InvalidDataException("A Fujifilm raw file states neither a TIFF nor a JPEG at the offset it names.");
   }
 
   private static CameraRawFile _ParseTiffBased(byte[] data) {
@@ -229,9 +239,11 @@ public static class CameraRawReader {
   /// <summary>How many start-of-image markers are worth trying before giving up.</summary>
   /// <remarks>
   /// A raw file is megabytes of sensor data and the byte pair that starts a JPEG turns up in it by
-  /// chance, so this stops after a handful rather than attempting a decode at every hit.
+  /// chance, so this stops after a bounded number rather than attempting a decode at every hit. A
+  /// dozen proved too few: one file here carries a hundred and fifty kilobytes of sensor data before
+  /// its preview, and the chance hits in that ran the count out before the picture was reached.
   /// </remarks>
-  private const int _JPEG_CANDIDATE_LIMIT = 12;
+  private const int _JPEG_CANDIDATE_LIMIT = 96;
 
   /// <summary>
   /// The largest JPEG anywhere in the file, when the directories name none.
