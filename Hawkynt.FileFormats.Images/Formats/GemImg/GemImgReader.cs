@@ -64,6 +64,22 @@ public static class GemImgReader {
         PixelData = pixelData
       };
 
+    // KNOWN WRONG for a multi-plane file, with two things visibly amiss in the loop below.
+    //
+    // A sixteen-colour sample decodes here to fifteen colours where XnView and RECOIL both show
+    // seven, and those two agree with each other — so indices are being invented, which is what
+    // happens when planes are combined out of step.
+    //
+    // First: this reads plane by plane, taking all of plane nought's rows before any of plane one's.
+    // A GEM IMG interleaves them by scanline — row nought of every plane, then row one of every
+    // plane — so for anything with more than one plane the wrong bits are being put together.
+    //
+    // Second: each opcode here ends a scanline. A scanline is built from as many items as it takes
+    // to fill it, and only then does the row advance, so a row coded as two runs is read as two rows.
+    //
+    // Both need the opcode meanings settled against the samples before they can be fixed — the
+    // encoding of a pattern run against a vertical replication is not what this code assumes, and
+    // guessing at it would trade one wrong picture for another.
     var pos = dataOffset;
     for (var plane = 0; plane < numPlanes; ++plane) {
       var planeOffset = plane * bytesPerRow * height;
