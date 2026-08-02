@@ -45,10 +45,28 @@ public readonly record struct GigaPaintFile : IImageFormatReader<GigaPaintFile>,
   /// <summary>Raw payload data (entire file content after load address).</summary>
   public byte[] RawData { get; init; }
 
+  /// <summary>Bytes a multicolour screen takes: the bitmap, the video matrix, the colour RAM and a background.</summary>
+  internal const int MulticolorSize = MinBitmapSize + _SCREEN_SIZE + _SCREEN_SIZE + 1;
+
+  private const int _SCREEN_SIZE = 1000;
+
   public static RawImage ToRawImage(GigaPaintFile file) {
     var data = file.RawData ?? [];
     var bitmap = new byte[MinBitmapSize];
     data.AsSpan(0, Math.Min(data.Length, MinBitmapSize)).CopyTo(bitmap);
+
+    // Giga Paint draws in two colours or in sixteen, and only the first was read here — so both of
+    // the multicolour samples came back in black and white where RECOIL shows nine colours. The two
+    // are told apart by length: the multicolour one carries a video matrix, a colour RAM and a
+    // background byte after the bitmap, which is the same shape a Koala has.
+    if (data.Length >= MulticolorSize) {
+      var matrix = data.AsSpan(MinBitmapSize, _SCREEN_SIZE).ToArray();
+      var colorRam = data.AsSpan(MinBitmapSize + _SCREEN_SIZE, _SCREEN_SIZE).ToArray();
+      var background = data[MinBitmapSize + _SCREEN_SIZE + _SCREEN_SIZE];
+
+      return Commodore64Graphics.DecodeMulticolor(
+        bitmap, matrix, colorRam, background, FixedWidth / 2, FixedHeight);
+    }
 
     var screen = new byte[Commodore64Graphics.Columns * (FixedHeight / Commodore64Graphics.CellHeight)];
     Array.Fill(screen, Attribute);
