@@ -63,6 +63,7 @@ internal static class JpegManagedDecoder {
 
     // 6. Assemble, upsample chroma, color convert.
     var isGrayscale = frame.Components.Length == 1;
+    var isFourColour = frame.Components.Length == 4;
     var width = frame.Width;
     var height = frame.Height;
 
@@ -100,6 +101,9 @@ internal static class JpegManagedDecoder {
       rgbPixelData = JpegColorConverter.YCbCrToRgb(yPlane, cbPlane, crPlane, width, height);
     }
 
+    if (isFourColour)
+      rgbPixelData = _FourColourToRgb(planes, componentData, frame, image, width, height, maxH, maxV);
+
     return new JpegFile {
       Width = width,
       Height = height,
@@ -107,6 +111,75 @@ internal static class JpegManagedDecoder {
       RgbPixelData = rgbPixelData,
       RawJpegBytes = dataArray
     };
+  }
+
+  /// <summary>The Adobe colour transform an APP14 segment declares, or -1 when there is none.</summary>
+  /// <remarks>
+  /// The segment is the eight bytes "Adobe" plus version and flags, then one byte saying how the
+  /// components were transformed: 0 leaves them alone, 1 is YCbCr, 2 is YCCK. It is the only thing
+  /// that distinguishes a four-component file carrying CMYK from one carrying YCCK, since the frame
+  /// header says nothing about colour at all.
+  /// </remarks>
+  private static int _AdobeTransform(JpegImage image) {
+    foreach (var segment in image.MarkerSegments) {
+      if (segment.Marker != 0xEE || segment.Data.Length < 12)
+        continue;
+
+      var d = segment.Data;
+      if (d[0] == 'A' && d[1] == 'd' && d[2] == 'o' && d[3] == 'b' && d[4] == 'e')
+        return d[11];
+    }
+
+    return -1;
+  }
+
+  /// <summary>
+  /// Converts a four-component JPEG — CMYK, or YCCK once its colour part is turned back into CMY.
+  /// </summary>
+  /// <remarks>
+  /// Four-component files were being read as though they were three: the first three planes went
+  /// through the YCbCr conversion and the black plane was dropped. What came out was the negative of
+  /// the picture, because Adobe stores its ink values inverted — full ink is 0, none is 255 — which
+  /// is the opposite of what the same numbers mean as colour.
+  /// </remarks>
+  private static byte[] _FourColourToRgb(
+    byte[][] planes, JpegComponentData[] componentData, JpegFrameHeader frame,
+    JpegImage image, int width, int height, int maxH, int maxV) {
+
+    var full = new byte[4][];
+    for (var ci = 0; ci < 4; ++ci) {
+      var compW = componentData[ci].WidthInBlocks * 8;
+      var compH = componentData[ci].HeightInBlocks * 8;
+      var actualW = ((width * frame.Components[ci].HSamplingFactor) + maxH - 1) / maxH;
+      var actualH = ((height * frame.Components[ci].VSamplingFactor) + maxV - 1) / maxV;
+      var plane = _CropPlane(planes[ci], compW, compH, actualW, actualH);
+      full[ci] = actualW == width && actualH == height
+        ? plane
+        : JpegColorConverter.Upsample(plane, actualW, actualH, width, height);
+    }
+
+    // Transform 2 says the first three planes are YCCK: undo the YCbCr part to get CMY back.
+    if (_AdobeTransform(image) == 2) {
+      var colour = JpegColorConverter.YCbCrToRgb(full[0], full[1], full[2], width, height);
+      for (var i = 0; i < width * height; ++i) {
+        full[0][i] = colour[i * 3];
+        full[1][i] = colour[(i * 3) + 1];
+        full[2][i] = colour[(i * 3) + 2];
+      }
+    }
+
+    // The three colour planes carry ink — more of it means less light — while the key plane carries
+    // the light that is left, which is the Adobe inversion. Taking all four the same way is what made
+    // the picture its own negative: the red quadrant came out cyan.
+    var rgb = new byte[width * height * 3];
+    for (var i = 0; i < width * height; ++i) {
+      var light = full[3][i];
+      rgb[i * 3] = (byte)((255 - full[0][i]) * light / 255);
+      rgb[(i * 3) + 1] = (byte)((255 - full[1][i]) * light / 255);
+      rgb[(i * 3) + 2] = (byte)((255 - full[2][i]) * light / 255);
+    }
+
+    return rgb;
   }
 
   /// <summary>Decodes a JPEG to the coefficient level (no IDCT / color conversion).
