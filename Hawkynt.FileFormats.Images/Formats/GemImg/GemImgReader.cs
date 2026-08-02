@@ -34,13 +34,23 @@ public static class GemImgReader {
     var span = data;
     var header = GemImgHeader.ReadFrom(span);
 
+    // Nothing was checked before the size was used to allocate, so a file of some other format
+    // named .img — one here begins 0x3FFF and states 65535 planes of 65535 rows — came out of the
+    // reader as an arithmetic overflow rather than as "this is not one of these".
+    if (header.Version is < 1 or > 3)
+      throw new InvalidDataException($"A GEM IMG states version 1 to 3; this file states {header.Version}.");
+    if (header.NumPlanes is < 1 or > 8)
+      throw new InvalidDataException($"A GEM IMG holds one to eight planes; this file states {header.NumPlanes}.");
+    if (header.ScanWidth <= 0 || header.ScanLines <= 0 || header.ScanWidth > 32767 || header.ScanLines > 32767)
+      throw new InvalidDataException($"A GEM IMG of {header.ScanWidth}x{header.ScanLines} is no size.");
+
     var dataOffset = header.HeaderLength * 2;
     var width = header.ScanWidth;
     var height = header.ScanLines;
     var numPlanes = header.NumPlanes;
     var patternLength = header.PatternLength;
     var bytesPerRow = (width + 7) / 8;
-    var pixelData = new byte[numPlanes * bytesPerRow * height];
+    var pixelData = new byte[(long)numPlanes * bytesPerRow * height];
 
     if (dataOffset >= data.Length)
       return new GemImgFile {

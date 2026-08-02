@@ -69,13 +69,25 @@ public static class PspReader {
       else if (blockId == PspFile.BlockIdCompositeImage)
         compositePixels = _ParseCompositeImage(data, dataOffset, (int)totalLength - (dataOffset - offset));
 
+      // A block length is a thirty-two-bit count and was added to the offset as a signed one, so a
+      // file of another format named .pspimage walked the reader off the end by arithmetic rather
+      // than being refused.
+      if (totalLength > int.MaxValue - offset)
+        break;
+
       offset += (int)totalLength;
       if (offset <= dataOffset)
         break;
     }
 
+    // The largest a Paint Shop Pro picture may be; anything beyond it is a misread header rather
+    // than a picture, and multiplying it out overflowed before anything checked.
+    const int LARGEST_SIDE = 30000;
+
     if (width <= 0 || height <= 0)
       throw new InvalidDataException("PSP file missing General Image Attributes block or invalid dimensions.");
+    if (width > LARGEST_SIDE || height > LARGEST_SIDE)
+      throw new InvalidDataException($"A Paint Shop Pro picture of {width}x{height} is larger than the format allows.");
 
     var expectedPixelBytes = width * height * 3;
     if (compositePixels == null)
