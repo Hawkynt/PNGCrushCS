@@ -146,6 +146,38 @@ public sealed class IcoFile : IImageFormatReader<IcoFile>, IImageToRawImage<IcoF
           PaletteCount = paletteCount,
         };
       }
+      case 1: {
+        // The oldest icons and nearly every classic cursor are two colours, which was refused here
+        // outright — so a plain black-and-white arrow could not be opened at all.
+        var biClrUsed = BinaryPrimitives.ReadInt32LittleEndian(dib.AsSpan(32));
+        var paletteCount = biClrUsed > 0 ? biClrUsed : 2;
+        var palette = new byte[paletteCount * 3];
+        for (var i = 0; i < paletteCount && biSize + i * 4 + 2 < dib.Length; ++i) {
+          var off = biSize + i * 4;
+          palette[i * 3] = dib[off + 2];
+          palette[i * 3 + 1] = dib[off + 1];
+          palette[i * 3 + 2] = dib[off];
+        }
+
+        var dataOffset = biSize + paletteCount * 4;
+        var srcStride = (width + 31) / 32 * 4;
+        var dstStride = (width + 7) / 8;
+        var packed = new byte[dstStride * height];
+        for (var y = 0; y < height; ++y) {
+          var from = dataOffset + (height - 1 - y) * srcStride;
+          if (from + dstStride <= dib.Length)
+            dib.AsSpan(from, dstStride).CopyTo(packed.AsSpan(y * dstStride));
+        }
+
+        return new RawImage {
+          Width = width,
+          Height = height,
+          Format = PixelFormat.Indexed1,
+          PixelData = packed,
+          Palette = palette,
+          PaletteCount = paletteCount,
+        };
+      }
       default:
         throw new NotSupportedException($"ICO BMP DIB with {biBitCount} bits per pixel is not supported.");
     }
