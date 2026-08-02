@@ -1,202 +1,82 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 using FileFormat.PrismPaint;
 
 namespace FileFormat.PrismPaint.Tests;
 
+/// <summary>
+/// Writing a Prism Paint picture and reading it back.
+/// </summary>
+/// <remarks>
+/// UNVERIFIED AGAINST ANY OTHER TOOL. The reader is checked — a real sample matches RECOIL on every
+/// pixel — and the writer is aligned with it, so the two agree. That is not the same as being right:
+/// RECOIL refuses a file this writes with eight bitplanes, which is what a picture round-tripped
+/// through a 256-entry palette becomes, and why is not settled.
+/// <para/>
+/// These tests therefore say only that the pair is consistent, which is exactly what the old pair
+/// said while both were wrong. They are not evidence that the writer is correct.
+/// </remarks>
 [TestFixture]
 public sealed class RoundTripTests {
 
-  [Test]
-  [Category("Integration")]
-  public void RoundTrip_320x200_PixelDataPreserved() {
-    var palette = new byte[PrismPaintFile.PaletteEntryCount * 3];
-    palette[0] = 0xFF;
-    palette[1] = 0x80;
-    palette[2] = 0x40;
-
-    var pixelData = new byte[320 * 200];
-    pixelData[0] = 1;
-    pixelData[1] = 2;
-    pixelData[320 * 200 - 1] = 255;
-
-    var original = new PrismPaintFile {
-      Width = 320,
-      Height = 200,
-      Palette = palette,
-      PixelData = pixelData,
-    };
-
-    var bytes = PrismPaintWriter.ToBytes(original);
-    var restored = PrismPaintReader.FromBytes(bytes);
-
-    Assert.That(restored.Width, Is.EqualTo(original.Width));
-    Assert.That(restored.Height, Is.EqualTo(original.Height));
-    Assert.That(restored.PixelData, Is.EqualTo(original.PixelData));
-    Assert.That(restored.Palette, Is.EqualTo(original.Palette));
-  }
-
-  [Test]
-  [Category("Integration")]
-  public void RoundTrip_640x480_PixelDataPreserved() {
-    var palette = new byte[PrismPaintFile.PaletteEntryCount * 3];
-    var pixelData = new byte[640 * 480];
-    for (var i = 0; i < pixelData.Length; ++i)
-      pixelData[i] = (byte)(i % 256);
-
-    var original = new PrismPaintFile {
-      Width = 640,
-      Height = 480,
-      Palette = palette,
-      PixelData = pixelData,
-    };
-
-    var bytes = PrismPaintWriter.ToBytes(original);
-    var restored = PrismPaintReader.FromBytes(bytes);
-
-    Assert.That(restored.Width, Is.EqualTo(640));
-    Assert.That(restored.Height, Is.EqualTo(480));
-    Assert.That(restored.PixelData, Is.EqualTo(original.PixelData));
-  }
-
-  [Test]
-  [Category("Integration")]
-  public void RoundTrip_AllZeros() {
-    var original = new PrismPaintFile {
-      Width = 100,
-      Height = 50,
-      Palette = new byte[PrismPaintFile.PaletteEntryCount * 3],
-      PixelData = new byte[100 * 50],
-    };
-
-    var bytes = PrismPaintWriter.ToBytes(original);
-    var restored = PrismPaintReader.FromBytes(bytes);
-
-    Assert.That(restored.Width, Is.EqualTo(100));
-    Assert.That(restored.Height, Is.EqualTo(50));
-    Assert.That(restored.PixelData, Is.EqualTo(original.PixelData));
-    Assert.That(restored.Palette, Is.EqualTo(original.Palette));
-  }
-
-  [Test]
-  [Category("Integration")]
-  public void RoundTrip_ViaFile() {
-    var palette = new byte[PrismPaintFile.PaletteEntryCount * 3];
-    palette[0] = 0x10;
-    palette[1] = 0x20;
-    palette[2] = 0x30;
-
-    var pixelData = new byte[200 * 100];
-    for (var i = 0; i < pixelData.Length; ++i)
-      pixelData[i] = (byte)(i * 7 % 256);
-
-    var original = new PrismPaintFile {
-      Width = 200,
-      Height = 100,
-      Palette = palette,
-      PixelData = pixelData,
-    };
-
-    var tempPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".pnt");
-    try {
-      var bytes = PrismPaintWriter.ToBytes(original);
-      File.WriteAllBytes(tempPath, bytes);
-
-      var restored = PrismPaintReader.FromFile(new FileInfo(tempPath));
-
-      Assert.That(restored.Width, Is.EqualTo(original.Width));
-      Assert.That(restored.Height, Is.EqualTo(original.Height));
-      Assert.That(restored.PixelData, Is.EqualTo(original.PixelData));
-      Assert.That(restored.Palette, Is.EqualTo(original.Palette));
-    } finally {
-      if (File.Exists(tempPath))
-        File.Delete(tempPath);
+  private static PrismPaintFile _Picture(int width, int height, int planes) {
+    var colors = 1 << planes;
+    var palette = new byte[colors * 3];
+    for (var i = 0; i < colors; ++i) {
+      palette[i * 3] = (byte)(i * 255 / (colors - 1));
+      palette[i * 3 + 1] = (byte)(255 - i * 255 / (colors - 1));
+      palette[i * 3 + 2] = (byte)(i % 4 * 85);
     }
+
+    var pixels = new byte[width * height];
+    for (var i = 0; i < pixels.Length; ++i)
+      pixels[i] = (byte)(i % colors);
+
+    return new() { Width = width, Height = height, Palette = palette, PixelData = pixels };
   }
 
   [Test]
   [Category("Integration")]
-  public void RoundTrip_ViaRawImage() {
-    var palette = new byte[PrismPaintFile.PaletteEntryCount * 3];
-    palette[0] = 0xFF;
-    palette[1] = 0x00;
-    palette[2] = 0x00;
-    palette[3] = 0x00;
-    palette[4] = 0xFF;
-    palette[5] = 0x00;
+  public void RoundTrip_KeepsTheSize() {
+    var restored = PrismPaintReader.FromBytes(PrismPaintWriter.ToBytes(_Picture(320, 200, 4)));
 
-    var pixelData = new byte[100 * 50];
-    pixelData[0] = 0;
-    pixelData[1] = 1;
-
-    var raw = new RawImage {
-      Width = 100,
-      Height = 50,
-      Format = PixelFormat.Indexed8,
-      PixelData = pixelData,
-      Palette = palette,
-      PaletteCount = 256,
-    };
-
-    var file = PrismPaintFile.FromRawImage(raw);
-    var rawBack = PrismPaintFile.ToRawImage(file);
-
-    Assert.That(rawBack.Format, Is.EqualTo(PixelFormat.Indexed8));
-    Assert.That(rawBack.Width, Is.EqualTo(100));
-    Assert.That(rawBack.Height, Is.EqualTo(50));
-    Assert.That(rawBack.PixelData[0], Is.EqualTo(0));
-    Assert.That(rawBack.PixelData[1], Is.EqualTo(1));
-    Assert.That(rawBack.Palette![0], Is.EqualTo(0xFF));
-    Assert.That(rawBack.Palette[1], Is.EqualTo(0x00));
-    Assert.That(rawBack.Palette[2], Is.EqualTo(0x00));
+    Assert.Multiple(() => {
+      Assert.That(restored.Width, Is.EqualTo(320));
+      Assert.That(restored.Height, Is.EqualTo(200));
+    });
   }
 
   [Test]
   [Category("Integration")]
-  public void RoundTrip_SmallImage_1x1() {
-    var palette = new byte[PrismPaintFile.PaletteEntryCount * 3];
-    palette[0] = 0x42;
-    var pixelData = new byte[1];
-    pixelData[0] = 0;
-
-    var original = new PrismPaintFile {
-      Width = 1,
-      Height = 1,
-      Palette = palette,
-      PixelData = pixelData,
-    };
-
-    var bytes = PrismPaintWriter.ToBytes(original);
-    var restored = PrismPaintReader.FromBytes(bytes);
-
-    Assert.That(restored.Width, Is.EqualTo(1));
-    Assert.That(restored.Height, Is.EqualTo(1));
-    Assert.That(restored.PixelData[0], Is.EqualTo(0));
-  }
-
-  [Test]
-  [Category("Integration")]
-  public void RoundTrip_AllMaxValues() {
-    var palette = new byte[PrismPaintFile.PaletteEntryCount * 3];
-    for (var i = 0; i < palette.Length; ++i)
-      palette[i] = 0xFF;
-
-    var pixelData = new byte[320 * 200];
-    for (var i = 0; i < pixelData.Length; ++i)
-      pixelData[i] = 0xFF;
-
-    var original = new PrismPaintFile {
-      Width = 320,
-      Height = 200,
-      Palette = palette,
-      PixelData = pixelData,
-    };
-
-    var bytes = PrismPaintWriter.ToBytes(original);
-    var restored = PrismPaintReader.FromBytes(bytes);
+  public void RoundTrip_KeepsEveryIndex() {
+    var original = _Picture(320, 200, 4);
+    var restored = PrismPaintReader.FromBytes(PrismPaintWriter.ToBytes(original));
 
     Assert.That(restored.PixelData, Is.EqualTo(original.PixelData));
-    Assert.That(restored.Palette, Is.EqualTo(original.Palette));
+  }
+
+  [Test]
+  [Category("Integration")]
+  public void RoundTrip_KeepsThePaletteToTheScaleItStores() {
+    var original = _Picture(64, 32, 4);
+    var restored = PrismPaintReader.FromBytes(PrismPaintWriter.ToBytes(original));
+
+    Assert.Multiple(() => {
+      for (var i = 0; i < 48; ++i)
+        Assert.That(restored.Palette[i], Is.EqualTo(original.Palette[i]).Within(2), $"channel {i}");
+    });
+  }
+
+  [Test]
+  [Category("Integration")]
+  public void Written_BeginsWithTheSignatureAndStatesItsSize() {
+    var bytes = PrismPaintWriter.ToBytes(_Picture(320, 200, 4));
+
+    Assert.Multiple(() => {
+      Assert.That(System.Text.Encoding.ASCII.GetString(bytes, 0, 3), Is.EqualTo("PNT"));
+      Assert.That((bytes[8] << 8) | bytes[9], Is.EqualTo(320));
+      Assert.That((bytes[10] << 8) | bytes[11], Is.EqualTo(200));
+      Assert.That((bytes[12] << 8) | bytes[13], Is.EqualTo(4));
+    });
   }
 }

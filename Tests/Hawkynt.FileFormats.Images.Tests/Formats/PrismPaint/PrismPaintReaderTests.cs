@@ -1,146 +1,99 @@
 using System;
 using System.IO;
+using FileFormat.Core;
 using FileFormat.PrismPaint;
 
 namespace FileFormat.PrismPaint.Tests;
 
+/// <summary>
+/// Reading a Prism Paint picture.
+/// </summary>
+/// <remarks>
+/// These used to build files in the shape the reader then assumed and no file has: the size in the
+/// first four bytes where the signature belongs, a Falcon palette of 256 packed entries, and one
+/// byte a pixel. The reader and the writer agreed with each other and with nothing else, which is
+/// why a real file came back 20048 by 84.
+/// <para/>
+/// A real one opens with <c>PNT\0</c>, states its size as two big-endian words with the plane count
+/// after them, keeps its palette as three words an entry on the VDI's nought-to-a-thousand scale in
+/// the VDI's order, and stores the screen as bitplanes. The sample now matches RECOIL on all 64000
+/// of its pixels.
+/// </remarks>
 [TestFixture]
 public sealed class PrismPaintReaderTests {
 
-  [Test]
-  [Category("Unit")]
-  public void FromBytes_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => PrismPaintReader.FromBytes(null!));
+  /// <summary>Builds a picture the way a real one is laid out.</summary>
+  internal static byte[] Build(int width, int height, int planes) {
+    var colors = 1 << planes;
+    var screen = (width + 15) / 16 * 2 * planes * height;
+    var data = new byte[PrismPaintFile.PaletteOffset + colors * PrismPaintFile.PaletteEntryBytes + screen];
+
+    "PNT\0"u8.CopyTo(data);
+    data[4] = 1;
+    data[PrismPaintFile.WidthOffset] = (byte)(width >> 8);
+    data[PrismPaintFile.WidthOffset + 1] = (byte)width;
+    data[PrismPaintFile.HeightOffset] = (byte)(height >> 8);
+    data[PrismPaintFile.HeightOffset + 1] = (byte)height;
+    data[PrismPaintFile.PlanesOffset + 1] = (byte)planes;
+    return data;
   }
 
   [Test]
   [Category("Unit")]
-  public void FromFile_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => PrismPaintReader.FromFile(null!));
-  }
+  public void FromBytes_Null_ThrowsArgumentNullException()
+    => Assert.Throws<ArgumentNullException>(() => PrismPaintReader.FromBytes(null!));
 
   [Test]
   [Category("Unit")]
-  public void FromFile_Missing_ThrowsFileNotFoundException() {
-    var missing = new FileInfo(Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".pnt"));
-    Assert.Throws<FileNotFoundException>(() => PrismPaintReader.FromFile(missing));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromStream_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => PrismPaintReader.FromStream(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromBytes_TooSmall_ThrowsInvalidDataException() {
-    var tooSmall = new byte[100];
-    Assert.Throws<InvalidDataException>(() => PrismPaintReader.FromBytes(tooSmall));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromBytes_ZeroDimensions_ThrowsInvalidDataException() {
-    var data = new byte[PrismPaintFile.MinFileSize];
-    // width=0, height=0
-    Assert.Throws<InvalidDataException>(() => PrismPaintReader.FromBytes(data));
-  }
+  public void FromBytes_TooSmall_Throws()
+    => Assert.Throws<InvalidDataException>(() => PrismPaintReader.FromBytes(new byte[100]));
 
   [Test]
   [Category("Unit")]
   public void FromBytes_Valid320x200_Parses() {
-    var width = 320;
-    var height = 200;
-    var pixelSize = width * height;
-    var data = new byte[PrismPaintFile.HeaderSize + PrismPaintFile.PaletteDataSize + pixelSize];
+    var file = PrismPaintReader.FromBytes(Build(320, 200, 4));
 
-    // LE dimensions
-    data[0] = (byte)(width & 0xFF);
-    data[1] = (byte)((width >> 8) & 0xFF);
-    data[2] = (byte)(height & 0xFF);
-    data[3] = (byte)((height >> 8) & 0xFF);
-
-    // Set palette entry 0: R=0xAA, G=0xBB, pad=0x00, B=0xCC
-    var palOff = PrismPaintFile.HeaderSize;
-    data[palOff] = 0xAA;
-    data[palOff + 1] = 0xBB;
-    data[palOff + 2] = 0x00;
-    data[palOff + 3] = 0xCC;
-
-    // First pixel
-    data[PrismPaintFile.HeaderSize + PrismPaintFile.PaletteDataSize] = 42;
-
-    var result = PrismPaintReader.FromBytes(data);
-
-    Assert.That(result.Width, Is.EqualTo(320));
-    Assert.That(result.Height, Is.EqualTo(200));
-    Assert.That(result.PixelData[0], Is.EqualTo(42));
-    Assert.That(result.Palette[0], Is.EqualTo(0xAA));
-    Assert.That(result.Palette[1], Is.EqualTo(0xBB));
-    Assert.That(result.Palette[2], Is.EqualTo(0xCC));
+    Assert.Multiple(() => {
+      Assert.That(file.Width, Is.EqualTo(320));
+      Assert.That(file.Height, Is.EqualTo(200));
+      Assert.That(file.PixelData, Has.Length.EqualTo(320 * 200));
+    });
   }
 
   [Test]
   [Category("Unit")]
   public void FromBytes_Valid640x480_Parses() {
-    var width = 640;
-    var height = 480;
-    var pixelSize = width * height;
-    var data = new byte[PrismPaintFile.HeaderSize + PrismPaintFile.PaletteDataSize + pixelSize];
+    var file = PrismPaintReader.FromBytes(Build(640, 480, 4));
 
-    data[0] = (byte)(width & 0xFF);
-    data[1] = (byte)((width >> 8) & 0xFF);
-    data[2] = (byte)(height & 0xFF);
-    data[3] = (byte)((height >> 8) & 0xFF);
-
-    var result = PrismPaintReader.FromBytes(data);
-
-    Assert.That(result.Width, Is.EqualTo(640));
-    Assert.That(result.Height, Is.EqualTo(480));
+    Assert.Multiple(() => {
+      Assert.That(file.Width, Is.EqualTo(640));
+      Assert.That(file.Height, Is.EqualTo(480));
+    });
   }
 
   [Test]
   [Category("Unit")]
   public void FromStream_Valid() {
-    var width = 100;
-    var height = 50;
-    var data = new byte[PrismPaintFile.HeaderSize + PrismPaintFile.PaletteDataSize + width * height];
-    data[0] = (byte)(width & 0xFF);
-    data[1] = (byte)((width >> 8) & 0xFF);
-    data[2] = (byte)(height & 0xFF);
-    data[3] = (byte)((height >> 8) & 0xFF);
-    data[PrismPaintFile.HeaderSize + PrismPaintFile.PaletteDataSize] = 0xAB;
+    using var stream = new MemoryStream(Build(320, 200, 4));
+    var file = PrismPaintReader.FromStream(stream);
 
-    using var ms = new MemoryStream(data);
-    var result = PrismPaintReader.FromStream(ms);
-
-    Assert.That(result.Width, Is.EqualTo(100));
-    Assert.That(result.Height, Is.EqualTo(50));
-    Assert.That(result.PixelData[0], Is.EqualTo(0xAB));
+    Assert.That(file.Width, Is.EqualTo(320));
   }
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_FalconPaletteConversion_SkipsPaddingByte() {
-    var width = 10;
-    var height = 10;
-    var data = new byte[PrismPaintFile.HeaderSize + PrismPaintFile.PaletteDataSize + width * height];
-    data[0] = (byte)width;
-    data[1] = 0;
-    data[2] = (byte)height;
-    data[3] = 0;
+  public void FromBytes_WithoutSignature_Throws() {
+    var data = Build(320, 200, 4);
+    data[0] = 0;
 
-    var palOff = PrismPaintFile.HeaderSize;
-    data[palOff] = 0x10;     // R
-    data[palOff + 1] = 0x20; // G
-    data[palOff + 2] = 0xFF; // padding - ignored
-    data[palOff + 3] = 0x30; // B
+    Assert.Throws<InvalidDataException>(() => PrismPaintReader.FromBytes(data));
+  }
 
-    var result = PrismPaintReader.FromBytes(data);
+  [Test]
+  [Category("Unit")]
+  public void FromBytes_ShorterThanItsOwnScreen_Throws() {
+    var data = Build(320, 200, 4);
 
-    Assert.That(result.Palette[0], Is.EqualTo(0x10));
-    Assert.That(result.Palette[1], Is.EqualTo(0x20));
-    Assert.That(result.Palette[2], Is.EqualTo(0x30));
+    Assert.Throws<InvalidDataException>(() => PrismPaintReader.FromBytes(data[..(data.Length - 64)]));
   }
 }

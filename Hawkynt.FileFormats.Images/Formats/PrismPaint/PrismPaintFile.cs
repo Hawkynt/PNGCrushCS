@@ -6,6 +6,31 @@ namespace FileFormat.PrismPaint;
 /// <summary>In-memory representation of an Atari Falcon Prism Paint (.pnt/.tpi) indexed image.</summary>
 public readonly record struct PrismPaintFile : IImageFormatReader<PrismPaintFile>, IImageToRawImage<PrismPaintFile>, IImageFromRawImage<PrismPaintFile>, IImageFormatWriter<PrismPaintFile> {
 
+  /// <summary>The four letters every one of these begins with.</summary>
+  internal static ReadOnlySpan<byte> Signature => "PNT\0"u8;
+
+  /// <summary>
+  /// Where the picture's size sits, as two big-endian words with the plane count after them.
+  /// </summary>
+  /// <remarks>
+  /// The size used to be read from the file's first four bytes, which are the signature: a real file
+  /// came back 20048 by 84 because that is what PNT reads as two little-endian words.
+  /// </remarks>
+  internal const int WidthOffset = 8;
+
+  internal const int HeightOffset = 10;
+
+  internal const int PlanesOffset = 12;
+
+  /// <summary>Where the palette begins, whatever precedes it.</summary>
+  internal const int PaletteOffset = 128;
+
+  /// <summary>Bytes one palette entry takes: three words on the 0..1000 scale the VDI uses.</summary>
+  internal const int PaletteEntryBytes = 6;
+
+  /// <summary>The largest value a palette channel states.</summary>
+  internal const int PaletteChannelMaximum = 1000;
+
   /// <summary>Size of the dimension header (width u16 LE + height u16 LE).</summary>
   public const int HeaderSize = 4;
 
@@ -18,8 +43,14 @@ public readonly record struct PrismPaintFile : IImageFormatReader<PrismPaintFile
   /// <summary>Size of the raw palette section in bytes.</summary>
   public const int PaletteDataSize = PaletteEntryCount * BytesPerPaletteEntry;
 
-  /// <summary>Minimum valid file size (header + palette + at least 1 pixel).</summary>
-  public const int MinFileSize = HeaderSize + PaletteDataSize + 1;
+  /// <summary>
+  /// The least a file can be: the header, the smallest palette, and a byte of picture.
+  /// </summary>
+  /// <remarks>
+  /// This used to count a Falcon palette of 256 packed entries, which is not what these carry, and
+  /// so refused anything under 1029 bytes — a small picture among them.
+  /// </remarks>
+  public const int MinFileSize = PaletteOffset + 2 * PaletteEntryBytes + 1;
 
   static string IImageFormatMetadata<PrismPaintFile>.PrimaryExtension => ".pnt";
   static string[] IImageFormatMetadata<PrismPaintFile>.FileExtensions => [".pnt", ".tpi"];

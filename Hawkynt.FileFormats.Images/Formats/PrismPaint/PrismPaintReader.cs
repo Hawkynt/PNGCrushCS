@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using FileFormat.Core;
 
 namespace FileFormat.PrismPaint;
 
@@ -31,70 +32,64 @@ public static class PrismPaintReader {
     if (data.Length < PrismPaintFile.MinFileSize)
       throw new InvalidDataException($"Data too small for a valid Prism Paint file (minimum {PrismPaintFile.MinFileSize} bytes, got {data.Length}).");
 
-    // Read dimensions (LE u16)
-    var width = (ushort)(data[0] | (data[1] << 8));
-    var height = (ushort)(data[2] | (data[3] << 8));
+    if (!data[..PrismPaintFile.Signature.Length].SequenceEqual(PrismPaintFile.Signature))
+      throw new InvalidDataException("Not a Prism Paint picture: it does not begin with PNT.");
 
-    if (width == 0 || height == 0)
+    // The size is two big-endian words a little way in, with the plane count after them. Reading the
+    // first four bytes instead read the signature, which is 20048 by 84 taken as two words.
+    var width = (data[PrismPaintFile.WidthOffset] << 8) | data[PrismPaintFile.WidthOffset + 1];
+    var height = (data[PrismPaintFile.HeightOffset] << 8) | data[PrismPaintFile.HeightOffset + 1];
+    var planes = (data[PrismPaintFile.PlanesOffset] << 8) | data[PrismPaintFile.PlanesOffset + 1];
+
+    if (width <= 0 || height <= 0)
       throw new InvalidDataException($"Invalid Prism Paint dimensions: {width}x{height}.");
 
-    // Convert Falcon palette to RGB
-    var rgbPalette = new byte[PrismPaintFile.PaletteEntryCount * 3];
-    PrismPaintFile.ConvertFalconPaletteToRgb(
-      data.Slice(PrismPaintFile.HeaderSize, PrismPaintFile.PaletteDataSize),
-      rgbPalette
-    );
+    if (planes is < 1 or > 8)
+      throw new InvalidDataException($"A Prism Paint picture has one to eight bitplanes, not {planes}.");
 
-    // Read pixel data
-    var pixelOffset = PrismPaintFile.HeaderSize + PrismPaintFile.PaletteDataSize;
-    var expectedPixelBytes = width * height;
-    var available = data.Length - pixelOffset;
-    var copyLen = Math.Min(expectedPixelBytes, available);
+    // Three words an entry on the VDI's nought-to-a-thousand scale, not the Falcon's packed bytes.
+    var colors = 1 << planes;
+    var rgbPalette = new byte[colors * 3];
+    for (var i = 0; i < colors; ++i) {
+      var at = PrismPaintFile.PaletteOffset + i * PrismPaintFile.PaletteEntryBytes;
+      if (at + 5 >= data.Length)
+        break;
 
-    var pixelData = new byte[expectedPixelBytes];
-    data.Slice(pixelOffset, copyLen).CopyTo(pixelData);
+      // The entries are in the VDI's order, which is not the order the pixels index. Leaving them
+      // where they lie draws the picture in the right colours put on the wrong shapes: the sample's
+      // white outline came out purple while both palettes held exactly the same sixteen colours.
+      var slot = AtariStGraphics.VdiToHardwareIndex(i, planes) * 3;
+      for (var channel = 0; channel < 3; ++channel) {
+        var value = (data[at + channel * 2] << 8) | data[at + channel * 2 + 1];
+        rgbPalette[slot + channel] = (byte)(value * 255 / PrismPaintFile.PaletteChannelMaximum);
+      }
+    }
+
+    var pixelOffset = PrismPaintFile.PaletteOffset + colors * PrismPaintFile.PaletteEntryBytes;
+    var screenBytes = (width + 15) / 16 * 2 * planes * height;
+    if (pixelOffset + screenBytes > data.Length)
+      throw new InvalidDataException($"A Prism Paint picture of {width}x{height} in {planes} planes needs {screenBytes} bytes; the file holds {data.Length - pixelOffset}.");
+
+    var chunky = PlanarConverter.AtariStToChunky(data.Slice(pixelOffset, screenBytes).ToArray(), width, height, planes);
 
     return new PrismPaintFile {
       Width = width,
       Height = height,
       Palette = rgbPalette,
-      PixelData = pixelData,
+      PixelData = chunky,
     };
     }
 
+  /// <summary>
+  /// Reads a picture from a byte array.
+  /// </summary>
+  /// <remarks>
+  /// This used to be a second copy of the whole parse rather than a call into the first, and the two
+  /// drifted exactly as such pairs do: a correction to one left the other reading the signature as
+  /// the picture's size.
+  /// </remarks>
   public static PrismPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    if (data.Length < PrismPaintFile.MinFileSize)
-      throw new InvalidDataException($"Data too small for a valid Prism Paint file (minimum {PrismPaintFile.MinFileSize} bytes, got {data.Length}).");
-
-    // Read dimensions (LE u16)
-    var width = (ushort)(data[0] | (data[1] << 8));
-    var height = (ushort)(data[2] | (data[3] << 8));
-
-    if (width == 0 || height == 0)
-      throw new InvalidDataException($"Invalid Prism Paint dimensions: {width}x{height}.");
-
-    // Convert Falcon palette to RGB
-    var rgbPalette = new byte[PrismPaintFile.PaletteEntryCount * 3];
-    PrismPaintFile.ConvertFalconPaletteToRgb(
-      data.AsSpan(PrismPaintFile.HeaderSize, PrismPaintFile.PaletteDataSize),
-      rgbPalette
-    );
-
-    // Read pixel data
-    var pixelOffset = PrismPaintFile.HeaderSize + PrismPaintFile.PaletteDataSize;
-    var expectedPixelBytes = width * height;
-    var available = data.Length - pixelOffset;
-    var copyLen = Math.Min(expectedPixelBytes, available);
-
-    var pixelData = new byte[expectedPixelBytes];
-    data.AsSpan(pixelOffset, copyLen).CopyTo(pixelData);
-
-    return new PrismPaintFile {
-      Width = width,
-      Height = height,
-      Palette = rgbPalette,
-      PixelData = pixelData,
-    };
+    return FromSpan(data);
   }
 }
