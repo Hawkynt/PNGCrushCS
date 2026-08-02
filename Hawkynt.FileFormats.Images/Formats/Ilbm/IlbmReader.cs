@@ -76,6 +76,7 @@ public static class IlbmReader {
         case "CMAP":
           cmap = new byte[chunkSize];
           data.Slice(chunkDataOffset, chunkSize).CopyTo(cmap);
+          _WidenTwelveBitColours(cmap);
           break;
         case "CAMG":
           if (chunkSize >= 4)
@@ -130,5 +131,27 @@ public static class IlbmReader {
       Palette = cmap,
       ViewportMode = camg
     };
+  }
+
+  /// <summary>
+  /// Repeats the high nibble of every channel where the map holds a twelve-bit palette.
+  /// </summary>
+  /// <remarks>
+  /// The Amiga's own palette is four bits a channel, and a colour map written by one of those
+  /// machines puts each value in the high nibble and leaves the low one empty. Taken as it stands
+  /// that makes 8 into 0x80 where the machine shows 0x88 — every colour a little too dark, and the
+  /// brightest white 0xF0 rather than 0xFF.
+  /// <para/>
+  /// A map whose low nibbles are every one of them zero is such a palette: sixteen colours chosen
+  /// independently do not all land on a multiple of sixteen by chance. A map with anything in a low
+  /// nibble is already eight-bit and is left alone.
+  /// </remarks>
+  private static void _WidenTwelveBitColours(byte[] cmap) {
+    foreach (var value in cmap)
+      if ((value & 0x0F) != 0)
+        return;
+
+    for (var i = 0; i < cmap.Length; ++i)
+      cmap[i] |= (byte)(cmap[i] >> 4);
   }
 }
