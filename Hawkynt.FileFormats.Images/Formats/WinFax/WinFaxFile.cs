@@ -6,9 +6,28 @@ namespace FileFormat.WinFax;
 /// <summary>In-memory representation of a WinFAX fax image image.</summary>
 public readonly record struct WinFaxFile : IImageFormatReader<WinFaxFile>, IImageToRawImage<WinFaxFile>, IImageFromRawImage<WinFaxFile>, IImageFormatWriter<WinFaxFile> {
 
-  internal const int HeaderSize = 16;
+  /// <summary>The two bytes every one of these begins with.</summary>
+  internal static ReadOnlySpan<byte> Signature => [0x0B, 0x23];
 
-  private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
+  /// <summary>Offset of the vertical resolution in dots per inch.</summary>
+  internal const int ResolutionOffset = 2;
+
+  /// <summary>Offset of the width, as a 16-bit little-endian count of pixels.</summary>
+  internal const int WidthOffset = 3;
+
+  /// <summary>Offset of the height, in the same shape.</summary>
+  internal const int HeightOffset = 5;
+
+  /// <summary>
+  /// Bytes before the coded page. What follows the size fields is the title the sending program gave
+  /// the document, and the page runs from there — the coded stream begins with a synchronising code,
+  /// so the text ahead of it is skipped rather than decoded. Starting past the title instead was
+  /// tried and decodes nothing at all.
+  /// </summary>
+  internal const int HeaderSize = 8;
+
+  /// <summary>White first: a fax states runs of white before black, and zero means paper.</summary>
+  private static readonly byte[] _BlackWhitePalette = [255, 255, 255, 0, 0, 0];
 
   static string IImageFormatMetadata<WinFaxFile>.PrimaryExtension => ".fxs";
   static string[] IImageFormatMetadata<WinFaxFile>.FileExtensions => [".fxs", ".fxo", ".fxr", ".fxd", ".fxm"];
