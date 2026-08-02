@@ -142,6 +142,11 @@ public static class IceLayout {
         // it is computed wrongly a step earlier, is not settled — so nothing is changed here on a
         // guess. The measurement is left for whoever has the mode documented.
         //
+        // One guess has since been tried and refuted, so it need not be tried again: that value 8
+        // selects the background, as it does in GTIA mode 10 proper, rather than a ninth playfield
+        // register. Pointing it at the background takes this sample from 93.3 per cent of its pixels
+        // down to 79.8, so whatever the ninth value means here, it is not that.
+        //
         // The nine GTIA registers in order, indexed straight by the pixel value.
         var colors = new byte[9];
         colors[0] = _At(header, 1);
