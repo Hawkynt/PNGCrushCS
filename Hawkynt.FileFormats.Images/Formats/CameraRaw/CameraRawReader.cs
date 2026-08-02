@@ -260,25 +260,83 @@ public static class CameraRawReader {
   /// marker is a candidate, whichever decodes largest wins, and one that does not decode costs
   /// nothing.
   /// </remarks>
+  /// <summary>Whether a byte is one a JPEG's first segment marker can be.</summary>
+  /// <remarks>
+  /// An application segment, a quantisation table, a frame header, a Huffman table or a comment.
+  /// Anything else after the start-of-image bytes means those bytes were sensor data that happened
+  /// to look like a marker, of which a raw file holds a great many.
+  /// </remarks>
+  private static bool _OpensAJpeg(byte marker)
+    => marker is >= 0xE0 and <= 0xEF or 0xDB or 0xC0 or 0xC1 or 0xC2 or 0xC4 or 0xFE;
+
   private static RawImage? _LargestJpegInTheFile(byte[] data) {
-    RawImage? best = null;
+    var bestAt = -1;
+    var bestPixels = 0L;
     var tried = 0;
 
-    for (var at = 0; at + 3 < data.Length && tried < _JPEG_CANDIDATE_LIMIT; ++at) {
+    for (var at = 0; at + 4 < data.Length && tried < _JPEG_CANDIDATE_LIMIT; ++at) {
       if (data[at] != 0xFF || data[at + 1] != 0xD8 || data[at + 2] != 0xFF)
         continue;
 
+      // The byte after that must begin a segment a JPEG really opens with. Without this the sensor
+      // data throws up dozens of false starts.
+      if (!_OpensAJpeg(data[at + 3]))
+        continue;
+
       ++tried;
-      try {
-        var decoded = JpegFile.ToRawImage(JpegReader.FromSpan(data.AsSpan(at)));
-        if (best == null || (long)decoded.Width * decoded.Height > (long)best.Width * best.Height)
-          best = decoded;
-      } catch (Exception) {
-        // Two bytes that merely look like a marker; the next candidate may be the picture.
-      }
+
+      // Only the frame header is read here. Decoding each candidate in full to find out how big it
+      // was meant twenty pictures being decoded to keep one, and a twenty-two megabyte raw took
+      // longer to open than every other format in the corpus put together.
+      var size = _PeekJpegSize(data, at);
+      if (size is not { } found)
+        continue;
+
+      var pixels = (long)found.Width * found.Height;
+      if (pixels <= bestPixels)
+        continue;
+
+      bestPixels = pixels;
+      bestAt = at;
     }
 
-    return best;
+    if (bestAt < 0)
+      return null;
+
+    try {
+      return JpegFile.ToRawImage(JpegReader.FromSpan(data.AsSpan(bestAt)));
+    } catch (Exception) {
+      return null;
+    }
+  }
+
+  /// <summary>Reads a JPEG's size from its frame header without decoding it.</summary>
+  private static (int Width, int Height)? _PeekJpegSize(byte[] data, int start) {
+    for (var at = start + 2; at + 9 < data.Length;) {
+      if (data[at] != 0xFF)
+        return null;
+
+      var marker = data[at + 1];
+      if (marker == 0xD8 || (marker >= 0xD0 && marker <= 0xD7)) {
+        at += 2;
+        continue;
+      }
+
+      if (marker == 0xD9 || marker == 0xDA)
+        return null;
+
+      var length = (data[at + 2] << 8) | data[at + 3];
+      if (length < 2)
+        return null;
+
+      // A frame header states the size in the two words after its precision byte.
+      if (marker is 0xC0 or 0xC1 or 0xC2 or 0xC3 or 0xC5 or 0xC6 or 0xC7 or 0xC9 or 0xCA or 0xCB or 0xCD or 0xCE or 0xCF)
+        return ((data[at + 7] << 8) | data[at + 8], (data[at + 5] << 8) | data[at + 6]);
+
+      at += 2 + length;
+    }
+
+    return null;
   }
 
   /// <summary>Where an IFD says its JPEG data is, by either of the two conventions.</summary>
