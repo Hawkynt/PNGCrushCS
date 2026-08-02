@@ -26,14 +26,18 @@ public class KofaxKfxReaderTests {
 
   [Test]
   public void FromBytes_ValidHeader_Succeeds() {
-    var data = new byte[16 + (1728 + 7) / 8 * 2200];
-    data[0] = 192;
-    data[1] = 6;
-    data[4] = 152; data[5] = 8;
-    var result = KofaxKfxReader.FromBytes(data);
-    Assert.That(result.Width, Is.GreaterThan(0));
-    Assert.That(result.Height, Is.GreaterThan(0));
+    // The file is the bitmap: seven bytes a row, and the height follows from how many there are.
+    var result = KofaxKfxReader.FromBytes(new byte[7 * 60]);
+
+    Assert.Multiple(() => {
+      Assert.That(result.Width, Is.EqualTo(56));
+      Assert.That(result.Height, Is.EqualTo(60));
+    });
   }
+
+  [Test]
+  public void FromBytes_RefusesALengthThatIsNotWholeRows()
+    => Assert.Throws<InvalidDataException>(() => KofaxKfxReader.FromBytes(new byte[7 * 60 + 3]));
 
   [Test]
   public void FromStream_NullStream_ThrowsArgumentNullException()
@@ -46,9 +50,9 @@ public class RoundTripTests {
   [Test]
   public void RoundTrip_PixelDataPreserved() {
     var file = new KofaxKfxFile {
-      Width = 1728,
-      Height = 2200,
-      PixelData = new byte[(1728 + 7) / 8 * 2200],
+      Width = 56,
+      Height = 60,
+      PixelData = new byte[7 * 60],
     };
     for (var i = 0; i < file.PixelData.Length; ++i)
       file.PixelData[i] = (byte)(i & 0xFF);
@@ -60,9 +64,9 @@ public class RoundTripTests {
   [Test]
   public void RoundTrip_ViaRawImage() {
     var file = new KofaxKfxFile {
-      Width = 1728,
-      Height = 2200,
-      PixelData = new byte[(1728 + 7) / 8 * 2200],
+      Width = 56,
+      Height = 60,
+      PixelData = new byte[7 * 60],
     };
     var raw = KofaxKfxFile.ToRawImage(file);
     Assert.That(raw.Format, Is.EqualTo(PixelFormat.Indexed1));

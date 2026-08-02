@@ -27,31 +27,14 @@ public static class KofaxKfxReader {
 
   public static KofaxKfxFile FromSpan(ReadOnlySpan<byte> data) {
 
-    if (data.Length < KofaxKfxFile.HeaderSize)
-      throw new InvalidDataException("Data too small for a valid KofaxKfx file.");
+    // The size used to be read from the first six bytes, which are picture, and replaced with a
+    // default when that looked wrong. There is no header at all: the file is the bitmap.
+    if (data.Length == 0 || data.Length % KofaxKfxFile.BytesPerRow != 0)
+      throw new InvalidDataException($"A Kofax KFX is a whole number of {KofaxKfxFile.BytesPerRow}-byte rows; this file is {data.Length} bytes.");
 
-    var width = data[0] | (data[1] << 8);
-    var height = data[2] | (data[3] << 8);
-    if (width == 0) width = data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24);
-    if (width <= 0 || width > 65535) width = 1728;
-
-    if (16 >= 8) {
-      height = data[4] | (data[5] << 8);
-      if (height <= 0 || height > 65535) height = 2200;
-    } else if (height <= 0 || height > 65535) {
-      height = 2200;
-    }
-
-    var pixelBytes = (width + 7) / 8 * height;
-    var pixelData = new byte[pixelBytes];
-    // Padding what the file does not contain turns a misread size into a picture: a header taken
-    // from the wrong offset asked for millions of pixels, the few hundred bytes present were
-    // copied in, and the rest was zeros reported as a successful read.
-    var available = data.Length - KofaxKfxFile.HeaderSize;
-    if (available < pixelBytes)
-      throw new InvalidDataException($"Expected {pixelBytes} bytes of pixel data, got {available}.");
-
-    data.Slice(KofaxKfxFile.HeaderSize, pixelBytes).CopyTo(pixelData.AsSpan(0));
+    var width = KofaxKfxFile.RowWidth;
+    var height = data.Length / KofaxKfxFile.BytesPerRow;
+    var pixelData = data.ToArray();
 
     return new() {
       Width = width,
