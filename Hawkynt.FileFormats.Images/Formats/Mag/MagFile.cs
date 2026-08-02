@@ -28,11 +28,24 @@ namespace FileFormat.Mag;
 ///     are <c>width / 8</c> flag bytes a row, each holding two four-bit codes, and each code covers
 ///     two bytes of picture. Doing this consumes both streams to their last byte, which is the
 ///     strongest evidence the container is right.</item>
-///   <item>A code of zero takes the next two bytes from the pixel data; anything else copies two
-///     bytes from earlier in the picture. Which earlier position each code names is <b>not</b>
-///     solved. A table of the usual shape reaches 87% of pixels and no rearrangement tried got past
-///     89%, and a decoder that is 13% wrong is the fault this reader is being fixed for.</item>
+///   <item>A code of zero takes the next two bytes from the pixel data; anything else repeats two
+///     bytes from earlier in the picture.</item>
+///   <item>Nine of the fifteen codes are plain copies and their sources are settled, each verified
+///     against XnView on every use where the source itself was right — 1 and 2 repeat the two bytes
+///     two to the left, 5 the row above, 7 and 8 two rows above, 10 and 11 four, 13 and 14 eight;
+///     the pairs differ by two bytes of horizontal offset.</item>
+///   <item>Codes 3, 4, 6, 9, 12 and 15 are <b>not</b> plain copies. Every horizontal offset up to 64
+///     bytes and every vertical one up to 18 rows was tried against each, and none falls below about
+///     a third wrong — while the nine above reach exactly none. Whatever those six mean, it is not
+///     "repeat from here", and that is the thing left to find.</item>
+///   <item>With the nine settled and the six approximated, 87% of pixels come out right. That is not
+///     shippable: a decoder wrong in one pixel in eight is the fault this reader is being fixed for,
+///     so it refuses instead.</item>
 /// </list>
+/// <para/>
+/// A caution for whoever picks this up: comparing decoded palette <em>indices</em> against another
+/// tool's rendering gives nonsense here, because entries 0 and 1 are both black and the picture
+/// cannot tell them apart. Compare colours.
 /// </remarks>
 public readonly record struct MagFile : IImageFormatReader<MagFile>, IImageToRawImage<MagFile>, IImageFromRawImage<MagFile>, IImageFormatWriter<MagFile> {
 
