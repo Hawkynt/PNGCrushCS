@@ -44,9 +44,14 @@ public static class CloeReader {
 
     var pixelBytes = width * height * 3;
     var pixelData = new byte[pixelBytes];
-    var available = Math.Min(pixelBytes, data.Length - CloeFile.HeaderSize);
-    if (available > 0)
-      data.Slice(CloeFile.HeaderSize, available).CopyTo(pixelData);
+    // Padding what the file does not contain turns a misread size into a picture: a header taken
+    // from the wrong offset asked for millions of pixels, the few hundred bytes present were
+    // copied in, and the rest was zeros reported as a successful read.
+    var available = data.Length - CloeFile.HeaderSize;
+    if (available < pixelBytes)
+      throw new InvalidDataException($"Expected {pixelBytes} bytes of pixel data, got {available}.");
+
+    data.Slice(CloeFile.HeaderSize, pixelBytes).CopyTo(pixelData);
 
     return new() {
       Width = width,

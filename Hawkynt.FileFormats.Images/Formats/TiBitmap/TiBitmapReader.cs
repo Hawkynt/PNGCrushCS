@@ -44,9 +44,14 @@ public static class TiBitmapReader {
 
     var pixelBytes = (width + 7) / 8 * height;
     var pixelData = new byte[pixelBytes];
-    var available = Math.Min(pixelBytes, data.Length - TiBitmapFile.HeaderSize);
-    if (available > 0)
-      data.Slice(TiBitmapFile.HeaderSize, available).CopyTo(pixelData.AsSpan(0));
+    // Padding what the file does not contain turns a misread size into a picture: a header taken
+    // from the wrong offset asked for millions of pixels, the few hundred bytes present were
+    // copied in, and the rest was zeros reported as a successful read.
+    var available = data.Length - TiBitmapFile.HeaderSize;
+    if (available < pixelBytes)
+      throw new InvalidDataException($"Expected {pixelBytes} bytes of pixel data, got {available}.");
+
+    data.Slice(TiBitmapFile.HeaderSize, pixelBytes).CopyTo(pixelData.AsSpan(0));
 
     return new() {
       Width = width,
