@@ -61,6 +61,37 @@ internal static class CcittG3Decoder {
     return pixelData;
   }
 
+/// <summary>
+  /// Measures how wide a line is by adding up the runs of the first one.
+  /// </summary>
+  /// <remarks>
+  /// A bare Group 3 stream states no size anywhere, so the width had to be assumed — and the fax
+  /// scan line, 1728, is only the commonest of several. It need not be assumed at all: every line's
+  /// runs add up to exactly the width, and a line ends with a marker that is not a run code, so
+  /// adding them until the run decoder refuses gives the width the coder used.
+  /// </remarks>
+  /// <returns>The width the first line adds up to, or zero if it cannot be read.</returns>
+  internal static int MeasureWidth(byte[] compressedData) {
+    var reader = new _BitReader(compressedData);
+    _SkipEol(reader);
+
+    var total = 0;
+    var isWhite = true;
+    while (total <= _WIDEST_LINE) {
+      var run = _DecodeRunLength(reader, isWhite);
+      if (run < 0)
+        break;
+
+      total += run;
+      isWhite = !isWhite;
+    }
+
+    return total is > 0 and <= _WIDEST_LINE ? total : 0;
+  }
+
+  /// <summary>Wider than any page a fax machine or scanner produces.</summary>
+  private const int _WIDEST_LINE = 30000;
+
   private static int _DecodeRunLength(_BitReader reader, bool isWhite) {
     var totalRun = 0;
 

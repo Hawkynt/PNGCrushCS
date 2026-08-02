@@ -23,7 +23,18 @@ public sealed class CcittFile :
   /// <summary>1bpp packed pixel data (MSB first, ceil(width/8) bytes per row).</summary>
   public byte[] PixelData { get; init; } = [];
 
-  private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
+  /// <summary>
+  /// What the two values draw: an unset bit is white, a set one is the ink.
+  /// </summary>
+  /// <remarks>
+  /// This was the other way about, so every bare stream came back as its own negative — a page of
+  /// white ink on black. The coding counts runs of white first and the decoder sets a bit for black,
+  /// so nought is paper.
+  /// <para/>
+  /// A CALS raster reverses this, and deliberately: that format defines a set bit as white. The two
+  /// therefore cannot share one palette, which is what made the mistake easy to carry.
+  /// </remarks>
+  private static readonly byte[] _BlackWhitePalette = [255, 255, 255, 0, 0, 0];
 
   /// <summary>The scan line a fax uses at standard resolution, in pixels.</summary>
   public const int StandardWidth = 1728;
@@ -48,17 +59,23 @@ public sealed class CcittFile :
     var bytes = data.ToArray();
     var isGroup3 = _StartsWithEndOfLine(data);
 
+    // Group 3 marks its line ends, so the first line can be added up and the width taken from the
+    // coding rather than assumed. Only where that cannot be read does the fax scan line stand in.
+    var width = StandardWidth;
+    if (isGroup3 && CcittG3Decoder.MeasureWidth(bytes) is var measured and > 0)
+      width = measured;
+
     var pixelData = isGroup3
-      ? CcittG3Decoder.Decode(bytes, StandardWidth, MaximumRows, out var height)
-      : CcittG4Decoder.Decode(bytes, StandardWidth, MaximumRows, out height);
+      ? CcittG3Decoder.Decode(bytes, width, MaximumRows, out var height)
+      : CcittG4Decoder.Decode(bytes, width, MaximumRows, out height);
 
     if (height <= 0)
       throw new InvalidDataException("No CCITT rows could be decoded.");
 
-    var stride = (StandardWidth + 7) / 8;
+    var stride = (width + 7) / 8;
 
     return new() {
-      Width = StandardWidth,
+      Width = width,
       Height = height,
       Format = isGroup3 ? CcittFormat.Group3_1D : CcittFormat.Group4,
       PixelData = pixelData[..(stride * height)],
