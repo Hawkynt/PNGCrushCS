@@ -126,6 +126,17 @@ public static class JpegXrReader {
     // Decode compressed bitstream using the JPEG XR codec
     var pixelData = JxrDecoder.Decode(compressedData, width, height, componentCount);
 
+    // The codec runs to completion on both real samples here and draws neither of them: against
+    // XnView's rendering the mean error a channel is 117 and 83 out of 255, which is not two lossy
+    // decoders differing but a picture that is not the one in the file. Until it is right, saying so
+    // is better than handing back a plausible-looking wash of colour nothing downstream can question.
+    //
+    // The container above this is sound and was worth fixing on its own: the four tags naming where
+    // the picture begins were written 0xBCE0 to 0xBCE3, where the standard puts them at 0xBCC0 to
+    // 0xBCC3, so no JPEG XR was ever found at all.
+    throw new NotSupportedException(
+      $"A JPEG XR of {width}x{height} was recognised, but the codec here does not reproduce the picture and its output is not returned.");
+
     return new JpegXrFile {
       Width = width,
       Height = height,

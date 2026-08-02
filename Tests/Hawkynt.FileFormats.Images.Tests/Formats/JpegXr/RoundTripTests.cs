@@ -4,234 +4,82 @@ using FileFormat.JpegXr;
 
 namespace FileFormat.JpegXr.Tests;
 
+/// <summary>
+/// What our JPEG XR support actually does, as opposed to what it appeared to do.
+/// </summary>
+/// <remarks>
+/// This file used to hold eleven round trips: build a picture, write it, read it back, compare. They
+/// all passed and none of them meant anything. The writer does not produce a JPEG XR bitstream — it
+/// stores the pixels — and the reader recovered them through a fallback that copied the compressed
+/// data into the picture whenever the plane header would not parse. Writer and reader agreed with
+/// each other about a format neither was speaking.
+/// <para/>
+/// The two real files in the corpus settle it: the codec runs to completion on both and draws
+/// neither, differing from XnView's rendering by 117 and 83 of 255 a channel. So the reader declines
+/// now rather than returning a picture that is not the one in the file, and these tests say that
+/// instead of dressing the bubble up as a round trip.
+/// <para/>
+/// The container above the codec is sound and worth keeping: the four tags naming where the picture
+/// begins were written 0xBCE0 to 0xBCE3, where the standard puts them at 0xBCC0 to 0xBCC3, so no
+/// JPEG XR was ever found at all. That is fixed, which is why the size below is read correctly.
+/// </remarks>
 [TestFixture]
 public sealed class RoundTripTests {
 
-  [Test]
-  [Category("Integration")]
-  public void RoundTrip_Grayscale() {
-    var pixelData = new byte[4 * 3];
-    for (var i = 0; i < pixelData.Length; ++i)
-      pixelData[i] = (byte)(i * 21 % 256);
+  /// <summary>Builds the smallest well-formed container: header, IFD, and somewhere to point at.</summary>
+  private static byte[] _Container(int width, int height) {
+    using var stream = new MemoryStream();
+    using var writer = new BinaryWriter(stream);
 
-    var original = new JpegXrFile {
-      Width = 4,
-      Height = 3,
-      ComponentCount = 1,
-      PixelData = pixelData
-    };
+    writer.Write((byte)0x49);
+    writer.Write((byte)0x49);
+    writer.Write((byte)0xBC);
+    writer.Write((byte)0x01);
+    writer.Write(8);
 
-    var bytes = JpegXrWriter.ToBytes(original);
-    var restored = JpegXrReader.FromBytes(bytes);
+    writer.Write((ushort)4);
 
-    Assert.That(restored.Width, Is.EqualTo(original.Width));
-    Assert.That(restored.Height, Is.EqualTo(original.Height));
-    Assert.That(restored.ComponentCount, Is.EqualTo(original.ComponentCount));
-    Assert.That(restored.PixelData, Is.EqualTo(original.PixelData));
-  }
-
-  [Test]
-  [Category("Integration")]
-  public void RoundTrip_Rgb() {
-    var pixelData = new byte[3 * 2 * 3];
-    for (var i = 0; i < pixelData.Length; ++i)
-      pixelData[i] = (byte)(i * 13 % 256);
-
-    var original = new JpegXrFile {
-      Width = 3,
-      Height = 2,
-      ComponentCount = 3,
-      PixelData = pixelData
-    };
-
-    var bytes = JpegXrWriter.ToBytes(original);
-    var restored = JpegXrReader.FromBytes(bytes);
-
-    Assert.That(restored.Width, Is.EqualTo(original.Width));
-    Assert.That(restored.Height, Is.EqualTo(original.Height));
-    Assert.That(restored.ComponentCount, Is.EqualTo(original.ComponentCount));
-    Assert.That(restored.PixelData, Is.EqualTo(original.PixelData));
-  }
-
-  [Test]
-  [Category("Integration")]
-  public void RoundTrip_AllZeros() {
-    var original = new JpegXrFile {
-      Width = 4,
-      Height = 4,
-      ComponentCount = 3,
-      PixelData = new byte[4 * 4 * 3]
-    };
-
-    var bytes = JpegXrWriter.ToBytes(original);
-    var restored = JpegXrReader.FromBytes(bytes);
-
-    Assert.That(restored.PixelData, Is.EqualTo(original.PixelData));
-  }
-
-  [Test]
-  [Category("Integration")]
-  public void RoundTrip_Gradient() {
-    var w = 8;
-    var h = 4;
-    var pixelData = new byte[w * h * 3];
-    for (var i = 0; i < pixelData.Length; ++i)
-      pixelData[i] = (byte)(i % 256);
-
-    var original = new JpegXrFile {
-      Width = w,
-      Height = h,
-      ComponentCount = 3,
-      PixelData = pixelData
-    };
-
-    var bytes = JpegXrWriter.ToBytes(original);
-    var restored = JpegXrReader.FromBytes(bytes);
-
-    Assert.That(restored.Width, Is.EqualTo(w));
-    Assert.That(restored.Height, Is.EqualTo(h));
-    Assert.That(restored.PixelData, Is.EqualTo(pixelData));
-  }
-
-  [Test]
-  [Category("Integration")]
-  public void RoundTrip_ViaFile() {
-    var pixelData = new byte[8 * 6 * 3];
-    for (var i = 0; i < pixelData.Length; ++i)
-      pixelData[i] = (byte)(i * 11 % 256);
-
-    var original = new JpegXrFile {
-      Width = 8,
-      Height = 6,
-      ComponentCount = 3,
-      PixelData = pixelData
-    };
-
-    var tempPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".jxr");
-    try {
-      var bytes = JpegXrWriter.ToBytes(original);
-      File.WriteAllBytes(tempPath, bytes);
-      var restored = JpegXrReader.FromFile(new FileInfo(tempPath));
-
-      Assert.That(restored.Width, Is.EqualTo(original.Width));
-      Assert.That(restored.Height, Is.EqualTo(original.Height));
-      Assert.That(restored.ComponentCount, Is.EqualTo(original.ComponentCount));
-      Assert.That(restored.PixelData, Is.EqualTo(original.PixelData));
-    } finally {
-      if (File.Exists(tempPath))
-        File.Delete(tempPath);
+    void Entry(ushort tag, uint value) {
+      writer.Write(tag);
+      writer.Write((ushort)4);
+      writer.Write(1u);
+      writer.Write(value);
     }
+
+    Entry(0xBC80, (uint)width);
+    Entry(0xBC81, (uint)height);
+    Entry(0xBCC0, 62);
+    Entry(0xBCC1, 16);
+    writer.Write(0);
+
+    while (stream.Length < 62 + 16)
+      writer.Write((byte)0);
+
+    return stream.ToArray();
   }
 
   [Test]
-  [Category("Integration")]
-  public void RoundTrip_ViaStream() {
-    var pixelData = new byte[4 * 4];
-    for (var i = 0; i < pixelData.Length; ++i)
-      pixelData[i] = (byte)(i * 19 % 256);
+  [Category("Unit")]
+  public void Read_TakesTheSizeFromTheTagsTheStandardNames() {
+    // 0xBC80 and 0xBC81 for the size, 0xBCC0 and 0xBCC1 for where the picture is — the last two were
+    // looked for at 0xBCE0 and 0xBCE1, which no file writes.
+    var failure = Assert.Catch<Exception>(() => JpegXrReader.FromBytes(_Container(800, 600)));
 
-    var original = new JpegXrFile {
-      Width = 4,
-      Height = 4,
-      ComponentCount = 1,
-      PixelData = pixelData
-    };
-
-    var bytes = JpegXrWriter.ToBytes(original);
-    using var ms = new MemoryStream(bytes);
-    var restored = JpegXrReader.FromStream(ms);
-
-    Assert.That(restored.Width, Is.EqualTo(original.Width));
-    Assert.That(restored.Height, Is.EqualTo(original.Height));
-    Assert.That(restored.ComponentCount, Is.EqualTo(original.ComponentCount));
-    Assert.That(restored.PixelData, Is.EqualTo(original.PixelData));
+    Assert.That(failure, Is.Not.Null, "the codec should decline rather than return a picture");
+    Assert.That(failure!.Message, Does.Contain("800x600"),
+      "the container should have been read even though the codec declines");
   }
 
   [Test]
-  [Category("Integration")]
-  public void RoundTrip_SinglePixel() {
-    var original = new JpegXrFile {
-      Width = 1,
-      Height = 1,
-      ComponentCount = 3,
-      PixelData = [0xAA, 0xBB, 0xCC]
-    };
+  [Category("Unit")]
+  public void Read_DeclinesRatherThanReturningAPictureItCannotDecode() {
+    var failure = Assert.Catch<NotSupportedException>(() => JpegXrReader.FromBytes(_Container(4, 3)));
 
-    var bytes = JpegXrWriter.ToBytes(original);
-    var restored = JpegXrReader.FromBytes(bytes);
-
-    Assert.That(restored.Width, Is.EqualTo(1));
-    Assert.That(restored.Height, Is.EqualTo(1));
-    Assert.That(restored.PixelData, Is.EqualTo(original.PixelData));
+    Assert.That(failure!.Message, Does.Contain("does not reproduce"));
   }
 
   [Test]
-  [Category("Integration")]
-  public void RoundTrip_LargerImage() {
-    var w = 64;
-    var h = 48;
-    var pixelData = new byte[w * h * 3];
-    for (var i = 0; i < pixelData.Length; ++i)
-      pixelData[i] = (byte)(i * 37 % 256);
-
-    var original = new JpegXrFile {
-      Width = w,
-      Height = h,
-      ComponentCount = 3,
-      PixelData = pixelData
-    };
-
-    var bytes = JpegXrWriter.ToBytes(original);
-    var restored = JpegXrReader.FromBytes(bytes);
-
-    Assert.That(restored.Width, Is.EqualTo(w));
-    Assert.That(restored.Height, Is.EqualTo(h));
-    Assert.That(restored.PixelData, Is.EqualTo(pixelData));
-  }
-
-  [Test]
-  [Category("Integration")]
-  public void RoundTrip_RawImage_Grayscale() {
-    var pixelData = new byte[4 * 3];
-    for (var i = 0; i < pixelData.Length; ++i)
-      pixelData[i] = (byte)(i * 23 % 256);
-
-    var rawImage = new FileFormat.Core.RawImage {
-      Width = 4,
-      Height = 3,
-      Format = FileFormat.Core.PixelFormat.Gray8,
-      PixelData = pixelData
-    };
-
-    var jxr = JpegXrFile.FromRawImage(rawImage);
-    var raw = JpegXrFile.ToRawImage(jxr);
-
-    Assert.That(raw.Width, Is.EqualTo(4));
-    Assert.That(raw.Height, Is.EqualTo(3));
-    Assert.That(raw.Format, Is.EqualTo(FileFormat.Core.PixelFormat.Gray8));
-    Assert.That(raw.PixelData, Is.EqualTo(pixelData));
-  }
-
-  [Test]
-  [Category("Integration")]
-  public void RoundTrip_RawImage_Rgb() {
-    var pixelData = new byte[2 * 2 * 3];
-    for (var i = 0; i < pixelData.Length; ++i)
-      pixelData[i] = (byte)(i * 31 % 256);
-
-    var rawImage = new FileFormat.Core.RawImage {
-      Width = 2,
-      Height = 2,
-      Format = FileFormat.Core.PixelFormat.Rgb24,
-      PixelData = pixelData
-    };
-
-    var jxr = JpegXrFile.FromRawImage(rawImage);
-    var raw = JpegXrFile.ToRawImage(jxr);
-
-    Assert.That(raw.Width, Is.EqualTo(2));
-    Assert.That(raw.Height, Is.EqualTo(2));
-    Assert.That(raw.Format, Is.EqualTo(FileFormat.Core.PixelFormat.Rgb24));
-    Assert.That(raw.PixelData, Is.EqualTo(pixelData));
-  }
+  [Category("Unit")]
+  public void Read_RefusesSomethingThatIsNotAJpegXrAtAll()
+    => Assert.Throws<InvalidDataException>(() => JpegXrReader.FromBytes(new byte[64]));
 }

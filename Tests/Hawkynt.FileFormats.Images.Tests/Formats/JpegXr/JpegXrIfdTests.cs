@@ -59,7 +59,7 @@ public sealed class JpegXrIfdTests {
   [Category("Unit")]
   public void ParseEntries_ValueVsOffset_SmallValue() {
     // A single LONG fits in the 4-byte value field (no external offset needed)
-    var data = _BuildIfdData(1, (0xBCE1, JpegXrIfd.TYPE_LONG, 1u, 42u));
+    var data = _BuildIfdData(1, (0xBCC1, JpegXrIfd.TYPE_LONG, 1u, 42u));
     var entries = JpegXrIfd.ParseEntries(data, 0);
 
     Assert.That(entries[0].Value, Is.EqualTo(42u));

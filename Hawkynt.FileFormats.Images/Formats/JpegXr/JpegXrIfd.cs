@@ -14,10 +14,13 @@ internal static class JpegXrIfd {
   internal const ushort TAG_SPATIAL_XFRM = 0xBC02;
   internal const ushort TAG_IMAGE_WIDTH = 0xBC80;
   internal const ushort TAG_IMAGE_HEIGHT = 0xBC81;
-  internal const ushort TAG_IMAGE_OFFSET = 0xBCE0;
-  internal const ushort TAG_IMAGE_BYTE_COUNT = 0xBCE1;
-  internal const ushort TAG_ALPHA_OFFSET = 0xBCE2;
-  internal const ushort TAG_ALPHA_BYTE_COUNT = 0xBCE3;
+  // These four were written as 0xBCE0 to 0xBCE3, which no file uses: the standard puts them at
+  // 0xBCC0 to 0xBCC3, and both samples here carry those. The reader could therefore never find where
+  // the picture began and refused every JPEG XR for want of an offset that was in front of it.
+  internal const ushort TAG_IMAGE_OFFSET = 0xBCC0;
+  internal const ushort TAG_IMAGE_BYTE_COUNT = 0xBCC1;
+  internal const ushort TAG_ALPHA_OFFSET = 0xBCC2;
+  internal const ushort TAG_ALPHA_BYTE_COUNT = 0xBCC3;
 
   // IFD field types
   internal const ushort TYPE_BYTE = 1;

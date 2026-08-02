@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 
 namespace FileFormat.JpegXr.Codec;
 
@@ -69,8 +70,11 @@ internal sealed class JxrDecoder {
     PlaneHeader header;
     try {
       header = _ParsePlaneHeader(reader, width, height, componentCount);
-    } catch {
-      return _FallbackRawDecode(compressedData, width, height, componentCount);
+    } catch (Exception failure) {
+      // This used to copy the compressed bytes into the picture and hand them back, which draws the
+      // bitstream as though it were pixels: a plausible-looking wash of colour that is not the
+      // picture and cannot be told from one by anything downstream.
+      throw new InvalidDataException("A JPEG XR plane header could not be read: " + failure.Message, failure);
     }
 
     return _DecodePlane(reader, header);
@@ -165,13 +169,4 @@ internal sealed class JxrDecoder {
     return result;
   }
 
-  /// <summary>Fallback: treat compressed data as raw pixel data when header parsing fails.</summary>
-  private static byte[] _FallbackRawDecode(byte[] data, int width, int height, int componentCount) {
-    var expectedSize = width * height * componentCount;
-    var result = new byte[expectedSize];
-    var toCopy = Math.Min(expectedSize, data.Length);
-    if (toCopy > 0)
-      data.AsSpan(0, toCopy).CopyTo(result);
-    return result;
-  }
 }

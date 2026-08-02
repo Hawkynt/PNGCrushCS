@@ -62,67 +62,50 @@ public sealed class JpegXrReaderTests {
   [Test]
   [Category("Unit")]
   public void FromBytes_ValidGrayscale() {
-    var jxr = _BuildJxr(4, 2, 1);
-    var result = JpegXrReader.FromBytes(jxr);
+    // The container is read; the codec is not trusted to draw the picture and says so instead of
+    // returning one, so what a valid file proves here is that the size came out of the right tags.
+    var failure = Assert.Catch<Exception>(() => JpegXrReader.FromBytes(_BuildJxr(4, 2, 1)));
 
-    Assert.That(result.Width, Is.EqualTo(4));
-    Assert.That(result.Height, Is.EqualTo(2));
-    Assert.That(result.ComponentCount, Is.EqualTo(1));
-    Assert.That(result.PixelData.Length, Is.EqualTo(4 * 2));
+    Assert.That(failure!.Message, Does.Contain("4x2"));
   }
 
   [Test]
   [Category("Unit")]
   public void FromBytes_ValidRgb() {
-    var jxr = _BuildJxr(3, 2, 3);
-    var result = JpegXrReader.FromBytes(jxr);
+    // The container is read; the codec is not trusted to draw the picture and says so instead of
+    // returning one, so what a valid file proves here is that the size came out of the right tags.
+    var failure = Assert.Catch<Exception>(() => JpegXrReader.FromBytes(_BuildJxr(3, 2, 3)));
 
-    Assert.That(result.Width, Is.EqualTo(3));
-    Assert.That(result.Height, Is.EqualTo(2));
-    Assert.That(result.ComponentCount, Is.EqualTo(3));
-    Assert.That(result.PixelData.Length, Is.EqualTo(3 * 2 * 3));
+    Assert.That(failure!.Message, Does.Contain("3x2"));
   }
 
   [Test]
   [Category("Unit")]
   public void FromBytes_ParsesDimensionsFromIfd() {
-    var jxr = _BuildJxr(16, 8, 3);
-    var result = JpegXrReader.FromBytes(jxr);
+    // The container is read; the codec is not trusted to draw the picture and says so instead of
+    // returning one, so what a valid file proves here is that the size came out of the right tags.
+    var failure = Assert.Catch<Exception>(() => JpegXrReader.FromBytes(_BuildJxr(16, 8, 3)));
 
-    Assert.That(result.Width, Is.EqualTo(16));
-    Assert.That(result.Height, Is.EqualTo(8));
+    Assert.That(failure!.Message, Does.Contain("16x8"));
   }
 
   [Test]
   [Category("Unit")]
   public void FromBytes_PixelDataPreserved() {
-    var pixelData = new byte[2 * 2 * 3];
-    for (var i = 0; i < pixelData.Length; ++i)
-      pixelData[i] = (byte)(i * 17 % 256);
+    // The container is read; the codec is not trusted to draw the picture and says so instead of
+    // returning one, so what a valid file proves here is that the size came out of the right tags.
+    var failure = Assert.Catch<Exception>(() => JpegXrReader.FromBytes(_BuildJxr(8, 4, 3)));
 
-    var file = new JpegXrFile {
-      Width = 2,
-      Height = 2,
-      ComponentCount = 3,
-      PixelData = pixelData
-    };
-
-    var jxr = JpegXrWriter.ToBytes(file);
-    var result = JpegXrReader.FromBytes(jxr);
-
-    Assert.That(result.PixelData, Is.EqualTo(pixelData));
+    Assert.That(failure!.Message, Does.Contain("8x4"));
   }
 
   [Test]
   [Category("Unit")]
   public void FromStream_ValidRgb() {
-    var jxr = _BuildJxr(2, 2, 3);
-    using var ms = new MemoryStream(jxr);
-    var result = JpegXrReader.FromStream(ms);
+    using var stream = new MemoryStream(_BuildJxr(3, 2, 3));
+    var failure = Assert.Catch<Exception>(() => JpegXrReader.FromStream(stream));
 
-    Assert.That(result.Width, Is.EqualTo(2));
-    Assert.That(result.Height, Is.EqualTo(2));
-    Assert.That(result.ComponentCount, Is.EqualTo(3));
+    Assert.That(failure!.Message, Does.Contain("3x2"));
   }
 
   /// <summary>Builds a minimal JPEG XR file with the given dimensions and component count.</summary>
@@ -161,8 +144,10 @@ public sealed class JpegXrReaderTests {
     _WriteEntry(span, ref pos, 0xBC01, 1, 1, pixelFormatByte);              // PixelFormat (BYTE)
     _WriteEntry(span, ref pos, 0xBC80, 4, 1, (uint)width);                  // ImageWidth
     _WriteEntry(span, ref pos, 0xBC81, 4, 1, (uint)height);                 // ImageHeight
-    _WriteEntry(span, ref pos, 0xBCE0, 4, 1, (uint)pixelDataOffset);        // ImageOffset
-    _WriteEntry(span, ref pos, 0xBCE1, 4, 1, (uint)totalPixelBytes);        // ImageByteCount
+    // The standard puts these at 0xBCC0 and 0xBCC1; this fixture wrote them where the reader was
+    // wrongly looking, so the two agreed with each other and neither agreed with a real file.
+    _WriteEntry(span, ref pos, 0xBCC0, 4, 1, (uint)pixelDataOffset);        // ImageOffset
+    _WriteEntry(span, ref pos, 0xBCC1, 4, 1, (uint)totalPixelBytes);        // ImageByteCount
 
     // Next IFD = 0
     BinaryPrimitives.WriteUInt32LittleEndian(span[pos..], 0);
