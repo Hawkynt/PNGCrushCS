@@ -1,7 +1,10 @@
 ﻿using System;
+using FileFormat.Core;
 using System.Buffers.Binary;
 using System.IO;
 using System.Text;
+
+using FileFormat.Jpeg;
 
 namespace FileFormat.Qtif;
 
@@ -12,6 +15,9 @@ public static class QtifReader {
   private const int _MIN_SIZE = 8;
 
   /// <summary>Size of the fixed image description structure.</summary>
+  /// <summary>The compressor a QuickTime picture states when its data is a JPEG stream.</summary>
+  private const string _COMPRESSOR_JPEG = "jpeg";
+
   private const int _IDSC_SIZE = 86;
 
   public static QtifFile FromFile(FileInfo file) {
@@ -41,6 +47,7 @@ public static class QtifReader {
     int width = 0, height = 0;
     byte[]? pixelData = null;
     var hasIdsc = false;
+    var compressor = string.Empty;
 
     var offset = 0;
     while (offset + 8 <= data.Length) {
@@ -59,6 +66,7 @@ public static class QtifReader {
             throw new InvalidDataException($"Image description too small: expected at least {_IDSC_SIZE} bytes, got {atomSize - 8}.");
           width = BinaryPrimitives.ReadUInt16BigEndian(data[(offset + 8 + 32)..]);
           height = BinaryPrimitives.ReadUInt16BigEndian(data[(offset + 8 + 34)..]);
+          compressor = Encoding.ASCII.GetString(data.Slice(offset + 8 + 4, 4));
           hasIdsc = true;
           break;
         case "idat":
@@ -73,6 +81,17 @@ public static class QtifReader {
 
     if (pixelData == null)
       throw new InvalidDataException("No 'idat' atom found in QTIF data.");
+
+    // The description says how the data is coded and this took it as pixels whatever it said, so a
+    // JPEG inside a QuickTime wrapper came back as a tenth of a picture's worth of its own bytes.
+    if (compressor == _COMPRESSOR_JPEG) {
+      var decoded = JpegFile.ToRawImage(JpegReader.FromBytes(pixelData)).EnsureFormat(PixelFormat.Rgb24);
+      return new QtifFile {
+        Width = decoded.Width,
+        Height = decoded.Height,
+        PixelData = decoded.PixelData,
+      };
+    }
 
     if (!hasIdsc) {
       var totalPixels = pixelData.Length / 3;
