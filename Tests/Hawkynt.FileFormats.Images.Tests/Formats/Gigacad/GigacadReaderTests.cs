@@ -197,10 +197,14 @@ public sealed class GigacadReaderTests {
 
   [Test]
   [Category("Unit")]
-  public void DataType_FixedDimensions() {
-    var file = new GigacadFile();
-    Assert.That(file.Width, Is.EqualTo(640));
-    Assert.That(file.Height, Is.EqualTo(400));
+  public void DataType_CarriesTheSizeRatherThanFixingIt() {
+    // The size used to be fixed at 640 by 400, which is the Atari form. The one sample in the corpus
+    // is the Commodore form at 320 by 200, and both RECOIL and XnView draw it that way, so the size
+    // is read from the file rather than assumed.
+    Assert.Multiple(() => {
+      Assert.That(new GigacadFile { Width = 640, Height = 400 }.Width, Is.EqualTo(640));
+      Assert.That(new GigacadFile { Width = 320, Height = 200 }.Height, Is.EqualTo(200));
+    });
   }
 
   [Test]

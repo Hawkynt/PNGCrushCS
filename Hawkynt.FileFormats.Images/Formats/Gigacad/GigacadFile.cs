@@ -6,6 +6,22 @@ namespace FileFormat.Gigacad;
 /// <summary>In-memory representation of an Atari ST GigaCAD monochrome image (640x400, 1 bitplane).</summary>
 public readonly record struct GigacadFile : IImageFormatReader<GigacadFile>, IImageToRawImage<GigacadFile>, IImageFormatWriter<GigacadFile> {
 
+  /// <summary>
+  /// The size of the only form any sample takes: a load address and eight kilobytes.
+  /// </summary>
+  /// <remarks>
+  /// This reader expected 32000 bytes at 640 by 400, which is an Atari ST screen and is not what the
+  /// corpus holds — the one GigaCAD picture is 8194 bytes and both RECOIL and XnView draw it 320 by
+  /// 200, which is a Commodore screen. It was refused outright while both tools read it.
+  /// <para/>
+  /// The 640 by 400 form is kept because nothing here disproves it, but nothing confirms it either;
+  /// no sample of that size exists to check against.
+  /// </remarks>
+  public const int CommodoreFileSize = 8194;
+
+  /// <summary>Bytes of screen a Commodore picture holds, after two of load address.</summary>
+  internal const int CommodoreScreenSize = 8000;
+
   /// <summary>The exact file size: 80 bytes/line x 400 lines = 32000 bytes.</summary>
   public const int ExpectedFileSize = 32000;
 
@@ -17,28 +33,38 @@ public readonly record struct GigacadFile : IImageFormatReader<GigacadFile>, IIm
   ];
   static byte[] IImageFormatWriter<GigacadFile>.ToBytes(GigacadFile file) => GigacadWriter.ToBytes(file);
 
-  /// <summary>Always 640.</summary>
-  public int Width => 640;
+  /// <summary>640 for an Atari screen, 320 for a Commodore one.</summary>
+  public int Width { get; init; }
 
-  /// <summary>Always 400.</summary>
-  public int Height => 400;
+  /// <summary>400 for an Atari screen, 200 for a Commodore one.</summary>
+  public int Height { get; init; }
+
+  /// <summary>
+  /// Whether a set bit is paper rather than ink, which is how the Commodore form has it.
+  /// </summary>
+  /// <remarks>
+  /// The two forms run opposite ways. Read with the Atari convention the Commodore sample came out as
+  /// its own negative against RECOIL and XnView, which agree with each other; read this way it matches
+  /// both on every pixel.
+  /// </remarks>
+  public bool SetBitIsPaper { get; init; }
 
   /// <summary>Raw monochrome bitmap data (1 bit per pixel, 32000 bytes total).</summary>
   public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(GigacadFile file) {
 
-    const int width = 640;
-    const int height = 400;
+    var width = file.Width > 0 ? file.Width : 640;
+    var height = file.Height > 0 ? file.Height : 400;
+    var bytesPerRow = width / 8;
     var rgb = new byte[width * height * 3];
 
     for (var y = 0; y < height; ++y)
       for (var x = 0; x < width; ++x) {
-        var byteIndex = y * 80 + x / 8;
+        var byteIndex = y * bytesPerRow + x / 8;
         var bitIndex = 7 - (x % 8);
         var isSet = byteIndex < file.PixelData.Length && (file.PixelData[byteIndex] & (1 << bitIndex)) != 0;
-        // Atari convention: bit=1 is black (0), bit=0 is white (255)
-        var color = isSet ? (byte)0 : (byte)255;
+        var color = isSet == file.SetBitIsPaper ? (byte)255 : (byte)0;
         var offset = (y * width + x) * 3;
         rgb[offset] = color;
         rgb[offset + 1] = color;
@@ -51,6 +77,19 @@ public readonly record struct GigacadFile : IImageFormatReader<GigacadFile>, IIm
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
     };
+  }
+
+  /// <summary>Puts a screen held a character cell at a time back into rows, as a Commodore holds it.</summary>
+  internal static byte[] CellsToRows(ReadOnlySpan<byte> cells, int width, int height) {
+    var rows = new byte[cells.Length];
+    var columns = width / 8;
+
+    for (var cellRow = 0; cellRow < height / 8; ++cellRow)
+      for (var cellColumn = 0; cellColumn < columns; ++cellColumn)
+        for (var line = 0; line < 8; ++line)
+          rows[(cellRow * 8 + line) * columns + cellColumn] = cells[(cellRow * columns + cellColumn) * 8 + line];
+
+    return rows;
   }
 
 }

@@ -28,13 +28,23 @@ public static class GigacadReader {
 
   public static GigacadFile FromSpan(ReadOnlySpan<byte> data) {
 
+    if (data.Length == GigacadFile.CommodoreFileSize)
+      return new GigacadFile {
+        Width = 320,
+        Height = 200,
+        SetBitIsPaper = true,
+        PixelData = GigacadFile.CellsToRows(data.Slice(2, GigacadFile.CommodoreScreenSize), 320, 200),
+      };
+
     if (data.Length != GigacadFile.ExpectedFileSize)
-      throw new InvalidDataException($"Invalid GigaCAD data size: expected exactly {GigacadFile.ExpectedFileSize} bytes, got {data.Length}.");
+      throw new InvalidDataException($"A GigaCAD picture is {GigacadFile.CommodoreFileSize} bytes on a Commodore or {GigacadFile.ExpectedFileSize} on an Atari; this file is {data.Length}.");
 
     var pixelData = new byte[GigacadFile.ExpectedFileSize];
     data.Slice(0, GigacadFile.ExpectedFileSize).CopyTo(pixelData);
 
     return new GigacadFile {
+      Width = 640,
+      Height = 400,
       PixelData = pixelData
     };
     }

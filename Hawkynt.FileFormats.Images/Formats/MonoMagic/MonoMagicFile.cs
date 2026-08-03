@@ -8,7 +8,21 @@ public readonly record struct MonoMagicFile : IImageFormatReader<MonoMagicFile>,
 
   internal const int FixedWidth = 320;
   internal const int FixedHeight = 200;
-  internal const int FileSize = 9009;
+  /// <summary>
+  /// A load address and 8192 bytes, of which the first 8000 are the screen.
+  /// </summary>
+  /// <remarks>
+  /// This was 9009, which no sample is, so the only Mono Magic picture in the corpus was refused
+  /// outright while RECOIL and XnView both drew it. It is 8194: two bytes of load address and eight
+  /// kilobytes, the last 192 of which the screen does not reach into.
+  /// </remarks>
+  internal const int FileSize = 8194;
+
+  /// <summary>Bytes of screen: 40 columns by 200 rows.</summary>
+  internal const int ScreenSize = 8000;
+
+  /// <summary>Where the screen starts, the two bytes before it being the load address.</summary>
+  internal const int ScreenOffset = 2;
 
   private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
@@ -21,6 +35,40 @@ public readonly record struct MonoMagicFile : IImageFormatReader<MonoMagicFile>,
   public int Width => FixedWidth;
   public int Height => FixedHeight;
   public byte[] PixelData { get; init; }
+
+  /// <summary>
+  /// Puts a screen held a character cell at a time back into rows, and vice versa.
+  /// </summary>
+  /// <remarks>
+  /// The machine's bitmap runs eight bytes down a cell before moving to the cell beside it, which is
+  /// not how rows run. The one sample matches RECOIL and XnView on every pixel read this way.
+  /// </remarks>
+  internal static byte[] CellsToRows(ReadOnlySpan<byte> cells) {
+    var rows = new byte[ScreenSize];
+    const int columns = FixedWidth / 8;
+
+    for (var cellRow = 0; cellRow < FixedHeight / 8; ++cellRow)
+      for (var cellColumn = 0; cellColumn < columns; ++cellColumn)
+        for (var line = 0; line < 8; ++line)
+          rows[(cellRow * 8 + line) * columns + cellColumn] = cells[(cellRow * columns + cellColumn) * 8 + line];
+
+    return rows;
+  }
+
+  /// <summary>Puts rows back into character cells.</summary>
+  internal static byte[] RowsToCells(ReadOnlySpan<byte> rows) {
+    var cells = new byte[ScreenSize];
+    const int columns = FixedWidth / 8;
+
+    for (var cellRow = 0; cellRow < FixedHeight / 8; ++cellRow)
+      for (var cellColumn = 0; cellColumn < columns; ++cellColumn)
+        for (var line = 0; line < 8; ++line) {
+          var from = (cellRow * 8 + line) * columns + cellColumn;
+          cells[(cellRow * columns + cellColumn) * 8 + line] = from < rows.Length ? rows[from] : (byte)0;
+        }
+
+    return cells;
+  }
 
   public static RawImage ToRawImage(MonoMagicFile file) {
     return new() {

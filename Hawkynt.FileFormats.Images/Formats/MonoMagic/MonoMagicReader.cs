@@ -30,9 +30,7 @@ public static class MonoMagicReader {
     if (data.Length != MonoMagicFile.FileSize)
       throw new InvalidDataException($"Invalid MonoMagic data size: expected exactly {MonoMagicFile.FileSize} bytes, got {data.Length}.");
 
-    var pixelData = new byte[MonoMagicFile.FileSize];
-    data.Slice(0, MonoMagicFile.FileSize).CopyTo(pixelData);
-    return new() { PixelData = pixelData };
+    return new() { PixelData = MonoMagicFile.CellsToRows(data.Slice(MonoMagicFile.ScreenOffset, MonoMagicFile.ScreenSize)) };
     }
 
   public static MonoMagicFile FromBytes(byte[] data) {
@@ -40,8 +38,6 @@ public static class MonoMagicReader {
     if (data.Length != MonoMagicFile.FileSize)
       throw new InvalidDataException($"Invalid MonoMagic data size: expected exactly {MonoMagicFile.FileSize} bytes, got {data.Length}.");
 
-    var pixelData = new byte[MonoMagicFile.FileSize];
-    data.AsSpan(0, MonoMagicFile.FileSize).CopyTo(pixelData);
-    return new() { PixelData = pixelData };
+    return new() { PixelData = MonoMagicFile.CellsToRows(data.AsSpan(MonoMagicFile.ScreenOffset, MonoMagicFile.ScreenSize)) };
   }
 }
