@@ -31,17 +31,68 @@ public static class GoDot4BitReader {
     return FromSpan(data);
   }
 
+  /// <summary>
+  /// Reads a GoDot picture or clip.
+  /// </summary>
+  /// <remarks>
+  /// The packing: 0xAD introduces a run — a count and then the byte to repeat, a count of nought
+  /// meaning 256. Everything else stands for itself. All six samples consume their file to the last
+  /// byte and expand to exactly the pixels their size takes, or one byte more where the last run
+  /// overshoots.
+  /// </remarks>
   public static GoDot4BitFile FromSpan(ReadOnlySpan<byte> data) {
-    if (data.Length < GoDot4BitFile.ExpectedFileSize)
-      throw new InvalidDataException($"Data too small for a valid GoDot 4-bit file (expected {GoDot4BitFile.ExpectedFileSize} bytes, got {data.Length}).");
+    if (data.Length < 4)
+      throw new InvalidDataException($"Data too small for a valid GoDot file (got {data.Length} bytes).");
 
-    if (data.Length != GoDot4BitFile.ExpectedFileSize)
-      throw new InvalidDataException($"Invalid GoDot 4-bit file size (expected {GoDot4BitFile.ExpectedFileSize} bytes, got {data.Length}).");
+    var isClip = data[..4].SequenceEqual(GoDot4BitFile.ClipMagic);
+    if (!isClip && !data[..4].SequenceEqual(GoDot4BitFile.ScreenMagic))
+      throw new InvalidDataException("Not a GoDot file: it opens with neither GOD0 nor GOD1.");
 
-    var pixelData = new byte[GoDot4BitFile.ExpectedFileSize];
-    data.Slice(0, GoDot4BitFile.ExpectedFileSize).CopyTo(pixelData.AsSpan(0));
+    int width, height, dataStart;
+    if (isClip) {
+      if (data.Length < 8)
+        throw new InvalidDataException("A GoDot clip states its size in the four bytes after its signature; this file is shorter than that.");
+
+      // Two bytes of where the clip was cut from, then its width and height in character cells.
+      width = data[6] * 8;
+      height = data[7] * 8;
+      dataStart = 8;
+    } else {
+      width = GoDot4BitFile.ScreenWidth;
+      height = GoDot4BitFile.ScreenHeight;
+      dataStart = 4;
+    }
+
+    if (width <= 0 || height <= 0)
+      throw new InvalidDataException($"A GoDot picture of {width}x{height} is no size.");
+
+    var wanted = width * height / 2;
+    var pixelData = new byte[wanted];
+    var written = 0;
+    var pos = dataStart;
+
+    while (pos < data.Length && written < wanted) {
+      var value = data[pos];
+      if (value != GoDot4BitFile.RunEscape || pos + 2 >= data.Length) {
+        pixelData[written++] = value;
+        ++pos;
+        continue;
+      }
+
+      // A count of nought stands for a full 256.
+      var run = Math.Min(data[pos + 1] == 0 ? 256 : data[pos + 1], wanted - written);
+      pixelData.AsSpan(written, run).Fill(data[pos + 2]);
+      written += run;
+      pos += 3;
+    }
+
+    if (written < wanted)
+      throw new InvalidDataException($"A GoDot picture of {width}x{height} holds {wanted} bytes; this one ran out after {written}.");
 
     return new() {
+      Width = width,
+      Height = height,
+      IsClip = isClip,
       PixelData = pixelData,
     };
   }
