@@ -33,7 +33,13 @@ public readonly record struct StadFile : IImageFormatReader<StadFile>, IImageToR
   /// <summary>Raw decompressed screen data (32000 bytes).</summary>
   public byte[] RawData { get; init; }
 
-  private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
+  /// <summary>Paper then ink: a clear bit is white, a set bit is black.</summary>
+  /// <remarks>
+  /// These were the other way round, so every STAD came out as its own negative — which the comment
+  /// below already said was wrong, having claimed a set bit meant black while the palette put white
+  /// there. All three samples now agree with RECOIL and XnView rather than inverting them.
+  /// </remarks>
+  private static readonly byte[] _BlackWhitePalette = [255, 255, 255, 0, 0, 0];
 
   /// <summary>Converts the STAD screen to an Indexed1 raw image (640x400, B&amp;W palette).
   /// Bit=1 means black (palette index 0), bit=0 means white (palette index 1).</summary>

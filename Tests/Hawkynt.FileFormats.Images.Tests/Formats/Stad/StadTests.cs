@@ -51,20 +51,45 @@ public sealed class StadReaderTests {
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_WithMagic_Parses() {
-    // Build a simple compressed file: magic + literal of 2 bytes
+  public void FromBytes_ReadsBothEscapesAndTheSevenByteHeader() {
+    // This used to hand-build a PackBits stream and assert what the reader made of it, so it agreed
+    // with an encoding STAD does not use. The header is seven bytes: the magic, an escape and the one
+    // value it repeats, then a second escape carrying a value of its own. Both counts are one less
+    // than the run.
     var compressed = new byte[] {
-      (byte)'p', (byte)'M', (byte)'8', (byte)'6',
-      1, 0xAA, 0xBB // literal: 2 bytes
+      (byte)'p', (byte)'M', (byte)'8', (byte)'5',
+      0x01, 0xFF, 0x02,
+      0x01, 0x03,       // four bytes of 0xFF
+      0xAA,             // one taken as it stands
+      0x02, 0xBB, 0x01, // two bytes of 0xBB
     };
 
     var result = StadReader.FromBytes(compressed);
 
     Assert.That(result.Width, Is.EqualTo(640));
     Assert.That(result.Height, Is.EqualTo(400));
-    Assert.That(result.RawData[0], Is.EqualTo(0xAA));
-    Assert.That(result.RawData[1], Is.EqualTo(0xBB));
+    Assert.That(result.RawData[..7], Is.EqualTo(new byte[] { 0xFF, 0xFF, 0xFF, 0xFF, 0xAA, 0xBB, 0xBB }));
   }
+
+  [Test]
+  [Category("Unit")]
+  public void FromBytes_PutsAPm86ScreenBackIntoRows() {
+    // pM86 stores the screen a byte-column at a time. Marking the first two bytes of the stream puts
+    // them at the start of the first two rows once transposed, 80 bytes apart, rather than side by
+    // side as pM85 would.
+    var compressed = new byte[] {
+      (byte)'p', (byte)'M', (byte)'8', (byte)'6',
+      0x01, 0x00, 0x02,
+      0xAA, 0xBB,
+    };
+
+    var result = StadReader.FromBytes(compressed);
+
+    Assert.That(result.RawData[0], Is.EqualTo(0xAA));
+    Assert.That(result.RawData[80], Is.EqualTo(0xBB));
+    Assert.That(result.RawData[1], Is.EqualTo(0x00));
+  }
+
 }
 
 [TestFixture]
