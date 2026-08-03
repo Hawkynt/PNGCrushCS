@@ -104,6 +104,24 @@ def same_picture(a, b):
     return True
 
 
+_FOUR_BIT = bytes(round(v / 17) * 17 for v in range(256))
+
+
+def same_picture_quantised(a, b):
+    """Whether two decodes agree once ours is rounded to four bits a channel.
+
+    RECOIL and XnView both render the eight-bit machines with four bits a channel, so every colour
+    they draw is a multiple of 17. Ours are the full-precision measurements — a Run Paint screen came
+    out pixel-for-pixel identical to both tools with each of its fifteen colours two or three levels
+    off, purely because they round and we do not. That is a difference in precision and not in the
+    picture, so it is not counted as a disagreement.
+    """
+    aw, ah, ap = a
+    if not ap:
+        return False
+    return same_picture((aw, ah, bytes(_FOUR_BIT[v] for v in ap)), b)
+
+
 def same_picture_different_palette(a, b):
     """Whether two decodes draw the same picture in different colours.
 
@@ -177,7 +195,7 @@ def main(root):
             elif ours is None:
                 counts[(key, "it reads, we cannot")] += 1
                 blockers[key].append((name, "we cannot read it"))
-            elif same_picture(ours, theirs):
+            elif same_picture(ours, theirs) or same_picture_quantised(ours, theirs):
                 counts[(key, "both read, we agree")] += 1
             elif same_picture_different_palette(ours, theirs):
                 counts[(key, "same picture, other colours")] += 1
