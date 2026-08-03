@@ -7,7 +7,19 @@ namespace FileFormat.Cals;
 public readonly record struct CalsFile() : IImageFormatReader<CalsFile>, IImageToRawImage<CalsFile>, IImageFromRawImage<CalsFile>, IImageFormatWriter<CalsFile> {
 
   static string IImageFormatMetadata<CalsFile>.PrimaryExtension => ".cal";
-  static string[] IImageFormatMetadata<CalsFile>.FileExtensions => [".cal", ".cals", ".gp4"];
+  static string[] IImageFormatMetadata<CalsFile>.FileExtensions => [".cal", ".cals", ".gp4", ".mil"];
+
+  /// <summary>
+  /// Whether the file opens with the record every CALS raster starts with.
+  /// </summary>
+  /// <remarks>
+  /// The three CALS files in the corpus are named .mil, which was not an extension this claimed —
+  /// so none of them was read, though the reader handles them and agrees with XnView and ImageMagick
+  /// once given one. The extension is now claimed, and .mil belongs to Micro Illustrator as well, so
+  /// the signature is stated here to tell them apart on content rather than on the name.
+  /// </remarks>
+  static bool? IImageFormatMetadata<CalsFile>.MatchesSignature(ReadOnlySpan<byte> header)
+    => header.Length >= 9 && header[..9].SequenceEqual("srcdocid:"u8) ? true : null;
   static CalsFile IImageFormatReader<CalsFile>.FromSpan(ReadOnlySpan<byte> data) => CalsReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<CalsFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])
