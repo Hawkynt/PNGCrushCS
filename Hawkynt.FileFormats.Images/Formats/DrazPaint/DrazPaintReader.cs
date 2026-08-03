@@ -26,6 +26,20 @@ public static class DrazPaintReader {
     return FromBytes(ms.ToArray());
   }
 
+  /// <summary>
+  /// Reads a DrazPaint picture.
+  /// </summary>
+  /// <remarks>
+  /// Nothing verifies this. The only .drz in the corpus is not a DrazPaint picture at all — it is the
+  /// same Vidcom 64 file the archive also files as .vid, byte for byte with one more on the end, and
+  /// both tools draw it as one. So the run-length decoding below and the order of the sections after
+  /// it are what a real file looks like only if the guess was right, and no sample says either way.
+  /// <para/>
+  /// A content check was considered and left out. The two formats cannot be told apart on what is
+  /// known here — a Vidcom is 10050 bytes and this file is 10051, which is close enough to guess at
+  /// and not close enough to build on, and guessing from a single misfiled sample is how a reader
+  /// ends up claiming files that are not its own.
+  /// </remarks>
   public static DrazPaintFile FromSpan(ReadOnlySpan<byte> data) {
 
     if (data.Length < DrazPaintFile.LoadAddressSize + 1)
