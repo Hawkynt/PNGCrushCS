@@ -94,7 +94,15 @@ public readonly record struct RunPaintFile : IImageFormatReader<RunPaintFile>, I
     };
   }
 
-  /// <summary>RLE-decompresses data using 0xC0 mask encoding.</summary>
+  /// <summary>
+  /// RLE-decompresses data using 0xC0 mask encoding.
+  /// </summary>
+  /// <remarks>
+  /// No sample exercises this. The only Run Paint file in the corpus is a plain screen after its load
+  /// address, and running it through here mangled every byte with its top two bits set — which is why
+  /// the reader now takes anything long enough to hold a screen as it stands. This is kept for files
+  /// too short to be one, but what such a file would actually look like is not established.
+  /// </remarks>
   internal static byte[] RleDecode(byte[] compressed) {
     using var output = new MemoryStream();
     var i = 0;

@@ -22,12 +22,13 @@ public static class RunPaintWriter {
 
     payload[offset] = file.BackgroundColor;
 
-    var compressed = RunPaintFile.RleEncode(payload);
-
-    var result = new byte[RunPaintFile.LoadAddressSize + compressed.Length];
+    // Written as it stands rather than run-length coded. The one real sample is a plain screen after
+    // the load address, which is what the reader now expects of anything long enough to be one; a
+    // coded payload that happened to come out no shorter would be read as a plain one and mangled.
+    var result = new byte[RunPaintFile.LoadAddressSize + payload.Length];
     result[0] = (byte)(file.LoadAddress & 0xFF);
     result[1] = (byte)(file.LoadAddress >> 8);
-    compressed.AsSpan(0, compressed.Length).CopyTo(result.AsSpan(RunPaintFile.LoadAddressSize));
+    payload.AsSpan(0, payload.Length).CopyTo(result.AsSpan(RunPaintFile.LoadAddressSize));
 
     return result;
   }

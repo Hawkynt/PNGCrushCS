@@ -36,7 +36,14 @@ public static class RunPaintReader {
     var compressed = new byte[data.Length - RunPaintFile.LoadAddressSize];
     data.Slice(RunPaintFile.LoadAddressSize, compressed.Length).CopyTo(compressed.AsSpan(0));
 
-    var decompressed = RunPaintFile.RleDecode(compressed);
+    // A file that already holds a whole screen is not compressed, and running it through the
+    // run-length decoder mangles every byte with its top two bits set. The only sample decoded to
+    // something with no relation to the picture RECOIL and XnView agree on; taken as it stands, the
+    // sections fall exactly where this reader already expects them and every pixel agrees.
+    var decompressed = compressed.Length >= RunPaintFile.UncompressedPayloadSize
+      ? compressed
+      : RunPaintFile.RleDecode(compressed);
+
     if (decompressed.Length < RunPaintFile.UncompressedPayloadSize)
       throw new InvalidDataException($"Decompressed data too small (expected at least {RunPaintFile.UncompressedPayloadSize} bytes, got {decompressed.Length}).");
 
