@@ -62,7 +62,37 @@ public static class ScitexCtReader {
       HResolution = 300,
       VResolution = 300,
       Description = string.Empty,
-      PixelData = data.Slice(ScitexCtHeader.StructSize, expected).ToArray(),
+      PixelData = _SeparationsToChunky(data.Slice(ScitexCtHeader.StructSize, expected), width, height, channels),
     };
+  }
+
+  /// <summary>
+  /// Turns the separations into pixels.
+  /// </summary>
+  /// <remarks>
+  /// A Scitex CT holds each row one separation at a time — a whole row of the first, then a whole row
+  /// of the second, and so on — rather than a channel at a time per pixel. This was copied straight
+  /// into the picture, so the first three samples of the red separation became the red, green and
+  /// blue of one pixel and the picture came out in bands of the wrong colour at a third of its width.
+  /// <para/>
+  /// Established against XnView and ImageMagick, which agree with each other: read this way the only
+  /// sample matches both exactly, where before the mean error was 30 of 255 a channel.
+  /// </remarks>
+  private static byte[] _SeparationsToChunky(ReadOnlySpan<byte> separations, int width, int height, int channels) {
+    if (channels == 1)
+      return separations.ToArray();
+
+    var chunky = new byte[separations.Length];
+
+    for (var row = 0; row < height; ++row) {
+      var rowStart = row * width * channels;
+      for (var channel = 0; channel < channels; ++channel) {
+        var from = rowStart + channel * width;
+        for (var column = 0; column < width; ++column)
+          chunky[rowStart + column * channels + channel] = separations[from + column];
+      }
+    }
+
+    return chunky;
   }
 }
