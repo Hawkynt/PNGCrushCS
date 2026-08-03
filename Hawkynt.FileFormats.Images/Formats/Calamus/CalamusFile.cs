@@ -23,6 +23,22 @@ public readonly record struct CalamusFile : IImageFormatReader<CalamusFile>, IIm
   /// <summary>Minimum valid file size.</summary>
   public const int MinFileSize = HeaderSize;
 
+  /// <summary>
+  /// The ten bytes a Calamus raster graphic opens with.
+  /// </summary>
+  /// <remarks>
+  /// All three samples in the corpus carry this rather than the four-byte "CALM" this reader looked
+  /// for, so none of them was read though RECOIL draws every one. They are packed as well, and the
+  /// reader took the bytes after its header to be the picture, which for a packed file is nothing.
+  /// </remarks>
+  internal static ReadOnlySpan<byte> RasterMagic => "CALAMUSCRG"u8;
+
+  /// <summary>Where the width, height and row length sit in a raster graphic's header.</summary>
+  internal const int RasterWidthOffset = 20;
+
+  /// <summary>Bytes ahead of the packed picture: a 32-byte header and a 10-byte chunk header.</summary>
+  internal const int RasterDataOffset = 42;
+
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
 
