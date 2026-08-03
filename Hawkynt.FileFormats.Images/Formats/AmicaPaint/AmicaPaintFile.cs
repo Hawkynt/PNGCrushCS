@@ -20,6 +20,18 @@ public readonly record struct AmicaPaintFile : IImageFormatReader<AmicaPaintFile
   /// <summary>The expected total file size in bytes (2 + 8000 + 1000 + 1000 + 1).</summary>
   public const int ExpectedFileSize = 10003;
 
+  /// <summary>
+  /// The byte that introduces a run: a count and then the value to repeat.
+  /// </summary>
+  /// <remarks>
+  /// Every Amica Paint file in the corpus is packed — 5038, 5668 and 6009 bytes where an unpacked one
+  /// is 10003 — and all three were refused for not being the full length while RECOIL draws them.
+  /// </remarks>
+  internal const byte RunEscape = 0xC2;
+
+  /// <summary>Bytes a whole screen takes once unpacked.</summary>
+  internal const int UnpackedSize = ExpectedFileSize - LoadAddressSize;
+
   /// <summary>Size of the load address in bytes.</summary>
   internal const int LoadAddressSize = 2;
 

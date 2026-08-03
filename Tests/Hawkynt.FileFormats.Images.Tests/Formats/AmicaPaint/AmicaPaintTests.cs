@@ -41,8 +41,11 @@ public sealed class AmicaPaintReaderTests {
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_WrongSize_ThrowsInvalidDataException() {
-    Assert.Throws<InvalidDataException>(() => AmicaPaintReader.FromBytes(new byte[10004]));
+  public void FromBytes_TooLittleToHoldAScreen_ThrowsInvalidDataException() {
+    // Length alone no longer decides: every real file is packed and shorter than a whole screen, so
+    // what is refused is a file that cannot reach one even unpacked. This used to reject 10004 bytes
+    // for not being 10003 exactly, which now expands to a perfectly good screen with room to spare.
+    Assert.Throws<InvalidDataException>(() => AmicaPaintReader.FromBytes(new byte[100]));
   }
 
   [Test]
