@@ -58,23 +58,35 @@ public sealed class Vidcom64ReaderTests {
     Assert.That(result.Width, Is.EqualTo(160));
     Assert.That(result.Height, Is.EqualTo(200));
     Assert.That(result.LoadAddress, Is.EqualTo(0x5800));
-    Assert.That(result.HeaderData.Length, Is.EqualTo(47));
+    Assert.That(result.HeaderData.Length, Is.EqualTo(24));
     Assert.That(result.BitmapData.Length, Is.EqualTo(8000));
     Assert.That(result.ScreenRam.Length, Is.EqualTo(1000));
     Assert.That(result.ColorRam.Length, Is.EqualTo(1000));
-    Assert.That(result.BackgroundColor, Is.EqualTo(0x06));
+    Assert.That(result.BackgroundColor, Is.EqualTo(0x00));
   }
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_HeaderData_CopiedCorrectly() {
+  public void FromBytes_ReadsTheSectionsInTheOrderTheFileHoldsThem() {
+    // Colour RAM straight after the load address, screen RAM a kilobyte on, bitmap a kilobyte after
+    // that and running to the end. This used to expect a 47-byte header and then bitmap, screen,
+    // colour, which is no real file — the padding between the first two sections is what the header
+    // field now holds.
     var data = new byte[Vidcom64File.ExpectedFileSize];
-    data[2] = 0xAA;
-    data[48] = 0xBB;
+    data[2] = 0xAA;                                        // first byte of colour RAM
+    data[2 + 1000] = 0xBB;                                 // first byte of the padding after it
+    data[2 + 1024] = 0xCC;                                 // first byte of screen RAM
+    data[2 + 1024 + 1024] = 0xDD;                          // first byte of the bitmap
+    data[Vidcom64File.ExpectedFileSize - 1] = 0xEE;        // and its last
 
     var result = Vidcom64Reader.FromBytes(data);
 
-    Assert.That(result.HeaderData[0], Is.EqualTo(0xAA));
-    Assert.That(result.HeaderData[46], Is.EqualTo(0xBB));
+    Assert.Multiple(() => {
+      Assert.That(result.ColorRam[0], Is.EqualTo(0xAA));
+      Assert.That(result.HeaderData[0], Is.EqualTo(0xBB));
+      Assert.That(result.ScreenRam[0], Is.EqualTo(0xCC));
+      Assert.That(result.BitmapData[0], Is.EqualTo(0xDD));
+      Assert.That(result.BitmapData[^1], Is.EqualTo(0xEE));
+    });
   }
 }

@@ -33,7 +33,17 @@ public readonly record struct Vidcom64File : IImageFormatReader<Vidcom64File>, I
   internal const int LoadAddressSize = 2;
 
   /// <summary>Size of the header data section in bytes.</summary>
-  internal const int HeaderDataSize = 47;
+  /// <summary>Bytes of padding after each of the first two sections, which use 1000 of a kilobyte.</summary>
+  internal const int HeaderDataSize = 24;
+
+  /// <summary>Where the colour RAM starts: straight after the load address.</summary>
+  internal const int ColorRamOffset = LoadAddressSize;
+
+  /// <summary>Where the screen RAM starts: a kilobyte after the colour RAM.</summary>
+  internal const int ScreenRamOffset = ColorRamOffset + 1024;
+
+  /// <summary>Where the bitmap starts: a kilobyte after the screen RAM, and it runs to the end.</summary>
+  internal const int BitmapOffset = ScreenRamOffset + 1024;
 
   /// <summary>Image width, always 160.</summary>
   public int Width => FixedWidth;

@@ -8,26 +8,21 @@ public static class Vidcom64Writer {
   public static byte[] ToBytes(Vidcom64File file) {
     ArgumentNullException.ThrowIfNull(file);
 
+    // Colour, then screen, then bitmap, with the first two sitting in a kilobyte each — this wrote a
+    // 47-byte header and then bitmap, screen, colour, which is the order the reader used to expect
+    // and no real file uses.
     var result = new byte[Vidcom64File.ExpectedFileSize];
-    var offset = 0;
 
-    result[offset] = (byte)(file.LoadAddress & 0xFF);
-    result[offset + 1] = (byte)(file.LoadAddress >> 8);
-    offset += Vidcom64File.LoadAddressSize;
+    result[0] = (byte)(file.LoadAddress & 0xFF);
+    result[1] = (byte)(file.LoadAddress >> 8);
 
-    file.HeaderData.AsSpan(0, Math.Min(file.HeaderData.Length, Vidcom64File.HeaderDataSize)).CopyTo(result.AsSpan(offset));
-    offset += Vidcom64File.HeaderDataSize;
+    file.ColorRam.AsSpan(0, Vidcom64File.ColorRamSize).CopyTo(result.AsSpan(Vidcom64File.ColorRamOffset));
+    file.ScreenRam.AsSpan(0, Vidcom64File.ScreenRamSize).CopyTo(result.AsSpan(Vidcom64File.ScreenRamOffset));
+    file.BitmapData.AsSpan(0, Vidcom64File.BitmapDataSize).CopyTo(result.AsSpan(Vidcom64File.BitmapOffset));
 
-    file.BitmapData.AsSpan(0, Vidcom64File.BitmapDataSize).CopyTo(result.AsSpan(offset));
-    offset += Vidcom64File.BitmapDataSize;
-
-    file.ScreenRam.AsSpan(0, Vidcom64File.ScreenRamSize).CopyTo(result.AsSpan(offset));
-    offset += Vidcom64File.ScreenRamSize;
-
-    file.ColorRam.AsSpan(0, Vidcom64File.ColorRamSize).CopyTo(result.AsSpan(offset));
-    offset += Vidcom64File.ColorRamSize;
-
-    result[offset] = file.BackgroundColor;
+    var padding = file.HeaderData ?? [];
+    padding.AsSpan(0, Math.Min(padding.Length, Vidcom64File.HeaderDataSize))
+      .CopyTo(result.AsSpan(Vidcom64File.ColorRamOffset + Vidcom64File.ColorRamSize));
 
     return result;
   }

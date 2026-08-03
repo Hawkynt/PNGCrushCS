@@ -9,7 +9,7 @@ public sealed class RoundTripTests {
   [Test]
   [Category("Integration")]
   public void RoundTrip_AllFieldsPreserved() {
-    var headerData = new byte[47];
+    var headerData = new byte[24];
     for (var i = 0; i < headerData.Length; ++i)
       headerData[i] = (byte)(i + 1);
 
@@ -34,6 +34,11 @@ public sealed class RoundTripTests {
       BackgroundColor = 6
     };
 
+    // The background does not survive, because the file has nowhere to put it: the 10050 bytes are a
+    // load address, a kilobyte each of colour and screen and 8000 of bitmap, with nothing left over.
+    // It used to be read from a byte past the end of the sections, which is what the old and equally
+    // invented layout left room for.
+
     var bytes = Vidcom64Writer.ToBytes(original);
     var restored = Vidcom64Reader.FromBytes(bytes);
 
@@ -42,13 +47,13 @@ public sealed class RoundTripTests {
     Assert.That(restored.BitmapData, Is.EqualTo(original.BitmapData));
     Assert.That(restored.ScreenRam, Is.EqualTo(original.ScreenRam));
     Assert.That(restored.ColorRam, Is.EqualTo(original.ColorRam));
-    Assert.That(restored.BackgroundColor, Is.EqualTo(original.BackgroundColor));
+    Assert.That(restored.BackgroundColor, Is.EqualTo(0), "the file states no background, so it is read as black");
   }
 
   [Test]
   [Category("Integration")]
   public void RoundTrip_HeaderDataPreserved() {
-    var headerData = new byte[47];
+    var headerData = new byte[24];
     Array.Fill(headerData, (byte)0xAA);
 
     var original = new Vidcom64File {
@@ -71,7 +76,7 @@ public sealed class RoundTripTests {
   public void RoundTrip_DimensionsAlwaysFixed() {
     var original = new Vidcom64File {
       LoadAddress = 0x5800,
-      HeaderData = new byte[47],
+      HeaderData = new byte[24],
       BitmapData = new byte[8000],
       ScreenRam = new byte[1000],
       ColorRam = new byte[1000],
