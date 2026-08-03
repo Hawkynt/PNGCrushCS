@@ -6,6 +6,22 @@ read differently?
 That is the question replacing them turns on. Counting how often we agree with a tool does not
 answer it — agreeing on nine formats out of ten is no comfort if the tenth is one somebody has.
 
+## Two tools agreeing is not always two opinions
+
+The rule worth applying to a disagreement is that one tool differing from us is an opinion and two
+agreeing against us is a defect. It holds for the machine formats, where each tool wrote its own
+reader, and it fails for the mainstream ones, where they all call the same library.
+
+The case that showed it: two JPEGs state a restart interval and carry no restart markers. XnView,
+ImageMagick and IrfanView all render the first eight rows and fill the remaining 340 with flat grey.
+That is not three tools agreeing on a picture — it is libjpeg giving up at the first missing marker
+and concealing the rest, seen three times. Both files decode in full here, and the disagreement was
+the evidence of it.
+
+So before treating agreement as consensus, ask whether the tools could be sharing a decoder. Expect
+they are for JPEG, PNG, TIFF, WebP, AVIF, HEIC and JPEG 2000, and expect they are not for anything
+that came off an eight-bit machine.
+
 ## Running it
 
 Set whichever tools are installed; the rest are skipped and say so.
