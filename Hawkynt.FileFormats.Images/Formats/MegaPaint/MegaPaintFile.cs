@@ -7,10 +7,10 @@ namespace FileFormat.MegaPaint;
 public readonly record struct MegaPaintFile : IImageFormatReader<MegaPaintFile>, IImageToRawImage<MegaPaintFile>, IImageFormatWriter<MegaPaintFile> {
 
   /// <summary>Header size in bytes: 2 (width) + 2 (height) + 4 (reserved) = 8.</summary>
-  public const int HeaderSize = 8;
+  public const int HeaderSize = 4;
 
   /// <summary>Minimum file size for validation.</summary>
-  public const int MinFileSize = 8;
+  public const int MinFileSize = 4;
 
   static string IImageFormatMetadata<MegaPaintFile>.PrimaryExtension => ".bld";
   static string[] IImageFormatMetadata<MegaPaintFile>.FileExtensions => [".bld"];

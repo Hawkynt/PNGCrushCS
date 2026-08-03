@@ -42,8 +42,15 @@ public static class MegaPaintReader {
     var expectedPixelDataSize = bytesPerRow * height;
     var availablePixelData = data.Length - MegaPaintFile.HeaderSize;
 
+    // Three of the four samples are a second form of MegaPaint that opens with a signature word
+    // rather than a size — 0xFF21 and 0xFDC9 turn up where the last column would be, which is no
+    // width — and carries its screen packed rather than plain. Their second word is still the last
+    // row, and RECOIL and XnView draw all three, so it is a real form and not damage. It is not
+    // decoded here; saying so is better than reading a size out of a signature.
     if (availablePixelData < expectedPixelDataSize)
-      throw new InvalidDataException($"Data too small for {width}x{height} MegaPaint image: expected {expectedPixelDataSize} bytes of pixel data, got {availablePixelData}.");
+      throw new InvalidDataException(availablePixelData * 2 < expectedPixelDataSize
+        ? $"This is a packed MegaPaint picture ({data.Length} bytes against the {expectedPixelDataSize + MegaPaintFile.HeaderSize} a plain {width}x{height} one takes), which is not decoded here."
+        : $"Data too small for {width}x{height} MegaPaint image: expected {expectedPixelDataSize} bytes of pixel data, got {availablePixelData}.");
 
     var pixelData = new byte[expectedPixelDataSize];
     data.Slice(MegaPaintFile.HeaderSize, expectedPixelDataSize).CopyTo(pixelData.AsSpan(0));

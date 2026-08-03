@@ -13,7 +13,8 @@ public static class MegaPaintWriter {
     var result = new byte[MegaPaintHeader.StructSize + pixelDataSize];
     var span = result.AsSpan();
 
-    new MegaPaintHeader((ushort)file.Width, (ushort)file.Height, 0).WriteTo(span);
+    // The header states the last column and the last row, not the counts.
+    new MegaPaintHeader((ushort)(file.Width - 1), (ushort)(file.Height - 1)).WriteTo(span);
 
     file.PixelData.AsSpan(0, Math.Min(file.PixelData.Length, pixelDataSize)).CopyTo(result.AsSpan(MegaPaintHeader.StructSize));
 

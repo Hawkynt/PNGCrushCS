@@ -35,23 +35,23 @@ public sealed class MegaPaintReaderTests {
   [Test]
   [Category("Unit")]
   public void FromBytes_TooSmall_ThrowsInvalidDataException() {
-    var tooSmall = new byte[7];
+    var tooSmall = new byte[3];
     Assert.Throws<InvalidDataException>(() => MegaPaintReader.FromBytes(tooSmall));
   }
 
   [Test]
   [Category("Unit")]
   public void FromBytes_ZeroDimensions_ThrowsInvalidDataException() {
-    var data = new byte[8]; // width=0, height=0
+    var data = new byte[4]; // one column and one row, and no pixels to go with them
     Assert.Throws<InvalidDataException>(() => MegaPaintReader.FromBytes(data));
   }
 
   [Test]
   [Category("Unit")]
   public void FromBytes_InsufficientPixelData_ThrowsInvalidDataException() {
-    var data = new byte[8];
-    data[0] = 0x00; data[1] = 0x10; // width=16 big endian
-    data[2] = 0x00; data[3] = 0x10; // height=16 big endian
+    var data = new byte[4];
+    data[0] = 0x00; data[1] = 0x0F; // last column 15, so 16 wide
+    data[2] = 0x00; data[3] = 0x0F; // last row 15, so 16 tall
     // needs (16/8)*16 = 32 bytes of pixel data but we only have 0
     Assert.Throws<InvalidDataException>(() => MegaPaintReader.FromBytes(data));
   }
@@ -59,11 +59,13 @@ public sealed class MegaPaintReaderTests {
   [Test]
   [Category("Unit")]
   public void FromBytes_Valid_Parses() {
-    // 16x8 image: bytesPerRow=2, pixelData=16 bytes
-    var data = new byte[8 + 16];
-    data[0] = 0x00; data[1] = 0x10; // width=16
-    data[2] = 0x00; data[3] = 0x08; // height=8
-    data[8] = 0xFF;
+    // 16x8 image: bytesPerRow=2, pixelData=16 bytes. The header states the LAST column and row, not
+    // the counts, and takes four bytes rather than eight — both of which these tests had wrong,
+    // agreeing with a reader that had them wrong the same way.
+    var data = new byte[4 + 16];
+    data[0] = 0x00; data[1] = 0x0F; // last column 15, so 16 wide
+    data[2] = 0x00; data[3] = 0x07; // last row 7, so 8 tall
+    data[4] = 0xFF;
 
     var result = MegaPaintReader.FromBytes(data);
 
@@ -76,10 +78,10 @@ public sealed class MegaPaintReaderTests {
   [Test]
   [Category("Unit")]
   public void FromStream_Valid() {
-    var data = new byte[8 + 16];
-    data[0] = 0x00; data[1] = 0x10; // width=16
-    data[2] = 0x00; data[3] = 0x08; // height=8
-    data[8] = 0xAB;
+    var data = new byte[4 + 16];
+    data[0] = 0x00; data[1] = 0x0F;
+    data[2] = 0x00; data[3] = 0x07;
+    data[4] = 0xAB;
 
     using var ms = new MemoryStream(data);
     var result = MegaPaintReader.FromStream(ms);
@@ -91,13 +93,13 @@ public sealed class MegaPaintReaderTests {
   [Test]
   [Category("Unit")]
   public void FromBytes_CopiesPixelData() {
-    var data = new byte[8 + 16];
-    data[0] = 0x00; data[1] = 0x10;
-    data[2] = 0x00; data[3] = 0x08;
-    data[8] = 0x42;
+    var data = new byte[4 + 16];
+    data[0] = 0x00; data[1] = 0x0F;
+    data[2] = 0x00; data[3] = 0x07;
+    data[4] = 0x42;
 
     var result = MegaPaintReader.FromBytes(data);
-    data[8] = 0x00;
+    data[4] = 0x00;
 
     Assert.That(result.PixelData[0], Is.EqualTo(0x42));
   }
@@ -194,13 +196,13 @@ public sealed class MegaPaintReaderTests {
 
     var bytes = MegaPaintWriter.ToBytes(file);
 
-    Assert.That(bytes.Length, Is.EqualTo(8 + 16));
-    // Check width in big-endian
+    Assert.That(bytes.Length, Is.EqualTo(4 + 16));
+    // The header states the last column, big-endian: 15 for a picture 16 wide.
     Assert.That(bytes[0], Is.EqualTo(0x00));
-    Assert.That(bytes[1], Is.EqualTo(0x10));
-    // Check height in big-endian
+    Assert.That(bytes[1], Is.EqualTo(0x0F));
+    // And the last row: 7 for a picture 8 tall.
     Assert.That(bytes[2], Is.EqualTo(0x00));
-    Assert.That(bytes[3], Is.EqualTo(0x08));
+    Assert.That(bytes[3], Is.EqualTo(0x07));
   }
 
   [Test]
@@ -212,13 +214,13 @@ public sealed class MegaPaintReaderTests {
 
   [Test]
   [Category("Unit")]
-  public void DataType_HeaderSize_Is8() {
-    Assert.That(MegaPaintFile.HeaderSize, Is.EqualTo(8));
+  public void DataType_HeaderSize_IsFour() {
+    Assert.That(MegaPaintFile.HeaderSize, Is.EqualTo(4));
   }
 
   [Test]
   [Category("Unit")]
-  public void DataType_MinFileSize_Is8() {
-    Assert.That(MegaPaintFile.MinFileSize, Is.EqualTo(8));
+  public void DataType_MinFileSize_IsFour() {
+    Assert.That(MegaPaintFile.MinFileSize, Is.EqualTo(4));
   }
 }
