@@ -82,6 +82,26 @@ public sealed class RestartMarkerTests {
   }
 
   [Test]
+  [Category("Unit")]
+  public void BitReader_LeavesItsPlaceAloneWhenNoRestartIsThere() {
+    // A restart interval says how often a marker MAY appear, not that one does. Two files in the
+    // corpus state an interval and carry no markers at all, and this used to align to a byte boundary
+    // before looking — throwing the bits in hand away on every interval and losing its place in a
+    // stream that was running on perfectly well. Both came out as one correct band of picture over a
+    // ruined remainder.
+    var stream = new byte[] { 0xAB, 0xCD, 0xEF };
+    var reader = new JpegBitReader(stream, 0);
+
+    Assert.That(reader.ReadBits(4), Is.EqualTo(0x0A));
+
+    Assert.Multiple(() => {
+      Assert.That(reader.TryConsumeRestart(0), Is.False, "there is no marker here");
+      Assert.That(reader.ReadBits(4), Is.EqualTo(0x0B), "so the next bits must be the ones that follow");
+      Assert.That(reader.ReadBits(8), Is.EqualTo(0xCD));
+    });
+  }
+
+  [Test]
   [Category("Integration")]
   public void Decoded_IsNotFlatAfterTheFirstRestart() {
     var original = _Picture(128, 96);

@@ -37,29 +37,18 @@ internal static class JpegBaselineDecoder {
 
     for (var mcuRow = 0; mcuRow < mcuRows; ++mcuRow)
       for (var mcuCol = 0; mcuCol < mcuCols; ++mcuCol) {
-        // Check for restart
-        // KNOWN WRONG, and worth recording here because JPEG is the format most likely to be
-        // trusted without checking.
+        // A restart interval says how often a marker MAY appear, not that one does. Both files in
+        // the corpus that state an interval carry no restart markers at all, and this cleared the DC
+        // predictors every interval regardless — so each picture was right down to its first
+        // interval and wrong from there on, the predictors having been thrown away mid-stream.
         //
-        // Two files with restart markers decode to the right size and the wrong picture: the mean
-        // error a channel is 44 of 255 against ImageMagick and XnView, which agree with each other
-        // exactly. The first eight rows — one row of minimum coded units — come out perfect and
-        // everything below them is wrong, so the loss of step happens at the very first restart and
-        // not gradually.
-        //
-        // Reading the pieces did not find it: the interval is applied at the right moment, the bit
-        // buffer is emptied before the marker is looked for, the marker itself is stepped over, the
-        // predictors are cleared after it, and the byte reader backs up onto a marker rather than
-        // consuming it. Each of those is what it should be, so the fault is in how they fit together
-        // rather than in any one of them.
-        //
-        // A JPEG without restart markers is unaffected, which is most of them, and is why this went
-        // unseen. Recorded rather than guessed at: this decoder is used by QuickTime pictures, raw
-        // previews and QTIF as well as by JPEG itself.
+        // The predictors are now cleared only when a marker was actually stepped over, which is what
+        // resynchronises them.
         if (restartInterval > 0 && mcuCount > 0 && mcuCount % restartInterval == 0) {
-          reader.TryConsumeRestart(rstCounter);
+          if (reader.TryConsumeRestart(rstCounter))
+            Array.Clear(dcPred);
+
           ++rstCounter;
-          Array.Clear(dcPred);
         }
 
         // Decode each component in the MCU

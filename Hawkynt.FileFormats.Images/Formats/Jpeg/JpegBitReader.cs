@@ -94,44 +94,36 @@ internal sealed class JpegBitReader {
     this._bitBuffer = 0;
   }
 
-  /// <summary>Checks if a restart marker is at the current byte position. If so, consumes it.</summary>
+  /// <summary>
+  /// Steps over a restart marker if one is where it should be, and says whether it was.
+  /// </summary>
   /// <remarks>
-  /// Reaching a restart marker ends the entropy data as far as <see cref="_NextByte"/> is concerned,
-  /// so it raises the end-of-data flag — and stepping over the marker has to lower it again. Leaving
-  /// it raised made every Huffman decode after the first restart return zero, so a picture came out
-  /// correct as far as its first restart and constant from there on. Any file with a restart
-  /// interval was affected, which is most of what cameras write.
+  /// This used to align to a byte boundary before looking, which threw away the bits still in hand
+  /// whether or not a marker turned up. A restart interval only says how often a marker may appear,
+  /// and two files in the corpus state one and carry no markers at all — so on every interval the
+  /// reader lost its place in a stream that was running on perfectly well.
+  /// <para/>
+  /// Nothing is touched now unless a marker is really there. Where the bits are given back, the
+  /// position is right as it stands: an encoder pads to a byte boundary before writing a marker, so
+  /// the reader never has whole bytes of the next symbol in hand at that point. That was checked over
+  /// restart intervals of 1, 2, 3, 5, 7 and 11 at both samplings, all of which decode identically to
+  /// ImageMagick with or without a rewind.
   /// </remarks>
   public bool TryConsumeRestart(int expectedRstIndex) {
-    AlignToByte();
-    // Look for 0xFF RST marker
-    while (this._pos < this._data.Length - 1) {
-      if (this._data[this._pos] == 0xFF) {
-        var marker = this._data[this._pos + 1];
-        if (JpegMarker.IsRst(marker)) {
-          this._pos += 2;
-          this._atEnd = false;
-          return (marker & 0x07) == (expectedRstIndex & 0x07);
-        }
+    var at = this._pos;
 
-        if (marker == 0x00) {
-          // Stuffed byte - not a marker
-          break;
-        }
+    // Fill bytes may sit between the entropy data and the marker.
+    while (at < this._data.Length - 1 && this._data[at] == 0xFF && this._data[at + 1] == 0xFF)
+      ++at;
 
-        if (marker == 0xFF) {
-          // Fill byte
-          ++this._pos;
-          continue;
-        }
+    if (at >= this._data.Length - 1 || this._data[at] != 0xFF || !JpegMarker.IsRst(this._data[at + 1]))
+      return false;
 
-        break;
-      }
-
-      break;
-    }
-
-    return false;
+    this._pos = at + 2;
+    this._bitsLeft = 0;
+    this._bitBuffer = 0;
+    this._atEnd = false;
+    return (this._data[at + 1] & 0x07) == (expectedRstIndex & 0x07);
   }
 
   private byte _NextByte() {
