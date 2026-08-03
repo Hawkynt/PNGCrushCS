@@ -37,13 +37,17 @@ public static class DoodleCompReader {
 
     var decompressed = _Decompress(data, offset);
     if (decompressed.Length < DoodleCompFile.DecompressedDataSize)
-      throw new InvalidDataException($"Decompressed data too small (expected {DoodleCompFile.DecompressedDataSize} bytes, got {decompressed.Length}).");
+      throw new InvalidDataException($"A compressed Doodle holds {DoodleCompFile.DecompressedDataSize} bytes of screen and bitmap; this one expands to {decompressed.Length}.");
+
+    // The screen comes first and sits in a kilobyte, then the bitmap — which is where each lands in
+    // the machine, the file loading at 0x5C00 and the bitmap at 0x6000. This took the bitmap first
+    // and the screen after it, so the colours belonged to the wrong cells and were themselves read
+    // out of the middle of the bitmap.
+    var screenRam = new byte[DoodleCompFile.ScreenRamSize];
+    decompressed.AsSpan(0, DoodleCompFile.ScreenRamSize).CopyTo(screenRam);
 
     var bitmapData = new byte[DoodleCompFile.BitmapDataSize];
-    decompressed.AsSpan(0, DoodleCompFile.BitmapDataSize).CopyTo(bitmapData);
-
-    var screenRam = new byte[DoodleCompFile.ScreenRamSize];
-    decompressed.AsSpan(DoodleCompFile.BitmapDataSize, DoodleCompFile.ScreenRamSize).CopyTo(screenRam);
+    decompressed.AsSpan(DoodleCompFile.ScreenRamPaddedSize, DoodleCompFile.BitmapDataSize).CopyTo(bitmapData);
 
     return new() {
       LoadAddress = loadAddress,
@@ -66,8 +70,10 @@ public static class DoodleCompReader {
         if (i + 1 >= data.Length)
           break;
 
-        var count = data[i++];
+        // The value comes before the count. These were read the other way round, which expanded the
+        // sample to 23233 bytes rather than the 9024 a screen and a bitmap take.
         var value = data[i++];
+        var count = data[i++];
         for (var j = 0; j < count; ++j)
           output.WriteByte(value);
       } else

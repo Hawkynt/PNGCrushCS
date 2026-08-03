@@ -15,10 +15,12 @@ public static class DoodleCompWriter {
     output.WriteByte((byte)(file.LoadAddress & 0xFF));
     output.WriteByte((byte)(file.LoadAddress >> 8));
 
-    // Combine bitmap + screen data
+    // The screen comes first and sits in a kilobyte, then the bitmap — which is where each lands in
+    // the machine. This wrote the bitmap first and the screen after it, matching a reader that read
+    // them that way and no real file.
     var raw = new byte[DoodleCompFile.DecompressedDataSize];
-    file.BitmapData.AsSpan(0, Math.Min(file.BitmapData.Length, DoodleCompFile.BitmapDataSize)).CopyTo(raw.AsSpan(0));
-    file.ScreenRam.AsSpan(0, Math.Min(file.ScreenRam.Length, DoodleCompFile.ScreenRamSize)).CopyTo(raw.AsSpan(DoodleCompFile.BitmapDataSize));
+    file.ScreenRam.AsSpan(0, Math.Min(file.ScreenRam.Length, DoodleCompFile.ScreenRamSize)).CopyTo(raw.AsSpan(0));
+    file.BitmapData.AsSpan(0, Math.Min(file.BitmapData.Length, DoodleCompFile.BitmapDataSize)).CopyTo(raw.AsSpan(DoodleCompFile.ScreenRamPaddedSize));
 
     _Compress(raw, output);
 
@@ -34,9 +36,10 @@ public static class DoodleCompWriter {
         ++runLength;
 
       if (runLength >= 3 || current == DoodleCompFile.RleEscapeByte) {
+        // Value first, then the count, which is the order real files use.
         output.WriteByte(DoodleCompFile.RleEscapeByte);
-        output.WriteByte((byte)runLength);
         output.WriteByte(current);
+        output.WriteByte((byte)runLength);
       } else {
         for (var j = 0; j < runLength; ++j)
           output.WriteByte(current);

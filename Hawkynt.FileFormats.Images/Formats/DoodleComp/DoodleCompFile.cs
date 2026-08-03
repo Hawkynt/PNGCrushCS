@@ -27,7 +27,10 @@ public readonly record struct DoodleCompFile : IImageFormatReader<DoodleCompFile
   internal const int LoadAddressSize = 2;
 
   /// <summary>Total decompressed data size (bitmap + screen).</summary>
-  internal const int DecompressedDataSize = BitmapDataSize + ScreenRamSize;
+  /// <summary>The kilobyte the screen sits in, of which it uses a thousand bytes.</summary>
+  internal const int ScreenRamPaddedSize = 1024;
+
+  internal const int DecompressedDataSize = ScreenRamPaddedSize + BitmapDataSize;
 
   /// <summary>Minimum file size: load address (2) + at least 1 byte of compressed data.</summary>
   internal const int MinimumFileSize = 3;
