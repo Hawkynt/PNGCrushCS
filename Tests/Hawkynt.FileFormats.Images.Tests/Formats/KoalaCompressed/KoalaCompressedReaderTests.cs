@@ -152,9 +152,11 @@ public sealed class KoalaCompressedReaderTests {
     for (var i = 0; i < decompressed.Length; ++i) {
       var b = decompressed[i];
       if (b == 0xFE) {
+        // The escape is followed by the value and then the count, which is the order real files use;
+        // this used to build them the other way round to match a reader that read them that way.
+        compressed.Add(0xFE);
         compressed.Add(0xFE);
         compressed.Add(1);
-        compressed.Add(0xFE);
       } else
         compressed.Add(b);
     }

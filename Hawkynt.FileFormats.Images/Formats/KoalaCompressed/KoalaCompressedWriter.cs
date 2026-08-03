@@ -43,9 +43,11 @@ public static class KoalaCompressedWriter {
         ++runLength;
 
       if (runLength >= 3 || current == KoalaCompressedFile.RleEscapeByte) {
+        // Value first, then the count, which is the order real files use — this had them the other
+        // way round to match a reader that read them the other way round.
         result.Add(KoalaCompressedFile.RleEscapeByte);
-        result.Add((byte)runLength);
         result.Add(current);
+        result.Add((byte)runLength);
       } else
         for (var j = 0; j < runLength; ++j)
           result.Add(current);

@@ -77,8 +77,11 @@ public static class KoalaCompressedReader {
         if (i + 1 >= data.Length)
           break;
 
-        var count = data[i++];
+        // The value comes before the count. These were read the other way round, so both samples
+        // came back as noise where RECOIL and XnView agree on the picture — one of them expands to
+        // exactly the 10001 bytes a screen takes on this reading and consumes its file to the byte.
         var value = data[i++];
+        var count = data[i++];
         for (var j = 0; j < count; ++j)
           result.Add(value);
       } else
