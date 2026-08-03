@@ -1,11 +1,35 @@
 using System;
 using System.IO;
+using FileFormat.Core;
 using FileFormat.FunPhotor;
+using FileFormat.Png;
 
 namespace FileFormat.FunPhotor.Tests;
 
+/// <summary>
+/// What a FunPhotor frame is.
+/// </summary>
+/// <remarks>
+/// These used to describe a Commodore 64 screen in exactly 10050 bytes, because that is what the
+/// reader expected. A .fpr is four bytes of length and then an ordinary PNG, so the tests and the
+/// reader agreed with each other and with no real file.
+/// </remarks>
 [TestFixture]
 public sealed class FunPhotorReaderTests {
+
+  /// <summary>Builds a frame: four bytes of length, then the smallest PNG that decodes.</summary>
+  private static byte[] _BuildValidFile() {
+    var png = PngWriter.ToBytes(PngFile.FromRawImage(new RawImage {
+      Width = 2,
+      Height = 2,
+      Format = PixelFormat.Rgb24,
+      PixelData = [255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255],
+    }));
+
+    var result = new byte[FunPhotorFile.HeaderSize + png.Length];
+    png.CopyTo(result, FunPhotorFile.HeaderSize);
+    return result;
+  }
 
   [Test]
   [Category("Unit")]
@@ -32,60 +56,22 @@ public sealed class FunPhotorReaderTests {
   [Test]
   [Category("Unit")]
   public void FromBytes_TooSmall_ThrowsInvalidDataException()
-    => Assert.Throws<InvalidDataException>(() => FunPhotorReader.FromBytes(new byte[100]));
+    => Assert.Throws<InvalidDataException>(() => FunPhotorReader.FromBytes(new byte[8]));
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_WrongSize_ThrowsInvalidDataException()
+  public void FromBytes_WithoutAPngFourBytesIn_ThrowsInvalidDataException()
     => Assert.Throws<InvalidDataException>(() => FunPhotorReader.FromBytes(new byte[10051]));
 
   [Test]
   [Category("Integration")]
-  public void FromBytes_ValidParsesCorrectly() {
-    var data = new byte[FunPhotorFile.ExpectedFileSize];
-    data[0] = 0x00; // load address low
-    data[1] = 0x60; // load address high = 0x6000
-
-    var result = FunPhotorReader.FromBytes(data);
+  public void FromBytes_HandsBackThePngItWraps() {
+    var result = FunPhotorReader.FromBytes(_BuildValidFile());
+    var image = FunPhotorFile.ToRawImage(result);
 
     Assert.Multiple(() => {
-      Assert.That(result.Width, Is.EqualTo(160));
-      Assert.That(result.Height, Is.EqualTo(200));
-      Assert.That(result.LoadAddress, Is.EqualTo(0x6000));
-      Assert.That(result.BitmapData.Length, Is.EqualTo(8000));
-      Assert.That(result.ScreenData.Length, Is.EqualTo(1000));
-      Assert.That(result.ColorData.Length, Is.EqualTo(1000));
+      Assert.That(image.Width, Is.EqualTo(2));
+      Assert.That(image.Height, Is.EqualTo(2));
     });
-  }
-
-  [Test]
-  [Category("Integration")]
-  public void FromBytes_RoundTrip_PreservesData() {
-    var data = new byte[FunPhotorFile.ExpectedFileSize];
-    data[0] = 0x00;
-    data[1] = 0x60;
-    for (var i = 2; i < data.Length; ++i)
-      data[i] = (byte)(i % 256);
-
-    var file = FunPhotorReader.FromBytes(data);
-    var written = FunPhotorWriter.ToBytes(file);
-    var reread = FunPhotorReader.FromBytes(written);
-
-    Assert.Multiple(() => {
-      Assert.That(reread.LoadAddress, Is.EqualTo(file.LoadAddress));
-      Assert.That(reread.BitmapData, Is.EqualTo(file.BitmapData));
-      Assert.That(reread.ScreenData, Is.EqualTo(file.ScreenData));
-      Assert.That(reread.ColorData, Is.EqualTo(file.ColorData));
-    });
-  }
-
-  [Test]
-  [Category("Integration")]
-  public void FromStream_ValidParsesCorrectly() {
-    var data = new byte[FunPhotorFile.ExpectedFileSize];
-    using var ms = new MemoryStream(data);
-    var result = FunPhotorReader.FromStream(ms);
-
-    Assert.That(result.Width, Is.EqualTo(160));
   }
 }

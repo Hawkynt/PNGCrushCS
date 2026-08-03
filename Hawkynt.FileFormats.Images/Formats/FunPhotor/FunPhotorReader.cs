@@ -3,13 +3,15 @@ using System.IO;
 
 namespace FileFormat.FunPhotor;
 
-/// <summary>Reads Fun Photor C64 multicolor files from bytes, streams, or file paths.</summary>
+/// <summary>Reads FunPhotor frames from bytes, streams, or file paths.</summary>
 public static class FunPhotorReader {
+
+  private static ReadOnlySpan<byte> _PngSignature => [0x89, (byte)'P', (byte)'N', (byte)'G', 0x0D, 0x0A, 0x1A, 0x0A];
 
   public static FunPhotorFile FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
-      throw new FileNotFoundException("Fun Photor file not found.", file.FullName);
+      throw new FileNotFoundException("FunPhotor frame not found.", file.FullName);
 
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
@@ -21,44 +23,21 @@ public static class FunPhotorReader {
       stream.ReadExactly(data);
       return FromBytes(data);
     }
+
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
     return FromBytes(ms.ToArray());
   }
 
   public static FunPhotorFile FromSpan(ReadOnlySpan<byte> data) {
+    if (data.Length <= FunPhotorFile.HeaderSize + _PngSignature.Length)
+      throw new InvalidDataException($"Data too small for a FunPhotor frame (got {data.Length} bytes).");
 
-    if (data.Length != FunPhotorFile.ExpectedFileSize)
-      throw new InvalidDataException($"Fun Photor file must be exactly {FunPhotorFile.ExpectedFileSize} bytes, got {data.Length}.");
+    if (!data.Slice(FunPhotorFile.HeaderSize, _PngSignature.Length).SequenceEqual(_PngSignature))
+      throw new InvalidDataException("A FunPhotor frame carries a PNG four bytes in; this file does not.");
 
-    var offset = 0;
-
-    var loadAddress = (ushort)(data[offset] | (data[offset + 1] << 8));
-    offset += FunPhotorFile.LoadAddressSize;
-
-    var bitmapData = new byte[FunPhotorFile.BitmapDataSize];
-    data.Slice(offset, FunPhotorFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
-    offset += FunPhotorFile.BitmapDataSize;
-
-    var screenData = new byte[FunPhotorFile.ScreenDataSize];
-    data.Slice(offset, FunPhotorFile.ScreenDataSize).CopyTo(screenData.AsSpan(0));
-    offset += FunPhotorFile.ScreenDataSize;
-
-    var colorData = new byte[FunPhotorFile.ColorDataSize];
-    data.Slice(offset, FunPhotorFile.ColorDataSize).CopyTo(colorData.AsSpan(0));
-    offset += FunPhotorFile.ColorDataSize;
-
-    var reserved = new byte[FunPhotorFile.ReservedSize];
-    data.Slice(offset, FunPhotorFile.ReservedSize).CopyTo(reserved.AsSpan(0));
-
-    return new() {
-      LoadAddress = loadAddress,
-      BitmapData = bitmapData,
-      ScreenData = screenData,
-      ColorData = colorData,
-      Reserved = reserved,
-    };
-    }
+    return new() { Embedded = data[FunPhotorFile.HeaderSize..].ToArray() };
+  }
 
   public static FunPhotorFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

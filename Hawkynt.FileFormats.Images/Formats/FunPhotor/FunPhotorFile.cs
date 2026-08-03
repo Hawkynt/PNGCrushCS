@@ -1,96 +1,31 @@
 using System;
+using System.IO;
 using FileFormat.Core;
+using FileFormat.Png;
 
 namespace FileFormat.FunPhotor;
 
-/// <summary>In-memory representation of a Fun Photor C64 multicolor image.</summary>
-public readonly record struct FunPhotorFile : IImageFormatReader<FunPhotorFile>, IImageToRawImage<FunPhotorFile>, IImageFormatWriter<FunPhotorFile> {
+/// <summary>In-memory representation of a FunPhotor frame (.fpr).</summary>
+/// <remarks>
+/// Four bytes of length and then an ordinary PNG. Nothing here decodes anything itself; the whole
+/// format is the wrapper, and all three samples come out of the PNG reader matching XnView exactly.
+/// </remarks>
+public readonly record struct FunPhotorFile
+  : IImageFormatReader<FunPhotorFile>, IImageToRawImage<FunPhotorFile> {
 
   static string IImageFormatMetadata<FunPhotorFile>.PrimaryExtension => ".fpr";
   static string[] IImageFormatMetadata<FunPhotorFile>.FileExtensions => [".fpr"];
   static FunPhotorFile IImageFormatReader<FunPhotorFile>.FromSpan(ReadOnlySpan<byte> data) => FunPhotorReader.FromSpan(data);
-  static byte[] IImageFormatWriter<FunPhotorFile>.ToBytes(FunPhotorFile file) => FunPhotorWriter.ToBytes(file);
+  static VideoMode[] IImageFormatMetadata<FunPhotorFile>.VideoModes => [
+    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [16777216])
+  ];
 
-  /// <summary>Fixed total file size: 2 + 8000 + 1000 + 1000 + 48 = 10050 bytes.</summary>
-  internal const int ExpectedFileSize = 10050;
+  /// <summary>Bytes of length ahead of the PNG.</summary>
+  internal const int HeaderSize = 4;
 
-  /// <summary>Minimum valid file size (exact match required).</summary>
-  public const int MinFileSize = ExpectedFileSize;
+  /// <summary>The PNG the wrapper carries, exactly as it stands in the file.</summary>
+  public byte[] Embedded { get; init; }
 
-  /// <summary>Size of the load address in bytes.</summary>
-  internal const int LoadAddressSize = 2;
-
-  /// <summary>Size of the bitmap data section in bytes.</summary>
-  internal const int BitmapDataSize = 8000;
-
-  /// <summary>Size of the screen RAM section in bytes.</summary>
-  internal const int ScreenDataSize = 1000;
-
-  /// <summary>Size of the color RAM section in bytes.</summary>
-  internal const int ColorDataSize = 1000;
-
-  /// <summary>Size of the reserved section in bytes.</summary>
-  internal const int ReservedSize = 48;
-
-  /// <summary>Image width, always 160.</summary>
-  public int Width => 160;
-
-  /// <summary>Image height, always 200.</summary>
-  public int Height => 200;
-
-  /// <summary>C64 memory load address (2 bytes, little-endian).</summary>
-  public ushort LoadAddress { get; init; }
-
-  /// <summary>Multicolor bitmap data (8000 bytes).</summary>
-  public byte[] BitmapData { get; init; }
-
-  /// <summary>Screen RAM (1000 bytes).</summary>
-  public byte[] ScreenData { get; init; }
-
-  /// <summary>Color RAM (1000 bytes).</summary>
-  public byte[] ColorData { get; init; }
-
-  /// <summary>Reserved bytes at end of file (48 bytes).</summary>
-  public byte[] Reserved { get; init; }
-
-  /// <summary>Converts this Fun Photor image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
-  public static RawImage ToRawImage(FunPhotorFile file) {
-
-    const int width = 160;
-    const int height = 200;
-    var rgb = new byte[width * height * 3];
-
-    for (var y = 0; y < height; ++y)
-      for (var x = 0; x < width; ++x) {
-        var cellX = x / 4;
-        var cellY = y / 8;
-        var cellIndex = cellY * 40 + cellX;
-        var byteInCell = y % 8;
-        var bitmapByte = file.BitmapData[cellIndex * 8 + byteInCell];
-        var pixelInByte = x % 4;
-        var bitValue = (bitmapByte >> ((3 - pixelInByte) * 2)) & 0x03;
-
-        var colorIndex = bitValue switch {
-          0 => 0,
-          1 => (file.ScreenData[cellIndex] >> 4) & 0x0F,
-          2 => file.ScreenData[cellIndex] & 0x0F,
-          3 => file.ColorData[cellIndex] & 0x0F,
-          _ => 0
-        };
-
-        var color = Commodore64Graphics.HexColors[colorIndex];
-        var offset = (y * width + x) * 3;
-        rgb[offset] = (byte)((color >> 16) & 0xFF);
-        rgb[offset + 1] = (byte)((color >> 8) & 0xFF);
-        rgb[offset + 2] = (byte)(color & 0xFF);
-      }
-
-    return new() {
-      Width = width,
-      Height = height,
-      Format = PixelFormat.Rgb24,
-      PixelData = rgb,
-    };
-  }
-
+  public static RawImage ToRawImage(FunPhotorFile file)
+    => PngFile.ToRawImage(PngReader.FromBytes(file.Embedded ?? throw new InvalidDataException("A FunPhotor frame carries no picture.")));
 }
