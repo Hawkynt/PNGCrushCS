@@ -29,8 +29,22 @@ public static class ArtDirectorReader {
 
   public static ArtDirectorFile FromSpan(ReadOnlySpan<byte> data) {
 
+    if (data.Length == ArtDirectorFile.ScreenFirstFileSize) {
+      var cyclePalette = new short[16];
+      for (var i = 0; i < cyclePalette.Length; ++i)
+        cyclePalette[i] = BinaryPrimitives.ReadInt16BigEndian(data[(ArtDirectorFile.PlanarDataSize + ArtDirectorFile.DisplayedPaletteIndex * 32 + i * 2)..]);
+
+      return new ArtDirectorFile {
+        Width = 320,
+        Height = 200,
+        Resolution = 0,
+        Palette = cyclePalette,
+        PixelData = data[..ArtDirectorFile.PlanarDataSize].ToArray(),
+      };
+    }
+
     if (data.Length != ArtDirectorFile.ExpectedFileSize)
-      throw new InvalidDataException($"Invalid Art Director data size: expected exactly {ArtDirectorFile.ExpectedFileSize} bytes, got {data.Length}.");
+      throw new InvalidDataException($"An Art Director picture is {ArtDirectorFile.ScreenFirstFileSize} bytes with its palettes after the screen or {ArtDirectorFile.ExpectedFileSize} with a header before it; this file is {data.Length}.");
 
     var header = ArtDirectorHeader.ReadFrom(data);
     var resolution = header.Resolution;

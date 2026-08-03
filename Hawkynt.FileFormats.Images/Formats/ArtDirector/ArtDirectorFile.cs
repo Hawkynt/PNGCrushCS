@@ -22,6 +22,28 @@ public readonly record struct ArtDirectorFile() : IImageFormatReader<ArtDirector
   /// <summary>The exact file size: 128 + 32000 = 32128 bytes.</summary>
   public const int ExpectedFileSize = HeaderSize + PlanarDataSize;
 
+  /// <summary>
+  /// The size of the form every sample takes: the screen first, then the palettes.
+  /// </summary>
+  /// <remarks>
+  /// All three Art Director pictures in the corpus are 32512 bytes and none was read, the reader
+  /// wanting 32128 with a header in front. They put the 32000 bytes of screen at the very start and
+  /// 512 after it — sixteen copies of a sixteen-colour Atari palette, which is what the program used
+  /// for colour cycling. RECOIL draws the first copy and so does this.
+  /// <para/>
+  /// Established against RECOIL: the screen read as a four-plane Atari picture from byte nought puts
+  /// every pixel in the same region as RECOIL's. Which of the eight palettes it draws with took a
+  /// third sample to settle — two of them repeat one palette eight times, and the third does not, and
+  /// on that one RECOIL uses the second. All three agree on the second; only two agree on the first.
+  /// </remarks>
+  public const int ScreenFirstFileSize = PlanarDataSize + PaletteCycleSize;
+
+  /// <summary>Bytes after the screen: eight palettes and then 256 of settings.</summary>
+  public const int PaletteCycleSize = 512;
+
+  /// <summary>Which of the eight palettes is the one the picture is drawn with.</summary>
+  public const int DisplayedPaletteIndex = 1;
+
   static string IImageFormatMetadata<ArtDirectorFile>.PrimaryExtension => ".art";
   static string[] IImageFormatMetadata<ArtDirectorFile>.FileExtensions => [".art"];
   static ArtDirectorFile IImageFormatReader<ArtDirectorFile>.FromSpan(ReadOnlySpan<byte> data) => ArtDirectorReader.FromSpan(data);
