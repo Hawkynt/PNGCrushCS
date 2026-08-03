@@ -45,7 +45,14 @@ public readonly record struct TimexGigascreenFile
   public const int FileSize = ScreenSize * 2;
 
   static string IImageFormatMetadata<TimexGigascreenFile>.PrimaryExtension => ".hrg";
-  static string[] IImageFormatMetadata<TimexGigascreenFile>.FileExtensions => [".hrg"];
+  /// <summary>
+  /// Also .scr, which is what every Timex hi-res picture in the corpus is named.
+  /// </summary>
+  /// <remarks>
+  /// The extension is shared with the ordinary ZX screen at 6912 bytes, the Timex hi-colour one at
+  /// 12288 and the Vector 06c, and the lengths tell all of them apart.
+  /// </remarks>
+  static string[] IImageFormatMetadata<TimexGigascreenFile>.FileExtensions => [".hrg", ".scr"];
   static TimexGigascreenFile IImageFormatReader<TimexGigascreenFile>.FromSpan(ReadOnlySpan<byte> data)
     => TimexGigascreenReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<TimexGigascreenFile>.VideoModes => [
@@ -55,14 +62,26 @@ public readonly record struct TimexGigascreenFile
   /// <summary>The file's bytes, both screens back to back.</summary>
   public byte[] Data { get; init; }
 
+  /// <summary>
+  /// Draws the picture: one screen on its own, or two blended where the file holds two.
+  /// </summary>
+  /// <remarks>
+  /// A single screen is a Timex hi-res picture and two of them are a gigascreen, where the machine
+  /// showed each in turn fast enough to mix the colours. Only the pair was read here, so the three
+  /// single screens in the corpus were refused although the drawing below already handled one —
+  /// RECOIL and XnView both draw them.
+  /// </remarks>
   public static RawImage ToRawImage(TimexGigascreenFile file) {
     var data = file.Data ?? [];
+    var first = _RenderScreen(data, 0);
 
     return new() {
       Width = Width,
       Height = Height,
       Format = PixelFormat.Rgb24,
-      PixelData = FrameBlend.Average(_RenderScreen(data, 0), _RenderScreen(data, SecondScreenOffset)),
+      PixelData = data.Length >= FileSize
+        ? FrameBlend.Average(first, _RenderScreen(data, SecondScreenOffset))
+        : first,
     };
   }
 

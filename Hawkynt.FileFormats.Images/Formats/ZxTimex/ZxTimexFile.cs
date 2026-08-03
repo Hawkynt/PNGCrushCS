@@ -7,7 +7,15 @@ namespace FileFormat.ZxTimex;
 public readonly record struct ZxTimexFile : IImageFormatReader<ZxTimexFile>, IImageToRawImage<ZxTimexFile>, IImageFormatWriter<ZxTimexFile> {
 
   static string IImageFormatMetadata<ZxTimexFile>.PrimaryExtension => ".tmx";
-  static string[] IImageFormatMetadata<ZxTimexFile>.FileExtensions => [".tmx"];
+  /// <summary>
+  /// Also .scr, which is what every Timex hi-colour picture in the corpus is named.
+  /// </summary>
+  /// <remarks>
+  /// Only .tmx was claimed, so none of the three was read although this reader decodes every one of
+  /// them read at all. The extension is shared with the ordinary ZX screen at 6912 bytes and the
+  /// Timex hi-res one at 12289, and the lengths tell them apart.
+  /// </remarks>
+  static string[] IImageFormatMetadata<ZxTimexFile>.FileExtensions => [".tmx", ".scr"];
   static ZxTimexFile IImageFormatReader<ZxTimexFile>.FromSpan(ReadOnlySpan<byte> data) => ZxTimexReader.FromSpan(data);
   static byte[] IImageFormatWriter<ZxTimexFile>.ToBytes(ZxTimexFile file) => ZxTimexWriter.ToBytes(file);
 
@@ -46,8 +54,12 @@ public readonly record struct ZxTimexFile : IImageFormatReader<ZxTimexFile>, IIm
         var bitPosition = 7 - (x % 8);
         var bitValue = (file.BitmapData[byteIndex] >> bitPosition) & 1;
 
-        var cellX = x / 8;
-        var attribute = file.AttributeData[y * 32 + cellX];
+        // The attribute area is addressed the same way the display file is — as third, character row
+        // within the third, and scanline within the character — and the reader hands it over exactly
+        // as the file holds it, where it de-interleaves the bitmap on the way in. Read straight
+        // through, as this used to, the colours land on the wrong rows and fewer than half the pixels
+        // match what RECOIL and XnView draw.
+        var attribute = file.AttributeData[ZxSpectrumGraphics.LineOffset(y) + x / 8];
         var bright = (attribute >> 6) & 1;
         var paper = (attribute >> 3) & 0x07;
         var ink = attribute & 0x07;

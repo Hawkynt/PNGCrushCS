@@ -28,9 +28,10 @@ public static class TimexGigascreenReader {
   }
 
   public static TimexGigascreenFile FromSpan(ReadOnlySpan<byte> data) {
-    // Two screens of bitmap-plus-colour and nothing else; the length is the only identification.
-    if (data.Length != TimexGigascreenFile.FileSize)
-      throw new InvalidDataException($"A gigascreen picture is {TimexGigascreenFile.FileSize} bytes, got {data.Length}.");
+    // Screens of bitmap-plus-colour and nothing else; the length is the only identification. One
+    // screen is a Timex hi-res picture, two are a gigascreen.
+    if (data.Length != TimexGigascreenFile.FileSize && data.Length != TimexGigascreenFile.ScreenSize)
+      throw new InvalidDataException($"A Timex hi-res picture is {TimexGigascreenFile.ScreenSize} bytes and a gigascreen {TimexGigascreenFile.FileSize}; this file is {data.Length}.");
 
     return new() { Data = data.ToArray() };
   }
