@@ -17,32 +17,44 @@ public static class PortfolioGraphicsWriter {
   }
 
   /// <summary>
-  /// Run-length codes the bitmap the way a PGC states it: a zero introduces a count and a value,
-  /// anything else stands for itself.
+  /// Run-length codes the bitmap the way a PGC states it: a byte with the top bit set repeats the
+  /// byte after it, and one without says how many bytes follow that are taken as they stand.
   /// </summary>
   /// <remarks>
-  /// A zero byte cannot stand for itself, being the introducer, so it is always spelled as a run —
-  /// which is why the shortest run worth coding is two rather than three.
+  /// This wrote a different encoding altogether — a zero introducing a count and a value — which is
+  /// what the reader used to expect, so the two agreed with each other and with no real file. Both
+  /// are corrected together, and the signature is written where it was previously left out.
+  /// <para/>
+  /// A run and a literal stretch each carry one byte of overhead, so a run is worth coding from two
+  /// alike upwards; both counts stop at 127, which is as far as seven bits reach.
   /// </remarks>
   private static byte[] _Compress(byte[] bitmap) {
     var result = new List<byte>(bitmap.Length);
+    foreach (var b in PortfolioGraphicsFile.PgcSignature)
+      result.Add(b);
 
     for (var at = 0; at < bitmap.Length;) {
-      var value = bitmap[at];
-
       var run = 1;
-      while (run < 255 && at + run < bitmap.Length && bitmap[at + run] == value)
+      while (run < 0x7F && at + run < bitmap.Length && bitmap[at + run] == bitmap[at])
         ++run;
 
-      if (run > 2 || value == 0) {
-        result.Add(0);
-        result.Add((byte)run);
-        result.Add(value);
-      } else
-        for (var i = 0; i < run; ++i)
-          result.Add(value);
+      if (run > 1) {
+        result.Add((byte)(0x80 | run));
+        result.Add(bitmap[at]);
+        at += run;
+        continue;
+      }
 
-      at += run;
+      // A stretch of bytes with no two alike in it, which is cheaper written out than coded.
+      var literal = 1;
+      while (literal < 0x7F && at + literal + 1 < bitmap.Length && bitmap[at + literal] != bitmap[at + literal + 1])
+        ++literal;
+
+      result.Add((byte)literal);
+      for (var i = 0; i < literal; ++i)
+        result.Add(bitmap[at + i]);
+
+      at += literal;
     }
 
     return result.ToArray();

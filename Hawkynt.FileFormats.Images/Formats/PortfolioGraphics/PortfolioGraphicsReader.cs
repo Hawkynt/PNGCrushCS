@@ -47,32 +47,51 @@ public static class PortfolioGraphicsReader {
     return new() { PixelData = pixelData };
   }
 
+  /// <summary>
+  /// Expands the run-length form: a byte with the top bit set repeats the byte after it, and one
+  /// without says how many bytes follow that are taken as they stand.
+  /// </summary>
+  /// <remarks>
+  /// This used to read the file as bytes with an escape of 0x00 introducing a count and a value, and
+  /// it began at the first byte — so the three of "PG" and a version were drawn as pixels and every
+  /// row after them was shifted. All three samples came back as noise where RECOIL and XnView agree
+  /// on the picture.
+  /// <para/>
+  /// Established by rebuilding the bitmap RECOIL draws and reading the file against it: the first
+  /// data byte 0xAB stands for the 43 zero bytes the picture opens with, 0x9D for the 29 that follow
+  /// the first set byte, and 0x02 0x01 0xC0 for the two bytes that start the next row. All three
+  /// samples now expand to exactly the 1920 bytes a screen takes.
+  /// </remarks>
   private static PortfolioGraphicsFile _ParsePgc(ReadOnlySpan<byte> data) {
     if (data.Length < 2)
       throw new InvalidDataException($"PGC data too small: expected at least 2 bytes, got {data.Length}.");
 
-    var output = new List<byte>(PortfolioGraphicsFile.PixelDataSize);
-    var pos = 0;
-
-    while (pos < data.Length && output.Count < PortfolioGraphicsFile.PixelDataSize) {
-      var b = data[pos++];
-      if (b == 0x00 && pos < data.Length) {
-        // RLE: next byte is count, then value
-        if (pos + 1 >= data.Length)
-          break;
-        var count = data[pos++];
-        var value = data[pos++];
-        for (var i = 0; i < count && output.Count < PortfolioGraphicsFile.PixelDataSize; ++i)
-          output.Add(value);
-      } else
-        output.Add(b);
-    }
-
-    while (output.Count < PortfolioGraphicsFile.PixelDataSize)
-      output.Add(0);
+    var pos = data.Length > PortfolioGraphicsFile.PgcSignature.Length
+              && data[..PortfolioGraphicsFile.PgcSignature.Length].SequenceEqual(PortfolioGraphicsFile.PgcSignature)
+      ? PortfolioGraphicsFile.PgcSignature.Length
+      : 0;
 
     var pixelData = new byte[PortfolioGraphicsFile.PixelDataSize];
-    output.CopyTo(0, pixelData, 0, PortfolioGraphicsFile.PixelDataSize);
+    var written = 0;
+
+    while (pos < data.Length && written < PortfolioGraphicsFile.PixelDataSize) {
+      var control = data[pos++];
+      if (pos >= data.Length)
+        break;
+
+      if ((control & 0x80) != 0) {
+        var run = Math.Min(control & 0x7F, PortfolioGraphicsFile.PixelDataSize - written);
+        pixelData.AsSpan(written, run).Fill(data[pos++]);
+        written += run;
+        continue;
+      }
+
+      var literal = Math.Min(control, Math.Min(data.Length - pos, PortfolioGraphicsFile.PixelDataSize - written));
+      data.Slice(pos, literal).CopyTo(pixelData.AsSpan(written));
+      pos += control;
+      written += literal;
+    }
+
     return new() { PixelData = pixelData, Compressed = true };
   }
 }

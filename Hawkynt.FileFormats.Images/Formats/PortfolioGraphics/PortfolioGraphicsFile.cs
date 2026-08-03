@@ -25,6 +25,9 @@ public readonly record struct PortfolioGraphicsFile : IImageFormatReader<Portfol
   /// </summary>
   internal const int PgfFileSize = PixelDataSize;
 
+  /// <summary>The three bytes the run-length form opens with, ahead of the packed screen.</summary>
+  internal static ReadOnlySpan<byte> PgcSignature => [0x50, 0x47, 0x01];
+
   static string IImageFormatMetadata<PortfolioGraphicsFile>.PrimaryExtension => ".pgf";
   static string[] IImageFormatMetadata<PortfolioGraphicsFile>.FileExtensions => [".pgf", ".pgc"];
   static PortfolioGraphicsFile IImageFormatReader<PortfolioGraphicsFile>.FromSpan(ReadOnlySpan<byte> data) => PortfolioGraphicsReader.FromSpan(data);
