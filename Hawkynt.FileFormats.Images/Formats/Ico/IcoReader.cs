@@ -84,9 +84,10 @@ public static class IcoReader {
         });
       } else {
         var dibBpp = _ReadDibBitsPerPixel(embeddedData, bitCount);
+        var (dibWidth, dibHeight) = _ReadDibDimensions(embeddedData, width, height);
         images.Add(new IcoImage {
-          Width = width,
-          Height = height,
+          Width = dibWidth,
+          Height = dibHeight,
           BitsPerPixel = dibBpp,
           Format = IcoImageFormat.Bmp,
           Data = embeddedData
@@ -129,6 +130,38 @@ public static class IcoReader {
     };
 
     bitsPerPixel = bitDepth * samplesPerPixel;
+  }
+
+  /// <summary>
+  /// Takes the size from the bitmap header rather than from the directory entry.
+  /// </summary>
+  /// <remarks>
+  /// A directory entry states each dimension in one byte, and a nought there means 256 — which is
+  /// what this used to read it as without looking further. Older cursors write nought for sizes that
+  /// are nothing of the kind: one in the corpus states 0 by 0 and is a 32 by 32 arrow, and XnView,
+  /// ImageMagick and IrfanView all draw it at 32, so the byte was never meant to be trusted alone.
+  /// <para/>
+  /// The bitmap header carries the real width, and a height of twice the picture — the second half
+  /// being the mask that says which pixels show through. The PNG-bodied entries already had their
+  /// size read from the body this way; the bitmap-bodied ones now do too.
+  /// </remarks>
+  private static (int Width, int Height) _ReadDibDimensions(byte[] dibData, int directoryWidth, int directoryHeight) {
+    if (dibData.Length < 12)
+      return (directoryWidth, directoryHeight);
+
+    var headerSize = BinaryPrimitives.ReadUInt32LittleEndian(dibData);
+    if (headerSize < 12)
+      return (directoryWidth, directoryHeight);
+
+    var width = BinaryPrimitives.ReadInt32LittleEndian(dibData.AsSpan(4));
+    var height = BinaryPrimitives.ReadInt32LittleEndian(dibData.AsSpan(8));
+    if (width <= 0 || height == 0)
+      return (directoryWidth, directoryHeight);
+
+    // The stated height covers the picture and the mask below it.
+    height = Math.Abs(height) / 2;
+
+    return height > 0 ? (width, height) : (directoryWidth, directoryHeight);
   }
 
   private static int _ReadDibBitsPerPixel(byte[] dibData, int directoryBitCount) {
