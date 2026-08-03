@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 
 namespace FileFormat.GemImg;
@@ -64,68 +65,76 @@ public static class GemImgReader {
         PixelData = pixelData
       };
 
-    // KNOWN WRONG for a multi-plane file, with two things visibly amiss in the loop below.
+    // A scanline is coded as however many items it takes to fill it, and the file holds one coded
+    // scanline per plane per row, taken row by row rather than plane by plane. Both were wrong here:
+    // each item ended a row, so a row written as two runs was read as two rows, and all of plane
+    // nought was read before any of plane one. Worse, the commonest item of the four was not decoded
+    // at all — it fell through to "unknown opcode, skip" and advanced a single byte.
     //
-    // A sixteen-colour sample decodes here to fifteen colours where XnView and RECOIL both show
-    // seven, and those two agree with each other — so indices are being invented, which is what
-    // happens when planes are combined out of step.
-    //
-    // First: this reads plane by plane, taking all of plane nought's rows before any of plane one's.
-    // A GEM IMG interleaves them by scanline — row nought of every plane, then row one of every
-    // plane — so for anything with more than one plane the wrong bits are being put together.
-    //
-    // Second: each opcode here ends a scanline. A scanline is built from as many items as it takes
-    // to fill it, and only then does the row advance, so a row coded as two runs is read as two rows.
-    //
-    // Both need the opcode meanings settled against the samples before they can be fixed — the
-    // encoding of a pattern run against a vertical replication is not what this code assumes, and
-    // guessing at it would trade one wrong picture for another.
+    // The four items:
+    //   00 00 FF nn   the scanline that follows stands for nn of them
+    //   00 nn         the pattern of PatternLength bytes that follows, nn times over
+    //   80 nn         nn bytes taken as they stand
+    //   nn            a run: the low seven bits count the bytes, the top bit is what they hold
+    var scanlines = new List<byte[]>(numPlanes * height);
     var pos = dataOffset;
-    for (var plane = 0; plane < numPlanes; ++plane) {
-      var planeOffset = plane * bytesPerRow * height;
-      var row = 0;
-      while (row < height && pos < data.Length) {
-        var opcode = data[pos];
 
-        if (opcode == 0x00 && pos + 1 < data.Length) {
-          // Vertical replication: repeat previous scan line 'count' times
-          ++pos;
-          var count = data[pos];
-          ++pos;
-          var srcRowOffset = planeOffset + (row > 0 ? (row - 1) * bytesPerRow : 0);
-          for (var r = 0; r < count && row < height; ++r) {
-            var dstRowOffset = planeOffset + row * bytesPerRow;
-            pixelData.AsSpan(srcRowOffset, bytesPerRow).CopyTo(pixelData.AsSpan(dstRowOffset));
-            ++row;
-          }
-        } else if (opcode == 0x80 && pos + 1 < data.Length) {
-          // Bit string: literal data
-          ++pos;
-          var count = data[pos];
-          ++pos;
-          var dstRowOffset = planeOffset + row * bytesPerRow;
-          var toCopy = Math.Min(count, Math.Min(data.Length - pos, bytesPerRow));
-          data.Slice(pos, toCopy).CopyTo(pixelData.AsSpan(dstRowOffset));
-          pos += count;
-          ++row;
-        } else if (opcode == 0xFF && pos + 1 < data.Length) {
-          // Pattern run: repeat pattern 'count' times
-          ++pos;
-          var count = data[pos];
-          ++pos;
-          var patLen = Math.Min(patternLength, data.Length - pos);
-          var dstRowOffset = planeOffset + row * bytesPerRow;
-          var dstPos = 0;
-          for (var r = 0; r < count && dstPos < bytesPerRow; ++r)
-            for (var p = 0; p < patLen && dstPos < bytesPerRow; ++p)
-              pixelData[dstRowOffset + dstPos++] = data[pos + p];
-          pos += patLen;
-          ++row;
-        } else {
-          // Unknown opcode, skip
-          ++pos;
-        }
+    while (scanlines.Count < numPlanes * height && pos < data.Length) {
+      var repeat = 1;
+      if (pos + 3 < data.Length && data[pos] == 0x00 && data[pos + 1] == 0x00 && data[pos + 2] == 0xFF) {
+        repeat = Math.Max(1, (int)data[pos + 3]);
+        pos += 4;
       }
+
+      var line = new byte[bytesPerRow];
+      var at = 0;
+      while (at < bytesPerRow && pos < data.Length) {
+        var opcode = data[pos++];
+
+        if (opcode == 0x00) {
+          if (pos >= data.Length)
+            break;
+
+          var count = data[pos++];
+          var patternBytes = Math.Min(patternLength, data.Length - pos);
+          if (patternBytes <= 0)
+            break;
+
+          for (var r = 0; r < count && at < bytesPerRow; ++r)
+            for (var p = 0; p < patternBytes && at < bytesPerRow; ++p)
+              line[at++] = data[pos + p];
+
+          pos += patternBytes;
+          continue;
+        }
+
+        if (opcode == 0x80) {
+          if (pos >= data.Length)
+            break;
+
+          var count = data[pos++];
+          var toCopy = Math.Min(count, Math.Min(data.Length - pos, bytesPerRow - at));
+          data.Slice(pos, toCopy).CopyTo(line.AsSpan(at));
+          at += toCopy;
+          pos += count;
+          continue;
+        }
+
+        var run = Math.Min(opcode & 0x7F, bytesPerRow - at);
+        line.AsSpan(at, run).Fill((opcode & 0x80) != 0 ? (byte)0xFF : (byte)0x00);
+        at += run;
+      }
+
+      for (var r = 0; r < repeat && scanlines.Count < numPlanes * height; ++r)
+        scanlines.Add(line);
+    }
+
+    // Coded scanline k is row k/planes of plane k%planes; the picture is held one whole plane after
+    // another, so that is where each one lands.
+    for (var k = 0; k < scanlines.Count; ++k) {
+      var plane = k % numPlanes;
+      var row = k / numPlanes;
+      scanlines[k].CopyTo(pixelData.AsSpan((plane * height + row) * bytesPerRow));
     }
 
     return new GemImgFile {

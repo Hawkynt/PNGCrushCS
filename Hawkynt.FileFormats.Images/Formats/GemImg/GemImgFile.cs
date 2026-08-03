@@ -27,24 +27,7 @@ public readonly record struct GemImgFile : IImageFormatReader<GemImgFile>, IImag
 
     var chunky = PlanarConverter.NonInterleavedPlanarToChunky(file.PixelData, file.Width, file.Height, file.NumPlanes);
     var paletteCount = Math.Min(1 << file.NumPlanes, 256);
-    var palette = new byte[paletteCount * 3];
-
-    // GEM convention: index 0 = white, index 1 = black, remaining evenly spaced
-    palette[0] = 255;
-    palette[1] = 255;
-    palette[2] = 255;
-    if (paletteCount > 1) {
-      palette[3] = 0;
-      palette[4] = 0;
-      palette[5] = 0;
-    }
-
-    for (var i = 2; i < paletteCount; ++i) {
-      var gray = (byte)(255 - i * 255 / (paletteCount - 1));
-      palette[i * 3] = gray;
-      palette[i * 3 + 1] = gray;
-      palette[i * 3 + 2] = gray;
-    }
+    var palette = _BuildPalette(paletteCount);
 
     return new() {
       Width = file.Width,
@@ -54,6 +37,42 @@ public readonly record struct GemImgFile : IImageFormatReader<GemImgFile>, IImag
       Palette = palette,
       PaletteCount = paletteCount,
     };
+  }
+
+  /// <summary>The sixteen colours VDI starts with, which is what a GEM picture without a palette means.</summary>
+  private static readonly byte[] _VdiPalette = [
+    255, 255, 255,  0,   0,   0,    255, 0,   0,    0,   255, 0,
+    0,   0,   255,  0,   255, 255,  255, 255, 0,    255, 0,   255,
+    192, 192, 192,  128, 128, 128,  255, 128, 128,  128, 255, 128,
+    128, 128, 255,  128, 255, 255,  255, 255, 128,  255, 128, 255,
+  ];
+
+  /// <summary>
+  /// Gives each index a colour of its own.
+  /// </summary>
+  /// <remarks>
+  /// This used to be white, black, and an even grey ramp over what was left — which put index fifteen
+  /// at the same black as index one, so a four-plane picture came back with two of its colours merged
+  /// into one. The picture itself was right; two of its regions simply could not be told apart.
+  /// <para/>
+  /// A GEM IMG carries no palette, so what the indices mean is the reader's choice, and the tools
+  /// choose differently: XnView draws this sample in muted colours where RECOIL draws it in primaries.
+  /// They agree on which pixels belong together and nothing else. RECOIL's are the VDI defaults, which
+  /// is the documented convention and the one taken here.
+  /// </remarks>
+  private static byte[] _BuildPalette(int paletteCount) {
+    var palette = new byte[paletteCount * 3];
+    var shared = Math.Min(paletteCount, _VdiPalette.Length / 3);
+    _VdiPalette.AsSpan(0, shared * 3).CopyTo(palette);
+
+    // Beyond the sixteen there is no convention at all, so the rest get a ramp that repeats nothing.
+    for (var i = shared; i < paletteCount; ++i) {
+      palette[i * 3] = (byte)(i * 255 / (paletteCount - 1));
+      palette[i * 3 + 1] = (byte)(255 - i * 255 / (paletteCount - 1));
+      palette[i * 3 + 2] = (byte)i;
+    }
+
+    return palette;
   }
 
   /// <summary>Creates a <see cref="GemImgFile"/> from a format-independent <see cref="RawImage"/>.</summary>

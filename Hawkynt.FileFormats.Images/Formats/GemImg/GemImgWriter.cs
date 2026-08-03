@@ -29,11 +29,12 @@ public static class GemImgWriter {
     header.WriteTo(headerBytes);
     ms.Write(headerBytes, 0, headerBytes.Length);
 
-    // Encode scan-line data per-plane using bit-string (0x80) opcodes
-    for (var plane = 0; plane < file.NumPlanes; ++plane) {
-      var planeOffset = plane * bytesPerRow * file.Height;
-      for (var row = 0; row < file.Height; ++row) {
-        var rowOffset = planeOffset + row * bytesPerRow;
+    // A GEM IMG holds one coded scanline per plane per row, taken row by row — this wrote all of
+    // plane nought before any of plane one, which is the same way round the reader used to have it,
+    // so the pair round-tripped with each other while agreeing with no file either would be given.
+    for (var row = 0; row < file.Height; ++row) {
+      for (var plane = 0; plane < file.NumPlanes; ++plane) {
+        var rowOffset = (plane * file.Height + row) * bytesPerRow;
         ms.WriteByte(0x80); // bit string opcode
         ms.WriteByte((byte)bytesPerRow); // count
         var count = Math.Min(bytesPerRow, file.PixelData.Length - rowOffset);
