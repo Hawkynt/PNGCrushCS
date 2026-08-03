@@ -28,11 +28,19 @@ public static class FunGraphicsMachineReader {
 
   public static FunGraphicsMachineFile FromSpan(ReadOnlySpan<byte> data) {
 
-    if (data.Length < FunGraphicsMachineFile.ExpectedFileSize)
-      throw new InvalidDataException($"Data too small for a valid Fun Graphics Machine file (expected {FunGraphicsMachineFile.ExpectedFileSize} bytes, got {data.Length}).");
+    if (data.Length == FunGraphicsMachineFile.BitmapOnlyFileSize) {
+      var screen = new byte[FunGraphicsMachineFile.ScreenRamSize];
+      Array.Fill(screen, FunGraphicsMachineFile.DefaultScreenAttribute);
+
+      return new() {
+        LoadAddress = (ushort)(data[0] | (data[1] << 8)),
+        ScreenRam = screen,
+        BitmapData = data.Slice(FunGraphicsMachineFile.LoadAddressSize, FunGraphicsMachineFile.BitmapDataSize).ToArray(),
+      };
+    }
 
     if (data.Length != FunGraphicsMachineFile.ExpectedFileSize)
-      throw new InvalidDataException($"Invalid Fun Graphics Machine file size (expected {FunGraphicsMachineFile.ExpectedFileSize} bytes, got {data.Length}).");
+      throw new InvalidDataException($"A Fun Graphics Machine picture is {FunGraphicsMachineFile.ExpectedFileSize} bytes with a screen or {FunGraphicsMachineFile.BitmapOnlyFileSize} without; this file is {data.Length}.");
 
     var offset = 0;
 

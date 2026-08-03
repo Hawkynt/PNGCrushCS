@@ -20,6 +20,19 @@ public readonly record struct FunGraphicsMachineFile : IImageFormatReader<FunGra
   /// <summary>The expected total file size in bytes (2 + 1000 + 8000 + 7).</summary>
   public const int ExpectedFileSize = 9009;
 
+  /// <summary>
+  /// The size of a picture that carries no screen RAM: a load address and the bitmap alone.
+  /// </summary>
+  /// <remarks>
+  /// The only sample in the corpus is this form, and it was refused for not being the other one while
+  /// RECOIL and XnView both drew it. With no screen RAM there is nothing to say what the two colours
+  /// of a cell are, and both tools draw it white on black.
+  /// </remarks>
+  public const int BitmapOnlyFileSize = LoadAddressSize + BitmapDataSize;
+
+  /// <summary>Ink white, paper black — the screen a picture that states none is drawn against.</summary>
+  internal const byte DefaultScreenAttribute = 0x10;
+
   /// <summary>Size of the bitmap data section in bytes.</summary>
   internal const int BitmapDataSize = 8000;
 
