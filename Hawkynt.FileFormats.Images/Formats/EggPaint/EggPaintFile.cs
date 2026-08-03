@@ -3,59 +3,75 @@ using FileFormat.Core;
 
 namespace FileFormat.EggPaint;
 
-/// <summary>In-memory representation of a Commodore 64 Egg Paint multicolor image.</summary>
-public readonly record struct EggPaintFile : IImageFormatReader<EggPaintFile>, IImageToRawImage<EggPaintFile>, IImageFormatWriter<EggPaintFile> {
+/// <summary>In-memory representation of an EggPaint / TruePaint picture (.trp) for the Atari.</summary>
+/// <remarks>
+/// This used to be a Commodore 64 multicolour reader: a load address, a bitmap, a video matrix, a
+/// colour RAM and a background, insisting on 10003 bytes. No .trp is anything of the kind, and none
+/// of the three in the corpus was read while RECOIL draws all three.
+/// <para/>
+/// A real one is four bytes of "TRUP", a width, a height, and then one sixteen-bit colour per pixel —
+/// five bits of red, six of green and five of blue. Every sample is exactly its own stated size:
+/// 128 by 128, 320 by 120 and 256 by 256, each width times height times two plus eight.
+/// </remarks>
+public readonly record struct EggPaintFile
+  : IImageFormatReader<EggPaintFile>, IImageToRawImage<EggPaintFile>, IImageFormatWriter<EggPaintFile> {
 
   static string IImageFormatMetadata<EggPaintFile>.PrimaryExtension => ".trp";
   static string[] IImageFormatMetadata<EggPaintFile>.FileExtensions => [".trp"];
   static EggPaintFile IImageFormatReader<EggPaintFile>.FromSpan(ReadOnlySpan<byte> data) => EggPaintReader.FromSpan(data);
   static byte[] IImageFormatWriter<EggPaintFile>.ToBytes(EggPaintFile file) => EggPaintWriter.ToBytes(file);
+  static VideoMode[] IImageFormatMetadata<EggPaintFile>.VideoModes => [
+    new("TruePaint", [(IntegerRange.Any, IntegerRange.Any)], [65536])
+  ];
 
-  /// <summary>The fixed width of an Egg Paint image in pixels.</summary>
-  public const int FixedWidth = 160;
+  /// <summary>The four bytes a picture opens with.</summary>
+  internal static ReadOnlySpan<byte> Magic => "TRUP"u8;
 
-  /// <summary>The fixed height of an Egg Paint image in pixels.</summary>
-  public const int FixedHeight = 200;
+  /// <summary>Bytes ahead of the pixels: the magic and the two sizes.</summary>
+  internal const int HeaderSize = 8;
 
-  /// <summary>The expected total file size in bytes (2 + 8000 + 1000 + 1000 + 1).</summary>
-  public const int ExpectedFileSize = 10003;
+  /// <summary>Image width in pixels.</summary>
+  public int Width { get; init; }
 
-  /// <summary>Size of the bitmap data section in bytes.</summary>
-  internal const int BitmapDataSize = 8000;
+  /// <summary>Image height in pixels.</summary>
+  public int Height { get; init; }
 
-  /// <summary>Size of the video matrix section in bytes.</summary>
-  internal const int VideoMatrixSize = 1000;
+  /// <summary>One sixteen-bit colour per pixel, big-endian, as the file holds them.</summary>
+  public byte[] PixelData { get; init; }
 
-  /// <summary>Size of the color RAM section in bytes.</summary>
-  internal const int ColorRamSize = 1000;
+  /// <summary>
+  /// Widens each pixel to eight bits a channel.
+  /// </summary>
+  /// <remarks>
+  /// The five- and six-bit fields are spread over the whole byte by repeating their own top bits,
+  /// which is what RECOIL does: read that way the smallest sample matches it on every pixel, where
+  /// scaling the fields instead agrees on barely a quarter of them.
+  /// </remarks>
+  public static RawImage ToRawImage(EggPaintFile file) {
+    var width = file.Width;
+    var height = file.Height;
+    var source = file.PixelData ?? [];
+    var rgb = new byte[width * height * 3];
 
-  /// <summary>Size of the load address in bytes.</summary>
-  internal const int LoadAddressSize = 2;
+    for (var i = 0; i < width * height; ++i) {
+      var at = i * 2;
+      var value = at + 1 < source.Length ? (source[at] << 8) | source[at + 1] : 0;
 
-  /// <summary>Image width, always 160.</summary>
-  public int Width => FixedWidth;
+      var red = (value >> 11) & 0x1F;
+      var green = (value >> 5) & 0x3F;
+      var blue = value & 0x1F;
 
-  /// <summary>Image height, always 200.</summary>
-  public int Height => FixedHeight;
+      var offset = i * 3;
+      rgb[offset] = (byte)((red << 3) | (red >> 2));
+      rgb[offset + 1] = (byte)((green << 2) | (green >> 4));
+      rgb[offset + 2] = (byte)((blue << 3) | (blue >> 2));
+    }
 
-  /// <summary>C64 memory load address (2 bytes, little-endian).</summary>
-  public ushort LoadAddress { get; init; }
-
-  /// <summary>Multicolor bitmap data (8000 bytes, 2 bits per pixel).</summary>
-  public byte[] BitmapData { get; init; }
-
-  /// <summary>Video matrix / screen RAM (1000 bytes, upper/lower nybble = 2 colors per cell).</summary>
-  public byte[] VideoMatrix { get; init; }
-
-  /// <summary>Color RAM (1000 bytes, lower nybble = 3rd color per cell).</summary>
-  public byte[] ColorRam { get; init; }
-
-  /// <summary>Background color index (0-15).</summary>
-  public byte BackgroundColor { get; init; }
-
-  /// <summary>Converts this Egg Paint image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
-  public static RawImage ToRawImage(EggPaintFile file)
-    => Commodore64Graphics.DecodeMulticolor(
-      file.BitmapData, file.VideoMatrix, file.ColorRam, file.BackgroundColor, FixedWidth, FixedHeight);
-
+    return new() {
+      Width = width,
+      Height = height,
+      Format = PixelFormat.Rgb24,
+      PixelData = rgb,
+    };
+  }
 }

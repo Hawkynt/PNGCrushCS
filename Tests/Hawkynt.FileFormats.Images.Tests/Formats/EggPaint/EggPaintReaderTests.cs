@@ -1,11 +1,37 @@
 using System;
 using System.IO;
+using FileFormat.Core;
 using FileFormat.EggPaint;
 
 namespace FileFormat.EggPaint.Tests;
 
+/// <summary>
+/// What a TruePaint picture is.
+/// </summary>
+/// <remarks>
+/// These used to describe a Commodore 64 screen — a load address, a bitmap, a video matrix, a colour
+/// RAM and a background in exactly 10003 bytes — because that is what the reader expected. No .trp is
+/// anything of the kind, so the tests and the reader agreed with each other and with no real file.
+/// </remarks>
 [TestFixture]
 public sealed class EggPaintReaderTests {
+
+  /// <summary>Builds a picture: the magic, the two sizes, and one big-endian colour per pixel.</summary>
+  private static byte[] _BuildValidFile(int width, int height, ushort fill) {
+    var data = new byte[EggPaintFile.HeaderSize + width * height * 2];
+    EggPaintFile.Magic.CopyTo(data);
+    data[4] = (byte)(width >> 8);
+    data[5] = (byte)width;
+    data[6] = (byte)(height >> 8);
+    data[7] = (byte)height;
+
+    for (var i = 0; i < width * height; ++i) {
+      data[EggPaintFile.HeaderSize + i * 2] = (byte)(fill >> 8);
+      data[EggPaintFile.HeaderSize + i * 2 + 1] = (byte)fill;
+    }
+
+    return data;
+  }
 
   [Test]
   [Category("Unit")]
@@ -35,116 +61,67 @@ public sealed class EggPaintReaderTests {
   [Test]
   [Category("Unit")]
   public void FromBytes_TooSmall_ThrowsInvalidDataException() {
-    Assert.Throws<InvalidDataException>(() => EggPaintReader.FromBytes(new byte[100]));
+    Assert.Throws<InvalidDataException>(() => EggPaintReader.FromBytes(new byte[4]));
   }
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_WrongSize_ThrowsInvalidDataException() {
-    Assert.Throws<InvalidDataException>(() => EggPaintReader.FromBytes(new byte[10004]));
+  public void FromBytes_WithoutTheMagic_ThrowsInvalidDataException() {
+    Assert.Throws<InvalidDataException>(() => EggPaintReader.FromBytes(new byte[64]));
   }
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_ValidParsesCorrectly() {
-    var data = _BuildValidFile(0x6000, 0x03);
-    var result = EggPaintReader.FromBytes(data);
-
-    Assert.That(result.Width, Is.EqualTo(160));
-    Assert.That(result.Height, Is.EqualTo(200));
-    Assert.That(result.LoadAddress, Is.EqualTo(0x6000));
-    Assert.That(result.BitmapData.Length, Is.EqualTo(8000));
-    Assert.That(result.VideoMatrix.Length, Is.EqualTo(1000));
-    Assert.That(result.ColorRam.Length, Is.EqualTo(1000));
-    Assert.That(result.BackgroundColor, Is.EqualTo(0x03));
+  public void FromBytes_ShorterThanItsOwnSize_ThrowsInvalidDataException() {
+    var truncated = _BuildValidFile(16, 16, 0)[..100];
+    Assert.Throws<InvalidDataException>(() => EggPaintReader.FromBytes(truncated));
   }
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_LoadAddress_ParsedAsLittleEndian() {
-    var data = new byte[EggPaintFile.ExpectedFileSize];
-    data[0] = 0x00;
-    data[1] = 0x60;
-    var result = EggPaintReader.FromBytes(data);
+  public void FromBytes_TakesTheSizeFromTheHeader() {
+    var result = EggPaintReader.FromBytes(_BuildValidFile(320, 120, 0x1234));
 
-    Assert.That(result.LoadAddress, Is.EqualTo(0x6000));
+    Assert.Multiple(() => {
+      Assert.That(result.Width, Is.EqualTo(320));
+      Assert.That(result.Height, Is.EqualTo(120));
+      Assert.That(result.PixelData.Length, Is.EqualTo(320 * 120 * 2));
+    });
   }
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_BitmapData_CopiedCorrectly() {
-    var data = _BuildValidFile(0x6000, 0x00);
-    data[2] = 0xAB;
-    data[8001] = 0xCD;
+  public void ToRawImage_WidensEachFieldByRepeatingItsOwnBits() {
+    // Five bits of red, six of green, five of blue. All ones must come out 255 rather than 248 or
+    // 252, which is what dropping the low bits instead of repeating the high ones would give.
+    var image = EggPaintFile.ToRawImage(EggPaintReader.FromBytes(_BuildValidFile(2, 2, 0xFFFF)));
+    var rgb = PixelConverter.Convert(image, PixelFormat.Rgb24).PixelData;
 
-    var result = EggPaintReader.FromBytes(data);
-
-    Assert.That(result.BitmapData[0], Is.EqualTo(0xAB));
-    Assert.That(result.BitmapData[7999], Is.EqualTo(0xCD));
+    Assert.That(rgb[..3], Is.EqualTo(new byte[] { 255, 255, 255 }));
   }
 
   [Test]
   [Category("Unit")]
   public void FromStream_ValidParsesCorrectly() {
-    var data = _BuildValidFile(0x6000, 0x05);
-    using var ms = new MemoryStream(data);
+    using var ms = new MemoryStream(_BuildValidFile(64, 32, 0x0000));
     var result = EggPaintReader.FromStream(ms);
 
-    Assert.That(result.Width, Is.EqualTo(160));
-    Assert.That(result.Height, Is.EqualTo(200));
-    Assert.That(result.LoadAddress, Is.EqualTo(0x6000));
-    Assert.That(result.BackgroundColor, Is.EqualTo(0x05));
+    Assert.Multiple(() => {
+      Assert.That(result.Width, Is.EqualTo(64));
+      Assert.That(result.Height, Is.EqualTo(32));
+    });
   }
 
   [Test]
   [Category("Integration")]
   public void RoundTrip_AllFieldsPreserved() {
-    var bitmapData = new byte[8000];
-    for (var i = 0; i < bitmapData.Length; ++i)
-      bitmapData[i] = (byte)(i * 7 % 256);
+    var original = EggPaintReader.FromBytes(_BuildValidFile(40, 24, 0xABCD));
+    var restored = EggPaintReader.FromBytes(EggPaintWriter.ToBytes(original));
 
-    var videoMatrix = new byte[1000];
-    for (var i = 0; i < videoMatrix.Length; ++i)
-      videoMatrix[i] = (byte)(i % 16);
-
-    var colorRam = new byte[1000];
-    for (var i = 0; i < colorRam.Length; ++i)
-      colorRam[i] = (byte)((i * 3 + 1) % 16);
-
-    var original = new EggPaintFile {
-      LoadAddress = 0x6000,
-      BitmapData = bitmapData,
-      VideoMatrix = videoMatrix,
-      ColorRam = colorRam,
-      BackgroundColor = 11,
-    };
-
-    var bytes = EggPaintWriter.ToBytes(original);
-    var restored = EggPaintReader.FromBytes(bytes);
-
-    Assert.That(restored.LoadAddress, Is.EqualTo(original.LoadAddress));
-    Assert.That(restored.BitmapData, Is.EqualTo(original.BitmapData));
-    Assert.That(restored.VideoMatrix, Is.EqualTo(original.VideoMatrix));
-    Assert.That(restored.ColorRam, Is.EqualTo(original.ColorRam));
-    Assert.That(restored.BackgroundColor, Is.EqualTo(original.BackgroundColor));
-  }
-
-  private static byte[] _BuildValidFile(ushort loadAddress, byte backgroundColor) {
-    var data = new byte[EggPaintFile.ExpectedFileSize];
-    data[0] = (byte)(loadAddress & 0xFF);
-    data[1] = (byte)(loadAddress >> 8);
-
-    for (var i = 0; i < 8000; ++i)
-      data[2 + i] = (byte)(i % 256);
-
-    for (var i = 0; i < 1000; ++i)
-      data[8002 + i] = (byte)(i % 16);
-
-    for (var i = 0; i < 1000; ++i)
-      data[9002 + i] = (byte)((i + 3) % 16);
-
-    data[10002] = backgroundColor;
-
-    return data;
+    Assert.Multiple(() => {
+      Assert.That(restored.Width, Is.EqualTo(original.Width));
+      Assert.That(restored.Height, Is.EqualTo(original.Height));
+      Assert.That(restored.PixelData, Is.EqualTo(original.PixelData));
+    });
   }
 }

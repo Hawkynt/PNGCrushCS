@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.EggPaint;
@@ -28,39 +29,29 @@ public static class EggPaintReader {
 
   public static EggPaintFile FromSpan(ReadOnlySpan<byte> data) {
 
-    if (data.Length < EggPaintFile.ExpectedFileSize)
-      throw new InvalidDataException($"Data too small for a valid Egg Paint file (expected {EggPaintFile.ExpectedFileSize} bytes, got {data.Length}).");
+    if (data.Length < EggPaintFile.HeaderSize)
+      throw new InvalidDataException($"Data too small for a valid TruePaint picture (got {data.Length} bytes).");
 
-    if (data.Length != EggPaintFile.ExpectedFileSize)
-      throw new InvalidDataException($"Invalid Egg Paint file size (expected {EggPaintFile.ExpectedFileSize} bytes, got {data.Length}).");
+    if (!data[..EggPaintFile.Magic.Length].SequenceEqual(EggPaintFile.Magic))
+      throw new InvalidDataException("Not a TruePaint picture: it does not open with TRUP.");
 
-    var offset = 0;
+    var width = BinaryPrimitives.ReadUInt16BigEndian(data[4..]);
+    var height = BinaryPrimitives.ReadUInt16BigEndian(data[6..]);
 
-    var loadAddress = (ushort)(data[offset] | (data[offset + 1] << 8));
-    offset += EggPaintFile.LoadAddressSize;
+    if (width == 0 || height == 0)
+      throw new InvalidDataException($"A TruePaint picture of {width}x{height} is no size.");
 
-    var bitmapData = new byte[EggPaintFile.BitmapDataSize];
-    data.Slice(offset, EggPaintFile.BitmapDataSize).CopyTo(bitmapData.AsSpan(0));
-    offset += EggPaintFile.BitmapDataSize;
-
-    var videoMatrix = new byte[EggPaintFile.VideoMatrixSize];
-    data.Slice(offset, EggPaintFile.VideoMatrixSize).CopyTo(videoMatrix.AsSpan(0));
-    offset += EggPaintFile.VideoMatrixSize;
-
-    var colorRam = new byte[EggPaintFile.ColorRamSize];
-    data.Slice(offset, EggPaintFile.ColorRamSize).CopyTo(colorRam.AsSpan(0));
-    offset += EggPaintFile.ColorRamSize;
-
-    var backgroundColor = data[offset];
+    var wanted = width * height * 2;
+    if (data.Length < EggPaintFile.HeaderSize + wanted)
+      throw new InvalidDataException(
+        $"{width}x{height} in sixteen-bit colour needs {EggPaintFile.HeaderSize + wanted} bytes; this file is {data.Length}.");
 
     return new() {
-      LoadAddress = loadAddress,
-      BitmapData = bitmapData,
-      VideoMatrix = videoMatrix,
-      ColorRam = colorRam,
-      BackgroundColor = backgroundColor,
+      Width = width,
+      Height = height,
+      PixelData = data.Slice(EggPaintFile.HeaderSize, wanted).ToArray(),
     };
-    }
+  }
 
   public static EggPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
