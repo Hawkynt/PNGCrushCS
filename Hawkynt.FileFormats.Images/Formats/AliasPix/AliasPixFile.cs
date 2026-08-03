@@ -7,7 +7,15 @@ namespace FileFormat.AliasPix;
 public readonly record struct AliasPixFile : IImageFormatReader<AliasPixFile>, IImageToRawImage<AliasPixFile>, IImageFromRawImage<AliasPixFile>, IImageFormatWriter<AliasPixFile> {
 
   static string IImageFormatMetadata<AliasPixFile>.PrimaryExtension => ".pix";
-  static string[] IImageFormatMetadata<AliasPixFile>.FileExtensions => [".pix", ".als", ".alias"];
+  /// <summary>
+  /// Also .img and .lux, which the three samples in the corpus carry between them.
+  /// </summary>
+  /// <remarks>
+  /// None of them was read though this reader decodes all three exactly as XnView does. The file
+  /// opens with its size rather than a signature, so there is nothing to state here beyond the
+  /// extensions; the reader's own checks are what tell one of these from another format's .img.
+  /// </remarks>
+  static string[] IImageFormatMetadata<AliasPixFile>.FileExtensions => [".pix", ".als", ".alias", ".img", ".lux"];
   static AliasPixFile IImageFormatReader<AliasPixFile>.FromSpan(ReadOnlySpan<byte> data) => AliasPixReader.FromSpan(data);
   static byte[] IImageFormatWriter<AliasPixFile>.ToBytes(AliasPixFile file) => AliasPixWriter.ToBytes(file);
   public int Width { get; init; }

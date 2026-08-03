@@ -29,7 +29,18 @@ public readonly record struct ArtMaster88File
   public const int BytesPerRow = Width / 8;
 
   static string IImageFormatMetadata<ArtMaster88File>.PrimaryExtension => ".arv";
-  static string[] IImageFormatMetadata<ArtMaster88File>.FileExtensions => [".arv"];
+  /// <summary>
+  /// Also .img, which all three samples in the corpus carry.
+  /// </summary>
+  /// <remarks>
+  /// Only .arv was claimed and no sample has it, so none of the three was read though this reader
+  /// decodes every one of them exactly as RECOIL does. The extension is shared with several other
+  /// formats, so the "SS_SIF" a real file opens with is stated below to settle it on content.
+  /// </remarks>
+  static string[] IImageFormatMetadata<ArtMaster88File>.FileExtensions => [".arv", ".img"];
+
+  static bool? IImageFormatMetadata<ArtMaster88File>.MatchesSignature(ReadOnlySpan<byte> header)
+    => header.Length >= 6 && header[..6].SequenceEqual("SS_SIF"u8) ? true : null;
   static ArtMaster88File IImageFormatReader<ArtMaster88File>.FromSpan(ReadOnlySpan<byte> data)
     => ArtMaster88Reader.FromSpan(data);
   static byte[] IImageFormatWriter<ArtMaster88File>.ToBytes(ArtMaster88File file) => ArtMaster88Writer.ToBytes(file);

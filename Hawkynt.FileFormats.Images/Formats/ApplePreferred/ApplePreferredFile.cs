@@ -30,7 +30,14 @@ public readonly record struct ApplePreferredFile
   public const int MultipalChunkSize = 6415;
 
   static string IImageFormatMetadata<ApplePreferredFile>.PrimaryExtension => ".32k";
-  static string[] IImageFormatMetadata<ApplePreferredFile>.FileExtensions => [".32k", ".gs", ".iigs"];
+  /// <summary>
+  /// Also .shr, which is what both samples in the corpus carry.
+  /// </summary>
+  /// <remarks>
+  /// Neither was read though this reader decodes both exactly as RECOIL does — one 320 by 514 and
+  /// the other 560 by 384, neither of which is a size a guess would have landed on.
+  /// </remarks>
+  static string[] IImageFormatMetadata<ApplePreferredFile>.FileExtensions => [".32k", ".gs", ".iigs", ".shr"];
   static ApplePreferredFile IImageFormatReader<ApplePreferredFile>.FromSpan(ReadOnlySpan<byte> data)
     => ApplePreferredReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<ApplePreferredFile>.VideoModes => [
