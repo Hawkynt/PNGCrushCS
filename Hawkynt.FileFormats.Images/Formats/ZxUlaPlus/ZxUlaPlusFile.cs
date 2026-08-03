@@ -7,7 +7,15 @@ namespace FileFormat.ZxUlaPlus;
 public readonly record struct ZxUlaPlusFile : IImageFormatReader<ZxUlaPlusFile>, IImageToRawImage<ZxUlaPlusFile>, IImageFormatWriter<ZxUlaPlusFile> {
 
   static string IImageFormatMetadata<ZxUlaPlusFile>.PrimaryExtension => ".ulp";
-  static string[] IImageFormatMetadata<ZxUlaPlusFile>.FileExtensions => [".ulp"];
+  /// <summary>
+  /// Also .scr, which is what both ULAplus pictures in the corpus are named.
+  /// </summary>
+  /// <remarks>
+  /// Only .ulp was claimed and neither sample carries it, so neither was read though RECOIL draws
+  /// both. The extension is shared with the ordinary ZX screen at 6912 bytes and the Timex ones at
+  /// 12288 and 12289; 6976 belongs to no other, so the lengths tell them apart.
+  /// </remarks>
+  static string[] IImageFormatMetadata<ZxUlaPlusFile>.FileExtensions => [".ulp", ".scr"];
   static ZxUlaPlusFile IImageFormatReader<ZxUlaPlusFile>.FromSpan(ReadOnlySpan<byte> data) => ZxUlaPlusReader.FromSpan(data);
   static byte[] IImageFormatWriter<ZxUlaPlusFile>.ToBytes(ZxUlaPlusFile file) => ZxUlaPlusWriter.ToBytes(file);
 
@@ -26,17 +34,26 @@ public readonly record struct ZxUlaPlusFile : IImageFormatReader<ZxUlaPlusFile>,
   /// <summary>64 bytes of ULAplus palette entries (3-bit GRB encoding per byte).</summary>
   public byte[] PaletteData { get; init; }
 
-  /// <summary>Decodes a ULAplus palette entry (bits 7-5=G, bits 4-2=R, bits 1-0=B) to an RGB color value.</summary>
+  /// <summary>
+  /// Widens a palette entry, which holds three bits of green, three of red and two of blue.
+  /// </summary>
+  /// <remarks>
+  /// Each field is spread over the whole byte by repeating its own bits rather than by scaling it,
+  /// which is what the hardware does. Scaled, six eighths came out 218 where the machine gives 219 —
+  /// a level or two off on most colours the palette can name.
+  /// <para/>
+  /// Checked against RECOIL: one sample matches it on all 49152 pixels this way and is nowhere near
+  /// on the scaled reading; the other is within seven levels a channel, RECOIL having rounded that
+  /// one to four bits. ImageMagick draws neither picture, whatever it does with the file.
+  /// </remarks>
   internal static int DecodePaletteEntry(byte entry) {
     var g3 = (entry >> 5) & 0x07;
     var r3 = (entry >> 2) & 0x07;
     var b2 = entry & 0x03;
 
-    // Expand 3-bit to 8-bit: value * 255 / 7
-    var r = r3 * 255 / 7;
-    var g = g3 * 255 / 7;
-    // Expand 2-bit to 8-bit: value * 255 / 3
-    var b = b2 * 255 / 3;
+    var r = (r3 << 5) | (r3 << 2) | (r3 >> 1);
+    var g = (g3 << 5) | (g3 << 2) | (g3 >> 1);
+    var b = (b2 << 6) | (b2 << 4) | (b2 << 2) | b2;
 
     return (r << 16) | (g << 8) | b;
   }
