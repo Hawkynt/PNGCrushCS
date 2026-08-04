@@ -12,7 +12,7 @@ namespace FileFormat.MsxScreen5;
 // as their magic, and the registry consults magic before extension — so whichever it happened to
 // reach first took every MSX picture. A Screen 5 file, 256 by 212, was being opened as a Screen 6
 // one and drawn 512 by 424. The extension is what tells these apart, and it is what decides now.
-public readonly record struct MsxScreen5File : IImageFormatReader<MsxScreen5File>, IImageToRawImage<MsxScreen5File>, IImageFormatWriter<MsxScreen5File> {
+public readonly record struct MsxScreen5File : IImageFormatReader<MsxScreen5File>, IImageToRawImage<MsxScreen5File>, IImageFromRawImage<MsxScreen5File>, IImageFormatWriter<MsxScreen5File> {
 
   static string IImageFormatMetadata<MsxScreen5File>.PrimaryExtension => ".sc5";
   static string[] IImageFormatMetadata<MsxScreen5File>.FileExtensions => [".sc5", ".ge5"];
@@ -74,6 +74,60 @@ public readonly record struct MsxScreen5File : IImageFormatReader<MsxScreen5File
 
   /// <summary>Whether the original data had a 7-byte BSAVE header.</summary>
   public bool HasBsaveHeader { get; init; }
+
+  /// <summary>
+  /// Reduces a picture to the machine's own sixteen colours, two pixels to the byte.
+  /// </summary>
+  /// <remarks>
+  /// A Screen 5 picture can choose its sixteen from the 512 the hardware can make, and writing a
+  /// chosen palette was tried and taken out again. A saved page runs past the 212 lines that are
+  /// drawn and the palette sits after all of it, so appending thirty-two bytes to the drawn part
+  /// puts them somewhere no reader but ours looks: RECOIL went on using the default sixteen and drew
+  /// a picture agreeing with ours in barely a third of its pixels. The only sample in the corpus is
+  /// 27143 bytes and carries no palette at all.
+  /// <para/>
+  /// So the reduction is onto the default sixteen and the file states no palette, which is the shape
+  /// a real one has and the only one anything else draws the same way.
+  /// </remarks>
+  public static MsxScreen5File FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(FixedWidth, FixedHeight).PixelData;
+    var pixels = new byte[PixelDataSize];
+
+    for (var y = 0; y < FixedHeight; ++y)
+      for (var byteX = 0; byteX < FixedWidth / 2; ++byteX) {
+        var left = _Nearest(rgb, (y * FixedWidth + byteX * 2) * 3, DefaultMsx2Palette);
+        var right = _Nearest(rgb, (y * FixedWidth + byteX * 2 + 1) * 3, DefaultMsx2Palette);
+        pixels[y * (FixedWidth / 2) + byteX] = (byte)((left << 4) | right);
+      }
+
+    return new() { PixelData = pixels, Palette = null, HasBsaveHeader = true };
+  }
+
+  /// <summary>Which of the sixteen entries a pixel is nearest to.</summary>
+  private static int _Nearest(byte[] rgb, int at, byte[] palette) {
+    var best = 0;
+    var bestCost = int.MaxValue;
+
+    for (var entry = 0; entry < 16; ++entry) {
+      var red = ((palette[entry * 2] >> 4) & 7) * 255 / 7;
+      var green = (palette[entry * 2 + 1] & 7) * 255 / 7;
+      var blue = (palette[entry * 2] & 7) * 255 / 7;
+
+      var dr = rgb[at] - red;
+      var dg = rgb[at + 1] - green;
+      var db = rgb[at + 2] - blue;
+      var cost = dr * dr + dg * dg + db * db;
+      if (cost >= bestCost)
+        continue;
+
+      bestCost = cost;
+      best = entry;
+    }
+
+    return best;
+  }
 
   /// <summary>Converts this MSX Screen 5 image to a platform-independent <see cref="RawImage"/> in Indexed8 format.</summary>
   public static RawImage ToRawImage(MsxScreen5File file) {

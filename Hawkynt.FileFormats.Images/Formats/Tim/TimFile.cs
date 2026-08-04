@@ -5,7 +5,7 @@ namespace FileFormat.Tim;
 
 /// <summary>In-memory representation of a PlayStation 1 TIM texture.</summary>
 [FormatMagicBytes([0x10, 0x00, 0x00, 0x00])]
-public readonly record struct TimFile : IImageFormatReader<TimFile>, IImageToRawImage<TimFile>, IImageFormatWriter<TimFile> {
+public readonly record struct TimFile : IImageFormatReader<TimFile>, IImageToRawImage<TimFile>, IImageFromRawImage<TimFile>, IImageFormatWriter<TimFile> {
 
   static string IImageFormatMetadata<TimFile>.PrimaryExtension => ".tim";
   static string[] IImageFormatMetadata<TimFile>.FileExtensions => [".tim"];
@@ -28,6 +28,53 @@ public readonly record struct TimFile : IImageFormatReader<TimFile>, IImageToRaw
 
   /// <summary>Raw pixel data as stored in the TIM file.</summary>
   public byte[] PixelData { get; init; }
+
+  /// <summary>
+  /// Builds a sixteen-bit direct-colour texture, five bits to each channel.
+  /// </summary>
+  /// <remarks>
+  /// Of the four depths a TIM can be, this is the one that needs nothing decided for it: the four-
+  /// and eight-bit forms want a palette built and a colour table placed in video memory, and
+  /// twenty-four bits is rare enough that most things that read TIMs do not.
+  /// <para/>
+  /// The top bit of each pixel is what the machine calls semi-transparency, and a pixel of all
+  /// zeros with that bit clear is not black but nothing at all. So black is written with the bit
+  /// set: left clear, every black pixel in the picture would come out as a hole.
+  /// <para/>
+  /// The picture goes to the origin of video memory. A TIM states where it expects to be loaded and
+  /// nothing here knows what else a caller means to put beside it, so there is no better answer than
+  /// the corner — and it is what every tool that reads one for its pixels ignores anyway.
+  /// </remarks>
+  public static TimFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.ToRgb24();
+    var pixels = new byte[image.Width * image.Height * 2];
+
+    for (var i = 0; i < image.Width * image.Height; ++i) {
+      // Five bits a channel, taken from the top of each byte rather than rounded, so that a channel
+      // already a multiple of eight comes back exactly.
+      var red = rgb[i * 3] >> 3;
+      var green = rgb[i * 3 + 1] >> 3;
+      var blue = rgb[i * 3 + 2] >> 3;
+      var value = red | (green << 5) | (blue << 10);
+      if (value == 0)
+        value = 0x8000;
+
+      pixels[i * 2] = (byte)value;
+      pixels[i * 2 + 1] = (byte)(value >> 8);
+    }
+
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      Bpp = TimBpp.Bpp16,
+      HasClut = false,
+      ImageX = 0,
+      ImageY = 0,
+      PixelData = pixels,
+    };
+  }
 
   /// <summary>Converts a TIM file to a <see cref="RawImage"/>.</summary>
   public static RawImage ToRawImage(TimFile file) {
