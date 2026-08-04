@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.DoodleAtari;
 
 /// <summary>In-memory representation of an Atari ST Doodle monochrome image (640x400, 1 bitplane).</summary>
-public readonly record struct DoodleAtariFile : IImageFormatReader<DoodleAtariFile>, IImageToRawImage<DoodleAtariFile>, IImageFormatWriter<DoodleAtariFile> {
+public readonly record struct DoodleAtariFile : IImageFormatReader<DoodleAtariFile>, IImageToRawImage<DoodleAtariFile>, IImageFromRawImage<DoodleAtariFile>, IImageFormatWriter<DoodleAtariFile> {
 
   /// <summary>The exact file size: 80 bytes/line x 400 lines = 32000 bytes.</summary>
   public const int ExpectedFileSize = 32000;
@@ -25,6 +25,39 @@ public readonly record struct DoodleAtariFile : IImageFormatReader<DoodleAtariFi
 
   /// <summary>Raw monochrome bitmap data (1 bit per pixel, 32000 bytes total).</summary>
   public byte[] PixelData { get; init; }
+
+  /// <summary>
+  /// Reduces a picture to the monochrome screen, a set bit standing for black.
+  /// </summary>
+  /// <remarks>
+  /// The threshold is on brightness rather than on any one channel, so a coloured picture comes out
+  /// as the light and dark of itself rather than as one of its separations. Nothing is dithered: the
+  /// screen is 640 by 400 and the format states no palette, so there is no choice to make beyond
+  /// which side of the middle each pixel falls.
+  /// </remarks>
+  public static DoodleAtariFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    const int width = 640;
+    const int height = 400;
+    const int bytesPerRow = width / 8;
+
+    var rgb = image.SampleTo(width, height).PixelData;
+    var pixels = new byte[ExpectedFileSize];
+
+    for (var y = 0; y < height; ++y)
+      for (var x = 0; x < width; ++x) {
+        var at = (y * width + x) * 3;
+
+        // The usual weighting of the three channels, which is what "darker than the middle" means
+        // for anything that is not already grey.
+        var brightness = (rgb[at] * 299 + rgb[at + 1] * 587 + rgb[at + 2] * 114) / 1000;
+        if (brightness < 128)
+          pixels[y * bytesPerRow + x / 8] |= (byte)(1 << (7 - (x % 8)));
+      }
+
+    return new() { PixelData = pixels };
+  }
 
   public static RawImage ToRawImage(DoodleAtariFile file) {
 

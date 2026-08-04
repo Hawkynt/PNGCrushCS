@@ -6,8 +6,26 @@ namespace FileFormat.Core.Tests;
 public sealed class DataTypeTests {
 
   [Test]
-  public void PixelFormat_Has17Values() {
-    Assert.That(System.Enum.GetValues<PixelFormat>(), Has.Length.EqualTo(17));
+  public void PixelFormat_Has18Values() {
+    Assert.That(System.Enum.GetValues<PixelFormat>(), Has.Length.EqualTo(18));
+  }
+
+  /// <summary>
+  /// Every pixel format can state how wide a pixel is.
+  /// </summary>
+  /// <remarks>
+  /// The count above only notices that a format was added. This notices that one was added and not
+  /// wired in — which is what a format the tables do not know actually costs, since anything asking
+  /// how big a picture of it would be throws rather than answering.
+  /// </remarks>
+  [Test]
+  public void PixelFormat_EveryValueHasAWidth() {
+    Assert.Multiple(() => {
+      foreach (var format in System.Enum.GetValues<PixelFormat>()) {
+        Assert.That(() => RawImage.BitsPerPixel(format), Throws.Nothing, $"{format} states no bit width");
+        Assert.That(() => RawImage.BytesPerPixel(format), Throws.Nothing, $"{format} states no byte width");
+      }
+    });
   }
 
   [Test]

@@ -59,6 +59,8 @@ public static class PixelConverter {
       // Remaining hub exits. Without these the (Bgra32, target) pair falls through to
       // _ConvertViaIntermediate, whose own hub leg is a no-op — which used to recurse forever.
       (PixelFormat.Bgra32, PixelFormat.GrayAlpha16) => BgraToGrayAlpha16(data, totalPixels),
+      (PixelFormat.GrayAlpha32, PixelFormat.Bgra32) => GrayAlpha32ToBgra(data, totalPixels),
+      (PixelFormat.Bgra32, PixelFormat.GrayAlpha32) => BgraToGrayAlpha32(data, totalPixels),
       (PixelFormat.Bgra32, PixelFormat.Gray10) => BgraToGray10(data, totalPixels),
       (PixelFormat.Bgra32, PixelFormat.Rgb30) => BgraToRgb30(data, totalPixels),
 
@@ -67,6 +69,10 @@ public static class PixelConverter {
       (PixelFormat.Rgba64, PixelFormat.Rgb48) => Rgba64ToRgb48(data, totalPixels),
       (PixelFormat.Gray16, PixelFormat.Rgb48) => Gray16ToRgb48(data, totalPixels),
       (PixelFormat.Gray16, PixelFormat.Rgba64) => Gray16ToRgba64(data, totalPixels),
+      (PixelFormat.GrayAlpha32, PixelFormat.Rgba64) => GrayAlpha32ToRgba64(data, totalPixels),
+      (PixelFormat.Rgba64, PixelFormat.GrayAlpha32) => Rgba64ToGrayAlpha32(data, totalPixels),
+      (PixelFormat.GrayAlpha32, PixelFormat.GrayAlpha16) => GrayAlpha32ToGrayAlpha16(data, totalPixels),
+      (PixelFormat.GrayAlpha16, PixelFormat.GrayAlpha32) => GrayAlpha16ToGrayAlpha32(data, totalPixels),
       (PixelFormat.Rgb48, PixelFormat.Gray16) => Rgb48ToGray16(data, totalPixels),
       (PixelFormat.Rgba64, PixelFormat.Gray16) => Rgba64ToGray16(data, totalPixels),
 
@@ -1356,6 +1362,110 @@ public static class PixelConverter {
       result[dst] = data[src + map0];
       result[dst + 1] = data[src + map1];
       result[dst + 2] = data[src + map2];
+    }
+
+    return result;
+  }
+
+  // ── Sixteen-bit grey with alpha ─────────────────────────────────────────────
+  //
+  // PNG's fourth colour type at a depth of sixteen. Every other combination PNG allows had a route
+  // through here and this one had none, so such a file could not be opened at all.
+
+  /// <summary>Converts grey and alpha at sixteen bits each, big-endian, to BGRA.</summary>
+  public static byte[] GrayAlpha32ToBgra(byte[] data, int totalPixels) {
+    var result = new byte[totalPixels * 4];
+
+    for (var i = 0; i < totalPixels; ++i) {
+      // The high byte of each channel is the whole of what eight bits can hold.
+      var grey = data[i * 4];
+      var alpha = data[i * 4 + 2];
+      result[i * 4] = grey;
+      result[i * 4 + 1] = grey;
+      result[i * 4 + 2] = grey;
+      result[i * 4 + 3] = alpha;
+    }
+
+    return result;
+  }
+
+  /// <summary>Converts BGRA to grey and alpha at sixteen bits each, big-endian.</summary>
+  public static byte[] BgraToGrayAlpha32(byte[] data, int totalPixels) {
+    var result = new byte[totalPixels * 4];
+
+    for (var i = 0; i < totalPixels; ++i) {
+      var grey = (byte)((data[i * 4 + 2] * 299 + data[i * 4 + 1] * 587 + data[i * 4] * 114) / 1000);
+      var alpha = data[i * 4 + 3];
+
+      // Widened by repetition rather than by shifting, so that 255 becomes 65535 and not 65280.
+      result[i * 4] = grey;
+      result[i * 4 + 1] = grey;
+      result[i * 4 + 2] = alpha;
+      result[i * 4 + 3] = alpha;
+    }
+
+    return result;
+  }
+
+  /// <summary>Converts sixteen-bit grey with alpha to sixteen-bit RGBA, keeping every bit.</summary>
+  public static byte[] GrayAlpha32ToRgba64(byte[] data, int totalPixels) {
+    var result = new byte[totalPixels * 8];
+
+    for (var i = 0; i < totalPixels; ++i) {
+      var high = data[i * 4];
+      var low = data[i * 4 + 1];
+      for (var channel = 0; channel < 3; ++channel) {
+        result[i * 8 + channel * 2] = high;
+        result[i * 8 + channel * 2 + 1] = low;
+      }
+
+      result[i * 8 + 6] = data[i * 4 + 2];
+      result[i * 8 + 7] = data[i * 4 + 3];
+    }
+
+    return result;
+  }
+
+  /// <summary>Converts sixteen-bit RGBA to sixteen-bit grey with alpha, keeping every bit of both.</summary>
+  public static byte[] Rgba64ToGrayAlpha32(byte[] data, int totalPixels) {
+    var result = new byte[totalPixels * 4];
+
+    for (var i = 0; i < totalPixels; ++i) {
+      var red = (data[i * 8] << 8) | data[i * 8 + 1];
+      var green = (data[i * 8 + 2] << 8) | data[i * 8 + 3];
+      var blue = (data[i * 8 + 4] << 8) | data[i * 8 + 5];
+      var grey = (red * 299 + green * 587 + blue * 114) / 1000;
+
+      result[i * 4] = (byte)(grey >> 8);
+      result[i * 4 + 1] = (byte)grey;
+      result[i * 4 + 2] = data[i * 8 + 6];
+      result[i * 4 + 3] = data[i * 8 + 7];
+    }
+
+    return result;
+  }
+
+  /// <summary>Narrows sixteen-bit grey with alpha to eight.</summary>
+  public static byte[] GrayAlpha32ToGrayAlpha16(byte[] data, int totalPixels) {
+    var result = new byte[totalPixels * 2];
+
+    for (var i = 0; i < totalPixels; ++i) {
+      result[i * 2] = data[i * 4];
+      result[i * 2 + 1] = data[i * 4 + 2];
+    }
+
+    return result;
+  }
+
+  /// <summary>Widens eight-bit grey with alpha to sixteen, repeating each byte.</summary>
+  public static byte[] GrayAlpha16ToGrayAlpha32(byte[] data, int totalPixels) {
+    var result = new byte[totalPixels * 4];
+
+    for (var i = 0; i < totalPixels; ++i) {
+      result[i * 4] = data[i * 2];
+      result[i * 4 + 1] = data[i * 2];
+      result[i * 4 + 2] = data[i * 2 + 1];
+      result[i * 4 + 3] = data[i * 2 + 1];
     }
 
     return result;

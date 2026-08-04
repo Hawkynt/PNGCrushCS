@@ -38,6 +38,7 @@ public sealed class RawImage {
         case PixelFormat.Argb32:
         case PixelFormat.Rgba64:
         case PixelFormat.GrayAlpha16:
+        case PixelFormat.GrayAlpha32:
           return true;
         case PixelFormat.Indexed8:
         case PixelFormat.Indexed4:
@@ -74,6 +75,7 @@ public sealed class RawImage {
     PixelFormat.Gray8 => 1,
     PixelFormat.Gray16 => 2,
     PixelFormat.GrayAlpha16 => 2,
+    PixelFormat.GrayAlpha32 => 4,
     PixelFormat.Indexed8 => 1,
     PixelFormat.Indexed4 => 0,
     PixelFormat.Indexed1 => 0,
@@ -131,6 +133,7 @@ public sealed class RawImage {
     PixelFormat.Gray8 => 8,
     PixelFormat.Gray16 => 16,
     PixelFormat.GrayAlpha16 => 16,
+    PixelFormat.GrayAlpha32 => 32,
     PixelFormat.Indexed8 => 8,
     PixelFormat.Indexed4 => 4,
     PixelFormat.Indexed1 => 1,

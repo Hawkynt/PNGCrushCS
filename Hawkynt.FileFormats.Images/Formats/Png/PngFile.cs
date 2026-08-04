@@ -106,7 +106,7 @@ public readonly record struct PngFile :
 
     image = image.EnsureAnyFormat(
       PixelFormat.Rgba32, PixelFormat.Rgb24, PixelFormat.Rgba64, PixelFormat.Rgb48,
-      PixelFormat.GrayAlpha16, PixelFormat.Gray16, PixelFormat.Gray8,
+      PixelFormat.GrayAlpha32, PixelFormat.GrayAlpha16, PixelFormat.Gray16, PixelFormat.Gray8,
       PixelFormat.Indexed8, PixelFormat.Indexed4, PixelFormat.Indexed1);
 
     var (colorType, bitDepth) = _GetPngSettings(image.Format);
@@ -176,6 +176,7 @@ public readonly record struct PngFile :
     PngColorType.Grayscale when bitDepth is 1 or 2 or 4 or 8 => PixelFormat.Gray8,
     PngColorType.Grayscale when bitDepth == 16 => PixelFormat.Gray16,
     PngColorType.GrayscaleAlpha when bitDepth == 8 => PixelFormat.GrayAlpha16,
+    PngColorType.GrayscaleAlpha when bitDepth == 16 => PixelFormat.GrayAlpha32,
     PngColorType.RGB when bitDepth == 8 => PixelFormat.Rgb24,
     PngColorType.RGB when bitDepth == 16 => PixelFormat.Rgb48,
     PngColorType.RGBA when bitDepth == 8 => PixelFormat.Rgba32,
@@ -190,6 +191,7 @@ public readonly record struct PngFile :
     PixelFormat.Gray8 => (PngColorType.Grayscale, 8),
     PixelFormat.Gray16 => (PngColorType.Grayscale, 16),
     PixelFormat.GrayAlpha16 => (PngColorType.GrayscaleAlpha, 8),
+    PixelFormat.GrayAlpha32 => (PngColorType.GrayscaleAlpha, 16),
     PixelFormat.Rgb24 => (PngColorType.RGB, 8),
     PixelFormat.Rgb48 => (PngColorType.RGB, 16),
     PixelFormat.Rgba32 => (PngColorType.RGBA, 8),

@@ -10,6 +10,18 @@ public enum PixelFormat {
   Gray8,
   Gray16,
   GrayAlpha16,
+
+  /// <summary>
+  /// Grey and alpha at sixteen bits each, big-endian, four bytes a pixel.
+  /// </summary>
+  /// <remarks>
+  /// PNG's fourth colour type at a depth of sixteen. Every other combination PNG allows had a format
+  /// here and this one did not, so a sixteen-bit grey-with-alpha PNG could not be opened at all —
+  /// not narrowed, refused. Byte order is the network order PNG stores, as with
+  /// <see cref="Gray16"/> and <see cref="Rgba64"/>.
+  /// </remarks>
+  GrayAlpha32,
+
   Indexed8,
   Indexed4,
   Indexed1,
