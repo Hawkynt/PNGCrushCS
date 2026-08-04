@@ -8,7 +8,18 @@ namespace FileFormat.Vicar;
 public readonly record struct VicarFile : IImageFormatReader<VicarFile>, IImageToRawImage<VicarFile>, IImageFromRawImage<VicarFile>, IImageFormatWriter<VicarFile> {
 
   static string IImageFormatMetadata<VicarFile>.PrimaryExtension => ".vic";
-  static string[] IImageFormatMetadata<VicarFile>.FileExtensions => [".vic", ".vicar"];
+  /// <summary>
+  /// Also .img, which is what most VICAR files are actually named.
+  /// </summary>
+  /// <remarks>
+  /// Only .vic and .vicar were claimed, and two of the three samples are .img, so they were not read
+  /// though this reader decodes them the moment it is given one. The extension is shared with several
+  /// other formats, so the "LBLSIZE=" every VICAR opens with is stated below to settle it on content.
+  /// </remarks>
+  static string[] IImageFormatMetadata<VicarFile>.FileExtensions => [".vic", ".vicar", ".img"];
+
+  static bool? IImageFormatMetadata<VicarFile>.MatchesSignature(ReadOnlySpan<byte> header)
+    => header.Length >= 8 && header[..8].SequenceEqual("LBLSIZE="u8) ? true : null;
   static VicarFile IImageFormatReader<VicarFile>.FromSpan(ReadOnlySpan<byte> data) => VicarReader.FromSpan(data);
   static byte[] IImageFormatWriter<VicarFile>.ToBytes(VicarFile file) => VicarWriter.ToBytes(file);
   public int Width { get; init; }
