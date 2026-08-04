@@ -27,12 +27,23 @@ public static class RiffWriter {
     return ms.ToArray();
   }
 
+  /// <summary>
+  /// Writes the plain chunks and then the lists.
+  /// </summary>
+  /// <remarks>
+  /// The lists used to go first, which puts an animated cursor's frames ahead of the header that
+  /// says how many of them there are and how big they are. Every real one of those files states its
+  /// header first, and Windows reads it as a header rather than searching for it — so a file written
+  /// the other way round is a well-formed RIFF that the thing it is meant for will not open.
+  /// <para/>
+  /// Nothing else here writes a list at all, so this only ever changed that one format.
+  /// </remarks>
   private static void _WriteElements(MemoryStream ms, System.Collections.Generic.List<RiffChunk> chunks, System.Collections.Generic.List<RiffList> lists) {
-    foreach (var list in lists)
-      _WriteList(ms, list);
-
     foreach (var chunk in chunks)
       _WriteChunk(ms, chunk);
+
+    foreach (var list in lists)
+      _WriteList(ms, list);
   }
 
   private static void _WriteChunk(MemoryStream ms, RiffChunk chunk) {
