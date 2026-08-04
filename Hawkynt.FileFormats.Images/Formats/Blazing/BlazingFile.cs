@@ -21,6 +21,25 @@ public readonly record struct BlazingFile : IImageFormatReader<BlazingFile>, IIm
   /// <summary>Expected file size: 2 + 8000 + 1000 + 7 = 9009.</summary>
   public const int ExpectedFileSize = LoadAddressSize + BitmapDataSize + ScreenDataSize + PaddingSize;
 
+  /// <summary>
+  /// The size of the multicolour form: a load address and three sections rounded up to kilobytes.
+  /// </summary>
+  /// <remarks>
+  /// Both Blazing Paddles pictures in the corpus are this form, and neither was read — the hires one
+  /// above wants 9009 bytes and they are 10242. The sections are padded out: the bitmap takes 8192 of
+  /// the 8000 it uses, and the screen and colour RAM a kilobyte each of their thousand bytes, which is
+  /// 10240 after the load address and the file to the byte.
+  /// <para/>
+  /// Nothing states a background; both samples come out right against RECOIL with it black.
+  /// </remarks>
+  public const int MulticolorFileSize = LoadAddressSize + 8192 + 1024 + 1024;
+
+  /// <summary>Where the video matrix starts in the multicolour form.</summary>
+  internal const int MulticolorScreenOffset = LoadAddressSize + 8192;
+
+  /// <summary>Where the colour RAM starts in the multicolour form.</summary>
+  internal const int MulticolorColorOffset = MulticolorScreenOffset + 1024;
+
   /// <summary>Default load address ($2000).</summary>
   internal const ushort DefaultLoadAddress = 0x2000;
 
@@ -31,7 +50,8 @@ public readonly record struct BlazingFile : IImageFormatReader<BlazingFile>, IIm
   internal const int PixelHeight = 200;
 
   static string IImageFormatMetadata<BlazingFile>.PrimaryExtension => ".blz";
-  static string[] IImageFormatMetadata<BlazingFile>.FileExtensions => [".blz"];
+  /// <summary>Also .pi, which both samples in the corpus carry.</summary>
+  static string[] IImageFormatMetadata<BlazingFile>.FileExtensions => [".blz", ".pi"];
   static BlazingFile IImageFormatReader<BlazingFile>.FromSpan(ReadOnlySpan<byte> data) => BlazingReader.FromSpan(data);
   static byte[] IImageFormatWriter<BlazingFile>.ToBytes(BlazingFile file) => BlazingWriter.ToBytes(file);
 
@@ -50,8 +70,13 @@ public readonly record struct BlazingFile : IImageFormatReader<BlazingFile>, IIm
   /// <summary>Screen RAM / video matrix (1000 bytes). Upper nybble = foreground color, lower nybble = background color per 8x8 cell.</summary>
   public byte[] ScreenData { get; init; }
 
+  /// <summary>Colour RAM, which only the multicolour form has.</summary>
+  public byte[] ColorData { get; init; }
+
   /// <summary>Converts this Blazing Paddles image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(BlazingFile file) {
+    if (file.ColorData != null)
+      return Commodore64Graphics.DecodeMulticolor(file.BitmapData, file.ScreenData, file.ColorData, 0, PixelWidth / 2, PixelHeight);
 
     var rgb = new byte[PixelWidth * PixelHeight * 3];
 

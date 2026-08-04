@@ -28,8 +28,16 @@ public static class BlazingReader {
 
   public static BlazingFile FromSpan(ReadOnlySpan<byte> data) {
 
+    if (data.Length == BlazingFile.MulticolorFileSize)
+      return new() {
+        LoadAddress = (ushort)(data[0] | (data[1] << 8)),
+        BitmapData = data.Slice(BlazingFile.LoadAddressSize, BlazingFile.BitmapDataSize).ToArray(),
+        ScreenData = data.Slice(BlazingFile.MulticolorScreenOffset, BlazingFile.ScreenDataSize).ToArray(),
+        ColorData = data.Slice(BlazingFile.MulticolorColorOffset, BlazingFile.ScreenDataSize).ToArray(),
+      };
+
     if (data.Length < BlazingFile.ExpectedFileSize)
-      throw new InvalidDataException($"Blazing Paddles file too small (got {data.Length} bytes, expected {BlazingFile.ExpectedFileSize}).");
+      throw new InvalidDataException($"A Blazing Paddles picture is {BlazingFile.MulticolorFileSize} bytes in multicolour or {BlazingFile.ExpectedFileSize} in hires; this file is {data.Length}.");
 
     var offset = 0;
 
