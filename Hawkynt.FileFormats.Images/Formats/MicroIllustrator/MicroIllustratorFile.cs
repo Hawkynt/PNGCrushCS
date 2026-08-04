@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.MicroIllustrator;
 
 /// <summary>In-memory representation of a Commodore 64 Micro Illustrator multicolor image.</summary>
-public readonly record struct MicroIllustratorFile : IImageFormatReader<MicroIllustratorFile>, IImageToRawImage<MicroIllustratorFile>, IImageFormatWriter<MicroIllustratorFile> {
+public readonly record struct MicroIllustratorFile : IImageFormatReader<MicroIllustratorFile>, IImageToRawImage<MicroIllustratorFile>, IImageFromRawImage<MicroIllustratorFile>, IImageFormatWriter<MicroIllustratorFile> {
 
   static string IImageFormatMetadata<MicroIllustratorFile>.PrimaryExtension => ".mil";
   static string[] IImageFormatMetadata<MicroIllustratorFile>.FileExtensions => [".mil"];
@@ -17,8 +17,8 @@ public readonly record struct MicroIllustratorFile : IImageFormatReader<MicroIll
   /// <summary>The fixed height of a Micro Illustrator image in pixels.</summary>
   public const int FixedHeight = 200;
 
-  /// <summary>The expected total file size in bytes (2 + 8000 + 1000 + 1000 + 1).</summary>
-  public const int ExpectedFileSize = 10003;
+  /// <summary>The total file size in bytes: 2 + 20 + 1000 + 1000 + 8000.</summary>
+  public const int ExpectedFileSize = 10022;
 
   /// <summary>Size of the bitmap data section in bytes.</summary>
   internal const int BitmapDataSize = 8000;
@@ -31,6 +31,30 @@ public readonly record struct MicroIllustratorFile : IImageFormatReader<MicroIll
 
   /// <summary>Size of the load address in bytes.</summary>
   internal const int LoadAddressSize = 2;
+
+  /// <summary>The header that follows the load address and states where the picture begins.</summary>
+  internal const int HeaderSize = 20;
+
+  /// <summary>Where the header states its own length.</summary>
+  internal const int HeaderSizeOffset = 6;
+
+  /// <summary>Where the picture starts: the last ten thousand bytes of the file.</summary>
+  internal const int PictureOffset = ExpectedFileSize - (VideoMatrixSize + ColorRamSize + BitmapDataSize);
+
+  /// <summary>
+  /// Where the shared background register sits.
+  /// </summary>
+  /// <remarks>
+  /// Found by changing one header byte at a time and asking RECOIL what colour it drew behind the
+  /// picture: this is the only byte that moves it.
+  /// </remarks>
+  internal const int BackgroundOffset = 8;
+
+  /// <summary>Where the header states the size of each section, matrix first and bitmap last.</summary>
+  internal const int SectionSizesOffset = 9;
+
+  /// <summary>The address Micro Illustrator's own files carry.</summary>
+  internal const ushort DefaultLoadAddress = 0x18DC;
 
   /// <summary>Image width, always 160.</summary>
   public int Width => FixedWidth;
@@ -57,5 +81,25 @@ public readonly record struct MicroIllustratorFile : IImageFormatReader<MicroIll
   public static RawImage ToRawImage(MicroIllustratorFile file)
     => Commodore64Graphics.DecodeMulticolor(
       file.BitmapData, file.VideoMatrix, file.ColorRam, file.BackgroundColor, FixedWidth, FixedHeight);
+
+  /// <summary>Reduces a picture to the multicolour screen this program saved.</summary>
+  public static MicroIllustratorFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(FixedWidth, FixedHeight);
+    var bitmap = new byte[BitmapDataSize];
+    var videoMatrix = new byte[VideoMatrixSize];
+    var colorRam = new byte[ColorRamSize];
+    var background = Commodore64Graphics.EncodeMulticolor(
+      rgb.PixelData, FixedWidth, FixedHeight, bitmap, videoMatrix, colorRam);
+
+    return new() {
+      LoadAddress = DefaultLoadAddress,
+      BitmapData = bitmap,
+      VideoMatrix = videoMatrix,
+      ColorRam = colorRam,
+      BackgroundColor = background,
+    };
+  }
 
 }

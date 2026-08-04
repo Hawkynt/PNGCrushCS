@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.KoalaCompressed;
 
 /// <summary>In-memory representation of a Commodore 64 compressed Koala multicolor image.</summary>
-public readonly record struct KoalaCompressedFile : IImageFormatReader<KoalaCompressedFile>, IImageToRawImage<KoalaCompressedFile>, IImageFormatWriter<KoalaCompressedFile> {
+public readonly record struct KoalaCompressedFile : IImageFormatReader<KoalaCompressedFile>, IImageToRawImage<KoalaCompressedFile>, IImageFromRawImage<KoalaCompressedFile>, IImageFormatWriter<KoalaCompressedFile> {
 
   static string IImageFormatMetadata<KoalaCompressedFile>.PrimaryExtension => ".gg";
   static string[] IImageFormatMetadata<KoalaCompressedFile>.FileExtensions => [".gg"];
@@ -63,5 +63,29 @@ public readonly record struct KoalaCompressedFile : IImageFormatReader<KoalaComp
   public static RawImage ToRawImage(KoalaCompressedFile file)
     => Commodore64Graphics.DecodeMulticolor(
       file.BitmapData, file.VideoMatrix, file.ColorRam, file.BackgroundColor, FixedWidth, FixedHeight);
+
+  /// <summary>Reduces a picture to a Koala screen, which the writer then packs.</summary>
+  /// <remarks>
+  /// The same screen a plain Koala holds; only what surrounds it differs, so the reduction is the
+  /// same one and the packing is the writer's business rather than this one's.
+  /// </remarks>
+  public static KoalaCompressedFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(FixedWidth, FixedHeight);
+    var bitmap = new byte[BitmapDataSize];
+    var videoMatrix = new byte[VideoMatrixSize];
+    var colorRam = new byte[ColorRamSize];
+    var background = Commodore64Graphics.EncodeMulticolor(
+      rgb.PixelData, FixedWidth, FixedHeight, bitmap, videoMatrix, colorRam);
+
+    return new() {
+      LoadAddress = 0x6000,
+      BitmapData = bitmap,
+      VideoMatrix = videoMatrix,
+      ColorRam = colorRam,
+      BackgroundColor = background,
+    };
+  }
 
 }

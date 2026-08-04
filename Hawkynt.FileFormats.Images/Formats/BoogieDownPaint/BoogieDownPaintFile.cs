@@ -11,7 +11,8 @@ namespace FileFormat.BoogieDownPaint;
 /// the earliest of the three has no header at all.
 /// </remarks>
 public readonly record struct BoogieDownPaintFile
-  : IImageFormatReader<BoogieDownPaintFile>, IImageToRawImage<BoogieDownPaintFile> {
+  : IImageFormatReader<BoogieDownPaintFile>, IImageToRawImage<BoogieDownPaintFile>,
+    IImageFromRawImage<BoogieDownPaintFile>, IImageFormatWriter<BoogieDownPaintFile> {
 
   /// <summary>Pixels across.</summary>
   public const int Width = 160;
@@ -35,12 +36,34 @@ public readonly record struct BoogieDownPaintFile
   static string[] IImageFormatMetadata<BoogieDownPaintFile>.FileExtensions => [".bdp"];
   static BoogieDownPaintFile IImageFormatReader<BoogieDownPaintFile>.FromSpan(ReadOnlySpan<byte> data)
     => BoogieDownPaintReader.FromSpan(data);
+  static byte[] IImageFormatWriter<BoogieDownPaintFile>.ToBytes(BoogieDownPaintFile file)
+    => BoogieDownPaintWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<BoogieDownPaintFile>.VideoModes => [
     new("Boogie Down Paint", [(Width, Height)], [Commodore64Graphics.ColorCount])
   ];
 
   /// <summary>The unpacked screen.</summary>
   public byte[] ScreenData { get; init; }
+
+  /// <summary>Reduces a picture to the multicolour screen this format packs.</summary>
+  /// <remarks>
+  /// The three sections and the background byte sit in one buffer here rather than in fields of
+  /// their own, because that is how the file stores them: the compression runs across the whole
+  /// screen and does not know where one section stops.
+  /// </remarks>
+  public static BoogieDownPaintFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(Width, Height);
+    var screen = new byte[UnpackedSize];
+    screen[BackgroundOffset] = Commodore64Graphics.EncodeMulticolor(
+      rgb.PixelData, Width, Height,
+      screen.AsSpan(0, MatrixOffset),
+      screen.AsSpan(MatrixOffset, ColorOffset - MatrixOffset),
+      screen.AsSpan(ColorOffset, BackgroundOffset - ColorOffset));
+
+    return new() { ScreenData = screen };
+  }
 
   public static RawImage ToRawImage(BoogieDownPaintFile file) {
     var data = file.ScreenData ?? [];

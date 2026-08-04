@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.InterPaintHi;
 
 /// <summary>In-memory representation of a Commodore 64 InterPaint Hires image.</summary>
-public readonly record struct InterPaintHiFile : IImageFormatReader<InterPaintHiFile>, IImageToRawImage<InterPaintHiFile>, IImageFormatWriter<InterPaintHiFile> {
+public readonly record struct InterPaintHiFile : IImageFormatReader<InterPaintHiFile>, IImageToRawImage<InterPaintHiFile>, IImageFromRawImage<InterPaintHiFile>, IImageFormatWriter<InterPaintHiFile> {
 
   static string IImageFormatMetadata<InterPaintHiFile>.PrimaryExtension => ".iph";
   static string[] IImageFormatMetadata<InterPaintHiFile>.FileExtensions => [".iph", ".hre"];
@@ -47,5 +47,22 @@ public readonly record struct InterPaintHiFile : IImageFormatReader<InterPaintHi
   /// <summary>Converts this InterPaint Hires image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(InterPaintHiFile file)
     => Commodore64Graphics.DecodeHires(file.BitmapData, file.ScreenRam, FixedWidth, FixedHeight);
+
+  /// <summary>Builds a high-resolution screen, two colours to each character cell.</summary>
+  /// <remarks>
+  /// The address is where the bitmap lands, the bitmap being the first thing after it. Nothing reads
+  /// it back — RECOIL takes a file of this length at this extension whatever the two leading bytes
+  /// say — but a machine told to load the file without one goes wherever it was last told.
+  /// </remarks>
+  public static InterPaintHiFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(FixedWidth, FixedHeight);
+    var bitmap = new byte[BitmapDataSize];
+    var screen = new byte[ScreenRamSize];
+    Commodore64Graphics.EncodeHires(rgb.PixelData, FixedWidth, FixedHeight, bitmap, screen);
+
+    return new() { LoadAddress = 0x4000, BitmapData = bitmap, ScreenRam = screen };
+  }
 
 }
