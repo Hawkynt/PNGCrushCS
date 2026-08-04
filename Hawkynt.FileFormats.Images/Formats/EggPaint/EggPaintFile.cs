@@ -14,7 +14,7 @@ namespace FileFormat.EggPaint;
 /// 128 by 128, 320 by 120 and 256 by 256, each width times height times two plus eight.
 /// </remarks>
 public readonly record struct EggPaintFile
-  : IImageFormatReader<EggPaintFile>, IImageToRawImage<EggPaintFile>, IImageFormatWriter<EggPaintFile> {
+  : IImageFormatReader<EggPaintFile>, IImageToRawImage<EggPaintFile>, IImageFromRawImage<EggPaintFile>, IImageFormatWriter<EggPaintFile> {
 
   static string IImageFormatMetadata<EggPaintFile>.PrimaryExtension => ".trp";
   static string[] IImageFormatMetadata<EggPaintFile>.FileExtensions => [".trp"];
@@ -47,6 +47,29 @@ public readonly record struct EggPaintFile
   /// which is what RECOIL does: read that way the smallest sample matches it on every pixel, where
   /// scaling the fields instead agrees on barely a quarter of them.
   /// </remarks>
+  /// <summary>
+  /// Builds a truecolour picture, five bits of red and blue and six of green.
+  /// </summary>
+  /// <remarks>
+  /// The word is big-endian, which is the machine's order and not the one the rest of this format's
+  /// neighbours use. Green gets the extra bit because the eye has most of its resolution there,
+  /// which is the same reason every other sixteen-bit direct-colour format of the period does it.
+  /// </remarks>
+  public static EggPaintFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.ToRgb24();
+    var pixels = new byte[image.Width * image.Height * 2];
+
+    for (var i = 0; i < image.Width * image.Height; ++i) {
+      var value = ((rgb[i * 3] >> 3) << 11) | ((rgb[i * 3 + 1] >> 2) << 5) | (rgb[i * 3 + 2] >> 3);
+      pixels[i * 2] = (byte)(value >> 8);
+      pixels[i * 2 + 1] = (byte)value;
+    }
+
+    return new() { Width = image.Width, Height = image.Height, PixelData = pixels };
+  }
+
   public static RawImage ToRawImage(EggPaintFile file) {
     var width = file.Width;
     var height = file.Height;

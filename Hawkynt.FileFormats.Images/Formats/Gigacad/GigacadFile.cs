@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Gigacad;
 
 /// <summary>In-memory representation of an Atari ST GigaCAD monochrome image (640x400, 1 bitplane).</summary>
-public readonly record struct GigacadFile : IImageFormatReader<GigacadFile>, IImageToRawImage<GigacadFile>, IImageFormatWriter<GigacadFile> {
+public readonly record struct GigacadFile : IImageFormatReader<GigacadFile>, IImageToRawImage<GigacadFile>, IImageFromRawImage<GigacadFile>, IImageFormatWriter<GigacadFile> {
 
   /// <summary>
   /// The size of the only form any sample takes: a load address and eight kilobytes.
@@ -51,6 +51,52 @@ public readonly record struct GigacadFile : IImageFormatReader<GigacadFile>, IIm
 
   /// <summary>Raw monochrome bitmap data (1 bit per pixel, 32000 bytes total).</summary>
   public byte[] PixelData { get; init; }
+
+  /// <summary>
+  /// Reduces a picture to the Commodore screen, 320 by 200, a clear bit standing for ink.
+  /// </summary>
+  /// <remarks>
+  /// The reader takes two shapes and this writes the smaller: both samples are the Commodore one at
+  /// 8194 bytes, and RECOIL refuses the Atari length of 32000 at this extension. The rows are dealt
+  /// back into character cells on the way out, eight lines of one cell together, which is how the
+  /// machine holds a bitmap and not how a picture is drawn.
+  /// <para/>
+  /// A set bit is paper here rather than ink, which is the opposite of most screens of the period
+  /// and is what the samples are.
+  /// </remarks>
+  public static GigacadFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    const int width = 320;
+    const int height = 200;
+    const int bytesPerRow = width / 8;
+
+    var rgb = image.SampleTo(width, height).PixelData;
+    var rows = new byte[CommodoreScreenSize];
+
+    for (var y = 0; y < height; ++y)
+      for (var x = 0; x < width; ++x) {
+        var at = (y * width + x) * 3;
+        var brightness = (rgb[at] * 299 + rgb[at + 1] * 587 + rgb[at + 2] * 114) / 1000;
+        if (brightness >= 128)
+          rows[y * bytesPerRow + x / 8] |= (byte)(1 << (7 - (x % 8)));
+      }
+
+    return new() { Width = width, Height = height, SetBitIsPaper = true, PixelData = rows };
+  }
+
+  /// <summary>Deals rows back into character cells, which is how the machine holds them.</summary>
+  internal static byte[] RowsToCells(ReadOnlySpan<byte> rows, int width, int height) {
+    var cells = new byte[rows.Length];
+    var columns = width / 8;
+
+    for (var cellRow = 0; cellRow < height / 8; ++cellRow)
+      for (var cellColumn = 0; cellColumn < columns; ++cellColumn)
+        for (var line = 0; line < 8; ++line)
+          cells[(cellRow * columns + cellColumn) * 8 + line] = rows[(cellRow * 8 + line) * columns + cellColumn];
+
+    return cells;
+  }
 
   public static RawImage ToRawImage(GigacadFile file) {
 
