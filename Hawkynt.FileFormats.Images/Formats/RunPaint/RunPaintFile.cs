@@ -5,7 +5,7 @@ using FileFormat.Core;
 namespace FileFormat.RunPaint;
 
 /// <summary>In-memory representation of a Run Paint multicolor image (.rpm).</summary>
-public readonly record struct RunPaintFile : IImageFormatReader<RunPaintFile>, IImageToRawImage<RunPaintFile>, IImageFormatWriter<RunPaintFile> {
+public readonly record struct RunPaintFile : IImageFormatReader<RunPaintFile>, IImageToRawImage<RunPaintFile>, IImageFromRawImage<RunPaintFile>, IImageFormatWriter<RunPaintFile> {
 
   static string IImageFormatMetadata<RunPaintFile>.PrimaryExtension => ".rpm";
   static string[] IImageFormatMetadata<RunPaintFile>.FileExtensions => [".rpm"];
@@ -55,6 +55,26 @@ public readonly record struct RunPaintFile : IImageFormatReader<RunPaintFile>, I
   public byte BackgroundColor { get; init; }
 
   /// <summary>Converts this image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
+  /// <summary>Reduces a picture to the multicolour screen this program saved.</summary>
+  public static RunPaintFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(FixedWidth, FixedHeight);
+    var bitmap = new byte[BitmapDataSize];
+    var screen = new byte[ScreenRamSize];
+    var colors = new byte[ColorRamSize];
+    var background = Commodore64Graphics.EncodeMulticolor(
+      rgb.PixelData, FixedWidth, FixedHeight, bitmap, screen, colors);
+
+    return new() {
+      LoadAddress = 0x6000,
+      BitmapData = bitmap,
+      ScreenRam = screen,
+      ColorRam = colors,
+      BackgroundColor = background,
+    };
+  }
+
   public static RawImage ToRawImage(RunPaintFile file) {
 
     const int width = FixedWidth;

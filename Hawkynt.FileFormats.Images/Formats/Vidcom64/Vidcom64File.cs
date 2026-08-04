@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Vidcom64;
 
 /// <summary>In-memory representation of a Commodore 64 Vidcom 64 multicolor image.</summary>
-public readonly record struct Vidcom64File : IImageFormatReader<Vidcom64File>, IImageToRawImage<Vidcom64File>, IImageFormatWriter<Vidcom64File> {
+public readonly record struct Vidcom64File : IImageFormatReader<Vidcom64File>, IImageToRawImage<Vidcom64File>, IImageFromRawImage<Vidcom64File>, IImageFormatWriter<Vidcom64File> {
 
   static string IImageFormatMetadata<Vidcom64File>.PrimaryExtension => ".vid";
   static string[] IImageFormatMetadata<Vidcom64File>.FileExtensions => [".vid"];
@@ -70,6 +70,38 @@ public readonly record struct Vidcom64File : IImageFormatReader<Vidcom64File>, I
   public byte BackgroundColor { get; init; }
 
   /// <summary>Converts this Vidcom 64 image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
+  /// <summary>
+  /// Reduces a picture to the multicolour screen Vidcom 64 saved.
+  /// </summary>
+  /// <remarks>
+  /// The twenty-four bytes between the load address and the picture are left empty. Nothing in them
+  /// is read back, and both a file this writes and one it reads come out the same either way.
+  /// <para/>
+  /// Pattern 00 is told to use black rather than left to choose. The file has nowhere to record a
+  /// background — the reader draws it black on the strength of RECOIL and XnView agreeing that it
+  /// does — so a background chosen here would be one the picture could not carry, and every pixel
+  /// standing on it would come back black however good the choice was.
+  /// </remarks>
+  public static Vidcom64File FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(FixedWidth, FixedHeight);
+    var bitmap = new byte[BitmapDataSize];
+    var screen = new byte[ScreenRamSize];
+    var colors = new byte[ColorRamSize];
+    Commodore64Graphics.EncodeMulticolor(
+      rgb.PixelData, FixedWidth, FixedHeight, bitmap, screen, colors, fixedBackground: 0);
+
+    return new() {
+      LoadAddress = 0x5800,
+      HeaderData = new byte[HeaderDataSize],
+      BitmapData = bitmap,
+      ScreenRam = screen,
+      ColorRam = colors,
+      BackgroundColor = 0,
+    };
+  }
+
   public static RawImage ToRawImage(Vidcom64File file) {
 
     const int width = FixedWidth;

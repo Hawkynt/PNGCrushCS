@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.AmicaPaint;
 
 /// <summary>In-memory representation of a Commodore 64 Amica Paint multicolor image.</summary>
-public readonly record struct AmicaPaintFile : IImageFormatReader<AmicaPaintFile>, IImageToRawImage<AmicaPaintFile>, IImageFormatWriter<AmicaPaintFile> {
+public readonly record struct AmicaPaintFile : IImageFormatReader<AmicaPaintFile>, IImageToRawImage<AmicaPaintFile>, IImageFromRawImage<AmicaPaintFile>, IImageFormatWriter<AmicaPaintFile> {
 
   static string IImageFormatMetadata<AmicaPaintFile>.PrimaryExtension => ".ami";
   static string[] IImageFormatMetadata<AmicaPaintFile>.FileExtensions => [".ami"];
@@ -69,6 +69,26 @@ public readonly record struct AmicaPaintFile : IImageFormatReader<AmicaPaintFile
   public byte BackgroundColor { get; init; }
 
   /// <summary>Converts this Amica Paint image to a platform-independent <see cref="RawImage"/> in Rgb24 format using multicolor decode.</summary>
+  /// <summary>Reduces a picture to the multicolour screen this program saved.</summary>
+  public static AmicaPaintFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(FixedWidth, FixedHeight);
+    var bitmap = new byte[BitmapDataSize];
+    var screen = new byte[ScreenRamSize];
+    var colors = new byte[ColorRamSize];
+    var background = Commodore64Graphics.EncodeMulticolor(
+      rgb.PixelData, FixedWidth, FixedHeight, bitmap, screen, colors);
+
+    return new() {
+      LoadAddress = 0x4000,
+      BitmapData = bitmap,
+      ScreenRam = screen,
+      ColorRam = colors,
+      BackgroundColor = background,
+    };
+  }
+
   public static RawImage ToRawImage(AmicaPaintFile file) {
 
     const int width = FixedWidth;

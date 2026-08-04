@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Blazing;
 
 /// <summary>In-memory representation of a Blazing Paddles hires image (C64, 320x200, 1bpp cell-based).</summary>
-public readonly record struct BlazingFile : IImageFormatReader<BlazingFile>, IImageToRawImage<BlazingFile>, IImageFormatWriter<BlazingFile> {
+public readonly record struct BlazingFile : IImageFormatReader<BlazingFile>, IImageToRawImage<BlazingFile>, IImageFromRawImage<BlazingFile>, IImageFormatWriter<BlazingFile> {
 
   /// <summary>Size of the load address in bytes.</summary>
   internal const int LoadAddressSize = 2;
@@ -72,6 +72,36 @@ public readonly record struct BlazingFile : IImageFormatReader<BlazingFile>, IIm
 
   /// <summary>Colour RAM, which only the multicolour form has.</summary>
   public byte[] ColorData { get; init; }
+
+  /// <summary>
+  /// Reduces a picture to the multicolour screen, which is the form Blazing Paddles saved.
+  /// </summary>
+  /// <remarks>
+  /// The high-resolution form is written too when a file already holds one, but nothing produces one
+  /// from a picture: both samples are multicolour and RECOIL refuses the hires length at either of
+  /// these extensions, so a hires file built here would be one nothing could open.
+  /// <para/>
+  /// Pattern 00 is told to use black rather than left to choose. The format keeps no register for
+  /// the background — there is nowhere in the file to record what was picked — and black is what
+  /// both samples come out right against RECOIL with.
+  /// </remarks>
+  public static BlazingFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(PixelWidth / 2, PixelHeight);
+    var bitmap = new byte[BitmapDataSize];
+    var screen = new byte[ScreenDataSize];
+    var colors = new byte[ScreenDataSize];
+    Commodore64Graphics.EncodeMulticolor(
+      rgb.PixelData, PixelWidth / 2, PixelHeight, bitmap, screen, colors, fixedBackground: 0);
+
+    return new() {
+      LoadAddress = DefaultLoadAddress,
+      BitmapData = bitmap,
+      ScreenData = screen,
+      ColorData = colors,
+    };
+  }
 
   /// <summary>Converts this Blazing Paddles image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(BlazingFile file) {
