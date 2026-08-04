@@ -10,14 +10,45 @@ namespace FileFormat.Cur;
 /// <summary>In-memory representation of a CUR file.</summary>
 [FormatMagicBytes([0x00, 0x00, 0x02, 0x00])]
 [FormatMimeType("image/vnd.microsoft.icon", "image/x-win-bitmap")]
-public sealed class CurFile : IImageFormatReader<CurFile>, IImageToRawImage<CurFile>, IImageFormatWriter<CurFile>, IMultiImageFileFormat<CurFile> {
+public sealed class CurFile : IImageFormatReader<CurFile>, IImageToRawImage<CurFile>, IImageFromRawImage<CurFile>, IImageFormatWriter<CurFile>, IMultiImageFileFormat<CurFile> {
 
   static string IImageFormatMetadata<CurFile>.PrimaryExtension => ".cur";
   static string[] IImageFormatMetadata<CurFile>.FileExtensions => [".cur"];
   static CurFile IImageFormatReader<CurFile>.FromSpan(ReadOnlySpan<byte> data) => CurReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<CurFile>.Capabilities => FormatCapability.HasDedicatedOptimizer | FormatCapability.MultiImage;
+
+  /// <summary>Any size up to 256 a side, a cursor being an icon in all but two fields.</summary>
+  static VideoMode[] IImageFormatMetadata<CurFile>.VideoModes => [
+    new("Cursor", [(new IntegerRange(1, IcoDib.MaximumSide), new IntegerRange(1, IcoDib.MaximumSide))])
+  ];
   static byte[] IImageFormatWriter<CurFile>.ToBytes(CurFile file) => CurWriter.ToBytes(file);
   public IReadOnlyList<CurImage> Images { get; init; } = [];
+
+  /// <summary>
+  /// Builds a one-entry cursor holding the picture, its hotspot at the top left.
+  /// </summary>
+  /// <remarks>
+  /// A cursor is an icon whose two unused directory fields carry the point the pointer actually
+  /// points at. A picture arriving from anywhere else says nothing about where that is, and the top
+  /// left corner is both the common choice and the only one that cannot be wrong by accident —
+  /// guessing the middle would put the hotspot somewhere the drawing may not even be opaque.
+  /// </remarks>
+  public static CurFile FromRawImage(RawImage image) {
+    var entry = IcoDib.FromRawImage(image);
+    return new() {
+      Images = [
+        new CurImage {
+          Width = entry.Width,
+          Height = entry.Height,
+          BitsPerPixel = entry.BitsPerPixel,
+          Format = entry.Format,
+          Data = entry.Data,
+          HotspotX = 0,
+          HotspotY = 0,
+        }
+      ]
+    };
+  }
 
   /// <summary>Returns the number of cursor entries in this CUR file.</summary>
   public static int ImageCount(CurFile file) => file.Images.Count;

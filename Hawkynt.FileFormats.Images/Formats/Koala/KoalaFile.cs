@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Koala;
 
 /// <summary>In-memory representation of a Commodore 64 Koala Painter image.</summary>
-public readonly record struct KoalaFile : IImageFormatReader<KoalaFile>, IImageToRawImage<KoalaFile>, IImageFormatWriter<KoalaFile> {
+public readonly record struct KoalaFile : IImageFormatReader<KoalaFile>, IImageToRawImage<KoalaFile>, IImageFromRawImage<KoalaFile>, IImageFormatWriter<KoalaFile> {
 
   static string IImageFormatMetadata<KoalaFile>.PrimaryExtension => ".koa";
   static string[] IImageFormatMetadata<KoalaFile>.FileExtensions => [".koa", ".koala", ".kla"];
@@ -52,6 +52,34 @@ public readonly record struct KoalaFile : IImageFormatReader<KoalaFile>, IImageT
 
   /// <summary>Background color index (0-15).</summary>
   public byte BackgroundColor { get; init; }
+
+  /// <summary>
+  /// Reduces a picture to the multicolour screen Koala Painter saved.
+  /// </summary>
+  /// <remarks>
+  /// The load address is the one Koala Painter itself wrote. It is not read back — the picture is
+  /// the same wherever it was meant to land — but a C64 asked to load the file without it goes to
+  /// whatever address it was told, and every tool that recognises these by their first two bytes
+  /// looks for exactly this pair.
+  /// </remarks>
+  public static KoalaFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(FixedWidth, FixedHeight);
+    var bitmap = new byte[BitmapDataSize];
+    var videoMatrix = new byte[VideoMatrixSize];
+    var colorRam = new byte[ColorRamSize];
+    var background = Commodore64Graphics.EncodeMulticolor(
+      rgb.PixelData, FixedWidth, FixedHeight, bitmap, videoMatrix, colorRam);
+
+    return new() {
+      LoadAddress = 0x6000,
+      BitmapData = bitmap,
+      VideoMatrix = videoMatrix,
+      ColorRam = colorRam,
+      BackgroundColor = background,
+    };
+  }
 
   /// <summary>Converts this Koala image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(KoalaFile file)

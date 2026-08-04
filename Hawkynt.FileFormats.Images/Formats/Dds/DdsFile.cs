@@ -8,7 +8,7 @@ namespace FileFormat.Dds;
 /// <summary>In-memory representation of a DDS (DirectDraw Surface) file.</summary>
 [FormatMagicBytes([0x44, 0x44, 0x53, 0x20])]
 [FormatMimeType("image/vnd.ms-dds", "image/x-dds")]
-public readonly record struct DdsFile : IImageFormatReader<DdsFile>, IImageToRawImage<DdsFile>, IImageFormatWriter<DdsFile> {
+public readonly record struct DdsFile : IImageFormatReader<DdsFile>, IImageToRawImage<DdsFile>, IImageFromRawImage<DdsFile>, IImageFormatWriter<DdsFile> {
 
   static string IImageFormatMetadata<DdsFile>.PrimaryExtension => ".dds";
   static string[] IImageFormatMetadata<DdsFile>.FileExtensions => [".dds"];
@@ -21,6 +21,12 @@ public readonly record struct DdsFile : IImageFormatReader<DdsFile>, IImageToRaw
   public DdsFormat Format { get; init; }
   public bool HasDx10Header { get; init; }
   public IReadOnlyList<DdsSurface> Surfaces { get; init; }
+
+  /// <summary>
+  /// Which byte of an uncompressed pixel is which colour. Meaningless for the block-compressed
+  /// formats, whose layout is fixed by the compression rather than stated in the header.
+  /// </summary>
+  public DdsChannelOrder ChannelOrder { get; init; }
 
   public static RawImage ToRawImage(DdsFile file) {
     if (file.Surfaces.Count == 0)
@@ -40,51 +46,58 @@ public readonly record struct DdsFile : IImageFormatReader<DdsFile>, IImageToRaw
       DdsFormat.Bc6HUnsigned => _DecodeBc(data, width, height, (d, w, h, o) => Bc6HDecoder.DecodeImage(d, w, h, o, false)),
       DdsFormat.Bc6HSigned => _DecodeBc(data, width, height, (d, w, h, o) => Bc6HDecoder.DecodeImage(d, w, h, o, true)),
       DdsFormat.Bc7 => _DecodeBc(data, width, height, Bc7Decoder.DecodeImage),
-      DdsFormat.Rgb => _DecodeUncompressed(data, width, height, PixelFormat.Rgb24, 3),
-      DdsFormat.Rgba => _DecodeUncompressed(data, width, height, PixelFormat.Rgba32, 4),
+      DdsFormat.Rgb => _DecodeUncompressed(data, width, height, file.ChannelOrder.ToPixelFormat(3), 3),
+      DdsFormat.Rgba => _DecodeUncompressed(data, width, height, file.ChannelOrder.ToPixelFormat(4), 4),
       _ => throw new NotSupportedException($"DDS format {file.Format} is not supported for conversion to RawImage.")
     };
   }
 
+  /// <summary>
+  /// Writes a picture as one uncompressed surface, blue channel first.
+  /// </summary>
+  /// <remarks>
+  /// The bytes are laid out to match the masks the header states, which is A8R8G8B8 — the
+  /// arrangement everything writes and everything expects. They used to be written red first under
+  /// those same masks, so a file this project produced was read back by ImageMagick and XnView with
+  /// red and blue exchanged; only this project's own reader, wrong in the same direction, agreed
+  /// with it.
+  /// <para/>
+  /// Any picture is accepted rather than the five layouts that happened to be listed. A writer
+  /// reachable from the registry is handed whatever a caller has, and refusing an indexed or
+  /// greyscale picture made the format unwritable for most of what it might be given; converting is
+  /// what every other writer here does with a picture that does not already match.
+  /// </remarks>
   public static DdsFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
 
-    byte[] outputData;
-    DdsFormat format;
-
-    switch (image.Format) {
-      case PixelFormat.Rgba32:
-        outputData = image.PixelData;
-        format = DdsFormat.Rgba;
-        break;
-      case PixelFormat.Bgra32:
-        outputData = _SwapChannels4(image.PixelData, image.Width * image.Height, 2, 1, 0, 3);
-        format = DdsFormat.Rgba;
-        break;
-      case PixelFormat.Argb32:
-        outputData = _SwapChannels4(image.PixelData, image.Width * image.Height, 1, 2, 3, 0);
-        format = DdsFormat.Rgba;
-        break;
-      case PixelFormat.Rgb24:
-        outputData = image.PixelData;
-        format = DdsFormat.Rgb;
-        break;
-      case PixelFormat.Bgr24:
-        outputData = _SwapChannels3(image.PixelData, image.Width * image.Height);
-        format = DdsFormat.Rgb;
-        break;
-      default:
-        throw new NotSupportedException($"Cannot convert PixelFormat {image.Format} to DDS. Use Rgba32, Rgb24, Bgra32, Bgr24, or Argb32.");
-    }
+    var hasAlpha = image.HasAlpha;
+    var data = hasAlpha ? image.ToBgra32() : _ToBgr24(image);
 
     return new DdsFile {
       Width = image.Width,
       Height = image.Height,
       Depth = 1,
       MipMapCount = 1,
-      Format = format,
-      Surfaces = [new DdsSurface { Width = image.Width, Height = image.Height, MipLevel = 0, Data = outputData }]
+      Format = hasAlpha ? DdsFormat.Rgba : DdsFormat.Rgb,
+      ChannelOrder = hasAlpha ? DdsChannelOrder.Bgra : DdsChannelOrder.Bgr,
+      Surfaces = [new DdsSurface { Width = image.Width, Height = image.Height, MipLevel = 0, Data = data }]
     };
+  }
+
+  /// <summary>The picture as three bytes a pixel, blue first.</summary>
+  private static byte[] _ToBgr24(RawImage image) {
+    if (image.Format == PixelFormat.Bgr24)
+      return image.PixelData;
+
+    var rgb = image.ToRgb24();
+    var bgr = new byte[rgb.Length];
+    for (var i = 0; i + 2 < rgb.Length; i += 3) {
+      bgr[i] = rgb[i + 2];
+      bgr[i + 1] = rgb[i + 1];
+      bgr[i + 2] = rgb[i];
+    }
+
+    return bgr;
   }
 
   private delegate void _BcDecoder(ReadOnlySpan<byte> data, int width, int height, Span<byte> output);
@@ -102,27 +115,4 @@ public readonly record struct DdsFile : IImageFormatReader<DdsFile>, IImageToRaw
     return new RawImage { Width = width, Height = height, Format = format, PixelData = pixels };
   }
 
-  private static byte[] _SwapChannels4(byte[] src, int pixelCount, int rIndex, int gIndex, int bIndex, int aIndex) {
-    var result = new byte[pixelCount * 4];
-    for (var i = 0; i < pixelCount; ++i) {
-      var s = i * 4;
-      var d = i * 4;
-      result[d] = src[s + rIndex];
-      result[d + 1] = src[s + gIndex];
-      result[d + 2] = src[s + bIndex];
-      result[d + 3] = src[s + aIndex];
-    }
-    return result;
-  }
-
-  private static byte[] _SwapChannels3(byte[] src, int pixelCount) {
-    var result = new byte[pixelCount * 3];
-    for (var i = 0; i < pixelCount; ++i) {
-      var s = i * 3;
-      result[s] = src[s + 2];
-      result[s + 1] = src[s + 1];
-      result[s + 2] = src[s];
-    }
-    return result;
-  }
 }

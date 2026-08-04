@@ -25,6 +25,56 @@ if (args[0] == "--extensions") {
   return 0;
 }
 
+// Which formats can be read but not written, so the list of what is left to encode is measured
+// rather than remembered. The capabilities say what a format can hold, which is most of what decides
+// whether writing it is a job at all: a fixed-palette machine format needs a quantiser behind it,
+// where a truecolour one only needs its bytes laid out.
+if (args[0] == "--readonly") {
+  var readOnly = FormatRegistry.AllFormats
+    .Where(entry => !entry.SupportsWrite)
+    .OrderBy(entry => entry.Name, StringComparer.Ordinal)
+    .ToArray();
+
+  foreach (var entry in readOnly)
+    Console.WriteLine($"{entry.Name}\t{entry.PrimaryExtension}\t{entry.Capabilities}\t{string.Join(',', entry.AllExtensions ?? Array.Empty<string>())}");
+
+  Console.WriteLine($"{readOnly.Length} of {FormatRegistry.AllFormats.Count()} formats read but do not write");
+  return 0;
+}
+
+// Encodes one picture into a named format, so that what a writer produces can be handed to the same
+// third-party tools the readers are measured against. A writer is only known to work when something
+// that is not this project reads its output back.
+//
+//   Decode --encode <format> <source picture> <output file>
+if (args[0] == "--encode") {
+  if (args.Length < 4) {
+    Console.Error.WriteLine("usage: Decode --encode <format> <source picture> <output file>");
+    return 2;
+  }
+
+  var wanted = FormatRegistry.AllFormats.FirstOrDefault(entry => string.Equals(entry.Name, args[1], StringComparison.OrdinalIgnoreCase));
+  if (wanted == null) {
+    Console.Error.WriteLine($"no format named {args[1]}");
+    return 2;
+  }
+
+  if (!wanted.SupportsWrite) {
+    Console.Error.WriteLine($"{wanted.Name} does not write");
+    return 2;
+  }
+
+  var source = FormatRegistry.Read(new FileInfo(args[2]));
+  if (source == null) {
+    Console.Error.WriteLine($"could not read {args[2]}");
+    return 2;
+  }
+
+  File.WriteAllBytes(args[3], wanted.ConvertFromRawImage!(source));
+  Console.WriteLine($"{wanted.Name}: {new FileInfo(args[3]).Length} bytes from {source.Width}x{source.Height}");
+  return 0;
+}
+
 if (args.Length < 2) {
   Console.Error.WriteLine("usage: Decode <sample directory> <output directory>");
   return 2;

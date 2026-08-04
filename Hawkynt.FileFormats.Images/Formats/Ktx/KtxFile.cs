@@ -8,7 +8,7 @@ namespace FileFormat.Ktx;
 /// <summary>In-memory representation of a KTX texture container.</summary>
 [FormatMagicBytes([0xAB, 0x4B, 0x54, 0x58, 0x20, 0x31, 0x31, 0xBB])]
 [FormatMagicBytes([0xAB, 0x4B, 0x54, 0x58, 0x20, 0x32, 0x30, 0xBB])]
-public readonly record struct KtxFile() : IImageFormatReader<KtxFile>, IImageToRawImage<KtxFile>, IImageFormatWriter<KtxFile> {
+public readonly record struct KtxFile() : IImageFormatReader<KtxFile>, IImageToRawImage<KtxFile>, IImageFromRawImage<KtxFile>, IImageFormatWriter<KtxFile> {
 
   static string IImageFormatMetadata<KtxFile>.PrimaryExtension => ".ktx";
   static string[] IImageFormatMetadata<KtxFile>.FileExtensions => [".ktx", ".ktx2"];
@@ -51,31 +51,18 @@ public readonly record struct KtxFile() : IImageFormatReader<KtxFile>, IImageToR
       : _DecodeKtx1(file, mip.Data, width, height);
   }
 
-  /// <summary>Creates an uncompressed KTX1 file from a <see cref="RawImage"/>. Only Rgba32 and Rgb24 are supported.</summary>
+  /// <summary>Creates an uncompressed KTX1 file of one mip level from a <see cref="RawImage"/>.</summary>
   public static KtxFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
 
-    int glFormat;
-    int glInternalFormat;
-    int glBaseInternalFormat;
-    byte[] pixelData;
-
-    switch (image.Format) {
-      case PixelFormat.Rgba32:
-        glFormat = 0x1908; // GL_RGBA
-        glInternalFormat = 0x8058; // GL_RGBA8
-        glBaseInternalFormat = 0x1908; // GL_RGBA
-        pixelData = image.PixelData;
-        break;
-      case PixelFormat.Rgb24:
-        glFormat = 0x1907; // GL_RGB
-        glInternalFormat = 0x8051; // GL_RGB8
-        glBaseInternalFormat = 0x1907; // GL_RGB
-        pixelData = image.PixelData;
-        break;
-      default:
-        throw new NotSupportedException($"Unsupported pixel format for KTX encoding: {image.Format}. Only Rgba32 and Rgb24 are supported.");
-    }
+    // Any picture is accepted and converted, rather than the two layouts that happened to be listed.
+    // A writer the registry can reach is handed whatever a caller has, and refusing an indexed or
+    // greyscale one made the format unwritable for most of what it might be given.
+    var hasAlpha = image.HasAlpha;
+    var glFormat = hasAlpha ? 0x1908 : 0x1907;                  // GL_RGBA / GL_RGB
+    var glInternalFormat = hasAlpha ? 0x8058 : 0x8051;          // GL_RGBA8 / GL_RGB8
+    var glBaseInternalFormat = glFormat;
+    var pixelData = hasAlpha ? image.ToRgba32() : image.ToRgb24();
 
     var mip = new KtxMipLevel {
       Width = image.Width,

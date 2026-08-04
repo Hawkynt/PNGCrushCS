@@ -12,14 +12,22 @@ namespace FileFormat.Ico;
 /// <summary>In-memory representation of an ICO file.</summary>
 [FormatMagicBytes([0x00, 0x00, 0x01, 0x00])]
 [FormatMimeType("image/vnd.microsoft.icon", "image/x-icon", "image/icon")]
-public sealed class IcoFile : IImageFormatReader<IcoFile>, IImageToRawImage<IcoFile>, IImageFormatWriter<IcoFile>, IMultiImageFileFormat<IcoFile> {
+public sealed class IcoFile : IImageFormatReader<IcoFile>, IImageToRawImage<IcoFile>, IImageFromRawImage<IcoFile>, IImageFormatWriter<IcoFile>, IMultiImageFileFormat<IcoFile> {
 
   static string IImageFormatMetadata<IcoFile>.PrimaryExtension => ".ico";
   static string[] IImageFormatMetadata<IcoFile>.FileExtensions => [".ico"];
   static IcoFile IImageFormatReader<IcoFile>.FromSpan(ReadOnlySpan<byte> data) => IcoReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<IcoFile>.Capabilities => FormatCapability.HasDedicatedOptimizer | FormatCapability.MultiImage;
+
+  /// <summary>Any size up to 256 a side, which is the largest a directory entry can state.</summary>
+  static VideoMode[] IImageFormatMetadata<IcoFile>.VideoModes => [
+    new("Icon", [(new IntegerRange(1, IcoDib.MaximumSide), new IntegerRange(1, IcoDib.MaximumSide))])
+  ];
   static byte[] IImageFormatWriter<IcoFile>.ToBytes(IcoFile file) => IcoWriter.ToBytes(file);
   public IReadOnlyList<IcoImage> Images { get; init; } = [];
+
+  /// <summary>Builds a one-entry icon holding the picture at its own size.</summary>
+  public static IcoFile FromRawImage(RawImage image) => new() { Images = [IcoDib.FromRawImage(image)] };
 
   /// <summary>Returns the number of image entries in this ICO file.</summary>
   public static int ImageCount(IcoFile file) => file.Images.Count;

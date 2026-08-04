@@ -58,6 +58,7 @@ public static class DdsReader {
 
     var format = _DetectFormat(header.PixelFormat);
     var hasDx10 = false;
+    var dx10Order = DdsChannelOrder.Unknown;
     var dataOffset = _MAGIC_SIZE + DdsHeader.StructSize;
 
     if (format == DdsFormat.Dx10) {
@@ -68,6 +69,11 @@ public static class DdsReader {
       var dx10 = DdsDx10Header.ReadFrom(span.Slice(dataOffset));
       format = _MapDxgiFormat(dx10.DxgiFormat) ?? format;
       dataOffset += DdsDx10Header.StructSize;
+
+      // A DX10 file leaves the mask fields empty and names its layout instead, so the masks say
+      // nothing and the name has to be taken at its word. R8G8B8A8 means what it says.
+      if (format == DdsFormat.Rgba)
+        dx10Order = DdsChannelOrder.Rgba;
     }
 
     var width = header.Width;
@@ -98,6 +104,7 @@ public static class DdsReader {
       offset += mipSize;
     }
 
+    var pf = header.PixelFormat;
     return new DdsFile {
       Width = width,
       Height = height,
@@ -105,6 +112,9 @@ public static class DdsReader {
       MipMapCount = mipMapCount,
       Format = format,
       HasDx10Header = hasDx10,
+      ChannelOrder = dx10Order != DdsChannelOrder.Unknown
+        ? dx10Order
+        : DdsChannelOrderExtensions.FromMasks(pf.RBitMask, pf.GBitMask, pf.BBitMask, pf.ABitMask, pf.RGBBitCount),
       Surfaces = surfaces
     };
     }

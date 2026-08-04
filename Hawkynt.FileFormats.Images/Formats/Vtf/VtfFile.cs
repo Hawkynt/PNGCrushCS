@@ -7,7 +7,7 @@ namespace FileFormat.Vtf;
 
 /// <summary>In-memory representation of a VTF texture file.</summary>
 [FormatMagicBytes([0x56, 0x54, 0x46, 0x00])]
-public readonly record struct VtfFile : IImageFormatReader<VtfFile>, IImageToRawImage<VtfFile>, IImageFormatWriter<VtfFile> {
+public readonly record struct VtfFile : IImageFormatReader<VtfFile>, IImageToRawImage<VtfFile>, IImageFromRawImage<VtfFile>, IImageFormatWriter<VtfFile> {
 
   static string IImageFormatMetadata<VtfFile>.PrimaryExtension => ".vtf";
   static string[] IImageFormatMetadata<VtfFile>.FileExtensions => [".vtf"];
@@ -61,45 +61,21 @@ public readonly record struct VtfFile : IImageFormatReader<VtfFile>, IImageToRaw
   public static VtfFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
 
-    byte[] outputData;
-    VtfFormat format;
-
-    switch (image.Format) {
-      case PixelFormat.Rgba32:
-        outputData = image.PixelData;
-        format = VtfFormat.Rgba8888;
-        break;
-      case PixelFormat.Bgra32:
-        outputData = image.PixelData;
-        format = VtfFormat.Bgra8888;
-        break;
-      case PixelFormat.Argb32:
-        outputData = image.PixelData;
-        format = VtfFormat.Argb8888;
-        break;
-      case PixelFormat.Rgb24:
-        outputData = image.PixelData;
-        format = VtfFormat.Rgb888;
-        break;
-      case PixelFormat.Bgr24:
-        outputData = image.PixelData;
-        format = VtfFormat.Bgr888;
-        break;
-      case PixelFormat.Gray8:
-        outputData = image.PixelData;
-        format = VtfFormat.I8;
-        break;
-      case PixelFormat.GrayAlpha16:
-        outputData = image.PixelData;
-        format = VtfFormat.Ia88;
-        break;
-      case PixelFormat.Rgb565:
-        outputData = image.PixelData;
-        format = VtfFormat.Rgb565;
-        break;
-      default:
-        throw new NotSupportedException($"Cannot convert PixelFormat {image.Format} to VTF. Use Rgba32, Bgra32, Argb32, Rgb24, Bgr24, Gray8, GrayAlpha16, or Rgb565.");
-    }
+    // A layout already suiting one of the format's own is kept as it stands; anything else is
+    // converted rather than refused, so that a picture arriving from any reader can be written.
+    var (outputData, format) = image.Format switch {
+      PixelFormat.Rgba32 => (image.PixelData, VtfFormat.Rgba8888),
+      PixelFormat.Bgra32 => (image.PixelData, VtfFormat.Bgra8888),
+      PixelFormat.Argb32 => (image.PixelData, VtfFormat.Argb8888),
+      PixelFormat.Rgb24 => (image.PixelData, VtfFormat.Rgb888),
+      PixelFormat.Bgr24 => (image.PixelData, VtfFormat.Bgr888),
+      PixelFormat.Gray8 => (image.PixelData, VtfFormat.I8),
+      PixelFormat.GrayAlpha16 => (image.PixelData, VtfFormat.Ia88),
+      PixelFormat.Rgb565 => (image.PixelData, VtfFormat.Rgb565),
+      _ => image.HasAlpha
+        ? (image.ToRgba32(), VtfFormat.Rgba8888)
+        : (image.ToRgb24(), VtfFormat.Rgb888),
+    };
 
     return new VtfFile {
       Width = image.Width,
