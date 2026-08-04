@@ -3,86 +3,59 @@ using FileFormat.Core;
 
 namespace FileFormat.HereticM8;
 
-/// <summary>In-memory representation of a Heretic II MipMap texture image.</summary>
-public readonly record struct HereticM8File : IImageFormatReader<HereticM8File>, IImageToRawImage<HereticM8File>, IImageFromRawImage<HereticM8File>, IImageFormatWriter<HereticM8File> {
-
-  internal const int HeaderSize = 8;
+/// <summary>In-memory representation of a Heretic II mipmap texture (.m8).</summary>
+/// <remarks>
+/// This used to take bytes 0 to 5 as a size and substitute a default when they looked wrong, which
+/// for these files gave 2 pixels by 256 and, for one of them, 2 by 27507 — the version number and
+/// whatever followed it read as a width and a height.
+/// <para/>
+/// The real layout: a version of 2, a name of 32 bytes, then sixteen widths, sixteen heights and
+/// sixteen offsets — one set per mipmap level, unused levels being nought. After those a second name,
+/// a palette of 256 colours, and three more long words, which puts the first level's pixels at 1040.
+/// The arithmetic settles it: 1040 plus 256 by 256 is 66576, which is one of the samples to the byte.
+/// <para/>
+/// The levels are the same picture at halving sizes, so the first is the one to read.
+/// </remarks>
+public readonly record struct HereticM8File
+  : IImageFormatReader<HereticM8File>, IImageToRawImage<HereticM8File> {
 
   static string IImageFormatMetadata<HereticM8File>.PrimaryExtension => ".m8";
   static string[] IImageFormatMetadata<HereticM8File>.FileExtensions => [".m8"];
   static HereticM8File IImageFormatReader<HereticM8File>.FromSpan(ReadOnlySpan<byte> data) => HereticM8Reader.FromSpan(data);
-  static VideoMode[] IImageFormatMetadata<HereticM8File>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 256)], _FixedPalettes)];
-  static byte[] IImageFormatWriter<HereticM8File>.ToBytes(HereticM8File file) => HereticM8Writer.ToBytes(file);
-
-  private static readonly FixedPalette[] _FixedPalettes = [
-    new FixedPalette("Heretic",
-      0x000000, 0x2B2317, 0x1B130F, 0xEFEBE7, 0xDBD7D3, 0xCBC7C3, 0xB7B3AF, 0xA7A39F,
-      0x93908B, 0x83807B, 0x6F6C68, 0x5F5C58, 0x4B4844, 0x3B3834, 0x2B2824, 0x1B1814,
-      0x9B7B5B, 0xAB8B6B, 0x735B43, 0x836B53, 0xA3835F, 0xB7976B, 0xC7A777, 0xD7B783,
-      0xE7C78F, 0xF3D79B, 0xFFE7A7, 0xFFEFBB, 0x3B2B17, 0x4B3717, 0x4F4017, 0x675313,
-      0x73670B, 0x877B07, 0x6F7B00, 0x4F5F00, 0x374700, 0x232F00, 0x131700, 0x07037C,
-      0xFFFFFF, 0xE7E7CF, 0xCFCBA3, 0xB7B37F, 0x9F9B5F, 0x878343, 0x6F6B2F, 0x575720,
-      0x474317, 0x37330F, 0x2B2707, 0x1F1B03, 0x171300, 0x0F0B00, 0x070700, 0x4B3B7C,
-      0xB37F37, 0xA3732F, 0x836325, 0x5B431F, 0x3F2F1B, 0x271F17, 0x171313, 0x0F0B0B,
-      0xFFEBBC, 0xFFE3A7, 0xFFD387, 0xFFC76B, 0xFFB74B, 0xFBB327, 0xE7AB1B, 0xD7A317,
-      0xC79B17, 0xB78F13, 0xA37F0F, 0x8F6F0B, 0x7B5F07, 0x674F07, 0x573F03, 0x432F00,
-      0x331F00, 0x1F1300, 0x130700, 0xBB0303, 0xAB0707, 0x9F0B0B, 0x930B0B, 0x870B0B,
-      0x7B0B0B, 0x6B0B0B, 0x5B0B0B, 0x4B0B0B, 0x3F0707, 0x2F0707, 0x1F0707, 0x130707,
-      0xFFD7D3, 0xFFB7B3, 0xFF9B97, 0xFF837F, 0xF36F6B, 0xE7575B, 0xD7474F, 0xCB373F,
-      0xBB2B33, 0xAB232B, 0x9B1B23, 0x8B131B, 0x7B0F17, 0x6B0B0F, 0x5B070B, 0x4B0307,
-      0x3B0303, 0x2B0000, 0x1F0000, 0x130000, 0x070000, 0xFCBFB1, 0xF3AB97, 0xE3987F,
-      0xD7836B, 0xC7775B, 0xB7674B, 0xA7573F, 0x974B37, 0x873F2F, 0x73332B, 0x632B23,
-      0x53231F, 0x431B17, 0x331313, 0x270F0B, 0x170707, 0x0B0303, 0xFFBFFB, 0xFB97FF,
-      0xF77BFF, 0xEF63FB, 0xE74BF3, 0xDF3BEB, 0xD32BE3, 0xC723D7, 0xBF1BCB, 0xB317BF,
-      0xA713B3, 0x9B0FA3, 0x8F0F93, 0x830B83, 0x77076F, 0x67075F, 0x57074B, 0x4B033B,
-      0x3B032B, 0x2B031B, 0x1B0313, 0x130707, 0x070000, 0xBFFFFF, 0xABF3FF, 0x97DFFF,
-      0x83C7FF, 0x73B3FB, 0x639BF3, 0x5387EB, 0x4773E3, 0x3F5FDB, 0x374FCF, 0x2B43C3,
-      0x2737B3, 0x1F2F9F, 0x172790, 0x131F73, 0x0F1B5F, 0x0B1747, 0x070F33, 0x070B23,
-      0x07071B, 0x000B0B, 0x73FFE3, 0x57F3D3, 0x4FE7C7, 0x47DBB7, 0x3FCFA7, 0x37BF97,
-      0x2FB387, 0x2BA77B, 0x23976B, 0x1F8B5F, 0x1B7F4F, 0x17703F, 0x135737, 0x0F432B,
-      0x0B331F, 0x072717, 0x07170B, 0x070B07, 0x131313, 0xFFFFE3, 0xFFFFAB, 0xFFFF6B,
-      0xFFFF1B, 0xFFE319, 0xFFCB13, 0xFFB30B, 0xFFA303, 0xFF8B00, 0xFB7300, 0xEF5F00,
-      0xE74F00, 0xDB3F00, 0xCF2F00, 0xC32300, 0xB71B00, 0xA71700, 0x97130C, 0x870F0B,
-      0x73070B, 0x630707, 0x4F0707, 0x3B0707, 0x2B0707, 0x170707, 0x070707, 0xEFD7CB,
-      0xE7C7B7, 0xDFB7A3, 0xD7A78F, 0xCF977B, 0xC7876B, 0xBB7757, 0xB36F4B, 0xA7633F,
-      0x9B5733, 0x8F4F2B, 0x834723, 0x773F1B, 0x6B3717, 0x5F2F13, 0x53270F, 0x471F0B,
-      0x3B1B07, 0x2F1303, 0x230B00, 0xD7C3CB, 0xCBB3BB, 0xBBA3AB, 0xB0939B, 0xA38790,
-      0x977B83, 0x877B7B, 0xE74F1B, 0xDB471F, 0xCF4727, 0xC3472F, 0xB74B37, 0xAB4F3F)
+  static VideoMode[] IImageFormatMetadata<HereticM8File>.VideoModes => [
+    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [256])
   ];
 
+  /// <summary>The version every file states.</summary>
+  internal const int Version = 2;
+
+  /// <summary>Mipmap levels a file has room for.</summary>
+  internal const int Levels = 16;
+
+  /// <summary>Where the widths, heights and offsets begin.</summary>
+  internal const int WidthsOffset = 4 + 32;
+
+  /// <summary>Where the palette begins: after the tables and a second name.</summary>
+  internal const int PaletteOffset = WidthsOffset + Levels * 4 * 3 + 32;
+
+  /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
+
+  /// <summary>Image height in pixels.</summary>
   public int Height { get; init; }
+
+  /// <summary>One index per pixel.</summary>
   public byte[] PixelData { get; init; }
 
-  private static readonly byte[] _DefaultPalette = _MakeGrayRamp(256);
+  /// <summary>The 256 colours the file states, as RGB triplets.</summary>
+  public byte[] Palette { get; init; }
 
-  private static byte[] _MakeGrayRamp(int entries) {
-    var p = new byte[entries * 3];
-    for (var i = 0; i < entries; ++i) {
-      var v = entries == 1 ? (byte)128 : (byte)(i * 255 / (entries - 1));
-      p[i * 3] = v; p[i * 3 + 1] = v; p[i * 3 + 2] = v;
-    }
-    return p;
-  }
-
-  public static RawImage ToRawImage(HereticM8File file) {
-    return new() {
-      Width = file.Width,
-      Height = file.Height,
-      Format = PixelFormat.Indexed8,
-      PixelData = file.PixelData[..],
-      Palette = _DefaultPalette[..],
-      PaletteCount = 256,
-    };
-  }
-
-  public static HereticM8File FromRawImage(RawImage image) {
-    ArgumentNullException.ThrowIfNull(image);
-    image = image.EnsureIndexed(PixelFormat.Indexed8, _DefaultPalette);
-    return new() {
-      Width = image.Width,
-      Height = image.Height,
-      PixelData = image.PixelData[..],
-    };
-  }
+  public static RawImage ToRawImage(HereticM8File file) => new() {
+    Width = file.Width,
+    Height = file.Height,
+    Format = PixelFormat.Indexed8,
+    PixelData = file.PixelData[..],
+    Palette = file.Palette[..],
+    PaletteCount = 256,
+  };
 }

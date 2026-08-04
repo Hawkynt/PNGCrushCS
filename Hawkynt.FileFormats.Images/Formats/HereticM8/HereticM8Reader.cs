@@ -1,15 +1,17 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.HereticM8;
 
-/// <summary>Reads Heretic II MipMap texture files from bytes, streams, or file paths.</summary>
+/// <summary>Reads Heretic II mipmap textures from bytes, streams, or file paths.</summary>
 public static class HereticM8Reader {
 
   public static HereticM8File FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
-      throw new FileNotFoundException("HereticM8 file not found.", file.FullName);
+      throw new FileNotFoundException("Heretic II texture not found.", file.FullName);
+
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
@@ -20,45 +22,41 @@ public static class HereticM8Reader {
       stream.ReadExactly(data);
       return FromBytes(data);
     }
+
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
     return FromBytes(ms.ToArray());
   }
 
   public static HereticM8File FromSpan(ReadOnlySpan<byte> data) {
+    if (data.Length < HereticM8File.PaletteOffset + 768)
+      throw new InvalidDataException($"Data too small for a Heretic II texture (got {data.Length} bytes).");
 
-    if (data.Length < HereticM8File.HeaderSize)
-      throw new InvalidDataException("Data too small for a valid HereticM8 file.");
+    var version = BinaryPrimitives.ReadInt32LittleEndian(data);
+    if (version != HereticM8File.Version)
+      throw new InvalidDataException($"A Heretic II texture states version {HereticM8File.Version}; this file states {version}.");
 
-    var width = data[0] | (data[1] << 8);
-    var height = data[2] | (data[3] << 8);
-    if (width == 0) width = data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24);
-    if (width <= 0 || width > 65535) width = 256;
+    // The first mipmap level is the full-size picture; the rest are it at halving sizes.
+    var width = BinaryPrimitives.ReadInt32LittleEndian(data[HereticM8File.WidthsOffset..]);
+    var height = BinaryPrimitives.ReadInt32LittleEndian(data[(HereticM8File.WidthsOffset + HereticM8File.Levels * 4)..]);
+    var offset = BinaryPrimitives.ReadInt32LittleEndian(data[(HereticM8File.WidthsOffset + HereticM8File.Levels * 8)..]);
 
-    if (8 >= 8) {
-      height = data[4] | (data[5] << 8);
-      if (height <= 0 || height > 65535) height = 256;
-    } else if (height <= 0 || height > 65535) {
-      height = 256;
-    }
+    if (width <= 0 || height <= 0 || width > 0xFFFF || height > 0xFFFF)
+      throw new InvalidDataException($"A Heretic II texture of {width}x{height} is no size.");
 
-    var pixelBytes = width * height;
-    var pixelData = new byte[pixelBytes];
-    // Padding what the file does not contain turns a misread size into a picture: a header taken
-    // from the wrong offset asked for millions of pixels, the few hundred bytes present were
-    // copied in, and the rest was zeros reported as a successful read.
-    var available = data.Length - HereticM8File.HeaderSize;
-    if (available < pixelBytes)
-      throw new InvalidDataException($"Expected {pixelBytes} bytes of pixel data, got {available}.");
+    if (offset < 0 || offset + width * height > data.Length)
+      throw new InvalidDataException($"A Heretic II texture of {width}x{height} needs {width * height} bytes from {offset}; this file is {data.Length}.");
 
-    data.Slice(HereticM8File.HeaderSize, pixelBytes).CopyTo(pixelData.AsSpan(0));
+    var palette = new byte[256 * 3];
+    data.Slice(HereticM8File.PaletteOffset, palette.Length).CopyTo(palette);
 
     return new() {
       Width = width,
       Height = height,
-      PixelData = pixelData,
+      PixelData = data.Slice(offset, width * height).ToArray(),
+      Palette = palette,
     };
-    }
+  }
 
   public static HereticM8File FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
