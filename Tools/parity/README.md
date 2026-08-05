@@ -311,3 +311,22 @@ The same check explains a second family. Pixel Perfect draws 120 colours, Fun Pa
 two frames shown alternately and blended by the eye, and the reference tool averages them. Our
 readers return one frame, which is why they disagree without being obviously wrong anywhere. An
 interlaced format needs both frames decoded and averaged before it can be compared at all.
+
+### Rocky Interlace, as far as it goes
+
+The container is settled and the picture is not. A file opens with `RIP1.0  `, then two-byte
+big-endian fields: the header size at 10, the line length at 12 and the height at 14. Chunks follow
+from offset 17, each a one-byte length, a name ending in a colon, and that many bytes of data — a
+`T:` title and a `CM:` colour map of nine registers in the sample. The chunks end exactly on the
+stated header size, and what follows is the stated line length times the height to the byte:
+44 + 80 × 200 = 16044, which is the file.
+
+Our reader reads none of that. It takes the first two bytes as a load address, which this format
+does not have, and the rest as an undifferentiated screen.
+
+The pixels resisted. The picture has real detail at 320 across — only 52% of aligned pixel pairs are
+uniform, so it is not 160 or 80 doubled — and 79 colours, which two blended frames of a four-colour
+mode could produce. But no arrangement tried reproduces it: two 40-byte frames side by side on each
+line or stacked whole, at one, two or four bits a pixel, with the second frame level with the first
+or half a pixel either side of it. Either the graphics are compressed despite the length arithmetic
+closing, or the mode is not one of those.
