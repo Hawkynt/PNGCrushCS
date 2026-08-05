@@ -382,3 +382,25 @@ LGPL-3.0-or-later. It can be used as a black box — given a file, asked what pi
 that is how every fix here was found and checked — but its decoders cannot be read and ported. So
 each of these has to be solved from the files themselves, and a format whose packing is not
 self-evident from two or three samples stays unsolved until more of them turn up.
+
+### Comparing samples against each other
+
+Where a format has several samples of one length, the bytes that are identical in all of them are
+structure and the bytes that differ are picture. That locates a layout without decoding anything, and
+it is the cheapest thing to try on a format that has resisted a solver.
+
+It settled CFLI Designer's container in one pass. The file is a load address and then eight blocks of
+1000 bytes at a stride of 1024, the last without its padding: 2 + 7 × 1024 + 1000 = 8170, which is
+the length of all three distinct samples to the byte. The 24 bytes of padding after each block are
+nought in every sample, which is what identified them as padding rather than data.
+
+What those blocks hold is still open. Eight blocks of a thousand at a 1024 stride is exactly how a
+FLI picture stores its eight video matrices, and their contents look like matrix entries — nibble
+pairs such as 0xF1 and 0x11. But eight matrices account for the whole file and a FLI needs a bitmap
+as well, and the picture RECOIL draws uses both nibbles of an entry, so it is not colour alone
+either: rendering every pixel from the high nibble, or every pixel from the low one, at either
+margin and at both cell widths, is inconsistent in all eight combinations.
+
+Interlace Studio's samples are equally uniform in length and much less uniform inside — the constant
+regions are only at 8016..8207 and past 16208, which suggests two pictures with a header between
+them rather than a block structure.
