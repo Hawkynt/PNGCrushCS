@@ -282,3 +282,32 @@ What the rest turned out to need, where it has been established:
   colours it uses appear nowhere in the file as bytes or as nibbles, in any channel order.
 - **FLI Graph.** 896 candidate arrangements of bitmap, eight matrices and colour memory were tried
   against the sample and none reproduces it.
+
+### Which machine a reader thinks it is
+
+A cheap check that finds a class of error no amount of tuning the layout would: take the colours the
+reference tool used and see which machine's palette they belong to.
+
+```sh
+# every colour RECOIL drew, against the sixteen of the C64 and the 238 of the Atari
+```
+
+Four readers model the Commodore 64 while their samples are drawn entirely in Atari colours, and
+RECOIL names all four as Atari 8-bit formats:
+
+| Format | Colours drawn | In the C64's sixteen | In the Atari's |
+|---|---|---|---|
+| Interlace Studio (`.ist`) | 7 | 2 | 7 |
+| Mcs (`.mcs`) | 8 | 2 | 8 |
+| Rocky Interlace (`.rip`) | 79 | 1 | 8 |
+| Din (`.din`) | 9 | 1 | 3 |
+
+Every colour of the first two is an Atari colour. Those readers cannot be made right by moving an
+offset: the palette they draw from is the wrong machine's, so the layout search that assumes a C64
+screen was looking for something that is not there.
+
+The same check explains a second family. Pixel Perfect draws 120 colours, Fun Painter and True Paint
+90 each, and Ffli 69 — all within the C64's, which sixteen colours cannot do on their own. That is
+two frames shown alternately and blended by the eye, and the reference tool averages them. Our
+readers return one frame, which is why they disagree without being obviously wrong anywhere. An
+interlaced format needs both frames decoded and averaged before it can be compared at all.
