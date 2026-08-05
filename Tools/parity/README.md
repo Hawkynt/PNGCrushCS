@@ -345,3 +345,33 @@ rows, or dealing the even ones before the odd, does not help. Something reorders
 is not any of those.
 
 A reader was not written on the strength of two pixels agreeing.
+
+### What is left, and why each is hard
+
+Of the twenty formats RECOIL reads and we did not, four have been fixed and three were never defects.
+The remaining thirteen fall into four kinds, and the kind decides what it would take:
+
+**Packed with an undocumented scheme** — UFLI (7757 bytes against 17194), CFLI (8170 against 17002),
+Flip64 (756 against 19002), Multi-Lace Editor, MegaPaint, Apple SHR, Spectrum 512 smooshed. The
+screen these unpack to is understood; the packing is not. A run-length guess was tried on the Apple
+one and consumes its input exactly while producing 26855 bytes rather than 32768, and no permutation
+of the four PackBytes modes reaches it.
+
+**Drawn on the wrong machine** — Interlace Studio, Mcs, Rocky Interlace, Din. Their readers model the
+Commodore 64 and the colours are Atari's. These need the Atari screen modes implemented, not an
+offset moved.
+
+**Two frames blended** — ZX MultiArtist draws 26 colours of which 2 are pure machine colours, and
+Multi-Lace Editor 10 of which 4 are. Neither can be matched a frame at a time, and searching two
+frames over the plausible offsets found nothing, which suggests they are packed as well.
+
+**Layout unsolved despite the container being known** — Rocky Interlace (header and chunks settled,
+pixels not), ComputerEyes (size, depth and colour scale settled, sample order not), SXG (pixels
+settled, palette not), FLI Graph (none of 896 arrangements).
+
+One constraint is worth stating because it shapes all of this. RECOIL is the only complete reference
+implementation of most of these formats and it is GPL-2.0-or-later, while this project ships
+LGPL-3.0-or-later. It can be used as a black box — given a file, asked what picture comes out, and
+that is how every fix here was found and checked — but its decoders cannot be read and ported. So
+each of these has to be solved from the files themselves, and a format whose packing is not
+self-evident from two or three samples stays unsolved until more of them turn up.
