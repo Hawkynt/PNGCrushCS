@@ -25,6 +25,39 @@ if (args[0] == "--extensions") {
   return 0;
 }
 
+// Why a file was refused, rather than only that it was.
+//
+// The ordinary decode answers null for every kind of failure, which tells a caller nothing about
+// which of them happened. A wrong length, a signature that is not this format's, and a depth nobody
+// implemented are three different jobs, and telling them apart is most of the work of fixing one.
+//
+//   Decode --why <file>...
+if (args[0] == "--why") {
+  foreach (var path in args[1..]) {
+    var file = new FileInfo(path);
+    var entries = FormatRegistry.AllFormats
+      .Where(entry => entry.AllExtensions?.Any(e => string.Equals(e, file.Extension, StringComparison.OrdinalIgnoreCase)) == true)
+      .ToArray();
+
+    Console.WriteLine($"{file.Name} ({file.Length} bytes) — {entries.Length} format(s) claim {file.Extension}");
+    foreach (var entry in entries) {
+      if (entry.LoadRawImageOrThrow == null) {
+        Console.WriteLine($"  {entry.Name}: no throwing entry point");
+        continue;
+      }
+
+      try {
+        var image = entry.LoadRawImageOrThrow(file);
+        Console.WriteLine($"  {entry.Name}: {(image == null ? "returned nothing" : $"{image.Width}x{image.Height} {image.Format}")}");
+      } catch (Exception failure) {
+        Console.WriteLine($"  {entry.Name}: {failure.GetType().Name}: {failure.Message}");
+      }
+    }
+  }
+
+  return 0;
+}
+
 // Which formats can be read but not written, so the list of what is left to encode is measured
 // rather than remembered. The capabilities say what a format can hold, which is most of what decides
 // whether writing it is a job at all: a fixed-palette machine format needs a quantiser behind it,

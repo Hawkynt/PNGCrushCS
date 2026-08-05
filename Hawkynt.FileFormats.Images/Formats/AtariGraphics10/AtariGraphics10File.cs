@@ -40,6 +40,15 @@ public sealed class AtariGraphics10File : IImageFormatReader<AtariGraphics10File
   /// <summary>Raw screen data (7680 bytes). Each byte contains 2 pixels in nybbles (upper=left, lower=right), values 0-8.</summary>
   public byte[] PixelData { get; init; } = [];
 
+  /// <summary>
+  /// The nine colour registers the picture was drawn with, or null where the file carried none.
+  /// </summary>
+  /// <remarks>
+  /// A register holds the machine's own hue and luminance rather than a colour, so it means nothing
+  /// without the GTIA palette to look it up in — and its lowest bit never reaches the screen.
+  /// </remarks>
+  public byte[]? Registers { get; init; }
+
   /// <summary>Default 9-color palette: 4 playfield registers, 4 player/missile registers, 1 background.</summary>
   private static readonly byte[] _DefaultPalette = [
     0x00, 0x00, 0x00, // 0: Background (black)
@@ -54,6 +63,31 @@ public sealed class AtariGraphics10File : IImageFormatReader<AtariGraphics10File
   ];
 
   /// <summary>Converts the Graphics 10 image to an Indexed8 raw image (80x192) with the default 9-color palette.</summary>
+  /// <summary>
+  /// The nine colours this picture states, or the stock ones where it states none.
+  /// </summary>
+  /// <remarks>
+  /// The registers are indices into the machine's palette, not colours, so each is looked up rather
+  /// than used as it stands.
+  /// </remarks>
+  private static byte[] _PaletteFor(AtariGraphics10File file) {
+    if (file.Registers == null)
+      return _DefaultPalette[..];
+
+    var palette = new byte[PaletteColors * 3];
+    var gtia = Atari8BitGraphics.Palette;
+
+    for (var i = 0; i < PaletteColors; ++i) {
+      // The low bit of a colour register does not reach the screen.
+      var entry = (file.Registers[i] & 0xFE) * 3;
+      palette[i * 3] = gtia[entry];
+      palette[i * 3 + 1] = gtia[entry + 1];
+      palette[i * 3 + 2] = gtia[entry + 2];
+    }
+
+    return palette;
+  }
+
   public static RawImage ToRawImage(AtariGraphics10File file) {
     ArgumentNullException.ThrowIfNull(file);
 
@@ -81,7 +115,7 @@ public sealed class AtariGraphics10File : IImageFormatReader<AtariGraphics10File
       Height = PixelHeight,
       Format = PixelFormat.Indexed8,
       PixelData = indexed,
-      Palette = _DefaultPalette[..],
+      Palette = _PaletteFor(file),
       PaletteCount = PaletteColors,
     };
   }

@@ -1,24 +1,24 @@
-﻿using System;
+using System;
+using System.Buffers.Binary;
 
 namespace FileFormat.Afli;
 
-/// <summary>Assembles AFLI (Advanced FLI) hires image file bytes from an AfliFile.</summary>
+/// <summary>Assembles AFLI (Advanced FLI) file bytes from an <see cref="AfliFile"/>.</summary>
 public static class AfliWriter {
 
   public static byte[] ToBytes(AfliFile file) {
-    ArgumentNullException.ThrowIfNull(file);
+    ArgumentNullException.ThrowIfNull(file.BitmapData);
+    ArgumentNullException.ThrowIfNull(file.Screens);
 
-    var result = new byte[AfliFile.ExpectedFileSize];
-    var offset = 0;
+    var result = new byte[AfliFile.MinimumFileSize];
+    BinaryPrimitives.WriteUInt16LittleEndian(result, file.LoadAddress);
 
-    // Load address (2 bytes, little-endian)
-    result[offset] = (byte)(file.LoadAddress & 0xFF);
-    result[offset + 1] = (byte)(file.LoadAddress >> 8);
-    offset += AfliFile.LoadAddressSize;
-
-    // Raw FLI data (9216 bytes)
-    var copyLength = Math.Min(file.RawData.Length, AfliFile.RawDataSize);
-    file.RawData.AsSpan(0, copyLength).CopyTo(result.AsSpan(offset));
+    file.Screens
+      .AsSpan(0, Math.Min(file.Screens.Length, AfliFile.ScreenCount * AfliFile.ScreenStride))
+      .CopyTo(result.AsSpan(AfliFile.ScreensOffset));
+    file.BitmapData
+      .AsSpan(0, Math.Min(file.BitmapData.Length, AfliFile.BitmapDataSize))
+      .CopyTo(result.AsSpan(AfliFile.BitmapOffset));
 
     return result;
   }
