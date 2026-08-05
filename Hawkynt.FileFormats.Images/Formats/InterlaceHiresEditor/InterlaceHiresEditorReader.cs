@@ -1,9 +1,10 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.InterlaceHiresEditor;
 
-/// <summary>Reads Interlace Hires Editor (.ihe) files from bytes, streams, or file paths.</summary>
+/// <summary>Reads Interlace Hires Editor pictures from bytes, streams, or file paths.</summary>
 public static class InterlaceHiresEditorReader {
 
   public static InterlaceHiresEditorFile FromFile(FileInfo file) {
@@ -21,26 +22,23 @@ public static class InterlaceHiresEditorReader {
       stream.ReadExactly(data);
       return FromBytes(data);
     }
+
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
     return FromBytes(ms.ToArray());
   }
 
   public static InterlaceHiresEditorFile FromSpan(ReadOnlySpan<byte> data) {
-
-    if (data.Length < InterlaceHiresEditorFile.LoadAddressSize + InterlaceHiresEditorFile.MinPayloadSize)
-      throw new InvalidDataException($"Data too small for a valid Interlace Hires Editor file (expected at least {InterlaceHiresEditorFile.LoadAddressSize + InterlaceHiresEditorFile.MinPayloadSize} bytes, got {data.Length}).");
-
-    var loadAddress = (ushort)(data[0] | (data[1] << 8));
-
-    var rawData = new byte[data.Length - InterlaceHiresEditorFile.LoadAddressSize];
-    data.Slice(InterlaceHiresEditorFile.LoadAddressSize, rawData.Length).CopyTo(rawData.AsSpan(0));
+    if (data.Length < InterlaceHiresEditorFile.ExpectedFileSize)
+      throw new InvalidDataException(
+        $"An Interlace Hires Editor picture is {InterlaceHiresEditorFile.ExpectedFileSize} bytes; this file is {data.Length}.");
 
     return new() {
-      LoadAddress = loadAddress,
-      RawData = rawData,
+      LoadAddress = BinaryPrimitives.ReadUInt16LittleEndian(data),
+      FirstBitmap = data.Slice(InterlaceHiresEditorFile.FirstBitmapOffset, InterlaceHiresEditorFile.BitmapSize).ToArray(),
+      SecondBitmap = data.Slice(InterlaceHiresEditorFile.SecondBitmapOffset, InterlaceHiresEditorFile.BitmapSize).ToArray(),
     };
-    }
+  }
 
   public static InterlaceHiresEditorFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

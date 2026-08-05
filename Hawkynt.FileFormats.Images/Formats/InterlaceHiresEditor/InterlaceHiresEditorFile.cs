@@ -3,108 +3,107 @@ using FileFormat.Core;
 
 namespace FileFormat.InterlaceHiresEditor;
 
-/// <summary>In-memory representation of a C64 Interlace Hires Editor image (two hires frames blended).</summary>
-public readonly record struct InterlaceHiresEditorFile : IImageFormatReader<InterlaceHiresEditorFile>, IImageToRawImage<InterlaceHiresEditorFile>, IImageFormatWriter<InterlaceHiresEditorFile> {
+/// <summary>In-memory representation of an Interlace Hires Editor picture for the Commodore 64.</summary>
+/// <remarks>
+/// This wanted 18002 bytes laid out as bitmap, video matrix, bitmap, video matrix. There is no video
+/// matrix. A file is a load address and two bitmaps, the first taking a whole eight-kilobyte page for
+/// the 8000 bytes it uses, which is 2 + 8192 + 8000 = 16194 — the length of the only sample, and
+/// 1808 bytes short of what the reader insisted on, so it was refused.
+/// <para/>
+/// The two bitmaps are shown one after the other, fast enough that the eye adds them. A pixel is
+/// therefore not on or off but on in neither frame, one of them, or both — three levels rather than
+/// two, which is exactly the three colours the reference tool draws.
+/// <para/>
+/// Nothing in the file says what those levels look like. There is no palette, no colour memory and
+/// no register: the 192 bytes between the bitmaps are the page padding and are all nought. So the
+/// picture is greyscale by construction, and the three values used here are the ones RECOIL draws so
+/// that the two agree — they are the reference's choice rather than the file's, because the file
+/// does not have one.
+/// </remarks>
+public readonly record struct InterlaceHiresEditorFile
+  : IImageFormatReader<InterlaceHiresEditorFile>, IImageToRawImage<InterlaceHiresEditorFile>, IImageFormatWriter<InterlaceHiresEditorFile> {
 
   static string IImageFormatMetadata<InterlaceHiresEditorFile>.PrimaryExtension => ".ihe";
   static string[] IImageFormatMetadata<InterlaceHiresEditorFile>.FileExtensions => [".ihe"];
-  static InterlaceHiresEditorFile IImageFormatReader<InterlaceHiresEditorFile>.FromSpan(ReadOnlySpan<byte> data) => InterlaceHiresEditorReader.FromSpan(data);
-  static byte[] IImageFormatWriter<InterlaceHiresEditorFile>.ToBytes(InterlaceHiresEditorFile file) => InterlaceHiresEditorWriter.ToBytes(file);
+  static InterlaceHiresEditorFile IImageFormatReader<InterlaceHiresEditorFile>.FromSpan(ReadOnlySpan<byte> data)
+    => InterlaceHiresEditorReader.FromSpan(data);
+  static byte[] IImageFormatWriter<InterlaceHiresEditorFile>.ToBytes(InterlaceHiresEditorFile file)
+    => InterlaceHiresEditorWriter.ToBytes(file);
+  static VideoMode[] IImageFormatMetadata<InterlaceHiresEditorFile>.VideoModes => [
+    new("Interlace Hires", [(FixedWidth, FixedHeight)], [3])
+  ];
 
-  /// <summary>The fixed width of the image in pixels.</summary>
+  /// <summary>Pixels across.</summary>
   public const int FixedWidth = 320;
 
-  /// <summary>The fixed height of the image in pixels.</summary>
+  /// <summary>Rows.</summary>
   public const int FixedHeight = 200;
 
   /// <summary>Size of the load address in bytes.</summary>
   internal const int LoadAddressSize = 2;
 
-  /// <summary>Size of one bitmap data section in bytes.</summary>
+  /// <summary>The bytes a bitmap uses.</summary>
   internal const int BitmapSize = 8000;
 
-  /// <summary>Size of one screen RAM section in bytes.</summary>
-  internal const int ScreenRamSize = 1000;
+  /// <summary>The address space a bitmap occupies, being a whole eight-kilobyte page.</summary>
+  internal const int BitmapStride = 8192;
 
-  /// <summary>Minimum payload size in bytes (bitmap1 + screen1 + bitmap2 + screen2).</summary>
-  internal const int MinPayloadSize = BitmapSize + ScreenRamSize + BitmapSize + ScreenRamSize;
+  /// <summary>Where the first bitmap starts.</summary>
+  internal const int FirstBitmapOffset = LoadAddressSize;
 
-  /// <summary>Image width, always 320.</summary>
+  /// <summary>Where the second starts: a whole page after the first, not 8000 bytes after it.</summary>
+  internal const int SecondBitmapOffset = LoadAddressSize + BitmapStride;
+
+  /// <summary>The whole of a file: 2 + 8192 + 8000.</summary>
+  public const int ExpectedFileSize = SecondBitmapOffset + BitmapSize;
+
+  /// <summary>
+  /// The three levels a pixel can be shown at, darkest first.
+  /// </summary>
+  /// <remarks>
+  /// Lit in both frames is darkest, in neither lightest, and the middle is half of the difference —
+  /// which is what makes them a scale rather than three unrelated colours.
+  /// </remarks>
+  internal static ReadOnlySpan<byte> Levels => [0, 0, 0, 54, 54, 54, 108, 108, 108];
+
+  /// <summary>Always 320.</summary>
   public int Width => FixedWidth;
 
-  /// <summary>Image height, always 200.</summary>
+  /// <summary>Always 200.</summary>
   public int Height => FixedHeight;
 
   /// <summary>C64 memory load address (2 bytes, little-endian).</summary>
   public ushort LoadAddress { get; init; }
 
-  /// <summary>Raw payload data (entire file content after load address).</summary>
-  public byte[] RawData { get; init; }
+  /// <summary>The first frame's bitmap.</summary>
+  public byte[] FirstBitmap { get; init; }
 
-  /// <summary>Converts this Interlace Hires Editor image to a platform-independent <see cref="RawImage"/> in Rgb24 format by averaging two hires frames.</summary>
+  /// <summary>The second frame's bitmap.</summary>
+  public byte[] SecondBitmap { get; init; }
+
+  /// <summary>Converts this picture to a platform-independent <see cref="RawImage"/>.</summary>
   public static RawImage ToRawImage(InterlaceHiresEditorFile file) {
+    var first = file.FirstBitmap ?? [];
+    var second = file.SecondBitmap ?? [];
+    var indices = new byte[FixedWidth * FixedHeight];
 
-    const int width = FixedWidth;
-    const int height = FixedHeight;
-    var rgb = new byte[width * height * 3];
+    for (var y = 0; y < FixedHeight; ++y)
+      for (var x = 0; x < FixedWidth; ++x) {
+        var cell = y / 8 * (FixedWidth / 8) + x / 8;
+        var bit = 7 - x % 8;
+        var lit = ((first[cell * 8 + y % 8] >> bit) & 1) + ((second[cell * 8 + y % 8] >> bit) & 1);
 
-    var hasScreen1 = file.RawData.Length >= BitmapSize + ScreenRamSize;
-    var hasFrame2 = file.RawData.Length >= BitmapSize + ScreenRamSize + BitmapSize;
-    var hasScreen2 = file.RawData.Length >= MinPayloadSize;
-
-    for (var y = 0; y < height; ++y)
-      for (var x = 0; x < width; ++x) {
-        var cellX = x / 8;
-        var cellY = y / 8;
-        var cellIndex = cellY * 40 + cellX;
-        var byteInCell = y % 8;
-        var bitmapOffset = cellIndex * 8 + byteInCell;
-        var bitPosition = 7 - (x % 8);
-
-        // Frame 1: hires decode
-        var bitmapByte1 = bitmapOffset < file.RawData.Length ? file.RawData[bitmapOffset] : (byte)0;
-        var bitValue1 = (bitmapByte1 >> bitPosition) & 1;
-
-        int colorIndex1;
-        if (hasScreen1) {
-          var screenByte1 = file.RawData[BitmapSize + cellIndex];
-          colorIndex1 = bitValue1 == 1
-            ? (screenByte1 >> 4) & 0x0F
-            : screenByte1 & 0x0F;
-        } else
-          colorIndex1 = bitValue1 == 1 ? 1 : 0;
-
-        // Frame 2: hires decode
-        var bitmap2Start = BitmapSize + ScreenRamSize;
-        var bitmapByte2 = hasFrame2 && bitmap2Start + bitmapOffset < file.RawData.Length
-          ? file.RawData[bitmap2Start + bitmapOffset]
-          : (byte)0;
-        var bitValue2 = (bitmapByte2 >> bitPosition) & 1;
-
-        int colorIndex2;
-        if (hasScreen2) {
-          var screenByte2 = file.RawData[BitmapSize + ScreenRamSize + BitmapSize + cellIndex];
-          colorIndex2 = bitValue2 == 1
-            ? (screenByte2 >> 4) & 0x0F
-            : screenByte2 & 0x0F;
-        } else
-          colorIndex2 = bitValue2 == 1 ? 1 : 0;
-
-        var color1 = Commodore64Graphics.HexColors[colorIndex1];
-        var color2 = Commodore64Graphics.HexColors[colorIndex2];
-
-        var offset = (y * width + x) * 3;
-        rgb[offset] = (byte)((((color1 >> 16) & 0xFF) + ((color2 >> 16) & 0xFF)) / 2);
-        rgb[offset + 1] = (byte)((((color1 >> 8) & 0xFF) + ((color2 >> 8) & 0xFF)) / 2);
-        rgb[offset + 2] = (byte)(((color1 & 0xFF) + (color2 & 0xFF)) / 2);
+        // Lit in both frames is the darkest of the three, so the count counts down the scale.
+        indices[y * FixedWidth + x] = (byte)(2 - lit);
       }
 
     return new() {
-      Width = width,
-      Height = height,
-      Format = PixelFormat.Rgb24,
-      PixelData = rgb,
+      Width = FixedWidth,
+      Height = FixedHeight,
+      Format = PixelFormat.Indexed8,
+      PixelData = indices,
+      Palette = Levels.ToArray(),
+      PaletteCount = 3,
     };
   }
-
 }
