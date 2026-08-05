@@ -1,15 +1,20 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.CfliDesigner;
 
-/// <summary>Reads CFLI Designer (.cfli) files from bytes, streams, or file paths.</summary>
+/// <summary>Reads CFLI Designer pictures from bytes, streams, or file paths.</summary>
+/// <remarks>
+/// The matrices are page-strided: each takes 1024 bytes of address space for the 1000 it uses, and
+/// the last is written without its padding, which is what makes a file 8170 rather than 8194.
+/// </remarks>
 public static class CfliDesignerReader {
 
   public static CfliDesignerFile FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
-      throw new FileNotFoundException("CFLI file not found.", file.FullName);
+      throw new FileNotFoundException("CFLI Designer file not found.", file.FullName);
 
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
@@ -21,26 +26,29 @@ public static class CfliDesignerReader {
       stream.ReadExactly(data);
       return FromBytes(data);
     }
+
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
     return FromBytes(ms.ToArray());
   }
 
   public static CfliDesignerFile FromSpan(ReadOnlySpan<byte> data) {
+    if (data.Length < CfliDesignerFile.ExpectedFileSize)
+      throw new InvalidDataException(
+        $"A CFLI Designer picture is {CfliDesignerFile.ExpectedFileSize} bytes; this file is {data.Length}.");
 
-    if (data.Length < CfliDesignerFile.LoadAddressSize + CfliDesignerFile.MinPayloadSize)
-      throw new InvalidDataException($"Data too small for a valid CFLI file (expected at least {CfliDesignerFile.LoadAddressSize + CfliDesignerFile.MinPayloadSize} bytes, got {data.Length}).");
-
-    var loadAddress = (ushort)(data[0] | (data[1] << 8));
-
-    var rawData = new byte[data.Length - CfliDesignerFile.LoadAddressSize];
-    data.Slice(CfliDesignerFile.LoadAddressSize, rawData.Length).CopyTo(rawData.AsSpan(0));
+    var screens = new byte[CfliDesignerFile.ScreenBankCount * CfliDesignerFile.ScreenBankSize];
+    for (var bank = 0; bank < CfliDesignerFile.ScreenBankCount; ++bank)
+      data.Slice(
+          CfliDesignerFile.LoadAddressSize + bank * CfliDesignerFile.ScreenBankStride,
+          CfliDesignerFile.ScreenBankSize)
+        .CopyTo(screens.AsSpan(bank * CfliDesignerFile.ScreenBankSize));
 
     return new() {
-      LoadAddress = loadAddress,
-      RawData = rawData,
+      LoadAddress = BinaryPrimitives.ReadUInt16LittleEndian(data),
+      Screens = screens,
     };
-    }
+  }
 
   public static CfliDesignerFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

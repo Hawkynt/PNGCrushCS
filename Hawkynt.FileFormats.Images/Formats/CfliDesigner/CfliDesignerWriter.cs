@@ -1,17 +1,26 @@
 using System;
+using System.Buffers.Binary;
 
 namespace FileFormat.CfliDesigner;
 
-/// <summary>Assembles CFLI Designer (.cfli) file bytes from a CfliDesignerFile.</summary>
+/// <summary>Assembles CFLI Designer picture bytes.</summary>
 public static class CfliDesignerWriter {
 
   public static byte[] ToBytes(CfliDesignerFile file) {
-    ArgumentNullException.ThrowIfNull(file);
+    ArgumentNullException.ThrowIfNull(file.Screens);
 
-    var result = new byte[CfliDesignerFile.LoadAddressSize + file.RawData.Length];
-    result[0] = (byte)(file.LoadAddress & 0xFF);
-    result[1] = (byte)(file.LoadAddress >> 8);
-    file.RawData.AsSpan(0, file.RawData.Length).CopyTo(result.AsSpan(CfliDesignerFile.LoadAddressSize));
+    var result = new byte[CfliDesignerFile.ExpectedFileSize];
+    BinaryPrimitives.WriteUInt16LittleEndian(result, file.LoadAddress);
+
+    for (var bank = 0; bank < CfliDesignerFile.ScreenBankCount; ++bank) {
+      var from = bank * CfliDesignerFile.ScreenBankSize;
+      if (from >= file.Screens.Length)
+        break;
+
+      file.Screens
+        .AsSpan(from, Math.Min(CfliDesignerFile.ScreenBankSize, file.Screens.Length - from))
+        .CopyTo(result.AsSpan(CfliDesignerFile.LoadAddressSize + bank * CfliDesignerFile.ScreenBankStride));
+    }
 
     return result;
   }
