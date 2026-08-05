@@ -351,9 +351,16 @@ A reader was not written on the strength of two pixels agreeing.
 Of the twenty formats RECOIL reads and we did not, four have been fixed and three were never defects.
 The remaining thirteen fall into four kinds, and the kind decides what it would take:
 
-**Packed with an undocumented scheme** — UFLI (7757 bytes against 17194), CFLI (8170 against 17002),
-Flip64 (756 against 19002), Multi-Lace Editor, MegaPaint, Apple SHR, Spectrum 512 smooshed. The
-screen these unpack to is understood; the packing is not. A run-length guess was tried on the Apple
+**Packed with an undocumented scheme** — UFLI (7757 bytes against 17194), Flip64, MegaPaint, Apple
+SHR, Spectrum 512 smooshed. The screen these unpack to is understood; the packing is not. Flip64 and
+Apple SHR are the clear cases: their samples are 756, 756, 2309 and 4508 bytes, and 7635, 7635, 15872
+and 7844, and a format whose files differ in length for pictures of one size is packing them.
+
+**Fixed size, layout unknown** — CFLI Designer and Interlace Studio were counted as packed and are
+not. Three distinct CFLI pictures are 8170 bytes each and three distinct Interlace Studio ones are
+17184 each, and a length that does not move with the picture is not compression. They are plain
+layouts nobody has worked out: a hires-FLI search over every bitmap and screen offset in the CFLI
+file, at five left margins and five screen strides, matched nothing. A run-length guess was tried on the Apple
 one and consumes its input exactly while producing 26855 bytes rather than 32768, and no permutation
 of the four PackBytes modes reaches it.
 
