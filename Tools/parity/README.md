@@ -239,3 +239,46 @@ is left is six: `.crw`, `.mrw` and `.x3f` camera raw, `.sid` and `.mrsid` wavele
 The other half — whether we decode those formats the way it does — needs a conversion apiece, and
 the limit stops that after a handful. Run the conformance suite with `TOMSEDITOR` set to spend the
 day's allowance on formats no installed tool can judge.
+
+## Reader gaps
+
+```sh
+dotnet run --project Tools/parity/Decode -- --why "$file"...
+```
+
+Every format claiming that file's extension is asked to read it and made to say why it would not.
+The ordinary decode answers null for a wrong length, a foreign signature and an unimplemented depth
+alike, and those are three different jobs.
+
+Sweeping the corpus with RECOIL and comparing turned up 44 formats where it reads a sample and we do
+not, or where we both read one and disagree. Two of those disagreements were the sweep's own fault:
+it normalised our size to the reference tool's with `-resize`, which interpolates, when a machine
+doubling a pixel is `-sample`. Use nearest-neighbour when comparing a picture stored 160 across and
+shown 320.
+
+Three of the refusals are not defects. RECOIL means a different format by that extension, and ours
+is right to turn the file down:
+
+| Extension | Ours | What the sample actually is |
+|---|---|---|
+| `.cpi` | Calamus (Atari ST) | Marco Pixel Editor (Atari 8-bit) |
+| `.mpl` | IFF multi-palette (Amiga) | Mad Studio multi-colour player (Atari 8-bit) |
+| `.pic` | Psion PIC | Graphic Arts Department (Atari 8-bit) |
+
+Those are three formats missing rather than three readers broken, and a reader that accepted them
+would be claiming files that are not its own.
+
+What the rest turned out to need, where it has been established:
+
+- **Compressed where we assume plain.** `.ufl`, `.cfli`, `.fbi`, `.him`, `.ghg` and others are far
+  smaller than the screen they hold — 756 bytes against 19002 in one case. The reader models the
+  unpacked screen and no unpacker exists.
+- **Interlaced.** `.rip` renders in 79 colours, which sixteen hardware colours cannot do without two
+  frames being blended. A solver for single-frame layouts cannot match one of these, and the same
+  goes for the `.drl`, `.hlf` and `.ist` disagreements.
+- **Speccy eXtended Graphics.** The pixels are settled: an 18-byte header stating width and height at
+  bytes 8 and 10, a 508-byte table, then four bits a pixel high nibble first, which reproduces
+  RECOIL's picture exactly as an index pattern. Where the palette lives is not settled — the sixteen
+  colours it uses appear nowhere in the file as bytes or as nibbles, in any channel order.
+- **FLI Graph.** 896 candidate arrangements of bitmap, eight matrices and colour memory were tried
+  against the sample and none reproduces it.
