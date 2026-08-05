@@ -330,3 +330,18 @@ mode could produce. But no arrangement tried reproduces it: two 40-byte frames s
 line or stacked whole, at one, two or four bits a pixel, with the second frame level with the first
 or half a pixel either side of it. Either the graphics are compressed despite the length arithmetic
 closing, or the mode is not one of those.
+
+### ComputerEyes, as far as it goes
+
+The sample opens with `EYES`, is 192022 bytes, and RECOIL draws it 320 by 200 in 13767 colours. The
+arithmetic is exact: 22 + 3 × 64000. Every byte of the data is 0..63, so a sample is six bits, and
+RECOIL's colours are those six bits at full scale — its first pixel (199, 178, 154) is (49, 44, 38)
+of 63.
+
+That is as far as it goes. The three planes look as though they start at 22, 64022 and 128022 —
+the first two pixels come out exactly right from there — but the third does not, and taking the
+whole picture that way has a value drawn two different ways in 62000 of 64000 pixels. Reversing the
+rows, or dealing the even ones before the odd, does not help. Something reorders the samples and it
+is not any of those.
+
+A reader was not written on the strength of two pixels agreeing.
