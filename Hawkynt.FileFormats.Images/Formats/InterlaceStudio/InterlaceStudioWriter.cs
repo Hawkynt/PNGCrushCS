@@ -2,42 +2,22 @@ using System;
 
 namespace FileFormat.InterlaceStudio;
 
-/// <summary>Assembles Interlace Studio (.ist) file bytes from an InterlaceStudioFile.</summary>
+/// <summary>Assembles Interlace Studio picture bytes.</summary>
 public static class InterlaceStudioWriter {
 
   public static byte[] ToBytes(InterlaceStudioFile file) {
-    ArgumentNullException.ThrowIfNull(file);
+    ArgumentNullException.ThrowIfNull(file.FirstFrame);
+    ArgumentNullException.ThrowIfNull(file.SecondFrame);
 
-    var result = new byte[InterlaceStudioFile.FileSize];
-    var offset = 0;
+    var result = new byte[InterlaceStudioFile.MinimumFileSize];
 
-    // Load address (2 bytes, little-endian)
-    result[offset] = (byte)(file.LoadAddress & 0xFF);
-    result[offset + 1] = (byte)(file.LoadAddress >> 8);
-    offset += InterlaceStudioFile.LoadAddressSize;
+    var header = file.Header ?? [];
+    header.AsSpan(0, Math.Min(header.Length, InterlaceStudioFile.HeaderSize)).CopyTo(result);
 
-    // Bitmap1 (8000 bytes)
-    file.Bitmap1.AsSpan(0, InterlaceStudioFile.BitmapDataSize).CopyTo(result.AsSpan(offset));
-    offset += InterlaceStudioFile.BitmapDataSize;
-
-    // Screen1 (1000 bytes)
-    file.Screen1.AsSpan(0, InterlaceStudioFile.ScreenDataSize).CopyTo(result.AsSpan(offset));
-    offset += InterlaceStudioFile.ScreenDataSize;
-
-    // ColorData (1000 bytes)
-    file.ColorData.AsSpan(0, InterlaceStudioFile.ColorDataSize).CopyTo(result.AsSpan(offset));
-    offset += InterlaceStudioFile.ColorDataSize;
-
-    // Bitmap2 (8000 bytes)
-    file.Bitmap2.AsSpan(0, InterlaceStudioFile.BitmapDataSize).CopyTo(result.AsSpan(offset));
-    offset += InterlaceStudioFile.BitmapDataSize;
-
-    // Screen2 (1000 bytes)
-    file.Screen2.AsSpan(0, InterlaceStudioFile.ScreenDataSize).CopyTo(result.AsSpan(offset));
-    offset += InterlaceStudioFile.ScreenDataSize;
-
-    // BackgroundColor (1 byte)
-    result[offset] = file.BackgroundColor;
+    file.FirstFrame.AsSpan(0, Math.Min(file.FirstFrame.Length, InterlaceStudioFile.FrameSize))
+      .CopyTo(result.AsSpan(InterlaceStudioFile.FirstFrameOffset));
+    file.SecondFrame.AsSpan(0, Math.Min(file.SecondFrame.Length, InterlaceStudioFile.FrameSize))
+      .CopyTo(result.AsSpan(InterlaceStudioFile.SecondFrameOffset));
 
     return result;
   }
