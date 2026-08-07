@@ -1,41 +1,45 @@
 using System;
+using System.Buffers.Binary;
 
 namespace FileFormat.SpeccyExtended;
 
-/// <summary>Assembles Speccy eXtended Graphics (SXG) file bytes from a <see cref="SpeccyExtendedFile"/>.</summary>
+/// <summary>Assembles Speccy eXtended Graphics (SXG) picture bytes.</summary>
+/// <remarks>
+/// What lies between the palette and the picture is not established, so it is written as nought.
+/// The reference tool does not read it, and neither does this.
+/// </remarks>
 public static class SpeccyExtendedWriter {
 
   public static byte[] ToBytes(SpeccyExtendedFile file) {
     ArgumentNullException.ThrowIfNull(file);
 
-    var result = new byte[SpeccyExtendedReader.FileSize];
+    var result = new byte[SpeccyExtendedFile.PixelOffset + (file.Width * file.Height + 1) / 2];
+    SpeccyExtendedReader.Magic.CopyTo(result);
+    BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(4), 3);
+    BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(SpeccyExtendedFile.WidthOffset), (ushort)file.Width);
+    BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(SpeccyExtendedFile.WidthOffset + 2), (ushort)file.Height);
 
-    // Write header: "SXG" + version
-    result[0] = SpeccyExtendedReader.Magic[0];
-    result[1] = SpeccyExtendedReader.Magic[1];
-    result[2] = SpeccyExtendedReader.Magic[2];
-    result[3] = file.Version;
-
-    var bitmapOffset = SpeccyExtendedReader.HeaderSize;
-
-    // Interleave linear bitmap data back to ZX Spectrum memory layout
-    for (var y = 0; y < SpeccyExtendedReader.RowCount; ++y) {
-      var third = y / 64;
-      var characterRow = (y % 64) / 8;
-      var pixelLine = y % 8;
-      var dstOffset = bitmapOffset + third * 2048 + pixelLine * 256 + characterRow * SpeccyExtendedReader.BytesPerRow;
-      var srcOffset = y * SpeccyExtendedReader.BytesPerRow;
-      file.BitmapData.AsSpan(srcOffset, SpeccyExtendedReader.BytesPerRow).CopyTo(result.AsSpan(dstOffset));
+    var palette = file.Palette ?? [];
+    for (var i = 0; i < SpeccyExtendedFile.PaletteCount && i * 3 + 2 < palette.Length; ++i) {
+      var value = (ushort)((_Channel(palette[i * 3]) << 10) | (_Channel(palette[i * 3 + 1]) << 5) | _Channel(palette[i * 3 + 2]));
+      BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(SpeccyExtendedFile.PaletteOffset + i * 2), value);
     }
 
-    // Copy standard attribute data
-    var stdAttrOffset = bitmapOffset + SpeccyExtendedReader.BitmapSize;
-    file.AttributeData.AsSpan(0, SpeccyExtendedReader.AttributeSize).CopyTo(result.AsSpan(stdAttrOffset));
-
-    // Copy extended attribute data
-    var extAttrOffset = stdAttrOffset + SpeccyExtendedReader.AttributeSize;
-    file.ExtendedAttributeData.AsSpan(0, SpeccyExtendedReader.AttributeSize).CopyTo(result.AsSpan(extAttrOffset));
+    var pixels = file.PixelData ?? [];
+    for (var i = 0; i < pixels.Length && i < file.Width * file.Height; ++i) {
+      var at = SpeccyExtendedFile.PixelOffset + i / 2;
+      result[at] |= (byte)(i % 2 == 0 ? (pixels[i] & 0x0F) << 4 : pixels[i] & 0x0F);
+    }
 
     return result;
   }
+
+  /// <summary>A channel of 0..255 as the five bits the file holds.</summary>
+  /// <remarks>
+  /// Rounded rather than truncated. Full scale is 24 of the 31 five bits can express, so truncating
+  /// loses a step where the reading side gains one — a colour written and read back would drift a
+  /// shade darker each time.
+  /// </remarks>
+  private static int _Channel(byte value)
+    => Math.Min(31, (value * SpeccyExtendedFile.ChannelFullScale + 127) / 255);
 }

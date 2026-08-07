@@ -1,97 +1,90 @@
 using System;
+using System.Buffers.Binary;
 using FileFormat.Core;
 
 namespace FileFormat.SpeccyExtended;
 
-/// <summary>In-memory representation of a Speccy eXtended Graphics (SXG) image.
-/// Extends the standard ZX Spectrum screen with per-character-line extended attributes (768 bytes per attribute plane).
-/// File structure: 4-byte header ("SXG" + version) + 6144 bitmap + standard attributes (768) + extended attributes (768) = 7684 bytes.
-/// </summary>
+/// <summary>In-memory representation of a Speccy eXtended Graphics (SXG) picture.</summary>
+/// <remarks>
+/// This was read as a ZX Spectrum screen with an extra attribute plane — 7684 bytes, 256 by 192, the
+/// machine's fifteen colours. It is none of those. An SXG is a ZX Evolution picture: it states its
+/// own size, carries its own sixteen colours and holds four bits a pixel, and the samples are 38926
+/// and 25102 bytes at 320 by 240 and 256 by 192. All were refused, and the reason given was that the
+/// magic was "SX" — the signature is at offset one, after a leading 0x7F, and the check read from
+/// nought.
+/// <para/>
+/// The palette was the last thing to give: the sixteen colours appear nowhere in the file as bytes
+/// or as nibbles in any channel order, which is what a search for them assumed. They are five bits a
+/// channel in a sixteen-bit word, and five bits do not fall on a nibble.
+/// </remarks>
 [FormatDetectionPriority(100)]
-[FormatMagicBytes(new byte[] { 0x53, 0x58, 0x47 })]
+[FormatMagicBytes([0x7F, 0x53, 0x58, 0x47])]
 public sealed class SpeccyExtendedFile : IImageFormatReader<SpeccyExtendedFile>, IImageToRawImage<SpeccyExtendedFile>, IImageFormatWriter<SpeccyExtendedFile> {
 
   static string IImageFormatMetadata<SpeccyExtendedFile>.PrimaryExtension => ".sxg";
   static string[] IImageFormatMetadata<SpeccyExtendedFile>.FileExtensions => [".sxg"];
   static SpeccyExtendedFile IImageFormatReader<SpeccyExtendedFile>.FromSpan(ReadOnlySpan<byte> data) => SpeccyExtendedReader.FromSpan(data);
-
   static byte[] IImageFormatWriter<SpeccyExtendedFile>.ToBytes(SpeccyExtendedFile file) => SpeccyExtendedWriter.ToBytes(file);
 
+  /// <summary>The signature, which begins with a byte before "SXG" rather than with it.</summary>
   static bool? IImageFormatMetadata<SpeccyExtendedFile>.MatchesSignature(ReadOnlySpan<byte> header)
-    => header.Length >= 3 && header[0] == 0x53 && header[1] == 0x58 && header[2] == 0x47;
+    => header.Length >= 4 && header[0] == 0x7F && header[1] == 0x53 && header[2] == 0x58 && header[3] == 0x47;
 
-  /// <summary>ZX Spectrum normal palette (bright=0): Black, Blue, Red, Magenta, Green, Cyan, Yellow, White.</summary>
-  private static readonly int[] _NormalPalette = [
-    0x000000, 0x0000CD, 0xCD0000, 0xCD00CD, 0x00CD00, 0x00CDCD, 0xCDCD00, 0xCDCDCD
-  ];
+  /// <summary>Where the width sits, as a sixteen-bit little-endian value; the height follows it.</summary>
+  internal const int WidthOffset = 8;
 
-  /// <summary>ZX Spectrum bright palette (bright=1).</summary>
-  private static readonly int[] _BrightPalette = [
-    0x000000, 0x0000FF, 0xFF0000, 0xFF00FF, 0x00FF00, 0x00FFFF, 0xFFFF00, 0xFFFFFF
-  ];
+  /// <summary>Where the sixteen colours start, two bytes apiece.</summary>
+  internal const int PaletteOffset = 16;
 
-  /// <summary>Always 256.</summary>
-  public int Width => 256;
+  /// <summary>How many colours a picture has.</summary>
+  internal const int PaletteCount = 16;
 
-  /// <summary>Always 192.</summary>
-  public int Height => 192;
+  /// <summary>Where the picture starts. What lies between the palette and here is not established.</summary>
+  internal const int PixelOffset = 526;
 
-  /// <summary>Format version byte (currently 1).</summary>
-  public byte Version { get; init; } = 1;
+  /// <summary>
+  /// What a five-bit channel is worth out of 255.
+  /// </summary>
+  /// <remarks>
+  /// Not 31. The reference tool draws a channel of 8 as 85 and one of 16 as 170, which is a scale of
+  /// 24 rather than of the 31 five bits could hold, and anything above 24 comes out white. Found by
+  /// setting one entry to a single bit at a time and reading back what was drawn.
+  /// </remarks>
+  internal const int ChannelFullScale = 24;
 
-  /// <summary>6144 bytes of 1bpp bitmap data in linear row order (deinterleaved).</summary>
-  public byte[] BitmapData { get; init; } = [];
+  /// <summary>Pixels across, as the file states.</summary>
+  public int Width { get; init; }
 
-  /// <summary>768 bytes of standard attribute data, one per 8x8 cell (bit 7=flash, bit 6=bright, bits 5-3=paper, bits 2-0=ink).</summary>
-  public byte[] AttributeData { get; init; } = [];
+  /// <summary>Rows, as the file states.</summary>
+  public int Height { get; init; }
 
-  /// <summary>768 bytes of extended attribute data, one per 8x8 cell (provides additional color information).</summary>
-  public byte[] ExtendedAttributeData { get; init; } = [];
+  /// <summary>Sixteen colours, three bytes apiece.</summary>
+  public byte[] Palette { get; init; } = [];
 
-  /// <summary>Converts this SXG screen to a platform-independent <see cref="RawImage"/> in Rgb24 format.
-  /// Uses extended attributes when the bright bit is set in the extended attribute (blends with standard attributes).</summary>
+  /// <summary>One index per pixel.</summary>
+  public byte[] PixelData { get; init; } = [];
+
+  /// <summary>Turns one of the file's sixteen-bit colours into red, green and blue.</summary>
+  /// <remarks>Five bits a channel, red highest, and the word is little-endian.</remarks>
+  internal static (byte Red, byte Green, byte Blue) DecodeColor(ushort value) => (
+    _Scale((value >> 10) & 0x1F),
+    _Scale((value >> 5) & 0x1F),
+    _Scale(value & 0x1F));
+
+  private static byte _Scale(int channel)
+    => (byte)Math.Min(255, channel * 255 / ChannelFullScale);
+
+  /// <summary>Converts this picture to a platform-independent <see cref="RawImage"/>.</summary>
   public static RawImage ToRawImage(SpeccyExtendedFile file) {
     ArgumentNullException.ThrowIfNull(file);
 
-    const int width = 256;
-    const int height = 192;
-    var rgb = new byte[width * height * 3];
-
-    for (var y = 0; y < height; ++y)
-      for (var x = 0; x < width; ++x) {
-        var byteIndex = y * 32 + x / 8;
-        var bitPosition = 7 - (x % 8);
-        var bitValue = (file.BitmapData[byteIndex] >> bitPosition) & 1;
-
-        var cellX = x / 8;
-        var cellY = y / 8;
-        var cellIndex = cellY * 32 + cellX;
-        var attribute = file.AttributeData[cellIndex];
-        var extAttr = file.ExtendedAttributeData[cellIndex];
-
-        // If extended attribute has the bright bit set, use extended attribute for colors
-        var useExtended = ((extAttr >> 6) & 1) == 1;
-        var effectiveAttr = useExtended ? extAttr : attribute;
-
-        var bright = (effectiveAttr >> 6) & 1;
-        var paper = (effectiveAttr >> 3) & 0x07;
-        var ink = effectiveAttr & 0x07;
-
-        var palette = bright == 1 ? _BrightPalette : _NormalPalette;
-        var color = palette[bitValue == 1 ? ink : paper];
-
-        var offset = (y * width + x) * 3;
-        rgb[offset] = (byte)((color >> 16) & 0xFF);
-        rgb[offset + 1] = (byte)((color >> 8) & 0xFF);
-        rgb[offset + 2] = (byte)(color & 0xFF);
-      }
-
     return new() {
-      Width = width,
-      Height = height,
-      Format = PixelFormat.Rgb24,
-      PixelData = rgb,
+      Width = file.Width,
+      Height = file.Height,
+      Format = PixelFormat.Indexed8,
+      PixelData = file.PixelData,
+      Palette = file.Palette,
+      PaletteCount = PaletteCount,
     };
   }
-
 }

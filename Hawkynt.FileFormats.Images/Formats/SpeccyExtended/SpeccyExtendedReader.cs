@@ -1,31 +1,14 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.SpeccyExtended;
 
-/// <summary>Reads Speccy eXtended Graphics (SXG) files from bytes, streams, or file paths.</summary>
+/// <summary>Reads Speccy eXtended Graphics (SXG) pictures from bytes, streams, or file paths.</summary>
 public static class SpeccyExtendedReader {
 
-  /// <summary>Magic bytes: "SXG".</summary>
-  internal static readonly byte[] Magic = [0x53, 0x58, 0x47];
-
-  /// <summary>Header size: 3 bytes magic + 1 byte version.</summary>
-  internal const int HeaderSize = 4;
-
-  /// <summary>Bitmap data size in bytes.</summary>
-  internal const int BitmapSize = 6144;
-
-  /// <summary>Attribute data size in bytes.</summary>
-  internal const int AttributeSize = 768;
-
-  /// <summary>Total file size: header + bitmap + standard attributes + extended attributes.</summary>
-  internal const int FileSize = HeaderSize + BitmapSize + AttributeSize + AttributeSize;
-
-  /// <summary>Bytes per pixel row (256 pixels / 8 bits per pixel).</summary>
-  internal const int BytesPerRow = 32;
-
-  /// <summary>Number of pixel rows.</summary>
-  internal const int RowCount = 192;
+  /// <summary>What a file opens with: a byte, then the three letters.</summary>
+  internal static ReadOnlySpan<byte> Magic => [0x7F, 0x53, 0x58, 0x47];
 
   public static SpeccyExtendedFile FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
@@ -42,50 +25,46 @@ public static class SpeccyExtendedReader {
       stream.ReadExactly(data);
       return FromBytes(data);
     }
+
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
     return FromBytes(ms.ToArray());
   }
 
   public static SpeccyExtendedFile FromSpan(ReadOnlySpan<byte> data) {
+    if (data.Length < SpeccyExtendedFile.PixelOffset)
+      throw new InvalidDataException($"Data too small for an SXG picture: {data.Length} bytes.");
 
-    if (data.Length < FileSize)
-      throw new InvalidDataException($"SXG file must be at least {FileSize} bytes, got {data.Length}.");
+    if (!data[..Magic.Length].SequenceEqual(Magic))
+      throw new InvalidDataException("Not an SXG picture: it does not open with 0x7F and \"SXG\".");
 
-    // Validate magic bytes
-    if (data[0] != Magic[0] || data[1] != Magic[1] || data[2] != Magic[2])
-      throw new InvalidDataException($"Invalid SXG magic: expected 'SXG', got '{(char)data[0]}{(char)data[1]}{(char)data[2]}'.");
+    var width = BinaryPrimitives.ReadUInt16LittleEndian(data[SpeccyExtendedFile.WidthOffset..]);
+    var height = BinaryPrimitives.ReadUInt16LittleEndian(data[(SpeccyExtendedFile.WidthOffset + 2)..]);
+    if (width <= 0 || height <= 0)
+      throw new InvalidDataException($"An SXG picture of {width}x{height} is no size.");
 
-    var version = data[3];
+    var needed = SpeccyExtendedFile.PixelOffset + (width * height + 1) / 2;
+    if (data.Length < needed)
+      throw new InvalidDataException($"An SXG picture of {width}x{height} takes {needed} bytes; this file is {data.Length}.");
 
-    var bitmapOffset = HeaderSize;
-    var linearBitmap = new byte[BitmapSize];
-
-    // Deinterleave from ZX Spectrum memory layout to linear row order
-    for (var y = 0; y < RowCount; ++y) {
-      var third = y / 64;
-      var characterRow = (y % 64) / 8;
-      var pixelLine = y % 8;
-      var srcOffset = bitmapOffset + third * 2048 + pixelLine * 256 + characterRow * BytesPerRow;
-      var dstOffset = y * BytesPerRow;
-      data.Slice(srcOffset, BytesPerRow).CopyTo(linearBitmap.AsSpan(dstOffset));
+    var palette = new byte[SpeccyExtendedFile.PaletteCount * 3];
+    for (var i = 0; i < SpeccyExtendedFile.PaletteCount; ++i) {
+      var value = BinaryPrimitives.ReadUInt16LittleEndian(data[(SpeccyExtendedFile.PaletteOffset + i * 2)..]);
+      var (red, green, blue) = SpeccyExtendedFile.DecodeColor(value);
+      palette[i * 3] = red;
+      palette[i * 3 + 1] = green;
+      palette[i * 3 + 2] = blue;
     }
 
-    var stdAttrOffset = bitmapOffset + BitmapSize;
-    var attributes = new byte[AttributeSize];
-    data.Slice(stdAttrOffset, AttributeSize).CopyTo(attributes);
-
-    var extAttrOffset = stdAttrOffset + AttributeSize;
-    var extAttributes = new byte[AttributeSize];
-    data.Slice(extAttrOffset, AttributeSize).CopyTo(extAttributes);
-
-    return new SpeccyExtendedFile {
-      Version = version,
-      BitmapData = linearBitmap,
-      AttributeData = attributes,
-      ExtendedAttributeData = extAttributes,
-    };
+    // Four bits a pixel, the high nibble first.
+    var pixels = new byte[width * height];
+    for (var i = 0; i < pixels.Length; ++i) {
+      var b = data[SpeccyExtendedFile.PixelOffset + i / 2];
+      pixels[i] = (byte)(i % 2 == 0 ? b >> 4 : b & 0x0F);
     }
+
+    return new() { Width = width, Height = height, Palette = palette, PixelData = pixels };
+  }
 
   public static SpeccyExtendedFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
