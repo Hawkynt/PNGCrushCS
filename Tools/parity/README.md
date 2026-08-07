@@ -445,12 +445,18 @@ It mapped Mcs in three rounds, having beaten every sweep before that:
 - Bytes 8201, 8202, 8203 each move one whole 8x8 cell in turn, so the video matrix starts at 8201 at
   one byte a cell. Byte 8393 predicts rows 32..39 columns 256..263 and moves exactly those.
 
-That is the bitmap and the matrix settled to the byte, which no amount of sweeping had found. What
-remains is the colour: read as ordinary high-resolution, foreground and background from the matrix
-nibbles, it is still wrong in 56 per cent of pixels with all sixteen indices in use, and as
-multicolour it is wrong in 42. The tail past 9161 holds the rest — bytes there move two rows at a
-time across scattered columns, which is what an overlay or a per-scanline colour change looks like
-and not what a colour memory looks like.
+That is the bitmap and the matrix settled to the byte, which no amount of sweeping had found.
+
+Flipping part of a byte took it further. One bit of a bitmap byte moves two columns, so it is two
+bits a pixel and 160 stored across drawn at 320 — multicolour, as FLI Graph turned out to be. The
+arithmetic then closes: 9 + 8192 of bitmap is 8201 where the matrix starts, 960 entries of that ends
+at 9161 where colour memory would start, another 960 ends at 10121, and the file is 10185.
+
+The colour still does not come out. Every assignment of the four patterns to background, the two
+matrix nibbles and colour memory was tried against every background, and the best is wrong in 41 per
+cent of pixels — better than the 56 a high-resolution reading gives and not a decode. Sweeping the
+colour memory offset over a thousand positions does not improve on it either, so the missing piece
+is not an offset.
 
 ### The probe also settles whether a format is packed
 
