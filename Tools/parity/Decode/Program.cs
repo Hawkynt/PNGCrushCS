@@ -32,6 +32,38 @@ if (args[0] == "--extensions") {
 // implemented are three different jobs, and telling them apart is most of the work of fixing one.
 //
 //   Decode --why <file>...
+// Which readers would take this file if its name were not in the way.
+//
+// A good share of what we cannot read is a format we already decode perfectly, reached under a name
+// somebody else's format holds. --why only asks the formats claiming the extension, so it cannot see
+// those. This asks every reader in the registry and reports the ones that accept, along with the
+// size each makes of it — which is enough to tell a real match from a coincidence.
+//
+//   Decode --anyformat <file>...
+if (args[0] == "--anyformat") {
+  foreach (var path in args[1..]) {
+    var file = new FileInfo(path);
+    Console.WriteLine($"{file.Name} ({file.Length} bytes)");
+
+    foreach (var entry in FormatRegistry.AllFormats) {
+      if (entry.LoadRawImageOrThrow == null)
+        continue;
+
+      RawImage? image;
+      try {
+        image = entry.LoadRawImageOrThrow(file);
+      } catch (Exception) {
+        continue;
+      }
+
+      if (image != null)
+        Console.WriteLine($"  {entry.Name}\t{image.Width}x{image.Height}\t{image.Format}\t{entry.PrimaryExtension}");
+    }
+  }
+
+  return 0;
+}
+
 if (args[0] == "--why") {
   foreach (var path in args[1..]) {
     var file = new FileInfo(path);

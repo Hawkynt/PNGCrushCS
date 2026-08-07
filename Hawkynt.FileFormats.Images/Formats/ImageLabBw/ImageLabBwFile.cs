@@ -26,7 +26,14 @@ public readonly record struct ImageLabBwFile
   public const int MaxDimension = 4096;
 
   static string IImageFormatMetadata<ImageLabBwFile>.PrimaryExtension => ".b&w";
-  static string[] IImageFormatMetadata<ImageLabBwFile>.FileExtensions => [".b&w", ".b_w"];
+  /// <summary>
+  /// Also <c>.dit</c>, which these are saved under as readily as the other two.
+  /// </summary>
+  /// <remarks>
+  /// That name was held only by Draw It, which takes one fixed length and refused a real Image Lab
+  /// picture for being 266 bytes. The signature says B&amp;W256 either way.
+  /// </remarks>
+  static string[] IImageFormatMetadata<ImageLabBwFile>.FileExtensions => [".b&w", ".b_w", ".dit"];
   static ImageLabBwFile IImageFormatReader<ImageLabBwFile>.FromSpan(ReadOnlySpan<byte> data) => ImageLabBwReader.FromSpan(data);
   static byte[] IImageFormatWriter<ImageLabBwFile>.ToBytes(ImageLabBwFile file) => ImageLabBwWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<ImageLabBwFile>.VideoModes => [
