@@ -423,3 +423,31 @@ a format changing its colour registers between scanlines would need.
 
 ComputerEyes cannot be attacked this way at all: its two files are byte-identical, so there is only
 one sample.
+
+### Asking the layout instead of guessing it
+
+```sh
+python3 probe_bytes.py <sample> <comma-separated offsets>
+```
+
+A solver proposes a layout and checks it, which needs the layout to be guessed first. This asks
+directly: change byte n of a real file, decode both with the reference tool, and the pixels that
+differ are the ones byte n controls. It does not need the format to be understood, only readable, and
+it works on formats where every solver has failed.
+
+It mapped Mcs in three rounds, having beaten every sweep before that:
+
+- Byte 9 moves row 0, columns 0..7; byte 10 moves row 1 of the same columns. So the bitmap is
+  cell-major — eight bytes down a cell before moving across — not row-major.
+- Bytes 1001 to 1032 move nothing, and byte 1033 moves row 24. So the bitmap is in blocks of 1024
+  holding 24 rows of 40 bytes, with 64 bytes of padding after each. Eight such blocks cover 192 rows.
+- Byte 8000 predicts row 191, columns 176..183 under that model and moves exactly those.
+- Bytes 8201, 8202, 8203 each move one whole 8x8 cell in turn, so the video matrix starts at 8201 at
+  one byte a cell. Byte 8393 predicts rows 32..39 columns 256..263 and moves exactly those.
+
+That is the bitmap and the matrix settled to the byte, which no amount of sweeping had found. What
+remains is the colour: read as ordinary high-resolution, foreground and background from the matrix
+nibbles, it is still wrong in 56 per cent of pixels with all sixteen indices in use, and as
+multicolour it is wrong in 42. The tail past 9161 holds the rest — bytes there move two rows at a
+time across scattered columns, which is what an overlay or a per-scanline colour change looks like
+and not what a colour memory looks like.
