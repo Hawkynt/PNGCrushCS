@@ -535,3 +535,10 @@ Eight bytes at the end of a page is where a Commodore 64 keeps its sprite pointe
 is underlay FLI, so that is almost certainly what they are — which would also explain the two the
 tool validates and refuses to read past. Almost certainly is not certainly, and the remaining three
 bytes move picture in a way a pointer does not, so it is written down rather than acted on.
+
+One more thing about UFLI, so nobody repeats it: the distance between bands is not constant. Byte
+5013 and byte 5276 both start the cell at columns 24 to 31, 263 apart, which looks like a stride
+until it is checked. Adding 263 again lands on row 57 rather than row 56, and adding it twice more
+lands on rows 69 and 73 — five, twelve and four rows on from each other. Whatever separates the
+bands varies in length, so there is no stride to write down, and a reader for this format has to
+walk the file rather than index into it.
