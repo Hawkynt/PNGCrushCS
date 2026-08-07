@@ -34,11 +34,18 @@ public static class PdsReader {
     if (data.Length < _MIN_HEADER_SIZE)
       throw new InvalidDataException("Data too small for a valid PDS file.");
 
-    var prefix = Encoding.ASCII.GetString(data.Slice(0, Math.Min(_MAGIC.Length, data.Length)));
-    if (!prefix.Equals(_MAGIC, StringComparison.Ordinal))
-      throw new InvalidDataException("Invalid PDS signature: header must start with 'PDS_VERSION_ID'.");
-
+    // A label may open with PDS_VERSION_ID or with an SFDU label, which is what an archived file
+    // carries: 20 characters of authority and length before the keywords start. Insisting on the
+    // first form alone turned down the real ones, whose first line reads "NJPL1I00PDS100309740 =
+    // SFDU_LABEL". Rather than list the authority codes, the label is parsed either way and the
+    // keywords it must contain are what decide.
     var (labels, imageOffset) = PdsHeaderParser.Parse(data.ToArray());
+
+    var prefix = Encoding.ASCII.GetString(data.Slice(0, Math.Min(_MAGIC.Length, data.Length)));
+    if (!prefix.Equals(_MAGIC, StringComparison.Ordinal)
+        && !(labels.ContainsKey("LINES") && labels.ContainsKey("LINE_SAMPLES") && labels.ContainsKey("^IMAGE")))
+      throw new InvalidDataException(
+        "Not a PDS label: it neither opens with 'PDS_VERSION_ID' nor states LINES, LINE_SAMPLES and ^IMAGE.");
 
     var width = _GetIntLabel(labels, "LINE_SAMPLES");
     var height = _GetIntLabel(labels, "LINES");
