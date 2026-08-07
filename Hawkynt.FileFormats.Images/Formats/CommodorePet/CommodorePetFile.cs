@@ -25,6 +25,20 @@ public sealed class CommodorePetFile : IImageFormatReader<CommodorePetFile>, IIm
   /// <summary>Cells the screen holds, which is also the length of each of the two areas.</summary>
   internal const int CellCount = Columns * Rows;
 
+  /// <summary>
+  /// Bytes lying between the screen and the colours.
+  /// </summary>
+  /// <remarks>
+  /// The reference decoder takes a saved screen at exactly <see cref="FixedFileSize"/> bytes and
+  /// turns down every other length, this many either side included. In the samples the field holds
+  /// two noughts and then the author's name in screen codes, so it is a caption rather than padding
+  /// — which is why what was read is written back rather than blanked.
+  /// </remarks>
+  internal const int CaptionSize = 24;
+
+  /// <summary>What a saved screen weighs: the address, the screen, the caption, the colours.</summary>
+  public const int FixedFileSize = LoadAddressSize + CellCount + CaptionSize + CellCount;
+
   public const int ImageWidth = Columns * CellSize;
   public const int ImageHeight = Rows * CellSize;
 
@@ -37,6 +51,9 @@ public sealed class CommodorePetFile : IImageFormatReader<CommodorePetFile>, IIm
   /// <summary>One colour a cell, taken from the colour area that follows the screen.</summary>
   public byte[] CellColors { get; init; } = [];
 
+  /// <summary>The caption between the screen and the colours, kept so writing it back preserves it.</summary>
+  public byte[] Caption { get; init; } = [];
+
   public byte[] Palette { get; init; } = new byte[768];
 
   /// <summary>The machine's character ROM, one byte per glyph row.</summary>
@@ -45,8 +62,16 @@ public sealed class CommodorePetFile : IImageFormatReader<CommodorePetFile>, IIm
   public static string PrimaryExtension => ".pet";
   public static string[] FileExtensions => [".pet"];
   static CommodorePetFile IImageFormatReader<CommodorePetFile>.FromSpan(ReadOnlySpan<byte> data) => CommodorePetReader.FromSpan(data);
+  /// <summary>
+  /// The size in pixels, which is what a picture is measured in.
+  /// </summary>
+  /// <remarks>
+  /// This declared 40 by 25 — the screen in character cells, which is how the format thinks of
+  /// itself and not a size any picture can be handed over at. A caller that believed it and passed
+  /// a 40 by 25 image was refused by the encoder, which wants the 320 by 200 those cells cover.
+  /// </remarks>
   static VideoMode[] IImageFormatMetadata<CommodorePetFile>.VideoModes => [
-    new("Default", [(40, 25)], [new IntegerRange(2, 256)])
+    new("Default", [(ImageWidth, ImageHeight)], [new IntegerRange(2, 256)])
   ];
   public static CommodorePetFile FromFile(FileInfo file) => CommodorePetReader.FromFile(file);
   public static CommodorePetFile FromBytes(byte[] data) => CommodorePetReader.FromBytes(data);

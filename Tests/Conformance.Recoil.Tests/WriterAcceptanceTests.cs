@@ -54,6 +54,7 @@ public sealed class WriterAcceptanceTests {
     [ImageFormat.HighResST] = "the reference tool reads .hrs as an Oric screen, which is a different format",
     [ImageFormat.KofaxKfx] = "the reference tool reads .kfx as a raw Atari screen dump, which is a different format",
     [ImageFormat.Clp] = "the reference tool reads .clp as a GoDot or CoCo clip, neither of which this is",
+    [ImageFormat.Pi] = "the reference tool reads .pi as a Blazing Paddles picture, which is a different format",
     [ImageFormat.PcPaint] = ".pic belongs to a dozen unrelated programs and the tool means none of ours by it",
     [ImageFormat.SoftImage] = ".pic belongs to a dozen unrelated programs and the tool means none of ours by it",
     [ImageFormat.BioRadPic] = ".pic belongs to a dozen unrelated programs and the tool means none of ours by it",
@@ -325,6 +326,17 @@ public sealed class WriterAcceptanceTests {
     // second for one whose reader is present but not licensed here. Neither is about our bytes.
     if (!decoded && (output.Contains("Don't know how to read", StringComparison.OrdinalIgnoreCase)
         || output.Contains("Contact your dealer", StringComparison.OrdinalIgnoreCase)))
+      return null;
+
+    // Off its catalogue it may accept but it may not reject.
+    //
+    // Asking beyond the catalogue is worth doing because the catalogue is older than the binary and
+    // misses formats it reads perfectly well. But a format it has never heard of is one it cannot
+    // have an opinion about, and it does not always say so in the two ways above: handed an NFO —
+    // a text file, and a name no catalogue here lists — it answered "Can't read file", which reads
+    // like a verdict on the bytes and is nothing of the kind. Accepting still counts, because only
+    // a real reader can accept; rejecting does not, because anything can reject.
+    if (!decoded && !XnViewOracle.Extensions.Contains(Path.GetExtension(path)))
       return null;
 
     return (decoded, $"XnView rejected it — {output}");

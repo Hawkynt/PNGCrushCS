@@ -48,7 +48,14 @@ public static class CommodorePetReader {
     else
       colors.AsSpan().Fill(1); // nothing said, so the machine's own default
 
-    return new CommodorePetFile { PixelData = codes, CellColors = colors };
+    // Whatever lies between the two areas is the caption. Keeping it means a screen read and
+    // written back comes out as it went in, rather than losing the line the author put there.
+    var captionAt = at + CommodorePetFile.CellCount;
+    var caption = new byte[CommodorePetFile.CaptionSize];
+    if (colorsAt - captionAt is var span && span > 0)
+      data.Slice(captionAt, Math.Min(span, caption.Length)).CopyTo(caption.AsSpan(0));
+
+    return new CommodorePetFile { PixelData = codes, CellColors = colors, Caption = caption };
   }
 
   public static CommodorePetFile FromBytes(byte[] data) {

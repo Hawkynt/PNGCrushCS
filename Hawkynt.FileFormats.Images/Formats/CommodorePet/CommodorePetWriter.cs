@@ -18,7 +18,7 @@ public static class CommodorePetWriter {
   public static byte[] ToBytes(CommodorePetFile file) {
     ArgumentNullException.ThrowIfNull(file);
 
-    var result = new byte[CommodorePetFile.LoadAddressSize + CommodorePetFile.CellCount * 2];
+    var result = new byte[CommodorePetFile.FixedFileSize];
     result[0] = unchecked((byte)_SCREEN_ADDRESS);
     result[1] = (byte)(_SCREEN_ADDRESS >> 8);
 
@@ -26,8 +26,16 @@ public static class CommodorePetWriter {
     codes.AsSpan(0, Math.Min(CommodorePetFile.CellCount, codes.Length))
       .CopyTo(result.AsSpan(CommodorePetFile.LoadAddressSize));
 
+    // The caption sits between the screen and the colours. Leaving it out packed the file 24 bytes
+    // tighter than the format is, and the reference decoder takes one length and no other — so what
+    // we wrote could be read here and nowhere else.
+    var caption = file.Caption ?? [];
+    var captionAt = CommodorePetFile.LoadAddressSize + CommodorePetFile.CellCount;
+    caption.AsSpan(0, Math.Min(CommodorePetFile.CaptionSize, caption.Length))
+      .CopyTo(result.AsSpan(captionAt));
+
     var colors = file.CellColors ?? [];
-    var at = CommodorePetFile.LoadAddressSize + CommodorePetFile.CellCount;
+    var at = captionAt + CommodorePetFile.CaptionSize;
     if (colors.Length > 0)
       colors.AsSpan(0, Math.Min(CommodorePetFile.CellCount, colors.Length)).CopyTo(result.AsSpan(at));
     else
