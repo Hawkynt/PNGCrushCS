@@ -451,3 +451,28 @@ nibbles, it is still wrong in 56 per cent of pixels with all sixteen indices in 
 multicolour it is wrong in 42. The tail past 9161 holds the rest — bytes there move two rows at a
 time across scattered columns, which is what an overlay or a per-scanline colour change looks like
 and not what a colour memory looks like.
+
+### The probe also settles whether a format is packed
+
+Change a byte in the middle of a file and see how far the damage spreads. A packed stream cannot
+absorb it — everything after the change shifts — so one byte moves most of the picture. A plain one
+moves the handful of pixels that byte holds.
+
+Three formats filed as packed are not:
+
+| Format | A byte in the middle moves |
+|---|---|
+| UFLI (`.ufl`) | 7 to 13 pixels, one row |
+| Flip64 (`.fbi`) | 4 to 6 pixels, one row |
+| Multi-Lace (`.mle`) | 8 pixels, one row |
+
+They were called packed because their files are far smaller than the screen they draw — 756 bytes
+against 19002 in Flip64's case. That reasoning was wrong twice over: it had already been wrong about
+CFLI Designer and Interlace Studio, which turned out to hold less than a full screen rather than a
+compressed one, and it is wrong here for the same reason.
+
+Multi-Lace went furthest. Its two bitmaps are at 2 and 2050, both cell-major with forty cells to a
+band, and 2 + 2048 + 2048 is 4098 to the byte. Every probe predicts: byte 400 gives row 14 column 72,
+byte 2500 row 10 column 128, byte 4000 row 54 column 24, and all three move exactly those pixels.
+What colours them is still missing — the two bitmaps together give four states and the picture shows
+ten colours, so something positional remains, and there is no room left in the file for it.
