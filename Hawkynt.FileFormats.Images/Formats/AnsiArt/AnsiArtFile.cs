@@ -16,6 +16,18 @@ public readonly record struct AnsiArtFile : IImageFormatReader<AnsiArtFile>, IIm
   static AnsiArtFile IImageFormatReader<AnsiArtFile>.FromSpan(ReadOnlySpan<byte> data) => AnsiArtReader.FromSpan(data);
   static byte[] IImageFormatWriter<AnsiArtFile>.ToBytes(AnsiArtFile file) => AnsiArtWriter.ToBytes(file);
 
+  /// <summary>
+  /// A picture here is a grid of characters, so only whole cells of the font can be expressed.
+  /// </summary>
+  /// <remarks>
+  /// Declaring nothing left callers to find that out by having the write throw, and a caller that
+  /// asks what sizes are allowed and is told "any" has been answered wrongly rather than not at all.
+  /// The step is the font's cell, so it follows a font swap instead of hard-coding 8 by 16.
+  /// </remarks>
+  static VideoMode[] IImageFormatMetadata<AnsiArtFile>.VideoModes => [
+    new("Text", [TextModeGrid.Dimensions], [TextPalette.ColorCount])
+  ];
+
   public int ColumnCount { get; init; }
   public int RowCount { get; init; }
   public TextCell[] Cells { get; init; }

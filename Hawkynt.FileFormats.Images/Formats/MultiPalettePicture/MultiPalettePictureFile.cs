@@ -31,7 +31,23 @@ public readonly record struct MultiPalettePictureFile : IImageFormatReader<Multi
   static string IImageFormatMetadata<MultiPalettePictureFile>.PrimaryExtension => ".mpp";
   static string[] IImageFormatMetadata<MultiPalettePictureFile>.FileExtensions => [".mpp"];
   static MultiPalettePictureFile IImageFormatReader<MultiPalettePictureFile>.FromSpan(ReadOnlySpan<byte> data) => MultiPalettePictureReader.FromSpan(data);
-  static VideoMode[] IImageFormatMetadata<MultiPalettePictureFile>.VideoModes => [new("Default", [(ImageWidth, ImageHeight)])];
+  /// <summary>
+  /// Sixteen colours, which understates what the format holds and matches what the writer takes.
+  /// </summary>
+  /// <remarks>
+  /// The real rule is sixteen per scanline, with a fresh palette on every line, so a picture may
+  /// carry far more than sixteen altogether — that is the whole point of the format. There is no way
+  /// to say "per scanline" here, and the choice is between claiming more than the writer accepts and
+  /// claiming less than the format holds. Less is the safe direction: a caller that reduces to
+  /// sixteen always succeeds, where one that trusted a larger number would be refused at the end.
+  /// Declaring nothing at all, which is what this did, promised full colour and was refused always.
+  /// </remarks>
+  static VideoMode[] IImageFormatMetadata<MultiPalettePictureFile>.VideoModes => [
+    new("Default", [(ImageWidth, ImageHeight)], [ColorsPerScanline])
+  ];
+
+  /// <summary>Colours one scanline can name; each line carries its own palette.</summary>
+  public const int ColorsPerScanline = 16;
   static byte[] IImageFormatWriter<MultiPalettePictureFile>.ToBytes(MultiPalettePictureFile file) => MultiPalettePictureWriter.ToBytes(file);
 
   /// <summary>Always 320.</summary>
@@ -135,7 +151,12 @@ public readonly record struct MultiPalettePictureFile : IImageFormatReader<Multi
               colorMap[steColor] = idx;
               ++colorCount;
             } else
-              throw new ArgumentException($"MPP requires no more than 16 distinct quantized colours per scanline; line {y} had more.", nameof(image));
+              // The line is full, so this colour becomes the nearest one already on it. Throwing
+              // here contradicted the policy stated above and made the format unwritable from any
+              // ordinary picture: 320 pixels reduced to twelve-bit ST colours run past sixteen
+              // distinct values on almost every line of a photograph. The helper below has always
+              // been here for exactly this.
+              idx = _FindClosestColor(steColor, palette, colorCount);
           }
 
           chunky[y * ImageWidth + x] = idx;

@@ -24,7 +24,17 @@ public readonly record struct HighresMediumFile : IImageFormatReader<HighresMedi
   static string IImageFormatMetadata<HighresMediumFile>.PrimaryExtension => ".hrm";
   static string[] IImageFormatMetadata<HighresMediumFile>.FileExtensions => [".hrm"];
   static HighresMediumFile IImageFormatReader<HighresMediumFile>.FromSpan(ReadOnlySpan<byte> data) => HighresMediumReader.FromSpan(data);
-  static VideoMode[] IImageFormatMetadata<HighresMediumFile>.VideoModes => [new("Default", [(ImageWidth, ImageHeight)])];
+  /// <summary>
+  /// Four colours, held as two frames of two planes each.
+  /// </summary>
+  /// <remarks>
+  /// The colour count was left undeclared, which reads as full colour, and the writer then turned
+  /// down every full-colour picture it was handed. Stating it lets a caller reduce first instead of
+  /// finding out by exception.
+  /// </remarks>
+  static VideoMode[] IImageFormatMetadata<HighresMediumFile>.VideoModes => [
+    new("Default", [(ImageWidth, ImageHeight)], [ColorCount])
+  ];
   static byte[] IImageFormatWriter<HighresMediumFile>.ToBytes(HighresMediumFile file) => HighresMediumWriter.ToBytes(file);
 
   /// <summary>16-entry palette for frame 1 (only first 4 entries used).</summary>

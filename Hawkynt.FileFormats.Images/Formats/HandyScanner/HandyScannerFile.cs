@@ -25,8 +25,16 @@ public readonly record struct HandyScannerFile
     => HandyScannerReader.FromSpan(data);
   static byte[] IImageFormatWriter<HandyScannerFile>.ToBytes(HandyScannerFile file)
     => HandyScannerWriter.ToBytes(file);
+  /// <summary>
+  /// A scan is a fixed 840 across and runs as long as the operator dragged the scanner.
+  /// </summary>
+  /// <remarks>
+  /// The height was declared as a fixed nought, which is not a size anything can be written at. Any
+  /// caller reading the metadata to pick a size got an impossible one, and the writer-acceptance
+  /// suite skipped the format for having no usable size at all rather than testing it.
+  /// </remarks>
   static VideoMode[] IImageFormatMetadata<HandyScannerFile>.VideoModes => [
-    new("Scan", [(Width, 0)], [2])
+    new("Scan", [(Width, IntegerRange.Any)], [2])
   ];
 
   /// <summary>The bitmap, one bit per pixel, most significant bit leftmost.</summary>

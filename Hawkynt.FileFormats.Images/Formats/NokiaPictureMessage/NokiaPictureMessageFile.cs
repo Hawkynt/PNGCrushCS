@@ -9,8 +9,20 @@ public readonly record struct NokiaPictureMessageFile : IImageFormatReader<Nokia
   static string IImageFormatMetadata<NokiaPictureMessageFile>.PrimaryExtension => ".npm";
   static string[] IImageFormatMetadata<NokiaPictureMessageFile>.FileExtensions => [".npm"];
   static NokiaPictureMessageFile IImageFormatReader<NokiaPictureMessageFile>.FromSpan(ReadOnlySpan<byte> data) => NokiaPictureMessageReader.FromSpan(data);
-  static VideoMode[] IImageFormatMetadata<NokiaPictureMessageFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
+  /// <summary>
+  /// Up to 255 each way: the header holds each dimension in a single byte.
+  /// </summary>
+  /// <remarks>
+  /// This said any size was allowed while the writer threw for anything past 255, so the metadata
+  /// promised pictures the format cannot hold.
+  /// </remarks>
+  static VideoMode[] IImageFormatMetadata<NokiaPictureMessageFile>.VideoModes => [
+    new("Default", [(new IntegerRange(1, MaxDimension), new IntegerRange(1, MaxDimension))], [2])
+  ];
   static byte[] IImageFormatWriter<NokiaPictureMessageFile>.ToBytes(NokiaPictureMessageFile file) => NokiaPictureMessageWriter.ToBytes(file);
+
+  /// <summary>The largest either dimension can be: the header holds each in one byte.</summary>
+  public const int MaxDimension = 255;
 
   /// <summary>Image width in pixels (1..255).</summary>
   public int Width { get; init; }
@@ -36,10 +48,10 @@ public readonly record struct NokiaPictureMessageFile : IImageFormatReader<Nokia
   public static NokiaPictureMessageFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
     image = image.EnsureFormat(PixelFormat.Indexed1);
-    if (image.Width is < 1 or > 255)
-      throw new ArgumentOutOfRangeException(nameof(image), "NPM width must be in the range 1..255.");
-    if (image.Height is < 1 or > 255)
-      throw new ArgumentOutOfRangeException(nameof(image), "NPM height must be in the range 1..255.");
+    if (image.Width is < 1 or > MaxDimension)
+      throw new ArgumentOutOfRangeException(nameof(image), $"NPM width must be in the range 1..{MaxDimension}.");
+    if (image.Height is < 1 or > MaxDimension)
+      throw new ArgumentOutOfRangeException(nameof(image), $"NPM height must be in the range 1..{MaxDimension}.");
 
     return new() {
       Width = image.Width,

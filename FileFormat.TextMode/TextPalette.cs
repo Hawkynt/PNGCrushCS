@@ -3,6 +3,9 @@ namespace FileFormat.TextMode;
 /// <summary>Default 16-colour text-mode palettes.</summary>
 public static class TextPalette {
 
+  /// <summary>How many colours a text-mode picture can hold.</summary>
+  public const int ColorCount = 16;
+
   /// <summary>Classic IBM EGA/VGA 16-colour text palette (R,G,B triples).</summary>
   public static readonly byte[] DefaultEga = [
     0x00, 0x00, 0x00,   //  0 Black

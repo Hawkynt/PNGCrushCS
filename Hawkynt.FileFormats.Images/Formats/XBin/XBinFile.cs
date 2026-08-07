@@ -18,6 +18,11 @@ public readonly record struct XBinFile : IImageFormatReader<XBinFile>, IImageFor
   static XBinFile IImageFormatReader<XBinFile>.FromSpan(ReadOnlySpan<byte> data) => XBinReader.FromSpan(data);
   static byte[] IImageFormatWriter<XBinFile>.ToBytes(XBinFile file) => XBinWriter.ToBytes(file);
 
+  /// <summary>Whole cells of the font only — see <see cref="TextModeGrid"/>.</summary>
+  static VideoMode[] IImageFormatMetadata<XBinFile>.VideoModes => [
+    new("Text", [TextModeGrid.Dimensions], [TextPalette.ColorCount])
+  ];
+
   public int ColumnCount { get; init; }
   public int RowCount { get; init; }
   public int FontHeight { get; init; }

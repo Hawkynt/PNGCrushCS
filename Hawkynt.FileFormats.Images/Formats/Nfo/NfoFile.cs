@@ -16,6 +16,17 @@ public readonly record struct NfoFile : IImageFormatReader<NfoFile>, IImageForma
   static NfoFile IImageFormatReader<NfoFile>.FromSpan(ReadOnlySpan<byte> data) => NfoReader.FromSpan(data);
   static byte[] IImageFormatWriter<NfoFile>.ToBytes(NfoFile file) => NfoWriter.ToBytes(file);
 
+  /// <summary>
+  /// Whole cells of the font, in two colours.
+  /// </summary>
+  /// <remarks>
+  /// Two, not the sixteen its neighbours take: an NFO stores characters and no attribute bytes, so
+  /// every cell is drawn light grey on black and there is nowhere to say otherwise.
+  /// </remarks>
+  static VideoMode[] IImageFormatMetadata<NfoFile>.VideoModes => [
+    new("Text", [TextModeGrid.Dimensions], [2])
+  ];
+
   /// <summary>Default column count used when no width is detected (classic 80-column scene NFO).</summary>
   public const int DefaultColumnCount = 80;
 

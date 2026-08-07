@@ -104,12 +104,12 @@ public sealed class WriterAcceptanceTests {
       string? rejected = null;
       var written = false;
 
-      foreach (var (width, height) in _SizesFor(entry))
+      foreach (var (width, height, mode) in _CasesFor(entry))
       foreach (var extension in extensions) {
         var path = Path.Combine(directory.FullName, "sample" + extension);
 
         try {
-          if (!FormatRegistry.Write(_Sample(width, height), format, new FileInfo(path))) {
+          if (!FormatRegistry.Write(_Sample(width, height, mode), format, new FileInfo(path))) {
             refused ??= "the registry declined to write a format it says it can";
             continue;
           }
@@ -167,13 +167,18 @@ public sealed class WriterAcceptanceTests {
       || IrfanViewOracle.Extensions.Contains(extension)
       || (TomsEditorOracle.Enabled && TomsEditorOracle.Extensions.Contains(extension));
 
-  /// <summary>The sizes a format says it takes, most likely first.</summary>
+  /// <summary>The pictures a format says it takes, most likely first.</summary>
   /// <remarks>
   /// Most of these formats accept one size or a handful, and writing at any other throws rather than
   /// producing a file. Trying the declared ones in turn keeps the fixture measuring what it is for —
   /// whether the bytes are readable — instead of whether a size was guessed correctly.
+  /// <para/>
+  /// The mode travels with the size because the colour count belongs to it. A format taking four
+  /// colours and one taking sixteen million declare that here and nowhere else, and handing both the
+  /// same full-colour gradient measured which writers refuse a picture rather than which write a bad
+  /// one.
   /// </remarks>
-  private static IEnumerable<(int Width, int Height)> _SizesFor(FormatEntry entry) {
+  private static IEnumerable<(int Width, int Height, VideoMode? Mode)> _CasesFor(FormatEntry entry) {
     var seen = new HashSet<(int, int)>();
 
     foreach (var mode in entry.VideoModes ?? [])
@@ -183,23 +188,36 @@ public sealed class WriterAcceptanceTests {
       if ((long)width * height is <= 0 or > 4096L * 4096L || !seen.Add((width, height)))
         continue;
 
-      yield return (width, height);
+      yield return (width, height, mode);
     }
 
     if (seen.Add((320, 200)))
-      yield return (320, 200);
+      yield return (320, 200, null);
   }
 
   /// <summary>What to try for one dimension: the stated values, or a default where anything goes.</summary>
+  /// <remarks>
+  /// Every value is snapped into the range and onto its step. A format taking whole text cells
+  /// declares a step of eight or sixteen, and the ordinary 320 by 200 satisfies neither — so the
+  /// picture was refused for a reason the format had stated all along and the writer was never
+  /// reached. Snapping asks the range what it will accept instead of guessing.
+  /// </remarks>
   private static IEnumerable<int> _Candidates(IntegerRange range, int whenUnbounded) {
     if (range.Min == 1 && range.Max == int.MaxValue) {
       yield return whenUnbounded;
       yield break;
     }
 
-    yield return range.Min;
-    if (range.Max != range.Min && range.Max < 4096)
-      yield return range.Max;
+    // The usual size first, moved to the nearest one this range allows.
+    var preferred = range.SnapToValid(whenUnbounded);
+    yield return preferred;
+
+    if (range.Min != preferred)
+      yield return range.Min;
+
+    var max = range.SnapToValid(range.Max);
+    if (max != preferred && max != range.Min && range.Max < 4096)
+      yield return max;
   }
 
   /// <summary>The extensions the reference decoder says it reads, taken from its own catalogue.</summary>
@@ -342,7 +360,22 @@ public sealed class WriterAcceptanceTests {
     }
   }
 
-  private static RawImage _Sample(int width, int height) {
+  /// <summary>A picture the mode can actually hold: full colour, or indexed within its colour count.</summary>
+  /// <remarks>
+  /// The full-colour gradient below is the right probe for a format that stores full colour and the
+  /// wrong one for the many here that store four colours or two. Those writers refused it, and a
+  /// refusal was being read as a defective writer when it was a picture the format had never claimed
+  /// to take. Where the mode states a colour count, the same gradient is drawn with that many
+  /// indices instead — so what is measured stays "are these bytes readable" rather than "did the
+  /// fixture hand over something impossible".
+  /// </remarks>
+  private static RawImage _Sample(int width, int height, VideoMode? mode) {
+    var colours = mode?.MaxColourCount ?? int.MaxValue;
+
+    return colours < 256 ? _IndexedSample(width, height, Math.Max(2, colours)) : _FullColourSample(width, height);
+  }
+
+  private static RawImage _FullColourSample(int width, int height) {
     var data = new byte[width * height * 4];
     for (var y = 0; y < height; ++y)
     for (var x = 0; x < width; ++x) {
@@ -354,5 +387,32 @@ public sealed class WriterAcceptanceTests {
     }
 
     return new() { Width = width, Height = height, Format = PixelFormat.Rgba32, PixelData = data };
+  }
+
+  /// <summary>The same gradient in <paramref name="colours"/> indices, every one of them used.</summary>
+  private static RawImage _IndexedSample(int width, int height, int colours) {
+    var palette = new byte[colours * 3];
+    for (var i = 0; i < colours; ++i) {
+      // A ramp rather than arbitrary colours: a writer that reorders or drops entries shows up as a
+      // picture out of order, which is visible, instead of as noise that looks like it decoded.
+      var level = (byte)(i * 255 / Math.Max(1, colours - 1));
+      palette[i * 3] = level;
+      palette[i * 3 + 1] = (byte)(255 - level);
+      palette[i * 3 + 2] = (byte)(i % 2 == 0 ? 255 : 0);
+    }
+
+    var data = new byte[width * height];
+    for (var y = 0; y < height; ++y)
+    for (var x = 0; x < width; ++x)
+      data[y * width + x] = (byte)((x * colours / width + y / 8) % colours);
+
+    return new() {
+      Width = width,
+      Height = height,
+      Format = PixelFormat.Indexed8,
+      PixelData = data,
+      Palette = palette,
+      PaletteCount = colours,
+    };
   }
 }
