@@ -562,8 +562,19 @@ bit a pixel and the second is two. Read that way — a hires bit from one frame,
 from the other, and the matrix entry — those three inputs determine every pixel of the picture with
 no exceptions at all: 944 distinct states over 61440 pixels and not one contradiction.
 
-That is the format settled to the byte. What is left is only the function from those three inputs to
-a colour. It is a blend of two frames drawn from the Atari palette — 441 of the 944 states land on a
-plain palette entry and the rest sit between two of them — but which entry each frame takes has not
-been worked out, and a reader built from the 944 states as a table would be a reader that works on
-one picture.
+That is the format settled to the byte, and the colour is most of the way there too.
+
+It is a blend: the drawn colour is the average of what the two frames show. Holding the pattern and
+the matrix entry fixed and flipping the hires bit gives one consistent difference for all 150 matrix
+values in the sample, which is what a blend of two independent frames does and nothing else does.
+
+The second frame's four colours are then separable. Patterns 00, 01 and 10 are three fixed registers:
+their pairwise differences come out to a single value each — B0 minus B1 is exactly (170, 170, 170)
+and B0 minus B2 is (-16, 112, 66) — so they do not vary with the cell. Pattern 11 does vary, taking
+two different values across the picture, which is what a per-cell colour looks like and is where the
+matrix entry most likely goes.
+
+What is left is the anchor: the differences between the registers are known and their absolute values
+are not, because every equation so far is a difference. One state whose two frames are known to show
+the same colour would fix them all. A reader built from the 944 states as a lookup table would score
+perfectly on this picture and fail on the next, so it has not been written.
