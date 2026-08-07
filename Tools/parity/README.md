@@ -582,6 +582,12 @@ two colours outright — byte 1 where its bit is clear and byte 2 where it is se
 
 Put together, that model is right in 81 per cent of pixels: the hires frame taking bytes 1 and 2, the
 multicolour frame taking byte 1 for pattern 00, byte 3 for 01, byte 4 for 10 and the per-cell matrix
-entry for 11, averaged without rounding. What the remaining fifth of the picture does with pattern 11
-is the last thing outstanding — byte 5 and the matrix entry both move it, and which wins where is not
-settled.
+entry for 11, averaged without rounding. Every one of the model's errors is a pattern 11 pixel and nothing else, so the other three quarters of
+the rule are right.
+
+Pattern 11 is not any of the obvious things. Taking those pixels and working backwards from what is
+drawn: none is a plain palette colour, and none is the blend of the hires frame with the matrix
+entry, with byte 5, or with either of the two frame registers. Whatever colours pattern 11 is not a
+register in the header, not the matrix entry, and not a blend of those with what the hires frame
+shows. That is the one thing between this format and a reader, and it is stated precisely so the next
+attempt starts there rather than re-deriving the rest.
