@@ -69,9 +69,12 @@ public readonly record struct InterPainterFile
     var palette = new byte[BlendCount * 3];
     var slotOf = new int[ColorCount, ColorCount];
     var used = 0;
+    // The chip ignores the bottom bit of a colour register, so an odd luminance is not a level it
+    // has. Blending the registers as stated put half-steps between the shades the machine can show
+    // — 0x2A where the pair really averages to 0x22 — and every blend inherited the error.
     for (var a = 0; a < ColorCount; ++a)
     for (var b = a; b < ColorCount; ++b) {
-      _Blend(gtia.AsSpan(file.Colors[a] * 3, 3), gtia.AsSpan(file.Colors[b] * 3, 3), palette.AsSpan(used * 3, 3));
+      _Blend(gtia.AsSpan((file.Colors[a] & 0xFE) * 3, 3), gtia.AsSpan((file.Colors[b] & 0xFE) * 3, 3), palette.AsSpan(used * 3, 3));
       slotOf[a, b] = slotOf[b, a] = used;
       ++used;
     }

@@ -11,42 +11,35 @@ public static class FbmWriter {
   }
 
   internal static byte[] Assemble(byte[] pixelData, int width, int height, int bands, string title) {
-    var bytesPerPixelRow = width * bands;
-
-    // rowlen is padded to 16-byte boundary
-    var rowLen = (bytesPerPixelRow + 15) & ~15;
+    // One row of ONE plane, padded, and a plane is that times the height. The bands go one whole
+    // plane after another rather than interleaved, and the rows run bottom to top.
+    var rowLen = (width + 15) & ~15;
     var plnLen = rowLen * height;
     const int clrLen = 0;
-    const int bits = 8;
-    const int physBits = 8;
-    const double aspect = 1.0;
 
-    var fileSize = FbmHeader.StructSize + clrLen + plnLen;
-    var result = new byte[fileSize];
-    var span = result.AsSpan();
+    var result = new byte[FbmHeader.StructSize + clrLen + plnLen * bands];
 
-    var header = new FbmHeader(
-      Magic: FbmHeader.MagicBytes,
+    new FbmHeader(
       Cols: width,
       Rows: height,
       Bands: bands,
-      Bits: bits,
-      PhysBits: physBits,
+      Bits: 8,
+      PhysBits: 8,
       RowLen: rowLen,
       PlnLen: plnLen,
       ClrLen: clrLen,
-      Aspect: aspect,
+      Aspect: 1.0,
       Title: title ?? string.Empty
-    );
-    header.WriteTo(span);
+    ).WriteTo(result);
 
-    // Write pixel data with row padding
+    for (var band = 0; band < bands; ++band)
     for (var y = 0; y < height; ++y) {
-      var srcOffset = y * bytesPerPixelRow;
-      var dstOffset = FbmHeader.StructSize + y * rowLen;
-      var copyLen = Math.Min(bytesPerPixelRow, pixelData.Length - srcOffset);
-      if (copyLen > 0)
-        pixelData.AsSpan(srcOffset, copyLen).CopyTo(result.AsSpan(dstOffset));
+      var target = FbmHeader.StructSize + band * plnLen + (height - 1 - y) * rowLen;
+      for (var x = 0; x < width; ++x) {
+        var source = (y * width + x) * bands + band;
+        if (source < pixelData.Length)
+          result[target + x] = pixelData[source];
+      }
     }
 
     return result;

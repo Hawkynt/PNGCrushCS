@@ -68,7 +68,12 @@ public readonly record struct AtariAgpFile : IImageFormatReader<AtariAgpFile>, I
       case AtariAgpMode.Graphics8:
         // Two colours drawn from one register pair: the background keeps its hue throughout and
         // only the luminance of the set bits comes from the other one.
-        var background = file.Registers[6];
+        //
+        // The background is masked the same way the foreground already was. The chip ignores the
+        // bottom bit of a colour register, so 0x0F is not a level it has and asking for it gets
+        // 0x0E. This sample states 0x0F and was drawn white, where the machine and the reference
+        // decoder both show the shade below it.
+        var background = (byte)(file.Registers[6] & 0xFE);
         var foreground = (byte)((background & 240) | (file.Registers[5] & 14));
         for (var y = 0; y < PixelHeight; ++y)
         for (var x = 0; x < PixelWidth; ++x) {
