@@ -30,41 +30,44 @@ public static class MgrBitmapReader {
   }
 
   public static MgrBitmapFile FromSpan(ReadOnlySpan<byte> data) {
-    if (data.Length < _MIN_FILE_SIZE)
-      throw new InvalidDataException($"Data too small for a valid MGR file: expected at least {_MIN_FILE_SIZE} bytes, got {data.Length}.");
+    if (data.Length < MgrBitmapFile.HeaderSize)
+      throw new InvalidDataException(
+        $"Data too small for a valid MGR file: expected at least {MgrBitmapFile.HeaderSize} bytes, got {data.Length}.");
 
-    var newlineIdx = data.IndexOf((byte)'\n');
-    if (newlineIdx < 0)
-      throw new InvalidDataException("Invalid MGR header: missing newline terminator.");
+    if (data[0] != (byte)'y' || data[1] != (byte)'z')
+      throw new InvalidDataException("Not an MGR bitmap: it does not open with 'yz'.");
 
-    var headerLine = Encoding.ASCII.GetString(data.Slice(0, newlineIdx));
-    var xIdx = headerLine.IndexOf('x', StringComparison.OrdinalIgnoreCase);
-    if (xIdx < 0)
-      throw new InvalidDataException("Invalid MGR header: missing 'x' dimension separator.");
+    // Six bits to a byte, biased into printable range so the whole header stays typable — which is
+    // what an MGR header is for. This was read as the text "800x600" followed by a newline, which
+    // is not a form the format has, so every real file was refused for want of an 'x'.
+    var width = _Pair(data, 2);
+    var height = _Pair(data, 4);
+    var depth = data[6] - MgrBitmapFile.HeaderBias;
 
-    if (!int.TryParse(headerLine[..xIdx].Trim(), out var width) || width <= 0)
-      throw new InvalidDataException($"Invalid MGR width in header: '{headerLine[..xIdx].Trim()}'.");
+    if (width <= 0)
+      throw new InvalidDataException($"Invalid MGR width in header: {width}.");
+    if (height <= 0)
+      throw new InvalidDataException($"Invalid MGR height in header: {height}.");
+    if (depth != 1)
+      throw new InvalidDataException($"Unsupported MGR depth: {depth}. Only one bit a pixel is read here.");
 
-    if (!int.TryParse(headerLine[(xIdx + 1)..].Trim(), out var height) || height <= 0)
-      throw new InvalidDataException($"Invalid MGR height in header: '{headerLine[(xIdx + 1)..].Trim()}'.");
+    var stride = (width + 7) / 8;
+    var needed = MgrBitmapFile.HeaderSize + stride * height;
+    if (data.Length < needed)
+      throw new InvalidDataException($"Data too small for pixel data: expected {needed} bytes, got {data.Length}.");
 
-    var pixelOffset = newlineIdx + 1;
-    var bytesPerRow = (width + 7) / 8;
-    var expectedPixelBytes = bytesPerRow * height;
-
-    if (data.Length < pixelOffset + expectedPixelBytes)
-      throw new InvalidDataException($"Data too small for pixel data: expected {pixelOffset + expectedPixelBytes} bytes, got {data.Length}.");
-
-    var pixelData = new byte[expectedPixelBytes];
-    data.Slice(pixelOffset, expectedPixelBytes).CopyTo(pixelData.AsSpan(0));
+    var pixelData = new byte[stride * height];
+    data.Slice(MgrBitmapFile.HeaderSize, pixelData.Length).CopyTo(pixelData);
 
     return new MgrBitmapFile {
       Width = width,
       Height = height,
       PixelData = pixelData,
     };
-  
   }
+
+  private static int _Pair(ReadOnlySpan<byte> data, int at)
+    => ((data[at] - MgrBitmapFile.HeaderBias) << 6) | (data[at + 1] - MgrBitmapFile.HeaderBias);
 
   public static MgrBitmapFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

@@ -8,7 +8,14 @@ namespace FileFormat.Xbm;
 public readonly record struct XbmFile : IImageFormatReader<XbmFile>, IImageToRawImage<XbmFile>, IImageFromRawImage<XbmFile>, IImageFormatWriter<XbmFile> {
 
   static string IImageFormatMetadata<XbmFile>.PrimaryExtension => ".xbm";
-  static string[] IImageFormatMetadata<XbmFile>.FileExtensions => [".xbm"];
+  /// <summary>
+  /// Also <c>.icon</c>, which is what X11 calls the same thing.
+  /// </summary>
+  /// <remarks>
+  /// Only the Sun icon claimed that name, and a Sun icon opens with a C comment where this opens
+  /// with a #define — so a real X11 icon was refused for not being the other format.
+  /// </remarks>
+  static string[] IImageFormatMetadata<XbmFile>.FileExtensions => [".xbm", ".icon"];
   static XbmFile IImageFormatReader<XbmFile>.FromSpan(ReadOnlySpan<byte> data) => XbmReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<XbmFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
   static byte[] IImageFormatWriter<XbmFile>.ToBytes(XbmFile file) => XbmWriter.ToBytes(file);

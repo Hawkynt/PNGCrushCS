@@ -9,7 +9,15 @@ namespace FileFormat.Xbm;
 internal static class XbmTextParser {
 
   private static readonly Regex _DefineRegex = new(@"#define\s+(\w+)_(\w+)\s+(\d+)", RegexOptions.Compiled);
-  private static readonly Regex _HexByteRegex = new(@"0[xX]([0-9a-fA-F]{1,2})", RegexOptions.Compiled);
+  /// <summary>
+  /// Up to four digits, because the array may be declared as shorts rather than chars.
+  /// </summary>
+  /// <remarks>
+  /// X11 writes a bitmap either way. Matching two digits took only the first half of every
+  /// <c>0xFEFF</c>, so a 64 by 64 icon yielded 256 bytes where it needs 512 and was refused for
+  /// being too short — with the half it did read being wrong as well.
+  /// </remarks>
+  private static readonly Regex _HexByteRegex = new(@"0[xX]([0-9a-fA-F]{1,4})", RegexOptions.Compiled);
 
   public static XbmFile Parse(string text) {
     ArgumentNullException.ThrowIfNull(text);
@@ -64,8 +72,16 @@ internal static class XbmTextParser {
 
     var hexMatches = _HexByteRegex.Matches(text);
     var bytes = new List<byte>(hexMatches.Count);
-    foreach (Match match in hexMatches)
-      bytes.Add(Convert.ToByte(match.Groups[1].Value, 16));
+    foreach (Match match in hexMatches) {
+      var digits = match.Groups[1].Value;
+      var value = Convert.ToUInt16(digits, 16);
+
+      // A word holds sixteen pixels, low half first — the same order the bytes would have been in
+      // had the array been declared as chars.
+      bytes.Add((byte)value);
+      if (digits.Length > 2)
+        bytes.Add((byte)(value >> 8));
+    }
 
     var bytesPerRow = (width.Value + 7) / 8;
     var expectedBytes = bytesPerRow * height.Value;

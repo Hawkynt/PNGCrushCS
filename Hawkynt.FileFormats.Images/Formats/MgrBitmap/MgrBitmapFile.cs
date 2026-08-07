@@ -12,13 +12,20 @@ public readonly record struct MgrBitmapFile : IImageFormatReader<MgrBitmapFile>,
   static VideoMode[] IImageFormatMetadata<MgrBitmapFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
   static byte[] IImageFormatWriter<MgrBitmapFile>.ToBytes(MgrBitmapFile file) => MgrBitmapWriter.ToBytes(file);
 
+  /// <summary>Bytes of header: the letters, the two dimensions, the depth and a spare.</summary>
+  public const int HeaderSize = 8;
+
+  /// <summary>What each six-bit half is biased by, to keep the header typable.</summary>
+  public const byte HeaderBias = 0x20;
+
   public int Width { get; init; }
   public int Height { get; init; }
 
   /// <summary>1bpp packed pixel data, MSB first, ceil(width/8) bytes per row.</summary>
   public byte[] PixelData { get; init; }
 
-  private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
+  /// <summary>Paper first: a set bit is the mark, which the tool that reads these draws black.</summary>
+  private static readonly byte[] _BlackWhitePalette = [255, 255, 255, 0, 0, 0];
 
   public static RawImage ToRawImage(MgrBitmapFile file) {
     // A row is padded out to a whole byte, so the bits are not one unbroken stream and cannot be
@@ -46,8 +53,8 @@ public readonly record struct MgrBitmapFile : IImageFormatReader<MgrBitmapFile>,
 
   /// <summary>Builds a bitmap from a picture, at whatever size the picture already is.</summary>
   /// <remarks>
-  /// The header carries the dimensions as text, so unlike most of the machine formats here there
-  /// is nothing to sample to — the picture keeps its own size and only its colours are reduced.
+  /// The header carries the dimensions, so unlike most of the machine formats here there is nothing
+  /// to sample to — the picture keeps its own size and only its colours are reduced.
   /// </remarks>
   public static MgrBitmapFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
