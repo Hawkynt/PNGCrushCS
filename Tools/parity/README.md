@@ -542,3 +542,21 @@ until it is checked. Adding 263 again lands on row 57 rather than row 56, and ad
 lands on rows 69 and 73 — five, twelve and four rows on from each other. Whatever separates the
 bands varies in length, so there is no stride to write down, and a reader for this format has to
 walk the file rather than index into it.
+
+### Din, solved but for its colour rule
+
+The probe took this one nearly all the way. A file is a seven-byte header and then sixteen chunks of
+1024 bytes, alternating between two frames — chunk nought is the first frame, chunk one the second,
+and so on. Each chunk carries 960 bytes and 64 of padding, and each frame's 7680 bytes are ordinary
+cell-major: forty cells to a band, eight bytes to a cell, one per row.
+
+Five independent predictions confirm it. Byte 2500 gives row 37 column 120, byte 3000 row 41 column
+304, byte 3500 row 37 column 96, byte 4000 row 41 column 280 and byte 5000 row 65 column 256, and
+every one moves exactly those eight pixels. The colour matrix is at 16391, one byte a cell, which
+byte 17000 confirms by moving precisely the 8x8 cell at row 120 column 72 — and 7 + 16 x 1024 + 960
+is 17351, the file, to the byte.
+
+What does not follow is the colour. Taking the two frame bits and the matrix entry together as the
+whole input — which is as general as it can be made — leaves 659 distinct states and 31 per cent of
+pixels wrong, so the same three inputs are drawn two different ways in different places. Something
+positional decides it and the file has no bytes left to hold it.
