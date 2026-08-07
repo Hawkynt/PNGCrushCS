@@ -474,5 +474,13 @@ compressed one, and it is wrong here for the same reason.
 Multi-Lace went furthest. Its two bitmaps are at 2 and 2050, both cell-major with forty cells to a
 band, and 2 + 2048 + 2048 is 4098 to the byte. Every probe predicts: byte 400 gives row 14 column 72,
 byte 2500 row 10 column 128, byte 4000 row 54 column 24, and all three move exactly those pixels.
-What colours them is still missing — the two bitmaps together give four states and the picture shows
-ten colours, so something positional remains, and there is no room left in the file for it.
+
+Changing part of a byte rather than all of it says more. Flipping one bit moves two columns and
+flipping a nibble moves four, which is two bits to a pixel and each pixel shown twice — multicolour,
+160 stored across and drawn at 320, not the one bit a pixel it looks like from a whole-byte probe.
+The two frames are also one column apart: a nibble of the first moves columns 193 to 196 where the
+same nibble of the second moves 192 to 195.
+
+That still does not colour it. Two multicolour frames give sixteen states and the picture shows ten
+colours, and the closest arrangement tried is wrong in 37 per cent of pixels. Something positional
+remains and the file has no room left for it, which is where Mcs and FLI Graph also stand.
