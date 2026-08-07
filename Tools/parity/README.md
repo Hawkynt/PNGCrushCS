@@ -650,11 +650,11 @@ Against a corpus of 633 samples, one per extension, with RECOIL and XnView both 
 
 | | RECOIL | XnView |
 |---|---|---|
-| both read, we agree | 317 | 101 |
+| both read, we agree | 318 | 101 |
 | same picture, other colours | 3 | 27 |
 | both read, we differ | 38 | 56 |
-| it reads, we cannot | 39 | 38 |
-| only we read it | 136 | 310 |
+| it reads, we cannot | 38 | 38 |
+| only we read it | 136 | 311 |
 
 The six disagreement figures started at 48/25, 40/56, 44/49 — 262 rows in all — and the depth fault
 above accounts for about a third of what has gone since. The rest is listed in the log: Cut Creator,
@@ -681,10 +681,18 @@ is locked when the *other* tool reads the same file and we already match that ot
 |---|---|---|
 | same picture, other colours | 3 winnable | 10 winnable, 17 locked |
 | both read, we differ | 36 winnable, 2 locked | 40 winnable, 16 locked |
-| it reads, we cannot | 39 winnable | 38 winnable |
+| it reads, we cannot | 38 winnable | 38 winnable |
 
-So the reachable floor for the two columns together is 166 rows away, not 201, and no amount of work
+So the reachable floor for the two columns together is 165 rows away, not 200, and no amount of work
 moves the other 35.
+
+### A trap in solving a layout by search
+
+Fitting an offset and a depth against the tool's rendering works, and it lies when the sampled
+points are all in a flat region. A .pg3 of 32331 bytes fits a monochrome 640 by 400 picture at
+offset 331 — and also, on four hundred sampled points, at 34 and at 2. Checked against every one of
+the 256000 pixels instead, 331 gives 100 per cent and the other two give 52 and 57. Any candidate
+worth acting on has to be checked over the whole picture, not a sample of it.
 
 ### What the winnable ones actually need
 
