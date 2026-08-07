@@ -26,7 +26,14 @@ public readonly record struct UimgFile
   public const int PaletteOffset = 14;
 
   static string IImageFormatMetadata<UimgFile>.PrimaryExtension => ".bp1";
-  static string[] IImageFormatMetadata<UimgFile>.FileExtensions => [".bp1", ".bp2", ".bp4", ".bp6", ".bp8", ".c01", ".c02", ".c04", ".c06", ".c08", ".c24", ".c32"];
+  /// <summary>
+  /// Also <c>.c16</c>, the sixteen-bit member of the same run.
+  /// </summary>
+  /// <remarks>
+  /// Every other depth in the series was listed and that one was not, so a UIMG named .c16 reached
+  /// only the Commodore 16 reader, which measured it against 10003 bytes and turned it down.
+  /// </remarks>
+  static string[] IImageFormatMetadata<UimgFile>.FileExtensions => [".bp1", ".bp2", ".bp4", ".bp6", ".bp8", ".c01", ".c02", ".c04", ".c06", ".c08", ".c16", ".c24", ".c32"];
   static UimgFile IImageFormatReader<UimgFile>.FromSpan(ReadOnlySpan<byte> data) => UimgReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<UimgFile>.VideoModes => [
     new("UIMG", [(IntegerRange.Any, IntegerRange.Any)], [16777216])

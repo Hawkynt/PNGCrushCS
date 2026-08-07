@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.IndyPaint;
@@ -30,17 +31,31 @@ public static class IndyPaintReader {
   }
 
   public static IndyPaintFile FromSpan(ReadOnlySpan<byte> data) {
+    if (data.Length < IndyPaintFile.HeaderSize)
+      throw new InvalidDataException($"Data too small for an IndyPaint header: got {data.Length} bytes.");
 
-    if (data.Length != _EXPECTED_SIZE)
-      throw new InvalidDataException($"Invalid IndyPaint data size: expected exactly {_EXPECTED_SIZE} bytes, got {data.Length}.");
+    if (!data[..4].SequenceEqual(IndyPaintFile.Signature))
+      throw new InvalidDataException("Not an IndyPaint picture: it does not open with Indy.");
 
-    var pixelData = new byte[IndyPaintFile.PixelDataSize];
-    data.Slice(IndyPaintFile.HeaderSize, IndyPaintFile.PixelDataSize).CopyTo(pixelData);
+    // The header says how big it is, and the samples are 320 and 384 across alike. Taking one fixed
+    // length instead refused every picture that was not the commoner of the two.
+    var width = BinaryPrimitives.ReadUInt16BigEndian(data[IndyPaintFile.DimensionsOffset..]);
+    var height = BinaryPrimitives.ReadUInt16BigEndian(data[(IndyPaintFile.DimensionsOffset + 2)..]);
+
+    if (width == 0 || height == 0)
+      throw new InvalidDataException($"Invalid IndyPaint size: {width}x{height}.");
+
+    var pixelBytes = width * height * IndyPaintFile.BytesPerPixel;
+    if (data.Length != IndyPaintFile.HeaderSize + pixelBytes)
+      throw new InvalidDataException(
+        $"An IndyPaint picture of {width}x{height} is {IndyPaintFile.HeaderSize + pixelBytes} bytes, got {data.Length}.");
 
     return new IndyPaintFile {
-      PixelData = pixelData
+      Width = width,
+      Height = height,
+      PixelData = data.Slice(IndyPaintFile.HeaderSize, pixelBytes).ToArray(),
     };
-    }
+  }
 
   public static IndyPaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

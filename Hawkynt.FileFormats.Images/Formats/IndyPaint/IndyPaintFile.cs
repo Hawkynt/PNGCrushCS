@@ -16,27 +16,40 @@ public readonly record struct IndyPaintFile : IImageFormatReader<IndyPaintFile>,
   /// <summary>Header size; pixel data starts here.</summary>
   public const int HeaderSize = 256;
 
-  /// <summary>Pixel data size: 320 x 240 x 2 bytes per pixel.</summary>
-  public const int PixelDataSize = 320 * 240 * 2;
+  /// <summary>Bytes a pixel: big-endian RGB565.</summary>
+  public const int BytesPerPixel = 2;
 
-  /// <summary>The exact file size.</summary>
+  /// <summary>The size the commonest one has, which is not the only one.</summary>
+  public const int DefaultWidth = 320, DefaultHeight = 240;
+
+  /// <summary>Pixel data size at the default width.</summary>
+  public const int PixelDataSize = DefaultWidth * DefaultHeight * BytesPerPixel;
+
+  /// <summary>The file size at the default width.</summary>
   public const int ExpectedFileSize = HeaderSize + PixelDataSize;
 
   static string IImageFormatMetadata<IndyPaintFile>.PrimaryExtension => ".ipn";
   static string[] IImageFormatMetadata<IndyPaintFile>.FileExtensions => [".ipn", ".idy", ".tru"];
   static IndyPaintFile IImageFormatReader<IndyPaintFile>.FromSpan(ReadOnlySpan<byte> data) => IndyPaintReader.FromSpan(data);
 
-  /// <summary>The one size this format holds, which its writer accepts and no other.</summary>
+  /// <summary>
+  /// The header states the size, so more than one is held.
+  /// </summary>
+  /// <remarks>
+  /// This declared 320 by 240 as the only one and the reader took that length and no other, so a
+  /// 384-wide picture — which the samples have as readily as 320 — was refused for being the size
+  /// it says it is.
+  /// </remarks>
   static VideoMode[] IImageFormatMetadata<IndyPaintFile>.VideoModes => [
-    new("Default", [(320, 240)]),
+    new("Default", [(DefaultWidth, DefaultHeight), (384, DefaultHeight)]),
   ];
   static byte[] IImageFormatWriter<IndyPaintFile>.ToBytes(IndyPaintFile file) => IndyPaintWriter.ToBytes(file);
 
-  /// <summary>Always 320.</summary>
-  public int Width => 320;
+  /// <summary>Pixels across, as the header states.</summary>
+  public int Width { get; init; }
 
-  /// <summary>Always 240.</summary>
-  public int Height => 240;
+  /// <summary>Pixels down, as the header states.</summary>
+  public int Height { get; init; }
 
   /// <summary>Raw RGB565 big-endian pixel data (2 bytes per pixel, 153600 bytes total).</summary>
   public byte[] PixelData { get; init; }
@@ -44,7 +57,7 @@ public readonly record struct IndyPaintFile : IImageFormatReader<IndyPaintFile>,
   public static RawImage ToRawImage(IndyPaintFile file) {
 
     var rgb565 = file.PixelData;
-    var pixelCount = 320 * 240;
+    var pixelCount = file.Width * file.Height;
     var rgb24 = new byte[pixelCount * 3];
 
     for (var i = 0; i < pixelCount; ++i) {
@@ -64,8 +77,8 @@ public readonly record struct IndyPaintFile : IImageFormatReader<IndyPaintFile>,
     }
 
     return new() {
-      Width = 320,
-      Height = 240,
+      Width = file.Width,
+      Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = rgb24,
     };
@@ -74,11 +87,11 @@ public readonly record struct IndyPaintFile : IImageFormatReader<IndyPaintFile>,
   public static IndyPaintFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
     image = image.EnsureFormat(PixelFormat.Rgb24);
-    if (image.Width != 320 || image.Height != 240)
-      throw new ArgumentException($"Expected 320x240 but got {image.Width}x{image.Height}.", nameof(image));
+    if (image.Width < 1 || image.Height < 1)
+      throw new ArgumentException($"A picture needs at least one pixel; got {image.Width}x{image.Height}.", nameof(image));
 
     var rgb24 = image.PixelData;
-    var pixelCount = 320 * 240;
+    var pixelCount = image.Width * image.Height;
     var rgb565 = new byte[pixelCount * 2];
 
     for (var i = 0; i < pixelCount; ++i) {
@@ -103,6 +116,8 @@ public readonly record struct IndyPaintFile : IImageFormatReader<IndyPaintFile>,
     }
 
     return new() {
+      Width = image.Width,
+      Height = image.Height,
       PixelData = rgb565,
     };
   }

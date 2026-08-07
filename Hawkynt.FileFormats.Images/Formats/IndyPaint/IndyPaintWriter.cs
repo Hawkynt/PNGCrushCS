@@ -1,26 +1,29 @@
-﻿using System;
+using System;
+using System.Buffers.Binary;
 
 namespace FileFormat.IndyPaint;
 
 /// <summary>Assembles IndyPaint screen dump bytes from pixel data.</summary>
+/// <remarks>
+/// The size goes in the header rather than being assumed: this used to write 320 by 240 into every
+/// file whatever the picture was, so a 384-wide one came out claiming to be narrower than it is.
+/// </remarks>
 public static class IndyPaintWriter {
 
-  /// <summary>The exact file size of a valid IndyPaint screen dump (320 x 240 x 2 bytes).</summary>
-  private const int _EXPECTED_SIZE = IndyPaintFile.ExpectedFileSize;
+  public static byte[] ToBytes(IndyPaintFile file) => Assemble(file.PixelData, file.Width, file.Height);
 
-  public static byte[] ToBytes(IndyPaintFile file) => Assemble(file.PixelData);
+  internal static byte[] Assemble(byte[] pixelData, int width, int height) {
+    if (width < 1) width = IndyPaintFile.DefaultWidth;
+    if (height < 1) height = IndyPaintFile.DefaultHeight;
 
-  internal static byte[] Assemble(byte[] pixelData) {
-    var result = new byte[_EXPECTED_SIZE];
+    var pixelBytes = width * height * IndyPaintFile.BytesPerPixel;
+    var result = new byte[IndyPaintFile.HeaderSize + pixelBytes];
 
-    // "Indy" signature, then the dimensions big-endian; RGB565 pixels start at the header size.
     IndyPaintFile.Signature.CopyTo(result);
-    result[IndyPaintFile.DimensionsOffset] = 320 >> 8;
-    result[IndyPaintFile.DimensionsOffset + 1] = 320 & 0xFF;
-    result[IndyPaintFile.DimensionsOffset + 2] = 240 >> 8;
-    result[IndyPaintFile.DimensionsOffset + 3] = 240 & 0xFF;
+    BinaryPrimitives.WriteUInt16BigEndian(result.AsSpan(IndyPaintFile.DimensionsOffset), (ushort)width);
+    BinaryPrimitives.WriteUInt16BigEndian(result.AsSpan(IndyPaintFile.DimensionsOffset + 2), (ushort)height);
 
-    pixelData.AsSpan(0, Math.Min(pixelData.Length, IndyPaintFile.PixelDataSize))
+    (pixelData ?? []).AsSpan(0, Math.Min((pixelData ?? []).Length, pixelBytes))
       .CopyTo(result.AsSpan(IndyPaintFile.HeaderSize));
 
     return result;
