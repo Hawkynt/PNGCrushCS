@@ -7,7 +7,15 @@ namespace FileFormat.ZxGigascreen;
 public readonly record struct ZxGigascreenFile : IImageFormatReader<ZxGigascreenFile>, IImageToRawImage<ZxGigascreenFile>, IImageFormatWriter<ZxGigascreenFile> {
 
   static string IImageFormatMetadata<ZxGigascreenFile>.PrimaryExtension => ".gsc";
-  static string[] IImageFormatMetadata<ZxGigascreenFile>.FileExtensions => [".gsc"];
+  /// <summary>
+  /// Also <c>.img</c>, which is the name the reference decoder knows these by.
+  /// </summary>
+  /// <remarks>
+  /// Nothing is at risk in claiming so general a name: the reader takes 13824 bytes and no other
+  /// length, that being two whole Spectrum screens, and the registry tries every format that claims
+  /// an extension rather than only the first.
+  /// </remarks>
+  static string[] IImageFormatMetadata<ZxGigascreenFile>.FileExtensions => [".gsc", ".img"];
   static ZxGigascreenFile IImageFormatReader<ZxGigascreenFile>.FromSpan(ReadOnlySpan<byte> data) => ZxGigascreenReader.FromSpan(data);
   static byte[] IImageFormatWriter<ZxGigascreenFile>.ToBytes(ZxGigascreenFile file) => ZxGigascreenWriter.ToBytes(file);
 
