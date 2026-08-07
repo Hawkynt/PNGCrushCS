@@ -525,6 +525,13 @@ more bytes in the same gap — 5005, 5008 and 5011 — each move most of the pic
 display list or a set of sprite pointers does.
 
 Within a band the bitmap is ordinary: eight bytes to a cell, one per row, cells eight bytes apart.
-Across bands it is not. Cells in one band come out 8, 8 and then 4 bytes apart depending on which
-byte is probed, so something of variable length sits between them, and until that is measured the
-band stride cannot be written down.
+Between bands sits an eight-byte block that is not bitmap. Probed one byte at a time across the
+boundary at 5268, it comes out as: two bytes the tool refuses the file over, two that move most of
+the picture, one that moves a whole band's worth of the leftmost sixteen columns, and three that
+move parts of the cell at columns 16 to 23. Eight bytes between the bands, of which several are
+structural rather than picture.
+
+Eight bytes at the end of a page is where a Commodore 64 keeps its sprite pointers, and this format
+is underlay FLI, so that is almost certainly what they are — which would also explain the two the
+tool validates and refuses to read past. Almost certainly is not certainly, and the remaining three
+bytes move picture in a way a pointer does not, so it is written down rather than acted on.
