@@ -42,6 +42,9 @@ public sealed class WriterAcceptanceTests {
     [ImageFormat.AliasPix] =
       "the reference tool reads one pixel more than each run states and cannot take a run of one at "
       + "all, so it rejects any picture whose neighbouring pixels differ, however it is encoded",
+    [ImageFormat.SeattleFilmWorks] =
+      "the only tool here with an opinion cannot read a genuine .sfw either — all three real samples "
+      + "fail in its JPEG handler — so its verdict is about its own reader rather than about ours",
     [ImageFormat.MatLab] =
       "the reference tool cannot read the .mat files it writes itself, so its verdict is about its "
       + "own reader rather than about ours",

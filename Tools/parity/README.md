@@ -690,3 +690,31 @@ which has nowhere to put the extension, so a format whose meaning depends on its
 which one to write. Dynamic Publisher stamps share their reader with GL6 pictures and differ only in
 the colours they fall back on — black on white paper against Screen 6's black and three greens — so a
 stamp gets quantised against the greens and read back as paper.
+
+### The three that need a reference nobody here can produce
+
+FBM, NITF and Seattle FilmWorks are each blocked on the same thing: no tool available here can write
+one, so there is nothing to compare a header against field by field.
+
+FBM was already recorded as known-wrong — the fields are written as big-endian integers where the
+format writes fixed-width decimal text, which is why XnView reads a binary 3 as "invalid number of
+planes". The note said it would stay that way until a real file turned up rather than be guessed at
+again. XnView cannot write one either, so it stays.
+
+NITF writes `NC` in the compression field and XnView still says "compressed images are not
+supported", so it is reading some other pair of bytes as that field. The subheader order and the
+166-byte security block both match NITF 2.1 as written, so the fault is somewhere the field order
+alone does not show, and there is no sample in the corpus and no tool here that will write one.
+
+Seattle FilmWorks is the one that turned out to be about the reader rather than the writer, in both
+directions at once. ImageMagick rejects what we write — and it cannot read a genuine .sfw either:
+all three real samples fail inside its JPEG handler. So its verdict is about its own coder, the same
+way MatLab's already was, and the format is recorded as unjudgeable rather than counted as a broken
+writer.
+
+That leaves the real finding, which is on the reading side. We refuse those same three files for
+having no JPEG SOI marker after the header — and they have none anywhere: searching the whole file
+for `FF D8` and `FF D9` turns up neither. The format stores the entropy-coded scan with the markers
+and tables stripped, to be rebuilt from tables the reader is expected to carry. So the reader's whole
+approach of seeking a JPEG inside the file cannot work, whatever offset it seeks at. XnView reads
+them at 640 by 480; nothing else here does.
