@@ -45,6 +45,13 @@ python3 Tools/parity/compare.py "$out"
 
 IrfanView is much the slowest — it runs under Wine and pays a process start per file.
 
+Build the decoder without `--no-build`, or measure the wrong thing for an hour. `dotnet build` at
+the solution level refreshes the library but does not copy it into this tool's output directory, so
+`dotnet run --no-build` keeps running against whatever was there before. A reader fix then appears
+to have no effect, which invites fixing it again in the opposite direction — and reverting *that*
+appears to have no effect either. Both of those happened here before the two DLL timestamps were
+compared.
+
 ## Reading the result
 
 `only we read it` is not a win by itself and `it reads, we cannot` is not automatically a fault: a
