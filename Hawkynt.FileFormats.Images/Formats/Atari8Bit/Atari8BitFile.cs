@@ -91,7 +91,7 @@ public readonly record struct Atari8BitFile : IImageFormatReader<Atari8BitFile>,
 
   /// <summary>Gets the default palette for a given mode as RGB triplets.</summary>
   internal static byte[] GetDefaultPalette(Atari8BitMode mode) => mode switch {
-    Atari8BitMode.Gr8 => [0, 0, 0, 255, 255, 255],
+    Atari8BitMode.Gr8 => Atari8BitGraphics.MonochromePalette.ToArray(),
     Atari8BitMode.Gr9 => _BuildGrayscale16Palette(),
     Atari8BitMode.Gr15 => [0, 0, 0, 85, 85, 85, 170, 170, 170, 255, 255, 255],
     Atari8BitMode.Gr7 => [0, 0, 0, 85, 85, 85, 170, 170, 170, 255, 255, 255],

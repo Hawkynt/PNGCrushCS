@@ -20,6 +20,23 @@ public static class MonochromePage {
   /// <param name="inkIsWhite">
   /// Whether a set bit is white on black, as a scanner records it, rather than black on white paper.
   /// </param>
+  /// <param name="palette">
+  /// The two colours to draw in, or null for plain black and white. A machine whose brightest
+  /// level is not white — the Atari's is 0xEE — needs to say so, and there is nowhere else to.
+  /// </param>
+  public static RawImage Decode(ReadOnlySpan<byte> data, int width, int height, bool inkIsWhite, ReadOnlySpan<byte> palette) {
+    var decoded = Decode(data, width, height, inkIsWhite);
+
+    return palette.Length < 6 ? decoded : new() {
+      Width = decoded.Width,
+      Height = decoded.Height,
+      Format = decoded.Format,
+      PixelData = decoded.PixelData,
+      Palette = palette.ToArray(),
+      PaletteCount = 2,
+    };
+  }
+
   public static RawImage Decode(ReadOnlySpan<byte> data, int width, int height, bool inkIsWhite) {
     var stride = BytesPerRow(width);
     var pixels = new byte[width * height];

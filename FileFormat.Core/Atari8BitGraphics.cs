@@ -654,6 +654,18 @@ public static class Atari8BitGraphics {
   /// table. These are Altirra's PAL measurements, the same ones RECOIL decodes with, so our output
   /// and the reference agree exactly instead of approximately.
   /// </remarks>
+  /// <summary>
+  /// The two colours a monochrome Atari picture is drawn in.
+  /// </summary>
+  /// <remarks>
+  /// The bright one is luminance 14 rather than 15, so it is 0xEE and not white. A colour byte
+  /// carries its luminance in the low nibble and the chip ignores that nibble's bottom bit, so 15
+  /// is not a level the hardware has — asking for it gets 14. Several formats here paired black
+  /// with 0xFF anyway, which is a shade the machine cannot show and a disagreement with the
+  /// reference decoder in every sample that has no colour of its own.
+  /// </remarks>
+  public static ReadOnlySpan<byte> MonochromePalette => [0x00, 0x00, 0x00, 0xEE, 0xEE, 0xEE];
+
   public static ReadOnlySpan<byte> Palette => [
     0x00, 0x00, 0x00, 0x11, 0x11, 0x11, 0x22, 0x22, 0x22, 0x33, 0x33, 0x33, 0x44, 0x44, 0x44, 0x55, 0x55, 0x55, 0x66, 0x66, 0x66, 0x77, 0x77, 0x77,
     0x88, 0x88, 0x88, 0x99, 0x99, 0x99, 0xAA, 0xAA, 0xAA, 0xBB, 0xBB, 0xBB, 0xCC, 0xCC, 0xCC, 0xDD, 0xDD, 0xDD, 0xEE, 0xEE, 0xEE, 0xFF, 0xFF, 0xFF,

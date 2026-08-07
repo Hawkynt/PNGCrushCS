@@ -57,12 +57,14 @@ public sealed class CutCreatorTests {
 
   [Test]
   [Category("Unit")]
-  public void ToRawImage_TakesASetBitAsWhiteAndTheTopBitAsLeftmost() {
+  public void ToRawImage_TakesASetBitAsLitAndTheTopBitAsLeftmost() {
     var picture = CutCreatorFile.ToRawImage(CutCreatorReader.FromBytes(_ValidFile()));
     var rgb = PixelConverter.Convert(picture, PixelFormat.Rgb24).PixelData;
 
+    // 0xEE and not white: a colour byte carries its luminance in the low nibble and the chip
+    // ignores that nibble's bottom bit, so 15 is not a level the hardware can show.
     Assert.Multiple(() => {
-      Assert.That(rgb[0], Is.EqualTo(255), "0b1010_1010 starts with a set bit, which is white");
+      Assert.That(rgb[0], Is.EqualTo(0xEE), "0b1010_1010 starts with a set bit, which is lit");
       Assert.That(rgb[3], Is.EqualTo(0), "and the next is clear");
     });
   }

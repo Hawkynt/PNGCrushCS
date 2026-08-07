@@ -42,8 +42,15 @@ public readonly record struct CutCreatorFile
   /// <summary>The bitmap, one bit a pixel.</summary>
   public byte[] PixelData { get; init; }
 
+  /// <summary>
+  /// Draws it in the two colours the machine has: black, and luminance 14 rather than white.
+  /// </summary>
+  /// <remarks>
+  /// The bright one is 0xEE. A colour byte carries its luminance in the low nibble and the chip
+  /// ignores that nibble's bottom bit, so 15 is not a level the hardware can show.
+  /// </remarks>
   public static RawImage ToRawImage(CutCreatorFile file)
-    => MonochromePage.Decode(file.PixelData ?? [], Width, Height, inkIsWhite: true);
+    => MonochromePage.Decode(file.PixelData ?? [], Width, Height, inkIsWhite: true, Atari8BitGraphics.MonochromePalette);
 
   public static CutCreatorFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);

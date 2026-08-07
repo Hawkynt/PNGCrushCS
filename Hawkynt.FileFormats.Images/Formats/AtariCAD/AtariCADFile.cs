@@ -47,7 +47,10 @@ public readonly record struct AtariCADFile : IImageFormatReader<AtariCADFile>, I
   /// <summary>Raw 1bpp MSB-first screen data (7680 bytes).</summary>
   public byte[] PixelData { get; init; }
 
-  private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
+  /// <summary>
+  /// Black and the brightest luminance the chip has, which is 0xEE rather than white.
+  /// </summary>
+  private static readonly byte[] _BlackWhitePalette = Atari8BitGraphics.MonochromePalette.ToArray();
 
   /// <summary>Converts this Atari CAD Screen to an Indexed1 raw image (320x192, B&amp;W palette).</summary>
   public static RawImage ToRawImage(AtariCADFile file) {
