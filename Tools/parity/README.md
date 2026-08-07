@@ -556,7 +556,14 @@ every one moves exactly those eight pixels. The colour matrix is at 16391, one b
 byte 17000 confirms by moving precisely the 8x8 cell at row 120 column 72 — and 7 + 16 x 1024 + 960
 is 17351, the file, to the byte.
 
-What does not follow is the colour. Taking the two frame bits and the matrix entry together as the
-whole input — which is as general as it can be made — leaves 659 distinct states and 31 per cent of
-pixels wrong, so the same three inputs are drawn two different ways in different places. Something
-positional decides it and the file has no bytes left to hold it.
+The two frames are not the same depth, which is what the first attempt at this got wrong. Flipping
+one bit of the first frame moves one pixel and one bit of the second moves two, so the first is one
+bit a pixel and the second is two. Read that way — a hires bit from one frame, a two-bit pattern
+from the other, and the matrix entry — those three inputs determine every pixel of the picture with
+no exceptions at all: 944 distinct states over 61440 pixels and not one contradiction.
+
+That is the format settled to the byte. What is left is only the function from those three inputs to
+a colour. It is a blend of two frames drawn from the Atari palette — 441 of the 944 states land on a
+plain palette entry and the rest sit between two of them — but which entry each frame takes has not
+been worked out, and a reader built from the 944 states as a table would be a reader that works on
+one picture.
