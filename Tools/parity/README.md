@@ -404,3 +404,22 @@ margin and at both cell widths, is inconsistent in all eight combinations.
 Interlace Studio's samples are equally uniform in length and much less uniform inside — the constant
 regions are only at 8016..8207 and past 16208, which suggests two pictures with a header between
 them rather than a block structure.
+
+### What the resumed pass added, and what it did not
+
+Applying the sample comparison to the rest found one more thing worth having and closed nothing.
+
+FLI Graph's two samples are both 17409 bytes and differ throughout, but the bytes that agree fall at
+1002, 2025, 3049, 4073 and on at intervals of 1024 — the same page-strided blocks of a thousand that
+CFLI Designer turned out to use. So its eight video matrices are located. What surrounds them is not:
+reading it as AFLI does, matrices then bitmap, is wrong in 19 per cent of pixels, and a sweep of every
+matrix base up to 2100 against seven bitmap positions bottoms out at 15 per cent.
+
+Mcs and Din resisted entirely. Both are single frames drawn in Atari colours, so the machine is
+settled, but no plain arrangement reproduces either: sweeping one, two and four bits a pixel against
+every offset to 80, and every row stride from the minimum to 70, leaves every candidate wrong in
+more than nine rows in ten — and that is with the test relaxed to per-row consistency, which is what
+a format changing its colour registers between scanlines would need.
+
+ComputerEyes cannot be attacked this way at all: its two files are byte-identical, so there is only
+one sample.
