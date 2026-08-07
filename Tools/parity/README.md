@@ -505,3 +505,16 @@ and is drawn anyway.
 
 So either the picture is not seven whole bands, or something outside the two blocks supplies both
 the missing corner and the colour. Both would be answered by a second sample, and there is only one.
+
+### UFLI, as far as the probe took it
+
+Consecutive bytes move consecutive rows of one cell, so it is cell-major like the rest of the family,
+and the picture is 288 across — four character cells lost at the left rather than the three FLI
+usually loses.
+
+It is not laid out cell after cell, though. The byte for row 33 of the rightmost cell is 5000 and the
+byte for row 43 of cell ten is 5040, which is 38 bytes apart where eleven whole cells would be 88.
+Something sits between the bands: bytes 5008 and 5009 fall in that gap and move 8995 and 168 pixels
+respectively — one of them most of the picture, the other a single band's worth of the left edge.
+That is colour, or a display list, interleaved band by band with the bitmap rather than gathered into
+a block of its own, which is why every arrangement that assumes one contiguous bitmap has failed.
