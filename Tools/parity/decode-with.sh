@@ -13,6 +13,17 @@
 #   RECOIL2PNG   path to recoil2png
 #   NCONVERT     path to XnView's nconvert
 #   IRFANVIEW    Windows path of i_view64.exe, with WINEPREFIX set to the prefix holding it
+#
+# Every conversion forces -depth 8, and leaving it off is not a cosmetic difference.
+#
+# These tools write a PNG at whatever depth the picture needs, so a four-colour one comes out as a
+# two-bit palette PNG whose entries are ordinary eight-bit colours. Converting that to PPM without
+# saying otherwise makes ImageMagick write "maxval 3" and store the palette *indices* 0..3 in place
+# of the colours. The comparison then scales those back by 255/3 — because a low maxval usually does
+# mean a low-depth picture — and a decode of 0x44, 0x88, 0xCC comes back as 0x55, 0xAA, 0xFF.
+#
+# That is the tool being misread rather than the tool disagreeing, and it was reported as "same
+# picture, other colours" for every format whose palette happens to be small.
 set -u
 
 tool=${1:?tool}
@@ -26,7 +37,7 @@ recoil)
   for f in "$samples"/*; do
     rm -f /tmp/parity-rc.png
     "$RECOIL2PNG" -o /tmp/parity-rc.png "$f" 2>/dev/null
-    [ -f /tmp/parity-rc.png ] && magick /tmp/parity-rc.png "$out/$(basename "$f").ppm" 2>/dev/null
+    [ -f /tmp/parity-rc.png ] && magick /tmp/parity-rc.png -depth 8 "$out/$(basename "$f").ppm" 2>/dev/null
   done
   ;;
 xnview)
@@ -34,7 +45,7 @@ xnview)
   for f in "$samples"/*; do
     rm -f /tmp/parity-xn.png
     "$NCONVERT" -quiet -out png -o /tmp/parity-xn.png "$f" >/dev/null 2>&1
-    [ -f /tmp/parity-xn.png ] && magick /tmp/parity-xn.png "$out/$(basename "$f").ppm" 2>/dev/null
+    [ -f /tmp/parity-xn.png ] && magick /tmp/parity-xn.png -depth 8 "$out/$(basename "$f").ppm" 2>/dev/null
   done
   ;;
 irfanview)
@@ -44,7 +55,7 @@ irfanview)
     rm -f /tmp/parity-iv.bmp
     # Wine reaches the host filesystem through Z:, and /silent stops a dialog waiting on a person.
     timeout 40 wine "$IRFANVIEW" "Z:$(echo "$f" | tr '/' '\\')" '/convert=Z:\tmp\parity-iv.bmp' /silent >/dev/null 2>&1
-    [ -f /tmp/parity-iv.bmp ] && magick /tmp/parity-iv.bmp "$out/$(basename "$f").ppm" 2>/dev/null
+    [ -f /tmp/parity-iv.bmp ] && magick /tmp/parity-iv.bmp -depth 8 "$out/$(basename "$f").ppm" 2>/dev/null
   done
   ;;
 *)
