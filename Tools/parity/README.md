@@ -591,3 +591,102 @@ entry, with byte 5, or with either of the two frame registers. Whatever colours 
 register in the header, not the matrix entry, and not a blend of those with what the hires frame
 shows. That is the one thing between this format and a reader, and it is stated precisely so the next
 attempt starts there rather than re-deriving the rest.
+
+## Both directions, measured together
+
+Everything above measures reading. Writing had never been measured the same way, and it turns out to
+be where the cheaper faults were: a reader is exercised by every sample anyone has, where a writer is
+exercised by whatever the fixture happens to hand it.
+
+Two fixtures do it now, and the difference between them matters. `WhatWeWrite_IsReadableBySomethingElse`
+encodes a picture and asks RECOIL, ImageMagick, XnView and IrfanView to open the result — that proves
+the container is well formed and says nothing about the pixels. `DecodedFromOurOwnBytes_MatchesRecoil`
+encodes, then has both sides decode the same file and compares pixel for pixel. Acceptance without
+agreement is the weaker claim and there are about 130 formats where it is all we have, because only
+RECOIL is set up to be compared against and it knows 181 of the writable formats.
+
+### What the fixture was really measuring
+
+The first run failed 18 formats. Eight of those were the fixture handing over a picture the format had
+never claimed to take, and finding that out is worth more than the eight fixes.
+
+The fixture writes a full-colour gradient at 320 by 200. A format that stores a grid of characters
+takes whole cells of the font and nothing else; one that stores four colours refuses a picture with
+sixteen million. Both are stated in the format's own metadata — `Step` on the size ranges, and the
+colour count on the mode — and the fixture read neither. So it wrote nothing, the write threw, and a
+fixture built to ask "are these bytes readable" recorded "this writer is broken".
+
+Except the metadata was wrong too, which is the part worth keeping. ANSI, NFO and XBIN declared no
+sizes at all, which reads as *any size will do*. Nokia Picture Message and OTB claimed any size while
+holding each dimension in one byte. Handy Scanner declared its height as a fixed nought. Highres
+Medium and Multi Palette Picture left the colour count undeclared, which reads as full colour, and
+refused every full-colour picture. Commodore PET declared 40 by 25 — its size in character cells,
+which is not a size any picture can be handed over at.
+
+None of that is a test problem. Anything reading the metadata to choose a size — a Save-As dialog
+most of all — was being told something untrue, and the writer-acceptance suite is simply the first
+thing that asked.
+
+### Asymmetry: a tool may accept off its catalogue but not reject
+
+XnView is asked about extensions its catalogue does not list, because the catalogue ships older than
+the binary and misses formats it reads perfectly well. It usually says plainly when it has no reader.
+Handed an NFO — a text file, under a name no catalogue here lists — it said `Can't read file`, which
+reads like a verdict on the bytes and is nothing of the kind.
+
+So off its catalogue its acceptance counts and its rejection does not. Only a real reader can accept;
+anything at all can refuse. The same rule would apply to any tool asked beyond what it claims.
+
+### Where the two directions stand
+
+Against a corpus of 633 samples, one per extension, with RECOIL and XnView both run:
+
+| | RECOIL | XnView |
+|---|---|---|
+| both read, we agree | 265 | 92 |
+| same picture, other colours | 48 | 25 |
+| both read, we differ | 40 | 56 |
+| it reads, we cannot | 44 | 49 |
+| only we read it | 125 | 305 |
+
+And the conformance suite, with RECOIL and XnView configured:
+
+| | count |
+|---|---|
+| passing | 1057 |
+| failing | 9 |
+| written, but no tool here knows the name to judge it by | 181 |
+
+That last row is the honest ceiling on the write direction. Those formats are written and nothing
+outside this project has ever read the result — not a claim that they are wrong, and not a claim that
+they are right.
+
+### The nine that remain
+
+Three are modern codecs written as stubs no decoder accepts: AVIF, HEIC and JPEG XL.
+
+Four are genuine writer faults against a tool that does know the format — FBM, NITF, Seattle
+FilmWorks and, in both directions, Highres Medium and Multi Palette Picture.
+
+Highres Medium is the one worth recording, because the container is now settled and only the colour
+rule is not. RECOIL draws it 640 by 400 and takes exactly 92000 bytes, where this reads 640 by 200 and
+writes 64064. Flipping one byte at a time says where everything lives: bytes 0 and 2 both move columns
+0 to 7 while bytes 1 and 3 move columns 8 to 15, which is two bitplanes interleaved a word at a time,
+the Atari ST's own layout. A row is 160 bytes, and byte 160 moves the same rows as byte 0 — so each
+stored row holds two 160-byte frames back to back, 320 bytes a row and 64000 for 200 rows. The
+remaining 28000 is 200 rows of 140 bytes, and within a row byte 64000 and byte 64070 move the same
+pixels, so that is 70 bytes per frame per row. Those 70 bytes are not a four-colour palette: the
+columns each pair moves marches steadily rightwards across the scanline — offset 8 moves columns 8 to
+87, offset 16 moves 89 to 101, offset 32 moves 248 to 327, offset 64 moves 569 to 606 — which is the
+palette being rewritten part-way along the line, about 18 pixels to the word.
+
+Multi Palette Picture is compressed and variable-size, which this had not allowed for: two samples of
+76506 and 81430 bytes both decode to 416 by 273, and a third of 86976 to 320 by 199, where this reads
+every one of them as a fixed 320 by 200. The header says which: `MPP` and then a version byte, and
+version 3 carries named chunks — `MPPH`, `TITL`, `CONV` — before the picture.
+
+The ninth is a limitation rather than a fault. The registry encodes through `FromRawImage(RawImage)`,
+which has nowhere to put the extension, so a format whose meaning depends on its name cannot be told
+which one to write. Dynamic Publisher stamps share their reader with GL6 pictures and differ only in
+the colours they fall back on — black on white paper against Screen 6's black and three greens — so a
+stamp gets quantised against the greens and read back as paper.
