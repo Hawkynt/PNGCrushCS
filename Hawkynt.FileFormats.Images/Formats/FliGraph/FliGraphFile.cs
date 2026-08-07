@@ -1,109 +1,140 @@
 using System;
+using System.Buffers.Binary;
 using FileFormat.Core;
 
 namespace FileFormat.FliGraph;
 
-/// <summary>In-memory representation of a FLI Graph (FLI multicolor variant) image for the Commodore 64.</summary>
+/// <summary>In-memory representation of an FLI Graph picture for the Commodore 64.</summary>
+/// <remarks>
+/// This wanted 17474 bytes and read them as a bitmap, a block of screens and colour memory laid end
+/// to end. Nothing in an FLI Graph is laid end to end: every block takes a whole page of address
+/// space for the thousand bytes it uses, and the file is 17409. Every sample was refused.
+/// <para/>
+/// The order is colour memory first, then the eight video matrices, then the bitmap — which is the
+/// opposite end of the file from where it was being looked for. That is what makes it FLI: the
+/// machine is pointed at a different matrix on each raster line of a character cell, so every row
+/// chooses its own colours rather than the cell choosing once for all eight.
+/// <para/>
+/// It is multicolour, two bits a pixel, so the picture is 148 across drawn at 296. The leftmost
+/// three character cells cannot be coloured in time and are not part of it.
+/// </remarks>
 public readonly record struct FliGraphFile : IImageFormatReader<FliGraphFile>, IImageToRawImage<FliGraphFile>, IImageFormatWriter<FliGraphFile> {
 
   static string IImageFormatMetadata<FliGraphFile>.PrimaryExtension => ".flg";
-  static string[] IImageFormatMetadata<FliGraphFile>.FileExtensions => [".flg", ".bml"];
+  static string[] IImageFormatMetadata<FliGraphFile>.FileExtensions => [".flg", ".bml", ".fli"];
   static FliGraphFile IImageFormatReader<FliGraphFile>.FromSpan(ReadOnlySpan<byte> data) => FliGraphReader.FromSpan(data);
   static byte[] IImageFormatWriter<FliGraphFile>.ToBytes(FliGraphFile file) => FliGraphWriter.ToBytes(file);
+  static VideoMode[] IImageFormatMetadata<FliGraphFile>.VideoModes => [
+    new("FLI Graph", [(VisibleWidth, FixedHeight)], [Commodore64Graphics.ColorCount])
+  ];
 
-  /// <summary>Image width in pixels, always 160 (multicolor).</summary>
-  public const int FixedWidth = 160;
+  /// <summary>Pixels a row holds once drawn, each stored one twice.</summary>
+  public const int FixedWidth = 320;
 
-  /// <summary>Image height in pixels, always 200.</summary>
+  /// <summary>Pixels across the picture: the first three cells cannot be coloured in time.</summary>
+  public const int VisibleWidth = 296;
+
+  /// <summary>
+  /// How many stored pixels are hidden at the left.
+  /// </summary>
+  /// <remarks>
+  /// Twenty-four drawn pixels, and a stored one is drawn twice, so twelve of them — not the six a
+  /// count of four-pixel cells would give.
+  /// </remarks>
+  internal const int HiddenStoredPixels = (FixedWidth - VisibleWidth) / 2;
+
+  /// <summary>Rows.</summary>
   public const int FixedHeight = 200;
 
-  /// <summary>Expected file size: 2 + 8000 + 8000 + 1000 + 472 = 17474 bytes.</summary>
-  public const int ExpectedFileSize = 17474;
+  /// <summary>Character columns held in memory.</summary>
+  internal const int Columns = FixedWidth / 8;
 
-  /// <summary>Size of the load address in bytes.</summary>
   internal const int LoadAddressSize = 2;
 
-  /// <summary>Size of the bitmap data section in bytes.</summary>
+  /// <summary>The entries a matrix or colour memory holds.</summary>
+  internal const int BankSize = 1000;
+
+  /// <summary>The address space one of those takes: a whole page.</summary>
+  internal const int BankStride = 1024;
+
+  /// <summary>How many matrices, one for each raster line of a cell.</summary>
+  internal const int ScreenBankCount = 8;
+
   internal const int BitmapDataSize = 8000;
 
-  /// <summary>Size of the per-scanline screen data section in bytes (40 bytes x 200 lines).</summary>
-  internal const int ScreenDataSize = 8000;
+  /// <summary>Colour memory comes first, right after the load address.</summary>
+  internal const int ColorRamOffset = LoadAddressSize;
 
-  /// <summary>Size of the color RAM section in bytes.</summary>
-  internal const int ColorRamSize = 1000;
+  /// <summary>The matrices follow it, a page apart.</summary>
+  internal const int ScreensOffset = ColorRamOffset + BankStride;
 
-  /// <summary>Size of the padding section in bytes.</summary>
-  internal const int PaddingSize = 472;
+  /// <summary>And the bitmap follows all eight of those.</summary>
+  internal const int BitmapOffset = ScreensOffset + ScreenBankCount * BankStride;
 
-  /// <summary>Image width, always 160.</summary>
-  public int Width => FixedWidth;
+  /// <summary>The least a whole picture takes: 2 + 1024 + 8 x 1024 + 8000.</summary>
+  public const int MinimumFileSize = BitmapOffset + BitmapDataSize;
 
-  /// <summary>Image height, always 200.</summary>
+  /// <summary>
+  /// What pattern 00 shows.
+  /// </summary>
+  /// <remarks>
+  /// Black in every sample, and the file states it nowhere that changing alters the picture.
+  /// </remarks>
+  internal const int Background = 0;
+
+  /// <summary>Always 296.</summary>
+  public int Width => VisibleWidth;
+
+  /// <summary>Always 200.</summary>
   public int Height => FixedHeight;
 
   /// <summary>C64 memory load address (2 bytes, little-endian).</summary>
   public ushort LoadAddress { get; init; }
 
-  /// <summary>Bitmap data (8000 bytes).</summary>
+  /// <summary>The bitmap, two bits a pixel.</summary>
   public byte[] BitmapData { get; init; }
 
-  /// <summary>Per-scanline screen RAM (8000 bytes: 40 bytes per scanline x 200 lines).</summary>
-  public byte[] ScreenData { get; init; }
+  /// <summary>The eight video matrices, a thousand entries apiece.</summary>
+  public byte[] Screens { get; init; }
 
-  /// <summary>Color RAM (1000 bytes, one per 4x8 cell).</summary>
+  /// <summary>Colour memory, which pattern 11 takes and which every row shares.</summary>
   public byte[] ColorRam { get; init; }
 
-  /// <summary>Padding bytes at the end of the file (472 bytes).</summary>
-  public byte[] Padding { get; init; }
-
-  /// <summary>Converts this FLI Graph image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
+  /// <summary>Converts this picture to a platform-independent <see cref="RawImage"/>.</summary>
   public static RawImage ToRawImage(FliGraphFile file) {
-    return _FliMultiToRawImage(file.BitmapData, file.ScreenData, file.ColorRam);
-  }
+    var bitmap = file.BitmapData ?? [];
+    var screens = file.Screens ?? [];
+    var colorRam = file.ColorRam ?? [];
+    var stored = VisibleWidth / 2;
+    var indices = new byte[VisibleWidth * FixedHeight];
 
-  /// <summary>Shared FLI multicolor decode: per-scanline screen RAM instead of per-cell.</summary>
-  private static RawImage _FliMultiToRawImage(byte[] bitmapData, byte[] screenData, byte[] colorRam) {
-    const int width = FixedWidth;
-    const int height = FixedHeight;
-    var rgb = new byte[width * height * 3];
+    for (var y = 0; y < FixedHeight; ++y)
+      for (var sx = 0; sx < stored; ++sx) {
+        var column = sx + HiddenStoredPixels;
+        var cell = y / 8 * Columns + column / 4;
+        var pattern = (bitmap[cell * 8 + y % 8] >> ((3 - column % 4) * 2)) & 3;
 
-    // Background color derived from first screen byte
-    var backgroundColor = screenData.Length > 0 ? screenData[0] & 0x0F : 0;
-
-    for (var y = 0; y < height; ++y)
-      for (var x = 0; x < width; ++x) {
-        var cellX = x / 4;
-        var cellY = y / 8;
-        var cellIndex = cellY * 40 + cellX;
-        var byteInCell = y % 8;
-        var bitmapByte = bitmapData[cellIndex * 8 + byteInCell];
-        var pixelInByte = x % 4;
-        var bitValue = (bitmapByte >> ((3 - pixelInByte) * 2)) & 0x03;
-
-        // FLI uses per-scanline screen RAM: screenData[y * 40 + cellX]
-        var screenIndex = y * 40 + cellX;
-        var screenByte = screenIndex < screenData.Length ? screenData[screenIndex] : (byte)0;
-
-        var colorIndex = bitValue switch {
-          0 => backgroundColor,
-          1 => (screenByte >> 4) & 0x0F,
-          2 => screenByte & 0x0F,
-          3 => cellIndex < colorRam.Length ? colorRam[cellIndex] & 0x0F : 0,
-          _ => 0
+        // Which matrix speaks for this row is the whole of what FLI is.
+        var entry = screens[y % ScreenBankCount * BankSize + cell];
+        var index = pattern switch {
+          0 => Background,
+          1 => entry >> 4,
+          2 => entry & 0x0F,
+          _ => colorRam[cell] & 0x0F,
         };
 
-        var color = Commodore64Graphics.HexColors[colorIndex];
-        var offset = (y * width + x) * 3;
-        rgb[offset] = (byte)((color >> 16) & 0xFF);
-        rgb[offset + 1] = (byte)((color >> 8) & 0xFF);
-        rgb[offset + 2] = (byte)(color & 0xFF);
+        // Two bits a pixel, so each stored pixel is drawn twice.
+        indices[y * VisibleWidth + sx * 2] = (byte)index;
+        indices[y * VisibleWidth + sx * 2 + 1] = (byte)index;
       }
 
     return new() {
-      Width = width,
-      Height = height,
-      Format = PixelFormat.Rgb24,
-      PixelData = rgb,
+      Width = VisibleWidth,
+      Height = FixedHeight,
+      Format = PixelFormat.Indexed8,
+      PixelData = indices,
+      Palette = Commodore64Graphics.CreatePalette(),
+      PaletteCount = Commodore64Graphics.ColorCount,
     };
   }
 }

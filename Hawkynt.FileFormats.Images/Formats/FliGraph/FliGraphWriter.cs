@@ -1,37 +1,33 @@
-﻿using System;
+using System;
+using System.Buffers.Binary;
 
 namespace FileFormat.FliGraph;
 
-/// <summary>Assembles FLI Graph (FLI multicolor variant) image file bytes from a FliGraphFile.</summary>
+/// <summary>Assembles FLI Graph picture bytes.</summary>
 public static class FliGraphWriter {
 
   public static byte[] ToBytes(FliGraphFile file) {
-    ArgumentNullException.ThrowIfNull(file);
+    ArgumentNullException.ThrowIfNull(file.BitmapData);
+    ArgumentNullException.ThrowIfNull(file.Screens);
+    ArgumentNullException.ThrowIfNull(file.ColorRam);
 
-    var result = new byte[FliGraphFile.ExpectedFileSize];
-    var offset = 0;
+    var result = new byte[FliGraphFile.MinimumFileSize];
+    BinaryPrimitives.WriteUInt16LittleEndian(result, file.LoadAddress);
 
-    // Load address (2 bytes, little-endian)
-    result[offset] = (byte)(file.LoadAddress & 0xFF);
-    result[offset + 1] = (byte)(file.LoadAddress >> 8);
-    offset += FliGraphFile.LoadAddressSize;
+    file.ColorRam.AsSpan(0, Math.Min(file.ColorRam.Length, FliGraphFile.BankSize))
+      .CopyTo(result.AsSpan(FliGraphFile.ColorRamOffset));
 
-    // Bitmap data (8000 bytes)
-    file.BitmapData.AsSpan(0, FliGraphFile.BitmapDataSize).CopyTo(result.AsSpan(offset));
-    offset += FliGraphFile.BitmapDataSize;
+    for (var bank = 0; bank < FliGraphFile.ScreenBankCount; ++bank) {
+      var from = bank * FliGraphFile.BankSize;
+      if (from >= file.Screens.Length)
+        break;
 
-    // Per-scanline screen RAM (8000 bytes)
-    file.ScreenData.AsSpan(0, FliGraphFile.ScreenDataSize).CopyTo(result.AsSpan(offset));
-    offset += FliGraphFile.ScreenDataSize;
+      file.Screens.AsSpan(from, Math.Min(FliGraphFile.BankSize, file.Screens.Length - from))
+        .CopyTo(result.AsSpan(FliGraphFile.ScreensOffset + bank * FliGraphFile.BankStride));
+    }
 
-    // Color RAM (1000 bytes)
-    file.ColorRam.AsSpan(0, FliGraphFile.ColorRamSize).CopyTo(result.AsSpan(offset));
-    offset += FliGraphFile.ColorRamSize;
-
-    // Padding (472 bytes)
-    var paddingLength = Math.Min(file.Padding.Length, FliGraphFile.PaddingSize);
-    if (paddingLength > 0)
-      file.Padding.AsSpan(0, paddingLength).CopyTo(result.AsSpan(offset));
+    file.BitmapData.AsSpan(0, Math.Min(file.BitmapData.Length, FliGraphFile.BitmapDataSize))
+      .CopyTo(result.AsSpan(FliGraphFile.BitmapOffset));
 
     return result;
   }
