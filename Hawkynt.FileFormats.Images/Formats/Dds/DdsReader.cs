@@ -150,6 +150,11 @@ public static class DdsReader {
         return DdsFormat.Rgb;
     }
 
+    // One byte a pixel, flagged alpha-only or luminance-only. Both say the same thing about the
+    // bytes and neither was being looked at.
+    if ((pf.Flags & (DdsHeader.DDPF_ALPHA | DdsHeader.DDPF_LUMINANCE)) != 0 && pf.RGBBitCount == 8)
+      return DdsFormat.Single8;
+
     return DdsFormat.Unknown;
   }
 

@@ -48,6 +48,7 @@ public readonly record struct DdsFile : IImageFormatReader<DdsFile>, IImageToRaw
       DdsFormat.Bc7 => _DecodeBc(data, width, height, Bc7Decoder.DecodeImage),
       DdsFormat.Rgb => _DecodeUncompressed(data, width, height, file.ChannelOrder.ToPixelFormat(3), 3),
       DdsFormat.Rgba => _DecodeUncompressed(data, width, height, file.ChannelOrder.ToPixelFormat(4), 4),
+      DdsFormat.Single8 => _DecodeUncompressed(data, width, height, PixelFormat.Gray8, 1),
       _ => throw new NotSupportedException($"DDS format {file.Format} is not supported for conversion to RawImage.")
     };
   }

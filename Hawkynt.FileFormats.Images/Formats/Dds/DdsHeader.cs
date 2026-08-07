@@ -36,6 +36,8 @@ public readonly partial record struct DdsHeader(
  internal const int DDPF_ALPHAPIXELS = 0x1;
  internal const int DDPF_FOURCC = 0x4;
  internal const int DDPF_RGB = 0x40;
+ internal const int DDPF_ALPHA = 0x2;
+ internal const int DDPF_LUMINANCE = 0x20000;
 
  // Caps flags
  internal const int DDSCAPS_TEXTURE = 0x1000;
