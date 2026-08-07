@@ -518,3 +518,13 @@ Something sits between the bands: bytes 5008 and 5009 fall in that gap and move 
 respectively — one of them most of the picture, the other a single band's worth of the left edge.
 That is colour, or a display list, interleaved band by band with the bitmap rather than gathered into
 a block of its own, which is why every arrangement that assumes one contiguous bitmap has failed.
+
+The name says as much: UFLI is underlay FLI, where sprites cover the left of the screen. Byte 5009
+moves rows 40 to 47 across the leftmost 24 output columns, and 24 pixels is exactly a sprite. Three
+more bytes in the same gap — 5005, 5008 and 5011 — each move most of the picture, which is what a
+display list or a set of sprite pointers does.
+
+Within a band the bitmap is ordinary: eight bytes to a cell, one per row, cells eight bytes apart.
+Across bands it is not. Cells in one band come out 8, 8 and then 4 bytes apart depending on which
+byte is probed, so something of variable length sits between them, and until that is measured the
+band stride cannot be written down.
