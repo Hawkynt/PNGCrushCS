@@ -484,3 +484,18 @@ same nibble of the second moves 192 to 195.
 That still does not colour it. Two multicolour frames give sixteen states and the picture shows ten
 colours, and the closest arrangement tried is wrong in 37 per cent of pixels. Something positional
 remains and the file has no room left for it, which is where Mcs and FLI Graph also stand.
+
+### Multi-Lace: why the arithmetic will not close
+
+Flipping a whole block at a time gives each block's reach. Block two moves exactly 16384 pixels,
+which is its 2048 bytes at eight pixels each — four pixels of two bits, each drawn twice. Block one
+moves 16336, the same less the column it is shifted out of.
+
+The geometry is confirmed by stepping: eight bytes on moves eight columns, and 258 bytes on moves a
+band and sixteen cells, which is forty cells to a band and eight lines to a cell. Seven bands of
+forty cells at eight lines is 2240 entries and each block holds 2048, so the file is 192 entries
+short of the picture the reference tool draws — the bottom right of the last band has no data in it
+and is drawn anyway.
+
+So either the picture is not seven whole bands, or something outside the two blocks supplies both
+the missing corner and the colour. Both would be answered by a second sample, and there is only one.
