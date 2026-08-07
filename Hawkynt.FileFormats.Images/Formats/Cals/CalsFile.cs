@@ -55,7 +55,11 @@ public readonly record struct CalsFile() : IImageFormatReader<CalsFile>, IImageT
   /// defined the other way about, so what the coding calls a white run is ink on the page. Getting
   /// this backwards gives a clean negative and nothing else.
   /// </remarks>
-  private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
+  // Measured rather than reasoned. The note above argued from the CALS raster definition that a
+  // clear bit is ink; the only tool here that reads these draws every one of them the other way
+  // about, and does so for both samples, every pixel. A clean negative against the one available
+  // opinion is not a reading of the spec worth keeping.
+  private static readonly byte[] _BlackWhitePalette = [255, 255, 255, 0, 0, 0];
 
   public static RawImage ToRawImage(CalsFile file) => new() {
     Width = file.Width,

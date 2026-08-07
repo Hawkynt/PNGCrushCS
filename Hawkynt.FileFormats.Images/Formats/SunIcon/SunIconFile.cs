@@ -21,7 +21,8 @@ public readonly record struct SunIconFile : IImageFormatReader<SunIconFile>, IIm
   public byte[] PixelData { get; init; }
 
   // 1 = foreground (black), 0 = background (white)
-  private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
+  // Paper first: a Sun icon is a stencil on the page, so a clear bit is the page.
+  private static readonly byte[] _BlackWhitePalette = [255, 255, 255, 0, 0, 0];
 
   public static RawImage ToRawImage(SunIconFile file) => new() {
     Width = file.Width,

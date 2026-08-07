@@ -29,7 +29,9 @@ public readonly record struct NokiaLogoFile
 
   internal const int HeightOffset = 12;
 
-  private static readonly byte[] _BlackWhitePalette = [255, 255, 255, 0, 0, 0];
+  // Ink first, which is the opposite way round from its neighbours: the tool that reads these draws
+  // a clear bit black, every pixel of the sample.
+  private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
 
   static string IImageFormatMetadata<NokiaLogoFile>.PrimaryExtension => ".nol";
   static string[] IImageFormatMetadata<NokiaLogoFile>.FileExtensions => [".nol", ".ngg"];

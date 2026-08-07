@@ -25,7 +25,9 @@ public readonly record struct PrintfoxPagefoxFile : IImageFormatReader<PrintfoxP
   internal const int MinDataSize = BytesPerRow * FixedHeight;
 
   /// <summary>Black and white palette (2 entries, 3 bytes each).</summary>
-  private static readonly byte[] _BlackWhitePalette = [0, 0, 0, 255, 255, 255];
+  // Paper first. Both reference tools draw a clear bit white, every pixel of the sample, and two of
+  // them agreeing against us is a defect rather than an opinion.
+  private static readonly byte[] _BlackWhitePalette = [255, 255, 255, 0, 0, 0];
 
   /// <summary>Image width, always 320.</summary>
   public int Width => FixedWidth;

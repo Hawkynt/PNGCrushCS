@@ -57,7 +57,7 @@ public sealed class DataTypeTests {
 
   [Test]
   [Category("Unit")]
-  public void SunIconFile_ToRawImage_HasBlackWhitePalette() {
+  public void SunIconFile_ToRawImage_DrawsPaperFirst() {
     var file = new SunIconFile {
       Width = 8,
       Height = 1,
@@ -68,14 +68,14 @@ public sealed class DataTypeTests {
 
     Assert.That(raw.PaletteCount, Is.EqualTo(2));
     Assert.That(raw.Palette, Is.Not.Null);
-    // Index 0 = black (0,0,0)
-    Assert.That(raw.Palette![0], Is.EqualTo(0));
-    Assert.That(raw.Palette[1], Is.EqualTo(0));
-    Assert.That(raw.Palette[2], Is.EqualTo(0));
-    // Index 1 = white (255,255,255)
-    Assert.That(raw.Palette[3], Is.EqualTo(255));
-    Assert.That(raw.Palette[4], Is.EqualTo(255));
-    Assert.That(raw.Palette[5], Is.EqualTo(255));
+    // Paper first: an icon is a stencil on the page, so a clear bit is the page. The reference tool
+    // draws every pixel of the sample that way and this had it the other way round.
+    Assert.That(raw.Palette![0], Is.EqualTo(255));
+    Assert.That(raw.Palette[1], Is.EqualTo(255));
+    Assert.That(raw.Palette[2], Is.EqualTo(255));
+    Assert.That(raw.Palette[3], Is.EqualTo(0));
+    Assert.That(raw.Palette[4], Is.EqualTo(0));
+    Assert.That(raw.Palette[5], Is.EqualTo(0));
   }
 
   [Test]
