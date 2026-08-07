@@ -38,6 +38,7 @@ public sealed class MsxBsaveMarkerTests {
       foreach (var (extension, expected) in new[] {
         (".sc2", "MsxScreen2"), (".sc5", "MsxScreen5"),
         (".sc8", "MsxScreen8"), (".sr6", "GraphSaurus6"),
+        (".sr7", "GraphSaurus7"),
       }) {
         var candidates = FormatRegistry.DetectCandidatesFromExtension(extension);
         Assert.That(candidates.Count, Is.GreaterThan(0), extension);

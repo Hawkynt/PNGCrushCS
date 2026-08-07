@@ -43,6 +43,10 @@ public sealed class RecoilDecodeAgreementTests {
     new("Botticelli logo", ImageFormat.Botticelli, ".p4i", _BotticelliLogo),
     // No companion .PL5/.PL7 exists beside a temp file, so these also pin down that both sides fall
     // back to the same MSX2 startup palette.
+    // The Graph Saurus mode that was missing: Screen 5, 6, 8 and the interlaced Screen 7 were all
+    // here and plain Screen 7 was not. Drawn 512 by 424, because its pixels are half as tall as
+    // they are wide and a stored row covers two scanlines.
+    new("Graph Saurus Screen 7", ImageFormat.GraphSaurus7, ".sr7", _GraphSaurus7),
     new("MSX2 GL5", ImageFormat.MsxGl16, ".gl5", () => _Gl16(64, 48)),
     new("MSX2 SH5", ImageFormat.MsxGl16, ".sh5", () => _Gl16(32, 24)),
     new("MSX2 GL7", ImageFormat.MsxGl16, ".gl7", () => _Gl16(64, 48)),
@@ -2770,6 +2774,30 @@ public sealed class RecoilDecodeAgreementTests {
   }
 
   /// <summary>A sized-header 16-colour picture whose nibbles walk every palette entry.</summary>
+  /// <summary>
+  /// A Screen 7 picture using all sixteen colours, behind the BSAVE header that identifies it.
+  /// </summary>
+  /// <remarks>
+  /// Every nibble position is exercised, both halves of every byte, so a reader that has the two
+  /// pixels in a byte the wrong way round shows up as a picture in mirrored pairs rather than as a
+  /// picture that happens to look plausible.
+  /// </remarks>
+  private static byte[] _GraphSaurus7() {
+    const int width = 512, storedHeight = 212, bytesPerRow = width / 2;
+    var data = new byte[7 + bytesPerRow * storedHeight];
+
+    data[0] = 0xFE;
+    var last = bytesPerRow * storedHeight - 1;
+    data[3] = (byte)last;
+    data[4] = (byte)(last >> 8);
+
+    for (var row = 0; row < storedHeight; ++row)
+    for (var at = 0; at < bytesPerRow; ++at)
+      data[7 + row * bytesPerRow + at] = (byte)(((at + row) & 0x0F) << 4 | ((at * 3 + row) & 0x0F));
+
+    return data;
+  }
+
   private static byte[] _Gl16(int width, int height) {
     var data = new byte[4 + (width * height + 1) / 2];
     data[0] = (byte)width;
