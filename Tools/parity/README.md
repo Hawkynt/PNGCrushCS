@@ -574,7 +574,14 @@ and B0 minus B2 is (-16, 112, 66) — so they do not vary with the cell. Pattern
 two different values across the picture, which is what a per-cell colour looks like and is where the
 matrix entry most likely goes.
 
-What is left is the anchor: the differences between the registers are known and their absolute values
-are not, because every equation so far is a difference. One state whose two frames are known to show
-the same colour would fix them all. A reader built from the 944 states as a lookup table would score
-perfectly on this picture and fail on the next, so it has not been written.
+The anchor turned out to be in the header. Bytes 1 to 6 each move the whole picture, and setting one
+at a time and watching which patterns move identifies them: byte 3 drives pattern 01, byte 4 drives
+pattern 10, byte 5 drives pattern 11, and byte 1 moves everything, which is what a colour shared by
+both frames does. Solving the measured differences against the palette then names the hires frame's
+two colours outright — byte 1 where its bit is clear and byte 2 where it is set.
+
+Put together, that model is right in 81 per cent of pixels: the hires frame taking bytes 1 and 2, the
+multicolour frame taking byte 1 for pattern 00, byte 3 for 01, byte 4 for 10 and the per-cell matrix
+entry for 11, averaged without rounding. What the remaining fifth of the picture does with pattern 11
+is the last thing outstanding — byte 5 and the matrix entry both move it, and which wins where is not
+settled.
