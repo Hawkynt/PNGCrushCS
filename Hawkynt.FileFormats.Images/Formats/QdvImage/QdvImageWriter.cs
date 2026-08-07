@@ -1,26 +1,23 @@
-﻿using System;
+using System;
+using System.Buffers.Binary;
 
 namespace FileFormat.QdvImage;
 
-/// <summary>Assembles QDV image file bytes from a QdvImageFile.</summary>
+/// <summary>Assembles a QDV picture: the size, the palette, then a byte a pixel.</summary>
 public static class QdvImageWriter {
 
   public static byte[] ToBytes(QdvImageFile file) {
-    ArgumentNullException.ThrowIfNull(file);
+    var pixels = file.PixelData ?? [];
+    var result = new byte[QdvImageFile.PixelOffset + file.Width * file.Height];
 
-    var pixelDataSize = file.PixelData.Length;
-    var result = new byte[QdvImageFile.HeaderSize + pixelDataSize];
+    BinaryPrimitives.WriteUInt16BigEndian(result, (ushort)file.Width);
+    BinaryPrimitives.WriteUInt16BigEndian(result.AsSpan(2), (ushort)file.Height);
+    result[4] = file.HighestIndex;
 
-    result[0] = QdvImageFile.Magic[0];
-    result[1] = QdvImageFile.Magic[1];
-    result[2] = QdvImageFile.Magic[2];
-    result[3] = QdvImageFile.Magic[3];
-    BitConverter.TryWriteBytes(new Span<byte>(result, 4, 2), (ushort)file.Width);
-    BitConverter.TryWriteBytes(new Span<byte>(result, 6, 2), (ushort)file.Height);
-    BitConverter.TryWriteBytes(new Span<byte>(result, 8, 2), file.Bpp);
-    BitConverter.TryWriteBytes(new Span<byte>(result, 10, 2), file.Flags);
-
-    file.PixelData.AsSpan(0, pixelDataSize).CopyTo(result.AsSpan(QdvImageFile.HeaderSize));
+    (file.Palette ?? []).AsSpan(0, Math.Min((file.Palette ?? []).Length, QdvImageFile.PaletteSize))
+      .CopyTo(result.AsSpan(QdvImageFile.HeaderSize));
+    pixels.AsSpan(0, Math.Min(pixels.Length, file.Width * file.Height))
+      .CopyTo(result.AsSpan(QdvImageFile.PixelOffset));
 
     return result;
   }

@@ -1,15 +1,16 @@
-﻿using System;
+using System;
+using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.QdvImage;
 
-/// <summary>Reads QDV image files from bytes, streams, or file paths.</summary>
+/// <summary>Reads QDV pictures from bytes, streams, or file paths.</summary>
 public static class QdvImageReader {
 
   public static QdvImageFile FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
-      throw new FileNotFoundException("QDV file not found.", file.FullName);
+      throw new FileNotFoundException("QDV picture not found.", file.FullName);
 
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
@@ -21,39 +22,34 @@ public static class QdvImageReader {
       stream.ReadExactly(data);
       return FromBytes(data);
     }
+
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
     return FromBytes(ms.ToArray());
   }
 
   public static QdvImageFile FromSpan(ReadOnlySpan<byte> data) {
-
     if (data.Length < QdvImageFile.MinFileSize)
-      throw new InvalidDataException($"Data too small for a valid QDV file (need at least {QdvImageFile.MinFileSize} bytes, got {data.Length}).");
+      throw new InvalidDataException(
+        $"Data too small for a valid QDV file (need at least {QdvImageFile.MinFileSize} bytes, got {data.Length}).");
 
-    if (data[0] != QdvImageFile.Magic[0] || data[1] != QdvImageFile.Magic[1] || data[2] != QdvImageFile.Magic[2] || data[3] != QdvImageFile.Magic[3])
-      throw new InvalidDataException("Invalid QDV magic bytes.");
-
-    var header = QdvImageHeader.ReadFrom(data);
-    var width = header.Width;
-    var height = header.Height;
-    var bpp = header.Bpp;
-    var flags = header.Flags;
+    var width = BinaryPrimitives.ReadUInt16BigEndian(data);
+    var height = BinaryPrimitives.ReadUInt16BigEndian(data[2..]);
 
     if (width == 0 || height == 0)
       throw new InvalidDataException($"Invalid QDV dimensions: {width}x{height}.");
 
-    var pixelDataSize = data.Length - QdvImageFile.HeaderSize;
-    var pixelData = new byte[pixelDataSize];
-    if (pixelDataSize > 0)
-      data.Slice(QdvImageFile.HeaderSize, pixelDataSize).CopyTo(pixelData.AsSpan(0));
+    // Nothing in the file says what it is, so the size stated has to account for the whole of it.
+    var needed = QdvImageFile.PixelOffset + width * height;
+    if (data.Length != needed)
+      throw new InvalidDataException($"A {width}x{height} QDV picture is {needed} bytes, got {data.Length}.");
 
     return new() {
       Width = width,
       Height = height,
-      Bpp = bpp,
-      Flags = flags,
-      PixelData = pixelData,
+      HighestIndex = data[4],
+      Palette = data.Slice(QdvImageFile.HeaderSize, QdvImageFile.PaletteSize).ToArray(),
+      PixelData = data.Slice(QdvImageFile.PixelOffset, width * height).ToArray(),
     };
   }
 
