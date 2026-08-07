@@ -643,11 +643,31 @@ Against a corpus of 633 samples, one per extension, with RECOIL and XnView both 
 
 | | RECOIL | XnView |
 |---|---|---|
-| both read, we agree | 265 | 92 |
-| same picture, other colours | 48 | 25 |
-| both read, we differ | 40 | 56 |
-| it reads, we cannot | 44 | 49 |
-| only we read it | 125 | 305 |
+| both read, we agree | 310 | 85 |
+| same picture, other colours | 6 | 32 |
+| both read, we differ | 38 | 56 |
+| it reads, we cannot | 43 | 49 |
+| only we read it | 125 | 306 |
+
+Two of those columns moved a long way once the sweep stopped misreading the tools — see the note on
+depth above — and the XnView palette column moved the wrong way for the same reason, because seven
+samples had only ever agreed by accident.
+
+### The part of this that cannot go to zero
+
+Driving both tool columns to nought at once is not possible, and it is worth stating as arithmetic
+rather than discovering it one format at a time.
+
+Where both tools read the same file, they agree with each other on 40 samples and disagree on 43 —
+17 by palette and 26 by picture. So for 42 of the samples in the table above, matching one tool
+exactly guarantees differing from the other. That is 54 of the 224 discrepancy rows.
+
+The remaining 170 rows have no such conflict: 202 of the 247 disagreeing samples are read by only
+one of the two tools, so there is a single opinion to match and nothing to trade off against.
+
+The clearest example is the four-bit expansion. Blazing Paddles pictures come back from RECOIL with
+channels at multiples of 0x11 — 0xEE for a value of 14 — and from XnView at multiples of 0x10, so
+0xE0. Both are defensible readings of the same four bits and they cannot both be matched.
 
 And the conformance suite, with RECOIL and XnView configured:
 
