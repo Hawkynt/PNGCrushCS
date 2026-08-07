@@ -650,11 +650,18 @@ Against a corpus of 633 samples, one per extension, with RECOIL and XnView both 
 
 | | RECOIL | XnView |
 |---|---|---|
-| both read, we agree | 310 | 85 |
-| same picture, other colours | 6 | 32 |
+| both read, we agree | 314 | 96 |
+| same picture, other colours | 3 | 27 |
 | both read, we differ | 38 | 56 |
-| it reads, we cannot | 43 | 49 |
-| only we read it | 125 | 306 |
+| it reads, we cannot | 42 | 43 |
+| only we read it | 131 | 307 |
+
+The six disagreement figures started at 48/25, 40/56, 44/49 — 262 rows in all — and the depth fault
+above accounts for about a third of what has gone since. The rest is listed in the log: Cut Creator,
+FBM, MGR, PM, IT01 and the 16-bit X11 bitmap newly read; the Atari's brightest level corrected from
+white to 0xEE; its colour registers masked to the even luminances the chip actually has; four bilevel
+readers that drew their pages as negatives; and two formats already decoded correctly whose
+extension belonged to something else.
 
 Two of those columns moved a long way once the sweep stopped misreading the tools — see the note on
 depth above — and the XnView palette column moved the wrong way for the same reason, because seven
@@ -665,12 +672,19 @@ samples had only ever agreed by accident.
 Driving both tool columns to nought at once is not possible, and it is worth stating as arithmetic
 rather than discovering it one format at a time.
 
-Where both tools read the same file, they agree with each other on 40 samples and disagree on 43 —
-17 by palette and 26 by picture. So for 42 of the samples in the table above, matching one tool
-exactly guarantees differing from the other. That is 54 of the 224 discrepancy rows.
+Where both tools read the same file they often disagree with each other, and where they do, matching
+one exactly guarantees differing from the other. Counted directly against the current numbers — a row
+is locked when the *other* tool reads the same file and we already match that other tool — 35 of the
+209 remaining rows are locked and 174 are winnable:
 
-The remaining 170 rows have no such conflict: 202 of the 247 disagreeing samples are read by only
-one of the two tools, so there is a single opinion to match and nothing to trade off against.
+| | RECOIL | XnView |
+|---|---|---|
+| same picture, other colours | 3 winnable | 10 winnable, 17 locked |
+| both read, we differ | 36 winnable, 2 locked | 40 winnable, 16 locked |
+| it reads, we cannot | 42 winnable | 43 winnable |
+
+So the reachable floor for the two columns together is 174 rows away, not 209, and no amount of work
+moves the other 35.
 
 The clearest example is the four-bit expansion. Blazing Paddles pictures come back from RECOIL with
 channels at multiples of 0x11 — 0xEE for a value of 14 — and from XnView at multiples of 0x10, so
