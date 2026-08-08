@@ -15,7 +15,11 @@ namespace FileFormat.HardColorMap;
 /// run the chip.
 /// </remarks>
 public readonly record struct HardColorMapFile
-  : IImageFormatReader<HardColorMapFile>, IImageToRawImage<HardColorMapFile> {
+  : IImageFormatReader<HardColorMapFile>, IImageToRawImage<HardColorMapFile>,
+    IImageFromRawImage<HardColorMapFile>, IImageFormatWriter<HardColorMapFile> {
+
+  /// <summary>Colours the playfield alone draws: the background and three registers.</summary>
+  public const int PlayfieldColorCount = 4;
 
   /// <summary>Pixels across.</summary>
   public const int Width = 256;
@@ -48,6 +52,8 @@ public readonly record struct HardColorMapFile
   static string[] IImageFormatMetadata<HardColorMapFile>.FileExtensions => [".hcm"];
   static HardColorMapFile IImageFormatReader<HardColorMapFile>.FromSpan(ReadOnlySpan<byte> data)
     => HardColorMapReader.FromSpan(data);
+  static byte[] IImageFormatWriter<HardColorMapFile>.ToBytes(HardColorMapFile file)
+    => HardColorMapWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<HardColorMapFile>.VideoModes => [
     new("Hard Color Map", [(Width, Height)], [256])
   ];
@@ -110,6 +116,75 @@ public readonly record struct HardColorMapFile
       Format = PixelFormat.Rgb24,
       PixelData = Atari8BitGraphics.ApplyPalette(frame),
     };
+  }
+
+  /// <summary>Writes a picture as the playfield alone, with every sprite left empty.</summary>
+  /// <remarks>
+  /// The colour map the name refers to is eight objects at their widest being repositioned twice per
+  /// scanline, 192 times a frame. What a pixel then shows depends on which of them happen to cover
+  /// it and on the priority register's ranking, so choosing shapes and positions to make a wanted
+  /// picture is not a layout problem at all — it is a search over the chip's behaviour, and one this
+  /// decoder can only score rather than guide.
+  /// <para/>
+  /// So the sprites are left empty and the four colours the playfield draws by itself are used: the
+  /// background and three registers, at two screen pixels per stored pixel. That is a quarter of
+  /// what the format can show and all of what an encoder can be sure of.
+  /// </remarks>
+  public static HardColorMapFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var source = image.SampleTo(Width, Height);
+    var registers = Atari8BitGraphics.ChooseGr15Registers(
+      PixelConverter.Convert(source, PixelFormat.Bgra32).PixelData, Width * Height, PlayfieldColorCount);
+
+    var data = new byte[FileSize];
+    for (var i = 0; i < Signature.Length; ++i)
+      data[i] = (byte)Signature[i];
+
+    data[5] = 1;
+    data[7] = registers[0];
+    data[10] = registers[1];
+    data[11] = registers[2];
+    data[12] = registers[3];
+
+    var gtia = Atari8BitGraphics.Palette;
+    for (var y = 0; y < Height; ++y)
+    for (var column = 0; column < Columns; ++column) {
+      byte bits = 0;
+      for (var pixel = 0; pixel < 4; ++pixel)
+        bits |= (byte)(_ChoosePattern(source.PixelData, registers, gtia, y, (column * 4 + pixel) * 2)
+                       << (6 - (pixel << 1)));
+
+      data[PlayfieldOffset + (y << 5) + column] = bits;
+    }
+
+    return new() { Data = data, LeftSprite = 2, Priority = 0 };
+  }
+
+  /// <summary>The pattern whose register is nearest the two screen pixels it covers.</summary>
+  private static int _ChoosePattern(
+    ReadOnlySpan<byte> rgb, ReadOnlySpan<byte> registers, ReadOnlySpan<byte> gtia, int y, int x) {
+    var best = 0;
+    var bestCost = long.MaxValue;
+
+    for (var pattern = 0; pattern < PlayfieldColorCount; ++pattern) {
+      var entry = registers[pattern] * 3;
+      long cost = 0;
+
+      for (var offset = 0; offset < 2; ++offset) {
+        var at = (y * Width + x + offset) * 3;
+        long dr = rgb[at] - gtia[entry], dg = rgb[at + 1] - gtia[entry + 1], db = rgb[at + 2] - gtia[entry + 2];
+        cost += dr * dr + dg * dg + db * db;
+      }
+
+      if (cost >= bestCost)
+        continue;
+
+      bestCost = cost;
+      best = pattern;
+    }
+
+    return best;
   }
 
   /// <summary>The playfield is a plain 32-byte row per scanline.</summary>
