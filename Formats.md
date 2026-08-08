@@ -650,6 +650,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | STAD                    | .pac                                                 | Atari ST STAD packed image       | Y      | —      | —         | RW    | —   | —      | —         |
 | Stela RAW               | .hsi                                                 | Stela HSI raw image              | Y      | Y      | —         | —     | —   | —      | —         |
 | Sun Icon                | .icon                                                | Sun Microsystems icon (text)     | Y      | Y      | —         | —     | —   | —      | —         |
+| Sun TAAC                | .vff, .taac, .suniff                                 | Sun TAAC/Visualization bitmap    | Y      | —      | —         | —     | —   | R      | —         |
 | Sun Raster              | .ras, .rast, .sun, .rs                               | Sun Microsystems raster          | Y      | Y      | —         | RW    | —   | RW     | R         |
 | Super Hires             | .shi                                                 | C64 interlace hires              | Y      | —      | —         | R     | —   | —      | —         |
 | Super Hires Editor      | .she                                                 | C64 Super Hires Editor           | Y      | —      | —         | R     | —   | —      | —         |
