@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace FileFormat.Jpeg;
 
@@ -22,10 +23,13 @@ internal static class JpegManagedEncoder {
   /// <param name="optimizeHuffman">When true, performs two-pass optimal Huffman table construction.</param>
   /// <param name="isGrayscale">When true, <paramref name="rgbPixelData"/> is single-channel Gray8.</param>
   /// <param name="stripMetadata">When true, omits any preserved marker segments (always true for fresh encodes).</param>
+  /// <param name="metadataSegments">EXIF/XMP/IPTC/COM marker segments to embed (typically built by
+  /// <see cref="JpegMetadataCodec.ToMarkerSegments"/>). Ignored when <paramref name="stripMetadata"/> is true.</param>
   public static byte[] Encode(
     byte[] rgbPixelData, int width, int height,
     int quality, JpegMode mode, JpegSubsampling subsampling,
-    bool optimizeHuffman, bool isGrayscale, bool stripMetadata = true
+    bool optimizeHuffman, bool isGrayscale, bool stripMetadata = true,
+    IReadOnlyList<JpegMarkerSegment>? metadataSegments = null
   ) {
     ArgumentNullException.ThrowIfNull(rgbPixelData);
     ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
@@ -115,6 +119,8 @@ internal static class JpegManagedEncoder {
       ComponentData = componentData,
       RestartInterval = 0,
     };
+    if (metadataSegments != null)
+      image.MarkerSegments.AddRange(metadataSegments);
 
     return JpegCoefficientWriter.Write(image, mode, optimizeHuffman, stripMetadata);
   }
