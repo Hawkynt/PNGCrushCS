@@ -650,11 +650,11 @@ Against a corpus of 633 samples, one per extension, with RECOIL and XnView both 
 
 | | RECOIL | XnView |
 |---|---|---|
-| both read, we agree | 320 | 101 |
+| both read, we agree | 322 | 101 |
 | same picture, other colours | 3 | 27 |
 | both read, we differ | 38 | 56 |
-| it reads, we cannot | 36 | 38 |
-| only we read it | 136 | 313 |
+| it reads, we cannot | 34 | 38 |
+| only we read it | 136 | 315 |
 
 The six disagreement figures started at 48/25, 40/56, 44/49 — 262 rows in all — and the depth fault
 above accounts for about a third of what has gone since. The rest is listed in the log: Cut Creator,

@@ -29,11 +29,24 @@ public readonly record struct AtariGrayscale9File
   /// <summary>Size of the screen section.</summary>
   public const int ScreenDataSize = BytesPerRow * ScreenRows;
 
-  /// <summary>Total file size.</summary>
+  /// <summary>Total file size of the single-screen form.</summary>
   public const int FileSize = HeaderSize + ScreenDataSize;
 
-  /// <summary>Displayed width.</summary>
+  /// <summary>
+  /// Total file size of the wide form: two screens, the left half of every row and then the right.
+  /// </summary>
+  /// <remarks>
+  /// Both samples here are this. Only the single-screen length was accepted, so both were refused
+  /// for being twice as long as a picture — when they are two pictures side by side and the second
+  /// half of row nought sits at 7680, which is what gave it away.
+  /// </remarks>
+  public const int WideFileSize = HeaderSize + ScreenDataSize * 2;
+
+  /// <summary>Displayed width of the single-screen form.</summary>
   public const int DisplayWidth = 320;
+
+  /// <summary>Displayed width of the wide form.</summary>
+  public const int WideDisplayWidth = DisplayWidth * 2;
 
   /// <summary>Displayed height.</summary>
   public const int DisplayHeight = 192;
@@ -46,17 +59,28 @@ public readonly record struct AtariGrayscale9File
   static AtariGrayscale9File IImageFormatReader<AtariGrayscale9File>.FromSpan(ReadOnlySpan<byte> data) => AtariGrayscale9Reader.FromSpan(data);
   static byte[] IImageFormatWriter<AtariGrayscale9File>.ToBytes(AtariGrayscale9File file) => AtariGrayscale9Writer.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<AtariGrayscale9File>.VideoModes => [
-    new("Graphics 9", [(DisplayWidth, DisplayHeight)], [ColorCount])
+    new("Graphics 9", [(DisplayWidth, DisplayHeight)], [ColorCount]),
+    new("Graphics 9, two screens wide", [(WideDisplayWidth, DisplayHeight)], [ColorCount]),
   ];
 
   /// <summary>Header bytes, preserved verbatim.</summary>
   public byte[] Header { get; init; }
 
-  /// <summary>Packed Graphics 9 screen.</summary>
+  /// <summary>Packed Graphics 9 screen; the left half of every row when a second screen follows.</summary>
   public byte[] ScreenData { get; init; }
 
+  /// <summary>The screen holding the right half of every row, or null in the single-screen form.</summary>
+  public byte[]? RightScreenData { get; init; }
+
+  /// <summary>Whether this is the wide form.</summary>
+  public bool IsWide => this.RightScreenData is { Length: > 0 };
+
   public static RawImage ToRawImage(AtariGrayscale9File file) {
-    var pixels = Atari8BitGraphics.UnpackGr9(file.ScreenData, 0, ScreenWidth, ScreenRows);
+    var wide = file.IsWide;
+    var displayWidth = wide ? WideDisplayWidth : DisplayWidth;
+    var left = Atari8BitGraphics.UnpackGr9(file.ScreenData, 0, ScreenWidth, ScreenRows);
+    var right = wide ? Atari8BitGraphics.UnpackGr9(file.RightScreenData!, 0, ScreenWidth, ScreenRows) : null;
+    var pixels = left;
 
     // Mode 9 renders 16 luminance steps of one hue; grey is the neutral choice without a
     // colour register to tell us which hue the artwork assumed.
@@ -68,13 +92,18 @@ public readonly record struct AtariGrayscale9File
       palette[level * 3 + 2] = v;
     }
 
-    var scaled = new byte[DisplayWidth * DisplayHeight];
+    // In the wide form the left screen holds the first 80 stored pixels of a row and the right
+    // screen the next 80, so the two sit side by side rather than being blended or interlaced.
+    var scaled = new byte[displayWidth * DisplayHeight];
     for (var y = 0; y < DisplayHeight; ++y)
-    for (var x = 0; x < DisplayWidth; ++x)
-      scaled[y * DisplayWidth + x] = pixels[y * ScreenRows / DisplayHeight * ScreenWidth + x * ScreenWidth / DisplayWidth];
+    for (var x = 0; x < displayWidth; ++x) {
+      var stored = x * ScreenWidth / DisplayWidth;
+      var row = y * ScreenRows / DisplayHeight * ScreenWidth;
+      scaled[y * displayWidth + x] = stored < ScreenWidth ? pixels[row + stored] : right![row + stored - ScreenWidth];
+    }
 
     return new() {
-      Width = DisplayWidth,
+      Width = displayWidth,
       Height = DisplayHeight,
       Format = PixelFormat.Indexed8,
       PixelData = scaled,

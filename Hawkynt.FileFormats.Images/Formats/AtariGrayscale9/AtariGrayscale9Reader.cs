@@ -28,9 +28,11 @@ public static class AtariGrayscale9Reader {
   }
 
   public static AtariGrayscale9File FromSpan(ReadOnlySpan<byte> data) {
-    // The format carries no signature; its fixed size is the only thing identifying it.
-    if (data.Length != AtariGrayscale9File.FileSize)
-      throw new InvalidDataException($"This format is exactly {AtariGrayscale9File.FileSize} bytes, got {data.Length}.");
+    // The format carries no signature; its fixed size is the only thing identifying it. There are
+    // two of those: one screen, or two side by side.
+    if (data.Length != AtariGrayscale9File.FileSize && data.Length != AtariGrayscale9File.WideFileSize)
+      throw new InvalidDataException(
+        $"This format is {AtariGrayscale9File.FileSize} bytes, or {AtariGrayscale9File.WideFileSize} for two screens side by side; got {data.Length}.");
 
     var header = new byte[AtariGrayscale9File.HeaderSize];
     data[..AtariGrayscale9File.HeaderSize].CopyTo(header);
@@ -38,7 +40,13 @@ public static class AtariGrayscale9Reader {
     var screen = new byte[AtariGrayscale9File.ScreenDataSize];
     data.Slice(AtariGrayscale9File.HeaderSize, AtariGrayscale9File.ScreenDataSize).CopyTo(screen);
 
-    return new() { Header = header, ScreenData = screen };
+    byte[]? right = null;
+    if (data.Length == AtariGrayscale9File.WideFileSize) {
+      right = new byte[AtariGrayscale9File.ScreenDataSize];
+      data.Slice(AtariGrayscale9File.HeaderSize + AtariGrayscale9File.ScreenDataSize, AtariGrayscale9File.ScreenDataSize).CopyTo(right);
+    }
+
+    return new() { Header = header, ScreenData = screen, RightScreenData = right };
   }
 
   public static AtariGrayscale9File FromBytes(byte[] data) {
