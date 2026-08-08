@@ -14,6 +14,10 @@ namespace FileFormat.Graph2FontScroll;
 /// It is the only format here whose entire content is a reference to other files. That is also why
 /// it can only be read from a path: given bytes alone there is nothing to resolve the names
 /// against, and the names are all there is.
+/// <para/>
+/// There is no writer for the same reason. A scroll holds no picture, so the bytes an encoder
+/// returned would decode to nothing at all — what would have to be written is a set of Graph2Font
+/// projects beside it, and a call that hands back one array of bytes has nowhere to put them.
 /// </remarks>
 public readonly record struct Graph2FontScrollFile
   : IImageFormatReader<Graph2FontScrollFile>, IImageToRawImage<Graph2FontScrollFile> {
