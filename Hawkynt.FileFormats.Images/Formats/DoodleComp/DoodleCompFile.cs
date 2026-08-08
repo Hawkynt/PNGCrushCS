@@ -4,7 +4,9 @@ using FileFormat.Core;
 namespace FileFormat.DoodleComp;
 
 /// <summary>In-memory representation of a Commodore 64 Doodle Compressed hires image.</summary>
-public readonly record struct DoodleCompFile : IImageFormatReader<DoodleCompFile>, IImageToRawImage<DoodleCompFile>, IImageFormatWriter<DoodleCompFile> {
+public readonly record struct DoodleCompFile
+  : IImageFormatReader<DoodleCompFile>, IImageToRawImage<DoodleCompFile>,
+    IImageFromRawImage<DoodleCompFile>, IImageFormatWriter<DoodleCompFile> {
 
   static string IImageFormatMetadata<DoodleCompFile>.PrimaryExtension => ".jj";
   static string[] IImageFormatMetadata<DoodleCompFile>.FileExtensions => [".jj"];
@@ -38,6 +40,9 @@ public readonly record struct DoodleCompFile : IImageFormatReader<DoodleCompFile
   /// <summary>The RLE escape byte used in Doodle compression.</summary>
   internal const byte RleEscapeByte = 0xFE;
 
+  /// <summary>Default load address: Doodle loads at $5C00 and its bitmap lands at $6000.</summary>
+  internal const ushort DefaultLoadAddress = 0x5C00;
+
   /// <summary>Image width, always 320.</summary>
   public int Width => FixedWidth;
 
@@ -56,5 +61,18 @@ public readonly record struct DoodleCompFile : IImageFormatReader<DoodleCompFile
   /// <summary>Converts this Doodle Compressed image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(DoodleCompFile file)
     => Commodore64Graphics.DecodeHires(file.BitmapData, file.ScreenRam, FixedWidth, FixedHeight);
+
+
+  /// <summary>Encodes a picture as a compressed Doodle, scaling it to 320x200 first.</summary>
+  public static DoodleCompFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(FixedWidth, FixedHeight).PixelData;
+    var bitmap = new byte[BitmapDataSize];
+    var screen = new byte[ScreenRamSize];
+    Commodore64Graphics.EncodeHires(rgb, FixedWidth, FixedHeight, bitmap, screen);
+
+    return new() { LoadAddress = DefaultLoadAddress, BitmapData = bitmap, ScreenRam = screen };
+  }
 
 }

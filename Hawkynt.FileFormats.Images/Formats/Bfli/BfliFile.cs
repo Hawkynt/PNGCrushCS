@@ -4,7 +4,9 @@ using FileFormat.Core;
 namespace FileFormat.Bfli;
 
 /// <summary>In-memory representation of a BFLI (Flexible Line Interpretation) image.</summary>
-public readonly record struct BfliFile : IImageFormatReader<BfliFile>, IImageToRawImage<BfliFile>, IImageFormatWriter<BfliFile> {
+public readonly record struct BfliFile
+  : IImageFormatReader<BfliFile>, IImageToRawImage<BfliFile>,
+    IImageFromRawImage<BfliFile>, IImageFormatWriter<BfliFile> {
 
   static string IImageFormatMetadata<BfliFile>.PrimaryExtension => ".bfl";
   static string[] IImageFormatMetadata<BfliFile>.FileExtensions => [".bfl", ".bfli"];
@@ -25,6 +27,9 @@ public readonly record struct BfliFile : IImageFormatReader<BfliFile>, IImageToR
 
   /// <summary>Size of the screen RAM section in bytes.</summary>
   internal const int ScreenRamSize = 1000;
+
+  /// <summary>Default load address, the one the program itself writes.</summary>
+  internal const ushort DefaultLoadAddress = 0x3C00;
 
   /// <summary>Image width, always 320.</summary>
   public int Width => FixedWidth;
@@ -80,6 +85,23 @@ public readonly record struct BfliFile : IImageFormatReader<BfliFile>, IImageToR
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
     };
+  }
+
+
+  /// <summary>Encodes a picture as BFLI, scaling it to 320x200 first.</summary>
+  /// <remarks>
+  /// Writes the two sections <see cref="ToRawImage"/> reads and nothing past them: the 8000-byte
+  /// bitmap and the video matrix after it. The decoder never looks further, so neither does this.
+  /// </remarks>
+  public static BfliFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(FixedWidth, FixedHeight).PixelData;
+    var raw = new byte[MinBitmapSize + ScreenRamSize];
+    Commodore64Graphics.EncodeHires(
+      rgb, FixedWidth, FixedHeight, raw.AsSpan(0, MinBitmapSize), raw.AsSpan(MinBitmapSize, ScreenRamSize));
+
+    return new() { LoadAddress = DefaultLoadAddress, RawData = raw };
   }
 
 }

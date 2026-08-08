@@ -5,7 +5,9 @@ using FileFormat.Core;
 namespace FileFormat.DoodlePacked;
 
 /// <summary>In-memory representation of a Doodle Packed (RLE-compressed C64 hires) image.</summary>
-public readonly record struct DoodlePackedFile : IImageFormatReader<DoodlePackedFile>, IImageToRawImage<DoodlePackedFile>, IImageFormatWriter<DoodlePackedFile> {
+public readonly record struct DoodlePackedFile
+  : IImageFormatReader<DoodlePackedFile>, IImageToRawImage<DoodlePackedFile>,
+    IImageFromRawImage<DoodlePackedFile>, IImageFormatWriter<DoodlePackedFile> {
 
   static string IImageFormatMetadata<DoodlePackedFile>.PrimaryExtension => ".dpk";
   static string[] IImageFormatMetadata<DoodlePackedFile>.FileExtensions => [".dpk"];
@@ -35,6 +37,9 @@ public readonly record struct DoodlePackedFile : IImageFormatReader<DoodlePacked
 
   /// <summary>Mask to extract the run count from an escape byte.</summary>
   internal const byte RleCountMask = 0x3F;
+
+  /// <summary>Default load address: Doodle loads at $5C00 and its bitmap lands at $6000.</summary>
+  internal const ushort DefaultLoadAddress = 0x5C00;
 
   /// <summary>C64 memory load address (2 bytes, little-endian).</summary>
   public ushort LoadAddress { get; init; }
@@ -131,4 +136,17 @@ public readonly record struct DoodlePackedFile : IImageFormatReader<DoodlePacked
 
     return output.ToArray();
   }
+
+  /// <summary>Encodes a picture as a packed Doodle, scaling it to 320x200 first.</summary>
+  public static DoodlePackedFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(ImageWidth, ImageHeight).PixelData;
+    var bitmap = new byte[BitmapDataSize];
+    var screen = new byte[ScreenDataSize];
+    Commodore64Graphics.EncodeHires(rgb, ImageWidth, ImageHeight, bitmap, screen);
+
+    return new() { LoadAddress = DefaultLoadAddress, BitmapData = bitmap, ScreenData = screen };
+  }
+
 }
