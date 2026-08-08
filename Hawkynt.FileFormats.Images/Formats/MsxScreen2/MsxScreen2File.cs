@@ -213,7 +213,7 @@ public sealed class MsxScreen2File
 
     return new() {
       PatternGenerator = patternGenerator, ColorTable = colorTable,
-      PatternNameTable = patternNameTable, HasBsaveHeader = false,
+      PatternNameTable = patternNameTable, HasBsaveHeader = true,
     };
   }
 
