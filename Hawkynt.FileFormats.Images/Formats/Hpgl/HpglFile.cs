@@ -46,7 +46,9 @@ public readonly record struct HpglFile : IImageFormatReader<HpglFile>, IImageToR
   ];
 
   static string IImageFormatMetadata<HpglFile>.PrimaryExtension => ".hpgl";
-  static string[] IImageFormatMetadata<HpglFile>.FileExtensions => [".hpgl", ".hgl", ".hpg", ".plt"];
+  // Not .plt, which plenty of plotter files do use but which PlotMaker already claims here. A
+  // second format on the same name would decide by whichever the registry happened to try first.
+  static string[] IImageFormatMetadata<HpglFile>.FileExtensions => [".hpgl", ".hgl", ".hpg"];
   static HpglFile IImageFormatReader<HpglFile>.FromSpan(ReadOnlySpan<byte> data) => HpglReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<HpglFile>.VideoModes => [
     new("Plot", [(IntegerRange.Any, IntegerRange.Any)], [16777216])
