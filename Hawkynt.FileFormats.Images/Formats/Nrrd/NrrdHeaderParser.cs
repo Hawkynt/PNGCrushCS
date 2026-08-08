@@ -43,6 +43,10 @@ internal static class NrrdHeaderParser {
     sb.Append("encoding: ").Append(_EncodingToString(file.Encoding)).Append('\n');
     sb.Append("endian: ").Append(file.Endian).Append('\n');
 
+    var kinds = _KindsFor(file.Sizes);
+    if (kinds != null)
+      sb.Append("kinds: ").Append(kinds).Append('\n');
+
     if (file.Spacings.Length > 0)
       sb.Append("spacings:").Append(_FormatDoubleArray(file.Spacings)).Append('\n');
 
@@ -52,6 +56,20 @@ internal static class NrrdHeaderParser {
     sb.Append('\n');
     return sb.ToString();
   }
+
+  /// <summary>What each axis measures, for the one case where saying nothing means the wrong thing.</summary>
+  /// <remarks>
+  /// A leading axis of three or four is colour here — that is how the decoder reads one back — but
+  /// the file has no way of saying so except this field, and a reader that does not see it has no
+  /// reason to think a 3 by 97 by 43 array is anything but a stack of three pictures. Every other
+  /// shape is two spatial axes, which is already what a missing <c>kinds</c> means, so nothing is
+  /// written for those.
+  /// </remarks>
+  private static string? _KindsFor(int[] sizes) => sizes.Length == 3 ? sizes[0] switch {
+    3 => "RGB-color domain domain",
+    4 => "RGBA-color domain domain",
+    _ => null
+  } : null;
 
   public static int FindDataOffset(byte[] data) {
     for (var i = 0; i < data.Length - 1; ++i)

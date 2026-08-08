@@ -55,4 +55,27 @@ public sealed class MetadataTests {
   public void ToRawImage_AttachesNoMetadataWhenThereAreNoLabels() {
     Assert.That(NrrdFile.ToRawImage(NrrdFile.FromRawImage(_Gray())).Metadata, Is.Null);
   }
+
+  [Test]
+  [Category("Unit")]
+  public void ToBytes_SaysWhichAxisHoldsTheColour() {
+    // Without the kinds field, a reader has no reason to think a 3 by w by h array is a picture
+    // rather than three of them.
+    var color = new RawImage {
+      Width = 4, Height = 3, Format = PixelFormat.Rgb24, PixelData = new byte[36]
+    };
+
+    var header = System.Text.Encoding.ASCII.GetString(NrrdWriter.ToBytes(NrrdFile.FromRawImage(color)), 0, 120);
+
+    Assert.That(header, Does.Contain("kinds: RGB-color domain domain"));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void ToBytes_SaysNothingAboutKindsForAPlainGreyPicture() {
+    // Two spatial axes is what a missing kinds field already means.
+    var header = System.Text.Encoding.ASCII.GetString(NrrdWriter.ToBytes(NrrdFile.FromRawImage(_Gray())), 0, 60);
+
+    Assert.That(header, Does.Not.Contain("kinds"));
+  }
 }
