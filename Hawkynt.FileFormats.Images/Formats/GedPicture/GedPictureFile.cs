@@ -16,7 +16,8 @@ namespace FileFormat.GedPicture;
 /// part way down the screen.
 /// </remarks>
 public readonly record struct GedPictureFile
-  : IImageFormatReader<GedPictureFile>, IImageToRawImage<GedPictureFile> {
+  : IImageFormatReader<GedPictureFile>, IImageToRawImage<GedPictureFile>,
+    IImageFromRawImage<GedPictureFile>, IImageFormatWriter<GedPictureFile> {
 
   /// <summary>Pixels across.</summary>
   public const int Width = 320;
@@ -55,6 +56,8 @@ public readonly record struct GedPictureFile
   static string[] IImageFormatMetadata<GedPictureFile>.FileExtensions => [".ged"];
   static GedPictureFile IImageFormatReader<GedPictureFile>.FromSpan(ReadOnlySpan<byte> data)
     => GedPictureReader.FromSpan(data);
+  static byte[] IImageFormatWriter<GedPictureFile>.ToBytes(GedPictureFile file)
+    => GedPictureWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<GedPictureFile>.VideoModes => [
     new("GED", [(Width, Height)], [256])
   ];
@@ -126,6 +129,19 @@ public readonly record struct GedPictureFile
       Format = PixelFormat.Rgb24,
       PixelData = Atari8BitGraphics.ApplyPalette(frame),
     };
+  }
+
+  /// <summary>Encodes a picture as a four-colour screen whose colours are rewritten as it is drawn.</summary>
+  /// <remarks>
+  /// No sprites, since a sprite is a shape rather than a colour and a picture reduced from pixels
+  /// has no shapes to give one. What is spent is the six colour rewrites a scanline gets, and the
+  /// one free register write a scanline may make — which goes to the background, turning a colour
+  /// the whole picture would otherwise share into one per scanline.
+  /// </remarks>
+  public static GedPictureFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    return GedPictureReader.FromBytes(GedPictureEncoder.Encode(image.SampleTo(Width, Height).PixelData));
   }
 
   /// <summary>Where a missile sits when the missiles form a playfield: just past the previous one.</summary>
