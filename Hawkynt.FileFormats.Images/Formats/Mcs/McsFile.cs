@@ -4,7 +4,9 @@ using FileFormat.Core;
 namespace FileFormat.Mcs;
 
 /// <summary>In-memory representation of a C64 Mcs (.mcs) multicolor screen image.</summary>
-public readonly record struct McsFile : IImageFormatReader<McsFile>, IImageToRawImage<McsFile>, IImageFormatWriter<McsFile> {
+public readonly record struct McsFile
+  : IImageFormatReader<McsFile>, IImageToRawImage<McsFile>,
+    IImageFromRawImage<McsFile>, IImageFormatWriter<McsFile> {
 
   static string IImageFormatMetadata<McsFile>.PrimaryExtension => ".mcs";
   static string[] IImageFormatMetadata<McsFile>.FileExtensions => [".mcs"];
@@ -22,6 +24,9 @@ public readonly record struct McsFile : IImageFormatReader<McsFile>, IImageToRaw
 
   /// <summary>Size of the load address in bytes.</summary>
   internal const int LoadAddressSize = 2;
+
+  /// <summary>Default load address, putting the bitmap at $2000.</summary>
+  internal const ushort DefaultLoadAddress = 0x2000;
 
   /// <summary>Size of the background color field in bytes.</summary>
   internal const int BackgroundColorSize = 1;
@@ -93,6 +98,31 @@ public readonly record struct McsFile : IImageFormatReader<McsFile>, IImageToRaw
       Height = height,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
+    };
+  }
+
+
+  /// <summary>Encodes a picture as an Mcs screen, scaling it to 160x200 first.</summary>
+  /// <remarks>
+  /// The background register is shared by the whole screen, so it goes to the picture's commonest
+  /// colour and every cell keeps all three of its own entries for what sets it apart.
+  /// </remarks>
+  public static McsFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(ImageWidth, ImageHeight).PixelData;
+    var bitmap = new byte[BitmapDataSize];
+    var screen = new byte[ScreenDataSize];
+    var color = new byte[ColorDataSize];
+    var background = Commodore64Graphics.EncodeMulticolor(rgb, ImageWidth, ImageHeight, bitmap, screen, color);
+
+    return new() {
+      LoadAddress = DefaultLoadAddress,
+      BitmapData = bitmap,
+      ScreenData = screen,
+      ColorData = color,
+      BackgroundColor = background,
+      TrailingData = [],
     };
   }
 

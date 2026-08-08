@@ -4,7 +4,9 @@ using FileFormat.Core;
 namespace FileFormat.Zoomatic;
 
 /// <summary>In-memory representation of a C64 Zoomatic (.zom) multicolor art image.</summary>
-public readonly record struct ZoomaticFile : IImageFormatReader<ZoomaticFile>, IImageToRawImage<ZoomaticFile>, IImageFormatWriter<ZoomaticFile> {
+public readonly record struct ZoomaticFile
+  : IImageFormatReader<ZoomaticFile>, IImageToRawImage<ZoomaticFile>,
+    IImageFromRawImage<ZoomaticFile>, IImageFormatWriter<ZoomaticFile> {
 
   static string IImageFormatMetadata<ZoomaticFile>.PrimaryExtension => ".zom";
   static string[] IImageFormatMetadata<ZoomaticFile>.FileExtensions => [".zom"];
@@ -22,6 +24,9 @@ public readonly record struct ZoomaticFile : IImageFormatReader<ZoomaticFile>, I
 
   /// <summary>Size of the load address in bytes.</summary>
   internal const int LoadAddressSize = 2;
+
+  /// <summary>Default load address, putting the bitmap at $2000.</summary>
+  internal const ushort DefaultLoadAddress = 0x2000;
 
   /// <summary>Minimum raw payload size: bitmap + screen + color.</summary>
   internal const int MinPayloadSize = BitmapDataSize + ScreenDataSize + ColorDataSize; // 10000
@@ -87,6 +92,31 @@ public readonly record struct ZoomaticFile : IImageFormatReader<ZoomaticFile>, I
       Height = height,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
+    };
+  }
+
+
+  /// <summary>Encodes a picture as a Zoomatic screen, scaling it to 160x200 first.</summary>
+  /// <remarks>
+  /// The background register is shared by the whole screen, so it goes to the picture's commonest
+  /// colour and every cell keeps all three of its own entries for what sets it apart.
+  /// </remarks>
+  public static ZoomaticFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(ImageWidth, ImageHeight).PixelData;
+    var bitmap = new byte[BitmapDataSize];
+    var screen = new byte[ScreenDataSize];
+    var color = new byte[ColorDataSize];
+    var background = Commodore64Graphics.EncodeMulticolor(rgb, ImageWidth, ImageHeight, bitmap, screen, color);
+
+    return new() {
+      LoadAddress = DefaultLoadAddress,
+      BitmapData = bitmap,
+      ScreenData = screen,
+      ColorData = color,
+      BackgroundColor = background,
+      TrailingData = [],
     };
   }
 

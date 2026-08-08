@@ -4,7 +4,9 @@ using FileFormat.Core;
 namespace FileFormat.C128Multi;
 
 /// <summary>In-memory representation of a C128 multicolor image (10240 bytes: 8000 bitmap + 1000 screen + 1000 color + 240 spare).</summary>
-public readonly record struct C128MultiFile : IImageFormatReader<C128MultiFile>, IImageToRawImage<C128MultiFile>, IImageFormatWriter<C128MultiFile> {
+public readonly record struct C128MultiFile
+  : IImageFormatReader<C128MultiFile>, IImageToRawImage<C128MultiFile>,
+    IImageFromRawImage<C128MultiFile>, IImageFormatWriter<C128MultiFile> {
 
   static string IImageFormatMetadata<C128MultiFile>.PrimaryExtension => ".c1m";
   static string[] IImageFormatMetadata<C128MultiFile>.FileExtensions => [".c1m"];
@@ -87,6 +89,29 @@ public readonly record struct C128MultiFile : IImageFormatReader<C128MultiFile>,
       Height = PixelHeight,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
+    };
+  }
+
+
+  /// <summary>Encodes a picture as a C128 multicolour screen, scaling it to 160x200 first.</summary>
+  /// <remarks>
+  /// The background register is shared by the whole screen, so it goes to the picture's commonest
+  /// colour and every cell keeps all three of its own entries for what sets it apart.
+  /// </remarks>
+  public static C128MultiFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(PixelWidth, PixelHeight).PixelData;
+    var bitmap = new byte[BitmapDataSize];
+    var screen = new byte[ScreenDataSize];
+    var color = new byte[ColorDataSize];
+    var background = Commodore64Graphics.EncodeMulticolor(rgb, PixelWidth, PixelHeight, bitmap, screen, color);
+
+    return new() {
+      BitmapData = bitmap,
+      ScreenData = screen,
+      ColorData = color,
+      BackgroundColor = background,
     };
   }
 

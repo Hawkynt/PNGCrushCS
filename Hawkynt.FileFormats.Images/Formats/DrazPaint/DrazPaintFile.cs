@@ -5,7 +5,9 @@ using FileFormat.Core;
 namespace FileFormat.DrazPaint;
 
 /// <summary>In-memory representation of a DrazPaint multicolor image (.drz).</summary>
-public readonly record struct DrazPaintFile : IImageFormatReader<DrazPaintFile>, IImageToRawImage<DrazPaintFile>, IImageFormatWriter<DrazPaintFile> {
+public readonly record struct DrazPaintFile
+  : IImageFormatReader<DrazPaintFile>, IImageToRawImage<DrazPaintFile>,
+    IImageFromRawImage<DrazPaintFile>, IImageFormatWriter<DrazPaintFile> {
 
   static string IImageFormatMetadata<DrazPaintFile>.PrimaryExtension => ".drz";
   static string[] IImageFormatMetadata<DrazPaintFile>.FileExtensions => [".drz", ".drp"];
@@ -32,6 +34,9 @@ public readonly record struct DrazPaintFile : IImageFormatReader<DrazPaintFile>,
 
   /// <summary>Size of the load address in bytes.</summary>
   internal const int LoadAddressSize = 2;
+
+  /// <summary>Default load address, putting the bitmap at $2000.</summary>
+  internal const ushort DefaultLoadAddress = 0x2000;
 
   /// <summary>The escape byte used by DrazPaint RLE compression.</summary>
   internal const byte RleEscapeByte = 0x00;
@@ -145,4 +150,28 @@ public readonly record struct DrazPaintFile : IImageFormatReader<DrazPaintFile>,
 
     return output.ToArray();
   }
+
+  /// <summary>Encodes a picture as a DrazPaint screen, scaling it to 160x200 first.</summary>
+  /// <remarks>
+  /// The background register is shared by the whole screen, so it goes to the picture's commonest
+  /// colour and every cell keeps all three of its own entries for what sets it apart.
+  /// </remarks>
+  public static DrazPaintFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(FixedWidth, FixedHeight).PixelData;
+    var bitmap = new byte[BitmapDataSize];
+    var screen = new byte[ScreenRamSize];
+    var color = new byte[ColorRamSize];
+    var background = Commodore64Graphics.EncodeMulticolor(rgb, FixedWidth, FixedHeight, bitmap, screen, color);
+
+    return new() {
+      LoadAddress = DefaultLoadAddress,
+      BitmapData = bitmap,
+      ScreenRam = screen,
+      ColorRam = color,
+      BackgroundColor = background,
+    };
+  }
+
 }

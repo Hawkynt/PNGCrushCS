@@ -4,7 +4,9 @@ using FileFormat.Core;
 namespace FileFormat.MultiPainter;
 
 /// <summary>In-memory representation of a Commodore 64 Multi Painter image.</summary>
-public readonly record struct MultiPainterFile : IImageFormatReader<MultiPainterFile>, IImageToRawImage<MultiPainterFile>, IImageFormatWriter<MultiPainterFile> {
+public readonly record struct MultiPainterFile
+  : IImageFormatReader<MultiPainterFile>, IImageToRawImage<MultiPainterFile>,
+    IImageFromRawImage<MultiPainterFile>, IImageFormatWriter<MultiPainterFile> {
 
   static string IImageFormatMetadata<MultiPainterFile>.PrimaryExtension => ".mpt";
   static string[] IImageFormatMetadata<MultiPainterFile>.FileExtensions => [".mpt", ".mlt64"];
@@ -22,6 +24,9 @@ public readonly record struct MultiPainterFile : IImageFormatReader<MultiPainter
 
   /// <summary>Size of the load address in bytes.</summary>
   internal const int LoadAddressSize = 2;
+
+  /// <summary>Default load address, putting the bitmap at $2000.</summary>
+  internal const ushort DefaultLoadAddress = 0x2000;
 
   /// <summary>Size of the bitmap data section in bytes.</summary>
   internal const int BitmapDataSize = 8000;
@@ -66,5 +71,31 @@ public readonly record struct MultiPainterFile : IImageFormatReader<MultiPainter
   public static RawImage ToRawImage(MultiPainterFile file)
     => Commodore64Graphics.DecodeMulticolor(
       file.BitmapData, file.VideoMatrix, file.ColorRam, file.BackgroundColor, FixedWidth, FixedHeight);
+
+
+  /// <summary>Encodes a picture as a Multi Painter screen, scaling it to 160x200 first.</summary>
+  /// <remarks>
+  /// The background register is shared by the whole screen, so it goes to the picture's commonest
+  /// colour and every cell keeps all three of its own entries for what sets it apart.
+  /// </remarks>
+  public static MultiPainterFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(FixedWidth, FixedHeight).PixelData;
+    var bitmap = new byte[BitmapDataSize];
+    var screen = new byte[VideoMatrixSize];
+    var color = new byte[ColorRamSize];
+    var background = Commodore64Graphics.EncodeMulticolor(rgb, FixedWidth, FixedHeight, bitmap, screen, color);
+
+    return new() {
+      LoadAddress = DefaultLoadAddress,
+      BitmapData = bitmap,
+      VideoMatrix = screen,
+      ColorRam = color,
+      BorderColor = background,
+      BackgroundColor = background,
+      Padding = new byte[PaddingSize],
+    };
+  }
 
 }

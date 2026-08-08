@@ -4,7 +4,9 @@ using FileFormat.Core;
 namespace FileFormat.EmcEditor;
 
 /// <summary>In-memory representation of a Commodore 64 EMC Editor extended multicolor image.</summary>
-public readonly record struct EmcEditorFile : IImageFormatReader<EmcEditorFile>, IImageToRawImage<EmcEditorFile>, IImageFormatWriter<EmcEditorFile> {
+public readonly record struct EmcEditorFile
+  : IImageFormatReader<EmcEditorFile>, IImageToRawImage<EmcEditorFile>,
+    IImageFromRawImage<EmcEditorFile>, IImageFormatWriter<EmcEditorFile> {
 
   static string IImageFormatMetadata<EmcEditorFile>.PrimaryExtension => ".emc";
   static string[] IImageFormatMetadata<EmcEditorFile>.FileExtensions => [".emc"];
@@ -31,6 +33,9 @@ public readonly record struct EmcEditorFile : IImageFormatReader<EmcEditorFile>,
 
   /// <summary>Minimum payload size (bitmap + screen RAM + color RAM).</summary>
   internal const int MinPayloadSize = BitmapSize + ScreenRamSize + ColorRamSize;
+
+  /// <summary>Default load address, the one the program itself writes.</summary>
+  internal const ushort DefaultLoadAddress = 0x2000;
 
   /// <summary>Image width, always 160.</summary>
   public int Width => FixedWidth;
@@ -94,6 +99,28 @@ public readonly record struct EmcEditorFile : IImageFormatReader<EmcEditorFile>,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
     };
+  }
+
+
+  /// <summary>Encodes a picture as an EMC Editor screen, scaling it to 160x200 first.</summary>
+  /// <remarks>
+  /// The file has nowhere to keep a background colour and <see cref="ToRawImage"/> accordingly shows
+  /// black behind pattern 00, so encoding has to assume the same. That leaves a cell three colours
+  /// of its own on top of that black rather than four.
+  /// </remarks>
+  public static EmcEditorFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(FixedWidth, FixedHeight).PixelData;
+    var raw = new byte[MinPayloadSize];
+    Commodore64Graphics.EncodeMulticolor(
+      rgb, FixedWidth, FixedHeight,
+      raw.AsSpan(0, BitmapSize),
+      raw.AsSpan(BitmapSize, ScreenRamSize),
+      raw.AsSpan(BitmapSize + ScreenRamSize, ColorRamSize),
+      0);
+
+    return new() { LoadAddress = DefaultLoadAddress, RawData = raw };
   }
 
 }
