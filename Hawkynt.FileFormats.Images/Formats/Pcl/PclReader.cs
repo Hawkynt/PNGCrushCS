@@ -28,22 +28,10 @@ public static class PclReader {
   private const int _MaxOffset = 1 << 16;
 
   /// <summary>Black and white, which is what a printer starts in.</summary>
-  private static readonly byte[] _Bilevel = [255, 255, 255, 0, 0, 0];
+  private static readonly byte[] _Bilevel = PclFile.BilevelPalette;
 
-  /// <summary>
-  /// The eight-entry device RGB palette of <c>ESC*r3U</c>: black, red, green, yellow, blue,
-  /// magenta, cyan, white.
-  /// </summary>
-  private static readonly byte[] _DeviceRgb = [
-    0, 0, 0,
-    255, 0, 0,
-    0, 255, 0,
-    255, 255, 0,
-    0, 0, 255,
-    255, 0, 255,
-    0, 255, 255,
-    255, 255, 255
-  ];
+  /// <summary>The eight-entry device RGB palette of <c>ESC*r3U</c>.</summary>
+  private static readonly byte[] _DeviceRgb = PclFile.DeviceRgbPalette;
 
   /// <summary>
   /// The eight-entry device CMY palette of <c>ESC*r-3U</c>: white, cyan, magenta, blue, yellow,

@@ -41,16 +41,42 @@ namespace FileFormat.Pcl;
 /// No sample was available to check any of this against. The fixtures in the tests are jobs built
 /// byte by byte from the manual's own tables.
 /// <para/>
-/// It does not write.
+/// Writing emits the raster half and nothing else: a reset, the resolution, the colour mode, the
+/// source size, the raster in TIFF packing and the end of it. Only the two colour modes the reader
+/// reads are available, because they are the only two a job can state without <c>ESC*v#W</c>, so a
+/// picture goes out either as black and white or on the eight-entry device palette — a grey takes the
+/// former, since that palette holds no greys and reducing one onto it would tint it.
 /// </remarks>
-public readonly record struct PclFile : IImageFormatReader<PclFile>, IImageToRawImage<PclFile> {
+public readonly record struct PclFile
+  : IImageFormatReader<PclFile>, IImageToRawImage<PclFile>,
+    IImageFromRawImage<PclFile>, IImageFormatWriter<PclFile> {
 
   /// <summary>The escape every command opens with.</summary>
   public const byte Escape = 0x1B;
 
+  /// <summary>Black and white, which is what a printer starts in and what <c>ESC*r1U</c> selects.</summary>
+  internal static byte[] BilevelPalette => [255, 255, 255, 0, 0, 0];
+
+  /// <summary>
+  /// The eight-entry device RGB palette of <c>ESC*r3U</c>: black, red, green, yellow, blue, magenta,
+  /// cyan, white. Plane one is the least significant bit of the index, which is what makes index one
+  /// red.
+  /// </summary>
+  internal static byte[] DeviceRgbPalette => [
+    0, 0, 0,
+    255, 0, 0,
+    0, 255, 0,
+    255, 255, 0,
+    0, 0, 255,
+    255, 0, 255,
+    0, 255, 255,
+    255, 255, 255
+  ];
+
   static string IImageFormatMetadata<PclFile>.PrimaryExtension => ".pcl";
   static string[] IImageFormatMetadata<PclFile>.FileExtensions => [".pcl", ".prn"];
   static PclFile IImageFormatReader<PclFile>.FromSpan(ReadOnlySpan<byte> data) => PclReader.FromSpan(data);
+  static byte[] IImageFormatWriter<PclFile>.ToBytes(PclFile file) => PclWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<PclFile>.VideoModes => [
     new("Bilevel", [(IntegerRange.Any, IntegerRange.Any)], [2]),
     new("Simple colour", [(IntegerRange.Any, IntegerRange.Any)], [8])
@@ -91,6 +117,41 @@ public readonly record struct PclFile : IImageFormatReader<PclFile>, IImageToRaw
       PixelData = file.PixelData,
       Palette = file.Palette,
       PaletteCount = file.PaletteCount
+    };
+  }
+
+  /// <summary>Reduces the picture to one of the two palettes a job can state on its own.</summary>
+  /// <remarks>
+  /// A grey goes out black and white. The eight-entry device palette holds black, white and six
+  /// saturated colours and no grey at all, so reducing a grey onto it would put red and cyan into a
+  /// photograph that had none; two levels is what a printer does with one anyway.
+  /// </remarks>
+  public static PclFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var bilevel = image.Format is PixelFormat.Gray8 or PixelFormat.Indexed1
+                  || image is { PaletteCount: > 0 and <= 2 };
+
+    if (bilevel)
+      return new() {
+        Width = image.Width,
+        Height = image.Height,
+        Planes = 1,
+        PixelData = BilevelRows.Threshold(image, setWhenDark: true),
+        Palette = BilevelPalette,
+        PaletteCount = 2
+      };
+
+    var palette = DeviceRgbPalette;
+    var indexed = image.EnsureIndexed(PixelFormat.Indexed8, palette);
+
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      Planes = 3,
+      PixelData = indexed.PixelData,
+      Palette = palette,
+      PaletteCount = 8
     };
   }
 }
