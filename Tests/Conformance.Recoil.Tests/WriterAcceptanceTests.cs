@@ -82,6 +82,11 @@ public sealed class WriterAcceptanceTests {
       + "own here",
     [ImageFormat.DegasIcon] = "the reference tool lists .icn as the Microsoft icon, which is a different format",
     [ImageFormat.Ice] = "the reference tool lists .icn as the Microsoft icon, which is a different format",
+    [ImageFormat.ChampionsInterlace] =
+      "the reference tool lists .cin as Cineon, which is a different format and one of its own here",
+    [ImageFormat.EsmSoftwarePix] =
+      "the reference tool lists .pix as the Alias/Wavefront one, which is a different format and one "
+      + "of its own here",
     [ImageFormat.IffPbm] =
       "the reference tool lists .pbm as the portable bitmap, which is a different format and one of "
       + "its own here, and knows no name for the Amiga one at all",

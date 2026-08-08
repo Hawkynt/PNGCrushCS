@@ -108,10 +108,12 @@ public sealed class Tim2ReaderTests {
       bw.Write(imageDataSize);
       bw.Write((ushort)Tim2PictureHeader.StructSize); // headerSize
       bw.Write((ushort)0); // paletteColors
-      bw.Write((byte)format);
+      // The image format, which every real file leaves at nought, and then the storage type in the
+      // fourth byte of the group — which is where a real .tm2 states 5 beside its 256-colour table.
+      bw.Write((byte)0);
       bw.Write((byte)1);  // mipmaps
       bw.Write((byte)0);  // paletteType
-      bw.Write((byte)0);  // imageType
+      bw.Write((byte)format);
       bw.Write((ushort)width);
       bw.Write((ushort)height);
       bw.Write((ulong)0); // GsTex0

@@ -37,10 +37,12 @@ public static class Tim2Writer {
         imageDataSize,
         Tim2PictureHeader.StructSize,
         (ushort)pic.PaletteColors,
-        (byte)pic.Format,
+        // The image format, which every real file leaves at nought; the storage type belongs in the
+        // fourth byte of this group and was being written into the first.
+        0,
         pic.MipmapCount,
-        0, // PaletteType
-        0, // ImageType
+        (byte)(pic.PaletteData is { Length: > 0 } ? 3 : 0),
+        (byte)pic.Format,
         (ushort)pic.Width,
         (ushort)pic.Height,
         0, // GsTex0

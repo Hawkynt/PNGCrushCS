@@ -75,7 +75,10 @@ public static class Tim2Reader {
       pictures.Add(new Tim2Picture {
         Width = picHeader.Width,
         Height = picHeader.Height,
-        Format = (Tim2Format)picHeader.PictureFormat,
+        // The storage type is the fourth byte of that group, not the first. The first is the image
+        // format, which every real file leaves at nought — so reading it there gave nought for a
+        // picture that plainly states 8-bit indexed with a 256-colour table beside it.
+        Format = (Tim2Format)picHeader.ImageType,
         MipmapCount = picHeader.Mipmaps,
         PixelData = pixelData,
         PaletteData = paletteData,

@@ -83,11 +83,15 @@ public sealed class Tim2WriterTests {
     var picHeaderOffset = Tim2Header.StructSize;
     var width = BitConverter.ToUInt16(bytes, picHeaderOffset + 20);
     var height = BitConverter.ToUInt16(bytes, picHeaderOffset + 22);
-    var format = bytes[picHeaderOffset + 16];
+    // The storage type is the fourth byte of its group, at 19, not the first at 16. A real .tm2
+    // leaves 16 at nought and states 5 at 19 beside a 256-colour table.
+    var imageFormat = bytes[picHeaderOffset + 16];
+    var storageType = bytes[picHeaderOffset + 19];
 
     Assert.That(width, Is.EqualTo(4));
     Assert.That(height, Is.EqualTo(2));
-    Assert.That(format, Is.EqualTo((byte)Tim2Format.Rgb32));
+    Assert.That(imageFormat, Is.EqualTo(0));
+    Assert.That(storageType, Is.EqualTo((byte)Tim2Format.Rgb32));
   }
 
   [Test]
