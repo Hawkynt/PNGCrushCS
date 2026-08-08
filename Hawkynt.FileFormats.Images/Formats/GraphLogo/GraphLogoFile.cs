@@ -12,7 +12,8 @@ namespace FileFormat.GraphLogo;
 /// alphabet.
 /// </remarks>
 public readonly record struct GraphLogoFile
-  : IImageFormatReader<GraphLogoFile>, IImageToRawImage<GraphLogoFile> {
+  : IImageFormatReader<GraphLogoFile>, IImageToRawImage<GraphLogoFile>,
+    IImageFromRawImage<GraphLogoFile>, IImageFormatWriter<GraphLogoFile> {
 
   /// <summary>Screen pixels across.</summary>
   public const int Width = 320;
@@ -42,6 +43,7 @@ public readonly record struct GraphLogoFile
   static string[] IImageFormatMetadata<GraphLogoFile>.FileExtensions => [".all"];
   static GraphLogoFile IImageFormatReader<GraphLogoFile>.FromSpan(ReadOnlySpan<byte> data)
     => GraphLogoReader.FromSpan(data);
+  static byte[] IImageFormatWriter<GraphLogoFile>.ToBytes(GraphLogoFile file) => GraphLogoWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<GraphLogoFile>.VideoModes => [
     new("Graph", [(Width, Height)], [5])
   ];
@@ -68,5 +70,120 @@ public readonly record struct GraphLogoFile
       Format = PixelFormat.Rgb24,
       PixelData = Atari8BitGraphics.ApplyPalette(frame),
     };
+  }
+
+  /// <summary>
+  /// Writes a picture as a mode 4 screen whose character set is redefined for every row.
+  /// </summary>
+  /// <remarks>
+  /// Redefining the set between rows is what the format exists for, and it is also what makes
+  /// encoding one easy: a row holds forty cells and a set holds 128 glyphs, so every cell in a row
+  /// can be given a glyph of its own and nothing has to be shared or approximated. Twenty-four sets
+  /// is what that costs, one per row.
+  /// <para/>
+  /// The colours are five registers for the whole screen, and a cell buys a sixth from its own high
+  /// bit: that bit draws the cell's highest pattern from PF3 rather than PF2. So each cell chooses
+  /// between two four-colour sets and is given whichever fits it better.
+  /// <para/>
+  /// A mode 4 pixel is two screen pixels wide, so the picture is stored at half the width it comes
+  /// back out at and every pair of columns shares a colour.
+  /// </remarks>
+  public static GraphLogoFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var source = image.SampleTo(Width, Height);
+    var gtia = Atari8BitGraphics.Palette;
+    var registers = Atari8BitGraphics.ChooseGr15Registers(
+      PixelConverter.Convert(source, PixelFormat.Bgra32).PixelData, Width * Height,
+      Atari8BitGraphics.Gr12RegisterCount);
+
+    var data = new byte[FontOffset + CharacterRows * FontSize + TrailerSize];
+    var screenOffset = FontOffset + CharacterRows * FontSize;
+
+    // PF0 to PF3 and then the background, which is the order the registers are poked in rather than
+    // the order a pattern indexes them.
+    for (var i = 0; i < Atari8BitGraphics.Gr12RegisterCount; ++i)
+      data[data.Length - 5 + i] = registers[(i + 1) % Atari8BitGraphics.Gr12RegisterCount];
+
+    for (var row = 0; row < CharacterRows; ++row) {
+      data[row] = (byte)row;
+
+      for (var column = 0; column < Columns; ++column) {
+        var glyph = FontOffset + row * FontSize + (column << 3);
+        var inverse = _ChooseInverse(source.PixelData, registers, gtia, row, column);
+        data[screenOffset + row * Columns + column] = (byte)(column | (inverse ? 128 : 0));
+
+        for (var y = 0; y < 8; ++y) {
+          byte bits = 0;
+          for (var pixel = 0; pixel < 4; ++pixel)
+            bits |= (byte)(_ChoosePattern(source.PixelData, registers, gtia, row * 8 + y,
+              column * 8 + pixel * 2, inverse) << (6 - (pixel << 1)));
+
+          data[glyph + y] = bits;
+        }
+      }
+    }
+
+    return new() { Data = data };
+  }
+
+  /// <summary>Whether a cell's highest pattern is better drawn from PF3 than from PF2.</summary>
+  private static bool _ChooseInverse(
+    ReadOnlySpan<byte> rgb, ReadOnlySpan<byte> registers, ReadOnlySpan<byte> gtia, int row, int column) {
+    long plain = 0, inverted = 0;
+
+    for (var y = row * 8; y < row * 8 + 8; ++y)
+    for (var x = column * 8; x < column * 8 + 8; x += 2) {
+      plain += _BestCost(rgb, registers, gtia, y, x, false);
+      inverted += _BestCost(rgb, registers, gtia, y, x, true);
+    }
+
+    return inverted < plain;
+  }
+
+  /// <summary>The pattern whose register is nearest the pixel, of the four a cell can draw.</summary>
+  private static int _ChoosePattern(
+    ReadOnlySpan<byte> rgb, ReadOnlySpan<byte> registers, ReadOnlySpan<byte> gtia, int y, int x, bool inverse) {
+    var best = 0;
+    var bestCost = long.MaxValue;
+
+    for (var pattern = 0; pattern < 4; ++pattern) {
+      var cost = _Cost(rgb, registers, gtia, y, x, pattern, inverse);
+      if (cost >= bestCost)
+        continue;
+
+      bestCost = cost;
+      best = pattern;
+    }
+
+    return best;
+  }
+
+  private static long _BestCost(
+    ReadOnlySpan<byte> rgb, ReadOnlySpan<byte> registers, ReadOnlySpan<byte> gtia, int y, int x, bool inverse) {
+    var best = long.MaxValue;
+    for (var pattern = 0; pattern < 4; ++pattern)
+      best = Math.Min(best, _Cost(rgb, registers, gtia, y, x, pattern, inverse));
+
+    return best;
+  }
+
+  /// <summary>
+  /// How far a pattern is from the two screen pixels it covers, a mode 4 pixel being two wide.
+  /// </summary>
+  private static long _Cost(
+    ReadOnlySpan<byte> rgb, ReadOnlySpan<byte> registers, ReadOnlySpan<byte> gtia, int y, int x, int pattern,
+    bool inverse) {
+    var register = pattern == 3 && inverse ? 4 : pattern;
+    var entry = (registers[register] & 254) * 3;
+    long cost = 0;
+
+    for (var offset = 0; offset < 2; ++offset) {
+      var at = (y * Width + x + offset) * 3;
+      long dr = rgb[at] - gtia[entry], dg = rgb[at + 1] - gtia[entry + 1], db = rgb[at + 2] - gtia[entry + 2];
+      cost += dr * dr + dg * dg + db * db;
+    }
+
+    return cost;
   }
 }
