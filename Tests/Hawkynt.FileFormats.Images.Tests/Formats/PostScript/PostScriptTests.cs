@@ -528,6 +528,10 @@ public sealed class PostScriptTests {
     // a colour on the page that the file never asked for.
     var failure = Assert.Throws<InvalidDataException>(() => _Draw("[/Separation /Spot /DeviceCMYK {}] setcolorspace 0 0 100 100 rectfill showpage\n"));
     Assert.That(failure!.Message, Does.Contain("Separation"));
+
+    // A CIE space has three components that are not red, green and blue. Taking them for those
+    // would come out looking plausible and wrong, which is the worst of the two failures.
+    Assert.Throws<InvalidDataException>(() => _Draw("[/CIEBasedABC << >>] setcolorspace 0 0 100 100 rectfill showpage\n"));
   }
 
   [Test]

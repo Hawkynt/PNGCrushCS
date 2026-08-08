@@ -437,8 +437,10 @@ public static class PostScriptGraphicsOperators {
   /// <summary>Which of the three device spaces a colour space object names.</summary>
   /// <remarks>
   /// The device spaces are the ones this can paint in. A space built on top of one of them — an
-  /// indexed palette, a separation, a CIE space — needs a lookup or a profile to turn a component
-  /// into ink, and guessing at that would put the wrong colour on the page, so it is refused.
+  /// indexed palette, a separation, a CIE space — needs a lookup, a tint transform or a white point
+  /// to turn a component into ink. A CIE space in particular has three components that are not red,
+  /// green and blue and would come out looking plausible and wrong if they were taken for them, so
+  /// every one of those is refused rather than approximated.
   /// </remarks>
   private static PsColourSpace _Space(PsObject value) {
     var name = value.Type switch {
@@ -448,8 +450,8 @@ public static class PostScriptGraphicsOperators {
     };
 
     return name switch {
-      "DeviceGray" or "G" or "CIEBasedA" => PsColourSpace.Gray,
-      "DeviceRGB" or "RGB" or "CIEBasedABC" => PsColourSpace.Rgb,
+      "DeviceGray" or "G" => PsColourSpace.Gray,
+      "DeviceRGB" or "RGB" => PsColourSpace.Rgb,
       "DeviceCMYK" or "CMYK" => PsColourSpace.Cmyk,
       _ => throw new PsUnsupportedException($"A PostScript program painted in the colour space {name}, which this reader has no way to turn into ink.")
     };
