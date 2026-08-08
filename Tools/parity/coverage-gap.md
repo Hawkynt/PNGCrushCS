@@ -8,8 +8,24 @@ A name here is a file we cannot open. That is counted and closed rather than exp
 the rendering differences in the report beside this, which are cases of the tool giving
 something up and are correct as they stand.
 
-**197 distinct extensions across 176 of its format names.** A few extensions are
-claimed by more than one of its names, so the rows below add up to more than that.
+**197 distinct extensions across 176 of its format names** when this was written. A few extensions
+are claimed by more than one of its names, so the rows below add up to more than that.
+
+**Fifteen are closed now and 161 remain.** Eight of the fifteen turned out to be one thing — a
+Windows DIB preview dropped inside a drawing or project file — and are read by a single reader
+rather than eight. IBM KIPS, the X11 puzzle, Synu and the Zoner brush were four more. The last three
+are wrappers around a picture format already here: ECC carries a PNG, LView Pro and IPSM each carry
+a JPEG, and all three state a size the payload agrees with, which is what identifies the file rather
+than a fixed offset guessed from one sample. Every one of the three was checked against ImageMagick
+on the extracted payload and matches it on every pixel.
+
+Of the 161 left, ten still have a sample here and the rest have none. That is what makes them hard
+rather than tedious: a format with no sample, no specification and no tool on this machine that
+reads it cannot be implemented without guessing a layout, and guessing has already been shown here
+to produce readers that score well on a sample of pixels and are wrong over the whole picture. The
+ten with samples are `afx`, `bmg`, `hru`, `pegs`, `pxa`, `tile`, `upe4`, `upst` and `vit`. Of those,
+`pe4` and `pst` are tiled — sixty separate JPEGs in one file — so they need the tiles assembled
+rather than the first one drawn, which is the mistake a signature search alone would make.
 
 The last column marks the ones XnView itself cannot load on this platform: its catalogue says
 Windows only, so nothing here has ever been able to compare against them either.
