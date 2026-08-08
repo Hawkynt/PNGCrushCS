@@ -126,6 +126,23 @@ public sealed class PngMetadataTests {
   }
 
   [Test]
+  public void ToRawImage_TruncatedItxtChunk_DoesNotThrow() {
+    // An iTXt body cut off right after the keyword's NUL (missing both the compression-flag and
+    // compression-method bytes the format requires) must be skipped, not crash the whole decode.
+    var truncated = "Comment\0"u8.ToArray(); // keyword + NUL, nothing else
+    var bytes = _BuildPngWithTrailingChunk("iTXt", truncated);
+
+    RawImage? roundTripped = null;
+    Assert.DoesNotThrow(() => roundTripped = PngFile.ToRawImage(PngReader.FromBytes(bytes)));
+    Assert.That(roundTripped!.Metadata is null || roundTripped.Metadata.TextEntries.Count == 0, Is.True);
+  }
+
+  private static byte[] _BuildPngWithTrailingChunk(string chunkType, byte[] data) {
+    var png = PngFile.FromRawImage(_TinyImage(null)) with { ChunksAfterIdat = [new PngChunk(chunkType, data)] };
+    return PngWriter.ToBytes(png);
+  }
+
+  [Test]
   public void ToRawImage_NoMetadataChunks_MetadataIsNull() {
     var bytes = PngWriter.ToBytes(PngFile.FromRawImage(_TinyImage(null)));
     var roundTripped = PngFile.ToRawImage(PngReader.FromBytes(bytes));

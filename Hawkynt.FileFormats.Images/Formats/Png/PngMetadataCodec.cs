@@ -166,7 +166,10 @@ internal static class PngMetadataCodec {
 
   private static TextMetadataEntry? _SplitInternationalTextChunk(byte[] data) {
     var pos = Array.IndexOf(data, (byte)0);
-    if (pos < 0 || pos + 2 > data.Length) return null;
+    // Need the keyword-terminating NUL plus both the compression-flag and compression-method bytes
+    // that immediately follow it — three bytes from pos, not two, or the method read below runs past
+    // the end of a truncated chunk.
+    if (pos < 0 || pos + 3 > data.Length) return null;
     var keyword = Encoding.Latin1.GetString(data, 0, pos);
     pos += 1;
     var compressionFlag = data[pos++];

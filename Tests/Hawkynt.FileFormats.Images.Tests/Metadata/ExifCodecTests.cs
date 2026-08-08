@@ -139,4 +139,21 @@ public sealed class ExifCodecTests {
     var orientation = parsed.Ifd0.Find(ExifData.TagOrientation);
     Assert.That(parsed.DecodeShort(orientation!), Is.EqualTo(1));
   }
+
+  [Test]
+  public void TryParse_HugeComponentCount_DoesNotThrow() {
+    // A corrupt/hostile Count field (here: 8 bytes/component * 0x30000000 components) overflows a
+    // 32-bit byte-length computation. It must be treated as "doesn't fit" and skipped, not crash.
+    var data = new byte[] {
+      (byte)'I', (byte)'I', 0x2A, 0x00, 0x08, 0x00, 0x00, 0x00, // header, IFD0 @ 8
+      0x01, 0x00,                                               // 1 entry
+      0x01, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x30, 0x00, 0x00, 0x00, 0x00, // tag=1 RATIONAL count=0x30000000
+      0x00, 0x00, 0x00, 0x00,                                   // next IFD = 0
+    };
+
+    ExifData? parsed = null;
+    Assert.DoesNotThrow(() => parsed = ExifCodec.TryParse(data));
+    Assert.That(parsed, Is.Not.Null);
+    Assert.That(parsed!.Ifd0.Entries, Has.Count.EqualTo(1));
+  }
 }
