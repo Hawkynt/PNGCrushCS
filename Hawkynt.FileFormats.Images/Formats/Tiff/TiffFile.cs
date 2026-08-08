@@ -11,7 +11,7 @@ public sealed class TiffFile :
   IMultiImageFileFormat<TiffFile>, IFormatChunkLayout<TiffFile> {
 
   static string IImageFormatMetadata<TiffFile>.PrimaryExtension => ".tiff";
-  static string[] IImageFormatMetadata<TiffFile>.FileExtensions => [".tif", ".tiff", ".ftf"];
+  static string[] IImageFormatMetadata<TiffFile>.FileExtensions => [".tif", ".tiff", ".ftf", ".stw"];
   static TiffFile IImageFormatReader<TiffFile>.FromSpan(ReadOnlySpan<byte> data) => TiffReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<TiffFile>.Capabilities => FormatCapability.HasDedicatedOptimizer | FormatCapability.MultiImage;
 
@@ -85,7 +85,7 @@ public sealed class TiffFile :
       case 1 when page.BitsPerSample == 8 && page.ColorMap != null:
         format = PixelFormat.Indexed8;
         palette = _ConvertTiffColorMap(page.ColorMap);
-        paletteCount = page.ColorMap.Length / 6;
+        paletteCount = page.ColorMap.Length / 3;
         break;
       case 1 when page.BitsPerSample == 8:
         format = PixelFormat.Gray8;
@@ -93,11 +93,20 @@ public sealed class TiffFile :
       case 1 when page.BitsPerSample == 16:
         format = PixelFormat.Gray16;
         break;
+      case 1 when page.BitsPerSample is 4 or 2:
+        return _FromShallowSamples(page.Width, page.Height, page.BitsPerSample, page.ColorMap, page.PixelData, null);
       case 1 when page.BitsPerSample == 1:
         format = PixelFormat.Indexed1;
-        palette = [0, 0, 0, 255, 255, 255];
+        palette = page.ColorMap is { Length: >= 6 } ? _ConvertTiffColorMap(page.ColorMap) : [0, 0, 0, 255, 255, 255];
         paletteCount = 2;
-        break;
+        return new() {
+          Width = page.Width,
+          Height = page.Height,
+          Format = format,
+          PixelData = _Unpad(page.PixelData, page.Width, page.Height, 1),
+          Palette = palette,
+          PaletteCount = paletteCount,
+        };
       default:
         throw new ArgumentException($"Unsupported TIFF page configuration: SamplesPerPixel={page.SamplesPerPixel}, BitsPerSample={page.BitsPerSample}.");
     }
@@ -110,6 +119,95 @@ public sealed class TiffFile :
       Palette = palette,
       PaletteCount = paletteCount,
     };
+  }
+
+  /// <summary>Builds a picture from samples narrower than a byte — one, two or four bits of index.</summary>
+  /// <remarks>
+  /// Four bits with a colour map is an ordinary way to store a small picture and was refused
+  /// outright, which is what kept every Neopaint stationery file out. Two bits has no format of its
+  /// own here, so its indices are widened to four and its palette padded to sixteen entries, which
+  /// draws the same picture.
+  /// </remarks>
+  private static RawImage _FromShallowSamples(int width, int height, int bitsPerSample, byte[]? colorMap, byte[] pixelData, ImageMetadata? metadata) {
+    var indices = _Unpad(pixelData, width, height, bitsPerSample);
+    if (bitsPerSample == 2)
+      indices = _WidenPairsToNibbles(indices, width, height);
+
+    byte[] palette;
+    if (colorMap is { Length: >= 3 }) {
+      palette = new byte[16 * 3];
+      colorMap.AsSpan(0, Math.Min(colorMap.Length, palette.Length)).CopyTo(palette);
+    } else {
+      // No colour map means a grey ramp over the depth the file states.
+      palette = new byte[16 * 3];
+      var levels = 1 << bitsPerSample;
+      for (var i = 0; i < levels; ++i) {
+        var value = (byte)(i * 255 / (levels - 1));
+        palette[i * 3] = palette[i * 3 + 1] = palette[i * 3 + 2] = value;
+      }
+    }
+
+    return new() {
+      Width = width,
+      Height = height,
+      Format = PixelFormat.Indexed4,
+      PixelData = indices,
+      Palette = palette,
+      PaletteCount = 16,
+      Metadata = metadata,
+    };
+  }
+
+  /// <summary>Drops the padding TIFF puts at the end of every row of sub-byte samples.</summary>
+  /// <remarks>
+  /// A TIFF row starts on a byte boundary, so a picture 381 pixels wide at four bits carries half a
+  /// byte of nothing at the end of each. The indexed formats here are a continuous bit stream with no
+  /// such gap, so leaving it in shears every row after the first.
+  /// </remarks>
+  private static byte[] _Unpad(byte[] pixelData, int width, int height, int bitsPerSample) {
+    var bytesPerRow = (width * bitsPerSample + 7) / 8;
+    var bitsPerRow = width * bitsPerSample;
+    if (bitsPerRow % 8 == 0 || height <= 1)
+      return pixelData[..];
+
+    var packed = new byte[(bitsPerRow * height + 7) / 8];
+    var bit = 0;
+    for (var row = 0; row < height; ++row) {
+      var rowStart = row * bytesPerRow;
+      for (var i = 0; i < bitsPerRow; ++i) {
+        var sourceBit = rowStart * 8 + i;
+        var sourceByte = sourceBit >> 3;
+        if (sourceByte >= pixelData.Length)
+          break;
+
+        if ((pixelData[sourceByte] & (0x80 >> (sourceBit & 7))) != 0)
+          packed[bit >> 3] |= (byte)(0x80 >> (bit & 7));
+
+        ++bit;
+      }
+    }
+
+    return packed;
+  }
+
+  /// <summary>Spreads two-bit indices one to a nibble so a four-bit palette can draw them.</summary>
+  private static byte[] _WidenPairsToNibbles(byte[] pairs, int width, int height) {
+    var total = width * height;
+    var widened = new byte[(total + 1) / 2];
+    for (var i = 0; i < total; ++i) {
+      var sourceBit = i * 2;
+      var sourceByte = sourceBit >> 3;
+      if (sourceByte >= pairs.Length)
+        break;
+
+      var index = (pairs[sourceByte] >> (6 - (sourceBit & 7))) & 0x03;
+      if ((i & 1) == 0)
+        widened[i >> 1] |= (byte)(index << 4);
+      else
+        widened[i >> 1] |= (byte)index;
+    }
+
+    return widened;
   }
 
   /// <summary>Builds a picture from a file whose samples are sixteen bits wide.</summary>
@@ -152,7 +250,7 @@ public sealed class TiffFile :
       case 1 when file.BitsPerSample == 8 && file.ColorMap != null:
         format = PixelFormat.Indexed8;
         palette = _ConvertTiffColorMap(file.ColorMap);
-        paletteCount = file.ColorMap.Length / 6;
+        paletteCount = file.ColorMap.Length / 3;
         break;
       case 1 when file.BitsPerSample == 8:
         format = PixelFormat.Gray8;
@@ -164,11 +262,21 @@ public sealed class TiffFile :
         return _FromDeepSamples(file, PixelFormat.Rgb24);
       case 4 when file.BitsPerSample == 16:
         return _FromDeepSamples(file, PixelFormat.Rgba32);
+      case 1 when file.BitsPerSample is 4 or 2:
+        return _FromShallowSamples(file.Width, file.Height, file.BitsPerSample, file.ColorMap, file.PixelData, file.Metadata);
       case 1 when file.BitsPerSample == 1:
         format = PixelFormat.Indexed1;
-        palette = [0, 0, 0, 255, 255, 255];
+        palette = file.ColorMap is { Length: >= 6 } ? _ConvertTiffColorMap(file.ColorMap) : [0, 0, 0, 255, 255, 255];
         paletteCount = 2;
-        break;
+        return new() {
+          Width = file.Width,
+          Height = file.Height,
+          Format = format,
+          PixelData = _Unpad(file.PixelData, file.Width, file.Height, 1),
+          Palette = palette,
+          PaletteCount = paletteCount,
+          Metadata = file.Metadata,
+        };
       default:
         throw new ArgumentException($"Unsupported TIFF configuration: SamplesPerPixel={file.SamplesPerPixel}, BitsPerSample={file.BitsPerSample}.", nameof(file));
     }
@@ -244,36 +352,28 @@ public sealed class TiffFile :
     };
   }
 
-  /// <summary>Converts TIFF ColorMap (16-bit interleaved R,G,B arrays) to RGB triplet palette.</summary>
-  private static byte[] _ConvertTiffColorMap(byte[] colorMap) {
-    var entryCount = colorMap.Length / 6;
-    var palette = new byte[entryCount * 3];
-    for (var i = 0; i < entryCount; ++i) {
-      // TIFF ColorMap: all reds (16-bit LE), then all greens, then all blues
-      palette[i * 3] = colorMap[i * 2 + 1];
-      palette[i * 3 + 1] = colorMap[entryCount * 2 + i * 2 + 1];
-      palette[i * 3 + 2] = colorMap[entryCount * 4 + i * 2 + 1];
-    }
+  /// <summary>Hands a stored colour map on as the RGB triplets everything either side of it holds.</summary>
+  /// <remarks>
+  /// <see cref="ColorMap"/> is eight-bit RGB triplets, one per palette entry. That is what
+  /// <see cref="TiffReader"/> builds from the file's three sixteen-bit arrays and what
+  /// <see cref="TiffWriter"/> and <see cref="TiffBinaryWriter"/> expand back into them. These two
+  /// converters alone treated it as the file's own layout — three sixteen-bit planes — so a palette
+  /// went out through one of them and came back scrambled: a third of the entries dropped for the
+  /// length being divided by six instead of three, and the survivors taking a green byte for a red.
+  /// Neither direction cancelled the other, so a palette TIFF read here and a palette TIFF written
+  /// here were both wrong, and against ImageMagick a 256-colour gradient missed 29% and 35% of its
+  /// pixels respectively.
+  /// </remarks>
+  private static byte[] _ConvertTiffColorMap(byte[] colorMap) => colorMap[..];
 
-    return palette;
-  }
-
-  /// <summary>Converts RGB triplet palette to TIFF ColorMap format (16-bit interleaved R,G,B arrays).</summary>
+  /// <summary>Takes the palette's RGB triplets as the colour map, trimmed to the entries in use.</summary>
   private static byte[] _ConvertToTiffColorMap(byte[]? palette, int paletteCount) {
     if (palette == null)
       throw new ArgumentException("Palette must not be null for indexed images.");
 
-    var colorMap = new byte[paletteCount * 6];
-    for (var i = 0; i < paletteCount; ++i) {
-      // TIFF ColorMap: all reds (16-bit LE), then all greens, then all blues
-      colorMap[i * 2] = 0;
-      colorMap[i * 2 + 1] = palette[i * 3];
-      colorMap[paletteCount * 2 + i * 2] = 0;
-      colorMap[paletteCount * 2 + i * 2 + 1] = palette[i * 3 + 1];
-      colorMap[paletteCount * 4 + i * 2] = 0;
-      colorMap[paletteCount * 4 + i * 2 + 1] = palette[i * 3 + 2];
-    }
-
+    var wanted = paletteCount * 3;
+    var colorMap = new byte[wanted];
+    palette.AsSpan(0, Math.Min(wanted, palette.Length)).CopyTo(colorMap);
     return colorMap;
   }
 }
