@@ -29,7 +29,7 @@ public static class NeroCoverDesignerReader {
   }
 
   public static NeroCoverDesignerFile FromSpan(ReadOnlySpan<byte> data) {
-    var (embedded, isPng) = WrappedPicture.Extract(data, NeroCoverDesignerFile.Magic, "a Nero cover");
+    var (embedded, isPng) = WrappedPicture.ExtractLargest(data, NeroCoverDesignerFile.Magic, "a Nero cover");
     return new() { Embedded = embedded, IsPng = isPng };
   }
 

@@ -77,6 +77,58 @@ internal static class WrappedPicture {
     return result;
   }
 
+  /// <summary>
+  /// Takes the largest picture out of a file that carries several, rather than the first.
+  /// </summary>
+  /// <remarks>
+  /// A document holds its pages' thumbnails as well as its artwork, and the thumbnails come first
+  /// because a file chooser wants them first. Taking the first picture drew an eighty-pixel square
+  /// where the artwork was thirteen hundred — a preview presented as the thing itself, which is the
+  /// one mistake this project refuses everywhere else.
+  /// <para/>
+  /// Largest by pixel count rather than by stored size, since a thumbnail stored without compression
+  /// can be the longer run of bytes.
+  /// </remarks>
+  internal static (byte[] Embedded, bool IsPng) ExtractLargest(ReadOnlySpan<byte> data, ReadOnlySpan<byte> magic, string formatName) {
+    if (data.Length <= magic.Length)
+      throw new InvalidDataException($"Data too small for {formatName} (got {data.Length} bytes).");
+
+    if (!data[..magic.Length].SequenceEqual(magic))
+      throw new InvalidDataException($"Not {formatName}: it does not open the way one does.");
+
+    byte[]? best = null;
+    var bestPng = false;
+    var bestPixels = -1L;
+
+    for (var at = magic.Length; at < data.Length;) {
+      var found = Find(data[at..], out var isPng);
+      if (found < 0)
+        break;
+
+      var start = at + found;
+      var candidate = data[start..].ToArray();
+
+      try {
+        var picture = Decode(candidate, isPng);
+        var pixels = (long)picture.Width * picture.Height;
+        if (pixels > bestPixels) {
+          bestPixels = pixels;
+          best = candidate;
+          bestPng = isPng;
+        }
+      } catch (Exception) {
+        // Three bytes that look like a signature and are not, which a scan is bound to meet.
+      }
+
+      at = start + 1;
+    }
+
+    if (best == null)
+      throw new InvalidDataException($"{formatName} carries an ordinary picture inside it; this file has none.");
+
+    return (best, bestPng);
+  }
+
   /// <summary>Takes the picture out of a file, having checked it opens the way the format does.</summary>
   internal static (byte[] Embedded, bool IsPng) Extract(ReadOnlySpan<byte> data, ReadOnlySpan<byte> magic, string formatName) {
     if (data.Length <= magic.Length)

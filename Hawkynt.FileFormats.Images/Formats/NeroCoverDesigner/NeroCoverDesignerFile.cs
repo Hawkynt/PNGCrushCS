@@ -15,7 +15,7 @@ public readonly record struct NeroCoverDesignerFile
     IImageFromRawImage<NeroCoverDesignerFile>, IImageFormatWriter<NeroCoverDesignerFile> {
 
   static string IImageFormatMetadata<NeroCoverDesignerFile>.PrimaryExtension => ".cde";
-  static string[] IImageFormatMetadata<NeroCoverDesignerFile>.FileExtensions => [".cde",".nct"];
+  static string[] IImageFormatMetadata<NeroCoverDesignerFile>.FileExtensions => [".cde", ".nct", ".ncd"];
   static NeroCoverDesignerFile IImageFormatReader<NeroCoverDesignerFile>.FromSpan(ReadOnlySpan<byte> data) => NeroCoverDesignerReader.FromSpan(data);
   static byte[] IImageFormatWriter<NeroCoverDesignerFile>.ToBytes(NeroCoverDesignerFile file) => NeroCoverDesignerWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<NeroCoverDesignerFile>.VideoModes => [
