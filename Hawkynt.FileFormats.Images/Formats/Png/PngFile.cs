@@ -98,6 +98,7 @@ public readonly record struct PngFile :
       Palette = palette,
       PaletteCount = paletteCount,
       AlphaTable = alphaTable,
+      Metadata = PngMetadataCodec.Read(file),
     };
   }
 
@@ -127,6 +128,14 @@ public readonly record struct PngFile :
         transparency = image.AlphaTable[..];
     }
 
+    List<PngChunk>? chunksBeforePlte = null;
+    List<PngChunk>? chunksAfterIdat = null;
+    if (image.Metadata is { IsEmpty: false } metadata) {
+      chunksBeforePlte = [];
+      chunksAfterIdat = [];
+      PngMetadataCodec.Apply(metadata, chunksBeforePlte, chunksAfterIdat);
+    }
+
     return new() {
       Width = image.Width,
       Height = image.Height,
@@ -136,6 +145,8 @@ public readonly record struct PngFile :
       Palette = palette,
       PaletteCount = paletteCount,
       Transparency = transparency,
+      ChunksBeforePlte = chunksBeforePlte is { Count: > 0 } ? chunksBeforePlte : null,
+      ChunksAfterIdat = chunksAfterIdat is { Count: > 0 } ? chunksAfterIdat : null,
     };
   }
 
