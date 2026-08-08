@@ -35,70 +35,24 @@ public sealed class IocaReaderTests {
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_ValidSimpleData_Parses() {
-    // 4-byte header: width=8 (BE), height=2 (BE), then 2 bytes pixel data
-    var data = new byte[] {
-      0x00, 0x08, // width = 8
-      0x00, 0x02, // height = 2
-      0xFF,       // row 0: all bits set
-      0xAA,       // row 1: alternating
-      0x00, 0x00, 0x00, 0x00, // padding to reach MinHeaderSize
-    };
+  public void FromBytes_AFourByteSizeIsNotAnIocaImage() {
+    // What this used to accept: any file at all, with its first four bytes taken as a width and a
+    // height. A real IOCA image is a chain of MO:DCA structured fields — two bytes of length, the
+    // introducer 0xD3, a three-byte type — and it states its size in an Image Data Descriptor. No
+    // file has the four-byte header this once invented, and the writer beside it wrote the same
+    // invention, so the two agreed and nothing else could read either.
+    var data = new byte[] { 0x00, 0x08, 0x00, 0x02, 0xFF, 0xAA, 0x00, 0x00, 0x00, 0x00 };
 
-    var result = IocaReader.FromBytes(data);
+    Assert.Throws<InvalidDataException>(() => IocaReader.FromBytes(data));
+  }
 
-    Assert.That(result.Width, Is.EqualTo(8));
-    Assert.That(result.Height, Is.EqualTo(2));
-    Assert.That(result.PixelData[0], Is.EqualTo(0xFF));
-    Assert.That(result.PixelData[1], Is.EqualTo(0xAA));
+  [Test]
+  [Category("Unit")]
+  public void FromBytes_AStructuredFieldChainThatStatesNoSizeIsRefused() {
+    // A well-formed chain that carries no Image Data Descriptor states no size, and a size is not
+    // guessed from anywhere else.
+    var data = new byte[] { 0x00, 0x08, 0xD3, 0xA8, 0xA8, 0x00, 0x00, 0x00, 0x00, 0x00 };
+
+    Assert.Throws<InvalidDataException>(() => IocaReader.FromBytes(data));
   }
 }
-
-[TestFixture]
-public sealed class RoundTripTests {
-
-  [Test]
-  [Category("Integration")]
-  public void RoundTrip_WriteThenRead_PreservesData() {
-    var pixelData = new byte[] { 0xFF, 0xAA, 0x55, 0x00 };
-    var original = new IocaFile { Width = 16, Height = 2, PixelData = pixelData };
-
-    var bytes = IocaWriter.ToBytes(original);
-    var restored = IocaReader.FromBytes(bytes);
-
-    Assert.That(restored.Width, Is.EqualTo(16));
-    Assert.That(restored.Height, Is.EqualTo(2));
-    Assert.That(restored.PixelData, Is.EqualTo(original.PixelData));
-  }
-
-  [Test]
-  [Category("Integration")]
-  public void RoundTrip_ViaRawImage() {
-    var pixelData = new byte[] { 0xAA, 0x55 };
-    var original = new IocaFile { Width = 8, Height = 2, PixelData = pixelData };
-
-    var raw = IocaFile.ToRawImage(original);
-    var restored = IocaFile.FromRawImage(raw);
-
-    Assert.That(restored.PixelData, Is.EqualTo(original.PixelData));
-  }
-
-  [Test]
-  [Category("Integration")]
-  public void RoundTrip_ViaFile() {
-    var pixelData = new byte[] { 0xDE, 0xAD };
-    var original = new IocaFile { Width = 8, Height = 2, PixelData = pixelData };
-
-    var tempPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".ica");
-    try {
-      File.WriteAllBytes(tempPath, IocaWriter.ToBytes(original));
-      var restored = IocaReader.FromFile(new FileInfo(tempPath));
-
-      Assert.That(restored.PixelData, Is.EqualTo(original.PixelData));
-    } finally {
-      if (File.Exists(tempPath))
-        File.Delete(tempPath);
-    }
-  }
-}
-

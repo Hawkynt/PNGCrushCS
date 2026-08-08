@@ -33,6 +33,14 @@ public static class BfliReader {
 
     var loadAddress = (ushort)(data[0] | (data[1] << 8));
 
+    // The address the file loads at, which is the only thing in it that says what it is. Without
+    // this any file longer than nine thousand bytes was accepted and drawn: handed a fax it
+    // reported a 320 by 200 picture, confidently and wrongly. Every sample carries 0x3BFF, and the
+    // address this format is documented to load at is 0x3C00, so both are taken and nothing else.
+    if (loadAddress is not (BfliFile.SampleLoadAddress or BfliFile.DefaultLoadAddress))
+      throw new InvalidDataException(
+        $"Not a BFLI picture: it loads at ${loadAddress:X4}, and one loads at ${BfliFile.SampleLoadAddress:X4} or ${BfliFile.DefaultLoadAddress:X4}.");
+
     var rawData = new byte[data.Length - BfliFile.LoadAddressSize];
     data.Slice(BfliFile.LoadAddressSize, rawData.Length).CopyTo(rawData.AsSpan(0));
 

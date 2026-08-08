@@ -31,6 +31,9 @@ public readonly record struct BfliFile
   /// <summary>Default load address, the one the program itself writes.</summary>
   internal const ushort DefaultLoadAddress = 0x3C00;
 
+  /// <summary>The address every sample here actually carries, which is one below the documented one.</summary>
+  internal const ushort SampleLoadAddress = 0x3BFF;
+
   /// <summary>Image width, always 320.</summary>
   public int Width => FixedWidth;
 

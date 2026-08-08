@@ -81,24 +81,13 @@ public static class IocaReader {
       }
     }
 
-    // Fallback: if no structured fields parsed, treat as raw with dimensions in first 4 bytes
-    if (width == 0 || height == 0) {
-      if (data.Length >= 4) {
-        width = (data[0] << 8) | data[1];
-        height = (data[2] << 8) | data[3];
-      }
-
-      if (width <= 0 || height <= 0)
-        throw new InvalidDataException("Could not determine image dimensions from IOCA data.");
-
-      var bytesPerRow = (width + 7) / 8;
-      var expectedSize = bytesPerRow * height;
-      pixelData = new byte[expectedSize];
-      var dataOffset = 4;
-      var copyLen = Math.Min(data.Length - dataOffset, expectedSize);
-      if (copyLen > 0)
-        data.Slice(dataOffset, copyLen).CopyTo(pixelData.AsSpan(0));
-    }
+    // No fallback. This used to take any file's first four bytes as a width and a height when it
+    // found no structured field, so every file of four bytes or more was drawn as something — which
+    // is not a lenient reader, it is a reader that cannot say no. A document that states no size in
+    // the fields the format defines is not one this can read.
+    if (width <= 0 || height <= 0 || pixelData == null)
+      throw new InvalidDataException(
+        "Not an IOCA image: no structured field in it states an image size, and the size is not guessed.");
 
     return new() { Width = width, Height = height, PixelData = pixelData ?? [] };
     }
