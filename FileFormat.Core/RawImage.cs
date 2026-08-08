@@ -26,6 +26,11 @@ public sealed class RawImage {
   /// <summary>Optional per-palette-entry alpha values. Used for PNG tRNS-style transparency on indexed images.</summary>
   public byte[]? AlphaTable { get; init; }
 
+  /// <summary>Optional EXIF/XMP/IPTC/ICC/DPI/text metadata carried alongside the pixels. <c>null</c>
+  /// means "the source format had none" or "the reader doesn't extract it" — never treat null as
+  /// license to fabricate a substitute.</summary>
+  public ImageMetadata? Metadata { get; init; }
+
   /// <summary>Whether this image uses an indexed pixel format.</summary>
   public bool IsIndexed => Format is PixelFormat.Indexed8 or PixelFormat.Indexed4 or PixelFormat.Indexed1 or PixelFormat.Indexed16;
 
