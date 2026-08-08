@@ -7,6 +7,18 @@ namespace FileFormat.Bmp;
 /// <summary>Reads BMP files from bytes, streams, or file paths.</summary>
 public static class BmpReader {
 
+  /// <summary><c>BI_JPEG</c>: the pixel data is a JPEG stream.</summary>
+  private const int _COMPRESSION_JPEG = 4;
+
+  /// <summary><c>BI_PNG</c>: the pixel data is a PNG stream.</summary>
+  private const int _COMPRESSION_PNG = 5;
+
+  /// <summary>The same thing written as the four letters <c>JPEG</c>, which is what Konica did.</summary>
+  private const int _COMPRESSION_JPEG_FOURCC = 0x4745504A;
+
+  /// <summary>The same thing written as the four letters <c>PNG </c>.</summary>
+  private const int _COMPRESSION_PNG_FOURCC = 0x20474E50;
+
   public static BmpFile FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
@@ -69,6 +81,14 @@ public static class BmpReader {
       colorsUsed = infoHeader.ColorsUsed;
       paletteEntrySize = 4;
     }
+
+    // Four and five say the pixel data is a whole JPEG or PNG stream rather than samples, and some
+    // writers spell them as the four letters instead of the number — Konica's .kqp holds JPEG there.
+    // Neither stream is one this reader undoes, and treating the bytes as samples anyway drew the
+    // markers and entropy-coded data as a band of noise above a black field and called it a picture.
+    if (bmpCompression is _COMPRESSION_JPEG or _COMPRESSION_PNG or _COMPRESSION_JPEG_FOURCC or _COMPRESSION_PNG_FOURCC)
+      throw new InvalidDataException(
+        $"A bitmap stating compression {bmpCompression} carries an embedded JPEG or PNG stream rather than samples.");
 
     var rowOrder = rawHeight < 0 ? BmpRowOrder.TopDown : BmpRowOrder.BottomUp;
     var height = Math.Abs(rawHeight);
