@@ -90,6 +90,7 @@ public sealed class WriterAcceptanceTests {
     [ImageFormat.DegasIcon] = "the reference tool lists .icn as the Microsoft icon, which is a different format",
     [ImageFormat.Ice] = "the reference tool lists .icn as the Microsoft icon, which is a different format",
     [ImageFormat.PsionPic] = "the reference tool lists .icn as the Microsoft icon, which is a different format",
+    [ImageFormat.AtariIce] = "the reference tool lists .icn as the Microsoft icon, which is a different format",
     [ImageFormat.ChampionsInterlace] =
       "the reference tool lists .cin as Cineon, which is a different format and one of its own here",
     [ImageFormat.AtariChampionsInterlace] =
