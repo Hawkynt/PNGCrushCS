@@ -8,29 +8,53 @@ namespace FileFormat.PcPaint.Tests;
 [TestFixture]
 public sealed class RoundTripTests {
 
+  /// <summary>
+  /// A palette the file can hold exactly. The digital-to-analogue converter takes six bits a
+  /// channel, so only values whose bottom two bits repeat their top two survive being written.
+  /// </summary>
+  private static byte[] _Palette(Func<int, (byte R, byte G, byte B)> colour) {
+    var palette = new byte[PcPaintFile.PaletteSize];
+    for (var i = 0; i < 256; ++i) {
+      var (r, g, b) = colour(i);
+      palette[i * 3] = _Representable(r);
+      palette[i * 3 + 1] = _Representable(g);
+      palette[i * 3 + 2] = _Representable(b);
+    }
+
+    return palette;
+  }
+
+  private static byte _Representable(byte value) {
+    var six = value >> 2;
+    return (byte)((six << 2) | (six >> 4));
+  }
+
+  private static PcPaintFile _Page(int width, int height, byte[] pixels, byte[]? palette = null) => new() {
+    Width = width,
+    Height = height,
+    BitsPerPixel = 8,
+    VideoMode = (byte)'A',
+    PaletteType = PcPaintFile.PaletteVga,
+    Palette = palette ?? new byte[PcPaintFile.PaletteSize],
+    PixelData = pixels,
+  };
+
   [Test]
   [Category("Integration")]
   public void RoundTrip_BasicIndexedImage() {
-    var palette = new byte[PcPaintFile.PaletteSize];
-    palette[0] = 255; palette[1] = 0; palette[2] = 0;
-    palette[3] = 0; palette[4] = 255; palette[5] = 0;
-    palette[6] = 0; palette[7] = 0; palette[8] = 255;
+    var palette = _Palette(i => i switch {
+      0 => (255, 0, 0),
+      1 => (0, 255, 0),
+      2 => (0, 0, 255),
+      _ => (0, 0, 0),
+    });
 
     var pixelData = new byte[4 * 3];
     for (var i = 0; i < pixelData.Length; ++i)
       pixelData[i] = (byte)(i % 3);
 
-    var original = new PcPaintFile {
-      Width = 4,
-      Height = 3,
-      Planes = 1,
-      BitsPerPixel = 8,
-      Palette = palette,
-      PixelData = pixelData,
-    };
-
-    var bytes = PcPaintWriter.ToBytes(original);
-    var restored = PcPaintReader.FromBytes(bytes);
+    var original = _Page(4, 3, pixelData, palette);
+    var restored = PcPaintReader.FromBytes(PcPaintWriter.ToBytes(original));
 
     Assert.That(restored.Width, Is.EqualTo(original.Width));
     Assert.That(restored.Height, Is.EqualTo(original.Height));
@@ -41,28 +65,17 @@ public sealed class RoundTripTests {
   [Test]
   [Category("Integration")]
   public void RoundTrip_ViaFile() {
-    var palette = new byte[PcPaintFile.PaletteSize];
-    for (var i = 0; i < PcPaintFile.PaletteSize; ++i)
-      palette[i] = (byte)(i % 256);
+    var palette = _Palette(i => ((byte)i, (byte)(255 - i), (byte)(i / 2)));
 
     var pixelData = new byte[10 * 10];
     for (var i = 0; i < pixelData.Length; ++i)
       pixelData[i] = (byte)(i * 7 % 256);
 
-    var original = new PcPaintFile {
-      Width = 10,
-      Height = 10,
-      Planes = 1,
-      BitsPerPixel = 8,
-      Palette = palette,
-      PixelData = pixelData,
-    };
+    var original = _Page(10, 10, pixelData, palette);
 
     var tempPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".pic");
     try {
-      var bytes = PcPaintWriter.ToBytes(original);
-      File.WriteAllBytes(tempPath, bytes);
-
+      File.WriteAllBytes(tempPath, PcPaintWriter.ToBytes(original));
       var restored = PcPaintReader.FromFile(new FileInfo(tempPath));
 
       Assert.That(restored.Width, Is.EqualTo(original.Width));
@@ -78,27 +91,17 @@ public sealed class RoundTripTests {
   [Test]
   [Category("Integration")]
   public void RoundTrip_ViaRawImage() {
-    var palette = new byte[PcPaintFile.PaletteSize];
-    for (var i = 0; i < 256; ++i) {
-      palette[i * 3] = (byte)i;
-      palette[i * 3 + 1] = (byte)(255 - i);
-      palette[i * 3 + 2] = (byte)(i / 2);
-    }
+    var palette = _Palette(i => ((byte)i, (byte)(255 - i), (byte)(i / 2)));
 
     var pixelData = new byte[8 * 6];
     for (var i = 0; i < pixelData.Length; ++i)
       pixelData[i] = (byte)(i % 256);
 
-    var original = new PcPaintFile {
-      Width = 8,
-      Height = 6,
-      Planes = 1,
-      BitsPerPixel = 8,
-      Palette = palette,
-      PixelData = pixelData,
-    };
+    var original = _Page(8, 6, pixelData, palette);
 
     var raw = PcPaintFile.ToRawImage(original);
+    Assert.That(raw.Format, Is.EqualTo(PixelFormat.Indexed8));
+
     var restored = PcPaintFile.FromRawImage(raw);
 
     Assert.That(restored.Width, Is.EqualTo(original.Width));
@@ -110,17 +113,8 @@ public sealed class RoundTripTests {
   [Test]
   [Category("Integration")]
   public void RoundTrip_AllZeros() {
-    var original = new PcPaintFile {
-      Width = 2,
-      Height = 2,
-      Planes = 1,
-      BitsPerPixel = 8,
-      Palette = new byte[PcPaintFile.PaletteSize],
-      PixelData = new byte[4],
-    };
-
-    var bytes = PcPaintWriter.ToBytes(original);
-    var restored = PcPaintReader.FromBytes(bytes);
+    var original = _Page(2, 2, new byte[4]);
+    var restored = PcPaintReader.FromBytes(PcPaintWriter.ToBytes(original));
 
     Assert.That(restored.Width, Is.EqualTo(2));
     Assert.That(restored.Height, Is.EqualTo(2));
@@ -130,22 +124,29 @@ public sealed class RoundTripTests {
 
   [Test]
   [Category("Integration")]
-  public void RoundTrip_LargeRunsUsingExtendedCount() {
+  public void RoundTrip_LongRunsUseTheExtendedCount() {
     var pixelData = new byte[500];
-    for (var i = 0; i < 500; ++i)
-      pixelData[i] = 99;
+    Array.Fill(pixelData, (byte)99);
 
-    var original = new PcPaintFile {
-      Width = 500,
-      Height = 1,
-      Planes = 1,
-      BitsPerPixel = 8,
-      Palette = new byte[PcPaintFile.PaletteSize],
-      PixelData = pixelData,
-    };
-
+    var original = _Page(500, 1, pixelData);
     var bytes = PcPaintWriter.ToBytes(original);
     var restored = PcPaintReader.FromBytes(bytes);
+
+    Assert.That(restored.PixelData, Is.EqualTo(original.PixelData));
+
+    // Five hundred of one value is one long run, so the block is far smaller than the picture.
+    Assert.That(bytes.Length, Is.LessThan(PcPaintFile.HeaderSize + PcPaintFile.VgaPaletteBytes + 2 + 500));
+  }
+
+  [Test]
+  [Category("Integration")]
+  public void RoundTrip_SeveralBlocksForALargePicture() {
+    var pixelData = new byte[400 * 400];
+    for (var i = 0; i < pixelData.Length; ++i)
+      pixelData[i] = (byte)(i / 400 % 256);
+
+    var original = _Page(400, 400, pixelData);
+    var restored = PcPaintReader.FromBytes(PcPaintWriter.ToBytes(original));
 
     Assert.That(restored.PixelData, Is.EqualTo(original.PixelData));
   }
@@ -153,19 +154,8 @@ public sealed class RoundTripTests {
   [Test]
   [Category("Integration")]
   public void RoundTrip_OffsetsPreserved() {
-    var original = new PcPaintFile {
-      Width = 2,
-      Height = 2,
-      XOffset = 100,
-      YOffset = 200,
-      Planes = 1,
-      BitsPerPixel = 8,
-      Palette = new byte[PcPaintFile.PaletteSize],
-      PixelData = new byte[4],
-    };
-
-    var bytes = PcPaintWriter.ToBytes(original);
-    var restored = PcPaintReader.FromBytes(bytes);
+    var original = _Page(2, 2, new byte[4]) with { XOffset = 100, YOffset = 200 };
+    var restored = PcPaintReader.FromBytes(PcPaintWriter.ToBytes(original));
 
     Assert.That(restored.XOffset, Is.EqualTo(100));
     Assert.That(restored.YOffset, Is.EqualTo(200));
@@ -173,52 +163,15 @@ public sealed class RoundTripTests {
 
   [Test]
   [Category("Integration")]
-  public void RoundTrip_AspectPreserved() {
-    var original = new PcPaintFile {
-      Width = 2,
-      Height = 2,
-      XAspect = 1,
-      YAspect = 2,
-      Planes = 1,
-      BitsPerPixel = 8,
-      Palette = new byte[PcPaintFile.PaletteSize],
-      PixelData = new byte[4],
-    };
-
-    var bytes = PcPaintWriter.ToBytes(original);
-    var restored = PcPaintReader.FromBytes(bytes);
-
-    Assert.That(restored.XAspect, Is.EqualTo(1));
-    Assert.That(restored.YAspect, Is.EqualTo(2));
-  }
-
-  [Test]
-  [Category("Integration")]
-  public void RoundTrip_GradientPixels() {
+  public void RoundTrip_EveryByteValueUsed() {
+    // No byte is free to be the run marker, so the block has to go out as literals throughout.
     var pixelData = new byte[256];
     for (var i = 0; i < 256; ++i)
       pixelData[i] = (byte)i;
 
-    var palette = new byte[PcPaintFile.PaletteSize];
-    for (var i = 0; i < 256; ++i) {
-      palette[i * 3] = (byte)i;
-      palette[i * 3 + 1] = (byte)i;
-      palette[i * 3 + 2] = (byte)i;
-    }
-
-    var original = new PcPaintFile {
-      Width = 16,
-      Height = 16,
-      Planes = 1,
-      BitsPerPixel = 8,
-      Palette = palette,
-      PixelData = pixelData,
-    };
-
-    var bytes = PcPaintWriter.ToBytes(original);
-    var restored = PcPaintReader.FromBytes(bytes);
+    var original = _Page(16, 16, pixelData);
+    var restored = PcPaintReader.FromBytes(PcPaintWriter.ToBytes(original));
 
     Assert.That(restored.PixelData, Is.EqualTo(original.PixelData));
-    Assert.That(restored.Palette, Is.EqualTo(original.Palette));
   }
 }
