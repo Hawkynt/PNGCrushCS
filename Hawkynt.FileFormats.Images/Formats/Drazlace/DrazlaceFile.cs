@@ -5,7 +5,9 @@ using FileFormat.Core;
 namespace FileFormat.Drazlace;
 
 /// <summary>In-memory representation of a Drazlace interlace multicolor image (.dlp/.drl).</summary>
-public readonly record struct DrazlaceFile : IImageFormatReader<DrazlaceFile>, IImageToRawImage<DrazlaceFile>, IImageFormatWriter<DrazlaceFile> {
+public readonly record struct DrazlaceFile
+  : IImageFormatReader<DrazlaceFile>, IImageToRawImage<DrazlaceFile>,
+    IImageFromRawImage<DrazlaceFile>, IImageFormatWriter<DrazlaceFile> {
 
   static string IImageFormatMetadata<DrazlaceFile>.PrimaryExtension => ".dlp";
   static string[] IImageFormatMetadata<DrazlaceFile>.FileExtensions => [".dlp", ".drl"];
@@ -35,6 +37,9 @@ public readonly record struct DrazlaceFile : IImageFormatReader<DrazlaceFile>, I
 
   /// <summary>The escape byte used by Drazlace RLE compression.</summary>
   internal const byte RleEscapeByte = 0x00;
+
+  /// <summary>Default load address, the one the program itself writes.</summary>
+  internal const ushort DefaultLoadAddress = 0x5800;
 
   /// <summary>Image width, always 160.</summary>
   public int Width => FixedWidth;
@@ -163,4 +168,31 @@ public readonly record struct DrazlaceFile : IImageFormatReader<DrazlaceFile>, I
 
     return output.ToArray();
   }
+
+  /// <summary>Encodes a picture as a Drazlace pair, scaling it to 160x200 first.</summary>
+  /// <remarks>
+  /// Colour memory and the background register are shared, so only the bitmap and the video matrix
+  /// are stored twice — and both copies are identical, because <see cref="ToRawImage"/> reports the
+  /// average of the two fields and anything else comes back as a blend rather than the picture.
+  /// </remarks>
+  public static DrazlaceFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(FixedWidth, FixedHeight).PixelData;
+    var bitmap = new byte[BitmapDataSize];
+    var screen = new byte[ScreenRamSize];
+    var color = new byte[ColorRamSize];
+    var background = Commodore64Graphics.EncodeMulticolor(rgb, FixedWidth, FixedHeight, bitmap, screen, color);
+
+    return new() {
+      LoadAddress = DefaultLoadAddress,
+      BitmapData1 = bitmap,
+      ScreenRam1 = screen,
+      ColorRam = color,
+      BackgroundColor = background,
+      BitmapData2 = bitmap[..],
+      ScreenRam2 = screen[..],
+    };
+  }
+
 }

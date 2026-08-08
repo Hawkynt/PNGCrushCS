@@ -4,7 +4,9 @@ using FileFormat.Core;
 namespace FileFormat.HardInterlace;
 
 /// <summary>In-memory representation of a C64 Hard Interlace (.hip) image.</summary>
-public readonly record struct HardInterlaceFile : IImageFormatReader<HardInterlaceFile>, IImageToRawImage<HardInterlaceFile>, IImageFormatWriter<HardInterlaceFile> {
+public readonly record struct HardInterlaceFile
+  : IImageFormatReader<HardInterlaceFile>, IImageToRawImage<HardInterlaceFile>,
+    IImageFromRawImage<HardInterlaceFile>, IImageFormatWriter<HardInterlaceFile> {
 
   static string IImageFormatMetadata<HardInterlaceFile>.PrimaryExtension => ".hip";
   static string[] IImageFormatMetadata<HardInterlaceFile>.FileExtensions => [".hip"];
@@ -31,6 +33,9 @@ public readonly record struct HardInterlaceFile : IImageFormatReader<HardInterla
 
   /// <summary>Minimum payload size in bytes (bitmap1 + screen1 + bitmap2 + screen2).</summary>
   internal const int MinPayloadSize = FrameSize * 2;
+
+  /// <summary>Default load address, the one the program itself writes.</summary>
+  internal const ushort DefaultLoadAddress = 0x2000;
 
   /// <summary>Image width, always 320.</summary>
   public int Width => FixedWidth;
@@ -109,6 +114,25 @@ public readonly record struct HardInterlaceFile : IImageFormatReader<HardInterla
       colorIndex = bitValue == 1 ? 1 : 0;
 
     return Commodore64Graphics.HexColors[colorIndex];
+  }
+
+
+  /// <summary>Encodes a picture as a Hard Interlace pair, scaling it to 320x200 first.</summary>
+  /// <remarks>
+  /// Both fields get identical contents. Interlacing exists to mix colours the machine cannot show
+  /// at once, but <see cref="ToRawImage"/> reports the average of the two, so only a matching
+  /// pair reproduces the picture rather than a blend of two different ones.
+  /// </remarks>
+  public static HardInterlaceFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(FixedWidth, FixedHeight).PixelData;
+    var raw = new byte[MinPayloadSize];
+    Commodore64Graphics.EncodeHires(
+      rgb, FixedWidth, FixedHeight, raw.AsSpan(0, BitmapDataSize), raw.AsSpan(BitmapDataSize, ScreenRamSize));
+    raw.AsSpan(0, FrameSize).CopyTo(raw.AsSpan(FrameSize));
+
+    return new() { LoadAddress = DefaultLoadAddress, RawData = raw };
   }
 
 }

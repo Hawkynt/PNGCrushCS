@@ -4,7 +4,9 @@ using FileFormat.Core;
 namespace FileFormat.ChampionsInterlace;
 
 /// <summary>In-memory representation of a C64 Champions Interlace (.cin) multicolor interlace image.</summary>
-public readonly record struct ChampionsInterlaceFile : IImageFormatReader<ChampionsInterlaceFile>, IImageToRawImage<ChampionsInterlaceFile>, IImageFormatWriter<ChampionsInterlaceFile> {
+public readonly record struct ChampionsInterlaceFile
+  : IImageFormatReader<ChampionsInterlaceFile>, IImageToRawImage<ChampionsInterlaceFile>,
+    IImageFromRawImage<ChampionsInterlaceFile>, IImageFormatWriter<ChampionsInterlaceFile> {
 
   static string IImageFormatMetadata<ChampionsInterlaceFile>.PrimaryExtension => ".cin";
   static string[] IImageFormatMetadata<ChampionsInterlaceFile>.FileExtensions => [".cin"];
@@ -34,6 +36,9 @@ public readonly record struct ChampionsInterlaceFile : IImageFormatReader<Champi
 
   /// <summary>Minimum payload size (everything except load address).</summary>
   internal const int MinPayloadSize = FileSize - LoadAddressSize; // 19001
+
+  /// <summary>Default load address, the one the program itself writes.</summary>
+  internal const ushort DefaultLoadAddress = 0x2000;
 
   /// <summary>C64 memory load address (2 bytes, little-endian).</summary>
   public ushort LoadAddress { get; init; }
@@ -107,6 +112,33 @@ public readonly record struct ChampionsInterlaceFile : IImageFormatReader<Champi
     };
 
     return Commodore64Graphics.HexColors[colorIndex];
+  }
+
+
+  /// <summary>Encodes a picture as a Champions Interlace pair, scaling it to 160x200 first.</summary>
+  /// <remarks>
+  /// The fields share one colour memory and one background register and differ only in bitmap and
+  /// video matrix. Both are given the same contents: <see cref="ToRawImage"/> reports the average of
+  /// the two, so only a matching pair averages back to the picture handed in.
+  /// </remarks>
+  public static ChampionsInterlaceFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(ImageWidth, ImageHeight).PixelData;
+    var bitmap = new byte[BitmapDataSize];
+    var screen = new byte[ScreenDataSize];
+    var color = new byte[ColorDataSize];
+    var background = Commodore64Graphics.EncodeMulticolor(rgb, ImageWidth, ImageHeight, bitmap, screen, color);
+
+    return new() {
+      LoadAddress = DefaultLoadAddress,
+      Bitmap1 = bitmap,
+      Screen1 = screen,
+      ColorData = color,
+      Bitmap2 = bitmap[..],
+      Screen2 = screen[..],
+      BackgroundColor = background,
+    };
   }
 
 }
