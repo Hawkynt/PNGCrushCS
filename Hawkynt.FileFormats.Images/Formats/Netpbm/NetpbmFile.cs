@@ -9,7 +9,16 @@ namespace FileFormat.Netpbm;
 public readonly record struct NetpbmFile : IImageFormatReader<NetpbmFile>, IImageToRawImage<NetpbmFile>, IImageFromRawImage<NetpbmFile>, IImageFormatWriter<NetpbmFile> {
 
   static string IImageFormatMetadata<NetpbmFile>.PrimaryExtension => ".ppm";
-  static string[] IImageFormatMetadata<NetpbmFile>.FileExtensions => [".pbm", ".pgm", ".ppm", ".pnm", ".pam"];
+  /// <summary>
+  /// Every name Netpbm files are saved under, the plain ones and the explicit ones.
+  /// </summary>
+  /// <remarks>
+  /// The <c>r</c> forms say the samples are raw rather than ASCII and <c>ppma</c> says the opposite,
+  /// which the magic already states — P1 to P3 are the ASCII forms and P4 to P6 the raw ones — so
+  /// the reader needs no telling. They were simply never claimed, and a file saved under one of them
+  /// reached nothing at all.
+  /// </remarks>
+  static string[] IImageFormatMetadata<NetpbmFile>.FileExtensions => [".pbm", ".pgm", ".ppm", ".pnm", ".pam", ".ppma", ".rpbm", ".rpgm", ".rppm", ".rpnm"];
   static NetpbmFile IImageFormatReader<NetpbmFile>.FromSpan(ReadOnlySpan<byte> data) => NetpbmReader.FromSpan(data);
   static byte[] IImageFormatWriter<NetpbmFile>.ToBytes(NetpbmFile file) => NetpbmWriter.ToBytes(file);
 

@@ -7,7 +7,8 @@ namespace FileFormat.Viff;
 public readonly record struct ViffFile : IImageFormatReader<ViffFile>, IImageToRawImage<ViffFile>, IImageFromRawImage<ViffFile>, IImageFormatWriter<ViffFile> {
 
   static string IImageFormatMetadata<ViffFile>.PrimaryExtension => ".viff";
-  static string[] IImageFormatMetadata<ViffFile>.FileExtensions => [".viff", ".xv"];
+  /// <summary>Also <c>.vif</c>, the same Khoros file under a shorter name.</summary>
+  static string[] IImageFormatMetadata<ViffFile>.FileExtensions => [".viff", ".xv", ".vif"];
   static ViffFile IImageFormatReader<ViffFile>.FromSpan(ReadOnlySpan<byte> data) => ViffReader.FromSpan(data);
   static byte[] IImageFormatWriter<ViffFile>.ToBytes(ViffFile file) => ViffWriter.ToBytes(file);
 

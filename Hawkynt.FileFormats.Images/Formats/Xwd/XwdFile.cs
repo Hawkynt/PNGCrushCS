@@ -7,7 +7,8 @@ namespace FileFormat.Xwd;
 public readonly record struct XwdFile : IImageFormatReader<XwdFile>, IImageToRawImage<XwdFile>, IImageFromRawImage<XwdFile>, IImageFormatWriter<XwdFile> {
 
   static string IImageFormatMetadata<XwdFile>.PrimaryExtension => ".xwd";
-  static string[] IImageFormatMetadata<XwdFile>.FileExtensions => [".xwd"];
+  /// <summary>Also <c>.x11</c>, which is the same window dump under the system's name.</summary>
+  static string[] IImageFormatMetadata<XwdFile>.FileExtensions => [".xwd", ".x11"];
   static XwdFile IImageFormatReader<XwdFile>.FromSpan(ReadOnlySpan<byte> data) => XwdReader.FromSpan(data);
   static byte[] IImageFormatWriter<XwdFile>.ToBytes(XwdFile file) => XwdWriter.ToBytes(file);
   public int Width { get; init; }

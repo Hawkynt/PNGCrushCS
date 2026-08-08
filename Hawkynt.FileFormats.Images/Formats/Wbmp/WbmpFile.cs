@@ -8,7 +8,8 @@ namespace FileFormat.Wbmp;
 public readonly record struct WbmpFile : IImageFormatReader<WbmpFile>, IImageToRawImage<WbmpFile>, IImageFromRawImage<WbmpFile>, IImageFormatWriter<WbmpFile> {
 
   static string IImageFormatMetadata<WbmpFile>.PrimaryExtension => ".wbmp";
-  static string[] IImageFormatMetadata<WbmpFile>.FileExtensions => [".wbmp"];
+  /// <summary>Also the two abbreviations the wireless bitmap is saved under.</summary>
+  static string[] IImageFormatMetadata<WbmpFile>.FileExtensions => [".wbmp", ".wbm", ".wap"];
   static WbmpFile IImageFormatReader<WbmpFile>.FromSpan(ReadOnlySpan<byte> data) => WbmpReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<WbmpFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
   static byte[] IImageFormatWriter<WbmpFile>.ToBytes(WbmpFile file) => WbmpWriter.ToBytes(file);

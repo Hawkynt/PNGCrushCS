@@ -686,6 +686,27 @@ is locked when the *other* tool reads the same file and we already match that ot
 So the reachable floor for the two columns together is 165 rows away, not 200, and no amount of work
 moves the other 35.
 
+### Where a tool does not honour the format, we do not copy it
+
+A standing decision, so it is not revisited every time the numbers are read.
+
+Several of the remaining disagreements with XnView are not disagreements about what a file holds but
+about how much of it to honour, and in each the tool is the one giving something up:
+
+- it truncates the Atari ST palette where the arithmetic rounds, so a channel of 73 comes back as 72;
+- it does not crop the leftmost cells of an FLI picture, which the hardware cannot colour;
+- it does not correct the non-square pixels of the modes that have them;
+- it collapses the Spectrum's bright bit, drawing 0xCD and 0xFF as one value;
+- and twice it answers with a picture of the right size in flat black, having decoded nothing.
+
+None of that is copied here. The aim is to read a format as well as the format can be read, not to
+reproduce another program's shortcuts, so those rows stay counted as differences and are correct as
+they stand. RECOIL is the reference where two readings are both defensible — it rounds, it crops,
+it corrects — and where neither tool honours the format, the format wins.
+
+What this does *not* excuse is missing a format. A name we do not claim is a file we cannot open,
+whoever else can, and that is counted separately and closed.
+
 ### One more row that is not worth winning
 
 A Spectrum snapshot (.sna) is the only sample left where the arrangement is identical to the tool's

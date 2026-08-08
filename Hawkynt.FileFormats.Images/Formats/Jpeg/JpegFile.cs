@@ -11,7 +11,8 @@ public readonly record struct JpegFile :
   IFormatChunkLayout<JpegFile>, IFormatChunkRewriter<JpegFile>, IFormatChunkPlanRewriter<JpegFile> {
 
   static string IImageFormatMetadata<JpegFile>.PrimaryExtension => ".jpg";
-  static string[] IImageFormatMetadata<JpegFile>.FileExtensions => [".jpg", ".jpeg", ".jpe", ".jfif", ".jps", ".thm"];
+  /// <summary>Every name a JPEG is saved under, including the two shortest.</summary>
+  static string[] IImageFormatMetadata<JpegFile>.FileExtensions => [".jpg", ".jpeg", ".jpe", ".jfif", ".jps", ".thm", ".j", ".jif"];
   static JpegFile IImageFormatReader<JpegFile>.FromSpan(ReadOnlySpan<byte> data) => JpegReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<JpegFile>.Capabilities => FormatCapability.HasDedicatedOptimizer;
 

@@ -9,7 +9,8 @@ namespace FileFormat.SunRaster;
 public readonly record struct SunRasterFile : IImageFormatReader<SunRasterFile>, IImageToRawImage<SunRasterFile>, IImageFromRawImage<SunRasterFile>, IImageFormatWriter<SunRasterFile> {
 
   static string IImageFormatMetadata<SunRasterFile>.PrimaryExtension => ".ras";
-  static string[] IImageFormatMetadata<SunRasterFile>.FileExtensions => [".ras", ".sun", ".rast", ".rs"];
+  /// <summary>Also <c>.sr</c>, another abbreviation of the same Sun raster.</summary>
+  static string[] IImageFormatMetadata<SunRasterFile>.FileExtensions => [".ras", ".sun", ".rast", ".rs", ".sr"];
   static SunRasterFile IImageFormatReader<SunRasterFile>.FromSpan(ReadOnlySpan<byte> data) => SunRasterReader.FromSpan(data);
   static byte[] IImageFormatWriter<SunRasterFile>.ToBytes(SunRasterFile file) => SunRasterWriter.ToBytes(file);
   public int Width { get; init; }

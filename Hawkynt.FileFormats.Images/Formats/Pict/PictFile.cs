@@ -33,7 +33,8 @@ public readonly record struct PictFile : IImageFormatReader<PictFile>, IImageToR
   }
 
   static string IImageFormatMetadata<PictFile>.PrimaryExtension => ".pict";
-  static string[] IImageFormatMetadata<PictFile>.FileExtensions => [".pict", ".pct"];
+  /// <summary>Also <c>.pict2</c>, which is the same picture with its version in the name.</summary>
+  static string[] IImageFormatMetadata<PictFile>.FileExtensions => [".pict", ".pct", ".pict2"];
   static PictFile IImageFormatReader<PictFile>.FromSpan(ReadOnlySpan<byte> data) => PictReader.FromSpan(data);
   static byte[] IImageFormatWriter<PictFile>.ToBytes(PictFile file) => PictWriter.ToBytes(file);
   /// <summary>Image width in pixels.</summary>
