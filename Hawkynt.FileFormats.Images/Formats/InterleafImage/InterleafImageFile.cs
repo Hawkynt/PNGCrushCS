@@ -17,6 +17,7 @@ namespace FileFormat.InterleafImage;
 /// single clean picture. Only one sample exists, so the reader states the arithmetic it depends on
 /// and refuses anything the header does not account for exactly.
 /// </remarks>
+[FormatMagicBytes([0x89, 0x4F, 0x50, 0x53])]
 public readonly record struct InterleafImageFile
   : IImageFormatReader<InterleafImageFile>, IImageToRawImage<InterleafImageFile>,
     IImageFromRawImage<InterleafImageFile>, IImageFormatWriter<InterleafImageFile> {

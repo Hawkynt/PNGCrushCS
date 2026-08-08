@@ -47,7 +47,7 @@ public static class EclipseTileReader {
     var paddedWidth = BinaryPrimitives.ReadInt32BigEndian(data[EclipseTileFile.PaddedWidthAt..]);
     var paddedHeight = BinaryPrimitives.ReadInt32BigEndian(data[EclipseTileFile.PaddedHeightAt..]);
 
-    if (width < 1 || height < 1)
+    if (width < 1 || height < 1 || width > EclipseTileFile.LargestSide || height > EclipseTileFile.LargestSide)
       throw new InvalidDataException($"Invalid Eclipse tiled raster size: {width}x{height}.");
 
     if (channels is not (EclipseTileFile.RgbChannelCount or EclipseTileFile.CmykChannelCount))

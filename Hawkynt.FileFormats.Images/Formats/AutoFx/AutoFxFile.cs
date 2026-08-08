@@ -23,6 +23,7 @@ namespace FileFormat.AutoFx;
 /// Nothing is searched for: the reader goes where the header points and refuses the file unless a
 /// JPEG starts there and the arithmetic closes.
 /// </remarks>
+[FormatMagicBytes([0x89, 0x41, 0x46, 0x58, 0x0D, 0x0A, 0x1A, 0x0A])]
 public readonly record struct AutoFxFile
   : IImageFormatReader<AutoFxFile>, IImageToRawImage<AutoFxFile>,
     IImageFromRawImage<AutoFxFile>, IImageFormatWriter<AutoFxFile> {

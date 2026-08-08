@@ -57,6 +57,9 @@ public readonly record struct EclipseTileFile
   /// <summary>How many bytes a pixel takes, whatever the number of channels.</summary>
   public const int BytesPerPixel = 4;
 
+  /// <summary>The largest side a stated size may have, so rounding it up cannot overflow.</summary>
+  internal const int LargestSide = 1 << 20;
+
   /// <summary>What the header states for a picture of three channels, and for one of four.</summary>
   internal const int RgbColorSpace = 0, CmykColorSpace = 1;
   internal const int RgbChannelCount = 3, CmykChannelCount = 4;

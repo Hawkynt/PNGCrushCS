@@ -66,7 +66,10 @@ public static class PixiaReader {
       var width = BinaryPrimitives.ReadInt32LittleEndian(data[geometry..]);
       var height = BinaryPrimitives.ReadInt32LittleEndian(data[(geometry + 4)..]);
 
-      if (width < 1 || height < 1)
+      // A run list expands, so a stated size need not be paid for in the file that states it. Left
+      // unbounded, a layer claiming a billion pixels a side is an allocation rather than a refusal —
+      // which is how a file of another format once walked a reader here off the end by arithmetic.
+      if (width < 1 || height < 1 || (long)width * (height + 1) > PixiaFile.LargestLayer)
         throw new InvalidDataException($"Invalid Pixia layer size: {width}x{height}.");
 
       if (at + PixiaFile.LayerRecordSize > data.Length)
@@ -112,6 +115,13 @@ public static class PixiaReader {
 
   /// <summary>Expands one list of runs, each a count and that many bytes' worth of one value.</summary>
   private static byte[] _ReadRuns(ReadOnlySpan<byte> data, ref int at, int expected, int channels) {
+    // What is left of the file bounds what it can expand to: every packet is a count of at most 200
+    // and costs its channels plus one. Checking that before allocating is what stops a short file
+    // claiming a layer of hundreds of megabytes.
+    var reachable = (long)(data.Length - at) / (channels + 1) * PixiaFile.LongestRun * channels;
+    if (expected > reachable)
+      throw new InvalidDataException($"A Pixia layer states {expected} bytes of pixels and the {data.Length - at} bytes left expand to at most {reachable}.");
+
     var result = new byte[expected];
     var written = 0;
     var packet = channels + 1;

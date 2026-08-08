@@ -53,6 +53,31 @@ public readonly record struct JigsawPuzzleFile
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [256])
   ];
 
+  /// <summary>Two letters and the arithmetic that has to hold behind them.</summary>
+  /// <remarks>
+  /// <c>JG</c> alone is two bytes and would claim anything that happens to begin with them, so what
+  /// is matched is the header accounting for itself: the stated bitmap length being the stated pixel
+  /// offset plus the height times the padded row length. That needs only the first thirty-two bytes,
+  /// which is what signature matching is given.
+  /// </remarks>
+  static bool? IImageFormatMetadata<JigsawPuzzleFile>.MatchesSignature(ReadOnlySpan<byte> header) {
+    if (header.Length < BitsPerPixelAt + 2 || !header[..Magic.Length].SequenceEqual(Magic))
+      return null;
+
+    var bitmapLength = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(header[BitmapLengthAt..]);
+    var pixelOffset = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(header[PixelOffsetAt..]);
+    var width = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(header[WidthAt..]);
+    var height = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(header[HeightAt..]);
+    var bitsPerPixel = System.Buffers.Binary.BinaryPrimitives.ReadUInt16LittleEndian(header[BitsPerPixelAt..]);
+
+    var rows = height < 0 ? -(long)height : height;
+    if (width < 1 || rows < 1 || bitsPerPixel is < 1 or > 32)
+      return null;
+
+    var stride = ((long)width * bitsPerPixel + 31) / 32 * 4;
+    return pixelOffset + rows * stride == bitmapLength ? true : null;
+  }
+
   /// <summary>Pixels across, as the bitmap header states.</summary>
   public int Width { get; init; }
 

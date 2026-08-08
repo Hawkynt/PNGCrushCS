@@ -49,6 +49,12 @@ public readonly record struct PixiaFile
   /// <summary>How many layers the tables have room for.</summary>
   public const int MaximumLayers = 64;
 
+  /// <summary>The most pixels one layer may state, runs being able to claim more than they cost.</summary>
+  internal const long LargestLayer = 1L << 28;
+
+  /// <summary>The longest run a count expresses, which bounds what the bytes left can expand to.</summary>
+  internal const int LongestRun = 200;
+
   /// <summary>The header, after which the length of the preview stands and then the preview.</summary>
   public const int HeaderSize = 45796;
 
