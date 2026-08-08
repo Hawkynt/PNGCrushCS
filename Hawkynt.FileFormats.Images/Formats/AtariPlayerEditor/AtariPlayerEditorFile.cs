@@ -14,7 +14,8 @@ namespace FileFormat.AtariPlayerEditor;
 /// whole workspace out.
 /// </remarks>
 public readonly record struct AtariPlayerEditorFile
-  : IImageFormatReader<AtariPlayerEditorFile>, IImageToRawImage<AtariPlayerEditorFile> {
+  : IImageFormatReader<AtariPlayerEditorFile>, IImageToRawImage<AtariPlayerEditorFile>,
+    IImageFromRawImage<AtariPlayerEditorFile>, IImageFormatWriter<AtariPlayerEditorFile> {
 
   /// <summary>The four bytes every file starts with.</summary>
   public static ReadOnlySpan<byte> Signature => [154, 248, 57, 33];
@@ -50,6 +51,8 @@ public readonly record struct AtariPlayerEditorFile
   static string[] IImageFormatMetadata<AtariPlayerEditorFile>.FileExtensions => [".apl"];
   static AtariPlayerEditorFile IImageFormatReader<AtariPlayerEditorFile>.FromSpan(ReadOnlySpan<byte> data)
     => AtariPlayerEditorReader.FromSpan(data);
+  static byte[] IImageFormatWriter<AtariPlayerEditorFile>.ToBytes(AtariPlayerEditorFile file)
+    => AtariPlayerEditorWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<AtariPlayerEditorFile>.VideoModes => [
     new("Player sheet", [(IntegerRange.Any, new IntegerRange(1, MaxHeight))], [256])
   ];
@@ -89,5 +92,157 @@ public readonly record struct AtariPlayerEditorFile
       Format = PixelFormat.Rgb24,
       PixelData = Atari8BitGraphics.ApplyPalette(frame),
     };
+  }
+
+  /// <summary>Pixels one player covers, each drawn two screen pixels wide.</summary>
+  public const int PlayerPixels = 8;
+
+  /// <summary>Screen pixels a frame occupies when the two players sit on top of each other.</summary>
+  public const int NarrowFrameWidth = (PlayerPixels + 2) * 2;
+
+  /// <summary>
+  /// Encodes a picture as a sheet of frames, the two players of each drawn on top of each other.
+  /// </summary>
+  /// <remarks>
+  /// The gap is left at zero so that the two players overlap. That is what buys the third colour:
+  /// the chip ORs the colours of players sharing a pixel, so a pair on top of each other shows
+  /// black, either colour, or the two together, where sliding them apart shows only two colours over
+  /// twice the width. Sliding them apart is what the editor was for, and it is not what makes the
+  /// better picture out of one that was not drawn as sprites.
+  /// <para/>
+  /// A frame is wider than its players by two pixels, which are the spacing the editor drew between
+  /// them and always show the border. The sheet is therefore a multiple of twenty across and at most
+  /// sixteen frames, so a picture is sampled to the nearest such width and to at most forty-eight
+  /// rows — the whole of what a player is.
+  /// </remarks>
+  public static AtariPlayerEditorFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var frames = Math.Clamp((image.Width + NarrowFrameWidth / 2) / NarrowFrameWidth, 1, MaxFrames);
+    var height = Math.Clamp(image.Height, 1, MaxHeight);
+    var width = frames * NarrowFrameWidth;
+    var rgb = image.SampleTo(width, height).PixelData;
+    var palette = Atari8BitGraphics.Palette;
+
+    var data = new byte[FileSize];
+    Signature.CopyTo(data);
+    data[4] = (byte)frames;
+    data[5] = (byte)height;
+    data[6] = 0;
+
+    for (var frame = 0; frame < frames; ++frame) {
+      var left = frame * NarrowFrameWidth;
+      var (first, second) = _ChooseColors(rgb, width, height, left, palette);
+      data[FirstColorOffset + frame] = first;
+      data[SecondColorOffset + frame] = second;
+
+      for (var y = 0; y < height; ++y) {
+        int firstBits = 0, secondBits = 0;
+
+        for (var x = 0; x < PlayerPixels; ++x) {
+          var at = (y * width + left + x * 2) * 3;
+          var best = _Best(palette, first, second, rgb[at], rgb[at + 1], rgb[at + 2]);
+          if ((best & 1) != 0)
+            firstBits |= 1 << (7 - x);
+
+          if ((best & 2) != 0)
+            secondBits |= 1 << (7 - x);
+        }
+
+        data[FirstShapeOffset + frame * ShapeStride + y] = (byte)firstBits;
+        data[SecondShapeOffset + frame * ShapeStride + y] = (byte)secondBits;
+      }
+    }
+
+    return new() { Data = data, Frames = frames, Height = height, Gap = 0 };
+  }
+
+  /// <summary>
+  /// The two colours a frame's players carry, chosen from the colours the frame actually shows.
+  /// </summary>
+  /// <remarks>
+  /// The two are chosen together rather than one at a time, because what they show is not two
+  /// colours but four: neither, either, and the two ORed. A pair that is poor on its own may be the
+  /// pair whose combination lands on the colour most of the frame needs.
+  /// </remarks>
+  private static (byte First, byte Second) _ChooseColors(
+    ReadOnlySpan<byte> rgb, int width, int height, int left, ReadOnlySpan<byte> palette) {
+    Span<int> counts = stackalloc int[256];
+
+    for (var y = 0; y < height; ++y)
+    for (var x = 0; x < PlayerPixels; ++x) {
+      var at = (y * width + left + x * 2) * 3;
+      ++counts[Atari8BitGraphics.FindNearestColorByte(palette, rgb[at], rgb[at + 1], rgb[at + 2])];
+    }
+
+    const int candidateCount = 12;
+    Span<byte> candidates = stackalloc byte[candidateCount];
+    for (var slot = 0; slot < candidateCount; ++slot) {
+      var best = 0;
+      for (var value = 0; value < 256; value += 2)
+        if (counts[value] > counts[best])
+          best = value;
+
+      candidates[slot] = (byte)best;
+      counts[best] = 0;
+    }
+
+    byte bestFirst = 0, bestSecond = 0;
+    var bestCost = long.MaxValue;
+
+    foreach (var first in candidates)
+    foreach (var second in candidates) {
+      long cost = 0;
+      for (var y = 0; y < height; ++y)
+      for (var x = 0; x < PlayerPixels; ++x) {
+        var at = (y * width + left + x * 2) * 3;
+        cost += _Cost(palette, first, second, rgb[at], rgb[at + 1], rgb[at + 2]);
+      }
+
+      if (cost >= bestCost)
+        continue;
+
+      bestCost = cost;
+      bestFirst = first;
+      bestSecond = second;
+    }
+
+    return (bestFirst, bestSecond);
+  }
+
+  /// <summary>Which of the four things a pixel can show describes a colour best, as a pair of bits.</summary>
+  private static int _Best(ReadOnlySpan<byte> palette, byte first, byte second, byte red, byte green, byte blue) {
+    var best = 0;
+    var bestCost = int.MaxValue;
+
+    for (var value = 0; value < 4; ++value) {
+      var cost = _Distance(palette, _Shown(first, second, value), red, green, blue);
+      if (cost >= bestCost)
+        continue;
+
+      bestCost = cost;
+      best = value;
+    }
+
+    return best;
+  }
+
+  private static int _Cost(ReadOnlySpan<byte> palette, byte first, byte second, byte red, byte green, byte blue) {
+    var best = int.MaxValue;
+    for (var value = 0; value < 4; ++value)
+      best = Math.Min(best, _Distance(palette, _Shown(first, second, value), red, green, blue));
+
+    return best;
+  }
+
+  /// <summary>The colour byte a pair of player bits puts on screen, the chip ORing what overlaps.</summary>
+  private static int _Shown(byte first, byte second, int bits)
+    => (((bits & 1) != 0 ? first & 254 : 0) | ((bits & 2) != 0 ? second & 254 : 0)) & 254;
+
+  private static int _Distance(ReadOnlySpan<byte> palette, int entry, byte red, byte green, byte blue) {
+    var at = entry * 3;
+    int dr = palette[at] - red, dg = palette[at + 1] - green, db = palette[at + 2] - blue;
+
+    return dr * dr + dg * dg + db * db;
   }
 }
