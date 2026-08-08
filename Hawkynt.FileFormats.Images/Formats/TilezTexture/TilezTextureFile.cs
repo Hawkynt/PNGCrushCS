@@ -11,11 +11,13 @@ namespace FileFormat.TilezTexture;
 /// itself; all three samples come out of the JPEG reader matching XnView exactly.
 /// </remarks>
 public readonly record struct TilezTextureFile
-  : IImageFormatReader<TilezTextureFile>, IImageToRawImage<TilezTextureFile> {
+  : IImageFormatReader<TilezTextureFile>, IImageToRawImage<TilezTextureFile>,
+    IImageFromRawImage<TilezTextureFile>, IImageFormatWriter<TilezTextureFile> {
 
   static string IImageFormatMetadata<TilezTextureFile>.PrimaryExtension => ".til";
   static string[] IImageFormatMetadata<TilezTextureFile>.FileExtensions => [".til"];
   static TilezTextureFile IImageFormatReader<TilezTextureFile>.FromSpan(ReadOnlySpan<byte> data) => TilezTextureReader.FromSpan(data);
+  static byte[] IImageFormatWriter<TilezTextureFile>.ToBytes(TilezTextureFile file) => TilezTextureWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<TilezTextureFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [16777216])
   ];
@@ -34,4 +36,10 @@ public readonly record struct TilezTextureFile
 
   public static RawImage ToRawImage(TilezTextureFile file)
     => JpegFile.ToRawImage(JpegReader.FromBytes(file.Embedded ?? throw new InvalidDataException("A Tilez texture carries no picture.")));
+
+  public static TilezTextureFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    return new() { Embedded = JpegWriter.ToBytes(JpegFile.FromRawImage(image)) };
+  }
 }

@@ -17,11 +17,13 @@ namespace FileFormat.Vivid;
 /// XnView on every pixel.
 /// </remarks>
 public readonly record struct VividFile
-  : IImageFormatReader<VividFile>, IImageToRawImage<VividFile> {
+  : IImageFormatReader<VividFile>, IImageToRawImage<VividFile>,
+    IImageFromRawImage<VividFile>, IImageFormatWriter<VividFile> {
 
   static string IImageFormatMetadata<VividFile>.PrimaryExtension => ".vivid";
   static string[] IImageFormatMetadata<VividFile>.FileExtensions => [".vivid", ".dis"];
   static VividFile IImageFormatReader<VividFile>.FromSpan(ReadOnlySpan<byte> data) => VividReader.FromSpan(data);
+  static byte[] IImageFormatWriter<VividFile>.ToBytes(VividFile file) => VividWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<VividFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [16777216])
   ];
@@ -47,4 +49,11 @@ public readonly record struct VividFile
     Format = PixelFormat.Rgb24,
     PixelData = file.PixelData[..],
   };
+
+  public static VividFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureFormat(PixelFormat.Rgb24);
+
+    return new() { Width = image.Width, Height = image.Height, PixelData = image.PixelData[..] };
+  }
 }

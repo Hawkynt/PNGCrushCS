@@ -17,7 +17,8 @@ namespace FileFormat.ZxSnapshot;
 /// the one the file stores first.
 /// </remarks>
 public readonly record struct ZxSnapshotFile
-  : IImageFormatReader<ZxSnapshotFile>, IImageToRawImage<ZxSnapshotFile> {
+  : IImageFormatReader<ZxSnapshotFile>, IImageToRawImage<ZxSnapshotFile>,
+    IImageFromRawImage<ZxSnapshotFile>, IImageFormatWriter<ZxSnapshotFile> {
 
   /// <summary>Bytes of register state before the memory image.</summary>
   public const int HeaderSize = 27;
@@ -40,6 +41,7 @@ public readonly record struct ZxSnapshotFile
   static string[] IImageFormatMetadata<ZxSnapshotFile>.FileExtensions => [".sna"];
   static ZxSnapshotFile IImageFormatReader<ZxSnapshotFile>.FromSpan(ReadOnlySpan<byte> data)
     => ZxSnapshotReader.FromSpan(data);
+  static byte[] IImageFormatWriter<ZxSnapshotFile>.ToBytes(ZxSnapshotFile file) => ZxSnapshotWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<ZxSnapshotFile>.VideoModes => [
     new("ZX Spectrum", [(256, 192)], [15])
   ];
@@ -57,4 +59,21 @@ public readonly record struct ZxSnapshotFile
   /// <summary>Hands the screen to the reader that already knows how to draw one.</summary>
   public static RawImage ToRawImage(ZxSnapshotFile file)
     => ZxSpectrumFile.ToRawImage(ZxSpectrumReader.FromSpan(file.Screen ?? new byte[ScreenSize]));
+
+  /// <summary>Builds a snapshot whose memory holds the given picture where the display reads it.</summary>
+  /// <remarks>
+  /// This writes a machine that is not running anything: the registers are left at nought and the
+  /// rest of memory empty. What comes out is not a resumable session and does not pretend to be one
+  /// — it is a snapshot whose screen is this picture, which is the whole of what the format holds
+  /// that anything here can supply.
+  /// </remarks>
+  public static ZxSnapshotFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    // The screen is a Spectrum screen, so the encoder that already makes one makes this one.
+    return new() {
+      Screen = ZxSpectrumWriter.ToBytes(ZxSpectrumFile.FromRawImage(image)),
+      BorderColor = 0,
+    };
+  }
 }

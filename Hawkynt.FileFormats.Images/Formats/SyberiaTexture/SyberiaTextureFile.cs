@@ -15,11 +15,13 @@ namespace FileFormat.SyberiaTexture;
 /// Putting the ten bytes back makes every sample an ordinary JPEG, and all three then match XnView.
 /// </remarks>
 public readonly record struct SyberiaTextureFile
-  : IImageFormatReader<SyberiaTextureFile>, IImageToRawImage<SyberiaTextureFile> {
+  : IImageFormatReader<SyberiaTextureFile>, IImageToRawImage<SyberiaTextureFile>,
+    IImageFromRawImage<SyberiaTextureFile>, IImageFormatWriter<SyberiaTextureFile> {
 
   static string IImageFormatMetadata<SyberiaTextureFile>.PrimaryExtension => ".syj";
   static string[] IImageFormatMetadata<SyberiaTextureFile>.FileExtensions => [".syj"];
   static SyberiaTextureFile IImageFormatReader<SyberiaTextureFile>.FromSpan(ReadOnlySpan<byte> data) => SyberiaTextureReader.FromSpan(data);
+  static byte[] IImageFormatWriter<SyberiaTextureFile>.ToBytes(SyberiaTextureFile file) => SyberiaTextureWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<SyberiaTextureFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [16777216])
   ];
@@ -32,4 +34,10 @@ public readonly record struct SyberiaTextureFile
 
   public static RawImage ToRawImage(SyberiaTextureFile file)
     => JpegFile.ToRawImage(JpegReader.FromBytes(file.Restored ?? throw new InvalidDataException("A Syberia texture carries no picture.")));
+
+  public static SyberiaTextureFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    return new() { Restored = JpegWriter.ToBytes(JpegFile.FromRawImage(image)) };
+  }
 }
