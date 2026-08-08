@@ -10,6 +10,27 @@ public readonly record struct PdsFile : IImageFormatReader<PdsFile>, IImageToRaw
 
   static string IImageFormatMetadata<PdsFile>.PrimaryExtension => ".pds";
   static string[] IImageFormatMetadata<PdsFile>.FileExtensions => [".pds", ".lbl"];
+
+  /// <summary>Recognises the SFDU label an archived PDS file opens with instead of the keyword.</summary>
+  /// <remarks>
+  /// The reader has always parsed both forms, but only <c>PDS_VERSION_ID</c> was stated as a
+  /// signature, so an archived file was found by its extension or not at all. Two radar images named
+  /// <c>.ibg</c> decoded perfectly the moment they were handed to this reader and were refused
+  /// before, because nothing recognised what they open with.
+  /// <para/>
+  /// The authority codes vary, so what is matched is the shape they share: <c>CCSD</c> at the front
+  /// and the <c>PDS</c> registration inside the twenty characters of the label. VICAR, the other
+  /// format that carries these labels, is settled on its own <c>LBLSIZE=</c> and is not affected.
+  /// </remarks>
+  static bool? IImageFormatMetadata<PdsFile>.MatchesSignature(ReadOnlySpan<byte> header)
+    => header.Length >= SfduLabelLength
+       && header[..4].SequenceEqual("CCSD"u8)
+       && header[..SfduLabelLength].IndexOf("PDS"u8) >= 0
+      ? true
+      : null;
+
+  /// <summary>How long an SFDU label is: twenty characters of authority and length, twice over.</summary>
+  internal const int SfduLabelLength = 40;
   static PdsFile IImageFormatReader<PdsFile>.FromSpan(ReadOnlySpan<byte> data) => PdsReader.FromSpan(data);
   static byte[] IImageFormatWriter<PdsFile>.ToBytes(PdsFile file) => PdsWriter.ToBytes(file);
 
