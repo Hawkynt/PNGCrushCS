@@ -29,13 +29,27 @@ namespace FileFormat.Mag;
 /// picture cannot tell them apart. Compare colours.
 /// </remarks>
 public readonly record struct MagFile
-  : IImageFormatReader<MagFile>, IImageToRawImage<MagFile> {
+  : IImageFormatReader<MagFile>, IImageToRawImage<MagFile>,
+    IImageFromRawImage<MagFile>, IImageFormatWriter<MagFile> {
 
   internal const int HeaderSize = 32;
+
+  /// <summary>Colours a picture is written with, the sixteen-colour form being the lossless one.</summary>
+  public const int WrittenColorCount = 16;
+
+  /// <summary>
+  /// Pixels the written width must be a whole number of: a row is a whole number of four-byte
+  /// groups, and at four bits a pixel that is eight pixels.
+  /// </summary>
+  public const int WidthGranularity = 8;
+
+  /// <summary>The widest and tallest picture the sixteen-bit corners can describe.</summary>
+  public const int MaximumExtent = 65536;
 
   static string IImageFormatMetadata<MagFile>.PrimaryExtension => ".mag";
   static string[] IImageFormatMetadata<MagFile>.FileExtensions => [".mag", ".mki"];
   static MagFile IImageFormatReader<MagFile>.FromSpan(ReadOnlySpan<byte> data) => MagReader.FromSpan(data);
+  static byte[] IImageFormatWriter<MagFile>.ToBytes(MagFile file) => MagWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<MagFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [16, 256])
   ];
@@ -80,4 +94,47 @@ public readonly record struct MagFile
     Palette = file.Palette[..],
     PaletteCount = file.PaletteCount,
   };
+
+  /// <summary>Reduces a picture to the sixteen-colour form, which is the one that stores what it is
+  /// given.</summary>
+  /// <remarks>
+  /// The 256-colour form stores half the width and shows it doubled, so it would throw away every
+  /// second column; sixteen colours cost less than that. Only the top nibble of a stored channel is
+  /// real, so the chosen colours are pulled onto the sixteen levels the format can say and the
+  /// picture comes back exactly as it went in.
+  /// <para/>
+  /// A row is a whole number of four-byte groups, which at four bits a pixel is eight pixels, so a
+  /// width that is not a multiple of eight is sampled to one that is rather than refused.
+  /// </remarks>
+  public static MagFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var width = Math.Max(
+      (image.Width + WidthGranularity - 1) / WidthGranularity * WidthGranularity, WidthGranularity);
+    var height = Math.Max(image.Height, 1);
+    if (width > MaximumExtent || height > MaximumExtent)
+      throw new ArgumentException(
+        $"A MAKIchan header states its corners in sixteen bits, so {width}x{height} cannot be written.",
+        nameof(image));
+
+    var source = image.Width == width && image.Height == height ? image : image.SampleTo(width, height);
+    var indexed = source.EnsureIndexedAtMost(WrittenColorCount);
+
+    // Only a nibble a channel survives the file, so the colours are moved there before the indices
+    // are settled against them rather than after.
+    var palette = new byte[WrittenColorCount * 3];
+    var chosen = indexed.Palette ?? [];
+    for (var i = 0; i < palette.Length; ++i) {
+      var value = i < chosen.Length ? chosen[i] : (byte)0;
+      palette[i] = (byte)((value & 0xF0) | (value >> 4));
+    }
+
+    return new() {
+      Width = width,
+      Height = height,
+      PaletteCount = WrittenColorCount,
+      Palette = palette,
+      PixelData = indexed.PixelData[..],
+    };
+  }
 }

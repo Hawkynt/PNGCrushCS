@@ -15,11 +15,16 @@ namespace FileFormat.PsionPic;
 /// and the one the tools draw.
 /// </remarks>
 public readonly record struct PsionPicFile
-  : IImageFormatReader<PsionPicFile>, IImageToRawImage<PsionPicFile> {
+  : IImageFormatReader<PsionPicFile>, IImageToRawImage<PsionPicFile>,
+    IImageFromRawImage<PsionPicFile>, IImageFormatWriter<PsionPicFile> {
+
+  /// <summary>The widest and tallest bitmap the sixteen-bit fields can state.</summary>
+  public const int MaximumExtent = 65535;
 
   static string IImageFormatMetadata<PsionPicFile>.PrimaryExtension => ".pic";
   static string[] IImageFormatMetadata<PsionPicFile>.FileExtensions => [".pic", ".icn", ".ch3"];
   static PsionPicFile IImageFormatReader<PsionPicFile>.FromSpan(ReadOnlySpan<byte> data) => PsionPicReader.FromSpan(data);
+  static byte[] IImageFormatWriter<PsionPicFile>.ToBytes(PsionPicFile file) => PsionPicWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<PsionPicFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])
   ];
@@ -59,4 +64,26 @@ public readonly record struct PsionPicFile
     Palette = _BlackAndWhite[..],
     PaletteCount = 2,
   };
+
+  /// <summary>Reduces a picture to the one bit a pixel the format holds, at whatever size it is.</summary>
+  /// <remarks>
+  /// Nothing is scaled: the record states the size, so any picture the sixteen-bit fields can
+  /// describe fits as it stands. Only the colours are given up, and there are only two to give.
+  /// </remarks>
+  public static PsionPicFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width > MaximumExtent || image.Height > MaximumExtent)
+      throw new ArgumentException(
+        $"A Psion PIC record states its size in sixteen bits, so {image.Width}x{image.Height} cannot be written.",
+        nameof(image));
+
+    var indexed = image.EnsureIndexed(PixelFormat.Indexed8, _BlackAndWhite[..]);
+
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      Count = 1,
+      PixelData = indexed.PixelData[..],
+    };
+  }
 }
