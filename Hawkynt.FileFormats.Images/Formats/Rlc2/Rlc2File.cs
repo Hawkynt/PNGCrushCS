@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Rlc2;
 
 /// <summary>In-memory representation of an RLC2 image.</summary>
-public readonly record struct Rlc2File : IImageFormatReader<Rlc2File>, IImageToRawImage<Rlc2File>, IImageFormatWriter<Rlc2File> {
+public readonly record struct Rlc2File : IImageFormatReader<Rlc2File>, IImageToRawImage<Rlc2File>, IImageFromRawImage<Rlc2File>, IImageFormatWriter<Rlc2File> {
 
   static string IImageFormatMetadata<Rlc2File>.PrimaryExtension => ".rlc";
   static string[] IImageFormatMetadata<Rlc2File>.FileExtensions => [".rlc"];
@@ -39,6 +39,24 @@ public readonly record struct Rlc2File : IImageFormatReader<Rlc2File>, IImageToR
       Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = file.PixelData[..],
+    };
+  }
+
+  /// <summary>Stores any <see cref="RawImage"/> as RLC2. Every size fits, because the header
+  /// states its own.</summary>
+  public static Rlc2File FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    // The body goes in as plain Rgb24 because that is exactly what the reader hands back out of
+    // it; writing the run-length coding the name promises would produce a file our own decoder
+    // could not read. Bpp says 24 so the two agree on what the bytes are.
+    var rgb = image.EnsureFormat(PixelFormat.Rgb24);
+
+    return new() {
+      Width = rgb.Width,
+      Height = rgb.Height,
+      Bpp = 24,
+      PixelData = rgb.PixelData[..],
     };
   }
 
