@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Buffers.Binary;
 using System.IO;
 
@@ -9,7 +9,14 @@ public static class PspReader {
 
   private const int _MAGIC_SIZE = 32;
   private const int _FILE_HEADER_SIZE = _MAGIC_SIZE + 4; // magic + major(2) + minor(2)
-  private const int _BLOCK_HEADER_SIZE_V5 = 10; // id(2) + initial length(4) + total length(4)
+  /// <summary>The four bytes every block opens with.</summary>
+  private static ReadOnlySpan<byte> _BlockMarker => [0x7E, 0x42, 0x4B, 0x00];
+
+  /// <summary>Marker(4) + id(2) + length(4), which is what a block header is from version four on.</summary>
+  private const int _BLOCK_HEADER_SIZE = 10;
+
+  /// <summary>Older files state a chunk length as well, between the id and the total.</summary>
+  private const int _BLOCK_HEADER_SIZE_OLD = 14;
   private const int _GENERAL_ATTRIBUTES_MIN_SIZE = 27; // width(4)+height(4)+resolution(8)+metric(1)+compression(2)+bitDepth(2)+planeCount(2)+colorCount(4)
 
   public static PspFile FromFile(FileInfo file) {
@@ -46,38 +53,32 @@ public static class PspReader {
     var bitDepth = 24;
     byte[]? compositePixels = null;
 
+    // Every block opens with its own four-byte marker, and the identifier follows it. This read the
+    // identifier where the marker stands, so every real file stated block 0x427E — the letters "~B"
+    // — and took its size out of the rest of the marker. Both samples came back as 4932222x1572874
+    // and were refused for being too large, which is the only reason it was ever noticed.
     var offset = _FILE_HEADER_SIZE;
-    while (offset + 6 <= data.Length) {
-      var blockId = BinaryPrimitives.ReadUInt16LittleEndian(data[offset..]);
-      var initialLength = BinaryPrimitives.ReadUInt32LittleEndian(data[(offset + 2)..]);
+    var header = majorVersion >= 4 ? _BLOCK_HEADER_SIZE : _BLOCK_HEADER_SIZE_OLD;
 
-      uint totalLength;
-      int dataOffset;
-      if (majorVersion >= 5) {
-        if (offset + _BLOCK_HEADER_SIZE_V5 > data.Length)
-          break;
+    while (offset + header <= data.Length) {
+      if (!data.Slice(offset, _BlockMarker.Length).SequenceEqual(_BlockMarker))
+        break;
 
-        totalLength = BinaryPrimitives.ReadUInt32LittleEndian(data[(offset + 6)..]);
-        dataOffset = offset + _BLOCK_HEADER_SIZE_V5;
-      } else {
-        totalLength = initialLength;
-        dataOffset = offset + 6;
-      }
+      var blockId = BinaryPrimitives.ReadUInt16LittleEndian(data[(offset + 4)..]);
+      var totalLength = majorVersion >= 4
+        ? BinaryPrimitives.ReadUInt32LittleEndian(data[(offset + 6)..])
+        : BinaryPrimitives.ReadUInt32LittleEndian(data[(offset + 10)..]);
+
+      var dataOffset = offset + header;
+      if (totalLength > (uint)(data.Length - dataOffset))
+        break;
 
       if (blockId == PspFile.BlockIdGeneralAttributes)
-        _ParseGeneralAttributes(data, dataOffset, (int)initialLength, out width, out height, out bitDepth);
+        _ParseGeneralAttributes(data, dataOffset, (int)totalLength, out width, out height, out bitDepth);
       else if (blockId == PspFile.BlockIdCompositeImage)
-        compositePixels = _ParseCompositeImage(data, dataOffset, (int)totalLength - (dataOffset - offset));
+        compositePixels = _ParseCompositeImage(data, dataOffset, (int)totalLength);
 
-      // A block length is a thirty-two-bit count and was added to the offset as a signed one, so a
-      // file of another format named .pspimage walked the reader off the end by arithmetic rather
-      // than being refused.
-      if (totalLength > int.MaxValue - offset)
-        break;
-
-      offset += (int)totalLength;
-      if (offset <= dataOffset)
-        break;
+      offset = dataOffset + (int)totalLength;
     }
 
     // The largest a Paint Shop Pro picture may be; anything beyond it is a misread header rather
@@ -123,7 +124,8 @@ public static class PspReader {
     if (length < _GENERAL_ATTRIBUTES_MIN_SIZE || offset + _GENERAL_ATTRIBUTES_MIN_SIZE > data.Length)
       throw new InvalidDataException("General Image Attributes block too small.");
 
-    var span = data[offset..];
+    // The block opens with the length of its own first chunk, and the size follows that.
+    var span = data[(offset + 4)..];
     width = BinaryPrimitives.ReadInt32LittleEndian(span);
     height = BinaryPrimitives.ReadInt32LittleEndian(span[4..]);
     // resolution(8 bytes) at offset 8, metric(1) at offset 16, compression(2) at offset 17

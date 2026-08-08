@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Buffers.Binary;
 
 namespace FileFormat.Psp;
@@ -44,23 +44,39 @@ public static class PspWriter {
     return result;
   }
 
+  /// <summary>The four bytes every block opens with.</summary>
+  private static ReadOnlySpan<byte> _BlockMarker => [0x7E, 0x42, 0x4B, 0x00];
+
+  /// <summary>Writes one block: the marker, the identifier, the length of the data, then the data.</summary>
+  /// <remarks>
+  /// The marker was left out, and the identifier written where it belongs — so a real reader took
+  /// the identifier out of the first two bytes of what should have been the marker. Our own reader
+  /// left it out in the same place and the two agreed, which is why nothing said so.
+  /// <para/>
+  /// The length that follows the identifier is the data's, not the whole block's. Both were written,
+  /// the second where the data belongs.
+  /// </remarks>
   private static int _WriteBlock(byte[] result, int offset, ushort blockId, byte[] blockData) {
     var span = result.AsSpan(offset);
-    var totalBlockLength = 10 + blockData.Length; // header(10) + data
 
-    BinaryPrimitives.WriteUInt16LittleEndian(span, blockId);
-    BinaryPrimitives.WriteUInt32LittleEndian(span[2..], (uint)blockData.Length);
-    BinaryPrimitives.WriteUInt32LittleEndian(span[6..], (uint)totalBlockLength);
+    _BlockMarker.CopyTo(span);
+    BinaryPrimitives.WriteUInt16LittleEndian(span[4..], blockId);
+    BinaryPrimitives.WriteUInt32LittleEndian(span[6..], (uint)blockData.Length);
 
     blockData.AsSpan(0, blockData.Length).CopyTo(result.AsSpan(offset + 10));
-    return offset + totalBlockLength;
+
+    return offset + 10 + blockData.Length;
   }
 
   private static byte[] _BuildGeneralAttributes(int width, int height, int bitDepth) {
-    // width(4) + height(4) + resolution(8) + metric(1) + compression(2) + bitDepth(2) + planeCount(2) + colorCount(4) = 27 bytes
-    var data = new byte[27];
+    // The block states the length of its own first chunk before anything else, which was missing:
+    // chunk(4) + width(4) + height(4) + resolution(8) + metric(1) + compression(2) + bitDepth(2)
+    // + planeCount(2) + colorCount(4).
+    var data = new byte[31];
     var span = data.AsSpan();
 
+    BinaryPrimitives.WriteUInt32LittleEndian(span, (uint)data.Length);
+    span = span[4..];
     BinaryPrimitives.WriteInt32LittleEndian(span, width);
     BinaryPrimitives.WriteInt32LittleEndian(span[4..], height);
     BinaryPrimitives.WriteDoubleLittleEndian(span[8..], 72.0); // default 72 DPI
