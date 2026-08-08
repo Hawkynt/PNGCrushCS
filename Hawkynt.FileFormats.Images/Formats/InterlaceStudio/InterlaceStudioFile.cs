@@ -22,7 +22,9 @@ namespace FileFormat.InterlaceStudio;
 /// not what it colours by. Nothing else here reads this format, so the ramp is what is matched and
 /// this is said rather than dressed up as a choice.
 /// </remarks>
-public readonly record struct InterlaceStudioFile : IImageFormatReader<InterlaceStudioFile>, IImageToRawImage<InterlaceStudioFile>, IImageFormatWriter<InterlaceStudioFile> {
+public readonly record struct InterlaceStudioFile
+  : IImageFormatReader<InterlaceStudioFile>, IImageToRawImage<InterlaceStudioFile>,
+    IImageFromRawImage<InterlaceStudioFile>, IImageFormatWriter<InterlaceStudioFile> {
 
   static string IImageFormatMetadata<InterlaceStudioFile>.PrimaryExtension => ".ist";
   static string[] IImageFormatMetadata<InterlaceStudioFile>.FileExtensions => [".ist"];
@@ -109,5 +111,39 @@ public readonly record struct InterlaceStudioFile : IImageFormatReader<Interlace
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
     };
+  }
+
+  /// <summary>Encodes a picture as an Interlace Studio pair, scaling it to 160x200 first.</summary>
+  /// <remarks>
+  /// Two frames of four levels average to seven, spaced half a step apart, so a grey is rounded to
+  /// one of those seven and then split into the two frames that make it — the halves differing by at
+  /// most one, which is what keeps both inside the four levels a frame can show.
+  /// <para/>
+  /// The sixteen-byte header holds what look like colour registers, but the reference tool draws
+  /// every sample in the same grey ramp regardless, so nothing is written into them.
+  /// </remarks>
+  public static InterlaceStudioFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(ImageWidth, ImageHeight).PixelData;
+    var first = new byte[FrameSize];
+    var second = new byte[FrameSize];
+
+    for (var y = 0; y < ImageHeight; ++y)
+    for (var x = 0; x < ImageWidth; ++x) {
+      var at = (y * ImageWidth + x) * 3;
+      var luminance = (rgb[at] * 77 + rgb[at + 1] * 151 + rgb[at + 2] * 28) >> 8;
+
+      // Seven levels half a step apart, so the step between them is half of a frame's own.
+      var level = Math.Min(6, (luminance + LevelStep / 4) / (LevelStep / 2));
+      var a = (level + 1) / 2;
+      var b = level / 2;
+
+      var shift = (3 - x % 4) * 2;
+      first[y * BytesPerRow + x / 4] |= (byte)(a << shift);
+      second[y * BytesPerRow + x / 4] |= (byte)(b << shift);
+    }
+
+    return new() { Header = new byte[HeaderSize], FirstFrame = first, SecondFrame = second };
   }
 }

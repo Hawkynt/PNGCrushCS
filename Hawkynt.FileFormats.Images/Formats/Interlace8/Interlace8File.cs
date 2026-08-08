@@ -4,7 +4,9 @@ using FileFormat.Core;
 namespace FileFormat.Interlace8;
 
 /// <summary>In-memory representation of an Atari Interlace Mode image (320x192, 2 frames combined).</summary>
-public readonly record struct Interlace8File : IImageFormatReader<Interlace8File>, IImageToRawImage<Interlace8File>, IImageFormatWriter<Interlace8File> {
+public readonly record struct Interlace8File
+  : IImageFormatReader<Interlace8File>, IImageToRawImage<Interlace8File>,
+    IImageFromRawImage<Interlace8File>, IImageFormatWriter<Interlace8File> {
 
   /// <summary>The size of one frame in bytes (40 bytes/line x 192 lines).</summary>
   public const int FrameSize = 7680;
@@ -69,6 +71,39 @@ public readonly record struct Interlace8File : IImageFormatReader<Interlace8File
       Format = PixelFormat.Gray8,
       PixelData = gray,
     };
+  }
+
+  /// <summary>Encodes a picture as an interlace pair, scaling it to 320x192 first.</summary>
+  /// <remarks>
+  /// Two one-bit frames shown one after another give a pixel four levels rather than two, and the
+  /// two middle ones are not interchangeable: lit in the first frame only is the lighter of them.
+  /// So a grey is rounded to one of the four the pair can make and then split back into the two bits
+  /// that make it, which is the exact inverse of the table <see cref="ToRawImage"/> reads it with.
+  /// </remarks>
+  public static Interlace8File FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(FixedWidth, FixedHeight).PixelData;
+    var first = new byte[FrameSize];
+    var second = new byte[FrameSize];
+
+    for (var y = 0; y < FixedHeight; ++y)
+    for (var x = 0; x < FixedWidth; ++x) {
+      var at = (y * FixedWidth + x) * 3;
+      var luminance = (rgb[at] * 77 + rgb[at + 1] * 151 + rgb[at + 2] * 28) >> 8;
+
+      // The levels are 0, 85, 170 and 255, so rounding to the nearest is a division by 85.
+      var level = (luminance + 42) / 85;
+      var byteIndex = y * BytesPerRow + x / 8;
+      var mask = (byte)(0x80 >> (x % 8));
+
+      if (level >= 2)
+        first[byteIndex] |= mask;
+      if (level == 1 || level == 3)
+        second[byteIndex] |= mask;
+    }
+
+    return new() { Frame1Data = first, Frame2Data = second };
   }
 
 }

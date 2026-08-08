@@ -21,7 +21,8 @@ namespace FileFormat.InterlaceHiresEditor;
 /// does not have one.
 /// </remarks>
 public readonly record struct InterlaceHiresEditorFile
-  : IImageFormatReader<InterlaceHiresEditorFile>, IImageToRawImage<InterlaceHiresEditorFile>, IImageFormatWriter<InterlaceHiresEditorFile> {
+  : IImageFormatReader<InterlaceHiresEditorFile>, IImageToRawImage<InterlaceHiresEditorFile>,
+    IImageFromRawImage<InterlaceHiresEditorFile>, IImageFormatWriter<InterlaceHiresEditorFile> {
 
   static string IImageFormatMetadata<InterlaceHiresEditorFile>.PrimaryExtension => ".ihe";
   static string[] IImageFormatMetadata<InterlaceHiresEditorFile>.FileExtensions => [".ihe"];
@@ -56,6 +57,9 @@ public readonly record struct InterlaceHiresEditorFile
 
   /// <summary>The whole of a file: 2 + 8192 + 8000.</summary>
   public const int ExpectedFileSize = SecondBitmapOffset + BitmapSize;
+
+  /// <summary>Default load address, putting the first bitmap at the start of a 16K bank.</summary>
+  internal const ushort DefaultLoadAddress = 0x4000;
 
   /// <summary>
   /// The three levels a pixel can be shown at, darkest first.
@@ -105,5 +109,39 @@ public readonly record struct InterlaceHiresEditorFile
       Palette = Levels.ToArray(),
       PaletteCount = 3,
     };
+  }
+
+  /// <summary>Encodes a picture as an Interlace Hires pair, scaling it to 320x200 first.</summary>
+  /// <remarks>
+  /// The two frames give a pixel three levels, not two, and which frames are lit is what picks
+  /// between them: both is darkest, neither lightest. So a grey is rounded to one of the three and
+  /// then turned back into a count of lit frames, and the count is spent on the first frame before
+  /// the second — the two frames being interchangeable here, since only how many are lit is read.
+  /// </remarks>
+  public static InterlaceHiresEditorFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(FixedWidth, FixedHeight).PixelData;
+    var first = new byte[BitmapSize];
+    var second = new byte[BitmapSize];
+
+    for (var y = 0; y < FixedHeight; ++y)
+    for (var x = 0; x < FixedWidth; ++x) {
+      var at = (y * FixedWidth + x) * 3;
+      var luminance = (rgb[at] * 77 + rgb[at + 1] * 151 + rgb[at + 2] * 28) >> 8;
+
+      // The three levels are 0, 54 and 108, so anything above the top one belongs to it.
+      var level = Math.Min(2, (luminance + 27) / 54);
+      var lit = 2 - level;
+
+      var atByte = (y / 8 * (FixedWidth / 8) + x / 8) * 8 + y % 8;
+      var mask = (byte)(0x80 >> (x % 8));
+      if (lit >= 1)
+        first[atByte] |= mask;
+      if (lit == 2)
+        second[atByte] |= mask;
+    }
+
+    return new() { LoadAddress = DefaultLoadAddress, FirstBitmap = first, SecondBitmap = second };
   }
 }
