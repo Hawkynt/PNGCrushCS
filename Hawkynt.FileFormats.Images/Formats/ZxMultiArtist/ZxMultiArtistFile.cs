@@ -16,13 +16,18 @@ public enum ZxMultiArtistMode {
 }
 
 /// <summary>In-memory representation of a ZX Spectrum MultiArtist image with variable attribute cell sizes.</summary>
-public sealed class ZxMultiArtistFile : IImageFormatReader<ZxMultiArtistFile>, IImageToRawImage<ZxMultiArtistFile>, IImageFormatWriter<ZxMultiArtistFile> {
+public sealed class ZxMultiArtistFile
+  : IImageFormatReader<ZxMultiArtistFile>, IImageToRawImage<ZxMultiArtistFile>,
+    IImageFromRawImage<ZxMultiArtistFile>, IImageFormatWriter<ZxMultiArtistFile> {
 
   static string IImageFormatMetadata<ZxMultiArtistFile>.PrimaryExtension => ".mg1";
   static string[] IImageFormatMetadata<ZxMultiArtistFile>.FileExtensions => [".mg1", ".mg2", ".mg4", ".mg8"];
   static ZxMultiArtistFile IImageFormatReader<ZxMultiArtistFile>.FromSpan(ReadOnlySpan<byte> data) => ZxMultiArtistReader.FromSpan(data);
 
   static byte[] IImageFormatWriter<ZxMultiArtistFile>.ToBytes(ZxMultiArtistFile file) => ZxMultiArtistWriter.ToBytes(file);
+  static VideoMode[] IImageFormatMetadata<ZxMultiArtistFile>.VideoModes => [
+    new("Default", [(256, 192)], [16])
+  ];
 
   /// <summary>ZX Spectrum normal palette (bright=0): Black, Blue, Red, Magenta, Green, Cyan, Yellow, White.</summary>
   internal static readonly int[] NormalPalette = [
@@ -151,6 +156,58 @@ public sealed class ZxMultiArtistFile : IImageFormatReader<ZxMultiArtistFile>, I
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
     };
+  }
+
+  /// <summary>Builds a MultiArtist image from a <see cref="RawImage"/>, using the finest attribute grid
+  /// (<see cref="ZxMultiArtistMode.Mg1"/>, one ink/paper pair per 8x1 strip) so as little colour detail
+  /// as possible is thrown away. Every pixel is mapped onto the Spectrum's 16-entry palette; within each
+  /// strip only the two most common colours survive, since the hardware allows just one ink and one
+  /// paper colour (and a shared bright flag) per cell.</summary>
+  public static ZxMultiArtistFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width != 256 || image.Height != 192)
+      throw new ArgumentException($"ZX Spectrum MultiArtist images are always 256x192, but got {image.Width}x{image.Height}.", nameof(image));
+
+    const int cellHeight = 1;
+    var indexed = image.EnsureIndexed(PixelFormat.Indexed8, ZxSpectrumGraphics.Palette.ToArray());
+    var bitmap = new byte[6144];
+    var attributes = new byte[GetAttributeSize(ZxMultiArtistMode.Mg1)];
+    const int cellsAcross = 32;
+    var cellsDown = 192 / cellHeight;
+
+    Span<int> counts = stackalloc int[16];
+    for (var cellY = 0; cellY < cellsDown; ++cellY)
+    for (var cellX = 0; cellX < cellsAcross; ++cellX) {
+      counts.Clear();
+      for (var y = 0; y < cellHeight; ++y)
+      for (var x = 0; x < 8; ++x)
+        ++counts[indexed.PixelData[(cellY * cellHeight + y) * 256 + cellX * 8 + x] & 15];
+
+      var paper = 0;
+      for (var c = 1; c < counts.Length; ++c)
+        if (counts[c] > counts[paper])
+          paper = c;
+
+      var ink = paper == 0 ? 1 : 0;
+      for (var c = 0; c < counts.Length; ++c)
+        if (c != paper && counts[c] > counts[ink])
+          ink = c;
+
+      attributes[cellY * cellsAcross + cellX] = ZxSpectrumGraphics.Attribute(ink, paper);
+
+      for (var y = 0; y < cellHeight; ++y) {
+        byte rowByte = 0;
+        for (var x = 0; x < 8; ++x) {
+          var color = indexed.PixelData[(cellY * cellHeight + y) * 256 + cellX * 8 + x] & 15;
+          if (color == ink)
+            rowByte |= (byte)(0x80 >> x);
+        }
+
+        bitmap[(cellY * cellHeight + y) * 32 + cellX] = rowByte;
+      }
+    }
+
+    return new() { Mode = ZxMultiArtistMode.Mg1, BitmapData = bitmap, AttributeData = attributes };
   }
 
 }

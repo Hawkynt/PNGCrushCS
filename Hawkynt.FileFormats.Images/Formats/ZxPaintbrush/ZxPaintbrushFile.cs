@@ -5,12 +5,17 @@ namespace FileFormat.ZxPaintbrush;
 
 /// <summary>In-memory representation of a ZX Spectrum ZX-Paintbrush image (6912+ bytes: 6144 bitmap + 768 attributes + optional extra data).</summary>
 [FormatDetectionPriority(200)]
-public readonly record struct ZxPaintbrushFile : IImageFormatReader<ZxPaintbrushFile>, IImageToRawImage<ZxPaintbrushFile>, IImageFormatWriter<ZxPaintbrushFile> {
+public readonly record struct ZxPaintbrushFile
+  : IImageFormatReader<ZxPaintbrushFile>, IImageToRawImage<ZxPaintbrushFile>,
+    IImageFromRawImage<ZxPaintbrushFile>, IImageFormatWriter<ZxPaintbrushFile> {
 
   static string IImageFormatMetadata<ZxPaintbrushFile>.PrimaryExtension => ".zxp";
   static string[] IImageFormatMetadata<ZxPaintbrushFile>.FileExtensions => [".zxp"];
   static ZxPaintbrushFile IImageFormatReader<ZxPaintbrushFile>.FromSpan(ReadOnlySpan<byte> data) => ZxPaintbrushReader.FromSpan(data);
   static byte[] IImageFormatWriter<ZxPaintbrushFile>.ToBytes(ZxPaintbrushFile file) => ZxPaintbrushWriter.ToBytes(file);
+  static VideoMode[] IImageFormatMetadata<ZxPaintbrushFile>.VideoModes => [
+    new("Default", [(256, 192)], [16])
+  ];
 
   /// <summary>ZX Spectrum normal palette (bright=0): Black, Blue, Red, Magenta, Green, Cyan, Yellow, White.</summary>
   private static readonly int[] _NormalPalette = [
@@ -72,6 +77,54 @@ public readonly record struct ZxPaintbrushFile : IImageFormatReader<ZxPaintbrush
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
     };
+  }
+
+  /// <summary>Builds a ZX-Paintbrush screen from a <see cref="RawImage"/>. Every pixel is mapped onto the
+  /// Spectrum's 16-entry palette; within each 8x8 cell only the two most common colours survive, since
+  /// the hardware allows just one ink and one paper colour (and a shared bright flag) per cell.</summary>
+  public static ZxPaintbrushFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width != 256 || image.Height != 192)
+      throw new ArgumentException($"ZX-Paintbrush screens are always 256x192, but got {image.Width}x{image.Height}.", nameof(image));
+
+    var indexed = image.EnsureIndexed(PixelFormat.Indexed8, ZxSpectrumGraphics.Palette.ToArray());
+    var bitmap = new byte[6144];
+    var attributes = new byte[768];
+    const int cellsAcross = 32, cellsDown = 24;
+
+    Span<int> counts = stackalloc int[16];
+    for (var cellY = 0; cellY < cellsDown; ++cellY)
+    for (var cellX = 0; cellX < cellsAcross; ++cellX) {
+      counts.Clear();
+      for (var y = 0; y < 8; ++y)
+      for (var x = 0; x < 8; ++x)
+        ++counts[indexed.PixelData[(cellY * 8 + y) * 256 + cellX * 8 + x] & 15];
+
+      var paper = 0;
+      for (var c = 1; c < counts.Length; ++c)
+        if (counts[c] > counts[paper])
+          paper = c;
+
+      var ink = paper == 0 ? 1 : 0;
+      for (var c = 0; c < counts.Length; ++c)
+        if (c != paper && counts[c] > counts[ink])
+          ink = c;
+
+      attributes[cellY * cellsAcross + cellX] = ZxSpectrumGraphics.Attribute(ink, paper);
+
+      for (var y = 0; y < 8; ++y) {
+        byte rowByte = 0;
+        for (var x = 0; x < 8; ++x) {
+          var color = indexed.PixelData[(cellY * 8 + y) * 256 + cellX * 8 + x] & 15;
+          if (color == ink)
+            rowByte |= (byte)(0x80 >> x);
+        }
+
+        bitmap[(cellY * 8 + y) * 32 + cellX] = rowByte;
+      }
+    }
+
+    return new() { BitmapData = bitmap, AttributeData = attributes, ExtraData = [] };
   }
 
 }
