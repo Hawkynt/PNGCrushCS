@@ -19,13 +19,16 @@ public readonly record struct PdsFile : IImageFormatReader<PdsFile>, IImageToRaw
   /// before, because nothing recognised what they open with.
   /// <para/>
   /// The authority codes vary, so what is matched is the shape they share: <c>CCSD</c> at the front
-  /// and the <c>PDS</c> registration inside the twenty characters of the label. VICAR, the other
-  /// format that carries these labels, is settled on its own <c>LBLSIZE=</c> and is not affected.
+  /// and the <c>PDS</c> registration inside the twenty characters of the label. VICAR carries the
+  /// same kind of label and states its own <c>LBLSIZE=</c>, so a label carrying that keyword is left
+  /// alone — claiming it would make a VICAR file unreadable rather than merely undetected, since a
+  /// reader that refuses is not fallen back from.
   /// </remarks>
   static bool? IImageFormatMetadata<PdsFile>.MatchesSignature(ReadOnlySpan<byte> header)
     => header.Length >= SfduLabelLength
        && header[..4].SequenceEqual("CCSD"u8)
        && header[..SfduLabelLength].IndexOf("PDS"u8) >= 0
+       && header.IndexOf("LBLSIZE"u8) < 0
       ? true
       : null;
 

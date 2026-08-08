@@ -23,12 +23,20 @@ public sealed class PdsSfduDetectionTests {
     Assert.That(FormatRegistry.DetectFromBytes(data), Is.EqualTo(ImageFormat.Pds));
   }
 
-  /// <summary>VICAR carries the same kind of label and is settled on its own keyword; the authority
-  /// code is what tells the two apart, so one without the PDS registration is not claimed.</summary>
+  /// <summary>VICAR carries the same kind of label and states its own keyword. Claiming one would make
+  /// it unreadable rather than merely undetected, a refusing reader not being fallen back from.</summary>
+  [Test]
+  [Category("Unit")]
+  public void DetectFromBytes_AnSfduLabelStatingVicarsKeywordIsLeftAlone() {
+    var data = Encoding.ASCII.GetBytes("CCSD3ZF0000100000001NJPL3IF0PDS200000001 = SFDU_LABEL\r\nLBLSIZE=1024\r\n");
+
+    Assert.That(FormatRegistry.DetectFromBytes(data), Is.Not.EqualTo(ImageFormat.Pds));
+  }
+
   [Test]
   [Category("Unit")]
   public void DetectFromBytes_AnSfduLabelWithoutThePdsRegistrationIsNotClaimed() {
-    var data = Encoding.ASCII.GetBytes("CCSD3ZF0000100000001NJPL3IF0MGN100000001 = SFDU_LABEL\r\nLBLSIZE=1024\r\n");
+    var data = Encoding.ASCII.GetBytes("CCSD3ZF0000100000001NJPL3IF0MGN100000001 = SFDU_LABEL\r\nRECORD_TYPE = FIXED_LENGTH\r\n");
 
     Assert.That(FormatRegistry.DetectFromBytes(data), Is.Not.EqualTo(ImageFormat.Pds));
   }
