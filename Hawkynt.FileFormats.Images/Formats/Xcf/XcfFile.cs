@@ -56,6 +56,11 @@ public readonly record struct XcfFile : IImageFormatReader<XcfFile>, IImageToRaw
   public static XcfFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
 
+    // A picture arrives in whatever form its own format kept it, and this took three and refused
+    // every other — including plain Rgb24, which is what most of the readers here hand over. The
+    // rest of the library converts to what it can hold instead of turning the picture away.
+    image = image.EnsureAnyFormat(PixelFormat.Rgba32, PixelFormat.GrayAlpha16, PixelFormat.Indexed8);
+
     switch (image.Format) {
       case PixelFormat.Rgba32:
         return new() {

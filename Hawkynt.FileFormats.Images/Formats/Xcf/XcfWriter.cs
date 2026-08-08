@@ -23,11 +23,16 @@ public static class XcfWriter {
     _WriteUInt32BE(ms, (uint)file.Height);
     _WriteUInt32BE(ms, (uint)file.ColorMode);
 
-    // Properties
-    // PROP_COMPRESSION (type=17, size=1, value=0 = None)
-    _WriteUInt32BE(ms, 17); // PROP_COMPRESSION
-    _WriteUInt32BE(ms, 1);  // size
-    ms.WriteByte(0);        // None
+    // PROP_COMPRESSION, run-length rather than none.
+    //
+    // GIMP has never written an uncompressed one, so nothing else has had cause to read one: the
+    // decoder in ImageMagick takes a fixed 64x64x4x1.5 bytes for the last tile whatever its real
+    // length, and a file whose last tile is also its last byte is refused for being short. Its
+    // run-length path stops when the pixels are decoded and does not care. Writing what real files
+    // contain costs nothing here and is what the format is.
+    _WriteUInt32BE(ms, 17);
+    _WriteUInt32BE(ms, 1);
+    ms.WriteByte((byte)XcfCompression.Rle);
 
     // PROP_COLORMAP for indexed mode
     if (file.ColorMode == XcfColorMode.Indexed && file.Palette != null) {
@@ -150,20 +155,19 @@ public static class XcfWriter {
       _WriteUInt32BE(ms, (uint)tileStart);
       ms.Position = curPos;
 
-      // Write tile as channel-planar (all channel0 bytes, then channel1, etc.)
+      // Cut the tile out of the picture, still interleaved, and let the encoder split the channels.
+      var tile = new byte[tileW * tileH * bpp];
+      for (var row = 0; row < tileH; ++row)
+      for (var col = 0; col < tileW; ++col)
       for (var channel = 0; channel < bpp; ++channel) {
-        for (var row = 0; row < tileH; ++row) {
-          for (var col = 0; col < tileW; ++col) {
-            var srcX = tileX * TILE_SIZE + col;
-            var srcY = tileY * TILE_SIZE + row;
-            var srcIndex = (srcY * file.Width + srcX) * bpp + channel;
-            if (srcIndex < file.PixelData.Length)
-              ms.WriteByte(file.PixelData[srcIndex]);
-            else
-              ms.WriteByte(0);
-          }
-        }
+        var srcX = tileX * TILE_SIZE + col;
+        var srcY = tileY * TILE_SIZE + row;
+        var srcIndex = (srcY * file.Width + srcX) * bpp + channel;
+        tile[(row * tileW + col) * bpp + channel] =
+          srcIndex < file.PixelData.Length ? file.PixelData[srcIndex] : (byte)0;
       }
+
+      ms.Write(XcfTileDecoder.EncodeRle(tile, bpp, tileW, tileH));
     }
 
     return ms.ToArray();

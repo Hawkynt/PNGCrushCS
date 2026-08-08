@@ -40,11 +40,11 @@ internal static class XcfTileDecoder {
             ++decoded;
           }
         } else if (n == 127) {
-          // Long literal run: next 4 bytes = uint32 BE count
-          if (srcOffset + 4 > compressed.Length)
+          // Long literal run: the count is two bytes, not four.
+          if (srcOffset + 2 > compressed.Length)
             break;
-          var count = (int)_ReadUInt32BE(compressed.AsSpan(srcOffset));
-          srcOffset += 4;
+          var count = (compressed[srcOffset] << 8) | compressed[srcOffset + 1];
+          srcOffset += 2;
           for (var i = 0; i < count && decoded < pixelCount; ++i) {
             if (srcOffset >= compressed.Length)
               break;
@@ -52,19 +52,20 @@ internal static class XcfTileDecoder {
             ++decoded;
           }
         } else if (n == 128) {
-          // Long repeat run: next 4 bytes = uint32 BE count, then 1 byte value
-          if (srcOffset + 5 > compressed.Length)
+          // Long repeat run: two bytes of count, then the byte to repeat.
+          if (srcOffset + 3 > compressed.Length)
             break;
-          var count = (int)_ReadUInt32BE(compressed.AsSpan(srcOffset));
-          srcOffset += 4;
+          var count = (compressed[srcOffset] << 8) | compressed[srcOffset + 1];
+          srcOffset += 2;
           var value = compressed[srcOffset++];
           for (var i = 0; i < count && decoded < pixelCount; ++i) {
             result[decoded * bytesPerPixel + channel] = value;
             ++decoded;
           }
         } else {
-          // n >= 129: repeat next byte (256 - n + 1) times
-          var count = 256 - n + 1;
+          // n >= 129: repeat the next byte (256 - n) times. This counted one too many, and the
+          // encoder below wrote one too few to match, so the pair agreed and nothing else did.
+          var count = 256 - n;
           if (srcOffset >= compressed.Length)
             break;
           var value = compressed[srcOffset++];
@@ -95,8 +96,8 @@ internal static class XcfTileDecoder {
 
         var runLength = pos - runStart;
         if (runLength >= 2) {
-          // Repeat run: n = 256 - (runLength - 1) = 257 - runLength
-          ms.WriteByte((byte)(257 - runLength));
+          // A repeat of L bytes is the opcode 256 - L, for L from two to 127.
+          ms.WriteByte((byte)(256 - runLength));
           ms.WriteByte(value);
         } else {
           // Literal run: collect non-repeating bytes

@@ -843,3 +843,29 @@ for `FF D8` and `FF D9` turns up neither. The format stores the entropy-coded sc
 and tables stripped, to be rebuilt from tables the reader is expected to carry. So the reader's whole
 approach of seeking a JPEG inside the file cannot work, whatever offset it seeks at. XnView reads
 them at 640 by 480; nothing else here does.
+
+### The four writers nothing else will read
+
+The writer-acceptance fixture walks the registry, writes each format that says it can be written,
+and asks another tool to read it back. Eight of them failed. Four turned out to be nothing of the
+kind: `.cut`, `.icn` twice and `.pbm` are names that ImageMagick knows and means somebody else's
+format by — its own format list says CUT is Dr Halo, ICN is the Microsoft icon and PBM is the
+portable bitmap, and all three of those are separate formats here. It knows no name for the Amiga
+PBM at all. Those are recorded as unjudgeable, with the tool's own listing as the evidence.
+
+The other four are real, and they stay red rather than being explained away:
+
+  - **AVIF** — "No 'av1C' box". The container is assembled without the box that states the codec
+    configuration, so nothing can tell what the coded data is.
+  - **HEIF** — "No 'iinf' box". Same shape of fault: no item information, so no item to decode.
+  - **JPEG XL** — "unable to read image data". The header is accepted and the codestream is not.
+  - **XCF** — two faults were found and fixed and it is still refused. It took only three pixel
+    formats and threw for the rest, including the plain Rgb24 most readers here hand over; and its
+    run-length coder was off by one on every repeat opcode and used four-byte counts where the
+    format uses two — a mistake its own decoder shared, so the round trip passed and nothing else
+    could read a byte of it. Both are corrected and verified against the specification. What remains
+    is structural and is not an end-of-file over-read: padding the file to any length does not help.
+
+The first three are modern container formats whose writers were never checked against anything but
+our own readers. That is exactly the class of matched mistake this fixture exists to find, and
+finding it is worth more than a green suite.

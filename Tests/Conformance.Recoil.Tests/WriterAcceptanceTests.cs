@@ -77,6 +77,14 @@ public sealed class WriterAcceptanceTests {
     [ImageFormat.AutodeskCel] =
       ".cel belongs to three unrelated programs: this is the Animator's frame, and the tool means "
       + "the Atari ST one, which is now a format of its own here",
+    [ImageFormat.CutCreator] =
+      "the reference tool lists .cut as Dr Halo, which is a different program and a format of its "
+      + "own here",
+    [ImageFormat.DegasIcon] = "the reference tool lists .icn as the Microsoft icon, which is a different format",
+    [ImageFormat.Ice] = "the reference tool lists .icn as the Microsoft icon, which is a different format",
+    [ImageFormat.IffPbm] =
+      "the reference tool lists .pbm as the portable bitmap, which is a different format and one of "
+      + "its own here, and knows no name for the Amiga one at all",
   };
 
   private static IEnumerable<TestCaseData> Writable() {

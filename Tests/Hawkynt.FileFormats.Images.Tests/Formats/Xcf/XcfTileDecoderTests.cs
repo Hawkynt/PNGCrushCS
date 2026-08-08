@@ -33,14 +33,43 @@ public sealed class XcfTileDecoderTests {
   [Test]
   [Category("Unit")]
   public void DecodeRle_AllSame_ReturnsRepeatedValue() {
-    // RLE for 4 pixels, 1 bpp: repeat byte 0xAA four times
-    // n = 257 - 4 = 253, value = 0xAA
-    var compressed = new byte[] { 253, 0xAA };
+    // A repeat of L bytes is the opcode 256 - L. This said 257 - L, and the encoder wrote the same,
+    // so the two agreed with each other and with nothing that reads the format.
+    var compressed = new byte[] { 256 - 4, 0xAA };
     var result = XcfTileDecoder.DecodeRle(compressed, 1, 2, 2);
 
     Assert.That(result.Length, Is.EqualTo(4));
     for (var i = 0; i < 4; ++i)
       Assert.That(result[i], Is.EqualTo(0xAA));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void DecodeRle_LongRuns_TakeATwoByteCount() {
+    // Opcodes 127 and 128 carry their length in two bytes, not four.
+    var longLiteral = new byte[] { 127, 0, 4, 10, 20, 30, 40 };
+    var longRepeat = new byte[] { 128, 0, 4, 0x5A };
+
+    Assert.Multiple(() => {
+      Assert.That(XcfTileDecoder.DecodeRle(longLiteral, 1, 2, 2), Is.EqualTo(new byte[] { 10, 20, 30, 40 }));
+      Assert.That(XcfTileDecoder.DecodeRle(longRepeat, 1, 2, 2), Is.EqualTo(new byte[] { 0x5A, 0x5A, 0x5A, 0x5A }));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void EncodeRle_RoundTrips() {
+    var pixels = new byte[64 * 4];
+    for (var i = 0; i < 64; ++i) {
+      pixels[i * 4] = (byte)(i < 40 ? 0x11 : i);
+      pixels[i * 4 + 1] = 0x22;
+      pixels[i * 4 + 2] = (byte)(i * 7);
+      pixels[i * 4 + 3] = 0xFF;
+    }
+
+    var restored = XcfTileDecoder.DecodeRle(XcfTileDecoder.EncodeRle(pixels, 4, 8, 8), 4, 8, 8);
+
+    Assert.That(restored, Is.EqualTo(pixels));
   }
 
   [Test]
