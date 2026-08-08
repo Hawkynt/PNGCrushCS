@@ -17,7 +17,7 @@ namespace FileFormat.ZonerBrush;
 /// tool draws.
 /// </remarks>
 public readonly record struct ZonerBrushFile
-  : IImageFormatReader<ZonerBrushFile>, IImageToRawImage<ZonerBrushFile>, IImageFormatWriter<ZonerBrushFile> {
+  : IImageFormatReader<ZonerBrushFile>, IImageToRawImage<ZonerBrushFile>, IImageFromRawImage<ZonerBrushFile>, IImageFormatWriter<ZonerBrushFile> {
 
   /// <summary>The preview is always this size.</summary>
   public const int Width = 100, Height = 100;
@@ -58,10 +58,15 @@ public readonly record struct ZonerBrushFile
     var data = file.PixelData ?? [];
     var stored = file.Palette ?? [];
     var palette = new byte[PaletteCount * 3];
+
+    // Blue first, as the entry is laid out — this used to take the bytes in the order they came and
+    // so drew every preview with its reds and blues exchanged. The samples settle it: all three
+    // carry the standard Windows sixteen, whose entry 1 is dark red, and the 0x7F in that entry sits
+    // in the third byte. Entry 4 is dark blue and has its 0x7F in the first.
     for (var i = 0; i < PaletteCount && i * PaletteEntrySize + 2 < stored.Length; ++i) {
-      palette[i * 3] = stored[i * PaletteEntrySize];
+      palette[i * 3] = stored[i * PaletteEntrySize + 2];
       palette[i * 3 + 1] = stored[i * PaletteEntrySize + 1];
-      palette[i * 3 + 2] = stored[i * PaletteEntrySize + 2];
+      palette[i * 3 + 2] = stored[i * PaletteEntrySize];
     }
 
     var pixels = new byte[Width * Height];
@@ -80,6 +85,45 @@ public readonly record struct ZonerBrushFile
       PixelData = pixels,
       Palette = palette,
       PaletteCount = PaletteCount,
+    };
+  }
+
+  /// <summary>Creates a brush carrying the picture as its preview.</summary>
+  /// <remarks>
+  /// Only the preview is written, the drawing behind it never having been read, so what comes out is
+  /// a file whose picture any reader of these can draw and which no tool can paint with. That is the
+  /// same limit <see cref="ZonerBrushWriter"/> already states, reached from the other side.
+  /// <para/>
+  /// The preview is a fixed 100 by 100, so a picture of any other size is sampled onto it rather
+  /// than refused, and reduced to the sixteen colours four bits a pixel can address. The rows go
+  /// bottom upwards and the palette entries blue first, both matching what <see cref="ToRawImage"/>
+  /// reads; the header is the eight bytes all three samples open with, which is as much of it as is
+  /// known to be constant.
+  /// </remarks>
+  public static ZonerBrushFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var quantized = ColorQuantizer.Quantize(image.SampleTo(Width, Height).ToBgra32(), Width * Height, PaletteCount);
+
+    var palette = new byte[PaletteCount * PaletteEntrySize];
+    for (var i = 0; i < quantized.Count; ++i) {
+      palette[i * PaletteEntrySize] = quantized.Palette[i * 3 + 2];
+      palette[i * PaletteEntrySize + 1] = quantized.Palette[i * 3 + 1];
+      palette[i * PaletteEntrySize + 2] = quantized.Palette[i * 3];
+    }
+
+    var pixels = new byte[BytesPerRow * Height];
+    for (var y = 0; y < Height; ++y)
+    for (var x = 0; x < Width; ++x) {
+      var index = quantized.Indices[y * Width + x] & 0x0F;
+      var at = (Height - 1 - y) * BytesPerRow + (x >> 1);
+      pixels[at] |= (byte)((x & 1) == 0 ? index << 4 : index);
+    }
+
+    return new() {
+      Header = [0x9A, 0x02, 0x02, 0x00, 0x2D, 0x2D, 0x2D, 0x00],
+      Palette = palette,
+      PixelData = pixels,
     };
   }
 }
