@@ -101,8 +101,13 @@ a font and the glyphs are in the font. A page that is nothing but words comes ou
 wrong.
 
 `ai` up to version 8 is that same PostScript; from version 9 it is a PDF under an Illustrator name,
-and its first four bytes send it to the PDF reader. What makes the name worth claiming is what it
-refuses. Eleven of the twelve `.ai` samples here declare procedure sets under
+and its first four bytes send it to the PDF reader — checked by renaming a PDF to `.ai`, which comes
+out the same picture under either name. That is the right reader rather than a complete answer: the
+PDF reader here takes the rasters a document carries and does not draw a page's own content, so a
+version 9 file whose artwork is vector has nothing in it for that reader to find. Drawing those
+would be a PDF content-stream interpreter, which is a different job from this one.
+
+What makes the name worth claiming is what it refuses. Eleven of the twelve `.ai` samples here declare procedure sets under
 `%%DocumentNeededResources` and do not carry them — `Adobe_level2_AI5` and `Adobe_Illustrator_AI5`
 for the ten written by Illustrator 6, `Adobe_packedarray` and `Adobe_IllustratorA_AI3` for
 `DIAMONDS.AI` — and every operator their drawing is made of is defined in those sets. They are
