@@ -16,7 +16,8 @@ namespace FileFormat.RagD;
 /// layout a program can draw into without shifting bits.
 /// </remarks>
 public readonly record struct RagDFile
-  : IImageFormatReader<RagDFile>, IImageToRawImage<RagDFile> {
+  : IImageFormatReader<RagDFile>, IImageToRawImage<RagDFile>,
+    IImageFromRawImage<RagDFile>, IImageFormatWriter<RagDFile> {
 
   /// <summary>The string every file starts with.</summary>
   public const string Signature = "RAG-D!";
@@ -37,6 +38,7 @@ public readonly record struct RagDFile
   static string[] IImageFormatMetadata<RagDFile>.FileExtensions => [".rag", ".ragc"];
   static RagDFile IImageFormatReader<RagDFile>.FromSpan(ReadOnlySpan<byte> data)
     => RagDReader.FromSpan(data);
+  static byte[] IImageFormatWriter<RagDFile>.ToBytes(RagDFile file) => RagDWriter.ToBytes(file);
 
   /// <summary>
   /// Reads a named file, the extension being what its reader needs.
@@ -103,6 +105,78 @@ public readonly record struct RagDFile
       PixelData = pixels,
       Palette = palette,
       PaletteCount = colors,
+    };
+  }
+
+  /// <summary>Bitplanes a written picture spreads a pixel over.</summary>
+  public const int WrittenPlanes = 8;
+
+  /// <summary>Colours a written picture's palette holds.</summary>
+  public const int WrittenColorCount = 256;
+
+  /// <summary>Pixels a row must be a whole number of; the hardware fetched a word at a time.</summary>
+  public const int WidthGranularity = 16;
+
+  /// <summary>The widest row the header can state, being a whole number of words.</summary>
+  public const int MaxWidth = 65535 / WidthGranularity * WidthGranularity;
+
+  /// <summary>The tallest picture the header can state, its height being stored one less.</summary>
+  public const int MaxHeight = 65536;
+
+  /// <summary>
+  /// Builds a picture from any image, as eight bitplanes against a 256-colour Falcon palette.
+  /// </summary>
+  /// <remarks>
+  /// Of the forms the header can state, this is the one that loses least. True colour is sixteen
+  /// bits a pixel in five-six-five, so it throws away three bits of red and blue from every pixel
+  /// and can never be exact; eight planes against a stored palette keeps whatever 256 colours the
+  /// picture is reduced to exactly as they were. Bitplanes rather than the chunky variant because
+  /// the two are the same length and nothing in the header tells them apart — only the file name
+  /// does, and a picture read back without one is taken as bitplanes.
+  /// <para/>
+  /// A row is a whole number of words, so a width that is not a multiple of sixteen is sampled up to
+  /// the next one rather than refused.
+  /// </remarks>
+  public static RagDFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var width = (image.Width + WidthGranularity - 1) / WidthGranularity * WidthGranularity;
+    if (width > MaxWidth || image.Height > MaxHeight)
+      throw new ArgumentException(
+        $"A RAG-D header states {MaxWidth}x{MaxHeight} at most, not {width}x{image.Height}.", nameof(image));
+
+    var height = image.Height;
+    var indexed = image.SampleTo(width, height).EnsureIndexedAtMost(WrittenColorCount);
+    var stride = (width >> 3) * WrittenPlanes;
+    var data = new byte[FalconBitmapOffset + stride * height];
+
+    for (var i = 0; i < Signature.Length; ++i)
+      data[i] = (byte)Signature[i];
+
+    data[12] = (byte)(width >> 8);
+    data[13] = (byte)width;
+
+    // The stored height is one less than the real one, so a 256-row picture still fits two bytes.
+    data[14] = (byte)((height - 1) >> 8);
+    data[15] = (byte)(height - 1);
+    data[17] = WrittenPlanes;
+    data[18] = (byte)(FalconPaletteLength >> 24);
+    data[19] = (byte)(FalconPaletteLength >> 16);
+    data[20] = (byte)(FalconPaletteLength >> 8);
+    data[21] = (byte)(FalconPaletteLength & 0xFF);
+
+    AtariStGraphics.WriteFalconPalette(
+      indexed.Palette ?? [], WrittenColorCount, data.AsSpan(PaletteOffset, FalconPaletteLength));
+    AtariStGraphics.PackBitplanes(indexed.PixelData, stride, WrittenPlanes, width, height)
+      .CopyTo(data.AsSpan(FalconBitmapOffset));
+
+    return new() {
+      Data = data,
+      Width = width,
+      Height = height,
+      Planes = WrittenPlanes,
+      PaletteLength = FalconPaletteLength,
+      IsChunky = false,
     };
   }
 }
