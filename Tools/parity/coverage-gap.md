@@ -263,7 +263,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | d3d | .b2d .b3d |  |
 | dsi | .dsi |  |
 | dwg | .dwg | thumbnail at the stated address |
-| dxf | .dxf | Windows only |
+| dxf | .dxf | read from the published group codes; Windows only in XnView |
 | ecc | .ecc |  |
 | eidi | .ei .eidi |  |
 | eif | .eif |  |
@@ -295,7 +295,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | ipg | .ipg |  |
 | iss | .iss |  |
 | iwc | .iwc | Windows only |
-| jbf | .jbf |  |
+| jbf | .jbf | version 2 read; version 1's bitmap coding refused |
 | jig | .jig |  |
 | jig2 | .jig |  |
 | k25 | .k25 |  |
@@ -323,7 +323,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | pan | .pan |  |
 | pax | .pax |  |
 | pbt | .pbt |  |
-| pcl | .pcl |  |
+| pcl | .pcl | the raster subset read; text and HP-GL/2 passed over |
 | pd | .pd .t1 .t2 |  |
 | pdd | .pdd |  |
 | pdx | .pdx |  |
@@ -367,7 +367,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | stw | .stw |  |
 | svg | .svg | read |
 | synu | .syn .synu |  |
-| taac | .suniff .taac .vff |  |
+| taac | .suniff .taac .vff | read, and checked against the sample |
 | tdi | .tdi |  |
 | tdim | .tdim |  |
 | ti | .73i .82i .83i .85i .86i .92i |  |
@@ -375,7 +375,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | tjp | .tjp |  |
 | tnl | .tnl |  |
 | tsk | .tsk |  |
-| ttf | .ttf |  |
+| ttf | .ttf | drawn as a sheet of its glyphs |
 | tub | .psptube .tub |  |
 | upe4 | .pe4 |  |
 | upi | .upi |  |
@@ -389,7 +389,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | wzl | .wzl |  |
 | x3f | .x3f |  |
 | xar | .xar | preview at the stated tag |
-| xif | .xif |  |
+| xif | .xif | a TIFF; the sample's private compression 34673 is not decoded |
 | xim | .xim |  |
 | xp0 | .xp0 |  |
 | ypc | .ypc | Windows only |
