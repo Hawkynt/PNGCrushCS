@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 
 namespace FileFormat.Bmp;
@@ -143,8 +143,17 @@ public static class BmpWriter {
         byte[] compressed;
         if (compression == BmpCompression.Rle8)
           compressed = RleCompressor.CompressRle8(rowData);
-        else
-          compressed = RleCompressor.CompressRle4(rowData, width);
+        else {
+          // One index a byte, which is what the coder reads. The row arrives packed two pixels to
+          // the byte, and handed over as it stands every pair was coded as a single index and the
+          // coder walked off the end of the row — so a four-bit run-length bitmap came out
+          // malformed, and nothing here read one back to say so.
+          var unpacked = new byte[width];
+          for (var x = 0; x < width; ++x)
+            unpacked[x] = (byte)((x & 1) == 0 ? rowData[x >> 1] >> 4 : rowData[x >> 1] & 0x0F);
+
+          compressed = RleCompressor.CompressRle4(unpacked, width);
+        }
 
         ms.Write(compressed);
       }
