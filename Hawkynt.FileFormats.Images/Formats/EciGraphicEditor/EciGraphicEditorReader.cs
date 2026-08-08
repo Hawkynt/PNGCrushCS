@@ -16,14 +16,23 @@ namespace FileFormat.EciGraphicEditor;
 /// picture is 296 wide, which is 148 stored pixels with 12 hidden at the left, again as in FLI. The
 /// two frames are averaged channel by channel.
 /// <para/>
-/// With the first bitmap at 2, its screen at 8194, the second bitmap at 16386, its screen at 24578
-/// and one shared colour map at 25602, that model draws 80.4 per cent of the picture exactly.
-/// Sweeping every page boundary in the file for the two screens and the two colour maps moves it
-/// only to 81.9, so the remaining fifth is not a misplaced block. The errors are not spread evenly
-/// either: where both frames select the colour map they are 95.6 per cent wrong, and where the
-/// first frame selects the screen's low nibble they are wrong essentially always — while the same
-/// low nibble against a different second frame is right four times in five. So the colour sources
-/// are what is left to work out, not the geometry.
+/// Each frame is an FLI frame, not a plain screen. A bank is eight video matrices of 1024 followed
+/// by the bitmap on the next page: bitmap at 2 with its eight matrices at 8194, and bitmap at 16386
+/// with its eight at 24578. Reading one matrix a raster line, as FLI does, draws 82.6 per cent of
+/// the picture exactly against 80.4 for a single matrix a frame.
+/// <para/>
+/// What is left is the colour that pattern 11 selects, and the shape of it is now known. Take only
+/// the pixels where both frames choose that pattern, so the blend is of one colour with itself and
+/// the palette entry can be read straight off what the reference draws. Grouped by character cell,
+/// 166 of 208 cells want a single colour and 42 want more than one — so it is not a colour map that
+/// stands still for a cell. Grouped by cell and raster line instead, all 1064 of 1064 want a single
+/// colour. The colour is line-strided exactly as the matrices are.
+/// <para/>
+/// It is not simply a ninth block of that shape, though: sweeping every even offset in the file for
+/// an eight-page run whose low nibbles satisfy those 1064 constraints gets 83 of them at best. So
+/// either the two frames carry a line-strided colour each and only their blend is visible here, or
+/// pattern 11 draws from something other than a colour map. That is the one thing between this
+/// format and a reader.
 /// <para/>
 /// Nothing is applied. Four fifths of a picture is not a decoder, and this is the same interlaced
 /// family as Drazlace, DrazPaint, True Paint and Pixel Perfect, which all sit at 2 to 4 per cent —
