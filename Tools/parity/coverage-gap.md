@@ -23,9 +23,23 @@ Of the 161 left, ten still have a sample here and the rest have none. That is wh
 rather than tedious: a format with no sample, no specification and no tool on this machine that
 reads it cannot be implemented without guessing a layout, and guessing has already been shown here
 to produce readers that score well on a sample of pixels and are wrong over the whole picture. The
-ten with samples are `afx`, `bmg`, `hru`, `pegs`, `pxa`, `tile`, `upe4`, `upst` and `vit`. Of those,
-`pe4` and `pst` are tiled — sixty separate JPEGs in one file — so they need the tiles assembled
-rather than the first one drawn, which is the mistake a signature search alone would make.
+ten with samples are `afx`, `bmg`, `hru`, `pegs`, `pxa`, `tile`, `upe4`, `upst` and `vit`. What has
+been measured about them, so it does not have to be measured again:
+
+  - `pe4` and `pst` are tiled — sixty separate JPEGs in one file — so they need the tiles assembled
+    rather than the first one drawn, which is the mistake a signature search alone would make.
+  - `afx` opens with PNG's eight-byte signature carrying `AFX` in place of `PNG`, and is not chunked
+    the way PNG is. It holds four JPEGs at 140x88, 128x80 and 125x128, which are previews at
+    different sizes rather than one picture. Which of them the tool draws is exactly what cannot be
+    settled without the tool, so it is left rather than guessed: drawing the largest would be picking
+    one on no evidence.
+  - `tile` names itself `Eclipse` at 16 and states two equal numbers at 4 and 8; `vit` names itself
+    `VITec` at 32; `pxa` names itself `Pixia` at 0. Each has a header worth reading and none of them
+    has been read.
+
+The pattern that closed `ecc`, `lvp` and `pan` is the one to try first on the rest: find whether the
+file carries a picture format already here, and if it does, require the header's stated size to agree
+with the payload's own before drawing it.
 
 The last column marks the ones XnView itself cannot load on this platform: its catalogue says
 Windows only, so nothing here has ever been able to compare against them either.
