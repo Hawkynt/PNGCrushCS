@@ -94,8 +94,7 @@ public readonly record struct MsxSpriteFile
   /// patterns carry picture data; the rest comes back zeroed.</summary>
   public static MsxSpriteFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Width != PixelWidth || image.Height != PixelHeight)
-      throw new ArgumentException($"MSX sprite tables render as a fixed {PixelWidth}x{PixelHeight} grid, but got {image.Width}x{image.Height}.", nameof(image));
+    image = image.SampleTo(PixelWidth, PixelHeight);
 
     var indexed = image.EnsureIndexed(PixelFormat.Indexed1, _BlackWhitePalette);
     var rowStride = PixelWidth / 8;

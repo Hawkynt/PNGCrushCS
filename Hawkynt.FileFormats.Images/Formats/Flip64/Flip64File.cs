@@ -132,8 +132,7 @@ public readonly record struct Flip64File
   /// hardware allows just four colours per cell.</summary>
   public static Flip64File FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Width != FixedWidth || image.Height != FixedHeight)
-      throw new ArgumentException($"Flip images are always {FixedWidth}x{FixedHeight}, but got {image.Width}x{image.Height}.", nameof(image));
+    image = image.SampleTo(FixedWidth, FixedHeight);
 
     var bgra = PixelConverter.Convert(image, PixelFormat.Bgra32);
     var bitmap = new byte[BitmapSize];

@@ -116,8 +116,7 @@ public readonly record struct Sprite64File
   /// since a mono sprite can hold everything a black-and-white 24x21 picture has to offer.</summary>
   public static Sprite64File FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Width != PixelWidth || image.Height != PixelHeight)
-      throw new ArgumentException($"C64 sprites are always {PixelWidth}x{PixelHeight}, but got {image.Width}x{image.Height}.", nameof(image));
+    image = image.SampleTo(PixelWidth, PixelHeight);
 
     var indexed = image.EnsureIndexed(PixelFormat.Indexed1, _BlackWhitePalette);
     var spriteData = new byte[SpriteDataSize];

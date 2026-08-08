@@ -91,8 +91,7 @@ public readonly record struct ZxTimexFile
   /// the hardware allows just one ink and one paper colour (and a shared bright flag) per strip.</summary>
   public static ZxTimexFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Width != 256 || image.Height != 192)
-      throw new ArgumentException($"Timex HiColor screens are always 256x192, but got {image.Width}x{image.Height}.", nameof(image));
+    image = image.SampleTo(256, 192);
 
     var indexed = image.EnsureIndexed(PixelFormat.Indexed8, ZxSpectrumGraphics.Palette.ToArray());
     var bitmap = new byte[6144];
@@ -116,7 +115,10 @@ public readonly record struct ZxTimexFile
         if (c != paper && counts[c] > counts[ink])
           ink = c;
 
-      attributes[y * cellsAcross + cellX] = ZxSpectrumGraphics.Attribute(ink, paper);
+      // The attribute area is addressed the way the display file is, and the reader hands it over
+      // exactly as the file holds it. Written straight through, as this did, every colour lands on
+      // the wrong scanline and the picture does not survive its own round trip.
+      attributes[ZxSpectrumGraphics.LineOffset(y) + cellX] = ZxSpectrumGraphics.Attribute(ink, paper);
 
       byte rowByte = 0;
       for (var x = 0; x < 8; ++x) {

@@ -85,8 +85,7 @@ public readonly record struct ZxFlashFile
   /// still <see cref="RawImage"/> carries, so only the base frame comes out.</summary>
   public static ZxFlashFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Width != 256 || image.Height != 192)
-      throw new ArgumentException($"ZX Spectrum Flash screens are always 256x192, but got {image.Width}x{image.Height}.", nameof(image));
+    image = image.SampleTo(256, 192);
 
     var indexed = image.EnsureIndexed(PixelFormat.Indexed8, ZxSpectrumGraphics.Palette.ToArray());
     var bitmap = new byte[6144];

@@ -165,8 +165,7 @@ public sealed class ZxMultiArtistFile
   /// paper colour (and a shared bright flag) per cell.</summary>
   public static ZxMultiArtistFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Width != 256 || image.Height != 192)
-      throw new ArgumentException($"ZX Spectrum MultiArtist images are always 256x192, but got {image.Width}x{image.Height}.", nameof(image));
+    image = image.SampleTo(256, 192);
 
     const int cellHeight = 1;
     var indexed = image.EnsureIndexed(PixelFormat.Indexed8, ZxSpectrumGraphics.Palette.ToArray());

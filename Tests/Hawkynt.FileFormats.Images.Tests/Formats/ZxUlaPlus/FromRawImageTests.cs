@@ -37,10 +37,16 @@ public sealed class FromRawImageTests {
 
   [Test]
   [Category("Unit")]
-  public void FromRawImage_RejectsWrongDimensions() {
-    var raw = new RawImage { Width = 100, Height = 100, Format = PixelFormat.Rgb24, PixelData = new byte[100 * 100 * 3] };
+  public void FromRawImage_ScalesAPictureOfAnyOtherSize() {
+    // This screen has one size and no other, so a picture of a different size is brought to it
+    // rather than refused — which is what the rest of the library does and what a converter is for.
+    static RawImage Raw(int width, int height)
+      => new() { Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = new byte[width * height * 3] };
 
-    Assert.Throws<ArgumentException>(() => ZxUlaPlusFile.FromRawImage(raw));
+    var small = ZxUlaPlusFile.ToRawImage(ZxUlaPlusFile.FromRawImage(Raw(100, 100)));
+    var large = ZxUlaPlusFile.ToRawImage(ZxUlaPlusFile.FromRawImage(Raw(640, 480)));
+
+    Assert.That((small.Width, small.Height), Is.EqualTo((large.Width, large.Height)));
   }
 
   [Test]

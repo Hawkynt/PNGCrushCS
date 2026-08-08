@@ -121,8 +121,7 @@ public readonly record struct Fli64File
   /// hold a strip-local colour.</summary>
   public static Fli64File FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Width != FixedWidth || image.Height != FixedHeight)
-      throw new ArgumentException($"FLI multicolor images are always {FixedWidth}x{FixedHeight}, but got {image.Width}x{image.Height}.", nameof(image));
+    image = image.SampleTo(FixedWidth, FixedHeight);
 
     var bgra = PixelConverter.Convert(image, PixelFormat.Bgra32);
     const int cellsAcross = 40, cellsDown = 25;

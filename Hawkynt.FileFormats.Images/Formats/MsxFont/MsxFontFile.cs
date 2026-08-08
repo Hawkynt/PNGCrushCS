@@ -95,8 +95,7 @@ public readonly record struct MsxFontFile
   /// 8x8 glyphs this format renders as. Each pixel is thresholded to black or white.</summary>
   public static MsxFontFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Width != PixelWidth || image.Height != PixelHeight)
-      throw new ArgumentException($"MSX font tables render as a fixed {PixelWidth}x{PixelHeight} grid, but got {image.Width}x{image.Height}.", nameof(image));
+    image = image.SampleTo(PixelWidth, PixelHeight);
 
     var indexed = image.EnsureIndexed(PixelFormat.Indexed1, _BlackWhitePalette);
     var rowStride = PixelWidth / 8;

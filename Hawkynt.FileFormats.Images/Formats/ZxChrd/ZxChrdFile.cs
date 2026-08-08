@@ -69,8 +69,7 @@ public readonly record struct ZxChrdFile
   /// glyphs this format renders as. Each pixel is thresholded to black or white.</summary>
   public static ZxChrdFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Width != 128 || image.Height != 128)
-      throw new ArgumentException($"ZX Spectrum character sets render as a fixed 128x128 grid, but got {image.Width}x{image.Height}.", nameof(image));
+    image = image.SampleTo(128, 128);
 
     var indexed = image.EnsureIndexed(PixelFormat.Indexed1, [0, 0, 0, 255, 255, 255]);
     const int bytesPerRow = 16;

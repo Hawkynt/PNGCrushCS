@@ -131,8 +131,7 @@ public readonly record struct ZxUlaPlusFile
   /// colour per cell.</summary>
   public static ZxUlaPlusFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Width != 256 || image.Height != 192)
-      throw new ArgumentException($"ZX Spectrum ULAplus screens are always 256x192, but got {image.Width}x{image.Height}.", nameof(image));
+    image = image.SampleTo(256, 192);
 
     var bgra = PixelConverter.Convert(image, PixelFormat.Bgra32);
     var quant = ColorQuantizer.Quantize(bgra.PixelData, image.Width * image.Height, 16);

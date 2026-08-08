@@ -103,8 +103,7 @@ public readonly record struct ZxTricolorFile
   /// the average exact instead of inventing two unrelated screens.</summary>
   public static ZxTricolorFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Width != 256 || image.Height != 192)
-      throw new ArgumentException($"ZX Spectrum Tricolor screens are always 256x192, but got {image.Width}x{image.Height}.", nameof(image));
+    image = image.SampleTo(256, 192);
 
     var indexed = image.EnsureIndexed(PixelFormat.Indexed8, ZxSpectrumGraphics.Palette.ToArray());
     var bitmap = new byte[6144];
