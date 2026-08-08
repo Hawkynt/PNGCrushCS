@@ -20,6 +20,13 @@ namespace Conformance.Recoil.Tests;
 /// A format neither reference tool knows is recorded as unverifiable rather than counted as a pass:
 /// those are the ones where nothing but our own reader has ever looked at the output, and pretending
 /// otherwise is what this fixture exists to stop.
+/// <para/>
+/// One limit of asking <c>identify</c> rather than converting: it stops as soon as it knows the size,
+/// which for some coders is before the picture is read at all. A Palm file is the case that showed
+/// it — the reader answers with the dimensions and only refuses further on, where it measures a
+/// packed file against an unpacked length and turns down anything that compressed well, its own
+/// writer's output included. So a pass here means the header was accepted, which is weaker than a
+/// full decode and still far stronger than our own reader agreeing with itself.
 /// </remarks>
 [TestFixture]
 [Category("Conformance")]
