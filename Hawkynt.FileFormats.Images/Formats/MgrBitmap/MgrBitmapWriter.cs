@@ -14,15 +14,22 @@ public static class MgrBitmapWriter {
     ArgumentNullException.ThrowIfNull(file);
 
     var pixels = file.PixelData ?? [];
-    var result = new byte[MgrBitmapFile.HeaderSize + pixels.Length];
-    result[0] = (byte)'y';
+    var header = file.HasDepthByte ? MgrBitmapFile.HeaderSize : MgrBitmapFile.ShortHeaderSize;
+    var result = new byte[header + pixels.Length];
+
+    // The shorter form and its letters, which is what the one real sample is. A file read in the
+    // longer form is written back in it, so its length does not change under a round trip.
+    result[0] = (byte)'z';
     result[1] = (byte)'z';
     _WritePair(result, 2, file.Width);
     _WritePair(result, 4, file.Height);
-    result[6] = MgrBitmapFile.HeaderBias + 1;
-    result[7] = MgrBitmapFile.HeaderBias;
 
-    pixels.CopyTo(result.AsSpan(MgrBitmapFile.HeaderSize));
+    if (file.HasDepthByte) {
+      result[6] = MgrBitmapFile.HeaderBias + 1;
+      result[7] = MgrBitmapFile.HeaderBias;
+    }
+
+    pixels.CopyTo(result.AsSpan(header));
 
     return result;
   }

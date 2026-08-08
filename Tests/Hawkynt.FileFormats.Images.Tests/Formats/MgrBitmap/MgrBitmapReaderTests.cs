@@ -137,6 +137,40 @@ public sealed class MgrBitmapReaderTests {
 
   [Test]
   [Category("Unit")]
+  public void FromBytes_TheShorterHeaderIsTakenWhenTheLengthSaysSo() {
+    // The one real sample is 518 bytes, opens 'zz' and states 64 by 64 — six bytes of header and
+    // then 512 of bitmap, exactly its length. Read with the eight-byte header it is two short, and
+    // read with the letters this used to demand it was refused outright.
+    var data = new byte[MgrBitmapFile.ShortHeaderSize + 8 * 64];
+    data[0] = (byte)'z';
+    data[1] = (byte)'z';
+    _Pair(data, 2, 64);
+    _Pair(data, 4, 64);
+
+    var file = MgrBitmapReader.FromBytes(data);
+
+    Assert.Multiple(() => {
+      Assert.That(file.Width, Is.EqualTo(64));
+      Assert.That(file.Height, Is.EqualTo(64));
+      Assert.That(file.HasDepthByte, Is.False);
+      Assert.That(file.PixelData, Has.Length.EqualTo(8 * 64));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void RoundTrip_AShortHeaderedFileKeepsItsLength() {
+    var data = new byte[MgrBitmapFile.ShortHeaderSize + 8 * 64];
+    data[0] = (byte)'z';
+    data[1] = (byte)'z';
+    _Pair(data, 2, 64);
+    _Pair(data, 4, 64);
+
+    Assert.That(MgrBitmapWriter.ToBytes(MgrBitmapReader.FromBytes(data)), Has.Length.EqualTo(data.Length));
+  }
+
+  [Test]
+  [Category("Unit")]
   public void FromRawImage_ASetBitIsTheDarkOne() {
     // Sampled the other way round the writer produced every picture as its own negative.
     var image = new RawImage {

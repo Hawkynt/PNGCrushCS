@@ -12,7 +12,15 @@ public readonly record struct MgrBitmapFile : IImageFormatReader<MgrBitmapFile>,
   static VideoMode[] IImageFormatMetadata<MgrBitmapFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
   static byte[] IImageFormatWriter<MgrBitmapFile>.ToBytes(MgrBitmapFile file) => MgrBitmapWriter.ToBytes(file);
 
-  /// <summary>Bytes of header: the letters, the two dimensions, the depth and a spare.</summary>
+  /// <summary>Bytes of header in the older form: the letters and the two dimensions.</summary>
+  /// <remarks>
+  /// The one real sample is 518 bytes, opens <c>zz</c>, and states 64 by 64 — which is six bytes and
+  /// then 512 of bitmap, exactly its length. Read with the longer header it is two bytes short, and
+  /// read with the letters this demanded it was refused outright.
+  /// </remarks>
+  public const int ShortHeaderSize = 6;
+
+  /// <summary>Bytes of header in the longer form, which states a depth as well.</summary>
   public const int HeaderSize = 8;
 
   /// <summary>What each six-bit half is biased by, to keep the header typable.</summary>
@@ -20,6 +28,10 @@ public readonly record struct MgrBitmapFile : IImageFormatReader<MgrBitmapFile>,
 
   public int Width { get; init; }
   public int Height { get; init; }
+
+  /// <summary>Whether the file this came from carried the longer header, which states a depth.</summary>
+  /// <remarks>Kept so a file read and written again comes back the length it went in as.</remarks>
+  public bool HasDepthByte { get; init; }
 
   /// <summary>1bpp packed pixel data, MSB first, ceil(width/8) bytes per row.</summary>
   public byte[] PixelData { get; init; }
