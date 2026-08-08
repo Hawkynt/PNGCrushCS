@@ -16,7 +16,8 @@ namespace FileFormat.Apac3;
 /// not the format.
 /// </remarks>
 public readonly record struct Apac3File
-  : IImageFormatReader<Apac3File>, IImageToRawImage<Apac3File> {
+  : IImageFormatReader<Apac3File>, IImageToRawImage<Apac3File>,
+    IImageFromRawImage<Apac3File>, IImageFormatWriter<Apac3File> {
 
   /// <summary>Displayed width.</summary>
   public const int Width = 320;
@@ -37,6 +38,7 @@ public readonly record struct Apac3File
   static string[] IImageFormatMetadata<Apac3File>.FileExtensions =>
     [".ap3", ".apv", ".dgi", ".dgp", ".esc", ".ilc", ".pzm", ".app", ".ils"];
   static Apac3File IImageFormatReader<Apac3File>.FromSpan(ReadOnlySpan<byte> data) => Apac3Reader.FromSpan(data);
+  static byte[] IImageFormatWriter<Apac3File>.ToBytes(Apac3File file) => Apac3Writer.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<Apac3File>.VideoModes => [
     new("APAC 3", [(Width, Height)], [256])
   ];
@@ -105,6 +107,42 @@ public readonly record struct Apac3File
       return 0;
 
     return (x & 4) == 0 ? data[index] >> 4 : data[index] & 15;
+  }
+
+  /// <summary>The shortest of the three lengths, which puts the hues straight after the luminances.</summary>
+  public const int CompactSize = 15360;
+
+  /// <summary>Where the hues begin in the shortest form.</summary>
+  public const int CompactHueOffset = SourceRows * RowStride;
+
+  /// <summary>Encodes a picture as an APAC 3 screen.</summary>
+  /// <remarks>
+  /// Written in the shortest of the three lengths. The longer one leaves a gap between the halves
+  /// that the picture does not use, so a file that had it would be five hundred bytes longer and say
+  /// exactly the same thing.
+  /// <para/>
+  /// The four blocks — two luminance halves and two hue halves — are chosen against each other
+  /// rather than one at a time, because a hue row has no luminance of its own and takes the mean of
+  /// its neighbours': a nibble therefore reaches four scanlines and choosing it against one of them
+  /// makes the other three worse.
+  /// </remarks>
+  public static Apac3File FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(Width, Height).PixelData;
+    var streams = ApacInterlaceEncoder.Encode(rgb, Width, Height);
+    var nibbles = Width / ApacInterlaceEncoder.PixelsPerNibble;
+    var data = new byte[CompactSize];
+
+    // The two fields interleave a row at a time: the luminances first, then the hues, and within
+    // each half the second field's row sits between the first field's rows.
+    ApacInterlaceEncoder.Pack(streams.FirstLuminance, data, 0, RowStride, SourceRows, nibbles);
+    ApacInterlaceEncoder.Pack(streams.SecondLuminance, data, FieldStride, RowStride, SourceRows, nibbles);
+    ApacInterlaceEncoder.Pack(streams.SecondHue, data, CompactHueOffset, RowStride, SourceRows, nibbles);
+    ApacInterlaceEncoder.Pack(
+      streams.FirstHue, data, CompactHueOffset + FieldStride, RowStride, SourceRows, nibbles);
+
+    return new() { Data = data, HueOffset = CompactHueOffset };
   }
 
   private static byte[] _ToRgb(ReadOnlySpan<byte> frame, ReadOnlySpan<byte> gtia) {

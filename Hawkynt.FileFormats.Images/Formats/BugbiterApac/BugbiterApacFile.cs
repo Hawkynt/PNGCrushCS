@@ -1,4 +1,6 @@
 using System;
+using System.Text;
+using FileFormat.Apac3;
 using FileFormat.Core;
 
 namespace FileFormat.BugbiterApac;
@@ -15,7 +17,8 @@ namespace FileFormat.BugbiterApac;
 /// why everything after the header moves.
 /// </remarks>
 public readonly record struct BugbiterApacFile
-  : IImageFormatReader<BugbiterApacFile>, IImageToRawImage<BugbiterApacFile> {
+  : IImageFormatReader<BugbiterApacFile>, IImageToRawImage<BugbiterApacFile>,
+    IImageFromRawImage<BugbiterApacFile>, IImageFormatWriter<BugbiterApacFile> {
 
   /// <summary>Screen pixels across.</summary>
   public const int Width = 320;
@@ -57,6 +60,8 @@ public readonly record struct BugbiterApacFile
   static string[] IImageFormatMetadata<BugbiterApacFile>.FileExtensions => [".bgp"];
   static BugbiterApacFile IImageFormatReader<BugbiterApacFile>.FromSpan(ReadOnlySpan<byte> data)
     => BugbiterApacReader.FromSpan(data);
+  static byte[] IImageFormatWriter<BugbiterApacFile>.ToBytes(BugbiterApacFile file)
+    => BugbiterApacWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<BugbiterApacFile>.VideoModes => [
     new("APAC239i", [(Width, Height)], [256])
   ];
@@ -88,5 +93,51 @@ public readonly record struct BugbiterApacFile
       PixelData = FrameBlend.Average(
         Atari8BitGraphics.ApplyPalette(first), Atari8BitGraphics.ApplyPalette(second)),
     };
+  }
+
+  /// <summary>Stored rows the first field's luminances and the second's hues occupy.</summary>
+  public const int LongRows = (Height + 1) / 2;
+
+  /// <summary>Stored rows the second field's luminances and the first's hues occupy.</summary>
+  public const int ShortRows = Height / 2;
+
+  /// <summary>The two bytes each half of the picture opens with.</summary>
+  public static ReadOnlySpan<byte> HalfMarker => [88, 37];
+
+  /// <summary>Encodes a picture as an APAC239i screen.</summary>
+  /// <remarks>
+  /// Written with no comment. The text is the file's own and carries nothing about the picture; a
+  /// comment of length zero is what moves everything after the header the least, and where the two
+  /// halves start is the only check the reader has that the length pointed at the picture.
+  /// <para/>
+  /// The odd number of scanlines is what the format's name refers to, and it falls unevenly: the
+  /// first field's luminances cover 120 rows and the second's 119, since the two are on alternate
+  /// scanlines and 239 does not halve.
+  /// </remarks>
+  public static BugbiterApacFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(Width, Height).PixelData;
+    var streams = ApacInterlaceEncoder.Encode(rgb, Width, Height);
+    var nibbles = Width / ApacInterlaceEncoder.PixelsPerNibble;
+
+    var data = new byte[BaseFileSize];
+    Encoding.ASCII.GetBytes(Signature).CopyTo(data, 0);
+    data[30] = 255;
+    data[31] = 80;
+    data[32] = Height;
+
+    var picture = TextOffset;
+    HalfMarker.CopyTo(data.AsSpan(picture));
+    HalfMarker.CopyTo(data.AsSpan(picture + SecondHueOffset - 2));
+
+    ApacInterlaceEncoder.Pack(
+      streams.FirstLuminance, data, picture + FirstLuminanceOffset, Stride, LongRows, nibbles);
+    ApacInterlaceEncoder.Pack(
+      streams.SecondLuminance, data, picture + SecondLuminanceOffset, Stride, ShortRows, nibbles);
+    ApacInterlaceEncoder.Pack(streams.SecondHue, data, picture + SecondHueOffset, Stride, LongRows, nibbles);
+    ApacInterlaceEncoder.Pack(streams.FirstHue, data, picture + FirstHueOffset, Stride, ShortRows, nibbles);
+
+    return new() { Data = data, PictureOffset = picture };
   }
 }
