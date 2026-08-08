@@ -15,7 +15,8 @@ namespace FileFormat.SeuckSprites;
 /// shows the same black and white throughout and varies only in the third.
 /// </remarks>
 public readonly record struct SeuckSpritesFile
-  : IImageFormatReader<SeuckSpritesFile>, IImageToRawImage<SeuckSpritesFile> {
+  : IImageFormatReader<SeuckSpritesFile>, IImageToRawImage<SeuckSpritesFile>,
+    IImageFromRawImage<SeuckSpritesFile>, IImageFormatWriter<SeuckSpritesFile> {
 
   /// <summary>Sprites the set holds.</summary>
   public const int SpriteCount = 127;
@@ -57,6 +58,8 @@ public readonly record struct SeuckSpritesFile
   static string[] IImageFormatMetadata<SeuckSpritesFile>.FileExtensions => [".a"];
   static SeuckSpritesFile IImageFormatReader<SeuckSpritesFile>.FromSpan(ReadOnlySpan<byte> data)
     => SeuckSpritesReader.FromSpan(data);
+  static byte[] IImageFormatWriter<SeuckSpritesFile>.ToBytes(SeuckSpritesFile file)
+    => SeuckSpritesWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<SeuckSpritesFile>.VideoModes => [
     new("Sprite set", [(Width, Height)], [Commodore64Graphics.ColorCount])
   ];
@@ -101,5 +104,115 @@ public readonly record struct SeuckSpritesFile
       Palette = Commodore64Graphics.CreatePalette(),
       PaletteCount = Commodore64Graphics.ColorCount,
     };
+  }
+
+  /// <summary>
+  /// Cuts a picture back into the 127 sprites the sheet shows, sampling it to the sheet's own size.
+  /// </summary>
+  /// <remarks>
+  /// Only one of a sprite's four colours is its own; the other three are the same throughout because
+  /// the hardware has one pair of multicolour registers and one background behind them. So the whole
+  /// of the decision per sprite is that one colour, and all sixteen are tried against the 252 pairs
+  /// of pixels it covers — the space around the sprites is not encoded at all, since nothing in the
+  /// file describes it.
+  /// </remarks>
+  public static SeuckSpritesFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(Width, Height).EnsureFormat(PixelFormat.Rgb24).PixelData;
+    var data = new byte[FileSize];
+
+    // What the reader checks for; the second byte is the high half of a count the sheet does not use.
+    data[0] = 66;
+
+    // A multicolour pixel is two screen pixels wide, so a sprite is twelve pairs across.
+    const int pairs = SpriteWidth / 2;
+    var indices = new int[pairs * SpriteHeight];
+
+    for (var sprite = 0; sprite < SpriteCount; ++sprite) {
+      var left = (sprite & (Columns - 1)) * CellWidth;
+      var top = sprite / Columns * CellHeight;
+
+      for (var row = 0; row < SpriteHeight; ++row)
+      for (var pair = 0; pair < pairs; ++pair) {
+        var at = ((top + row) * Width + left + pair * 2) * 3;
+        var next = at + 3;
+
+        // The pair shows one colour, so both of its source pixels have a say in which.
+        indices[row * pairs + pair] = Commodore64Graphics.FindNearestColorIndex(
+          (byte)((rgb[at] + rgb[next]) / 2),
+          (byte)((rgb[at + 1] + rgb[next + 1]) / 2),
+          (byte)((rgb[at + 2] + rgb[next + 2]) / 2));
+      }
+
+      var own = _ChooseSpriteColor(indices);
+      var offset = SpritesOffset + sprite * SpriteLength;
+      data[offset + SpriteLength - 1] = (byte)own;
+
+      for (var row = 0; row < SpriteHeight; ++row)
+      for (var pair = 0; pair < pairs; ++pair) {
+        var column = pair * 2;
+        var pattern = _ChoosePattern(indices[row * pairs + pair], own);
+        data[offset + row * 3 + (column >> 3)] |= (byte)(pattern << (~column & 6));
+      }
+    }
+
+    return new() { Data = data };
+  }
+
+  /// <summary>The one colour of a sprite's four that the sprite itself gets to choose.</summary>
+  private static int _ChooseSpriteColor(ReadOnlySpan<int> indices) {
+    var best = 0;
+    var bestError = long.MaxValue;
+
+    for (var candidate = 0; candidate < Commodore64Graphics.ColorCount; ++candidate) {
+      long error = 0;
+      foreach (var index in indices)
+        error += _Distance(index, _ChoosePattern(index, candidate) switch {
+          1 => 0,
+          2 => candidate,
+          3 => 1,
+          _ => BackgroundColor,
+        });
+
+      if (error >= bestError)
+        continue;
+
+      bestError = error;
+      best = candidate;
+    }
+
+    return best;
+  }
+
+  /// <summary>Which of the four patterns comes closest to a wanted colour.</summary>
+  private static int _ChoosePattern(int index, int own) {
+    var best = 0;
+    var bestDistance = _Distance(index, BackgroundColor);
+
+    ReadOnlySpan<int> candidates = [0, own, 1];
+    for (var pattern = 1; pattern <= 3; ++pattern) {
+      var distance = _Distance(index, candidates[pattern - 1]);
+      if (distance >= bestDistance)
+        continue;
+
+      bestDistance = distance;
+      best = pattern;
+    }
+
+    return best;
+  }
+
+  /// <summary>Squared distance in RGB between two of the machine's colours.</summary>
+  private static int _Distance(int left, int right) {
+    if (left == right)
+      return 0;
+
+    int a = Commodore64Graphics.HexColors[left], b = Commodore64Graphics.HexColors[right];
+    int dr = ((a >> 16) & 0xFF) - ((b >> 16) & 0xFF);
+    int dg = ((a >> 8) & 0xFF) - ((b >> 8) & 0xFF);
+    int db = (a & 0xFF) - (b & 0xFF);
+
+    return dr * dr + dg * dg + db * db;
   }
 }

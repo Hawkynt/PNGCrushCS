@@ -14,7 +14,8 @@ namespace FileFormat.SuperHiresFli;
 /// pattern comes from how the sprites had to be reused down the screen, and it is not regular.
 /// </remarks>
 public readonly record struct SuperHiresFliFile
-  : IImageFormatReader<SuperHiresFliFile>, IImageToRawImage<SuperHiresFliFile> {
+  : IImageFormatReader<SuperHiresFliFile>, IImageToRawImage<SuperHiresFliFile>,
+    IImageFromRawImage<SuperHiresFliFile>, IImageFormatWriter<SuperHiresFliFile> {
 
   /// <summary>Rows.</summary>
   public const int Height = 167;
@@ -53,6 +54,8 @@ public readonly record struct SuperHiresFliFile
   static string[] IImageFormatMetadata<SuperHiresFliFile>.FileExtensions => [".shf"];
   static SuperHiresFliFile IImageFormatReader<SuperHiresFliFile>.FromSpan(ReadOnlySpan<byte> data)
     => SuperHiresFliReader.FromSpan(data);
+  static byte[] IImageFormatWriter<SuperHiresFliFile>.ToBytes(SuperHiresFliFile file)
+    => SuperHiresFliWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<SuperHiresFliFile>.VideoModes => [
     new("Super Hires FLI", [(WideWidth, Height), (NarrowWidth, Height)], [Commodore64Graphics.ColorCount])
   ];
@@ -80,6 +83,101 @@ public readonly record struct SuperHiresFliFile
       Palette = Commodore64Graphics.CreatePalette(),
       PaletteCount = Commodore64Graphics.ColorCount,
     };
+  }
+
+  /// <summary>Bytes one row of the narrow form occupies in each of its four planes.</summary>
+  public const int NarrowStride = NarrowWidth / 8;
+
+  /// <summary>Offset of the narrow form's second sprite plane.</summary>
+  public const int NarrowSecondSpriteOffset = 2048;
+
+  /// <summary>Offset of the narrow form's bitmap, which chooses between a cell's two colours.</summary>
+  public const int NarrowBitmapOffset = 4096;
+
+  /// <summary>Offset of the narrow form's colour map, one byte per eight pixels of one scanline.</summary>
+  public const int NarrowColorOffset = 6144;
+
+  /// <summary>Offset of the colour the narrow form's sprites draw in.</summary>
+  public const int NarrowSpriteColorOffset = 8168;
+
+  /// <summary>
+  /// Builds a picture from any image, sampling it to the 96x167 the narrow form shows.
+  /// </summary>
+  /// <remarks>
+  /// The narrow form is written rather than the wide one, and the reason is that the wide one cannot
+  /// be written honestly. Its sprite pointers address the same memory as its bitmap — sprite 132's
+  /// 64 bytes are the bitmap's columns 18 to 25 of the first cell row — so the sprites and the
+  /// picture are not independent there, and a real file only works because the editor placed each
+  /// sprite where a sprite already covers whatever the bitmap would otherwise have shown. An encoder
+  /// that filled the bitmap freely would have those bytes read back as sprite coverage.
+  /// <para/>
+  /// The narrow form keeps its two sprite planes, its bitmap and its colour map in four separate
+  /// blocks that overlap nothing. With the sprite planes clear every pixel comes from the colour
+  /// map, which holds a pair of colours for every eight pixels of every single scanline — finer than
+  /// the wide form manages and with nothing to disentangle.
+  /// </remarks>
+  public static SuperHiresFliFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(NarrowWidth, Height).EnsureFormat(PixelFormat.Rgb24).PixelData;
+    var data = new byte[UnpackedSize];
+    Span<int> line = stackalloc int[8];
+
+    for (var y = 0; y < Height; ++y)
+    for (var column = 0; column < NarrowStride; ++column) {
+      for (var x = 0; x < 8; ++x) {
+        var at = (y * NarrowWidth + (column << 3) + x) * 3;
+        line[x] = Commodore64Graphics.FindNearestColorIndex(rgb[at], rgb[at + 1], rgb[at + 2]);
+      }
+
+      var (foreground, background) = _ChoosePair(line);
+      var offset = y * NarrowStride + column;
+      var bits = 0;
+
+      for (var x = 0; x < 8; ++x)
+        if (_Distance(line[x], foreground) <= _Distance(line[x], background))
+          bits |= 1 << (~x & 7);
+
+      data[NarrowBitmapOffset + offset] = (byte)bits;
+      data[NarrowColorOffset + offset] = (byte)((foreground << 4) | background);
+    }
+
+    return new() { Data = data, HasSprites = false };
+  }
+
+  /// <summary>The two colours that between them describe eight pixels with the least total error.</summary>
+  private static (int Foreground, int Background) _ChoosePair(ReadOnlySpan<int> indices) {
+    int bestForeground = 0, bestBackground = 0;
+    var bestError = long.MaxValue;
+
+    for (var first = 0; first < Commodore64Graphics.ColorCount; ++first)
+    for (var second = 0; second <= first; ++second) {
+      long error = 0;
+      foreach (var index in indices)
+        error += Math.Min(_Distance(index, first), _Distance(index, second));
+
+      if (error >= bestError)
+        continue;
+
+      bestError = error;
+      bestForeground = first;
+      bestBackground = second;
+    }
+
+    return (bestForeground, bestBackground);
+  }
+
+  /// <summary>Squared distance in RGB between two of the machine's colours.</summary>
+  private static int _Distance(int left, int right) {
+    if (left == right)
+      return 0;
+
+    int a = Commodore64Graphics.HexColors[left], b = Commodore64Graphics.HexColors[right];
+    int dr = ((a >> 16) & 0xFF) - ((b >> 16) & 0xFF);
+    int dg = ((a >> 8) & 0xFF) - ((b >> 8) & 0xFF);
+    int db = (a & 0xFF) - (b & 0xFF);
+
+    return dr * dr + dg * dg + db * db;
   }
 
   private static int _WidePixel(ReadOnlySpan<byte> data, int x, int y) {

@@ -15,7 +15,8 @@ namespace FileFormat.SuperHiresEditor;
 /// only works because the two can never want more than sixteen colours between them.
 /// </remarks>
 public readonly record struct SuperHiresEditor1File
-  : IImageFormatReader<SuperHiresEditor1File>, IImageToRawImage<SuperHiresEditor1File> {
+  : IImageFormatReader<SuperHiresEditor1File>, IImageToRawImage<SuperHiresEditor1File>,
+    IImageFromRawImage<SuperHiresEditor1File>, IImageFormatWriter<SuperHiresEditor1File> {
 
   /// <summary>Displayed width.</summary>
   public const int Width = 96;
@@ -33,6 +34,8 @@ public readonly record struct SuperHiresEditor1File
   static string[] IImageFormatMetadata<SuperHiresEditor1File>.FileExtensions => [".sh1"];
   static SuperHiresEditor1File IImageFormatReader<SuperHiresEditor1File>.FromSpan(ReadOnlySpan<byte> data)
     => SuperHiresEditor1Reader.FromSpan(data);
+  static byte[] IImageFormatWriter<SuperHiresEditor1File>.ToBytes(SuperHiresEditor1File file)
+    => SuperHiresEditor1Writer.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<SuperHiresEditor1File>.VideoModes => [
     new("Super-hires I", [(Width, Height)], [Commodore64Graphics.ColorCount])
   ];
@@ -99,6 +102,37 @@ public readonly record struct SuperHiresEditor1File
       PixelData = pixels,
       Palette = Commodore64Graphics.CreatePalette(),
       PaletteCount = Commodore64Graphics.ColorCount,
+    };
+  }
+
+  /// <summary>Builds a picture from any image, sampling it to the 96x168 the editor showed.</summary>
+  /// <remarks>
+  /// Written as a plain file with both sprite layers clear, so every pixel comes from the bitmap and
+  /// each cell keeps its own pair of colours. A layer's colour is one entry for a 24-pixel band down
+  /// the whole picture; taking it would override that band's cells everywhere it covers, which is
+  /// worth doing only when the picture actually wants one colour held constant that far.
+  /// </remarks>
+  public static SuperHiresEditor1File FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(Width, Height).EnsureFormat(PixelFormat.Rgb24);
+    var data = new byte[PlainFileSize];
+
+    const int bitmapOffset = 6690;
+    const int videoMatrixOffset = 448;
+    Commodore64Graphics.EncodeHires(
+      rgb.PixelData, Width, Height, data.AsSpan(bitmapOffset), data.AsSpan(videoMatrixOffset));
+
+    return new() {
+      Data = data,
+      BitmapOffset = bitmapOffset,
+      VideoMatrixOffset = videoMatrixOffset,
+      ScreenStride = Commodore64Graphics.Columns,
+      ForegroundSpritesOffset = 4530,
+      BackgroundSpritesOffset = 2482,
+      ForegroundColorsOffset = 430,
+      BackgroundColorsOffset = 426,
+      RowShift = 2,
     };
   }
 

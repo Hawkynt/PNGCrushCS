@@ -15,7 +15,8 @@ namespace FileFormat.SuperHiresEditor;
 /// beyond where everything sits.
 /// </remarks>
 public readonly record struct SuperHiresEditor2File
-  : IImageFormatReader<SuperHiresEditor2File>, IImageToRawImage<SuperHiresEditor2File> {
+  : IImageFormatReader<SuperHiresEditor2File>, IImageToRawImage<SuperHiresEditor2File>,
+    IImageFromRawImage<SuperHiresEditor2File>, IImageFormatWriter<SuperHiresEditor2File> {
 
   /// <summary>Displayed width.</summary>
   public const int Width = 192;
@@ -33,6 +34,8 @@ public readonly record struct SuperHiresEditor2File
   static string[] IImageFormatMetadata<SuperHiresEditor2File>.FileExtensions => [".sh2"];
   static SuperHiresEditor2File IImageFormatReader<SuperHiresEditor2File>.FromSpan(ReadOnlySpan<byte> data)
     => SuperHiresEditor2Reader.FromSpan(data);
+  static byte[] IImageFormatWriter<SuperHiresEditor2File>.ToBytes(SuperHiresEditor2File file)
+    => SuperHiresEditor2Writer.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<SuperHiresEditor2File>.VideoModes => [
     new("Super-hires II", [(Width, Height)], [Commodore64Graphics.ColorCount])
   ];
@@ -90,6 +93,37 @@ public readonly record struct SuperHiresEditor2File
       PixelData = pixels,
       Palette = Commodore64Graphics.CreatePalette(),
       PaletteCount = Commodore64Graphics.ColorCount,
+    };
+  }
+
+  /// <summary>Builds a picture from any image, sampling it to the 192x168 the editor showed.</summary>
+  /// <remarks>
+  /// Written as a plain file, which is the one length the reader recognises without unpacking, and
+  /// with no sprites. A sprite's colour serves a 24-pixel band down the whole picture, so spending
+  /// one costs every cell in that band the freedom to choose its own second colour; with the band
+  /// clear each cell keeps both of its own, which is where the exhaustive pair search does its work.
+  /// </remarks>
+  public static SuperHiresEditor2File FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(Width, Height).EnsureFormat(PixelFormat.Rgb24);
+    var data = new byte[PlainFileSize];
+
+    // The plain layout's video matrix rows are 40 cells apart even though only 24 of them show,
+    // which is what the encoder's own stride already assumes.
+    const int bitmapOffset = 6642;
+    const int videoMatrixOffset = 442;
+    Commodore64Graphics.EncodeHires(
+      rgb.PixelData, Width, Height, data.AsSpan(bitmapOffset), data.AsSpan(videoMatrixOffset));
+
+    return new() {
+      Data = data,
+      BitmapOffset = bitmapOffset,
+      VideoMatrixOffset = videoMatrixOffset,
+      ScreenStride = Commodore64Graphics.Columns,
+      SpritesOffset = 2482,
+      SpriteColorsOffset = 426,
+      ColumnSprites = false,
     };
   }
 

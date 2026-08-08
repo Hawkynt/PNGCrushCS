@@ -14,7 +14,8 @@ namespace FileFormat.SuperHiresStudio;
 /// its four sprite-widths rather than per cell.
 /// </remarks>
 public readonly record struct SuperHiresStudioFile
-  : IImageFormatReader<SuperHiresStudioFile>, IImageToRawImage<SuperHiresStudioFile> {
+  : IImageFormatReader<SuperHiresStudioFile>, IImageToRawImage<SuperHiresStudioFile>,
+    IImageFromRawImage<SuperHiresStudioFile>, IImageFormatWriter<SuperHiresStudioFile> {
 
   /// <summary>Picture width.</summary>
   public const int Width = 320;
@@ -59,6 +60,8 @@ public readonly record struct SuperHiresStudioFile
   static string[] IImageFormatMetadata<SuperHiresStudioFile>.FileExtensions => [".shs"];
   static SuperHiresStudioFile IImageFormatReader<SuperHiresStudioFile>.FromSpan(ReadOnlySpan<byte> data)
     => SuperHiresStudioReader.FromSpan(data);
+  static byte[] IImageFormatWriter<SuperHiresStudioFile>.ToBytes(SuperHiresStudioFile file)
+    => SuperHiresStudioWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<SuperHiresStudioFile>.VideoModes => [
     new("Super Hires Studio", [(Width, Height)], [Commodore64Graphics.ColorCount])
   ];
@@ -82,6 +85,28 @@ public readonly record struct SuperHiresStudioFile
       Palette = Commodore64Graphics.CreatePalette(),
       PaletteCount = Commodore64Graphics.ColorCount,
     };
+  }
+
+  /// <summary>Builds a picture from any image, sampling it to the 320x200 screen.</summary>
+  /// <remarks>
+  /// The sprite window is left empty. Its two layers add one extra colour each across a whole
+  /// character-column band and all 168 of the scanlines they reach — a choice that can only be made
+  /// well by knowing which colour the picture wants held constant down a strip that tall, and made
+  /// badly it replaces good cell colours with a worse one over a sixth of the screen. Left clear,
+  /// every pixel comes from the bitmap, which is where the cell-by-cell search already puts the two
+  /// best colours it can find.
+  /// </remarks>
+  public static SuperHiresStudioFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(Width, Height).EnsureFormat(PixelFormat.Rgb24);
+    var data = new byte[FileSize];
+    Commodore64Graphics.EncodeHires(
+      rgb.PixelData, Width, Height,
+      data.AsSpan(BitmapOffset, Width * Height / 8),
+      data.AsSpan(VideoMatrixOffset, Width / 8 * (Height / Commodore64Graphics.CellHeight)));
+
+    return new() { Data = data };
   }
 
   private static byte _ColorAt(ReadOnlySpan<byte> data, int x, int y) {
