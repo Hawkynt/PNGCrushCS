@@ -11,7 +11,7 @@ something up and are correct as they stand.
 **197 distinct extensions across 176 of its format names** when this was written. A few extensions
 are claimed by more than one of its names, so the rows below add up to more than that.
 
-**Thirty-four are closed now and 142 remain.** Eight of the fifteen turned out to be one thing — a
+**Forty are closed now and 136 remain.** Eight of the fifteen turned out to be one thing — a
 Windows DIB preview dropped inside a drawing or project file — and are read by a single reader
 rather than eight. IBM KIPS, the X11 puzzle, Synu and the Zoner brush were four more. The last three
 are wrappers around a picture format already here: ECC carries a PNG, LView Pro and IPSM each carry
@@ -56,7 +56,38 @@ structure, and one that varies with the picture is a dimension. That is a strong
 most of the formats already read here were settled from.
 
 Of the 63, eight or so are vector — `svg`, `ai`, `ps`, `cgm`, `dwg`, `hpgl`, `xar`, `gem` — and want
-a rasteriser rather than a layout, which is a different kind of work.
+a rasteriser rather than a layout. There is one now, in `FileFormat.Core/Vector`: a path buffer, a
+scanline filler with both winding rules, a stroker, a stipple, a clip mask and a gradient paint.
+Six of the eight are read through it or past it, and the reasoning about size is the same for all
+of them — the file's own stated page, and nothing invented where it states one.
+
+  - `gem` reads all 42 samples. Every one walks from the header to the terminating word and lands
+    on it exactly. The size is the header's arithmetic: the extent as a fraction of the coordinate
+    window, times the page in tenths of a millimetre, at 96 pixels to the inch.
+  - `svg` reads 10 of its 14. Sizes match librsvg exactly where it renders at all, and by eye the
+    geometry does too. Three are refused as malformed XML — an undeclared `xlink` prefix, a
+    redefined `xmlns`, and a file that is not XML at all — and librsvg refuses all three for the
+    same reasons. One more states a height of zero, which librsvg also calls sizeless.
+  - `cgm` reads the six binary samples and refuses the character and clear-text encodings, which
+    are different grammars rather than variants. `abydos` is in the corpus as a metafile, an SVG
+    and a plot; ours of the metafile against librsvg's of the SVG is 1.3% RMSE at 512x384.
+  - `hpgl` reads all five. Nothing here renders HP-GL, so the evidence is the parse: a second
+    reading written separately agrees on the extent of all five.
+  - `xar` and `dwg` are not rendered and should not be. Both state where a preview lives — Xara in
+    a record tagged 61, 62 or 63 by picture format, AutoCAD at the address in byte 13, behind a
+    sentinel and its own complement — and all nine previews match ImageMagick on every pixel.
+
+`ai` and `ps` are the two left, and `ai` was written and then removed rather than shipped. The
+imaging model is a closed grammar Adobe published, the bounding box gives the size, and seven of
+the eleven samples came out looking right. The other four came out with whole figures in black,
+which is a colour the file never asks for — every path in them sets its own CMYK. What made it
+unfixable inside this piece of work is that there is nothing here to check against: Ghostscript
+refuses ten of the eleven outright, because they call for the `Adobe_level2_AI5` procset under
+`%%DocumentNeededResources` and do not carry it. A reader that draws four plausible wrong pictures
+out of eleven, with no way to tell which four, is the thing this file has twice been rewritten to
+avoid. What was learnt and is worth not learning again: the case of a path operator says smooth or
+corner and not absolute or relative; `v` omits the first control point and `y` the second; and a
+compound path between `*u` and `*U` is painted once at the end rather than per subpath.
 
 ### And where the ceiling actually is
 
@@ -114,7 +145,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | cbmf | .bmf |  |
 | cdr | .cdr |  |
 | cft | .ctf |  |
-| cgm | .cgm | Windows only |
+| cgm | .cgm | binary encoding read; character and clear-text refused |
 | cloe | .cloe |  |
 | cmt | .cmt |  |
 | cmx | .cmx |  |
@@ -124,7 +155,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | cvp | .cvp |  |
 | d3d | .b2d .b3d |  |
 | dsi | .dsi |  |
-| dwg | .dwg | Windows only |
+| dwg | .dwg | thumbnail at the stated address |
 | dxf | .dxf | Windows only |
 | ecc | .ecc |  |
 | eidi | .ei .eidi |  |
@@ -140,11 +171,11 @@ Windows only, so nothing here has ever been able to compare against them either.
 | frm2 | .frm |  |
 | fsy | .fsy |  |
 | fx3 | .fx3 |  |
-| gem | .gem |  |
+| gem | .gem | read |
 | gm | .gm .gm2 .gm4 |  |
 | hdri | .hdri |  |
 | hdru | .gn .hdru |  |
-| hpgl | .hgl .hpg .hpgl .prn .prt | Windows only |
+| hpgl | .hgl .hpg .hpgl .prn .prt | read |
 | hru | .hru |  |
 | hta | .hta |  |
 | icd | .idc |  |
@@ -227,7 +258,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | ssp | .ssp |  |
 | stm | .stm |  |
 | stw | .stw |  |
-| svg | .svg | Windows only |
+| svg | .svg | read |
 | synu | .syn .synu |  |
 | taac | .suniff .taac .vff |  |
 | tdi | .tdi |  |
@@ -250,7 +281,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | wrl | .wrl |  |
 | wzl | .wzl |  |
 | x3f | .x3f |  |
-| xar | .xar |  |
+| xar | .xar | preview at the stated tag |
 | xif | .xif |  |
 | xim | .xim |  |
 | xp0 | .xp0 |  |
