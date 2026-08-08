@@ -29,9 +29,36 @@ public sealed class NiftiFile :
   /// <summary>Voxel dimensions (up to 8 entries matching pixdim[0..7]).</summary>
   public float[] Pixdim { get; init; } = [];
 
+  /// <summary>The keyword the 80-character <c>descrip</c> field is carried under.</summary>
+  /// <remarks>
+  /// It is what a scanner or a pipeline wrote about the study, so it belongs with the picture rather
+  /// than being dropped the moment the voxels are converted. "Description" is one of PNG's own
+  /// keywords, so it survives a hop through any format that keeps text.
+  /// </remarks>
+  private const string _DESCRIPTION_KEYWORD = "Description";
+
   /// <summary>Converts the first 2D slice of this NIfTI volume to a <see cref="RawImage"/>, preserving 16-bit precision where possible.</summary>
   public static RawImage ToRawImage(NiftiFile file) {
     ArgumentNullException.ThrowIfNull(file);
+
+    var image = _Decode(file);
+    var description = file.Description?.Trim('\0').Trim();
+    if (string.IsNullOrEmpty(description))
+      return image;
+
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      Format = image.Format,
+      PixelData = image.PixelData,
+      Palette = image.Palette,
+      PaletteCount = image.PaletteCount,
+      AlphaTable = image.AlphaTable,
+      Metadata = new() { TextEntries = [new(_DESCRIPTION_KEYWORD, description)] },
+    };
+  }
+
+  private static RawImage _Decode(NiftiFile file) {
     var width = file.Width;
     var height = file.Height;
     var src = file.PixelData;
@@ -166,8 +193,32 @@ public sealed class NiftiFile :
       SclInter = 0f,
       VoxOffset = 352f,
       Pixdim = [1f, 1f, 1f, 1f, 0f, 0f, 0f, 0f],
+      Description = _DescriptionFrom(image.Metadata),
       PixelData = voxels,
     };
+  }
+
+  /// <summary>The text that belongs in <c>descrip</c>, trimmed to the 80 characters it holds.</summary>
+  /// <remarks>
+  /// A picture arriving from a format with keyword-tagged text is searched for the same keyword
+  /// this writes out; one carrying a single bare annotation — a JPEG comment, say — has nothing
+  /// else it could mean, so that is taken instead.
+  /// </remarks>
+  private static string _DescriptionFrom(ImageMetadata? metadata) {
+    if (metadata is not { TextEntries.Count: > 0 } present)
+      return "";
+
+    var text = "";
+    foreach (var entry in present.TextEntries)
+      if (string.Equals(entry.Keyword, _DESCRIPTION_KEYWORD, StringComparison.OrdinalIgnoreCase)) {
+        text = entry.Text;
+        break;
+      }
+
+    if (text.Length == 0 && present.TextEntries.Count == 1 && present.TextEntries[0].Keyword.Length == 0)
+      text = present.TextEntries[0].Text;
+
+    return text.Length > 80 ? text[..80] : text;
   }
 
   /// <summary>Turns the big-endian words of a <see cref="PixelFormat.Gray16"/> buffer into the file's little-endian voxels.</summary>

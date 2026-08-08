@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using FileFormat.Core;
 
 namespace FileFormat.Nrrd;
@@ -22,9 +23,39 @@ public sealed class NrrdFile :
   public byte[] PixelData { get; init; } = [];
   public string[] Labels { get; init; } = [];
 
+  /// <summary>The keyword each entry of the <c>labels</c> field is carried under.</summary>
+  /// <remarks>
+  /// A label names what an axis measures — "x", "frequency", "tesla" — which is the kind of thing a
+  /// scientific file is written for and has no business being thrown away because the next format
+  /// stores pixels differently. One entry per axis, in the file's own order.
+  /// </remarks>
+  private const string _LABEL_KEYWORD = "Label";
+
   /// <summary>Converts this NRRD image to a <see cref="RawImage"/>, preserving 16-bit precision where possible.</summary>
   public static RawImage ToRawImage(NrrdFile file) {
     ArgumentNullException.ThrowIfNull(file);
+
+    var image = _Decode(file);
+    if (file.Labels is not { Length: > 0 } labels)
+      return image;
+
+    var entries = new TextMetadataEntry[labels.Length];
+    for (var i = 0; i < labels.Length; ++i)
+      entries[i] = new(_LABEL_KEYWORD, labels[i]);
+
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      Format = image.Format,
+      PixelData = image.PixelData,
+      Palette = image.Palette,
+      PaletteCount = image.PaletteCount,
+      AlphaTable = image.AlphaTable,
+      Metadata = new() { TextEntries = entries },
+    };
+  }
+
+  private static RawImage _Decode(NrrdFile file) {
     var sizes = file.Sizes;
     if (sizes.Length < 2)
       throw new NotSupportedException("NRRD data must have at least 2 dimensions.");
@@ -194,8 +225,35 @@ public sealed class NrrdFile :
       DataType = type,
       Encoding = NrrdEncoding.Raw,
       Endian = "little",
+      Labels = _LabelsFrom(image.Metadata, sizes.Length),
       PixelData = samples,
     };
+  }
+
+  /// <summary>The axis labels to write out, which the header holds one of per axis or none at all.</summary>
+  /// <remarks>
+  /// A partial list is not a thing the format has: <c>labels</c> is per-axis, so either every axis
+  /// is named or the field is left out. A picture arriving with fewer labels than axes — because a
+  /// channel axis was added on the way in, say — therefore contributes nothing rather than a list
+  /// that names the wrong axes.
+  /// </remarks>
+  private static string[] _LabelsFrom(ImageMetadata? metadata, int axisCount) {
+    if (metadata is not { TextEntries.Count: > 0 } present)
+      return [];
+
+    var labels = new List<string>(axisCount);
+    foreach (var entry in present.TextEntries)
+      if (string.Equals(entry.Keyword, _LABEL_KEYWORD, StringComparison.OrdinalIgnoreCase)) {
+
+        // The header quotes each label and ends at a newline, so text carrying either would produce
+        // a header that no longer parses as the one written. Dropping the field is the safe answer.
+        if (entry.Text.IndexOfAny(['"', '\n', '\r']) >= 0)
+          return [];
+
+        labels.Add(entry.Text);
+      }
+
+    return labels.Count == axisCount ? labels.ToArray() : [];
   }
 
   /// <summary>Reverses the byte order of a run of 16-bit samples.</summary>
