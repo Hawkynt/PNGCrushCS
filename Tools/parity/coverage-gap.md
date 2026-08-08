@@ -56,7 +56,28 @@ structure, and one that varies with the picture is a dimension. That is a strong
 most of the formats already read here were settled from.
 
 Of the 63, eight or so are vector — `svg`, `ai`, `ps`, `cgm`, `dwg`, `hpgl`, `xar`, `gem` — and want
-a rasteriser rather than a layout, which is a different kind of work and not attempted here.
+a rasteriser rather than a layout, which is a different kind of work.
+
+### And where the ceiling actually is
+
+The archive was then swept a second time for every remaining name, reading up to two hundred entries
+a directory rather than sixty, across all 843 of them. It returned **one file**. So the ninety-odd
+names still without a sample are not waiting on a more patient search of that archive: it does not
+have them.
+
+Two things make this harder than it sounds. Most files there are stored under a name with no
+extension at all — `beaker03`, `caligpen` — so matching by extension finds only what happens to be
+named for its format. And matching by directory name instead is worse than useless: "tdi" is a
+substring of "artDirector", and a dozen such coincidences look exactly like hits until the samples
+are opened.
+
+Other public corpora were looked at — the Open Preservation format corpus, the codec conformance
+suites — and they cover mainstream codecs thoroughly and none of these names at all.
+
+So for those ninety-odd the honest position is that there is nothing here to check an implementation
+against, and this project's standard is that a reader agreeing with nothing but itself is worth less
+than no reader. Several have been shown wrong by exactly that route already. What would move them is
+a sample or a specification, not more effort.
 
 The last column marks the ones XnView itself cannot load on this platform: its catalogue says
 Windows only, so nothing here has ever been able to compare against them either.
