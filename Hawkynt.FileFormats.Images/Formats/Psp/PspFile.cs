@@ -8,7 +8,16 @@ namespace FileFormat.Psp;
 public readonly record struct PspFile : IImageFormatReader<PspFile>, IImageToRawImage<PspFile>, IImageFromRawImage<PspFile>, IImageFormatWriter<PspFile> {
 
   static string IImageFormatMetadata<PspFile>.PrimaryExtension => ".psp";
-  static string[] IImageFormatMetadata<PspFile>.FileExtensions => [".psp", ".pspimage"];
+
+  /// <summary>Every name Paint Shop Pro saves this same block layout under.</summary>
+  /// <remarks>
+  /// A tube, a brush, a frame, a mask and a template are all one format: the file header is the same
+  /// string, the blocks are the same blocks, and what tells them apart is a data block beside the
+  /// picture rather than any difference in how the picture is stored. Naming them separately would
+  /// have meant five readers of one format.
+  /// </remarks>
+  static string[] IImageFormatMetadata<PspFile>.FileExtensions =>
+    [".psp", ".pspimage", ".tub", ".psptube", ".pspbrush", ".pspframe", ".pspmask", ".pspt"];
   static PspFile IImageFormatReader<PspFile>.FromSpan(ReadOnlySpan<byte> data) => PspReader.FromSpan(data);
   static byte[] IImageFormatWriter<PspFile>.ToBytes(PspFile file) => PspWriter.ToBytes(file);
 
@@ -27,7 +36,14 @@ public readonly record struct PspFile : IImageFormatReader<PspFile>, IImageToRaw
   /// <summary>Minor version of the PSP file format.</summary>
   public ushort MinorVersion { get; init; }
 
-  /// <summary>Raw RGB24 pixel data (3 bytes per pixel, row-major).</summary>
+  /// <summary>Whether the picture carries the layer transparency mask alongside its colour.</summary>
+  /// <remarks>
+  /// A tube is transparent everywhere except where it paints, so drawing one without its mask draws
+  /// the rectangle it was cut from rather than the shape.
+  /// </remarks>
+  public bool HasAlpha { get; init; }
+
+  /// <summary>Raw pixel data, row-major: RGB24, or RGBA32 when <see cref="HasAlpha"/> is set.</summary>
   public byte[] PixelData { get; init; }
 
   /// <summary>The 32-byte file magic identifying a PSP file.</summary>
@@ -35,9 +51,6 @@ public readonly record struct PspFile : IImageFormatReader<PspFile>, IImageToRaw
 
   /// <summary>Block ID for General Image Attributes.</summary>
   internal const ushort BlockIdGeneralAttributes = 0x00;
-
-  /// <summary>Block ID for Composite Image Bank.</summary>
-  internal const ushort BlockIdCompositeImage = 0x24;
 
   private static byte[] _BuildMagic() {
     var magic = new byte[32];
@@ -50,19 +63,21 @@ public readonly record struct PspFile : IImageFormatReader<PspFile>, IImageToRaw
     return new() {
       Width = file.Width,
       Height = file.Height,
-      Format = PixelFormat.Rgb24,
+      Format = file.HasAlpha ? PixelFormat.Rgba32 : PixelFormat.Rgb24,
       PixelData = file.PixelData[..],
     };
   }
 
   public static PspFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    image = image.EnsureFormat(PixelFormat.Rgb24);
+    var hasAlpha = image.HasAlpha;
+    image = image.EnsureFormat(hasAlpha ? PixelFormat.Rgba32 : PixelFormat.Rgb24);
 
     return new() {
       Width = image.Width,
       Height = image.Height,
       BitDepth = 24,
+      HasAlpha = hasAlpha,
       PixelData = image.PixelData[..],
     };
   }
