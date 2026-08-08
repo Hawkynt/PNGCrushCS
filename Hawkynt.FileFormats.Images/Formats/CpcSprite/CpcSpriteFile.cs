@@ -4,7 +4,9 @@ using FileFormat.Core;
 namespace FileFormat.CpcSprite;
 
 /// <summary>In-memory representation of a CPC sprite (64 bytes: 16x16 pixels, Mode 1 packing, 4 colors).</summary>
-public readonly record struct CpcSpriteFile : IImageFormatReader<CpcSpriteFile>, IImageToRawImage<CpcSpriteFile>, IImageFormatWriter<CpcSpriteFile> {
+public readonly record struct CpcSpriteFile
+  : IImageFormatReader<CpcSpriteFile>, IImageToRawImage<CpcSpriteFile>,
+    IImageFromRawImage<CpcSpriteFile>, IImageFormatWriter<CpcSpriteFile> {
 
   static string IImageFormatMetadata<CpcSpriteFile>.PrimaryExtension => ".cps";
   static string[] IImageFormatMetadata<CpcSpriteFile>.FileExtensions => [".cps"];
@@ -82,6 +84,35 @@ public readonly record struct CpcSpriteFile : IImageFormatReader<CpcSpriteFile>,
       Palette = _CpcMode1Palette[..],
       PaletteCount = 4,
     };
+  }
+
+  /// <summary>Encodes a picture as a CPC sprite, scaling it to 16x16 first.</summary>
+  /// <remarks>
+  /// Mode 1 packs four pixels into a byte and does not keep their bits together: the low bit of each
+  /// pixel sits in the top nibble and the high bit in the bottom one, one bit position apart per
+  /// pixel. That interleave is the whole of the format and is the exact inverse of what
+  /// <see cref="ToRawImage"/> unpicks.
+  /// </remarks>
+  public static CpcSpriteFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var indexed = image.SampleTo(PixelWidth, PixelHeight).EnsureIndexed(PixelFormat.Indexed8, _CpcMode1Palette);
+    var indices = indexed.PixelData;
+    var raw = new byte[ExpectedFileSize];
+
+    for (var y = 0; y < PixelHeight; ++y)
+    for (var byteColumn = 0; byteColumn < BytesPerRow; ++byteColumn) {
+      var packed = 0;
+      for (var pixel = 0; pixel < PixelsPerByte; ++pixel) {
+        var index = indices[y * PixelWidth + byteColumn * PixelsPerByte + pixel] & 3;
+        packed |= (index & 1) << (7 - pixel);
+        packed |= ((index >> 1) & 1) << (3 - pixel);
+      }
+
+      raw[y * BytesPerRow + byteColumn] = (byte)packed;
+    }
+
+    return new() { RawData = raw };
   }
 
 }

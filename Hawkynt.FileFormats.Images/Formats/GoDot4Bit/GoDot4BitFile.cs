@@ -14,7 +14,8 @@ namespace FileFormat.GoDot4Bit;
 /// packed the same way and hold the same four bits a pixel, a character cell at a time.
 /// </remarks>
 public readonly record struct GoDot4BitFile
-  : IImageFormatReader<GoDot4BitFile>, IImageToRawImage<GoDot4BitFile>, IImageFormatWriter<GoDot4BitFile> {
+  : IImageFormatReader<GoDot4BitFile>, IImageToRawImage<GoDot4BitFile>,
+    IImageFromRawImage<GoDot4BitFile>, IImageFormatWriter<GoDot4BitFile> {
 
   static string IImageFormatMetadata<GoDot4BitFile>.PrimaryExtension => ".4bt";
   static string[] IImageFormatMetadata<GoDot4BitFile>.FileExtensions => [".4bt", ".4bit", ".clp"];
@@ -100,5 +101,35 @@ public readonly record struct GoDot4BitFile
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
     };
+  }
+
+  /// <summary>Encodes a picture as a whole GoDot screen, scaling it to 320x200 first.</summary>
+  /// <remarks>
+  /// Four bits a pixel against the machine's sixteen colours, a character cell at a time. GoDot
+  /// numbers those colours by brightness rather than by the VIC-II's own numbering, so an index has
+  /// to be looked up back through that ordering — writing the hardware index straight out would
+  /// scramble the colours in a way only this code would then read back correctly.
+  /// </remarks>
+  public static GoDot4BitFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(ScreenWidth, ScreenHeight).PixelData;
+    var cellColumns = ScreenWidth / 8;
+    var cells = new byte[cellColumns * (ScreenHeight / 8) * CellSize];
+
+    Span<int> toGoDot = stackalloc int[Commodore64Graphics.ColorCount];
+    for (var i = 0; i < BrightnessOrder.Length; ++i)
+      toGoDot[BrightnessOrder[i]] = i;
+
+    for (var y = 0; y < ScreenHeight; ++y)
+    for (var x = 0; x < ScreenWidth; ++x) {
+      var at = (y * ScreenWidth + x) * 3;
+      var value = toGoDot[Commodore64Graphics.FindNearestColorIndex(rgb[at], rgb[at + 1], rgb[at + 2])];
+
+      var offset = (y / 8 * cellColumns + x / 8) * CellSize + y % 8 * 4 + x % 8 / 2;
+      cells[offset] |= (byte)((x & 1) == 0 ? value << 4 : value);
+    }
+
+    return new() { Width = ScreenWidth, Height = ScreenHeight, IsClip = false, PixelData = cells };
   }
 }

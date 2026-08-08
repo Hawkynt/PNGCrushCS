@@ -4,7 +4,9 @@ using FileFormat.Core;
 namespace FileFormat.SpritePad;
 
 /// <summary>In-memory representation of a SpritePad (.spd) sprite collection file for the C64.</summary>
-public readonly record struct SpritePadFile : IImageFormatReader<SpritePadFile>, IImageToRawImage<SpritePadFile>, IImageFormatWriter<SpritePadFile> {
+public readonly record struct SpritePadFile
+  : IImageFormatReader<SpritePadFile>, IImageToRawImage<SpritePadFile>,
+    IImageFromRawImage<SpritePadFile>, IImageFormatWriter<SpritePadFile> {
 
   static string IImageFormatMetadata<SpritePadFile>.PrimaryExtension => ".spd";
   static string[] IImageFormatMetadata<SpritePadFile>.FileExtensions => [".spd"];
@@ -119,6 +121,30 @@ public readonly record struct SpritePadFile : IImageFormatReader<SpritePadFile>,
       Palette = _BlackWhitePalette[..],
       PaletteCount = 2,
     };
+  }
+
+  /// <summary>Encodes a picture as a single-sprite collection, scaling it to 24x21 first.</summary>
+  /// <remarks>
+  /// A sprite is the only size the machine has, so one sprite is what a picture becomes. It is
+  /// written as a hi-res sprite rather than a multicolour one: <see cref="ToRawImage"/> collapses a
+  /// multicolour sprite's four values to set-or-clear anyway and halves the horizontal resolution
+  /// doing it, so nothing is gained by spending two bits where one is read.
+  /// </remarks>
+  public static SpritePadFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(SpritePixelWidth, SpritePixelHeight).PixelData;
+    var raw = new byte[BytesPerSprite];
+
+    for (var y = 0; y < SpritePixelHeight; ++y)
+    for (var x = 0; x < SpritePixelWidth; ++x) {
+      var at = (y * SpritePixelWidth + x) * 3;
+      var luminance = (rgb[at] * 77 + rgb[at + 1] * 151 + rgb[at + 2] * 28) >> 8;
+      if (luminance >= 128)
+        raw[y * BytesPerRow + x / 8] |= (byte)(0x80 >> (x % 8));
+    }
+
+    return new() { Version = 1, SpriteCount = 1, IsMulticolor = false, ExtraHeader = [], RawData = raw };
   }
 
   /// <summary>Decodes a mono (hi-res) sprite at the given offset into the pixel buffer.</summary>
