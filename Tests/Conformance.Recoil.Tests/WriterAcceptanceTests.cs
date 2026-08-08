@@ -92,6 +92,8 @@ public sealed class WriterAcceptanceTests {
     [ImageFormat.PsionPic] = "the reference tool lists .icn as the Microsoft icon, which is a different format",
     [ImageFormat.ChampionsInterlace] =
       "the reference tool lists .cin as Cineon, which is a different format and one of its own here",
+    [ImageFormat.AtariChampionsInterlace] =
+      "the reference tool lists .cin as Cineon, which is a different format and one of its own here",
     [ImageFormat.EsmSoftwarePix] =
       "the reference tool lists .pix as the Alias/Wavefront one, which is a different format and one "
       + "of its own here",
