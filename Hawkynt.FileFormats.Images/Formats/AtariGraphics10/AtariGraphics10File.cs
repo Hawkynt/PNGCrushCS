@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.AtariGraphics10;
 
 /// <summary>In-memory representation of an Atari Graphics 10 (GTIA 9-color) image. 80x192.</summary>
-public sealed class AtariGraphics10File : IImageFormatReader<AtariGraphics10File>, IImageToRawImage<AtariGraphics10File>, IImageFormatWriter<AtariGraphics10File> {
+public sealed class AtariGraphics10File : IImageFormatReader<AtariGraphics10File>, IImageToRawImage<AtariGraphics10File>, IImageFromRawImage<AtariGraphics10File>, IImageFormatWriter<AtariGraphics10File> {
 
   /// <summary>Image width in pixels.</summary>
   internal const int PixelWidth = 80;
@@ -29,6 +29,7 @@ public sealed class AtariGraphics10File : IImageFormatReader<AtariGraphics10File
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [9])
   ];
   static RawImage IImageToRawImage<AtariGraphics10File>.ToRawImage(AtariGraphics10File file) => ToRawImage(file);
+  static AtariGraphics10File IImageFromRawImage<AtariGraphics10File>.FromRawImage(RawImage image) => FromRawImage(image);
   static byte[] IImageFormatWriter<AtariGraphics10File>.ToBytes(AtariGraphics10File file) => AtariGraphics10Writer.ToBytes(file);
 
   /// <summary>Always 80.</summary>
@@ -118,5 +119,31 @@ public sealed class AtariGraphics10File : IImageFormatReader<AtariGraphics10File
       Palette = _PaletteFor(file),
       PaletteCount = PaletteColors,
     };
+  }
+
+  /// <summary>Builds a Graphics 10 screen from any picture, sampling it to 80x192 and naming the nine stock registers.</summary>
+  /// <remarks>
+  /// A nibble names a colour register rather than a colour, and the writer stores the screen alone —
+  /// it has nowhere to put registers of its own — so what comes back is drawn with the stock nine.
+  /// Those are therefore what the indices must address; a quantiser choosing its own would leave
+  /// every pixel naming a different register than the one it was measured against.
+  /// <para/>
+  /// Only nine of the sixteen values a nibble can hold are registers; the decoder reads anything
+  /// above eight as the background, which is why the palette given to the mapper stops at nine.
+  /// </remarks>
+  public static AtariGraphics10File FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var indexed = image.SampleTo(PixelWidth, PixelHeight)
+      .EnsureIndexed(PixelFormat.Indexed8, _DefaultPalette[..(PaletteColors * 3)]);
+    var pixelData = new byte[FileSize];
+
+    for (var y = 0; y < PixelHeight; ++y)
+    for (var x = 0; x < BytesPerLine; ++x) {
+      var at = y * PixelWidth + x * 2;
+      pixelData[y * BytesPerLine + x] = (byte)(((indexed.PixelData[at] & 15) << 4) | (indexed.PixelData[at + 1] & 15));
+    }
+
+    return new() { PixelData = pixelData };
   }
 }

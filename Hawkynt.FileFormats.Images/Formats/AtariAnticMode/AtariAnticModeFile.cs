@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.AtariAnticMode;
 
 /// <summary>In-memory representation of an Atari ANTIC Mode E/F Screen (.ame) file.</summary>
-public readonly record struct AtariAnticModeFile : IImageFormatReader<AtariAnticModeFile>, IImageToRawImage<AtariAnticModeFile>, IImageFormatWriter<AtariAnticModeFile> {
+public readonly record struct AtariAnticModeFile : IImageFormatReader<AtariAnticModeFile>, IImageToRawImage<AtariAnticModeFile>, IImageFromRawImage<AtariAnticModeFile>, IImageFormatWriter<AtariAnticModeFile> {
 
   /// <summary>Size of the screen data in bytes.</summary>
   public const int ScreenDataSize = 7680;
@@ -62,6 +62,60 @@ public readonly record struct AtariAnticModeFile : IImageFormatReader<AtariAntic
       return _DecodeModeE(file);
 
     return _DecodeModeF(file);
+  }
+
+  /// <summary>Builds a screen from any picture, in mode E unless the picture is already black and white.</summary>
+  /// <remarks>
+  /// Both modes cost the same 7680 bytes and trade colour against width: mode F is 320 pixels across
+  /// in two colours, mode E is 160 across in four. The trailing mode byte records which was taken, so
+  /// the reader follows either way — and mode F is taken only for a picture that is already the black
+  /// and white it can show, which is the one case where the extra width costs nothing.
+  /// </remarks>
+  public static AtariAnticModeFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    return _IsBlackAndWhite(image) ? _EncodeModeF(image) : _EncodeModeE(image);
+  }
+
+  private static bool _IsBlackAndWhite(RawImage image) {
+    var rgb = image.EnsureFormat(PixelFormat.Rgb24).PixelData;
+    for (var i = 0; i + 2 < rgb.Length; i += 3) {
+      var value = rgb[i];
+      if (value != rgb[i + 1] || value != rgb[i + 2] || value is not (0 or 255))
+        return false;
+    }
+
+    return true;
+  }
+
+  private static AtariAnticModeFile _EncodeModeF(RawImage image) {
+    const int width = 320;
+    const int height = 192;
+
+    // A set bit is the lit pixel: the two-colour palette the decoder hands back puts white at one.
+    var pixels = BilevelRows.Threshold(image.SampleTo(width, height), setWhenDark: false);
+
+    return new() { PixelData = BilevelRows.Pack(pixels, width, height), Mode = ModeF };
+  }
+
+  private static AtariAnticModeFile _EncodeModeE(RawImage image) {
+    const int width = 160;
+    const int height = 192;
+    var indexed = image.SampleTo(width, height).EnsureIndexed(PixelFormat.Indexed8, _ModeEPalette);
+    var pixelData = new byte[ScreenDataSize];
+
+    for (var y = 0; y < height; ++y)
+    for (var byteCol = 0; byteCol < BytesPerRow; ++byteCol) {
+      var value = 0;
+
+      // Four pixels a byte, the leftmost in the top bit pair.
+      for (var p = 0; p < 4; ++p)
+        value |= (indexed.PixelData[y * width + byteCol * 4 + p] & 3) << ((3 - p) * 2);
+
+      pixelData[y * BytesPerRow + byteCol] = (byte)value;
+    }
+
+    return new() { PixelData = pixelData, Mode = ModeE };
   }
 
   private static RawImage _DecodeModeF(AtariAnticModeFile file) {

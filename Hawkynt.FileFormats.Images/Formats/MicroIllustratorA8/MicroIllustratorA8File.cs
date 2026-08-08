@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.MicroIllustratorA8;
 
 /// <summary>In-memory representation of a Micro Illustrator Atari 8-bit (.mia) image.</summary>
-public readonly record struct MicroIllustratorA8File : IImageFormatReader<MicroIllustratorA8File>, IImageToRawImage<MicroIllustratorA8File>, IImageFormatWriter<MicroIllustratorA8File> {
+public readonly record struct MicroIllustratorA8File : IImageFormatReader<MicroIllustratorA8File>, IImageToRawImage<MicroIllustratorA8File>, IImageFromRawImage<MicroIllustratorA8File>, IImageFormatWriter<MicroIllustratorA8File> {
 
   /// <summary>Exact file size: 40 bytes/row x 192 rows.</summary>
   public const int ExpectedFileSize = 7680;
@@ -71,6 +71,27 @@ public readonly record struct MicroIllustratorA8File : IImageFormatReader<MicroI
       Palette = _DefaultPalette[..],
       PaletteCount = 4,
     };
+  }
+
+  /// <summary>Builds a screen from any picture, sampling it to 160x192 and mapping it onto the four mode E registers.</summary>
+  public static MicroIllustratorA8File FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var indexed = image.SampleTo(PixelWidth, PixelHeight).EnsureIndexed(PixelFormat.Indexed8, _DefaultPalette);
+    var pixelData = new byte[ExpectedFileSize];
+
+    for (var y = 0; y < PixelHeight; ++y)
+    for (var byteCol = 0; byteCol < BytesPerRow; ++byteCol) {
+      var value = 0;
+
+      // Four pixels a byte, the leftmost in the top bit pair.
+      for (var p = 0; p < 4; ++p)
+        value |= (indexed.PixelData[y * PixelWidth + byteCol * 4 + p] & 3) << ((3 - p) * 2);
+
+      pixelData[y * BytesPerRow + byteCol] = (byte)value;
+    }
+
+    return new() { PixelData = pixelData };
   }
 
 }
