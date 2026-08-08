@@ -6,6 +6,14 @@ using System.Text;
 namespace FileFormat.PalmImageViewer;
 
 /// <summary>Assembles Palm ImageViewer databases from a <see cref="PalmImageViewerFile"/>.</summary>
+/// <remarks>
+/// One thing here is deliberately not written the way the other tool would like. Its reader refuses
+/// any file shorter than a row of the picture plus 257 bytes, which compares an unpacked row against
+/// a packed file and so turns down anything that compressed well. It turns down its own writer's
+/// output for it: a flat 320 by 200 picture written by that tool is 270 bytes, its size check wants
+/// 297, and it reports insufficient image data for a file it made itself. Padding ours out to suit
+/// that would cost every picture the compression the format exists to give it.
+/// </remarks>
 public static class PalmImageViewerWriter {
 
   /// <summary>The Palm database header, before the list of records.</summary>
@@ -22,6 +30,27 @@ public static class PalmImageViewerWriter {
 
   /// <summary>Bytes a database or record name may occupy, the last of which is the terminator.</summary>
   private const int _NameLength = 32;
+
+  /// <summary>Where the depth is stated inside the picture record.</summary>
+  private const int _DepthOffset = 33;
+
+  /// <summary>Where the two anchors sit, the pair a picture that is not anchored fills with ones.</summary>
+  private const int _AnchorOffset = 50;
+
+  /// <summary>
+  /// The three bytes that follow a record's attributes: the identifier every ImageViewer record
+  /// carries, counting up from the first.
+  /// </summary>
+  /// <remarks>
+  /// A Palm record's identifier is nominally the database's own business, and this reader has never
+  /// looked at it. It is not free, though: the reader every other tool uses compares it against this
+  /// exact value and calls the file corrupt when it differs, so a record identified any other way is
+  /// one only we can open.
+  /// </remarks>
+  private static ReadOnlySpan<byte> _RecordIdentifier => [0x6F, 0x80, 0x00];
+
+  /// <summary>The attributes byte an ImageViewer record carries.</summary>
+  private const byte _RecordAttributes = 0x40;
 
   private static ReadOnlySpan<byte> _Type => "vIMG"u8;
   private static ReadOnlySpan<byte> _Creator => "View"u8;
@@ -48,9 +77,17 @@ public static class PalmImageViewerWriter {
 
     var record = _DatabaseHeaderSize + _RecordEntrySize;
     BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(_DatabaseHeaderSize), (uint)record);
+    data[_DatabaseHeaderSize + 4] = _RecordAttributes;
+    _RecordIdentifier.CopyTo(data.AsSpan(_DatabaseHeaderSize + 5));
 
     _WriteName(data.AsSpan(record, _NameLength), name);
     data[record + 32] = (byte)(compressed ? 1 : 0);
+    data[record + _DepthOffset] = DepthByte(file.BitsPerPixel);
+
+    // A picture with no anchor says so with ones rather than with zeroes, which are a corner.
+    BinaryPrimitives.WriteUInt16BigEndian(data.AsSpan(record + _AnchorOffset), ushort.MaxValue);
+    BinaryPrimitives.WriteUInt16BigEndian(data.AsSpan(record + _AnchorOffset + 2), ushort.MaxValue);
+
     BinaryPrimitives.WriteUInt16BigEndian(data.AsSpan(record + _WidthOffset), (ushort)file.Width);
     BinaryPrimitives.WriteUInt16BigEndian(data.AsSpan(record + _WidthOffset + 2), (ushort)file.Height);
 
@@ -58,6 +95,17 @@ public static class PalmImageViewerWriter {
 
     return data;
   }
+
+  /// <summary>How a depth is named in the record, which is not by the number of bits.</summary>
+  /// <remarks>
+  /// Two bits is written as nought and one bit as 255, so the value is a name rather than a count
+  /// and the obvious reading of it — a zero meaning "unset" — is the two-bit form.
+  /// </remarks>
+  public static byte DepthByte(int bitsPerPixel) => bitsPerPixel switch {
+    4 => 0x02,
+    2 => 0x00,
+    _ => 0xFF,
+  };
 
   private static void _WriteName(Span<byte> target, ReadOnlySpan<byte> name) {
     // One byte short of the field, so whatever is written is terminated.

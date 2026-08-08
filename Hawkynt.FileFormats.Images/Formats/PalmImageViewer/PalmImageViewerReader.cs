@@ -2,6 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.IO;
 using System.Text;
+using FileFormat.Core;
 
 namespace FileFormat.PalmImageViewer;
 
@@ -19,6 +20,9 @@ public static class PalmImageViewerReader {
 
   /// <summary>Where the width sits inside the picture record.</summary>
   private const int _WidthOffset = 54;
+
+  /// <summary>Where the depth is stated inside the picture record.</summary>
+  private const int _DepthOffset = 33;
 
   private static ReadOnlySpan<byte> _Type => "vIMG"u8;
   private static ReadOnlySpan<byte> _Creator => "View"u8;
@@ -66,8 +70,8 @@ public static class PalmImageViewerReader {
     while (nameEnd < 32 && record[nameEnd] != 0)
       ++nameEnd;
 
-    // The low bit says whether the rows are run-length coded; the depth is not stated anywhere, so
-    // it comes out of how much they decompress to.
+    // The low bit says whether the rows are run-length coded; the byte after it names the depth,
+    // and names it rather than counting it — two bits is nought and one bit is 255.
     var isCompressed = (record[32] & 1) != 0;
     var width = BinaryPrimitives.ReadUInt16BigEndian(record[_WidthOffset..]);
     var height = BinaryPrimitives.ReadUInt16BigEndian(record[(_WidthOffset + 2)..]);
@@ -78,11 +82,11 @@ public static class PalmImageViewerReader {
     var body = record[_RecordHeaderSize..];
     var rows = isCompressed ? _Decompress(body) : body.ToArray();
 
-    var bytesPerRow = rows.Length / height;
-    var bitsPerPixel = bytesPerRow * 8 / width;
-    if (bitsPerPixel is not (1 or 2 or 4))
+    var bitsPerPixel = record[_DepthOffset] switch { 0 => 2, 2 => 4, _ => 1 };
+    if (PackedRows.Stride(width, bitsPerPixel) * height > rows.Length)
       throw new InvalidDataException(
-        $"ImageViewer {width}x{height} decompressed to {rows.Length} bytes, which is no usable depth.");
+        $"An ImageViewer {width}x{height} of {bitsPerPixel} bits needs more than the {rows.Length} bytes "
+        + "its record decompressed to.");
 
     return new() {
       Width = width,
