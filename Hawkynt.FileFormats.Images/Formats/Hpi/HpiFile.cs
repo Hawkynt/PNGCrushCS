@@ -13,11 +13,13 @@ namespace FileFormat.Hpi;
 /// established, and none of the three samples settles it.
 /// </remarks>
 public readonly record struct HpiFile
-  : IImageFormatReader<HpiFile>, IImageToRawImage<HpiFile> {
+  : IImageFormatReader<HpiFile>, IImageToRawImage<HpiFile>,
+    IImageFromRawImage<HpiFile>, IImageFormatWriter<HpiFile> {
 
   static string IImageFormatMetadata<HpiFile>.PrimaryExtension => ".hpi";
   static string[] IImageFormatMetadata<HpiFile>.FileExtensions => [".hpi"];
   static HpiFile IImageFormatReader<HpiFile>.FromSpan(ReadOnlySpan<byte> data) => HpiReader.FromSpan(data);
+  static byte[] IImageFormatWriter<HpiFile>.ToBytes(HpiFile file) => HpiWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<HpiFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [16777216])
   ];
@@ -31,9 +33,24 @@ public readonly record struct HpiFile
   /// <summary>Where the offset of the JPEG is stated, as a little-endian long word.</summary>
   internal const int JpegOffsetField = 12;
 
+  /// <summary>The head this writes: the signature and the table that states where the picture is.</summary>
+  internal const int DefaultJpegOffset = JpegOffsetField + 4;
+
   /// <summary>The JPEG the file carries, exactly as it stands in it.</summary>
   public byte[] Embedded { get; init; }
 
   public static RawImage ToRawImage(HpiFile file)
     => JpegFile.ToRawImage(JpegReader.FromBytes(file.Embedded ?? throw new InvalidDataException("A Hemera photo-object carries no picture.")));
+
+  /// <summary>Builds one carrying only the JPEG.</summary>
+  /// <remarks>
+  /// A real photo-object has a second picture after the first — a palette-indexed PNG whose purpose
+  /// none of the samples settles. Writing one whose meaning is unknown would be inventing it, so
+  /// only the picture that is understood is written, and the table states where it is.
+  /// </remarks>
+  public static HpiFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    return new() { Embedded = JpegWriter.ToBytes(JpegFile.FromRawImage(image)) };
+  }
 }

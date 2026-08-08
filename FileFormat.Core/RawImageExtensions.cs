@@ -144,10 +144,13 @@ public static class RawImageExtensions {
 
     var rgb = new byte[width * height * 3];
     for (var y = 0; y < height; ++y) {
-      var sourceY = y * image.Height / height;
+      // In long arithmetic. A source wider than about 32768 overflows a signed int part way along a
+      // row, and the offset comes out negative — so the widest pictures the headers here can state
+      // were the ones that threw.
+      var sourceY = (int)((long)y * image.Height / height);
 
       for (var x = 0; x < width; ++x) {
-        var from = (sourceY * image.Width + x * image.Width / width) * 3;
+        var from = (int)(((long)sourceY * image.Width + (long)x * image.Width / width) * 3);
         var to = (y * width + x) * 3;
         rgb[to] = source.PixelData[from];
         rgb[to + 1] = source.PixelData[from + 1];

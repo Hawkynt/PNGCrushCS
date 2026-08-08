@@ -17,11 +17,13 @@ namespace FileFormat.HereticM8;
 /// The levels are the same picture at halving sizes, so the first is the one to read.
 /// </remarks>
 public readonly record struct HereticM8File
-  : IImageFormatReader<HereticM8File>, IImageToRawImage<HereticM8File> {
+  : IImageFormatReader<HereticM8File>, IImageToRawImage<HereticM8File>,
+    IImageFromRawImage<HereticM8File>, IImageFormatWriter<HereticM8File> {
 
   static string IImageFormatMetadata<HereticM8File>.PrimaryExtension => ".m8";
   static string[] IImageFormatMetadata<HereticM8File>.FileExtensions => [".m8"];
   static HereticM8File IImageFormatReader<HereticM8File>.FromSpan(ReadOnlySpan<byte> data) => HereticM8Reader.FromSpan(data);
+  static byte[] IImageFormatWriter<HereticM8File>.ToBytes(HereticM8File file) => HereticM8Writer.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<HereticM8File>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [256])
   ];
@@ -58,4 +60,25 @@ public readonly record struct HereticM8File
     Palette = file.Palette[..],
     PaletteCount = 256,
   };
+
+  /// <summary>Builds a texture, quantised onto the 256 colours the format keeps a table of.</summary>
+  /// <remarks>
+  /// Only the first mipmap level is written. The rest are the same picture at halving sizes, and a
+  /// file that states none of them is still a file this reader takes — it reads level zero and no
+  /// other, because that is the full-size picture.
+  /// </remarks>
+  public static HereticM8File FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    image = PixelConverter.Convert(image, PixelFormat.Indexed8);
+
+    var palette = new byte[256 * 3];
+    (image.Palette ?? []).AsSpan(0, Math.Min(image.Palette?.Length ?? 0, palette.Length)).CopyTo(palette);
+
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      PixelData = image.PixelData[..],
+      Palette = palette,
+    };
+  }
 }
