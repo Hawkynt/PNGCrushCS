@@ -15,7 +15,8 @@ namespace FileFormat.PowerGraphics;
 /// hardware's timing, which is what makes this the format the renderer exists for.
 /// </remarks>
 public readonly record struct PowerGraphicsFile
-  : IImageFormatReader<PowerGraphicsFile>, IImageToRawImage<PowerGraphicsFile> {
+  : IImageFormatReader<PowerGraphicsFile>, IImageToRawImage<PowerGraphicsFile>,
+    IImageFromRawImage<PowerGraphicsFile>, IImageFormatWriter<PowerGraphicsFile> {
 
   /// <summary>Pixels across, including the borders the raster instructions can reach.</summary>
   public const int Width = 336;
@@ -36,6 +37,8 @@ public readonly record struct PowerGraphicsFile
   static string[] IImageFormatMetadata<PowerGraphicsFile>.FileExtensions => [".pgr"];
   static PowerGraphicsFile IImageFormatReader<PowerGraphicsFile>.FromSpan(ReadOnlySpan<byte> data)
     => PowerGraphicsReader.FromSpan(data);
+  static byte[] IImageFormatWriter<PowerGraphicsFile>.ToBytes(PowerGraphicsFile file)
+    => PowerGraphicsWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<PowerGraphicsFile>.VideoModes => [
     new("PowerGraphics", [(Width, Height)], [256])
   ];
@@ -151,6 +154,18 @@ public readonly record struct PowerGraphicsFile
       Format = PixelFormat.Rgb24,
       PixelData = Atari8BitGraphics.ApplyPalette(frame),
     };
+  }
+
+  /// <summary>Writes the display program that draws a picture.</summary>
+  /// <remarks>
+  /// The program written is the plainest one the format allows: mode E all the way down, and four
+  /// register writes at the blanked start of every scanline, which is as many as the cycles before
+  /// the picture begins will hold. See <see cref="PowerGraphicsEncoder"/>.
+  /// </remarks>
+  public static PowerGraphicsFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    return PowerGraphicsReader.FromBytes(PowerGraphicsEncoder.Encode(image.SampleTo(Width, Height).PixelData));
   }
 
   /// <summary>The playfield comes from wherever the display list last pointed ANTIC.</summary>
