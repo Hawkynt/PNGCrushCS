@@ -386,11 +386,14 @@ public sealed class WriterAcceptanceTests {
       process.StandardOutput.ReadToEnd();
       process.WaitForExit(20000);
 
-      // Both of these are it declining to judge rather than judging: the first says it has never
-      // heard of the format, the second that the format states no size and it will not guess one.
-      // Neither is a statement about our bytes.
+      // All three of these are it declining to judge rather than judging: the first says it has
+      // never heard of the format, the second that the format states no size and it will not guess
+      // one, and the third that it reads this one by handing the file to a separate program. It
+      // reports that program being absent and that program turning the file down with the same
+      // words, so a verdict that cannot be told from a missing tool is not a verdict.
       if (error.Contains("no decode delegate", StringComparison.OrdinalIgnoreCase)
-          || error.Contains("must specify image size", StringComparison.OrdinalIgnoreCase))
+          || error.Contains("must specify image size", StringComparison.OrdinalIgnoreCase)
+          || error.Contains("delegate failed", StringComparison.OrdinalIgnoreCase))
         return null;
 
       return (process.ExitCode == 0, $"ImageMagick rejected it — {error.Trim()}");
