@@ -35,15 +35,26 @@ public readonly record struct JpegFile :
   public byte[]? RgbPixelData { get; init; }
   public byte[]? RawJpegBytes { get; init; }
 
+  /// <summary>Explicit metadata for the writer to embed. <c>null</c> means "use whatever
+  /// <see cref="RawJpegBytes"/> already carries, unchanged" — see <see cref="JpegWriter"/> remarks for
+  /// why this isn't auto-populated by <see cref="JpegReader"/>.</summary>
+  public ImageMetadata? Metadata { get; init; }
+
   public static RawImage ToRawImage(JpegFile file) {
     if (file.RgbPixelData == null)
       throw new ArgumentException("RgbPixelData must not be null. Ensure the JPEG was decoded before conversion.", nameof(file));
+
+    // Metadata is computed on demand from RawJpegBytes rather than eagerly stashed on JpegFile by the
+    // reader: that keeps a plain decode -> ToBytes round trip byte-identical (see JpegWriter remarks)
+    // while still exposing everything the source file carried to whoever reads RawImage.Metadata.
+    var metadata = file.Metadata ?? (file.RawJpegBytes != null ? JpegMetadataCodec.Read(file.RawJpegBytes) : null);
 
     return new() {
       Width = file.Width,
       Height = file.Height,
       Format = file.IsGrayscale ? PixelFormat.Gray8 : PixelFormat.Rgb24,
       PixelData = file.RgbPixelData[..],
+      Metadata = metadata,
     };
   }
 
@@ -58,6 +69,7 @@ public readonly record struct JpegFile :
       Height = image.Height,
       IsGrayscale = isGrayscale,
       RgbPixelData = image.PixelData[..],
+      Metadata = image.Metadata,
     };
   }
 }

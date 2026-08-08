@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 
 namespace FileFormat.Jpeg;
 
@@ -13,8 +14,14 @@ internal static class JpegCoefficientWriter {
 
     JpegMarkerWriter.WriteSoi(stream);
 
-    // Write APP0 JFIF header
-    JpegMarkerWriter.WriteApp0Jfif(stream);
+    // A lossless transcode's MarkerSegments were parsed straight off the source file, and
+    // JpegMarkerParser captures every APPn (including APP0) — so a JFIF-bearing source already
+    // carries its own APP0 in there. Writing the canonical one unconditionally on top of that
+    // duplicated it verbatim in the output. Only fall back to synthesizing one when nothing
+    // preserved already provides it (fresh encodes, or stripped output).
+    var hasPreservedJfif = !stripMetadata && image.MarkerSegments.Any(s => s.Marker == JpegMarker.APP0);
+    if (!hasPreservedJfif)
+      JpegMarkerWriter.WriteApp0Jfif(stream);
 
     // Write preserved markers (unless stripping)
     if (!stripMetadata)
