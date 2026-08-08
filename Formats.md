@@ -553,6 +553,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | PC Paint/Pictor         | .pic, .clp                                           | PC Paint/Pictor page format      | Y      | Y      | —         | R     | —   | —      | —         |
 | PC-88                   | .pc8                                                 | NEC PC-88 graphics               | Y      | Y      | —         | —     | —   | —      | —         |
 | PCO 16-bit              | .b16                                                 | PCO 16-bit image                 | Y      | Y      | —         | —     | —   | —      | —         |
+| PCL raster              | .pcl, .prn                                           | HP PCL 5 raster graphics subset  | Y      | —      | —         | —     | —   | —      | —         |
 | PCX                     | .pcx, .pcc, .fcx                                     | ZSoft PC Paintbrush              | Y      | Y      | Y         | RW    | RW  | RW     | RW        |
 | PDF                     | .pdf                                                 | PDF embedded image extractor     | Y      | Y      | —         | R     | RW  | R      | RW        |
 | PDN                     | .pdn                                                 | Paint.NET native format          | Y      | Y      | —         | —     | —   | —      | R         |
@@ -766,7 +767,6 @@ Formats we consciously chose not to implement, with reason codes:
 | LuraWave          | .lwf        | proprietary  | —     | —   | RW     | —         |
 | MVG               | .mvg        | meta         | R     | RW  | —      | —         |
 | MrSID             | .sid        | proprietary  | —     | —   | —      | R         |
-| PCL               | .pcl        | vector       | —     | —   | —      | —         |
 | PES (embroidery)  | .pes        | app-specific | R     | R   | —      | —         |
 | SVG               | .svg        | vector       | R     | RW  | R      | R         |
 | TrueType Font     | .ttf        | font         | R     | —   | —      | R         |
@@ -798,7 +798,6 @@ Formats with public or partially-public specifications that could be added in fu
 | OME-TIFF               | .ome.tif   | Open Microscopy multi-channel | —     | —   | —      | —         |
 | ORA (full layers)      | .ora       | Full OpenRaster layer support | —     | R   | RW     | —         |
 | PaintShop (Atari)      | .da4       | Atari ST PaintShop            | RW    | —   | —      | —         |
-| PCL raster             | .pcl       | HP PCL raster subset          | —     | —   | —      | —         |
 | PIX (TRS-80)           | .pix       | TRS-80 Color Computer PIX     | R     | —   | —      | —         |
 | Psion Series 3 (full)  | .icn       | Psion multi-format support    | R     | —   | —      | —         |
 | QSS/Fuji print         | .qss       | Fuji digital print format     | —     | —   | —      | —         |
