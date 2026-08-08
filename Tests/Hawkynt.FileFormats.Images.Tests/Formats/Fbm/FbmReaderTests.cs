@@ -1,38 +1,38 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
+using System.Text;
 using FileFormat.Fbm;
 
 namespace FileFormat.Fbm.Tests;
 
+/// <summary>
+/// Reading a CMU Fuzzy Bitmap: a text header, then one whole plane per band, rows bottom to top.
+/// </summary>
+/// <remarks>
+/// These used to build their samples as big-endian integers laid out at 8, 12, 16, 20 and so on,
+/// with the bands interleaved and the rows top-down. No file has any of that, so the tests passed
+/// against a reader that agreed with them and disagreed with the format. A real 800 by 600 sample
+/// settled every one of those three questions.
+/// </remarks>
 [TestFixture]
 public sealed class FbmReaderTests {
 
-  private static byte[] _BuildValidFbm(int cols, int rows, int bands, byte[]? pixelData = null) {
-    var bytesPerPixelRow = cols * bands;
-    var rowLen = (bytesPerPixelRow + 15) & ~15;
-    var plnLen = rowLen * rows;
-    var fileSize = FbmHeader.StructSize + plnLen;
-    var data = new byte[fileSize];
+  /// <summary>Builds a file the way one is really laid out, from an interleaved top-down picture.</summary>
+  private static byte[] _BuildValidFbm(int cols, int rows, int bands, byte[]? pixels = null, int rowLen = 0, string title = "") {
+    if (rowLen <= 0)
+      rowLen = cols;
 
-    Array.Copy(FbmHeader.MagicBytes, 0, data, 0, 8);
-    BinaryPrimitives.WriteInt32BigEndian(data.AsSpan(8), cols);
-    BinaryPrimitives.WriteInt32BigEndian(data.AsSpan(12), rows);
-    BinaryPrimitives.WriteInt32BigEndian(data.AsSpan(16), bands);
-    BinaryPrimitives.WriteInt32BigEndian(data.AsSpan(20), 8); // bits
-    BinaryPrimitives.WriteInt32BigEndian(data.AsSpan(24), 8); // physbits
-    BinaryPrimitives.WriteInt32BigEndian(data.AsSpan(28), rowLen);
-    BinaryPrimitives.WriteInt32BigEndian(data.AsSpan(32), plnLen);
-    BinaryPrimitives.WriteInt32BigEndian(data.AsSpan(36), 0); // clrlen
-    BinaryPrimitives.WriteDoubleBigEndian(data.AsSpan(40), 1.0);
+    var planeLen = rowLen * rows;
+    var data = new byte[FbmHeader.StructSize + planeLen * bands];
+    new FbmHeader(cols, rows, bands, 8, 8, rowLen, planeLen, 0, 1.0, title).WriteTo(data);
 
-    if (pixelData != null)
-      for (var y = 0; y < rows; ++y) {
-        var srcOff = y * bytesPerPixelRow;
-        var dstOff = FbmHeader.StructSize + y * rowLen;
-        var copyLen = Math.Min(bytesPerPixelRow, pixelData.Length - srcOff);
-        if (copyLen > 0)
-          Array.Copy(pixelData, srcOff, data, dstOff, copyLen);
+    if (pixels != null)
+      for (var band = 0; band < bands; ++band)
+      for (var y = 0; y < rows; ++y)
+      for (var x = 0; x < cols; ++x) {
+        var source = (y * cols + x) * bands + band;
+        if (source < pixels.Length)
+          data[FbmHeader.StructSize + band * planeLen + (rows - 1 - y) * rowLen + x] = pixels[source];
       }
 
     return data;
@@ -40,15 +40,13 @@ public sealed class FbmReaderTests {
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => FbmReader.FromBytes(null!));
-  }
+  public void FromBytes_Null_ThrowsArgumentNullException()
+    => Assert.Throws<ArgumentNullException>(() => FbmReader.FromBytes(null!));
 
   [Test]
   [Category("Unit")]
-  public void FromFile_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => FbmReader.FromFile(null!));
-  }
+  public void FromFile_Null_ThrowsArgumentNullException()
+    => Assert.Throws<ArgumentNullException>(() => FbmReader.FromFile(null!));
 
   [Test]
   [Category("Unit")]
@@ -59,22 +57,20 @@ public sealed class FbmReaderTests {
 
   [Test]
   [Category("Unit")]
-  public void FromStream_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => FbmReader.FromStream(null!));
-  }
+  public void FromStream_Null_ThrowsArgumentNullException()
+    => Assert.Throws<ArgumentNullException>(() => FbmReader.FromStream(null!));
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_TooSmall_ThrowsInvalidDataException() {
-    var tooSmall = new byte[100];
-    Assert.Throws<InvalidDataException>(() => FbmReader.FromBytes(tooSmall));
-  }
+  public void FromBytes_TooSmall_ThrowsInvalidDataException()
+    => Assert.Throws<InvalidDataException>(() => FbmReader.FromBytes(new byte[100]));
 
   [Test]
   [Category("Unit")]
   public void FromBytes_InvalidMagic_ThrowsInvalidDataException() {
-    var data = new byte[256];
-    data[0] = (byte)'X'; // wrong magic
+    var data = new byte[FbmHeader.StructSize];
+    data[0] = (byte)'X';
+
     Assert.Throws<InvalidDataException>(() => FbmReader.FromBytes(data));
   }
 
@@ -82,14 +78,15 @@ public sealed class FbmReaderTests {
   [Category("Unit")]
   public void FromBytes_ValidGrayscale_ParsesCorrectly() {
     var pixels = new byte[] { 10, 20, 30, 40 };
-    var data = _BuildValidFbm(2, 2, 1, pixels);
 
-    var result = FbmReader.FromBytes(data);
+    var file = FbmReader.FromBytes(_BuildValidFbm(2, 2, 1, pixels));
 
-    Assert.That(result.Width, Is.EqualTo(2));
-    Assert.That(result.Height, Is.EqualTo(2));
-    Assert.That(result.Bands, Is.EqualTo(1));
-    Assert.That(result.PixelData, Is.EqualTo(pixels));
+    Assert.Multiple(() => {
+      Assert.That(file.Width, Is.EqualTo(2));
+      Assert.That(file.Height, Is.EqualTo(2));
+      Assert.That(file.Bands, Is.EqualTo(1));
+      Assert.That(file.PixelData, Is.EqualTo(pixels));
+    });
   }
 
   [Test]
@@ -99,75 +96,86 @@ public sealed class FbmReaderTests {
     for (var i = 0; i < pixels.Length; ++i)
       pixels[i] = (byte)(i * 17);
 
-    var data = _BuildValidFbm(2, 2, 3, pixels);
+    var file = FbmReader.FromBytes(_BuildValidFbm(2, 2, 3, pixels));
 
-    var result = FbmReader.FromBytes(data);
+    Assert.Multiple(() => {
+      Assert.That(file.Width, Is.EqualTo(2));
+      Assert.That(file.Bands, Is.EqualTo(3));
+      Assert.That(file.PixelData, Is.EqualTo(pixels), "the three planes come back interleaved");
+    });
+  }
 
-    Assert.That(result.Width, Is.EqualTo(2));
-    Assert.That(result.Height, Is.EqualTo(2));
-    Assert.That(result.Bands, Is.EqualTo(3));
-    Assert.That(result.PixelData, Is.EqualTo(pixels));
+  [Test]
+  [Category("Unit")]
+  public void FromBytes_LastRowStoredIsTheTopOfThePicture() {
+    // The single thing a made-up sample can never catch: get this backwards and a symmetric test
+    // picture still passes.
+    var data = _BuildValidFbm(1, 3, 1);
+    data[FbmHeader.StructSize] = 0x11;
+    data[FbmHeader.StructSize + 1] = 0x22;
+    data[FbmHeader.StructSize + 2] = 0x33;
+
+    Assert.That(FbmReader.FromBytes(data).PixelData, Is.EqualTo(new byte[] { 0x33, 0x22, 0x11 }));
   }
 
   [Test]
   [Category("Unit")]
   public void FromBytes_StripsRowPadding() {
-    // 3 cols, 1 band => 3 bytes per row, rowlen = 16 (padded to 16-byte boundary)
-    var data = _BuildValidFbm(3, 1, 1);
+    // rowlen is a row of ONE plane, padding included — not the interleaved stride.
+    var data = _BuildValidFbm(3, 1, 1, rowLen: 16);
     data[FbmHeader.StructSize] = 0xAA;
     data[FbmHeader.StructSize + 1] = 0xBB;
     data[FbmHeader.StructSize + 2] = 0xCC;
-    // padding bytes 3..15 are zero
 
-    var result = FbmReader.FromBytes(data);
-
-    Assert.That(result.PixelData.Length, Is.EqualTo(3));
-    Assert.That(result.PixelData[0], Is.EqualTo(0xAA));
-    Assert.That(result.PixelData[1], Is.EqualTo(0xBB));
-    Assert.That(result.PixelData[2], Is.EqualTo(0xCC));
+    Assert.That(FbmReader.FromBytes(data).PixelData, Is.EqualTo(new byte[] { 0xAA, 0xBB, 0xCC }));
   }
 
   [Test]
   [Category("Unit")]
   public void FromStream_ValidGrayscale() {
     var pixels = new byte[] { 42, 84, 126, 168 };
-    var data = _BuildValidFbm(4, 1, 1, pixels);
+    using var ms = new MemoryStream(_BuildValidFbm(4, 1, 1, pixels));
 
-    using var ms = new MemoryStream(data);
-    var result = FbmReader.FromStream(ms);
+    var file = FbmReader.FromStream(ms);
 
-    Assert.That(result.Width, Is.EqualTo(4));
-    Assert.That(result.Height, Is.EqualTo(1));
-    Assert.That(result.Bands, Is.EqualTo(1));
-    Assert.That(result.PixelData, Is.EqualTo(pixels));
+    Assert.Multiple(() => {
+      Assert.That(file.Width, Is.EqualTo(4));
+      Assert.That(file.Height, Is.EqualTo(1));
+      Assert.That(file.PixelData, Is.EqualTo(pixels));
+    });
   }
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_TitlePreserved() {
-    var data = _BuildValidFbm(1, 1, 1, [0xFF]);
-    var title = "Test Image";
-    var titleBytes = System.Text.Encoding.ASCII.GetBytes(title);
-    Array.Copy(titleBytes, 0, data, 48, titleBytes.Length);
+  public void FromBytes_TitlePreserved()
+    => Assert.That(FbmReader.FromBytes(_BuildValidFbm(1, 1, 1, [0xFF], title: "Test Image")).Title, Is.EqualTo("Test Image"));
 
-    var result = FbmReader.FromBytes(data);
+  [Test]
+  [Category("Unit")]
+  public void FromBytes_ColourMapIsSkippedBeforeThePicture() {
+    // clrlen says how many bytes sit between the header and the picture.
+    var data = new byte[FbmHeader.StructSize + 12 + 2];
+    new FbmHeader(2, 1, 1, 8, 8, 2, 2, 12, 1.0, string.Empty).WriteTo(data);
+    data[FbmHeader.StructSize + 12] = 0x7F;
+    data[FbmHeader.StructSize + 13] = 0x80;
 
-    Assert.That(result.Title, Is.EqualTo(title));
+    Assert.That(FbmReader.FromBytes(data).PixelData, Is.EqualTo(new byte[] { 0x7F, 0x80 }));
   }
 
   [Test]
   [Category("Unit")]
   public void FromBytes_InvalidBands_ThrowsInvalidDataException() {
-    var data = new byte[256];
-    Array.Copy(FbmHeader.MagicBytes, 0, data, 0, 8);
-    BinaryPrimitives.WriteInt32BigEndian(data.AsSpan(8), 4);
-    BinaryPrimitives.WriteInt32BigEndian(data.AsSpan(12), 4);
-    BinaryPrimitives.WriteInt32BigEndian(data.AsSpan(16), 2); // invalid bands
-    BinaryPrimitives.WriteInt32BigEndian(data.AsSpan(20), 8);
-    BinaryPrimitives.WriteInt32BigEndian(data.AsSpan(24), 8);
-    BinaryPrimitives.WriteInt32BigEndian(data.AsSpan(28), 16);
-    BinaryPrimitives.WriteInt32BigEndian(data.AsSpan(32), 64);
-    BinaryPrimitives.WriteInt32BigEndian(data.AsSpan(36), 0);
+    var data = new byte[FbmHeader.StructSize + 64];
+    new FbmHeader(4, 4, 2, 8, 8, 4, 16, 0, 1.0, string.Empty).WriteTo(data);
+
+    Assert.Throws<InvalidDataException>(() => FbmReader.FromBytes(data));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void FromBytes_UnsupportedDepth_ThrowsInvalidDataException() {
+    var data = new byte[FbmHeader.StructSize + 32];
+    new FbmHeader(4, 4, 1, 4, 4, 4, 16, 0, 1.0, string.Empty).WriteTo(data);
 
     Assert.Throws<InvalidDataException>(() => FbmReader.FromBytes(data));
   }

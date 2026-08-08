@@ -55,13 +55,17 @@ public readonly record struct MgrBitmapFile : IImageFormatReader<MgrBitmapFile>,
   /// <remarks>
   /// The header carries the dimensions, so unlike most of the machine formats here there is nothing
   /// to sample to — the picture keeps its own size and only its colours are reduced.
+  /// <para/>
+  /// A set bit is the dark one, matching what the reader draws. Sampling the other way round — the
+  /// default, which suits a machine drawing light ink over a dark screen — wrote every picture as
+  /// its own negative, and a black pixel came back white.
   /// </remarks>
   public static MgrBitmapFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
     if (image.Width < 1 || image.Height < 1)
       throw new ArgumentException("A picture needs at least one pixel.", nameof(image));
 
-    var set = GlyphSheet.Sample(image, image.Width, image.Height);
+    var set = GlyphSheet.Sample(image, image.Width, image.Height, setWhenBright: false);
     var stride = (image.Width + 7) / 8;
     var bitmap = new byte[stride * image.Height];
 

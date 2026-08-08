@@ -13,7 +13,9 @@ public sealed class IndyPaintTests {
     for (var i = 0; i < pixels.Length; ++i)
       pixels[i] = (byte)(i * 31 % 256);
 
-    return new() { PixelData = pixels };
+    // The size comes from the header now, so a sample that states only its pixels states nothing:
+    // it used to be fixed at 320 by 240 and no longer is.
+    return new() { Width = IndyPaintFile.DefaultWidth, Height = IndyPaintFile.DefaultHeight, PixelData = pixels };
   }
 
   [Test]

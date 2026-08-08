@@ -21,9 +21,10 @@ public sealed class DataTypeTests {
     Assert.That((int)DdsFormat.Bc6HUnsigned, Is.EqualTo(9));
     Assert.That((int)DdsFormat.Bc6HSigned, Is.EqualTo(10));
     Assert.That((int)DdsFormat.Bc7, Is.EqualTo(11));
+    Assert.That((int)DdsFormat.Single8, Is.EqualTo(12));
 
     var values = Enum.GetValues<DdsFormat>();
-    Assert.That(values, Has.Length.EqualTo(12));
+    Assert.That(values, Has.Length.EqualTo(13));
   }
 
   [Test]
