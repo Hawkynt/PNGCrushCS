@@ -61,6 +61,7 @@ public sealed class WebPFile :
         Height = h,
         Format = file.Features.HasAlpha ? PixelFormat.Rgba32 : PixelFormat.Rgb24,
         PixelData = file.Features.HasAlpha ? rgba : _StripAlpha(rgba, w * h),
+        Metadata = WebPMetadataCodec.Read(file.MetadataChunks),
       };
     }
 
@@ -77,7 +78,10 @@ public sealed class WebPFile :
         rgba[i * 4 + 2] = rgb[i * 3 + 2];
         rgba[i * 4 + 3] = file.AlphaData[i];
       }
-      return new() { Width = w, Height = h, Format = PixelFormat.Rgba32, PixelData = rgba };
+      return new() {
+        Width = w, Height = h, Format = PixelFormat.Rgba32, PixelData = rgba,
+        Metadata = WebPMetadataCodec.Read(file.MetadataChunks),
+      };
     }
 
     return new() {
@@ -85,6 +89,7 @@ public sealed class WebPFile :
       Height = h,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
+      Metadata = WebPMetadataCodec.Read(file.MetadataChunks),
     };
   }
 
@@ -108,6 +113,7 @@ public sealed class WebPFile :
       Features = new WebPFeatures(w, h, hasAlpha, IsLossless: true, IsAnimated: false),
       ImageData = vp8lData,
       IsLossless = true,
+      MetadataChunks = WebPMetadataCodec.Write(image.Metadata),
     };
   }
 
@@ -132,6 +138,7 @@ public sealed class WebPFile :
 
     return new() {
       Features = new WebPFeatures(image.Width, image.Height, hasAlpha, IsLossless: false, IsAnimated: false),
+      MetadataChunks = WebPMetadataCodec.Write(image.Metadata),
       ImageData = vp8Data,
       IsLossless = false,
       AlphaData = alphaData,
