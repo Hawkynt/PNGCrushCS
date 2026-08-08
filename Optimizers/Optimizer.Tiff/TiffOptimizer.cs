@@ -22,6 +22,9 @@ public sealed class TiffOptimizer {
   private readonly ushort _photometric;
 
   private readonly byte[] _pixelData;
+  /// <summary>What the source carried beside its pixels, kept so shrinking a file does not strip it.</summary>
+  private readonly ImageMetadata? _metadata;
+
   private readonly int _samplesPerPixel;
   private readonly bool _skipPackBits;
   private readonly int _uniqueColors;
@@ -32,6 +35,7 @@ public sealed class TiffOptimizer {
     this._options = options ?? new TiffOptimizationOptions();
     this._width = image.Width;
     this._height = image.Height;
+    this._metadata = image.Metadata;
 
     _ExtractPixelData(image, out this._pixelData, out this._samplesPerPixel, out this._bitsPerSample,
       out this._photometric,
@@ -247,7 +251,7 @@ public sealed class TiffOptimizer {
         (pixelData, samples, bits, photometric, colorMap) = this._ConvertColorMode(combo.ColorMode);
 
       return TiffWriter.Assemble(
-        pixelData, this._width, this._height,
+        pixelData, this._width, this._height, this._metadata,
         samples, bits,
         combo.Compression, combo.Predictor,
         combo.StripRowCount, this._options.ZopfliIterations,

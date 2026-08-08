@@ -94,6 +94,10 @@ public static class PixelConverter {
       Height = height,
       Format = target,
       PixelData = converted,
+      // Changing how the pixels are stored says nothing about who took the picture or when, so the
+      // metadata rides along. Dropped here it was lost the moment any format converted on the way
+      // in or out, which is most of them.
+      Metadata = source.Metadata,
     };
   }
 
@@ -124,6 +128,7 @@ public static class PixelConverter {
       Palette = result.Palette,
       PaletteCount = result.Count,
       AlphaTable = result.AlphaTable,
+      Metadata = source.Metadata,
     };
   }
 

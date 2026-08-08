@@ -69,6 +69,7 @@ public static class TiffReader {
       ColorMap = colorMap,
       ColorMode = colorMode,
       Pages = pages,
+      Metadata = TiffMetadataCodec.Read(data),
     };
   }
 

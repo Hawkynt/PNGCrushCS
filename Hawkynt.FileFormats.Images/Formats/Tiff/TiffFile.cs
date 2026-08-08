@@ -43,6 +43,13 @@ public sealed class TiffFile :
   /// <summary>Additional pages beyond the first IFD. Empty for single-page TIFFs.</summary>
   public IReadOnlyList<TiffPage> Pages { get; init; } = [];
 
+  /// <summary>Everything the file carries beside its pixels, read from its own IFD tags.</summary>
+  /// <remarks>
+  /// A TIFF needs no separate container for this: EXIF is a TIFF stream, and XMP, the Photoshop IPTC
+  /// block, an ICC profile and the resolution are ordinary tags of IFD0.
+  /// </remarks>
+  public ImageMetadata? Metadata { get; init; }
+
   /// <summary>Returns the total number of pages (IFDs) in the TIFF file.</summary>
   public static int ImageCount(TiffFile file) {
     ArgumentNullException.ThrowIfNull(file);
@@ -173,6 +180,7 @@ public sealed class TiffFile :
       PixelData = file.PixelData[..],
       Palette = palette,
       PaletteCount = paletteCount,
+      Metadata = file.Metadata,
     };
   }
 
@@ -232,6 +240,7 @@ public sealed class TiffFile :
       PixelData = image.PixelData[..],
       ColorMap = colorMap,
       ColorMode = colorMode,
+      Metadata = image.Metadata,
     };
   }
 

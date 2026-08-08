@@ -155,7 +155,7 @@ public static class RawImageExtensions {
       }
     }
 
-    return new() { Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = rgb };
+    return new() { Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = rgb, Metadata = image.Metadata };
   }
 
   /// <summary>The picture as packed 0xAARRGGBB values, one per pixel, row by row.</summary>

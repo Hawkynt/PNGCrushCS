@@ -1,8 +1,10 @@
-﻿using System;
+using System;
 using System.IO;
 using BitMiracle.LibTiff.Classic;
 using Compression.Core;
 using LibTiff = BitMiracle.LibTiff.Classic.Tiff;
+
+using FileFormat.Core;
 
 namespace FileFormat.Tiff;
 
@@ -15,7 +17,7 @@ public static class TiffWriter {
     if (file.Pages.Count == 0) {
       var photometric = _DeterminePhotometric(file.ColorMap, file.SamplesPerPixel);
       return Assemble(
-        file.PixelData, file.Width, file.Height,
+        file.PixelData, file.Width, file.Height, file.Metadata,
         file.SamplesPerPixel, file.BitsPerSample,
         compression, predictor, stripRowCount, zopfliIterations,
         photometric, file.ColorMap,
@@ -32,14 +34,14 @@ public static class TiffWriter {
     using var tiff = LibTiff.ClientOpen("output", "w", ms, new TiffStream());
 
     // Write first page (from TiffFile's own properties)
-    _WriteDirectory(tiff, file.PixelData, file.Width, file.Height, file.SamplesPerPixel, file.BitsPerSample,
+    _WriteDirectory(tiff, file.Metadata, file.PixelData, file.Width, file.Height, file.SamplesPerPixel, file.BitsPerSample,
       compression, predictor, stripRowCount, zopfliIterations,
       _DeterminePhotometric(file.ColorMap, file.SamplesPerPixel), file.ColorMap, tileWidth, tileHeight);
     tiff.WriteDirectory();
 
     // Write additional pages
     foreach (var page in file.Pages) {
-      _WriteDirectory(tiff, page.PixelData, page.Width, page.Height, page.SamplesPerPixel, page.BitsPerSample,
+      _WriteDirectory(tiff, null, page.PixelData, page.Width, page.Height, page.SamplesPerPixel, page.BitsPerSample,
         compression, predictor, stripRowCount, zopfliIterations,
         _DeterminePhotometric(page.ColorMap, page.SamplesPerPixel), page.ColorMap, tileWidth, tileHeight);
       tiff.WriteDirectory();
@@ -49,7 +51,7 @@ public static class TiffWriter {
     return ms.ToArray();
   }
 
-  private static void _WriteDirectory(LibTiff tiff, byte[] pixelData, int width, int height,
+  private static void _WriteDirectory(LibTiff tiff, ImageMetadata? metadata, byte[] pixelData, int width, int height,
     int samplesPerPixel, int bitsPerSample, TiffCompression compression, TiffPredictor predictor,
     int stripRowCount, int zopfliIterations, ushort photometric, byte[]? colorMap,
     int tileWidth, int tileHeight) {
@@ -58,6 +60,10 @@ public static class TiffWriter {
     tiff.SetField(TiffTag.SAMPLESPERPIXEL, samplesPerPixel);
     tiff.SetField(TiffTag.BITSPERSAMPLE, bitsPerSample);
     tiff.SetField(TiffTag.ORIENTATION, Orientation.TOPLEFT);
+
+    // While the directory is still open. Set before it is started, the fields do not reach the file.
+    if (metadata != null)
+      TiffMetadataCodec.Apply(metadata, tiff);
     tiff.SetField(TiffTag.PHOTOMETRIC, (Photometric)photometric);
     tiff.SetField(TiffTag.PLANARCONFIG, PlanarConfig.CONTIG);
 
@@ -112,6 +118,7 @@ public static class TiffWriter {
     byte[] pixelData,
     int width,
     int height,
+    ImageMetadata? metadata,
     int samplesPerPixel,
     int bitsPerSample,
     TiffCompression compression,
@@ -131,6 +138,12 @@ public static class TiffWriter {
     tiff.SetField(TiffTag.SAMPLESPERPIXEL, samplesPerPixel);
     tiff.SetField(TiffTag.BITSPERSAMPLE, bitsPerSample);
     tiff.SetField(TiffTag.ORIENTATION, Orientation.TOPLEFT);
+
+    // A single-page file comes through here and not through the multi-page path, so the tags have to
+    // go on in both places or a one-page TIFF is written without any of them.
+    if (metadata != null)
+      TiffMetadataCodec.Apply(metadata, tiff);
+
     tiff.SetField(TiffTag.PHOTOMETRIC, (Photometric)photometric);
     tiff.SetField(TiffTag.PLANARCONFIG, PlanarConfig.CONTIG);
 
