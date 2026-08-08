@@ -702,6 +702,33 @@ throwing away a bit the machine has and the picture uses.
 So this is counted as a disagreement and left as one. Agreeing with a tool is the goal only while
 the tool is right.
 
+### Six more where the pixels are settled and only the palette is not
+
+Mapping every stored value onto what the tool draws — rather than guessing a layout and scoring it —
+settles six of the remaining unreadable files completely as far as their pixels go. Each is listed
+with the arrangement that reproduces the tool's rendering with **no** stored value ever wanting two
+different colours, checked over every pixel and not a sample:
+
+| file | stored | arrangement | colours |
+|---|---|---|---|
+| `.ge7` | 512x212, drawn twice as tall | 4bpp, offset 7, 256 bytes a row | 15 |
+| `.sc7` | 512x212, drawn twice as tall | 4bpp, offset 7, 256 bytes a row | 16 |
+| `.tm2` | 64x64 | 8bpp, offset 64, 64 bytes a row | 253 |
+| `.txc` | 64x64 | 8bpp, offset 64, 64 bytes a row | 235 |
+| `.wal` | 128x128 | 8bpp, offset 100, 128 bytes a row | 50 |
+| `.iff` | 640x480 | 8bpp, offset 1880, 640 bytes a row | 256 |
+
+What is missing in every case is where the palette lives. The two MSX ones draw in three bits a
+channel — every colour is a multiple of 255/7 — and neither a two-byte MSX entry nor any of the
+twelve ways three such fields can sit in two bytes reproduces more than 6 of the 15 at any offset in
+the file. Both carry about ten thousand bytes beyond the bitmap, which is roughly 212 rows of 32,
+so a palette that changes down the screen is the thing to try next. The four eight-bit ones want a
+256-entry table that is not stored as plain triplets at any offset: the PlayStation pair is the
+known swizzled case, and a Quake `.wal` has no palette in it at all — the tool is supplying one.
+
+None is applied. A picture drawn in the wrong colours is not a decoder, and the arrangement being
+right is exactly what makes that tempting.
+
 ### A trap in solving a layout by search
 
 Fitting an offset and a depth against the tool's rendering works, and it lies when the sampled
