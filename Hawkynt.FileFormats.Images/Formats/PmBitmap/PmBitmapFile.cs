@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.PmBitmap;
 
 /// <summary>In-memory representation of a PM bitmap image.</summary>
-public readonly record struct PmBitmapFile : IImageFormatReader<PmBitmapFile>, IImageToRawImage<PmBitmapFile>, IImageFormatWriter<PmBitmapFile> {
+public readonly record struct PmBitmapFile : IImageFormatReader<PmBitmapFile>, IImageToRawImage<PmBitmapFile>, IImageFromRawImage<PmBitmapFile>, IImageFormatWriter<PmBitmapFile> {
 
   /// <summary>Header size: 3 magic + 1 version + 2 width + 2 height + 2 depth + 2 padding = 12 bytes.</summary>
   public const int HeaderSize = 12;
@@ -52,6 +52,25 @@ public readonly record struct PmBitmapFile : IImageFormatReader<PmBitmapFile>, I
       Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
+    };
+  }
+
+  /// <summary>Creates a PM bitmap from a <see cref="RawImage"/> of any size up to 65535 a side.</summary>
+  /// <remarks>
+  /// PM holds either 8-bit grey or 24-bit colour, so a greyscale source stays greyscale and
+  /// everything else becomes RGB rather than being flattened to luminance it never asked for.
+  /// </remarks>
+  public static PmBitmapFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var source = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Gray8);
+
+    return new() {
+      Width = source.Width,
+      Height = source.Height,
+      Depth = source.Format == PixelFormat.Gray8 ? 8 : 24,
+      Version = 1,
+      PixelData = source.PixelData[..],
     };
   }
 

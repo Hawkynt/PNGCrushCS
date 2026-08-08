@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.AndrewToolkit;
 
 /// <summary>In-memory representation of an Andrew Toolkit (ATK) raster image.</summary>
-public readonly record struct AndrewToolkitFile : IImageFormatReader<AndrewToolkitFile>, IImageToRawImage<AndrewToolkitFile>, IImageFormatWriter<AndrewToolkitFile> {
+public readonly record struct AndrewToolkitFile : IImageFormatReader<AndrewToolkitFile>, IImageToRawImage<AndrewToolkitFile>, IImageFromRawImage<AndrewToolkitFile>, IImageFormatWriter<AndrewToolkitFile> {
 
   static string IImageFormatMetadata<AndrewToolkitFile>.PrimaryExtension => ".atk";
   static string[] IImageFormatMetadata<AndrewToolkitFile>.FileExtensions => [".atk"];
@@ -35,6 +35,26 @@ public readonly record struct AndrewToolkitFile : IImageFormatReader<AndrewToolk
       Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
+    };
+  }
+
+  /// <summary>Creates an Andrew Toolkit raster from a <see cref="RawImage"/> of any size.</summary>
+  /// <remarks>
+  /// The body is one byte of grey per pixel and the dimensions live in the text header, so nothing
+  /// about the picture's size has to be negotiated — only its colour, which collapses to luminance.
+  /// The header lines are the ones <see cref="AndrewToolkitWriter"/> emits, so the model here and
+  /// the bytes it turns into stay in step.
+  /// </remarks>
+  public static AndrewToolkitFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var gray = image.EnsureFormat(PixelFormat.Gray8);
+
+    return new() {
+      Width = gray.Width,
+      Height = gray.Height,
+      RawData = gray.PixelData[..],
+      HeaderLines = [$"width = {gray.Width}", $"height = {gray.Height}", string.Empty],
     };
   }
 
