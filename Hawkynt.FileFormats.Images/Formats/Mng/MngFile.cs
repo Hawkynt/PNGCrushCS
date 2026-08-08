@@ -9,7 +9,7 @@ namespace FileFormat.Mng;
 /// <summary>In-memory representation of an MNG (VLC profile) animation.</summary>
 [FormatMagicBytes([0x8A, 0x4D, 0x4E, 0x47])]
 [FormatMimeType("video/x-mng", "image/x-mng")]
-public sealed class MngFile : IImageFormatReader<MngFile>, IImageToRawImage<MngFile>, IImageFormatWriter<MngFile>, IMultiImageFileFormat<MngFile> {
+public sealed class MngFile : IImageFormatReader<MngFile>, IImageToRawImage<MngFile>, IImageFromRawImage<MngFile>, IImageFormatWriter<MngFile>, IMultiImageFileFormat<MngFile> {
 
   static string IImageFormatMetadata<MngFile>.PrimaryExtension => ".mng";
   static string[] IImageFormatMetadata<MngFile>.FileExtensions => [".mng"];
@@ -44,6 +44,27 @@ public sealed class MngFile : IImageFormatReader<MngFile>, IImageToRawImage<MngF
       throw new ArgumentException("MNG file contains no frames.", nameof(file));
 
     return PngFile.ToRawImage(PngReader.FromBytes(file.Frames[0]));
+  }
+
+  /// <summary>Creates a single-frame MNG from a <see cref="RawImage"/> of any size.</summary>
+  /// <remarks>
+  /// An MNG frame is a whole PNG, so this defers to the PNG codec rather than growing a second one:
+  /// whatever PNG can hold losslessly, a one-frame MNG holds too, at any size. The result is a VLC
+  /// profile stream — one image, no delta or object chunks — which is what a still picture is.
+  /// The TERM action leaves the frame on screen and the tick rate is the customary one per second,
+  /// neither of which a single frame ever reaches.
+  /// </remarks>
+  public static MngFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      TicksPerSecond = 1,
+      NumPlays = 1,
+      TermAction = MngTermAction.ShowLast,
+      Frames = [PngWriter.ToBytes(PngFile.FromRawImage(image))],
+    };
   }
 
 }

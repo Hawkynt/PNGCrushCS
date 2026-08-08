@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.SeqImage;
 
 /// <summary>In-memory representation of a SEQ image.</summary>
-public readonly record struct SeqImageFile : IImageFormatReader<SeqImageFile>, IImageToRawImage<SeqImageFile>, IImageFormatWriter<SeqImageFile> {
+public readonly record struct SeqImageFile : IImageFormatReader<SeqImageFile>, IImageToRawImage<SeqImageFile>, IImageFromRawImage<SeqImageFile>, IImageFormatWriter<SeqImageFile> {
 
   static string IImageFormatMetadata<SeqImageFile>.PrimaryExtension => ".seq";
   static string[] IImageFormatMetadata<SeqImageFile>.FileExtensions => [".seq"];
@@ -45,6 +45,23 @@ public readonly record struct SeqImageFile : IImageFormatReader<SeqImageFile>, I
       Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = file.PixelData[..],
+    };
+  }
+
+  /// <summary>Creates a single-frame SEQ image from a <see cref="RawImage"/> of any size up to 65535 a side.</summary>
+  /// <remarks>The body is uncompressed RGB triplets, so one frame is all a still picture needs.</remarks>
+  public static SeqImageFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.EnsureFormat(PixelFormat.Rgb24);
+
+    return new() {
+      Width = rgb.Width,
+      Height = rgb.Height,
+      Version = 1,
+      FrameCount = 1,
+      Bpp = 24,
+      PixelData = rgb.PixelData[..],
     };
   }
 

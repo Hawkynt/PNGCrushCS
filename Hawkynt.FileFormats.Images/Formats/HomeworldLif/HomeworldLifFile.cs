@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.HomeworldLif;
 
 /// <summary>In-memory representation of a Homeworld LIF texture image.</summary>
-public readonly record struct HomeworldLifFile : IImageFormatReader<HomeworldLifFile>, IImageToRawImage<HomeworldLifFile>, IImageFormatWriter<HomeworldLifFile> {
+public readonly record struct HomeworldLifFile : IImageFormatReader<HomeworldLifFile>, IImageToRawImage<HomeworldLifFile>, IImageFromRawImage<HomeworldLifFile>, IImageFormatWriter<HomeworldLifFile> {
 
   static string IImageFormatMetadata<HomeworldLifFile>.PrimaryExtension => ".lif";
   static string[] IImageFormatMetadata<HomeworldLifFile>.FileExtensions => [".lif"];
@@ -50,6 +50,25 @@ public readonly record struct HomeworldLifFile : IImageFormatReader<HomeworldLif
       Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
+    };
+  }
+
+  /// <summary>Creates a Homeworld LIF texture from a <see cref="RawImage"/> of any size.</summary>
+  /// <remarks>
+  /// The body is RGBA in that byte order — the same order <see cref="ToRawImage"/> reads its first
+  /// three bytes back in — so a source without an alpha channel gains an opaque one rather than
+  /// having its colours shifted a byte.
+  /// </remarks>
+  public static HomeworldLifFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgba = image.EnsureFormat(PixelFormat.Rgba32);
+
+    return new() {
+      Width = rgba.Width,
+      Height = rgba.Height,
+      Version = 1,
+      PixelData = rgba.PixelData[..],
     };
   }
 

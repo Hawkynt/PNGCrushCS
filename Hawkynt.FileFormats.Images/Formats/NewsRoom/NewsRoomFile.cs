@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.NewsRoom;
 
 /// <summary>In-memory representation of a NewsRoom NSR image (320x192, 1bpp monochrome).</summary>
-public readonly record struct NewsRoomFile : IImageFormatReader<NewsRoomFile>, IImageToRawImage<NewsRoomFile>, IImageFormatWriter<NewsRoomFile> {
+public readonly record struct NewsRoomFile : IImageFormatReader<NewsRoomFile>, IImageToRawImage<NewsRoomFile>, IImageFromRawImage<NewsRoomFile>, IImageFormatWriter<NewsRoomFile> {
 
   static string IImageFormatMetadata<NewsRoomFile>.PrimaryExtension => ".nsr";
   static string[] IImageFormatMetadata<NewsRoomFile>.FileExtensions => [".nsr"];
@@ -59,6 +59,29 @@ public readonly record struct NewsRoomFile : IImageFormatReader<NewsRoomFile>, I
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
     };
+  }
+
+  /// <summary>Creates a NewsRoom photo from a <see cref="RawImage"/>, sampling it to the fixed 320x192 panel.</summary>
+  /// <remarks>
+  /// The file is nothing but the 7680 bytes of the panel — no header states a size — so a picture of
+  /// any other size is sampled to fit rather than refused. A set bit is black, as
+  /// <see cref="ToRawImage"/> reads it.
+  /// </remarks>
+  public static NewsRoomFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var gray = image.SampleTo(FixedWidth, FixedHeight).EnsureFormat(PixelFormat.Gray8);
+    var pixels = new byte[ExpectedFileSize];
+
+    for (var y = 0; y < FixedHeight; ++y)
+      for (var x = 0; x < FixedWidth; ++x) {
+        if (gray.PixelData[y * FixedWidth + x] >= 128)
+          continue;
+
+        pixels[y * BytesPerRow + x / 8] |= (byte)(1 << (7 - (x % 8)));
+      }
+
+    return new() { PixelData = pixels };
   }
 
 }

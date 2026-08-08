@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.WebShots;
 
 /// <summary>In-memory representation of a WebShots image.</summary>
-public readonly record struct WebShotsFile : IImageFormatReader<WebShotsFile>, IImageToRawImage<WebShotsFile>, IImageFormatWriter<WebShotsFile> {
+public readonly record struct WebShotsFile : IImageFormatReader<WebShotsFile>, IImageToRawImage<WebShotsFile>, IImageFromRawImage<WebShotsFile>, IImageFormatWriter<WebShotsFile> {
 
   static string IImageFormatMetadata<WebShotsFile>.PrimaryExtension => ".wb1";
   static string[] IImageFormatMetadata<WebShotsFile>.FileExtensions => [".wb1", ".wbc", ".wbp", ".wbz"];
@@ -42,6 +42,23 @@ public readonly record struct WebShotsFile : IImageFormatReader<WebShotsFile>, I
       Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = file.PixelData[..],
+    };
+  }
+
+  /// <summary>Creates a WebShots image from a <see cref="RawImage"/> of any size up to 65535 a side.</summary>
+  /// <remarks>The header states the depth and the body follows uncompressed, so RGB24 needs no
+  /// further negotiation.</remarks>
+  public static WebShotsFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.EnsureFormat(PixelFormat.Rgb24);
+
+    return new() {
+      Width = rgb.Width,
+      Height = rgb.Height,
+      Version = 1,
+      Bpp = 24,
+      PixelData = rgb.PixelData[..],
     };
   }
 

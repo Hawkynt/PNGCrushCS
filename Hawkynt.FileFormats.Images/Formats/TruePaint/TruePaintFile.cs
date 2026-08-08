@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.TruePaint;
 
 /// <summary>In-memory representation of a True Paint interlace multicolor image (.mci).</summary>
-public readonly record struct TruePaintFile : IImageFormatReader<TruePaintFile>, IImageToRawImage<TruePaintFile>, IImageFormatWriter<TruePaintFile> {
+public readonly record struct TruePaintFile : IImageFormatReader<TruePaintFile>, IImageToRawImage<TruePaintFile>, IImageFromRawImage<TruePaintFile>, IImageFormatWriter<TruePaintFile> {
 
   static string IImageFormatMetadata<TruePaintFile>.PrimaryExtension => ".mci";
   static string[] IImageFormatMetadata<TruePaintFile>.FileExtensions => [".mci"];
@@ -126,6 +126,127 @@ public readonly record struct TruePaintFile : IImageFormatReader<TruePaintFile>,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
     };
+  }
+
+  /// <summary>Creates a True Paint picture from a <see cref="RawImage"/>, sampling it to the VIC-II's 160x200 multicolour screen.</summary>
+  /// <remarks>
+  /// True Paint holds two multicolour screens that the machine alternates between, and
+  /// <see cref="ToRawImage"/> reproduces that by averaging the two. Writing the same screen into
+  /// both fields is what a still picture wants: the average of a colour with itself is that colour,
+  /// so what comes back is exactly what went in. Mixing two different fields would buy extra
+  /// apparent colours at the cost of never reproducing the original, which is a dithering decision
+  /// and not one an encoder should make silently.
+  /// <para/>
+  /// Within one field the hardware allows four colours per 4x8 cell: a shared background register
+  /// plus the two screen nibbles and the colour RAM nibble.
+  /// </remarks>
+  public static TruePaintFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var bgra = image.SampleTo(FixedWidth, FixedHeight).ToBgra32();
+    var indices = new byte[FixedWidth * FixedHeight];
+    for (var i = 0; i < indices.Length; ++i) {
+      var offset = i * 4;
+      indices[i] = (byte)Commodore64Graphics.FindNearestColorIndex(bgra[offset + 2], bgra[offset + 1], bgra[offset]);
+    }
+
+    Span<int> frequency = stackalloc int[16];
+    foreach (var index in indices)
+      ++frequency[index];
+
+    var background = 0;
+    for (var i = 1; i < 16; ++i)
+      if (frequency[i] > frequency[background])
+        background = i;
+
+    var bitmapData = new byte[BitmapDataSize];
+    var screenRam = new byte[ScreenRamSize];
+    var colorRam = new byte[ColorRamSize];
+    Span<int> cellColors = stackalloc int[3];
+
+    for (var cellY = 0; cellY < FixedHeight / 8; ++cellY)
+      for (var cellX = 0; cellX < 40; ++cellX) {
+        var cellIndex = cellY * 40 + cellX;
+        _PickCellColors(indices, cellX, cellY, (byte)background, cellColors);
+
+        screenRam[cellIndex] = (byte)((cellColors[0] << 4) | cellColors[1]);
+        colorRam[cellIndex] = (byte)cellColors[2];
+
+        for (var row = 0; row < 8; ++row) {
+          byte packed = 0;
+          for (var column = 0; column < 4; ++column) {
+            var color = indices[(cellY * 8 + row) * FixedWidth + cellX * 4 + column];
+            var pattern = _PickPattern(color, (byte)background, cellColors);
+            packed |= (byte)(pattern << ((3 - column) * 2));
+          }
+
+          bitmapData[cellIndex * 8 + row] = packed;
+        }
+      }
+
+    return new() {
+      LoadAddress = 0x9C00,
+      BitmapData1 = bitmapData,
+      ScreenRam1 = screenRam,
+      BitmapData2 = bitmapData[..],
+      ScreenRam2 = screenRam[..],
+      ColorRam = colorRam,
+      BackgroundColor = (byte)background,
+      BorderColor = (byte)background,
+    };
+  }
+
+  /// <summary>Fills <paramref name="cellColors"/> with the three commonest colours in the cell that are not the background.</summary>
+  private static void _PickCellColors(byte[] indices, int cellX, int cellY, byte background, Span<int> cellColors) {
+    Span<int> frequency = stackalloc int[16];
+    for (var row = 0; row < 8; ++row)
+      for (var column = 0; column < 4; ++column)
+        ++frequency[indices[(cellY * 8 + row) * FixedWidth + cellX * 4 + column]];
+
+    frequency[background] = -1;
+    for (var slot = 0; slot < 3; ++slot) {
+      var best = 0;
+      for (var i = 1; i < 16; ++i)
+        if (frequency[i] > frequency[best])
+          best = i;
+
+      cellColors[slot] = frequency[best] > 0 ? best : background;
+      if (frequency[best] > 0)
+        frequency[best] = -1;
+    }
+  }
+
+  /// <summary>Picks the two-bit pattern whose register holds the colour, or the nearest one it does hold.</summary>
+  private static int _PickPattern(byte color, byte background, ReadOnlySpan<int> cellColors) {
+    if (color == background)
+      return 0;
+
+    for (var slot = 0; slot < 3; ++slot)
+      if (cellColors[slot] == color)
+        return slot + 1;
+
+    var bestPattern = 0;
+    var bestDistance = _Distance(color, background);
+    for (var slot = 0; slot < 3; ++slot) {
+      var distance = _Distance(color, (byte)cellColors[slot]);
+      if (distance >= bestDistance)
+        continue;
+
+      bestDistance = distance;
+      bestPattern = slot + 1;
+    }
+
+    return bestPattern;
+  }
+
+  /// <summary>Squared RGB distance between two VIC-II palette entries.</summary>
+  private static int _Distance(byte left, byte right) {
+    var a = Commodore64Graphics.HexColors[left];
+    var b = Commodore64Graphics.HexColors[right];
+    var dr = ((a >> 16) & 0xFF) - ((b >> 16) & 0xFF);
+    var dg = ((a >> 8) & 0xFF) - ((b >> 8) & 0xFF);
+    var db = (a & 0xFF) - (b & 0xFF);
+    return dr * dr + dg * dg + db * db;
   }
 
 }

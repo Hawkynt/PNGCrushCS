@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.CompW;
 
 /// <summary>In-memory representation of a CompW WLM indexed image.</summary>
-public readonly record struct CompWFile : IImageFormatReader<CompWFile>, IImageToRawImage<CompWFile>, IImageFormatWriter<CompWFile> {
+public readonly record struct CompWFile : IImageFormatReader<CompWFile>, IImageToRawImage<CompWFile>, IImageFromRawImage<CompWFile>, IImageFormatWriter<CompWFile> {
 
   static string IImageFormatMetadata<CompWFile>.PrimaryExtension => ".wlm";
   static string[] IImageFormatMetadata<CompWFile>.FileExtensions => [".wlm"];
@@ -59,6 +59,29 @@ public readonly record struct CompWFile : IImageFormatReader<CompWFile>, IImageT
       Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
+    };
+  }
+
+  /// <summary>Creates a CompW WLM image from a <see cref="RawImage"/> of any size up to 65535 a side.</summary>
+  /// <remarks>
+  /// The palette slot is a fixed 768 bytes whatever the picture uses, so a shorter one is padded
+  /// rather than written short — the reader slices exactly 768 bytes off the end of the file and a
+  /// truncated table would put the pixel data's tail into the palette.
+  /// </remarks>
+  public static CompWFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var indexed = image.EnsureFormat(PixelFormat.Indexed8);
+    var palette = new byte[PaletteSize];
+    if (indexed.Palette is { Length: > 0 } source)
+      source.AsSpan(0, Math.Min(source.Length, PaletteSize)).CopyTo(palette);
+
+    return new() {
+      Width = indexed.Width,
+      Height = indexed.Height,
+      BitsPerPixel = 8,
+      PixelData = indexed.PixelData[..],
+      Palette = palette,
     };
   }
 

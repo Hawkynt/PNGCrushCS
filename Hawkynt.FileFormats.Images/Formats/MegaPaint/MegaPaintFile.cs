@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.MegaPaint;
 
 /// <summary>In-memory representation of an Atari ST MegaPaint monochrome image.</summary>
-public readonly record struct MegaPaintFile : IImageFormatReader<MegaPaintFile>, IImageToRawImage<MegaPaintFile>, IImageFormatWriter<MegaPaintFile> {
+public readonly record struct MegaPaintFile : IImageFormatReader<MegaPaintFile>, IImageToRawImage<MegaPaintFile>, IImageFromRawImage<MegaPaintFile>, IImageFormatWriter<MegaPaintFile> {
 
   /// <summary>Header size in bytes: 2 (width) + 2 (height) + 4 (reserved) = 8.</summary>
   public const int HeaderSize = 8;
@@ -52,6 +52,33 @@ public readonly record struct MegaPaintFile : IImageFormatReader<MegaPaintFile>,
       Height = height,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
+    };
+  }
+
+  /// <summary>Creates a MegaPaint monochrome image from a <see cref="RawImage"/> of any size up to 65535 a side.</summary>
+  /// <remarks>
+  /// Follows the Atari convention <see cref="ToRawImage"/> decodes: a set bit is black. Sources with
+  /// more than two tones are thresholded at mid-grey.
+  /// </remarks>
+  public static MegaPaintFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var gray = image.EnsureFormat(PixelFormat.Gray8);
+    var bytesPerRow = (gray.Width + 7) / 8;
+    var pixels = new byte[bytesPerRow * gray.Height];
+
+    for (var y = 0; y < gray.Height; ++y)
+      for (var x = 0; x < gray.Width; ++x) {
+        if (gray.PixelData[y * gray.Width + x] >= 128)
+          continue;
+
+        pixels[y * bytesPerRow + x / 8] |= (byte)(1 << (7 - (x % 8)));
+      }
+
+    return new() {
+      Width = gray.Width,
+      Height = gray.Height,
+      PixelData = pixels,
     };
   }
 
