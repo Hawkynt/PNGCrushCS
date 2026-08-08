@@ -147,6 +147,7 @@ public readonly record struct Fli64File
     var colorRam = new byte[ColorRamSize];
 
     Span<int> cellFreq = stackalloc int[16];
+    Span<int> rowFreq = stackalloc int[16];
     for (var cellY = 0; cellY < cellsDown; ++cellY)
     for (var cellX = 0; cellX < cellsAcross; ++cellX) {
       var cellIndex = cellY * cellsAcross + cellX;
@@ -168,7 +169,7 @@ public readonly record struct Fli64File
       for (var py = 0; py < 8; ++py) {
         var y = cellY * 8 + py;
 
-        Span<int> rowFreq = stackalloc int[16];
+        rowFreq.Clear();
         for (var px = 0; px < 4; ++px) {
           var color = colorAt[y, cellX * 4 + px];
           if (color != background && color != color3)
