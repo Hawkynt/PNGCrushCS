@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Tg4;
 
 /// <summary>In-memory representation of a TG4 image.</summary>
-public readonly record struct Tg4File : IImageFormatReader<Tg4File>, IImageToRawImage<Tg4File>, IImageFormatWriter<Tg4File> {
+public readonly record struct Tg4File : IImageFormatReader<Tg4File>, IImageToRawImage<Tg4File>, IImageFromRawImage<Tg4File>, IImageFormatWriter<Tg4File> {
 
   static string IImageFormatMetadata<Tg4File>.PrimaryExtension => ".tg4";
   static string[] IImageFormatMetadata<Tg4File>.FileExtensions => [".tg4"];
@@ -52,6 +52,21 @@ public readonly record struct Tg4File : IImageFormatReader<Tg4File>, IImageToRaw
       Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
+    };
+  }
+
+  /// <summary>Thresholds any <see cref="RawImage"/> down to the two tones this format holds.
+  /// Every size fits, because the header states its own.</summary>
+  public static Tg4File FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    // A set bit is ink on white paper, the way round ToRawImage reads it back again. The
+    // opposite polarity is just as common among scanner formats and would hand back every
+    // picture as its own negative.
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      PixelData = MonochromePage.Encode(image, image.Width, image.Height, inkIsWhite: false),
     };
   }
 

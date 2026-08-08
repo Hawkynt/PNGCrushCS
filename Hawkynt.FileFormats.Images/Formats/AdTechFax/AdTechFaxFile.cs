@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.AdTechFax;
 
 /// <summary>In-memory representation of an AdTech fax image.</summary>
-public readonly record struct AdTechFaxFile : IImageFormatReader<AdTechFaxFile>, IImageToRawImage<AdTechFaxFile>, IImageFormatWriter<AdTechFaxFile> {
+public readonly record struct AdTechFaxFile : IImageFormatReader<AdTechFaxFile>, IImageToRawImage<AdTechFaxFile>, IImageFromRawImage<AdTechFaxFile>, IImageFormatWriter<AdTechFaxFile> {
 
   static string IImageFormatMetadata<AdTechFaxFile>.PrimaryExtension => ".adt";
   static string[] IImageFormatMetadata<AdTechFaxFile>.FileExtensions => [".adt"];
@@ -58,6 +58,23 @@ public readonly record struct AdTechFaxFile : IImageFormatReader<AdTechFaxFile>,
       Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
+    };
+  }
+
+  /// <summary>Thresholds any <see cref="RawImage"/> down to the two tones this format holds.
+  /// Every size fits, because the header states its own.</summary>
+  public static AdTechFaxFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    // A set bit is ink on white paper, the way round ToRawImage reads it back again. The
+    // opposite polarity is just as common among scanner formats and would hand back every
+    // picture as its own negative.
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      // 200 dpi: the fine mode a fax scans at, and what these files normally declare.
+      Resolution = 200,
+      PixelData = MonochromePage.Encode(image, image.Width, image.Height, inkIsWhite: false),
     };
   }
 

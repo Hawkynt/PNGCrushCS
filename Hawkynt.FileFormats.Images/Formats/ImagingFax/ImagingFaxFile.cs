@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.ImagingFax;
 
 /// <summary>In-memory representation of an ImagingFax G3N image.</summary>
-public readonly record struct ImagingFaxFile : IImageFormatReader<ImagingFaxFile>, IImageToRawImage<ImagingFaxFile>, IImageFormatWriter<ImagingFaxFile> {
+public readonly record struct ImagingFaxFile : IImageFormatReader<ImagingFaxFile>, IImageToRawImage<ImagingFaxFile>, IImageFromRawImage<ImagingFaxFile>, IImageFormatWriter<ImagingFaxFile> {
 
   static string IImageFormatMetadata<ImagingFaxFile>.PrimaryExtension => ".g3n";
   static string[] IImageFormatMetadata<ImagingFaxFile>.FileExtensions => [".g3n"];
@@ -58,6 +58,23 @@ public readonly record struct ImagingFaxFile : IImageFormatReader<ImagingFaxFile
       Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
+    };
+  }
+
+  /// <summary>Thresholds any <see cref="RawImage"/> down to the two tones this format holds.
+  /// Every size fits, because the header states its own.</summary>
+  public static ImagingFaxFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    // A set bit is ink on white paper, the way round ToRawImage reads it back again. The
+    // opposite polarity is just as common among scanner formats and would hand back every
+    // picture as its own negative.
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      // Encoding 0: the rows go in raw, whatever the extension promises.
+      Encoding = 0,
+      PixelData = MonochromePage.Encode(image, image.Width, image.Height, inkIsWhite: false),
     };
   }
 

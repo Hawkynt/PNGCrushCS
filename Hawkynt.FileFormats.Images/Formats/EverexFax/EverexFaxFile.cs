@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.EverexFax;
 
 /// <summary>In-memory representation of an Everex Fax EFX image.</summary>
-public readonly record struct EverexFaxFile : IImageFormatReader<EverexFaxFile>, IImageToRawImage<EverexFaxFile>, IImageFormatWriter<EverexFaxFile> {
+public readonly record struct EverexFaxFile : IImageFormatReader<EverexFaxFile>, IImageToRawImage<EverexFaxFile>, IImageFromRawImage<EverexFaxFile>, IImageFormatWriter<EverexFaxFile> {
 
   static string IImageFormatMetadata<EverexFaxFile>.PrimaryExtension => ".efx";
   static string[] IImageFormatMetadata<EverexFaxFile>.FileExtensions => [".efx", ".ef3"];
@@ -64,6 +64,25 @@ public readonly record struct EverexFaxFile : IImageFormatReader<EverexFaxFile>,
       Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
+    };
+  }
+
+  /// <summary>Thresholds any <see cref="RawImage"/> down to the two tones this format holds.
+  /// Every size fits, because the header states its own.</summary>
+  public static EverexFaxFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    // A set bit is ink on white paper, the way round ToRawImage reads it back again. The
+    // opposite polarity is just as common among scanner formats and would hand back every
+    // picture as its own negative.
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      // One uncompressed page; a RawImage carries no second one.
+      Version = 1,
+      Pages = 1,
+      Compression = 0,
+      PixelData = MonochromePage.Encode(image, image.Width, image.Height, inkIsWhite: false),
     };
   }
 

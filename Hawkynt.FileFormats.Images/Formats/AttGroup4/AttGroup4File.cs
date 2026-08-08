@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.AttGroup4;
 
 /// <summary>In-memory representation of an AT&amp;T Group 4 fax image.</summary>
-public readonly record struct AttGroup4File : IImageFormatReader<AttGroup4File>, IImageToRawImage<AttGroup4File>, IImageFormatWriter<AttGroup4File> {
+public readonly record struct AttGroup4File : IImageFormatReader<AttGroup4File>, IImageToRawImage<AttGroup4File>, IImageFromRawImage<AttGroup4File>, IImageFormatWriter<AttGroup4File> {
 
   static string IImageFormatMetadata<AttGroup4File>.PrimaryExtension => ".att";
   static string[] IImageFormatMetadata<AttGroup4File>.FileExtensions => [".att"];
@@ -52,6 +52,21 @@ public readonly record struct AttGroup4File : IImageFormatReader<AttGroup4File>,
       Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
+    };
+  }
+
+  /// <summary>Thresholds any <see cref="RawImage"/> down to the two tones this format holds.
+  /// Every size fits, because the header states its own.</summary>
+  public static AttGroup4File FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    // A set bit is ink on white paper, the way round ToRawImage reads it back again. The
+    // opposite polarity is just as common among scanner formats and would hand back every
+    // picture as its own negative.
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      PixelData = MonochromePage.Encode(image, image.Width, image.Height, inkIsWhite: false),
     };
   }
 

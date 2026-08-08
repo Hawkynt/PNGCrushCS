@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.FremontFax;
 
 /// <summary>In-memory representation of a Fremont Fax F96 image.</summary>
-public readonly record struct FremontFaxFile : IImageFormatReader<FremontFaxFile>, IImageToRawImage<FremontFaxFile>, IImageFormatWriter<FremontFaxFile> {
+public readonly record struct FremontFaxFile : IImageFormatReader<FremontFaxFile>, IImageToRawImage<FremontFaxFile>, IImageFromRawImage<FremontFaxFile>, IImageFormatWriter<FremontFaxFile> {
 
   static string IImageFormatMetadata<FremontFaxFile>.PrimaryExtension => ".f96";
   static string[] IImageFormatMetadata<FremontFaxFile>.FileExtensions => [".f96"];
@@ -52,6 +52,21 @@ public readonly record struct FremontFaxFile : IImageFormatReader<FremontFaxFile
       Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
+    };
+  }
+
+  /// <summary>Thresholds any <see cref="RawImage"/> down to the two tones this format holds.
+  /// Every size fits, because the header states its own.</summary>
+  public static FremontFaxFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    // A set bit is ink on white paper, the way round ToRawImage reads it back again. The
+    // opposite polarity is just as common among scanner formats and would hand back every
+    // picture as its own negative.
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      PixelData = MonochromePage.Encode(image, image.Width, image.Height, inkIsWhite: false),
     };
   }
 
