@@ -666,6 +666,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | TIM                     | .tim                                                 | PlayStation 1 texture            | Y      | —      | —         | R     | R   | —      | —         |
 | TIM2                    | .tm2                                                 | PlayStation 2/PSP texture        | Y      | —      | —         | —     | —   | —      | —         |
 | Tiny                    | .tn1, .tn2, .tn3, .tny                               | Atari ST Tiny compressed         | Y      | Y      | —         | R     | —   | —      | —         |
+| TrueType Font           | .ttf                                                 | Glyph sheet of the glyf outlines | Y      | —      | —         | R     | —   | —      | R         |
 | TriPaint                | .tpf                                                 | Atari Falcon TriPaint TC         | Y      | Y      | —         | R     | —   | —      | —         |
 | TRS-80                  | .hr                                                  | TRS-80 hi-res screen dump        | Y      | Y      | —         | R     | —   | —      | —         |
 | True Paint              | .mci                                                 | C64 True Paint interlace MC      | Y      | —      | —         | R     | —   | —      | —         |
@@ -769,7 +770,6 @@ Formats we consciously chose not to implement, with reason codes:
 | MrSID             | .sid        | proprietary  | —     | —   | —      | R         |
 | PES (embroidery)  | .pes        | app-specific | R     | R   | —      | —         |
 | SVG               | .svg        | vector       | R     | RW  | R      | R         |
-| TrueType Font     | .ttf        | font         | R     | —   | —      | R         |
 | MPEG video        | .mpg, .mpeg | video        | R     | —   | —      | —         |
 
 ---
