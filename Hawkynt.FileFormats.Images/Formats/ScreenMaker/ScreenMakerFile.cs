@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.ScreenMaker;
 
 /// <summary>In-memory representation of a Screen Maker image.</summary>
-public readonly record struct ScreenMakerFile : IImageFormatReader<ScreenMakerFile>, IImageToRawImage<ScreenMakerFile>, IImageFormatWriter<ScreenMakerFile> {
+public readonly record struct ScreenMakerFile : IImageFormatReader<ScreenMakerFile>, IImageToRawImage<ScreenMakerFile>, IImageFromRawImage<ScreenMakerFile>, IImageFormatWriter<ScreenMakerFile> {
 
   static string IImageFormatMetadata<ScreenMakerFile>.PrimaryExtension => ".smk";
   static string[] IImageFormatMetadata<ScreenMakerFile>.FileExtensions => [".smk"];
@@ -51,6 +51,30 @@ public readonly record struct ScreenMakerFile : IImageFormatReader<ScreenMakerFi
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
     };
+  }
+
+
+  /// <summary>Encodes a picture as a Screen Maker file.</summary>
+  /// <remarks>
+  /// One of the few here with no fixed screen: the file states its own size, so the picture keeps
+  /// the one it came with and is only brought inside what two bytes can express.
+  /// </remarks>
+  public static ScreenMakerFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var width = Math.Clamp(image.Width, 1, ushort.MaxValue);
+    var height = Math.Clamp(image.Height, 1, ushort.MaxValue);
+    var bgra = PixelConverter.Convert(image.SampleTo(width, height), PixelFormat.Bgra32);
+    var quantised = ColorQuantizer.Quantize(bgra.PixelData, width * height, 256);
+
+    var palette = new byte[PaletteDataSize];
+    quantised.Palette.AsSpan(0, Math.Min(quantised.Palette.Length, PaletteDataSize)).CopyTo(palette);
+
+    var pixels = new byte[width * height];
+    for (var i = 0; i < pixels.Length; ++i)
+      pixels[i] = (byte)quantised.Indices[i];
+
+    return new() { Width = (ushort)width, Height = (ushort)height, Palette = palette, PixelData = pixels };
   }
 
 }

@@ -6,7 +6,9 @@ namespace FileFormat.Fli;
 
 /// <summary>In-memory representation of a FLI/FLC animation file.</summary>
 [FormatMimeType("video/x-fli", "video/x-flc")]
-public sealed class FliFile : IImageFormatReader<FliFile>, IImageToRawImage<FliFile>, IImageFormatWriter<FliFile>, IMultiImageFileFormat<FliFile> {
+public sealed class FliFile
+  : IImageFormatReader<FliFile>, IImageToRawImage<FliFile>,
+    IImageFromRawImage<FliFile>, IImageFormatWriter<FliFile>, IMultiImageFileFormat<FliFile> {
 
   static string IImageFormatMetadata<FliFile>.PrimaryExtension => ".fli";
   static string[] IImageFormatMetadata<FliFile>.FileExtensions => [".fli", ".flc"];
@@ -67,6 +69,58 @@ public sealed class FliFile : IImageFormatReader<FliFile>, IImageToRawImage<FliF
 
     return ToRawImage(file, 0);
   }
+
+  /// <summary>Encodes a picture as a one-frame FLI animation.</summary>
+  /// <remarks>
+  /// A still picture is an animation of one frame, and that frame needs both of the chunks a first
+  /// frame always carries: the palette, because 256 indices mean nothing without one, and the
+  /// pixels. They go out uncompressed — a Literal chunk rather than a ByteRun — since a single
+  /// frame's size is not what an animation format is judged on and the run coder would only obscure
+  /// what is being written.
+  /// <para/>
+  /// The header's dimensions are sixteen-bit, so a picture larger than that has to be brought inside
+  /// it; nothing else here constrains the picture.
+  /// </remarks>
+  public static FliFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var width = Math.Clamp(image.Width, 1, short.MaxValue);
+    var height = Math.Clamp(image.Height, 1, short.MaxValue);
+    var bgra = PixelConverter.Convert(image.SampleTo(width, height), PixelFormat.Bgra32);
+    var quantised = ColorQuantizer.Quantize(bgra.PixelData, width * height, 256);
+
+    var palette = new byte[768];
+    quantised.Palette.AsSpan(0, Math.Min(quantised.Palette.Length, palette.Length)).CopyTo(palette);
+
+    var canvas = new byte[width * height];
+    for (var i = 0; i < canvas.Length; ++i)
+      canvas[i] = (byte)quantised.Indices[i];
+
+    // One packet, skipping nothing, holding all 256 entries — which the count states as zero.
+    var colors = new byte[4 + palette.Length];
+    colors[0] = 1;
+    palette.CopyTo(colors.AsSpan(4));
+
+    var frame = new FliFrame {
+      Chunks = [
+        new FliFrameChunk { ChunkType = FliChunkType.Color256, Data = colors },
+        new FliFrameChunk { ChunkType = FliChunkType.Literal, Data = canvas },
+      ],
+    };
+
+    return new() {
+      Width = (short)width,
+      Height = (short)height,
+      FrameCount = 1,
+      Speed = _DEFAULT_SPEED,
+      FrameType = FliFrameType.Fli,
+      Palette = palette,
+      Frames = [frame],
+    };
+  }
+
+  /// <summary>Milliseconds a frame is held for, which for a still picture only has to be sane.</summary>
+  private const int _DEFAULT_SPEED = 70;
 
   private static void _ApplyFrame(FliFrame frame, byte[] canvas, byte[] palette, int w, int h) {
     foreach (var chunk in frame.Chunks)

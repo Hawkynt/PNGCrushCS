@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.MobyDick;
 
 /// <summary>In-memory representation of a Moby Dick paint image.</summary>
-public readonly record struct MobyDickFile : IImageFormatReader<MobyDickFile>, IImageToRawImage<MobyDickFile>, IImageFormatWriter<MobyDickFile> {
+public readonly record struct MobyDickFile : IImageFormatReader<MobyDickFile>, IImageToRawImage<MobyDickFile>, IImageFromRawImage<MobyDickFile>, IImageFormatWriter<MobyDickFile> {
 
   static string IImageFormatMetadata<MobyDickFile>.PrimaryExtension => ".mby";
   static string[] IImageFormatMetadata<MobyDickFile>.FileExtensions => [".mby", ".mbd"];
@@ -61,6 +61,30 @@ public readonly record struct MobyDickFile : IImageFormatReader<MobyDickFile>, I
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
     };
+  }
+
+
+  /// <summary>Encodes a picture as a Moby Dick paint file, scaling it to 320x200 first.</summary>
+  /// <remarks>
+  /// One byte a pixel against a palette the file carries itself, so nothing constrains the colours
+  /// beyond there being 256 of them. A picture already inside that many survives exactly, the
+  /// quantiser being exact whenever the source holds no more distinct colours than the palette can
+  /// address.
+  /// </remarks>
+  public static MobyDickFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var bgra = PixelConverter.Convert(image.SampleTo(FixedWidth, FixedHeight), PixelFormat.Bgra32);
+    var quantised = ColorQuantizer.Quantize(bgra.PixelData, FixedWidth * FixedHeight, 256);
+
+    var palette = new byte[PaletteDataSize];
+    quantised.Palette.AsSpan(0, Math.Min(quantised.Palette.Length, PaletteDataSize)).CopyTo(palette);
+
+    var pixels = new byte[PixelDataSize];
+    for (var i = 0; i < pixels.Length; ++i)
+      pixels[i] = (byte)quantised.Indices[i];
+
+    return new() { Palette = palette, PixelData = pixels };
   }
 
 }
