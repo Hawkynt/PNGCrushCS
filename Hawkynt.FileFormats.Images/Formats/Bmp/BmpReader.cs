@@ -116,6 +116,13 @@ public static class BmpReader {
     if (compression == BmpCompression.Rle8) {
       pixelData = RleCompressor.DecompressRle8(rawPixelData, width, height);
     } else {
+      // A 4-bit run-length picture used to fall straight through here, which read its opcodes as
+      // pixels and drew noise; the writer has been able to produce these all along and nothing could
+      // read one back. Unpacking it into the rows an uncompressed one would have had keeps the
+      // ordering and the un-padding below as one path rather than two.
+      if (compression == BmpCompression.Rle4)
+        rawPixelData = RleCompressor.DecompressRle4(rawPixelData, width, height);
+
       var bytesPerRow = (width * bitsPerPixel + 7) / 8;
       var paddedBytesPerRow = (bytesPerRow + 3) & ~3;
       pixelData = new byte[bytesPerRow * height];

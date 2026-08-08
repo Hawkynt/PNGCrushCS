@@ -76,4 +76,27 @@ public sealed class RleCompressorTests {
     Assert.That(ratio, Is.GreaterThan(0.0));
     Assert.That(ratio, Is.LessThan(3.0));
   }
+
+  [Test]
+  [Category("Unit")]
+  public void DecompressRle4_ReadsBothFormsOfRunAndPadsRowsToFourBytes() {
+    // Six pixels of alternating nibbles, end of line, six pixels given outright, end of bitmap.
+    // The absolute run takes three bytes and is padded out to four, which the reader has to step over.
+    byte[] data = [0x06, 0x12, 0x00, 0x00, 0x00, 0x06, 0x34, 0x56, 0x78, 0x00, 0x00, 0x01];
+
+    var rows = RleCompressor.DecompressRle4(data, 6, 2);
+
+    Assert.That(rows, Is.EqualTo(new byte[] { 0x12, 0x12, 0x12, 0x00, 0x34, 0x56, 0x78, 0x00 }));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void DecompressRle4_ADeltaLeavesWhatItSkipsAlone() {
+    // Two pixels, then skip two across and one down, then two more.
+    byte[] data = [0x02, 0xAB, 0x00, 0x02, 0x02, 0x01, 0x02, 0xCD, 0x00, 0x01];
+
+    var rows = RleCompressor.DecompressRle4(data, 8, 2);
+
+    Assert.That(rows, Is.EqualTo(new byte[] { 0xAB, 0x00, 0x00, 0x00, 0x00, 0x00, 0xCD, 0x00 }));
+  }
 }
