@@ -137,7 +137,14 @@ public static class TiffReader {
     var scanline = new byte[tiff.ScanlineSize()];
 
     for (var row = 0; row < height; ++row) {
-      tiff.ReadScanline(scanline, row);
+      // A row that will not decode leaves the buffer as it was, and the picture came back a blank
+      // page reported as a success. A TIFF using a compression the library does not have — a
+      // vendor's private one, say — is a file we cannot read, and saying so is the only honest
+      // answer available.
+      if (!tiff.ReadScanline(scanline, row))
+        throw new InvalidDataException(
+          $"This TIFF's rows will not decode at row {row}; its compression is {tiff.GetField(TiffTag.COMPRESSION)?[0].ToInt()}, which is not one this reads.");
+
       var copyLen = Math.Min(bytesPerRow, scanline.Length);
       scanline.AsSpan(0, copyLen).CopyTo(pixelData.AsSpan(row * bytesPerRow));
     }
@@ -164,7 +171,11 @@ public static class TiffReader {
     var tileIndex = 0;
     for (var ty = 0; ty < height; ty += tileHeight)
     for (var tx = 0; tx < width; tx += tileWidth) {
-      tiff.ReadEncodedTile(tileIndex, tileBuf, 0, tileSize);
+      // As with the stripped path: a tile that will not decode leaves its bytes untouched, so the
+      // page came back blank and successful rather than refused.
+      if (tiff.ReadEncodedTile(tileIndex, tileBuf, 0, tileSize) < 0)
+        throw new InvalidDataException(
+          $"This TIFF's tiles will not decode at tile {tileIndex}; its compression is {tiff.GetField(TiffTag.COMPRESSION)?[0].ToInt()}, which is not one this reads.");
 
       var rowsInTile = Math.Min(tileHeight, height - ty);
       var colsInTile = Math.Min(tileWidth, width - tx);
