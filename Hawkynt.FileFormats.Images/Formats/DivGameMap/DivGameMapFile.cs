@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.DivGameMap;
 
 /// <summary>In-memory representation of a DIV Games Studio FPG image (first entry).</summary>
-public readonly record struct DivGameMapFile : IImageFormatReader<DivGameMapFile>, IImageToRawImage<DivGameMapFile>, IImageFormatWriter<DivGameMapFile> {
+public readonly record struct DivGameMapFile : IImageFormatReader<DivGameMapFile>, IImageToRawImage<DivGameMapFile>, IImageFromRawImage<DivGameMapFile>, IImageFormatWriter<DivGameMapFile> {
 
   static string IImageFormatMetadata<DivGameMapFile>.PrimaryExtension => ".fpg";
   static string[] IImageFormatMetadata<DivGameMapFile>.FileExtensions => [".fpg"];
@@ -59,6 +59,28 @@ public readonly record struct DivGameMapFile : IImageFormatReader<DivGameMapFile
       Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
+    };
+  }
+
+  /// <summary>Creates a single-entry FPG map from a <see cref="RawImage"/> of any size.</summary>
+  /// <remarks>
+  /// An FPG is a bag of maps sharing one global palette; a still picture becomes the one entry, with
+  /// no control points, so the reader's point-skipping arithmetic lands straight on the pixels.
+  /// The palette slot is a fixed 768 bytes and is padded when the picture uses fewer colours.
+  /// </remarks>
+  public static DivGameMapFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var indexed = image.EnsureFormat(PixelFormat.Indexed8);
+    var palette = new byte[PaletteSize];
+    if (indexed.Palette is { Length: > 0 } source)
+      source.AsSpan(0, Math.Min(source.Length, PaletteSize)).CopyTo(palette);
+
+    return new() {
+      Width = indexed.Width,
+      Height = indexed.Height,
+      PixelData = indexed.PixelData[..],
+      Palette = palette,
     };
   }
 
