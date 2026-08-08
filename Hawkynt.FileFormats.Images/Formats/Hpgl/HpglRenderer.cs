@@ -90,7 +90,10 @@ public static class HpglRenderer {
       maxY = Math.Max(maxY, y);
     });
 
-    return any && maxX > minX && maxY > minY ? (minX, minY, maxX, maxY) : null;
+    // A plot that is one straight line has no extent along one axis. That is still a plot, and the
+    // pen's own width gives it a thickness, so it is the margin the caller adds that makes it a
+    // picture rather than this refusing it.
+    return any ? (minX, minY, maxX, maxY) : null;
   }
 
   private static void _Play(HpglFile file, Matrix2D transform, VectorCanvas? canvas, Action<double, double>? note = null) {

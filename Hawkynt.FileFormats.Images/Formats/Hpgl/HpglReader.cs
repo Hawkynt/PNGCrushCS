@@ -58,15 +58,18 @@ public static class HpglReader {
     var text = Encoding.Latin1.GetString(data);
     var instructions = _Parse(text);
 
-    // A plot is nothing but instructions, so a file that yields none of the ones that draw is not
-    // one — which is what keeps any text file with two capitals in it from being read as a plot.
+    // A plot is nothing but instructions, and any two letters in a row look like one — the sentence
+    // "jumps over the lazy dog" yields ER, which is an instruction that draws. So what is required
+    // is an instruction that moves the pen and states where to, which prose does not produce.
     var drawing = 0;
     foreach (var instruction in instructions)
-      if (instruction.Mnemonic is "PU" or "PD" or "PA" or "PR" or "CI" or "AA" or "AR" or "EA" or "ER" or "RA" or "RR" or "PE")
+      if (instruction.Numbers.Length >= 2 && instruction.Mnemonic is "PU" or "PD" or "PA" or "PR" or "AA" or "AR" or "EA" or "ER" or "RA" or "RR")
+        ++drawing;
+      else if (instruction.Mnemonic is "CI" && instruction.Numbers.Length >= 1)
         ++drawing;
 
     if (drawing == 0)
-      throw new InvalidDataException("Not an HP-GL plot: nothing in it moves the pen.");
+      throw new InvalidDataException("Not an HP-GL plot: nothing in it moves the pen to anywhere.");
 
     return new() { Instructions = instructions };
   }
