@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.OcsPics;
 
 /// <summary>In-memory representation of an OCS Pics image (Atari ST, 320x200, 16 colors).</summary>
-public readonly record struct OcsPicsFile : IImageFormatReader<OcsPicsFile>, IImageToRawImage<OcsPicsFile>, IImageFormatWriter<OcsPicsFile> {
+public readonly record struct OcsPicsFile : IImageFormatReader<OcsPicsFile>, IImageToRawImage<OcsPicsFile>, IImageFromRawImage<OcsPicsFile>, IImageFormatWriter<OcsPicsFile> {
 
   public const int FileSize = 32034;
   private const int _PIXEL_DATA_SIZE = 32000;
@@ -45,6 +45,34 @@ public readonly record struct OcsPicsFile : IImageFormatReader<OcsPicsFile>, IIm
       PixelData = chunky,
       Palette = rgb,
       PaletteCount = paletteCount,
+    };
+  }
+
+  /// <summary>Creates an OCS Pics image from a <see cref="RawImage"/>, sampling it to the ST's 320x200 low-resolution screen.</summary>
+  /// <remarks>
+  /// The file is a fixed 32034 bytes with no field for a size, so a picture of any other size is
+  /// sampled to the screen rather than refused. The sixteen colours are picked by median cut and
+  /// then snapped to the ST's three-bits-per-channel palette, and the body is word-interleaved
+  /// across four bitplanes — the exact inverse of what <see cref="ToRawImage"/> unpicks.
+  /// </remarks>
+  public static OcsPicsFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var sampled = image.SampleTo(_WIDTH, _HEIGHT);
+    var quantized = ColorQuantizer.Quantize(sampled.ToBgra32(), _WIDTH * _HEIGHT, 16);
+
+    var chunky = new byte[_WIDTH * _HEIGHT];
+    for (var i = 0; i < chunky.Length; ++i)
+      chunky[i] = (byte)quantized.Indices[i];
+
+    var palette = new short[16];
+    PlanarConverter.RgbToStPalette(quantized.Palette, quantized.Count).AsSpan().CopyTo(palette);
+
+    return new() {
+      Width = _WIDTH,
+      Height = _HEIGHT,
+      Palette = palette,
+      PixelData = PlanarConverter.ChunkyToAtariSt(chunky, _WIDTH, _HEIGHT, _NUM_PLANES),
     };
   }
 
