@@ -13,6 +13,16 @@ namespace FileFormat.TaquartInterlace;
 /// The picture is drawn at twice its stored size both ways, and the Graphics 10 field starts two
 /// pixels later than the others — a consequence of when the chip fetches its first byte, which the
 /// artist drew around rather than something to correct.
+/// <para/>
+/// Read only, and the displacement is why. A displayed column takes its luminance from one Graphics
+/// 9 nibble, its hue from a Graphics 11 nibble in step with it, and its second luminance from a
+/// Graphics 10 nibble two pixels out of step — so within any four-pixel group the two luminance
+/// fields disagree about where their group boundaries are for half of it. Vertically the same:
+/// only the odd scanlines carry a stored luminance, and the even ones are the mean of the two
+/// around them, so a row cannot be chosen without its neighbours. An encoder here is a joint search
+/// over three differently phased fields rather than the inverse of a reader, and one built without
+/// a picture drawn on the hardware to check it against would agree with this decoder and with
+/// nothing else.
 /// </remarks>
 public readonly record struct TaquartInterlaceFile
   : IImageFormatReader<TaquartInterlaceFile>, IImageToRawImage<TaquartInterlaceFile> {

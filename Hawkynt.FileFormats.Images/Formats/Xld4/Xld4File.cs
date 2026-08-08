@@ -12,6 +12,16 @@ namespace FileFormat.Xld4;
 /// <para/>
 /// The picture is divided into chunks, each dictionary-coded on its own and each saying how many
 /// pixels it covers — so a dictionary never has to grow beyond what one chunk needs.
+/// <para/>
+/// Read only, and the file's own length field is why. It is a single word, and the reader checks it
+/// against the file, so a whole 640 by 400 picture has to come to under 65536 bytes — 256000 pixels
+/// in less than a quarter of a byte each. Nothing short of the dictionary coder working properly
+/// reaches that: writing the run-length layer alone, with the dictionary reduced to passing symbols
+/// through, needs five bits a symbol and overruns the field several times over on any picture that
+/// is not almost entirely runs. So a writer here is not a simpler encoder than the real one but the
+/// real one, and its dictionary has to reproduce this decoder's exactly — including that an entry
+/// is the one it names plus the symbol after it, which may be the symbol the entry is still being
+/// written to.
 /// </remarks>
 public readonly record struct Xld4File
   : IImageFormatReader<Xld4File>, IImageToRawImage<Xld4File> {
