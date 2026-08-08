@@ -34,6 +34,7 @@ namespace FileFormat.PaintShopBrowser;
 /// <para/>
 /// It does not write.
 /// </remarks>
+[FormatMagicBytes([0x4A, 0x41, 0x53, 0x43, 0x20, 0x42, 0x52, 0x4F, 0x57, 0x53, 0x20, 0x46, 0x49, 0x4C, 0x45])]
 public sealed class PaintShopBrowserFile : IImageFormatReader<PaintShopBrowserFile>, IImageToRawImage<PaintShopBrowserFile>, IMultiImageFileFormat<PaintShopBrowserFile> {
 
   /// <summary>The letters the file opens with.</summary>

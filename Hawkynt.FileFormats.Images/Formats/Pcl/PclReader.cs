@@ -208,9 +208,9 @@ public static class PclReader {
     var carriesData =
       (parameterised == '*' && group == 'b' && command is (byte)'W' or (byte)'V')
       || (parameterised == '*' && group == 'v' && command == 'W')
-      || (parameterised == ')' && group == 's' && command == 'W')
-      || (parameterised == '(' && group == 's' && command == 'W')
-      || (parameterised == '&' && group == 'n' && command == 'W')
+      || (parameterised == '*' && group == 'c' && command == 'W')
+      || (parameterised is (byte)'(' or (byte)')' && group is (byte)'s' or (byte)'f' && command == 'W')
+      || (parameterised == '&' && group is (byte)'n' or (byte)'b' && command == 'W')
       || (parameterised == '&' && group == 'p' && command == 'X');
 
     var length = carriesData ? Math.Max(0, number) : 0;
