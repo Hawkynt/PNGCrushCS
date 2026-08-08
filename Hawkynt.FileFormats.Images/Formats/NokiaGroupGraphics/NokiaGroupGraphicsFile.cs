@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.NokiaGroupGraphics;
 
 /// <summary>In-memory representation of a Nokia Group Graphics (NGG) image.</summary>
-public readonly record struct NokiaGroupGraphicsFile : IImageFormatReader<NokiaGroupGraphicsFile>, IImageToRawImage<NokiaGroupGraphicsFile>, IImageFormatWriter<NokiaGroupGraphicsFile> {
+public readonly record struct NokiaGroupGraphicsFile : IImageFormatReader<NokiaGroupGraphicsFile>, IImageToRawImage<NokiaGroupGraphicsFile>, IImageFromRawImage<NokiaGroupGraphicsFile>, IImageFormatWriter<NokiaGroupGraphicsFile> {
 
   static string IImageFormatMetadata<NokiaGroupGraphicsFile>.PrimaryExtension => ".ngg";
   static string[] IImageFormatMetadata<NokiaGroupGraphicsFile>.FileExtensions => [".ngg"];
@@ -56,6 +56,27 @@ public readonly record struct NokiaGroupGraphicsFile : IImageFormatReader<NokiaG
       Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
+    };
+  }
+
+  /// <summary>Builds a group graphic from any picture, sampling it down when the header cannot name its size.</summary>
+  /// <remarks>
+  /// Width and height are single bytes, so 255 is the ceiling — a phone screen of the day was far
+  /// smaller anyway. A set bit is a lit pixel on the monochrome display, which the decoder paints
+  /// black.
+  /// </remarks>
+  public static NokiaGroupGraphicsFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var width = Math.Min(image.Width, byte.MaxValue);
+    var height = Math.Min(image.Height, byte.MaxValue);
+    var pixels = BilevelRows.Threshold(image.SampleTo(width, height), setWhenDark: true);
+
+    return new() {
+      Width = width,
+      Height = height,
+      Version = 1,
+      PixelData = BilevelRows.Pack(pixels, width, height),
     };
   }
 

@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Msx;
 
 /// <summary>In-memory representation of an MSX2 screen dump.</summary>
-public readonly record struct MsxFile : IImageFormatReader<MsxFile>, IImageToRawImage<MsxFile>, IImageFormatWriter<MsxFile> {
+public readonly record struct MsxFile : IImageFormatReader<MsxFile>, IImageToRawImage<MsxFile>, IImageFromRawImage<MsxFile>, IImageFormatWriter<MsxFile> {
 
   static string IImageFormatMetadata<MsxFile>.PrimaryExtension => ".sc5";
   static string[] IImageFormatMetadata<MsxFile>.FileExtensions => [".sc2", ".sc5", ".sc7", ".sc8", ".ge7", ".ge8"];
@@ -111,6 +111,72 @@ public readonly record struct MsxFile : IImageFormatReader<MsxFile>, IImageToRaw
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
     };
+  }
+
+  /// <summary>Pixels across a Screen 5 picture.</summary>
+  internal const int Screen5Width = 256;
+
+  /// <summary>Rows down a Screen 5 picture.</summary>
+  internal const int Screen5Height = 212;
+
+  /// <summary>
+  /// Bytes of Screen 5 picture a file holds, which is not the whole screen.
+  /// </summary>
+  /// <remarks>
+  /// A Screen 5 file is 26880 bytes with the palette's thirty-two at the end, leaving 26848 for the
+  /// picture — two rows and a quarter short of the 27136 the screen occupies in the machine. The
+  /// reader stops where the data does and leaves the rest at index nought, so the encoder puts the
+  /// colour that region holds in entry nought rather than letting the quantiser decide it.
+  /// </remarks>
+  internal const int Screen5DataSize = 26848;
+
+  /// <summary>Builds a Screen 5 picture from any image, sampling it to 256x212 and reducing it to sixteen colours.</summary>
+  /// <remarks>
+  /// Screen 5 is what the format's own extension names and the mode with the most colour to give:
+  /// sixteen entries chosen freely out of 512, against Screen 8's fixed 256 with two bits of blue.
+  /// </remarks>
+  public static MsxFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var source = image.SampleTo(Screen5Width, Screen5Height).EnsureFormat(PixelFormat.Bgra32);
+    var quantized = ColorQuantizer.Quantize(source.PixelData, Screen5Width * Screen5Height, 16);
+    var palette = quantized.Palette;
+    var indices = quantized.Indices;
+
+    // Everything past what the file holds decodes as entry nought, so entry nought is made the
+    // colour that part of the picture actually is.
+    const int stored = Screen5DataSize * 2;
+    if (indices.Length > stored)
+      _MoveToFront(palette, indices, indices[stored]);
+
+    var pixelData = new byte[Screen5DataSize];
+    for (var i = 0; i < stored && i < indices.Length; ++i)
+      MsxGraphics.SetNibble(pixelData, 0, i, indices[i] & 0x0F);
+
+    return new() {
+      Width = Screen5Width,
+      Height = Screen5Height,
+      Mode = MsxMode.Screen5,
+      BitsPerPixel = 4,
+      PixelData = pixelData,
+      Palette = MsxGraphics.PaletteFromRgb(palette, quantized.Count, 16),
+      HasBloadHeader = true,
+    };
+  }
+
+  /// <summary>Swaps a palette entry with the first, renumbering the pixels that named either.</summary>
+  private static void _MoveToFront(byte[] palette, int[] indices, int entry) {
+    if (entry == 0)
+      return;
+
+    for (var channel = 0; channel < 3; ++channel)
+      (palette[channel], palette[entry * 3 + channel]) = (palette[entry * 3 + channel], palette[channel]);
+
+    for (var i = 0; i < indices.Length; ++i)
+      if (indices[i] == entry)
+        indices[i] = 0;
+      else if (indices[i] == 0)
+        indices[i] = entry;
   }
 
   /// <summary>Screen5: 256x212, 4bpp indexed with MSX palette.</summary>

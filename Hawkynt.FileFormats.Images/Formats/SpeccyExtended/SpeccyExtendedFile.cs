@@ -19,7 +19,7 @@ namespace FileFormat.SpeccyExtended;
 /// </remarks>
 [FormatDetectionPriority(100)]
 [FormatMagicBytes([0x7F, 0x53, 0x58, 0x47])]
-public sealed class SpeccyExtendedFile : IImageFormatReader<SpeccyExtendedFile>, IImageToRawImage<SpeccyExtendedFile>, IImageFormatWriter<SpeccyExtendedFile> {
+public sealed class SpeccyExtendedFile : IImageFormatReader<SpeccyExtendedFile>, IImageToRawImage<SpeccyExtendedFile>, IImageFromRawImage<SpeccyExtendedFile>, IImageFormatWriter<SpeccyExtendedFile> {
 
   static string IImageFormatMetadata<SpeccyExtendedFile>.PrimaryExtension => ".sxg";
   static string[] IImageFormatMetadata<SpeccyExtendedFile>.FileExtensions => [".sxg"];
@@ -86,5 +86,30 @@ public sealed class SpeccyExtendedFile : IImageFormatReader<SpeccyExtendedFile>,
       Palette = file.Palette,
       PaletteCount = PaletteCount,
     };
+  }
+
+  /// <summary>Builds a picture from any image, keeping its size and reducing it to sixteen colours.</summary>
+  /// <remarks>
+  /// The size is the file's to state, so nothing has to be sampled away — only the colours are
+  /// fixed at sixteen, and the picture carries its own, so they are quantised rather than matched
+  /// against a table. Five bits a channel are kept, which is what the writer narrows them to.
+  /// </remarks>
+  public static SpeccyExtendedFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var width = Math.Min(image.Width, ushort.MaxValue);
+    var height = Math.Min(image.Height, ushort.MaxValue);
+    var source = image.SampleTo(width, height).EnsureFormat(PixelFormat.Bgra32);
+    var quantized = ColorQuantizer.Quantize(source.PixelData, width * height, PaletteCount);
+
+    var palette = new byte[PaletteCount * 3];
+    for (var i = 0; i < quantized.Count * 3; ++i)
+      palette[i] = quantized.Palette[i];
+
+    var pixels = new byte[width * height];
+    for (var i = 0; i < pixels.Length; ++i)
+      pixels[i] = (byte)(quantized.Indices[i] & 0x0F);
+
+    return new() { Width = width, Height = height, Palette = palette, PixelData = pixels };
   }
 }
