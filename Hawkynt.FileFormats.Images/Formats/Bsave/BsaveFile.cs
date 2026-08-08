@@ -621,48 +621,8 @@ public readonly record struct BsaveFile : IImageFormatReader<BsaveFile>, IImageT
     };
   }
 
-  // Default VGA Mode 13h palette (256 RGB triplets). Indices 0..15 = EGA palette,
-  // 16..31 = grayscale ramp, 32..255 = standard VGA color cube + ramps.
-  // This is a synthesized approximation suitable for indexed-image round-tripping —
-  // the exact ROM palette is hardware-defined and not stored in BSAVE files.
-  private static readonly byte[] _DefaultVgaPalette = _BuildDefaultVgaPalette();
-
-  private static byte[] _BuildDefaultVgaPalette() {
-    var palette = new byte[256 * 3];
-    // 0..15: EGA palette
-    for (var i = 0; i < 16; ++i) {
-      palette[i * 3] = _EgaPalette[i * 3];
-      palette[i * 3 + 1] = _EgaPalette[i * 3 + 1];
-      palette[i * 3 + 2] = _EgaPalette[i * 3 + 2];
-    }
-    // 16..31: grayscale ramp
-    for (var i = 0; i < 16; ++i) {
-      var v = (byte)(i * 255 / 15);
-      var idx = (16 + i) * 3;
-      palette[idx] = v;
-      palette[idx + 1] = v;
-      palette[idx + 2] = v;
-    }
-    // 32..255: spread a 6x6x6 color cube + remaining grayscale
-    var pos = 32;
-    for (var r = 0; r < 6 && pos < 256; ++r)
-      for (var g = 0; g < 6 && pos < 256; ++g)
-        for (var b = 0; b < 6 && pos < 256; ++b) {
-          var idx = pos * 3;
-          palette[idx] = (byte)(r * 51);
-          palette[idx + 1] = (byte)(g * 51);
-          palette[idx + 2] = (byte)(b * 51);
-          ++pos;
-        }
-    // Fill remainder with grayscale ramp
-    while (pos < 256) {
-      var v = (byte)((pos - 248) * 32);
-      var idx = pos * 3;
-      palette[idx] = v;
-      palette[idx + 1] = v;
-      palette[idx + 2] = v;
-      ++pos;
-    }
-    return palette;
-  }
+  // Default VGA Mode 13h palette (256 RGB triplets). BSAVE stores none, so this is what the card
+  // holds when nobody has changed it; the same default the Fastgraph pixel run reader needs, which
+  // is why it lives in the core rather than here.
+  private static readonly byte[] _DefaultVgaPalette = VgaPalette.Default256;
 }
