@@ -746,6 +746,10 @@ Formats we consciously chose not to implement, with reason codes:
 - **font** — Font file, not an image
 - **audio** — Audio format
 - **meta** — ImageMagick pseudo-format or metaformat
+- **embeds-images** — Not an image itself; a document or package holding ordinary
+  pictures that a viewer pulls out of it
+- **unidentified** — What the extension names could not be established from any
+  source worth trusting
 
 | Format            | Extensions  | Reason       | Tom's | IM  | XnView | IrfanView |
 | ----------------- | ----------- | ------------ | ----- | --- | ------ | --------- |
@@ -761,6 +765,7 @@ Formats we consciously chose not to implement, with reason codes:
 | CorelDRAW         | .cdr        | vector       | —     | —   | R      | —         |
 | Crayola           | .crayola    | app-specific | —     | —   | —      | —         |
 | DWG               | .dwg        | vector       | —     | —   | R      | —         |
+| Half-Life Model   | .mdl        | 3d-model     | —     | —   | R      | —         |
 | FIG               | .fig        | vector       | R     | —   | —      | —         |
 | Flash SWF         | .swf        | video/vector | —     | —   | —      | R         |
 | GnuPlot           | .gplt       | vector       | R     | —   | —      | —         |
@@ -770,8 +775,39 @@ Formats we consciously chose not to implement, with reason codes:
 | MVG               | .mvg        | meta         | R     | RW  | —      | —         |
 | MrSID             | .sid        | proprietary  | —     | —   | —      | R         |
 | PES (embroidery)  | .pes        | app-specific | R     | R   | —      | —         |
+| Picture Gear Pkt  | .prc        | proprietary  | —     | —   | R      | —         |
+| Pocket PC Theme   | .tsk        | embeds-images| —     | —   | R      | —         |
+| PowerPoint        | .ppt, .pps  | embeds-images| —     | —   | R      | —         |
+| Skantek           | .skn        | unidentified | —     | —   | R      | —         |
 | SVG               | .svg        | vector       | R     | RW  | R      | R         |
 | MPEG video        | .mpg, .mpeg | video        | R     | —   | —      | —         |
+| VRML              | .wrl        | 3d-model     | —     | —   | R      | —         |
+
+Seven of those were looked at in detail, because a name a viewer opens is not the
+same thing as a picture format, and it is worth writing down which is which:
+
+- **.ppt, .pps, .tsk** are containers. A legacy PowerPoint file is an OLE compound
+  document whose pictures sit as BLIPs in a separate `Pictures` stream; a Pocket PC
+  theme is an archive of ordinary JPEGs, GIFs and BMPs. XnView labels both entries
+  "(images)" — it is unpacking them, not rendering them. Doing the same here would
+  be writing two archive readers, which is a different job.
+- **.wrl** is VRML: a text 3D scene description opening `#VRML V2.0 utf8`,
+  standardised as ISO/IEC 14772-1. It references textures and holds no pixels.
+- **.mdl** is the Half-Life model. Its skin textures are already read here, under
+  `.mdltex`; the model itself is geometry and animation.
+- **.prc** is the awkward one. Most files with that name are Palm OS resource
+  databases — programs — and ISO 14739 gives the same three letters to a 3D format
+  for embedding in PDF. What XnView means is neither: it is Sony's Picture Gear
+  Pocket, a raster photo in a Palm database wrapper, told apart by `IMVSIMVS` at
+  offset 60. That layout was reverse-engineered from XnView's own writer and is
+  documented nowhere else, so there is nothing to build a reader from that is not
+  a guess about a guess.
+- **.skn** could not be identified at all. XnView calls it "Skantek", and no source
+  worth trusting says what Skantek is; the file-extension sites that name it share
+  one auto-generated template and give its signature as `78 9C`, which is simply a
+  zlib header. Half a dozen unrelated formats also use `.skn` — Kinupix, Symbian
+  themes, The Sims' mesh data, Virtual TI faceplates — so implementing it would
+  mean picking one and hoping.
 
 ---
 
