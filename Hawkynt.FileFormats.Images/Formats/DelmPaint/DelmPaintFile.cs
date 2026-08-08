@@ -14,7 +14,8 @@ namespace FileFormat.DelmPaint;
 /// the same reason — the Falcon could hold a quadrant in the memory an ST screen occupied.
 /// </remarks>
 public readonly record struct DelmPaintFile
-  : IImageFormatReader<DelmPaintFile>, IImageToRawImage<DelmPaintFile> {
+  : IImageFormatReader<DelmPaintFile>, IImageToRawImage<DelmPaintFile>,
+    IImageFromRawImage<DelmPaintFile>, IImageFormatWriter<DelmPaintFile> {
 
   /// <summary>Bytes a packed block unpacks to.</summary>
   public const int BlockSize = 32000;
@@ -52,6 +53,7 @@ public readonly record struct DelmPaintFile
   /// happened to expose it.
   /// </remarks>
   static DelmPaintFile IImageFormatReader<DelmPaintFile>.FromFile(FileInfo file) => DelmPaintReader.FromFile(file);
+  static byte[] IImageFormatWriter<DelmPaintFile>.ToBytes(DelmPaintFile file) => DelmPaintWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<DelmPaintFile>.VideoModes => [
     new("DelmPaint", [(QuadrantWidth, QuadrantHeight), (QuadrantWidth * 2, QuadrantHeight * 2)], [ColorCount])
   ];
@@ -96,5 +98,30 @@ public readonly record struct DelmPaintFile
       Palette = AtariStGraphics.ReadFalconPalette(data, 0, ColorCount),
       PaletteCount = ColorCount,
     };
+  }
+
+  /// <summary>Encodes a picture as one quadrant, which is the form the .del extension names.</summary>
+  /// <remarks>
+  /// The four-quadrant form is not written. Nothing inside a file says which of the two it is — the
+  /// reader is told by the extension — so writing the larger one would produce bytes that read as a
+  /// picture only when the caller also named the file .dph, and read as a truncated one otherwise.
+  /// <para/>
+  /// The unpacked side is three blocks of 32000 bytes whatever the picture needs, because the packer
+  /// works a block at a time and the last one holds the remainder of a screen that does not divide
+  /// by the block size. Only the first 77824 of those bytes are the palette and the quadrant; the
+  /// rest is what the program had in memory past its picture, and zero is as good an answer as any.
+  /// </remarks>
+  public static DelmPaintFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var indexed = image.SampleTo(QuadrantWidth, QuadrantHeight).EnsureIndexedAtMost(ColorCount);
+    var unpacked = new byte[BlockSize * 3];
+    AtariStGraphics.WriteFalconPalette(indexed.Palette ?? [], ColorCount, unpacked);
+
+    AtariStGraphics
+      .PackBitplanes(indexed.PixelData, QuadrantWidth, Planes, QuadrantWidth, QuadrantHeight)
+      .CopyTo(unpacked, PaletteSize);
+
+    return new() { Unpacked = unpacked, Width = QuadrantWidth, Height = QuadrantHeight };
   }
 }

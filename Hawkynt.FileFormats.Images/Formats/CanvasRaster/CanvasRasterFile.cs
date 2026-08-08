@@ -17,10 +17,29 @@ namespace FileFormat.CanvasRaster;
 /// pays full price for the rest, rather than choosing between the two.
 /// </remarks>
 public readonly record struct CanvasRasterFile
-  : IImageFormatReader<CanvasRasterFile>, IImageToRawImage<CanvasRasterFile> {
+  : IImageFormatReader<CanvasRasterFile>, IImageToRawImage<CanvasRasterFile>,
+    IImageFromRawImage<CanvasRasterFile>, IImageFormatWriter<CanvasRasterFile> {
 
   /// <summary>Bands a picture is divided into, each four scanlines tall.</summary>
   public const int BandCount = 50;
+
+  /// <summary>Scanlines one band covers.</summary>
+  public const int BandHeight = 4;
+
+  /// <summary>Colours one band's palette names.</summary>
+  public const int ColorCount = 16;
+
+  /// <summary>Pixels across the mode Canvas drew in.</summary>
+  public const int Width = 320;
+
+  /// <summary>Rows the picture holds.</summary>
+  public const int Height = 200;
+
+  /// <summary>Bytes one row of the bitmap occupies: four planes interleaved by the word.</summary>
+  public const int Stride = Width / 2;
+
+  /// <summary>Size of the unpacked bitmap.</summary>
+  public const int BitmapSize = Stride * Height;
 
   /// <summary>Bytes one band's palette occupies: sixteen colours of three bytes.</summary>
   public const int PaletteSize = 48;
@@ -38,6 +57,8 @@ public readonly record struct CanvasRasterFile
   static string[] IImageFormatMetadata<CanvasRasterFile>.FileExtensions => [".ful"];
   static CanvasRasterFile IImageFormatReader<CanvasRasterFile>.FromSpan(ReadOnlySpan<byte> data)
     => CanvasRasterReader.FromSpan(data);
+  static byte[] IImageFormatWriter<CanvasRasterFile>.ToBytes(CanvasRasterFile file)
+    => CanvasRasterWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<CanvasRasterFile>.VideoModes => [
     new("Atari ST", [(320, 200), (640, 400)], [16])
   ];
@@ -137,4 +158,70 @@ public readonly record struct CanvasRasterFile
 
   private static byte _At(ReadOnlySpan<byte> data, int offset)
     => offset >= 0 && offset < data.Length ? data[offset] : (byte)0;
+
+  /// <summary>The stored slot a hardware colour number is written in, which is the VDI order reversed.</summary>
+  internal static int VdiSlotFor(int hardwareIndex) {
+    for (var slot = 0; slot < ColorCount; ++slot)
+      if (AtariStGraphics.VdiToHardwareIndex(slot, 4) == hardwareIndex)
+        return slot;
+
+    return hardwareIndex;
+  }
+
+  /// <summary>Encodes a picture as the narrow mode, giving every band of four rows its own palette.</summary>
+  /// <remarks>
+  /// Every band gets one. The alternative — one palette for the whole screen and forty-nine bands
+  /// saying they have none — is a shorter file showing sixteen colours where the format holds eight
+  /// hundred, and the palette per band is the only reason this format exists rather than being a
+  /// plain ST screen.
+  /// <para/>
+  /// Nothing is compressed. The run list fills the parts of a screen that repeat and the rest is
+  /// paid for in full afterwards, so a picture with no runs at all is a legal file and the shortest
+  /// route to one; what the runs would save is bytes on disk, not colours on screen.
+  /// </remarks>
+  public static CanvasRasterFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(Width, Height);
+    var indices = new byte[Width * Height];
+
+    // Every band carries a palette, so the palettes end where a file with fifty of them ends.
+    var cursor = PaletteEnd + PaletteSize * (BandCount - 1);
+    var headerAt = cursor + HeaderGap;
+    var runsAt = headerAt + 34;
+    var bitmapAt = runsAt + 12;
+    var data = new byte[bitmapAt + BitmapSize];
+
+    // The run list contributes nothing, so it is the terminator alone.
+    data[runsAt] = 255;
+    data[runsAt + 1] = 255;
+
+    for (var band = 0; band < BandCount; ++band) {
+      var top = band * BandHeight;
+      var slice = new byte[Width * BandHeight * 3];
+      rgb.PixelData.AsSpan(top * Width * 3, slice.Length).CopyTo(slice);
+
+      var quantized = new RawImage {
+        Width = Width, Height = BandHeight, Format = PixelFormat.Rgb24, PixelData = slice,
+      }.EnsureIndexedAtMost(ColorCount);
+
+      quantized.PixelData.AsSpan(0, Width * BandHeight).CopyTo(indices.AsSpan(top * Width));
+
+      // The palettes are written backwards, the first band's last, because the routine that loaded
+      // them counted down.
+      var palette = quantized.Palette ?? [];
+      for (var colour = 0; colour < ColorCount; ++colour) {
+        var target = cursor - (band + 1) * PaletteSize + VdiSlotFor(colour) * 3;
+        for (var channel = 0; channel < 3; ++channel) {
+          var at = colour * 3 + channel;
+          data[target + channel] = (byte)(at < palette.Length ? (palette[at] * 7 + 127) / 255 : 0);
+        }
+      }
+    }
+
+    var bitmap = AtariStGraphics.PackBitplanes(indices, Stride, 4, Width, Height);
+    bitmap.CopyTo(data, bitmapAt);
+
+    return new() { Data = data, Bitmap = bitmap, PaletteCursor = cursor, Bitplanes = 4, Mode = 0 };
+  }
 }

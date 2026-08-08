@@ -28,15 +28,27 @@ public enum ComputerEyesStKind {
 /// It is not the Atari 8-bit ComputerEyes format, which shares the name and most of an extension.
 /// </remarks>
 public readonly record struct ComputerEyesStFile
-  : IImageFormatReader<ComputerEyesStFile>, IImageToRawImage<ComputerEyesStFile> {
+  : IImageFormatReader<ComputerEyesStFile>, IImageToRawImage<ComputerEyesStFile>,
+    IImageFromRawImage<ComputerEyesStFile>, IImageFormatWriter<ComputerEyesStFile> {
 
   /// <summary>Rows the digitiser captured, whatever the picture is drawn at.</summary>
   public const int CapturedHeight = 200;
+
+  /// <summary>Pixels across a colour capture.</summary>
+  public const int ColorWidth = 320;
+
+  /// <summary>Where a colour capture's first channel plane starts.</summary>
+  public const int ColorOffset = 22;
+
+  /// <summary>Size of a colour capture.</summary>
+  public const int ColorFileSize = ColorOffset + ColorWidth * CapturedHeight * 3;
 
   static string IImageFormatMetadata<ComputerEyesStFile>.PrimaryExtension => ".ce3";
   static string[] IImageFormatMetadata<ComputerEyesStFile>.FileExtensions => [".ce3"];
   static ComputerEyesStFile IImageFormatReader<ComputerEyesStFile>.FromSpan(ReadOnlySpan<byte> data)
     => ComputerEyesStReader.FromSpan(data);
+  static byte[] IImageFormatWriter<ComputerEyesStFile>.ToBytes(ComputerEyesStFile file)
+    => ComputerEyesStWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<ComputerEyesStFile>.VideoModes => [
     new("ComputerEyes", [(320, 200), (640, 400)], [262144])
   ];
@@ -124,5 +136,38 @@ public readonly record struct ComputerEyesStFile
     }
 
     return new() { Width = width, Height = height, Format = PixelFormat.Gray8, PixelData = pixels };
+  }
+
+  /// <summary>Encodes a picture as a colour capture, which is the mode that keeps its hues.</summary>
+  /// <remarks>
+  /// Of the three shapes only the colour one is written. The other two are what the digitiser
+  /// produced in its other settings — one throws hue away and the other is the same picture at a
+  /// resolution the capture never had — so writing them would be describing a capture that did not
+  /// happen rather than storing the picture handed over.
+  /// <para/>
+  /// Six bits a channel, and the picture is stored a column at a time because that is the order the
+  /// hardware sampled it in: one column per television frame.
+  /// </remarks>
+  public static ComputerEyesStFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(ColorWidth, CapturedHeight).PixelData;
+    var data = new byte[ColorFileSize];
+    data[0] = (byte)'E';
+    data[1] = (byte)'Y';
+    data[2] = (byte)'E';
+    data[3] = (byte)'S';
+
+    const int plane = ColorWidth * CapturedHeight;
+    for (var y = 0; y < CapturedHeight; ++y)
+    for (var x = 0; x < ColorWidth; ++x) {
+      var source = (y * ColorWidth + x) * 3;
+      var target = ColorOffset + x * CapturedHeight + y;
+
+      for (var channel = 0; channel < 3; ++channel)
+        data[target + plane * channel] = (byte)((rgb[source + channel] * 63 + 127) / 255);
+    }
+
+    return new() { Data = data, Kind = ComputerEyesStKind.Color };
   }
 }
