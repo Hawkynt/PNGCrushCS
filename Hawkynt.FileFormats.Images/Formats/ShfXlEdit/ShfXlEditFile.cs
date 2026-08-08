@@ -12,7 +12,8 @@ namespace FileFormat.ShfXlEdit;
 /// simpler to read and could not have been displayed without being taken apart again.
 /// </remarks>
 public readonly record struct ShfXlEditFile
-  : IImageFormatReader<ShfXlEditFile>, IImageToRawImage<ShfXlEditFile> {
+  : IImageFormatReader<ShfXlEditFile>, IImageToRawImage<ShfXlEditFile>,
+    IImageFromRawImage<ShfXlEditFile>, IImageFormatWriter<ShfXlEditFile> {
 
   /// <summary>Pixels across.</summary>
   public const int Width = 144;
@@ -42,6 +43,8 @@ public readonly record struct ShfXlEditFile
   static string[] IImageFormatMetadata<ShfXlEditFile>.FileExtensions => [".shx"];
   static ShfXlEditFile IImageFormatReader<ShfXlEditFile>.FromSpan(ReadOnlySpan<byte> data)
     => ShfXlEditReader.FromSpan(data);
+  static byte[] IImageFormatWriter<ShfXlEditFile>.ToBytes(ShfXlEditFile file)
+    => ShfXlEditWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<ShfXlEditFile>.VideoModes => [
     new("SHF-XL", [(Width, Height)], [Commodore64Graphics.ColorCount])
   ];
@@ -68,6 +71,79 @@ public readonly record struct ShfXlEditFile
       Palette = Commodore64Graphics.CreatePalette(),
       PaletteCount = Commodore64Graphics.ColorCount,
     };
+  }
+
+  /// <summary>Builds a picture from any image, sampling it to the 144x168 the editor showed.</summary>
+  /// <remarks>
+  /// Written in the editor's own layout rather than as a copy of video memory. The two are the same
+  /// picture, but the video-memory form spreads a cell across a sprite table, five interleaved
+  /// bitmap banks and a correction for the sprites the machine could not place contiguously — none
+  /// of which a picture needs to say anything about. The editor's layout is three flat planes, and
+  /// with the sprite plane clear every pixel comes from the colour map, which holds a pair of
+  /// colours for each eight pixels of each single scanline.
+  /// </remarks>
+  public static ShfXlEditFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(Width, Height).EnsureFormat(PixelFormat.Rgb24).PixelData;
+    var data = new byte[UnpackedSize];
+    Span<int> line = stackalloc int[8];
+
+    for (var y = 0; y < Height; ++y)
+    for (var column = 0; column < PackedStride; ++column) {
+      for (var x = 0; x < 8; ++x) {
+        var at = (y * Width + (column << 3) + x) * 3;
+        line[x] = Commodore64Graphics.FindNearestColorIndex(rgb[at], rgb[at + 1], rgb[at + 2]);
+      }
+
+      var (foreground, background) = _ChoosePair(line);
+      var offset = y * PackedStride + column;
+      var bits = 0;
+
+      for (var x = 0; x < 8; ++x)
+        if (_Distance(line[x], foreground) <= _Distance(line[x], background))
+          bits |= 1 << (~x & 7);
+
+      data[PackedMaskOffset + offset] = (byte)bits;
+      data[PackedColorOffset + offset] = (byte)((foreground << 4) | background);
+    }
+
+    return new() { Data = data, IsRaw = false };
+  }
+
+  /// <summary>The two colours that between them describe eight pixels with the least total error.</summary>
+  private static (int Foreground, int Background) _ChoosePair(ReadOnlySpan<int> indices) {
+    int bestForeground = 0, bestBackground = 0;
+    var bestError = long.MaxValue;
+
+    for (var first = 0; first < Commodore64Graphics.ColorCount; ++first)
+    for (var second = 0; second <= first; ++second) {
+      long error = 0;
+      foreach (var index in indices)
+        error += Math.Min(_Distance(index, first), _Distance(index, second));
+
+      if (error >= bestError)
+        continue;
+
+      bestError = error;
+      bestForeground = first;
+      bestBackground = second;
+    }
+
+    return (bestForeground, bestBackground);
+  }
+
+  /// <summary>Squared distance in RGB between two of the machine's colours.</summary>
+  private static int _Distance(int left, int right) {
+    if (left == right)
+      return 0;
+
+    int a = Commodore64Graphics.HexColors[left], b = Commodore64Graphics.HexColors[right];
+    int dr = ((a >> 16) & 0xFF) - ((b >> 16) & 0xFF);
+    int dg = ((a >> 8) & 0xFF) - ((b >> 8) & 0xFF);
+    int db = (a & 0xFF) - (b & 0xFF);
+
+    return dr * dr + dg * dg + db * db;
   }
 
   private static int _RawPixel(ReadOnlySpan<byte> data, int x, int y) {
