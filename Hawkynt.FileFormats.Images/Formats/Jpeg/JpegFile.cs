@@ -12,7 +12,8 @@ public readonly record struct JpegFile :
 
   static string IImageFormatMetadata<JpegFile>.PrimaryExtension => ".jpg";
   /// <summary>Every name a JPEG is saved under, including the two shortest.</summary>
-  static string[] IImageFormatMetadata<JpegFile>.FileExtensions => [".jpg", ".jpeg", ".jpe", ".jfif", ".jps", ".thm", ".j", ".jif"];
+  /// <summary><c>.fsy</c> is what Photodex CompuPic wrote its JPEGs under; the bytes are a plain JFIF.</summary>
+  static string[] IImageFormatMetadata<JpegFile>.FileExtensions => [".jpg", ".jpeg", ".jpe", ".jfif", ".jps", ".thm", ".j", ".jif", ".fsy"];
   static JpegFile IImageFormatReader<JpegFile>.FromSpan(ReadOnlySpan<byte> data) => JpegReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<JpegFile>.Capabilities => FormatCapability.HasDedicatedOptimizer;
 

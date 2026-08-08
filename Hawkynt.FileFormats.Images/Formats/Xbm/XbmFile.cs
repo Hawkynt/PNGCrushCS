@@ -15,7 +15,12 @@ public readonly record struct XbmFile : IImageFormatReader<XbmFile>, IImageToRaw
   /// Only the Sun icon claimed that name, and a Sun icon opens with a C comment where this opens
   /// with a #define — so a real X11 icon was refused for not being the other format.
   /// </remarks>
-  static string[] IImageFormatMetadata<XbmFile>.FileExtensions => [".xbm", ".icon", ".ico"];
+  /// <summary>
+  /// <c>.cbm</c> and <c>.x</c> are names X bitmaps are found under as often as <c>.xbm</c> — the
+  /// former from Photon/QNX widget sets, the latter from X11 source trees. The file is the same C
+  /// fragment either way, and the parser refuses anything without the <c>#define</c> pair.
+  /// </summary>
+  static string[] IImageFormatMetadata<XbmFile>.FileExtensions => [".xbm", ".icon", ".ico", ".cbm", ".x"];
   static XbmFile IImageFormatReader<XbmFile>.FromSpan(ReadOnlySpan<byte> data) => XbmReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<XbmFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
   static byte[] IImageFormatWriter<XbmFile>.ToBytes(XbmFile file) => XbmWriter.ToBytes(file);

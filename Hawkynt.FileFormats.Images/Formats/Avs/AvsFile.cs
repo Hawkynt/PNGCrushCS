@@ -7,7 +7,13 @@ namespace FileFormat.Avs;
 public readonly record struct AvsFile : IImageFormatReader<AvsFile>, IImageToRawImage<AvsFile>, IImageFromRawImage<AvsFile>, IImageFormatWriter<AvsFile> {
 
   static string IImageFormatMetadata<AvsFile>.PrimaryExtension => ".avs";
-  static string[] IImageFormatMetadata<AvsFile>.FileExtensions => [".avs"];
+  /// <summary>
+  /// Also <c>.x</c>, which is what the AVS distribution itself names its sample images. Nothing in
+  /// the file says so — there is no signature, only two lengths — but the reader requires the
+  /// header and the pixels to account for the file to the byte, so a <c>.x</c> belonging to one of
+  /// the several other formats using that name is refused rather than drawn wrongly.
+  /// </summary>
+  static string[] IImageFormatMetadata<AvsFile>.FileExtensions => [".avs", ".x"];
   static AvsFile IImageFormatReader<AvsFile>.FromSpan(ReadOnlySpan<byte> data) => AvsReader.FromSpan(data);
   static byte[] IImageFormatWriter<AvsFile>.ToBytes(AvsFile file) => AvsWriter.ToBytes(file);
   public int Width { get; init; }

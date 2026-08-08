@@ -9,7 +9,8 @@ namespace FileFormat.SunIcon;
 public readonly record struct SunIconFile : IImageFormatReader<SunIconFile>, IImageToRawImage<SunIconFile>, IImageFromRawImage<SunIconFile>, IImageFormatWriter<SunIconFile> {
 
   static string IImageFormatMetadata<SunIconFile>.PrimaryExtension => ".icon";
-  static string[] IImageFormatMetadata<SunIconFile>.FileExtensions => [".icon"];
+  /// <summary><c>.pr</c> is the name the SunView pixrect tools wrote them under.</summary>
+  static string[] IImageFormatMetadata<SunIconFile>.FileExtensions => [".icon", ".pr"];
   static SunIconFile IImageFormatReader<SunIconFile>.FromSpan(ReadOnlySpan<byte> data) => SunIconReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<SunIconFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
   static byte[] IImageFormatWriter<SunIconFile>.ToBytes(SunIconFile file) => SunIconWriter.ToBytes(file);
