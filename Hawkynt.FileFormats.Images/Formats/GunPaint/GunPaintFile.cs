@@ -17,7 +17,8 @@ namespace FileFormat.GunPaint;
 /// The raster work costs the leftmost characters, which is why the picture is 296 pixels wide.
 /// </remarks>
 public readonly record struct GunPaintFile
-  : IImageFormatReader<GunPaintFile>, IImageToRawImage<GunPaintFile> {
+  : IImageFormatReader<GunPaintFile>, IImageToRawImage<GunPaintFile>,
+    IImageFromRawImage<GunPaintFile>, IImageFormatWriter<GunPaintFile> {
 
   /// <summary>Displayed width; the raster work costs the leftmost cells.</summary>
   public const int Width = 296;
@@ -55,6 +56,7 @@ public readonly record struct GunPaintFile
   static string IImageFormatMetadata<GunPaintFile>.PrimaryExtension => ".gun";
   static string[] IImageFormatMetadata<GunPaintFile>.FileExtensions => [".gun", ".ifl"];
   static GunPaintFile IImageFormatReader<GunPaintFile>.FromSpan(ReadOnlySpan<byte> data) => GunPaintReader.FromSpan(data);
+  static byte[] IImageFormatWriter<GunPaintFile>.ToBytes(GunPaintFile file) => GunPaintWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<GunPaintFile>.VideoModes => [
     new("GunPaint", [(Width, Height)], [Commodore64Graphics.ColorCount * Commodore64Graphics.ColorCount])
   ];
@@ -121,4 +123,21 @@ public readonly record struct GunPaintFile
 
   private static byte _At(ReadOnlySpan<byte> data, int offset)
     => offset >= 0 && offset < data.Length ? data[offset] : (byte)0;
+
+  /// <summary>Encodes a picture as the two displaced FLI screens the format shows.</summary>
+  /// <remarks>
+  /// Nothing comes back exactly and that is the format rather than the encoder. The second field is
+  /// a pixel to the right of the first, so its two-pixel blocks fall between the first field's and
+  /// no pixel has a block of its own — the block that colours a pixel colours its neighbour too, in
+  /// one field or the other. A picture whose neighbouring pixels disagree cannot ask both fields for
+  /// what it wants, and the two disagreements are what the display averages.
+  /// <para/>
+  /// What can be had is the least wrong reading of a whole scanline at once, which is what is taken:
+  /// a chain settled by dynamic programming rather than a pass that improves one block at a time.
+  /// </remarks>
+  public static GunPaintFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    return new() { Data = GunPaintEncoder.Encode(image.SampleTo(Width, Height).PixelData) };
+  }
 }
