@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Crack;
 
 /// <summary>In-memory representation of a Crack Art 2 image (Atari ST, 320x200, 16 colors).</summary>
-public readonly record struct CrackFile : IImageFormatReader<CrackFile>, IImageToRawImage<CrackFile>, IImageFormatWriter<CrackFile> {
+public readonly record struct CrackFile : IImageFormatReader<CrackFile>, IImageToRawImage<CrackFile>, IImageFromRawImage<CrackFile>, IImageFormatWriter<CrackFile> {
 
   public const int FileSize = 32034;
   private const int _PIXEL_DATA_SIZE = 32000;
@@ -45,6 +45,36 @@ public readonly record struct CrackFile : IImageFormatReader<CrackFile>, IImageT
       PixelData = chunky,
       Palette = rgb,
       PaletteCount = paletteCount,
+    };
+  }
+
+
+  /// <summary>Encodes a picture as a Crack Art 2 picture, scaling it to 320x200 first.</summary>
+  /// <remarks>
+  /// An Atari ST low-resolution screen: sixteen colours, four bitplanes interleaved a word at a
+  /// time, and a palette of nine-bit values. The palette is built from the picture rather than fixed
+  /// by the machine, so the colours are quantised first and the indices then split into planes —
+  /// the exact inverse of what <see cref="ToRawImage"/> puts back together.
+  /// </remarks>
+  public static CrackFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var indexed = image.SampleTo(320, 200).EnsureFormat(PixelFormat.Indexed8);
+    var quantised = ColorQuantizer.Quantize(
+      PixelConverter.Convert(indexed, PixelFormat.Bgra32).PixelData, 320 * 200, 16);
+
+    var chunky = new byte[320 * 200];
+    for (var i = 0; i < chunky.Length; ++i)
+      chunky[i] = (byte)quantised.Indices[i];
+
+    var palette = new short[16];
+    PlanarConverter.RgbToStPalette(quantised.Palette, quantised.Count).AsSpan(0, Math.Min(quantised.Count, 16)).CopyTo(palette);
+
+    return new() {
+      Width = 320,
+      Height = 200,
+      Palette = palette,
+      PixelData = PlanarConverter.ChunkyToAtariSt(chunky, 320, 200, 4),
     };
   }
 

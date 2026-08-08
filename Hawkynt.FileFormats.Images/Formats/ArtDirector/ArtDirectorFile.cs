@@ -5,7 +5,7 @@ using FileFormat.Core;
 namespace FileFormat.ArtDirector;
 
 /// <summary>In-memory representation of an Atari ST Art Director image (128-byte header + 32000 bytes planar data).</summary>
-public readonly record struct ArtDirectorFile() : IImageFormatReader<ArtDirectorFile>, IImageToRawImage<ArtDirectorFile>, IImageFormatWriter<ArtDirectorFile> {
+public readonly record struct ArtDirectorFile() : IImageFormatReader<ArtDirectorFile>, IImageToRawImage<ArtDirectorFile>, IImageFromRawImage<ArtDirectorFile>, IImageFormatWriter<ArtDirectorFile> {
 
   /// <summary>Header size in bytes.</summary>
   public const int HeaderSize = 128;
@@ -87,6 +87,37 @@ public readonly record struct ArtDirectorFile() : IImageFormatReader<ArtDirector
       PixelData = chunky,
       Palette = rgb,
       PaletteCount = paletteCount,
+    };
+  }
+
+
+  /// <summary>Encodes a picture as an Art Director picture, scaling it to 320x200 first.</summary>
+  /// <remarks>
+  /// An Atari ST low-resolution screen: sixteen colours, four bitplanes interleaved a word at a
+  /// time, and a palette of nine-bit values. The palette is built from the picture rather than fixed
+  /// by the machine, so the colours are quantised first and the indices then split into planes —
+  /// the exact inverse of what <see cref="ToRawImage"/> puts back together.
+  /// </remarks>
+  public static ArtDirectorFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var indexed = image.SampleTo(320, 200).EnsureFormat(PixelFormat.Indexed8);
+    var quantised = ColorQuantizer.Quantize(
+      PixelConverter.Convert(indexed, PixelFormat.Bgra32).PixelData, 320 * 200, 16);
+
+    var chunky = new byte[320 * 200];
+    for (var i = 0; i < chunky.Length; ++i)
+      chunky[i] = (byte)quantised.Indices[i];
+
+    var palette = new short[16];
+    PlanarConverter.RgbToStPalette(quantised.Palette, quantised.Count).AsSpan(0, Math.Min(quantised.Count, 16)).CopyTo(palette);
+
+    return new() {
+      Width = 320,
+      Height = 200,
+      Resolution = 0,
+      Palette = palette,
+      PixelData = PlanarConverter.ChunkyToAtariSt(chunky, 320, 200, 4),
     };
   }
 
