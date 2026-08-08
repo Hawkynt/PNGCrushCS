@@ -321,7 +321,9 @@ public sealed class ImageFormatDetectorTests {
 
   [Test]
   public void DetectFromSignature_FpxMagic_ReturnsFpx() {
-    ReadOnlySpan<byte> header = [0x46, 0x50, 0x58, 0x00, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    // A FlashPix picture is a compound file. The four bytes "FPX\0" this used to expect were an
+    // invention of the reader that has been replaced, and no such file exists.
+    ReadOnlySpan<byte> header = [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1, 0, 0, 0, 0, 0, 0, 0, 0];
     Assert.That(ImageFormatDetector.DetectFromSignature(header), Is.EqualTo(ImageFormat.Fpx));
   }
 

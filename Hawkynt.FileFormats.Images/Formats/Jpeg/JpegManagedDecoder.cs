@@ -10,6 +10,15 @@ namespace FileFormat.Jpeg;
 /// </summary>
 internal static class JpegManagedDecoder {
 
+  /// <summary>One component's samples, one byte a pixel, at the picture's own size.</summary>
+  /// <remarks>
+  /// Handed out so a container that stores its own colour model can have the planes without this
+  /// deciding what they mean. FlashPix keeps four of them — luma, two chromas and an opacity — with
+  /// nothing in the stream to say so, and a decoder that assumes four planes are ink turns a
+  /// photograph into a colour negative.
+  /// </remarks>
+  internal readonly record struct ComponentPlanes(int Width, int Height, byte[][] Planes);
+
   /// <summary>Decodes JPEG data into a <see cref="JpegFile"/> with RGB pixel data.</summary>
   public static JpegFile Decode(ReadOnlySpan<byte> data) {
     if (data.Length < 2)
@@ -139,6 +148,66 @@ internal static class JpegManagedDecoder {
     }
 
     return JpegColorConverter.AdobeTransformNone;
+  }
+
+  /// <summary>Decodes to one byte a pixel a component, with no colour model applied.</summary>
+  internal static ComponentPlanes DecodeToPlanes(ReadOnlySpan<byte> data) {
+    if (data.Length < 2)
+      throw new InvalidDataException("Data too small for a valid JPEG file.");
+
+    if (data[0] != 0xFF || data[1] != 0xD8)
+      throw new InvalidDataException("Invalid JPEG signature.");
+
+    var dataArray = data.ToArray();
+    var image = JpegMarkerParser.ParseAllMarkers(dataArray);
+    var frame = image.Frame;
+
+    if (frame.Width == 0 || frame.Height == 0)
+      throw new InvalidDataException("JPEG frame has zero dimensions.");
+
+    var maxH = 1;
+    var maxV = 1;
+    foreach (var comp in frame.Components) {
+      if (comp.HSamplingFactor > maxH) maxH = comp.HSamplingFactor;
+      if (comp.VSamplingFactor > maxV) maxV = comp.VSamplingFactor;
+    }
+
+    var componentData = new JpegComponentData[frame.Components.Length];
+    for (var ci = 0; ci < frame.Components.Length; ++ci) {
+      var comp = frame.Components[ci];
+      var widthInBlocks = ((frame.Width * comp.HSamplingFactor + maxH - 1) / maxH + 7) / 8;
+      var heightInBlocks = ((frame.Height * comp.VSamplingFactor + maxV - 1) / maxV + 7) / 8;
+
+      var mcuCols = (frame.Width + maxH * 8 - 1) / (maxH * 8);
+      var mcuRows = (frame.Height + maxV * 8 - 1) / (maxV * 8);
+      var mcuW = mcuCols * comp.HSamplingFactor;
+      var mcuH = mcuRows * comp.VSamplingFactor;
+      if (mcuW > widthInBlocks) widthInBlocks = mcuW;
+      if (mcuH > heightInBlocks) heightInBlocks = mcuH;
+
+      componentData[ci] = JpegComponentData.Allocate(widthInBlocks, heightInBlocks);
+    }
+
+    image.ComponentData = componentData;
+    _DecodeScanData(dataArray, frame, image, componentData);
+
+    var planes = _InverseDctAllComponents(frame, image.QuantTables, componentData, maxH, maxV);
+    var width = frame.Width;
+    var height = frame.Height;
+    var full = new byte[frame.Components.Length][];
+
+    for (var i = 0; i < full.Length; ++i) {
+      var compW = componentData[i].WidthInBlocks * 8;
+      var compH = componentData[i].HeightInBlocks * 8;
+      var actualW = (width * frame.Components[i].HSamplingFactor + maxH - 1) / maxH;
+      var actualH = (height * frame.Components[i].VSamplingFactor + maxV - 1) / maxV;
+      var plane = _CropPlane(planes[i], compW, compH, actualW, actualH);
+      full[i] = actualW == width && actualH == height
+        ? plane
+        : JpegColorConverter.Upsample(plane, actualW, actualH, width, height);
+    }
+
+    return new(width, height, full);
   }
 
   /// <summary>Decodes a JPEG to the coefficient level (no IDCT / color conversion).
