@@ -45,6 +45,18 @@ public static class DrazlaceReader {
   /// blocks in roughly the right colours — so at least one more thing is wrong and the corrections
   /// are not applied, rather than leaving the format half-changed against a writer that would then
   /// disagree with it. The measurements are here so the next attempt starts from them.
+  /// <para/>
+  /// What a later attempt added, which is where the fourth thing is. The packing is not a byte
+  /// escape run at all. Every such scheme was tried against the sample — the data starting anywhere
+  /// from offset 14 to 19, all 256 values as the escape, the count and the value in either order,
+  /// and the count read as itself or as one less, 6144 combinations — and not one of them expands
+  /// the file to the 18001 bytes the structure needs, or to within a byte of it. Applying the three
+  /// corrections above and unpacking as an escape run gives 18240 bytes, and the picture built from
+  /// those agrees with RECOIL on 4 per cent of its pixels whichever order the five sections are
+  /// tried in, all 24 of them.
+  /// <para/>
+  /// So the next attempt should start on the packing rather than on the layout: the sections and
+  /// their sizes are known, and what turns the file into them is not.
   /// </remarks>
   public static DrazlaceFile FromSpan(ReadOnlySpan<byte> data) {
 
