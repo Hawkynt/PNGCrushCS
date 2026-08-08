@@ -14,18 +14,23 @@ namespace FileFormat.TaquartInterlace;
 /// pixels later than the others — a consequence of when the chip fetches its first byte, which the
 /// artist drew around rather than something to correct.
 /// <para/>
-/// Read only, and the displacement is why. A displayed column takes its luminance from one Graphics
-/// 9 nibble, its hue from a Graphics 11 nibble in step with it, and its second luminance from a
-/// Graphics 10 nibble two pixels out of step — so within any four-pixel group the two luminance
-/// fields disagree about where their group boundaries are for half of it. Vertically the same:
-/// only the odd scanlines carry a stored luminance, and the even ones are the mean of the two
-/// around them, so a row cannot be chosen without its neighbours. An encoder here is a joint search
-/// over three differently phased fields rather than the inverse of a reader, and one built without
-/// a picture drawn on the hardware to check it against would agree with this decoder and with
-/// nothing else.
+/// The displacement is what makes reading one easy and drawing one hard. A displayed column takes
+/// its luminance from one Graphics 9 nibble, its hue from a Graphics 11 nibble in step with it, and
+/// its second luminance from a Graphics 10 nibble two pixels out of step — so within any four-pixel
+/// group the two luminance fields disagree about where their group boundaries are for half of it.
+/// Vertically the same: only the odd scanlines carry a stored luminance, and the even ones are the
+/// mean of the two around them, so a row cannot be chosen without its neighbours.
+/// <para/>
+/// None of that makes a picture unfittable, though, because it is a chain rather than a tangle:
+/// every Graphics 10 nibble joins exactly two luminance-and-hue nibbles, and every even row joins
+/// exactly two odd ones. One pass along a scanline settles the whole of it, and rows settled in
+/// order each know the one above — see <see cref="TaquartInterlaceEncoder"/>. What the format costs
+/// a picture is its colours, not its detail: both fields draw one hue at a column, so a displayed
+/// colour is the mean of two entries of one row of the palette and nothing else.
 /// </remarks>
 public readonly record struct TaquartInterlaceFile
-  : IImageFormatReader<TaquartInterlaceFile>, IImageToRawImage<TaquartInterlaceFile> {
+  : IImageFormatReader<TaquartInterlaceFile>, IImageToRawImage<TaquartInterlaceFile>,
+    IImageFromRawImage<TaquartInterlaceFile>, IImageFormatWriter<TaquartInterlaceFile> {
 
   /// <summary>The bytes every file starts with.</summary>
   public static ReadOnlySpan<byte> Signature => [(byte)'T', (byte)'I', (byte)'P', 1, 0];
@@ -49,6 +54,8 @@ public readonly record struct TaquartInterlaceFile
   static string[] IImageFormatMetadata<TaquartInterlaceFile>.FileExtensions => [".tip"];
   static TaquartInterlaceFile IImageFormatReader<TaquartInterlaceFile>.FromSpan(ReadOnlySpan<byte> data)
     => TaquartInterlaceReader.FromSpan(data);
+  static byte[] IImageFormatWriter<TaquartInterlaceFile>.ToBytes(TaquartInterlaceFile file)
+    => TaquartInterlaceWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<TaquartInterlaceFile>.VideoModes => [
     new("Taquart Interlace", [(IntegerRange.Any, IntegerRange.Any)], [256])
   ];
@@ -89,5 +96,21 @@ public readonly record struct TaquartInterlaceFile
       PixelData = FrameBlend.Average(
         Atari8BitGraphics.ApplyPalette(first), Atari8BitGraphics.ApplyPalette(second)),
     };
+  }
+
+  /// <summary>Draws a picture as three interlaced fields.</summary>
+  /// <remarks>
+  /// The format holds any size up to its maximum, so a picture keeps as much of its own as the
+  /// stored fields can state: half of it each way, the width rounded to the four stored pixels a
+  /// nibble pair covers. What does not fit is sampled down rather than refused.
+  /// </remarks>
+  public static TaquartInterlaceFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var storedWidth = Math.Clamp((image.Width / 2 + 2) / 4 * 4, 4, MaxStoredWidth);
+    var storedHeight = Math.Clamp((image.Height + 1) / 2, 1, MaxStoredHeight);
+
+    return TaquartInterlaceReader.FromBytes(TaquartInterlaceEncoder.Encode(
+      image.SampleTo(storedWidth * 2, storedHeight * 2).PixelData, storedWidth, storedHeight));
   }
 }
