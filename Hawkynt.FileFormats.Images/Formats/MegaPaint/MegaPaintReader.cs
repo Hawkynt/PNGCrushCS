@@ -47,6 +47,17 @@ public static class MegaPaintReader {
     // width — and carries its screen packed rather than plain. Their second word is still the last
     // row, and RECOIL and XnView draw all three, so it is a real form and not damage. It is not
     // decoded here; saying so is better than reading a size out of a signature.
+    //
+    // What a later attempt established, so it need not be established again. The reference decoder
+    // draws the .bld sample 224 by 247, and 247 is the second word plus one, so the row count is
+    // read the same way in both forms. The width is not: 224 is nowhere in the header, and the third
+    // word — 0x005F, or 95 — is the first thing that looks like one. Rebuilding the unpacked bitmap
+    // from what the reference draws makes its first run 96 bytes of 0xFF, and 95 is one less than
+    // 96, which is the encoding a count-minus-one uses. That is suggestive and no more: the words
+    // after it (0x03FF, 0x00F0, 0x0018, then the same three again) do not continue the pattern, and
+    // no reading of them as byte runs reproduces the next runs of the picture, which are single
+    // bytes of 0xFC, 0x00 and 0x0F. So the third word is probably a length and the packing is not
+    // a plain byte run-length.
     if (availablePixelData < expectedPixelDataSize)
       throw new InvalidDataException(availablePixelData * 2 < expectedPixelDataSize
         ? $"This is a packed MegaPaint picture ({data.Length} bytes against the {expectedPixelDataSize + MegaPaintFile.HeaderSize} a plain {width}x{height} one takes), which is not decoded here."
