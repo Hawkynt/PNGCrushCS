@@ -5,12 +5,23 @@ namespace FileFormat.Avif;
 
 /// <summary>In-memory representation of an AVIF (AV1 Image File Format) image.</summary>
 [FormatMimeType("image/avif", "image/avif-sequence")]
-public readonly record struct AvifFile : IImageFormatReader<AvifFile>, IImageToRawImage<AvifFile>, IImageFromRawImage<AvifFile>, IImageFormatWriter<AvifFile> {
+/// <remarks>
+/// This reads and does not write, and the writer beside it is not registered.
+/// <para/>
+/// There is no AV1 encoder here — only a decoder. What the writer produced was an ISO base media
+/// container with the picture's own bytes inside it and no av1C box that states the codec configuration,
+/// which is not AVIF: nothing that reads AVIF can read one, and the reference tool says so. It
+/// round-tripped only because our own reader took the same bytes back out again, which is the exact
+/// thing the writer-acceptance fixture exists to catch.
+/// <para/>
+/// Registering it would count a format as writable on the strength of a file no other program will
+/// open. The encoder is the missing piece, and until there is one this reads.
+/// </remarks>
+public readonly record struct AvifFile : IImageFormatReader<AvifFile>, IImageToRawImage<AvifFile> {
 
   static string IImageFormatMetadata<AvifFile>.PrimaryExtension => ".avif";
   static string[] IImageFormatMetadata<AvifFile>.FileExtensions => [".avif"];
   static AvifFile IImageFormatReader<AvifFile>.FromSpan(ReadOnlySpan<byte> data) => AvifReader.FromSpan(data);
-  static byte[] IImageFormatWriter<AvifFile>.ToBytes(AvifFile file) => AvifWriter.ToBytes(file);
 
   static bool? IImageFormatMetadata<AvifFile>.MatchesSignature(ReadOnlySpan<byte> header) {
     if (header.Length < 12 || header[4] != 0x66 || header[5] != 0x74 || header[6] != 0x79 || header[7] != 0x70)
