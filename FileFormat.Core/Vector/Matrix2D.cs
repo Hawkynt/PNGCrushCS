@@ -56,6 +56,31 @@ public readonly record struct Matrix2D(double A, double B, double C, double D, d
   /// <summary>How much the transform multiplies area by.</summary>
   public double Determinant => this.A * this.D - this.B * this.C;
 
+  /// <summary>The transform that undoes this one, or null where it collapses the plane.</summary>
+  /// <remarks>
+  /// What a raster needs: a picture is placed by mapping its own pixel grid onto the page, and
+  /// drawing it means asking, for each pixel of the page, which pixel of the picture landed there.
+  /// That is the inverse, and going the other way — walking the source and marking where each pixel
+  /// goes — leaves gaps wherever the transform enlarges.
+  /// </remarks>
+  public Matrix2D? Inverse {
+    get {
+      var determinant = this.Determinant;
+      if (Math.Abs(determinant) < 1e-12)
+        return null;
+
+      var scale = 1 / determinant;
+      return new(
+        this.D * scale,
+        -this.B * scale,
+        -this.C * scale,
+        this.A * scale,
+        (this.C * this.F - this.D * this.E) * scale,
+        (this.B * this.E - this.A * this.F) * scale
+      );
+    }
+  }
+
   /// <summary>
   /// The factor a length is multiplied by on average, which is what a stroke width has to be scaled
   /// by when the transform is not a plain scale.

@@ -38,11 +38,16 @@ public static class CgmRenderer {
       throw new InvalidDataException($"A metafile states an extent of {maxX - minX} by {maxY - minY}, which cannot be drawn.");
 
     // The extent is in the picture's own units and the standard does not say how big one is unless
-    // the file states a scale, so one unit is one pixel and the whole thing is brought inside a
-    // sensible limit — which for a drawing keeps the shapes and only changes how finely they land.
+    // the file states a scale, so one unit is one pixel, and a picture too large for that is brought
+    // inside a sensible limit — which for a drawing keeps the shapes and only changes how finely
+    // they land.
+    //
+    // It is never enlarged. A metafile may carry a cell array, and that is a raster: enlarging it by
+    // a factor the extent happens to produce resamples the very pixels the file was written to hold,
+    // and at a factor that is not a whole number they cannot be got back.
     var width = maxX - minX;
     var height = maxY - minY;
-    var scale = Math.Min(_AbstractSideLimit / Math.Max(width, height), 4);
+    var scale = Math.Min(_AbstractSideLimit / Math.Max(width, height), 1);
 
     // The picture's y axis points up, as it does everywhere the standard is used, and the first row
     // of a raster is its top.
@@ -135,8 +140,66 @@ public static class CgmRenderer {
 
           break;
         }
+
+        case 9:
+          _CellArray(canvas, parameters, transform);
+          break;
       }
     }
+  }
+
+  /// <summary>Draws a cell array: a rectangular grid of colours placed by three of its corners.</summary>
+  /// <remarks>
+  /// The standard states the array by two diagonally opposite corners <c>P</c> and <c>Q</c> and a
+  /// third corner <c>R</c>. A row of cells runs from <c>P</c> towards <c>R</c> and the rows advance
+  /// from <c>R</c> towards <c>Q</c>, so the first cell stored is the one at <c>P</c> and the last is
+  /// the one at <c>Q</c>. That makes the grid a parallelogram rather than a rectangle where the two
+  /// directions are not perpendicular, which the placement handles because it is an affine map from
+  /// the cell grid onto the picture.
+  /// <para/>
+  /// In the binary encoding each row of cells starts on a word boundary, so a row of an odd number
+  /// of bytes is followed by one the parameter list does not otherwise account for. Reading straight
+  /// on through would shift every row after the first by a byte — a picture that leans, which is
+  /// exactly the fault a round trip against a writer making the same mistake would not show.
+  /// </remarks>
+  private static void _CellArray(VectorCanvas canvas, CgmParameters parameters, Matrix2D transform) {
+    var (px, py) = parameters.Point();
+    var (qx, qy) = parameters.Point();
+    var (rx, ry) = parameters.Point();
+    var nx = parameters.Integer();
+    var ny = parameters.Integer();
+    var precision = parameters.Integer();
+
+    if (nx < 1 || ny < 1 || (long)nx * ny > VectorCanvas.MaximumPixels)
+      throw new InvalidDataException($"A metafile states a cell array of {nx} by {ny} cells.");
+
+    var perCell = parameters.ColourSize(precision);
+    if (perCell < 1)
+      throw new InvalidDataException("A metafile states a cell array whose colours take no bytes at all.");
+
+    var pixels = new byte[nx * ny * 4];
+    for (var row = 0; row < ny; ++row) {
+      for (var column = 0; column < nx; ++column) {
+        if (parameters.Remaining < perCell)
+          throw new InvalidDataException($"A cell array of {nx} by {ny} runs out of colours at row {row}.");
+
+        var colour = parameters.Colour(precision);
+        var at = (row * nx + column) * 4;
+        pixels[at] = colour.R;
+        pixels[at + 1] = colour.G;
+        pixels[at + 2] = colour.B;
+        pixels[at + 3] = 255;
+      }
+
+      parameters.AlignToWord();
+    }
+
+    var image = new RawImage { Width = nx, Height = ny, Format = PixelFormat.Rgba32, PixelData = pixels };
+
+    // The cell grid's own coordinates onto the picture's: one step across is P to R over nx cells,
+    // one step down is R to Q over ny rows, and the grid's origin is P.
+    var placement = new Matrix2D((rx - px) / nx, (ry - py) / nx, (qx - rx) / ny, (qy - ry) / ny, px, py).Then(transform);
+    canvas.DrawImage(image, placement);
   }
 
   private static void _Apply(CgmCommand command, CgmState state) {

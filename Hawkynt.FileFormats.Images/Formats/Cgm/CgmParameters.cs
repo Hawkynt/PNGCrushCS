@@ -118,6 +118,33 @@ public sealed class CgmParameters(byte[] data, CgmState state) {
   /// <summary>Steps over the rest of the parameter list.</summary>
   public void Skip() => this._at = data.Length;
 
+  /// <summary>
+  /// A colour read at a precision the command states for itself rather than at the file's.
+  /// </summary>
+  /// <param name="precision">Bits a component or an index takes, or nought to use the file's.</param>
+  public Rgba32 Colour(int precision) {
+    if (!state.DirectColour)
+      return state.Lookup(this.Unsigned(precision > 0 ? precision : state.ColourIndexPrecision));
+
+    var bits = precision > 0 ? precision : state.ColourPrecision;
+    return new(state.Component(this.Unsigned(bits), 0), state.Component(this.Unsigned(bits), 1), state.Component(this.Unsigned(bits), 2));
+  }
+
+  /// <summary>How many bytes one colour takes at that precision.</summary>
+  public int ColourSize(int precision)
+    => state.DirectColour
+      ? 3 * ((precision > 0 ? precision : state.ColourPrecision) / 8)
+      : (precision > 0 ? precision : state.ColourIndexPrecision) / 8;
+
+  /// <summary>
+  /// Moves on to the next word boundary of the parameter list, which is where a cell array's next
+  /// row of cells begins.
+  /// </summary>
+  public void AlignToWord() {
+    if ((this._at & 1) != 0)
+      ++this._at;
+  }
+
   private int _Signed(int bits) {
     var value = this.Unsigned(bits);
     var sign = 1 << (bits - 1);

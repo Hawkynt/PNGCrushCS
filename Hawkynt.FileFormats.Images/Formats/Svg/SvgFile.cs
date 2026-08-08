@@ -18,14 +18,23 @@ namespace FileFormat.Svg;
 /// <c>viewBox</c>, and otherwise the box its own contents fall in, which is what a renderer has
 /// left when the file states nothing.
 /// <para/>
-/// What is not read: text, filters, markers, patterns, animation and raster images. Text needs
-/// fonts that are not in the file, and the rest change how a shape looks rather than where it is.
-/// A drawing that is nothing but text therefore comes out blank rather than wrong, and the four
-/// samples here that carry any have it as labelling on drawings that are otherwise geometry.
+/// A raster is read where the document carries one outright: an <c>image</c> whose <c>href</c> is a
+/// <c>data:</c> URI holding a PNG or a JPEG. One that names a file or a URL is not fetched — that
+/// would be a picture opening a network connection or reading a path somebody else chose — so its
+/// rectangle is left empty.
 /// <para/>
-/// It does not write.
+/// What is not read: text, filters, markers, patterns and animation. Text needs fonts that are not
+/// in the file, and the rest change how a shape looks rather than where it is. A drawing that is
+/// nothing but text therefore comes out blank rather than wrong, and the four samples here that
+/// carry any have it as labelling on drawings that are otherwise geometry.
+/// <para/>
+/// Writing embeds rather than traces. A picture goes out as one <c>image</c> element carrying it as
+/// a base64 PNG, at its own size, which is a conforming drawing that any renderer draws. Turning a
+/// bitmap into paths would put geometry into the file that the picture never had.
 /// </remarks>
-public readonly record struct SvgFile : IImageFormatReader<SvgFile>, IImageToRawImage<SvgFile> {
+public readonly record struct SvgFile
+  : IImageFormatReader<SvgFile>, IImageToRawImage<SvgFile>,
+    IImageFromRawImage<SvgFile>, IImageFormatWriter<SvgFile> {
 
   /// <summary>The namespace every conforming drawing puts its elements in.</summary>
   public const string Namespace = "http://www.w3.org/2000/svg";
@@ -33,6 +42,7 @@ public readonly record struct SvgFile : IImageFormatReader<SvgFile>, IImageToRaw
   static string IImageFormatMetadata<SvgFile>.PrimaryExtension => ".svg";
   static string[] IImageFormatMetadata<SvgFile>.FileExtensions => [".svg"];
   static SvgFile IImageFormatReader<SvgFile>.FromSpan(ReadOnlySpan<byte> data) => SvgReader.FromSpan(data);
+  static byte[] IImageFormatWriter<SvgFile>.ToBytes(SvgFile file) => SvgWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<SvgFile>.VideoModes => [
     new("Drawing", [(IntegerRange.Any, IntegerRange.Any)], [16777216])
   ];
@@ -44,4 +54,10 @@ public readonly record struct SvgFile : IImageFormatReader<SvgFile>, IImageToRaw
   public XElement Root => this.Document?.Root ?? throw new InvalidOperationException("No document was read.");
 
   public static RawImage ToRawImage(SvgFile file) => SvgRenderer.Render(file);
+
+  /// <summary>A drawing that holds this picture, at its own size, as an embedded PNG.</summary>
+  public static SvgFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    return new() { Document = SvgWriter.Document(image.Width, image.Height, SvgDataUri.EncodePng(image)) };
+  }
 }

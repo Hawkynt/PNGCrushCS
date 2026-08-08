@@ -112,6 +112,78 @@ public sealed class VectorCanvas {
     this.Fill(outline, FillRule.NonZero, paint, null, mask);
   }
 
+  /// <summary>Paints a raster picture onto the surface through a transform.</summary>
+  /// <param name="image">The picture to place.</param>
+  /// <param name="placement">
+  /// Maps the picture's own pixel grid — nought to its width across and nought to its height down —
+  /// onto the surface.
+  /// </param>
+  /// <param name="mask">What the picture is allowed to reach, or null for the whole surface.</param>
+  /// <remarks>
+  /// Several of these drawing formats can carry a raster inside them: SVG has an <c>image</c>
+  /// element, CGM a cell array, GEM a raster opcode. Each is a rectangle of pixels placed by a
+  /// transform, so one blit serves all three.
+  /// <para/>
+  /// The surface is walked rather than the picture, and each of its pixels asks which pixel of the
+  /// picture landed there. Walking the picture instead and marking where each of its pixels goes
+  /// leaves holes wherever the placement enlarges — the same picture, with a grid of the background
+  /// showing through it.
+  /// <para/>
+  /// Nearest neighbour. What is placed is usually the whole point of the file rather than a detail
+  /// of it, and at one pixel to one it comes out exactly as it went in; smoothing would soften a
+  /// picture that was meant to arrive unchanged.
+  /// </remarks>
+  public void DrawImage(RawImage image, Matrix2D placement, VectorMask? mask = null) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width < 1 || image.Height < 1)
+      return;
+
+    var inverse = placement.Inverse;
+    if (inverse == null)
+      return;
+
+    var source = image.Format == PixelFormat.Rgba32 ? image : PixelConverter.Convert(image, PixelFormat.Rgba32);
+
+    // The device box the placed rectangle falls in, which is where there is anything to draw.
+    double minX = double.MaxValue, minY = double.MaxValue, maxX = double.MinValue, maxY = double.MinValue;
+    foreach (var (cornerX, cornerY) in new[] { (0.0, 0.0), (image.Width, 0.0), (0.0, (double)image.Height), ((double)image.Width, (double)image.Height) }) {
+      var (x, y) = placement.Apply(cornerX, cornerY);
+      minX = Math.Min(minX, x);
+      minY = Math.Min(minY, y);
+      maxX = Math.Max(maxX, x);
+      maxY = Math.Max(maxY, y);
+    }
+
+    var left = Math.Max(0, (int)Math.Floor(minX));
+    var top = Math.Max(0, (int)Math.Floor(minY));
+    var right = Math.Min(this.Width - 1, (int)Math.Ceiling(maxX));
+    var bottom = Math.Min(this.Height - 1, (int)Math.Ceiling(maxY));
+
+    for (var y = top; y <= bottom; ++y)
+      for (var x = left; x <= right; ++x) {
+        var (u, v) = inverse.Value.Apply(x + 0.5, y + 0.5);
+        var sourceX = (int)Math.Floor(u);
+        var sourceY = (int)Math.Floor(v);
+        if (sourceX < 0 || sourceY < 0 || sourceX >= image.Width || sourceY >= image.Height)
+          continue;
+
+        var at = (y * this.Width + x);
+        var alpha = source.PixelData[(sourceY * image.Width + sourceX) * 4 + 3] / 255f;
+        if (mask != null)
+          alpha *= mask.Coverage[at] / 255f;
+
+        if (alpha <= 0)
+          continue;
+
+        var from = (sourceY * image.Width + sourceX) * 4;
+        var keep = 1 - alpha;
+        this._red[at] = this._red[at] * keep + source.PixelData[from] / 255f * alpha;
+        this._green[at] = this._green[at] * keep + source.PixelData[from + 1] / 255f * alpha;
+        this._blue[at] = this._blue[at] * keep + source.PixelData[from + 2] / 255f * alpha;
+        this._alpha[at] = this._alpha[at] * keep + alpha;
+      }
+  }
+
   /// <summary>
   /// The coverage of a path, as a mask that later fills can be confined to.
   /// </summary>

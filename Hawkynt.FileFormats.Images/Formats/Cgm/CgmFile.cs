@@ -26,13 +26,26 @@ namespace FileFormat.Cgm;
 /// are refused rather than half read. They are different grammars, not variations, and a file in
 /// either of them opens with something this would misread.
 /// <para/>
-/// Text is not drawn: the fonts a metafile names are not in it. It does not write.
+/// A raster is drawn where the file carries one: the cell array element, which is the standard's own
+/// way of putting a grid of colours into a metafile.
+/// <para/>
+/// Text is not drawn: the fonts a metafile names are not in it.
+/// <para/>
+/// Writing embeds rather than traces. A picture goes out as one cell array of one cell to the pixel,
+/// at an extent that is the picture's own size, because turning a bitmap into paths would put
+/// geometry into the file that the picture never had. Nothing outside this project reads a binary
+/// metafile on the machine this was built on, so what stands behind the encoding is a second
+/// decoder written from the standard rather than from this code, and the corners are placed by the
+/// standard's own rule: a row runs from P towards R and the rows advance from R towards Q.
 /// </remarks>
-public readonly record struct CgmFile : IImageFormatReader<CgmFile>, IImageToRawImage<CgmFile> {
+public readonly record struct CgmFile
+  : IImageFormatReader<CgmFile>, IImageToRawImage<CgmFile>,
+    IImageFromRawImage<CgmFile>, IImageFormatWriter<CgmFile> {
 
   static string IImageFormatMetadata<CgmFile>.PrimaryExtension => ".cgm";
   static string[] IImageFormatMetadata<CgmFile>.FileExtensions => [".cgm"];
   static CgmFile IImageFormatReader<CgmFile>.FromSpan(ReadOnlySpan<byte> data) => CgmReader.FromSpan(data);
+  static byte[] IImageFormatWriter<CgmFile>.ToBytes(CgmFile file) => CgmWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<CgmFile>.VideoModes => [
     new("Picture", [(IntegerRange.Any, IntegerRange.Any)], [16777216])
   ];
@@ -54,6 +67,15 @@ public readonly record struct CgmFile : IImageFormatReader<CgmFile>, IImageToRaw
   public string? Name { get; init; }
 
   public static RawImage ToRawImage(CgmFile file) => CgmRenderer.Render(file);
+
+  /// <summary>A metafile holding this picture as a cell array, one cell to the pixel.</summary>
+  public static CgmFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    return new() { Commands = CgmWriter.Picture(image, DefaultName), Name = DefaultName };
+  }
+
+  /// <summary>What a metafile written here calls itself.</summary>
+  private const string DefaultName = "picture";
 }
 
 /// <summary>One command: what it is and the bytes of its parameter list.</summary>

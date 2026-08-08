@@ -184,7 +184,60 @@ public static class SvgRenderer {
       case "polygon":
         _Paint(context, _Points(element, local, name == "polygon"), element, style, local, ownClip, name == "polygon");
         return;
+
+      case "image":
+        _DrawImage(element, context, local, ownClip);
+        return;
     }
+  }
+
+  /// <summary>Draws an <c>image</c> whose source is a data URI.</summary>
+  /// <remarks>
+  /// Only a data URI. An <c>image</c> that names a file or a URL is a reference to something that is
+  /// not in the document, and fetching it would mean a picture opening a network connection or
+  /// reading a path of somebody else's choosing; a renderer that did that would be a worse thing
+  /// than one that leaves the rectangle empty.
+  /// </remarks>
+  private static void _DrawImage(XElement element, Context context, Matrix2D transform, VectorMask? clip) {
+    var href = element.Attribute("href")?.Value ?? element.Attribute("{http://www.w3.org/1999/xlink}href")?.Value;
+    var picture = SvgDataUri.Decode(href);
+    if (picture == null)
+      return;
+
+    SvgLength.TryPixels(element.Attribute("x")?.Value, 0, out var x);
+    SvgLength.TryPixels(element.Attribute("y")?.Value, 0, out var y);
+
+    // With no width or height the element is the picture's own size, which is what the
+    // specification says for a raster whose intrinsic size is known.
+    var hasWidth = SvgLength.TryPixels(element.Attribute("width")?.Value, 0, out var width) && width > 0;
+    var hasHeight = SvgLength.TryPixels(element.Attribute("height")?.Value, 0, out var height) && height > 0;
+    if (!hasWidth)
+      width = picture.Width;
+    if (!hasHeight)
+      height = picture.Height;
+
+    if (width <= 0 || height <= 0)
+      return;
+
+    var box = new double[] { 0, 0, picture.Width, picture.Height };
+    var placement = _FitBox(box, width, height, element.Attribute("preserveAspectRatio")?.Value)
+      .Then(Matrix2D.Translation(x, y))
+      .Then(transform);
+
+    if (context.Measuring) {
+      var area = new VectorPath();
+      var corners = new[] { (0.0, 0.0), ((double)picture.Width, 0.0), ((double)picture.Width, (double)picture.Height), (0.0, (double)picture.Height) };
+      var xs = new double[4];
+      var ys = new double[4];
+      for (var i = 0; i < 4; ++i)
+        (xs[i], ys[i]) = placement.Apply(corners[i].Item1, corners[i].Item2);
+
+      area.AddPolygon(xs, ys);
+      context.Note(area, 0);
+      return;
+    }
+
+    context.Canvas!.DrawImage(picture, placement, clip);
   }
 
   private static void _DrawUse(XElement element, Context context, Matrix2D transform, SvgPresentation style, VectorMask? clip, int depth) {
