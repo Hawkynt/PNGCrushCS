@@ -15,7 +15,8 @@ namespace FileFormat.SamCoupeLce;
 /// in the file that says how long either of them is.
 /// </remarks>
 public readonly record struct SamCoupeLceFile
-  : IImageFormatReader<SamCoupeLceFile>, IImageToRawImage<SamCoupeLceFile> {
+  : IImageFormatReader<SamCoupeLceFile>, IImageToRawImage<SamCoupeLceFile>,
+    IImageFromRawImage<SamCoupeLceFile>, IImageFormatWriter<SamCoupeLceFile> {
 
   /// <summary>Pixels one screen stores per row.</summary>
   public const int StoredWidth = 256;
@@ -51,6 +52,8 @@ public readonly record struct SamCoupeLceFile
   static string[] IImageFormatMetadata<SamCoupeLceFile>.FileExtensions => [".lce"];
   static SamCoupeLceFile IImageFormatReader<SamCoupeLceFile>.FromSpan(ReadOnlySpan<byte> data)
     => SamCoupeLceReader.FromSpan(data);
+  static byte[] IImageFormatWriter<SamCoupeLceFile>.ToBytes(SamCoupeLceFile file)
+    => SamCoupeLceWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<SamCoupeLceFile>.VideoModes => [
     new("Interlaced", [(Width, Height)], [PaletteSize * 2])
   ];
@@ -70,6 +73,78 @@ public readonly record struct SamCoupeLceFile
     _RenderScreen(data, file.SecondScreenOffset, rgb, 1);
 
     return new() { Width = Width, Height = Height, Format = PixelFormat.Rgb24, PixelData = rgb };
+  }
+
+  /// <summary>Bytes one screen occupies: its bitmap, its palette, and an interrupt list of nothing.</summary>
+  public const int ScreenSize = InterruptOffset + 1;
+
+  /// <summary>Offset of a screen's palette, relative to the screen's start.</summary>
+  public const int PaletteOffset = InterruptOffset - PaletteToInterruptGap;
+
+  /// <summary>
+  /// Builds an interlaced picture from any image, sampling it to the 512x384 the pair displays.
+  /// </summary>
+  /// <remarks>
+  /// The two screens do not blend: one owns the even scanlines and the other the odd ones. So they
+  /// are not two attempts at the same picture but two halves of one, and each is reduced to sixteen
+  /// colours on its own — which is where the format's thirty-two come from, and why reducing the
+  /// whole picture once and sharing the result would throw half of them away.
+  /// <para/>
+  /// Neither screen is given any line interrupts. An interrupt rewrites one palette entry part-way
+  /// down the screen, which would let a screen show more than its sixteen; deciding where to put one
+  /// means deciding which entry the picture can most afford to change and where, and a picture that
+  /// wanted the extra colours has no way of saying so. The lists are written empty, which is a
+  /// terminator and nothing else, and that is what fixes where the second screen begins.
+  /// </remarks>
+  public static SamCoupeLceFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var sampled = image.SampleTo(Width, Height).EnsureFormat(PixelFormat.Rgb24);
+    var data = new byte[ScreenSize * 2];
+    data[InterruptOffset] = InterruptTerminator;
+    data[ScreenSize + InterruptOffset] = InterruptTerminator;
+
+    for (var parity = 0; parity < 2; ++parity)
+      _EncodeScreen(sampled.PixelData, data, ScreenSize * parity, parity);
+
+    return new() { Data = data, SecondScreenOffset = ScreenSize };
+  }
+
+  /// <summary>Reduces the scanlines of one parity to sixteen colours and stores them as mode 4.</summary>
+  private static void _EncodeScreen(ReadOnlySpan<byte> rgb, byte[] data, int screen, int parity) {
+    var field = new byte[StoredWidth * StoredHeight * 3];
+
+    for (var y = 0; y < StoredHeight; ++y)
+    for (var x = 0; x < StoredWidth; ++x) {
+      // Every stored pixel is drawn two screen pixels wide, so both have a say in its colour.
+      var left = ((y * 2 + parity) * Width + x * 2) * 3;
+      var target = (y * StoredWidth + x) * 3;
+      for (var channel = 0; channel < 3; ++channel)
+        field[target + channel] = (byte)((rgb[left + channel] + rgb[left + channel + 3]) / 2);
+    }
+
+    var source = new RawImage {
+      Width = StoredWidth, Height = StoredHeight, Format = PixelFormat.Rgb24, PixelData = field,
+    };
+    var reduced = source.EnsureIndexedAtMost(PaletteSize);
+    var palette = reduced.Palette ?? [];
+
+    var stored = data.AsSpan(screen + PaletteOffset, PaletteSize);
+    for (var i = 0; i < PaletteSize; ++i) {
+      var entry = i * 3;
+      stored[i] = entry + 2 < palette.Length
+        ? SamCoupePalette.FromRgb(palette[entry], palette[entry + 1], palette[entry + 2])
+        : (byte)0;
+    }
+
+    var indices = source.EnsureIndexed(PixelFormat.Indexed8, SamCoupePalette.ToRgbTriplets(stored)).PixelData;
+
+    for (var y = 0; y < StoredHeight; ++y)
+    for (var x = 0; x < StoredWidth; ++x) {
+      // Mode 4 is four bits a pixel, high half of a byte first.
+      var index = indices[y * StoredWidth + x] & 15;
+      data[screen + (y << 7) + (x >> 1)] |= (byte)((x & 1) == 0 ? index << 4 : index);
+    }
   }
 
   /// <summary>Draws one screen onto every second scanline.</summary>

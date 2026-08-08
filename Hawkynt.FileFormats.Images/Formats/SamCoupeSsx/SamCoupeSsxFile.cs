@@ -17,7 +17,8 @@ namespace FileFormat.SamCoupeSsx;
 /// a program produced when it rendered rather than displayed.
 /// </remarks>
 public readonly record struct SamCoupeSsxFile
-  : IImageFormatReader<SamCoupeSsxFile>, IImageToRawImage<SamCoupeSsxFile> {
+  : IImageFormatReader<SamCoupeSsxFile>, IImageToRawImage<SamCoupeSsxFile>,
+    IImageFromRawImage<SamCoupeSsxFile>, IImageFormatWriter<SamCoupeSsxFile> {
 
   /// <summary>Rows every form stores.</summary>
   public const int StoredRows = 192;
@@ -41,6 +42,8 @@ public readonly record struct SamCoupeSsxFile
   static string[] IImageFormatMetadata<SamCoupeSsxFile>.FileExtensions => [".ssx"];
   static SamCoupeSsxFile IImageFormatReader<SamCoupeSsxFile>.FromSpan(ReadOnlySpan<byte> data)
     => SamCoupeSsxReader.FromSpan(data);
+  static byte[] IImageFormatWriter<SamCoupeSsxFile>.ToBytes(SamCoupeSsxFile file)
+    => SamCoupeSsxWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<SamCoupeSsxFile>.VideoModes => [
     new("Modes 1, 2 and 4", [(256, StoredRows)], [16]),
     new("Mode 3", [(512, StoredRows * 2)], [4]),
@@ -61,6 +64,53 @@ public readonly record struct SamCoupeSsxFile
       Mode4Size => _Nibbles(data),
       _ => _Doubled(data, _FullPalette(), 128, (y, x) => data[(y << 9) + x]),
     };
+  }
+
+  /// <summary>Pixels a mode 4 row stores, at four bits each.</summary>
+  public const int Mode4Width = 256;
+
+  /// <summary>Where a mode 4 dump's palette sits, the bitmap ending exactly there.</summary>
+  public const int Mode4PaletteOffset = Mode4Width / 2 * StoredRows;
+
+  /// <summary>
+  /// Builds a screen dump from any image, sampling it to the 256x192 of mode 4.
+  /// </summary>
+  /// <remarks>
+  /// Mode 4 of the four, and the reason is that nothing in a dump says which mode it is — only the
+  /// length does, so writing one means choosing a mode and then producing exactly its length. Of the
+  /// four, mode 4 is the only one with no constraint beyond its palette: modes 1 and 2 inherit the
+  /// Spectrum's attribute byte and can show two colours per cell or per scanline, and mode 3 spends
+  /// its extra width on having four colours in total. Mode 4 gives every pixel its own choice of all
+  /// sixteen.
+  /// </remarks>
+  public static SamCoupeSsxFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var sampled = image.SampleTo(Mode4Width, StoredRows);
+    var reduced = sampled.EnsureIndexedAtMost(SamCoupePalette.EntryCount);
+    var data = new byte[Mode4Size];
+
+    // The palette is snapped to what the hardware can make and the pixels then mapped onto that,
+    // so the indices address the colours the file will be read back as.
+    var stored = data.AsSpan(Mode4PaletteOffset, SamCoupePalette.EntryCount);
+    var palette = reduced.Palette ?? [];
+    for (var i = 0; i < SamCoupePalette.EntryCount; ++i) {
+      var entry = i * 3;
+      stored[i] = entry + 2 < palette.Length
+        ? SamCoupePalette.FromRgb(palette[entry], palette[entry + 1], palette[entry + 2])
+        : (byte)0;
+    }
+
+    var indices = sampled.EnsureIndexed(PixelFormat.Indexed8, SamCoupePalette.ToRgbTriplets(stored)).PixelData;
+
+    for (var y = 0; y < StoredRows; ++y)
+    for (var x = 0; x < Mode4Width; ++x) {
+      // Four bits a pixel, the left one in the high half of a byte.
+      var index = indices[y * Mode4Width + x] & 15;
+      data[y * (Mode4Width / 2) + (x >> 1)] |= (byte)((x & 1) == 0 ? index << 4 : index);
+    }
+
+    return new() { Data = data };
   }
 
   /// <summary>All 128 colours the hardware can make, for a dump that names them directly.</summary>
