@@ -11,7 +11,7 @@ something up and are correct as they stand.
 **197 distinct extensions across 176 of its format names** when this was written. A few extensions
 are claimed by more than one of its names, so the rows below add up to more than that.
 
-**Forty are closed now and 136 remain.** Eight of the fifteen turned out to be one thing — a
+**Sixty-seven are closed now and 109 remain.** Eight of the fifteen turned out to be one thing — a
 Windows DIB preview dropped inside a drawing or project file — and are read by a single reader
 rather than eight. IBM KIPS, the X11 puzzle, Synu and the Zoner brush were four more. The last three
 are wrappers around a picture format already here: ECC carries a PNG, LView Pro and IPSM each carry
@@ -40,6 +40,113 @@ been measured about them, so it does not have to be measured again:
 The pattern that closed `ecc`, `lvp` and `pan` is the one to try first on the rest: find whether the
 file carries a picture format already here, and if it does, require the header's stated size to agree
 with the payload's own before drawing it.
+
+### Names that belonged to a format already here
+
+XnView's catalogue pairs a format name with the extensions that name reads, so where it names a
+format this library already reads and gives an extension nothing here claims, claiming it closes the
+row honestly — provided the reader would still refuse a file of some other format arriving under
+that name. Seven were claimed on that test and three were declined on it.
+
+  - `iff` wants `.blk`, which is an Amiga IFF bitmap under a name of its own. Claimed: the reader
+    requires the group identifier and the form type before it reads anything.
+  - `sct` wants `.ch`, `pspf` wants `.pfr`, `pmsk` wants `.msk` and `pspt` wants `.tex`. All four
+    are claimed: Scitex CT is identified by two characters at offset 80 and Paint Shop Pro by the
+    eight-byte string it opens with, so a font resource or a game texture under one of those names
+    is refused rather than drawn.
+  - `avs` wants `.mbfavs` and `.mbfs`. Claimed: an AVS raster has no signature at all, but its two
+    lengths have to account for the file to the byte, which a foreign file does not do.
+  - `hpgl` wants `.prn` and `.prt`, the names a driver gives a job printed to a file. Claimed
+    because the parse decides, not the name: it requires an instruction that moves the pen and says
+    where to, and all five PostScript samples here are refused by it.
+  - `cloe` wants `.cloe`, which is the long name of the format read here as `.clo`. Claimed, after
+    taking out of the reader the part that invented 320 by 200 whenever the header stated no size —
+    which meant any file long enough was drawn as a picture of a size it never claimed.
+
+Declined, and why:
+
+  - `bfli` wants `.flp`. The BFLI reader validates nothing but the file's length, and it can be
+    shown to: handed the IOCA sample in this corpus it reports a 320 by 200 picture. Claiming
+    `.flp` would draw whatever was under that name.
+  - `ioca` wants `.mod`. Worse — the IOCA reader falls back to reading the first four bytes of
+    anything at all as a width and a height. `.mod` is an Amiga music module as often as anything
+    else, and every one of them would be drawn.
+  - `eps` wants `.ps`. The EPS reader here reads the DOS binary wrapper and the TIFF preview inside
+    it; plain PostScript is a language and it refuses all five `.ps` samples in the corpus. Claiming
+    the name would add an extension that is never actually read, which is not coverage.
+
+Three more were looked at and left: `aim` wants `.ima`, but the reader's "AIM\0" signature is not
+sourced from anything and there is no sample, so the claim could not be shown to read a real file;
+`icd` wants `.idc` and `pixi` wants `.pxb`, and neither is the format the similarly-named reader
+here actually reads.
+
+### The formats that had samples, read
+
+  - `.b3d` is Maxon BodyPaint 3D, `AC4DBody` and then a tagged value stream with no length on any
+    record. All ten distinct samples walk from the signature to the end of the file exactly with no
+    tag unaccounted for, and every one of their 32,400 scanlines unpacks to exactly the width the
+    header states. A second decoder written separately agrees with this one on every pixel of all
+    ten. Files with a layer carry the same bitmap twice and one carries a layer with no pixels at
+    all, so the picture taken is the first that has scanlines and is the size the header states.
+  - `.cam` is a Casio QV camera. One container for both generations: four bytes, a count of areas,
+    a descriptor each, and the areas end to end. The later cameras store a whole JFIF, which is
+    handed over untouched; the QV-10 stores a JPEG with the markers, the frame and the Huffman
+    tables taken out, and those are put back from `cam2jpgtab.h` in itojun's `qvplay`, which is the
+    published reference. The quantisation tables are not reconstructed — only their segment headers
+    are constant and the values come out of the file. All four reconstructions match ImageMagick's
+    decode of the same stream exactly.
+  - Reading them found a real fault in the JPEG decoder. A scan naming one component is not
+    interleaved and its minimum coded unit is a single block, but the baseline decoder read every
+    scan on the frame's interleaved grid — so a three-by-two picture had six blocks read where one
+    was written and the bit reader was lost from the first block on. Nothing had noticed because
+    every ordinary JPEG interleaves.
+  - `.ssp` is an Axialis screensaver project and `.php` an Adobe PhotoParade album, and both hold
+    several pictures. Neither is read by finding the first signature, which in every one of the
+    nineteen samples would return a background tile, a theme backdrop or a thumbnail. The project
+    states each picture's length immediately in front of it and that length has to be the one the
+    picture's own framing gives; the album describes each photograph in a block standing directly
+    behind it, so a photograph is the JPEG whose markers run out exactly where the next block
+    begins. The album's own count of photographs agrees with the number of blocks in all seven.
+  - `.sim` was reported as a small gap in the PC Paint reader. It was not: byte 10 was being read as
+    a count of planes and byte 11 as a depth, where the format packs both into byte 10 and uses byte
+    11 as a version flag of 0FFh — which is why the sample was refused for having a depth of 255.
+    The two words behind that were being read as an aspect ratio the format has no field for, and
+    the compressed data as bare count-and-value pairs where it is really blocks with their own
+    headers and a marker byte saying which byte introduces a run. Read as written, the sample
+    accounts for itself three times over and comes out as a legible line of text, the right way up
+    once the rows are taken from the bottom of the picture upwards.
+
+### Measured and left, so it need not be measured again
+
+  - `.pp5` is Micrografx Picture Publisher 5 and it settles: `PPUBII`, a canvas size, then a chain
+    of objects each of which is a 106-byte header, a length, and a little-endian TIFF whose
+    compression tag 213 is plain zlib. Walking that consumes the one sample to the byte and every
+    strip decompresses to exactly its own width times height times samples. The catch is that the
+    base image is blank white and the picture is in four layers with 8-bit masks at stated origins,
+    so a reader that returns the base image returns an empty rectangle — it needs compositing, and
+    there is one sample to check that against.
+  - `.92i` settles too, but it is not the container `TiPictureReader` already reads: the TI-92 has a
+    directory of named entries at absolute offsets where the TI-82 and its siblings have a flat run.
+    Both entries in the one sample are 127 by 63, plain 1bpp — the remark in `TiPictureFile` that
+    these are compressed is wrong. `.73i` is the container already read here with a different width,
+    but its picture type byte could not be confirmed from any source and there is no sample, so the
+    `ti` row cannot be closed on `.92i` alone.
+  - `.tex` under XnView's `pspt` name is a Paint Shop Pro texture, which none of the five samples
+    here is. Four are Croteam Serious Engine textures and three of those settle exactly — the
+    header's width and height are in world units and the pixel size is that shifted right by the
+    first mip level, which reproduces every byte count. The fourth uses a `FRMC` block that does not
+    appear in the released engine source at all, and the fifth is a `TDIPLOOM` document that cannot
+    be shown to hold a raster.
+  - `.ypc` is WhyPic, and its specification and reference source were found — the distribution's own
+    `SAMPLE.YPC` is byte-identical to the corpus sample. It is not a header-and-unpack format: every
+    byte past the fourth is arithmetic-coded against eight interpolated probability models. It is a
+    project rather than a patch, and the reference source is GPL, so it would have to be written
+    from the format document rather than ported.
+  - `.frm` is not one format and mostly not pictures: sixteen of the samples are EZ-Forms form
+    definitions, six are character-cell templates, one is an unidentified object format and one is a
+    JPEG under the wrong name. There is no raster `.frm` here to implement.
+  - `.lwf` is LuraWave. No description of its subband coding has ever been published and the
+    decoder was licensed as a binary. This one is not worth further effort.
 
 ### The corpus was the limit, and it need not have been
 
@@ -122,13 +229,13 @@ Windows only, so nothing here has ever been able to compare against them either.
 | aim | .ima |  |
 | ami | .[b] |  |
 | anv | .anv |  |
-| aphp | .php |  |
+| aphp | .php | every photograph read, not the theme artwork |
 | apx | .apx |  |
 | arf | .arf |  |
 | arn | .arn |  |
-| aurora | .sim |  |
-| avs | .mbfavs .mbfs .x |  |
-| b3d | .b3d |  |
+| aurora | .sim | read; it is a Pictor page and the reader of those was wrong |
+| avs | .mbfavs .mbfs .x | read |
+| b3d | .b3d | read |
 | bfli | .flp |  |
 | bias | .flt .msk |  |
 | bif | .bif |  |
@@ -139,14 +246,14 @@ Windows only, so nothing here has ever been able to compare against them either.
 | bpr | .bpr |  |
 | btn | .btn |  |
 | bum | .bum |  |
-| cam | .cam |  |
+| cam | .cam | read, both camera generations |
 | car | .car |  |
 | cat | .cat |  |
 | cbmf | .bmf |  |
 | cdr | .cdr |  |
 | cft | .ctf |  |
 | cgm | .cgm | binary encoding read; character and clear-text refused |
-| cloe | .cloe |  |
+| cloe | .cloe | read |
 | cmt | .cmt |  |
 | cmx | .cmx |  |
 | cncd | .ncd |  |
@@ -180,7 +287,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | hta | .hta |  |
 | icd | .idc |  |
 | icon | .pr |  |
-| iff | .blk |  |
+| iff | .blk | read |
 | iimg | .iimg |  |
 | imi | .imi |  |
 | imt | .imt |  |
@@ -225,7 +332,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | pixi | .pxb |  |
 | pixp | .i17 .i18 .ib7 .if9 |  |
 | pmp | .pmp |  |
-| pmsk | .msk |  |
+| pmsk | .msk | read by the Paint Shop Pro reader |
 | pp4 | .pp4 |  |
 | pp5 | .pp5 |  |
 | pps | .pps |  |
@@ -236,9 +343,9 @@ Windows only, so nothing here has ever been able to compare against them either.
 | ps | .prn .ps .ps1 .ps2 .ps3 |  |
 | pseg | .pse |  |
 | pspb | .pspbrush |  |
-| pspf | .pfr .pspframe |  |
+| pspf | .pfr .pspframe | read by the Paint Shop Pro reader |
 | pspm | .pspmask |  |
-| pspt | .tex |  |
+| pspt | .tex | read by the Paint Shop Pro reader |
 | pwc | .pwc | Windows only |
 | pxa | .pxa |  |
 | pzl | .pzl |  |
@@ -247,7 +354,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | raw | .grey .gry |  |
 | rfax | .001 |  |
 | rix | .sc? |  |
-| sct | .ch |  |
+| sct | .ch | read by the Scitex CT reader |
 | sdg | .sdg |  |
 | sfax | .001 |  |
 | sid | .sid | Windows only |
@@ -255,7 +362,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | skn | .skn |  |
 | smp | .smp |  |
 | ssi | .ssi |  |
-| ssp | .ssp |  |
+| ssp | .ssp | every embedded picture read, not the first |
 | stm | .stm |  |
 | stw | .stw |  |
 | svg | .svg | read |
