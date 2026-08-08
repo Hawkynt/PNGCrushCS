@@ -41,6 +41,23 @@ The pattern that closed `ecc`, `lvp` and `pan` is the one to try first on the re
 file carries a picture format already here, and if it does, require the header's stated size to agree
 with the payload's own before drawing it.
 
+### The corpus was the limit, and it need not have been
+
+Most of what is above was written as though the missing names had no samples. That was true of what
+was on this machine and not true of what could be had: the sample archive `fetch-samples.sh` already
+points at carries files for a third of them. Sweeping its 843 directories for the extensions listed
+here returned **483 files across 63 of the missing extensions** — `gem`, `fif`, `frm`, `mix`, `wzl`,
+`cat`, `svg`, `eri`, `dwg`, `prf`, `lwi`, `cgm`, `ssp`, `ai`, `afx`, `wi`, `pdd`, `jig`, `sid`,
+`pxa`, `pst`, `b3d`, `tile`, `ibg`, `xar`, `crw`, `k25`, `mrw`, `x3f` and more, several of them with
+a dozen or more samples each.
+
+Several samples of one format is worth more than one: a field constant across all of them is
+structure, and one that varies with the picture is a dimension. That is a stronger position than
+most of the formats already read here were settled from.
+
+Of the 63, eight or so are vector — `svg`, `ai`, `ps`, `cgm`, `dwg`, `hpgl`, `xar`, `gem` — and want
+a rasteriser rather than a layout, which is a different kind of work and not attempted here.
+
 The last column marks the ones XnView itself cannot load on this platform: its catalogue says
 Windows only, so nothing here has ever been able to compare against them either.
 
