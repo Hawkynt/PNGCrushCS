@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Ps2Txc;
 
 /// <summary>In-memory representation of a PS2 TXC texture image.</summary>
-public readonly record struct Ps2TxcFile : IImageFormatReader<Ps2TxcFile>, IImageToRawImage<Ps2TxcFile>, IImageFormatWriter<Ps2TxcFile> {
+public readonly record struct Ps2TxcFile : IImageFormatReader<Ps2TxcFile>, IImageToRawImage<Ps2TxcFile>, IImageFromRawImage<Ps2TxcFile>, IImageFormatWriter<Ps2TxcFile> {
 
   static string IImageFormatMetadata<Ps2TxcFile>.PrimaryExtension => ".txc";
   static string[] IImageFormatMetadata<Ps2TxcFile>.FileExtensions => [".txc"];
@@ -70,6 +70,27 @@ public readonly record struct Ps2TxcFile : IImageFormatReader<Ps2TxcFile>, IImag
       Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
+    };
+  }
+
+  /// <summary>Creates a TXC texture from a platform-independent <see cref="RawImage"/>.</summary>
+  /// <remarks>
+  /// The header carries the size and the depth, so any size fits. Twenty-four bits is the depth
+  /// chosen because it is the one the decoder takes byte for byte — sixteen would quantise the
+  /// channels to 5-6-5 and thirty-two would spend a byte a pixel on an alpha channel nothing here
+  /// reads back.
+  /// </remarks>
+  public static Ps2TxcFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var source = image.EnsureFormat(PixelFormat.Rgb24);
+
+    return new() {
+      Width = source.Width,
+      Height = source.Height,
+      BitsPerPixel = 24,
+      Flags = 0,
+      PixelData = source.PixelData[..(source.Width * source.Height * 3)],
     };
   }
 

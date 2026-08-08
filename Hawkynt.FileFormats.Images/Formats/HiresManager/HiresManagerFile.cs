@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.HiresManager;
 
 /// <summary>In-memory representation of a C64 Hires Manager by Cosmos (.him) image.</summary>
-public readonly record struct HiresManagerFile : IImageFormatReader<HiresManagerFile>, IImageToRawImage<HiresManagerFile>, IImageFormatWriter<HiresManagerFile> {
+public readonly record struct HiresManagerFile : IImageFormatReader<HiresManagerFile>, IImageToRawImage<HiresManagerFile>, IImageFromRawImage<HiresManagerFile>, IImageFormatWriter<HiresManagerFile> {
 
   static string IImageFormatMetadata<HiresManagerFile>.PrimaryExtension => ".him";
   static string[] IImageFormatMetadata<HiresManagerFile>.FileExtensions => [".him"];
@@ -83,6 +83,24 @@ public readonly record struct HiresManagerFile : IImageFormatReader<HiresManager
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
     };
+  }
+
+  /// <summary>Builds a Hires Manager screen, choosing two of the machine's colours per character cell.</summary>
+  /// <remarks>
+  /// The screen is 320 by 200 and nothing in the file says otherwise, so a picture of another size
+  /// is brought to that one. The payload is the bitmap followed by the video matrix, which is what
+  /// a real one holds behind its <c>$4000</c> load address.
+  /// </remarks>
+  public static HiresManagerFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(FixedWidth, FixedHeight);
+    var payload = new byte[MinPayloadSize];
+    Commodore64Graphics.EncodeHires(
+      rgb.PixelData, FixedWidth, FixedHeight,
+      payload.AsSpan(0, BitmapDataSize), payload.AsSpan(BitmapDataSize, ScreenRamSize));
+
+    return new() { LoadAddress = 0x4000, RawData = payload };
   }
 
 }

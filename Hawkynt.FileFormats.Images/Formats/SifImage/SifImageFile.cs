@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.SifImage;
 
 /// <summary>In-memory representation of a SIF image.</summary>
-public readonly record struct SifImageFile : IImageFormatReader<SifImageFile>, IImageToRawImage<SifImageFile>, IImageFormatWriter<SifImageFile> {
+public readonly record struct SifImageFile : IImageFormatReader<SifImageFile>, IImageToRawImage<SifImageFile>, IImageFromRawImage<SifImageFile>, IImageFormatWriter<SifImageFile> {
 
   static string IImageFormatMetadata<SifImageFile>.PrimaryExtension => ".sif";
   static string[] IImageFormatMetadata<SifImageFile>.FileExtensions => [".sif"];
@@ -39,6 +39,24 @@ public readonly record struct SifImageFile : IImageFormatReader<SifImageFile>, I
       Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = file.PixelData[..],
+    };
+  }
+
+  /// <summary>Creates a SIF image from a platform-independent <see cref="RawImage"/>.</summary>
+  /// <remarks>
+  /// The header carries the dimensions, so any size fits; the pixels follow it as three bytes each,
+  /// which is what the reader hands straight out.
+  /// </remarks>
+  public static SifImageFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var source = image.EnsureFormat(PixelFormat.Rgb24);
+
+    return new() {
+      Width = source.Width,
+      Height = source.Height,
+      Bpp = 24,
+      PixelData = source.PixelData[..(source.Width * source.Height * 3)],
     };
   }
 

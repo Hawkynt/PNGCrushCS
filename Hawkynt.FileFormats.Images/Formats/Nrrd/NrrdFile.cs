@@ -7,7 +7,7 @@ namespace FileFormat.Nrrd;
 [FormatMagicBytes([0x4E, 0x52, 0x52, 0x44])]
 public sealed class NrrdFile :
   IImageFormatReader<NrrdFile>, IImageToRawImage<NrrdFile>,
-  IImageFormatWriter<NrrdFile> {
+  IImageFromRawImage<NrrdFile>, IImageFormatWriter<NrrdFile> {
 
   static string IImageFormatMetadata<NrrdFile>.PrimaryExtension => ".nrrd";
   static string[] IImageFormatMetadata<NrrdFile>.FileExtensions => [".nrrd", ".nhdr"];
@@ -157,6 +157,56 @@ public sealed class NrrdFile :
     }
 
     throw new NotSupportedException($"NRRD with {channels} channels is not supported.");
+  }
+
+  /// <summary>Writes a picture as a raw NRRD array, keeping the precision and the channels it arrived with.</summary>
+  /// <remarks>
+  /// NRRD says what it holds rather than assuming, so nothing has to be thrown away: sixteen-bit
+  /// samples stay sixteen-bit as <c>uint16</c>, colour keeps its channels as a leading axis of 3 or
+  /// 4, and the sizes are whatever the picture is.
+  /// <para/>
+  /// Samples are written little-endian, which the header then declares — the deep
+  /// <see cref="PixelFormat"/> buffers are big-endian, so the words are swapped rather than copied.
+  /// </remarks>
+  public static NrrdFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var width = image.Width;
+    var height = image.Height;
+    var pixelCount = width * height;
+
+    var (sizes, type, samples) = image.Format switch {
+      PixelFormat.Gray16 or PixelFormat.Gray10
+        => (new[] { width, height }, NrrdType.UInt16, _SwapWords(image.EnsureFormat(PixelFormat.Gray16).PixelData, pixelCount)),
+      PixelFormat.Gray8 or PixelFormat.GrayAlpha16
+        => (new[] { width, height }, NrrdType.UInt8, image.EnsureFormat(PixelFormat.Gray8).PixelData[..pixelCount]),
+      PixelFormat.Rgb48
+        => (new[] { 3, width, height }, NrrdType.UInt16, _SwapWords(image.PixelData, pixelCount * 3)),
+      PixelFormat.Rgba64
+        => (new[] { 4, width, height }, NrrdType.UInt16, _SwapWords(image.PixelData, pixelCount * 4)),
+      PixelFormat.Rgba32 or PixelFormat.Bgra32 or PixelFormat.Argb32
+        => (new[] { 4, width, height }, NrrdType.UInt8, image.EnsureFormat(PixelFormat.Rgba32).PixelData[..(pixelCount * 4)]),
+      _ => (new[] { 3, width, height }, NrrdType.UInt8, image.EnsureFormat(PixelFormat.Rgb24).PixelData[..(pixelCount * 3)])
+    };
+
+    return new() {
+      Sizes = sizes,
+      DataType = type,
+      Encoding = NrrdEncoding.Raw,
+      Endian = "little",
+      PixelData = samples,
+    };
+  }
+
+  /// <summary>Reverses the byte order of a run of 16-bit samples.</summary>
+  private static byte[] _SwapWords(byte[] source, int sampleCount) {
+    var result = new byte[sampleCount * 2];
+    for (var i = 0; i < sampleCount; ++i) {
+      result[i * 2] = source[i * 2 + 1];
+      result[i * 2 + 1] = source[i * 2];
+    }
+
+    return result;
   }
 
   private static int _BytesPerSample(NrrdType type) => type switch {

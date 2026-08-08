@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.SonyMavica;
 
 /// <summary>In-memory representation of a Sony Mavica .411 image.</summary>
-public readonly record struct SonyMavicaFile : IImageFormatReader<SonyMavicaFile>, IImageToRawImage<SonyMavicaFile>, IImageFormatWriter<SonyMavicaFile> {
+public readonly record struct SonyMavicaFile : IImageFormatReader<SonyMavicaFile>, IImageToRawImage<SonyMavicaFile>, IImageFromRawImage<SonyMavicaFile>, IImageFormatWriter<SonyMavicaFile> {
 
   static string IImageFormatMetadata<SonyMavicaFile>.PrimaryExtension => ".411";
   static string[] IImageFormatMetadata<SonyMavicaFile>.FileExtensions => [".411"];
@@ -39,6 +39,24 @@ public readonly record struct SonyMavicaFile : IImageFormatReader<SonyMavicaFile
       Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = file.PixelData[..],
+    };
+  }
+
+  /// <summary>Creates a Mavica image from a platform-independent <see cref="RawImage"/>.</summary>
+  /// <remarks>
+  /// The header carries the dimensions, so any size fits; the pixels follow as three bytes each,
+  /// which is what the reader hands straight out.
+  /// </remarks>
+  public static SonyMavicaFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var source = image.EnsureFormat(PixelFormat.Rgb24);
+
+    return new() {
+      Width = source.Width,
+      Height = source.Height,
+      Format = 0,
+      PixelData = source.PixelData[..(source.Width * source.Height * 3)],
     };
   }
 

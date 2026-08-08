@@ -5,7 +5,7 @@ using FileFormat.Core;
 namespace FileFormat.Tim2;
 
 /// <summary>In-memory representation of a PlayStation 2/PSP TIM2 texture file.</summary>
-public readonly record struct Tim2File : IImageFormatReader<Tim2File>, IImageToRawImage<Tim2File>, IImageFormatWriter<Tim2File> {
+public readonly record struct Tim2File : IImageFormatReader<Tim2File>, IImageToRawImage<Tim2File>, IImageFromRawImage<Tim2File>, IImageFormatWriter<Tim2File> {
 
   static string IImageFormatMetadata<Tim2File>.PrimaryExtension => ".tm2";
   static string[] IImageFormatMetadata<Tim2File>.FileExtensions => [".tm2"];
@@ -30,6 +30,34 @@ public readonly record struct Tim2File : IImageFormatReader<Tim2File>, IImageToR
       Tim2Format.Rgb24 => _DecodeRgb24(pic),
       Tim2Format.Rgb32 => _DecodeRgb32(pic),
       _ => throw new NotSupportedException($"Unsupported TIM2 format: {pic.Format}")
+    };
+  }
+
+  /// <summary>Creates a single-picture TIM2 texture from a platform-independent <see cref="RawImage"/>.</summary>
+  /// <remarks>
+  /// The picture header carries the size, so any size fits — textures are conventionally powers of
+  /// two, but nothing in the file demands it.
+  /// <para/>
+  /// Written as <see cref="Tim2Format.Rgb24"/>, three bytes a pixel and no palette. The 32-bit mode
+  /// would carry alpha, but a PS2 texture's alpha runs 0 to 128 rather than 0 to 255, so an opaque
+  /// picture written that way would come back at half strength anywhere the convention is honoured.
+  /// </remarks>
+  public static Tim2File FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var source = image.EnsureFormat(PixelFormat.Rgb24);
+    var picture = new Tim2Picture {
+      Width = source.Width,
+      Height = source.Height,
+      Format = Tim2Format.Rgb24,
+      MipmapCount = 1,
+      PixelData = source.PixelData[..(source.Width * source.Height * 3)],
+    };
+
+    return new() {
+      Version = 4,
+      Alignment = 0,
+      Pictures = new[] { picture },
     };
   }
 

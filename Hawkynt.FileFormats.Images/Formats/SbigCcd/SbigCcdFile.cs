@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.SbigCcd;
 
 /// <summary>In-memory representation of an SBIG CCD camera image (16-bit grayscale).</summary>
-public readonly record struct SbigCcdFile : IImageFormatReader<SbigCcdFile>, IImageToRawImage<SbigCcdFile>, IImageFormatWriter<SbigCcdFile> {
+public readonly record struct SbigCcdFile : IImageFormatReader<SbigCcdFile>, IImageToRawImage<SbigCcdFile>, IImageFromRawImage<SbigCcdFile>, IImageFormatWriter<SbigCcdFile> {
 
   /// <summary>Header size: 2 width + 2 height + 8 reserved = 12 bytes.</summary>
   public const int HeaderSize = 12;
@@ -35,6 +35,33 @@ public readonly record struct SbigCcdFile : IImageFormatReader<SbigCcdFile>, IIm
       Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
+    };
+  }
+
+  /// <summary>Creates an SBIG CCD frame from a platform-independent <see cref="RawImage"/>.</summary>
+  /// <remarks>
+  /// A CCD frame is a count of photons at sixteen bits a well, so the samples are kept at sixteen
+  /// even though the decoder only shows the top eight of them — halving them here would throw away
+  /// the part an astronomer stretches. The header carries the size, so any size fits.
+  /// <para/>
+  /// Samples are little-endian words; the <see cref="PixelFormat.Gray16"/> buffer they come from is
+  /// big-endian.
+  /// </remarks>
+  public static SbigCcdFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var pixelCount = image.Width * image.Height;
+    var gray16 = image.EnsureFormat(PixelFormat.Gray16).PixelData;
+    var samples = new byte[pixelCount * 2];
+    for (var i = 0; i < pixelCount; ++i) {
+      samples[i * 2] = gray16[i * 2 + 1];
+      samples[i * 2 + 1] = gray16[i * 2];
+    }
+
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      PixelData = samples,
     };
   }
 

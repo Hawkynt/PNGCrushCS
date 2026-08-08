@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.AdexImage;
 
 /// <summary>In-memory representation of an ADEX image.</summary>
-public readonly record struct AdexImageFile : IImageFormatReader<AdexImageFile>, IImageToRawImage<AdexImageFile>, IImageFormatWriter<AdexImageFile> {
+public readonly record struct AdexImageFile : IImageFormatReader<AdexImageFile>, IImageToRawImage<AdexImageFile>, IImageFromRawImage<AdexImageFile>, IImageFormatWriter<AdexImageFile> {
 
   static string IImageFormatMetadata<AdexImageFile>.PrimaryExtension => ".adx";
   static string[] IImageFormatMetadata<AdexImageFile>.FileExtensions => [".adx"];
@@ -42,6 +42,25 @@ public readonly record struct AdexImageFile : IImageFormatReader<AdexImageFile>,
       Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = file.PixelData[..],
+    };
+  }
+
+  /// <summary>Creates an ADEX image from a platform-independent <see cref="RawImage"/>.</summary>
+  /// <remarks>
+  /// The header carries the dimensions, so any size fits; only the pixel layout is fixed, and the
+  /// reader hands the bytes straight out as three per pixel.
+  /// </remarks>
+  public static AdexImageFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var source = image.EnsureFormat(PixelFormat.Rgb24);
+
+    return new() {
+      Width = source.Width,
+      Height = source.Height,
+      Bpp = 24,
+      Compression = 0,
+      PixelData = source.PixelData[..],
     };
   }
 

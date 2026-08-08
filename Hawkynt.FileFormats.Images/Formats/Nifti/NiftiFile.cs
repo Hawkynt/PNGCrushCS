@@ -6,7 +6,7 @@ namespace FileFormat.Nifti;
 /// <summary>In-memory representation of a NIfTI neuroimaging file.</summary>
 public sealed class NiftiFile :
   IImageFormatReader<NiftiFile>, IImageToRawImage<NiftiFile>,
-  IImageFormatWriter<NiftiFile> {
+  IImageFromRawImage<NiftiFile>, IImageFormatWriter<NiftiFile> {
 
   static string IImageFormatMetadata<NiftiFile>.PrimaryExtension => ".nii";
   static string[] IImageFormatMetadata<NiftiFile>.FileExtensions => [".nii"];
@@ -131,6 +131,54 @@ public sealed class NiftiFile :
       Format = PixelFormat.Gray16,
       PixelData = result16,
     };
+  }
+
+  /// <summary>Writes a picture as a single-slice NIfTI volume, keeping whatever precision it arrived with.</summary>
+  /// <remarks>
+  /// A scan is measurement rather than picture, so the depth it was taken at is the thing worth
+  /// keeping: sixteen-bit grey is stored as <see cref="NiftiDataType.UInt16"/> voxels rather than
+  /// being crushed to eight, and colour is stored as <see cref="NiftiDataType.Rgb24"/>, which is the
+  /// only colour voxel type NIfTI-1 has. The dimensions live in the header, so any size fits.
+  /// <para/>
+  /// Voxels are little-endian, which is what <c>ToRawImage</c> reads them back as — the
+  /// <see cref="PixelFormat.Gray16"/> buffer it hands out is big-endian, so the two orders are
+  /// swapped here rather than copied.
+  /// </remarks>
+  public static NiftiFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var pixelCount = image.Width * image.Height;
+    var (datatype, bitpix, voxels) = image.Format switch {
+      PixelFormat.Gray16 or PixelFormat.Gray10
+        => (NiftiDataType.UInt16, (short)16, _Gray16ToUInt16LE(image.EnsureFormat(PixelFormat.Gray16).PixelData, pixelCount)),
+      PixelFormat.Gray8 or PixelFormat.GrayAlpha16
+        => (NiftiDataType.UInt8, (short)8, image.EnsureFormat(PixelFormat.Gray8).PixelData[..pixelCount]),
+      _ => (NiftiDataType.Rgb24, (short)24, image.EnsureFormat(PixelFormat.Rgb24).PixelData[..(pixelCount * 3)])
+    };
+
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      Depth = 1,
+      Datatype = datatype,
+      Bitpix = bitpix,
+      SclSlope = 1f,
+      SclInter = 0f,
+      VoxOffset = 352f,
+      Pixdim = [1f, 1f, 1f, 1f, 0f, 0f, 0f, 0f],
+      PixelData = voxels,
+    };
+  }
+
+  /// <summary>Turns the big-endian words of a <see cref="PixelFormat.Gray16"/> buffer into the file's little-endian voxels.</summary>
+  private static byte[] _Gray16ToUInt16LE(byte[] gray16, int count) {
+    var voxels = new byte[count * 2];
+    for (var i = 0; i < count; ++i) {
+      voxels[i * 2] = gray16[i * 2 + 1];
+      voxels[i * 2 + 1] = gray16[i * 2];
+    }
+
+    return voxels;
   }
 
   /// <summary>Converts little-endian signed Int16 to Gray16 (big-endian uint16) by offsetting by 32768.</summary>

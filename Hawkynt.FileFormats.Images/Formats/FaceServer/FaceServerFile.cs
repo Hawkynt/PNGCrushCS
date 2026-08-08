@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.FaceServer;
 
 /// <summary>In-memory representation of a FaceServer image (fixed 48x48 grayscale).</summary>
-public readonly record struct FaceServerFile : IImageFormatReader<FaceServerFile>, IImageToRawImage<FaceServerFile>, IImageFormatWriter<FaceServerFile> {
+public readonly record struct FaceServerFile : IImageFormatReader<FaceServerFile>, IImageToRawImage<FaceServerFile>, IImageFromRawImage<FaceServerFile>, IImageFormatWriter<FaceServerFile> {
 
   /// <summary>Fixed image width.</summary>
   public const int FixedWidth = 48;
@@ -43,6 +43,21 @@ public readonly record struct FaceServerFile : IImageFormatReader<FaceServerFile
       Height = FixedHeight,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
+    };
+  }
+
+  /// <summary>Creates a FaceServer portrait from a platform-independent <see cref="RawImage"/>.</summary>
+  /// <remarks>
+  /// The thumbnail is 48 by 48 and nothing in the file says otherwise, so a picture of another size
+  /// is brought to that one rather than refused.
+  /// </remarks>
+  public static FaceServerFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var source = image.Width == FixedWidth && image.Height == FixedHeight ? image : image.SampleTo(FixedWidth, FixedHeight);
+
+    return new() {
+      PixelData = source.EnsureFormat(PixelFormat.Gray8).PixelData[..PixelCount],
     };
   }
 

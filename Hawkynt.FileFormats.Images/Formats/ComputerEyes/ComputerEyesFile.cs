@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.ComputerEyes;
 
 /// <summary>In-memory representation of a ComputerEyes grayscale image.</summary>
-public readonly record struct ComputerEyesFile : IImageFormatReader<ComputerEyesFile>, IImageToRawImage<ComputerEyesFile>, IImageFormatWriter<ComputerEyesFile> {
+public readonly record struct ComputerEyesFile : IImageFormatReader<ComputerEyesFile>, IImageToRawImage<ComputerEyesFile>, IImageFromRawImage<ComputerEyesFile>, IImageFormatWriter<ComputerEyesFile> {
 
   /// <summary>Header size: 2 width + 2 height = 4 bytes.</summary>
   public const int HeaderSize = 4;
@@ -35,6 +35,23 @@ public readonly record struct ComputerEyesFile : IImageFormatReader<ComputerEyes
       Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
+    };
+  }
+
+  /// <summary>Creates a ComputerEyes picture from a platform-independent <see cref="RawImage"/>.</summary>
+  /// <remarks>
+  /// The digitiser produced one grey byte a pixel and the header carries the size, so a colour
+  /// picture is reduced to grey and one of any size is kept as it is.
+  /// </remarks>
+  public static ComputerEyesFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var source = image.EnsureFormat(PixelFormat.Gray8);
+
+    return new() {
+      Width = source.Width,
+      Height = source.Height,
+      PixelData = source.PixelData[..],
     };
   }
 

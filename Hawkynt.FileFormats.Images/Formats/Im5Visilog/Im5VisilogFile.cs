@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Im5Visilog;
 
 /// <summary>In-memory representation of an IM5 Visilog grayscale image.</summary>
-public readonly record struct Im5VisilogFile : IImageFormatReader<Im5VisilogFile>, IImageToRawImage<Im5VisilogFile>, IImageFormatWriter<Im5VisilogFile> {
+public readonly record struct Im5VisilogFile : IImageFormatReader<Im5VisilogFile>, IImageToRawImage<Im5VisilogFile>, IImageFromRawImage<Im5VisilogFile>, IImageFormatWriter<Im5VisilogFile> {
 
   static string IImageFormatMetadata<Im5VisilogFile>.PrimaryExtension => ".im5";
   static string[] IImageFormatMetadata<Im5VisilogFile>.FileExtensions => [".im5"];
@@ -58,6 +58,40 @@ public readonly record struct Im5VisilogFile : IImageFormatReader<Im5VisilogFile
       Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
+    };
+  }
+
+  /// <summary>Writes a picture as an IM5 image, at whatever of the two depths it arrived with.</summary>
+  /// <remarks>
+  /// Visilog is machine vision, where the samples are measurements: a sixteen-bit picture is stored
+  /// at sixteen rather than being halved, since the header has a depth field precisely so it need
+  /// not be. The size lives there too, so any size fits.
+  /// <para/>
+  /// Samples are little-endian words, which is how the reader takes them and the opposite of the
+  /// big-endian <see cref="PixelFormat.Gray16"/> buffer they come from.
+  /// </remarks>
+  public static Im5VisilogFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var pixelCount = image.Width * image.Height;
+    var deep = image.Format is PixelFormat.Gray16 or PixelFormat.Gray10;
+
+    byte[] samples;
+    if (deep) {
+      var gray16 = image.EnsureFormat(PixelFormat.Gray16).PixelData;
+      samples = new byte[pixelCount * 2];
+      for (var i = 0; i < pixelCount; ++i) {
+        samples[i * 2] = gray16[i * 2 + 1];
+        samples[i * 2 + 1] = gray16[i * 2];
+      }
+    } else
+      samples = image.EnsureFormat(PixelFormat.Gray8).PixelData[..pixelCount];
+
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      Depth = deep ? 16 : 8,
+      PixelData = samples,
     };
   }
 

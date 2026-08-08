@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.MultiLaceEditor;
 
 /// <summary>In-memory representation of a C64 Multi-Lace Editor multicolor interlace image (two multicolor frames blended).</summary>
-public readonly record struct MultiLaceEditorFile : IImageFormatReader<MultiLaceEditorFile>, IImageToRawImage<MultiLaceEditorFile>, IImageFormatWriter<MultiLaceEditorFile> {
+public readonly record struct MultiLaceEditorFile : IImageFormatReader<MultiLaceEditorFile>, IImageToRawImage<MultiLaceEditorFile>, IImageFromRawImage<MultiLaceEditorFile>, IImageFormatWriter<MultiLaceEditorFile> {
 
   static string IImageFormatMetadata<MultiLaceEditorFile>.PrimaryExtension => ".mle";
   static string[] IImageFormatMetadata<MultiLaceEditorFile>.FileExtensions => [".mle"];
@@ -119,6 +119,36 @@ public readonly record struct MultiLaceEditorFile : IImageFormatReader<MultiLace
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
     };
+  }
+
+  /// <summary>Builds a Multi-Lace picture, writing the same multicolour screen into both frames.</summary>
+  /// <remarks>
+  /// The format holds two frames shown alternately, and what reaches the eye is their average. Two
+  /// different frames would let a cell show colours the machine cannot hold in one — but choosing
+  /// which pair averages to a wanted colour is a search this does not attempt, and half of every
+  /// such pair is a colour the picture never contains. Writing one screen into both frames averages
+  /// each colour with itself, so what comes back out is what went in.
+  /// <para/>
+  /// Pattern 00 is drawn black by the decoder and there is no register in the file to say otherwise,
+  /// so the background is fixed at black rather than chosen.
+  /// </remarks>
+  public static MultiLaceEditorFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(FixedWidth, FixedHeight);
+    var bitmap = new byte[BitmapSize];
+    var screen = new byte[ScreenRamSize];
+    var color = new byte[ColorRamSize];
+    Commodore64Graphics.EncodeMulticolor(rgb.PixelData, FixedWidth, FixedHeight, bitmap, screen, color, fixedBackground: 0);
+
+    var payload = new byte[MinPayloadSize];
+    bitmap.CopyTo(payload, 0);
+    screen.CopyTo(payload, BitmapSize);
+    bitmap.CopyTo(payload, BitmapSize + ScreenRamSize);
+    screen.CopyTo(payload, BitmapSize + ScreenRamSize + BitmapSize);
+    color.CopyTo(payload, BitmapSize + ScreenRamSize + BitmapSize + ScreenRamSize);
+
+    return new() { LoadAddress = 0x2000, RawData = payload };
   }
 
 }

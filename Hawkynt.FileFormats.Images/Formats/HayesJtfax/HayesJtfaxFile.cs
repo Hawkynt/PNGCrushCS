@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.HayesJtfax;
 
 /// <summary>In-memory representation of a Hayes JT Fax image.</summary>
-public readonly record struct HayesJtfaxFile : IImageFormatReader<HayesJtfaxFile>, IImageToRawImage<HayesJtfaxFile>, IImageFormatWriter<HayesJtfaxFile> {
+public readonly record struct HayesJtfaxFile : IImageFormatReader<HayesJtfaxFile>, IImageToRawImage<HayesJtfaxFile>, IImageFromRawImage<HayesJtfaxFile>, IImageFormatWriter<HayesJtfaxFile> {
 
   static string IImageFormatMetadata<HayesJtfaxFile>.PrimaryExtension => ".jtf";
   static string[] IImageFormatMetadata<HayesJtfaxFile>.FileExtensions => [".jtf"];
@@ -58,6 +58,22 @@ public readonly record struct HayesJtfaxFile : IImageFormatReader<HayesJtfaxFile
       Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
+    };
+  }
+
+  /// <summary>Creates a JT Fax page from a platform-independent <see cref="RawImage"/>.</summary>
+  /// <remarks>
+  /// A fax page is ink on paper: the header carries the size, so any size fits, and everything
+  /// darker than mid grey becomes a set bit — which is what the decoder here draws as black.
+  /// </remarks>
+  public static HayesJtfaxFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      Version = 1,
+      PixelData = MonochromePage.Encode(image, image.Width, image.Height, inkIsWhite: false),
     };
   }
 
