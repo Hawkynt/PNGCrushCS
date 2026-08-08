@@ -200,12 +200,46 @@ foreach (var path in Directory.GetFiles(samples).OrderBy(x => x, StringComparer.
     if (rgb.LongLength < wanted)
       continue;
 
-    using var file = File.Create(Path.Combine(output, Path.GetFileName(path) + ".ppm"));
-    file.Write(Encoding.ASCII.GetBytes($"P6\n{image.Width} {image.Height}\n255\n"));
-    file.Write(rgb, 0, (int)wanted);
+    using (var file = File.Create(Path.Combine(output, Path.GetFileName(path) + ".ppm"))) {
+      file.Write(Encoding.ASCII.GetBytes($"P6\n{image.Width} {image.Height}\n255\n"));
+      file.Write(rgb, 0, (int)wanted);
+    }
+
     ++written;
   } catch (Exception) {
     // Refusing a file is an answer, and the comparison counts it as one.
+  }
+
+  // And every other reading the registry can give of the same name.
+  //
+  // Fifty-odd extensions here are claimed by more than one format, and the two reference tools do
+  // not always mean the same one by a name: a .sc2 is a Paintworks screen to one and an MSX Screen 2
+  // to the other, and both are right about their own file. Writing only the first reading measures
+  // which claimant the registry happened to order first, not whether this project can read the file.
+  // The comparison takes the best of these, so a sample counts as read when any of our formats reads
+  // it correctly — which is the question the report is asking.
+  var alternate = 0;
+  foreach (var entry in FormatRegistry.AllFormats) {
+    if (entry.LoadRawImageOrThrow == null
+        || entry.AllExtensions?.Any(e => string.Equals(e, Path.GetExtension(path), StringComparison.OrdinalIgnoreCase)) != true)
+      continue;
+
+    try {
+      var other = entry.LoadRawImageOrThrow(new FileInfo(path));
+      if (other == null || other.Width <= 0 || other.Height <= 0 || (long)other.Width * other.Height > 40_000_000)
+        continue;
+
+      var bytes = other.ToRgb24();
+      var need = (long)other.Width * other.Height * 3;
+      if (bytes.LongLength < need)
+        continue;
+
+      using var file = File.Create(Path.Combine(output, Path.GetFileName(path) + $".alt{++alternate}.ppm"));
+      file.Write(Encoding.ASCII.GetBytes($"P6\n{other.Width} {other.Height}\n255\n"));
+      file.Write(bytes, 0, (int)need);
+    } catch (Exception) {
+      // A format refusing a name it claims is the ordinary case here.
+    }
   }
 }
 

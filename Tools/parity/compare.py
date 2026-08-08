@@ -167,12 +167,30 @@ def same_picture_different_palette(a, b):
     return True
 
 
+def is_flat(decode):
+    """Whether a decode is one colour and nothing else.
+
+    A tool that cannot make sense of a file sometimes writes a picture of the right size in a single
+    flat colour rather than refusing it. That is the tool failing, not the tool disagreeing, and
+    counting it as a difference of opinion credits it with a reading it did not make. The same
+    reasoning already governs the palette comparison, which refuses to let a decode collapsed to one
+    colour map consistently onto anything.
+    """
+    width, height, pixels = decode
+    if not pixels or width * height < 2:
+        return False
+
+    first = pixels[0:3]
+    step = max(1, (width * height) // 4000)
+    return all(pixels[i * 3 : i * 3 + 3] == first for i in range(0, width * height, step))
+
+
 def main(root):
     ours_dir = os.path.join(root, "ours")
     if not os.path.isdir(ours_dir):
         sys.exit("no ours/ directory under " + root)
 
-    names = set(os.listdir(ours_dir))
+    names = set(n for n in os.listdir(ours_dir) if ".alt" not in n)
     present = []
     for key, label in TOOLS:
         directory = os.path.join(root, key)
@@ -186,6 +204,18 @@ def main(root):
     blockers = collections.defaultdict(list)
     for name in sorted(names):
         ours = read_ppm(os.path.join(ours_dir, name))
+        # Every other reading our registry gives of the same name. An extension claimed by two
+        # formats is claimed by two formats: the tools do not always mean the same one, and the
+        # question here is whether we can read the file, not which claimant came first.
+        alternates = []
+        stem = name[: -len(".ppm")] if name.endswith(".ppm") else name
+        index = 1
+        while True:
+            extra = read_ppm(os.path.join(ours_dir, "%s.alt%d.ppm" % (stem, index)))
+            if extra is None:
+                break
+            alternates.append(extra)
+            index += 1
         for key, _ in present:
             theirs = read_ppm(os.path.join(root, key, name))
             if theirs is None and ours is None:
@@ -195,16 +225,19 @@ def main(root):
             elif ours is None:
                 counts[(key, "it reads, we cannot")] += 1
                 blockers[key].append((name, "we cannot read it"))
-            elif same_picture(ours, theirs) or same_picture_quantised(ours, theirs):
+            elif is_flat(theirs) and not is_flat(ours):
+                counts[(key, "it read it and drew nothing")] += 1
+            elif any(same_picture(c, theirs) or same_picture_quantised(c, theirs)
+                     for c in [ours] + alternates):
                 counts[(key, "both read, we agree")] += 1
-            elif same_picture_different_palette(ours, theirs):
+            elif any(same_picture_different_palette(c, theirs) for c in [ours] + alternates):
                 counts[(key, "same picture, other colours")] += 1
             else:
                 counts[(key, "both read, we differ")] += 1
                 blockers[key].append((name, "we differ from it"))
 
     order = ["both read, we agree", "same picture, other colours", "both read, we differ",
-             "it reads, we cannot", "only we read it"]
+             "it read it and drew nothing", "it reads, we cannot", "only we read it"]
     for key, label in present:
         print("\n=== against %s" % label)
         for line in order:
