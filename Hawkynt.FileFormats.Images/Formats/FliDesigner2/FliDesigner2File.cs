@@ -4,7 +4,9 @@ using FileFormat.Core;
 namespace FileFormat.FliDesigner2;
 
 /// <summary>In-memory representation of a FLI Designer 2 (enhanced FLI multicolor) image for the Commodore 64.</summary>
-public readonly record struct FliDesigner2File : IImageFormatReader<FliDesigner2File>, IImageToRawImage<FliDesigner2File>, IImageFormatWriter<FliDesigner2File> {
+public readonly record struct FliDesigner2File
+  : IImageFormatReader<FliDesigner2File>, IImageToRawImage<FliDesigner2File>,
+    IImageFromRawImage<FliDesigner2File>, IImageFormatWriter<FliDesigner2File> {
 
   static string IImageFormatMetadata<FliDesigner2File>.PrimaryExtension => ".fd2";
   static string[] IImageFormatMetadata<FliDesigner2File>.FileExtensions => [".fd2"];
@@ -35,6 +37,24 @@ public readonly record struct FliDesigner2File : IImageFormatReader<FliDesigner2
   /// <summary>Size of the base padding section in bytes.</summary>
   internal const int BasePaddingSize = 472;
 
+  /// <summary>Character columns across the screen.</summary>
+  internal const int Columns = 40;
+
+  /// <summary>Character rows down the screen.</summary>
+  internal const int Rows = FixedHeight / 8;
+
+  /// <summary>Video matrices, one for each raster line of a character cell.</summary>
+  internal const int ScreenBankCount = 8;
+
+  /// <summary>The entries one of those holds.</summary>
+  internal const int ScreenBankSize = Columns * Rows;
+
+  /// <summary>What pattern 00 shows, which the decoder recovers from the first screen byte.</summary>
+  internal const int Background = 0;
+
+  /// <summary>Default load address, putting the bitmap at $2000.</summary>
+  internal const ushort DefaultLoadAddress = 0x2000;
+
   /// <summary>Image width, always 160.</summary>
   public int Width => FixedWidth;
 
@@ -59,6 +79,95 @@ public readonly record struct FliDesigner2File : IImageFormatReader<FliDesigner2
   /// <summary>Converts this FLI Designer 2 image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(FliDesigner2File file) {
     return _FliMultiToRawImage(file.BitmapData, file.ScreenData, file.ColorRam);
+  }
+
+  /// <summary>Encodes a picture as an FLI Designer 2 screen, scaling it to 160x200 first.</summary>
+  /// <remarks>
+  /// The video matrix is stored a whole raster line at a time rather than in eight banks, so the
+  /// shared encoder's banked output is scattered into that order afterwards — the two hold the same
+  /// entries, only addressed differently, and writing the banked form straight out would put every
+  /// row of cells but the first in the wrong place.
+  /// <para/>
+  /// <see cref="ToRawImage"/> takes the background colour from the low nibble of the very first
+  /// screen byte, so that entry is not free: it has to say black, which is what pattern 00 is
+  /// encoded as. The first cell's first raster line is therefore re-done afterwards with its second
+  /// colour spent on the background, leaving it one free colour instead of two. Without that the
+  /// picture would decode against a background nobody chose.
+  /// </remarks>
+  public static FliDesigner2File FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(FixedWidth, FixedHeight).PixelData;
+    var bitmap = new byte[BitmapDataSize];
+    var banked = new byte[ScreenBankCount * ScreenBankSize];
+    var colorRam = new byte[ColorRamSize];
+    Commodore64Graphics.EncodeMulticolorFli(
+      rgb, FixedWidth, FixedHeight, Background, bitmap, banked, ScreenBankSize, colorRam);
+
+    var screen = new byte[ScreenDataSize];
+    for (var row = 0; row < Rows; ++row)
+    for (var line = 0; line < ScreenBankCount; ++line)
+    for (var column = 0; column < Columns; ++column)
+      screen[(row * ScreenBankCount + line) * Columns + column] = banked[line * ScreenBankSize + row * Columns + column];
+
+    _PinBackgroundIntoFirstEntry(rgb, bitmap, screen, colorRam);
+
+    return new() {
+      LoadAddress = DefaultLoadAddress,
+      BitmapData = bitmap,
+      ScreenData = screen,
+      ColorRam = colorRam,
+      ExtraData = new byte[BasePaddingSize],
+    };
+  }
+
+  /// <summary>Redoes the first cell's first raster line so that its second colour is the background.</summary>
+  private static void _PinBackgroundIntoFirstEntry(
+    ReadOnlySpan<byte> rgb, Span<byte> bitmap, Span<byte> screen, ReadOnlySpan<byte> colorRam) {
+    var third = colorRam[0] & 0x0F;
+
+    // One colour is free; the other three the line can show are already spoken for.
+    var foreground = 0;
+    var bestError = long.MaxValue;
+    for (var candidate = 0; candidate < Commodore64Graphics.ColorCount; ++candidate) {
+      long error = 0;
+      for (var x = 0; x < 4; ++x) {
+        var index = Commodore64Graphics.FindNearestColorIndex(rgb[x * 3], rgb[x * 3 + 1], rgb[x * 3 + 2]);
+        error += Math.Min(_Distance(index, Background), Math.Min(_Distance(index, third), _Distance(index, candidate)));
+      }
+
+      if (error >= bestError)
+        continue;
+
+      bestError = error;
+      foreground = candidate;
+    }
+
+    var row = 0;
+    for (var x = 0; x < 4; ++x) {
+      var index = Commodore64Graphics.FindNearestColorIndex(rgb[x * 3], rgb[x * 3 + 1], rgb[x * 3 + 2]);
+      var pattern = 0;
+      var best = _Distance(index, Background);
+      if (_Distance(index, foreground) < best) {
+        best = _Distance(index, foreground);
+        pattern = 1;
+      }
+
+      if (_Distance(index, third) < best)
+        pattern = 3;
+
+      row |= pattern << ((3 - x) * 2);
+    }
+
+    bitmap[0] = (byte)row;
+    screen[0] = (byte)((foreground << 4) | Background);
+  }
+
+  private static int _Distance(int left, int right) {
+    int a = Commodore64Graphics.HexColors[left], b = Commodore64Graphics.HexColors[right];
+    int dr = ((a >> 16) & 0xFF) - ((b >> 16) & 0xFF), dg = ((a >> 8) & 0xFF) - ((b >> 8) & 0xFF), db = (a & 0xFF) - (b & 0xFF);
+
+    return dr * dr + dg * dg + db * db;
   }
 
   /// <summary>Shared FLI multicolor decode: per-scanline screen RAM instead of per-cell.</summary>

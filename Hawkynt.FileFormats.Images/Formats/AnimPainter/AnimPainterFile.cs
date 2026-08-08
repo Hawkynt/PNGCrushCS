@@ -18,7 +18,9 @@ public readonly record struct AnimPainterFrame(
 );
 
 /// <summary>In-memory representation of an Anim Painter (animated C64 multicolor) image.</summary>
-public sealed class AnimPainterFile : IImageFormatReader<AnimPainterFile>, IImageToRawImage<AnimPainterFile>, IImageFormatWriter<AnimPainterFile> {
+public sealed class AnimPainterFile
+  : IImageFormatReader<AnimPainterFile>, IImageToRawImage<AnimPainterFile>,
+    IImageFromRawImage<AnimPainterFile>, IImageFormatWriter<AnimPainterFile> {
 
   static string IImageFormatMetadata<AnimPainterFile>.PrimaryExtension => ".anp";
   static string[] IImageFormatMetadata<AnimPainterFile>.FileExtensions => [".anp"];
@@ -49,6 +51,9 @@ public sealed class AnimPainterFile : IImageFormatReader<AnimPainterFile>, IImag
 
   /// <summary>Size of the load address in bytes.</summary>
   internal const int LoadAddressSize = 2;
+
+  /// <summary>Default load address, putting the first frame's bitmap at $2000.</summary>
+  internal const ushort DefaultLoadAddress = 0x2000;
 
   /// <summary>C64 memory load address (2 bytes, little-endian).</summary>
   public ushort LoadAddress { get; init; }
@@ -97,6 +102,26 @@ public sealed class AnimPainterFile : IImageFormatReader<AnimPainterFile>, IImag
       Height = ImageHeight,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
+    };
+  }
+
+  /// <summary>Encodes a picture as a one-frame Anim Painter animation, scaling it to 160x200 first.</summary>
+  /// <remarks>
+  /// A still picture is an animation of length one. <see cref="ToRawImage"/> only ever shows the
+  /// first frame, so padding the file out with repeats of it would multiply the length for nothing.
+  /// </remarks>
+  public static AnimPainterFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(ImageWidth, ImageHeight).PixelData;
+    var bitmap = new byte[BitmapDataSize];
+    var screen = new byte[VideoMatrixSize];
+    var color = new byte[ColorRamSize];
+    var background = Commodore64Graphics.EncodeMulticolor(rgb, ImageWidth, ImageHeight, bitmap, screen, color);
+
+    return new() {
+      LoadAddress = DefaultLoadAddress,
+      Frames = [new(bitmap, screen, color, background)],
     };
   }
 
