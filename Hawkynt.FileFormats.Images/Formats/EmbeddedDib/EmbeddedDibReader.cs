@@ -2,6 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.IO;
 using FileFormat.Bmp;
+using FileFormat.Core;
 
 namespace FileFormat.EmbeddedDib;
 
@@ -51,6 +52,29 @@ public static class EmbeddedDibReader {
     }
 
     throw new InvalidDataException("No Windows bitmap preview was found in this file.");
+  }
+
+  /// <summary>
+  /// Decodes a headerless Windows bitmap that begins at the first byte, rather than searching for one.
+  /// </summary>
+  /// <remarks>
+  /// A container that states where its preview begins does not need it hunted for, and hunting
+  /// could land on an earlier run that merely looks like a header. AutoCAD's drawing files are the
+  /// case in point: the image list says outright that a given run is a bitmap without its file
+  /// header, and this puts one in front and hands it to the bitmap reader.
+  /// </remarks>
+  public static RawImage DecodeHeaderless(ReadOnlySpan<byte> data) {
+    if (data.Length < EmbeddedDibFile.MinHeaderSize)
+      throw new InvalidDataException($"A Windows bitmap needs at least {EmbeddedDibFile.MinHeaderSize} bytes and this run has {data.Length}.");
+
+    var bmp = new byte[14 + data.Length];
+    bmp[0] = (byte)'B';
+    bmp[1] = (byte)'M';
+    BinaryPrimitives.WriteInt32LittleEndian(bmp.AsSpan(2), bmp.Length);
+    BinaryPrimitives.WriteInt32LittleEndian(bmp.AsSpan(10), 14 + _PixelOffsetWithin(data, 0));
+    data.CopyTo(bmp.AsSpan(14));
+
+    return BmpFile.ToRawImage(BmpReader.FromSpan(bmp));
   }
 
   /// <summary>Whether a bitmap header starts here, and how many bytes the whole preview takes.</summary>
