@@ -178,7 +178,17 @@ public static class ExifCodec {
         continue;
       }
 
-      var byteLen = typeSize * compCount;
+      // Widen to long before multiplying: a hostile/corrupt Count near uint.MaxValue would overflow
+      // an int product (and could even wrap negative, which "byteLen <= 4" would then wave through
+      // into a negative-length Slice — a crash, not a graceful skip).
+      var byteLenLong = (long)typeSize * compCount;
+      if (byteLenLong > tiff.Length) {
+        var fallback = tiff.Slice(entryOffset + 8, 4).ToArray();
+        entries.Add(new ExifTagEntry(tag, ExifTagType.Undefined, 4, fallback));
+        continue;
+      }
+
+      var byteLen = (int)byteLenLong;
       byte[] raw;
       if (byteLen <= 4) {
         raw = tiff.Slice(entryOffset + 8, byteLen).ToArray();
