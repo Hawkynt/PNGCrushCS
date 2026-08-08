@@ -4,7 +4,9 @@ using FileFormat.Core;
 namespace FileFormat.Sprite64;
 
 /// <summary>In-memory representation of a C64 sprite (24x21, mono or multicolor, 64 bytes).</summary>
-public readonly record struct Sprite64File : IImageFormatReader<Sprite64File>, IImageToRawImage<Sprite64File>, IImageFormatWriter<Sprite64File> {
+public readonly record struct Sprite64File
+  : IImageFormatReader<Sprite64File>, IImageToRawImage<Sprite64File>,
+    IImageFromRawImage<Sprite64File>, IImageFormatWriter<Sprite64File> {
 
   /// <summary>Size of the sprite pixel data in bytes (3 bytes/row x 21 rows = 63).</summary>
   internal const int SpriteDataSize = 63;
@@ -30,7 +32,7 @@ public readonly record struct Sprite64File : IImageFormatReader<Sprite64File>, I
   static string IImageFormatMetadata<Sprite64File>.PrimaryExtension => ".s64";
   static string[] IImageFormatMetadata<Sprite64File>.FileExtensions => [".s64", ".spr64"];
   static Sprite64File IImageFormatReader<Sprite64File>.FromSpan(ReadOnlySpan<byte> data) => Sprite64Reader.FromSpan(data);
-  static VideoMode[] IImageFormatMetadata<Sprite64File>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
+  static VideoMode[] IImageFormatMetadata<Sprite64File>.VideoModes => [new("Default", [(PixelWidth, PixelHeight)], [2])];
   static byte[] IImageFormatWriter<Sprite64File>.ToBytes(Sprite64File file) => Sprite64Writer.ToBytes(file);
 
   /// <summary>Always 24.</summary>
@@ -107,5 +109,30 @@ public readonly record struct Sprite64File : IImageFormatReader<Sprite64File>, I
         pixels[row * PixelWidth + outX] = colorIndex;
         pixels[row * PixelWidth + outX + 1] = colorIndex;
       }
+  }
+
+  /// <summary>Builds a mono (hi-res) sprite from a <see cref="RawImage"/>. Every pixel is thresholded to
+  /// black or white; multicolor sprites (which halve the horizontal resolution) are never produced,
+  /// since a mono sprite can hold everything a black-and-white 24x21 picture has to offer.</summary>
+  public static Sprite64File FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width != PixelWidth || image.Height != PixelHeight)
+      throw new ArgumentException($"C64 sprites are always {PixelWidth}x{PixelHeight}, but got {image.Width}x{image.Height}.", nameof(image));
+
+    var indexed = image.EnsureIndexed(PixelFormat.Indexed1, _BlackWhitePalette);
+    var spriteData = new byte[SpriteDataSize];
+    for (var row = 0; row < PixelHeight; ++row)
+    for (var col = 0; col < PixelWidth; ++col) {
+      var srcByteIndex = (row * PixelWidth + col) >> 3;
+      var srcBit = (indexed.PixelData[srcByteIndex] >> (7 - (col & 7))) & 1;
+      if (srcBit == 0)
+        continue;
+
+      var dstByteIndex = row * BytesPerRow + col / 8;
+      var dstBit = 7 - (col % 8);
+      spriteData[dstByteIndex] |= (byte)(1 << dstBit);
+    }
+
+    return new() { SpriteData = spriteData, ModeByte = 0 };
   }
 }
