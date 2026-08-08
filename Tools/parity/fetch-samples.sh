@@ -11,7 +11,10 @@
 # It exists because the corpus was the limit on what could be said. Three hundred and twenty formats
 # had a sample and four hundred and twenty-one did not, and "we support 741 formats" cannot be
 # checked against a corpus drawn from the ones we already read.
-S="/tmp/claude-1000/-home-hawky-Working-Copies-PNGCrushCS/35e733e1-264c-42df-8147-cea5ff119564/scratchpad"
+# Where the corpus and the tools live. Override it to keep them somewhere else; the default is a
+# scratch directory beside the repository rather than inside it, so a corpus of somebody else's
+# sample files never lands in version control.
+S="${PARITY_WORK:-${TMPDIR:-/tmp}/pngcrush-parity}"
 ROOT="https://telparia.com/fileFormatSamples/image"
 OUT="$S/more"
 mkdir -p "$OUT"

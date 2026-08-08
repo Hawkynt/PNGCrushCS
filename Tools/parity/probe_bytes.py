@@ -7,7 +7,11 @@ format is understood, only that the tool reads it.
 import subprocess
 import sys
 
-SC = '/tmp/claude-1000/-home-hawky-Working-Copies-PNGCrushCS/35e733e1-264c-42df-8147-cea5ff119564/scratchpad'
+import os
+
+# Where the reference decoder was unpacked. Override with PARITY_WORK to keep it elsewhere; the
+# default matches fetch-samples.sh so the two agree without either naming a particular machine.
+SC = os.environ.get('PARITY_WORK', os.path.join(os.environ.get('TMPDIR', '/tmp'), 'pngcrush-parity'))
 RECOIL = f'{SC}/recoil-6.4.5/recoil2png'
 
 path = sys.argv[1]
