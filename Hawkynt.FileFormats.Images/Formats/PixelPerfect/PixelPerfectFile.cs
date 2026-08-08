@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.PixelPerfect;
 
 /// <summary>In-memory representation of a Commodore 64 Pixel Perfect multicolor image.</summary>
-public readonly record struct PixelPerfectFile : IImageFormatReader<PixelPerfectFile>, IImageToRawImage<PixelPerfectFile>, IImageFormatWriter<PixelPerfectFile> {
+public readonly record struct PixelPerfectFile : IImageFormatReader<PixelPerfectFile>, IImageToRawImage<PixelPerfectFile>, IImageFromRawImage<PixelPerfectFile>, IImageFormatWriter<PixelPerfectFile> {
 
   static string IImageFormatMetadata<PixelPerfectFile>.PrimaryExtension => ".pp";
   static string[] IImageFormatMetadata<PixelPerfectFile>.FileExtensions => [".pp", ".ppp"];
@@ -88,6 +88,104 @@ public readonly record struct PixelPerfectFile : IImageFormatReader<PixelPerfect
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
     };
+  }
+
+  /// <summary>Creates a Pixel Perfect screen from a <see cref="RawImage"/>, sampling it to the VIC-II's 160x200 multicolour screen.</summary>
+  /// <remarks>
+  /// The payload is bitmap plus screen RAM and nothing else: there is no colour RAM and no
+  /// background register, so <see cref="ToRawImage"/> reads bit patterns 00 and 11 alike as black
+  /// and only 01 and 10 name a colour. That leaves three colours per 4x8 cell — black plus the two
+  /// the screen byte's nibbles hold — and this encoder gives each cell its two commonest non-black
+  /// colours. Pattern 11 is never written, since it would decode as black anyway.
+  /// </remarks>
+  public static PixelPerfectFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var bgra = image.SampleTo(FixedWidth, FixedHeight).ToBgra32();
+    var indices = new byte[FixedWidth * FixedHeight];
+    for (var i = 0; i < indices.Length; ++i) {
+      var offset = i * 4;
+      indices[i] = (byte)Commodore64Graphics.FindNearestColorIndex(bgra[offset + 2], bgra[offset + 1], bgra[offset]);
+    }
+
+    var rawData = new byte[StandardPayloadSize];
+    Span<int> cellColors = stackalloc int[2];
+
+    for (var cellY = 0; cellY < FixedHeight / 8; ++cellY)
+      for (var cellX = 0; cellX < 40; ++cellX) {
+        var cellIndex = cellY * 40 + cellX;
+        _PickCellColors(indices, cellX, cellY, cellColors);
+        rawData[MinBitmapSize + cellIndex] = (byte)((cellColors[0] << 4) | cellColors[1]);
+
+        for (var row = 0; row < 8; ++row) {
+          byte packed = 0;
+          for (var column = 0; column < 4; ++column) {
+            var color = indices[(cellY * 8 + row) * FixedWidth + cellX * 4 + column];
+            var pattern = _PickPattern(color, cellColors);
+            packed |= (byte)(pattern << ((3 - column) * 2));
+          }
+
+          rawData[cellIndex * 8 + row] = packed;
+        }
+      }
+
+    return new() {
+      LoadAddress = 0x2000,
+      RawData = rawData,
+    };
+  }
+
+  /// <summary>Fills <paramref name="cellColors"/> with the two commonest colours in the cell that are not black.</summary>
+  private static void _PickCellColors(byte[] indices, int cellX, int cellY, Span<int> cellColors) {
+    Span<int> frequency = stackalloc int[16];
+    for (var row = 0; row < 8; ++row)
+      for (var column = 0; column < 4; ++column)
+        ++frequency[indices[(cellY * 8 + row) * FixedWidth + cellX * 4 + column]];
+
+    frequency[0] = -1;
+    for (var slot = 0; slot < 2; ++slot) {
+      var best = 0;
+      for (var i = 1; i < 16; ++i)
+        if (frequency[i] > frequency[best])
+          best = i;
+
+      cellColors[slot] = frequency[best] > 0 ? best : 0;
+      if (frequency[best] > 0)
+        frequency[best] = -1;
+    }
+  }
+
+  /// <summary>Picks the two-bit pattern whose nibble holds the colour, or the nearest colour the cell does hold.</summary>
+  private static int _PickPattern(byte color, ReadOnlySpan<int> cellColors) {
+    if (color == 0)
+      return 0;
+
+    for (var slot = 0; slot < 2; ++slot)
+      if (cellColors[slot] == color)
+        return slot + 1;
+
+    var bestPattern = 0;
+    var bestDistance = _Distance(color, 0);
+    for (var slot = 0; slot < 2; ++slot) {
+      var distance = _Distance(color, (byte)cellColors[slot]);
+      if (distance >= bestDistance)
+        continue;
+
+      bestDistance = distance;
+      bestPattern = slot + 1;
+    }
+
+    return bestPattern;
+  }
+
+  /// <summary>Squared RGB distance between two VIC-II palette entries.</summary>
+  private static int _Distance(byte left, byte right) {
+    var a = Commodore64Graphics.HexColors[left];
+    var b = Commodore64Graphics.HexColors[right];
+    var dr = ((a >> 16) & 0xFF) - ((b >> 16) & 0xFF);
+    var dg = ((a >> 8) & 0xFF) - ((b >> 8) & 0xFF);
+    var db = (a & 0xFF) - (b & 0xFF);
+    return dr * dr + dg * dg + db * db;
   }
 
 }
