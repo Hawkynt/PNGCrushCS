@@ -15,10 +15,17 @@ namespace FileFormat.AmosBank;
 /// scheme worth its complexity on a machine where a screen is a hundred kilobytes.
 /// </remarks>
 public readonly record struct AmosBankFile
-  : IImageFormatReader<AmosBankFile>, IImageToRawImage<AmosBankFile> {
+  : IImageFormatReader<AmosBankFile>, IImageToRawImage<AmosBankFile>,
+    IImageFromRawImage<AmosBankFile>, IImageFormatWriter<AmosBankFile> {
 
   /// <summary>Colours an Amiga OCS palette holds.</summary>
   public const int ColorCount = 32;
+
+  /// <summary>Bitplanes thirty-two colours need.</summary>
+  public const int Planes = 5;
+
+  /// <summary>Pixels the hardware fetches at a time, and so the step a sprite's width comes in.</summary>
+  public const int WidthStep = 16;
 
   /// <summary>The two bytes every bank starts with.</summary>
   public const string Signature = "Am";
@@ -27,6 +34,7 @@ public readonly record struct AmosBankFile
   static string[] IImageFormatMetadata<AmosBankFile>.FileExtensions => [".abk"];
   static AmosBankFile IImageFormatReader<AmosBankFile>.FromSpan(ReadOnlySpan<byte> data)
     => AmosBankReader.FromSpan(data);
+  static byte[] IImageFormatWriter<AmosBankFile>.ToBytes(AmosBankFile file) => AmosBankWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<AmosBankFile>.VideoModes => [
     new("AMOS bank", [(IntegerRange.Any, IntegerRange.Any)], [ColorCount])
   ];
@@ -73,5 +81,35 @@ public readonly record struct AmosBankFile
     }
 
     return palette;
+  }
+
+  /// <summary>Encodes a picture as a bank of one sprite.</summary>
+  /// <remarks>
+  /// Of the two kinds that hold pictures the sprite bank is the one written. The packed screen is a
+  /// compressor with three streams read in step, and a bank of one sprite says the same picture in
+  /// bytes any AMOS program can read — so the packing would be work spent on a file that is no more
+  /// readable for it.
+  /// <para/>
+  /// A sprite's width counts sixteen-pixel words because that is how the hardware fetches them, so a
+  /// picture whose width is not a multiple of sixteen is sampled to the nearest one that is rather
+  /// than padded: padding would put columns in the file that the picture does not have and that
+  /// anything reading it would show.
+  /// </remarks>
+  public static AmosBankFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var width = Math.Max(WidthStep, (image.Width + WidthStep / 2) / WidthStep * WidthStep);
+    var height = Math.Max(1, image.Height);
+    var source = image.Width == width && image.Height == height ? image : image.SampleTo(width, height);
+    var indexed = source.EnsureIndexedAtMost(ColorCount);
+
+    // Four bits a channel is what a bank stores, so the palette is reduced before the pixels are
+    // mapped onto it and two entries that would have collapsed afterwards collapse before.
+    var palette = new byte[ColorCount * 3];
+    var stated = indexed.Palette ?? [];
+    for (var i = 0; i < palette.Length && i < stated.Length; ++i)
+      palette[i] = ChannelScaling.Expand4((stated[i] * 15 + 127) / 255);
+
+    return new() { PixelData = indexed.PixelData, Palette = palette, Width = width, Height = height };
   }
 }
