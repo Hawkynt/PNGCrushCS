@@ -4,12 +4,14 @@ using FileFormat.Core;
 namespace FileFormat.MsxFont;
 
 /// <summary>In-memory representation of an MSX font pattern table (2048 bytes: 256 characters x 8 bytes each, 8x8 mono).</summary>
-public readonly record struct MsxFontFile : IImageFormatReader<MsxFontFile>, IImageToRawImage<MsxFontFile>, IImageFormatWriter<MsxFontFile> {
+public readonly record struct MsxFontFile
+  : IImageFormatReader<MsxFontFile>, IImageToRawImage<MsxFontFile>,
+    IImageFromRawImage<MsxFontFile>, IImageFormatWriter<MsxFontFile> {
 
   static string IImageFormatMetadata<MsxFontFile>.PrimaryExtension => ".fnt";
   static string[] IImageFormatMetadata<MsxFontFile>.FileExtensions => [".fnt", ".mft"];
   static MsxFontFile IImageFormatReader<MsxFontFile>.FromSpan(ReadOnlySpan<byte> data) => MsxFontReader.FromSpan(data);
-  static VideoMode[] IImageFormatMetadata<MsxFontFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
+  static VideoMode[] IImageFormatMetadata<MsxFontFile>.VideoModes => [new("Default", [(PixelWidth, PixelHeight)], [2])];
   static byte[] IImageFormatWriter<MsxFontFile>.ToBytes(MsxFontFile file) => MsxFontWriter.ToBytes(file);
 
   /// <summary>Expected file size in bytes.</summary>
@@ -87,6 +89,41 @@ public readonly record struct MsxFontFile : IImageFormatReader<MsxFontFile>, IIm
       Palette = _BlackWhitePalette[..],
       PaletteCount = 2,
     };
+  }
+
+  /// <summary>Builds a font pattern table from a <see cref="RawImage"/> holding the fixed 16x16 grid of
+  /// 8x8 glyphs this format renders as. Each pixel is thresholded to black or white.</summary>
+  public static MsxFontFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width != PixelWidth || image.Height != PixelHeight)
+      throw new ArgumentException($"MSX font tables render as a fixed {PixelWidth}x{PixelHeight} grid, but got {image.Width}x{image.Height}.", nameof(image));
+
+    var indexed = image.EnsureIndexed(PixelFormat.Indexed1, _BlackWhitePalette);
+    var rowStride = PixelWidth / 8;
+    var data = new byte[CharCount * BytesPerChar];
+
+    for (var charIndex = 0; charIndex < CharCount; ++charIndex) {
+      var gridCol = charIndex % CharsPerRow;
+      var gridRow = charIndex / CharsPerRow;
+      var baseX = gridCol * CharWidth;
+      var baseY = gridRow * CharHeight;
+
+      for (var row = 0; row < CharHeight; ++row) {
+        byte charByte = 0;
+        for (var bit = 0; bit < CharWidth; ++bit) {
+          var px = baseX + bit;
+          var py = baseY + row;
+          var byteIndex = py * rowStride + px / 8;
+          var bitIndex = 7 - (px % 8);
+          if (((indexed.PixelData[byteIndex] >> bitIndex) & 1) != 0)
+            charByte |= (byte)(1 << (7 - bit));
+        }
+
+        data[charIndex * BytesPerChar + row] = charByte;
+      }
+    }
+
+    return new() { RawData = data };
   }
 
 }

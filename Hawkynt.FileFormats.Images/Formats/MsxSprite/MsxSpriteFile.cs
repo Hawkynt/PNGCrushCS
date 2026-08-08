@@ -4,12 +4,14 @@ using FileFormat.Core;
 namespace FileFormat.MsxSprite;
 
 /// <summary>In-memory representation of an MSX sprite pattern table (2048 bytes: 32 sprites x 8 bytes each, 8x8 mono).</summary>
-public readonly record struct MsxSpriteFile : IImageFormatReader<MsxSpriteFile>, IImageToRawImage<MsxSpriteFile>, IImageFormatWriter<MsxSpriteFile> {
+public readonly record struct MsxSpriteFile
+  : IImageFormatReader<MsxSpriteFile>, IImageToRawImage<MsxSpriteFile>,
+    IImageFromRawImage<MsxSpriteFile>, IImageFormatWriter<MsxSpriteFile> {
 
   static string IImageFormatMetadata<MsxSpriteFile>.PrimaryExtension => ".spt";
   static string[] IImageFormatMetadata<MsxSpriteFile>.FileExtensions => [".spt"];
   static MsxSpriteFile IImageFormatReader<MsxSpriteFile>.FromSpan(ReadOnlySpan<byte> data) => MsxSpriteReader.FromSpan(data);
-  static VideoMode[] IImageFormatMetadata<MsxSpriteFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
+  static VideoMode[] IImageFormatMetadata<MsxSpriteFile>.VideoModes => [new("Default", [(PixelWidth, PixelHeight)], [2])];
   static byte[] IImageFormatWriter<MsxSpriteFile>.ToBytes(MsxSpriteFile file) => MsxSpriteWriter.ToBytes(file);
 
   /// <summary>Expected file size in bytes.</summary>
@@ -84,6 +86,43 @@ public readonly record struct MsxSpriteFile : IImageFormatReader<MsxSpriteFile>,
       Palette = _BlackWhitePalette[..],
       PaletteCount = 2,
     };
+  }
+
+  /// <summary>Builds a sprite pattern table from a <see cref="RawImage"/> holding the fixed 16x2 grid of
+  /// 8x8 sprites this format renders as. Each pixel is thresholded to black or white. The file always
+  /// reserves the full 2048-byte pattern generator table the hardware addresses; only the first 32
+  /// patterns carry picture data; the rest comes back zeroed.</summary>
+  public static MsxSpriteFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width != PixelWidth || image.Height != PixelHeight)
+      throw new ArgumentException($"MSX sprite tables render as a fixed {PixelWidth}x{PixelHeight} grid, but got {image.Width}x{image.Height}.", nameof(image));
+
+    var indexed = image.EnsureIndexed(PixelFormat.Indexed1, _BlackWhitePalette);
+    var rowStride = PixelWidth / 8;
+    var data = new byte[ExpectedFileSize];
+
+    for (var spriteIndex = 0; spriteIndex < SpriteCount; ++spriteIndex) {
+      var gridCol = spriteIndex % _SPRITES_PER_ROW;
+      var gridRow = spriteIndex / _SPRITES_PER_ROW;
+      var baseX = gridCol * SpriteWidth;
+      var baseY = gridRow * SpriteHeight;
+
+      for (var row = 0; row < SpriteHeight; ++row) {
+        byte spriteByte = 0;
+        for (var bit = 0; bit < SpriteWidth; ++bit) {
+          var px = baseX + bit;
+          var py = baseY + row;
+          var byteIndex = py * rowStride + px / 8;
+          var bitIndex = 7 - (px % 8);
+          if (((indexed.PixelData[byteIndex] >> bitIndex) & 1) != 0)
+            spriteByte |= (byte)(1 << (7 - bit));
+        }
+
+        data[spriteIndex * BytesPerSprite + row] = spriteByte;
+      }
+    }
+
+    return new() { RawData = data };
   }
 
 }

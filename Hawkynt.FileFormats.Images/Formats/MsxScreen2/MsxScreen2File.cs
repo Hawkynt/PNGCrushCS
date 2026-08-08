@@ -17,11 +17,16 @@ namespace FileFormat.MsxScreen2;
 /// less blocky than a character screen and still cost a byte a cell to place.
 /// </remarks>
 [FormatMagicBytes([0xFE])]
-public sealed class MsxScreen2File : IImageFormatReader<MsxScreen2File>, IImageToRawImage<MsxScreen2File>, IImageFormatWriter<MsxScreen2File> {
+public sealed class MsxScreen2File
+  : IImageFormatReader<MsxScreen2File>, IImageToRawImage<MsxScreen2File>,
+    IImageFromRawImage<MsxScreen2File>, IImageFormatWriter<MsxScreen2File> {
 
   static string IImageFormatMetadata<MsxScreen2File>.PrimaryExtension => ".sc2";
   static string[] IImageFormatMetadata<MsxScreen2File>.FileExtensions => [".sc2", ".grp"];
   static MsxScreen2File IImageFormatReader<MsxScreen2File>.FromSpan(ReadOnlySpan<byte> data) => MsxScreen2Reader.FromSpan(data);
+  static VideoMode[] IImageFormatMetadata<MsxScreen2File>.VideoModes => [
+    new("Default", [(FixedWidth, FixedHeight)], [16])
+  ];
 
   static byte[] IImageFormatWriter<MsxScreen2File>.ToBytes(MsxScreen2File file) => MsxScreen2Writer.ToBytes(file);
 
@@ -148,6 +153,67 @@ public sealed class MsxScreen2File : IImageFormatReader<MsxScreen2File>, IImageT
       PixelData = pixels,
       Palette = file.Palette is { } stored ? MsxGraphics.PaletteToRgb(stored, 16) : MsxGraphics.Tms9918Palette.ToArray(),
       PaletteCount = 16,
+    };
+  }
+
+  /// <summary>Builds a Screen 2 image from a <see cref="RawImage"/>. Every pixel is mapped onto the
+  /// TMS9918's fixed sixteen colours. The name table is filled so every one of the 768 cells addresses
+  /// its own, otherwise-unused pattern and colour slot (position within its bank) — nothing is shared,
+  /// so nothing is lost to pattern reuse. Within each cell, every 8x1 pixel row gets its own foreground
+  /// and background, since that is what Screen 2's per-row colour table actually offers; only the two
+  /// most common colours per row survive.</summary>
+  public static MsxScreen2File FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width != FixedWidth || image.Height != FixedHeight)
+      throw new ArgumentException($"MSX Screen 2 images are always {FixedWidth}x{FixedHeight}, but got {image.Width}x{image.Height}.", nameof(image));
+
+    var indexed = image.EnsureIndexed(PixelFormat.Indexed8, MsxGraphics.Tms9918Palette.ToArray());
+    var patternGenerator = new byte[PatternGeneratorSize];
+    var colorTable = new byte[ColorTableSize];
+    var patternNameTable = new byte[PatternNameTableSize];
+
+    Span<int> rowFreq = stackalloc int[16];
+    for (var charRow = 0; charRow < 24; ++charRow)
+    for (var charCol = 0; charCol < 32; ++charCol) {
+      var bank = charRow / 8;
+      var charIndex = (charRow % 8) * 32 + charCol;
+      patternNameTable[charRow * 32 + charCol] = (byte)charIndex;
+      var slotOffset = bank * 2048 + charIndex * 8;
+
+      for (var pixelRow = 0; pixelRow < 8; ++pixelRow) {
+        var y = charRow * 8 + pixelRow;
+
+        rowFreq.Clear();
+        for (var bit = 0; bit < 8; ++bit) {
+          var x = charCol * 8 + bit;
+          ++rowFreq[indexed.PixelData[y * FixedWidth + x]];
+        }
+
+        int fg = 0, bg = 0, best1 = -1, best2 = -1;
+        for (var c = 0; c < 16; ++c) {
+          if (rowFreq[c] > best1) {
+            best2 = best1; bg = fg;
+            best1 = rowFreq[c]; fg = c;
+          } else if (rowFreq[c] > best2) {
+            best2 = rowFreq[c]; bg = c;
+          }
+        }
+
+        byte patternByte = 0;
+        for (var bit = 0; bit < 8; ++bit) {
+          var x = charCol * 8 + bit;
+          if (indexed.PixelData[y * FixedWidth + x] == fg)
+            patternByte |= (byte)(1 << (7 - bit));
+        }
+
+        patternGenerator[slotOffset + pixelRow] = patternByte;
+        colorTable[slotOffset + pixelRow] = (byte)((fg << 4) | bg);
+      }
+    }
+
+    return new() {
+      PatternGenerator = patternGenerator, ColorTable = colorTable,
+      PatternNameTable = patternNameTable, HasBsaveHeader = false,
     };
   }
 
