@@ -17,7 +17,18 @@ public readonly record struct ColoRixFile : IImageFormatReader<ColoRixFile>, IIm
   internal const int HeaderSize = 10;
 
   static string IImageFormatMetadata<ColoRixFile>.PrimaryExtension => ".rix";
-  static string[] IImageFormatMetadata<ColoRixFile>.FileExtensions => [".rix", ".scx", ".sci"];
+
+  /// <summary>The numbered names are the same format under the screen mode it was saved in.</summary>
+  /// <remarks>
+  /// XnView's catalogue writes this row's extensions as <c>rix sci scx sc?</c>, one decoder for all
+  /// of them: the trailing character is the ColoRIX screen mode and the header behind it is
+  /// identical. The names are shared with other things from the same era, so nothing here trusts
+  /// them — the file still has to open with <c>RIX3</c>.
+  /// </remarks>
+  static string[] IImageFormatMetadata<ColoRixFile>.FileExtensions => [
+    ".rix", ".scx", ".sci",
+    ".sc0", ".sc1", ".sc2", ".sc3", ".sc4", ".sc5", ".sc6", ".sc7", ".sc8", ".sc9",
+  ];
   static ColoRixFile IImageFormatReader<ColoRixFile>.FromSpan(ReadOnlySpan<byte> data) => ColoRixReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<ColoRixFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [256])

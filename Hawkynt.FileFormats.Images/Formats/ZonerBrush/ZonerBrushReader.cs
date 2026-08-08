@@ -34,6 +34,14 @@ public static class ZonerBrushReader {
       throw new InvalidDataException(
         $"A Zoner brush carries a {ZonerBrushFile.Width}x{ZonerBrushFile.Height} preview needing {ZonerBrushFile.MinimumFileSize} bytes; got {data.Length}.");
 
+    // The length was the whole of the test, which is not a test: any file over 5368 bytes was read
+    // as a 100 by 100 picture of whatever happened to be at offset 168. `.zbr` is also ZBrush's
+    // name, and a ZBrush file is far longer than this — it would have been drawn every time.
+    if (!ZonerBrushFile.HasSignature(data))
+      throw new InvalidDataException(
+        "Not a Zoner brush: it does not open with 0x9A 0x02 and carry 0x00 '-' '-' '-' 0x00 at "
+        + "offset 3.");
+
     return new() {
       Header = data[..ZonerBrushFile.PaletteOffset].ToArray(),
       Palette = data.Slice(ZonerBrushFile.PaletteOffset, ZonerBrushFile.PaletteCount * ZonerBrushFile.PaletteEntrySize).ToArray(),

@@ -12,7 +12,17 @@ public readonly record struct BmpFile :
   IImageInfoReader<BmpFile>, IFormatChunkLayout<BmpFile> {
 
   static string IImageFormatMetadata<BmpFile>.PrimaryExtension => ".bmp";
-  static string[] IImageFormatMetadata<BmpFile>.FileExtensions => [".bmp", ".dib", ".bga", ".rl4", ".rl8", ".vga", ".sys"];
+
+  /// <summary><c>.bum</c> is a Poser bump map, which is a Windows DIB and nothing else.</summary>
+  /// <remarks>
+  /// All three Poser samples are ordinary uncompressed 32-bit DIBs whose stated file size is the
+  /// file's own. The fourth byte of each pixel is padding rather than an alpha channel — the height
+  /// is in the colour — but that is a matter of what the picture means, not of how it is stored, so
+  /// the reader is this one and the name is claimed here. The signature still decides: anything
+  /// under the name that does not open with a DIB header is refused.
+  /// </remarks>
+  static string[] IImageFormatMetadata<BmpFile>.FileExtensions =>
+    [".bmp", ".dib", ".bga", ".rl4", ".rl8", ".vga", ".sys", ".bum"];
   static BmpFile IImageFormatReader<BmpFile>.FromSpan(ReadOnlySpan<byte> data) => BmpReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<BmpFile>.Capabilities => FormatCapability.HasDedicatedOptimizer;
   static VideoMode[] IImageFormatMetadata<BmpFile>.VideoModes => [

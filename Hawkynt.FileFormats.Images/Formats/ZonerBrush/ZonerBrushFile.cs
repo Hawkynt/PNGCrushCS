@@ -39,6 +39,22 @@ public readonly record struct ZonerBrushFile
 
   static string IImageFormatMetadata<ZonerBrushFile>.PrimaryExtension => ".zbr";
   static string[] IImageFormatMetadata<ZonerBrushFile>.FileExtensions => [".zbr"];
+
+  /// <summary>What all three samples open with, and what a ZBrush file under the same name does not.</summary>
+  /// <remarks>
+  /// Byte 2 differs between files, so it is not part of the test; bytes 0, 1 and 3 through 7 are the
+  /// same in every one. ZBrush also writes <c>.zbr</c> and opens with the words "ZBrush File", which
+  /// this refuses.
+  /// </remarks>
+  internal static ReadOnlySpan<byte> Signature => [0x9A, 0x02, 0x02, 0x00, 0x2D, 0x2D, 0x2D, 0x00];
+
+  internal static bool HasSignature(ReadOnlySpan<byte> data)
+    => data.Length >= 8
+       && data[0] == 0x9A && data[1] == 0x02
+       && data[3] == 0x00 && data[4] == 0x2D && data[5] == 0x2D && data[6] == 0x2D && data[7] == 0x00;
+
+  static bool? IImageFormatMetadata<ZonerBrushFile>.MatchesSignature(ReadOnlySpan<byte> header)
+    => header.Length < 8 ? null : HasSignature(header);
   static ZonerBrushFile IImageFormatReader<ZonerBrushFile>.FromSpan(ReadOnlySpan<byte> data) => ZonerBrushReader.FromSpan(data);
   static byte[] IImageFormatWriter<ZonerBrushFile>.ToBytes(ZonerBrushFile file) => ZonerBrushWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<ZonerBrushFile>.VideoModes => [
