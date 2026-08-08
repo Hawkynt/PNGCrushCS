@@ -11,11 +11,13 @@ namespace FileFormat.NeroCoverDesigner;
 /// XnView exactly once the wrapper is stepped over.
 /// </remarks>
 public readonly record struct NeroCoverDesignerFile
-  : IImageFormatReader<NeroCoverDesignerFile>, IImageToRawImage<NeroCoverDesignerFile> {
+  : IImageFormatReader<NeroCoverDesignerFile>, IImageToRawImage<NeroCoverDesignerFile>,
+    IImageFromRawImage<NeroCoverDesignerFile>, IImageFormatWriter<NeroCoverDesignerFile> {
 
   static string IImageFormatMetadata<NeroCoverDesignerFile>.PrimaryExtension => ".cde";
   static string[] IImageFormatMetadata<NeroCoverDesignerFile>.FileExtensions => [".cde",".nct"];
   static NeroCoverDesignerFile IImageFormatReader<NeroCoverDesignerFile>.FromSpan(ReadOnlySpan<byte> data) => NeroCoverDesignerReader.FromSpan(data);
+  static byte[] IImageFormatWriter<NeroCoverDesignerFile>.ToBytes(NeroCoverDesignerFile file) => NeroCoverDesignerWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<NeroCoverDesignerFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [16777216])
   ];
@@ -33,4 +35,10 @@ public readonly record struct NeroCoverDesignerFile
   public bool IsPng { get; init; }
 
   public static RawImage ToRawImage(NeroCoverDesignerFile file) => WrappedPicture.Decode(file.Embedded, file.IsPng);
+
+  public static NeroCoverDesignerFile FromRawImage(RawImage image) {
+    var (embedded, isPng) = WrappedPicture.Encode(image);
+
+    return new() { Embedded = embedded, IsPng = isPng };
+  }
 }

@@ -11,11 +11,13 @@ namespace FileFormat.FunPhotor;
 /// format is the wrapper, and all three samples come out of the PNG reader matching XnView exactly.
 /// </remarks>
 public readonly record struct FunPhotorFile
-  : IImageFormatReader<FunPhotorFile>, IImageToRawImage<FunPhotorFile> {
+  : IImageFormatReader<FunPhotorFile>, IImageToRawImage<FunPhotorFile>,
+    IImageFromRawImage<FunPhotorFile>, IImageFormatWriter<FunPhotorFile> {
 
   static string IImageFormatMetadata<FunPhotorFile>.PrimaryExtension => ".fpr";
   static string[] IImageFormatMetadata<FunPhotorFile>.FileExtensions => [".fpr"];
   static FunPhotorFile IImageFormatReader<FunPhotorFile>.FromSpan(ReadOnlySpan<byte> data) => FunPhotorReader.FromSpan(data);
+  static byte[] IImageFormatWriter<FunPhotorFile>.ToBytes(FunPhotorFile file) => FunPhotorWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<FunPhotorFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [16777216])
   ];
@@ -28,4 +30,10 @@ public readonly record struct FunPhotorFile
 
   public static RawImage ToRawImage(FunPhotorFile file)
     => PngFile.ToRawImage(PngReader.FromBytes(file.Embedded ?? throw new InvalidDataException("A FunPhotor frame carries no picture.")));
+
+  public static FunPhotorFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    return new() { Embedded = PngWriter.ToBytes(PngFile.FromRawImage(image)) };
+  }
 }

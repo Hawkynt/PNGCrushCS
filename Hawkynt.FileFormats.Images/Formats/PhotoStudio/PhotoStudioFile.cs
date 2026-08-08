@@ -11,11 +11,13 @@ namespace FileFormat.PhotoStudio;
 /// XnView exactly once the wrapper is stepped over.
 /// </remarks>
 public readonly record struct PhotoStudioFile
-  : IImageFormatReader<PhotoStudioFile>, IImageToRawImage<PhotoStudioFile> {
+  : IImageFormatReader<PhotoStudioFile>, IImageToRawImage<PhotoStudioFile>,
+    IImageFromRawImage<PhotoStudioFile>, IImageFormatWriter<PhotoStudioFile> {
 
   static string IImageFormatMetadata<PhotoStudioFile>.PrimaryExtension => ".psf";
   static string[] IImageFormatMetadata<PhotoStudioFile>.FileExtensions => [".psf"];
   static PhotoStudioFile IImageFormatReader<PhotoStudioFile>.FromSpan(ReadOnlySpan<byte> data) => PhotoStudioReader.FromSpan(data);
+  static byte[] IImageFormatWriter<PhotoStudioFile>.ToBytes(PhotoStudioFile file) => PhotoStudioWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<PhotoStudioFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [16777216])
   ];
@@ -33,4 +35,10 @@ public readonly record struct PhotoStudioFile
   public bool IsPng { get; init; }
 
   public static RawImage ToRawImage(PhotoStudioFile file) => WrappedPicture.Decode(file.Embedded, file.IsPng);
+
+  public static PhotoStudioFile FromRawImage(RawImage image) {
+    var (embedded, isPng) = WrappedPicture.Encode(image);
+
+    return new() { Embedded = embedded, IsPng = isPng };
+  }
 }

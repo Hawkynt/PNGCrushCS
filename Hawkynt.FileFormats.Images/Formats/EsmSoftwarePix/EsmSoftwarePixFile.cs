@@ -11,11 +11,13 @@ namespace FileFormat.EsmSoftwarePix;
 /// XnView exactly once the wrapper is stepped over.
 /// </remarks>
 public readonly record struct EsmSoftwarePixFile
-  : IImageFormatReader<EsmSoftwarePixFile>, IImageToRawImage<EsmSoftwarePixFile> {
+  : IImageFormatReader<EsmSoftwarePixFile>, IImageToRawImage<EsmSoftwarePixFile>,
+    IImageFromRawImage<EsmSoftwarePixFile>, IImageFormatWriter<EsmSoftwarePixFile> {
 
   static string IImageFormatMetadata<EsmSoftwarePixFile>.PrimaryExtension => ".pix";
   static string[] IImageFormatMetadata<EsmSoftwarePixFile>.FileExtensions => [".pix"];
   static EsmSoftwarePixFile IImageFormatReader<EsmSoftwarePixFile>.FromSpan(ReadOnlySpan<byte> data) => EsmSoftwarePixReader.FromSpan(data);
+  static byte[] IImageFormatWriter<EsmSoftwarePixFile>.ToBytes(EsmSoftwarePixFile file) => EsmSoftwarePixWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<EsmSoftwarePixFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [16777216])
   ];
@@ -33,4 +35,10 @@ public readonly record struct EsmSoftwarePixFile
   public bool IsPng { get; init; }
 
   public static RawImage ToRawImage(EsmSoftwarePixFile file) => WrappedPicture.Decode(file.Embedded, file.IsPng);
+
+  public static EsmSoftwarePixFile FromRawImage(RawImage image) {
+    var (embedded, isPng) = WrappedPicture.Encode(image);
+
+    return new() { Embedded = embedded, IsPng = isPng };
+  }
 }

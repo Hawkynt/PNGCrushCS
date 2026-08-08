@@ -11,11 +11,13 @@ namespace FileFormat.PhotoLine;
 /// XnView exactly once the wrapper is stepped over.
 /// </remarks>
 public readonly record struct PhotoLineFile
-  : IImageFormatReader<PhotoLineFile>, IImageToRawImage<PhotoLineFile> {
+  : IImageFormatReader<PhotoLineFile>, IImageToRawImage<PhotoLineFile>,
+    IImageFromRawImage<PhotoLineFile>, IImageFormatWriter<PhotoLineFile> {
 
   static string IImageFormatMetadata<PhotoLineFile>.PrimaryExtension => ".pld";
   static string[] IImageFormatMetadata<PhotoLineFile>.FileExtensions => [".pld"];
   static PhotoLineFile IImageFormatReader<PhotoLineFile>.FromSpan(ReadOnlySpan<byte> data) => PhotoLineReader.FromSpan(data);
+  static byte[] IImageFormatWriter<PhotoLineFile>.ToBytes(PhotoLineFile file) => PhotoLineWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<PhotoLineFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [16777216])
   ];
@@ -33,4 +35,10 @@ public readonly record struct PhotoLineFile
   public bool IsPng { get; init; }
 
   public static RawImage ToRawImage(PhotoLineFile file) => WrappedPicture.Decode(file.Embedded, file.IsPng);
+
+  public static PhotoLineFile FromRawImage(RawImage image) {
+    var (embedded, isPng) = WrappedPicture.Encode(image);
+
+    return new() { Embedded = embedded, IsPng = isPng };
+  }
 }

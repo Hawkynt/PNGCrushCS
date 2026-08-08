@@ -11,11 +11,13 @@ namespace FileFormat.WizSolitaireDeck;
 /// XnView exactly once the wrapper is stepped over.
 /// </remarks>
 public readonly record struct WizSolitaireDeckFile
-  : IImageFormatReader<WizSolitaireDeckFile>, IImageToRawImage<WizSolitaireDeckFile> {
+  : IImageFormatReader<WizSolitaireDeckFile>, IImageToRawImage<WizSolitaireDeckFile>,
+    IImageFromRawImage<WizSolitaireDeckFile>, IImageFormatWriter<WizSolitaireDeckFile> {
 
   static string IImageFormatMetadata<WizSolitaireDeckFile>.PrimaryExtension => ".dec";
   static string[] IImageFormatMetadata<WizSolitaireDeckFile>.FileExtensions => [".dec"];
   static WizSolitaireDeckFile IImageFormatReader<WizSolitaireDeckFile>.FromSpan(ReadOnlySpan<byte> data) => WizSolitaireDeckReader.FromSpan(data);
+  static byte[] IImageFormatWriter<WizSolitaireDeckFile>.ToBytes(WizSolitaireDeckFile file) => WizSolitaireDeckWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<WizSolitaireDeckFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [16777216])
   ];
@@ -33,4 +35,10 @@ public readonly record struct WizSolitaireDeckFile
   public bool IsPng { get; init; }
 
   public static RawImage ToRawImage(WizSolitaireDeckFile file) => WrappedPicture.Decode(file.Embedded, file.IsPng);
+
+  public static WizSolitaireDeckFile FromRawImage(RawImage image) {
+    var (embedded, isPng) = WrappedPicture.Encode(image);
+
+    return new() { Embedded = embedded, IsPng = isPng };
+  }
 }

@@ -47,6 +47,36 @@ internal static class WrappedPicture {
       : JpegFile.ToRawImage(JpegReader.FromBytes(embedded));
   }
 
+  /// <summary>Encodes a picture into the form these wrappers carry.</summary>
+  /// <remarks>
+  /// PNG, because it is the one of the two that loses nothing. A wrapper says nothing about which
+  /// its picture has to be — the readers here take either — so there is no reason to choose the
+  /// lossy one.
+  /// </remarks>
+  internal static (byte[] Embedded, bool IsPng) Encode(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    return (PngWriter.ToBytes(PngFile.FromRawImage(image)), true);
+  }
+
+  /// <summary>Assembles one of these: the name it opens with, then the picture.</summary>
+  /// <remarks>
+  /// The bookkeeping between the two is whatever the program that wrote the file put there, and
+  /// nothing here knows what it means — the readers find the picture rather than being told where it
+  /// is, precisely because it does not sit at a fixed offset. So this writes the magic and the
+  /// picture and nothing in between, which is a file every reader here opens and the shortest one
+  /// that is honest about what is known.
+  /// </remarks>
+  internal static byte[] Assemble(ReadOnlySpan<byte> magic, byte[] embedded) {
+    ArgumentNullException.ThrowIfNull(embedded);
+
+    var result = new byte[magic.Length + embedded.Length];
+    magic.CopyTo(result);
+    embedded.CopyTo(result.AsSpan(magic.Length));
+
+    return result;
+  }
+
   /// <summary>Takes the picture out of a file, having checked it opens the way the format does.</summary>
   internal static (byte[] Embedded, bool IsPng) Extract(ReadOnlySpan<byte> data, ReadOnlySpan<byte> magic, string formatName) {
     if (data.Length <= magic.Length)
