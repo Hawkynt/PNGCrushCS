@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.WorldportFax;
 
 /// <summary>In-memory representation of a WorldportFax WPF image.</summary>
-public readonly record struct WorldportFaxFile : IImageFormatReader<WorldportFaxFile>, IImageToRawImage<WorldportFaxFile>, IImageFormatWriter<WorldportFaxFile> {
+public readonly record struct WorldportFaxFile : IImageFormatReader<WorldportFaxFile>, IImageToRawImage<WorldportFaxFile>, IImageFromRawImage<WorldportFaxFile>, IImageFormatWriter<WorldportFaxFile> {
 
   static string IImageFormatMetadata<WorldportFaxFile>.PrimaryExtension => ".wpf";
   static string[] IImageFormatMetadata<WorldportFaxFile>.FileExtensions => [".wpf"];
@@ -55,6 +55,21 @@ public readonly record struct WorldportFaxFile : IImageFormatReader<WorldportFax
       Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
+    };
+  }
+
+  /// <summary>Thresholds any <see cref="RawImage"/> down to the two tones this format holds.
+  /// Every size fits, because the header states its own.</summary>
+  public static WorldportFaxFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    // A set bit is ink on white paper, the way round ToRawImage reads it back again. The
+    // opposite polarity is just as common among scanner formats and would hand back every
+    // picture as its own negative.
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      PixelData = MonochromePage.Encode(image, image.Width, image.Height, inkIsWhite: false),
     };
   }
 

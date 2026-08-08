@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.RicohFax;
 
 /// <summary>In-memory representation of a RicohFax RIC image.</summary>
-public readonly record struct RicohFaxFile : IImageFormatReader<RicohFaxFile>, IImageToRawImage<RicohFaxFile>, IImageFormatWriter<RicohFaxFile> {
+public readonly record struct RicohFaxFile : IImageFormatReader<RicohFaxFile>, IImageToRawImage<RicohFaxFile>, IImageFromRawImage<RicohFaxFile>, IImageFormatWriter<RicohFaxFile> {
 
   static string IImageFormatMetadata<RicohFaxFile>.PrimaryExtension => ".ric";
   static string[] IImageFormatMetadata<RicohFaxFile>.FileExtensions => [".ric"];
@@ -58,6 +58,24 @@ public readonly record struct RicohFaxFile : IImageFormatReader<RicohFaxFile>, I
       Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
+    };
+  }
+
+  /// <summary>Thresholds any <see cref="RawImage"/> down to the two tones this format holds.
+  /// Every size fits, because the header states its own.</summary>
+  public static RicohFaxFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    // A set bit is ink on white paper, the way round ToRawImage reads it back again. The
+    // opposite polarity is just as common among scanner formats and would hand back every
+    // picture as its own negative.
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      // 200 dpi and uncompressed, the rows this writer emits.
+      Resolution = 200,
+      Compression = 0,
+      PixelData = MonochromePage.Encode(image, image.Width, image.Height, inkIsWhite: false),
     };
   }
 

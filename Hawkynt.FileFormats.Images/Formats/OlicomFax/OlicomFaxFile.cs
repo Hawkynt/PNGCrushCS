@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.OlicomFax;
 
 /// <summary>In-memory representation of an OlicomFax OFX image.</summary>
-public readonly record struct OlicomFaxFile : IImageFormatReader<OlicomFaxFile>, IImageToRawImage<OlicomFaxFile>, IImageFormatWriter<OlicomFaxFile> {
+public readonly record struct OlicomFaxFile : IImageFormatReader<OlicomFaxFile>, IImageToRawImage<OlicomFaxFile>, IImageFromRawImage<OlicomFaxFile>, IImageFormatWriter<OlicomFaxFile> {
 
   static string IImageFormatMetadata<OlicomFaxFile>.PrimaryExtension => ".ofx";
   static string[] IImageFormatMetadata<OlicomFaxFile>.FileExtensions => [".ofx"];
@@ -55,6 +55,21 @@ public readonly record struct OlicomFaxFile : IImageFormatReader<OlicomFaxFile>,
       Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
+    };
+  }
+
+  /// <summary>Thresholds any <see cref="RawImage"/> down to the two tones this format holds.
+  /// Every size fits, because the header states its own.</summary>
+  public static OlicomFaxFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    // A set bit is ink on white paper, the way round ToRawImage reads it back again. The
+    // opposite polarity is just as common among scanner formats and would hand back every
+    // picture as its own negative.
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      PixelData = MonochromePage.Encode(image, image.Width, image.Height, inkIsWhite: false),
     };
   }
 

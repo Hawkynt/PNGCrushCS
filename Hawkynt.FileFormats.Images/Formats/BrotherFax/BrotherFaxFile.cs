@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.BrotherFax;
 
 /// <summary>In-memory representation of a Brother fax UNI image.</summary>
-public readonly record struct BrotherFaxFile : IImageFormatReader<BrotherFaxFile>, IImageToRawImage<BrotherFaxFile>, IImageFormatWriter<BrotherFaxFile> {
+public readonly record struct BrotherFaxFile : IImageFormatReader<BrotherFaxFile>, IImageToRawImage<BrotherFaxFile>, IImageFromRawImage<BrotherFaxFile>, IImageFormatWriter<BrotherFaxFile> {
 
   static string IImageFormatMetadata<BrotherFaxFile>.PrimaryExtension => ".uni";
   static string[] IImageFormatMetadata<BrotherFaxFile>.FileExtensions => [".uni"];
@@ -58,6 +58,24 @@ public readonly record struct BrotherFaxFile : IImageFormatReader<BrotherFaxFile
       Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
+    };
+  }
+
+  /// <summary>Thresholds any <see cref="RawImage"/> down to the two tones this format holds.
+  /// Every size fits, because the header states its own.</summary>
+  public static BrotherFaxFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    // A set bit is ink on white paper, the way round ToRawImage reads it back again. The
+    // opposite polarity is just as common among scanner formats and would hand back every
+    // picture as its own negative.
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      // Version 1 uncompressed — nothing in the layout varies by version, and the rows go in raw.
+      Version = 1,
+      Compression = 0,
+      PixelData = MonochromePage.Encode(image, image.Width, image.Height, inkIsWhite: false),
     };
   }
 

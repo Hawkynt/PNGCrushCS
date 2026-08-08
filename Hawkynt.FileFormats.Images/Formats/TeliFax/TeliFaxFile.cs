@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.TeliFax;
 
 /// <summary>In-memory representation of a TeliFax MH image.</summary>
-public readonly record struct TeliFaxFile : IImageFormatReader<TeliFaxFile>, IImageToRawImage<TeliFaxFile>, IImageFormatWriter<TeliFaxFile> {
+public readonly record struct TeliFaxFile : IImageFormatReader<TeliFaxFile>, IImageToRawImage<TeliFaxFile>, IImageFromRawImage<TeliFaxFile>, IImageFormatWriter<TeliFaxFile> {
 
   static string IImageFormatMetadata<TeliFaxFile>.PrimaryExtension => ".mh";
   static string[] IImageFormatMetadata<TeliFaxFile>.FileExtensions => [".mh"];
@@ -55,6 +55,22 @@ public readonly record struct TeliFaxFile : IImageFormatReader<TeliFaxFile>, IIm
       Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
+    };
+  }
+
+  /// <summary>Thresholds any <see cref="RawImage"/> down to the two tones this format holds.
+  /// Every size fits, because the header states its own.</summary>
+  public static TeliFaxFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    // A set bit is ink on white paper, the way round ToRawImage reads it back again. The
+    // opposite polarity is just as common among scanner formats and would hand back every
+    // picture as its own negative.
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      Version = 1,
+      PixelData = MonochromePage.Encode(image, image.Width, image.Height, inkIsWhite: false),
     };
   }
 

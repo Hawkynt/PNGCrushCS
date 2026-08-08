@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.FaxMan;
 
 /// <summary>In-memory representation of a FaxMan FMF image.</summary>
-public readonly record struct FaxManFile : IImageFormatReader<FaxManFile>, IImageToRawImage<FaxManFile>, IImageFormatWriter<FaxManFile> {
+public readonly record struct FaxManFile : IImageFormatReader<FaxManFile>, IImageToRawImage<FaxManFile>, IImageFromRawImage<FaxManFile>, IImageFormatWriter<FaxManFile> {
 
   static string IImageFormatMetadata<FaxManFile>.PrimaryExtension => ".fmf";
   static string[] IImageFormatMetadata<FaxManFile>.FileExtensions => [".fmf"];
@@ -58,6 +58,22 @@ public readonly record struct FaxManFile : IImageFormatReader<FaxManFile>, IImag
       Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
+    };
+  }
+
+  /// <summary>Thresholds any <see cref="RawImage"/> down to the two tones this format holds.
+  /// Every size fits, because the header states its own.</summary>
+  public static FaxManFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    // A set bit is ink on white paper, the way round ToRawImage reads it back again. The
+    // opposite polarity is just as common among scanner formats and would hand back every
+    // picture as its own negative.
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      Version = 1,
+      PixelData = MonochromePage.Encode(image, image.Width, image.Height, inkIsWhite: false),
     };
   }
 
