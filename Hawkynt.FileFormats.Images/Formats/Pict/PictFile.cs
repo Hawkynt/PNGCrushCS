@@ -34,7 +34,7 @@ public readonly record struct PictFile : IImageFormatReader<PictFile>, IImageToR
 
   static string IImageFormatMetadata<PictFile>.PrimaryExtension => ".pict";
   /// <summary>Also <c>.pict2</c>, which is the same picture with its version in the name.</summary>
-  static string[] IImageFormatMetadata<PictFile>.FileExtensions => [".pict", ".pct", ".pict2"];
+  static string[] IImageFormatMetadata<PictFile>.FileExtensions => [".pict", ".pct", ".pict2", ".bum", ".x"];
   static PictFile IImageFormatReader<PictFile>.FromSpan(ReadOnlySpan<byte> data) => PictReader.FromSpan(data);
   static byte[] IImageFormatWriter<PictFile>.ToBytes(PictFile file) => PictWriter.ToBytes(file);
   /// <summary>Image width in pixels.</summary>
@@ -59,6 +59,17 @@ public readonly record struct PictFile : IImageFormatReader<PictFile>, IImageToR
     return p;
   }
 
+  /// <summary>The file's colour table grown to the full 256 entries, or a grey ramp when it states none.</summary>
+  private static byte[] _PadPalette(byte[]? stated) {
+    if (stated is not { Length: >= 3 })
+      return _DefaultPalette[..];
+
+    var full = new byte[768];
+    var copy = Math.Min(stated.Length - stated.Length % 3, 768);
+    stated.AsSpan(0, copy).CopyTo(full);
+    return full;
+  }
+
   /// <summary>Converts this PICT file to a format-independent <see cref="RawImage"/>.</summary>
   public static RawImage ToRawImage(PictFile file) {
 
@@ -71,7 +82,13 @@ public readonly record struct PictFile : IImageFormatReader<PictFile>, IImageToR
       };
 
     // Indexed (8bpp)
-    var palette = file.Palette is { Length: >= 768 } p ? p[..768] : _DefaultPalette[..];
+    //
+    // A QuickDraw colour table states only as many entries as the picture uses, and most state far
+    // fewer than 256 — one here has 59. Requiring a full 768 bytes threw every one of those away and
+    // substituted a grey ramp, so a picture drawn from indices 0 to 58 came out in the bottom fifth
+    // of that ramp: recognisable in shape, and very nearly black. Short tables are padded instead,
+    // which leaves the colours the file states where the file put them.
+    var palette = _PadPalette(file.Palette);
     return new() {
       Width = file.Width,
       Height = file.Height,
