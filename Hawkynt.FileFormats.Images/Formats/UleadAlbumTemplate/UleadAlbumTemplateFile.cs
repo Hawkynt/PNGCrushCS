@@ -22,9 +22,14 @@ namespace FileFormat.UleadAlbumTemplate;
 /// exactly on the picture's own end-of-image marker in all twelve records. After it come four bytes
 /// that describe the layout the diagram draws, and they agree with it: <c>LH</c> states twelve cells
 /// in three rows of four, <c>L1</c> states one cell in one row of one.
+/// <para/>
+/// Writing puts the directory back at the end, because the offset and the length the header states
+/// have to add up to the file. What it does not state is the cell layout: that is a description of
+/// how a page is arranged, and a diagram this library was handed says nothing about one.
 /// </remarks>
 public sealed class UleadAlbumTemplateFile
   : IImageFormatReader<UleadAlbumTemplateFile>, IImageToRawImage<UleadAlbumTemplateFile>,
+    IImageFromRawImage<UleadAlbumTemplateFile>, IImageFormatWriter<UleadAlbumTemplateFile>,
     IMultiImageFileFormat<UleadAlbumTemplateFile> {
 
   /// <summary>The four bytes every one of these opens with.</summary>
@@ -85,4 +90,13 @@ public sealed class UleadAlbumTemplateFile
 
     return ToRawImage(file, 0);
   }
+
+  /// <summary>A set of one template, whose diagram is this picture.</summary>
+  public static UleadAlbumTemplateFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    return new() { Templates = [new("P1", JpegWriter.ToBytes(JpegFile.FromRawImage(image)))] };
+  }
+
+  static byte[] IImageFormatWriter<UleadAlbumTemplateFile>.ToBytes(UleadAlbumTemplateFile file)
+    => UleadAlbumTemplateWriter.ToBytes(file);
 }

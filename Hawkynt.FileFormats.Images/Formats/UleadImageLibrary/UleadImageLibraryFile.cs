@@ -28,9 +28,15 @@ namespace FileFormat.UleadImageLibrary;
 /// The pictures are thumbnails. The full-size artwork is the <c>extra</c> block each record carries
 /// after its metadata, whose format is not established here — it is where the 2.2 MB of
 /// <c>2DFrame.pst</c> goes.
+/// <para/>
+/// Writing computes the same chain rather than inventing a directory, and states each record's size
+/// from the picture, because the reader refuses a record whose size is not the one the JPEG states of
+/// itself. The extra block goes out empty: what belongs in it is artwork in a form nothing here has
+/// worked out, and filling it with anything else would be inventing it.
 /// </remarks>
 public sealed class UleadImageLibraryFile
   : IImageFormatReader<UleadImageLibraryFile>, IImageToRawImage<UleadImageLibraryFile>,
+    IImageFromRawImage<UleadImageLibraryFile>, IImageFormatWriter<UleadImageLibraryFile>,
     IMultiImageFileFormat<UleadImageLibraryFile> {
 
   /// <summary>The four bytes every one of these opens with.</summary>
@@ -90,4 +96,13 @@ public sealed class UleadImageLibraryFile
 
     return ToRawImage(file, 0);
   }
+
+  /// <summary>A library of one item, whose picture is this one.</summary>
+  public static UleadImageLibraryFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    return new() { Items = [JpegWriter.ToBytes(JpegFile.FromRawImage(image))] };
+  }
+
+  static byte[] IImageFormatWriter<UleadImageLibraryFile>.ToBytes(UleadImageLibraryFile file)
+    => UleadImageLibraryWriter.ToBytes(file);
 }

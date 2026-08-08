@@ -70,6 +70,23 @@ internal static class WrappedDib {
     return size + used * 4;
   }
 
+  /// <summary>A picture as the bitmap one of these containers stores: the info header, the palette
+  /// and the rows, with no file header in front of it.</summary>
+  /// <remarks>
+  /// The inverse of <see cref="Decode"/>, and it goes through the same bitmap writer the reader hands
+  /// its bytes to — so the palette form, the row order and the padding are whatever that writer and
+  /// that reader already agree on rather than a second opinion about them kept here.
+  /// </remarks>
+  internal static byte[] Encode(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var bmp = BmpWriter.ToBytes(BmpFile.FromRawImage(image));
+    if (bmp.Length <= 14)
+      throw new InvalidDataException("The bitmap writer produced nothing to embed.");
+
+    return bmp[14..];
+  }
+
   /// <summary>Decodes the bitmap at <paramref name="at"/>, or throws saying why it is not one.</summary>
   internal static RawImage Decode(ReadOnlySpan<byte> data, int at, int maxDimension, string what) {
     var length = Measure(data, at, maxDimension);

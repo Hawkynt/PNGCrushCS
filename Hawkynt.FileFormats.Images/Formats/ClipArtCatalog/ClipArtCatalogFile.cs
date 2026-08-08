@@ -19,11 +19,14 @@ namespace FileFormat.ClipArtCatalog;
 /// — lands exactly on the end and nowhere else. The names bear it out too: the thumbnail read out of
 /// the chunk called <c>ape.pcx</c> is an ape.
 /// <para/>
-/// It does not write. What it read was somebody's index of files that are not in it.
+/// Writing puts the chunks back round a thumbnail with every length written from what follows it. It
+/// is an index with one entry in it: the drawings a real catalogue stands for are the files beside
+/// it, and those are not in the catalogue and are not invented on the way out.
 /// </remarks>
 [FormatMagicBytes([(byte)'C', (byte)'A', (byte)'T', (byte)' '])]
 public sealed class ClipArtCatalogFile
   : IImageFormatReader<ClipArtCatalogFile>, IImageToRawImage<ClipArtCatalogFile>,
+    IImageFromRawImage<ClipArtCatalogFile>, IImageFormatWriter<ClipArtCatalogFile>,
     IMultiImageFileFormat<ClipArtCatalogFile> {
 
   /// <summary>The four bytes every one of these opens with.</summary>
@@ -70,6 +73,14 @@ public sealed class ClipArtCatalogFile
 
     return file.Entries[0].Thumbnail;
   }
+
+  /// <summary>A catalogue of one drawing, whose thumbnail is this picture.</summary>
+  public static ClipArtCatalogFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    return new() { Entries = [new("clipart.pcx", image)] };
+  }
+
+  static byte[] IImageFormatWriter<ClipArtCatalogFile>.ToBytes(ClipArtCatalogFile file) => ClipArtCatalogWriter.ToBytes(file);
 }
 
 /// <summary>One catalogued drawing: the name of the file it stands for and the thumbnail of it.</summary>

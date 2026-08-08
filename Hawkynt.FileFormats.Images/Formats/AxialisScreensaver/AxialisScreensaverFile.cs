@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using FileFormat.Core;
 using FileFormat.EmbeddedPicture;
+using FileFormat.Png;
 
 namespace FileFormat.AxialisScreensaver;
 
@@ -26,11 +27,15 @@ namespace FileFormat.AxialisScreensaver;
 /// found would be drawing wallpaper. Records that only reference a file on the author's disk carry
 /// no bytes at all and contribute nothing.
 /// <para/>
-/// It does not write: the pictures are the smallest part of a project and nothing here models the
-/// rest of one.
+/// Writing puts the media records back — the signature, the version digits, and each picture behind
+/// the length that picture has — and nothing else. The timing, the transitions and the paths the
+/// author's pictures came from are the greater part of a project and nothing here models them, so
+/// what is written is a file whose pictures stand where a project's do and which the producer itself
+/// would not run.
 /// </remarks>
 public sealed class AxialisScreensaverFile
   : IImageFormatReader<AxialisScreensaverFile>, IImageToRawImage<AxialisScreensaverFile>,
+    IImageFromRawImage<AxialisScreensaverFile>, IImageFormatWriter<AxialisScreensaverFile>,
     IMultiImageFileFormat<AxialisScreensaverFile> {
 
   /// <summary>The five bytes every one of these opens with, before four digits of version.</summary>
@@ -79,4 +84,13 @@ public sealed class AxialisScreensaverFile
 
     return ToRawImage(file, 0);
   }
+
+  /// <summary>A project embedding one picture, as the PNG a media record carries whole.</summary>
+  public static AxialisScreensaverFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    return new() { Version = "0100", Embedded = [PngWriter.ToBytes(PngFile.FromRawImage(image))] };
+  }
+
+  static byte[] IImageFormatWriter<AxialisScreensaverFile>.ToBytes(AxialisScreensaverFile file)
+    => AxialisScreensaverWriter.ToBytes(file);
 }

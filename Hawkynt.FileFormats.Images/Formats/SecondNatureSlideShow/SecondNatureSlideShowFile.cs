@@ -22,7 +22,10 @@ namespace FileFormat.SecondNatureSlideShow;
 /// The arithmetic closes as well: every slide's start is the one before it plus that one's length, and
 /// the last one ends on the last byte of the file.
 /// <para/>
-/// It does not write. What it read was a catalogue with a publisher's number on it.
+/// Writing puts the directory back with every offset the one before it plus that one's length, and
+/// states each slide's size in both the places the record keeps it. A collection of one slide is
+/// still a collection; what it does not carry is the publisher's catalogue number, which is not
+/// something to invent.
 /// </remarks>
 [FormatMagicBytes([
   (byte)'S', (byte)'e', (byte)'c', (byte)'o', (byte)'n', (byte)'d', (byte)' ',
@@ -30,6 +33,7 @@ namespace FileFormat.SecondNatureSlideShow;
 ])]
 public sealed class SecondNatureSlideShowFile
   : IImageFormatReader<SecondNatureSlideShowFile>, IImageToRawImage<SecondNatureSlideShowFile>,
+    IImageFromRawImage<SecondNatureSlideShowFile>, IImageFormatWriter<SecondNatureSlideShowFile>,
     IMultiImageFileFormat<SecondNatureSlideShowFile> {
 
   /// <summary>The line every one of these opens with.</summary>
@@ -90,6 +94,19 @@ public sealed class SecondNatureSlideShowFile
 
     return ToRawImage(file, 0);
   }
+
+  /// <summary>A collection of one slide, whose JPEG is this picture.</summary>
+  public static SecondNatureSlideShowFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    return new() {
+      Title = "Slide Show",
+      Slides = [new(image.Width, image.Height, JpegWriter.ToBytes(JpegFile.FromRawImage(image)))],
+    };
+  }
+
+  static byte[] IImageFormatWriter<SecondNatureSlideShowFile>.ToBytes(SecondNatureSlideShowFile file)
+    => SecondNatureSlideShowWriter.ToBytes(file);
 }
 
 /// <summary>One slide: the size its record states and the JPEG that follows it.</summary>

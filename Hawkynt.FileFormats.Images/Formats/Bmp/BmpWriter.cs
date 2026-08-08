@@ -132,6 +132,7 @@ public static class BmpWriter {
 
     var bytesPerRow = (width * bitsPerPixel + 7) / 8;
     var paddedBytesPerRow = (bytesPerRow + 3) & ~3;
+    pixelData = _AddRowPadding(pixelData, width, height, bitsPerPixel);
 
     if (bmpCompression is 1 or 2) {
       for (var row = 0; row < height; ++row) {
@@ -175,5 +176,44 @@ public static class BmpWriter {
     }
 
     return ms.ToArray();
+  }
+
+  /// <summary>Restacks sub-byte rows from the continuous layout to BMP's byte-aligned one.</summary>
+  /// <remarks>
+  /// The counterpart of what the reader does on the way in, and it was missing. A four- or one-bit
+  /// picture is held here as one unbroken stream of indices with nothing between its rows; a BMP
+  /// starts every row on a fresh byte. Writing the stream out as though it were already aligned costs
+  /// nothing while the row happens to be a whole number of bytes — a four-bit picture of even width,
+  /// a one-bit one whose width is a multiple of eight — and slides every row after the first by part
+  /// of a byte otherwise.
+  /// <para/>
+  /// What it looked like was a picture that leans. ImageMagick and the reader here agreed with each
+  /// other over a sixty-nine pixel wide four-bit bitmap and both disagreed with what went in, which is
+  /// what says the fault was on this side.
+  /// </remarks>
+  private static byte[] _AddRowPadding(byte[] pixelData, int width, int height, int bitsPerPixel) {
+    if (bitsPerPixel >= 8)
+      return pixelData;
+
+    var bytesPerRow = (width * bitsPerPixel + 7) / 8;
+    if (bytesPerRow * 8 == width * bitsPerPixel)
+      return pixelData;
+
+    var result = new byte[bytesPerRow * height];
+    var mask = (1 << bitsPerPixel) - 1;
+
+    for (var y = 0; y < height; ++y)
+      for (var x = 0; x < width; ++x) {
+        var sourceBit = (y * width + x) * bitsPerPixel;
+        var sourceByte = sourceBit >> 3;
+        if (sourceByte >= pixelData.Length)
+          return result;
+
+        var value = (pixelData[sourceByte] >> (8 - bitsPerPixel - (sourceBit & 7))) & mask;
+        var targetBit = y * bytesPerRow * 8 + x * bitsPerPixel;
+        result[targetBit >> 3] |= (byte)(value << (8 - bitsPerPixel - (targetBit & 7)));
+      }
+
+    return result;
   }
 }

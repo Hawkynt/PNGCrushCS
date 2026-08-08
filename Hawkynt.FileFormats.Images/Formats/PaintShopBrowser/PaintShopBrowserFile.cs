@@ -32,10 +32,14 @@ namespace FileFormat.PaintShopBrowser;
 /// No sample of either version was available. The fixtures in the tests are caches built byte by
 /// byte from those three readers' field lists.
 /// <para/>
-/// It does not write.
+/// Writing produces the version 2 layout and only that one, for the same reason the reader refuses
+/// version 1: its coding is against a palette that is not in the file.
 /// </remarks>
 [FormatMagicBytes([0x4A, 0x41, 0x53, 0x43, 0x20, 0x42, 0x52, 0x4F, 0x57, 0x53, 0x20, 0x46, 0x49, 0x4C, 0x45])]
-public sealed class PaintShopBrowserFile : IImageFormatReader<PaintShopBrowserFile>, IImageToRawImage<PaintShopBrowserFile>, IMultiImageFileFormat<PaintShopBrowserFile> {
+public sealed class PaintShopBrowserFile
+  : IImageFormatReader<PaintShopBrowserFile>, IImageToRawImage<PaintShopBrowserFile>,
+    IImageFromRawImage<PaintShopBrowserFile>, IImageFormatWriter<PaintShopBrowserFile>,
+    IMultiImageFileFormat<PaintShopBrowserFile> {
 
   /// <summary>The letters the file opens with.</summary>
   public const string Magic = "JASC BROWS FILE";
@@ -81,6 +85,20 @@ public sealed class PaintShopBrowserFile : IImageFormatReader<PaintShopBrowserFi
 
     return JpegFile.ToRawImage(JpegReader.FromBytes(file.Thumbnails[index].Jpeg));
   }
+
+  /// <summary>A cache of one thumbnail, which is this picture.</summary>
+  public static PaintShopBrowserFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    return new() {
+      Version = (2, 0),
+      Directory = string.Empty,
+      Thumbnails = [new("picture", image.Width, image.Height, JpegWriter.ToBytes(JpegFile.FromRawImage(image)))],
+    };
+  }
+
+  static byte[] IImageFormatWriter<PaintShopBrowserFile>.ToBytes(PaintShopBrowserFile file)
+    => PaintShopBrowserWriter.ToBytes(file);
 }
 
 /// <summary>One cached thumbnail and what the cache says about the picture it came from.</summary>

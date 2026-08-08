@@ -18,7 +18,9 @@ namespace FileFormat.Vue;
 /// The picture is small because a Vue object has no larger one; it is what the file holds, not a
 /// reduction of something else.
 /// </remarks>
-public readonly record struct VueFile : IImageFormatReader<VueFile>, IImageToRawImage<VueFile> {
+public readonly record struct VueFile
+  : IImageFormatReader<VueFile>, IImageToRawImage<VueFile>,
+    IImageFromRawImage<VueFile>, IImageFormatWriter<VueFile> {
 
   /// <summary>What every one of these opens with.</summary>
   public static ReadOnlySpan<byte> Magic => "Vue d'Esprit\0"u8;
@@ -45,6 +47,21 @@ public readonly record struct VueFile : IImageFormatReader<VueFile>, IImageToRaw
   /// <summary>The GIF the file carries, exactly as it stands in it.</summary>
   public byte[] Embedded { get; init; }
 
+  static byte[] IImageFormatWriter<VueFile>.ToBytes(VueFile file) => VueWriter.ToBytes(file);
+
   public static RawImage ToRawImage(VueFile file)
     => GifFile.ToRawImage(GifReader.FromBytes(file.Embedded ?? throw new InvalidDataException("A Vue object carries no picture.")));
+
+  /// <summary>An object file whose picture is this one, coded as the GIF the format keeps.</summary>
+  public static VueFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    return new() {
+      Name = "object",
+      Description = string.Empty,
+      Width = image.Width,
+      Height = image.Height,
+      Embedded = GifWriter.ToBytes(GifFile.FromRawImage(image)),
+    };
+  }
 }

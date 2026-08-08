@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using FileFormat.Core;
 using FileFormat.EmbeddedPicture;
+using FileFormat.Jpeg;
 
 namespace FileFormat.PhotoParade;
 
@@ -29,12 +30,15 @@ namespace FileFormat.PhotoParade;
 /// tile in three, a preview and a thumbnail in another. The album begins where the first
 /// <c>PNFO</c> says it does.
 /// <para/>
-/// It does not write. The last kilobyte or two of every file is a compressed listing of the theme's
-/// own members in a scheme nothing here has worked out, and a file written without it would not be
-/// a slide show.
+/// Writing puts the album back: each photograph followed by the block describing it, and the album
+/// block stating how many there are. What it does not put back is the theme — the last kilobyte or
+/// two of a real file is a compressed listing of the theme's own members in a scheme nothing here has
+/// worked out, and the backdrop and the border tile in front of the first photograph belong to it. So
+/// the file holds the album and is not a slide show anything would run.
 /// </remarks>
 public sealed class PhotoParadeFile
   : IImageFormatReader<PhotoParadeFile>, IImageToRawImage<PhotoParadeFile>,
+    IImageFromRawImage<PhotoParadeFile>, IImageFormatWriter<PhotoParadeFile>,
     IMultiImageFileFormat<PhotoParadeFile> {
 
   /// <summary>The four bytes at offset four, after the header states its own length.</summary>
@@ -107,4 +111,12 @@ public sealed class PhotoParadeFile
 
     return ToRawImage(file, 0);
   }
+
+  /// <summary>An album of one photograph, which is this picture.</summary>
+  public static PhotoParadeFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    return new() { Photographs = [new("Photograph", JpegWriter.ToBytes(JpegFile.FromRawImage(image)))] };
+  }
+
+  static byte[] IImageFormatWriter<PhotoParadeFile>.ToBytes(PhotoParadeFile file) => PhotoParadeWriter.ToBytes(file);
 }

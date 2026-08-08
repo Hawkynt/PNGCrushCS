@@ -15,11 +15,14 @@ namespace FileFormat.CorelGallery;
 /// where the format puts it rather than searched for, and it is refused when what it states does not
 /// fit in the file — which is what keeps a file of the wrong kind from being drawn.
 /// <para/>
-/// It does not write. A thumbnail on its own is not a clipart file and Corel GALLERY would not open one.
+/// Writing puts the same sixty-nine bytes back and the preview after them, which is a file this
+/// reader opens by its own arithmetic. It is a preview and not a clipart file: the drawing is Corel's
+/// own vector record stream, which is not read here and is not invented on the way out.
 /// </remarks>
 [FormatMagicBytes([(byte)'@', (byte)'C', (byte)'o', (byte)'r', (byte)'e', (byte)'l', (byte)'B', (byte)'M', (byte)'F'])]
 public readonly record struct CorelGalleryFile
-  : IImageFormatReader<CorelGalleryFile>, IImageToRawImage<CorelGalleryFile> {
+  : IImageFormatReader<CorelGalleryFile>, IImageToRawImage<CorelGalleryFile>,
+    IImageFromRawImage<CorelGalleryFile>, IImageFormatWriter<CorelGalleryFile> {
 
   /// <summary>The nine bytes every one of these opens with.</summary>
   public static ReadOnlySpan<byte> Magic =>
@@ -42,6 +45,13 @@ public readonly record struct CorelGalleryFile
   /// <summary>The preview, already decoded by the bitmap reader.</summary>
   public RawImage Preview { get; init; }
 
+  static byte[] IImageFormatWriter<CorelGalleryFile>.ToBytes(CorelGalleryFile file) => CorelGalleryWriter.ToBytes(file);
+
   public static RawImage ToRawImage(CorelGalleryFile file)
     => file.Preview ?? throw new InvalidOperationException("No preview was read.");
+
+  public static CorelGalleryFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    return new() { Preview = image };
+  }
 }
