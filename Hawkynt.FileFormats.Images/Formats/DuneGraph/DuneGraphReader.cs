@@ -28,8 +28,18 @@ public static class DuneGraphReader {
 
   public static DuneGraphFile FromSpan(ReadOnlySpan<byte> data) {
 
+    // The packed form says DGC where this says DGU, and it is not accepted here.
+    //
+    // Not because the tag is hard to allow — it is one line — but because the unpacking below does
+    // not decode it. Letting the tag through was tried: the .dc1 sample then decodes to 320 by 200
+    // and agrees with the reference decoder on 0.04 per cent of its pixels, which is a picture
+    // manufactured rather than read. The run-length scheme written here, an escape of 0x00 followed
+    // by a count and a value, is not the one those files use.
+    //
+    // A refusal that names the reason is worth more than a decode that is wrong, so the tag stays
+    // out until somebody has the scheme.
     if (!DuneGraphFile.TryReadHeader(data, out _, out _))
-      throw new InvalidDataException("Not a DuneGraph file: missing the 'DGU' tag.");
+      throw new InvalidDataException("Not a DuneGraph file: missing the 'DGU' tag (a packed one says 'DGC', which is not decoded here).");
 
     if (data.Length < DuneGraphFile.HeaderSize + DuneGraphFile.PaletteDataSize + 1)
       throw new InvalidDataException($"Data too small for a valid DuneGraph file (minimum {DuneGraphFile.HeaderSize + DuneGraphFile.PaletteDataSize + 1} bytes, got {data.Length}).");
