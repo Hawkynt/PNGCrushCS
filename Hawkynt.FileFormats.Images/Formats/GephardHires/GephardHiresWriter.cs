@@ -1,17 +1,21 @@
 using System;
+using System.Buffers.Binary;
+using FileFormat.Core;
 
 namespace FileFormat.GephardHires;
 
-/// <summary>Assembles Gephard Hires (.ghg) file bytes from a GephardHiresFile.</summary>
+/// <summary>Assembles a Gephard Hires picture: the size, then the bitmap.</summary>
 public static class GephardHiresWriter {
 
   public static byte[] ToBytes(GephardHiresFile file) {
-    ArgumentNullException.ThrowIfNull(file);
+    var stride = MonochromePage.BytesPerRow(file.Width);
+    var pixels = file.PixelData ?? [];
+    var result = new byte[GephardHiresFile.HeaderSize + stride * file.Height];
 
-    var result = new byte[GephardHiresFile.LoadAddressSize + file.RawData.Length];
-    result[0] = (byte)(file.LoadAddress & 0xFF);
-    result[1] = (byte)(file.LoadAddress >> 8);
-    file.RawData.AsSpan(0, file.RawData.Length).CopyTo(result.AsSpan(GephardHiresFile.LoadAddressSize));
+    BinaryPrimitives.WriteUInt16LittleEndian(result, (ushort)file.Width);
+    result[2] = (byte)file.Height;
+    pixels.AsSpan(0, Math.Min(pixels.Length, stride * file.Height))
+      .CopyTo(result.AsSpan(GephardHiresFile.HeaderSize));
 
     return result;
   }
