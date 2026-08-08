@@ -14,7 +14,8 @@ namespace FileFormat.Graph2Font;
 /// only way to see the result is to run them through it.
 /// </remarks>
 public readonly record struct Graph2FontFile
-  : IImageFormatReader<Graph2FontFile>, IImageToRawImage<Graph2FontFile> {
+  : IImageFormatReader<Graph2FontFile>, IImageToRawImage<Graph2FontFile>,
+    IImageFromRawImage<Graph2FontFile>, IImageFormatWriter<Graph2FontFile> {
 
   /// <summary>Pixels across, including the borders the sprites can reach.</summary>
   public const int Width = 336;
@@ -32,6 +33,8 @@ public readonly record struct Graph2FontFile
   static string[] IImageFormatMetadata<Graph2FontFile>.FileExtensions => [".g2f"];
   static Graph2FontFile IImageFormatReader<Graph2FontFile>.FromSpan(ReadOnlySpan<byte> data)
     => Graph2FontReader.FromSpan(data);
+  static byte[] IImageFormatWriter<Graph2FontFile>.ToBytes(Graph2FontFile file)
+    => Graph2FontWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<Graph2FontFile>.VideoModes => [
     new("Graph2Font", [(Width, Height)], [256])
   ];
@@ -49,6 +52,20 @@ public readonly record struct Graph2FontFile
       Format = PixelFormat.Rgb24,
       PixelData = Atari8BitGraphics.ApplyPalette(frame),
     };
+  }
+
+  /// <summary>Builds a project that draws the given picture.</summary>
+  /// <remarks>
+  /// Of everything the editor lets a project carry, almost none is spent: no sprites, no raster
+  /// program, no video upgrade, and one display mode down the whole screen. What carries the picture
+  /// is the colour table, which has an entry per scanline, and the character sets, of which a
+  /// project may hold 128 — one per row of cells is enough for every cell to have a character
+  /// nothing else uses.
+  /// </remarks>
+  public static Graph2FontFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    return new() { Data = Graph2FontEncoder.Encode(image.SampleTo(Width, Height).PixelData) };
   }
 
   /// <summary>Draws one project into a frame, which the vertical-scroll format stacks several of.</summary>
