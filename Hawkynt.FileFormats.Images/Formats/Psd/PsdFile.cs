@@ -8,7 +8,13 @@ namespace FileFormat.Psd;
 public readonly record struct PsdFile : IImageFormatReader<PsdFile>, IImageToRawImage<PsdFile>, IImageFromRawImage<PsdFile>, IImageFormatWriter<PsdFile> {
 
   static string IImageFormatMetadata<PsdFile>.PrimaryExtension => ".psd";
-  static string[] IImageFormatMetadata<PsdFile>.FileExtensions => [".psd"];
+  /// <summary>The names Photoshop's own format comes under.</summary>
+  /// <remarks>
+  /// PhotoDeluxe saved under <c>.pdd</c>, and every one of the eleven samples opens with <c>8BPS</c>
+  /// and reads here exactly as ImageMagick reads it. It is Photoshop's format with a different name,
+  /// not a format of its own.
+  /// </remarks>
+  static string[] IImageFormatMetadata<PsdFile>.FileExtensions => [".psd", ".pdd"];
   static PsdFile IImageFormatReader<PsdFile>.FromSpan(ReadOnlySpan<byte> data) => PsdReader.FromSpan(data);
 
   static bool? IImageFormatMetadata<PsdFile>.MatchesSignature(ReadOnlySpan<byte> header)

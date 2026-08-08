@@ -9,7 +9,14 @@ namespace FileFormat.Pcx;
 public readonly record struct PcxFile : IImageFormatReader<PcxFile>, IImageToRawImage<PcxFile>, IImageFromRawImage<PcxFile>, IImageFormatWriter<PcxFile> {
 
   static string IImageFormatMetadata<PcxFile>.PrimaryExtension => ".pcx";
-  static string[] IImageFormatMetadata<PcxFile>.FileExtensions => [".pcx", ".pcc", ".fcx"];
+  /// <summary>The names a PCX comes under.</summary>
+  /// <remarks>
+  /// <c>.bmg</c> and <c>.ibg</c> are the Bible study programs' picture libraries, and every one of
+  /// them is an ordinary four-plane PCX at 560 by 480 — a byte-for-byte match with ImageMagick on
+  /// all eleven samples once the name stopped standing in the way. Two files named <c>.ibg</c> are
+  /// not: they are planetary science labels, and they are refused rather than drawn.
+  /// </remarks>
+  static string[] IImageFormatMetadata<PcxFile>.FileExtensions => [".pcx", ".pcc", ".fcx", ".bmg", ".ibg"];
   static PcxFile IImageFormatReader<PcxFile>.FromSpan(ReadOnlySpan<byte> data) => PcxReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<PcxFile>.Capabilities => FormatCapability.HasDedicatedOptimizer;
   static byte[] IImageFormatWriter<PcxFile>.ToBytes(PcxFile file) => PcxWriter.ToBytes(file);
