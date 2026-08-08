@@ -4,7 +4,9 @@ using FileFormat.Core;
 namespace FileFormat.FliProfi;
 
 /// <summary>In-memory representation of a FLI Profi (.fpr) C64 image with per-raster-line color switching.</summary>
-public readonly record struct FliProfiFile : IImageFormatReader<FliProfiFile>, IImageToRawImage<FliProfiFile>, IImageFormatWriter<FliProfiFile> {
+public readonly record struct FliProfiFile
+  : IImageFormatReader<FliProfiFile>, IImageToRawImage<FliProfiFile>,
+    IImageFromRawImage<FliProfiFile>, IImageFormatWriter<FliProfiFile> {
 
   static string IImageFormatMetadata<FliProfiFile>.PrimaryExtension => ".fpr";
   static string[] IImageFormatMetadata<FliProfiFile>.FileExtensions => [".fpr"];
@@ -37,6 +39,9 @@ public readonly record struct FliProfiFile : IImageFormatReader<FliProfiFile>, I
 
   /// <summary>Minimum payload size (bitmap + 8 screen RAM banks + color RAM).</summary>
   internal const int MinPayloadSize = BitmapSize + TotalScreenRamSize + ColorRamSize;
+
+  /// <summary>Default load address, the one FLI Profi's display routine expects.</summary>
+  internal const ushort DefaultLoadAddress = 0x3B00;
 
   /// <summary>Image width, always 160 (multicolor).</summary>
   public int Width => FixedWidth;
@@ -109,6 +114,26 @@ public readonly record struct FliProfiFile : IImageFormatReader<FliProfiFile>, I
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
     };
+  }
+
+  /// <summary>Encodes a picture as an FLI Profi screen, scaling it to 160x200 first.</summary>
+  /// <remarks>
+  /// The inverse of <see cref="ToRawImage"/>: bitmap, then the eight video matrices selected by the
+  /// raster line within a cell, then colour memory. Pattern 00 goes out as black, which is what the
+  /// decoder resolves it to since the file keeps no background register.
+  /// </remarks>
+  public static FliProfiFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(FixedWidth, FixedHeight).PixelData;
+    var raw = new byte[MinPayloadSize];
+    Commodore64Graphics.EncodeMulticolorFli(
+      rgb, FixedWidth, FixedHeight, 0,
+      raw.AsSpan(0, BitmapSize),
+      raw.AsSpan(BitmapSize, TotalScreenRamSize), ScreenRamBankSize,
+      raw.AsSpan(BitmapSize + TotalScreenRamSize, ColorRamSize));
+
+    return new() { LoadAddress = DefaultLoadAddress, RawData = raw };
   }
 
 }

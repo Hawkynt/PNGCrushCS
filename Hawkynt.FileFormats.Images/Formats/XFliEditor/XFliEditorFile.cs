@@ -4,7 +4,9 @@ using FileFormat.Core;
 namespace FileFormat.XFliEditor;
 
 /// <summary>In-memory representation of a C64 X-FLI Editor (.xfl) extended FLI multicolor image.</summary>
-public readonly record struct XFliEditorFile : IImageFormatReader<XFliEditorFile>, IImageToRawImage<XFliEditorFile>, IImageFormatWriter<XFliEditorFile> {
+public readonly record struct XFliEditorFile
+  : IImageFormatReader<XFliEditorFile>, IImageToRawImage<XFliEditorFile>,
+    IImageFromRawImage<XFliEditorFile>, IImageFormatWriter<XFliEditorFile> {
 
   static string IImageFormatMetadata<XFliEditorFile>.PrimaryExtension => ".xfl";
   static string[] IImageFormatMetadata<XFliEditorFile>.FileExtensions => [".xfl"];
@@ -37,6 +39,9 @@ public readonly record struct XFliEditorFile : IImageFormatReader<XFliEditorFile
 
   /// <summary>Image height in pixels, always 200.</summary>
   public const int ImageHeight = 200;
+
+  /// <summary>Default load address, putting the bitmap at $2000.</summary>
+  internal const ushort DefaultLoadAddress = 0x2000;
 
   /// <summary>C64 memory load address (2 bytes, little-endian).</summary>
   public ushort LoadAddress { get; init; }
@@ -97,6 +102,56 @@ public readonly record struct XFliEditorFile : IImageFormatReader<XFliEditorFile
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
     };
+  }
+
+  /// <summary>Encodes a picture as an X-FLI screen, scaling it to 160x200 first.</summary>
+  /// <remarks>
+  /// Unlike the bare FLI formats this one keeps a background register of its own, so pattern 00 can
+  /// be spent on the picture's commonest colour instead of being stuck on black. The eight video
+  /// matrices are filled a raster line at a time and colour memory stays shared across each cell,
+  /// which is how <see cref="ToRawImage"/> reads them back.
+  /// </remarks>
+  public static XFliEditorFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(ImageWidth, ImageHeight).PixelData;
+    var bitmap = new byte[BitmapDataSize];
+    var screens = new byte[AllScreenBanksSize];
+    var color = new byte[ColorDataSize];
+
+    // Only the shared register is chosen by frequency here; the per-cell work is the encoder's.
+    var background = _CommonestColor(rgb);
+    Commodore64Graphics.EncodeMulticolorFli(
+      rgb, ImageWidth, ImageHeight, background, bitmap, screens, ScreenBankSize, color);
+
+    var banks = new byte[ScreenBankCount][];
+    for (var i = 0; i < ScreenBankCount; ++i) {
+      banks[i] = new byte[ScreenBankSize];
+      screens.AsSpan(i * ScreenBankSize, ScreenBankSize).CopyTo(banks[i]);
+    }
+
+    return new() {
+      LoadAddress = DefaultLoadAddress,
+      BitmapData = bitmap,
+      ScreenBanks = banks,
+      ColorData = color,
+      BackgroundColor = background,
+      TrailingData = [],
+    };
+  }
+
+  /// <summary>The machine colour the picture uses most, which is what the shared register is worth spending on.</summary>
+  private static byte _CommonestColor(ReadOnlySpan<byte> rgb) {
+    Span<int> totals = stackalloc int[Commodore64Graphics.ColorCount];
+    for (var at = 0; at + 2 < rgb.Length; at += 3)
+      ++totals[Commodore64Graphics.FindNearestColorIndex(rgb[at], rgb[at + 1], rgb[at + 2])];
+
+    var best = 0;
+    for (var i = 1; i < totals.Length; ++i)
+      if (totals[i] > totals[best])
+        best = i;
+
+    return (byte)best;
   }
 
 }

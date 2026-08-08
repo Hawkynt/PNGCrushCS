@@ -18,7 +18,9 @@ namespace FileFormat.FliGraph;
 /// It is multicolour, two bits a pixel, so the picture is 148 across drawn at 296. The leftmost
 /// three character cells cannot be coloured in time and are not part of it.
 /// </remarks>
-public readonly record struct FliGraphFile : IImageFormatReader<FliGraphFile>, IImageToRawImage<FliGraphFile>, IImageFormatWriter<FliGraphFile> {
+public readonly record struct FliGraphFile
+  : IImageFormatReader<FliGraphFile>, IImageToRawImage<FliGraphFile>,
+    IImageFromRawImage<FliGraphFile>, IImageFormatWriter<FliGraphFile> {
 
   static string IImageFormatMetadata<FliGraphFile>.PrimaryExtension => ".flg";
   static string[] IImageFormatMetadata<FliGraphFile>.FileExtensions => [".flg", ".bml", ".fli"];
@@ -73,6 +75,9 @@ public readonly record struct FliGraphFile : IImageFormatReader<FliGraphFile>, I
 
   /// <summary>The least a whole picture takes: 2 + 1024 + 8 x 1024 + 8000.</summary>
   public const int MinimumFileSize = BitmapOffset + BitmapDataSize;
+
+  /// <summary>Default load address, putting colour memory at the start of a 16K bank.</summary>
+  internal const ushort DefaultLoadAddress = 0x4000;
 
   /// <summary>
   /// What pattern 00 shows.
@@ -135,6 +140,40 @@ public readonly record struct FliGraphFile : IImageFormatReader<FliGraphFile>, I
       PixelData = indices,
       Palette = Commodore64Graphics.CreatePalette(),
       PaletteCount = Commodore64Graphics.ColorCount,
+    };
+  }
+
+  /// <summary>Encodes a picture as an FLI Graph, scaling it to 296x200 first.</summary>
+  /// <remarks>
+  /// Multicolour, so a stored pixel is drawn twice and the 296 across are 148 in memory. Those sit
+  /// twelve stored pixels in — the three character cells the raster switch cannot reach in time —
+  /// within the 160 the screen holds, and what is left of the picture goes out black.
+  /// <para/>
+  /// Because a stored pixel covers two drawn ones, the picture is sampled to the stored width rather
+  /// than the drawn one: sampling to 296 and then throwing every second column away would do the
+  /// same job twice and lose half of it.
+  /// </remarks>
+  public static FliGraphFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var stored = VisibleWidth / 2;
+    var visible = image.SampleTo(stored, FixedHeight).PixelData;
+    var rgb = new byte[FixedWidth / 2 * FixedHeight * 3];
+    for (var y = 0; y < FixedHeight; ++y)
+      visible.AsSpan(y * stored * 3, stored * 3)
+        .CopyTo(rgb.AsSpan((y * (FixedWidth / 2) + HiddenStoredPixels) * 3));
+
+    var bitmap = new byte[BitmapDataSize];
+    var screens = new byte[ScreenBankCount * BankSize];
+    var colorRam = new byte[BankSize];
+    Commodore64Graphics.EncodeMulticolorFli(
+      rgb, FixedWidth / 2, FixedHeight, Background, bitmap, screens, BankSize, colorRam);
+
+    return new() {
+      LoadAddress = DefaultLoadAddress,
+      BitmapData = bitmap,
+      Screens = screens,
+      ColorRam = colorRam,
     };
   }
 }

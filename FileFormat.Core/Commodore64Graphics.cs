@@ -420,6 +420,151 @@ public static class Commodore64Graphics {
     return pattern;
   }
 
+  /// <summary>
+  /// Encodes a high-resolution FLI screen: one bitmap, and one video matrix for each of the eight
+  /// raster lines of a character cell.
+  /// </summary>
+  /// <remarks>
+  /// FLI is the same hires bitmap with the colour decision taken eight times as often. A cell row
+  /// still shows only two colours, but it chooses them for itself rather than inheriting the cell's,
+  /// so the encoder runs the same exhaustive pair search over each row of eight pixels instead of
+  /// over all sixty-four.
+  /// <para/>
+  /// The picture handed in is the full 320 the memory holds. Formats that hide the leftmost cells —
+  /// the raster switch cannot be ready before the border ends, so the first 24 pixels of a row are
+  /// not part of the picture — must place their picture within that width themselves, because what
+  /// goes in the hidden columns is theirs to decide and not this function's.
+  /// </remarks>
+  /// <param name="bankStride">
+  /// Bytes from one video matrix to the next. A thousand where they are packed, 1024 where each
+  /// takes a whole page of address space.
+  /// </param>
+  public static void EncodeHiresFli(
+    ReadOnlySpan<byte> rgb, int width, int height, Span<byte> bitmap, Span<byte> screens, int bankStride) {
+    Span<int> line = stackalloc int[8];
+    var columns = width / 8;
+
+    for (var y = 0; y < height; ++y)
+    for (var left = 0; left < width; left += 8) {
+      for (var x = 0; x < 8; ++x) {
+        var at = (y * width + left + x) * 3;
+        line[x] = FindNearestColorIndex(rgb[at], rgb[at + 1], rgb[at + 2]);
+      }
+
+      var (foreground, background) = _ChoosePair(line);
+
+      var cell = y / CellHeight * columns + left / 8;
+      var row = 0;
+      for (var x = 0; x < 8; ++x)
+        if (_Distance(line[x], foreground) <= _Distance(line[x], background))
+          row |= 1 << (7 - x);
+
+      bitmap[cell * CellHeight + y % CellHeight] = (byte)row;
+      screens[y % CellHeight * bankStride + cell] = (byte)((foreground << 4) | background);
+    }
+  }
+
+  /// <summary>
+  /// Encodes a multicolour FLI screen: one bitmap, a video matrix for each of the eight raster lines
+  /// of a character cell, and one colour memory the whole cell shares.
+  /// </summary>
+  /// <remarks>
+  /// The awkward part is that the two decisions are on different scales. Patterns 01 and 10 are
+  /// chosen per raster line, but pattern 11 comes from colour memory, which is read once per cell
+  /// and so must serve all eight of its lines. So colour memory is settled first, by trying all
+  /// sixteen values and keeping whichever leaves the eight lines with the least total error, and
+  /// only then does each line pick its own pair. Sixteen tries over thirty-two pixels is nothing,
+  /// and it is exact where a cell obeys the format's limits.
+  /// </remarks>
+  /// <param name="background">The colour pattern 00 shows. FLI formats with no register for it pass zero.</param>
+  /// <param name="bankStride">Bytes from one video matrix to the next: a thousand, or 1024 where each takes a page.</param>
+  /// <param name="fixedColorRam">
+  /// The colour pattern 11 must take everywhere, or -1 to let each cell choose. Formats that store
+  /// no colour memory of their own pass the one value they show.
+  /// </param>
+  public static void EncodeMulticolorFli(
+    ReadOnlySpan<byte> rgb, int width, int height, byte background,
+    Span<byte> bitmap, Span<byte> screens, int bankStride, Span<byte> colorRam, int fixedColorRam = -1) {
+    var columns = width / 4;
+    var shared = background & 0x0F;
+    Span<int> cell = stackalloc int[CellHeight * 4];
+    Span<int> pair = stackalloc int[2];
+    Span<int> chosen = stackalloc int[3];
+
+    for (var top = 0; top < height; top += CellHeight)
+    for (var left = 0; left < width; left += 4) {
+      for (var y = 0; y < CellHeight; ++y)
+      for (var x = 0; x < 4; ++x) {
+        var at = ((top + y) * width + left + x) * 3;
+        cell[y * 4 + x] = FindNearestColorIndex(rgb[at], rgb[at + 1], rgb[at + 2]);
+      }
+
+      var entry = fixedColorRam & 0x0F;
+      if (fixedColorRam < 0) {
+        entry = 0;
+        var bestError = long.MaxValue;
+        for (var candidate = 0; candidate < ColorCount; ++candidate) {
+          long error = 0;
+          for (var y = 0; y < CellHeight; ++y)
+            error += _ChooseLinePair(cell.Slice(y * 4, 4), shared, candidate, pair);
+
+          if (error >= bestError)
+            continue;
+
+          bestError = error;
+          entry = candidate;
+        }
+      }
+
+      var at2 = top / CellHeight * columns + left / 4;
+      chosen[2] = entry;
+
+      for (var y = 0; y < CellHeight; ++y) {
+        _ChooseLinePair(cell.Slice(y * 4, 4), shared, entry, pair);
+        chosen[0] = pair[0];
+        chosen[1] = pair[1];
+
+        var row = 0;
+        for (var x = 0; x < 4; ++x)
+          row |= _Pattern(cell[y * 4 + x], shared, chosen) << ((3 - x) * 2);
+
+        bitmap[at2 * CellHeight + y] = (byte)row;
+        screens[y * bankStride + at2] = (byte)((chosen[0] << 4) | chosen[1]);
+      }
+
+      colorRam[at2] = (byte)entry;
+    }
+  }
+
+  /// <summary>The two colours a raster line of a multicolour cell is best off naming, and its error.</summary>
+  /// <remarks>
+  /// The line already has the background and colour memory available to it for free, so the search
+  /// is over what those two do not already cover. Four pixels means at most four candidates, so
+  /// trying every pair of the colours actually present is a handful of comparisons.
+  /// </remarks>
+  private static long _ChooseLinePair(ReadOnlySpan<int> line, int background, int colorRam, Span<int> pair) {
+    pair[0] = pair[1] = background;
+
+    var bestError = long.MaxValue;
+    for (var a = 0; a < line.Length; ++a)
+    for (var b = a; b < line.Length; ++b) {
+      long error = 0;
+      foreach (var index in line)
+        error += Math.Min(
+          Math.Min(_Distance(index, background), _Distance(index, colorRam)),
+          Math.Min(_Distance(index, line[a]), _Distance(index, line[b])));
+
+      if (error >= bestError)
+        continue;
+
+      bestError = error;
+      pair[0] = line[a];
+      pair[1] = line[b];
+    }
+
+    return bestError == long.MaxValue ? 0 : bestError;
+  }
+
   /// <summary>The three colours that, beside the shared background, describe a cell best.</summary>
   private static void _ChooseTriple(
     ReadOnlySpan<int> cell, ReadOnlySpan<int> present, int background, Span<int> chosen,

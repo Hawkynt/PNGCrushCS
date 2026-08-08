@@ -4,7 +4,9 @@ using FileFormat.Core;
 namespace FileFormat.HiresFliCrest;
 
 /// <summary>In-memory representation of a C64 Hires FLI by Crest (.hfc) image.</summary>
-public readonly record struct HiresFliCrestFile : IImageFormatReader<HiresFliCrestFile>, IImageToRawImage<HiresFliCrestFile>, IImageFormatWriter<HiresFliCrestFile> {
+public readonly record struct HiresFliCrestFile
+  : IImageFormatReader<HiresFliCrestFile>, IImageToRawImage<HiresFliCrestFile>,
+    IImageFromRawImage<HiresFliCrestFile>, IImageFormatWriter<HiresFliCrestFile> {
 
   static string IImageFormatMetadata<HiresFliCrestFile>.PrimaryExtension => ".hfc";
   static string[] IImageFormatMetadata<HiresFliCrestFile>.FileExtensions => [".hfc", ".hfd"];
@@ -34,6 +36,9 @@ public readonly record struct HiresFliCrestFile : IImageFormatReader<HiresFliCre
 
   /// <summary>Minimum payload size in bytes (bitmap + 8 x screenRAM).</summary>
   internal const int MinPayloadSize = BitmapDataSize + TotalScreenRamSize;
+
+  /// <summary>Default load address, the one the program itself writes.</summary>
+  internal const ushort DefaultLoadAddress = 0x4000;
 
   /// <summary>Image width, always 320.</summary>
   public int Width => FixedWidth;
@@ -91,6 +96,25 @@ public readonly record struct HiresFliCrestFile : IImageFormatReader<HiresFliCre
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
     };
+  }
+
+
+  /// <summary>Encodes a picture as a hires FLI screen, scaling it to 320x200 first.</summary>
+  /// <remarks>
+  /// FLI swaps the video matrix on every raster line, so each of the eight rows of a character cell
+  /// picks its own two colours. The encoder chooses them row by row, which is exactly how
+  /// <see cref="ToRawImage"/> reads them back with the bank selected by the row within the cell.
+  /// </remarks>
+  public static HiresFliCrestFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(FixedWidth, FixedHeight).PixelData;
+    var raw = new byte[MinPayloadSize];
+    Commodore64Graphics.EncodeHiresFli(
+      rgb, FixedWidth, FixedHeight,
+      raw.AsSpan(0, BitmapDataSize), raw.AsSpan(BitmapDataSize, TotalScreenRamSize), ScreenRamBankSize);
+
+    return new() { LoadAddress = DefaultLoadAddress, RawData = raw };
   }
 
 }

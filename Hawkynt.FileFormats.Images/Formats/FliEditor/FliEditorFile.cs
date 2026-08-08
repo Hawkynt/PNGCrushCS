@@ -4,7 +4,9 @@ using FileFormat.Core;
 namespace FileFormat.FliEditor;
 
 /// <summary>In-memory representation of a C64 FLI Editor multicolor image.</summary>
-public readonly record struct FliEditorFile : IImageFormatReader<FliEditorFile>, IImageToRawImage<FliEditorFile>, IImageFormatWriter<FliEditorFile> {
+public readonly record struct FliEditorFile
+  : IImageFormatReader<FliEditorFile>, IImageToRawImage<FliEditorFile>,
+    IImageFromRawImage<FliEditorFile>, IImageFormatWriter<FliEditorFile> {
 
   static string IImageFormatMetadata<FliEditorFile>.PrimaryExtension => ".fed";
   static string[] IImageFormatMetadata<FliEditorFile>.FileExtensions => [".fed"];
@@ -55,5 +57,28 @@ public readonly record struct FliEditorFile : IImageFormatReader<FliEditorFile>,
     => Commodore64Graphics.DecodeFliMulticolor(
       file.RawData, FixedWidth, FixedHeight,
       MinPayloadSize, BitmapSize, ScreenBankCount, ScreenBankSize, TotalScreenSize);
+
+  /// <summary>Default load address, the one the format's own display routine expects.</summary>
+  internal const ushort DefaultLoadAddress = 0x3B00;
+
+  /// <summary>Encodes a picture as FLI Editor, scaling it to 160x200 first.</summary>
+  /// <remarks>
+  /// The inverse of <see cref="ToRawImage"/>, laid out the way it reads: the bitmap, then the eight
+  /// video matrices, then colour memory. Pattern 00 is encoded as black because the file has no
+  /// register to say otherwise and the decoder resolves it that way.
+  /// </remarks>
+  public static FliEditorFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(FixedWidth, FixedHeight).PixelData;
+    var raw = new byte[MinPayloadSize];
+    Commodore64Graphics.EncodeMulticolorFli(
+      rgb, FixedWidth, FixedHeight, 0,
+      raw.AsSpan(0, BitmapSize),
+      raw.AsSpan(BitmapSize, TotalScreenSize), ScreenBankSize,
+      raw.AsSpan(BitmapSize + TotalScreenSize, ColorRamSize));
+
+    return new() { LoadAddress = DefaultLoadAddress, RawData = raw };
+  }
 
 }

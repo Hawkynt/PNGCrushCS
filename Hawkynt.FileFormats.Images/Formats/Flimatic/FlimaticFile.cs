@@ -4,7 +4,9 @@ using FileFormat.Core;
 namespace FileFormat.Flimatic;
 
 /// <summary>In-memory representation of a Commodore 64 Flimatic multicolor FLI image.</summary>
-public readonly record struct FlimaticFile : IImageFormatReader<FlimaticFile>, IImageToRawImage<FlimaticFile>, IImageFormatWriter<FlimaticFile> {
+public readonly record struct FlimaticFile
+  : IImageFormatReader<FlimaticFile>, IImageToRawImage<FlimaticFile>,
+    IImageFromRawImage<FlimaticFile>, IImageFormatWriter<FlimaticFile> {
 
   static string IImageFormatMetadata<FlimaticFile>.PrimaryExtension => ".flm";
   static string[] IImageFormatMetadata<FlimaticFile>.FileExtensions => [".flm"];
@@ -55,5 +57,28 @@ public readonly record struct FlimaticFile : IImageFormatReader<FlimaticFile>, I
     => Commodore64Graphics.DecodeFliMulticolor(
       file.RawData, FixedWidth, FixedHeight,
       MinPayloadSize, BitmapSize, ScreenBankCount, ScreenBankSize, TotalScreenSize);
+
+  /// <summary>Default load address, the one the format's own display routine expects.</summary>
+  internal const ushort DefaultLoadAddress = 0x3B00;
+
+  /// <summary>Encodes a picture as Flimatic, scaling it to 160x200 first.</summary>
+  /// <remarks>
+  /// The inverse of <see cref="ToRawImage"/>, laid out the way it reads: the bitmap, then the eight
+  /// video matrices, then colour memory. Pattern 00 is encoded as black because the file has no
+  /// register to say otherwise and the decoder resolves it that way.
+  /// </remarks>
+  public static FlimaticFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(FixedWidth, FixedHeight).PixelData;
+    var raw = new byte[MinPayloadSize];
+    Commodore64Graphics.EncodeMulticolorFli(
+      rgb, FixedWidth, FixedHeight, 0,
+      raw.AsSpan(0, BitmapSize),
+      raw.AsSpan(BitmapSize, TotalScreenSize), ScreenBankSize,
+      raw.AsSpan(BitmapSize + TotalScreenSize, ColorRamSize));
+
+    return new() { LoadAddress = DefaultLoadAddress, RawData = raw };
+  }
 
 }

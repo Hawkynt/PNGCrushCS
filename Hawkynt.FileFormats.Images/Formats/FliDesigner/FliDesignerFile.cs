@@ -4,7 +4,9 @@ using FileFormat.Core;
 namespace FileFormat.FliDesigner;
 
 /// <summary>In-memory representation of a C64 FLI Designer multicolor image.</summary>
-public readonly record struct FliDesignerFile : IImageFormatReader<FliDesignerFile>, IImageToRawImage<FliDesignerFile>, IImageFormatWriter<FliDesignerFile> {
+public readonly record struct FliDesignerFile
+  : IImageFormatReader<FliDesignerFile>, IImageToRawImage<FliDesignerFile>,
+    IImageFromRawImage<FliDesignerFile>, IImageFormatWriter<FliDesignerFile> {
 
   static string IImageFormatMetadata<FliDesignerFile>.PrimaryExtension => ".fd2";
   static string[] IImageFormatMetadata<FliDesignerFile>.FileExtensions => [".fd2"];
@@ -55,5 +57,28 @@ public readonly record struct FliDesignerFile : IImageFormatReader<FliDesignerFi
     => Commodore64Graphics.DecodeFliMulticolor(
       file.RawData, FixedWidth, FixedHeight,
       MinPayloadSize, BitmapSize, ScreenBankCount, ScreenBankSize, TotalScreenSize);
+
+  /// <summary>Default load address, the one the format's own display routine expects.</summary>
+  internal const ushort DefaultLoadAddress = 0x3B00;
+
+  /// <summary>Encodes a picture as FLI Designer, scaling it to 160x200 first.</summary>
+  /// <remarks>
+  /// The inverse of <see cref="ToRawImage"/>, laid out the way it reads: the bitmap, then the eight
+  /// video matrices, then colour memory. Pattern 00 is encoded as black because the file has no
+  /// register to say otherwise and the decoder resolves it that way.
+  /// </remarks>
+  public static FliDesignerFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(FixedWidth, FixedHeight).PixelData;
+    var raw = new byte[MinPayloadSize];
+    Commodore64Graphics.EncodeMulticolorFli(
+      rgb, FixedWidth, FixedHeight, 0,
+      raw.AsSpan(0, BitmapSize),
+      raw.AsSpan(BitmapSize, TotalScreenSize), ScreenBankSize,
+      raw.AsSpan(BitmapSize + TotalScreenSize, ColorRamSize));
+
+    return new() { LoadAddress = DefaultLoadAddress, RawData = raw };
+  }
 
 }

@@ -19,7 +19,9 @@ namespace FileFormat.Afli;
 /// of every row are whatever the hardware was showing. They are not part of the picture and are not
 /// returned: the picture is 296 across, which is what RECOIL draws.
 /// </remarks>
-public readonly record struct AfliFile : IImageFormatReader<AfliFile>, IImageToRawImage<AfliFile>, IImageFormatWriter<AfliFile> {
+public readonly record struct AfliFile
+  : IImageFormatReader<AfliFile>, IImageToRawImage<AfliFile>,
+    IImageFromRawImage<AfliFile>, IImageFormatWriter<AfliFile> {
 
   static string IImageFormatMetadata<AfliFile>.PrimaryExtension => ".afl";
   static string[] IImageFormatMetadata<AfliFile>.FileExtensions => [".afl"];
@@ -61,6 +63,9 @@ public readonly record struct AfliFile : IImageFormatReader<AfliFile>, IImageToR
 
   /// <summary>The least a whole AFLI takes; a file may run on to the end of its 16K block.</summary>
   public const int MinimumFileSize = BitmapOffset + BitmapDataSize;
+
+  /// <summary>Default load address, putting the eight matrices at the start of a 16K bank.</summary>
+  internal const ushort DefaultLoadAddress = 0x4000;
 
   /// <summary>Image width, always 296.</summary>
   public int Width => VisibleWidth;
@@ -104,5 +109,31 @@ public readonly record struct AfliFile : IImageFormatReader<AfliFile>, IImageToR
       Palette = Commodore64Graphics.CreatePalette(),
       PaletteCount = Commodore64Graphics.ColorCount,
     };
+  }
+
+  /// <summary>Encodes a picture as AFLI, scaling it to 296x200 first.</summary>
+  /// <remarks>
+  /// The picture is 296 wide but memory is 320, so it is laid into a full-width screen 24 pixels in
+  /// and the three cells to the left of it are left black. Those cells are still encoded — they are
+  /// real bytes in a real file — but nothing reads them back, because the raster switch that makes
+  /// FLI work has not happened yet when they are drawn.
+  /// <para/>
+  /// Beyond that it is an ordinary hires FLI: every raster line of a cell picks its own pair of
+  /// colours, which is the whole of what the eight video matrices buy.
+  /// </remarks>
+  public static AfliFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var visible = image.SampleTo(VisibleWidth, FixedHeight).PixelData;
+    var rgb = new byte[FixedWidth * FixedHeight * 3];
+    for (var y = 0; y < FixedHeight; ++y)
+      visible.AsSpan(y * VisibleWidth * 3, VisibleWidth * 3)
+        .CopyTo(rgb.AsSpan((y * FixedWidth + HiddenColumns) * 3));
+
+    var bitmap = new byte[BitmapDataSize];
+    var screens = new byte[ScreenCount * ScreenStride];
+    Commodore64Graphics.EncodeHiresFli(rgb, FixedWidth, FixedHeight, bitmap, screens, ScreenStride);
+
+    return new() { LoadAddress = DefaultLoadAddress, BitmapData = bitmap, Screens = screens };
   }
 }

@@ -22,7 +22,9 @@ namespace FileFormat.CfliDesigner;
 /// pixels it is wrong at are the odd columns and nothing else — which is what identified the
 /// pattern.
 /// </remarks>
-public readonly record struct CfliDesignerFile : IImageFormatReader<CfliDesignerFile>, IImageToRawImage<CfliDesignerFile>, IImageFormatWriter<CfliDesignerFile> {
+public readonly record struct CfliDesignerFile
+  : IImageFormatReader<CfliDesignerFile>, IImageToRawImage<CfliDesignerFile>,
+    IImageFromRawImage<CfliDesignerFile>, IImageFormatWriter<CfliDesignerFile> {
 
   static string IImageFormatMetadata<CfliDesignerFile>.PrimaryExtension => ".cfli";
   static string[] IImageFormatMetadata<CfliDesignerFile>.FileExtensions => [".cfli"];
@@ -64,6 +66,9 @@ public readonly record struct CfliDesignerFile : IImageFormatReader<CfliDesigner
   public const int ExpectedFileSize =
     LoadAddressSize + (ScreenBankCount - 1) * ScreenBankStride + ScreenBankSize;
 
+  /// <summary>Default load address, putting the first matrix at the start of a 16K bank.</summary>
+  internal const ushort DefaultLoadAddress = 0x4000;
+
   /// <summary>Always 296.</summary>
   public int Width => VisibleWidth;
 
@@ -100,5 +105,74 @@ public readonly record struct CfliDesignerFile : IImageFormatReader<CfliDesigner
       Palette = Commodore64Graphics.CreatePalette(),
       PaletteCount = Commodore64Graphics.ColorCount,
     };
+  }
+
+  /// <summary>Encodes a picture as a CFLI, scaling it to 296x200 first.</summary>
+  /// <remarks>
+  /// There is no bitmap to write, only the eight matrices, and the bit pattern the hardware runs
+  /// behind them is fixed: even columns take the high nibble of a cell's entry and odd columns the
+  /// low one. So a raster line of a cell holds two colours, one for each half of its pixels
+  /// interleaved, and encoding is choosing those two — done exhaustively over the machine's sixteen,
+  /// which is four pixels against sixteen candidates and therefore both cheap and exact.
+  /// <para/>
+  /// The picture is 296 wide against 320 in memory, so it sits 24 pixels in and the three cells to
+  /// its left go out black. They are never read back: the raster switch is not ready that early.
+  /// </remarks>
+  public static CfliDesignerFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(VisibleWidth, FixedHeight).PixelData;
+    var screens = new byte[ScreenBankCount * ScreenBankSize];
+
+    for (var y = 0; y < FixedHeight; ++y)
+      for (var cell = 0; cell < Columns; ++cell) {
+        var high = _BestColor(rgb, y, cell, 0);
+        var low = _BestColor(rgb, y, cell, 1);
+        screens[y % ScreenBankCount * ScreenBankSize + y / 8 * Columns + cell] = (byte)((high << 4) | low);
+      }
+
+    return new() { LoadAddress = DefaultLoadAddress, Screens = screens };
+  }
+
+  /// <summary>The machine colour that best covers every other pixel of a cell's raster line.</summary>
+  /// <param name="parity">0 for the even columns, which take the high nibble; 1 for the odd ones.</param>
+  private static int _BestColor(ReadOnlySpan<byte> rgb, int y, int cell, int parity) {
+    Span<int> present = stackalloc int[4];
+    var count = 0;
+
+    for (var x = parity; x < 8; x += 2) {
+      var column = cell * 8 + x - HiddenColumns;
+      if (column < 0 || column >= VisibleWidth)
+        continue;
+
+      var at = (y * VisibleWidth + column) * 3;
+      present[count++] = Commodore64Graphics.FindNearestColorIndex(rgb[at], rgb[at + 1], rgb[at + 2]);
+    }
+
+    if (count == 0)
+      return 0;
+
+    var best = 0;
+    var bestError = long.MaxValue;
+    for (var candidate = 0; candidate < Commodore64Graphics.ColorCount; ++candidate) {
+      long error = 0;
+      for (var i = 0; i < count; ++i)
+        error += _Distance(present[i], candidate);
+
+      if (error >= bestError)
+        continue;
+
+      bestError = error;
+      best = candidate;
+    }
+
+    return best;
+  }
+
+  private static int _Distance(int left, int right) {
+    int a = Commodore64Graphics.HexColors[left], b = Commodore64Graphics.HexColors[right];
+    int dr = ((a >> 16) & 0xFF) - ((b >> 16) & 0xFF), dg = ((a >> 8) & 0xFF) - ((b >> 8) & 0xFF), db = (a & 0xFF) - (b & 0xFF);
+
+    return dr * dr + dg * dg + db * db;
   }
 }

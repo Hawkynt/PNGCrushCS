@@ -4,7 +4,9 @@ using FileFormat.Core;
 namespace FileFormat.Ffli;
 
 /// <summary>In-memory representation of a C64 Full FLI multicolor image.</summary>
-public readonly record struct FfliFile : IImageFormatReader<FfliFile>, IImageToRawImage<FfliFile>, IImageFormatWriter<FfliFile> {
+public readonly record struct FfliFile
+  : IImageFormatReader<FfliFile>, IImageToRawImage<FfliFile>,
+    IImageFromRawImage<FfliFile>, IImageFormatWriter<FfliFile> {
 
   static string IImageFormatMetadata<FfliFile>.PrimaryExtension => ".ffli";
   static string[] IImageFormatMetadata<FfliFile>.FileExtensions => [".ffli", ".ffl"];
@@ -55,5 +57,28 @@ public readonly record struct FfliFile : IImageFormatReader<FfliFile>, IImageToR
     => Commodore64Graphics.DecodeFliMulticolor(
       file.RawData, FixedWidth, FixedHeight,
       MinPayloadSize, BitmapSize, ScreenBankCount, ScreenBankSize, TotalScreenSize);
+
+  /// <summary>Default load address, the one the format's own display routine expects.</summary>
+  internal const ushort DefaultLoadAddress = 0x4000;
+
+  /// <summary>Encodes a picture as Full FLI, scaling it to 160x200 first.</summary>
+  /// <remarks>
+  /// The inverse of <see cref="ToRawImage"/>, laid out the way it reads: the bitmap, then the eight
+  /// video matrices, then colour memory. Pattern 00 is encoded as black because the file has no
+  /// register to say otherwise and the decoder resolves it that way.
+  /// </remarks>
+  public static FfliFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(FixedWidth, FixedHeight).PixelData;
+    var raw = new byte[MinPayloadSize];
+    Commodore64Graphics.EncodeMulticolorFli(
+      rgb, FixedWidth, FixedHeight, 0,
+      raw.AsSpan(0, BitmapSize),
+      raw.AsSpan(BitmapSize, TotalScreenSize), ScreenBankSize,
+      raw.AsSpan(BitmapSize + TotalScreenSize, ColorRamSize));
+
+    return new() { LoadAddress = DefaultLoadAddress, RawData = raw };
+  }
 
 }

@@ -4,7 +4,9 @@ using FileFormat.Core;
 namespace FileFormat.MuifliEditor;
 
 /// <summary>In-memory representation of a C64 MUIFLI (Multicolor Unrestricted FLI Interlace) image.</summary>
-public readonly record struct MuifliEditorFile : IImageFormatReader<MuifliEditorFile>, IImageToRawImage<MuifliEditorFile>, IImageFormatWriter<MuifliEditorFile> {
+public readonly record struct MuifliEditorFile
+  : IImageFormatReader<MuifliEditorFile>, IImageToRawImage<MuifliEditorFile>,
+    IImageFromRawImage<MuifliEditorFile>, IImageFormatWriter<MuifliEditorFile> {
 
   static string IImageFormatMetadata<MuifliEditorFile>.PrimaryExtension => ".muf";
   static string[] IImageFormatMetadata<MuifliEditorFile>.FileExtensions => [".muf", ".mui", ".mup"];
@@ -43,6 +45,9 @@ public readonly record struct MuifliEditorFile : IImageFormatReader<MuifliEditor
 
   /// <summary>Minimum payload size (2 frames).</summary>
   internal const int MinPayloadSize = FrameCount * FrameSize;
+
+  /// <summary>Default load address, the one the MUIFLI display routine expects.</summary>
+  internal const ushort DefaultLoadAddress = 0x3B00;
 
   /// <summary>Image width, always 160.</summary>
   public int Width => FixedWidth;
@@ -124,6 +129,28 @@ public readonly record struct MuifliEditorFile : IImageFormatReader<MuifliEditor
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
     };
+  }
+
+  /// <summary>Encodes a picture as a MUIFLI interlace pair, scaling it to 160x200 first.</summary>
+  /// <remarks>
+  /// Each of the two frames is a whole FLI screen of its own — bitmap, eight video matrices and
+  /// colour memory — and they are given identical contents. Interlacing exists to mix colours the
+  /// machine cannot show at once, but <see cref="ToRawImage"/> reports the average of the frames, so
+  /// only a matching pair averages back to the picture that was handed in.
+  /// </remarks>
+  public static MuifliEditorFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(FixedWidth, FixedHeight).PixelData;
+    var raw = new byte[MinPayloadSize];
+    Commodore64Graphics.EncodeMulticolorFli(
+      rgb, FixedWidth, FixedHeight, 0,
+      raw.AsSpan(0, BitmapSize),
+      raw.AsSpan(BitmapSize, TotalScreenSize), ScreenBankSize,
+      raw.AsSpan(BitmapSize + TotalScreenSize, ColorRamSize));
+    raw.AsSpan(0, FrameSize).CopyTo(raw.AsSpan(FrameSize));
+
+    return new() { LoadAddress = DefaultLoadAddress, RawData = raw };
   }
 
 }
