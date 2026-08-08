@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Centauri;
 
 /// <summary>In-memory representation of a Commodore 64 Centauri paint image.</summary>
-public readonly record struct CentauriFile : IImageFormatReader<CentauriFile>, IImageToRawImage<CentauriFile>, IImageFormatWriter<CentauriFile> {
+public readonly record struct CentauriFile : IImageFormatReader<CentauriFile>, IImageToRawImage<CentauriFile>, IImageFromRawImage<CentauriFile>, IImageFormatWriter<CentauriFile> {
 
   static string IImageFormatMetadata<CentauriFile>.PrimaryExtension => ".cnt";
   static string[] IImageFormatMetadata<CentauriFile>.FileExtensions => [".cnt", ".cen"];
@@ -66,5 +66,33 @@ public readonly record struct CentauriFile : IImageFormatReader<CentauriFile>, I
   public static RawImage ToRawImage(CentauriFile file)
     => Commodore64Graphics.DecodeMulticolor(
       file.BitmapData, file.VideoMatrix, file.ColorRam, file.BackgroundColor, FixedWidth, FixedHeight);
+
+  /// <summary>Builds a Centauri picture from any image, sampling it to the 160x200 multicolour screen.</summary>
+  /// <remarks>
+  /// The file keeps its own background register, so the encoder is left to choose one rather than
+  /// being told to show black behind pattern 00.
+  /// </remarks>
+  public static CentauriFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(FixedWidth, FixedHeight).EnsureFormat(PixelFormat.Rgb24);
+    var bitmap = new byte[BitmapDataSize];
+    var videoMatrix = new byte[VideoMatrixSize];
+    var colorRam = new byte[ColorRamSize];
+
+    var background = Commodore64Graphics.EncodeMulticolor(
+      rgb.PixelData, FixedWidth, FixedHeight, bitmap, videoMatrix, colorRam);
+
+    return new() {
+      // Where the VIC-II expects a bitmap screen to sit, which is what every one of these states.
+      LoadAddress = 0x2000,
+      BitmapData = bitmap,
+      VideoMatrix = videoMatrix,
+      ColorRam = colorRam,
+      BorderColor = background,
+      BackgroundColor = background,
+      Padding = new byte[PaddingSize],
+    };
+  }
 
 }

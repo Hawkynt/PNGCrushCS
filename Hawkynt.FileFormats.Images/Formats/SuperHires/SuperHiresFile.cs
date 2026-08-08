@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.SuperHires;
 
 /// <summary>In-memory representation of a Super Hires (C64 interlace hires) image.</summary>
-public readonly record struct SuperHiresFile : IImageFormatReader<SuperHiresFile>, IImageToRawImage<SuperHiresFile>, IImageFormatWriter<SuperHiresFile> {
+public readonly record struct SuperHiresFile : IImageFormatReader<SuperHiresFile>, IImageToRawImage<SuperHiresFile>, IImageFromRawImage<SuperHiresFile>, IImageFormatWriter<SuperHiresFile> {
 
   static string IImageFormatMetadata<SuperHiresFile>.PrimaryExtension => ".shi";
   static string[] IImageFormatMetadata<SuperHiresFile>.FileExtensions => [".shi"];
@@ -105,6 +105,34 @@ public readonly record struct SuperHiresFile : IImageFormatReader<SuperHiresFile
       Height = ImageHeight,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
+    };
+  }
+
+  /// <summary>Builds an interlace picture from any image, sampling it to the 320x200 high-resolution screen.</summary>
+  /// <remarks>
+  /// Both fields are given the same screen. Interlacing buys colours the machine cannot otherwise
+  /// show, but only ones that are the exact average of two of its sixteen — anything else the eye
+  /// merely tolerates. A field that differs from its partner therefore has to be paid for in flicker
+  /// on real hardware, and the decoder above shows the two averaged rather than alternating, so a
+  /// picture already made of the machine's own colours gains nothing from the difference and loses
+  /// exactness: written twice the same, it comes back the colours it went in as.
+  /// </remarks>
+  public static SuperHiresFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(ImageWidth, ImageHeight).EnsureFormat(PixelFormat.Rgb24);
+    var bitmap = new byte[BitmapDataSize];
+    var screen = new byte[ScreenDataSize];
+    Commodore64Graphics.EncodeHires(rgb.PixelData, ImageWidth, ImageHeight, bitmap, screen);
+
+    return new() {
+      // Where the VIC-II expects a bitmap screen to sit.
+      LoadAddress = 0x2000,
+      BitmapData1 = bitmap,
+      ScreenData1 = screen,
+      BitmapData2 = (byte[])bitmap.Clone(),
+      ScreenData2 = (byte[])screen.Clone(),
+      Padding = new byte[PaddingSize],
     };
   }
 

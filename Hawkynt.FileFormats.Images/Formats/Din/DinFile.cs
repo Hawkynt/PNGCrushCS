@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Din;
 
 /// <summary>In-memory representation of a C64 Din (.din) multicolor art image.</summary>
-public readonly record struct DinFile : IImageFormatReader<DinFile>, IImageToRawImage<DinFile>, IImageFormatWriter<DinFile> {
+public readonly record struct DinFile : IImageFormatReader<DinFile>, IImageToRawImage<DinFile>, IImageFromRawImage<DinFile>, IImageFormatWriter<DinFile> {
 
   static string IImageFormatMetadata<DinFile>.PrimaryExtension => ".din";
   static string[] IImageFormatMetadata<DinFile>.FileExtensions => [".din"];
@@ -87,6 +87,29 @@ public readonly record struct DinFile : IImageFormatReader<DinFile>, IImageToRaw
       Height = height,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
+    };
+  }
+
+  /// <summary>Builds a Din picture from any image, sampling it to the 160x200 multicolour screen.</summary>
+  public static DinFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(ImageWidth, ImageHeight).EnsureFormat(PixelFormat.Rgb24);
+    var bitmap = new byte[BitmapDataSize];
+    var screen = new byte[ScreenDataSize];
+    var color = new byte[ColorDataSize];
+
+    var background = Commodore64Graphics.EncodeMulticolor(
+      rgb.PixelData, ImageWidth, ImageHeight, bitmap, screen, color);
+
+    return new() {
+      // Where the VIC-II expects a bitmap screen to sit.
+      LoadAddress = 0x2000,
+      BitmapData = bitmap,
+      ScreenData = screen,
+      ColorData = color,
+      BackgroundColor = background,
+      TrailingData = [],
     };
   }
 

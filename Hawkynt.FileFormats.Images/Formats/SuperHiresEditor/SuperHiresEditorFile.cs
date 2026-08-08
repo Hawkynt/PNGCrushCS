@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.SuperHiresEditor;
 
 /// <summary>In-memory representation of a C64 Super Hires Editor (.she) interlace hires image.</summary>
-public readonly record struct SuperHiresEditorFile : IImageFormatReader<SuperHiresEditorFile>, IImageToRawImage<SuperHiresEditorFile>, IImageFormatWriter<SuperHiresEditorFile> {
+public readonly record struct SuperHiresEditorFile : IImageFormatReader<SuperHiresEditorFile>, IImageToRawImage<SuperHiresEditorFile>, IImageFromRawImage<SuperHiresEditorFile>, IImageFormatWriter<SuperHiresEditorFile> {
 
   static string IImageFormatMetadata<SuperHiresEditorFile>.PrimaryExtension => ".she";
   static string[] IImageFormatMetadata<SuperHiresEditorFile>.FileExtensions => [".she"];
@@ -75,6 +75,32 @@ public readonly record struct SuperHiresEditorFile : IImageFormatReader<SuperHir
       Height = height,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
+    };
+  }
+
+  /// <summary>Builds an interlace picture from any image, sampling it to the 320x200 high-resolution screen.</summary>
+  /// <remarks>
+  /// Both fields are given the same screen. The decoder above averages them rather than alternating,
+  /// and the only colours an average adds are the exact midpoints of two of the machine's sixteen —
+  /// so a picture already drawn in those sixteen gains nothing by differing and comes back exactly
+  /// as it went in when the two agree.
+  /// </remarks>
+  public static SuperHiresEditorFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var rgb = image.SampleTo(ImageWidth, ImageHeight).EnsureFormat(PixelFormat.Rgb24);
+    var bitmap = new byte[BitmapDataSize];
+    var screen = new byte[ScreenDataSize];
+    Commodore64Graphics.EncodeHires(rgb.PixelData, ImageWidth, ImageHeight, bitmap, screen);
+
+    return new() {
+      // Where the VIC-II expects a bitmap screen to sit.
+      LoadAddress = 0x2000,
+      Bitmap1 = bitmap,
+      Screen1 = screen,
+      Bitmap2 = (byte[])bitmap.Clone(),
+      Screen2 = (byte[])screen.Clone(),
+      TrailingData = [],
     };
   }
 
