@@ -314,6 +314,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | Dr. Halo CUT            | .cut                                                 | Dr. Halo CUT indexed             | Y      | Y      | —         | R     | —   | —      | —         |
 | Dragon                  | .dgn                                                 | Dragon 32/64 graphics            | Y      | Y      | —         | —     | —   | —      | —         |
 | DrawIt                  | .dit                                                 | DrawIt 8-bit indexed image       | Y      | Y      | —         | —     | —   | —      | —         |
+| Drawing Exchange (DXF)  | .dxf                                                 | AutoCAD drawing exchange, ASCII  | Y      | —      | —         | R     | —   | R      | R         |
 | Drazlace                | .dlp, .drl                                           | C64 Drazlace interlace MC        | Y      | —      | —         | R     | —   | —      | —         |
 | DrazPaint               | .drz                                                 | C64 DrazPaint                    | Y      | —      | —         | RW    | —   | —      | —         |
 | DuneGraph               | .dg1, .dc1                                           | Atari Falcon DuneGraph indexed   | Y      | Y      | —         | R     | —   | —      | —         |
@@ -756,7 +757,6 @@ Formats we consciously chose not to implement, with reason codes:
 | CorelDRAW         | .cdr        | vector       | —     | —   | R      | —         |
 | Crayola           | .crayola    | app-specific | —     | —   | —      | —         |
 | DWG               | .dwg        | vector       | —     | —   | R      | —         |
-| DXF               | .dxf        | vector       | R     | —   | R      | R         |
 | FIG               | .fig        | vector       | R     | —   | —      | —         |
 | Flash SWF         | .swf        | video/vector | —     | —   | —      | R         |
 | GnuPlot           | .gplt       | vector       | R     | —   | —      | —         |
