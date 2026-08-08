@@ -686,6 +686,22 @@ is locked when the *other* tool reads the same file and we already match that ot
 So the reachable floor for the two columns together is 165 rows away, not 200, and no amount of work
 moves the other 35.
 
+### One more row that is not worth winning
+
+A Spectrum snapshot (.sna) is the only sample left where the arrangement is identical to the tool's
+and nothing but the colours differ — every pixel in the right place, ten colours to remap. It is
+also not worth fixing, and the reason is worth stating because it is the same shape as the locked
+rows without being one of them.
+
+XnView draws that file with 0xBF for every colour, mapping our 0xCD and our 0xFF onto the same
+value: it is discarding the Spectrum's bright bit. RECOIL does not read a .sna at all, so the locked
+test does not catch this — there is no second opinion on that file — but RECOIL's Spectrum palette
+was measured directly against a probe and is 0xCD and 0xFF, exactly ours. Matching XnView here means
+throwing away a bit the machine has and the picture uses.
+
+So this is counted as a disagreement and left as one. Agreeing with a tool is the goal only while
+the tool is right.
+
 ### A trap in solving a layout by search
 
 Fitting an offset and a depth against the tool's rendering works, and it lies when the sampled
