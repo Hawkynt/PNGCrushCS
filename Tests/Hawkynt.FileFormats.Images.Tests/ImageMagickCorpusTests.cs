@@ -55,11 +55,12 @@ public sealed class ImageMagickCorpusTests {
     [".yuv"] = "headerless samples: nothing in the file gives its size",
     [".g3"] = "a bare fax stream states no page size; we take the fax scan line and the reference tool an A4 page",
     [".g4"] = "a bare fax stream states no page size; we take the fax scan line and the reference tool an A4 page",
-    [".eps"] = "PostScript, which needs an interpreter rather than a decoder",
-    [".epi"] = "PostScript, which needs an interpreter rather than a decoder",
-    [".epsf"] = "PostScript, which needs an interpreter rather than a decoder",
-    [".epsi"] = "PostScript, which needs an interpreter rather than a decoder",
-    [".ept"] = "PostScript with a preview, which needs an interpreter for the picture itself",
+    [".ps"] = "a page in points, which we draw at ninety-six pixels to the inch and the reference tool at seventy-two",
+    [".eps"] = "a page in points, which we draw at ninety-six pixels to the inch and the reference tool at seventy-two",
+    [".epi"] = "a page in points, which we draw at ninety-six pixels to the inch and the reference tool at seventy-two",
+    [".epsf"] = "a page in points, which we draw at ninety-six pixels to the inch and the reference tool at seventy-two",
+    [".epsi"] = "a page in points, which we draw at ninety-six pixels to the inch and the reference tool at seventy-two",
+    [".ept"] = "the reference tool draws the PostScript and we take the preview it is wrapped around, which is a smaller picture of the same page",
   };
 
   [TestCaseSource(nameof(Samples))]

@@ -11,7 +11,7 @@ something up and are correct as they stand.
 **197 distinct extensions across 176 of its format names** when this was written. A few extensions
 are claimed by more than one of its names, so the rows below add up to more than that.
 
-**Seventy-seven are closed now and 99 remain.** Eight of the fifteen turned out to be one thing — a
+**Eighty are closed now and 96 remain.** Eight of the fifteen turned out to be one thing — a
 Windows DIB preview dropped inside a drawing or project file — and are read by a single reader
 rather than eight. IBM KIPS, the X11 puzzle, Synu and the Zoner brush were four more. The last three
 are wrappers around a picture format already here: ECC carries a PNG, LView Pro and IPSM each carry
@@ -71,14 +71,50 @@ Declined, and why:
   - `ioca` wants `.mod`. Worse — the IOCA reader falls back to reading the first four bytes of
     anything at all as a width and a height. `.mod` is an Amiga music module as often as anything
     else, and every one of them would be drawn.
-  - `eps` wants `.ps`. The EPS reader here reads the DOS binary wrapper and the TIFF preview inside
-    it; plain PostScript is a language and it refuses all five `.ps` samples in the corpus. Claiming
-    the name would add an extension that is never actually read, which is not coverage.
+  - `eps` wanted `.ps`, and was declined here for a while: the EPS reader reads the DOS binary
+    wrapper and the TIFF preview inside it, and plain PostScript is a language rather than a layout.
+    That is no longer the position — there is an interpreter now, and the entry below says what it
+    does.
 
 Three more were looked at and left: `aim` wants `.ima`, but the reader's "AIM\0" signature is not
 sourced from anything and there is no sample, so the claim could not be shown to read a real file;
 `icd` wants `.idc` and `pixi` wants `.pxb`, and neither is the format the similarly-named reader
 here actually reads.
+
+### The three that needed an interpreter rather than a reader
+
+`ps`, `eps` and `ai` are one job: PostScript. A file of any of those names is a program, so what
+closed them is an interpreter — the scanner, the operand and dictionary stacks, the control
+constructs, and the graphics operators — running onto the vector rasteriser the drawing formats here
+already share. The page is the `%%BoundingBox` the file states, at ninety-six pixels to the inch,
+and the first `showpage` ends it.
+
+Measured against Ghostscript, at the same page box, on the five PostScript samples in this corpus:
+`tiger.ps` 727x756 and `GOLFER.PS` 760x927 both come out the size Ghostscript does and within 0.03
+of it on ink coverage over a 32 by 32 grid; `table2_1_76.ps` 431x175 and `img.ps` 53x9, both of
+which are a raster laid down with `image`, likewise; and `parrot.ps` 229x288 agrees with Ghostscript
+on every pixel — the file's last operation covers the whole page in green, which Ghostscript also
+draws, on a canvas of any size.
+
+Text is not drawn, for the reason the SVG, HP-GL and DXF readers here do not draw it: the file names
+a font and the glyphs are in the font. A page that is nothing but words comes out blank rather than
+wrong.
+
+`ai` up to version 8 is that same PostScript; from version 9 it is a PDF under an Illustrator name,
+and its first four bytes send it to the PDF reader. What makes the name worth claiming is what it
+refuses. Eleven of the twelve `.ai` samples here declare procedure sets under
+`%%DocumentNeededResources` and do not carry them — `Adobe_level2_AI5` and `Adobe_Illustrator_AI5`
+for the ten written by Illustrator 6, `Adobe_packedarray` and `Adobe_IllustratorA_AI3` for
+`DIAMONDS.AI` — and every operator their drawing is made of is defined in those sets. They are
+refused by the names of the sets they are missing. Ghostscript refuses the same eleven, with
+`undefined in Adobe_level2_AI5` and its equivalents, which is the same decision reached a little
+later. `Illustrator8-s01.ai` carries its procedure sets and is drawn, at 723x1020, agreeing with
+Ghostscript to 0.03 on the same measure.
+
+An earlier attempt at `.ai` here rendered seven of eleven convincingly and four with whole figures
+in a black none of them asked for, and was deleted rather than shipped because nothing could say
+which four were wrong. The rule above is what says it: an operator that is not defined stops the
+render with its name in the message, so a file that would have come out wrong comes out refused.
 
 ### The formats that had samples, read
 
@@ -225,7 +261,6 @@ Windows only, so nothing here has ever been able to compare against them either.
 | 2d | .2d |  |
 | abs | .abs |  |
 | afx | .afx |  |
-| ai | .ai |  |
 | aim | .ima |  |
 | ami | .[b] |  |
 | anv | .anv |  |
@@ -267,7 +302,6 @@ Windows only, so nothing here has ever been able to compare against them either.
 | ecc | .ecc |  |
 | eidi | .ei .eidi |  |
 | eif | .eif |  |
-| eps | .ps |  |
 | eri | .eri | Windows only |
 | fbm | .cbm |  |
 | fff | .fff |  |
@@ -340,7 +374,6 @@ Windows only, so nothing here has ever been able to compare against them either.
 | prc | .prc |  |
 | prf | .prf |  |
 | prisms | .pri |  |
-| ps | .prn .ps .ps1 .ps2 .ps3 |  |
 | pseg | .pse |  |
 | pspb | .pspbrush |  |
 | pspf | .pfr .pspframe | read by the Paint Shop Pro reader |
