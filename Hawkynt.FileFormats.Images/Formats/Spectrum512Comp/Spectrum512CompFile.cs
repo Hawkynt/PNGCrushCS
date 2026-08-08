@@ -6,7 +6,7 @@ using FileFormat.Core;
 namespace FileFormat.Spectrum512Comp;
 
 /// <summary>In-memory representation of an Atari ST Spectrum 512 Compressed (SPC) image (320x199, 512 colors).</summary>
-public readonly record struct Spectrum512CompFile : IImageFormatReader<Spectrum512CompFile>, IImageToRawImage<Spectrum512CompFile>, IImageFormatWriter<Spectrum512CompFile> {
+public readonly record struct Spectrum512CompFile : IImageFormatReader<Spectrum512CompFile>, IImageToRawImage<Spectrum512CompFile>, IImageFromRawImage<Spectrum512CompFile>, IImageFormatWriter<Spectrum512CompFile> {
 
   /// <summary>The decompressed data size (same as SPU format): 32000 + 19104 = 51104 bytes.</summary>
   public const int DecompressedSize = 51104;
@@ -71,6 +71,48 @@ public readonly record struct Spectrum512CompFile : IImageFormatReader<Spectrum5
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
     };
+  }
+
+  /// <summary>Builds a compressed Spectrum 512 picture from any image, sampling it to 320x199.</summary>
+  /// <remarks>
+  /// Each scanline carries its own sixteen colours, chosen from the line alone rather than from the
+  /// picture — that is where the format's 512 come from, and quantising the whole picture at once
+  /// would throw the greater part of them away.
+  /// <para/>
+  /// A line stores forty-eight entries rather than sixteen because the ST reloads its palette
+  /// registers twice while the beam crosses, so which of the three sets a pixel reads depends on how
+  /// far along the line it sits. All three are written with the same sixteen colours. That costs
+  /// nothing and means a decoder that models the reloads and one that reads the first set flat show
+  /// the same picture; writing only the first set would leave two thirds of every line black in a
+  /// player that does model them.
+  /// </remarks>
+  public static Spectrum512CompFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    const int width = 320;
+    const int height = _SCANLINE_COUNT;
+    var source = image.SampleTo(width, height).EnsureFormat(PixelFormat.Bgra32);
+    var plain = new byte[DecompressedSize];
+    var chunky = new byte[width * height];
+    var line = new byte[width * 4];
+
+    for (var y = 0; y < height; ++y) {
+      source.PixelData.AsSpan(y * width * 4, width * 4).CopyTo(line);
+      var quantized = ColorQuantizer.Quantize(line, width, 16);
+      var palette = PlanarConverter.RgbToStPalette(quantized.Palette, quantized.Count);
+
+      for (var x = 0; x < width; ++x)
+        chunky[y * width + x] = (byte)quantized.Indices[x];
+
+      var paletteOffset = _PIXEL_DATA_SIZE + y * _PALETTE_ENTRIES_PER_LINE * 2;
+      for (var i = 0; i < palette.Length; ++i)
+      for (var zone = 0; zone < 3; ++zone)
+        BinaryPrimitives.WriteInt16BigEndian(plain.AsSpan(paletteOffset + (zone * 16 + i) * 2), palette[i]);
+    }
+
+    PlanarConverter.ChunkyToAtariSt(chunky, width, height, 4).CopyTo(plain.AsSpan(0));
+
+    return new() { RawData = PackBits.Pack(plain) };
   }
 
   private static byte[] _PackBitsDecompress(byte[] compressed, int expectedSize) {

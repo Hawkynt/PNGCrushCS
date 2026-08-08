@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.FontasyGrafik;
 
 /// <summary>In-memory representation of an Atari ST Fontasy Grafik image (320x200, 4 planes, 16 colors).</summary>
-public readonly record struct FontasyGrafikFile : IImageFormatReader<FontasyGrafikFile>, IImageToRawImage<FontasyGrafikFile>, IImageFormatWriter<FontasyGrafikFile> {
+public readonly record struct FontasyGrafikFile : IImageFormatReader<FontasyGrafikFile>, IImageToRawImage<FontasyGrafikFile>, IImageFromRawImage<FontasyGrafikFile>, IImageFormatWriter<FontasyGrafikFile> {
 
   /// <summary>Palette size in bytes (16 words = 32 bytes).</summary>
   public const int PaletteSize = 32;
@@ -51,6 +51,26 @@ public readonly record struct FontasyGrafikFile : IImageFormatReader<FontasyGraf
       PixelData = chunky,
       Palette = rgb,
       PaletteCount = paletteCount,
+    };
+  }
+
+  /// <summary>Builds a Fontasy Grafik picture from any image, sampling it to 320x200 and reducing it to sixteen ST colours.</summary>
+  public static FontasyGrafikFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var source = image.SampleTo(320, 200).EnsureFormat(PixelFormat.Bgra32);
+    var quantized = ColorQuantizer.Quantize(source.PixelData, 320 * 200, 16);
+
+    var palette = new short[16];
+    PlanarConverter.RgbToStPalette(quantized.Palette, quantized.Count).CopyTo(palette.AsSpan());
+
+    var chunky = new byte[320 * 200];
+    for (var i = 0; i < chunky.Length; ++i)
+      chunky[i] = (byte)quantized.Indices[i];
+
+    return new() {
+      Palette = palette,
+      PixelData = PlanarConverter.ChunkyToAtariSt(chunky, 320, 200, 4),
     };
   }
 

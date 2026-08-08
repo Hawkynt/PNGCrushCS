@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Calamus;
 
 /// <summary>In-memory representation of a Calamus raster image.</summary>
-public readonly record struct CalamusFile : IImageFormatReader<CalamusFile>, IImageToRawImage<CalamusFile>, IImageFormatWriter<CalamusFile> {
+public readonly record struct CalamusFile : IImageFormatReader<CalamusFile>, IImageToRawImage<CalamusFile>, IImageFromRawImage<CalamusFile>, IImageFormatWriter<CalamusFile> {
 
   static string IImageFormatMetadata<CalamusFile>.PrimaryExtension => ".cpi";
   static string[] IImageFormatMetadata<CalamusFile>.FileExtensions => [".cpi", ".crg"];
@@ -77,6 +77,30 @@ public readonly record struct CalamusFile : IImageFormatReader<CalamusFile>, IIm
       Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
+    };
+  }
+
+  /// <summary>Builds a Calamus raster from any picture, keeping its size unless the header cannot name it.</summary>
+  /// <remarks>
+  /// The unpacked form is written, not the packed "CALAMUSCRG" one the reader also takes — the two
+  /// describe the same picture and only this one has a writer.
+  /// <para/>
+  /// Width and height are words, so anything larger is sampled down rather than refused. A set bit
+  /// is ink on white paper, which is why it is the dark half of the picture that gets the bits.
+  /// </remarks>
+  public static CalamusFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var width = Math.Min(image.Width, ushort.MaxValue);
+    var height = Math.Min(image.Height, ushort.MaxValue);
+    var pixels = BilevelRows.Threshold(image.SampleTo(width, height), setWhenDark: true);
+
+    return new() {
+      Width = width,
+      Height = height,
+      Version = 1,
+      Bpp = 1,
+      PixelData = BilevelRows.Pack(pixels, width, height),
     };
   }
 

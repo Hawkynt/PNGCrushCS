@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.AtariGrafik;
 
 /// <summary>In-memory representation of an Atari Grafik PCP image (320x200, 16 colors).</summary>
-public readonly record struct AtariGrafikFile : IImageFormatReader<AtariGrafikFile>, IImageToRawImage<AtariGrafikFile>, IImageFormatWriter<AtariGrafikFile> {
+public readonly record struct AtariGrafikFile : IImageFormatReader<AtariGrafikFile>, IImageToRawImage<AtariGrafikFile>, IImageFromRawImage<AtariGrafikFile>, IImageFormatWriter<AtariGrafikFile> {
 
   static string IImageFormatMetadata<AtariGrafikFile>.PrimaryExtension => ".pcp";
   static string[] IImageFormatMetadata<AtariGrafikFile>.FileExtensions => [".pcp"];
@@ -61,6 +61,28 @@ public readonly record struct AtariGrafikFile : IImageFormatReader<AtariGrafikFi
       Height = 200,
       Format = PixelFormat.Rgb24,
       PixelData = pixelData,
+    };
+  }
+
+  /// <summary>Builds a Grafik picture from any image, sampling it to 320x200 and reducing it to sixteen ST colours.</summary>
+  public static AtariGrafikFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var source = image.SampleTo(320, 200).EnsureFormat(PixelFormat.Bgra32);
+    var quantized = ColorQuantizer.Quantize(source.PixelData, 320 * 200, 16);
+
+    var palette = new short[16];
+    PlanarConverter.RgbToStPalette(quantized.Palette, quantized.Count).CopyTo(palette.AsSpan());
+
+    var chunky = new byte[320 * 200];
+    for (var i = 0; i < chunky.Length; ++i)
+      chunky[i] = (byte)quantized.Indices[i];
+
+    return new() {
+      // Low resolution: four planes across 320 pixels, the only shape this format holds.
+      Resolution = 0,
+      Palette = palette,
+      PixelData = PlanarConverter.ChunkyToAtariSt(chunky, 320, 200, 4),
     };
   }
 
