@@ -29,10 +29,14 @@ namespace FileFormat.CasioQv;
 /// <c>qvplay</c>'s own examples scale the result to 320 by 240 before looking at it — but resampling
 /// is a decision for whatever displays the picture, and no other reader here corrects an aspect.
 /// <para/>
-/// It does not write. Reassembling a camera's stripped stream is not a format anything would want
-/// written back.
+/// Writing emits the later cameras' shape: the container with one area 12 holding a whole JFIF. The
+/// QV-10 generation's stripped area is not written back — putting a stream into that shape means
+/// coding three separate scans on the camera's own sampling grid, and the picture is no better
+/// recorded for it than by the whole stream the same reader accepts.
 /// </remarks>
-public readonly record struct CasioQvFile : IImageFormatReader<CasioQvFile>, IImageToRawImage<CasioQvFile> {
+public readonly record struct CasioQvFile
+  : IImageFormatReader<CasioQvFile>, IImageToRawImage<CasioQvFile>,
+    IImageFromRawImage<CasioQvFile>, IImageFormatWriter<CasioQvFile> {
 
   /// <summary>The four bytes every one of these opens with.</summary>
   public static ReadOnlySpan<byte> Magic => [0x07, 0x20, 0x4D, 0x4D];
@@ -61,6 +65,7 @@ public readonly record struct CasioQvFile : IImageFormatReader<CasioQvFile>, IIm
   static string IImageFormatMetadata<CasioQvFile>.PrimaryExtension => ".cam";
   static string[] IImageFormatMetadata<CasioQvFile>.FileExtensions => [".cam"];
   static CasioQvFile IImageFormatReader<CasioQvFile>.FromSpan(ReadOnlySpan<byte> data) => CasioQvReader.FromSpan(data);
+  static byte[] IImageFormatWriter<CasioQvFile>.ToBytes(CasioQvFile file) => CasioQvWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<CasioQvFile>.VideoModes => [
     new("QV-10", [(480, 240)], [16777216]),
     new("QV-5000", [(IntegerRange.Any, IntegerRange.Any)], [16777216]),
@@ -84,4 +89,16 @@ public readonly record struct CasioQvFile : IImageFormatReader<CasioQvFile>, IIm
   /// <summary>Decodes the stream the file carries.</summary>
   public static RawImage ToRawImage(CasioQvFile file)
     => JpegFile.ToRawImage(JpegReader.FromBytes(file.Jpeg ?? throw new InvalidDataException("A Casio QV picture carries no stream.")));
+
+  /// <summary>Codes the picture as the whole JFIF the later cameras keep in area 12.</summary>
+  public static CasioQvFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      WasReassembled = false,
+      Jpeg = JpegWriter.ToBytes(JpegFile.FromRawImage(image)),
+    };
+  }
 }

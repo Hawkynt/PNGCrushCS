@@ -25,11 +25,16 @@ internal static class JpegManagedEncoder {
   /// <param name="stripMetadata">When true, omits any preserved marker segments (always true for fresh encodes).</param>
   /// <param name="metadataSegments">EXIF/XMP/IPTC/COM marker segments to embed (typically built by
   /// <see cref="JpegMetadataCodec.ToMarkerSegments"/>). Ignored when <paramref name="stripMetadata"/> is true.</param>
+  /// <param name="quantTablesNatural">Quantisation tables in natural order, luminance first, replacing
+  /// the ones <paramref name="quality"/> would build. A handful of camera formats store the scan
+  /// without its tables and expect a fixed pair to be supplied by the decoder; an encoder for one of
+  /// those has to quantise against exactly those tables or nothing reads what it writes.</param>
   public static byte[] Encode(
     byte[] rgbPixelData, int width, int height,
     int quality, JpegMode mode, JpegSubsampling subsampling,
     bool optimizeHuffman, bool isGrayscale, bool stripMetadata = true,
-    IReadOnlyList<JpegMarkerSegment>? metadataSegments = null
+    IReadOnlyList<JpegMarkerSegment>? metadataSegments = null,
+    IReadOnlyList<int[]>? quantTablesNatural = null
   ) {
     ArgumentNullException.ThrowIfNull(rgbPixelData);
     ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
@@ -70,13 +75,17 @@ internal static class JpegManagedEncoder {
 
     // 4. Quantization tables — natural order for in-loop quantization,
     //    zigzag order for DQT serialization (the JPEG bitstream stores DQT in zigzag).
-    var lumQuantNatural = JpegQuantizer.BuildQuantTable(isLuminance: true, quality);
+    var lumQuantNatural = quantTablesNatural is { Count: > 0 }
+      ? quantTablesNatural[0]
+      : JpegQuantizer.BuildQuantTable(isLuminance: true, quality);
     var lumQuantZigzag = _NaturalToZigzag(lumQuantNatural);
 
     int[]? chromQuantNatural = null;
     int[]? chromQuantZigzag = null;
     if (!isGrayscale) {
-      chromQuantNatural = JpegQuantizer.BuildQuantTable(isLuminance: false, quality);
+      chromQuantNatural = quantTablesNatural is { Count: > 1 }
+        ? quantTablesNatural[1]
+        : JpegQuantizer.BuildQuantTable(isLuminance: false, quality);
       chromQuantZigzag = _NaturalToZigzag(chromQuantNatural);
     }
 

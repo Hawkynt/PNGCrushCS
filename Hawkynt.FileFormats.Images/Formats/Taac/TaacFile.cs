@@ -31,10 +31,15 @@ namespace FileFormat.Taac;
 /// green, red per pixel, which is the order xloadimage reads them in and the order the colour map in
 /// the same file uses, but nothing here has confirmed it against a picture.
 /// <para/>
-/// It does not write.
+/// Writing states the same things the reader cross-checks — the extents against the rank, the colour
+/// map's length against <c>colormapsize</c>, the raster's length against the size — and keeps the
+/// colour map blue first, so the file is the one xloadimage reads rather than only the one this
+/// reads back.
 /// </remarks>
 [FormatMagicBytes([0x6E, 0x63, 0x61, 0x61])]
-public readonly record struct TaacFile : IImageFormatReader<TaacFile>, IImageToRawImage<TaacFile> {
+public readonly record struct TaacFile
+  : IImageFormatReader<TaacFile>, IImageToRawImage<TaacFile>,
+    IImageFromRawImage<TaacFile>, IImageFormatWriter<TaacFile> {
 
   /// <summary>The four letters a file opens with.</summary>
   public const string Magic = "ncaa";
@@ -45,6 +50,7 @@ public readonly record struct TaacFile : IImageFormatReader<TaacFile>, IImageToR
   static string IImageFormatMetadata<TaacFile>.PrimaryExtension => ".vff";
   static string[] IImageFormatMetadata<TaacFile>.FileExtensions => [".vff", ".taac", ".suniff"];
   static TaacFile IImageFormatReader<TaacFile>.FromSpan(ReadOnlySpan<byte> data) => TaacReader.FromSpan(data);
+  static byte[] IImageFormatWriter<TaacFile>.ToBytes(TaacFile file) => TaacWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<TaacFile>.VideoModes => [
     new("Indexed", [(IntegerRange.Any, IntegerRange.Any)], [256]),
     new("Colour", [(IntegerRange.Any, IntegerRange.Any)], [16777216])
@@ -97,6 +103,46 @@ public readonly record struct TaacFile : IImageFormatReader<TaacFile>, IImageToR
       Height = file.Height,
       Format = PixelFormat.Bgr24,
       PixelData = file.PixelData
+    };
+  }
+
+  /// <summary>Builds the file the board would have displayed: one band with a map where the picture
+  /// has few enough colours for one, three bands otherwise.</summary>
+  /// <remarks>
+  /// A grey goes out as the single band with no map, which is what the format is for; a picture that
+  /// already has an eight-bit index keeps it and its colours; anything else becomes the three-band
+  /// case rather than being reduced, since the format states no limit that would require it.
+  /// </remarks>
+  public static TaacFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    if (image.Format == PixelFormat.Gray8)
+      return new() {
+        Width = image.Width,
+        Height = image.Height,
+        Bands = 1,
+        PixelData = image.PixelData,
+        Palette = null,
+        PaletteCount = 0
+      };
+
+    if (image.Format == PixelFormat.Indexed8 && image is { Palette.Length: >= 3, PaletteCount: > 0 })
+      return new() {
+        Width = image.Width,
+        Height = image.Height,
+        Bands = 1,
+        PixelData = image.PixelData,
+        Palette = image.Palette,
+        PaletteCount = Math.Min(image.PaletteCount, image.Palette.Length / 3)
+      };
+
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      Bands = 3,
+      PixelData = image.EnsureFormat(PixelFormat.Bgr24).PixelData,
+      Palette = null,
+      PaletteCount = 0
     };
   }
 }

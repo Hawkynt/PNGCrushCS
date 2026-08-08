@@ -19,7 +19,9 @@ namespace FileFormat.TiPicture;
 /// The <c>**TI92**</c> files are a different container — a folder of named entries rather than a run
 /// of them — and their picture data is compressed, so they are not read here.
 /// </remarks>
-public readonly record struct TiPictureFile : IImageFormatReader<TiPictureFile>, IImageToRawImage<TiPictureFile> {
+public readonly record struct TiPictureFile
+  : IImageFormatReader<TiPictureFile>, IImageToRawImage<TiPictureFile>,
+    IImageFromRawImage<TiPictureFile>, IImageFormatWriter<TiPictureFile> {
 
   /// <summary>The signature is eight bytes, then two more of format and a nought.</summary>
   public const int SignatureSize = 11;
@@ -51,6 +53,7 @@ public readonly record struct TiPictureFile : IImageFormatReader<TiPictureFile>,
   static string IImageFormatMetadata<TiPictureFile>.PrimaryExtension => ".82i";
   static string[] IImageFormatMetadata<TiPictureFile>.FileExtensions => [".82i", ".83i", ".85i", ".86i"];
   static TiPictureFile IImageFormatReader<TiPictureFile>.FromSpan(ReadOnlySpan<byte> data) => TiPictureReader.FromSpan(data);
+  static byte[] IImageFormatWriter<TiPictureFile>.ToBytes(TiPictureFile file) => TiPictureWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<TiPictureFile>.VideoModes => [
     new("TI-82/83", [(new(Width8283, Width8283), new(ScreenHeight, ScreenHeight))], [2]),
     new("TI-85/86", [(new(Width8586, Width8586), new(ScreenHeight, ScreenHeight))], [2]),
@@ -61,6 +64,9 @@ public readonly record struct TiPictureFile : IImageFormatReader<TiPictureFile>,
 
   /// <summary>Image height in pixels.</summary>
   public int Height { get; init; }
+
+  /// <summary>The two digits the signature names the calculator with, such as <c>86</c>.</summary>
+  public string? Model { get; init; }
 
   /// <summary>The screen as it stands in the file, one bit to the pixel, rows padded to whole bytes.</summary>
   public byte[] PixelData { get; init; }
@@ -73,6 +79,38 @@ public readonly record struct TiPictureFile : IImageFormatReader<TiPictureFile>,
       PixelData = file.PixelData[..],
       Palette = _Palette[..],
       PaletteCount = 2,
+    };
+  }
+
+  public static TiPictureFile FromRawImage(RawImage image) => FromRawImage(image, ".82i");
+
+  /// <summary>Fits the picture to the screen of the calculator the extension names.</summary>
+  /// <remarks>
+  /// The extension is the only thing that says which of the two screens a file is for — the layout is
+  /// otherwise identical — so a picture written as <c>.85i</c> or <c>.86i</c> gets the wider one and
+  /// everything else the narrower. There is nothing to refuse: a picture of some other size is
+  /// sampled to the screen, because the screen is a fact about the calculator rather than a fault in
+  /// the picture.
+  /// </remarks>
+  public static TiPictureFile FromRawImage(RawImage image, string extension) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var model = extension?.ToLowerInvariant() switch {
+      ".83i" => "83",
+      ".85i" => "85",
+      ".86i" => "86",
+      _ => "82",
+    };
+
+    var width = model is "85" or "86" ? Width8586 : Width8283;
+    var screen = image.Width == width && image.Height == ScreenHeight ? image : image.SampleTo(width, ScreenHeight);
+
+    // Index one is the lit pixel, which the palette here draws black.
+    return new() {
+      Width = width,
+      Height = ScreenHeight,
+      Model = model,
+      PixelData = BilevelRows.Pack(BilevelRows.Threshold(screen, setWhenDark: true), width, ScreenHeight),
     };
   }
 }

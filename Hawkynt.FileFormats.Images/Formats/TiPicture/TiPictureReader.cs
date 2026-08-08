@@ -80,6 +80,7 @@ public static class TiPictureReader {
           return new() {
             Width = width,
             Height = TiPictureFile.ScreenHeight,
+            Model = $"{(char)data[4]}{(char)data[5]}",
             PixelData = pixels,
           };
         }

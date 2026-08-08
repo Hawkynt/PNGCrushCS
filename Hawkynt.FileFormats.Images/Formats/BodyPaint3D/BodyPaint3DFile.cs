@@ -27,10 +27,16 @@ namespace FileFormat.BodyPaint3D;
 /// Nothing on this machine reads the format and no specification of it is published, so what stands
 /// behind the layout is the corpus: all ten distinct samples walk from the signature to the last
 /// record and land on the end of the file exactly, with no tag left unaccounted for, and every one
-/// of the 32,400 scanlines decompresses to exactly the width the header states. It does not write:
-/// a texture with no document behind it is not a document.
+/// of the 32,400 scanlines decompresses to exactly the width the header states.
+/// <para/>
+/// Writing emits the same nesting the samples carry — the document record, the texture header, and a
+/// bitmap covering the whole texture — and no layers. A file with layers holds the picture twice,
+/// once flattened and once as the single layer; writing a second copy would be filling in a
+/// structure the document does not have.
 /// </remarks>
-public readonly record struct BodyPaint3DFile : IImageFormatReader<BodyPaint3DFile>, IImageToRawImage<BodyPaint3DFile> {
+public readonly record struct BodyPaint3DFile
+  : IImageFormatReader<BodyPaint3DFile>, IImageToRawImage<BodyPaint3DFile>,
+    IImageFromRawImage<BodyPaint3DFile>, IImageFormatWriter<BodyPaint3DFile> {
 
   /// <summary>The eight bytes every one of these opens with.</summary>
   public static ReadOnlySpan<byte> Magic => "AC4DBody"u8;
@@ -77,6 +83,7 @@ public readonly record struct BodyPaint3DFile : IImageFormatReader<BodyPaint3DFi
   static string IImageFormatMetadata<BodyPaint3DFile>.PrimaryExtension => ".b3d";
   static string[] IImageFormatMetadata<BodyPaint3DFile>.FileExtensions => [".b3d"];
   static BodyPaint3DFile IImageFormatReader<BodyPaint3DFile>.FromSpan(ReadOnlySpan<byte> data) => BodyPaint3DReader.FromSpan(data);
+  static byte[] IImageFormatWriter<BodyPaint3DFile>.ToBytes(BodyPaint3DFile file) => BodyPaint3DWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<BodyPaint3DFile>.VideoModes => [
     new("Grayscale", [(IntegerRange.Any, IntegerRange.Any)], [256]),
     new("Color", [(IntegerRange.Any, IntegerRange.Any)], [16777216]),
@@ -104,4 +111,24 @@ public readonly record struct BodyPaint3DFile : IImageFormatReader<BodyPaint3DFi
     Format = file.Planes == GrayPlanes ? PixelFormat.Gray8 : PixelFormat.Rgb24,
     PixelData = file.PixelData[..],
   };
+
+  /// <summary>A grey goes out as the one-channel texture, anything else as the three-channel one.</summary>
+  public static BodyPaint3DFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    if (image.Format == PixelFormat.Gray8)
+      return new() {
+        Width = image.Width,
+        Height = image.Height,
+        Planes = GrayPlanes,
+        PixelData = image.PixelData,
+      };
+
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      Planes = RgbPlanes,
+      PixelData = image.ToRgb24(),
+    };
+  }
 }

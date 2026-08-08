@@ -19,7 +19,9 @@ namespace FileFormat.Vitec;
 /// is what the format is called and it is a far better signature than four bytes of which two are
 /// small numbers, so it is required.
 /// </remarks>
-public readonly record struct VitecFile : IImageFormatReader<VitecFile>, IImageToRawImage<VitecFile> {
+public readonly record struct VitecFile
+  : IImageFormatReader<VitecFile>, IImageToRawImage<VitecFile>,
+    IImageFromRawImage<VitecFile>, IImageFormatWriter<VitecFile> {
 
   /// <summary>The four bytes the file opens with.</summary>
   public static ReadOnlySpan<byte> Magic => [0x00, 0x5B, 0x07, 0x20];
@@ -36,6 +38,7 @@ public readonly record struct VitecFile : IImageFormatReader<VitecFile>, IImageT
   static string IImageFormatMetadata<VitecFile>.PrimaryExtension => ".vit";
   static string[] IImageFormatMetadata<VitecFile>.FileExtensions => [".vit"];
   static VitecFile IImageFormatReader<VitecFile>.FromSpan(ReadOnlySpan<byte> data) => VitecReader.FromSpan(data);
+  static byte[] IImageFormatWriter<VitecFile>.ToBytes(VitecFile file) => VitecWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<VitecFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [256, 16777216])
   ];
@@ -66,6 +69,26 @@ public readonly record struct VitecFile : IImageFormatReader<VitecFile>, IImageT
       Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = file.PixelData[..],
+    };
+  }
+
+  /// <summary>A grey goes out as the one-sample case, anything else as the three.</summary>
+  public static VitecFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    if (image.Format == PixelFormat.Gray8)
+      return new() {
+        Width = image.Width,
+        Height = image.Height,
+        Samples = 1,
+        PixelData = image.PixelData,
+      };
+
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      Samples = 3,
+      PixelData = image.ToRgb24(),
     };
   }
 }

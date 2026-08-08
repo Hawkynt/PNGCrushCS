@@ -19,7 +19,9 @@ namespace FileFormat.Hru;
 /// size comes from the screen descriptor, and the check that it is the right size is that the coded
 /// data unpacks to exactly that many pixels and no more.
 /// </remarks>
-public readonly record struct HruFile : IImageFormatReader<HruFile>, IImageToRawImage<HruFile> {
+public readonly record struct HruFile
+  : IImageFormatReader<HruFile>, IImageToRawImage<HruFile>,
+    IImageFromRawImage<HruFile>, IImageFormatWriter<HruFile> {
 
   /// <summary>The twenty-eight bytes every one of these opens with.</summary>
   public static ReadOnlySpan<byte> Magic => [
@@ -39,6 +41,7 @@ public readonly record struct HruFile : IImageFormatReader<HruFile>, IImageToRaw
   static string IImageFormatMetadata<HruFile>.PrimaryExtension => ".hru";
   static string[] IImageFormatMetadata<HruFile>.FileExtensions => [".hru"];
   static HruFile IImageFormatReader<HruFile>.FromSpan(ReadOnlySpan<byte> data) => HruReader.FromSpan(data);
+  static byte[] IImageFormatWriter<HruFile>.ToBytes(HruFile file) => HruWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<HruFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [256])
   ];
@@ -66,6 +69,20 @@ public readonly record struct HruFile : IImageFormatReader<HruFile>, IImageToRaw
       PixelData = file.PixelData[..],
       Palette = file.Palette[..],
       PaletteCount = file.PaletteCount,
+    };
+  }
+
+  /// <summary>Reduces the picture to the indexed one the global colour table addresses.</summary>
+  public static HruFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var indexed = image.EnsureIndexedAtMost(256);
+    return new() {
+      Width = indexed.Width,
+      Height = indexed.Height,
+      PixelData = indexed.PixelData,
+      Palette = indexed.Palette ?? new byte[768],
+      PaletteCount = indexed.PaletteCount > 0 ? indexed.PaletteCount : 256,
     };
   }
 }

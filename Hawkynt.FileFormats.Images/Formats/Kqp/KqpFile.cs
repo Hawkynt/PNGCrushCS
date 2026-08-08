@@ -24,7 +24,9 @@ namespace FileFormat.Kqp;
 /// with the software decodes with lettering that is sharp to the pixel, which the wrong tables
 /// cannot produce.
 /// </remarks>
-public readonly record struct KqpFile : IImageFormatReader<KqpFile>, IImageToRawImage<KqpFile> {
+public readonly record struct KqpFile
+  : IImageFormatReader<KqpFile>, IImageToRawImage<KqpFile>,
+    IImageFromRawImage<KqpFile>, IImageFormatWriter<KqpFile> {
 
   /// <summary>The two bytes a Windows bitmap file header opens with.</summary>
   public static ReadOnlySpan<byte> Magic => [(byte)'B', (byte)'M'];
@@ -41,9 +43,41 @@ public readonly record struct KqpFile : IImageFormatReader<KqpFile>, IImageToRaw
   /// <summary>Where the offset of the picture data is stored.</summary>
   public const int DataOffsetField = 10;
 
+  /// <summary>
+  /// The quantisation tables every one of these is coded against, as a ready-made segment.
+  /// </summary>
+  /// <remarks>
+  /// Eight-bit precision, two tables: nought for luminance and one for both chrominance components,
+  /// which is what the scan header asks for. The camera never wrote them into the file, so a decoder
+  /// has to know them; these are the ones the Konica software used, and an encoder has to quantise
+  /// against exactly these or the file it writes decodes to some other picture.
+  /// </remarks>
+  internal static ReadOnlySpan<byte> QuantisationTables => [
+    0xFF, 0xDB, 0x00, 0x84,
+    0x00,
+    0x0C, 0x08, 0x09, 0x0A, 0x09, 0x07, 0x0C, 0x0A,
+    0x0A, 0x0A, 0x0E, 0x0D, 0x0C, 0x0E, 0x12, 0x1F,
+    0x14, 0x12, 0x11, 0x11, 0x12, 0x26, 0x1B, 0x1C,
+    0x16, 0x1F, 0x2D, 0x27, 0x2F, 0x2E, 0x2C, 0x27,
+    0x2B, 0x2A, 0x32, 0x38, 0x47, 0x3C, 0x32, 0x35,
+    0x43, 0x35, 0x2A, 0x2B, 0x3E, 0x55, 0x3F, 0x43,
+    0x4A, 0x4C, 0x50, 0x51, 0x50, 0x30, 0x3C, 0x58,
+    0x5E, 0x57, 0x4E, 0x5D, 0x47, 0x4E, 0x50, 0x4D,
+    0x01,
+    0x0F, 0x10, 0x10, 0x16, 0x13, 0x16, 0x2C, 0x18,
+    0x18, 0x2C, 0x5C, 0x3D, 0x34, 0x3D, 0x5C, 0x5C,
+    0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C,
+    0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C,
+    0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C,
+    0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C,
+    0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C,
+    0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C,
+  ];
+
   static string IImageFormatMetadata<KqpFile>.PrimaryExtension => ".kqp";
   static string[] IImageFormatMetadata<KqpFile>.FileExtensions => [".kqp"];
   static KqpFile IImageFormatReader<KqpFile>.FromSpan(ReadOnlySpan<byte> data) => KqpReader.FromSpan(data);
+  static byte[] IImageFormatWriter<KqpFile>.ToBytes(KqpFile file) => KqpWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<KqpFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [16777216])
   ];
@@ -63,6 +97,16 @@ public readonly record struct KqpFile : IImageFormatReader<KqpFile>, IImageToRaw
       Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = file.PixelData[..],
+    };
+  }
+
+  public static KqpFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      PixelData = image.ToRgb24(),
     };
   }
 }

@@ -20,7 +20,9 @@ namespace FileFormat.Mrf;
 /// same header and reads that byte as a depth and a plane count. Nought means one bit and one plane,
 /// so insisting on it is the same as insisting the file is monochrome.
 /// </remarks>
-public readonly record struct MrfFile : IImageFormatReader<MrfFile>, IImageToRawImage<MrfFile> {
+public readonly record struct MrfFile
+  : IImageFormatReader<MrfFile>, IImageToRawImage<MrfFile>,
+    IImageFromRawImage<MrfFile>, IImageFormatWriter<MrfFile> {
 
   /// <summary>The four bytes every one of these opens with.</summary>
   public static ReadOnlySpan<byte> Magic => [(byte)'M', (byte)'R', (byte)'F', (byte)'1'];
@@ -37,6 +39,7 @@ public readonly record struct MrfFile : IImageFormatReader<MrfFile>, IImageToRaw
   static string IImageFormatMetadata<MrfFile>.PrimaryExtension => ".mrf";
   static string[] IImageFormatMetadata<MrfFile>.FileExtensions => [".mrf"];
   static MrfFile IImageFormatReader<MrfFile>.FromSpan(ReadOnlySpan<byte> data) => MrfReader.FromSpan(data);
+  static byte[] IImageFormatWriter<MrfFile>.ToBytes(MrfFile file) => MrfWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<MrfFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])
   ];
@@ -58,6 +61,21 @@ public readonly record struct MrfFile : IImageFormatReader<MrfFile>, IImageToRaw
       PixelData = file.PixelData[..],
       Palette = _BlackWhitePalette[..],
       PaletteCount = 2,
+    };
+  }
+
+  /// <summary>Reduces a picture to the one bit the format stores, nought black and one white.</summary>
+  /// <remarks>
+  /// There is no palette in the file to record anything else with, so the reduction is by brightness
+  /// against the middle of the range rather than by matching two colours the picture may not have.
+  /// </remarks>
+  public static MrfFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      PixelData = BilevelRows.Threshold(image, setWhenDark: false),
     };
   }
 }
