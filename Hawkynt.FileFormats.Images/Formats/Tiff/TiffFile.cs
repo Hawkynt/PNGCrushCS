@@ -5,6 +5,21 @@ using FileFormat.Core;
 namespace FileFormat.Tiff;
 
 /// <summary>In-memory representation of a TIFF image.</summary>
+/// <remarks>
+/// A note on <c>.xif</c>, which is not claimed here. Xerox's eXtended Image File is a TIFF: the
+/// standard eight-byte header, and then, at offset eight, ten bytes reading <c>XEROX DIFF</c> or
+/// <c>eXtended</c> that no tag in the file points at, so a plain TIFF reader walks straight past
+/// them into the ordinary directory chain. The sample to hand does exactly that and its pages come
+/// out with the right dimensions.
+/// <para/>
+/// What it does not come out with is any pixels. Its tiles are written with compression 34673, one
+/// of Xerox's private mixed-raster schemes, which LibTiff does not decode and neither does
+/// ImageMagick — it reports "compression not supported" and stops. Ours does not stop; it hands
+/// back a page of white. Claiming the extension would therefore put a blank sheet into the corpus
+/// under the name of a document, which is worse for a reader of these notes than the name being
+/// absent. A file written with a compression the format does define would decode here perfectly
+/// well, and if one turns up the extension can be added then.
+/// </remarks>
 [FormatMimeType("image/tiff", "image/tif", "image/x-tiff")]
 public sealed class TiffFile :
   IImageFormatReader<TiffFile>, IImageToRawImage<TiffFile>, IImageFromRawImage<TiffFile>, IImageFormatWriter<TiffFile>,

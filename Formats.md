@@ -546,6 +546,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | Pagefox (Hires)         | .pfx                                                 | C64 Pagefox 640x200 monochrome  | Y      | Y      | —         | —     | —   | —      | —         |
 | Paint Magic             | .pmg                                                 | C64 Paint Magic                  | Y      | Y      | —         | RW    | —   | —      | —         |
 | Paint Pro               | .ppro                                                | Atari ST Paint Pro               | Y      | Y      | —         | R     | —   | —      | —         |
+| PaintShop Browser Cache | .jbf                                                 | PSP thumbnail cache, version 2   | Y      | —      | —         | —     | —   | R      | —         |
 | Palm                    | .palm                                                | Palm OS bitmap                   | Y      | Y      | —         | RW    | —   | —      | —         |
 | Palm PDB                | .pdb                                                 | Palm Database image viewer       | Y      | Y      | —         | R     | —   | —      | —         |
 | PAT                     | .pat                                                 | GIMP Pattern                     | Y      | Y      | —         | —     | —   | —      | —         |
