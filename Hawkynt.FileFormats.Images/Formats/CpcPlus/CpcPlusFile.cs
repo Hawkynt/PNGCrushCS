@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.CpcPlus;
 
 /// <summary>In-memory representation of a CPC Plus Mode 1 image (16384 bytes screen + 16 bytes palette: 320x200, 4 colors from 4096-color palette).</summary>
-public readonly record struct CpcPlusFile : IImageFormatReader<CpcPlusFile>, IImageToRawImage<CpcPlusFile>, IImageFormatWriter<CpcPlusFile> {
+public readonly record struct CpcPlusFile : IImageFormatReader<CpcPlusFile>, IImageToRawImage<CpcPlusFile>, IImageFromRawImage<CpcPlusFile>, IImageFormatWriter<CpcPlusFile> {
 
   static string IImageFormatMetadata<CpcPlusFile>.PrimaryExtension => ".cpp";
   static string[] IImageFormatMetadata<CpcPlusFile>.FileExtensions => [".cpp"];
@@ -100,5 +100,49 @@ public readonly record struct CpcPlusFile : IImageFormatReader<CpcPlusFile>, IIm
       PixelData = rgb,
     };
   }
+
+  /// <summary>Builds a Plus screen from any picture, sampling it to 320x200 and reducing it to the four inks mode 1 shows.</summary>
+  /// <remarks>
+  /// Unlike the base machine the Plus has no fixed palette — its four inks are chosen freely out of
+  /// 4096 — so the colours come from a quantiser rather than from a lookup, and only their top four
+  /// bits a channel are kept.
+  /// </remarks>
+  public static CpcPlusFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var source = image.SampleTo(PixelWidth, PixelHeight).EnsureFormat(PixelFormat.Bgra32);
+    var quantized = ColorQuantizer.Quantize(source.PixelData, PixelWidth * PixelHeight, PaletteEntries);
+
+    var paletteData = new byte[PaletteDataSize];
+    for (var i = 0; i < quantized.Count; ++i) {
+      paletteData[i * 4] = _ToNibble(quantized.Palette[i * 3]);
+      paletteData[i * 4 + 1] = _ToNibble(quantized.Palette[i * 3 + 1]);
+      paletteData[i * 4 + 2] = _ToNibble(quantized.Palette[i * 3 + 2]);
+    }
+
+    var pixelData = new byte[PixelHeight * BytesPerRow];
+    for (var y = 0; y < PixelHeight; ++y)
+    for (var byteCol = 0; byteCol < BytesPerRow; ++byteCol) {
+      var baseX = byteCol * PixelsPerByte;
+      var value = 0;
+
+      for (var p = 0; p < PixelsPerByte; ++p) {
+        var index = quantized.Indices[y * PixelWidth + baseX + p] & 3;
+        value |= (index & 1) << (7 - p);
+        value |= ((index >> 1) & 1) << (3 - p);
+      }
+
+      pixelData[y * BytesPerRow + byteCol] = (byte)value;
+    }
+
+    return new() { PixelData = pixelData, PaletteData = paletteData };
+  }
+
+  /// <summary>A channel of 0..255 as the nibble the file holds.</summary>
+  /// <remarks>
+  /// Rounded, not truncated. The decoder widens a nibble by multiplying by seventeen, and dividing
+  /// by sixteen to get it back lands a step low on every value but nought and fifteen.
+  /// </remarks>
+  private static byte _ToNibble(byte channel) => (byte)((channel + 8) / 17);
 
 }

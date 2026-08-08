@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.CpcOverscan;
 
 /// <summary>In-memory representation of a CPC overscan image (32768 bytes: 384x272, Mode 1, 4 colors).</summary>
-public readonly record struct CpcOverscanFile : IImageFormatReader<CpcOverscanFile>, IImageToRawImage<CpcOverscanFile>, IImageFormatWriter<CpcOverscanFile> {
+public readonly record struct CpcOverscanFile : IImageFormatReader<CpcOverscanFile>, IImageToRawImage<CpcOverscanFile>, IImageFromRawImage<CpcOverscanFile>, IImageFormatWriter<CpcOverscanFile> {
 
   static string IImageFormatMetadata<CpcOverscanFile>.PrimaryExtension => ".cpo";
   static string[] IImageFormatMetadata<CpcOverscanFile>.FileExtensions => [".cpo"];
@@ -86,6 +86,32 @@ public readonly record struct CpcOverscanFile : IImageFormatReader<CpcOverscanFi
       Palette = _CpcMode1Palette[..],
       PaletteCount = 4,
     };
+  }
+
+  /// <summary>Builds an overscan screen from any picture, sampling it to 384x272 and mapping it onto the four mode 1 inks.</summary>
+  public static CpcOverscanFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var indexed = image.SampleTo(PixelWidth, PixelHeight).EnsureIndexed(PixelFormat.Indexed8, _CpcMode1Palette);
+    var pixelData = new byte[PixelHeight * BytesPerRow];
+
+    for (var y = 0; y < PixelHeight; ++y)
+    for (var byteCol = 0; byteCol < BytesPerRow; ++byteCol) {
+      var baseX = byteCol * PixelsPerByte;
+      var value = 0;
+
+      // Mode 1 keeps a pixel's two bits four places apart, one nibble to a bitplane, which is what
+      // the four shifts the decoder above does undo.
+      for (var p = 0; p < PixelsPerByte; ++p) {
+        var index = indexed.PixelData[y * PixelWidth + baseX + p] & 3;
+        value |= (index & 1) << (7 - p);
+        value |= ((index >> 1) & 1) << (3 - p);
+      }
+
+      pixelData[y * BytesPerRow + byteCol] = (byte)value;
+    }
+
+    return new() { PixelData = pixelData };
   }
 
 }

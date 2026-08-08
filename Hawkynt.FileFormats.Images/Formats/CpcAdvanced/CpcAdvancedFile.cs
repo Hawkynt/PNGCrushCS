@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.CpcAdvanced;
 
 /// <summary>In-memory representation of a CPC Advanced Mode 0 image (16384 bytes: 160x200, 16 colors, CPC memory interleave).</summary>
-public readonly record struct CpcAdvancedFile : IImageFormatReader<CpcAdvancedFile>, IImageToRawImage<CpcAdvancedFile>, IImageFormatWriter<CpcAdvancedFile> {
+public readonly record struct CpcAdvancedFile : IImageFormatReader<CpcAdvancedFile>, IImageToRawImage<CpcAdvancedFile>, IImageFromRawImage<CpcAdvancedFile>, IImageFormatWriter<CpcAdvancedFile> {
 
   static string IImageFormatMetadata<CpcAdvancedFile>.PrimaryExtension => ".cpa";
   static string[] IImageFormatMetadata<CpcAdvancedFile>.FileExtensions => [".cpa"];
@@ -87,6 +87,28 @@ public readonly record struct CpcAdvancedFile : IImageFormatReader<CpcAdvancedFi
       Palette = _CpcPalette[..],
       PaletteCount = 16,
     };
+  }
+
+  /// <summary>Builds a screen from any picture, sampling it to 160x200 and mapping it onto the firmware palette.</summary>
+  /// <remarks>
+  /// The file stores bare mode 0 indices and nothing else, so they have to address the same sixteen
+  /// colours the decoder re-applies — a quantiser inventing its own palette would leave every colour
+  /// naming a different one.
+  /// </remarks>
+  public static CpcAdvancedFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var indexed = image.SampleTo(PixelWidth, PixelHeight).EnsureIndexed(PixelFormat.Indexed8, _CpcPalette);
+    var pixelData = new byte[PixelHeight * BytesPerRow];
+
+    for (var y = 0; y < PixelHeight; ++y)
+    for (var byteCol = 0; byteCol < BytesPerRow; ++byteCol) {
+      var at = y * PixelWidth + byteCol * PixelsPerByte;
+      pixelData[y * BytesPerRow + byteCol] =
+        AmstradGraphics.Mode0Byte(indexed.PixelData[at] & 15, indexed.PixelData[at + 1] & 15);
+    }
+
+    return new() { PixelData = pixelData };
   }
 
   /// <summary>Unpacks pixel 0 from a CPC Mode 0 byte: bits [7,3,5,1].</summary>

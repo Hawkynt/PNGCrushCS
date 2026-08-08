@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.CpcFont;
 
 /// <summary>In-memory representation of a CPC font file (2048 bytes: 256 characters x 8 bytes each, 8x8 mono).</summary>
-public readonly record struct CpcFontFile : IImageFormatReader<CpcFontFile>, IImageToRawImage<CpcFontFile>, IImageFormatWriter<CpcFontFile> {
+public readonly record struct CpcFontFile : IImageFormatReader<CpcFontFile>, IImageToRawImage<CpcFontFile>, IImageFromRawImage<CpcFontFile>, IImageFormatWriter<CpcFontFile> {
 
   static string IImageFormatMetadata<CpcFontFile>.PrimaryExtension => ".cpf";
   static string[] IImageFormatMetadata<CpcFontFile>.FileExtensions => [".cpf"];
@@ -89,6 +89,35 @@ public readonly record struct CpcFontFile : IImageFormatReader<CpcFontFile>, IIm
       Palette = _BlackWhitePalette[..],
       PaletteCount = 2,
     };
+  }
+
+  /// <summary>Cuts a character set out of any picture, sampling it to the sixteen-by-sixteen sheet the decoder lays out.</summary>
+  /// <remarks>
+  /// A set bit is the lit pixel — the decoder's palette puts white at index one — so it is the
+  /// bright half of the picture that gets the bits. The other way round writes every glyph as its
+  /// own negative, and a round trip through this same pair would not notice.
+  /// </remarks>
+  public static CpcFontFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var lit = GlyphSheet.Sample(image, PixelWidth, PixelHeight, setWhenBright: true);
+    var rawData = new byte[ExpectedFileSize];
+
+    for (var charIndex = 0; charIndex < CharCount; ++charIndex) {
+      var baseX = charIndex % CharsPerRow * CharWidth;
+      var baseY = charIndex / CharsPerRow * CharHeight;
+
+      for (var row = 0; row < CharHeight; ++row) {
+        var value = 0;
+        for (var bit = 0; bit < CharWidth; ++bit)
+          if (lit[(baseY + row) * PixelWidth + baseX + bit])
+            value |= 1 << (7 - bit);
+
+        rawData[charIndex * BytesPerChar + row] = (byte)value;
+      }
+    }
+
+    return new() { RawData = rawData };
   }
 
 }
