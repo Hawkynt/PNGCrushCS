@@ -8,7 +8,7 @@ namespace FileFormat.IffRgbn;
 public readonly record struct IffRgbnFile : IImageFormatReader<IffRgbnFile>, IImageToRawImage<IffRgbnFile>, IImageFromRawImage<IffRgbnFile>, IImageFormatWriter<IffRgbnFile> {
 
   static string IImageFormatMetadata<IffRgbnFile>.PrimaryExtension => ".rgbn";
-  static string[] IImageFormatMetadata<IffRgbnFile>.FileExtensions => [".rgbn", ".iff"];
+  static string[] IImageFormatMetadata<IffRgbnFile>.FileExtensions => [".rgbn", ".iff", ".blk"];
   static IffRgbnFile IImageFormatReader<IffRgbnFile>.FromSpan(ReadOnlySpan<byte> data) => IffRgbnReader.FromSpan(data);
 
   static bool? IImageFormatMetadata<IffRgbnFile>.MatchesSignature(ReadOnlySpan<byte> header)

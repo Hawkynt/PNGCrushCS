@@ -48,7 +48,14 @@ public readonly record struct HpglFile : IImageFormatReader<HpglFile>, IImageToR
   static string IImageFormatMetadata<HpglFile>.PrimaryExtension => ".hpgl";
   // Not .plt, which plenty of plotter files do use but which PlotMaker already claims here. A
   // second format on the same name would decide by whichever the registry happened to try first.
-  static string[] IImageFormatMetadata<HpglFile>.FileExtensions => [".hpgl", ".hgl", ".hpg"];
+  /// <summary>Every name a plot arrives under, the printer-spool ones included.</summary>
+  /// <remarks>
+  /// <c>.prn</c> and <c>.prt</c> are what a driver calls a job printed to a file, and the job is
+  /// as often PostScript or PCL as it is HP-GL. That costs nothing here because the name is not
+  /// what identifies the file: the parse has to find an instruction that moves the pen and says
+  /// where to, which prose and PostScript do not produce, so a spool of either is refused.
+  /// </remarks>
+  static string[] IImageFormatMetadata<HpglFile>.FileExtensions => [".hpgl", ".hgl", ".hpg", ".prn", ".prt"];
   static HpglFile IImageFormatReader<HpglFile>.FromSpan(ReadOnlySpan<byte> data) => HpglReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<HpglFile>.VideoModes => [
     new("Plot", [(IntegerRange.Any, IntegerRange.Any)], [16777216])

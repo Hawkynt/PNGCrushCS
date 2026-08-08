@@ -8,8 +8,18 @@ public readonly record struct CloeFile : IImageFormatReader<CloeFile>, IImageToR
 
   internal const int HeaderSize = 8;
 
+  /// <summary>The largest side a Cloe picture may state, past which the header is not one.</summary>
+  internal const int MaxDimension = 65535;
+
   static string IImageFormatMetadata<CloeFile>.PrimaryExtension => ".clo";
-  static string[] IImageFormatMetadata<CloeFile>.FileExtensions => [".clo"];
+
+  /// <summary>Both names the ray-tracer's own pictures carry.</summary>
+  /// <remarks>
+  /// <c>.clo</c> and <c>.cloe</c> are one format under a short name and a long one. <c>.clo</c> is
+  /// shared with unrelated data files, so what identifies a picture is the header alone: two
+  /// little-endian lengths that between them have to account for the pixels present.
+  /// </remarks>
+  static string[] IImageFormatMetadata<CloeFile>.FileExtensions => [".clo", ".cloe"];
   static CloeFile IImageFormatReader<CloeFile>.FromSpan(ReadOnlySpan<byte> data) => CloeReader.FromSpan(data);
   static byte[] IImageFormatWriter<CloeFile>.ToBytes(CloeFile file) => CloeWriter.ToBytes(file);
 

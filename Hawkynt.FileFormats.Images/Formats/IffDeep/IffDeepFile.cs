@@ -8,7 +8,7 @@ namespace FileFormat.IffDeep;
 public readonly record struct IffDeepFile : IImageFormatReader<IffDeepFile>, IImageToRawImage<IffDeepFile>, IImageFromRawImage<IffDeepFile>, IImageFormatWriter<IffDeepFile> {
 
   static string IImageFormatMetadata<IffDeepFile>.PrimaryExtension => ".deep";
-  static string[] IImageFormatMetadata<IffDeepFile>.FileExtensions => [".deep", ".iff"];
+  static string[] IImageFormatMetadata<IffDeepFile>.FileExtensions => [".deep", ".iff", ".blk"];
   static IffDeepFile IImageFormatReader<IffDeepFile>.FromSpan(ReadOnlySpan<byte> data) => IffDeepReader.FromSpan(data);
 
   static bool? IImageFormatMetadata<IffDeepFile>.MatchesSignature(ReadOnlySpan<byte> header)

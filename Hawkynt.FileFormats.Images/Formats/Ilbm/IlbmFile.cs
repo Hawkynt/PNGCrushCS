@@ -8,7 +8,14 @@ namespace FileFormat.Ilbm;
 public readonly record struct IlbmFile : IImageFormatReader<IlbmFile>, IImageToRawImage<IlbmFile>, IImageFromRawImage<IlbmFile>, IImageFormatWriter<IlbmFile> {
 
   static string IImageFormatMetadata<IlbmFile>.PrimaryExtension => ".lbm";
-  static string[] IImageFormatMetadata<IlbmFile>.FileExtensions => [".lbm", ".ilbm", ".iff", ".ham", ".ham6", ".ham8", ".256", ".ap2", ".beam", ".dct", ".dr", ".mp", ".bl1", ".bl2", ".bl3"];
+  /// <summary>Every name an IFF bitmap arrives under, <c>.blk</c> among them.</summary>
+  /// <remarks>
+  /// <c>.blk</c> is an Amiga IFF block saved out of a paint program under a name of its own; the
+  /// bytes are an ordinary <c>FORM ILBM</c>. Nothing is guessed from the name — the reader still
+  /// requires the group identifier and the form type, so a file that only happens to be called
+  /// <c>.blk</c> is refused rather than drawn.
+  /// </remarks>
+  static string[] IImageFormatMetadata<IlbmFile>.FileExtensions => [".lbm", ".ilbm", ".iff", ".blk", ".ham", ".ham6", ".ham8", ".256", ".ap2", ".beam", ".dct", ".dr", ".mp", ".bl1", ".bl2", ".bl3"];
   static IlbmFile IImageFormatReader<IlbmFile>.FromSpan(ReadOnlySpan<byte> data) => IlbmReader.FromSpan(data);
 
   static bool? IImageFormatMetadata<IlbmFile>.MatchesSignature(ReadOnlySpan<byte> header)

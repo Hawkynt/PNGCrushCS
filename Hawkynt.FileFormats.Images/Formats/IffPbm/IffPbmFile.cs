@@ -8,7 +8,7 @@ namespace FileFormat.IffPbm;
 public readonly record struct IffPbmFile : IImageFormatReader<IffPbmFile>, IImageToRawImage<IffPbmFile>, IImageFromRawImage<IffPbmFile>, IImageFormatWriter<IffPbmFile> {
 
   static string IImageFormatMetadata<IffPbmFile>.PrimaryExtension => ".lbm";
-  static string[] IImageFormatMetadata<IffPbmFile>.FileExtensions => [".lbm", ".pbm"];
+  static string[] IImageFormatMetadata<IffPbmFile>.FileExtensions => [".lbm", ".pbm", ".blk"];
   static IffPbmFile IImageFormatReader<IffPbmFile>.FromSpan(ReadOnlySpan<byte> data) => IffPbmReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<IffPbmFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 256)])];
 

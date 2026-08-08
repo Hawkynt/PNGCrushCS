@@ -8,7 +8,7 @@ namespace FileFormat.IffAcbm;
 public readonly record struct IffAcbmFile : IImageFormatReader<IffAcbmFile>, IImageToRawImage<IffAcbmFile>, IImageFromRawImage<IffAcbmFile>, IImageFormatWriter<IffAcbmFile> {
 
   static string IImageFormatMetadata<IffAcbmFile>.PrimaryExtension => ".acbm";
-  static string[] IImageFormatMetadata<IffAcbmFile>.FileExtensions => [".acbm", ".iff"];
+  static string[] IImageFormatMetadata<IffAcbmFile>.FileExtensions => [".acbm", ".iff", ".blk"];
   static IffAcbmFile IImageFormatReader<IffAcbmFile>.FromSpan(ReadOnlySpan<byte> data) => IffAcbmReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<IffAcbmFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 256)])];
 

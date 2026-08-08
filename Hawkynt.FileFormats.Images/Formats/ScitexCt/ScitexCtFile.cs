@@ -8,7 +8,13 @@ namespace FileFormat.ScitexCt;
 public readonly record struct ScitexCtFile : IImageFormatReader<ScitexCtFile>, IImageToRawImage<ScitexCtFile>, IImageFromRawImage<ScitexCtFile>, IImageFormatWriter<ScitexCtFile> {
 
   static string IImageFormatMetadata<ScitexCtFile>.PrimaryExtension => ".sct";
-  static string[] IImageFormatMetadata<ScitexCtFile>.FileExtensions => [".sct", ".ct"];
+  /// <summary>The three names a Scitex continuous-tone separation is saved under.</summary>
+  /// <remarks>
+  /// <c>.ch</c> is the same file under the name the handover to a Scitex prepress station uses.
+  /// The reader identifies it the same way regardless of the name: the two characters <c>CT</c> at
+  /// offset 80, which nothing else puts there.
+  /// </remarks>
+  static string[] IImageFormatMetadata<ScitexCtFile>.FileExtensions => [".sct", ".ct", ".ch"];
   static ScitexCtFile IImageFormatReader<ScitexCtFile>.FromSpan(ReadOnlySpan<byte> data) => ScitexCtReader.FromSpan(data);
   static byte[] IImageFormatWriter<ScitexCtFile>.ToBytes(ScitexCtFile file) => ScitexCtWriter.ToBytes(file);
 

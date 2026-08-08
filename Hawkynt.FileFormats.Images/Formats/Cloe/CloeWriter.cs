@@ -13,13 +13,12 @@ public static class CloeWriter {
 
     result[0] = (byte)(file.Width & 0xFF);
     result[1] = (byte)((file.Width >> 8) & 0xFF);
-    if (8 >= 8) {
-      result[4] = (byte)(file.Height & 0xFF);
-      result[5] = (byte)((file.Height >> 8) & 0xFF);
-    } else {
-      result[2] = (byte)(file.Height & 0xFF);
-      result[3] = (byte)((file.Height >> 8) & 0xFF);
-    }
+    result[2] = (byte)((file.Width >> 16) & 0xFF);
+    result[3] = (byte)((file.Width >> 24) & 0xFF);
+    result[4] = (byte)(file.Height & 0xFF);
+    result[5] = (byte)((file.Height >> 8) & 0xFF);
+    result[6] = (byte)((file.Height >> 16) & 0xFF);
+    result[7] = (byte)((file.Height >> 24) & 0xFF);
 
     file.PixelData.AsSpan(0, Math.Min(pixelBytes, file.PixelData.Length)).CopyTo(result.AsSpan(CloeFile.HeaderSize));
     return result;

@@ -30,17 +30,17 @@ public static class CloeReader {
     if (data.Length < CloeFile.HeaderSize)
       throw new InvalidDataException("Data too small for a valid Cloe file.");
 
-    var width = data[0] | (data[1] << 8);
-    var height = data[2] | (data[3] << 8);
-    if (width == 0) width = data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24);
-    if (width <= 0 || width > 65535) width = 320;
+    // Two little-endian 32-bit lengths and nothing else — there is no signature, so the header's
+    // own arithmetic is the whole of the identification and it has to be taken literally.
+    // Inventing 320x200 when the header states neither, which is what stood here, meant any file
+    // long enough was drawn as a picture of a size it never claimed.
+    var width = data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24);
+    var height = data[4] | (data[5] << 8) | (data[6] << 16) | (data[7] << 24);
 
-    if (8 >= 8) {
-      height = data[4] | (data[5] << 8);
-      if (height <= 0 || height > 65535) height = 200;
-    } else if (height <= 0 || height > 65535) {
-      height = 200;
-    }
+    if (width <= 0 || width > CloeFile.MaxDimension)
+      throw new InvalidDataException($"A Cloe picture states a width of {width}.");
+    if (height <= 0 || height > CloeFile.MaxDimension)
+      throw new InvalidDataException($"A Cloe picture states a height of {height}.");
 
     var pixelBytes = width * height * 3;
     var pixelData = new byte[pixelBytes];

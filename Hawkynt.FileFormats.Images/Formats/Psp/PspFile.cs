@@ -16,8 +16,15 @@ public readonly record struct PspFile : IImageFormatReader<PspFile>, IImageToRaw
   /// picture rather than any difference in how the picture is stored. Naming them separately would
   /// have meant five readers of one format.
   /// </remarks>
+  /// <remarks>
+  /// The short names beside the long ones — <c>.pfr</c> for a frame, <c>.msk</c> for a mask and
+  /// <c>.tex</c> for a texture — are the same blocks again under the abbreviations Paint Shop Pro
+  /// also writes. All three are names other programs use for entirely different files, so nothing
+  /// here trusts the name: the eight-byte header string is still required, and a font resource or
+  /// a game texture under one of these names is refused.
+  /// </remarks>
   static string[] IImageFormatMetadata<PspFile>.FileExtensions =>
-    [".psp", ".pspimage", ".tub", ".psptube", ".pspbrush", ".pspframe", ".pspmask", ".pspt"];
+    [".psp", ".pspimage", ".tub", ".psptube", ".pspbrush", ".pspframe", ".pfr", ".pspmask", ".msk", ".pspt", ".tex"];
   static PspFile IImageFormatReader<PspFile>.FromSpan(ReadOnlySpan<byte> data) => PspReader.FromSpan(data);
   static byte[] IImageFormatWriter<PspFile>.ToBytes(PspFile file) => PspWriter.ToBytes(file);
 
