@@ -15,7 +15,8 @@ namespace FileFormat.ShapeTable;
 /// extension covered would claim three formats for the work of one.
 /// </remarks>
 public readonly record struct ShapeTableFileType
-  : IImageFormatReader<ShapeTableFileType>, IImageToRawImage<ShapeTableFileType> {
+  : IImageFormatReader<ShapeTableFileType>, IImageToRawImage<ShapeTableFileType>,
+    IImageFromRawImage<ShapeTableFileType>, IImageFormatWriter<ShapeTableFileType> {
 
   /// <summary>Where Blazing Paddles' shapes were loaded, which its stored addresses are relative to.</summary>
   public const int VectorLoadAddress = 31744;
@@ -39,6 +40,8 @@ public readonly record struct ShapeTableFileType
   static string[] IImageFormatMetadata<ShapeTableFileType>.FileExtensions => [".shp"];
   static ShapeTableFileType IImageFormatReader<ShapeTableFileType>.FromSpan(ReadOnlySpan<byte> data)
     => ShapeTableReader.FromSpan(data);
+  static byte[] IImageFormatWriter<ShapeTableFileType>.ToBytes(ShapeTableFileType file)
+    => ShapeTableWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<ShapeTableFileType>.VideoModes => [
     new("Shape table", [(IntegerRange.Any, IntegerRange.Any)], [16])
   ];
@@ -129,6 +132,38 @@ public readonly record struct ShapeTableFileType
         };
       }
     }
+  }
+
+  /// <summary>The size of an unpacked multicolour screen: bitmap, video matrix, colour map, background.</summary>
+  public const int MulticolorScreenSize = 10001;
+
+  /// <summary>Builds a packed C64 multicolour screen, which is what most of this extension holds.</summary>
+  /// <remarks>
+  /// Four unrelated things share <c>.shp</c> and only one of them can be written from a picture at
+  /// all — the Blazing Paddles form is drawing instructions rather than pixels, and turning a
+  /// picture back into turns and pen movements is not a conversion but a tracing problem. Of the
+  /// three that are screens, the packed multicolour one is chosen: it holds the most colour, and
+  /// its 160 by 200 is the size two of the four use.
+  /// <para/>
+  /// That screen has one size and no other, so a picture of a different size is brought to it. The
+  /// background register is the screen's to choose, so it is chosen rather than fixed.
+  /// </remarks>
+  public static ShapeTableFileType FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    const int width = 160, height = 200;
+    var rgb = image.SampleTo(width, height);
+    var screen = new byte[MulticolorScreenSize];
+    screen[10000] = Commodore64Graphics.EncodeMulticolor(
+      rgb.PixelData, width, height,
+      screen.AsSpan(0, 8000), screen.AsSpan(8000, 1000), screen.AsSpan(9000, 1000));
+
+    return new() {
+      Data = screen,
+      Kind = ShapeTableKind.C64Multicolor,
+      Width = width,
+      Height = height,
+    };
   }
 
   private static RawImage _Indexed(byte[] pixels, int width, int height) => new() {
