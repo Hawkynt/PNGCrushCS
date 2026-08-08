@@ -20,6 +20,9 @@ public readonly record struct AdexImageFile : IImageFormatReader<AdexImageFile>,
   /// <summary>Minimum valid file size.</summary>
   public const int MinFileSize = HeaderSize;
 
+  /// <summary>The largest either dimension goes, which is what the header's words hold.</summary>
+  public const int MaxDimension = 65535;
+
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
 
@@ -52,6 +55,13 @@ public readonly record struct AdexImageFile : IImageFormatReader<AdexImageFile>,
   /// </remarks>
   public static AdexImageFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+
+    // The header states the size as words, and a picture bigger than one holds would be written
+    // with its dimensions wrapped — a file that reads back as a different picture rather than as a
+    // broken one, which is the worse of the two failures.
+    if (image.Width is < 1 or > MaxDimension || image.Height is < 1 or > MaxDimension)
+      throw new ArgumentException(
+        $"An ADEX image is at most {MaxDimension}x{MaxDimension}; got {image.Width}x{image.Height}.", nameof(image));
 
     var source = image.EnsureFormat(PixelFormat.Rgb24);
 

@@ -9,6 +9,9 @@ public readonly record struct SbigCcdFile : IImageFormatReader<SbigCcdFile>, IIm
   /// <summary>Header size: 2 width + 2 height + 8 reserved = 12 bytes.</summary>
   public const int HeaderSize = 12;
 
+  /// <summary>The largest either dimension goes, which is what the header's words hold.</summary>
+  public const int MaxDimension = 65535;
+
   static string IImageFormatMetadata<SbigCcdFile>.PrimaryExtension => ".st4";
   static string[] IImageFormatMetadata<SbigCcdFile>.FileExtensions => [".st4", ".stx", ".st5", ".st6", ".st7", ".st8"];
   static SbigCcdFile IImageFormatReader<SbigCcdFile>.FromSpan(ReadOnlySpan<byte> data) => SbigCcdReader.FromSpan(data);
@@ -49,6 +52,12 @@ public readonly record struct SbigCcdFile : IImageFormatReader<SbigCcdFile>, IIm
   /// </remarks>
   public static SbigCcdFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+
+    // The header states the size as words; a bigger frame would be written with its dimensions
+    // wrapped and read back as a different one rather than as a broken one.
+    if (image.Width is < 1 or > MaxDimension || image.Height is < 1 or > MaxDimension)
+      throw new ArgumentException(
+        $"An SBIG frame is at most {MaxDimension}x{MaxDimension}; got {image.Width}x{image.Height}.", nameof(image));
 
     var pixelCount = image.Width * image.Height;
     var gray16 = image.EnsureFormat(PixelFormat.Gray16).PixelData;

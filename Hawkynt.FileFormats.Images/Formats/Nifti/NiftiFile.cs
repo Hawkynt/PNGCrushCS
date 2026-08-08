@@ -29,6 +29,9 @@ public sealed class NiftiFile :
   /// <summary>Voxel dimensions (up to 8 entries matching pixdim[0..7]).</summary>
   public float[] Pixdim { get; init; } = [];
 
+  /// <summary>The largest either dimension goes, which is what a signed word of <c>dim[]</c> holds.</summary>
+  public const int MaxDimension = 32767;
+
   /// <summary>The keyword the 80-character <c>descrip</c> field is carried under.</summary>
   /// <remarks>
   /// It is what a scanner or a pipeline wrote about the study, so it belongs with the picture rather
@@ -173,6 +176,12 @@ public sealed class NiftiFile :
   /// </remarks>
   public static NiftiFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+
+    // dim[] is eight signed words; a bigger volume would be written with its dimensions wrapped and
+    // read back as a different one rather than as a broken one.
+    if (image.Width is < 1 or > MaxDimension || image.Height is < 1 or > MaxDimension)
+      throw new ArgumentException(
+        $"A NIfTI slice is at most {MaxDimension}x{MaxDimension}; got {image.Width}x{image.Height}.", nameof(image));
 
     var pixelCount = image.Width * image.Height;
     var (datatype, bitpix, voxels) = image.Format switch {

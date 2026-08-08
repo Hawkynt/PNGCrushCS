@@ -14,6 +14,9 @@ public readonly record struct Tim2File : IImageFormatReader<Tim2File>, IImageToR
   public byte Version { get; init; }
   public byte Alignment { get; init; }
 
+  /// <summary>The largest either dimension goes, which is what the picture header's words hold.</summary>
+  public const int MaxDimension = 65535;
+
   /// <summary>All pictures contained in this TIM2 file.</summary>
   public IReadOnlyList<Tim2Picture> Pictures { get; init; }
 
@@ -44,6 +47,12 @@ public readonly record struct Tim2File : IImageFormatReader<Tim2File>, IImageToR
   /// </remarks>
   public static Tim2File FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+
+    // The picture header states the size as words; a bigger texture would be written with its
+    // dimensions wrapped and read back as a different one rather than as a broken one.
+    if (image.Width is < 1 or > MaxDimension || image.Height is < 1 or > MaxDimension)
+      throw new ArgumentException(
+        $"A TIM2 picture is at most {MaxDimension}x{MaxDimension}; got {image.Width}x{image.Height}.", nameof(image));
 
     var source = image.EnsureFormat(PixelFormat.Rgb24);
     var picture = new Tim2Picture {

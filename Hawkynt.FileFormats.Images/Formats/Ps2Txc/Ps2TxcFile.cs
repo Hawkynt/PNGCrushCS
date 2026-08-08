@@ -17,6 +17,9 @@ public readonly record struct Ps2TxcFile : IImageFormatReader<Ps2TxcFile>, IImag
   /// <summary>Minimum valid file size.</summary>
   public const int MinFileSize = HeaderSize;
 
+  /// <summary>The largest either dimension goes, which is what the header's words hold.</summary>
+  public const int MaxDimension = 65535;
+
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
 
@@ -82,6 +85,12 @@ public readonly record struct Ps2TxcFile : IImageFormatReader<Ps2TxcFile>, IImag
   /// </remarks>
   public static Ps2TxcFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+
+    // The header states the size as words; a bigger picture would be written with its dimensions
+    // wrapped and read back as a different one rather than as a broken one.
+    if (image.Width is < 1 or > MaxDimension || image.Height is < 1 or > MaxDimension)
+      throw new ArgumentException(
+        $"A TXC texture is at most {MaxDimension}x{MaxDimension}; got {image.Width}x{image.Height}.", nameof(image));
 
     var source = image.EnsureFormat(PixelFormat.Rgb24);
 

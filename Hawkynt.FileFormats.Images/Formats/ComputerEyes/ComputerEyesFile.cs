@@ -9,6 +9,9 @@ public readonly record struct ComputerEyesFile : IImageFormatReader<ComputerEyes
   /// <summary>Header size: 2 width + 2 height = 4 bytes.</summary>
   public const int HeaderSize = 4;
 
+  /// <summary>The largest either dimension goes, which is what the header's words hold.</summary>
+  public const int MaxDimension = 65535;
+
   static string IImageFormatMetadata<ComputerEyesFile>.PrimaryExtension => ".ce";
   static string[] IImageFormatMetadata<ComputerEyesFile>.FileExtensions => [".ce", ".ce1", ".ce2"];
   static ComputerEyesFile IImageFormatReader<ComputerEyesFile>.FromSpan(ReadOnlySpan<byte> data) => ComputerEyesReader.FromSpan(data);
@@ -45,6 +48,12 @@ public readonly record struct ComputerEyesFile : IImageFormatReader<ComputerEyes
   /// </remarks>
   public static ComputerEyesFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+
+    // The header states the size as words; a bigger picture would be written with its dimensions
+    // wrapped and read back as a different one rather than as a broken one.
+    if (image.Width is < 1 or > MaxDimension || image.Height is < 1 or > MaxDimension)
+      throw new ArgumentException(
+        $"A ComputerEyes picture is at most {MaxDimension}x{MaxDimension}; got {image.Width}x{image.Height}.", nameof(image));
 
     var source = image.EnsureFormat(PixelFormat.Gray8);
 
