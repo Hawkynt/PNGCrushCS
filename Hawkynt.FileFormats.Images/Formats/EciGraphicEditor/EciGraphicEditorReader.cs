@@ -34,6 +34,14 @@ namespace FileFormat.EciGraphicEditor;
 /// pattern 11 draws from something other than a colour map. That is the one thing between this
 /// format and a reader.
 /// <para/>
+/// Two families ruled out on the way, so they are not tried again. The picture the reference draws
+/// is 90.8 per cent column-doubled and carries 41 distinct colours, which says the two frames are
+/// blended rather than one drawn — but the ninth of it that is *not* doubled is not a half-pixel
+/// interlace either. Shifting either frame by one stored pixel on either the even or the odd drawn
+/// columns scores 78.2, 79.5, 82.1 and 82.1 against 82.1 for no shift at all, so no shift helps and
+/// two hurt. Nor is it the frames taking alternate columns outright, which scores 72.9. Whatever
+/// makes those columns differ comes from the colour rather than from the geometry.
+/// <para/>
 /// Nothing is applied. Four fifths of a picture is not a decoder, and this is the same interlaced
 /// family as Drazlace, DrazPaint, True Paint and Pixel Perfect, which all sit at 2 to 4 per cent —
 /// whatever settles the colour rule here is likely to settle several of them.
