@@ -4,12 +4,17 @@ using FileFormat.Core;
 namespace FileFormat.ZxGigascreen;
 
 /// <summary>In-memory representation of a ZX Spectrum Gigascreen file (13824 bytes: two complete 6912-byte screens, averaged for more colors).</summary>
-public readonly record struct ZxGigascreenFile : IImageFormatReader<ZxGigascreenFile>, IImageToRawImage<ZxGigascreenFile>, IImageFormatWriter<ZxGigascreenFile> {
+public readonly record struct ZxGigascreenFile
+  : IImageFormatReader<ZxGigascreenFile>, IImageToRawImage<ZxGigascreenFile>,
+    IImageFromRawImage<ZxGigascreenFile>, IImageFormatWriter<ZxGigascreenFile> {
 
   static string IImageFormatMetadata<ZxGigascreenFile>.PrimaryExtension => ".gsc";
   static string[] IImageFormatMetadata<ZxGigascreenFile>.FileExtensions => [".gsc"];
   static ZxGigascreenFile IImageFormatReader<ZxGigascreenFile>.FromSpan(ReadOnlySpan<byte> data) => ZxGigascreenReader.FromSpan(data);
   static byte[] IImageFormatWriter<ZxGigascreenFile>.ToBytes(ZxGigascreenFile file) => ZxGigascreenWriter.ToBytes(file);
+  static VideoMode[] IImageFormatMetadata<ZxGigascreenFile>.VideoModes => [
+    new("Default", [(256, 192)], [16])
+  ];
 
   /// <summary>ZX Spectrum normal palette (bright=0).</summary>
   internal static readonly int[] NormalPalette = [
@@ -88,6 +93,57 @@ public readonly record struct ZxGigascreenFile : IImageFormatReader<ZxGigascreen
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
     };
+  }
+
+  /// <summary>Builds a Gigascreen file from a <see cref="RawImage"/> by encoding the same screen twice.
+  /// The format's extra colours come from blending two different screens together, but a single
+  /// <see cref="RawImage"/> only ever supplies one picture — encoding it identically into both halves
+  /// keeps the average exact instead of inventing a second, unrelated screen.</summary>
+  public static ZxGigascreenFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width != 256 || image.Height != 192)
+      throw new ArgumentException($"ZX Spectrum Gigascreen screens are always 256x192, but got {image.Width}x{image.Height}.", nameof(image));
+
+    var indexed = image.EnsureIndexed(PixelFormat.Indexed8, ZxSpectrumGraphics.Palette.ToArray());
+    var bitmap = new byte[6144];
+    var attributes = new byte[768];
+    const int cellsAcross = 32, cellsDown = 24;
+
+    Span<int> counts = stackalloc int[16];
+    for (var cellY = 0; cellY < cellsDown; ++cellY)
+    for (var cellX = 0; cellX < cellsAcross; ++cellX) {
+      counts.Clear();
+      for (var y = 0; y < 8; ++y)
+      for (var x = 0; x < 8; ++x)
+        ++counts[indexed.PixelData[(cellY * 8 + y) * 256 + cellX * 8 + x] & 15];
+
+      var paper = 0;
+      for (var c = 1; c < counts.Length; ++c)
+        if (counts[c] > counts[paper])
+          paper = c;
+
+      var ink = paper == 0 ? 1 : 0;
+      for (var c = 0; c < counts.Length; ++c)
+        if (c != paper && counts[c] > counts[ink])
+          ink = c;
+
+      attributes[cellY * cellsAcross + cellX] = ZxSpectrumGraphics.Attribute(ink, paper);
+
+      for (var y = 0; y < 8; ++y) {
+        byte rowByte = 0;
+        for (var x = 0; x < 8; ++x) {
+          var color = indexed.PixelData[(cellY * 8 + y) * 256 + cellX * 8 + x] & 15;
+          if (color == ink)
+            rowByte |= (byte)(0x80 >> x);
+        }
+
+        bitmap[(cellY * 8 + y) * 32 + cellX] = rowByte;
+      }
+    }
+
+    var bitmap2 = (byte[])bitmap.Clone();
+    var attributes2 = (byte[])attributes.Clone();
+    return new() { BitmapData1 = bitmap, AttributeData1 = attributes, BitmapData2 = bitmap2, AttributeData2 = attributes2 };
   }
 
 }

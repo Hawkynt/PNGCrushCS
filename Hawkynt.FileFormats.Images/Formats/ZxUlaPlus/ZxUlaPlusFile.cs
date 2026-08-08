@@ -4,12 +4,17 @@ using FileFormat.Core;
 namespace FileFormat.ZxUlaPlus;
 
 /// <summary>In-memory representation of a ZX Spectrum ULAplus file (6976 bytes: 6144 bitmap + 768 attributes + 64 palette entries).</summary>
-public readonly record struct ZxUlaPlusFile : IImageFormatReader<ZxUlaPlusFile>, IImageToRawImage<ZxUlaPlusFile>, IImageFormatWriter<ZxUlaPlusFile> {
+public readonly record struct ZxUlaPlusFile
+  : IImageFormatReader<ZxUlaPlusFile>, IImageToRawImage<ZxUlaPlusFile>,
+    IImageFromRawImage<ZxUlaPlusFile>, IImageFormatWriter<ZxUlaPlusFile> {
 
   static string IImageFormatMetadata<ZxUlaPlusFile>.PrimaryExtension => ".ulp";
   static string[] IImageFormatMetadata<ZxUlaPlusFile>.FileExtensions => [".ulp"];
   static ZxUlaPlusFile IImageFormatReader<ZxUlaPlusFile>.FromSpan(ReadOnlySpan<byte> data) => ZxUlaPlusReader.FromSpan(data);
   static byte[] IImageFormatWriter<ZxUlaPlusFile>.ToBytes(ZxUlaPlusFile file) => ZxUlaPlusWriter.ToBytes(file);
+  static VideoMode[] IImageFormatMetadata<ZxUlaPlusFile>.VideoModes => [
+    new("Default", [(256, 192)], [16])
+  ];
 
   /// <summary>Always 256.</summary>
   public int Width => 256;
@@ -92,6 +97,88 @@ public readonly record struct ZxUlaPlusFile : IImageFormatReader<ZxUlaPlusFile>,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
     };
+  }
+
+  /// <summary>Encodes an 8-bit RGB triplet into a ULAplus palette byte (bits 7-5=G, bits 4-2=R, bits 1-0=B).</summary>
+  private static byte _EncodePaletteEntry(byte r, byte g, byte b) {
+    var g3 = (g * 7 + 127) / 255;
+    var r3 = (r * 7 + 127) / 255;
+    var b2 = (b * 3 + 127) / 255;
+    return (byte)((g3 << 5) | (r3 << 2) | b2);
+  }
+
+  /// <summary>Builds a ULAplus screen from a <see cref="RawImage"/>. The picture's colours are reduced to
+  /// a 16-entry palette built from the image itself (not the fixed Spectrum colours), stored in palette
+  /// group 0 and mirrored into the other three groups so the group bits never matter. Within each 8x8
+  /// cell only the two most common colours survive, since the hardware allows just one ink and one paper
+  /// colour per cell.</summary>
+  public static ZxUlaPlusFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width != 256 || image.Height != 192)
+      throw new ArgumentException($"ZX Spectrum ULAplus screens are always 256x192, but got {image.Width}x{image.Height}.", nameof(image));
+
+    var bgra = PixelConverter.Convert(image, PixelFormat.Bgra32);
+    var quant = ColorQuantizer.Quantize(bgra.PixelData, image.Width * image.Height, 16);
+    var count = quant.Count;
+
+    var paletteData = new byte[64];
+    for (var i = 0; i < 16; ++i) {
+      var entry = i < count
+        ? _EncodePaletteEntry(quant.Palette[i * 3], quant.Palette[i * 3 + 1], quant.Palette[i * 3 + 2])
+        : (byte)0;
+      paletteData[i] = entry;
+      paletteData[i + 16] = entry;
+      paletteData[i + 32] = entry;
+      paletteData[i + 48] = entry;
+    }
+
+    var bitmap = new byte[6144];
+    var attributes = new byte[768];
+    const int cellsAcross = 32, cellsDown = 24;
+
+    // The attribute byte can only ever reach palette slots 0-7 as ink and slots 8-15 as paper, so the
+    // sixteen quantized colours split into two disjoint eight-colour pools by construction — a cell picks
+    // its best candidate from each pool independently.
+    Span<int> inkCounts = stackalloc int[8];
+    Span<int> paperCounts = stackalloc int[8];
+    for (var cellY = 0; cellY < cellsDown; ++cellY)
+    for (var cellX = 0; cellX < cellsAcross; ++cellX) {
+      inkCounts.Clear();
+      paperCounts.Clear();
+      for (var y = 0; y < 8; ++y)
+      for (var x = 0; x < 8; ++x) {
+        var idx = quant.Indices[(cellY * 8 + y) * 256 + cellX * 8 + x];
+        if (idx < 8)
+          ++inkCounts[idx];
+        else
+          ++paperCounts[idx - 8];
+      }
+
+      var ink = 0;
+      for (var c = 1; c < 8; ++c)
+        if (inkCounts[c] > inkCounts[ink])
+          ink = c;
+
+      var paper = 0;
+      for (var c = 1; c < 8; ++c)
+        if (paperCounts[c] > paperCounts[paper])
+          paper = c;
+
+      attributes[cellY * cellsAcross + cellX] = (byte)((paper << 3) | ink);
+
+      for (var y = 0; y < 8; ++y) {
+        byte rowByte = 0;
+        for (var x = 0; x < 8; ++x) {
+          var idx = quant.Indices[(cellY * 8 + y) * 256 + cellX * 8 + x];
+          if (idx == ink)
+            rowByte |= (byte)(0x80 >> x);
+        }
+
+        bitmap[(cellY * 8 + y) * 32 + cellX] = rowByte;
+      }
+    }
+
+    return new() { BitmapData = bitmap, AttributeData = attributes, PaletteData = paletteData };
   }
 
 }

@@ -4,12 +4,17 @@ using FileFormat.Core;
 namespace FileFormat.ZxBorderMulticolor;
 
 /// <summary>In-memory representation of a ZX Spectrum Border Multicolor 8x4 file (11904 bytes: 6144 bitmap + 1536 attributes + 4224 border data).</summary>
-public readonly record struct ZxBorderMulticolorFile : IImageFormatReader<ZxBorderMulticolorFile>, IImageToRawImage<ZxBorderMulticolorFile>, IImageFormatWriter<ZxBorderMulticolorFile> {
+public readonly record struct ZxBorderMulticolorFile
+  : IImageFormatReader<ZxBorderMulticolorFile>, IImageToRawImage<ZxBorderMulticolorFile>,
+    IImageFromRawImage<ZxBorderMulticolorFile>, IImageFormatWriter<ZxBorderMulticolorFile> {
 
   static string IImageFormatMetadata<ZxBorderMulticolorFile>.PrimaryExtension => ".bmc4";
   static string[] IImageFormatMetadata<ZxBorderMulticolorFile>.FileExtensions => [".bmc4"];
   static ZxBorderMulticolorFile IImageFormatReader<ZxBorderMulticolorFile>.FromSpan(ReadOnlySpan<byte> data) => ZxBorderMulticolorReader.FromSpan(data);
   static byte[] IImageFormatWriter<ZxBorderMulticolorFile>.ToBytes(ZxBorderMulticolorFile file) => ZxBorderMulticolorWriter.ToBytes(file);
+  static VideoMode[] IImageFormatMetadata<ZxBorderMulticolorFile>.VideoModes => [
+    new("Default", [(256, 192)], [16])
+  ];
 
   /// <summary>ZX Spectrum normal palette (bright=0): Black, Blue, Red, Magenta, Green, Cyan, Yellow, White.</summary>
   internal static readonly int[] NormalPalette = [
@@ -73,6 +78,55 @@ public readonly record struct ZxBorderMulticolorFile : IImageFormatReader<ZxBord
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
     };
+  }
+
+  /// <summary>Builds a Border Multicolor screen from a <see cref="RawImage"/>. Colours are mapped onto
+  /// the Spectrum's 16-entry palette; within each 8x4 cell only the two most common colours survive,
+  /// since the hardware allows just one ink and one paper colour per cell. Border data (drawn outside
+  /// the 256x192 picture) carries no information a <see cref="RawImage"/> can supply, so it comes back zeroed.</summary>
+  public static ZxBorderMulticolorFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width != 256 || image.Height != 192)
+      throw new ArgumentException($"ZX Spectrum Border Multicolor screens are always 256x192, but got {image.Width}x{image.Height}.", nameof(image));
+
+    var indexed = image.EnsureIndexed(PixelFormat.Indexed8, ZxSpectrumGraphics.Palette.ToArray());
+    var bitmap = new byte[6144];
+    var attributes = new byte[1536];
+    const int cellsAcross = 32, cellsDown = 48, cellHeight = 4;
+
+    Span<int> counts = stackalloc int[16];
+    for (var cellY = 0; cellY < cellsDown; ++cellY)
+    for (var cellX = 0; cellX < cellsAcross; ++cellX) {
+      counts.Clear();
+      for (var y = 0; y < cellHeight; ++y)
+      for (var x = 0; x < 8; ++x)
+        ++counts[indexed.PixelData[(cellY * cellHeight + y) * 256 + cellX * 8 + x] & 15];
+
+      var paper = 0;
+      for (var c = 1; c < counts.Length; ++c)
+        if (counts[c] > counts[paper])
+          paper = c;
+
+      var ink = paper == 0 ? 1 : 0;
+      for (var c = 0; c < counts.Length; ++c)
+        if (c != paper && counts[c] > counts[ink])
+          ink = c;
+
+      attributes[cellY * cellsAcross + cellX] = ZxSpectrumGraphics.Attribute(ink, paper);
+
+      for (var y = 0; y < cellHeight; ++y) {
+        byte rowByte = 0;
+        for (var x = 0; x < 8; ++x) {
+          var color = indexed.PixelData[(cellY * cellHeight + y) * 256 + cellX * 8 + x] & 15;
+          if (color == ink)
+            rowByte |= (byte)(0x80 >> x);
+        }
+
+        bitmap[(cellY * cellHeight + y) * 32 + cellX] = rowByte;
+      }
+    }
+
+    return new() { BitmapData = bitmap, AttributeData = attributes, BorderData = new byte[4224] };
   }
 
 }

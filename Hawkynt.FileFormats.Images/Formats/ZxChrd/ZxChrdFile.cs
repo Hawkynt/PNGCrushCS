@@ -4,12 +4,14 @@ using FileFormat.Core;
 namespace FileFormat.ZxChrd;
 
 /// <summary>In-memory representation of a ZX Spectrum character set file (2048 bytes: 256 characters x 8 bytes each, 1bpp 8x8 per character).</summary>
-public readonly record struct ZxChrdFile : IImageFormatReader<ZxChrdFile>, IImageToRawImage<ZxChrdFile>, IImageFormatWriter<ZxChrdFile> {
+public readonly record struct ZxChrdFile
+  : IImageFormatReader<ZxChrdFile>, IImageToRawImage<ZxChrdFile>,
+    IImageFromRawImage<ZxChrdFile>, IImageFormatWriter<ZxChrdFile> {
 
   static string IImageFormatMetadata<ZxChrdFile>.PrimaryExtension => ".chr";
   static string[] IImageFormatMetadata<ZxChrdFile>.FileExtensions => [".chr", ".chrd"];
   static ZxChrdFile IImageFormatReader<ZxChrdFile>.FromSpan(ReadOnlySpan<byte> data) => ZxChrdReader.FromSpan(data);
-  static VideoMode[] IImageFormatMetadata<ZxChrdFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
+  static VideoMode[] IImageFormatMetadata<ZxChrdFile>.VideoModes => [new("Default", [(128, 128)], [2])];
   static byte[] IImageFormatWriter<ZxChrdFile>.ToBytes(ZxChrdFile file) => ZxChrdWriter.ToBytes(file);
 
   /// <summary>Number of characters in the font.</summary>
@@ -61,6 +63,31 @@ public readonly record struct ZxChrdFile : IImageFormatReader<ZxChrdFile>, IImag
       Palette = [0, 0, 0, 255, 255, 255],
       PaletteCount = 2,
     };
+  }
+
+  /// <summary>Builds a character set from a <see cref="RawImage"/> holding the fixed 16x16 grid of 8x8
+  /// glyphs this format renders as. Each pixel is thresholded to black or white.</summary>
+  public static ZxChrdFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width != 128 || image.Height != 128)
+      throw new ArgumentException($"ZX Spectrum character sets render as a fixed 128x128 grid, but got {image.Width}x{image.Height}.", nameof(image));
+
+    var indexed = image.EnsureIndexed(PixelFormat.Indexed1, [0, 0, 0, 255, 255, 255]);
+    const int bytesPerRow = 16;
+    var data = new byte[CharCount * BytesPerChar];
+
+    for (var charIndex = 0; charIndex < CharCount; ++charIndex) {
+      var gridCol = charIndex % CharsPerRow;
+      var gridRow = charIndex / CharsPerRow;
+
+      for (var line = 0; line < 8; ++line) {
+        var y = gridRow * 8 + line;
+        var byteOffset = y * bytesPerRow + gridCol;
+        data[charIndex * BytesPerChar + line] = indexed.PixelData[byteOffset];
+      }
+    }
+
+    return new() { CharacterData = data };
   }
 
 }

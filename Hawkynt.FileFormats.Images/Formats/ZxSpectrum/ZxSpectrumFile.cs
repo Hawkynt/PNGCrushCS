@@ -4,12 +4,23 @@ using FileFormat.Core;
 namespace FileFormat.ZxSpectrum;
 
 /// <summary>In-memory representation of a ZX Spectrum screen (6912 bytes: 6144 bitmap + 768 attributes).</summary>
-public readonly record struct ZxSpectrumFile : IImageFormatReader<ZxSpectrumFile>, IImageToRawImage<ZxSpectrumFile>, IImageFormatWriter<ZxSpectrumFile> {
+public readonly record struct ZxSpectrumFile
+  : IImageFormatReader<ZxSpectrumFile>, IImageToRawImage<ZxSpectrumFile>,
+    IImageFromRawImage<ZxSpectrumFile>, IImageFormatWriter<ZxSpectrumFile> {
+
+  /// <summary>Attribute cells across the screen.</summary>
+  private const int CellsAcross = 32;
+
+  /// <summary>Attribute cells down the screen.</summary>
+  private const int CellsDown = 24;
 
   static string IImageFormatMetadata<ZxSpectrumFile>.PrimaryExtension => ".scr";
   static string[] IImageFormatMetadata<ZxSpectrumFile>.FileExtensions => [".scr", ".$s", ".$c", ".!s"];
   static ZxSpectrumFile IImageFormatReader<ZxSpectrumFile>.FromSpan(ReadOnlySpan<byte> data) => ZxSpectrumReader.FromSpan(data);
   static byte[] IImageFormatWriter<ZxSpectrumFile>.ToBytes(ZxSpectrumFile file) => ZxSpectrumWriter.ToBytes(file);
+  static VideoMode[] IImageFormatMetadata<ZxSpectrumFile>.VideoModes => [
+    new("Default", [(256, 192)], [ZxSpectrumGraphics.PaletteEntryCount])
+  ];
 
   /// <summary>ZX Spectrum normal palette (bright=0): Black, Blue, Red, Magenta, Green, Cyan, Yellow, White.</summary>
   private static readonly int[] _NormalPalette = [
@@ -71,6 +82,53 @@ public readonly record struct ZxSpectrumFile : IImageFormatReader<ZxSpectrumFile
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
     };
+  }
+
+  /// <summary>Builds a ZX Spectrum screen from a <see cref="RawImage"/>. Every pixel is mapped onto the
+  /// Spectrum's 16-entry palette; within each 8x8 cell only the two most common colours survive, since the
+  /// hardware allows just one ink and one paper colour (and a shared bright flag) per cell.</summary>
+  public static ZxSpectrumFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width != 256 || image.Height != 192)
+      throw new ArgumentException($"ZX Spectrum screens are always 256x192, but got {image.Width}x{image.Height}.", nameof(image));
+
+    var indexed = image.EnsureIndexed(PixelFormat.Indexed8, ZxSpectrumGraphics.Palette.ToArray());
+    var bitmap = new byte[6144];
+    var attributes = new byte[768];
+
+    Span<int> counts = stackalloc int[ZxSpectrumGraphics.PaletteEntryCount];
+    for (var cellY = 0; cellY < CellsDown; ++cellY)
+    for (var cellX = 0; cellX < CellsAcross; ++cellX) {
+      counts.Clear();
+      for (var y = 0; y < 8; ++y)
+      for (var x = 0; x < 8; ++x)
+        ++counts[indexed.PixelData[(cellY * 8 + y) * 256 + cellX * 8 + x] & 15];
+
+      var paper = 0;
+      for (var c = 1; c < counts.Length; ++c)
+        if (counts[c] > counts[paper])
+          paper = c;
+
+      var ink = paper == 0 ? 1 : 0;
+      for (var c = 0; c < counts.Length; ++c)
+        if (c != paper && counts[c] > counts[ink])
+          ink = c;
+
+      attributes[cellY * CellsAcross + cellX] = ZxSpectrumGraphics.Attribute(ink, paper);
+
+      for (var y = 0; y < 8; ++y) {
+        byte rowByte = 0;
+        for (var x = 0; x < 8; ++x) {
+          var color = indexed.PixelData[(cellY * 8 + y) * 256 + cellX * 8 + x] & 15;
+          if (color == ink)
+            rowByte |= (byte)(0x80 >> x);
+        }
+
+        bitmap[(cellY * 8 + y) * 32 + cellX] = rowByte;
+      }
+    }
+
+    return new() { BitmapData = bitmap, AttributeData = attributes, BorderColor = 0 };
   }
 
 }

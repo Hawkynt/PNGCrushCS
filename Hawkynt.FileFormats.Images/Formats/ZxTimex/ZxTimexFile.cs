@@ -4,12 +4,17 @@ using FileFormat.Core;
 namespace FileFormat.ZxTimex;
 
 /// <summary>In-memory representation of a Timex HiColor file (12288 bytes: 6144 bitmap + 6144 per-scanline-row extended attributes).</summary>
-public readonly record struct ZxTimexFile : IImageFormatReader<ZxTimexFile>, IImageToRawImage<ZxTimexFile>, IImageFormatWriter<ZxTimexFile> {
+public readonly record struct ZxTimexFile
+  : IImageFormatReader<ZxTimexFile>, IImageToRawImage<ZxTimexFile>,
+    IImageFromRawImage<ZxTimexFile>, IImageFormatWriter<ZxTimexFile> {
 
   static string IImageFormatMetadata<ZxTimexFile>.PrimaryExtension => ".tmx";
   static string[] IImageFormatMetadata<ZxTimexFile>.FileExtensions => [".tmx"];
   static ZxTimexFile IImageFormatReader<ZxTimexFile>.FromSpan(ReadOnlySpan<byte> data) => ZxTimexReader.FromSpan(data);
   static byte[] IImageFormatWriter<ZxTimexFile>.ToBytes(ZxTimexFile file) => ZxTimexWriter.ToBytes(file);
+  static VideoMode[] IImageFormatMetadata<ZxTimexFile>.VideoModes => [
+    new("Default", [(256, 192)], [16])
+  ];
 
   /// <summary>ZX Spectrum normal palette (bright=0).</summary>
   internal static readonly int[] NormalPalette = [
@@ -67,6 +72,51 @@ public readonly record struct ZxTimexFile : IImageFormatReader<ZxTimexFile>, IIm
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
     };
+  }
+
+  /// <summary>Builds a Timex HiColor screen from a <see cref="RawImage"/>. Every pixel is mapped onto the
+  /// Spectrum's 16-entry palette; within each 8x1 strip only the two most common colours survive, since
+  /// the hardware allows just one ink and one paper colour (and a shared bright flag) per strip.</summary>
+  public static ZxTimexFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width != 256 || image.Height != 192)
+      throw new ArgumentException($"Timex HiColor screens are always 256x192, but got {image.Width}x{image.Height}.", nameof(image));
+
+    var indexed = image.EnsureIndexed(PixelFormat.Indexed8, ZxSpectrumGraphics.Palette.ToArray());
+    var bitmap = new byte[6144];
+    var attributes = new byte[6144];
+    const int cellsAcross = 32;
+
+    Span<int> counts = stackalloc int[16];
+    for (var y = 0; y < 192; ++y)
+    for (var cellX = 0; cellX < cellsAcross; ++cellX) {
+      counts.Clear();
+      for (var x = 0; x < 8; ++x)
+        ++counts[indexed.PixelData[y * 256 + cellX * 8 + x] & 15];
+
+      var paper = 0;
+      for (var c = 1; c < counts.Length; ++c)
+        if (counts[c] > counts[paper])
+          paper = c;
+
+      var ink = paper == 0 ? 1 : 0;
+      for (var c = 0; c < counts.Length; ++c)
+        if (c != paper && counts[c] > counts[ink])
+          ink = c;
+
+      attributes[y * cellsAcross + cellX] = ZxSpectrumGraphics.Attribute(ink, paper);
+
+      byte rowByte = 0;
+      for (var x = 0; x < 8; ++x) {
+        var color = indexed.PixelData[y * 256 + cellX * 8 + x] & 15;
+        if (color == ink)
+          rowByte |= (byte)(0x80 >> x);
+      }
+
+      bitmap[y * 32 + cellX] = rowByte;
+    }
+
+    return new() { BitmapData = bitmap, AttributeData = attributes };
   }
 
 }
