@@ -14,7 +14,13 @@ public readonly record struct JpegFile :
   /// <summary>Every name a JPEG is saved under, including the two shortest.</summary>
   /// <summary><c>.fsy</c> is what Photodex CompuPic wrote its JPEGs under; the bytes are a plain JFIF.</summary>
   /// <summary><c>.mph</c> is MonkeyPhoto's name for the same thing, and is likewise a plain JFIF.</summary>
-  static string[] IImageFormatMetadata<JpegFile>.FileExtensions => [".jpg", ".jpeg", ".jpe", ".jfif", ".jps", ".thm", ".j", ".jif", ".fsy", ".mph"];
+  /// <summary>
+  /// <c>.ncy</c> is a FlashCam frame. XnView reads it with the same function it reads a JPEG with —
+  /// one entry in its format table names the other's loader — and its converter, told to read a
+  /// plain JFIF as a FlashCam frame, returns the picture. So the extension is the camera's and the
+  /// bytes are a JPEG.
+  /// </summary>
+  static string[] IImageFormatMetadata<JpegFile>.FileExtensions => [".jpg", ".jpeg", ".jpe", ".jfif", ".jps", ".thm", ".j", ".jif", ".fsy", ".mph", ".ncy"];
   static JpegFile IImageFormatReader<JpegFile>.FromSpan(ReadOnlySpan<byte> data) => JpegReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<JpegFile>.Capabilities => FormatCapability.HasDedicatedOptimizer;
 

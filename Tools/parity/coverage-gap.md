@@ -14,6 +14,7 @@ are claimed by more than one of its names, so the rows below add up to more than
 **A hundred and twelve are closed now and 66 remain.** Eleven of those went in one pass, off a source
 that had been sitting in this tree unread — see "Reading the reader" below. Eight of the fifteen
 before them turned out to be one thing — a
+**A hundred and nine are closed now and 69 remain.** Eight of the fifteen turned out to be one thing — a
 Windows DIB preview dropped inside a drawing or project file — and are read by a single reader
 rather than eight. IBM KIPS, the X11 puzzle, Synu and the Zoner brush were four more. The last three
 are wrappers around a picture format already here: ECC carries a PNG, LView Pro and IPSM each carry
@@ -619,7 +620,7 @@ open because the wildcard was counted as a name; there is nothing to do for it.
 
 ### What the rest turned out to be
 
-Four of them are not picture formats and cannot be made into ones by a reader:
+Three of them are not picture formats and cannot be made into ones by a reader:
 
   - `wrl` is VRML 2, a language for describing a three-dimensional scene. Rendering one is a scene
     graph, a camera and a lighting model, which is a different job from reading a raster. XnView
@@ -637,10 +638,16 @@ Four of them are not picture formats and cannot be made into ones by a reader:
     refused to call a format.
   - `pzp` is an MGI PhotoSuite project, also an OLE compound document; its own stream is called
     `Catalog`.
+    the bitmaps a theme is made of.
+
+`pzp` was in that list and is out of it: an MGI PhotoSuite project is an OLE compound document, but
+the pictures inside it are whole PNG files and XnView does not use the stream names to find them. It
+is read now — see below.
 
 One cannot be read at all: `pax` is Smaller Animals Software's Pick Ax format, which opens with
 `PAX` and is encrypted under a password the file does not carry. Tools exist whose entire purpose is
-to guess that password.
+to guess that password. Its codec is a closed Windows DLL — `pax` is the one name of the 178 that
+XnView's own Linux converter does not carry at all, so there is nothing here to interrogate either.
 
 Two are identified down to their first bytes and no further, because the coding was never published:
 `pwc` is the piecewise-constant image model, `4yVa`, distributed as a Windows binary from its
@@ -653,10 +660,12 @@ Three have a shape worth writing down for whoever comes back to them:
   - `prc` is Sony's Picture Gear Pocket, and it is a Palm resource database — the 78-byte Palm
     header, type and creator both `IMVS`, then resources named `iINF`, `iFRI`, `iPLT` and `iTIL`.
     The picture is in the `iTIL` tiles against the `iPLT` palette. `nconvert` writes one given
-    `-colours 16`, so unlike everything else in this list it can be worked on with a sample in hand.
-  - `pseg` is an IBM printer page segment: MO:DCA structured fields, each introduced by `5A`, around
-    an IOCA image. Both references are published, and there is an IOCA reader here already, though
-    the note above about how little that reader validates applies.
+    `-colours 16`, so unlike everything else in this list it can be worked on with a sample in hand
+    — but not a trustworthy one. See the measurements further down.
+  - `pseg` is an IBM printer page segment: MO:DCA structured fields, each introduced by `5A`. The
+    architecture allows an IOCA image inside one and there is an IOCA reader here already, but that
+    is not what XnView reads: its page-segment loader handles the IM1 image and nothing else. See
+    further down.
   - `xp0` is the SecretPhotos puzzle, and it carries a JPEG. It is the `ecc`/`lvp`/`pan` shape — a
     wrapper round a picture format already here — and where the JPEG begins was for a long time only
     one signature scan's worth of evidence, which this file has twice been rewritten to say is not a
@@ -676,9 +685,104 @@ have a published description after all, and finding it was worth doing because i
 binary field for field. `pd` is the odd one: XnView calls it `Male MRI` and gives it `.pd`,
 `.t1` and `.t2`, which are the names of the pulse sequences a scan is taken with rather than of a
 format, so it belongs with the raw formats above — slices with nothing to say how big they are.
+PRONOM, the Encyclopedia of Graphics File Formats, and general web search: `skn` is Skantek, `smp`
+Xionics SMP, `ssi` SriSun, `stm` an ArcSoft PhotoStudio stamp, `tdim` Digital F/X, `tnl` a
+thumbnail, `upi` Ulead PhotoImpact and `xim` Ximage.
 
-`pmp` is a name with one fact attached that would matter if a sample turned up: a Sony DSC-F1 file
-is a JPEG behind a fixed header, which is the same shape as three rows already closed here.
+### Asking XnView's own converter what the format is
+
+The web has nothing to say about most of these names, and a sample of one of them turns up about
+once a year. The converter has both: it reads every one of them and it is on this machine. Two ways
+of asking it were used here and the second is the one that pays.
+
+The first is interrogation: build a candidate file, hand it to `nconvert -in <name> -info`, and
+correct until the width, the height and the depth come back as written. That settles a layout once
+you have a hypothesis, and it settled `mfrm` in four tries. It cannot produce a hypothesis.
+
+The second is to read the converter. Its formats live in one table in its data segment, eighty bytes
+an entry — the name, the description, four slots, the loader's address, three more, the extension
+list. Find the description string, find the eight bytes that point at it, and the entry's fifth slot
+is the function that reads the format. Six helper functions do all the reading — a byte, a
+sixteen-bit number either way round, a thirty-two-bit number either way round, and a skip — so a
+loader disassembles into a list of offsets and constants that is the format's header. That is where
+`ncr`'s four opening bytes, `pixi`'s twelve, `nsr`'s ten-byte header and the rest below came from.
+Every one of them was then built as a file and put back through `-info`, and the pictures compared
+pixel for pixel, so nothing here rests on the reading of the disassembly alone.
+
+Two of the twenty turned out to be a format already here, and the table said so before a byte was
+read: two entries pointing at one loader address are one format under two names.
+
+  - `pd` — XnView's "Male MRI", `.pd`, `.t1` and `.t2` — has the same loader as `fre`, "Male Normal
+    CT". Both are GE Genesis 5.x images, which is read here; the extensions are the Visible Human
+    dataset's names for the pulse sequences, not names of formats. Claimed.
+  - `ncy`, the FlashCam frame, has the same loader as `jpeg` — the one `.jps`, `.fsy` and `.mph`
+    already share. It is a JPEG. Claimed.
+
+Six more were implemented from what the loader does:
+
+  - `mfrm`, Megalux Frame: `FRM`, a layout code that has to be four, a sixteen-bit width and height,
+    then sixteen bytes that are not read, then four bytes a pixel with blue first. FFmpeg's demuxer
+    puts the picture at offset eight and reads five layout codes; XnView reads one code and starts
+    the picture at twenty-four, and a file built FFmpeg's way comes back shifted.
+  - `pixi`, Pixibox: twelve fixed bytes, a width and a height at 14 and 16, the picture at 1024,
+    run-length coded four bytes a pixel with a count of zero meaning "to the end of the row", rows
+    from the bottom up.
+  - `ncr`, NCR Image: `6E 6E 0A 00`, the width and the height at 0x42 and 0x46, a coding byte at
+    0x4A and Group 4 coding from 0x5E. A page coded by this library's own G4 encoder and put under
+    that header comes back from the converter with no pixel differing.
+  - `pmp`, Sony DSC-F1: the JPEG at 124, as Klingebiel's page describes. XnView will take a JPEG
+    behind a prefix of any length up to about three hundred bytes, so it would read a foreign file
+    that happened to carry one; this reader requires the header to state 124 and the JPEG to start
+    there.
+  - `pzp`, MGI PhotoSuite: the compound-document signature, then a walk from offset 512 in steps of
+    four for the eight bytes a PNG opens with, and the first one found is the picture. No stream
+    name is involved — the loader does not open the directory at all.
+  - `nsr`, NewsRoom: ten bytes — `00 A0`, two that are not read, a pair whose difference is the
+    height, a pair whose difference plus one is the width, then `00 FF` — and the bits behind them,
+    a set bit being paper. The reader that stood here checked nothing but a length of 7680 bytes and
+    called every such file a 320x192 panel; the format cannot state a width of 320 at all, because
+    both of its sizes are pairs of single-byte coordinates.
+
+The rest were read far enough to say what stopped them, which is worth more to whoever comes back
+than the vendor's name:
+
+  - `mbig`, Cartes Michelin: four thirty-two-bit numbers and no signature — a tile width and height
+    between 32 and 512, then a count across and down between 2 and 64. Nothing in the file says it
+    is one of these, so claiming it would mean drawing any file whose first sixteen bytes fall in
+    those ranges.
+  - `mdl`, Half-Life Model: `IDST` and version 10, then three numbers at 0xAC that give the textures
+    and their data. It is a multi-image reader over a model's skins. Implementable, but the field
+    at 0xAC does not line up with the published `studiohdr_t` — where that puts the texture count is
+    0xB4 — and there is no model here to settle which is right.
+  - `pbt`, Micro Dynamics MARS: `02 00` and then `PBIT`, big-endian numbers behind it. The signature
+    is certain and the rest was not run down.
+  - `pig`, Ricoh IS30: `01 00`, a third byte choosing between two things, and then fields written as
+    ASCII decimal numbers of three and four characters that it converts with `strtol`.
+  - `pixp`, Pixel Power Collage: the first thirty-two bytes of the file have to equal the file's own
+    name — the loader takes the basename off the path and compares — then a thirty-two-bit number at
+    0x40. A reader for it would have to be given the name as well as the bytes, which nothing here
+    does.
+  - `prisms`: `EB E8 00 00`, the eight characters `R8G8B8A8` at 0x86, a height and a width at 0x1CC,
+    and a sixteen-bit offset at 0x200 saying where the coded picture starts. The coding is a
+    run-length scheme with several opcodes and was not finished. Worth noting for the row above it:
+    XnView reads `lff`, "LucasFilm Format", with this same loader, so what XnView calls an LFF is a
+    file opening `EB E8 00 00` and not the `LFF\0` this library's LucasFilm reader requires. One of
+    the two is reading something the other does not.
+  - `pseg`, IBM printer page segment: every structured field has to be introduced by `5A`, and the
+    types the loader handles are `D3 A6 7B`, `D3 AC 7B` and `D3 EE 7B` — the IM1 image, not IOCA.
+    An IOCA page segment built here, with and without the `5A` prefixes, is read by XnView's `ioca`
+    and refused by its `pseg`, so the IOCA reader already here is not what closes this row.
+  - `pp4`, Micrografx Picture Publisher 4: `II`, then a thirty-two-bit offset at 0x2A, and the
+    loader copies what it finds there into a temporary file and hands it to another reader. What
+    that reader is was not chased down.
+  - `prc`, Picture Gear Pocket: the Palm resource database named above, now measured. `iINF` is
+    eighteen bytes — width, height, a zero, the depth, a zero, a stride in pixels, `00 FF`, the
+    record id — `iPLT` is a count and four bytes an entry, `iFRI` names the tile records, and each
+    `iTIL` is a two-byte length and a 32x32 tile. It is still not implemented, and the reason is that
+    there is nothing to check it against: the converter cannot read `prc` at all, not even the file
+    it has just written, and the file it writes is wrong — a 16x12 picture comes back with rows 0, 2,
+    4 and so on in the first half of the tile and the rest of it blank. A reader built on that would
+    be agreeing with a bug.
 
 The last column marks the ones XnView itself cannot load on this platform: its catalogue says
 Windows only, so nothing here has ever been able to compare against them either.
@@ -734,7 +838,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | fff | .fff | MAGGI Hairstyles & Cosmetics is real; its file is not described anywhere |
 | fi | .fi |  |
 | fif | .fif | Windows only |
-| fre | .fre | read; a GE Genesis image, met as the Visible Human CT slices |
+| fre | .fre | read; a GE Genesis image, met as the Visible Human CT slices, and the Male MRI slices too |
 | frm | .frm |  |
 | frm2 | .frm |  |
 | fsy | .fsy |  |
@@ -768,45 +872,45 @@ Windows only, so nothing here has ever been able to compare against them either.
 | lvp | .lvp |  |
 | lwf | .lwf | Windows only |
 | lwi | .lwi |  |
-| mbig | .big | a tile grid with no magic at all; the tiles' own coding was not recovered |
-| mdl | .mdl | declined: the reader of that name here reads a bare texture blob, not a model |
-| mfrm | .frm |  |
+| mbig | .big | a tile grid with no magic at all: four numbers, a tile size between 32 and 512 and a count between 2 and 64 |
+| mdl | .mdl | declined: IDST and version 10, and the field XnView reads at 0xAC is not where studiohdr_t puts the texture count |
+| mfrm | .frm | read; FRM, the one layout code XnView takes, and the picture at 24 rather than at 8 |
 | mix | .mix |  |
 | mjpg | .wi |  |
 | mph | .mph |  |
 | mrf | .mrf |  |
 | mrw | .mrw |  |
 | mtx | .mtx | read; the constant, the size, the width of a pixel, and the pixels |
-| ncr | .ncr |  |
-| ncy | .ncy |  |
-| nsr | .bn .ph |  |
+| ncr | .ncr | read; 6E 6E 0A 00, the size at 0x42 and 0x46, and Group 4 coding from 0x5E |
+| ncy | .ncy | read by the JPEG reader, which is the loader XnView reads it with |
+| nsr | .bn .ph | read; a ten-byte header, and the panel it states cannot be the 320x192 the old reader assumed |
 | oil | .oil |  |
 | mtx | .mtx |  |
-| ncr | .ncr | NCR Image; nothing beyond the name describes it |
-| ncy | .ncy | a FlashCam frame; nothing beyond the name describes it |
-| nsr | .bn .ph | NewsRoom's banner and photo panels; declined, the reader validates nothing but a length |
+| ncr | .ncr | read; 6E 6E 0A 00, the size at 0x42 and 0x46, and Group 4 coding from 0x5E |
+| ncy | .ncy | read by the JPEG reader, which is the loader XnView reads it with |
+| nsr | .bn .ph | read; a ten-byte header, and the panel it states cannot be the 320x192 the old reader assumed |
 | oil | .oil | read, from the Open Image Library's own specification; no sample was available |
 | pan | .pan |  |
-| pax | .pax | Pick Ax, encrypted under a password the file does not carry |
-| pbt | .pbt | Micro Dynamics MARS, a Macintosh document archive |
+| pax | .pax | Pick Ax, Blowfish under a password the file does not carry; XnView's Linux converter does not carry it either |
+| pbt | .pbt | Micro Dynamics MARS: 02 00 and then PBIT; the fields behind it were not run down |
 | pcl | .pcl | the raster subset read; text and HP-GL/2 passed over |
-| pd | .pd .t1 .t2 | raw MRI slices named for the pulse sequence; nothing states the size |
+| pd | .pd .t1 .t2 | read by the GE Genesis reader, which is the loader XnView reads it with |
 | pdd | .pdd |  |
 | pdx | .pdx | read; Mayura Draw saves Encapsulated PostScript under a name of its own |
 | pegs | .pxa .pxs |  |
-| pig | .pig | a Ricoh IS30 scanner; nothing beyond the name describes it |
-| pixi | .pxb | Pixibox; nothing beyond the name describes it |
-| pixp | .i17 .i18 .ib7 .if9 | Pixel Power Collage; nothing beyond the name describes it |
-| pmp | .pmp | a Sony DSC-F1 file, a JPEG behind a fixed header; no sample |
+| pig | .pig | Ricoh IS30: 01 00, a mode byte, then fields written as ASCII decimal numbers |
+| pixi | .pxb | read; twelve fixed bytes, the size at 14, and a run-length picture at 1024 from the bottom up |
+| pixp | .i17 .i18 .ib7 .if9 | Pixel Power Collage: the first 32 bytes have to equal the file's own name, which a reader of bytes cannot check |
+| pmp | .pmp | read; the JPEG at 124, and the size the header states is not the picture's |
 | pmsk | .msk | read by the Paint Shop Pro reader |
-| pp4 | .pp4 | Micrografx Picture Publisher 4; nothing beyond the name describes it |
+| pp4 | .pp4 | Micrografx Picture Publisher 4: II, an offset at 0x2A, and XnView hands what is there to another reader |
 | pp5 | .pp5 |  |
 | pps | .pps | PowerPoint: a compound document holding pictures, not a picture format |
 | ppt | .ppt | PowerPoint: a compound document holding pictures, not a picture format |
-| prc | .prc | Picture Gear Pocket, a Palm resource database of tiles; a sample can be made |
+| prc | .prc | Picture Gear Pocket, measured but not built: the converter cannot read one, and the one it writes is wrong |
 | prf | .prf |  |
-| prisms | .pri | Prisms; nothing beyond the name describes it |
-| pseg | .pse | MO:DCA structured fields round an IOCA image; both references published |
+| prisms | .pri | Prisms: EB E8 00 00 and R8G8B8A8 at 0x86; the run-length coding was not finished |
+| pseg | .pse | IBM page segment: the 5A-introduced fields XnView reads are the IM1 image, not IOCA |
 | pspb | .pspbrush |  |
 | pspf | .pfr .pspframe | read by the Paint Shop Pro reader |
 | pspm | .pspmask |  |
@@ -814,7 +918,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | pwc | .pwc | the piecewise-constant image model; its coding was never published; Windows only |
 | pxa | .pxa |  |
 | pzl | .pzl |  |
-| pzp | .pzp | an MGI PhotoSuite project: an OLE compound document |
+| pzp | .pzp | read; a compound document, walked from 512 for the first whole PNG in it |
 | qcad | .cad |  |
 | raw | .grey .gry | raw greyscale; XnView asks the operator for the size and its own reader requires it |
 | rfax | .001 | Ricoh Fax; signature and header recovered, the page coding not |

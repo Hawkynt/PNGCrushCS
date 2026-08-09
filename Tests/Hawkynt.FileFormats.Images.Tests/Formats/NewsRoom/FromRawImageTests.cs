@@ -6,8 +6,8 @@ namespace FileFormat.NewsRoom.Tests;
 [TestFixture]
 public sealed class FromRawImageTests {
 
-  private const int _WIDTH = 320;
-  private const int _HEIGHT = 192;
+  private const int _WIDTH = 128;
+  private const int _HEIGHT = 96;
 
   private static RawImage _Stripes(int width, int height) {
     var pixels = new byte[width * height * 3];
@@ -25,10 +25,12 @@ public sealed class FromRawImageTests {
 
   [Test]
   [Category("Integration")]
-  public void RoundTrip_PanelSizedTwoTonePicture_ReturnsEveryPixelUnchanged() {
+  public void RoundTrip_ATwoTonePicture_ReturnsEveryPixelUnchanged() {
     var source = _Stripes(_WIDTH, _HEIGHT);
 
-    var restored = NewsRoomFile.ToRawImage(NewsRoomReader.FromBytes(NewsRoomWriter.ToBytes(NewsRoomFile.FromRawImage(source))));
+    var restored = PixelConverter.Convert(
+      NewsRoomFile.ToRawImage(NewsRoomReader.FromBytes(NewsRoomWriter.ToBytes(NewsRoomFile.FromRawImage(source)))),
+      PixelFormat.Rgb24);
 
     Assert.Multiple(() => {
       Assert.That(restored.Width, Is.EqualTo(_WIDTH));
@@ -37,30 +39,48 @@ public sealed class FromRawImageTests {
     });
   }
 
-  /// <summary>The file is nothing but the panel and states no size, so a picture of another size is
-  /// sampled onto it rather than refused.</summary>
+  /// <summary>
+  /// Both sizes stand in the header as a pair of single-byte coordinates, so a panel cannot be
+  /// wider than 256 or taller than 248; a larger picture is sampled onto one that size.
+  /// </summary>
   [Test]
   [Category("Integration")]
-  public void FromRawImage_AnyOtherSize_IsSampledOntoThePanel([Values(40, 100, 640)] int width) {
-    var file = NewsRoomFile.FromRawImage(_Stripes(width, width / 2));
+  public void FromRawImage_ALargerPicture_IsSampledOntoWhatTheHeaderCanState() {
+    var file = NewsRoomFile.FromRawImage(_Stripes(640, 480));
 
     Assert.Multiple(() => {
-      Assert.That(file.PixelData, Has.Length.EqualTo(NewsRoomFile.ExpectedFileSize));
-      Assert.That(NewsRoomWriter.ToBytes(file), Has.Length.EqualTo(NewsRoomFile.ExpectedFileSize));
+      Assert.That(file.Width, Is.EqualTo(NewsRoomFile.MaximumWidth));
+      Assert.That(file.Height, Is.EqualTo(NewsRoomFile.MaximumHeight));
+      Assert.That(NewsRoomWriter.ToBytes(file),
+        Has.Length.EqualTo(NewsRoomFile.HeaderSize + NewsRoomFile.StrideOf(NewsRoomFile.MaximumWidth) * NewsRoomFile.MaximumHeight));
+    });
+  }
+
+  /// <summary>A size that is not a whole number of bytes across is rounded up to one.</summary>
+  [Test]
+  [Category("Integration")]
+  public void FromRawImage_ASizeOffAByteBoundary_IsRoundedUp() {
+    var file = NewsRoomFile.FromRawImage(_Stripes(37, 21));
+
+    Assert.Multiple(() => {
+      Assert.That(file.Width, Is.EqualTo(40));
+      Assert.That(file.Height, Is.EqualTo(24));
     });
   }
 
   [Test]
   [Category("Unit")]
-  public void FromRawImage_BlackPixel_SetsItsBit() {
+  public void FromRawImage_AWhitePixel_SetsItsBit() {
     var pixels = new byte[_WIDTH * _HEIGHT];
-    Array.Fill(pixels, (byte)255);
-    pixels[0] = 0;
+    pixels[0] = 255;
 
     var file = NewsRoomFile.FromRawImage(new() {
       Width = _WIDTH, Height = _HEIGHT, Format = PixelFormat.Gray8, PixelData = pixels
     });
 
-    Assert.That(file.PixelData[0], Is.EqualTo(0x80));
+    Assert.Multiple(() => {
+      Assert.That(file.PixelData[0], Is.EqualTo(0x80));
+      Assert.That(file.PixelData[1], Is.EqualTo(0x00));
+    });
   }
 }

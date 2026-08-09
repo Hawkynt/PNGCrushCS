@@ -55,7 +55,16 @@ public readonly record struct GeGenesisFile
   internal const int MinimumHeaderSize = 24;
 
   static string IImageFormatMetadata<GeGenesisFile>.PrimaryExtension => ".fre";
-  static string[] IImageFormatMetadata<GeGenesisFile>.FileExtensions => [".fre"];
+
+  /// <summary>
+  /// <c>.pd</c>, <c>.t1</c> and <c>.t2</c> are the same format under the other half of the same
+  /// dataset. XnView calls those three "Male MRI" — the Visible Human male's proton-density,
+  /// T1-weighted and T2-weighted slices — and reads them with the very function it reads
+  /// <c>.fre</c> with: the two rows of its format table name one address between them. Its
+  /// converter, told to read an <c>IMGF</c> file as a Male MRI, returns the picture at the size the
+  /// control header states.
+  /// </summary>
+  static string[] IImageFormatMetadata<GeGenesisFile>.FileExtensions => [".fre", ".pd", ".t1", ".t2"];
   static GeGenesisFile IImageFormatReader<GeGenesisFile>.FromSpan(ReadOnlySpan<byte> data) => GeGenesisReader.FromSpan(data);
   static byte[] IImageFormatWriter<GeGenesisFile>.ToBytes(GeGenesisFile file) => GeGenesisWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<GeGenesisFile>.VideoModes => [

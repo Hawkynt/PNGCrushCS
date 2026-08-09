@@ -372,6 +372,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | GBA Tile                | .gba                                                 | Game Boy Advance tile            | Y      | Y      | —         | —     | —   | —      | —         |
 | GBR                     | .gbr                                                 | GIMP Brush                       | Y      | Y      | —         | —     | —   | RW     | —         |
 | GD2                     | .gd2                                                 | libgd version 2                  | Y      | Y      | —         | —     | —   | —      | —         |
+| GE Genesis              | .fre, .pd, .t1, .t2                                  | GE Genesis 5.x medical raster    | Y      | Y      | —         | —     | —   | R      | —         |
 | GEM IMG                 | .img                                                 | GEM raster image                 | Y      | Y      | —         | R     | —   | —      | R         |
 | GeoPaint                | .geo                                                 | GEOS GeoPaint monochrome         | Y      | Y      | —         | —     | —   | —      | —         |
 | Gephard Hires           | .ghg                                                 | C64 Gephard Hires                | Y      | —      | —         | R     | —   | —      | —         |
@@ -446,7 +447,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | JBIG                    | .jbg, .bie, .jbig                                    | Joint Bi-level Image Group       | Y      | Y      | —         | RW    | RW  | RW     | —         |
 | JBIG2                   | .jb2, .jbig2                                         | JBIG2 bi-level compression       | Y      | Y      | —         | —     | —   | —      | —         |
 | JNG                     | .jng                                                 | JPEG Network Graphics            | Y      | —      | —         | RW    | RW  | RW     | R         |
-| JPEG                    | .jpg, .jpeg, .jpe, .jfif, .jps, .thm                 | Joint Photographic Experts Group | Y      | Y      | Y         | RW    | RW  | RW     | RW        |
+| JPEG                    | .jpg, .jpeg, .jpe, .jfif, .jps, .thm, .ncy           | Joint Photographic Experts Group | Y      | Y      | Y         | RW    | RW  | RW     | RW        |
 | JPEG 2000               | .jp2, .j2k, .jpc, .jpx, .jpf, .jpt, .j2c, .jpm       | JPEG 2000 wavelet codec          | Y      | Y      | —         | RW    | RW  | RW     | RW        |
 | JPEG XL                 | .jxl                                                 | JPEG XL next-gen codec           | Y      | Y      | —         | —     | RW  | RW     | RW        |
 | JPEG XR                 | .jxr, .hdp, .wdp                                     | JPEG eXtended Range / HD Photo   | Y      | Y      | —         | RW    | RW  | RW     | R         |
@@ -471,6 +472,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | Maya IFF                | .iff, .maya                                          | Maya IFF (FOR4/CIMG)             | Y      | Y      | —         | —     | —   | —      | —         |
 | MCS                     | .mcs                                                 | C64 Mcs multicolor screen        | Y      | —      | —         | R     | —   | —      | —         |
 | MegaPaint               | .bld                                                 | Atari ST MegaPaint               | Y      | —      | —         | R     | —   | —      | —         |
+| Megalux Frame           | .frm                                                 | Megalux captured video frame     | Y      | —      | —         | —     | —   | R      | —         |
 | MetaImage               | .mha, .mhd                                           | MetaImage medical format         | Y      | Y      | —         | —     | —   | —      | —         |
 | MGR Bitmap              | .mgr                                                 | MGR Window Manager bitmap        | Y      | —      | —         | —     | —   | —      | —         |
 | Micro Illustrator       | .mil                                                 | C64 Micro Illustrator            | Y      | —      | —         | RW    | —   | —      | —         |
@@ -523,7 +525,8 @@ build one from pixel data they didn't read, so the registry reports them as read
 | NEOchrome               | .neo                                                 | Atari ST NEOchrome               | Y      | Y      | —         | R     | —   | —      | —         |
 | NES CHR                 | .chr                                                 | NES character ROM tile           | Y      | Y      | —         | —     | —   | —      | —         |
 | Netpbm                  | .pbm, .pgm, .ppm, .pnm, .pam                         | Portable anymap family           | Y      | Y      | —         | RW    | RW  | RW     | RW        |
-| NewsRoom                | .nsr                                                 | NewsRoom clip art                | Y      | —      | —         | —     | —   | —      | —         |
+| NCR Image               | .ncr                                                 | NCR scanner Group 4 raster       | Y      | —      | —         | —     | —   | R      | —         |
+| NewsRoom                | .nsr, .ph, .bn                                       | NewsRoom panel, photo, banner    | Y      | Y      | —         | —     | —   | R      | —         |
 | NIE                     | .nie                                                 | Wuffs Naive Image format         | Y      | Y      | —         | —     | —   | —      | —         |
 | NIfTI                   | .nii, .nii.gz                                        | Neuroimaging Informatics         | Y      | —      | —         | —     | —   | R      | —         |
 | NIST IHead              | .nst                                                 | NIST IHead biometric             | Y      | Y      | —         | —     | —   | —      | —         |
@@ -567,11 +570,13 @@ build one from pixel data they didn't read, so the registry reports them as read
 | PIC2                    | .p2                                                  | Japanese PIC2 format             | Y      | Y      | —         | —     | —   | —      | —         |
 | Picasso 64              | .p64                                                 | C64 Picasso 64                   | Y      | —      | —         | RW    | —   | —      | —         |
 | PICT                    | .pict, .pct                                          | Apple QuickDraw PICT             | Y      | Y      | —         | RW    | —   | —      | R         |
+| PhotoSuite Project      | .pzp                                                 | MGI PhotoSuite project picture   | Y      | —      | —         | —     | —   | R      | —         |
 | Picture Editor          | .ped                                                 | Atari 8-bit Picture Editor       | Y      | Y      | —         | R     | —   | —      | —         |
 | PicWorks                | .pwk, .pws                                           | Atari ST PicWorks paint          | Y      | Y      | —         | R     | —   | —      | —         |
 | Pixar RIB               | .pxr, .pixar, .picio                                 | Pixar RenderMan image            | Y      | Y      | —         | —     | —   | —      | —         |
 | Pixel 64                | .px64, .px                                           | C64 Pixel Perfect paint          | Y      | —      | —         | R     | —   | —      | —         |
 | Pixel Perfect           | .pp, .ppp                                            | C64 Pixel Perfect multicolor     | Y      | —      | —         | R     | —   | —      | —         |
+| Pixibox                 | .pxb                                                 | Pixibox run-length picture       | Y      | —      | —         | —     | —   | R      | —         |
 | PKM                     | .pkm                                                 | Ericsson ETC texture             | Y      | Y      | —         | —     | —   | —      | —         |
 | Plot Maker              | .plt, .plm2                                          | Plot Maker monochrome image      | Y      | Y      | —         | —     | —   | —      | —         |
 | PM Bitmap               | .pm1, .pm2, .pm3, .pm4                               | PM bitmap format                 | Y      | —      | —         | —     | —   | —      | —         |
@@ -637,6 +642,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | Softimage PIC           | .pic, .si                                            | Softimage 3D texture             | Y      | Y      | —         | —     | —   | —      | —         |
 | Software Automation     | .sag, .swa                                           | Atari 8-bit Software Automation  | Y      | Y      | —         | R     | —   | —      | —         |
 | Sony Mavica             | .411                                                 | Sony Mavica still image          | Y      | —      | —         | —     | —   | —      | —         |
+| Sony DSC-F1             | .pmp                                                 | Cyber-shot DSC-F1 still          | Y      | —      | —         | —     | —   | R      | —         |
 | SPC Painter             | .spp, .spc2                                          | Atari ST SPC Painter             | Y      | —      | —         | R     | —   | —      | —         |
 | Speccy eXtended         | .sxg                                                 | ZX Spectrum extended graphics    | Y      | —      | —         | R     | —   | —      | —         |
 | Spectrum 512            | .spu                                                 | Atari ST Spectrum 512            | Y      | Y      | —         | R     | —   | —      | —         |
