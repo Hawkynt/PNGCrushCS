@@ -850,3 +850,21 @@ Windows only, so nothing here has ever been able to compare against them either.
 | yuv444 | .qtl | raw YUV; nothing states the size, and five names share this extension |
 | zbr | .zbr |  |
 | zmf | .zmf |  |
+
+### The .qtl family, and a fault it exposed
+
+Five of the remaining names — `uyvy`, `uyvyi`, `yuv411`, `yuv422`, `yuv444` — all sit on `.qtl`, and
+`raw` sits on `.grey`/`.gry` the same way. None of these states its size. XnView's own converter
+writes one and then refuses to read it back, with or without the size on its command line, so there
+is no reading of it to match.
+
+There are readers here for two of those layouts already, under `.uyvy` and `.yuv`, and they settle
+the size by requiring the file's length to be exactly one of the frame sizes the layout is made in —
+refusing anything else, which is the same rule used everywhere else here. Claiming `.qtl` for them
+looked like a free close.
+
+It is not, and trying it is what showed why. A frame written by that converter and read by our UYVY
+reader comes back with pure red as 198, 31, 31: the file is in studio swing, where luma runs 16 to
+235 and chroma 16 to 240, and the reader treats it as full range. The mean error over a gradient is
+47 of 255. So the name stays open and the fault is recorded — it is in a reader we already ship
+under a name we already claim, which is the more useful half of the finding.
