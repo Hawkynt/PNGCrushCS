@@ -18,16 +18,28 @@ public readonly record struct ColoRixFile : IImageFormatReader<ColoRixFile>, IIm
 
   static string IImageFormatMetadata<ColoRixFile>.PrimaryExtension => ".rix";
 
-  /// <summary>The numbered names are the same format under the screen mode it was saved in.</summary>
+  /// <summary>The suffixed names are the same format under the screen mode it was saved in.</summary>
   /// <remarks>
   /// XnView's catalogue writes this row's extensions as <c>rix sci scx sc?</c>, one decoder for all
   /// of them: the trailing character is the ColoRIX screen mode and the header behind it is
-  /// identical. The names are shared with other things from the same era, so nothing here trusts
-  /// them — the file still has to open with <c>RIX3</c>.
+  /// identical. <c>sc?</c> is a wildcard rather than a name — the only one in a catalogue of 554
+  /// entries — and it stands for <c>sc</c> and any one character, so every one of those is listed
+  /// here.
+  /// <para/>
+  /// Claiming that many names costs nothing because the extension decides nothing. XnView's own
+  /// converter identifies this format from the bytes and reads a ColoRIX picture under any name at
+  /// all, including names belonging to other formats entirely; the wildcard is what its file chooser
+  /// offers, not what its reader tests. Half of this set is spoken for here by something else —
+  /// <c>.scr</c> by four formats, <c>.sca</c> and <c>.scb</c> by MSX Screen 10, <c>.scf</c> by
+  /// SciFax, <c>.sct</c> by Scitex — and none of that matters either, because a file under any of
+  /// these names still has to open with <c>RIX3</c> before this reader takes it.
   /// </remarks>
   static string[] IImageFormatMetadata<ColoRixFile>.FileExtensions => [
-    ".rix", ".scx", ".sci",
+    ".rix",
     ".sc0", ".sc1", ".sc2", ".sc3", ".sc4", ".sc5", ".sc6", ".sc7", ".sc8", ".sc9",
+    ".sca", ".scb", ".scc", ".scd", ".sce", ".scf", ".scg", ".sch", ".sci", ".scj", ".sck", ".scl",
+    ".scm", ".scn", ".sco", ".scp", ".scq", ".scr", ".scs", ".sct", ".scu", ".scv", ".scw", ".scx",
+    ".scy", ".scz",
   ];
   static ColoRixFile IImageFormatReader<ColoRixFile>.FromSpan(ReadOnlySpan<byte> data) => ColoRixReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<ColoRixFile>.VideoModes => [
