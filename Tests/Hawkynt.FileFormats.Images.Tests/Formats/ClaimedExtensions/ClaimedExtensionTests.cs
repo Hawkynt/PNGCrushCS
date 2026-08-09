@@ -3,15 +3,18 @@ using System.IO;
 using System.Text;
 using FileFormat.Avs;
 using FileFormat.Bmp;
+using FileFormat.BodyPaint3D;
 using FileFormat.Cloe;
 using FileFormat.Core;
 using FileFormat.Hpgl;
 using FileFormat.Ilbm;
 using FileFormat.Jpeg;
 using FileFormat.PcPaint;
+using FileFormat.Pixia;
 using FileFormat.Png;
 using FileFormat.Psp;
 using FileFormat.ScitexCt;
+using FileFormat.TiPicture;
 
 namespace FileFormat.ClaimedExtensions.Tests;
 
@@ -147,6 +150,7 @@ public sealed class ClaimedExtensionTests {
     Assert.Multiple(() => {
       Assert.That(extensions, Does.Contain(".prn"));
       Assert.That(extensions, Does.Contain(".prt"));
+      Assert.That(extensions, Does.Contain(".spl"));
     });
 
     Assert.Throws<InvalidDataException>(() => HpglReader.FromBytes(_Png()));
@@ -181,5 +185,43 @@ public sealed class ClaimedExtensionTests {
 
     Assert.Throws<InvalidDataException>(() => BmpReader.FromBytes(_Png()));
     Assert.Throws<InvalidDataException>(() => BmpReader.FromBytes(_Jpeg()));
+  }
+
+  /// <summary>
+  /// The rows where one extension of several was claimed and the other was not.
+  /// </summary>
+  /// <remarks>
+  /// These are not new formats. Each is a name XnView's catalogue gives a row that also carries a
+  /// name already read here, and in each case its converter runs one loader for both: the same file
+  /// under either name comes back at the same size and the same pixels. So the row was only ever half
+  /// closed, and closing the other half costs a string.
+  /// <para/>
+  /// <c>.flt</c> shares the BIAS FringeProcessor row with <c>.msk</c>, and both are Windows bitmaps.
+  /// <c>.pxs</c> shares the Pegs row with <c>.pxa</c>, and both are Pixia pictures. <c>.b2d</c>
+  /// shares the TopDesign Thumbnail row with <c>.b3d</c>, and both are BodyPaint textures.
+  /// </remarks>
+  [Test]
+  [Category("Unit")]
+  public void TheHalfClosedRows_AreClaimedByTheReaderThatReadsTheirSibling() {
+    Assert.Multiple(() => {
+      Assert.That(_Extensions<BmpFile>(), Does.Contain(".flt"));
+      Assert.That(_Extensions<PixiaFile>(), Does.Contain(".pxs"));
+      Assert.That(_Extensions<BodyPaint3DFile>(), Does.Contain(".b2d"));
+      Assert.That(_Extensions<TiPictureFile>(), Does.Contain(".73i"));
+    });
+  }
+
+  /// <summary>Each of those readers still decides from the bytes rather than the name.</summary>
+  [Test]
+  [Category("Unit")]
+  public void TheHalfClosedRows_StillRefuseAFileOfAnotherFormat() {
+    Assert.Throws<InvalidDataException>(() => PixiaReader.FromBytes(_Png()));
+    Assert.Throws<InvalidDataException>(() => PixiaReader.FromBytes(_Jpeg()));
+    Assert.Throws<InvalidDataException>(() => PixiaReader.FromBytes(_Noise()));
+    Assert.Throws<InvalidDataException>(() => BodyPaint3DReader.FromBytes(_Png()));
+    Assert.Throws<InvalidDataException>(() => BodyPaint3DReader.FromBytes(_Jpeg()));
+    Assert.Throws<InvalidDataException>(() => BodyPaint3DReader.FromBytes(_Noise()));
+    Assert.Throws<InvalidDataException>(() => TiPictureReader.FromBytes(_Png()));
+    Assert.Throws<InvalidDataException>(() => TiPictureReader.FromBytes(_Jpeg()));
   }
 }

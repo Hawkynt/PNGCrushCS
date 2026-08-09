@@ -85,7 +85,7 @@ public static class TiPictureWriter {
   /// <summary>Which calculator the file says it came off, falling back on what its width can only be.</summary>
   private static string _Model(TiPictureFile file) {
     var model = file.Model;
-    if (model is "82" or "83" && file.Width == TiPictureFile.Width8283)
+    if (model is "73" or "82" or "83" && file.Width == TiPictureFile.Width8283)
       return model;
 
     if (model is "85" or "86" && file.Width == TiPictureFile.Width8586)
@@ -94,9 +94,9 @@ public static class TiPictureWriter {
     return file.Width == TiPictureFile.Width8283 ? "82" : "86";
   }
 
-  /// <summary>The name as the model spells one: a token on the TI-82 and TI-83, letters on the others.</summary>
+  /// <summary>The name as the model spells one: a token on the TI-73, TI-82 and TI-83, letters on the others.</summary>
   private static byte[] _Name(string model) {
-    if (model is "82" or "83") {
+    if (model is "73" or "82" or "83") {
       var token = new byte[_PaddedNameLength];
       token[0] = _PictureToken;
       return token;

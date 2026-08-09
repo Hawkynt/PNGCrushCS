@@ -45,9 +45,14 @@ public readonly record struct BmpFile :
   /// DIB, and the claim that closed that row was against a reader that would refuse the file. Both
   /// readers hold the name now: this one takes the DIB and the other one takes anything that really
   /// does open with Paint Shop Pro's header.
+  /// <para/>
+  /// <c>.flt</c> came in with it and for the same reason. XnView pairs it with <c>.msk</c> on one row
+  /// titled "BIAS FringeProcessor", which sounds like interferometry and is in fact the same Windows
+  /// bitmap reader again — a DIB renamed <c>.flt</c> is read, and the row was only half closed while
+  /// <c>.msk</c> was claimed and this was not.
   /// </remarks>
   static string[] IImageFormatMetadata<BmpFile>.FileExtensions =>
-    [".bmp", ".dib", ".bga", ".rl4", ".rl8", ".vga", ".sys", ".bum", ".thb", ".2d", ".bmc", ".stm", ".upi", ".msk"];
+    [".bmp", ".dib", ".bga", ".rl4", ".rl8", ".vga", ".sys", ".bum", ".thb", ".2d", ".bmc", ".stm", ".upi", ".msk", ".flt"];
   static BmpFile IImageFormatReader<BmpFile>.FromSpan(ReadOnlySpan<byte> data) => BmpReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<BmpFile>.Capabilities => FormatCapability.HasDedicatedOptimizer;
   static VideoMode[] IImageFormatMetadata<BmpFile>.VideoModes => [

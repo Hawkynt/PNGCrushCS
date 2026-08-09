@@ -50,10 +50,16 @@ public sealed class TiPictureTests {
   public void FromBytes_WrongMagic_ThrowsInvalidDataException()
     => Assert.Throws<InvalidDataException>(() => TiPictureReader.FromBytes(new byte[128]));
 
+  /// <summary>The TI-92 is a different container and its picture data is compressed.</summary>
+  /// <remarks>
+  /// This used to be asserted of the TI-73, which was wrong: that one is the TI-82's container and
+  /// the TI-82's screen under another signature, and XnView's converter reads a picture built under
+  /// both signatures identically. The TI-92 is the one that really is something else.
+  /// </remarks>
   [Test]
   [Category("Unit")]
   public void FromBytes_ACalculatorThisDoesNotRead_ThrowsInvalidDataException()
-    => Assert.Throws<InvalidDataException>(() => TiPictureReader.FromBytes(_File("**TI73**", TiPictureFile.PictureType8283, TiPictureFile.Width8283)));
+    => Assert.Throws<InvalidDataException>(() => TiPictureReader.FromBytes(_File("**TI92**", TiPictureFile.PictureType8283, TiPictureFile.Width8283)));
 
   [Test]
   [Category("Unit")]
@@ -72,7 +78,7 @@ public sealed class TiPictureTests {
   [Test]
   [Category("Unit")]
   public void FromBytes_TheEightyTwoAndEightyThreeScreenIsNinetySixBySixtyThree(
-    [Values("**TI82**", "**TI83**")] string signature) {
+    [Values("**TI73**", "**TI82**", "**TI83**")] string signature) {
     var decoded = TiPictureFile.ToRawImage(TiPictureReader.FromBytes(_File(signature, TiPictureFile.PictureType8283, TiPictureFile.Width8283)));
 
     Assert.Multiple(() => {

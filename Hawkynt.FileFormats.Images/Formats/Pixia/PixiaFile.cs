@@ -74,7 +74,15 @@ public readonly record struct PixiaFile
   internal const int WrittenVersion = 3;
 
   static string IImageFormatMetadata<PixiaFile>.PrimaryExtension => ".pxa";
-  static string[] IImageFormatMetadata<PixiaFile>.FileExtensions => [".pxa"];
+  /// <summary>Also .pxs, which is the same file under the name XnView files Pegs pictures under.</summary>
+  /// <remarks>
+  /// The catalogue keeps two rows for these — one for Pixia on <c>.pxa</c> and one for Pegs on
+  /// <c>.pxa</c> and <c>.pxs</c> — which reads like two formats sharing a name. It is one reader:
+  /// a Pixia picture renamed <c>.pxs</c> and handed to the converter comes back at the same size,
+  /// pixel for pixel, as the same file under <c>.pxa</c>. The signature is still what identifies it,
+  /// so a file that is not a Pixia picture is refused under either name.
+  /// </remarks>
+  static string[] IImageFormatMetadata<PixiaFile>.FileExtensions => [".pxa", ".pxs"];
   static PixiaFile IImageFormatReader<PixiaFile>.FromSpan(ReadOnlySpan<byte> data) => PixiaReader.FromSpan(data);
   static byte[] IImageFormatWriter<PixiaFile>.ToBytes(PixiaFile file) => PixiaWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<PixiaFile>.VideoModes => [

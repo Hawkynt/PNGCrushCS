@@ -104,6 +104,9 @@ public static class TiPictureReader {
       throw new InvalidDataException("Not a TI transfer file: it does not open with a **TInn** signature.");
 
     return (char)data[4] switch {
+      // The TI-73 has the TI-82's screen and the TI-82's container; the signature is the only thing
+      // that differs, which is why it belongs on this arm rather than an arm of its own.
+      '7' when data[5] is (byte)'3' => TiPictureFile.Width8283,
       '8' when data[5] is (byte)'2' or (byte)'3' => TiPictureFile.Width8283,
       '8' when data[5] is (byte)'5' or (byte)'6' => TiPictureFile.Width8586,
       _ => throw new InvalidDataException($"A TI transfer file for the {(char)data[4]}{(char)data[5]} is not one this reads."),

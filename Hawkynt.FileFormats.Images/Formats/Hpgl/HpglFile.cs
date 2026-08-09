@@ -50,12 +50,17 @@ public readonly record struct HpglFile : IImageFormatReader<HpglFile>, IImageToR
   // second format on the same name would decide by whichever the registry happened to try first.
   /// <summary>Every name a plot arrives under, the printer-spool ones included.</summary>
   /// <remarks>
-  /// <c>.prn</c> and <c>.prt</c> are what a driver calls a job printed to a file, and the job is
-  /// as often PostScript or PCL as it is HP-GL. That costs nothing here because the name is not
+  /// <c>.prn</c>, <c>.prt</c> and <c>.spl</c> are what a driver calls a job printed to a file, and the
+  /// job is as often PostScript or PCL as it is HP-GL. That costs nothing here because the name is not
   /// what identifies the file: the parse has to find an instruction that moves the pen and says
   /// where to, which prose and PostScript do not produce, so a spool of either is refused.
+  /// <para/>
+  /// All three come off the same catalogue row, and that row is a Windows-only third-party plugin —
+  /// the converter on this machine refuses a plot under every one of these names, so unlike the other
+  /// claims here this one could not be checked against it. What it rests on instead is the refusal
+  /// test: a JPEG, a PNG and a Windows bitmap under each name are all turned away.
   /// </remarks>
-  static string[] IImageFormatMetadata<HpglFile>.FileExtensions => [".hpgl", ".hgl", ".hpg", ".prn", ".prt"];
+  static string[] IImageFormatMetadata<HpglFile>.FileExtensions => [".hpgl", ".hgl", ".hpg", ".prn", ".prt", ".spl"];
   static HpglFile IImageFormatReader<HpglFile>.FromSpan(ReadOnlySpan<byte> data) => HpglReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<HpglFile>.VideoModes => [
     new("Plot", [(IntegerRange.Any, IntegerRange.Any)], [16777216])

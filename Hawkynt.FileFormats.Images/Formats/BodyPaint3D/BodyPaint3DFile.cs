@@ -81,7 +81,14 @@ public readonly record struct BodyPaint3DFile
   public const int MaxDimension = 1 << 16;
 
   static string IImageFormatMetadata<BodyPaint3DFile>.PrimaryExtension => ".b3d";
-  static string[] IImageFormatMetadata<BodyPaint3DFile>.FileExtensions => [".b3d"];
+  /// <summary>Also .b2d, which XnView reads with the same loader under a different name.</summary>
+  /// <remarks>
+  /// Its catalogue calls the row "TopDesign Thumbnail" and gives it both extensions, which suggested
+  /// a second format rather than a second name. It is a second name: a texture written here and
+  /// renamed <c>.b2d</c> comes back from the converter at the same size and the same pixels as the
+  /// same file under <c>.b3d</c>. The <c>AC4DBody</c> signature is what identifies it either way.
+  /// </remarks>
+  static string[] IImageFormatMetadata<BodyPaint3DFile>.FileExtensions => [".b3d", ".b2d"];
   static BodyPaint3DFile IImageFormatReader<BodyPaint3DFile>.FromSpan(ReadOnlySpan<byte> data) => BodyPaint3DReader.FromSpan(data);
   static byte[] IImageFormatWriter<BodyPaint3DFile>.ToBytes(BodyPaint3DFile file) => BodyPaint3DWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<BodyPaint3DFile>.VideoModes => [

@@ -13,10 +13,10 @@ are claimed by more than one of its names, so the rows below add up to more than
 to 184 rows as names the first pass had missed came to light, which is why the running counts below
 are against a denominator that moved.
 
-**Recomputed rather than carried forward: of the catalogue's 491 format names, 18 still have an
-extension nothing here claims.** Eleven of those are unread altogether, five are read under one name
-and not under another of theirs, and two never had an extension to claim. That is the current state,
-and it is measured — `Decode --extensions` against `Formats.txt` — not counted up from this file.
+**Recomputed rather than carried forward: of the catalogue's 491 format names, 14 still have an
+extension nothing here claims.** Eleven of those are unread altogether, one is read under four of
+its six names, and two never had an extension to claim. That is the current state, and it is
+measured — `Decode --extensions` against `Formats.txt` — not counted up from this file.
 
 What follows is how it got there, newest first,
 because the route mattered more than once: three separate times a ceiling was declared here and
@@ -53,11 +53,12 @@ and `pax` is Blowfish under a password the file does not carry. What would move 
 specification or a working decoder, not more searching — the per-name detail is in "Nothing credible
 describes these" and the table below.
 
-Beside those eleven sit a few rows where one extension of several is unclaimed rather than the whole
-name: `bias` wants `.flt` as well as `.msk`, `pegs` wants `.pxs` beside `.pxa`, `ti` wants `.73i` and
-`.92i` beside the four already read, `d3d` wants `.b2d` beside `.b3d`, and `hpgl` wants `.spl`. Two
-more are not extensions at all and never were — Amica Paint's is the literal `[b]` and ColoRIX's the
-wildcard `sc?` — which is recorded under "The two rows whose extension was not an extension".
+Beside those eleven, one row is read under some of its names and not all: `ti` wants `.92i` as well
+as the five now read, and the TI-92 really is a different container with its picture data compressed,
+so that half stays open on its merits. Two more are not extensions at all and never were — Amica
+Paint's is the literal `[b]` and ColoRIX's the wildcard `sc?` — which is recorded under "The two rows
+whose extension was not an extension". See "The half-closed rows" below for the four that were in
+this position until they were measured.
 
 ### Names that belonged to a format already here
 
@@ -1525,3 +1526,32 @@ resource names on its own reader and nothing here claims any of them. And the ca
 platform has no `hpgl` row at all — `prn` there belongs to PostScript; HP-GL is a Windows-only
 third-party plugin, and `.prn` and `.prt` come from the plugin's line in `Formats.txt`, which is
 where the gap list was generated from.
+
+### The half-closed rows
+
+Counting the gap by name hid a fifth kind of hole. XnView's catalogue gives a row several extensions,
+and a row counted as closed the moment one of them was claimed — so four rows stood as closed while
+half of what they name was still unopenable here. Recomputing extension by extension rather than row
+by row is what found them.
+
+None turned out to be a format. Each is one loader under a second name, and the converter proves it
+the same way each time: build the file under the name already read, rename it, hand both over, and
+compare. All four come back at the same size and the same pixels under either name.
+
+  - `.flt` shares the "BIAS FringeProcessor" row with `.msk`. The title suggests interferometry; the
+    file is a Windows bitmap, read by the same loader as the twelve other names on the DIB reader.
+  - `.pxs` shares the "Pegs" row with `.pxa`. A Pixia picture renamed `.pxs` reads identically.
+  - `.b2d` shares the "TopDesign Thumbnail" row with `.b3d`. A BodyPaint texture renamed `.b2d`
+    reads identically, signature and all.
+  - `.spl` shares the HP-GL row with `.prn` and `.prt`. This is the one that could not be checked
+    against the converter — HP-GL is a Windows-only third-party plugin and the Linux build refuses a
+    plot under every one of those names — so it rests on the refusal test alone: a JPEG, a PNG and a
+    Windows bitmap under `.spl` are all turned away, as they are under the two names beside it.
+
+`.73i` is the fifth and is not quite the same case, because it needed a line of reader rather than a
+line of metadata. The TI-73 is the TI-82's container, the TI-82's entry type and the TI-82's
+ninety-six by sixty-three screen; only the signature differs. It had been left out for want of a
+sample, and a test here actually asserted that `**TI73**` was refused. Building one picture under
+both signatures and handing the pair to the converter settled it: they are read identically, and this
+reader now agrees with it on both at zero difference. The TI-92, which that test should have named,
+really is a different container with compressed picture data and stays refused.
