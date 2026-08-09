@@ -11,6 +11,12 @@ namespace FileFormat.UyvyRaw.Tests;
 /// The byte order and the colour conversion here were both taken from files another tool wrote and
 /// checked against its own decode of them, rather than from a description — a 4:2:2 stream has four
 /// plausible orderings and two plausible ranges, and nothing in the file says which.
+/// <para/>
+/// The numbers below are the ones XnView's converter writes for those colours in a 720 by 576 frame:
+/// 91, 82, 240 for red and 240, 41, 110 for blue, which is studio-swing BT.601 exactly. A frame two
+/// pixels wide gives different numbers, because the chroma filter runs off both ends of so short a
+/// row and pulls the difference towards neutral — which is why the constants here were taken from a
+/// full frame rather than from the smallest one that would fit in a test.
 /// </remarks>
 [TestFixture]
 public sealed class UyvyRawTests {
@@ -19,14 +25,41 @@ public sealed class UyvyRawTests {
   [Category("Unit")]
   public void Decoded_ReadsTheOrderTheNameSpellsOut() {
     // U, then the first luma, then V, then the second: red, twice.
-    var data = new byte[] { 84, 76, 255, 76 };
+    var data = new byte[] { 91, 82, 240, 81 };
     var file = new UyvyRawFile { Width = 2, Height = 1, PixelData = data };
     var image = UyvyRawFile.ToRawImage(file);
 
     Assert.Multiple(() => {
-      Assert.That(image.PixelData[0], Is.EqualTo(255).Within(2), "red");
-      Assert.That(image.PixelData[1], Is.EqualTo(0).Within(2));
-      Assert.That(image.PixelData[2], Is.EqualTo(0).Within(2));
+      Assert.That(image.PixelData[0], Is.EqualTo(255).Within(3), "red");
+      Assert.That(image.PixelData[1], Is.EqualTo(0).Within(3));
+      Assert.That(image.PixelData[2], Is.EqualTo(0).Within(3));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void Decoded_ReadsTheStudioSwingTheStandardStatesRatherThanTheWholeByte() {
+    // Blue, as XnView's converter writes it. Read as though the samples filled the byte this
+    // comes back around 240 rather than 255, and every colour with it is wrong by as much.
+    var file = new UyvyRawFile { Width = 2, Height = 1, PixelData = [240, 41, 110, 41] };
+    var image = UyvyRawFile.ToRawImage(file);
+
+    Assert.Multiple(() => {
+      Assert.That(image.PixelData[0], Is.EqualTo(0).Within(3));
+      Assert.That(image.PixelData[1], Is.EqualTo(0).Within(3));
+      Assert.That(image.PixelData[2], Is.EqualTo(255).Within(3), "blue");
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void Decoded_PutsBlackAtSixteenAndWhiteAtTwoHundredAndThirtyFive() {
+    var black = UyvyRawFile.ToRawImage(new() { Width = 2, Height = 1, PixelData = [128, 16, 128, 16] });
+    var white = UyvyRawFile.ToRawImage(new() { Width = 2, Height = 1, PixelData = [128, 235, 128, 235] });
+
+    Assert.Multiple(() => {
+      Assert.That(black.PixelData[0], Is.EqualTo(0));
+      Assert.That(white.PixelData[0], Is.EqualTo(255));
     });
   }
 
@@ -38,9 +71,22 @@ public sealed class UyvyRawTests {
     var file = UyvyRawFile.FromRawImage(image);
 
     Assert.Multiple(() => {
-      Assert.That(file.PixelData[0], Is.EqualTo(84).Within(1), "the blue difference");
-      Assert.That(file.PixelData[1], Is.EqualTo(76).Within(1), "luma");
-      Assert.That(file.PixelData[2], Is.EqualTo(255).Within(1), "the red difference");
+      Assert.That(file.PixelData[0], Is.EqualTo(90).Within(1), "the blue difference");
+      Assert.That(file.PixelData[1], Is.EqualTo(81).Within(1), "luma");
+      Assert.That(file.PixelData[2], Is.EqualTo(240).Within(1), "the red difference");
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void Read_TakesTheFrameSizeXnViewTakesWhereTwoOfThemAreTheSameLength() {
+    // 720 by 512 and 640 by 576 are both 737280 bytes. XnView's own table reaches the first of
+    // them first, so a stream of that length is that one.
+    var file = UyvyRawReader.FromBytes(new byte[720 * 512 * 2]);
+
+    Assert.Multiple(() => {
+      Assert.That(file.Width, Is.EqualTo(720));
+      Assert.That(file.Height, Is.EqualTo(512));
     });
   }
 

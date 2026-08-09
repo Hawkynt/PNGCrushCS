@@ -14,6 +14,21 @@ namespace FileFormat.UyvyRaw;
 /// Not the same thing as the planar 4:2:0 stream this project already reads: that one keeps its
 /// three components in three blocks and halves the chroma vertically as well. Neither can be read
 /// as the other.
+/// <para/>
+/// The samples are studio swing — luma 16 to 235, chroma 16 to 240 — which is what the standard this
+/// stream comes off the wire under says and what XnView's own converter writes. Reading them as
+/// though they filled the whole byte, which is what this did, returns pure red as 237, 15, 14 and is
+/// wrong by 15 of 255 on average over a chart of saturated colours; read as studio swing the same
+/// chart comes back within 0.26 of 255 on average and 3 at worst, which is the resampling the
+/// halved chroma costs and nothing else.
+/// <para/>
+/// XnView has two names for this one stream and the difference between them is not in the pixels.
+/// Its "YUV 16Bits Interleaved" is what is read here — the rows in order. Its "YUV 16Bits" stores
+/// the even rows of a frame first and the odd rows after them, and nothing in a headerless stream
+/// says which of the two it is; a file of one read as the other comes back correct at the first row
+/// and the last and shows the top field's colours through the middle, wrong by 61 of 255 on average.
+/// Both names claim this extension, so the progressive reading is the one taken, that being what the
+/// four letters mean everywhere they name a capture buffer.
 /// </remarks>
 public readonly record struct UyvyRawFile
   : IImageFormatReader<UyvyRawFile>, IImageToRawImage<UyvyRawFile>,
@@ -34,22 +49,47 @@ public readonly record struct UyvyRawFile
   /// The sizes a headerless stream is guessed to be, largest first where two share a length.
   /// </summary>
   /// <remarks>
-  /// Nothing in the file states its size, so the length is the only evidence there is. These are
-  /// the frame sizes capture hardware produces; a stream of any other length cannot be placed and
-  /// is refused rather than shown at a shape picked out of the air.
+  /// Nothing in the file states its size, so the length is the only evidence there is. The first
+  /// twenty-five entries are not a list assembled here: they are the one XnView's own reader carries
+  /// for this format, in its order, which matters because two of them are the same number of bytes —
+  /// 720 by 512 and 640 by 576 both come to 737280, and taking them in this order is what makes this
+  /// reader place such a stream where that one places it.
+  /// <para/>
+  /// The five after them are sizes this reader already accepted and that list does not name. They are
+  /// kept because dropping them would refuse files that were being read, and they are kept last so
+  /// that they can only ever settle a length XnView refuses outright. A stream matching none of the
+  /// thirty is refused rather than shown at a shape picked out of the air.
   /// </remarks>
   internal static readonly (int Width, int Height)[] KnownResolutions = [
-    (720, 576),
-    (720, 486),
-    (720, 480),
-    (704, 576),
+    (360, 240),
+    (360, 288),
+    (352, 480),
+    (360, 480),
+    (480, 480),
+    (528, 480),
+    (544, 480),
     (640, 480),
+    (704, 480),
+    (720, 480),
+    (720, 486),
+    (720, 512),
+    (352, 576),
+    (360, 576),
+    (480, 576),
+    (528, 576),
+    (544, 576),
+    (640, 576),
+    (704, 576),
+    (720, 576),
+    (720, 608),
+    (1280, 720),
+    (1280, 1080),
+    (1440, 1080),
+    (1920, 1080),
     (352, 288),
     (352, 240),
     (320, 240),
     (176, 144),
-    (1920, 1080),
-    (1280, 720),
     (64, 64),
   ];
 
@@ -94,11 +134,16 @@ public readonly record struct UyvyRawFile
     return new() { Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = rgb };
   }
 
-  /// <summary>Full-range BT.601, which is what the hardware and every reader of these assume.</summary>
+  /// <summary>Studio-swing BT.601: luma spans 16 to 235 and the chroma differences 16 to 240.</summary>
+  /// <remarks>
+  /// The constants are the usual ones over sixteen bits: 255/219 for the luma, and the three
+  /// difference terms each already carrying the 255/224 the chroma range needs.
+  /// </remarks>
   private static void _Write(byte[] rgb, int at, int luma, int u, int v) {
-    rgb[at] = _Clamp(luma + ((91881 * v) >> 16));
-    rgb[at + 1] = _Clamp(luma - ((22554 * u + 46802 * v) >> 16));
-    rgb[at + 2] = _Clamp(luma + ((116130 * u) >> 16));
+    var y = 76309 * (luma - 16);
+    rgb[at] = _Clamp((y + 104597 * v + 32768) >> 16);
+    rgb[at + 1] = _Clamp((y - 25675 * u - 53279 * v + 32768) >> 16);
+    rgb[at + 2] = _Clamp((y + 132201 * u + 32768) >> 16);
   }
 
   private static byte _Clamp(int value) => (byte)(value < 0 ? 0 : value > 255 ? 255 : value);
@@ -131,8 +176,9 @@ public readonly record struct UyvyRawFile
     return new() { Width = width, Height = height, PixelData = data };
   }
 
+  /// <summary>Studio-swing BT.601 the other way round, so that what is written is read back.</summary>
   private static byte _Luma(byte[] rgb, int at)
-    => _Clamp((19595 * rgb[at] + 38470 * rgb[at + 1] + 7471 * rgb[at + 2]) >> 16);
+    => _Clamp(((16829 * rgb[at] + 33039 * rgb[at + 1] + 6416 * rgb[at + 2] + 32768) >> 16) + 16);
 
   private static byte _Chroma(byte[] rgb, int first, int second, bool blue) {
     var a = _Component(rgb, first, blue);
@@ -141,6 +187,6 @@ public readonly record struct UyvyRawFile
   }
 
   private static int _Component(byte[] rgb, int at, bool blue) => blue
-    ? (-11056 * rgb[at] - 21712 * rgb[at + 1] + 32768 * rgb[at + 2]) >> 16
-    : (32768 * rgb[at] - 27440 * rgb[at + 1] - 5328 * rgb[at + 2]) >> 16;
+    ? (-9714 * rgb[at] - 19071 * rgb[at + 1] + 28785 * rgb[at + 2] + 32768) >> 16
+    : (28785 * rgb[at] - 24103 * rgb[at + 1] - 4682 * rgb[at + 2] + 32768) >> 16;
 }

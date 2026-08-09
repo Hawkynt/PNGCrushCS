@@ -32,9 +32,14 @@ public readonly record struct BmpFile :
   /// which libembroidery registers as stitch-only and refuses to read for want of any description of
   /// it. Neither of those is a picture, and neither of them opens with <c>BM</c>, so neither is drawn
   /// here — which is the point of claiming the name on the signature rather than on the name.
+  /// <para/>
+  /// <c>.stm</c> and <c>.upi</c> joined them on the same test. XnView lists them as PhotoStudio Stamp
+  /// and Ulead PhotoImpact, and the reader it uses for both is the one it uses for <c>.bmp</c>: a
+  /// Windows bitmap renamed to either is reported as a Windows Bitmap of the right size, and a JPEG
+  /// under either name is refused by it.
   /// </remarks>
   static string[] IImageFormatMetadata<BmpFile>.FileExtensions =>
-    [".bmp", ".dib", ".bga", ".rl4", ".rl8", ".vga", ".sys", ".bum", ".thb", ".2d", ".bmc"];
+    [".bmp", ".dib", ".bga", ".rl4", ".rl8", ".vga", ".sys", ".bum", ".thb", ".2d", ".bmc", ".stm", ".upi"];
   static BmpFile IImageFormatReader<BmpFile>.FromSpan(ReadOnlySpan<byte> data) => BmpReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<BmpFile>.Capabilities => FormatCapability.HasDedicatedOptimizer;
   static VideoMode[] IImageFormatMetadata<BmpFile>.VideoModes => [

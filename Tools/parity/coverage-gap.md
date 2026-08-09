@@ -11,7 +11,9 @@ something up and are correct as they stand.
 **197 distinct extensions across 176 of its format names** when this was written. A few extensions
 are claimed by more than one of its names, so the rows below add up to more than that.
 
-**A hundred and one are closed now and 77 remain.** Eight of the fifteen turned out to be one thing — a
+**A hundred and twelve are closed now and 66 remain.** Eleven of those went in one pass, off a source
+that had been sitting in this tree unread — see "Reading the reader" below. Eight of the fifteen
+before them turned out to be one thing — a
 Windows DIB preview dropped inside a drawing or project file — and are read by a single reader
 rather than eight. IBM KIPS, the X11 puzzle, Synu and the Zoner brush were four more. The last three
 are wrappers around a picture format already here: ECC carries a PNG, LView Pro and IPSM each carry
@@ -620,12 +622,19 @@ open because the wildcard was counted as a name; there is nothing to do for it.
 Four of them are not picture formats and cannot be made into ones by a reader:
 
   - `wrl` is VRML 2, a language for describing a three-dimensional scene. Rendering one is a scene
-    graph, a camera and a lighting model, which is a different job from reading a raster.
+    graph, a camera and a lighting model, which is a different job from reading a raster. XnView
+    agrees outright: its catalogue entry for the name carries a writer and a null where the reader
+    would be, so it emits VRML and has no reading of it either.
   - `pps` and `ppt` are PowerPoint. XnView's own catalogue writes them as `PowerPoint (images)`:
     what it takes out is the pictures a presentation carries, which live in an OLE compound
     document's picture stream. There is no PowerPoint picture format.
   - `tsk` is a Pocket PC theme, which is a Microsoft cabinet archive — it opens `MSCF` — holding
-    the bitmaps a theme is made of.
+    the bitmaps a theme is made of. XnView's reader for it requires those four letters and then does
+    nothing but scan the whole file for `GIF8`, a PNG signature or a JFIF marker and hand the *n*th
+    hit to the matching decoder. It never unpacks the cabinet, so it finds only what a theme happens
+    to store uncompressed. Reading the format properly means a cabinet reader, which is a different
+    job; reading it XnView's way means a signature scan, which is the thing this file has twice
+    refused to call a format.
   - `pzp` is an MGI PhotoSuite project, also an OLE compound document; its own stream is called
     `Catalog`.
 
@@ -649,18 +658,22 @@ Three have a shape worth writing down for whoever comes back to them:
     an IOCA image. Both references are published, and there is an IOCA reader here already, though
     the note above about how little that reader validates applies.
   - `xp0` is the SecretPhotos puzzle, and it carries a JPEG. It is the `ecc`/`lvp`/`pan` shape — a
-    wrapper round a picture format already here — but the only evidence of where the JPEG begins is
-    one signature scan's worth, and this file has twice been rewritten to say that a fixed offset
-    taken from one sample is not a format.
+    wrapper round a picture format already here — and where the JPEG begins was for a long time only
+    one signature scan's worth of evidence, which this file has twice been rewritten to say is not a
+    format. That is settled now, from two sources that have never seen each other; the row below says
+    how, and it is read.
 
 The rest are a name and a vendor and nothing else. Searched by extension and by full name across the
 Just Solve The File Format Problem wiki, TrID's definition set, Deark's and dexvert's format lists,
 PRONOM, the Encyclopedia of Graphics File Formats, and general web search: `ncr` is NCR Image,
 `ncy` a FlashCam frame, `pbt` Micro Dynamics MARS — a Macintosh archival system that stored scanned
 documents on optical disk — `pig` a Ricoh IS30 scanner, `pixi` Pixibox, `pixp` Pixel Power Collage,
-`pp4` Micrografx Picture Publisher 4, `prisms` Prisms, `skn` Skantek, `smp` Xionics SMP, `ssi`
-SriSun, `stm` an ArcSoft PhotoStudio stamp, `tdim` Digital F/X, `tnl` a thumbnail, `upi` Ulead
-PhotoImpact and `xim` Ximage. `pd` is the odd one: XnView calls it `Male MRI` and gives it `.pd`,
+`pp4` Micrografx Picture Publisher 4 and `prisms` Prisms. That search was repeated for `skn`, `smp`,
+`ssi`, `stm`, `tdim`, `tnl`, `upi` and `xim` and returned nothing for seven of the eight either — but
+those eight are answered now, and not by searching. Their layouts came out of XnView's own reader,
+which is in this tree and had never been read; see "Reading the reader" below. The eighth, `xim`, does
+have a published description after all, and finding it was worth doing because it agrees with the
+binary field for field. `pd` is the odd one: XnView calls it `Male MRI` and gives it `.pd`,
 `.t1` and `.t2`, which are the names of the pulse sequences a scan is taken with rather than of a
 format, so it belongs with the raw formats above — slices with nothing to say how big they are.
 
@@ -803,47 +816,47 @@ Windows only, so nothing here has ever been able to compare against them either.
 | pzl | .pzl |  |
 | pzp | .pzp | an MGI PhotoSuite project: an OLE compound document |
 | qcad | .cad |  |
-| raw | .grey .gry | raw greyscale; nothing states the size, and XnView asks the operator for it |
-| rfax | .001 |  |
+| raw | .grey .gry | raw greyscale; XnView asks the operator for the size and its own reader requires it |
+| rfax | .001 | Ricoh Fax; signature and header recovered, the page coding not |
 | rix | .sc? | read by the ColoRIX reader; sc? is a wildcard it already covers |
 | sct | .ch | read by the Scitex CT reader |
 | sdg | .sdg |  |
-| sfax | .001 |  |
+| sfax | .001 | SmartFax; signature and header recovered, the page coding not |
 | sid | .sid | Windows only |
 | skf | .skf |  |
-| skn | .skn | Skantek; nothing beyond the name describes it |
-| smp | .smp | Xionics SMP; nothing beyond the name describes it |
-| ssi | .ssi | SriSun; nothing beyond the name describes it |
+| skn | .skn | Skantek; the 740-byte header recovered, the CCITT coding not |
+| smp | .smp | Xionics SMP; signature recovered, the tagged header not mapped |
+| ssi | .ssi | read; SriSun, recovered from XnView's own reader and checked against it |
 | ssp | .ssp | every embedded picture read, not the first |
-| stm | .stm | an ArcSoft PhotoStudio stamp; nothing beyond the name describes it |
+| stm | .stm | read by the Windows bitmap reader, which is what XnView reads it with |
 | stw | .stw |  |
 | svg | .svg | read |
 | synu | .syn .synu |  |
 | taac | .suniff .taac .vff | read, and checked against the sample |
 | tdi | .tdi | read by the Maya IFF reader, which had to be corrected first |
-| tdim | .tdim | Digital F/X; nothing beyond the name describes it |
+| tdim | .tdim | read; Digital F/X, recovered from XnView's own reader and checked against it |
 | ti | .73i .82i .83i .85i .86i .92i |  |
 | tile | .tile |  |
 | tjp | .tjp | read, from tilepic(5); the bottom layer rather than the first tile |
-| tnl | .tnl | Thumbnail; nothing beyond the name describes it |
-| tsk | .tsk | a Pocket PC theme: a Microsoft cabinet holding bitmaps |
+| tnl | .tnl | read; DISPTNL, a grey or a JPEG at 168 |
+| tsk | .tsk | a Microsoft cabinet; XnView scavenges it for embedded GIF, PNG and JPEG |
 | ttf | .ttf | drawn as a sheet of its glyphs |
 | tub | .psptube .tub |  |
 | upe4 | .pe4 |  |
-| upi | .upi | Ulead PhotoImpact; nothing beyond the name describes it |
+| upi | .upi | read by the Windows bitmap reader, which is what XnView reads it with |
 | upst | .pst |  |
 | uyvy | .qtl | raw YUV; nothing states the size, and five names share this extension |
 | uyvyi | .qtl | raw YUV; nothing states the size, and five names share this extension |
 | vit | .vit |  |
 | vob | .vob |  |
 | wic | .wic | the J Wavelet Image Codec; its coding was never published; Windows only |
-| wrl | .wrl | VRML 2, a language for a three-dimensional scene rather than a raster |
+| wrl | .wrl | VRML 2; XnView writes it and has no reader for it at all |
 | wzl | .wzl |  |
 | x3f | .x3f |  |
 | xar | .xar | preview at the stated tag |
-| xif | .xif | a TIFF; the sample's private compression 34673 is not decoded |
-| xim | .xim | Ximage; nothing beyond the name describes it |
-| xp0 | .xp0 | the SecretPhotos puzzle, which carries a JPEG at no stated offset |
+| xif | .xif | read by the TIFF reader, which is what XnView reads it with |
+| xim | .xim | read; Thompson's Xim, eight-bit planes; netpbm's header and XnView's reader agree |
+| xp0 | .xp0 | read; 00 00 00 01 and a JPEG at 1779, which two sources agree on |
 | ypc | .ypc | Windows only |
 | yuv411 | .qtl | raw YUV; nothing states the size, and five names share this extension |
 | yuv422 | .qtl | raw YUV; nothing states the size, and five names share this extension |
@@ -851,26 +864,139 @@ Windows only, so nothing here has ever been able to compare against them either.
 | zbr | .zbr |  |
 | zmf | .zmf |  |
 
-### The .qtl family, and a fault it exposed
+### Reading the reader
+
+`nconvert` does not only write six of these formats and read a file built to a guessed layout. It
+*contains* a reader for nearly every name in this list, and that reader is a description of the
+format — the only one that exists for most of them. Its catalogue is an array in the binary of
+eighty-byte entries: the short name, the description, the list of extensions, and at offset 0x20 the
+address of the function that reads it. Five hundred and sixty of them.
+
+Two things fall out of that before a single byte is decoded. The entry for `wrl` has a null there,
+which settles VRML outright: XnView writes it and cannot read it, so there is nothing to match. And
+several names share one function, which settles three more the way `2d` and `bmc` were settled.
+`stm` and `upi` — PhotoStudio Stamp and Ulead PhotoImpact — point at the same function as `bmp`,
+`dib` and `2bp`, and `xif` points at the same one as `tiff`, `adt` and fifteen other fax names. Each
+was confirmed the way the earlier three were, by renaming a file of the underlying format to it and
+watching XnView report the right size, and by renaming a foreign one and watching it refuse: a JPEG
+under `.stm`, `.upi` or `.xif` is refused, and so is a Windows bitmap under `.xif`.
+
+`xif` is worth a sentence more, because its row said the sample's compression 34673 "is not
+decoded" and left open whether that was documented anywhere. It is. Xerox's own XIFF 3.0
+specification survives, and it names the private compressions outright: 34667 token-based, 34668
+wavelet, 34672 lossy dither, and 34673 the same coding as 34667 without loss. So it is describable,
+and it is a whole coding rather than a variant — which is why the name is claimed for the TIFF reader
+and files using Xerox's own compressions are still refused rather than shown as a blank page.
+(Two neighbouring tag numbers had been suspected of being Xerox's as well; they are not. 34675 is
+the ICC profile tag, and Xerox's private *tags* are 34730 and 34732.)
+
+For the rest, the function says what the header is. Four helpers do all the reading in it and each is
+four instructions long, so which of them a field goes through says its width and its byte order
+outright. That is a specification, and it was checked the same way a specification would be: a file
+was built to it, handed to `nconvert -info`, and then converted to a PNM and compared to what was
+encoded. Every layout below is one XnView reads at the size and depth it was built with, with the
+pixels it hands back equal to the ones written.
+
+  - `ssi` is SriSun: `srisunim`, a byte that has to be zero for the picture to be readable at all,
+    the depth, a byte that has to be 2, then the width and the height as big-endian words, all inside
+    a 256-byte header with the rows after it uncompressed. One, four, eight, sixteen and twenty-four
+    bits. There is no colour table anywhere in the file and the reader never looks for one, so the
+    shallow depths are greys — a set bit is white — and sixteen is five bits a channel in a
+    little-endian word, widened by the exact fraction rather than by repeating the high bits, which
+    is what made 0x2011 come back as 65, 0, 139 rather than 66, 0, 140.
+  - `xim` is Ximage, and it is the one name where a published description turned up to check the
+    binary against. It is Philip Thompson's Xim, out of the X11R4 contributions, and netpbm still
+    carries its header file: eleven decimal numbers in fixed-width ASCII fields, four free-text
+    fields, and a 256-entry colour table, coming to the 1024 bytes the second field states. Every
+    offset recovered from XnView's reader is the offset netpbm's `xim.h` gives, which is two
+    independent readings of the same document agreeing. The planes are whole — all the rows of the
+    first, then all the rows of the second — and each row is either flat or coded as a count one less
+    than the run and the byte to repeat. Only the eight-bit planes are read: the header can also say
+    one bit, and where it says the picture has an alpha channel XnView takes a different path through
+    the body that nothing here has seen a file for. Both are refused rather than read as though the
+    field said something else.
+  - `tdim` is Digital F/X: `00 02 00 20`, four bytes nothing reads, the height and the width as
+    big-endian words in that order, and a big-endian long saying where the picture begins. Four bytes
+    a pixel, run-length coded, and the first of the four is not drawn — which was settled by giving
+    all four channels different values and reading back which three came out.
+  - `tnl` is Thumbnail: `DISPTNL` and then one byte that decides which of two files it is. `5` means
+    an ordinary JPEG at 168; anything else means the file states its own size as two little-endian
+    longs at 16 and 20 and the picture is one byte a pixel from 168.
+  - `xp0` is the SecretPhotos puzzle, and this is the row that says why reading the reader is worth
+    more than reading a sample. This file has twice been rewritten to say that the JPEG's offset was
+    one signature scan's worth of evidence and so could not be claimed. XnView's reader requires four
+    bytes reading `00 00 00 01` and then seeks to 1779 — a constant in the code, not an accident of a
+    sample. TrID's definition, built from seven files nobody here has, records `JFIF` at 1785, and a
+    JFIF's `JFIF` stands six bytes past the start of the picture. Two sources that have never seen
+    each other put the picture in the same place. It is claimed, with the requirement that a JPEG
+    actually opens there.
+
+### The .qtl family, and the fault it exposed, which is now run down
 
 Five of the remaining names — `uyvy`, `uyvyi`, `yuv411`, `yuv422`, `yuv444` — all sit on `.qtl`, and
-`raw` sits on `.grey`/`.gry` the same way. None of these states its size. XnView's own converter
-writes one and then refuses to read it back, with or without the size on its command line, so there
-is no reading of it to match.
+`raw` sits on `.grey`/`.gry` the same way. None of these states its size, five mutually incompatible
+layouts share the one extension, and `.qtl` is separately registered as QuickTime Media Link, which
+is an XML playlist. Those rows stay open and the reason has not changed.
 
-There are readers here for two of those layouts already, under `.uyvy` and `.yuv`, and they settle
-the size by requiring the file's length to be exactly one of the frame sizes the layout is made in —
-refusing anything else, which is the same rule used everywhere else here. Claiming `.qtl` for them
-looked like a free close.
+What has changed is that the readers behind them can now be read. All five require the size from the
+operator before they do anything, which is why the converter that wrote the file refuses to read it
+back on this platform however the size is given. Two facts came out of them that are worth keeping.
 
-It is not, and trying it is what showed why. A frame written by that converter and read by our UYVY
-reader comes back with pure red as 198, 31, 31: the file is in studio swing, where luma runs 16 to
-235 and chroma 16 to 240, and the reader treats it as full range. The mean error over a gradient is
-47 of 255.
+The first is that `uyvyi` carries a table of twenty-five frame sizes and places a headerless stream by
+matching its length against them — exactly the rule the reader here uses, against a list that had
+been guessed. That list is now XnView's, in XnView's order, which matters: 720 by 512 and 640 by 576
+are the same number of bytes, and taking them in that order is what makes this reader place such a
+stream where that one places it. Five sizes this reader already accepted and that list does not name
+are kept after them, so they can only ever settle a length XnView refuses outright.
 
-Correcting the range to studio swing on both sides brings that to 42 and no further, and what is left
-is not a range fault: a vertical red-to-blue gradient comes back correct at the top row and the
-bottom row and shows red in the middle. Both ends right and the middle wrong is a structure fault,
-not a coefficient one, and it was not run down — the correction is reverted rather than half-shipped.
-So the name stays open and the fault is recorded — it is in a reader we already ship
-under a name we already claim, which is the more useful half of the finding.
+The second is the fault recorded here last time, which was two faults.
+
+One is the range. A frame written by that converter and read as though the samples filled the whole
+byte returns pure red as 237, 15, 14; the stream is studio swing, luma 16 to 235 and chroma 16 to
+240. Read as studio swing the same frame returns 253, 0, 0, and over a chart of saturated colour bars
+the mean error falls from 15.2 of 255 to 0.26, worst 3.1 — which is what the halved chroma costs at a
+bar edge and nothing else. That correction is in.
+
+The other is why correcting the range appeared not to help. XnView has two names for this one stream
+and the difference is not in the pixels: its `uyvyi`, "YUV 16Bits Interleaved", stores the rows in
+order, and its `uyvy`, "YUV 16Bits", stores the even rows of a frame and then the odd rows. Read one
+as the other and the picture comes back correct at the first row and the last with the top field's
+colours through the middle — the "red in the middle" recorded before — wrong by 61 of 255 on average.
+Nothing in a headerless stream says which it is, and both names claim `.uyvy`, so the progressive
+reading is the one taken, that being what the four letters mean everywhere they name a capture buffer.
+
+There was a third thing, and it is worth recording because it nearly went in as a finding. Fitting
+the colour matrix over 256 random colours said the converter's chroma was exactly three quarters of
+the standard's. It is not. The test picture was two pixels wide, and the chroma filter that halves
+the horizontal resolution runs off both ends of so short a row and pulls the difference towards
+neutral. At 720 pixels the same colours come out at exactly the standard's numbers — red as 91, 82,
+240 — and the three quarters was a measurement of the test rather than of the format.
+
+`raw`, on `.grey` and `.gry`, is the same shape and stays open for the same reason: `-size` is where
+its size comes from. The reader here under `.raw` guesses one from a table, which is the same fault
+under a name we already own; it is left alone rather than quietly widened.
+
+### The four whose headers are now known and whose pixels are not
+
+Reading the reader gave these four a signature and a header and stopped there, because what follows
+the header is a coded bitstream that would have to be implemented rather than described. They are
+recorded so the next attempt starts here rather than at the name.
+
+  - `skn` is Skantek. Four big-endian longs — `FFFF0001`, `FFFFFFFE`, `FFFD0000`, `00000000` — then
+    286 bytes skipped, the six characters `920101` at 302, 424 more bytes skipped, and the height and
+    the width as big-endian longs at 732 and 736. The header is exactly 740 bytes. What follows is
+    one bit a pixel through XnView's CCITT decoder; there is a CCITT decoder here already, so the
+    remaining work is which of its codings the format uses.
+  - `smp` is Xionics SMP: a zero word, `Xionics `, then `F`, `1B`, `7F`, `00`. After that the header
+    is a run of tagged fields with fixed constants between them — `1B`, `19`, `02`, `1A`, `02` in
+    that order — which were not mapped to their meanings.
+  - `rfax` is Ricoh Fax: two bytes, then the fourteen characters `FAXNET / RICOH`. The pages begin
+    at 256 and there can be up to 4300 of them, each a fixed-size record fed to a strip decoder.
+  - `sfax` is SmartFax: the five characters `FAX1D`, a word, two bytes, then a byte that is only ever
+    tested for zero — it selects 100 or 200 dots to the inch — and five more bytes.
+
+This also settles something about two readers already here. `RicohFaxFile` requires `RICF` and
+`SmartFaxFile` requires `SMFX`, each in front of a header of its own invention. Neither signature
+appears in the format XnView reads under that name. They are readers that agree with nothing but
+themselves — the twelfth and thirteenth found here — and they are left standing only because
+replacing them means implementing the real coding, which is the work above.

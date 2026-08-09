@@ -6,19 +6,24 @@ namespace FileFormat.Tiff;
 
 /// <summary>In-memory representation of a TIFF image.</summary>
 /// <remarks>
-/// A note on <c>.xif</c>, which is not claimed here. Xerox's eXtended Image File is a TIFF: the
-/// standard eight-byte header, and then, at offset eight, ten bytes reading <c>XEROX DIFF</c> or
+/// A note on <c>.xif</c>, which is claimed. Xerox's eXtended Image File is a TIFF: the standard
+/// eight-byte header, and then, at offset eight, ten bytes reading <c>XEROX DIFF</c> or
 /// <c>eXtended</c> that no tag in the file points at, so a plain TIFF reader walks straight past
 /// them into the ordinary directory chain. The sample to hand does exactly that and its pages come
 /// out with the right dimensions.
 /// <para/>
-/// What it does not come out with is any pixels. Its tiles are written with compression 34673, one
-/// of Xerox's private mixed-raster schemes, which LibTiff does not decode and neither does
-/// ImageMagick — it reports "compression not supported" and stops. Ours does not stop; it hands
-/// back a page of white. Claiming the extension would therefore put a blank sheet into the corpus
-/// under the name of a document, which is worse for a reader of these notes than the name being
-/// absent. A file written with a compression the format does define would decode here perfectly
-/// well, and if one turns up the extension can be added then.
+/// What that sample does not come out with is any pixels. Its tiles are written with compression
+/// 34673, and Xerox's own XIFF 3.0 specification says what that is: the same token-based coding as
+/// 34667, applied without loss. It is a whole coding rather than a variant of one, and neither
+/// LibTiff nor ImageMagick decodes it. Nor does this — but it is refused now rather than handed back
+/// as a page of white, which is what the name being claimed rests on: a file using a compression the
+/// format does define decodes here as any other TIFF does, and one using Xerox's own is turned down
+/// instead of drawn blank.
+/// <para/>
+/// XnView reads the name with its own TIFF reader — the catalogue points <c>xif</c> at the same
+/// function as <c>tiff</c> — and an ordinary TIFF renamed <c>.xif</c> comes back from it as a TIFF of
+/// the right size while a JPEG or a Windows bitmap under that name is refused. That is the same test
+/// <c>.fx3</c> below was claimed on.
 /// <para/>
 /// <c>.fx3</c> is claimed. It is Fugawi's packaged raster chart, from Northport Systems' moving-map
 /// software, and Blue Marble's Global Mapper developer says of one that it "is a TIFF image" whose
@@ -33,7 +38,7 @@ public sealed class TiffFile :
   IMultiImageFileFormat<TiffFile>, IFormatChunkLayout<TiffFile> {
 
   static string IImageFormatMetadata<TiffFile>.PrimaryExtension => ".tiff";
-  static string[] IImageFormatMetadata<TiffFile>.FileExtensions => [".tif", ".tiff", ".ftf", ".stw", ".fx3"];
+  static string[] IImageFormatMetadata<TiffFile>.FileExtensions => [".tif", ".tiff", ".ftf", ".stw", ".fx3", ".xif"];
   static TiffFile IImageFormatReader<TiffFile>.FromSpan(ReadOnlySpan<byte> data) => TiffReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<TiffFile>.Capabilities => FormatCapability.HasDedicatedOptimizer | FormatCapability.MultiImage;
 
