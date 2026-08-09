@@ -11,7 +11,11 @@ something up and are correct as they stand.
 **197 distinct extensions across 176 of its format names** when this was written. A few extensions
 are claimed by more than one of its names, so the rows below add up to more than that.
 
-**A hundred and forty-nine are closed now and 32 remain.** Eleven of those went in one pass, off a source
+**A hundred and fifty-five are closed now and 26 remain.** The last six went together and none of them
+needed a corpus: `pps`, `ppt` and `tsk` were read out of the converter's own code and checked by
+building files for it, and `ami`, `rix` and `wrl` were three rows the catalogue had never really
+opened — two whose extension was a bracket or a wildcard rather than a name, and one whose reader
+does not exist. Eleven before them went in one pass, off a source
 that had been sitting in this tree unread — see "Reading the reader" below. Eight of the fifteen
 before them turned out to be one thing — a
 **A hundred and nine are closed now and 69 remain.** Eight of the fifteen turned out to be one thing — a
@@ -57,12 +61,13 @@ that name. Seven were claimed on that test and three were declined on it.
   - `sct` wants `.ch`, `pspf` wants `.pfr`, `pmsk` wants `.msk` and `pspt` wants `.tex`. All four
     are claimed: Scitex CT is identified by two characters at offset 80 and Paint Shop Pro by the
     eight-byte string it opens with, so a font resource or a game texture under one of those names
-    is refused rather than drawn.
+    is refused rather than drawn. `.msk` was claimed for the wrong reader and is corrected below.
   - `avs` wants `.mbfavs` and `.mbfs`. Claimed: an AVS raster has no signature at all, but its two
     lengths have to account for the file to the byte, which a foreign file does not do.
   - `hpgl` wants `.prn` and `.prt`, the names a driver gives a job printed to a file. Claimed
     because the parse decides, not the name: it requires an instruction that moves the pen and says
-    where to, and all five PostScript samples here are refused by it.
+    where to, and all five PostScript samples here are refused by it. That test was not enough and
+    the audit below says what replaced it.
   - `cloe` wants `.cloe`, which is the long name of the format read here as `.clo`. Claimed, after
     taking out of the reader the part that invented 320 by 200 whenever the header stated no size —
     which meant any file long enough was drawn as a picture of a size it never claimed.
@@ -615,9 +620,17 @@ Amiga IFF bitmap or a JPEG under either name is refused.
 ### `rix`, which was already read
 
 `rix` wants `rix sci scx sc?`, and `sc?` is a wildcard for the screen mode the file was saved in
-rather than an extension. The ColoRIX reader here already claims `.rix`, `.scx`, `.sci` and `.sc0`
-through `.sc9`, which is the whole of it, and it requires the file to open with `RIX3`. The row was
-open because the wildcard was counted as a name; there is nothing to do for it.
+rather than an extension. The reader here requires the file to open with `RIX3` and the row was open
+because the wildcard was counted as a name.
+
+That was left at "`.sc0` through `.sc9`, which is the whole of it", and it is not the whole of it:
+`sc?` is `sc` and any one character, so the letters are in it too. All thirty-six are claimed now.
+Claiming that many names costs nothing, and the reason is worth stating because it decides this row
+and several like it — the extension is not what identifies a file to XnView. Its converter reads a
+ColoRIX picture named `.foo`, and named `.ppt`, as a ColoRIX picture; the wildcard is what its file
+chooser offers, not what its reader tests. Half the set is spoken for here by something else, and
+that does not matter either: `.scr` is claimed by four formats already and a file under it still has
+to open with `RIX3` before this reader takes it.
 
 ### What the rest turned out to be
 
@@ -776,11 +789,8 @@ than the vendor's name:
   - `pp4`, Micrografx Picture Publisher 4: `II`, then a thirty-two-bit offset at 0x2A, and the
     loader copies what it finds there into a temporary file and hands it to another reader. What
     that reader is was not chased down.
-  - `pps` and `ppt` share one loader, and it is the same shape as the one that closed `pzp`: the
-    compound-document signature, a skip to 512, then a walk of the file counting pictures. It is a
-    walk of length-prefixed records rather than a signature search, and it was not finished. The
-    entry above still calls PowerPoint "not a picture format", which is true of the container and no
-    longer the whole story — the row is closable the way `pzp` was closed.
+  - `pps` and `ppt` share one loader and are read now; the walk is described under "Two containers
+    XnView reads without opening" below.
   - `prc`, Picture Gear Pocket: the Palm resource database named above, now measured. `iINF` is
     eighteen bytes — width, height, a zero, the depth, a zero, a stride in pixels, `00 FF`, the
     record id — `iPLT` is a count and four bytes an entry, `iFRI` names the tile records, and each
@@ -799,7 +809,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | abs | .abs | read; Optocat's 16-bit header, and the extension settles it against TIFF as XnView's does |
 | afx | .afx |  |
 | aim | .ima | declined again; the size comes from a `.hd` beside the file, which bytes alone cannot reach |
-| ami | .[b] | `[b]` is a filename prefix, not an extension; the files are `.ami`, read and agreeing once XnView's doubling is undone |
+| ami | .[b] | `[b]` is a filename prefix, not an extension — one of two bracket-or-wildcard tokens in a catalogue of 554; the files are `.ami`, read and agreeing once XnView's doubling is undone |
 | anv | .anv | read; a 256-colour DIB with AN for BM, at fixed offsets |
 | aphp | .php | every photograph read, not the theme artwork |
 | apx | .apx | read; MXPaint's two signatures, a layer table, and ABGR rows from the bottom up |
@@ -911,11 +921,11 @@ Windows only, so nothing here has ever been able to compare against them either.
 | pixi | .pxb | read; twelve fixed bytes, the size at 14, and a run-length picture at 1024 from the bottom up |
 | pixp | .i17 .i18 .ib7 .if9 | Pixel Power Collage: the first 32 bytes have to equal the file's own name, which a reader of bytes cannot check |
 | pmp | .pmp | read; the JPEG at 124, and the size the header states is not the picture's |
-| pmsk | .msk | read by the Paint Shop Pro reader |
+| pmsk | .msk | read by the Windows bitmap reader, which is what XnView reads it with — the Paint Shop Pro reader that used to hold this name alone could not have read one |
 | pp4 | .pp4 | Micrografx Picture Publisher 4: II, an offset at 0x2A, and XnView hands what is there to another reader |
 | pp5 | .pp5 |  |
-| pps | .pps | PowerPoint: a compound document holding pictures, not a picture format |
-| ppt | .ppt | PowerPoint: a compound document holding pictures, not a picture format |
+| pps | .pps | read; one reader with `ppt`, walking the OfficeArt records from offset 512 for the first JPEG or PNG BLIP |
+| ppt | .ppt | read; one reader with `pps` |
 | prc | .prc | Picture Gear Pocket, measured but not built: the converter cannot read one, and the one it writes is wrong |
 | prf | .prf |  |
 | prisms | .pri | Prisms: EB E8 00 00 and R8G8B8A8 at 0x86; the run-length coding was not finished |
@@ -931,7 +941,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | qcad | .cad |  |
 | raw | .grey .gry | raw greyscale; XnView asks the operator for the size and its own reader requires it |
 | rfax | .001 | Ricoh Fax; signature and header recovered, the page coding not |
-| rix | .sc? | read by the ColoRIX reader; sc? is a wildcard it already covers |
+| rix | .sc? | `sc?` is a wildcard, not an extension; it stands for `sc` and any one character and the ColoRIX reader claims all thirty-six now |
 | sct | .ch | read by the Scitex CT reader |
 | sdg | .sdg |  |
 | sfax | .001 | SmartFax; signature and header recovered, the page coding not |
@@ -952,7 +962,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | tile | .tile |  |
 | tjp | .tjp | read, from tilepic(5); the bottom layer rather than the first tile |
 | tnl | .tnl | read; DISPTNL, a grey or a JPEG at 168 |
-| tsk | .tsk | a Microsoft cabinet; XnView scavenges it for embedded GIF, PNG and JPEG |
+| tsk | .tsk | read; a Microsoft cabinet scavenged for a GIF, PNG or JFIF stored in it whole, which is all XnView does with one |
 | ttf | .ttf | drawn as a sheet of its glyphs |
 | tub | .psptube .tub |  |
 | upe4 | .pe4 |  |
@@ -963,7 +973,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | vit | .vit |  |
 | vob | .vob |  |
 | wic | .wic | the J Wavelet Image Codec; its coding was never published; Windows only |
-| wrl | .wrl | VRML 2; XnView writes it and has no reader for it at all |
+| wrl | .wrl | VRML 2; the catalogue row has a null where the reader's address goes, and the converter refuses the `.wrl` it has just written |
 | wzl | .wzl |  |
 | x3f | .x3f |  |
 | xar | .xar | preview at the stated tag |
@@ -1258,3 +1268,89 @@ refused — a picture named `.qtl` that is really a PNG is turned away by name.
 Worth recording that the converter will not read that frame back at all on this platform. It takes
 the size from its command line and refuses a file carrying only pixels, so these five are closed by
 reading what its catalogue lists and the tool itself declines to.
+
+### Two containers XnView reads without opening
+
+`pps`, `ppt` and `tsk` are three rows and two readers, and neither reader unpacks the container it
+is given. Both were read out of the converter's own code and then checked by building files and
+asking it what they are.
+
+A presentation is a Microsoft compound document. XnView's reader for it never opens the directory
+and never looks for the Pictures stream by name: it checks the signature, steps to offset 512, and
+walks eight-byte OfficeArt record headers, stepping over every record by the length it states. Two
+record types stop the walk — `0xF01D` at instance `0x46A`, a JPEG stored in RGB, and `0xF01E` at
+instance `0x6E0`, a PNG — and the picture begins seventeen bytes into the record's data, behind one
+checksum and a tag byte.
+
+The instance is part of the test and not decoration, which is the kind of thing only the code says.
+Ten fixtures were built and put to the converter: it read the PNG BLIP, the JPEG BLIP, and a file
+with a filler record in front of the picture; it refused the same PNG at instance `0x6E1`, the same
+JPEG at instance `0x6E2`, a bare PNG standing at offset 512 with no record around it, and a BLIP
+inside an `0xF001` container. The reader here agrees with all ten, and the pixels it returns are
+byte-identical to what the converter writes out for the five it reads.
+
+That last refusal is what separates this from `pzp`. A PhotoSuite project is closed by searching for
+a signature; a presentation is not, because the walk steps over containers whole and never sees what
+is inside one.
+
+A Pocket PC theme is a Microsoft cabinet, and the reader for it does not unpack that either. It
+checks `MSCF` and scans the remaining bytes for `GIF8`, PNG's `89 P N G`, or a JFIF's `FF D8 FF E0`,
+decoding from the first hit — which finds only what the cabinet happened to store uncompressed. The
+JPEG test is on four bytes and not three: a file whose JPEG opens `FF D8 FF E1` is refused under this
+name by the converter, which then falls through to its own general JPEG scan and reports it as
+something else. Seven fixtures, seven agreements, and the pixels match on all four it reads.
+
+So `tsk` is at parity rather than complete, and the distinction is worth keeping: a theme whose
+pictures are all MSZIP or LZX packed is invisible to XnView and is invisible here.
+
+### The two rows whose extension was not an extension
+
+`ami` and `rix` are the only two entries in a catalogue of 554 whose extension list carries a bracket
+or a wildcard. `[b]` is the prefix a Commodore file carries in front of its name, and `sc?` is `sc`
+and any one character. The list these rows came from read both as names to claim, which is why they
+were open at all. ColoRIX is dealt with above.
+
+Amica Paint is `.ami` and is read, and the doubling recorded against it was measured again rather
+than inherited: a screen written here is reported by the converter as 320 by 200 where this reads it
+as 160 by 200, and all 32,000 pixels agree once each of ours is matched against the pair XnView makes
+of it.
+
+`wrl` is the third of that kind and settles by construction. Its row in the converter's format table
+has a null where the address of the reader goes — one of six such rows, and the other five are
+`bmp565`, `guetzli`, `jpegli`, `pcl` and `csv`, every one of them something XnView writes and does
+not read. The converter writes a `.wrl` happily, as a VRML2 `PixelTexture` node, and then refuses to
+read the file it has just written. Nothing here claims the name either. The row is a disposition, not
+a gap: the catalogue lists a format its own reader does not have.
+
+### The refusal audit, and the two things it found
+
+Eighteen extensions were closed this week by claiming them for a reader already here, on the test
+that the reader would refuse a foreign file arriving under the name. That test had been run with
+noise and a PostScript program. Running it again with the three things such a file is most likely to
+really be — a JPEG, a PNG and a Windows bitmap, each renamed to the claimed extension, fifty-four
+files in all — found two defects.
+
+`.prn` and `.prt` are HP-GL's, and the reader drew a PNG under them as a picture three pixels square.
+The cause is that the parse read the whole file as text and asked only for one instruction that moves
+the pen and states where to; eight kilobytes of compressed bytes carry that by accident sooner or
+later. HP-GL is printable ASCII and nothing else between its instructions — the bytes outside that
+set which a plot may legitimately carry all sit inside a label, a comment, or the Polyline Encoded
+alphabet, and each of those is consumed whole by the parse. Requiring it refuses all three, and the
+PostScript samples are still refused for the reason they were before.
+
+`.msk` was claimed for the Paint Shop Pro reader because XnView titles the entry PaintShopPro Mask.
+The title is not the reader: that entry runs the same code as `.bmp`, one reader shared by twelve
+names, and Paint Shop Pro's own mask has a separate entry of its own under `.pspmask`. So the reader
+that held the name would have refused every file the name was claimed for — a row closed on paper
+and open in fact. The Windows bitmap reader holds it now as well, and a real `.msk` is read.
+
+Nothing else in the fifty-four was drawn by anything it should not have been. The three acceptances
+that remain are the ones that ought to be there: a Windows bitmap under `.msk`, `.stm` and `.upi`,
+and a JPEG under `.ncy`, which are the formats those names are.
+
+Two further things fell out of reading the table rather than the names, and are recorded here rather
+than acted on. `.pspmask`, `.psptube`, `.pspbrush`, `.pspframe` and `.pat` are Paint Shop Pro's own
+resource names on its own reader and nothing here claims any of them. And the catalogue on this
+platform has no `hpgl` row at all — `prn` there belongs to PostScript; HP-GL is a Windows-only
+third-party plugin, and `.prn` and `.prt` come from the plugin's line in `Formats.txt`, which is
+where the gap list was generated from.
