@@ -37,9 +37,17 @@ public readonly record struct BmpFile :
   /// and Ulead PhotoImpact, and the reader it uses for both is the one it uses for <c>.bmp</c>: a
   /// Windows bitmap renamed to either is reported as a Windows Bitmap of the right size, and a JPEG
   /// under either name is refused by it.
+  /// <para/>
+  /// <c>.msk</c> is the same story and was got wrong once. XnView lists it as PaintShopPro Mask, and
+  /// the name was claimed here for the Paint Shop Pro reader on the strength of that title — but the
+  /// entry runs the same Windows bitmap reader as the twelve above it, and Paint Shop Pro's own mask
+  /// under XnView is <c>.pspmask</c>, a separate entry on its separate reader. So a <c>.msk</c> is a
+  /// DIB, and the claim that closed that row was against a reader that would refuse the file. Both
+  /// readers hold the name now: this one takes the DIB and the other one takes anything that really
+  /// does open with Paint Shop Pro's header.
   /// </remarks>
   static string[] IImageFormatMetadata<BmpFile>.FileExtensions =>
-    [".bmp", ".dib", ".bga", ".rl4", ".rl8", ".vga", ".sys", ".bum", ".thb", ".2d", ".bmc", ".stm", ".upi"];
+    [".bmp", ".dib", ".bga", ".rl4", ".rl8", ".vga", ".sys", ".bum", ".thb", ".2d", ".bmc", ".stm", ".upi", ".msk"];
   static BmpFile IImageFormatReader<BmpFile>.FromSpan(ReadOnlySpan<byte> data) => BmpReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<BmpFile>.Capabilities => FormatCapability.HasDedicatedOptimizer;
   static VideoMode[] IImageFormatMetadata<BmpFile>.VideoModes => [

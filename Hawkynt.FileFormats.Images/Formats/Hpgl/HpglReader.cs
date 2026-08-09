@@ -22,8 +22,18 @@ public static class HpglReader {
   /// <summary>How many instructions a plot may hold, which bounds what a wrong guess can cost.</summary>
   private const int _MaxInstructions = 1 << 22;
 
-  /// <summary>How much of the file is looked at before it is called something other than a plot.</summary>
-  private const int _SniffLength = 4096;
+  /// <summary>
+  /// Whether a byte can stand between instructions, where the language is printable ASCII and
+  /// nothing else.
+  /// </summary>
+  /// <remarks>
+  /// HP-GL is a text language. The bytes outside this set that a plot may legitimately carry all sit
+  /// inside something delimited — a label, a comment, or the printable-character alphabet of the
+  /// Polyline Encoded instruction — and each of those is consumed whole by the parse, so nothing
+  /// belonging to one reaches this test.
+  /// </remarks>
+  private static bool _IsPlotText(char c)
+    => c is >= ' ' and <= '~' || c is '\t' or '\n' or '\r' or '\f' or _Escape;
 
   public static HpglFile FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
@@ -86,6 +96,18 @@ public static class HpglReader {
         at = _SkipEscape(text, at);
         continue;
       }
+
+      // A byte that cannot stand in the language ends the plot. Without this the parse reads any
+      // file at all, and a run of compressed bytes long enough will sooner or later carry two
+      // letters and a pair of numbers — which is all the test in FromSpan asks for. A PNG under the
+      // name this format claims from a printer spool was drawn as a picture three pixels square.
+      //
+      // Stopping rather than refusing outright is what keeps a real plot readable: a spool padded
+      // out to a block boundary, or a job that switches to a raster language partway, still yields
+      // everything drawn up to that point. A file that was never a plot yields nothing to draw and
+      // is refused by the test that follows.
+      if (!_IsPlotText(c))
+        break;
 
       if (!char.IsAsciiLetter(c)) {
         ++at;
