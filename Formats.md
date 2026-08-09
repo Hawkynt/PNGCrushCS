@@ -598,7 +598,9 @@ build one from pixel data they didn't read, so the registry reports them as read
 | PNG                     | .png                                                 | Portable Network Graphics        | Y      | Y      | Y         | RW    | RW  | RW     | RW        |
 | PntrFalcon              | .pnf, .pfl                                           | Atari Falcon PntrFalcon          | Y      | Y      | —         | R     | —   | —      | —         |
 | Pocket PC 2BP           | .2bp                                                 | Pocket PC 2-bit bitmap           | Y      | Y      | —         | —     | —   | —      | —         |
+| Pocket PC Theme         | .tsk                                                 | Theme cabinet, picture stored whole | Y   | —      | —         | —     | —   | R      | —         |
 | Portfolio Graphics      | .pgf, .pgc                                           | Atari Portfolio graphics         | Y      | Y      | —         | R     | —   | —      | —         |
+| PowerPoint              | .ppt, .pps                                           | Presentation, picture in a BLIP  | Y      | —      | —         | —     | —   | R      | —         |
 | Print Shop              | .psa                                                 | Print Shop sign/graphic          | Y      | Y      | —         | —     | —   | —      | —         |
 | Printfox/Pagefox        | .bs, .pg                                             | C64 Printfox/Pagefox             | Y      | —      | —         | —     | —   | —      | —         |
 | PrintMaster             | .pm                                                  | PrintMaster clip art             | Y      | Y      | —         | —     | —   | —      | —         |
@@ -797,23 +799,19 @@ Formats we consciously chose not to implement, with reason codes:
 | MrSID             | .sid        | proprietary  | —     | —   | —      | R         |
 | PES (embroidery)  | .pes        | app-specific | R     | R   | —      | —         |
 | Picture Gear Pkt  | .prc        | proprietary  | —     | —   | R      | —         |
-| Pocket PC Theme   | .tsk        | embeds-images| —     | —   | R      | —         |
-| PowerPoint        | .ppt, .pps  | embeds-images| —     | —   | R      | —         |
 | Skantek           | .skn        | unidentified | —     | —   | R      | —         |
 | SVG               | .svg        | vector       | R     | RW  | R      | R         |
 | MPEG video        | .mpg, .mpeg | video        | R     | —   | —      | —         |
-| VRML              | .wrl        | 3d-model     | —     | —   | R      | —         |
+| VRML              | .wrl        | 3d-model     | —     | —   | W      | —         |
 
-Seven of those were looked at in detail, because a name a viewer opens is not the
+Four of those were looked at in detail, because a name a viewer opens is not the
 same thing as a picture format, and it is worth writing down which is which:
 
-- **.ppt, .pps, .tsk** are containers. A legacy PowerPoint file is an OLE compound
-  document whose pictures sit as BLIPs in a separate `Pictures` stream; a Pocket PC
-  theme is an archive of ordinary JPEGs, GIFs and BMPs. XnView labels both entries
-  "(images)" — it is unpacking them, not rendering them. Doing the same here would
-  be writing two archive readers, which is a different job.
 - **.wrl** is VRML: a text 3D scene description opening `#VRML V2.0 utf8`,
   standardised as ISO/IEC 14772-1. It references textures and holds no pixels.
+  XnView writes one and cannot read it — the row in its format table has a null
+  where the reader's address goes, and its converter refuses the file it has just
+  written — so the column above says W rather than R.
 - **.mdl** is the Half-Life model. Its skin textures are already read here, under
   `.mdltex`; the model itself is geometry and animation.
 - **.prc** is the awkward one. Most files with that name are Palm OS resource
