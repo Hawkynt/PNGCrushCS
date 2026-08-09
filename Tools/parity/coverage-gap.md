@@ -1339,6 +1339,15 @@ are both defensible. `.flp` is claimed on the corrected reader, which now requir
 the load address and the marker; `.fli` and `.afl` from the same catalogue row were left alone,
 because Autodesk FLIC and AFLI own them here.
 
+`pxa` is a third, and it came out of checking the half-closed rows rather than of looking for it.
+Against a real Pixia sample the converter reports 256 by 256 and this reader 95 by 95, which looks
+like a plain disagreement about size until the file is asked: its layer table states one layer of 95
+by 95, and the 256 by 256 is the JPEG the header keeps as a preview. So the converter is drawing the
+preview and this is drawing the painting. That is the same shape of thing as the JPEGs whose restart
+markers are missing — a tool taking the cheaper answer — and it is why our own written file measures
+thirteen per cent different when handed back to it: it renders the preview we embed, not the layers.
+The sample beside it, `tone25`, is version 1 with no preview at all, and both refuse it.
+
 ### `aim`, declined a third time, and a reader that had never read anything
 
 `aim` is the one name of the twenty-three left open, and the disassembly settles why rather than
