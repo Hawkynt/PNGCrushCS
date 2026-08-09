@@ -19,6 +19,13 @@ namespace FileFormat.Tiff;
 /// under the name of a document, which is worse for a reader of these notes than the name being
 /// absent. A file written with a compression the format does define would decode here perfectly
 /// well, and if one turns up the extension can be added then.
+/// <para/>
+/// <c>.fx3</c> is claimed. It is Fugawi's packaged raster chart, from Northport Systems' moving-map
+/// software, and Blue Marble's Global Mapper developer says of one that it "is a TIFF image" whose
+/// positioning is not stored the GeoTIFF way. XnView's Fugawi reader is a TIFF reader: handed an
+/// ordinary TIFF renamed <c>.fx3</c> and forced through it, XnView reports a TIFF of the right size,
+/// and a JPEG under the same name is refused. So the pixels are a TIFF's pixels; what is lost is the
+/// calibration, which lives in private tags nothing here reads and nothing published describes.
 /// </remarks>
 [FormatMimeType("image/tiff", "image/tif", "image/x-tiff")]
 public sealed class TiffFile :
@@ -26,7 +33,7 @@ public sealed class TiffFile :
   IMultiImageFileFormat<TiffFile>, IFormatChunkLayout<TiffFile> {
 
   static string IImageFormatMetadata<TiffFile>.PrimaryExtension => ".tiff";
-  static string[] IImageFormatMetadata<TiffFile>.FileExtensions => [".tif", ".tiff", ".ftf", ".stw"];
+  static string[] IImageFormatMetadata<TiffFile>.FileExtensions => [".tif", ".tiff", ".ftf", ".stw", ".fx3"];
   static TiffFile IImageFormatReader<TiffFile>.FromSpan(ReadOnlySpan<byte> data) => TiffReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<TiffFile>.Capabilities => FormatCapability.HasDedicatedOptimizer | FormatCapability.MultiImage;
 

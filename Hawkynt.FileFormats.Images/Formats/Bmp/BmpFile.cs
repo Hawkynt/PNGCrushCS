@@ -13,16 +13,28 @@ public readonly record struct BmpFile :
 
   static string IImageFormatMetadata<BmpFile>.PrimaryExtension => ".bmp";
 
-  /// <summary><c>.bum</c> is a Poser bump map, which is a Windows DIB and nothing else.</summary>
+  /// <summary><c>.bum</c> is a Poser bump map and <c>.thb</c> a KinuPix skin, which are Windows DIBs and nothing else.</summary>
   /// <remarks>
   /// All three Poser samples are ordinary uncompressed 32-bit DIBs whose stated file size is the
   /// file's own. The fourth byte of each pixel is padding rather than an alpha channel — the height
   /// is in the colour — but that is a matter of what the picture means, not of how it is stored, so
   /// the reader is this one and the name is claimed here. The signature still decides: anything
   /// under the name that does not open with a DIB header is refused.
+  /// <para/>
+  /// <c>.thb</c>, <c>.2d</c> and <c>.bmc</c> arrived the same way. XnView lists each of them under a
+  /// format of its own — KinuPix Skin, Amapi and Embroidery — and its reader for all three is the one
+  /// it uses for <c>.bmp</c>: a Windows bitmap renamed to any of them and forced through that reader
+  /// is reported as a Windows Bitmap of the right size, and a JPEG under the same name is refused by
+  /// it. So each is a DIB and the names are claimed on the same terms as the others.
+  /// <para/>
+  /// What those three names are elsewhere is not this. Amapi's own drawings are <c>.a3d</c> and are
+  /// three-dimensional geometry; <c>.bmc</c> in the embroidery world is a Bitmap Cache of stitches,
+  /// which libembroidery registers as stitch-only and refuses to read for want of any description of
+  /// it. Neither of those is a picture, and neither of them opens with <c>BM</c>, so neither is drawn
+  /// here — which is the point of claiming the name on the signature rather than on the name.
   /// </remarks>
   static string[] IImageFormatMetadata<BmpFile>.FileExtensions =>
-    [".bmp", ".dib", ".bga", ".rl4", ".rl8", ".vga", ".sys", ".bum"];
+    [".bmp", ".dib", ".bga", ".rl4", ".rl8", ".vga", ".sys", ".bum", ".thb", ".2d", ".bmc"];
   static BmpFile IImageFormatReader<BmpFile>.FromSpan(ReadOnlySpan<byte> data) => BmpReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<BmpFile>.Capabilities => FormatCapability.HasDedicatedOptimizer;
   static VideoMode[] IImageFormatMetadata<BmpFile>.VideoModes => [
