@@ -7,11 +7,24 @@ namespace FileFormat.Ccitt;
 internal static class CcittG3Encoder {
 
   /// <summary>Encodes 1bpp pixel data to Group 3 1D compressed bytes.</summary>
-  internal static byte[] Encode(byte[] pixelData, int width, int height) {
+  /// <param name="pixelData">Packed rows, a set bit being ink.</param>
+  /// <param name="width">Pixels across.</param>
+  /// <param name="height">Rows.</param>
+  /// <param name="leadingEndOfLine">
+  /// Whether to open the stream with an end-of-line word as well as closing every row with one.
+  /// T.4 puts one in front of the first row and decoders that hunt for it to find their bit
+  /// alignment — XnView's among them — read a stream without it as the wrong picture entirely, not
+  /// as a shifted one, because the first codeword lands mid-byte. Off by default so that the
+  /// streams this has always written are unchanged.
+  /// </param>
+  internal static byte[] Encode(byte[] pixelData, int width, int height, bool leadingEndOfLine = false) {
     var bytesPerRow = (width + 7) / 8;
     using var ms = new MemoryStream();
     var bitPos = 0;
     var currentByte = 0;
+
+    if (leadingEndOfLine)
+      _WriteBits(ref currentByte, ref bitPos, ms, CcittHuffmanTable.EolCode, CcittHuffmanTable.EolBitLength);
 
     for (var row = 0; row < height; ++row) {
       var rowOffset = row * bytesPerRow;
