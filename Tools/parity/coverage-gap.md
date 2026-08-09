@@ -11,8 +11,7 @@ something up and are correct as they stand.
 **197 distinct extensions across 176 of its format names** when this was written. A few extensions
 are claimed by more than one of its names, so the rows below add up to more than that.
 
-**Ninety-six are closed now and 77 remain.** Eight of the fifteen turned out to be one thing — a
-**Eighty-six are closed now and 87 remain.** Eight of the fifteen turned out to be one thing — a
+**A hundred and one are closed now and 77 remain.** Eight of the fifteen turned out to be one thing — a
 Windows DIB preview dropped inside a drawing or project file — and are read by a single reader
 rather than eight. IBM KIPS, the X11 puzzle, Synu and the Zoner brush were four more. The last three
 are wrappers around a picture format already here: ECC carries a PNG, LView Pro and IPSM each carry

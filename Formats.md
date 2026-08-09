@@ -18,7 +18,7 @@ Cross-reference of implemented formats against four major image processing tools
 > The Writer column below is maintained by hand and drifts behind the code — a format gaining a
 > writer does not update this table. For what is true right now, ask the registry:
 > `dotnet run --project Tools/parity/Decode -- --readonly`, which lists every format that reads and
-> does not write, and counts them. At the time of writing that is 52 of 810.
+> does not write, and counts them. At the time of writing that is 38 of 822.
 
 ---
 
