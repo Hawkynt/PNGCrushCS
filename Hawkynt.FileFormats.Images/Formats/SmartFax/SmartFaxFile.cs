@@ -3,74 +3,97 @@ using FileFormat.Core;
 
 namespace FileFormat.SmartFax;
 
-/// <summary>In-memory representation of a SmartFax SMF image.</summary>
-public readonly record struct SmartFaxFile : IImageFormatReader<SmartFaxFile>, IImageToRawImage<SmartFaxFile>, IImageFromRawImage<SmartFaxFile>, IImageFormatWriter<SmartFaxFile> {
+/// <summary>In-memory representation of a SmartFax page (.001, .smf).</summary>
+/// <remarks>
+/// The reader that stood here required four bytes of <c>SMFX</c> and read uncompressed rows behind a
+/// ten-byte header. Those four bytes appear in no file and in no other reader; they were invented, and
+/// the format they described agreed with nothing but itself. What XnView reads under this name is a
+/// different file, and this is now that file.
+/// <para/>
+/// Five characters of <c>FAX1D</c>, which name the coding as much as the format. A little-endian word at
+/// 5 gives the row length in bytes and the width is that times eight — the format has no way of stating
+/// a width that is not a whole number of bytes. Two bytes are skipped; the byte at 9 chooses the vertical
+/// resolution, zero meaning 100 dots an inch and anything else 200. Six more bytes are skipped and the
+/// coding begins at 16. It is Group 3 one-dimensional with the bits running from the bottom of each byte
+/// upwards. Nothing states a height: it is however many rows the coding holds.
+/// <para/>
+/// A page that ends with the coding's end-of-line word is read here as the rows it carries; the converter
+/// counts that last separator as one further, blank row. Nothing this writes ends with a bare separator
+/// that is not a row, so the two agree on everything written here.
+/// </remarks>
+public readonly record struct SmartFaxFile
+  : IImageFormatReader<SmartFaxFile>, IImageToRawImage<SmartFaxFile>,
+    IImageFromRawImage<SmartFaxFile>, IImageFormatWriter<SmartFaxFile> {
+
+  /// <summary>The five characters a page opens with.</summary>
+  public static ReadOnlySpan<byte> Signature => "FAX1D"u8;
+
+  /// <summary>Where the row length in bytes stands, as a little-endian word.</summary>
+  public const int BytesPerRowOffset = 5;
+
+  /// <summary>Where the byte choosing the vertical resolution stands.</summary>
+  public const int ResolutionOffset = 9;
+
+  /// <summary>The two resolutions that byte chooses between.</summary>
+  public const int CoarseResolution = 100, FineResolution = 200;
+
+  /// <summary>How long the header is, which is where the coding begins.</summary>
+  public const int HeaderSize = 16;
+
+  /// <summary>The most rows this will decode.</summary>
+  public const int MaxRows = 4300;
+
+  /// <summary>The smallest file that can carry a header and something behind it.</summary>
+  public const int MinFileSize = HeaderSize + 1;
 
   static string IImageFormatMetadata<SmartFaxFile>.PrimaryExtension => ".smf";
-  static string[] IImageFormatMetadata<SmartFaxFile>.FileExtensions => [".smf"];
+  static string[] IImageFormatMetadata<SmartFaxFile>.FileExtensions => [".smf", ".001"];
   static SmartFaxFile IImageFormatReader<SmartFaxFile>.FromSpan(ReadOnlySpan<byte> data) => SmartFaxReader.FromSpan(data);
   static byte[] IImageFormatWriter<SmartFaxFile>.ToBytes(SmartFaxFile file) => SmartFaxWriter.ToBytes(file);
 
-  /// <summary>Magic bytes: "SMFX" (0x53 0x4D 0x46 0x58).</summary>
-  internal static readonly byte[] Magic = [0x53, 0x4D, 0x46, 0x58];
+  static VideoMode[] IImageFormatMetadata<SmartFaxFile>.VideoModes => [
+    new("Default", [(new IntegerRange(8, 65528, step: 8), IntegerRange.Any)], [2])
+  ];
 
-  /// <summary>Header size: magic(4) + width(2) + height(2) + flags(2) = 10 bytes.</summary>
-  internal const int HeaderSize = 10;
+  static bool? IImageFormatMetadata<SmartFaxFile>.MatchesSignature(ReadOnlySpan<byte> header)
+    => header.Length < Signature.Length ? null : header[..Signature.Length].SequenceEqual(Signature);
 
-  /// <summary>Minimum valid file size.</summary>
-  public const int MinFileSize = HeaderSize;
-
-  /// <summary>Image width in pixels.</summary>
+  /// <summary>Pixels across, which is the stated row length times eight.</summary>
   public int Width { get; init; }
 
-  /// <summary>Image height in pixels.</summary>
+  /// <summary>Rows, which is however many the coding held.</summary>
   public int Height { get; init; }
 
-  /// <summary>Flags field.</summary>
-  public ushort Flags { get; init; }
+  /// <summary>Dots an inch down: 100 or 200.</summary>
+  public int VerticalResolution { get; init; }
 
-  /// <summary>1bpp pixel data, MSB first, rows padded to byte boundary.</summary>
+  /// <summary>Packed rows, a set bit being ink.</summary>
   public byte[] PixelData { get; init; }
 
-  /// <summary>Converts this SMF image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
-  public static RawImage ToRawImage(SmartFaxFile file) {
+  private static readonly byte[] _BlackWhitePalette = [255, 255, 255, 0, 0, 0];
 
-    var bytesPerRow = (file.Width + 7) / 8;
-    var rgb = new byte[file.Width * file.Height * 3];
+  public static RawImage ToRawImage(SmartFaxFile file) => new() {
+    Width = file.Width,
+    Height = file.Height,
+    Format = PixelFormat.Indexed8,
+    PixelData = BilevelRows.Unpack(file.PixelData ?? [], file.Width, file.Height),
+    Palette = _BlackWhitePalette[..],
+    PaletteCount = 2,
+  };
 
-    for (var y = 0; y < file.Height; ++y)
-      for (var x = 0; x < file.Width; ++x) {
-        var byteIndex = y * bytesPerRow + x / 8;
-        var bitIndex = 7 - (x % 8);
-        var bit = (file.PixelData[byteIndex] >> bitIndex) & 1;
-        var offset = (y * file.Width + x) * 3;
-        var color = bit == 1 ? (byte)0 : (byte)255;
-        rgb[offset] = color;
-        rgb[offset + 1] = color;
-        rgb[offset + 2] = color;
-      }
-
-    return new() {
-      Width = file.Width,
-      Height = file.Height,
-      Format = PixelFormat.Rgb24,
-      PixelData = rgb,
-    };
-  }
-
-  /// <summary>Thresholds any <see cref="RawImage"/> down to the two tones this format holds.
-  /// Every size fits, because the header states its own.</summary>
+  /// <summary>Reduces a picture to the two tones a fax page holds, rounded out to a whole number of bytes.</summary>
   public static SmartFaxFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
 
-    // A set bit is ink on white paper, the way round ToRawImage reads it back again. The
-    // opposite polarity is just as common among scanner formats and would hand back every
-    // picture as its own negative.
+    // The format can only state a width in whole bytes, so a picture that is not a multiple of eight
+    // across is laid on paper that is.
+    var width = (image.Width + 7) & ~7;
+
     return new() {
-      Width = image.Width,
+      Width = width,
       Height = image.Height,
-      PixelData = MonochromePage.Encode(image, image.Width, image.Height, inkIsWhite: false),
+      VerticalResolution = FineResolution,
+      PixelData = MonochromePage.Encode(image, width, image.Height, inkIsWhite: false),
     };
   }
-
 }

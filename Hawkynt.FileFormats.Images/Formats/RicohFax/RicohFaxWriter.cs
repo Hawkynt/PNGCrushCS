@@ -1,26 +1,21 @@
-﻿using System;
+using System;
+using FileFormat.Ccitt;
 
 namespace FileFormat.RicohFax;
 
-/// <summary>Assembles RicohFax RIC file bytes from a RicohFaxFile.</summary>
+/// <summary>Assembles Ricoh Fax page bytes from a <see cref="RicohFaxFile"/>.</summary>
 public static class RicohFaxWriter {
 
   public static byte[] ToBytes(RicohFaxFile file) {
-    ArgumentNullException.ThrowIfNull(file);
+    var pixelData = file.PixelData ?? [];
+    var coded = CcittG3Encoder.Encode(pixelData, RicohFaxFile.PageWidth, file.Height, leadingEndOfLine: true);
 
-    var pixelDataSize = file.PixelData.Length;
-    var result = new byte[RicohFaxFile.HeaderSize + pixelDataSize];
+    // The coding goes down with its bits the other way up, which is how the format holds it.
+    var reversed = CcittFillOrder.Reverse(coded);
 
-    result[0] = RicohFaxFile.Magic[0];
-    result[1] = RicohFaxFile.Magic[1];
-    result[2] = RicohFaxFile.Magic[2];
-    result[3] = RicohFaxFile.Magic[3];
-    BitConverter.TryWriteBytes(new Span<byte>(result, 4, 2), (ushort)file.Width);
-    BitConverter.TryWriteBytes(new Span<byte>(result, 6, 2), (ushort)file.Height);
-    BitConverter.TryWriteBytes(new Span<byte>(result, 8, 2), file.Resolution);
-    BitConverter.TryWriteBytes(new Span<byte>(result, 10, 2), file.Compression);
-
-    file.PixelData.AsSpan(0, pixelDataSize).CopyTo(result.AsSpan(RicohFaxFile.HeaderSize));
+    var result = new byte[RicohFaxFile.HeaderSize + reversed.Length];
+    RicohFaxFile.Signature.CopyTo(result.AsSpan(RicohFaxFile.SignatureOffset));
+    reversed.CopyTo(result.AsSpan(RicohFaxFile.HeaderSize));
 
     return result;
   }

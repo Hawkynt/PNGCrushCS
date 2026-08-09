@@ -1,15 +1,17 @@
-﻿using System;
+using System;
 using System.IO;
+using FileFormat.Ccitt;
+using FileFormat.Core;
 
 namespace FileFormat.RicohFax;
 
-/// <summary>Reads RicohFax RIC files from bytes, streams, or file paths.</summary>
+/// <summary>Reads Ricoh Fax pages from bytes, streams, or file paths.</summary>
 public static class RicohFaxReader {
 
   public static RicohFaxFile FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
-      throw new FileNotFoundException("RIC file not found.", file.FullName);
+      throw new FileNotFoundException("Ricoh Fax file not found.", file.FullName);
 
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
@@ -21,47 +23,37 @@ public static class RicohFaxReader {
       stream.ReadExactly(data);
       return FromBytes(data);
     }
+
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
     return FromBytes(ms.ToArray());
   }
 
-  public static RicohFaxFile FromSpan(ReadOnlySpan<byte> data) {
-
-    if (data.Length < RicohFaxFile.MinFileSize)
-      throw new InvalidDataException($"Data too small for a valid RIC file (need at least {RicohFaxFile.MinFileSize} bytes, got {data.Length}).");
-
-    if (data[0] != RicohFaxFile.Magic[0] || data[1] != RicohFaxFile.Magic[1] || data[2] != RicohFaxFile.Magic[2] || data[3] != RicohFaxFile.Magic[3])
-      throw new InvalidDataException("Invalid RIC magic bytes.");
-
-    var header = RicohFaxHeader.ReadFrom(data);
-    var width = header.Width;
-    var height = header.Height;
-    var resolution = header.Resolution;
-    var compression = header.Compression;
-
-    if (width == 0 || height == 0)
-      throw new InvalidDataException($"Invalid RIC dimensions: {width}x{height}.");
-
-    var bytesPerRow = (width + 7) / 8;
-    var pixelDataSize = bytesPerRow * height;
-    if (data.Length < RicohFaxFile.HeaderSize + pixelDataSize)
-      throw new InvalidDataException("RIC file truncated: not enough pixel data.");
-
-    var pixelData = new byte[pixelDataSize];
-    data.Slice(RicohFaxFile.HeaderSize, pixelDataSize).CopyTo(pixelData.AsSpan(0));
-
-    return new() {
-      Width = width,
-      Height = height,
-      Resolution = resolution,
-      Compression = compression,
-      PixelData = pixelData,
-    };
-  }
-
   public static RicohFaxFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     return FromSpan(data);
+  }
+
+  public static RicohFaxFile FromSpan(ReadOnlySpan<byte> data) {
+    if (data.Length < RicohFaxFile.MinFileSize)
+      throw new InvalidDataException(
+        $"Data too small for a Ricoh Fax page (at least {RicohFaxFile.MinFileSize} bytes are needed, got {data.Length}).");
+
+    if (!data.Slice(RicohFaxFile.SignatureOffset, RicohFaxFile.Signature.Length).SequenceEqual(RicohFaxFile.Signature))
+      throw new InvalidDataException("Not a Ricoh Fax page: the fourteen characters at offset 2 do not name it.");
+
+    // The bits run from the bottom of each byte upwards, so every byte is turned over first.
+    var coded = CcittFillOrder.Reverse(data[RicohFaxFile.HeaderSize..]);
+
+    // The page states no height, so the decoder is given a ceiling and asked how far it got. The
+    // ceiling is bounded by the coding's own length as well as by the converter's limit, since a row
+    // costs at least the twelve bits of its separator.
+    var ceiling = Math.Min(RicohFaxFile.MaxRows, coded.Length + 1);
+    var page = CcittG3Decoder.Decode(coded, RicohFaxFile.PageWidth, ceiling, out var rows);
+    if (rows < 1)
+      throw new InvalidDataException("A Ricoh Fax page carries no row this can decode.");
+
+    var stride = BilevelRows.Stride(RicohFaxFile.PageWidth);
+    return new() { Height = rows, PixelData = page.AsSpan(0, stride * rows).ToArray() };
   }
 }

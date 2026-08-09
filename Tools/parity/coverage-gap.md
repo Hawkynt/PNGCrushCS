@@ -17,6 +17,12 @@ building files for it, and `ami`, `rix` and `wrl` were three rows the catalogue 
 opened — two whose extension was a bracket or a wildcard rather than a name, and one whose reader
 does not exist. Eleven before them went in one pass, off a source
 that had been sitting in this tree unread — see "Reading the reader" below. Eight of the fifteen
+**A hundred and fifty-nine are closed now and 22 remain.** Ten of those went in one pass over the
+scanner, fax and wrapper names — Micro Dynamics MARS, Skantek, Xionics SMP, Ricoh IS30, Ricoh Fax,
+SmartFax, Prisms, the Half-Life model, Picture Publisher 4 and Cartes Michelin — and two readers that
+agreed with nothing but themselves were replaced by the files they claim to read rather than added
+beside. Eleven before them went the same way, off a source that had been sitting in this tree
+unread — see "Reading the reader" below. Eight of the fifteen
 before them turned out to be one thing — a
 **A hundred and nine are closed now and 69 remain.** Eight of the fifteen turned out to be one thing — a
 **A hundred and twenty-three are closed now and 55 remain.** Eight of the fifteen turned out to be one thing — a
@@ -400,10 +406,12 @@ reader for that name to take a JPEG, which every one of them refused:
     be exactly 33,795 bytes with `b` at offset 2 and draws it at 320 by 400, XnView reports 320 by
     400, and all three samples here are exactly 33,795 bytes. Claiming a name for a reader that
     draws the wrong picture is worse than leaving the name. The reader wants correcting first.
-  - `mdl` wants `.mdl`, the Half-Life model. Declined: `HalfLifeMdlReader` is not a reader of that
-    file at all. It takes a bare `.mdltex` blob, reads a width and a height out of the first bytes
-    with no signature anywhere, and accepts anything long enough. A real model opens with `IDST` and
-    keeps its skins in a table the header points at, and none of that is here.
+  - `mdl` wants `.mdl`, the Half-Life model. Declined at the time, and rightly: `HalfLifeMdlReader` is
+    not a reader of that file at all. It takes a bare `.mdltex` blob, reads a width and a height out of
+    the first bytes with no signature anywhere, and accepts anything long enough. A real model opens
+    with `IDST` and keeps its skins in a table the header points at, and none of that is there. The row
+    is closed now by a reader of the real file — see `mdl` further down — and the `.mdltex` reader is
+    left standing beside it, still agreeing with nothing but itself.
   - `apx` is Ability Photopaint. Two files gathered under the name open with `SD3S` and are a tagged
     stream — `MXRB`, `MXLS`, a layer name, an author credit, and the size at offset 10 as two
     big-endian words. XnView's own `apx` reader refuses both, so either they are not the format or
@@ -732,7 +740,9 @@ read: two entries pointing at one loader address are one format under two names.
   - `ncy`, the FlashCam frame, has the same loader as `jpeg` — the one `.jps`, `.fsy` and `.mph`
     already share. It is a JPEG. Claimed.
 
-Six more were implemented from what the loader does:
+Six more were implemented from what the loader does, and ten of the ones recorded below as stopped
+have since been implemented the same way — those entries say what was found rather than what was
+missing:
 
   - `mfrm`, Megalux Frame: `FRM`, a layout code that has to be four, a sixteen-bit width and height,
     then sixteen bytes that are not read, then four bytes a pixel with blue first. FFmpeg's demuxer
@@ -760,18 +770,33 @@ Six more were implemented from what the loader does:
 The rest were read far enough to say what stopped them, which is worth more to whoever comes back
 than the vendor's name:
 
-  - `mbig`, Cartes Michelin: four thirty-two-bit numbers and no signature — a tile width and height
-    between 32 and 512, then a count across and down between 2 and 64. Nothing in the file says it
-    is one of these, so claiming it would mean drawing any file whose first sixteen bytes fall in
-    those ranges.
-  - `mdl`, Half-Life Model: `IDST` and version 10, then three numbers at 0xAC that give the textures
-    and their data. It is a multi-image reader over a model's skins. Implementable, but the field
-    at 0xAC does not line up with the published `studiohdr_t` — where that puts the texture count is
-    0xB4 — and there is no model here to settle which is right.
-  - `pbt`, Micro Dynamics MARS: `02 00` and then `PBIT`, big-endian numbers behind it. The signature
-    is certain and the rest was not run down.
-  - `pig`, Ricoh IS30: `01 00`, a third byte choosing between two things, and then fields written as
-    ASCII decimal numbers of three and four characters that it converts with `strtol`.
+  - `mbig`, Cartes Michelin, is read now and the objection above is what got answered. Four
+    thirty-two-bit numbers open it — a tile width and height between 32 and 512, then a count across
+    and down between 2 and 64 — and on their own they are a range check, not a signature. Behind them
+    is a directory of two longs a tile in reading order, an offset and a length, a length of zero
+    meaning the tile is absent; and **every tile that is there is a whole GIF file**, which the loader
+    checks for. That is the signature the four numbers are not, and it is one per tile. The sheet's
+    size is the occupied part of the grid — the tile size times the bounding box of the present tiles,
+    with that box's corner drawn at the origin — confirmed against the converter for a full grid, for
+    a single column and for one lone tile. A file whose first sixteen bytes fall in range and whose
+    directory is empty is refused by both.
+  - `mdl`, Half-Life Model, is read now and the disagreement is settled the other way round from how
+    it looked. The converter does not read the fields at 0xAC: it seeks 0xAC bytes on from where it
+    already stands, having consumed the eight bytes of `IDST` and version, which lands on **0xB4** —
+    exactly where the published `studiohdr_t` puts `numtextures`. Built both ways and handed over, the
+    0xB4 file is read and the 0xAC one is refused. Behind it is a table of eighty-byte entries, each
+    sixty-four bytes of name then flags, width, height and an offset, and each skin is one byte a
+    pixel with a 256-colour palette immediately behind it. The converter counts the skins and draws
+    the last, so this reads the last; the rest can be asked for by index.
+  - `pbt`, Micro Dynamics MARS, is read now: a big-endian word of two and then `PBIT`, a resolution at
+    6 that the converter uses for both axes, and the size big-endian and the unusual way round — the
+    height at 0x0C and the width at 0x10. The header is 512 bytes and Group 4 follows it.
+  - `pig`, Ricoh IS30, is read now, and the odd thing about it is that half the header is text. `01 00`,
+    then a byte choosing the depth — one means one bit a pixel, anything else two — then three ASCII
+    decimal numbers read with `strtol`: three characters of resolution at 3, four of row length at 6
+    and five of height at 10. The byte at 17 has to be two and the uncompressed rows start at 18. The
+    width is never stored; it is the row length times eight over the depth. At two bits a pixel the
+    four values are a grey ramp with zero white and three black.
   - `pixp`, Pixel Power Collage: the first thirty-two bytes of the file have to equal the file's own
     name — the loader takes the basename off the path and compares — then a thirty-two-bit number at
     0x40. A reader for it would have to be given the name as well as the bytes, which nothing here
@@ -791,6 +816,49 @@ than the vendor's name:
     that reader is was not chased down.
   - `pps` and `ppt` share one loader and are read now; the walk is described under "Two containers
     XnView reads without opening" below.
+  - `prisms` is read now, and with it `lff`. `EB E8 00 00`, the eight characters `R8G8B8A8` at 0x86, a
+    height and a width at 0x1CC, and a sixteen-bit offset at 0x200. The coding is a stream of two-byte
+    commands, a count and an opcode: 0x10 is a literal run of count-plus-one four-byte pixels, 0x20 is
+    count-plus-one run-length groups each a length byte and one pixel, opcode zero with a count of zero
+    steps on to the next sixteen-byte boundary, and every other opcode is a two-byte no-op. Rows run
+    from the bottom of the picture up, and the red, green and blue the converter draws are the fourth,
+    third and second bytes of a pixel — not what the header's own `R8G8B8A8` says.
+    <br>The `lff` question is settled with it, and by two sources that have never seen each other.
+    XnView's table points `lff`, "LucasFilm Format", at this same loader address, so the two names are
+    one format; and dexvert, which built its catalogue from real files rather than from that table,
+    gives its Lucasfilm Picture the magic `Prims` — which is the very name this loader writes into the
+    converter's own info block. So a `.lff` opens `EB E8 00 00`, and the `LFF\0` that this library's
+    `LucasFilmFile` requires appears in no file either source has seen. `PrismsFile` claims `.lff`
+    alongside `.pri`; the invented `LFF\0` reader and its magic should go the way `aim`'s did.
+  - `pseg`, IBM printer page segment, is the one of these eleven that did not converge, and this is
+    exactly where it stopped. Every structured field is introduced by `5A`, then a big-endian length
+    covering the eight bytes behind it, then a three-byte type. The types the loader walks past are
+    `D3 EE EE`, `D3 A8 5F`, `D3 A8 7B` and `D3 A7 7B`; the three it acts on are `D3 A6 7B`, `D3 AC 7B`
+    and `D3 EE 7B` — the IM1 image, not IOCA. An IOCA page segment built here, with and without the
+    `5A` prefixes, is read by XnView's `ioca` and refused by its `pseg`, so the IOCA reader already
+    here does not close this row.
+    <br>What was recovered: `D3 A6 7B` is the image input descriptor, and the loader reads 36 bytes of
+    it, taking the image width from bytes 18 and 19 and the height from 20 and 21, both big-endian,
+    requiring byte 19 to be a multiple of eight, and taking a cell width from bytes 24 and 25 — falling
+    back to the image width when bytes 24 to 27 are all zero. `D3 AC 7B` is the image cell position: it
+    is where the picture gets allocated at the size the descriptor gave, one bit a pixel, and the
+    loader then rewinds nine bytes and walks the fields again, this time reading twelve bytes of each
+    cell position — an X offset in pels, a Y offset in rows, a cell width, then a fill width and height
+    of `FFFF` meaning "skip this one". What was not recovered is the `D3 EE 7B` image picture data
+    itself: the cell coding is a further loop that was not run down, and without it there is nothing to
+    build a file from and therefore nothing to check a reader against.
+  - `pp4`, Micrografx Picture Publisher 4, is read now, and it needed no describing in the end. The
+    loader takes the long at 0x2A, copies everything from there to the end of the file into a temporary
+    file, and hands that to another of its readers — and which reader was settled by dropping a TIFF, a
+    Windows bitmap, a PCX, a Targa, a PNG, a JPEG and a portable pixmap in at the offset in turn. Only
+    the TIFF was read. So a `.pp4` is `II`, an offset at 0x2A, and a whole TIFF standing at it: the
+    same shape as the ECC, LView Pro and IPSM wrappers, and identified the same way, by requiring the
+    offset to point at something that really is one.
+  - `pps` and `ppt` share one loader, and it is the same shape as the one that closed `pzp`: the
+    compound-document signature, a skip to 512, then a walk of the file counting pictures. It is a
+    walk of length-prefixed records rather than a signature search, and it was not finished. The
+    entry above still calls PowerPoint "not a picture format", which is true of the container and no
+    longer the whole story — the row is closable the way `pzp` was closed.
   - `prc`, Picture Gear Pocket: the Palm resource database named above, now measured. `iINF` is
     eighteen bytes — width, height, a zero, the depth, a zero, a stride in pixels, `00 FF`, the
     record id — `iPLT` is a count and four bytes an entry, `iFRI` names the tile records, and each
@@ -891,8 +959,8 @@ Windows only, so nothing here has ever been able to compare against them either.
 | lvp | .lvp |  |
 | lwf | .lwf | Windows only |
 | lwi | .lwi |  |
-| mbig | .big | a tile grid with no magic at all: four numbers, a tile size between 32 and 512 and a count between 2 and 64 |
-| mdl | .mdl | declined: IDST and version 10, and the field XnView reads at 0xAC is not where studiohdr_t puts the texture count |
+| mbig | .big | read; four numbers in range, then a directory of tiles each of which is a whole GIF, which is the signature the four numbers are not |
+| mdl | .mdl | read; IDST and version 10, and the skin table at 0xB4 where studiohdr_t puts it, not at 0xAC |
 | mfrm | .frm | read; FRM, the one layout code XnView takes, and the picture at 24 rather than at 8 |
 | mix | .mix |  |
 | mjpg | .wi |  |
@@ -911,25 +979,27 @@ Windows only, so nothing here has ever been able to compare against them either.
 | oil | .oil | read, from the Open Image Library's own specification; no sample was available |
 | pan | .pan |  |
 | pax | .pax | Pick Ax, Blowfish under a password the file does not carry; XnView's Linux converter does not carry it either |
-| pbt | .pbt | Micro Dynamics MARS: 02 00 and then PBIT; the fields behind it were not run down |
+| pbt | .pbt | read; 02 00 and PBIT, the size at 0x0C and 0x10 big-endian, Group 4 from 512 |
 | pcl | .pcl | the raster subset read; text and HP-GL/2 passed over |
 | pd | .pd .t1 .t2 | read by the GE Genesis reader, which is the loader XnView reads it with |
 | pdd | .pdd |  |
 | pdx | .pdx | read; Mayura Draw saves Encapsulated PostScript under a name of its own |
 | pegs | .pxa .pxs |  |
-| pig | .pig | Ricoh IS30: 01 00, a mode byte, then fields written as ASCII decimal numbers |
+| pig | .pig | read; 01 00, a depth byte, three ASCII decimal numbers, and uncompressed rows from 18 |
 | pixi | .pxb | read; twelve fixed bytes, the size at 14, and a run-length picture at 1024 from the bottom up |
 | pixp | .i17 .i18 .ib7 .if9 | Pixel Power Collage: the first 32 bytes have to equal the file's own name, which a reader of bytes cannot check |
 | pmp | .pmp | read; the JPEG at 124, and the size the header states is not the picture's |
 | pmsk | .msk | read by the Windows bitmap reader, which is what XnView reads it with — the Paint Shop Pro reader that used to hold this name alone could not have read one |
 | pp4 | .pp4 | Micrografx Picture Publisher 4: II, an offset at 0x2A, and XnView hands what is there to another reader |
+| pmsk | .msk | read by the Paint Shop Pro reader |
+| pp4 | .pp4 | read; II and an offset at 0x2A, and what stands there is a whole TIFF |
 | pp5 | .pp5 |  |
 | pps | .pps | read; one reader with `ppt`, walking the OfficeArt records from offset 512 for the first JPEG or PNG BLIP |
 | ppt | .ppt | read; one reader with `pps` |
 | prc | .prc | Picture Gear Pocket, measured but not built: the converter cannot read one, and the one it writes is wrong |
 | prf | .prf |  |
-| prisms | .pri | Prisms: EB E8 00 00 and R8G8B8A8 at 0x86; the run-length coding was not finished |
-| pseg | .pse | IBM page segment: the 5A-introduced fields XnView reads are the IM1 image, not IOCA |
+| prisms | .pri .lff | read; EB E8 00 00 and R8G8B8A8, a two-byte command stream, rows from the bottom up |
+| pseg | .pse | left; the IM1 structured fields are mapped as far as the image cell position, the cell coding is not |
 | pspb | .pspbrush |  |
 | pspf | .pfr .pspframe | read by the Paint Shop Pro reader |
 | pspm | .pspmask |  |
@@ -942,13 +1012,15 @@ Windows only, so nothing here has ever been able to compare against them either.
 | raw | .grey .gry | raw greyscale; XnView asks the operator for the size and its own reader requires it |
 | rfax | .001 | Ricoh Fax; signature and header recovered, the page coding not |
 | rix | .sc? | `sc?` is a wildcard, not an extension; it stands for `sc` and any one character and the ColoRIX reader claims all thirty-six now |
+| rfax | .001 .ric | read; FAXNET / RICOH, the page at 256, 1728 wide, Group 3 with the bits the other way up |
+| rix | .sc? | read by the ColoRIX reader; sc? is a wildcard it already covers |
 | sct | .ch | read by the Scitex CT reader |
 | sdg | .sdg |  |
-| sfax | .001 | SmartFax; signature and header recovered, the page coding not |
+| sfax | .001 | read; FAX1D, the row length at 5, Group 3 from 16 with the bits the other way up |
 | sid | .sid | Windows only |
 | skf | .skf |  |
-| skn | .skn | Skantek; the 740-byte header recovered, the CCITT coding not |
-| smp | .smp | Xionics SMP; signature recovered, the tagged header not mapped |
+| skn | .skn | read; the 740-byte header, then Group 4 with the bits running from the bottom of each byte up |
+| smp | .smp | read; the 70-byte header, uncompressed, Group 3 and Group 4; its own run-length scheme refused |
 | ssi | .ssi | read; SriSun, recovered from XnView's own reader and checked against it |
 | ssp | .ssp | every embedded picture read, not the first |
 | stm | .stm | read by the Windows bitmap reader, which is what XnView reads it with |
@@ -1101,30 +1173,55 @@ neutral. At 720 pixels the same colours come out at exactly the standard's numbe
 its size comes from. The reader here under `.raw` guesses one from a table, which is the same fault
 under a name we already own; it is left alone rather than quietly widened.
 
-### The four whose headers are now known and whose pixels are not
+### The four whose headers were known and whose pixels now are
 
-Reading the reader gave these four a signature and a header and stopped there, because what follows
-the header is a coded bitstream that would have to be implemented rather than described. They are
-recorded so the next attempt starts here rather than at the name.
+These four were recorded as having a signature and a header and nothing behind it, because what
+follows the header is a coded bitstream. All four are read now, and the thing that unlocked them was
+one word in the converter's fax context.
+
+That word chooses between two 256-byte tables at `0x35cdc0` and `0x35cec0`, and dumping them settles
+what the choice is: the first is the identity and the second is a bit-reversal. Every byte of the
+coding goes through the chosen table on its way into the decoder, so the word is the fill order —
+which end of a byte the coding starts at. Group 4 read the ordinary way round gives a blank page for
+Skantek and noise for Ricoh Fax; turned over, both come back exact. `CcittFillOrder` does the turning
+and the two decoders already here do the rest.
 
   - `skn` is Skantek. Four big-endian longs — `FFFF0001`, `FFFFFFFE`, `FFFD0000`, `00000000` — then
     286 bytes skipped, the six characters `920101` at 302, 424 more bytes skipped, and the height and
-    the width as big-endian longs at 732 and 736. The header is exactly 740 bytes. What follows is
-    one bit a pixel through XnView's CCITT decoder; there is a CCITT decoder here already, so the
-    remaining work is which of its codings the format uses.
-  - `smp` is Xionics SMP: a zero word, `Xionics `, then `F`, `1B`, `7F`, `00`. After that the header
-    is a run of tagged fields with fixed constants between them — `1B`, `19`, `02`, `1A`, `02` in
-    that order — which were not mapped to their meanings.
-  - `rfax` is Ricoh Fax: two bytes, then the fourteen characters `FAXNET / RICOH`. The pages begin
-    at 256 and there can be up to 4300 of them, each a fixed-size record fed to a strip decoder.
-  - `sfax` is SmartFax: the five characters `FAX1D`, a word, two bytes, then a byte that is only ever
-    tested for zero — it selects 100 or 200 dots to the inch — and five more bytes.
+    the width as big-endian longs at 732 and 736. The header is exactly 740 bytes and Group 4 follows
+    it with the bits the other way up.
+  - `smp` is Xionics SMP: a zero word, `Xionics `, then `F`, `1B`, `7F`, `00`. The tagged fields the
+    header ends with are mapped now: a word of one at 18, the coding at 28, the row length in bytes at
+    31 and the height at 33, then `1B`/`19`/two/resolution and `1A`/two/resolution. The data begins at
+    70 and the width is the row length times eight — the format cannot state a width that is not a
+    whole number of bytes. Five codings exist; uncompressed, Group 3 and Group 4 are read, and Group 3
+    two-dimensional and the vendor's own run-length scheme are refused by name rather than drawn as
+    something else.
+  - `rfax` is Ricoh Fax: two bytes, then the fourteen characters `FAXNET / RICOH`. The page begins at
+    256, is always 1728 pixels across — the header states no size at all — and is Group 3
+    one-dimensional, again with the bits the other way up. The height is however many rows the coding
+    holds, up to the converter's own limit of 4300.
+  - `sfax` is SmartFax: the five characters `FAX1D`, the row length in bytes as a word at 5, two bytes,
+    then a byte that is only ever tested for zero — it selects 100 or 200 dots to the inch — and six
+    more. The coding begins at 16 and is the same Group 3 the other way up.
 
-This also settles something about two readers already here. `RicohFaxFile` requires `RICF` and
-`SmartFaxFile` requires `SMFX`, each in front of a header of its own invention. Neither signature
-appears in the format XnView reads under that name. They are readers that agree with nothing but
-themselves — the twelfth and thirteenth found here — and they are left standing only because
-replacing them means implementing the real coding, which is the work above.
+Two readers already here are corrected by this rather than added to. `RicohFaxFile` required `RICF`
+and `SmartFaxFile` required `SMFX`, each in front of a header of its own invention, and neither
+signature appears in the format XnView reads under that name. They were the twelfth and thirteenth
+readers found here agreeing with nothing but themselves; they now read the real files, and both keep
+a writer whose output the converter reads back at the right size with every pixel right.
+
+One thing the converter's own encoder taught this library on the way. `CcittG3Encoder` wrote an
+end-of-line word after every row and none in front of the first, and a stream in that shape is not
+read as a shifted picture by XnView but as a different one, because its decoder hunts for the leading
+end-of-line to find its bit alignment and never finds it. The encoder now takes a `leadingEndOfLine`
+option, off by default so nothing that used it changes, and the two fax writers pass it.
+
+Where the two implementations still part company is one row at the very end. XnView's Ricoh Fax loop
+will not commit a row until it has read a further byte, so it reports one row fewer for a page that
+stops dead after its last row; its SmartFax loop instead counts a trailing separator as one further,
+blank row. Both readers here report the rows the coding carries. The difference is padding at the foot
+of a page and nothing else, and everything written here ends the way the converter wants.
 Correcting the range to studio swing on both sides brings that to 42 and no further, and what is left
 is not a range fault: a vertical red-to-blue gradient comes back correct at the top row and the
 bottom row and shows red in the middle. Both ends right and the middle wrong is a structure fault,
