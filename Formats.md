@@ -395,7 +395,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | Great Paint             | .gpt                                                 | Atari 8-bit Great Paint 160x192 | Y      | Y      | —         | R     | —   | —      | —         |
 | GRS 16-bit              | .g16                                                 | GRS 16-bit grayscale             | Y      | Y      | —         | —     | —   | —      | —         |
 | GunPaint                | .gun, .ifl                                           | C64 two FLI fields, one pixel apart | Y      | —      | —         | R     | —   | —      | —         |
-| Half-Life MDL           | .mdltex                                              | Half-Life model texture          | Y      | Y      | —         | —     | —   | R      | —         |
+| Half-Life MDL           | .mdltex                                              | Half-Life model texture blob     | Y      | Y      | —         | —     | —   | —      | —         |
 | HAM-E                   | .hame                                                | Amiga HAM Enhanced 18-bit        | Y      | —      | —         | R     | —   | —      | —         |
 | Hard Interlace          | .hip                                                 | C64 Hard Interlace hires         | Y      | Y      | —         | R     | —   | —      | —         |
 | Hayes JT Fax            | .jtf                                                 | Hayes JT Fax                     | Y      | —      | —         | —     | —   | —      | —         |
@@ -473,7 +473,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | Logo Painter            | .lp3                                                 | C64 Logo Painter 3/3+ MC         | Y      | —      | —         | R     | —   | —      | —         |
 | Logo.sys                | .sys, .logo                                          | Windows 95/98 boot logo          | Y      | Y      | —         | —     | —   | —      | —         |
 | LSS16                   | .lss, .16                                            | SYSLINUX splash screen           | Y      | Y      | —         | —     | —   | —      | —         |
-| LucasFilm               | .lff                                                 | LucasFilm image format           | Y      | Y      | —         | —     | —   | —      | —         |
+| LucasFilm               | .lff                                                 | LucasFilm image (unattested magic) | Y      | Y      | —         | —     | —   | —      | —         |
 | MacPaint                | .mac, .pntg, .pnt, .paint, .mpnt, .macp              | Apple MacPaint monochrome        | Y      | Y      | —         | R     | —   | —      | —         |
 | MAG                     | .mag, .mki                                           | MAKI-chan Graphics (Japanese)    | Y      | Y      | —         | R     | —   | —      | —         |
 | MAGGI Hairstyles        | .fff                                                 | MAGGI Hairstyles & Cosmetics     | Y      | —      | —         | —     | —   | R      | —         |
@@ -628,7 +628,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | Red Storm RSB           | .rsb                                                 | Red Storm Entertainment tex      | Y      | Y      | —         | —     | —   | —      | —         |
 | Rembrandt               | .tcp                                                 | Atari Falcon Rembrandt TC        | Y      | Y      | —         | R     | —   | —      | —         |
 | RGF                     | .rgf                                                 | LEGO Mindstorms EV3 graphic      | Y      | Y      | —         | RW    | —   | —      | —         |
-| Ricoh Fax               | .ric                                                 | Ricoh fax format                 | Y      | —      | —         | —     | —   | —      | —         |
+| Ricoh Fax               | .ric, .001                                           | Ricoh FAXNET Group 3 page        | Y      | Y      | —         | —     | —   | R      | —         |
 | RISC OS Sprite          | .ros                                                 | RISC OS sprite format            | Y      | Y      | —         | R     | —   | R      | —         |
 | RLA/RPF                 | .rla, .rlb, .rpf                                     | Wavefront Advanced Visualizer    | Y      | Y      | —         | R     | R   | RW     | R         |
 | RLC2                    | .rlc                                                 | RLC2 image format                | Y      | —      | —         | —     | —   | —      | —         |
@@ -654,7 +654,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | SIF Image               | .sif                                                 | SIF image format                 | Y      | Y      | —         | —     | —   | —      | R         |
 | Sinbad Slideshow        | .ssb                                                 | Atari ST Sinbad Slideshow        | Y      | Y      | —         | R     | —   | —      | —         |
 | Sixel                   | .six, .sixel                                         | DEC terminal Sixel graphics      | Y      | Y      | —         | —     | —   | —      | —         |
-| SmartFax                | .smf                                                 | SmartFax fax format              | Y      | —      | —         | —     | —   | —      | —         |
+| SmartFax                | .smf, .001                                           | SmartFax FAX1D Group 3 page      | Y      | Y      | —         | —     | —   | R      | —         |
 | SNES Tile               | .sfc, .snes                                          | Super NES 4bpp tile              | Y      | Y      | —         | —     | —   | —      | —         |
 | Softimage PIC           | .pic, .si                                            | Softimage 3D texture             | Y      | Y      | —         | —     | —   | —      | —         |
 | Software Automation     | .sag, .swa                                           | Atari 8-bit Software Automation  | Y      | Y      | —         | R     | —   | —      | —         |
@@ -754,6 +754,14 @@ build one from pixel data they didn't read, so the registry reports them as read
 | ZX ULAplus              | .ulp                                                 | ZX Spectrum ULAplus palette      | Y      | —      | —         | —     | —   | —      | —         |
 | ZX-Paintbrush           | .zxp                                                 | ZX Spectrum ZX-Paintbrush        | Y      | —      | —         | R     | —   | —      | —         |
 | ZX81                    | .zx81, .p81                                          | Sinclair ZX81 screen             | Y      | Y      | —         | —     | —   | —      | —         |
+| Micro Dynamics MARS     | .pbt                                                 | MARS archival Group 4 page       | Y      | —      | —         | —     | —   | R      | —         |
+| Skantek                 | .skn                                                 | Skantek Group 4 page             | Y      | —      | —         | —     | —   | R      | —         |
+| Xionics SMP             | .smp                                                 | Xionics document page            | Y      | —      | —         | —     | —   | R      | —         |
+| Ricoh IS30              | .pig                                                 | Ricoh IS30 scanner raster        | Y      | —      | —         | —     | —   | R      | —         |
+| Prisms                  | .pri, .lff                                           | Prisms/LucasFilm run-length RGBA | Y      | —      | —         | —     | —   | R      | —         |
+| Half-Life Model         | .mdl                                                 | Half-Life model skins            | Y      | —      | —         | —     | —   | R      | —         |
+| Picture Publisher 4     | .pp4                                                 | Micrografx wrapper round a TIFF  | Y      | —      | —         | —     | —   | R      | —         |
+| Cartes Michelin         | .big                                                 | Michelin road atlas GIF tiles    | Y      | —      | —         | —     | —   | R      | —         |
 
 ---
 
@@ -788,7 +796,6 @@ Formats we consciously chose not to implement, with reason codes:
 | CorelDRAW         | .cdr        | vector       | —     | —   | R      | —         |
 | Crayola           | .crayola    | app-specific | —     | —   | —      | —         |
 | DWG               | .dwg        | vector       | —     | —   | R      | —         |
-| Half-Life Model   | .mdl        | 3d-model     | —     | —   | R      | —         |
 | FIG               | .fig        | vector       | R     | —   | —      | —         |
 | Flash SWF         | .swf        | video/vector | —     | —   | —      | R         |
 | GnuPlot           | .gplt       | vector       | R     | —   | —      | —         |
@@ -800,12 +807,22 @@ Formats we consciously chose not to implement, with reason codes:
 | PES (embroidery)  | .pes        | app-specific | R     | R   | —      | —         |
 | Picture Gear Pkt  | .prc        | proprietary  | —     | —   | R      | —         |
 | Skantek           | .skn        | unidentified | —     | —   | R      | —         |
+| Pocket PC Theme   | .tsk        | embeds-images| —     | —   | R      | —         |
+| PowerPoint        | .ppt, .pps  | embeds-images| —     | —   | R      | —         |
 | SVG               | .svg        | vector       | R     | RW  | R      | R         |
 | MPEG video        | .mpg, .mpeg | video        | R     | —   | —      | —         |
 | VRML              | .wrl        | 3d-model     | —     | —   | W      | —         |
 
 Four of those were looked at in detail, because a name a viewer opens is not the
 same thing as a picture format, and it is worth writing down which is which:
+Five of those were looked at in detail, because a name a viewer opens is not the
+same thing as a picture format, and it is worth writing down which is which. Two
+more used to stand on that list and no longer do. The Half-Life model is geometry
+and animation, but the skins it carries are ordinary paletted rasters and are read
+out of it now. Skantek could not be identified from any source worth trusting — the
+extension sites that name it share one auto-generated template and give its
+signature as `78 9C`, which is simply a zlib header — and was settled instead
+against XnView's own converter, which reads it and can be asked.
 
 - **.wrl** is VRML: a text 3D scene description opening `#VRML V2.0 utf8`,
   standardised as ISO/IEC 14772-1. It references textures and holds no pixels.
@@ -821,12 +838,6 @@ same thing as a picture format, and it is worth writing down which is which:
   offset 60. That layout was reverse-engineered from XnView's own writer and is
   documented nowhere else, so there is nothing to build a reader from that is not
   a guess about a guess.
-- **.skn** could not be identified at all. XnView calls it "Skantek", and no source
-  worth trusting says what Skantek is; the file-extension sites that name it share
-  one auto-generated template and give its signature as `78 9C`, which is simply a
-  zlib header. Half a dozen unrelated formats also use `.skn` — Kinupix, Symbian
-  themes, The Sims' mesh data, Virtual TI faceplates — so implementing it would
-  mean picking one and hoping.
 
 ---
 
