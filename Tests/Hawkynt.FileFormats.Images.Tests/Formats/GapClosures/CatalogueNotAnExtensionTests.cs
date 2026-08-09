@@ -110,13 +110,13 @@ public sealed class CatalogueNotAnExtensionTests {
 
   /// <summary>
   /// VRML2 is in the catalogue with no reader behind it — XnView writes a <c>.wrl</c> and refuses
-  /// the file it has just written. Nothing here claims the name either, and the row is a disposition
-  /// rather than a gap.
+  /// the file it has just written. That was read as a disposition rather than a gap, and it was the
+  /// wrong reading: what it writes carries the whole picture inline, so the name is claimed here now.
   /// </summary>
   [Test]
   [Category("Unit")]
-  public void Vrml_IsClaimedByNothingHere()
+  public void Vrml_IsClaimedHereEvenThoughXnViewOnlyWritesIt()
     => Assert.That(
       FormatRegistry.AllFormats.SelectMany(entry => entry.AllExtensions ?? []),
-      Has.None.EqualTo(".wrl").IgnoreCase);
+      Has.Some.EqualTo(".wrl").IgnoreCase);
 }

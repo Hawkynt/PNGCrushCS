@@ -762,6 +762,11 @@ build one from pixel data they didn't read, so the registry reports them as read
 | Half-Life Model         | .mdl                                                 | Half-Life model skins            | Y      | —      | —         | —     | —   | R      | —         |
 | Picture Publisher 4     | .pp4                                                 | Micrografx wrapper round a TIFF  | Y      | —      | —         | —     | —   | R      | —         |
 | Cartes Michelin         | .big                                                 | Michelin road atlas GIF tiles    | Y      | —      | —         | —     | —   | R      | —         |
+| AIM Grey Scale          | .ima                                                 | Greys, size from the .hd beside  | Y      | —      | —         | —     | —   | R      | —         |
+| Pixel Power Collage     | .i17, .i18, .ib7, .if9                               | Still naming itself in its head  | Y      | —      | —         | —     | —   | R      | —         |
+| Printer Page Segment    | .pse, .psg                                           | IBM MO:DCA IM1 image cells       | Y      | —      | —         | —     | —   | R      | —         |
+| Raw Greyscale           | .gry, .grey                                          | Greys, size from the length      | Y      | —      | —         | —     | —   | W      | —         |
+| VRML                    | .wrl, .vrml                                          | PixelTexture inside a 3D scene   | Y      | —      | —         | —     | —   | W      | —         |
 
 ---
 
@@ -811,24 +816,22 @@ Formats we consciously chose not to implement, with reason codes:
 | PowerPoint        | .ppt, .pps  | embeds-images| —     | —   | R      | —         |
 | SVG               | .svg        | vector       | R     | RW  | R      | R         |
 | MPEG video        | .mpg, .mpeg | video        | R     | —   | —      | —         |
-| VRML              | .wrl        | 3d-model     | —     | —   | W      | —         |
 
 Four of those were looked at in detail, because a name a viewer opens is not the
 same thing as a picture format, and it is worth writing down which is which:
 Five of those were looked at in detail, because a name a viewer opens is not the
-same thing as a picture format, and it is worth writing down which is which. Two
+same thing as a picture format, and it is worth writing down which is which. Three
 more used to stand on that list and no longer do. The Half-Life model is geometry
 and animation, but the skins it carries are ordinary paletted rasters and are read
 out of it now. Skantek could not be identified from any source worth trusting — the
 extension sites that name it share one auto-generated template and give its
 signature as `78 9C`, which is simply a zlib header — and was settled instead
-against XnView's own converter, which reads it and can be asked.
+against XnView's own converter, which reads it and can be asked. VRML was written
+off on the wrong premise, which is worth stating because the premise sounded right:
+a scene description references its textures and holds no pixels. It may also carry
+one inline, in a `PixelTexture` node, and that is exactly what XnView writes — so a
+`.wrl` from it is a picture, and is read here now.
 
-- **.wrl** is VRML: a text 3D scene description opening `#VRML V2.0 utf8`,
-  standardised as ISO/IEC 14772-1. It references textures and holds no pixels.
-  XnView writes one and cannot read it — the row in its format table has a null
-  where the reader's address goes, and its converter refuses the file it has just
-  written — so the column above says W rather than R.
 - **.mdl** is the Half-Life model. Its skin textures are already read here, under
   `.mdltex`; the model itself is geometry and animation.
 - **.prc** is the awkward one. Most files with that name are Palm OS resource

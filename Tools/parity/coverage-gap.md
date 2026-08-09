@@ -11,11 +11,14 @@ something up and are correct as they stand.
 **197 distinct extensions across 176 of its format names** when this was written. A few extensions
 are claimed by more than one of its names, so the rows below add up to more than that.
 
-**A hundred and sixty-seven are closed now and 17 remain.** The last six went together and none of them
-needed a corpus: `pps`, `ppt` and `tsk` were read out of the converter's own code and checked by
+**A hundred and seventy-two are closed now and 12 remain.** The last five were rows that had been
+written off, three of them here and two of them twice, and every one of the reasons turned out to be
+wrong — see "Five that were written off too early" below. Six before them went together and none of
+them needed a corpus: `pps`, `ppt` and `tsk` were read out of the converter's own code and checked by
 building files for it, and `ami`, `rix` and `wrl` were three rows the catalogue had never really
 opened — two whose extension was a bracket or a wildcard rather than a name, and one whose reader
-does not exist. Eleven before them went in one pass, off a source
+does not exist, though that last was not the disposition it looked like and is closed now too.
+Eleven before them went in one pass, off a source
 that had been sitting in this tree unread — see "Reading the reader" below. Eight of the fifteen
 **A hundred and fifty-nine are closed now and 22 remain.** Ten of those went in one pass over the
 scanner, fax and wrapper names — Micro Dynamics MARS, Skantek, Xionics SMP, Ricoh IS30, Ricoh Fax,
@@ -876,7 +879,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | 2d | .2d | read by the Windows bitmap reader, which is what XnView reads it with |
 | abs | .abs | read; Optocat's 16-bit header, and the extension settles it against TIFF as XnView's does |
 | afx | .afx |  |
-| aim | .ima | declined again; the size comes from a `.hd` beside the file, which bytes alone cannot reach |
+| aim | .ima | read; headerless greys, the size from the `.hd` beside the file, and 65,536 bytes meaning 256x256 when there is none |
 | ami | .ami | `[b]` is a filename prefix, not an extension — one of two bracket-or-wildcard tokens in a catalogue of 554; the files are `.ami`, read and agreeing once XnView's doubling is undone |
 | anv | .anv | read; a 256-colour DIB with AN for BM, at fixed offsets |
 | aphp | .php | every photograph read, not the theme artwork |
@@ -987,7 +990,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | pegs | .pxa .pxs |  |
 | pig | .pig | read; 01 00, a depth byte, three ASCII decimal numbers, and uncompressed rows from 18 |
 | pixi | .pxb | read; twelve fixed bytes, the size at 14, and a run-length picture at 1024 from the bottom up |
-| pixp | .i17 .i18 .ib7 .if9 | Pixel Power Collage: the first 32 bytes have to equal the file's own name, which a reader of bytes cannot check |
+| pixp | .i17 .i18 .ib7 .if9 | read from a named file; the first 32 bytes are the file's own name, then a depth code at 0x40, the size at 0x4C and the picture at 0x80 |
 | pmp | .pmp | read; the JPEG at 124, and the size the header states is not the picture's |
 | pmsk | .msk | read by the Windows bitmap reader, which is what XnView reads it with — the Paint Shop Pro reader that used to hold this name alone could not have read one |
 | pp4 | .pp4 | Micrografx Picture Publisher 4: II, an offset at 0x2A, and XnView hands what is there to another reader |
@@ -999,7 +1002,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | prc | .prc | Picture Gear Pocket, measured but not built: the converter cannot read one, and the one it writes is wrong |
 | prf | .prf |  |
 | prisms | .pri .lff | read; EB E8 00 00 and R8G8B8A8, a two-byte command stream, rows from the bottom up |
-| pseg | .pse | left; the IM1 structured fields are mapped as far as the image cell position, the cell coding is not |
+| pseg | .pse .psg | read; the IM1 image cells are uncompressed bits, a cell width's worth to a row, placed where the cell positions say |
 | pspb | .pspbrush |  |
 | pspf | .pfr .pspframe | read by the Paint Shop Pro reader |
 | pspm | .pspmask |  |
@@ -1009,7 +1012,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | pzl | .pzl |  |
 | pzp | .pzp | read; a compound document, walked from 512 for the first whole PNG in it |
 | qcad | .cad |  |
-| raw | .grey .gry | raw greyscale; XnView asks the operator for the size and its own reader requires it |
+| raw | .grey .gry | read; one byte a pixel from the top-left, at the one size the length can be |
 | rfax | .001 | Ricoh Fax; signature and header recovered, the page coding not |
 | rix | .scr .sci .scf | `sc?` is a wildcard, not an extension; it stands for `sc` and any one character and the ColoRIX reader claims all thirty-six now |
 | rfax | .001 .ric | read; FAXNET / RICOH, the page at 256, 1728 wide, Group 3 with the bits the other way up |
@@ -1044,7 +1047,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | vit | .vit |  |
 | vob | .vob |  |
 | wic | .wic | the J Wavelet Image Codec; its coding was never published; Windows only |
-| wrl | .wrl | VRML 2; the catalogue row has a null where the reader's address goes, and the converter refuses the `.wrl` it has just written |
+| wrl | .wrl | read; the `PixelTexture` node the converter writes and cannot read back, bottom row first |
 | wzl | .wzl |  |
 | x3f | .x3f |  |
 | xar | .xar | preview at the stated tag |
@@ -1411,12 +1414,83 @@ than inherited: a screen written here is reported by the converter as 320 by 200
 as 160 by 200, and all 32,000 pixels agree once each of ours is matched against the pair XnView makes
 of it.
 
-`wrl` is the third of that kind and settles by construction. Its row in the converter's format table
-has a null where the address of the reader goes — one of six such rows, and the other five are
-`bmp565`, `guetzli`, `jpegli`, `pcl` and `csv`, every one of them something XnView writes and does
-not read. The converter writes a `.wrl` happily, as a VRML2 `PixelTexture` node, and then refuses to
-read the file it has just written. Nothing here claims the name either. The row is a disposition, not
-a gap: the catalogue lists a format its own reader does not have.
+`wrl` is the third of that kind. Its row in the converter's format table has a null where the address
+of the reader goes — one of six such rows, and the other five are `bmp565`, `guetzli`, `jpegli`,
+`pcl` and `csv`, every one of them something XnView writes and does not read. The converter writes a
+`.wrl` happily and then refuses to read the file it has just written.
+
+That was called a disposition rather than a gap, and it was the wrong call. What the converter writes
+is a VRML2 `PixelTexture` node, and a `PixelTexture` is a picture: a width, a height, a component
+count and one integer a pixel, inline in the text. The row is closed now — see below.
+
+### Five that were written off too early
+
+Five of the seventeen rows still standing had already been looked at and declined, three of them in
+this document and two of them twice over. Every one of the five reasons was wrong, and the five
+mistakes are not the same mistake, which is the reason for writing them down.
+
+**`pixp` and `aim` were declined on a premise this library does not hold.** The stated reason was
+that a reader handed bytes cannot see a filename or a file beside the file. But readers here are not
+only handed bytes: `IImageFormatReader<T>` carries a `FromFile` that takes the path, and reading a
+companion is an established pattern — Graph Saurus keeps its palette in a `.pl5`, and OCP Art Studio
+writes one out as a `.pal`. Both rows were closable the whole time.
+
+- `pixp`, Pixel Power Collage, authenticates against its own name: the first thirty-two bytes hold
+  the name the file must be filed under, terminated by a zero, and the loader compares them with the
+  name it was given, ignoring case and counting the extension. Behind that is a big-endian code at
+  0x40 — zero for thirty-two bits a pixel, one for twenty-four, two for eight — the size big-endian
+  at 0x4C and 0x50, and the picture at 0x80 with no padding at the row end. Twenty-four bits are
+  stored blue first; thirty-two are stored **alpha** first and then blue, green, red, which is not the
+  order the same converter uses for a thirty-two-bit Windows bitmap and was settled by handing it one
+  of each. Read here from a named file; reading it from bytes refuses outright and says why, because
+  skipping the name check would leave a reader that accepts any file with three plausible numbers in
+  it. Twenty-one files it accepts and thirteen it refuses were built and handed over, and this reader
+  agrees with it on all thirty-four.
+- `aim`, AIM Grey Scale, is one byte a pixel with no header of any kind, and its size lives in a
+  companion under the same name with `.hd` for an extension: two characters `AA` at offset four, the
+  width big-endian at 0x16 and the height at 0x18, and the two multiplied have to account for the
+  picture exactly or the companion is not this picture's and is ignored. Then one fallback and only
+  one: 65,536 bytes is 256 by 256, and every other length with no usable companion is refused.
+  Reading by bytes reaches no companion and so reaches that one size, which is exactly what the
+  loader does when the companion is missing.
+  <br>Worth repeating, since it cost a format: there is no `AIM\0` magic. The four bytes appear in
+  that loader only as the display name it writes into its own info block. The reader that used to
+  stand here requiring them as a signature could not have read one real file, and deleting it was
+  right; this is the format itself.
+
+**`wrl` was declined for being a scene description rather than a picture**, which is true of VRML in
+general and false of what XnView writes. Its catalogue row does have a null where the reader's
+address goes, and its converter does refuse the file it has just written — but that file is a unit
+box wearing the picture as an inline `PixelTexture`: `image`, a width, a height, a component count of
+one to four, and one integer a pixel with the first component in the top byte. The rows run bottom
+first, a texture's origin being its lower-left corner. Nothing is lost in the writing, so everything
+is recoverable in the reading, and reading it makes this library able to open a file its own author
+cannot — the same reasoning that closed the `.qtl` rows. A six by four picture converted to `.wrl`
+and read back here comes out byte-identical to the pixels that went in, at one, three and four
+components.
+
+**`raw` was declined because the converter asks the operator for the size.** It does, and that does
+not settle anything: `uyvy` asks the same question and its rows were closed by taking the length as
+the only evidence there is and requiring it to be exactly one of the sizes the layout comes in. The
+same rule closes this one. A greyscale dump is one byte a pixel from the top-left corner and nothing
+else — confirmed by handing the converter a 320 by 240 picture and getting back 76,800 bytes equal to
+its pixels in that order — and a file whose length is none of the sizes in the table is refused
+rather than drawn at a shape picked out of the air. One length is claimed twice, 720 by 512 against
+640 by 576, and goes the way XnView's own table orders them.
+
+**`pseg` was the one with work left rather than a reason**, and the work is done. `D3 EE 7B`, the
+image picture data, has no coding at all: it is raw uncompressed bits, a cell width's worth to a row,
+copied straight into the raster with a set bit meaning ink. What made it look like a coding problem
+was that the rows land where the last `D3 AC 7B` said and not at the left margin, so a segment is a
+mosaic and the data of one field carries on down from where the last one stopped. The rest fell out
+with it: the cell width in the descriptor is at bytes 28 and 29 rather than 24 and 25, falling back
+to the picture's width only when bytes 28 to 31 are all zero; the fill rectangle in a cell position
+runs only when neither of its dimensions is `FFFF` and clears one row fewer than it asks for; and the
+walk accepts different field types before the picture starts than after, so a type merely skipped on
+the way in ends the read on the way through. A segment whose data stops exactly at the bottom row
+with no `D3 A9 7B` behind it is refused, while the same segment with one spare byte is read — a
+distinction nobody would invent, and both were built and handed over. Twenty-two files it accepts and
+thirteen it refuses were built; this reader agrees with it on all thirty-five, pixel for pixel.
 
 ### The refusal audit, and the two things it found
 
