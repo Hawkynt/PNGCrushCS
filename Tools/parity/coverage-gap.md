@@ -11,7 +11,7 @@ something up and are correct as they stand.
 **197 distinct extensions across 176 of its format names** when this was written. A few extensions
 are claimed by more than one of its names, so the rows below add up to more than that.
 
-**A hundred and fifty-five are closed now and 26 remain.** The last six went together and none of them
+**A hundred and sixty-seven are closed now and 17 remain.** The last six went together and none of them
 needed a corpus: `pps`, `ppt` and `tsk` were read out of the converter's own code and checked by
 building files for it, and `ami`, `rix` and `wrl` were three rows the catalogue had never really
 opened — two whose extension was a bracket or a wildcard rather than a name, and one whose reader
@@ -877,7 +877,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | abs | .abs | read; Optocat's 16-bit header, and the extension settles it against TIFF as XnView's does |
 | afx | .afx |  |
 | aim | .ima | declined again; the size comes from a `.hd` beside the file, which bytes alone cannot reach |
-| ami | .[b] | `[b]` is a filename prefix, not an extension — one of two bracket-or-wildcard tokens in a catalogue of 554; the files are `.ami`, read and agreeing once XnView's doubling is undone |
+| ami | .ami | `[b]` is a filename prefix, not an extension — one of two bracket-or-wildcard tokens in a catalogue of 554; the files are `.ami`, read and agreeing once XnView's doubling is undone |
 | anv | .anv | read; a 256-colour DIB with AN for BM, at fixed offsets |
 | aphp | .php | every photograph read, not the theme artwork |
 | apx | .apx | read; MXPaint's two signatures, a layer table, and ABGR rows from the bottom up |
@@ -1011,9 +1011,8 @@ Windows only, so nothing here has ever been able to compare against them either.
 | qcad | .cad |  |
 | raw | .grey .gry | raw greyscale; XnView asks the operator for the size and its own reader requires it |
 | rfax | .001 | Ricoh Fax; signature and header recovered, the page coding not |
-| rix | .sc? | `sc?` is a wildcard, not an extension; it stands for `sc` and any one character and the ColoRIX reader claims all thirty-six now |
+| rix | .scr .sci .scf | `sc?` is a wildcard, not an extension; it stands for `sc` and any one character and the ColoRIX reader claims all thirty-six now |
 | rfax | .001 .ric | read; FAXNET / RICOH, the page at 256, 1728 wide, Group 3 with the bits the other way up |
-| rix | .sc? | read by the ColoRIX reader; sc? is a wildcard it already covers |
 | sct | .ch | read by the Scitex CT reader |
 | sdg | .sdg |  |
 | sfax | .001 | read; FAX1D, the row length at 5, Group 3 from 16 with the bits the other way up |
