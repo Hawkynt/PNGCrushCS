@@ -39,6 +39,10 @@ public sealed class TiffFile :
 
   static string IImageFormatMetadata<TiffFile>.PrimaryExtension => ".tiff";
   static string[] IImageFormatMetadata<TiffFile>.FileExtensions => [".tif", ".tiff", ".ftf", ".stw", ".fx3", ".xif"];
+  // .ctf is XnView's "Optigraphics", whose reader is this same TIFF reader — the two names share
+  // one function in its binary, as does its neighbouring "Optigraphics Tiled" — and a TIFF renamed
+  // .ctf is reported by it as a TIFF under the name cft.
+  static string[] IImageFormatMetadata<TiffFile>.FileExtensions => [".tif", ".tiff", ".ftf", ".stw", ".fx3", ".ctf"];
   static TiffFile IImageFormatReader<TiffFile>.FromSpan(ReadOnlySpan<byte> data) => TiffReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<TiffFile>.Capabilities => FormatCapability.HasDedicatedOptimizer | FormatCapability.MultiImage;
 

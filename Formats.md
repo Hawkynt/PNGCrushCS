@@ -33,13 +33,13 @@ build one from pixel data they didn't read, so the registry reports them as read
 | Format                  | Extensions                                           | Description                      | Reader | Writer | Optimizer | Tom's | IM  | XnView | IrfanView |
 | ----------------------- | ---------------------------------------------------- | -------------------------------- | ------ | ------ | --------- | ----- | --- | ------ | --------- |
 | AAI                     | .aai                                                 | Dune HD media player image       | Y      | Y      | —         | RW    | RW  | —      | —         |
+| Ability Photopaint      | .apx                                                 | Ability Photopaint image         | Y      | —      | —         | —     | —   | R      | —         |
 | Access Fax              | .acc                                                 | Access fax format                | Y      | —      | —         | R     | —   | R      | —         |
 | Acorn Sprite            | .acorn                                               | Acorn RISC OS sprite             | Y      | Y      | —         | R     | —   | R      | —         |
 | Ad-Tech Fax             | .adt                                                 | Ad-Tech fax format               | Y      | —      | —         | —     | —   | —      | —         |
 | ADEX Image              | .adx                                                 | ADEX image format                | Y      | —      | —         | —     | —   | R      | —         |
 | Advanced Art Studio     | .ocp                                                 | C64 Advanced Art Studio          | Y      | —      | —         | RW    | —   | —      | —         |
 | AFLI                    | .afl                                                 | C64 Advanced FLI hires           | Y      | —      | —         | R     | —   | —      | —         |
-| AIM Grayscale           | .aim                                                 | AIM grayscale image              | Y      | Y      | —         | —     | —   | R      | —         |
 | Aladdin Paint           | .alp                                                 | Atari ST Aladdin Paint           | Y      | Y      | —         | R     | —   | —      | —         |
 | Alias PIX               | .als, .alias                                         | Alias/Wavefront PIX              | Y      | Y      | —         | RW    | —   | —      | —         |
 | Amica Paint             | .ami                                                 | C64 Amica Paint multicolor       | Y      | —      | —         | R     | —   | —      | —         |
@@ -59,6 +59,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | Art Studio (Atari 8)    | .as8                                                 | Atari 8-bit Art Studio 320x192   | Y      | Y      | —         | R     | —   | —      | —         |
 | Artist 64               | .a64                                                 | C64 Wigmore Artist 64            | Y      | —      | —         | R     | —   | —      | —         |
 | ASTC                    | .astc                                                | Adaptive Scalable Texture        | Y      | Y      | —         | —     | —   | —      | —         |
+| Astronomical Research   | .arn                                                 | ARN PDS-style label              | Y      | —      | —         | —     | —   | R      | —         |
 | AT&T Group 4 Fax        | .att                                                 | AT&T Group 4 fax                 | Y      | —      | —         | R     | —   | R      | —         |
 | Atari 2600              | .a26, .tia                                           | Atari 2600 playfield graphics    | Y      | Y      | —         | —     | —   | —      | —         |
 | Atari 7800              | .a78, .a7800                                         | Atari 7800 tile graphics         | Y      | Y      | —         | —     | —   | —      | —         |
@@ -231,10 +232,11 @@ build one from pixel data they didn't read, so the registry reports them as read
 | AVHRR Image             | .sst                                                 | NOAA satellite imagery           | Y      | Y      | —         | —     | —   | R      | —         |
 | AVIF                    | .avif                                                | AV1 Image File Format            | Y      | Y      | —         | —     | RW  | R      | R         |
 | AVS                     | .avs                                                 | Advanced Visualization Studio    | Y      | Y      | —         | RW    | RW  | —      | —         |
+| Autologic               | .gm, .gm2, .gm4                                      | Autologic typesetter raster      | Y      | Y      | —         | —     | —   | R      | —         |
 | AWD                     | .awd                                                 | Microsoft Fax document           | Y      | Y      | —         | —     | —   | R      | —         |
 | BBC Micro               | .bb0, .bb1, .bb2, .bb4, .bb5                         | BBC Micro screen modes           | Y      | Y      | —         | R     | —   | —      | —         |
 | Bennet Yee Face         | .ybm                                                 | Bennet Yee Face monochrome       | Y      | Y      | —         | —     | —   | —      | —         |
-| BFLI                    | .bfl, .bfli                                          | C64 Big FLI                      | Y      | —      | —         | R     | —   | RW     | —         |
+| BFLI                    | .bfl, .bfli, .flp                                    | C64 Big FLI                      | Y      | —      | —         | R     | —   | RW     | —         |
 | BFX Bitware Fax         | .bfx                                                 | BFX Bitware fax                  | Y      | —      | —         | —     | —   | —      | —         |
 | BigTIFF                 | .btf, .tf8                                           | 64-bit offset TIFF               | Y      | Y      | —         | —     | RW  | —      | —         |
 | Bio-Rad PIC             | .pic                                                 | Bio-Rad confocal microscopy      | Y      | Y      | —         | —     | —   | R      | —         |
@@ -248,6 +250,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | BSAVE                   | .bsv                                                 | IBM PC BSAVE screen dump         | Y      | Y      | —         | —     | —   | —      | —         |
 | BSB                     | .bsb                                                 | Maptech nautical chart           | Y      | Y      | —         | —     | —   | —      | —         |
 | Bug Bitmap              | .bbm, .bug                                           | C64 Bug Bitmap                   | Y      | —      | —         | R     | —   | —      | —         |
+| byLight                 | .bif                                                 | byLight 20/20 capture            | Y      | —      | —         | —     | —   | R      | —         |
 | BYU SIR                 | .sir                                                 | BYU synthetic aperture radar     | Y      | Y      | —         | —     | —   | —      | —         |
 | C128 Hires              | .c1h                                                 | C128 hires 320x200 monochrome   | Y      | Y      | —         | R     | —   | —      | —         |
 | C128 Multicolor         | .c1m                                                 | C128 multicolor 160x200         | Y      | —      | —         | R     | —   | —      | —         |
@@ -265,6 +268,8 @@ build one from pixel data they didn't read, so the registry reports them as read
 | Champions Interlace     | .cin                                                 | C64 Champions Interlace MC       | Y      | —      | —         | R     | —   | —      | —         |
 | CharSet 64              | .chr64                                               | C64 character set 256x8          | Y      | Y      | —         | —     | —   | —      | —         |
 | Cheese                  | .che, .chs                                           | C64 Cheese paint                 | Y      | —      | —         | R     | —   | —      | —         |
+| Chinon ES-1000          | .cmt                                                 | Chinon ES-1000 camera CCD        | Y      | —      | —         | —     | —   | R      | —         |
+| CImage                  | .dsi                                                 | CImage engineering raster        | Y      | —      | —         | —     | —   | R      | —         |
 | Cinemaster (Atari)      | .cin8                                                | Atari 8-bit Cinemaster anim      | Y      | Y      | —         | —     | —   | —      | —         |
 | Cineon                  | .cin                                                 | Kodak Cineon film scan           | Y      | —      | —         | RW    | RW  | RW     | R         |
 | Cisco IP Phone          | .cip                                                 | Cisco IP phone display           | Y      | Y      | —         | W     | —   | —      | —         |
@@ -280,6 +285,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | Commodore PET           | .pet                                                 | PET PETSCII screen               | Y      | Y      | —         | R     | —   | —      | —         |
 | ComputerEyes            | .ce, .ce1, .ce2                                      | ComputerEyes digitizer           | Y      | —      | —         | R     | —   | —      | —         |
 | CompW                   | .wlm                                                 | CompW image format               | Y      | —      | —         | —     | —   | —      | —         |
+| Core IDC                | .idc                                                 | CORE Software remote sensing     | Y      | —      | —         | —     | —   | R      | —         |
 | Corel Photo-Paint       | .cpt                                                 | Corel Photo-Paint native         | Y      | Y      | —         | —     | —   | —      | R         |
 | CP8 Grayscale           | .cp8                                                 | CP8 grayscale image              | Y      | —      | —         | —     | —   | —      | —         |
 | CPC Advanced            | .cpa                                                 | CPC Advanced Mode 0 160x200     | Y      | —      | —         | R     | —   | —      | —         |
@@ -345,6 +351,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | FFLI                    | .ffli                                                | C64 Full FLI multicolor          | Y      | —      | —         | R     | —   | —      | —         |
 | FITS                    | .fits, .fit, .fts                                    | Flexible Image Transport System  | Y      | Y      | —         | RW    | RW  | RW     | R         |
 | FL32                    | .fl32                                                | FilmLight 32-bit float image     | Y      | Y      | —         | —     | RW  | —      | —         |
+| Flash Image             | .fi                                                  | Flash Image                      | Y      | Y      | —         | —     | —   | R      | —         |
 | FlashPix                | .fpx                                                 | FlashPix multi-resolution        | Y      | Y      | —         | RW    | RW  | RW     | R         |
 | FLI 64                  | .fli64                                               | C64 FLI Designer multicolor      | Y      | —      | —         | R     | —   | —      | —         |
 | FLI Designer 2          | .fd2                                                 | C64 FLI Designer 2 enhanced      | Y      | —      | —         | R     | —   | —      | —         |
@@ -394,6 +401,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | Hayes JT Fax            | .jtf                                                 | Hayes JT Fax                     | Y      | —      | —         | —     | —   | —      | —         |
 | HDR                     | .hdr, .rad                                           | Radiance RGBE HDR                | Y      | Y      | —         | RW    | RW  | RW     | —         |
 | HEIF                    | .heic, .heif                                         | High Efficiency Image Format     | Y      | Y      | —         | R     | RW  | R      | R         |
+| Hemera Thumbs           | .hta                                                 | Hemera thumbnail archive         | Y      | —      | —         | —     | —   | R      | —         |
 | Heretic II M8           | .m8                                                  | Heretic II MIP texture           | Y      | Y      | —         | —     | —   | —      | —         |
 | HF Image                | .hf                                                  | HF heightfield image             | Y      | Y      | —         | —     | —   | —      | —         |
 | Hi-Eddi                 | .hed                                                 | C64 Hi-Eddi                      | Y      | —      | —         | RW    | —   | —      | —         |
@@ -431,6 +439,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | Imagic                  | .ic1, .ic2, .ic3                                     | Atari ST Imagic compressed       | Y      | Y      | —         | R     | —   | —      | —         |
 | Imagic Paint            | .imp, .igp                                           | Atari ST Imagic Paint            | Y      | Y      | —         | R     | —   | —      | —         |
 | Imaging Fax             | .g3n                                                 | Imaging fax format               | Y      | —      | —         | —     | —   | —      | —         |
+| IMNET Image             | .imt                                                 | IMNET document raster            | Y      | —      | —         | —     | —   | R      | —         |
 | IndyPaint               | .ipn, .idy                                           | Atari Falcon IndyPaint           | Y      | Y      | —         | R     | —   | —      | —         |
 | Inter Paint Hires       | .iph, .hre                                           | C64 Inter Paint hires            | Y      | —      | —         | RW    | —   | —      | —         |
 | Inter Paint Multicolor  | .ipt                                                 | C64 Inter Paint multicolor       | Y      | —      | —         | R     | —   | —      | —         |
@@ -444,6 +453,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | ICDRAW icon             | .ibi, .ib3                                           | Atari Falcon ICDRAW icon         | Y      | Y      | —         | R     | —   | —      | —         |
 | IOCA                    | .ica, .ioca                                          | Image Object Content Arch.       | Y      | Y      | —         | —     | —   | —      | —         |
 | IPL                     | .ipl                                                 | Image Processing Library         | Y      | Y      | —         | —     | —   | —      | —         |
+| ISS                     | .iss                                                 | ISS document raster              | Y      | —      | —         | —     | —   | R      | —         |
 | JBIG                    | .jbg, .bie, .jbig                                    | Joint Bi-level Image Group       | Y      | Y      | —         | RW    | RW  | RW     | —         |
 | JBIG2                   | .jb2, .jbig2                                         | JBIG2 bi-level compression       | Y      | Y      | —         | —     | —   | —      | —         |
 | JNG                     | .jng                                                 | JPEG Network Graphics            | Y      | —      | —         | RW    | RW  | RW     | R         |
@@ -459,12 +469,14 @@ build one from pixel data they didn't read, so the registry reports them as read
 | Kofax KFX               | .kfx                                                 | Kofax Group 4 fax                | Y      | Y      | —         | RW    | —   | —      | —         |
 | Krita                   | .kra                                                 | Krita native format              | Y      | Y      | —         | —     | —   | —      | —         |
 | KTX                     | .ktx, .ktx2                                          | Khronos GPU Texture              | Y      | —      | —         | —     | —   | —      | —         |
+| LaserData               | .lda                                                 | LaserData/LaserView fax          | Y      | —      | —         | —     | —   | R      | —         |
 | Logo Painter            | .lp3                                                 | C64 Logo Painter 3/3+ MC         | Y      | —      | —         | R     | —   | —      | —         |
 | Logo.sys                | .sys, .logo                                          | Windows 95/98 boot logo          | Y      | Y      | —         | —     | —   | —      | —         |
 | LSS16                   | .lss, .16                                            | SYSLINUX splash screen           | Y      | Y      | —         | —     | —   | —      | —         |
 | LucasFilm               | .lff                                                 | LucasFilm image format           | Y      | Y      | —         | —     | —   | —      | —         |
 | MacPaint                | .mac, .pntg, .pnt, .paint, .mpnt, .macp              | Apple MacPaint monochrome        | Y      | Y      | —         | R     | —   | —      | —         |
 | MAG                     | .mag, .mki                                           | MAKI-chan Graphics (Japanese)    | Y      | Y      | —         | R     | —   | —      | —         |
+| MAGGI Hairstyles        | .fff                                                 | MAGGI Hairstyles & Cosmetics     | Y      | —      | —         | —     | —   | R      | —         |
 | Magic Painter           | .mgp                                                 | Magic Painter MGP image          | Y      | Y      | —         | R     | —   | —      | —         |
 | Mad Studio              | .an4, .an2, .an5, .gr1, .gr2                         | Atari 8-bit character screens     | Y      | Y      | —         | R     | —   | —      | —         |
 | Master System Tile      | .sms, .gg                                            | Sega Master System tile          | Y      | Y      | —         | —     | —   | —      | —         |
@@ -496,6 +508,9 @@ build one from pixel data they didn't read, so the registry reports them as read
 | MSX2 GL6                | .gl6, .sh6, .stp                                     | MSX2 Screen 6 with sized header  | Y      | Y      | —         | R     | —   | —      | —         |
 | Botticelli              | .p4i                                                 | C16/Plus4 hires, multi and logo  | Y      | —      | —         | R     | —   | —      | —         |
 | MSX2 GL16               | .gl5, .sh5, .gl7, .sh7                               | Sized-header 16-colour Screen 5/7| Y      | Y      | —         | R     | —   | —      | —         |
+| Optocat                 | .abs                                                 | Breuckmann Optocat scan          | Y      | —      | —         | —     | —   | R      | —         |
+| Portrait                | .cvp                                                 | Portrait 512x512 RGB planes      | Y      | —      | —         | —     | —   | R      | —         |
+| PowerCard maker         | .crd                                                 | PowerCard maker card             | Y      | —      | —         | —     | —   | R      | —         |
 | SAM Coupe modes 1-3     | .ss1, .ss2, .ss3                                     | Spectrum-compatible, per-line and 2bpp screens | Y      | —      | —         | R     | —   | —      | —         |
 | McPainter               | .mcp                                                 | Atari 8-bit two-field Gr15 blend | Y      | —      | —         | R     | —   | —      | —         |
 | Mad Designer            | .mbg                                                 | Atari 8-bit 512x256 monochrome   | Y      | Y      | —         | R     | —   | —      | —         |

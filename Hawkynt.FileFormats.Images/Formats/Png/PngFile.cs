@@ -12,7 +12,10 @@ public readonly record struct PngFile :
   IFormatChunkLayout<PngFile>, IFormatChunkRewriter<PngFile>, IFormatChunkPlanRewriter<PngFile> {
 
   static string IImageFormatMetadata<PngFile>.PrimaryExtension => ".png";
-  static string[] IImageFormatMetadata<PngFile>.FileExtensions => [".png"];
+  // .frm is claimed twice in XnView's catalogue: by "PhotoFrame", whose reader is its JPEG reader,
+  // and by "Album", whose reader is this same PNG reader. A PNG renamed .frm is reported by it as
+  // a ZIP-compressed picture under the name frm2, having printed the file's PNG chunks first.
+  static string[] IImageFormatMetadata<PngFile>.FileExtensions => [".png", ".frm"];
   static PngFile IImageFormatReader<PngFile>.FromSpan(ReadOnlySpan<byte> data) => PngReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<PngFile>.Capabilities => FormatCapability.HasDedicatedOptimizer;
   static VideoMode[] IImageFormatMetadata<PngFile>.VideoModes => [

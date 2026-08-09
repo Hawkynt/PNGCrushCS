@@ -15,6 +15,7 @@ are claimed by more than one of its names, so the rows below add up to more than
 that had been sitting in this tree unread — see "Reading the reader" below. Eight of the fifteen
 before them turned out to be one thing — a
 **A hundred and nine are closed now and 69 remain.** Eight of the fifteen turned out to be one thing — a
+**A hundred and twenty-three are closed now and 55 remain.** Eight of the fifteen turned out to be one thing — a
 Windows DIB preview dropped inside a drawing or project file — and are read by a single reader
 rather than eight. IBM KIPS, the X11 puzzle, Synu and the Zoner brush were four more. The last three
 are wrappers around a picture format already here: ECC carries a PNG, LView Pro and IPSM each carry
@@ -795,26 +796,26 @@ Windows only, so nothing here has ever been able to compare against them either.
 | XnView name | extensions | |
 |---|---|---|
 | 2d | .2d | read by the Windows bitmap reader, which is what XnView reads it with |
-| abs | .abs | Optocat 3D scan raster; layout recovered from XnView, left for want of a constant |
+| abs | .abs | read; Optocat's 16-bit header, and the extension settles it against TIFF as XnView's does |
 | afx | .afx |  |
-| aim | .ima | declined: the real format has no header at all and the reader here has an invented one |
-| ami | .[b] | `[b]` is a filename prefix, not an extension; the files are `.ami` and are read |
+| aim | .ima | declined again; the size comes from a `.hd` beside the file, which bytes alone cannot reach |
+| ami | .[b] | `[b]` is a filename prefix, not an extension; the files are `.ami`, read and agreeing once XnView's doubling is undone |
 | anv | .anv | read; a 256-colour DIB with AN for BM, at fixed offsets |
 | aphp | .php | every photograph read, not the theme artwork |
-| apx | .apx | the two files under the name open with SD3S and XnView refuses them too |
+| apx | .apx | read; MXPaint's two signatures, a layer table, and ABGR rows from the bottom up |
 | arf | .arf | read; XnView's ARF is not Axon's, which it refuses |
-| arn | .arn | a PDS-style label; layout recovered from XnView and not implemented |
+| arn | .arn | read; the label, then three colour tables at their own padding, then the rows |
 | aurora | .sim | read; it is a Pictor page and the reader of those was wrong |
 | avs | .mbfavs .mbfs .x | read |
 | b3d | .b3d | read |
-| bfli | .flp | declined again: the reader draws 320x200 hires where the format is 320x400 FLI |
+| bfli | .flp | read at 320x400 now, the two FLI frames de-interleaved, and `.flp` claimed on it |
 | bias | .flt .msk |  |
-| bif | .bif | byLight 20/20; FA BA and a 374-byte header, the rest unreconstructed |
+| bif | .bif | read; FA BA, 374 bytes nothing reads, then one whole JPEG |
 | bmc | .bmc | read by the Windows bitmap reader; the embroidery format of that name is stitches |
 | bmf | .bmf | Windows only |
 | bmg | .bmg .ibg |  |
 | bms | .bms | read; BMSWinPlay and a Windows bitmap |
-| bpr | .bpr | nothing credible describes it |
+| bpr | .bpr | read; XnView's reader for the name is its GIF reader, function for function |
 | btn | .btn |  |
 | bum | .bum |  |
 | cam | .cam | read, both camera generations |
@@ -822,17 +823,17 @@ Windows only, so nothing here has ever been able to compare against them either.
 | cat | .cat |  |
 | cbmf | .bmf |  |
 | cdr | .cdr |  |
-| cft | .ctf | OptiGraphics made lenticular prints; nothing describes the file |
+| cft | .ctf | read; XnView's reader for the name is its TIFF reader, function for function |
 | cgm | .cgm | binary encoding read; character and clear-text refused |
 | cloe | .cloe | read |
-| cmt | .cmt | Chinon ES-1000; cmttoppm.c is public and no sample exists to check a decode against |
+| cmt | .cmt | read; the demosaic in double, which is where XnView and cmttoppm.c part company |
 | cmx | .cmx |  |
 | cncd | .ncd |  |
-| crd | .crd | a card document rather than a bitmap; nothing describes it |
+| crd | .crd | read; a length-prefixed CardMaker, then the JPEG found by its own JFIF identifier |
 | crw | .crw |  |
-| cvp | .cvp | nothing credible describes it |
+| cvp | .cvp | read; 512x512 in three planes and nothing else — the length is the whole signature |
 | d3d | .b2d .b3d |  |
-| dsi | .dsi | Cimage engineering raster, Group 4; no layout published |
+| dsi | .dsi | read; `DI`, four fields at fixed places, Group 4 or uncompressed |
 | dwg | .dwg | thumbnail at the stated address |
 | dxf | .dxf | read from the published group codes; Windows only in XnView |
 | ecc | .ecc |  |
@@ -840,30 +841,33 @@ Windows only, so nothing here has ever been able to compare against them either.
 | eif | .eif | read; the document's pages are whole TIFF streams |
 | eri | .eri | Windows only |
 | fbm | .cbm |  |
-| fff | .fff | MAGGI Hairstyles & Cosmetics is real; its file is not described anywhere |
-| fi | .fi |  |
+| fff | .fff | read; its signature stands at 452 and its JPEG at 3272 |
+| fi | .fi | read; a zlib stream holding the palette and then the rows, or a JPEG at 598 |
 | fif | .fif | Windows only |
 | fre | .fre | read; a GE Genesis image, met as the Visible Human CT slices, and the Male MRI slices too |
 | frm | .frm |  |
 | frm2 | .frm |  |
+| fre | .fre | read; a GE Genesis image, met as the Visible Human CT slices |
+| frm | .frm | read; XnView's reader for the name is its JPEG reader, function for function |
+| frm2 | .frm | read; XnView's reader for the name is its PNG reader, function for function |
 | fsy | .fsy |  |
 | fx3 | .fx3 | read by the TIFF reader, which is what XnView reads it with |
 | gem | .gem | read |
-| gm | .gm .gm2 .gm4 | Autologic typesetter raster; the published header and the real files disagree |
+| gm | .gm .gm2 .gm4 | read; FF04 0007, a level byte at 17, and the ICL manual's byte pair |
 | hdri | .hdri |  |
 | hdru | .gn .hdru | read uncompressed; the Group 3 and Group 4 cases are refused |
 | hpgl | .hgl .hpg .hpgl .prn .prt | read |
 | hru | .hru |  |
-| hta | .hta | deark reads what the format document says and XnView refuses the same file |
-| icd | .idc | CORE Software remote sensing, not the icdraw format; no layout published |
+| hta | .hta | read; a directory of PNGs, written so that deark and XnView both take it |
+| icd | .idc | read; the header is a 32-byte trailer and it ends in IDC21 |
 | icon | .pr |  |
 | iff | .blk | read |
 | iimg | .iimg |  |
 | imi | .imi | read; TMSat, headerless, at the one length the format has |
-| imt | .imt | IMNET document raster, Group 3 and 4; no layout published |
+| imt | .imt | read; 27 43 31 00, a 22-byte header, Group 4 |
 | ioca | .mod |  |
 | ipg | .ipg |  |
-| iss | .iss | nothing credible describes it |
+| iss | .iss | read; 3KCBIMSP, one or eight bits a pixel, counting upward from white |
 | iwc | .iwc | header recovered from WaveL's own applet; the subband coding is not. Windows only |
 | jbf | .jbf | version 2 read; version 1's bitmap coding refused |
 | jig | .jig |  |
@@ -872,7 +876,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | kps | .kps |  |
 | kqp | .kqp |  |
 | kskn | .thb | read by the Windows bitmap reader, which is what XnView reads it with |
-| lda | .lda | LaserView Group 4; three vendors name it and none describes it |
+| lda | .lda | read; DC DC, a 512-byte header, Group 3, Group 4 or uncompressed |
 | ldf | .ldf | LuraTech, binary-only like LuraWave. Windows only |
 | lvp | .lvp |  |
 | lwf | .lwf | Windows only |
@@ -1111,3 +1115,131 @@ This also settles something about two readers already here. `RicohFaxFile` requi
 appears in the format XnView reads under that name. They are readers that agree with nothing but
 themselves — the twelfth and thirteenth found here — and they are left standing only because
 replacing them means implementing the real coding, which is the work above.
+Correcting the range to studio swing on both sides brings that to 42 and no further, and what is left
+is not a range fault: a vertical red-to-blue gradient comes back correct at the top row and the
+bottom row and shows red in the middle. Both ends right and the middle wrong is a structure fault,
+not a coefficient one, and it was not run down — the correction is reverted rather than half-shipped.
+So the name stays open and the fault is recorded — it is in a reader we already ship
+under a name we already claim, which is the more useful half of the finding.
+
+### The converter's own format table, and twenty-two names off the back of it
+
+The interrogation above treats the converter as a black box: build a file, ask what it made of it,
+correct, repeat. It is not a black box. `nconvert` is a stripped but unpacked ELF whose `.rodata` and
+`.text` sit at their file offsets, and it carries **a table of 567 entries, eighty bytes each**, in
+`.data.rel.ro`. Each entry is the format's short id, its display name, the address of the function
+that reads it, and its extensions. Every name in this file can be found in it in one grep, and with
+it the exact function to read.
+
+That turns the loop from guess-and-check into read-then-check, and it answers one question a black
+box cannot: **whether two of XnView's names are one reader**. Four of the names here are.
+
+  - `bpr`, "AAA logo", is its **GIF** reader — the same function address as `gif`.
+  - `cft`, "Optigraphics", is its **TIFF** reader, as is its neighbouring "Optigraphics Tiled".
+  - `frm`, "PhotoFrame", is its **JPEG** reader.
+  - `frm2`, "Album", is its **PNG** reader — and `.frm` is therefore claimed twice over. Of the
+    twenty-four `.frm` files in this corpus exactly one is a picture, and it is a JPEG; the other
+    twenty-three are documents, and both readers here refuse all of them, as XnView refuses them.
+
+Sharing the function means the behaviour is not similar but identical, and renaming a file of each
+format confirmed it: the converter reports the picture and names the reader `bpr`, `cft`, `frm` and
+`frm2`. All four are claimed for the readers already here, on the usual test — a JPEG under `.bpr`
+or `.ctf`, and a GIF under `.frm`, are refused by every reader that claims those names.
+
+The other eighteen were recovered from the disassembly and then confirmed the way everything else
+here is: a file built byte by byte, `-info` reporting the size and depth that went in, and `-out pnm`
+giving back the pixels that went in. **Every one of the eighteen is byte-identical on pixels**, and
+where a field could not be explained it was flipped one byte at a time until it could.
+
+  - `ami`, Amica Paint, was already read here and is left where it was, with one thing measured that
+    had not been: on the three files in this corpus every pixel this library draws matches both of
+    XnView's, which draws the same picture at 320 across by doubling each multicolour pixel where
+    this library returns the 160 stored ones.
+  - `cvp`, "Portrait", has no header at all: the file must be exactly 786,432 bytes, which is
+    512 by 512 in three planes, red then green then blue. The length is the whole signature, so the
+    reader is reached by extension and never claims a file by content.
+  - `abs`, Optocat, is the 16-bit header recovered in the pass before this one, and the objection to
+    it — that `II`/`MM` is TIFF's opening too — was settled rather than argued. A file was built that
+    is a valid TIFF *and* a valid Optocat picture; the converter reads it as TIFF under `.tif` and as
+    Optocat under `.abs`, so the extension decides, and that is what this reader does too. It also
+    carries the lowest detection priority and a signature test that only says yes when the offset is
+    past 2047, the samples are one to four and the raster fits, so content sniffing never prefers it.
+  - `icd`, Core IDC, keeps its header as a **32-byte trailer** ending in `IDC21`, with the picture at
+    byte 0 — which is why looking for a signature at the front found nothing. Three planes are stored
+    whole, one after another, not interleaved.
+  - `iss` opens `3KCBIMSP` and counts **upward from white**: an eight-bit sample of 0x28 comes back
+    as 0xD7, and a set bit in the one-bit kind is black.
+  - `arn` is the PDS-style label the pass before this one described, with one correction: the picture
+    does not begin at RECORD_BYTES times LABEL_RECORDS. Behind the label stand a 1024-byte gap and
+    three 256-byte colour tables, each padded up to the record size, and only then the rows. Reading
+    it as the earlier note said would have drawn the palette as the top of the picture.
+  - `lda` (LaserData), `imt` (IMNET) and `dsi` (CImage) are the three document rasters the vendors
+    describe as Group 3 and Group 4 and nobody describes further. All three are now read, on the
+    decoders already here rather than a third copy of them, and the CCITT payloads the tests use are
+    the converter's own encoder output rather than ours — so the decoders are measured against a
+    foreign encoder. LaserData's Group 3 wants a T.4 end-of-line in front of every row; without them
+    the converter draws a blank page, which is how that was found.
+  - `bif` (byLight) and `crd` (PowerCard maker) and `fff` (MAGGI Hairstyles & Cosmetics) are three
+    more of the carriers this file keeps meeting. byLight is `FA BA`, 374 bytes its own reader never
+    looks at, and one whole JPEG — pinned by moving the payload one byte either way, which stops the
+    file being taken. PowerCard is a length-prefixed `CardMaker` and then a JPEG located by its own
+    JFIF identifier rather than by a fixed offset. MAGGI's signature is the lowercase
+    `hairstyles & cosmetic` with two trailing spaces at offset 452, and its JPEG at 3272; one space
+    or three, or the picture one byte out, and the file is refused.
+  - `hta`, Hemera Thumbs, was the one case where two implementations disagreed, and both were right
+    about something. XnView checks only the first four bytes of the magic and requires the first
+    member to stand at 64 or beyond; deark checks all eight and does not. The file written here
+    satisfies both, and deark extracts from it the same bytes the directory points at.
+  - `apx` is not a carrier but a real raster: two signatures, `MXPaint-NickAvrionov` and
+    `MXPaintPro-NickAvrion`, a layer table, and four bytes a pixel in the order alpha, blue, green,
+    red, stored bottom row first.
+  - `fi`, Flash Image, hides nothing exotic: the codec behind it is **stock zlib**, and the 0x70-byte
+    context passed around is a `z_stream`. The stream holds the palette first and then the rows. Its
+    modes 1 and 2 are a different thing entirely — a JPEG at offset 598, whose own header gives the
+    size. `SURPRISE.FI`, the only `.fi` in this corpus and one the converter refuses, is **not this
+    format**: it opens `FTC\0` and is an Iterated Systems fractal image sharing the extension.
+  - `gm`, Autologic, is `FF04 0007` — TrID's signature from twelve real files — then the width, the
+    height and a **level byte at offset 17** that gives both the depth and the coding. 255 means raw
+    eight-bit samples; anything else means the byte pair the Input Command Language manual
+    documents, where a byte with the top bit set repeats the sample before it. Sixty-seven files
+    covering every level from 0 to 255, both codings and widths from 1 to 640 all come back
+    byte-identical, and the four malformed ones the converter refuses are refused here too.
+
+### Two disagreements worth keeping rather than papering over
+
+`cmt`, the Chinon ES-1000, is the one place where the public reference implementation and XnView are
+both available and do not agree. YOSHIDA Hideki's `cmttoppm.c` works the interpolation and the
+saturation in `float`; XnView works all of it in `double`, and carries the square root of the
+saturation as the full `1.224744871391589` where the C rounds it to a float first. Over fifteen files
+built from known CCD values and run through both, they agree on thirteen and differ on two, by 15
+samples of 361,500 and by 37. In a step that divides three times by a neighbour's own estimate, a
+last-bit difference grows into a whole level. XnView is the standard here, so the port is in double,
+and all fifteen are byte-identical to it — including the two where `cmttoppm.c` is not.
+
+`bfli` is now right and still not byte-identical, and the difference is entirely the palette. The
+reader drew 320 by 200 in high resolution; the format is 320 by 400 in two interleaved multicolour
+FLI frames, which is what RECOIL and XnView both report, and what it draws now. The file is exactly
+33,795 bytes: `FF 3B` for the load address, `'b'`, and 33,792 bytes that fill one buffer in an order
+that accounts for the file to the byte. Against the converter on all three samples here **every one
+of the 128,000 colour indices agrees**, and substituting XnView's sixteen idealised colours for
+Pepto's measured ones makes all three byte-identical. They were not substituted: that table is shared
+by every C64 format here and the standing decision is that RECOIL is the reference where two readings
+are both defensible. `.flp` is claimed on the corrected reader, which now requires the exact length,
+the load address and the marker; `.fli` and `.afl` from the same catalogue row were left alone,
+because Autodesk FLIC and AFLI own them here.
+
+### `aim`, declined a third time, and a reader that had never read anything
+
+`aim` is the one name of the twenty-three left open, and the disassembly settles why rather than
+guessing at it. XnView takes the picture's path, strips everything after the last dot, appends the
+four bytes `.hd` — the string is at rodata 0x37b2e0 — and opens that sidecar: `AA` at offset 4, the
+width at 22, the height at 24. Failing to find it, it accepts a file of exactly 65,536 bytes as
+256 by 256. The first cannot be reached from an interface that is handed bytes, and the second is
+the `ioca` objection in another form: every 64K file under the name would be drawn.
+
+What is new is that the reader this library shipped for the name is gone. `AimGrayScale` was built
+on a four-byte `AIM\0` signature that exists nowhere — not in XnView's reader, not in any
+specification, not in any file — so it read nothing but what it had itself written, and it claimed
+`.aim`, which is not even an extension XnView's `aim` name holds. It is the twelfth reader of that
+kind found here, and it is removed rather than left with a note against it. A reader that agrees
+with nothing but itself is worth less than no reader.

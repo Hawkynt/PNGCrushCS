@@ -76,7 +76,10 @@ public sealed class GifFile :
   // ============================================================
 
   static string IImageFormatMetadata<GifFile>.PrimaryExtension => ".gif";
-  static string[] IImageFormatMetadata<GifFile>.FileExtensions => [".gif", ".giff"];
+  // .bpr is XnView's "AAA logo". Its reader for that name is this same GIF reader — the two names
+  // share one function in its binary — and a GIF renamed .bpr is reported by it as a GIF under the
+  // name bpr. Nothing else was ever found to describe the name.
+  static string[] IImageFormatMetadata<GifFile>.FileExtensions => [".gif", ".giff", ".bpr"];
   static FormatCapability IImageFormatMetadata<GifFile>.Capabilities
     => FormatCapability.HasDedicatedOptimizer | FormatCapability.MultiImage;
 

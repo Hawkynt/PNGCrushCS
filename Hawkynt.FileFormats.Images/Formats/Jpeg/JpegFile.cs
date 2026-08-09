@@ -21,6 +21,10 @@ public readonly record struct JpegFile :
   /// bytes are a JPEG.
   /// </summary>
   static string[] IImageFormatMetadata<JpegFile>.FileExtensions => [".jpg", ".jpeg", ".jpe", ".jfif", ".jps", ".thm", ".j", ".jif", ".fsy", ".mph", ".ncy"];
+  // .frm is XnView's "PhotoFrame", whose reader is this same JPEG reader — the two names share one
+  // function in its binary. The name is also claimed there by "Album", which is its PNG reader, so
+  // a .frm is a JPEG or a PNG and the signature decides which.
+  static string[] IImageFormatMetadata<JpegFile>.FileExtensions => [".jpg", ".jpeg", ".jpe", ".jfif", ".jps", ".thm", ".j", ".jif", ".fsy", ".mph", ".frm"];
   static JpegFile IImageFormatReader<JpegFile>.FromSpan(ReadOnlySpan<byte> data) => JpegReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<JpegFile>.Capabilities => FormatCapability.HasDedicatedOptimizer;
 

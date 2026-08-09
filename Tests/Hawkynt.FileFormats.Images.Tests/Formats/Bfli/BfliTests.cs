@@ -33,16 +33,26 @@ public sealed class BfliReaderTests {
     Assert.Throws<InvalidDataException>(() => BfliReader.FromBytes(new byte[100]));
   }
 
+  /// <summary>A file of the right length that opens with something else is not this format.</summary>
+  [Test]
+  [Category("Unit")]
+  public void FromBytes_RightLengthWrongHeader_ThrowsInvalidDataException() {
+    var data = TestHelpers._BuildValidBfliData();
+    data[2] = (byte)'a';
+
+    Assert.Throws<InvalidDataException>(() => BfliReader.FromBytes(data));
+  }
+
   [Test]
   [Category("Unit")]
   public void FromBytes_ValidData_ParsesDimensions() {
-    var data = TestHelpers._BuildValidBfliData(0x3C00);
-    var result = BfliReader.FromBytes(data);
+    var result = BfliReader.FromBytes(TestHelpers._BuildValidBfliData());
 
-    Assert.That(result.Width, Is.EqualTo(320));
-    Assert.That(result.Height, Is.EqualTo(200));
-    Assert.That(result.LoadAddress, Is.EqualTo(0x3C00));
-    Assert.That(result.RawData.Length, Is.GreaterThanOrEqualTo(8000));
+    Assert.Multiple(() => {
+      Assert.That(result.Width, Is.EqualTo(320));
+      Assert.That(result.Height, Is.EqualTo(400));
+      Assert.That(result.RawData.Length, Is.EqualTo(BfliFile.PayloadSize));
+    });
   }
 }
 
@@ -52,30 +62,31 @@ public sealed class BfliRoundTripTests {
   [Test]
   [Category("Integration")]
   public void RoundTrip_AllFieldsPreserved() {
-    var rawData = new byte[33000];
-    for (var i = 0; i < rawData.Length; ++i)
-      rawData[i] = (byte)(i * 13 % 256);
+    var payload = new byte[BfliFile.PayloadSize];
+    for (var i = 0; i < payload.Length; ++i)
+      payload[i] = (byte)(i * 13 % 256);
 
-    var original = new BfliFile { LoadAddress = 0x3C00, RawData = rawData };
+    var original = new BfliFile { RawData = payload };
 
     var bytes = BfliWriter.ToBytes(original);
     var restored = BfliReader.FromBytes(bytes);
 
-    Assert.That(restored.LoadAddress, Is.EqualTo(original.LoadAddress));
-    Assert.That(restored.RawData, Is.EqualTo(original.RawData));
+    Assert.Multiple(() => {
+      Assert.That(bytes, Has.Length.EqualTo(BfliFile.FileSize));
+      Assert.That(restored.RawData, Is.EqualTo(original.RawData));
+    });
   }
 }
 
 file static class TestHelpers {
-  internal static byte[] _BuildValidBfliData(ushort loadAddress) {
-    var rawData = new byte[9000];
-    for (var i = 0; i < rawData.Length; ++i)
-      rawData[i] = (byte)(i % 256);
+  internal static byte[] _BuildValidBfliData() {
+    var data = new byte[BfliFile.FileSize];
+    data[0] = 0xFF;
+    data[1] = 0x3B;
+    data[2] = (byte)'b';
+    for (var i = BfliFile.HeaderSize; i < data.Length; ++i)
+      data[i] = (byte)(i % 256);
 
-    var data = new byte[2 + rawData.Length];
-    data[0] = (byte)(loadAddress & 0xFF);
-    data[1] = (byte)(loadAddress >> 8);
-    Array.Copy(rawData, 0, data, 2, rawData.Length);
     return data;
   }
 }
