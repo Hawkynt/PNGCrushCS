@@ -11,7 +11,7 @@ something up and are correct as they stand.
 **197 distinct extensions across 176 of its format names** when this was written. A few extensions
 are claimed by more than one of its names, so the rows below add up to more than that.
 
-**A hundred and twelve are closed now and 66 remain.** Eleven of those went in one pass, off a source
+**A hundred and forty-nine are closed now and 32 remain.** Eleven of those went in one pass, off a source
 that had been sitting in this tree unread — see "Reading the reader" below. Eight of the fifteen
 before them turned out to be one thing — a
 **A hundred and nine are closed now and 69 remain.** Eight of the fifteen turned out to be one thing — a
@@ -1243,3 +1243,18 @@ specification, not in any file — so it read nothing but what it had itself wri
 `.aim`, which is not even an extension XnView's `aim` name holds. It is the twelfth reader of that
 kind found here, and it is removed rather than left with a note against it. A reader that agrees
 with nothing but itself is worth less than no reader.
+
+### The .qtl family, closed on the second attempt
+
+Five rows — `uyvy`, `uyvyi`, `yuv411`, `yuv422`, `yuv444` — share `.qtl` and state no size, and the
+first attempt at them was reverted because the decode was wrong twice over: the samples were read as
+full-byte range where they are studio swing, and the two orderings were confused, which showed as a
+gradient correct at its first and last rows and wrong through the middle. Both are settled, and a
+frame written by XnView's own converter now comes back within a quarter of a level.
+
+The length still has to be exactly one of the frame sizes the layout is made in, and anything else is
+refused — a picture named `.qtl` that is really a PNG is turned away by name.
+
+Worth recording that the converter will not read that frame back at all on this platform. It takes
+the size from its command line and refuses a file carrying only pixels, so these five are closed by
+reading what its catalogue lists and the tool itself declines to.

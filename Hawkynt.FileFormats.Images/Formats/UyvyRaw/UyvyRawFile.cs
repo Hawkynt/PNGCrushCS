@@ -38,7 +38,22 @@ public readonly record struct UyvyRawFile
   public const int BytesPerPixel = 2;
 
   static string IImageFormatMetadata<UyvyRawFile>.PrimaryExtension => ".uyvy";
-  static string[] IImageFormatMetadata<UyvyRawFile>.FileExtensions => [".uyvy"];
+  /// <summary>Also .qtl, which XnView files five raw layouts under and this is two of them.</summary>
+  /// <remarks>
+  /// A stream in this layout states no size, so the length must be exactly one of the frame sizes
+  /// the layout is made in and anything else is refused — the same rule used everywhere else here.
+  /// <para/>
+  /// This was tried once before and reverted, because the decode was wrong twice over: the samples
+  /// were read as full-byte range where they are studio swing, and the two orderings were confused,
+  /// which showed as a gradient correct at its first and last rows and wrong through the middle.
+  /// Both are settled now, and a frame written by XnView's own converter comes back within a quarter
+  /// of a level.
+  /// <para/>
+  /// Worth recording that its converter will not read that frame back at all on this platform —
+  /// it takes the size from its command line and refuses a file that only carries pixels. So the
+  /// name is closed by reading what the catalogue lists and the tool declines to.
+  /// </remarks>
+  static string[] IImageFormatMetadata<UyvyRawFile>.FileExtensions => [".uyvy", ".qtl"];
   static UyvyRawFile IImageFormatReader<UyvyRawFile>.FromSpan(ReadOnlySpan<byte> data) => UyvyRawReader.FromSpan(data);
   static byte[] IImageFormatWriter<UyvyRawFile>.ToBytes(UyvyRawFile file) => UyvyRawWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<UyvyRawFile>.VideoModes => [
