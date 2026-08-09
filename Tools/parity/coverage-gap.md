@@ -9,54 +9,55 @@ the rendering differences in the report beside this, which are cases of the tool
 something up and are correct as they stand.
 
 **197 distinct extensions across 176 of its format names** when this was written. A few extensions
-are claimed by more than one of its names, so the rows below add up to more than that.
+are claimed by more than one of its names, so the rows below add up to more than that. The list grew
+to 184 rows as names the first pass had missed came to light, which is why the running counts below
+are against a denominator that moved.
 
-**A hundred and seventy-two are closed now and 12 remain.** The last five were rows that had been
-written off, three of them here and two of them twice, and every one of the reasons turned out to be
-wrong — see "Five that were written off too early" below. Six before them went together and none of
-them needed a corpus: `pps`, `ppt` and `tsk` were read out of the converter's own code and checked by
-building files for it, and `ami`, `rix` and `wrl` were three rows the catalogue had never really
-opened — two whose extension was a bracket or a wildcard rather than a name, and one whose reader
-does not exist, though that last was not the disposition it looked like and is closed now too.
-Eleven before them went in one pass, off a source
-that had been sitting in this tree unread — see "Reading the reader" below. Eight of the fifteen
-**A hundred and fifty-nine are closed now and 22 remain.** Ten of those went in one pass over the
-scanner, fax and wrapper names — Micro Dynamics MARS, Skantek, Xionics SMP, Ricoh IS30, Ricoh Fax,
-SmartFax, Prisms, the Half-Life model, Picture Publisher 4 and Cartes Michelin — and two readers that
-agreed with nothing but themselves were replaced by the files they claim to read rather than added
-beside. Eleven before them went the same way, off a source that had been sitting in this tree
-unread — see "Reading the reader" below. Eight of the fifteen
-before them turned out to be one thing — a
-**A hundred and nine are closed now and 69 remain.** Eight of the fifteen turned out to be one thing — a
-**A hundred and twenty-three are closed now and 55 remain.** Eight of the fifteen turned out to be one thing — a
-Windows DIB preview dropped inside a drawing or project file — and are read by a single reader
-rather than eight. IBM KIPS, the X11 puzzle, Synu and the Zoner brush were four more. The last three
-are wrappers around a picture format already here: ECC carries a PNG, LView Pro and IPSM each carry
-a JPEG, and all three state a size the payload agrees with, which is what identifies the file rather
-than a fixed offset guessed from one sample. Every one of the three was checked against ImageMagick
-on the extracted payload and matches it on every pixel.
+**Recomputed rather than carried forward: of the catalogue's 491 format names, 18 still have an
+extension nothing here claims.** Eleven of those are unread altogether, five are read under one name
+and not under another of theirs, and two never had an extension to claim. That is the current state,
+and it is measured — `Decode --extensions` against `Formats.txt` — not counted up from this file.
 
-Of the 161 left, ten still have a sample here and the rest have none. That is what makes them hard
-rather than tedious: a format with no sample, no specification and no tool on this machine that
-reads it cannot be implemented without guessing a layout, and guessing has already been shown here
-to produce readers that score well on a sample of pixels and are wrong over the whole picture. The
-ten with samples are `afx`, `bmg`, `hru`, `pegs`, `pxa`, `tile`, `upe4`, `upst` and `vit`. What has
-been measured about them, so it does not have to be measured again:
+What follows is how it got there, newest first,
+because the route mattered more than once: three separate times a ceiling was declared here and
+three times it was wrong, and each was overturned by checking rather than by reasoning.
 
-  - `pe4` and `pst` are tiled — sixty separate JPEGs in one file — so they need the tiles assembled
-    rather than the first one drawn, which is the mistake a signature search alone would make.
-  - `afx` opens with PNG's eight-byte signature carrying `AFX` in place of `PNG`, and is not chunked
-    the way PNG is. It holds four JPEGs at 140x88, 128x80 and 125x128, which are previews at
-    different sizes rather than one picture. Which of them the tool draws is exactly what cannot be
-    settled without the tool, so it is left rather than guessed: drawing the largest would be picking
-    one on no evidence.
-  - `tile` names itself `Eclipse` at 16 and states two equal numbers at 4 and 8; `vit` names itself
-    `VITec` at 32; `pxa` names itself `Pixia` at 0. Each has a header worth reading and none of them
-    has been read.
+  - The last five were rows that had already been written off, three of them in this document and
+    two of them twice over, and every one of the five reasons turned out to be wrong — see "Five
+    that were written off too early" below.
+  - Six before them needed no corpus at all: `pps`, `ppt` and `tsk` were read out of the converter's
+    own code and checked by building files for it, and `ami`, `rix` and `wrl` were rows the
+    catalogue had never really opened — two whose extension was a bracket or a wildcard rather than
+    a name, and one whose reader does not exist, though that last was not the disposition it looked
+    like and is closed now too.
+  - Ten went in one pass over the scanner, fax and wrapper names — Micro Dynamics MARS, Skantek,
+    Xionics SMP, Ricoh IS30, Ricoh Fax, SmartFax, Prisms, the Half-Life model, Picture Publisher 4
+    and Cartes Michelin — and two readers that agreed with nothing but themselves were replaced by
+    the files they claim to read rather than added beside.
+  - Eleven before those came off a source that had been sitting in this tree unread — see "Reading
+    the reader" below — and twenty-two more off the converter's own format table.
+  - Eight of an earlier fifteen turned out to be one thing, a Windows DIB preview dropped inside a
+    drawing or project file, and are read by a single reader rather than eight. IBM KIPS, the X11
+    puzzle, Synu and the Zoner brush were four more. The last three are wrappers around a picture
+    format already here: ECC carries a PNG, LView Pro and IPSM each carry a JPEG, and all three
+    state a size the payload agrees with, which is what identifies the file rather than a fixed
+    offset guessed from one sample. Every one of the three was checked against ImageMagick on the
+    extracted payload and matches it on every pixel.
 
-The pattern that closed `ecc`, `lvp` and `pan` is the one to try first on the rest: find whether the
-file carries a picture format already here, and if it does, require the header's stated size to agree
-with the payload's own before drawing it.
+The names still open are not waiting on effort. Recomputed against the catalogue rather than taken
+from this file's own history, they are eleven: `sid`, `lwf`, `ldf`, `eri`, `fif`, `pwc`, `iwc`,
+`wic` and `ypc` are Windows-only third-party plugins whose coding was never published, and the
+converter on this platform does not carry their readers either, so there is nothing here to ask;
+`prc`'s only reference implementation cannot read its own output, and writes a file it then refuses;
+and `pax` is Blowfish under a password the file does not carry. What would move any of them is a
+specification or a working decoder, not more searching — the per-name detail is in "Nothing credible
+describes these" and the table below.
+
+Beside those eleven sit a few rows where one extension of several is unclaimed rather than the whole
+name: `bias` wants `.flt` as well as `.msk`, `pegs` wants `.pxs` beside `.pxa`, `ti` wants `.73i` and
+`.92i` beside the four already read, `d3d` wants `.b2d` beside `.b3d`, and `hpgl` wants `.spl`. Two
+more are not extensions at all and never were — Amica Paint's is the literal `[b]` and ColoRIX's the
+wildcard `sc?` — which is recorded under "The two rows whose extension was not an extension".
 
 ### Names that belonged to a format already here
 

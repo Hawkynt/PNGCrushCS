@@ -817,8 +817,6 @@ Formats we consciously chose not to implement, with reason codes:
 | SVG               | .svg        | vector       | R     | RW  | R      | R         |
 | MPEG video        | .mpg, .mpeg | video        | R     | —   | —      | —         |
 
-Four of those were looked at in detail, because a name a viewer opens is not the
-same thing as a picture format, and it is worth writing down which is which:
 Five of those were looked at in detail, because a name a viewer opens is not the
 same thing as a picture format, and it is worth writing down which is which. Three
 more used to stand on that list and no longer do. The Half-Life model is geometry
