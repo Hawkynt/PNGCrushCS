@@ -135,7 +135,16 @@ if (args[0] == "--encode") {
     return 2;
   }
 
-  File.WriteAllBytes(args[3], wanted.ConvertFromRawImage!(source));
+  // Written through the path rather than the byte array, because that is the route a caller with
+  // somewhere to put the file takes, and it is the only one that reaches what belongs beside it: a
+  // palette in a companion, a size in a companion, or a name the format writes into itself and then
+  // refuses to open under any other. Handing a tool the byte array's output instead measures a file
+  // nobody would ever have written.
+  if (!FormatRegistry.Write(source, wanted.Format, new FileInfo(args[3]))) {
+    Console.Error.WriteLine($"{wanted.Name} would not write {args[3]}");
+    return 2;
+  }
+
   Console.WriteLine($"{wanted.Name}: {new FileInfo(args[3]).Length} bytes from {source.Width}x{source.Height}");
   return 0;
 }
