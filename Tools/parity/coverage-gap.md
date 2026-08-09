@@ -775,6 +775,11 @@ than the vendor's name:
   - `pp4`, Micrografx Picture Publisher 4: `II`, then a thirty-two-bit offset at 0x2A, and the
     loader copies what it finds there into a temporary file and hands it to another reader. What
     that reader is was not chased down.
+  - `pps` and `ppt` share one loader, and it is the same shape as the one that closed `pzp`: the
+    compound-document signature, a skip to 512, then a walk of the file counting pictures. It is a
+    walk of length-prefixed records rather than a signature search, and it was not finished. The
+    entry above still calls PowerPoint "not a picture format", which is true of the container and no
+    longer the whole story — the row is closable the way `pzp` was closed.
   - `prc`, Picture Gear Pocket: the Palm resource database named above, now measured. `iINF` is
     eighteen bytes — width, height, a zero, the depth, a zero, a stride in pixels, `00 FF`, the
     record id — `iPLT` is a count and four bytes an entry, `iFRI` names the tile records, and each
