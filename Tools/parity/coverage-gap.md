@@ -938,9 +938,11 @@ Five of the remaining names — `uyvy`, `uyvyi`, `yuv411`, `yuv422`, `yuv444` �
 layouts share the one extension, and `.qtl` is separately registered as QuickTime Media Link, which
 is an XML playlist. Those rows stay open and the reason has not changed.
 
-What has changed is that the readers behind them can now be read. All five require the size from the
-operator before they do anything, which is why the converter that wrote the file refuses to read it
-back on this platform however the size is given. Two facts came out of them that are worth keeping.
+What has changed is that the readers behind them can now be read. The two that were read — `uyvy` and
+`uyvyi` — open by taking the width and the height from the command line and returning an error where
+either is absent, which is what its help says of all of them and what its behaviour shows: it refuses
+every one of these files on this platform whether the size is given or not. Two facts came out of
+those two that are worth keeping.
 
 The first is that `uyvyi` carries a table of twenty-five frame sizes and places a headerless stream by
 matching its length against them — exactly the rule the reader here uses, against a list that had
