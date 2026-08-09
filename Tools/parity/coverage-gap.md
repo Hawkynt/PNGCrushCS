@@ -866,5 +866,11 @@ looked like a free close.
 It is not, and trying it is what showed why. A frame written by that converter and read by our UYVY
 reader comes back with pure red as 198, 31, 31: the file is in studio swing, where luma runs 16 to
 235 and chroma 16 to 240, and the reader treats it as full range. The mean error over a gradient is
-47 of 255. So the name stays open and the fault is recorded — it is in a reader we already ship
+47 of 255.
+
+Correcting the range to studio swing on both sides brings that to 42 and no further, and what is left
+is not a range fault: a vertical red-to-blue gradient comes back correct at the top row and the
+bottom row and shows red in the middle. Both ends right and the middle wrong is a structure fault,
+not a coefficient one, and it was not run down — the correction is reverted rather than half-shipped.
+So the name stays open and the fault is recorded — it is in a reader we already ship
 under a name we already claim, which is the more useful half of the finding.
