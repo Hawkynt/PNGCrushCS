@@ -606,6 +606,26 @@ public sealed class PostScriptTests {
 
   [Test]
   [Category("Unit")]
+  public void ClaimedNames_IncludeMayuraDrawsOwn() {
+    // Mayura Draw, formerly PageDraw, saves Encapsulated PostScript as .pdx. XnView catalogues it
+    // as a format of its own and reads it with the same interpreter it reads .eps with.
+    Assert.That(_Extensions<PostScriptFile>(), Does.Contain(".pdx"));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void SomethingElseUnderAClaimedName_IsRefused() {
+    // Claiming a name is only safe while the parse decides. These are the things a stray .pdx or
+    // .prn is as likely to be as a program.
+    Assert.Multiple(() => {
+      Assert.Throws<InvalidDataException>(() => PostScriptReader.FromBytes([0x89, (byte)'P', (byte)'N', (byte)'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13]));
+      Assert.Throws<InvalidDataException>(() => PostScriptReader.FromBytes([0xFF, 0xD8, 0xFF, 0xE0, 0, 16, (byte)'J', (byte)'F', (byte)'I', (byte)'F', 0]));
+      Assert.Throws<InvalidDataException>(() => PostScriptReader.FromBytes(new byte[4096]));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
   public void Signature_IsTheTwoCharactersEveryProgramOpensWith() {
     Assert.Multiple(() => {
       Assert.That(_Matches<PostScriptFile>("%!PS-Adobe-3.0"u8), Is.True);

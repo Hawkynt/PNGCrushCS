@@ -7,7 +7,17 @@ namespace FileFormat.MayaIff;
 public readonly record struct MayaIffFile : IImageFormatReader<MayaIffFile>, IImageToRawImage<MayaIffFile>, IImageFromRawImage<MayaIffFile>, IImageFormatWriter<MayaIffFile> {
 
   static string IImageFormatMetadata<MayaIffFile>.PrimaryExtension => ".iff";
-  static string[] IImageFormatMetadata<MayaIffFile>.FileExtensions => [".iff", ".maya"];
+  /// <summary>
+  /// The three names one format goes by: Alias|Wavefront's own, Maya's, and Explore's.
+  /// </summary>
+  /// <remarks>
+  /// XnView catalogues this as <c>Explore (TDI) &amp; Maya</c> reading <c>iff</c> and <c>tdi</c>,
+  /// which are one decoder — Explore was TDI's renderer and Maya inherited its image format.
+  /// Claiming <c>.tdi</c> is safe because the name decides nothing: the file still has to open with
+  /// <c>FOR4</c>, name its form <c>CIMG</c>, carry a <c>TBHD</c>, and have every tile's coding
+  /// account for that tile's chunk exactly.
+  /// </remarks>
+  static string[] IImageFormatMetadata<MayaIffFile>.FileExtensions => [".iff", ".maya", ".tdi"];
   static MayaIffFile IImageFormatReader<MayaIffFile>.FromSpan(ReadOnlySpan<byte> data) => MayaIffReader.FromSpan(data);
 
   static bool? IImageFormatMetadata<MayaIffFile>.MatchesSignature(ReadOnlySpan<byte> header)

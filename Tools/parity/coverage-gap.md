@@ -12,6 +12,7 @@ something up and are correct as they stand.
 are claimed by more than one of its names, so the rows below add up to more than that.
 
 **Ninety-six are closed now and 77 remain.** Eight of the fifteen turned out to be one thing — a
+**Eighty-six are closed now and 87 remain.** Eight of the fifteen turned out to be one thing — a
 Windows DIB preview dropped inside a drawing or project file — and are read by a single reader
 rather than eight. IBM KIPS, the X11 puzzle, Synu and the Zoner brush were four more. The last three
 are wrappers around a picture format already here: ECC carries a PNG, LView Pro and IPSM each carry
@@ -499,6 +500,173 @@ definitions, `file`'s magic database, ImageMagick's coder list and telparia's 84
 archive. The consumer extension directories — filext, file.org, openwith, datatypes, filesuffix and
 the rest — return only reworded copies of XnView's own one-line description, several now padded with
 invented detail, and none of it was treated as evidence.
+### Two things that were here all along
+
+The names in the left-hand column are XnView's, and its catalogue says what each of them is. That
+was never read: `Formats.txt` has a description column beside the extension column, and the list
+above was generated from the extensions alone. Reading the other column names every row outright.
+Half a day of searching for what a `pixp` or an `ssi` might be was work that a file already on this
+machine would have finished in a minute, and the names it gives are not guessable — `oil` is not
+Micro Illustrator but the Open Image Library, `tdi` is not Art Director but Explore, `wic` is not
+Microsoft's imaging component but a wavelet codec of the same initials, and `ncr` is a scanner
+company rather than an encrypted JPEG. Three of those four had been guessed wrong here.
+
+The second is that `nconvert`, XnView's own converter, is in this tree and runs on this platform.
+That changes what "no sample" means, in two ways.
+
+It **writes** six of the missing formats — `prc`, `raw`, `tdi`, `uyvy`, `uyvyi` and `wrl` — so a
+sample of those can be made rather than found, from a picture of our own choosing, which is better
+evidence than a found sample because the original is known.
+
+And for the ones it only reads, a file built to a published specification can be handed to it. If
+XnView reads a file this project constructed at the size and depth it was built with, two
+independent readings of the same document agree, which is most of what a real sample would have
+settled. That is not the same as agreeing on pixels — it says the header was read the same way —
+and where it can be pushed further it has been.
+
+The rest of this section is what those two things settled.
+
+### The five names on one extension, and the sixth beside them
+
+`uyvy`, `uyvyi`, `yuv411`, `yuv422` and `yuv444` all want `.qtl`, and `raw` wants `.grey` and
+`.gry`. The layout each name describes is fully determined by the name; what is not determined is
+how big the picture is, and that is the whole question.
+
+Nothing states it. `nconvert` writing an eight by eight picture as `uyvy` produces 128 bytes and no
+header — the pixels and nothing else — and handed that file straight back it answers *Don't know how
+to read this picture*, with or without the `-size 8x8` its own help offers for exactly this case.
+The tool that wrote the file cannot read the file. Its help is the evidence rather than the failure:
+`-size geometry : Width and height (Raw/YUV)` says in as many words that for these formats the
+operator supplies the size because the file does not.
+
+`.qtl` makes it worse rather than better. Five of the six names claim that one extension, with five
+mutually incompatible pixel layouts, so even a reader that knew the size could not know which of the
+five to apply — and `.qtl` is separately registered as QuickTime Media Link, which is an XML
+playlist and not pixels at all.
+
+So there is nothing to implement. A reader that picked a size from the file's length would draw a
+sheared picture whenever it picked wrong and would have no way of knowing it had. The row stays open
+and states why, which is a better answer than a reader that is right about one frame size in ten.
+
+`.raw` and `.uyvy` are already claimed here by readers that do guess a size from a table of frame
+dimensions. That is the same fault under a name we already own, and it is left alone rather than
+quietly widened.
+
+### The three that were implemented from their own documents
+
+  - `oil` is the Open Image Library's own format — OpenIL's, before it was renamed DevIL. It existed
+    for under a year, from December 2000 to November 2001, which is why nothing has one. Its
+    specification survives in the DevIL 1.1.8 documentation as `ImageLib/docs/oil_spec/index.htm`
+    and describes every field. The one thing the document does not say is whether its structures are
+    packed or aligned, and the file settles that itself: the eighty-three byte description string it
+    ends with can only sit at offset 22, which is where the packed layout puts it. Written that way,
+    files built here in all four of the pixel types and all three of the compressions the format
+    describes are read by XnView at the size and depth they were built with. Its pixels are not a
+    check — handed a picture of four distinct rows it returns the last of them four times over — but
+    the one row it does get right is ours to the byte. LZO is refused rather than guessed at. The
+    weak point is stated on the reader: nothing in the document says which way up the rows go, and
+    what says bottom-up is XnView calling the format "Bottom Left", the single row it does draw
+    being the last one stored, and DevIL holding its images at a lower-left origin.
+  - `tjp` is TilePic, out of the Berkeley Digital Library project: a pyramid of JPEG tiles in one
+    file so a viewer can fetch the part of a large scan that is on screen. `tilepic(5)` reproduces
+    the layout comment from its own source in full. What makes it safe to write without a sample is
+    that the tiling is arithmetic: the layer sizes follow from the picture size and the scale, the
+    tile counts follow from those, and they have to add up to the count the header states. The
+    document's own worked example — 1011 by 765 in 256-pixel tiles over four layers — comes to
+    eighteen tiles and the reader here agrees. Files built to it are read by XnView, which takes the
+    first tile, the top of the pyramid; this takes the bottom layer, which is the picture. A file of
+    a large scan therefore comes out here at the size the header states and there as a thumbnail.
+  - `pdx` is Mayura Draw, formerly PageDraw, and it is not a raster format at all: the program saves
+    Encapsulated PostScript under a name of its own. Handing XnView one file under both `.pdx` and
+    `.eps` gets the same picture by the same route, so the name is claimed for the PostScript
+    interpreter here. It costs nothing in strictness — what decides is still the two characters a
+    PostScript program has to begin with, and a PNG or a JPEG arriving as `.pdx` is refused.
+
+### `tdi`, and a reader that had never agreed with anything
+
+`tdi` is XnView's `Explore (TDI) & Maya`, reading `iff` and `tdi` with one decoder: Explore was
+TDI's renderer and Maya inherited its image format. This tree has had a Maya IFF reader for some
+time. It could not read a Maya IFF.
+
+Three things were wrong, and each of them alone would have been enough. Its header structure was
+declared as 32 bytes where the format's is 24, so any file not written by this library was refused
+before anything was read. It took the channel count from the name of the tile chunk, which is
+`RGBA` even for a picture with three planes — the flags in the header say how many there are. And
+what a tile holds between its corners and its end was recorded in the writer as unsettled, with a
+note that the answer was in a real file: it took the planes in the order the tag reads forwards,
+top row first, where the format names them backwards and counts rows from the bottom.
+
+`nconvert` writing Maya IFF is the real file that note asked for. Three pictures — colour, colour
+with alpha, and one flat enough that the run-length coding is used rather than skipped — go out
+through it and come back through the reader here matching the originals on every pixel of all three.
+Written the other way, a picture encoded here is read by XnView on every pixel as well. Two more
+things fell out of doing it in both directions: the tile corners count rows from the bottom of the
+picture, which a file of one tile row cannot show and a file of two shows immediately, and the
+header's compression field has to name the coding even when a tile is stored uncompressed, which is
+what XnView's own writer does.
+
+`.tdi` is claimed on that. The name decides nothing — a file still has to open `FOR4`, name its form
+`CIMG`, carry a `TBHD`, and have every tile's coding account for that tile's chunk exactly — and an
+Amiga IFF bitmap or a JPEG under either name is refused.
+
+### `rix`, which was already read
+
+`rix` wants `rix sci scx sc?`, and `sc?` is a wildcard for the screen mode the file was saved in
+rather than an extension. The ColoRIX reader here already claims `.rix`, `.scx`, `.sci` and `.sc0`
+through `.sc9`, which is the whole of it, and it requires the file to open with `RIX3`. The row was
+open because the wildcard was counted as a name; there is nothing to do for it.
+
+### What the rest turned out to be
+
+Four of them are not picture formats and cannot be made into ones by a reader:
+
+  - `wrl` is VRML 2, a language for describing a three-dimensional scene. Rendering one is a scene
+    graph, a camera and a lighting model, which is a different job from reading a raster.
+  - `pps` and `ppt` are PowerPoint. XnView's own catalogue writes them as `PowerPoint (images)`:
+    what it takes out is the pictures a presentation carries, which live in an OLE compound
+    document's picture stream. There is no PowerPoint picture format.
+  - `tsk` is a Pocket PC theme, which is a Microsoft cabinet archive — it opens `MSCF` — holding
+    the bitmaps a theme is made of.
+  - `pzp` is an MGI PhotoSuite project, also an OLE compound document; its own stream is called
+    `Catalog`.
+
+One cannot be read at all: `pax` is Smaller Animals Software's Pick Ax format, which opens with
+`PAX` and is encrypted under a password the file does not carry. Tools exist whose entire purpose is
+to guess that password.
+
+Two are identified down to their first bytes and no further, because the coding was never published:
+`pwc` is the piecewise-constant image model, `4yVa`, distributed as a Windows binary from its
+author's research page; `wic` is the J Wavelet Image Codec, `FA DE BA BE 01 01` in its later form
+and `1B 7A FB 30` in its earlier. Both are marked Windows-only in XnView's catalogue, so nothing
+here has ever seen one decoded either.
+
+Three have a shape worth writing down for whoever comes back to them:
+
+  - `prc` is Sony's Picture Gear Pocket, and it is a Palm resource database — the 78-byte Palm
+    header, type and creator both `IMVS`, then resources named `iINF`, `iFRI`, `iPLT` and `iTIL`.
+    The picture is in the `iTIL` tiles against the `iPLT` palette. `nconvert` writes one given
+    `-colours 16`, so unlike everything else in this list it can be worked on with a sample in hand.
+  - `pseg` is an IBM printer page segment: MO:DCA structured fields, each introduced by `5A`, around
+    an IOCA image. Both references are published, and there is an IOCA reader here already, though
+    the note above about how little that reader validates applies.
+  - `xp0` is the SecretPhotos puzzle, and it carries a JPEG. It is the `ecc`/`lvp`/`pan` shape — a
+    wrapper round a picture format already here — but the only evidence of where the JPEG begins is
+    one signature scan's worth, and this file has twice been rewritten to say that a fixed offset
+    taken from one sample is not a format.
+
+The rest are a name and a vendor and nothing else. Searched by extension and by full name across the
+Just Solve The File Format Problem wiki, TrID's definition set, Deark's and dexvert's format lists,
+PRONOM, the Encyclopedia of Graphics File Formats, and general web search: `ncr` is NCR Image,
+`ncy` a FlashCam frame, `pbt` Micro Dynamics MARS — a Macintosh archival system that stored scanned
+documents on optical disk — `pig` a Ricoh IS30 scanner, `pixi` Pixibox, `pixp` Pixel Power Collage,
+`pp4` Micrografx Picture Publisher 4, `prisms` Prisms, `skn` Skantek, `smp` Xionics SMP, `ssi`
+SriSun, `stm` an ArcSoft PhotoStudio stamp, `tdim` Digital F/X, `tnl` a thumbnail, `upi` Ulead
+PhotoImpact and `xim` Ximage. `pd` is the odd one: XnView calls it `Male MRI` and gives it `.pd`,
+`.t1` and `.t2`, which are the names of the pulse sequences a scan is taken with rather than of a
+format, so it belongs with the raw formats above — slices with nothing to say how big they are.
+
+`pmp` is a name with one fact attached that would matter if a sample turned up: a Sony DSC-F1 file
+is a JPEG behind a fixed header, which is the same shape as three rows already closed here.
 
 The last column marks the ones XnView itself cannot load on this platform: its catalogue says
 Windows only, so nothing here has ever been able to compare against them either.
@@ -601,80 +769,85 @@ Windows only, so nothing here has ever been able to compare against them either.
 | ncy | .ncy |  |
 | nsr | .bn .ph |  |
 | oil | .oil |  |
+| mtx | .mtx |  |
+| ncr | .ncr | NCR Image; nothing beyond the name describes it |
+| ncy | .ncy | a FlashCam frame; nothing beyond the name describes it |
+| nsr | .bn .ph | NewsRoom's banner and photo panels; declined, the reader validates nothing but a length |
+| oil | .oil | read, from the Open Image Library's own specification; no sample was available |
 | pan | .pan |  |
-| pax | .pax |  |
-| pbt | .pbt |  |
+| pax | .pax | Pick Ax, encrypted under a password the file does not carry |
+| pbt | .pbt | Micro Dynamics MARS, a Macintosh document archive |
 | pcl | .pcl | the raster subset read; text and HP-GL/2 passed over |
-| pd | .pd .t1 .t2 |  |
+| pd | .pd .t1 .t2 | raw MRI slices named for the pulse sequence; nothing states the size |
 | pdd | .pdd |  |
-| pdx | .pdx |  |
+| pdx | .pdx | read; Mayura Draw saves Encapsulated PostScript under a name of its own |
 | pegs | .pxa .pxs |  |
-| pig | .pig |  |
-| pixi | .pxb |  |
-| pixp | .i17 .i18 .ib7 .if9 |  |
-| pmp | .pmp |  |
+| pig | .pig | a Ricoh IS30 scanner; nothing beyond the name describes it |
+| pixi | .pxb | Pixibox; nothing beyond the name describes it |
+| pixp | .i17 .i18 .ib7 .if9 | Pixel Power Collage; nothing beyond the name describes it |
+| pmp | .pmp | a Sony DSC-F1 file, a JPEG behind a fixed header; no sample |
 | pmsk | .msk | read by the Paint Shop Pro reader |
-| pp4 | .pp4 |  |
+| pp4 | .pp4 | Micrografx Picture Publisher 4; nothing beyond the name describes it |
 | pp5 | .pp5 |  |
-| pps | .pps |  |
-| ppt | .ppt |  |
-| prc | .prc |  |
+| pps | .pps | PowerPoint: a compound document holding pictures, not a picture format |
+| ppt | .ppt | PowerPoint: a compound document holding pictures, not a picture format |
+| prc | .prc | Picture Gear Pocket, a Palm resource database of tiles; a sample can be made |
 | prf | .prf |  |
-| prisms | .pri |  |
-| pseg | .pse |  |
+| prisms | .pri | Prisms; nothing beyond the name describes it |
+| pseg | .pse | MO:DCA structured fields round an IOCA image; both references published |
 | pspb | .pspbrush |  |
 | pspf | .pfr .pspframe | read by the Paint Shop Pro reader |
 | pspm | .pspmask |  |
 | pspt | .tex | read by the Paint Shop Pro reader |
-| pwc | .pwc | Windows only |
+| pwc | .pwc | the piecewise-constant image model; its coding was never published; Windows only |
 | pxa | .pxa |  |
 | pzl | .pzl |  |
-| pzp | .pzp |  |
+| pzp | .pzp | an MGI PhotoSuite project: an OLE compound document |
 | qcad | .cad |  |
-| raw | .grey .gry |  |
+| raw | .grey .gry | raw greyscale; nothing states the size, and XnView asks the operator for it |
 | rfax | .001 |  |
-| rix | .sc? |  |
+| rix | .sc? | read by the ColoRIX reader; sc? is a wildcard it already covers |
 | sct | .ch | read by the Scitex CT reader |
 | sdg | .sdg |  |
 | sfax | .001 |  |
 | sid | .sid | Windows only |
 | skf | .skf |  |
-| skn | .skn |  |
-| smp | .smp |  |
-| ssi | .ssi |  |
+| skn | .skn | Skantek; nothing beyond the name describes it |
+| smp | .smp | Xionics SMP; nothing beyond the name describes it |
+| ssi | .ssi | SriSun; nothing beyond the name describes it |
 | ssp | .ssp | every embedded picture read, not the first |
-| stm | .stm |  |
+| stm | .stm | an ArcSoft PhotoStudio stamp; nothing beyond the name describes it |
 | stw | .stw |  |
 | svg | .svg | read |
 | synu | .syn .synu |  |
 | taac | .suniff .taac .vff | read, and checked against the sample |
-| tdi | .tdi |  |
-| tdim | .tdim |  |
+| tdi | .tdi | read by the Maya IFF reader, which had to be corrected first |
+| tdim | .tdim | Digital F/X; nothing beyond the name describes it |
 | ti | .73i .82i .83i .85i .86i .92i |  |
 | tile | .tile |  |
-| tjp | .tjp |  |
-| tnl | .tnl |  |
-| tsk | .tsk |  |
+| tjp | .tjp | read, from tilepic(5); the bottom layer rather than the first tile |
+| tnl | .tnl | Thumbnail; nothing beyond the name describes it |
+| tsk | .tsk | a Pocket PC theme: a Microsoft cabinet holding bitmaps |
 | ttf | .ttf | drawn as a sheet of its glyphs |
 | tub | .psptube .tub |  |
 | upe4 | .pe4 |  |
-| upi | .upi |  |
+| upi | .upi | Ulead PhotoImpact; nothing beyond the name describes it |
 | upst | .pst |  |
-| uyvy | .qtl |  |
-| uyvyi | .qtl |  |
+| uyvy | .qtl | raw YUV; nothing states the size, and five names share this extension |
+| uyvyi | .qtl | raw YUV; nothing states the size, and five names share this extension |
 | vit | .vit |  |
 | vob | .vob |  |
-| wic | .wic | Windows only |
-| wrl | .wrl |  |
+| wic | .wic | the J Wavelet Image Codec; its coding was never published; Windows only |
+| wrl | .wrl | VRML 2, a language for a three-dimensional scene rather than a raster |
 | wzl | .wzl |  |
 | x3f | .x3f |  |
 | xar | .xar | preview at the stated tag |
 | xif | .xif | a TIFF; the sample's private compression 34673 is not decoded |
-| xim | .xim |  |
-| xp0 | .xp0 |  |
+| xim | .xim | Ximage; nothing beyond the name describes it |
+| xp0 | .xp0 | the SecretPhotos puzzle, which carries a JPEG at no stated offset |
 | ypc | .ypc | Windows only |
-| yuv411 | .qtl |  |
-| yuv422 | .qtl |  |
-| yuv444 | .qtl |  |
+| yuv411 | .qtl | raw YUV; nothing states the size, and five names share this extension |
+| yuv422 | .qtl | raw YUV; nothing states the size, and five names share this extension |
+| yuv444 | .qtl | raw YUV; nothing states the size, and five names share this extension |
 | zbr | .zbr |  |
 | zmf | .zmf |  |

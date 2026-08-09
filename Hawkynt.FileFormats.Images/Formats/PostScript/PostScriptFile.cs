@@ -42,8 +42,18 @@ public readonly record struct PostScriptFile : IImageFormatReader<PostScriptFile
 
   static string IImageFormatMetadata<PostScriptFile>.PrimaryExtension => ".ps";
 
+  /// <summary>
+  /// <c>.pdx</c> is Mayura Draw, which saves Encapsulated PostScript under a name of its own.
+  /// </summary>
+  /// <remarks>
+  /// The drawing program formerly called PageDraw writes <c>.pdx</c> and <c>.md</c> files that open
+  /// <c>%!PS-Adobe-3.0 EPSF-3.0</c> — XnView catalogues the name separately and reads it with the
+  /// same interpreter it reads <c>.eps</c> with, which is what handing it the same file under both
+  /// names shows. Claiming the name costs nothing in strictness: what decides is still the two
+  /// characters the program has to begin with.
+  /// </remarks>
   static string[] IImageFormatMetadata<PostScriptFile>.FileExtensions => [
-    ".ps", ".ps1", ".ps2", ".ps3", ".eps", ".epsf", ".epsi", ".epi", ".prn"
+    ".ps", ".ps1", ".ps2", ".ps3", ".eps", ".epsf", ".epsi", ".epi", ".prn", ".pdx"
   ];
 
   static PostScriptFile IImageFormatReader<PostScriptFile>.FromSpan(ReadOnlySpan<byte> data) => PostScriptReader.FromSpan(data);
