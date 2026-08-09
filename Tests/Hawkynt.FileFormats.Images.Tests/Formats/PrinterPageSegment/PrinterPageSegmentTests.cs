@@ -230,4 +230,113 @@ public sealed class PrinterPageSegmentTests {
   [Category("Unit")]
   public void Read_RefusesAFileNotMadeOfStructuredFields()
     => Assert.Throws<InvalidDataException>(() => PrinterPageSegmentReader.FromBytes(new byte[64]));
+
+  /// <summary>Ink and paper as a grey picture, deliberately asymmetric both ways round.</summary>
+  private static RawImage _Ink(int width, int height) {
+    var pixels = new byte[width * height];
+    for (var y = 0; y < height; ++y)
+    for (var x = 0; x < width; ++x)
+      pixels[y * width + x] = (byte)((x / 2 + y) % 2 == 0 && x != 5 ? 0 : 255);
+
+    return new() { Width = width, Height = height, Format = PixelFormat.Gray8, PixelData = pixels };
+  }
+
+  private static byte[] _AsGrey(RawImage image) => image.EnsureFormat(PixelFormat.Gray8).PixelData;
+
+  [Test]
+  [Category("Integration")]
+  public void Write_RoundTripsTheInkItWasGiven() {
+    var source = _Ink(16, 4);
+    var back = FormatIO.Decode<PrinterPageSegmentFile>(FormatIO.Encode<PrinterPageSegmentFile>(source));
+
+    Assert.Multiple(() => {
+      Assert.That((back.Width, back.Height), Is.EqualTo((16, 4)));
+      Assert.That(back.Format, Is.EqualTo(PixelFormat.Indexed1));
+      Assert.That(_AsGrey(back), Is.EqualTo(source.PixelData));
+    });
+  }
+
+  /// <summary>A set bit is ink, so the dark pixel is the one that gets it.</summary>
+  /// <remarks>Backwards this produces a negative, which on a line drawing is not obvious.</remarks>
+  [Test]
+  [Category("Unit")]
+  public void Write_SetsTheBitOnTheDarkPixel() {
+    var file = PrinterPageSegmentFile.FromRawImage(new RawImage {
+      Width = 8, Height = 1, Format = PixelFormat.Gray8,
+      PixelData = [0, 0, 0, 0, 255, 255, 255, 255],
+    });
+
+    Assert.That(file.PixelData, Is.EqualTo(new byte[] { 0xF0 }));
+  }
+
+  /// <summary>
+  /// The end-of-image field is what makes the bottom row readable, so it has to be written.
+  /// </summary>
+  /// <remarks>
+  /// A segment whose data stops exactly at the bottom row with nothing behind it is refused — the test
+  /// above pins that, and the converter does the same. So a writer that left the marker off would
+  /// produce a file neither could open.
+  /// </remarks>
+  [Test]
+  [Category("Unit")]
+  public void Write_ClosesTheSegmentWithTheEndOfImageMarker() {
+    var bytes = FormatIO.Encode<PrinterPageSegmentFile>(_Ink(16, 4));
+    var marker = _Field(_END_OF_IMAGE);
+
+    Assert.That(bytes[^marker.Length..], Is.EqualTo(marker));
+  }
+
+  /// <summary>The cell width goes at 28, which is the byte a decoy at 24 proved is not read.</summary>
+  [Test]
+  [Category("Unit")]
+  public void Write_StatesTheCellWidthAtTwentyEight() {
+    var bytes = FormatIO.Encode<PrinterPageSegmentFile>(_Ink(24, 2));
+    var descriptor = bytes[9..45];
+
+    Assert.Multiple(() => {
+      Assert.That((descriptor[18] << 8) | descriptor[19], Is.EqualTo(24), "the width");
+      Assert.That((descriptor[20] << 8) | descriptor[21], Is.EqualTo(2), "the height");
+      Assert.That((descriptor[28] << 8) | descriptor[29], Is.EqualTo(24), "the cell width");
+      Assert.That((descriptor[24] << 8) | descriptor[25], Is.Zero, "and nothing at 24");
+    });
+  }
+
+  /// <summary>
+  /// A width that is not a whole number of bytes is widened rather than refused.
+  /// </summary>
+  /// <remarks>
+  /// Both the descriptor's width and the cell's have to divide by eight. Narrowing a seven-pixel
+  /// picture would throw away a column of it, so it goes up to eight.
+  /// </remarks>
+  [TestCase(7, 8)]
+  [TestCase(9, 16)]
+  [TestCase(16, 16)]
+  [Category("Unit")]
+  public void Write_WidensAPictureToAWholeNumberOfBytes(int width, int expected) {
+    var back = FormatIO.Decode<PrinterPageSegmentFile>(
+      FormatIO.Encode<PrinterPageSegmentFile>(_Ink(width, 3)));
+
+    Assert.That(back.Width, Is.EqualTo(expected));
+  }
+
+  /// <summary>
+  /// A raster too big for one field is split across several, which the rows carry on across.
+  /// </summary>
+  /// <remarks>
+  /// A field states its length in sixteen bits, so one holds a little under 64 kilobytes. 640 by 200
+  /// needs 16,000 bytes of raster and fits; 640 by 1000 does not, and is what this checks.
+  /// </remarks>
+  [Test]
+  [Category("Integration")]
+  public void Write_SplitsARasterTooBigForOneFieldAcrossSeveral() {
+    var source = _Ink(640, 1000);
+    var bytes = FormatIO.Encode<PrinterPageSegmentFile>(source);
+    var back = FormatIO.Decode<PrinterPageSegmentFile>(bytes);
+
+    Assert.Multiple(() => {
+      Assert.That(bytes, Has.Length.GreaterThan(0xFFFF), "more than one field's worth");
+      Assert.That((back.Width, back.Height), Is.EqualTo((640, 1000)));
+      Assert.That(_AsGrey(back), Is.EqualTo(source.PixelData));
+    });
+  }
 }

@@ -22,7 +22,7 @@ namespace FileFormat.AimGreyScale;
 /// of the fallback — not a table, one entry — and it is why reading by bytes alone works for that one
 /// size and nothing else.
 /// </remarks>
-public readonly record struct AimGreyScaleFile : IImageFormatReader<AimGreyScaleFile>, IImageToRawImage<AimGreyScaleFile> {
+public readonly record struct AimGreyScaleFile : IImageFormatReader<AimGreyScaleFile>, IImageToRawImage<AimGreyScaleFile>, IImageFromRawImage<AimGreyScaleFile>, IImageFormatWriter<AimGreyScaleFile> {
 
   static string IImageFormatMetadata<AimGreyScaleFile>.PrimaryExtension => ".ima";
 
@@ -46,6 +46,20 @@ public readonly record struct AimGreyScaleFile : IImageFormatReader<AimGreyScale
     new("Grey scale", [(IntegerRange.Any, IntegerRange.Any)], [256]),
   ];
 
+  static byte[] IImageFormatWriter<AimGreyScaleFile>.ToBytes(AimGreyScaleFile file) => AimGreyScaleWriter.ToBytes(file);
+
+  /// <summary>Writes the companion, without which the picture states no size at all.</summary>
+  /// <remarks>
+  /// Unlike the palettes the other companion-keeping formats write, this one is not an improvement on
+  /// the reading — it is the reading. A picture written without it is 256 by 256 or it is nothing, so
+  /// a caller taking the bytes and putting them somewhere itself has to write this beside them.
+  /// </remarks>
+  static void IImageFormatWriter<AimGreyScaleFile>.WriteCompanions(AimGreyScaleFile file, FileInfo target) {
+    ArgumentNullException.ThrowIfNull(target);
+
+    File.WriteAllBytes(Path.ChangeExtension(target.FullName, CompanionExtension), AimGreyScaleWriter.CompanionBytes(file));
+  }
+
   /// <summary>The companion stating the size lives under this extension.</summary>
   public const string CompanionExtension = ".hd";
 
@@ -60,6 +74,9 @@ public readonly record struct AimGreyScaleFile : IImageFormatReader<AimGreyScale
 
   public const int FallbackExtent = 256;
 
+  /// <summary>Largest size the companion can state, its two numbers being sixteen bits each.</summary>
+  public const int MaximumExtent = 0xFFFF;
+
   public int Width { get; init; }
 
   public int Height { get; init; }
@@ -73,4 +90,24 @@ public readonly record struct AimGreyScaleFile : IImageFormatReader<AimGreyScale
     Format = PixelFormat.Gray8,
     PixelData = file.PixelData[..],
   };
+
+  /// <summary>
+  /// Takes the picture at whatever size it is, the companion being able to state any of them.
+  /// </summary>
+  /// <remarks>
+  /// Nothing is resampled here, which is the exception among the writers that hold only certain
+  /// shapes: this one holds every shape, the size living in a file whose two numbers are free. The
+  /// one thing a size has to fit is sixteen bits each way, and anything larger is brought down to
+  /// that rather than written as a number that wraps.
+  /// </remarks>
+  public static AimGreyScaleFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var width = Math.Min(image.Width, MaximumExtent);
+    var height = Math.Min(image.Height, MaximumExtent);
+    var source = (width == image.Width && height == image.Height ? image : image.SampleTo(width, height))
+      .EnsureFormat(PixelFormat.Gray8);
+
+    return new() { Width = width, Height = height, PixelData = source.PixelData[..] };
+  }
 }

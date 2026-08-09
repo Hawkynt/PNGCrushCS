@@ -95,7 +95,9 @@ public static class PixelPowerCollageReader {
     var pixels = new byte[needed];
     Array.Copy(data, PixelPowerCollageFile.PixelOffset, pixels, 0, needed);
 
-    return new() { Width = width, Height = height, BitsPerPixel = bits, PixelData = pixels };
+    // The stored name rather than the one on disk: the two matched or we would not be here, and it
+    // is the stored one a re-write has to put back.
+    return new() { Name = stored, Width = width, Height = height, BitsPerPixel = bits, PixelData = pixels };
   }
 
   /// <summary>The name at the head of the file, which ends at the first zero.</summary>

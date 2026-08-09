@@ -89,4 +89,70 @@ public sealed class RawGreyscaleTests {
   [Category("Unit")]
   public void Read_RefusesALengthOneByteOffASizeItKnows()
     => Assert.Throws<InvalidDataException>(() => RawGreyscaleReader.FromBytes(new byte[256 * 256 + 1]));
+
+  private static RawImage _Grey(int width, int height, byte[] pixels)
+    => new() { Width = width, Height = height, Format = PixelFormat.Gray8, PixelData = pixels };
+
+  /// <summary>
+  /// The same picture the converter was given comes back out as the same 76,800 bytes.
+  /// </summary>
+  /// <remarks>
+  /// Compared against the pixels rather than against a stored file, the converter's output for this
+  /// picture having been exactly them: there is no header to differ in, so equality of the bytes is
+  /// equality of the whole file.
+  /// </remarks>
+  [Test]
+  [Category("Integration")]
+  public void Write_ProducesTheSameBytesTheConverterWrote() {
+    var pixels = _Ramp(320, 240);
+
+    Assert.That(FormatIO.Encode<RawGreyscaleFile>(_Grey(320, 240, pixels)), Is.EqualTo(pixels));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void Write_RoundTripsAPictureAlreadyAtASizeTheTableHolds() {
+    var pixels = _Ramp(64, 64);
+    var back = FormatIO.Decode<RawGreyscaleFile>(FormatIO.Encode<RawGreyscaleFile>(_Grey(64, 64, pixels)));
+
+    Assert.Multiple(() => {
+      Assert.That((back.Width, back.Height), Is.EqualTo((64, 64)));
+      Assert.That(back.PixelData, Is.EqualTo(pixels));
+    });
+  }
+
+  /// <summary>
+  /// A size the table does not hold is moved to the nearest one it does, rather than refused.
+  /// </summary>
+  /// <remarks>
+  /// Writing the pixels at their own size would produce a length nothing can place — not this reader,
+  /// which has only the length to go on, and not the converter, which asks the operator. A file that
+  /// cannot be opened again is worse than one that has been resampled.
+  /// </remarks>
+  [TestCase(300, 220, 320, 240)]
+  [TestCase(1920, 1080, 1920, 1080)]
+  [TestCase(2, 2, 64, 64)]
+  [Category("Unit")]
+  public void Write_MovesAnUnknownSizeToTheNearestKnownOne(int width, int height, int expectedWidth, int expectedHeight) {
+    var bytes = FormatIO.Encode<RawGreyscaleFile>(_Grey(width, height, new byte[width * height]));
+    var back = FormatIO.Decode<RawGreyscaleFile>(bytes);
+
+    Assert.Multiple(() => {
+      Assert.That((back.Width, back.Height), Is.EqualTo((expectedWidth, expectedHeight)));
+      Assert.That(bytes, Has.Length.EqualTo(expectedWidth * expectedHeight));
+    });
+  }
+
+  /// <summary>Whatever this writes can be read back, there being no size in the file to help.</summary>
+  [Test]
+  [Category("Unit")]
+  public void Write_AlwaysProducesALengthTheReaderPlaces() {
+    Assert.Multiple(() => {
+      foreach (var (width, height) in new[] { (1, 1), (17, 23), (640, 480), (4000, 3000) })
+        Assert.DoesNotThrow(
+          () => FormatIO.Decode<RawGreyscaleFile>(
+            FormatIO.Encode<RawGreyscaleFile>(_Grey(width, height, new byte[width * height]))),
+          $"{width}x{height}");
+    });
+  }
 }

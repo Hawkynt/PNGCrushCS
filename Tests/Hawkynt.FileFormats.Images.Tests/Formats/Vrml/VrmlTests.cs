@@ -148,4 +148,130 @@ public sealed class VrmlTests {
   public void Read_RefusesAComponentCountNoPixelHas()
     => Assert.Throws<InvalidDataException>(() => VrmlReader.FromBytes(_Bytes(
       "#VRML V2.0 utf8\nPixelTexture { image 1 1 5 0x00 }")));
+
+  private static RawImage _Rgb(int width, int height, byte[] pixels)
+    => new() { Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = pixels };
+
+  /// <summary>
+  /// The whole file for a four-pixel picture, written out so the shape of the output is readable.
+  /// </summary>
+  /// <remarks>
+  /// Every space matters and none is decoration: a value is followed by a space whether or not a line
+  /// break comes after it, and the brace that closes the texture is indented eight. Byte equality with
+  /// the converter's own output was checked separately at 6x4, 5x3, 10x2, 13x2, 7x1, 1x7 and 4x2; this
+  /// is the same agreement written where it can be read.
+  /// </remarks>
+  private const string _FourPixels =
+    "#VRML V2.0 utf8\n"
+    + "Group {\n"
+    + "  children [\n"
+    + "    Shape {\n"
+    + "      appearance Appearance {\n"
+    + "        material Material {\n"
+    + "          diffuseColor 1.0 1.0 1.0\n"
+    + "        }\n"
+    + "        texture PixelTexture {\n"
+    + "          image 4 1 1\n"
+    + "0x11 0x22 0x33 0x44 \n"
+    + "        }\n"
+    + "      }\n"
+    + "      geometry Box {}\n"
+    + "    }\n"
+    + "  ]\n"
+    + "}\n";
+
+  [Test]
+  [Category("Unit")]
+  public void Write_ProducesTheSceneTheConverterWritesDownToTheSpacing() {
+    var grey = new RawImage {
+      Width = 4, Height = 1, Format = PixelFormat.Gray8, PixelData = [0x11, 0x22, 0x33, 0x44],
+    };
+
+    Assert.That(Encoding.ASCII.GetString(FormatIO.Encode<VrmlFile>(grey)), Is.EqualTo(_FourPixels));
+  }
+
+  /// <summary>
+  /// What we write parses to the same picture as the scene the converter wrote for it.
+  /// </summary>
+  /// <remarks>
+  /// The two files are not byte-identical here only because the fixture above has had its trailing
+  /// spaces trimmed by the source file; what is compared is therefore the picture rather than the text.
+  /// </remarks>
+  [Test]
+  [Category("Integration")]
+  public void Write_CarriesThePictureTheConvertersOwnSceneCarries() {
+    var ours = VrmlFile.ToRawImage(VrmlReader.FromBytes(FormatIO.Encode<VrmlFile>(_Rgb(6, 4, _Source()))));
+    var theirs = VrmlFile.ToRawImage(VrmlReader.FromBytes(_Bytes(_Scene)));
+
+    Assert.Multiple(() => {
+      Assert.That((ours.Width, ours.Height), Is.EqualTo((theirs.Width, theirs.Height)));
+      Assert.That(ours.Format, Is.EqualTo(theirs.Format));
+      Assert.That(ours.PixelData, Is.EqualTo(theirs.PixelData));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void Write_ListsTheBottomRowFirst() {
+    // Read back the other way up this picture would come out mirrored, and the round-trip below
+    // would still pass — so the field itself is what is looked at.
+    var text = Encoding.ASCII.GetString(FormatIO.Encode<VrmlFile>(new RawImage {
+      Width = 1, Height = 2, Format = PixelFormat.Gray8, PixelData = [0x11, 0x22],
+    }));
+
+    // One pixel across never reaches a line break, so the two values stand on the one line.
+    Assert.That(text, Does.Contain("image 1 2 1\n0x22 0x11         }"));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void Write_BreaksTheLineEveryFourPixelsOfARowRatherThanOfTheField() {
+    // Six across: four on the first line, two on the second, and the next row starts its own count.
+    var text = Encoding.ASCII.GetString(FormatIO.Encode<VrmlFile>(new RawImage {
+      Width = 6, Height = 2, Format = PixelFormat.Gray8, PixelData = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+    }));
+
+    // The bottom row is written first, so its four break the line and its last two carry the top
+    // row's first four along with them — which is the wrapping the converter produces.
+    Assert.That(text, Does.Contain(
+      "0x07 0x08 0x09 0x0a \n0x0b 0x0c 0x01 0x02 0x03 0x04 \n0x05 0x06         }"));
+  }
+
+  [TestCase(PixelFormat.Gray8, 1)]
+  [TestCase(PixelFormat.Rgb24, 3)]
+  [TestCase(PixelFormat.Rgba32, 4)]
+  [Category("Unit")]
+  public void Write_SpendsTwoDigitsOnEveryComponentItStates(PixelFormat format, int components) {
+    var text = Encoding.ASCII.GetString(FormatIO.Encode<VrmlFile>(new RawImage {
+      Width = 1, Height = 1, Format = format, PixelData = new byte[components],
+    }));
+
+    Assert.That(text, Does.Contain($"image 1 1 {components}\n0x{new string('0', components * 2)} "));
+  }
+
+  /// <summary>
+  /// Alpha survives a picture that keeps it blue-first, which choosing by layout alone would drop.
+  /// </summary>
+  [Test]
+  [Category("Unit")]
+  public void Write_KeepsTheAlphaOfAPictureStoredBlueFirst() {
+    var text = Encoding.ASCII.GetString(FormatIO.Encode<VrmlFile>(new RawImage {
+      Width = 1, Height = 1, Format = PixelFormat.Bgra32, PixelData = [0x33, 0x22, 0x11, 0x44],
+    }));
+
+    Assert.That(text, Does.Contain("image 1 1 4\n0x11223344 "));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void Write_RoundTripsThePictureItWasGiven() {
+    var source = _Rgb(6, 4, _Source());
+    var back = FormatIO.Decode<VrmlFile>(FormatIO.Encode<VrmlFile>(source));
+
+    Assert.Multiple(() => {
+      Assert.That((back.Width, back.Height), Is.EqualTo((6, 4)));
+      Assert.That(back.Format, Is.EqualTo(PixelFormat.Rgb24));
+      Assert.That(back.PixelData, Is.EqualTo(source.PixelData));
+    });
+  }
 }

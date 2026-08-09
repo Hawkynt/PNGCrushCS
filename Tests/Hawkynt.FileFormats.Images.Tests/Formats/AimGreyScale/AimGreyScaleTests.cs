@@ -141,4 +141,78 @@ public sealed class AimGreyScaleTests {
 
     Assert.Throws<InvalidDataException>(() => AimGreyScaleReader.FromBytesAndCompanion(new byte[6], stunted));
   }
+
+  private static RawImage _Grey(int width, int height) {
+    var pixels = new byte[width * height];
+    for (var i = 0; i < pixels.Length; ++i)
+      pixels[i] = (byte)(i * 5 + 3);
+
+    return new() { Width = width, Height = height, Format = PixelFormat.Gray8, PixelData = pixels };
+  }
+
+  /// <summary>Writes a picture through the path, then reads back whatever ended up in the directory.</summary>
+  private static (AimGreyScaleFile File, bool Companion) _Written(RawImage image, string name = "scan.ima") {
+    var directory = Directory.CreateTempSubdirectory("aim");
+    try {
+      var target = new FileInfo(Path.Combine(directory.FullName, name));
+      FormatIO.WriteToFile<AimGreyScaleFile>(image, target);
+
+      return (AimGreyScaleReader.FromFile(target),
+        File.Exists(Path.ChangeExtension(target.FullName, AimGreyScaleFile.CompanionExtension)));
+    } finally {
+      directory.Delete(recursive: true);
+    }
+  }
+
+  /// <summary>
+  /// A size that is not 256 by 256 comes back only because the companion was written too.
+  /// </summary>
+  /// <remarks>
+  /// This is the whole of what makes the format writable. The picture file states nothing, so without
+  /// the <c>.hd</c> beside it a 48 by 20 picture is 960 bytes that no reader can place — refused here
+  /// and refused by the converter, which was checked by handing it both files and then only one.
+  /// </remarks>
+  [Test]
+  [Category("Integration")]
+  public void Write_PutsTheSizeInTheCompanionSoAnyShapeReadsBack() {
+    var source = _Grey(48, 20);
+    var (file, companion) = _Written(source);
+
+    Assert.Multiple(() => {
+      Assert.That(companion, Is.True, "the .hd was written");
+      Assert.That((file.Width, file.Height), Is.EqualTo((48, 20)));
+      Assert.That(file.PixelData, Is.EqualTo(source.PixelData));
+    });
+  }
+
+  [Test]
+  [Category("Integration")]
+  public void Write_NamesTheCompanionAfterThePictureEvenWithMoreThanOneDot() {
+    var (file, companion) = _Written(_Grey(7, 4), "study.01.ima");
+
+    Assert.Multiple(() => {
+      Assert.That(companion, Is.True);
+      Assert.That((file.Width, file.Height), Is.EqualTo((7, 4)));
+    });
+  }
+
+  /// <summary>The companion this writes is one this reader accepts, field for field.</summary>
+  [Test]
+  [Category("Unit")]
+  public void Write_BuildsACompanionShapedTheWayTheLoaderWantsIt() {
+    var written = AimGreyScaleWriter.CompanionBytes(AimGreyScaleFile.FromRawImage(_Grey(300, 7)));
+
+    Assert.That(written, Is.EqualTo(_Companion(300, 7)));
+  }
+
+  /// <summary>Bytes alone reach no companion, so only the one fallback size survives that route.</summary>
+  [Test]
+  [Category("Unit")]
+  public void Write_ToBytesAloneIsReadableOnlyAtTheSizeThatNeedsNoCompanion() {
+    Assert.Multiple(() => {
+      Assert.That(FormatIO.Encode<AimGreyScaleFile>(_Grey(256, 256)), Has.Length.EqualTo(AimGreyScaleFile.FallbackLength));
+      Assert.DoesNotThrow(() => AimGreyScaleReader.FromBytes(FormatIO.Encode<AimGreyScaleFile>(_Grey(256, 256))));
+      Assert.Throws<InvalidDataException>(() => AimGreyScaleReader.FromBytes(FormatIO.Encode<AimGreyScaleFile>(_Grey(48, 20))));
+    });
+  }
 }

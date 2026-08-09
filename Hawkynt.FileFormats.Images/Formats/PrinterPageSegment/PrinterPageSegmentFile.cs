@@ -23,7 +23,7 @@ namespace FileFormat.PrinterPageSegment;
 /// reach stays white rather than black — and the fill rectangle a cell position may carry writes
 /// paper too, clearing what an earlier cell put there.
 /// </remarks>
-public readonly record struct PrinterPageSegmentFile : IImageFormatReader<PrinterPageSegmentFile>, IImageToRawImage<PrinterPageSegmentFile> {
+public readonly record struct PrinterPageSegmentFile : IImageFormatReader<PrinterPageSegmentFile>, IImageToRawImage<PrinterPageSegmentFile>, IImageFromRawImage<PrinterPageSegmentFile>, IImageFormatWriter<PrinterPageSegmentFile> {
 
   static string IImageFormatMetadata<PrinterPageSegmentFile>.PrimaryExtension => ".pse";
 
@@ -34,6 +34,7 @@ public readonly record struct PrinterPageSegmentFile : IImageFormatReader<Printe
   static VideoMode[] IImageFormatMetadata<PrinterPageSegmentFile>.VideoModes => [
     new("IM1", [(IntegerRange.Any, IntegerRange.Any)], [2]),
   ];
+  static byte[] IImageFormatWriter<PrinterPageSegmentFile>.ToBytes(PrinterPageSegmentFile file) => PrinterPageSegmentWriter.ToBytes(file);
 
   /// <summary>
   /// Whether the file opens the way a page segment must: <c>5A</c>, and a type this reader walks.
@@ -51,6 +52,9 @@ public readonly record struct PrinterPageSegmentFile : IImageFormatReader<Printe
 
     return PrinterPageSegmentReader.IsFirstPassType((header[3] << 16) | (header[4] << 8) | header[5]);
   }
+
+  /// <summary>Largest picture the original will allocate, either way round.</summary>
+  public const int MaximumExtent = 0x927BF;
 
   public int Width { get; init; }
 
@@ -73,4 +77,30 @@ public readonly record struct PrinterPageSegmentFile : IImageFormatReader<Printe
     Palette = _Palette[..],
     PaletteCount = 2,
   };
+
+  /// <summary>
+  /// Reduces the picture to ink and paper, at a width the format can state.
+  /// </summary>
+  /// <remarks>
+  /// Both the descriptor's width and the cell's have to divide by eight — the original refuses a file
+  /// that breaks it and so does the reader here — so a picture whose width does not is widened to the
+  /// next multiple of eight and resampled into it rather than turned away. Widening rather than
+  /// narrowing because the alternative throws away a column of a picture only seven pixels wide.
+  /// <para/>
+  /// A set bit is ink, so the threshold sets the bit on the DARK pixel. Getting that backwards
+  /// produces a negative, which on a scanned page is obvious and on a line drawing is not.
+  /// </remarks>
+  public static PrinterPageSegmentFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var width = Math.Min((image.Width + 7) & ~7, MaximumExtent & ~7);
+    var height = Math.Min(image.Height, MaximumExtent);
+    var source = width == image.Width && height == image.Height ? image : image.SampleTo(width, height);
+
+    return new() {
+      Width = width,
+      Height = height,
+      PixelData = BilevelRows.Pack(BilevelRows.Threshold(source, setWhenDark: true), width, height),
+    };
+  }
 }

@@ -48,7 +48,7 @@ public static class PrinterPageSegmentReader {
   private const int _NO_FILL = 0xFFFF;
 
   /// <summary>Largest picture the original will allocate, either way round.</summary>
-  private const int _MAX_EXTENT = 0x927BF;
+  private const int _MAX_EXTENT = PrinterPageSegmentFile.MaximumExtent;
 
   public static PrinterPageSegmentFile FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);

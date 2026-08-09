@@ -67,10 +67,15 @@ public static class FormatIO {
   /// picture again. That matters where the two have to agree on something chosen rather than
   /// derived — a colour reduction run twice can settle differently, and then the palette beside the
   /// file describes colours the file does not use.
+  /// <para/>
+  /// The encoding is given the whole path rather than its extension, because a format may write its
+  /// own name into itself and then refuse to open under any other.
   /// </remarks>
   public static void WriteToFile<T>(RawImage image, FileInfo target)
     where T : IImageFromRawImage<T>, IImageFormatWriter<T> {
-    var file = T.FromRawImage(image, target.Extension);
+    ArgumentNullException.ThrowIfNull(target);
+
+    var file = T.FromRawImage(image, target);
     File.WriteAllBytes(target.FullName, T.ToBytes(file));
     T.WriteCompanions(file, target);
   }

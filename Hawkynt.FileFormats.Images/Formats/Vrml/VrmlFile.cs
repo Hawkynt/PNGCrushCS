@@ -24,12 +24,13 @@ namespace FileFormat.Vrml;
 /// </remarks>
 [FormatMagicBytes([0x23, 0x56, 0x52, 0x4D, 0x4C])] // "#VRML"
 [FormatMimeType("model/vrml", "x-world/x-vrml")]
-public readonly record struct VrmlFile : IImageFormatReader<VrmlFile>, IImageToRawImage<VrmlFile> {
+public readonly record struct VrmlFile : IImageFormatReader<VrmlFile>, IImageToRawImage<VrmlFile>, IImageFromRawImage<VrmlFile>, IImageFormatWriter<VrmlFile> {
 
   static string IImageFormatMetadata<VrmlFile>.PrimaryExtension => ".wrl";
   static string[] IImageFormatMetadata<VrmlFile>.FileExtensions => [".wrl", ".vrml"];
   static VrmlFile IImageFormatReader<VrmlFile>.FromSpan(ReadOnlySpan<byte> data) => VrmlReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<VrmlFile>.VideoModes => [new("PixelTexture", [(IntegerRange.Any, IntegerRange.Any)])];
+  static byte[] IImageFormatWriter<VrmlFile>.ToBytes(VrmlFile file) => VrmlWriter.ToBytes(file);
 
   /// <summary>The header every VRML 2.0 file opens with, ahead of any node.</summary>
   public const string Header = "#VRML V2.0";
@@ -55,4 +56,37 @@ public readonly record struct VrmlFile : IImageFormatReader<VrmlFile>, IImageToR
     },
     PixelData = file.PixelData[..],
   };
+
+  /// <summary>
+  /// Turns a picture into a texture: grey, colour, or colour with alpha, and nothing between.
+  /// </summary>
+  /// <remarks>
+  /// The field allows two components as well, and this never writes them — which is deliberate rather
+  /// than an omission. XnView's converter, the only producer these files were checked against, turns a
+  /// grey-with-alpha picture into four components and never emits two; matching it keeps our output
+  /// inside the shapes that were actually confirmed. The reader still takes two from anything else
+  /// that writes them.
+  /// <para/>
+  /// Anything carrying alpha goes to four components rather than being flattened to three, which is
+  /// what the same converter does with grey-and-alpha. Choosing by the picture's own layout instead
+  /// would drop the alpha of every picture that keeps it blue-first.
+  /// </remarks>
+  public static VrmlFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var source = image.HasAlpha
+      ? image.EnsureFormat(PixelFormat.Rgba32)
+      : image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Gray8);
+
+    return new() {
+      Width = source.Width,
+      Height = source.Height,
+      Components = source.Format switch {
+        PixelFormat.Gray8 => 1,
+        PixelFormat.Rgba32 => 4,
+        _ => 3,
+      },
+      PixelData = source.PixelData[..],
+    };
+  }
 }

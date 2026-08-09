@@ -153,4 +153,97 @@ public sealed class PixelPowerCollageTests {
   [Category("Unit")]
   public void Read_RefusesAFileTooShortToHoldAHeader()
     => Assert.Throws<InvalidDataException>(() => PixelPowerCollageReader.FromNamedBytes(new byte[16], "p.i17"));
+
+  /// <summary>Encodes through the path, then reads back the file that was actually written.</summary>
+  private static PixelPowerCollageFile _RoundTrip(RawImage image, string fileName) {
+    var directory = Directory.CreateTempSubdirectory("collage");
+    try {
+      var target = new FileInfo(Path.Combine(directory.FullName, fileName));
+      FormatIO.WriteToFile<PixelPowerCollageFile>(image, target);
+
+      return PixelPowerCollageReader.FromFile(target);
+    } finally {
+      directory.Delete(recursive: true);
+    }
+  }
+
+  private static RawImage _Image(int width, int height, PixelFormat format, byte[] pixels)
+    => new() { Width = width, Height = height, Format = format, PixelData = pixels };
+
+  /// <summary>
+  /// The name in the header is the name on disk, which is the only reason this can be written at all.
+  /// </summary>
+  /// <remarks>
+  /// Encoding to a byte array cannot know where the bytes are going, so the writer is reached through
+  /// the entry that takes a path. Written any other way the file names itself something else and every
+  /// reader, ours and the converter's, turns it away — which the last two cases here check.
+  /// </remarks>
+  [TestCase("still.i17")]
+  [TestCase("another.i18")]
+  [TestCase("third.ib7")]
+  [TestCase("fourth.if9")]
+  [Category("Integration")]
+  public void Write_PutsTheNameOnDiskIntoTheHeader(string fileName) {
+    byte[] pixels = [0xFF, 0x00, 0x00, 0x00, 0xFF, 0x00, 0x00, 0x00, 0xFF, 0x10, 0x20, 0x30];
+    var back = _RoundTrip(_Image(2, 2, PixelFormat.Rgb24, pixels), fileName);
+
+    Assert.Multiple(() => {
+      Assert.That(back.Name, Is.EqualTo(fileName));
+      Assert.That(back.BitsPerPixel, Is.EqualTo(24));
+      Assert.That(PixelPowerCollageFile.ToRawImage(back).EnsureFormat(PixelFormat.Rgb24).PixelData, Is.EqualTo(pixels));
+    });
+  }
+
+  [Test]
+  [Category("Integration")]
+  public void Write_KeepsTheThirtyTwoBitPixelAlphaFirst() {
+    byte[] pixels = [0x44, 0x33, 0x22, 0x11];
+    var back = _RoundTrip(_Image(1, 1, PixelFormat.Rgba32, pixels), "a.i17");
+
+    Assert.Multiple(() => {
+      Assert.That(back.BitsPerPixel, Is.EqualTo(32));
+      Assert.That(back.PixelData, Is.EqualTo(new byte[] { 0x11, 0x22, 0x33, 0x44 }), "alpha, blue, green, red");
+      Assert.That(PixelPowerCollageFile.ToRawImage(back).PixelData, Is.EqualTo(pixels));
+    });
+  }
+
+  [Test]
+  [Category("Integration")]
+  public void Write_KeepsAGreyPictureAtEightBits() {
+    byte[] pixels = [0x00, 0x40, 0x80, 0xC0, 0xFF, 0x10];
+    var back = _RoundTrip(_Image(3, 2, PixelFormat.Gray8, pixels), "g.ib7");
+
+    Assert.Multiple(() => {
+      Assert.That(back.BitsPerPixel, Is.EqualTo(8));
+      Assert.That(back.PixelData, Is.EqualTo(pixels));
+    });
+  }
+
+  /// <summary>
+  /// Bytes written with no path to learn a name from carry one fixed name, and only open under it.
+  /// </summary>
+  [Test]
+  [Category("Unit")]
+  public void Write_ToBytesAloneNamesItselfAndOpensUnderNoOtherName() {
+    var bytes = FormatIO.Encode<PixelPowerCollageFile>(_Image(1, 1, PixelFormat.Rgb24, [1, 2, 3]));
+    var expected = PixelPowerCollageFile.DefaultStem + PixelPowerCollageFile.DefaultExtension;
+
+    Assert.Multiple(() => {
+      Assert.DoesNotThrow(() => PixelPowerCollageReader.FromNamedBytes(bytes, expected));
+      Assert.Throws<InvalidDataException>(() => PixelPowerCollageReader.FromNamedBytes(bytes, "somewhere.i17"));
+    });
+  }
+
+  /// <summary>A name with no room for its terminator is cut, and then only opens under the cut name.</summary>
+  [Test]
+  [Category("Unit")]
+  public void Write_CutsANameTooLongToLeaveRoomForItsTerminator() {
+    var overlong = new string('n', 40) + ".i17";
+    var bytes = PixelPowerCollageWriter.ToBytes(
+      PixelPowerCollageFile.FromRawImage(_Image(1, 1, PixelFormat.Gray8, [0x7F]), new FileInfo(overlong)));
+
+    Assert.That(bytes[PixelPowerCollageFile.NameSize - 1], Is.Zero, "the terminator survives");
+    Assert.DoesNotThrow(
+      () => PixelPowerCollageReader.FromNamedBytes(bytes, overlong[..(PixelPowerCollageFile.NameSize - 1)]));
+  }
 }

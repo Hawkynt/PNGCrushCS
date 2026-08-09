@@ -21,7 +21,7 @@ namespace FileFormat.RawGreyscale;
 /// A stream matching none of them is refused rather than shown at a shape picked out of the air. A
 /// wrong shape is worse than no picture: it is a picture that looks like a reading and is not one.
 /// </remarks>
-public readonly record struct RawGreyscaleFile : IImageFormatReader<RawGreyscaleFile>, IImageToRawImage<RawGreyscaleFile> {
+public readonly record struct RawGreyscaleFile : IImageFormatReader<RawGreyscaleFile>, IImageToRawImage<RawGreyscaleFile>, IImageFromRawImage<RawGreyscaleFile>, IImageFormatWriter<RawGreyscaleFile> {
 
   /// <summary>Bytes one pixel takes.</summary>
   public const int BytesPerPixel = 1;
@@ -29,6 +29,7 @@ public readonly record struct RawGreyscaleFile : IImageFormatReader<RawGreyscale
   static string IImageFormatMetadata<RawGreyscaleFile>.PrimaryExtension => ".gry";
   static string[] IImageFormatMetadata<RawGreyscaleFile>.FileExtensions => [".gry", ".grey"];
   static RawGreyscaleFile IImageFormatReader<RawGreyscaleFile>.FromSpan(ReadOnlySpan<byte> data) => RawGreyscaleReader.FromSpan(data);
+  static byte[] IImageFormatWriter<RawGreyscaleFile>.ToBytes(RawGreyscaleFile file) => RawGreyscaleWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<RawGreyscaleFile>.VideoModes => [
     new("Greyscale", _Dimensions, [256]),
   ];
@@ -118,4 +119,44 @@ public readonly record struct RawGreyscaleFile : IImageFormatReader<RawGreyscale
     Format = PixelFormat.Gray8,
     PixelData = file.PixelData[..],
   };
+
+  /// <summary>
+  /// Writes the picture at the nearest size the table holds, resampling it to get there.
+  /// </summary>
+  /// <remarks>
+  /// A dump states no size, so the only thing that can ever be read back is a length the table
+  /// recognises — write the pixels at their own size and the file is unreadable by this library and
+  /// by the converter alike, since neither has anywhere to learn the shape from. So the picture is
+  /// moved to a size rather than refused, which is what the rest of the writers here do when a format
+  /// holds fewer shapes than a caller may hand it.
+  /// <para/>
+  /// Nearest is by the plain distance between the two shapes, and a tie goes to whichever entry the
+  /// table lists first — the same order that settles the one length two entries share.
+  /// </remarks>
+  public static RawGreyscaleFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var (width, height) = _NearestResolution(image.Width, image.Height);
+    var source = image.SampleTo(width, height).EnsureFormat(PixelFormat.Gray8);
+
+    return new() { Width = width, Height = height, PixelData = source.PixelData[..] };
+  }
+
+  /// <summary>The size in the table closest to the one asked for.</summary>
+  private static (int Width, int Height) _NearestResolution(int width, int height) {
+    var best = KnownResolutions[0];
+    var bestDistance = long.MaxValue;
+    foreach (var (w, h) in KnownResolutions) {
+      long dx = w - width;
+      long dy = h - height;
+      var distance = dx * dx + dy * dy;
+      if (distance >= bestDistance)
+        continue;
+
+      bestDistance = distance;
+      best = (w, h);
+    }
+
+    return best;
+  }
 }

@@ -18,7 +18,7 @@ Cross-reference of implemented formats against four major image processing tools
 > The Writer column below is maintained by hand and drifts behind the code — a format gaining a
 > writer does not update this table. For what is true right now, ask the registry:
 > `dotnet run --project Tools/parity/Decode -- --readonly`, which lists every format that reads and
-> does not write, and counts them. At the time of writing that is 72 of 857.
+> does not write, and counts them. At the time of writing that is 72 of 862.
 
 ---
 
@@ -762,11 +762,11 @@ build one from pixel data they didn't read, so the registry reports them as read
 | Half-Life Model         | .mdl                                                 | Half-Life model skins            | Y      | —      | —         | —     | —   | R      | —         |
 | Picture Publisher 4     | .pp4                                                 | Micrografx wrapper round a TIFF  | Y      | —      | —         | —     | —   | R      | —         |
 | Cartes Michelin         | .big                                                 | Michelin road atlas GIF tiles    | Y      | —      | —         | —     | —   | R      | —         |
-| AIM Grey Scale          | .ima                                                 | Greys, size from the .hd beside  | Y      | —      | —         | —     | —   | R      | —         |
-| Pixel Power Collage     | .i17, .i18, .ib7, .if9                               | Still naming itself in its head  | Y      | —      | —         | —     | —   | R      | —         |
-| Printer Page Segment    | .pse, .psg                                           | IBM MO:DCA IM1 image cells       | Y      | —      | —         | —     | —   | R      | —         |
-| Raw Greyscale           | .gry, .grey                                          | Greys, size from the length      | Y      | —      | —         | —     | —   | W      | —         |
-| VRML                    | .wrl, .vrml                                          | PixelTexture inside a 3D scene   | Y      | —      | —         | —     | —   | W      | —         |
+| AIM Grey Scale          | .ima                                                 | Greys, size from the .hd beside  | Y      | Y      | —         | —     | —   | R      | —         |
+| Pixel Power Collage     | .i17, .i18, .ib7, .if9                               | Still naming itself in its head  | Y      | Y      | —         | —     | —   | R      | —         |
+| Printer Page Segment    | .pse, .psg                                           | IBM MO:DCA IM1 image cells       | Y      | Y      | —         | —     | —   | R      | —         |
+| Raw Greyscale           | .gry, .grey                                          | Greys, size from the length      | Y      | Y      | —         | —     | —   | W      | —         |
+| VRML                    | .wrl, .vrml                                          | PixelTexture inside a 3D scene   | Y      | Y      | —         | —     | —   | W      | —         |
 
 ---
 
