@@ -580,6 +580,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | PFM                     | .pfm                                                 | Portable Float Map               | Y      | Y      | —         | RW    | —   | —      | —         |
 | PHM                     | .phm                                                 | Portable Half Map (fp16)         | Y      | Y      | —         | —     | RW  | —      | —         |
 | Photo CD                | .pcd                                                 | Kodak Photo CD                   | Y      | Y      | —         | RW    | RW  | —      | R         |
+| Photo CD (sRGB)         | .pcds                                                | Photo CD, planes read as sRGB    | Y      | Y      | —         | —     | RW  | —      | —         |
 | PhotoChrome             | .pcf, .phc                                           | Atari Falcon PhotoChrome         | Y      | Y      | —         | R     | —   | —      | —         |
 | Pi                      | .pi                                                  | Japanese NEC PC-98 image         | Y      | Y      | —         | R     | —   | —      | —         |
 | PIC2                    | .p2                                                  | Japanese PIC2 format             | Y      | Y      | —         | —     | —   | —      | —         |

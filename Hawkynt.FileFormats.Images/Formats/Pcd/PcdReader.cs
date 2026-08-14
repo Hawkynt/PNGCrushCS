@@ -28,6 +28,26 @@ public static class PcdReader {
   }
 
   public static PcdFile FromSpan(ReadOnlySpan<byte> data) {
+    var (width, height, rgb) = ReadPlanes(data, photoYcc: true);
+
+    return new() {
+      Width = width,
+      Height = height,
+      PixelData = rgb,
+    };
+  }
+
+  /// <summary>Reads the largest size the file holds whole, as RGB.</summary>
+  /// <param name="photoYcc">
+  /// Whether the stored triple is Photo YCC, which is what a <c>.pcd</c> means by it. A
+  /// <c>.pcds</c> is the same container read without that transform, so it says no.
+  /// </param>
+  /// <remarks>
+  /// The container is the same either way — the same preamble, the same magic, the same pyramid at
+  /// the same offsets, the same interleave and the same half-resolution chrominance — so both
+  /// spellings read it here and only the last step differs.
+  /// </remarks>
+  internal static (int Width, int Height, byte[] Rgb) ReadPlanes(ReadOnlySpan<byte> data, bool photoYcc) {
     if (data.Length < PcdFile.PreambleSize + PcdFile.Magic.Length)
       throw new InvalidDataException("Data too small for a valid PCD file.");
 
@@ -48,11 +68,7 @@ public static class PcdReader {
 
     var (chosenWidth, chosenHeight, chosenOffset) = PcdFile.Resolutions[chosen];
 
-    return new() {
-      Width = chosenWidth,
-      Height = chosenHeight,
-      PixelData = _Decode(data[chosenOffset..], chosenWidth, chosenHeight),
-    };
+    return (chosenWidth, chosenHeight, _Decode(data[chosenOffset..], chosenWidth, chosenHeight, photoYcc));
   }
 
   /// <summary>Turns one resolution's planes into RGB.</summary>
@@ -62,7 +78,7 @@ public static class PcdReader {
   /// Each chrominance row therefore serves the pair of luminance rows above it, and each of its
   /// samples serves two pixels across.
   /// </remarks>
-  private static byte[] _Decode(ReadOnlySpan<byte> data, int width, int height) {
+  private static byte[] _Decode(ReadOnlySpan<byte> data, int width, int height, bool photoYcc) {
     var half = width / 2;
     var groupBytes = width * 2 + half * 2;
     var rgb = new byte[width * height * 3];
@@ -77,7 +93,18 @@ public static class PcdReader {
         var blue = _Chroma(data, groupBytes, width, half, chromaRows, 0, x, y);
         var red = _Chroma(data, groupBytes, width, half, chromaRows, half, x, y);
 
-        _ToRgb(luminance, blue, red, rgb.AsSpan((y * width + x) * 3, 3));
+        var pixel = rgb.AsSpan((y * width + x) * 3, 3);
+        if (photoYcc)
+          _ToRgb(luminance, blue, red, pixel);
+        else {
+          // Taken as they stand: the three planes are the three channels in the order they are
+          // stored, so the luminance plane is red and the two chrominance planes are green and
+          // blue. Nothing is scaled either, because there is no extended range to fit back into a
+          // byte when the file is not claiming one.
+          pixel[0] = (byte)luminance;
+          pixel[1] = (byte)blue;
+          pixel[2] = (byte)red;
+        }
       }
     }
 
@@ -115,31 +142,43 @@ public static class PcdReader {
   /// takes its stored sample unchanged and the one between takes the mean of that sample and the
   /// next. Repeating instead leaves a blocky edge wherever the colour changes sharply, and centring
   /// the interpolation shifts every sample half a pixel, which is worse than either.
+  /// <para/>
+  /// The pixel that falls between four stored samples is rounded once, from the four, rather than
+  /// twice from a pair of already-rounded means. Both are the same bilinear interpolation and the
+  /// nested form is off by one wherever the two roundings go the same way — which is a quarter of
+  /// the picture, and is exactly where this used to disagree with ImageMagick.
   /// </remarks>
   private static int _Chroma(
     ReadOnlySpan<byte> data, int groupBytes, int width, int half, int chromaRows, int plane, int x, int y) {
-    var top = _ChromaRow(data, groupBytes, width, half, chromaRows, plane, x, y >> 1);
-    if ((y & 1) == 0)
-      return top;
+    var topLeft = _ChromaAt(data, groupBytes, width, half, chromaRows, plane, x >> 1, y >> 1);
+    var oddX = (x & 1) != 0;
+    var oddY = (y & 1) != 0;
+    if (!oddX && !oddY)
+      return topLeft;
 
-    var bottom = _ChromaRow(data, groupBytes, width, half, chromaRows, plane, x, (y >> 1) + 1);
+    if (!oddY) {
+      var topRight = _ChromaAt(data, groupBytes, width, half, chromaRows, plane, (x >> 1) + 1, y >> 1);
 
-    return (top + bottom + 1) >> 1;
+      return (topLeft + topRight + 1) >> 1;
+    }
+
+    var bottomLeft = _ChromaAt(data, groupBytes, width, half, chromaRows, plane, x >> 1, (y >> 1) + 1);
+    if (!oddX)
+      return (topLeft + bottomLeft + 1) >> 1;
+
+    var topRightCorner = _ChromaAt(data, groupBytes, width, half, chromaRows, plane, (x >> 1) + 1, y >> 1);
+    var bottomRight = _ChromaAt(data, groupBytes, width, half, chromaRows, plane, (x >> 1) + 1, (y >> 1) + 1);
+
+    return (topLeft + topRightCorner + bottomLeft + bottomRight + 2) >> 2;
   }
 
-  /// <summary>One chrominance row, doubled across.</summary>
-  private static int _ChromaRow(
-    ReadOnlySpan<byte> data, int groupBytes, int width, int half, int chromaRows, int plane, int x, int row) {
+  /// <summary>One stored chrominance sample, with the edges of the plane held rather than wrapped.</summary>
+  private static int _ChromaAt(
+    ReadOnlySpan<byte> data, int groupBytes, int width, int half, int chromaRows, int plane, int column, int row) {
     row = row >= chromaRows ? chromaRows - 1 : row;
+    column = column >= half ? half - 1 : column;
 
-    var at = row * groupBytes + width * 2 + plane;
-    var left = _At(data, at + Math.Min(x >> 1, half - 1));
-    if ((x & 1) == 0)
-      return left;
-
-    var right = _At(data, at + Math.Min((x >> 1) + 1, half - 1));
-
-    return (left + right + 1) >> 1;
+    return _At(data, row * groupBytes + width * 2 + plane + column);
   }
 
   private static byte _Fit(double value) {
