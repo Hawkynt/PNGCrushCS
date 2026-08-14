@@ -22,6 +22,9 @@ public static class WebPReader {
   /// <summary>The chunk one frame of an animation sits in.</summary>
   private const string _CHUNK_ANMF = "ANMF";
 
+  /// <summary>The chunk stating what holds for the animation as a whole.</summary>
+  private const string _CHUNK_ANIM = "ANIM";
+
   /// <summary>
   /// Bytes of frame description before an animation frame's own chunks: where it sits, how big it
   /// is, how long it lasts, and how it is blended.
@@ -30,17 +33,97 @@ public static class WebPReader {
 
   /// <summary>Lifts a frame's own chunks out of its ANMF wrapper into the file's own lookup.</summary>
   private static void _AddFrameChunks(byte[] frame, Dictionary<string, byte[]> chunks) {
+    foreach (var (id, payload) in _EnumerateFrameChunks(frame))
+      // The frame's own size wins over the canvas, which is why these are set rather than added to.
+      chunks[id] = payload;
+  }
+
+  /// <summary>Walks the chunks an ANMF wrapper holds after its 16-byte frame description.</summary>
+  private static IEnumerable<(string Id, byte[] Data)> _EnumerateFrameChunks(byte[] frame) {
     var at = _ANMF_HEADER_SIZE;
     while (at + 8 <= frame.Length) {
       var id = Encoding.ASCII.GetString(frame, at, 4);
-      var length = BinaryPrimitives.ReadInt32LittleEndian(frame.AsSpan(at + 4));
-      if (length < 0 || at + 8 + length > frame.Length)
+      // Widened before the bounds check: a chunk claiming a length near int.MaxValue makes the sum
+      // wrap negative, and a negative sum passes a check written in int arithmetic.
+      var length = (long)BinaryPrimitives.ReadUInt32LittleEndian(frame.AsSpan(at + 4));
+      if (at + 8 + length > frame.Length)
         break;
 
-      // The frame's own size wins over the canvas, which is why these are set rather than added to.
-      chunks[id] = frame[(at + 8)..(at + 8 + length)];
-      at += 8 + length + (length & 1);
+      yield return (id, frame[(at + 8)..(int)(at + 8 + length)]);
+      at += (int)(8 + length + (length & 1));
     }
+  }
+
+  /// <summary>Reads a 24-bit little-endian field of the kind ANMF headers are made of.</summary>
+  private static int _Read24(ReadOnlySpan<byte> data, int at)
+    => data[at] | (data[at + 1] << 8) | (data[at + 2] << 16);
+
+  /// <summary>Turns one ANMF chunk into a frame.</summary>
+  private static WebPFrame _ParseFrame(byte[] chunk) {
+    if (chunk.Length < _ANMF_HEADER_SIZE)
+      throw new InvalidDataException($"ANMF chunk is {chunk.Length} bytes, too small for its {_ANMF_HEADER_SIZE}-byte frame description.");
+
+    byte[]? imageData = null;
+    byte[]? alphaChunk = null;
+    var isLossless = false;
+    foreach (var (id, payload) in _EnumerateFrameChunks(chunk))
+      switch (id) {
+        case _CHUNK_VP8L:
+          imageData = payload;
+          isLossless = true;
+          break;
+        case _CHUNK_VP8:
+          imageData = payload;
+          isLossless = false;
+          break;
+        case _CHUNK_ALPH:
+          alphaChunk = payload;
+          break;
+      }
+
+    // A frame with no picture in it is a file libwebp's demuxer refuses outright, and quietly
+    // dropping it here would make the frame count disagree with the file for no stated reason —
+    // every frame after it would answer to the wrong index.
+    if (imageData == null)
+      throw new InvalidDataException("ANMF chunk holds neither VP8 nor VP8L picture data.");
+
+    // Offsets are stored halved, which is why a frame can only ever start on an even pixel; sizes
+    // are stored one short, which is why a frame can never be empty.
+    var flags = chunk[15];
+    var frameWidth = _Read24(chunk, 6) + 1;
+    var frameHeight = _Read24(chunk, 9) + 1;
+
+    // A frame has alpha when an ALPH chunk sits beside its lossy picture or when its lossless
+    // header says so. This decides whether the frame can be treated as owing nothing to its
+    // predecessors, so guessing it wrong changes the picture and not only the speed.
+    var hasAlpha = alphaChunk is { Length: > 0 };
+    if (isLossless && imageData.Length >= Vp8LHeader.StructSize)
+      hasAlpha |= Vp8LHeader.ReadFrom(imageData).HasAlpha;
+
+    return new WebPFrame {
+      X = _Read24(chunk, 0) * 2,
+      Y = _Read24(chunk, 3) * 2,
+      Width = frameWidth,
+      Height = frameHeight,
+      DurationMilliseconds = _Read24(chunk, 12),
+      BlendMethod = (flags & 0x02) != 0 ? WebPFrameBlendMethod.None : WebPFrameBlendMethod.AlphaBlend,
+      DisposalMethod = (flags & 0x01) != 0 ? WebPFrameDisposalMethod.Background : WebPFrameDisposalMethod.None,
+      ImageData = imageData,
+      IsLossless = isLossless,
+      AlphaChunk = alphaChunk,
+      HasAlpha = hasAlpha,
+    };
+  }
+
+  /// <summary>Reads the ANIM chunk: what the animation is shown against, and how often it plays.</summary>
+  private static WebPAnimationInfo? _ParseAnimationInfo(byte[] chunk) {
+    if (chunk.Length < 6)
+      return null;
+
+    return new WebPAnimationInfo {
+      BackgroundColorBgra = BinaryPrimitives.ReadUInt32LittleEndian(chunk),
+      LoopCount = BinaryPrimitives.ReadUInt16LittleEndian(chunk.AsSpan(4)),
+    };
   }
 
   private static readonly HashSet<string> _MetadataChunkIds = [_CHUNK_ICCP, _CHUNK_EXIF, _CHUNK_XMP];
@@ -77,11 +160,23 @@ public static class WebPReader {
     var chunks = _BuildChunkLookup(riff.Chunks);
 
     // An animation keeps its pictures inside ANMF chunks rather than at the top level, so a file
-    // holding seventeen frames looked to this like a file holding none. The first frame is the one
-    // shown before anything moves, and is what every still viewer draws.
+    // holding seventeen frames looked to this like a file holding none — and then, once the first
+    // one was found, like a file holding exactly one. Every ANMF is a frame; they are kept in file
+    // order, which is the order they are shown in.
+    var frames = new List<WebPFrame>();
+    foreach (var chunk in riff.Chunks) {
+      if (chunk.Id.ToString() != _CHUNK_ANMF)
+        continue;
+
+      frames.Add(_ParseFrame(chunk.Data));
+    }
+
+    // The first frame is the one shown before anything moves, and is what every still viewer draws.
     if (!chunks.ContainsKey(_CHUNK_VP8L) && !chunks.ContainsKey(_CHUNK_VP8)
         && chunks.TryGetValue(_CHUNK_ANMF, out var firstFrame))
       _AddFrameChunks(firstFrame, chunks);
+
+    var animation = chunks.TryGetValue(_CHUNK_ANIM, out var anim) ? _ParseAnimationInfo(anim) : null;
 
     var hasVp8X = chunks.ContainsKey(_CHUNK_VP8X);
     var hasVp8L = chunks.ContainsKey(_CHUNK_VP8L);
@@ -110,9 +205,11 @@ public static class WebPReader {
       : (chunks.TryGetValue(_CHUNK_VP8, out var vp8Data) ? vp8Data : []);
 
     // ALPH chunk (only present for VP8 lossy + alpha — lossless format carries alpha inline).
+    // An animation's frames each carry their own, at their own size, and are decoded when the frame
+    // is composited; the canvas-sized decode here would be asking the wrong picture's question.
     byte[]? alphaData = null;
-    if (!isLossless && chunks.TryGetValue(_CHUNK_ALPH, out var alph))
-      alphaData = _DecodeAlphChunk(alph, features.Width, features.Height);
+    if (!isLossless && frames.Count == 0 && chunks.TryGetValue(_CHUNK_ALPH, out var alph))
+      alphaData = WebPAlphaDecoder.Decode(alph, features.Width, features.Height);
 
     // Collect metadata chunks
     foreach (var chunk in riff.Chunks) {
@@ -127,22 +224,9 @@ public static class WebPReader {
       IsLossless = isLossless,
       MetadataChunks = metadataChunks,
       AlphaData = alphaData,
+      Frames = frames,
+      Animation = animation,
     };
-  }
-
-  /// <summary>Decode an ALPH chunk into a flat alpha-plane byte buffer (one byte per pixel).
-  /// Currently supports compression method 0 (uncompressed). Method 1 (VP8L-encoded alpha)
-  /// returns null — caller treats absence of alphaData as opaque.</summary>
-  private static byte[]? _DecodeAlphChunk(byte[] data, int width, int height) {
-    if (data.Length < 1) return null;
-    var flagByte = data[0];
-    var compression = flagByte & 0x03;
-    if (compression != 0) return null; // method 1 (VP8L) decoding not implemented yet
-    var expectedLength = width * height;
-    if (data.Length < 1 + expectedLength) return null;
-    var alpha = new byte[expectedLength];
-    System.Buffer.BlockCopy(data, 1, alpha, 0, expectedLength);
-    return alpha;
   }
 
   public static WebPFile FromBytes(byte[] data) {

@@ -30,10 +30,26 @@ internal static class Vp8LDecoder {
   /// <param name="height">Image height from the VP8L header.</param>
   /// <param name="hasAlpha">Whether the image has alpha from the VP8L header.</param>
   /// <returns>RGBA byte array of size width * height * 4.</returns>
-  public static byte[] Decode(byte[] vp8lData, int width, int height, bool hasAlpha) {
-    // VP8L data: 1 byte signature (0x2F) + 4 bytes bitfield header = 5 bytes
-    // The bit reader starts after the 5-byte header
-    var reader = new Vp8LBitReader(vp8lData, 5);
+  public static byte[] Decode(byte[] vp8lData, int width, int height, bool hasAlpha)
+    // VP8L data: 1 byte signature (0x2F) + 4 bytes bitfield header = 5 bytes.
+    // The bit reader starts after the 5-byte header.
+    => _ArgbToRgba(DecodeArgbStream(vp8lData, 5, width, height), width, height, hasAlpha);
+
+  /// <summary>Decodes a bare VP8L image stream — transforms, Huffman codes and all — from a bit
+  /// position the caller names, into ARGB pixels.</summary>
+  /// <remarks>
+  /// The stream a VP8L chunk holds is preceded by five bytes stating a signature and the size, and
+  /// everything after those is the stream proper. An ALPH chunk with compression method 1 holds the
+  /// same stream with no such preamble: it is one byte of flags and then the bits, and the size
+  /// comes from the picture the alpha belongs to. Splitting the entry point is what lets one decoder
+  /// serve both instead of the alpha path growing a second, thinner copy of it.
+  /// </remarks>
+  /// <param name="data">The buffer holding the stream.</param>
+  /// <param name="byteOffset">Where in it the stream's first bit sits.</param>
+  /// <param name="width">Image width, from whatever states it for this stream.</param>
+  /// <param name="height">Image height, likewise.</param>
+  public static uint[] DecodeArgbStream(byte[] data, int byteOffset, int width, int height) {
+    var reader = new Vp8LBitReader(data, byteOffset);
 
     // Read transforms
     var transforms = new List<Vp8LTransform>();
@@ -91,8 +107,7 @@ internal static class Vp8LDecoder {
         transforms[i].InverseTransform(pixels, width, height);
     }
 
-    // Convert ARGB uint[] to RGBA byte[]
-    return _ArgbToRgba(pixels, width, height, hasAlpha);
+    return pixels;
   }
 
   /// <summary>Read a sub-resolution image (used for transform data and meta-Huffman images).</summary>
