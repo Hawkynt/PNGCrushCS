@@ -54,12 +54,15 @@ public static class MiffReader {
     var width = fields.TryGetValue("columns", out var colStr) ? int.Parse(colStr) : 0;
     var height = fields.TryGetValue("rows", out var rowStr) ? int.Parse(rowStr) : 0;
     var depth = fields.TryGetValue("depth", out var depthStr) ? int.Parse(depthStr) : 8;
-    var type = fields.TryGetValue("type", out var typeStr) ? typeStr : "TrueColor";
     var colorspace = fields.TryGetValue("colorspace", out var csStr) ? csStr : "sRGB";
 
     var colorClass = MiffColorClass.DirectClass;
     if (fields.TryGetValue("class", out var classStr) && classStr.Equals("PseudoClass", StringComparison.OrdinalIgnoreCase))
       colorClass = MiffColorClass.PseudoClass;
+
+    // What the pixel is made of, said the way the file says it rather than the way `type` says it.
+    var hasAlpha = _HasAlphaChannel(fields);
+    var type = _DescribeLayout(colorspace, hasAlpha);
 
     var compression = MiffCompression.None;
     if (fields.TryGetValue("compression", out var compStr)) {
@@ -88,7 +91,7 @@ public static class MiffReader {
     var rawData = new byte[remainingBytes];
     data.Slice(dataOffset, remainingBytes).CopyTo(rawData.AsSpan(0));
 
-    var channelsPerPixel = _GetChannelsPerPixel(type, colorspace);
+    var channelsPerPixel = _GetChannelsPerPixel(colorClass, colorspace, hasAlpha);
     var bytesPerPixel = channelsPerPixel * bytesPerChannel;
     var pixelCount = width * height;
 
@@ -198,22 +201,68 @@ public static class MiffReader {
     return result;
   }
 
-  private static int _GetChannelsPerPixel(string type, string colorspace) {
-    if (colorspace.Equals("CMYK", StringComparison.OrdinalIgnoreCase))
-      return type.Contains("Alpha", StringComparison.OrdinalIgnoreCase) ? 5 : 4;
+  /// <summary>Whether a pixel carries an alpha sample, taken from the fields that state it.</summary>
+  /// <remarks>
+  /// <c>alpha-trait</c> is the modern field and <c>matte</c> the one that predates it; ImageMagick
+  /// writes both and reads either. Neither being present means no alpha, which is what an absent
+  /// <c>alpha-trait</c> means to ImageMagick as well.
+  /// </remarks>
+  private static bool _HasAlphaChannel(Dictionary<string, string> fields) {
+    if (fields.TryGetValue("alpha-trait", out var trait))
+      return !trait.Equals("Undefined", StringComparison.OrdinalIgnoreCase);
 
-    if (type.Contains("Alpha", StringComparison.OrdinalIgnoreCase))
-      return type.StartsWith("Grayscale", StringComparison.OrdinalIgnoreCase) ? 2 :
-             type.StartsWith("Palette", StringComparison.OrdinalIgnoreCase) ? 2 : 4;
+    return fields.TryGetValue("matte", out var matte) && matte.Equals("True", StringComparison.OrdinalIgnoreCase);
+  }
 
-    if (type.StartsWith("Grayscale", StringComparison.OrdinalIgnoreCase))
-      return 1;
+  private static bool _IsGrayColorspace(string colorspace)
+    => colorspace.Equals("Gray", StringComparison.OrdinalIgnoreCase)
+       || colorspace.Equals("LinearGray", StringComparison.OrdinalIgnoreCase);
 
-    if (type.StartsWith("Palette", StringComparison.OrdinalIgnoreCase))
-      return 1;
+  private static bool _IsCmykColorspace(string colorspace)
+    => colorspace.Equals("CMYK", StringComparison.OrdinalIgnoreCase);
 
-    // TrueColor, default
-    return 3;
+  /// <summary>Names the pixel layout the header describes, for everything downstream.</summary>
+  /// <remarks>
+  /// The <c>type</c> line is not this answer and cannot be: ImageMagick's own files with an alpha
+  /// channel have no <c>type</c> line, so believing it means falling back to a default of TrueColor
+  /// and reading four samples three at a time. It is derived here instead, once, so that the channel
+  /// count and the pixel format downstream cannot disagree about the same file — which is the shape
+  /// the fault took.
+  /// </remarks>
+  private static string _DescribeLayout(string colorspace, bool hasAlpha) {
+    if (_IsGrayColorspace(colorspace))
+      return hasAlpha ? "GrayscaleAlpha" : "Grayscale";
+
+    if (_IsCmykColorspace(colorspace))
+      return hasAlpha ? "CMYKAlpha" : "CMYK";
+
+    return hasAlpha ? "TrueColorAlpha" : "TrueColor";
+  }
+
+  /// <summary>How many samples a pixel holds, by the rule ImageMagick sizes its own packet with.</summary>
+  /// <remarks>
+  /// Taken from its reader in that order: one sample to begin with, three if the class is
+  /// DirectClass, one again if the colourspace is grey, then one more for an alpha channel and one
+  /// more for CMYK. A palette file is one sample whatever its colourspace says, because the sample
+  /// is an index.
+  /// <para/>
+  /// Checked against the <c>number-channels</c> ImageMagick states in its own headers: 1 for grey,
+  /// 2 for grey with alpha, 3 for truecolour, 4 for truecolour with alpha, 5 for CMYK with alpha and
+  /// 5 for a palette with alpha — the last of which counts the colormap's three, where the packet
+  /// holds two.
+  /// </remarks>
+  private static int _GetChannelsPerPixel(MiffColorClass colorClass, string colorspace, bool hasAlpha) {
+    var channels = 1;
+    if (colorClass == MiffColorClass.DirectClass)
+      channels = _IsGrayColorspace(colorspace) ? 1 : 3;
+
+    if (hasAlpha)
+      ++channels;
+
+    if (colorClass == MiffColorClass.DirectClass && _IsCmykColorspace(colorspace))
+      ++channels;
+
+    return channels;
   }
 
   private static byte[] _DecompressZip(byte[] compressedData, int expectedSize) {
