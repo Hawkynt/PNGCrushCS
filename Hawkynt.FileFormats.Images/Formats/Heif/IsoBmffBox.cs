@@ -29,6 +29,7 @@ internal readonly struct IsoBmffBox {
   internal const string Ipco = "ipco";
   internal const string Ipma = "ipma";
   internal const string Ispe = "ispe";
+  internal const string Clap = "clap";
   internal const string HvcC = "hvcC";
   internal const string Mdat = "mdat";
 
