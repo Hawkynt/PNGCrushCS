@@ -99,7 +99,7 @@ public static class PcdWriter {
     var level = 0.299 * red + 0.587 * green + 0.114 * blue;
 
     return (
-      _Clamp(level / 1.3584),
+      _Clamp(level / PcdReader.LuminanceScale),
       _Clamp((blue - level) / 2.2179 + 156),
       _Clamp((red - level) / 1.8215 + 137));
   }

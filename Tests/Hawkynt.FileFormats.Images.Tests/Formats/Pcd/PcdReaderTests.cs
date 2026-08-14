@@ -111,6 +111,52 @@ public sealed class PcdReaderTests {
       Assert.That(restored.PixelData[i], Is.EqualTo(pixels[i]).Within(3), $"channel {i}");
   }
 
+  /// <summary>A neutral sample comes back as the value it went in as.</summary>
+  /// <remarks>
+  /// This is the property the extended range exists to give, and the one that says the range is the
+  /// right size. A neutral has both chrominance planes at their own zero, so all three channels come
+  /// out of the matrix as 1.3584 times the stored luminance; fitting that back into a byte returns
+  /// the luminance exactly when, and only when, the range is 1.3584 times 255. Built from planes
+  /// rather than through the writer on purpose — the writer inverts whatever the reader does, so a
+  /// round trip through it agrees with any range at all and cannot see this.
+  /// </remarks>
+  [TestCase((byte)0)]
+  [TestCase((byte)64)]
+  [TestCase((byte)128)]
+  [TestCase((byte)200)]
+  [TestCase((byte)255)]
+  [Category("Unit")]
+  public void FromBytes_NeutralSample_ComesBackAtTheStoredLuminance(byte luminance) {
+    var result = PcdReader.FromBytes(_Neutral(luminance));
+
+    Assert.Multiple(() => {
+      for (var channel = 0; channel < 3; ++channel)
+        Assert.That(result.PixelData[channel], Is.EqualTo(luminance), $"channel {channel}");
+    });
+  }
+
+  /// <summary>A file of one resolution whose luminance is flat and whose chrominance is neutral.</summary>
+  private static byte[] _Neutral(byte luminance) {
+    var (width, height, offset) = PcdFile.Resolutions[0];
+    var half = width / 2;
+    var groupBytes = width * 2 + half * 2;
+    var data = new byte[offset + PcdFile.PlaneBytes(width, height)];
+    PcdFile.Magic.CopyTo(data.AsSpan(PcdFile.PreambleSize));
+
+    for (var group = 0; group < height / 2; ++group) {
+      var at = offset + group * groupBytes;
+      for (var i = 0; i < width * 2; ++i)
+        data[at + i] = luminance;
+
+      for (var i = 0; i < half; ++i) {
+        data[at + width * 2 + i] = 156;
+        data[at + width * 2 + half + i] = 137;
+      }
+    }
+
+    return data;
+  }
+
   [Test]
   [Category("Unit")]
   public void ToRawImage_GivesTheSizeItRead() {
