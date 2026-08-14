@@ -11,12 +11,19 @@ namespace FileFormat.WebP;
 [FormatMimeType("image/webp")]
 public sealed class WebPFile :
   IImageFormatReader<WebPFile>, IImageToRawImage<WebPFile>, IImageFromRawImage<WebPFile>, IImageFormatWriter<WebPFile>,
+  IMultiImageFileFormat<WebPFile>,
   IFormatChunkLayout<WebPFile>, IFormatChunkRewriter<WebPFile>, IFormatChunkPlanRewriter<WebPFile> {
 
   public required WebPFeatures Features { get; init; }
   public byte[] ImageData { get; init; } = [];
   public bool IsLossless { get; init; }
   public List<(string ChunkId, byte[] Data)> MetadataChunks { get; init; } = [];
+
+  /// <summary>The animation's frames in the order they are shown, or empty for a still picture.</summary>
+  public IReadOnlyList<WebPFrame> Frames { get; init; } = [];
+
+  /// <summary>What the ANIM chunk stated, or <c>null</c> for a still picture.</summary>
+  public WebPAnimationInfo? Animation { get; init; }
 
   /// <summary>VP8 lossy alpha plane bytes (one byte per pixel, top-left origin, no padding).
   /// Only meaningful when <see cref="IsLossless"/> is false and <see cref="WebPFeatures.HasAlpha"/>
@@ -25,6 +32,7 @@ public sealed class WebPFile :
 
   public static string PrimaryExtension => ".webp";
   public static string[] FileExtensions => [".webp", ".wep"];
+  static FormatCapability IImageFormatMetadata<WebPFile>.Capabilities => FormatCapability.MultiImage;
   static WebPFile IImageFormatReader<WebPFile>.FromSpan(ReadOnlySpan<byte> data) => WebPReader.FromSpan(data);
 
   public static bool? MatchesSignature(ReadOnlySpan<byte> header)
@@ -48,8 +56,70 @@ public sealed class WebPFile :
   static ChunkRewriteResult IFormatChunkPlanRewriter<WebPFile>.ApplyPlan(ReadOnlySpan<byte> data, ChunkRewritePlan plan)
     => WebPChunkLayout.ApplyPlan(data, plan);
 
+  /// <summary>How many frames this file holds — one for a still picture, one per ANMF chunk for an
+  /// animation.</summary>
+  public static int ImageCount(WebPFile file) {
+    ArgumentNullException.ThrowIfNull(file);
+    return file.Frames.Count == 0 ? 1 : file.Frames.Count;
+  }
+
+  /// <summary>The canvas as it stands when frame <paramref name="index"/> is shown.</summary>
+  /// <remarks>
+  /// Not the frame's own rectangle. A frame carries only what changed, and what it looks like on
+  /// screen is that rectangle drawn over the canvas the frames before it left behind — so frame
+  /// <paramref name="index"/> costs the decoding of every frame up to it, and always comes back at
+  /// the canvas size the VP8X chunk states.
+  /// </remarks>
+  public static RawImage ToRawImage(WebPFile file, int index) {
+    ArgumentNullException.ThrowIfNull(file);
+    if ((uint)index >= (uint)ImageCount(file))
+      throw new ArgumentOutOfRangeException(nameof(index), index, $"The file holds {ImageCount(file)} frame(s).");
+
+    if (file.Frames.Count == 0)
+      return ToRawImage(file);
+
+    return new() {
+      Width = file.Features.Width,
+      Height = file.Features.Height,
+      Format = PixelFormat.Rgba32,
+      PixelData = WebPAnimationCompositor.Compose(file, index),
+      Metadata = WebPMetadataCodec.Read(file.MetadataChunks),
+    };
+  }
+
+  /// <summary>Every frame, composited in one pass.</summary>
+  /// <remarks>
+  /// Overridden rather than left to the interface's default, which asks for each frame in turn and
+  /// so replays the animation from the beginning every time — a hundred-frame animation would cost
+  /// five thousand frame decodes to read once.
+  /// </remarks>
+  public static IReadOnlyList<RawImage> ToRawImages(WebPFile file) {
+    ArgumentNullException.ThrowIfNull(file);
+    if (file.Frames.Count == 0)
+      return [ToRawImage(file)];
+
+    var metadata = WebPMetadataCodec.Read(file.MetadataChunks);
+    var canvases = WebPAnimationCompositor.ComposeAll(file);
+    var images = new RawImage[canvases.Count];
+    for (var i = 0; i < images.Length; ++i)
+      images[i] = new() {
+        Width = file.Features.Width,
+        Height = file.Features.Height,
+        Format = PixelFormat.Rgba32,
+        PixelData = canvases[i],
+        Metadata = metadata,
+      };
+
+    return images;
+  }
+
   public static RawImage ToRawImage(WebPFile file) {
     ArgumentNullException.ThrowIfNull(file);
+
+    // An animation's first frame is a rectangle on a canvas like every other, and reading it as a
+    // picture of canvas size gets both wrong whenever it does not happen to cover the whole canvas.
+    if (file.Frames.Count > 0)
+      return ToRawImage(file, 0);
 
     var w = file.Features.Width;
     var h = file.Features.Height;
