@@ -10,44 +10,139 @@ internal static class MiffHeaderParser {
 
   private const string _MAGIC = "id=ImageMagick";
   private const byte _TERMINATOR_BYTE = 0x1A;
+  private const byte _COMMENT_OPEN = (byte)'{';
+  private const byte _COMMENT_CLOSE = (byte)'}';
+
+  /// <summary>Offset of the first header byte that is neither blank nor part of a comment.</summary>
+  /// <remarks>
+  /// The id line does not have to come first. A comment in braces may precede it, and XnView's
+  /// nconvert writes one — <c>{\n  Created with XNview\n}\n</c> — ahead of everything else. Testing
+  /// for the id at offset zero calls that file corrupt; ImageMagick, which owns the format, reads
+  /// the comment and carries on.
+  /// </remarks>
+  public static int FindHeaderStart(ReadOnlySpan<byte> data) {
+    var position = 0;
+    while (position < data.Length) {
+      var c = data[position];
+      if (c is (byte)' ' or (byte)'\t' or (byte)'\r' or (byte)'\n' or (byte)'\f') {
+        ++position;
+        continue;
+      }
+
+      if (c != _COMMENT_OPEN)
+        break;
+
+      position = _SkipComment(data, position);
+    }
+
+    return position;
+  }
+
+  /// <summary>Steps over one brace comment, including any nested inside it.</summary>
+  /// <remarks>
+  /// Returns the end of the data when the comment is never closed, which leaves the caller looking
+  /// at nothing and refusing the file rather than reading the comment as fields.
+  /// </remarks>
+  private static int _SkipComment(ReadOnlySpan<byte> data, int position) {
+    var depth = 0;
+    while (position < data.Length) {
+      var c = data[position++];
+      switch (c) {
+        case (byte)'\\':
+          // A brace can be escaped so that it does not count towards the nesting.
+          if (position < data.Length)
+            ++position;
+          break;
+        case _COMMENT_OPEN:
+          ++depth;
+          break;
+        case _COMMENT_CLOSE:
+          if (--depth <= 0)
+            return position;
+
+          break;
+      }
+    }
+
+    return position;
+  }
 
   public static Dictionary<string, string> Parse(byte[] data, out int dataOffset) {
     var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
     var text = Encoding.ASCII.GetString(data);
 
-    // Find the terminator line ":" followed by newline and 0x1A
-    var offset = 0;
-    var foundTerminator = false;
+    // Scanned a character at a time rather than a line at a time because a comment is delimited by
+    // braces and not by line ends: it may open on one line and close on another, and anything
+    // inside it — a colon above all — must not be read as structure.
+    var line = new StringBuilder();
+    var onlyBlankSoFar = true;
+    var lastNonBlank = (byte)0;
+    var position = 0;
+    var terminator = -1;
 
-    while (offset < text.Length) {
-      var lineEnd = text.IndexOf('\n', offset);
-      if (lineEnd < 0)
-        lineEnd = text.Length;
+    while (position < data.Length) {
+      var c = data[position];
 
-      var line = text.Substring(offset, lineEnd - offset).TrimEnd('\r');
+      if (c == _COMMENT_OPEN) {
+        var end = _SkipComment(data, position);
+
+        // A brace straight after '=' opens a value, not a comment: ImageMagick states its PNG chunk
+        // notes as `png:bKGD={chunk was found ...}`, and treating those as comments drops fields the
+        // writer put there. Only a brace starting a token is a comment.
+        if (lastNonBlank == (byte)'=') {
+          for (var i = position; i < end; ++i)
+            line.Append(text[i]);
+
+          onlyBlankSoFar = false;
+          lastNonBlank = _COMMENT_CLOSE;
+        }
+
+        position = end;
+        continue;
+      }
+
+      if (c is (byte)'\n' or (byte)'\r') {
+        _ReadFields(line.ToString(), result);
+        line.Clear();
+        onlyBlankSoFar = true;
+        lastNonBlank = 0;
+        ++position;
+        continue;
+      }
 
       // The header ends at a colon, and the colon is not alone on its line: a writer emits a form
       // feed, a newline, the colon and then the control byte, with the samples following it
       // immediately. Looking for a line equal to ":" therefore reads the colon together with the
       // whole binary payload and never matches.
-      var colon = line.IndexOf(':');
-      if (colon >= 0 && line[..colon].TrimEnd('\f', ' ', '\t').Length == 0) {
-        offset += colon + 1;
-        foundTerminator = true;
+      if (c == (byte)':' && onlyBlankSoFar) {
+        terminator = position;
         break;
       }
 
-      offset = lineEnd + 1;
+      if (c is not ((byte)' ' or (byte)'\t' or (byte)'\f')) {
+        onlyBlankSoFar = false;
+        lastNonBlank = c;
+      }
 
-      _ReadFields(line, result);
+      line.Append(text[position]);
+      ++position;
     }
 
-    if (!foundTerminator)
+    if (terminator < 0)
       throw new InvalidDataException("MIFF header terminator ':' not found.");
 
-    // What follows the colon varies: a writer may put the control byte straight after it, or end
-    // the line first. Skipping either leaves the samples in both cases.
-    while (offset < data.Length && data[offset] is (byte)'\r' or (byte)'\n' or _TERMINATOR_BYTE)
+    // What follows the colon varies: one writer ends the line first and another puts the control
+    // byte straight after it, so both are stepped over — but only one of each. Skipping every
+    // newline that follows eats a first sample that happens to be 0x0A, which shifts the whole
+    // picture one channel to the left.
+    var offset = terminator + 1;
+    if (offset < data.Length && data[offset] == (byte)'\r')
+      ++offset;
+
+    if (offset < data.Length && data[offset] == (byte)'\n')
+      ++offset;
+
+    if (offset < data.Length && data[offset] == _TERMINATOR_BYTE)
       ++offset;
 
     dataOffset = offset;
