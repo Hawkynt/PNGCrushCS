@@ -36,13 +36,16 @@ public readonly record struct HeifFile : IImageFormatReader<HeifFile>, IImageToR
     return null;
   }
 
-  /// <summary>Image width in pixels (from ispe box).</summary>
+  /// <summary>Image width in pixels: the clean aperture where one is given, else the ispe extent.</summary>
   public int Width { get; init; }
 
-  /// <summary>Image height in pixels (from ispe box).</summary>
+  /// <summary>Image height in pixels: the clean aperture where one is given, else the ispe extent.</summary>
   public int Height { get; init; }
 
-  /// <summary>Raw pixel data (Rgb24 format, 3 bytes per pixel) for container-level round-trip.</summary>
+  /// <summary>
+  /// Raw pixel data (Rgb24 format, 3 bytes per pixel) for container-level round-trip, cropped to
+  /// <see cref="Width"/> by <see cref="Height"/> so the encoder's padding is not handed back.
+  /// </summary>
   public byte[] PixelData { get; init; }
 
   /// <summary>The major brand from the ftyp box (e.g. "heic", "heix", "hevc", "mif1").</summary>
