@@ -40,11 +40,16 @@ five-character extension.
   - **DPX crashes.** ffmpeg's DPX output makes the reader throw `IndexOutOfRangeException` rather
     than refuse the file. A crash is worse than a refusal: it escapes as an exception nobody
     downstream expects, and this is the only reader in the corpus that does it.
-  - **`.iff` dispatches to Maya only.** nconvert writes an Amiga IFF ILBM under `.iff`; the name is
-    claimed here by the Maya reader, which wants `FOR4` and refuses. The Amiga reader that would
-    take it is never asked.
-  - **`.raw` dispatches to the camera reader only**, which wants a TIFF byte-order mark. nconvert's
-    `.raw` is a headerless dump.
+  - **`.iff` is read as a palette index when it holds colours.** *(This was first written down here
+    as "dispatches to Maya only", which was wrong and is corrected: six formats claim `.iff` and the
+    registry asks all six.)* What nconvert writes is a `FORM ILBM` of 24 planes with no CMAP — a
+    truecolour picture, each group of eight planes one colour byte. The ILBM reader ran every plane
+    count through the chunky conversion, folding 24 planes onto the lowest eight, so the red channel
+    came back as a palette index and the other two were dropped. It then reported success, and
+    drawing the result threw for want of a palette.
+  - **`.raw` was claimed only by the camera reader**, which wants a TIFF byte-order mark. XnView
+    files `raw`, `gry` and `grey` on one row against one reader, and the other two names were already
+    held here.
   - **GIMP brush refuses three bytes a pixel.** The reader takes 1 and 4; nconvert writes an RGB
     brush.
   - **Psion MBM refuses UID2 `0x10000042`**, accepting only `0x10000000`.
@@ -53,8 +58,17 @@ five-character extension.
     rather than a wrong reader.
   - **Softimage `.pic`**: nconvert's `ray` output carries `36 31 20 33` where `0x5380F634` is wanted,
     so `.pic` is at least two formats and the name alone does not settle which.
-  - **`.flt` is ambiguous.** It is claimed here for the Windows bitmap, on XnView's BIAS
-    FringeProcessor row; nconvert also writes ESRI float grids under it, one file a band.
+  - **`.flt` is ambiguous, and the claim here is right.** It is held for the Windows bitmap, on
+    XnView's BIAS FringeProcessor row, and a DIB renamed `.flt` decodes here identically to
+    nconvert's own reading of it. nconvert *also* writes ESRI float grids under the name — not
+    through `-out flt`, which is not a format name, but through `-out arcib`, which emits one
+    `.flt` a band with a `.hdr` beside it stating `ncols`, `nrows` and the byte order, and a payload
+    of exactly `ncols * nrows` little-endian floats.
+    <br>It cannot read one back: handed its own `.flt`, it answers "Don't know how to read this
+    picture". So this is the `.qtl` and `.wrl` situation again — a format the tool writes and
+    cannot open — and it is left rather than closed, because it is a single-band elevation grid
+    per file rather than a picture, and the three bands only become one by being named alike.
+    Implementable from the sidecar alone if it is ever wanted.
 
 ## Not defects, recorded so they are not re-investigated
 
