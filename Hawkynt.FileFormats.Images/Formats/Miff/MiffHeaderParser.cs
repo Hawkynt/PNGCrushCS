@@ -157,6 +157,23 @@ internal static class MiffHeaderParser {
     sb.Append("rows=").Append(file.Height).Append('\n');
     sb.Append("depth=").Append(file.Depth).Append('\n');
     sb.Append("type=").Append(file.Type).Append('\n');
+
+    // How wide a sample packet is, in the field ImageMagick decides it by.
+    //
+    // It does not take that from `type`: its own files with an alpha channel carry no type line at
+    // all, only these two. Saying TrueColorAlpha and nothing else therefore hands it four samples a
+    // pixel to read three at a time, so every fourth byte becomes the next pixel's red and the
+    // picture shears — 748 of 2257 pixels wrong on a 61x37 sample, while our own reader, which does
+    // believe `type`, read the same file perfectly. Both fields are written because ImageMagick
+    // writes both, and the older `matte` is what a reader predating alpha-trait looks for.
+    var hasAlpha = file.Type != null
+                   && (file.Type.Contains("Alpha", StringComparison.OrdinalIgnoreCase)
+                       || file.Type.Contains("Matte", StringComparison.OrdinalIgnoreCase));
+
+    sb.Append("alpha-trait=").Append(hasAlpha ? "Blend" : "Undefined").Append('\n');
+    if (hasAlpha)
+      sb.Append("matte=True\n");
+
     sb.Append("colorspace=").Append(file.Colorspace).Append('\n');
 
     if (file.Compression != MiffCompression.None)
