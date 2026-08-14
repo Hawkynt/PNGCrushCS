@@ -90,6 +90,78 @@ if (args[0] == "--why") {
   return 0;
 }
 
+// Every frame of an animation, rather than the one a still viewer would draw.
+//
+// The ordinary decode answers a single picture, which for an animation is its first frame — so an
+// animation read as a single frame and an animation whose later frames are composited wrongly look
+// identical from here, and both look like success. Writing every frame is what lets each be handed
+// to ffmpeg's or ImageMagick's or libwebp's own output for the same file and compared.
+//
+//   Decode --frames <file> <output directory>
+//
+// Writes <output directory>/<name>.NN.pam and .NN.ppm, numbered from zero in playing order.
+//
+// Both, because the two answer different questions. The .ppm is what the rest of this tool emits and
+// what the comparison scripts expect, and it has no alpha — which for an animation hides the one
+// thing most likely to be wrong, since a frame that disposes its rectangle leaves transparency
+// behind and nothing else. The .pam carries all four channels so that transparency can be compared
+// rather than assumed.
+if (args[0] == "--frames") {
+  if (args.Length < 3) {
+    Console.Error.WriteLine("usage: Decode --frames <file> <output directory>");
+    return 2;
+  }
+
+  var animation = new FileInfo(args[1]);
+  var into = args[2];
+  Directory.CreateDirectory(into);
+
+  var format = FormatRegistry.DetectFromFile(animation);
+  var formatEntry = FormatRegistry.GetEntry(format);
+  if (formatEntry == null) {
+    Console.Error.WriteLine($"no format claims {animation.Name}");
+    return 2;
+  }
+
+  // A format that does not enumerate frames still has one picture, and saying so beats pretending
+  // the question was refused.
+  var count = formatEntry.GetImageCount?.Invoke(animation) ?? 1;
+  for (var frame = 0; frame < count; ++frame) {
+    var picture = formatEntry.LoadRawImageAtIndex?.Invoke(animation, frame)
+                  ?? formatEntry.LoadRawImage(animation);
+    if (picture == null) {
+      Console.Error.WriteLine($"{animation.Name}: frame {frame} did not decode");
+      return 1;
+    }
+
+    var rgb = picture.ToRgb24();
+    var rgba = picture.ToRgba32();
+    var wantedRgb = (long)picture.Width * picture.Height * 3;
+    var wantedRgba = (long)picture.Width * picture.Height * 4;
+    if (rgb.LongLength < wantedRgb || rgba.LongLength < wantedRgba) {
+      Console.Error.WriteLine($"{animation.Name}: frame {frame} produced too few bytes for a {picture.Width}x{picture.Height} picture");
+      return 1;
+    }
+
+    var stem = Path.Combine(into, $"{animation.Name}.{frame:D2}");
+    using (var file = File.Create(stem + ".ppm")) {
+      file.Write(Encoding.ASCII.GetBytes($"P6\n{picture.Width} {picture.Height}\n255\n"));
+      file.Write(rgb, 0, (int)wantedRgb);
+    }
+
+    using (var file = File.Create(stem + ".pam")) {
+      file.Write(Encoding.ASCII.GetBytes(
+        $"P7\nWIDTH {picture.Width}\nHEIGHT {picture.Height}\nDEPTH 4\nMAXVAL 255\nTUPLTYPE RGB_ALPHA\nENDHDR\n"));
+      file.Write(rgba, 0, (int)wantedRgba);
+    }
+
+    Console.WriteLine($"{stem}\t{picture.Width}x{picture.Height}\t{picture.Format}");
+  }
+
+  Console.WriteLine($"{formatEntry.Name}: {count} frame(s) from {animation.Name}");
+  return 0;
+}
+
 // Which formats can be read but not written, so the list of what is left to encode is measured
 // rather than remembered. The capabilities say what a format can hold, which is most of what decides
 // whether writing it is a job at all: a fixed-palette machine format needs a quantiser behind it,
