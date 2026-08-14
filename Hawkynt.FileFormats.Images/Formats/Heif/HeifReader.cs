@@ -3,7 +3,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
-using FileFormat.Heif.Codec;
+using FileFormat.Core;
 
 namespace FileFormat.Heif;
 
@@ -37,6 +37,99 @@ public static class HeifReader {
   }
 
   public static HeifFile FromSpan(ReadOnlySpan<byte> data) {
+    var container = _ReadContainer(data);
+    var width = container.CodedWidth;
+    var height = container.CodedHeight;
+    var rawImageData = container.MdatPayload;
+
+    // An hvcC property is the container stating that the item is HEVC-coded, which is what every
+    // HEIF encoder writes; anything else here is our own writer's uncompressed payload. There is no
+    // HEVC decoder in this project, so this is the point where that has to be said out loud rather
+    // than answered with a raster.
+    if (container.IsHevcCoded)
+      throw new NotSupportedException(
+        "HEIF: the picture is HEVC-coded (ISO/IEC 23008-2) and there is no HEVC decoder here. " +
+        $"The container's extent is readable — {width}x{height} coded" +
+        (container.Aperture != null ? ", with a clean aperture inside it" : string.Empty) +
+        " — so HeifFile.ReadImageInfo still answers the size."
+      );
+
+    // What is left has to be the uncompressed payload HeifWriter emits for a container-level round
+    // trip: exactly the picture's bytes. A payload of any other length is coded in some scheme that
+    // has not been identified here, and padding the difference with zeroes would hand back a raster
+    // nobody wrote. An extent that does not survive being turned into a byte count is left alone —
+    // that is the malformed-container case the clean aperture guards already answer with an empty
+    // raster rather than an exception.
+    var expectedPixelBytes = width * height * 3;
+    if (expectedPixelBytes > 0 && rawImageData.Length != expectedPixelBytes)
+      throw new NotSupportedException(
+        $"HEIF: the {width}x{height} item carries {rawImageData.Length} bytes where an uncompressed " +
+        $"picture would be {expectedPixelBytes}, so it is coded in a scheme that is not implemented " +
+        "here. HeifFile.ReadImageInfo still answers the size."
+      );
+
+    var pixelData = new byte[expectedPixelBytes > 0 ? expectedPixelBytes : 0];
+    if (expectedPixelBytes > 0)
+      rawImageData.AsSpan(0, expectedPixelBytes).CopyTo(pixelData.AsSpan(0));
+
+    // ispe carries the coded extent, which an encoder pads out to whole coding blocks; clap is what
+    // states the picture inside it. Applied last so it trims the raster as well as the reported size.
+    if (container.Aperture != null && _TryResolveCleanAperture(container.Aperture.Value, width, height, out var cropX, out var cropY, out var cropWidth, out var cropHeight)) {
+      pixelData = _CropRgb24(pixelData, width, cropX, cropY, cropWidth, cropHeight);
+      width = cropWidth;
+      height = cropHeight;
+    }
+
+    return new HeifFile {
+      Width = width,
+      Height = height,
+      PixelData = pixelData,
+      Brand = container.Brand,
+      RawImageData = rawImageData,
+    };
+  }
+
+  /// <summary>The extent the container states, without touching the codestream.</summary>
+  /// <remarks>
+  /// ispe and clap are container properties, so the size of an HEVC-coded item is knowable even
+  /// though its pixels are not. This is the path that keeps answering when <see cref="FromSpan"/>
+  /// refuses.
+  /// </remarks>
+  public static ImageInfo? ReadImageInfo(ReadOnlySpan<byte> data) {
+    HeifContainer container;
+    try {
+      container = _ReadContainer(data);
+    } catch (Exception) {
+      // A metadata probe is handed arbitrary bytes and its contract is to answer "I do not know"
+      // rather than throw: a box table can be malformed in ways the parser reports as any of half a
+      // dozen exception types, and none of them is this method's caller's problem.
+      return null;
+    }
+
+    var width = container.CodedWidth;
+    var height = container.CodedHeight;
+    if (width <= 0 || height <= 0)
+      return null;
+
+    if (container.Aperture != null && _TryResolveCleanAperture(container.Aperture.Value, width, height, out _, out _, out var cropWidth, out var cropHeight)) {
+      width = cropWidth;
+      height = cropHeight;
+    }
+
+    return new(width, height, 24, "Rgb24", container.IsHevcCoded ? "HEVC" : "None");
+  }
+
+  /// <summary>Everything the ISO base media boxes say, before any of it is turned into pixels.</summary>
+  private readonly record struct HeifContainer(
+    string Brand,
+    int CodedWidth,
+    int CodedHeight,
+    CleanAperture? Aperture,
+    bool IsHevcCoded,
+    byte[] MdatPayload
+  );
+
+  private static HeifContainer _ReadContainer(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_FILE_SIZE)
       throw new InvalidDataException("Data too small for a valid HEIF file.");
 
@@ -53,61 +146,22 @@ public static class HeifReader {
 
     var width = 0;
     var height = 0;
-    byte[]? rawImageData = null;
     byte[]? hvcCData = null;
     CleanAperture? clap = null;
 
-    // Parse meta box for dimensions, hvcC config and the clean aperture
     var metaBox = _FindBox(boxes, IsoBmffBox.Meta);
     if (metaBox != null)
       _ParseMetaBox(metaBox.Value.Data, ref width, ref height, ref hvcCData, ref clap);
 
-    // Extract mdat payload
     var mdatBox = _FindBox(boxes, IsoBmffBox.Mdat);
-    if (mdatBox != null)
-      rawImageData = mdatBox.Value.Data;
+    var rawImageData = mdatBox?.Data ?? [];
 
-    rawImageData ??= [];
+    // hvcC is the container's own statement. A file that carries no properties at all but whose
+    // mdat is a run of HEVC NAL units is still an HEVC item, so the payload is sniffed as well.
+    var isHevcCoded = hvcCData != null
+                      || (rawImageData.Length > 0 && rawImageData.Length != width * height * 3 && _LooksLikeHevcData(rawImageData));
 
-    // Try HEVC decode if we have mdat data that doesn't look like raw pixels
-    var expectedPixelBytes = width * height * 3;
-    byte[] pixelData;
-
-    if (rawImageData.Length > 0 && rawImageData.Length != expectedPixelBytes && _LooksLikeHevcData(rawImageData)) {
-      try {
-        var (decW, decH, rgbData) = HeifHevcDecoder.Decode(hvcCData, rawImageData);
-        width = decW;
-        height = decH;
-        pixelData = rgbData;
-      } catch {
-        // HEVC decode failed: return container-level data only
-        pixelData = new byte[expectedPixelBytes > 0 ? expectedPixelBytes : 0];
-        if (expectedPixelBytes > 0)
-          rawImageData.AsSpan(0, Math.Min(rawImageData.Length, expectedPixelBytes)).CopyTo(pixelData.AsSpan(0));
-      }
-    } else {
-      // Raw uncompressed or fallback
-      pixelData = new byte[expectedPixelBytes > 0 ? expectedPixelBytes : 0];
-      if (expectedPixelBytes > 0)
-        rawImageData.AsSpan(0, Math.Min(rawImageData.Length, expectedPixelBytes)).CopyTo(pixelData.AsSpan(0));
-    }
-
-    // ispe and the HEVC SPS both carry the coded extent, which an encoder pads out to whole coding
-    // blocks; clap is what states the picture inside it. Applied last so it also trims a decoded
-    // raster — the decoder reads the SPS conformance window offsets but discards them.
-    if (clap != null && _TryResolveCleanAperture(clap.Value, width, height, out var cropX, out var cropY, out var cropWidth, out var cropHeight)) {
-      pixelData = _CropRgb24(pixelData, width, cropX, cropY, cropWidth, cropHeight);
-      width = cropWidth;
-      height = cropHeight;
-    }
-
-    return new HeifFile {
-      Width = width,
-      Height = height,
-      PixelData = pixelData,
-      Brand = brand,
-      RawImageData = rawImageData,
-    };
+    return new(brand, width, height, clap, isHevcCoded, rawImageData);
   }
 
   public static HeifFile FromBytes(byte[] data) {

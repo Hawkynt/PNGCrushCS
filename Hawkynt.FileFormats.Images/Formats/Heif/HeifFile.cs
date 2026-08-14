@@ -5,9 +5,14 @@ namespace FileFormat.Heif;
 
 /// <summary>In-memory representation of a HEIF/HEIC (ISO/IEC 23008-12) image at the container level.</summary>
 /// <remarks>
-/// This reads and does not write, and the writer beside it is not registered.
+/// This reads the container and does not write, and the writer beside it is not registered.
 /// <para/>
-/// There is no HEVC encoder here — only a decoder. What the writer produced was an ISO base media
+/// There is no HEVC codec here in either direction. Every HEIF anything else wrote holds an
+/// HEVC-coded item, so <see cref="HeifReader.FromSpan"/> refuses one rather than hand back a raster
+/// it could not fill; <see cref="ReadImageInfo"/> still reports the extent, which ispe and clap
+/// state in the container and not in the codestream.
+/// <para/>
+/// The writer is unregistered for the mirror-image reason. What it produced was an ISO base media
 /// container with the picture's own bytes inside it and no iinf box that names the item to decode,
 /// which is not HEIF: nothing that reads HEIF can read one, and the reference tool says so. It
 /// round-tripped only because our own reader took the same bytes back out again, which is the exact
@@ -16,11 +21,17 @@ namespace FileFormat.Heif;
 /// Registering it would count a format as writable on the strength of a file no other program will
 /// open. The encoder is the missing piece, and until there is one this reads.
 /// </remarks>
-public readonly record struct HeifFile : IImageFormatReader<HeifFile>, IImageToRawImage<HeifFile> {
+public readonly record struct HeifFile : IImageFormatReader<HeifFile>, IImageToRawImage<HeifFile>, IImageInfoReader<HeifFile> {
 
   static string IImageFormatMetadata<HeifFile>.PrimaryExtension => ".heic";
   static string[] IImageFormatMetadata<HeifFile>.FileExtensions => [".heic", ".heif"];
   static HeifFile IImageFormatReader<HeifFile>.FromSpan(ReadOnlySpan<byte> data) => HeifReader.FromSpan(data);
+
+  /// <summary>
+  /// The extent the container states, which stays readable for an HEVC-coded item whose pixels are
+  /// not. <see cref="HeifReader.FromSpan"/> refuses those; this does not have to.
+  /// </summary>
+  public static ImageInfo? ReadImageInfo(ReadOnlySpan<byte> header) => HeifReader.ReadImageInfo(header);
 
   static bool? IImageFormatMetadata<HeifFile>.MatchesSignature(ReadOnlySpan<byte> header) {
     if (header.Length < 12 || header[4] != 0x66 || header[5] != 0x74 || header[6] != 0x79 || header[7] != 0x70)
