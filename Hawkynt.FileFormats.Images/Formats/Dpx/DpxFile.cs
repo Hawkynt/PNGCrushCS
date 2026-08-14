@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Dpx;
@@ -34,8 +35,9 @@ public readonly record struct DpxFile : IImageFormatReader<DpxFile>, IImageToRaw
       case DpxDescriptor.Rgb: {
         switch (bits) {
           case 8: {
+            _EnsureImageData(file, 3);
             var result = new byte[pixelCount * 3];
-            Buffer.BlockCopy(src, 0, result, 0, Math.Min(src.Length, result.Length));
+            Buffer.BlockCopy(src, 0, result, 0, result.Length);
             return new() {
               Width = width,
               Height = height,
@@ -44,6 +46,7 @@ public readonly record struct DpxFile : IImageFormatReader<DpxFile>, IImageToRaw
             };
           }
           case 10: {
+            _EnsureImageData(file, 4); // one 32-bit word carries all three components
             var result = new byte[pixelCount * 6];
             for (var i = 0; i < pixelCount; ++i) {
               var offset = i * 4;
@@ -68,6 +71,7 @@ public readonly record struct DpxFile : IImageFormatReader<DpxFile>, IImageToRaw
             };
           }
           case 16: {
+            _EnsureImageData(file, 6);
             var result = new byte[pixelCount * 6];
             for (var i = 0; i < pixelCount; ++i) {
               var offset = i * 6;
@@ -98,8 +102,9 @@ public readonly record struct DpxFile : IImageFormatReader<DpxFile>, IImageToRaw
         if (bits != 8)
           throw new NotSupportedException($"DPX RGBA with {bits} bits per element is not supported; only 8-bit is implemented.");
 
+        _EnsureImageData(file, 4);
         var result = new byte[pixelCount * 4];
-        Buffer.BlockCopy(src, 0, result, 0, Math.Min(src.Length, result.Length));
+        Buffer.BlockCopy(src, 0, result, 0, result.Length);
         return new() {
           Width = width,
           Height = height,
@@ -110,8 +115,9 @@ public readonly record struct DpxFile : IImageFormatReader<DpxFile>, IImageToRaw
       case DpxDescriptor.Luma: {
         switch (bits) {
           case 8: {
+            _EnsureImageData(file, 1);
             var result = new byte[pixelCount];
-            Buffer.BlockCopy(src, 0, result, 0, Math.Min(src.Length, result.Length));
+            Buffer.BlockCopy(src, 0, result, 0, result.Length);
             return new() {
               Width = width,
               Height = height,
@@ -120,6 +126,7 @@ public readonly record struct DpxFile : IImageFormatReader<DpxFile>, IImageToRaw
             };
           }
           case 10: {
+            _EnsureImageData(file, 4);
             var result = new byte[pixelCount * 2];
             for (var i = 0; i < pixelCount; ++i) {
               var offset = i * 4;
@@ -137,6 +144,7 @@ public readonly record struct DpxFile : IImageFormatReader<DpxFile>, IImageToRaw
             };
           }
           case 16: {
+            _EnsureImageData(file, 2);
             var result = new byte[pixelCount * 2];
             for (var i = 0; i < pixelCount; ++i) {
               var v = _ReadUInt16(src, i * 2, file.IsBigEndian);
@@ -195,6 +203,25 @@ public readonly record struct DpxFile : IImageFormatReader<DpxFile>, IImageToRaw
       ImageDataOffset = 0,
       PixelData = pixelData,
     };
+  }
+
+  /// <summary>
+  /// Refuses image data that cannot cover the declared dimensions. Without this a short or
+  /// mis-offset file walks off the end of the buffer and the caller sees an
+  /// <see cref="IndexOutOfRangeException"/> instead of a diagnosable refusal. The count is
+  /// computed in 64-bit so a header claiming absurd dimensions cannot overflow into a small
+  /// requirement that then passes.
+  /// </summary>
+  private static void _EnsureImageData(DpxFile file, int bytesPerPixel) {
+    var required = (long)file.Width * file.Height * bytesPerPixel;
+    var available = file.PixelData?.Length ?? 0;
+    if (available >= required)
+      return;
+
+    throw new InvalidDataException(
+      $"DPX {file.Descriptor} {file.BitsPerElement}-bit image data is truncated: "
+      + $"{file.Width}x{file.Height} needs {required} bytes, {available} present."
+    );
   }
 
   private static uint _ReadUInt32(byte[] data, int offset, bool bigEndian) =>
