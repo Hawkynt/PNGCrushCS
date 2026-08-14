@@ -15,25 +15,34 @@ public static class PcdWriter {
   public static byte[] ToBytes(PcdFile file) {
     ArgumentNullException.ThrowIfNull(file);
 
+    return Assemble(file.Width, file.Height, file.PixelData, photoYcc: true);
+  }
+
+  /// <summary>Lays the pyramid out and fills every size in it.</summary>
+  /// <param name="photoYcc">
+  /// Whether the planes are to hold Photo YCC, which is what a <c>.pcd</c> means by them. A
+  /// <c>.pcds</c> holds the channels themselves, so it says no.
+  /// </param>
+  internal static byte[] Assemble(int width, int height, byte[]? pixelData, bool photoYcc) {
     var source = new RawImage {
-      Width = file.Width,
-      Height = file.Height,
+      Width = width,
+      Height = height,
       Format = PixelFormat.Rgb24,
-      PixelData = file.PixelData ?? new byte[file.Width * file.Height * 3],
+      PixelData = pixelData ?? new byte[width * height * 3],
     };
 
     var last = PcdFile.Resolutions[^1];
     var result = new byte[last.Offset + PcdFile.PlaneBytes(last.Width, last.Height)];
     PcdFile.Magic.CopyTo(result.AsSpan(PcdFile.PreambleSize));
 
-    foreach (var (width, height, offset) in PcdFile.Resolutions)
-      _Encode(source.SampleTo(width, height), width, height, result.AsSpan(offset));
+    foreach (var (planeWidth, planeHeight, offset) in PcdFile.Resolutions)
+      _Encode(source.SampleTo(planeWidth, planeHeight), planeWidth, planeHeight, result.AsSpan(offset), photoYcc);
 
     return result;
   }
 
   /// <summary>Writes one resolution: two rows of luminance, then a row of each chrominance.</summary>
-  private static void _Encode(RawImage image, int width, int height, Span<byte> target) {
+  private static void _Encode(RawImage image, int width, int height, Span<byte> target, bool photoYcc) {
     var half = width / 2;
     var groupBytes = width * 2 + half * 2;
     var rgb = image.PixelData;
@@ -43,7 +52,7 @@ public static class PcdWriter {
       var luminanceRow = group * groupBytes + (y & 1) * width;
 
       for (var x = 0; x < width; ++x) {
-        var (luminance, _, _) = _FromRgb(rgb, (y * width + x) * 3);
+        var (luminance, _, _) = _FromRgb(rgb, (y * width + x) * 3, photoYcc);
         target[luminanceRow + x] = luminance;
       }
     }
@@ -55,7 +64,7 @@ public static class PcdWriter {
 
       for (var dy = 0; dy < 2 && y + dy < height; ++dy)
       for (var dx = 0; dx < 2 && x + dx < width; ++dx) {
-        var (_, sampleBlue, sampleRed) = _FromRgb(rgb, ((y + dy) * width + x + dx) * 3);
+        var (_, sampleBlue, sampleRed) = _FromRgb(rgb, ((y + dy) * width + x + dx) * 3, photoYcc);
         blue += sampleBlue;
         red += sampleRed;
         ++count;
@@ -75,9 +84,14 @@ public static class PcdWriter {
   /// three-quarters as bright as it went in, which looks like a plausible picture and is not the
   /// one that was written.
   /// </remarks>
-  private static (byte Luminance, byte Blue, byte Red) _FromRgb(ReadOnlySpan<byte> rgb, int at) {
+  private static (byte Luminance, byte Blue, byte Red) _FromRgb(ReadOnlySpan<byte> rgb, int at, bool photoYcc) {
     if (at + 2 >= rgb.Length)
-      return (0, 156, 137);
+      return photoYcc ? ((byte)0, (byte)156, (byte)137) : ((byte)0, (byte)0, (byte)0);
+
+    // Without the transform there is nothing to invert: the three channels go into the three planes
+    // as they stand, which is what the reading side takes back out of them.
+    if (!photoYcc)
+      return (rgb[at], rgb[at + 1], rgb[at + 2]);
 
     const double toExtended = PcdReader.ExtendedRange / 255.0;
     double red = rgb[at] * toExtended, green = rgb[at + 1] * toExtended, blue = rgb[at + 2] * toExtended;
