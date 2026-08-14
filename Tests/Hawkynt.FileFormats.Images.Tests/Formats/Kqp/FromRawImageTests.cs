@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Diagnostics;
+using Hawkynt.FileFormats.Images.Tests;
 using System.IO;
 using FileFormat.Core;
 
@@ -138,14 +139,9 @@ public sealed class FromRawImageTests {
       var path = Path.Combine(directory.FullName, "sample.jpg");
       File.WriteAllBytes(path, complete.ToArray());
 
-      using var identify = Process.Start(new ProcessStartInfo("identify", $"-format \"%wx%h\" \"{path}\"") {
-        RedirectStandardOutput = true, RedirectStandardError = true,
-      });
+      using var identify = ExternalTool.StartOrIgnore("identify", $"-format \"%wx%h\" \"{path}\"");
 
-      if (identify == null)
-        Assert.Ignore("no ImageMagick here to ask");
-
-      var reported = identify!.StandardOutput.ReadToEnd().Trim().Trim('"');
+      var reported = identify.StandardOutput.ReadToEnd().Trim().Trim('"');
       identify.WaitForExit();
 
       if (identify.ExitCode != 0)
