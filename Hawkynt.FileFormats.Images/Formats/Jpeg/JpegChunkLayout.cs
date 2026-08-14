@@ -182,6 +182,58 @@ internal static class JpegChunkLayout {
 
   /// <summary>Scans entropy-coded data starting at <paramref name="pos"/>, returning the offset of the
   /// next genuine marker (0xFF followed by a non-zero, non-RST byte) or end of file.</summary>
+  /// <summary>
+  /// The length of the JPEG beginning at offset zero, or 0 if it has no end-of-image marker.
+  /// </summary>
+  /// <remarks>
+  /// For splitting a stream of JPEGs laid end to end — a Motion JPEG file, or the frame chunks of an
+  /// MJPG AVI. <see cref="Enumerate"/> answers this too, in the offset of its footer, but it goes on
+  /// to walk everything after the marker as trailing metadata: called once per frame on the rest of
+  /// the stream, that is quadratic in the file's length, and a stream is exactly where a file is long
+  /// and the frames are many. This walks one picture and stops.
+  /// <para/>
+  /// Searching for <c>FF D9</c> instead would be linear too and wrong: entropy-coded data may contain
+  /// those two bytes, and a frame carrying a thumbnail has a whole second JPEG inside its APP1 with
+  /// an end marker of its own. Hence the same segment walk and the same <see cref="_ScanEntropyData"/>
+  /// as above — the delicate part stays in one place.
+  /// </remarks>
+  internal static int FirstImageLength(ReadOnlySpan<byte> data) {
+    if (data.Length < 4 || data[0] != 0xFF || data[1] != JpegMarker.SOI)
+      return 0;
+
+    var pos = 2;
+    while (pos + 1 < data.Length) {
+      // Filler bytes between segments are legal.
+      while (pos < data.Length - 1 && data[pos] == 0xFF && data[pos + 1] == 0xFF)
+        ++pos;
+      if (pos + 1 >= data.Length || data[pos] != 0xFF)
+        return 0;
+
+      var marker = data[pos + 1];
+      if (marker == JpegMarker.EOI)
+        return pos + 2;
+
+      // Markers standing alone, carrying no length.
+      if (JpegMarker.IsRst(marker) || marker == 0x01 || marker == JpegMarker.SOI) {
+        pos += 2;
+        continue;
+      }
+
+      if (pos + 4 > data.Length)
+        return 0;
+
+      var segmentLength = BinaryPrimitives.ReadUInt16BigEndian(data.Slice(pos + 2, 2));
+      if (segmentLength < 2 || pos + 2 + segmentLength > data.Length)
+        return 0;
+
+      pos += 2 + segmentLength;
+      if (marker == JpegMarker.SOS)
+        pos = _ScanEntropyData(data, pos);
+    }
+
+    return 0;
+  }
+
   private static int _ScanEntropyData(ReadOnlySpan<byte> data, int pos) {
     while (pos < data.Length - 1) {
       if (data[pos] != 0xFF) { pos++; continue; }
