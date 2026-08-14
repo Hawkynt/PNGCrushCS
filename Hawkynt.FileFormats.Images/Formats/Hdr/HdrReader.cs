@@ -37,8 +37,10 @@ public static class HdrReader {
     if (data.Length < _MIN_FILE_SIZE)
       throw new InvalidDataException("Data is too small to be a valid HDR file.");
 
-    if (data[0] != (byte)'#' || data[1] != (byte)'?')
-      throw new InvalidDataException("Invalid HDR magic: expected '#?'.");
+    // Not only '#?': nconvert writes the FORMAT line and nothing before it. See
+    // HdrHeaderParser.HasRadianceHeader for why that counts as a signature rather than a hole.
+    if (!HdrHeaderParser.HasRadianceHeader(data))
+      throw new InvalidDataException("Invalid HDR magic: expected '#?' or a Radiance 'FORMAT=' line.");
 
     var bytes = data.ToArray();
     var (width, height, exposure, dataOffset) = HdrHeaderParser.Parse(bytes);
