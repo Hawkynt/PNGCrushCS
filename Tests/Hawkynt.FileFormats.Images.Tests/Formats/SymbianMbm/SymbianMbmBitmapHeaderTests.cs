@@ -15,13 +15,16 @@ public sealed class SymbianMbmBitmapHeaderTests {
   [Test]
   [Category("Unit")]
   public void RoundTrip_PreservesAllFields() {
-    var original = new SymbianMbmBitmapHeader(1000, 40, 320, 240, 24, 0, 0, 0, 960, 0);
+    var original = new SymbianMbmBitmapHeader(1000, 40, 320, 240, 4535, 3401, 24, 1, 0, 0);
     Span<byte> buffer = stackalloc byte[SymbianMbmBitmapHeader.StructSize];
     original.WriteTo(buffer);
     var parsed = SymbianMbmBitmapHeader.ReadFrom(buffer);
     Assert.That(parsed, Is.EqualTo(original));
   }
 
+  // The field order is Symbian's SEpocBitmapHeader, and the size in twips between the size in pixels
+  // and the depth is the part that is easy to leave out - doing so reads the depth off the width in
+  // twips, which is zero on every file the converters write.
   [Test]
   [Category("Unit")]
   public void ReadFrom_ParsesKnownValues() {
@@ -29,25 +32,25 @@ public sealed class SymbianMbmBitmapHeaderTests {
     BinaryPrimitives.WriteInt32LittleEndian(data.AsSpan(0), 500);
     BinaryPrimitives.WriteInt32LittleEndian(data.AsSpan(4), 40);
     BinaryPrimitives.WriteInt32LittleEndian(data.AsSpan(8), 64);
-    BinaryPrimitives.WriteInt32LittleEndian(data.AsSpan(12), 64);
-    BinaryPrimitives.WriteInt32LittleEndian(data.AsSpan(16), 8);
-    BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(20), 1);
-    BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(24), 0);
-    BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(28), 256);
-    BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(32), 460);
-    BinaryPrimitives.WriteInt32LittleEndian(data.AsSpan(36), 0);
+    BinaryPrimitives.WriteInt32LittleEndian(data.AsSpan(12), 48);
+    BinaryPrimitives.WriteInt32LittleEndian(data.AsSpan(16), 907);
+    BinaryPrimitives.WriteInt32LittleEndian(data.AsSpan(20), 680);
+    BinaryPrimitives.WriteInt32LittleEndian(data.AsSpan(24), 8);
+    BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(28), 1);
+    BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(32), 256);
+    BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(36), 2);
     var h = SymbianMbmBitmapHeader.ReadFrom(data);
     Assert.Multiple(() => {
-      Assert.That(h.HeaderSize, Is.EqualTo(500));
+      Assert.That(h.BitmapSize, Is.EqualTo(500));
       Assert.That(h.HeaderLength, Is.EqualTo(40));
       Assert.That(h.Width, Is.EqualTo(64));
-      Assert.That(h.Height, Is.EqualTo(64));
+      Assert.That(h.Height, Is.EqualTo(48));
+      Assert.That(h.WidthInTwips, Is.EqualTo(907));
+      Assert.That(h.HeightInTwips, Is.EqualTo(680));
       Assert.That(h.BitsPerPixel, Is.EqualTo(8));
       Assert.That(h.ColorMode, Is.EqualTo(1u));
-      Assert.That(h.Compression, Is.EqualTo(0u));
       Assert.That(h.PaletteSize, Is.EqualTo(256u));
-      Assert.That(h.DataSize, Is.EqualTo(460u));
-      Assert.That(h.Padding, Is.EqualTo(0));
+      Assert.That(h.Compression, Is.EqualTo(2u));
     });
   }
 
