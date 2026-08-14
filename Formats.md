@@ -80,6 +80,7 @@ build one from pixel data they didn't read, so the registry reports them as read
 | Atari GR.8              | .gr8                                                 | Atari 8-bit ANTIC Mode 8        | Y      | Y      | —         | R     | —   | —      | —         |
 | Atari Grafik            | .pcp                                                 | Atari graphics format            | Y      | —      | —         | —     | —   | —      | —         |
 | Atari Graphics 10       | .gr10, .g10                                          | Atari GTIA 9-color mode          | Y      | —      | —         | R     | —   | —      | —         |
+| Atari Graphics 10+      | .gr10p                                               | GTIA mode 10, 60 rows shown x4   | Y      | Y      | —         | —     | —   | —      | —         |
 | Atari Graphics 11       | .gr11, .g11                                          | Atari GTIA 16-luminance mode     | Y      | Y      | —         | R     | —   | —      | —         |
 | Atari Graphics 9        | .gr9, .g9, .g9s, .sfd                                            | Atari GTIA 16-shade grayscale    | Y      | Y      | —         | R     | —   | —      | —         |
 | Atari HR                | .hr                                                  | Atari 8-bit HR hires 320x192    | Y      | Y      | —         | R     | —   | —      | —         |
@@ -938,6 +939,14 @@ registers appended, and Blazing Paddles' shapes, which are not a picture at all 
 instructions and so have no size until every shape has been walked to find one. All four are
 read, because implementing one and calling the extension covered would have claimed three
 formats for the work of one.
+
+One entry of RECOIL's is not in that count on either side, because RECOIL comments it out of its
+own catalogue: Graphics 10+, `.gr10p`, excluded there for having five characters after the dot.
+Nothing here has that limit — `.farbfeld`, `.pspimage` and `.pspbrush` were already registered — so
+it is read and written now. The reference decoder as shipped will not open the name, but the same
+2409 bytes under `.g10` are a sixty-row Graphics 10 screen, which it does open and which agrees
+with us pixel for pixel; the only difference between the two names is that a stored row is four
+scanlines tall rather than one.
 
 Largest remaining clusters: Atari 8-bit (56), Commodore 64 (23), Atari ST/STE (19), Atari Falcon
 (8), NEC PC-98 (7), ZX Spectrum (3). SAM Coupe is now fully covered. Atari TT, the MSX2+ YJK modes and the Commodore 16/Plus4

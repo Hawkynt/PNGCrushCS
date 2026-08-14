@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using FileFormat.Core;
+using FileFormat.Graphics10Plus;
 using FileFormat.Hp48Grob;
 using FileFormat.AmstradMode5;
 using FileFormat.ColrObjectEditor;
@@ -5050,6 +5051,122 @@ public sealed class RecoilDecodeAgreementTests {
     var data = new byte[2050];
     for (var i = 0; i < 2048; ++i)
       data[2 + i] = (byte)(i * 17 + (i >> 3));
+
+    return data;
+  }
+
+  /// <summary>
+  /// Graphics 10+, checked through the extension the reference decoder will answer to.
+  /// </summary>
+  /// <remarks>
+  /// RECOIL comments this format out of its own catalogue for having five characters after the dot,
+  /// so <c>recoil2png</c> as shipped will not open a <c>.gr10p</c> at all. It does not have to. The
+  /// same 2409 bytes under <c>.g10</c> are a Graphics 10 screen of sixty rows — the length test
+  /// there is that the bytes past the bitmap number nine, which is exactly the nine registers this
+  /// format ends with — and RECOIL decodes it to the same sixty rows of pixels, drawn once each
+  /// instead of four times.
+  /// <para/>
+  /// So every pixel value, every register, the nibble order and the mode's two-pixel offset are all
+  /// held against the reference; the only thing the comparison supplies itself is that a stored row
+  /// is four scanlines tall, which is the one thing the two names differ in.
+  /// </remarks>
+  [Test]
+  [Category("Conformance")]
+  public void Graphics10Plus_MatchesRecoilRowForRow() {
+    RecoilOracle.RequireAvailable();
+
+    var directory = Path.Combine(Path.GetTempPath(), $"recoilg10p_{Guid.NewGuid():N}");
+    Directory.CreateDirectory(directory);
+
+    try {
+      var bytes = _Graphics10Plus();
+      var ourPath = Path.Combine(directory, "screen.gr10p");
+      var theirPath = Path.Combine(directory, "screen.g10");
+      File.WriteAllBytes(ourPath, bytes);
+      File.WriteAllBytes(theirPath, bytes);
+
+      var (png, output) = RecoilOracle.TryDecodeToPng(theirPath);
+      Assert.That(png, Is.Not.Null, $"RECOIL rejected the screen — {output}");
+
+      var theirs = _AsRgb(FormatRegistry.Read(png!));
+      var ours = _AsRgb(Graphics10PlusFile.ToRawImage(Graphics10PlusReader.FromFile(new(ourPath))));
+
+      Assert.That((ours.Width, ours.Height), Is.EqualTo((theirs.Width, theirs.Height * Graphics10PlusFile.Scale)));
+
+      for (var y = 0; y < ours.Height; ++y)
+      for (var x = 0; x < ours.Width; ++x)
+      for (var channel = 0; channel < 3; ++channel) {
+        var mine = ours.PixelData[(y * ours.Width + x) * 3 + channel];
+        var theirsHere = theirs.PixelData[(y / Graphics10PlusFile.Scale * theirs.Width + x) * 3 + channel];
+        if (mine != theirsHere)
+          Assert.Fail($"pixel {x},{y} channel {channel} — ours {mine}, RECOIL {theirsHere}");
+      }
+    } finally {
+      try { Directory.Delete(directory, true); } catch { /* best effort */ }
+    }
+  }
+
+  /// <summary>
+  /// What we write, judged the same way: the reference decoder will not open a <c>.gr10p</c>, so it
+  /// is handed our bytes under the name it does open.
+  /// </summary>
+  /// <remarks>
+  /// This is what stands in for the writer-acceptance test the five-character extension puts out of
+  /// reach, and it is the stricter of the two — acceptance asks only whether a tool opens the file,
+  /// whereas this asks whether it sees the same picture in it.
+  /// </remarks>
+  [Test]
+  [Category("Conformance")]
+  public void Graphics10Plus_WhatWeWrite_MatchesRecoilRowForRow() {
+    RecoilOracle.RequireAvailable();
+
+    var directory = Path.Combine(Path.GetTempPath(), $"recoilg10pw_{Guid.NewGuid():N}");
+    Directory.CreateDirectory(directory);
+
+    try {
+      // Round-tripped from a picture this format can hold rather than from arbitrary bytes, so the
+      // registers the writer chose are the ones under test alongside the bitmap it packed.
+      var source = Graphics10PlusFile.ToRawImage(Graphics10PlusReader.FromBytes(_Graphics10Plus()));
+      var bytes = Graphics10PlusWriter.ToBytes(Graphics10PlusFile.FromRawImage(source));
+      Assert.That(bytes, Has.Length.EqualTo(Graphics10PlusFile.FileSize));
+
+      var theirPath = Path.Combine(directory, "written.g10");
+      File.WriteAllBytes(theirPath, bytes);
+
+      var (png, output) = RecoilOracle.TryDecodeToPng(theirPath);
+      Assert.That(png, Is.Not.Null, $"RECOIL rejected what we wrote — {output}");
+
+      var theirs = _AsRgb(FormatRegistry.Read(png!));
+      var ours = _AsRgb(Graphics10PlusFile.ToRawImage(Graphics10PlusReader.FromBytes(bytes)));
+
+      Assert.That((ours.Width, ours.Height), Is.EqualTo((theirs.Width, theirs.Height * Graphics10PlusFile.Scale)));
+
+      for (var y = 0; y < ours.Height; ++y)
+      for (var x = 0; x < ours.Width; ++x)
+      for (var channel = 0; channel < 3; ++channel) {
+        var mine = ours.PixelData[(y * ours.Width + x) * 3 + channel];
+        var theirsHere = theirs.PixelData[(y / Graphics10PlusFile.Scale * theirs.Width + x) * 3 + channel];
+        if (mine != theirsHere)
+          Assert.Fail($"pixel {x},{y} channel {channel} — ours {mine}, RECOIL {theirsHere}");
+      }
+    } finally {
+      try { Directory.Delete(directory, true); } catch { /* best effort */ }
+    }
+  }
+
+  /// <summary>
+  /// A Graphics 10+ screen exercising all sixteen nibble values, so the seven that are aliases of
+  /// other registers are covered rather than assumed.
+  /// </summary>
+  private static byte[] _Graphics10Plus() {
+    var data = new byte[Graphics10PlusFile.FileSize];
+    for (var i = 0; i < Graphics10PlusFile.ScreenDataSize; ++i)
+      data[i] = (byte)(i * 37 + (i >> 4));
+
+    // Nine registers no two of which are the same colour, so a decoder reaching for the wrong one
+    // cannot land on the right answer by accident.
+    ReadOnlySpan<byte> registers = [0x24, 0x46, 0x68, 0x8A, 0xAC, 0xCE, 0xE0, 0x12, 0x34];
+    registers.CopyTo(data.AsSpan(Graphics10PlusFile.RegisterOffset));
 
     return data;
   }

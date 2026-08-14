@@ -101,6 +101,11 @@ public sealed class WriterAcceptanceTests {
     [ImageFormat.IffPbm] =
       "the reference tool lists .pbm as the portable bitmap, which is a different format and one of "
       + "its own here, and knows no name for the Amiga one at all",
+    [ImageFormat.Graphics10Plus] =
+      "no tool here answers to .gr10p — the reference decoder comments the format out of its own "
+      + "catalogue for having five characters after the dot, and nothing else knows the name. What "
+      + "we write is judged instead by RecoilDecodeAgreementTests, which hands the same bytes over "
+      + "as the .g10 the reference decoder does read",
   };
 
   private static IEnumerable<TestCaseData> Writable() {
