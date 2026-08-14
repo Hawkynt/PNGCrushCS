@@ -111,14 +111,47 @@ public static class PcdReader {
     return rgb;
   }
 
+  /// <summary>What the stored luminance is multiplied by, which is Kodak's own published figure.</summary>
+  /// <remarks>
+  /// Kodak's Photo CD bulletin PCD-042 gives the reason for this exact number: it is chosen "so that
+  /// the code values on the disc representing a 90% white are mapped to a code value of 235,235,235,
+  /// in accordance with the SMPTE digital specification". So it is a video scaling, and it does not
+  /// put white at 255 — 100% white is stored as luminance 182 and comes out of the matrix at 247,
+  /// and 255 falls at 107% white. That is why the output runs past a byte and has to be fitted.
+  /// </remarks>
+  internal const double LuminanceScale = 1.3584;
+
   /// <summary>The extent of the transform's output before it is fitted to a byte.</summary>
   /// <remarks>
   /// Photo YCC carries luminance past white on purpose — the format was built to keep highlights a
-  /// negative captured and a screen cannot show — so the matrix runs to about 350 rather than 255.
-  /// Clipping that at 255 turns every bright area flat white; the range is fitted instead, which is
-  /// what makes a neutral sample come back as the value it went in as.
+  /// negative captured and a screen cannot show — so the matrix runs past 255. Clipping there is
+  /// what loses them, and it is what the netpbm reader does: hpcdtoppm clamps at 255 and everything
+  /// from 107% white up comes back flat. The range is fitted instead.
+  /// <para/>
+  /// The size of that range is not a matter of taste. A neutral has both chrominance planes at their
+  /// own zero, so the matrix gives all three channels as <see cref="LuminanceScale"/> times the
+  /// luminance, and the largest it can produce is that scale times 255 — which is why Ford and
+  /// Roberts describe the matrix as yielding "RGB values from 0 to 346". Fitting that span returns a
+  /// neutral unchanged. It was 350 here, a round number near enough to look right, which returned a
+  /// neutral 1.03% dark: 255 came back as 252 and 200 as 198, so the one property the range exists
+  /// to give was not one it gave.
+  /// <para/>
+  /// ImageMagick lands 0.216% the other side, and that difference is theirs. It applies this same
+  /// matrix with these same coefficients and then indexes a 1389-entry table whose contents are the
+  /// straight line i/1388 to within a float's precision — so it fits the range linearly, exactly as
+  /// this does, and its table is not a transfer curve at all. Its index is 1024*v/MaxMap, making its
+  /// range 255*1388/1024 = 345.64, where the scale named in its own comment gives 1024*1.3584 =
+  /// 1390.8 and a table three entries longer. Measured on a 768x512 plasma, ours against theirs,
+  /// channels differing of 1179648: 781349 at 350, 195937 here, 43877 if their constant were taken
+  /// whole. The rest is their table quantising the index to an integer, which is not worth copying.
+  /// <para/>
+  /// What neither of us does is what Kodak actually recommends, which is a non-linear per-device
+  /// table that rolls the highlights off and puts 100% white near 223 rather than near 182. That is
+  /// a brighter, higher-contrast rendering than fitting linearly gives, and Kodak publishes nine of
+  /// them, one per output device, with no single answer among them. Choosing one is a rendering
+  /// decision rather than a decoding one, and it is not made here.
   /// </remarks>
-  internal const double ExtendedRange = 350.0;
+  internal const double ExtendedRange = LuminanceScale * 255.0;
 
   /// <summary>The Photo CD colour transform, which is not the one video uses.</summary>
   /// <remarks>
@@ -126,12 +159,15 @@ public static class PcdReader {
   /// because neither is symmetric about grey in this space.
   /// </remarks>
   private static void _ToRgb(int luminance, int blue, int red, Span<byte> rgb) {
-    var l = luminance * 1.3584;
+    var l = luminance * LuminanceScale;
     var c1 = (blue - 156) * 2.2179;
     var c2 = (red - 137) * 1.8215;
 
+    // The green coefficients are the published ones at their own precision rather than rounded to
+    // four places, which is what they were. Worth 210 channels of 1179648 on the plasma measured
+    // above — not much, but the digits are published and rounding them off buys nothing.
     rgb[0] = _Fit(l + c2);
-    rgb[1] = _Fit(l - 0.4303 * (blue - 156) - 0.9271 * (red - 137));
+    rgb[1] = _Fit(l - 0.4302726 * (blue - 156) - 0.9271435 * (red - 137));
     rgb[2] = _Fit(l + c1);
   }
 
