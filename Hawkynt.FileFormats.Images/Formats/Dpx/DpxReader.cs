@@ -7,7 +7,13 @@ namespace FileFormat.Dpx;
 /// <summary>Reads DPX files from bytes, streams, or file paths.</summary>
 public static class DpxReader {
 
-  private const int _MINIMUM_HEADER_SIZE = 2048;
+  // SMPTE 268M splits the header in two: the generic part (file information 768 +
+  // image information 640 + image orientation 256 = 1664) and an industry-specific part
+  // (motion picture film 256 + television 128 = 384) that is optional. Files carrying both
+  // start their image data at 2048, but ffmpeg writes the generic part only and points at
+  // 1664 — assuming 2048 there swallows the first 384 bytes of the image.
+  private const int _GENERIC_HEADER_SIZE = 1664;
+  private const int _FULL_HEADER_SIZE = 2048;
   private const int _IMAGE_INFO_OFFSET = 768;
 
   public static DpxFile FromFile(FileInfo file) {
@@ -32,7 +38,7 @@ public static class DpxReader {
 
   public static DpxFile FromSpan(ReadOnlySpan<byte> data) {
 
-    if (data.Length < _MINIMUM_HEADER_SIZE)
+    if (data.Length < _GENERIC_HEADER_SIZE)
       throw new InvalidDataException("Data too small for a valid DPX file.");
 
     var span = data;
@@ -48,9 +54,12 @@ public static class DpxReader {
 
     var header = DpxHeader.ReadFrom(span);
 
+    // Trust the declared offset whenever it can actually point at image data. Files that leave
+    // the field unset (0) or undefined (0xFFFFFFFF, read back as a negative int) fall back to the
+    // conventional full-header layout.
     var dataOffset = header.ImageDataOffset;
-    if (dataOffset < _MINIMUM_HEADER_SIZE)
-      dataOffset = _MINIMUM_HEADER_SIZE;
+    if (dataOffset < _GENERIC_HEADER_SIZE || dataOffset > data.Length)
+      dataOffset = _FULL_HEADER_SIZE;
 
     // Image information header at offset 768
     var imageInfo = span[_IMAGE_INFO_OFFSET..];
@@ -69,6 +78,9 @@ public static class DpxReader {
     var height = isBigEndian
       ? BinaryPrimitives.ReadInt32BigEndian(imageInfo[8..])
       : BinaryPrimitives.ReadInt32LittleEndian(imageInfo[8..]);
+
+    if (width < 0 || height < 0)
+      throw new InvalidDataException($"DPX declares negative dimensions ({width}x{height}).");
 
     // First image element descriptor starts at offset 780 (768 + 12)
     // Element descriptor byte at offset 780 + 16 = 796
