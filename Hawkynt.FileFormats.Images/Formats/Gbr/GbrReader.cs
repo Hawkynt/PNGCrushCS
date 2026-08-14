@@ -69,8 +69,21 @@ public static class GbrReader {
       throw new InvalidDataException($"Invalid GBR width: {width}.");
     if (height <= 0)
       throw new InvalidDataException($"Invalid GBR height: {height}.");
-    if (bytesPerPixel is not (1 or 4))
-      throw new InvalidDataException($"Invalid GBR bytes per pixel: {bytesPerPixel} (expected 1 or 4).");
+    // The depth is a byte count per pixel, and the count decides the channels: 1 is the mask alone,
+    // 4 is R,G,B and the mask. GIMP writes only those two, but XnView/nconvert writes 3 for an RGB
+    // brush - the same meaning the field carries in GIMP's own pattern (GPAT) header, where 1,2,3,4
+    // are GRAY, GRAY+A, RGB, RGBA. Measured on a brush nconvert wrote: header_size 28, exactly
+    // width*height*3 bytes follow, laid out as R,G,B triplets in row order, and the picture it makes
+    // is the one nconvert renders from the same file.
+    //
+    // 2 is deliberately not in this list. GIMP reads it as a Cinepaint brush whose payload is 16-bit
+    // half floats rather than two 8-bit channels, so admitting it here would hand back noise.
+    if (bytesPerPixel is not (1 or 3 or 4))
+      throw new InvalidDataException(
+        bytesPerPixel == 2
+          ? "Unsupported GBR depth 2: Cinepaint 16-bit float brushes are not implemented."
+          : $"Invalid GBR bytes per pixel: {bytesPerPixel} (expected 1, 3 or 4)."
+      );
 
     var name = string.Empty;
     var nameLength = headerSize - _MIN_HEADER_SIZE;
