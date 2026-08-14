@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Miff;
@@ -53,7 +54,13 @@ public readonly record struct MiffFile : IImageFormatReader<MiffFile>, IImageToR
   public static RawImage ToRawImage(MiffFile file) {
     var pixelData = _NarrowSamples(file.PixelData, file.Depth);
 
-    if (file.ColorClass == MiffColorClass.PseudoClass && file.Palette != null)
+    if (file.ColorClass == MiffColorClass.PseudoClass && file.Palette != null) {
+      // An index and an alpha sample per pixel, which Indexed8 has nowhere to put: taking the data
+      // as indices would read every second byte as one. ImageMagick writes such a file for
+      // `-colors 16 -alpha set`, and reading the channel count properly is what makes it visible.
+      if (file.Type != null && file.Type.Contains("Alpha", StringComparison.OrdinalIgnoreCase))
+        throw new InvalidDataException("A MIFF palette with an alpha channel is not supported; its indices carry an alpha sample the indexed pixel format cannot hold.");
+
       return new() {
         Width = file.Width,
         Height = file.Height,
@@ -62,9 +69,11 @@ public readonly record struct MiffFile : IImageFormatReader<MiffFile>, IImageToR
         Palette = file.Palette[..],
         PaletteCount = file.Palette.Length / 3,
       };
+    }
 
     var format = file.Type switch {
       "TrueColorAlpha" or "TrueColorMatte" => PixelFormat.Rgba32,
+      "GrayscaleAlpha" or "GrayscaleMatte" => PixelFormat.GrayAlpha16,
       "Grayscale" => PixelFormat.Gray8,
       _ => PixelFormat.Rgb24,
     };
