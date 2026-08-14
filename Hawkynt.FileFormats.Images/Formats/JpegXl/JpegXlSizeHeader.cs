@@ -39,7 +39,16 @@ internal static class JpegXlSizeHeader {
       var heightDiv8 = (int)reader.ReadBits(5);
       var height = (heightDiv8 + 1) * 8;
       var ratio = (int)reader.ReadBits(3);
-      var width = _GetWidthFromRatio(ratio, height);
+
+      // Ratio zero means the width is spelled out rather than derived, and in the small header it
+      // is spelled out the way the height was: five bits of eighths. Skipping that read left the
+      // width equal to the height — libjxl's own 40 by 24 header, FF 0A 05 08, measured 24 by 24 —
+      // and left the reader five bits short of where the next field begins, so everything after the
+      // size came out of the wrong place.
+      var width = ratio == 0
+        ? ((int)reader.ReadBits(5) + 1) * 8
+        : _GetWidthFromRatio(ratio, height);
+
       return (width, height, reader.BytesConsumed);
     }
 
@@ -69,6 +78,18 @@ internal static class JpegXlSizeHeader {
         writer.WriteBits(1, 1); // small=true (bit value 1, per libjxl spec)
         writer.WriteBits((uint)(height / 8 - 1), 5);
         writer.WriteBits((uint)ratio, 3);
+        return writer.ToArray();
+      }
+
+      // None of the seven shapes fits, but a width that is itself a multiple of eight still belongs
+      // in the small header: ratio zero and then the width in eighths. Falling through to the large
+      // form instead cost two bytes on every such picture and wrote a header libjxl does not write
+      // for that size — its own 40 by 24 is two bytes, 05 08, and this is how they are arrived at.
+      if (width is >= 8 and <= 256 && width % 8 == 0) {
+        writer.WriteBits(1, 1);
+        writer.WriteBits((uint)(height / 8 - 1), 5);
+        writer.WriteBits(0, 3);
+        writer.WriteBits((uint)(width / 8 - 1), 5);
         return writer.ToArray();
       }
     }
