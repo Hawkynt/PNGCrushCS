@@ -35,26 +35,42 @@ public static class MtvReader {
 
     var headerText = Encoding.ASCII.GetString(data.Slice(0, newlineIndex));
     var parts = headerText.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-    if (parts.Length < 2 || !int.TryParse(parts[0], out var width) || !int.TryParse(parts[1], out var height))
+
+    // Two numbers and nothing else. The size line is the only thing telling this format from the
+    // others that answer to .pic, so a line carrying anything more is not one of ours.
+    if (parts.Length != 2 || !int.TryParse(parts[0], out var width) || !int.TryParse(parts[1], out var height))
       throw new InvalidDataException("Invalid MTV header dimensions.");
 
     if (width <= 0 || height <= 0)
       throw new InvalidDataException("MTV image dimensions must be positive.");
 
     var pixelOffset = newlineIndex + 1;
-    var expectedPixelBytes = width * height * 3;
-    var available = data.Length - pixelOffset;
-    var copyLen = Math.Min(expectedPixelBytes, available);
+    var expectedPixelBytes = (long)width * height * 3;
+    var available = (long)data.Length - pixelOffset;
+
+    // nconvert puts one 0x00 between the size line and the samples and will not read a file back
+    // without it, though neither Rayshade nor the MTV tracer itself writes one. It is taken as
+    // padding only when the payload is otherwise one byte too long, so a genuinely black first
+    // pixel in an exactly-sized file stays a sample.
+    if (available == expectedPixelBytes + 1 && data[pixelOffset] == 0) {
+      ++pixelOffset;
+      --available;
+    }
+
+    // A file that cannot fill the size it states is not this format; padding it out would hand back
+    // a picture half of which was never in the file.
+    if (available < expectedPixelBytes)
+      throw new InvalidDataException($"MTV payload holds {available} bytes but {width}x{height} needs {expectedPixelBytes}.");
 
     var pixelData = new byte[expectedPixelBytes];
-    data.Slice(pixelOffset, copyLen).CopyTo(pixelData.AsSpan(0));
+    data.Slice(pixelOffset, (int)expectedPixelBytes).CopyTo(pixelData.AsSpan(0));
 
     return new MtvFile {
       Width = width,
       Height = height,
       PixelData = pixelData
     };
-  
+
   }
 
   public static MtvFile FromBytes(byte[] data) {
