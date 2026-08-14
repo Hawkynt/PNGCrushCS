@@ -4,7 +4,14 @@ using FileFormat.Core;
 namespace FileFormat.SunIcon;
 
 /// <summary>In-memory representation of a Sun Icon (.icon) image.</summary>
-[FormatMagicBytes([0x2F, 0x2A, 0x20])]
+/// <remarks>
+/// The signature is the whole of <c>/* Format_version=</c> and not the <c>/*</c> it used to be.
+/// Two characters of comment opener and a space is not a signature — it is how every C comment
+/// begins, and three of the formats here are C source. The detector answered "Sun Icon" for any
+/// XPM, PICON or UIL file put to it, and the reader behind that answer then refused the file for
+/// want of the <c>Width</c> field it wanted.
+/// </remarks>
+[FormatMagicBytes([0x2F, 0x2A, 0x20, 0x46, 0x6F, 0x72, 0x6D, 0x61, 0x74, 0x5F, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6F, 0x6E, 0x3D])]
 [FormatMimeType("image/x-sun-icon")]
 public readonly record struct SunIconFile : IImageFormatReader<SunIconFile>, IImageToRawImage<SunIconFile>, IImageFromRawImage<SunIconFile>, IImageFormatWriter<SunIconFile> {
 

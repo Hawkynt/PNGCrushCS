@@ -11,7 +11,7 @@ namespace FileFormat.SunIcon;
 public static class SunIconReader {
 
   private const int _MINIMUM_SIZE = 10;
-  private const string _MAGIC = "/* ";
+  private const string _MAGIC = "/* Format_version=";
 
   private static readonly Regex _HeaderFieldRegex = new(
     @"(\w+)\s*=\s*(\d+)",
@@ -51,7 +51,7 @@ public static class SunIconReader {
     var text = Encoding.ASCII.GetString(data);
 
     if (!text.StartsWith(_MAGIC, StringComparison.Ordinal))
-      throw new InvalidDataException("Invalid Sun Icon format: missing '/* ' magic.");
+      throw new InvalidDataException($"Not a Sun Icon: it does not open with \"{_MAGIC}\".");
 
     return _Parse(text);
   }
