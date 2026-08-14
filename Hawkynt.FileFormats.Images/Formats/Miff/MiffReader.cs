@@ -35,8 +35,12 @@ public static class MiffReader {
     if (data.Length < _MIN_HEADER_SIZE)
       throw new InvalidDataException("Data too small for a valid MIFF file.");
 
-    // Verify magic
-    var magic = Encoding.ASCII.GetString(data.Slice(0, _MAGIC.Length));
+    // Verify magic, which a leading comment may sit in front of rather than start the file.
+    var headerStart = MiffHeaderParser.FindHeaderStart(data);
+    if (headerStart + _MAGIC.Length > data.Length)
+      throw new InvalidDataException("Invalid MIFF signature.");
+
+    var magic = Encoding.ASCII.GetString(data.Slice(headerStart, _MAGIC.Length));
     if (magic != _MAGIC)
       throw new InvalidDataException("Invalid MIFF signature.");
 
