@@ -7,7 +7,21 @@ namespace FileFormat.Mtv;
 public readonly record struct MtvFile : IImageFormatReader<MtvFile>, IImageToRawImage<MtvFile>, IImageFromRawImage<MtvFile>, IImageFormatWriter<MtvFile> {
 
   static string IImageFormatMetadata<MtvFile>.PrimaryExtension => ".mtv";
-  static string[] IImageFormatMetadata<MtvFile>.FileExtensions => [".mtv"];
+
+  /// <summary><c>.pic</c> is the same raster under Rayshade's name for it.</summary>
+  /// <remarks>
+  /// Rayshade writes Utah RLE only when it is built against that toolkit; without it, per its own
+  /// README, it "can be configured to create image files using a generic format identical to that
+  /// used by Mark VandeWettering's 'mtv' ray tracer", and that is what lands in a <c>.pic</c>.
+  /// XnView lists Rayshade and MTV as two formats but its writers emit the same bytes — one 61x37
+  /// picture converted both ways gave files that compare equal.
+  /// <para/>
+  /// Several other formats answer to <c>.pic</c>, all of them with a binary magic number, so the
+  /// registry reaches this reader only after those have looked at the bytes and declined. What
+  /// keeps it from taking their files anyway is the size line: two numbers, and a payload that
+  /// fills them.
+  /// </remarks>
+  static string[] IImageFormatMetadata<MtvFile>.FileExtensions => [".mtv", ".pic"];
   static MtvFile IImageFormatReader<MtvFile>.FromSpan(ReadOnlySpan<byte> data) => MtvReader.FromSpan(data);
   static byte[] IImageFormatWriter<MtvFile>.ToBytes(MtvFile file) => MtvWriter.ToBytes(file);
   public int Width { get; init; }
