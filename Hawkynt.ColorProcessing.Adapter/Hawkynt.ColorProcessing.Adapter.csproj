@@ -13,6 +13,26 @@
                       OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
+  <!-- Both packages are asked for and then told to contribute nothing. That looks redundant and is
+       not: the references below reach into the package cache by path, and nothing was putting the
+       packages there. It built on a machine that happened to have them from some earlier day and
+       failed on any clean one, which is what it did on the build agent - the whole of
+       Hawkynt.ColorProcessing missing, and every type in it unresolved.
+
+       PackageDownload rather than PackageReference, and that distinction is the whole of it. A
+       PackageReference to either of these - even with ExcludeAssets="all" - brings the package's own
+       windows-only target framework into the build and it stops with NETSDK1136, which is the reason
+       the references below were written by hand in the first place. PackageDownload only puts the
+       package in the cache. Nothing is referenced by it, no target framework is negotiated, and the
+       references below go on picking the netcoreapp3.1 asset themselves.
+
+       Checked by building against an empty package directory: without these two lines the build
+       fails exactly as the agent's did, with them it succeeds. -->
+  <ItemGroup>
+    <PackageDownload Include="FrameworkExtensions.System.Drawing" Version="[1.0.1.1347]" />
+    <PackageDownload Include="FrameworkExtensions.Backports" Version="[1.0.0.1347]" />
+  </ItemGroup>
+
   <!-- The package's netcoreapp3.1 asset carries the whole of Hawkynt.ColorProcessing and is not
        tied to Windows; only its Bitmap glue is, and this project replaces that. Referencing the
        assembly directly rather than the package avoids the package's own windows-only target
