@@ -6,6 +6,29 @@ namespace FileFormat.Wpg;
 /// <summary>WPG RLE compression. Bit 7 set = repeat run, otherwise literal copy.</summary>
 internal static class WpgRleCompressor {
 
+  /// <summary>Codes a bitmap one scanline at a time, which is how WPG stores one.</summary>
+  /// <remarks>
+  /// Every row is its own little stream. No run carries across the end of one, so a reader that has
+  /// finished a row is standing on a control byte and not in the middle of a run. Coding the whole
+  /// raster in a single pass would merge the runs over that boundary and leave every row after the
+  /// first out of step.
+  /// </remarks>
+  public static byte[] CompressRows(byte[] data, int stride, int height) {
+    ArgumentNullException.ThrowIfNull(data);
+
+    using var ms = new MemoryStream();
+    for (var y = 0; y < height; ++y) {
+      var from = y * stride;
+      if (from + stride > data.Length)
+        break;
+
+      var row = Compress(data[from..(from + stride)]);
+      ms.Write(row, 0, row.Length);
+    }
+
+    return ms.ToArray();
+  }
+
   public static byte[] Compress(byte[] data) {
     if (data.Length == 0)
       return [];
