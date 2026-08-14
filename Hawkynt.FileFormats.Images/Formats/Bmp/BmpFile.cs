@@ -97,12 +97,17 @@ public readonly record struct BmpFile :
     var mode = file.ColorMode;
     if (mode == BmpColorMode.Original)
       mode = file.BitsPerPixel switch {
+        32 => BmpColorMode.Bgra32,
         24 => BmpColorMode.Rgb24,
         16 => BmpColorMode.Rgb16_565,
         8 when file.Palette != null => BmpColorMode.Palette8,
         8 => BmpColorMode.Grayscale8,
         4 => BmpColorMode.Palette4,
-        _ => BmpColorMode.Palette1
+        1 => BmpColorMode.Palette1,
+        // Every depth used to fall through to a one-bit palette, so a 32-bit file was announced as
+        // Indexed1 with no palette and threw on colour conversion far from the cause. A depth nobody
+        // handles is worth refusing outright rather than describing as a picture it is not.
+        _ => throw new ArgumentException($"Unsupported BMP depth: {file.BitsPerPixel} bits per pixel.", nameof(file))
       };
 
     PixelFormat format;
@@ -112,6 +117,9 @@ public readonly record struct BmpFile :
     switch (mode) {
       case BmpColorMode.Rgb24:
         format = PixelFormat.Bgr24;
+        break;
+      case BmpColorMode.Bgra32:
+        format = PixelFormat.Bgra32;
         break;
       case BmpColorMode.Rgb16_565:
         format = PixelFormat.Rgb565;
@@ -157,10 +165,16 @@ public readonly record struct BmpFile :
   public static BmpFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
 
-    // The writer has no 32-bpp path, so alpha-bearing input lands on Bgr24 and loses transparency.
     image = image.EnsureAnyFormat(
-      PixelFormat.Bgr24, PixelFormat.Rgb565, PixelFormat.Gray8,
+      PixelFormat.Bgr24, PixelFormat.Bgra32, PixelFormat.Rgb565, PixelFormat.Gray8,
       PixelFormat.Indexed8, PixelFormat.Indexed4, PixelFormat.Indexed1);
+
+    // A 32-bit bitmap costs a third more than a 24-bit one and buys nothing but transparency, so it
+    // is worth writing only for a picture that has some. Opaque input keeps the 24-bit output it has
+    // always had; what changes is that transparency now survives being written, where before the
+    // only 32-bit path out of here was a narrowing one that dropped it without saying so.
+    if (image.Format == PixelFormat.Bgra32 && !_HasTransparency(image.PixelData))
+      image = image.EnsureFormat(PixelFormat.Bgr24);
 
     BmpColorMode colorMode;
     int bpp;
@@ -171,6 +185,10 @@ public readonly record struct BmpFile :
       case PixelFormat.Bgr24:
         colorMode = BmpColorMode.Rgb24;
         bpp = 24;
+        break;
+      case PixelFormat.Bgra32:
+        colorMode = BmpColorMode.Bgra32;
+        bpp = 32;
         break;
       case PixelFormat.Rgb565:
         colorMode = BmpColorMode.Rgb16_565;
@@ -213,6 +231,14 @@ public readonly record struct BmpFile :
       Compression = BmpCompression.None,
       ColorMode = colorMode
     };
+  }
+
+  private static bool _HasTransparency(byte[] bgra) {
+    for (var i = 3; i < bgra.Length; i += 4)
+      if (bgra[i] != 0xFF)
+        return true;
+
+    return false;
   }
 
   private static byte[] _FlipRows(byte[] data, int stride, int height) {

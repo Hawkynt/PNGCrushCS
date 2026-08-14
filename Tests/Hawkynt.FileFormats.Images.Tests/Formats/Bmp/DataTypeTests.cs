@@ -16,9 +16,10 @@ public sealed class DataTypeTests {
     Assert.That((int)BmpColorMode.Palette4, Is.EqualTo(4));
     Assert.That((int)BmpColorMode.Palette1, Is.EqualTo(5));
     Assert.That((int)BmpColorMode.Grayscale8, Is.EqualTo(6));
+    Assert.That((int)BmpColorMode.Bgra32, Is.EqualTo(7));
 
     var values = Enum.GetValues<BmpColorMode>();
-    Assert.That(values, Has.Length.EqualTo(7));
+    Assert.That(values, Has.Length.EqualTo(8));
   }
 
   [Test]

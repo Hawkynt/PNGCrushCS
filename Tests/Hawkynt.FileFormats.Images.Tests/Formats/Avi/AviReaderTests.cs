@@ -183,19 +183,67 @@ public sealed class AviReaderTests {
     Assert.That(failure!.Message, Does.Contain(fourCC));
   }
 
-  [TestCase((short)16)]
-  [TestCase((short)32)]
+  [Test]
   [Category("Unit")]
-  public void Uncompressed_DepthTheBitmapReaderGetsWrong_IsRefused(short bitsPerPixel) {
-    // Measured, not assumed: a 32-bit BI_RGB bitmap comes back from the bitmap reader as Indexed1
-    // with no palette, and a 16-bit one is read as 5-6-5 where the format is 5-5-5 — 387 of 2257
-    // pixels wrong against ffmpeg on a gradient. Returning either as a frame would be reporting a
-    // wrong picture as a good one.
+  public void Uncompressed_SixteenBitFrames_AreFiveFiveFive() {
+    // Refused here while the bitmap reader behind this one read BI_RGB at 16 bits as 5-6-5, which
+    // put 395 of 2257 pixels of a gradient wrong against ffmpeg. That reader now takes the layout
+    // from the channel masks, so the frame comes back as the file states it and the refusal is gone.
+    var raster = AviTestContainer.BuildRgb555Raster(_WIDTH, _HEIGHT, _RowColours, bottomUp: true);
+    var file = AviReader.FromBytes(AviTestContainer.Build("\0\0\0\0", _WIDTH, _HEIGHT, 16, [raster]));
+
+    var rgb = AviFile.ToRawImage(file, 0).ToRgb24();
+    for (var row = 0; row < _HEIGHT; ++row) {
+      var offset = row * _WIDTH * 3;
+      Assert.That(rgb[offset], Is.EqualTo(_ThroughFiveBits(_RowColours[row].R)), $"row {row} red");
+      Assert.That(rgb[offset + 1], Is.EqualTo(_ThroughFiveBits(_RowColours[row].G)), $"row {row} green");
+      Assert.That(rgb[offset + 2], Is.EqualTo(_ThroughFiveBits(_RowColours[row].B)), $"row {row} blue");
+    }
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void Uncompressed_ThirtyTwoBitFrames_KeepTheirAlpha() {
+    // Refused here while a 32-bit BI_RGB bitmap came back from that reader as Indexed1 with no
+    // palette and threw when asked for colours.
+    byte[] alphaPerRow = [0x10, 0x40, 0x80, 0xFF];
+    var raster = AviTestContainer.BuildBgra32Raster(_WIDTH, _HEIGHT, _RowColours, alphaPerRow, bottomUp: true);
+    var file = AviReader.FromBytes(AviTestContainer.Build("\0\0\0\0", _WIDTH, _HEIGHT, 32, [raster]));
+
+    var image = AviFile.ToRawImage(file, 0);
+
+    Assert.That(image.Format, Is.EqualTo(PixelFormat.Bgra32));
+    for (var row = 0; row < _HEIGHT; ++row)
+      Assert.That(image.PixelData[row * _WIDTH * 4 + 3], Is.EqualTo(alphaPerRow[row]), $"row {row} alpha");
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void Uncompressed_ThirtyTwoBitFrames_WithNothingInTheFourthByte_AreOpaque() {
+    // The fourth byte is padding as often as it is alpha, and a frame whose every one is zero is the
+    // former; both tools render it opaque. Taking it literally would make the whole film invisible.
+    byte[] noAlpha = [0x00, 0x00, 0x00, 0x00];
+    var raster = AviTestContainer.BuildBgra32Raster(_WIDTH, _HEIGHT, _RowColours, noAlpha, bottomUp: true);
+    var file = AviReader.FromBytes(AviTestContainer.Build("\0\0\0\0", _WIDTH, _HEIGHT, 32, [raster]));
+
+    _AssertRowColours(AviFile.ToRawImage(file, 0));
+  }
+
+  [TestCase((short)2)]
+  [TestCase((short)48)]
+  [Category("Unit")]
+  public void Uncompressed_DepthNoBitmapIsStoredAt_IsRefused(short bitsPerPixel) {
     var stride = (_WIDTH * bitsPerPixel / 8 + 3) & ~3;
     var container = AviTestContainer.Build("\0\0\0\0", _WIDTH, _HEIGHT, bitsPerPixel, [new byte[stride * _HEIGHT]]);
 
     var failure = Assert.Throws<NotSupportedException>(() => AviReader.FromBytes(container));
     Assert.That(failure!.Message, Does.Contain(bitsPerPixel.ToString()));
+  }
+
+  /// <summary>What a channel becomes once stored in five bits and widened back out.</summary>
+  private static byte _ThroughFiveBits(byte value) {
+    var stored = value >> 3;
+    return (byte)((stored << 3) | (stored >> 2));
   }
 
   [Test]

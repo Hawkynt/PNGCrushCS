@@ -100,6 +100,46 @@ internal static class AviTestContainer {
     return raster;
   }
 
+  /// <summary>A 16-bit 5-5-5 raster where every pixel of a row holds that row's colour.</summary>
+  public static byte[] BuildRgb555Raster(
+    int width, int height, IReadOnlyList<(byte B, byte G, byte R)> rowColoursTopDown, bool bottomUp) {
+    var stride = (width * 2 + 3) & ~3;
+    var raster = new byte[stride * height];
+
+    for (var row = 0; row < height; ++row) {
+      var colour = rowColoursTopDown[row];
+      var packed = (ushort)(((colour.R >> 3) << 10) | ((colour.G >> 3) << 5) | (colour.B >> 3));
+      var target = bottomUp ? height - 1 - row : row;
+      var offset = target * stride;
+      for (var x = 0; x < width; ++x)
+        BinaryPrimitives.WriteUInt16LittleEndian(raster.AsSpan(offset + x * 2), packed);
+    }
+
+    return raster;
+  }
+
+  /// <summary>A 32-bit raster where every pixel of a row holds that row's colour and alpha.</summary>
+  public static byte[] BuildBgra32Raster(
+    int width, int height, IReadOnlyList<(byte B, byte G, byte R)> rowColoursTopDown,
+    IReadOnlyList<byte> rowAlphaTopDown, bool bottomUp) {
+    var stride = width * 4; // four bytes a pixel is always a multiple of four
+    var raster = new byte[stride * height];
+
+    for (var row = 0; row < height; ++row) {
+      var colour = rowColoursTopDown[row];
+      var target = bottomUp ? height - 1 - row : row;
+      var offset = target * stride;
+      for (var x = 0; x < width; ++x) {
+        raster[offset + x * 4] = colour.B;
+        raster[offset + x * 4 + 1] = colour.G;
+        raster[offset + x * 4 + 2] = colour.R;
+        raster[offset + x * 4 + 3] = rowAlphaTopDown[row];
+      }
+    }
+
+    return raster;
+  }
+
   private static byte[] _BuildMainHeader(int width, int height, int frameCount) {
     var data = new byte[56];
     var span = data.AsSpan();

@@ -36,6 +36,13 @@ public static class BmpWriter {
         bitsPerPixel = 24;
         bmpCompression = 0; // BI_RGB
         break;
+      case BmpColorMode.Bgra32:
+        // A plain BITMAPINFOHEADER with BI_RGB, which is what ffmpeg itself writes for bgra and what
+        // both it and ImageMagick read back as an alpha channel. A BITMAPV4HEADER would state the
+        // alpha mask outright, but it is the less widely understood of the two and buys nothing here.
+        bitsPerPixel = 32;
+        bmpCompression = 0; // BI_RGB
+        break;
       case BmpColorMode.Rgb16_565:
         bitsPerPixel = 16;
         bmpCompression = 3; // BI_BITFIELDS
