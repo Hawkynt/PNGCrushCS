@@ -81,8 +81,23 @@ five-character extension.
   - Video containers — `flv`, `mpeg`, `mpg`, `m2v`, `webm`, `wmv` — are out of scope for a still
     image library, and are listed here only so the number 13 above adds up.
 
-## Genuinely missing formats
+## Genuinely missing formats, all three now read
 
-  - `svgz`, which is SVG under gzip and nothing else.
-  - `pcds`, Photo CD's stacked form, beside the `.pcd` already read.
-  - `gr10p`, RECOIL's one.
+Two of them were not what this file first said they were.
+
+  - `svgz` is SVG under gzip and nothing else, which is what it said and what it is. Worth recording
+    about the checking rather than the format: `magick picture.png out.svgz` does **not** write an
+    SVG. It writes gzip wrapped round a PNG — inflate it and the first eight bytes are PNG's
+    signature — so that file is no use as an oracle and is refused here rather than drawn.
+    ImageMagick's `svgz` *reader* is honest, unpacking and then dispatching on what it finds, so the
+    reader is the side to measure against.
+  - `pcds` **is not a second format, and not a "stacked form"** as this file first claimed. It is the
+    same file: `magick picture.png out.pcd` and `out.pcds` are byte-for-byte identical, and both
+    spellings run one coder. The difference is entirely on the read side — under `.pcd` the three
+    planes are Photo YCC and are transformed, under `.pcds` they are already sRGB and are not, so the
+    luminance plane is red and the two chrominance planes are green and blue.
+  - `gr10p` is Atari GTIA mode 10 with each stored row shown four scanlines tall. RECOIL leaves it
+    out of its own catalogue for having a five-character extension; **that is RECOIL's limitation and
+    not one here** — `.farbfeld`, `.pspimage` and a dozen others were already registered, so the
+    "can the registry even express this" question raised when the work was handed out had the
+    answer yes.
