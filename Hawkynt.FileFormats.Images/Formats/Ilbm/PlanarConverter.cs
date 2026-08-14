@@ -15,6 +15,13 @@ internal static class PlanarConverter {
     => Core.PlanarConverter.IlbmPlanarToChunky(planarData, width, height, numPlanes);
 
   /// <summary>
+  ///   Converts interleaved planar data to whole component bytes, one for each group of eight
+  ///   planes. For pictures deeper than a palette can describe — 24 planes and 32.
+  /// </summary>
+  public static byte[] PlanarToDeep(ReadOnlySpan<byte> planarData, int width, int height, int numPlanes)
+    => Core.PlanarConverter.IlbmPlanarToDeep(planarData, width, height, numPlanes);
+
+  /// <summary>
   ///   Converts chunky pixel data (one byte per pixel) to interleaved planar format.
   ///   Each scanline produces <paramref name="numPlanes"/> bitplane rows, each word-aligned.
   /// </summary>

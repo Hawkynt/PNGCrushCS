@@ -199,8 +199,12 @@ public static class IlbmReader {
       ? ByteRun1Compressor.Decode(body, expectedPlanarSize)
       : body;
 
-    // Convert planar to chunky
-    var pixelData = PlanarConverter.PlanarToChunky(planarData, width, height, numPlanes);
+    // Convert planar to chunky — or, past eight planes, to the colour bytes themselves. Nothing
+    // indexes a palette that deep: 24 planes are three bytes a pixel and 32 are four, and running
+    // them through the chunky conversion keeps only the lowest eight.
+    var pixelData = IlbmFile.IsDeepPlaneCount(numPlanes)
+      ? PlanarConverter.PlanarToDeep(planarData, width, height, numPlanes)
+      : PlanarConverter.PlanarToChunky(planarData, width, height, numPlanes);
 
     // PCHG states the palette as changes rather than in full: a bitmap of which lines change, then
     // for each of those the registers it sets. It is read after the loop because it builds on CMAP,

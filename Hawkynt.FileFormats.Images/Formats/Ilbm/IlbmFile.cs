@@ -33,7 +33,12 @@ public readonly record struct IlbmFile : IImageFormatReader<IlbmFile>, IImageToR
   public byte YAspect { get; init; }
   public int PageWidth { get; init; }
   public int PageHeight { get; init; }
+  /// <summary>
+  /// The picture unpacked from its planes: one byte a pixel where the planes index a palette, and
+  /// one byte for each group of eight where they carry the colour itself.
+  /// </summary>
   public byte[] PixelData { get; init; }
+
   public byte[]? Palette { get; init; }
 
   /// <summary>
@@ -60,8 +65,33 @@ public readonly record struct IlbmFile : IImageFormatReader<IlbmFile>, IImageToR
   /// <summary>Whether the image uses Extra Half-Brite mode.</summary>
   public bool IsEhb => (ViewportMode & 0x80) != 0;
 
+  /// <summary>Plane counts that carry whole colour bytes rather than an index into a palette.</summary>
+  /// <remarks>
+  /// Twenty-four planes are the three colour bytes and thirty-two add an alpha, one byte to each
+  /// group of eight planes. Such a file carries no CMAP — there is nothing for it to describe — so
+  /// reading it as indexed produces a picture with no palette to draw it by, which is what happened
+  /// to everything XnView's converter wrote under this name.
+  /// </remarks>
+  internal static bool IsDeepPlaneCount(int numPlanes) => numPlanes is 24 or 32;
+
+  /// <summary>Whether this picture's planes are colour bytes rather than palette indices.</summary>
+  public bool IsDeep => IsDeepPlaneCount(this.NumPlanes);
+
   /// <summary>Converts this ILBM file to a format-independent <see cref="RawImage"/>.</summary>
   public static RawImage ToRawImage(IlbmFile file) {
+
+    // Deep first, and before the mode bits are consulted: a truecolour picture has no palette for
+    // HAM or half-brite to work from, and the pixel data is already the colours rather than indices
+    // into anything. CAMG is written on these files all the same — XnView's converter puts 0x1000
+    // on every one — so asking about the modes first would send some of them down a branch that
+    // reads its own bytes as indices.
+    if (file.IsDeep)
+      return new() {
+        Width = file.Width,
+        Height = file.Height,
+        Format = file.NumPlanes == 32 ? PixelFormat.Rgba32 : PixelFormat.Rgb24,
+        PixelData = file.PixelData[..],
+      };
 
     // HAM mode: decode indexed data to RGB via HamDecoder
     if (file.IsHam && file.Palette is { } hamPalette) {
