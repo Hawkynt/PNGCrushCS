@@ -60,8 +60,74 @@ public sealed class GbrReaderTests {
   [Category("Unit")]
   public void FromBytes_InvalidBytesPerPixel_ThrowsInvalidDataException() {
     var data = _BuildGbrBytes(4, 4, 1, 10, "test");
-    BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(16), 3u);
+    BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(16), 5u);
     Assert.Throws<InvalidDataException>(() => GbrReader.FromBytes(data));
+  }
+
+  // Depth 2 is a Cinepaint brush: the payload is 16-bit half floats, not two 8-bit channels, so a
+  // reader that treated it as bytes would produce noise. Refused by name until somebody implements it.
+  [Test]
+  [Category("Unit")]
+  public void FromBytes_CinepaintDepth_ThrowsInvalidDataException() {
+    var data = _BuildGbrBytes(4, 4, 1, 10, "test");
+    BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(16), 2u);
+    Assert.Throws<InvalidDataException>(() => GbrReader.FromBytes(data));
+  }
+
+  // XnView/nconvert writes an RGB brush: depth 3, w*h*3 bytes of R,G,B triplets and no mask
+  // channel. GIMP itself only writes 1 and 4, but the depth field is a byte count and 3 is the
+  // same meaning it carries in GIMP's own pattern (GPAT) header.
+  [Test]
+  [Category("Unit")]
+  public void FromBytes_ValidRgb() {
+    var width = 3;
+    var height = 2;
+    var pixelData = new byte[width * height * 3];
+    for (var i = 0; i < pixelData.Length; ++i)
+      pixelData[i] = (byte)(i * 23 % 256);
+
+    var data = _BuildGbrBytes(width, height, 3, 15, "RGB Brush", pixelData);
+    var result = GbrReader.FromBytes(data);
+
+    Assert.That(result.Width, Is.EqualTo(width));
+    Assert.That(result.Height, Is.EqualTo(height));
+    Assert.That(result.BytesPerPixel, Is.EqualTo(3));
+    Assert.That(result.Spacing, Is.EqualTo(15));
+    Assert.That(result.Name, Is.EqualTo("RGB Brush"));
+    Assert.That(result.PixelData, Is.EqualTo(pixelData));
+  }
+
+  // The brush nconvert writes carries no name at all: header_size is exactly the 28-byte header.
+  [Test]
+  [Category("Unit")]
+  public void FromBytes_RgbWithoutName() {
+    var width = 5;
+    var height = 3;
+    var pixelData = new byte[width * height * 3];
+    for (var i = 0; i < pixelData.Length; ++i)
+      pixelData[i] = (byte)(i * 11 % 256);
+
+    var data = new byte[28 + pixelData.Length];
+    var span = data.AsSpan();
+    BinaryPrimitives.WriteUInt32BigEndian(span, 28u);
+    BinaryPrimitives.WriteUInt32BigEndian(span[4..], 2u);
+    BinaryPrimitives.WriteUInt32BigEndian(span[8..], (uint)width);
+    BinaryPrimitives.WriteUInt32BigEndian(span[12..], (uint)height);
+    BinaryPrimitives.WriteUInt32BigEndian(span[16..], 3u);
+    span[20] = (byte)'G';
+    span[21] = (byte)'I';
+    span[22] = (byte)'M';
+    span[23] = (byte)'P';
+    BinaryPrimitives.WriteUInt32BigEndian(span[24..], 0u);
+    pixelData.CopyTo(span[28..]);
+
+    var result = GbrReader.FromBytes(data);
+
+    Assert.That(result.Width, Is.EqualTo(width));
+    Assert.That(result.Height, Is.EqualTo(height));
+    Assert.That(result.BytesPerPixel, Is.EqualTo(3));
+    Assert.That(result.Name, Is.EqualTo(string.Empty));
+    Assert.That(result.PixelData, Is.EqualTo(pixelData));
   }
 
   [Test]
