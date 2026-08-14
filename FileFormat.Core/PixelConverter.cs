@@ -284,46 +284,18 @@ public static class PixelConverter {
     return result;
   }
 
-  /// <summary>Converts RGBA16 big-endian (8 bytes/pixel) to BGRA (4 bytes/pixel) by taking high bytes.</summary>
+  /// <summary>Converts RGBA16 big-endian (8 bytes/pixel) to BGRA (4 bytes/pixel).</summary>
+  /// <remarks>The shuffle that gathered high bytes is gone for the reason given on <see cref="Rgb48ToBgra"/>.</remarks>
   public static byte[] Rgba16BeToBgra(byte[] data, int totalPixels) {
     var result = new byte[totalPixels * 4];
-    var i = 0;
 
-    if (Vector128.IsHardwareAccelerated) {
-      // Process 4 pixels per iteration: 32 bytes input → 16 bytes output
-      // Input per pixel: [Rh,Rl,Gh,Gl,Bh,Bl,Ah,Al] (big-endian 16-bit channels)
-      // Output per pixel: [Bh,Gh,Rh,Ah] (BGRA with high bytes)
-      var extractMask = Vector128.Create(
-        (byte)4, 2, 0, 6,   // pixel 0: B_hi, G_hi, R_hi, A_hi
-        12, 10, 8, 14,      // pixel 1
-        0xFF, 0xFF, 0xFF, 0xFF,
-        0xFF, 0xFF, 0xFF, 0xFF
-      );
-      var srcSpan = data.AsSpan();
-      var dstSpan = result.AsSpan();
-
-      for (; i + 4 <= totalPixels; i += 4) {
-        // Process first 2 pixels
-        var vec0 = Vector128.Create(srcSpan.Slice(i * 8, 16));
-        var bgra0 = Vector128.Shuffle(vec0, extractMask);
-
-        // Process next 2 pixels
-        var vec1 = Vector128.Create(srcSpan.Slice(i * 8 + 16, 16));
-        var bgra1 = Vector128.Shuffle(vec1, extractMask);
-
-        // Combine: take low 8 bytes from each and merge into 16 bytes
-        var combined = bgra0.WithUpper(bgra1.GetLower());
-        combined.CopyTo(dstSpan.Slice(i * 4, 16));
-      }
-    }
-
-    for (; i < totalPixels; ++i) {
+    for (var i = 0; i < totalPixels; ++i) {
       var src = i * 8;
       var dst = i * 4;
-      result[dst] = data[src + 4];
-      result[dst + 1] = data[src + 2];
-      result[dst + 2] = data[src];
-      result[dst + 3] = data[src + 6];
+      result[dst] = ChannelScaling.Reduce16((data[src + 4] << 8) | data[src + 5]);
+      result[dst + 1] = ChannelScaling.Reduce16((data[src + 2] << 8) | data[src + 3]);
+      result[dst + 2] = ChannelScaling.Reduce16((data[src] << 8) | data[src + 1]);
+      result[dst + 3] = ChannelScaling.Reduce16((data[src + 6] << 8) | data[src + 7]);
     }
 
     return result;
@@ -601,47 +573,21 @@ public static class PixelConverter {
   }
 
   /// <summary>Converts RGB48 (6 bytes/pixel, big-endian 16-bit channels) to BGRA (4 bytes/pixel).</summary>
+  /// <remarks>
+  /// This used to gather the high bytes with a single shuffle, which is the fastest wrong answer
+  /// available: narrowing to eight bits is a divide by 257 and a round, not a byte selection. See
+  /// <see cref="ChannelScaling.Reduce16"/> for what that cost. There is no byte-permute that rounds,
+  /// so the shuffle is gone rather than corrected.
+  /// </remarks>
   public static byte[] Rgb48ToBgra(byte[] data, int totalPixels) {
     var result = new byte[totalPixels * 4];
-    var i = 0;
 
-    if (Vector128.IsHardwareAccelerated) {
-      // Process 2 pixels per iteration: 12 bytes input → 8 bytes output
-      // Input: [Rh0,Rl0,Gh0,Gl0,Bh0,Bl0, Rh1,Rl1,Gh1,Gl1,Bh1,Bl1, ...]
-      // Output: [Bh0,Gh0,Rh0,255, Bh1,Gh1,Rh1,255, ...]
-      var extractMask = Vector128.Create(
-        (byte)4, 2, 0, 0xFF,  // pixel 0: B_hi, G_hi, R_hi, 0xFF→0
-        10, 8, 6, 0xFF,       // pixel 1
-        0xFF, 0xFF, 0xFF, 0xFF,
-        0xFF, 0xFF, 0xFF, 0xFF
-      );
-      var alphaMask = Vector128.Create((byte)0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 0, 0, 0, 0, 0);
-      var srcSpan = data.AsSpan();
-      var dstSpan = result.AsSpan();
-
-      // The load pulls a full 16 bytes even though a pixel pair is only 12, so the guard has to
-      // reserve 16 — checking for 12 overruns the buffer on the final pair.
-      for (; i + 2 <= totalPixels && i * 6 + 16 <= data.Length; i += 2) {
-        var vec = Vector128.Create(srcSpan.Slice(i * 6, 16));
-        var bgra = Vector128.Shuffle(vec, extractMask) | alphaMask;
-        // Write 8 bytes (2 BGRA pixels)
-        dstSpan[i * 4] = bgra.GetElement(0);
-        dstSpan[i * 4 + 1] = bgra.GetElement(1);
-        dstSpan[i * 4 + 2] = bgra.GetElement(2);
-        dstSpan[i * 4 + 3] = bgra.GetElement(3);
-        dstSpan[i * 4 + 4] = bgra.GetElement(4);
-        dstSpan[i * 4 + 5] = bgra.GetElement(5);
-        dstSpan[i * 4 + 6] = bgra.GetElement(6);
-        dstSpan[i * 4 + 7] = bgra.GetElement(7);
-      }
-    }
-
-    for (; i < totalPixels; ++i) {
+    for (var i = 0; i < totalPixels; ++i) {
       var src = i * 6;
       var dst = i * 4;
-      result[dst] = data[src + 4];
-      result[dst + 1] = data[src + 2];
-      result[dst + 2] = data[src];
+      result[dst] = ChannelScaling.Reduce16((data[src + 4] << 8) | data[src + 5]);
+      result[dst + 1] = ChannelScaling.Reduce16((data[src + 2] << 8) | data[src + 3]);
+      result[dst + 2] = ChannelScaling.Reduce16((data[src] << 8) | data[src + 1]);
       result[dst + 3] = 255;
     }
 
@@ -729,7 +675,7 @@ public static class PixelConverter {
     var result = new byte[totalPixels * 4];
 
     for (var i = 0; i < totalPixels; ++i) {
-      var gray = data[i * 2]; // high byte
+      var gray = ChannelScaling.Reduce16((data[i * 2] << 8) | data[i * 2 + 1]);
       var dst = i * 4;
       result[dst] = gray;
       result[dst + 1] = gray;
@@ -925,58 +871,44 @@ public static class PixelConverter {
 
   // ── Direct 16→8 shortcuts ─────────────────────────────────────────────────
 
-  /// <summary>Converts RGB48 big-endian (6 bytes/pixel) to RGB24 (3 bytes/pixel) by taking high bytes.</summary>
+  /// <summary>Converts RGB48 big-endian (6 bytes/pixel) to RGB24 (3 bytes/pixel).</summary>
   public static byte[] Rgb48ToRgb24(byte[] data, int totalPixels) {
     var result = new byte[totalPixels * 3];
 
     for (var i = 0; i < totalPixels; ++i) {
       var src = i * 6;
       var dst = i * 3;
-      result[dst] = data[src];     // R hi
-      result[dst + 1] = data[src + 2]; // G hi
-      result[dst + 2] = data[src + 4]; // B hi
+      result[dst] = ChannelScaling.Reduce16((data[src] << 8) | data[src + 1]);
+      result[dst + 1] = ChannelScaling.Reduce16((data[src + 2] << 8) | data[src + 3]);
+      result[dst + 2] = ChannelScaling.Reduce16((data[src + 4] << 8) | data[src + 5]);
     }
 
     return result;
   }
 
-  /// <summary>Converts RGBA64 big-endian (8 bytes/pixel) to RGBA32 (4 bytes/pixel) by taking high bytes.</summary>
+  /// <summary>Converts RGBA64 big-endian (8 bytes/pixel) to RGBA32 (4 bytes/pixel).</summary>
+  /// <remarks>The shuffle that gathered high bytes is gone for the reason given on <see cref="Rgb48ToBgra"/>.</remarks>
   public static byte[] Rgba64ToRgba32(byte[] data, int totalPixels) {
     var result = new byte[totalPixels * 4];
-    var i = 0;
 
-    if (Vector128.IsHardwareAccelerated) {
-      // Process 4 pixels at a time: 32 bytes → 16 bytes (extract high bytes from each 16-bit pair)
-      var shuffle = Vector128.Create((byte)0, 2, 4, 6, 8, 10, 12, 14, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80);
-      for (; i <= totalPixels - 4; i += 4) {
-        var src0 = Vector128.Create(data, i * 8);       // pixels 0-1 (16 bytes)
-        var src1 = Vector128.Create(data, i * 8 + 16);  // pixels 2-3 (16 bytes)
-        var lo = Vector128.Shuffle(src0, shuffle); // 8 useful bytes in low half
-        var hi = Vector128.Shuffle(src1, shuffle); // 8 useful bytes in low half
-        // Combine: lo bytes 0-7 → result 0-7, hi bytes 0-7 → result 8-15
-        var combined = lo.WithUpper(hi.GetLower());
-        combined.CopyTo(result, i * 4);
-      }
-    }
-
-    for (; i < totalPixels; ++i) {
+    for (var i = 0; i < totalPixels; ++i) {
       var src = i * 8;
       var dst = i * 4;
-      result[dst] = data[src];
-      result[dst + 1] = data[src + 2];
-      result[dst + 2] = data[src + 4];
-      result[dst + 3] = data[src + 6];
+      result[dst] = ChannelScaling.Reduce16((data[src] << 8) | data[src + 1]);
+      result[dst + 1] = ChannelScaling.Reduce16((data[src + 2] << 8) | data[src + 3]);
+      result[dst + 2] = ChannelScaling.Reduce16((data[src + 4] << 8) | data[src + 5]);
+      result[dst + 3] = ChannelScaling.Reduce16((data[src + 6] << 8) | data[src + 7]);
     }
 
     return result;
   }
 
-  /// <summary>Converts 16-bit big-endian grayscale (2 bytes/pixel) to 8-bit grayscale (1 byte/pixel) by taking the high byte.</summary>
+  /// <summary>Converts 16-bit big-endian grayscale (2 bytes/pixel) to 8-bit grayscale (1 byte/pixel).</summary>
   public static byte[] Gray16ToGray8(byte[] data, int totalPixels) {
     var result = new byte[totalPixels];
 
     for (var i = 0; i < totalPixels; ++i)
-      result[i] = data[i * 2]; // high byte
+      result[i] = ChannelScaling.Reduce16((data[i * 2] << 8) | data[i * 2 + 1]);
 
     return result;
   }
@@ -1382,9 +1314,8 @@ public static class PixelConverter {
     var result = new byte[totalPixels * 4];
 
     for (var i = 0; i < totalPixels; ++i) {
-      // The high byte of each channel is the whole of what eight bits can hold.
-      var grey = data[i * 4];
-      var alpha = data[i * 4 + 2];
+      var grey = ChannelScaling.Reduce16((data[i * 4] << 8) | data[i * 4 + 1]);
+      var alpha = ChannelScaling.Reduce16((data[i * 4 + 2] << 8) | data[i * 4 + 3]);
       result[i * 4] = grey;
       result[i * 4 + 1] = grey;
       result[i * 4 + 2] = grey;
@@ -1455,8 +1386,8 @@ public static class PixelConverter {
     var result = new byte[totalPixels * 2];
 
     for (var i = 0; i < totalPixels; ++i) {
-      result[i * 2] = data[i * 4];
-      result[i * 2 + 1] = data[i * 4 + 2];
+      result[i * 2] = ChannelScaling.Reduce16((data[i * 4] << 8) | data[i * 4 + 1]);
+      result[i * 2 + 1] = ChannelScaling.Reduce16((data[i * 4 + 2] << 8) | data[i * 4 + 3]);
     }
 
     return result;

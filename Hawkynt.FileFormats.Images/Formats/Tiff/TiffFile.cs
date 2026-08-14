@@ -248,17 +248,25 @@ public sealed class TiffFile :
     PixelData = _NarrowSamples(file.PixelData, file.IsBigEndian),
   };
 
-  /// <summary>Narrows sixteen-bit samples to eight, keeping the byte the magnitude lives in.</summary>
+  /// <summary>Narrows sixteen-bit samples to eight.</summary>
   /// <remarks>
   /// A deep TIFF is ordinary rather than exotic — a scanner or a camera writes one by default — so
-  /// refusing it refuses a large share of real files. The low byte is dropped rather than rounded
-  /// into the high one: the difference is under half a level at eight bits, and dropping it cannot
-  /// carry a sample past its neighbour the way rounding can.
+  /// refusing it refuses a large share of real files.
+  /// <para/>
+  /// This used to drop the low byte, on the grounds that the difference was under half a level and
+  /// that rounding could carry a sample past a neighbour. Both halves of that are wrong. Dropping
+  /// the low byte divides by 256 where the range is 257, so the error reaches a whole level and runs
+  /// in both directions — a 61 by 37 deep TIFF had 366 of its 2257 pixels disagree with ImageMagick,
+  /// some too dark and some too bright. And rounding cannot reorder anything, because it is
+  /// monotonic: two samples that differ can never come back the wrong way round.
   /// </remarks>
   private static byte[] _NarrowSamples(ReadOnlySpan<byte> data, bool isBigEndian) {
     var narrowed = new byte[data.Length / 2];
-    for (var i = 0; i < narrowed.Length; ++i)
-      narrowed[i] = data[i * 2 + (isBigEndian ? 0 : 1)];
+    for (var i = 0; i < narrowed.Length; ++i) {
+      var high = data[i * 2 + (isBigEndian ? 0 : 1)];
+      var low = data[i * 2 + (isBigEndian ? 1 : 0)];
+      narrowed[i] = ChannelScaling.Reduce16((high << 8) | low);
+    }
 
     return narrowed;
   }

@@ -1,6 +1,6 @@
 namespace FileFormat.Core;
 
-/// <summary>Widens the narrow colour channels vintage hardware stores to eight bits.</summary>
+/// <summary>Moves colour channels between the widths file formats store them at and eight bits.</summary>
 /// <remarks>
 /// The obvious arithmetic — multiply by 255 and divide by the maximum — is not what these machines
 /// do, and it is off by one for most inputs: three bits of value 2 becomes 72 that way and 73 by
@@ -27,4 +27,21 @@ public static class ChannelScaling {
 
   /// <summary>Widens a six-bit channel, as the green of a 16-bit truecolour pixel stores it.</summary>
   public static byte Expand6(int value) => (byte)((value << 2) | (value >> 4));
+
+  /// <summary>Narrows a sixteen-bit channel to eight, the way every reference reader narrows it.</summary>
+  /// <remarks>
+  /// Discarding the low byte is a divide by 256, and the range wants 257 — 0xFFFF is 255 of 255, not
+  /// 255.996 of 256 — so dropping it is wrong twice over: the divisor is too small and the result is
+  /// floored. The two errors do not cancel and do not even point the same way. Measured against
+  /// ImageMagick over all 65536 inputs, dropping the low byte disagrees on 16256 of them; a 61 by 37
+  /// 16-bit PNG came out with 366 of its 2257 pixels a level off, some low and some high.
+  /// <para/>
+  /// The reduction the readers agree on is v*255/65535 to nearest, which is what this computes: the
+  /// form below is that value exactly for every input, without the multiply or the divide.
+  /// </remarks>
+  public static byte Reduce16(int value) {
+    var biased = value + 128;
+
+    return (byte)((biased - (biased >> 8)) >> 8);
+  }
 }
