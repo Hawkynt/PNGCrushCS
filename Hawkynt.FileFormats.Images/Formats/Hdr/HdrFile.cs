@@ -13,8 +13,12 @@ public readonly record struct HdrFile : IImageFormatReader<HdrFile>, IImageToRaw
   /// <summary><c>.hdri</c> is the same Radiance file under a longer name.</summary>
   /// <remarks>
   /// XnView lists <c>hdri</c> and <c>rad</c> as two names, and the second reads <c>.rad</c>, which
-  /// is claimed here already. Both are Radiance RGBE: the <c>#?</c> the file opens with decides, so
-  /// a foreign file under either name is refused rather than read.
+  /// is claimed here already. Both are Radiance RGBE, and the header decides rather than the name,
+  /// so a foreign file under either is refused rather than read.
+  /// <para/>
+  /// The header is not always the <c>#?</c> line: nconvert's <c>.rad</c> opens with
+  /// <c>FORMAT=32-bit_rle_rgbe</c> and never writes one, which is why
+  /// <see cref="HdrHeaderParser.HasRadianceHeader"/> accepts either opening.
   /// </remarks>
   static string[] IImageFormatMetadata<HdrFile>.FileExtensions => [".hdr", ".hdri", ".rgbe", ".xyze", ".rad"];
   static HdrFile IImageFormatReader<HdrFile>.FromSpan(ReadOnlySpan<byte> data) => HdrReader.FromSpan(data);
