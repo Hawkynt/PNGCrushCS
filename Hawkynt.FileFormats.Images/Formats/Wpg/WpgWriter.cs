@@ -62,8 +62,17 @@ public static class WpgWriter {
     // BitmapType1 record
     ms.WriteByte((byte)WpgRecordType.BitmapType1);
 
+    // The bitmap in a WPG record is run-length coded, always, and this wrote it raw. Our own reader
+    // took it back because it guesses: a payload exactly as long as the raster is treated as
+    // uncompressed. Nothing else guesses. XnView's converter decodes the record the one way the
+    // format has, so every byte of a raw raster was read as a control byte and the picture it drew
+    // shared 71% of its pixels with the one written — the two halves of this library agreeing with
+    // each other and with nothing else.
+    var stride = (width * bitsPerPixel + 7) / 8;
+    var coded = WpgRleCompressor.CompressRows(pixelData, stride, height);
+
     // Bitmap sub-header: width(2) + height(2) + depth(2) + xdpi(2) + ydpi(2) = 10 bytes + pixel data
-    var bitmapSize = WpgBitmapSubHeader.StructSize + pixelData.Length;
+    var bitmapSize = WpgBitmapSubHeader.StructSize + coded.Length;
     _WriteRecordSize(ms, bitmapSize);
 
     var bmpSub = new WpgBitmapSubHeader((ushort)width, (ushort)height, (ushort)bitsPerPixel, 96, 96);
@@ -71,8 +80,7 @@ public static class WpgWriter {
     bmpSub.WriteTo(bmpSubBuf);
     ms.Write(bmpSubBuf);
 
-    // Uncompressed pixel data
-    ms.Write(pixelData, 0, pixelData.Length);
+    ms.Write(coded, 0, coded.Length);
 
     // EndWpg record (type 16, size 0)
     ms.WriteByte((byte)WpgRecordType.EndWpg);
