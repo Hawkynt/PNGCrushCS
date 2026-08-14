@@ -27,8 +27,21 @@ public readonly record struct RawGreyscaleFile : IImageFormatReader<RawGreyscale
   public const int BytesPerPixel = 1;
 
   static string IImageFormatMetadata<RawGreyscaleFile>.PrimaryExtension => ".gry";
-  static string[] IImageFormatMetadata<RawGreyscaleFile>.FileExtensions => [".gry", ".grey"];
+
+  /// <summary>The three names XnView files this one reader under, <c>.raw</c> among them.</summary>
+  /// <remarks>
+  /// Its catalogue puts <c>raw</c>, <c>gry</c> and <c>grey</c> on a single row called "Raw" served
+  /// by a single reader whose channel type defaults to greyscale, and that reader is this one. Only
+  /// the two that spell out grey were claimed here, so a dump arriving as <c>.raw</c> was offered to
+  /// the camera-raw reader alone — which wants a TIFF byte-order mark and refuses a file carrying
+  /// only pixels. Both readers hold the name now: that one takes anything that really does open with
+  /// a byte-order mark, and this one takes the bare dump.
+  /// <para/>
+  /// The name is not read as freely as the other two, though. See <see cref="SizeOfBareDump"/>.
+  /// </remarks>
+  static string[] IImageFormatMetadata<RawGreyscaleFile>.FileExtensions => [".gry", ".grey", ".raw"];
   static RawGreyscaleFile IImageFormatReader<RawGreyscaleFile>.FromSpan(ReadOnlySpan<byte> data) => RawGreyscaleReader.FromSpan(data);
+  static RawGreyscaleFile IImageFormatReader<RawGreyscaleFile>.FromFile(FileInfo file) => RawGreyscaleReader.FromFile(file);
   static byte[] IImageFormatWriter<RawGreyscaleFile>.ToBytes(RawGreyscaleFile file) => RawGreyscaleWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<RawGreyscaleFile>.VideoModes => [
     new("Greyscale", _Dimensions, [256]),
@@ -111,6 +124,57 @@ public readonly record struct RawGreyscaleFile : IImageFormatReader<RawGreyscale
 
     throw new InvalidDataException(
       $"A raw greyscale dump states no size, and {length} bytes is not one of the sizes it comes in.");
+  }
+
+  /// <summary>
+  /// Which picture a dump of a given length is when its name did not say greyscale.
+  /// </summary>
+  /// <remarks>
+  /// <c>.gry</c> and <c>.grey</c> name the channel type, so one byte a pixel is settled and the
+  /// length only has to place the shape. <c>.raw</c> names the row rather than the member of it: the
+  /// same converter writes three bytes a pixel under that name whenever the picture handed to it had
+  /// colour, and four when it had an alpha as well.
+  /// <para/>
+  /// A length can then mean two shapes at once. 230,400 bytes is 480 by 480 in grey and 320 by 240
+  /// in colour, both of them sizes in the table, and 307,200 is 640 by 480 in grey and 320 by 240
+  /// with an alpha. Nothing in a file that is only pixels distinguishes them, so such a length is
+  /// refused here rather than drawn at whichever reading the table reaches first. A picture at the
+  /// wrong shape looks like a reading and is not one.
+  /// <para/>
+  /// Only the reading is held to this. The writer still produces greyscale lengths and the two names
+  /// that spell out grey still place every one of them, so nothing that could be read before stops
+  /// being readable.
+  /// </remarks>
+  internal static (int Width, int Height) SizeOfBareDump(int length) {
+    var grey = (Width: 0, Height: 0);
+    var colour = (Width: 0, Height: 0);
+
+    foreach (var (width, height) in KnownResolutions) {
+      var pixels = (long)width * height;
+
+      if (grey.Width == 0 && pixels * BytesPerPixel == length)
+        grey = (width, height);
+
+      // The same length read as three bytes a pixel, or four with an alpha. Neither is read here;
+      // what matters is only whether one of them could explain the file as well as grey does.
+      if (colour.Width == 0 && (pixels * 3 == length || pixels * 4 == length))
+        colour = (width, height);
+    }
+
+    if (grey.Width == 0)
+      throw new InvalidDataException(
+        colour.Width == 0
+          ? $"A raw dump states no size, and {length} bytes is not one of the sizes it comes in."
+          : $"A raw dump states no size, and {length} bytes is none of the greyscale sizes it comes "
+            + $"in — it is a {colour.Width} by {colour.Height} colour one, which is not read here.");
+
+    if (colour.Width != 0)
+      throw new InvalidDataException(
+        $"A raw dump states neither its size nor how many channels it has, and {length} bytes is "
+        + $"both a {grey.Width} by {grey.Height} greyscale picture and a {colour.Width} by "
+        + $"{colour.Height} colour one. Name it .gry to read it as greyscale.");
+
+    return grey;
   }
 
   public static RawImage ToRawImage(RawGreyscaleFile file) => new() {

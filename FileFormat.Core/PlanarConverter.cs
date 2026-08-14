@@ -35,6 +35,44 @@ public static class PlanarConverter {
   }
 
   /// <summary>
+  ///   Converts ILBM-style interleaved planar data to whole component bytes, one per group of eight
+  ///   planes: three for a 24-plane picture, four for a 32-plane one.
+  /// </summary>
+  /// <remarks>
+  ///   Past eight planes there is no palette to index and the planes carry the colour itself: planes
+  ///   0 to 7 are the red byte with plane 0 its low bit, 8 to 15 the green, 16 to 23 the blue and
+  ///   24 to 31 the alpha. Running such a file through <see cref="IlbmPlanarToChunky"/> instead
+  ///   collapses every plane onto one byte, so the top sixteen are dropped and the red channel is
+  ///   handed out as a palette index — which is what happened until this existed. Confirmed against
+  ///   XnView's converter: a 320 by 240 picture written as <c>iff</c> comes back as 24 planes with
+  ///   no CMAP, and read this way it equals the pixels that went in.
+  /// </remarks>
+  public static byte[] IlbmPlanarToDeep(ReadOnlySpan<byte> planarData, int width, int height, int numPlanes) {
+    var bytesPerPixel = numPlanes / 8;
+    var bytesPerPlaneRow = ((width + 15) / 16) * 2;
+    var bytesPerScanline = bytesPerPlaneRow * numPlanes;
+    var result = new byte[width * height * bytesPerPixel];
+
+    for (var y = 0; y < height; ++y) {
+      var scanlineOffset = y * bytesPerScanline;
+
+      for (var plane = 0; plane < numPlanes; ++plane) {
+        var planeOffset = scanlineOffset + plane * bytesPerPlaneRow;
+        var component = plane >> 3;
+        var componentBit = (byte)(1 << (plane & 7));
+
+        for (var x = 0; x < width; ++x) {
+          var at = planeOffset + (x >> 3);
+          if (at < planarData.Length && (planarData[at] & (1 << (7 - (x & 7)))) != 0)
+            result[(y * width + x) * bytesPerPixel + component] |= componentBit;
+        }
+      }
+    }
+
+    return result;
+  }
+
+  /// <summary>
   ///   Converts chunky pixel data to ILBM-style interleaved planar format.
   ///   Each scanline produces <paramref name="numPlanes"/> bitplane rows, each word-aligned.
   /// </summary>
