@@ -104,15 +104,15 @@ public sealed class PixelConverterTests {
   }
 
   [Test]
-  public void Rgba16BeToBgra_TakesHighBytesSwapsRedBlue() {
+  public void Rgba16BeToBgra_RoundsAndSwapsRedBlue() {
     byte[] rgba16 = [0xAA, 0x00, 0xBB, 0x00, 0xCC, 0x00, 0xDD, 0x00];
 
     var result = PixelConverter.Rgba16BeToBgra(rgba16, 1);
 
-    Assert.That(result[0], Is.EqualTo(0xCC));
-    Assert.That(result[1], Is.EqualTo(0xBB));
-    Assert.That(result[2], Is.EqualTo(0xAA));
-    Assert.That(result[3], Is.EqualTo(0xDD));
+    Assert.That(result[0], Is.EqualTo(203));
+    Assert.That(result[1], Is.EqualTo(186));
+    Assert.That(result[2], Is.EqualTo(169));
+    Assert.That(result[3], Is.EqualTo(220));
   }
 
   [Test]
@@ -247,14 +247,14 @@ public sealed class PixelConverterTests {
   }
 
   [Test]
-  public void Rgb48ToBgra_TakesHighBytesSwapsRedBlue() {
+  public void Rgb48ToBgra_RoundsAndSwapsRedBlue() {
     byte[] rgb48 = [0xAA, 0x00, 0xBB, 0x00, 0xCC, 0x00];
 
     var result = PixelConverter.Rgb48ToBgra(rgb48, 1);
 
-    Assert.That(result[0], Is.EqualTo(0xCC));
-    Assert.That(result[1], Is.EqualTo(0xBB));
-    Assert.That(result[2], Is.EqualTo(0xAA));
+    Assert.That(result[0], Is.EqualTo(203));
+    Assert.That(result[1], Is.EqualTo(186));
+    Assert.That(result[2], Is.EqualTo(169));
     Assert.That(result[3], Is.EqualTo(255));
   }
 
@@ -852,8 +852,8 @@ public sealed class PixelConverterTests {
   // ── Gray16 hub route tests ────────────────────────────────────────────────
 
   [Test]
-  public void Gray16ToBgra_SinglePixel_TakesHighByteExpandsToRgb() {
-    byte[] gray16 = [0x80, 0x40]; // BE: 0x8040
+  public void Gray16ToBgra_SinglePixel_ReducesAndExpandsToRgb() {
+    byte[] gray16 = [0x80, 0x40]; // BE: 0x8040, which reduces to 0x80 either way
 
     var result = PixelConverter.Gray16ToBgra(gray16, 1);
 
@@ -1018,38 +1018,79 @@ public sealed class PixelConverterTests {
   // ── Direct 16→8 shortcut tests ────────────────────────────────────────────
 
   [Test]
-  public void Rgb48ToRgb24_TakesHighBytes() {
+  public void Rgb48ToRgb24_Rounds() {
     byte[] rgb48 = [0xAA, 0x11, 0xBB, 0x22, 0xCC, 0x33];
 
     var result = PixelConverter.Rgb48ToRgb24(rgb48, 1);
 
     Assert.That(result, Has.Length.EqualTo(3));
-    Assert.That(result[0], Is.EqualTo(0xAA));
-    Assert.That(result[1], Is.EqualTo(0xBB));
-    Assert.That(result[2], Is.EqualTo(0xCC));
+    Assert.That(result[0], Is.EqualTo(169));
+    Assert.That(result[1], Is.EqualTo(186));
+    Assert.That(result[2], Is.EqualTo(203));
   }
 
   [Test]
-  public void Rgba64ToRgba32_TakesHighBytes() {
+  public void Rgba64ToRgba32_Rounds() {
     byte[] rgba64 = [0xAA, 0x11, 0xBB, 0x22, 0xCC, 0x33, 0xDD, 0x44];
 
     var result = PixelConverter.Rgba64ToRgba32(rgba64, 1);
 
     Assert.That(result, Has.Length.EqualTo(4));
-    Assert.That(result[0], Is.EqualTo(0xAA));
-    Assert.That(result[1], Is.EqualTo(0xBB));
-    Assert.That(result[2], Is.EqualTo(0xCC));
-    Assert.That(result[3], Is.EqualTo(0xDD));
+    Assert.That(result[0], Is.EqualTo(169));
+    Assert.That(result[1], Is.EqualTo(186));
+    Assert.That(result[2], Is.EqualTo(203));
+    Assert.That(result[3], Is.EqualTo(220));
   }
 
   [Test]
-  public void Gray16ToGray8_TakesHighByte() {
+  public void Gray16ToGray8_Rounds() {
     byte[] gray16 = [0xAB, 0xCD];
 
     var result = PixelConverter.Gray16ToGray8(gray16, 1);
 
     Assert.That(result, Has.Length.EqualTo(1));
-    Assert.That(result[0], Is.EqualTo(0xAB));
+    Assert.That(result[0], Is.EqualTo(171));
+  }
+
+  /// <summary>
+  /// The two samples a 16-bit PNG disagreed with ImageMagick on, one either side of the error.
+  /// </summary>
+  /// <remarks>
+  /// Discarding the low byte is a divide by 256 where the range asks for 257, so it is not a
+  /// consistent bias: 0x2AAB is a level too dark and 0xCE38 a level too bright, and a 61 by 37
+  /// gradient landed 366 of its 2257 pixels wrong in both directions at once. Anything that only
+  /// checks the ends of the range misses this, because 0 and 0xFFFF are the two values every
+  /// reduction agrees on.
+  /// </remarks>
+  [TestCase((byte)0x2A, (byte)0xAB, (byte)43)]
+  [TestCase((byte)0xCE, (byte)0x38, (byte)205)]
+  [TestCase((byte)0x00, (byte)0xFF, (byte)1)]
+  [TestCase((byte)0x00, (byte)0x00, (byte)0)]
+  [TestCase((byte)0xFF, (byte)0xFF, (byte)255)]
+  public void Gray16ToGray8_MatchesTheReferenceReduction(byte high, byte low, byte expected) {
+    var result = PixelConverter.Gray16ToGray8([high, low], 1);
+
+    Assert.That(result[0], Is.EqualTo(expected));
+  }
+
+  /// <summary>Every one of the 65536 inputs reduces the way the reference readers reduce it.</summary>
+  /// <remarks>
+  /// Spot values cannot show a rounding rule is right, only that it is right twice. The reduction
+  /// every other reader performs is v*255/65535 to nearest, and this walks the whole domain against
+  /// it, which is cheap enough to be worth doing once per converter.
+  /// </remarks>
+  [Test]
+  public void Gray16ToGray8_WholeDomain_MatchesTheReferenceReduction() {
+    var gray16 = new byte[65536 * 2];
+    for (var v = 0; v < 65536; ++v) {
+      gray16[v * 2] = (byte)(v >> 8);
+      gray16[v * 2 + 1] = (byte)v;
+    }
+
+    var result = PixelConverter.Gray16ToGray8(gray16, 65536);
+
+    for (var v = 0; v < 65536; ++v)
+      Assert.That(result[v], Is.EqualTo((byte)((v * 255 + 32767) / 65535)), $"value {v}");
   }
 
   // ── Direct 8→16 upscale tests ─────────────────────────────────────────────
@@ -1275,8 +1316,8 @@ public sealed class PixelConverterTests {
     var result = PixelConverter.Gray16ToBgra(gray16, 3);
 
     Assert.That(result, Has.Length.EqualTo(12));
-    Assert.That(result[0], Is.EqualTo(0x40));
-    Assert.That(result[4], Is.EqualTo(0x80));
-    Assert.That(result[8], Is.EqualTo(0xC0));
+    Assert.That(result[0], Is.EqualTo(64));
+    Assert.That(result[4], Is.EqualTo(128));
+    Assert.That(result[8], Is.EqualTo(191));
   }
 }

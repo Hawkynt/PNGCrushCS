@@ -61,10 +61,14 @@ public readonly record struct IplFile : IImageFormatReader<IplFile>, IImageToRaw
       if (at >= file.PixelData.Length)
         break;
 
-      // Deeper samples are narrowed by taking the top byte rather than by rounding, which can
-      // carry a sample past the neighbour it is meant to stay below.
+      // Deeper samples are rounded into eight bits rather than having the low byte dropped. The
+      // note here used to say rounding could carry a sample past the neighbour it was meant to stay
+      // below; it cannot, because rounding is monotonic. Dropping the byte divides by 256 where the
+      // range is 257, which is what actually moved samples — 732 of 2257 pixels on a deep sample.
       var value = step == 2 && at + 1 < file.PixelData.Length
-        ? file.IsBigEndian ? file.PixelData[at] : file.PixelData[at + 1]
+        ? ChannelScaling.Reduce16(file.IsBigEndian
+          ? (file.PixelData[at] << 8) | file.PixelData[at + 1]
+          : (file.PixelData[at + 1] << 8) | file.PixelData[at])
         : file.PixelData[at];
 
       result[channels == 1 ? i : i * 3 + c] = value;
