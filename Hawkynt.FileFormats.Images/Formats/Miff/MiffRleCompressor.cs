@@ -4,15 +4,24 @@ using System.IO;
 namespace FileFormat.Miff;
 
 /// <summary>
-/// MIFF RLE compression. Each pixel packet may be followed by a run-count byte (bit 7 set).
-/// The run-count encodes (value &amp; 0x7F) additional copies of the preceding pixel packet.
-/// A run-count byte of 0x80 means zero additional copies (used to disambiguate when the next
-/// pixel's first byte has bit 7 set). Without a run-count byte, the next pixel follows immediately.
+/// MIFF run-length compression: every pixel packet is followed by a one-byte count, and the count
+/// states one fewer than the number of pixels the packet stands for.
 /// </summary>
+/// <remarks>
+/// The count byte is unconditional — a lone pixel is written as the pixel and a zero — and it is a
+/// plain number rather than a flagged one. ImageMagick sizes its packet as the samples plus one for
+/// exactly this reason, so the layout is fixed-width and needs no lookahead to parse.
+/// <para/>
+/// Reading the count only when its top bit is set is what this replaces, and it is the kind of wrong
+/// that produces a picture rather than an error: a file whose first row is sixty-one blue pixels
+/// states them as <c>00 00 00 00 ff ff 3c</c>, and 0x3C read as the next pixel's leading sample puts
+/// every pixel after the first in the wrong place. Against ImageMagick's own reading of a 61x37
+/// sample that measured 828 of 2257 pixels different.
+/// </remarks>
 internal static class MiffRleCompressor {
 
-  /// <summary>Maximum additional copies in a single run byte: 0x7F = 127, so 128 total pixels.</summary>
-  private const int _MAX_EXTRA = 127;
+  /// <summary>The largest count a byte states: 255, which stands for 256 pixels.</summary>
+  private const int _MAX_EXTRA = 255;
 
   public static byte[] Decompress(byte[] data, int bytesPerPixel, int pixelCount) {
     var outputSize = pixelCount * bytesPerPixel;
@@ -20,24 +29,18 @@ internal static class MiffRleCompressor {
     var inIdx = 0;
     var outIdx = 0;
 
-    while (inIdx < data.Length && outIdx < outputSize) {
-      if (inIdx + bytesPerPixel > data.Length)
+    while (outIdx < outputSize) {
+      // The packet is the samples and the count together; a short tail states neither.
+      if (inIdx + bytesPerPixel + 1 > data.Length)
         break;
 
-      // Read one pixel packet
-      var packetStart = outIdx;
-      for (var b = 0; b < bytesPerPixel && outIdx < outputSize; ++b)
-        output[outIdx++] = data[inIdx++];
+      var packetStart = inIdx;
+      inIdx += bytesPerPixel;
+      var pixels = data[inIdx++] + 1;
 
-      // Check if next byte is a run count (bit 7 set)
-      if (inIdx < data.Length && (data[inIdx] & 0x80) != 0) {
-        var extraCopies = data[inIdx] & 0x7F;
-        ++inIdx;
-
-        for (var r = 0; r < extraCopies && outIdx < outputSize; ++r)
-          for (var b = 0; b < bytesPerPixel && outIdx < outputSize; ++b)
-            output[outIdx++] = output[packetStart + b];
-      }
+      for (var r = 0; r < pixels && outIdx < outputSize; ++r)
+        for (var b = 0; b < bytesPerPixel && outIdx < outputSize; ++b)
+          output[outIdx++] = data[packetStart + b];
     }
 
     return output;
@@ -55,7 +58,7 @@ internal static class MiffRleCompressor {
       var runStart = i;
       ++i;
 
-      // Count consecutive identical pixel packets (cap at 1 + _MAX_EXTRA = 128 total)
+      // A run states one packet, and a count byte cannot say more than 256 pixels.
       while (i < pixelCount && i - runStart < 1 + _MAX_EXTRA) {
         var match = true;
         for (var b = 0; b < bytesPerPixel; ++b) {
@@ -71,20 +74,10 @@ internal static class MiffRleCompressor {
         ++i;
       }
 
-      var runLength = i - runStart;
-
-      // Write the pixel packet once
       for (var b = 0; b < bytesPerPixel; ++b)
         ms.WriteByte(data[runStart * bytesPerPixel + b]);
 
-      if (runLength > 1) {
-        // Emit run count: (runLength - 1) extra copies with bit 7 set
-        ms.WriteByte((byte)(0x80 | (runLength - 1)));
-      } else if (i < pixelCount && (data[i * bytesPerPixel] & 0x80) != 0) {
-        // Single pixel followed by a pixel whose first byte has bit 7 set:
-        // emit a no-op run count (0x80 = 0 extra copies) to prevent misinterpretation
-        ms.WriteByte(0x80);
-      }
+      ms.WriteByte((byte)(i - runStart - 1));
     }
 
     return ms.ToArray();

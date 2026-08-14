@@ -169,7 +169,12 @@ internal static class MiffHeaderParser {
       sb.Append("colors=").Append(colorCount).Append('\n');
     }
 
-    sb.Append(":\n");
+    // The samples begin at the byte after the control byte, and ImageMagick counts them from there
+    // without looking: its reader takes the colon, discards exactly one byte and starts reading. A
+    // newline between the colon and the control byte therefore costs it the control byte's place —
+    // it reads the 0x1A as the first red sample and every sample after it lands one position late.
+    // Our own reader steps over both and never noticed. This is the terminator ImageMagick writes.
+    sb.Append("\f\n:");
 
     var headerBytes = Encoding.ASCII.GetBytes(sb.ToString());
     var result = new byte[headerBytes.Length + 1];

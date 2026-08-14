@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Buffers.Binary;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
@@ -104,6 +106,8 @@ public static class MiffReader {
         break;
     }
 
+    pixelData = _NormaliseSamples(pixelData, depth, fields);
+
     return new MiffFile {
       Width = width,
       Height = height,
@@ -121,6 +125,77 @@ public static class MiffReader {
   public static MiffFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     return FromSpan(data);
+  }
+
+  /// <summary>Turns the samples into unsigned integers of the stated depth, whatever they were.</summary>
+  /// <remarks>
+  /// A MIFF says how its samples are held in <c>quantum:format</c>, and a high-dynamic-range
+  /// ImageMagick writes <c>floating-point</c> for anything it keeps as real numbers — which includes
+  /// every picture it has taken through a colourspace, so <c>magick x.png -colorspace Gray x.miff</c>
+  /// is one. Those are IEEE floats scaled so that one is white: half at depth sixteen, single at
+  /// thirty-two, double at sixty-four.
+  /// <para/>
+  /// Read as integers instead they are not noise but a curve — the first sample of the reference
+  /// grey file is 0x2C9F, which is 0.0722 and therefore 18 of 255, where its leading byte is 44. The
+  /// picture that comes out is plausible and wrong, which is the failure this reader must not have;
+  /// against ImageMagick's own reading of a 61x37 sample it measured 688 of 2257 pixels different.
+  /// <para/>
+  /// Converted here rather than at the point of use so that everything downstream — the narrowing to
+  /// eight bits, the palette, the writer — sees the one representation the rest of the format uses.
+  /// Rounding to the stated depth reproduces what ImageMagick itself puts in the file when asked for
+  /// unsigned samples: 0x2C9F becomes 0x127C, byte for byte.
+  /// </remarks>
+  private static byte[] _NormaliseSamples(byte[] pixelData, int depth, Dictionary<string, string> fields) {
+    if (!fields.TryGetValue("quantum:format", out var format))
+      return pixelData;
+
+    if (format.Equals("unsigned", StringComparison.OrdinalIgnoreCase))
+      return pixelData;
+
+    if (!format.Equals("floating-point", StringComparison.OrdinalIgnoreCase))
+      throw new InvalidDataException($"MIFF quantum:format '{format}' is not supported; only unsigned and floating-point samples are read.");
+
+    var bytesPerSample = depth / 8;
+    if (bytesPerSample is not (2 or 4 or 8))
+      throw new InvalidDataException($"MIFF floating-point samples at depth {depth} are not supported.");
+
+    var sampleCount = pixelData.Length / bytesPerSample;
+    var result = new byte[sampleCount * bytesPerSample];
+    var span = pixelData.AsSpan();
+
+    for (var i = 0; i < sampleCount; ++i) {
+      var at = i * bytesPerSample;
+      var value = bytesPerSample switch {
+        2 => (double)BinaryPrimitives.ReadHalfBigEndian(span[at..]),
+        4 => BinaryPrimitives.ReadSingleBigEndian(span[at..]),
+        _ => BinaryPrimitives.ReadDoubleBigEndian(span[at..]),
+      };
+
+      // High dynamic range is what the floating-point form is for, so a sample may sit outside the
+      // displayable range; the integer form has nowhere to put those.
+      if (double.IsNaN(value) || value <= 0)
+        continue;
+
+      var target = result.AsSpan(at, bytesPerSample);
+      if (value >= 1) {
+        target.Fill(0xFF);
+        continue;
+      }
+
+      switch (bytesPerSample) {
+        case 2:
+          BinaryPrimitives.WriteUInt16BigEndian(target, (ushort)Math.Round(value * ushort.MaxValue, MidpointRounding.AwayFromZero));
+          break;
+        case 4:
+          BinaryPrimitives.WriteUInt32BigEndian(target, (uint)Math.Round(value * uint.MaxValue, MidpointRounding.AwayFromZero));
+          break;
+        default:
+          BinaryPrimitives.WriteUInt64BigEndian(target, (ulong)Math.Round(value * ulong.MaxValue, MidpointRounding.AwayFromZero));
+          break;
+      }
+    }
+
+    return result;
   }
 
   private static int _GetChannelsPerPixel(string type, string colorspace) {
