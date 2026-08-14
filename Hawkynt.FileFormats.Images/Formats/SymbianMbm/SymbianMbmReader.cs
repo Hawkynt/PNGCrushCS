@@ -55,8 +55,10 @@ public static class SymbianMbmReader {
     if (bitmapCount < 0)
       throw new InvalidDataException($"Invalid bitmap count: {bitmapCount}.");
 
+    // Compared this way round rather than as offsetsStart + bitmapCount * 4, which overflows for a
+    // count near the top of the range and lets an invented table size through the check it fails.
     var offsetsStart = trailerOffset + 4;
-    if (offsetsStart + bitmapCount * 4 > data.Length)
+    if (bitmapCount > (data.Length - offsetsStart) / 4)
       throw new InvalidDataException("Data too small for bitmap offset table.");
 
     // Read bitmap offsets
@@ -68,14 +70,32 @@ public static class SymbianMbmReader {
     var bitmaps = new SymbianMbmBitmap[bitmapCount];
     for (var i = 0; i < bitmapCount; ++i) {
       var offset = offsets[i];
-      if (offset + SymbianMbmFile.BitmapHeaderSize > data.Length)
+      if (offset < 0 || offset > data.Length - SymbianMbmFile.BitmapHeaderSize)
         throw new InvalidDataException($"Bitmap {i} header extends beyond file.");
 
       var bmpSpan = span[offset..];
       var bmpHeader = SymbianMbmBitmapHeader.ReadFrom(bmpSpan[..SymbianMbmBitmapHeader.StructSize]);
 
+      // Later releases added fields on the end of the bitmap header, so the declared length is what
+      // says where the pixels begin. Shorter than the struct we just read is not a header at all.
+      if (bmpHeader.HeaderLength < SymbianMbmBitmapHeader.StructSize)
+        throw new InvalidDataException($"Bitmap {i} declares a {bmpHeader.HeaderLength}-byte header, shorter than the {SymbianMbmBitmapHeader.StructSize}-byte minimum.");
+
+      if (bmpHeader.Width <= 0 || bmpHeader.Height <= 0)
+        throw new InvalidDataException($"Invalid bitmap {i} size: {bmpHeader.Width}x{bmpHeader.Height}.");
+
+      // Symbian packs bitmaps with one of several RLE codings, chosen by the depth. None of them is
+      // decoded here, and the packed bytes are not pixels, so this is refused rather than returned.
+      if (bmpHeader.Compression != 0)
+        throw new InvalidDataException($"Bitmap {i} is compressed (Symbian compression {bmpHeader.Compression}), which is not decoded.");
+
       var pixelDataOffset = offset + bmpHeader.HeaderLength;
-      var pixelDataLength = (int)bmpHeader.DataSize;
+
+      // The length comes from the geometry rather than from the header's own size field. That field
+      // is the whole bitmap, this header included, but the converters disagree with it and with each
+      // other: XnView writes 0 on its 24-bit files and the payload length alone on its 8-bit ones.
+      // Width, height and depth are consistent everywhere and give the length outright.
+      var pixelDataLength = SymbianMbmFile.ScanLineLength(bmpHeader.Width, bmpHeader.BitsPerPixel) * bmpHeader.Height;
       if (pixelDataOffset + pixelDataLength > data.Length)
         pixelDataLength = Math.Max(0, data.Length - pixelDataOffset);
 
@@ -86,11 +106,13 @@ public static class SymbianMbmReader {
       bitmaps[i] = new SymbianMbmBitmap {
         Width = bmpHeader.Width,
         Height = bmpHeader.Height,
+        WidthInTwips = bmpHeader.WidthInTwips,
+        HeightInTwips = bmpHeader.HeightInTwips,
         BitsPerPixel = bmpHeader.BitsPerPixel,
         ColorMode = bmpHeader.ColorMode,
         Compression = bmpHeader.Compression,
         PaletteSize = bmpHeader.PaletteSize,
-        DataSize = bmpHeader.DataSize,
+        DataSize = (uint)pixelDataLength,
         PixelData = pixelData,
       };
     }
