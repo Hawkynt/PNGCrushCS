@@ -1,11 +1,24 @@
 using System;
 using System.Buffers.Binary;
 using System.IO;
+using System.Numerics;
 
 namespace FileFormat.Bmp;
 
 /// <summary>Reads BMP files from bytes, streams, or file paths.</summary>
 public static class BmpReader {
+
+  /// <summary><c>BI_BITFIELDS</c>: three masks state where each channel sits inside the pixel.</summary>
+  private const int _COMPRESSION_BITFIELDS = 3;
+
+  /// <summary><c>BI_ALPHABITFIELDS</c>: as above with a fourth mask for alpha.</summary>
+  private const int _COMPRESSION_ALPHABITFIELDS = 6;
+
+  /// <summary>The length of a BITMAPV2INFOHEADER, the shortest one carrying its own channel masks.</summary>
+  private const int _V2_HEADER_SIZE = 52;
+
+  /// <summary>The length of a BITMAPV3INFOHEADER, the shortest one carrying an alpha mask.</summary>
+  private const int _V3_HEADER_SIZE = 56;
 
   /// <summary><c>BI_JPEG</c>: the pixel data is a JPEG stream.</summary>
   private const int _COMPRESSION_JPEG = 4;
@@ -93,10 +106,57 @@ public static class BmpReader {
     var rowOrder = rawHeight < 0 ? BmpRowOrder.TopDown : BmpRowOrder.BottomUp;
     var height = Math.Abs(rawHeight);
 
-    // Skip any extra header bytes + BITFIELDS masks
+    // Where each channel sits inside a 16- or 32-bit pixel. Under BI_BITFIELDS the file says; under
+    // BI_RGB it does not, and the defaults below are what it means by saying nothing.
+    //
+    // A plain BITMAPINFOHEADER keeps the masks in the three (or four) words directly after itself,
+    // while every header from BITMAPV2INFOHEADER up has fields of its own at offset 40 — which is the
+    // same place, so one offset serves both.
+    var maskOffset = BitmapFileHeader.StructSize + (headerSize >= _V2_HEADER_SIZE ? 40 : headerSize);
+    var usesBitfields = bmpCompression is _COMPRESSION_BITFIELDS or _COMPRESSION_ALPHABITFIELDS;
+
+    uint maskRed = 0, maskGreen = 0, maskBlue = 0, maskAlpha = 0;
+    var alphaMaskIsStated = false;
+    if (usesBitfields && data.Length >= maskOffset + 12) {
+      maskRed = BinaryPrimitives.ReadUInt32LittleEndian(data[maskOffset..]);
+      maskGreen = BinaryPrimitives.ReadUInt32LittleEndian(data[(maskOffset + 4)..]);
+      maskBlue = BinaryPrimitives.ReadUInt32LittleEndian(data[(maskOffset + 8)..]);
+
+      // The alpha mask is a field of its own from BITMAPV3INFOHEADER up, and the fourth word after a
+      // plain header when the compression is BI_ALPHABITFIELDS. Either way it is stated, and a stated
+      // zero means there is no alpha channel rather than that nobody said.
+      if ((headerSize >= _V3_HEADER_SIZE || bmpCompression == _COMPRESSION_ALPHABITFIELDS)
+          && data.Length >= maskOffset + 16) {
+        maskAlpha = BinaryPrimitives.ReadUInt32LittleEndian(data[(maskOffset + 12)..]);
+        alphaMaskIsStated = true;
+      }
+    }
+
+    // A file may state BI_BITFIELDS and then leave the masks empty, which describes no channel at
+    // all; fall back to what BI_RGB would have meant rather than decoding every pixel to black.
+    if (maskRed == 0 && maskGreen == 0 && maskBlue == 0) {
+      alphaMaskIsStated = false;
+      switch (bitsPerPixel) {
+        // BI_RGB at 16bpp is 5-5-5 with the top bit unused. 5-6-5 is a BI_BITFIELDS layout and only
+        // when the masks say so; reading one as the other left 395 of 2257 pixels of an
+        // ffmpeg-written gradient wrong, and ffprobe calls the same file rgb555le.
+        case 16:
+          maskRed = 0x7C00;
+          maskGreen = 0x03E0;
+          maskBlue = 0x001F;
+          break;
+        case 32:
+          maskRed = 0x00FF0000;
+          maskGreen = 0x0000FF00;
+          maskBlue = 0x000000FF;
+          break;
+      }
+    }
+
+    // Skip any extra header bytes and the masks that follow a plain one.
     var paletteStart = BitmapFileHeader.StructSize + headerSize;
-    if (bmpCompression == 3 && headerSize == BitmapInfoHeader.StructSize)
-      paletteStart += 12; // 3 x 4-byte masks
+    if (usesBitfields && headerSize == BitmapInfoHeader.StructSize)
+      paletteStart += bmpCompression == _COMPRESSION_ALPHABITFIELDS ? 16 : 12;
 
     // Read palette
     byte[]? palette = null;
@@ -130,7 +190,7 @@ public static class BmpReader {
       _ => BmpCompression.None
     };
 
-    var colorMode = _DetectColorMode(bitsPerPixel, bmpCompression, palette, paletteColorCount);
+    var colorMode = _DetectColorMode(bitsPerPixel, palette, paletteColorCount);
 
     byte[] pixelData;
     if (compression == BmpCompression.Rle8) {
@@ -162,6 +222,20 @@ public static class BmpReader {
       // every row after the first further out of step than the one above it. A 196 by 228 one-bit
       // file came out 71% right against XnView and ImageMagick, which agree with each other exactly.
       pixelData = _RemoveRowPadding(pixelData, width, height, bitsPerPixel);
+    }
+
+    // A 16- or 32-bit pixel is a packed word whose channels the masks locate. Widening it here rather
+    // than downstream keeps BitsPerPixel describing what PixelData actually holds, which is what the
+    // stride arithmetic in BmpFile.ToRawImage reads it for.
+    if (bitsPerPixel is 16 or 32 && compression == BmpCompression.None) {
+      var carriesAlpha = _CarriesAlpha(
+        pixelData, width * height, bitsPerPixel, ref maskAlpha, alphaMaskIsStated);
+
+      pixelData = _ExpandMaskedSamples(
+        pixelData, width * height, bitsPerPixel, maskRed, maskGreen, maskBlue, maskAlpha, carriesAlpha);
+
+      bitsPerPixel = carriesAlpha ? 32 : 24;
+      colorMode = carriesAlpha ? BmpColorMode.Bgra32 : BmpColorMode.Rgb24;
     }
 
     return new BmpFile {
@@ -209,10 +283,123 @@ public static class BmpReader {
     return result;
   }
 
-  private static BmpColorMode _DetectColorMode(int bitsPerPixel, int bmpCompression, byte[]? palette, int paletteColorCount) {
-    if (bmpCompression == 3 && bitsPerPixel == 16)
-      return BmpColorMode.Rgb16_565;
+  /// <summary>Decides whether a 16- or 32-bit file's spare bits are an alpha channel or padding.</summary>
+  /// <remarks>
+  /// <c>biCompression</c> alone does not say, so this was settled by measurement against ffmpeg n9.0
+  /// and ImageMagick 7.1.2 over bitmaps built to isolate each case:
+  /// <list type="bullet">
+  /// <item>32bpp BI_RGB whose fourth byte is 0x80 throughout, or varies across the row: both tools
+  /// read it as alpha and keep the value.</item>
+  /// <item>32bpp BI_RGB whose fourth byte is zero throughout: ffmpeg substitutes an opaque alpha and
+  /// ImageMagick drops the channel. Both render it opaque, and so do we — writers that mean the byte
+  /// as padding leave it at zero, and taking that literally turns an opaque picture invisible.</item>
+  /// <item>A stated alpha mask of zero (BITMAPV4HEADER, BI_BITFIELDS): ffmpeg reports <c>bgr0</c> and
+  /// ImageMagick three channels. No alpha.</item>
+  /// <item>A stated non-zero alpha mask whose every pixel is zero: the two disagree. ImageMagick
+  /// honours the mask and gives a transparent picture; ffmpeg applies the same rescue it uses for
+  /// BI_RGB and gives an opaque one. We follow ImageMagick, because a header that declares an alpha
+  /// mask has stated something and overriding a stated channel is how a legitimately transparent
+  /// picture becomes a wrong one — whereas the rescue above fills a gap where nothing was stated.</item>
+  /// </list>
+  /// 16bpp gets no implicit alpha under either tool, so the spare bit of a 5-5-5 stays spare.
+  /// </remarks>
+  private static bool _CarriesAlpha(
+    byte[] packed, int pixelCount, int bitsPerPixel, ref uint maskAlpha, bool alphaMaskIsStated) {
+    if (alphaMaskIsStated)
+      return maskAlpha != 0;
 
+    // Nothing was stated. Only a 32-bit pixel has room left over once three 8-bit channels are placed.
+    if (bitsPerPixel != 32)
+      return false;
+
+    maskAlpha = 0xFF000000;
+    return _AnyMaskedBitSet(packed, pixelCount, bitsPerPixel, maskAlpha);
+  }
+
+  private static bool _AnyMaskedBitSet(byte[] packed, int pixelCount, int bitsPerPixel, uint mask) {
+    var bytesPerPixel = bitsPerPixel / 8;
+    for (var i = 0; i < pixelCount; ++i)
+      if ((_ReadPacked(packed, i, bytesPerPixel) & mask) != 0)
+        return true;
+
+    return false;
+  }
+
+  private static uint _ReadPacked(byte[] packed, int index, int bytesPerPixel) {
+    var offset = index * bytesPerPixel;
+    if (offset + bytesPerPixel > packed.Length)
+      return 0;
+
+    return bytesPerPixel == 2
+      ? BinaryPrimitives.ReadUInt16LittleEndian(packed.AsSpan(offset))
+      : BinaryPrimitives.ReadUInt32LittleEndian(packed.AsSpan(offset));
+  }
+
+  /// <summary>Widens packed masked channels into one byte each, blue-green-red(-alpha).</summary>
+  private static byte[] _ExpandMaskedSamples(
+    byte[] packed, int pixelCount, int bitsPerPixel,
+    uint maskRed, uint maskGreen, uint maskBlue, uint maskAlpha, bool withAlpha) {
+    var bytesPerPixel = bitsPerPixel / 8;
+    var bytesPerSample = withAlpha ? 4 : 3;
+    var result = new byte[pixelCount * bytesPerSample];
+
+    var red = _MaskShape(maskRed);
+    var green = _MaskShape(maskGreen);
+    var blue = _MaskShape(maskBlue);
+    var alpha = _MaskShape(maskAlpha);
+
+    for (var i = 0; i < pixelCount; ++i) {
+      var value = _ReadPacked(packed, i, bytesPerPixel);
+      var destination = i * bytesPerSample;
+      result[destination] = _Sample(value, blue);
+      result[destination + 1] = _Sample(value, green);
+      result[destination + 2] = _Sample(value, red);
+      if (withAlpha)
+        result[destination + 3] = alpha.Width == 0 ? (byte)0xFF : _Sample(value, alpha);
+    }
+
+    return result;
+  }
+
+  private static (uint Mask, int Shift, int Width) _MaskShape(uint mask)
+    => mask == 0 ? (0u, 0, 0) : (mask, BitOperations.TrailingZeroCount(mask), BitOperations.PopCount(mask));
+
+  /// <summary>Widens one channel to the full 0..255 range by repeating its bits.</summary>
+  /// <remarks>
+  /// Sweeping all 32 values of a 5-bit channel through both tools settled which of the two candidate
+  /// rules they use. ffmpeg matches bit replication on 32 of 32; rounding the scale instead differs
+  /// from it at four values (3, 7, 24, 28) and is what left 488 of 2257 pixels of the gradient off by
+  /// one. ImageMagick matches neither cleanly — 30 of 32 either way, disagreeing with ffmpeg at 3 and
+  /// 7 — so the two tools differ from each other on 366 pixels of that same file and no single answer
+  /// satisfies both. We follow ffmpeg, which is the reading the parity check measures against and the
+  /// only one of the two that is self-consistent.
+  /// <para/>
+  /// Replication is also the rule that reaches the ends of the range: a full-scale 5-bit 31 becomes
+  /// 255 rather than the 248 a plain shift gives. The one place it parts company with both tools is a
+  /// 4-4-4 layout, where each of them shifts instead and so cannot express white — a full-scale 15
+  /// comes back as 240 from both. That layout is vanishingly rare and being unable to write white is
+  /// the worse fault, so it is not followed there.
+  /// </remarks>
+  private static byte _Sample(uint value, (uint Mask, int Shift, int Width) channel) {
+    if (channel.Width == 0)
+      return 0;
+
+    var raw = (value & channel.Mask) >> channel.Shift;
+    if (channel.Width >= 8)
+      return (byte)(raw >> (channel.Width - 8));
+
+    // Repeat the pattern until it fills at least eight bits, then keep the top eight.
+    var filled = raw;
+    var bits = channel.Width;
+    while (bits < 8) {
+      filled = (filled << channel.Width) | raw;
+      bits += channel.Width;
+    }
+
+    return (byte)(filled >> (bits - 8));
+  }
+
+  private static BmpColorMode _DetectColorMode(int bitsPerPixel, byte[]? palette, int paletteColorCount) {
     if (bitsPerPixel == 24)
       return BmpColorMode.Rgb24;
 

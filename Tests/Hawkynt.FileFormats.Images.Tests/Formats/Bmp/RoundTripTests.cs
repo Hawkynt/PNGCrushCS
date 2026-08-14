@@ -1,5 +1,6 @@
 using System;
 using FileFormat.Bmp;
+using FileFormat.Core;
 
 namespace FileFormat.Bmp.Tests;
 
@@ -213,8 +214,18 @@ public sealed class RoundTripTests {
 
     Assert.That(restored.Width, Is.EqualTo(2));
     Assert.That(restored.Height, Is.EqualTo(2));
-    Assert.That(restored.BitsPerPixel, Is.EqualTo(16));
-    Assert.That(restored.ColorMode, Is.EqualTo(BmpColorMode.Rgb16_565));
-    Assert.That(restored.PixelData, Is.EqualTo(original.PixelData));
+
+    // A 16-bit bitmap now comes back a byte to the channel. Its channels sit wherever the masks say
+    // and can be any width, so widening them on the way in is what lets one arbitrary layout be read
+    // exactly instead of two hard-coded ones being guessed between; it is also what put this reader
+    // on ffmpeg's own decode to the pixel. What it costs is that the depth the file was stored at is
+    // no longer the depth that comes back.
+    Assert.That(restored.BitsPerPixel, Is.EqualTo(24));
+    Assert.That(restored.ColorMode, Is.EqualTo(BmpColorMode.Rgb24));
+
+    // Nothing is lost by widening: each channel is stretched by repeating its bits, so packing the
+    // result back down to 5-6-5 returns the very bytes that went in.
+    var repacked = PixelConverter.Convert(BmpFile.ToRawImage(restored), PixelFormat.Rgb565);
+    Assert.That(repacked.PixelData, Is.EqualTo(pixelData));
   }
 }

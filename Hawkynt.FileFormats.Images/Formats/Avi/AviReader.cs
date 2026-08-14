@@ -205,30 +205,20 @@ public static class AviReader {
 
   /// <summary>Refuses an uncompressed depth the bitmap path does not turn into the right colours.</summary>
   /// <remarks>
-  /// The frames go to <see cref="BmpReader"/>, and two depths come back from it wrong rather than
-  /// refused, which measured against ffmpeg is:
-  /// <list type="bullet">
-  ///   <item>
-  ///     32 — a <c>BI_RGB</c> bitmap at this depth is reported as <c>Indexed1</c> with no palette,
-  ///     a picture that is not merely inexact but of the wrong kind; asking it for colours throws.
-  ///   </item>
-  ///   <item>
-  ///     16 — read as 5-6-5 where <c>BI_RGB</c> at 16 bits is 5-5-5, which on a 61x37 gradient puts
-  ///     387 of 2257 pixels (17%) wrong against ffmpeg's own decode of the same file.
-  ///   </item>
-  /// </list>
-  /// Both are the bitmap reader's to fix and both predate this format — a plain <c>.bmp</c> of
-  /// either depth does the same thing today. Until they are, a frame of those depths is refused
-  /// here rather than handed back as a picture, because a wrong picture reported as a good one is
-  /// the failure this whole reader is written to avoid. Lifting the refusal is then a matter of
-  /// deleting this check.
+  /// 16 and 32 were refused here because <see cref="BmpReader"/> returned both of them wrong rather
+  /// than refusing: a 32-bit <c>BI_RGB</c> bitmap came back as <c>Indexed1</c> with no palette and
+  /// threw when asked for colours, and a 16-bit one was read as 5-6-5 where <c>BI_RGB</c> is 5-5-5,
+  /// which put 395 of 2257 pixels of a gradient wrong against ffmpeg's own decode of it. Both were
+  /// the bitmap reader's to fix, and both are now fixed: it reads the channel masks rather than
+  /// guessing a layout, and a file of either depth decodes to ffmpeg's reading of it exactly. So the
+  /// two depths are read here as well, and what is left is the depths a DIB has no meaning for.
   /// </remarks>
   private static void _RefuseUnrenderableDepth(int streamNumber, int bitsPerPixel) {
-    if (bitsPerPixel is 1 or 4 or 8 or 24)
+    if (bitsPerPixel is 1 or 4 or 8 or 16 or 24 or 32)
       return;
 
     throw new NotSupportedException(
-      $"AVI video stream {streamNumber} holds uncompressed frames of {bitsPerPixel} bits per pixel, which the bitmap reader behind this one does not render correctly. Uncompressed frames of 1, 4, 8 and 24 bits are read.");
+      $"AVI video stream {streamNumber} holds uncompressed frames of {bitsPerPixel} bits per pixel, which is not a depth a device-independent bitmap is stored at. Uncompressed frames of 1, 4, 8, 16, 24 and 32 bits are read.");
   }
 
   /// <summary>Renders a four-character code the way a person would recognise it in an error message.</summary>
