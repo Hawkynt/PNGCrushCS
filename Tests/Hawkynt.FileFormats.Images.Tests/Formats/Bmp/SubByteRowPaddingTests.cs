@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using Hawkynt.FileFormats.Images.Tests;
 using System.IO;
 using FileFormat.Core;
 
@@ -72,14 +73,9 @@ public sealed class SubByteRowPaddingTests {
       var rendered = Path.Combine(directory.FullName, "rendered.ppm");
       File.WriteAllBytes(bitmap, BmpWriter.ToBytes(BmpFile.FromRawImage(source)));
 
-      using var convert = Process.Start(new ProcessStartInfo("magick", $"\"{bitmap}\" -depth 8 \"{rendered}\"") {
-        RedirectStandardOutput = true, RedirectStandardError = true,
-      });
+      using var convert = ExternalTool.StartOrIgnore("magick", $"\"{bitmap}\" -depth 8 \"{rendered}\"");
 
-      if (convert == null)
-        Assert.Ignore("no ImageMagick here to ask");
-
-      var complaint = convert!.StandardError.ReadToEnd();
+      var complaint = convert.StandardError.ReadToEnd();
       convert.WaitForExit();
       if (convert.ExitCode != 0 || !File.Exists(rendered))
         Assert.Ignore($"ImageMagick would not read it here: {complaint.Trim()}");

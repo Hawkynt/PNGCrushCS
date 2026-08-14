@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using Hawkynt.FileFormats.Images.Tests;
 using System.IO;
 using System.Text;
 using FileFormat.Core;
@@ -139,14 +140,9 @@ public sealed class FromRawImageTests {
       var path = Path.Combine(directory.FullName, "job.pcl");
       File.WriteAllBytes(path, PclWriter.ToBytes(PclFile.FromRawImage(_Colours(37, 11))));
 
-      using var identify = Process.Start(new ProcessStartInfo("file", $"-b \"{path}\"") {
-        RedirectStandardOutput = true, RedirectStandardError = true,
-      });
+      using var identify = ExternalTool.StartOrIgnore("file", $"-b \"{path}\"");
 
-      if (identify == null)
-        Assert.Ignore("no file(1) here to ask");
-
-      var reported = identify!.StandardOutput.ReadToEnd().Trim();
+      var reported = identify.StandardOutput.ReadToEnd().Trim();
       identify.WaitForExit();
 
       if (identify.ExitCode != 0)

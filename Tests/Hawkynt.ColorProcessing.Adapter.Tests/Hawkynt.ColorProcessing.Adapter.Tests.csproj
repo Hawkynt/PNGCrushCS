@@ -17,6 +17,15 @@
     <Using Include="NUnit.Framework" />
   </ItemGroup>
 
+  <!-- Downloaded so that restore puts them in the cache, which is where the references below reach
+       for them by path. Nothing was doing that, so the build worked only on a machine that already
+       had the packages from some earlier day. PackageDownload rather than PackageReference: the
+       latter would negotiate the package's windows-only target framework and stop the build. -->
+  <ItemGroup>
+    <PackageDownload Include="FrameworkExtensions.System.Drawing" Version="[1.0.1.1347]" />
+    <PackageDownload Include="FrameworkExtensions.Backports" Version="[1.0.0.1347]" />
+  </ItemGroup>
+
   <!-- A Reference is not transitive the way a PackageReference is, so the test has to name the
        colour library too in order to name a ditherer at compile time. -->
   <ItemGroup>
