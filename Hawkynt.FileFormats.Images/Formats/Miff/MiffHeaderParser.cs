@@ -151,7 +151,11 @@ internal static class MiffHeaderParser {
 
   public static byte[] Format(MiffFile file) {
     var sb = new StringBuilder();
-    sb.Append("id=ImageMagick\n");
+
+    // The version is what tells ImageMagick a Zip payload is cut into one length-prefixed chunk per
+    // row, which is the only shape of it that its reader accepts: stated as nothing, the same bytes
+    // are refused outright. ImageMagick writes this line on every file it writes, compressed or not.
+    sb.Append("id=ImageMagick version=1.0\n");
     sb.Append("class=").Append(file.ColorClass == MiffColorClass.PseudoClass ? "PseudoClass" : "DirectClass").Append('\n');
     sb.Append("columns=").Append(file.Width).Append('\n');
     sb.Append("rows=").Append(file.Height).Append('\n');

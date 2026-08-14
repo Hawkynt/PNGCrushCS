@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
@@ -101,7 +102,7 @@ public static class MiffReader {
         pixelData = MiffRleCompressor.Decompress(rawData, bytesPerPixel, pixelCount);
         break;
       case MiffCompression.Zip:
-        pixelData = _DecompressZip(rawData, pixelCount * bytesPerPixel);
+        pixelData = _DecompressZip(rawData, pixelCount * bytesPerPixel, height, _StatesRowChunks(fields));
         break;
       default:
         pixelData = new byte[pixelCount * bytesPerPixel];
@@ -265,15 +266,83 @@ public static class MiffReader {
     return channels;
   }
 
-  private static byte[] _DecompressZip(byte[] compressedData, int expectedSize) {
-    using var inputStream = new MemoryStream(compressedData);
-    using var deflateStream = new DeflateStream(inputStream, CompressionMode.Decompress);
-    using var outputStream = new MemoryStream();
-    deflateStream.CopyTo(outputStream);
-    var decompressed = outputStream.ToArray();
+  /// <summary>Whether the Zip payload is cut into one length-prefixed chunk per row.</summary>
+  /// <remarks>
+  /// The id line carries a version — <c>id=ImageMagick version=1.0</c> — and ImageMagick's reader
+  /// takes a four-byte big-endian length before each row for any version above zero. A file that
+  /// states no version has no lengths; ImageMagick refuses a Zip payload in that shape, and it is
+  /// read here as the plain stream it would have to be.
+  /// </remarks>
+  private static bool _StatesRowChunks(Dictionary<string, string> fields)
+    => fields.TryGetValue("version", out var version)
+       && double.TryParse(version, NumberStyles.Float, CultureInfo.InvariantCulture, out var number)
+       && number != 0;
+
+  /// <summary>Joins the per-row chunks back into the one zlib stream they were cut from.</summary>
+  /// <remarks>
+  /// ImageMagick flushes its deflater at the end of every row and writes what came out with its
+  /// length in front, so a chunk ends at a flush boundary — <c>00 00 FF FF</c> — rather than being a
+  /// stream of its own. Inflating a chunk alone therefore fails; the concatenation is what inflates,
+  /// and it is what its reader feeds its inflater one chunk at a time.
+  /// <para/>
+  /// A stated length that runs past the end of the file is the file being wrong about itself, which
+  /// is worth saying rather than inflating whatever happens to be there.
+  /// </remarks>
+  private static byte[] _JoinRowChunks(byte[] payload, int rows) {
+    using var joined = new MemoryStream(payload.Length);
+    var at = 0;
+    for (var row = 0; row < rows; ++row) {
+      if (at + sizeof(uint) > payload.Length)
+        throw new InvalidDataException($"A Zip-compressed MIFF ends after {row} of its {rows} rows.");
+
+      var length = BinaryPrimitives.ReadUInt32BigEndian(payload.AsSpan(at));
+      at += sizeof(uint);
+      if (length > (uint)(payload.Length - at))
+        throw new InvalidDataException($"A Zip-compressed MIFF states a {length} byte row where {payload.Length - at} bytes are left.");
+
+      joined.Write(payload, at, (int)length);
+      at += (int)length;
+    }
+
+    return joined.ToArray();
+  }
+
+  /// <summary>Inflates the Zip payload, which is a zlib stream and not a raw deflate one.</summary>
+  /// <remarks>
+  /// It was handed to a raw <see cref="DeflateStream"/>, which finds no zlib header where one is, so
+  /// every Zip-compressed MIFF failed outright — one of eleven reference samples would not decode at
+  /// all.
+  /// <para/>
+  /// The stream is read to exactly the size the header accounts for and no further, because
+  /// ImageMagick never finishes it: it flushes after the last row and stops, so there is no final
+  /// block and no Adler-32 trailer to arrive at. Reading past the last sample would be reading for
+  /// an end that was never written.
+  /// </remarks>
+  private static byte[] _DecompressZip(byte[] compressedData, int expectedSize, int rows, bool rowChunks) {
+    var payload = rowChunks ? _JoinRowChunks(compressedData, rows) : compressedData;
+
+    using var inputStream = new MemoryStream(payload);
+    using var zlibStream = new ZLibStream(inputStream, CompressionMode.Decompress);
 
     var result = new byte[expectedSize];
-    decompressed.AsSpan(0, Math.Min(decompressed.Length, expectedSize)).CopyTo(result.AsSpan(0));
+    var filled = 0;
+    while (filled < expectedSize) {
+      int read;
+      try {
+        read = zlibStream.Read(result, filled, expectedSize - filled);
+      } catch (InvalidDataException e) {
+        throw new InvalidDataException($"A Zip-compressed MIFF does not inflate: {e.Message}", e);
+      }
+
+      if (read <= 0)
+        break;
+
+      filled += read;
+    }
+
+    if (filled != expectedSize)
+      throw new InvalidDataException($"A Zip-compressed MIFF inflates to {filled} bytes where its size calls for {expectedSize}.");
+
     return result;
   }
 }
