@@ -29,14 +29,36 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
   private const string _NAMESPACE_PROPERTY = "build_property.FileFormatRegistryNamespace";
   private const string _DEFAULT_NAMESPACE = "Optimizer.Image";
 
+  /// <summary>
+  /// MSBuild property <c>&lt;FileFormatEmitImageRegistry&gt;</c>: set to <c>false</c> to suppress the
+  /// image registry in a project that runs this generator for something else.
+  /// </summary>
+  /// <remarks>
+  /// Discovery walks the referenced assemblies as well as the compilation, so any project that
+  /// references Hawkynt.FileFormats.Images and runs this generator would emit a second, complete copy
+  /// of the image registry into its own namespace. Two registries over the same formats is two
+  /// tables to keep in step, and the second one would need the whole of FormatEntry/FormatRegistry
+  /// duplicated beside it to compile at all. The video package references the image one for its JPEG
+  /// and bitmap readers and wants only the video registry, so it turns this off.
+  /// </remarks>
+  private const string _EMIT_IMAGE_REGISTRY_PROPERTY = "build_property.FileFormatEmitImageRegistry";
+
   public void Initialize(IncrementalGeneratorInitializationContext context) {
-    var nsOption = context.AnalyzerConfigOptionsProvider.Select(static (options, _) => {
+    var options = context.AnalyzerConfigOptionsProvider.Select(static (options, _) => {
       options.GlobalOptions.TryGetValue(_NAMESPACE_PROPERTY, out var ns);
-      return string.IsNullOrWhiteSpace(ns) ? _DEFAULT_NAMESPACE : ns!;
+      options.GlobalOptions.TryGetValue(_EMIT_IMAGE_REGISTRY_PROPERTY, out var emit);
+      return (
+        Namespace: string.IsNullOrWhiteSpace(ns) ? _DEFAULT_NAMESPACE : ns!,
+        Emit: !string.Equals(emit, "false", StringComparison.OrdinalIgnoreCase));
     });
     var formatTypes = context.CompilationProvider.Select(static (compilation, ct) => _DiscoverFormats(compilation, ct));
-    var combined = formatTypes.Combine(nsOption);
-    context.RegisterSourceOutput(combined, static (spc, pair) => _GenerateOutput(spc, pair.Left, pair.Right));
+    var combined = formatTypes.Combine(options);
+    context.RegisterSourceOutput(combined, static (spc, pair) => {
+      if (!pair.Right.Emit)
+        return;
+
+      _GenerateOutput(spc, pair.Left, pair.Right.Namespace);
+    });
   }
 
   private static ImmutableArray<FormatInfo> _DiscoverFormats(Compilation compilation, System.Threading.CancellationToken ct) {

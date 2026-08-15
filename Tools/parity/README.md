@@ -257,6 +257,22 @@ Every format claiming that file's extension is asked to read it and made to say 
 The ordinary decode answers null for a wrong length, a foreign signature and an unimplemented depth
 alike, and those are three different jobs.
 
+Containers are asked too, and counted separately, since a name may be claimed on both sides — which
+one is right is the reader's to judge from what each answers. For a container the answer comes in
+three steps, because after demuxing was split from decoding they fail separately: whether it opened,
+whether a codec takes each stream, and whether that codec decoded a frame. A file that opens and
+reports its streams but has no codec is a codec nobody has written yet, not a container that failed:
+
+```
+c_mpeg4.avi (6138 bytes) — 0 image format(s) and 1 container(s) claim .avi
+  [video] Avi: opened, 1 stream(s)
+    stream 0 video 'FMP4' 61x37@24: no codec — NotSupportedException: Stream 0 is coded as 'FMP4' …
+```
+
+`--frames` and `--anyformat` consult both registries the same way. `--frames` builds the decoder
+before it starts walking, so a container whose codec is missing says so rather than quietly writing
+no frames — which is what a container holding no packets also looks like.
+
 Sweeping the corpus with RECOIL and comparing turned up 44 formats where it reads a sample and we do
 not, or where we both read one and disagree. Two of those disagreements were the sweep's own fault:
 it normalised our size to the reference tool's with `-resize`, which interpolates, when a machine

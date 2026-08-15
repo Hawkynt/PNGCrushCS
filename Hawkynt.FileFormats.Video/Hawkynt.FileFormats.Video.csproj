@@ -1,0 +1,68 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>preview</LangVersion>
+    <RootNamespace>Hawkynt.FileFormats.Video</RootNamespace>
+    <AssemblyName>Hawkynt.FileFormats.Video</AssemblyName>
+
+    <!-- Tells the source generator to emit `VideoFormat` and `VideoFormatRegistration` into our
+         namespace, exactly as Hawkynt.FileFormats.Images does for its own registry. -->
+    <FileFormatRegistryNamespace>Hawkynt.FileFormats.Video</FileFormatRegistryNamespace>
+
+    <!-- …and to leave the image registry alone here. Discovery walks the referenced assemblies, so
+         without this the image package we reference for its JPEG and bitmap readers would be
+         re-registered into a second, identical table inside this one. -->
+    <FileFormatEmitImageRegistry>false</FileFormatEmitImageRegistry>
+
+    <!-- NuGet packaging metadata -->
+    <PackageId>Hawkynt.FileFormats.Video</PackageId>
+    <!-- Last digit is auto-stamped at CI time by version.pl in stamp mode (matches the convention
+         used by every other csproj in the repo): MAJOR.MINOR.PATCH here, .BUILD appended at pack. -->
+    <Version>1.0.0</Version>
+    <Authors>Hawkynt</Authors>
+    <Description>Pure-C# library for reading video containers and decoding video codecs. Demuxing, decoding, encoding and muxing are four separate contracts, so a container can be read and a different one written without a decode in between. Frames are FileFormat.Core RawImages, so everything the image library does to a picture works on a frame.</Description>
+    <PackageTags>video;file-format;avi;mjpeg;container;demuxer;codec;decoder;riff</PackageTags>
+    <PackageLicenseExpression>LGPL-3.0-or-later</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/Hawkynt/PNGCrushCS</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IncludeBuildOutput>true</IncludeBuildOutput>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+    <!-- Expose the registry properties to the source generator's AnalyzerConfigOptions. -->
+    <CompilerVisibleProperty Include="FileFormatRegistryNamespace" />
+    <CompilerVisibleProperty Include="FileFormatEmitImageRegistry" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Hawkynt.FileFormats.Video.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      The image package is a real dependency rather than a bundled private one: a Motion JPEG packet
+      is a JPEG and an uncompressed AVI frame is the pixel array of a Windows bitmap, both of which
+      that package already reads. Taking it as a dependency means consumers get one copy of those
+      readers; bundling it would ship a second copy of every image format inside this package and
+      then have two of FileFormat.Core to choose between at load time.
+    -->
+    <ProjectReference Include="..\Hawkynt.FileFormats.Images\Hawkynt.FileFormats.Images.csproj" />
+    <ProjectReference Include="..\FileFormat.Core\FileFormat.Core.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\FileFormat.Core.Generators\FileFormat.Core.Generators.csproj"
+                      OutputItemType="Analyzer" ReferenceOutputAssembly="false"
+                      PrivateAssets="all" />
+    <ProjectReference Include="..\FileFormat.Registry.Generator\FileFormat.Registry.Generator.csproj"
+                      OutputItemType="Analyzer" ReferenceOutputAssembly="false"
+                      PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FrameworkExtensions.Backports" Version="1.0.0.256" />
+  </ItemGroup>
+
+</Project>

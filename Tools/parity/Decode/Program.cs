@@ -10,6 +10,8 @@ if (args.Length < 1) {
   Console.Error.WriteLine("       Decode --implausible <sample directory>");
   Console.Error.WriteLine("       Decode --extensions");
   Console.Error.WriteLine("       Decode --frames <file> <output directory>");
+  Console.Error.WriteLine("       Decode --why <file>...");
+  Console.Error.WriteLine("       Decode --anyformat <file>...");
   return 2;
 }
 
@@ -60,6 +62,11 @@ if (args[0] == "--anyformat") {
       if (image != null)
         Console.WriteLine($"  {entry.Name}\t{image.Width}x{image.Height}\t{image.Format}\t{entry.PrimaryExtension}");
     }
+
+    // And the containers, which answer a different question about the same bytes: not "what picture
+    // is this" but "what streams does this hold and is there a codec for them". A file may well be
+    // taken by both, and which one is right is the reader's to judge from what each says.
+    VideoParity.Describe(file);
   }
 
   return 0;
@@ -72,7 +79,13 @@ if (args[0] == "--why") {
       .Where(entry => entry.AllExtensions?.Any(e => string.Equals(e, file.Extension, StringComparison.OrdinalIgnoreCase)) == true)
       .ToArray();
 
-    Console.WriteLine($"{file.Name} ({file.Length} bytes) — {entries.Length} format(s) claim {file.Extension}");
+    // Both registries, and both counted. A name claimed on each side is claimed twice, and picking
+    // one to report would hide the contest — .avi is a container here and could perfectly well be a
+    // still somewhere too, the way .mjpg already is a JPEG.
+    var containers = VideoParity.ContainersClaiming(file);
+    Console.WriteLine(
+      $"{file.Name} ({file.Length} bytes) — {entries.Length} image format(s) and {containers.Count} container(s) claim {file.Extension}");
+
     foreach (var entry in entries) {
       if (entry.LoadRawImageOrThrow == null) {
         Console.WriteLine($"  {entry.Name}: no throwing entry point");
@@ -86,6 +99,8 @@ if (args[0] == "--why") {
         Console.WriteLine($"  {entry.Name}: {failure.GetType().Name}: {failure.Message}");
       }
     }
+
+    VideoParity.Explain(file);
   }
 
   return 0;
@@ -119,6 +134,17 @@ if (args[0] == "--frames") {
 
   var format = FormatRegistry.DetectFromFile(animation);
   var formatEntry = FormatRegistry.GetEntry(format);
+
+  // A container is asked as well as an image format, and asked first when no image format claims the
+  // name at all. Frame-by-frame comparison was added here for AVI in the first place; when AVI moved
+  // into the video package this path stopped being able to see it, and the coverage went with it.
+  var containers = VideoParity.ContainersClaiming(animation);
+  if (formatEntry != null && containers.Count > 0)
+    Console.WriteLine($"note: {animation.Name} is claimed by the image format {formatEntry.Name} and by {containers.Count} container(s); writing the container's frames");
+
+  if (containers.Count > 0)
+    return VideoParity.WriteFrames(animation, into, containers[0]);
+
   if (formatEntry == null) {
     Console.Error.WriteLine($"no format claims {animation.Name}");
     return 2;
