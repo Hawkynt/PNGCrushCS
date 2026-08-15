@@ -10,6 +10,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\Hawkynt.FileFormats.Images\Hawkynt.FileFormats.Images.csproj" />
+    <!-- Containers and codecs live in their own registry, so measuring them takes their own
+         reference. Without it this tool goes blind to every video format the moment one exists. -->
+    <ProjectReference Include="..\..\..\Hawkynt.FileFormats.Video\Hawkynt.FileFormats.Video.csproj" />
     <ProjectReference Include="..\..\..\FileFormat.Core\FileFormat.Core.csproj" />
   </ItemGroup>
 </Project>

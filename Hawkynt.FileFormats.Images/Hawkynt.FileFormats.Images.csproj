@@ -79,6 +79,14 @@
     <_InternalsConsumer Include="..\Tests\*\*.csproj" />
     <_InternalsConsumer Include="..\Optimizers\*\*.csproj" />
     <InternalsVisibleTo Include="@(_InternalsConsumer->'%(Filename)'->Distinct())" />
+    <!--
+      The video package's Motion JPEG splitter needs JpegChunkLayout.FirstImageLength. Splitting a
+      stream by searching for FF D9 cuts frames in half — entropy-coded data contains those bytes and
+      a thumbnail is a whole second JPEG with an end marker of its own — so it has to be the same
+      marker walk the JPEG optimizer uses, and that walk stays in one place rather than being copied
+      into a second assembly.
+    -->
+    <InternalsVisibleTo Include="Hawkynt.FileFormats.Video" />
   </ItemGroup>
 
   <ItemGroup>

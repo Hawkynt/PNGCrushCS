@@ -25,6 +25,7 @@
 | Component | Description |
 |---|---|
 | **[`Hawkynt.FileFormats.Images`](Hawkynt.FileFormats.Images/README.md)** (NuGet) | Public meta-package: format reader/writers behind one zero-reflection static registry. **Start here if you just want to read/write images.** |
+| **[`Hawkynt.FileFormats.Video`](Hawkynt.FileFormats.Video/README.md)** (NuGet) | Video containers and codecs, with demuxing, decoding, encoding and muxing as four separate contracts. Decoded frames are the same `RawImage` the image package produces. |
 | **`Crush.Image`** (CLI) | Single unified CLI that auto-detects input format and runs an exhaustive optimizer across its supported raster formats with optional cross-format conversion. |
 | **`Compression.Core`** | Pure RFC 1951 DEFLATE with Zopfli-class optimal parsing (Ultra: 2-pass DP, dual hash chain depths; Hyper: parallel hash chains, iterative refinement, block splitting). No platform dependencies. |
 | **`FileFormat.*`** (one library per format) | Standalone reader/writer per format. Used by both the NuGet package and the CLI optimizers. |
@@ -83,6 +84,11 @@ FileFormat.TextMode   text-screen model and bitmap fonts; multi-targeted because
 Hawkynt.FileFormats.Images  <-- (public NuGet — every format lives here)
   Formats/<Name>/           one folder and one namespace per format, one assembly for all
   Source-generated FormatRegistry / ImageFormat enum over everything in the compilation
+
+Hawkynt.FileFormats.Video   <-- (public NuGet — containers and codecs)
+  Formats/<Name>/           one folder per container (demux)
+  Codecs/                   one class per codec (decode); no container names one, none names a container
+  Source-generated VideoFormatRegistry / VideoFormat enum over everything in the compilation
 
 Crush.Core         <-- Crush.Image + the Optimizer.* libraries
 Optimizer.Image    <-- BitmapConverter, ImageFormatDetector (Windows-specific glue)

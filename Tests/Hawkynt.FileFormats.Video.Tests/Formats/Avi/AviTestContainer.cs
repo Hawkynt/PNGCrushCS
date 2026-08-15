@@ -27,6 +27,9 @@ internal static class AviTestContainer {
   /// <param name="frames">One payload per <c>00dc</c> chunk; an empty one is written as an empty chunk.</param>
   /// <param name="palette">Palette entries as BGRx quads appended to the <c>strf</c>, or null for none.</param>
   /// <param name="streamType">The <c>strh.fccType</c>; anything but <c>vids</c> makes the stream a non-video one.</param>
+  /// <param name="language">The <c>strh.wLanguage</c> locale identifier, or 0 for "unstated".</param>
+  /// <param name="streamName">The <c>strn</c> chunk of the stream list, or null for none.</param>
+  /// <param name="info">Entries of a <c>LIST INFO</c> written beside the header list, or null for none.</param>
   public static byte[] Build(
     string compression,
     int width,
@@ -34,13 +37,20 @@ internal static class AviTestContainer {
     short bitsPerPixel,
     IReadOnlyList<byte[]> frames,
     byte[]? palette = null,
-    string streamType = "vids") {
+    string streamType = "vids",
+    short language = 0,
+    string? streamName = null,
+    IReadOnlyList<(string Id, string Text)>? info = null) {
 
     var strf = _BuildStreamFormat(compression, width, height, bitsPerPixel, palette);
-    var strh = _BuildStreamHeader(compression, width, Math.Abs(height), frames.Count, streamType);
+    var strh = _BuildStreamHeader(compression, width, Math.Abs(height), frames.Count, streamType, language);
     var avih = _BuildMainHeader(width, Math.Abs(height), frames.Count);
 
-    var strl = _List("strl", [_Chunk("strh", strh), _Chunk("strf", strf)]);
+    var streamParts = new List<byte[]> { _Chunk("strh", strh), _Chunk("strf", strf) };
+    if (streamName != null)
+      streamParts.Add(_Chunk("strn", _ZeroTerminated(streamName)));
+
+    var strl = _List("strl", streamParts);
     var hdrl = _List("hdrl", [_Chunk("avih", avih), strl]);
 
     var movieParts = new List<byte[]>(frames.Count);
@@ -51,6 +61,15 @@ internal static class AviTestContainer {
     var body = new MemoryStream();
     body.Write("AVI "u8);
     body.Write(hdrl);
+
+    if (info != null) {
+      var infoParts = new List<byte[]>(info.Count);
+      foreach (var (id, text) in info)
+        infoParts.Add(_Chunk(id, _ZeroTerminated(text)));
+
+      body.Write(_List("INFO", infoParts));
+    }
+
     body.Write(movi);
 
     var payload = body.ToArray();
@@ -59,6 +78,14 @@ internal static class AviTestContainer {
     _WriteUInt32(file, (uint)payload.Length);
     file.Write(payload);
     return file.ToArray();
+  }
+
+  private static byte[] _ZeroTerminated(string value) {
+    var result = new byte[value.Length + 1];
+    for (var i = 0; i < value.Length; ++i)
+      result[i] = (byte)value[i];
+
+    return result;
   }
 
   /// <summary>A bottom-up 24-bit DIB raster whose rows each carry one solid colour.</summary>
@@ -151,11 +178,12 @@ internal static class AviTestContainer {
     return data;
   }
 
-  private static byte[] _BuildStreamHeader(string compression, int width, int height, int frameCount, string streamType) {
+  private static byte[] _BuildStreamHeader(string compression, int width, int height, int frameCount, string streamType, short language) {
     var data = new byte[56];
     var span = data.AsSpan();
     _WriteFourCC(span, streamType);
     _WriteFourCC(span[4..], compression.Length == 4 ? compression : "\0\0\0\0");
+    BinaryPrimitives.WriteInt16LittleEndian(span[14..], language); // wLanguage
     BinaryPrimitives.WriteUInt32LittleEndian(span[20..], 1);   // dwScale
     BinaryPrimitives.WriteUInt32LittleEndian(span[24..], 10);  // dwRate
     BinaryPrimitives.WriteUInt32LittleEndian(span[32..], (uint)frameCount); // dwLength

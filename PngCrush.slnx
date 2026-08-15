@@ -17,6 +17,7 @@
   </Folder>
   <Folder Name="/MetaPackages/">
     <Project Path="Hawkynt.FileFormats.Images/Hawkynt.FileFormats.Images.csproj" />
+    <Project Path="Hawkynt.FileFormats.Video/Hawkynt.FileFormats.Video.csproj" />
     <Project Path="Hawkynt.ImageTransformUI/Hawkynt.ImageTransformUI.csproj" />
   </Folder>
   <Folder Name="/Tools/">
@@ -46,6 +47,7 @@
     <Project Path="Tests/Conformance.Recoil.Tests/Conformance.Recoil.Tests.csproj" />
     <Project Path="Tests/Hawkynt.ColorProcessing.Adapter.Tests/Hawkynt.ColorProcessing.Adapter.Tests.csproj" />
     <Project Path="Tests/Hawkynt.FileFormats.Images.Tests/Hawkynt.FileFormats.Images.Tests.csproj" />
+    <Project Path="Tests/Hawkynt.FileFormats.Video.Tests/Hawkynt.FileFormats.Video.Tests.csproj" />
     <Project Path="Tests/EndToEnd.Tests/EndToEnd.Tests.csproj" />
     <Project Path="Tests/Optimizer.Ani.Tests/Optimizer.Ani.Tests.csproj" />
     <Project Path="Tests/Optimizer.Bmp.Tests/Optimizer.Bmp.Tests.csproj" />

@@ -789,13 +789,18 @@ Formats we consciously chose not to implement, with reason codes:
 - **unidentified** — What the extension names could not be established from any
   source worth trusting
 
+¹ Out of scope for the *image* library, not for the repository: AVI and raw Motion
+JPEG are read by `Hawkynt.FileFormats.Video`, which demuxes containers and decodes
+codecs as separate concerns. Their frames are the same `RawImage` this table's
+formats produce.
+
 | Format            | Extensions  | Reason       | Tom's | IM  | XnView | IrfanView |
 | ----------------- | ----------- | ------------ | ----- | --- | ------ | --------- |
 | 3DS Max Thumbnail | .max        | app-specific | —     | —   | R      | —         |
 | Adobe Illustrator | .ai         | vector       | R     | RW  | R      | —         |
 | Affinity Designer | .afdesign   | app-specific | —     | —   | R      | —         |
 | Affinity Photo    | .afphoto    | app-specific | —     | —   | R      | —         |
-| AVI               | .avi        | video        | R     | R   | —      | —         |
+| AVI               | .avi        | video ¹      | R     | R   | —      | —         |
 | Blender           | .blend      | app-specific | —     | —   | —      | —         |
 | CGM               | .cgm        | vector       | R     | —   | —      | —         |
 | Cinema 4D         | .c4d        | 3d-model     | —     | —   | —      | —         |
