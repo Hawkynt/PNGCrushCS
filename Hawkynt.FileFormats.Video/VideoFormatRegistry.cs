@@ -192,8 +192,14 @@ public static class VideoFormatRegistry {
       if (codec.Accepts(stream))
         return codec.CreateDecoder(stream);
 
+    // The container's own name for the codec goes first where it has one, because for a container
+    // that names codecs with text the four-character code is zero and naming only that says nothing.
+    var named = stream.CodecId != null
+      ? $"'{stream.CodecId}'"
+      : $"'{stream.Codec}' (0x{stream.Codec.Value:X8}, stream handler '{stream.Handler}')";
+
     throw new NotSupportedException(
-      $"Stream {stream.Index} is coded as '{stream.Codec}' (0x{stream.Codec.Value:X8}, stream handler '{stream.Handler}'), "
+      $"Stream {stream.Index} is coded as {named}, "
       + $"which no registered codec decodes. Decoders present: {string.Join(", ", _codecs.Select(c => c.CodecName))}.");
   }
 

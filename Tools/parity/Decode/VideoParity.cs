@@ -83,7 +83,7 @@ internal static class VideoParity {
 
       Console.WriteLine($"  [video] {entry.Name}: opened, {streams.Count} stream(s)");
       foreach (var stream in streams) {
-        var described = $"    stream {stream.Index} {stream.Kind.ToString().ToLowerInvariant()} '{stream.Codec}'"
+        var described = $"    stream {stream.Index} {stream.Kind.ToString().ToLowerInvariant()} '{_Named(stream)}'"
                         + (stream.Width > 0 ? $" {stream.Width}x{stream.Height}@{stream.BitsPerPixel}" : string.Empty);
 
         IVideoFrameDecoder decoder;
@@ -132,11 +132,18 @@ internal static class VideoParity {
 
       foreach (var stream in streams)
         Console.WriteLine(
-          $"    stream {stream.Index}\t{stream.Kind.ToString().ToLowerInvariant()}\t'{stream.Codec}'"
+          $"    stream {stream.Index}\t{stream.Kind.ToString().ToLowerInvariant()}\t'{_Named(stream)}'"
           + $"\t{(stream.Width > 0 ? $"{stream.Width}x{stream.Height}" : "-")}"
           + $"\t{(VideoFormatRegistry.CanDecode(stream) ? "decodable" : "no codec")}");
     }
   }
+
+  /// <summary>What to call a stream's codec, whichever way its container names codecs.</summary>
+  /// <remarks>
+  /// A container that names them with text states no four-character code at all, so printing the
+  /// code would print <c>0x00000000</c> for every Matroska stream and say nothing about any of them.
+  /// </remarks>
+  private static string _Named(MediaStreamInfo stream) => stream.CodecId ?? stream.Codec.ToString();
 
   /// <summary>
   /// Writes every frame of a container's first video stream — the <c>--frames</c> path for video.

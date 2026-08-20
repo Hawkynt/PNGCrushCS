@@ -44,18 +44,32 @@ public sealed class RawVideoDecoder : IVideoCodecDecoder<RawVideoDecoder> {
 
   public static string CodecName => "Uncompressed (BI_RGB)";
 
+  /// <summary>What Matroska calls a track that describes itself with a <c>BITMAPINFOHEADER</c>.</summary>
+  private const string _VFW_CODEC_ID = "V_MS/VFW/FOURCC";
+
   /// <summary>
-  /// Takes a video stream whose codec tag is zero.
+  /// Takes a video stream whose codec tag is zero because a <c>BITMAPINFOHEADER</c> said so.
   /// </summary>
   /// <remarks>
   /// Zero and only zero. <c>DIB </c> is the four-character code a writer may put in the stream
   /// handler beside it, but as a compression it is not <c>BI_RGB</c>, and a stream naming it is
   /// refused by name rather than read as though it had said nothing.
+  /// <para/>
+  /// The tag alone is not enough, because zero means two different things depending on who is
+  /// speaking. A container that names its codecs with a code and states zero is stating
+  /// <c>BI_RGB</c> — the compression that means "these are samples". A container that names them
+  /// with text states no code at all, and the zero is an absence: every Matroska track would
+  /// otherwise arrive here as an uncompressed one, VP9 and Vorbis included, and be refused for
+  /// carrying the wrong number of bytes rather than for being a codec nothing here reads. The one
+  /// <c>CodecID</c> that does mean a Windows bitmap says so by name and carries the very header the
+  /// zero would have come from.
   /// </remarks>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
-    return stream.Kind == MediaStreamKind.Video && stream.Codec.Value == 0;
+    return stream.Kind == MediaStreamKind.Video
+           && stream.Codec.Value == 0
+           && (stream.CodecId == null || string.Equals(stream.CodecId, _VFW_CODEC_ID, StringComparison.OrdinalIgnoreCase));
   }
 
   public static RawVideoDecoder Create(MediaStreamInfo stream) {

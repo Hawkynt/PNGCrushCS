@@ -31,6 +31,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | --- | --- | --- | --- |
 | AVI (RIFF) | `.avi` | Y | — |
 | ISO base media (MP4, QuickTime, 3GP) | `.mp4`, `.m4v`, `.mov`, `.qt`, `.3gp`, `.3g2`, `.m4a` | Y | — |
+| Matroska / WebM (EBML) | `.mkv`, `.mka`, `.mks`, `.mk3d`, `.webm` | Y | — |
 | MPEG program stream (MPEG-1, MPEG-2, VOB) | `.mpg`, `.mpeg`, `.vob`, `.m2p`, `.m2ps` | Y | — |
 | Motion JPEG stream | `.mjpg`, `.mjpeg` | Y | — |
 | MPEG-1 video elementary stream | `.m1v`, `.mpv`, `.mpeg1video` | Y | — |
@@ -38,7 +39,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | Codec | Tag | Decode | Encode |
 | --- | --- | --- | --- |
 | Uncompressed (`BI_RGB`) | 0 | Y | — |
-| Motion JPEG | `MJPG`, `mjpg`, `jpeg` | Y | — |
+| Motion JPEG | `MJPG`, `mjpg`, `jpeg`, `V_MJPEG` | Y | — |
 | MPEG-1 video (ISO/IEC 11172-2) | `MPG1`, `PIM1`, `mp1v` | Y | — |
 
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
@@ -59,8 +60,21 @@ one reader and one start code and no layout at all; which of them a file is, is 
 pack header, because a program stream has no version field, no index and no header listing its
 streams.
 
-A stream coded with anything else is refused by name — the four-character code and the stream
-handler are both in the message — rather than half decoded into noise.
+One reader for Matroska and WebM for the reason MP4 and MOV share one: WebM is a Matroska document
+with a `DocType` that says so and a shorter list of codecs allowed inside it, and which codecs are
+allowed is the business of whoever is asked for a decoder. Its packet boundaries are in neither a
+table nor a chunk header but in the clusters themselves, and a single block may carry several frames
+at once — all four lacings are unpacked, so a laced block comes out as the packets it holds rather
+than as one. Elements the writer stated no length for, which is what a stream written live produces,
+end where the next element that cannot be inside them begins.
+
+Matroska names its codecs with strings rather than four-character codes, so a stream from it carries
+a `CodecId` and no tag — the exception being `V_MS/VFW/FOURCC`, whose `BITMAPINFOHEADER` holds a real
+code. A stream whose blocks were compressed, header-stripped or encrypted before being written is
+refused by name rather than handed on as frames it is not.
+
+A stream coded with anything else is refused by name — the code, or the container's own name for the
+codec where it has one — rather than half decoded into noise.
 
 ### MPEG-1 video
 
