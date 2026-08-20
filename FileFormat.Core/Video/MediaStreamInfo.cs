@@ -34,6 +34,22 @@ public sealed class MediaStreamInfo {
   public CodecTag Handler { get; init; } = CodecTag.None;
 
   /// <summary>
+  /// The container's own name for the codec, where it names codecs with text rather than with a
+  /// four-character code.
+  /// </summary>
+  /// <remarks>
+  /// Matroska is the case this exists for: its <c>CodecID</c> is a string — <c>V_MJPEG</c>,
+  /// <c>V_MPEG4/ISO/AVC</c>, <c>A_VORBIS</c> — and there is no code in the file to put in
+  /// <see cref="Codec"/> at all. Deriving one would put a number in a stream's description that is in
+  /// no file, and a refusal naming <c>0x00000000</c> tells nobody which codec is missing.
+  /// <para/>
+  /// A second name for the same thing rather than a replacement. A codec collects the spellings it
+  /// answers to and neither container has to know what the other calls it, which is the same
+  /// arrangement that lets one Motion JPEG decoder take an AVI's <c>MJPG</c> and a MOV's <c>jpeg</c>.
+  /// </remarks>
+  public string? CodecId { get; init; }
+
+  /// <summary>
   /// The seconds one unit of this stream's timestamps stands for, as an exact ratio.
   /// </summary>
   public Rational TimeBase { get; init; } = Rational.Unknown;

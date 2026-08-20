@@ -24,27 +24,33 @@ public sealed class MotionJpegDecoder : IVideoCodecDecoder<MotionJpegDecoder> {
   /// <summary>What the same codec is called in an ISO base media file's sample entry.</summary>
   private static readonly CodecTag _JPEG = CodecTag.FromCharacters("jpeg");
 
+  /// <summary>What Matroska calls it, which is a string because Matroska has no code field at all.</summary>
+  private const string _MATROSKA_CODEC_ID = "V_MJPEG";
+
   public static string CodecName => "Motion JPEG";
 
   /// <summary>
-  /// Takes a stream tagged <c>MJPG</c> or <c>jpeg</c>, in either case.
+  /// Takes a stream tagged <c>MJPG</c> or <c>jpeg</c> in either case, or named <c>V_MJPEG</c>.
   /// </summary>
   /// <remarks>
   /// ffprobe reads a container patched from <c>MJPG</c> to <c>mjpg</c> as the same codec with the
   /// same frame count, so a decoder that took only one spelling would refuse a file every other tool
   /// plays.
   /// <para/>
-  /// The second code is the same codec under the name a different container gives it: ffmpeg's MOV
-  /// muxer writes <c>jpeg</c> into the sample entry where its AVI muxer writes <c>MJPG</c>, for
-  /// streams that are byte for byte the same JPEGs. Two codes and one codec is exactly the case the
-  /// demux/decode split is for — the codec collects the spellings, and neither container has to know
-  /// what the other calls it.
+  /// The other two are the same codec under the names different containers give it: ffmpeg's MOV
+  /// muxer writes <c>jpeg</c> into the sample entry where its AVI muxer writes <c>MJPG</c>, and its
+  /// Matroska muxer writes no code at all but a <c>CodecID</c> of <c>V_MJPEG</c> — for streams that
+  /// are byte for byte the same JPEGs. Three spellings and one codec is exactly the case the
+  /// demux/decode split is for: the codec collects the spellings, and no container has to know what
+  /// the others call it.
   /// </remarks>
   public static bool Accepts(MediaStreamInfo stream) {
     System.ArgumentNullException.ThrowIfNull(stream);
 
     return stream.Kind == MediaStreamKind.Video
-           && (stream.Codec.EqualsIgnoringCase(_MJPG) || stream.Codec.EqualsIgnoringCase(_JPEG));
+           && (stream.Codec.EqualsIgnoringCase(_MJPG)
+               || stream.Codec.EqualsIgnoringCase(_JPEG)
+               || string.Equals(stream.CodecId, _MATROSKA_CODEC_ID, System.StringComparison.OrdinalIgnoreCase));
   }
 
   public static MotionJpegDecoder Create(MediaStreamInfo stream) {
