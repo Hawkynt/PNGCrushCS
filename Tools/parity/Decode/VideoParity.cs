@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -105,6 +106,66 @@ internal static class VideoParity {
       }
     }
   }
+
+  /// <summary>
+  /// Every packet a container hands out, in the columns ffprobe prints them in — <c>--packets</c>.
+  /// </summary>
+  /// <remarks>
+  /// The one measurement a demuxer can be held to. <c>--frames</c> compares pictures and so can only
+  /// be run against a stream something here decodes, which leaves every container carrying a codec
+  /// this project has not written — most of them — with nothing to be checked against at all. Packets
+  /// need no codec: the count, the order, the sizes and the timestamps are the container's own work,
+  /// and ffprobe prints exactly those for any file it opens.
+  /// <para/>
+  /// The columns are ffprobe's, so that
+  /// <c>ffprobe -v error -show_entries packet=stream_index,pts,dts,size,flags -of csv=p=0</c> and this
+  /// can be compared line for line. A size that differs is the thing worth chasing: a container's own
+  /// framing is not payload, and a reader that hands out its tag headers along with the frame reports
+  /// a packet larger than the one every other tool sees.
+  /// </remarks>
+  internal static int WritePackets(FileInfo file) {
+    byte[] bytes;
+    try {
+      bytes = File.ReadAllBytes(file.FullName);
+    } catch (Exception failure) {
+      Console.Error.WriteLine($"{file.Name}: {failure.GetType().Name}: {failure.Message}");
+      return 1;
+    }
+
+    var containers = ContainersClaiming(file);
+    if (containers.Count == 0) {
+      Console.Error.WriteLine($"no container claims {file.Name}");
+      return 2;
+    }
+
+    var entry = containers[0];
+    try {
+      foreach (var stream in entry.ReadStreams(bytes))
+        Console.Error.WriteLine(
+          $"# stream {stream.Index} {stream.Kind.ToString().ToLowerInvariant()} '{stream.Codec}' handler '{stream.Handler}'"
+          + $" {(stream.Width > 0 ? $"{stream.Width}x{stream.Height}" : "-")} time base {stream.TimeBase} rate {stream.FrameRate}"
+          + $" extradata {stream.CodecPrivateData.Length}");
+
+      var count = 0;
+      foreach (var packet in entry.ReadPackets(bytes)) {
+        Console.WriteLine(
+          $"{packet.StreamIndex},{_Stamp(packet.PresentationTimestamp)},{_Stamp(packet.DecodeTimestamp)},"
+          + $"{packet.Data.Length},{(packet.IsKeyFrame ? "K__" : "___")}");
+        ++count;
+      }
+
+      Console.Error.WriteLine($"# {entry.Name}: {count} packet(s)");
+      return 0;
+    } catch (Exception failure) {
+      // Half a walk is not a walk. Whatever came out before the refusal has already been printed, so
+      // the refusal itself has to be loud or a truncated read reads as a complete one.
+      Console.Error.WriteLine($"{file.Name}: {entry.Name} refused — {failure.GetType().Name}: {failure.Message}");
+      return 1;
+    }
+  }
+
+  /// <summary>A timestamp the way ffprobe prints one, which for an absent one is <c>N/A</c>.</summary>
+  private static string _Stamp(long? value) => value?.ToString(CultureInfo.InvariantCulture) ?? "N/A";
 
   /// <summary>Which containers would take this file if its name were not in the way — <c>--anyformat</c>.</summary>
   internal static void Describe(FileInfo file) {

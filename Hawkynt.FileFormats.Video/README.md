@@ -30,6 +30,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | Container | Extensions | Read | Write |
 | --- | --- | --- | --- |
 | AVI (RIFF) | `.avi` | Y | — |
+| Flash Video (FLV) | `.flv`, `.f4v` | Y | — |
 | ISO base media (MP4, QuickTime, 3GP) | `.mp4`, `.m4v`, `.mov`, `.qt`, `.3gp`, `.3g2`, `.m4a` | Y | — |
 | Matroska / WebM (EBML) | `.mkv`, `.mka`, `.mks`, `.mk3d`, `.webm` | Y | — |
 | MPEG program stream (MPEG-1, MPEG-2, VOB) | `.mpg`, `.mpeg`, `.vob`, `.m2p`, `.m2ps` | Y | — |
@@ -72,6 +73,13 @@ Matroska names its codecs with strings rather than four-character codes, so a st
 a `CodecId` and no tag — the exception being `V_MS/VFW/FOURCC`, whose `BITMAPINFOHEADER` holds a real
 code. A stream whose blocks were compressed, header-stripped or encrypted before being written is
 refused by name rather than handed on as frames it is not.
+
+FLV is the one container here that declares nothing. Its nine-byte header says whether sound and
+pictures are present and stops, so the streams are discovered from the tags and each codec from the
+first tag belonging to it — which also means the streams are numbered in the order their first tag
+appears, as ffprobe numbers them. Two payload shapes are not frames and never become packets: an AVC
+sequence header, whose configuration record becomes the stream's private data, and an AAC one, which
+does the same.
 
 A stream coded with anything else is refused by name — the code, or the container's own name for the
 codec where it has one — rather than half decoded into noise.

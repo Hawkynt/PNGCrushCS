@@ -273,6 +273,30 @@ c_mpeg4.avi (6138 bytes) — 0 image format(s) and 1 container(s) claim .avi
 before it starts walking, so a container whose codec is missing says so rather than quietly writing
 no frames — which is what a container holding no packets also looks like.
 
+## Demuxer parity
+
+```sh
+dotnet run --project Tools/parity/Decode -- --packets "$file"
+ffprobe -v error -show_entries packet=stream_index,pts,dts,size,flags -of csv=p=0 "$file"
+```
+
+The two print the same four columns in the same order, so they compare line for line. This is the
+only measurement a demuxer can be held to across the board: `--frames` compares pictures and so needs
+a codec, which leaves every container carrying one this project has not written — most of them — with
+nothing to be checked against. How many packets, in what order, how big, and when each is due is the
+container's own work and needs no decoder at all.
+
+A size that differs is the thing worth chasing rather than adjusting. A container's own framing is
+not payload, and every container spends some bytes on it before the coded ones start — a reader that
+hands those over reports every packet larger than every other tool does, and one that drops too many
+reports it smaller. Two errors that cancel are not a match.
+
+Add `-fflags +noparse` to the ffprobe side when comparing a format whose elementary streams ffmpeg
+runs a codec parser over, which for MPEG's multiplexes it does by default. With the parser on, what
+ffprobe prints is not the demuxer's packets: it re-splits them into codec access units, so one PES
+packet of sound comes back as the fourteen AAC frames inside it. That is a parser's work and not a
+demuxer's, and `+noparse` turns it off and prints what the demuxer actually produced.
+
 Sweeping the corpus with RECOIL and comparing turned up 44 formats where it reads a sample and we do
 not, or where we both read one and disagree. Two of those disagreements were the sweep's own fault:
 it normalised our size to the reference tool's with `-resize`, which interpolates, when a machine

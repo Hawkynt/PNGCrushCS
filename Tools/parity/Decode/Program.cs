@@ -10,6 +10,7 @@ if (args.Length < 1) {
   Console.Error.WriteLine("       Decode --implausible <sample directory>");
   Console.Error.WriteLine("       Decode --extensions");
   Console.Error.WriteLine("       Decode --frames <file> <output directory>");
+  Console.Error.WriteLine("       Decode --packets <file>");
   Console.Error.WriteLine("       Decode --why <file>...");
   Console.Error.WriteLine("       Decode --anyformat <file>...");
   return 2;
@@ -76,6 +77,25 @@ if (args[0] == "--anyformat") {
   }
 
   return 0;
+}
+
+// Every packet a container hands out, so that a demuxer can be measured without a decoder standing
+// between it and the answer.
+//
+// --frames is the picture comparison and needs a codec; most containers carry codecs this project has
+// not written, and for those it can say nothing at all. Packets are the demuxer's own work — how many,
+// in what order, how big, and when each is due — and ffprobe prints the same four columns for any
+// file it opens, so the two outputs compare line for line:
+//
+//   Decode --packets <file>
+//   ffprobe -v error -show_entries packet=stream_index,pts,dts,size,flags -of csv=p=0 <file>
+if (args[0] == "--packets") {
+  if (args.Length < 2) {
+    Console.Error.WriteLine("usage: Decode --packets <file>");
+    return 2;
+  }
+
+  return VideoParity.WritePackets(new FileInfo(args[1]));
 }
 
 if (args[0] == "--why") {
