@@ -30,12 +30,20 @@ who wants one frame of a two-hour recording pays for one frame.
 | Container | Extensions | Read | Write |
 | --- | --- | --- | --- |
 | AVI (RIFF) | `.avi` | Y | — |
+| ISO base media (MP4, QuickTime, 3GP) | `.mp4`, `.m4v`, `.mov`, `.qt`, `.3gp`, `.3g2`, `.m4a` | Y | — |
 | Motion JPEG stream | `.mjpg`, `.mjpeg` | Y | — |
 
 | Codec | Tag | Decode | Encode |
 | --- | --- | --- | --- |
 | Uncompressed (`BI_RGB`) | 0 | Y | — |
-| Motion JPEG | `MJPG`, `mjpg` | Y | — |
+| Motion JPEG | `MJPG`, `mjpg`, `jpeg` | Y | — |
+
+One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
+structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
+is an undivided heap of bytes, and where each packet starts and stops is a computation over five
+tables in `stbl`, which is why a file whose `moov` follows its `mdat` needs no second pass. A
+fragmented file, whose sample tables live in `moof` boxes instead, is refused by name rather than
+read as a film of no packets.
 
 A stream coded with anything else is refused by name — the four-character code and the stream
 handler are both in the message — rather than half decoded into noise.
