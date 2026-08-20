@@ -86,17 +86,33 @@ public static class AvifReader {
       pixelData = new byte[expectedPixelBytes];
       rawImageData.AsSpan(0, expectedPixelBytes).CopyTo(pixelData.AsSpan(0));
     } else if (rawImageData.Length > 0 && _LooksLikeAv1Bitstream(rawImageData)) {
-      // Attempt AV1 decode
+
+      // The catch here used to hand back a buffer of zeroes and report success, so an AVIF that
+      // every other tool reads came out of this one as a black rectangle of the right size. A
+      // 61x37 picture from ImageMagick decoded to 0 non-zero bytes of 6771 and nothing said so.
+      //
+      // That is the same fallback that was taken out of the HEIF reader, and it is the worst shape
+      // a defect takes here: a wrong picture nothing announces. A caller can do something with a
+      // refusal and can do nothing at all with a plausible black frame.
       try {
         var (decW, decH, rgbData) = Av1FrameDecoder.Decode(rawImageData, 0, rawImageData.Length);
         width = decW;
         height = decH;
         pixelData = rgbData;
-      } catch {
-        // AV1 decode failed: return container-level data only
-        pixelData = new byte[expectedPixelBytes > 0 ? expectedPixelBytes : 0];
+      } catch (Exception failure) {
+        throw new NotSupportedException(
+          $"AVIF: the picture is AV1-coded and this decoder did not get through it ({failure.Message}). "
+          + $"The container's extent is readable — {width}x{height} — but the pixels are not, and a "
+          + "raster of zeroes is not an answer.", failure);
       }
-    }
+    } else if (rawImageData.Length > 0)
+
+      // Neither our own uncompressed payload nor anything recognisable as AV1. Falling through left
+      // PixelData empty while Width and Height still stated a picture, which reads downstream as a
+      // successful decode of nothing.
+      throw new NotSupportedException(
+        $"AVIF: the item's payload is {rawImageData.Length} bytes, which is neither an uncompressed "
+        + $"raster for {width}x{height} nor an AV1 bitstream this reader recognises.");
 
     return new AvifFile {
       Width = width,
