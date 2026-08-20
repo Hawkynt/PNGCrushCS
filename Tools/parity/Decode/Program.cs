@@ -17,9 +17,15 @@ if (args.Length < 1) {
 
 // Every extension anything here claims, for comparing against a tool that publishes a list rather
 // than being installable — which is the only way to measure one that runs as somebody's web service.
+//
+// Both registries, because the comparison this feeds divides what we read by what we could read, and
+// leaving the containers out shrinks both halves silently: a .mov the reference tool lists and this
+// one did not would count as neither a hit nor a miss. The two lists are merged rather than printed
+// apart because a name claimed on both sides is still one name to whatever is being compared against.
 if (args[0] == "--extensions") {
   foreach (var extension in FormatRegistry.AllFormats
              .SelectMany(entry => entry.AllExtensions ?? Array.Empty<string>())
+             .Concat(VideoParity.Extensions())
              .Select(x => x.ToLowerInvariant())
              .Distinct()
              .OrderBy(x => x, StringComparer.Ordinal))
@@ -245,64 +251,6 @@ if (args[0] == "--encode") {
   }
 
   Console.WriteLine($"{wanted.Name}: {new FileInfo(args[3]).Length} bytes from {source.Width}x{source.Height}");
-  return 0;
-}
-
-// Every frame of a multi-frame file, rather than only the one the ordinary decode writes.
-//
-// The bulk decode below writes a single picture per sample, which is the right measurement for the
-// several hundred formats holding one. It is not a measurement at all for the two dozen holding a
-// sequence: a container whose frames are all decoded from the first chunk, or whose frame list is
-// off by one, writes exactly the same first frame as a correct one and passes. This writes them all,
-// numbered, so an oracle's own per-frame extraction can be compared against ours frame by frame.
-//
-//   Decode --frames <file> <output directory>
-if (args[0] == "--frames") {
-  if (args.Length < 3) {
-    Console.Error.WriteLine("usage: Decode --frames <file> <output directory>");
-    return 2;
-  }
-
-  var source = new FileInfo(args[1]);
-  var destination = args[2];
-  Directory.CreateDirectory(destination);
-
-  var format = FormatRegistry.AllFormats.FirstOrDefault(entry
-    => entry.GetImageCount != null
-       && entry.AllExtensions?.Any(e => string.Equals(e, source.Extension, StringComparison.OrdinalIgnoreCase)) == true);
-
-  if (format == null) {
-    Console.Error.WriteLine($"no multi-frame format claims {source.Extension}");
-    return 2;
-  }
-
-  // Through the throwing entry point: a container this cannot read has to say so here rather than
-  // report zero frames, which is what the silent one would do and is indistinguishable from a file
-  // that really holds none.
-  format.LoadRawImageOrThrow?.Invoke(source);
-
-  var frameCount = format.GetImageCount!(source);
-  var stem = Path.GetFileNameWithoutExtension(source.Name);
-  for (var index = 0; index < frameCount; ++index) {
-    var frame = format.LoadRawImageAtIndex?.Invoke(source, index);
-    if (frame == null) {
-      Console.Error.WriteLine($"{format.Name}: frame {index} of {frameCount} did not decode");
-      return 1;
-    }
-
-    var rgb = frame.ToRgb24();
-    var wanted = (long)frame.Width * frame.Height * 3;
-    if (rgb.LongLength < wanted) {
-      Console.Error.WriteLine($"{format.Name}: frame {index} produced {rgb.LongLength} bytes where {wanted} were needed");
-      return 1;
-    }
-
-    using var file = File.Create(Path.Combine(destination, $"{stem}_{index:00}.ppm"));
-    file.Write(Encoding.ASCII.GetBytes($"P6\n{frame.Width} {frame.Height}\n255\n"));
-    file.Write(rgb, 0, (int)wanted);
-  }
-
-  Console.WriteLine($"{format.Name}: {frameCount} frame(s) from {source.Name}");
   return 0;
 }
 

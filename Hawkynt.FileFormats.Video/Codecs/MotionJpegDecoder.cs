@@ -21,20 +21,30 @@ public sealed class MotionJpegDecoder : IVideoCodecDecoder<MotionJpegDecoder> {
   /// <summary><c>MJPG</c> as it sits in a little-endian four-character code field.</summary>
   private static readonly CodecTag _MJPG = CodecTag.FromCharacters("MJPG");
 
+  /// <summary>What the same codec is called in an ISO base media file's sample entry.</summary>
+  private static readonly CodecTag _JPEG = CodecTag.FromCharacters("jpeg");
+
   public static string CodecName => "Motion JPEG";
 
   /// <summary>
-  /// Takes a stream tagged <c>MJPG</c> in either case.
+  /// Takes a stream tagged <c>MJPG</c> or <c>jpeg</c>, in either case.
   /// </summary>
   /// <remarks>
   /// ffprobe reads a container patched from <c>MJPG</c> to <c>mjpg</c> as the same codec with the
   /// same frame count, so a decoder that took only one spelling would refuse a file every other tool
   /// plays.
+  /// <para/>
+  /// The second code is the same codec under the name a different container gives it: ffmpeg's MOV
+  /// muxer writes <c>jpeg</c> into the sample entry where its AVI muxer writes <c>MJPG</c>, for
+  /// streams that are byte for byte the same JPEGs. Two codes and one codec is exactly the case the
+  /// demux/decode split is for — the codec collects the spellings, and neither container has to know
+  /// what the other calls it.
   /// </remarks>
   public static bool Accepts(MediaStreamInfo stream) {
     System.ArgumentNullException.ThrowIfNull(stream);
 
-    return stream.Kind == MediaStreamKind.Video && stream.Codec.EqualsIgnoringCase(_MJPG);
+    return stream.Kind == MediaStreamKind.Video
+           && (stream.Codec.EqualsIgnoringCase(_MJPG) || stream.Codec.EqualsIgnoringCase(_JPEG));
   }
 
   public static MotionJpegDecoder Create(MediaStreamInfo stream) {

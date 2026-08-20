@@ -24,6 +24,15 @@ using Hawkynt.FileFormats.Video;
 /// </remarks>
 internal static class VideoParity {
 
+  /// <summary>Every extension a registered container claims.</summary>
+  /// <remarks>
+  /// Part of the denominator of the comparison and not a separate list: a name this project reads is
+  /// read whether the thing behind it is a still or a film, and counting only the stills would make
+  /// every container we do read look like one we do not.
+  /// </remarks>
+  internal static IEnumerable<string> Extensions()
+    => VideoFormatRegistry.AllFormats.SelectMany(entry => entry.AllExtensions ?? Array.Empty<string>());
+
   /// <summary>The containers that claim a file, by its bytes first and then by its name.</summary>
   /// <remarks>
   /// The bytes come first because they are what the writer wrote. The name is consulted as well
