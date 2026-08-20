@@ -36,6 +36,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | MPEG program stream (MPEG-1, MPEG-2, VOB) | `.mpg`, `.mpeg`, `.vob`, `.m2p`, `.m2ps` | Y | — |
 | Motion JPEG stream | `.mjpg`, `.mjpeg` | Y | — |
 | MPEG-1 video elementary stream | `.m1v`, `.mpv`, `.mpeg1video` | Y | — |
+| MPEG-2 transport stream (also Blu-ray, AVCHD) | `.ts`, `.m2ts`, `.mts`, `.m2t`, `.tsv` | Y | — |
 
 | Codec | Tag | Decode | Encode |
 | --- | --- | --- | --- |
@@ -80,6 +81,15 @@ first tag belonging to it — which also means the streams are numbered in the o
 appears, as ffprobe numbers them. Two payload shapes are not frames and never become packets: an AVC
 sequence header, whose configuration record becomes the stream's private data, and an AAC one, which
 does the same.
+
+A transport stream is the one container here that was not designed for a file. It is a broadcast, so
+there is no index, no directory and no header: the streams are found by reading the tables the
+multiplex repeats — the program association table at PID 0, then a program map per program — and a
+coded unit is reassembled out of the 188-byte packets it was cut into, which is also why its packets
+are copies rather than windows onto the file. Blu-ray and AVCHD put a four-byte arrival timecode in
+front of every packet, so the stride is 192 rather than 188; which of the two a file uses is measured
+from its sync bytes rather than taken from its name. A lost packet is caught by the continuity
+counter and refused by name, because a unit assembled across one is a frame with a hole in it.
 
 A stream coded with anything else is refused by name — the code, or the container's own name for the
 codec where it has one — rather than half decoded into noise.
