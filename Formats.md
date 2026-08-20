@@ -789,10 +789,12 @@ Formats we consciously chose not to implement, with reason codes:
 - **unidentified** — What the extension names could not be established from any
   source worth trusting
 
-¹ Out of scope for the *image* library, not for the repository: AVI and raw Motion
-JPEG are read by `Hawkynt.FileFormats.Video`, which demuxes containers and decodes
-codecs as separate concerns. Their frames are the same `RawImage` this table's
-formats produce.
+¹ Out of scope for the *image* library, not for the repository: AVI, raw Motion
+JPEG and MPEG-1 video elementary streams are read by `Hawkynt.FileFormats.Video`,
+which demuxes containers and decodes codecs as separate concerns. Their frames are
+the same `RawImage` this table's formats produce. A `.mpg` — an MPEG program
+stream, which multiplexes video with audio — is not read; the video elementary
+stream inside one is.
 
 | Format            | Extensions  | Reason       | Tom's | IM  | XnView | IrfanView |
 | ----------------- | ----------- | ------------ | ----- | --- | ------ | --------- |
@@ -822,6 +824,7 @@ formats produce.
 | Pocket PC Theme   | .tsk        | embeds-images| —     | —   | R      | —         |
 | PowerPoint        | .ppt, .pps  | embeds-images| —     | —   | R      | —         |
 | SVG               | .svg        | vector       | R     | RW  | R      | R         |
+| MPEG-1 video      | .m1v, .mpv  | video ¹      | R     | —   | —      | —         |
 | MPEG video        | .mpg, .mpeg | video        | R     | —   | —      | —         |
 
 Five of those were looked at in detail, because a name a viewer opens is not the

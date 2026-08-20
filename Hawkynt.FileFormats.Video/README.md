@@ -32,11 +32,13 @@ who wants one frame of a two-hour recording pays for one frame.
 | AVI (RIFF) | `.avi` | Y | — |
 | ISO base media (MP4, QuickTime, 3GP) | `.mp4`, `.m4v`, `.mov`, `.qt`, `.3gp`, `.3g2`, `.m4a` | Y | — |
 | Motion JPEG stream | `.mjpg`, `.mjpeg` | Y | — |
+| MPEG-1 video elementary stream | `.m1v`, `.mpv`, `.mpeg1video` | Y | — |
 
 | Codec | Tag | Decode | Encode |
 | --- | --- | --- | --- |
 | Uncompressed (`BI_RGB`) | 0 | Y | — |
 | Motion JPEG | `MJPG`, `mjpg`, `jpeg` | Y | — |
+| MPEG-1 video (ISO/IEC 11172-2) | `MPG1`, `PIM1`, `mp1v` | Y | — |
 
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
@@ -47,6 +49,23 @@ read as a film of no packets.
 
 A stream coded with anything else is refused by name — the four-character code and the stream
 handler are both in the message — rather than half decoded into noise.
+
+### MPEG-1 video
+
+I, P and B pictures, with the full block layer: the Annex B variable-length codes, dequantisation
+against the default and any loaded quantiser matrices, the inverse transform, and motion compensation
+at half-pixel resolution in both directions. Frames come out in display order, so an anchor is held
+until the next one arrives and `Flush` is not empty at the end of a stream.
+
+Thirty-one encoded streams were compared with ffmpeg's decode of the same bitstream, plane by plane
+and frame by frame: sixteen match byte for byte against ffmpeg's floating-point inverse transform and
+the rest differ in at most thirty-two samples of one frame, by one level, without growing across a
+group of pictures. That residual is the transform's, which ISO/IEC 11172-2 specifies as a formula
+with an accuracy bound rather than as an algorithm; ffmpeg's own two transforms differ from each other
+by more.
+
+What is not implemented refuses and says so: D pictures, an MPEG-2 sequence extension, and a picture
+size that changes while pictures predicted from the old one are still held.
 
 ## 📜 License
 
