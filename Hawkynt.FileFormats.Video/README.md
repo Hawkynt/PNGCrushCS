@@ -31,6 +31,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | --- | --- | --- | --- |
 | AVI (RIFF) | `.avi` | Y | — |
 | ISO base media (MP4, QuickTime, 3GP) | `.mp4`, `.m4v`, `.mov`, `.qt`, `.3gp`, `.3g2`, `.m4a` | Y | — |
+| MPEG program stream (MPEG-1, MPEG-2, VOB) | `.mpg`, `.mpeg`, `.vob`, `.m2p`, `.m2ps` | Y | — |
 | Motion JPEG stream | `.mjpg`, `.mjpeg` | Y | — |
 | MPEG-1 video elementary stream | `.m1v`, `.mpv`, `.mpeg1video` | Y | — |
 
@@ -46,6 +47,17 @@ is an undivided heap of bytes, and where each packet starts and stops is a compu
 tables in `stbl`, which is why a file whose `moov` follows its `mdat` needs no second pass. A
 fragmented file, whose sample tables live in `moof` boxes instead, is refused by name rather than
 read as a film of no packets.
+
+An MPEG program stream states its packet boundaries even less than that. It chops each elementary
+stream into PES packets sized to fill 2048-byte packs, so a picture routinely spans two of them and
+one of them routinely holds seven pictures. The payloads are stitched back together and cut again
+where the elementary stream itself says a picture starts, which makes a packet the coded picture a
+decoder wants with nothing of the container left in it — measured against `ffprobe -fflags +nofillin`
+on eleven files, agreeing on every packet's size and timestamp, and reproducing ffmpeg's own extracted
+elementary stream byte for byte. Its two systems standards, ISO/IEC 11172-1 and ISO/IEC 13818-1, share
+one reader and one start code and no layout at all; which of them a file is, is read off its first
+pack header, because a program stream has no version field, no index and no header listing its
+streams.
 
 A stream coded with anything else is refused by name — the four-character code and the stream
 handler are both in the message — rather than half decoded into noise.
