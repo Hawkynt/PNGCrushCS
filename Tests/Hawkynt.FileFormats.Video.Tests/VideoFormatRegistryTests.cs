@@ -130,18 +130,21 @@ public sealed class VideoFormatRegistryTests {
   [Test]
   [Category("Unit")]
   public void AnUnknownCodecIsRefusedByItsFourCharacterCode() {
+    // AV1, which nothing here decodes. The codec this test used to name was VP9, and it had to be
+    // given another one when VP9 gained a decoder — a test that stands for "a code nothing reads"
+    // has to keep being given a code nothing reads.
     var stream = new MediaStreamInfo {
       Index = 0,
       Kind = MediaStreamKind.Video,
-      Codec = CodecTag.FromCharacters("VP90"),
-      Handler = CodecTag.FromCharacters("vp09"),
+      Codec = CodecTag.FromCharacters("AV01"),
+      Handler = CodecTag.FromCharacters("av01"),
     };
 
     Assert.That(VideoFormatRegistry.CanDecode(stream), Is.False);
 
     var failure = Assert.Throws<NotSupportedException>(() => VideoFormatRegistry.CreateDecoder(stream));
-    Assert.That(failure!.Message, Does.Contain("VP90"));
-    Assert.That(failure.Message, Does.Contain("vp09"));
+    Assert.That(failure!.Message, Does.Contain("AV01"));
+    Assert.That(failure.Message, Does.Contain("av01"));
   }
 
   [Test]
