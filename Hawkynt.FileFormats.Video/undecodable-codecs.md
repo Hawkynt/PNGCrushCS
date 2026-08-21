@@ -1,8 +1,5 @@
 # Codecs investigated and not implemented
 
-Fourteen codecs were investigated and none was implemented. That is a result rather than a gap, and it
-is written down here so the work is not repeated by somebody who assumes it was never attempted.
-
 Fifteen codecs were investigated and none was implemented. That is a result rather than a gap, and it is
 written down here so the work is not repeated by somebody who assumes it was never attempted.
 
@@ -15,12 +12,14 @@ completely, and the entropy coder inside it is defined by the rounding behaviour
 floating-point unit rather than by anything written down. DV stops at a fourth: its own frame layer is
 recovered and measured directly against real files, but its two central tables — the entropy code and
 the macroblock shuffle — live only in a standard that is not free to read and, for one of them, in
-exactly one secondary source this project cannot fully trust on its own. MSS1, MSS2 and Canopus HQ,
-HQA and HQX are a variant of the first place rather than a fifth: their tables are undocumented too, but
-the evidence is a detailed write-up that turns out to be somebody else's reverse-engineering notes
-rather than a file too small to hold what is needed. Where each stops is recorded below.
-
-None of the fourteen had anything committed.
+exactly one secondary source this project cannot fully trust on its own. MSS1, MSS2, Canopus HQ, HQA
+and HQX, and MSZH are a variant of the first place rather than a fifth: their tables or their coder are
+undocumented too, but the evidence is a detailed write-up that turns out to be somebody else's
+reverse-engineering notes, or no description at all, rather than a file too small to hold what is
+needed. Escape 124 and SpeedHQ stop closer to the finish than any of the rest: each has its container
+and most of its bitstream recovered and verified against real files, with one specific, narrow piece —
+a skip-count coding for Escape 124, some unknown number of reassigned coefficient codewords for SpeedHQ
+— that this project's evidence could narrow down but not close. Where each stops is recorded below.
 
 None of the fifteen had anything committed.
 
@@ -940,6 +939,117 @@ directly once the bitstream position feeding it is trustworthy. Failing that, a 
 sample decoded far enough to cross-check the byte-alignment and codebook-2-multiplier findings above
 against more than one data point apiece would narrow the search considerably, even without a published
 skip-count rule to confirm against.
+
+# NewTek SpeedHQ, an MPEG-2-shaped codec that agrees with the real standard almost everywhere and not quite everywhere
+
+SpeedHQ (`SHQ0` through `SHQ5`, `SHQ7`, `SHQ9`) was investigated as the next professional/intermediate
+codec after Hap, on the strength of MultimediaWiki's own note for it — unlike Canopus's pages above,
+this one states plainly that "NewTek has provided samples and support in understanding the format,"
+and ffmpeg carries a real encoder as well as a decoder, so a corpus could be built to order rather than
+found. It stops closer to working than any other entry in this file: the container, the field and slice
+framing, and the DC coefficient layer all check out exactly against real ISO/IEC 13818-2 tables this
+package already carries from its own MPEG-2 decoder, and dozens of whole blocks of real AC coefficients
+decode cleanly against the same standard's Table B.15 — but at least one codeword does not match it,
+and this investigation could not determine which of several equally-close candidates, if any, is the
+real one.
+
+## What the page states in prose, and what it prints as ffmpeg's own array
+
+The MultimediaWiki "SpeedHQ" page is unusual among this file's sources for saying, in its own words,
+that the vendor cooperated in writing it — a materially different footing from Canopus's silent papers
+or MSS1/MSS2's unattributed page above. Most of it reads as genuine independent description: the field
+and slice framing, the macroblock and block layout, the quantisation matrix and the allowed-quality
+table, the DC prediction rule, and a prose account of alpha coding for the variants that carry it. One
+part of the page is not independent description, and says so itself: a block of code headed "In FFmpeg
+format, the codes are (except that they would need to be bit-reversed due to `INIT_VLC_LE` demands)",
+printing `static const uint16_t speedhq_vlc[123][2]`, `speedhq_level[121]` and `speedhq_run[121]` —
+C array declarations, ffmpeg's own variable names, and a comment about ffmpeg's own bit-reader macro.
+That block is `libavcodec/speedhq.c` copied out, not documentation of it, and this project does not
+transcribe or translate ffmpeg source regardless of who else contributed to the page it is quoted on.
+It was read to know it exists and not used for a single bit pattern.
+
+## What was verified independently of that array
+
+A corpus was built with ffmpeg's own `speedhq` encoder — small `testsrc2` frames, both chroma
+subsamplings the encoder writes (`yuv420p`, `yuv422p`), quality settings from `-qscale:v` 2 to 20 — and
+read directly, byte by byte and bit by bit, against nothing but the page's prose and this project's own
+already-verified MPEG-2 tables.
+
+  - **The frame header** matches the page's own description on every file tried: byte 0 is a quality
+    value with the quantiser equal to `100 - quality`, and the following three bytes are a little-endian
+    offset to a second field — every file from ffmpeg's encoder states an offset of exactly 4, the page's
+    own documented exception meaning a single progressive field rather than two interlaced ones, and
+    every file's remaining bytes divide cleanly into that single field's slices with nothing left over
+    but sub-byte padding.
+  - **Bits are packed into 32-bit little-endian words and read from the least significant bit**, exactly
+    as stated: reading a slice's bytes four at a time as little-endian words and concatenating each
+    word's bits from bit 0 upward reproduces a linear bitstream in which every code below decodes cleanly
+    in sequence; reading big-endian, or most-significant-bit first, does not get past the first slice's
+    first block on any file tried.
+  - **Slice chaining by a three-byte length prefix, including its own three bytes**, holds exactly:
+    walking a field's bytes by each slice's own stated length lands precisely on the next slice's length
+    field, with zero bytes left over past the last slice on every file tried, and the number of slices
+    found always matches the field height divided by sixteen, rounded up.
+  - **DC coefficients decode with ISO/IEC 13818-2's own Table B.12 (luminance) and Table B.13
+    (chrominance)** — the exact tables this package's `MpegVlcTables.cs` already carries, transcribed
+    from the standard for its own MPEG-2 decoder and reused here unchanged — together with the page's
+    stated twist: **prediction restarts at 1024 at the start of each macroblock row, and the coded
+    differential is subtracted from the prediction rather than added.** On a flat test frame, every
+    block's coded differential and its effect on the running prediction were checked by hand against the
+    frame's own uniform pixel value and came out exact; on textured frames, the predicted-then-corrected
+    DC values move in the direction the source image's own gradients do, block by block, which a wrong
+    table or a wrong sign would not produce.
+
+## What was verified about the AC table, and where it stops
+
+Real ISO/IEC 13818-2 Table B.15 — the second AC coefficient table, `MpegVlcTables.cs`'s own
+`IntraCoefficient`, used for exactly the intra-only purpose SpeedHQ needs it for — was tried unmodified
+as the AC coding, with the escape code read as the page states: six bits of run, twelve bits of level
+offset by 2048. Across a dozen full macroblocks spread over several files, whole sequences of blocks —
+DC through every AC coefficient to a terminating End of Block — decode with no unmatched code, run and
+level values that stay small and plausible for real image content, and a slice's total bits consumed
+landing within a handful of padding bits of the slice's own stated length. That is not the signature of
+a wrong table: a table wrong in enough places to matter would drift a slice's bit count by much more
+than padding across dozens of blocks, the same reasoning this project applies to Ut Video's and
+MagicYUV's Huffman tables when their bit budgets close exactly.
+
+It is not a hundred per cent match either. On a 64x32 `testsrc2` frame encoded at `-qscale:v 20`
+(quantiser 40), the first macroblock's first two luma blocks decode completely — DC 1806 then 1694,
+every AC coefficient found, both ending in a clean End of Block — and its third luma block's DC (1751)
+and first AC coefficient (run 0, level 2) also decode cleanly, immediately followed, at bit 169 of the
+slice, by a twelve-bit sequence — `000000011101` — that is not any code in Table B.15 at all. It is not
+merely close to one wrong reading either: it sits at a Hamming distance of exactly one bit from four
+different Table B.15 codes at that same length — `(run=3, level=3)`, `(run=7, level=2)`, `(run=17,
+level=1)` and `(run=19, level=1)` — and distance two from three more, which rules out guessing a single
+bit flip as the fix. Nothing short of independently knowing which coefficient the encoder actually
+intended at that position — computed from the source picture through SpeedHQ's own stated
+dequantisation and forward transform, the way this project's VP6 investigation used a forward DCT of
+ffmpeg's decoded output as ground truth — would settle which candidate, if any, is real, and building
+that ground-truth harness was not completed in the time this investigation had.
+
+## Why this is not the same wall as Canopus, MSS1, MSS2 or DV above
+
+Every other entry in this file that stops at a missing table stops because no independent description
+of the table exists at all, or because the encoder needed to drive a corpus toward a specific codeword
+does not exist. Neither is true here: ffmpeg's `speedhq` encoder writes real files to order, the vendor
+is credited with helping write the documentation, and the great majority of both the DC and the AC
+tables were confirmed, not assumed, against real bitstreams using tables this project already owns from
+the ISO standard. What stops it is narrower and more specific — a small number of codewords, of unknown
+count, that the page's own prose says are "moved around" relative to real MPEG-2 without saying where to
+or how many — and closing that gap needs either a description of exactly which codewords differ from a
+source that is not ffmpeg's own array, or the forward-transform ground-truth work this investigation
+did not reach.
+
+## What would change the answer
+
+A statement of which Table B.15 codewords SpeedHQ reassigns and to what, from a source that is not
+`libavcodec/speedhq.c` or a page quoting it — even a handful of examples would likely be enough to
+recognise the pattern, if there is one, across the rest of the table. Failing that, a forward-DCT
+ground-truth harness built from the page's own stated quantisation (a fixed DC divisor of 16, the
+printed 8x8 matrix scaled by `100 - quality` for AC and divided by 16 without rounding, and the
+DC-only shortcut `(dc + 4) >> 3`) run against ffmpeg's own decoded pixels would let each divergent
+codeword be resolved by elimination the way this project's VP6 investigation attempted, rather than by
+the single-bit-flip guessing that this investigation's evidence explicitly cannot support.
 
 # Canopus HQ, HQA and HQX, where the vendor's own papers say nothing about the bitstream
 
