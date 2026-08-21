@@ -55,6 +55,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | VP8 (RFC 6386) | `VP80`, `vp08`, `V_VP8` | Y | — |
 | HuffYUV / FFVHUFF | `HFYU`, `FFVH` | Y | — |
 | FFV1 (RFC 9043) | `FFV1`, `V_FFV1` | Y | — |
+| MPEG-4 Part 2 (ISO/IEC 14496-2) | `mp4v`, `XVID`, `DIVX`, `DX50`, `FMP4`, `MP4S`, `M4S2`, `3IV2`, `FVFW`, `RMP4`, `V_MPEG4/ISO/*` | Y | — |
 
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
@@ -427,6 +428,43 @@ What refuses: samples deeper than eight bits, version 2, a coder type or colour 
 specification does not describe, a configuration record or a slice whose checksum does not come out,
 a slice that states a place outside the raster, and a version 0 or 1 stream that opens with a frame
 that is not a keyframe.
+### MPEG-4 Part 2
+
+Intra, predicted and bidirectionally coded pictures at Advanced Simple Profile, less quarter-sample
+motion: the block layer with both coefficient tables and all three escape forms, prediction of an
+intra block's DC and first row or column from its neighbours with the scan that goes with the
+direction chosen, both inverse quantisation methods with the default and any loaded weighting
+matrices, one and four motion vectors per macroblock, vectors that point outside the picture, the
+direct prediction mode of a bidirectionally coded macroblock, and video packets. Frames come out in
+display order, so an anchor is held until the next one arrives and `Flush` is not empty at the end of
+a stream.
+
+A stream in an ISO base media file usually carries its headers in the sample entry rather than in its
+packets, so the codec walks the `esds` descriptor to find them — which is the codec's business and
+not the container's, and is why the container hands over the sample entry verbatim.
+
+Twenty-seven encoded streams, one thousand and eighty-three frames, were compared with ffmpeg's
+decode of the same bitstreams plane by plane and sample by sample — sizes from 64x48 to 352x288,
+quantisers 1 to 25, both quantisation methods, one and four vectors per macroblock, up to four
+bidirectionally coded pictures between anchors, video packets, and groups of pictures from a single
+frame to a hundred. Seventeen of the twenty-seven match on every sample of every frame; the rest
+differ in at most sixty samples of a frame out of thirty-eight thousand, by one level. That residual
+is the transform's, which Annex A specifies as an accuracy bound rather than as an algorithm.
+
+The long streams are the ones that matter. A group of pictures that starts afresh every few frames
+displaces any error before it can be seen, so a wrong reference or a wrong time base looks like
+rounding; the streams here that carry one intra picture and a hundred frames after it are what a
+bidirectionally coded picture's time base is actually measured against.
+
+Two decisions are worth reading the code for, because both are places where following the standard's
+words literally produces a decode that disagrees with every encoder in existence: the mismatch
+control of clause 7.4.4.5 is applied to non-intra blocks only, and the inverse transform rounds an
+exact half to the even value. Each is measured in the remarks beside it.
+
+What is not implemented refuses and says so, naming the clause: quarter-sample motion vectors,
+sprites and global motion compensation, interlaced coding, overlapped block motion compensation, data
+partitioning, scalability, non-rectangular shape, samples of any depth but eight, chroma formats
+other than 4:2:0, newpred, reduced-resolution pictures and the complexity estimation header.
 
 ## 📜 License
 

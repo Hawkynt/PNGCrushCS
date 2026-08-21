@@ -483,7 +483,7 @@ public sealed class Mp4ReaderTests {
   }
 
   [TestCase("hev1")]
-  [TestCase("mp4v")]
+  [TestCase("vp09")]
   [Category("Unit")]
   public void UnsupportedCodec_StillDemuxes(string code) {
     // The refusal is the codec's and not the container's. A file nothing here decodes still comes
