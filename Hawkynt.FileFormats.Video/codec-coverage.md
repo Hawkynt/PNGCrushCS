@@ -132,11 +132,17 @@ scale of this package's H.265 work rather than a gap to be filled in passing.
 `mss1`, `mss2`, `msa1`, `mts2`. Version 2 is done. Versions 1 and 3 are argued in `README.md` to be
 out of reach on evidence: version 3 chooses per picture between ten tables that are Microsoft's own
 and published nowhere, and version 1 has no encoder in existence to derive its tables from or to
-check a guess against. WMV1 is now argued the same way in `undecodable-codecs.md`, on the strength of a
-real encoder that turns out not to matter: its run-level, DC and motion-vector tables are version 3's
+check a guess against. WMV1, WMV2, MSS1 and MSS2 are now argued the same way in
+`undecodable-codecs.md`, each with its own section. WMV1 and WMV2 stop on the strength of a real
+encoder that turns out not to matter: their run-level, DC and motion-vector tables are version 3's
 own, tied to it by two identical escape constants in the one document that gives either version's
 syntax, and the only macroblocks a corpus can locate without those tables are exactly the ones with no
-coded codeword in them to learn the tables from.
+coded codeword in them to learn the tables from; WMV2 adds a private macroblock-type table of its own
+on top of that. MSS1 and MSS2 stop somewhere else: no independent description of their arithmetic
+coder exists, the one detailed write-up tracks libavcodec's own function names down to a shared
+spelling mistake, and MSS2 additionally embeds Windows Media Video 9 rectangles located by the very
+structure that coder would decode. What is left of this family is `msmpeg4v1`, `msmpeg4` (version 3),
+`msp2`, `msa1` and `mts2`.
 
 **On2 and RealVideo** — `vp4`, `vp5`, `vp6`, `vp7`, `rv30`, `rv40`, `rv60`. VP4 and VP6 are the two
 already investigated, and neither is implemented, for two different reasons. VP6's specification is
@@ -221,8 +227,10 @@ codecs, the `xan_*` pair and many more. Almost none has a published specificatio
 on MultimediaWiki from reverse engineering. Their value is preservation rather than reach, and each is
 small.
 
-**Everything else** — `indeo2`, `asv1`, `asv2`, `cljr`, `mdec`, `mimic`, `amv`, `mxpeg`, `sp5x`,
-`truemotion2` and the remainder. TrueMotion 2 is the partial case: it is self-describing and
+**Everything else** — `indeo2`, `asv1`, `asv2`, `mdec`, `mimic`, `amv`, `mxpeg`, `sp5x`,
+`truemotion2` and the remainder. `cljr` came out of this group and reached exact equality; it is the
+one lossy packing among the fixed layouts, measured against ffmpeg's own decode rather than the
+source because its encoder dithers. TrueMotion 2 is the partial case: it is self-describing and
 about two thirds recovered, with the evidence in `undecodable-codecs.md`, and it was deliberately not
 shipped half-working because a wrong block type in a still passage is indistinguishable from the
 codec working.
