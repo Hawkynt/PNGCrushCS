@@ -52,6 +52,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | Microsoft Video 1 | `CRAM`, `MSVC`, `WHAM` | Y | — |
 | Cinepak | `cvid`, `CVID` | Y | — |
 | QuickTime Animation (RLE) | `rle ` | Y | — |
+| Apple Video (RPZA) | `rpza`, `azpr` | Y | — |
 | H.263 (ITU-T H.263 baseline) | `H263`, `s263`, `U263` | Y | — |
 | Sorenson Spark (Flash Video's H.263) | `FLV1` | Y | — |
 | H.264 / AVC, Baseline I and P slices | `avc1`, `avc3`, `H264`, `X264`, `DAVC`, `VSSH`, `V_MPEG4/ISO/AVC` | Y | — |
@@ -401,6 +402,42 @@ every coded block. None of them hands back a picture. That matters more here tha
 because a frame in which nothing changed is a normal thing for a VP3 stream to contain — so a decoder
 that repeated the previous frame on failure would be producing exactly what working looks like.
 
+### Apple Video (RPZA)
+
+A vector quantizer over 4x4 blocks of 15-bit RGB colour, also called Road Pizza, and QuickTime's own
+alternative to Microsoft Video 1: the same one-colour, several-colour and skip shape of coding, over
+blocks read left to right and top to bottom rather than Microsoft's bottom-up bitmap order. A block is
+one colour; a quad of colours, two given by the stream and two built from them by a fixed blend,
+chosen per pixel by a two-bit index; or, one block at a time only, that same quad built inline or
+sixteen colours with nothing shared between them. A run of blocks under one opcode shares one set of
+colours and reads its own index bytes per block, which is what makes a flat run cheap without
+changing which opcode reads it.
+
+Two things measurement decided rather than the format's own documentation, both in the "special"
+opcode — the one whose first byte doubles as a colour rather than naming an operation. Which of its
+two variants a block uses is not decided by that colour's own low byte, tempting as that reading is;
+it is decided by the byte after it, which is also the first byte either variant goes on to read
+regardless of which one it turns out to be. Reading the choice off the wrong byte still produces a
+picture — every byte after it is still there to be read as something — so this was only caught by
+comparing decoded pixels against ffmpeg's, where a real chunk's second block came back as nine
+scattered colours in a block that should hold one. And a standard opcode names four code points; the
+format's documentation describes three and calls the fourth, 0xE0, unused. A real chunk from Apple's
+own QuickTime encoder uses it seven times in one keyframe, and every block it names decodes correctly
+against ffmpeg when read as a second spelling of skip.
+
+Eight streams — QuickTime and AVI, geometry that is and is not a whole number of blocks in either
+direction, 60x64 up to 574x252 — were decoded here and by ffmpeg and compared pixel for pixel on every
+frame: 924 frames, all identical, RGB-native so there is no chroma-siting convention to disagree about.
+The coding is lossy at the encoder and exact at the decoder — every colour a chunk paints with is
+either read from the stream or built from two others by an integer formula the format states in full
+— so there is nothing here for a decoder to round, and none of the 924 frames differ by so much as one
+level.
+
+What refuses: a chunk shorter than its four-byte header, a standard opcode's run reaching past the
+last block, and a chunk that stops before every block is accounted for. A skip opcode is not refused
+on the very first frame — the canvas a freshly built decoder starts with is black, which is exactly
+the picture a skip paints when nothing has been decoded yet, so an encoder using one there is stating
+a black block rather than pointing at a frame that does not exist.
 ### VP8
 
 The codec WebM was built around, and all of it: the boolean entropy decoder, segmentation, both loop
