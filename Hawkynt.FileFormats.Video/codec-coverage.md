@@ -23,8 +23,8 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 | | Count | Share |
 | --- | --- | --- |
 | Decoded and verified against ffmpeg | 42 | 20% |
-| Established as not implementable from files alone | 7 | 3% |
-| Not yet attempted | 162 | 77% |
+| Established as not implementable from files alone | 8 | 4% |
+| Not yet attempted | 161 | 76% |
 
 The 42 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
@@ -46,17 +46,16 @@ built here has its encoder but not its decoder, so the comparison is against the
 into the encoder rather than against another decoder's opinion of what came out. For a lossless codec
 that is the stronger oracle of the two, being the ground truth itself.
 
-The 7 are Indeo 3, Indeo 4, Indeo 5, TrueMotion 1, WMV1, Lagarith and DV, and the arguments that settle
+The 8 are Indeo 3, Indeo 4, Indeo 5, TrueMotion 1, WMV1, WMV2, Lagarith and DV, and the arguments that settle
 them are in `undecodable-codecs.md`. The first four have frames too small to carry the tables they need —
 340 bytes for a 320x240 Indeo 3 picture, 14 for Indeo 4, 2 for Indeo 5, 0 for TrueMotion 1 — so those
-tables live in the codec binary and cannot be recovered by reading files. WMV1 has a real ffmpeg
-encoder, which none of those four do, and it still stops the same way: its six run-level tables, two DC
-tables and two motion-vector tables are the ones MS-MPEG4v3 was already found to need and never publish,
-tied to version 3's own figures by two identical escape constants in the one syntax document that covers
-both. A skipped or all-zero-CBP macroblock can be located without them, but that is exactly what puts
-the six run-level tables out of reach — a macroblock reachable that way has no coded codeword to test a
-table against, and one that does have a coded codeword is unreachable until the table is already known.
-Lagarith stops somewhere
+tables live in the codec binary and cannot be recovered by reading files. WMV1 and WMV2 both have real ffmpeg
+encoders and stop anyway: their run-level, DC and motion-vector tables are the same undocumented ones
+MS-MPEG4v3 and WMV1 already need, tied to them by two identical escape constants in the one syntax
+document that covers all three, and its own P-frame macroblock type table, `wmv2_inter_table`, is not
+shared with either and is published nowhere either — reachable, like the shared tables, only for the
+first macroblock of a slice, because a corpus cannot see a second one without already knowing the tables
+being sought. Lagarith stops somewhere
 more interesting: its frame layer comes out completely and is recorded there, but the range coder
 inside it keeps its state in a floating-point variable and its probability header has to reproduce
 one implementation's x86 rounding exactly, so the format is defined by an implementation rather than
