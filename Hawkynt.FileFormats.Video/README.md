@@ -89,6 +89,8 @@ who wants one frame of a two-hour recording pays for one frame.
 
 | Uncompressed RGB 10-bit (r210) | `r210` | Y | — |
 
+| AJA Kona 10-bit RGB (r10k) | `R10k` | Y | — |
+
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
 is an undivided heap of bytes, and where each packet starts and stops is a computation over five
@@ -1521,6 +1523,33 @@ rows, and 33x25, which needs the padding — carried through r210 and decoded he
 word against the `x2rgb10le` samples that went into the encoder: **every one identical.**
 
 What refuses: a picture with no pixels, and a packet shorter than its padded stride times its height.
+
+### r10k
+
+AJA's Kona 10-bit RGB layout, and a close relative of r210 rather than the same format under a second
+name — the two differ in where the ten-bit fields and the two unused bits sit inside the word, and in
+whether a row carries any padding at all. Neither is written down anywhere this project found; both
+were recovered the same way, by sweeping every reading of which component owns which bit range against
+ffmpeg's own encoder fed a picture of known samples and keeping the one that reproduces the source for
+every pixel.
+
+Red sits in the high ten bits of the big-endian word, bits 22-31; green in the middle ten, bits 12-21;
+blue in the next ten down, bits 2-11; and the two unused bits are the *low* two of the word rather than
+the high two r210 leaves spare. **There is no row padding at all** — a row is exactly `width` times
+four bytes, measured against three geometries including one whose unpadded row is not a multiple of
+any alignment r210's family uses, and ffmpeg's own encoder never writes a byte beyond it.
+
+Decoded straight into `Rgb30`, as r210 is — but unlike r210 this is a real repacking and not a plain
+byte reversal, since r10k's own bit arrangement is not `Rgb30`'s: each component is pulled out of its
+own position in the big-endian word and written back into the little-endian one. The two bits this
+format leaves unused become that format's alpha field, set to fully opaque, which is what carrying a
+stream through ffmpeg's own decoder and back out to `gbrp10le` shows those two bits are worth.
+
+Three geometries and 90 frames of ffmpeg's `rgbtestsrc` — 8x2, 33x25 and 64x40 — carried through r10k
+and decoded here, compared word for word against the `gbrp10le` planes that went into the encoder:
+**every one identical**, with no row padding found at any of the three widths.
+
+What refuses: a picture with no pixels, and a packet shorter than its stride times its height.
 
 ## 📜 License
 
