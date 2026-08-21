@@ -29,6 +29,7 @@ who wants one frame of a two-hour recording pays for one frame.
 
 | Container | Extensions | Read | Write |
 | --- | --- | --- | --- |
+| Advanced Systems Format (ASF, WMV, WMA) | `.asf`, `.wmv`, `.wma`, `.wm`, `.wmx`, `.asx` | Y | — |
 | AVI (RIFF) | `.avi` | Y | — |
 | Flash Video (FLV) | `.flv`, `.f4v` | Y | — |
 | ISO base media (MP4, QuickTime, 3GP) | `.mp4`, `.m4v`, `.mov`, `.qt`, `.3gp`, `.3g2`, `.m4a` | Y | — |
@@ -89,6 +90,29 @@ Matroska names its codecs with strings rather than four-character codes, so a st
 a `CodecId` and no tag — the exception being `V_MS/VFW/FOURCC`, whose `BITMAPINFOHEADER` holds a real
 code. A stream whose blocks were compressed, header-stripped or encrypted before being written is
 refused by name rather than handed on as frames it is not.
+
+ASF is one format under three extensions: `.asf` is its own name, `.wmv` one whose first stream
+carries pictures and `.wma` one whose streams carry only sound. Nothing in the file distinguishes
+them, so nothing in the reader does either. Its whole structure is objects keyed by sixteen-byte
+GUIDs, each stating its own length, which means an object nobody has heard of costs a skip — a file
+carrying rights management, a mutual exclusion or an index reads exactly as fast as one carrying
+none.
+
+Its packets are a fixed size and frames are not, so a frame larger than a packet is cut across
+several and several small frames share one. Both are put back together, because a reader that handed
+the pieces out would be reporting the shape of the wire rather than the shape of the film. Three
+payload forms have to be handled or ordinary files come out wrong: the one ffmpeg writes, the
+single-payload form that states no length at all, and the compressed form, whose one byte of
+replicated data means the payload is a run of whole frames rather than a piece of one. Every
+timestamp has the file's preroll taken off it — ffmpeg writes 3100 milliseconds of it, and a reader
+that kept it would report every frame of every such file three seconds late.
+
+Measured against `ffprobe -fflags +noparse` on fifteen files — Microsoft MPEG-4 v3, WMV1, WMV2, sound
+alone, sound and pictures together, two video streams at different rates, and eight assembled by hand
+for the forms ffmpeg will not write — agreeing on the count, order, size and presentation timestamp of
+all 549 packets. The one difference is the key frame flag on sound: ffprobe reports every audio packet
+as a key frame whatever the file says, because an audio frame is independently decodable, and that is
+a fact about the codec rather than anything an ASF file contains.
 
 FLV is the one container here that declares nothing. Its nine-byte header says whether sound and
 pictures are present and stops, so the streams are discovered from the tags and each codec from the
