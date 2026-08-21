@@ -482,8 +482,9 @@ public sealed class Mp4ReaderTests {
     Assert.That(Mp4Container.ReadPackets(container, 7), Is.Empty);
   }
 
-  // vp09 stood here until VP9 gained a decoder; hev1 is still a code nothing here reads.
-  [TestCase("hev1")]
+  // vp09 stood here until VP9 gained a decoder and hev1 until HEVC did; av01 is still a code
+  // nothing here reads. When AV1 is decoded here this needs another one, not a weaker assertion.
+  [TestCase("av01")]
   [Category("Unit")]
   public void UnsupportedCodec_StillDemuxes(string code) {
     // The refusal is the codec's and not the container's. A file nothing here decodes still comes
@@ -497,7 +498,7 @@ public sealed class Mp4ReaderTests {
     Assert.That(VideoFormatRegistry.CanDecode(streams[0]), Is.False);
   }
 
-  [TestCase("hev1")]
+  [TestCase("av01")]
   [Category("Unit")]
   public void UnsupportedCodec_IsRefusedWithItsCodeWhenAPictureIsAskedFor(string code) {
     var container = Mp4TestContainer.Build(code, 64, 48, [_Payload(1, 16)]);

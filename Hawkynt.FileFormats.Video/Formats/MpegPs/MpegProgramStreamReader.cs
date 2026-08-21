@@ -210,6 +210,7 @@ public static class MpegProgramStreamReader {
       0x10 => CodecTag.FromCharacters("mp4v"),
       0x1B => CodecTag.FromCharacters("avc1"),
       0x24 => CodecTag.FromCharacters("hvc1"),
+      0x33 => CodecTag.FromCharacters("vvc1"),
       _ => CodecTag.FromCharacters(systemsVersion == 1 ? "mpg1" : "mpg2"),
     };
 

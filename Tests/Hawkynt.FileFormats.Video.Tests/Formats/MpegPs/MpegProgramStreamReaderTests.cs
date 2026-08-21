@@ -554,7 +554,7 @@ public sealed class MpegProgramStreamReaderTests {
   [Test]
   [Category("Unit")]
   public void UnsupportedCodec_StillDemuxes() {
-    // The refusal is the codec's and not the container's. A program stream carrying HEVC, which
+    // The refusal is the codec's and not the container's. A program stream carrying H.266, which
     // nothing here decodes, still comes apart into the packets a remux would move.
     //
     // The stream map is what makes this test say what it means. Without one a video stream is named
@@ -564,7 +564,7 @@ public sealed class MpegProgramStreamReaderTests {
     var container = MpegProgramStreamReader.FromBytes(
       MpegPsTestContainer.Build(
         [_Video(MpegPsTestContainer.Concat(_Frame(1), _Frame(2)), 45000)],
-        streamMap: [(_HEVC_STREAM_TYPE, MpegPsTestContainer.VIDEO_STREAM)]));
+        streamMap: [(_UNDECODED_STREAM_TYPE, MpegPsTestContainer.VIDEO_STREAM)]));
 
     var streams = MpegProgramStreamContainer.Streams(container);
 
@@ -576,10 +576,10 @@ public sealed class MpegProgramStreamReaderTests {
   [Category("Unit")]
   public void UnsupportedCodec_IsRefusedWithItsCodeWhenAPictureIsAskedFor() {
     var file = MpegPsTestContainer.Build(
-      [_Video(_Frame(1), 45000)], streamMap: [(_HEVC_STREAM_TYPE, MpegPsTestContainer.VIDEO_STREAM)]);
+      [_Video(_Frame(1), 45000)], streamMap: [(_UNDECODED_STREAM_TYPE, MpegPsTestContainer.VIDEO_STREAM)]);
 
     var failure = Assert.Throws<NotSupportedException>(() => VideoFormatRegistry.DecodeFrames(file).ToList());
-    Assert.That(failure!.Message, Does.Contain("hvc1"));
+    Assert.That(failure!.Message, Does.Contain("vvc1"));
   }
 
   [Test]
@@ -593,8 +593,19 @@ public sealed class MpegProgramStreamReaderTests {
     Assert.That(VideoFormatRegistry.CanDecode(MpegProgramStreamContainer.Streams(container)[0]), Is.True);
   }
 
-  /// <summary>ISO/IEC 13818-1 stream_type for HEVC video, which this library has no decoder for.</summary>
-  private const byte _HEVC_STREAM_TYPE = 0x24;
+  /// <summary>
+  /// ISO/IEC 13818-1 stream_type 0x33, H.266 video, which this library has no decoder for.
+  /// </summary>
+  /// <remarks>
+  /// This was H.264 until an H.264 decoder landed, and HEVC until HEVC intra pictures did, and each
+  /// time both tests here quietly began asserting that a codec this library reads is one it does
+  /// not. A test whose meaning rests on a gap has to be moved when the gap closes; moving it is the
+  /// cheap half and noticing is the expensive half.
+  /// <para/>
+  /// The pattern will recur. When H.266 is decoded here, these need a stream type that is still
+  /// undecoded — not a relaxed assertion.
+  /// </remarks>
+  private const byte _UNDECODED_STREAM_TYPE = 0x33;
 
   [Test]
   [Category("Unit")]

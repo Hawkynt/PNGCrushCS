@@ -22,6 +22,10 @@ namespace FileFormat.Heif.Tests;
 /// A wrong picture that nothing announces is worse than a refusal, so this refuses. The extent is
 /// still readable — it comes from the container's ispe and clap boxes, not from the codestream —
 /// and <see cref="HeifFile.ReadImageInfo"/> keeps answering it.
+/// <para/>
+/// The video library does decode HEVC intra pictures, which is what a still HEIF carries, but this
+/// library does not reference it and the two ship apart. Bringing them together would make these
+/// files readable and is a change of its own.
 /// </remarks>
 [TestFixture]
 public sealed class HevcCodedItemTests {
