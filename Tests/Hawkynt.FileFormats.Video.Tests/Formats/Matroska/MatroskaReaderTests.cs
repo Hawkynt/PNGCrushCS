@@ -889,7 +889,8 @@ public sealed class MatroskaReaderTests {
     // all, and every Matroska track would otherwise arrive at the uncompressed decoder — VP9 and
     // Vorbis included — and be refused for holding the wrong number of bytes rather than for being a
     // codec nothing here reads.
-    var stream = _Streams(MatroskaTestContainer.Build([new MatroskaTestTrack { CodecId = "V_VP8" }]))[0];
+    // The track has to be one nothing here decodes, or the test would pass for the wrong reason.
+    var stream = _Streams(MatroskaTestContainer.Build([new MatroskaTestTrack { CodecId = "V_THEORA" }]))[0];
 
     Assert.That(stream.Codec, Is.EqualTo(CodecTag.None));
     Assert.That(VideoFormatRegistry.CanDecode(stream), Is.False);
