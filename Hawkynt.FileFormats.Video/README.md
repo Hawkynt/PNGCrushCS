@@ -47,6 +47,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | Microsoft RLE | `MRLE`, `mrle`, `BI_RLE8` (1), `BI_RLE4` (2) | Y | — |
 | Microsoft Video 1 | `CRAM`, `MSVC`, `WHAM` | Y | — |
 | Cinepak | `cvid`, `CVID` | Y | — |
+| QuickTime Animation (RLE) | `rle ` | Y | — |
 
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
@@ -232,6 +233,29 @@ What is not implemented refuses and says so: a strip identifier that is neither 
 chunk type the format does not define, a strip reaching outside its frame or not made of whole
 blocks, a picture size that changes part way through a stream, a vector list stopping before every
 block is accounted for, and any chunk shorter than it says it is.
+### QuickTime Animation (RLE)
+
+Lossless, and line-based rather than block-based: a frame names the band of lines it touches and
+writes them as runs, literal pixels and skips over a canvas the frames before it left behind. All of
+1, 2, 4, 8, 16, 24 and 32 bits, and the greyscale depths 33, 34, 36 and 40 that are the same indices
+into a ramp running from white. Thirty-two bits carries alpha and the alpha survives.
+
+Every count in the bitstream is in coded units and not in pixels. Above eight bits a unit is a pixel;
+at eight and below it is four bytes — four indices at eight bits, eight at four, sixteen at two — and
+at one bit it is two bytes, which is sixteen pixels again. One bit is a different shape altogether:
+each opcode carries its own skip, and the skip's top bit is what starts a line.
+
+Twenty-two streams covering every depth ffmpeg's encoder can write were decoded here and by ffmpeg and
+compared pixel for pixel on every frame, alpha included: 360 frames, all identical. The depths ffmpeg
+cannot encode — one, two and four bits, eight bits through a colour table, and widths that are not a
+whole number of coded units — were checked the other way round, by building streams that say a known
+picture and confirming ffmpeg reads them as that picture and this reads them as ffmpeg does: another
+sixty frames across fifteen streams, all identical.
+
+What refuses: a depth the compressor does not code; an indexed depth carrying no colour table, since
+the Macintosh default palettes cannot be checked against anything here and a picture drawn through a
+guessed table cannot be told from one drawn through the right one; a stream that opens with a frame
+touching only part of the picture; and any count that would write outside the line it is on.
 
 ## 📜 License
 
