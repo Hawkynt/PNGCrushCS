@@ -53,9 +53,10 @@ tables live in the codec binary and cannot be recovered by reading files. WMV1 h
 encoder, which none of those four do, and it still stops the same way: its six run-level tables, two DC
 tables and two motion-vector tables are the ones MS-MPEG4v3 was already found to need and never publish,
 tied to version 3's own figures by two identical escape constants in the one syntax document that covers
-both, and a macroblock's coded blocks have to be decoded with those same tables before the next
-macroblock's codeword can even be located — so no corpus, however large, reaches past the first
-macroblock of a slice. Lagarith stops somewhere
+both. A skipped or all-zero-CBP macroblock can be located without them, but that is exactly what puts
+the six run-level tables out of reach — a macroblock reachable that way has no coded codeword to test a
+table against, and one that does have a coded codeword is unreachable until the table is already known.
+Lagarith stops somewhere
 more interesting: its frame layer comes out completely and is recorded there, but the range coder
 inside it keeps its state in a floating-point variable and its probability header has to reproduce
 one implementation's x86 rounding exactly, so the format is defined by an implementation rather than
@@ -91,7 +92,8 @@ and published nowhere, and version 1 has no encoder in existence to derive its t
 check a guess against. WMV1 is now argued the same way in `undecodable-codecs.md`, on the strength of a
 real encoder that turns out not to matter: its run-level, DC and motion-vector tables are version 3's
 own, tied to it by two identical escape constants in the one document that gives either version's
-syntax, and reaching past the first macroblock of a slice needs the very tables being sought.
+syntax, and the only macroblocks a corpus can locate without those tables are exactly the ones with no
+coded codeword in them to learn the tables from.
 
 **On2 and RealVideo** — `vp4`, `vp5`, `vp6`, `vp7`, `rv30`, `rv40`, `rv60`. VP3 shares almost all of
 its structure with Theora, which is done and exact, so it is the cheapest of these by a wide margin.

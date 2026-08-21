@@ -496,25 +496,34 @@ control is available here in a way it never was for version 3. It does not help,
 missing tables sit in the bitstream rather than because nothing can be encoded.
 
 A macroblock in an inter picture reads its joint type/CBP code, then its motion vector, and only after
-that does it read the coded blocks — so the motion-vector codeword for the *first* macroblock of a
-frame sits at a fixed, locatable position once the type/CBP code in front of it is known. Every
-macroblock after the first does not: reaching it means having already decoded every earlier
-macroblock's coded blocks in full, because a run-level code's length is not known until it is decoded,
-and that decoding needs the very six tables in question. There is no way to skip ahead. A corpus can be
-built as large as disk space allows and it changes nothing about this: what it buys is one motion-vector
-codeword and one type/CBP codeword per independently-reachable position (the first macroblock of each
-slice) and nothing at all from any macroblock after it, in any frame, ever — the six run-level tables
-stay at zero coverage regardless of corpus size, because the mechanism that would read a second
-macroblock's codeword is the same mechanism the corpus is trying to recover.
+that does it read the coded blocks — so a macroblock's motion-vector codeword sits at a fixed, locatable
+position once the type/CBP code in front of it is known, without needing the run-level tables at all.
+That is true of more than just the first macroblock of a slice: a skipped macroblock carries no bits
+beyond its skip flag, and an unskipped one whose CBP comes out to zero calls `block()` six times but
+reads nothing from any of them, so either one hands the next macroblock's header straight over without
+ever touching a run-level table. What resets synchronisation is any *coded* block — the moment CBP is
+non-zero for some block, its run-level codewords have to be decoded to know how many bits they consumed,
+and that is the one thing not available; every macroblock from there until the next skip or all-zero
+macroblock is unreachable, not merely unread.
 
-Even granting the most generous reading — that the joint type/CBP table alone is small enough to
-recover the way MS-MPEG4v2's two macroblock tables were, and that this unlocks the first
-macroblock of every slice in every frame of an arbitrarily large corpus — the motion-vector table's own
-scale defeats it. Driving an encoder to choose one specific vector value, at one specific probability
-bucket, for the one macroblock in the whole frame that happens to sit first, is a considerably harder
-target than simply encoding varied motion; MS-MPEG4v3's own investigation reached exactly this
-conclusion for the same ~1,100-entry table under weaker constraints than "and it has to be the first
-macroblock too," and nothing about WMV1 changes what the table itself asks for.
+This still does not open a route to the six run-level tables themselves, and the reason is not about
+how many macroblocks are reachable but about what a reachable one can prove. Every macroblock whose
+start position is known this way is, by construction, one that has no coded run-level codeword to
+observe — that is what makes it reachable. A corpus therefore never delivers a codeword that starts at
+a known bit offset *and* is guaranteed non-empty, and without both, there is nothing to test a candidate
+table against: any bit sequence that follows a reachable macroblock could equally well be an unrelated
+neighbour's skip flag or the header of whatever comes next. Reaching a specific run-level codeword needs
+the position *after* it as well as before it, and that position is exactly what decoding the codeword
+was supposed to establish.
+
+The motion-vector table fares better in principle, since its codeword is read before the still-unknown
+blocks and its own end position does not depend on them — but recovering it exactly this way is the
+same reconstruction MS-MPEG4v3's own investigation already attempted for the identical ~1,100-entry
+table and did not complete, because a specific rare vector value has to be driven onto a macroblock
+whose start position is independently known, and the two constraints compound rather than add. Nothing
+about WMV1 relaxes either one: the table is either version 3's own, per the escape-constant evidence
+above, or a WMV1-specific table of the same size never published anywhere, and either way this
+investigation did not attempt to redo that reconstruction from scratch.
 
 ## What was verified
 
