@@ -115,6 +115,8 @@ who wants one frame of a two-hour recording pays for one frame.
 
 | Westwood VQA Video | `WSVQ` (synthetic — the format states no codec tag of its own) | Y | — |
 
+| Apple Planar RGB (8BPS) | `8BPS` | Y | — |
+
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
 is an undivided heap of bytes, and where each packet starts and stops is a computation over five
@@ -2207,6 +2209,56 @@ under the reading above: measured against a real version-1 file, the two-half sp
 decodes exactly under instead produces implausible, structureless indices, and nothing in the format's
 own published description states what version 1 uses in its place. Version 1 and the separate
 fifteen-bit-colour form both refuse by name rather than guess.
+
+### 8BPS
+
+Apple's own Planar RGB, QuickTime's lossless codec for capturing true-colour frames whole — red,
+green and blue as three complete planes, and a fourth of alpha where the picture carries one, each
+run-length coded a line at a time rather than block by block. Read from "Description of the Planar
+RGB (8BPS) Codec" by Roberto Togni, v1.0, October 2003, published at `multimedia.cx/8bps.txt` under
+the GNU Free Documentation Licence and mirrored on MultimediaWiki's own `8BPS` page — a standalone
+technical write-up citing XAnim as its own source, predating rather than following the codec's
+inclusion in any tool this project treats as an oracle, and not a paraphrase of anybody's own
+decoder.
+
+A frame is two sections: for every plane in turn, one 16-bit big-endian compressed length a row, top
+row first; then, in the same order, the compressed rows themselves. Which colourspace decides plane
+count — one plane of palette indices at eight bits, three planes of red, green and blue at
+twenty-four, four with alpha at thirty-two — and nothing about the line coding differs between them.
+
+Line decompression is PackBits, and the one place the document's own prose does not match a real
+file is the literal run's length. It states the control byte itself is the count; every file measured
+disagrees. Decoding a real frame both ways and comparing against ffmpeg's own decode of the same file
+settles it: reading the control byte as the count leaves the row short and every pixel after it
+wrong, where reading it as **control plus one** — ordinary PackBits — reproduces the row exactly and
+every row after it for the rest of the file.
+
+The indexed depth's colour table sits exactly where QuickTime Animation's own indexed depths keep
+one, in the sample description behind the depth field, and a table identifier of zero — the value
+every real file measured here carries — states that a custom table follows rather than naming a
+system colour resource. Each entry gives red, green and blue at sixteen bits; only the high byte of
+each survives, which is not documented anywhere but is what a real file's embedded table and ffmpeg's
+own decoded palette agree on entry for entry across all 256 of them.
+
+No inter-frame coding is implemented. The format's own document is unsure whether a row shorter than
+the picture — leaving the rest as whatever the previous frame drew — was ever used by a real encoder,
+since none of its own samples used it either; none of the three real files measured here do, so a row
+that cannot be filled to the picture's width from its own compressed bytes is refused rather than
+patched in from a frame this decoder does not keep between packets.
+
+**Measured against ffmpeg's own decode, exactly, on real files** — RGB-native throughout, so a direct
+sample comparison is valid and there is no chroma-siting convention to disagree about. Three streams
+from `samples.ffmpeg.org/V-codecs/8BPS-PlanarRGB/`, one at each depth this codec reads: 34 frames of
+160x120 at twenty-four bits, 150 frames of 320x213 at thirty-two bits with a real alpha channel, and
+169 frames of 360x240 at eight bits through an embedded colour table — 353 frames in all, every plane
+of every one identical to ffmpeg's decode of the same file, alpha and palette entries included.
+
+What refuses, by name: a depth that is none of eight, twenty-four or thirty-two; an indexed picture
+whose colour table identifier is not the custom-table value every sample measured here uses, or whose
+table names an index outside its own stated size; a packet too short for the line-length tables its
+plane count and picture height require; a row whose control bytes run past the compressed length its
+own table entry states, fall short of the picture's width without doing so, or overrun it; and a
+plane's worth of rows that does not end exactly where its table entry said it would.
 
 ## 📜 License
 

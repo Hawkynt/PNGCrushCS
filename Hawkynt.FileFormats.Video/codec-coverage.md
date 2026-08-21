@@ -22,11 +22,11 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 
 | | Count | Share |
 | --- | --- | --- |
-| Decoded and verified against ffmpeg | 48 | 23% |
+| Decoded and verified against ffmpeg | 49 | 23% |
 | Established as not implementable from files alone | 15 | 7% |
-| Not yet attempted | 148 | 70% |
+| Not yet attempted | 147 | 70% |
 
-The 48 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
+The 49 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
 frame against ffmpeg's decode of the same bitstream before it was merged, and the measurements are in
 each one's section of that file. The ones that reach exact equality on every sample of every frame
@@ -45,7 +45,9 @@ lossless one at a different source: max delta 0 against ffmpeg's decode of the s
 streams and six hundred frames, on raw RGB or RGBA planes since Hap carries no chroma subsampling of
 any kind for an RGB comparison to be a shortcut around.
 Theora and VP3 reach it too, Theora over 1,717 frames across all three of its pixel formats and VP3
-over 3,182.
+over 3,182. 8BPS joins them as well, RGB-native across all three depths it defines — indexed, RGB and
+RGB with alpha — over 353 frames of three real files at samples.ffmpeg.org, alpha and colour table
+entries included.
 
 MagicYUV is one exception to "against ffmpeg's decode", and in the useful direction: the ffmpeg built
 here has its encoder but not its decoder, so the comparison is against the rawvideo that went into the
