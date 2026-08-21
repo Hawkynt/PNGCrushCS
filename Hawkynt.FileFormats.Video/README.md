@@ -44,6 +44,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | RealMedia (RealVideo, RealAudio) | `.rm`, `.rmvb`, `.ra`, `.rmj`, `.rms` | Y | — |
 | Autodesk FLIC | `.fli`, `.flc`, `.flx` | Y | — |
 | id RoQ | `.roq` | Y | — |
+| Interplay MVE | `.mve` | Y | — |
 
 | Codec | Tag | Decode | Encode |
 | --- | --- | --- | --- |
@@ -102,6 +103,8 @@ who wants one frame of a two-hour recording pays for one frame.
 | Flash Screen Video 2 (FSV2) | `FSV2` | Y | — |
 
 | ZeroCodec | `ZECO` | Y | — |
+
+| Interplay Video | `IMVE` (synthetic — the format states no codec tag of its own) | Y | — |
 
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
@@ -1876,6 +1879,68 @@ What refuses: a picture whose width is odd, since two luma samples share one chr
 leaves the last sample with none; a depth other than sixteen bits, for want of a second sample to measure
 any other packing against; and a packet whose zlib stream is truncated, corrupt, or does not inflate to
 exactly the picture's own byte count.
+
+### Interplay Video
+
+Interplay's own FMV codec, behind Baldur's Gate and the rest of their DOS-and-Windows-era catalogue,
+carried in the same kind of self-contained container as RoQ: a twenty-byte signature and then a flat
+run of chunks, each wrapping a stream of opcodes rather than one packet per picture. `MveContainer`
+answers where each opcode is and which stream it belongs to; `MveVideoDecoder` is the only thing here
+that reads an 8x8 block encoding. A picture needs three opcodes read together — `INIT_VIDEO_BUFFERS`
+for the size, `DECODING_MAP` for which of sixteen encodings each block uses, and only `VIDEO_DATA`
+reads that map and produces one — the same seam RoQ's `INFO`/`QUAD_CODEBOOK`/`QUAD_VQ` opcodes use.
+
+The coding is a fixed 8x8 grid, each block one of sixteen encodings: a plain copy, a true no-op, four
+kinds of motion compensation, a two-colour or four-colour bit-packed pattern at several block-splitting
+granularities, three flavours of raw pixels, a solid fill, and a checkerboard dither. Interplay's own
+published description — Mike Melanson's `interplay-mve.txt`, which ffmpeg's own decoder is written
+from and credits by name — is thorough by the standard of this family of formats, and two things in it
+were measured against real files and found wrong.
+
+**Every `VIDEO_DATA` opcode opens with a fourteen-byte header nothing published mentions.** It was
+found by noticing that bytes 8–11 of the payload restate the picture's own size in macroblocks — the
+same figures `INIT_VIDEO_BUFFERS` already gives — and confirmed because a decode starting at the wrong
+(zero) offset put every block needing more than a plain copy fifty per cent wrong and every raw or
+solid block correct, which is exactly the shape a constant offset error draws: the opcodes that read
+their own colour values regardless of position land anywhere, and the opcodes that read a byte meant
+to be a motion vector or a pattern's first colour instead read whatever the header happened to hold.
+
+**Every bit-packed pattern reads low bit first, not high bit first.** The description states a rule
+for one case — the plain eight-byte two-colour block, "the rightmost pixel is represented by the
+low-order bit" — and that statement does not hold for any pattern-coded block measured, this one
+included: reading high bit first there reproduces no sample from either file, and low bit first
+reproduces both completely, checkerboard splits and the two- and four-colour quadrant and half-block
+patterns alike.
+
+**A skip reaches back two pictures, not one — the same finding as RoQ's, this time from a description
+that states it outright rather than leaving it to be found.** Interplay's own text says a skipped block
+(encoding `0x1`) "has the same value it had 2 frames ago", which only makes sense built on exactly two
+alternating picture buffers: every other encoding writes into the buffer being built and reads the
+*other* one — the most recently completed picture — while a skip writes nothing at all, so whichever
+content that same buffer slot held the last time *it* was written, two pictures back, shows through.
+Encoding `0x0`, a plain copy naming no offset, is the ordinary one-picture-back reference by contrast,
+and the two are easy to conflate from the description alone since both read as "unchanged". The first
+picture has no second buffer to have been built into two pictures ago, so its result is copied into
+both buffer slots once it is painted — the same bootstrap RoQ's decoder needs and for the identical
+reason.
+
+**Measured.** Two files from `samples.ffmpeg.org/game-formats/interplay-mve/` — 432x320 and 640x272,
+225 and 330 pictures, 555 in all, covering every block encoding this reads and confirming encoding
+`0x6` (which the format's own description doubts) never appears — were decoded here and by ffmpeg and
+compared sample for sample against ffmpeg's own `pal8` output, index and installed palette both: every
+picture is identical. This is paletted throughout, so the comparison is a direct one on samples with no
+RGB conversion and no chroma-siting convention to get wrong — worth stating plainly here because for
+several codecs elsewhere in this package that comparison would not mean what it appears to.
+
+Palette entries are six-bit VGA precision, widened to eight bits by repeating the top two bits into the
+bottom rather than shifting — the same rule this project's other six-bit channels use, and the one that
+reproduces ffmpeg's installed palette exactly where a plain multiply by four does not.
+
+What is not implemented refuses and says so: a true-colour video buffer, which the format's own
+sixteen-bit block encodings are documented as differing in ways not fully stated and which no sample
+here carries; block encoding `0x6`, which the format's own description doubts its own reading of and
+which no sample states; a compressed palette opcode; and a picture size that changes part way through
+a stream.
 
 ## 📜 License
 
