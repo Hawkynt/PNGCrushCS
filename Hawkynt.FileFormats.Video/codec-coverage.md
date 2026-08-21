@@ -22,16 +22,16 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 
 | | Count | Share |
 | --- | --- | --- |
-| Decoded and verified against ffmpeg | 44 | 21% |
+| Decoded and verified against ffmpeg | 45 | 21% |
 | Established as not implementable from files alone | 10 | 5% |
-| Not yet attempted | 157 | 74% |
+| Not yet attempted | 156 | 74% |
 
-The 44 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
+The 45 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
 frame against ffmpeg's decode of the same bitstream before it was merged, and the measurements are in
 each one's section of that file. The ones that reach exact equality on every sample of every frame
 are Microsoft RLE, Microsoft Video 1, Cinepak, QuickTime Animation, Apple Video, Apple Graphics, FLIC, HuffYUV,
-FFVHUFF, FFV1, ZMBV, TSCC, CSCD, Flash Screen Video, Flash Screen Video 2, id RoQ, Interplay Video, ZeroCodec, Ut Video, MagicYUV, v210, r210, r10k,
+FFVHUFF, FFV1, ZMBV, TSCC, CSCD, Flash Screen Video, Flash Screen Video 2, id RoQ, Interplay Video, ZeroCodec, LCL ZLIB, Ut Video, MagicYUV, v210, r210, r10k,
 y41p, CLJR
 and ZeroCodec — the two colour-space ones over 883 and 1,446 frames, in all six and all seven of their
 colour spaces, and the packed layouts on the sample data itself, at its own coded depth and with
@@ -43,10 +43,12 @@ ffmpeg encoder exists to build a corpus with.
 Theora and VP3 reach it too, Theora over 1,717 frames across all three of its pixel formats and VP3
 over 3,182.
 
-MagicYUV is the one exception to "against ffmpeg's decode", and in the useful direction: the ffmpeg
-built here has its encoder but not its decoder, so the comparison is against the rawvideo that went
-into the encoder rather than against another decoder's opinion of what came out. For a lossless codec
-that is the stronger oracle of the two, being the ground truth itself.
+MagicYUV is one exception to "against ffmpeg's decode", and in the useful direction: the ffmpeg built
+here has its encoder but not its decoder, so the comparison is against the rawvideo that went into the
+encoder rather than against another decoder's opinion of what came out. For a lossless codec that is
+the stronger oracle of the two, being the ground truth itself. LCL ZLIB is measured the same way in
+addition to the usual one, since it too has a real encoder here: round-tripped through it as well as
+checked against seven real recordings.
 
 The 10 are Indeo 3, Indeo 4, Indeo 5, TrueMotion 1, WMV1, WMV2, MSS1, MSS2, Lagarith and DV, and the arguments that settle
 them are in `undecodable-codecs.md`. The first four have frames too small to carry the tables they need —
