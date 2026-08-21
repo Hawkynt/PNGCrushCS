@@ -62,7 +62,10 @@ public sealed class FormatRoundTripTests {
     new Random(42).NextBytes(data);
     for (var i = 3; i < data.Length; i += 4) data[i] = 255;
     var raw = new RawImage { Width = 256, Height = 240, Format = PixelFormat.Rgba32, PixelData = data };
-    _AssertRoundTrip<HrzFile>(raw, PixelFormat.Rgb24);
+    // HRZ packs 6 bits a channel; widening by bit replication and narrowing by rounding are not
+    // exact inverses of one another, and land up to 2 levels off (e.g. a stored sample of 2 widens
+    // to 8 and narrows back to 0).
+    _AssertRoundTrip<HrzFile>(raw, PixelFormat.Rgb24, tolerance: 2);
   }
 
   // --- Cross-format chain ---
