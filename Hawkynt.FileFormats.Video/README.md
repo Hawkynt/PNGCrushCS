@@ -91,6 +91,8 @@ who wants one frame of a two-hour recording pays for one frame.
 
 | AJA Kona 10-bit RGB (r10k) | `R10k` | Y | — |
 
+| Uncompressed 4:1:1 (y41p) | `Y41P` | Y | — |
+
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
 is an undivided heap of bytes, and where each packet starts and stops is a computation over five
@@ -1550,6 +1552,40 @@ and decoded here, compared word for word against the `gbrp10le` planes that went
 **every one identical**, with no row padding found at any of the three widths.
 
 What refuses: a picture with no pixels, and a packet shorter than its stride times its height.
+
+### y41p
+
+4:1:1 YUV with nothing compressed at all, twelve bytes packing eight luma samples and the two chroma
+pairs that cover them. There is no MultimediaWiki page for this one, so the layout was recovered rather
+than read: synthetic pseudo-random frames were carried through ffmpeg's own y41p encoder and swept
+against every placement of which byte holds which sample. One group of twelve bytes is
+
+```
+U(0,1,2,3)  Y(0)  V(0,1,2,3)  Y(1)  U(4,5,6,7)  Y(2)  V(4,5,6,7)  Y(3)  Y(4)  Y(5)  Y(6)  Y(7)
+```
+
+— the first chroma pair ahead of the first two luma samples, the second ahead of the next two, and the
+last four luma samples running on with no chroma among them. A row is exactly `width` times one and a
+half bytes and there is no padding: ffmpeg's own encoder refuses a width that is not a whole number of
+eight-pixel groups outright, so this refuses the same width for the same reason.
+
+**Rows are coded bottom row first** — the same convention every Windows bitmap this format was built
+around uses, and the reason the first sweep against real content found no placement that fit at all:
+every byte looked plausible and none of them were right, because the row being compared against was
+the wrong row entirely. Comparing each coded row against the picture's rows in reverse turned a match
+rate indistinguishable from noise into an exact one.
+
+Verified on the planes and not on packed colour, because this is a lossless packing of the eight-bit
+samples themselves. Three geometries and 90 frames of pseudo-random content — 64x8, 96x40 and 128x33,
+all a whole number of eight-pixel groups since ffmpeg's encoder accepts no other — carried through
+y41p and decoded here, compared sample for sample against ffmpeg's own raw `yuv411p` output of the
+same content before it was packed: every sample of every plane of every frame is identical.
+
+The packed colour a caller gets back is a display convention on top of that, as with v210 — ITU-R
+BT.601 with studio swing and each chroma pair repeated across the four luma columns it covers.
+
+What refuses: a picture with no pixels, a width that is not a multiple of eight, and a packet shorter
+than its stride times its height.
 
 ## 📜 License
 
