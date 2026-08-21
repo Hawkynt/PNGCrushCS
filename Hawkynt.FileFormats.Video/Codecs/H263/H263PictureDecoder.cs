@@ -64,6 +64,18 @@ internal sealed class H263PictureDecoder {
 
   private int _quantiser;
 
+  /// <summary>
+  /// The first macroblock of the run being decoded, before which nothing may be predicted from.
+  /// </summary>
+  /// <remarks>
+  /// Zero for an H.263 picture, whose macroblocks are one run from the first to the last, so the
+  /// substitution rules of clause 6.1.1 behave exactly as they did before this existed. A RealVideo
+  /// picture arrives as several independently coded runs — it sends each in its own packet so that
+  /// losing one costs part of a picture rather than all of it — and a run that predicted from the run
+  /// before it would not be independent at all.
+  /// </remarks>
+  private int _runStart;
+
   private H263PictureDecoder(H263PictureHeader header, H263Frame target, H263Frame? reference) {
     this._header = header;
     this._target = target;
@@ -117,6 +129,35 @@ internal sealed class H263PictureDecoder {
 
       this._DecodeMacroblock(ref reader, address);
     }
+  }
+
+  /// <summary>
+  /// Decodes one independently coded run of macroblocks, at a quantiser of its own.
+  /// </summary>
+  /// <remarks>
+  /// For RealVideo, whose pictures are cut into runs that each restate the picture's type and
+  /// quantiser and say which macroblock they begin at and how many they carry. There is no group of
+  /// blocks layer to look for between them: a run ends when its count is exhausted, and the next one
+  /// begins at the next byte of the picture.
+  /// <para/>
+  /// The reconstructed samples land in the same target as every other run of the picture, which is
+  /// what makes the runs pieces of one picture rather than pictures of their own. What does not carry
+  /// across is prediction: <see cref="_runStart"/> makes every macroblock before this run unavailable
+  /// to the vector predictor, so a run decodes to the same samples whether or not the runs before it
+  /// arrived.
+  /// </remarks>
+  internal void DecodeRun(ref H263BitReader reader, int firstAddress, int count, int quantiser) {
+    var total = this._macroblockWidth * this._macroblockHeight;
+    if (firstAddress < 0 || count < 0 || firstAddress > total - count)
+      throw new InvalidDataException(
+        $"A run of {count} macroblock(s) beginning at {firstAddress} does not fit in a picture of {total}.");
+
+    this._quantiser = quantiser;
+    this._runStart = firstAddress;
+
+    var end = firstAddress + count;
+    for (var address = firstAddress; address < end; ++address)
+      this._DecodeMacroblock(ref reader, address);
   }
 
   private void _ReadGroupHeader(ref H263BitReader reader, int expectedGroupNumber, int row) {
@@ -298,7 +339,12 @@ internal sealed class H263PictureDecoder {
     var atTop = row == 0
                 || (row % this._header.MacroblockRowsPerGroup == 0 && this._groupHasHeader[row]);
 
-    var left = atLeftEdge ? 0 : vectors[address - 1];
+    // A macroblock coded in an earlier run of this picture is not this run's to predict from. For an
+    // H.263 picture the run begins at nought and these tests can never fire, which is why the
+    // behaviour measured against ffmpeg for that codec is untouched.
+    atTop = atTop || address - this._macroblockWidth < this._runStart;
+
+    var left = atLeftEdge || address - 1 < this._runStart ? 0 : vectors[address - 1];
     var above = atTop ? left : vectors[address - this._macroblockWidth];
     var aboveRight = atTop
       ? left
