@@ -175,9 +175,10 @@ public sealed class AviReaderTests {
     Assert.Throws<InvalidDataException>(() => _Frames(container));
   }
 
+  // VP90 stood here until VP9 gained a decoder. A test that means "a code nothing reads" has to keep
+  // being given a code nothing reads, and WMV3, AV01 and DIB still are.
   [TestCase("WMV3")]
   [TestCase("AV01")]
-  [TestCase("VP90")]
   [TestCase("DIB ")]
   [Category("Unit")]
   public void UnsupportedCodec_IsRefusedWithItsFourCharacterCode(string fourCC) {
