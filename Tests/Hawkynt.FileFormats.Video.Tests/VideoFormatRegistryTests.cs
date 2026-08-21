@@ -30,6 +30,23 @@ public sealed class VideoFormatRegistryTests {
 
     Assert.That(names, Does.Contain("Motion JPEG"));
     Assert.That(names, Does.Contain("Uncompressed (BI_RGB)"));
+    Assert.That(names, Does.Contain("Apple ProRes"));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void ACodecIsFoundForAProResStream() {
+    // The registry chooses a codec from the stream's tag alone, without building one, which is what
+    // lets a caller ask whether a file can be decoded before committing to decoding it.
+    var stream = new MediaStreamInfo {
+      Index = 0,
+      Kind = MediaStreamKind.Video,
+      Codec = CodecTag.FromCharacters("apcn"),
+      Width = 176,
+      Height = 144,
+    };
+
+    Assert.That(VideoFormatRegistry.AllCodecs.Any(c => c.Accepts(stream)), Is.True);
   }
 
   [Test]
