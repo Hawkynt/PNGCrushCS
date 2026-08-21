@@ -22,16 +22,17 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 
 | | Count | Share |
 | --- | --- | --- |
-| Decoded and verified against ffmpeg | 40 | 19% |
+| Decoded and verified against ffmpeg | 41 | 19% |
 | Established as not implementable from files alone | 6 | 3% |
-| Not yet attempted | 165 | 78% |
+| Not yet attempted | 164 | 78% |
 
-The 40 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
+The 41 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
 frame against ffmpeg's decode of the same bitstream before it was merged, and the measurements are in
 each one's section of that file. The ones that reach exact equality on every sample of every frame
 are Microsoft RLE, Microsoft Video 1, Cinepak, QuickTime Animation, Apple Video, Apple Graphics, FLIC, HuffYUV,
-FFVHUFF, FFV1, ZMBV, TSCC, CSCD, Flash Screen Video, Ut Video, MagicYUV, v210, r210, r10k, y41p
+FFVHUFF, FFV1, ZMBV, TSCC, CSCD, Flash Screen Video, id RoQ, Ut Video, MagicYUV, v210, r210, r10k,
+y41p
 and CLJR — the two colour-space ones over 883 and 1,446 frames, in all six and all seven of their
 colour spaces, and the packed layouts on the sample data itself, at its own coded depth and with
 no display conversion in the way, over 120, 90, 90, 90 and 60 frames at three geometries each.
@@ -126,10 +127,11 @@ not free, and the investigation recorded in `undecodable-codecs.md` found no ind
 its entropy table or a confirmed shuffle table either; it is counted with the not-implementable
 codecs above rather than left in this list.
 
-**Game and FMV codecs** — the largest group, around 45 names: `binkvideo`, `smackvid`, `roqvideo`,
-`interplayvideo`, `vmdvideo`, `escape124`, `escape130`, the several `ea*` codecs, the `xan_*` pair
-and many more. Almost none has a published specification; most are described on MultimediaWiki from
-reverse engineering. Their value is preservation rather than reach, and each is small.
+**Game and FMV codecs** — the largest group, around 45 names, of which `roqvideo` is now done:
+`binkvideo`, `smackvid`, `interplayvideo`, `vmdvideo`, `escape124`, `escape130`, the several `ea*`
+codecs, the `xan_*` pair and many more. Almost none has a published specification; most are described
+on MultimediaWiki from reverse engineering. Their value is preservation rather than reach, and each is
+small.
 
 **Everything else** — `indeo2`, `asv1`, `asv2`, `cljr`, `mdec`, `mimic`, `amv`, `mxpeg`, `sp5x`,
 `truemotion2` and the remainder. TrueMotion 2 is the partial case: it is self-describing and
