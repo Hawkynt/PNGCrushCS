@@ -564,7 +564,7 @@ public sealed class MpegProgramStreamReaderTests {
     var container = MpegProgramStreamReader.FromBytes(
       MpegPsTestContainer.Build(
         [_Video(MpegPsTestContainer.Concat(_Frame(1), _Frame(2)), 45000)],
-        streamMap: [(_UNDECODED_STREAM_TYPE, MpegPsTestContainer.VIDEO_STREAM)]));
+        streamMap: [(_HEVC_STREAM_TYPE, MpegPsTestContainer.VIDEO_STREAM)]));
 
     var streams = MpegProgramStreamContainer.Streams(container);
 
@@ -576,7 +576,7 @@ public sealed class MpegProgramStreamReaderTests {
   [Category("Unit")]
   public void UnsupportedCodec_IsRefusedWithItsCodeWhenAPictureIsAskedFor() {
     var file = MpegPsTestContainer.Build(
-      [_Video(_Frame(1), 45000)], streamMap: [(_UNDECODED_STREAM_TYPE, MpegPsTestContainer.VIDEO_STREAM)]);
+      [_Video(_Frame(1), 45000)], streamMap: [(_HEVC_STREAM_TYPE, MpegPsTestContainer.VIDEO_STREAM)]);
 
     var failure = Assert.Throws<NotSupportedException>(() => VideoFormatRegistry.DecodeFrames(file).ToList());
     Assert.That(failure!.Message, Does.Contain("hvc1"));
@@ -593,19 +593,8 @@ public sealed class MpegProgramStreamReaderTests {
     Assert.That(VideoFormatRegistry.CanDecode(MpegProgramStreamContainer.Streams(container)[0]), Is.True);
   }
 
-  /// <summary>ISO/IEC 13818-1 stream_type for AVC video, which this library has no decoder for.</summary>
-  /// <summary>
-  /// HEVC, which nothing here decodes — the point of these two tests.
-  /// </summary>
-  /// <remarks>
-  /// This was H.264 until an H.264 decoder landed, at which point both tests began asserting that a
-  /// codec this library reads is one it does not. A test whose meaning depends on a gap has to be
-  /// moved when the gap closes, and moving it is the cheap half; noticing is the expensive half.
-  /// <para/>
-  /// The pattern will recur. When HEVC is decoded here, these need a stream type that is still
-  /// undecoded — not a relaxed assertion.
-  /// </remarks>
-  private const byte _UNDECODED_STREAM_TYPE = 0x24;
+  /// <summary>ISO/IEC 13818-1 stream_type for HEVC video, which this library has no decoder for.</summary>
+  private const byte _HEVC_STREAM_TYPE = 0x24;
 
   [Test]
   [Category("Unit")]
