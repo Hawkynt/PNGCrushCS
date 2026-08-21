@@ -438,6 +438,7 @@ question, even without the entropy table. The container-layer facts above — th
 arithmetic, both frame sizes measured exactly, both chroma formats confirmed — are recorded here so that
 whoever picks this up again starts from the block layer and not from the container.
 
+<<<<<<< HEAD
 # Windows Media Video 7 (WMV1), where the tables are MS-MPEG4v3's own
 
 WMV1 — Microsoft's name is Windows Media Video 7 — was investigated because it looked like it might
@@ -540,3 +541,69 @@ The same thing that would change MS-MPEG4v3's answer: a publication of the six r
 two DC tables and the two motion-vector tables that is not somebody's implementation. Barring that, a
 demonstration that WMV1's tables are genuinely smaller or differently shaped than version 3's — which
 the shared escape constants above argue against, but do not by themselves rule out beyond doubt.
+=======
+# Windows Media Video 8 (WMV2), which adds a private table on top of WMV1's wall
+
+WMV2 — Windows Media Video 8 — was investigated alongside WMV1 for the same reason: ffmpeg carries a
+real `wmv2` encoder, which is more than MS-MPEG4v3's own investigation had to work with. It stops at the
+same wall WMV1 does, for the same evidence, and it adds one wall of its own on top.
+
+The source is the same document as WMV1's: Michael Niedermayer's *DIVX3 / MS-MPEG4v1-v3 / WMV7-8*,
+numbering WMV2 version 5 of five bitstreams that share one syntax description. Its own copy at
+`ffmpeg.org/~michael/msmpeg4.txt` no longer resolves; the Internet Archive's capture of it,
+`web.archive.org/web/20211205015009/http://ffmpeg.org/~michael/msmpeg4.txt`, is what this and WMV1's
+section were both read from.
+
+## What WMV2 shares with MS-MPEG4v3 and WMV1
+
+The document's version column marks the run-level table selectors, `dc_table_index` and
+`mv_table_index` as version `345` throughout — version 5 reads exactly the same fields, in the same
+positions, as versions 3 and 4 do. The two escape constants that tie WMV1 to version 3 tie WMV2 to it
+as well: the DC bitstream's escape at level **119** and the motion-vector bitstream's escape at code
+**1099** both carry the `345` marker without qualification, meaning WMV2 reads the identical sentinel
+values version 3 does in the identical fields. Where WMV2 genuinely changes the coding, the document
+says so in the open, exactly as it does for the scan tables: WMV2 adds 8x4 and 4x8 sub-block splits
+under an adaptive block transform, and it adds horizontal quarter-pel motion compensation with its own
+one-bit shift. Both are new syntax on top of the shared frame, not a replacement for the six run-level,
+two DC or two motion-vector tables underneath it — the sub-block split changes how many transform
+blocks a coded macroblock contains, and the quarter-pel bit changes how a decoded half-pel vector is
+refined, but the codewords selecting a run-level table, a DC table or a motion vector still read through
+the same `345` fields and the same two escape constants as WMV1's.
+
+## What WMV2 adds that WMV1 does not have
+
+WMV2's P-frame macroblock header reads its joint type/coded-block-pattern code through
+`wmv2_inter_table[cbp_index]`, a table selected by `cbp_index` — itself a three-way reordering of a
+two-bit code, keyed to the picture's quantiser scale — where versions 3 and 4 read `table_mb_non_intra`
+in that position instead. Different variable, different version marker (`5` alone, not `345`): this is
+a table of WMV2's own, not one it shares with the version 3 wall this section otherwise leans on. It
+sits in exactly the same locked position the joint type/CBP code sits in for every version — first in
+every macroblock, gating where every field after it starts — so recovering it faces the same structural
+problem as the joint tables discussed for WMV1: it is reachable only for the first macroblock of a
+slice, because reaching the second means first decoding the coded blocks of the one before it, and that
+decoding needs the six run-level tables that are the actual wall. WMV2 does not inherit a smaller
+version of MS-MPEG4v3's problem; it inherits the whole of it and adds a fourth private table — three,
+counting one per `cbp_index` value — that WMV1 does not have at all.
+
+One small table is the exception, and it is exactly the kind of thing this project can and does use:
+`table_inter_intra`, the four-entry mapping from a coded prediction direction to a luma/chroma pair
+`{0,1}, {2,2}, {6,3}, {7,3}`, is printed in the syntax document in full. It governs the rarely-taken
+`inter_intra_pred` path, not the run-level, DC or motion-vector tables, so having it does not open a way
+through the wall — it is recorded here because it is one of the few tables this codec's syntax document
+actually gives, alongside the scan tables and the DC dequantisation scale, and finding it does not
+change where WMV2 stops.
+
+## What was verified
+
+`ffmpeg -h encoder=wmv2` confirms the encoder exists and writes `yuv420p`. Every field this section
+relies on — the `345` version markers on the shared table selectors, the `119` and `1099` escape
+constants, and the `5`-only marker on `wmv2_inter_table` that sets it apart from `table_mb_non_intra` —
+is read directly from the syntax document's own bitstream tables rather than inferred.
+
+## What would change the answer
+
+The same publication that would change WMV1's and MS-MPEG4v3's: the six run-level tables, the two DC
+tables and the two motion-vector tables, from a source that is not an implementation. WMV2 additionally
+needs `wmv2_inter_table`'s three entries published on top, since that table is its own and not covered
+by anything that would settle the other three versions.
+>>>>>>> 8bfb2e9a (Investigated wmv2 on the same evidence that stopped wmv1, and it)
