@@ -22,18 +22,24 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 
 | | Count | Share |
 | --- | --- | --- |
-| Decoded and verified against ffmpeg | 32 | 15% |
+| Decoded and verified against ffmpeg | 33 | 16% |
 | Established as not implementable from files alone | 4 | 2% |
-| Not yet attempted | 175 | 83% |
+| Not yet attempted | 174 | 82% |
 
-The 32 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
+The 33 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
 frame against ffmpeg's decode of the same bitstream before it was merged, and the measurements are in
 each one's section of that file. The ones that reach exact equality on every sample of every frame
 are Microsoft RLE, Microsoft Video 1, Cinepak, QuickTime Animation, Apple Video, Apple Graphics, FLIC, HuffYUV,
-FFVHUFF, FFV1, ZMBV, TSCC, CSCD and Ut Video — the last over 883 frames in all six of its colour spaces.
+FFVHUFF, FFV1, ZMBV, TSCC, CSCD, Ut Video and MagicYUV — the last two over 883 and 1,446 frames, in
+all six and all seven of their colour spaces.
 Theora and VP3 reach it too, Theora over 1,717 frames across all three of its pixel formats and VP3
 over 3,182.
+
+MagicYUV is the one exception to "against ffmpeg's decode", and in the useful direction: the ffmpeg
+built here has its encoder but not its decoder, so the comparison is against the rawvideo that went
+into the encoder rather than against another decoder's opinion of what came out. For a lossless codec
+that is the stronger oracle of the two, being the ground truth itself.
 
 The 4 are Indeo 3, Indeo 4, Indeo 5 and TrueMotion 1, and the argument that settles them is in
 `undecodable-codecs.md`: their frames are too small to carry the tables they need — 340 bytes for a
@@ -70,10 +76,11 @@ wall with no published specification at all.
 **Sorenson** — `svq1`, `svq3`. No published specification.
 
 **Lossless RGB and YUV** — around 30 names including `012v`, `aasc`, `cllc`, `cyuv`, `dxtory`,
-`loco`, `m101`, `magicyuv`, `mszh`, `r10k`, `r210`, `sheervideo`, `v210`, `vble`, `y41p`, `ylc`,
+`loco`, `m101`, `mszh`, `r10k`, `r210`, `sheervideo`, `v210`, `vble`, `y41p`, `ylc`,
 `zerocodec`, `zlib`, and `lagarith`, which is arithmetic coding over the same kind of prediction. Ut
-Video came out of this group and reached exact equality, which is the standard for every one of them:
-max delta 0 or it is wrong. This is the densest source of verifiable wins in the list.
+Video and MagicYUV both came out of this group and reached exact equality, which is the standard for
+every one of them: max delta 0 or it is wrong. This is the densest source of verifiable wins in the
+list.
 
 **Screen capture** — `flashsv`, `flashsv2`, `g2m`, `mscc`, `mwsc`, `rasc`, `rscc`, `screenpresso`,
 `tdsc`, `tscc2`, `vmnc`, `wcmv`, `scpr`. Mostly DEFLATE over a framebuffer with a delta scheme on
