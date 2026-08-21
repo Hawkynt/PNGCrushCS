@@ -1654,3 +1654,83 @@ exists. No frame is ever going to be the one that turns out to carry it.
 A description of SVQ1's codebook and VLC tables from a source that is not an implementation — a genuine
 Sorenson technical document, or a second patent that prints the tables themselves rather than describing
 their existence and size. Neither exists today.
+
+# Sorenson Video 3 (SVQ3), an H.264 draft with nobody publishing where it departs
+
+SVQ3 — Sorenson Vector Quantizer 3, FourCC `SVQ3` — sits differently from SVQ1: this package already
+carries a verified H.264 decoder (`Codecs/H264/`), and every account of SVQ3 agrees it is a variant of
+that same family — the reason to look at it at all. What stops it is not a shortage of shared machinery;
+it is that the parts where SVQ3 diverges from H.264 are exactly the parts nobody has published
+independently of the one implementation that reverse-engineered them.
+
+## What the container hands over, verified directly against a real file
+
+This much needed no secondary source at all. `gl2.mov`, fetched from
+`samples.ffmpeg.org/V-codecs/SVQ3/`, carries a standard QuickTime `ImageDescription` sample entry for
+its video track — the fixed 86-byte structure Apple's own QuickTime File Format documentation defines,
+independent of any codec — with `width` and `height` fields reading 470 and 352 directly out of the
+file's bytes at their documented offsets, matching `ffprobe`'s report of the same file exactly.
+Immediately after that fixed structure, at the position the sample entry's own stated size implies,
+sits a nested atom named `SMI `, and inside it a four-byte marker `SEQH` followed by a four-byte
+big-endian length and that many bytes of payload — 21 bytes for the `SMI` atom as a whole in this file,
+matching `ffprobe`'s independently reported `extradata_size=21` exactly, and 5 bytes of `SEQH` payload
+itself. That confirms the extradata wrapper's existence and shape from the file's own bytes: `SEQH`-
+prefixed sequence data nested in an `SMI` atom inside the `ImageDescription`, the way any other
+QuickTime codec extension sits — nothing about that part depended on reading anyone's decoder.
+
+## Where the container stops mattering and the sourcing collapses
+
+What is inside that `SEQH` payload — width/height codes, half-pel and third-pel motion flags, the
+B-frame flag — and everything in the coded picture data after it — the entropy coding, the macroblock
+type tables, the residual coding, the intra-prediction departures from H.264 — has exactly one technical
+description anywhere: MultimediaWiki's Sorenson Video 3 page. That page names no source for almost
+everything on it. Its introduction is one unattributed sentence — "Video codec apparently based on an
+early H.264 draft" — and the one place it does cite something, it cites `svq3.c` itself, labelling its
+own quantizer table "Quantizer table (from svq3.c)." The rest of the page's content — the Golomb-coded
+macroblock type tables, the `SEQH` bit layout, the thirdpel interpolation formula, the intra-prediction
+departures from H.264 — carries no citation to anything at all, and how anyone learned any of it is on
+record independently of the wiki page: SVQ3 was closed and playable only through Apple's own QuickTime
+component for years, until, as its own recorded history has it, an anonymous FFmpeg developer
+reverse-engineered it and wrote the decoder that has carried it ever since. That decoder is not a
+second, independent source standing next to the wiki page — on the page's own admission for the one
+table it names outright, and on the format's own documented history for everything else, it is the
+source the page paraphrases.
+
+No IETF draft, ITU-T H.26L committee document, or Sorenson-assigned patent describing this format's own
+departures from an early H.264 draft turned up in any search that reached the datatracker, the patent
+literature, or Sorenson Media's own public output. The closest thing to a Sorenson-authored technical
+document is the Library of Congress's format-sustainability page for Sorenson Video 3, and it states the
+codec's marketing description — variable bitrate encoding, temporal scalability, "advanced vector
+quantization with motion compensation" — and not one bitstream fact.
+
+## Why the verified H.264 decoder does not rescue it
+
+Reusing this package's H.264 work is exactly right where H.264 and SVQ3 coincide, and that was the
+starting assumption of this investigation — but the two do not coincide at the layer that decides
+whether a stream parses at all. SVQ3's documented departures are not cosmetic: a different entropy code
+from either of H.264's own two (the one fact everyone credits it with, uncited, is that "this codec
+extensively uses Golomb coding," which is neither H.264's CAVLC nor its CABAC), its own macroblock type
+tables per frame type, and motion vectors carried at up to third-pel precision with per-macroblock
+precision selection that H.264 has no field for at all. A decoder built from the public H.264 standard
+alone desynchronises at the first macroblock-type codeword, because the standard does not define the
+code SVQ3 uses there.
+
+Recovering that code by measurement alone — the way this project recovered TrueMotion 2's Huffman trees
+or Indeo 3's sixteen-byte table, from real bitstreams and an oracle, never from a description — was not
+attempted at that depth here. The difference from those two is where the unknown sits: TrueMotion 2's
+and Indeo 3's undocumented pieces are single tables reachable at a known bit offset once the surrounding
+structure is parsed. SVQ3's is the entropy decoder itself, so nothing after the first unknown codeword
+in a slice can be trusted to be at the right bit offset to test against — the same wall On2's VP6 stops
+at with a full published specification in hand and years of the community's own effort behind it, and
+there is no specification here to be even the eight decisions VP6 manages before it goes wrong.
+
+## What would change the answer
+
+A description of SVQ3's own departures from its H.264 draft ancestor — the entropy code, the per-frame
+macroblock type tables, the `SEQH` field layout, the thirdpel interpolation and its motion-vector
+precision signalling — from a source that is not FFmpeg's own decoder or a page that names no source at
+all. Failing that, a blind reconstruction of the entropy layer against real samples, in the manner
+TrueMotion 2's tables were recovered here, is the only route left; it was not carried past the container
+in this pass, and the container-level facts above — the `ImageDescription` and `SMI`/`SEQH` wrapper,
+both confirmed against a real file rather than assumed — are recorded so whoever attempts it does not
+have to start from the container.
