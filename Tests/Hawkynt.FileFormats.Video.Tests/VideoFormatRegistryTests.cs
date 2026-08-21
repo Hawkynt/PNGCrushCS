@@ -31,6 +31,7 @@ public sealed class VideoFormatRegistryTests {
     Assert.That(names, Does.Contain("Motion JPEG"));
     Assert.That(names, Does.Contain("Uncompressed (BI_RGB)"));
     Assert.That(names, Does.Contain("Apple ProRes"));
+    Assert.That(names, Does.Contain("Avid DNxHD / DNxHR (SMPTE VC-3)"));
   }
 
   [Test]
@@ -44,6 +45,20 @@ public sealed class VideoFormatRegistryTests {
       Codec = CodecTag.FromCharacters("apcn"),
       Width = 176,
       Height = 144,
+    };
+
+    Assert.That(VideoFormatRegistry.AllCodecs.Any(c => c.Accepts(stream)), Is.True);
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void ACodecIsFoundForADnxHdStream() {
+    var stream = new MediaStreamInfo {
+      Index = 0,
+      Kind = MediaStreamKind.Video,
+      Codec = CodecTag.FromCharacters("AVdn"),
+      Width = 1920,
+      Height = 1080,
     };
 
     Assert.That(VideoFormatRegistry.AllCodecs.Any(c => c.Accepts(stream)), Is.True);
