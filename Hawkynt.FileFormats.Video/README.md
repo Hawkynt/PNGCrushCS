@@ -79,6 +79,8 @@ who wants one frame of a two-hour recording pays for one frame.
 
 | TechSmith Screen Capture (TSCC) | `tscc` | Y | — |
 
+| CamStudio Screen Codec (CSCD) | `CSCD` | Y | — |
+
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
 is an undivided heap of bytes, and where each packet starts and stops is a computation over five
@@ -1242,6 +1244,52 @@ Also refused by name: tiles, dependent slice segments, coding units coded as raw
 4:4:4, monochrome, more than eight bits a sample, separate colour planes, and the range, screen
 content, multilayer and three-dimensional extensions. There is no `catch` anywhere that returns a
 blank, a copied or a partial frame.
+
+### CamStudio Screen Codec
+
+Lossless, and the MultimediaWiki page names the whole of the coding in five lines: a header byte whose
+top seven bits choose LZO or zlib and whose bottom bit says whether this is a key frame, a reserved
+byte, and the compressed data. A key frame is a whole picture; a delta frame is the same compression
+around a difference added onto the frame before it.
+
+Two things the page does not say, and this reads off real files rather than guesses at. **Which
+compression a header value actually means** — the page's two-case switch, 0 for LZO and 1 for zlib,
+never once appears as literally 1 in a real file; every zlib stream measured states some other nonzero
+value instead, so nonzero is the rule read off the bytes here rather than the documented case. And
+**what "add deltas to previous frame" means at the byte level** — unsigned addition with the result
+wrapped modulo 256, settled by reconstructing a real captured frame both ways and finding addition
+matches ffmpeg's decode exactly where the same byte-wise XOR a natural first guess would reach for
+differs in 67,144 of 1,572,864 bytes on the same frame.
+
+**A coded row is a whole four-byte word**, the convention every Windows bitmap this format is built
+around uses and which nothing in the wiki page states. A 239-pixel-wide, 24-bit picture is 717 bytes
+of pixels and 720 bytes of picture, and a delta read against the packed width alone lands three bytes
+out of step on every row after the first — silent corruption, not a refusal. It was found by a match
+instruction inside a real file whose distance was consistently the padded stride and made no sense as
+the packed one.
+
+**There is no 8-bit palettised mode**, despite the format otherwise mirroring TSCC closely enough that
+assuming one seemed reasonable. Building a stream that stated one and handing it to ffmpeg settled it:
+ffmpeg's own decoder refuses a depth of 8 bits a pixel by name, "invalid depth 8 bpp", so this refuses
+it the same way instead of inventing a palette layout nothing exercises.
+
+The LZO compression the header can choose is CamStudio's, and the MultimediaWiki page for it says
+outright that no specification exists. "LZO stream format as understood by Linux's LZO decompressor"
+(Willy Tarreau, 2014; updated by Dave Rodgman, 2018) is the closest thing to one, and even it disagrees
+with itself in one place: its bit diagram for the sixteen-bit word that carries a match's distance and
+the literals to copy after it can be read two ways, and the two disagree about which bits are which.
+The `lzop` command-line tool's own encoder, used to build streams of known content, settles it — the
+state is the low two bits of the word and the distance is everything above them.
+
+**Measured against ffmpeg**, at every depth and every compression a real file was found at. Four
+streams and 6,309 frames — 16-bit (555), 24-bit and 32-bit pixel layouts, both compressions the header
+names, and a picture whose row is not a whole number of four-byte words. **Every sample of every frame
+is identical.**
+
+What refuses: 8 bits a pixel, which ffmpeg's own decoder refuses as well, and any depth besides that
+and 16, 24 and 32; an LZO stream whose instructions run off the end of the compressed data or whose
+match reaches before the start of the picture; and a zlib stream that does not decompress to exactly
+the bytes a frame of this picture needs.
 
 ## 📜 License
 
