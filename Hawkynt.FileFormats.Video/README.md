@@ -40,6 +40,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | MPEG video elementary stream | `.m1v`, `.m2v`, `.mpv`, `.mpeg1video`, `.mpeg2video` | Y | — |
 | MPEG-2 transport stream (also Blu-ray, AVCHD) | `.ts`, `.m2ts`, `.mts`, `.m2t`, `.tsv` | Y | — |
 | Ogg (Theora, Vorbis, Opus, FLAC) | `.ogg`, `.ogv`, `.oga`, `.ogx`, `.opus`, `.spx` | Y | — |
+| RealMedia (RealVideo, RealAudio) | `.rm`, `.rmvb`, `.ra`, `.rmj`, `.rms` | Y | — |
 
 | Codec | Tag | Decode | Encode |
 | --- | --- | --- | --- |
@@ -161,8 +162,44 @@ identical across all of them, and every video packet's presentation timestamp as
 packets are not packets — they are the codec's private data, reported once, framed in the Xiph lacing
 Matroska uses for the same codecs so that one decoder reads a stream out of either container.
 
-A stream coded with anything else is refused by name — the code, or the container's own name for the
-codec where it has one — rather than half decoded into noise.
+RealMedia is a flat run of chunks, each naming itself and stating its own length: `PROP` for the
+rates and the duration, one `MDPR` per stream carrying that stream's codec-specific description
+verbatim, `CONT` for the title, author, copyright and comment, `DATA` for the packets, `INDX` for
+seeking. A chunk nobody here has heard of costs nothing to step over, which is what makes the reader
+complete for the format while it decodes none of its codecs.
+
+Its packets are capped at a size the writer chose and its pictures are not, so a picture arrives in
+pieces, each behind a small header of its own saying which piece of which picture it is. Two of that
+header's fields are the trap: for every piece but the last they are the whole picture's length and
+this piece's offset, and for the last they are the whole length and this piece's *own* length, the
+offset following by subtraction. A picture is handed over when its bytes are all present rather than
+when a piece is marked as the last, because plenty of pictures are never marked; a piece sent twice is
+skipped rather than costing the picture; a piece that leaves a hole drops it. Only the element that
+opens a packet takes the packet's timestamp — a second picture in the same packet is one the file gave
+no time to, and it is reported as having none rather than being given an interpolated one.
+
+Where it cut is reported and not thrown away. RealMedia cuts a picture at its slices, one slice to a
+piece, and a RealVideo slice carries no start code and no fixed padding — so once the pieces are
+joined the boundaries are gone, and a RealVideo decoder needs them. They go out on the packet as
+`CodedPacket.FragmentOffsets`. ffmpeg carries the same fact by writing a table of those offsets in
+front of the picture's bytes, one count byte and eight bytes a slice, which is why a packet from its
+demuxer is `8n+1` bytes longer than the picture; the fact is identical and only the spelling differs,
+and a byte layout invented by one demuxer for one decoder is the private arrangement the split
+between demux and decode exists to prevent.
+
+Sound comes out as it is stored. RealAudio's codecs interleave their sub-packets across the packets
+carrying them, and the geometry that undoes it is in the RealAudio header this reader hands across as
+codec-private data, which makes deinterleaving the codec's business; ffmpeg's demuxer does it there
+and so reports five or six times as many audio packets for the same file.
+
+Measured against `ffprobe -fflags +noparse` on twelve recordings — RealVideo 1, 2, 3 and 4, 50 KB to
+18 MB, 360 330 coded pictures — every file yields the same picture count with the same timestamps,
+key-frame flags and byte lengths, and the piece offsets are compared entry for entry against
+ffmpeg's own table and are identical. Three of the twelve are damaged: two cut off mid-recording, one
+whose data chunk length was never filled in and which re-sends a piece. All three are read. On the
+last, one picture in 338 672 differs on purpose — the repeat is skipped and the picture recovered
+whole, where ffmpeg, having lost the sequence there, hands back the 46 bytes it still had as though
+they were a picture.
 
 ### MPEG-1 video
 
