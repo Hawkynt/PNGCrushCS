@@ -106,6 +106,8 @@ who wants one frame of a two-hour recording pays for one frame.
 
 | Interplay Video | `IMVE` (synthetic — the format states no codec tag of its own) | Y | — |
 
+| Lossless Codec Library, ZLIB variant | `ZLIB` | Y | — |
+
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
 is an undivided heap of bytes, and where each packet starts and stops is a computation over five
@@ -1941,6 +1943,47 @@ sixteen-bit block encodings are documented as differing in ways not fully stated
 here carries; block encoding `0x6`, which the format's own description doubts its own reading of and
 which no sample states; a compressed palette opcode; and a picture size that changes part way through
 a stream.
+
+### Lossless Codec Library (ZLIB)
+
+Lossless, and the simplest coding this family has: a picture converted to a target colour space and
+handed straight to zlib's DEFLATE, with the compressor reset fresh for every frame, so a packet decodes
+on its own with nothing carried from the one before it. Built from a real specification, unusually for
+this family — "Description of the LCL codecs (MSZH and ZLIB)" by Roberto Togni, published as
+`multimedia.cx/lcl.txt` under the GNU FDL — though its own author calls it "random notes... while
+building a decoder" and leaves several fields as unfilled placeholders. Codec identity, the eight-byte
+trailer LCL appends to a standard `BITMAPINFOHEADER`, and the zlib compression itself are exactly as
+that document states. Only the RGB24 colour space is read: every YUV form the format defines has its
+byte order left as one of the document's unfilled placeholders, and neither ffmpeg's encoder nor any of
+seven real recordings from samples.ffmpeg.org write anything else.
+
+**A coded row is sometimes a whole four-byte word, and which is a property of the file rather than of
+the format.** One real recording, 1246 pixels wide — the one width among any sample here not already a
+multiple of four — decompresses two bytes longer a row than the picture packs to, confirmed against the
+file's own `biSizeImage`. A stream built here with ffmpeg's own encoder at an equally unaligned width
+decompresses to exactly the packed byte count instead, and ffmpeg's own decoder logs a size mismatch
+against the padded figure it expects and proceeds regardless. The two encoders disagree about whether
+the padding the document never mentions is written, so nothing here assumes either answer: the row
+stride is read off however many bytes the zlib stream actually produced, taken as whichever of the
+packed or the padded byte count that total equals.
+
+The picture is stored bottom row first, matching every AVI codec in this package.
+
+**Measured against ffmpeg** two ways at once, because ZLIB is one of the few codecs in this family with
+a real encoder. Round-tripped through it — four streams built and encoded here, 2x2 to 322x240,
+including widths that leave a row unaligned and ones that do not — every decoded frame is identical to
+the source frame that was encoded, the stronger of the two comparisons this package usually has to
+choose between since it is the ground truth itself rather than a second decoder's opinion. And measured
+against seven real files from samples.ffmpeg.org, 282 frames from 64x48 to 1246x992 — every sample of
+every frame is identical across all 307 frames measured either way, RGB-native so the comparison is a
+direct one and not a plane-by-plane approximation of anything subsampled.
+
+What refuses: an image type other than RGB24, for want of anything to measure a YUV byte layout
+against; the multithread flag, whose split's own length and offset fields the specification never
+states; the PNG filter flag, whose per-colour-space structure is another of the specification's unfilled
+placeholders and whose own author states his RGB24 implementation of it does not work correctly; and a
+packet whose zlib stream is truncated, corrupt, or inflates to neither the picture's packed nor its
+padded byte count.
 
 ## 📜 License
 
