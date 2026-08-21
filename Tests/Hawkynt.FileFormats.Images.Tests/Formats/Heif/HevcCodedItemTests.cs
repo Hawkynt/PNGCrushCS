@@ -49,6 +49,8 @@ public sealed class HevcCodedItemTests {
       }
 
       var bytes = File.ReadAllBytes(heic);
+      if (!_IsIsoBmff(bytes))
+        Assert.Ignore("ImageMagick has no HEIF encoder here: it wrote the source back unconverted rather than refusing.");
 
       var refusal = Assert.Throws<NotSupportedException>(() => HeifReader.FromBytes(bytes));
       Assert.That(refusal!.Message, Does.Contain("HEVC"), "the refusal must name what is unimplemented");
@@ -79,7 +81,11 @@ public sealed class HevcCodedItemTests {
           Assert.Ignore($"ImageMagick has no HEIF encoder here: {complaint.Trim()}");
       }
 
-      var info = HeifFile.ReadImageInfo(File.ReadAllBytes(heic));
+      var heicBytes = File.ReadAllBytes(heic);
+      if (!_IsIsoBmff(heicBytes))
+        Assert.Ignore("ImageMagick has no HEIF encoder here: it wrote the source back unconverted rather than refusing.");
+
+      var info = HeifFile.ReadImageInfo(heicBytes);
 
       Assert.That(info, Is.Not.Null, "the extent comes from the container, which is readable");
       Assert.Multiple(() => {
@@ -92,6 +98,20 @@ public sealed class HevcCodedItemTests {
       try { directory.Delete(recursive: true); } catch { /* best effort */ }
     }
   }
+
+  /// <summary>
+  /// Whether a file ImageMagick claims to have written is actually ISOBMFF, rather than the source
+  /// PNG copied over with a new extension.
+  /// </summary>
+  /// <remarks>
+  /// A <c>magick</c> build without a HEIF encoder does not refuse to write one: it warns on stderr,
+  /// exits 0, and writes the input image back out under the requested name, unconverted. Exit code
+  /// and file existence, which is all the encode step above checks, both look identical to a real
+  /// write. Asking <see cref="HeifReader"/> to read a PNG in a coat that says ".heic" is not this
+  /// test's oracle disagreeing with us; it is not a HEIF on this machine to compare against.
+  /// </remarks>
+  private static bool _IsIsoBmff(byte[] bytes)
+    => bytes.Length >= 8 && bytes[4] == (byte)'f' && bytes[5] == (byte)'t' && bytes[6] == (byte)'y' && bytes[7] == (byte)'p';
 
   // --- the same two claims, on a container built here, so they hold without ImageMagick ---
 
