@@ -99,6 +99,8 @@ who wants one frame of a two-hour recording pays for one frame.
 
 | id RoQ | `RoQV` (synthetic — the format states no codec tag of its own) | Y | — |
 
+| Flash Screen Video 2 (FSV2) | `FSV2` | Y | — |
+
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
 is an undivided heap of bytes, and where each packet starts and stops is a computation over five
@@ -1754,6 +1756,72 @@ one that changes part way through a stream; a codebook cell named before any cod
 one; and a motion vector reaching outside the picture, which nothing measured this against exercises.
 Sound (`RoQ_SOUND_MONO`, `RoQ_SOUND_STEREO`) is demuxed onto its own stream, DPCM-coded and unread past
 that — decoding it is future work.
+
+### Flash Screen Video 2
+
+Lossless, and despite the name a genuinely different bitstream from FSV1 rather than a variant of it —
+nothing below the four-byte grid header is shared. The grid gains one more flags byte, every block gains
+a format byte of its own, a pixel is one byte or two depending on its own top bit, and "unchanged" is no
+longer the only inter-frame trick a block can play.
+
+**The hybrid colourspace is a per-pixel choice.** Behind the block format byte's two-bit `ColorDepth`
+— 24-bit RGB, or, on every stream measured, the 15/7-bit hybrid — a byte with its high bit clear is a
+seven-bit index into a 128-entry palette; a byte with it set is the first half of a fifteen-bit colour,
+its own low seven bits over bits 14-8 and the next byte whole over bits 7-0, widened to 24 bits the same
+way this package's other 5-5-5 formats already are. That makes a block's decompressed length unknowable
+in advance, so it is decompressed whole and then walked pixel by pixel until the grid position's own
+pixel count is reached. The 128-entry default table is transcribed from the specification's Appendix C,
+"Screen Video v2 Palette" — a stream is free to carry a table of its own instead, a v1-shaped block of
+384 bytes, three a colour, decompressed the same way FSV1 already reads one.
+
+**A diff block's two extra header bytes name a run of rows**, not the whole cell: a row and a count,
+both counted from the cell's own bottom exactly as every row in this family already is. The decompressed
+pixel count follows the count and not the cell's height.
+
+**"Priming" is a DEFLATE preset dictionary keyed to the container's own key frames, and nothing about
+that sentence was obvious going in.** The first reading tried was this package's own ZMBV decoder's
+trick — one zlib stream held open across packets — and it is wrong: a block that does not claim to be
+primed decompresses alone as a complete, checksummed zlib stream, which a stream ZMBV-style continuation
+would have to *not* be. Feeding a primed block's raw bytes to an ordinary DEFLATE decoder with no history
+at all fails outright with a match reaching before the start of the data — the exact diagnostic a genuine
+preset dictionary produces and nothing else does. What the dictionary actually is took longer: not the
+previous frame's content for that cell, and not the immediately preceding block's own decode, but the
+exact byte sequence — in this format's coded form, one or two bytes a pixel, not the colour it means —
+that cell held the last time the *container* stated a key frame. Two consecutive full, unprimed blocks
+sent on ordinary interframes decode correctly on their own, each checked against ffmpeg's decoded
+picture, but the block after them primes against neither; it primes against the key frame twelve frames
+earlier, found by testing every candidate dictionary a plausible reading suggested until the decompressed
+byte count exactly consumed the compressed data with nothing left over and every resulting pixel matched
+ffmpeg's. Since neither .NET's zlib wrapper nor its `DeflateStream` exposes a preset dictionary, decoding
+this needed RFC 1951 read directly rather than asked of either — Huffman decoding, LZ77, and a sliding
+window seeded from the dictionary before the first bit of the compressed data is read, checked
+independently of anything Screen Video v2 needs by running it with an empty dictionary over an ordinary
+zlib payload's own raw DEFLATE bytes and comparing byte for byte against `ZLibStream`'s decode of the
+same input before it was trusted for the case `ZLibStream` cannot do at all.
+
+**Every block composes onto that reference, not onto the frame before it.** Before a block's own rows are
+written, the whole cell is repainted from the reference the last key frame established; only afterwards
+does the block's own decoded rows go on top. A block whose row count is zero and carries no data at all
+is not empty — it still repaints the cell from the reference, which is how three bytes put a cell that
+drifted across several interframes back where the last key frame left it.
+
+`ZlibPrimeCompressCurrent` — priming against a *different* cell's data, named by an explicit position the
+header would carry in that case — never appears in anything measured and refuses by name, as does a grid
+header setting `HasIFrameImage`, whose second list of blocks the specification describes only as
+interblocks "that must be combined with the previous keyblocks", without saying how.
+
+**Measured against ffmpeg**, built with its own flashsv2 encoder — five streams, 122 frames, sizes that
+are and are not a whole number of 64x64 blocks in either direction, multiple key frames a stream, and
+interframes mixing fresh, primed, whole-cell and partial-row blocks in every combination the encoder
+produced. **Every sample of every frame is identical**, RGB-native so the comparison is a direct one and
+not a plane-by-plane approximation of anything subsampled.
+
+What refuses: everything FSV1 already refuses, at the same points; `HasIFrameImage`; a block format byte
+naming a colour depth the specification does not define, or setting `ZlibPrimeCompressCurrent`; a diff
+block whose row range reaches outside its own cell; a key frame block that does not cover its whole cell,
+since nothing measured exercises what a partial reference would mean; a primed block whose cell has no
+reference to prime against; and a decompressed pixel stream that runs out before the pixel count a
+block's position in the grid calls for.
 
 ## 📜 License
 

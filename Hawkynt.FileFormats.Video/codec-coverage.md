@@ -22,16 +22,16 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 
 | | Count | Share |
 | --- | --- | --- |
-| Decoded and verified against ffmpeg | 41 | 19% |
+| Decoded and verified against ffmpeg | 42 | 20% |
 | Established as not implementable from files alone | 6 | 3% |
-| Not yet attempted | 164 | 78% |
+| Not yet attempted | 163 | 77% |
 
-The 41 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
+The 42 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
 frame against ffmpeg's decode of the same bitstream before it was merged, and the measurements are in
 each one's section of that file. The ones that reach exact equality on every sample of every frame
 are Microsoft RLE, Microsoft Video 1, Cinepak, QuickTime Animation, Apple Video, Apple Graphics, FLIC, HuffYUV,
-FFVHUFF, FFV1, ZMBV, TSCC, CSCD, Flash Screen Video, id RoQ, Ut Video, MagicYUV, v210, r210, r10k,
+FFVHUFF, FFV1, ZMBV, TSCC, CSCD, Flash Screen Video, Flash Screen Video 2, id RoQ, Ut Video, MagicYUV, v210, r210, r10k,
 y41p
 and CLJR — the two colour-space ones over 883 and 1,446 frames, in all six and all seven of their
 colour spaces, and the packed layouts on the sample data itself, at its own coded depth and with
@@ -115,9 +115,9 @@ reading of the same bits rather than against the picture that went in. This is t
 verifiable wins in the list — but not a uniformly cheap one. `lagarith`, which is arithmetic coding over
 the same kind of prediction, also came out of it and is now in `undecodable-codecs.md` instead.
 
-**Screen capture** — `flashsv2`, `g2m`, `mscc`, `mwsc`, `rasc`, `rscc`, `screenpresso`, `tdsc`,
-`tscc2`, `vmnc`, `wcmv`, `scpr`. Mostly DEFLATE over a framebuffer with a delta scheme on top, so
-also lossless and also absolutely measurable. `flashsv` came out of this group and reached exact
+**Screen capture** — `g2m`, `mscc`, `mwsc`, `rasc`, `rscc`, `screenpresso`, `tdsc`, `tscc2`, `vmnc`,
+`wcmv`, `scpr`. Mostly DEFLATE over a framebuffer with a delta scheme on top, so also lossless and
+also absolutely measurable. `flashsv` and `flashsv2` came out of this group and reached exact
 equality; see `README.md`.
 
 **Professional and intermediate** — `cfhd`, `hap`, `hq_hqa`, `hqx`, `pixlet`, `prores_raw`,
