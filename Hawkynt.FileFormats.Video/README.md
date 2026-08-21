@@ -61,6 +61,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | MPEG-4 Part 2 (ISO/IEC 14496-2) | `mp4v`, `XVID`, `DIVX`, `DX50`, `FMP4`, `MP4S`, `M4S2`, `3IV2`, `FVFW`, `RMP4`, `V_MPEG4/ISO/*` | Y | — |
 | Apple ProRes (SMPTE RDD 36) | `apco`, `apcs`, `apcn`, `apch`, `ap4h`, `ap4x` | Y | — |
 | VC-1 / Windows Media Video 9, intra pictures | `WMV3`, `WMV9` | Y | — |
+| Microsoft MPEG-4 version 2 | `MP42`, `DIV2` | Y | — |
 
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
@@ -681,6 +682,74 @@ scan tables twenty-four columns wide on a page that fits twenty-three, so two ce
 the margin and are absent from the document. Each scan is a permutation of 0 to 63, so which two
 values are missing is not in doubt; which position each belongs in follows from the scan's own
 geometry, and all three scans are exercised by the frames measured above.
+
+### Microsoft MPEG-4 version 2
+
+The middle of the three variants Microsoft derived from MPEG-4 Part 2 before Windows Media Video, and
+the one that turns out to be nearly all standard underneath. Intra and predicted pictures both, which
+is the whole format — it has no bidirectionally coded pictures.
+
+There is no start code, no sequence header and no video object layer header anywhere in the
+bitstream. A packet is a picture, and the picture header is seven bits — two for its type, five for
+the quantiser it uses throughout — plus five more for an intra picture's slice count or one for a
+predicted picture's skip flag. Everything ISO/IEC 14496-2 states once per layer is fixed rather than
+signalled, so the picture size comes from the container and there is nothing left to refuse.
+
+**The tables are mostly the standard's**, which is the finding that decides the shape of the whole
+decoder. The luminance coded block pattern is Table B-8 unaltered. The run-level codes are Table B-16
+for an intra luminance block and Table B-17 for an intra chrominance block and for every block of a
+predicted macroblock, both unaltered — the split is between the two tables rather than between intra
+and predicted macroblocks, which is not something a reader of the standard would guess. The intra DC
+size codes are Tables B-13 and B-14 with every bit inverted, so a differential of nought is `100`
+where the standard writes `011`. The motion vector difference is Table B-12 with the sign taken out of
+the code and read as a bit of its own, which works because the standard's codes for a difference and
+its negation differ in nothing but their last bit. Only two small tables are Microsoft's own: the
+chrominance pattern of an intra macroblock, and the eight macroblock types of a predicted picture.
+
+What else differs is small and each piece is invisible until it is not. A macroblock has one motion
+vector and never four. The quantiser is stated once per picture and the macroblock layer cannot
+change it, which is why the alternating current prediction here needs no rescaling. Vectors reach
+thirty-one and a half samples either way rather than a range the picture chooses. The intra DC step is
+eight at every quantiser, where the standard varies it by a table. The DC gradient test uses `<=`
+where the standard uses `<`, and the two disagree exactly where the gradients are equal — which is
+everywhere in a flat region. A predicted macroblock states its luminance pattern inverted unless both
+of its chrominance bits are set. And the second of the three escape forms adds nothing to the run it
+recovers where the standard adds one, which is a single `+ 1` that lands every later coefficient of
+the block one position out and still decodes.
+
+Sixty-four encoded streams, four thousand four hundred frames, were decoded here and by ffmpeg and
+compared plane by plane on every frame: four sources, sizes from 64x64 to 352x288, quantisers 3, 8, 16
+and 25, and groups of pictures of one frame, twelve and a thousand. **Forty-nine of the sixty-four are
+identical on every sample of every plane of every frame.** The other fifteen differ by exactly one
+level and never by more — 1,910 samples out of some 450 million, at worst 64 samples of a frame of
+152,064. That comparison is against ffmpeg's floating-point inverse transform; against its default
+integer one the residual is larger and it is the transform's rather than the decode's, which is what
+identifies it, since ISO/IEC 14496-2 Annex A specifies the inverse transform as an accuracy bound
+rather than as an algorithm. The bit-level reading was checked separately over 2,960 pictures, every
+one of which consumed exactly the bits it should, exercising all three escape forms.
+
+What refuses, by name: version 1 and version 3, which are different bitstreams sharing this one's
+name.
+
+One note on the source, because it is why this job is shaped the way it is. Microsoft published no
+specification for any of the three. The Open Specifications programme documents Microsoft's protocols
+and containers, not its codec bitstreams; SMPTE ST 421 standardised Windows Media Video 9 and says
+nothing of the three before it; and the one Microsoft document that reaches a nearby codec specifies
+motion compensation and deblocking for Windows Media Video 8 while leaving entropy decoding to the
+host. The only public description of the bitstream is Michael Niedermayer's *DIVX3 / MS-MPEG4v1-v3 /
+WMV7-8* (0.07, 2003, GNU Free Documentation Licence), which gives the syntax in full and then refers
+the reader to a reverse-engineered decoder's source for every large table. The syntax here follows
+that document; the tables were derived from the bitstream, by building pictures whose content was
+known and reading back the codeword that had to stand for it, and — for the four macroblock types no
+encoder emits — by writing streams that use a codeword and asking a reference decoder what it made of
+them.
+
+Version 3 is out of reach on the same evidence. Each of its pictures chooses which of six run-level
+tables, which of two DC tables and which of two motion vector tables it was coded with, and all ten
+are Microsoft's own with nothing published anywhere. The motion vector tables pair one code with a
+whole vector across some eleven hundred entries, which no encoder can be driven to emit in full, so a
+decoder derived from observation would be complete only where somebody happened to look. Version 1 has
+no encoder in existence to derive its two macroblock tables from or to check a guess against.
 
 ## 📜 License
 
