@@ -75,6 +75,8 @@ who wants one frame of a two-hour recording pays for one frame.
 
 | Ut Video | `ULRG`, `ULRA`, `ULY0`, `ULY2`, `ULY4`, `ULH0`, `ULH2`, `ULH4` | Y | — |
 
+| TechSmith Screen Capture (TSCC) | `tscc` | Y | — |
+
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
 is an undivided heap of bytes, and where each packet starts and stops is a computation over five
@@ -1174,6 +1176,37 @@ no zlib stream to continue; a version other than the only one the format defines
 height of zero; a pixel layout the format defines but no encoder writes — 1, 2 and 4 bits a pixel
 palettised, and 24 bits a pixel — since there is nothing to measure a guess at their byte packing
 against; and a packet whose compressed data runs out before its frame does.
+
+### TechSmith Screen Capture
+
+Lossless, and built from a document rather than a guess: "Description of the TechSmith Screen Capture
+Codec (TSCC)" by Mike Melanson and Konstantin Shishkov gives the whole of the coding. It is zlib
+wrapped around a run-length coding that is Microsoft's own in every particular but the width of a
+pixel — a count and a colour repeated, or one of three escapes that move the pen instead of painting
+with it — walked onto the picture from the bottom row up, at eight bits a pixel through a palette or
+at sixteen, twenty-four or thirty-two directly.
+
+**Not every packet carries a picture.** A screen-capture video spends most of its frames on content
+that has not changed at all, and this codec's answer to a completely unchanged frame is not to
+compress an empty delta — compressing nothing costs more bytes than it saves — but to write a few
+bytes that are not zlib data at all and carry no picture. Measured directly: on one sample, 348 of 849
+packets open with a valid zlib header, and ffprobe's own frame count for the same file is 348 exactly.
+The other 501 are read off the bytes rather than a flag the format states nowhere — a valid zlib
+stream's header carries a checksum property, `(CMF × 256 + FLG) mod 31 = 0`, that essentially never
+holds by accident — and a packet that fails it produces no frame at all, the same "not yet" this
+package's decoder interface already has a word for.
+
+**Measured against ffmpeg**, at every depth a real sample was found at. Four files and 2,240 frames —
+16-bit (555), 24-bit and 32-bit pixel layouts, one of them truncated to a fraction of its stated length
+by the mirror it was fetched from and read for whatever whole frames that leaves — decoded here and
+compared against ffmpeg's own decode of the same packets. **Every sample of every frame is identical.**
+The palettised 8-bit path, which none of the four samples happens to use, was checked the other way
+round: a hand-built stream exercising a run, an absolute copy, a position-change escape and an
+unchanged-frame packet, decoded here and by ffmpeg, agreeing on every index and every palette entry.
+
+What refuses: a depth the format does not define; a palettised stream with no palette to decode its
+indices to, since the palette is the container's business — TSCC's own document says so — and never
+carried in a frame; and any opcode that runs off the picture or off the end of the decompressed data.
 
 ## 📜 License
 

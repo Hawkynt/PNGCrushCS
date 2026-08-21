@@ -22,16 +22,18 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 
 | | Count | Share |
 | --- | --- | --- |
-| Decoded and verified against ffmpeg | 23 | 11% |
+| Decoded and verified against ffmpeg | 29 | 14% |
 | Established as not implementable from files alone | 4 | 2% |
-| Not yet attempted | 184 | 87% |
+| Not yet attempted | 178 | 84% |
 
-The 23 are the codec table in `README.md`. Every one was cross-checked frame by frame against
-ffmpeg's decode of the same bitstream before it was merged, and the measurements are in each one's
-section of that file. The ones that reach exact equality on every sample of every frame are
-Microsoft RLE, Microsoft Video 1, Cinepak, QuickTime Animation, Apple Video, FLIC, HuffYUV, FFVHUFF,
-FFV1, ZMBV and Ut Video — the last over 883 frames in all six of its colour spaces. Theora and VP3
-reach it too, Theora over 1,717 frames across all three of its pixel formats and VP3 over 3,182.
+The 29 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
+table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
+frame against ffmpeg's decode of the same bitstream before it was merged, and the measurements are in
+each one's section of that file. The ones that reach exact equality on every sample of every frame
+are Microsoft RLE, Microsoft Video 1, Cinepak, QuickTime Animation, Apple Video, FLIC, HuffYUV,
+FFVHUFF, FFV1, ZMBV, TSCC and Ut Video — the last over 883 frames in all six of its colour spaces.
+Theora and VP3 reach it too, Theora over 1,717 frames across all three of its pixel formats and VP3
+over 3,182.
 
 The 4 are Indeo 3, Indeo 4, Indeo 5 and TrueMotion 1, and the argument that settles them is in
 `undecodable-codecs.md`: their frames are too small to carry the tables they need — 340 bytes for a
