@@ -22,14 +22,14 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 
 | | Count | Share |
 | --- | --- | --- |
-| Decoded and verified against ffmpeg | 22 | 10% |
+| Decoded and verified against ffmpeg | 23 | 11% |
 | Established as not implementable from files alone | 4 | 2% |
-| Not yet attempted | 185 | 88% |
+| Not yet attempted | 184 | 87% |
 
-The 22 are the codec table in `README.md`. Every one was cross-checked frame by frame against
+The 23 are the codec table in `README.md`. Every one was cross-checked frame by frame against
 ffmpeg's decode of the same bitstream before it was merged, and the measurements are in each one's
-section of that file. Seven reach exact equality on every sample: Microsoft RLE, Microsoft Video 1,
-Cinepak, QuickTime Animation, HuffYUV, FFVHUFF and FFV1. Theora reaches it too, over 1,717 frames
+section of that file. Eight reach exact equality on every sample: Microsoft RLE, Microsoft Video 1,
+Cinepak, QuickTime Animation, HuffYUV, FFVHUFF, FFV1 and ZMBV. Theora reaches it too, over 1,717 frames
 across all three of its pixel formats.
 
 The 4 are Indeo 3, Indeo 4, Indeo 5 and TrueMotion 1, and the argument that settles them is in
