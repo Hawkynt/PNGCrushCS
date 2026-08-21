@@ -31,9 +31,9 @@ table rows — one row covers several names where a decoder does. Every one was 
 frame against ffmpeg's decode of the same bitstream before it was merged, and the measurements are in
 each one's section of that file. The ones that reach exact equality on every sample of every frame
 are Microsoft RLE, Microsoft Video 1, Cinepak, QuickTime Animation, Apple Video, Apple Graphics, FLIC, HuffYUV,
-FFVHUFF, FFV1, ZMBV, TSCC, CSCD, Flash Screen Video, Flash Screen Video 2, id RoQ, Interplay Video, ZeroCodec, LCL ZLIB, Ut Video, MagicYUV, v210, r210, r10k,
-y41p, CLJR
-and ZeroCodec — the two colour-space ones over 883 and 1,446 frames, in all six and all seven of their
+FFVHUFF, FFV1, ZMBV, TSCC, CSCD, Flash Screen Video, Flash Screen Video 2, id RoQ, Interplay Video, Ut Video, MagicYUV, v210, r210, r10k,
+y41p, CLJR, ZeroCodec
+and LCL ZLIB — the two colour-space ones over 883 and 1,446 frames, in all six and all seven of their
 colour spaces, and the packed layouts on the sample data itself, at its own coded depth and with
 no display conversion in the way, over 120, 90, 90, 90 and 60 frames at three geometries each.
 CLJR is the one lossy format among them — measured against ffmpeg's own decode rather than the
@@ -114,9 +114,9 @@ wall with no published specification at all.
 
 **Sorenson** — `svq1`, `svq3`. No published specification.
 
-**Lossless RGB and YUV** — around 30 names including `012v`, `aasc`, `cllc`, `cyuv`, `dxtory`,
-`loco`, `m101`, `magicyuv`, `mszh`, `r10k`, `r210`, `sheervideo`, `v210`, `vble`, `y41p`, `ylc`
-and `zlib`. Ut Video came out of this group and reached exact equality, which is the
+**Lossless RGB and YUV** — what is left of the group is `012v`, `aasc`, `cllc`, `cyuv`, `dxtory`,
+`loco`, `m101`, `sheervideo`, `vble` and `ylc`. Ut Video, MagicYUV, ZeroCodec and LCL ZLIB came out
+of it and reached exact equality, and MSZH came out of it into `undecodable-codecs.md`. That is the
 standard for every one of them: max delta 0 or it is wrong. `v210`, `r210`, `r10k` and `y41p` carry no
 compression at all, only a fixed packing of samples into words or byte groups, so there was nothing for
 a decoder to get wrong except the layout, and the two RGB ones decode straight into a ten-bit RGB pixel
