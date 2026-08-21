@@ -644,13 +644,12 @@ names for MSS2's own arithmetic coder — `ac2_init`, `ac2_renorm`, `ac2_get_sca
 with the functions FFmpeg's own `libavcodec/mss2.c` is independently known to define: `arith2_normalise`,
 `arith2_get_scaled_value`, `arith2_rescale_interval`, `arith2_get_number`, `arith2_get_prob`,
 `arith2_get_consumed_bytes`. That is not a family resemblance between two people who solved the same
-problem; a `get_consumed_byes` typo surviving next to five other functions that keep the same argument
-order and the same names in the same sequence is what a page describing an implementation, function by
-function, looks like. `decode_pal_v2`, `decode_555` and `decode_rle` appear on the wiki page under those
-exact names as well. This project does not transcribe or translate ffmpeg's source, and a wiki page that
-is itself a paraphrase of that source is the same material at one remove — using it to write a decoder
-here would be exactly what the rule against transcription exists to prevent, whether or not a single line
-of code is copied.
+problem; a `get_consumed_byes` typo surviving next to six other functions that keep the same argument
+order and the same names in the same sequence, one letter and one prefix apart, is what a page
+describing an implementation, function by function, looks like. This project does not transcribe or
+translate ffmpeg's source, and a wiki page that is itself a paraphrase of that source is the same
+material at one remove — using it to write a decoder here would be exactly what the rule against
+transcription exists to prevent, whether or not a single line of code is copied.
 
 Set the wiki page aside and nothing independent is left. The Witten, Neal and Cleary paper the arithmetic
 coder is said to resemble is genuinely independent and genuinely published, but it describes arithmetic
