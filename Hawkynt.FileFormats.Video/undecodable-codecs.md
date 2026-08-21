@@ -1,14 +1,16 @@
 # Codecs investigated and not implemented
 
-Seven codecs were investigated and none was implemented. That is a result rather than a gap, and it is
+Eight codecs were investigated and none was implemented. That is a result rather than a gap, and it is
 written down here so the work is not repeated by somebody who assumes it was never attempted.
 
-Five of them stop for one reason and two for another, and the two reasons are worth keeping apart. The
-first five need constant tables that are not in the file. VP6 and VP5 stop somewhere else entirely:
-VP6's tables **are** published, every one of them was transcribed and checked, and the decode still
-does not come out. Where each stops is recorded below.
+They stop in three different places, and the three are worth keeping apart. Five need constant tables
+that are not in the file. VP6 and VP5 stop somewhere else entirely: VP6's tables **are** published,
+every one of them was transcribed and checked, and the decode still does not come out. Lagarith stops
+at a third place again — its wrapper comes out completely, and the entropy coder inside it is defined
+by the rounding behaviour of one implementation's floating-point unit rather than by anything written
+down. Where each stops is recorded below.
 
-None of the seven had anything committed.
+None of the eight had anything committed.
 
 Indeo 3 (`IV32`), Indeo 4 (`IV41`), Indeo 5 (`IV50`), TrueMotion 1 (`DUCK`) and TrueMotion 2 (`TM20`)
 are the proprietary codecs of the multimedia era. None has a published specification. No encoder for
@@ -233,3 +235,88 @@ decisions of the first block.
 Not attempted. VP5 shares the range coder and the coefficient model family with VP6, so it is behind
 the same wall, and unlike VP6 it has no published specification at all — only a community description
 of its range coder and frame header. Whatever unblocks VP6 is the thing to try first on VP5.
+
+# Lagarith, where the entropy coder's state is a floating-point number
+
+Lagarith (`LAGS`) is a lossless codec of the HuffYUV family: median prediction, a run-length pass over
+the zeroes, and then a range coder rather than a Huffman table. It was investigated because lossless
+is the sharpest bar this package has — max delta 0 or the decoder is wrong — and because two of its
+relatives, Ut Video and MagicYUV, both reached that bar. This one does not, and the reason is
+specific rather than a shortage of effort.
+
+Samples were fetched from `samples.ffmpeg.org` under `V-codecs/lagarith/` — `lagarith.avi`,
+`lagarith422.avi` and `sample-yv12-lags.avi`, 452 frames between them, covering all three of the
+colour arrangements a real file uses. ffmpeg decodes all three. Nothing was committed.
+
+## What was recovered, and verified
+
+The frame layer comes out completely, and it agrees with the codec author's own description on
+MultimediaWiki, which he wrote there himself in 2006:
+
+  - **Byte 0 is the frame type.** The published list runs 1 to 11: uncompressed, unaligned RGB24,
+    arithmetic-coded YUY2, arithmetic-coded RGB24, solid grey, solid colour, an obsolete RGB
+    keyframe, arithmetic-coded RGBA, solid RGBA, arithmetic-coded YV12, and a reduced-resolution
+    frame. A frame of no bytes at all means the picture is unchanged from the one before.
+  - **Two 32-bit little-endian plane offsets follow it**, and the first plane's data begins at byte 9.
+    Verified on every frame of all three files: 451 of 452 have offsets that rise, land inside the
+    frame, and leave three pieces whose sizes are in the ratio the pixel format implies. The one that
+    does not is the last packet of `sample-yv12-lags.avi`, whose published file ends part way through
+    a frame — its checksum matches the manifest, so the sample is truncated rather than the download.
+  - **The three files use types 4, 3 and 10**, which is arithmetic-coded RGB24, YUY2 and YV12, and
+    their stream descriptions carry 0, 1 and 2 in the four bytes behind the `BITMAPINFOHEADER`.
+  - **Each plane opens with one byte that is the run-length escape length** — how many zeroes in a row
+    trigger a run, which the author's changelog says is 1, 2 or 3, with 0 meaning the plane was coded
+    without the run pass at all. Measured over 1,353 planes: `lagarith.avi` uses 1, 2 and 3 across its
+    planes, `lagarith422.avi` uses 3 throughout, and `sample-yv12-lags.avi` uses 2 and 3 with a single
+    plane at 0.
+  - **Red and blue are carried as their difference from green**, and the prediction is HuffYUV's
+    median. Both are stated by the author.
+
+## Where it stops
+
+Everything above is the wrapper. Inside it is a range coder, and four things about that coder are
+published nowhere:
+
+  1. how it is initialised — the starting range and the number of bytes that prime it;
+  2. its renormalisation rule, of which the only public statement is that the denominator is the top
+     two bytes of the range;
+  3. how the decoder knows to stop;
+  4. the layout of the per-plane probability header, which carries a scale and an escape count.
+
+The community description of the fourth — that the probabilities are Fibonacci-coded with a run
+escape for zeroes — was tried against all nine planes of the three files under twelve readings: the
+code taken as the value and as a length prefix, bits taken most and least significant first, and with
+and without the little-endian word swap that its two nearest relatives need. **No reading produces a
+plausible table for more than one plane at a time**, and none produces 256 probabilities summing to
+anything round. The published sentence is a sketch by somebody who had read the format, not a
+specification, and the wiki still carries its original "describe compressed data layout" note twenty
+years on.
+
+## The part that makes this different from a shortage of effort
+
+**The coder's state is a floating-point variable**, and the scaling in the probability header is
+computed in floating point and has to round exactly the way the reference implementation's x86
+arithmetic rounds. The FFmpeg developers hit this directly while writing their decoder: on one clip a
+probability came out as 0x700 where the reference gives 0x6ff, and their conclusion was that ordinary
+floats are not portable enough to match it. That is not a detail to be tidied up later. It means the
+format is defined by the rounding behaviour of one implementation's floating-point unit rather than by
+anything writable down, and reproducing it means reproducing that implementation.
+
+There are exactly two descriptions of this coder in existence, and both are implementations — the
+codec's own GPL source and ffmpeg's decoder. This project does not transcribe implementations, so
+neither is available, and there is no third thing to read.
+
+**And the oracle is not sound for this bar.** FFmpeg's own issue tracker records its Lagarith decoder
+as not bit-exact. Every other codec here was accepted by comparing against ffmpeg's decode of the same
+bitstream; for a codec whose standard is exact equality, an oracle that is itself known to be
+inexact cannot establish that standard. Even a decoder written here that happened to be right could
+not be shown to be right, and one that was wrong would not be caught. That is the second wall, and it
+stands whichever way the first one is got round.
+
+## What would change the answer
+
+A published description of the range coder — initialisation, renormalisation, termination and the
+probability header's fields — from a source that is not an implementation. Failing that, a reference
+decoder that is bit-exact, so that a comparison could mean something. Neither exists today, and the
+frame layer above is recorded here so that whoever finds one does not have to start from the
+container.
