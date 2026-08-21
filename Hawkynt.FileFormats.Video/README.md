@@ -54,6 +54,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | H.263 (ITU-T H.263 baseline) | `H263`, `s263`, `U263` | Y | — |
 | Sorenson Spark (Flash Video's H.263) | `FLV1` | Y | — |
 | H.264 / AVC, Baseline I and P slices | `avc1`, `avc3`, `H264`, `X264`, `DAVC`, `VSSH`, `V_MPEG4/ISO/AVC` | Y | — |
+| On2 VP3.1 | `VP31`, `VP32` (and `VP30`, refused by name) | Y | — |
 | VP8 (RFC 6386) | `VP80`, `vp08`, `V_VP8` | Y | — |
 | VP9, profile 0 | `VP90`, `vp09`, `V_VP9` | Y | — |
 | HuffYUV / FFVHUFF | `HFYU`, `FFVH` | Y | — |
@@ -321,6 +322,48 @@ What refuses: a depth the compressor does not code; an indexed depth carrying no
 the Macintosh default palettes cannot be checked against anything here and a picture drawn through a
 guessed table cannot be told from one drawn through the right one; a stream that opens with a frame
 touching only part of the picture; and any count that would write outside the line it is on.
+
+### On2 VP3.1
+
+The codec Theora was built from, and all of it: the run-length coded block flags, all eight macro
+block coding modes with the eight schemes for coding the modes themselves, motion vectors from either
+of two reference frames at half-pixel accuracy, the eighty built-in DCT token codebooks, DC prediction
+from four weighted neighbours, the normative integer inverse DCT with its DC-only shortcut, and the
+deblocking loop filter.
+
+On2 donated VP3 to Xiph.Org, who built Theora on it, so the free and complete Theora specification is
+also the specification for most of VP3 — the two share the frame layout, the transform, the
+quantisation, the coding modes, the motion vector coding and the loop filter, and Appendix B of that
+document writes down the tables VP3 has hard-coded where Theora carries them in a setup header. What
+it does not write down is VP3's own frame header, which it says only is "substantially different".
+That was derived from VP3 streams and the derivation is written out where the code parses it: the
+number of bits before the coded-block flags was found by decoding whole frames at each candidate
+length and keeping the one where every coded block's coefficients were accounted for, and which six
+bits hold the quantisation index was settled by decoding both ways and comparing against a reference
+decoder. The same goes for where the picture sits inside the coded frame when the size is not a
+multiple of sixteen: the specification says the lower left, VP3 files say the upper left, and the
+files win.
+
+Seven streams and 3,182 frames — 640x480, 640x272, 480x256, 350x141, 320x240 and 280x200, the last two
+of which are not a whole number of macro blocks — were decoded here and by ffmpeg and compared plane
+by plane, sample by sample. Every plane of every frame is identical: not close, not on average, the
+same bytes, on the 1,505th frame of a run as on the first. That is the only acceptable result, because
+the loss happened in the encoder and both decoders are reading what came out of it — and because an
+error of one anywhere in the transform or the loop filter is added to the next frame's error and the
+one after that, growing until the next intra frame. Counting what two of the streams contain, between
+them they use all eight coding modes — including the four-vector mode and both golden-frame modes —
+both ways of coding a motion vector, quantisation indices between 17 and 63, and 645,877 half-pixel
+predictions.
+
+What is not implemented refuses and says so: a `VP30` stream, which is the earlier VP3.0 bitstream and
+cannot be read with VP3.1's rules at any bit offset; a stream whose container states no picture size,
+since VP3 carries none of its own; a stream that begins at an inter frame; a packet that ends in the
+middle of a frame; a run of block flags longer than the frame has blocks; a coefficient token that
+would write past the end of a block; and a frame whose tokens do not account for every coefficient of
+every coded block. None of them hands back a picture. That matters more here than in most codecs,
+because a frame in which nothing changed is a normal thing for a VP3 stream to contain — so a decoder
+that repeated the previous frame on failure would be producing exactly what working looks like.
+
 ### VP8
 
 The codec WebM was built around, and all of it: the boolean entropy decoder, segmentation, both loop
