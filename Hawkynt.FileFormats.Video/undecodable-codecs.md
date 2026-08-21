@@ -439,6 +439,7 @@ arithmetic, both frame sizes measured exactly, both chroma formats confirmed —
 whoever picks this up again starts from the block layer and not from the container.
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 # Windows Media Video 7 (WMV1), where the tables are MS-MPEG4v3's own
 
 WMV1 — Microsoft's name is Windows Media Video 7 — was investigated because it looked like it might
@@ -607,3 +608,72 @@ tables and the two motion-vector tables, from a source that is not an implementa
 needs `wmv2_inter_table`'s three entries published on top, since that table is its own and not covered
 by anything that would settle the other three versions.
 >>>>>>> 8bfb2e9a (Investigated wmv2 on the same evidence that stopped wmv1, and it)
+=======
+# Microsoft Screen Codec 1 (MSS1), where the only detailed write-up is somebody else's decoder
+
+MSS1 — Windows Media Screen Codec version 7, FourCC `MSS1` — was investigated as the simpler of the two
+screen codecs Microsoft shipped alongside Windows Media Video. It is a real arithmetic coder over a
+recursively subdivided picture, not a table-driven codec like the Windows Media Video family above, so
+the argument that settles Indeo and TrueMotion does not apply to it directly. It stops one step earlier
+than that: there is nothing independent to build from at all.
+
+## What Microsoft published, and what it covers
+
+Microsoft's own documentation of this codec is on `learn.microsoft.com`, under "Windows Media Video 9
+Screen Codec", "Windows Media Video 9 Screen Decoder" and "Windows Media Video 9 Screen Encoder". Every
+one of those pages is a DirectX Media Object and Media Foundation Transform reference: the class
+identifiers (`CLSID_CMSSCEncMediaObject2` to encode, `CLSID_CMSSCDecMediaObject` to decode both MSS1 and
+MSS2), the FourCCs, and the pixel formats a decoder instance will hand back — `RGB24`, `RGB32`,
+`ARGB32`, `RGB565`, `RGB555`, `RGB8`. That is the same shape the Open Specifications programme's coverage
+of the whole Windows Media family already has: the API surface and the container are documented, the
+bitstream inside the packets is not. Nothing on any of those pages states a header layout, an entropy
+coder, a block type or a context model.
+
+## The one detailed write-up found, and why it cannot be used
+
+MultimediaWiki's "Microsoft Screen Codec" page is the only place a bitstream-level description of MSS1
+exists at all: a header layout, an arithmetic coder said to resemble a 1987 paper by Witten, Neal and
+Cleary, a context modeller with a last-decoded-pixel cache and several adaptive layers, and pseudocode
+for two functions it names `recursive_decode_intra` and `recursive_decode_inter`. Nothing on the page
+states where this description came from — no citation to a Microsoft document, no note that it was
+reverse-engineered from the codec binary, nothing.
+
+What the page does carry is a strong, specific signal about where it came from anyway. Its function
+names for MSS2's own arithmetic coder — `ac2_init`, `ac2_renorm`, `ac2_get_scaled_value`,
+`ac2_rescale_interval`, `ac2_get_number`, `ac2_get_prob`, `ac2_get_consumed_byes` — line up one for one
+with the functions FFmpeg's own `libavcodec/mss2.c` is independently known to define: `arith2_normalise`,
+`arith2_get_scaled_value`, `arith2_rescale_interval`, `arith2_get_number`, `arith2_get_prob`,
+`arith2_get_consumed_bytes`. That is not a family resemblance between two people who solved the same
+problem; a `get_consumed_byes` typo surviving next to six other functions that keep the same argument
+order and the same names in the same sequence, one letter and one prefix apart, is what a page
+describing an implementation, function by function, looks like. This project does not transcribe or
+translate ffmpeg's source, and a wiki page that is itself a paraphrase of that source is the same
+material at one remove — using it to write a decoder here would be exactly what the rule against
+transcription exists to prevent, whether or not a single line of code is copied.
+
+Set the wiki page aside and nothing independent is left. The Witten, Neal and Cleary paper the arithmetic
+coder is said to resemble is genuinely independent and genuinely published, but it describes arithmetic
+coding in general, not this codec: it has no header layout, no block types, no cache sizes, no context
+selection rules and no escape thresholds, all of which are Microsoft's own design choices for this
+specific format and are exactly what a decoder needs.
+
+## Why blind reverse engineering does not reach it either
+
+Every codec on this page that was mapped from the bitstream alone — TrueMotion 2, Indeo 3's header, the
+container layers of DV and Lagarith — had some independently-sourced anchor to start from: a field whose
+meaning could be cross-checked against a `BITMAPINFOHEADER`, or a container invariant measured directly
+against real files. MSS1 offers no such anchor. Its extradata and its packet bytes are opaque without
+already knowing the arithmetic coder's renormalisation rule and the context models it starts from, and
+unlike Lagarith — whose author published the frame layer himself in 2006, leaving only the range coder
+unresolved — no comparable first-party description of MSS1 exists to start from at all. And unlike every
+codec in the "Windows Media before VC-1" family above, ffmpeg carries no `mss1` encoder — `ffmpeg -h
+encoder=mss1` reports none available — so a corpus is limited to whatever samples exist already, at
+`samples.ffmpeg.org/V-codecs/MSS1/`, rather than one built to order.
+
+## What would change the answer
+
+A description of MSS1's bitstream from a source that is not an implementation: a Microsoft document
+that states the header layout, the coder and the context models rather than only the DMO/MFT class
+identifiers and pixel formats, or an independent reverse-engineering write-up that says, plainly, how it
+was produced and from what.
+>>>>>>> 125a73c6 (Investigated mss1 and found no independent description of its)
