@@ -255,6 +255,110 @@ public sealed class Mp4ReaderTests {
 
   [Test]
   [Category("Unit")]
+  public void ACompressedMovieHeader_ReadsTheSameAsAPlainOne() {
+    // Classic QuickTime's "fast start, compressed header": moov's only child is a cmov naming zlib and
+    // holding the real moov, its inflated size stated first and the deflated bytes after. Both of the
+    // reference files this was measured against — a Sorenson SMC one and a VP3 one — are written this
+    // way, and a reader that only ever looked for mvhd straight off moov's own children refused both
+    // for a box that was there, just not where it looked.
+    var track = new Mp4TestTrack {
+      Codec = "jpeg",
+      Samples = [_Payload(1, 10), _Payload(2, 20), _Payload(3, 30)],
+    };
+
+    var plain = Mp4Reader.FromBytes(Mp4TestContainer.Build([track]));
+    var compressed = Mp4Reader.FromBytes(Mp4TestContainer.Build([track], compressMovieHeader: true));
+
+    var plainStream = Mp4Container.Streams(plain)[0];
+    var compressedStream = Mp4Container.Streams(compressed)[0];
+    Assert.That(compressedStream.Codec, Is.EqualTo(plainStream.Codec));
+    Assert.That(compressedStream.Width, Is.EqualTo(plainStream.Width));
+    Assert.That(compressedStream.Height, Is.EqualTo(plainStream.Height));
+
+    var plainPackets = Mp4Container.ReadPackets(plain).ToList();
+    var compressedPackets = Mp4Container.ReadPackets(compressed).ToList();
+    Assert.That(compressedPackets.Select(p => p.Data.ToArray()), Is.EqualTo(plainPackets.Select(p => p.Data.ToArray())));
+    Assert.That(compressedPackets.Select(p => p.PresentationTimestamp), Is.EqualTo(plainPackets.Select(p => p.PresentationTimestamp)));
+    Assert.That(compressedPackets.Select(p => p.IsKeyFrame), Is.EqualTo(plainPackets.Select(p => p.IsKeyFrame)));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void ACompressedMovieHeadersSampleOffsets_PointIntoTheRealFileNotTheInflatedBuffer() {
+    // A chunk offset inside a decompressed moov still counts from the start of the file that was
+    // handed in, because a compressed movie header never touches mdat — only the atom tree above it
+    // moved. A reader that validated or resolved those offsets against the small inflated buffer
+    // instead of the real file would refuse every sample as out of range, or read the wrong bytes.
+    var samples = new[] { _Payload(1, 6), _Payload(2, 9), _Payload(3, 12) };
+    var container = Mp4TestContainer.Build([new Mp4TestTrack { Samples = samples }], compressMovieHeader: true);
+
+    var packets = _Packets(container);
+
+    Assert.That(packets.Select(p => p.Data.ToArray()), Is.EqualTo(samples));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void ACompressedMovieHeaderWithAnUnknownAlgorithm_IsRefusedByName() {
+    // zlib is the only method every file this was measured against uses, and the only one this reader
+    // decompresses. A file naming another one is refused with that name rather than as a plain missing
+    // mvhd, which is what it would look like without the check.
+    var container = Mp4TestContainer.Build([new Mp4TestTrack { Samples = [_Payload(1, 4)] }], compressMovieHeader: true);
+    var algorithm = _Find(container, "dcom");
+    container[algorithm] = (byte)'x';
+    container[algorithm + 1] = (byte)'y';
+    container[algorithm + 2] = (byte)'z';
+    container[algorithm + 3] = (byte)'1';
+
+    var failure = Assert.Throws<NotSupportedException>(() => Mp4Reader.FromBytes(container));
+    Assert.That(failure!.Message, Does.Contain("xyz1"));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void ACompressedMovieHeaderWithNoCmvd_IsRefusedByName() {
+    var container = Mp4TestContainer.Build([new Mp4TestTrack { Samples = [_Payload(1, 4)] }], compressMovieHeader: true);
+    var cmvdType = _Find(container, "cmvd") - 4;
+    container[cmvdType] = (byte)'f';
+    container[cmvdType + 1] = (byte)'r';
+    container[cmvdType + 2] = (byte)'e';
+    container[cmvdType + 3] = (byte)'e';
+
+    var failure = Assert.Throws<InvalidDataException>(() => Mp4Reader.FromBytes(container));
+    Assert.That(failure!.Message, Does.Contain("cmvd"));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void ACompressedMovieHeaderWhoseCmvdIsNotValidZlib_IsRefusedByName() {
+    var container = Mp4TestContainer.Build([new Mp4TestTrack { Samples = [_Payload(1, 4)] }], compressMovieHeader: true);
+    var cmvdBody = _Find(container, "cmvd");
+    // Past the four-byte inflated size, into what is supposed to be the zlib stream.
+    for (var i = 0; i < 8; ++i)
+      container[cmvdBody + 4 + i] = 0xFF;
+
+    var failure = Assert.Throws<InvalidDataException>(() => Mp4Reader.FromBytes(container));
+    Assert.That(failure!.Message, Does.Contain("cmvd"));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void AMovieWithNeitherMvhdNorCmov_StillNamesMvhdAsWhatIsMissing() {
+    // A moov with no mvhd and no cmov either is genuinely missing its header, and the message has to
+    // keep saying so rather than mentioning a box that was never there.
+    var container = Mp4TestContainer.Build([new Mp4TestTrack { Samples = [_Payload(1, 4)] }]);
+    var mvhdType = _Find(container, "mvhd") - 4;
+    container[mvhdType] = (byte)'f';
+    container[mvhdType + 1] = (byte)'r';
+    container[mvhdType + 2] = (byte)'e';
+    container[mvhdType + 3] = (byte)'e';
+
+    var failure = Assert.Throws<InvalidDataException>(() => Mp4Reader.FromBytes(container));
+    Assert.That(failure!.Message, Does.Contain("mvhd"));
+  }
+
+  [Test]
+  [Category("Unit")]
   public void AMovieBoxWrittenBeforeTheMedia_ReadsTheSameAsOneWrittenAfterIt() {
     // A writer producing a file in one pass cannot know its own sample tables until it has written
     // the samples, so moov ends up last — which is what both reference files are. A file prepared for

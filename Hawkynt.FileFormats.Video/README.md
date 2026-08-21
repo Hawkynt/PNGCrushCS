@@ -89,6 +89,22 @@ tables in `stbl`, which is why a file whose `moov` follows its `mdat` needs no s
 fragmented file, whose sample tables live in `moof` boxes instead, is refused by name rather than
 read as a film of no packets.
 
+Classic QuickTime allows the whole movie atom to be written deflated into a single `cmov` — what
+"Save As" writes for a file meant to start playing before it finishes downloading — and a reader
+that only ever looked for `mvhd` straight off `moov`'s own children refused every one of these,
+naming the box that happened not to be there rather than the one that was. Inflated with the zlib
+the file itself names in `dcom`, what `cmvd` holds is an ordinary uncompressed `moov`; nothing about
+reading it afterwards changes, because a chunk offset inside it still counts from the start of the
+real file, exactly as one in an uncompressed `moov` does — a compressed header moves where the atom
+tree lives and not one byte of `mdat`. A method other than `zlib`, which is the only one any file
+this was measured against names, is refused by name instead of guessed at.
+
+Measured on thirty-eight files a sweep of samples.ffmpeg.org's QuickTime and MOV samples found
+written this way, seven of them opened in full — Sorenson SMC, VP3, QuickTime RLE twice over, ALAC,
+SVQ1 with QCELP sound, and ZyGo — every video track's packets agreeing with `ffprobe -fflags
++noparse` on count, size, timestamp and key-frame flag, all of it: 962, 622, 1440, 214, 1 and 3586
+packets across the six with pictures, matched one for one.
+
 An MPEG program stream states its packet boundaries even less than that. It chops each elementary
 stream into PES packets sized to fill 2048-byte packs, so a picture routinely spans two of them and
 one of them routinely holds seven pictures. The payloads are stitched back together and cut again
