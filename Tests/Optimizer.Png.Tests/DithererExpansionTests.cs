@@ -168,7 +168,7 @@ public sealed class DithererExpansionTests {
       UseDithering: true,
       AllowLossyPalette: false,
       QuantizerNames: ["Wu"],
-      DithererNames: ["Ordered_Bayer4x4"],
+      DithererNames: ["OrderedDitherer_Bayer4x4"],
       FilterStrategies: [FilterStrategy.SingleFilter],
       DeflateMethods: [DeflateMethod.Default]
     ));
