@@ -46,6 +46,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | id RoQ | `.roq` | Y | — |
 | Interplay MVE | `.mve` | Y | — |
 | id Cinematic | `.cin` | Y | — |
+| Westwood VQA | `.vqa` | Y | — |
 
 | Codec | Tag | Decode | Encode |
 | --- | --- | --- | --- |
@@ -111,6 +112,8 @@ who wants one frame of a two-hour recording pays for one frame.
 
 | Vidvox Hap | `Hap1`, `Hap5`, `HapY`, `HapM`, `HapA` (`Hap7`, `HapH` refused by name) | Y | — |
 | id Cinematic Video | `IDCV` (synthetic — the format states no codec tag of its own) | Y | — |
+
+| Westwood VQA Video | `WSVQ` (synthetic — the format states no codec tag of its own) | Y | — |
 
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
@@ -2141,6 +2144,69 @@ not refused outright. The audio chunk size is Ferguson's page's own formula — 
 count times sample rate divided by fourteen — applied with no remainder redistribution of any kind:
 neither real file exercises a sample rate that does not divide fourteen evenly, so nothing beyond the
 documented formula is claimed.
+
+### Westwood VQA Video
+
+The FMV codec behind Command & Conquer, Red Alert and most of Westwood's DOS-and-Windows-era catalogue,
+carried in `.vqa`'s own RIFF-style container — a `FORM` chunk naming its type `WVQA`, then a flat run of
+four-character-ID-and-size chunks, the size big-endian where ordinary RIFF's own chunks are
+little-endian. Published in full in Gordan Ugarkovic's VQA format description, mirrored at
+`multimedia.cx/vqa_overview.htm`. `VqaReader` answers where each chunk is and which stream it belongs
+to; `VqaVideoDecoder` is the only thing here that reads a codebook entry or an index byte.
+**`FORM`'s own stated size is not trustworthy** — measured directly: one real file's covers only its
+header chunks and the real file runs on for megabytes past it — so this reader walks chunks by their
+own sizes to the end of the file rather than to where `FORM` says it ends.
+
+The coding is vector quantisation over an 8-bit palettised picture: a codebook of small pixel blocks —
+four by two pixels in every sample this was measured against — and, for every block of a picture, an
+index table naming either a codebook entry to copy or a single colour to fill the block with outright.
+Any of a picture's codebook, palette or index-table chunks may be compressed with Westwood's own
+run-length scheme, "format80", published in the same document down to the bit pattern of each of its
+five commands — see `VqaFormat80` for the construction, and its own remarks for the one real distinction
+its tests draw out: a short back-reference may overlap what it is still writing, which is what lets two
+bytes encode a run of one repeated byte.
+
+**A codebook is rationed across eight pictures, not delivered whole.** The first picture's codebook
+chunk is complete; every eighth picture after that is preceded by seven more, each carrying an eighth of
+the *next* codebook, which only becomes a real codebook once all eight pieces are concatenated in
+picture order and decompressed together — the format's own description states plainly that decompressing
+one piece alone is not the same data. **That assembled codebook becomes current starting with the
+picture after the one whose eighth piece completed it, not the picture that delivered that final
+piece** — measured directly against a real 85-picture file: applying it to the delivering picture too
+reads every eighth picture wrong, and holding it back one picture reads every one of the eighty-five
+correctly.
+
+**An index table is two byte-arrays end to end, not one array of pairs.** For a block at column `bx`,
+row `by` in block units, the format's own description gives `topVal = table[by*blocksWide+bx]` and
+`lowVal = table[blocksWide*blocksHigh + by*blocksWide+bx]` — a value from the first half of the table
+and the corresponding one from the second, not two neighbouring bytes. `lowVal == 0x0f` means "fill this
+block with colour `topVal`" outright; any other `lowVal` means "copy codebook entry `lowVal*256+topVal`".
+
+Palette entries are six-bit VGA precision, widened the same way this project's other six-bit channels
+are — by repeating the top two bits into the bottom. **A palette chunk is not always the full 768
+bytes.** All four files from the original Command & Conquer demo carry a 753-byte palette chunk — 251
+colours, not 256 — and nothing past what a chunk actually states is touched; whatever a colour already
+held (black, on the first picture) stands for any index a chunk leaves unnamed. Assuming the full 768
+bytes always arrive is what an early build of this decoder did, and it read as a bare, unnamed range
+exception on exactly those four files — the one thing this project's own standard does not allow a
+decoder to do, refusal or not.
+
+**Measured.** Six files from `samples.ffmpeg.org/game-formats/vqa/` — two from the Red Alert set and
+all four of the original Command & Conquer demo set, 320x156 and 320x200, 2,046 pictures in all — were
+decoded here and by ffmpeg and compared sample for sample against ffmpeg's own `rgb24` output: every
+picture of all six files is identical. Three of the four demo files run past a point where ffmpeg's own
+demuxer logs a chunk-size or corruption warning near the very end; every picture either decoder actually
+produces past that point still agrees with the other exactly, which is what "measured against ffmpeg"
+means for a file whose last few bytes are not itself clean. This is paletted throughout, so the
+comparison is direct with no chroma-siting convention to get wrong.
+
+**Only version 2, standard colour, is decoded.** The header states a version — `1`, from the format's
+original use in Legend of Kyrandia III, and `2`, the far more common form every sample above uses — and
+a flag byte that separately marks a fifteen-bit-colour form. Version 1's own index table does not decode
+under the reading above: measured against a real version-1 file, the two-half split every version-2 file
+decodes exactly under instead produces implausible, structureless indices, and nothing in the format's
+own published description states what version 1 uses in its place. Version 1 and the separate
+fifteen-bit-colour form both refuse by name rather than guess.
 
 ## 📜 License
 
