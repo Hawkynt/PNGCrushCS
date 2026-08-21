@@ -1606,3 +1606,51 @@ something to redo. Failing either, the same two things would help on the header:
 the key frame's fifty unpublished bits, or a demonstration that a fixed-width skip past them is safe to
 assume, checked the way this project checks anything else — against the oracle, over real files, not
 by inspection alone.
+
+# Sorenson Video 1 (SVQ1), where the codebook is the whole codec and nobody has printed it
+
+SVQ1 — Sorenson Vector Quantizer 1, FourCC `SVQ1` — is a hierarchical multistage vector quantizer over
+16x16 blocks down to 4x2, with mean removal and motion compensation between frames. The brief for this
+investigation named the question to ask before writing anything: is that codebook published anywhere
+independent of an implementation, or does it live only in one? It lives only in one, and the sole
+detailed technical document on the format says as much about itself.
+
+## The one technical document, and what it cites instead of printing
+
+The only bitstream-level description of SVQ1 anywhere is "Description of the Sorenson Vector Quantizer
+#1 (SVQ1) Video Codec" by Mike Melanson and Ewald Snel, published at `multimedia.cx/svq1-format.txt`;
+MultimediaWiki's own SVQ1 page states outright that it "is based on" that document, so the two are one
+source rather than two. It explains the algorithm's shape in real detail — mean removal, the multistage
+codebook search, the 16x16-down-to-4x2 hierarchy, the interframe motion modes — and prints not one
+codebook entry or VLC code. Its own reference list gives the reason: three FFmpeg CVS files —
+`svq1_cb.h`, `svq1_vlc.h` and `svq1.c` — are named as where the tables actually are, and the document
+says so directly rather than reproducing them: "All of these data tables can be found in the CVS source
+repository for the ffmpeg project." That is a citation into an implementation for the one thing a
+decoder cannot do without, not an independent publication of it — the same shape MSS1's page had with
+FFmpeg's `mss2.c`, here made explicit by the document's own words instead of inferred from matching
+identifiers.
+
+The document's other cited source, US Patent 5,844,612 (*Motion vector quantizing selection system*,
+Israelsen, assigned to Utah State University Foundation — the university whose licensed technology
+became Sorenson's), is genuinely independent of FFmpeg, and was read on its own merits for exactly that
+reason. It describes the same shape at the method level: codebook memory holds "the VQ comparison
+codebooks" and the specification states its total size, and "all Huffman tables are stored in writable
+tables" — but nowhere does it give a table's actual contents, only that tables of a certain size exist
+and where they sit in the hardware. A patent claims a method; it is not a place a lookup table gets
+printed, and this one does not print one.
+
+## Why this settles it the same way it settles four codecs already in this file
+
+The argument at the top of this document already covers the shape of the problem: a table this large —
+a hierarchical multistage codebook covering four block sizes — comes from the file or from the decoder,
+and if it is the decoder, this project does not transcribe implementations to recover it. SVQ1 does not
+even reach the question this document's four smallest-frame codecs had to ask, whether a given sample
+carries enough bytes to hold such a table, because the codebook is not carried per-stream at all: it is,
+in the one document's own words, "hardwired" into the coding scheme, identical in every SVQ1 file that
+exists. No frame is ever going to be the one that turns out to carry it.
+
+## What would change the answer
+
+A description of SVQ1's codebook and VLC tables from a source that is not an implementation — a genuine
+Sorenson technical document, or a second patent that prints the tables themselves rather than describing
+their existence and size. Neither exists today.
