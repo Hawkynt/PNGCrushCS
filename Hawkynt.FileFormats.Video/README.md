@@ -53,6 +53,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | Sorenson Spark (Flash Video's H.263) | `FLV1` | Y | — |
 | H.264 / AVC, Baseline I and P slices | `avc1`, `avc3`, `H264`, `X264`, `DAVC`, `VSSH`, `V_MPEG4/ISO/AVC` | Y | — |
 | VP8 (RFC 6386) | `VP80`, `vp08`, `V_VP8` | Y | — |
+| VP9, profile 0 | `VP90`, `vp09`, `V_VP9` | Y | — |
 | HuffYUV / FFVHUFF | `HFYU`, `FFVH` | Y | — |
 | FFV1 (RFC 9043) | `FFV1`, `V_FFV1` | Y | — |
 | MPEG-4 Part 2 (ISO/IEC 14496-2) | `mp4v`, `XVID`, `DIVX`, `DX50`, `FMP4`, `MP4S`, `M4S2`, `3IV2`, `FVFW`, `RMP4`, `V_MPEG4/ISO/*` | Y | — |
@@ -290,6 +291,54 @@ headers — decoded by ffmpeg as well, so agreement is still the measurement.
 What is not implemented refuses and says so: a bitstream version RFC 6386 reserves, a key frame that
 sets the reserved colour space or clamping fields, a stream that begins at an interframe, a truncated
 packet, and a partition table that does not fit in one.
+
+### VP9, profile 0
+
+Profile 0 — eight bits a sample at 4:2:0 — and all of it: superframes, the uncompressed and
+compressed headers, the four frame contexts and the probability updates they carry, tiles in both
+directions, the recursive superblock partition from 64x64 down to 4x4, the motion vector reference
+scan, the coefficient tokens with a scan order per transform type, the cosine transform at four sizes
+and the sine transform at three, the lossless Walsh-Hadamard transform, all ten intra prediction modes
+at four block sizes, eight-tap inter prediction with reference frame scaling and compound prediction,
+the loop filter, and the backward probability adaptation — which needs every syntax element the frame
+contained counted, in the context it was read in.
+
+Profiles 1, 2 and 3 are refused by name rather than half-decoded. They carry chrominance at 4:2:2,
+4:4:0 or 4:4:4, or ten and twelve bits a sample, and the transforms, the prediction and the loop
+filter all change shape for those. Profile 0 is what WebM overwhelmingly carries, and this decodes an
+eight-bit 4:2:0 stream completely or not at all.
+
+Ninety-two encoded streams and twenty-two built by hand — 6,196 decoded frames — were decoded here, by
+ffmpeg and by libvpx, and compared plane by plane and sample by sample. Every plane of every frame is
+identical in all three: not close, not on average, the same bytes. VP9's inverse transforms are
+specified down to the rounding of every intermediate, so that is the only acceptable result — and it
+is the measurement that matters, because a mistake in the loop filter, in prediction or in the
+probability adaptation shows up as a small difference that grows with every frame until the next key
+frame. The one thing the adaptation is measured by is the frames *after* the ones it ran on: a frame
+whose counts were wrong still decodes perfectly, and its successor is noise.
+
+The encoded streams cover picture sizes from 2x2 to 1920x1080 including sizes that are a whole number
+of neither superblocks nor blocks, one to four tile columns and one to four tile rows, lossless
+frames, every intra and inter prediction mode, every transform size and type, every coefficient token
+including the largest category, alternate reference frames and the superframes and repeated-frame
+headers that come with them, compound prediction, segmentation, error resilient and frame parallel
+frames, all four frame contexts, and reference frame scaling — libvpx resampling mid-sequence under a
+starved buffer, so that later frames predict from references of a different size. The syntax libvpx
+has but never chooses — intra-only frames, the frame context resets, segmentation stating absolute
+values, the per-segment filter level and the per-reference filter adjustments — was reached with
+hand-written frames, decoded by ffmpeg and libvpx as well, so agreement is still the measurement.
+
+Two paths are implemented from the specification and reached by neither: a frame stating that *every*
+inter block is compound rather than letting each block choose, and the segment feature that names a
+block's reference frame. No encoder emits either, and neither can be reached from an intra frame.
+
+What is not implemented refuses and says so: a profile other than 0, an sRGB colour space a profile 0
+stream cannot carry, a missing frame marker or sync code, a compressed header or tile that does not
+fit in the packet, a superframe index stating more than the chunk holds, a frame that shows a
+reference slot nothing has written, and a reference too far from the current frame's size to be
+scaled. There is no `catch` anywhere that hands back a blank frame or repeats the last one — which
+matters more here than for most codecs, because a repeated frame is exactly what a still passage of a
+film looks like.
 
 ### H.263 and Sorenson Spark
 

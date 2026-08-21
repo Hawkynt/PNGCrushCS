@@ -867,10 +867,10 @@ public sealed class MatroskaReaderTests {
   [Test]
   [Category("Unit")]
   public void AStreamNothingDecodes_StillComesApartIntoItsPackets() {
-    // A WebM full of VP9 is a perfectly good WebM, and copying its packets into another container
+    // A WebM full of AV1 is a perfectly good WebM, and copying its packets into another container
     // needs no decoder at all. The refusal happens when a decoder is asked for, and names the codec
     // the file names rather than a four-character code no file contains.
-    var document = MatroskaTestContainer.Build("V_VP9", [_Payload(1, 20), _Payload(2, 30)]);
+    var document = MatroskaTestContainer.Build("V_AV1", [_Payload(1, 20), _Payload(2, 30)]);
 
     Assert.That(_Packets(document).Select(p => p.Data.Length), Is.EqualTo(new[] { 20, 30 }));
 
@@ -878,7 +878,7 @@ public sealed class MatroskaReaderTests {
     Assert.That(VideoFormatRegistry.CanDecode(stream), Is.False);
 
     var failure = Assert.Throws<NotSupportedException>(() => VideoFormatRegistry.CreateDecoder(stream));
-    Assert.That(failure!.Message, Does.Contain("V_VP9"));
+    Assert.That(failure!.Message, Does.Contain("V_AV1"));
   }
 
   [Test]

@@ -177,7 +177,6 @@ public sealed class AviReaderTests {
 
   [TestCase("WMV3")]
   [TestCase("AV01")]
-  [TestCase("VP90")]
   [TestCase("DIB ")]
   [Category("Unit")]
   public void UnsupportedCodec_IsRefusedWithItsFourCharacterCode(string fourCC) {
