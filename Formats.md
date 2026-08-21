@@ -789,13 +789,14 @@ Formats we consciously chose not to implement, with reason codes:
 - **unidentified** — What the extension names could not be established from any
   source worth trusting
 
-¹ Out of scope for the *image* library, not for the repository: AVI, raw Motion
-JPEG and MPEG-1/MPEG-2 video elementary streams are read by `Hawkynt.FileFormats.Video`,
-JPEG, MPEG-1 video and H.264 elementary streams are read by `Hawkynt.FileFormats.Video`,
-which demuxes containers and decodes codecs as separate concerns. Their frames are
-the same `RawImage` this table's formats produce. A `.mpg` — an MPEG program
-stream, which multiplexes video with audio — is not read; the video elementary
-stream inside one is.
+¹ Out of scope for the *image* library, not for the repository. `Hawkynt.FileFormats.Video`
+reads eleven containers — ASF/WMV, AVI, FLV, ISO base media (MP4, MOV, 3GP), Matroska
+and WebM, MPEG program streams, MPEG-2 transport streams, MPEG and H.264 elementary
+streams, Motion JPEG and Ogg — and decodes the codecs inside them, with demuxing and
+decoding kept as separate concerns. Their frames are the same `RawImage` this table's
+formats produce, so a frame pulled out of a film can be written as any format above it.
+See that package's own README for the current container and codec tables, which are
+where those lists are maintained.
 
 | Format            | Extensions  | Reason       | Tom's | IM  | XnView | IrfanView |
 | ----------------- | ----------- | ------------ | ----- | --- | ------ | --------- |
@@ -825,10 +826,11 @@ stream inside one is.
 | Pocket PC Theme   | .tsk        | embeds-images| —     | —   | R      | —         |
 | PowerPoint        | .ppt, .pps  | embeds-images| —     | —   | R      | —         |
 | SVG               | .svg        | vector       | R     | RW  | R      | R         |
-| MPEG-1/2 video    | .m1v, .m2v  | video ¹      | R     | —   | —      | —         |
+| MPEG elementary   | .m1v, .m2v, .mpv | video ¹ | R     | —   | —      | —         |
 | H.264 elementary  | .264, .h264 | video ¹      | R     | —   | —      | —         |
-| MPEG-1 video      | .m1v, .mpv  | video ¹      | R     | —   | —      | —         |
-| MPEG video        | .mpg, .mpeg | video        | R     | —   | —      | —         |
+| MPEG program stream | .mpg, .mpeg, .vob | video ¹ | R  | —   | —      | —         |
+| Matroska / WebM   | .mkv, .webm | video ¹      | —     | —   | —      | —         |
+| ISO base media    | .mp4, .mov  | video ¹      | —     | —   | —      | —         |
 
 Five of those were looked at in detail, because a name a viewer opens is not the
 same thing as a picture format, and it is worth writing down which is which. Three
