@@ -23,8 +23,8 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 | | Count | Share |
 | --- | --- | --- |
 | Decoded and verified against ffmpeg | 33 | 16% |
-| Established as not implementable from files alone | 4 | 2% |
-| Not yet attempted | 174 | 82% |
+| Established as not implementable from files alone | 5 | 2% |
+| Not yet attempted | 173 | 82% |
 
 The 33 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
@@ -41,11 +41,16 @@ built here has its encoder but not its decoder, so the comparison is against the
 into the encoder rather than against another decoder's opinion of what came out. For a lossless codec
 that is the stronger oracle of the two, being the ground truth itself.
 
-The 4 are Indeo 3, Indeo 4, Indeo 5 and TrueMotion 1, and the argument that settles them is in
-`undecodable-codecs.md`: their frames are too small to carry the tables they need — 340 bytes for a
-320x240 Indeo 3 picture, 14 for Indeo 4, 2 for Indeo 5, 0 for TrueMotion 1 — so those tables live in
-the codec binary and cannot be recovered by reading files. That is a finished investigation with a
-negative answer, not a gap waiting to be filled.
+The 5 are Indeo 3, Indeo 4, Indeo 5, TrueMotion 1 and Lagarith, and the arguments that settle them
+are in `undecodable-codecs.md`. The first four have frames too small to carry the tables they need —
+340 bytes for a 320x240 Indeo 3 picture, 14 for Indeo 4, 2 for Indeo 5, 0 for TrueMotion 1 — so those
+tables live in the codec binary and cannot be recovered by reading files. Lagarith stops somewhere
+more interesting: its frame layer comes out completely and is recorded there, but the range coder
+inside it keeps its state in a floating-point variable and its probability header has to reproduce
+one implementation's x86 rounding exactly, so the format is defined by an implementation rather than
+by anything writable down — and FFmpeg's own decoder for it is recorded as not bit-exact, which
+leaves no sound oracle for a codec whose bar is exact equality. Both are finished investigations with
+negative answers, not gaps waiting to be filled.
 
 ## What is left, by family
 
@@ -76,11 +81,11 @@ wall with no published specification at all.
 **Sorenson** — `svq1`, `svq3`. No published specification.
 
 **Lossless RGB and YUV** — around 30 names including `012v`, `aasc`, `cllc`, `cyuv`, `dxtory`,
-`loco`, `m101`, `mszh`, `r10k`, `r210`, `sheervideo`, `v210`, `vble`, `y41p`, `ylc`,
-`zerocodec`, `zlib`, and `lagarith`, which is arithmetic coding over the same kind of prediction. Ut
-Video and MagicYUV both came out of this group and reached exact equality, which is the standard for
-every one of them: max delta 0 or it is wrong. This is the densest source of verifiable wins in the
-list.
+`loco`, `m101`, `magicyuv`, `mszh`, `r10k`, `r210`, `sheervideo`, `v210`, `vble`, `y41p`, `ylc`,
+`zerocodec` and `zlib`. Ut Video came out of this group and reached exact equality, which is the
+standard for every one of them: max delta 0 or it is wrong. This is the densest source of verifiable
+wins in the list — but not a uniformly cheap one. `lagarith`, which is arithmetic coding over the
+same kind of prediction, also came out of it and is now in `undecodable-codecs.md` instead.
 
 **Screen capture** — `flashsv`, `flashsv2`, `g2m`, `mscc`, `mwsc`, `rasc`, `rscc`, `screenpresso`,
 `tdsc`, `tscc2`, `vmnc`, `wcmv`, `scpr`. Mostly DEFLATE over a framebuffer with a delta scheme on
