@@ -54,6 +54,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | H.264 / AVC, Baseline I and P slices | `avc1`, `avc3`, `H264`, `X264`, `DAVC`, `VSSH`, `V_MPEG4/ISO/AVC` | Y | — |
 | VP8 (RFC 6386) | `VP80`, `vp08`, `V_VP8` | Y | — |
 | HuffYUV / FFVHUFF | `HFYU`, `FFVH` | Y | — |
+| Avid DNxHD / DNxHR (SMPTE VC-3) | `AVdn`, `AVdh`, `AVd1`, `V_DNXHD` | Y | — |
 | FFV1 (RFC 9043) | `FFV1`, `V_FFV1` | Y | — |
 | MPEG-4 Part 2 (ISO/IEC 14496-2) | `mp4v`, `XVID`, `DIVX`, `DX50`, `FMP4`, `MP4S`, `M4S2`, `3IV2`, `FVFW`, `RMP4`, `V_MPEG4/ISO/*` | Y | — |
 | Apple ProRes (SMPTE RDD 36) | `apco`, `apcs`, `apcn`, `apch`, `ap4h`, `ap4x` | Y | — |
@@ -518,6 +519,60 @@ What refuses: a bitstream version later than the two RDD 36 describes; a reserve
 `interlace_mode` or `alpha_channel_type`; a `quantization_index` outside the permitted 1 to 224; a
 version 0 frame stating syntax its own version does not have; a packet that is not a compressed
 frame; and any structure whose stated size does not fit inside the one containing it.
+
+### Avid DNxHD and DNxHR
+
+Written from SMPTE ST 2019-1:2016, *VC-3 Picture Compression and Data Stream Format*, cited by clause
+throughout the source. Intra only, and independently decodable a macroblock scan line at a time: each
+scan line starts at a byte offset the header states and resets the DC prediction, which is the
+property an editing codec on shared storage exists for.
+
+Two profiles, one block layer. Header versions 1 and 2 are the HD profile of Table C.1 — fixed
+rasters, a 640-byte header, codec tag `AVdn`. Version 3 is the resolution-independent profile of
+Table C.2, which Avid sells as **DNxHR** and which tags itself `AVdh`: the raster comes from the
+header and the header grows with the picture. Both are read.
+
+**The compression identifier is the one thing a decoder cannot infer.** It is not a bitrate and not a
+raster — it names a row of Annex C, and that row picks one of eleven quantisation weighting tables
+and one of six groups of code tables. Two frames of the same size and depth under different
+identifiers decode to different pictures, so an identifier in neither Table C.1 nor Table C.2 is
+refused rather than guessed at.
+
+Three things are easy to get wrong and none fails loudly. **Every block ends with an end-of-block
+codeword, including a block that fills all sixty-three AC coefficients** — Figure 29 shows it
+unconditionally, while the informative pseudo-code of Figure 47 simply runs out at coefficient 64 and
+stops reading. Following the pseudo-code leaves one codeword unread in exactly those blocks: 52 of a
+1080-line frame's 68 scan lines then fail outright, and the 16 that survive are the ones that
+happened to contain no such block. **Annex D's weights are indexed by raster position, not by
+zig-zag position** — indexing by the zig-zag decodes every block and gets every one slightly wrong,
+moving samples by up to 49 levels of 255. And **the inverse quantisation adds half the divisor only
+where the weight and the divisor differ**, which reads like a typo and is not.
+
+Measured against ffmpeg on the planes, at the coded depth, frame by frame and sample by sample —
+against `-pix_fmt yuv422p`, `yuv422p10le` and `yuv444p10le` — because this library interpolates
+chroma where ffmpeg replicates and a comparison of packed colour measures that instead. Every
+compression identifier ffmpeg's encoder will write, 4:2:2 and 4:4:4, eight and ten bits, and a raster
+that is not a whole number of macroblocks: **no sample differs by more than 5 of 255 at eight bits or
+11 of 1023 at ten**, with 0.4% of samples differing at eight bits and by one level in the great
+majority of those. The residue is the inverse transform and the last rounding of the quantiser; VC-3
+specifies no particular IDCT and settles accuracy in its conformance document, SMPTE RP 2019-2, so
+this evaluates the defining sum in double precision rather than reproducing a fixed-point
+approximation.
+
+One row of Annex C does not match the bitstreams and is worth recording. **Table C.2 sends
+compression ID 1271 — DNxHR HQX — to Table D.1; every frame measured is quantised with Table D.4**
+and decodes correctly only with that. This is not a coin toss between two readings: sweeping all
+eleven weighting tables against the reference decode picks exactly one table per identifier, and for
+every other identifier it picks the one Annex C names (1272 picks D.3, 1273 picks D.2, 1270 picks
+D.11, and 1235 — which Annex C also sends to D.1 — picks D.1). Only 1271 picks otherwise, and by a
+margin that is not arguable: worst sample difference 3 of 1023 with D.4 against 103 with D.1, at
+every divisor the standard defines.
+
+What refuses, by name: an unknown compression identifier, a header version outside the three defined,
+an undefined sample depth code, an interlaced frame — field-encoded or the adaptive-macroblock mode
+of compression ID 1260 — 4:2:0 sampling, a macroblock coded in RGB mode, an alpha channel, a
+macroblock whose quantisation scale factor is zero, and any structure whose stated size does not fit
+inside the one containing it.
 
 ## 📜 License
 
