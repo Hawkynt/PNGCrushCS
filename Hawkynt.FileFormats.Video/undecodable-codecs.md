@@ -437,3 +437,97 @@ independent rendering of the same two tables would at least settle the quantisat
 question, even without the entropy table. The container-layer facts above — the DIF and frame
 arithmetic, both frame sizes measured exactly, both chroma formats confirmed — are recorded here so that
 whoever picks this up again starts from the block layer and not from the container.
+
+# Windows Media Video 7 (WMV1), where the tables are MS-MPEG4v3's own
+
+WMV1 — Microsoft's name is Windows Media Video 7 — was investigated because it looked like it might
+have an advantage MS-MPEG4v3 did not: ffmpeg carries a real `wmv1` encoder, so a corpus can be built and
+driven toward whatever codeword needs to be seen, which is exactly how Microsoft MPEG-4 version 2's
+tables were recovered — see that codec's section in `README.md`. That advantage turns out not to apply
+here, and the reason is in the one document this whole family is read from.
+
+Michael Niedermayer's *DIVX3 / MS-MPEG4v1-v3 / WMV7-8* — the same GNU Free Documentation Licence
+syntax description MS-MPEG4 version 2 was built from — numbers the five bitstreams 1 to 5: MS-MPEG4v1,
+v2, v3, WMV7/WMV1 and WMV8/WMV2, and writes every bitstream element's syntax once with a "Version"
+column stating which of the five numbers read it. Its own copy at `ffmpeg.org/~michael/msmpeg4.txt` no
+longer resolves; the copy read here is the Internet Archive's capture of it,
+`web.archive.org/web/20211205015009/http://ffmpeg.org/~michael/msmpeg4.txt`, taken while it was still
+live.
+
+## What the document says versions 3, 4 and 5 share
+
+The document is precise about where WMV1 and WMV2 genuinely differ from MS-MPEG4v3, and it says so in
+as many words: "MSMPEG4 upto version 3 is pretty much ISO-MPEG4 ... WMV1 just has different scantables
+too and WMV2 additionally uses 8x4, 4x8 DCT ... and supports horizontal quarterpel". Two tables are
+then given in full because they are exactly what changed — the scan tables (stated as replaced
+outright for versions 4-5) and the DC dequantisation scale, printed as two 31-entry arrays that differ
+from version 3's own two 31-entry arrays only in their low end. Both are small, both are in the
+document, and neither is the problem.
+
+Every large table is not in the document at all, and the version column shows that versions 3, 4 and 5
+read the same ones. The macroblock type/coded-block-pattern joint code (`table_mb_intra`) carries the
+version marker `345` for I frames without qualification. The run-level table selectors —
+`rl chroma_table_index` and `rl table_index`, each a three-value code choosing among what the run-level
+coding section calls, throughout, "six run-level tables" once chroma and luma are counted separately —
+carry the same `345` marker, as does `dc_table_index` and, in the P-frame branch, `mv_table_index`.
+Nowhere in the thirty-one-entry dequantisation tables' neighbourhood, or anywhere else in the document,
+is there a second run-level, DC or motion-vector table given for version 4 or 5 the way the scan tables
+and the dequantisation scale were. The document's own reference for all of them is one line: a link to
+`msmpeg4data.h`, an implementation, for every version at once.
+
+Two numbers in the syntax pin this down harder than the missing tables alone would. The DC bitstream
+for versions 3-5 reads `luma_dc_vlc[dc_table_index]` or `chroma_dc_vlc[dc_table_index]`, and "if
+level==119" is the escape that reads a raw byte instead of trusting the small code — **119**, not a
+round number, identical for versions 3, 4 and 5 in the one place the document states it. The
+motion-vector bitstream for the same three versions reads `mv_vlc[mv_table_index]`, and "if code==1099"
+is its escape into six raw bits each way — **1099**, again identical across all three, and again the
+exact figure MS-MPEG4v3's own investigation already named: "the motion vector tables pair one code with
+a whole vector across some eleven hundred entries." A format that had actually redesigned these tables
+for WMV1 and WMV2 — the way it demonstrably redesigned the scan tables and the DC scale — would have no
+reason to land on the same three-digit sentinel value in two unrelated tables by coincidence. The
+document does not say the tables are identical between versions 3, 4 and 5 in a single sentence; it
+says so by giving one syntax, one set of escape constants and one external reference for all three, and
+by being exactly the kind of document that flags a difference in the open when there is one.
+
+## Why an encoder does not rescue it
+
+WMV1 has what MS-MPEG4v3 did not: `ffmpeg -c:v wmv1` writes real files, so `-idct faani`-grade encoder
+control is available here in a way it never was for version 3. It does not help, because of where the
+missing tables sit in the bitstream rather than because nothing can be encoded.
+
+A macroblock in an inter picture reads its joint type/CBP code, then its motion vector, and only after
+that does it read the coded blocks — so the motion-vector codeword for the *first* macroblock of a
+frame sits at a fixed, locatable position once the type/CBP code in front of it is known. Every
+macroblock after the first does not: reaching it means having already decoded every earlier
+macroblock's coded blocks in full, because a run-level code's length is not known until it is decoded,
+and that decoding needs the very six tables in question. There is no way to skip ahead. A corpus can be
+built as large as disk space allows and it changes nothing about this: what it buys is one motion-vector
+codeword and one type/CBP codeword per independently-reachable position (the first macroblock of each
+slice) and nothing at all from any macroblock after it, in any frame, ever — the six run-level tables
+stay at zero coverage regardless of corpus size, because the mechanism that would read a second
+macroblock's codeword is the same mechanism the corpus is trying to recover.
+
+Even granting the most generous reading — that the joint type/CBP table alone is small enough to
+recover the way MS-MPEG4v2's two macroblock tables were, and that this unlocks the first
+macroblock of every slice in every frame of an arbitrarily large corpus — the motion-vector table's own
+scale defeats it. Driving an encoder to choose one specific vector value, at one specific probability
+bucket, for the one macroblock in the whole frame that happens to sit first, is a considerably harder
+target than simply encoding varied motion; MS-MPEG4v3's own investigation reached exactly this
+conclusion for the same ~1,100-entry table under weaker constraints than "and it has to be the first
+macroblock too," and nothing about WMV1 changes what the table itself asks for.
+
+## What was verified
+
+`ffmpeg -h encoder=wmv1` confirms the encoder exists and writes `yuv420p`. The document's small tables —
+the scan tables, the DC dequantisation scale, the `c3` code (`0`→`0`, `10`→`1`, `11`→`2`) every
+three-valued selector in the header uses — are given in full and are not in question; what is in
+question is only the run-level, DC and motion-vector code tables, and those are absent from the
+document for every version alike, tied to version 3's own already-established figures by two shared
+escape constants rather than merely by family resemblance.
+
+## What would change the answer
+
+The same thing that would change MS-MPEG4v3's answer: a publication of the six run-level tables, the
+two DC tables and the two motion-vector tables that is not somebody's implementation. Barring that, a
+demonstration that WMV1's tables are genuinely smaller or differently shaped than version 3's — which
+the shared escape constants above argue against, but do not by themselves rule out beyond doubt.
