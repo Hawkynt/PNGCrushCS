@@ -47,6 +47,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | Interplay MVE | `.mve` | Y | — |
 | id Cinematic | `.cin` | Y | — |
 | Westwood VQA | `.vqa` | Y | — |
+| Smacker | `.smk` | Y | — |
 
 | Codec | Tag | Decode | Encode |
 | --- | --- | --- | --- |
