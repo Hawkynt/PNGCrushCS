@@ -1,7 +1,7 @@
 # Codecs investigated and not implemented
 
-Fifteen codecs were investigated and none was implemented. That is a result rather than a gap, and it is
-written down here so the work is not repeated by somebody who assumes it was never attempted.
+Twenty-four codecs were investigated and none was implemented. That is a result rather than a gap, and
+it is written down here so the work is not repeated by somebody who assumes it was never attempted.
 
 They stop in four different places, and the four are worth keeping apart. Five need constant tables
 that are not in the file, and WMV1 and WMV2 join them on the same evidence, tied to MS-MPEG4v3's own
@@ -21,7 +21,20 @@ and most of its bitstream recovered and verified against real files, with one sp
 a skip-count coding for Escape 124, some unknown number of reassigned coefficient codewords for SpeedHQ
 — that this project's evidence could narrow down but not close. Where each stops is recorded below.
 
-None of the fifteen had anything committed.
+The nine screen-capture codecs below — MSCC, RSCC, WCMV, MWSC, RASC, Go2Meeting, ScreenPressor,
+Screenpresso and TSCC2 — sort into the same places rather than needing a new one. Six of the nine
+(MSCC, WCMV, MWSC, RASC, ScreenPressor and Screenpresso) join MSS1, MSS2, Canopus and MSZH's variant of
+the first place: the only bitstream-level description that exists for any of them, where one exists at
+all, is a paraphrase of the implementation that produced it, and for three of the six no usable sample
+corpus exists either — a wall MSS1 and MSS2 did not have to clear, since ffmpeg still carries no
+`mscc`, `wcmv`, `rasc` or `screenpresso` encoder and no third-party sample archive searched carries a
+file for any of those four. TSCC2 and Go2Meeting are the same variant on better-attested evidence: each
+has one detailed technical write-up, and each write-up's own author is on record as the implementation's
+author too. RSCC alone reaches Escape 124 and SpeedHQ's place — a real sample corpus, a container and a
+packet framing fully recovered and verified against it, and a delta-record scheme whose destination
+coordinates are pinned down and whose remaining fields resist every reading tried.
+
+None of the twenty-four had anything committed.
 
 Indeo 3 (`IV32`), Indeo 4 (`IV41`), Indeo 5 (`IV50`), TrueMotion 1 (`DUCK`) and TrueMotion 2 (`TM20`)
 are the proprietary codecs of the multimedia era. None has a published specification. No encoder for
@@ -1153,3 +1166,297 @@ Failing that, a substantially larger sample corpus — particularly for HQA and 
 to exist publicly at all — would still need an independent anchor to check a reconstructed table
 against, since ffmpeg's decoder cannot be that anchor without the transcription this project does not
 do.
+
+# Mandsoft Screen Capture Codec (MSCC), where neither a description nor a single file exists
+
+MSCC was investigated as the first of the screen-capture codecs `codec-coverage.md` still listed as
+left. It stops before the others do, on the plainest evidence in this file: there is nothing to read.
+
+No MultimediaWiki page exists for it under any name tried — `MSCC`, `Mandsoft Screen Capture Codec` and
+a full-text search of the wiki for `MSCC` all return nothing. Mandsoft's own site, `mandsoft.com`, whose
+product page a search engine's cache still describes as "Capture screen to AVI movie files," now
+resolves to a GoDaddy domain-sale listing with no content of its own, current or archived through this
+project's tooling, carrying nothing about the codec beyond the fact that it once existed. No SDK, no
+format note, no developer page.
+
+Nor does a single sample file. `samples.ffmpeg.org/V-codecs/` — the corpus this package's other screen
+and lossless codecs were measured against — carries no `MSCC` directory and no loose `mscc`-named file
+anywhere in its listing, checked directly rather than assumed. FFmpeg's own `fate-suite`, reachable over
+rsync and richer than the public sample tree for exactly this kind of obscure format — it is what
+supplied RSCC's corpus below — carries no `mscc` directory either, out of 306 top-level entries checked
+by name. `ffmpeg -h encoder=mscc` reports no encoder, so none can be built. Every general web search
+tried, including ones aimed specifically at a stray `.avi` built by Mandsoft's own "Screen Movie Studio"
+product, turns up nothing but FFmpeg's own decoder source and pages that cite it.
+
+This is a stronger negative than MSS1 and MSS2's above, not a weaker one: MSS1 and MSS2 at least have a
+sample directory at `samples.ffmpeg.org/V-codecs/MSS1/` and `MSS2/` to be opaque *about* once no
+independent description can be found. MSCC has neither the description nor the file, so there is no
+route to it — not the paraphrased-implementation route this file's other entries take, and not the
+blind bitstream-measurement route RSCC below was tried against, which needs files to measure.
+
+## What would change the answer
+
+A real sample — from a recovered Screen Movie Studio installation, a still-live mirror of Mandsoft's own
+downloads, or a corpus this project has not found — would open the same blind-measurement route RSCC
+below was tried against. A vendor document describing the bitstream, even informally, would open the
+same route MSS1 and MSS2 above are waiting on. Neither exists today.
+
+# innoHeim/Rsupport Screen Capture Codec (RSCC), where the destination is legible and nothing else is
+
+RSCC (`ISCC`, `RSCC`) — Rsupport's codec for its `liteCam` recording products — was investigated second,
+and stops further along than MSCC does: FFmpeg's `fate-suite` carries a real corpus for it, five files
+built as a deliberate feature test rather than a recording, and a real structure was recovered and
+measured against real bytes before the investigation ran out of road. It stops closer to Escape 124 and
+SpeedHQ's place than to MSS1's: a packet framing fully solved and a partial delta-record structure, with
+one field of that structure and its numeric coding still open.
+
+## What exists to build from, and what does not
+
+No MultimediaWiki page exists for RSCC under any name tried, and a full-text search of the wiki turns up
+nothing. What surfaces instead is FFmpeg's and Libav's own doxygen-generated source pages and mailing-list
+commit messages for `rscc.c`, and nothing else — no vendor document, no independent write-up, nothing
+that reads as anything but the implementation itself restated by tooling. Those pages were not read
+beyond confirming that this is all that exists; nothing from them informed anything below, which was
+built and checked against real packet bytes and ffmpeg's decoded pixels only.
+
+`fate-suite`'s `rscc/` directory holds five files built to exercise the format's pixel-format range
+rather than to record a screen: `8bpp.avi` (854×480, one frame, palettised), `16bpp_555.avi` (320×240,
+15 usable frames, RGB555), `24bpp.avi` (854×480, 58 frames, BGR24), `32bpp.avi` (320×240, 9 usable
+frames, BGR0) and `pip.avi` (1760×968, 5 frames, BGRA). `ffmpeg -threads 1 -fps_mode passthrough` decodes
+all five; the last packet of `16bpp_555.avi` and several of `32bpp.avi`'s are shorter than their own RIFF
+chunk headers state, which ffmpeg reports as `Insufficient input` rather than decoding — a truncated
+sample rather than a format variant, the same shape RealMedia's and Lagarith's truncated files take
+elsewhere in this project, and the frames before the truncation decode and were used regardless.
+
+## What was recovered from the packets themselves, and verified
+
+**A key frame is one zlib stream carrying the whole raw picture, behind a fixed thirteen-byte header.**
+`16bpp_555.avi`'s first packet opens `01 00 00 00 | 40 01 00 00 | f0 00 | 17 07 | 00`, then a valid
+zlib stream (RFC 1950's own header checksum, the same test this package's TSCC decoder already applies).
+Read as little-endian, that is a `1` of unknown purpose, then `320` and `240` — the stream's own width
+and height, confirmed against `ffprobe`'s stream info — then `1815`, which is exactly the packet's own
+1828 bytes less the thirteen-byte header, and a trailing zero byte. Decompressing the zlib stream that
+follows yields exactly 153,600 bytes, `320 × 240 × 2` — the whole raw picture at this stream's own two
+bytes a pixel, with no remainder. The same shape — count, width, height, exact remaining-length field,
+then a zlib stream decompressing to exactly `width × height × bytesPerPixel` — was confirmed on every
+sample's own first packet, at each file's own resolution and pixel depth.
+
+**A delta frame's payload is a whole number of eight-byte records**, and this is exact rather than
+approximate: across every delta packet checked in `16bpp_555.avi`, `32bpp.avi` and `pip.avi`'s
+count-4 packets, the zlib stream's decompressed length divided by eight equals the packet's own leading
+count field precisely, with no remainder on any packet tried — 60 records for 480 decompressed bytes,
+64 for 512, 37 for 296, and so on, every one exact.
+
+**Two of a record's four sixteen-bit fields are legible, and they are the destination.** Read as four
+little-endian words, the third field runs from 0 to within eight of the frame's own width, rises in
+scan order across a delta packet's own records with only the resets a multi-row update would produce,
+and never differs from a multiple of eight across any record in any packet checked — consistent with a
+destination X coordinate on an eight-pixel grid. The fourth field takes only the small values 8, 16 and
+32 in the packets checked here, which is well short of the frame's own height and fits a destination row
+index on the same eight-pixel grid better than it fits anything else tried.
+
+**The remaining two fields do not resolve as a source position on the same grid.** Read the same way as
+the destination pair, the first two fields of several records in `16bpp_555.avi`'s later delta packets
+carry values above 240 and even above 320 — outside both of the 320×240 frame's own axes — which rules
+out the plainest reading, a source pixel coordinate on the same picture the destination pair addresses.
+Whether they are a coordinate on a different implicit surface, an offset rather than a position, or not
+a position at all was not settled.
+
+## Where it stops, precisely
+
+At the mystery header field between a delta packet's leading count and its zlib stream. That field is
+not a fixed width: across the packets checked it is a plain two-byte little-endian value when its low
+byte is at or above 0xAA and a single byte otherwise — every packet with a two-byte field's low byte
+seen so far is 0xAA or higher, every packet with a one-byte field is below it, with a consistent gap
+between the two ranges (the highest one-byte value seen is 0x8A, the lowest two-byte low byte is 0xAA)
+— but no reading of that split as a numeric quantity was found consistent with anything else measured:
+not the record count, not the compressed or decompressed payload length, and no checksum of the
+decompressed payload tried (Adler-32, CRC-32 or a plain byte sum, each truncated to sixteen bits) matches
+it either. Confirming the field's true meaning would very likely also settle the header's real, principled
+length rather than the length-by-trial this investigation used to reach the records at all.
+
+The frame this project's own `pip.avi` sample uses for its "picture in picture" name compounds the
+problem rather than side-stepping it: its delta packets carry a much larger prefix before their zlib
+stream — 37 bytes ahead of a stated record count of 4, not the four bytes seen on the small files — which
+does not divide into any clean number of same-shaped small records, and was not solved either. Whether
+this is a second packet shape RSCC switches to under some condition, or the small-file shape with a field
+this investigation has not identified running to a different length, was not determined.
+
+A block-copy simulation using the two settled destination fields, a provisional eight-pixel block size
+and the two unresolved fields taken at face value as a source position was tried against real decoded
+frame pairs from `16bpp_555.avi` and does not reproduce the real next frame — the real byte-level
+difference between consecutive decoded frames runs tens of thousands of bytes deep on packets whose
+record count is far too small to state that much change under any block size the records themselves
+state, which is itself evidence that the still-unresolved fields are not a simple source coordinate on
+the previous frame's own canvas, whatever they are.
+
+Nothing was shipped. A decoder that reproduced the destination grid correctly and guessed at the source
+and the coding it is packed with would be exactly the failure this project holds itself to a stronger
+rule than: a wrong still passage is indistinguishable from a working one, and a screen-capture codec
+spends most of its frames on exactly that.
+
+## What would change the answer
+
+A description of the mystery header field's encoding and the two unresolved record fields' meaning, from
+a source that is not `rscc.c` restated — or a larger, more varied sample corpus than `fate-suite`'s five
+files, since a scheme this resistant to five files' worth of evidence may simply need more of it, the way
+TrueMotion 2's entropy layer above needed thousands of streams rather than dozens to pin down with
+confidence.
+
+# WinCAM Motion Video (WCMV), where WinCAM's own screen codec has no independent trace at all
+
+WCMV was investigated on the strength of sharing a vendor family with ScreenPressor below — both are
+associated with WinCAM, the screen-recording product ScreenPressor's own GitHub mirrors describe as one
+of its host applications — and stops on the same evidence MSCC does. No MultimediaWiki page exists under
+`WCMV` or `WinCAM Motion Video`, checked directly and by search; every general search tried surfaces only
+FFmpeg's own `wcmv.c` and mailing-list commit records referring to it, nothing that reads as independent.
+No sample exists either: `samples.ffmpeg.org/V-codecs/` carries no `WCMV` entry, and FFmpeg's `fate-suite`
+carries no `wcmv` directory among its 306 top-level entries. `ffmpeg -h encoder=wcmv` reports none. As
+with MSCC, there is neither a description nor a file to build from.
+
+## What would change the answer
+
+The same two things MSCC needs: a real sample, or a vendor or independent description of the bitstream.
+Neither was found.
+
+# MatchWare Screen Capture Codec (MWSC), where one file exists and nothing describes it
+
+MWSC was investigated next. It clears MSCC's and WCMV's first bar — `samples.ffmpeg.org/V-codecs/`
+carries one file, `MWSC.avi`, decoding under ffmpeg to 8-bit palettised frames — but nothing describes
+its bitstream. No MultimediaWiki page exists under `MWSC` or `MatchWare Screen Capture Codec`, by direct
+lookup or search, and FFmpeg's `fate-suite` carries no `mwsc` directory to widen the one-file corpus with.
+`ffmpeg -h encoder=mwsc` reports none, so nothing can drive a second file toward a specific codeword.
+
+This project's own standard for a corpus already rules out building blind from one file before the
+provenance question is even reached: every codec here that was mapped from bitstream measurement alone —
+TrueMotion 2's entropy layer, RSCC's destination grid above, Ut Video's slice division, MagicYUV's
+permutation — needed dozens to thousands of streams to pin a table or a rule down with confidence, and
+this project's own MSZH entry above records what one real file (there, one still picture re-encoded six
+ways) is worth: two genuine match tokens, neither resolved. One MWSC file is the same shape of evidence,
+not more of it just because it happens to be a real recording rather than six re-encodings of a
+photograph.
+
+## What would change the answer
+
+A second and third sample distinct enough to cross-check a reading against, or a description of the
+bitstream from a source that is not an implementation. Neither exists today.
+
+# RemotelyAnywhere Screen Capture (RASC), where neither a sample nor a description turned up
+
+RASC was investigated fourth and stops on MSCC's and WCMV's evidence rather than MWSC's: no
+MultimediaWiki page under `RASC` or `RemotelyAnywhere Screen Capture`, by direct lookup or search: every
+search tried surfaces only FFmpeg's own decoder source and nothing that reads as independent of it. No
+sample turned up either — `samples.ffmpeg.org/V-codecs/` carries no `RASC` entry, and FFmpeg's
+`fate-suite` carries no `rasc` directory among its 306 entries. `ffmpeg -h encoder=rasc` reports none.
+
+## What would change the answer
+
+The same as MSCC and WCMV: a real sample, or a description of the bitstream from a source that is not an
+implementation.
+
+# Go2Meeting (G2M), where the one detailed page is the decoder's own author's account of it
+
+Go2Meeting's screen codec (`G2M2`, `G2M3`, `G2M4`) was investigated fifth, flagged going in as large and
+partly JPEG-based, and it stops on documentation grounds before its size becomes the deciding factor.
+
+## What exists
+
+MultimediaWiki's `GoToMeeting_Codec` page is genuinely detailed: a four-byte frame signature, a
+chunk-based body with a one-byte type and a four-byte length, a 192×128 tiling scheme, six named chunk
+types (display configuration, image update, cursor position, cursor shape, a resync marker and a
+time-related chunk), and three compression paths — an entropy-coded-only path, an entropy-plus-JPEG
+hybrid, and a deflate-plus-JPEG path — with the entropy coder described as context-modelled exponential
+Golomb coding over neighbour-predicted pixel values. A real sample corpus exists to check any of it
+against: FFmpeg's `fate-suite` carries `g2m/g2m2.asf`, `g2m3.asf` and `g2m4.asf`, and
+`samples.ffmpeg.org/V-codecs/G2M4/` carries four further `.wmv` files.
+
+## Why it was not pursued past that
+
+The page states no provenance for any of it — no citation to a Citrix or GoToMeeting engineering
+document, no note that it was reverse-engineered from the codec, nothing. That is the same silence MSS1's
+and MSS2's pages carry, and this project's standard for that silence is not to take a detailed page at
+face value merely because nothing on it announces where it came from: MSS1's and MSS2's own pages passed
+that same silent test until their function names were checked against `libavcodec/mss2.c`'s and found to
+match one for one, shared typo included. No comparable public FourCC-string check was performed here —
+this section did not read `libavcodec/g2meet.c` or any description of it to compare against, the same
+restriction this project holds everywhere else — so the page's independence was not established, only
+left unconfirmed. What tips this from "unconfirmed" to "not pursued" is that Go2Meeting's screen codec
+is, on this page's own account, three coding paths deep, one of them a JPEG hybrid needing its own
+tile-boundary and quantisation handling worked out on top of the entropy coder — the largest and most
+structurally involved format on this list bar TSCC2's DCT path — and building that on a page whose
+independence could not be checked either way is not a wager this project takes, on the evidence MSS1,
+MSS2, Canopus and TSCC2 below all give for what such a page usually turns out to be.
+
+## What would change the answer
+
+A statement of where the `GoToMeeting_Codec` page's description came from — confirming it as an
+independent account rather than a paraphrase of an implementation — would open a large, real sample
+corpus to work from. Absent that, the same function-name or constant-matching check this project used
+for MSS1 and MSS2 against a suspected source, performed by someone willing to read that source directly
+to make the check (which this investigation does not do), would settle the question either way.
+
+# ScreenPressor (SCPR), where the only "documentation" is somebody else's open-source rebuild
+
+ScreenPressor was investigated sixth. `samples.ffmpeg.org/V-codecs/` carries one file, `SCPR.avi`, and
+`ffmpeg -h encoder=scpr` reports none, so the same one-file ceiling MWSC stops at applies here before the
+documentation question is even reached. No MultimediaWiki page exists under `ScreenPressor` or `SCPR`,
+by direct lookup or search.
+
+What search turns up instead is two GitHub repositories, `yarrom/ScreenPressor` and
+`thedeemon/screenpressor`, both styled as open-source rebuilds of Infognition's proprietary codec rather
+than anything Infognition itself published. Both are implementations — exactly what this project's rule
+against transcription covers regardless of who wrote them or under what licence — and neither was opened
+or read beyond confirming what they are from their own repository descriptions. Using either to write a
+decoder here would be the identical problem this project already declined for MSZH's and Lagarith's own
+implementation-only descriptions, applied to a second author's code instead of the vendor's or ffmpeg's.
+
+## What would change the answer
+
+A statement of the bitstream from Infognition itself, or from an independent party who did not derive it
+by reading ScreenPressor's own code or a rebuild of it — plus, regardless, several more real samples than
+the one file found, on the same evidence MWSC's entry above gives for why one file is not a corpus this
+project builds a table from.
+
+# Screenpresso, where neither a sample nor a description turned up
+
+Screenpresso was investigated seventh and stops on MSCC's, WCMV's and RASC's evidence: no MultimediaWiki
+page under `Screenpresso`, by direct lookup or search — every search tried surfaces only the Screenpresso
+application's own marketing pages and FFmpeg's decoder source, nothing independent describing its
+bitstream. No sample exists either: `samples.ffmpeg.org/V-codecs/` carries no `screenpresso` entry, and
+FFmpeg's `fate-suite` carries no matching directory among its 306 entries. `ffmpeg -h encoder=screenpresso`
+reports none.
+
+## What would change the answer
+
+The same as MSCC, WCMV and RASC: a real sample, or a description of the bitstream from a source that is
+not an implementation.
+
+# TechSmith Screen Codec 2 (TSCC2), the DCT-based codec that shares only a vendor with TSCC
+
+TSCC2 was investigated last, as the brief for this batch of work expected: despite the name, it is not a
+variant of this package's own TSCC decoder — DEFLATE over a run-length coding — but a block-transform
+codec, and it stops on the same evidence Canopus HQ, HQA and HQX do above.
+
+## What exists
+
+FFmpeg's `fate-suite` carries one sample, `tscc/tsc2_16bpp.avi`, alongside the unrelated TSCC files that
+directory's name suggests. The one technical description found anywhere is Konstantin Shishkov's own
+blog, `codecs.multimedia.cx`, in the same 2012 post this package's Canopus investigation above already
+found describing HQ, HQA and HQX: internally named "Dora," splitting a frame into 16×8 slices and those
+into 4×4 blocks coded in 4:4:4 at a 16–240 range with a DCT-like transform and one of two quantisers, with
+VLC tables for DC, a "number of coefficients" field and AC values.
+
+## Why it was not pursued past that
+
+Shishkov is `tscc2.c`'s own author in FFmpeg, exactly as he is `hq_hqa.c`'s and `hqx.c`'s in libav, and
+this post is the same shape of document this project already declined for those three codecs above: his
+own account of reverse-engineering a format he then wrote a decoder from, not a citation of anything
+TechSmith published. TechSmith's own pages for Camtasia and the TSC2 codec describe the download and the
+product, not the bitstream, the same gap Canopus and Grass Valley's marketing papers leave for HQ and
+HQX. Nothing independent of that one post was found anywhere searched.
+
+## What would change the answer
+
+The same as Canopus HQ, HQA and HQX above: a description of the bitstream from a source that states it is
+not derived from reading an implementation, or a second reverse-engineering write-up that says plainly how
+it was produced and from what.
