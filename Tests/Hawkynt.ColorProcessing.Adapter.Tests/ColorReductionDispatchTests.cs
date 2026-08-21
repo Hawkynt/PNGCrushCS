@@ -155,4 +155,25 @@ public sealed class ColorReductionDispatchTests {
       Assert.That(reduced.PixelData.Distinct().Count(), Is.GreaterThan(1), "came out flat");
     });
   }
+
+  /// <summary>
+  /// The underscore-joined spellings Optimizer.Png hands through, resolved to the generated name
+  /// they actually mean.
+  /// </summary>
+  /// <remarks>
+  /// Optimizer.Png's own default ditherer list is written in this shorthand, so a name here that
+  /// stops resolving is a name Optimizer.Png stops being able to select, silently, until something
+  /// runs it. Checking the resolution here rather than only through a round trip is what makes a
+  /// typo in the shorthand a build-time-adjacent failure instead of one that only ever shows up on
+  /// whichever platform happens to exercise that particular ditherer.
+  /// </remarks>
+  [TestCase("NoDithering_Instance", "NoDithering.Instance")]
+  [TestCase("ErrorDiffusion_FloydSteinberg", "ErrorDiffusion.FloydSteinberg")]
+  [TestCase("ErrorDiffusion_Atkinson", "ErrorDiffusion.Atkinson")]
+  [TestCase("ErrorDiffusion_Sierra", "ErrorDiffusion.Sierra")]
+  [TestCase("OrderedDitherer_Bayer4x4", "OrderedDitherer.Bayer4x4")]
+  [Category("Unit")]
+  public void TheUnderscoredShorthand_ResolvesToTheNameItMeans(string shorthand, string expected) {
+    Assert.That(ColorReductionDispatch.ResolveDitherer(shorthand), Is.EqualTo(expected));
+  }
 }
