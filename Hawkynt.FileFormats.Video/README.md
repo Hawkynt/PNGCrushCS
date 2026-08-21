@@ -83,6 +83,8 @@ who wants one frame of a two-hour recording pays for one frame.
 
 | CamStudio Screen Codec (CSCD) | `CSCD` | Y | — |
 
+| Flash Screen Video (FSV1) | `FSV1` | Y | — |
+
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
 is an undivided heap of bytes, and where each packet starts and stops is a computation over five
@@ -1415,6 +1417,55 @@ What refuses: 8 bits a pixel, which ffmpeg's own decoder refuses as well, and an
 and 16, 24 and 32; an LZO stream whose instructions run off the end of the compressed data or whose
 match reaches before the start of the picture; and a zlib stream that does not decompress to exactly
 the bytes a frame of this picture needs.
+
+### Flash Screen Video
+
+Lossless, and simpler than either TSCC or CSCD: a grid of blocks, each block either unchanged since the
+frame before it or its own independent zlib stream, and nothing else — no run-length layer, no delta
+arithmetic, no palette. Read from the SWF File Format Specification's own appendix rather than from any
+decoder's source, since Adobe published Screen Video's bitstream in full once the format's licensing
+restrictions lifted.
+
+**Nothing about the picture's size comes from the container.** A Flash Video file states no width or
+height for this codec at all unless a script tag happens to carry one, and this format does not need
+one: every packet opens with a four-byte header stating both the block grid's cell size and the
+picture's own size, packed as four bit fields — `BlockWidth` and `BlockHeight` as `(actual / 16) - 1`,
+so a cell is a multiple of sixteen up to 256, and `ImageWidth` and `ImageHeight` as twelve-bit pixel
+counts — the whole thirty-two bits big-endian with no byte swap. The geometry a decoder needs is
+therefore read fresh from the bitstream and held, the same shape this package already uses for Sorenson
+Spark, which states its own picture size the same way.
+
+**The grid, and which blocks are partial.** Cells are counted by dividing the picture's width and
+height by the cell's own and rounding up, so a remainder becomes one partial column and one partial row
+rather than being dropped — exactly the last column and the last row, the two edges furthest from where
+counting starts. Blocks are ordered bottom row first, left to right within a row, upward to the top,
+stated plainly in the specification; the pixels inside a block are ordered the same way, so a block's
+first decompressed row is its own bottom row and copies straight across into a canvas built the same
+way round.
+
+**A block's two-byte length is the whole of the inter-frame coding.** There is no difference operation
+here at all, unlike CSCD's byte-wise addition — a length of zero means this block is exactly what the
+canvas already holds, and a nonzero length means a complete, self-terminating zlib stream for exactly
+that cell's pixels, decompressing to precisely the width and height its grid position implies and never
+a length the format states anywhere else. That makes the canvas the entire state a decoder carries
+between packets: an unchanged block costs nothing to honour because there is nothing to do to it.
+
+Pixels are three bytes, B, G, R, which the specification states directly and which is this package's
+own `Bgr24` layout byte for byte, so no channel reordering happens anywhere in this decoder.
+
+**Measured against ffmpeg**, built with its own flashsv encoder since no real-world corpus of this
+format was needed to reach every path — five streams, 106 frames, sizes that are and are not a whole
+number of the encoder's 64x64 blocks in either direction, down to a 20x14 picture that is one partial
+block covering the whole thing, and a mostly static capture whose interframes leave most of the grid at
+zero length. **Every sample of every frame is identical**, RGB-native so the comparison is a direct one
+rather than a plane-by-plane approximation of anything subsampled.
+
+What refuses: a packet shorter than its own four-byte grid header; a picture the header states as zero
+pixels in either direction; a block whose two-byte length runs past the packet's own end; a zlib stream
+that does not decompress to exactly the byte count its position in the grid implies; and a packet whose
+header states a different picture size or cell size than the one this decoder has already built its
+canvas against, since every unchanged block from that point on would be read against a canvas the new
+geometry does not describe.
 
 ## 📜 License
 
