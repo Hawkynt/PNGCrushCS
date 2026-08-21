@@ -41,6 +41,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | MPEG-2 transport stream (also Blu-ray, AVCHD) | `.ts`, `.m2ts`, `.mts`, `.m2t`, `.tsv` | Y | — |
 | Ogg (Theora, Vorbis, Opus, FLAC) | `.ogg`, `.ogv`, `.oga`, `.ogx`, `.opus`, `.spx` | Y | — |
 | RealMedia (RealVideo, RealAudio) | `.rm`, `.rmvb`, `.ra`, `.rmj`, `.rms` | Y | — |
+| Autodesk FLIC | `.fli`, `.flc`, `.flx` | Y | — |
 
 | Codec | Tag | Decode | Encode |
 | --- | --- | --- | --- |
@@ -67,6 +68,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | VC-1 / Windows Media Video 9, intra pictures | `WMV3`, `WMV9` | Y | — |
 | Microsoft MPEG-4 version 2 | `MP42`, `DIV2` | Y | — |
 | Theora (Xiph.Org Theora I) | `theora`, `V_THEORA`, `Theo` | Y | — |
+| FLIC (Autodesk Animator / Animator Pro) | `FLIC` (synthetic — the format states no codec tag of its own) | Y | — |
 
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
@@ -948,6 +950,87 @@ at an inter frame or a duplicate one, a packet that ends part way through its co
 table with more than 32 entries or a code longer than 32 bits, quant ranges that do not cover the
 quantisation scale exactly, and a stream whose container carried no setup headers. There is no
 `catch` anywhere that hands back a blank frame or repeats the last one.
+
+### FLIC
+
+Autodesk Animator's format, and the one container here with no demuxer underneath it at all: a file
+is its own codec's bitstream, a 128-byte header and then a run of frame chunks with nothing else
+between them. Splitting it into the same four contracts as every other format here still asks two
+different questions of the same bytes. `FliContainer` answers the first — where a frame begins and
+ends, and nothing about what is in it — from a single field, each frame chunk's own four-byte size;
+`FlicVideoDecoder` answers the second, walking every palette packet and delta opcode the container
+never touches. What a `CodedPacket` carries out of this container is a frame chunk's sub-chunks
+verbatim, exactly what a JPEG carries out of a raw Motion JPEG stream: the codec's own bitstream
+syntax, not container framing.
+
+One piece of container-shaped judgement still belongs on the demux side: whether a frame carries a
+whole-frame picture chunk (`BLACK`, `BRUN` or `COPY`) is what decides `IsKeyFrame`, and that is a
+structural fact about which sub-chunk types are present — the same kind of fact an MP4 sample flag or
+an ASF key-frame bit states outright — read by scanning six-byte sub-chunk headers rather than by
+decoding any of them.
+
+Palette updates (`FLI_COLOR64`, `FLI_COLOR256`), delta-coded frames (`FLI_LC`, the original Animator's
+byte-oriented coding, and `FLI_SS2`, Animator Pro's word-oriented one), whole frames (`FLI_BRUN`
+byte-run and `FLI_COPY` uncompressed), `FLI_BLACK`, and `PSTAMP` — a postage-stamp thumbnail for a file
+requestor, skipped rather than decoded into the canvas. Both magic numbers are read, `0xAF11` (`.fli`)
+and `0xAF12` (`.flc`, and an eight-bit `.flx`); every other FLIC-family magic — Huffman/BWT compression,
+frame-shift compression, and DTA's non-eight-bit form — is a different, undocumented bitstream sharing
+only a file extension, and is refused by name rather than guessed at.
+
+Two places this is quietly wrong to get slightly wrong. A palette packet's skip and change counts are
+in palette *entries*, not bytes — a two-byte packet header in front of up to 256 three-byte colours,
+and a change count of zero means all 256 rather than none. And `FLI_COLOR64` packs each component in
+six bits rather than eight, widened here by repeating the top two bits into the bottom
+(`ChannelScaling.Expand6`) rather than by a plain shift, the same rule this library's other six-bit
+channels use — measured against ffmpeg's decode of every `.fli` sample that carries the chunk, where a
+plain `<< 2` disagrees on every colour but black and white.
+
+The third: a `.fli`'s last frame chunk is not a picture of the film. It is the ring frame — a delta
+back to frame one, written only so a player can loop without paying to re-decode the run-length-coded
+first frame — and every clean file pulled from ffmpeg's own sample corpus carries exactly one more
+frame chunk than its header's `frames` field states, with the file ending exactly there. `FliContainer`
+stops after exactly `frames` packets, so the ring frame is never handed out as an ordinary extra frame;
+ffmpeg's own frame count is one higher, which is not a difference to match; the header's own count is
+what a caller asking for the pictures of the film is asking for.
+
+`.flc`'s `oframe1` field is trusted over the assumption that frame one sits directly behind the header.
+One sample — `2422.FLC`, from ffmpeg's own corpus — needs it: a 2778-byte `PREFIX_TYPE` chunk of
+undocumented Animator Pro settings sits between the header and frame one, and `oframe1` is the only
+thing in the file that says where frame one actually is. `.fli`'s header has no such field, and its
+frame one always sits at byte 128 — the format states no other possibility.
+
+**The coding is lossless**, so the target is exact agreement and there is no rounding excuse. Twelve
+files pulled from `samples.ffmpeg.org/fli-flc`, including its `fli-bugs` subdirectory — ffmpeg has no
+FLIC encoder, only a decoder, so ffmpeg served as a decoding oracle rather than as the source of a
+built corpus — were compared against ffmpeg's own decode frame by frame: 320x200 up to 720x360, both
+magic numbers, chains from 6 frames to 384 with no drift anywhere along the longest of them, and every
+sample of every one of 1,418 frames identical. Chunk types exercised by those files: `FLI_COLOR64`,
+`FLI_COLOR256`, `FLI_LC`, `FLI_SS2`, `FLI_BRUN`, and `PSTAMP` — `2422.FLC` carries a genuine 100x63
+byte-run thumbnail on its first frame, behind the `oframe1` prefix chunk above. `FLI_COPY` and
+`FLI_BLACK` are not reachable in any sample this was built against or could be fetched — ffmpeg's own
+demuxer only decodes the format, and every sample found opens with a byte-run first frame — so both
+are covered by hand-built fixtures instead, checked against the specification's stated behaviour
+rather than against a third-party decode.
+
+One sample in ffmpeg's `fli-flc/fli-bugs` directory, `malev2.fli`, is genuinely corrupted: its
+twenty-first frame chunk states magic `0xF5FA` where every other frame in every file states `0xF1FA`,
+a single corrupted nibble. This is refused by name, citing the frame index and the byte the magic was
+found at, rather than resynchronised or skipped — and ffmpeg's own decode of the same file is why.
+Decoded and compared frame by frame against itself, ffmpeg's output is correct for the first eighty-odd
+frames and then, without erroring, repeats its very first frame byte-for-byte for the last sixteen of
+its 102 — a `catch` somewhere silently handing back a blank canvas or the frame it already had, exactly
+the failure mode this project's decoders are built not to produce. Matching that would mean matching a
+masked failure rather than a decode.
+
+What refuses, by name: a magic outside `{0xAF11, 0xAF12}`; a depth other than eight bits; a picture of
+zero width or height; a frame chunk whose magic is not `0xF1FA`; a frame stating a picture-size
+override, which no sample here uses and which nothing states how to apply mid-stream; a sub-chunk type
+outside the eight this reads; a palette write reaching past the 256th entry; a delta chunk naming lines
+past the picture's height; an opcode writing pixels past a row's width; an opcode wanting more bytes
+than the packet holds; and a `FLI_BRUN` packet whose count is zero, which is a no-op under one sign
+reading and a single ambiguous byte under the format's own reversed convention for `FLI_LC` — the two
+disagree about everything that follows and no encoder has a reason to write one. There is no `catch`
+anywhere that hands back a blank frame or repeats the last one.
 
 ## 📜 License
 
