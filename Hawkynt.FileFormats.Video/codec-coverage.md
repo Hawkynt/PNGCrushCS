@@ -22,17 +22,18 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 
 | | Count | Share |
 | --- | --- | --- |
-| Decoded and verified against ffmpeg | 34 | 16% |
+| Decoded and verified against ffmpeg | 35 | 17% |
 | Established as not implementable from files alone | 5 | 2% |
-| Not yet attempted | 172 | 82% |
+| Not yet attempted | 171 | 81% |
 
-The 34 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
+The 35 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
 frame against ffmpeg's decode of the same bitstream before it was merged, and the measurements are in
 each one's section of that file. The ones that reach exact equality on every sample of every frame
 are Microsoft RLE, Microsoft Video 1, Cinepak, QuickTime Animation, Apple Video, Apple Graphics, FLIC, HuffYUV,
-FFVHUFF, FFV1, ZMBV, TSCC, CSCD, Flash Screen Video, Ut Video and MagicYUV — the last two over 883 and
-1,446 frames, in all six and all seven of their colour spaces.
+FFVHUFF, FFV1, ZMBV, TSCC, CSCD, Flash Screen Video, Ut Video, MagicYUV and v210 — the two
+colour-space ones over 883 and 1,446 frames, in all six and all seven of their colour spaces, and
+v210 on the plane data itself over 120 frames at three geometries.
 Theora and VP3 reach it too, Theora over 1,717 frames across all three of its pixel formats and VP3
 over 3,182.
 
@@ -88,9 +89,11 @@ wall with no published specification at all.
 **Lossless RGB and YUV** — around 30 names including `012v`, `aasc`, `cllc`, `cyuv`, `dxtory`,
 `loco`, `m101`, `magicyuv`, `mszh`, `r10k`, `r210`, `sheervideo`, `v210`, `vble`, `y41p`, `ylc`,
 `zerocodec` and `zlib`. Ut Video came out of this group and reached exact equality, which is the
-standard for every one of them: max delta 0 or it is wrong. This is the densest source of verifiable
-wins in the list — but not a uniformly cheap one. `lagarith`, which is arithmetic coding over the
-same kind of prediction, also came out of it and is now in `undecodable-codecs.md` instead.
+standard for every one of them: max delta 0 or it is wrong. `v210` is done as well — it carries no
+compression at all, only a fixed packing of ten-bit samples into 32-bit words, so there was nothing
+for a decoder to get wrong except the bit ranges. This is the densest source of verifiable wins in the
+list — but not a uniformly cheap one. `lagarith`, which is arithmetic coding over the same kind of
+prediction, also came out of it and is now in `undecodable-codecs.md` instead.
 
 **Screen capture** — `flashsv2`, `g2m`, `mscc`, `mwsc`, `rasc`, `rscc`, `screenpresso`, `tdsc`,
 `tscc2`, `vmnc`, `wcmv`, `scpr`. Mostly DEFLATE over a framebuffer with a delta scheme on top, so
