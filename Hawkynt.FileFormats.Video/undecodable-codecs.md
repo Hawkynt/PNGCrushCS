@@ -3,6 +3,9 @@
 Twenty-four codecs were investigated and none was implemented. That is a result rather than a gap, and
 it is written down here so the work is not repeated by somebody who assumes it was never attempted.
 
+Sixteen codecs were investigated and none was implemented. That is a result rather than a gap, and it is
+written down here so the work is not repeated by somebody who assumes it was never attempted.
+
 They stop in four different places, and the four are worth keeping apart. Five need constant tables
 that are not in the file, and WMV1 and WMV2 join them on the same evidence, tied to MS-MPEG4v3's own
 already-missing tables by shared escape constants rather than by file size. VP6 and VP5 stop somewhere
@@ -19,7 +22,13 @@ reverse-engineering notes, or no description at all, rather than a file too smal
 needed. Escape 124 and SpeedHQ stop closer to the finish than any of the rest: each has its container
 and most of its bitstream recovered and verified against real files, with one specific, narrow piece —
 a skip-count coding for Escape 124, some unknown number of reassigned coefficient codewords for SpeedHQ
-— that this project's evidence could narrow down but not close. Where each stops is recorded below.
+— that this project's evidence could narrow down but not close. VP4 stands apart from all of these: its
+two independent sources name their own method rather than paraphrasing somebody else's decoder, and
+this project went further than reading them, obtaining and running On2's own `vp4vfw.dll` directly and
+verifying an independent bit-level parser against it frame by frame — and it still stops at exactly the
+one family of tables neither source prints, the motion-vector Huffman codes, which the codec's own
+binary stores as branches rather than as data reachable by inspection. Where each stops is recorded
+below.
 
 The nine screen-capture codecs below — MSCC, RSCC, WCMV, MWSC, RASC, Go2Meeting, ScreenPressor,
 Screenpresso and TSCC2 — sort into the same places rather than needing a new one. Six of the nine
@@ -35,6 +44,8 @@ packet framing fully recovered and verified against it, and a delta-record schem
 coordinates are pinned down and whose remaining fields resist every reading tried.
 
 None of the twenty-four had anything committed.
+
+None of the sixteen had anything committed.
 
 Indeo 3 (`IV32`), Indeo 4 (`IV41`), Indeo 5 (`IV50`), TrueMotion 1 (`DUCK`) and TrueMotion 2 (`TM20`)
 are the proprietary codecs of the multimedia era. None has a published specification. No encoder for
@@ -1460,3 +1471,138 @@ HQX. Nothing independent of that one post was found anywhere searched.
 The same as Canopus HQ, HQA and HQX above: a description of the bitstream from a source that states it is
 not derived from reading an implementation, or a second reverse-engineering write-up that says plainly how
 it was produced and from what.
+
+# On2 VP4, where the wiring is published and one wire is not
+
+VP4 — FourCC `VP40` — was investigated first among the two On2 codecs this task targeted, on the
+strength of a real advantage the note above already gives it: it shares almost all of its structure
+with VP3, which this package decodes exact over 3,182 frames. That advantage turns out to be real for
+everything except one family of tables, and this section records exactly where the line falls,
+verified against the codec's own binary rather than against anyone's description of it.
+
+## Provenance, checked before anything was trusted
+
+Two sources describe VP4's bitstream: the MultimediaWiki `On2_VP4` page, and three posts on Kostya
+Shishkov's `codecs.multimedia.cx`, the most detailed being "Some notes on VP4" (2015) and "General
+overview of Duck codecs and their design" (2020). Both name their own method in the open, which is what
+the MSS1/MSS2 and Canopus HQ sections above found missing and declined to use on that account: "REing
+VP4 is rather easy — you just download original VP3.2 decoder source (still available at Xiph SVN
+servers) and compare it to the structure in `vp4vfw.dll`." That is a first-party account of reading
+On2's own shipped binary against On2's own already-public VP3.2 source, not a paraphrase of somebody
+else's decoder — the same category of source this project already accepts from Lagarith's author's own
+2006 wiki page — and the account is candid about its own gaps: several header fields are marked "I
+didn't care enough to decipher their meaning though," which is not how a page copying a working,
+complete implementation reads.
+
+## What was recovered from those two sources
+
+  - **The shared frame prefix**: 1 bit frame type, 1 bit unused, 6 bits of "DCT Q mask" (a quantiser
+    index), for every frame.
+  - **The CBP scheme for non-key frames** in full: `MBFullyFlags[]` and, for macroblocks it leaves
+    zero, `MBCoded[]`, both run-coded flag arrays; then, for a macroblock `MBCoded` marks, a
+    Huffman-coded coded-block pattern read from one of two 14-entry tables, switching to the second
+    whenever the value just read was `0x3`, `0x7`, `0xD` or `0xE`. Both tables are printed to the
+    codeword.
+  - **The flag-array code** in full, a hand-rollable exp-Golomb-like scheme (`get_mplayer` in the
+    source's own naming) that this project reimplemented directly from the printed pseudocode.
+  - **Four structural facts, each a genuine departure from VP3** that the two sources between them
+    name plainly: coefficient tokens are grouped by block rather than by frequency across the frame;
+    DC prediction averages the two available neighbours, or falls back to the last predicted value,
+    rather than VP3's weighted sum; the loop filter runs during motion compensation against the
+    prediction rather than once over the whole reconstructed picture, so reference frames carry no
+    filtering of their own; and motion vectors are Huffman-coded per component, the table chosen by
+    `log2(ABS(last_component))`, with the sign taken from the previous vector rather than read fresh.
+  - **What is not stated anywhere in either source**: the motion-vector Huffman tables themselves —
+    the wiki gives the *scheme* (`get_vlc(hufftab_mvx[log2(ABS(last_mv_x))])`) and never the table —
+    and the meaning of roughly fifty bits in the key-frame header, six fields the wiki marks `???` and
+    states only the width of, immediately after a named `version byte 0` (8 bits), `version` (5 bits,
+    "should be 2"), `key frame type` (1 bit) and 2 spare bits.
+
+## What this project verified independently, against the codec itself
+
+Nothing above was taken on faith. `samples.mplayerhq.hu/V-codecs/VP4/` — the address the wiki page
+itself gives — carries not only a sample (`ot171_vp40.avi`, 160×112, 364 frames, md5-checked against
+its own manifest) but the actual On2 `vp4vfw.dll` (4.0.20.24, same directory, same manifest), placed
+there for exactly this kind of work. `ffprobe`/`ffmpeg` decode the sample cleanly (`yuv420p`, one key
+frame, `-fps_mode passthrough` matching `ffprobe -count_frames` exactly), so it is a usable oracle, and
+the DLL is a second, independent one: On2's own decoder, not a paraphrase of it.
+
+  - **A harness was built and run.** No native 32-bit toolchain exists in this environment, so one was
+    assembled from what does: `clang -target i686-pc-windows-gnu` compiling against Wine's own
+    `i386-windows` import libraries (`vfw.h`, `libkernel32.a`) with a handful of freestanding stub
+    headers for the pieces no libc was available to supply, linked with `lld-link`, run under
+    `wine` (11.15). The harness calls `vp4vfw.dll`'s exported `DriverProc` directly through the
+    documented Video-for-Windows protocol (`DRV_LOAD`, `DRV_OPEN` with an `ICOPEN` naming `VP40`,
+    `ICM_DECOMPRESS_GET_FORMAT`, `ICM_DECOMPRESS_BEGIN`, `ICM_DECOMPRESS`) — all Microsoft's own public
+    ABI, no different from using a documented file format's header layout.
+  - **It decodes.** Frame 0 (the key frame) comes back `ICERR_OK`; converted the same bottom-up BGR24
+    way any DIB is and compared against `ffmpeg`'s decode of the same frame, every sample lands within
+    16 of ffmpeg's — the shape this project's own notes describe as ordinary YUV-to-RGB rounding, not a
+    structural mismatch, and the frame's content and orientation both check out by eye. Frame 1, an
+    inter frame, also returns `ICERR_OK` in sequence against the same open instance.
+  - **The published pieces were reimplemented independently and checked against the real bitstream,
+    bit by bit, with no reference to any decoder's source.** A from-scratch parser — the shared
+    8-bit prefix, `get_mplayer`, both CBP tables with the context switch, and VP3's own macroblock
+    coded-order geometry and mode-scheme Huffman table (`Vp3Geometry`, `Vp3ModeReader`, already in this
+    tree) reused verbatim, since the wiki states the mode data is "coded in the same way as in VP3" —
+    was run against frame 1's real bytes. It parses to the bit with no desync: 70 macroblocks for the
+    160×112, 10×7 grid; 69 read fully coded and one partially, whose Huffman-coded CBP comes out
+    non-zero; a mode scheme of 7 (the three-bit literal form) reading a sensible histogram — 25
+    no-motion, 6 intra, 7 single-vector inter, 8 last-vector, 6 last-2-vector, 7 golden-no-vector, 3
+    golden-with-vector, 8 four-vector — that lines up with VP3's own `ReferenceOfMode` table with no
+    forcing. That lands the parser at bit 252 of the packet's 9,280, precisely at the motion-vector
+    section, needing 42 individual vector components from here (7, plus 3, plus 8 fours) that the two published
+    sources describe the shape of and print no table for.
+  - **A search for the tables as data, not as description, came back empty.** The CBP tables are known
+    exactly, so they make a positive control: every code/value and length/value encoding this project
+    could construct for them was searched, byte for byte, against the DLL's `.rdata` on disk and
+    against its live `.data` section dumped from the running Wine process after decoding the key frame
+    and again after decoding the following inter frame (the two dumps are byte-identical, so nothing is
+    built lazily into that section between the two, and it is not where a runtime-constructed table
+    would appear either). None of these encodings appears anywhere in either. That is informative on its
+    own: it says the codec's own C source almost certainly decodes these small alphabets with inline
+    branches rather than a lookup table, which is exactly why the CBP tables the wiki does print had to
+    come from someone reading disassembled code rather than a data section, and why the same route
+    would be needed for the motion-vector tables this project does not have.
+  - **A live decoded frame's heap was inspected**, and a window of small `int16` pairs matching plausible
+    motion vector magnitudes (0, ±1, ±2) was found in the codec's per-instance state between decoding
+    frame 0 and frame 1 — genuine evidence the DLL is really doing motion compensation on this stream —
+    but its count (25 pairs) does not match the 42 raw vector reads the bitstream parse above requires,
+    so it is some derived or partial array rather than a one-to-one trace of the codewords read, and
+    was not something a table could be reconstructed from without knowing which of those two counts,
+    and which order, it actually holds.
+
+## Where it stops, and why further static reading does not close it
+
+The wall is exactly the one the two published sources already drew, now confirmed rather than assumed:
+the per-component, magnitude-bucket-indexed motion-vector Huffman tables are not printed anywhere this
+project found — not on the wiki, not in any of Kostya's three posts, not in a patent or an academic
+paper, not in any GitHub or archive.org listing a search for `hufftab_mvx` or equivalent turned up —
+and they are not recoverable from the DLL by the means available here. They are used from the first
+inter frame of the first real sample, so a decoder that cannot read them cannot decode motion at all,
+which is most of what a real VP4 file spends its bits on. The roughly fifty unstated bits of the
+key-frame header are a second, smaller unknown in the same direction: their width is published, their
+meaning is not, and nothing here tried skipping them at the stated width against the oracle, because a
+working key frame alone — without the inter frames the same stream needs the missing tables for — would
+not be a working decoder by this project's own standard.
+
+Recovering the missing tables from the binary directly, the way Kostya's own account says he read the
+CBP tables and the frame header shape, is possible in principle — this project got as far as a
+correct, working, independently-built harness that runs the real decoder and inspects its live state,
+which is further than a description of the codec alone would allow — but doing so needs the actual
+decode routine disassembled and stepped through instruction by instruction to find where the codeword
+is read and matched against a symbol, not a data section searched for a table that turns out not to be
+stored as one. That is a different, and considerably larger, piece of work than this investigation
+completed, and nothing here should be read as ruling it out for whoever picks it up next: the DLL, the
+sample, and a cross-compiler that reaches it without installing anything are all confirmed to exist and
+to work.
+
+## What would change the answer
+
+A published account of the motion-vector Huffman tables from a source that names its own method the
+way the two used here do — or a completed disassembly of `vp4vfw.dll`'s decode routine, for which this
+investigation's harness and verified frame-by-frame bit parser are a working starting point rather than
+something to redo. Failing either, the same two things would help on the header: a stated meaning for
+the key frame's fifty unpublished bits, or a demonstration that a fixed-width skip past them is safe to
+assume, checked the way this project checks anything else — against the oracle, over real files, not
+by inspection alone.
