@@ -23,8 +23,8 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 | | Count | Share |
 | --- | --- | --- |
 | Decoded and verified against ffmpeg | 46 | 22% |
-| Established as not implementable from files alone | 11 | 5% |
-| Not yet attempted | 154 | 73% |
+| Established as not implementable from files alone | 12 | 6% |
+| Not yet attempted | 153 | 72% |
 
 The 46 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
@@ -54,8 +54,9 @@ the stronger oracle of the two, being the ground truth itself. LCL ZLIB is measu
 addition to the usual one, since it too has a real encoder here: round-tripped through it as well as
 checked against seven real recordings.
 
-The 11 are Indeo 3, Indeo 4, Indeo 5, TrueMotion 1, WMV1, WMV2, MSS1, MSS2, Lagarith, DV and MSZH, and the
-arguments that settle them are in `undecodable-codecs.md`. The first four have frames too small to carry the tables they need —
+The 12 are Indeo 3, Indeo 4, Indeo 5, TrueMotion 1, WMV1, WMV2, MSS1, MSS2, Lagarith, DV, MSZH and
+Escape 124, and the arguments that settle them are in `undecodable-codecs.md`. The first four have
+frames too small to carry the tables they need —
 340 bytes for a 320x240 Indeo 3 picture, 14 for Indeo 4, 2 for Indeo 5, 0 for TrueMotion 1 — so those
 tables live in the codec binary and cannot be recovered by reading files. WMV1 and WMV2 both have real ffmpeg
 encoders and stop anyway: their run-level, DC and motion-vector tables are the same undocumented ones
@@ -78,8 +79,16 @@ decoded, and its "no compression" mode is fully verified across every colour spa
 but the actual compression — "copying blocks from already decoded data," the format's own document says,
 then leaves an unfilled placeholder where the algorithm should be — was reverse-engineered against a
 single still picture re-encoded six ways rather than a real recording, which yielded exactly two genuine
-match tokens to calibrate an entirely unpublished encoding against and settled neither. All are finished
-investigations with negative answers, not gaps waiting to be filled.
+match tokens to calibrate an entirely unpublished encoding against and settled neither.
+
+Escape 124 stops closer to the finish than any of the other eleven: its container — ARMovie/RPL, not
+AVI — is fully mapped and verified against real files, and its bitstream's byte order and first
+codebook's sizing are confirmed against real frame data. What remains is one coefficient: the exact bit
+pattern behind the skip-count coding that the only published description names "Rice decoding" without
+ever stating, and every reading tried decodes into implausibly large skip counts on a key frame that
+should skip almost nothing.
+
+All twelve are finished investigations with negative answers, not gaps waiting to be filled.
 
 ## What is left, by family
 
@@ -153,7 +162,8 @@ it — but the standard, IEC 61834 and SMPTE 314M, is not free, and the investig
 table either; it is counted with the not-implementable codecs above rather than left in this list.
 
 **Game and FMV codecs** — the largest group, around 45 names, of which `roqvideo` and `interplayvideo`
-are now done: `binkvideo`, `smackvid`, `vmdvideo`, `escape124`, `escape130`, the several `ea*`
+are now done and `escape124` is investigated and not implementable (`undecodable-codecs.md`):
+`binkvideo`, `smackvid`, `vmdvideo`, `escape130`, the several `ea*`
 codecs, the `xan_*` pair and many more. Almost none has a published specification; most are described
 on MultimediaWiki from reverse engineering. Their value is preservation rather than reach, and each is
 small.

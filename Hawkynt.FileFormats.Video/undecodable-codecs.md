@@ -814,3 +814,120 @@ A description of MSZH's compression scheme from a source that is not an implemen
 not further encodings of the one photograph this corpus re-uses six times, would let a reconstruction be
 checked against a second independent match token the way every other bitstream-recovered codec in this
 package was.
+
+# Escape 124, where the container is solved and the coefficient that matters is not
+
+Escape 124 — Eidos Technologies' vector-quantised codec — was investigated as one of the
+smaller game and FMV formats this package's coverage still lacks. It stops with the container fully
+mapped and verified against real files, and the codec's own bitstream reconstructed as far as the
+published pseudocode goes before running out: a skip-count coding neither that pseudocode nor anything
+else found states precisely enough to reproduce.
+
+## The container is not AVI, and is fully solved
+
+Escape 124 is not carried in AVI the way Cinepak or Microsoft Video 1 are. It is usually encapsulated in
+ARMovie/RPL files (`.rpl`) — the format early PC Tomb Raider games use — a text header followed by a
+binary chunk catalogue, with no relation to RIFF at all. Assuming AVI here would cost the next attempt
+real time before it ever reached the codec, so it is worth stating plainly: a working decoder for this
+codec needs a new container reader, not a new entry in an existing one.
+
+The header is twenty-one newline-terminated text fields in a fixed order — signature (`ARMovie`), movie
+name, copyright, an author/tool line, then decimal value/description pairs for video compression format,
+X and Y resolution, pixel depth, frame rate, sound compression format, sample rate, channel count, sample
+precision, frames per chunk, number of chunks, even and odd chunk sizes, chunk catalogue offset, sprite
+offset and size, and key frame offset. Two real samples from `samples.ffmpeg.org/game-formats/rpl/escape124/`
+— `ESCAPE.RPL`, 320x240, and `PYRAMID.RPL`, 320x120 — were read field by field against this layout and
+matched exactly, including the video format field itself: both state `124` in plain decimal, confirming
+the codec's own name is the format code and not a coincidence of numbering.
+
+What follows the header is a flat binary chunk catalogue at the offset the header states, one line per
+chunk, `FO,BS;OS` — file offset, video byte size, sound byte size — comma before the video size and
+semicolon before the sound size, each chunk's video and sound data sitting contiguously at its own file
+offset. The header's own "number of chunks" field undercounts by one: it names the highest chunk index
+rather than a count, so a file stating `3` has four chunks, indices 0 through 3, and the catalogue has
+one line per chunk rather than one more than the count. This was found because `ESCAPE.RPL`'s header
+states three chunks and twenty-five frames per chunk — seventy-five frames by a literal reading — while
+its catalogue holds four lines and ffmpeg reports exactly one hundred frames for the file, `4 x 25`.
+Every catalogue entry's file offset plus its two sizes lands exactly on the next entry's file offset in
+both samples, which is what closes the loop: the catalogue is internally consistent and its frame count
+agrees with ffmpeg's own count, so this half of the format is not a guess.
+
+Inside a chunk's video bytes, frames are packed back to back with no gap, each opening with its own
+eight-byte header — a `frame_flags` doubleword and a `frame_size` doubleword stating the whole frame's
+size, header included. Walking `ESCAPE.RPL`'s first chunk by `frame_size` alone lands on exactly
+twenty-five frame headers and ends precisely at the chunk's own video byte count, with nothing left
+over — the same closed-loop check the chunk catalogue passed. `frame_flags` was read the same way: the
+first frame of every chunk sequence carries three extra bits (17, 18 and 19) that every following frame
+in the sample lacks, and those three bits are exactly the ones a community pseudocode description
+(below) names as "unpack codebook 1", "unpack codebook 2" and "unpack codebook 3" — which is what a
+keyframe needs and a delta frame does not, and confirms the bit numbering by behaviour rather than by
+trusting the source that named it.
+
+## What is confirmed about the codec itself, and how
+
+The only bitstream-level description found is MultimediaWiki's Escape 124 page, itself explicit that it
+is incomplete: no bit pattern for the skip-count coding it names "Rice decoding", no loop-termination
+rule for the per-superblock macroblock loop, and no statement of a decoder's initial state. What it does
+give — a codebook structure, a superblock/macroblock assembly outline, and the frame-header bit numbers
+above — was checked against real frame data rather than trusted outright, and two things came out
+confirmed:
+
+**The bitstream is read most-significant-bit first.** Every frame opens with a four-bit codebook-1
+depth field, and codebook 1's stated size is `2^depth` entries of a known width (a four-bit pixel mask
+plus two 5-5-5 RGB colours, thirty-four bits an entry). Reading that four-bit field most-significant-bit
+first on `ESCAPE.RPL`'s first frame gives a depth of 9 — a 512-entry codebook, 17,408 bits, comfortably
+inside the frame's 99,648-bit payload. Reading it least-significant-bit first gives a depth of 14 — a
+16,384-entry codebook needing more than five times the whole payload before a single macroblock is
+decoded. A codebook that cannot fit in the frame that supposedly carries it is not a candidate reading,
+which is what makes this check work without yet knowing anything else about the format: only one bit
+order produces a codebook size the frame could possibly hold, on the very first field read.
+
+**Codebook 1's size is exactly `2^depth`, as stated.** Unpacking 512 entries at thirty-four bits apiece
+from that starting position lands the read position at exactly 17,412 bits — 4 bits for the depth field
+plus 512 × 34 — with no drift, which is what let the next field (codebook 2's own depth) be read from a
+known-correct position rather than a guessed one.
+
+## What is suggestive and not corroborated further
+
+Two more things fit one clean observation each, and are recorded as exactly that — a single data point,
+not an established fact the way the two above are:
+
+- **Byte-alignment between codebook sections.** Rounding the read position up to the next byte boundary
+  after codebook 1, and again after codebook 2, before reading codebook 3's size, produces a size of
+  zero on `ESCAPE.RPL`'s first frame — a clean, structurally sensible answer (a 20-bit field landing on
+  exactly zero by chance is roughly a one-in-a-million read) where every unaligned reading tried instead
+  produces a codebook 3 many times larger than the space remaining in the frame. One clean zero across
+  one field on one frame is a real signal and not a coincidence dismissed lightly, but it is one data
+  point, not a rule checked against a second frame or a second file.
+- **Codebook 2's size multiplier.** The wiki page states codebook 2 holds `2^depth` entries multiplied
+  by "total number of superblocks" — for a 320x240 picture at 8x8 superblocks, 1,200 — which produces a
+  codebook many times larger than the space remaining in the frame regardless of which byte-alignment
+  reading is used. Multiplying by the superblock count of one row (40, for this picture) instead is the
+  only multiplier tried that leaves room for what has to follow it, but nothing beyond that plausibility
+  argument was found to confirm it, and no smaller test than decoding a whole frame was available to
+  check it in isolation.
+
+## Where it stops, precisely
+
+At the per-superblock skip-count decode, immediately after the third codebook. Every reading of the
+"Rice decoding" the wiki page names but does not specify — including the most common shape such a name
+suggests, a unary prefix counting leading zero bits followed by that many literal bits, value equal to
+the literal plus `2^prefix - 1` — produces skip counts in the hundreds on the first several superblocks
+of a key frame, where a key frame, coding every superblock fresh, should skip nothing or next to
+nothing. A three-hundred-and-some-superblock skip within the first handful of reads is not a plausible
+encoding of "nothing to skip yet"; it is the signature of a bitstream position that is not where the
+skip-count coding actually begins, or a coding rule that is not the one being tried. Both remain open:
+whether one more alignment step precedes the loop, whether the loop's own structure differs from the
+pseudocode's outline in some way not yet tested, or whether the skip code is not the unary-prefix shape
+guessed at, cannot be told apart from the evidence gathered so far.
+
+## What would change the answer
+
+A description of the skip-count bit pattern from a source that states it rather than names it — the
+exact prefix-to-value mapping "Rice decoding" is standing in for — would very likely settle the rest in
+short order, since everything after it (the macroblock mask assembly, the codebook-index update, the
+raster order of a superblock's sixteen macroblock positions) is stated in enough detail to implement
+directly once the bitstream position feeding it is trustworthy. Failing that, a second and third real
+sample decoded far enough to cross-check the byte-alignment and codebook-2-multiplier findings above
+against more than one data point apiece would narrow the search considerably, even without a published
+skip-count rule to confirm against.
