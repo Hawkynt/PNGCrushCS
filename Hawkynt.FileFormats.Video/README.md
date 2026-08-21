@@ -45,6 +45,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | Autodesk FLIC | `.fli`, `.flc`, `.flx` | Y | — |
 | id RoQ | `.roq` | Y | — |
 | Interplay MVE | `.mve` | Y | — |
+| id Cinematic | `.cin` | Y | — |
 
 | Codec | Tag | Decode | Encode |
 | --- | --- | --- | --- |
@@ -109,6 +110,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | Lossless Codec Library, ZLIB variant | `ZLIB` | Y | — |
 
 | Vidvox Hap | `Hap1`, `Hap5`, `HapY`, `HapM`, `HapA` (`Hap7`, `HapH` refused by name) | Y | — |
+| id Cinematic Video | `IDCV` (synthetic — the format states no codec tag of its own) | Y | — |
 
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
@@ -2073,6 +2075,72 @@ length its own preamble states, a Snappy back-reference pointing before the star
 multiple-image section holding any combination other than Scaled YCoCg DXT5 with RGTC1/BC4 alpha.
 There is no `catch` anywhere in this decoder that hands back a blank frame or repeats the one before
 it.
+
+### id Cinematic Video
+
+Quake II's cutscene codec, `.cin`, a third self-contained container in the same family as RoQ and
+Interplay MVE — a twenty-byte header and then a flat run of frame commands, video and (where the header
+states a sample rate at all) raw PCM audio alternating one for one. Header layout, the Huffman table
+size and the per-frame command values are all stated in Tim Ferguson's format description, mirrored at
+`multimedia.cx/mirror/idcin.html` and the page MultimediaWiki's own CIN entry points to. Unlike either
+sibling container, the format carries no signature of any kind: `IdcinContainer.MatchesSignature` runs a
+plausibility heuristic of its own instead, checking the header states a plausible picture size and,
+where it states audio, a plausible sample width and channel count. `IdcinReader` answers where each
+frame command is and which stream it belongs to; `IdcinVideoDecoder` is the only thing here that reads a
+Huffman code.
+
+Two of the frame layout's own fields are named by Ferguson's page without their arithmetic being
+stated: "Huffman count" and "Decode count", four bytes each, right before the coded picture. **Whether a
+picture's own bytes number "Huffman count" or "Huffman count minus four" was settled by measurement**,
+not read anywhere: the former runs both real files out of data after two pictures each, and the latter —
+treating "Huffman count" as covering "Decode count" and the picture together — is the one reading, among
+five combinations of bit order and tie-breaking tried against this question and the two below, that
+reaches every picture of both real files, forty-eight and eighty-two. "Decode count" itself is never
+read back: on every picture of both real files it equals width times height exactly, which this decoder
+already knows before a picture is reached.
+
+The coding itself is unrelated to either sibling: an order-1 static Huffman code straight over the
+already-paletted index buffer, with no motion compensation and no block structure of any kind. The
+header's own sixty-four kilobytes are 256 histograms of 256 byte counts, one histogram per value the
+previous pixel might hold; a decoder builds 256 canonical Huffman trees from them once, using the
+standard construction — repeatedly pair the two lowest-count nodes not yet paired — and then walks one
+for every pixel, switching to the tree named by whichever pixel it just produced. Ferguson's page states
+that a dictionary is built from the histogram and explicitly leaves the construction itself to "look
+elsewhere for a more in depth discussion on Huffman coding" — general knowledge of the algorithm, not a
+fact this format states — so **which of several equal-count nodes is paired first was also settled by
+measurement**: breaking a tie toward the lowest index is the only rule, among every combination tried,
+that reaches every picture of both real files: breaking toward the highest index fails a first picture
+outright or manages two before running out of bits it should not have. **Bits are read least significant
+bit first**, the same way: reading most significant bit first fails a first picture on both real files,
+where least significant bit first reaches every picture of both.
+
+**A histogram with at most one nonzero count builds no internal node at all, and decodes to node 255
+regardless of which symbol (if any) actually held that count.** Nothing pairs with nothing, so the
+construction's own loop stops before writing anything above the 256 leaves, and the sentinel value the
+construction is left holding happens to be the top of that leaf range rather than the symbol that was
+actually starved of company. This is not a separate fact to confirm — it falls straight out of the
+construction above once that construction is fixed by measurement — and a context this starved of data
+cannot arise from a real picture without every other byte in it being outside this tree's alphabet too.
+
+Palette entries are six-bit VGA precision, widened the same way this project's other six-bit channels
+are — by repeating the top two bits into the bottom — unless any of the 768 bytes in a given palette
+command exceeds 63, in which case none of it is touched: some of the tools that built these files wrote
+full eight-bit RGB instead, and nothing in a palette command states which convention a given file uses.
+A frame command that states no palette at all means exactly "the previous one still applies", not "there
+is none" — the same carry-forward RoQ's own codebooks need across a skip.
+
+**Measured.** Two files from `samples.ffmpeg.org/game-formats/idcin/` — 320x200 and 320x240, 48 and 82
+pictures, 130 in all — were decoded here and by ffmpeg and compared sample for sample against ffmpeg's
+own `rgb24` output, index looked up through the installed palette both ways: every picture is identical,
+maximum delta nought. This is paletted throughout, so the comparison is direct with no chroma-siting
+convention to get wrong. `quake.cin` runs out of file mid-picture with no end-of-file command anywhere
+in it; ffmpeg's own decode stops at the same forty-eighth picture this reader does, which is what
+"measured against ffmpeg" means for a file that is not, itself, complete. A frame command or a chunk
+that does not fully fit in what remains of the file is therefore read as far as it goes and no further,
+not refused outright. The audio chunk size is Ferguson's page's own formula — sample width times channel
+count times sample rate divided by fourteen — applied with no remainder redistribution of any kind:
+neither real file exercises a sample rate that does not divide fourteen evenly, so nothing beyond the
+documented formula is claimed.
 
 ## 📜 License
 
