@@ -56,6 +56,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | HuffYUV / FFVHUFF | `HFYU`, `FFVH` | Y | — |
 | FFV1 (RFC 9043) | `FFV1`, `V_FFV1` | Y | — |
 | MPEG-4 Part 2 (ISO/IEC 14496-2) | `mp4v`, `XVID`, `DIVX`, `DX50`, `FMP4`, `MP4S`, `M4S2`, `3IV2`, `FVFW`, `RMP4`, `V_MPEG4/ISO/*` | Y | — |
+| Apple ProRes (SMPTE RDD 36) | `apco`, `apcs`, `apcn`, `apch`, `ap4h`, `ap4x` | Y | — |
 
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
@@ -465,6 +466,58 @@ What is not implemented refuses and says so, naming the clause: quarter-sample m
 sprites and global motion compensation, interlaced coding, overlapped block motion compensation, data
 partitioning, scalability, non-rectangular shape, samples of any depth but eight, chroma formats
 other than 4:2:0, newpred, reduced-resolution pictures and the complexity estimation header.
+### Apple ProRes
+
+Written from SMPTE RDD 36:2022, which is the published description of the bitstream and is cited by
+clause throughout the source. Intra only, so there is no reference handling at all: every frame is a
+whole picture, a seek needs nothing decoded before it, and a difference in one frame cannot become a
+difference in the next.
+
+One bitstream under six names. The profiles — Proxy, LT, Standard, HQ, 4444 and 4444 XQ — differ in
+how hard an encoder quantises and whether it writes 4:2:2 or 4:4:4, both of which a decoder reads out
+of the frame rather than off the tag. **There is no sample depth in a ProRes frame at all**: 7.5.1
+gives the conversion from the transform's output to samples of any depth and leaves the choice to the
+decoder, so the depth taken here is the one the profile is coded for — ten bits for the 4:2:2
+profiles and twelve for the 4:4:4 ones.
+
+Coefficients are coded with Golomb-Rice/exponential-Golomb combination codes whose codebook adapts to
+the previous symbol, with three adaptations running at once and each reset per component per slice to
+a stated non-zero value rather than to nothing. Two details are easy to get wrong and neither fails
+loudly: **a DC difference is negated when the one before it was negative**, so the sign is state and
+not just the magnitude; and **the four 4:4:4 chroma blocks of a macroblock run top to bottom then
+left to right where the four luma blocks run left to right then top to bottom**, which the
+specification prints a note of its own about.
+
+Measured against ffmpeg on the planes, at the coded depth, before any reduction to eight bits —
+against `-pix_fmt yuv422p10le` and `yuv444p12le` — because this library interpolates chroma where
+ffmpeg replicates and a comparison on packed colour measures that disagreement instead of the decode.
+All six profiles, both of ffmpeg's encoders, progressive and interlaced in both field orders, sizes
+that are and are not a whole number of macroblocks, and 176x144 up to 1280x718: **every sample of
+every plane is within one level**, and one is the only difference that ever occurs. That residue is
+the inverse transform and nothing else — RDD 36 specifies no particular IDCT and requires only the
+accuracy of its Annex A, so this evaluates the defining sum in double precision rather than
+reproducing anyone's fixed-point approximation. **Alpha is exact**: 8- and 16-bit alpha both decode
+to ffmpeg's values with no sample differing anywhere, which it should, since ProRes codes alpha
+losslessly with no transform in the path.
+
+The clamping bounds are the second of the two 7.5.1 offers — the permissible video levels, 4 to 1019
+at ten bits and 16 to 4079 at twelve, rather than the full 0 to 2^b−1. Taking the wider pair puts a
+scatter of samples exactly four levels apart at the extremes of a heavily quantised picture and
+nowhere else, which is how the choice was found.
+
+Reducing the samples to the eight bits a `RawImage` holds is folded into the colour conversion so
+that a sample is rounded once. It is worth saying why this is not `ChannelScaling`'s reduction:
+that one narrows a channel which fills its range, `v * 255 / max`, whereas 7.5.1 fixes black at
+`16 * 2^(b-8)` and white at `235 * 2^(b-8)`, so moving a Y′CbCr sample between depths is an exact
+power of two. Ten-bit white is 940, and `round(940 * 255 / 1023)` is 234 where the format says 235.
+Alpha is the opposite case — 7.5.2 does define it as filling its range — so that one is
+`ChannelScaling.Reduce16` exactly. Reducing the planes first and converting afterwards, rather than
+folding the two together, moves up to three levels of RGB on a fifth to a third of the samples.
+
+What refuses: a bitstream version later than the two RDD 36 describes; a reserved `chroma_format`,
+`interlace_mode` or `alpha_channel_type`; a `quantization_index` outside the permitted 1 to 224; a
+version 0 frame stating syntax its own version does not have; a packet that is not a compressed
+frame; and any structure whose stated size does not fit inside the one containing it.
 
 ## 📜 License
 
