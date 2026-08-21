@@ -101,6 +101,8 @@ who wants one frame of a two-hour recording pays for one frame.
 
 | Flash Screen Video 2 (FSV2) | `FSV2` | Y | — |
 
+| ZeroCodec | `ZECO` | Y | — |
+
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
 is an undivided heap of bytes, and where each packet starts and stops is a computation over five
@@ -1822,6 +1824,58 @@ block whose row range reaches outside its own cell; a key frame block that does 
 since nothing measured exercises what a partial reference would mean; a primed block whose cell has no
 reference to prime against; and a decompressed pixel stream that runs out before the pixel count a
 block's position in the grid calls for.
+
+### ZeroCodec
+
+Lossless, and built entirely out of zlib in the plainest way this package has seen: a packet is one
+complete, independently checksummed zlib stream, decompressing to exactly one picture's worth of bytes,
+and the whole of the coding is what a decompressed byte of zero means — the byte already held at that
+position is unchanged — against anything else, which is the literal new byte.
+
+**No specification exists.** The community write-up on MultimediaWiki states only that the codec performs
+"difference processing" and reads and writes RGB, YUY2 and UYVY; it names no frame layout, no byte order
+and no rule for what the difference actually is. Everything below was established here by decompressing
+real packets and comparing the result against ffmpeg's own decode of the same file — samples.ffmpeg.org
+carries exactly one ZeroCodec recording and ffmpeg has no encoder for it, so there is no corpus to build,
+only the one sample to read.
+
+**The delta rule needs no notion of a key frame, and none is read.** Every packet — the container's own
+much larger, full-picture ones included — decompresses to the picture's full byte count and is merged
+into the picture already held by the very same rule. The first packet a decoder ever sees comes out
+identical to a literal copy under it, because the picture "already held" before anything has arrived is
+an all-zero buffer, and a decompressed zero at a position nothing has written to yet leaves a zero exactly
+where a literal reading would have put one; a packet partway through the stream that happens to carry a
+picture unrelated to the one before it decompresses to bytes that are almost all nonzero and so is carried
+by the same rule without anything having to say which packets those are. Measured directly: applying this
+one rule, with no container flag consulted anywhere, reproduces every frame of the sample file byte for
+byte, including three packets an order of magnitude larger than the ones around them. One consequence
+follows from the rule itself rather than from anything chosen here: a sample whose true new value is
+exactly zero where the previous value was not can only be written by this scheme in the one case that does
+not matter, where the previous value already reads as unchanged — nothing in the format works around that,
+and nothing in the one sample measured here needed it to.
+
+The picture is coded bottom row first, the Windows DIB convention this package's other AVI codecs already
+carry, found by decompressing the first packet — exactly the stream's picture size — and finding it a
+mirror image of ffmpeg's own first frame until the rows are reversed. The one pixel layout measured is
+sixteen bits a pixel, packed 4:2:2 with the byte order U, Y, V, Y, matching ffmpeg's own report of
+`uyvy422` for the sample and the only `biBitCount` any file reaching this decoder has stated; the
+community page's other two forms, full RGB and the reverse YUY2 packing, have no sample here to measure a
+byte layout against and are refused rather than guessed at.
+
+**Measured against ffmpeg** on the packed samples themselves and not through an RGB conversion — this is
+a 4:2:2 format, so the same chroma-siting ambiguity this package's other subsampled codecs are compared
+plane by plane to avoid applies here too. One file, 38 frames, 1280x720: every one of the 70,041,600 bytes
+ffmpeg's own decode produces (`ffmpeg -threads 1 -i sample-zeco.avi -fps_mode passthrough -f rawvideo
+-pix_fmt uyvy422`) is reproduced exactly, frame by frame, with no drift across the run. The RGB picture
+this package hands back — `RawImage` has no packed 4:2:2 format of its own — converts with BT.601
+coefficients, assumed rather than measured since there is nothing in the one sample available to read a
+colour-space choice off, and repeats each chroma pair across both of its luma samples rather than
+interpolating, a display convenience the measurement above does not depend on.
+
+What refuses: a picture whose width is odd, since two luma samples share one chroma pair and an odd width
+leaves the last sample with none; a depth other than sixteen bits, for want of a second sample to measure
+any other packing against; and a packet whose zlib stream is truncated, corrupt, or does not inflate to
+exactly the picture's own byte count.
 
 ## 📜 License
 

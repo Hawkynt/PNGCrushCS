@@ -22,22 +22,24 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 
 | | Count | Share |
 | --- | --- | --- |
-| Decoded and verified against ffmpeg | 42 | 20% |
+| Decoded and verified against ffmpeg | 43 | 20% |
 | Established as not implementable from files alone | 10 | 5% |
-| Not yet attempted | 159 | 75% |
+| Not yet attempted | 158 | 75% |
 
-The 42 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
+The 43 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
 frame against ffmpeg's decode of the same bitstream before it was merged, and the measurements are in
 each one's section of that file. The ones that reach exact equality on every sample of every frame
 are Microsoft RLE, Microsoft Video 1, Cinepak, QuickTime Animation, Apple Video, Apple Graphics, FLIC, HuffYUV,
-FFVHUFF, FFV1, ZMBV, TSCC, CSCD, Flash Screen Video, Flash Screen Video 2, id RoQ, Ut Video, MagicYUV, v210, r210, r10k,
-y41p
-and CLJR — the two colour-space ones over 883 and 1,446 frames, in all six and all seven of their
+FFVHUFF, FFV1, ZMBV, TSCC, CSCD, Flash Screen Video, Flash Screen Video 2, id RoQ, ZeroCodec, Ut Video, MagicYUV, v210, r210, r10k,
+y41p, CLJR
+and ZeroCodec — the two colour-space ones over 883 and 1,446 frames, in all six and all seven of their
 colour spaces, and the packed layouts on the sample data itself, at its own coded depth and with
 no display conversion in the way, over 120, 90, 90, 90 and 60 frames at three geometries each.
 CLJR is the one lossy format among them — measured against ffmpeg's own decode rather than the
-source, because its encoder dithers.
+source, because its encoder dithers. ZeroCodec is measured the same packed-native way — on its
+own 4:2:2 samples, not through an RGB conversion — over the one recording that exists for it: no
+ffmpeg encoder exists to build a corpus with.
 Theora and VP3 reach it too, Theora over 1,717 frames across all three of its pixel formats and VP3
 over 3,182.
 
@@ -106,8 +108,8 @@ wall with no published specification at all.
 **Sorenson** — `svq1`, `svq3`. No published specification.
 
 **Lossless RGB and YUV** — around 30 names including `012v`, `aasc`, `cllc`, `cyuv`, `dxtory`,
-`loco`, `m101`, `magicyuv`, `mszh`, `r10k`, `r210`, `sheervideo`, `v210`, `vble`, `y41p`, `ylc`,
-`zerocodec` and `zlib`. Ut Video came out of this group and reached exact equality, which is the
+`loco`, `m101`, `magicyuv`, `mszh`, `r10k`, `r210`, `sheervideo`, `v210`, `vble`, `y41p`, `ylc`
+and `zlib`. Ut Video came out of this group and reached exact equality, which is the
 standard for every one of them: max delta 0 or it is wrong. `v210`, `r210`, `r10k` and `y41p` carry no
 compression at all, only a fixed packing of samples into words or byte groups, so there was nothing for
 a decoder to get wrong except the layout, and the two RGB ones decode straight into a ten-bit RGB pixel
