@@ -35,6 +35,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | ISO base media (MP4, QuickTime, 3GP) | `.mp4`, `.m4v`, `.mov`, `.qt`, `.3gp`, `.3g2`, `.m4a` | Y | — |
 | Matroska / WebM (EBML) | `.mkv`, `.mka`, `.mks`, `.mk3d`, `.webm` | Y | — |
 | H.264 byte stream (Annex B) | `.264`, `.h264`, `.avc`, `.x264` | Y | — |
+| H.265 byte stream (Annex B) | `.265`, `.h265`, `.hevc`, `.x265` | Y | — |
 | MPEG program stream (MPEG-1, MPEG-2, VOB) | `.mpg`, `.mpeg`, `.vob`, `.m2p`, `.m2ps` | Y | — |
 | Motion JPEG stream | `.mjpg`, `.mjpeg` | Y | — |
 | MPEG video elementary stream | `.m1v`, `.m2v`, `.mpv`, `.mpeg1video`, `.mpeg2video` | Y | — |
@@ -58,6 +59,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | Sorenson Spark (Flash Video's H.263) | `FLV1` | Y | — |
 | RealVideo 1 (revision 0 only) | `RV10`, `RV13` | Y | — |
 | H.264 / AVC, Baseline I and P slices | `avc1`, `avc3`, `H264`, `X264`, `DAVC`, `VSSH`, `V_MPEG4/ISO/AVC` | Y | — |
+| H.265 / HEVC, Main profile intra pictures | `hvc1`, `hev1`, `hvc2`, `hev2`, `HEVC`, `H265`, `V_MPEGH/ISO/HEVC` | Y | — |
 | On2 VP3.1 | `VP31`, `VP32` (and `VP30`, refused by name) | Y | — |
 | VP8 (RFC 6386) | `VP80`, `vp08`, `V_VP8` | Y | — |
 | VP9, profile 0 | `VP90`, `vp09`, `V_VP9` | Y | — |
@@ -1207,6 +1209,39 @@ unchanged-frame packet, decoded here and by ffmpeg, agreeing on every index and 
 What refuses: a depth the format does not define; a palettised stream with no palette to decode its
 indices to, since the palette is the container's business — TSCC's own document says so — and never
 carried in a frame; and any opcode that runs off the picture or off the end of the decompressed data.
+
+### H.265 / HEVC
+
+Intra pictures, decoded from ITU-T H.265 itself rather than from anybody's implementation: NAL and
+Annex B parsing with emulation prevention, the video, sequence and picture parameter sets, the CABAC
+engine with its contexts entered from the normative initialisation tables, the coding tree quadtree,
+all thirty-five intra prediction modes with reference substitution and both smoothing filters, four
+transform sizes including the 4x4 sine transform the smallest luma blocks use, dequantisation with
+scaling lists, residual coding with sign data hiding, per-unit quantiser derivation, wavefront
+entropy synchronisation, the deblocking filter, the sample adaptive offset, and Annex C output
+bumping.
+
+Forty-two intra streams were compared plane by plane against ffmpeg on every frame — sizes from 34x18
+to 640x360, every x265 preset from ultrafast to placebo, coding tree units of 16, 32 and 64, quantiser
+groups of 8 to 64, transform depths 1 and 4, the sample adaptive offset and deblocking and sign data
+hiding each on and off, transform skip, lossless, quantisers 4, 32 and 48, and runs of 100 and 200
+frames. **Every sample of every plane of every frame is identical**, against ffmpeg's default integer
+transform and against `-idct faani` alike.
+
+**Predicted and bidirectional slices are refused, and the reason is the interesting part.** The inter
+path is written and mostly works: reference picture sets, list construction, merge and advanced motion
+vector prediction, temporal candidates, the eight-tap luma and four-tap chroma interpolation, weighted
+prediction. Forty-four of fifty measured predicted-slice streams are bit-exact, including long-GOP
+runs. The other six build the motion candidate list differently from the reference for certain coding
+structures, differing in a tenth of a percent to one percent of samples. A codec here is exact or it
+is refused, so it refuses — naming `slice_type` and Table 7-7, and saying that intra pictures are
+exact. The code stays in the tree, unreachable, with the reason recorded against it, because the
+distance left to run is small and throwing it away would mean finding it again.
+
+Also refused by name: tiles, dependent slice segments, coding units coded as raw samples, 4:2:2,
+4:4:4, monochrome, more than eight bits a sample, separate colour planes, and the range, screen
+content, multilayer and three-dimensional extensions. There is no `catch` anywhere that returns a
+blank, a copied or a partial frame.
 
 ## 📜 License
 

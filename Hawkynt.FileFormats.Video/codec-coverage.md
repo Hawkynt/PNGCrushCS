@@ -22,11 +22,11 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 
 | | Count | Share |
 | --- | --- | --- |
-| Decoded and verified against ffmpeg | 29 | 14% |
+| Decoded and verified against ffmpeg | 30 | 14% |
 | Established as not implementable from files alone | 4 | 2% |
-| Not yet attempted | 178 | 84% |
+| Not yet attempted | 177 | 84% |
 
-The 29 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
+The 30 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
 frame against ffmpeg's decode of the same bitstream before it was merged, and the measurements are in
 each one's section of that file. The ones that reach exact equality on every sample of every frame
@@ -46,7 +46,9 @@ negative answer, not a gap waiting to be filled.
 Grouping matters because codecs within a family share a bitstream ancestor, and one decoder usually
 opens several names. The families are roughly in descending order of what they buy.
 
-**Modern standards** — `av1`, `vvc`, `dirac`, `snow`, `cavs`, `apv`. AV1 is the one that pays twice:
+**Modern standards** — `av1`, `vvc`, `dirac`, `snow`, `cavs`, `apv`. HEVC is decoded for intra
+pictures; its predicted and bidirectional slices are written but refused, for the reason given in
+`README.md`. AV1 is the one that pays twice:
 the AVIF reader in the image package is known wrong on every real file, and its fault is inside the
 AV1 decoder rather than the container, so a correct AV1 fixes a still-image format at the same time.
 
