@@ -175,7 +175,6 @@ public sealed class AviReaderTests {
     Assert.Throws<InvalidDataException>(() => _Frames(container));
   }
 
-  [TestCase("H264")]
   [TestCase("FMP4")]
   [TestCase("DIVX")]
   [TestCase("XVID")]
@@ -188,7 +187,6 @@ public sealed class AviReaderTests {
     Assert.That(failure!.Message, Does.Contain(fourCC));
   }
 
-  [TestCase("H264")]
   [TestCase("XVID")]
   [Category("Unit")]
   public void UnsupportedCodec_StillDemuxes(string fourCC) {

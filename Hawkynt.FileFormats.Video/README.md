@@ -33,6 +33,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | Flash Video (FLV) | `.flv`, `.f4v` | Y | — |
 | ISO base media (MP4, QuickTime, 3GP) | `.mp4`, `.m4v`, `.mov`, `.qt`, `.3gp`, `.3g2`, `.m4a` | Y | — |
 | Matroska / WebM (EBML) | `.mkv`, `.mka`, `.mks`, `.mk3d`, `.webm` | Y | — |
+| H.264 byte stream (Annex B) | `.264`, `.h264`, `.avc`, `.x264` | Y | — |
 | MPEG program stream (MPEG-1, MPEG-2, VOB) | `.mpg`, `.mpeg`, `.vob`, `.m2p`, `.m2ps` | Y | — |
 | Motion JPEG stream | `.mjpg`, `.mjpeg` | Y | — |
 | MPEG video elementary stream | `.m1v`, `.m2v`, `.mpv`, `.mpeg1video`, `.mpeg2video` | Y | — |
@@ -50,6 +51,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | QuickTime Animation (RLE) | `rle ` | Y | — |
 | H.263 (ITU-T H.263 baseline) | `H263`, `s263`, `U263` | Y | — |
 | Sorenson Spark (Flash Video's H.263) | `FLV1` | Y | — |
+| H.264 / AVC, Baseline I and P slices | `avc1`, `avc3`, `H264`, `X264`, `DAVC`, `VSSH`, `V_MPEG4/ISO/AVC` | Y | — |
 
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
@@ -297,6 +299,42 @@ What is not implemented refuses and says so, naming the annex and the field: the
 header of clause 5.1.4 and everything it signals, unrestricted motion vectors (Annex D), arithmetic
 coding (Annex E), advanced prediction and its four vectors per macroblock (Annex F), PB-frames
 (Annex G), continuous presence multipoint (Annex C), and the escape level Annex T reserves.
+
+### H.264 / AVC
+
+I and P slices of the Baseline and Constrained Baseline profiles, and every Main or High profile
+stream that happens to be coded without the tools those profiles add. That is: CAVLC, 4:2:0, 8-bit
+samples, progressive frames, one slice group, the 4x4 transform and flat quantiser matrices. Within
+it, everything — the nine Intra_4x4 modes, Intra_16x16 and chroma prediction, `I_PCM`, all four
+macroblock partitionings and all four sub-macroblock partitionings, multiple reference frames with
+list reordering, quarter-sample motion with the six-tap luma filter and bilinear chroma, constrained
+intra prediction, and the deblocking filter with per-slice offsets and both disable modes.
+
+Both delivery forms, because H.264 has two. A transport stream, a program stream and a bare `.264`
+carry NAL units separated by start codes; MP4, Matroska and FLV carry each unit behind its length,
+with the parameter sets in an `AVCDecoderConfigurationRecord` in the container's header. Which form a
+stream is in is decided from whether that record is present rather than guessed at each packet, and
+the same content in either form decodes to identical frames.
+
+Forty-six encoded streams were compared with ffmpeg's decode of the same bitstream, plane by plane
+and frame by frame, and **every sample of every frame is identical** — across quantisers 1 to 51,
+picture sizes from 16x16 to 640x480 including one whose size is not a whole number of macroblocks and
+is therefore cropped, one to eight reference frames, one to nine slices a picture, deblocking off and
+at both offset extremes, constant quantiser and two rate-controlled modes, intra refresh, a High
+profile stream that uses none of the High profile tools, and the same content through all five
+containers. Four of them are a single intra picture followed by 125 to 200 predicted ones, which is
+the shape in which a small error compounds: the difference stays at zero for the whole chain. H.264
+specifies its inverse transform as exact integer arithmetic rather than as a formula with an accuracy
+bound, so exact equality is the right bar here, unlike MPEG-1 above.
+
+Three things no encoder in ordinary use emits are covered by built streams instead, because a
+comparison cannot reach what nothing produces: `I_PCM` macroblocks, reference picture list
+reordering, and marking a reference unused part way through a sequence.
+
+What is not implemented refuses by name and cites the clause: CABAC, B slices, SP and SI slices, the
+8x8 transform and scaling matrices, 4:2:2, 4:4:4 and monochrome, sample depths above eight, field
+pictures and MBAFF, flexible macroblock ordering, weighted prediction, long-term references, slice
+data partitioning, redundant coded pictures, and the scalable and multiview extensions.
 
 ## 📜 License
 
