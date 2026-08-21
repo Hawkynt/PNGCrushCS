@@ -3,17 +3,26 @@
 Fourteen codecs were investigated and none was implemented. That is a result rather than a gap, and it
 is written down here so the work is not repeated by somebody who assumes it was never attempted.
 
+Fifteen codecs were investigated and none was implemented. That is a result rather than a gap, and it is
+written down here so the work is not repeated by somebody who assumes it was never attempted.
+
 They stop in four different places, and the four are worth keeping apart. Five need constant tables
-that are not in the file. VP6 and VP5 stop somewhere else entirely: VP6's tables **are** published,
-every one of them was transcribed and checked, and the decode still does not come out. Lagarith stops
-at a third place again — its wrapper comes out completely, and the entropy coder inside it is defined
-by the rounding behaviour of one implementation's floating-point unit rather than by anything written
-down. DV stops at a fourth: its own frame layer is recovered and measured directly against real files,
-but its two central tables — the entropy code and the macroblock shuffle — live only in a standard that
-is not free to read and, for one of them, in exactly one secondary source this project cannot fully
-trust on its own. Where each stops is recorded below.
+that are not in the file, and WMV1 and WMV2 join them on the same evidence, tied to MS-MPEG4v3's own
+already-missing tables by shared escape constants rather than by file size. VP6 and VP5 stop somewhere
+else entirely: VP6's tables **are** published, every one of them was transcribed and checked, and the
+decode still does not come out. Lagarith stops at a third place again — its wrapper comes out
+completely, and the entropy coder inside it is defined by the rounding behaviour of one implementation's
+floating-point unit rather than by anything written down. DV stops at a fourth: its own frame layer is
+recovered and measured directly against real files, but its two central tables — the entropy code and
+the macroblock shuffle — live only in a standard that is not free to read and, for one of them, in
+exactly one secondary source this project cannot fully trust on its own. MSS1, MSS2 and Canopus HQ,
+HQA and HQX are a variant of the first place rather than a fifth: their tables are undocumented too, but
+the evidence is a detailed write-up that turns out to be somebody else's reverse-engineering notes
+rather than a file too small to hold what is needed. Where each stops is recorded below.
 
 None of the fourteen had anything committed.
+
+None of the fifteen had anything committed.
 
 Indeo 3 (`IV32`), Indeo 4 (`IV41`), Indeo 5 (`IV50`), TrueMotion 1 (`DUCK`) and TrueMotion 2 (`TM20`)
 are the proprietary codecs of the multimedia era. None has a published specification. No encoder for
@@ -931,3 +940,106 @@ directly once the bitstream position feeding it is trustworthy. Failing that, a 
 sample decoded far enough to cross-check the byte-alignment and codebook-2-multiplier findings above
 against more than one data point apiece would narrow the search considerably, even without a published
 skip-count rule to confirm against.
+
+# Canopus HQ, HQA and HQX, where the vendor's own papers say nothing about the bitstream
+
+Canopus HQ (`CUVC`) and its alpha-carrying sibling HQA share one ffmpeg decoder, `hq_hqa`; their
+successor HQX (`CHQX`) is a second. Both were investigated on the strength of what `codec-coverage.md`
+said about this whole family — "documented on MultimediaWiki" — and both stop at the same place MSS1
+and MSS2 do above: the one detailed technical description of either bitstream is, by its own author's
+account, notes from reverse engineering, and nothing independent of that exists to build from instead.
+
+## What Canopus and Grass Valley published, and what it covers
+
+Three white papers are linked from the MultimediaWiki pages for `Canopus_HQ` and `HQX`. Two resolve
+through the Internet Archive after their original hosts — `canopus.com` no longer resolves at all, and
+`grassvalley.com`'s copies 404 — went away: *The Canopus HQ Codec* (2004,
+`web.archive.org/web/20071026184329/...cc_hqcodec_whitepaper70b72.pdf`) and *The Benefits of HQX*
+(Grass Valley, May 2014, `web.archive.org/web/20140513073637/.../GV-6097M-3_HQX_WP.pdf`, read here in
+full). A third, `GV-4097M_HQX_Whitepaper.pdf`, has only a truncated Wayback capture — 1,048,576 bytes of
+a stated 1,254,057, cut off mid-file by whatever crawled it, `qpdf --check` reporting the cross-reference
+table missing — and could not be read at all.
+
+Both papers that could be read are marketing and comparison documents, not specifications, and neither
+states a single bitstream fact. The HQ paper is a sampling-resolution and bitrate comparison against
+DVCPRO HD and HDCAM, illustrated with oscilloscope photographs and side-by-side crops at different
+bitrates — image quality, not image coding. The HQX paper compares PSNR and multi-generation
+degradation against DNxHD, ProRes and AVC-Intra, explains 10-bit quantisation error in general terms,
+and gives the codec's architecture as a three-box diagram — "Block Transform → Quantizer → Entropy
+Encoder" — with two user-facing knobs, a bit-rate fraction and a quantiser aggressiveness slider, and
+one sentence on the entropy stage: "a lossless, arithmetic coder, similar to algorithms like WinZip."
+No header layout, no macroblock size, no quantiser matrix, no VLC table, no scan order and no mention of
+the macroblock shuffle the MultimediaWiki stub for HQ says the codec uses appears anywhere in either
+document. Neither `Canopus_HQ` nor `HQX` on MultimediaWiki carries more than one paragraph of its own —
+"an ordinary intermediate codec... 8x8 DCT blocks... intra-only" — before linking out to these same
+papers and, for both, to their libav decoder source directly: `libavcodec/hq_hqa.c` and
+`libavcodec/hqx.c`.
+
+No SMPTE Registered Disclosure Document was found for either codec — unlike Apple ProRes, whose
+bitstream is RDD 36, publicised widely enough to be cross-referenced from Wikipedia, ffmpeg's own
+documentation and general search results alike. Nothing comparable turns up anywhere searched for
+Grass Valley or HQX by name; the RDD index itself renders no document list without JavaScript this
+project does not run, so the index page's own listing could not be checked directly, only what search
+engines and other sites say about it.
+
+## The one detailed write-up found, and why it cannot be used
+
+*Final Words on Canopus HQ, HQA and HQX*, Konstantin Shishkov's blog at `codecs.multimedia.cx`, May 2013,
+is the only place a bitstream-level description of any of the three exists. It states, for HQ: 16x16
+macroblocks, 4:2:2, predefined profiles by frame size (160x120 to 1920x1080) each naming a slice count
+and "a macroblock shuffling order... like DV," sixteen selectable quantiser sets with four quantising
+matrices apiece, split by luma and chroma — 128 matrices, about 80 of them unique — and interlacing
+signalled per block. For HQA: the same tables and coding as HQ, with a flexible frame size, an alpha
+component per macroblock and a coded block pattern selecting which of four luma blocks (and their
+paired alpha and chroma blocks) are actually coded, the rest filled with zero — full transparency. For
+HQX: frames split into 480-macroblock slices with every 16 macroblocks shuffled, DC coefficients coded
+as differences from the previous one in the same macroblock component and Huffman-coded by a table
+chosen from the component's bit depth rather than sent as a flat 9-bit number, and quantisation split
+into a selectable quantiser plus two matrices — "two instead of seventy eight" — with the AC token
+tables ("CBP + 3 DC + 6 AC tables") selected by which quantiser a block uses.
+
+Every one of those is exactly the kind of fact a decoder implementation needs and a specification would
+state — and the post says outright where they came from. Its own conclusion: "Reverse engineering all
+those formats was obvious because they are not complex, obfuscated or C++." Shishkov is `hq_hqa.c` and
+`hqx.c`'s own author in libav; this post is his account of reverse-engineering the formats he then wrote
+those decoders from, not a citation of anything published by Canopus or Grass Valley. It is a paraphrase
+of an implementation one step removed, the same shape the MultimediaWiki page MSS1's and MSS2's sections
+above found and declined to use, for the same reason: this project does not transcribe or translate
+ffmpeg or libav source, and a description that is itself derived from reading that source is the same
+material at one remove, whether or not a single line of code appears in it.
+
+Set the post aside and nothing is left to build from. The vendor's own papers describe image quality
+and business benefits, not coding; MultimediaWiki's own text is one paragraph pointing at those same
+papers and at the source directly; and there is no SMPTE, ISO or other standards-body document naming
+either codec at all.
+
+## Why blind reverse engineering does not reach it either
+
+Every codec elsewhere in this file that was mapped from the bitstream alone had either a corpus that
+could be driven toward a specific codeword, or an independently-sourced anchor to cross-check a guess
+against. Neither exists here. `ffmpeg -h encoder=hq_hqa` and `ffmpeg -h encoder=hqx` both report the
+codec known but no encoder available, so there is no way to manufacture a stream that isolates one
+quantiser set, one matrix or one shuffle order from the rest — what samples exist are whatever real
+files happen to be found. And what real files exist is close to nothing: `samples.ffmpeg.org` carries
+exactly one, `V-codecs/CUVC/canopushq.avi`, alongside three of the codec's own Windows VfW DLLs (not
+documentation, and not something this project runs or disassembles) and a several-line MPlayer
+`codecs.conf`-style registration snippet — FourCC, DLL name, output pixel formats — with no bitstream
+content of any kind; there is no `HQA` or `HQX` directory there at all. Shishkov's own
+post states he had seen only one Canopus HQ sample and no HQA or HQX samples whatever when he wrote it,
+and thirteen years on that has not changed. Sixteen quantiser sets of four matrices each, a macroblock
+shuffle tied to a table of named frame-size profiles, and — for HQX — a Huffman table chosen by bit
+depth are all large, multi-valued tables of exactly the kind this project's own Indeo and TrueMotion 1
+investigations found cannot be recovered by reading files that are too small to carry them; one file,
+with nothing to check a candidate reading against, is the same wall by a different route — there is
+nothing here large or varied enough to triangulate eighty unique matrices or a shuffle order from.
+
+## What would change the answer
+
+A description of any of the three bitstreams from a source that states it is not derived from reading
+an implementation — an actual Canopus or Grass Valley engineering document, a patent that prints the
+quantiser matrices or the macroblock shuffle order, or a second reverse-engineering write-up that says
+plainly how it was produced and from what, the way this project would need for MSS1 and MSS2 above.
+Failing that, a substantially larger sample corpus — particularly for HQA and HQX, where none is known
+to exist publicly at all — would still need an independent anchor to check a reconstructed table
+against, since ffmpeg's decoder cannot be that anchor without the transcription this project does not
+do.
