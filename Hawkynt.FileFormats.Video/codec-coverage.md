@@ -22,16 +22,16 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 
 | | Count | Share |
 | --- | --- | --- |
-| Decoded and verified against ffmpeg | 46 | 22% |
+| Decoded and verified against ffmpeg | 47 | 22% |
 | Established as not implementable from files alone | 15 | 7% |
-| Not yet attempted | 150 | 71% |
+| Not yet attempted | 149 | 71% |
 
-The 46 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
+The 47 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
 frame against ffmpeg's decode of the same bitstream before it was merged, and the measurements are in
 each one's section of that file. The ones that reach exact equality on every sample of every frame
 are Microsoft RLE, Microsoft Video 1, Cinepak, QuickTime Animation, Apple Video, Apple Graphics, FLIC, HuffYUV,
-FFVHUFF, FFV1, ZMBV, TSCC, CSCD, Flash Screen Video, Flash Screen Video 2, id RoQ, Interplay Video, Ut Video, MagicYUV, v210, r210, r10k,
+FFVHUFF, FFV1, ZMBV, TSCC, CSCD, Flash Screen Video, Flash Screen Video 2, id RoQ, Interplay Video, id Cinematic Video, Ut Video, MagicYUV, v210, r210, r10k,
 y41p, CLJR, ZeroCodec, LCL ZLIB
 and Hap — the two colour-space ones over 883 and 1,446 frames, in all six and all seven of their
 colour spaces, and the packed layouts on the sample data itself, at its own coded depth and with
@@ -184,8 +184,8 @@ like the cheapest of these on the same promise — a published standard behind i
 independent source for its entropy table or a confirmed shuffle table either; it too is counted with
 the not-implementable codecs above rather than left in this list.
 
-**Game and FMV codecs** — the largest group, around 45 names, of which `roqvideo` and `interplayvideo`
-are now done and `escape124` is investigated and not implementable (`undecodable-codecs.md`):
+**Game and FMV codecs** — the largest group, around 45 names, of which `roqvideo`, `interplayvideo` and
+`idcinvideo` are now done and `escape124` is investigated and not implementable (`undecodable-codecs.md`):
 `binkvideo`, `smackvid`, `vmdvideo`, `escape130`, the several `ea*`
 codecs, the `xan_*` pair and many more. Almost none has a published specification; most are described
 on MultimediaWiki from reverse engineering. Their value is preservation rather than reach, and each is
