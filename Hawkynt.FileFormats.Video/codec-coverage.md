@@ -23,8 +23,8 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 | | Count | Share |
 | --- | --- | --- |
 | Decoded and verified against ffmpeg | 46 | 22% |
-| Established as not implementable from files alone | 12 | 6% |
-| Not yet attempted | 153 | 72% |
+| Established as not implementable from files alone | 14 | 7% |
+| Not yet attempted | 151 | 72% |
 
 The 46 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
@@ -54,9 +54,9 @@ the stronger oracle of the two, being the ground truth itself. LCL ZLIB is measu
 addition to the usual one, since it too has a real encoder here: round-tripped through it as well as
 checked against seven real recordings.
 
-The 12 are Indeo 3, Indeo 4, Indeo 5, TrueMotion 1, WMV1, WMV2, MSS1, MSS2, Lagarith, DV, MSZH and
-Escape 124, and the arguments that settle them are in `undecodable-codecs.md`. The first four have
-frames too small to carry the tables they need —
+The 14 are Indeo 3, Indeo 4, Indeo 5, TrueMotion 1, WMV1, WMV2, MSS1, MSS2, Canopus HQ/HQA
+(`hq_hqa`), Canopus HQX, Lagarith, DV, MSZH and Escape 124, and the arguments that settle them
+are in `undecodable-codecs.md`. The first four have frames too small to carry the tables they need —
 340 bytes for a 320x240 Indeo 3 picture, 14 for Indeo 4, 2 for Indeo 5, 0 for TrueMotion 1 — so those
 tables live in the codec binary and cannot be recovered by reading files. WMV1 and WMV2 both have real ffmpeg
 encoders and stop anyway: their run-level, DC and motion-vector tables are the same undocumented ones
@@ -64,7 +64,12 @@ MS-MPEG4v3 and WMV1 already need, tied to them by two identical escape constants
 document that covers all three, and its own P-frame macroblock type table, `wmv2_inter_table`, is not
 shared with either and is published nowhere either — reachable, like the shared tables, only for the
 first macroblock of a slice, because a corpus cannot see a second one without already knowing the tables
-being sought. Lagarith stops somewhere
+being sought. MSS1, MSS2, Canopus HQ/HQA and Canopus HQX join the same first group by a different
+route: the vendor's own published material — Microsoft's DMO/MFT reference pages for the two screen
+codecs, Canopus and Grass Valley's own marketing white papers for the three professional ones — states
+no bitstream fact at all, and the only detailed technical write-up found for either family turns out to
+be somebody else's account of reverse-engineering the codec, which this project does not build from any
+more than it builds from ffmpeg's source directly. Lagarith stops somewhere
 more interesting: its frame layer comes out completely and is recorded there, but the range coder
 inside it keeps its state in a floating-point variable and its probability header has to reproduce
 one implementation's x86 rounding exactly, so the format is defined by an implementation rather than
@@ -152,14 +157,19 @@ the same kind of prediction, also came out of it and is now in `undecodable-code
 also absolutely measurable. `flashsv` and `flashsv2` came out of this group and reached exact
 equality; see `README.md`.
 
-**Professional and intermediate** — `cfhd`, `hq_hqa`, `hqx`, `pixlet`, `prores_raw`, `speedhq`,
-`aic`, `media100`. Mostly well documented. `hap` came out of this group and reached exact equality —
-DXT/BC texture compression in a small chunked header, optionally Snappy-compressed, published in full
-by its own authors, which is what made it the cheapest of the group rather than merely well
-documented. `dvvideo` looked like the next cheapest on the same promise — a published standard behind
-it — but the standard, IEC 61834 and SMPTE 314M, is not free, and the investigation recorded in
-`undecodable-codecs.md` found no independent source for its entropy table or a confirmed shuffle
-table either; it is counted with the not-implementable codecs above rather than left in this list.
+**Professional and intermediate** — `cfhd`, `pixlet`, `prores_raw`,
+`speedhq`, `aic`, `media100`. `hap` came out of this group and reached exact equality — DXT/BC
+texture blocks in a small chunked header, published in full by its own authors, which is what made it
+the cheapest of the group rather than merely the best documented. `hq_hqa` and `hqx` looked well
+documented too,
+on the strength of a MultimediaWiki page each, and turned out not to be: neither Canopus's nor Grass
+Valley's own white papers state a bitstream fact, and the one detailed technical description of either
+is a reverse engineer's own account of decompiling the codec rather than anything published; they are
+counted with the not-implementable codecs above, on the same footing as MSS1 and MSS2. `dvvideo` looked
+like the cheapest of these on the same promise — a published standard behind it — but the standard, IEC
+61834 and SMPTE 314M, is not free, and the investigation recorded in `undecodable-codecs.md` found no
+independent source for its entropy table or a confirmed shuffle table either; it too is counted with
+the not-implementable codecs above rather than left in this list.
 
 **Game and FMV codecs** — the largest group, around 45 names, of which `roqvideo` and `interplayvideo`
 are now done and `escape124` is investigated and not implementable (`undecodable-codecs.md`):
