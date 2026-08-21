@@ -59,9 +59,14 @@ opens several names. The families are roughly in descending order of what they b
 
 **Modern standards** — `av1`, `vvc`, `dirac`, `snow`, `cavs`, `apv`. HEVC is decoded for intra
 pictures; its predicted and bidirectional slices are written but refused, for the reason given in
-`README.md`. AV1 is the one that pays twice:
-the AVIF reader in the image package is known wrong on every real file, and its fault is inside the
-AV1 decoder rather than the container, so a correct AV1 fixes a still-image format at the same time.
+`README.md`. AV1 still pays twice — a correct one
+would close a video codec and a still-image format together — but the AVIF reader's own decoder has
+now been examined against the reference and is not a candidate for repair. It reads
+equal-probability literal bits where AV1 uses context-indexed CDFs and carries none of the normative
+default tables, so it desynchronises at the first partition decision: on a 32x32 still it returns a
+flat 130 across the plane where the reference has structure, 1024 samples of 1024 wrong. That path
+now refuses. A real AV1 decoder has to be built from the specification, and that is a job on the
+scale of this package's H.265 work rather than a gap to be filled in passing.
 
 **Windows Media before VC-1** — `wmv1`, `wmv2`, `msmpeg4v1`, `msmpeg4` (that is version 3), `msp2`,
 `mss1`, `mss2`, `msa1`, `mts2`. Version 2 is done. Versions 1 and 3 are argued in `README.md` to be
@@ -127,6 +132,20 @@ getting them wrong first:
   approximation, so a codec measuring 3 against it measured 1 against `-idct faani`; ffmpeg's
   frame-threaded Theora decode is not deterministic on large frames; `ffprobe` without
   `-fflags +noparse` invents timestamps a container never carried.
+- **Know what the tool did to the pictures before you compare them.** Every one of these has produced
+  a false alarm here, and each looks exactly like a decoder defect:
+  - `ffmpeg -i in out%04d.ppm` runs the image2 muxer at a constant frame rate and **duplicates
+    frames** to fill it. It reported a 348-frame file as 824 and a 272-frame one as 3485. Pass
+    `-fps_mode passthrough`, and check against `ffprobe -count_frames`.
+  - Decoder options go **before** `-i`. `-idct faani` placed after is an output option and silently
+    does nothing — with it misplaced a codec measured 6 where it actually measures 2.
+  - **PPM carries no alpha.** Comparing an alpha-bearing format through it makes both sides
+    composite and invents a large error; one codec read max delta 179 that way and 0 on its planes.
+  - Frame files named with a fixed two-digit index sort lexicographically as 10, 100, 11 once a
+    stream passes a hundred frames. That put frame 100 against frame 12 and looked precisely like a
+    decoder diverging mid-stream.
+  - Decode with `-threads 1`: ffmpeg's frame-threaded decode is not deterministic for every codec.
+
 - **Refuse by name.** No `catch` may hand back a blank frame or repeat the last one. That silent
   zero-fill is the worst defect shape in this repository — a wrong picture nothing announces — and
   several instances have been removed from it.

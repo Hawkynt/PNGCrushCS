@@ -9,23 +9,34 @@ namespace FileFormat.Avif;
 
 /// <summary>Reads AVIF files from bytes, streams, or file paths.</summary>
 /// <remarks>
-/// KNOWN WRONG on every real file tried, and recorded here rather than in a note nobody reads.
+/// The AV1 path refuses, and the reason is settled rather than suspected.
 ///
-/// Three AVIF samples decode to the right size and the wrong picture: the mean error a channel is
-/// 107, 127 and 127 of 255 against ImageMagick, which agrees with XnView exactly on all three. The
-/// container is read correctly — the sizes match to the pixel — so the fault is inside the AV1
-/// decoder under <c>Codec</c> rather than in this file.
+/// This file used to say that three AVIF samples decoded to the right size and the wrong picture —
+/// mean channel error 107, 127 and 127 of 255 against ImageMagick, which agrees with XnView exactly
+/// on all three — and that the decoder under <c>Codec</c> was left in place because three thousand
+/// lines of entropy coding, transforms, intra prediction and loop filtering "may be close to right".
+/// It asked for somebody to step through one of those files against a reference decoder rather than
+/// judge it from outside. That has now been done, and the answer removes the reason for keeping it.
 ///
-/// It is left in place rather than made to refuse, which is the opposite of what was done for JPEG
-/// XR the same day, and the difference is worth stating. There the picture came out of a fallback
-/// that copied the compressed bytes into it, and the round-trip tests passed only because the writer
-/// stored pixels the same way; there was nothing to keep. Here there are three thousand lines of a
-/// real decoder — entropy coding, transforms, intra prediction, loop filtering — which may be close
-/// to right, and throwing that away on the strength of three files would be the more destructive
-/// mistake.
+/// A 32x32 still AVIF written by libaom was decoded here and by the reference decoder. The reference
+/// luma begins 74, 74, 74, 74, 74, 74, 74, 74, 146, 146. This decoder returns a flat 130 across the
+/// whole plane: 1024 samples of 1024 wrong, with no structure at all. That is not a rounding fault
+/// with a picture underneath it.
 ///
-/// What is needed is somebody stepping through one of those three against a reference decoder, not a
-/// judgement from the outside.
+/// The cause is structural. AV1 codes its syntax elements with context-indexed cumulative
+/// distribution functions; this decoder reads plain equal-probability literal bits for the partition
+/// type, the intra mode and the coefficients, collapses every non-square partition to a split, and
+/// fixes the transform to DCT-DCT whatever the stream signals. The normative default CDF tables the
+/// format requires — several thousand values across partition, mode, skip, transform size and
+/// coefficient contexts — are not present anywhere in the directory. Reading uniform bits out of an
+/// arithmetic-coded stream desynchronises at the first partition decision, so everything after it is
+/// noise, and there is no partial credit to repair.
+///
+/// So it refuses. A caller can act on a refusal and can do nothing at all with a plausible wrong
+/// picture, which is the worst shape a defect takes in this library. The dead decoder is left in the
+/// tree rather than deleted because its container-side parsing — OBU, sequence header, frame header
+/// — is worth keeping for whoever builds the real one, and <c>Hawkynt.FileFormats.Video</c> is where
+/// that belongs.
 /// </remarks>
 public static class AvifReader {
 
@@ -85,27 +96,25 @@ public static class AvifReader {
       // Raw uncompressed pixel data (round-trip from our writer)
       pixelData = new byte[expectedPixelBytes];
       rawImageData.AsSpan(0, expectedPixelBytes).CopyTo(pixelData.AsSpan(0));
-    } else if (rawImageData.Length > 0 && _LooksLikeAv1Bitstream(rawImageData)) {
+    } else if (rawImageData.Length > 0 && _LooksLikeAv1Bitstream(rawImageData))
 
-      // The catch here used to hand back a buffer of zeroes and report success, so an AVIF that
-      // every other tool reads came out of this one as a black rectangle of the right size. A
-      // 61x37 picture from ImageMagick decoded to 0 non-zero bytes of 6771 and nothing said so.
+      // The decoder under Codec does not implement AV1's entropy layer — it reads equal-probability
+      // literal bits where the format uses context-indexed CDFs, and carries none of the normative
+      // default tables — so it desynchronises at the first partition decision. Measured against the
+      // reference on a 32x32 still: 1024 samples of 1024 wrong, a flat 130 where the reference has
+      // structure. It does not fail while running, which is what makes it dangerous; it returns a
+      // picture, and nothing downstream can tell that picture from a real one.
       //
-      // That is the same fallback that was taken out of the HEIF reader, and it is the worst shape
-      // a defect takes here: a wrong picture nothing announces. A caller can do something with a
-      // refusal and can do nothing at all with a plausible black frame.
-      try {
-        var (decW, decH, rgbData) = Av1FrameDecoder.Decode(rawImageData, 0, rawImageData.Length);
-        width = decW;
-        height = decH;
-        pixelData = rgbData;
-      } catch (Exception failure) {
-        throw new NotSupportedException(
-          $"AVIF: the picture is AV1-coded and this decoder did not get through it ({failure.Message}). "
-          + $"The container's extent is readable — {width}x{height} — but the pixels are not, and a "
-          + "raster of zeroes is not an answer.", failure);
-      }
-    } else if (rawImageData.Length > 0)
+      // Refusing is the same call already made for HEIF and for the zero-fill that used to sit here.
+      // A caller can act on a refusal and can do nothing with a plausible wrong picture.
+      throw new NotSupportedException(
+        $"AVIF: the picture is AV1-coded. The container is readable — {width}x{height} — but this "
+        + "library has no working AV1 decoder: the one present reads uniform bits from an "
+        + "arithmetic-coded stream and produces a uniform field rather than a picture. It is "
+        + "refused rather than handed back, because a wrong picture nothing announces is worse "
+        + "than no picture.");
+
+    else if (rawImageData.Length > 0)
 
       // Neither our own uncompressed payload nor anything recognisable as AV1. Falling through left
       // PixelData empty while Width and Height still stated a picture, which reads downstream as a
