@@ -23,8 +23,8 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 | | Count | Share |
 | --- | --- | --- |
 | Decoded and verified against ffmpeg | 49 | 23% |
-| Established as not implementable from files alone | 15 | 7% |
-| Not yet attempted | 147 | 70% |
+| Established as not implementable from files alone | 24 | 11% |
+| Not yet attempted | 138 | 65% |
 
 The 49 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
@@ -56,8 +56,9 @@ the stronger oracle of the two, being the ground truth itself. LCL ZLIB is measu
 addition to the usual one, since it too has a real encoder here: round-tripped through it as well as
 checked against seven real recordings.
 
-The 15 are Indeo 3, Indeo 4, Indeo 5, TrueMotion 1, WMV1, WMV2, MSS1, MSS2, Canopus HQ/HQA
-(`hq_hqa`), Canopus HQX, Lagarith, DV, MSZH, Escape 124 and SpeedHQ, and the arguments that settle
+The 24 are Indeo 3, Indeo 4, Indeo 5, TrueMotion 1, WMV1, WMV2, MSS1, MSS2, Canopus HQ/HQA
+(`hq_hqa`), Canopus HQX, Lagarith, DV, MSZH, Escape 124, SpeedHQ, MSCC, RSCC, WCMV, MWSC, RASC, Go2Meeting
+(`g2m`), ScreenPressor (`scpr`), Screenpresso and TSCC2, and the arguments that settle
 them are in `undecodable-codecs.md`. The first four have frames too small to carry the tables they need —
 340 bytes for a 320x240 Indeo 3 picture, 14 for Indeo 4, 2 for Indeo 5, 0 for TrueMotion 1 — so those
 tables live in the codec binary and cannot be recovered by reading files. WMV1 and WMV2 both have real ffmpeg
@@ -101,7 +102,7 @@ AC coefficients decode cleanly too — but at least one AC codeword does not mat
 sitting at one bit's difference from four candidates at once with no way to tell which, if any, is
 right without forward-transform ground truth this investigation did not build.
 
-All fifteen are finished investigations with negative answers, not gaps waiting to be filled.
+All twenty-four are finished investigations with negative answers, not gaps waiting to be filled.
 
 ## What is left, by family
 
@@ -160,10 +161,15 @@ reading of the same bits rather than against the picture that went in. This is t
 verifiable wins in the list — but not a uniformly cheap one. `lagarith`, which is arithmetic coding over
 the same kind of prediction, also came out of it and is now in `undecodable-codecs.md` instead.
 
-**Screen capture** — `g2m`, `mscc`, `mwsc`, `rasc`, `rscc`, `screenpresso`, `tdsc`, `tscc2`, `vmnc`,
-`wcmv`, `scpr`. Mostly DEFLATE over a framebuffer with a delta scheme on top, so also lossless and
-also absolutely measurable. `flashsv` and `flashsv2` came out of this group and reached exact
-equality; see `README.md`.
+**Screen capture** — `tdsc` and `vmnc` are what remains of this group unattempted. Mostly DEFLATE over
+a framebuffer with a delta scheme on top, so also lossless and also absolutely measurable. `flashsv` and
+`flashsv2` came out of this group and reached exact equality; see `README.md`. `g2m`, `mscc`, `mwsc`,
+`rasc`, `rscc`, `screenpresso`, `scpr`, `tscc2` and `wcmv` came out of it the other way, into
+`undecodable-codecs.md`: none of the nine carries an independent bitstream description this project
+could confirm, four of them (`mscc`, `wcmv`, `rasc` and `screenpresso`) carry no sample corpus at all,
+`mwsc` and `scpr` carry exactly one file each, and `rscc` alone reached a real recovered packet framing
+and a delta record's destination coordinates before the two remaining fields resisted every reading
+tried.
 
 **Professional and intermediate** — `cfhd`, `pixlet`, `prores_raw`,
 `aic`, `media100`. `hap` came out of this group and reached exact equality — DXT/BC
@@ -180,7 +186,18 @@ check out exactly against this package's own ISO/IEC 13818-2 tables; what stops 
 number of AC codewords the page's prose says are "moved around" without saying to where, printed
 nowhere except inside that same page's verbatim copy of `libavcodec/speedhq.c`'s own arrays, which this
 project does not use. It is counted with the not-implementable codecs above too, closer to Escape 124's
-shape than to Canopus's. `dvvideo` looked
+shape than to Canopus's.
+
+The remaining nine are the screen-capture family below this section: MSCC, WCMV, RASC and Screenpresso
+carry neither a sample anywhere searched nor an independent bitstream description; MWSC and ScreenPressor
+each clear only a one-file corpus, too thin a base to build a table from on this project's own standard,
+and ScreenPressor's only detailed technical trace besides is a second author's open-source rebuild of the
+vendor's code rather than anything the vendor published; Go2Meeting and TSCC2 each have a real sample
+corpus and a genuinely detailed MultimediaWiki page, but each page is either unconfirmed or confirmed to
+be its own decoder's author's reverse-engineering notes restated, the same shape MSS1's, MSS2's and
+Canopus's pages already turned out to be; and RSCC alone reaches Escape 124's and SpeedHQ's shape — a real
+five-file corpus, a packet framing and a delta record's destination coordinates fully recovered and
+verified against it, with one header field and two of a record's four fields not resolved. `dvvideo` looked
 like the cheapest of these on the same promise — a published standard behind it — but the standard, IEC
 61834 and SMPTE 314M, is not free, and the investigation recorded in `undecodable-codecs.md` found no
 independent source for its entropy table or a confirmed shuffle table either; it too is counted with
