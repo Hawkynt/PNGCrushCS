@@ -23,8 +23,8 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 | | Count | Share |
 | --- | --- | --- |
 | Decoded and verified against ffmpeg | 50 | 24% |
-| Established as not implementable from files alone | 25 | 12% |
-| Not yet attempted | 136 | 64% |
+| Established as not implementable from files alone | 26 | 12% |
+| Not yet attempted | 135 | 64% |
 
 The 50 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
@@ -56,10 +56,11 @@ the stronger oracle of the two, being the ground truth itself. LCL ZLIB is measu
 addition to the usual one, since it too has a real encoder here: round-tripped through it as well as
 checked against seven real recordings.
 
-The 25 are Indeo 3, Indeo 4, Indeo 5, TrueMotion 1, WMV1, WMV2, MSS1, MSS2, Canopus HQ/HQA
+The 26 are Indeo 3, Indeo 4, Indeo 5, TrueMotion 1, WMV1, WMV2, MSS1, MSS2, Canopus HQ/HQA
 (`hq_hqa`), Canopus HQX, Lagarith, DV, MSZH, Escape 124, SpeedHQ, VP4, MSCC, RSCC, WCMV, MWSC,
-RASC, Go2Meeting (`g2m`), ScreenPressor (`scpr`), Screenpresso and TSCC2, and the arguments that settle
-them are in `undecodable-codecs.md`. The first four have frames too small to carry the tables they need —
+RASC, Go2Meeting (`g2m`), ScreenPressor (`scpr`), Screenpresso, TSCC2 and Sorenson Video 1 (`svq1`), and
+the arguments that settle them are in `undecodable-codecs.md`. The first four have frames too small to
+carry the tables they need —
 340 bytes for a 320x240 Indeo 3 picture, 14 for Indeo 4, 2 for Indeo 5, 0 for TrueMotion 1 — so those
 tables live in the codec binary and cannot be recovered by reading files. WMV1 and WMV2 both have real ffmpeg
 encoders and stop anyway: their run-level, DC and motion-vector tables are the same undocumented ones
@@ -110,7 +111,17 @@ parses with no desync all the way to the motion-vector section. What is left is 
 tables: the per-component, magnitude-bucket motion-vector Huffman codes, printed nowhere and stored in
 the binary as branches rather than as a table a file could be searched for.
 
-All twenty-five are finished investigations with negative answers, not gaps waiting to be filled.
+SVQ1 stops a fifth way, and it is the cleanest of the group: it does not even need a small frame to make
+the case, because its codebook is not carried per-stream at all. The one detailed technical document on
+the format — Melanson and Snel's `svq1-format.txt`, which MultimediaWiki's own SVQ1 page states it is
+based on — explains the algorithm's shape in full and prints not one codebook or VLC entry, citing
+FFmpeg's own `svq1_cb.h`, `svq1_vlc.h` and `svq1.c` in its own words as where those tables actually are.
+Its other source, a genuinely independent Utah State University patent on the underlying technology,
+states that such tables exist and how large they are without printing one either. The codebook is
+"hardwired" into the coding scheme, the document's own word for it, identical in every file — there is
+no frame, however large, that was ever going to carry it.
+
+All twenty-six are finished investigations with negative answers, not gaps waiting to be filled.
 
 ## What is left, by family
 
@@ -156,7 +167,9 @@ than as a table a file could be searched for. How far each got, and everything r
 `undecodable-codecs.md`, so neither search need be repeated from the start. VP5 is behind VP6's same
 wall with no published specification at all.
 
-**Sorenson** — `svq1`, `svq3`. No published specification.
+**Sorenson** — `svq3` is what remains. `svq1` is now argued in `undecodable-codecs.md`: its codebook is
+not carried in the stream at all, and the one technical document on the format cites FFmpeg's own source
+for the tables rather than printing them.
 
 **Lossless RGB and YUV** — what is left of the group is `012v`, `aasc`, `cllc`, `cyuv`, `dxtory`,
 `loco`, `m101`, `sheervideo`, `vble` and `ylc`. Ut Video, MagicYUV, ZeroCodec and LCL ZLIB came out
