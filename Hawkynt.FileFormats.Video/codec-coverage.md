@@ -22,24 +22,28 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 
 | | Count | Share |
 | --- | --- | --- |
-| Decoded and verified against ffmpeg | 45 | 21% |
+| Decoded and verified against ffmpeg | 46 | 22% |
 | Established as not implementable from files alone | 11 | 5% |
-| Not yet attempted | 155 | 73% |
+| Not yet attempted | 154 | 73% |
 
-The 45 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
+The 46 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
 frame against ffmpeg's decode of the same bitstream before it was merged, and the measurements are in
 each one's section of that file. The ones that reach exact equality on every sample of every frame
 are Microsoft RLE, Microsoft Video 1, Cinepak, QuickTime Animation, Apple Video, Apple Graphics, FLIC, HuffYUV,
 FFVHUFF, FFV1, ZMBV, TSCC, CSCD, Flash Screen Video, Flash Screen Video 2, id RoQ, Interplay Video, Ut Video, MagicYUV, v210, r210, r10k,
-y41p, CLJR, ZeroCodec
-and LCL ZLIB — the two colour-space ones over 883 and 1,446 frames, in all six and all seven of their
+y41p, CLJR, ZeroCodec, LCL ZLIB
+and Hap — the two colour-space ones over 883 and 1,446 frames, in all six and all seven of their
 colour spaces, and the packed layouts on the sample data itself, at its own coded depth and with
 no display conversion in the way, over 120, 90, 90, 90 and 60 frames at three geometries each.
 CLJR is the one lossy format among them — measured against ffmpeg's own decode rather than the
 source, because its encoder dithers. ZeroCodec is measured the same packed-native way — on its
 own 4:2:2 samples, not through an RGB conversion — over the one recording that exists for it: no
-ffmpeg encoder exists to build a corpus with.
+ffmpeg encoder exists to build a corpus with. Hap is the only one of these whose coded blocks are
+themselves an exact format — DXT1/BC1, DXT5/BC3 texture compression — so its own bar is the same
+lossless one at a different source: max delta 0 against ffmpeg's decode of the same blocks, over six
+streams and six hundred frames, on raw RGB or RGBA planes since Hap carries no chroma subsampling of
+any kind for an RGB comparison to be a shortcut around.
 Theora and VP3 reach it too, Theora over 1,717 frames across all three of its pixel formats and VP3
 over 3,182.
 
@@ -139,12 +143,14 @@ the same kind of prediction, also came out of it and is now in `undecodable-code
 also absolutely measurable. `flashsv` and `flashsv2` came out of this group and reached exact
 equality; see `README.md`.
 
-**Professional and intermediate** — `cfhd`, `hap`, `hq_hqa`, `hqx`, `pixlet`, `prores_raw`,
-`speedhq`, `aic`, `media100`. Mostly well documented. `dvvideo` looked like the cheapest of these on
-the same promise — a published standard behind it — but the standard, IEC 61834 and SMPTE 314M, is
-not free, and the investigation recorded in `undecodable-codecs.md` found no independent source for
-its entropy table or a confirmed shuffle table either; it is counted with the not-implementable
-codecs above rather than left in this list.
+**Professional and intermediate** — `cfhd`, `hq_hqa`, `hqx`, `pixlet`, `prores_raw`, `speedhq`,
+`aic`, `media100`. Mostly well documented. `hap` came out of this group and reached exact equality —
+DXT/BC texture compression in a small chunked header, optionally Snappy-compressed, published in full
+by its own authors, which is what made it the cheapest of the group rather than merely well
+documented. `dvvideo` looked like the next cheapest on the same promise — a published standard behind
+it — but the standard, IEC 61834 and SMPTE 314M, is not free, and the investigation recorded in
+`undecodable-codecs.md` found no independent source for its entropy table or a confirmed shuffle
+table either; it is counted with the not-implementable codecs above rather than left in this list.
 
 **Game and FMV codecs** — the largest group, around 45 names, of which `roqvideo` and `interplayvideo`
 are now done: `binkvideo`, `smackvid`, `vmdvideo`, `escape124`, `escape130`, the several `ea*`

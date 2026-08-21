@@ -108,6 +108,8 @@ who wants one frame of a two-hour recording pays for one frame.
 
 | Lossless Codec Library, ZLIB variant | `ZLIB` | Y | — |
 
+| Vidvox Hap | `Hap1`, `Hap5`, `HapY`, `HapM`, `HapA` (`Hap7`, `HapH` refused by name) | Y | — |
+
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
 is an undivided heap of bytes, and where each packet starts and stops is a computation over five
@@ -1984,6 +1986,93 @@ states; the PNG filter flag, whose per-colour-space structure is another of the 
 placeholders and whose own author states his RGB24 implementation of it does not work correctly; and a
 packet whose zlib stream is truncated, corrupt, or inflates to neither the picture's packed nor its
 padded byte count.
+
+### Vidvox Hap
+
+Hap frames are meant to be handed to a graphics card almost unchanged: a `Hap1` or `Hap5` frame's
+payload, once its second-stage compressor is undone, is exactly the DXT1 or DXT5 texture a GPU would
+be loaded with, block for block. That is what sets this codec apart from almost every other one in
+this package — a block's decoded pixels are not an approximation converging on a source picture and
+not the output of a transform with a stated accuracy bound; they are the one and only picture that
+block's bits mean, defined completely by S3TC (DXT1/BC1, DXT5/BC3) and, for the "Q" pixel format, by
+van Waveren and Castaño's Scaled YCoCg-DXT5 reconstruction. Decoding is held to this package's
+lossless bar — max delta 0 on every sample of every frame — even though the picture an encoder started
+from was compressed to get there.
+
+The frame layout is published in full, in the Hap project's own repository on GitHub
+(`documentation/HapVideoDRAFT.md`): a run of sections, each a type byte and a size in a header that is
+four bytes or grows to eight when the size does not fit in three. A top-level section's type names a
+pixel format and how its data reaches it — as-is, through one Snappy block (Google's own
+`format_description.txt`, which Hap names as an external reference rather than restating), or, for the
+"consult decode instructions" forms, cut into chunks that are each decompressed independently, with
+their own second-stage compressors, sizes and — optionally — explicit byte offsets. One type byte,
+`0x0D`, names no pixel format at all and instead holds one or two further top-level sections whose
+textures are combined into the final picture, the only combination the format defines being Scaled
+YCoCg DXT5 with a separate RGTC1/BC4 alpha image — what the `HapM` code names.
+
+**The Scaled YCoCg pixel format is a DXT5 block read for different meaning.** The eight-sample alpha
+channel, reproduced at full precision rather than through a three-bit index into four values, carries
+luma; the DXT1-style colour part carries the two chroma channels signed around 128 in its red and
+green samples and a per-block scale factor in blue, which widens them back out before the 5- and
+6-bit quantisation that crushed them. The reconstruction — `scale = blue/8 + 1`, `Co`/`Cg` divided by
+that scale, `R = Y + Co - Cg`, `G = Y + Cg`, `B = Y - Co - Cg` — is carried over unchanged from the
+[0,1] texture-space pseudocode van Waveren and Castaño give in "Real-Time YCoCg-DXT Compression" (id
+Software / NVIDIA, September 2007), the paper the Hap specification itself names as this pixel
+format's definition; every term of that pseudocode is an 8-bit sample divided by 255, and 255 is a
+common factor of every term on both sides.
+
+**Two things about the DXT1/DXT5 block decode measured differently from what this package's own
+DDS and KTX block decoders do**, and Hap keeps its own decode of them rather than reuse that code.
+The interpolated third and fourth colours of a four-colour block, and the six interpolated steps of an
+alpha ramp, are a plain integer division with no rounding term — `(2*color0+color1)/3`,
+`(6*alpha0+alpha1)/7` — which is what the OpenGL S3TC and RGTC extension texts themselves give,
+literally, where the shared decoders round both to the nearest whole value; measured against the
+corpus below, the rounded reading disagreed at a maximum delta of 2 and the literal one came out
+bit-exact. And the 5-bit and 6-bit colour-endpoint expansion — what S3TC states only as "unpacked ...
+as though a 16-bit packed pixel with a type of `UNSIGNED_SHORT_5_6_5`", no arithmetic given — is
+**not** bit replication (the exact linear scaling the shared decoders use, and wrong for four of the
+thirty-two five-bit values) and not a single rounding or truncating division by 31, at any constant
+added before the divide from 0 to 30: every one of those still misses at least one value. What this
+decoder uses instead was read directly off ffmpeg's own decode: every one of the thirty-two five-bit
+and sixty-four six-bit values, at a colour index the extension text defines as an endpoint outright —
+`code(x,y)` 0 or 1, `RGB0` or `RGB1`, no interpolation involved — appearing hundreds to hundreds of
+thousands of times across the corpus below and never once disagreeing with another occurrence of the
+same input.
+
+**Measured, and lossless with respect to its own coded blocks**, which is the standard stated above:
+max delta 0, not a bound on how close. ffmpeg's Hap encoder writes exactly the three pixel formats
+named `Hap1`, `Hap5` and `HapY` in the table row above, so the corpus was built here rather than
+fetched from samples.ffmpeg.org: six streams, 64x64 to 96x64, one to eight chunks, both second-stage
+compressors, one hundred frames each. Decoded here and by ffmpeg (`-threads 1 -fps_mode passthrough`,
+frame count cross-checked against `ffprobe -count_frames`) and compared **on raw RGB or RGBA planes,
+never through a format that composites alpha** — Hap is RGB/RGBA-native, carrying no chroma
+subsampling of any kind, so a direct plane comparison is the correct one and not merely a convenient
+one, which is worth stating explicitly because that is what makes the number mean something: one
+codec elsewhere in this package once read a maximum delta of 179 when its alpha-bearing frames were
+compared through a format with no alpha channel, and 0 once the comparison was moved to its raw
+planes. Six hundred frames, every sample of every plane, identical. Between the six streams: every
+top-level pixel format ffmpeg writes; both of DXT1's colour branches, wherever the encoder happened to
+choose one; a whole-frame Snappy block and an uncompressed one; and, at eight chunks, ffmpeg's encoder
+chose the "consult decode instructions" form on its own, exercising the chunked path end to end rather
+than only by construction. ffmpeg's own top-level section headers are all eight bytes regardless of
+size, so the four-byte form and an explicit chunk offset table are reached only by hand-built frames in
+this codec's own tests.
+
+**Hap R (BC7) and Hap HDR (BC6U/BC6S) refuse by name**, at `Create`, before a single frame is read —
+not for want of a block decoder, since this package already has one for each, reused by the image
+formats that carry them, but because BC6 is half-float HDR data and this package's `RawImage` has no
+floating-point pixel format to receive it in, and because ffmpeg's own Hap encoder — what this decoder
+is measured against — writes none of the four HDR or BC7 variants, so there would be no oracle to
+check a decode against even if one were written.
+
+What else refuses, by name: a section whose header does not fit, a size that runs past the data
+holding it, a top-level type byte naming no pixel format and no multiple-image marker, a "consult
+decode instructions" section missing its compressor table or its size table, a chunk naming a
+compressor that is neither uncompressed nor Snappy, a Snappy block whose elements do not produce the
+length its own preamble states, a Snappy back-reference pointing before the start of the output, and a
+multiple-image section holding any combination other than Scaled YCoCg DXT5 with RGTC1/BC4 alpha.
+There is no `catch` anywhere in this decoder that hands back a blank frame or repeats the one before
+it.
 
 ## 📜 License
 
