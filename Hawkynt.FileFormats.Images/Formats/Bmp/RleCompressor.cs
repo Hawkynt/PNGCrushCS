@@ -107,56 +107,27 @@ internal static class RleCompressor {
     return ms.ToArray();
   }
 
+  /// <summary>Unpacks an eight-bit run-length picture into one index per pixel.</summary>
+  /// <remarks>
+  /// The opcodes are <see cref="MicrosoftRle"/>'s, which an <c>MRLE</c> video frame is coded with
+  /// too — the same counts, the same three escapes, the same word alignment. A still starts on an
+  /// empty canvas where a frame starts on the frame before it, and that difference is the argument
+  /// this passes rather than a second copy of the walk.
+  /// <para/>
+  /// Damaged coding is taken as far as it goes rather than refused. A still is a thing somebody
+  /// wants to look at, and most of a picture beats none of it; a decoder feeding a film has the
+  /// opposite duty and asks for the refusal instead.
+  /// </remarks>
   public static byte[] DecompressRle8(ReadOnlySpan<byte> data, int width, int height) {
     var output = new byte[width * height];
-    var inIdx = 0;
-    var x = 0;
-    var y = 0;
-
-    while (inIdx < data.Length && y < height) {
-      var first = data[inIdx++];
-      if (inIdx >= data.Length)
-        break;
-
-      var second = data[inIdx++];
-
-      if (first > 0) {
-        for (var j = 0; j < first && x < width; ++j)
-          output[y * width + x++] = second;
-      } else {
-        switch (second) {
-          case 0:
-            x = 0;
-            ++y;
-            break;
-          case 1:
-            return output;
-          case 2:
-            if (inIdx + 1 < data.Length) {
-              x += data[inIdx++];
-              y += data[inIdx++];
-            }
-
-            break;
-          default:
-            for (var j = 0; j < second && inIdx < data.Length && x < width; ++j)
-              output[y * width + x++] = data[inIdx++];
-            if (second % 2 != 0 && inIdx < data.Length)
-              ++inIdx;
-            break;
-        }
-      }
-    }
-
+    MicrosoftRle.Decode(data, output, width, height, 8, refuseMalformed: false);
     return output;
   }
 
   /// <summary>Unpacks a 4-bit run-length picture into the rows an uncompressed one would have had.</summary>
   /// <remarks>
-  /// The opcodes are the 8-bit ones with the pixels half as wide. A count and a byte repeats that
-  /// byte's two nibbles in turn, high one first. A zero count introduces the rest: 0 ends the line,
-  /// 1 ends the picture, 2 is a delta and takes two bytes, and anything else is that many pixels
-  /// packed two to a byte and padded out to a whole word.
+  /// The opcodes are the 8-bit ones with the pixels half as wide, so it is the same walk
+  /// (<see cref="MicrosoftRle"/>) told which depth it is reading.
   /// <para/>
   /// What comes back is laid out as an uncompressed bitmap body — each row on a four-byte boundary,
   /// rows in the order the file stores them — so that the row ordering and the un-padding after it
@@ -164,51 +135,7 @@ internal static class RleCompressor {
   /// </remarks>
   public static byte[] DecompressRle4(ReadOnlySpan<byte> data, int width, int height) {
     var indices = new byte[width * height];
-    var inIdx = 0;
-    var x = 0;
-    var y = 0;
-
-    while (inIdx + 1 < data.Length && y < height) {
-      var count = data[inIdx++];
-      var value = data[inIdx++];
-
-      if (count > 0) {
-        for (var j = 0; j < count && x < width; ++j, ++x)
-          indices[y * width + x] = (byte)((j & 1) == 0 ? value >> 4 : value & 0x0F);
-
-        continue;
-      }
-
-      switch (value) {
-        case 0:
-          x = 0;
-          ++y;
-          break;
-        case 1:
-          y = height;
-          break;
-        case 2:
-          if (inIdx + 1 < data.Length) {
-            x += data[inIdx++];
-            y += data[inIdx++];
-          }
-
-          break;
-        default:
-          var bytes = (value + 1) / 2;
-          for (var j = 0; j < value && x < width; ++j, ++x) {
-            var at = inIdx + j / 2;
-            if (at >= data.Length)
-              break;
-
-            indices[y * width + x] = (byte)((j & 1) == 0 ? data[at] >> 4 : data[at] & 0x0F);
-          }
-
-          // Absolute runs are padded out to a whole word, not merely to a byte.
-          inIdx += bytes + (bytes & 1);
-          break;
-      }
-    }
+    MicrosoftRle.Decode(data, indices, width, height, 4, refuseMalformed: false);
 
     var stride = ((width + 1) / 2 + 3) & ~3;
     var packed = new byte[stride * height];

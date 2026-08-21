@@ -44,6 +44,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | Motion JPEG | `MJPG`, `mjpg`, `jpeg`, `V_MJPEG` | Y | — |
 | MPEG-1 video (ISO/IEC 11172-2) | `MPG1`, `PIM1`, `mp1v` | Y | — |
 | MPEG-2 video (ISO/IEC 13818-2) | `MPG2`, `MPEG`, `mp2v`, `m2v1`, `hdv1`–`hdv3`, `V_MPEG2` | Y | — |
+| Microsoft RLE | `MRLE`, `mrle`, `BI_RLE8` (1), `BI_RLE4` (2) | Y | — |
 
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
@@ -147,6 +148,25 @@ what separates a rounding difference from a fault in prediction or dequantisatio
 same streams ffmpeg's own two inverse transforms differ from each other by tens of thousands of samples
 per frame. The residual is the transform's, which both standards specify as a formula with an accuracy
 bound rather than as an algorithm, and not a disagreement about the bitstream.
+
+### Microsoft RLE
+
+Run-length coded palettised frames at four bits a pixel and at eight, with the end-of-line, delta and
+end-of-bitmap escapes. There is no second copy of the coding here: a run-length Windows bitmap is the
+same opcodes over the same kind of picture, so the walk lives with the bitmap reader and takes the
+canvas it paints on as an argument. That argument is the whole difference between the two uses — a
+still starts on an empty canvas, and a frame starts on the frame before it, which is what turns the
+escapes from a way of leaving parts of a picture unstated into the entire inter-frame coding.
+
+The coding is lossless, so there is nothing to round: every frame of every stream measured came out
+identical to ffmpeg's decode of the same file, key frames and delta frames alike, with no differing
+samples at all.
+
+What is not implemented refuses and says so: a depth the coding is not defined at, a depth that
+disagrees with the compression stated beside it, a stream carrying no palette, rows stored top-down,
+and any opcode that runs off the picture or off the end of the data. QuickTime's `WRLE` — the same
+coding with a QuickTime colour table in place of the bitmap header's palette — is not claimed, so a
+`.mov` carrying it is refused by name rather than decoded against the wrong colours.
 
 ## 📜 License
 
