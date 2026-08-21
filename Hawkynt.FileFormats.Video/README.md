@@ -93,6 +93,8 @@ who wants one frame of a two-hour recording pays for one frame.
 
 | Uncompressed 4:1:1 (y41p) | `Y41P` | Y | — |
 
+| Cirrus Logic AccuPak (CLJR) | `CLJR` | Y | — |
+
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
 is an undivided heap of bytes, and where each packet starts and stops is a computation over five
@@ -1586,6 +1588,35 @@ BT.601 with studio swing and each chroma pair repeated across the four luma colu
 
 What refuses: a picture with no pixels, a width that is not a multiple of eight, and a packet shorter
 than its stride times its height.
+
+### CLJR
+
+Cirrus Logic AccuPak — the one lossy entry among these packing rules, four pixels of 4:1:1 YUV
+quantised into one 32-bit word rather than repacked whole. The loss is the encoder's; a decoder reading
+the coded bits back has nothing left to round, which is what makes exact equality the right bar for a
+lossy format here.
+
+The word, read big-endian: bits 27-31 are the fourth luma sample, bits 22-26 the third, bits 17-21 the
+second and bits 12-16 the first — the four columns in *reverse* order — then bits 6-11 are the shared
+chroma blue difference and bits 0-5 the shared red difference. Recovered by quantising pseudo-random
+content through ffmpeg's own encoder with dithering held to one fixed algorithm and sweeping every
+placement of five- and six-bit fields against ffmpeg's own decode of what it wrote — the oracle this
+format needs, because dithering carries a sample's rounding error into the columns after it, so a coded
+word is not a plain quantisation of the source and only another decoder's reading of the bits is a fact
+the encoder can be checked against.
+
+**Two different rules turn five and six bits back into eight, and they are not the same rule at two
+widths.** Luma replicates its own top three bits into the three it does not carry, the usual way of
+filling a narrower channel without landing short of white. Chroma does not — a coded value of 41 decodes
+to 164, which is `41 << 2` exactly, and not the 166 the same replication would give. Rows run top to
+bottom, unlike y41p's, checked the same way that format's row order was found and getting the opposite
+answer.
+
+Three geometries and sixty frames of pseudo-random `yuv411p` content, quantised through CLJR and decoded
+both here and by ffmpeg: **every sample of every plane of every frame identical.**
+
+What refuses: a picture with no pixels, a width that is not a multiple of four — ffmpeg's own encoder
+refuses the same width — and a packet shorter than its stride times its height.
 
 ## 📜 License
 
