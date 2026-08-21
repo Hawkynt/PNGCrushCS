@@ -52,6 +52,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | H.263 (ITU-T H.263 baseline) | `H263`, `s263`, `U263` | Y | — |
 | Sorenson Spark (Flash Video's H.263) | `FLV1` | Y | — |
 | H.264 / AVC, Baseline I and P slices | `avc1`, `avc3`, `H264`, `X264`, `DAVC`, `VSSH`, `V_MPEG4/ISO/AVC` | Y | — |
+| VP8 (RFC 6386) | `VP80`, `vp08`, `V_VP8` | Y | — |
 
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
@@ -260,6 +261,31 @@ What refuses: a depth the compressor does not code; an indexed depth carrying no
 the Macintosh default palettes cannot be checked against anything here and a picture drawn through a
 guessed table cannot be told from one drawn through the right one; a stream that opens with a frame
 touching only part of the picture; and any count that would write outside the line it is on.
+### VP8
+
+The codec WebM was built around, and all of it: the boolean entropy decoder, segmentation, both loop
+filters, up to eight token partitions, all fourteen intra prediction modes, prediction from any of
+the three reference frames with the six-tap and bilinear sub-pixel filters, and the probability state
+that carries from one frame to the next. A frame the stream asks not to be shown — an alternate
+reference built from several frames at once — is decoded, kept as a reference, and not handed back.
+
+Fifty-three encoded streams and six built by hand — 3,189 coded frames, 3,116 of them shown — were
+compared with ffmpeg's decode of the same bitstreams plane by plane and sample by sample. Every plane
+of every frame is identical: not close, not on average, the same bytes. That is the only acceptable
+result, because the loss happened in the encoder and both decoders are reading what came out of it —
+and because an error in prediction or in the loop filter shows up as a small difference everywhere
+that grows with every frame until the next key frame.
+
+The streams cover both filters, sharpness zero to seven, all four bitstream versions, one to eight
+token partitions, segmentation, hidden reference frames, motion vector sign bias, every split
+partitioning, every subblock mode, every range token, and picture sizes from 16x16 to 1280x720
+including sizes that are not a whole number of macroblocks. The reference-buffer copies and the
+segment-based filter levels, which no encoder here will emit, were reached with hand-written frame
+headers — decoded by ffmpeg as well, so agreement is still the measurement.
+
+What is not implemented refuses and says so: a bitstream version RFC 6386 reserves, a key frame that
+sets the reserved colour space or clamping fields, a stream that begins at an interframe, a truncated
+packet, and a partition table that does not fit in one.
 
 ### H.263 and Sorenson Spark
 
