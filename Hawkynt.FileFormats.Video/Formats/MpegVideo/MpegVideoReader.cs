@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.IO;
 using FileFormat.Core;
 
-namespace FileFormat.Mpeg1Video;
+namespace FileFormat.MpegVideo;
 
 /// <summary>
-/// Cuts an MPEG-1 video elementary stream into one packet per coded picture.
+/// Cuts an MPEG-1 or MPEG-2 video elementary stream into one packet per coded picture.
 /// </summary>
 /// <remarks>
 /// The whole of the format's structure is the start code: three zero bytes, a one byte, and one more
@@ -18,10 +18,14 @@ namespace FileFormat.Mpeg1Video;
 /// What this does <em>not</em> do is read any of the headers it walks past. It never learns the
 /// picture size, the frame rate, the quantiser matrices or which picture type a packet holds: every
 /// one of those lives in a header the decoder parses for itself, and a demuxer that parsed them too
-/// would be a second place for the same field to be read differently. The one thing it looks at
-/// beyond the start-code byte is nothing at all.
+/// would be a second place for the same field to be read differently.
+/// <para/>
+/// The one thing it looks at beyond the start-code byte is the four-bit identifier of the first
+/// extension, and only to answer which of the two standards the stream is — see
+/// <see cref="CarriesSequenceExtension"/>. That is not a field being copied out of a header; it is
+/// the presence or absence of a header, which is structure, and the demuxer has to state a codec.
 /// </remarks>
-public static class Mpeg1VideoReader {
+public static class MpegVideoReader {
 
   /// <summary>The byte that follows <c>00 00 01</c> in a picture start code (11172-2, Table 2-B.1).</summary>
   internal const byte PictureStartCode = 0x00;
@@ -37,15 +41,49 @@ public static class Mpeg1VideoReader {
   /// <summary>Sequence end code — the last thing in a stream.</summary>
   internal const byte SequenceEndCode = 0xB7;
 
-  public static Mpeg1VideoContainer FromFile(FileInfo file) {
+  /// <summary>Extension start code, which in MPEG-2 introduces the sequence extension (13818-2, 6.2.1).</summary>
+  internal const byte ExtensionStartCode = 0xB5;
+
+  /// <summary>
+  /// Whether the stream's first sequence header is followed by a sequence extension, which is the
+  /// whole of what tells MPEG-2 from MPEG-1.
+  /// </summary>
+  /// <remarks>
+  /// The walk stops at the first picture, because a sequence extension is required to be the very
+  /// next start code after the first sequence header of an MPEG-2 sequence (13818-2, 6.2.2.3) and a
+  /// stream that has reached a picture without one is MPEG-1. Stopping matters for a long file: the
+  /// question is answered from its first few dozen bytes rather than from all of it.
+  /// <para/>
+  /// The identifier is the top four bits of the byte after the start code, and only the value one is
+  /// a sequence extension. A sequence display extension may legitimately follow a sequence header
+  /// too, so the identifier has to be read rather than the extension start code merely counted.
+  /// </remarks>
+  internal static bool CarriesSequenceExtension(ReadOnlyMemory<byte> data) {
+    foreach (var (position, code) in StartCodes(data))
+      switch (code) {
+        case ExtensionStartCode:
+          return position + 4 < data.Length && _At(data, position + 4) >> 4 == 1;
+
+        case PictureStartCode:
+        case >= FirstSliceStartCode and <= LastSliceStartCode:
+          return false;
+
+        default:
+          continue;
+      }
+
+    return false;
+  }
+
+  public static MpegVideoContainer FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
-      throw new FileNotFoundException("MPEG-1 video file not found.", file.FullName);
+      throw new FileNotFoundException("MPEG video file not found.", file.FullName);
 
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static Mpeg1VideoContainer FromStream(Stream stream) {
+  public static MpegVideoContainer FromStream(Stream stream) {
     ArgumentNullException.ThrowIfNull(stream);
     if (stream.CanSeek) {
       var data = new byte[stream.Length - stream.Position];
@@ -58,7 +96,7 @@ public static class Mpeg1VideoReader {
     return FromBytes(buffer.ToArray());
   }
 
-  public static Mpeg1VideoContainer FromBytes(byte[] data) {
+  public static MpegVideoContainer FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
 
     _RefuseWithoutSequenceHeader(data);
@@ -72,7 +110,7 @@ public static class Mpeg1VideoReader {
   /// The container outlives this call and its packets are windows onto the bytes, which a span makes
   /// no promise about. Callers holding an array should use <see cref="FromBytes"/>.
   /// </remarks>
-  public static Mpeg1VideoContainer FromSpan(ReadOnlySpan<byte> data) {
+  public static MpegVideoContainer FromSpan(ReadOnlySpan<byte> data) {
     _RefuseWithoutSequenceHeader(data);
 
     return new() { Data = data.ToArray() };
@@ -89,7 +127,7 @@ public static class Mpeg1VideoReader {
   private static void _RefuseWithoutSequenceHeader(ReadOnlySpan<byte> data) {
     if (data.Length < 4 || data[0] != 0x00 || data[1] != 0x00 || data[2] != 0x01 || data[3] != SequenceHeaderCode)
       throw new InvalidDataException(
-        "Data does not begin with an MPEG-1 sequence header start code (00 00 01 B3).");
+        "Data does not begin with an MPEG sequence header start code (00 00 01 B3).");
   }
 
   /// <summary>
