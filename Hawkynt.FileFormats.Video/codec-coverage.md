@@ -23,8 +23,8 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 | | Count | Share |
 | --- | --- | --- |
 | Decoded and verified against ffmpeg | 42 | 20% |
-| Established as not implementable from files alone | 9 | 4% |
-| Not yet attempted | 160 | 76% |
+| Established as not implementable from files alone | 10 | 5% |
+| Not yet attempted | 159 | 75% |
 
 The 42 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
@@ -46,7 +46,7 @@ built here has its encoder but not its decoder, so the comparison is against the
 into the encoder rather than against another decoder's opinion of what came out. For a lossless codec
 that is the stronger oracle of the two, being the ground truth itself.
 
-The 9 are Indeo 3, Indeo 4, Indeo 5, TrueMotion 1, WMV1, WMV2, MSS1, Lagarith and DV, and the arguments that settle
+The 10 are Indeo 3, Indeo 4, Indeo 5, TrueMotion 1, WMV1, WMV2, MSS1, MSS2, Lagarith and DV, and the arguments that settle
 them are in `undecodable-codecs.md`. The first four have frames too small to carry the tables they need —
 340 bytes for a 320x240 Indeo 3 picture, 14 for Indeo 4, 2 for Indeo 5, 0 for TrueMotion 1 — so those
 tables live in the codec binary and cannot be recovered by reading files. WMV1 and WMV2 both have real ffmpeg

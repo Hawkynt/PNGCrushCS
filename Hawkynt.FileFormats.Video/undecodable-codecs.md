@@ -440,6 +440,7 @@ whoever picks this up again starts from the block layer and not from the contain
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 # Windows Media Video 7 (WMV1), where the tables are MS-MPEG4v3's own
 
 WMV1 — Microsoft's name is Windows Media Video 7 — was investigated because it looked like it might
@@ -677,3 +678,56 @@ that states the header layout, the coder and the context models rather than only
 identifiers and pixel formats, or an independent reverse-engineering write-up that says, plainly, how it
 was produced and from what.
 >>>>>>> 125a73c6 (Investigated mss1 and found no independent description of its)
+=======
+# Microsoft Screen Codec 2 (MSS2), which adds an embedded codec to MSS1's wall
+
+MSS2 — Windows Media Screen Codec version 9, FourCC `MSS2` — was investigated alongside MSS1. It stops
+for the same reason MSS1 does, with one further complication that makes it strictly harder rather than
+easier: part of its picture is coded by embedding Windows Media Video 9 image blocks, so even a decoder
+that somehow reached the screen-content half would still need the arithmetic-coded half to know where
+that other codec's data starts and ends.
+
+## The same absence of a source
+
+Microsoft's own `learn.microsoft.com` pages for the "Windows Media Video 9 Screen Codec" name MSS2 as
+the FourCC for the format's version 9 content and describe the same DirectX Media Object and Media
+Foundation Transform surface MSS1's section above found: `CLSID_CMSSCEncMediaObject2` to encode,
+`CLSID_CMSSCDecMediaObject` to decode — the same decoder class serves MSS1 and MSS2 alike — and the
+output pixel formats a decoded frame can be delivered in. No bitstream field, block type or coder rule
+is stated anywhere on those pages.
+
+The one detailed technical write-up covering MSS2, on the same MultimediaWiki page MSS1's section
+examined, carries the identical problem for its MSS2-specific material: a second arithmetic coder
+described with functions named `ac2_get_scaled_value`, `ac2_rescale_interval`, `ac2_get_number`,
+`ac2_get_prob` and `ac2_get_consumed_byes`, matching `libavcodec/mss2.c`'s own `arith2_get_scaled_value`,
+`arith2_rescale_interval`, `arith2_get_number`, `arith2_get_prob` and `arith2_get_consumed_bytes` — the
+same typo included, one letter and one prefix apart across all five. Whatever independent knowledge of
+MSS2 the page might also carry is not separable from what reads as a paraphrase of the implementation,
+and this project does not use either.
+
+## What the embedding adds, on top of an already-missing coder
+
+MSS2 frames can carry rectangles coded as Windows Media Video 9 — the codec this package already reads
+as `WMV3`/`WMV9` intra pictures — inside the same arithmetic-coded container MSS1 uses for its own
+recursive subdivision. Even granting, for the sake of argument, that MSS1's coder and context models
+were somehow recovered, a working MSS2 decoder would still need to know, from the same undocumented
+bitstream, which rectangles are screen content and which are WMV9 image data, and where in the packet
+each WMV9 sub-bitstream begins — a fact this project's own VC-1 decoder cannot supply, since it expects
+a complete WMV3 elementary stream and MSS2 is not one. That boundary information is exactly the kind of
+framing decision a container's demuxer would ordinarily carry, and here it does not exist independently
+of the same coder this section has already found no legitimate description of.
+
+## What was verified
+
+`ffmpeg -h encoder=mss2` reports no encoder, the same as MSS1, so there is no way to drive a corpus
+toward a specific codeword here either; what samples exist are fixed, at
+`samples.ffmpeg.org/V-codecs/MSS2/`. The function-name correspondence between the MultimediaWiki page
+and `libavcodec/mss2.c` was checked against both the page's own listed function names and the file names
+and function names independently reported for that source file, not assumed.
+
+## What would change the answer
+
+The same thing MSS1 needs: a description of the arithmetic coder and its context models from a source
+that is not an implementation, plus, for MSS2 specifically, a stated rule for where a WMV9-coded
+rectangle's bytes begin and end inside the packet.
+>>>>>>> ccac9979 (Investigated mss2 on the same evidence that stopped mss1, plus its)
