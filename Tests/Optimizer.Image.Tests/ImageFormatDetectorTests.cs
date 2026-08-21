@@ -630,15 +630,15 @@ public sealed class ImageFormatDetectorTests {
 
   [Test]
   public void DetectFromSignature_PcPaintMagic_ReturnsPcPaint() {
-    var header = new byte[16];
+    var header = new byte[32]; // PcPaintFile.HeaderSize is 17; 16 bytes is one short
     header[0] = 0x34; // magic LE 0x1234
     header[1] = 0x12;
     header[2] = 0x40; // width = 320 (0x0140 LE)
     header[3] = 0x01;
     header[4] = 0xC8; // height = 200 (0x00C8 LE)
     header[5] = 0x00;
-    header[10] = 0x01; // planes = 1
-    header[11] = 0x08; // bpp = 8
+    header[10] = 0x08; // bpp = 8, no planes past the first
+    header[11] = 0xFF; // version-2 flag: the palette fields behind it are there to be read
     Assert.That(ImageFormatDetector.DetectFromSignature(header), Is.EqualTo(ImageFormat.PcPaint));
   }
 

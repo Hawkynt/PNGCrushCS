@@ -205,11 +205,14 @@ public sealed class BitmapConverterTests {
 
   [Test]
   public void LoadBitmap_Farbfeld_DownscalesAndConverts() {
+    // Each 16-bit sample replicates its high byte into its low byte, the way an 8-bit source
+    // widens losslessly, so narrowing back to 8 bits recovers the original value exactly rather
+    // than off by the rounding a non-replicated 16-bit sample would legitimately pick up.
     var pixelData = new byte[8];
-    pixelData[0] = 0xFF; pixelData[1] = 0x00;
-    pixelData[2] = 0x80; pixelData[3] = 0x00;
-    pixelData[4] = 0x40; pixelData[5] = 0x00;
-    pixelData[6] = 0xC0; pixelData[7] = 0x00;
+    pixelData[0] = 0xFF; pixelData[1] = 0xFF;
+    pixelData[2] = 0x80; pixelData[3] = 0x80;
+    pixelData[4] = 0x40; pixelData[5] = 0x40;
+    pixelData[6] = 0xC0; pixelData[7] = 0xC0;
     var file = new FarbfeldFile {
       Width = 1, Height = 1,
       PixelData = pixelData
