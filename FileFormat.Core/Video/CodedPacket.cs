@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace FileFormat.Core;
 
@@ -24,10 +25,39 @@ namespace FileFormat.Core;
 /// timestamp exactly when a codec reorders frames.</param>
 /// <param name="Duration">How long this occupies, in the stream's time base, where stated.</param>
 /// <param name="IsKeyFrame">Whether decoding may begin here without anything before it.</param>
+/// <param name="FragmentOffsets">Where in <see cref="Data"/> each of the pieces the container carried
+/// this in begins, or <c>null</c> where the container carried it in one piece and said so by not
+/// cutting it.</param>
 public readonly record struct CodedPacket(
   int StreamIndex,
   ReadOnlyMemory<byte> Data,
   long? PresentationTimestamp = null,
   long? DecodeTimestamp = null,
   long? Duration = null,
-  bool IsKeyFrame = false);
+  bool IsKeyFrame = false,
+  IReadOnlyList<int>? FragmentOffsets = null) {
+
+  /// <summary>
+  /// Where each piece this was carried in begins, with a single piece at nought where the container
+  /// cut none.
+  /// </summary>
+  /// <remarks>
+  /// A container that cuts a coded unit into pieces knows where it cut, and that knowledge dies with
+  /// the reassembly unless it is carried. For most containers it is worth nothing — an ASF payload or
+  /// a Matroska block is cut wherever the packet size ran out, at no boundary the codec would
+  /// recognise — but RealMedia cuts a picture at its slices, one slice to a piece, and a RealVideo
+  /// picture's slices are not otherwise findable: they carry no start code and the bit padding between
+  /// them is not fixed.
+  /// <para/>
+  /// It is stated as offsets and not as a prefix on the bytes on purpose. ffmpeg's demuxer writes a
+  /// small table of them in front of every RealVideo packet it hands out, which works and is why a
+  /// packet from it is eight bytes a slice longer than the picture; but a byte layout invented by one
+  /// demuxer for one decoder is exactly the kind of private arrangement the split between the two
+  /// exists to prevent. A demuxer here says where it cut and says it in the model, a decoder that has
+  /// a use for that reads it, and one that has not is unaffected — no codec has to know how a
+  /// container spells anything.
+  /// </remarks>
+  public IReadOnlyList<int> Fragments => this.FragmentOffsets ?? _WHOLE;
+
+  private static readonly int[] _WHOLE = [0];
+}
