@@ -56,6 +56,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | Apple Video (RPZA) | `rpza`, `azpr` | Y | — |
 | H.263 (ITU-T H.263 baseline) | `H263`, `s263`, `U263` | Y | — |
 | Sorenson Spark (Flash Video's H.263) | `FLV1` | Y | — |
+| RealVideo 1 (revision 0 only) | `RV10`, `RV13` | Y | — |
 | H.264 / AVC, Baseline I and P slices | `avc1`, `avc3`, `H264`, `X264`, `DAVC`, `VSSH`, `V_MPEG4/ISO/AVC` | Y | — |
 | On2 VP3.1 | `VP31`, `VP32` (and `VP30`, refused by name) | Y | — |
 | VP8 (RFC 6386) | `VP80`, `vp08`, `V_VP8` | Y | — |
@@ -552,6 +553,43 @@ What is not implemented refuses and says so, naming the annex and the field: the
 header of clause 5.1.4 and everything it signals, unrestricted motion vectors (Annex D), arithmetic
 coding (Annex E), advanced prediction and its four vectors per macroblock (Annex F), PB-frames
 (Annex G), continuous presence multipoint (Annex C), and the escape level Annex T reserves.
+
+### RealVideo 1
+
+RealVideo 1 is ITU-T H.263 from the macroblock layer down with a different picture header on top, so
+it is the H.263 decoder above with its own header reader and its own idea of where a picture begins
+and ends. Nothing of the block layer is written twice.
+
+What the header replaces: H.263 states the picture size as one of five named formats, where RealVideo
+carries none at all and takes it from the container — a stream whose container lost the size is one
+nothing can decode. H.263 codes a picture as one run of macroblocks broken by optional group headers,
+where RealVideo cuts a picture into independently coded runs, each restating the picture's type and
+quantiser and naming the macroblock it begins at and the number it carries, and sends each run in its
+own packet so that losing one costs part of a picture rather than all of it. And H.263 keeps its
+vectors inside the picture unless Annex D is signalled, where RealVideo always lets them point
+outside it and reads the edge sample — there is no bit to turn that off with.
+
+The runs carry no start code and the padding between them is not fixed, so where each begins is taken
+from `CodedPacket.FragmentOffsets` rather than searched for. That is the seam working: the container
+knows where it cut because it did the cutting, the decoder needs it and cannot recover it, and neither
+has to know anything else about the other.
+
+**Measured.** Twenty-seven encoded streams, 238 frames, compared with ffmpeg plane by plane and frame
+by frame — 96x64 to 352x288, quantisers 2 to 31, intra-only and groups of pictures up to fifty.
+Against `-idct faani`, **235 of 238 frames are identical sample for sample**; the other three differ
+in five samples between them, always by one level. Against ffmpeg's default integer transform, 87 197
+samples of 24 million differ at a maximum of two levels — the same size as the difference between
+ffmpeg's own two transforms, which is the residual H.263 Annex A exists to allow.
+
+**What it refuses, by name.** RealVideo 2, 3 and 4 are not accepted at all rather than accepted and
+then failed, so a caller asking whether anything reads an `RV40` stream is told no once. Within
+RealVideo 1 only revision 0 of the bitstream — version word `0x10000000`, which is what ffmpeg's own
+encoder writes — is implemented; the recordings on the sample servers state `0x10001000` and
+`0x10003001`, and those are a different bitstream below the picture header rather than the same one
+shifted, since no offset into one of their pictures decodes even three macroblocks with the H.263
+tables. A first run that leaves its macroblock position out is refused for the same reason: no
+measured stream does it, so the shape of such a header is unverified, and reading it wrongly would
+produce noise shaped like a picture instead of an error. A PB-frame is refused where it is signalled.
 
 ### H.264 / AVC
 
