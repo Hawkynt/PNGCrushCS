@@ -101,15 +101,15 @@ public sealed class VideoFormatRegistryTests {
     var stream = new MediaStreamInfo {
       Index = 0,
       Kind = MediaStreamKind.Video,
-      Codec = CodecTag.FromCharacters("H264"),
-      Handler = CodecTag.FromCharacters("h264"),
+      Codec = CodecTag.FromCharacters("VP90"),
+      Handler = CodecTag.FromCharacters("vp09"),
     };
 
     Assert.That(VideoFormatRegistry.CanDecode(stream), Is.False);
 
     var failure = Assert.Throws<NotSupportedException>(() => VideoFormatRegistry.CreateDecoder(stream));
-    Assert.That(failure!.Message, Does.Contain("H264"));
-    Assert.That(failure.Message, Does.Contain("h264"));
+    Assert.That(failure!.Message, Does.Contain("VP90"));
+    Assert.That(failure.Message, Does.Contain("vp09"));
   }
 
   [Test]

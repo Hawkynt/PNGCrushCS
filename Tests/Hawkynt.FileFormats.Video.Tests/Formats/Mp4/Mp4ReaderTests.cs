@@ -482,7 +482,6 @@ public sealed class Mp4ReaderTests {
     Assert.That(Mp4Container.ReadPackets(container, 7), Is.Empty);
   }
 
-  [TestCase("avc1")]
   [TestCase("hev1")]
   [TestCase("mp4v")]
   [Category("Unit")]
@@ -498,7 +497,6 @@ public sealed class Mp4ReaderTests {
     Assert.That(VideoFormatRegistry.CanDecode(streams[0]), Is.False);
   }
 
-  [TestCase("avc1")]
   [TestCase("hev1")]
   [Category("Unit")]
   public void UnsupportedCodec_IsRefusedWithItsCodeWhenAPictureIsAskedFor(string code) {
