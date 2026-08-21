@@ -22,19 +22,21 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 
 | | Count | Share |
 | --- | --- | --- |
-| Decoded and verified against ffmpeg | 38 | 18% |
+| Decoded and verified against ffmpeg | 39 | 18% |
 | Established as not implementable from files alone | 5 | 2% |
-| Not yet attempted | 168 | 80% |
+| Not yet attempted | 167 | 79% |
 
-The 38 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
+The 39 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
 frame against ffmpeg's decode of the same bitstream before it was merged, and the measurements are in
 each one's section of that file. The ones that reach exact equality on every sample of every frame
 are Microsoft RLE, Microsoft Video 1, Cinepak, QuickTime Animation, Apple Video, Apple Graphics, FLIC, HuffYUV,
-FFVHUFF, FFV1, ZMBV, TSCC, CSCD, Flash Screen Video, Ut Video, MagicYUV, v210, r210, r10k and
-y41p — the two colour-space ones over 883 and 1,446 frames, in all six and all seven of their
+FFVHUFF, FFV1, ZMBV, TSCC, CSCD, Flash Screen Video, Ut Video, MagicYUV, v210, r210, r10k, y41p
+and CLJR — the two colour-space ones over 883 and 1,446 frames, in all six and all seven of their
 colour spaces, and the packed layouts on the sample data itself, at its own coded depth and with
-no display conversion in the way, over 120, 90, 90 and 90 frames at three geometries each.
+no display conversion in the way, over 120, 90, 90, 90 and 60 frames at three geometries each.
+CLJR is the one lossy format among them — measured against ffmpeg's own decode rather than the
+source, because its encoder dithers.
 Theora and VP3 reach it too, Theora over 1,717 frames across all three of its pixel formats and VP3
 over 3,182.
 
@@ -90,19 +92,22 @@ wall with no published specification at all.
 **Lossless RGB and YUV** — around 30 names including `012v`, `aasc`, `cllc`, `cyuv`, `dxtory`,
 `loco`, `m101`, `magicyuv`, `mszh`, `r10k`, `r210`, `sheervideo`, `v210`, `vble`, `y41p`, `ylc`,
 `zerocodec` and `zlib`. Ut Video came out of this group and reached exact equality, which is the
-standard for every one of them: max delta 0 or it is wrong. `v210`, `r210`, `r10k` and `y41p` are done
-as well — all four carry no compression at all, only a fixed packing of samples into words or byte
-groups, so there was nothing for a decoder to get wrong except the layout, and the two RGB ones decode
-straight into a ten-bit RGB pixel format with no reduction to eight bits standing in the way of the
-comparison at all. None of the four layouts is written down anywhere this project found; all were
-recovered by sweeping every reading against ffmpeg's own encoder fed known or pseudo-random samples,
-and r210 and r10k turned out to disagree with each other about which ten bits are which despite the
-family resemblance their names suggest, while y41p's rows turned out to be coded bottom row first —
-found only once random content, which has no row in common with the wrong one, turned a sweep that
-looked like it matched nothing at all into an exact match once the row order was reversed. This is
-the densest source of verifiable wins in the list — but not a uniformly cheap one. `lagarith`, which
-is arithmetic coding over the same kind of prediction, also came out of it and is now in
-`undecodable-codecs.md` instead.
+standard for every one of them: max delta 0 or it is wrong. `v210`, `r210`, `r10k` and `y41p` carry no
+compression at all, only a fixed packing of samples into words or byte groups, so there was nothing for
+a decoder to get wrong except the layout, and the two RGB ones decode straight into a ten-bit RGB pixel
+format with no reduction to eight bits standing in the way of the comparison at all. None of the four
+layouts is written down anywhere this project found; all were recovered by sweeping every reading
+against ffmpeg's own encoder fed known or pseudo-random samples, and r210 and r10k turned out to
+disagree with each other about which ten bits are which despite the family resemblance their names
+suggest, while y41p's rows turned out to be coded bottom row first — found only once random content,
+which has no row in common with the wrong one, turned a sweep that looked like it matched nothing at
+all into an exact match once the row order was reversed. `cljr` is done too, and it is the one lossy
+format in this group: the quantisation is the encoder's, so a decoder reading the coded bits has
+nothing left to round, but the encoder dithers, which means a coded word is not a plain quantisation of
+the source and the sweep that recovered its bit layout had to be checked against another decoder's
+reading of the same bits rather than against the picture that went in. This is the densest source of
+verifiable wins in the list — but not a uniformly cheap one. `lagarith`, which is arithmetic coding over
+the same kind of prediction, also came out of it and is now in `undecodable-codecs.md` instead.
 
 **Screen capture** — `flashsv2`, `g2m`, `mscc`, `mwsc`, `rasc`, `rscc`, `screenpresso`, `tdsc`,
 `tscc2`, `vmnc`, `wcmv`, `scpr`. Mostly DEFLATE over a framebuffer with a delta scheme on top, so
