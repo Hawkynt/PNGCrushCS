@@ -54,6 +54,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | H.264 / AVC, Baseline I and P slices | `avc1`, `avc3`, `H264`, `X264`, `DAVC`, `VSSH`, `V_MPEG4/ISO/AVC` | Y | — |
 | VP8 (RFC 6386) | `VP80`, `vp08`, `V_VP8` | Y | — |
 | HuffYUV / FFVHUFF | `HFYU`, `FFVH` | Y | — |
+| FFV1 (RFC 9043) | `FFV1`, `V_FFV1` | Y | — |
 
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
@@ -394,6 +395,38 @@ none of the three; a Huffman table whose lengths do not describe a complete code
 4:2:0 with median prediction, whose row order could not be established against any file — reading it
 as the nearest arrangement that is known reproduces five rows and then diverges, which is the one
 answer a decoder must not give.
+
+### FFV1
+
+Lossless, intra only, and the codec archives standardised on. No transform and no quantiser: each
+sample is predicted from the median of three neighbours and the difference is entropy coded in a
+context chosen by five more. What makes it unusual is how much of the coding the stream itself gets
+to decide — the context quantisers, the states each context starts at, and even the range coder's
+state transition table are all replaceable by a file that says so, and all three are read here.
+
+Both entropy coders. The range coder spends thirty-two adaptive states on each context; Golomb-Rice
+spends four running numbers and adds a run mode for the flat areas. Everything else — the
+prediction, the contexts, the plane order — is the same either way.
+
+Versions 0, 1 and 3. Where the header lives is the version: 0 and 1 put it inside every keyframe, 3
+moves it into a configuration record the container carries, adds slices that can be found and decoded
+independently of one another, and protects both with a checksum. Version 2 was never finished and is
+refused by name. A frame that is not a keyframe still codes every sample — what it inherits is the
+entropy coder's statistics and nothing of the picture.
+
+Eighty-four streams and 379 frames were decoded here and by ffmpeg: every pixel format its encoder
+writes at eight bits, both coders, all three versions, one slice and sixteen, with and without slice
+checksums, with the coder's own state transition table and with the default one, at sizes from 4x4 to
+320x240. The formats that need no colour conversion — `gray`, `ya8`, `bgr0`, `bgra` — are compared
+against ffmpeg's frames directly and every frame is identical. The luminance-and-chrominance formats
+are compared plane by plane against ffmpeg's decoded planes, and every sample of every plane is
+identical. Four of the streams carry an alpha channel that is a gradient rather than the constant a
+test pattern produces, so the transparency is measured rather than assumed.
+
+What refuses: samples deeper than eight bits, version 2, a coder type or colour space the
+specification does not describe, a configuration record or a slice whose checksum does not come out,
+a slice that states a place outside the raster, and a version 0 or 1 stream that opens with a frame
+that is not a keyframe.
 
 ## 📜 License
 
