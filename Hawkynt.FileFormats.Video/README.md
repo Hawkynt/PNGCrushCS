@@ -39,6 +39,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | Motion JPEG stream | `.mjpg`, `.mjpeg` | Y | — |
 | MPEG video elementary stream | `.m1v`, `.m2v`, `.mpv`, `.mpeg1video`, `.mpeg2video` | Y | — |
 | MPEG-2 transport stream (also Blu-ray, AVCHD) | `.ts`, `.m2ts`, `.mts`, `.m2t`, `.tsv` | Y | — |
+| Ogg (Theora, Vorbis, Opus, FLAC) | `.ogg`, `.ogv`, `.oga`, `.ogx`, `.opus`, `.spx` | Y | — |
 
 | Codec | Tag | Decode | Encode |
 | --- | --- | --- | --- |
@@ -132,6 +133,32 @@ are copies rather than windows onto the file. Blu-ray and AVCHD put a four-byte 
 front of every packet, so the stride is 192 rather than 188; which of the two a file uses is measured
 from its sync bytes rather than taken from its name. A lost packet is caught by the continuity
 counter and refused by name, because a unit assembled across one is a frame with a hole in it.
+
+Ogg is the purest framing layer here: pages, a lacing that divides them into packets, a serial number
+saying which of the multiplexed bitstreams a page belongs to, and a checksum of its own — a CRC-32
+sharing only its polynomial with the usual one, computed over the whole page with the checksum field
+read as zeroes. Packets routinely span pages, because a page holds at most 65 025 bytes and a keyframe
+of a large picture does not; they are put back together, and only those packets are copied rather than
+windowed onto the file. A page's last lacing value of exactly 255 is the only thing that says a packet
+continues, which is also why a packet whose length divides by 255 ends on a zero-length segment.
+
+Its granule position is not a timestamp and the format says so — it is a stream position whose meaning
+each codec's mapping defines. Vorbis and FLAC count output samples; Opus counts them at 48 kHz
+whatever the encoder was fed, and the first playable one sits at the granule less the header's
+pre-skip; Theora packs the count of frames to the last keyframe and the count since it into two bit
+fields, whose sum counts from one, so the frame index is one less. A position also sits at the *end*
+of a page and belongs to the last packet finishing on it. For Theora, where one packet is one frame,
+the packets before it are counted back from it exactly; for the audio mappings, where a packet is
+worth a block whose length is in the codec's own setup data, they are not, and the reader reports the
+one position the file states — the timestamp of the packet beginning at the page boundary — rather
+than a reconstruction.
+
+Measured against `ffprobe -fflags +noparse` on nine files: Theora alone at three sizes, with a long
+group of pictures, at 30000/1001, with duplicate-frame packets, with keyframes large enough to span
+three pages, with Vorbis, with Opus, and Opus and FLAC alone. Every packet's stream, order and size is
+identical across all of them, and every video packet's presentation timestamp as well. The header
+packets are not packets — they are the codec's private data, reported once, framed in the Xiph lacing
+Matroska uses for the same codecs so that one decoder reads a stream out of either container.
 
 A stream coded with anything else is refused by name — the code, or the container's own name for the
 codec where it has one — rather than half decoded into noise.

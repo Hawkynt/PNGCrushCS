@@ -24,7 +24,7 @@
     <Version>1.0.0</Version>
     <Authors>Hawkynt</Authors>
     <Description>Pure-C# library for reading video containers and decoding video codecs. Demuxing, decoding, encoding and muxing are four separate contracts, so a container can be read and a different one written without a decode in between. Frames are FileFormat.Core RawImages, so everything the image library does to a picture works on a frame.</Description>
-    <PackageTags>video;file-format;avi;mp4;mov;quicktime;3gp;isobmff;matroska;mkv;webm;ebml;mpeg;mpeg-ps;mpegts;m2ts;transport-stream;pes;bluray;avchd;vob;dvd;mjpeg;flv;flash-video;asf;wmv;wma;windows-media;container;demuxer;codec;decoder;riff;vc1;wmv3;windows-media-video;smpte-421m;msmpeg4;mp42;div2;mpeg4v2</PackageTags>
+    <PackageTags>video;file-format;avi;mp4;mov;quicktime;3gp;isobmff;matroska;mkv;webm;ebml;mpeg;mpeg-ps;mpegts;m2ts;transport-stream;pes;bluray;avchd;vob;dvd;mjpeg;flv;flash-video;asf;wmv;wma;windows-media;container;demuxer;codec;decoder;riff;vc1;wmv3;windows-media-video;smpte-421m;ogg;ogv;oga;xiph;theora;vorbis;opus;flac</PackageTags>
     <PackageLicenseExpression>LGPL-3.0-or-later</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/Hawkynt/PNGCrushCS</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
