@@ -65,13 +65,13 @@ public sealed class AaiReaderTests {
     var data = new byte[8 + 16];
     BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(0), 2);
     BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(4), 2);
-    data[8] = 0xAA;   // R
+    data[8] = 0xAA;   // B
     data[9] = 0xBB;   // G
-    data[10] = 0xCC;  // B
+    data[10] = 0xCC;  // R
     data[11] = 0xFF;  // A
-    data[12] = 0x11;  // R
+    data[12] = 0x11;  // B
     data[13] = 0x22;  // G
-    data[14] = 0x33;  // B
+    data[14] = 0x33;  // R
     data[15] = 0x80;  // A
 
     var result = AaiReader.FromBytes(data);

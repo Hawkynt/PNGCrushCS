@@ -14,7 +14,7 @@ public readonly record struct AaiFile : IImageFormatReader<AaiFile>, IImageToRaw
   public int Width { get; init; }
   public int Height { get; init; }
 
-  /// <summary>Raw RGBA pixel data (4 bytes per pixel: R, G, B, A).</summary>
+  /// <summary>Raw BGRA pixel data (4 bytes per pixel: B, G, R, A), the order the format stores on disk.</summary>
   public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(AaiFile file) {
@@ -28,7 +28,7 @@ public readonly record struct AaiFile : IImageFormatReader<AaiFile>, IImageToRaw
 
   public static AaiFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    image = image.EnsureFormat(PixelFormat.Rgba32);
+    image = image.EnsureFormat(PixelFormat.Bgra32);
 
     return new() {
       Width = image.Width,
