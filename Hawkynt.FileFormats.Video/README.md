@@ -45,6 +45,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | MPEG-1 video (ISO/IEC 11172-2) | `MPG1`, `PIM1`, `mp1v` | Y | — |
 | MPEG-2 video (ISO/IEC 13818-2) | `MPG2`, `MPEG`, `mp2v`, `m2v1`, `hdv1`–`hdv3`, `V_MPEG2` | Y | — |
 | Microsoft RLE | `MRLE`, `mrle`, `BI_RLE8` (1), `BI_RLE4` (2) | Y | — |
+| Microsoft Video 1 | `CRAM`, `MSVC`, `WHAM` | Y | — |
 
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
@@ -167,6 +168,37 @@ disagrees with the compression stated beside it, a stream carrying no palette, r
 and any opcode that runs off the picture or off the end of the data. QuickTime's `WRLE` — the same
 coding with a QuickTime colour table in place of the bitmap header's palette — is not claimed, so a
 `.mov` carrying it is refused by name rather than decoded against the wrong colours.
+### Microsoft Video 1
+
+Vector quantisation over 4x4 blocks: a block is one colour, two colours chosen per pixel by a
+sixteen-bit mask, or eight — the block split into four 2x2 quads with two colours each, chosen by the
+same mask. A fourth code skips a run of blocks, and that is the whole of the inter-frame coding: a
+skipped block is one that did not change, so the frame before has to still be there to be left alone.
+Blocks run bottom to top as a bitmap's rows do, and left to right within a row.
+
+Both depths are one decoder because they are one algorithm. What differs is how wide a colour is and,
+at sixteen bits, that the choice between two colours and eight is made by the spare top bit of the
+first colour rather than by the second flag byte.
+
+The quantisation is the encoder's, so a decoder reading the same bitstream has nothing to round.
+Eleven streams were compared with ffmpeg frame by frame — 4x4 up to 320x240, fifty frames of moving
+content, noise, colour bars, in AVI and in Matroska — and every frame of every one is identical,
+sample for sample. The eight-bit variant is measured the same way against hand-built streams, since
+ffmpeg's own encoder writes only the sixteen-bit one.
+
+Colours are 5-5-5 with red in the high bits, which is what ffprobe calls the codec's pixel format and
+what decoding a frame each way and comparing with ffmpeg settles; the format description on
+multimedia.cx names the channels the other way round. Five bits are widened to eight by repeating
+the pattern rather than shifting, the same rule this library's bitmap reader arrived at against the
+same tool.
+
+What is not implemented refuses and says so: a depth other than eight or sixteen, a picture whose
+sides are not whole blocks, an eight-bit stream with no palette, a skip run reaching past the last
+block, a frame that stops before every block is accounted for, and an opcode wanting more bytes than
+the packet holds. A skip run of *no* blocks is refused too, and for a different reason: read as the
+format describes it the run is a no-op, where ffmpeg abandons the rest of the frame at one. Both
+readings produce a picture, they differ across everything after the run, and nothing in the file says
+which was meant.
 
 ## 📜 License
 
