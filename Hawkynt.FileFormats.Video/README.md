@@ -48,6 +48,8 @@ who wants one frame of a two-hour recording pays for one frame.
 | Microsoft Video 1 | `CRAM`, `MSVC`, `WHAM` | Y | — |
 | Cinepak | `cvid`, `CVID` | Y | — |
 | QuickTime Animation (RLE) | `rle ` | Y | — |
+| H.263 (ITU-T H.263 baseline) | `H263`, `s263`, `U263` | Y | — |
+| Sorenson Spark (Flash Video's H.263) | `FLV1` | Y | — |
 
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
@@ -256,6 +258,45 @@ What refuses: a depth the compressor does not code; an indexed depth carrying no
 the Macintosh default palettes cannot be checked against anything here and a picture drawn through a
 guessed table cannot be told from one drawn through the right one; a stream that opens with a frame
 touching only part of the picture; and any count that would write outside the line it is on.
+
+### H.263 and Sorenson Spark
+
+Baseline ITU-T H.263: the picture, group of blocks, macroblock and block layers, intra and predicted
+pictures, one motion vector per macroblock at half-pixel resolution with the median predictor of
+clause 6.1.1, and the inverse quantisation of 6.2.1. Group headers are optional in the bitstream and
+whether each one was present is remembered, because the prediction rules treat the macroblocks above
+a group as unavailable only when that group opened with a header of its own.
+
+Sorenson Spark — what Flash Video calls `FLV1` — is the same codec from the group of blocks layer
+down and a different bitstream above it, so it shares everything here but the picture header. Its
+three real differences are all in the decoder by name: it states its own picture size rather than
+naming one of five formats, it has no group of blocks layer at all, and a stream of version 1 puts a
+bit in front of the coefficient escape choosing between a seven-bit and an eleven-bit level. A
+Sorenson picture may also be disposable — predicted, shown, and never predicted from — which is kept
+rather than ignored, because keeping it as a reference would put every picture after it one
+prediction out of step.
+
+Thirty encoded streams, seven hundred and forty-three frames, were compared with ffmpeg's decode of
+the same bitstreams **plane by plane** and sample by sample — sizes from 100x60 to 704x576, quantisers
+1 to 31, groups of pictures from one frame to fifty, and streams with and without group headers.
+Plane by plane and not in RGB, because turning 4:2:0 samples into RGB is a display convention rather
+than part of the decode and the two conventions differ: this library interpolates the chrominance
+planes back up and ffmpeg repeats each sample across its square, which on a picture of hard colour
+edges puts nearly half the samples of every frame tens of levels apart while the decoded samples are
+identical. Feeding ffmpeg's own decoded planes through the conversion here reproduces that difference
+exactly, with no decoder of ours involved, and the same comparison does the same thing to the MPEG-1
+decoder above.
+Twenty-one of the thirty match sample for sample on every frame against ffmpeg's floating-point
+inverse transform; the rest differ in at most about forty samples of a frame out of thirty-eight
+thousand, always by exactly one level, and the difference stays at one level across fifty frames with
+no intra picture to reset it. That residual is the transform's, which H.263 Annex A specifies as an
+accuracy bound rather than as an algorithm; ffmpeg's own two transforms differ from each other by an
+order of magnitude more on the same streams.
+
+What is not implemented refuses and says so, naming the annex and the field: the extended picture
+header of clause 5.1.4 and everything it signals, unrestricted motion vectors (Annex D), arithmetic
+coding (Annex E), advanced prediction and its four vectors per macroblock (Annex F), PB-frames
+(Annex G), continuous presence multipoint (Annex C), and the escape level Annex T reserves.
 
 ## 📜 License
 
