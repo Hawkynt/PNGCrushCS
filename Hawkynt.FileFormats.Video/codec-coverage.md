@@ -22,11 +22,11 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 
 | | Count | Share |
 | --- | --- | --- |
-| Decoded and verified against ffmpeg | 39 | 18% |
+| Decoded and verified against ffmpeg | 40 | 19% |
 | Established as not implementable from files alone | 5 | 2% |
-| Not yet attempted | 167 | 79% |
+| Not yet attempted | 166 | 79% |
 
-The 39 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
+The 40 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
 frame against ffmpeg's decode of the same bitstream before it was merged, and the measurements are in
 each one's section of that file. The ones that reach exact equality on every sample of every frame
@@ -123,8 +123,8 @@ published standard behind it.
 and many more. Almost none has a published specification; most are described on MultimediaWiki from
 reverse engineering. Their value is preservation rather than reach, and each is small.
 
-**Everything else** — `h261`, `indeo2`, `asv1`, `asv2`, `cljr`, `mdec`, `mimic`, `amv`, `mxpeg`,
-`sp5x`, `truemotion2` and the remainder. TrueMotion 2 is the partial case: it is self-describing and
+**Everything else** — `indeo2`, `asv1`, `asv2`, `cljr`, `mdec`, `mimic`, `amv`, `mxpeg`, `sp5x`,
+`truemotion2` and the remainder. TrueMotion 2 is the partial case: it is self-describing and
 about two thirds recovered, with the evidence in `undecodable-codecs.md`, and it was deliberately not
 shipped half-working because a wrong block type in a still passage is indistinguishable from the
 codec working.

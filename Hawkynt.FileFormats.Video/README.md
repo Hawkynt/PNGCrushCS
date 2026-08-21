@@ -56,6 +56,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | QuickTime Animation (RLE) | `rle ` | Y | — |
 | Apple Video (RPZA) | `rpza`, `azpr` | Y | — |
 | Apple Graphics (SMC) | `smc ` | Y | — |
+| H.261 (ITU-T H.261) | `H261` | Y | — |
 | H.263 (ITU-T H.263 baseline) | `H263`, `s263`, `U263` | Y | — |
 | Sorenson Spark (Flash Video's H.263) | `FLV1` | Y | — |
 | RealVideo 1 (revision 0 only) | `RV10`, `RV13` | Y | — |
@@ -1617,6 +1618,69 @@ both here and by ffmpeg: **every sample of every plane of every frame identical.
 
 What refuses: a picture with no pixels, a width that is not a multiple of four — ffmpeg's own encoder
 refuses the same width — and a packet shorter than its stride times its height.
+
+### H.261
+
+The codec H.263 grew out of, and the ancestor that makes H.263's own section above worth reading first:
+the two share the macroblock, block and quantisation shape closely enough that this decoder reuses
+H.263's picture buffer, colour conversion, coefficient dequantisation, zig-zag scan and inverse
+transform outright — the arithmetic was checked term for term against ITU-T Recommendation H.261
+(03/93) rather than assumed, and it is the same formula in both Recommendations, which is recorded in
+the doc comments of `H261BlockDecoder` alongside the clause numbers on both sides. Everything else is
+H.261's own, because everything else differs.
+
+Two picture sizes only, QCIF and CIF, chosen by one bit of PTYPE (clause 3.1) — no source-format field
+and no extended header. **No picture-level intra/inter flag at all**: every macroblock states its own
+prediction mode in MTYPE (Table 2), so one picture may freely mix intra- and inter-coded macroblocks,
+and only the very first picture of a stream is constrained, by having nothing yet to predict from.
+Motion vectors are **whole-pixel**, not half-pixel — clause 3.2.2 gives them integer components not
+exceeding ±15 — so there is no bilinear interpolation, and the chrominance vector is derived by
+truncating towards zero rather than H.263's Table 18 rounding. A macroblock's address is coded as the
+**difference from the last transmitted one** (clause 4.2.3.1), and a gap greater than one means the
+macroblocks in between carry no bits at all: not coded with a zero residual, simply never visited, which
+this decoder implements by seeding every predicted picture's canvas with a copy of the reference before
+a single macroblock of it is read, so an address nothing ever mentions comes out exactly as the
+reference left it. Table 5's coefficient coding is not H.263's single self-terminating table: an
+explicit end-of-block symbol exists and cannot be a block's first thing, so the first coefficient of a
+coded block and every one after it are read from two different tables.
+
+**The loop filter is part of prediction, not a post-decode step.** Clause 3.2.3's optional two-dimensional
+spatial filter — nominally 1/4, 1/2, 1/4 in each direction, degenerating to 0, 1, 0 at a block edge
+rather than reading past it, full precision kept between the horizontal and vertical passes and a
+fractional half rounded up — runs on the motion-compensated prediction *before* the residual is added
+to it, when a macroblock's MTYPE asks for it ("Inter + MC + FIL", which Table 2's own second note says
+may be requested with a zero vector). That is a different place in the pipeline from every other filter
+this package reads: H.263 baseline has none at all, and VP8's and VP9's both run on the finished,
+reconstructed picture after the residual, so what a later picture predicts from is the filtered result.
+Getting H.261's ordering backwards — add the residual, then filter — reads the wrong samples through
+the filter and desyncs from the encoder by an amount that compounds every predicted picture after it,
+which a single still frame cannot show; it is verified here by a hand-built stream whose filtered block
+is column-invariant, so the two-dimensional filter reduces to one dimension and every value can be
+worked out by hand, including the one column where clause 3.2.3's "round a fractional half up" rule is
+the only thing standing between two adjacent integers.
+
+**Measured against ffmpeg.** Two streams — a QCIF and a CIF clip, sixty frames each, one intra picture
+anchoring the whole chain (`-g 1000`, which the encoder itself clips to six hundred) — were decoded
+here and by ffmpeg and compared plane by plane, sample by sample, every frame. Against `-idct faani`,
+the QCIF stream differs in 518 samples of 2,280,960 and the CIF stream in 1,022 of 9,123,840, both
+capped at one level — 0.02% and 0.01% of the samples measured, the residual Annex A's accuracy bound
+exists to allow and not a disagreement about the bitstream. Against ffmpeg's default integer transform
+the difference is larger — up to four levels on a few hundred thousand samples a frame — which is the
+same size as the gap between ffmpeg's own two transforms on the same streams. Across the two corpora,
+1,883 and 1,642 macroblock addresses respectively are gaps the decoder never visits, matched exactly
+against ffmpeg's own reference handling, and thousands more are motion-compensated with and without a
+coded residual — real content that exercises the address-difference and skip machinery thoroughly.
+
+What real content does not reach: ffmpeg's own H.261 encoder was measured never to emit the loop
+filter, a quantiser change in the middle of a group, or the bit-stuffing codeword, so those three are
+verified instead by hand-built streams under `Tests/Hawkynt.FileFormats.Video.Tests/Codecs/H261`,
+worked out from the Recommendation's own arithmetic rather than recorded from a run.
+
+What is not implemented refuses and says so, naming the clause: the still image transmission of Annex
+D, which reassembles four ordinary pictures into one at four times the resolution and is signalled by a
+bit this decoder reads and rejects rather than silently ignoring; a picture size that changes mid-stream
+while a picture predicted from the old size is still held as the reference; and, as in every codec here,
+there is no `catch` anywhere that hands back a blank, a copied or a zero-filled picture.
 
 ## 📜 License
 
