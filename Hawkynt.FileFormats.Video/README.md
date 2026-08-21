@@ -85,6 +85,8 @@ who wants one frame of a two-hour recording pays for one frame.
 
 | Flash Screen Video (FSV1) | `FSV1` | Y | — |
 
+| Uncompressed 4:2:2 10-bit (v210) | `v210` | Y | — |
+
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
 is an undivided heap of bytes, and where each packet starts and stops is a computation over five
@@ -1466,6 +1468,32 @@ that does not decompress to exactly the byte count its position in the grid impl
 header states a different picture size or cell size than the one this decoder has already built its
 canvas against, since every unchanged block from that point on would be read against a canvas the new
 geometry does not describe.
+
+### v210
+
+Not a codec in the sense any other entry in this file is — a packing rule, and the whole of it fits
+in one paragraph. Ten-bit 4:2:2 YUV, three components a word: six luma samples and three chroma pairs
+sit in four little-endian 32-bit words, ten bits a component in bits 0-9, 10-19 and 20-29, the top two
+bits of every one left unused. A row is padded out to a whole 128 bytes — eight such groups, forty-eight
+luma samples — and a picture whose width is not a multiple of six still codes a whole group for its
+last few columns, with the samples that fall past the picture's own edge read and discarded rather
+than assumed absent.
+
+Verified on the planes and not on packed colour, because this is a lossless repacking of the ten-bit
+samples themselves and the planes are what that claim is about. Three geometries and 120 frames of
+ffmpeg's `testsrc2` — 22x18 and 98x60, both needing row padding, and 48x32, exactly eight groups and
+needing none — carried through v210 and decoded here, compared sample for sample against ffmpeg's own
+raw `yuv422p10le` output of the same content before it was packed: every sample of every plane of
+every frame is identical, because nothing in a fixed packing rule with no prediction and no entropy
+coding underneath it is capable of losing one.
+
+The packed colour a caller gets back is a display convention on top of that and not part of the
+claim above — ITU-R BT.601 with studio swing, ten bits reduced to eight by a plain shift of two, and
+each chroma pair repeated across the two luma columns it covers rather than interpolated between
+neighbours, the same choice this package's HuffYUV decoder made and for the same reason: it is what
+the reference decoder's own conversion does.
+
+What refuses: a picture with no pixels, and a packet shorter than its padded stride times its height.
 
 ## 📜 License
 
