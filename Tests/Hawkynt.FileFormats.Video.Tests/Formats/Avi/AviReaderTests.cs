@@ -175,9 +175,9 @@ public sealed class AviReaderTests {
     Assert.Throws<InvalidDataException>(() => _Frames(container));
   }
 
-  [TestCase("FMP4")]
-  [TestCase("DIVX")]
-  [TestCase("XVID")]
+  [TestCase("WMV3")]
+  [TestCase("AV01")]
+  [TestCase("VP90")]
   [TestCase("DIB ")]
   [Category("Unit")]
   public void UnsupportedCodec_IsRefusedWithItsFourCharacterCode(string fourCC) {
@@ -187,7 +187,7 @@ public sealed class AviReaderTests {
     Assert.That(failure!.Message, Does.Contain(fourCC));
   }
 
-  [TestCase("XVID")]
+  [TestCase("WMV3")]
   [Category("Unit")]
   public void UnsupportedCodec_StillDemuxes(string fourCC) {
     // The refusal is the codec's and not the container's. A file nothing here decodes still comes
