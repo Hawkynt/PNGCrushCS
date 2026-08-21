@@ -60,6 +60,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | FFV1 (RFC 9043) | `FFV1`, `V_FFV1` | Y | — |
 | MPEG-4 Part 2 (ISO/IEC 14496-2) | `mp4v`, `XVID`, `DIVX`, `DX50`, `FMP4`, `MP4S`, `M4S2`, `3IV2`, `FVFW`, `RMP4`, `V_MPEG4/ISO/*` | Y | — |
 | Apple ProRes (SMPTE RDD 36) | `apco`, `apcs`, `apcn`, `apch`, `ap4h`, `ap4x` | Y | — |
+| VC-1 / Windows Media Video 9, intra pictures | `WMV3`, `WMV9` | Y | — |
 
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
@@ -646,6 +647,40 @@ an undefined sample depth code, an interlaced frame — field-encoded or the ada
 of compression ID 1260 — 4:2:0 sampling, a macroblock coded in RGB mode, an alpha channel, a
 macroblock whose quantisation scale factor is zero, and any structure whose stated size does not fit
 inside the one containing it.
+
+### VC-1 / Windows Media Video 9
+
+Intra pictures of the Simple and Main profiles, which is the first rung of SMPTE 421M and where this
+stops. What it covers is the whole of clause 8.1: the picture layer, the predicted coded block
+pattern, the differentially coded DC with both of its tables, the three-dimensional run-level AC
+coding with all eight coding sets and all three escape modes, DC and AC prediction with the scan each
+implies, both quantisers, the integer inverse transform of Annex A, and overlap smoothing.
+
+The sequence header is not in the bitstream. Simple and Main profile state it as the thirty-two bit
+`STRUCT_C` of Annex J, which the container carries as the stream's private data — so a Windows Media
+Video stream cannot be decoded from its packets alone, and the demuxer's habit of handing that data
+across untouched is what makes it decodable at all. Four bits of it are reserved and the standard
+fixes all four, which is how thirty-two bits with no length, no signature and no checksum can be
+recognised as a sequence header rather than something else.
+
+Thirty-five intra pictures of seven files were decoded here and by ffmpeg and compared plane by
+plane: Simple and Main profile, picture quantisers from 3 to 13, both the uniform and the nonuniform
+quantiser, overlap smoothing on and off, both DC tables, and all four intra and all four inter coding
+sets. **Every sample of every plane is identical** — 16.1 million samples, none differing anywhere.
+Each picture also consumes its packet to within a byte, which is the cheapest evidence there is that
+the bitstream was read the way it was written.
+
+What refuses, by name: predicted, bidirectional and skipped pictures, each as what it is, because
+every one of them needs motion compensation against a reference this builds no part of; the Advanced
+profile, under its own code, since it carries a sequence header and entry point inside a byte stream
+and shares only its block layer; and multi-resolution coding, range reduction and the in-loop
+deblocking filter, where the sequence header signals them.
+
+One note on the source. The freely circulating committee draft of SMPTE 421M prints its three intra
+scan tables twenty-four columns wide on a page that fits twenty-three, so two cells of each fall past
+the margin and are absent from the document. Each scan is a permutation of 0 to 63, so which two
+values are missing is not in doubt; which position each belongs in follows from the scan's own
+geometry, and all three scans are exercised by the frames measured above.
 
 ## 📜 License
 
