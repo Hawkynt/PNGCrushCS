@@ -28,9 +28,10 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 
 The 23 are the codec table in `README.md`. Every one was cross-checked frame by frame against
 ffmpeg's decode of the same bitstream before it was merged, and the measurements are in each one's
-section of that file. Eight reach exact equality on every sample: Microsoft RLE, Microsoft Video 1,
-Cinepak, QuickTime Animation, HuffYUV, FFVHUFF, FFV1 and ZMBV. Theora reaches it too, over 1,717 frames
-across all three of its pixel formats.
+section of that file. The ones that reach exact equality on every sample of every frame are
+Microsoft RLE, Microsoft Video 1, Cinepak, QuickTime Animation, Apple Video, FLIC, HuffYUV, FFVHUFF,
+FFV1, ZMBV and Ut Video — the last over 883 frames in all six of its colour spaces. Theora and VP3
+reach it too, Theora over 1,717 frames across all three of its pixel formats and VP3 over 3,182.
 
 The 4 are Indeo 3, Indeo 4, Indeo 5 and TrueMotion 1, and the argument that settles them is in
 `undecodable-codecs.md`: their frames are too small to carry the tables they need — 340 bytes for a
@@ -65,9 +66,10 @@ wall with no published specification at all.
 **Sorenson** — `svq1`, `svq3`. No published specification.
 
 **Lossless RGB and YUV** — around 30 names including `012v`, `aasc`, `cllc`, `cyuv`, `dxtory`,
-`loco`, `m101`, `mszh`, `r10k`, `r210`, `sheervideo`, `v210`, `vble`, `y41p`, `ylc`, `zerocodec`,
-`zlib`. Individually small, and the standard for each is absolute: max delta 0 or it is wrong. This
-is the densest source of verifiable wins in the list.
+`loco`, `m101`, `magicyuv`, `mszh`, `r10k`, `r210`, `sheervideo`, `v210`, `vble`, `y41p`, `ylc`,
+`zerocodec`, `zlib`, and `lagarith`, which is arithmetic coding over the same kind of prediction. Ut
+Video came out of this group and reached exact equality, which is the standard for every one of them:
+max delta 0 or it is wrong. This is the densest source of verifiable wins in the list.
 
 **Screen capture** — `flashsv`, `flashsv2`, `g2m`, `mscc`, `mwsc`, `rasc`, `rscc`, `screenpresso`,
 `tdsc`, `tscc2`, `vmnc`, `wcmv`, `scpr`. Mostly DEFLATE over a framebuffer with a delta scheme on

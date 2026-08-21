@@ -73,6 +73,8 @@ who wants one frame of a two-hour recording pays for one frame.
 
 | Zip Motion Blocks Video (ZMBV) | `ZMBV` | Y | — |
 
+| Ut Video | `ULRG`, `ULRA`, `ULY0`, `ULY2`, `ULY4`, `ULH0`, `ULH2`, `ULH4` | Y | — |
+
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
 is an undivided heap of bytes, and where each packet starts and stops is a computation over five
@@ -917,6 +919,65 @@ one of which consumed exactly the bits it should, exercising all three escape fo
 
 What refuses, by name: version 1 and version 3, which are different bitstreams sharing this one's
 name.
+
+### Ut Video
+
+Lossless and intra only, and the capture codec of the three here that is still in active use. A
+sample is predicted from its neighbours, the difference is Huffman coded with one table a plane, and
+the plane is cut into horizontal bands that share the table but nothing else — which is what lets a
+decoder with four cores use them, and is the reason the codec exists.
+
+Six colour spaces in eight codes. `ULRG` and `ULRA` are full-range colour, with and without
+transparency; the digit in `ULY0`, `ULY2` and `ULY4` is the chroma subsampling and `ULH0`, `ULH2` and
+`ULH4` are the same bits against BT.709's primaries rather than BT.601's. All four prediction methods
+are read: none, left, the gradient, and the median of the two and the plane through them.
+
+**Almost none of the coding is written down.** The author publishes the codes and their colour
+spaces; the community write-up adds the sixteen bytes of stream description, the order of a plane's
+parts, that a slice starts at `height * index / slices`, and that codes run from the longest length
+down. Everything else was established here by measurement, and each piece is recorded in the code
+beside what reading it the other way does to a picture:
+
+  - **The bits are in little-endian words**, as HuffYUV's are, so every four bytes of a slice have to
+    be turned round. Read in file order a plane decodes for a dozen samples and then wanders.
+  - **Within one code length the symbols run from the highest down.** Ascending order — what every
+    other Huffman format here uses — decodes a plane's short codes correctly and every long one
+    wrongly.
+  - **Prediction starts a slice at 128, not nought.** It is a running sum, so the starting value never
+    leaves it: nought is wrong by exactly that on every sample of every plane.
+  - **The median runs on past the end of a row** — the sample left of column zero is the last sample
+    of the row above. The gradient does not: it starts every row from the sample above it. The two
+    differ nowhere else, and the median's rule usually chooses the sample above anyway, so reading it
+    the simple way gets four rows of a forty-eight-row frame wrong and the rest right.
+  - **Blue and red are carried as their distance from green plus 128.** The write-up mentions the
+    difference and not the 128; without it both planes are out by exactly that, which is a picture
+    with its blues and reds inverted rather than one that looks broken. The same write-up gives the
+    plane order as green, red, blue, where every file measured here has blue second and red third.
+  - **A 4:2:0 frame is cut on whole chrominance rows.** Dividing each plane on its own height instead
+    agrees on every frame whose boundaries already land on even rows, and puts the two planes on
+    different bands of picture as soon as the slice count does not divide the height.
+  - **A plane in which one symbol occurs gives it a length of nought and carries no bits at all.** A
+    flat alpha channel produces one on every frame.
+
+163 streams and 883 frames were decoded here and by ffmpeg and compared **plane by plane against
+ffmpeg's own planes** — no colour conversion in the comparison, so the chroma siting of the
+subsampled formats cannot hide anything — and every sample of every plane of every frame is
+identical. That covers every pixel format ffmpeg's encoder writes, both colour-space spellings, slice
+counts of one, two, three, four, five and eight, and sizes from 16x16 to 320x240 including several
+where the slice count does not divide the height.
+
+ffmpeg's encoder will not write the gradient predictor, so 36 of those streams were coded here and
+handed to ffmpeg's decoder instead, which reproduces the picture that went in exactly. That is the
+only way that predictor could be measured against anything, and it also puts the rest of the reading
+— the code assignment, the word order, the slice division, the decorrelation — under ffmpeg's
+judgement rather than this decoder's own.
+
+What refuses, by name: the ten-bit Pro codes and the T2 codes, both different bitstreams sharing the
+name and neither published; a frame coded with finite state entropy coding rather than Huffman, which
+is the mode version 23 of the codec added and which the stream description flags; an interlaced
+stream, since nothing states what the flag does to a frame's rows and no encoder reachable here
+writes one to measure against; a code-length table that does not describe a complete code; and a
+frame whose parts do not add up to its length.
 
 One note on the source, because it is why this job is shaped the way it is. Microsoft published no
 specification for any of the three. The Open Specifications programme documents Microsoft's protocols
