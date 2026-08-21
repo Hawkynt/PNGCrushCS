@@ -43,6 +43,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | Ogg (Theora, Vorbis, Opus, FLAC) | `.ogg`, `.ogv`, `.oga`, `.ogx`, `.opus`, `.spx` | Y | — |
 | RealMedia (RealVideo, RealAudio) | `.rm`, `.rmvb`, `.ra`, `.rmj`, `.rms` | Y | — |
 | Autodesk FLIC | `.fli`, `.flc`, `.flx` | Y | — |
+| id RoQ | `.roq` | Y | — |
 
 | Codec | Tag | Decode | Encode |
 | --- | --- | --- | --- |
@@ -95,6 +96,8 @@ who wants one frame of a two-hour recording pays for one frame.
 | Uncompressed 4:1:1 (y41p) | `Y41P` | Y | — |
 
 | Cirrus Logic AccuPak (CLJR) | `CLJR` | Y | — |
+
+| id RoQ | `RoQV` (synthetic — the format states no codec tag of its own) | Y | — |
 
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
@@ -1681,6 +1684,76 @@ D, which reassembles four ordinary pictures into one at four times the resolutio
 bit this decoder reads and rejects rather than silently ignoring; a picture size that changes mid-stream
 while a picture predicted from the old size is still held as the reference; and, as in every codec here,
 there is no `catch` anywhere that hands back a blank, a copied or a zero-filled picture.
+
+### id RoQ
+
+The FMV format Graeme Devine wrote for The 11th Hour, carried into Quake III and Return to Castle
+Wolfenstein's engine and named, according to Devine's own development diary, after his newborn
+daughter Roqee. Like FLIC it is a container with nothing beneath it: a file is a flat run of
+self-delimiting chunks — id, a length that is the chunk's own payload, an argument, and the payload —
+and `RoqContainer` answers only where each chunk begins and ends and which of picture, sound or
+housekeeping it is; `RoqVideoDecoder` is the only thing here that reads a codebook entry or a motion
+byte. A picture is not one chunk the way a Cinepak frame is: `RoQ_INFO` states the picture size once,
+wherever in the file it happens to sit rather than at a fixed offset, and only `RoQ_QUAD_VQ` ever
+produces one.
+
+The coding is vector quantisation with motion compensation over a quadtree: a picture is 16-pixel
+macroblocks, each four 8x8 quadrants, each either skipped, motion-compensated from the picture before,
+painted from one 4x4 codebook cell doubled to fill it, or subdivided into four 4x4 blocks that repeat
+the same choice one level down — where a 4x4 cell is now used at its own size rather than doubled, and
+subdividing again is the walk's one terminal case, four raw 2x2 cell indices with no code of their own.
+A codebook chunk restates both tables outright whenever either changes; long runs of frames between
+restatements carry none at all.
+
+Two things about it are not written down anywhere published and were recovered by measurement.
+
+**Skipping reaches back two pictures, not one.** Every description of RoQ agrees a skipped block costs
+no argument byte and "leaves the block unchanged" — both true, and neither says unchanged *from what*.
+Reading it as "the picture immediately before" reproduces two real files' first two pictures exactly
+and then drifts, worse wherever a chunk states a nonzero mean motion vector, healing only when a later
+picture happens to recode the same area from a fresh codebook cell. Bisecting one wrong block against
+ffmpeg's own decode of the picture before it — the technique that settles a token tree gone one bit
+sideways — found the true source of those sixteen samples sitting two pictures back, not one: a RoQ
+encoder keeps two picture buffers and alternates which one it is currently building, and a skipped block
+is a block the encoder wrote nothing for, so the decoder has to write nothing for it either and let the
+buffer's own two-pictures-stale content show through. Motion compensation and every codebook paint
+write into the buffer being built and read the *other* one, the most recently completed picture — the
+ordinary reference every other block type here uses; skipping is the one code that reaches further back
+because it is the one code that writes nothing at all. The first picture has no second buffer to have
+been building into two pictures ago, so its result is copied into both buffer slots once it is painted,
+the same way a freshly built decoder's canvas is already what a skip opcode states for the block-vector
+codecs elsewhere in this package.
+
+**Chroma ends up at full resolution, not the half its codebook cells state.** A 2x2 codebook cell holds
+one Cb and one Cr for its whole area — 4:2:0 on paper — but motion compensation moves whatever a block
+already holds, chroma included, at the same pixel precision as luma, and a picture a few frames past its
+last codebook repaint routinely has chroma that lines up with no 2x2 grid at all. This is not a rounding
+approximation on this decoder's part; it is what the format's own history of blocks moving at whole-pixel
+precision leaves the picture holding, and it is confirmed independently by ffmpeg's own decoder, whose
+native output for RoQ is `yuvj444p` — full-resolution chroma throughout — and not `yuvj420p`.
+
+**Measured.** Three files from `samples.ffmpeg.org/game-formats/idroq/` — 512x256 to 512x512, 210 to
+802 pictures, 1,338 in all, one of them (`jk02.roq`, from Jedi Knight II) shipped with the sample's own
+accompanying note naming motion compensation with a nonzero mean vector as "the last problem in the
+native roq decoder" for chrominance addressing — were decoded here and by ffmpeg and compared sample
+for sample against ffmpeg's own `yuvj444p` output, plane by plane rather than through any RGB
+conversion: **every plane of every picture in all three files is identical**, ffmpeg's decode included
+on the file whose own author flags it as exercising the addressing bug. RGB output is verified too, and
+almost everywhere agrees exactly — the exceptions, a few dozen pixels across two of the three files,
+were run down to ffmpeg's own `swscale` disagreeing with a plain reading of its own decoded planes
+rather than with anything this decoder reconstructed, by reproducing the identical handful of pixels at
+the identical positions with no decoder of ours involved at all. This is genuinely lossless-at-decode
+territory — the quantisation is the encoder's, and a decoder reading the same bitstream has nothing
+left to round — so exact agreement on the planes is the only acceptable result, not a residual within
+some accuracy bound the way a DCT-based codec's is.
+
+What is not implemented refuses and says so: `RoQ_JPEG`, the 11th Hour and Clandestiny superset of the
+format where a keyframe may be a plain JFIF file in place of a quadtree-coded one — no sample this was
+measured against carries one; a picture size that is not a whole number of 16-pixel macroblocks, and
+one that changes part way through a stream; a codebook cell named before any codebook chunk has stated
+one; and a motion vector reaching outside the picture, which nothing measured this against exercises.
+Sound (`RoQ_SOUND_MONO`, `RoQ_SOUND_STEREO`) is demuxed onto its own stream, DPCM-coded and unread past
+that — decoding it is future work.
 
 ## 📜 License
 
