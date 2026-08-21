@@ -53,6 +53,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | Sorenson Spark (Flash Video's H.263) | `FLV1` | Y | — |
 | H.264 / AVC, Baseline I and P slices | `avc1`, `avc3`, `H264`, `X264`, `DAVC`, `VSSH`, `V_MPEG4/ISO/AVC` | Y | — |
 | VP8 (RFC 6386) | `VP80`, `vp08`, `V_VP8` | Y | — |
+| HuffYUV / FFVHUFF | `HFYU`, `FFVH` | Y | — |
 
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
@@ -361,6 +362,38 @@ What is not implemented refuses by name and cites the clause: CABAC, B slices, S
 8x8 transform and scaling matrices, 4:2:2, 4:4:4 and monochrome, sample depths above eight, field
 pictures and MBAFF, flexible macroblock ordering, weighted prediction, long-term references, slice
 data partitioning, redundant coded pictures, and the scalable and multiview extensions.
+
+### HuffYUV and FFVHUFF
+
+Lossless and intra only: no transform, no quantiser. A sample is predicted from its neighbours — from
+the left, by gradient, or by the median of the two and the plane through them — and the difference is
+Huffman coded with one table a plane.
+
+Two things about it are easy to get wrong and both are load-bearing. **The bits are in little-endian
+words**, so every four bytes of a frame have to be turned round before any of it decodes; the raw
+first pixel arriving as alpha, red, green, blue is that swap showing through. And **the Huffman codes
+are handed out from the longest length down**, not the shortest up, so the canonical assignment a
+reader reaches for first decodes nothing.
+
+Three header forms, and which one a file uses is not its four-character code — `HFYU` and `FFVH` both
+write all three. One states a bitstream depth and codes 4:2:2 groups along each row, or colour a
+pixel at a time bottom row first; one states a sample depth with the chroma subsampling packed into
+its low nibble and codes each plane through to its end; the third is the original codec, which states
+nothing at all and is refused rather than guessed at.
+
+Eighty streams were decoded here and by ffmpeg: every pixel format its two encoders will write, each
+with all three predictors, progressive and interlaced, with the tables in the stream description and
+in every frame, at sizes from 2x2 to 352x576. The formats that need no colour conversion — `gray`,
+`gbrp`, `gbrap`, `rgb24`, `bgra` — are compared against ffmpeg's frames directly and every frame is
+identical. The luminance-and-chrominance formats are compared plane by plane against ffmpeg's decoded
+planes, and every sample of every plane is identical: 362 frames in all, none differing anywhere.
+
+What refuses: the original codec; samples deeper than eight bits; a description that states neither
+interlaced nor progressive and expects the height to be guessed from; a prediction method that is
+none of the three; a Huffman table whose lengths do not describe a complete code; and interlaced
+4:2:0 with median prediction, whose row order could not be established against any file — reading it
+as the nearest arrangement that is known reproduces five rows and then diverges, which is the one
+answer a decoder must not give.
 
 ## 📜 License
 
