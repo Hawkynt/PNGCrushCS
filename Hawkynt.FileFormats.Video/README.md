@@ -46,6 +46,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | MPEG-2 video (ISO/IEC 13818-2) | `MPG2`, `MPEG`, `mp2v`, `m2v1`, `hdv1`–`hdv3`, `V_MPEG2` | Y | — |
 | Microsoft RLE | `MRLE`, `mrle`, `BI_RLE8` (1), `BI_RLE4` (2) | Y | — |
 | Microsoft Video 1 | `CRAM`, `MSVC`, `WHAM` | Y | — |
+| Cinepak | `cvid`, `CVID` | Y | — |
 
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
@@ -199,6 +200,38 @@ the packet holds. A skip run of *no* blocks is refused too, and for a different 
 format describes it the run is a no-op, where ffmpeg abandons the rest of the frame at one. Both
 readings produce a picture, they differ across everything after the run, and nothing in the file says
 which was meant.
+### Cinepak
+
+Vector quantisation with two codebooks per strip. A codebook entry is four luminance samples and one
+chrominance pair — a 4x4 block at 12 bits a pixel — and a block is coded either as one entry, whose
+four samples are each stretched over a 2x2 square, or as four, one per quadrant. One byte a block or
+four, and everything else is in the codebooks. Both codebook depths are read, the 12-bit one and the
+8-bit grey one.
+
+The inter-frame coding is in two places at once, which is what makes the format small: a vector list
+may say a block is unchanged and code nothing for it, and a codebook chunk may restate a handful of
+entries and leave the other two hundred. So both the picture and the codebooks carry over between
+frames, and a strip that states nothing is not a strip of nothing.
+
+Fifteen streams were compared with ffmpeg frame by frame — 4x4 up to 640x480, a hundred frames of
+zooming fractal, noise, greyscale, one strip forced and eight, in AVI and in QuickTime — and every
+one of 303 frames is identical, sample for sample. Nothing drifts because nothing differs.
+
+Two things measurement decided rather than the documentation. The chrominance bytes are **signed**
+and not biased by 128, which the technical note has the other way round; a stream whose codebook
+sweeps every value of each byte gives 5120 samples of what the answer must be, and the signed reading
+reproduces all 5120 where the biased one reproduces none. And the halving in the green row truncates
+toward zero rather than shifting right, which is a different number for a negative odd difference and
+wrong in 319 of those same samples.
+
+Every strip after the first states a top of zero and a bottom that is really its height, so it is
+placed under the one before it. Read literally, a three-strip frame draws all three strips across the
+top third of the picture — a picture rather than an error, and so one that would never be noticed.
+
+What is not implemented refuses and says so: a strip identifier that is neither intra nor inter, a
+chunk type the format does not define, a strip reaching outside its frame or not made of whole
+blocks, a picture size that changes part way through a stream, a vector list stopping before every
+block is accounted for, and any chunk shorter than it says it is.
 
 ## 📜 License
 
