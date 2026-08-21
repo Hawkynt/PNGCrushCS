@@ -1,16 +1,13 @@
 # Codecs investigated and not implemented
 
-Twenty-four codecs were investigated and none was implemented. That is a result rather than a gap, and
+Twenty-seven codecs were investigated and none was implemented. That is a result rather than a gap, and
 it is written down here so the work is not repeated by somebody who assumes it was never attempted.
-
-Sixteen codecs were investigated and none was implemented. That is a result rather than a gap, and it is
-written down here so the work is not repeated by somebody who assumes it was never attempted.
 
 They stop in four different places, and the four are worth keeping apart. Five need constant tables
 that are not in the file, and WMV1 and WMV2 join them on the same evidence, tied to MS-MPEG4v3's own
-already-missing tables by shared escape constants rather than by file size. VP6 and VP5 stop somewhere
-else entirely: VP6's tables **are** published, every one of them was transcribed and checked, and the
-decode still does not come out. Lagarith stops at a third place again — its wrapper comes out
+already-missing tables by shared escape constants rather than by file size. VP6 and VP5 stop
+somewhere else entirely: VP6's tables **are** published, every one of them was transcribed and
+checked, and the decode still does not come out. Lagarith stops at a third place again — its wrapper comes out
 completely, and the entropy coder inside it is defined by the rounding behaviour of one implementation's
 floating-point unit rather than by anything written down. DV stops at a fourth: its own frame layer is
 recovered and measured directly against real files, but its two central tables — the entropy code and
@@ -27,8 +24,12 @@ two independent sources name their own method rather than paraphrasing somebody 
 this project went further than reading them, obtaining and running On2's own `vp4vfw.dll` directly and
 verifying an independent bit-level parser against it frame by frame — and it still stops at exactly the
 one family of tables neither source prints, the motion-vector Huffman codes, which the codec's own
-binary stores as branches rather than as data reachable by inspection. Where each stops is recorded
-below.
+binary stores as branches rather than as data reachable by inspection. VP7 is the cleanest case of the
+first place this project has found: not a secondary source or a reverse-engineer's notes but On2's own
+"VP7 Data Format and Decoder," predating ffmpeg's own VP7 decoder by nine years, naming its own
+reference decoder's two source files — `quant_common.c` and `findnearmv.c` — at the exact two points,
+the dequantisation tables and the interframe motion-vector census, where it declines to print what
+those files hold. Where each stops is recorded below.
 
 The nine screen-capture codecs below — MSCC, RSCC, WCMV, MWSC, RASC, Go2Meeting, ScreenPressor,
 Screenpresso and TSCC2 — sort into the same places rather than needing a new one. Six of the nine
@@ -43,9 +44,7 @@ author too. RSCC alone reaches Escape 124 and SpeedHQ's place — a real sample 
 packet framing fully recovered and verified against it, and a delta-record scheme whose destination
 coordinates are pinned down and whose remaining fields resist every reading tried.
 
-None of the twenty-four had anything committed.
-
-None of the sixteen had anything committed.
+None of the twenty-seven had anything committed.
 
 Indeo 3 (`IV32`), Indeo 4 (`IV41`), Indeo 5 (`IV50`), TrueMotion 1 (`DUCK`) and TrueMotion 2 (`TM20`)
 are the proprietary codecs of the multimedia era. None has a published specification. No encoder for
@@ -1606,6 +1605,105 @@ something to redo. Failing either, the same two things would help on the header:
 the key frame's fifty unpublished bits, or a demonstration that a fixed-width skip past them is safe to
 assume, checked the way this project checks anything else — against the oracle, over real files, not
 by inspection alone.
+
+# VP7, where the document names the two files it will not print
+
+VP7 (`VP70`, `VP71`, `VP72`) is VP8's immediate ancestor, and On2 published its own specification for
+it — "VP7 Data Format and Decoder," document version 1.5 of March 28, 2005, mirrored at
+`multimedia.cx/mirror/VP7_Data_Format_and_Decoder_Overview.pdf` — nine years before ffmpeg's own VP7
+decoder existed (the patch is dated February 2014), so the direction of dependence is the right way
+round. It is a complete document in the way VP6's is: sixty-five pages, a full worked description of
+the boolean coder, the frame header, every intra prediction mode, the coefficient tree, and VP7's own
+4x4 DCT — not VP8's Walsh-Hadamard-and-butterfly pair, but a real DCT-II, given as a complete,
+unambiguous C fragment. Samples came from `samples.ffmpeg.org/V-codecs/VP7/`, an AVI wrapper (fourcc
+`VP70`) around each; ffmpeg decodes them, so it remains a usable oracle.
+
+## What was verified
+
+Everything the document prints was checked against ffmpeg's decode of two of those files —
+`potter-40.vp7` and `potter-700.vp7`, the same footage (an MPAA ratings-board leader) at two
+bitrates and two different quantiser indices, 320x176 and 624x352. The boolean coder is VP8's own,
+formula for formula (`split = 1 + (((range-1)*prob)>>8)`), which this project already has and reused
+rather than re-deriving. A striking number of the document's other tables and small arrays turn out to
+be VP8's own too, printed as the same numbers rather than merely the same shape: the key frame subblock
+mode probabilities (nine hundred entries, matching RFC 6386's from the first row on), the default token
+probability table's printed portion, the coefficient bands, the default scan order, the six-tap
+sub-pixel filter, the small-motion-vector tree, the category extra-bit probabilities, and several of
+the default mode probability arrays. Two of the document's own small tables are left as `{ ??, ??, ?? }`
+and `{ ?? }` in both the rendered PDF and its text layer — key frame chroma mode defaults and the
+interframe subblock mode defaults — and VP8's RFC 6386 values were used in their place on the same
+evidence.
+
+The frame tag, the boolean-coded picture dimensions, the four macroblock "feature" records (VP7's
+replacement for VP8's segmentation), and the five optional quantiser-index overrides were all checked
+bit for bit by an independent, from-scratch decoder written in Python against the same two files'
+headers, and agree with this project's own C# decoder exactly — width, height, every feature disabled,
+base quantiser index 17 for the 320x176 file and 8 for the 624x352 one, every one of the five optional
+indices defaulting to the base as their flags said. Intra prediction's formulas were compared against
+VP8's (RFC 6386, 12) by hand rather than against real pixels — the quantiser gap below means no
+macroblock with any AC coefficient in it can be checked against the oracle yet — and they match exactly
+except for one confirmed, isolated difference: VP7 substitutes the single value 128 for a sample outside
+the picture on every side, where VP8 uses 127 above and 129 to the left. VP7's own 4x4 DCT-II was
+implemented from the document's complete C fragment and checked by hand against its own arithmetic: for
+a DC-only 4x4 block the two-pass, fixed-point computation this project wrote reproduces, digit for digit,
+the values a plain evaluation of the document's own formula gives, and that same DC-only case is the one
+place the transform's output was also checked against a real file — see below.
+
+## Where it stops, precisely
+
+At the dequantisation factors — chapter 14 names the file they come from, `quant_common.c`, and prints
+none of them.
+
+The evidence is a single macroblock: the top-left 16x16 of frame 0 in both files is a flat area of the
+ratings-board card, decoding to a perfectly uniform block in both this project's output and ffmpeg's,
+which confirms on its own that no AC coefficient survives anywhere in it — the discrepancy is a pure DC
+scale. In the 320x176 file (quantiser index 17) this project decodes that block to 98; ffmpeg decodes it
+to 93. In the 624x352 file (quantiser index 8) this project decodes it to a different but equally flat
+wrong value; ffmpeg again gives 93. Since the DC path for a macroblock with no Y2 residue elsewhere in
+it runs the token's dequantised value through the document's own two-pass transform twice — once to
+invert the "second order" Y2 block, once more for the luma subblock the result is scattered into — the
+exact dequantisation factor needed to land on 93 can be computed by inverting that arithmetic, which is
+itself fully specified and already checked. It is 44 at index 17 and 23 at index 8. VP8's RFC 6386
+dequantisation tables, doubled the way VP8's own Y2 DC factor is derived from its DC lookup, give 38 and
+22 — close enough to look plausible and wrong both times, and not by any single additive or
+multiplicative adjustment that fits both indices at once. Chapter 16.3 is the same shape of gap for a
+second, independent reason: the probability table that picks a macroblock's motion vector reference is
+"calculated, using already-decoded motion vectors in (up to) 12 nearby blocks, by a fairly elaborate
+process best described by the reference implementation itself (the function `FindNearMVs` in the file
+`findnearmv.c`)" — named and left undescribed, the same way `quant_common.c` is, and its own
+`ModeContexts` probability table has thirty-one rows where VP8's equivalent has six, which is further
+evidence the two algorithms are not the same one at a different scale.
+
+Neither file is available from a source this project will read. VP7 was never open-sourced the way VP8
+was — On2's reference decoder was licensed, not published — and the only place either constant lives
+today is ffmpeg's own `vp7.c` and `vp8data.h`, written from that unavailable reference nine years after
+On2's own document was current. A web search for the quantiser tables surfaced only the *names* ffmpeg
+gives them — `vp7_ydc_qlookup`, `vp7_yac_qlookup`, `vp7_y2dc_qlookup` and `vp7_y2ac_qlookup`, distinct
+from and not simply derived from VP8's own `vp8_dc_qlookup` and `vp8_ac_qlookup` — which is itself
+useful confirmation that VP7 carries its own tables and not VP8's borrowed forward, but the numbers
+inside those tables were not looked at, on the same rule that held a PR for quoting ffmpeg comments
+verbatim: reading the file to extract a constant is reading the file.
+
+## What is already solved, if this is picked up again
+
+The boolean coder, the frame tag and boolean-coded dimensions, the macroblock-feature header layout and
+its per-macroblock encoding, and the quantiser index parsing are all checked bit for bit against real
+files by two independent decoders and need no revisiting. VP7's own 4x4 DCT-II is checked by hand against
+its own specified arithmetic and against the one real-file case its output could be isolated in. Intra
+prediction's eleven modes are checked against VP8's RFC 6386 formulas by direct comparison, not yet
+against real pixels — nothing but a DC-only macroblock can be checked until the quantiser is right, so
+that comparison, and everything to do with interframe decoding (which needs the motion-vector census to
+reach any macroblock at all), is exactly what a correct quantiser would unlock next rather than something
+already closed. What would unblock this is a description of `quant_common.c`'s four (or six) constant
+tables and of `FindNearMVs`'s twelve-block census from a source that states, or can be shown, not to be a
+restatement of ffmpeg's or any other implementation — the same standard 8BPS's document cleared and
+MSS1's, SpeedHQ's and TSCC2's did not.
+
+## What would change the answer
+
+An independent publication of VP7's quantisation tables and of the `FindNearMVs` algorithm, sourced the
+way the rest of the document already is: from On2 itself, or from a description that predates and does
+not derive from ffmpeg's reverse-engineered decoder.
 
 # Sorenson Video 1 (SVQ1), where the codebook is the whole codec and nobody has printed it
 

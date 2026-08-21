@@ -23,8 +23,8 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 | | Count | Share |
 | --- | --- | --- |
 | Decoded and verified against ffmpeg | 50 | 24% |
-| Established as not implementable from files alone | 27 | 13% |
-| Not yet attempted | 134 | 63% |
+| Established as not implementable from files alone | 28 | 13% |
+| Not yet attempted | 133 | 63% |
 
 The 50 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
@@ -56,10 +56,11 @@ the stronger oracle of the two, being the ground truth itself. LCL ZLIB is measu
 addition to the usual one, since it too has a real encoder here: round-tripped through it as well as
 checked against seven real recordings.
 
-The 27 are Indeo 3, Indeo 4, Indeo 5, TrueMotion 1, WMV1, WMV2, MSS1, MSS2, Canopus HQ/HQA
-(`hq_hqa`), Canopus HQX, Lagarith, DV, MSZH, Escape 124, SpeedHQ, VP4, MSCC, RSCC, WCMV, MWSC,
-RASC, Go2Meeting (`g2m`), ScreenPressor (`scpr`), Screenpresso, TSCC2, Sorenson Video 1 (`svq1`) and
-Sorenson Video 3 (`svq3`), and the arguments that settle them are in `undecodable-codecs.md`. The first four have frames too small to
+The 28 are Indeo 3, Indeo 4, Indeo 5, TrueMotion 1, WMV1, WMV2, MSS1, MSS2, Canopus HQ/HQA
+(`hq_hqa`), Canopus HQX, Lagarith, DV, MSZH, Escape 124, SpeedHQ, VP4, VP7, MSCC, RSCC, WCMV,
+MWSC, RASC, Go2Meeting (`g2m`), ScreenPressor (`scpr`), Screenpresso, TSCC2, Sorenson Video 1
+(`svq1`) and Sorenson Video 3 (`svq3`), and the arguments that settle them are in
+`undecodable-codecs.md`. The first four have frames too small to
 carry the tables they need —
 340 bytes for a 320x240 Indeo 3 picture, 14 for Indeo 4, 2 for Indeo 5, 0 for TrueMotion 1 — so those
 tables live in the codec binary and cannot be recovered by reading files. WMV1 and WMV2 both have real ffmpeg
@@ -111,10 +112,30 @@ parses with no desync all the way to the motion-vector section. What is left is 
 tables: the per-component, magnitude-bucket motion-vector Huffman codes, printed nowhere and stored in
 the binary as branches rather than as a table a file could be searched for.
 
+VP7 stops close to VP4, but for the opposite reason: its document is not silent, it is precise about
+what it will not say. On2's own "VP7 Data Format and Decoder" predates ffmpeg's decoder by nine years
+and gives everything else in full — the boolean coder, the frame header, macroblock features, intra
+prediction, and VP7's own 4x4 DCT-II, several tables printed identical to VP8's RFC 6386 ones — but
+names `quant_common.c` and `findnearmv.c` by filename at the exact two points, the dequantisation
+tables and the interframe motion-vector census, where it declines to print what those files hold. A
+flat first macroblock of a real key frame, at two different quantiser indices in two different real
+files, needs a DC dequantisation factor no adjustment of VP8's own published tables produces, which is
+the gap made concrete: not a missing description, a named and inaccessible one.
+
+SVQ1 stops a fifth way, and it is the cleanest of the group: it does not even need a small frame to make
+the case, because its codebook is not carried per-stream at all. The one detailed technical document on
+the format — Melanson and Snel's `svq1-format.txt`, which MultimediaWiki's own SVQ1 page states it is
+based on — explains the algorithm's shape in full and prints not one codebook or VLC entry, citing
+FFmpeg's own `svq1_cb.h`, `svq1_vlc.h` and `svq1.c` in its own words as where those tables actually are.
+Its other source, a genuinely independent Utah State University patent on the underlying technology,
+states that such tables exist and how large they are without printing one either. The codebook is
+"hardwired" into the coding scheme, the document's own word for it, identical in every file — there is
+no frame, however large, that was ever going to carry it.
+
 RASC, Go2Meeting (`g2m`), ScreenPressor (`scpr`), Screenpresso, TSCC2, Sorenson Video 1 (`svq1`) and
 Sorenson Video 3 (`svq3`), and
 
-All twenty-six are finished investigations with negative answers, not gaps waiting to be filled.
+All twenty-eight are finished investigations with negative answers, not gaps waiting to be filled.
 
 ## What is left, by family
 
@@ -148,17 +169,24 @@ spelling mistake, and MSS2 additionally embeds Windows Media Video 9 rectangles 
 structure that coder would decode. What is left of this family is `msmpeg4v1`, `msmpeg4` (version 3),
 `msp2`, `msa1` and `mts2`.
 
-**On2 and RealVideo** — `vp4`, `vp5`, `vp6`, `vp7`, `rv30`, `rv40`, `rv60`. VP4 and VP6 are the two
-already investigated, and neither is implemented, for two different reasons. VP6's specification is
-public and every table in it was transcribed and checked back against the document, but the coefficient
-decode still diverges eight binary decisions into the first block of the first key frame. VP4 shares
-almost all of its structure with VP3 — which this package decodes exact over 3,182 frames — and its two
-independent published sources, plus this project's own verified parse against the real bitstream and
-against On2's own `vp4vfw.dll` run directly, confirm all of it except one family of tables: the
-motion-vector Huffman codes, printed nowhere and stored in the codec's own binary as branches rather
-than as a table a file could be searched for. How far each got, and everything ruled out, are in
-`undecodable-codecs.md`, so neither search need be repeated from the start. VP5 is behind VP6's same
-wall with no published specification at all.
+**On2 and RealVideo** — `vp4`, `vp5`, `vp6`, `vp7`, `rv30`, `rv40`, `rv60`. VP3 shares almost all of
+its structure with Theora, which is done and exact, so it is the cheapest of these by a wide margin.
+VP4, VP6 and VP7 are the three already investigated, and none is implemented, for three different
+reasons. VP4 shares almost all of its structure with VP3 too, and its two independent published
+sources, plus this project's own verified parse against the real bitstream and against On2's own
+`vp4vfw.dll` run directly, confirm all of it except one family of tables: the motion-vector Huffman
+codes, printed nowhere and stored in the codec's own binary as branches rather than as a table a file
+could be searched for. VP6's specification is public and every table in it was transcribed and checked
+back against the document, but the coefficient decode still diverges eight binary decisions into the
+first block of the first key frame. VP7's own document is thorough enough to name the two reference
+decoder files it declines to print — the dequantisation tables (`quant_common.c`) and the interframe
+motion-vector census (`findnearmv.c`) — and a real key frame's flat first macroblock shows exactly why
+that gap matters: this project's own reimplementation of everything else the document does print,
+checked bit for bit against real files with an independent second decoder, reproduces the wrong DC
+value at two different quantiser indices, by an amount no adjustment of VP8's own published tables
+accounts for. How far each got, and everything ruled out, are in `undecodable-codecs.md`, so none of
+the three searches need be repeated from the start. VP5 is behind VP6's same wall with no published
+specification at all.
 
 **Sorenson** — `svq3` is what remains. `svq1` is now argued in `undecodable-codecs.md`: its codebook is
 not carried in the stream at all, and the one technical document on the format cites FFmpeg's own source
