@@ -23,8 +23,8 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 | | Count | Share |
 | --- | --- | --- |
 | Decoded and verified against ffmpeg | 40 | 19% |
-| Established as not implementable from files alone | 5 | 2% |
-| Not yet attempted | 166 | 79% |
+| Established as not implementable from files alone | 6 | 3% |
+| Not yet attempted | 165 | 78% |
 
 The 40 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
@@ -45,7 +45,7 @@ built here has its encoder but not its decoder, so the comparison is against the
 into the encoder rather than against another decoder's opinion of what came out. For a lossless codec
 that is the stronger oracle of the two, being the ground truth itself.
 
-The 5 are Indeo 3, Indeo 4, Indeo 5, TrueMotion 1 and Lagarith, and the arguments that settle them
+The 6 are Indeo 3, Indeo 4, Indeo 5, TrueMotion 1, Lagarith and DV, and the arguments that settle them
 are in `undecodable-codecs.md`. The first four have frames too small to carry the tables they need —
 340 bytes for a 320x240 Indeo 3 picture, 14 for Indeo 4, 2 for Indeo 5, 0 for TrueMotion 1 — so those
 tables live in the codec binary and cannot be recovered by reading files. Lagarith stops somewhere
@@ -53,8 +53,13 @@ more interesting: its frame layer comes out completely and is recorded there, bu
 inside it keeps its state in a floating-point variable and its probability header has to reproduce
 one implementation's x86 rounding exactly, so the format is defined by an implementation rather than
 by anything writable down — and FFmpeg's own decoder for it is recorded as not bit-exact, which
-leaves no sound oracle for a codec whose bar is exact equality. Both are finished investigations with
-negative answers, not gaps waiting to be filled.
+leaves no sound oracle for a codec whose bar is exact equality. DV stops a fourth way: its container
+and frame layer are recovered completely and measured against real files, but its two central
+tables — the AC-coefficient entropy code and the macroblock shuffle — live in a standard (IEC 61834,
+SMPTE 314M) that is not free to read, and the one genuinely independent source that reprints
+anything close to them describes a different chroma format from the one this task targets and cannot
+be checked against a second rendering. All are finished investigations with negative answers, not
+gaps waiting to be filled.
 
 ## What is left, by family
 
@@ -114,9 +119,12 @@ the same kind of prediction, also came out of it and is now in `undecodable-code
 also lossless and also absolutely measurable. `flashsv` came out of this group and reached exact
 equality; see `README.md`.
 
-**Professional and intermediate** — `dvvideo`, `cfhd`, `hap`, `hq_hqa`, `hqx`, `pixlet`,
-`prores_raw`, `speedhq`, `aic`, `media100`. Well documented, and DV in particular is a format with a
-published standard behind it.
+**Professional and intermediate** — `cfhd`, `hap`, `hq_hqa`, `hqx`, `pixlet`, `prores_raw`,
+`speedhq`, `aic`, `media100`. Mostly well documented. `dvvideo` looked like the cheapest of these on
+the same promise — a published standard behind it — but the standard, IEC 61834 and SMPTE 314M, is
+not free, and the investigation recorded in `undecodable-codecs.md` found no independent source for
+its entropy table or a confirmed shuffle table either; it is counted with the not-implementable
+codecs above rather than left in this list.
 
 **Game and FMV codecs** — the largest group, around 45 names: `binkvideo`, `smackvid`, `roqvideo`,
 `interplayvideo`, `vmdvideo`, `escape124`, `escape130`, the several `ea*` codecs, the `xan_*` pair
