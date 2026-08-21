@@ -1,6 +1,6 @@
 using System;
 
-namespace FileFormat.Codecs.Mpeg1;
+namespace FileFormat.Codecs.Mpeg;
 
 /// <summary>
 /// The inverse discrete cosine transform of ISO/IEC 11172-2, 2.4.4.2, evaluated as the standard
@@ -10,7 +10,7 @@ namespace FileFormat.Codecs.Mpeg1;
 /// The standard does not specify an algorithm for this, only the transform and an accuracy the
 /// result must be within (11172-2 Annex A, which refers to IEEE 1180). Every decoder therefore has
 /// its own, and no two agree in the last bit: a fast integer transform is free to differ from the
-/// exact one by ±1 at any sample, and the "oddification" in <see cref="Mpeg1Quantisation"/> exists
+/// exact one by ±1 at any sample, and the "oddification" in <see cref="MpegQuantisation"/> exists
 /// precisely because those differences would otherwise accumulate through prediction.
 /// <para/>
 /// So this evaluates the defining sum in double precision rather than reproducing anyone's fast
@@ -23,7 +23,7 @@ namespace FileFormat.Codecs.Mpeg1;
 /// entirely zero — are exact rather than approximate. They are worth having because the first is
 /// most of the blocks in a flat region and the second is most of the rows of almost every block.
 /// </remarks>
-internal static class Mpeg1InverseDct {
+internal static class MpegInverseDct {
 
   /// <summary>
   /// <c>C(u)/2 * cos((2x+1)u&#960;/16)</c>, indexed <c>[u * 8 + x]</c>.

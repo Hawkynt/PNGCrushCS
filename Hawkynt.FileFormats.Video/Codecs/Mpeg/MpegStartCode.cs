@@ -1,4 +1,4 @@
-namespace FileFormat.Codecs.Mpeg1;
+namespace FileFormat.Codecs.Mpeg;
 
 /// <summary>
 /// The byte that follows <c>00 00 01</c> and says what the start code introduces
@@ -10,7 +10,7 @@ namespace FileFormat.Codecs.Mpeg1;
 /// a program stream or a caller's own buffer still has to find the headers inside them — so the
 /// knowledge belongs to whichever side is doing the finding, and both sides are.
 /// </remarks>
-internal static class Mpeg1StartCode {
+internal static class MpegStartCode {
 
   /// <summary>picture_start_code: a coded picture's header follows.</summary>
   internal const byte Picture = 0x00;

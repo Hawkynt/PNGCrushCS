@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 
-namespace FileFormat.Codecs.Mpeg1;
+namespace FileFormat.Codecs.Mpeg;
 
 /// <summary>
 /// One of ISO/IEC 11172-2's variable-length code tables, held as written and read by lookup.
@@ -20,7 +20,7 @@ namespace FileFormat.Codecs.Mpeg1;
 /// than decoding something plausible. What construction cannot catch is a code that is unique but
 /// attached to the wrong value; that is what the comparison against a reference decoder is for.
 /// </remarks>
-internal sealed class Mpeg1VlcTable {
+internal sealed class MpegVlcTable {
 
   /// <summary>Length in bits of the code that fills each lookup cell, or zero where none does.</summary>
   private readonly byte[] _lengths;
@@ -30,7 +30,7 @@ internal sealed class Mpeg1VlcTable {
   private readonly string _name;
   private readonly (string Code, int Value)[] _entries;
 
-  internal Mpeg1VlcTable(string name, params (string Code, int Value)[] entries) {
+  internal MpegVlcTable(string name, params (string Code, int Value)[] entries) {
     this._name = name;
     this._entries = entries;
 
@@ -73,7 +73,7 @@ internal sealed class Mpeg1VlcTable {
 
   /// <summary>Reads one code and returns the value the standard attaches to it.</summary>
   /// <exception cref="InvalidDataException">The next bits are a code the table does not define.</exception>
-  internal int Read(ref Mpeg1BitReader reader) {
+  internal int Read(ref MpegBitReader reader) {
     var bits = reader.NextBits(this._maxLength);
     var length = this._lengths[bits];
     if (length == 0)

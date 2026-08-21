@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 
-namespace FileFormat.Codecs.Mpeg1;
+namespace FileFormat.Codecs.Mpeg;
 
 /// <summary>
 /// Reads an MPEG-1 video bitstream: most significant bit first, with no escaping of any kind.
@@ -17,12 +17,12 @@ namespace FileFormat.Codecs.Mpeg1;
 /// then consumed, and every variable-length code is decoded by peeking the longest code in its table
 /// and consuming only as many bits as the match turned out to be.
 /// </remarks>
-internal ref struct Mpeg1BitReader {
+internal ref struct MpegBitReader {
 
   private readonly ReadOnlySpan<byte> _data;
   private int _bitPosition;
 
-  public Mpeg1BitReader(ReadOnlySpan<byte> data) {
+  public MpegBitReader(ReadOnlySpan<byte> data) {
     this._data = data;
     this._bitPosition = 0;
   }

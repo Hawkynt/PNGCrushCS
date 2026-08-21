@@ -554,10 +554,17 @@ public sealed class MpegProgramStreamReaderTests {
   [Test]
   [Category("Unit")]
   public void UnsupportedCodec_StillDemuxes() {
-    // The refusal is the codec's and not the container's. Nothing here decodes MPEG video, and the
-    // file still comes apart into the packets a remux would move.
+    // The refusal is the codec's and not the container's. A program stream carrying H.264, which
+    // nothing here decodes, still comes apart into the packets a remux would move.
+    //
+    // The stream map is what makes this test say what it means. Without one a video stream is named
+    // MPEG-1 or MPEG-2 video from the pack header alone, and both of those now decode — so the file
+    // that used to stand for "a container this reads and a codec it does not" has to be one that
+    // states a codec outright.
     var container = MpegProgramStreamReader.FromBytes(
-      MpegPsTestContainer.Build([_Video(MpegPsTestContainer.Concat(_Frame(1), _Frame(2)), 45000)]));
+      MpegPsTestContainer.Build(
+        [_Video(MpegPsTestContainer.Concat(_Frame(1), _Frame(2)), 45000)],
+        streamMap: [(_H264_STREAM_TYPE, MpegPsTestContainer.VIDEO_STREAM)]));
 
     var streams = MpegProgramStreamContainer.Streams(container);
 
@@ -568,11 +575,26 @@ public sealed class MpegProgramStreamReaderTests {
   [Test]
   [Category("Unit")]
   public void UnsupportedCodec_IsRefusedWithItsCodeWhenAPictureIsAskedFor() {
-    var file = MpegPsTestContainer.Build([_Video(_Frame(1), 45000)]);
+    var file = MpegPsTestContainer.Build(
+      [_Video(_Frame(1), 45000)], streamMap: [(_H264_STREAM_TYPE, MpegPsTestContainer.VIDEO_STREAM)]);
 
     var failure = Assert.Throws<NotSupportedException>(() => VideoFormatRegistry.DecodeFrames(file).ToList());
-    Assert.That(failure!.Message, Does.Contain("mpg2"));
+    Assert.That(failure!.Message, Does.Contain("avc1"));
   }
+
+  [Test]
+  [Category("Unit")]
+  public void AnMpeg2Stream_HasACodecToDecodeItWith() {
+    // The other half of the split, and the reason the two tests above had to be given a codec this
+    // library does not read: a program stream naming MPEG-2 video now reaches a decoder.
+    var container = MpegProgramStreamReader.FromBytes(
+      MpegPsTestContainer.Build([_Video(_Frame(1), 45000)], systemsVersion: 2));
+
+    Assert.That(VideoFormatRegistry.CanDecode(MpegProgramStreamContainer.Streams(container)[0]), Is.True);
+  }
+
+  /// <summary>ISO/IEC 13818-1 stream_type for AVC video, which this library has no decoder for.</summary>
+  private const byte _H264_STREAM_TYPE = 0x1B;
 
   [Test]
   [Category("Unit")]

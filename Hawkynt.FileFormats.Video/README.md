@@ -35,7 +35,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | Matroska / WebM (EBML) | `.mkv`, `.mka`, `.mks`, `.mk3d`, `.webm` | Y | — |
 | MPEG program stream (MPEG-1, MPEG-2, VOB) | `.mpg`, `.mpeg`, `.vob`, `.m2p`, `.m2ps` | Y | — |
 | Motion JPEG stream | `.mjpg`, `.mjpeg` | Y | — |
-| MPEG-1 video elementary stream | `.m1v`, `.mpv`, `.mpeg1video` | Y | — |
+| MPEG video elementary stream | `.m1v`, `.m2v`, `.mpv`, `.mpeg1video`, `.mpeg2video` | Y | — |
 | MPEG-2 transport stream (also Blu-ray, AVCHD) | `.ts`, `.m2ts`, `.mts`, `.m2t`, `.tsv` | Y | — |
 
 | Codec | Tag | Decode | Encode |
@@ -43,6 +43,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | Uncompressed (`BI_RGB`) | 0 | Y | — |
 | Motion JPEG | `MJPG`, `mjpg`, `jpeg`, `V_MJPEG` | Y | — |
 | MPEG-1 video (ISO/IEC 11172-2) | `MPG1`, `PIM1`, `mp1v` | Y | — |
+| MPEG-2 video (ISO/IEC 13818-2) | `MPG2`, `MPEG`, `mp2v`, `m2v1`, `hdv1`–`hdv3`, `V_MPEG2` | Y | — |
 
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
@@ -108,8 +109,44 @@ group of pictures. That residual is the transform's, which ISO/IEC 11172-2 speci
 with an accuracy bound rather than as an algorithm; ffmpeg's own two transforms differ from each other
 by more.
 
-What is not implemented refuses and says so: D pictures, an MPEG-2 sequence extension, and a picture
-size that changes while pictures predicted from the old one are still held.
+What is not implemented refuses and says so: D pictures, and a picture size that changes while
+pictures predicted from the old one are still held.
+
+### MPEG-2 video
+
+One decoder reads both standards, because ISO/IEC 13818-2 is written that way — it requires a decoder
+of itself to decode ISO/IEC 11172-2 as well, and the picture, slice, macroblock and block layers are
+the same walk with more fields in them. Which standard a stream is decides itself, from the sequence
+extension after the sequence header, and not from what a container called the codec. The two decoder
+types exist to claim different four-character codes; behind them is one engine.
+
+What MPEG-2 adds and this reads: the sequence and picture coding extensions; 4:2:0 with MPEG-2's own
+chrominance siting, and 4:2:2; `intra_dc_precision`, so a picture may code its DC to nine, ten or
+eleven bits; the non-linear quantiser scale; the alternate scan; the second intra coefficient table
+(Table B.15); loadable chrominance quantiser matrices; concealment motion vectors; 13818-2's own
+dequantisation, which corrects each block's parity once at the end rather than forcing every
+coefficient odd; and interlaced coding within a frame picture — field DCT, and field-based motion
+compensation where the two fields of a macroblock are predicted separately from either field of the
+reference.
+
+What it refuses, by name and with the clause: field pictures, dual-prime prediction, 4:4:4, and the
+three scalability extensions.
+
+Thirty-seven encoded streams, eleven hundred frames in all, were compared with ffmpeg's decode of the
+same bitstreams — every frame, every sample. Progressive and interlaced; 4:2:0 and 4:2:2; 64×48 up to
+704×480; sizes that are and are not whole macroblocks in either direction; greyscale, so that no
+chrominance convention could mask a luminance error; every intra DC precision; the alternate scan, the
+non-linear quantiser and the second intra table, separately and together; and the same video through
+an elementary stream, a program stream and a transport stream. Every one produced the frame count
+ffprobe counts.
+
+Against ffmpeg's floating-point inverse transform, twenty-seven of the thirty-seven are identical
+sample for sample on every frame. The other ten differ in at most thirteen samples of one frame — out
+of a million — by at most three levels, flat across a group of pictures rather than growing, which is
+what separates a rounding difference from a fault in prediction or dequantisation. For scale: on those
+same streams ffmpeg's own two inverse transforms differ from each other by tens of thousands of samples
+per frame. The residual is the transform's, which both standards specify as a formula with an accuracy
+bound rather than as an algorithm, and not a disagreement about the bitstream.
 
 ## 📜 License
 

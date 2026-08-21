@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using FileFormat.Core;
-using FileFormat.Mpeg1Video;
+using FileFormat.MpegVideo;
 
-namespace FileFormat.Codecs.Mpeg1.Tests;
+namespace FileFormat.Codecs.Mpeg.Tests;
 
 /// <summary>
 /// The MPEG-1 video decoder, on streams built here bit by bit.
@@ -49,7 +49,7 @@ public sealed class Mpeg1VideoDecoderTests {
     // Luminance blocks in order: +8, 0, -8, 0. The predictor starts at 1024 and each differential is
     // eight times the coded value, so the four quadrants reconstruct at 1088, 1088, 1024 and 1024,
     // which are luminances of 136, 136, 128 and 128.
-    var stream = new Mpeg1TestStream()
+    var stream = new MpegTestStream()
       .SequenceHeader(16, 16).GroupOfPictures().PictureHeader(1).SliceHeader(0, 1)
       .Code("1")  // macroblock_address_increment = 1
       .Code("1")  // macroblock_type: intra (Table B.2)
@@ -141,7 +141,7 @@ public sealed class Mpeg1VideoDecoderTests {
   public void ASkippedMacroblockOfAPredictedPictureCopiesTheReference() {
     // Three macroblocks at three different greys; the predicted picture codes the first and the
     // third and skips the middle one, which must come out as the reference's rather than as black.
-    var intra = new Mpeg1TestStream()
+    var intra = new MpegTestStream()
       .SequenceHeader(48, 16).GroupOfPictures().PictureHeader(1).SliceHeader(0, 1);
     _IntraMacroblock(intra, "1", 8);    // 1088 -> 136
     _IntraMacroblock(intra, "1", 8);    // 1152 -> 144
@@ -161,7 +161,7 @@ public sealed class Mpeg1VideoDecoderTests {
   [Category("Unit")]
   public void AMotionVectorPointingOffTheReferenceIsRefusedByName() {
     // motion_code -2 at the leftmost macroblock reads one pixel to the left of the picture.
-    var stream = new Mpeg1TestStream()
+    var stream = new MpegTestStream()
       .SequenceHeader(16, 16).GroupOfPictures().PictureHeader(1).SliceHeader(0, 1);
     _IntraMacroblock(stream, "1", 0);
     stream.PictureHeader(2, temporalReference: 1).SliceHeader(0, 1)
@@ -211,7 +211,7 @@ public sealed class Mpeg1VideoDecoderTests {
     // The container here cuts a packet per picture, so this only happens to a caller with packets
     // from somewhere else. It is worth having because the failure is silent: a decoder that kept
     // only the last picture of a packet would hand back a shorter film with no error anywhere.
-    var stream = new Mpeg1TestStream()
+    var stream = new MpegTestStream()
       .SequenceHeader(16, 16).GroupOfPictures().PictureHeader(1).SliceHeader(0, 1);
     _IntraMacroblock(stream, "1", 8);
     stream.PictureHeader(2, temporalReference: 1).SliceHeader(0, 1).Code("1").Code("001").Code("1").Code("1");
@@ -226,7 +226,7 @@ public sealed class Mpeg1VideoDecoderTests {
   [Test]
   [Category("Unit")]
   public void MacroblockStuffingIsDiscarded() {
-    var stream = new Mpeg1TestStream()
+    var stream = new MpegTestStream()
       .SequenceHeader(16, 16).GroupOfPictures().PictureHeader(1).SliceHeader(0, 1)
       .Code("0000 0001 111")   // macroblock_stuffing
       .Code("0000 0001 111")   // …twice, since it may repeat
@@ -262,7 +262,7 @@ public sealed class Mpeg1VideoDecoderTests {
   [Test]
   [Category("Unit")]
   public void ADcPictureIsRefusedByName() {
-    var stream = new Mpeg1TestStream()
+    var stream = new MpegTestStream()
       .SequenceHeader(16, 16).GroupOfPictures().PictureHeader(4).SliceHeader(0, 1).Code("1").End();
 
     var failure = Assert.Throws<NotSupportedException>(() => _Decode(stream));
@@ -272,23 +272,8 @@ public sealed class Mpeg1VideoDecoderTests {
 
   [Test]
   [Category("Unit")]
-  public void AnMpeg2SequenceExtensionIsRefusedByName() {
-    // Where an MPEG-2 stream carries it: straight after the sequence header, before the first
-    // picture, which is the only difference between the two formats' opening bytes.
-    var stream = new Mpeg1TestStream()
-      .SequenceHeader(16, 16).StartCode(0xB5).Bits(0, 32)
-      .GroupOfPictures().PictureHeader(1).SliceHeader(0, 1);
-    _IntraMacroblock(stream, "1", 0);
-
-    var failure = Assert.Throws<NotSupportedException>(() => _Decode(stream.End()));
-    Assert.That(failure!.Message, Does.Contain("MPEG-2"));
-    Assert.That(failure.Message, Does.Contain("not implemented"));
-  }
-
-  [Test]
-  [Category("Unit")]
   public void AReservedPictureCodingTypeIsRefused() {
-    var stream = new Mpeg1TestStream()
+    var stream = new MpegTestStream()
       .SequenceHeader(16, 16).GroupOfPictures().PictureHeader(5).SliceHeader(0, 1).Code("1").End();
 
     Assert.That(Assert.Throws<InvalidDataException>(() => _Decode(stream))!.Message,
@@ -298,11 +283,11 @@ public sealed class Mpeg1VideoDecoderTests {
   [Test]
   [Category("Unit")]
   public void AQuantiserScaleOfZeroIsRefused() {
-    var stream = new Mpeg1TestStream()
+    var stream = new MpegTestStream()
       .SequenceHeader(16, 16).GroupOfPictures().PictureHeader(1).SliceHeader(0, 0).Code("1").End();
 
     Assert.That(Assert.Throws<InvalidDataException>(() => _Decode(stream))!.Message,
-      Does.Contain("quantiser_scale of zero"));
+      Does.Contain("quantiser_scale_code of zero"));
   }
 
   [Test]
@@ -312,7 +297,7 @@ public sealed class Mpeg1VideoDecoderTests {
     Array.Fill(matrix, (byte)16);
     matrix[40] = 0;
 
-    var stream = new Mpeg1TestStream()
+    var stream = new MpegTestStream()
       .SequenceHeader(16, 16, matrix).GroupOfPictures().PictureHeader(1).SliceHeader(0, 1);
     _IntraMacroblock(stream, "1", 0);
 
@@ -325,7 +310,7 @@ public sealed class Mpeg1VideoDecoderTests {
   public void APictureWhoseSlicesLeaveMacroblocksUncodedIsRefused() {
     // A 48-pixel-wide picture is three macroblocks across; this slice codes only the first, which
     // leaves two of them holding whatever the buffer held. That is a picture nobody coded.
-    var stream = new Mpeg1TestStream()
+    var stream = new MpegTestStream()
       .SequenceHeader(48, 16).GroupOfPictures().PictureHeader(1).SliceHeader(0, 1);
     _IntraMacroblock(stream, "1", 0);
 
@@ -337,7 +322,7 @@ public sealed class Mpeg1VideoDecoderTests {
   [Test]
   [Category("Unit")]
   public void APredictedPictureWithNoReferenceIsRefused() {
-    var stream = new Mpeg1TestStream()
+    var stream = new MpegTestStream()
       .SequenceHeader(16, 16).GroupOfPictures().PictureHeader(2).SliceHeader(0, 1).Code("1").End();
 
     Assert.That(Assert.Throws<InvalidDataException>(() => _Decode(stream))!.Message,
@@ -347,7 +332,7 @@ public sealed class Mpeg1VideoDecoderTests {
   [Test]
   [Category("Unit")]
   public void ASliceWithNoPictureHeaderIsRefused() {
-    var stream = new Mpeg1TestStream().SequenceHeader(16, 16).SliceHeader(0, 1).Code("1").End();
+    var stream = new MpegTestStream().SequenceHeader(16, 16).SliceHeader(0, 1).Code("1").End();
 
     // The container hands out packets cut at pictures, so a slice with no picture in front of it
     // reaches the decoder only when a caller assembles packets itself — which is why the decoder
@@ -359,7 +344,7 @@ public sealed class Mpeg1VideoDecoderTests {
   [Test]
   [Category("Unit")]
   public void APictureBeforeAnySequenceHeaderIsRefused() {
-    var stream = new Mpeg1TestStream().PictureHeader(1).SliceHeader(0, 1).Code("1").ToArray();
+    var stream = new MpegTestStream().PictureHeader(1).SliceHeader(0, 1).Code("1").ToArray();
 
     Assert.That(Assert.Throws<InvalidDataException>(() => _DecodeAsOnePacket(stream))!.Message,
       Does.Contain("before any sequence header"));
@@ -368,7 +353,7 @@ public sealed class Mpeg1VideoDecoderTests {
   [Test]
   [Category("Unit")]
   public void APictureSizeThatChangesMidStreamIsRefusedByName() {
-    var stream = new Mpeg1TestStream()
+    var stream = new MpegTestStream()
       .SequenceHeader(16, 16).GroupOfPictures().PictureHeader(1).SliceHeader(0, 1);
     _IntraMacroblock(stream, "1", 0);
     stream.SequenceHeader(32, 16).GroupOfPictures().PictureHeader(1).SliceHeader(0, 1);
@@ -385,7 +370,7 @@ public sealed class Mpeg1VideoDecoderTests {
   public void ACodeThatIsNotInATableIsRefusedWithTheTablesName() {
     // Twenty-three zeroes would be a start code, so a shorter invalid prefix is used: eleven zeroes
     // is not a macroblock_address_increment in Table B.1.
-    var stream = new Mpeg1TestStream()
+    var stream = new MpegTestStream()
       .SequenceHeader(16, 16).GroupOfPictures().PictureHeader(1).SliceHeader(0, 1)
       .Code("0000 0000 001").Code("1")
       .End();
@@ -399,7 +384,7 @@ public sealed class Mpeg1VideoDecoderTests {
   // ============================================================================================
 
   private static byte[] _FlatIntraPicture(int width, int height, int differential) {
-    var stream = new Mpeg1TestStream().SequenceHeader(width, height).GroupOfPictures().PictureHeader(1);
+    var stream = new MpegTestStream().SequenceHeader(width, height).GroupOfPictures().PictureHeader(1);
 
     for (var row = 0; row < (height + 15) / 16; ++row) {
       stream.SliceHeader(row, 1);
@@ -413,7 +398,7 @@ public sealed class Mpeg1VideoDecoderTests {
   /// <summary>A one-macroblock intra picture whose first luminance block carries one coefficient.</summary>
   private static byte[] _IntraPictureWithFirstBlockCoefficient(
     int width, int height, string coefficient, byte[]? intraMatrix = null)
-    => new Mpeg1TestStream()
+    => new MpegTestStream()
       .SequenceHeader(width, height, intraMatrix).GroupOfPictures().PictureHeader(1).SliceHeader(0, 1)
       .Code("1").Code("1")
       .IntraBlock(true, 0, coefficient).IntraBlock(true, 0).IntraBlock(true, 0).IntraBlock(true, 0)
@@ -425,7 +410,7 @@ public sealed class Mpeg1VideoDecoderTests {
   /// first macroblock by the given motion code and leaves the second where it is.
   /// </summary>
   private static byte[] _ShiftedPicture(string motionCode, bool fullPel) {
-    var stream = new Mpeg1TestStream()
+    var stream = new MpegTestStream()
       .SequenceHeader(32, 16).GroupOfPictures().PictureHeader(1).SliceHeader(0, 1)
       .Code("1").Code("1")
       .IntraBlock(true, 0, "0000 0000 0010 000" + "0")
@@ -448,7 +433,7 @@ public sealed class Mpeg1VideoDecoderTests {
   /// bidirectional picture coded with the given macroblock type.
   /// </summary>
   private static byte[] _BidirectionalStream(string macroblockType, bool backwardIntra) {
-    var stream = new Mpeg1TestStream()
+    var stream = new MpegTestStream()
       .SequenceHeader(16, 16).GroupOfPictures().PictureHeader(1).SliceHeader(0, 1);
     _IntraMacroblock(stream, "1", 8);                                  // 1088 -> 136
 
@@ -473,7 +458,7 @@ public sealed class Mpeg1VideoDecoderTests {
   }
 
   /// <summary>One intra macroblock: an address increment of one, a type, and six blocks.</summary>
-  private static void _IntraMacroblock(Mpeg1TestStream stream, string type, int luminanceDifferential)
+  private static void _IntraMacroblock(MpegTestStream stream, string type, int luminanceDifferential)
     => stream
       .Code("1").Code(type)
       .IntraBlock(true, luminanceDifferential).IntraBlock(true, 0).IntraBlock(true, 0).IntraBlock(true, 0)
@@ -484,10 +469,10 @@ public sealed class Mpeg1VideoDecoderTests {
   // ============================================================================================
 
   private static List<RawImage> _Decode(byte[] stream) {
-    var container = Mpeg1VideoReader.FromBytes(stream);
-    var info = Mpeg1VideoContainer.Streams(container)[0];
+    var container = MpegVideoReader.FromBytes(stream);
+    var info = MpegVideoContainer.Streams(container)[0];
 
-    return VideoIO.Decode<Mpeg1VideoDecoder>(Mpeg1VideoContainer.ReadPackets(container, 0), info)
+    return VideoIO.Decode<Mpeg1VideoDecoder>(MpegVideoContainer.ReadPackets(container, 0), info)
       .Select(frame => frame.Image)
       .ToList();
   }
