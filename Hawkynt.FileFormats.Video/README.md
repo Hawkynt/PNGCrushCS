@@ -75,6 +75,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | FLIC (Autodesk Animator / Animator Pro) | `FLIC` (synthetic — the format states no codec tag of its own) | Y | — |
 
 | Zip Motion Blocks Video (ZMBV) | `ZMBV` | Y | — |
+| MagicYUV | `M8RG`, `M8RA`, `M8Y0`, `M8Y2`, `M8Y4`, `M8YA`, `M8G0` | Y | — |
 
 | Ut Video | `ULRG`, `ULRA`, `ULY0`, `ULY2`, `ULY4`, `ULH0`, `ULH2`, `ULH4` | Y | — |
 
@@ -1246,6 +1247,64 @@ no zlib stream to continue; a version other than the only one the format defines
 height of zero; a pixel layout the format defines but no encoder writes — 1, 2 and 4 bits a pixel
 palettised, and 24 bits a pixel — since there is nothing to measure a guess at their byte packing
 against; and a packet whose compressed data runs out before its frame does.
+### MagicYUV
+
+Lossless and intra only, and the codec of the three lossless ones here whose format is least
+described. Huffman coding over a spatial prediction, with the frame cut into slices that decode
+independently. Seven codes: `M8RG` and `M8RA` for colour with and without transparency, `M8Y0`,
+`M8Y2`, `M8Y4` and `M8YA` for the subsamplings, and `M8G0` for grey.
+
+**Almost nothing about the bitstream is published.** It is a commercial codec with no specification
+and no format note. Public are: a list of the four-character codes and their pixel formats, from the
+codec's author; that it is intra only and cut into slices, also from him; and the rule by which its
+Huffman codes are built from the transmitted lengths, which is stated in ffmpeg's commit messages
+rather than in its source. That is the whole of the record. Everything else here was established by
+measuring frames against the pictures they were made from, and each piece is recorded in the code
+beside what reading it the other way does:
+
+  - **The frame carries its own header** — signature, size, slice height, tables and all — and the
+    sixteen bytes an AVI holds behind the `BITMAPINFOHEADER` are a copy of it, so the container
+    contributes nothing but the picture size.
+  - **The offsets are a permutation, and it runs the other way from the obvious one.** The map's
+    k-th entry names the piece the k-th offset belongs to, not the offset the k-th piece uses. On a
+    frame of one slice the two readings are the same permutation, so a single-slice frame decodes
+    perfectly either way and every other frame comes apart — which is how it was found.
+  - **The bits are plain bytes, most significant first.** No little-endian word swapping, which both
+    HuffYUV and Ut Video need and which decodes nothing here.
+  - **Within one code length the symbols run ascending**, where Ut Video's otherwise identical
+    construction runs them descending.
+  - **Every row starts again from the sample above it**, not from the end of the row before. Reading
+    it the other way — the way HuffYUV and Ut Video work — decodes the first row of a plane exactly
+    and puts every row after it out, which is how it was found: a plane that agreed for exactly its
+    first 64 samples and disagreed from the 65th.
+  - **A slice may carry its differences as plain bytes** rather than coded, and says so in its first
+    byte. The prediction still applies. Sixty-four streams of the corpus contain one, so it is not an
+    edge case — a frame too small for a table to pay for itself produces them, and so does noise.
+  - **The colour planes are blue, green, red**, with green carried plainly and the other two as their
+    distance from it — with no offset, where Ut Video's otherwise identical decorrelation adds 128.
+
+309 streams and 1,446 frames were decoded and compared plane by plane, every sample of every plane of
+every frame identical. **The oracle here is not another decoder.** The ffmpeg built on this machine
+has MagicYUV's encoder but not its decoder, so what the decode is measured against is the rawvideo
+that went into the encoder — which for a lossless codec is the stronger of the two, being the ground
+truth rather than a second opinion. The corpus covers all seven pixel formats its encoder writes, all
+three predictors, slice counts of one to eight, and sizes from 1x1 to 320x240 including odd widths and
+heights and slice counts larger than the number of rows.
+
+One thing is assumed rather than measured, and is called out where it happens: the conversion from
+luminance and chrominance to pixels uses BT.601. The codec's author has said publicly that which set
+of primaries a file uses is carried inside the stream, but no field of the header changes when the
+encoder here is asked for BT.709 — it simply never writes one — so there is no file against which a
+reading of that field could be found. It affects only the pixels handed back and none of the samples
+the codec codes, which is why the comparison above is made on the planes.
+
+What refuses, by name: the codes for samples deeper than eight bits, `MAGY` from before each format
+had a code of its own, grey with an alpha channel, a frame whose header size or version byte is not
+the one measured, a frame without its signature or stating a size other than the stream's, a
+code-length table that does not describe a complete code or holds a code longer than the frame says
+it uses, a slice height that does not divide by the chrominance block, a slice map that names a piece
+twice, and a slice whose first byte is neither of the two values that mean anything. There is no
+`catch` anywhere that hands back a blank frame or repeats the last one.
 
 ### TechSmith Screen Capture
 
