@@ -23,8 +23,8 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 | | Count | Share |
 | --- | --- | --- |
 | Decoded and verified against ffmpeg | 45 | 21% |
-| Established as not implementable from files alone | 10 | 5% |
-| Not yet attempted | 156 | 74% |
+| Established as not implementable from files alone | 11 | 5% |
+| Not yet attempted | 155 | 73% |
 
 The 45 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
@@ -50,8 +50,8 @@ the stronger oracle of the two, being the ground truth itself. LCL ZLIB is measu
 addition to the usual one, since it too has a real encoder here: round-tripped through it as well as
 checked against seven real recordings.
 
-The 10 are Indeo 3, Indeo 4, Indeo 5, TrueMotion 1, WMV1, WMV2, MSS1, MSS2, Lagarith and DV, and the arguments that settle
-them are in `undecodable-codecs.md`. The first four have frames too small to carry the tables they need —
+The 11 are Indeo 3, Indeo 4, Indeo 5, TrueMotion 1, WMV1, WMV2, MSS1, MSS2, Lagarith, DV and MSZH, and the
+arguments that settle them are in `undecodable-codecs.md`. The first four have frames too small to carry the tables they need —
 340 bytes for a 320x240 Indeo 3 picture, 14 for Indeo 4, 2 for Indeo 5, 0 for TrueMotion 1 — so those
 tables live in the codec binary and cannot be recovered by reading files. WMV1 and WMV2 both have real ffmpeg
 encoders and stop anyway: their run-level, DC and motion-vector tables are the same undocumented ones
@@ -69,8 +69,13 @@ and frame layer are recovered completely and measured against real files, but it
 tables — the AC-coefficient entropy code and the macroblock shuffle — live in a standard (IEC 61834,
 SMPTE 314M) that is not free to read, and the one genuinely independent source that reprints
 anything close to them describes a different chroma format from the one this task targets and cannot
-be checked against a second rendering. All are finished investigations with negative answers, not
-gaps waiting to be filled.
+be checked against a second rendering. MSZH stops the newest way: its container is ZLIB's, already
+decoded, and its "no compression" mode is fully verified across every colour space the format defines,
+but the actual compression — "copying blocks from already decoded data," the format's own document says,
+then leaves an unfilled placeholder where the algorithm should be — was reverse-engineered against a
+single still picture re-encoded six ways rather than a real recording, which yielded exactly two genuine
+match tokens to calibrate an entirely unpublished encoding against and settled neither. All are finished
+investigations with negative answers, not gaps waiting to be filled.
 
 ## What is left, by family
 

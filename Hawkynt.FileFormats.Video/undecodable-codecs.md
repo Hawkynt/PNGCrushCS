@@ -1,7 +1,7 @@
 # Codecs investigated and not implemented
 
-Nine codecs were investigated and none was implemented. That is a result rather than a gap, and it is
-written down here so the work is not repeated by somebody who assumes it was never attempted.
+Fourteen codecs were investigated and none was implemented. That is a result rather than a gap, and it
+is written down here so the work is not repeated by somebody who assumes it was never attempted.
 
 They stop in four different places, and the four are worth keeping apart. Five need constant tables
 that are not in the file. VP6 and VP5 stop somewhere else entirely: VP6's tables **are** published,
@@ -13,7 +13,7 @@ but its two central tables — the entropy code and the macroblock shuffle — l
 is not free to read and, for one of them, in exactly one secondary source this project cannot fully
 trust on its own. Where each stops is recorded below.
 
-None of the nine had anything committed.
+None of the fourteen had anything committed.
 
 Indeo 3 (`IV32`), Indeo 4 (`IV41`), Indeo 5 (`IV50`), TrueMotion 1 (`DUCK`) and TrueMotion 2 (`TM20`)
 are the proprietary codecs of the multimedia era. None has a published specification. No encoder for
@@ -438,9 +438,6 @@ question, even without the entropy table. The container-layer facts above — th
 arithmetic, both frame sizes measured exactly, both chroma formats confirmed — are recorded here so that
 whoever picks this up again starts from the block layer and not from the container.
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
 # Windows Media Video 7 (WMV1), where the tables are MS-MPEG4v3's own
 
 WMV1 — Microsoft's name is Windows Media Video 7 — was investigated because it looked like it might
@@ -543,7 +540,7 @@ The same thing that would change MS-MPEG4v3's answer: a publication of the six r
 two DC tables and the two motion-vector tables that is not somebody's implementation. Barring that, a
 demonstration that WMV1's tables are genuinely smaller or differently shaped than version 3's — which
 the shared escape constants above argue against, but do not by themselves rule out beyond doubt.
-=======
+
 # Windows Media Video 8 (WMV2), which adds a private table on top of WMV1's wall
 
 WMV2 — Windows Media Video 8 — was investigated alongside WMV1 for the same reason: ffmpeg carries a
@@ -608,8 +605,7 @@ The same publication that would change WMV1's and MS-MPEG4v3's: the six run-leve
 tables and the two motion-vector tables, from a source that is not an implementation. WMV2 additionally
 needs `wmv2_inter_table`'s three entries published on top, since that table is its own and not covered
 by anything that would settle the other three versions.
->>>>>>> 8bfb2e9a (Investigated wmv2 on the same evidence that stopped wmv1, and it)
-=======
+
 # Microsoft Screen Codec 1 (MSS1), where the only detailed write-up is somebody else's decoder
 
 MSS1 — Windows Media Screen Codec version 7, FourCC `MSS1` — was investigated as the simpler of the two
@@ -677,8 +673,7 @@ A description of MSS1's bitstream from a source that is not an implementation: a
 that states the header layout, the coder and the context models rather than only the DMO/MFT class
 identifiers and pixel formats, or an independent reverse-engineering write-up that says, plainly, how it
 was produced and from what.
->>>>>>> 125a73c6 (Investigated mss1 and found no independent description of its)
-=======
+
 # Microsoft Screen Codec 2 (MSS2), which adds an embedded codec to MSS1's wall
 
 MSS2 — Windows Media Screen Codec version 9, FourCC `MSS2` — was investigated alongside MSS1. It stops
@@ -730,4 +725,92 @@ and function names independently reported for that source file, not assumed.
 The same thing MSS1 needs: a description of the arithmetic coder and its context models from a source
 that is not an implementation, plus, for MSS2 specifically, a stated rule for where a WMV9-coded
 rectangle's bytes begin and end inside the packet.
->>>>>>> ccac9979 (Investigated mss2 on the same evidence that stopped mss1, plus its)
+
+# MSZH, the LCL sibling whose "homebrew LZ77" has no description anywhere
+
+MSZH — the other half of the Lossless Codec Library, FourCC `MSZH` — was investigated straight after its
+sibling ZLIB, which this package does decode; see `README.md`. The two share one container down to the
+byte: the same eight-byte trailer behind a standard `BITMAPINFOHEADER`, the same colour-space and flag
+encoding, the same "reset every frame" framing. Where ZLIB hands its picture to a compressor the zlib
+documentation describes in full, MSZH hands it to one Kenji Oshima wrote himself, and nothing describing
+that step was found published anywhere.
+
+## What was recovered, and verified against real files
+
+The container layer needed no separate work at all — it is `LclHeader`, already read for ZLIB — and a
+sweep of samples.ffmpeg.org's `V-codecs/mszh-zlib/mszh/` directory, sixteen files built as a deliberate
+feature test rather than a recording, confirms it reads MSZH correctly too: every combination of the six
+imagetypes the format defines (RGB24 and five YUV subsamplings), the multithread flag, and the null-frame
+flag are all present, and every field this project's `LclHeader.Read` already parses came out exactly as
+the filenames promise.
+
+MSZH's `compression` byte states two things, "0: compression" and "1: no compression", and the second of
+them is now fully verified rather than merely read. A packet with `compression = 1` carries the raw
+picture with zero framing overhead — measured directly against the packet's own bytes, no oracle needed:
+`mszh_rgb24_nocomp.avi`'s single packet is exactly 253,440 bytes, 352 × 240 × 3, and reversing the same
+bottom-up flip this package already applies for ZLIB's RGB24 reproduces ffmpeg's own decode of the same
+file exactly. The same check holds for all five YUV "no compression" files — `mszh_yuv111_nocomp.avi`
+(253,440 bytes, 4:4:4), `mszh_yuv211_nocomp.avi` and `mszh_yuv422_nocomp.avi` (168,960 bytes each, 4:2:2
+under two different imagetype codes), `mszh_yuv411_nocomp.avi` and `mszh_yuv420_nocomp.avi` (126,720
+bytes each, 4:1:1 and 4:2:0) — every packet's length is exactly its picture's uncompressed byte count and
+nothing more, confirming "no compression" means precisely what it says for every colour space the format
+defines, not only the one ZLIB was measured against.
+
+## Where it stops
+
+Every other file in that same directory — the ones without `_nocomp` in their name — uses
+`compression = 0`, real MSZH compression, and that is where this stops. The format's own document,
+`multimedia.cx/lcl.txt`, gives it one sentence: "Mszh compression: works by copying blocks from already
+decoded data," immediately followed by its own unfilled placeholder, `[add mszh decompression
+algorithm]` — the author's own acknowledgement that this step was never written down, even by him. The
+one secondary source found, Kostya Shishkov's public survey of lossless video codecs
+(`codecs.multimedia.cx`), categorises LCL in one clause — "left prediction plus deflate or homebrew LZ77
+scheme" — without describing either half further.
+
+`mszh_yuv420.avi` and `mszh_yuv420_nocomp.avi` decode, through ffmpeg, to the identical `yuv420p` frame —
+confirmed byte for byte — which makes the pair a real ground truth to reverse the compression against:
+whatever `mszh_yuv420.avi`'s 108,571-byte packet decompresses to has to equal `mszh_yuv420_nocomp.avi`'s
+126,720 raw bytes exactly. Walking the two together finds a single, clean, repeating shape for most of
+the stream: one `0x00` byte in the compressed packet that is not present in the raw output, followed by a
+run of literal bytes that then matches the raw stream exactly until the next such byte. Those literal
+runs are not a fixed length — 45, 19, 30, 48, 18, 27, 37, 48, 14, 50 and sixteen more measured this way,
+from as few as 1 to as many as 67 bytes — and nothing about the position, the byte before it or the byte
+after it predicts where the next one falls, so there is no length field here to have missed: whatever
+determines a literal run's end is not encoded anywhere near its start.
+
+The same walk breaks down completely at raw offset 2,048, and it breaks down instructively. `raw[2048:]`
+is a genuine repeat of `raw[56:]` — content that occurred exactly 1,992 bytes earlier — which is what
+"copying blocks from already decoded data" describes exactly. But the compressed bytes standing in for
+that copy, `f2c817d417e017ec0702`, do not resolve to any offset-and-length encoding found by inspection:
+not a little- or big-endian 16- or 32-bit pair at that distance, not a length-prefixed or nibble-split
+form tried against it. The same shape recurs in `mszh_yuv111.avi` against its own `_nocomp` sibling — a
+clean run of single-byte-marked literals for the first 861 bytes, then a break at a point where
+`raw[861:]` is a genuine, verified repeat of a three-byte motif recurring 240 bytes earlier — with the
+same result: a real match exists to be encoded, and what encodes it in the compressed bytes was not
+recovered.
+
+Two things keep this from being a shortage of effort rather than a wall. First, the corpus is a single
+still picture re-encoded six ways, not a recording — every file above is one frame at 352×240 — so there
+is exactly one real match token's worth of evidence to calibrate an entirely unpublished encoding against
+per colour space, where every codec in this package that was recovered from bitstream measurement alone
+needed dozens to thousands of streams to pin a table or a rule down with confidence: Ut Video's slice
+division and MagicYUV's permutation were each settled against hundreds of frames, and TrueMotion 2's
+Huffman tables against 13,941 independently-decoding streams. Two candidate match tokens, both unsolved,
+is not that. Second, ffmpeg carries no `mszh` encoder — `ffmpeg -h encoder=mszh` reports none — so there
+is no way to drive a corpus toward a specific codeword the way ZLIB's own encoder let that codec's row
+padding be settled directly; what samples exist is what samples exist.
+
+One more thing is worth being precise about, because Lagarith's entry above turns on it: this is not
+established as an unsound oracle. ffmpeg's `mszh` decoder was checked against real bytes it did not
+produce — the `_nocomp` packets, compared to the file's own raw content directly, not to ffmpeg's opinion
+of it — and it was correct on every one of the six imagetypes measured that way. Nothing here tests
+ffmpeg's decode of the `compression = 0` path independently, so unlike Lagarith this format was not
+reached rather than found unreliable; the distinction is DV's, drawn the same way there.
+
+## What would change the answer
+
+A description of MSZH's compression scheme from a source that is not an implementation — the algorithm
+`lcl.txt` itself never filled in. Failing that, several more genuinely distinct compressed recordings,
+not further encodings of the one photograph this corpus re-uses six times, would let a reconstruction be
+checked against a second independent match token the way every other bitstream-recovered codec in this
+package was.
