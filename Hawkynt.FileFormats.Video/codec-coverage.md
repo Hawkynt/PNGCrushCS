@@ -22,15 +22,15 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 
 | | Count | Share |
 | --- | --- | --- |
-| Decoded and verified against ffmpeg | 31 | 15% |
+| Decoded and verified against ffmpeg | 32 | 15% |
 | Established as not implementable from files alone | 4 | 2% |
-| Not yet attempted | 176 | 83% |
+| Not yet attempted | 175 | 83% |
 
-The 31 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
+The 32 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
 frame against ffmpeg's decode of the same bitstream before it was merged, and the measurements are in
 each one's section of that file. The ones that reach exact equality on every sample of every frame
-are Microsoft RLE, Microsoft Video 1, Cinepak, QuickTime Animation, Apple Video, FLIC, HuffYUV,
+are Microsoft RLE, Microsoft Video 1, Cinepak, QuickTime Animation, Apple Video, Apple Graphics, FLIC, HuffYUV,
 FFVHUFF, FFV1, ZMBV, TSCC, CSCD and Ut Video — the last over 883 frames in all six of its colour spaces.
 Theora and VP3 reach it too, Theora over 1,717 frames across all three of its pixel formats and VP3
 over 3,182.

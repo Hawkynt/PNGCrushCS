@@ -55,6 +55,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | Cinepak | `cvid`, `CVID` | Y | — |
 | QuickTime Animation (RLE) | `rle ` | Y | — |
 | Apple Video (RPZA) | `rpza`, `azpr` | Y | — |
+| Apple Graphics (SMC) | `smc ` | Y | — |
 | H.263 (ITU-T H.263 baseline) | `H263`, `s263`, `U263` | Y | — |
 | Sorenson Spark (Flash Video's H.263) | `FLV1` | Y | — |
 | RealVideo 1 (revision 0 only) | `RV10`, `RV13` | Y | — |
@@ -373,7 +374,6 @@ What refuses: a depth the compressor does not code; an indexed depth carrying no
 the Macintosh default palettes cannot be checked against anything here and a picture drawn through a
 guessed table cannot be told from one drawn through the right one; a stream that opens with a frame
 touching only part of the picture; and any count that would write outside the line it is on.
-
 ### On2 VP3.1
 
 The codec Theora was built from, and all of it: the run-length coded block flags, all eight macro
@@ -414,7 +414,6 @@ would write past the end of a block; and a frame whose tokens do not account for
 every coded block. None of them hands back a picture. That matters more here than in most codecs,
 because a frame in which nothing changed is a normal thing for a VP3 stream to contain — so a decoder
 that repeated the previous frame on failure would be producing exactly what working looks like.
-
 ### Apple Video (RPZA)
 
 A vector quantizer over 4x4 blocks of 15-bit RGB colour, also called Road Pizza, and QuickTime's own
@@ -451,6 +450,57 @@ last block, and a chunk that stops before every block is accounted for. A skip o
 on the very first frame — the canvas a freshly built decoder starts with is black, which is exactly
 the picture a skip paints when nothing has been decoded yet, so an encoder using one there is stating
 a black block rather than pointing at a frame that does not exist.
+### Apple Graphics (SMC)
+
+A vector quantizer over 4x4 blocks of eight-bit palettised pixels, named after its author Sean M.
+Callahan and read from the description Mike Melanson published, which the MultimediaWiki page itself
+is drawn from. Blocks run left to right, top to bottom. A block is skipped, so the frame before it is
+left alone; the last block, or the last two blocks together, is repeated forward; one, two, four or
+eight colours are chosen per pixel by packed indices; or sixteen raw palette indices arrive with
+nothing shared between them at all. Two, four and eight colours each have two spellings — a set of
+colours given in the stream, or a number naming one of three small circular caches the decoder keeps
+of the most recently given sets — and the caches are not part of the picture: they are reset empty at
+the start of every chunk, where the picture itself is not.
+
+The eight-colour block's index bytes are not six bytes of four pixels apiece. They are permuted:
+twelve nibbles come out of the six bytes and two 24-bit numbers are built by picking six of those
+twelve for each, in an order that is not the format's usual left-to-right, top-to-bottom shape and
+was recovered from a worked example in the source document rather than derived from anything else
+about the format.
+
+Most real Apple Graphics streams carry no colour table of their own — six of the eight downloaded end
+their sample description exactly where a table would begin — and that is not the same thing as
+carrying no colours. QuickTime defines a standard colour table for every indexed depth, the classic
+Macintosh system palette, and a sample description naming that table's own identifier, or the generic
+"no table" value, with nothing following it, is stating "use the standard table" rather than "there
+is none". All six of those streams name one or the other, and one of the six — the one whose depth
+states forty rather than eight, QuickTime's convention for an eight-bit greyscale capture — asks for
+the standard table's greyscale counterpart, the linear ramp white to black this library's QuickTime
+Animation decoder already reads the same way for its own greyscale depths. Both tables are generated
+by formula rather than looked up: the colour one from the six-level red/green/blue count and the ten
+supplementary shades the classic Macintosh 'clut' resource of ID 8 is itself built from, the
+greyscale one as the plain 256-level ramp.
+
+Eight real streams — 60x64 up to 640x480, one to 399 frames, six of them reaching only the standard
+tables above and two carrying an explicit one — were decoded here and by ffmpeg and compared pixel
+for pixel on every frame: 950 frames in all, identical. Between them the eight streams cover every
+opcode the format defines, including thousands of individual eight-colour and cached-reference
+blocks and, in one stream, the "repeat the last two blocks together" opcode's only occurrence
+straddling a row of blocks — which is what settled that opcode's reading after earlier hand-built
+chunks exercising it had disagreed with ffmpeg in ways nothing about the format explained; the
+disagreement was in those hand-built chunks, and the real stream's own use of the opcode matches the
+reading the format's documentation gives without exception.
+
+What refuses: a depth other than the two this format's sample descriptions state — eight bits with a
+colour table, or forty for the greyscale convention — a colour table identifier that is neither "no
+table" nor the stream's own depth and has no table bytes to fall back on, naming a system colour
+resource genuinely outside the file; a chunk shorter than its four-byte header; an opcode's run
+reaching past the last block; a chunk that stops before every block is accounted for; a repeat opcode
+with nothing before it to repeat; and the one opcode value the format leaves undefined, which ffmpeg
+does not refuse either but answers with palette index zero — not a reading of anything the format
+states, and not reproduced here. A skip opcode is not refused on the very first frame: the canvas a
+freshly built decoder starts with is already what a skip states, so an encoder using one there is
+stating that canvas rather than pointing at a frame that does not exist.
 ### VP8
 
 The codec WebM was built around, and all of it: the boolean entropy decoder, segmentation, both loop
