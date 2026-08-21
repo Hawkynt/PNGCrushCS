@@ -2,6 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Text;
 using FileFormat.Core;
 using FileFormat.Riff;
@@ -33,6 +34,9 @@ public static class Mp4Reader {
   private static readonly FourCC _MOVIE = new("moov");
   private static readonly FourCC _MOVIE_FRAGMENT = new("moof");
   private static readonly FourCC _MOVIE_HEADER = new("mvhd");
+  private static readonly FourCC _COMPRESSED_MOVIE = new("cmov");
+  private static readonly FourCC _DECOMPRESSOR = new("dcom");
+  private static readonly FourCC _COMPRESSED_MOVIE_DATA = new("cmvd");
   private static readonly FourCC _TRACK = new("trak");
   private static readonly FourCC _EDIT_LIST_CONTAINER = new("edts");
   private static readonly FourCC _EDIT_LIST = new("elst");
@@ -143,14 +147,22 @@ public static class Mp4Reader {
       throw new NotSupportedException(
         $"This file is fragmented: its samples are described by '{_MOVIE_FRAGMENT}' boxes rather than by the sample tables of '{_MOVIE}', which this reader does not walk.");
 
-    var (movieTimescale, duration, created) = _ReadMovieHeader(file, movie.Value);
+    // Classic QuickTime allows the whole movie atom to be written zlib-compressed inside a single
+    // 'cmov', which is what a moov with no 'mvhd' among its direct children usually means. The tree
+    // that comes back describes the same film; only where its bytes live changes, so everything below
+    // this point is walked against whichever buffer actually holds it while sample data is still read
+    // from the file as delivered — a chunk offset in a decompressed moov still counts from the start
+    // of the original file, not from the start of the buffer the header was unpacked into.
+    var (structure, structureMovie) = _ResolveMovie(file, movie.Value);
+
+    var (movieTimescale, duration, created) = _ReadMovieHeader(structure, structureMovie);
 
     var tracks = new List<Mp4Track>();
-    foreach (var box in BoxScanner.Children(file, movie.Value))
+    foreach (var box in BoxScanner.Children(structure, structureMovie))
       if (box.Type == _TRACK)
-        tracks.Add(_ReadTrack(file, box, tracks.Count, movieTimescale));
+        tracks.Add(_ReadTrack(structure, file, box, tracks.Count, movieTimescale));
 
-    var metadata = _ReadMetadata(file, movie.Value, tracks, movieTimescale, duration, created);
+    var metadata = _ReadMetadata(structure, structureMovie, tracks, movieTimescale, duration, created);
 
     return new() {
       MajorBrand = brand,
@@ -158,6 +170,84 @@ public static class Mp4Reader {
       Tracks = tracks.ToArray(),
       FileMetadata = metadata,
     };
+  }
+
+  /// <summary>
+  /// Unpacks a compressed movie atom, if that is what this one is.
+  /// </summary>
+  /// <remarks>
+  /// A moov with no <c>mvhd</c> among its direct children is not necessarily broken — QuickTime's own
+  /// "Save As" has always been able to write one whose atom tree is deflated into a single <c>cmov</c>,
+  /// which is what "fast start, compressed header" means. <c>cmov</c> holds a <c>dcom</c> naming the
+  /// method, always <c>zlib</c> in every file this was measured against, and a <c>cmvd</c> whose first
+  /// four bytes are the inflated size and the rest a zlib stream; what comes out the far side is a
+  /// complete replacement <c>moov</c> atom, header and all, standing in for the one that was compressed
+  /// away.
+  /// <para/>
+  /// A moov that already has an <c>mvhd</c> is handed back untouched, and one with neither an
+  /// <c>mvhd</c> nor a <c>cmov</c> is handed back untouched too — there is nothing to unpack, and
+  /// <see cref="_ReadMovieHeader"/> is what reports that honestly.
+  /// </remarks>
+  private static (ReadOnlyMemory<byte> File, Mp4Box Movie) _ResolveMovie(ReadOnlyMemory<byte> file, Mp4Box movie) {
+    Mp4Box? compressed = null;
+    foreach (var box in BoxScanner.Children(file, movie)) {
+      if (box.Type == _MOVIE_HEADER)
+        return (file, movie);
+
+      if (box.Type == _COMPRESSED_MOVIE)
+        compressed ??= box;
+    }
+
+    if (compressed == null)
+      return (file, movie);
+
+    string? algorithm = null;
+    Mp4Box? compressedData = null;
+    foreach (var box in BoxScanner.Children(file, compressed.Value)) {
+      if (box.Type == _DECOMPRESSOR && box.Body.Length >= 4)
+        algorithm ??= _Ascii(box.Body.Span[..4]);
+      else if (box.Type == _COMPRESSED_MOVIE_DATA)
+        compressedData ??= box;
+    }
+
+    if (compressedData == null)
+      throw new InvalidDataException($"'{_COMPRESSED_MOVIE}' box has no '{_COMPRESSED_MOVIE_DATA}'.");
+
+    if (algorithm != "zlib")
+      throw new NotSupportedException(
+        $"This file's movie header is compressed with '{algorithm ?? "an unnamed method"}' rather than 'zlib', which this reader does not decompress.");
+
+    var body = compressedData.Value.Body;
+    if (body.Length < 4)
+      throw new InvalidDataException($"'{_COMPRESSED_MOVIE_DATA}' is {body.Length} bytes, too short to hold its own inflated size.");
+
+    var inflatedSize = BinaryPrimitives.ReadUInt32BigEndian(body.Span[..4]);
+    if (inflatedSize > int.MaxValue)
+      throw new InvalidDataException($"'{_COMPRESSED_MOVIE_DATA}' states an inflated size of {inflatedSize} bytes, too large to hold in memory.");
+
+    var inflated = _Inflate(body[4..], inflatedSize, _COMPRESSED_MOVIE_DATA);
+
+    var decompressed = new ReadOnlyMemory<byte>(inflated);
+    foreach (var box in BoxScanner.Walk(decompressed, 0, decompressed.Length))
+      if (box.Type == _MOVIE)
+        return (decompressed, box);
+
+    throw new InvalidDataException(
+      $"'{_COMPRESSED_MOVIE}' inflated to {inflated.Length} bytes with no '{_MOVIE}' box inside.");
+  }
+
+  /// <summary>Inflates a <c>cmvd</c>'s zlib payload to the size its own header claims.</summary>
+  private static byte[] _Inflate(ReadOnlyMemory<byte> compressed, uint inflatedSize, FourCC box) {
+    using var source = new MemoryStream(compressed.ToArray(), writable: false);
+    using var zlib = new ZLibStream(source, CompressionMode.Decompress);
+    using var destination = new MemoryStream(checked((int)inflatedSize));
+    try {
+      zlib.CopyTo(destination);
+    } catch (InvalidDataException e) {
+      throw new InvalidDataException($"'{box}' does not hold a valid zlib stream.", e);
+    }
+
+    return destination.ToArray();
   }
 
   // ------------------------------------------------------------------------------------------
@@ -196,7 +286,16 @@ public static class Mp4Reader {
   }
 
   /// <summary>Describes one <c>trak</c> without deciding anything about its codec.</summary>
-  private static Mp4Track _ReadTrack(ReadOnlyMemory<byte> file, Mp4Box track, int index, long movieTimescale) {
+  /// <param name="file">
+  /// Where the track's boxes live — the file itself, or a <c>cmov</c>'s inflated buffer when the movie
+  /// header was compressed.
+  /// </param>
+  /// <param name="dataFile">
+  /// The file as delivered, whatever <paramref name="file"/> is. A sample table's chunk offsets are
+  /// always counted from here: they name a place in <c>mdat</c>, which a compressed movie header never
+  /// touches, so they stay correct however the atom tree above them was stored.
+  /// </param>
+  private static Mp4Track _ReadTrack(ReadOnlyMemory<byte> file, ReadOnlyMemory<byte> dataFile, Mp4Box track, int index, long movieTimescale) {
     Mp4Box? media = null;
     Mp4Box? editList = null;
     string? name = null;
@@ -231,7 +330,7 @@ public static class Mp4Reader {
       = _ReadSampleTableBoxes(file, sampleTable);
 
     var table = new Mp4SampleTable(
-      file, timeToSample, compositionOffsets, sampleToChunk, sampleSizes, compactSizes,
+      dataFile, timeToSample, compositionOffsets, sampleToChunk, sampleSizes, compactSizes,
       chunkOffsets, chunkOffsets64, syncSamples,
       _EditShift(editList, movieTimescale, timescale));
 

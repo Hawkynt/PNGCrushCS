@@ -2,6 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Text;
 
 namespace FileFormat.Mp4.Tests;
@@ -113,6 +114,14 @@ internal static class Mp4TestContainer {
   /// <param name="wideMovieBox">Gives <c>moov</c> a 64-bit size rather than a 32-bit one.</param>
   /// <param name="fragment">Appends an empty <c>moof</c>, which makes the file a fragmented one.</param>
   /// <param name="brand">The <c>ftyp</c> major brand.</param>
+  /// <param name="compressMovieHeader">
+  /// Writes the whole movie atom as a classic QuickTime <c>cmov</c> — a <c>moov</c> whose only child is
+  /// <c>dcom</c> naming <c>zlib</c> and <c>cmvd</c> holding the real <c>moov</c>, inflated size first,
+  /// deflated after — rather than the plain, uncompressed atom. Combining this with
+  /// <paramref name="movieFirst"/> is not supported: deflating changes length with the bytes it is fed,
+  /// so the two-pass trick <see cref="Build"/> uses to place <c>moov</c> before <c>mdat</c> cannot also
+  /// predict a compressed length before the real chunk offsets are known.
+  /// </param>
   public static byte[] Build(
     IReadOnlyList<Mp4TestTrack> tracks,
     long movieDuration = 500,
@@ -123,8 +132,11 @@ internal static class Mp4TestContainer {
     bool movieFirst = false,
     bool wideMovieBox = false,
     bool fragment = false,
-    string brand = "isom") {
+    string brand = "isom",
+    bool compressMovieHeader = false) {
     ArgumentNullException.ThrowIfNull(tracks);
+    if (compressMovieHeader && movieFirst)
+      throw new ArgumentException("A compressed movie header cannot also be placed before mdat by this builder.", nameof(compressMovieHeader));
 
     var fileType = _Box("ftyp", _Ascii(brand), _UInt32(512), _Ascii(brand));
 
@@ -142,6 +154,9 @@ internal static class Mp4TestContainer {
       : fileType.Length + 8;
 
     var movie = _Movie(tracks, chunkPlan, mediaStart, movieDuration, creationTime, tags, quickTimeTags, cover, wideMovieBox);
+    if (compressMovieHeader)
+      movie = _CompressMovie(movie);
+
     var media = _Box("mdat", chunks);
 
     var file = new MemoryStream();
@@ -259,6 +274,25 @@ internal static class Mp4TestContainer {
     widened.Write(_UInt64((ulong)movie.Length + 8));
     widened.Write(movie.AsSpan(8));
     return widened.ToArray();
+  }
+
+  /// <summary>
+  /// Wraps a whole <c>moov</c> atom, header included, into a classic QuickTime <c>cmov</c>: the atom
+  /// itself becomes the payload of <c>cmvd</c>, four bytes of its own length in front and deflated
+  /// after, next to a <c>dcom</c> naming <c>zlib</c> — the same shape a real fast-start QuickTime file
+  /// carries when it was saved with its header compressed.
+  /// </summary>
+  private static byte[] _CompressMovie(byte[] plainMovie) {
+    using var deflated = new MemoryStream();
+    using (var zlib = new ZLibStream(deflated, CompressionLevel.Optimal, leaveOpen: true))
+      zlib.Write(plainMovie);
+
+    var cmvdBody = new byte[4 + (int)deflated.Length];
+    BinaryPrimitives.WriteUInt32BigEndian(cmvdBody, (uint)plainMovie.Length);
+    deflated.ToArray().CopyTo(cmvdBody.AsSpan(4));
+
+    var cmov = _Box("cmov", _Box("dcom", _Ascii("zlib")), _Box("cmvd", cmvdBody));
+    return _Box("moov", cmov);
   }
 
   private static byte[] _MovieHeader(long duration, long creationTime)
