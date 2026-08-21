@@ -53,8 +53,14 @@ out of reach on evidence: version 3 chooses per picture between ten tables that 
 and published nowhere, and version 1 has no encoder in existence to derive its tables from or to
 check a guess against.
 
-**On2 and RealVideo** — `vp4`, `vp7`, `rv30`, `rv40`, `rv60`. VP3 shares almost all of its structure
-with Theora, which is done and exact, so it is the cheapest of these by a wide margin.
+**On2 and RealVideo** — `vp4`, `vp5`, `vp6`, `vp7`, `rv30`, `rv40`, `rv60`. VP3 shares almost all of
+its structure with Theora, which is done and exact, so it is the cheapest of these by a wide margin.
+VP6 is the one already investigated, and it is not like the four above it: its specification is public
+and every table in it was transcribed and checked back against the document, but the coefficient
+decode still diverges eight binary decisions into the first block of the first key frame. How far it
+got, the four errors in that specification it did settle, and everything ruled out are in
+`undecodable-codecs.md`, so the search need not be repeated from the start. VP5 is behind the same
+wall with no published specification at all.
 
 **Sorenson** — `svq1`, `svq3`. No published specification.
 
