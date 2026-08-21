@@ -87,6 +87,8 @@ who wants one frame of a two-hour recording pays for one frame.
 
 | Uncompressed 4:2:2 10-bit (v210) | `v210` | Y | — |
 
+| Uncompressed RGB 10-bit (r210) | `r210` | Y | — |
+
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
 is an undivided heap of bytes, and where each packet starts and stops is a computation over five
@@ -1492,6 +1494,31 @@ claim above — ITU-R BT.601 with studio swing, ten bits reduced to eight by a p
 each chroma pair repeated across the two luma columns it covers rather than interpolated between
 neighbours, the same choice this package's HuffYUV decoder made and for the same reason: it is what
 the reference decoder's own conversion does.
+
+What refuses: a picture with no pixels, and a packet shorter than its padded stride times its height.
+
+### r210
+
+Another packing rule rather than a codec proper: 10-bit RGB, one 32-bit big-endian word a pixel, a row
+padded out to a whole 256 bytes. MultimediaWiki's page for the format writes the bit string with red
+in the high ten bits after two unused ones, green in the middle and blue in the low ten — and measured
+against a real encoder that is backwards. Red sits in the word's low ten bits, green in the middle and
+blue in the high ten, found by sweeping every reading of which component owns which bit range against
+ffmpeg's own r210 encoder fed a picture of known samples, where exactly one reading reproduces the
+source for every pixel of every geometry tried.
+
+Decoded straight into `PixelFormat.Rgb30` and nothing is lost doing it. That format's own layout — red
+in bits 0-9, green in 10-19, blue in 20-29, little-endian — is exactly what falls out of reading r210's
+big-endian word and writing the same bits back little-endian, so there is no eight-bit reduction and no
+display convention between the coded samples and what a caller receives. The two bits this format
+leaves unused become the alpha field `Rgb30` reserves in the same position, set to fully opaque because
+that is what ffmpeg's own decoder writes there — carrying a stream through it and back out to
+`x2rgb10le`, the same 30 bits in the same arrangement this format owns, reproduces every sample of
+every frame exactly, alpha included.
+
+Three geometries and 90 frames of ffmpeg's `rgbtestsrc` — 8x2 and 64x40, a whole number of 256-byte
+rows, and 33x25, which needs the padding — carried through r210 and decoded here, compared word for
+word against the `x2rgb10le` samples that went into the encoder: **every one identical.**
 
 What refuses: a picture with no pixels, and a packet shorter than its padded stride times its height.
 
