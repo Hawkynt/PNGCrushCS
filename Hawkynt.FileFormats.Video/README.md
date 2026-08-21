@@ -71,6 +71,8 @@ who wants one frame of a two-hour recording pays for one frame.
 | Theora (Xiph.Org Theora I) | `theora`, `V_THEORA`, `Theo` | Y | — |
 | FLIC (Autodesk Animator / Animator Pro) | `FLIC` (synthetic — the format states no codec tag of its own) | Y | — |
 
+| Zip Motion Blocks Video (ZMBV) | `ZMBV` | Y | — |
+
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
 is an undivided heap of bytes, and where each packet starts and stops is a computation over five
@@ -1069,6 +1071,48 @@ than the packet holds; and a `FLI_BRUN` packet whose count is zero, which is a n
 reading and a single ambiguous byte under the format's own reversed convention for `FLI_LC` — the two
 disagree about everything that follows and no encoder has a reason to write one. There is no `catch`
 anywhere that hands back a blank frame or repeats the last one.
+
+### Zip Motion Blocks Video
+
+Lossless, and built entirely out of zlib: DOSBox's screen-capture codec spends no bits of its own on
+entropy coding, only on saying which rectangular block of the picture changed and how. A block is
+either copied whole from wherever a motion vector in the frame before it points, or copied and then
+corrected with an XOR'ed difference — the whole of the format is that choice, repeated once a block,
+laid end to end and handed to DEFLATE.
+
+**The trap is not the block arithmetic, it is the zlib stream.** ZMBV's own description says to reset
+zlib for an intraframe and nothing about doing so for any other kind, which means every interframe's
+compressed bytes are a continuation of the same stream the intraframe opened — meaningless read on
+their own, since a block's copied bytes and an intraframe's raw picture both sit in the same 32
+kilobyte window a decoder's dictionary is supposed to carry forward. A decoder that opened a fresh
+zlib stream per packet would decode an intraframe correctly, since a lone one carries a complete
+stream of its own, and then diverge on the interframe straight after it — silently, with no packet
+ever failing to decompress, which is what makes it the trap rather than an ordinary bug. See
+`ZmbvInflater`, which holds one zlib stream open for as long as intraframes let it and only ever
+changes which bytes it is fed next.
+
+Both of the format's other pieces of state live for exactly as long as the dictionary does: the
+picture a block's motion vector is copied out of, and — in the one pixel layout that carries one — the
+palette. An intraframe states a palette outright; an interframe with the palette-change bit set states
+768 bytes to XOR into the one already held. There is no palette anywhere in the container for this
+codec: `MediaStreamInfo.CodecPrivateData` is not read at all, because the stream carries its own.
+
+**Measured against ffmpeg's own encoder**, one of the few codecs in this package that has one. Six
+streams and 460 frames — 8-bit palettised, 15-, 16- and 32-bit pixel layouts, a picture that is not a
+whole number of blocks in either direction so a block's copy and its XOR correction are both clipped
+at the picture's edge rather than padded to a hidden grid, a stream carrying more than one intraframe,
+and a 150-frame run long enough that a dictionary carried wrongly across even one packet would have
+shown up in the frame right after it. **Every sample of every frame is identical** — these are RGB and
+palette-index native pixel layouts, so a direct sample comparison is the right one and not the
+convention this package otherwise has to work around for 4:2:0 codecs. The one piece of the format no
+encoder here will write — a palette-change interframe — was checked the other way round, against a
+hand-built stream ffmpeg decodes the same way this does.
+
+What refuses, by name: a stream that opens on an interframe, which has no picture to predict from and
+no zlib stream to continue; a version other than the only one the format defines, 0.1; a block width or
+height of zero; a pixel layout the format defines but no encoder writes — 1, 2 and 4 bits a pixel
+palettised, and 24 bits a pixel — since there is nothing to measure a guess at their byte packing
+against; and a packet whose compressed data runs out before its frame does.
 
 ## 📜 License
 
