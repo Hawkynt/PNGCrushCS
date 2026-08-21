@@ -63,6 +63,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | Apple ProRes (SMPTE RDD 36) | `apco`, `apcs`, `apcn`, `apch`, `ap4h`, `ap4x` | Y | — |
 | VC-1 / Windows Media Video 9, intra pictures | `WMV3`, `WMV9` | Y | — |
 | Microsoft MPEG-4 version 2 | `MP42`, `DIV2` | Y | — |
+| Theora (Xiph.Org Theora I) | `theora`, `V_THEORA`, `Theo` | Y | — |
 
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
@@ -777,6 +778,59 @@ are Microsoft's own with nothing published anywhere. The motion vector tables pa
 whole vector across some eleven hundred entries, which no encoder can be driven to emit in full, so a
 decoder derived from observation would be complete only where somebody happened to look. Version 1 has
 no encoder in existence to derive its two macroblock tables from or to check a guess against.
+
+### Theora
+
+Xiph's free specification, and all of it: the three setup headers with their loop filter limits,
+interpolated quantisation matrices and eighty Huffman codes; the run-length coded block flags; all
+eight macro block coding modes under all eight mode-coding schemes; motion vectors in both of their
+codings, with a vector per luma block and the chroma vectors averaged from them; block-level
+quantisation indices; the 32-token coefficient alphabet; DC prediction across the four
+reference-frame classes; the normative integer inverse transform; whole- and half-pixel prediction
+from either reference frame; and the in-loop deblocking filter. All three pixel formats — 4:2:0,
+4:2:2 and 4:4:4 — decode.
+
+Theora is On2's VP3 with a specification written for it, and the descent shows in the parts a decoder
+has to get exactly right. Its coordinate system is right-handed, so the origin is the bottom-left
+corner and every position in the format counts upwards. Blocks are walked in a coded order that is a
+Hilbert curve inside each 4x4 super block, with any block past the edge of a plane simply left out —
+while DC prediction and the loop filter walk the same blocks in raster order, so both mappings have
+to exist. The coefficients are grouped by frequency rather than by block: every block's DC token,
+then every block's first AC token, and so on for all 64 positions, with a single end-of-block run
+able to finish blocks scattered across the frame and then carry on into the next pass. And the DC
+predictor extrapolates a gradient from three neighbours with weights of 29, −26 and 29 over 32, then
+checks whether it has run away from any of them by more than 128 and falls back on that neighbour's
+own value if it has.
+
+Two rules are easy to read past and change every sample if missed. The inverse transform is normative
+to the bit — its intermediate truncations to sixteen bits are part of the specification and not an
+artefact of a narrow register, so a decoder with wider ones has to reproduce them deliberately. And a
+block whose coefficient count is under two takes a direct-current shortcut that is *not* equivalent
+to running the full transform, because it skips those truncations; whether it applies is decided by
+the count the token layer kept, not by looking to see whether the other coefficients happen to be
+zero.
+
+Twenty-five encoded streams — 1,925 coded frames, 1,717 of them carrying coded blocks — were compared
+with ffmpeg's decode of the same bitstreams plane by plane and sample by sample. Every plane of every
+frame is identical: not close, not on average, the same bytes. The streams cover all three pixel
+formats, quality settings from the lowest to the highest, rate-controlled encodes, a scene change,
+heavy motion, still scenes that are almost entirely uncoded, per-pixel noise that is almost entirely
+coded, a 250-frame group of pictures, picture sizes that are not a whole number of macro blocks in
+either direction, and frames from 100x70 to 1920x1080.
+
+Two notes on measuring it. ffmpeg's Theora decoder emits no picture at all for a zero-length packet,
+where section 7.11 defines one as an inter frame with nothing coded — a duplicate frame — so those
+208 packets are decoded here and produce the previous picture again; they are excluded from the
+comparison, since by construction they are the frame before. And ffmpeg's frame-threaded decode of
+this codec is not deterministic on large frames: on four of the streams it left bands of chroma at
+zero, differently on each run, and every one of those differences went away under `-threads 1`.
+
+What refuses, by name: a bitstream version other than 3.2, the pixel format Table 6.4 reserves, a
+reserved bit that is set in either the identification header or a frame header, a stream that begins
+at an inter frame or a duplicate one, a packet that ends part way through its coded data, a Huffman
+table with more than 32 entries or a code longer than 32 bits, quant ranges that do not cover the
+quantisation scale exactly, and a stream whose container carried no setup headers. There is no
+`catch` anywhere that hands back a blank frame or repeats the last one.
 
 ## 📜 License
 
