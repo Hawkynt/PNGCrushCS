@@ -117,6 +117,8 @@ who wants one frame of a two-hour recording pays for one frame.
 
 | Apple Planar RGB (8BPS) | `8BPS` | Y | — |
 
+| GoPro CineForm (SMPTE VC-5) | `CFHD` | Y | — |
+
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
 is an undivided heap of bytes, and where each packet starts and stops is a computation over five
@@ -2259,6 +2261,87 @@ table names an index outside its own stated size; a packet too short for the lin
 plane count and picture height require; a row whose control bytes run past the compressed length its
 own table entry states, fall short of the picture's width without doing so, or overrun it; and a
 plane's worth of rows that does not end exactly where its table entry said it would.
+
+### GoPro CineForm
+
+Written from SMPTE ST 2073-1:2017, the VC-5 elementary bitstream standard — free, fifty-two pages, and
+GoPro's own SDK documentation calls VC-5 a "superset" of the original CineForm engine, standardised and
+better defined. That description holds up: the tag-value and chunk framing (clause 8), the inverse
+wavelet transform (Annex A, normative), the two-hundred-and-sixty-four-entry entropy codebook (Annex C,
+transcribed in full and checked entry by entry against the standard's own printed table) and the
+dequantisation formula (Annex F) are all stated completely, and nothing here reads GoPro's SDK source
+or ffmpeg's `cfhd` decoder — both are used, where at all, only as a black-box oracle on their output.
+
+**What the free standard does not state, and what a real file carries beyond it.** A frame from
+ffmpeg's own `cfhd` encoder opens with none of the standard's own start marker and threads its
+tag-value header through with dozens of tag numbers Table B.2 does not define — GoPro's own encoder
+predates the standard it was later folded into. None of that matters to a decoder, because clause 8.3.1
+makes every tag-value pair exactly one segment whatever its tag: an unrecognised tag costs four bytes
+and nothing more. What is not skippable — where a channel's lowpass and each of its nine highpass
+codeblocks begin, which physical channel carries which colour, and the prescale shifts a real encoder
+actually applies — was recovered by building a corpus with that same encoder and measuring. A highpass
+row whose stated width is not already a whole multiple of eight is coded padded out to the next one,
+the padding always zero, on any channel at any wavelet level, not only the horizontally-subsampled
+chroma channels where it happens most often; `yuv422p10le` codes channel 0 as luma, channel 1 as **V**
+and channel 2 as **U**, and `gbrp12le`/`gbrap12le` code channel 0 as green, channel 1 as red and
+channel 2 as blue, matching neither ffmpeg's own plane order nor a guess. And Annex E.1's own table of
+prescale shifts — informative, something an encoder "can benefit from" rather than must state — turns
+out to be wrong for the case that matters most: at ten bits it states shifts of (0,0,2) for wavelet
+levels 1 through 3, and reconstructing with that leaves the middle level's highpass four times too
+large while the other two already agree, discovered by forward-transforming ffmpeg's own decoded
+reference through the same three levels and comparing every subband's coefficients against what this
+decoder read back. Moving that one shift from level 3 to level 2 — (0,2,0) — is what the real encoder
+actually does, and it is what the arithmetic in `CineFormPrescale` states along with the measurement
+behind it. Twelve bits needed no such correction: Annex E.1 states the same shift at both of those
+levels, so nothing distinguishes them either way.
+
+**Scope.** ffmpeg's own `cfhd` encoder writes exactly three pixel formats — `yuv422p10le`, `gbrp12le`
+and `gbrap12le` — and this decoder reads the two of them without alpha: ten-bit 4:2:2 and twelve-bit
+RGB, three channels each. A frame stating any other channel count, the alpha-bearing `gbrap12le`
+layout included, is refused by name: alpha's channel position was never measured against a real file,
+and guessing at it risks exactly the wrong-picture-that-looks-right failure this library refuses to
+ship. Intra only, like every other codec of this shape here — no reference handling, no state carried
+between packets beyond the stream's declared dimensions.
+
+**A reconstructed sample is clamped to the depth it is coded at, and the free standard never says so.**
+The wavelet transform's ordinary overshoot near a hard edge — the same ringing every linear transform
+codec has — puts a reconstructed channel sample a few levels below zero or above the coded maximum now
+and again; nothing in Annex A forbids it, and nothing states a decoder must undo it. ffmpeg's own
+decode cannot even show the alternative, because `yuv422p10le` and `gbrp12le` are unsigned formats:
+whatever it reconstructs internally is clamped before it can be written out at all. Left unclamped,
+that overshoot survives as a plausible small difference on the channels themselves — a handful of
+levels, indistinguishable from ordinary quantisation noise — but explodes once it is narrowed to eight
+bits: `ChannelScaling.Reduce16` narrows a value that fills its declared range, and a `byte` cast on one
+that does not wraps rather than saturates. A sample of −15 shifts to −240 and reduces to 255 instead of
+0; a sample of 4108 reduces to 0 instead of 255 — the coded picture's own edges turning into the exact
+opposite extreme of the eight-bit range, at whichever pixels the overshoot happens to reach. A 256x192
+`gbrp12le` frame at default quality carried twenty-three thousand seven hundred and one such pixels
+across twenty frames, eighty of them in its own first row alone, every one wrong by up to the full
+scale of the format; a heavier quantiser setting on the same frame carried ten times as many. Clamping
+every reconstructed sample to its coded depth, once, at the end of channel reconstruction, removes it
+entirely — the same corpus reads zero such pixels afterwards — and is also what makes the "compare the
+channels themselves" measurement below mean what it says: an unclamped decode compared against
+ffmpeg's own clamped one was reading two different things at exactly the pixels this overshoot reaches,
+not two decodes of the same bitstream.
+
+**Measured against ffmpeg, on the channels, before any narrowing or colour conversion** — this library
+interpolates chroma where ffmpeg replicates, exactly the reason every other subsampled codec here is
+compared on planes and not on packed colour. Thirteen streams built with ffmpeg's own encoder, a
+hundred and forty-one frames in all: 4:2:2 at 64x48, 80x64, 96x50, 96x84 and 256x192 — sizes that are
+and are not a whole multiple of sixty-four wide, exercising the row padding above on every wavelet
+level rather than only the coarsest — a synthetic test pattern, colour bars and a Mandelbrot zoom, at
+default and at a heavier quantiser setting; and 12-bit RGB at the same sizes and settings. Every frame
+of every stream, sampled with `-threads 1 -fps_mode passthrough` and cross-checked against
+`ffprobe -count_frames`: at ten bits the largest difference on any sample of any plane is 9 of 1023,
+the mean under one level on every stream; at twelve bits the largest is 49 of 4095, reached only at the
+heavier quantiser setting, the mean under three on every stream. CineForm is visually lossless and
+mathematically lossy, and that is what these numbers say — a small, flat residual from the codebook's
+own quantisation, not a defect that grows or resets with content.
+
+What refuses, by name: a channel count other than three; a highpass codeblock that does not
+entropy-decode cleanly to Annex C.2's band end marker at its stated row width or at the next multiple
+of eight; and a channel that ends before its lowpass band was ever coded. There is no `catch` here
+returning a blank, a copied or a repeated frame.
 
 ## 📜 License
 

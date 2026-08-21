@@ -22,11 +22,11 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 
 | | Count | Share |
 | --- | --- | --- |
-| Decoded and verified against ffmpeg | 49 | 23% |
+| Decoded and verified against ffmpeg | 50 | 24% |
 | Established as not implementable from files alone | 25 | 12% |
-| Not yet attempted | 137 | 65% |
+| Not yet attempted | 136 | 64% |
 
-The 49 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
+The 50 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
 frame against ffmpeg's decode of the same bitstream before it was merged, and the measurements are in
 each one's section of that file. The ones that reach exact equality on every sample of every frame
@@ -188,10 +188,13 @@ could confirm, four of them (`mscc`, `wcmv`, `rasc` and `screenpresso`) carry no
 and a delta record's destination coordinates before the two remaining fields resisted every reading
 tried.
 
-**Professional and intermediate** — `cfhd`, `pixlet`, `prores_raw`,
+**Professional and intermediate** — `pixlet`, `prores_raw`,
 `aic`, `media100`. `hap` came out of this group and reached exact equality — DXT/BC
 texture blocks in a small chunked header, published in full by its own authors, which is what made it
-the cheapest of the group rather than merely the best documented. `hq_hqa` and `hqx` looked well
+the cheapest of the group rather than merely the best documented. `cfhd` came out of it too, and is the
+one member of this group whose free standard, SMPTE ST 2073-1, turned out to state everything a decoder
+needs — the tag-value framing, the wavelet transform, the codebook, all of it. It is lossy rather than
+exact; see `README.md`. `hq_hqa` and `hqx` looked well
 documented too,
 on the strength of a MultimediaWiki page each, and turned out not to be: neither Canopus's nor Grass
 Valley's own white papers state a bitstream fact, and the one detailed technical description of either
