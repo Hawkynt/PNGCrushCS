@@ -1,16 +1,19 @@
 # Codecs investigated and not implemented
 
-Eight codecs were investigated and none was implemented. That is a result rather than a gap, and it is
+Nine codecs were investigated and none was implemented. That is a result rather than a gap, and it is
 written down here so the work is not repeated by somebody who assumes it was never attempted.
 
-They stop in three different places, and the three are worth keeping apart. Five need constant tables
+They stop in four different places, and the four are worth keeping apart. Five need constant tables
 that are not in the file. VP6 and VP5 stop somewhere else entirely: VP6's tables **are** published,
 every one of them was transcribed and checked, and the decode still does not come out. Lagarith stops
 at a third place again — its wrapper comes out completely, and the entropy coder inside it is defined
 by the rounding behaviour of one implementation's floating-point unit rather than by anything written
-down. Where each stops is recorded below.
+down. DV stops at a fourth: its own frame layer is recovered and measured directly against real files,
+but its two central tables — the entropy code and the macroblock shuffle — live only in a standard that
+is not free to read and, for one of them, in exactly one secondary source this project cannot fully
+trust on its own. Where each stops is recorded below.
 
-None of the eight had anything committed.
+None of the nine had anything committed.
 
 Indeo 3 (`IV32`), Indeo 4 (`IV41`), Indeo 5 (`IV50`), TrueMotion 1 (`DUCK`) and TrueMotion 2 (`TM20`)
 are the proprietary codecs of the multimedia era. None has a published specification. No encoder for
@@ -320,3 +323,117 @@ probability header's fields — from a source that is not an implementation. Fai
 decoder that is bit-exact, so that a comparison could mean something. Neither exists today, and the
 frame layer above is recorded here so that whoever finds one does not have to start from the
 container.
+
+# DV, where the two tables that matter live only in a standard nobody gives away
+
+DV (`dvvideo` — IEC 61834 and SMPTE 314M, what a MiniDV camcorder, a DVCAM deck or a DVCPRO deck all
+write) went into `codec-coverage.md`'s "what is left" list with a note that it looked like the cheap
+one of the professional formats: intra-only, and "a format with a published standard behind it," unlike
+the reverse-engineered game and screen-capture codecs beside it there. That note was wrong, or at least
+not the whole truth, and this is the correction.
+
+IEC 61834 and SMPTE 314M are real standards and neither is free. The IEC's own store sells 61834 by the
+part; SMPTE sells 314M for about $34 as of libdv's own project page, which is the closest thing to an
+official position on the question — the Quasar DV codec (libdv) project states outright that it could
+not include the standards because they are not free, and points newcomers at Sony's *DVCAM Format
+Overview* brochure instead, calling it a free substitute good enough to understand the source by. That
+brochure is the one genuinely independent free document this format is supposed to have, and it could
+not be found: the only citation of it left on the web is Adam Wilt's DV technical reference page, itself
+pointing at a Sony Canada URL last known good around 2005, long dead, and no mirror of the PDF turned up
+anywhere searched.
+
+## What was recovered, and verified against real files
+
+The container layer comes out completely, and every piece of it was cross-checked against at least two
+independent sources and then measured against ffmpeg's own encoder:
+
+  - **The DIF block and frame structure.** An 80-byte DIF block — a 3-byte ID and a 77-byte payload —
+    is the unit of everything: header, subcode, VAUX, audio and video blocks are the same 80 bytes with
+    different contents. A DIF sequence is 150 of them: 1 header, 2 subcode, 3 VAUX, 9 audio and 135
+    video, stated identically by RFC 6469 and by the Wikipedia article's own citation trail, and a frame
+    is 10 sequences at 525/60 or 12 at 625/50.
+  - **The frame-size invariant, measured rather than read.** `ffmpeg -f lavfi -i testsrc=size=720x480 -c:v
+    dvvideo -pix_fmt yuv411p -g 1000` for thirty frames wrote a file of exactly 3,600,000 bytes — 120,000
+    a frame, exactly 10 × 150 × 80. The same at 720x576 and `yuv420p` for twenty-five frames wrote
+    exactly 3,600,000 bytes as well — 144,000 a frame, exactly 12 × 150 × 80. Both are on the nose, no
+    slack anywhere.
+  - **The chroma trap the task brief called out, reproduced directly.** `ffprobe -fflags +noparse` on
+    the two files above states `pix_fmt=yuv411p` for the 720x480 file and `pix_fmt=yuv420p` for the
+    720x576 one. Nothing here assumed the answer; both came from encoding real content at each system
+    and reading back what ffmpeg's own encoder chose.
+  - **The macroblock and superblock arithmetic.** 720x480 is 45×30 macroblocks (1,350), 720x576 is
+    45×36 (1,620). Both a Sony/Panasonic transcoding patent's background section (US 6,944,226,
+    discussed below) and an independent academic paper on a real-time DV software encoder (Arora, Kant
+    and Ramkishor, *Design and Implementation of a Real Time High Quality DV Digital Video Software
+    Encoder*, EC-VIP-MC 2003) state that 27 macroblocks make one superblock and that a video segment —
+    the unit one DIF video block carries — draws one macroblock from each of five superblocks. 1,350
+    and 1,620 both divide by 27 exactly, into 50 and 60 superblocks, and both divide again by 5 into 10
+    and 12 — the same 10 and 12 as the DIF sequence counts above, arrived at from an entirely different
+    direction. That agreement is real evidence the container-layer numbers are right.
+
+## What was found in exactly one place, and could not be checked against a second
+
+US Patent 6,944,226, *System and associated method for transcoding discrete cosine transform coded
+signals* (Lin, Bushmitch, Braun, Mudumbai and Wang; assigned to Matsushita Electric Corporation of
+America, granted 2005), is a genuinely independent source — a patent's background description of prior
+art, not source code, and not ffmpeg's — and it is the only place either of DV's two central tables
+turned up in weeks of searching that reached patents, academic papers, standards-body listings, national
+standard mirrors, RFC text, MultimediaWiki, and every DV technical overview page findable.
+
+Its Table 1 is the class/quantisation-number/area-number quantisation step-size table, printed as a
+22-row grid where each of the four class columns is a staircase offset from the one before it. Its FIG.
+4A shows a superblock's 27 macroblocks numbered 0 to 26 in the order a video segment index draws them,
+which is the shuffle table — the exact fact this format's signature failure mode turns on.
+
+Both come with a real reservation and neither was carried into a decoder on the strength of one reading:
+
+  - The patent describes DV50 — 4:2:2, eight DCT blocks a macroblock — not the 4:1:1/4:2:0, six-block
+    macroblock this task targets. Nothing in it states that the superblock numbering it shows for DV50
+    is the same one DV25 uses; the macroblock/superblock *arithmetic* above is confirmed to be shared
+    (27 macroblocks a superblock, 5 across a DIF sequence), but the internal *order* in FIG. 4A is a
+    single, unconfirmed data point for the format actually wanted here.
+  - Table 1 is a scanned grid with four columns that share the same 22 physical rows at different
+    offsets, exactly the layout most prone to transcribing a digit into the wrong cell, and this project
+    checks a table like that element by element against a second rendering before trusting it — which is
+    what settled VP6's transcription. No second rendering of this table exists anywhere found.
+
+## What was never found anywhere independent
+
+The AC-coefficient run-amplitude entropy code — the table that actually does DV's compression, and the
+one piece a working decoder cannot approximate or guess its way past — was not found in any form outside
+implementation source. One patent (US 7,681,013, on lookup-table VLC decoding generally) states in
+passing that a hardware table for this code holds "64K entries, each entry a triplet of {run, level,
+code length}" with codes up to 16 bits, which describes the table's shape and says nothing of its
+contents. The DC coefficient's own coding, and the exact byte offsets of a macroblock's own header —
+which byte carries the quantisation number, which bits carry each block's class number — were not found
+stated anywhere independent either; US 6,944,226 states that a QNO is read once a macroblock and a class
+number once a block, and no more.
+
+## Why this is a wall and not a shortage of effort
+
+Everything above came from real searching, not from stopping early: patent literature (Sony's,
+Matsushita's and others' filings on DV encoding, transcoding and hardware decoding), the academic
+literature on real-time DV encoding, RFC 3189 and RFC 6469, Wikipedia's own citation trail, SGI's
+DIVO-DVC option board documentation (`techpubs.jurassic.nl`, Appendix F), Adam Wilt's long-standing DV
+technical reference page, the libdv project's own page, and searches of the Bureau of Indian Standards'
+and China's national standards mirrors for a free adoption of IEC 61834 that turned out not to exist.
+Every one of these describes DV's shape and none of them prints its entropy table or confirms its
+shuffle table for the format this task targets.
+
+Shipping a decoder on the strength of the container layer alone — which is solid — plus an entropy
+table built by guessing at run-amplitude assignments, or a shuffle table taken from a different chroma
+format's patent figure without a second source to check it against, would produce exactly the failure
+this format is singled out for above every other codec in this package: a picture with blocks in
+roughly plausible places and colours roughly plausible, which is a wrong decode indistinguishable by eye
+from a right one. That is worse than refusing, and it is what refusing here is for.
+
+## What would change the answer
+
+A genuinely independent publication of the AC/DC entropy table and the macroblock header layout — a
+library or standards mirror carrying IEC 61834 or SMPTE 314M for free, a working copy of Sony's *DVCAM
+Format Overview*, or a second patent or paper that reprints the same run-amplitude table US 7,681,013
+only describes the shape of. Failing that, US 6,944,226's Table 1 and FIG. 4A checked against a second
+independent rendering of the same two tables would at least settle the quantisation and shuffle
+question, even without the entropy table. The container-layer facts above — the DIF and frame
+arithmetic, both frame sizes measured exactly, both chroma formats confirmed — are recorded here so that
+whoever picks this up again starts from the block layer and not from the container.
