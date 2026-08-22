@@ -107,6 +107,8 @@ who wants one frame of a two-hour recording pays for one frame.
 
 | Avid Meridien Uncompressed (avui) | `AVUI` | Y | — |
 
+| Uncompressed 4:4:4 (v308) | `v308` | Y | — |
+
 | id RoQ | `RoQV` (synthetic — the format states no codec tag of its own) | Y | — |
 
 | Flash Screen Video 2 (FSV2) | `FSV2` | Y | — |
@@ -1709,6 +1711,31 @@ ITU-R BT.601 with studio swing and each chroma pair repeated across the two luma
 
 What refuses: a picture whose width and height are not one of the two geometries avui's own encoder
 ever writes, and a packet shorter than its header plus its picture's stride times its height.
+
+### v308
+
+4:4:4 YUV with nothing compressed at all, three bytes a pixel and no subsampling in either direction
+for a decoder to interpolate around. There is no MultimediaWiki page for this one and no dedicated
+ffmpeg decoder to ask about it — it is one of the raw layouts ffmpeg's own container demuxers map
+straight onto a pixel format rather than routing through a codec of its own, the same shape as
+`rawvideo` itself. So the layout was recovered the same way v210's and y41p's were: pseudo-random
+content, built at the pixel format ffmpeg's own QuickTime demuxer names for this tag, carried through
+its generic uncompressed muxer with the tag forced to `v308` and swept against every placement of a
+header ahead of, inside and behind the picture data.
+
+Three bytes a pixel and nothing else — V, then Y, then U, repeating across a row with no padding of
+any kind. A row is exactly `width` times three bytes, measured against a width that is not a multiple
+of four in either direction, and there is no header ahead of the picture the way avui's SD-only
+relatives carry one.
+
+Packed-YUV format, and a direct sample comparison is what settles it — 4:4:4 carries no subsampling at
+all, so every pixel states its own chroma and there is no interpolation convention for a comparison to
+disagree about the way there is for anything at 4:2:2 or 4:2:0. Fifty frames of pseudo-random content
+at 17x9 — not a whole number of any alignment this format's neighbours use — carried through this
+packing and decoded here, compared byte for byte against ffmpeg's own raw output of the same content
+before it was packed: every sample of every plane of every frame identical.
+
+What refuses: a picture with no pixels, and a packet shorter than its stride times its height.
 
 ### H.261
 
