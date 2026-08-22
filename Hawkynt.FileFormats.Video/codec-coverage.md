@@ -23,8 +23,8 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 | | Count | Share |
 | --- | --- | --- |
 | Decoded and verified against ffmpeg | 63 | 30% |
-| Established as not implementable from files alone | 42 | 20% |
-| Not yet attempted | 106 | 50% |
+| Established as not implementable from files alone | 43 | 20% |
+| Not yet attempted | 105 | 50% |
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
 frame against ffmpeg's decode of the same bitstream before it was merged, and the measurements are in
 each one's section of that file. The ones that reach exact equality on every sample of every frame
@@ -83,6 +83,8 @@ MWSC, RASC, Go2Meeting (`g2m`), ScreenPressor (`scpr`), Screenpresso, TSCC2, Sor
 8088flex TMV (`tmv`) and HuffYUV MT (`hymt`),
 
 8088flex TMV (`tmv`) and MidiVid Archive (`mvha`),
+
+8088flex TMV (`tmv`) and Brooktree ProSumer Video (`prosumer`),
 and the arguments that settle them are in
 `undecodable-codecs.md`. The first four have frames too small to
 carry the tables they need —
@@ -341,7 +343,10 @@ and a delta record's destination coordinates before the two remaining fields res
 tried.
 
 **Professional and intermediate** — `pixlet`, `prores_raw`,
-`aic`, `media100`. `hap` came out of this group and reached exact equality — DXT/BC
+`aic`, `media100`. `prosumer` came out of this group into `undecodable-codecs.md`: its whole published
+bitstream description is one sentence, added to MultimediaWiki in September 2022 — four years after
+ffmpeg's own decoder — and that sentence's last clause depends on a codebook it does not print, which
+is SVQ1's wall on a smaller format. `hap` came out of this group and reached exact equality — DXT/BC
 texture blocks in a small chunked header, published in full by its own authors, which is what made it
 the cheapest of the group rather than merely the best documented. `cfhd` came out of it too, and is the
 one member of this group whose free standard, SMPTE ST 2073-1, turned out to state everything a decoder
