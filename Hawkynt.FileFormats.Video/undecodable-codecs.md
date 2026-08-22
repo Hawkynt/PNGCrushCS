@@ -2519,3 +2519,58 @@ A description of the actual compression — the entropy coding, the prediction a
 bytes — from a source that is not an implementation, or from the vendor. Failing that, an encoder or a
 larger corpus of real files would at least make the blind route conceivable; with one file and no way
 to choose what goes into it, it is not.
+
+# VBLE, whose one page's own "documentation" is a line of C
+
+VBLE (`VBLE`) was investigated with LOCO and Canopus Lossless as the third member of the same lossless
+group, and it fails the provenance test the other two are settled by, on evidence more direct than
+either: its one technical source does not merely trace back to an implementation, it quotes one.
+
+## What the page says, in full
+
+MultimediaWiki's `VBLE` page opens by naming its subject — "a lossless codec for YUV colourspace
+written by a person known as Mark FD" — states that it "employs standard median prediction and coding
+components with reduced number of bits," describes the frame as a luma line followed by two chroma
+lines coded as pixel quads, and gives exactly one further fact: a formula for widening a coded value
+back to a sample, printed not as a rule in words but as a literal C conditional expression, `pix & 1 ?
+255 - (pix >> 1) : (pix >> 1)`. That is the whole of the page. There is no header layout beyond the one
+line above, no entropy coder named, no bit order, nothing about the prediction beyond calling it
+"standard."
+
+## Who wrote it, and when
+
+The page has one revision. It was created in full — all 766 bytes of it — on 9 November 2011 by the
+user "Kostya," the same Konstantin Shishkov whose own wiki biography already settles LOCO's entry above:
+a reverse engineer and a prolific author of decoders for exactly this class of obscure format. Nobody
+else has ever edited the page.
+
+FFmpeg's own `vble.c` was not written by Kostya — its first commit, "VBLE Decoder," is Derek Buitenhuis's,
+landed 11 November 2011, two days after the wiki page. That puts this entry on the opposite side of
+LOCO's chronology: LOCO's decoder came eleven months before its page, and this page came two days
+before its decoder. The direction-of-dependence test LOCO settles on a commit date does not, by itself,
+settle this one the same way.
+
+It does not need to. A specification does not carry a line of C. `pix & 1 ? 255 - (pix >> 1) : (pix >>
+1)` is not prose describing a rule, a table, or a worked example the way Niedermayer's `asv1.txt` gives
+ASV1 and ASV2's own tables in full — it is an expression, complete with its own operator precedence and
+a ternary a reader has to already know C to parse, exactly the shape a decompiler or a disassembler
+hands back and exactly unlike anything a person explaining a format to someone else would choose to
+write instead. Whichever binary it came out of — Mark FD's own original encoder/decoder, most plausibly,
+given the two-day gap before ffmpeg's own decoder existed to quote — the page is a transcription of
+running code, not a description of one, which is the same failure this project already declines LOCO,
+TSCC2, Go2Meeting, MSS1 and MSS2 for, reached here by the content itself rather than by a citation or a
+matching function name.
+
+## What was not found to fill the gap
+
+No vendor document from Mark FD or anyone else describing VBLE was found. FFmpeg carries no `vble`
+encoder, so no corpus can be built to order; one real file exists, `fate-suite.ffmpeg.org/vble/
+flowers-partial-2MB.avi` — named, and sized, as a deliberately incomplete capture rather than a full
+recording — and it was not carried further, because a corpus is not what this format is missing.
+
+## What would change the answer
+
+A description of VBLE's prediction and entropy coding, or of the widening formula above, written in
+prose or tables rather than transcribed from a binary — from Mark FD himself, from a document that
+names him as its source, or from a reverse-engineering write-up that says plainly how it was produced
+and from what, the way this project would need for LOCO or Canopus Lossless above.
