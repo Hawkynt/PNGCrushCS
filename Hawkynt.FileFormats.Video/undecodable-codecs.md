@@ -2574,3 +2574,67 @@ A description of VBLE's prediction and entropy coding, or of the widening formul
 prose or tables rather than transcribed from a binary — from Mark FD himself, from a document that
 names him as its source, or from a reverse-engineering write-up that says plainly how it was produced
 and from what, the way this project would need for LOCO or Canopus Lossless above.
+
+# HuffYUV MT (HYMT), where the only thing missing is the only thing not written down
+
+HYMT is a community fork of Ben Rudiak-Gould's HuffYUV, made multithreadable. This package already
+decodes HuffYUV and FFVHUFF exactly — the median, left and gradient predictors, the Huffman tables in
+the stream description, the word-swapped bit order, the longest-length-down code assignment, all of it
+— so on the face of it HYMT should be the cheapest entry this project could add: reuse everything and
+handle whatever the fork changed.
+
+The trouble is that what the fork changed is precisely and exclusively the part nobody wrote down.
+
+## What is published, in full
+
+MultimediaWiki's "Huffyuv mt" page, created on 2 May 2009 by "Nazo" in two edits, is this in its
+entirety, technical content included:
+
+> This codec is multithreadable codec based on HuffYUV. This codec is compatible with Huffyuv in
+> non-multithread mode.
+
+plus the four-character code `HYMT`, a link to the author's site, and — nine years after it was written
+and six after ffmpeg gained a decoder — the page is still filed under `Category:Undiscovered Video
+Codecs`. There is no header layout, no table format, no slice structure and no bit order. The main
+HuffYUV page does not mention HYMT or the multithreaded mode at all.
+
+The first-party source is no better. The author's own project page carries a download and a version
+changelog: it confirms the codec is a fork of HuffYUV v2.1.1 and that **v613 is where the four-character
+code became `HYMT`**, and its remaining entries are "decoding fixes", "compress function corrections",
+a Japanese resource file and a 64-bit installer. Not one line describes a format change.
+
+## Where the difference actually lives
+
+The fork's own claim — compatible with HuffYUV in non-multithread mode — says by implication that a
+file written in multithread mode is *not* classic HuffYUV, and that is the whole of what is known about
+how the two differ from any published source. The shape of the difference is a slice table for thread
+partitioning: some per-slice offsets, sizes and a slice height, so that threads can start at several
+points in a frame at once.
+
+Knowing the shape is not knowing the encoding. Where that table sits, how many entries it has, how wide
+its fields are, in what byte order, whether the predictors and the Huffman state reset at each slice
+boundary or run through it, and how it interacts with the header forms HuffYUV already has — every one
+of those is a decision a bit-exact decoder must get right, and not one of them is published anywhere.
+
+## The one complete description is a GPL implementation
+
+The wiki page links the fork's own GPL v2-or-later decoder and encoder source, which does describe the
+format completely, being it. This project does not transcribe implementations, and this one carries a
+second problem on top of that rule: a GPL v2+ source translated into an LGPL-3.0-or-later library is a
+licence incompatibility as well as a provenance one. ffmpeg's own HYMT decoder, added by a different
+author in 2018, is the other implementation and is barred for the usual reason.
+
+## And there is no file to work from
+
+No HYMT sample turned up anywhere searched. `fate-suite.ffmpeg.org/hymt/` returns 404 and there is no
+FATE test for the codec; `samples.ffmpeg.org/V-codecs/HuffYUV/` holds twenty files and every one of them
+is classic `HFYU`. ffmpeg has `huffyuv` and `ffvhuff` encoders but none for HYMT, so no corpus can be
+built to order either. Running the fork's own Windows binary would produce files, and would still leave
+the slice table undocumented — it would supply the corpus and none of the description.
+
+## What would change the answer
+
+A statement of the multithreaded frame layout — where the slice table sits, its field widths and order,
+and whether prediction and the Huffman state carry across a slice boundary — from a source that is not
+an implementation. That is a small document, and everything around it is already decoded in this
+package, which is what makes this entry a genuinely narrow miss rather than a wall.
