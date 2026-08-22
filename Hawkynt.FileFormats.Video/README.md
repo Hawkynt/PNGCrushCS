@@ -124,6 +124,8 @@ who wants one frame of a two-hour recording pays for one frame.
 
 | GoPro CineForm (SMPTE VC-5) | `CFHD` | Y | — |
 
+| Commodore CDXL Video | `CDXL` (synthetic — the format states no codec tag of its own) | Y | — |
+
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
 is an undivided heap of bytes, and where each packet starts and stops is a computation over five
@@ -2407,6 +2409,50 @@ What refuses, by name: a channel count other than three; a highpass codeblock th
 entropy-decode cleanly to Annex C.2's band end marker at its stated row width or at the next multiple
 of eight; and a channel that ends before its lowpass band was ever coded. There is no `catch` here
 returning a blank, a copied or a repeated frame.
+
+### Commodore CDXL Video
+
+The Amiga CDTV's own motion-video format, uncompressed and streamed straight off a single-speed
+CD-ROM at whatever bit rate the disc could sustain — see `CdxlContainer`'s own remarks for the chunk
+framing this decoder's packets carry whole, header and all, because a later chunk is documented as
+free to restate its picture size and bitplane count rather than hold them fixed for the file.
+
+Bit planar pixel bytes are plane-major: all of bitplane zero top to bottom, then all of bitplane one,
+and so on, each row `ceil(width / 8)` bytes with the leftmost pixel the most significant bit of the
+first byte, plane zero contributing bit zero of the combined pixel value. The twelve-bit palette —
+four bits a channel in a big-endian word's low twelve bits — widens to eight by repeating the nibble,
+the same construction this library's IFF ILBM reader uses for the same Amiga colour words.
+
+RGB mode reads a pixel's combined bitplane value as a palette index outright. Hold-And-Modify reads
+the top two bits as a choice — a fresh palette lookup through the low bits, or hold the pixel before it
+and overwrite one channel with the low bits widened the same way the palette is, by repeating the
+nibble. **Only HAM6 — six bitplanes, a four-bit index and four-bit modify value — reaches this
+decoder's own bar.** A row's very first pixel starts from the palette's own first entry rather than
+black: an Amiga display carries its border colour into the pixels before anything modifies them, and a
+real file's HAM6 frames disagreed with ffmpeg by a small, constant amount in exactly the rows whose
+first coded pixel is a modify opcode until this was corrected.
+
+**HAM8 does not reach the same bar and is refused rather than shipped.** Scaled the same way — two
+control bits, six modify bits widened by plain shift rather than HAM6's nibble replication, confirmed
+separately since blue and green already agree exactly without any replication — a real HAM8 file's
+blue and green channels decode exactly, and its red channel does not: one to three levels of error on
+about a third of its modify opcodes, with the same modify value producing a different error at
+different positions in the picture, which is not the shape a scaling mistake takes. Whether that is a
+rule this investigation did not find or an inconsistency in the oracle's own red channel was not
+settled, so HAM8 is refused by name rather than shipped with an unexplained wrong channel.
+
+**Measured.** Four files from `samples.ffmpeg.org/cdxl/` — `cat.cdxl` (160x120, six planes, HAM),
+`fruit.cdxl` (128x80, four planes, RGB), `maku.cdxl` (176x128, eight planes, RGB) and `mirage.cdxl`
+(176x128, eight planes, HAM) — were decoded here and by ffmpeg and compared sample for sample against
+ffmpeg's own `rgb24` output, RGB-native so there is no chroma-siting convention to disagree about.
+Every frame of the RGB files and every frame of the HAM6 file — seventy-three frames across three
+files — is identical, maximum delta nought. `mirage.cdxl`'s HAM8 frames are refused rather than
+compared, for the reason above.
+
+What refuses, by name: a plane arrangement other than bit planar; the YUV and AVM/DCTV video
+encodings CDXL's own documentation names but no measured file uses; HAM at any plane count other than
+six; a packet shorter than its own stated palette and pixel bytes; and a coded pixel naming a palette
+index the stated palette does not have.
 
 ## 📜 License
 
