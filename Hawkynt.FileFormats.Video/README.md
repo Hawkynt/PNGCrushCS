@@ -53,6 +53,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | Commodore CDXL | `.cdxl` | Y | — |
 | IFF ANIM | `.anim`, `.iff` | Y | — |
 | Sierra VMD | `.vmd` | Y | — |
+| ARMovie/RPL | `.rpl` | Y | — |
 
 | Codec | Tag | Decode | Encode |
 | --- | --- | --- | --- |
@@ -152,6 +153,8 @@ who wants one frame of a two-hour recording pays for one frame.
 | ASUS V1 | `ASV1` | Y | — |
 
 | ASUS V2 | `ASV2` | Y | — |
+
+| Eidos Escape 130 | `130` (plain decimal — the ARMovie/RPL container names its codecs by number, not a four-character code) | Y | — |
 
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
@@ -353,6 +356,32 @@ revision's own shorter, palette-free 52-byte form, and the 816-byte form's two-f
 an external audio codec, are refused by name rather than guessed at. What a video frame's own bytes
 mean — the LZ compression and the three ways of painting a rectangle from them — is not this container's
 business and is not yet decoded.
+
+ARMovie/RPL — the container early PC Tomb Raider games and Eidos' other Escape-codec titles use —
+carries no relation to RIFF at all: a text header of twenty-one newline-terminated fields, then a flat
+binary catalogue at the offset the header names, stating every chunk's own file offset and the byte
+length of its video and sound payloads, video first and sound immediately after at that same offset.
+The header's own "number of chunks" field states the highest chunk index rather than a count, so the
+catalogue holds one more line than that field says — the same off-by-one Escape 124's own investigation
+found and recorded in `undecodable-codecs.md` before any codec riding this container was implemented,
+confirmed again here against real files whose header states three chunks and twenty-five frames a
+chunk, seventy-five frames read literally, where the catalogue holds four lines and ffmpeg reports the
+true count, `4 x 25 = 100`. Every catalogue entry's own offset and two sizes land exactly on the next
+entry's own offset in every file measured, closing the loop on the catalogue being internally consistent
+rather than merely present.
+
+A chunk's video bytes are handed to the codec whole rather than split into pictures here, because that
+split needs a per-codec frame header this reader does not read — Escape 130's own sixteen-byte one and
+Escape 124's own eight-byte one are different shapes entirely, and reading either one here would make
+the demuxer codec-specific the way RoQ's and Sierra VMD's own readers are not. Every real Escape 130
+clip found for this reader states exactly one frame a chunk, which is the only shape read; a file
+stating more than one is refused by name rather than guessed at.
+
+**Measured.** Five real ARMovie/RPL files from `samples.ffmpeg.org/game-formats/rpl/` — 320x240, 25 to
+869 chunks apiece, spanning four different Eidos titles and a Watch advertisement's own intro reel —
+were opened here and every packet fully decoded and compared against ffmpeg's own decode, sample by
+sample: 1,297 pictures measured in all, every one of every file identical to ffmpeg's own `yuv420p`
+planes. See Escape 130's own section below for what that decode measures and how.
 
 ### MPEG-1 video
 
@@ -2922,6 +2951,79 @@ ASV1 and this library's MPEG-1, H.263 and H.261 decoders already measure against
 
 What refuses, by name: a quantisation parameter of zero, which the dequantisation divides by; and
 codec-private data shorter than the eight-byte global header the document's own bitstream clause needs.
+
+### Eidos Escape 130
+
+The FMV codec that replaced Escape 122 and Escape 124 for the PC Tomb Raider era, carried in the
+ARMovie/RPL container above and sharing almost nothing else with either predecessor: no codebook and no
+quadtree, just a picture built from 2x2 blocks in a mixed Y'Pb'Pr' colourspace, each block a flat
+colour, a four-way brightness pattern around one, or a clone of the block before it. Read from the
+format's own "EIDOS ESCAPE Codec 130" technical description — mirrored at
+`multimedia.cx/mirror/dec130-spec.txt`, a reverse-engineer's account of disassembling Eidos' own
+`dec130.dll` rather than a paraphrase of any other project's decoder — and checked against real files
+at every point real files could settle it, four of which turned out to need a different reading than a
+literal one gives.
+
+**Every skip code is decremented by one, not only the frame's first.** The specification's own table
+gives a skip code's four tiers as stating `1`, `v+1`, `v+8` and `v+263` blocks skipped, and says only
+the picture's first skip code is decremented by one to address its own top-left block. Read literally, a
+keyframe — which the same specification states may only ever skip zero blocks — could never actually
+skip zero anywhere but its own first skip code, since every tier's stated minimum is one. Measured
+against real keyframes, every skip code decodes to that minimum and every one of them has to mean zero:
+applying the `-1` correction uniformly is what turns a full 320x240 keyframe into exactly 19,200 explicit
+block codes with nothing skipped, consuming the bitstream to within a handful of bits of its own stated
+length.
+
+**A block code's "previous block" resets to zero at the start of every frame, not only the very first
+one.** The specification's own "Persistent Storage" section states Y'/Pb'/Pr' are initialised to zero
+"before decoding the first frame" and are otherwise carried across frame boundaries. Read literally, a
+delta-coded block at a later frame's own top-left corner would adjust against whatever the picture's
+*last* block held several frames back — measured against a real interframe whose own first coded block
+is a Y-adjust code, that reading is off by a magnitude no adjustment code can cover, where treating every
+frame's own first coded block as adjusting from a fresh zero reproduces the file exactly. Only the
+delta and reuse reference resets each frame; the picture's own per-position state a *skip* copies
+forward is untouched.
+
+**A four-brightness block's five-bit Y' field is doubled to the shared six-bit scale in all three of its
+own variants**, not only the two the specification calls it out for. Its own words — "ccccc0 ⇒ New Y'.
+(Note the trailing 0)" — appear only where a Pb'/Pr' field follows, and say nothing for the plain
+"Set Y" variant. Fit against 71,267 pixels of one real file's own keyframe, its four-brightness and
+single-colour blocks together, doubling that field uniformly reproduces every one exactly; leaving the
+one undoubled variant as read reproduces none of them — corroborated afterward by all five files' own
+full decodes matching ffmpeg byte-exact end to end.
+
+**"Reuse previous block" clones the whole rendered block, sign pattern included** — the specification's
+own word for it is "cloning," and a real file's own reuse code following a four-brightness block
+reproduces that block's non-uniform four pixels rather than a flat repaint of its shared base colour.
+Every other single-colour code that only restates Y' leaves the previous block's own sign pattern behind
+and paints flat, which is what the rest of every file measured needs.
+
+**MultimediaWiki's own correction to the chroma adjustment table was not carried here.** Its Escape 130
+page states plainly that the source document above "had errors" in this one table and prints a
+different reading for three of its eight entries. Measured against 202,374 absolute Pb'/Pr' block codes
+and every adjustment code reachable from them, on the one real file found with genuine colour rather
+than the near-flat greyscale most of the others open on, the source document's own table, unmodified,
+reproduces every Cb and Cr sample of every picture with no difference at all — settling which of the two
+tables real files were actually encoded against, without needing to try the wiki's own three altered
+entries against the same data at all.
+
+The colourspace conversion itself uses the specification's own nonlinear Pb'/Pr' table rather than the
+plain linear one it also offers as an alternative: fit the same way, `U = round(256 × table[Pb'] + 128)`
+and `V = round(256 × table[Pr'] + 128)` reproduce every chroma sample exactly, where the linear mapping's
+own best-fit line reproduces well under half of the same samples.
+
+**Measured.** Five real files from `samples.ffmpeg.org/game-formats/rpl/` — 320x240, 25 to 869 pictures
+apiece, 1,297 in all, one of them a Watch advertisement's own intro carrying genuine colour rather than
+the greyscale most of the others open on — were decoded here and by ffmpeg and compared against ffmpeg's
+own decoded `yuv420p` planes, sample by sample, every frame of every file: Y, Cb and Cr are all bit-exact
+on every one. A direct YCbCr comparison rather than an RGB one is what settles it, for the same reason
+id RoQ's own decoder here is measured that way — this decoder converts to RGB for its own output, but
+ffmpeg's `swscale` RGB is not perfectly faithful to its own decoded planes, where the codec's native
+colourspace is.
+
+What refuses, by name: a picture whose width or height is not a whole number of 2x2 blocks, and — in
+`RplContainer` rather than here, since it is the demuxer's own business — an ARMovie/RPL chunk stating
+more than one frame.
 
 ## 📜 License
 
