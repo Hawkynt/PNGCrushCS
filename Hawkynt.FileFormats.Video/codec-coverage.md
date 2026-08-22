@@ -22,9 +22,9 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 
 | | Count | Share |
 | --- | --- | --- |
-| Decoded and verified against ffmpeg | 61 | 29% |
+| Decoded and verified against ffmpeg | 62 | 29% |
 | Established as not implementable from files alone | 35 | 17% |
-| Not yet attempted | 115 | 55% |
+| Not yet attempted | 114 | 54% |
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
 frame against ffmpeg's decode of the same bitstream before it was merged, and the measurements are in
 each one's section of that file. The ones that reach exact equality on every sample of every frame
@@ -33,14 +33,22 @@ FFVHUFF, FFV1, ZMBV, TSCC, CSCD, Flash Screen Video, Flash Screen Video 2, id Ro
 id Cinematic Video, Westwood VQA Video, Electronic Arts CMV, Commodore CDXL Video, IFF ANIM Video, BFI Video, QPEG Video,
 Sierra VMD Video,
 Ut Video, MagicYUV, v210, r210, r10k,
-y41p, CLJR, ZeroCodec, LCL ZLIB, Autodesk Animator Codec, avui, avrp
+y41p, CLJR, ZeroCodec, LCL ZLIB, Autodesk Animator Codec, avui, avrp,
+Creative YUV
 and Hap — the two colour-space ones over 883 and 1,446 frames, in all six and all seven of their
 colour spaces, and the packed layouts on the sample data itself, at its own coded depth and with
 no display conversion in the way, over 120, 90, 90, 90 and 60 frames at three geometries each.
-CLJR is the one lossy format among them — measured against ffmpeg's own decode rather than the
-source, because its encoder dithers. ZeroCodec is measured the same packed-native way — on its
+CLJR and Creative YUV are the two lossy formats among them, and both are exact at the decoder for the
+same reason: the loss is the encoder's, so a decoder reading the coded bits has nothing left to round.
+CLJR is measured against ffmpeg's own decode rather than the source because its encoder dithers, and
+Creative YUV quantises every sample to one of sixteen per-frame table entries, which is a difference
+already taken before a decoder sees it. ZeroCodec is measured the same packed-native way — on its
 own 4:2:2 samples, not through an RGB conversion — over the one recording that exists for it: no
-ffmpeg encoder exists to build a corpus with. Hap is the only one of these whose coded blocks are
+ffmpeg encoder exists to build a corpus with. Creative YUV has no encoder either, and is measured on
+its planes and its packed samples over the two recordings that exist — 150 coded frames of 176x144 at
+4:1:1 and 14 uncompressed frames of 320x240, the two shapes the format has, told apart by packet
+length alone since nothing in either file states which is which.
+Hap is the only one of these whose coded blocks are
 themselves an exact format — DXT1/BC1, DXT5/BC3 texture compression — so its own bar is the same
 lossless one at a different source: max delta 0 against ffmpeg's decode of the same blocks, over six
 streams and six hundred frames, on raw RGB or RGBA planes since Hap carries no chroma subsampling of
@@ -219,8 +227,9 @@ package's own H.264 decoder everywhere the two coincide, but its departures from
 code chief among them — have no description independent of the one implementation that reverse-engineered
 it, confirmed by the format's own recorded history as well as by the page's own citation.
 
-**Lossless RGB and YUV** — what is left of the group is `012v`, `cllc`, `cyuv`, `dxtory`,
-`loco`, `m101`, `sheervideo`, `vble` and `ylc`. Ut Video, MagicYUV, ZeroCodec, LCL ZLIB and AASC came out
+**Lossless RGB and YUV** — what is left of the group is `012v`, `cllc`, `dxtory`,
+`loco`, `m101`, `sheervideo`, `vble` and `ylc`. Ut Video, MagicYUV, ZeroCodec, LCL ZLIB, AASC and
+Creative YUV came out
 of it and reached exact equality, and MSZH came out of it into `undecodable-codecs.md`. AASC's own
 row-and-column bookkeeping — a coding this project found no independent description narrower than "the
 same shape as Microsoft RLE" — needed measuring against a real file to settle at all: the wiki page names
