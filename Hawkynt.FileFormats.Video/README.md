@@ -105,6 +105,8 @@ who wants one frame of a two-hour recording pays for one frame.
 
 | Cirrus Logic AccuPak (CLJR) | `CLJR` | Y | — |
 
+| Avid Meridien Uncompressed (avui) | `AVUI` | Y | — |
+
 | id RoQ | `RoQV` (synthetic — the format states no codec tag of its own) | Y | — |
 
 | Flash Screen Video 2 (FSV2) | `FSV2` | Y | — |
@@ -1678,6 +1680,35 @@ both here and by ffmpeg: **every sample of every plane of every frame identical.
 
 What refuses: a picture with no pixels, a width that is not a multiple of four — ffmpeg's own encoder
 refuses the same width — and a packet shorter than its stride times its height.
+
+### avui
+
+Avid Meridien's uncompressed 4:2:2 packing, and the only member of this family whose geometry is not
+free: ffmpeg's own encoder accepts exactly two sizes, 720x486 and 720x576, and refuses everything else
+outright — the two standard-definition NTSC and PAL rasters the Meridien board switched between, with
+no high-definition mode at all. There is no MultimediaWiki page for this one either, so what follows was
+recovered the same way v210 and y41p were: pseudo-random `uyvy422` content carried through ffmpeg's own
+avui encoder and swept against every placement of a header ahead of, inside and behind the picture data.
+
+**A fixed run of blank lines opens every packet**, ahead of an otherwise perfectly ordinary `uyvy422`
+row of the picture — ten lines' worth at the NTSC geometry, 14,400 bytes, and sixteen at PAL, 23,040.
+Nothing about the count scales with either dimension the way a picture row does; it is a flat number of
+lines tied to which of the two standards a stream is, not a formula computed from the width or the
+height. Once past it, a row is `Cb(0), Y(0), Cr(0), Y(1)`, repeating, with no padding of its own.
+
+Verified on the planes and not on packed colour, because this is a lossless packing of the eight-bit
+samples themselves. Both geometries and fifty frames of pseudo-random content each — the only two sizes
+ffmpeg's encoder will write — carried through avui and decoded here, compared sample for sample against
+ffmpeg's own raw `uyvy422` output of the same content: every sample of every plane of every frame is
+identical, and the header bytes ahead of the picture are all zero in every one of the hundred frames
+measured, which is what a decoder that only ever skips them rather than interpreting them needs to be
+true.
+
+The packed colour a caller gets back is a display convention on top of that, as with v210 and y41p —
+ITU-R BT.601 with studio swing and each chroma pair repeated across the two luma columns it covers.
+
+What refuses: a picture whose width and height are not one of the two geometries avui's own encoder
+ever writes, and a packet shorter than its header plus its picture's stride times its height.
 
 ### H.261
 
