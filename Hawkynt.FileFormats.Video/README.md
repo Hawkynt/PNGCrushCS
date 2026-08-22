@@ -53,7 +53,6 @@ who wants one frame of a two-hour recording pays for one frame.
 | Commodore CDXL | `.cdxl` | Y | — |
 | IFF ANIM | `.anim`, `.iff` | Y | — |
 | Sierra VMD | `.vmd` | Y | — |
-| Sony PlayStation STR | `.str` | Y | — |
 
 | Codec | Tag | Decode | Encode |
 | --- | --- | --- | --- |
