@@ -23,8 +23,8 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 | | Count | Share |
 | --- | --- | --- |
 | Decoded and verified against ffmpeg | 51 | 24% |
-| Established as not implementable from files alone | 29 | 14% |
-| Not yet attempted | 131 | 62% |
+| Established as not implementable from files alone | 32 | 15% |
+| Not yet attempted | 128 | 61% |
 
 The 51 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
@@ -56,10 +56,11 @@ the stronger oracle of the two, being the ground truth itself. LCL ZLIB is measu
 addition to the usual one, since it too has a real encoder here: round-tripped through it as well as
 checked against seven real recordings.
 
-The 29 are Indeo 3, Indeo 4, Indeo 5, TrueMotion 1, WMV1, WMV2, MSS1, MSS2, Canopus HQ/HQA
+The 32 are Indeo 3, Indeo 4, Indeo 5, TrueMotion 1, WMV1, WMV2, MSS1, MSS2, Canopus HQ/HQA
 (`hq_hqa`), Canopus HQX, Lagarith, DV, MSZH, Escape 124, SpeedHQ, VP4, VP7, MSCC, RSCC, WCMV,
 MWSC, RASC, Go2Meeting (`g2m`), ScreenPressor (`scpr`), Screenpresso, TSCC2, Sorenson Video 1
-(`svq1`), Sorenson Video 3 (`svq3`) and Smacker (`smackvid`), and the arguments that settle them are in
+(`svq1`), Sorenson Video 3 (`svq3`), Smacker (`smackvid`) and Electronic Arts TGQ, TQI and MAD
+(`eatgq`, `eatqi`, `eamad`), and the arguments that settle them are in
 `undecodable-codecs.md`. The first four have frames too small to
 carry the tables they need —
 340 bytes for a 320x240 Indeo 3 picture, 14 for Indeo 4, 2 for Indeo 5, 0 for TrueMotion 1 — so those
@@ -90,6 +91,15 @@ but the actual compression — "copying blocks from already decoded data," the f
 then leaves an unfilled placeholder where the algorithm should be — was reverse-engineered against a
 single still picture re-encoded six ways rather than a real recording, which yielded exactly two genuine
 match tokens to calibrate an entirely unpublished encoding against and settled neither.
+
+Electronic Arts TGQ, TQI and MAD join the same first group, and cleanly: the only detailed description
+of any of the three, on MultimediaWiki, is by the same person who wrote every one of ffmpeg's decoders
+for them, and that page's own edit history shows its maintainer replacing what it once said about the
+shared inverse transform with a link into that decoder's own source file rather than writing the
+transform down — the two sibling pages carry the identical gap as an open `<FIXME>`. A DCT decoder
+cannot approximate its way past a missing transform the way a container can skip an unread field, so
+this is the SVQ1 shape rather than the WMV1 one: not a corpus too small to hold the table, but a source
+that names where the table lives instead of printing it.
 
 Escape 124 and SpeedHQ both stop closer to the finish than the rest: their containers, and most of
 their bitstreams, are fully mapped and verified against real files, with one specific piece each left
@@ -263,11 +273,15 @@ independent source for its entropy table or a confirmed shuffle table either; it
 the not-implementable codecs above rather than left in this list.
 
 **Game and FMV codecs** — the largest group, around 45 names, of which `roqvideo`, `interplayvideo`,
-`idcinvideo`, `vqavideo` and `eacmv` are now done and `escape124` and `smackvid` are investigated and not
-implementable (`undecodable-codecs.md`): `binkvideo`, `vmdvideo`, `escape130`, the rest of the `ea*`
-codecs (`eatgv`, `eatgq`, `eatqi`, `eamad`), the `xan_*` pair and many more. Almost none has a published
-specification; most are described on MultimediaWiki from reverse engineering. Their value is
-preservation rather than reach, and each is small.
+`idcinvideo`, `vqavideo` and `eacmv` are now done and `escape124`, `smackvid`, `eatgq`, `eatqi` and
+`eamad` are investigated and not implementable (`undecodable-codecs.md`): `binkvideo`, `vmdvideo`,
+`escape130`, the `xan_*` pair and many more. `eatgv` is investigated and partially recovered rather than
+either done or closed — see `undecodable-codecs.md`, which records a container and picture header
+confirmed to the byte, a published one-byte literal-run formula measured and corrected, and where the
+next statement's own bit layout stops matching the file, the same shape TrueMotion 2's own section
+there is in. Almost none of what is left has a published specification; most are described on
+MultimediaWiki from reverse engineering. Their value is preservation rather than reach, and each is
+small.
 
 **Everything else** — `indeo2`, `asv1`, `asv2`, `mdec`, `mimic`, `amv`, `mxpeg`, `sp5x`,
 `truemotion2` and the remainder. `cljr` came out of this group and reached exact equality; it is the
