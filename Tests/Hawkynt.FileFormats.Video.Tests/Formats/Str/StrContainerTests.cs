@@ -9,8 +9,12 @@ namespace FileFormat.Str.Tests;
 /// The Sony PlayStation STR container's demuxing behaviour: finding the run of CD sectors whether it
 /// opens the file directly or sits behind a RIFF/CDXA wrapper, reassembling a video frame out of
 /// chunks that are not necessarily consecutive sectors, trimming a frame to its own stated byte length
-/// rather than the chunk budget it was reserved, and reporting a video frame's timestamp as the
-/// per-chunk header's own frame number rather than a running count of pictures seen.
+/// rather than the chunk budget it was reserved, reporting a video frame's timestamp as the per-chunk
+/// header's own frame number rather than a running count of pictures seen, and handing that frame out
+/// as exactly the reassembled bitstream with the per-chunk header itself left off — see
+/// <see cref="StrReader.ReadPackets"/>'s own remarks for which of that header's fields are container
+/// bookkeeping already spent and which are left off only because nothing here yet knows the codec
+/// needs them restated.
 /// </summary>
 /// <remarks>
 /// Five real recordings from <c>samples.mplayerhq.hu/game-formats/psx-str/</c> — Descent, two
@@ -18,12 +22,16 @@ namespace FileFormat.Str.Tests;
 /// other wrapped — were opened here and their packet stream compared against <c>ffprobe -fflags
 /// +noparse</c>'s own: 2,461 video packets and 1,377 audio packets across the five, every video
 /// packet's stream index, size and presentation timestamp identical, and every audio packet's size
-/// identical. What a hand-built fixture reaches for instead is what no measured sample happened to
-/// force: a signature that is not this format's, a truncated file cut inside a frame's own chunks,
-/// and a frame numbering with a gap in it, to settle whether the timestamp this reader reports is the
-/// file's own frame number or an invented running count — the same question Sierra VMD's own table of
-/// contents forced, answered here by construction since every real sample's frame numbering happened
-/// to be contiguous.
+/// identical. On three of the five, video and audio both, every packet's own bytes were checked
+/// against <c>ffprobe -show_data_hash MD5</c>'s own hash of that same packet — 1,212 video packets and
+/// 891 audio packets, byte for byte identical to ffmpeg's own demuxed data rather than to a
+/// reconstruction built here that could share this reader's own assumptions about where a packet
+/// begins. What a hand-built fixture reaches for instead is what no measured sample happened to force:
+/// a signature that is not this format's, a truncated file cut inside a frame's own chunks, a frame
+/// numbering with a gap in it to settle whether the timestamp this reader reports is the file's own
+/// frame number or an invented running count — the same question Sierra VMD's own table of contents
+/// forced — and a disc interleaving more than one CD-XA channel's worth of video or audio, which this
+/// reader refuses rather than silently merges.
 /// </remarks>
 [TestFixture]
 public sealed class StrContainerTests {
@@ -135,15 +143,17 @@ public sealed class StrContainerTests {
 
   [Test]
   [Category("Unit")]
-  public void AVideoPacketOpensWithTheFirstChunksThirtyTwoByteHeader() {
+  public void AVideoPacketIsExactlyTheTrimmedBitstreamWithNoChunkHeaderPrefix() {
+    // The thirty-two-byte per-chunk header is container bookkeeping this reader has already spent —
+    // reassembly, trimming and the timestamp all consumed it — so it is not carried on the packet.
+    // Width and height are on the stream, not repeated on every packet.
     var payload = _Bytes(20);
     var file = _VideoSector(chunkIndex: 0, chunkCount: 1, frameNumber: 1, frameSize: 20, width: 320, height: 160, payload: payload);
     var container = StrContainer.FromBytes(file);
 
     var packet = StrContainer.ReadPackets(container).Single(p => p.StreamIndex == 0);
-    Assert.That(packet.Data.Length, Is.EqualTo(32 + 20));
-    Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(packet.Data.Span[16..]), Is.EqualTo(320)); // width, at the chunk header's own offset
-    Assert.That(packet.Data.Span[32..].ToArray(), Is.EqualTo(payload));
+    Assert.That(packet.Data.Length, Is.EqualTo(20));
+    Assert.That(packet.Data.ToArray(), Is.EqualTo(payload));
   }
 
   [Test]
@@ -167,7 +177,7 @@ public sealed class StrContainerTests {
 
     var packet = StrContainer.ReadPackets(container).Single(p => p.StreamIndex == 0);
     var expected = chunk0.Concat(chunk1).Concat(chunk2.Take(100)).ToArray();
-    Assert.That(packet.Data.Span[32..].ToArray(), Is.EqualTo(expected));
+    Assert.That(packet.Data.ToArray(), Is.EqualTo(expected));
   }
 
   [Test]
@@ -193,7 +203,7 @@ public sealed class StrContainerTests {
 
     var video = packets.Single(p => p.StreamIndex == 0);
     var expected = chunk0.Concat(chunk1.Take(50)).ToArray();
-    Assert.That(video.Data.Span[32..].ToArray(), Is.EqualTo(expected));
+    Assert.That(video.Data.ToArray(), Is.EqualTo(expected));
   }
 
   [Test]
@@ -212,9 +222,9 @@ public sealed class StrContainerTests {
     var container = StrContainer.FromBytes(file);
     var packet = StrContainer.ReadPackets(container).Single(p => p.StreamIndex == 0);
 
-    Assert.That(packet.Data.Length, Is.EqualTo(32 + _ChunkPayloadLength + 5));
+    Assert.That(packet.Data.Length, Is.EqualTo(_ChunkPayloadLength + 5));
     var expected = chunk0.Concat(chunk1.Take(5)).ToArray();
-    Assert.That(packet.Data.Span[32..].ToArray(), Is.EqualTo(expected));
+    Assert.That(packet.Data.ToArray(), Is.EqualTo(expected));
   }
 
   // ============================================================================================
