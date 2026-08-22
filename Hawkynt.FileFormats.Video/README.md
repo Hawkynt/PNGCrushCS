@@ -49,6 +49,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | Westwood VQA | `.vqa` | Y | — |
 | Smacker | `.smk` | Y | — |
 | Electronic Arts Multimedia | `.wve`, `.cmv`, `.tgv`, `.uv`, `.uv2` | Y | — |
+| Brute Force & Ignorance (BFI) | `.bfi` | Y | — |
 | Commodore CDXL | `.cdxl` | Y | — |
 | IFF ANIM | `.anim`, `.iff` | Y | — |
 
