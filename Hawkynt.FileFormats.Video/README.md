@@ -127,6 +127,8 @@ who wants one frame of a two-hour recording pays for one frame.
 
 | Commodore CDXL Video | `CDXL` (synthetic — the format states no codec tag of its own) | Y | — |
 
+| IFF ANIM Video | `ANIM` (synthetic — the format states no codec tag of its own) | Y | — |
+
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
 is an undivided heap of bytes, and where each packet starts and stops is a computation over five
@@ -2454,6 +2456,44 @@ What refuses, by name: a plane arrangement other than bit planar; the YUV and AV
 encodings CDXL's own documentation names but no measured file uses; HAM at any plane count other than
 six; a packet shorter than its own stated palette and pixel bytes; and a coded pixel naming a palette
 index the stated palette does not have.
+
+### IFF ANIM Video
+
+The Amiga's own CEL animation format, and the same two pixel encodings this library's CDXL decoder
+already reads — a picture read straight through a palette, or through Hold-And-Modify — laid over IFF
+ILBM's plane-major bit planar pictures rather than CDXL's own. Only compression method 5, Byte Vertical
+Delta, is decoded: the original ANIM specification names four other frame-to-frame methods and says of
+them, in its own words, that "the only one currently being placed in new code is the vertical run
+length encoded byte encoding developed by Jim Kent" — method 5 — and every real file measured bears
+that out.
+
+The first frame is an ordinary IFF ILBM picture; what a delta frame modifies is not it, exactly. ANIM
+was built for hardware double-buffering, so this decoder keeps two plane-major picture buffers and an
+animation header's `interleave` field says which one a delta lands on — zero, its default, meaning the
+one that was hidden two frames ago, and one meaning the buffer just shown. Applying delta data to a
+buffer in IFF's own interleaved, per-scanline layout — the shape the first frame's `BODY` chunk
+actually arrives in — reproduces roughly two thirds of a frame correctly and nothing resembling the
+rest, since the delta coding was designed for the Amiga's own in-memory bitmap, whose planes are
+separate contiguous arrays. This decoder transposes a keyframe's interleaved picture to that plane-major
+layout once, immediately after unpacking it, and every delta and every read-out afterwards works in
+that layout, the same arithmetic CDXL's own bit-planar pictures already use.
+
+Hold-And-Modify's modify values, four bits at six bitplanes and six at eight, both widen to eight bits
+by repeating their own low bits — the rule CDXL's HAM6 needs and its HAM8 does not, where the red
+channel disagrees with the oracle under either widening and is refused outright. Here the same rule
+reaches exact equality on every channel at both depths, which says CDXL's HAM8 discrepancy belongs to
+that format or that oracle rather than to Hold-And-Modify as such.
+
+**Measured.** Four files from `samples.ffmpeg.org/anim/` — one bitplane, eight bitplanes, HAM6 and
+HAM8, all 160x120 and 123 frames — were decoded here and by ffmpeg and compared sample for sample
+against ffmpeg's own `rgb24` output: all 492 frames are identical, maximum delta nought.
+
+What refuses, by name: any compression method other than 0 (a whole picture stated again) and 5;
+method 74 ("J", Eric Graham's compression), whose own specification says only "details to be released
+later" and never gives them; an interleave other than zero or one; any of method 5's option bits set,
+since no measured file sets one and the only documented use of them is its own author's stated
+extension rather than the specification's; more than eight bitplanes, the limit the delta chunk's own
+pointer table states; and a coded pixel naming a palette index the stated palette does not have.
 
 ## 📜 License
 

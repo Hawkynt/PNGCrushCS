@@ -22,18 +22,18 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 
 | | Count | Share |
 | --- | --- | --- |
-| Decoded and verified against ffmpeg | 52 | 25% |
+| Decoded and verified against ffmpeg | 53 | 25% |
 | Established as not implementable from files alone | 32 | 15% |
-| Not yet attempted | 127 | 60% |
+| Not yet attempted | 126 | 60% |
 
-The 52 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
+The 53 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
 frame against ffmpeg's decode of the same bitstream before it was merged, and the measurements are in
 each one's section of that file. The ones that reach exact equality on every sample of every frame
 are Microsoft RLE, Microsoft Video 1, Cinepak, QuickTime Animation, Apple Video, Apple Graphics, FLIC, HuffYUV,
 FFVHUFF, FFV1, ZMBV, TSCC, CSCD, Flash Screen Video, Flash Screen Video 2, id RoQ, Interplay Video,
-id Cinematic Video, Westwood VQA Video, Electronic Arts CMV, Commodore CDXL Video, Ut Video,
-MagicYUV, v210, r210, r10k,
+id Cinematic Video, Westwood VQA Video, Electronic Arts CMV, Commodore CDXL Video, IFF ANIM Video,
+Ut Video, MagicYUV, v210, r210, r10k,
 y41p, CLJR, ZeroCodec, LCL ZLIB
 and Hap — the two colour-space ones over 883 and 1,446 frames, in all six and all seven of their
 colour spaces, and the packed layouts on the sample data itself, at its own coded depth and with
@@ -275,7 +275,8 @@ independent source for its entropy table or a confirmed shuffle table either; it
 the not-implementable codecs above rather than left in this list.
 
 **Game and FMV codecs** — the largest group, around 45 names, of which `roqvideo`, `interplayvideo`,
-`idcinvideo`, `vqavideo`, `eacmv` and `cdxl` are now done and `escape124`, `smackvid`, `eatgq`,
+`idcinvideo`, `vqavideo`, `eacmv`, `cdxl` and `iff` (IFF ANIM's Byte Vertical Delta, method 5) are
+now done and `escape124`, `smackvid`, `eatgq`,
 `eatqi` and `eamad` are investigated and not implementable (`undecodable-codecs.md`):
 `binkvideo`, `vmdvideo`, `escape130`, the `xan_*` pair and many more. `eatgv` is investigated and
 partially recovered rather than either done or closed — see `undecodable-codecs.md`, which records
