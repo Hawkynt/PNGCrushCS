@@ -48,6 +48,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | id Cinematic | `.cin` | Y | — |
 | Westwood VQA | `.vqa` | Y | — |
 | Smacker | `.smk` | Y | — |
+| Electronic Arts Multimedia | `.wve`, `.cmv`, `.tgv`, `.uv`, `.uv2` | Y | — |
 
 | Codec | Tag | Decode | Encode |
 | --- | --- | --- | --- |
@@ -270,6 +271,26 @@ whose data chunk length was never filled in and which re-sends a piece. All thre
 last, one picture in 338 672 differs on purpose — the repeat is skipped and the picture recovered
 whole, where ffmpeg, having lost the sequence there, hands back the 46 bytes it still had as though
 they were a picture.
+
+Electronic Arts' own family of game cinematics — CMV, TGV, TGQ, TQI, MAD and the rest, carried under
+`.wve`, `.cmv`, `.tgv`, `.uv` and a handful of other extensions the studio never settled on one of —
+share one container underneath every one of them: a flat run of chunks, each a four-character name, a
+four-byte little-endian size counting its own eight-byte header as well as the payload behind it, and
+nothing else. `EaReader` answers only where a chunk is and which of the handful this reads anything of
+it is; a chunk it has no name for — every audio stream, every one of EA's own video codecs this package
+does not decode — costs nothing to step over, the same as an unrecognised RealMedia chunk.
+
+The format carries no signature of its own: which of EA's codecs a file holds is stated nowhere outside
+the chunk names themselves, so what stands in for one here is the same shape of plausibility check id
+Cinematic's reader already needs — the file's first chunk names one of the handful of kinds this reader
+is built from, and the size behind it is at least the eight bytes that size is itself supposed to cover.
+
+A file is not necessarily one video stream from start to end. The one real sample this reader was built
+and measured against, EA Sports' own `TITLE.CMV`, closes its first forty-nine pictures with an `MVIe`
+chunk and opens straight back into a fresh `MVIh` that restates the palette for a second run of
+pictures — 194 pictures across the two runs in all, matching `ffprobe -count_frames`'s own count exactly
+— walked as one stream by this reader rather than as two, because nothing in the format calls that
+boundary anything more than another header restatement.
 
 ### MPEG-1 video
 
