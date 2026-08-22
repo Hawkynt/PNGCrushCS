@@ -23,8 +23,8 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 | | Count | Share |
 | --- | --- | --- |
 | Decoded and verified against ffmpeg | 63 | 30% |
-| Established as not implementable from files alone | 43 | 20% |
-| Not yet attempted | 105 | 50% |
+| Established as not implementable from files alone | 44 | 21% |
+| Not yet attempted | 104 | 49% |
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
 frame against ffmpeg's decode of the same bitstream before it was merged, and the measurements are in
 each one's section of that file. The ones that reach exact equality on every sample of every frame
@@ -85,6 +85,8 @@ MWSC, RASC, Go2Meeting (`g2m`), ScreenPressor (`scpr`), Screenpresso, TSCC2, Sor
 8088flex TMV (`tmv`) and MidiVid Archive (`mvha`),
 
 8088flex TMV (`tmv`) and Brooktree ProSumer Video (`prosumer`),
+
+8088flex TMV (`tmv`) and SheerVideo (`sheervideo`),
 and the arguments that settle them are in
 `undecodable-codecs.md`. The first four have frames too small to
 carry the tables they need —
@@ -260,6 +262,9 @@ Creative YUV came out
 
 **Lossless RGB and YUV** — what is left of the group is `012v`, `cllc`, `cyuv`, `dxtory`,
 `loco`, `m101`, `sheervideo` and `ylc`. Ut Video, MagicYUV, ZeroCodec, LCL ZLIB and AASC came out
+
+**Lossless RGB and YUV** — what is left of the group is `012v`, `cllc`, `cyuv`, `dxtory`,
+`loco`, `m101`, `vble` and `ylc`. Ut Video, MagicYUV, ZeroCodec, LCL ZLIB and AASC came out
 of it and reached exact equality, and MSZH came out of it into `undecodable-codecs.md`. AASC's own
 row-and-column bookkeeping — a coding this project found no independent description narrower than "the
 same shape as Microsoft RLE" — needed measuring against a real file to settle at all: the wiki page names
@@ -331,6 +336,14 @@ has `mvha`, whose only description — the MidiVid page's archival section — w
 ffmpeg's own decoder was authored, and which even taken at face value states a frame header and then
 stops: no tree construction, no bit order, no prediction seeding, no strides, and no sample of the
 codec exists anywhere to settle any of them against.
+
+the same kind of prediction, also came out of it and is now in `undecodable-codecs.md` instead, and so
+has `sheervideo` — the one codec in that file whose documentation passes the provenance test outright
+and stops anyway. Its bitstream write-up predates ffmpeg's decoder by three years and is by a different
+person, and the vendor itself edited the same page; what it never prints is the dozen VLC codesets and
+the per-format seed predictors its own pseudocode indexes, and because those codes are static rather
+than transmitted, no packet of any of the thirteen real files carries them. That is SVQ1's wall rather
+than Indeo's: not a frame too small to hold a table, but a table no frame was ever going to hold.
 
 **Screen capture** — `tdsc` and `vmnc` are what remains of this group unattempted. Mostly DEFLATE over
 a framebuffer with a delta scheme on top, so also lossless and also absolutely measurable. `flashsv` and
