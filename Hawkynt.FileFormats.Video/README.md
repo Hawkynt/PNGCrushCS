@@ -111,6 +111,8 @@ who wants one frame of a two-hour recording pays for one frame.
 
 | Uncompressed 4:4:4 with alpha (v408) | `v408` | Y | — |
 
+| Uncompressed 4:4:4:4 (ayuv) | `AYUV` | Y | — |
+
 | id RoQ | `RoQV` (synthetic — the format states no codec tag of its own) | Y | — |
 
 | Flash Screen Video 2 (FSV2) | `FSV2` | Y | — |
@@ -1750,6 +1752,26 @@ ahead of, inside and behind the picture data.
 Four bytes a pixel — U, then Y, then V, then alpha, repeating across a row with no padding of any
 kind. A row is exactly `width` times four bytes, and there is no header ahead of the picture at all.
 
+### ayuv
+
+4:4:4:4 YUV with alpha and nothing compressed at all, four bytes a pixel and no chroma subsampling to
+interpolate around — the DirectShow relative of v308 and v408 rather than a third spelling of the same
+layout. Where those two are QuickTime tags ffmpeg's demuxer only recognises inside a MOV, this one is
+recognised inside an AVI, and the two containers do not agree on what a fourth byte of alpha does to
+the order of the first three. There is no MultimediaWiki page and no dedicated ffmpeg decoder for it
+either, so the layout was recovered the same way: pseudo-random content, built at the pixel format
+ffmpeg's own AVI demuxer names for this tag, carried through its generic uncompressed muxer with the
+tag forced to `AYUV`, and swept against every placement of a header ahead of, inside and behind the
+picture data.
+
+Four bytes a pixel — V, then U, then Y, then alpha — which is the *reverse* of what the name spells and
+not the order v408 uses for its own three letters plus alpha. A naive first measurement, generated and
+checked against a mismatched pixel convention on the two sides of the comparison, appeared to show the
+name's own order; regenerating both sides from the one ffmpeg itself uses for a real `AYUV`-tagged AVI
+settled it the other way, and only a comparison against every byte of a real packet — not a single
+flat-coloured frame, where a reversed and a forward reading of a symmetric value can coincide — ruled
+the first reading out for good. A row is exactly `width` times four bytes, with no padding of any kind.
+
 Packed-YUV format carrying alpha, and a direct sample comparison is what settles it — 4:4:4 carries no
 subsampling, so every pixel states its own chroma and there is no interpolation convention to disagree
 about. Fifty frames of pseudo-random content at 17x9 — not a whole number of any alignment this
@@ -1759,6 +1781,9 @@ of every frame identical, alpha included.
 
 The alpha channel is carried through unchanged rather than composited or assumed opaque — PPM carries
 no alpha, and comparing this format through it would invent a value the coding states exactly.
+
+The alpha channel is carried through unchanged rather than composited or assumed opaque, for the same
+reason v408's is.
 
 What refuses: a picture with no pixels, and a packet shorter than its stride times its height.
 
