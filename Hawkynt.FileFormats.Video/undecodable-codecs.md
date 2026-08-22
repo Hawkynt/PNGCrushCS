@@ -2750,3 +2750,80 @@ The codebook, and the frame layout behind `BTIC`, from a source that is not an i
 or Conexant documentation for `btvvc32.drv`, or a reverse-engineering write-up that predates the decoder
 and says how it was produced. Failing that, an encoder would at least open the sweep that recovered the
 packed layouts in this group.
+
+# SheerVideo, whose provenance is clean and whose tables are still in the binary
+
+SheerVideo is BitJazz's commercial lossless codec, `Shr0` through `Shr7` in a QuickTime file, covering
+RGB and Y'CbCr with and without alpha, 8-bit and 10-bit, full and video range, 4:4:4 and 4:2:2,
+progressive and interlaced. It is worth separating from everything else in this file for one reason:
+**it is the only entry here whose documentation passes the provenance test outright and stops anyway.**
+
+## The provenance is genuinely clean
+
+MultimediaWiki's SheerVideo page has a history that reads the right way round for once. The vendor
+itself edited it — user `BitJazz`, on 26 March 2007, comment "Initial write-up" — contributing the
+feature, pixel-format and platform material. The bitstream description proper was added by User:Kostya
+on **24 May 2013**, the page growing by some 1,573 bytes under the edit comment `/* Frame Format */`.
+FFmpeg's own `sheervideo.c` is Paul B Mahol's and dates from **June 2016** — three years later — and the
+wiki carries a 2016-06-10 edit by another hand whose comment is simply "Implemented by Paul".
+
+So the document came first, a different person wrote the decoder, and the decoder was built from the
+document. That is the ordering this project accepts, the same one that made ASV1 and ASV2 buildable
+from `asv1.txt`. Nothing here is disqualified for where it came from.
+
+## What the document actually withholds
+
+It withholds the only thing that matters. The page's own summary of the coding is:
+
+> every line is transferred as raw or delta-coded with **static codes**. There is a dozen of different
+> double codesets depending on input format, different components can be coded with the first or the
+> second VLC in the set
+
+and its pseudocode reads, in the two places that decide every sample:
+
+```
+pred[i] = pred_for_this_format[i];
+line[0][x][i] = pred[i] = (pred[i] + get_vlc(vlc_set[format][i])) & mask;
+```
+
+Neither `vlc_set` nor `pred_for_this_format` is ever printed. A dozen double codesets and a seed
+predictor per format are named, described in shape, and left as identifiers.
+
+**The word "static" is what makes this final.** Because the codes are fixed rather than transmitted,
+they are absent from every packet of every file at every frame size — so unlike TrueMotion 2, which
+carries its own Huffman trees and was therefore two-thirds recovered from files alone, no sample can
+ever yield them. This is SVQ1's situation exactly: its own document explains the algorithm in full,
+prints not one codebook entry, and cites the implementation's source files for where the tables live.
+The frames being large changes nothing, which is why the smallest-frame table this file opens with is
+not reproduced for this codec — it would be beside the point.
+
+The header the page does give is twenty bytes deep — the `Shir`/`Zwak` magic, a four-byte `0D 0A 00 0A`,
+a version byte, the ASCII `BitJazz`, and a four-byte colour format at offset 16 — and states no picture
+size, no interlace flag and no alpha flag parsing.
+
+## The vendor published the wrong half
+
+BitJazz's site is still live and publishes marketing material only — speed, fidelity, versatility, an
+FAQ, trial downloads — with no SDK, no developer documentation, no whitepaper and no algorithm
+description. The company holds exactly one patent family, US 7,659,911 B2 (Andreas Wittenstein,
+granted 2010), continued as US 2010/0316285 A1, and it covers the *Synchromy* lossless RGB-to-Y'CbCr
+colour conversion and explicitly no compression, no entropy coding and no code tables; it does not
+mention SheerVideo. So the one genuinely independent printed source describes the half of the codec
+that is not the problem.
+
+## The corpus is excellent and does not help
+
+Thirteen real recordings sit at `samples.ffmpeg.org/ffmpeg-bugs/trac/ticket492/`, covering very nearly
+the whole variant matrix — `Sheer_RGB[A]_8bf`, `_10bf` and their 32-bit-per-pixel forms,
+`Sheer_YCbCr[A]` at 8 and 10 bits in both 4:4:4 and 4:2:2 with and without alpha and their 32bpp forms,
+and the legacy `Sheer_YCbCr_8bw_4_2_2`. All decode. There is no ffmpeg encoder, so ground truth would
+have to come from BitJazz's own trial encoder, a commercial binary.
+
+None of that reaches the tables, for the reason above: they are not in the files.
+
+## What would change the answer
+
+The dozen VLC codesets and the per-format seed predictors, printed. From BitJazz, or from anyone who
+has written them down outside an implementation. Everything else about this codec is already
+documented well enough to build from, which is what makes it the most frustrating entry in this file
+rather than the most obscure.
