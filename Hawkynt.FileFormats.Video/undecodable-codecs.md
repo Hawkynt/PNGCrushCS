@@ -2312,6 +2312,7 @@ real files to let the same kind of position-by-position bisection against ffmpeg
 CDXL's and BFI's own byte layouts run in earnest, would change the answer. The header fields confirmed
 above are recorded so whoever finds either does not have to re-derive them.
 
+<<<<<<< HEAD
 # LOCO, whose only description says on its own face where it came from
 
 LOCO (`LOCO`) was investigated as part of the lossless group that produced Ut Video, MagicYUV, ZeroCodec,
@@ -2827,3 +2828,85 @@ The dozen VLC codesets and the per-format seed predictors, printed. From BitJazz
 has written them down outside an implementation. Everything else about this codec is already
 documented well enough to build from, which is what makes it the most frustrating entry in this file
 rather than the most obscure.
+=======
+# YLC, which reads as a complete description until one clause of it is taken seriously
+
+YLC — "YUY2 Lossless Codec", `YLC0` in an AVI — comes from a Japanese AviUtl plugin author's own tool.
+It was investigated with the lossless group, and it is the closest call in this file: everything about
+it says implementable right up to a single clause in the middle of its own pseudocode.
+
+## What is right about it
+
+The provenance is clean, and checked. MultimediaWiki's YLC page began in 2009 as a bare stub — the
+four-character code and a link, filed under undiscovered codecs — and its entire technical section was
+written by User:Kostya on **24 June 2012**. FFmpeg's own `ylc.c` is Paul B Mahol's and dates from **13
+June 2016**, four years later and by a different person. Document first, different author, decoder
+built from it: the ordering this project accepts, the same one that made ASV1 and ASV2 buildable.
+
+There is a real sample, too. The page's own link to `samples.libav.org` is dead, but the file survives
+at `samples.ffmpeg.org/V-codecs/ylc0.avi` — 320x240, `yuyv422`, 100 frames — and ffmpeg decodes it, so
+an oracle exists.
+
+And the description is unusually specific for this file. The frame header is given to the byte:
+
+```
+bytes  0- 3  'YLC0'
+bytes  4- 7  zero
+bytes  8-11  offset to the Huffman table descriptors (should be 16)
+bytes 12-15  offset to the compressed YUY2 data
+```
+
+with the bitstream read as 32-bit little-endian words most significant bit first, four Huffman tables
+whose 256 weights each are carried in the file itself, and a reconstruction rule stated exactly: the
+top line left-predicted per component, `left + top - topleft` for the rest, prediction wrapping so that
+a line's left predictor is the previous line's last pixel, and initial left and top-left predictors of
+128. That is more than enough to build the wrapper, and none of it is in question.
+
+## The clause that stops it
+
+The per-quad decode reads, in the page's own words:
+
+```
+if (get_bit()) {
+    val = decode_sym(tree1);
+    if (val < 0xE1) {
+        output predefined YUYV quad from the constant table;
+    } else {
+        ...
+```
+
+**The constant table is never printed.** `0xE1` is 225, so that branch selects among up to 225
+predefined four-byte YUYV quads, and the page names the table, uses it, and gives not one entry of it.
+
+Being constant, it is in the codec binary and in no file — the same reason SheerVideo's dozen static
+codesets and SVQ1's codebook are out of reach, and the exact opposite of TrueMotion 2, whose Huffman
+trees are carried per stream and were therefore recoverable from files alone. A decoder missing this
+table does not fail loudly; it produces a plausible picture wherever the other branch happens to be
+taken and wrong colours wherever this one is, which is the failure shape this project exists to refuse.
+
+The weights are stated as "gamma'-coded" and the tree construction from them is not stated at all —
+neither the ordering nor the code assignment — which would be a second gap to close even with the table
+in hand. This project has closed gaps of that kind before by measurement, so it is not recorded as the
+reason; the table is.
+
+## What was and was not attempted
+
+Recovering the 225 quads empirically is conceivable in principle — decode with ffmpeg as oracle, and
+read off the quad each `tree1` value produces — and it was not attempted, for a reason that is worth
+stating rather than hiding. One recording of 100 frames is very unlikely to exercise all 225 values,
+and a table recovered in part is worse than none: it yields a decoder that is exact on the corpus that
+built it and silently wrong on the first file that uses an entry the corpus never reached. That is not
+a bar this project can certify against, and shipping toward it would repeat exactly the mistake
+TrueMotion 2's own section explains was avoided by not shipping types 0 and 1 alone.
+
+Extracting the table from the author's own codec binary, which is still downloadable, is reading an
+implementation and is barred whether the implementation belongs to a third party or to the format's
+own vendor — the same rule that stopped Deluxe Paint Animation at Electronic Arts' own reference source.
+
+## What would change the answer
+
+The 225-entry quad table, printed, from any source that is not an implementation — or enough real YLC
+recordings, from varied content, to demonstrate that every entry has been exercised and read off
+against the oracle. The header, the prediction rule and the sample above are recorded so that whoever
+has either does not start from the container.
+>>>>>>> THEIRS
