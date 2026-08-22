@@ -23,8 +23,8 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 | | Count | Share |
 | --- | --- | --- |
 | Decoded and verified against ffmpeg | 63 | 30% |
-| Established as not implementable from files alone | 36 | 17% |
-| Not yet attempted | 112 | 53% |
+| Established as not implementable from files alone | 37 | 18% |
+| Not yet attempted | 111 | 53% |
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
 frame against ffmpeg's decode of the same bitstream before it was merged, and the measurements are in
 each one's section of that file. The ones that reach exact equality on every sample of every frame
@@ -70,6 +70,8 @@ MWSC, RASC, Go2Meeting (`g2m`), ScreenPressor (`scpr`), Screenpresso, TSCC2, Sor
 (`svq1`), Sorenson Video 3 (`svq3`), Smacker (`smackvid`), Electronic Arts TGQ, TQI and MAD
 (`eatgq`, `eatqi`, `eamad`), Deluxe Paint Animation (`anm`), Chronomaster DFA (`dfa`) and
 8088flex TMV (`tmv`) and LOCO (`loco`),
+
+8088flex TMV (`tmv`) and Canopus Lossless (`cllc`),
 and the arguments that settle them are in
 `undecodable-codecs.md`. The first four have frames too small to
 carry the tables they need —
@@ -231,6 +233,8 @@ it, confirmed by the format's own recorded history as well as by the page's own 
 Creative YUV came out
 
 **Lossless RGB and YUV** — what is left of the group is `cllc`, `cyuv`, `dxtory`,
+
+**Lossless RGB and YUV** — what is left of the group is `012v`, `cyuv`, `dxtory`,
 `loco`, `m101`, `sheervideo`, `vble` and `ylc`. Ut Video, MagicYUV, ZeroCodec, LCL ZLIB and AASC came out
 
 **Lossless RGB and YUV** — what is left of the group is `012v`, `cllc`, `cyuv`, `dxtory`,
@@ -270,6 +274,13 @@ MultimediaWiki page opens by stating that it is based on a description by the sa
 commit message credits the decoder to, and its edit history puts it eleven months after that decoder
 landed. The page is the implementation written up afterwards, which is the one thing this project
 cannot build from.
+
+`cllc` has now joined it there — not on a paraphrase to be ruled out but on the absence of any
+description whatever: its MultimediaWiki page has carried three bullet points and no bitstream fact
+since 2009, and its own edit history shows the note calling the codec undiscovered being stripped once
+a decoder existed elsewhere rather than replaced by anything describing one. Three real recordings
+covering RGB, ARGB and YUY2 do exist, and the frames are far too large for the missing-tables argument
+to apply, so what stops it is only that the sole descriptions in existence are implementations.
 
 **Screen capture** — `tdsc` and `vmnc` are what remains of this group unattempted. Mostly DEFLATE over
 a framebuffer with a delta scheme on top, so also lossless and also absolutely measurable. `flashsv` and
