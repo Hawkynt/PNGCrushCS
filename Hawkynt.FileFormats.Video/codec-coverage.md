@@ -23,8 +23,8 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 | | Count | Share |
 | --- | --- | --- |
 | Decoded and verified against ffmpeg | 55 | 26% |
-| Established as not implementable from files alone | 34 | 16% |
-| Not yet attempted | 122 | 58% |
+| Established as not implementable from files alone | 35 | 17% |
+| Not yet attempted | 121 | 57% |
 
 The 55 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
