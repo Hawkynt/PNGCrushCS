@@ -23,8 +23,8 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 | | Count | Share |
 | --- | --- | --- |
 | Decoded and verified against ffmpeg | 63 | 30% |
-| Established as not implementable from files alone | 41 | 19% |
-| Not yet attempted | 107 | 51% |
+| Established as not implementable from files alone | 42 | 20% |
+| Not yet attempted | 106 | 50% |
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
 frame against ffmpeg's decode of the same bitstream before it was merged, and the measurements are in
 each one's section of that file. The ones that reach exact equality on every sample of every frame
@@ -81,6 +81,8 @@ MWSC, RASC, Go2Meeting (`g2m`), ScreenPressor (`scpr`), Screenpresso, TSCC2, Sor
 8088flex TMV (`tmv`) and VBLE,
 
 8088flex TMV (`tmv`) and HuffYUV MT (`hymt`),
+
+8088flex TMV (`tmv`) and MidiVid Archive (`mvha`),
 and the arguments that settle them are in
 `undecodable-codecs.md`. The first four have frames too small to
 carry the tables they need —
@@ -321,6 +323,12 @@ under undiscovered codecs; the fork's own changelog records only that v613 renam
 code; the sole complete description is the fork's GPL v2+ source, which this package could not
 transcribe on licence grounds even if it transcribed implementations; and no HYMT sample exists
 anywhere searched.
+
+the same kind of prediction, also came out of it and is now in `undecodable-codecs.md` instead, and so
+has `mvha`, whose only description — the MidiVid page's archival section — was written the day after
+ffmpeg's own decoder was authored, and which even taken at face value states a frame header and then
+stops: no tree construction, no bit order, no prediction seeding, no strides, and no sample of the
+codec exists anywhere to settle any of them against.
 
 **Screen capture** — `tdsc` and `vmnc` are what remains of this group unattempted. Mostly DEFLATE over
 a framebuffer with a delta scheme on top, so also lossless and also absolutely measurable. `flashsv` and

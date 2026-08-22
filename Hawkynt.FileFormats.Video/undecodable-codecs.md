@@ -2638,3 +2638,63 @@ A statement of the multithreaded frame layout — where the slice table sits, it
 and whether prediction and the Huffman state carry across a slice boundary — from a source that is not
 an implementation. That is a small document, and everything around it is already decoded in this
 package, which is what makes this entry a genuinely narrow miss rather than a wall.
+
+# MidiVid Archive (MVHA), a header sketch written the day after the decoder
+
+MVHA is the lossless member of the MidiVid family, the codecs behind a run of early-2000s console game
+cinematics. It was investigated with the lossless group and stops for two reasons, either of which
+would be enough on its own.
+
+## The description arrives after the decoder
+
+The only account of this bitstream anywhere is the "MidiVid Archival" section of MultimediaWiki's
+Midivid page, added on 26 November 2019. FFmpeg's own `mvha.c` — "avcodec: add mvha video decoder", by
+Paul B Mahol — carries an author date of **25 November 2019, 11:59:56 UTC**, the day before, with its
+commit landing on the 27th.
+
+So a working decoder existed before the description of the format did. That is the direction of
+dependence this project treats as disqualifying, and while the interval here is a day rather than the
+eleven months LOCO's page trails its decoder by, the order is the same one and the conclusion does not
+change with the size of the gap. Nothing found suggests an independent reverse-engineering write-up
+that predates either: the codec author's own survey of the MidiVid family, published two months
+earlier in September 2019, covers MidiVid, MidiVid Lossless and MidiVid 3 and does not mention the
+archival codec at all.
+
+## And the description does not reach a decoder anyway
+
+This is the whole of it. A frame is four bytes of compression type — `HUFY` for Huffman coding, `LZVY`
+for deflate — then four bytes of source size, then data. For `LZVY` the data is a deflate stream. For
+`HUFY` it is three bytes of decompressed size, one byte of start symbol, one byte of symbol count less
+one, then tree weights, which "can be zero for non-present symbols and coded as either `1` plus 12 bits
+or `0` plus 3 bits". The decompressed result is YUV420, Y plane then U then V, and the codec is
+described in one line as "Huffman coding or deflate plus median prediction".
+
+Every remaining question is one a bit-exact decoder has to answer, and none is answered:
+
+  - how a tree is built from the weights — the ordering, the tie-breaking, the code assignment;
+  - the bit reader's endianness and fill order, which for this family of codecs is exactly the sort of
+    thing that differs per codec and is never guessable — HuffYUV's own bits arrive in byte-swapped
+    little-endian words, and its codes are handed out from the longest length down rather than the
+    shortest up;
+  - what the twelve-bit and three-bit weight forms mean numerically;
+  - how the median prediction is seeded, per row and per plane;
+  - the plane strides and the chroma dimensions;
+  - whether inter frames exist at all.
+
+The `LZVY` half is genuinely readable — deflate is fully specified and this package already inflates
+LCL ZLIB and ZeroCodec — but a decoder that reads one of a format's two compression types is not a
+decoder for the format, and the split between them is not something a file gets to choose on a
+reader's behalf.
+
+## And there is no file to check against
+
+No MVHA sample turned up anywhere searched. `samples.ffmpeg.org/V-codecs/` carries `MVDV.avi`, `MVDV/`,
+`MV43/`, `MVI2/`, `MVLZ.avi` and `mv30.avi` — the rest of the family — and nothing for MVHA;
+`fate-suite.ffmpeg.org/mvha/` and `/midivid/` both return 404, and there is no FATE test. ffmpeg has no
+MVHA encoder either, so a corpus cannot be built to order.
+
+## What would change the answer
+
+A statement of the Huffman tree construction, the bit order and the prediction seeding from a source
+that is not an implementation, together with at least one real file to measure against. The header
+sketch above is reproduced here so that whoever finds either does not have to locate it again.
