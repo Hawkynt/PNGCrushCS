@@ -147,6 +147,8 @@ who wants one frame of a two-hour recording pays for one frame.
 
 | Autodesk Animator Codec | `AASC` | Y | — |
 
+| Sierra VMD Video | `VMDV` (synthetic — the format states no codec tag of its own) | Y | — |
+
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
 is an undivided heap of bytes, and where each packet starts and stops is a computation over five
@@ -2672,6 +2674,55 @@ later" and never gives them; an interleave other than zero or one; any of method
 since no measured file sets one and the only documented use of them is its own author's stated
 extension rather than the specification's; more than eight bitplanes, the limit the delta chunk's own
 pointer table states; and a coded pixel naming a palette index the stated palette does not have.
+
+### Sierra VMD Video
+
+The FMV codec behind Phantasmagoria, Gabriel Knight 2 and Sierra's other CD-ROM adventures: an LZSS
+variant compressing a run-length row coding, painted a rectangle at a time onto a picture that persists
+between frames rather than a whole frame at once — see `VmdContainer`'s own remarks for the table of
+contents that states each rectangle and carries it in front of the compressed bytes, and for the one
+finding forced by a real file rather than by the published description, that a picture's timestamp is
+which block of the container it belongs to rather than a running count of pictures.
+
+A skip in the row coding needs no second picture buffer to reach back into the way Interplay MVE's or
+id RoQ's own skip opcodes do. "Copy the same position from the previous frame" and "leave this byte
+alone" are the same instruction in the order both of this codec's rendering methods paint in — nothing
+still being painted has touched a skipped byte yet — so a skip is a genuine no-op against one persistent
+canvas rather than a read out of a second buffer.
+
+**Only the LZ form carrying its preload marker is decoded.** Sierra's own published description of the
+LZSS variant this codec uses gives two initialisations for the ring buffer it decompresses through — a
+four-byte marker that seeds it with a fixed dictionary and turns on an escape for a longer match, and,
+when the marker is absent, an empty buffer with no escape — and states both as the same otherwise
+identical algorithm. Measured against a real interframe whose first several decompressed bytes are
+provably wrong under the marker-absent reading — the picture they paint does not match ffmpeg's decode,
+even though the row coding built on top of them consumes every byte cleanly and never runs off the end
+of anything — no reading tried recovers it: different starting positions for the ring buffer, treating
+the four bytes after the output length as always consumed whether or not they are the marker, and
+combinations of both, each checked against the same real bytes, come closer without reaching exact.
+Nothing published states a third possibility, so a marker-absent chunk is refused by name.
+
+**Measured.** Four real files from `samples.ffmpeg.org/game-formats/sierra-vmd/` — three Sierra SWAT
+recordings and one Lighthouse, 280x218 and 500x150, 36 to 78 pictures apiece, 197 pictures in all,
+between them exercising every path this decoder reads — were decoded here and by ffmpeg and compared
+sample for sample against ffmpeg's own `pal8` output, index and installed palette both: every picture
+of all four is identical. This is paletted throughout, so a direct sample comparison — no RGB
+conversion, no chroma-siting convention — is exactly what settles it.
+
+A fifth SWAT recording is corrupted partway through rather than refused outright: this decoder and
+ffmpeg's own both read its first thirty-three pictures identically and then both fail — this one with
+the row coding overrunning its own rectangle, ffmpeg's own with "Invalid data found when processing
+input" — on the thirty-fourth, which is the sample at fault rather than either decoder. A sixth file,
+one Leisure Suit Larry 7 recording, is not part of the measured set at all: over a third of its
+interframes are LZ-compressed without the preload marker, reached on this file's second picture
+already, and every one is refused by name rather than decoded wrong.
+
+What refuses, by name: a codec version other than 1, the eight-bit palettised form — sixteen-bit,
+twenty-four-bit and Indeo-3-compressed VMD video are none of them implemented; render method 3, which
+no sample measured against this decoder uses; a picture stating a new palette mid-stream, since no
+sample sets that flag either and the 770-byte layout the published description gives it is exactly the
+kind of unmeasured claim this project does not ship; and an LZ-compressed rectangle lacking the preload
+marker, for the reason above.
 
 ### Brute Force & Ignorance Video
 
