@@ -23,8 +23,8 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 | | Count | Share |
 | --- | --- | --- |
 | Decoded and verified against ffmpeg | 63 | 30% |
-| Established as not implementable from files alone | 45 | 21% |
-| Not yet attempted | 103 | 49% |
+| Established as not implementable from files alone | 46 | 22% |
+| Not yet attempted | 102 | 48% |
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
 frame against ffmpeg's decode of the same bitstream before it was merged, and the measurements are in
 each one's section of that file. The ones that reach exact equality on every sample of every frame
@@ -89,6 +89,9 @@ MWSC, RASC, Go2Meeting (`g2m`), ScreenPressor (`scpr`), Screenpresso, TSCC2, Sor
 8088flex TMV (`tmv`) and SheerVideo (`sheervideo`),
 
 8088flex TMV (`tmv`) and YLC (`ylc`),
+
+(`eatgq`, `eatqi`, `eamad`), Deluxe Paint Animation (`anm`), Chronomaster DFA (`dfa`),
+8088flex TMV (`tmv`) and FM Screen Capture Codec,
 and the arguments that settle them are in
 `undecodable-codecs.md`. The first four have frames too small to
 carry the tables they need —

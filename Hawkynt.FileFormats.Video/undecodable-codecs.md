@@ -2313,6 +2313,7 @@ CDXL's and BFI's own byte layouts run in earnest, would change the answer. The h
 above are recorded so whoever finds either does not have to re-derive them.
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 # LOCO, whose only description says on its own face where it came from
 
 LOCO (`LOCO`) was investigated as part of the lossless group that produced Ut Video, MagicYUV, ZeroCodec,
@@ -2910,3 +2911,54 @@ recordings, from varied content, to demonstrate that every entry has been exerci
 against the oracle. The header, the prediction rule and the sample above are recorded so that whoever
 has either does not start from the container.
 >>>>>>> THEIRS
+=======
+# FM Screen Capture Codec (FMVC), whose real page arrived five years after its decoder
+
+FM Screen Capture Codec (`FMVC`) was investigated as one of the screen-capture and lossless names this
+project's coverage still lacked, and looked promising on first sight: a real sample corpus and a
+MultimediaWiki page describing tile sizes, header fields and byte counts in some detail. It stops on
+provenance, the same wall LOCO's entry above is settled on, once the page's own history is read
+properly rather than glanced at.
+
+## The page is a redirect, and the real one predates its own content by years
+
+MultimediaWiki's `FMVC` page is not an article — it is a two-line redirect to "Fox Magic Screen Capture
+Codec," and that redirect's own single revision, 72 bytes, is all a shallow read of `FMVC` itself turns
+up. The real page has four revisions. The first two, both on 11 January 2009 by "Multimedia Mike," are
+a 370-then-411-byte stub: the codec's name, its FourCC, and the note "also a screen capture codec." A
+third edit in August 2009 trims three bytes. The fourth, on **13 September 2022** by "Kostya," is where
+every technical fact on the page appears — the frame header's byte layout, the keyframe and interframe
+tile scheme, the 112x84 tile size and its scaling rule, and the naming of two LZ77-based compression
+types — taking the page from 372 bytes to 1,105.
+
+FFmpeg's own `fmvc.c` was added well before that: "avcodec: add FM Screen Capture Codec decoder," Paul
+B Mahol, **6 February 2017** — five years and seven months before Kostya's edit gave the page anything
+beyond its name. That is LOCO's ordering again, with a longer gap: the decoder came first, and the one
+person who ever added a bitstream fact to this page is the reverse engineer LOCO's and VBLE's own
+entries above already identify as a prolific author of exactly this class of decoder.
+
+## What the page does and does not state, and why the gap matters on its own
+
+Even granting the page every fact it states, it stops short of a working description. Its own words for
+the compression are "there are two compression types known, type 1 and type 2, both are based on LZ77
+scheme" — naming a family of algorithm and not one. No match-length coding, no literal-versus-match
+flag, no window size and no codeword table for either type appears anywhere on the page. That is a
+second, independent reason this format is not implementable from what has been published, on top of the
+provenance question above: even a page that passed the direction-of-dependence test would still leave
+the one thing a decoder needs — how "type 1" and "type 2" actually pack a byte stream — unstated.
+
+## What the corpus is
+
+Two real recordings exist at `samples.ffmpeg.org/V-codecs/FMVC/` — `6-methyl-5-hepten-2-one-CC-db.avi`
+and `skrzyzowanie4.avi`, screen captures pulled from two personal academic pages per the directory's own
+`readme.txt` — and ffmpeg decodes both. FFmpeg carries no `fmvc` encoder, so neither file can be used to
+drive a corpus toward a specific codeword the way this project's own encoder-backed recoveries work;
+what exists is what exists, two uncontrolled recordings against an LZ77 variant named but not specified.
+
+## What would change the answer
+
+A description of FMVC's two LZ77 variants — the match and literal coding, the window and length limits
+— from a source that is not an implementation and does not postdate ffmpeg's own decoder by five years:
+Fox Magic's own documentation, or a reverse-engineering write-up that says plainly how it was produced
+and from what, the way this project would need for LOCO, VBLE or Canopus Lossless above.
+>>>>>>> 25b1cfc2 (* FM Screen Capture Codec settled as not implementable, its real page five years late)
