@@ -51,26 +51,26 @@ internal static class JpegDct {
 
       // Odd part (libjpeg jfdctint.c formulation)
       // Variable mapping: tmp7=elem[0]-elem[7], tmp6=elem[1]-elem[6], tmp5=elem[2]-elem[5], tmp4=elem[3]-elem[4]
-      var z1o = tmp7 + tmp4;
-      var z2o = tmp6 + tmp5;
-      var z3o = tmp7 + tmp5;
-      var z4o = tmp6 + tmp4;
+      var z1o = tmp4 + tmp7;
+      var z2o = tmp5 + tmp6;
+      var z3o = tmp4 + tmp6;
+      var z4o = tmp5 + tmp7;
       var z5o = (z3o + z4o) * FIX_1_175875602;
 
-      var p0 = tmp7 * FIX_0_298631336;
-      var p1 = tmp6 * FIX_2_053119869;
-      var p2 = tmp5 * FIX_3_072711026;
-      var p3 = tmp4 * FIX_1_501321110;
+      var p4 = tmp4 * FIX_0_298631336;
+      var p5 = tmp5 * FIX_2_053119869;
+      var p6 = tmp6 * FIX_3_072711026;
+      var p7 = tmp7 * FIX_1_501321110;
       z1o *= -FIX_0_899976223;
       z2o *= -FIX_2_562915447;
       z3o = -z3o * FIX_1_961570560 + z5o;
       z4o = -z4o * FIX_0_390180644 + z5o;
 
       var oddRound = 1 << (CONST_BITS - PASS1_BITS - 1);
-      block[i + 7] = (p0 + z1o + z3o + oddRound) >> (CONST_BITS - PASS1_BITS);
-      block[i + 5] = (p1 + z2o + z4o + oddRound) >> (CONST_BITS - PASS1_BITS);
-      block[i + 3] = (p2 + z2o + z3o + oddRound) >> (CONST_BITS - PASS1_BITS);
-      block[i + 1] = (p3 + z1o + z4o + oddRound) >> (CONST_BITS - PASS1_BITS);
+      block[i + 7] = (p4 + z1o + z3o + oddRound) >> (CONST_BITS - PASS1_BITS);
+      block[i + 5] = (p5 + z2o + z4o + oddRound) >> (CONST_BITS - PASS1_BITS);
+      block[i + 3] = (p6 + z2o + z3o + oddRound) >> (CONST_BITS - PASS1_BITS);
+      block[i + 1] = (p7 + z1o + z4o + oddRound) >> (CONST_BITS - PASS1_BITS);
     }
 
     // Pass 2: process columns
@@ -97,26 +97,26 @@ internal static class JpegDct {
       block[i + 48] = (z1 - tmp12 * FIX_1_847759065 + (1 << (CONST_BITS + PASS1_BITS - 1))) >> (CONST_BITS + PASS1_BITS);
 
       // Odd part (libjpeg jfdctint.c formulation)
-      var z1c = tmp7 + tmp4;
-      var z2c = tmp6 + tmp5;
-      var z3c = tmp7 + tmp5;
-      var z4c = tmp6 + tmp4;
+      var z1c = tmp4 + tmp7;
+      var z2c = tmp5 + tmp6;
+      var z3c = tmp4 + tmp6;
+      var z4c = tmp5 + tmp7;
       var z5c = (z3c + z4c) * FIX_1_175875602;
 
-      var p0c = tmp7 * FIX_0_298631336;
-      var p1c = tmp6 * FIX_2_053119869;
-      var p2c = tmp5 * FIX_3_072711026;
-      var p3c = tmp4 * FIX_1_501321110;
+      var p4c = tmp4 * FIX_0_298631336;
+      var p5c = tmp5 * FIX_2_053119869;
+      var p6c = tmp6 * FIX_3_072711026;
+      var p7c = tmp7 * FIX_1_501321110;
       z1c *= -FIX_0_899976223;
       z2c *= -FIX_2_562915447;
       z3c = -z3c * FIX_1_961570560 + z5c;
       z4c = -z4c * FIX_0_390180644 + z5c;
 
       var colOddRound = 1 << (CONST_BITS + PASS1_BITS - 1);
-      block[i + 56] = (p0c + z1c + z3c + colOddRound) >> (CONST_BITS + PASS1_BITS);
-      block[i + 40] = (p1c + z2c + z4c + colOddRound) >> (CONST_BITS + PASS1_BITS);
-      block[i + 24] = (p2c + z2c + z3c + colOddRound) >> (CONST_BITS + PASS1_BITS);
-      block[i + 8] = (p3c + z1c + z4c + colOddRound) >> (CONST_BITS + PASS1_BITS);
+      block[i + 56] = (p4c + z1c + z3c + colOddRound) >> (CONST_BITS + PASS1_BITS);
+      block[i + 40] = (p5c + z2c + z4c + colOddRound) >> (CONST_BITS + PASS1_BITS);
+      block[i + 24] = (p6c + z2c + z3c + colOddRound) >> (CONST_BITS + PASS1_BITS);
+      block[i + 8] = (p7c + z1c + z4c + colOddRound) >> (CONST_BITS + PASS1_BITS);
     }
   }
 
