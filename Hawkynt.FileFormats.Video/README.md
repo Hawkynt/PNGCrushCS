@@ -158,6 +158,8 @@ who wants one frame of a two-hour recording pays for one frame.
 
 | Creative YUV | `cyuv` | Y | — |
 
+| Apple Motion JPEG-B | `mjpb` | Y | — |
+
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
 is an undivided heap of bytes, and where each packet starts and stops is a computation over five
@@ -3093,6 +3095,60 @@ and a row shorter than the whole groups its width needs. The last is a real limi
 formality — the format permits a final group cut short, a trailing pair of pixels costing five bytes and
 a trailing single one two, and no file measured here uses it, the one sample's rows being 848 bytes
 where that rule would make them 842. It is refused rather than read under a packing nothing confirms.
+### Apple Motion JPEG-B
+
+Baseline JPEG under a QuickTime-native framing that finds its four sections by an offset instead of
+by scanning for a marker, and with one or two whole coded pictures — QuickTime's own two interlaced
+fields — packed one after the other inside a single packet. There is no published bitstream
+description of this one, so what follows was recovered directly from two real captures — a 720x480
+broadcast clip and a 160x120 one, six and twenty-seven pictures — by reading the bytes against what
+`ffprobe` already states about them and confirming every reading against ffmpeg's own decode of the
+same files.
+
+**The 48-byte field header.** Twelve big-endian 32-bit words: a reserved word that is zero on every
+field measured; the four characters `mjpg`; two sizes that were not needed to decode a single frame
+correctly and so are read and ignored; an offset to a second field's own header of this same shape,
+zero when this is the only field or the second one; and four more offsets — to the quantisation
+table, the Huffman tables, the frame header and the scan header — each counted from this field's own
+start, followed by two words that were zero on every field measured and are otherwise unused.
+
+**What sits behind each of those four offsets is a JPEG marker segment's own payload with its length
+but not its marker** — the same two-byte big-endian length, counting itself, that would follow `FF
+DB`, `FF C4`, `FF C0` or `FF DA` in an ordinary JPEG, with the marker itself never written because the
+header's own offsets already say which section is which. Put the marker back in front of each one and
+what results is byte for byte a standard JPEG quantisation, Huffman, frame or scan segment, which is
+why this reuses the same JPEG reader Motion JPEG does for everything after reassembly rather than
+decoding any of it itself. Both captures measured carry the ITU-T T.81 Annex K standard Huffman tables
+and a real, per-picture quantisation table — nothing here is fixed the way some of this family's other
+members turn out to be.
+
+**The scan data itself is not byte-stuffed.** An ordinary JPEG escapes every `FF` byte inside
+entropy-coded data with a trailing zero so a decoder scanning for the next marker cannot mistake
+picture data for one; this format has no need of that, because nothing ever scans for a marker inside
+it — every section starts at a stated offset instead. Both captures' entropy data carry roughly one
+unescaped `FF` byte every three hundred bytes, and reassembling it for a standard reader without
+putting the escape back in front of every one of them decodes the picture that happens to have few
+enough of them to get away with it and fails outright on the one that does not — the second field of
+the very first frame tried, with a "huffman table decode error" hundreds of bytes short of where the
+real fault was. The escape is put back before the data reaches the reader.
+
+**Two fields, not one picture.** Every stream measured carries exactly two, matching the `fiel` atom
+QuickTime's own sample description states beside this codec — top field first, which is also the
+order the header's own chain of fields arrives in. Each field is a whole, independently coded JPEG at
+half the picture's height, with no shared state and no prediction between them or between one coded
+picture and the next. Decoding both and interleaving their rows — field one into the even rows, field
+two into the odd ones — reproduces ffmpeg's own decode of the same packet exactly. A packet naming a
+third field is refused rather than guessed at, since none was ever measured and nothing here says what
+order it would arrive in.
+
+**Verified exactly.** Every one of the thirty-three pictures across both captures — 720x480 and
+160x120, 4:2:2 throughout — was compared against ffmpeg's own `mjpegb` decode of the same file, plane
+for plane: all thirty-three are identical, not one sample different anywhere, on every frame of both
+files and not only the first.
+
+What refuses, by name: a field header whose tag is not `mjpg`; a packet too short to hold one; a field
+naming a third field; and two fields whose decoded pictures disagree on width or height. There is no
+`catch` anywhere that hands back a blank or a repeated picture.
 
 ## 📜 License
 
