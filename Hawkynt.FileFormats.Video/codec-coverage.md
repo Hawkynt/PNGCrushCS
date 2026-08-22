@@ -22,9 +22,9 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 
 | | Count | Share |
 | --- | --- | --- |
-| Decoded and verified against ffmpeg | 60 | 28% |
+| Decoded and verified against ffmpeg | 61 | 29% |
 | Established as not implementable from files alone | 35 | 17% |
-| Not yet attempted | 116 | 55% |
+| Not yet attempted | 115 | 55% |
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
 frame against ffmpeg's decode of the same bitstream before it was merged, and the measurements are in
 each one's section of that file. The ones that reach exact equality on every sample of every frame
@@ -315,6 +315,20 @@ on any sample, flat across every one of 325 measured frames rather than growing.
 partial case: it is self-describing and about two thirds recovered, with the evidence in
 `undecodable-codecs.md`, and it was deliberately not shipped half-working because a wrong block type
 in a still passage is indistinguishable from the codec working.
+
+**Everything else** — `indeo2`, `asv1`, `mdec`, `mimic`, `amv`, `mxpeg`, `sp5x`,
+`truemotion2` and the remainder. `cljr` came out of this group and reached exact equality; it is the
+one lossy packing among the fixed layouts, measured against ffmpeg's own decode rather than the
+source because its encoder dithers. `asv2` came out of the group too, from the same specification
+`asv1` is read from — Michael Niedermayer's asv1.txt — with one gap the document itself leaves as an
+ellipsis: its level table prints magnitudes one to seven and the boundary magnitude thirty-one in full
+and states nothing between them. Every printed value, both signs of the boundary included, fits one
+formula — a nested code whose offset bits read as a magnitude least significant bit first — and that
+formula's answer for the twenty-three unstated magnitudes was checked against a real file encoded fine
+enough to need the whole range before being counted rather than shipped on the strength of the pattern
+alone; see `README.md`. TrueMotion 2 is the partial case: it is self-describing and about two thirds
+recovered, with the evidence in `undecodable-codecs.md`, and it was deliberately not shipped
+half-working because a wrong block type in a still passage is indistinguishable from the codec working.
 
 ## What a codec has to clear to be counted
 
