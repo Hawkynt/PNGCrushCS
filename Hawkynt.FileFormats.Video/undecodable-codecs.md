@@ -2261,3 +2261,53 @@ from-scratch derivation has an oracle to check itself against — carried far en
 schemes independently, the same kind of effort this project spent on TrueMotion 2's tables and BFI's own
 back-reference and fill codes. Neither was attempted here because the page's own shape settled the
 question before either was needed.
+
+# 8088flex TMV, which has neither a description nor a whole sample
+
+TMV (magic `TMAV`) was investigated next and stops earliest of anything in this file: it clears none of
+the three things every other entry here had at least one of — a published document, a paraphrase-shaped
+wiki page to rule out, or a real, complete sample corpus.
+
+MultimediaWiki carries no page for it at all, under either name tried — `TMV` and `8088flex_TMV` both
+return "There is currently no text in this page." `samples.ffmpeg.org` carries no directory for it
+either, under `game-formats/`, `V-codecs/`, or the root. FFmpeg's own separate FATE test-suite server,
+`fate-suite.ffmpeg.org/tmv/`, does carry one file, `pop-partial.tmv` — and its own name says what it is:
+ffmpeg's decoder itself logs "Input buffer too small, truncated sample?" while reading it, and stops 110
+pictures into a stream its own header states holds 111. One partial file is what exists to check anything
+against, where every other entry in this file had at least a handful of complete ones.
+
+## What little the header gives up
+
+The twelve bytes the file opens with cross-check cleanly against what ffprobe reports for the same file,
+which is the only reason this section exists at all rather than nothing: bytes 4-5, read little-endian,
+are 22058 — ffprobe's own audio sample rate for the file, exactly. Bytes 6-7 are 368, which is exactly
+`22058 * 184 / 11029` — 184/11029 being the video stream's own time base, so 368 is the count of 8-bit
+mono audio bytes one video frame's worth of time actually holds, derived two different ways and landing
+on the same integer. Byte 9 is 40 and byte 10 is 25 — 320/8 and 200/8, the file's own picture size, which
+ffprobe also confirms directly. None of this reaches the picture itself: what comes after byte 12 is
+opaque. It is not a plausible small frame-length prefix (32689 as a two-byte count, or a nonsense
+four-byte one), and the string `TMAV` does not recur anywhere later in the file to mark where a second
+frame might begin, so even the per-frame chunk boundary was not located, let alone the coding inside it.
+
+## Why this was not carried further
+
+Frame one's own decoded picture, from ffmpeg, uses exactly four colours — 0, 85, 170 and 255, evenly
+spaced — which is the shape a 2-bit index widened by bit-replication produces and is consistent with an
+intro card meant to look right in a very restricted mode. But the header bytes immediately following the
+twelve confirmed above do not read as that image under any of the readings tried — not as a stored
+palette, not as packed 2-bit pixels, not as a plausible run-length opcode stream — and with only one
+sample, and that one truncated before its own last frame, there is no second file to weigh a candidate
+reading against the way `INTEL_S.TGV`'s repetition settled TGV's own two-byte statement above. Blind
+reverse-engineering of an unknown format from a single incomplete instance is not a sound way to reach
+this project's own bar of exact equality against every frame of every file; it was not attempted past the
+header fields recorded here.
+
+## What would change the answer
+
+A second real TMV file, complete rather than truncated, from any source — the `8088 Corruption` /
+`8088flex` project this format's name points to was searched for (its likely home under
+`trixter.oldskool.org` and a GitHub search for `8088flex`/`TMV`) and turned up no released source, README,
+or format note describing the picture coding. Either that documentation surfacing, or enough additional
+real files to let the same kind of position-by-position bisection against ffmpeg's decode that recovered
+CDXL's and BFI's own byte layouts run in earnest, would change the answer. The header fields confirmed
+above are recorded so whoever finds either does not have to re-derive them.
