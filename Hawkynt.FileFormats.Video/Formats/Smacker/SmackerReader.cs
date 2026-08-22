@@ -43,6 +43,17 @@ namespace FileFormat.SmackerVideo;
 /// itself, so the sound bytes after it are four less than the count states, and ffmpeg's own reported
 /// packet size for every one of 741 audio chunks across two files — sizes from 8 to 11 244 bytes — is
 /// exactly that count minus four, with no exception anywhere in either file.
+/// <para/>
+/// <b>A video packet here is smaller than ffmpeg's own, by design and not by omission.</b> Comparing
+/// this reader's video packets against ffprobe's reported packet sizes on a real file shows this
+/// reader's own packet running 768 bytes short on nearly every frame past the first — exactly the size
+/// of a full 256-entry RGB palette. Nothing is missing: ffmpeg's demuxer keeps the running palette
+/// itself and prepends a complete, resolved copy to every packet it hands its decoder, so that decoder
+/// never has to track palette state across packets on its own. This reader does not do that — a video
+/// packet here carries the frame's own palette chunk only when the frame itself restates one, which is
+/// what <see cref="SmackerContainer.FrameTypes"/>'s own palette bit already says either way — because
+/// resolving what the current palette is from a run of restatements and skips is decoding, and a
+/// container's job stops at saying what the file itself stated and where.
 /// </remarks>
 internal static class SmackerReader {
 
