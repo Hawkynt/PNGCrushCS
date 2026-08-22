@@ -2461,3 +2461,61 @@ A single real M101, M102 or M103 file from Matrox hardware, or Matrox's own docu
 packing. Either one alone would probably be enough, because an uncompressed layout has no hidden
 tables: with a file, the sweep that recovered r210's and y41p's layouts runs directly; with the
 documentation, there is nothing else to derive.
+
+# Dxtory, whose description stops exactly where the compression starts
+
+Dxtory (`xtor`) is the capture codec of the Windows screen-recording tool of the same name, written for
+recording high frame-rate games. It was investigated with the lossless group, and it stops twice over:
+the description that exists does not describe the compression at all, and what description there is
+comes from the decoder's own author on the day he wrote it.
+
+## The page does not reach the coding
+
+MultimediaWiki's Dxtory page is five lines, and this is the whole of its technical content:
+
+> Frame data consists of 16-byte header and YV12 blocks (2x2 block of luma and two bytes for chroma).
+
+That is a statement about what the picture is made of, not about how it is coded. Dxtory compresses —
+that is the entire point of a capture codec — and there is not one word here about the entropy coding,
+the prediction, the block ordering, the meaning of any of the sixteen header bytes, or how a frame's
+coded bytes turn into those YV12 blocks. Read at face value and believed entirely, this page does not
+get a decoder to its first sample.
+
+That is a different failure from the rest of this file. LOCO's page and TSCC2's are detailed enough to
+build from and are disqualified for where they came from; this one would not be enough even if its
+provenance were spotless.
+
+## And its provenance is not spotless
+
+The page has exactly one revision in its entire history: 03:24 on 9 December 2011, by User:Kostya —
+Konstantin Shishkov. FFmpeg's own `dxtory.c` was committed by Kostya Shishkov at 10:06 UTC **the same
+day**, under the message "Dxtory capture format decoder", roughly seven hours later.
+
+The page therefore predates the commit by hours rather than following it, which is the opposite of
+LOCO's ordering. But same author and same working day is not an independent description that a decoder
+was later built from; it is one person's notes from the session that produced the decoder, published
+alongside it. This project already declined TSCC2 and Go2Meeting on the finding that each write-up's
+author is on record as the implementation's author too, and this is that pattern with the interval
+compressed to a single morning.
+
+Taken together the two findings settle it: the only account of this bitstream that is not an
+implementation does not describe the compression, and the person who wrote it wrote the implementation
+the same day. Everything a decoder actually needs exists only in ffmpeg's decoder and in Dxtory's own
+binary, and this project transcribes neither.
+
+## What the corpus is
+
+One real file, `dxtory_mic.avi`, on ffmpeg's own test-suite server at `fate-suite.ffmpeg.org/dxtory/`.
+There is no ffmpeg encoder, so no corpus can be built to order and no known content can be driven
+through the coder to calibrate a candidate reading. One uncontrolled recording is the same thin base
+that stopped MWSC and ScreenPressor here, and it is thinner still against an entropy coder nothing
+describes.
+
+Dxtory's own vendor site publishes no bitstream documentation.
+
+## What would change the answer
+
+A description of the actual compression — the entropy coding, the prediction and the sixteen header
+bytes — from a source that is not an implementation, or from the vendor. Failing that, an encoder or a
+larger corpus of real files would at least make the blind route conceivable; with one file and no way
+to choose what goes into it, it is not.

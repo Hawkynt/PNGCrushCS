@@ -23,8 +23,8 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 | | Count | Share |
 | --- | --- | --- |
 | Decoded and verified against ffmpeg | 63 | 30% |
-| Established as not implementable from files alone | 38 | 18% |
-| Not yet attempted | 110 | 52% |
+| Established as not implementable from files alone | 39 | 18% |
+| Not yet attempted | 109 | 52% |
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
 frame against ffmpeg's decode of the same bitstream before it was merged, and the measurements are in
 each one's section of that file. The ones that reach exact equality on every sample of every frame
@@ -74,6 +74,8 @@ MWSC, RASC, Go2Meeting (`g2m`), ScreenPressor (`scpr`), Screenpresso, TSCC2, Sor
 8088flex TMV (`tmv`) and Canopus Lossless (`cllc`),
 
 8088flex TMV (`tmv`) and Matrox Uncompressed SD (`m101`),
+
+8088flex TMV (`tmv`) and Dxtory (`dxtory`),
 and the arguments that settle them are in
 `undecodable-codecs.md`. The first four have frames too small to
 carry the tables they need —
@@ -237,6 +239,8 @@ Creative YUV came out
 **Lossless RGB and YUV** — what is left of the group is `cllc`, `cyuv`, `dxtory`,
 
 **Lossless RGB and YUV** — what is left of the group is `012v`, `cyuv`, `dxtory`,
+
+**Lossless RGB and YUV** — what is left of the group is `012v`, `cllc`, `cyuv`,
 `loco`, `m101`, `sheervideo`, `vble` and `ylc`. Ut Video, MagicYUV, ZeroCodec, LCL ZLIB and AASC came out
 
 **Lossless RGB and YUV** — what is left of the group is `012v`, `cllc`, `cyuv`, `dxtory`,
@@ -293,6 +297,13 @@ coding, and which stops anyway because the sweep that recovers a packing needs e
 feed known content through or a real file to sweep against, and it has neither: no wiki page exists at
 all, ffmpeg carries no encoder, and no sample turned up in `samples.ffmpeg.org`, in ffmpeg's own
 test-suite server or at fourcc.org.
+
+the same kind of prediction, also came out of it and is now in `undecodable-codecs.md` instead, and so
+has `dxtory`, which stops twice over: its MultimediaWiki page's whole technical content is one sentence
+naming a sixteen-byte header and YV12 blocks and saying nothing whatever about the compression, so it
+would not reach a first sample even if believed entirely — and that page's single revision and
+ffmpeg's own decoder are the same person's work on the same December morning in 2011, seven hours
+apart.
 
 **Screen capture** — `tdsc` and `vmnc` are what remains of this group unattempted. Mostly DEFLATE over
 a framebuffer with a delta scheme on top, so also lossless and also absolutely measurable. `flashsv` and
