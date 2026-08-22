@@ -160,6 +160,8 @@ who wants one frame of a two-hour recording pays for one frame.
 
 | Apple Motion JPEG-B | `mjpb` | Y | — |
 
+| Avid AVRn | `AVRn` | Y | — |
+
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
 is an undivided heap of bytes, and where each packet starts and stops is a computation over five
@@ -3167,6 +3169,50 @@ codec and the wrong one to have called exact.
 What refuses, by name: a field header whose tag is not `mjpg`; a packet too short to hold one; a field
 naming a third field; and two fields whose decoded pictures disagree on width or height. There is no
 `catch` anywhere that hands back a blank or a repeated picture.
+### Avid AVRn
+
+Ordinary baseline JPEG, marker for marker — every packet is `FF D8`, a JFIF `APP0`, a comment naming
+`AVID`, a restart interval, the quantisation and Huffman tables, the frame and scan headers, entropy
+data, `FF D9`, decoded by the same reader Motion JPEG already uses because it genuinely is the same
+coding under a different fourcc. The one place it departs from a plain Motion JPEG stream is which of
+the JPEG's own stated size and the container's is trusted, and here it is the other way round.
+
+There is no published bitstream description of this one either, so what follows was recovered directly
+from four real captures at samples.ffmpeg.org — two broadcast recordings at 720x486 (NTSC) and
+720x576 (PAL) and two small test clips at 160x120 — by reading a packet on its own as a standalone
+JPEG and comparing that against ffmpeg's own decode of the whole file.
+
+**Where it differs is one thing the plain Motion JPEG decoder does deliberately.** That decoder trusts
+the JPEG's own stated size over the container's, on the reasoning that the JPEG is the thing that was
+actually coded. Two of the four captures measured are the case that reasoning gets wrong for this
+codec: the NTSC one's packets code a frame header stating 720x496, sixteen lines taller than the
+720x486 the container's own `BITMAPINFOHEADER` states, and one of the two PAL ones codes 720x592
+against a stated 720x576 — again sixteen lines, again exactly one macroblock row. ffmpeg's own decode
+of both files is the container's own, shorter figure, not the frame header's: what is happening is an
+encoder padding its coded frame out to a whole number of macroblock rows and never trimming the frame
+header back down to say so, leaving the true height nowhere but the container. The other two
+captures' frame headers already state their real size exactly, so the difference is invisible on half
+the corpus and would still be a defect for the other half if unhandled — a picture with sixteen rows
+of undefined content that nothing tells you not to trust.
+
+**Which sixteen rows are padding is not the half of this that goes without saying.** The padded rows
+sit above the real picture, not below it: cropping the coded frame's own top rows down to the
+container's height disagreed with ffmpeg on every sample of every frame, and keeping the bottom rows
+instead — discarding the top of the coded frame — matched exactly. A hand-built fixture whose top half
+and bottom half are two different flat colours is what a test can check this against without a real
+capture at all, since which colour survives says on its own face which end a decoder kept.
+
+**Verified.** All four captures — 46, 200, 50 and 50 pictures — were compared against ffmpeg's own
+decode of the same file, plane by plane, sampling every frame. Every picture agrees with ffmpeg to
+within the same small, pre-existing chroma-upsampling margin every JPEG-family decoder in this package
+carries — including every frame of the padded NTSC and PAL captures, which need the crop applied, and
+every frame of the two that need none. The one exception in 346 real pictures is the NTSC capture's own
+last packet, which the file itself cuts off mid-picture before either decoder ever sees the rest of it;
+both produce a picture from what bytes exist, and the two do not agree on filling in what neither had,
+which is not a defect in either.
+
+What refuses, by name: a container stating a picture size larger than the one its own JPEG frame
+header codes, which nothing here has bytes to fill in.
 
 ## 📜 License
 
