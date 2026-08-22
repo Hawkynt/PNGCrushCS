@@ -151,6 +151,8 @@ who wants one frame of a two-hour recording pays for one frame.
 
 | ASUS V1 | `ASV1` | Y | — |
 
+| ASUS V2 | `ASV2` | Y | — |
+
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
 is an undivided heap of bytes, and where each packet starts and stops is a computation over five
@@ -2872,6 +2874,54 @@ coefficient group's pattern naming the block's own DC position, which the docume
 coded as zero and read from the separate DC field instead; a block reading an eleventh coefficient group
 without having reached End Of Block first; and codec-private data shorter than the eight-byte global
 header the document's own bitstream clause needs.
+
+### ASUS V2
+
+ASUSTeK's successor to ASV1, for the same TV tuner cards and read from the same document: Michael
+Niedermayer's "ASUS V1/V2 Codecs" (asv1.txt, 2003–2016, GNU FDL/GPL). It keeps ASV1's macroblock shape,
+its per-file quantisation parameter and its dequantisation against ISO/IEC 11172-2's own intra matrix,
+and changes three things the document states outright: the packet's bit order is reversed within each
+byte rather than swapped by four-byte word; a block states how many coefficient groups follow up front
+rather than ending on an End Of Block code, reaching every one of the sixteen groups the coefficient-group
+diagram names rather than only the first ten ASV1's coding can reach; and the dequantisation scale is a
+hundred and twenty-eight rather than sixty-four. Like ASV1, this reuses ITU-T H.263's picture buffer,
+inverse transform and studio-range colour conversion, and every picture is coded independently.
+
+**Two things settled the same way ASV1's were.** The coefficient-group scan needs the same row-and-column
+swap, at both levels, that ASV1's own two diagrams need — the document draws them once, for both codecs
+at once. What is ASV2's own: a coefficient group's pattern bit for one of its four positions is read most
+significant bit first, where ASV1 reads the same shape of pattern least significant bit first.
+
+**A fixed-width field is not a variable-length code, and needs a second reversal on top of the byte-wide
+one.** The coefficient group count, the DC field and an escaped level's own raw byte are plain binary
+numbers rather than codes read bit by bit for their shape, and reading them the way a variable-length
+code is read — most significant bit first out of the once-reversed stream — answers with the bit-reversal
+of the field's real value. Caught on a flat frame, whose every DC field has to equal the picture's one
+known luminance: five of a macroblock's six blocks matched regardless, because a value that happens to be
+a palindrome at eight bits cannot tell the two readings apart, and the sixth read 1 where the file states
+128 — each other's mirror image at eight bits, which is exactly what confirmed the fixed-width fields need
+their own second reversal rather than only the byte-wide one clause 4.1 states.
+
+**What the document leaves as an ellipsis, and how this closes it.** Clause 5.2.3's level table prints
+magnitudes one to seven and the boundary magnitude thirty-one in full, and leaves magnitudes eight to
+thirty unstated behind three dots. Every printed value — including both signs of the boundary magnitude —
+fits one formula at once: a nested code of `k` zero bits, a one, `k` further bits and a sign, the `k` bits
+naming a magnitude offset from `2^k` when read least significant bit first rather than in the order they
+arrive. Applying that formula to the twenty-three unstated magnitudes was not shipped on the strength of
+the pattern alone: a real file encoded at a quantiser fine enough to need the full range, decoded here and
+compared against ffmpeg's own decode, uses the formula's magnitudes eight to thirty-one several hundred
+times over one 64x64 frame with no decoding error and no difference from ffmpeg's decode beyond the same
+one-level transform rounding every other measured stream shows.
+
+**Measured.** Six streams — five built here with ffmpeg's own encoder, 64x64 to 352x288, one of them
+100x60 and so not a whole number of macroblocks in either direction, quantisers 1 to 35, and a sixth built
+at quantiser 69 specifically to force the full level range — 302 frames in all, decoded here and by
+ffmpeg and compared **plane by plane**, sampling every frame. Every plane of every frame differs from
+ffmpeg's decode by at most one level, flat across every stream, the same transform-rounding residual
+ASV1 and this library's MPEG-1, H.263 and H.261 decoders already measure against the same oracle.
+
+What refuses, by name: a quantisation parameter of zero, which the dequantisation divides by; and
+codec-private data shorter than the eight-byte global header the document's own bitstream clause needs.
 
 ## 📜 License
 
