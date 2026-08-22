@@ -153,6 +153,8 @@ who wants one frame of a two-hour recording pays for one frame.
 
 | ASUS V2 | `ASV2` | Y | — |
 
+| Creative YUV | `cyuv` | Y | — |
+
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
 is an undivided heap of bytes, and where each packet starts and stops is a computation over five
@@ -2970,6 +2972,62 @@ ASV1 and this library's MPEG-1, H.263 and H.261 decoders already measure against
 
 What refuses, by name: a quantisation parameter of zero, which the dequantisation divides by; and
 codec-private data shorter than the eight-byte global header the document's own bitstream clause needs.
+
+### Creative YUV
+
+The codec Creative Labs' Video Blaster capture cards wrote, and the whole of it: 4:1:1 samples coded as
+differences along each row, where every difference is a four-bit index into one of three sixteen-entry
+signed tables the frame itself carries. There is no transform, no quantiser in the decoder, no
+run-length coding, no escape and nothing carried between frames — one running sum per component and a
+table block that makes every packet self-contained.
+
+**Two documents describe it and they agree.** Mike Melanson's *Simple YUV Coding Formats* and Dr. Tim
+Ferguson's `cyuv.txt`, written at Monash University and mirrored at `multimedia.cx/mirror/cyuv.txt` since
+its own address stopped resolving. They are not fully independent — Melanson's cites Ferguson's as its
+source — but they check each other arithmetically: Ferguson states the coded picture as
+`width * height * 6 / 8` bytes, and Melanson's byte layout reduces to exactly that, six nibbles carrying
+four luminance samples and one of each chrominance. The file confirms both. Every one of the 150 packets
+of `samples.ffmpeg.org/V-codecs/CYUV/cyuv.avi` is exactly 19,056 bytes, which is the 48-byte table block
+plus 176 × 144 × 6 / 8.
+
+**One thing measurement decided against both documents.** Each gives the third byte of a group as its
+high nibble naming the third luminance sample and its low nibble the fourth. It is the other way round.
+This is a difference no picture would announce: read as written, every *fourth* sample still comes out
+right, because a running sum does not care which order two differences are added in, and only the sample
+between them is wrong — at a plausible value between its two correct neighbours. The measurement showed
+exactly that shape: 3,996 of 25,344 luminance samples differing on frame 0, every one at a column
+congruent to two modulo four, with both chrominance planes already exact. Swapping the two nibbles takes
+the frame to zero.
+
+**A seed nibble is the top four bits of its sample**, so it widens by shifting rather than by repeating
+the pattern — measured the same way, shifting leaving only the nibble-order difference above where
+repeating leaves 37,725 of 38,016 samples wrong. Each row restarts from its own seed rather than carrying
+on from the row above.
+
+**The format has a second, uncompressed shape, and only its length says so.** A packet as long as the
+picture's packed 4:2:2 byte count is samples in U, Y, V, Y order with no table block and no prediction,
+stored bottom row first — the Windows bitmap convention, where the coded shape's rows run top-down. Both
+are real: `samples.ffmpeg.org/V-codecs/CYUV.AVI` is 320x240 and carries the uncompressed shape in all 14
+of its packets, and both files state `cyuv` and sixteen bits a pixel in the same header fields, so
+nothing but the length separates them.
+
+**Measured.** Both recordings, on the coded samples themselves rather than through a colour conversion,
+since this is a subsampled format and the chroma-siting convention would otherwise sit inside the
+comparison. The coded shape: 150 frames of 176x144 against `ffmpeg -threads 1 -fps_mode passthrough -f
+rawvideo -pix_fmt yuv411p`, **every sample of all three planes identical on every frame** — max delta 0,
+nothing drifting across the run. The uncompressed shape: 14 frames of 320x240 against the same command
+at `-pix_fmt uyvy422`, identical as well.
+
+**What is not settled, and is recorded as such.** Whether a sum leaving the byte range wraps or
+saturates: swept over all 150 coded frames, no running sum of any component ever goes below zero or above
+255, so both readings reproduce every measured frame exactly. Byte arithmetic is implemented, which is
+what this package's other prediction-coded lossless codecs do, and it is a choice the files did not
+decide rather than a fact they did. The coding is lossy at the encoder — each sample is quantised to one
+of sixteen table entries — and exact at the decoder, so max delta 0 is the right bar despite that.
+
+What refuses, by name: a width that is not a whole number of four-sample groups, since that is the unit
+both the coded rows and the chrominance are built from; a packet whose length is neither of the two
+shapes, rather than one of them decoded partway; and a picture size the stream states as nothing.
 
 ## 📜 License
 
