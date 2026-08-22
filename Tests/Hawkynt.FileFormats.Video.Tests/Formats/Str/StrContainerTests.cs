@@ -135,15 +135,18 @@ public sealed class StrContainerTests {
 
   [Test]
   [Category("Unit")]
-  public void AVideoPacketOpensWithTheFirstChunksThirtyTwoByteHeader() {
+  public void AVideoPacketIsExactlyTheTrimmedBitstreamWithNoChunkHeaderPrefix() {
+    // The thirty-two-byte per-chunk header is container bookkeeping this reader has already spent —
+    // reassembly, trimming and the timestamp all consumed it — so it is not carried on the packet.
+    // Width and height are on the stream (see DeclaresOnlyAVideoStreamWhenNoAudioSectorIsPresent's
+    // sibling assertions on container.Width/Height) rather than repeated on every packet.
     var payload = _Bytes(20);
     var file = _VideoSector(chunkIndex: 0, chunkCount: 1, frameNumber: 1, frameSize: 20, width: 320, height: 160, payload: payload);
     var container = StrContainer.FromBytes(file);
 
     var packet = StrContainer.ReadPackets(container).Single(p => p.StreamIndex == 0);
-    Assert.That(packet.Data.Length, Is.EqualTo(32 + 20));
-    Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(packet.Data.Span[16..]), Is.EqualTo(320)); // width, at the chunk header's own offset
-    Assert.That(packet.Data.Span[32..].ToArray(), Is.EqualTo(payload));
+    Assert.That(packet.Data.Length, Is.EqualTo(20));
+    Assert.That(packet.Data.ToArray(), Is.EqualTo(payload));
   }
 
   [Test]
@@ -167,7 +170,7 @@ public sealed class StrContainerTests {
 
     var packet = StrContainer.ReadPackets(container).Single(p => p.StreamIndex == 0);
     var expected = chunk0.Concat(chunk1).Concat(chunk2.Take(100)).ToArray();
-    Assert.That(packet.Data.Span[32..].ToArray(), Is.EqualTo(expected));
+    Assert.That(packet.Data.ToArray(), Is.EqualTo(expected));
   }
 
   [Test]
@@ -193,7 +196,7 @@ public sealed class StrContainerTests {
 
     var video = packets.Single(p => p.StreamIndex == 0);
     var expected = chunk0.Concat(chunk1.Take(50)).ToArray();
-    Assert.That(video.Data.Span[32..].ToArray(), Is.EqualTo(expected));
+    Assert.That(video.Data.ToArray(), Is.EqualTo(expected));
   }
 
   [Test]
@@ -212,9 +215,9 @@ public sealed class StrContainerTests {
     var container = StrContainer.FromBytes(file);
     var packet = StrContainer.ReadPackets(container).Single(p => p.StreamIndex == 0);
 
-    Assert.That(packet.Data.Length, Is.EqualTo(32 + _ChunkPayloadLength + 5));
+    Assert.That(packet.Data.Length, Is.EqualTo(_ChunkPayloadLength + 5));
     var expected = chunk0.Concat(chunk1.Take(5)).ToArray();
-    Assert.That(packet.Data.Span[32..].ToArray(), Is.EqualTo(expected));
+    Assert.That(packet.Data.ToArray(), Is.EqualTo(expected));
   }
 
   // ============================================================================================

@@ -252,6 +252,30 @@ internal static class StrReader {
   /// <summary>Walks the sectors a second time, this time handing out the packets they describe. See
   /// <see cref="Open"/> for why a frame's chunks are tracked by index and not by sector count, and
   /// why its packet is trimmed rather than being the chunks' full reserved capacity.</summary>
+  /// <remarks>
+  /// A video packet is the trimmed, reassembled MDEC bitstream and nothing else — the thirty-two-byte
+  /// per-chunk header is not carried on it, and that is a decision rather than an oversight. Of what
+  /// that header states: <c>chunk_index</c> and <c>chunk_count</c> exist only to reassemble this very
+  /// packet and are consumed doing it; <c>frame_number</c> is consumed into
+  /// <see cref="CodedPacket.PresentationTimestamp"/>; the frame's own byte length is consumed to trim
+  /// the packet and is exactly <see cref="CodedPacket.Data"/>'s length afterwards; and width and
+  /// height are restated on <see cref="MediaStreamInfo.Width"/> and <see cref="MediaStreamInfo.Height"/>
+  /// — a decoder reads a stream's own size once rather than every packet's repetition of it. Passing
+  /// any of those four on regardless would be the container handing the codec bytes it has already
+  /// read for it, under a fixed offset that exists only because of how this one container happens to
+  /// be written — the coupling the demux/decode seam exists to prevent.
+  /// <para/>
+  /// The header's other four fields — a per-frame quantiser scale, a count this reader has not
+  /// interpreted, a version number, and two words constant on every sample measured — are not carried
+  /// either, and for a different reason: nothing here yet knows whether the codec needs any of them
+  /// restated at all. ISO/IEC 11172-2, whose coefficient table MDEC's own is compatible with, reads its
+  /// quantiser scale out of the bitstream itself rather than from anything the container states, and
+  /// nothing measured for this container rules out MDEC doing the same. Carrying a field on the chance
+  /// a decoder might want it is the same mistake in the other direction — a byte layout invented for
+  /// one decoder before that decoder exists to say what it needs. If the codec, reading Sony's own
+  /// document, finds one of the four genuinely is not in the bitstream, that is the point to add it
+  /// back here, named and justified, not before.
+  /// </remarks>
   internal static IEnumerable<CodedPacket> ReadPackets(StrContainer container) {
     var data = container.Data;
     var span = data.Span;
@@ -259,7 +283,6 @@ internal static class StrReader {
     var sectorCount = container.SectorCount;
 
     List<byte[]>? chunks = null;
-    var chunkHeader = ReadOnlyMemory<byte>.Empty;
     var expectedChunks = 0;
     var frameSize = 0u;
     long? firstFrameNumber = null;
@@ -294,7 +317,6 @@ internal static class StrReader {
         firstFrameNumber ??= frameNumber;
 
         frameSize = BinaryPrimitives.ReadUInt32LittleEndian(payloadSpan[12..]);
-        chunkHeader = payload[.._ChunkHeaderLength];
         expectedChunks = chunkCount;
         chunks = chunkCount > 0 ? [] : null;
         frameOpen = chunkCount > 0;
@@ -303,7 +325,7 @@ internal static class StrReader {
           chunks!.Add(payload.Slice(_ChunkHeaderLength, _ChunkPayloadLength).ToArray());
 
         if (frameOpen && chunks!.Count == expectedChunks) {
-          yield return _CompleteFrame(chunkHeader, chunks, frameSize, frameNumber - firstFrameNumber.Value);
+          yield return _CompleteFrame(chunks, frameSize, frameNumber - firstFrameNumber.Value);
           frameOpen = false;
         }
       } else if (frameOpen) {
@@ -311,7 +333,7 @@ internal static class StrReader {
         if (chunks.Count == expectedChunks) {
           // The frame number is the one its opening chunk stated; every continuation chunk repeats it.
           var frameNumber = (long)BinaryPrimitives.ReadUInt32LittleEndian(payloadSpan[8..]);
-          yield return _CompleteFrame(chunkHeader, chunks, frameSize, frameNumber - firstFrameNumber!.Value);
+          yield return _CompleteFrame(chunks, frameSize, frameNumber - firstFrameNumber!.Value);
           frameOpen = false;
         }
       }
@@ -323,23 +345,21 @@ internal static class StrReader {
     // — and it is dropped rather than handed out with fewer chunks than its own header promised.
   }
 
-  private static CodedPacket _CompleteFrame(ReadOnlyMemory<byte> chunkHeader, List<byte[]> chunks, uint frameSize, long presentationTimestamp) {
+  private static CodedPacket _CompleteFrame(List<byte[]> chunks, uint frameSize, long presentationTimestamp) {
     var totalCapacity = 0;
     foreach (var chunk in chunks)
       totalCapacity += chunk.Length;
 
     var used = (int)Math.Min(frameSize, (uint)totalCapacity);
-    var combined = new byte[_ChunkHeaderLength + used];
-    chunkHeader.Span.CopyTo(combined);
+    var combined = new byte[used];
 
     var written = 0;
-    var dest = combined.AsSpan(_ChunkHeaderLength);
     foreach (var chunk in chunks) {
       if (written >= used)
         break;
 
       var take = Math.Min(chunk.Length, used - written);
-      chunk.AsSpan(0, take).CopyTo(dest[written..]);
+      chunk.AsSpan(0, take).CopyTo(combined.AsSpan(written));
       written += take;
     }
 

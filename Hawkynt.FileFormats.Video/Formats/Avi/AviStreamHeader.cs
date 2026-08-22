@@ -33,6 +33,11 @@ public readonly partial record struct AviStreamHeader(
 
   public const int StructSize = 56;
 
+  /// <summary>
+  /// The header without its trailing <c>rcFrame</c> rectangle, which older writers leave off.
+  /// </summary>
+  public const int StructSizeWithoutFrameRectangle = 48;
+
   /// <summary>The four letters marking a stream of pictures.</summary>
   public const string VIDEO_STREAM_TYPE = "vids";
 

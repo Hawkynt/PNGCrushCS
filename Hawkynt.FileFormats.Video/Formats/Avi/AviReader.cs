@@ -175,8 +175,7 @@ public static class AviReader {
 
       switch (element.Id.ToString()) {
         case _STREAM_HEADER_ID:
-          if (element.Body.Length >= AviStreamHeader.StructSize)
-            streamHeader ??= AviStreamHeader.ReadFrom(element.Body.Span);
+          streamHeader ??= _ReadStreamHeader(element.Body.Span);
           break;
         case _STREAM_FORMAT_ID:
           if (format.IsEmpty)
@@ -348,6 +347,31 @@ public static class AviReader {
   }
 
   /// <summary>Reads a RIFF text chunk, which is Latin-1 and terminated by a zero that may be padding.</summary>
+  /// <summary>
+  /// Reads a <c>strh</c> whose trailing rectangle may simply not be there.
+  /// </summary>
+  /// <remarks>
+  /// The stream header is fifty-six bytes with its <c>rcFrame</c> rectangle and forty-eight without,
+  /// and the shorter form is what older writers produce — <c>samples.ffmpeg.org</c>'s own Creative YUV
+  /// recording is one, with an otherwise ordinary <c>vids</c> header naming <c>cyuv</c> in both its
+  /// handler and its stream format. Requiring the full fifty-six meant that header was skipped
+  /// silently and the stream came back with no kind and no codec tag at all, so a file every other
+  /// tool reads was reported as holding no video. The rectangle says where in the movie rectangle a
+  /// stream draws and nothing here reads it, so its absence costs nothing: the four fields are left
+  /// at zero, which is what a writer omitting them means.
+  /// </remarks>
+  private static AviStreamHeader? _ReadStreamHeader(ReadOnlySpan<byte> body) {
+    if (body.Length >= AviStreamHeader.StructSize)
+      return AviStreamHeader.ReadFrom(body);
+
+    if (body.Length < AviStreamHeader.StructSizeWithoutFrameRectangle)
+      return null;
+
+    Span<byte> padded = stackalloc byte[AviStreamHeader.StructSize];
+    body[..AviStreamHeader.StructSizeWithoutFrameRectangle].CopyTo(padded);
+    return AviStreamHeader.ReadFrom(padded);
+  }
+
   private static string? _ReadZeroTerminated(ReadOnlySpan<byte> data) {
     var end = data.IndexOf((byte)0);
     if (end >= 0)
