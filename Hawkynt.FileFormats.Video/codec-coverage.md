@@ -22,11 +22,11 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 
 | | Count | Share |
 | --- | --- | --- |
-| Decoded and verified against ffmpeg | 64 | 30% |
+| Decoded and verified against ffmpeg | 65 | 31% |
 | Established as not implementable from files alone | 46 | 22% |
-| Not yet attempted | 101 | 48% |
+| Not yet attempted | 100 | 47% |
 
-The 64 are the codec table in `README.md`, which has fewer
+The 65 are the codec table in `README.md`, which has fewer
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
 frame against ffmpeg's decode of the same bitstream before it was merged, and the measurements are in
 each one's section of that file. The ones that reach exact equality on every sample of every frame
