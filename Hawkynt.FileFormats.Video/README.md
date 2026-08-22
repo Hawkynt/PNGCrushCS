@@ -52,6 +52,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | Brute Force & Ignorance (BFI) | `.bfi` | Y | — |
 | Commodore CDXL | `.cdxl` | Y | — |
 | IFF ANIM | `.anim`, `.iff` | Y | — |
+| Sierra VMD | `.vmd` | Y | — |
 
 | Codec | Tag | Decode | Encode |
 | --- | --- | --- | --- |
@@ -316,6 +317,36 @@ chunk and opens straight back into a fresh `MVIh` that restates the palette for 
 pictures — 194 pictures across the two runs in all, matching `ffprobe -count_frames`'s own count exactly
 — walked as one stream by this reader rather than as two, because nothing in the format calls that
 boundary anything more than another header restatement.
+
+Sierra VMD — "Video and Music Data", the format behind Phantasmagoria, Gabriel Knight 2 and Sierra's
+other CD-ROM adventures — carries no signature either, only a fixed 814-byte length field at the very
+start of its own 816-byte header. A file is that header, a run of coded frame data the header's own
+multimedia data offset names the start of, and a table of contents near the end holding two tables of
+its own: a block offset table, a seeking aid over units this format calls blocks, and a frame
+information table stating every audio or video frame's own byte length and, for a video frame, the
+rectangle it repaints and whether it opens with a new palette. Nothing here needs the block table to
+walk the file in order — a running cursor that starts at the header's own multimedia data offset and
+advances by each frame's stated length lands on every frame in turn, and, checked rather than assumed,
+lands exactly on the table of contents' own offset once the last one has been walked; a file whose
+lengths do not sum to that offset is refused. The block table earns its keep at exactly one thing this
+reader does need it for: naming which block a video frame belongs to, which is the timestamp this
+reader reports for it, because a block may hold more sound than a single frame's worth and no picture
+at all — a run of such blocks leaves the video frames on either side of it further apart in time than a
+plain count of pictures would say.
+
+**Measured.** Five real recordings from `samples.ffmpeg.org/game-formats/sierra-vmd/` — four of
+Sierra's own SWAT and one of Leisure Suit Larry 7, 280x218 and 320x240, 36 to 117 pictures apiece, 335
+video packets in all — were opened here and their packet stream compared against `ffprobe`'s own,
+stream index, presentation timestamp and size all three: identical on every one, including the Larry 7
+recording whose video timestamps repeatedly jump by more than one where a run of sound-only blocks
+sits between two pictures, which is the one thing a plain frame count would have gotten wrong. A sixth
+file, a Coktel Vision title carrying a later revision of the format, is refused: its table of contents
+holds a frame type this reader has no independent description of the meaning of, and guessing would
+hand a decoder bytes under the wrong description. Only the classic 816-byte header is read; the later
+revision's own shorter, palette-free 52-byte form, and the 816-byte form's two-field extension naming
+an external audio codec, are refused by name rather than guessed at. What a video frame's own bytes
+mean — the LZ compression and the three ways of painting a rectangle from them — is not this container's
+business and is not yet decoded.
 
 ### MPEG-1 video
 
