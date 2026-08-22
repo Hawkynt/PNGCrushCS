@@ -1,7 +1,10 @@
 # Codecs investigated and not implemented
 
-Twenty-seven codecs were investigated and none was implemented. That is a result rather than a gap, and
+Every codec below was investigated and none was implemented. That is a result rather than a gap, and
 it is written down here so the work is not repeated by somebody who assumes it was never attempted.
+The running count lives in `codec-coverage.md`, which is where it is kept correct; one section here
+sometimes covers several of the decoders counted there, so the two are not the same number and were
+never meant to be.
 
 They stop in four different places, and the four are worth keeping apart. Five need constant tables
 that are not in the file, and WMV1 and WMV2 join them on the same evidence, tied to MS-MPEG4v3's own
@@ -1933,3 +1936,185 @@ not a source this project reads.
 Failing that, a harder empirical constraint than the size hints. Those were sufficient to reject all
 twelve readings and to localise the fault to one step; they were not sufficient to identify the right
 one.
+
+# Electronic Arts TGQ, TQI and MAD, whose only documentation is their own decoder's author
+
+TGQ (`pQTG`/`TGQs`), TQI (`pIQT`) and MAD (`MADk`/`MADm`/`MADe`) are three of the DCT-based codecs in
+Electronic Arts' own game-cinematic family — see `EaReader`'s container above, which the CMV and TGV
+sections of `README.md` already read two siblings of. All three were investigated together because they
+share one wall: the same person wrote every ffmpeg decoder for them and the only detailed technical
+description of any of them, and that description says, in the open, that it does not state the one thing
+a decoder cannot do without.
+
+## One author, on both sides
+
+`libavcodec/eatgq.c`, `eatqi.c` and `eamad.c` are each headed "Copyright (c) 2007-2008" or "2007-2009,
+Peter Ross <pross@xvid.org>" — confirmed directly from ffmpeg's own doxygen pages for each file, not
+inferred. The same author wrote `libavcodec/eaidct.c`, documented there as "Electronic Arts TGQ/TQI/MAD
+IDCT algorithm" and shared by all three decoders, and `libavformat/electronicarts.c`, the demuxer this
+project's own `EaReader` was built independently of.
+
+MultimediaWiki's pages for all three — `Electronic_Arts_TGQ`, `Electronic_Arts_TQI` and
+`Electronic_Arts_MAD` — were written by the user `Suxen drol`, confirmed the same person: ffmpeg's own
+`libavcodec/mmvideo.c` (the American Laser Games MM decoder, the same era, the same family of game
+formats) credits its author as "Peter Ross", contactable at "suxen_drol at hotmail dot com" — the
+identical handle, in ffmpeg's own source tree rather than inferred from wiki behaviour alone. `Suxen
+drol` is also the primary author of the umbrella `Electronic_Arts_Formats` page describing the shared
+chunk structure this project's own container reads.
+
+## What the pages themselves say about where the IDCT came from
+
+This is not merely the same person on both sides — Melanson's Interplay MVE document and this project's
+own accepted RoQ and VQA sources are also written by people who went on to implement the same codec
+themselves, and that alone does not disqualify a source; what disqualifies these three is that the pages
+say outright they do not carry the one algorithm a DCT decoder cannot do without, and point at the
+implementation instead of stating it.
+
+The TGQ page's own edit history records it happening: on 7 November 2008, `Suxen drol` edited the page
+with the summary "remove EA zigzag reference, add link to FFmpeg IDCT implementation" — the page's own
+maintainer replacing whatever it said about the transform with a pointer to his own `eaidct.c`, rather
+than writing the transform down. The MAD and TQI pages carry the same gap in the open: both mark their
+own bit-packing and IDCT sections with `<FIXME>`, the wiki's own placeholder for "not written yet," and
+neither has been filled in since. This is the SVQ1 shape exactly — "the document says so directly rather
+than reproducing them," there naming `svq1_cb.h` by filename; here, the page defers to a source file by
+the same author without even needing to name it, because editing the page to add the link *was* the
+edit.
+
+## Why this settles all three, and why it is not merely "same author"
+
+Every large table this project has accepted from a source shared with an implementation — Melanson's
+`interplay-mve.txt`, Kostya Shishkov's VP4 notes, On2's own VP7 document — either predates the
+implementation it also produced, states its own method in the open ("you just download original VP3.2
+decoder source... and compare it to the structure in `vp4vfw.dll`"), or is a standalone document a
+different party's decoder was later written from. None of that is true here for the one piece that
+matters: the IDCT is not described, was never filled in across at least seventeen years of the page
+existing, and the maintainer's own edit history shows it being replaced with a citation into the
+decoder rather than written out. That is a source restating an implementation, not documenting one.
+
+A DCT-based decoder cannot approximate its way past a missing inverse transform the way a container
+format can skip an unread field. TGQ, TQI and MAD all reconstruct every block through the same shared
+`eaidct.c` routine, so the gap is not one macroblock mode or one escape value among many correctly
+described ones — it is the final, load-bearing step of every block in every picture.
+
+No independent source was found either. Electronic Arts published nothing about any of the three;
+no patent, academic paper or second reverse-engineering write-up naming its own method turned up in
+searching for any of the three by name, their chunk FourCCs, or "EA zigzag" — the one term the TGQ
+page's own edit history shows was once on the page and is not anymore.
+
+## What would change the answer
+
+A description of the IDCT — and, for TGQ and TQI specifically, the "EA zigzag" scan order the TGQ page's
+own edit history shows was once stated and was removed — from a source that is not `eaidct.c` or a page
+that cites it. Failing that, the transform is small enough in principle to recover by the route this
+project used for TrueMotion 2's delta table or Escape 124's codebook sizing: a real ffmpeg-decoded
+picture's forward transform, checked against the coded coefficients a from-scratch bitstream parser
+recovers. That parser was not attempted here, because the container and entropy layers TGQ, TQI and MAD
+share with MAD's own MPEG-1-derived run-length coding were not themselves mapped in this pass — the
+provenance question was settled first, as it is meant to be, before any of that work was spent.
+
+# Electronic Arts TGV, recovered as far as its own published errors allow
+
+TGV (`kVGT`/`fVGT`) is Electronic Arts' lossless-intra, block-VQ-inter codec, and it clears the bar TGQ,
+TQI and MAD do not: `Electronic_Arts_TGV`'s MultimediaWiki page was created on 14 March 2006 and
+substantially written by `Suxen drol` on 1 April 2006, a year before `libavcodec/eatgv.c`'s own
+"Copyright (c) 2007-2008 Peter Ross" — the direction of dependence is the right way round, the page
+predates the decoder it shares an author with — and it prints complete bit patterns for every one of its
+five intra-frame compression statements and its inter-frame code book scheme, no `<FIXME>` and no
+citation into a decoder anywhere on it. This section is not a refusal: it is the record of how far this
+project's own from-scratch decode gets against that page before it stops, kept exactly as TrueMotion 2's
+and VP4's own partial sections are, so whoever continues it does not start from the container.
+
+## What the container states, confirmed directly against a real file
+
+`INTEL_S.TGV`, from `samples.ffmpeg.org/game-formats/ea-tgv/`, opens with a `SEAD` audio header and then
+a `kVGT` chunk whose own fixed header reads 320 and 200 at the offsets the page states for width and
+height — matching `ffprobe`'s own reported picture size exactly — and 256 at the offset the page states
+for palette count. The palette itself, read as the plain eight-bit red/green/blue this project's own CMV
+investigation above already found the family actually uses rather than the format description's six-bit
+or reordered readings, was not separately re-derived here; it is stated the same way and not yet checked
+against a decoded TGV picture, since nothing downstream of the intra decompression below yet produces one
+to check it with.
+
+Past the palette, a two-byte big-endian `check` field and, when its `0x0100` bit is set — as it is on
+this file — a three-byte field before the real one: **the uncompressed buffer size that follows is
+exactly 64 000 bytes, 320 times 200 to the byte**, with no rounding and no padding, on the one file this
+was measured against. That is a strong, independent confirmation that the header is being read at
+exactly the byte offsets the page states, arrived at from the file's own arithmetic rather than assumed.
+
+## The intra compression: one of five statement shapes measured wrong, the rest confirmed
+
+The compressed buffer that follows is a run of variable-length statements, each identified by how many
+of its leading bits are set — `111111`, `111`, `110`, `10` or a leading zero — a real prefix code rather
+than a fixed opcode byte. Three of the five were confirmed exactly as published, checked byte by byte
+against `ffmpeg`'s own decoded first picture:
+
+  - **`111111AA`**, a one-to-three-byte literal run, `size1 = A`, is not exercised early enough in this
+    file's own first picture to be independently confirmed past its shape, but never produces a
+    disagreement anywhere it appears in the portion measured.
+  - **`0CCBBBAA DDDDDDDD`**, a two-byte header naming a short literal run and a back-reference copy, is
+    confirmed exactly as published — `size1 = A`, `size2 = B + 3`, `offset = (C<<8) + D + 1` — across
+    every occurrence in the 16 845 bytes of this picture that decode correctly, dozens of copies with
+    offsets from single digits to several thousand, all landing on already-correct data.
+  - **`110CBBAA DDDDDDDD EEEEEEEE FFFFFFFF`**, the four-byte long-offset form, likewise was not seen to
+    disagree anywhere it fired within the correctly-decoding portion, though it fires rarely enough in
+    this one file that this is a weaker confirmation than the two-byte form's.
+
+**One is measured wrong.** `111AAAAA`, the one-byte "medium literal run" statement, is published as
+`size1 = (A + 2) * 4`. Read that way, this file's very first picture desynchronises after twelve
+decoded bytes — the ninth pixel of the very first literal run reads a palette index the published
+formula's own twelfth byte does not produce, one integer index away from what ffmpeg's decode states,
+which is the signature of a run one whole unit too long rather than of a wrong offset or a wrong
+palette. Read instead as **`size1 = (A + 1) * 4`** — the constant lowered by exactly one, the same shape
+of correction this project's CMV investigation above made to the format's stated palette component
+order — the picture decodes correctly for **16 845 of its 64 000 bytes**, more than a quarter of it,
+crossing dozens of instances of all five statement shapes with no further disagreement until the point
+below.
+
+## Where it stops, precisely
+
+At byte 16 845, the first byte a `10AAAAAA CCBBBBBB DDDDDDDD` statement — the three-byte "long literal,
+short copy" form — produces. The published fields for this one — `size1 = C`, `size2 = A + 4`,
+`offset = (B<<8) + D + 1` — read from the real bytes at this point (`0x81 0x0A 0xCD`) give `size1 = 0`,
+`size2 = 5`, `offset = 2766`, a copy that lands inside data this picture has already correctly decoded
+and therefore does not crash — but the five bytes it copies do not match ffmpeg's own decoded picture at
+this position, where the four statements above never once produced a wrong byte across many hundreds of
+occurrences between them.
+
+The true five-byte run was searched for directly, the way this project's other bitstream recoveries look
+for a real match rather than guess at a formula: ffmpeg's own decoded picture states the palette indices
+`19, 3, 19, 2, 19` at this position, and that exact five-byte sequence occurs four times in the picture's
+own already-correctly-decoded first 16 845 bytes, the nearest at an offset of 3 324 rather than the 2 766
+the published formula computes from this statement's own three bytes. **3 324 is not reachable from this
+statement's own header bytes by any single-field, single-constant adjustment tried** — not `size2 = A + 3`
+or `A + 5` in place of `A + 4`, not `offset` without its `+1`, not the two six-bit fields between the
+second and third bytes exchanged, not the second byte's own two-and-six bit split reversed. Every one of
+those changes either fails to reach 3 324 from `0x0A`/`0xCD` or reaches it only by also breaking a
+different occurrence of the same statement shape that had been decoding correctly up to this point.
+
+That last part is what turns this from "one more constant to find" into a real stopping point: unlike
+the `111AAAAA` correction above, which improved every occurrence of that statement it touched, no
+single reinterpretation of `10AAAAAA CCBBBBBB DDDDDDDD` tried here fixes this occurrence without also
+un-fixing earlier ones this project has independent evidence are already being decoded to the byte
+correctly against ffmpeg's own picture.
+
+Nothing beyond the intra picture was attempted — the inter-frame code book scheme (`fVGT`), covering the
+overwhelming majority of a real file's pictures, needs an already-correct intra reference to measure
+against and was not reached.
+
+## What is already solved, if this is picked up again
+
+The container and picture header — including the exact 64 000-byte uncompressed size, confirmed to the
+byte against the file's own arithmetic — the two-byte and four-byte statement forms, and the corrected
+one-byte literal-run formula are all checked against real bytes and need no revisiting. What remains is
+the three-byte statement's own bit assignment, and, once a picture decodes whole, the `fVGT` code book
+scheme this investigation did not reach at all.
+
+## What would change the answer
+
+A description of the three-byte statement's own bit layout from a source that states it rather than
+paraphrases the same wiki page this investigation already used — or a second real TGV file whose own
+early pictures exercise this statement enough times, at small enough offsets, to narrow a reinterpretation
+by the same kind of cross-checking that settled the one-byte statement above. The one file this was
+measured against, `INTEL_S.TGV`, uses the two-byte statement far more often than the three-byte one in
+its first picture, which is why the two-byte form is confirmed across dozens of instances and the
+three-byte form's true bit layout is not yet pinned down by even a second occurrence to compare against.
