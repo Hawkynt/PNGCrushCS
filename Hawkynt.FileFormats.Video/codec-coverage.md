@@ -58,11 +58,12 @@ the stronger oracle of the two, being the ground truth itself. LCL ZLIB is measu
 addition to the usual one, since it too has a real encoder here: round-tripped through it as well as
 checked against seven real recordings.
 
-The 33 are Indeo 3, Indeo 4, Indeo 5, TrueMotion 1, WMV1, WMV2, MSS1, MSS2, Canopus HQ/HQA
+The 35 are Indeo 3, Indeo 4, Indeo 5, TrueMotion 1, WMV1, WMV2, MSS1, MSS2, Canopus HQ/HQA
 (`hq_hqa`), Canopus HQX, Lagarith, DV, MSZH, Escape 124, SpeedHQ, VP4, VP7, MSCC, RSCC, WCMV,
 MWSC, RASC, Go2Meeting (`g2m`), ScreenPressor (`scpr`), Screenpresso, TSCC2, Sorenson Video 1
 (`svq1`), Sorenson Video 3 (`svq3`), Smacker (`smackvid`), Electronic Arts TGQ, TQI and MAD
-(`eatgq`, `eatqi`, `eamad`), and Deluxe Paint Animation (`anm`),
+(`eatgq`, `eatqi`, `eamad`), Deluxe Paint Animation (`anm`), Chronomaster DFA (`dfa`) and
+8088flex TMV (`tmv`),
 and the arguments that settle them are in
 `undecodable-codecs.md`. The first four have frames too small to
 carry the tables they need —
@@ -157,7 +158,7 @@ no frame, however large, that was ever going to carry it.
 RASC, Go2Meeting (`g2m`), ScreenPressor (`scpr`), Screenpresso, TSCC2, Sorenson Video 1 (`svq1`) and
 Sorenson Video 3 (`svq3`), and
 
-All twenty-nine are finished investigations with negative answers, not gaps waiting to be filled.
+All thirty-five are finished investigations with negative answers, not gaps waiting to be filled.
 
 ## What is left, by family
 
