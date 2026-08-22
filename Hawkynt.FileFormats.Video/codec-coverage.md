@@ -22,9 +22,9 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 
 | | Count | Share |
 | --- | --- | --- |
-| Decoded and verified against ffmpeg | 62 | 29% |
+| Decoded and verified against ffmpeg | 63 | 30% |
 | Established as not implementable from files alone | 35 | 17% |
-| Not yet attempted | 114 | 54% |
+| Not yet attempted | 113 | 54% |
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
 frame against ffmpeg's decode of the same bitstream before it was merged, and the measurements are in
 each one's section of that file. The ones that reach exact equality on every sample of every frame
@@ -32,9 +32,8 @@ are Microsoft RLE, Microsoft Video 1, Cinepak, QuickTime Animation, Apple Video,
 FFVHUFF, FFV1, ZMBV, TSCC, CSCD, Flash Screen Video, Flash Screen Video 2, id RoQ, Interplay Video,
 id Cinematic Video, Westwood VQA Video, Electronic Arts CMV, Commodore CDXL Video, IFF ANIM Video, BFI Video, QPEG Video,
 Sierra VMD Video,
-Ut Video, MagicYUV, v210, r210, r10k,
-y41p, CLJR, ZeroCodec, LCL ZLIB, Autodesk Animator Codec, avui, avrp,
-Creative YUV
+Ut Video, MagicYUV, v210, 012v, r210, r10k,
+y41p, CLJR, ZeroCodec, LCL ZLIB, Autodesk Animator Codec, avui, avrp, Creative YUV
 and Hap — the two colour-space ones over 883 and 1,446 frames, in all six and all seven of their
 colour spaces, and the packed layouts on the sample data itself, at its own coded depth and with
 no display conversion in the way, over 120, 90, 90, 90 and 60 frames at three geometries each.
@@ -230,6 +229,9 @@ it, confirmed by the format's own recorded history as well as by the page's own 
 **Lossless RGB and YUV** — what is left of the group is `012v`, `cllc`, `dxtory`,
 `loco`, `m101`, `sheervideo`, `vble` and `ylc`. Ut Video, MagicYUV, ZeroCodec, LCL ZLIB, AASC and
 Creative YUV came out
+
+**Lossless RGB and YUV** — what is left of the group is `cllc`, `cyuv`, `dxtory`,
+`loco`, `m101`, `sheervideo`, `vble` and `ylc`. Ut Video, MagicYUV, ZeroCodec, LCL ZLIB and AASC came out
 of it and reached exact equality, and MSZH came out of it into `undecodable-codecs.md`. AASC's own
 row-and-column bookkeeping — a coding this project found no independent description narrower than "the
 same shape as Microsoft RLE" — needed measuring against a real file to settle at all: the wiki page names
@@ -245,7 +247,15 @@ against ffmpeg's own encoder fed known or pseudo-random samples, and r210 and r1
 disagree with each other about which ten bits are which despite the family resemblance their names
 suggest, while y41p's rows turned out to be coded bottom row first — found only once random content,
 which has no row in common with the wrong one, turned a sweep that looked like it matched nothing at
-all into an exact match once the row order was reversed. `cljr` is done too, and it is the one lossy
+all into an exact match once the row order was reversed. `012v` is done as well, and it is the cheapest
+of the group for a reason its own name states backwards: its sixteen-byte group is `v210`'s own, sample
+for sample and bit for bit, and the whole of the difference is that a row is as long as the packet's own
+length divided by the height rather than padded out to a multiple of 128. What that codec's
+investigation had stopped on turned out not to be about it at all — the "transparency is not implemented"
+message its reference decoder logs belongs to the sibling four-character code `a12v`, which the same
+implementation serves and whose alpha channel it drops; patching nothing but the tag bytes of the real
+sample makes the message appear on byte-identical picture data, and the unpatched file decodes without
+it. So the oracle is sound here where it would not be for `a12v`, which is not claimed. `cljr` is done too, and it is the one lossy
 format in this group: the quantisation is the encoder's, so a decoder reading the coded bits has
 nothing left to round, but the encoder dithers, which means a coded word is not a plain quantisation of
 the source and the sweep that recovered its bit layout had to be checked against another decoder's
