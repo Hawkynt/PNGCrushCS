@@ -2311,3 +2311,38 @@ or format note describing the picture coding. Either that documentation surfacin
 real files to let the same kind of position-by-position bisection against ffmpeg's decode that recovered
 CDXL's and BFI's own byte layouts run in earnest, would change the answer. The header fields confirmed
 above are recorded so whoever finds either does not have to re-derive them.
+
+# Brooktree ProSumer Video, where there is nothing anywhere to read
+
+Brooktree ProSumer Video (`prosumer`) was investigated as one of the lossless group's remaining names.
+It stops on the plainest evidence this file records: there is nothing to build from at all, not a
+description and not a single file.
+
+## What was searched, and what turned up
+
+No MultimediaWiki page exists for this codec under any name tried — `Brooktree_ProSumer_Video`,
+`ProSumer`, `Prosumer_Video` and a check of the wiki's own `Brooktree` material, which covers only
+that company's BT848/BT878 capture chips and their unrelated `BT20`/TwoCC registration, all return
+nothing. Brooktree itself was acquired by Conexant in 1996 and no longer exists as a company; no SDK,
+developer note or format description survives anywhere this project could reach.
+
+No sample exists either. `ffmpeg -h decoder=prosumer` confirms a decoder is registered — "Brooktree
+ProSumer Video" — but ffmpeg carries no encoder, so no corpus can be built to order, and none was found
+ready-made: `samples.ffmpeg.org/V-codecs/PROSUMER/` and the equivalent path on the mplayerhq mirror
+both return nothing, and ffmpeg's own `fate-suite`, reachable over rsync and richer than the public
+sample tree for exactly this kind of obscure format — it is what supplied Canopus Lossless's and
+Escape 124's corpora above — carries no `prosumer` directory either.
+
+## Why this is not worth a longer entry
+
+Every other codec in this file that stops on absent documentation still has something to weigh: a
+stub page naming a fourcc and a vendor, a sample corpus with no description to read it against, or an
+implementation whose function names give away its origin. None of that exists here. There is a
+registered decoder name and nothing else — the same shape MSCC's entry above records, and the same
+conclusion: nothing was ever published, and nothing survives to reverse-engineer from either.
+
+## What would change the answer
+
+Any Brooktree engineering document naming this codec, or a real sample file from any source — a
+capture made with Brooktree's own hardware, or a recording found in an archive this search did not
+reach. Either would give this entry something to start from that it does not have now.

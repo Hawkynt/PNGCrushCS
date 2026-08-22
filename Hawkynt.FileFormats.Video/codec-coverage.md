@@ -23,8 +23,8 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 | | Count | Share |
 | --- | --- | --- |
 | Decoded and verified against ffmpeg | 61 | 29% |
-| Established as not implementable from files alone | 35 | 17% |
-| Not yet attempted | 115 | 55% |
+| Established as not implementable from files alone | 36 | 17% |
+| Not yet attempted | 114 | 54% |
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
 frame against ffmpeg's decode of the same bitstream before it was merged, and the measurements are in
 each one's section of that file. The ones that reach exact equality on every sample of every frame
@@ -57,12 +57,12 @@ the stronger oracle of the two, being the ground truth itself. LCL ZLIB is measu
 addition to the usual one, since it too has a real encoder here: round-tripped through it as well as
 checked against seven real recordings.
 
-The 35 are Indeo 3, Indeo 4, Indeo 5, TrueMotion 1, WMV1, WMV2, MSS1, MSS2, Canopus HQ/HQA
+The 36 are Indeo 3, Indeo 4, Indeo 5, TrueMotion 1, WMV1, WMV2, MSS1, MSS2, Canopus HQ/HQA
 (`hq_hqa`), Canopus HQX, Lagarith, DV, MSZH, Escape 124, SpeedHQ, VP4, VP7, MSCC, RSCC, WCMV,
 MWSC, RASC, Go2Meeting (`g2m`), ScreenPressor (`scpr`), Screenpresso, TSCC2, Sorenson Video 1
 (`svq1`), Sorenson Video 3 (`svq3`), Smacker (`smackvid`), Electronic Arts TGQ, TQI and MAD
-(`eatgq`, `eatqi`, `eamad`), Deluxe Paint Animation (`anm`), Chronomaster DFA (`dfa`) and
-8088flex TMV (`tmv`),
+(`eatgq`, `eatqi`, `eamad`), Deluxe Paint Animation (`anm`), Chronomaster DFA (`dfa`),
+8088flex TMV (`tmv`) and Brooktree ProSumer Video,
 and the arguments that settle them are in
 `undecodable-codecs.md`. The first four have frames too small to
 carry the tables they need —
