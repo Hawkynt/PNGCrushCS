@@ -34,8 +34,11 @@ reference decoder's two source files — `quant_common.c` and `findnearmv.c` —
 the dequantisation tables and the interframe motion-vector census, where it declines to print what
 those files hold. Where each stops is recorded below.
 
-The nine screen-capture codecs below — MSCC, RSCC, WCMV, MWSC, RASC, Go2Meeting, ScreenPressor,
-Screenpresso and TSCC2 — sort into the same places rather than needing a new one. Six of the nine
+The ten screen-capture codecs below — MSCC, RSCC, WCMV, MWSC, RASC, Go2Meeting, ScreenPressor,
+Screenpresso, TSCC2 and FMVC — sort into the same places rather than needing a new one. FMVC is the
+tenth and the plainest of the group's provenance cases: every technical fact on its page was added
+five years and seven months after ffmpeg's own decoder, and even at face value the page names its two
+compression types as LZ77 variants without stating either one's coding. Six of the nine older ones
 (MSCC, WCMV, MWSC, RASC, ScreenPressor and Screenpresso) join MSS1, MSS2, Canopus and MSZH's variant of
 the first place: the only bitstream-level description that exists for any of them, where one exists at
 all, is a paraphrase of the implementation that produced it, and for three of the six no usable sample
@@ -47,7 +50,9 @@ author too. RSCC alone reaches Escape 124 and SpeedHQ's place — a real sample 
 packet framing fully recovered and verified against it, and a delta-record scheme whose destination
 coordinates are pinned down and whose remaining fields resist every reading tried.
 
-None of the twenty-seven had anything committed.
+None of them had anything committed. The running count lives in `codec-coverage.md` for the same
+reason it is not repeated here: a number written in two places drifts apart at the first merge, and
+this file has already had that happen to it.
 
 Indeo 3 (`IV32`), Indeo 4 (`IV41`), Indeo 5 (`IV50`), TrueMotion 1 (`DUCK`) and TrueMotion 2 (`TM20`)
 are the proprietary codecs of the multimedia era. None has a published specification. No encoder for
@@ -2312,8 +2317,6 @@ real files to let the same kind of position-by-position bisection against ffmpeg
 CDXL's and BFI's own byte layouts run in earnest, would change the answer. The header fields confirmed
 above are recorded so whoever finds either does not have to re-derive them.
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 # LOCO, whose only description says on its own face where it came from
 
 LOCO (`LOCO`) was investigated as part of the lossless group that produced Ut Video, MagicYUV, ZeroCodec,
@@ -2829,7 +2832,6 @@ The dozen VLC codesets and the per-format seed predictors, printed. From BitJazz
 has written them down outside an implementation. Everything else about this codec is already
 documented well enough to build from, which is what makes it the most frustrating entry in this file
 rather than the most obscure.
-=======
 # YLC, which reads as a complete description until one clause of it is taken seriously
 
 YLC — "YUY2 Lossless Codec", `YLC0` in an AVI — comes from a Japanese AviUtl plugin author's own tool.
@@ -2910,8 +2912,6 @@ The 225-entry quad table, printed, from any source that is not an implementation
 recordings, from varied content, to demonstrate that every entry has been exercised and read off
 against the oracle. The header, the prediction rule and the sample above are recorded so that whoever
 has either does not start from the container.
->>>>>>> THEIRS
-=======
 # FM Screen Capture Codec (FMVC), whose real page arrived five years after its decoder
 
 FM Screen Capture Codec (`FMVC`) was investigated as one of the screen-capture and lossless names this
@@ -2961,4 +2961,3 @@ A description of FMVC's two LZ77 variants — the match and literal coding, the 
 — from a source that is not an implementation and does not postdate ffmpeg's own decoder by five years:
 Fox Magic's own documentation, or a reverse-engineering write-up that says plainly how it was produced
 and from what, the way this project would need for LOCO, VBLE or Canopus Lossless above.
->>>>>>> 25b1cfc2 (* FM Screen Capture Codec settled as not implementable, its real page five years late)
