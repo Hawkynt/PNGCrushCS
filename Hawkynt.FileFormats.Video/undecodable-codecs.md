@@ -2311,3 +2311,49 @@ or format note describing the picture coding. Either that documentation surfacin
 real files to let the same kind of position-by-position bisection against ffmpeg's decode that recovered
 CDXL's and BFI's own byte layouts run in earnest, would change the answer. The header fields confirmed
 above are recorded so whoever finds either does not have to re-derive them.
+
+# LOCO, whose only description says on its own face where it came from
+
+LOCO (`LOCO`) was investigated as part of the lossless group that produced Ut Video, MagicYUV, ZeroCodec,
+LCL ZLIB and Creative YUV. It is a prediction-and-entropy codec of the HuffYUV family and it looks, at
+first glance, exactly like the kind of thing that family's other members turned out to be: a
+MultimediaWiki page with a real technical description on it, enough to build from.
+
+It stops on provenance, and the evidence is unusually clean because the page itself states it.
+
+## The direction of dependence, from the page's own words and its own history
+
+MultimediaWiki's LOCO page opens with the sentence *"This page is originally based on a description
+written by User:Kostya."* That user's own wiki biography describes him as a reverse engineer, and he is
+Konstantin Shishkov — a prolific author of exactly this class of decoder.
+
+The page's edit history settles the rest. It was created at 12:03 on 5 February 2006 by "Multimedia
+Mike", carrying the whole 2,290-byte technical write-up in a single edit, and Kostya himself edited it
+the same day. FFmpeg's own `loco.c` was added on 1 March 2005 — eleven months **earlier** — in a commit
+whose message reads "go LOCO, courtesy of Kostya Shishkov". So the decoder came first, its originating
+author is the same person the page credits its description to, and the description arrived the better
+part of a year afterwards.
+
+That is both disqualifying legs of the test this project already applied to TSCC2, Go2Meeting, MSS1,
+MSS2 and Electronic Arts TGQ at once, and it is a cleaner case than any of them: those had to be
+established by matching function names or by reading an edit history against a commit date, where this
+page volunteers its own source in its first line. The page is the decoder described after the fact, not
+a specification the decoder was built from — the opposite of ASV1 and ASV2's `asv1.txt`, which is
+written as a specification, carries a changelog naming two authors, and predates any implementation of
+it in this repository by years.
+
+## Why nothing else fills the gap
+
+No other description of LOCO's bitstream was found. It is not a vendor format with a published
+standard behind it, there is no encoder in ffmpeg to drive a corpus with, and the only technical text
+in existence is the page above. Blind recovery from files is not a route here either: the codec is
+prediction plus an entropy coder whose parameters are exactly what the page states and nothing else
+does, so there is no independently-sourced anchor of the kind Indeo 3's header offsets or TrueMotion
+2's own container framing gave those investigations to start from.
+
+## What would change the answer
+
+A description of LOCO's prediction and entropy coding from a source that is not an implementation and
+not a retrospective account of one — the format's own author, a vendor document, or a reverse
+engineer's write-up that predates the decoder and says plainly how it was produced and from what.
+Nothing found is that, and the page that exists says in its own first line that it is not.

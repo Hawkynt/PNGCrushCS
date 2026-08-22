@@ -23,8 +23,8 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 | | Count | Share |
 | --- | --- | --- |
 | Decoded and verified against ffmpeg | 63 | 30% |
-| Established as not implementable from files alone | 35 | 17% |
-| Not yet attempted | 113 | 54% |
+| Established as not implementable from files alone | 36 | 17% |
+| Not yet attempted | 112 | 53% |
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
 frame against ffmpeg's decode of the same bitstream before it was merged, and the measurements are in
 each one's section of that file. The ones that reach exact equality on every sample of every frame
@@ -64,12 +64,12 @@ the stronger oracle of the two, being the ground truth itself. LCL ZLIB is measu
 addition to the usual one, since it too has a real encoder here: round-tripped through it as well as
 checked against seven real recordings.
 
-The 35 are Indeo 3, Indeo 4, Indeo 5, TrueMotion 1, WMV1, WMV2, MSS1, MSS2, Canopus HQ/HQA
+The 36 are Indeo 3, Indeo 4, Indeo 5, TrueMotion 1, WMV1, WMV2, MSS1, MSS2, Canopus HQ/HQA
 (`hq_hqa`), Canopus HQX, Lagarith, DV, MSZH, Escape 124, SpeedHQ, VP4, VP7, MSCC, RSCC, WCMV,
 MWSC, RASC, Go2Meeting (`g2m`), ScreenPressor (`scpr`), Screenpresso, TSCC2, Sorenson Video 1
 (`svq1`), Sorenson Video 3 (`svq3`), Smacker (`smackvid`), Electronic Arts TGQ, TQI and MAD
 (`eatgq`, `eatqi`, `eamad`), Deluxe Paint Animation (`anm`), Chronomaster DFA (`dfa`) and
-8088flex TMV (`tmv`),
+8088flex TMV (`tmv`) and LOCO (`loco`),
 and the arguments that settle them are in
 `undecodable-codecs.md`. The first four have frames too small to
 carry the tables they need —
@@ -164,7 +164,7 @@ no frame, however large, that was ever going to carry it.
 RASC, Go2Meeting (`g2m`), ScreenPressor (`scpr`), Screenpresso, TSCC2, Sorenson Video 1 (`svq1`) and
 Sorenson Video 3 (`svq3`), and
 
-All thirty-five are finished investigations with negative answers, not gaps waiting to be filled.
+All thirty-six are finished investigations with negative answers, not gaps waiting to be filled.
 
 ## What is left, by family
 
@@ -232,6 +232,9 @@ Creative YUV came out
 
 **Lossless RGB and YUV** — what is left of the group is `cllc`, `cyuv`, `dxtory`,
 `loco`, `m101`, `sheervideo`, `vble` and `ylc`. Ut Video, MagicYUV, ZeroCodec, LCL ZLIB and AASC came out
+
+**Lossless RGB and YUV** — what is left of the group is `012v`, `cllc`, `cyuv`, `dxtory`,
+`m101`, `sheervideo`, `vble` and `ylc`. Ut Video, MagicYUV, ZeroCodec, LCL ZLIB and AASC came out
 of it and reached exact equality, and MSZH came out of it into `undecodable-codecs.md`. AASC's own
 row-and-column bookkeeping — a coding this project found no independent description narrower than "the
 same shape as Microsoft RLE" — needed measuring against a real file to settle at all: the wiki page names
@@ -261,7 +264,12 @@ nothing left to round, but the encoder dithers, which means a coded word is not 
 the source and the sweep that recovered its bit layout had to be checked against another decoder's
 reading of the same bits rather than against the picture that went in. This is the densest source of
 verifiable wins in the list — but not a uniformly cheap one. `lagarith`, which is arithmetic coding over
-the same kind of prediction, also came out of it and is now in `undecodable-codecs.md` instead.
+the same kind of prediction, also came out of it and is now in `undecodable-codecs.md` instead, and
+`loco` has now joined it there on the cleanest provenance evidence this project has found anywhere: its
+MultimediaWiki page opens by stating that it is based on a description by the same person ffmpeg's own
+commit message credits the decoder to, and its edit history puts it eleven months after that decoder
+landed. The page is the implementation written up afterwards, which is the one thing this project
+cannot build from.
 
 **Screen capture** — `tdsc` and `vmnc` are what remains of this group unattempted. Mostly DEFLATE over
 a framebuffer with a delta scheme on top, so also lossless and also absolutely measurable. `flashsv` and
