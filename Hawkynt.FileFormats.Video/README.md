@@ -126,6 +126,8 @@ who wants one frame of a two-hour recording pays for one frame.
 
 | GoPro CineForm (SMPTE VC-5) | `CFHD` | Y | — |
 
+| Brute Force & Ignorance Video | `BFIV` (synthetic — the format states no codec tag of its own) | Y | — |
+
 | Commodore CDXL Video | `CDXL` (synthetic — the format states no codec tag of its own) | Y | — |
 
 | IFF ANIM Video | `ANIM` (synthetic — the format states no codec tag of its own) | Y | — |
@@ -2495,6 +2497,34 @@ later" and never gives them; an interleave other than zero or one; any of method
 since no measured file sets one and the only documented use of them is its own author's stated
 extension rather than the specification's; more than eight bitplanes, the limit the delta chunk's own
 pointer table states; and a coded pixel naming a palette index the stated palette does not have.
+
+### Brute Force & Ignorance Video
+
+Tsunami Media's own FMV format, named — in the words of *Flash Traffic: City of Angels*' own README —
+because "we don't think you should *have* to buy a brand new 100Mz PCI bus Pentium machine ... just to
+play a computer game." Every picture is palettised eight-bit, one palette for the whole file, coded with
+a small mix of LZ and RLE: a control byte's top two bits choose one of four operations and its low six
+bits are a length, extended through a following sixteen-bit value when they read zero.
+
+A literal run copies that many bytes from the input outright. A back-reference copies that many
+**dwords** — four bytes each, one byte at a time — from earlier in the same picture, which is what a
+run shorter than its own offset needs: each byte it copies may itself have been written moments before
+by the same operation, so a block copy would read the wrong thing. An unchanged run leaves that many
+bytes exactly as the frame before left them, which is what makes decoding a frame start from a copy of
+the one before it rather than a blank canvas — and an unchanged run whose extended length reads zero is
+not a run of nothing, it is the stream's own stop code. A fill run writes that many **words** — two
+bytes each — of one flat value repeated. The palette is six-bit VGA precision, widened to eight bits by
+repeating the value's own low bits, the same construction this library already uses for CDXL's and IFF
+ANIM's Hold-And-Modify channels.
+
+**Measured.** Three files from `samples.ffmpeg.org/game-formats/bfi/` — `2287.bfi`, `5081.bfi` and
+`5082.bfi`, all 320x140, fifty-seven, forty-three and thirty-eight frames — were decoded here and by
+ffmpeg and compared sample for sample against ffmpeg's own `rgb24` output: all 138 frames are identical,
+maximum delta nought.
+
+What refuses, by name: a chunk not opening with the four bytes `IVAS`; a compressed stream whose codes
+read past the end of the input or write past the frame's own stated size; and a back-reference whose
+offset reaches before the start of the picture.
 
 ## 📜 License
 
