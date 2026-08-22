@@ -22,9 +22,9 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 
 | | Count | Share |
 | --- | --- | --- |
-| Decoded and verified against ffmpeg | 59 | 28% |
+| Decoded and verified against ffmpeg | 60 | 28% |
 | Established as not implementable from files alone | 35 | 17% |
-| Not yet attempted | 117 | 55% |
+| Not yet attempted | 116 | 55% |
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
 frame against ffmpeg's decode of the same bitstream before it was merged, and the measurements are in
 each one's section of that file. The ones that reach exact equality on every sample of every frame
@@ -303,13 +303,18 @@ specification; most are described on MultimediaWiki from reverse engineering. Th
 preservation rather than reach, and each is
 small.
 
-**Everything else** — `indeo2`, `asv1`, `asv2`, `mdec`, `mimic`, `amv`, `mxpeg`, `sp5x`,
+**Everything else** — `indeo2`, `asv2`, `mdec`, `mimic`, `amv`, `mxpeg`, `sp5x`,
 `truemotion2` and the remainder. `cljr` came out of this group and reached exact equality; it is the
 one lossy packing among the fixed layouts, measured against ffmpeg's own decode rather than the
-source because its encoder dithers. TrueMotion 2 is the partial case: it is self-describing and
-about two thirds recovered, with the evidence in `undecodable-codecs.md`, and it was deliberately not
-shipped half-working because a wrong block type in a still passage is indistinguishable from the
-codec working.
+source because its encoder dithers. `asv1` came out of the group too, on a genuine specification —
+Michael Niedermayer's asv1.txt prints every field, both variable-length code tables and the
+dequantisation formula in full — with two of its own diagrams settled by measurement rather than read
+literally; see `README.md`. Sharing its transform with this library's MPEG-1, H.263 and H.261
+decoders, its bar is the same one theirs is: at most one level of difference against ffmpeg's decode
+on any sample, flat across every one of 325 measured frames rather than growing. TrueMotion 2 is the
+partial case: it is self-describing and about two thirds recovered, with the evidence in
+`undecodable-codecs.md`, and it was deliberately not shipped half-working because a wrong block type
+in a still passage is indistinguishable from the codec working.
 
 ## What a codec has to clear to be counted
 

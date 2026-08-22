@@ -149,6 +149,8 @@ who wants one frame of a two-hour recording pays for one frame.
 
 | Sierra VMD Video | `VMDV` (synthetic — the format states no codec tag of its own) | Y | — |
 
+| ASUS V1 | `ASV1` | Y | — |
+
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
 is an undivided heap of bytes, and where each packet starts and stops is a computation over five
@@ -2820,6 +2822,56 @@ down rather than bottom up; coded data that runs out before a frame signals its 
 literal run or reposition addressing a row outside the picture or a column running past the end of its
 row — the sentinel row every frame opens on excepted, since a run addressing it is not malformed, it is
 what every measured frame's first opcode does.
+
+### ASUS V1
+
+An intra-only DCT codec ASUSTeK wrote for its own TV tuner cards, read from Michael Niedermayer's
+"ASUS V1/V2 Codecs" (asv1.txt, 2003–2016, GNU FDL/GPL) — a real bitstream specification and not a
+paraphrase of anyone's decoder: every field width, both variable-length code tables and the
+dequantisation formula are printed in full, with a six-entry changelog naming two authors and a worked
+example decoder whose own description of the coefficient-group loop is exactly how a reader independent
+of the document's prose confirms it was read correctly. Every picture is coded on its own — there is no
+motion compensation and no prediction between pictures of any kind — so a packet always decodes to
+exactly one picture and nothing is ever held back.
+
+A macroblock is 16x16 luma as four 8x8 blocks and one 8x8 block each of Cb and Cr, the same 4:2:0 shape
+and the same top-left/top-right/bottom-left/bottom-right quadrant order ITU-T H.263 uses, so this reuses
+that codec's picture buffer, inverse transform and studio-range colour conversion rather than writing new
+copies of them. What is ASV1's own: a single quantisation parameter carried once in the stream's
+codec-private data rather than in every packet; coefficients dequantised against ISO/IEC 11172-2's own
+intra matrix, scaled by a factor of sixty-four and floor-divided by that one quantiser; a block read as an
+eight-bit DC field and up to ten groups of four coefficients, each group's own pattern code naming which
+of its four positions are coded and an explicit End Of Block code standing in for an eleventh; and a
+packet stored with every four-byte word's byte order reversed before any of that can be read.
+
+**Two things the document states as a diagram and this settles by measurement.** Its coordinate diagrams
+— the sixteen coefficient groups across a block, and the four positions within one group — are drawn as a
+page reads, left to right then top to bottom, but a real encoded picture only reconstructs when the row
+and column each diagram states are swapped, at both levels at once: a flat frame's every DC field matches
+its known pixel value regardless, since that identity does not depend on where an AC coefficient lands,
+but a frame with real detail only reconstructs against ffmpeg's decode once the swap is applied. And
+"byte-swapped 32-bit words" needed no correction at all once tried literally — reversing each four-byte
+group once, up front, leaves an ordinary most-significant-bit-first reader for everything after it.
+
+**Right column and bottom row.** A picture whose size is not a whole number of macroblocks codes the
+macroblocks that are, in raster order, then the partial-width column top to bottom, then the
+partial-height row — including its own corner — left to right, exactly as clause 3.1's own worked example
+draws it.
+
+**Measured.** Five streams built here with ffmpeg's own encoder — 64x64 to 352x288, one of them 100x60
+and so not a whole number of macroblocks in either direction, quantisers 1 to 31, and content from flat
+colour through a hard-edged colour bar pattern to a fractal zoom — 325 frames in all, decoded here and by
+ffmpeg and compared **plane by plane**, not in RGB, sampling every frame rather than the endpoints. Every
+plane of every frame differs from ffmpeg's decode by at most one level, flat across every stream rather
+than growing, which is the shape of the shared inverse transform's own rounding and not a defect — the
+same residual this library's MPEG-1, H.263 and H.261 decoders measure against the same oracle, for the
+same reason: none of these formats specifies the transform as an algorithm, only as a formula.
+
+What refuses, by name: a quantisation parameter of zero, which the dequantisation divides by; a
+coefficient group's pattern naming the block's own DC position, which the document states must always be
+coded as zero and read from the separate DC field instead; a block reading an eleventh coefficient group
+without having reached End Of Block first; and codec-private data shorter than the eight-byte global
+header the document's own bitstream clause needs.
 
 ## 📜 License
 
