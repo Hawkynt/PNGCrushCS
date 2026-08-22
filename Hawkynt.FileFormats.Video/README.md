@@ -134,6 +134,8 @@ who wants one frame of a two-hour recording pays for one frame.
 
 | IFF ANIM Video | `ANIM` (synthetic — the format states no codec tag of its own) | Y | — |
 
+| Autodesk Animator Codec | `AASC` | Y | — |
+
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
 is an undivided heap of bytes, and where each packet starts and stops is a computation over five
@@ -2557,6 +2559,45 @@ What refuses, by name: a frame shorter than the 134-byte header every frame open
 document calls unknown, at offset 132, stating anything other than the `0xE0` every measured file states
 there; and any run, copy, skip or motion block that would read past the end of the coded data or write
 past the picture's own size.
+
+### Autodesk Animator Codec
+
+A run-length coding over twenty-four-bit BGR pictures, coded bottom row first, with the same shape of
+escapes Microsoft RLE uses at eight bits a pixel — end of row, end of frame and a delta that moves the
+pen without painting. Read from MultimediaWiki's "Autodesk Animator Codec" page, whose only citation is
+itself and whose prose calls the format "similar to Microsoft RLE" without saying where the two differ.
+
+**The picture is walked one byte at a time, not one pixel at a time.** A twenty-four-bit frame is a
+picture `width * 3` bytes wide, and every run, literal run and reposition the wiki's prose states is
+counted in bytes of that wider row rather than in pixels of the true one — "pixel" in its text is just
+its word for "byte". A repeat opcode's run value is one byte, not three, filled straight across the row
+rather than broadcast into three channels of a colour; what makes the picture come out in colour at all
+is that the row itself interleaves blue, green and red bytes in that order, and a run or a reposition
+can start and stop mid-triple exactly as it pleases. Reading a repeat's value as a three-byte colour
+instead paints a solid-black reference frame with bright, saturated noise, because the real byte values
+— repeated hundreds of times a row to fill a row three times the true picture's width — are never once
+aligned enough to read as plausible small BGR triples.
+
+**Every frame's coded data opens on a row that does not exist.** The row cursor starts one past the
+bottom row a picture actually has, and the very first opcode of every measured frame, keyframe and delta
+alike, targets that row and is silently discarded before the frame's first end-of-row or reposition
+escape brings the cursor onto the picture's real bottom row, which the coding then walks upward from.
+Starting the cursor at the real bottom row instead decodes twelve black frames of the one sample this
+was checked against correctly regardless, since black hides the difference — the first frame with real
+content is where it shows: its opening reposition states a sixty-row move that only lands on the row its
+own five painted pixels belong to when the frame began one row higher than that reposition's target.
+
+**Measured.** The one sample found for this codec, `AASC.AVI` from `samples.mplayerhq.hu/V-codecs/AASC/`
+(also mirrored at `samples.ffmpeg.org`) — 320x175, 113 frames, twelve of them solid black and coded as
+such — was decoded here and by ffmpeg and compared sample for sample against ffmpeg's own `bgr24` output,
+RGB-native so there is no chroma-siting convention to disagree about: all 113 frames are identical,
+maximum delta nought.
+
+What refuses, by name: a stream that does not state twenty-four bits a pixel; one storing its rows top
+down rather than bottom up; coded data that runs out before a frame signals its own end; and any run,
+literal run or reposition addressing a row outside the picture or a column running past the end of its
+row — the sentinel row every frame opens on excepted, since a run addressing it is not malformed, it is
+what every measured frame's first opcode does.
 
 ## 📜 License
 
