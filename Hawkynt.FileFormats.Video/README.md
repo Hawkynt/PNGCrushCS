@@ -117,6 +117,8 @@ who wants one frame of a two-hour recording pays for one frame.
 
 | Westwood VQA Video | `WSVQ` (synthetic — the format states no codec tag of its own) | Y | — |
 
+| Electronic Arts CMV | `cmv ` (synthetic — the format states no codec tag of its own) | Y | — |
+
 | Apple Planar RGB (8BPS) | `8BPS` | Y | — |
 
 | GoPro CineForm (SMPTE VC-5) | `CFHD` | Y | — |
@@ -2233,6 +2235,46 @@ under the reading above: measured against a real version-1 file, the two-half sp
 decodes exactly under instead produces implausible, structureless indices, and nothing in the format's
 own published description states what version 1 uses in its place. Version 1 and the separate
 fifteen-bit-colour form both refuse by name rather than guess.
+
+### Electronic Arts CMV
+
+The block-replacement codec behind NHL 95's own cinematics, over the chunked container the whole
+Electronic Arts family shares — see the container prose above. A picture is a plain grid of 4x4 pixel
+blocks: an intra picture states every one of them as a raw raster of palette indices, and an inter
+picture states each block as a motion vector, a raw replacement, or an escape.
+
+**Motion compensation reaches back either one picture or two, and which is which is stated by the
+escape byte rather than by the block's own position.** A block whose motion byte is not `0xFF` copies
+from the picture immediately before it. `0xFF` reads a second byte: if that byte is itself not `0xFF`,
+the block copies from the picture *before that one* — "the second-last decoded frame," in the format's
+own words — and only a doubled `0xFF` means the sixteen bytes that follow are raw pixels rather than
+another motion byte. Reaching two pictures back needs a decoder that keeps the two most recently
+completed pictures apart rather than one held frame and a copy, the same shape this package's RoQ and
+Interplay Video decoders already need for their own skip opcodes — except CMV's second reference is
+never a no-op the way a skip is: every block, all three ways, writes real pixels. The first intra
+picture has no second-last frame to have completed before it, so its result is copied into both
+reference slots once it is painted, the same bootstrap RoQ's and MVE's decoders use.
+
+**The palette is plain eight-bit RGB, not the six-bit VGA precision or the component order the format's
+own published description states.** The header's own text gives the three palette bytes as red, blue,
+green; reading them that way, at either full precision or widened as this package's other six-bit
+channels are, disagrees with tens of thousands of ffmpeg's own decoded samples. Reading them as red,
+green, blue at full eight-bit precision — the plain reading the text does not give — reproduces the
+intra picture exactly, all 40 000 samples of it.
+
+**Measured.** The one sample known to exist for this codec, `TITLE.CMV` from
+`samples.ffmpeg.org/game-formats/ea-cmv/` — 200x200, 194 pictures across the two runs the container
+section above describes — was decoded here and by ffmpeg and compared sample for sample against
+ffmpeg's own `rgb24` output: every picture is identical, including every one past the mid-file palette
+restatement. This is paletted throughout, so a direct sample comparison — no RGB conversion beyond
+looking a decoded index up in the picture's own palette, no chroma-siting convention — is exactly what
+settles it.
+
+What is not implemented refuses and says so: a picture whose size is not a whole number of 4-pixel
+blocks in either direction, and a picture size that changes part way through a stream; nothing this was
+measured against carries either. A motion vector reaching outside the picture reads as zero, as the
+format's own description states, though no block in the one file this was measured against ever names
+one.
 
 ### 8BPS
 
