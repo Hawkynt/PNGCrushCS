@@ -20,6 +20,12 @@ namespace Hawkynt.ColorProcessing.Adapter.Generators;
 /// can be selected appears as a real call in the source, so the trimmer keeps exactly those and
 /// ahead-of-time compilation has everything it needs. It also means a name that does not exist is
 /// a build-time absence rather than a run-time exception.
+/// <para/>
+/// Built with <c>new T()</c>, never <c>default(T)</c>: these are structs whose settings live in
+/// property initialisers that only an explicit parameterless constructor runs, so
+/// <c>default(T)</c> zeroes them. <c>PngQuantQuantizer.MedianCutIterations</c> read as 0 that way,
+/// its loop never ran, and the palette it fills stayed null. On a struct with no explicit
+/// constructor <c>new T()</c> compiles to <c>default(T)</c> anyway.
 /// </remarks>
 [Generator(LanguageNames.CSharp)]
 public sealed class ColorReductionDispatchGenerator : IIncrementalGenerator {
@@ -70,7 +76,7 @@ public sealed class ColorReductionDispatchGenerator : IIncrementalGenerator {
 
       var implements = type.AllInterfaces;
       if (implements.Any(i => SymbolEqualityComparer.Default.Equals(i, quantizer)))
-        quantizers.Add(new(type.Name, $"default(global::{type.ToDisplayString()})"));
+        quantizers.Add(new(type.Name, $"new global::{type.ToDisplayString()}()"));
       else if (implements.Any(i => SymbolEqualityComparer.Default.Equals(i, ditherer)))
         _AddDitherer(type, ditherers);
     }
@@ -99,7 +105,7 @@ public sealed class ColorReductionDispatchGenerator : IIncrementalGenerator {
       .ToList();
 
     if (presets.Count == 0) {
-      into.Add(new(type.Name, $"default(global::{name})"));
+      into.Add(new(type.Name, $"new global::{name}()"));
       return;
     }
 
