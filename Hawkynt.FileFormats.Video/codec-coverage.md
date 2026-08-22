@@ -23,8 +23,8 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 | | Count | Share |
 | --- | --- | --- |
 | Decoded and verified against ffmpeg | 50 | 24% |
-| Established as not implementable from files alone | 28 | 13% |
-| Not yet attempted | 133 | 63% |
+| Established as not implementable from files alone | 29 | 14% |
+| Not yet attempted | 132 | 63% |
 
 The 50 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
@@ -56,10 +56,10 @@ the stronger oracle of the two, being the ground truth itself. LCL ZLIB is measu
 addition to the usual one, since it too has a real encoder here: round-tripped through it as well as
 checked against seven real recordings.
 
-The 28 are Indeo 3, Indeo 4, Indeo 5, TrueMotion 1, WMV1, WMV2, MSS1, MSS2, Canopus HQ/HQA
+The 29 are Indeo 3, Indeo 4, Indeo 5, TrueMotion 1, WMV1, WMV2, MSS1, MSS2, Canopus HQ/HQA
 (`hq_hqa`), Canopus HQX, Lagarith, DV, MSZH, Escape 124, SpeedHQ, VP4, VP7, MSCC, RSCC, WCMV,
 MWSC, RASC, Go2Meeting (`g2m`), ScreenPressor (`scpr`), Screenpresso, TSCC2, Sorenson Video 1
-(`svq1`) and Sorenson Video 3 (`svq3`), and the arguments that settle them are in
+(`svq1`), Sorenson Video 3 (`svq3`) and Smacker (`smackvid`), and the arguments that settle them are in
 `undecodable-codecs.md`. The first four have frames too small to
 carry the tables they need —
 340 bytes for a 320x240 Indeo 3 picture, 14 for Indeo 4, 2 for Indeo 5, 0 for TrueMotion 1 — so those
@@ -135,7 +135,7 @@ no frame, however large, that was ever going to carry it.
 RASC, Go2Meeting (`g2m`), ScreenPressor (`scpr`), Screenpresso, TSCC2, Sorenson Video 1 (`svq1`) and
 Sorenson Video 3 (`svq3`), and
 
-All twenty-eight are finished investigations with negative answers, not gaps waiting to be filled.
+All twenty-nine are finished investigations with negative answers, not gaps waiting to be filled.
 
 ## What is left, by family
 
@@ -263,8 +263,8 @@ independent source for its entropy table or a confirmed shuffle table either; it
 the not-implementable codecs above rather than left in this list.
 
 **Game and FMV codecs** — the largest group, around 45 names, of which `roqvideo`, `interplayvideo`,
-`idcinvideo` and `vqavideo` are now done and `escape124` is investigated and not implementable
-(`undecodable-codecs.md`): `binkvideo`, `smackvid`, `vmdvideo`, `escape130`, the several `ea*`
+`idcinvideo` and `vqavideo` are now done and `escape124` and `smackvid` are investigated and not implementable
+(`undecodable-codecs.md`): `binkvideo`, `vmdvideo`, `escape130`, the several `ea*`
 codecs, the `xan_*` pair and many more. Almost none has a published specification; most are described
 on MultimediaWiki from reverse engineering. Their value is preservation rather than reach, and each is
 small.

@@ -1832,3 +1832,104 @@ TrueMotion 2's tables were recovered here, is the only route left; it was not ca
 in this pass, and the container-level facts above — the `ImageDescription` and `SMI`/`SEQH` wrapper,
 both confirmed against a real file rather than assumed — are recorded so whoever attempts it does not
 have to start from the container.
+
+# Smacker, where the tree algorithm is right and the thing built out of it is not
+
+Smacker is RAD Game Tools' own FMV format, and its container is read here — `Formats/Smacker`, merged
+and measured against `ffprobe` packet for packet on six real files. The codec is not, and it stops in
+an unusual place: not at a missing description, and not at a table nobody printed, but at a
+composition step whose prose exists, reads the same in every revision of the only document that
+covers it, and does not produce anything resembling what the files contain.
+
+## What is confirmed correct
+
+The base tree algorithm — the Tag/Flag/Leaf recursive descent every one of Smacker's Huffman trees is
+built with — was settled independently and then confirmed twice over:
+
+  - **Bit order is least-significant-bit of each byte first**, with the first bit read becoming the
+    least significant bit of the output. Derived by arithmetic on the worked example in the February
+    2006 revision of the format description, which predates any decoder built from it.
+  - **Tree construction is a plain recursive pre-order walk**, the zero subtree built out in full
+    before the one subtree.
+
+The 2006 revision's own worked diagram contradicts the second of those. Its bottom rows read `(5) ( )`
+then `(3) (4)`, which no reading of its own prose produces. A later revision of the same page silently
+corrects the diagram to `(3) ( )` then `(4) (5)` — a plain pre-order walk, matching what the prose
+says and what was implemented here from it. That later revision has been edited by the author of a
+decoder for this format and so is not a source this project builds from; it is recorded only as
+independent confirmation that the 2006 diagram was a transcription error and the reading taken here
+was right.
+
+## Where it stops
+
+Everything above is the *base* algorithm. Smacker's four sixteen-bit tables — `MMap`, `MClr`, `Full`
+and `Type` — are not built with it directly. They are built by a composition described in the format's
+"Optimized Compression" section: two eight-bit sub-decoders, three marker values, and a
+move-to-front cache, assembled into each outer table. That prose is **identical in the 2006 revision
+and in every later one**, so there is nothing further to read.
+
+Twelve distinct structural readings of that composition were implemented and measured against three
+real files — per-table against shared sub-trees, tag placement, marker byte order, markers decoded
+through the sub-trees against markers read raw, and small bit-offset shifts around the marker and body
+boundary. Every one leaves the great majority of the declared tree section unconsumed:
+
+| file | size | tree section unaccounted for |
+| --- | ---: | ---: |
+| `ajfstr1.smk` | 3 KB | 79% |
+| `hypnotix.smk` | 193 KB | 93% |
+| `wetlogo.smk` | 724 KB | 98.7% |
+
+A sweep of plus and minus four bits around the marker/body boundary on the worst case found nothing
+better than 19 nodes where hundreds are needed. This is not an off-by-something.
+
+## The header's own allocation hints settle it
+
+`MMap_Size`, `MClr_Size`, `Full_Size` and `Type_Size` are stated in the file header, independently of
+any parsing hypothesis:
+
+| file | MMap | MClr | Full | Type |
+| --- | ---: | ---: | ---: | ---: |
+| `ajfstr1.smk` | 2 992 | 400 | 200 | 248 |
+| `hypnotix.smk` | 2 272 | 432 | 4 272 | 976 |
+| `wetlogo.smk` | 31 232 | 3 048 | 71 512 | 2 512 |
+
+All twelve values divide by eight exactly, implying per-table entry counts from 25 to 8 939. **Every
+one of the twelve variants collapses to between one and three leaves per table on every file** —
+three to four orders of magnitude short, on a measure that does not depend on any of them being right.
+
+The same measurement isolates the fault. The eight-bit sub-decoders those bodies are built from land
+at 100 to 511 leaves on their own, which is the range they should be in. So the defect is not in the
+base algorithm, which is confirmed, and not in the sub-decoders, which are plausible on their own
+terms. It is in the step that turns two sub-decoders and three markers into the outer table's shape,
+and nowhere else.
+
+## The finding worth more than the codec
+
+**A parse succeeding is not evidence here, and a future attempt has to know that before it starts.**
+
+The Tag/Flag/Leaf descent always terminates. Fed arbitrary bits it produces a well-formed tree
+regardless of whether those bits were ever a tree. `wetlogo.smk`'s 245 024-bit tree section, parsed as
+a single flat eight-bit tree with no low and high split, no markers and no four-table structure at
+all — a model that is definitely wrong — terminates cleanly after 2 560 bits and yields a complete
+256-leaf tree covering every byte value.
+
+So "it parses without error and the tree looks plausible" carries no information for this format. The
+only signals that mean anything are whether a reading consumes close to the declared byte budget, and
+whether the pictures it produces match the reference. Twelve hypotheses were tested against the first
+of those; none survives it.
+
+This is the strongest instance of a pattern this file records elsewhere — RoQ's published skip reading
+reproduces the first two pictures of every file exactly before drifting without bound, and a
+row-order-insensitive test fixture once passed against a decoder with its rows upside down. Those are
+checks that return success on wrong work. This is a check that cannot return anything else.
+
+## What would change the answer
+
+An independent description of the "Optimized Compression" composition — not the same prose again. RAD
+published no format note that has been found. `libsmacker` exists as another implementation but states
+no provenance, postdates the reference decoder by seven years and makes no clean-room claim, so it is
+not a source this project reads.
+
+Failing that, a harder empirical constraint than the size hints. Those were sufficient to reject all
+twelve readings and to localise the fault to one step; they were not sufficient to identify the right
+one.
