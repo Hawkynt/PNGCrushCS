@@ -53,6 +53,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | Commodore CDXL | `.cdxl` | Y | — |
 | IFF ANIM | `.anim`, `.iff` | Y | — |
 | Sierra VMD | `.vmd` | Y | — |
+| Sony PlayStation STR | `.str` | Y | — |
 
 | Codec | Tag | Decode | Encode |
 | --- | --- | --- | --- |
@@ -353,6 +354,54 @@ revision's own shorter, palette-free 52-byte form, and the 816-byte form's two-f
 an external audio codec, are refused by name rather than guessed at. What a video frame's own bytes
 mean — the LZ compression and the three ways of painting a rectangle from them — is not this container's
 business and is not yet decoded.
+
+The PlayStation's own movie format carries no header of its own at all. A `.str` file is a raw run of
+2352-byte CD-XA sectors — the console's own disc format is the container, because nothing here plays
+outside a drive that already knows how big the file is and where it sits on the disc. A sector is a
+twelve-byte sync pattern, a three-byte time code and a mode byte, an eight-byte subheader stated twice
+for redundancy, and 2328 bytes of user data shaped by that subheader's own `submode` byte: 2048 bytes
+for a Form 1 sector carrying the `Data` or `Video` bit, 2324 for a Form 2 sector carrying the `Audio`
+bit. Neither bit is universal — one real sample states `Data`, another states `Video`, for the same
+kind of sector — so this reader tells a video sector from an unrelated one not by either bit alone but
+by its own thirty-two-byte per-chunk header, which every real sample opens with the same two fixed
+marker words this reader treats as a plausibility check without knowing what either one is for.
+
+A frame is not one sector. A picture routinely needs several chunks, each numbered `0` to
+`chunk_count - 1` in its own header, and — because the header also states the whole frame's own
+compressed byte length, smaller than the chunk budget a constant-bit-rate encoder reserves for it — a
+frame's packet is that stated length trimmed out of the chunks concatenated in order, padding beyond it
+left behind rather than folded into the bitstream. Nor are a frame's chunks necessarily consecutive
+sectors: a disc interleaves audio sectors between them, so this walk tracks an open frame by chunk index
+rather than by counting sectors forward — a chunk numbered `1` two sectors after chunk `0` is still that
+frame's second chunk, with the audio sector between them handed out on its own stream. The timestamp
+this reader reports for a video packet is the frame number the
+chunk's own header states, not a running count of pictures handed out — nothing forces the two apart in
+any sample measured here, but nothing in the format promises they stay together either, and Sierra VMD's
+own block-timed frames are exactly the shape of thing that would separate them on a file this reader has
+not seen.
+
+Three of the five real samples measured here wrap that same run of sectors in a RIFF container stating
+the form type `CDXA` — a shell PlayStation development tools wrote around the sectors without touching
+one byte of them. What comes after the form type is not a `fmt ` chunk and a `data` chunk a generic RIFF
+walk could
+key off: every wrapped sample measured here states thirty-two bytes there that are either zero or a
+size nothing downstream needs, never a fourCC. This reader finds the sectors by searching for the sync
+pattern instead, which reads the wrapped shape and the raw one with the same code once that search is
+done — nothing about a sector changes once it is found.
+
+**Measured.** Five real recordings from `samples.mplayerhq.hu/game-formats/psx-str/` — Descent and
+Serial Experiments Lain, raw; `abc000`, `river1` and Lunar 2, wrapped in RIFF/CDXA, one of them stating
+a real RIFF size where the other two state nought — 160 to 240 pixels tall, 320 to 640 wide, 73 to 870
+pictures apiece, 2,461 video packets and 1,377 audio packets in all — were opened here
+and their packet stream compared against `ffprobe -fflags +noparse`'s own: every video packet's stream
+index, size and presentation timestamp identical, every audio packet's size identical, and every video
+packet's own bytes — the chunks reassembled and trimmed, header stripped — identical byte for byte to
+an independent reconstruction straight off the sectors. The Lain recording is the site's own known-odd
+one, its video track described as carrying an unrelated encryption layer; this reader's own walk does
+not need to know that, since nothing about a chunk's declared shape depends on what its bytes decode to,
+and the packet stream reads exactly as cleanly as the other four. What a video packet's bytes mean — the
+per-block quantiser, the DC and AC Huffman tables, the inverse DCT — is not this container's business
+and is not yet decoded.
 
 ### MPEG-1 video
 
