@@ -22,11 +22,11 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 
 | | Count | Share |
 | --- | --- | --- |
-| Decoded and verified against ffmpeg | 55 | 26% |
+| Decoded and verified against ffmpeg | 56 | 27% |
 | Established as not implementable from files alone | 35 | 17% |
-| Not yet attempted | 121 | 57% |
+| Not yet attempted | 120 | 57% |
 
-The 55 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
+The 56 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
 frame against ffmpeg's decode of the same bitstream before it was merged, and the measurements are in
 each one's section of that file. The ones that reach exact equality on every sample of every frame
@@ -34,7 +34,7 @@ are Microsoft RLE, Microsoft Video 1, Cinepak, QuickTime Animation, Apple Video,
 FFVHUFF, FFV1, ZMBV, TSCC, CSCD, Flash Screen Video, Flash Screen Video 2, id RoQ, Interplay Video,
 id Cinematic Video, Westwood VQA Video, Electronic Arts CMV, Commodore CDXL Video, IFF ANIM Video, BFI Video, QPEG Video,
 Ut Video, MagicYUV, v210, r210, r10k,
-y41p, CLJR, ZeroCodec, LCL ZLIB
+y41p, CLJR, ZeroCodec, LCL ZLIB, Autodesk Animator Codec
 and Hap — the two colour-space ones over 883 and 1,446 frames, in all six and all seven of their
 colour spaces, and the packed layouts on the sample data itself, at its own coded depth and with
 no display conversion in the way, over 120, 90, 90, 90 and 60 frames at three geometries each.
@@ -220,9 +220,14 @@ package's own H.264 decoder everywhere the two coincide, but its departures from
 code chief among them — have no description independent of the one implementation that reverse-engineered
 it, confirmed by the format's own recorded history as well as by the page's own citation.
 
-**Lossless RGB and YUV** — what is left of the group is `012v`, `aasc`, `cllc`, `cyuv`, `dxtory`,
-`loco`, `m101`, `sheervideo`, `vble` and `ylc`. Ut Video, MagicYUV, ZeroCodec and LCL ZLIB came out
-of it and reached exact equality, and MSZH came out of it into `undecodable-codecs.md`. That is the
+**Lossless RGB and YUV** — what is left of the group is `012v`, `cllc`, `cyuv`, `dxtory`,
+`loco`, `m101`, `sheervideo`, `vble` and `ylc`. Ut Video, MagicYUV, ZeroCodec, LCL ZLIB and AASC came out
+of it and reached exact equality, and MSZH came out of it into `undecodable-codecs.md`. AASC's own
+row-and-column bookkeeping — a coding this project found no independent description narrower than "the
+same shape as Microsoft RLE" — needed measuring against a real file to settle at all: the wiki page names
+the escapes but neither states that a twenty-four-bit run is counted in bytes of a three-times-wide row
+rather than in pixels, nor that every frame's row cursor opens one row past the picture and reaches the
+real bottom row only via that frame's own first escape. That is the
 standard for every one of them: max delta 0 or it is wrong. `v210`, `r210`, `r10k` and `y41p` carry no
 compression at all, only a fixed packing of samples into words or byte groups, so there was nothing for
 a decoder to get wrong except the layout, and the two RGB ones decode straight into a ten-bit RGB pixel
