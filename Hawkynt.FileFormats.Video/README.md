@@ -109,6 +109,8 @@ who wants one frame of a two-hour recording pays for one frame.
 
 | Uncompressed 4:4:4 (v308) | `v308` | Y | — |
 
+| Uncompressed 4:4:4 with alpha (v408) | `v408` | Y | — |
+
 | id RoQ | `RoQV` (synthetic — the format states no codec tag of its own) | Y | — |
 
 | Flash Screen Video 2 (FSV2) | `FSV2` | Y | — |
@@ -1734,6 +1736,29 @@ disagree about the way there is for anything at 4:2:2 or 4:2:0. Fifty frames of 
 at 17x9 — not a whole number of any alignment this format's neighbours use — carried through this
 packing and decoded here, compared byte for byte against ffmpeg's own raw output of the same content
 before it was packed: every sample of every plane of every frame identical.
+
+### v408
+
+4:4:4 YUV with alpha and nothing compressed at all, four bytes a pixel and no chroma subsampling to
+interpolate around. Like v308 there is no MultimediaWiki page and no dedicated ffmpeg decoder for it —
+it is one of the raw layouts ffmpeg's own container demuxers map straight onto a pixel format rather
+than routing through a codec of its own. The layout was recovered the same way: pseudo-random content,
+built at the pixel format ffmpeg's own QuickTime demuxer names for this tag, carried through its
+generic uncompressed muxer with the tag forced to `v408` and swept against every placement of a header
+ahead of, inside and behind the picture data.
+
+Four bytes a pixel — U, then Y, then V, then alpha, repeating across a row with no padding of any
+kind. A row is exactly `width` times four bytes, and there is no header ahead of the picture at all.
+
+Packed-YUV format carrying alpha, and a direct sample comparison is what settles it — 4:4:4 carries no
+subsampling, so every pixel states its own chroma and there is no interpolation convention to disagree
+about. Fifty frames of pseudo-random content at 17x9 — not a whole number of any alignment this
+format's neighbours use — carried through this packing and decoded here, compared byte for byte
+against ffmpeg's own raw output of the same content before it was packed: every sample of every plane
+of every frame identical, alpha included.
+
+The alpha channel is carried through unchanged rather than composited or assumed opaque — PPM carries
+no alpha, and comparing this format through it would invent a value the coding states exactly.
 
 What refuses: a picture with no pixels, and a packet shorter than its stride times its height.
 
