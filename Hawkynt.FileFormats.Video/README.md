@@ -113,6 +113,8 @@ who wants one frame of a two-hour recording pays for one frame.
 
 | Uncompressed 4:4:4:4 (ayuv) | `AYUV` | Y | — |
 
+| Avid 1:1 10-bit RGB Packer (avrp) | `AVrp` | Y | — |
+
 | id RoQ | `RoQV` (synthetic — the format states no codec tag of its own) | Y | — |
 
 | Flash Screen Video 2 (FSV2) | `FSV2` | Y | — |
@@ -1784,6 +1786,36 @@ no alpha, and comparing this format through it would invent a value the coding s
 
 The alpha channel is carried through unchanged rather than composited or assumed opaque, for the same
 reason v408's is.
+
+### avrp
+
+Avid's own "1:1" RGB packer, and a close relative of r10k rather than the same word under a second
+byte order — the two share exactly the same bit arrangement, red in the high ten bits, green in the
+middle ten and blue in the next ten down with the low two left spare, but r10k's word is big-endian and
+this one is little-endian, and r10k pads no row at all where this one pads every row out to a whole
+number of sixty-four-pixel blocks. Neither the word nor the padding is written down anywhere this
+project found; both were recovered by feeding known and pseudo-random samples through ffmpeg's own
+encoder and sweeping every reading of which component owns which bit range and where a row's padding
+begins against what came out.
+
+The word, little-endian: red in bits 22-31, green in bits 12-21, blue in bits 2-11, and the low two
+bits always zero across every pixel measured — the same reading r10k uses, off a little-endian rather
+than a big-endian word. The padding: a row is `width` rounded up to the next whole multiple of
+sixty-four pixels, times four bytes — measured directly against ffmpeg's own encoder at eight
+geometries from 8x2 up to 100x30, where the coded row is 64, 64, 128 and 64 pixels respectively for
+source widths of 8, 33, 100 and 64. There is no padding in the vertical direction at all: height scales
+the coded size exactly linearly at every width tried. The padding columns themselves are read and
+thrown away rather than assumed to hold anything in particular.
+
+Decoded straight into `Rgb30`, as r10k is, since the two share a bit arrangement and both need the
+same repacking into that format's own little-endian layout. The two bits this format leaves unused
+become that format's alpha field, set to fully opaque.
+
+Four geometries and twenty frames of ffmpeg's own `rgbtestsrc` — 8x2, 64x40, 100x30 and 33x25,
+covering a width under one block, exactly one block, more than one block and one that pads by less
+than half a block — carried through avrp and decoded here, compared word for word against the
+`gbrp10le` planes that went into the encoder: **every one identical**, with the low two bits of every
+word zero throughout.
 
 What refuses: a picture with no pixels, and a packet shorter than its stride times its height.
 
