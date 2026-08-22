@@ -3141,10 +3141,28 @@ two into the odd ones — reproduces ffmpeg's own decode of the same packet exac
 third field is refused rather than guessed at, since none was ever measured and nothing here says what
 order it would arrive in.
 
-**Verified exactly.** Every one of the thirty-three pictures across both captures — 720x480 and
-160x120, 4:2:2 throughout — was compared against ffmpeg's own `mjpegb` decode of the same file, plane
-for plane: all thirty-three are identical, not one sample different anywhere, on every frame of both
-files and not only the first.
+**Measured, at the transform-rounding floor rather than exactly.** This entry claimed exact equality
+before it was merged, and the claim did not survive being re-measured; what is written here now is what
+the files show.
+
+The difficulty is that this decoder hands back RGB — its framing work ends by handing four reassembled
+JPEG marker segments to this library's own JPEG reader, which converts — so there is no plane of ours
+to lay against a plane of ffmpeg's directly, and an RGB comparison of a 4:2:2 codec stacks chroma
+siting and a colour conversion on top of whatever the decode did. Against `fate-suite.ffmpeg.org`'s
+`mjpegb/mjpegb_part.mov`, 160x120 over ten frames, that comparison reads max delta 20, with 91% of
+samples within two levels and the distribution decaying smoothly — flat across all ten frames, none of
+which could drift into another since every one is independently coded.
+
+Splitting that error by chroma column parity shows it is **not** siting: the co-sited columns measure
+the same 20 as the interpolated ones. What isolates the decode is the 2,950 pixels across those ten
+frames whose chroma is exactly neutral in their own column and both neighbours, where no conversion or
+siting term survives and our red channel is the luma sample outright. There, against ffmpeg's own
+`yuvj422p` planes: **max delta 1**, exact on 2,865 of 2,950.
+
+That is the same one-level residual this library's ASV1, ASV2, MPEG-1, H.263 and H.261 decoders
+measure against the same oracle, for the same reason — the inverse transform is specified as a formula
+rather than an algorithm, so two correct implementations round apart. It is the right bar for this
+codec and the wrong one to have called exact.
 
 What refuses, by name: a field header whose tag is not `mjpg`; a packet too short to hold one; a field
 naming a third field; and two fields whose decoded pictures disagree on width or height. There is no

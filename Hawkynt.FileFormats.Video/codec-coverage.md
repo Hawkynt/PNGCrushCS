@@ -35,7 +35,7 @@ FFVHUFF, FFV1, ZMBV, TSCC, CSCD, Flash Screen Video, Flash Screen Video 2, id Ro
 id Cinematic Video, Westwood VQA Video, Electronic Arts CMV, Commodore CDXL Video, IFF ANIM Video, BFI Video, QPEG Video,
 Sierra VMD Video,
 Ut Video, MagicYUV, v210, 012v, r210, r10k,
-y41p, CLJR, ZeroCodec, LCL ZLIB, Autodesk Animator Codec, avui, avrp, Creative YUV, Apple Motion JPEG-B
+y41p, CLJR, ZeroCodec, LCL ZLIB, Autodesk Animator Codec, avui, avrp, Creative YUV
 and Hap — the two colour-space ones over 883 and 1,446 frames, in all six and all seven of their
 colour spaces, and the packed layouts on the sample data itself, at its own coded depth and with
 no display conversion in the way, over 120, 90, 90, 90 and 60 frames at three geometries each.
