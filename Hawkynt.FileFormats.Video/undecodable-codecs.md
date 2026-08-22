@@ -2698,3 +2698,55 @@ MVHA encoder either, so a corpus cannot be built to order.
 A statement of the Huffman tree construction, the bit order and the prediction seeding from a source
 that is not an implementation, together with at least one real file to measure against. The header
 sketch above is reproduced here so that whoever finds either does not have to locate it again.
+
+# Brooktree ProSumer Video (BT20), one sentence written four years late
+
+ProSumer (`BT20`) is the capture codec of the Brooktree — later Conexant — Bt848 capture cards, whose
+binary decoder answers to the filename `btvvc32.drv`. It is intra-only, 4:1:1, in an AVI, and its frame
+payloads open with the four ASCII characters `BTIC`. It was investigated with the lossless group and
+stops in the same place as Dxtory, by a wider margin on both counts.
+
+## The technical content is one sentence, and it names what it does not print
+
+The whole of the bitstream description on MultimediaWiki's BT20 page is this:
+
+> This is a simple intra-only delta compression codec. It codes UYVY data using vertical prediction,
+> 6-bit deltas and an additional compression pass that removes repeats and replaces certain delta pairs
+> with their codebook index.
+
+That is an outline of a method, not a format. It states neither the layout of a frame behind `BTIC`,
+nor how the 6-bit deltas are packed, nor which delta pairs are replaced, nor — decisively — one entry of
+the codebook the last clause depends on. A codebook that a decoder must have and that no file carries
+is exactly the wall this project already recorded for SVQ1, whose own document explains the algorithm
+in full and prints not one codebook entry, and for Indeo and TrueMotion 1, whose tables are in the
+binary because the frames are too small to hold them.
+
+## And it was written four years after the decoder
+
+The BT20 page has three revisions in its entire history. The first two, both on 10 and 11 December 2008
+by "Multimedia Mike", are a FourCC stub with a fourcc.org one-liner, no coding information at all, and
+a note to go looking through Video4Linux for some. The third, on **13 September 2022**, is where the
+sentence above appears, added by User:Kostya.
+
+FFmpeg's own `prosumer.c` — "avcodec: add Brooktree ProSumer Video decoder", by Paul B Mahol — is dated
+**16 August 2018**. So every word of technical description on that page postdates the decoder by four
+years, which is the LOCO ordering with a longer interval. Nothing found suggests an independent
+reverse-engineering write-up from 2022 or earlier that the page might be reporting rather than
+summarising.
+
+## What the corpus is
+
+Two real recordings exist, at `samples.ffmpeg.org/V-codecs/BT20/` — `test7.avi`, 160x120 with
+`pcm_u8` sound, and `cnn1.avi` — and both decode. There is no ffmpeg encoder, so no corpus can be built
+to order and no known content driven through the coder to calibrate a candidate codebook. Two
+uncontrolled files against an unpublished codebook is not a base this project's own standard can be
+reached from: the blind recoveries it has managed — TrueMotion 2's Huffman trees, y41p's row order,
+r210 and r10k's bit orders — all had either an encoder to drive or a self-describing stream to read the
+tables out of, and this has neither.
+
+## What would change the answer
+
+The codebook, and the frame layout behind `BTIC`, from a source that is not an implementation — Brooktree
+or Conexant documentation for `btvvc32.drv`, or a reverse-engineering write-up that predates the decoder
+and says how it was produced. Failing that, an encoder would at least open the sweep that recovered the
+packed layouts in this group.
