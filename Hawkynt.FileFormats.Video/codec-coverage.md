@@ -25,6 +25,8 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 | Decoded and verified against ffmpeg | 63 | 30% |
 | Established as not implementable from files alone | 46 | 22% |
 | Not yet attempted | 102 | 48% |
+
+The 63 are the codec table in `README.md`, which has fewer
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
 frame against ffmpeg's decode of the same bitstream before it was merged, and the measurements are in
 each one's section of that file. The ones that reach exact equality on every sample of every frame
@@ -64,34 +66,15 @@ the stronger oracle of the two, being the ground truth itself. LCL ZLIB is measu
 addition to the usual one, since it too has a real encoder here: round-tripped through it as well as
 checked against seven real recordings.
 
-The 36 are Indeo 3, Indeo 4, Indeo 5, TrueMotion 1, WMV1, WMV2, MSS1, MSS2, Canopus HQ/HQA
-(`hq_hqa`), Canopus HQX, Lagarith, DV, MSZH, Escape 124, SpeedHQ, VP4, VP7, MSCC, RSCC, WCMV,
+The 46 are Indeo 3, Indeo 4, Indeo 5, TrueMotion 1, WMV1, WMV2, MSS1, MSS2, Canopus HQ/HQA
+(`hq_hqa`), Canopus HQX (`hqx`), Lagarith, DV, MSZH, Escape 124, SpeedHQ, VP4, VP7, MSCC, RSCC, WCMV,
 MWSC, RASC, Go2Meeting (`g2m`), ScreenPressor (`scpr`), Screenpresso, TSCC2, Sorenson Video 1
 (`svq1`), Sorenson Video 3 (`svq3`), Smacker (`smackvid`), Electronic Arts TGQ, TQI and MAD
-(`eatgq`, `eatqi`, `eamad`), Deluxe Paint Animation (`anm`), Chronomaster DFA (`dfa`) and
-8088flex TMV (`tmv`) and LOCO (`loco`),
-
-8088flex TMV (`tmv`) and Canopus Lossless (`cllc`),
-
-8088flex TMV (`tmv`) and Matrox Uncompressed SD (`m101`),
-
-8088flex TMV (`tmv`) and Dxtory (`dxtory`),
-
 (`eatgq`, `eatqi`, `eamad`), Deluxe Paint Animation (`anm`), Chronomaster DFA (`dfa`),
-8088flex TMV (`tmv`) and VBLE,
-
-8088flex TMV (`tmv`) and HuffYUV MT (`hymt`),
-
-8088flex TMV (`tmv`) and MidiVid Archive (`mvha`),
-
-8088flex TMV (`tmv`) and Brooktree ProSumer Video (`prosumer`),
-
-8088flex TMV (`tmv`) and SheerVideo (`sheervideo`),
-
-8088flex TMV (`tmv`) and YLC (`ylc`),
-
-(`eatgq`, `eatqi`, `eamad`), Deluxe Paint Animation (`anm`), Chronomaster DFA (`dfa`),
-8088flex TMV (`tmv`) and FM Screen Capture Codec,
+8088flex TMV (`tmv`), LOCO (`loco`), Canopus Lossless (`cllc`),
+Matrox Uncompressed SD (`m101`), Dxtory (`dxtory`), VBLE (`vble`), HuffYUV MT (`hymt`),
+MidiVid Archive (`mvha`), Brooktree ProSumer Video (`prosumer`), SheerVideo (`sheervideo`),
+YLC (`ylc`) and FM Screen Capture Codec (`fmvc`),
 and the arguments that settle them are in
 `undecodable-codecs.md`. The first four have frames too small to
 carry the tables they need —
@@ -183,10 +166,7 @@ states that such tables exist and how large they are without printing one either
 "hardwired" into the coding scheme, the document's own word for it, identical in every file — there is
 no frame, however large, that was ever going to carry it.
 
-RASC, Go2Meeting (`g2m`), ScreenPressor (`scpr`), Screenpresso, TSCC2, Sorenson Video 1 (`svq1`) and
-Sorenson Video 3 (`svq3`), and
-
-All thirty-six are finished investigations with negative answers, not gaps waiting to be filled.
+All forty-six are finished investigations with negative answers, not gaps waiting to be filled.
 
 ## What is left, by family
 
@@ -239,40 +219,17 @@ accounts for. How far each got, and everything ruled out, are in `undecodable-co
 the three searches need be repeated from the start. VP5 is behind VP6's same wall with no published
 specification at all.
 
-**Sorenson** — `svq3` is what remains. `svq1` is now argued in `undecodable-codecs.md`: its codebook is
-not carried in the stream at all, and the one technical document on the format cites FFmpeg's own source
-for the tables rather than printing them.
+**Sorenson** — nothing is left of this group, and neither member is implemented. Both are argued in
+`undecodable-codecs.md`. `svq1`'s codebook is not carried in the stream at all, and the one technical
+document on the format cites FFmpeg's own source for the tables rather than printing them. `svq3`
+shares this package's own H.264 decoder everywhere the two coincide, but its departures from H.264 —
+its entropy code chief among them — have no description independent of the one implementation that
+reverse-engineered it, confirmed by the format's own recorded history as well as by the page's own
+citation.
 
-**Sorenson** — `svq1` is what remains. `svq3` is now argued in `undecodable-codecs.md`: it shares this
-package's own H.264 decoder everywhere the two coincide, but its departures from H.264 — its entropy
-code chief among them — have no description independent of the one implementation that reverse-engineered
-it, confirmed by the format's own recorded history as well as by the page's own citation.
-
-**Lossless RGB and YUV** — what is left of the group is `012v`, `cllc`, `dxtory`,
-`loco`, `m101`, `sheervideo`, `vble` and `ylc`. Ut Video, MagicYUV, ZeroCodec, LCL ZLIB, AASC and
+**Lossless RGB and YUV** — nothing is left of this group unattempted: every name in it is now either
+decoded or argued in `undecodable-codecs.md`. Ut Video, MagicYUV, ZeroCodec, LCL ZLIB, AASC and
 Creative YUV came out
-
-**Lossless RGB and YUV** — what is left of the group is `cllc`, `cyuv`, `dxtory`,
-
-**Lossless RGB and YUV** — what is left of the group is `012v`, `cyuv`, `dxtory`,
-
-**Lossless RGB and YUV** — what is left of the group is `012v`, `cllc`, `cyuv`,
-`loco`, `m101`, `sheervideo`, `vble` and `ylc`. Ut Video, MagicYUV, ZeroCodec, LCL ZLIB and AASC came out
-
-**Lossless RGB and YUV** — what is left of the group is `012v`, `cllc`, `cyuv`, `dxtory`,
-`m101`, `sheervideo`, `vble` and `ylc`. Ut Video, MagicYUV, ZeroCodec, LCL ZLIB and AASC came out
-
-**Lossless RGB and YUV** — what is left of the group is `012v`, `cllc`, `cyuv`, `dxtory`,
-`loco`, `sheervideo`, `vble` and `ylc`. Ut Video, MagicYUV, ZeroCodec, LCL ZLIB and AASC came out
-
-**Lossless RGB and YUV** — what is left of the group is `012v`, `cllc`, `cyuv`, `dxtory`,
-`loco`, `m101`, `sheervideo` and `ylc`. Ut Video, MagicYUV, ZeroCodec, LCL ZLIB and AASC came out
-
-**Lossless RGB and YUV** — what is left of the group is `012v`, `cllc`, `cyuv`, `dxtory`,
-`loco`, `m101`, `vble` and `ylc`. Ut Video, MagicYUV, ZeroCodec, LCL ZLIB and AASC came out
-
-**Lossless RGB and YUV** — what is left of the group is `012v`, `cllc`, `cyuv`, `dxtory`,
-`loco`, `m101`, `sheervideo` and `vble`. Ut Video, MagicYUV, ZeroCodec, LCL ZLIB and AASC came out
 of it and reached exact equality, and MSZH came out of it into `undecodable-codecs.md`. AASC's own
 row-and-column bookkeeping — a coding this project found no independent description narrower than "the
 same shape as Microsoft RLE" — needed measuring against a real file to settle at all: the wiki page names
@@ -316,22 +273,26 @@ a decoder existed elsewhere rather than replaced by anything describing one. Thr
 covering RGB, ARGB and YUY2 do exist, and the frames are far too large for the missing-tables argument
 to apply, so what stops it is only that the sole descriptions in existence are implementations.
 
-the same kind of prediction, also came out of it and is now in `undecodable-codecs.md` instead, and so
-has `m101` — the one member of the group that is a plain packing like `v210` and `y41p` rather than a
+`m101` is there too — the one member of the group that is a plain packing like `v210` and `y41p` rather than a
 coding, and which stops anyway because the sweep that recovers a packing needs either an encoder to
 feed known content through or a real file to sweep against, and it has neither: no wiki page exists at
 all, ffmpeg carries no encoder, and no sample turned up in `samples.ffmpeg.org`, in ffmpeg's own
 test-suite server or at fourcc.org.
 
-the same kind of prediction, also came out of it and is now in `undecodable-codecs.md` instead, and so
-has `dxtory`, which stops twice over: its MultimediaWiki page's whole technical content is one sentence
+`dxtory` is there as well, and it stops twice over: its MultimediaWiki page's whole technical content is one sentence
 naming a sixteen-byte header and YV12 blocks and saying nothing whatever about the compression, so it
 would not reach a first sample even if believed entirely — and that page's single revision and
 ffmpeg's own decoder are the same person's work on the same December morning in 2011, seven hours
 apart.
 
-the same kind of prediction, also came out of it and is now in `undecodable-codecs.md` instead. `hymt`
-is there too, and is the narrowest miss in this package: HuffYUV itself is decoded here exactly, and
+`vble` is there on the most direct evidence of the group. Its one technical source does not merely
+trace back to an implementation, it quotes one: the whole of MultimediaWiki's `VBLE` page is a
+sentence naming the codec's author, a claim that it uses "standard median prediction," a two-line
+sketch of the frame, and then one literal C conditional expression — ternary, operator precedence and
+all — printed where a rule in words should be. A specification does not carry a line of C. The page
+has a single revision, and the same reverse engineer LOCO's own entry turns on wrote every byte of it.
+
+`hymt` is there too, and is the narrowest miss in this package: HuffYUV itself is decoded here exactly, and
 the multithreaded fork changes exactly one thing — a slice table for thread partitioning — which is
 exactly the one thing no published source states. Its wiki page is two sentences and is still filed
 under undiscovered codecs; the fork's own changelog records only that v613 renamed the four-character
@@ -339,22 +300,19 @@ code; the sole complete description is the fork's GPL v2+ source, which this pac
 transcribe on licence grounds even if it transcribed implementations; and no HYMT sample exists
 anywhere searched.
 
-the same kind of prediction, also came out of it and is now in `undecodable-codecs.md` instead, and so
-has `mvha`, whose only description — the MidiVid page's archival section — was written the day after
+`mvha` is there too, and its only description — the MidiVid page's archival section — was written the day after
 ffmpeg's own decoder was authored, and which even taken at face value states a frame header and then
 stops: no tree construction, no bit order, no prediction seeding, no strides, and no sample of the
 codec exists anywhere to settle any of them against.
 
-the same kind of prediction, also came out of it and is now in `undecodable-codecs.md` instead, and so
-has `sheervideo` — the one codec in that file whose documentation passes the provenance test outright
+`sheervideo` is there too — the one codec in that file whose documentation passes the provenance test outright
 and stops anyway. Its bitstream write-up predates ffmpeg's decoder by three years and is by a different
 person, and the vendor itself edited the same page; what it never prints is the dozen VLC codesets and
 the per-format seed predictors its own pseudocode indexes, and because those codes are static rather
 than transmitted, no packet of any of the thirteen real files carries them. That is SVQ1's wall rather
 than Indeo's: not a frame too small to hold a table, but a table no frame was ever going to hold.
 
-the same kind of prediction, also came out of it and is now in `undecodable-codecs.md` instead, and so
-has `ylc`, which is the closest call of the group: clean provenance — its description predates ffmpeg's
+`ylc` is there last, and it is the closest call of the group: clean provenance — its description predates ffmpeg's
 decoder by four years and is by a different person — a real sample at samples.ffmpeg.org, a frame header
 given to the byte and a prediction rule stated exactly, and then one clause of its own pseudocode that
 outputs a "predefined YUYV quad from the constant table" and never prints the table. Two hundred and
@@ -363,13 +321,17 @@ SheerVideo's and SVQ1's wall rather than anything about this codec's own difficu
 
 **Screen capture** — `tdsc` and `vmnc` are what remains of this group unattempted. Mostly DEFLATE over
 a framebuffer with a delta scheme on top, so also lossless and also absolutely measurable. `flashsv` and
-`flashsv2` came out of this group and reached exact equality; see `README.md`. `g2m`, `mscc`, `mwsc`,
-`rasc`, `rscc`, `screenpresso`, `scpr`, `tscc2` and `wcmv` came out of it the other way, into
-`undecodable-codecs.md`: none of the nine carries an independent bitstream description this project
+`flashsv2` came out of this group and reached exact equality; see `README.md`. `fmvc`, `g2m`, `mscc`,
+`mwsc`, `rasc`, `rscc`, `screenpresso`, `scpr`, `tscc2` and `wcmv` came out of it the other way, into
+`undecodable-codecs.md`: none of the ten carries an independent bitstream description this project
 could confirm, four of them (`mscc`, `wcmv`, `rasc` and `screenpresso`) carry no sample corpus at all,
 `mwsc` and `scpr` carry exactly one file each, and `rscc` alone reached a real recovered packet framing
 and a delta record's destination coordinates before the two remaining fields resisted every reading
-tried.
+tried. `fmvc` is the one of the ten with two real recordings and a page detailed enough to look
+buildable — tile sizes, header layout, byte counts — and it stops on both walls at once: every
+technical fact on that page was added in September 2022, five years and seven months after ffmpeg's
+own decoder, and even taken at face value the page names the compression only as "two types, both
+based on LZ77 scheme" without stating a match length, a literal flag or a window size for either.
 
 **Professional and intermediate** — `pixlet`, `prores_raw`,
 `aic`, `media100`. `prosumer` came out of this group into `undecodable-codecs.md`: its whole published
@@ -423,7 +385,7 @@ specification; most are described on MultimediaWiki from reverse engineering. Th
 preservation rather than reach, and each is
 small.
 
-**Everything else** — `indeo2`, `asv2`, `mdec`, `mimic`, `amv`, `mxpeg`, `sp5x`,
+**Everything else** — `indeo2`, `mdec`, `mimic`, `amv`, `mxpeg`, `sp5x`,
 `truemotion2` and the remainder. `cljr` came out of this group and reached exact equality; it is the
 one lossy packing among the fixed layouts, measured against ffmpeg's own decode rather than the
 source because its encoder dithers. `asv1` came out of the group too, on a genuine specification —
@@ -431,16 +393,9 @@ Michael Niedermayer's asv1.txt prints every field, both variable-length code tab
 dequantisation formula in full — with two of its own diagrams settled by measurement rather than read
 literally; see `README.md`. Sharing its transform with this library's MPEG-1, H.263 and H.261
 decoders, its bar is the same one theirs is: at most one level of difference against ffmpeg's decode
-on any sample, flat across every one of 325 measured frames rather than growing. TrueMotion 2 is the
-partial case: it is self-describing and about two thirds recovered, with the evidence in
-`undecodable-codecs.md`, and it was deliberately not shipped half-working because a wrong block type
-in a still passage is indistinguishable from the codec working.
-
-**Everything else** — `indeo2`, `asv1`, `mdec`, `mimic`, `amv`, `mxpeg`, `sp5x`,
-`truemotion2` and the remainder. `cljr` came out of this group and reached exact equality; it is the
-one lossy packing among the fixed layouts, measured against ffmpeg's own decode rather than the
-source because its encoder dithers. `asv2` came out of the group too, from the same specification
-`asv1` is read from — Michael Niedermayer's asv1.txt — with one gap the document itself leaves as an
+on any sample, flat across every one of 325 measured frames rather than growing. `asv2` came out of
+the group as well, from the same document,
+with one gap the document itself leaves as an
 ellipsis: its level table prints magnitudes one to seven and the boundary magnitude thirty-one in full
 and states nothing between them. Every printed value, both signs of the boundary included, fits one
 formula — a nested code whose offset bits read as a magnitude least significant bit first — and that
