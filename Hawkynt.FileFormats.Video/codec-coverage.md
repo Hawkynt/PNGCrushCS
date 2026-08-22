@@ -22,17 +22,17 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 
 | | Count | Share |
 | --- | --- | --- |
-| Decoded and verified against ffmpeg | 54 | 26% |
+| Decoded and verified against ffmpeg | 55 | 26% |
 | Established as not implementable from files alone | 32 | 15% |
-| Not yet attempted | 125 | 59% |
+| Not yet attempted | 124 | 59% |
 
-The 54 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
+The 55 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
 frame against ffmpeg's decode of the same bitstream before it was merged, and the measurements are in
 each one's section of that file. The ones that reach exact equality on every sample of every frame
 are Microsoft RLE, Microsoft Video 1, Cinepak, QuickTime Animation, Apple Video, Apple Graphics, FLIC, HuffYUV,
 FFVHUFF, FFV1, ZMBV, TSCC, CSCD, Flash Screen Video, Flash Screen Video 2, id RoQ, Interplay Video,
-id Cinematic Video, Westwood VQA Video, Electronic Arts CMV, Commodore CDXL Video, IFF ANIM Video, BFI Video,
+id Cinematic Video, Westwood VQA Video, Electronic Arts CMV, Commodore CDXL Video, IFF ANIM Video, BFI Video, QPEG Video,
 Ut Video, MagicYUV, v210, r210, r10k,
 y41p, CLJR, ZeroCodec, LCL ZLIB
 and Hap — the two colour-space ones over 883 and 1,446 frames, in all six and all seven of their

@@ -128,6 +128,8 @@ who wants one frame of a two-hour recording pays for one frame.
 
 | Brute Force & Ignorance Video | `BFIV` (synthetic — the format states no codec tag of its own) | Y | — |
 
+| Q-Team QPEG | `QPEG`, `Q1.0`, `Q1.1` | Y | — |
+
 | Commodore CDXL Video | `CDXL` (synthetic — the format states no codec tag of its own) | Y | — |
 
 | IFF ANIM Video | `ANIM` (synthetic — the format states no codec tag of its own) | Y | — |
@@ -2525,6 +2527,36 @@ maximum delta nought.
 What refuses, by name: a chunk not opening with the four bytes `IVAS`; a compressed stream whose codes
 read past the end of the input or write past the frame's own stated size; and a back-reference whose
 offset reaches before the start of the picture.
+
+### Q-Team QPEG
+
+Palettised eight-bit pictures, coded bottom row first, read from "Description of the QPEG Video Codec"
+by Mike Melanson and Konstantin Shishkov — the same named, independent write-up this library's Apple
+Graphics decoder already reads from. An intraframe is a basic run-length scheme with three sizes of
+literal run and three of copy-from-the-coded-data; an interframe adds skip codes — the frame is
+predicted from the one before it, so most of a picture is usually just left alone — a per-frame 128-byte
+table for cheap flat fills, and, where the frame states it, variable-sized block motion compensation
+with vectors from -8 to 7 in each direction.
+
+**Two of the document's own interframe run-length formulas are one short.** Its short literal run and
+its short copy both state their length as a control byte's low bits with nothing added; against three
+real files, both need one added before the byte following a run lands on the next real opcode rather
+than one byte into what the run should already have consumed. Every other run and skip formula in the
+document, on both frame kinds, is exact as written — the intraframe algorithm's own three run forms
+already carry a stated `+1` or `+2` and needed no correction. **Motion compensation reads its source
+block from the previous frame, not from the picture being built** — the document says so in prose, and
+it matters because a block's source and destination can overlap within one frame, which reading from the
+partially-decoded output gets wrong on exactly the overlapping pixels.
+
+**Measured.** Three files from `samples.ffmpeg.org/V-codecs/QPEG/` — `qpeg-test.avi` (80x60, fifteen
+frames exercising every frame type), `Clock.avi` and `Space.avi` (320x240, one hundred and one hundred
+ninety-nine frames) — were decoded here and by ffmpeg and compared sample for sample against ffmpeg's own
+`rgb24` output: all 314 frames are identical, maximum delta nought.
+
+What refuses, by name: a frame shorter than the 134-byte header every frame opens with; the byte the
+document calls unknown, at offset 132, stating anything other than the `0xE0` every measured file states
+there; and any run, copy, skip or motion block that would read past the end of the coded data or write
+past the picture's own size.
 
 ## 📜 License
 
