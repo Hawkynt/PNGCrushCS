@@ -33,9 +33,8 @@ public sealed class XcfTileDecoderTests {
   [Test]
   [Category("Unit")]
   public void DecodeRle_AllSame_ReturnsRepeatedValue() {
-    // A repeat of L bytes is the opcode 256 - L. This said 257 - L, and the encoder wrote the same,
-    // so the two agreed with each other and with nothing that reads the format.
-    var compressed = new byte[] { 256 - 4, 0xAA };
+    // A repeat of L bytes is the opcode L - 1, below 128.
+    var compressed = new byte[] { 4 - 1, 0xAA };
     var result = XcfTileDecoder.DecodeRle(compressed, 1, 2, 2);
 
     Assert.That(result.Length, Is.EqualTo(4));
@@ -46,9 +45,10 @@ public sealed class XcfTileDecoderTests {
   [Test]
   [Category("Unit")]
   public void DecodeRle_LongRuns_TakeATwoByteCount() {
-    // Opcodes 127 and 128 carry their length in two bytes, not four.
-    var longLiteral = new byte[] { 127, 0, 4, 10, 20, 30, 40 };
-    var longRepeat = new byte[] { 128, 0, 4, 0x5A };
+    // Opcodes 127 and 128 carry their length in two bytes, not four: 127 escapes a repeat, 128 a
+    // literal, matching which side of 128 each opcode class sits on.
+    var longRepeat = new byte[] { 127, 0, 4, 0x5A };
+    var longLiteral = new byte[] { 128, 0, 4, 10, 20, 30, 40 };
 
     Assert.Multiple(() => {
       Assert.That(XcfTileDecoder.DecodeRle(longLiteral, 1, 2, 2), Is.EqualTo(new byte[] { 10, 20, 30, 40 }));
@@ -75,8 +75,8 @@ public sealed class XcfTileDecoderTests {
   [Test]
   [Category("Unit")]
   public void DecodeRle_Literal_ReturnsOriginalBytes() {
-    // RLE literal: n = 3 (4 literal bytes), followed by 4 bytes
-    var compressed = new byte[] { 3, 10, 20, 30, 40 };
+    // A literal of L bytes is the opcode 256 - L, at or above 128: four bytes is 252.
+    var compressed = new byte[] { 256 - 4, 10, 20, 30, 40 };
     var result = XcfTileDecoder.DecodeRle(compressed, 1, 2, 2);
 
     Assert.That(result.Length, Is.EqualTo(4));
@@ -100,11 +100,9 @@ public sealed class XcfTileDecoderTests {
   [Category("Unit")]
   public void DecodeRle_MultiChannel_InterleavesCorrectly() {
     // 2 pixels, 2 bpp (e.g., GrayA)
-    // Channel 0: literal 2 bytes (n=1): 100, 200
-    // Channel 1: literal 2 bytes (n=1): 255, 128
     var compressed = new byte[] {
-      1, 100, 200,  // channel 0: 2 literal bytes
-      1, 255, 128   // channel 1: 2 literal bytes
+      256 - 2, 100, 200,  // channel 0: 2 literal bytes
+      256 - 2, 255, 128   // channel 1: 2 literal bytes
     };
 
     var result = XcfTileDecoder.DecodeRle(compressed, 2, 2, 1);

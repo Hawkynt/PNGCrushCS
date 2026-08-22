@@ -19,6 +19,12 @@ internal static class XcfTileDecoder {
   }
 
   /// <summary>Decodes RLE-compressed tile data. XCF RLE encodes each channel separately.</summary>
+  /// <remarks>
+  /// An opcode below 128 opens a repeat and one at 128 or above opens a literal, which is the way
+  /// round GIMP's own <c>xcf_load_tile_rle</c> reads it. This file had the two swapped, and the
+  /// encoder below was swapped to match, so the pair round-tripped and no other reader could open
+  /// what it wrote.
+  /// </remarks>
   internal static byte[] DecodeRle(byte[] compressed, int bytesPerPixel, int tileWidth, int tileHeight) {
     var pixelCount = tileWidth * tileHeight;
     var result = new byte[pixelCount * bytesPerPixel];
@@ -30,47 +36,38 @@ internal static class XcfTileDecoder {
       while (decoded < pixelCount && srcOffset < compressed.Length) {
         var n = compressed[srcOffset++];
 
-        if (n <= 126) {
-          // n+1 literal bytes
+        if (n < 128) {
+          // Repeat the next byte n+1 times; n == 127 escapes to a two-byte count instead.
           var count = n + 1;
-          for (var i = 0; i < count && decoded < pixelCount; ++i) {
-            if (srcOffset >= compressed.Length)
+          if (count == 128) {
+            if (srcOffset + 2 > compressed.Length)
               break;
-            result[decoded * bytesPerPixel + channel] = compressed[srcOffset++];
-            ++decoded;
+            count = (compressed[srcOffset] << 8) | compressed[srcOffset + 1];
+            srcOffset += 2;
           }
-        } else if (n == 127) {
-          // Long literal run: the count is two bytes, not four.
-          if (srcOffset + 2 > compressed.Length)
+
+          if (srcOffset >= compressed.Length)
             break;
-          var count = (compressed[srcOffset] << 8) | compressed[srcOffset + 1];
-          srcOffset += 2;
-          for (var i = 0; i < count && decoded < pixelCount; ++i) {
-            if (srcOffset >= compressed.Length)
-              break;
-            result[decoded * bytesPerPixel + channel] = compressed[srcOffset++];
-            ++decoded;
-          }
-        } else if (n == 128) {
-          // Long repeat run: two bytes of count, then the byte to repeat.
-          if (srcOffset + 3 > compressed.Length)
-            break;
-          var count = (compressed[srcOffset] << 8) | compressed[srcOffset + 1];
-          srcOffset += 2;
+
           var value = compressed[srcOffset++];
           for (var i = 0; i < count && decoded < pixelCount; ++i) {
             result[decoded * bytesPerPixel + channel] = value;
             ++decoded;
           }
         } else {
-          // n >= 129: repeat the next byte (256 - n) times. This counted one too many, and the
-          // encoder below wrote one too few to match, so the pair agreed and nothing else did.
+          // 256-n literal bytes; n == 128 escapes to a two-byte count instead.
           var count = 256 - n;
-          if (srcOffset >= compressed.Length)
-            break;
-          var value = compressed[srcOffset++];
+          if (count == 128) {
+            if (srcOffset + 2 > compressed.Length)
+              break;
+            count = (compressed[srcOffset] << 8) | compressed[srcOffset + 1];
+            srcOffset += 2;
+          }
+
           for (var i = 0; i < count && decoded < pixelCount; ++i) {
-            result[decoded * bytesPerPixel + channel] = value;
+            if (srcOffset >= compressed.Length)
+              break;
+            result[decoded * bytesPerPixel + channel] = compressed[srcOffset++];
             ++decoded;
           }
         }
@@ -96,8 +93,9 @@ internal static class XcfTileDecoder {
 
         var runLength = pos - runStart;
         if (runLength >= 2) {
-          // A repeat of L bytes is the opcode 256 - L, for L from two to 127.
-          ms.WriteByte((byte)(256 - runLength));
+          // A repeat of L bytes is the opcode L - 1, for L from two to 127; 127 is the escape to a
+          // two-byte count, so the run is capped below it rather than emitted as one.
+          ms.WriteByte((byte)(runLength - 1));
           ms.WriteByte(value);
         } else {
           // Literal run: collect non-repeating bytes
@@ -112,8 +110,10 @@ internal static class XcfTileDecoder {
           if (pos == litStart)
             ++pos; // at least one byte
 
+          // A literal of L bytes is the opcode 256 - L, for L from one to 127; 128 is the escape to
+          // a two-byte count, so again the run stops short of it.
           var litLength = pos - litStart;
-          ms.WriteByte((byte)(litLength - 1));
+          ms.WriteByte((byte)(256 - litLength));
           for (var i = litStart; i < litStart + litLength; ++i)
             ms.WriteByte(pixelData[i * bytesPerPixel + channel]);
         }
