@@ -98,6 +98,8 @@ who wants one frame of a two-hour recording pays for one frame.
 
 | Uncompressed 4:2:2 10-bit (v210) | `v210` | Y | — |
 
+| Uncompressed 4:2:2 10-bit (012v) | `012v` | Y | — |
+
 | Uncompressed RGB 10-bit (r210) | `r210` | Y | — |
 
 | AJA Kona 10-bit RGB (r10k) | `R10k` | Y | — |
@@ -3028,6 +3030,49 @@ of sixteen table entries — and exact at the decoder, so max delta 0 is the rig
 What refuses, by name: a width that is not a whole number of four-sample groups, since that is the unit
 both the coded rows and the chrominance are built from; a packet whose length is neither of the two
 shapes, rather than one of them decoded partway; and a picture size the stream states as nothing.
+
+### Uncompressed 4:2:2 10-bit (012v)
+
+The name is `v210` written backwards and the resemblance goes all the way down: the sixteen-byte group
+is that codec's own, sample for sample and bit for bit — six luma samples and three chroma pairs in
+four little-endian 32-bit words, ten bits a sample, three samples to a word. Nothing is compressed and
+nothing is predicted. The whole of the difference is the row: v210 pads every row out to a multiple of
+128 bytes, and this does not — a row here is as long as the packet's own length divided by the
+picture's height, which is the only thing there is to read it from, since neither the stream
+description nor the packet states it.
+
+**The two bits above every ten-bit field are not padding to be trusted.** They are masked rather than
+assumed clear, because the one real sample does not leave them clear: seven of its 50,880 words carry
+something in bits 30 and 31, and the reference decoder ignores it. A group past the picture's own width
+is read and thrown away — a 316-pixel row is 53 whole groups, which is 318 luma samples and 159 chroma
+columns, and the two samples and one column past the width are discarded rather than assumed absent.
+
+**Why the earlier investigation stopped, and why that was the wrong codec.** This format was once set
+aside because the reference decoder logs "transparency is not implemented" for it, and an oracle that
+announces its own incompleteness is a real problem — it is part of why Lagarith is in
+`undecodable-codecs.md`. That message is not this codec's. The same implementation serves a second
+four-character code, `a12v`, which carries an alpha channel it drops, and the message belongs to that
+one: patching nothing but the four tag bytes of the real sample from `012v` to `a12v` makes it appear
+on byte-identical picture data, and the unpatched file decodes with no warning at all. So the oracle is
+sound here in a way it is not for `a12v`, and only `012v` is claimed — `a12v` has neither a sample nor a
+decoder anywhere that states it reads all of it, and is not accepted.
+
+The other half of that stop was that the coded packet size does not match a naive sixteen-bit-per-sample
+layout, which is true and has an ordinary explanation: 203,520 bytes over 240 rows is 848 bytes a row,
+and 848 is 53 sixteen-byte groups of six pixels each.
+
+**Measured.** On the planes, at the coded depth. The one sample that exists —
+`fate-suite.ffmpeg.org/012v/sample.avi`, 316x240 in a single 203,520-byte packet — compared against
+`ffmpeg -threads 1 -fps_mode passthrough -f rawvideo -pix_fmt yuv422p10le`: **all 303,360 bytes of its
+three planes identical**. The comparison is at ten bits on purpose. Taking it through eight-bit RGB
+would stack a depth reduction, a chroma siting and a colour conversion on top of a decode that is
+exact, and report a difference none of them is this decoder's.
+
+What refuses, by name: a picture with no pixels; a packet whose length is not a whole number of rows;
+and a row shorter than the whole groups its width needs. The last is a real limit rather than a
+formality — the format permits a final group cut short, a trailing pair of pixels costing five bytes and
+a trailing single one two, and no file measured here uses it, the one sample's rows being 848 bytes
+where that rule would make them 842. It is refused rather than read under a packing nothing confirms.
 
 ## 📜 License
 
