@@ -23,8 +23,8 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 | | Count | Share |
 | --- | --- | --- |
 | Decoded and verified against ffmpeg | 63 | 30% |
-| Established as not implementable from files alone | 37 | 18% |
-| Not yet attempted | 111 | 53% |
+| Established as not implementable from files alone | 38 | 18% |
+| Not yet attempted | 110 | 52% |
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
 frame against ffmpeg's decode of the same bitstream before it was merged, and the measurements are in
 each one's section of that file. The ones that reach exact equality on every sample of every frame
@@ -72,6 +72,8 @@ MWSC, RASC, Go2Meeting (`g2m`), ScreenPressor (`scpr`), Screenpresso, TSCC2, Sor
 8088flex TMV (`tmv`) and LOCO (`loco`),
 
 8088flex TMV (`tmv`) and Canopus Lossless (`cllc`),
+
+8088flex TMV (`tmv`) and Matrox Uncompressed SD (`m101`),
 and the arguments that settle them are in
 `undecodable-codecs.md`. The first four have frames too small to
 carry the tables they need —
@@ -239,6 +241,9 @@ Creative YUV came out
 
 **Lossless RGB and YUV** — what is left of the group is `012v`, `cllc`, `cyuv`, `dxtory`,
 `m101`, `sheervideo`, `vble` and `ylc`. Ut Video, MagicYUV, ZeroCodec, LCL ZLIB and AASC came out
+
+**Lossless RGB and YUV** — what is left of the group is `012v`, `cllc`, `cyuv`, `dxtory`,
+`loco`, `sheervideo`, `vble` and `ylc`. Ut Video, MagicYUV, ZeroCodec, LCL ZLIB and AASC came out
 of it and reached exact equality, and MSZH came out of it into `undecodable-codecs.md`. AASC's own
 row-and-column bookkeeping — a coding this project found no independent description narrower than "the
 same shape as Microsoft RLE" — needed measuring against a real file to settle at all: the wiki page names
@@ -281,6 +286,13 @@ since 2009, and its own edit history shows the note calling the codec undiscover
 a decoder existed elsewhere rather than replaced by anything describing one. Three real recordings
 covering RGB, ARGB and YUY2 do exist, and the frames are far too large for the missing-tables argument
 to apply, so what stops it is only that the sole descriptions in existence are implementations.
+
+the same kind of prediction, also came out of it and is now in `undecodable-codecs.md` instead, and so
+has `m101` — the one member of the group that is a plain packing like `v210` and `y41p` rather than a
+coding, and which stops anyway because the sweep that recovers a packing needs either an encoder to
+feed known content through or a real file to sweep against, and it has neither: no wiki page exists at
+all, ffmpeg carries no encoder, and no sample turned up in `samples.ffmpeg.org`, in ffmpeg's own
+test-suite server or at fourcc.org.
 
 **Screen capture** — `tdsc` and `vmnc` are what remains of this group unattempted. Mostly DEFLATE over
 a framebuffer with a delta scheme on top, so also lossless and also absolutely measurable. `flashsv` and

@@ -2413,3 +2413,51 @@ A description of CLLC's frame layout, entropy coding and prediction from a sourc
 implementation — Canopus, Thomson or Grass Valley documentation, or an independent reverse-engineering
 write-up that states how it was produced and from what. The corpus above and the `INFO` chunk framing
 are recorded so that whoever finds one does not start from nothing.
+
+# Matrox Uncompressed SD (M101), which has no description, no sample and no encoder
+
+M101 was investigated with the lossless group and is the one member of it that stops for the plainest
+reason available: there is nothing to read and nothing to read it against. It joins 8088flex TMV as an
+entry that clears none of the three things every other codec in this file had at least one of — a
+published document, a paraphrase-shaped page to rule out, or a real sample corpus — and it is in a worse
+position than TMV, which at least had one truncated file.
+
+## It is a packing rather than a coding, which is what makes the absence decisive
+
+M101 is Matrox's uncompressed standard-definition format, one of a family with M102 for high definition
+and M103 carrying alpha, in 8-bit and 10-bit variants. Uncompressed means there is no entropy coder to
+recover and no tables to find — the entire format *is* a byte layout. That would normally make it one of
+the cheapest things in this package to do: `v210`, `r210`, `r10k`, `y41p` and `012v` are all exactly
+this shape, and every one of them was recovered by sweeping candidate readings against ffmpeg fed known
+or pseudo-random samples until one matched.
+
+That method is the whole of how a packing gets recovered here, and it needs one of two things: an
+encoder to feed known content through, or a real file to sweep against. M101 has neither, and that is
+the finding.
+
+## What was checked, and came back empty
+
+  - **MultimediaWiki carries no page.** `wiki.multimedia.cx/index.php/M101` returns 404, and the wiki's
+    own full-text search for "M101" answers "There were no results". There is not even a stub to
+    evaluate the provenance of, which is a different situation from Canopus Lossless's three bullet
+    points and from every screen-capture codec in this file.
+  - **There is no encoder.** `ffmpeg -encoders` lists nothing for `m101`, `m102` or Matrox at all; the
+    codec is decode-only, so no corpus can be built to order the way v210's and y41p's were.
+  - **There is no sample anywhere searched.** Neither `samples.ffmpeg.org/V-codecs/` nor ffmpeg's own
+    `fate-suite.ffmpeg.org` carries an `m101`, `m102` or Matrox directory, and fourcc.org's registry
+    has no entry either. Matrox itself publishes no format documentation for it.
+
+## The one thing the record does say, and it cuts the wrong way
+
+The decoder's own commit history carries the note *"TODO: find out which LSB for 10bit go where"* —
+its author's own statement that the 10-bit sample layout was not settled when it was written. So even
+setting aside that this project does not read that source, the one implementation that exists records
+uncertainty about the exact question a bit-exact decoder would have to answer. There is no second
+decoder to weigh it against and no file to test either reading on.
+
+## What would change the answer
+
+A single real M101, M102 or M103 file from Matrox hardware, or Matrox's own documentation of the pixel
+packing. Either one alone would probably be enough, because an uncompressed layout has no hidden
+tables: with a file, the sweep that recovered r210's and y41p's layouts runs directly; with the
+documentation, there is nothing else to derive.
