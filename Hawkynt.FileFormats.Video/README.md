@@ -53,6 +53,7 @@ who wants one frame of a two-hour recording pays for one frame.
 | Commodore CDXL | `.cdxl` | Y | — |
 | IFF ANIM | `.anim`, `.iff` | Y | — |
 | Sierra VMD | `.vmd` | Y | — |
+| Sony PlayStation STR | `.str` | Y | — |
 
 | Codec | Tag | Decode | Encode |
 | --- | --- | --- | --- |
@@ -383,28 +384,47 @@ any sample measured here, but nothing in the format promises they stay together 
 own block-timed frames are exactly the shape of thing that would separate them on a file this reader has
 not seen.
 
+A video packet is exactly that trimmed, reassembled bitstream and nothing more — the thirty-two-byte
+per-chunk header is not carried on it, which is a decision and not an oversight. `chunk_index`,
+`chunk_count` and the frame's own byte length are spent reassembling and trimming the very packet they
+describe; the frame number is spent on the packet's own timestamp; and width and height are restated on
+the stream rather than on every packet, the same fields this reader already read out of this same header
+to do it. Carrying any of those four forward regardless would be handing the codec bytes this reader has
+already read for it, at an offset that exists only because of how this one container happens to be
+written — the coupling the seam between demuxing and decoding exists to prevent. The header's other four
+fields — a per-frame quantiser scale, a count this reader has not interpreted, a version number, and the
+two fixed marker words above — are left off for the opposite reason: nothing measured here says whether
+MDEC's own bitstream needs any of them restated at all, and ISO/IEC 11172-2, whose coefficient table
+MDEC's is compatible with, reads its own quantiser scale out of the bitstream rather than from a
+container field. Whichever of the four the codec turns out to need, reading Sony's own document, is this
+container's to add back — named and justified — rather than to guess at ahead of that reading.
+
 Three of the five real samples measured here wrap that same run of sectors in a RIFF container stating
 the form type `CDXA` — a shell PlayStation development tools wrote around the sectors without touching
 one byte of them. What comes after the form type is not a `fmt ` chunk and a `data` chunk a generic RIFF
-walk could
-key off: every wrapped sample measured here states thirty-two bytes there that are either zero or a
-size nothing downstream needs, never a fourCC. This reader finds the sectors by searching for the sync
-pattern instead, which reads the wrapped shape and the raw one with the same code once that search is
-done — nothing about a sector changes once it is found.
+walk could key off: every wrapped sample measured here states thirty-two bytes there that are either
+zero or a size nothing downstream needs, never a fourCC. This reader finds the sectors by searching for
+the sync pattern instead, which reads the wrapped shape and the raw one with the same code once that
+search is done — nothing about a sector changes once it is found.
 
 **Measured.** Five real recordings from `samples.mplayerhq.hu/game-formats/psx-str/` — Descent and
 Serial Experiments Lain, raw; `abc000`, `river1` and Lunar 2, wrapped in RIFF/CDXA, one of them stating
 a real RIFF size where the other two state nought — 160 to 240 pixels tall, 320 to 640 wide, 73 to 870
-pictures apiece, 2,461 video packets and 1,377 audio packets in all — were opened here
-and their packet stream compared against `ffprobe -fflags +noparse`'s own: every video packet's stream
-index, size and presentation timestamp identical, every audio packet's size identical, and every video
-packet's own bytes — the chunks reassembled and trimmed, header stripped — identical byte for byte to
-an independent reconstruction straight off the sectors. The Lain recording is the site's own known-odd
-one, its video track described as carrying an unrelated encryption layer; this reader's own walk does
-not need to know that, since nothing about a chunk's declared shape depends on what its bytes decode to,
-and the packet stream reads exactly as cleanly as the other four. What a video packet's bytes mean — the
-per-block quantiser, the DC and AC Huffman tables, the inverse DCT — is not this container's business
-and is not yet decoded.
+pictures apiece, 2,461 video packets and 1,377 audio packets in all — were opened here and their packet
+stream compared against `ffprobe -fflags +noparse`'s own: every video packet's stream index, size and
+presentation timestamp identical, every audio packet's size identical. On three of the five — Descent
+and both RIFF/CDXA samples above, raw and wrapped both represented — every packet's own bytes were
+checked against `ffprobe -show_data_hash MD5`'s own hash of that same packet, computed by ffmpeg over
+bytes this reader never touched: 1,212 video packets and 891 audio packets, byte for byte identical.
+That is what settled the packet this reader hands out is the reassembled, trimmed bitstream and nothing
+wider — an earlier pass of this same check compared content only against this reader's own independent
+reconstruction of the same sectors, which shares this reader's own assumptions about where a packet
+begins and could not have caught a packet carrying thirty-two bytes more than ffmpeg's own, the way
+ffmpeg's own hash immediately did. The Lain recording is the site's own known-odd one, its video track
+described as carrying an unrelated encryption layer; this reader's own walk does not need to know that,
+since nothing about a chunk's declared shape depends on what its bytes decode to, and the packet stream
+reads exactly as cleanly as the other four. What a video packet's bytes mean — the per-block quantiser,
+the DC and AC Huffman tables, the inverse DCT — is not this container's business and is not yet decoded.
 
 ### MPEG-1 video
 
