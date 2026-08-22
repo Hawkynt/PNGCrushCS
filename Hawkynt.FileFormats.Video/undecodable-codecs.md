@@ -2357,3 +2357,59 @@ A description of LOCO's prediction and entropy coding from a source that is not 
 not a retrospective account of one — the format's own author, a vendor document, or a reverse
 engineer's write-up that predates the decoder and says plainly how it was produced and from what.
 Nothing found is that, and the page that exists says in its own first line that it is not.
+
+# Canopus Lossless (CLLC), where the page never had anything on it to check
+
+Canopus Lossless (`CLLC`) was investigated with LOCO and VBLE as part of the lossless group. Unlike
+those two it needs no argument about who wrote what: there has never been a technical description of
+this format anywhere to argue about.
+
+## What the page is, and has always been
+
+MultimediaWiki's `CLLC` redirects to "Canopus Lossless", and that page's entire content is three
+bullet points — the four-character code, the company, and a link to a proprietary binary installer.
+There is no header layout, no coder, no prediction rule, not one bitstream fact.
+
+Its full edit history, six revisions, shows it was never anything else. It was created at 00:50 on 20
+January 2009 by "Nazo" at 127 bytes; Nazo and "Multimedia Mike" edited it through August 2009; on 15
+October 2012 a user removed content with the edit summary *"no more undiscovered, available in
+ffmpeg/libav"* — that is, the page's own note that the codec was unimplemented was stripped once a
+decoder existed elsewhere, not replaced with a description of it; and the last edit, in May 2013,
+added the link to the vendor binary. FFmpeg's own `cllc.c` was added on 27 July 2012, which is what
+that October 2012 edit is reacting to.
+
+So the sequence is the reverse of a specification being written and then implemented. Nothing was ever
+written down; a decoder appeared; the page was updated to stop calling the codec undiscovered.
+
+Canopus — later Thomson, then Grass Valley — published nothing about it either. That is the same
+finding this file already records for Canopus HQ, HQA and HQX: the vendor's own material states no
+bitstream fact at all. No academic citation exists, and there is no standard behind it.
+
+## What the corpus does say, and why it does not rescue this
+
+Three real recordings exist on ffmpeg's own test-suite server at `fate-suite.ffmpeg.org/cllc/`, and
+they cover three different colour arrangements — `sample-cllc-rgb.avi` at 640x480 (`rgb24`, 1000
+pictures), `sample-cllc-argb.avi` at 1280x720 (`argb`, 19 pictures) and
+`sample-cllc-yuy2-noblock.avi` at 640x480 (`yuv422p`, 101 pictures). ffmpeg decodes all three without
+error, so an oracle is available, and the framing is visibly chunked: every packet measured opens with
+the four bytes `INFO` and a 24-byte length, in both the RGB and the ARGB file alike.
+
+**The small-frame argument that settles Indeo and TrueMotion 1 does not apply here, and this entry does
+not pretend it does.** The ARGB file's smallest picture is 338,464 bytes against a 1280x720 raw frame
+of 3,686,400, so there is easily room in every frame for whatever tables the coder needs; this format
+may well be self-describing the way TrueMotion 2 turned out to be.
+
+What stops it is the other wall, the one MSS1 and MSS2 stop at: there is nothing independent to build
+from at all. The only two descriptions of this bitstream in existence are implementations — ffmpeg's
+decoder and Canopus's own binary — and this project does not transcribe either, whether the author is a
+third party or the format's own vendor. Blind recovery of an unpublished Huffman coder and its
+prediction from three files, to this project's standard of exact equality on every sample of every
+frame, was not undertaken and is not claimed; recording it as attempted-and-failed would be as
+dishonest as recording it as done.
+
+## What would change the answer
+
+A description of CLLC's frame layout, entropy coding and prediction from a source that is not an
+implementation — Canopus, Thomson or Grass Valley documentation, or an independent reverse-engineering
+write-up that states how it was produced and from what. The corpus above and the `INFO` chunk framing
+are recorded so that whoever finds one does not start from nothing.
