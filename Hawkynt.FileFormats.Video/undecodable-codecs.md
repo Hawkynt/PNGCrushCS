@@ -2196,3 +2196,68 @@ rather than inferring the first byte's class alone. The container facts above �
 the large-page directory, and the record framing, all confirmed against three real files — are recorded
 here so that whoever picks this up again starts from the record's own compressed bytes and not from the
 file format around them.
+
+# Chronomaster DFA, whose page is the cleanest case of a paraphrase this project has found without a
+citation to prove it
+
+DFA (`dfa`, magic `DFIA`) was investigated as the next Amiga-and-legacy-adjacent item on the list —
+DreamForge's FMV format for *Chronomaster* and *Anvil of Dawn* — and it stops before a byte of it was
+written, on provenance alone.
+
+## What MultimediaWiki's page reads like
+
+The page states the 128-byte header and the general chunk preamble in the same plain, field-by-field
+prose every other container on this project's list was read from, and that half is unremarkable. What
+follows it is not: a full section per video chunk type — `TSW1`, `BDLT`, `WDLT`, `TDLT`, `DSW1`, `DDS1`
+— each given not as a description of what the coding achieves but as a block of C-shaped pseudocode,
+complete with `get_le16()`, `get_byte()`, `memmove()`, `cur_frame_pos`, `frame_ptr`, `line_ptr`, and a
+`while (segments--)` idiom repeated across three of the six sections. Bit-level tie-breaks that a
+genuine reverse-engineer would ordinarily explain — why `DDS1`'s mask advances by two rather than one,
+why `WDLT`'s stripe count is read as a signed value and re-read when its top bits are set — are stated
+as bare code with no explanation of how they were determined, which is what a working implementation's
+own logic looks like once its comments are stripped, not what a decoder recovered by measurement reads
+like.
+
+That is exactly the shape this project has already learned to distrust for a specific, checkable
+reason, not a stylistic complaint. MSS1 and MSS2's own sections above turned on function names lining up
+with `libavcodec/mss2.c` one for one, typo included; SpeedHQ's on a table that is a verbatim copy of
+`libavcodec/speedhq.c`'s own arrays. DFA's page offers no such single fingerprint to point at, but it
+offers something just as telling by its absence: unlike CDXL's, BFI's and IFF ANIM's own MultimediaWiki
+pages — all read for this same family of formats, all citing a named first-party source or plainly
+marking what is not known — DFA's page cites nothing at all for any of its six chunk algorithms. No
+README, no archived technical document, no reverse-engineer credited by name. A page built from real
+reverse-engineering ordinarily says so, the way this project's own README does for VP3's frame header or
+TrueMotion 2's tables; a page built by transcribing a working decoder's source into prose has nothing to
+cite, because the source was the decoder.
+
+`ffmpeg` carries a real `dfa` decoder, `libavcodec/dfa.c`, so the paraphrase this page most plausibly
+descends from already exists in the one place this project does not read. Two accompanying sample notes
+on `samples.ffmpeg.org` — `chronomaster-dfa.txt` and `LOGOS.DFA.TXT` — were checked for a second,
+independent source; the first names only the game the samples come from, and the second names this same
+wiki page as its own reference, which settles nothing either way but adds no independent confirmation.
+
+## Why this stops the investigation rather than starting it
+
+Six chunk types, each its own coding scheme, is a large surface to get right by measurement alone, and
+this project's own standard for a codec like this is exact equality on every frame — the same bar CDXL,
+BFI and IFF ANIM all cleared in the same investigation pass DFA was reached in. Attempting it from a
+page this project already has good reason to believe is a paraphrase would mean one of two outcomes:
+either the transcription happens to be faithful and the result is, in substance, a translation of
+`libavcodec/dfa.c` with the serial numbers filed off — exactly what "this project does not transcribe
+implementations" exists to prevent, whether or not a single line of code is copied — or it is not
+faithful, and a subtle mistranscription somewhere in six separate decoding loops produces a picture that
+is wrong in a way nothing here would have reason to doubt, since the source it was checked against was
+the same paraphrase. Neither outcome is worth having.
+
+## What would change the answer
+
+A description of `TSW1`, `BDLT`, `WDLT`, `TDLT`, `DSW1` and `DDS1`'s coding from a source that names
+itself and how it reached its conclusions — a DreamForge document of the kind Electronic Arts published
+for Deluxe Paint Animation's container (see that section above), or a reverse-engineer's own account
+that says, plainly, that the six chunk types were worked out from files and not read out of a decoder.
+Failing that, this project's own blind measurement against real files — `0000.dfa`, `0001.dfa`,
+`0002.dfa` and `LOGOS.DFA` are all on `samples.ffmpeg.org` and ffmpeg decodes all four, so a genuine
+from-scratch derivation has an oracle to check itself against — carried far enough to recover all six
+schemes independently, the same kind of effort this project spent on TrueMotion 2's tables and BFI's own
+back-reference and fill codes. Neither was attempted here because the page's own shape settled the
+question before either was needed.
