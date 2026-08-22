@@ -2118,3 +2118,81 @@ by the same kind of cross-checking that settled the one-byte statement above. Th
 measured against, `INTEL_S.TGV`, uses the two-byte statement far more often than the three-byte one in
 its first picture, which is why the two-byte form is confirmed across dozens of instances and the
 three-byte form's true bit layout is not yet pinned down by even a second occurrence to compare against.
+
+# Deluxe Paint Animation (ANM), where the container is Electronic Arts' own documentation and the
+codec is only their source code
+
+ANM (`anm`, FourCC-less, magic `LPF `) was investigated because it looked like the cheapest of the
+remaining game formats on the same promise several already-decoded ones had: a container recovered from
+prose, a small alphabet of frame-to-frame operations, and real samples to check either against. The
+container half of that promise holds completely. The codec half does not, and the reason is specific
+rather than a shortage of searching.
+
+## What was recovered, and verified against real files
+
+Electronic Arts released a "Programmer's Kit for DeluxePaint Animation" — an executable, C source and a
+plain-text file, `ANIMFILE.TXT`, whose own cover letter (`READFRST.TXT`) says outright: "For information
+on the ANM (animation) file format, please see the comments in the LPFILE.C file." `ANIMFILE.TXT` is
+that description extracted into prose on its own, and it is a genuinely independent, first-party
+document — Electronic Arts describing a format Electronic Arts designed, years before any third-party
+decoder existed. MultimediaWiki's own DeluxePaint Animation page states plainly that its "Format
+description" section is "recovered from `http://www.whisqu.se/per/docs/iffanim.txt`, which is now dead,"
+and a byte-for-byte comparison shows the wiki page and the kit's own `ANIMFILE.TXT` are the same text —
+so the wiki page's provenance is not somebody's decoder, it is this same first-party document at one
+remove.
+
+That document gives, in full, the whole container: a 2816-byte header (`LPF ` magic, large-page and
+record limits, a `contentType` of `ANIM `, picture size, an EA-defined `CompressionType` of 1 named
+"RunSkipDump", frame count and rate), an inline 256-entry RGBX palette, a 256-entry large-page directory
+copied from the pages themselves, and the "large pages" proper — up to 64KiB blocks, stored in whatever
+order the encoder chose rather than playback order, each opening with a small header and a table of its
+own records' lengths, each record itself opening with a byte stated as "always 66" and a flags byte.
+
+All of it was checked against three real files from `samples.ffmpeg.org/game-formats/anm/` —
+`CINEOV2.ANM`, `INTRO1.ANM` and `SW.ANM`, 158, 156 and 44 records respectively. Every large-page
+directory entry's record count sums to the file's own stated `nRecords`; every non-empty record's first
+byte is 66 with no exception across 320 records; and `CINEOV2.ANM`'s 158 records include exactly five of
+zero length, leaving 153 — which is exactly what `ffprobe -count_frames` reports for the file, a
+zero-length record being "no change from the frame before it" rather than a frame of its own, confirmed
+independently by the two counts agreeing.
+
+## Where it stops
+
+`ANIMFILE.TXT` stops exactly at the record header. What a record's compressed bytes mean — the
+"RunSkipDump" scheme the header field names but the prose never explains — exists nowhere except inside
+the Programmer's Kit's own reference source, `LPFILE.C` and `ANIMIO.C`, an assembly-optimised C
+implementation with named routines for what its own comments call short and long forms of a skip, a dump
+and a run. That source is exactly the kind of material this project does not transcribe: not a
+third-party reverse-engineer's notes this time, but the format owner's own implementation all the same,
+and the licence terms `READFRST.TXT` states — provided to registered users of a 1990 consumer product,
+not published under any open licence — give no more standing to copy from it than ffmpeg's own decoder
+would. A second, wider search turned up nothing else: no independent write-up states the opcode byte
+values, the short/long thresholds or the bit layout distinguishing the three operation kinds: everything
+found either restates the container fields above or points at an implementation — this project's own or
+ffmpeg's — for the rest.
+
+Blind measurement was tried before this was set aside. Every non-empty record examined opens with the
+same four bytes — `42 00 01 00` — read as the documented header (`IDnum` 66, `Flags` 0) followed by two
+bytes with no stated meaning once `Flags` is zero; and the byte immediately after that pair is `0x80` in
+every record checked, in three unrelated files, at every position a large page places one. A single
+opcode byte recurring at the very start of unrelated compressed streams this consistently is a real
+finding — most plausibly the compressor always opens a record with the same class of instruction, a
+"dump" large enough to need its long form after a scene change — but it names one byte's likely class and
+nothing about where that class's own count field starts or ends, which byte values the other two classes
+of instruction use, or which of them switches between an eight-bit and a sixteen-bit count. Recovering
+that would need the same kind of exhaustive, position-by-position bisection against the oracle that
+recovered TrueMotion 2's block-type allocation or Escape 124's codebook sizing, and this investigation
+did not carry it that far.
+
+## What would change the answer
+
+A description of RunSkipDump's opcode bytes and count-field widths from a source that is not an
+implementation — a second archived copy of a technical document that goes further than `ANIMFILE.TXT`
+does, or a published reverse-engineering account that states its own method rather than restating
+`LPFILE.C`. Failing that, the blind measurement above, carried to the same depth this project reached for
+TrueMotion 2: enough records at enough known byte offsets, compared pixel by pixel against ffmpeg's own
+decode of the same file, to pin down each opcode class's byte values and count-field width one at a time
+rather than inferring the first byte's class alone. The container facts above — the header, the palette,
+the large-page directory, and the record framing, all confirmed against three real files — are recorded
+here so that whoever picks this up again starts from the record's own compressed bytes and not from the
+file format around them.

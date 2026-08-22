@@ -23,8 +23,8 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 | | Count | Share |
 | --- | --- | --- |
 | Decoded and verified against ffmpeg | 55 | 26% |
-| Established as not implementable from files alone | 32 | 15% |
-| Not yet attempted | 124 | 59% |
+| Established as not implementable from files alone | 33 | 16% |
+| Not yet attempted | 123 | 58% |
 
 The 55 are the codec table in `README.md`, counted as distinct libavcodec decoders rather than as
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
@@ -58,11 +58,12 @@ the stronger oracle of the two, being the ground truth itself. LCL ZLIB is measu
 addition to the usual one, since it too has a real encoder here: round-tripped through it as well as
 checked against seven real recordings.
 
-The 32 are Indeo 3, Indeo 4, Indeo 5, TrueMotion 1, WMV1, WMV2, MSS1, MSS2, Canopus HQ/HQA
+The 33 are Indeo 3, Indeo 4, Indeo 5, TrueMotion 1, WMV1, WMV2, MSS1, MSS2, Canopus HQ/HQA
 (`hq_hqa`), Canopus HQX, Lagarith, DV, MSZH, Escape 124, SpeedHQ, VP4, VP7, MSCC, RSCC, WCMV,
 MWSC, RASC, Go2Meeting (`g2m`), ScreenPressor (`scpr`), Screenpresso, TSCC2, Sorenson Video 1
-(`svq1`), Sorenson Video 3 (`svq3`), Smacker (`smackvid`) and Electronic Arts TGQ, TQI and MAD
-(`eatgq`, `eatqi`, `eamad`), and the arguments that settle them are in
+(`svq1`), Sorenson Video 3 (`svq3`), Smacker (`smackvid`), Electronic Arts TGQ, TQI and MAD
+(`eatgq`, `eatqi`, `eamad`), and Deluxe Paint Animation (`anm`),
+and the arguments that settle them are in
 `undecodable-codecs.md`. The first four have frames too small to
 carry the tables they need —
 340 bytes for a 320x240 Indeo 3 picture, 14 for Indeo 4, 2 for Indeo 5, 0 for TrueMotion 1 — so those
@@ -102,6 +103,15 @@ transform down — the two sibling pages carry the identical gap as an open `<FI
 cannot approximate its way past a missing transform the way a container can skip an unread field, so
 this is the SVQ1 shape rather than the WMV1 one: not a corpus too small to hold the table, but a source
 that names where the table lives instead of printing it.
+
+Deluxe Paint Animation (`anm`) stops the same way from a different direction: its container comes from
+Electronic Arts' own first-party documentation, `ANIMFILE.TXT`, released with the format's official
+Programmer's Kit and confirmed to be MultimediaWiki's own source at one remove — recovered in full and
+verified against three real files down to the record framing and a zero-length record's meaning. What
+that document does not cover, and nothing else published does either, is the "RunSkipDump" compression
+it names: the only place that scheme is written down at all is inside the same kit's reference source
+code, which this project does not transcribe whether the author is a third party or the format's own
+vendor.
 
 Escape 124 and SpeedHQ both stop closer to the finish than the rest: their containers, and most of
 their bitstreams, are fully mapped and verified against real files, with one specific piece each left
