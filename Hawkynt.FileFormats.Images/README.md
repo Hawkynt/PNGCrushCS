@@ -76,9 +76,29 @@ foreach (var entry in FormatRegistry.AllFormats.OrderBy(e => e.Name))
 | [Cineon](https://en.wikipedia.org/wiki/Cineon) | ✅ | ✅ | [LOC Cineon overview](https://www.loc.gov/preservation/digital/formats/fdd/fdd000180.shtml) |
 | [PFM](https://en.wikipedia.org/wiki/Netpbm#PFM_graphic_format) | ✅ | ✅ | [Paul Debevec's PFM notes](https://www.pauldebevec.com/Research/HDR/PFM/) |
 
-### Historical and platform formats
+### Vintage computing (~200 formats)
 
-The package also contains hundreds of platform-specific and historical formats: Amiga/Atari/C64/CPC/Apple II, console graphics, fax formats, paint-program files, icon/cursor families, texture containers, and hardware screen dumps. Listing all of them twice would make the NuGet landing page worse; use the complete [`Formats.md`](../Formats.md) table or enumerate `FormatRegistry.AllFormats`.
+The package contains roughly 200 screen-dump, paint-program, tile, sprite, icon, and platform-native image formats from home computers, consoles, and early personal-computing systems. The table is grouped by platform family so the NuGet landing page remains usable; [`../Formats.md`](../Formats.md) and `FormatRegistry.AllFormats` provide the individual entries.
+
+| Platform / family | Representative registered formats | Read | Write | Reference |
+| --- | --- | :---: | :---: | --- |
+| Apple II / IIgs / classic Mac | Apple II, IIgs SHR/DHR/16-color, AppleICN, AppleColorSPF, AppleSPF, MacPaint, PICT | ✅ | ⚠️ | [Apple II graphics](https://en.wikipedia.org/wiki/Apple_II_graphics), [MacPaint](https://en.wikipedia.org/wiki/MacPaint), [PICT](https://en.wikipedia.org/wiki/PICT) |
+| Atari 8-bit / ST | Degas / Degas Elite, NeoChrome, AtariPaintworks, CrackArt, Spectrum 512 variants, QuantumPaint, Stad, Calamus, ArtDirector, MegaPaint, GfaRaytrace | ✅ | ⚠️ | [Atari ST](https://en.wikipedia.org/wiki/Atari_ST), [Spectrum 512](https://en.wikipedia.org/wiki/Spectrum_512) |
+| Commodore 64 / 128 / Plus/4 / VIC-20 | Koala, Doodle, Multicolor, Hires, AdvancedArt, AmicaPaint, GunPaint, FunPainter, DrazPaint, GigaPaint, Artist64, FacePainter, GoDot, Printfox/Pagefox, and many others | ✅ | ⚠️ | [Commodore 64 graphics](https://en.wikipedia.org/wiki/Commodore_64#Graphics) |
+| Amiga | IFF, ILBM, ANIM, ACBM, DEEP, RGB8, RGBN, PBM | ✅ | ⚠️ | [IFF](https://en.wikipedia.org/wiki/Interchange_File_Format), [ILBM](https://en.wikipedia.org/wiki/ILBM) |
+| Sinclair ZX Spectrum / Timex / Next | SCR, ZxNext, ZxTimex, ZxUlaPlus, ZxMulticolor, ZxBorderMulticolor, ZxPaintbrush, ZxArtStudio | ✅ | ⚠️ | [ZX Spectrum graphic modes](https://en.wikipedia.org/wiki/ZX_Spectrum_graphic_modes) |
+| MSX | Screen 2/5/7/8/10/12, SC4, SC8, MSX View | ✅ | ⚠️ | [MSX](https://en.wikipedia.org/wiki/MSX) |
+| Amstrad CPC / CPC Plus | AmstradCpc, AmstradCpcPlus, AmstradOcp, FontasyGrafik | ✅ | ⚠️ | [Amstrad CPC](https://en.wikipedia.org/wiki/Amstrad_CPC) |
+| Sharp systems | Sharp MZ, X1Pal, Sharp X68000 | ✅ | ⚠️ | [Sharp MZ](https://en.wikipedia.org/wiki/Sharp_MZ), [X68000](https://en.wikipedia.org/wiki/X68000) |
+| Acorn / BBC / RISC OS | Acorn Sprite, BbcMicroBeeb, BbcMicroAdvanced, RiscOsSprite | ✅ | ⚠️ | [BBC Micro](https://en.wikipedia.org/wiki/BBC_Micro), [RISC OS](https://en.wikipedia.org/wiki/RISC_OS) |
+| Sega consoles | Genesis / Mega Drive tiles, Master System tiles, Game Gear, Genesis SJ1 | ✅ | ⚠️ | [Mega Drive / Genesis](https://en.wikipedia.org/wiki/Sega_Genesis), [Master System](https://en.wikipedia.org/wiki/Master_System) |
+| Nintendo / SNK consoles | Game Boy / Game Boy Color, GBA tiles, NES CHR, SNES tiles, Nintendo DS textures, N64 SAI/TM, Neo Geo sprites / Pocket, Virtual Boy tiles | ✅ | ⚠️ | [NES PPU](https://en.wikipedia.org/wiki/Picture_Processing_Unit), [Game Boy](https://en.wikipedia.org/wiki/Game_Boy), [Super NES](https://en.wikipedia.org/wiki/Super_Nintendo_Entertainment_System) |
+| Other 8/16-bit systems | TI bitmap, HP GROB, EPA BIOS, CiscoIp, PocketPc2bp, Thomson, PET, FM Towns, PC-88, Enterprise 128, Atari 2600/7800, TRS-80, Dragon, Jupiter Ace, ZX81, Vector-06C | ✅ | ⚠️ | [Home computer](https://en.wikipedia.org/wiki/Home_computer) |
+| Japanese interchange / paint formats | MAG, Pi, Q0, Makichan Graph | ✅ | ⚠️ | [MAG image format overview](https://en.wikipedia.org/wiki/MAG_(file_format)) |
+| Mobile / embedded | NokiaLogo, NokiaNlm, NokiaGroupGraphics, SiemensBmx, PsionPic | ✅ | ⚠️ | [Nokia logo formats context](https://en.wikipedia.org/wiki/Nokia_Logo_Manager) |
+| HP calculators / workstations | HpBufImage, HpForth / HP48, HpGrob | ✅ | ⚠️ | [HP 48 series](https://en.wikipedia.org/wiki/HP_48_series) |
+
+`⚠️` in the grouped Write column means writer coverage varies between formats in that family; it does not mean every listed format has a partial writer. Query each `FormatEntry.SupportsWrite` for the exact current capability.
 
 ## 🚀 Quick start
 
