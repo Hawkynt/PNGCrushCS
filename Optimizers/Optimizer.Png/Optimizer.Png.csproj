@@ -5,29 +5,31 @@
 
         <Description>This package provides a PngOptimizer implementation.</Description>
         <PackageReadmeFile>ReadMe.md</PackageReadmeFile>
-        <PackageProjectUrl>https://github.com/Hawkynt/PNGCrush</PackageProjectUrl>
+        <PackageProjectUrl>https://github.com/Hawkynt/PNGCrushCS</PackageProjectUrl>
         <PackageTags>PngOptimizer;ImageCrush;Hawkynt</PackageTags>
-        <RepositoryUrl>https://github.com/Hawkynt/PNGCrush</RepositoryUrl>
+        <RepositoryUrl>https://github.com/Hawkynt/PNGCrushCS</RepositoryUrl>
         <RepositoryType>git</RepositoryType>
         <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
     </PropertyGroup>
 
     <ItemGroup>
+        <None Include="ReadMe.md" Pack="true" PackagePath="\" />
         <InternalsVisibleTo Include="Optimizer.Png.Tests" />
         <InternalsVisibleTo Include="Optimizer.Image" />
     </ItemGroup>
 
     <ItemGroup>
         <ProjectReference Include="../../Crush.Core/Crush.Core.csproj" />
-    <ProjectReference Include="..\..\Hawkynt.FileFormats.Images\Hawkynt.FileFormats.Images.csproj" />
-    <ProjectReference Include="..\..\FileFormat.Core\FileFormat.Core.csproj" />
-    <ProjectReference Include="..\..\Compression.Core\Compression.Core.csproj" />
+        <ProjectReference Include="..\..\Hawkynt.FileFormats.Images\Hawkynt.FileFormats.Images.csproj" />
+        <ProjectReference Include="..\..\FileFormat.Core\FileFormat.Core.csproj" />
+        <ProjectReference Include="..\..\Compression.Core\Compression.Core.csproj" />
     </ItemGroup>
 
     <ItemGroup>
         <PackageReference Include="FrameworkExtensions.Backports" Version="1.0.0.256" />
         <PackageReference Include="FrameworkExtensions.Corlib" Version="1.0.2.459" />
     </ItemGroup>
+
     <ItemGroup>
         <ProjectReference Include="..\..\Hawkynt.ColorProcessing.Adapter\Hawkynt.ColorProcessing.Adapter.csproj" />
     </ItemGroup>

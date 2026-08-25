@@ -5,14 +5,15 @@
 
     <Description>TIFF optimization engine with compression method selection, predictor optimization, and color mode reduction.</Description>
     <PackageReadmeFile>ReadMe.md</PackageReadmeFile>
-    <PackageProjectUrl>https://github.com/Hawkynt/PNGCrush</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/Hawkynt/PNGCrushCS</PackageProjectUrl>
     <PackageTags>TiffOptimizer;ImageCrush;Hawkynt</PackageTags>
-    <RepositoryUrl>https://github.com/Hawkynt/PNGCrush</RepositoryUrl>
+    <RepositoryUrl>https://github.com/Hawkynt/PNGCrushCS</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
   </PropertyGroup>
 
   <ItemGroup>
+    <None Include="ReadMe.md" Pack="true" PackagePath="\" />
     <InternalsVisibleTo Include="Optimizer.Tiff.Tests" />
   </ItemGroup>
 
@@ -20,9 +21,6 @@
     <ProjectReference Include="..\..\Hawkynt.FileFormats.Images\Hawkynt.FileFormats.Images.csproj" />
     <ProjectReference Include="..\..\FileFormat.Core\FileFormat.Core.csproj" />
     <ProjectReference Include="../../Crush.Core/Crush.Core.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
   </ItemGroup>
 
 </Project>
