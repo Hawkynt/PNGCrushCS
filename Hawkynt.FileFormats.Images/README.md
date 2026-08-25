@@ -107,11 +107,9 @@ using FileFormat.Core;
 using Hawkynt.FileFormats.Images;
 
 var input = new FileInfo("mystery.bin");
-
 var format = FormatRegistry.DetectFromFile(input);
 var raw = FormatRegistry.Read(input);
 var png = FormatRegistry.Write(raw!, ImageFormat.Png);
-
 File.WriteAllBytes("out.png", png!);
 ```
 
@@ -125,35 +123,93 @@ ImageFormat fromBytes = FormatRegistry.DetectFromBytes(headerBuffer);
 using var stream = File.OpenRead("photo.bin");
 ImageFormat fromStream = FormatRegistry.DetectFromStream(stream);
 
-// For non-seekable streams, get a replayable stream back with the detected format.
 var (detected, replay) = FormatRegistry.DetectFromStreamRewound(networkStream);
 RawImage? image = FormatRegistry.Read(replay);
 ```
 
-### Inspect capabilities before writing
+### Read and normalize any image
 
 ```csharp
-var entry = FormatRegistry.GetEntry(ImageFormat.WebP);
-if (entry?.SupportsWrite == true) {
-  var bytes = FormatRegistry.Write(raw, ImageFormat.WebP);
-  File.WriteAllBytes("out.webp", bytes!);
+RawImage? image = FormatRegistry.Read(new FileInfo("anything.tga"));
+if (image != null) {
+  Console.WriteLine($"{image.Width}x{image.Height} {image.Format} HasAlpha={image.HasAlpha}");
+  byte[] rgba = image.ToRgba32();
 }
 ```
+
+### Encode a `RawImage`
+
+```csharp
+var raw = new RawImage {
+  Width = 256,
+  Height = 256,
+  Format = PixelFormat.Rgba32,
+  PixelData = pixelBytes,
+};
+
+byte[]? png = FormatRegistry.Write(raw, ImageFormat.Png);
+byte[]? webp = FormatRegistry.Write(raw, ImageFormat.WebP);
+byte[]? qoi = FormatRegistry.Write(raw, ImageFormat.Qoi);
+
+using var output = File.Create("out.bmp");
+bool ok = FormatRegistry.Write(raw, ImageFormat.Bmp, output);
+```
+
+### Look up extensions and MIME types
+
+```csharp
+string ext = FormatRegistry.PrimaryExtension(ImageFormat.Jpeg);
+var aliases = FormatRegistry.AllExtensions(ImageFormat.Jpeg);
+string mime = FormatRegistry.PrimaryMimeType(ImageFormat.WebP);
+var mimes = FormatRegistry.AllMimeTypes(ImageFormat.Png);
+```
+
+### Inspect and filter capabilities
+
+```csharp
+var roundTrippable = FormatRegistry.AllFormats
+  .Where(e => e.SupportsRead && e.SupportsWrite)
+  .OrderBy(e => e.Name);
+
+var multiImage = FormatRegistry.AllFormats.Where(e => e.SupportsMultiImage);
+var mimed = FormatRegistry.AllFormats.Where(e => e.MimeTypes.Length > 0);
+```
+
+### Cross-format conversion
+
+```csharp
+File.WriteAllBytes(
+  "out.png",
+  FormatRegistry.Write(FormatRegistry.Read(new FileInfo("in.tga"))!, ImageFormat.Png)!);
+```
+
+### Metadata without decoding pixels
+
+```csharp
+var entry = FormatRegistry.GetEntry(ImageFormat.Jpeg);
+ImageInfo? info = entry?.ReadImageInfo?.Invoke(File.ReadAllBytes("photo.jpg"));
+if (info is { } meta)
+  Console.WriteLine($"{meta.Width}x{meta.Height} @ {meta.BitsPerPixel}bpp ({meta.ColorMode})");
+```
+
+`ReadImageInfo` is `null` when a format has no fast metadata-only path; callers can fall back to `Read`.
 
 ### Multi-image formats
 
 ```csharp
 var entry = FormatRegistry.GetEntry(ImageFormat.Tiff);
 if (entry?.SupportsMultiImage == true) {
-  var pages = entry.GetImageCount!(new FileInfo("multi.tif"));
+  int pages = entry.GetImageCount!(new FileInfo("multi.tif"));
   for (var i = 0; i < pages; ++i) {
     RawImage? page = entry.LoadRawImageAtIndex!(new FileInfo("multi.tif"), i);
     // ...
   }
+
+  var allPages = entry.LoadAllRawImages!(new FileInfo("multi.tif"));
 }
 ```
 
-## 📚 API
+## 📚 API reference
 
 ### `FormatRegistry`
 
@@ -169,12 +225,40 @@ if (entry?.SupportsMultiImage == true) {
 | `Write(RawImage, ImageFormat)` | Encode to bytes when a writer exists. |
 | `Write(RawImage, ImageFormat, Stream)` | Encode directly to a stream. |
 | `GetEntry(ImageFormat)` | Get extensions, MIME types, signatures and capabilities. |
+| `PrimaryExtension` / `AllExtensions` | Canonical extension and aliases. |
+| `PrimaryMimeType` / `AllMimeTypes` | Preferred MIME type and aliases. |
 | `AllFormats` | Enumerate every registered format. |
 | `SupportedReadFormats` / `SupportedWriteFormats` | Enumerate by capability. |
 
-### `RawImage`
+### `FormatEntry`
 
-`RawImage` is the platform-independent decoded image exchanged by every format:
+The source generator produces typed registry entries rather than using runtime reflection. The public record carries the format identity, names/extensions/MIME types, capabilities/signatures/detection priority, read/write delegates, optional metadata reader, and optional multi-image delegates.
+
+Key computed properties are:
+
+| Property | Meaning |
+| --- | --- |
+| `PrimaryMimeType` | First registered MIME type, otherwise `application/octet-stream`. |
+| `SupportsRead` | A reader is registered. |
+| `SupportsWrite` | A conversion from arbitrary `RawImage` is registered. |
+| `SupportsMultiImage` | Image count/index/all-image delegates are registered. |
+
+### `MagicSignature`
+
+```csharp
+public readonly record struct MagicSignature(
+  byte[] Signature,
+  int Offset,
+  int MinHeaderLength);
+```
+
+Signatures are emitted from `[FormatMagicBytes(...)]`; `MinHeaderLength` prevents matchers from reading beyond the supplied header.
+
+### `ImageFormat`
+
+`ImageFormat` is generated at compile time. `Unknown = 0`; every discovered image format contributes another member. Consumers should not copy a hand-maintained enum list into application code—use the package's generated enum/registry.
+
+### `RawImage`
 
 ```csharp
 public sealed class RawImage {
@@ -187,32 +271,218 @@ public sealed class RawImage {
   public int PaletteCount { get; init; }
   public byte[]? AlphaTable { get; init; }
 
+  public bool IsIndexed { get; }
+  public bool HasAlpha { get; }
+
   public byte[] ToBgra32();
   public byte[] ToRgba32();
   public byte[] ToRgb24();
+
+  public static int BytesPerPixel(PixelFormat format);
+  public static int BitsPerPixel(PixelFormat format);
 }
 ```
 
-Common pixel layouts include BGRA/RGBA/ARGB 32-bit, RGB/BGR 24-bit, 8/16-bit grayscale, indexed 1/4/8-bit, RGB565, RGB48, and RGBA64.
+### `PixelFormat`
 
-### `FormatEntry`
+| Value | Layout | Bits |
+| --- | --- | ---: |
+| `Bgra32` | B, G, R, A | 32 |
+| `Rgba32` | R, G, B, A | 32 |
+| `Argb32` | A, R, G, B | 32 |
+| `Rgb24` | R, G, B | 24 |
+| `Bgr24` | B, G, R | 24 |
+| `Gray8` | grayscale | 8 |
+| `Gray16` | 16-bit grayscale | 16 |
+| `GrayAlpha16` | grayscale + alpha | 16 |
+| `Indexed8` | palette index | 8 |
+| `Indexed4` | packed palette index | 4 |
+| `Indexed1` | packed palette index | 1 |
+| `Rgba64` | 16-bit R/G/B/A | 64 |
+| `Rgb48` | 16-bit R/G/B | 48 |
+| `Rgb565` | 5/6/5 RGB | 16 |
 
-| Property | Meaning |
+### `FormatCapability`
+
+`FormatCapability` contains format-level flags such as `HasDedicatedOptimizer` and `MultiImage`. Per-format geometry/palette/display restrictions are modeled separately through `VideoMode` rather than being flattened into capability bits.
+
+### `VideoMode`
+
+```csharp
+public sealed record VideoMode(
+  string Name,
+  (IntegerRange Width, IntegerRange Height)[] Dimensions,
+  IntegerRange[]? AllowedPaletteRanges = null,
+  FixedPalette[]? AvailablePalettes = null,
+  PixelAspectRatio? PixelAspectRatio = null,
+  DisplayFilter DisplayFilter = DisplayFilter.None,
+  string? Description = null);
+```
+
+A format declares its selectable modes through `IImageFormatMetadata<TSelf>.VideoModes`. Multiple resolutions sharing one palette profile stay in one mode; palette variants for the same dimensions belong in `AvailablePalettes`.
+
+Representative declarations include:
+
+```csharp
+// Arbitrary-resolution full colour.
+static VideoMode[] VideoModes => [
+  new("Default", [(IntegerRange.Any, IntegerRange.Any)])
+];
+
+// Atari ST NeoChrome.
+static VideoMode[] VideoModes => [
+  new("Low resolution", [(320, 200)], [16]),
+  new("Medium resolution", [(640, 200)], [4]),
+  new("High resolution", [(640, 400)], [2]),
+];
+
+// CGA palette variants stay attached to the same geometry/profile.
+static VideoMode[] VideoModes => [
+  new("4-colour", [(320, 200)], [4],
+      [_LowIntensity0, _HighIntensity0, _LowIntensity1, _HighIntensity1]),
+  new("Monochrome", [(640, 200)], [2], [_MonochromePalette]),
+];
+
+// NES CHR can additionally describe pixel aspect and display filtering.
+static VideoMode[] VideoModes => [
+  new("Tilesheet (2bpp)",
+      [(128, new IntegerRange(8, 8192, step: 8))],
+      [new IntegerRange(2, 4)],
+      [_NesMaster64],
+      (8, 7),
+      DisplayFilter.NtscComposite),
+];
+```
+
+### `ImageInfo`
+
+```csharp
+public readonly record struct ImageInfo(
+  int Width,
+  int Height,
+  int BitsPerPixel,
+  string? ColorMode = null,
+  string? Compression = null,
+  int FrameCount = 1);
+```
+
+It is the lightweight metadata result for formats that can inspect dimensions/properties without a full pixel decode.
+
+## 🏗️ Registry and detection architecture
+
+`FileFormat.Registry.Generator` scans the compilation and referenced format assemblies at build time for the static image contracts and emits the `ImageFormat` enum plus registration code wired directly to the concrete static methods. There is no runtime reflection step.
+
+Detection runs priority-ordered custom `MatchesSignature(ReadOnlySpan<byte>)` logic for formats that need more than fixed magic bytes, then the generated magic-signature table. `DetectFromFile` falls back to extension only after byte-level detection fails.
+
+MIME types come from `[FormatMimeType(...)]`. The first annotation is the primary MIME type and later values are aliases; formats without a MIME annotation simply expose no registered MIME values rather than receiving guessed ones.
+
+## 📚 Extended format-family reference
+
+The exact current Read/Write/Multi-image state for every individual entry remains `FormatRegistry.AllFormats`. The tables here preserve the package's long-form inventory without freezing old capability counts or resurrecting obsolete states.
+
+### Lossless / scientific / HDR long tail
+
+| Family / format | Coverage note | Reference |
+| --- | --- | --- |
+| Farbfeld | simple 16-bit-per-channel lossless raster | [farbfeld](https://tools.suckless.org/farbfeld/) |
+| Netpbm PBM/PGM/PPM/PAM/P7 | portable bitmap/graymap/pixmap/anymap family | [Netpbm](http://netpbm.sourceforge.net/doc/) |
+| Analyze 7.5 | medical/scientific volume imagery | [Analyze 7.5](https://eeg.sourceforge.net/ANALYZE75.pdf) |
+| MetaImage `.mhd` / `.mha` | ITK MetaIO image data | [MetaImage](https://itk.org/Wiki/ITK/MetaIO) |
+| MRC2014 | electron microscopy/volume data | [CCP-EM MRC](https://www.ccpem.ac.uk/mrc_format/mrc2014.php) |
+| DICOM | medical image/container paths | [DICOM](https://www.dicomstandard.org/) |
+| ENVI | remote-sensing raster/header format | [ENVI header files](https://www.l3harrisgeospatial.com/docs/enviheaderfiles.html) |
+| VICAR | NASA/JPL image format | [VICAR](https://www-mipl.jpl.nasa.gov/external/VICAR_file_fmt.pdf) |
+| PDS | NASA Planetary Data System imagery | [PDS](https://pds.nasa.gov/) |
+
+### Professional / authoring
+
+| Family / format | Coverage note | Reference |
+| --- | --- | --- |
+| Photoshop PSD / PSB | Adobe Photoshop documents; exact writer state is registry-defined | [Adobe PSD/PSB](https://www.adobe.com/devnet-apps/photoshop/fileformatashtml/) |
+| Krita KRA | Krita document container/image data | [Krita](https://docs.krita.org/) |
+| OpenRaster ORA | layered raster interchange | [OpenRaster](https://www.openraster.org/) |
+| GIMP XCF | GIMP native image document | [XCF specification](https://developer.gimp.org/core/standards/xcf/) |
+| MagicaVoxel VOX | voxel scene/image data | [VOX format](https://github.com/ephtracy/voxel-model/blob/master/MagicaVoxel-file-format-vox.txt) |
+| WMF / EMF | Windows metafile/vector-rendering paths | [MS-WMF](https://learn.microsoft.com/openspecs/windows_protocols/ms-wmf/) |
+| EPS / PostScript | raster-preview/extraction paths | [PostScript reference](https://www.adobe.com/jp/print/postscript/pdfs/PLRM.pdf) |
+| PDF | image extraction rather than page renderer/editor | [ISO 32000 background](https://opensource.adobe.com/dc-acrobat-sdk-docs/pdfstandards/) |
+| PE EXE/DLL | image/resource extraction, not executable editing | [PE/COFF](https://learn.microsoft.com/windows/win32/debug/pe-format) |
+| VIPS | libvips native image format | [libvips](https://www.libvips.org/) |
+| SoftImage / Maya IFF | authoring/renderer image outputs | [IFF](https://en.wikipedia.org/wiki/Interchange_File_Format) |
+
+### GPU textures / 3D
+
+| Format | Coverage note | Reference |
+| --- | --- | --- |
+| DDS | DirectDraw/DirectX textures | [DDS](https://learn.microsoft.com/windows/win32/direct3ddds/dx-graphics-dds) |
+| KTX / KTX2 | Khronos texture containers | [KTX](https://registry.khronos.org/KTX/specs/) |
+| PVR | PowerVR texture container | [PVR format](https://docs.imgtec.com/PVR-File-Format-Specification/) |
+| ASTC | Adaptive Scalable Texture Compression | [ASTC encoder/spec resources](https://github.com/ARM-software/astc-encoder) |
+| PKM / ETC1 / ETC2 | Ericsson texture compression container/data | [Khronos ETC](https://registry.khronos.org/OpenGL/extensions/OES/OES_compressed_ETC1_RGB8_texture.txt) |
+| VTF | Valve Texture Format | [Valve VTF](https://developer.valvesoftware.com/wiki/Valve_Texture_Format) |
+| BLP | Blizzard texture family | [BLP](https://wowdev.wiki/BLP) |
+| FSH | EA Sports texture container | [FSH](https://wiki.simtropolis.com/wiki/FSH) |
+| WAD/WAD2/WAD3, MipTex | Quake/Half-Life texture archives and embedded texture data | [Quake file formats](https://quakewiki.org/wiki/Quake_file_formats) |
+| Block codecs | BC1–BC7, ETC1/ETC2, ASTC LDR, PVRTC helpers used by texture formats | [DirectX BC formats](https://learn.microsoft.com/windows/win32/direct3d11/texture-block-compression-in-direct3d-11) |
+
+### Animation / multi-image
+
+| Format | Coverage note | Reference |
+| --- | --- | --- |
+| GIF | animated frame/page access through the multi-image contract | [GIF89a](https://www.w3.org/Graphics/GIF/spec-gif89a.txt) |
+| APNG | animated PNG | [APNG spec](https://wiki.mozilla.org/APNG_Specification) |
+| MNG | Multiple-image Network Graphics; writer is a documented subset | [MNG](http://www.libpng.org/pub/mng/spec/) |
+| FLI/FLC | Autodesk Animator family | [FLIC](https://www.compuphase.com/flic.htm) |
+| TIFF / BigTIFF | multi-page image families | [TIFF](https://www.adobe.io/open/standards/TIFF.html), [BigTIFF](https://www.awaresystems.be/imaging/tiff/bigtiff.html) |
+| DCX | multi-page PCX/WinFax family | [DCX](https://fileformats.archiveteam.org/wiki/DCX) |
+| MPO | multi-picture JPEG | [CIPA DC-007](https://www.cipa.jp/std/documents/e/DC-007_E.pdf) |
+| ICNS | Apple icon resources with multiple representations | [ICNS](https://en.wikipedia.org/wiki/Apple_Icon_Image_format) |
+
+### Icons / cursors / fonts
+
+| Format | Coverage note | Reference |
+| --- | --- | --- |
+| ICO / CUR | Windows icons/cursors | [ICO/CUR](https://en.wikipedia.org/wiki/ICO_(file_format)) |
+| ANI | animated Windows cursors | [ANI](https://en.wikipedia.org/wiki/ANI_(file_format)) |
+| ICNS | Apple icon images | [ICNS](https://en.wikipedia.org/wiki/Apple_Icon_Image_format) |
+| Xcursor | X11 cursor images | [Xcursor](https://www.x.org/releases/X11R7.7/doc/man/man3/Xcursor.3.xhtml) |
+| SunIcon | Sun/X bitmap-family icon data | [XBM background](https://en.wikipedia.org/wiki/X_BitMap) |
+| MS FONT / FNT | bitmap-font glyph imagery | [Windows font resources](https://learn.microsoft.com/windows/win32/menurc/font-resource) |
+
+### Document / fax
+
+The package includes CCITT Group 3/4 primitives plus numerous fax-container variants including AccessFax, AdTechFax, BfxBitware, BrotherFax, CanonNavFax, EverexFax, FaxMan, FremontFax, GammaFax, HayesJtfax, ImagingFax, KofaxKfx, MobileFax, OazFax, OlicomFax, RicohFax, SciFax, SmartFax, TeliFax, Tg4, VentaFax, WinFax, WorldportFax, BrooktroutFax, EdmicsC4 and AttGroup4. Exact writer state is per registry entry.
+
+| Format/family | Reference |
 | --- | --- |
-| `PrimaryExtension` / `AllExtensions` | Canonical extension and aliases. |
-| `PrimaryMimeType` / `MimeTypes` | Preferred MIME type and aliases. |
-| `SupportsRead` | A decoder is registered. |
-| `SupportsWrite` | An arbitrary `RawImage` can be encoded. |
-| `SupportsMultiImage` | Multiple frames/pages/entries can be addressed. |
-| `ReadImageInfo` | Optional metadata-only path. |
+| CCITT Fax Group 3 / Group 4 | [ITU-T T.4](https://www.itu.int/rec/T-REC-T.4) / [T.6](https://www.itu.int/rec/T-REC-T.6) |
+| WSQ fingerprint imagery | [FBI WSQ specification](https://www.fbibiospecs.cjis.gov/Document/Get?fileName=WSQ_Gray-scale_Specification_Version_3_1_Final.pdf) |
+| Symbian MBM | [Symbian bitmap background](https://en.wikipedia.org/wiki/Symbian) |
 
-## 🏗️ Architecture
+### RAW camera
 
-`FileFormat.Registry.Generator` scans the compilation at build time and emits the registry and `ImageFormat` enum. Function pointers are wired directly to format implementations; the runtime does not discover formats through reflection.
+| Format | Coverage note | Reference |
+| --- | --- | --- |
+| Adobe DNG | TIFF-derived digital negative | [DNG specification](https://helpx.adobe.com/camera-raw/digital-negative.html) |
+| Canon CR2 | lossless-JPEG/slice-oriented paths | [CR2 background](https://en.wikipedia.org/wiki/Raw_image_format#Canon) |
+| Canon CR3 | HEIF/ISOBMFF-derived subset | [CR3 background](https://en.wikipedia.org/wiki/Raw_image_format#Canon) |
+| Nikon NEF | manufacturer RAW paths including compressed variants | [NEF background](https://en.wikipedia.org/wiki/Raw_image_format#Nikon) |
+| Sony ARW2 | Sony RAW path including delta coding | [ARW background](https://en.wikipedia.org/wiki/Raw_image_format#Sony) |
+| Olympus ORF | Olympus RAW | [ORF background](https://en.wikipedia.org/wiki/Raw_image_format#Olympus) |
+| Panasonic RW2 | Panasonic RAW | [RW2 background](https://en.wikipedia.org/wiki/Raw_image_format#Panasonic) |
 
-Each format lives under `Formats/<Name>/` in its own namespace and implements the relevant static contracts from `FileFormat.Core`. Adding a format extends the generated registry automatically.
+### Other notable formats
 
-Detection is priority ordered: custom matchers handle formats whose identity is more complex than one fixed signature, then magic-byte signatures are checked. Extension fallback is used by `DetectFromFile` only after byte-level detection fails.
+The long tail also includes TGA/Targa, PCX, SGI/Iris, Sun Raster, X PixMap (XPM), X BitMap (XBM), Wireless Bitmap (WBMP), AAI/DuneHD, HRZ slow-scan TV, CMU bitmap, GEM/GTM, PageMaker-related formats, Macromedia FreeHand, Pixar PXR, GD2/libgd, MIFF/ImageMagick, ECW, JNG, VIFF/Khoros, RLA/RPF/Wavefront, ART/PFS and AliasPix. `FormatRegistry.AllFormats` is the definitive individual list.
+
+## 🧪 Detection, registration, and verification notes
+
+- Registry generation is compile-time and typed; adding a format that implements the static contracts extends the generated enum/registration without runtime reflection.
+- Custom signature matchers may return `true`, `false`, or `null` when a header is insufficient; fixed magic signatures run through the generated priority table.
+- A format's MIME aliases are explicit metadata, not guesses derived from extensions.
+- A registered reader is not evidence for a writer; `SupportsWrite` is derived from the actual conversion delegate.
+- Writers should be validated against a specification, external implementation, or other independent evidence. Two project methods agreeing only with each other is not treated as sufficient conformance evidence.
+- Exact fast-moving counts belong to the generated registry/build rather than repeated prose.
 
 ## 🔌 Dependencies
 
@@ -230,8 +500,11 @@ Detection is priority ordered: custom matchers handle formats whose identity is 
 
 - Coverage breadth is larger than conformance depth. Some historical formats have scarce or no public samples; registry presence is not a promise that every obscure producer variant has been verified.
 - AVIF/HEIF and JPEG XL demonstrate why registration and conformance are separate questions: unsupported writers stay unregistered, and partial codecs are documented as partial rather than counted as complete interoperability.
+- The current JPEG XL pixel path is not general libjxl interoperability; do not treat its internal round-trip as proof of arbitrary `.jxl` compatibility.
 - Writers are added only when another implementation or specification-based validator can check the result. A reader and writer agreeing only with each other is not treated as sufficient evidence.
-- [`../Formats.md`](../Formats.md) is a useful cross-reference, but the runtime registry is authoritative for current read/write capability.
+- Camera RAW support is format/manufacturer specific; one RAW decoder path does not imply all manufacturer compressions and generations.
+- PDF/PE handling is image/resource extraction, not full page rendering, vector editing, or executable rewriting.
+- [`../Formats.md`](../Formats.md) is useful as a human cross-reference, but the runtime registry is authoritative for current read/write capability.
 
 ## ❤️ Support
 
