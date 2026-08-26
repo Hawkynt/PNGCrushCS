@@ -498,12 +498,14 @@ The long tail also includes TGA/Targa, PCX, SGI/Iris, Sun Raster, X PixMap (XPM)
 
 ## ⚠️ Limitations
 
+- **Lossy advanced features** — VP8 lossy is keyframe-only; multi-pass rate control and token-partition threading are not implemented yet. Alpha IS preserved (the encoder writes an ALPH chunk on RGBA input; uncompressed method 0 — VP8L-encoded alpha is a future optimization).
+- **Codec subsets** — HEIF/AVIF/BPG decoders are I-frame only, single tile, YCbCr 4:2:0 8-bit. **JPEG XL**: container + SizeHeader + ImageMetadata + FrameHeader (ISO/IEC 18181-1 §3.6.2 / §3.6.3 / §3.6.5) are spec-conformant — the all_default fast path that most libjxl-encoded files use is fully supported, and the non-default conditional plumbing (orientation, bit_depth, num_extra_channels, extra_channel_info, color_encoding, tone_mapping, frame_type, encoding flag) is in place. Pixel codec (modular sub-codec body and VarDCT) is the remaining workstream — arbitrary real-world `.jxl` files will not decode their pixels yet, but signature, dimensions, and image-level metadata are extracted correctly. Camera RAW supports DNG lossless JPEG, Canon CR2, Nikon NEF, Sony ARW2; other manufacturer-specific compressions are future work.
+- **Write coverage** — 344 of 547 formats implement `FromRawImage` and can encode an arbitrary image; `FormatRegistry.Write` returns `null` for the other 203. Those parse and re-serialize a file they read, but cannot author one from pixel data — this includes the authoring formats (PSD, XCF, PSB, ICNS, Xcursor, ECW, DjVu, JBIG2, FLIF) and most vintage/8-bit formats. Filter on `FormatEntry.SupportsWrite` rather than assuming.
+- **PDF / PE** — image extraction only. PDF rendering, page composition, vector graphics, and PE writing are out of scope.
+- **Bundle size** — `~4.9 MB`, four assemblies. There is no way to take only the formats you need; if that matters, per-format NuGet packages may be published in future.
+- **TFM** — targets `net8.0`. Older runtimes are not supported.
 - Coverage breadth is larger than conformance depth. Some historical formats have scarce or no public samples; registry presence is not a promise that every obscure producer variant has been verified.
-- AVIF/HEIF and JPEG XL demonstrate why registration and conformance are separate questions: unsupported writers stay unregistered, and partial codecs are documented as partial rather than counted as complete interoperability.
 - The current JPEG XL pixel path is not general libjxl interoperability; do not treat its internal round-trip as proof of arbitrary `.jxl` compatibility.
-- Writers are added only when another implementation or specification-based validator can check the result. A reader and writer agreeing only with each other is not treated as sufficient evidence.
-- Camera RAW support is format/manufacturer specific; one RAW decoder path does not imply all manufacturer compressions and generations.
-- PDF/PE handling is image/resource extraction, not full page rendering, vector editing, or executable rewriting.
 - [`../Formats.md`](../Formats.md) is useful as a human cross-reference, but the runtime registry is authoritative for current read/write capability.
 
 ## ❤️ Support
