@@ -54,5 +54,11 @@ unless explicitly asked.
 - Standard frame: title → badges → one-line `>` blockquote; fixed emoji
   mapping for the standard sections (`## 🚀 CLI usage`,
   `## 🛠️ Build / test / run`, `## ❤️ Support`, `## 📜 License`).
+- Package READMEs follow [`docs/PACKAGE_README_TEMPLATE.md`](docs/PACKAGE_README_TEMPLATE.md):
+  common headings stay in one order, use the standard emoji vocabulary, and
+  represent format/capability support with tables rather than prose.
+- Format names in support tables should link to a useful overview; put the
+  normative specification, original paper, or author's/project website in a
+  separate Reference column whenever one exists.
 - License is LGPL-3.0-or-later; the `## ❤️ Support` section and
   `.github/FUNDING.yml` stay intact.
