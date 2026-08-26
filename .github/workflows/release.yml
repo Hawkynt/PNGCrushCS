@@ -50,7 +50,7 @@ jobs:
       changelog-flag: --release v${{ needs.version.outputs.version }}
 
   nuget:
-    # Pack and publish the Hawkynt.FileFormats.Images public NuGet meta-package.
+    # Pack and publish the public NuGet packages shipped from this repository.
     # Same versioning convention as everything else in the repo: csproj declares
     # MAJOR.MINOR.PATCH, then version.pl --stamp appends .BUILD where BUILD is
     # the git rev-list count, producing e.g. 1.0.0.234 at pack time.
@@ -91,19 +91,23 @@ jobs:
         working-directory: PNGCrushCS
         run: dotnet pack Hawkynt.FileFormats.Images/Hawkynt.FileFormats.Images.csproj -c Release -o ./packages --nologo
 
+      - name: Pack Hawkynt.FileFormats.Video
+        working-directory: PNGCrushCS
+        run: dotnet pack Hawkynt.FileFormats.Video/Hawkynt.FileFormats.Video.csproj -c Release -o ./packages --nologo
+
       - name: Pack Hawkynt.ImageTransformUI
         working-directory: PNGCrushCS
         run: dotnet pack Hawkynt.ImageTransformUI/Hawkynt.ImageTransformUI.csproj -c Release -o ./packages --nologo
 
-      # Both packages have to exist before anything is pushed. `dotnet pack` can succeed while
+      # Every public package has to exist before anything is pushed. `dotnet pack` can succeed while
       # producing nothing for a project (IsPackable off, a renamed PackageId, a meta-package whose
       # bundling target found no DLLs), and the push loop below globs — so a missing package would
-      # push the other one and finish green.
-      - name: Verify both packages were produced
+      # otherwise push the remaining packages and finish green.
+      - name: Verify all NuGet packages were produced
         working-directory: PNGCrushCS
         run: |
           ls -la ./packages/ || { echo "::error::pack produced no packages directory"; exit 1; }
-          for id in Hawkynt.FileFormats.Images Hawkynt.ImageTransformUI; do
+          for id in Hawkynt.FileFormats.Images Hawkynt.FileFormats.Video Hawkynt.ImageTransformUI; do
             if ! ls ./packages/"$id".*.nupkg >/dev/null 2>&1; then
               echo "::error::no .nupkg was produced for $id"
               exit 1
