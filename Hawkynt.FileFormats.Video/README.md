@@ -58,6 +58,7 @@ The tables below are the package-level overview. The detailed codec-by-codec imp
 | [IFF ANIM](https://en.wikipedia.org/wiki/ANIM) | `.anim`, `.iff` | ✅ | — | [Amiga ANIM IFF](https://wiki.amigaos.net/wiki/ANIM_IFF_Animation) |
 | [Sierra VMD](https://wiki.multimedia.cx/index.php/Sierra_VMD) | `.vmd` | ✅ | — | [MultimediaWiki VMD](https://wiki.multimedia.cx/index.php/Sierra_VMD) |
 | [PlayStation STR](https://wiki.multimedia.cx/index.php/PlayStation_STR) | `.str` | ✅ | — | [MultimediaWiki STR](https://wiki.multimedia.cx/index.php/PlayStation_STR) |
+| [ARMovie/RPL](https://wiki.multimedia.cx/index.php/ARMovie) | `.rpl` | ✅ | — | [MultimediaWiki ARMovie](https://wiki.multimedia.cx/index.php/ARMovie) |
 
 ### Codec highlights
 
@@ -84,7 +85,7 @@ The tables below are the package-level overview. The detailed codec-by-codec imp
 | [CamStudio](https://en.wikipedia.org/wiki/CamStudio) | ✅ | — | CSCD | [MultimediaWiki CamStudio](https://wiki.multimedia.cx/index.php/CamStudio) |
 | [Hap](https://en.wikipedia.org/wiki/Hap_(video_codec)) | ⚠️ | — | supported Hap variants; unsupported variants are refused explicitly | [Vidvox Hap](https://hap.video/) |
 
-For the long tail (QuickTime Animation, RPZA, SMC, H.261/H.263, RealVideo 1, VC-1/WMV, FLIC, ZMBV, screen codecs, uncompressed packed YUV/RGB families, game codecs, QPEG, ASUS, Creative YUV, MJPEG-B, AVRn, and others), see [`codec-coverage.md`](codec-coverage.md).
+For the long tail (QuickTime Animation, RPZA, SMC, H.261/H.263, RealVideo 1, VC-1/WMV, FLIC, ZMBV, screen codecs, uncompressed packed YUV/RGB families, game codecs, QPEG, ASUS, Creative YUV, MJPEG-B, AVRn, Escape 130, and others), see [`codec-coverage.md`](codec-coverage.md).
 
 ## 🚀 Quick start
 
