@@ -188,7 +188,7 @@ public sealed class Mp4Writer : IVideoContainerWriter<Mp4Writer> {
       this._WriteTrackHeader(trak, track, trackId);
       ContainerWriterTools.WriteBox(trak, "mdia", mdia => {
         this._WriteMediaHeader(mdia, track);
-        this._WriteHandler(mdia, track.Info);
+        _WriteHandler(mdia, track.Info);
         ContainerWriterTools.WriteBox(mdia, "minf", minf => this._WriteMediaInfo(minf, track));
       });
     });
