@@ -20,7 +20,14 @@ public sealed class Escape124VideoDecoderTests {
   [Test]
   [Category("Unit")]
   public void AnotherCodecNumberIsNotTaken() {
-    var stream = _Stream(8, 8) with { Codec = new CodecTag(130) };
+    var stream = new MediaStreamInfo {
+      Index = 0,
+      Kind = MediaStreamKind.Video,
+      Codec = new CodecTag(130),
+      Width = 8,
+      Height = 8,
+      BitsPerPixel = 16,
+    };
     Assert.That(Escape124VideoDecoder.Accepts(stream), Is.False);
   }
 
