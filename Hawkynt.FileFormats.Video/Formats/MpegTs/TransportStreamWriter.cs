@@ -169,30 +169,32 @@ public sealed class TransportStreamWriter : IVideoContainerWriter<TransportStrea
     var flags = pts == null ? 0 : dts != pts ? 0xC0 : 0x80;
     var headerLength = flags == 0 ? 0 : flags == 0xC0 ? 10 : 5;
     var declared = 3L + headerLength + payload.Length;
-    var pesLength = stream.Kind == MediaStreamKind.Video && declared > ushort.MaxValue ? 0 : checked((ushort)declared);
+    var pesLength = stream.Kind == MediaStreamKind.Video && declared > ushort.MaxValue
+      ? (ushort)0
+      : checked((ushort)declared);
 
-    return ContainerWriterTools.Build(pes => {
-      pes.Write([0x00, 0x00, 0x01, streamId]);
-      ContainerWriterTools.WriteUInt16BigEndian(pes, pesLength);
-      pes.WriteByte(0x80);
-      pes.WriteByte((byte)flags);
-      pes.WriteByte((byte)headerLength);
-      if (pts != null) {
-        _WriteTimestamp(pes, dts != pts ? 3 : 2, pts.Value);
-        if (dts != pts)
-          _WriteTimestamp(pes, 1, dts!.Value);
-      }
-      pes.Write(payload);
-    });
+    using var pes = new MemoryStream(9 + headerLength + payload.Length);
+    pes.Write([0x00, 0x00, 0x01, streamId]);
+    ContainerWriterTools.WriteUInt16BigEndian(pes, pesLength);
+    pes.WriteByte(0x80);
+    pes.WriteByte((byte)flags);
+    pes.WriteByte((byte)headerLength);
+    if (pts != null) {
+      _WriteTimestamp(pes, dts != pts ? 3 : 2, pts.Value);
+      if (dts != pts)
+        _WriteTimestamp(pes, 1, dts!.Value);
+    }
+    pes.Write(payload);
+    return pes.ToArray();
   }
 
   private static void _WriteTimestamp(Stream output, int prefix, long timestamp) {
-    var value = timestamp & 0x1FFFFFFFFL;
-    output.WriteByte((byte)((prefix << 4) | (((value >> 30) & 7) << 1) | 1));
+    var value = (ulong)timestamp & 0x1FFFFFFFFUL;
+    output.WriteByte((byte)(((uint)prefix << 4) | (uint)(((value >> 30) & 7) << 1) | 1));
     output.WriteByte((byte)(value >> 22));
-    output.WriteByte((byte)((((value >> 15) & 0x7F) << 1) | 1));
+    output.WriteByte((byte)(((value >> 15) & 0x7F) << 1 | 1));
     output.WriteByte((byte)(value >> 7));
-    output.WriteByte((byte)(((value & 0x7F) << 1) | 1));
+    output.WriteByte((byte)((value & 0x7F) << 1 | 1));
   }
 
   private static byte _StreamType(MediaStreamInfo stream) {
