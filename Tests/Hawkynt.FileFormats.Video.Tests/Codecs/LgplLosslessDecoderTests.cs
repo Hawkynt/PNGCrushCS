@@ -15,30 +15,35 @@ public sealed class LgplLosslessDecoderTests {
   [Test]
   [Category("Unit")]
   public void LocoRgbRestoresThreeIndependentRicePlanes() {
-    var decoder = LocoVideoDecoder.Create(_LocoStream(1, 1, 3));
+    var decoder = LocoVideoDecoder.Create(_LocoStream(2, 1, 3));
 
-    // Initial k is 3. Each one-pixel plane consumes one byte because LOCO rounds each plane to a
-    // whole byte before the next one begins. Encoded unsigned values 2, 4 and 6 restore +1,+2,+3.
-    var packet = new byte[] { 0xA0, 0xC0, 0xE0 }; // B, G, R planes
+    // Initial k is 3. Each two-pixel plane still fits exactly in one byte here. Unsigned Rice value
+    // 2 restores +1, value 4 restores +2, and value 6 restores +3; repeating each residual makes
+    // the left predictor visible as well as the B/G/R plane ordering.
+    var packet = new byte[] { 0xAA, 0xCC, 0xEE }; // B, G, R planes
     Assert.That(decoder.TryDecode(new(0, packet), out var frame), Is.True);
     Assert.That(frame.Format, Is.EqualTo(PixelFormat.Rgb24));
-    Assert.That(frame.PixelData, Is.EqualTo(new byte[] { 131, 130, 129 }));
+    Assert.That(frame.PixelData, Is.EqualTo(new byte[] {
+      131, 130, 129,
+      134, 132, 130,
+    }));
   }
 
   [Test]
   [Category("Unit")]
   public void LocoZeroResidualUsesItsRunSubcode() {
-    var decoder = LocoVideoDecoder.Create(_LocoStream(1, 1, 3));
+    var decoder = LocoVideoDecoder.Create(_LocoStream(2, 1, 3));
 
-    // v=0 at k=3 is 1 000; because save starts non-negative a k=2 zero-run code follows: 1 00.
+    // First v=0 at k=3 is 1 000; because save starts non-negative a k=2 zero-run code follows:
+    // 1 00. The second zero then takes the save<0 path and needs no second run subcode.
     Assert.That(decoder.TryDecode(new(0, new byte[] { 0x88, 0x88, 0x88 }), out var frame), Is.True);
-    Assert.That(frame.PixelData, Is.EqualTo(new byte[] { 128, 128, 128 }));
+    Assert.That(frame.PixelData, Is.EqualTo(new byte[] { 128, 128, 128, 128, 128, 128 }));
   }
 
   [Test]
   [Category("Unit")]
   public void LocoRequiresItsTwelveByteAviTrailer() {
-    var stream = _LocoStream(1, 1, 3);
+    var stream = _LocoStream(2, 1, 3);
     stream = new() {
       Index = stream.Index,
       Kind = stream.Kind,
