@@ -5,12 +5,13 @@ using System.IO;
 namespace FileFormat.Core;
 
 /// <summary>
-/// Generic entry points for video I/O, and the one place demuxing and decoding are joined up. The
-/// counterpart of <see cref="FormatIO"/> for containers.
+/// Generic entry points for video I/O, and the one place the four independent video pipeline stages
+/// are joined up when a caller wants that convenience. The counterpart of <see cref="FormatIO"/> for
+/// containers.
 /// </summary>
 /// <remarks>
 /// Every method here dispatches through static interface members on the type parameters, so the
-/// joining costs nothing at run time and there is no reflection anywhere in it. The join lives here
+/// joining costs nothing at run time and there is no reflection anywhere in it. The joins live here
 /// rather than inside either interface precisely so that neither side has to know the other exists.
 /// </remarks>
 public static class VideoIO {
@@ -55,6 +56,49 @@ public static class VideoIO {
         return stream;
 
     return null;
+  }
+
+  // --- Mux ---
+
+  /// <summary>Begins a writer for a container without involving a codec.</summary>
+  public static TWriter CreateWriter<TWriter>(IReadOnlyList<MediaStreamInfo> streams, VideoMetadata? metadata = null)
+    where TWriter : IVideoContainerWriter<TWriter> {
+    ArgumentNullException.ThrowIfNull(streams);
+
+    return TWriter.Create(streams, metadata ?? VideoMetadata.Empty);
+  }
+
+  /// <summary>Writes coded packets into a container and returns the finished file.</summary>
+  /// <remarks>
+  /// No decoder or encoder is constructed. This is the packet-level remux path: stream descriptions
+  /// and coded bytes go from one container contract to another unchanged unless the destination
+  /// container itself has a representation rule it must enforce.
+  /// </remarks>
+  public static byte[] Mux<TWriter>(
+    IReadOnlyList<MediaStreamInfo> streams,
+    IEnumerable<CodedPacket> packets,
+    VideoMetadata? metadata = null)
+    where TWriter : IVideoContainerWriter<TWriter> {
+    ArgumentNullException.ThrowIfNull(streams);
+    ArgumentNullException.ThrowIfNull(packets);
+
+    var writer = TWriter.Create(streams, metadata ?? VideoMetadata.Empty);
+    foreach (var packet in packets)
+      writer.WritePacket(packet);
+
+    return writer.Finish();
+  }
+
+  /// <summary>Writes coded packets into a container file without constructing a codec.</summary>
+  public static void Mux<TWriter>(
+    FileInfo file,
+    IReadOnlyList<MediaStreamInfo> streams,
+    IEnumerable<CodedPacket> packets,
+    VideoMetadata? metadata = null)
+    where TWriter : IVideoContainerWriter<TWriter> {
+    ArgumentNullException.ThrowIfNull(file);
+
+    File.WriteAllBytes(file.FullName, Mux<TWriter>(streams, packets, metadata));
   }
 
   // --- Demux + decode ---
