@@ -108,12 +108,13 @@ public sealed class MveWriter : IVideoContainerWriter<MveWriter> {
   private static byte[] _Opcode(byte type, byte version, ReadOnlySpan<byte> payload) {
     if (payload.Length > ushort.MaxValue)
       throw new NotSupportedException("An MVE opcode may carry at most 65,535 bytes.");
-    return ContainerWriterTools.Build(opcode => {
-      ContainerWriterTools.WriteUInt16LittleEndian(opcode, checked((ushort)payload.Length));
-      opcode.WriteByte(type);
-      opcode.WriteByte(version);
-      opcode.Write(payload);
-    });
+
+    using var opcode = new MemoryStream(4 + payload.Length);
+    ContainerWriterTools.WriteUInt16LittleEndian(opcode, checked((ushort)payload.Length));
+    opcode.WriteByte(type);
+    opcode.WriteByte(version);
+    opcode.Write(payload);
+    return opcode.ToArray();
   }
 
   private static void _ValidateOpcode(ReadOnlySpan<byte> packet) {
