@@ -29,9 +29,9 @@ namespace FileFormat.Codecs;
 /// <para/>
 /// The original codec can mark a stream as compressed and still put a complete uncompressed RGB24
 /// picture in a packet; the reference decoder recognizes that case from the packet length. It can also
-/// split a compressed frame into two independent sections: the packet then starts with the first
-/// section's compressed byte count and decompressed byte count, both little-endian 32-bit values,
-/// followed by the two compressed sections. Both forms are handled here.
+/// split a compressed frame into two independently coded, equally sized output sections: the packet
+/// starts with the first section's compressed byte count and one section's decompressed byte count,
+/// both little-endian 32-bit values, followed by the two compressed sections. Both forms are handled.
 /// <para/>
 /// RGB24 is implemented because its byte layout is already independently established by the sibling
 /// LCL ZLIB decoder and maps directly to <see cref="PixelFormat.Bgr24"/>. LCL's YUV layouts are not
@@ -108,11 +108,6 @@ public sealed class MszhVideoDecoder : IVideoCodecDecoder<MszhVideoDecoder> {
         $"Video stream {stream.Index} states LCL image type {header.ImageType}. This MSZH decoder currently reads "
         + "RGB24 (2) only; the YUV packings need real-file, plane-level verification before they are exposed.");
 
-    if (header.PngFiltered)
-      throw new NotSupportedException(
-        $"Video stream {stream.Index} sets LCL's PNG-filter flag. That transform belongs to the sibling ZLIB codec "
-        + "and is not a defined MSZH operation.");
-
     if (header.Compression is not (_COMPRESSION_MSZH or _COMPRESSION_NONE))
       throw new NotSupportedException(
         $"Video stream {stream.Index} states unsupported MSZH compression mode {header.Compression}; known modes are "
@@ -185,24 +180,24 @@ public sealed class MszhVideoDecoder : IVideoCodecDecoder<MszhVideoDecoder> {
         $"Video stream {this._streamIndex} carries a split MSZH packet shorter than its eight-byte split header.");
 
     var firstCompressedLength = BinaryPrimitives.ReadUInt32LittleEndian(source);
-    var firstDecodedLength = BinaryPrimitives.ReadUInt32LittleEndian(source[4..]);
-    if (firstCompressedLength > int.MaxValue || firstDecodedLength > int.MaxValue)
+    var sectionDecodedLength = BinaryPrimitives.ReadUInt32LittleEndian(source[4..]);
+    if (firstCompressedLength > int.MaxValue || sectionDecodedLength > int.MaxValue)
       throw new InvalidDataException(
         $"Video stream {this._streamIndex} carries a split MSZH packet whose section lengths do not fit in memory.");
 
     var firstInput = (int)firstCompressedLength;
-    var firstOutput = (int)firstDecodedLength;
+    var sectionOutput = (int)sectionDecodedLength;
     if (firstInput > source.Length - 8)
       throw new InvalidDataException(
         $"Video stream {this._streamIndex} states a first MSZH section of {firstInput} compressed byte(s), but only "
         + $"{source.Length - 8} byte(s) follow the split header.");
-    if (firstOutput > destination.Length)
+    if ((long)sectionOutput * 2 != destination.Length)
       throw new InvalidDataException(
-        $"Video stream {this._streamIndex} states a first MSZH section of {firstOutput} decoded byte(s), larger than "
-        + $"the complete {destination.Length}-byte frame.");
+        $"Video stream {this._streamIndex} states split MSZH sections of {sectionOutput} decoded byte(s) each, which "
+        + $"does not cover its {destination.Length}-byte RGB24 frame exactly.");
 
-    _Decompress(source.Slice(8, firstInput), destination, 0, firstOutput, this._streamIndex);
-    _Decompress(source[(8 + firstInput)..], destination, firstOutput, destination.Length - firstOutput, this._streamIndex);
+    _Decompress(source.Slice(8, firstInput), destination, 0, sectionOutput, this._streamIndex);
+    _Decompress(source[(8 + firstInput)..], destination, sectionOutput, sectionOutput, this._streamIndex);
   }
 
   private static void _Decompress(
