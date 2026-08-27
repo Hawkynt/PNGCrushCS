@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using FileFormat.Core;
@@ -29,17 +30,24 @@ namespace FileFormat.Rpl;
 /// </remarks>
 internal static class RplReader {
 
+  /// <summary>The one video format whose per-frame header this container knows how to walk.</summary>
+  private const int _ESCAPE_124 = 124;
+
+  /// <summary>Bytes of flags and length in front of every Escape 124 frame inside a chunk.</summary>
+  private const int _Escape124FrameHeaderLength = 8;
+
   internal readonly record struct Summary(RplHeader Header, IReadOnlyList<RplChunkEntry> Chunks);
 
   internal static RplContainer Open(ReadOnlyMemory<byte> data) {
     var span = data.Span;
     var header = RplHeader.Parse(span);
 
-    if (header.FramesPerChunk != 1)
+    if (header.FramesPerChunk != 1 && header.VideoCompressionFormat != _ESCAPE_124)
       throw new NotSupportedException(
-        $"This ARMovie/RPL file states {header.FramesPerChunk} frames a chunk. Only one frame a chunk "
-        + "is implemented — splitting a chunk into several pictures needs a per-codec frame header this "
-        + "container does not read, and no sample measured against this reader states anything else.");
+        $"This ARMovie/RPL file states {header.FramesPerChunk} frames a chunk for video format "
+        + $"{header.VideoCompressionFormat}. Splitting a chunk needs a per-frame header, and the only one this "
+        + "container knows is Escape 124's — every other format measured against this reader states "
+        + "one frame a chunk.");
 
     var chunkCount = header.HighestChunkIndex + 1;
     if (chunkCount <= 0)
@@ -104,17 +112,33 @@ internal static class RplReader {
     var chunks = container.Chunks;
     var hasAudio = container.HasAudio;
 
+    var splitFrames = container.Header.VideoCompressionFormat == _ESCAPE_124;
+    long videoPosition = 0;
     long audioPosition = 0;
     for (var i = 0; i < chunks.Count; ++i) {
       var chunk = chunks[i];
-      if (chunk.VideoByteSize > 0)
-        yield return new(
-          StreamIndex: 0,
-          Data: data.Slice(checked((int)chunk.FileOffset), checked((int)chunk.VideoByteSize)),
-          PresentationTimestamp: i,
-          DecodeTimestamp: i,
-          Duration: 1,
-          IsKeyFrame: i == 0);
+      if (chunk.VideoByteSize > 0) {
+        if (splitFrames)
+          foreach (var frame in _SplitEscape124Chunk(data, chunk, i)) {
+            yield return frame with {
+              PresentationTimestamp = videoPosition,
+              DecodeTimestamp = videoPosition,
+              Duration = 1,
+              IsKeyFrame = videoPosition == 0,
+            };
+            ++videoPosition;
+          }
+        else {
+          yield return new(
+            StreamIndex: 0,
+            Data: data.Slice(checked((int)chunk.FileOffset), checked((int)chunk.VideoByteSize)),
+            PresentationTimestamp: videoPosition,
+            DecodeTimestamp: videoPosition,
+            Duration: 1,
+            IsKeyFrame: videoPosition == 0);
+          ++videoPosition;
+        }
+      }
 
       if (hasAudio && chunk.AudioByteSize > 0) {
         yield return new(
@@ -124,6 +148,40 @@ internal static class RplReader {
           IsKeyFrame: true);
         audioPosition += chunk.AudioByteSize;
       }
+    }
+  }
+
+  /// <summary>Walks the pictures an Escape 124 chunk holds, one packet apiece.</summary>
+  /// <remarks>
+  /// Every other format this reader carries states one frame a chunk, and for those the chunk is the
+  /// packet. Escape 124 is the exception, and its own files are the reason: both real recordings at
+  /// <c>samples.ffmpeg.org/game-formats/rpl/escape124/</c> state twenty-five and fifteen frames a
+  /// chunk, so refusing the shape refuses every Escape 124 file there is.
+  /// <para/>
+  /// The walk is eight bytes of frame header — a flags word this reader does not interpret, then a
+  /// little-endian length — where the length counts those eight bytes as well as the picture behind
+  /// them. Measured on <c>ESCAPE.RPL</c>: the first chunk's twenty-five frames consume its 54,568
+  /// video bytes exactly, with nothing left over, which is what says the length is inclusive rather
+  /// than a payload size.
+  /// </remarks>
+  private static IEnumerable<CodedPacket> _SplitEscape124Chunk(
+    ReadOnlyMemory<byte> data, RplChunkEntry chunk, int chunkIndex) {
+    var at = checked((int)chunk.FileOffset);
+    var end = checked((int)(chunk.FileOffset + chunk.VideoByteSize));
+
+    while (at < end) {
+      if (end - at < _Escape124FrameHeaderLength)
+        throw new InvalidDataException(
+          $"Chunk {chunkIndex} ends {end - at} bytes into an Escape 124 frame header, which is eight bytes long.");
+
+      var length = checked((int)BinaryPrimitives.ReadUInt32LittleEndian(data.Span.Slice(at + 4, 4)));
+      if (length < _Escape124FrameHeaderLength || at + length > end)
+        throw new InvalidDataException(
+          $"An Escape 124 frame in chunk {chunkIndex} states a length of {length} bytes, which does not "
+          + $"fit the {end - at} bytes left in the chunk.");
+
+      yield return new(StreamIndex: 0, Data: data.Slice(at, length));
+      at += length;
     }
   }
 }
