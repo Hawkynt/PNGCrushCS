@@ -30,6 +30,8 @@ internal sealed class ElementaryStreamMuxer {
     ArgumentNullException.ThrowIfNull(formatName);
     ArgumentNullException.ThrowIfNull(acceptsStream);
 
+    this._formatName = formatName;
+
     if (streams.Count != 1)
       throw new NotSupportedException($"{formatName} carries exactly one stream; {streams.Count} were supplied.");
 
