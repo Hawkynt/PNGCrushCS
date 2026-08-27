@@ -35,7 +35,7 @@ internal sealed class TagTree {
 
     var widths = new List<int>();
     var heights = new List<int>();
-    for (var w = width, h = height;; w = (w + 1) >> 1, h = (h + 1) >> 1) {
+    for (int w = width, h = height; ; w = (w + 1) >> 1, h = (h + 1) >> 1) {
       widths.Add(w);
       heights.Add(h);
       if (w == 1 && h == 1)
@@ -157,8 +157,6 @@ internal sealed class TagTree {
       if (state >= thresholdExclusive)
         return false;
 
-      // state == value < threshold: publish this node's exact value and descend. A previously
-      // published node never emits the one again; _known carries that fact across later layers.
       writer.WriteBit(1);
       _known[level][index] = true;
       lowerBound = value;

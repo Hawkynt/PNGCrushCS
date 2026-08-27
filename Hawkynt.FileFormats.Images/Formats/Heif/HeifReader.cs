@@ -85,18 +85,18 @@ public static class HeifReader {
 
       if (container.Items.Count == 0) {
         var legacy = _LegacyDescriptor(container);
-        var width = legacy.Width;
-        var height = legacy.Height;
-        if (width <= 0 || height <= 0)
+        var legacyWidth = legacy.Width;
+        var legacyHeight = legacy.Height;
+        if (legacyWidth <= 0 || legacyHeight <= 0)
           return null;
         if (legacy.Aperture != null
             && _TryResolveCleanAperture(
-              legacy.Aperture.Value, width, height,
-              out _, out _, out var cleanWidth, out var cleanHeight)) {
-          width = cleanWidth;
-          height = cleanHeight;
+              legacy.Aperture.Value, legacyWidth, legacyHeight,
+              out _, out _, out var legacyCleanWidth, out var legacyCleanHeight)) {
+          legacyWidth = legacyCleanWidth;
+          legacyHeight = legacyCleanHeight;
         }
-        return new(width, height, 24, "Rgb24", _LegacyHasHevcConfiguration(container) ? "HEVC" : "None");
+        return new(legacyWidth, legacyHeight, 24, "Rgb24", _LegacyHasHevcConfiguration(container) ? "HEVC" : "None");
       }
 
       var visible = _VisibleImageItems(container);
