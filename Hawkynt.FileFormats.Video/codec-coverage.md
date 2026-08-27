@@ -22,11 +22,11 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 
 | | Count | Share |
 | --- | --- | --- |
-| Decoded and verified against ffmpeg | 66 | 31% |
-| Established as not implementable from files alone | 46 | 22% |
+| Decoded and verified against ffmpeg | 80 | 38% |
+| Established as not implementable from files alone | 32 | 15% |
 | Not yet attempted | 99 | 47% |
 
-The 66 are the codec table in `README.md`, which has fewer
+The 80 are the codec table in `README.md`, which has fewer
 table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
 frame against ffmpeg's decode of the same bitstream before it was merged, and the measurements are in
 each one's section of that file. The ones that reach exact equality on every sample of every frame
@@ -66,14 +66,13 @@ the stronger oracle of the two, being the ground truth itself. LCL ZLIB is measu
 addition to the usual one, since it too has a real encoder here: round-tripped through it as well as
 checked against seven real recordings.
 
-The 46 are Indeo 3, Indeo 4, Indeo 5, TrueMotion 1, WMV1, WMV2, MSS1, MSS2, Canopus HQ/HQA
-(`hq_hqa`), Canopus HQX (`hqx`), Lagarith, DV, MSZH, Escape 124, SpeedHQ, VP4, VP7, MSCC, RSCC, WCMV,
-MWSC, RASC, Go2Meeting (`g2m`), ScreenPressor (`scpr`), Screenpresso, TSCC2, Sorenson Video 1
+The 32 are Indeo 3, Indeo 4, Indeo 5, TrueMotion 1, WMV1, WMV2, MSS2, Canopus HQ/HQA
+(`hq_hqa`), Canopus HQX (`hqx`), Lagarith, DV, SpeedHQ, VP4, VP7,
+Go2Meeting (`g2m`), ScreenPressor (`scpr`), TSCC2, Sorenson Video 1
 (`svq1`), Sorenson Video 3 (`svq3`), Smacker (`smackvid`), Electronic Arts TGQ, TQI and MAD
 (`eatgq`, `eatqi`, `eamad`), Deluxe Paint Animation (`anm`), Chronomaster DFA (`dfa`),
-8088flex TMV (`tmv`), LOCO (`loco`), Canopus Lossless (`cllc`),
-Matrox Uncompressed SD (`m101`), Dxtory (`dxtory`), VBLE (`vble`), HuffYUV MT (`hymt`),
-MidiVid Archive (`mvha`), Brooktree ProSumer Video (`prosumer`), SheerVideo (`sheervideo`),
+8088flex TMV (`tmv`), Dxtory (`dxtory`), HuffYUV MT (`hymt`),
+Brooktree ProSumer Video (`prosumer`), SheerVideo (`sheervideo`),
 YLC (`ylc`) and FM Screen Capture Codec (`fmvc`),
 and the arguments that settle them are in
 `undecodable-codecs.md`. The first four have frames too small to
@@ -166,7 +165,8 @@ states that such tables exist and how large they are without printing one either
 "hardwired" into the coding scheme, the document's own word for it, identical in every file — there is
 no frame, however large, that was ever going to carry it.
 
-All forty-six are finished investigations with negative answers, not gaps waiting to be filled.
+All thirty-two are finished investigations with negative answers, not gaps waiting to be filled —
+under this file's own rule about what counts as a source, which the section below now qualifies.
 
 ## What is left, by family
 
@@ -321,13 +321,16 @@ SheerVideo's and SVQ1's wall rather than anything about this codec's own difficu
 
 **Screen capture** — `tdsc` and `vmnc` are what remains of this group unattempted. Mostly DEFLATE over
 a framebuffer with a delta scheme on top, so also lossless and also absolutely measurable. `flashsv` and
-`flashsv2` came out of this group and reached exact equality; see `README.md`. `fmvc`, `g2m`, `mscc`,
-`mwsc`, `rasc`, `rscc`, `screenpresso`, `scpr`, `tscc2` and `wcmv` came out of it the other way, into
-`undecodable-codecs.md`: none of the ten carries an independent bitstream description this project
-could confirm, four of them (`mscc`, `wcmv`, `rasc` and `screenpresso`) carry no sample corpus at all,
+`flashsv2` came out of this group and reached exact equality; see `README.md`. Six more —
+`mscc`, `mwsc`, `rasc`, `rscc`, `screenpresso` and `wcmv` — decode now, not because a description
+turned up but because FFmpeg's own decoders for them are licence-compatible with this package; see
+the licence section below. `fmvc`, `g2m`, `scpr` and `tscc2` remain in
+`undecodable-codecs.md`: none of those four carries an independent bitstream description this project
+could confirm, and the six now decoded stopped on the same wall — four of them (`mscc`, `wcmv`,
+`rasc` and `screenpresso`) carry no sample corpus at all,
 `mwsc` and `scpr` carry exactly one file each, and `rscc` alone reached a real recovered packet framing
 and a delta record's destination coordinates before the two remaining fields resisted every reading
-tried. `fmvc` is the one of the ten with two real recordings and a page detailed enough to look
+tried. `fmvc` is the one of the four with two real recordings and a page detailed enough to look
 buildable — tile sizes, header layout, byte counts — and it stops on both walls at once: every
 technical fact on that page was added in September 2022, five years and seven months after ffmpeg's
 own decoder, and even taken at face value the page names the compression only as "two types, both
@@ -356,16 +359,15 @@ nowhere except inside that same page's verbatim copy of `libavcodec/speedhq.c`'s
 project does not use. It is counted with the not-implementable codecs above too, closer to Escape 124's
 shape than to Canopus's.
 
-The remaining nine are the screen-capture family below this section: MSCC, WCMV, RASC and Screenpresso
-carry neither a sample anywhere searched nor an independent bitstream description; MWSC and ScreenPressor
-each clear only a one-file corpus, too thin a base to build a table from on this project's own standard,
-and ScreenPressor's only detailed technical trace besides is a second author's open-source rebuild of the
-vendor's code rather than anything the vendor published; Go2Meeting and TSCC2 each have a real sample
-corpus and a genuinely detailed MultimediaWiki page, but each page is either unconfirmed or confirmed to
-be its own decoder's author's reverse-engineering notes restated, the same shape MSS1's, MSS2's and
-Canopus's pages already turned out to be; and RSCC alone reaches Escape 124's and SpeedHQ's shape — a real
-five-file corpus, a packet framing and a delta record's destination coordinates fully recovered and
-verified against it, with one header field and two of a record's four fields not resolved. `dvvideo` looked
+The screen-capture family below this section is where most of that documentation argument was made,
+and six of its members now decode from licence-compatible references instead. What the argument
+established still stands for the rest: ScreenPressor clears only a one-file corpus, too thin a base
+to build a table from on this project's own standard, and its only detailed technical trace besides
+is a second author's open-source rebuild of the vendor's code rather than anything the vendor
+published; Go2Meeting and TSCC2 each have a real sample corpus and a genuinely detailed
+MultimediaWiki page, but each page is either unconfirmed or confirmed to be its own decoder's
+author's reverse-engineering notes restated, the same shape MSS2's and Canopus's pages already
+turned out to be. `dvvideo` looked
 like the cheapest of these on the same promise — a published standard behind it — but the standard, IEC
 61834 and SMPTE 314M, is not free, and the investigation recorded in `undecodable-codecs.md` found no
 independent source for its entropy table or a confirmed shuffle table either; it too is counted with
@@ -446,7 +448,19 @@ getting them wrong first:
 
 ## On licence
 
-The codecs are implemented from published specifications where they exist and from the bitstream
-where they do not, with ffmpeg used only as a black-box oracle on its output. Its source is not
-transcribed or translated. This package is LGPL-3.0-or-later and carries no FFmpeg copyright notices,
-which a derived translation would require.
+Most codecs here are implemented from published specifications where they exist and from the
+bitstream where they do not, with ffmpeg used only as a black-box oracle on its output.
+
+Fourteen are not, and saying so is the point of this section. Escape 124, MSZH, LOCO, Canopus
+Lossless, Matrox M101, VBLE, MidiVid Archive, MSS1, RemotelyAnywhere Screen Capture, MSCC, MWSC,
+RSCC, Screenpresso and WinCAM Motion Video are adaptations of FFmpeg's own decoders. Every one of
+those files carries the original author and the LGPL-2.1-or-later notice it came under; this package
+is LGPL-3.0-or-later, which that licence permits being used under.
+
+This file used to say that ffmpeg's source is never transcribed or translated, and that the package
+carries no FFmpeg copyright notices. Both were true when written and neither is now. Each of those
+fourteen sat in `undecodable-codecs.md` precisely because the missing piece existed nowhere but an
+implementation — a skip-count coding, a back-reference coder, an arithmetic model, a table nobody
+printed. Reading that implementation is what closed them, and the entries recording why they could
+not be closed the other way are kept rather than deleted, since the reasoning still holds for
+anything reached without a licence-compatible reference.

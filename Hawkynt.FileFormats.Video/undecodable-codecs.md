@@ -1,10 +1,25 @@
 # Codecs investigated and not implemented
 
-Every codec below was investigated and none was implemented. That is a result rather than a gap, and
-it is written down here so the work is not repeated by somebody who assumes it was never attempted.
-The running count lives in `codec-coverage.md`, which is where it is kept correct; one section here
-sometimes covers several of the decoders counted there, so the two are not the same number and were
-never meant to be.
+Every codec below was investigated and not implemented **from files and published descriptions
+alone**. That is a result rather than a gap, and it is written down here so the work is not repeated
+by somebody who assumes it was never attempted. The running count lives in `codec-coverage.md`,
+which is where it is kept correct; one section here sometimes covers several of the decoders counted
+there, so the two are not the same number and were never meant to be.
+
+## Fourteen of these are now decoded, and their sections below are kept anyway
+
+Escape 124, MSZH, LOCO, Canopus Lossless, Matrox M101, VBLE, MidiVid Archive, MSS1,
+RemotelyAnywhere Screen Capture, MSCC, MWSC, RSCC, Screenpresso and WinCAM Motion Video all decode
+now. None of them was closed by finding a description that had been missed: each was adapted from
+FFmpeg's own decoder, which is LGPL-2.1-or-later and so usable by this LGPL-3.0-or-later package
+with its authorship kept. `codec-coverage.md`'s licence section says which and on what terms.
+
+Their sections are kept rather than deleted because what those sections establish is still true and
+still useful: the skip-count coding Escape 124's own published description names without stating,
+MSZH's unspecified back-reference coder, the tables LOCO and VBLE need and nobody printed. That is
+the record of what the format's own documentation does and does not contain, which is a different
+question from whether an implementation exists to read. Anything reached without a licence-compatible
+reference still stops exactly where these sections say it does.
 
 They stop in four different places, and the four are worth keeping apart. Five need constant tables
 that are not in the file, and WMV1 and WMV2 join them on the same evidence, tied to MS-MPEG4v3's own
