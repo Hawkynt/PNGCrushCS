@@ -7,36 +7,9 @@ using FileFormat.Core;
 namespace FileFormat.Str;
 
 /// <summary>
-/// Walks a Sony PlayStation STR file's CD sectors and turns them into video and audio packets,
-/// without reading a single MDEC run-length code or a single ADPCM nibble.
+/// Walks a Sony PlayStation STR file's raw CD-XA sectors and exposes reassembled MDEC frames plus
+/// XA-ADPCM sectors without decoding either codec.
 /// </summary>
-/// <remarks>
-/// STR is a raw run of Mode 2 CD sectors — 2352 bytes apiece: a twelve-byte sync pattern, a
-/// three-byte time code and a mode byte, an eight-byte CD-XA subheader stated twice, and 2328 bytes
-/// of user data whose shape depends on <c>submode</c>'s <c>Form 2</c> bit. A Form 1 sector carrying
-/// the <c>Data</c> bit holds 2048 bytes: a thirty-two-byte per-chunk header this reader does
-/// understand, naming which chunk of which frame this is, followed by 2016 bytes of MDEC bitstream.
-/// A Form 2 sector carrying the <c>Audio</c> bit holds 2324 bytes of XA-ADPCM this reader hands out
-/// unread. Every other sector — a duplicate subheader whose fields disagree with the first, a Form 1
-/// sector without the recognised per-chunk header, anything this format's own known shapes do not
-/// cover — is stepped over the same way an unrecognised RealMedia or EA chunk is: it costs nothing to
-/// skip and nothing here claims to know what it means.
-/// <para/>
-/// Some real files wrap that same run of sectors in a RIFF container stating the form type
-/// <c>CDXA</c> — a shell PlayStation development tools wrote around the sectors without changing one
-/// byte of them. Nothing about the sectors changes once the wrapper is found and stepped over, which
-/// is why one reader below the point of finding the first sector serves both shapes.
-/// <para/>
-/// A frame is not one sector. A CD sector's own 2048 or 2324 bytes are rarely enough for a whole
-/// picture, so a frame is spread across a run of chunks a per-chunk header numbers <c>0</c> to
-/// <c>chunk_count - 1</c>, and it is not necessarily a run of *consecutive* sectors either — audio
-/// sectors interleave with a video frame's own chunks on real discs, which is why this walk tracks
-/// an open frame's chunks by chunk index rather than by counting sectors forward. A chunk's header
-/// also states the whole frame's own compressed byte length, which is smaller than the chunk budget
-/// spends: real encoders reserve a fixed run of sectors per frame for a constant bit rate and pad
-/// what compression left unused, so a frame's packet is the stated length trimmed out of the
-/// concatenated chunks and not the chunks' own full capacity.
-/// </remarks>
 internal static class StrReader {
 
   internal const int SectorSize = 2352;
@@ -46,22 +19,11 @@ internal static class StrReader {
   private const int _PayloadOffset = 24;
   private const int _ChunkHeaderLength = 32;
   private const int _Form1PayloadLength = 2048;
-
-  /// <summary>How many bytes of a Form 1 sector's own 2048-byte user data are real chunk payload once
-  /// the thirty-two byte per-chunk header is taken off — and not one byte more. A sector's user data
-  /// is followed by its own EDC and ECC, and a naive slice to the end of what this reader copied out
-  /// of the sector would fold those checksum bytes into the middle of a multi-chunk frame's bitstream
-  /// wherever a frame's stated byte length happened to fall inside an early chunk rather than exactly
-  /// on its boundary.</summary>
   private const int _ChunkPayloadLength = _Form1PayloadLength - _ChunkHeaderLength;
-  private const int _Form2PayloadLength = 2324;
   private const int _XaAdpcmDataLength = 2304;
   private const int _RiffPreambleSearchLimit = 2048;
 
-  // submode bits (CD-ROM XA, ISO/IEC 10149 / Sony "System Description CD-ROM XA")
-  private const byte _SubmodeVideo = 0x02;
   private const byte _SubmodeAudio = 0x04;
-  private const byte _SubmodeData = 0x08;
   private const byte _SubmodeForm2 = 0x20;
 
   private const ushort _ChunkMarker0 = 0x0160;
@@ -78,19 +40,6 @@ internal static class StrReader {
   internal static CodecTag VideoCodec => _VideoCodec;
   internal static CodecTag AudioCodec => _AudioCodec;
 
-  /// <summary>
-  /// Finds where the run of CD sectors starts: byte zero of a raw file, or the first sync pattern
-  /// found within a bounded search of a file wrapped in a RIFF/CDXA shell. Returns -1 for neither.
-  /// </summary>
-  /// <remarks>
-  /// The RIFF wrapper's own chunk structure is not walked to find a <c>data</c> chunk, because real
-  /// files do not reliably have one to find: every RIFF/CDXA sample this reader was measured against
-  /// states a RIFF size of nought — a streamed file whose length was not known when its header was
-  /// written — and the thirty-two bytes between the CDXA form type and the first sector are, on every
-  /// one of them, either zero or a size nothing downstream needs, never a <c>fmt </c> or <c>data</c>
-  /// fourCC a generic RIFF walk could key off. Searching for the sync pattern instead of a chunk name
-  /// is what reads them regardless.
-  /// </remarks>
   internal static int LocateSyncStart(ReadOnlySpan<byte> data) {
     if (data.Length >= _SyncLength && data[.._Sync.Length].SequenceEqual(_Sync))
       return 0;
@@ -103,13 +52,6 @@ internal static class StrReader {
     return found < 0 ? -1 : 12 + found;
   }
 
-  /// <summary>
-  /// Whether a header looks like a Sony STR file's: a sync pattern this reader can find, at a sector
-  /// whose per-chunk header — Form 1, the two fixed marker words every real sample states, and the
-  /// magic word at its own fixed offset — matches what a video chunk states. Checked on the first
-  /// sector search finds rather than assumed to be the very first one, because a handful of real
-  /// files open on an audio sector.
-  /// </remarks>
   internal static bool? LooksPlausible(ReadOnlySpan<byte> header) {
     var syncStart = LocateSyncStart(header);
     if (syncStart < 0)
@@ -117,7 +59,7 @@ internal static class StrReader {
 
     var sectorsAvailable = (header.Length - syncStart) / SectorSize;
     if (sectorsAvailable == 0)
-      return null; // not enough of the header to tell
+      return null;
 
     for (var i = 0; i < sectorsAvailable; ++i) {
       var sector = header.Slice(syncStart + i * SectorSize, SectorSize);
@@ -126,14 +68,13 @@ internal static class StrReader {
 
       var submode = sector[_SubheaderOffset + 2];
       if ((submode & _SubmodeForm2) != 0)
-        continue; // an audio (or other Form 2) sector — keep looking for a video one to check
+        continue;
 
-      var payload = sector[_PayloadOffset..];
-      if (_LooksLikeChunkHeader(payload))
+      if (_LooksLikeChunkHeader(sector[_PayloadOffset..]))
         return true;
     }
 
-    return null; // every sector examined was Form 2; inconclusive from this much of the file
+    return null;
   }
 
   private static bool _LooksLikeChunkHeader(ReadOnlySpan<byte> payload)
@@ -143,24 +84,24 @@ internal static class StrReader {
        && BinaryPrimitives.ReadUInt16LittleEndian(payload[22..]) == _ChunkMagic;
 
   internal static StrContainer Open(ReadOnlyMemory<byte> data) {
-    var span = data.Span;
-    var syncStart = LocateSyncStart(span);
+    var syncStart = LocateSyncStart(data.Span);
     if (syncStart < 0)
       throw new NotSupportedException(
-        "This file opens with neither the CD sector sync pattern a raw Sony STR file starts on, nor "
-        + "a RIFF header stating the CDXA form type the wrapped shape uses. This is not a Sony STR "
-        + "file this reader recognises.");
+        "This file opens with neither a raw CD sector sync pattern nor a RIFF/CDXA shell. "
+        + "This is not a Sony PlayStation STR file this reader recognises.");
 
     var sectorCount = (data.Length - syncStart) / SectorSize;
     if (sectorCount == 0)
       throw new InvalidDataException(
-        $"The sync pattern was found at byte {syncStart}, but fewer than {SectorSize} bytes follow it "
-        + "— not even one whole CD sector.");
+        $"The sync pattern was found at byte {syncStart}, but fewer than {SectorSize} bytes follow it.");
 
     var width = 0;
     var height = 0;
     var videoFrameCount = 0;
     var audioPacketCount = 0;
+    var audioSampleRate = 0;
+    var audioChannels = 0;
+    var audioBitsPerSample = 0;
     var anyChunkSeen = false;
     var frameOpen = false;
     var expectedChunks = 0;
@@ -169,11 +110,10 @@ internal static class StrReader {
     var audioChannel = -1;
 
     for (var i = 0; i < sectorCount; ++i) {
-      var sector = span.Slice(syncStart + i * SectorSize, SectorSize);
+      var sector = data.Span.Slice(syncStart + i * SectorSize, SectorSize);
       if (!sector[.._Sync.Length].SequenceEqual(_Sync))
         throw new InvalidDataException(
-          $"Sector {i}, at byte {syncStart + i * SectorSize}, does not open with the CD sync pattern. "
-          + "Either this is not a whole number of CD sectors or the file is corrupt.");
+          $"Sector {i}, at byte {syncStart + i * SectorSize}, does not open with the CD sync pattern.");
 
       var channel = sector[_SubheaderOffset + 1];
       var submode = sector[_SubheaderOffset + 2];
@@ -183,10 +123,19 @@ internal static class StrReader {
             audioChannel = channel;
           else if (audioChannel != channel)
             throw new NotSupportedException(
-              $"Sector {i} is an audio sector on CD-XA channel {channel}, where an earlier one was on "
-              + $"channel {audioChannel}. This reader hands out one audio stream per file; a disc "
-              + "interleaving several channels' worth of sound needs telling apart by channel, which "
-              + "nothing measured here forced and which this reader does not guess at.");
+              $"Sector {i} is XA audio on channel {channel}, while earlier audio used channel {audioChannel}. "
+              + "One STR audio stream cannot represent several interleaved XA channels.");
+
+          var coding = sector[_SubheaderOffset + 3];
+          var (sampleRate, channels, bitsPerSample) = _AudioGeometry(coding);
+          if (audioPacketCount == 0) {
+            audioSampleRate = sampleRate;
+            audioChannels = channels;
+            audioBitsPerSample = bitsPerSample;
+          } else if (audioSampleRate != sampleRate || audioChannels != channels || audioBitsPerSample != bitsPerSample)
+            throw new NotSupportedException(
+              $"Sector {i} changes XA audio geometry from {audioSampleRate} Hz/{audioChannels}ch/{audioBitsPerSample}-bit "
+              + $"to {sampleRate} Hz/{channels}ch/{bitsPerSample}-bit inside one stream.");
 
           ++audioPacketCount;
         }
@@ -202,10 +151,8 @@ internal static class StrReader {
         videoChannel = channel;
       else if (videoChannel != channel)
         throw new NotSupportedException(
-          $"Sector {i} is a video chunk on CD-XA channel {channel}, where an earlier one was on channel "
-          + $"{videoChannel}. This reader hands out one video stream per file; a disc interleaving "
-          + "several channels' worth of picture needs telling apart by channel, which nothing measured "
-          + "here forced and which this reader does not guess at.");
+          $"Sector {i} is video on CD-XA channel {channel}, while earlier video used channel {videoChannel}. "
+          + "One STR video stream cannot represent several interleaved XA channels.");
 
       anyChunkSeen = true;
       var chunkIndex = BinaryPrimitives.ReadUInt16LittleEndian(payload[4..]);
@@ -220,10 +167,10 @@ internal static class StrReader {
         expectedChunks = chunkCount;
         chunksSeen = chunkCount > 0 ? 1 : 0;
         frameOpen = chunkCount > 0;
-      } else if (frameOpen) {
+      } else if (frameOpen)
         ++chunksSeen;
-      } else
-        continue; // a continuation chunk with no frame open — a truncated start, stepped over
+      else
+        continue;
 
       if (frameOpen && chunksSeen == expectedChunks) {
         ++videoFrameCount;
@@ -233,9 +180,7 @@ internal static class StrReader {
 
     if (!anyChunkSeen)
       throw new NotSupportedException(
-        "Every sector in this file is either Form 2 or a Form 1 sector without the per-chunk header "
-        + "this reader knows: the two fixed marker words and the magic word real Sony STR video "
-        + "chunks all state. There is nothing here this reader recognises as MDEC video.");
+        "No Form-1 sector with the recognised PlayStation STR video chunk header was found.");
 
     return new() {
       Data = data,
@@ -246,43 +191,25 @@ internal static class StrReader {
       VideoFrameCount = videoFrameCount,
       HasAudio = audioPacketCount > 0,
       AudioPacketCount = audioPacketCount,
+      AudioSampleRate = audioSampleRate,
+      AudioChannels = audioChannels,
+      AudioBitsPerSample = audioBitsPerSample,
     };
   }
 
-  /// <summary>Walks the sectors a second time, this time handing out the packets they describe. See
-  /// <see cref="Open"/> for why a frame's chunks are tracked by index and not by sector count, and
-  /// why its packet is trimmed rather than being the chunks' full reserved capacity.</summary>
-  /// <remarks>
-  /// A video packet is the trimmed, reassembled MDEC bitstream and nothing else — the thirty-two-byte
-  /// per-chunk header is not carried on it, and that is a decision rather than an oversight. Of what
-  /// that header states: <c>chunk_index</c> and <c>chunk_count</c> exist only to reassemble this very
-  /// packet and are consumed doing it; <c>frame_number</c> is consumed into
-  /// <see cref="CodedPacket.PresentationTimestamp"/>; the frame's own byte length is consumed to trim
-  /// the packet and is exactly <see cref="CodedPacket.Data"/>'s length afterwards; and width and
-  /// height are restated on <see cref="MediaStreamInfo.Width"/> and <see cref="MediaStreamInfo.Height"/>
-  /// — a decoder reads a stream's own size once rather than every packet's repetition of it. Passing
-  /// any of those four on regardless would be the container handing the codec bytes it has already
-  /// read for it, under a fixed offset that exists only because of how this one container happens to
-  /// be written — the coupling the demux/decode seam exists to prevent.
-  /// <para/>
-  /// The header's other four fields — a per-frame quantiser scale, a count this reader has not
-  /// interpreted, a version number, and two words constant on every sample measured — are not carried
-  /// either, and for a different reason: nothing here yet knows whether the codec needs any of them
-  /// restated at all. ISO/IEC 11172-2, whose coefficient table MDEC's own is compatible with, reads its
-  /// quantiser scale out of the bitstream itself rather than from anything the container states, and
-  /// nothing measured for this container rules out MDEC doing the same. Carrying a field on the chance
-  /// a decoder might want it is the same mistake in the other direction — a byte layout invented for
-  /// one decoder before that decoder exists to say what it needs. If the codec, reading Sony's own
-  /// document, finds one of the four genuinely is not in the bitstream, that is the point to add it
-  /// back here, named and justified, not before.
-  /// </remarks>
+  /// <summary>
+  /// Walks sectors a second time and emits logical packets. The MDEC payload itself stays free of the
+  /// 32-byte STR sector header; the twelve bytes at offsets 20..31 of that header are retained as
+  /// <see cref="CodedPacket.ContainerPrivateData"/> because they include the replicated MDEC size,
+  /// magic, quantizer and version fields a writer needs for a lossless remux of container state.
+  /// </summary>
   internal static IEnumerable<CodedPacket> ReadPackets(StrContainer container) {
     var data = container.Data;
-    var span = data.Span;
     var syncStart = container.SyncStart;
     var sectorCount = container.SectorCount;
 
     List<byte[]>? chunks = null;
+    byte[]? framePrivate = null;
     var expectedChunks = 0;
     var frameSize = 0u;
     long? firstFrameNumber = null;
@@ -291,73 +218,63 @@ internal static class StrReader {
     for (var i = 0; i < sectorCount; ++i) {
       var sectorOffset = syncStart + i * SectorSize;
       var sector = data.Slice(sectorOffset, SectorSize);
-      var sectorSpan = sector.Span;
-      var submode = sectorSpan[_SubheaderOffset + 2];
+      var submode = sector.Span[_SubheaderOffset + 2];
 
       if ((submode & _SubmodeForm2) != 0) {
-        if ((submode & _SubmodeAudio) != 0)
+        if ((submode & _SubmodeAudio) != 0 && container.HasAudio)
           yield return new(
             StreamIndex: 1,
             Data: sector.Slice(_PayloadOffset, _XaAdpcmDataLength),
             IsKeyFrame: true);
-
         continue;
       }
 
       var payload = sector.Slice(_PayloadOffset);
-      var payloadSpan = payload.Span;
-      if (!_LooksLikeChunkHeader(payloadSpan))
+      if (!_LooksLikeChunkHeader(payload.Span))
         continue;
 
-      var chunkIndex = BinaryPrimitives.ReadUInt16LittleEndian(payloadSpan[4..]);
-      var chunkCount = BinaryPrimitives.ReadUInt16LittleEndian(payloadSpan[6..]);
+      var chunkIndex = BinaryPrimitives.ReadUInt16LittleEndian(payload.Span[4..]);
+      var chunkCount = BinaryPrimitives.ReadUInt16LittleEndian(payload.Span[6..]);
 
       if (chunkIndex == 0) {
-        var frameNumber = (long)BinaryPrimitives.ReadUInt32LittleEndian(payloadSpan[8..]);
+        var frameNumber = (long)BinaryPrimitives.ReadUInt32LittleEndian(payload.Span[8..]);
         firstFrameNumber ??= frameNumber;
 
-        frameSize = BinaryPrimitives.ReadUInt32LittleEndian(payloadSpan[12..]);
+        frameSize = BinaryPrimitives.ReadUInt32LittleEndian(payload.Span[12..]);
         expectedChunks = chunkCount;
         chunks = chunkCount > 0 ? [] : null;
+        framePrivate = chunkCount > 0 ? payload.Slice(20, 12).ToArray() : null;
         frameOpen = chunkCount > 0;
 
         if (frameOpen)
           chunks!.Add(payload.Slice(_ChunkHeaderLength, _ChunkPayloadLength).ToArray());
 
         if (frameOpen && chunks!.Count == expectedChunks) {
-          yield return _CompleteFrame(chunks, frameSize, frameNumber - firstFrameNumber.Value);
+          yield return _CompleteFrame(chunks, frameSize, frameNumber - firstFrameNumber.Value, framePrivate!);
           frameOpen = false;
         }
       } else if (frameOpen) {
         chunks!.Add(payload.Slice(_ChunkHeaderLength, _ChunkPayloadLength).ToArray());
         if (chunks.Count == expectedChunks) {
-          // The frame number is the one its opening chunk stated; every continuation chunk repeats it.
-          var frameNumber = (long)BinaryPrimitives.ReadUInt32LittleEndian(payloadSpan[8..]);
-          yield return _CompleteFrame(chunks, frameSize, frameNumber - firstFrameNumber!.Value);
+          var frameNumber = (long)BinaryPrimitives.ReadUInt32LittleEndian(payload.Span[8..]);
+          yield return _CompleteFrame(chunks, frameSize, frameNumber - firstFrameNumber!.Value, framePrivate!);
           frameOpen = false;
         }
       }
-      // A continuation chunk with no frame open is a truncated start and is stepped over, the same
-      // way Open's counting pass does.
     }
-
-    // An open frame here is a truncated one at end of file — real samples are often cut mid-recording
-    // — and it is dropped rather than handed out with fewer chunks than its own header promised.
   }
 
-  private static CodedPacket _CompleteFrame(List<byte[]> chunks, uint frameSize, long presentationTimestamp) {
+  private static CodedPacket _CompleteFrame(List<byte[]> chunks, uint frameSize, long presentationTimestamp, byte[] privateData) {
     var totalCapacity = 0;
     foreach (var chunk in chunks)
       totalCapacity += chunk.Length;
 
     var used = (int)Math.Min(frameSize, (uint)totalCapacity);
     var combined = new byte[used];
-
     var written = 0;
     foreach (var chunk in chunks) {
       if (written >= used)
         break;
-
       var take = Math.Min(chunk.Length, used - written);
       chunk.AsSpan(0, take).CopyTo(combined.AsSpan(written));
       written += take;
@@ -368,6 +285,14 @@ internal static class StrReader {
       Data: combined,
       PresentationTimestamp: presentationTimestamp,
       DecodeTimestamp: presentationTimestamp,
-      IsKeyFrame: true);
+      IsKeyFrame: true,
+      ContainerPrivateData: privateData);
+  }
+
+  private static (int SampleRate, int Channels, int BitsPerSample) _AudioGeometry(byte codingInformation) {
+    var channels = (codingInformation & 0x01) != 0 ? 2 : 1;
+    var sampleRate = (codingInformation & 0x04) != 0 ? 18_900 : 37_800;
+    var bitsPerSample = (codingInformation & 0x10) != 0 ? 8 : 4;
+    return (sampleRate, channels, bitsPerSample);
   }
 }
