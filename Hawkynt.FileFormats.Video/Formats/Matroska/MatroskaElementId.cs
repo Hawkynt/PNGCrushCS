@@ -56,6 +56,10 @@ internal static class MatroskaElementId {
   internal const uint VIDEO = 0xE0;
   internal const uint PIXEL_WIDTH = 0xB0;
   internal const uint PIXEL_HEIGHT = 0xBA;
+  internal const uint AUDIO = 0xE1;
+  internal const uint SAMPLING_FREQUENCY = 0xB5;
+  internal const uint CHANNELS = 0x9F;
+  internal const uint BIT_DEPTH = 0x6264;
   internal const uint CONTENT_ENCODINGS = 0x6D80;
   internal const uint CONTENT_ENCODING = 0x6240;
   internal const uint CONTENT_ENCODING_TYPE = 0x5033;
@@ -89,16 +93,6 @@ internal static class MatroskaElementId {
   internal const uint TAG_NAME = 0x45A3;
   internal const uint TAG_STRING = 0x4487;
 
-  /// <summary>
-  /// Whether an identifier belongs to the segment's own level, which is what ends an element the
-  /// file stated no length for.
-  /// </summary>
-  /// <remarks>
-  /// A <c>Cluster</c> written to a pipe carries no length, and where it stops is where the next
-  /// element that cannot be inside it starts. These are those elements: the next cluster, and every
-  /// other child a segment has. Nothing at this level ever appears inside a cluster, so the first one
-  /// encountered is the end of it.
-  /// </remarks>
   internal static bool IsSegmentLevel(uint id)
     => id is SEEK_HEAD or INFO or TRACKS or CLUSTER or CUES or ATTACHMENTS or CHAPTERS or TAGS;
 }
