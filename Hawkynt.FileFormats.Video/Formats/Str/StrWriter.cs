@@ -222,7 +222,7 @@ public sealed class StrWriter : IVideoContainerWriter<StrWriter> {
   private static uint _Edc(ReadOnlySpan<byte> source) {
     uint edc = 0;
     foreach (var value in source)
-      edc = (edc >> 8) ^ _EdcLut[(edc ^ value) & 0xFF];
+      edc = (edc >> 8) ^ _EdcLut[(int)((edc ^ value) & 0xFF)];
     return edc;
   }
 
