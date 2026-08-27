@@ -86,7 +86,9 @@ The tables below are the package-level overview. The detailed codec-by-codec imp
 | [CamStudio](https://en.wikipedia.org/wiki/CamStudio) | ✅ | — | CSCD | [MultimediaWiki CamStudio](https://wiki.multimedia.cx/index.php/CamStudio) |
 | [Hap](https://en.wikipedia.org/wiki/Hap_(video_codec)) | ⚠️ | — | supported Hap variants; unsupported variants are refused explicitly | [Vidvox Hap](https://hap.video/) |
 
-For the long tail (QuickTime Animation, RPZA, SMC, H.261/H.263, RealVideo 1, VC-1/WMV, FLIC, ZMBV, screen codecs, uncompressed packed YUV/RGB families, game codecs, QPEG, ASUS, Creative YUV, MJPEG-B, AVRn, Escape 130, and others), see [`codec-coverage.md`](codec-coverage.md).
+For the long tail (QuickTime Animation, RPZA, SMC, H.261/H.263, RealVideo 1, VC-1/WMV, FLIC, ZMBV, screen codecs, uncompressed packed YUV/RGB families, game codecs, QPEG, ASUS, Creative YUV, MJPEG-B, AVRn, Escape 124, Escape 130, MSZH, LOCO, Canopus Lossless, Matrox M101, VBLE, MidiVid Archive, MSS1, RASC, MSCC, MWSC, RSCC, Screenpresso, WCMV, and others), see [`codec-coverage.md`](codec-coverage.md).
+
+Fourteen of those — Escape 124, MSZH, LOCO, Canopus Lossless, Matrox M101, VBLE, MidiVid Archive, MSS1, RASC, MSCC, MWSC, RSCC, Screenpresso and WCMV — are adaptations of FFmpeg's own LGPL-2.1-or-later decoders rather than implementations from a published description, and each source file names the author it came from. See the licence section of [`codec-coverage.md`](codec-coverage.md).
 
 ## 🚀 Quick start
 

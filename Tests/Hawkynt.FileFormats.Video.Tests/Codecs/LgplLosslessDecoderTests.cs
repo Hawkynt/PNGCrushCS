@@ -1,9 +1,10 @@
+extern alias Images;
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using FileFormat.Bmp;
+using BitmapInfoHeader = Images::FileFormat.Bmp.BitmapInfoHeader;
 using FileFormat.Core;
 using Hawkynt.FileFormats.Video;
 
