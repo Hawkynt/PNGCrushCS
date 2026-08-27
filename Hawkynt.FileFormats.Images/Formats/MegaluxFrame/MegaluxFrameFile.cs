@@ -24,7 +24,7 @@ namespace FileFormat.MegaluxFrame;
 /// a picture of the wrong shape rather than fail.
 /// </remarks>
 public readonly record struct MegaluxFrameFile
-  : IImageFormatReader<MegaluxFrameFile>, IImageToRawImage<MegaluxFrameFile> {
+  : IImageFormatReader<MegaluxFrameFile>, IImageToRawImage<MegaluxFrameFile>, IImageFromRawImage<MegaluxFrameFile>, IImageFormatWriter<MegaluxFrameFile> {
 
   /// <summary>The three letters a file opens with.</summary>
   public static ReadOnlySpan<byte> Signature => "FRM"u8;
@@ -44,6 +44,7 @@ public readonly record struct MegaluxFrameFile
   static string IImageFormatMetadata<MegaluxFrameFile>.PrimaryExtension => ".frm";
   static string[] IImageFormatMetadata<MegaluxFrameFile>.FileExtensions => [".frm"];
   static MegaluxFrameFile IImageFormatReader<MegaluxFrameFile>.FromSpan(ReadOnlySpan<byte> data) => MegaluxFrameReader.FromSpan(data);
+  static byte[] IImageFormatWriter<MegaluxFrameFile>.ToBytes(MegaluxFrameFile file) => MegaluxFrameWriter.ToBytes(file);
 
   static VideoMode[] IImageFormatMetadata<MegaluxFrameFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [16777216])
@@ -71,4 +72,21 @@ public readonly record struct MegaluxFrameFile
     Format = PixelFormat.Rgb24,
     PixelData = file.PixelData[..],
   };
+
+  public static MegaluxFrameFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width is < 1 or > ushort.MaxValue || image.Height is < 1 or > ushort.MaxValue)
+      throw new ArgumentOutOfRangeException(nameof(image), "Megalux Frame dimensions must fit in unsigned 16-bit words.");
+
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24);
+    var required = checked(image.Width * image.Height * 3);
+    if (image.PixelData.Length < required)
+      throw new ArgumentException("The raw image does not contain enough RGB pixel data for its dimensions.", nameof(image));
+
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      PixelData = image.PixelData[..required],
+    };
+  }
 }

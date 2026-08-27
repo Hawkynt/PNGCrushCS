@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.DigitalFx;
@@ -18,7 +17,7 @@ namespace FileFormat.DigitalFx;
 /// three came out.
 /// </remarks>
 public readonly record struct DigitalFxFile
-  : IImageFormatReader<DigitalFxFile>, IImageToRawImage<DigitalFxFile> {
+  : IImageFormatReader<DigitalFxFile>, IImageToRawImage<DigitalFxFile>, IImageFromRawImage<DigitalFxFile>, IImageFormatWriter<DigitalFxFile> {
 
   /// <summary>The four bytes every one of these opens with.</summary>
   public static ReadOnlySpan<byte> Magic => [0x00, 0x02, 0x00, 0x20];
@@ -38,6 +37,7 @@ public readonly record struct DigitalFxFile
   static string IImageFormatMetadata<DigitalFxFile>.PrimaryExtension => ".tdim";
   static string[] IImageFormatMetadata<DigitalFxFile>.FileExtensions => [".tdim"];
   static DigitalFxFile IImageFormatReader<DigitalFxFile>.FromSpan(ReadOnlySpan<byte> data) => DigitalFxReader.FromSpan(data);
+  static byte[] IImageFormatWriter<DigitalFxFile>.ToBytes(DigitalFxFile file) => DigitalFxWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<DigitalFxFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [16777216])
   ];
@@ -64,5 +64,25 @@ public readonly record struct DigitalFxFile
     }
 
     return new() { Width = file.Width, Height = file.Height, Format = PixelFormat.Rgb24, PixelData = rgb };
+  }
+
+  public static DigitalFxFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width is < 1 or > MaximumSide || image.Height is < 1 or > MaximumSide)
+      throw new ArgumentOutOfRangeException(nameof(image), $"Digital F/X dimensions must be between 1 and {MaximumSide} pixels per side.");
+
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24);
+    var count = checked(image.Width * image.Height);
+    if (image.PixelData.Length < count * 3)
+      throw new ArgumentException("The raw image does not contain enough RGB pixel data for its dimensions.", nameof(image));
+
+    var pixels = new byte[count * BytesPerPixel];
+    for (var i = 0; i < count; ++i) {
+      pixels[i * BytesPerPixel + 1] = image.PixelData[i * 3];
+      pixels[i * BytesPerPixel + 2] = image.PixelData[i * 3 + 1];
+      pixels[i * BytesPerPixel + 3] = image.PixelData[i * 3 + 2];
+    }
+
+    return new() { Width = image.Width, Height = image.Height, PixelData = pixels };
   }
 }

@@ -23,7 +23,7 @@ namespace FileFormat.Ximage;
 /// one.
 /// </remarks>
 public readonly record struct XimageFile
-  : IImageFormatReader<XimageFile>, IImageToRawImage<XimageFile> {
+  : IImageFormatReader<XimageFile>, IImageToRawImage<XimageFile>, IImageFromRawImage<XimageFile>, IImageFormatWriter<XimageFile> {
 
   /// <summary>The version the reader accepts, and the only one there is a reading of.</summary>
   public const int Version = 3;
@@ -43,6 +43,7 @@ public readonly record struct XimageFile
   static string IImageFormatMetadata<XimageFile>.PrimaryExtension => ".xim";
   static string[] IImageFormatMetadata<XimageFile>.FileExtensions => [".xim"];
   static XimageFile IImageFormatReader<XimageFile>.FromSpan(ReadOnlySpan<byte> data) => XimageReader.FromSpan(data);
+  static byte[] IImageFormatWriter<XimageFile>.ToBytes(XimageFile file) => XimageWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<XimageFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [256, 16777216])
   ];
@@ -94,5 +95,32 @@ public readonly record struct XimageFile
       }
 
     return new() { Width = file.Width, Height = file.Height, Format = PixelFormat.Rgb24, PixelData = rgb };
+  }
+
+  public static XimageFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width is < 1 or > MaximumSide || image.Height is < 1 or > MaximumSide)
+      throw new ArgumentOutOfRangeException(nameof(image), $"Ximage dimensions must be between 1 and {MaximumSide} pixels per side.");
+
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24);
+    var count = checked(image.Width * image.Height);
+    if (image.PixelData.Length < count * 3)
+      throw new ArgumentException("The raw image does not contain enough RGB pixel data for its dimensions.", nameof(image));
+
+    var planes = new[] { new byte[count], new byte[count], new byte[count] };
+    for (var i = 0; i < count; ++i) {
+      planes[0][i] = image.PixelData[i * 3];
+      planes[1][i] = image.PixelData[i * 3 + 1];
+      planes[2][i] = image.PixelData[i * 3 + 2];
+    }
+
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      Planes = 3,
+      HasPalette = false,
+      PlaneData = planes,
+      Palette = new byte[PaletteEntries * 3],
+    };
   }
 }
