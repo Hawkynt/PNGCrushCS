@@ -1,0 +1,11 @@
+<Project>
+  <!--
+    HEIF still images are H.265 pictures. The video assembly already references Images, so Images
+    cannot reference Video without a cycle. Compile the decoder core from its single source location
+    into this assembly as linked source; H265VideoDecoder.cs itself is deliberately not linked.
+  -->
+  <ItemGroup>
+    <Compile Include="..\Hawkynt.FileFormats.Video\Codecs\H265\*.cs"
+             LinkBase="Shared\H265" />
+  </ItemGroup>
+</Project>

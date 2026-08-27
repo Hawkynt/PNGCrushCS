@@ -8,13 +8,14 @@ public sealed class DataTypeTests {
 
   [Test]
   [Category("Unit")]
-  public void MngTermAction_HasExpectedValues() {
+  public void MngTermAction_HasNormativeWireValues() {
     Assert.That((int)MngTermAction.ShowLast, Is.EqualTo(0));
-    Assert.That((int)MngTermAction.ShowFirst, Is.EqualTo(1));
-    Assert.That((int)MngTermAction.ShowBlank, Is.EqualTo(2));
+    Assert.That((int)MngTermAction.ShowBlank, Is.EqualTo(1));
+    Assert.That((int)MngTermAction.ShowFirst, Is.EqualTo(2));
+    Assert.That((int)MngTermAction.Repeat, Is.EqualTo(3));
 
     var values = Enum.GetValues<MngTermAction>();
-    Assert.That(values, Has.Length.EqualTo(3));
+    Assert.That(values, Has.Length.EqualTo(4));
   }
 
   [Test]

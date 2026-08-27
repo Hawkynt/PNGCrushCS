@@ -49,19 +49,19 @@ foreach (var entry in FormatRegistry.AllFormats.OrderBy(e => e.Name))
 | [GIF](https://en.wikipedia.org/wiki/GIF) | `.gif` | ✅ | ✅ | ✅ | `image/gif` | [GIF89a](https://www.w3.org/Graphics/GIF/spec-gif89a.txt) |
 | [BMP](https://en.wikipedia.org/wiki/BMP_file_format) | `.bmp`, `.dib` | ✅ | ✅ | — | `image/bmp` | [Microsoft bitmap storage](https://learn.microsoft.com/windows/win32/gdi/bitmap-storage) |
 | [TIFF](https://en.wikipedia.org/wiki/TIFF) | `.tif`, `.tiff` | ✅ | ✅ | ✅ | `image/tiff` | [TIFF 6.0](https://www.adobe.io/open/standards/TIFF.html) |
-| [WebP](https://en.wikipedia.org/wiki/WebP) | `.webp` | ✅ | ✅ | ⚠️ | `image/webp` | [WebP RIFF container](https://developers.google.com/speed/webp/docs/riff_container) |
+| [WebP](https://en.wikipedia.org/wiki/WebP) | `.webp` | ✅ | ✅ | ✅ | `image/webp` | [WebP RIFF container](https://developers.google.com/speed/webp/docs/riff_container) |
 | [AVIF](https://en.wikipedia.org/wiki/AVIF) | `.avif` | ⚠️ | — | — | `image/avif` | [AOMedia AVIF](https://aomediacodec.github.io/av1-avif/) |
-| [HEIF / HEIC](https://en.wikipedia.org/wiki/High_Efficiency_Image_File_Format) | `.heif`, `.heic` | ⚠️ | — | ⚠️ | `image/heic` | [Nokia HEIF](https://nokiatech.github.io/heif/) |
+| [HEIF / HEIC](https://en.wikipedia.org/wiki/High_Efficiency_Image_File_Format) | `.heif`, `.heic` | ⚠️ | — | ✅ | `image/heic` | [Nokia HEIF](https://nokiatech.github.io/heif/) |
 | [APNG](https://en.wikipedia.org/wiki/APNG) | `.apng`, `.png` | ✅ | ✅ | ✅ | `image/apng` | [APNG specification](https://wiki.mozilla.org/APNG_Specification) |
 | [MNG](https://en.wikipedia.org/wiki/Multiple-image_Network_Graphics) | `.mng` | ✅ | ⚠️ | ✅ | `video/x-mng` | [MNG specification](http://www.libpng.org/pub/mng/spec/) |
 | [QOI](https://en.wikipedia.org/wiki/QOI_(image_format)) | `.qoi` | ✅ | ✅ | — | `image/qoi` | [QOI specification](https://qoiformat.org/qoi-specification.pdf) |
 | [JPEG XL](https://en.wikipedia.org/wiki/JPEG_XL) | `.jxl` | ⚠️ | ⚠️ | — | `image/jxl` | [JPEG XL](https://jpeg.org/jpegxl/) |
-| [JPEG 2000](https://en.wikipedia.org/wiki/JPEG_2000) | `.jp2`, `.j2k`, … | ✅ | ⚠️ | — | `image/jp2` | [JPEG 2000](https://jpeg.org/jpeg2000/) |
-| [JPEG XR](https://en.wikipedia.org/wiki/JPEG_XR) | `.jxr`, `.wdp`, `.hdp` | ✅ | ⚠️ | — | `image/jxr` | [ITU-T T.832](https://www.itu.int/rec/T-REC-T.832) |
+| [JPEG 2000](https://en.wikipedia.org/wiki/JPEG_2000) | `.jp2`, `.j2k`, … | ✅ | ✅ | — | `image/jp2` | [JPEG 2000](https://jpeg.org/jpeg2000/) |
+| [JPEG XR](https://en.wikipedia.org/wiki/JPEG_XR) | `.jxr`, `.wdp`, `.hdp` | ⚠️ | ⚠️ | — | `image/jxr` | [ITU-T T.832](https://www.itu.int/rec/T-REC-T.832) |
 | [BPG](https://en.wikipedia.org/wiki/Better_Portable_Graphics) | `.bpg` | ✅ | — | — | — | [Fabrice Bellard's BPG](https://bellard.org/bpg/) |
 | [FLIF](https://en.wikipedia.org/wiki/Free_Lossless_Image_Format) | `.flif` | ✅ | — | — | — | [FLIF project](https://flif.info/) |
 
-`⚠️` means a material subset or interoperability limitation exists. In particular, AVIF and HEIF have no registered encoder; JPEG XL container/header handling is useful, but its current pixel codec is not interoperable with arbitrary libjxl files and its writer must not be treated as a conforming general-purpose JPEG XL encoder.
+`⚠️` means a material subset or interoperability limitation exists. AVIF container handling is present, but real AV1 pixel payloads are deliberately not decoded by the current nonconforming AV1 codec and there is no registered AV1 encoder. HEIF/HEIC now decodes directly coded HEVC Main-profile intra-picture items through the managed H.265 codec and exposes additional image items through the multi-image contract, but unsupported HEVC profiles/features are rejected and no general HEVC authoring path is registered. MNG writing targets the conforming MNG-VLC subset rather than every MNG feature. JPEG XL container/header handling is useful, but its current pixel codec is not interoperable with arbitrary libjxl files. JPEG XR recognizes real containers but deliberately refuses the current incorrect real-file pixel output. JPEG 2000 writing now uses the conforming managed baseline Tier-1/Tier-2 path rather than the former private packet grammar.
 
 ### Scientific, HDR, and professional formats
 
@@ -499,7 +499,7 @@ The long tail also includes TGA/Targa, PCX, SGI/Iris, Sun Raster, X PixMap (XPM)
 ## ⚠️ Limitations
 
 - **Lossy advanced features** — VP8 lossy is keyframe-only; multi-pass rate control and token-partition threading are not implemented yet. Alpha IS preserved (the encoder writes an ALPH chunk on RGBA input; uncompressed method 0 — VP8L-encoded alpha is a future optimization).
-- **Codec subsets** — HEIF/AVIF/BPG decoders are I-frame only, single tile, YCbCr 4:2:0 8-bit. **JPEG XL**: container + SizeHeader + ImageMetadata + FrameHeader (ISO/IEC 18181-1 §3.6.2 / §3.6.3 / §3.6.5) are spec-conformant — the all_default fast path that most libjxl-encoded files use is fully supported, and the non-default conditional plumbing (orientation, bit_depth, num_extra_channels, extra_channel_info, color_encoding, tone_mapping, frame_type, encoding flag) is in place. Pixel codec (modular sub-codec body and VarDCT) is the remaining workstream — arbitrary real-world `.jxl` files will not decode their pixels yet, but signature, dimensions, and image-level metadata are extracted correctly. Camera RAW supports DNG lossless JPEG, Canon CR2, Nikon NEF, Sony ARW2; other manufacturer-specific compressions are future work.
+- **Codec subsets** — HEIF/HEIC now resolves and decodes directly coded HEVC image items through the shared managed H.265 decoder; that path currently targets Main-profile intra-picture 8-bit 4:2:0 content and rejects unsupported HEVC profiles/features instead of fabricating pixels. AVIF container parsing exists, but real AV1 pixel decoding remains disabled until the AV1 entropy syntax is conforming. BPG remains an I-frame-oriented managed subset. **JPEG 2000** writing uses a deliberately narrow 8-bit Gray/RGB conforming baseline profile; unsupported optional coding modes are outside that authoring profile rather than encoded with private syntax. **JPEG XL**: container + SizeHeader + ImageMetadata + FrameHeader (ISO/IEC 18181-1 §3.6.2 / §3.6.3 / §3.6.5) are spec-conformant — the all_default fast path that most libjxl-encoded files use is fully supported, and the non-default conditional plumbing (orientation, bit_depth, num_extra_channels, extra_channel_info, color_encoding, tone_mapping, frame_type, encoding flag) is in place. Pixel codec (modular sub-codec body and VarDCT) is the remaining workstream — arbitrary real-world `.jxl` files will not decode their pixels yet, but signature, dimensions, and image-level metadata are extracted correctly. **JPEG XR** recognizes real containers but the current pixel decoder is known to reproduce the wrong image, so real-file pixels are deliberately refused until the T.832 codec is repaired. Camera RAW supports DNG lossless JPEG, Canon CR2, Nikon NEF, Sony ARW2; other manufacturer-specific compressions are future work.
 - **Write coverage** — 344 of 547 formats implement `FromRawImage` and can encode an arbitrary image; `FormatRegistry.Write` returns `null` for the other 203. Those parse and re-serialize a file they read, but cannot author one from pixel data — this includes the authoring formats (PSD, XCF, PSB, ICNS, Xcursor, ECW, DjVu, JBIG2, FLIF) and most vintage/8-bit formats. Filter on `FormatEntry.SupportsWrite` rather than assuming.
 - **PDF / PE** — image extraction only. PDF rendering, page composition, vector graphics, and PE writing are out of scope.
 - **Bundle size** — `~4.9 MB`, four assemblies. There is no way to take only the formats you need; if that matters, per-format NuGet packages may be published in future.
@@ -513,7 +513,7 @@ The long tail also includes TGA/Targa, PCX, SGI/Iris, Sun Raster, X PixMap (XPM)
 If this project saves you time or money, consider supporting its development:
 
 [![GitHub Sponsors](https://img.shields.io/badge/GitHub-Sponsor-EA4AAA?logo=githubsponsors)](https://github.com/sponsors/Hawkynt)
-[![PayPal](https://img.shields.io/badge/PayPal-Donate-00457C?logo=paypal)](https://www.paypal.me/hawkynt)
+[![PayPal](https://img.shields.io/badge/PayPal-Donate-00457C)](https://www.paypal.me/hawkynt)
 
 ## 📜 License
 

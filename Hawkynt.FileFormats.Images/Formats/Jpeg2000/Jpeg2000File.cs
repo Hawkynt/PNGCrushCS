@@ -10,7 +10,7 @@ public readonly record struct Jpeg2000File : IImageFormatReader<Jpeg2000File>, I
   static string IImageFormatMetadata<Jpeg2000File>.PrimaryExtension => ".jp2";
   static string[] IImageFormatMetadata<Jpeg2000File>.FileExtensions => [".jp2", ".j2k", ".j2c", ".jpx", ".jpc", ".jpf", ".jpt", ".jpm"];
   static Jpeg2000File IImageFormatReader<Jpeg2000File>.FromSpan(ReadOnlySpan<byte> data) => Jpeg2000Reader.FromSpan(data);
-  static byte[] IImageFormatWriter<Jpeg2000File>.ToBytes(Jpeg2000File file) => Jpeg2000Writer.ToBytesEbcot(file);
+  static byte[] IImageFormatWriter<Jpeg2000File>.ToBytes(Jpeg2000File file) => Jpeg2000BaselineWriter.ToBytes(file);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
@@ -43,14 +43,14 @@ public readonly record struct Jpeg2000File : IImageFormatReader<Jpeg2000File>, I
     ArgumentNullException.ThrowIfNull(image);
     image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Gray8);
     var componentCount = image.Format == PixelFormat.Gray8 ? 1 : 3;
-    var pixelData = image.PixelData[..];
 
     return new() {
       Width = image.Width,
       Height = image.Height,
       ComponentCount = componentCount,
       BitsPerComponent = 8,
-      PixelData = pixelData,
+      DecompositionLevels = 0,
+      PixelData = image.PixelData[..],
     };
   }
 }
