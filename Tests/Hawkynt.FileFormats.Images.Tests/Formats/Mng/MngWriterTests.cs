@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using FileFormat.Mng;
 
 namespace FileFormat.Mng.Tests;
@@ -11,86 +12,93 @@ public sealed class MngWriterTests {
   [Test]
   [Category("Unit")]
   public void ToBytes_StartsWithMngSignature() {
-    var file = new MngFile {
-      Width = 1,
-      Height = 1,
-      TicksPerSecond = 1000,
-      Frames = []
-    };
-
+    var file = new MngFile { Width = 1, Height = 1, TicksPerSecond = 1000, Frames = [] };
     var bytes = MngWriter.ToBytes(file);
-
-    for (var i = 0; i < _MNG_SIGNATURE.Length; ++i)
-      Assert.That(bytes[i], Is.EqualTo(_MNG_SIGNATURE[i]), $"Signature byte {i} mismatch");
+    Assert.That(bytes.AsSpan(0, _MNG_SIGNATURE.Length).ToArray(), Is.EqualTo(_MNG_SIGNATURE));
   }
 
   [Test]
   [Category("Unit")]
-  public void ToBytes_HasMhdrChunk() {
+  public void ToBytes_WritesNormativeVlcHeaderCountsAndProfile() {
+    var png = MngTestHelper.BuildMinimalPng();
+    var file = new MngFile { Width = 1, Height = 1, TicksPerSecond = 1000, Frames = [png, png] };
+
+    var bytes = MngWriter.ToBytes(file);
+    var mhdr = FindChunk(bytes, "MHDR");
+
+    Assert.That(mhdr.Length, Is.EqualTo(28));
+    Assert.That(BinaryPrimitives.ReadUInt32BigEndian(mhdr[12..]), Is.EqualTo(3u), "VLC layer count is embedded images + background");
+    Assert.That(BinaryPrimitives.ReadUInt32BigEndian(mhdr[16..]), Is.EqualTo(2u));
+    Assert.That(BinaryPrimitives.ReadUInt32BigEndian(mhdr[20..]), Is.EqualTo(2u));
+    Assert.That(BinaryPrimitives.ReadUInt32BigEndian(mhdr[24..]), Is.EqualTo(457u), "VLC profile allowing transparency");
+  }
+
+  [TestCase(MngTermAction.ShowLast, 0)]
+  [TestCase(MngTermAction.ShowBlank, 1)]
+  [TestCase(MngTermAction.ShowFirst, 2)]
+  [Category("Unit")]
+  public void ToBytes_NonRepeatTermUsesOneByteForm(MngTermAction action, int wireValue) {
+    var file = new MngFile { Width = 1, Height = 1, TicksPerSecond = 1, TermAction = action, Frames = [] };
+    var term = FindChunk(MngWriter.ToBytes(file), "TERM");
+
+    Assert.That(term.Length, Is.EqualTo(1));
+    Assert.That(term[0], Is.EqualTo((byte)wireValue));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void ToBytes_RepeatTermUsesNormativeTenByteForm() {
     var file = new MngFile {
-      Width = 100,
-      Height = 80,
-      TicksPerSecond = 1000,
+      Width = 1,
+      Height = 1,
+      TicksPerSecond = 100,
+      TermAction = MngTermAction.Repeat,
+      ActionAfterIterations = MngTermAction.ShowFirst,
+      RepeatDelay = 25,
+      NumPlays = 7,
       Frames = []
     };
 
-    var bytes = MngWriter.ToBytes(file);
+    var term = FindChunk(MngWriter.ToBytes(file), "TERM");
 
-    // MHDR chunk type starts at offset 12 (8 sig + 4 length)
-    Assert.That(bytes[12], Is.EqualTo((byte)'M'));
-    Assert.That(bytes[13], Is.EqualTo((byte)'H'));
-    Assert.That(bytes[14], Is.EqualTo((byte)'D'));
-    Assert.That(bytes[15], Is.EqualTo((byte)'R'));
+    Assert.That(term.Length, Is.EqualTo(10));
+    Assert.That(term[0], Is.EqualTo(3));
+    Assert.That(term[1], Is.EqualTo(2));
+    Assert.That(BinaryPrimitives.ReadUInt32BigEndian(term[2..]), Is.EqualTo(25u));
+    Assert.That(BinaryPrimitives.ReadUInt32BigEndian(term[6..]), Is.EqualTo(7u));
   }
 
   [Test]
   [Category("Unit")]
   public void ToBytes_HasMendChunk() {
-    var file = new MngFile {
-      Width = 1,
-      Height = 1,
-      TicksPerSecond = 1000,
-      Frames = []
-    };
-
+    var file = new MngFile { Width = 1, Height = 1, TicksPerSecond = 1000, Frames = [] };
     var bytes = MngWriter.ToBytes(file);
-
-    // Find MEND chunk near end: 4-byte length (0) + "MEND" + 4-byte CRC = last 12 bytes
-    var mendOffset = bytes.Length - 12;
-    // Length should be 0
-    Assert.That(bytes[mendOffset], Is.EqualTo(0));
-    Assert.That(bytes[mendOffset + 1], Is.EqualTo(0));
-    Assert.That(bytes[mendOffset + 2], Is.EqualTo(0));
-    Assert.That(bytes[mendOffset + 3], Is.EqualTo(0));
-    // Type should be MEND
-    Assert.That(bytes[mendOffset + 4], Is.EqualTo((byte)'M'));
-    Assert.That(bytes[mendOffset + 5], Is.EqualTo((byte)'E'));
-    Assert.That(bytes[mendOffset + 6], Is.EqualTo((byte)'N'));
-    Assert.That(bytes[mendOffset + 7], Is.EqualTo((byte)'D'));
+    Assert.That(FindChunk(bytes, "MEND").Length, Is.Zero);
   }
 
   [Test]
   [Category("Unit")]
   public void ToBytes_FramesEmbedded_ContainsIhdrChunks() {
     var png = MngTestHelper.BuildMinimalPng();
-    var file = new MngFile {
-      Width = 1,
-      Height = 1,
-      TicksPerSecond = 1000,
-      Frames = [png]
-    };
-
+    var file = new MngFile { Width = 1, Height = 1, TicksPerSecond = 1000, Frames = [png] };
     var bytes = MngWriter.ToBytes(file);
+    Assert.That(FindChunk(bytes, "IHDR").Length, Is.EqualTo(13));
+  }
 
-    // Look for IHDR chunk type in output
-    var found = false;
-    for (var i = 0; i < bytes.Length - 4; ++i) {
-      if (bytes[i] == (byte)'I' && bytes[i + 1] == (byte)'H' && bytes[i + 2] == (byte)'D' && bytes[i + 3] == (byte)'R') {
-        found = true;
-        break;
-      }
+  private static ReadOnlySpan<byte> FindChunk(byte[] bytes, string type) {
+    var offset = 8;
+    while (offset + 12 <= bytes.Length) {
+      var length = checked((int)BinaryPrimitives.ReadUInt32BigEndian(bytes.AsSpan(offset, 4)));
+      if (offset + 12 + length > bytes.Length)
+        Assert.Fail($"Truncated {type} fixture while scanning MNG chunks.");
+
+      var chunkType = System.Text.Encoding.ASCII.GetString(bytes, offset + 4, 4);
+      if (chunkType == type)
+        return bytes.AsSpan(offset + 8, length);
+      offset += 12 + length;
     }
 
-    Assert.That(found, Is.True, "Expected IHDR chunk from embedded PNG frame");
+    Assert.Fail($"Chunk {type} not found.");
+    return default;
   }
 }
