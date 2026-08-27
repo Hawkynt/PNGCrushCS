@@ -140,7 +140,7 @@ public sealed class WcmvVideoDecoder : IVideoCodecDecoder<WcmvVideoDecoder> {
   private static int _ReadVariableLittleEndian(ReadOnlySpan<byte> data, ref int position, int width, int streamIndex, string field) {
     if (width is < 1 or > 3 || data.Length - position < width)
       throw new InvalidDataException($"WCMV stream {streamIndex} truncates its {field}.");
-    var value = data[position];
+    int value = data[position];
     if (width >= 2)
       value |= data[position + 1] << 8;
     if (width == 3)
