@@ -138,7 +138,7 @@ internal sealed class Av1AnsDecoder {
       if (i == symbol)
         target = (int)_CDF_PROB_TOP;
 
-      var value = cdf[i];
+      var value = (int)cdf[i];
       if (target < value)
         value -= (value - target) >> rate;
       else
