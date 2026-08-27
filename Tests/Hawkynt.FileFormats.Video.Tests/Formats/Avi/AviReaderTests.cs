@@ -1,10 +1,13 @@
+extern alias Images;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using FileFormat.Core;
-using FileFormat.Jpeg;
+using JpegFile = Images::FileFormat.Jpeg.JpegFile;
+using JpegReader = Images::FileFormat.Jpeg.JpegReader;
+using JpegWriter = Images::FileFormat.Jpeg.JpegWriter;
 using Hawkynt.FileFormats.Video;
 
 namespace FileFormat.Avi.Tests;

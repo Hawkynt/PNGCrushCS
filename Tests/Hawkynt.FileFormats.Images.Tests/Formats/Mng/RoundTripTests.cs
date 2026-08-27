@@ -39,8 +39,12 @@ public sealed class RoundTripTests {
       Width = 1,
       Height = 1,
       TicksPerSecond = 500,
+      // An iteration count only exists in TERM's ten-byte repeat form. Asking for one alongside
+      // ShowFirst asks the format to carry a field that form has no room for, so the repeat action
+      // is what this exercises, with ShowFirst as what happens once the iterations are done.
       NumPlays = 3,
-      TermAction = MngTermAction.ShowFirst,
+      TermAction = MngTermAction.Repeat,
+      ActionAfterIterations = MngTermAction.ShowFirst,
       Frames = [png1, png2]
     };
 
@@ -50,7 +54,8 @@ public sealed class RoundTripTests {
     Assert.That(restored.Frames, Has.Count.EqualTo(2));
     Assert.That(restored.Frames[0], Is.EqualTo(original.Frames[0]));
     Assert.That(restored.Frames[1], Is.EqualTo(original.Frames[1]));
-    Assert.That(restored.TermAction, Is.EqualTo(MngTermAction.ShowFirst));
+    Assert.That(restored.TermAction, Is.EqualTo(MngTermAction.Repeat));
+    Assert.That(restored.ActionAfterIterations, Is.EqualTo(MngTermAction.ShowFirst));
     Assert.That(restored.NumPlays, Is.EqualTo(3));
   }
 

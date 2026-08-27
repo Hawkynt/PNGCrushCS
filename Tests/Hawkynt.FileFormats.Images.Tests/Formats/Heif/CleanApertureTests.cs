@@ -201,9 +201,15 @@ public sealed class CleanApertureTests {
   }
 
   /// <summary>
-  /// A coded extent whose byte count overflows a 32-bit int leaves an empty raster behind, and an
-  /// aperture nearly as large would overflow the crop allocation too. Neither may throw.
+  /// A coded extent whose byte count overflows a 32-bit int is refused by name, not by an
+  /// arithmetic overflow and not by handing back a picture that is not there.
   /// </summary>
+  /// <remarks>
+  /// This used to assert the reader returned <c>Width</c> 715827883 with an empty raster. That is
+  /// the shape this repository refuses everywhere else — a caller cannot tell it from a decode —
+  /// so the contract is now a refusal. What the test still guards is that the refusal is a stated
+  /// one rather than an <see cref="OverflowException"/> from multiplying the extent out.
+  /// </remarks>
   [Test]
   [Category("Unit")]
   public void FromBytes_ClapOnOverflowingCodedExtent_Ignored() {
@@ -211,18 +217,12 @@ public sealed class CleanApertureTests {
     const int CODED_HEIGHT = 3;
     var bytes = _BuildHeif(CODED_WIDTH, CODED_HEIGHT, _Clap(CODED_WIDTH - 1, 1, 2, 1, 0, 1, 0, 1), [1, 2, 3, 4]);
 
-    var result = HeifReader.FromBytes(bytes);
-
-    Assert.Multiple(() => {
-      Assert.That(result.Width, Is.EqualTo(CODED_WIDTH));
-      Assert.That(result.Height, Is.EqualTo(CODED_HEIGHT));
-      Assert.That(result.PixelData, Is.Empty);
-    });
+    Assert.That(() => HeifReader.FromBytes(bytes), Throws.TypeOf<NotSupportedException>());
   }
 
   /// <summary>
-  /// A tiny aperture passes every extent check, but indexing row y of a raster that wide overflows
-  /// a 32-bit offset. The raster is empty here for the same reason, so no row is readable at all.
+  /// A tiny aperture passes every extent check, but the coded raster behind it is still one whose
+  /// row indexing overflows a 32-bit offset, and the payload does not hold it. Refused by name.
   /// </summary>
   [Test]
   [Category("Unit")]
@@ -231,13 +231,7 @@ public sealed class CleanApertureTests {
     const int CODED_HEIGHT = 3;
     var bytes = _BuildHeif(CODED_WIDTH, CODED_HEIGHT, _Clap(1, 1, 1, 1, 0, 1, 0, 1), [1, 2, 3, 4]);
 
-    var result = HeifReader.FromBytes(bytes);
-
-    Assert.Multiple(() => {
-      Assert.That(result.Width, Is.EqualTo(1));
-      Assert.That(result.Height, Is.EqualTo(1));
-      Assert.That(result.PixelData, Has.Length.EqualTo(3));
-    });
+    Assert.That(() => HeifReader.FromBytes(bytes), Throws.TypeOf<NotSupportedException>());
   }
 
   [Test]
