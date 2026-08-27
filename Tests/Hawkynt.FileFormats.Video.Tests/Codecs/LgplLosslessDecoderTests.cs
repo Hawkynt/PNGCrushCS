@@ -34,9 +34,11 @@ public sealed class LgplLosslessDecoderTests {
   public void LocoZeroResidualUsesItsRunSubcode() {
     var decoder = LocoVideoDecoder.Create(_LocoStream(2, 1, 3));
 
-    // First v=0 at k=3 is 1 000; because save starts non-negative a k=2 zero-run code follows:
-    // 1 00. The second zero then takes the save<0 path and needs no second run subcode.
-    Assert.That(decoder.TryDecode(new(0, new byte[] { 0x88, 0x88, 0x88 }), out var frame), Is.True);
+    // First v=0 at k=3 is 1 000; because save starts non-negative a k=2 zero-run code follows,
+    // and it has to state a run of one — 1 01 — so the second pixel is taken from the run and
+    // reads no bits at all. A run of zero would leave the second pixel needing a Rice code of its
+    // own, which does not fit in the byte this plane gets. Bits are 1000 101, then one of padding.
+    Assert.That(decoder.TryDecode(new(0, new byte[] { 0x8A, 0x8A, 0x8A }), out var frame), Is.True);
     Assert.That(frame.PixelData, Is.EqualTo(new byte[] { 128, 128, 128, 128, 128, 128 }));
   }
 
