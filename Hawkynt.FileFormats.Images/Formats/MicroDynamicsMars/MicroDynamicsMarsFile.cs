@@ -20,7 +20,7 @@ namespace FileFormat.MicroDynamicsMars;
 /// The converter reads no other coding for this name, so no other is offered here.
 /// </remarks>
 public readonly record struct MicroDynamicsMarsFile
-  : IImageFormatReader<MicroDynamicsMarsFile>, IImageToRawImage<MicroDynamicsMarsFile> {
+  : IImageFormatReader<MicroDynamicsMarsFile>, IImageToRawImage<MicroDynamicsMarsFile>, IImageFromRawImage<MicroDynamicsMarsFile>, IImageFormatWriter<MicroDynamicsMarsFile> {
 
   /// <summary>The six bytes a page opens with: a big-endian two, then the format's four letters.</summary>
   public static ReadOnlySpan<byte> Signature => [0x02, 0x00, (byte)'P', (byte)'B', (byte)'I', (byte)'T'];
@@ -37,10 +37,15 @@ public readonly record struct MicroDynamicsMarsFile
   /// <summary>How long the header is, which is where the Group 4 coding begins.</summary>
   public const int HeaderSize = 512;
 
+  /// <summary>The largest side accepted by the decoder.</summary>
+  public const int MaximumSide = 65535;
+
   static string IImageFormatMetadata<MicroDynamicsMarsFile>.PrimaryExtension => ".pbt";
   static string[] IImageFormatMetadata<MicroDynamicsMarsFile>.FileExtensions => [".pbt"];
   static MicroDynamicsMarsFile IImageFormatReader<MicroDynamicsMarsFile>.FromSpan(ReadOnlySpan<byte> data)
     => MicroDynamicsMarsReader.FromSpan(data);
+  static byte[] IImageFormatWriter<MicroDynamicsMarsFile>.ToBytes(MicroDynamicsMarsFile file)
+    => MicroDynamicsMarsWriter.ToBytes(file);
 
   static VideoMode[] IImageFormatMetadata<MicroDynamicsMarsFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])
@@ -71,4 +76,18 @@ public readonly record struct MicroDynamicsMarsFile
     Palette = _BlackWhitePalette[..],
     PaletteCount = 2,
   };
+
+  public static MicroDynamicsMarsFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width is < 1 or > MaximumSide || image.Height is < 1 or > MaximumSide)
+      throw new ArgumentOutOfRangeException(nameof(image), $"Micro Dynamics MARS dimensions must be between 1 and {MaximumSide} pixels per side.");
+
+    var pixels = BilevelRows.Threshold(image, setWhenDark: true);
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      Resolution = 300,
+      PixelData = BilevelRows.Pack(pixels, image.Width, image.Height),
+    };
+  }
 }
