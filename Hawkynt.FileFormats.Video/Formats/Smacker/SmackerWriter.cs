@@ -67,25 +67,26 @@ public sealed class SmackerWriter : IVideoContainerWriter<SmackerWriter> {
         continue;
       }
 
-      var video = packet.Data.Span;
+      var video = packet.Data;
       if (video.IsEmpty)
         throw new InvalidDataException("Smacker video packet is missing its frame-type byte.");
-      var type = video[0];
+      var type = video.Span[0];
       var at = 1;
-      ReadOnlySpan<byte> palette = default;
+      var palette = ReadOnlyMemory<byte>.Empty;
       if ((type & 1) != 0) {
         if (at >= video.Length)
           throw new InvalidDataException("Smacker frame says it has a palette but the video packet contains none.");
-        var length = video[at] * 4;
+        var length = video.Span[at] * 4;
         if (length == 0 || at + length > video.Length)
           throw new InvalidDataException("Smacker palette chunk length runs past its video packet.");
         palette = video.Slice(at, length);
         at += length;
       }
 
+      var videoPayload = video[at..];
       var blob = ContainerWriterTools.Build(frame => {
         if (!palette.IsEmpty)
-          frame.Write(palette);
+          frame.Write(palette.Span);
         for (var streamIndex = 1; streamIndex < this._streams.Count; ++streamIndex) {
           var physical = this._audioTrackByStream[streamIndex];
           var bit = 2 << physical;
@@ -100,7 +101,7 @@ public sealed class SmackerWriter : IVideoContainerWriter<SmackerWriter> {
           ContainerWriterTools.WriteUInt32LittleEndian(frame, checked((uint)audio.Length + 4));
           frame.Write(audio.Span);
         }
-        frame.Write(video[at..]);
+        frame.Write(videoPayload.Span);
       });
       frames.Add((type, blob));
       pendingAudio.Clear();
