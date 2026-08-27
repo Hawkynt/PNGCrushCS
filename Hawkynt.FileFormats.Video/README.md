@@ -38,12 +38,12 @@ The tables below are the package-level overview. The detailed codec-by-codec imp
 | [Flash Video](https://en.wikipedia.org/wiki/Flash_Video) | `.flv`, `.f4v` | ✅ | — | [FLV format description](https://www.loc.gov/preservation/digital/formats/fdd/fdd000131.shtml) |
 | [ISO Base Media / MP4 / QuickTime](https://en.wikipedia.org/wiki/ISO_base_media_file_format) | `.mp4`, `.m4v`, `.mov`, `.qt`, `.3gp`, `.3g2`, `.m4a` | ✅ | — | [MP4RA](https://mp4ra.org/) / [Apple QuickTime File Format](https://developer.apple.com/documentation/quicktime-file-format) |
 | [Matroska](https://en.wikipedia.org/wiki/Matroska) / [WebM](https://en.wikipedia.org/wiki/WebM) | `.mkv`, `.mka`, `.mks`, `.mk3d`, `.webm` | ✅ | — | [Matroska elements](https://www.matroska.org/technical/elements.html) / [WebM container](https://www.webmproject.org/docs/container/) |
-| [H.264 Annex B byte stream](https://en.wikipedia.org/wiki/Advanced_Video_Coding) | `.264`, `.h264`, `.avc`, `.x264` | ✅ | — | [ITU-T H.264](https://www.itu.int/rec/T-REC-H.264) |
-| [H.265 / HEVC Annex B byte stream](https://en.wikipedia.org/wiki/High_Efficiency_Video_Coding) | `.265`, `.h265`, `.hevc`, `.x265` | ✅ | — | [ITU-T H.265](https://www.itu.int/rec/T-REC-H.265) |
+| [H.264 Annex B byte stream](https://en.wikipedia.org/wiki/Advanced_Video_Coding) | `.264`, `.h264`, `.avc`, `.x264` | ✅ | ✅ | [ITU-T H.264](https://www.itu.int/rec/T-REC-H.264) |
+| [H.265 / HEVC Annex B byte stream](https://en.wikipedia.org/wiki/High_Efficiency_Video_Coding) | `.265`, `.h265`, `.hevc`, `.x265` | ✅ | ✅ | [ITU-T H.265](https://www.itu.int/rec/T-REC-H.265) |
 | [MPEG Program Stream](https://en.wikipedia.org/wiki/MPEG_program_stream) | `.mpg`, `.mpeg`, `.vob`, `.m2p`, `.m2ps` | ✅ | — | [MPEG-2 Systems](https://mpeg.chiariglione.org/standards/mpeg-2/systems) |
 | [MPEG Transport Stream](https://en.wikipedia.org/wiki/MPEG_transport_stream) | `.ts`, `.m2ts`, `.mts`, `.m2t`, `.tsv` | ✅ | — | [MPEG-2 Systems](https://mpeg.chiariglione.org/standards/mpeg-2/systems) |
-| [Motion JPEG stream](https://en.wikipedia.org/wiki/Motion_JPEG) | `.mjpg`, `.mjpeg` | ✅ | — | [JPEG / ITU-T T.81](https://www.itu.int/rec/T-REC-T.81) |
-| [MPEG elementary video stream](https://en.wikipedia.org/wiki/Elementary_stream) | `.m1v`, `.m2v`, `.mpv`, `.mpeg1video`, `.mpeg2video` | ✅ | — | [MPEG-1 Video](https://mpeg.chiariglione.org/standards/mpeg-1/video) / [MPEG-2 Video](https://mpeg.chiariglione.org/standards/mpeg-2/video) |
+| [Motion JPEG stream](https://en.wikipedia.org/wiki/Motion_JPEG) | `.mjpg`, `.mjpeg` | ✅ | ✅ | [JPEG / ITU-T T.81](https://www.itu.int/rec/T-REC-T.81) |
+| [MPEG elementary video stream](https://en.wikipedia.org/wiki/Elementary_stream) | `.m1v`, `.m2v`, `.mpv`, `.mpeg1video`, `.mpeg2video` | ✅ | ✅ | [MPEG-1 Video](https://mpeg.chiariglione.org/standards/mpeg-1/video) / [MPEG-2 Video](https://mpeg.chiariglione.org/standards/mpeg-2/video) |
 | [Ogg](https://en.wikipedia.org/wiki/Ogg) | `.ogg`, `.ogv`, `.oga`, `.ogx`, `.opus`, `.spx` | ✅ | — | [RFC 3533](https://www.rfc-editor.org/rfc/rfc3533) |
 | [RealMedia](https://en.wikipedia.org/wiki/RealMedia) | `.rm`, `.rmvb`, `.ra`, `.rmj`, `.rms` | ✅ | — | [MultimediaWiki RealMedia](https://wiki.multimedia.cx/index.php/RealMedia) |
 | [Autodesk FLIC](https://en.wikipedia.org/wiki/FLIC_(file_format)) | `.fli`, `.flc`, `.flx` | ✅ | — | [MultimediaWiki FLIC](https://wiki.multimedia.cx/index.php/FLIC) |
@@ -120,6 +120,19 @@ foreach (var packet in VideoFormatRegistry.ReadPackets(data)) {
 }
 ```
 
+### Mux without encoding
+
+```csharp
+using FileFormat.H264Video;
+
+var source = H264VideoContainer.FromBytes(File.ReadAllBytes("source.h264"));
+var streams = H264VideoContainer.Streams(source);
+var packets = H264VideoContainer.ReadPackets(source);
+
+byte[] remuxed = VideoIO.Mux<H264VideoWriter>(streams, packets, H264VideoContainer.Metadata(source));
+File.WriteAllBytes("copy.h264", remuxed);
+```
+
 ### Select a decoder explicitly
 
 ```csharp
@@ -143,6 +156,8 @@ if (VideoFormatRegistry.CanDecode(videoStream)) {
 | `ReadStreams(byte[] / FileInfo)` | Read declared media streams. |
 | `ReadPackets(byte[], ...)` | Lazily demux coded packets. |
 | `ReadMetadata(byte[] / FileInfo)` | Read container metadata. |
+| `VideoIO.CreateWriter<TWriter>(...)` | Create a statically dispatched container writer. |
+| `VideoIO.Mux<TWriter>(...)` | Packet-level mux/remux without decoding or encoding. |
 | `CanDecode(MediaStreamInfo)` | Test whether any registered codec accepts a stream. |
 | `CreateDecoder(MediaStreamInfo)` | Create the matching frame decoder or throw a named refusal. |
 | `DecodeFrames(byte[] / FileInfo, ...)` | Convenience path combining demux + decode. |
@@ -180,7 +195,8 @@ Those rules exist because “find a familiar marker and split there” works on 
 
 ## ⚠️ Limitations
 
-- The current implementation surface is primarily **demux + decode**. Container writers and codec encoders are contracts in the architecture but are not generally implemented for the formats listed above.
+- Container muxing is currently implemented for H.264 Annex B, H.265 Annex B, raw Motion JPEG and MPEG-1/2 elementary video streams. Structured containers still remain demux-only.
+- H.264/H.265 raw-stream muxers accept Annex B packets only; length-prefixed MP4/QuickTime packet representations are refused rather than silently written as invalid byte streams.
 - Several advanced codecs intentionally implement well-defined subsets (for example H.264 Baseline and HEVC Main intra paths). Unsupported profiles/features should be refused rather than silently misdecoded.
 - Codec support is more precise than a single green check can express; consult [`codec-coverage.md`](codec-coverage.md) before relying on a profile/level/feature not named in this README.
 - Video correctness depends on real-world packetization as much as codec math. The project therefore validates packet counts, sizes, timestamps, and key-frame flags against external tools where samples are available.
