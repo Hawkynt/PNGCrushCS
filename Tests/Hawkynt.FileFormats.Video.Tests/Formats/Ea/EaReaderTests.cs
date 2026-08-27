@@ -49,7 +49,7 @@ public sealed class EaReaderTests {
     var file = _File([_MviHeader(4, 4, 10, 0, 0, []), malformed]);
 
     var failure = Assert.Throws<InvalidDataException>(() => EaContainer.FromBytes(file));
-    Assert.That(failure!.Message, Does.Contain("eight-byte header"));
+    Assert.That(failure!.Message, Does.Contain("shorter than its header"));
   }
 
   [Test]
@@ -141,17 +141,20 @@ public sealed class EaReaderTests {
 
   [Test]
   [Category("Unit")]
-  public void AnEndChunkBecomesNoPacketAtAll() {
+  public void AnEndChunkBecomesAPacketTheCodecTreatsAsEndOfStream() {
+    // It used to be skipped here. A remux has to put it back, and the demuxer is the only thing
+    // that saw it, so it is a packet now and the CMV decoder ends its stream on it rather than
+    // refusing a chunk it does not paint from.
     var file = _File([_MviHeader(4, 4, 10, 0, 0, []), _Chunk("MVIe", [])]);
     var container = EaContainer.FromBytes(file);
 
     var packets = EaContainer.ReadPackets(container).ToArray();
-    Assert.That(packets, Has.Length.EqualTo(1)); // the MVIh only
+    Assert.That(packets, Has.Length.EqualTo(2)); // the MVIh and the MVIe
   }
 
   [Test]
   [Category("Unit")]
-  public void AnUnrecognisedChunkBetweenTwoRecognisedOnesIsSteppedOverWithoutBecomingAPacket() {
+  public void AKnownAudioChunkBetweenTwoVideoOnesBecomesAnAudioPacket() {
     var file = _File([
       _MviHeader(4, 4, 10, 0, 0, []),
       _Chunk("SCHl", new byte[12]), // an audio stream header, which this reader decodes nothing of
@@ -160,7 +163,10 @@ public sealed class EaReaderTests {
     var container = EaContainer.FromBytes(file);
 
     var packets = EaContainer.ReadPackets(container).ToArray();
-    Assert.That(packets, Has.Length.EqualTo(2)); // MVIh and MVIf, the SCHl chunk stepped over entirely
+    // SCHl is a sound stream header this reader now names rather than steps over, so a remux can
+    // put it back where it was. It is an audio packet; nothing decodes it here.
+    Assert.That(packets, Has.Length.EqualTo(3));
+    Assert.That(packets.Count(p => p.StreamIndex == 0), Is.EqualTo(2));
   }
 
   [Test]

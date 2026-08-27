@@ -70,6 +70,20 @@ public sealed class MediaStreamInfo {
   /// <summary>Bits per pixel as the container stated it, or zero when it did not.</summary>
   public int BitsPerPixel { get; init; }
 
+  /// <summary>Audio sample rate in samples per second, or zero when the container did not state one.</summary>
+  /// <remarks>
+  /// Container geometry rather than codec parsing: AVI's WAVEFORMATEX, Matroska's Audio element,
+  /// MP4's audio sample entry and FLV's sound header all state it independently of the coded payload.
+  /// A muxer needs the same number to write those headers back without inventing one.
+  /// </remarks>
+  public int SampleRate { get; init; }
+
+  /// <summary>Number of audio channels the container stated, or zero when unstated.</summary>
+  public int Channels { get; init; }
+
+  /// <summary>Bits per audio sample as the container stated it, or zero when unstated.</summary>
+  public int BitsPerSample { get; init; }
+
   /// <summary>
   /// The codec's own description of the stream, verbatim — an AVI's <c>strf</c>, an MP4 sample
   /// entry's codec configuration, a Matroska track's private data.

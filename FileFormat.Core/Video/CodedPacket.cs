@@ -28,6 +28,10 @@ namespace FileFormat.Core;
 /// <param name="FragmentOffsets">Where in <see cref="Data"/> each of the pieces the container carried
 /// this in begins, or <c>null</c> where the container carried it in one piece and said so by not
 /// cutting it.</param>
+/// <param name="ContainerPrivateData">Packet-local bytes the container needs to reproduce its framing
+/// but which are not part of the coded payload itself. Empty for almost every format. This exists for
+/// fields such as a RoQ sound chunk's two-byte DPCM predictor seed: dropping it makes exact remuxing
+/// impossible, while prepending it to <see cref="Data"/> would make the codec payload container-shaped.</param>
 public readonly record struct CodedPacket(
   int StreamIndex,
   ReadOnlyMemory<byte> Data,
@@ -35,7 +39,8 @@ public readonly record struct CodedPacket(
   long? DecodeTimestamp = null,
   long? Duration = null,
   bool IsKeyFrame = false,
-  IReadOnlyList<int>? FragmentOffsets = null) {
+  IReadOnlyList<int>? FragmentOffsets = null,
+  ReadOnlyMemory<byte> ContainerPrivateData = default) {
 
   /// <summary>
   /// Where each piece this was carried in begins, with a single piece at nought where the container

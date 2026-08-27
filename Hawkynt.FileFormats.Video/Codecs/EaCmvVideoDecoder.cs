@@ -103,9 +103,26 @@ public sealed class EaCmvVideoDecoder : IVideoCodecDecoder<EaCmvVideoDecoder> {
         frame = this._DecodePicture(payload);
         return true;
 
+      // Ends one CMV stream and produces no picture. A file may hold several back to back —
+      // TITLE.CMV does, restarting with a fresh MVIh straight after — so this resets rather than
+      // refuses, and the header that follows restates everything the next stream needs.
+      case EaChunkType.MVIe:
+        this._Reset();
+        frame = null!;
+        return false;
+
       default:
         throw new NotSupportedException($"An Electronic Arts CMV video packet opens with chunk 0x{fourCc:X8}, which is not one this decoder reads.");
     }
+  }
+
+  /// <summary>Drops everything one stream carried, so the next one starts from its own header.</summary>
+  private void _Reset() {
+    this._lastFrame = null;
+    this._secondLastFrame = null;
+    this._width = 0;
+    this._height = 0;
+    Array.Clear(this._palette);
   }
 
   /// <summary>

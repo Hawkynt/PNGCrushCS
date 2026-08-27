@@ -135,8 +135,6 @@ internal static class RoqReader {
           $"A RoQ chunk header would start at byte {at}, {data.Length - at} bytes from the end of a "
           + "file whose chunk headers are eight bytes each.");
 
-      // A span cannot be held across a yield, so it is read fresh from the memory each time round
-      // rather than cached in a local that would have to live across one.
       var id = BinaryPrimitives.ReadUInt16LittleEndian(data.Span[at..]);
       var size = BinaryPrimitives.ReadUInt32LittleEndian(data.Span[(at + 2)..]);
       var argument = BinaryPrimitives.ReadUInt16LittleEndian(data.Span[(at + 6)..]);
@@ -186,14 +184,24 @@ internal static class RoqReader {
 
         case RoqChunkType.SOUND_MONO:
           if (audioStreamIndex >= 0) {
-            yield return new(StreamIndex: audioStreamIndex, Data: payload, PresentationTimestamp: audioSample, IsKeyFrame: true);
+            yield return new(
+              StreamIndex: audioStreamIndex,
+              Data: payload,
+              PresentationTimestamp: audioSample,
+              IsKeyFrame: true,
+              ContainerPrivateData: data.Slice(chunk.PayloadOffset - 2, 2));
             audioSample += payload.Length;
           }
           break;
 
         case RoqChunkType.SOUND_STEREO:
           if (audioStreamIndex >= 0) {
-            yield return new(StreamIndex: audioStreamIndex, Data: payload, PresentationTimestamp: audioSample, IsKeyFrame: true);
+            yield return new(
+              StreamIndex: audioStreamIndex,
+              Data: payload,
+              PresentationTimestamp: audioSample,
+              IsKeyFrame: true,
+              ContainerPrivateData: data.Slice(chunk.PayloadOffset - 2, 2));
             audioSample += payload.Length / 2;
           }
           break;

@@ -20,10 +20,11 @@ Decoded frames use `FileFormat.Core.RawImage`, the same representation exposed b
 - Separate container and codec contracts: demux, decode, encode, and mux are different responsibilities.
 - Lazy packet/frame access rather than materializing an entire movie in memory.
 - Shared `RawImage` output for decoded frames, enabling the existing image conversion/processing pipeline.
-- Container readers for modern, legacy, game, and streaming formats.
+- Container readers and writers for modern, legacy, game, and streaming formats.
 - Pure-C# decoders for a broad codec set including MPEG families, VPx, Theora, FFV1, ProRes, DNx, CineForm, classic QuickTime/Windows codecs, screen codecs, and game-video codecs.
 - Registry-based container/codec dispatch instead of container-specific decoder plumbing in callers.
 - Packet boundaries are reconstructed according to each container's indexing/lacing/PES rules rather than guessed from byte patterns.
+- Packet-level remuxing preserves coded bytes and refuses source representations whose required container state cannot be reproduced honestly.
 
 ## 🧩 Format / codec support
 
@@ -33,32 +34,32 @@ The tables below are the package-level overview. The detailed codec-by-codec imp
 
 | Container / stream format | Extensions | Demux | Mux | Reference |
 | --- | --- | :---: | :---: | --- |
-| [Advanced Systems Format (ASF)](https://en.wikipedia.org/wiki/Advanced_Systems_Format) | `.asf`, `.wmv`, `.wma`, `.wm`, `.wmx`, `.asx` | ✅ | — | [Microsoft ASF overview](https://learn.microsoft.com/windows/win32/wmformat/overview-of-the-asf-format) |
-| [AVI](https://en.wikipedia.org/wiki/Audio_Video_Interleave) | `.avi` | ✅ | — | [Microsoft AVI RIFF reference](https://learn.microsoft.com/windows/win32/directshow/avi-riff-file-reference) |
-| [Flash Video](https://en.wikipedia.org/wiki/Flash_Video) | `.flv`, `.f4v` | ✅ | — | [FLV format description](https://www.loc.gov/preservation/digital/formats/fdd/fdd000131.shtml) |
-| [ISO Base Media / MP4 / QuickTime](https://en.wikipedia.org/wiki/ISO_base_media_file_format) | `.mp4`, `.m4v`, `.mov`, `.qt`, `.3gp`, `.3g2`, `.m4a` | ✅ | — | [MP4RA](https://mp4ra.org/) / [Apple QuickTime File Format](https://developer.apple.com/documentation/quicktime-file-format) |
-| [Matroska](https://en.wikipedia.org/wiki/Matroska) / [WebM](https://en.wikipedia.org/wiki/WebM) | `.mkv`, `.mka`, `.mks`, `.mk3d`, `.webm` | ✅ | — | [Matroska elements](https://www.matroska.org/technical/elements.html) / [WebM container](https://www.webmproject.org/docs/container/) |
-| [H.264 Annex B byte stream](https://en.wikipedia.org/wiki/Advanced_Video_Coding) | `.264`, `.h264`, `.avc`, `.x264` | ✅ | — | [ITU-T H.264](https://www.itu.int/rec/T-REC-H.264) |
-| [H.265 / HEVC Annex B byte stream](https://en.wikipedia.org/wiki/High_Efficiency_Video_Coding) | `.265`, `.h265`, `.hevc`, `.x265` | ✅ | — | [ITU-T H.265](https://www.itu.int/rec/T-REC-H.265) |
-| [MPEG Program Stream](https://en.wikipedia.org/wiki/MPEG_program_stream) | `.mpg`, `.mpeg`, `.vob`, `.m2p`, `.m2ps` | ✅ | — | [MPEG-2 Systems](https://mpeg.chiariglione.org/standards/mpeg-2/systems) |
-| [MPEG Transport Stream](https://en.wikipedia.org/wiki/MPEG_transport_stream) | `.ts`, `.m2ts`, `.mts`, `.m2t`, `.tsv` | ✅ | — | [MPEG-2 Systems](https://mpeg.chiariglione.org/standards/mpeg-2/systems) |
-| [Motion JPEG stream](https://en.wikipedia.org/wiki/Motion_JPEG) | `.mjpg`, `.mjpeg` | ✅ | — | [JPEG / ITU-T T.81](https://www.itu.int/rec/T-REC-T.81) |
-| [MPEG elementary video stream](https://en.wikipedia.org/wiki/Elementary_stream) | `.m1v`, `.m2v`, `.mpv`, `.mpeg1video`, `.mpeg2video` | ✅ | — | [MPEG-1 Video](https://mpeg.chiariglione.org/standards/mpeg-1/video) / [MPEG-2 Video](https://mpeg.chiariglione.org/standards/mpeg-2/video) |
-| [Ogg](https://en.wikipedia.org/wiki/Ogg) | `.ogg`, `.ogv`, `.oga`, `.ogx`, `.opus`, `.spx` | ✅ | — | [RFC 3533](https://www.rfc-editor.org/rfc/rfc3533) |
-| [RealMedia](https://en.wikipedia.org/wiki/RealMedia) | `.rm`, `.rmvb`, `.ra`, `.rmj`, `.rms` | ✅ | — | [MultimediaWiki RealMedia](https://wiki.multimedia.cx/index.php/RealMedia) |
-| [Autodesk FLIC](https://en.wikipedia.org/wiki/FLIC_(file_format)) | `.fli`, `.flc`, `.flx` | ✅ | — | [MultimediaWiki FLIC](https://wiki.multimedia.cx/index.php/FLIC) |
-| [id RoQ](https://en.wikipedia.org/wiki/RoQ) | `.roq` | ✅ | — | [MultimediaWiki RoQ](https://wiki.multimedia.cx/index.php/RoQ) |
-| [Interplay MVE](https://wiki.multimedia.cx/index.php/Interplay_MVE) | `.mve` | ✅ | — | [MultimediaWiki MVE](https://wiki.multimedia.cx/index.php/Interplay_MVE) |
-| [id Cinematic](https://wiki.multimedia.cx/index.php/Id_Cinematic) | `.cin` | ✅ | — | [MultimediaWiki CIN](https://wiki.multimedia.cx/index.php/Id_Cinematic) |
-| [Westwood VQA](https://wiki.multimedia.cx/index.php/Westwood_VQA) | `.vqa` | ✅ | — | [MultimediaWiki VQA](https://wiki.multimedia.cx/index.php/Westwood_VQA) |
-| [Smacker](https://en.wikipedia.org/wiki/Smacker_video) | `.smk` | ✅ | — | [RAD Game Tools](https://www.radgametools.com/smkmain.htm) |
-| [Electronic Arts Multimedia](https://wiki.multimedia.cx/index.php/Electronic_Arts_Formats) | `.wve`, `.cmv`, `.tgv`, `.uv`, `.uv2` | ✅ | — | [MultimediaWiki EA formats](https://wiki.multimedia.cx/index.php/Electronic_Arts_Formats) |
-| [BFI](https://wiki.multimedia.cx/index.php/Brute_Force_%26_Ignorance) | `.bfi` | ✅ | — | [MultimediaWiki BFI](https://wiki.multimedia.cx/index.php/Brute_Force_%26_Ignorance) |
-| [Commodore CDXL](https://en.wikipedia.org/wiki/CDXL) | `.cdxl` | ✅ | — | [MultimediaWiki CDXL](https://wiki.multimedia.cx/index.php/CDXL) |
-| [IFF ANIM](https://en.wikipedia.org/wiki/ANIM) | `.anim`, `.iff` | ✅ | — | [Amiga ANIM IFF](https://wiki.amigaos.net/wiki/ANIM_IFF_Animation) |
-| [Sierra VMD](https://wiki.multimedia.cx/index.php/Sierra_VMD) | `.vmd` | ✅ | — | [MultimediaWiki VMD](https://wiki.multimedia.cx/index.php/Sierra_VMD) |
-| [PlayStation STR](https://wiki.multimedia.cx/index.php/PlayStation_STR) | `.str` | ✅ | — | [MultimediaWiki STR](https://wiki.multimedia.cx/index.php/PlayStation_STR) |
-| [ARMovie/RPL](https://wiki.multimedia.cx/index.php/ARMovie) | `.rpl` | ✅ | — | [MultimediaWiki ARMovie](https://wiki.multimedia.cx/index.php/ARMovie) |
+| [Advanced Systems Format (ASF)](https://en.wikipedia.org/wiki/Advanced_Systems_Format) | `.asf`, `.wmv`, `.wma`, `.wm`, `.wmx`, `.asx` | ✅ | ✅ | [Microsoft ASF overview](https://learn.microsoft.com/windows/win32/wmformat/overview-of-the-asf-format) |
+| [AVI](https://en.wikipedia.org/wiki/Audio_Video_Interleave) | `.avi` | ✅ | ✅ | [Microsoft AVI RIFF reference](https://learn.microsoft.com/windows/win32/directshow/avi-riff-file-reference) |
+| [Flash Video](https://en.wikipedia.org/wiki/Flash_Video) | `.flv`, `.f4v` | ✅ | ✅ | [FLV format description](https://www.loc.gov/preservation/digital/formats/fdd/fdd000131.shtml) |
+| [ISO Base Media / MP4 / QuickTime](https://en.wikipedia.org/wiki/ISO_base_media_file_format) | `.mp4`, `.m4v`, `.mov`, `.qt`, `.3gp`, `.3g2`, `.m4a` | ✅ | ✅ | [MP4RA](https://mp4ra.org/) / [Apple QuickTime File Format](https://developer.apple.com/documentation/quicktime-file-format) |
+| [Matroska](https://en.wikipedia.org/wiki/Matroska) / [WebM](https://en.wikipedia.org/wiki/WebM) | `.mkv`, `.mka`, `.mks`, `.mk3d`, `.webm` | ✅ | ✅ | [Matroska elements](https://www.matroska.org/technical/elements.html) / [WebM container](https://www.webmproject.org/docs/container/) |
+| [H.264 Annex B byte stream](https://en.wikipedia.org/wiki/Advanced_Video_Coding) | `.264`, `.h264`, `.avc`, `.x264` | ✅ | ✅ | [ITU-T H.264](https://www.itu.int/rec/T-REC-H.264) |
+| [H.265 / HEVC Annex B byte stream](https://en.wikipedia.org/wiki/High_Efficiency_Video_Coding) | `.265`, `.h265`, `.hevc`, `.x265` | ✅ | ✅ | [ITU-T H.265](https://www.itu.int/rec/T-REC-H.265) |
+| [MPEG Program Stream](https://en.wikipedia.org/wiki/MPEG_program_stream) | `.mpg`, `.mpeg`, `.vob`, `.m2p`, `.m2ps` | ✅ | ✅ | [MPEG-2 Systems](https://mpeg.chiariglione.org/standards/mpeg-2/systems) |
+| [MPEG Transport Stream](https://en.wikipedia.org/wiki/MPEG_transport_stream) | `.ts`, `.m2ts`, `.mts`, `.m2t`, `.tsv` | ✅ | ✅ | [MPEG-2 Systems](https://mpeg.chiariglione.org/standards/mpeg-2/systems) |
+| [Motion JPEG stream](https://en.wikipedia.org/wiki/Motion_JPEG) | `.mjpg`, `.mjpeg` | ✅ | ✅ | [JPEG / ITU-T T.81](https://www.itu.int/rec/T-REC-T.81) |
+| [MPEG elementary video stream](https://en.wikipedia.org/wiki/Elementary_stream) | `.m1v`, `.m2v`, `.mpv`, `.mpeg1video`, `.mpeg2video` | ✅ | ✅ | [MPEG-1 Video](https://mpeg.chiariglione.org/standards/mpeg-1/video) / [MPEG-2 Video](https://mpeg.chiariglione.org/standards/mpeg-2/video) |
+| [Ogg](https://en.wikipedia.org/wiki/Ogg) | `.ogg`, `.ogv`, `.oga`, `.ogx`, `.opus`, `.spx` | ✅ | ✅ | [RFC 3533](https://www.rfc-editor.org/rfc/rfc3533) |
+| [RealMedia](https://en.wikipedia.org/wiki/RealMedia) | `.rm`, `.rmvb`, `.ra`, `.rmj`, `.rms` | ✅ | ✅ | [MultimediaWiki RealMedia](https://wiki.multimedia.cx/index.php/RealMedia) |
+| [Autodesk FLIC](https://en.wikipedia.org/wiki/FLIC_(file_format)) | `.fli`, `.flc`, `.flx` | ✅ | ✅ | [MultimediaWiki FLIC](https://wiki.multimedia.cx/index.php/FLIC) |
+| [id RoQ](https://en.wikipedia.org/wiki/RoQ) | `.roq` | ✅ | ✅ | [MultimediaWiki RoQ](https://wiki.multimedia.cx/index.php/RoQ) |
+| [Interplay MVE](https://wiki.multimedia.cx/index.php/Interplay_MVE) | `.mve` | ✅ | ✅ | [MultimediaWiki MVE](https://wiki.multimedia.cx/index.php/Interplay_MVE) |
+| [id Cinematic](https://wiki.multimedia.cx/index.php/Id_Cinematic) | `.cin` | ✅ | ✅ | [MultimediaWiki CIN](https://wiki.multimedia.cx/index.php/Id_Cinematic) |
+| [Westwood VQA](https://wiki.multimedia.cx/index.php/Westwood_VQA) | `.vqa` | ✅ | ✅ | [MultimediaWiki VQA](https://wiki.multimedia.cx/index.php/Westwood_VQA) |
+| [Smacker](https://en.wikipedia.org/wiki/Smacker_video) | `.smk` | ✅ | ✅ | [RAD Game Tools](https://www.radgametools.com/smkmain.htm) |
+| [Electronic Arts Multimedia](https://wiki.multimedia.cx/index.php/Electronic_Arts_Formats) | `.wve`, `.cmv`, `.tgv`, `.uv`, `.uv2` | ✅ | ✅ | [MultimediaWiki EA formats](https://wiki.multimedia.cx/index.php/Electronic_Arts_Formats) |
+| [BFI](https://wiki.multimedia.cx/index.php/Brute_Force_%26_Ignorance) | `.bfi` | ✅ | ✅ | [MultimediaWiki BFI](https://wiki.multimedia.cx/index.php/Brute_Force_%26_Ignorance) |
+| [Commodore CDXL](https://en.wikipedia.org/wiki/CDXL) | `.cdxl` | ✅ | ✅ | [MultimediaWiki CDXL](https://wiki.multimedia.cx/index.php/CDXL) |
+| [IFF ANIM](https://en.wikipedia.org/wiki/ANIM) | `.anim`, `.iff` | ✅ | ✅ | [Amiga ANIM IFF](https://wiki.amigaos.net/wiki/ANIM_IFF_Animation) |
+| [Sierra VMD](https://wiki.multimedia.cx/index.php/Sierra_VMD) | `.vmd` | ✅ | ✅ | [MultimediaWiki VMD](https://wiki.multimedia.cx/index.php/Sierra_VMD) |
+| [PlayStation STR](https://wiki.multimedia.cx/index.php/PlayStation_STR) | `.str` | ✅ | ✅ | [MultimediaWiki STR](https://wiki.multimedia.cx/index.php/PlayStation_STR) |
+| [ARMovie/RPL](https://wiki.multimedia.cx/index.php/ARMovie) | `.rpl` | ✅ | ✅ | [MultimediaWiki ARMovie](https://wiki.multimedia.cx/index.php/ARMovie) |
 
 ### Codec highlights
 
@@ -120,6 +121,19 @@ foreach (var packet in VideoFormatRegistry.ReadPackets(data)) {
 }
 ```
 
+### Mux without encoding
+
+```csharp
+using FileFormat.H264Video;
+
+var source = H264VideoContainer.FromBytes(File.ReadAllBytes("source.h264"));
+var streams = H264VideoContainer.Streams(source);
+var packets = H264VideoContainer.ReadPackets(source);
+
+byte[] remuxed = VideoIO.Mux<H264VideoWriter>(streams, packets, H264VideoContainer.Metadata(source));
+File.WriteAllBytes("copy.h264", remuxed);
+```
+
 ### Select a decoder explicitly
 
 ```csharp
@@ -143,6 +157,8 @@ if (VideoFormatRegistry.CanDecode(videoStream)) {
 | `ReadStreams(byte[] / FileInfo)` | Read declared media streams. |
 | `ReadPackets(byte[], ...)` | Lazily demux coded packets. |
 | `ReadMetadata(byte[] / FileInfo)` | Read container metadata. |
+| `VideoIO.CreateWriter<TWriter>(...)` | Create a statically dispatched container writer. |
+| `VideoIO.Mux<TWriter>(...)` | Packet-level mux/remux without decoding or encoding. |
 | `CanDecode(MediaStreamInfo)` | Test whether any registered codec accepts a stream. |
 | `CreateDecoder(MediaStreamInfo)` | Create the matching frame decoder or throw a named refusal. |
 | `DecodeFrames(byte[] / FileInfo, ...)` | Convenience path combining demux + decode. |
@@ -165,6 +181,8 @@ A few container rules explain much of the implementation shape:
 - **MPEG Program Stream** reassembles PES payloads and then cuts them at elementary-stream picture boundaries; PES packet size is not assumed to equal picture size.
 - **MPEG Transport Stream** reconstructs PES/program state from TS packets rather than exposing transport packet boundaries as codec packets.
 - **Motion JPEG** uses the JPEG parser from the image package rather than byte-searching for `FF D9`, which can occur inside entropy-coded data or embedded thumbnails.
+- **PlayStation STR** remuxing writes actual 2352-byte Mode-2 sectors, including Form-1 EDC/ECC and Form-2 EDC; parity is not left blank merely because the demuxer does not need it.
+- **RoQ and STR** retain rare packet-local framing state in `CodedPacket.ContainerPrivateData` when that state is required to reproduce the container but is not part of the codec payload itself.
 
 Those rules exist because “find a familiar marker and split there” works on demo files and fails on real media. Detailed validation notes live next to the relevant readers and in [`codec-coverage.md`](codec-coverage.md).
 
@@ -180,7 +198,10 @@ Those rules exist because “find a familiar marker and split there” works on 
 
 ## ⚠️ Limitations
 
-- The current implementation surface is primarily **demux + decode**. Container writers and codec encoders are contracts in the architecture but are not generally implemented for the formats listed above.
+- Mux support is packet-level remuxing, not codec transcoding. A writer may require container-specific stream description bytes, timing geometry, fragment offsets, or packet-private state when those cannot be reconstructed from coded payload alone.
+- H.264/H.265 raw-stream muxers accept Annex B packets only; length-prefixed MP4/QuickTime packet representations are refused rather than silently written as invalid byte streams.
+- MP4/QuickTime muxing requires a complete sample entry in `CodecPrivateData` for codecs whose configuration cannot be synthesized safely; missing codec configuration is refused rather than guessed.
+- Large RealVideo pictures require preserved slice offsets when they must be split across 16-bit RealMedia packet lengths, and RoQ sound requires its original predictor argument.
 - Several advanced codecs intentionally implement well-defined subsets (for example H.264 Baseline and HEVC Main intra paths). Unsupported profiles/features should be refused rather than silently misdecoded.
 - Codec support is more precise than a single green check can express; consult [`codec-coverage.md`](codec-coverage.md) before relying on a profile/level/feature not named in this README.
 - Video correctness depends on real-world packetization as much as codec math. The project therefore validates packet counts, sizes, timestamps, and key-frame flags against external tools where samples are available.

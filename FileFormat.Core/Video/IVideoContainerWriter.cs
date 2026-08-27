@@ -15,8 +15,6 @@ namespace FileFormat.Core;
 /// other, remuxing a film into another container is those two and no codec in between, and the
 /// picture that comes out the far side is bit for bit the one that went in. Put decoding in the
 /// container reader and that is impossible — everything becomes a re-encode.
-/// <para/>
-/// Declared here with the rest of the shape although nothing implements it yet.
 /// </remarks>
 public interface IVideoContainerWriter<TSelf> : IVideoFormatMetadata<TSelf> where TSelf : IVideoContainerWriter<TSelf> {
 
