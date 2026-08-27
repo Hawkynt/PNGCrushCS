@@ -20,7 +20,7 @@ namespace FileFormat.SriSun;
 /// XnView a picture built here and comparing the pixels it returned against the ones encoded.
 /// </remarks>
 public readonly record struct SriSunFile
-  : IImageFormatReader<SriSunFile>, IImageToRawImage<SriSunFile> {
+  : IImageFormatReader<SriSunFile>, IImageToRawImage<SriSunFile>, IImageFromRawImage<SriSunFile>, IImageFormatWriter<SriSunFile> {
 
   /// <summary>The eight letters a SriSun picture opens with.</summary>
   public static ReadOnlySpan<byte> Magic => "srisunim"u8;
@@ -53,6 +53,7 @@ public readonly record struct SriSunFile
   static string IImageFormatMetadata<SriSunFile>.PrimaryExtension => ".ssi";
   static string[] IImageFormatMetadata<SriSunFile>.FileExtensions => [".ssi"];
   static SriSunFile IImageFormatReader<SriSunFile>.FromSpan(ReadOnlySpan<byte> data) => SriSunReader.FromSpan(data);
+  static byte[] IImageFormatWriter<SriSunFile>.ToBytes(SriSunFile file) => SriSunWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<SriSunFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2, 16, 256, 65536, 16777216])
   ];
@@ -123,6 +124,24 @@ public readonly record struct SriSunFile
     }
 
     return new() { Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = rgb };
+  }
+
+  public static SriSunFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width is < 1 or > MaximumSide || image.Height is < 1 or > MaximumSide)
+      throw new ArgumentOutOfRangeException(nameof(image), $"SriSun dimensions must be between 1 and {MaximumSide} pixels per side.");
+
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24);
+    var required = checked(image.Width * image.Height * 3);
+    if (image.PixelData.Length < required)
+      throw new ArgumentException("The raw image does not contain enough RGB pixel data for its dimensions.", nameof(image));
+
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      Depth = 24,
+      PixelData = image.PixelData[..required],
+    };
   }
 
   /// <summary>Widens one of the five-bit channels the way the format's own reader does.</summary>
