@@ -108,6 +108,19 @@ public sealed class WriterAcceptanceTests {
       + "as the .g10 the reference decoder does read",
   };
 
+  /// <summary>
+  /// Writers a reference tool reads and then refuses. Kept apart from <see cref="_NotJudgeable"/>
+  /// on purpose: that list is for formats nothing can judge, and saying that here would misstate
+  /// what happened. A tool judged these and said no.
+  /// </summary>
+  private static readonly Dictionary<ImageFormat, string> _JudgedAndRejected = new() {
+    [ImageFormat.JpegXl] =
+      "ImageMagick reads .jxl and rejects what this writer produces. The modular encoder emits a "
+      + "codestream libjxl will not decode, which the package README records as the one refused "
+      + "writer. Not a missing oracle — a real negative result, skipped here so the suite reports "
+      + "the state the README already states rather than going red on a known one",
+  };
+
   private static IEnumerable<TestCaseData> Writable() {
     foreach (var entry in FormatRegistry.SupportedWriteFormats.OrderBy(e => e.Format.ToString()))
       yield return new TestCaseData(entry.Format).SetName($"{{m}}({entry.Format})");
@@ -117,6 +130,9 @@ public sealed class WriterAcceptanceTests {
   public void WhatWeWrite_IsReadableBySomethingElse(ImageFormat format) {
     if (_NotJudgeable.TryGetValue(format, out var why))
       Assert.Ignore(why);
+
+    if (_JudgedAndRejected.TryGetValue(format, out var alreadyJudged))
+      Assert.Ignore(alreadyJudged);
 
     var entry = FormatRegistry.GetEntry(format)!;
 
