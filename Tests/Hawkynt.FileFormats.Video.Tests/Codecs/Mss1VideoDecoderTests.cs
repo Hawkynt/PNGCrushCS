@@ -54,6 +54,40 @@ public sealed class Mss1VideoDecoderTests {
 
   [Test]
   [Category("Unit")]
+  public void ContextRegionReusesItsLeftNeighbour() {
+    var decoder = Mss1VideoDecoder.Create(_Stream(2, 1, firstPaletteColour: [0x31, 0x42, 0x53]));
+
+    // keyframe=0, no split, non-solid intra region, first cache symbol=0; the second pixel sees four
+    // identical neighbours and secondary-context symbol 0 selects that reference pixel directly.
+    Assert.That(decoder.TryDecode(new(0, new byte[] { 0x14, 0x26, 0, 0, 0, 0 }), out var frame), Is.True);
+    Assert.That(frame.PixelData, Is.EqualTo(new byte[] {
+      0x31, 0x42, 0x53,
+      0x31, 0x42, 0x53,
+    }));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void RecursiveVerticalSplitPreservesBottomUpMssPictureOrder() {
+    var decoder = Mss1VideoDecoder.Create(_Stream(
+      1,
+      2,
+      firstPaletteColour: [0x10, 0x20, 0x30],
+      secondPaletteColour: [0xA0, 0xB0, 0xC0]
+    ));
+
+    // keyframe=0; root split=vertical; non-inverted pivot=1. The lower coded rectangle is a solid
+    // cache-index-0 pixel and the upper coded rectangle a solid cache-index-1 pixel. MSS1 addresses
+    // its palette surface bottom-up, so RGB exposure must reverse those coded rows.
+    Assert.That(decoder.TryDecode(new(0, new byte[] { 0x7A, 0x9F, 0, 0, 0, 0, 0, 0, 0, 0 }), out var frame), Is.True);
+    Assert.That(frame.PixelData, Is.EqualTo(new byte[] {
+      0xA0, 0xB0, 0xC0,
+      0x10, 0x20, 0x30,
+    }));
+  }
+
+  [Test]
+  [Category("Unit")]
   public void InterframeCanKeepThePersistentPictureFromTheKeyframe() {
     var decoder = Mss1VideoDecoder.Create(_Stream(1, 1, firstPaletteColour: [7, 8, 9]));
     Assert.That(decoder.TryDecode(new(0, new byte[] { 0x28, 0x4C, 0x00, 0x00 }), out _), Is.True);
@@ -151,7 +185,8 @@ public sealed class Mss1VideoDecoderTests {
     int width,
     int height,
     int freeColours = 0,
-    byte[]? firstPaletteColour = null
+    byte[]? firstPaletteColour = null,
+    byte[]? secondPaletteColour = null
   ) {
     const int bitmapHeaderSize = 40;
     const int extraSize = 52 + 256 * 3;
@@ -175,6 +210,8 @@ public sealed class Mss1VideoDecoderTests {
 
     if (firstPaletteColour is { Length: 3 })
       firstPaletteColour.CopyTo(extra[52..55]);
+    if (secondPaletteColour is { Length: 3 })
+      secondPaletteColour.CopyTo(extra[55..58]);
 
     return new() {
       Index = 0,
