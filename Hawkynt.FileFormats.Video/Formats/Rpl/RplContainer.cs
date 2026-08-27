@@ -10,43 +10,22 @@ namespace FileFormat.Rpl;
 /// Escape-codec titles use — taken apart into its header fields and the packets its chunk catalogue
 /// describes, and nothing else.
 /// </summary>
-/// <remarks>
-/// ARMovie names its video and sound codecs by a plain decimal number rather than by a four-character
-/// code — <c>130</c> for Escape 130, <c>124</c> for Escape 124 — so <see cref="CodecTag"/> here carries
-/// that number directly rather than a synthetic four-letter spelling: a codec riding this container
-/// checks <see cref="CodecTag.Value"/> against the number its own name is. See <see cref="RplReader"/>
-/// for the header and chunk catalogue walk this hands off to.
-/// </remarks>
 [FormatMimeType("video/x-armovie")]
 [FormatMagicBytes([(byte)'A', (byte)'R', (byte)'M', (byte)'o', (byte)'v', (byte)'i', (byte)'e'])]
 public sealed class RplContainer : IVideoContainerReader<RplContainer> {
 
-  /// <summary>The whole file, which every packet is a window onto.</summary>
   public required ReadOnlyMemory<byte> Data { get; init; }
-
-  /// <summary>The twenty-one-field text header this file opens with, parsed.</summary>
   public required RplHeader Header { get; init; }
-
-  /// <summary>Every chunk the catalogue names, in file order.</summary>
   public required IReadOnlyList<RplChunkEntry> Chunks { get; init; }
-
-  /// <summary>Whether the header names a sound codec at all.</summary>
   public bool HasAudio => this.Header.SoundCompressionFormat != 0;
 
-  // -------- Format identity --------
-
   public static string PrimaryExtension => ".rpl";
-
   public static string[] FileExtensions => [".rpl"];
-
-  // -------- Demux --------
 
   public static RplContainer FromSpan(ReadOnlySpan<byte> data) => RplReader.Open(data.ToArray());
 
-  /// <summary>Opens a file over the caller's array, keeping it rather than copying it.</summary>
   public static RplContainer FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-
     return RplReader.Open(data);
   }
 
@@ -54,7 +33,6 @@ public sealed class RplContainer : IVideoContainerReader<RplContainer> {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
       throw new FileNotFoundException("ARMovie/RPL file not found.", file.FullName);
-
     return RplReader.Open(File.ReadAllBytes(file.FullName));
   }
 
@@ -88,6 +66,9 @@ public sealed class RplContainer : IVideoContainerReader<RplContainer> {
         Kind = MediaStreamKind.Audio,
         Codec = new((uint)header.SoundCompressionFormat),
         TimeBase = header.SampleRate > 0 ? new Rational(1, header.SampleRate) : Rational.Unknown,
+        SampleRate = header.SampleRate,
+        Channels = header.ChannelCount,
+        BitsPerSample = header.SamplePrecision,
       });
 
     return streams;
@@ -95,12 +76,9 @@ public sealed class RplContainer : IVideoContainerReader<RplContainer> {
 
   public static IEnumerable<CodedPacket> ReadPackets(RplContainer container) {
     ArgumentNullException.ThrowIfNull(container);
-
     return RplReader.ReadPackets(container);
   }
 
-  /// <summary>The three free-text lines the header carries: the movie's own name (usually the tool's
-  /// original output path), a copyright line and the authoring tool's name and version.</summary>
   public static VideoMetadata Metadata(RplContainer container) {
     ArgumentNullException.ThrowIfNull(container);
 
