@@ -100,8 +100,6 @@ public sealed class StrWriter : IVideoContainerWriter<StrWriter> {
     var data = packet.Data;
     if (data.IsEmpty)
       throw new InvalidDataException("An STR video frame cannot be empty.");
-    if ((data.Length & 3) != 0)
-      throw new NotSupportedException("The STR frame-size field is defined in four-byte units; MDEC packet length must be a multiple of four.");
 
     var chunkCount = checked((data.Length + _ChunkPayloadLength - 1) / _ChunkPayloadLength);
     if (chunkCount > ushort.MaxValue)
