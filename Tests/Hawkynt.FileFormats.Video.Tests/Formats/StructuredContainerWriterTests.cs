@@ -3,8 +3,10 @@ using System.Buffers.Binary;
 using System.Linq;
 using System.Text;
 using FileFormat.Asf;
+using FileFormat.Avi;
 using FileFormat.Core;
 using FileFormat.Ea;
+using FileFormat.Matroska;
 using FileFormat.RealMedia;
 using FileFormat.RoqVideo;
 using FileFormat.Rpl;
@@ -189,6 +191,67 @@ public sealed class StructuredContainerWriterTests {
     var packets = RplContainer.ReadPackets(container).ToArray();
     Assert.That(packets.Single(p => p.StreamIndex == 0).Data.ToArray(), Is.EqualTo(video));
     Assert.That(packets.Single(p => p.StreamIndex == 1).Data.ToArray(), Is.EqualTo(audio));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void AviRoundTripPromotesWaveFormatGeometry() {
+    var wave = new byte[16];
+    BinaryPrimitives.WriteUInt16LittleEndian(wave, 1);
+    BinaryPrimitives.WriteUInt16LittleEndian(wave.AsSpan(2), 2);
+    BinaryPrimitives.WriteUInt32LittleEndian(wave.AsSpan(4), 44_100);
+    BinaryPrimitives.WriteUInt32LittleEndian(wave.AsSpan(8), 176_400);
+    BinaryPrimitives.WriteUInt16LittleEndian(wave.AsSpan(12), 4);
+    BinaryPrimitives.WriteUInt16LittleEndian(wave.AsSpan(14), 16);
+    var stream = new MediaStreamInfo {
+      Index = 0,
+      Kind = MediaStreamKind.Audio,
+      Codec = new CodecTag(1),
+      TimeBase = new Rational(1, 44_100),
+      CodecPrivateData = wave,
+    };
+    var payload = new byte[] { 1, 2, 3, 4 };
+
+    var file = VideoIO.Mux<AviWriter>([stream], [new CodedPacket(0, payload, IsKeyFrame: true)]);
+    var container = AviContainer.FromBytes(file);
+    var roundTrip = AviContainer.Streams(container).Single();
+
+    Assert.That(roundTrip.SampleRate, Is.EqualTo(44_100));
+    Assert.That(roundTrip.Channels, Is.EqualTo(2));
+    Assert.That(roundTrip.BitsPerSample, Is.EqualTo(16));
+    Assert.That(AviContainer.ReadPackets(container).Single().Data.ToArray(), Is.EqualTo(payload));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void MatroskaRoundTripPromotesAudioElementGeometry() {
+    var opusHead = new byte[19];
+    "OpusHead"u8.CopyTo(opusHead);
+    opusHead[8] = 1;
+    opusHead[9] = 2;
+    BinaryPrimitives.WriteUInt32LittleEndian(opusHead.AsSpan(12), 48_000);
+    var stream = new MediaStreamInfo {
+      Index = 0,
+      Kind = MediaStreamKind.Audio,
+      CodecId = "A_OPUS",
+      TimeBase = new Rational(1, 1000),
+      SampleRate = 48_000,
+      Channels = 2,
+      BitsPerSample = 16,
+      CodecPrivateData = opusHead,
+    };
+    var payload = new byte[] { 0xF8, 0xFF, 0xFE };
+
+    var file = VideoIO.Mux<MatroskaWriter>(
+      [stream],
+      [new CodedPacket(0, payload, PresentationTimestamp: 0, Duration: 20, IsKeyFrame: true)]);
+    var container = MatroskaContainer.FromBytes(file);
+    var roundTrip = MatroskaContainer.Streams(container).Single();
+
+    Assert.That(roundTrip.SampleRate, Is.EqualTo(48_000));
+    Assert.That(roundTrip.Channels, Is.EqualTo(2));
+    Assert.That(roundTrip.BitsPerSample, Is.EqualTo(16));
+    Assert.That(MatroskaContainer.ReadPackets(container).Single().Data.ToArray(), Is.EqualTo(payload));
   }
 
   [Test]
