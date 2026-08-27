@@ -16,7 +16,7 @@ namespace FileFormat.Portrait;
 /// the third as blue, and the bytes were the ones that went in.
 /// </remarks>
 public readonly record struct PortraitFile
-  : IImageFormatReader<PortraitFile>, IImageToRawImage<PortraitFile> {
+  : IImageFormatReader<PortraitFile>, IImageToRawImage<PortraitFile>, IImageFromRawImage<PortraitFile>, IImageFormatWriter<PortraitFile> {
 
   /// <summary>The only side the format has.</summary>
   public const int Side = 512;
@@ -31,6 +31,7 @@ public readonly record struct PortraitFile
   static string[] IImageFormatMetadata<PortraitFile>.FileExtensions => [".cvp"];
   static PortraitFile IImageFormatReader<PortraitFile>.FromSpan(ReadOnlySpan<byte> data)
     => PortraitReader.FromSpan(data);
+  static byte[] IImageFormatWriter<PortraitFile>.ToBytes(PortraitFile file) => PortraitWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<PortraitFile>.VideoModes => [
     new("Portrait", [(Side, Side)], [16777216])
   ];
@@ -57,5 +58,25 @@ public readonly record struct PortraitFile
       Format = PixelFormat.Rgb24,
       PixelData = pixels,
     };
+  }
+
+  public static PortraitFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width != Side || image.Height != Side)
+      throw new ArgumentException($"Portrait images are fixed at {Side}x{Side} pixels.", nameof(image));
+
+    image = image.EnsureAnyFormat(PixelFormat.Rgb24);
+    if (image.PixelData.Length < FileSize)
+      throw new ArgumentException("The raw image does not contain enough RGB pixel data for a Portrait picture.", nameof(image));
+
+    var planes = new byte[FileSize];
+    for (var i = 0; i < PlaneSize; ++i) {
+      var at = i * 3;
+      planes[i] = image.PixelData[at];
+      planes[PlaneSize + i] = image.PixelData[at + 1];
+      planes[PlaneSize * 2 + i] = image.PixelData[at + 2];
+    }
+
+    return new() { PlaneData = planes };
   }
 }
