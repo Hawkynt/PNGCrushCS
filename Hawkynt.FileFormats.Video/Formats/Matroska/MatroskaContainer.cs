@@ -105,11 +105,17 @@ public sealed class MatroskaContainer : IVideoContainerReader<MatroskaContainer>
         foreach (var field in EbmlScanner.Children(container.File, child))
           switch (field.Id) {
             case MatroskaElementId.SAMPLING_FREQUENCY: {
-              var value = field.FloatValue();
-              var rounded = Math.Round(value);
-              sampleRate = double.IsFinite(value) && value > 0 && rounded <= int.MaxValue && Math.Abs(value - rounded) < 1e-9
-                ? checked((int)rounded)
-                : 0;
+              // An element that is present but unreadable is not the same as one that is absent:
+              // the schema default only stands for the absent case, so an unreadable one reads as
+              // no stated rate rather than as 8000 Hz.
+              sampleRate = 0;
+              if (field.FloatValue() is { } value) {
+                var rounded = Math.Round(value);
+                sampleRate = double.IsFinite(value) && value > 0 && rounded <= int.MaxValue && Math.Abs(value - rounded) < 1e-9
+                  ? checked((int)rounded)
+                  : 0;
+              }
+
               break;
             }
             case MatroskaElementId.CHANNELS:
