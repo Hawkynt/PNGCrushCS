@@ -16,11 +16,21 @@ public sealed class MngFile : IImageFormatReader<MngFile>, IImageToRawImage<MngF
   static MngFile IImageFormatReader<MngFile>.FromSpan(ReadOnlySpan<byte> data) => MngReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<MngFile>.Capabilities => FormatCapability.MultiImage;
   static byte[] IImageFormatWriter<MngFile>.ToBytes(MngFile file) => MngWriter.ToBytes(file);
+
   public int Width { get; init; }
   public int Height { get; init; }
   public int TicksPerSecond { get; init; }
+
+  /// <summary>Maximum number of TERM repeat iterations. A value of <c>0x7fffffff</c> means infinity.</summary>
   public int NumPlays { get; init; }
+
   public MngTermAction TermAction { get; init; }
+
+  /// <summary>Action after the requested repeat iterations. Used only when <see cref="TermAction"/> is <see cref="MngTermAction.Repeat"/>.</summary>
+  public MngTermAction ActionAfterIterations { get; init; } = MngTermAction.ShowLast;
+
+  /// <summary>Delay in MNG ticks before a TERM repeat. Used only for <see cref="MngTermAction.Repeat"/>.</summary>
+  public int RepeatDelay { get; init; }
 
   /// <summary>Embedded PNG frames (each is a complete PNG file).</summary>
   public IReadOnlyList<byte[]> Frames { get; init; } = [];
@@ -51,8 +61,6 @@ public sealed class MngFile : IImageFormatReader<MngFile>, IImageToRawImage<MngF
   /// An MNG frame is a whole PNG, so this defers to the PNG codec rather than growing a second one:
   /// whatever PNG can hold losslessly, a one-frame MNG holds too, at any size. The result is a VLC
   /// profile stream — one image, no delta or object chunks — which is what a still picture is.
-  /// The TERM action leaves the frame on screen and the tick rate is the customary one per second,
-  /// neither of which a single frame ever reaches.
   /// </remarks>
   public static MngFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
@@ -66,5 +74,4 @@ public sealed class MngFile : IImageFormatReader<MngFile>, IImageToRawImage<MngF
       Frames = [PngWriter.ToBytes(PngFile.FromRawImage(image))],
     };
   }
-
 }
