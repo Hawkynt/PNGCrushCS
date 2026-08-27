@@ -3,52 +3,61 @@ using System.IO;
 
 namespace FileFormat.Jpeg2000.Codec;
 
-/// <summary>Writes individual bits to a byte stream (MSB-first), applying JPEG 2000 marker byte-stuffing.</summary>
+/// <summary>Writes JPEG 2000 packet-header bits MSB first with the B.10.1 bit-stuffing rule.</summary>
 internal sealed class BitWriter {
 
-  private readonly MemoryStream _output;
+  private readonly MemoryStream _output = new();
   private int _currentByte;
   private int _bitsUsed;
   private bool _lastByteWasFF;
 
-  public BitWriter() {
-    _output = new MemoryStream();
-    _currentByte = 0;
-    _bitsUsed = 0;
-    _lastByteWasFF = false;
-  }
-
-  /// <summary>Write a single bit (0 or 1).</summary>
+  /// <summary>Write a single bit.</summary>
   public void WriteBit(int bit) {
-    var maxBits = _lastByteWasFF ? 7 : 8;
+    var capacity = _lastByteWasFF ? 7 : 8;
     _currentByte = (_currentByte << 1) | (bit & 1);
     ++_bitsUsed;
-    if (_bitsUsed == maxBits)
+
+    if (_bitsUsed == capacity)
       _FlushByte();
   }
 
-  /// <summary>Write <paramref name="count"/> bits from an integer value (MSB-first).</summary>
+  /// <summary>Write <paramref name="count"/> bits, most significant bit first.</summary>
   public void WriteBits(int value, int count) {
-    for (var i = count - 1; i >= 0; --i)
-      WriteBit((value >> i) & 1);
+    if (count < 0 || count > 31)
+      throw new ArgumentOutOfRangeException(nameof(count));
+
+    for (var bit = count - 1; bit >= 0; --bit)
+      WriteBit((value >> bit) & 1);
   }
 
-  /// <summary>Flush any remaining partial byte and return the encoded data.</summary>
+  /// <summary>
+  /// Pads the packet header to a byte boundary and returns it.
+  /// </summary>
+  /// <remarks>
+  /// T.800 B.10.1 has one non-obvious edge case: a packet header is not allowed to end on FF. If a
+  /// fully occupied byte is FF, the stuffed zero bit that belongs to the following byte still has to
+  /// be present even when there are no more syntax bits. The previous writer omitted that byte, so a
+  /// decoder began the packet body where it was still expecting the stuffed bit.
+  /// </remarks>
   public byte[] Flush() {
     if (_bitsUsed > 0) {
-      var maxBits = _lastByteWasFF ? 7 : 8;
-      _currentByte <<= (maxBits - _bitsUsed);
-      _output.WriteByte((byte)_currentByte);
-      _lastByteWasFF = (byte)_currentByte == 0xFF;
-      _bitsUsed = 0;
-      _currentByte = 0;
+      var capacity = _lastByteWasFF ? 7 : 8;
+      _currentByte <<= capacity - _bitsUsed;
+      _FlushByte();
     }
+
+    if (_lastByteWasFF) {
+      _output.WriteByte(0);
+      _lastByteWasFF = false;
+    }
+
     return _output.ToArray();
   }
 
   private void _FlushByte() {
-    _output.WriteByte((byte)_currentByte);
-    _lastByteWasFF = (byte)_currentByte == 0xFF;
+    var value = (byte)_currentByte;
+    _output.WriteByte(value);
+    _lastByteWasFF = value == 0xFF;
     _currentByte = 0;
     _bitsUsed = 0;
   }
