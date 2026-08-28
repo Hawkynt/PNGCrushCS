@@ -21,7 +21,7 @@ namespace FileFormat.NcrImage;
 /// XnView and there is no file to check a reading of it against, so it is refused by name rather
 /// than decoded as Group 4 — which would draw a page of noise at exactly the right size.
 /// </remarks>
-public readonly record struct NcrImageFile : IImageFormatReader<NcrImageFile>, IImageToRawImage<NcrImageFile> {
+public readonly record struct NcrImageFile : IImageFormatReader<NcrImageFile>, IImageToRawImage<NcrImageFile>, IImageFromRawImage<NcrImageFile>, IImageFormatWriter<NcrImageFile> {
 
   /// <summary>The four bytes a file opens with.</summary>
   public static ReadOnlySpan<byte> Signature => [0x6E, 0x6E, 0x0A, 0x00];
@@ -41,6 +41,7 @@ public readonly record struct NcrImageFile : IImageFormatReader<NcrImageFile>, I
   static string IImageFormatMetadata<NcrImageFile>.PrimaryExtension => ".ncr";
   static string[] IImageFormatMetadata<NcrImageFile>.FileExtensions => [".ncr"];
   static NcrImageFile IImageFormatReader<NcrImageFile>.FromSpan(ReadOnlySpan<byte> data) => NcrImageReader.FromSpan(data);
+  static byte[] IImageFormatWriter<NcrImageFile>.ToBytes(NcrImageFile file) => NcrImageWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<NcrImageFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
 
   static bool? IImageFormatMetadata<NcrImageFile>.MatchesSignature(ReadOnlySpan<byte> header)
@@ -66,4 +67,13 @@ public readonly record struct NcrImageFile : IImageFormatReader<NcrImageFile>, I
     Palette = _BlackWhitePalette[..],
     PaletteCount = 2,
   };
+
+  /// <summary>Creates a conforming Group-4 NCR Image from any source image.</summary>
+  public static NcrImageFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width is < 1 or > ushort.MaxValue || image.Height is < 1 or > ushort.MaxValue)
+      throw new ArgumentException($"NCR dimensions must fit 16-bit fields; got {image.Width}x{image.Height}.", nameof(image));
+    var mono = image.EnsureIndexed(PixelFormat.Indexed1, _BlackWhitePalette);
+    return new() { Width = mono.Width, Height = mono.Height, PixelData = mono.PixelData[..] };
+  }
 }
