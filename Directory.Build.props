@@ -5,6 +5,15 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+    <!-- The package READMEs' API reference takes its summaries and <example> blocks from these
+         files. It is set repo-wide rather than per package because the packages bundle other
+         projects' assemblies, and each bundled assembly needs its own XML docs alongside it.
+         CS1591 stays quiet: undocumented members are reported by the README check as an advisory
+         count, which is the place to see the gap, not one warning per member. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+
     <Version>1.0.0</Version>
     <Authors>Hawkynt</Authors>
     <PackageLicenseExpression>LGPL-3.0-or-later</PackageLicenseExpression>
