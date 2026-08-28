@@ -884,7 +884,7 @@ Implements `IVideoCodecDecoder<H263VideoDecoder>`, `IVideoFrameDecoder`.
 
 #### `H264VideoDecoder`
 
-Decodes H.264 / AVC video, ITU-T H.264 \| ISO/IEC 14496-10: Baseline profile I and P slices.
+Decodes H.264 / AVC video, ITU-T H.264 | ISO/IEC 14496-10: Baseline profile I and P slices.
 
 Implements `IVideoCodecDecoder<H264VideoDecoder>`, `IVideoFrameDecoder`.
 
@@ -898,7 +898,7 @@ Implements `IVideoCodecDecoder<H264VideoDecoder>`, `IVideoFrameDecoder`.
 
 #### `H265VideoDecoder`
 
-Decodes H.265 / HEVC video, ITU-T H.265 \| ISO/IEC 23008-2: Main profile intra pictures.
+Decodes H.265 / HEVC video, ITU-T H.265 | ISO/IEC 23008-2: Main profile intra pictures.
 
 Implements `IVideoCodecDecoder<H265VideoDecoder>`, `IVideoFrameDecoder`.
 
@@ -1827,7 +1827,7 @@ What role a chunk plays in the format. Generic categories that map onto each for
 
 #### `ChunkMobility`
 
-What a caller may do with a chunk during rewrite. Flags compose — a movable + removable metadata chunk has `Movable \| Removable`.
+What a caller may do with a chunk during rewrite. Flags compose — a movable + removable metadata chunk has `Movable | Removable`.
 
 | Value | Numeric | Summary |
 | --- | --- | --- |
