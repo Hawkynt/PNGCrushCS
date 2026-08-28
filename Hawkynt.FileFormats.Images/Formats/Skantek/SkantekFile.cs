@@ -22,7 +22,7 @@ namespace FileFormat.Skantek;
 /// Decoding the stream the ordinary way round produces a blank page, which is how the choice was
 /// found.
 /// </remarks>
-public readonly record struct SkantekFile : IImageFormatReader<SkantekFile>, IImageToRawImage<SkantekFile> {
+public readonly record struct SkantekFile : IImageFormatReader<SkantekFile>, IImageToRawImage<SkantekFile>, IImageFromRawImage<SkantekFile>, IImageFormatWriter<SkantekFile> {
 
   /// <summary>The sixteen bytes the file opens with, all four longs of them fixed.</summary>
   public static ReadOnlySpan<byte> Signature => [
@@ -50,6 +50,7 @@ public readonly record struct SkantekFile : IImageFormatReader<SkantekFile>, IIm
   static string IImageFormatMetadata<SkantekFile>.PrimaryExtension => ".skn";
   static string[] IImageFormatMetadata<SkantekFile>.FileExtensions => [".skn"];
   static SkantekFile IImageFormatReader<SkantekFile>.FromSpan(ReadOnlySpan<byte> data) => SkantekReader.FromSpan(data);
+  static byte[] IImageFormatWriter<SkantekFile>.ToBytes(SkantekFile file) => SkantekWriter.ToBytes(file);
 
   static VideoMode[] IImageFormatMetadata<SkantekFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])
@@ -77,4 +78,18 @@ public readonly record struct SkantekFile : IImageFormatReader<SkantekFile>, IIm
     Palette = _BlackWhitePalette[..],
     PaletteCount = 2,
   };
+
+  /// <summary>Creates a bilevel Skantek page from any source image.</summary>
+  public static SkantekFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width is < 1 or > 65535 || image.Height is < 1 or > 65535)
+      throw new ArgumentException($"Skantek dimensions must be between 1 and 65535; got {image.Width}x{image.Height}.", nameof(image));
+
+    var mono = image.EnsureIndexed(PixelFormat.Indexed1, _BlackWhitePalette);
+    return new() {
+      Width = mono.Width,
+      Height = mono.Height,
+      PixelData = mono.PixelData[..],
+    };
+  }
 }
