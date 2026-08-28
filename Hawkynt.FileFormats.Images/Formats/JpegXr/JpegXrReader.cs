@@ -101,7 +101,7 @@ public static class JpegXrReader {
     byte[] pixels;
 
     if (pixelFormat.Value.ComponentCount == 1) {
-      var decoded = JxrCodestream.DecodeGray(codestream);
+      var decoded = JpegXrFrequencyGrayDecoder.Decode(codestream);
       _RequireMatchingDimensions(width, height, decoded.width, decoded.height, "image");
       pixels = new byte[pixelCount];
       for (var i = 0; i < pixels.Length; ++i)
