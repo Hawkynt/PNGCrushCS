@@ -33,11 +33,12 @@ public enum LaserDataCompression : byte {
 /// <see cref="PixelData"/> therefore holds the complement, a set bit being black, matching the other
 /// fax-derived formats here.
 /// </remarks>
-public readonly record struct LaserDataFile : IImageFormatReader<LaserDataFile>, IImageToRawImage<LaserDataFile> {
+public readonly record struct LaserDataFile : IImageFormatReader<LaserDataFile>, IImageToRawImage<LaserDataFile>, IImageFromRawImage<LaserDataFile>, IImageFormatWriter<LaserDataFile> {
 
   static string IImageFormatMetadata<LaserDataFile>.PrimaryExtension => ".lda";
   static string[] IImageFormatMetadata<LaserDataFile>.FileExtensions => [".lda"];
   static LaserDataFile IImageFormatReader<LaserDataFile>.FromSpan(ReadOnlySpan<byte> data) => LaserDataReader.FromSpan(data);
+  static byte[] IImageFormatWriter<LaserDataFile>.ToBytes(LaserDataFile file) => LaserDataWriter.ToBytes(file);
 
   /// <summary>Magic value at offset 0, a 16 bit little-endian 0xDCDC, so the bytes 0xDC 0xDC.</summary>
   internal const ushort Magic = 0xDCDC;
@@ -89,6 +90,24 @@ public readonly record struct LaserDataFile : IImageFormatReader<LaserDataFile>,
       Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
+    };
+  }
+
+  /// <summary>Creates a Group-4-compressed LaserData page from any source image.</summary>
+  public static LaserDataFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width is < 1 or > ushort.MaxValue || image.Height is < 1 or > ushort.MaxValue)
+      throw new ArgumentException($"LaserData dimensions must fit 16-bit fields; got {image.Width}x{image.Height}.", nameof(image));
+
+    var mono = image.EnsureIndexed(PixelFormat.Indexed1, [255, 255, 255, 0, 0, 0]);
+    return new() {
+      Width = mono.Width,
+      Height = mono.Height,
+      Compression = LaserDataCompression.Group4,
+      IsMostSignificantBitFirst = true,
+      HorizontalResolution = 300,
+      VerticalResolution = 300,
+      PixelData = mono.PixelData[..],
     };
   }
 
