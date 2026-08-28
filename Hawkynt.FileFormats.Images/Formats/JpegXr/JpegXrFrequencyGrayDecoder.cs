@@ -9,8 +9,8 @@ namespace FileFormat.JpegXr;
 /// frequency-order Y-only codestream, as used by JXRLib for planar alpha in ordinary
 /// 32bpp BGRA files. The signal, entropy, prediction, quantization, and overlap work is
 /// performed by the vendored JXRLib-compatible managed core; this class only performs
-/// the frequency packet/index-table orchestration that <see cref="JxrCodestream.DecodeGray"/>
-/// does not currently expose.
+/// the Y-only plane-header and frequency packet/index-table orchestration that
+/// <see cref="JxrCodestream.DecodeGray"/> does not currently expose for frequency order.
 /// </summary>
 internal static class JpegXrFrequencyGrayDecoder {
 
@@ -32,35 +32,59 @@ internal static class JpegXrFrequencyGrayDecoder {
       return JxrCodestream.DecodeGray(codestream);
 
     if (imageHeader.TilingFlag)
-      throw new NotSupportedException("Frequency-order tiled Y-only JPEG XR is outside the current public planar-alpha adapter.");
+      throw new NotSupportedException("Frequency-order tiled Y-only JPEG XR is outside the current public grayscale/planar-alpha adapter.");
     if (imageHeader.OverlapMode is < 0 or > 2)
       throw new NotSupportedException($"JPEG XR overlap mode {imageHeader.OverlapMode} is not supported.");
     if (imageHeader.OutputBitDepth != JxrOutputBitDepth.Bd8)
-      throw new NotSupportedException($"The public JPEG XR planar-alpha adapter requires BD8 alpha, got {imageHeader.OutputBitDepth}.");
+      throw new NotSupportedException($"The public JPEG XR frequency Y-only adapter currently requires BD8 samples, got {imageHeader.OutputBitDepth}.");
 
     var width = checked((int)imageHeader.WidthMinus1 + 1);
     var height = checked((int)imageHeader.HeightMinus1 + 1);
     if (width <= 0 || height <= 0)
-      throw new InvalidDataException($"Invalid JPEG XR alpha dimensions: {width}x{height}.");
+      throw new InvalidDataException($"Invalid JPEG XR Y-only dimensions: {width}x{height}.");
 
-    var planeHeader = ImagePlaneHeader.Read(ref reader, imageHeader.OutputBitDepth);
-    if (planeHeader.InternalClrFmt != JxrInternalColorFormat.YOnly)
-      throw new NotSupportedException($"JPEG XR planar alpha must use a Y-only plane, got {planeHeader.InternalClrFmt}.");
-    if (!planeHeader.DcImagePlaneUniformFlag ||
-        !planeHeader.LpImagePlaneUniformFlag ||
-        !planeHeader.HpImagePlaneUniformFlag)
-      throw new NotSupportedException("Frequency-order JPEG XR planar alpha with per-tile quantizer tables is not exposed by the current adapter.");
+    // Mirror JxrCodestream.ReadPlaneHeaderGray exactly. This matters because the JXRLib Y-only
+    // grammar uses the LP/HP quantizer-reuse bits in the same positions as that proven path.
+    var internalColorFormat = (JxrInternalColorFormat)reader.ReadBits(3);
+    if (internalColorFormat != JxrInternalColorFormat.YOnly)
+      throw new NotSupportedException($"JPEG XR frequency grayscale/alpha requires Y-only internal format, got {internalColorFormat}.");
 
-    var bandCount = planeHeader.BandsPresent switch {
+    var scaled = reader.ReadBit();
+    var bandsPresent = (JxrBandsPresent)reader.ReadBits(4);
+    var bandCount = bandsPresent switch {
       JxrBandsPresent.AllBands => 4,
       JxrBandsPresent.NoFlexbits => 3,
-      _ => throw new NotSupportedException($"Frequency-order JPEG XR planar alpha with {planeHeader.BandsPresent} is not exposed by the current adapter.")
+      _ => throw new NotSupportedException($"Frequency-order JPEG XR Y-only with {bandsPresent} is not exposed by the current adapter.")
     };
-    var noFlexBits = planeHeader.BandsPresent == JxrBandsPresent.NoFlexbits;
+    var noFlexBits = bandsPresent == JxrBandsPresent.NoFlexbits;
 
-    var qDc = Quantization.Resolve(planeHeader.DcQuant, planeHeader.ScaledFlag);
-    var qLp = Quantization.Resolve(planeHeader.LpQuant, planeHeader.ScaledFlag);
-    var qHp = Quantization.Resolve(planeHeader.HpQuant, planeHeader.ScaledFlag);
+    // BD8 carries no SHIFT_BITS / LEN_MANTISSA fields.
+    if (!reader.ReadBit())
+      throw new NotSupportedException("Frequency-order JPEG XR Y-only with non-uniform DC quantization is not supported.");
+    var qpDc = (int)reader.ReadBits(8);
+
+    int qpLp;
+    if (reader.ReadBit()) {
+      qpLp = qpDc;
+    } else {
+      if (!reader.ReadBit())
+        throw new NotSupportedException("Frequency-order JPEG XR Y-only with non-uniform LP quantization is not supported.");
+      qpLp = (int)reader.ReadBits(8);
+    }
+
+    int qpHp;
+    if (reader.ReadBit()) {
+      qpHp = qpLp;
+    } else {
+      if (!reader.ReadBit())
+        throw new NotSupportedException("Frequency-order JPEG XR Y-only with non-uniform HP quantization is not supported.");
+      qpHp = (int)reader.ReadBits(8);
+    }
+    _AlignToByte(ref reader);
+
+    var qDc = Quantization.Resolve(qpDc, scaled);
+    var qLp = Quantization.Resolve(qpLp, scaled);
+    var qHp = Quantization.Resolve(qpHp, scaled);
 
     var mbCols = checked((width + 15) / 16);
     var mbRows = checked((height + 15) / 16);
@@ -68,23 +92,24 @@ internal static class JpegXrFrequencyGrayDecoder {
 
     var startCode = reader.ReadBits(16);
     if (startCode != IndexTableTiles.IndexTableStartCode)
-      throw new InvalidDataException($"JPEG XR frequency alpha index-table start code mismatch: got 0x{startCode:X4}.");
+      throw new InvalidDataException($"JPEG XR frequency Y-only index-table start code mismatch: got 0x{startCode:X4}.");
 
     var offsets = new long[bandCount];
     var empty = new bool[bandCount];
     for (var band = 0; band < bandCount; ++band)
       offsets[band] = _ReadFrequencyIndexEntry(ref reader, out empty[band]);
 
-    _ReadVlwEsc(ref reader); // end escape / no profile-level block
+    _ReadVlwEsc(ref reader); // 0xFF end escape / no profile-level block
     _AlignToByte(ref reader);
     var packetBase = reader.BytePosition;
+    var codedLength = codestream.Length;
 
     BitReader BandReader(int band) {
       var result = new BitReader(padded);
       if (!empty[band]) {
         var packetOffset = checked(packetBase + (int)offsets[band]);
-        if (packetOffset < 0 || packetOffset > padded.Length - _PACKET_HEADER_BYTES)
-          throw new InvalidDataException($"JPEG XR alpha band {band} packet points outside the codestream.");
+        if (packetOffset < 0 || packetOffset > codedLength - _PACKET_HEADER_BYTES)
+          throw new InvalidDataException($"JPEG XR Y-only band {band} packet points outside the codestream.");
         result.SeekToByte(packetOffset + _PACKET_HEADER_BYTES);
       }
       return result;
@@ -118,17 +143,11 @@ internal static class JpegXrFrequencyGrayDecoder {
       tile.AdvanceRow();
     }
 
-    OverlapTransform.Inverse(
-      planes,
-      mbCols,
-      mbRows,
-      imageHeader.OverlapMode,
-      planeHeader.ScaledFlag
-    );
+    OverlapTransform.Inverse(planes, mbCols, mbRows, imageHeader.OverlapMode, scaled);
 
     var pixels = new int[checked(width * height)];
     var macroblock = new int[256];
-    var outputShift = planeHeader.ScaledFlag ? SignalTransform.ScaledShift : 0;
+    var outputShift = scaled ? SignalTransform.ScaledShift : 0;
     for (var mbRow = 0; mbRow < mbRows; ++mbRow)
     for (var mbColumn = 0; mbColumn < mbCols; ++mbColumn) {
       var baseOffset = OverlapTransform.MbBase(mbCols, mbRow, mbColumn);
