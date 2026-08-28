@@ -4,14 +4,23 @@ using System.Linq;
 namespace FileFormat.Core.Tests;
 
 /// <summary>
-/// Exercises every <see cref="PixelFormat"/> pair through <see cref="PixelConverter.Convert"/>.
+/// Exercises every packed integer <see cref="PixelFormat"/> pair through <see cref="PixelConverter.Convert"/>.
 /// The hub-based fallback used to recurse forever for targets with no direct route from BGRA32,
 /// overflowing the stack — an uncatchable crash reachable from the public encode API.
 /// </summary>
+/// <remarks>
+/// Planar YUV and floating-point formats deliberately live one layer above this converter in
+/// <see cref="RawImageConverter"/>. Keeping them out of this matrix is not an exemption from conversion
+/// coverage: <c>RawImageExtendedFormatTests</c> exercises those routes and their colour interpretation.
+/// In particular, RGB-to-YUV cannot be a context-free byte shuffle: a writer has to choose a matrix,
+/// signal range and chroma siting rather than have this low-level converter invent those semantics.
+/// </remarks>
 [TestFixture]
 public sealed class PixelConverterMatrixTests {
 
-  private static PixelFormat[] AllFormats => Enum.GetValues<PixelFormat>();
+  private static PixelFormat[] PackedIntegerFormats => Enum.GetValues<PixelFormat>()
+    .Where(format => !RawImage.IsPlanarYuvFormat(format) && !RawImage.IsFloatingPointFormat(format))
+    .ToArray();
 
   private static readonly PixelFormat[] _IndexedFormats = [
     PixelFormat.Indexed1, PixelFormat.Indexed4, PixelFormat.Indexed8, PixelFormat.Indexed16
@@ -35,11 +44,11 @@ public sealed class PixelConverterMatrixTests {
 
   [Test]
   [Category("Unit")]
-  public void Convert_EveryFormatPair_Terminates() {
-    foreach (var source in AllFormats) {
+  public void Convert_EveryPackedIntegerFormatPair_Terminates() {
+    foreach (var source in PackedIntegerFormats) {
       var image = _MakeSource(source);
 
-      foreach (var target in AllFormats) {
+      foreach (var target in PackedIntegerFormats) {
         var result = PixelConverter.Convert(image, target);
 
         Assert.That(result, Is.Not.Null, $"{source} -> {target} returned null");
@@ -97,8 +106,8 @@ public sealed class PixelConverterMatrixTests {
 
   [Test]
   [Category("Unit")]
-  public void Convert_SameFormat_ReturnsSourceUnchanged() {
-    foreach (var format in AllFormats) {
+  public void Convert_SamePackedIntegerFormat_ReturnsSourceUnchanged() {
+    foreach (var format in PackedIntegerFormats) {
       var image = _MakeSource(format);
       Assert.That(PixelConverter.Convert(image, format), Is.SameAs(image), $"{format} was needlessly copied");
     }
