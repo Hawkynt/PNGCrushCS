@@ -44,7 +44,7 @@ public sealed class Vp9VideoDecoderTests {
   [Test]
   [Category("Unit")]
   public void TheCodecIsNamedForTheProfilesItReads()
-    => Assert.That(Vp9VideoDecoder.CodecName, Does.Contain("VP9").And.Contain("profiles 0/1"));
+    => Assert.That(Vp9VideoDecoder.CodecName, Does.Contain("VP9").And.Contain("profiles 0-3"));
 
   [Test]
   [Category("Unit")]
@@ -285,16 +285,6 @@ public sealed class Vp9VideoDecoderTests {
   // Refusals
   // ============================================================================================
 
-  [TestCase(2)]
-  [TestCase(3)]
-  [Category("Unit")]
-  public void AHighBitDepthProfileIsRefusedByName(int profile) {
-    var failure = Assert.Throws<NotSupportedException>(
-      () => _Decode(Vp9TestStream.BuildKeyFrame(new() { Profile = profile })));
-
-    Assert.That(failure!.Message, Does.Contain($"profile {profile}").And.Contain("ten- or twelve-bit"));
-  }
-
   [Test]
   [Category("Unit")]
   public void AMissingFrameMarkerIsRefusedByName() {
@@ -316,10 +306,10 @@ public sealed class Vp9VideoDecoderTests {
   [Test]
   [Category("Unit")]
   public void TheColourSpaceProfileZeroCannotCarryIsRefusedByName() {
-    var failure = Assert.Throws<NotSupportedException>(
+    var failure = Assert.Throws<InvalidDataException>(
       () => _Decode(Vp9TestStream.BuildKeyFrame(new() { ColorSpace = 7 })));
 
-    Assert.That(failure!.Message, Does.Contain("sRGB").And.Contain("7.2.2"));
+    Assert.That(failure!.Message, Does.Contain("sRGB").And.Contain("profile-0"));
   }
 
   [Test]
