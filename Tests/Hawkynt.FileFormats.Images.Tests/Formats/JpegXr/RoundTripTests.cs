@@ -2,7 +2,6 @@ using System;
 using System.Buffers.Binary;
 using System.Linq;
 using FileFormat.JpegXr;
-using SharpAstro.Jxr;
 
 namespace FileFormat.JpegXr.Tests;
 
@@ -10,8 +9,6 @@ namespace FileFormat.JpegXr.Tests;
 public sealed class RoundTripTests {
 
   // glencoesoftware/jxrlib fixture red.jxr: 10x10 solid red, 32bpp BGRA with planar alpha.
-  // The public JpegXrFile model intentionally remains Gray8/RGB24, so this test exercises the
-  // imported T.832 core directly against an independently produced JXRLib codestream.
   private const string _RedFixtureBase64 =
     "SUm8ASAAAAAkw91vA07+S7GFPXd2jckPAAAAAAAAAAAKAAG8AQAQAAAACAAA" +
     "AAK8BAABAAAAAAAAAIC8BAABAAAACgAAAIG8BAABAAAACgAAAIK8CwABAAAA" +
@@ -66,6 +63,28 @@ public sealed class RoundTripTests {
 
   [Test]
   [Category("Unit")]
+  public void Rgba32_PlanarAlphaRoundTrip_IsPixelExact() {
+    const int width = 17, height = 18;
+    var pixels = new byte[width * height * 4];
+    for (var i = 0; i < width * height; ++i) {
+      var p = i * 4;
+      pixels[p] = (byte)(i * 17 + 3);
+      pixels[p + 1] = (byte)(i * 29 + 5);
+      pixels[p + 2] = (byte)(255 - i * 11);
+      pixels[p + 3] = (byte)(i * 43 + 7);
+    }
+
+    var encoded = JpegXrWriter.ToBytes(new JpegXrFile { Width = width, Height = height, ComponentCount = 4, PixelData = pixels });
+    var decoded = JpegXrReader.FromBytes(encoded);
+
+    Assert.Multiple(() => {
+      Assert.That(decoded.ComponentCount, Is.EqualTo(4));
+      Assert.That(decoded.PixelData, Is.EqualTo(pixels));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
   public void Writer_UsesStandardWicGuidAndRealWmphotoCodestream() {
     var file = new JpegXrFile {
       Width = 3,
@@ -96,22 +115,24 @@ public sealed class RoundTripTests {
 
   [Test]
   [Category("Unit")]
-  public void ManagedCore_DecodesIndependentJxrLibFrequencyFixture() {
-    var bytes = Convert.FromBase64String(_RedFixtureBase64);
-    var ifdOffset = checked((int)BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(4, 4)));
-    var entries = JpegXrIfd.ParseEntries(bytes, ifdOffset);
-    var imageOffset = entries.Single(e => e.Tag == JpegXrIfd.TAG_IMAGE_OFFSET).Value;
-    var imageCount = entries.Single(e => e.Tag == JpegXrIfd.TAG_IMAGE_BYTE_COUNT).Value;
-
-    var decoded = JxrCodestream.Decode(bytes.AsSpan((int)imageOffset, (int)imageCount));
+  public void PublicReader_DecodesIndependentJxrLibFrequencyAndAlphaFixture() {
+    var decoded = JpegXrReader.FromBytes(Convert.FromBase64String(_RedFixtureBase64));
 
     Assert.Multiple(() => {
-      Assert.That(decoded.width, Is.EqualTo(10));
-      Assert.That(decoded.height, Is.EqualTo(10));
-      Assert.That(decoded.r, Is.All.EqualTo(255));
-      Assert.That(decoded.g, Is.All.EqualTo(0));
-      Assert.That(decoded.b, Is.All.EqualTo(0));
+      Assert.That(decoded.Width, Is.EqualTo(10));
+      Assert.That(decoded.Height, Is.EqualTo(10));
+      Assert.That(decoded.ComponentCount, Is.EqualTo(4));
+      Assert.That(decoded.PixelData.Length, Is.EqualTo(10 * 10 * 4));
     });
+
+    for (var i = 0; i < 100; ++i) {
+      var p = i * 4;
+      Assert.Multiple(() => {
+        Assert.That(decoded.PixelData[p], Is.EqualTo(255), $"R at pixel {i}");
+        Assert.That(decoded.PixelData[p + 1], Is.EqualTo(0), $"G at pixel {i}");
+        Assert.That(decoded.PixelData[p + 2], Is.EqualTo(0), $"B at pixel {i}");
+      });
+    }
   }
 
   [Test]
