@@ -10,5 +10,6 @@ public enum NiftiDataType : short {
   Rgb24 = 128,
   Int8 = 256,
   UInt16 = 512,
-  UInt32 = 768
+  UInt32 = 768,
+  Rgba32 = 2304
 }
