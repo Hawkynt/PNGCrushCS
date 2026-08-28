@@ -1,10 +1,11 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Nifti;
 
-/// <summary>NIfTI-1 paired-file form: a 348-byte .hdr header with voxel bytes in a sibling .img.</summary>
+/// <summary>Paired NIfTI .hdr/.img form. Reads NIfTI-1 and NIfTI-2; writes portable NIfTI-1 pairs.</summary>
 [FormatDetectionPriority(90)]
 public sealed class NiftiPairFile :
   IImageFormatReader<NiftiPairFile>, IImageToRawImage<NiftiPairFile>,
@@ -20,10 +21,10 @@ public sealed class NiftiPairFile :
   public NiftiFile Nifti { get; init; } = new();
 
   public static bool? MatchesSignature(ReadOnlySpan<byte> header) {
-    if (header.Length < NiftiHeader.StructSize)
-      return null;
-    var magic = header.Slice(344, 4);
-    return magic.SequenceEqual("ni1\0"u8) ? true : null;
+    var v2 = Nifti2Codec.Matches(header, pair: true);
+    if (v2 == true)
+      return true;
+    return Nifti1Codec.Matches(header, pair: true);
   }
 
   public static RawImage ToRawImage(NiftiPairFile file) {
@@ -40,12 +41,9 @@ public sealed class NiftiPairFile :
 public static class NiftiPairReader {
 
   public static NiftiPairFile FromSpan(ReadOnlySpan<byte> data) {
-    if (data.Length < NiftiHeader.StructSize)
-      throw new InvalidDataException("Data is too small for a NIfTI-1 paired header.");
-    var header = NiftiHeader.ReadFrom(data);
-    if (header.SizeOfHdr != NiftiHeader.StructSize || header.Magic != "ni1")
+    if (Nifti1Codec.Matches(data, pair: true) == true || Nifti2Codec.Matches(data, pair: true) == true)
       throw new InvalidDataException("NIfTI paired data requires its .img companion and must be opened by file path.");
-    throw new InvalidDataException("NIfTI paired data requires its .img companion and must be opened by file path.");
+    throw new InvalidDataException("Data is not a recognised NIfTI paired header.");
   }
 
   public static NiftiPairFile FromFile(FileInfo file) {
@@ -64,44 +62,22 @@ public static class NiftiPairReader {
     if (!File.Exists(imagePath))
       throw new FileNotFoundException("NIfTI paired voxel companion not found.", imagePath);
 
-    var bytes = File.ReadAllBytes(headerPath);
-    if (bytes.Length < NiftiHeader.StructSize)
+    var header = File.ReadAllBytes(headerPath);
+    var payload = File.ReadAllBytes(imagePath);
+    if (header.Length < 4)
       throw new InvalidDataException("NIfTI paired header is truncated.");
 
-    var header = NiftiHeader.ReadFrom(bytes);
-    if (header.SizeOfHdr != NiftiHeader.StructSize)
-      throw new InvalidDataException($"Invalid NIfTI SizeOfHdr: expected {NiftiHeader.StructSize}, got {header.SizeOfHdr}.");
-    if (header.Magic != "ni1")
-      throw new InvalidDataException($"NIfTI paired header has magic '{header.Magic}', expected 'ni1'.");
+    var littleSize = BinaryPrimitives.ReadInt32LittleEndian(header);
+    var bigSize = BinaryPrimitives.ReadInt32BigEndian(header);
+    NiftiFile parsed;
+    if (littleSize == Nifti2Codec.HeaderSize || bigSize == Nifti2Codec.HeaderSize)
+      parsed = Nifti2Codec.ParsePair(header, payload);
+    else if (littleSize == Nifti1Codec.HeaderSize || bigSize == Nifti1Codec.HeaderSize)
+      parsed = Nifti1Codec.ParsePair(header, payload);
+    else
+      throw new InvalidDataException("NIfTI paired header has neither a 348-byte NIfTI-1 nor 540-byte NIfTI-2 header.");
 
-    var ndims = header.Dim[0];
-    var width = ndims >= 1 ? header.Dim[1] : 1;
-    var height = ndims >= 2 ? header.Dim[2] : 1;
-    var depth = ndims >= 3 ? header.Dim[3] : 1;
-    if (width < 1 || height < 1 || depth < 1)
-      throw new InvalidDataException("NIfTI paired header contains a non-positive image dimension.");
-
-    var payload = File.ReadAllBytes(imagePath);
-    var start = Math.Max(0, (int)header.VoxOffset);
-    if (start > payload.Length)
-      throw new InvalidDataException("NIfTI vox_offset exceeds the .img companion length.");
-    var pixels = payload[start..];
-
-    return new() {
-      Nifti = new NiftiFile {
-        Width = width,
-        Height = height,
-        Depth = depth,
-        Datatype = (NiftiDataType)header.Datatype,
-        Bitpix = header.Bitpix,
-        SclSlope = header.SclSlope,
-        SclInter = header.SclInter,
-        VoxOffset = 0,
-        Description = header.Descrip,
-        PixelData = pixels,
-        Pixdim = header.Pixdim,
-      },
-    };
+    return new() { Nifti = parsed };
   }
 }
 
@@ -125,7 +101,7 @@ public static class NiftiPairWriter {
     ArgumentNullException.ThrowIfNull(file);
     var model = file.Nifti;
     if (model.Width is < 1 or > short.MaxValue || model.Height is < 1 or > short.MaxValue || model.Depth is < 1 or > short.MaxValue)
-      throw new InvalidDataException("NIfTI-1 paired dimensions must fit signed 16-bit dim[] entries.");
+      throw new InvalidDataException("NIfTI-1 paired dimensions must fit signed 16-bit dim[] entries; use NIfTI-2 for larger dimensions.");
 
     var dim = new short[8];
     var ndims = (short)(model.Depth > 1 ? 3 : 2);
