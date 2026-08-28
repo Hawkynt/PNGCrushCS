@@ -54,15 +54,31 @@ public static class FitsReader {
 
     var width = 0;
     var height = 0;
+    var channels = 1;
     if (naxis >= 1)
       width = FitsHeaderParser.GetIntValue(keywords, "NAXIS1");
     if (naxis >= 2)
       height = FitsHeaderParser.GetIntValue(keywords, "NAXIS2");
+    if (naxis >= 3)
+      channels = FitsHeaderParser.GetIntValue(keywords, "NAXIS3");
+
+    if (width < 0 || height < 0 || channels < 1)
+      throw new InvalidDataException("Invalid FITS axis size.");
+
+    // This image API maps a conventional NAXIS3=3/4 colour cube onto RGB(A). Higher-dimensional
+    // scientific arrays are still represented by their first image plane rather than silently
+    // multiplying arbitrary axes into a bogus colour count.
+    if (naxis > 3)
+      channels = 1;
 
     // Read pixel data
-    var bytesPerPixel = Math.Abs((int)bitpix) / 8;
-    var pixelCount = (long)width * height;
-    var dataSize = (int)(pixelCount * bytesPerPixel);
+    var bytesPerSample = Math.Abs((int)bitpix) / 8;
+    var sampleCount = checked((long)width * height * channels);
+    var dataSize64 = checked(sampleCount * bytesPerSample);
+    if (dataSize64 > int.MaxValue)
+      throw new InvalidDataException("FITS image data exceeds the supported in-memory size.");
+
+    var dataSize = (int)dataSize64;
     var availableData = Math.Min(dataSize, data.Length - headerLength);
 
     var pixelData = new byte[availableData > 0 ? availableData : 0];
@@ -72,6 +88,7 @@ public static class FitsReader {
     return new FitsFile {
       Width = width,
       Height = height,
+      Channels = channels,
       Bitpix = bitpix,
       Keywords = keywords,
       PixelData = pixelData
