@@ -66,10 +66,14 @@ public sealed class H264PredictionWeightsTests {
     var spsNal = H264NalReader.SplitAnnexB(new H264TestStream().SequenceParameterSet().ToArray()).Single();
     var sps = H264SequenceParameterSet.Parse(spsNal.Payload);
     var payload = new H264TestStream().Unsigned(8).RawPayload();
-    var reader = new H264BitReader(payload);
 
     Assert.That(
-      () => H264PredictionWeights.ParseP(ref reader, sps, 1),
+      () => _ParseWeights(payload, sps),
       Throws.TypeOf<System.IO.InvalidDataException>().With.Message.Contains("luma_log2_weight_denom"));
+  }
+
+  private static H264PredictionWeights _ParseWeights(byte[] payload, H264SequenceParameterSet sps) {
+    var reader = new H264BitReader(payload);
+    return H264PredictionWeights.ParseP(ref reader, sps, 1);
   }
 }
