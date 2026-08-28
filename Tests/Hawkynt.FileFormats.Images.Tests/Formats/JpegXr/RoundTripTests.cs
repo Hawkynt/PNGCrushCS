@@ -111,19 +111,11 @@ public sealed class RoundTripTests {
   }
 
   /// <summary>
-  /// The fixture is a FREQUENCY-mode codestream and the vendored reference decoder is SPATIAL-only,
-  /// which it says by name rather than returning something wrong.
+  /// Decodes glencoesoftware/JXRLib's independent frequency-order BGRA fixture through the public
+  /// T.833 reader, including its separate frequency-order Y-only planar-alpha codestream.
   /// </summary>
-  /// <remarks>
-  /// Kept rather than deleted because the fixture is sound and the refusal is the right behaviour
-  /// until frequency-mode decoding exists. Its own alpha byte count was also wrong — it stated the
-  /// whole file length, 454, where the alpha runs from 334 to the end, 120 bytes — and that is
-  /// corrected here so the test fails on the capability that is missing rather than on a fixture
-  /// that could never have parsed.
-  /// </remarks>
   [Test]
   [Category("Unit")]
-  [Ignore("Frequency-mode JPEG XR is not implemented; the decoder refuses it by name.")]
   public void PublicReader_DecodesIndependentJxrLibFrequencyAndAlphaFixture() {
     var decoded = JpegXrReader.FromBytes(Convert.FromBase64String(_RedFixtureBase64));
 
