@@ -6,30 +6,8 @@ namespace FileFormat.Codecs.Vp9;
 /// <summary>
 /// Smooths the block boundaries of a reconstructed frame (specification 8.8).
 /// </summary>
-/// <remarks>
-/// Quantisation is applied to each transform block on its own, so two neighbouring blocks of what was
-/// a smooth gradient come back as two flat steps with a visible seam between them. This filter looks
-/// across every block boundary and, where the samples on both sides look like they were meant to be
-/// continuous, pulls them back together.
-/// <para/>
-/// It runs after the whole frame is reconstructed and not as each block is finished, because intra
-/// prediction reads the reconstruction and must not see filtered samples. What the next frame predicts
-/// from, on the other hand, is the filtered picture — which is why this is called an in-loop filter and
-/// why getting it slightly wrong does not stay slightly wrong for long.
-/// <para/>
-/// Three filter widths, chosen per boundary. A narrow one touching two samples either side; a wide one
-/// of eight taps; and a wider one of sixteen, used only where sixteen samples either side are already
-/// flat enough that smoothing them cannot destroy any detail. The masks that decide between them all
-/// have the same shape: filter only where the differences across the boundary are small enough to be
-/// quantisation error rather than a real edge.
-/// <para/>
-/// The order is normative. Every superblock is filtered left edge and interior vertical boundaries
-/// first, then top edge and interior horizontal ones, and many samples are filtered more than once, so
-/// a different order gives different samples.
-/// </remarks>
 internal sealed class Vp9LoopFilter {
 
-  /// <summary>The filter level for each segment, reference frame and mode class (specification 8.8.1).</summary>
   private readonly byte[] _levels = new byte[MAX_SEGMENTS * MAX_REF_FRAMES * MAX_MODE_LF_DELTAS];
 
   internal void Apply(Vp9Frame frame, Vp9ModeInfoGrid grid, Vp9FrameHeader header) {
@@ -44,10 +22,6 @@ internal sealed class Vp9LoopFilter {
     for (var pass = 0; pass < 2; ++pass)
       this._FilterSuperblock(frame, grid, header, plane, pass, row, column);
   }
-
-  // ============================================================================================
-  // Filter strengths
-  // ============================================================================================
 
   private void _BuildLevels(Vp9FrameHeader header) {
     var shift = header.LoopFilterLevel >> 5;
@@ -68,8 +42,6 @@ internal sealed class Vp9LoopFilter {
       if (!header.LoopFilterDeltaEnabled)
         continue;
 
-      // An intra block has no mode delta: the two mode classes are "moving" and "not moving", and
-      // intra prediction is neither.
       var intra = level + (header.LoopFilterReferenceDeltas[INTRA_FRAME] << shift);
       this._levels[_LevelIndex(segment, INTRA_FRAME, 0)] = (byte)Clip3(0, MAX_LOOP_FILTER, intra);
 
@@ -85,10 +57,6 @@ internal sealed class Vp9LoopFilter {
 
   private static int _LevelIndex(int segment, int reference, int mode)
     => (segment * MAX_REF_FRAMES + reference) * MAX_MODE_LF_DELTAS + mode;
-
-  // ============================================================================================
-  // One superblock, one plane, one direction (specification 8.8.2)
-  // ============================================================================================
 
   private void _FilterSuperblock(
     Vp9Frame frame, Vp9ModeInfoGrid grid, Vp9FrameHeader header, int plane, int pass, int row, int column) {
@@ -116,7 +84,9 @@ internal sealed class Vp9LoopFilter {
 
       var index = grid.IndexOf(loopRow, loopColumn);
       var size = grid.Sizes[index];
-      var transformSize = plane > 0 ? _ChromaTransformSize(size, grid.TransformSizes[index]) : grid.TransformSizes[index];
+      var transformSize = plane > 0
+        ? _ChromaTransformSize(size, grid.TransformSizes[index], subX, subY)
+        : grid.TransformSizes[index];
       var superblockSize = sub == 0 ? size : Math.Max(BLOCK_16X16, (int)size);
       var skip = grid.Skips[index];
       var isIntra = grid.ReferenceFrames[index * 2] <= INTRA_FRAME;
@@ -158,30 +128,24 @@ internal sealed class Vp9LoopFilter {
     }
   }
 
-  /// <summary>The transform size a chrominance plane sees for a block (specification 6.4.22).</summary>
-  private static int _ChromaTransformSize(int size, int transformSize)
+  private static int _ChromaTransformSize(int size, int transformSize, int subX, int subY)
     => size < BLOCK_8X8
       ? TX_4X4
-      : Math.Min(transformSize, Vp9Tables.MaxTransformSize[Vp9Tables.SubsampledSizeLookup[size * 4 + 3]]);
+      : Math.Min(
+        transformSize,
+        Vp9Tables.MaxTransformSize[Vp9Tables.SubsampledSizeLookup[(size * 2 + subX) * 2 + subY]]);
 
   private static bool _IsTransformEdge(Vp9FrameHeader header, int pass, int subX, int edge, int x, int transformSize) {
-    // A chrominance row of an odd-width picture has its last block half off screen, and the boundary
-    // that would have been inside it is not a boundary at all.
     if (pass == 1 && subX == 1 && (header.MiCols & 1) != 0 && (edge & 1) != 0 && x + 8 >= header.MiCols * 8)
       return false;
 
     return edge % (1 << transformSize) == 0;
   }
 
-  /// <summary>
-  /// The widest filter this boundary may use (specification 8.8.3).
-  /// </summary>
   private static int _FilterSize(
     Vp9FrameHeader header, int transformSize, bool is32Edge, int pass, int x, int y, int subX, int subY) {
     var baseSize = transformSize == TX_4X4 && is32Edge ? TX_8X8 : Math.Min(TX_16X16, transformSize);
 
-    // The widest filter reaches eight samples either side, which at the last chrominance block of the
-    // picture would reach past its end. Narrowing it there is cheaper than widening the picture.
     if (pass == 0 && subX == 1 && baseSize == TX_16X16 && x >> 3 == header.MiCols - 1)
       return TX_8X8;
 
@@ -190,10 +154,6 @@ internal sealed class Vp9LoopFilter {
 
     return baseSize;
   }
-
-  // ============================================================================================
-  // The filters themselves (specification 8.8.5)
-  // ============================================================================================
 
   private static void _FilterSamples(
     byte[] plane, int stride, int x, int y, int dx, int dy,
@@ -246,15 +206,6 @@ internal sealed class Vp9LoopFilter {
     _FilterWide(plane, at, step, flatter ? 4 : 3);
   }
 
-  /// <summary>
-  /// Moves at most two samples either side of the boundary (specification 8.8.5.2).
-  /// </summary>
-  /// <remarks>
-  /// Where the samples closest to the boundary differ sharply, only the two nearest move and the
-  /// filter is built from four samples; where they do not, four samples move and the filter is built
-  /// from the two nearest. That is the whole of the format's answer to "is this a coding artefact or a
-  /// real edge": a real edge is left where it is and only its immediate neighbours are nudged.
-  /// </remarks>
   private static void _FilterNarrow(byte[] plane, int at, int step, bool highEdgeVariance) {
     var q0 = plane[at] - 128;
     var q1 = plane[at + step] - 128;
@@ -280,10 +231,6 @@ internal sealed class Vp9LoopFilter {
 
   private static int _Clamp8(int value) => Clip3(-128, 127, value);
 
-  /// <summary>
-  /// Replaces a run of samples either side of the boundary with a low pass of their neighbourhood
-  /// (specification 8.8.5.3).
-  /// </summary>
   private static void _FilterWide(byte[] plane, int at, int step, int sizeLog2) {
     var taps = (1 << (sizeLog2 - 1)) - 1;
     Span<int> filtered = stackalloc int[16];
