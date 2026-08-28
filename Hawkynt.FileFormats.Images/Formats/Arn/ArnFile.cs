@@ -21,7 +21,7 @@ namespace FileFormat.Arn;
 /// </remarks>
 [FormatDetectionPriority(50)]
 public readonly record struct ArnFile
-  : IImageFormatReader<ArnFile>, IImageToRawImage<ArnFile> {
+  : IImageFormatReader<ArnFile>, IImageToRawImage<ArnFile>, IImageFromRawImage<ArnFile>, IImageFormatWriter<ArnFile> {
 
   /// <summary>The keyword that has to carry the format's own value.</summary>
   public const string SimpleKeyword = "SIMPLE";
@@ -41,6 +41,7 @@ public readonly record struct ArnFile
   static string IImageFormatMetadata<ArnFile>.PrimaryExtension => ".arn";
   static string[] IImageFormatMetadata<ArnFile>.FileExtensions => [".arn"];
   static ArnFile IImageFormatReader<ArnFile>.FromSpan(ReadOnlySpan<byte> data) => ArnReader.FromSpan(data);
+  static byte[] IImageFormatWriter<ArnFile>.ToBytes(ArnFile file) => ArnWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<ArnFile>.VideoModes => [
     new("Astronomical Research Network", [(IntegerRange.Any, IntegerRange.Any)], [PaletteEntries])
   ];
@@ -78,6 +79,27 @@ public readonly record struct ArnFile
       PixelData = file.PixelData[..],
       Palette = file.Palette[..],
       PaletteCount = PaletteEntries,
+    };
+  }
+
+  /// <summary>Creates a standards-shaped ARN indexed raster from any source picture.</summary>
+  public static ArnFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width <= 0 || image.Height <= 0)
+      throw new ArgumentException("ARN dimensions must be positive.", nameof(image));
+
+    var indexed = image.EnsureIndexedAtMost(PaletteEntries);
+    var palette = new byte[PaletteEntries * 3];
+    if (indexed.Palette is { Length: > 0 })
+      indexed.Palette.AsSpan(0, Math.Min(indexed.Palette.Length, palette.Length)).CopyTo(palette);
+
+    return new() {
+      Width = indexed.Width,
+      Height = indexed.Height,
+      RecordBytes = 256,
+      LabelRecords = 1,
+      Palette = palette,
+      PixelData = indexed.PixelData[..],
     };
   }
 }
