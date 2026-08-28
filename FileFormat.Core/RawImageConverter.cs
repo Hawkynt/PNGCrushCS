@@ -60,9 +60,9 @@ public static class RawImageConverter {
     var maxCode = (1 << bitDepth) - 1;
     var info = source.ColorInfo;
     var range = info?.Range is RawColorRange.Full ? RawColorRange.Full : RawColorRange.Limited;
-    var matrix = info?.Matrix is { } stated and not RawMatrixCoefficients.Unspecified
-      ? stated
-      : RawMatrixCoefficients.Bt601;
+    var matrix = info?.Matrix ?? RawMatrixCoefficients.Unspecified;
+    if (matrix == RawMatrixCoefficients.Unspecified)
+      matrix = RawMatrixCoefficients.Bt601;
 
     var yPlane = source.GetPlaneData(0);
     var uPlane = source.GetPlaneData(1);
