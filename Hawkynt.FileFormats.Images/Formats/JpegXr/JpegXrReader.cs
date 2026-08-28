@@ -58,7 +58,7 @@ public static class JpegXrReader {
     var entries = JpegXrIfd.ParseEntries(data, ifdOffset);
 
     int width = 0, height = 0;
-    uint imageOffset = 0, imageByteCount = 0;
+    uint imageOffset = 0, imageByteCount = 0, alphaOffset = 0, alphaByteCount = 0;
     JpegXrPixelFormatInfo? pixelFormat = null;
 
     foreach (var entry in entries) {
@@ -78,6 +78,12 @@ public static class JpegXrReader {
         case JpegXrIfd.TAG_IMAGE_BYTE_COUNT:
           imageByteCount = entry.Value;
           break;
+        case JpegXrIfd.TAG_ALPHA_OFFSET:
+          alphaOffset = entry.Value;
+          break;
+        case JpegXrIfd.TAG_ALPHA_BYTE_COUNT:
+          alphaByteCount = entry.Value;
+          break;
       }
     }
 
@@ -85,37 +91,57 @@ public static class JpegXrReader {
       throw new InvalidDataException($"Invalid JPEG XR dimensions: {width}x{height}.");
     if (pixelFormat is null)
       throw new InvalidDataException("JPEG XR container is missing the required 16-byte pixel-format GUID.");
-    if (pixelFormat.Value.HasAlpha)
-      throw new NotSupportedException("The current JpegXrFile model exposes Gray8 and RGB24 only; planar/interleaved alpha is not representable yet.");
-    if (pixelFormat.Value.ComponentCount is not (1 or 3))
-      throw new NotSupportedException($"JPEG XR pixel format has {pixelFormat.Value.ComponentCount} components; the current model supports one or three.");
+    if (pixelFormat.Value.ComponentCount is not (1 or 3 or 4))
+      throw new NotSupportedException($"JPEG XR pixel format has {pixelFormat.Value.ComponentCount} components; the current model supports one, three, or four.");
     if (imageOffset == 0 || imageByteCount == 0)
       throw new InvalidDataException("JPEG XR container is missing its image codestream location.");
 
-    var offset = checked((int)imageOffset);
-    var count = checked((int)imageByteCount);
-    if (offset < 0 || count < 0 || offset > data.Length - count)
-      throw new InvalidDataException($"JPEG XR codestream range [{offset}, {offset + (long)count}) lies outside the file ({data.Length} bytes).");
-
-    var codestream = data.AsSpan(offset, count);
+    var codestream = _SliceCodestream(data, imageOffset, imageByteCount, "image");
+    var pixelCount = checked(width * height);
     byte[] pixels;
 
     if (pixelFormat.Value.ComponentCount == 1) {
       var decoded = JxrCodestream.DecodeGray(codestream);
-      _RequireMatchingDimensions(width, height, decoded.width, decoded.height);
-      pixels = new byte[checked(width * height)];
+      _RequireMatchingDimensions(width, height, decoded.width, decoded.height, "image");
+      pixels = new byte[pixelCount];
       for (var i = 0; i < pixels.Length; ++i)
         pixels[i] = checked((byte)decoded.y[i]);
     } else {
       var decoded = JxrCodestream.Decode(codestream);
-      _RequireMatchingDimensions(width, height, decoded.width, decoded.height);
-      var pixelCount = checked(width * height);
-      pixels = new byte[checked(pixelCount * 3)];
-      for (var i = 0; i < pixelCount; ++i) {
-        var destination = i * 3;
-        pixels[destination] = checked((byte)decoded.r[i]);
-        pixels[destination + 1] = checked((byte)decoded.g[i]);
-        pixels[destination + 2] = checked((byte)decoded.b[i]);
+      _RequireMatchingDimensions(width, height, decoded.width, decoded.height, "image");
+
+      if (!pixelFormat.Value.HasAlpha) {
+        pixels = new byte[checked(pixelCount * 3)];
+        for (var i = 0; i < pixelCount; ++i) {
+          var destination = i * 3;
+          pixels[destination] = checked((byte)decoded.r[i]);
+          pixels[destination + 1] = checked((byte)decoded.g[i]);
+          pixels[destination + 2] = checked((byte)decoded.b[i]);
+        }
+      } else {
+        if (alphaOffset == 0 || alphaByteCount == 0)
+          throw new NotSupportedException("JPEG XR interleaved alpha is not exposed by the current T.832 adapter; a planar BCC2/BCC3 alpha codestream is required.");
+
+        var alpha = JxrCodestream.DecodeGray(_SliceCodestream(data, alphaOffset, alphaByteCount, "alpha"));
+        _RequireMatchingDimensions(width, height, alpha.width, alpha.height, "alpha");
+        pixels = new byte[checked(pixelCount * 4)];
+        for (var i = 0; i < pixelCount; ++i) {
+          var a = checked((byte)alpha.y[i]);
+          var r = checked((byte)decoded.r[i]);
+          var g = checked((byte)decoded.g[i]);
+          var b = checked((byte)decoded.b[i]);
+          if (pixelFormat.Value.PremultipliedAlpha && a is > 0 and < 255) {
+            r = _Unpremultiply(r, a);
+            g = _Unpremultiply(g, a);
+            b = _Unpremultiply(b, a);
+          }
+
+          var destination = i * 4;
+          pixels[destination] = r;
+          pixels[destination + 1] = g;
+          pixels[destination + 2] = b;
+          pixels[destination + 3] = a;
+        }
       }
     }
 
@@ -127,9 +153,20 @@ public static class JpegXrReader {
     };
   }
 
-  private static void _RequireMatchingDimensions(int containerWidth, int containerHeight, int codecWidth, int codecHeight) {
+  private static ReadOnlySpan<byte> _SliceCodestream(byte[] data, uint offsetValue, uint countValue, string name) {
+    var offset = checked((int)offsetValue);
+    var count = checked((int)countValue);
+    if (offset < 0 || count < 0 || offset > data.Length - count)
+      throw new InvalidDataException($"JPEG XR {name} codestream range [{offset}, {offset + (long)count}) lies outside the file ({data.Length} bytes).");
+    return data.AsSpan(offset, count);
+  }
+
+  private static void _RequireMatchingDimensions(int containerWidth, int containerHeight, int codecWidth, int codecHeight, string plane) {
     if (containerWidth != codecWidth || containerHeight != codecHeight)
       throw new InvalidDataException(
-        $"JPEG XR container dimensions {containerWidth}x{containerHeight} disagree with codestream dimensions {codecWidth}x{codecHeight}.");
+        $"JPEG XR container dimensions {containerWidth}x{containerHeight} disagree with {plane} codestream dimensions {codecWidth}x{codecHeight}.");
   }
+
+  private static byte _Unpremultiply(byte value, byte alpha)
+    => (byte)Math.Clamp((value * 255 + alpha / 2) / alpha, 0, 255);
 }
