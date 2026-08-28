@@ -18,9 +18,10 @@ public sealed class DataTypeTests {
     Assert.That((short)NiftiDataType.Int8, Is.EqualTo(256));
     Assert.That((short)NiftiDataType.UInt16, Is.EqualTo(512));
     Assert.That((short)NiftiDataType.UInt32, Is.EqualTo(768));
+    Assert.That((short)NiftiDataType.Rgba32, Is.EqualTo(2304));
 
     var values = Enum.GetValues<NiftiDataType>();
-    Assert.That(values, Has.Length.EqualTo(9));
+    Assert.That(values, Has.Length.EqualTo(10));
   }
 
   [Test]
