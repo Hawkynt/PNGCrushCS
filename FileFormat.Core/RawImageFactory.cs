@@ -5,62 +5,38 @@ namespace FileFormat.Core;
 /// <summary>Factories for assembling canonical <see cref="RawImage"/> layouts from decoder planes.</summary>
 public static class RawImageFactory {
 
-  /// <summary>
-  /// Crops three 8-bit 4:2:0 decoder planes and packs them as canonical Y, U, V planes.
-  /// </summary>
-  /// <remarks>
-  /// Decoder reference buffers are commonly larger than the displayed picture because prediction is
-  /// allowed to address coded samples outside a conformance crop. <see cref="RawImage"/> represents
-  /// the picture handed to a caller, so this copies only the displayed rectangle while leaving the
-  /// decoder's reference buffers untouched. A 4:2:0 crop must start on an even luma coordinate to be
-  /// representable without resampling chroma; H.264/H.265 conformance windows obey that constraint.
-  /// </remarks>
+  /// <summary>Crops three 8-bit 4:2:0 decoder planes and packs them as canonical Y, U, V planes.</summary>
   public static RawImage FromYuv420P8(
-    int width,
-    int height,
-    ReadOnlySpan<byte> yPlane,
-    int yStride,
-    ReadOnlySpan<byte> uPlane,
-    ReadOnlySpan<byte> vPlane,
-    int chromaStride,
-    int left = 0,
-    int top = 0,
-    RawImageColorInfo? colorInfo = null,
-    ImageMetadata? metadata = null)
+    int width, int height, ReadOnlySpan<byte> yPlane, int yStride,
+    ReadOnlySpan<byte> uPlane, ReadOnlySpan<byte> vPlane, int chromaStride,
+    int left = 0, int top = 0, RawImageColorInfo? colorInfo = null, ImageMetadata? metadata = null)
     => _FromYuvP8(
       PixelFormat.Yuv420P8, 1, 1,
       width, height, yPlane, yStride, uPlane, vPlane, chromaStride, left, top, colorInfo, metadata);
 
   /// <summary>Crops three 8-bit 4:2:2 decoder planes and packs them as canonical Y, U, V planes.</summary>
   public static RawImage FromYuv422P8(
-    int width,
-    int height,
-    ReadOnlySpan<byte> yPlane,
-    int yStride,
-    ReadOnlySpan<byte> uPlane,
-    ReadOnlySpan<byte> vPlane,
-    int chromaStride,
-    int left = 0,
-    int top = 0,
-    RawImageColorInfo? colorInfo = null,
-    ImageMetadata? metadata = null)
+    int width, int height, ReadOnlySpan<byte> yPlane, int yStride,
+    ReadOnlySpan<byte> uPlane, ReadOnlySpan<byte> vPlane, int chromaStride,
+    int left = 0, int top = 0, RawImageColorInfo? colorInfo = null, ImageMetadata? metadata = null)
     => _FromYuvP8(
       PixelFormat.Yuv422P8, 1, 0,
       width, height, yPlane, yStride, uPlane, vPlane, chromaStride, left, top, colorInfo, metadata);
 
+  /// <summary>Crops three 8-bit 4:4:0 decoder planes and packs them as canonical Y, U, V planes.</summary>
+  public static RawImage FromYuv440P8(
+    int width, int height, ReadOnlySpan<byte> yPlane, int yStride,
+    ReadOnlySpan<byte> uPlane, ReadOnlySpan<byte> vPlane, int chromaStride,
+    int left = 0, int top = 0, RawImageColorInfo? colorInfo = null, ImageMetadata? metadata = null)
+    => _FromYuvP8(
+      PixelFormat.Yuv440P8, 0, 1,
+      width, height, yPlane, yStride, uPlane, vPlane, chromaStride, left, top, colorInfo, metadata);
+
   /// <summary>Crops three 8-bit 4:4:4 decoder planes and packs them as canonical Y, U, V planes.</summary>
   public static RawImage FromYuv444P8(
-    int width,
-    int height,
-    ReadOnlySpan<byte> yPlane,
-    int yStride,
-    ReadOnlySpan<byte> uPlane,
-    ReadOnlySpan<byte> vPlane,
-    int chromaStride,
-    int left = 0,
-    int top = 0,
-    RawImageColorInfo? colorInfo = null,
-    ImageMetadata? metadata = null)
+    int width, int height, ReadOnlySpan<byte> yPlane, int yStride,
+    ReadOnlySpan<byte> uPlane, ReadOnlySpan<byte> vPlane, int chromaStride,
+    int left = 0, int top = 0, RawImageColorInfo? colorInfo = null, ImageMetadata? metadata = null)
     => _FromYuvP8(
       PixelFormat.Yuv444P8, 0, 0,
       width, height, yPlane, yStride, uPlane, vPlane, chromaStride, left, top, colorInfo, metadata);
