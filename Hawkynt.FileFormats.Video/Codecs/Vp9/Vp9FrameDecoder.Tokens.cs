@@ -227,10 +227,26 @@ internal sealed partial class Vp9FrameDecoder {
       : (Vp9Tables.ParetoTable[row * 8 + column] + Vp9Tables.ParetoTable[(row + 1) * 8 + column]) >> 1;
   }
 
+  private const int _CATEGORY_SIX = 6;
+  private const int _CATEGORY_SIX_EXTRA_BITS_AT_EIGHT = 14;
+
   private int _ReadCoefficient(int token) {
     var category = Vp9Tables.TokenCategory[token];
     var extra = Vp9Tables.TokenExtraBits[token];
     int coefficient = Vp9Tables.TokenBaseValue[token];
+
+    // Category six is the one token bit depth widens: fourteen extra bits at eight bits a sample,
+    // sixteen at ten, eighteen at twelve, each read from its own tail of one table. Reading the
+    // eight-bit fourteen out of a ten-bit stream leaves the arithmetic decoder two bits behind at
+    // the first large coefficient and everything after it is noise.
+    if (category == _CATEGORY_SIX) {
+      var bits = _CATEGORY_SIX_EXTRA_BITS_AT_EIGHT + (this._header.BitDepth - 8);
+      var probabilities = Vp9Tables.Category6Probabilities[(Vp9Tables.Category6Probabilities.Length - bits)..];
+      for (var e = 0; e < bits; ++e)
+        coefficient += this._reader.ReadBool(probabilities[e]) << (bits - 1 - e);
+
+      return coefficient;
+    }
 
     for (var e = 0; e < extra; ++e)
       coefficient += this._reader.ReadBool(Vp9Tables.CategoryProbabilities[category * 14 + e]) << (extra - 1 - e);

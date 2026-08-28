@@ -448,6 +448,21 @@ internal static class Vp9Tables {
     254, 254, 254, 252, 249, 243, 230, 196, 177, 153, 140, 133, 130, 129,
   ];
 
+  /// <summary>
+  /// Category six's extra-bit probabilities at every bit depth, longest first.
+  /// </summary>
+  /// <remarks>
+  /// Category six is the one token whose bitstream depends on the sample depth: it carries fourteen
+  /// extra bits at eight bits a sample, sixteen at ten and eighteen at twelve. The three readings
+  /// are tails of this one table — start four in for eight bits, two in for ten, at the front for
+  /// twelve — which is how the specification and libvpx's <c>vp9_cat6_prob_high12</c> both express
+  /// it. The last fourteen entries are exactly the eight-bit row above.
+  /// </remarks>
+  internal static ReadOnlySpan<byte> Category6Probabilities => [
+    255, 255, 255, 255,
+    254, 254, 254, 252, 249, 243, 230, 196, 177, 153, 140, 133, 130, 129,
+  ];
+
   // ============================================================================================
   // Section 10.3 — Pareto probability table
   // ============================================================================================
