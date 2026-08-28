@@ -16,15 +16,14 @@ namespace FileFormat.Codecs.Vp9;
 /// looked at again — which is the same answer a decoder that cropped and replicated would give, for
 /// the cost of not having to copy anything.
 /// <para/>
-/// Each picture remembers its own size and subsampling because VP9 lets both differ between coded
-/// sequences. A reference buffer must therefore describe the geometry of its own chroma planes rather
-/// than borrowing the current frame's assumptions.
+/// Each picture remembers its own size, subsampling and colour interpretation. The latter is part of
+/// buffer identity as well as metadata: VP9 profile 1 can switch a same-sized 4:4:4 sequence between
+/// YUV and sRGB/GBR at an intra refresh, and recycling one buffer for the other would relabel its
+/// planes even though their meaning changed.
 /// </remarks>
 internal sealed class Vp9Frame {
 
-  /// <summary>The picture size the frame header stated, which is what is shown and what is predicted from.</summary>
   internal readonly int Width;
-
   internal readonly int Height;
 
   internal readonly int SubsamplingX;
@@ -71,7 +70,6 @@ internal sealed class Vp9Frame {
 
   internal int PlaneHeight(int plane) => plane == 0 ? this.LumaHeight : this.ChromaHeight;
 
-  /// <summary>The last column of this picture's visible area in a plane, which is where reads are clamped.</summary>
   internal int LastColumn(int plane)
     => plane == 0 ? this.Width - 1 : ((this.Width + (1 << this.SubsamplingX) - 1) >> this.SubsamplingX) - 1;
 
@@ -79,8 +77,10 @@ internal sealed class Vp9Frame {
     => plane == 0 ? this.Height - 1 : ((this.Height + (1 << this.SubsamplingY) - 1) >> this.SubsamplingY) - 1;
 
   internal bool Matches(
-    int width, int height, int superblockColumns, int superblockRows, int subsamplingX, int subsamplingY)
+    int width, int height, int superblockColumns, int superblockRows,
+    int subsamplingX, int subsamplingY, int colorSpace, int colorRange)
     => this.Width == width && this.Height == height
        && this.SubsamplingX == subsamplingX && this.SubsamplingY == subsamplingY
+       && this.ColorSpace == colorSpace && this.ColorRange == colorRange
        && this.LumaWidth == superblockColumns * 64 && this.LumaHeight == superblockRows * 64;
 }
