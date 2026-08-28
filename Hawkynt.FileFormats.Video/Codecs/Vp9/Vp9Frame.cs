@@ -1,31 +1,14 @@
 namespace FileFormat.Codecs.Vp9;
 
 /// <summary>
-/// One decoded eight-bit VP9 picture, with chroma geometry defined by its profile and colour configuration.
+/// One decoded VP9 picture. Samples are held in sixteen-bit containers so the same reconstruction
+/// path represents profiles 0/1 (8-bit) and profiles 2/3 (10/12-bit) without narrowing references.
 /// </summary>
-/// <remarks>
-/// The planes are a whole number of 64x64 superblocks across and down rather than the size the frame
-/// header states, and superblocks rather than the eight-sample blocks the picture size rounds up to.
-/// A 64x64 prediction block is allowed as long as its middle is on screen, so a block can reach as
-/// much as twenty-four samples past the last on-screen row, and prediction writes all of it. Anything
-/// smaller than a superblock would be a buffer with an edge in the middle of a legal block. The crop
-/// happens once, on the way out.
-/// <para/>
-/// What the crop is <em>not</em> is a limit on what a later frame may predict from. Inter prediction
-/// clamps its reads to the stated picture size, so the samples beyond it are written and then never
-/// looked at again — which is the same answer a decoder that cropped and replicated would give, for
-/// the cost of not having to copy anything.
-/// <para/>
-/// Each picture remembers its own size, subsampling and colour interpretation. The latter is part of
-/// buffer identity as well as metadata: VP9 profile 1 can switch a same-sized 4:4:4 sequence between
-/// YUV and sRGB/GBR at an intra refresh, and recycling one buffer for the other would relabel its
-/// planes even though their meaning changed.
-/// </remarks>
 internal sealed class Vp9Frame {
 
   internal readonly int Width;
   internal readonly int Height;
-
+  internal readonly int BitDepth;
   internal readonly int SubsamplingX;
   internal readonly int SubsamplingY;
   internal readonly int ColorSpace;
@@ -36,15 +19,16 @@ internal sealed class Vp9Frame {
   internal readonly int ChromaWidth;
   internal readonly int ChromaHeight;
 
-  internal readonly byte[] Luma;
-  internal readonly byte[] Cb;
-  internal readonly byte[] Cr;
+  internal readonly ushort[] Luma;
+  internal readonly ushort[] Cb;
+  internal readonly ushort[] Cr;
 
   internal Vp9Frame(
     int width, int height, int superblockColumns, int superblockRows,
-    int subsamplingX, int subsamplingY, int colorSpace, int colorRange) {
+    int bitDepth, int subsamplingX, int subsamplingY, int colorSpace, int colorRange) {
     this.Width = width;
     this.Height = height;
+    this.BitDepth = bitDepth;
     this.SubsamplingX = subsamplingX;
     this.SubsamplingY = subsamplingY;
     this.ColorSpace = colorSpace;
@@ -55,12 +39,12 @@ internal sealed class Vp9Frame {
     this.ChromaWidth = this.LumaWidth >> subsamplingX;
     this.ChromaHeight = this.LumaHeight >> subsamplingY;
 
-    this.Luma = new byte[this.LumaWidth * this.LumaHeight];
-    this.Cb = new byte[this.ChromaWidth * this.ChromaHeight];
-    this.Cr = new byte[this.ChromaWidth * this.ChromaHeight];
+    this.Luma = new ushort[this.LumaWidth * this.LumaHeight];
+    this.Cb = new ushort[this.ChromaWidth * this.ChromaHeight];
+    this.Cr = new ushort[this.ChromaWidth * this.ChromaHeight];
   }
 
-  internal byte[] Plane(int plane) => plane switch {
+  internal ushort[] Plane(int plane) => plane switch {
     0 => this.Luma,
     1 => this.Cb,
     _ => this.Cr,
@@ -78,8 +62,9 @@ internal sealed class Vp9Frame {
 
   internal bool Matches(
     int width, int height, int superblockColumns, int superblockRows,
-    int subsamplingX, int subsamplingY, int colorSpace, int colorRange)
+    int bitDepth, int subsamplingX, int subsamplingY, int colorSpace, int colorRange)
     => this.Width == width && this.Height == height
+       && this.BitDepth == bitDepth
        && this.SubsamplingX == subsamplingX && this.SubsamplingY == subsamplingY
        && this.ColorSpace == colorSpace && this.ColorRange == colorRange
        && this.LumaWidth == superblockColumns * 64 && this.LumaHeight == superblockRows * 64;
