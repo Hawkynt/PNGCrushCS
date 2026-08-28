@@ -11,12 +11,8 @@ namespace FileFormat.Codecs.H264.Tests;
 /// The H.264 decoder against streams built here, where every bit is known.
 /// </summary>
 /// <remarks>
-/// The arithmetic — prediction, dequantisation, the transform, the interpolator and the loop filter —
-/// was checked against ffmpeg over a corpus of encoded streams, sample by sample, and not here: no
-/// test that writes its own bitstream can tell whether the decoder and the test agree with the
-/// standard or only with each other. What these do check is the two things that comparison cannot
-/// reach — the boundary of what is refused, and the handful of syntactic paths a real encoder never
-/// emits.
+/// Codec reconstruction is tested in its native YUV domain. Tests that intentionally describe
+/// display RGB use <see cref="RawImageConverter"/> at the same boundary a writer/viewer now uses.
 /// </remarks>
 [TestFixture]
 public sealed class H264VideoDecoderTests {
@@ -27,8 +23,7 @@ public sealed class H264VideoDecoderTests {
     Codec = CodecTag.FromCharacters("avc1"),
   };
 
-  /// <summary>Decodes a byte stream the way a container would hand it over: one packet per access unit.</summary>
-  private static List<RawImage> _Decode(byte[] stream) {
+  private static List<RawImage> _DecodeNative(byte[] stream) {
     var decoder = H264VideoDecoder.Create(_AnnexBStream);
     var frames = new List<RawImage>();
 
@@ -41,17 +36,17 @@ public sealed class H264VideoDecoderTests {
   }
 
   /// <summary>
-  /// Hands the whole stream over as one packet, without the container cutting it into access units.
+  /// Existing display-oriented assertions deliberately convert here rather than forcing that
+  /// conversion back into the decoder.
   /// </summary>
-  /// <remarks>
-  /// For the units a container would never make a packet of at all. An access unit is a picture, so a
-  /// stream of parameter sets and nothing else yields no packets and reaches no decoder — which is
-  /// right for the container and useless for testing what the decoder does with such a unit.
-  /// </remarks>
+  private static List<RawImage> _Decode(byte[] stream)
+    => _DecodeNative(stream)
+      .Select(static frame => RawImageConverter.Convert(frame, PixelFormat.Rgb24))
+      .ToList();
+
   private static void _DecodeWholeStreamAsOnePacket(byte[] stream)
     => H264VideoDecoder.Create(_AnnexBStream).TryDecode(new(0, stream), out _);
 
-  /// <summary>A stream of one intra picture whose single macroblock predicts flat and codes nothing.</summary>
   private static byte[] _OneFlatIntraPicture()
     => new H264TestStream()
       .SequenceParameterSet()
@@ -66,6 +61,21 @@ public sealed class H264VideoDecoderTests {
   // ==============================================================================================
 
   [Test]
+  public void DecoderReturnsTheReconstructedPlanesWithoutAnRgbRoundTrip() {
+    var frames = _DecodeNative(_OneFlatIntraPicture());
+
+    Assert.That(frames, Has.Count.EqualTo(1));
+    var frame = frames[0];
+    Assert.That(frame.Format, Is.EqualTo(PixelFormat.Yuv420P8));
+    Assert.That(frame.PlaneCount, Is.EqualTo(3));
+    Assert.That(frame.GetPlaneData(0).ToArray(), Is.All.EqualTo(128));
+    Assert.That(frame.GetPlaneData(1).ToArray(), Is.All.EqualTo(128));
+    Assert.That(frame.GetPlaneData(2).ToArray(), Is.All.EqualTo(128));
+    Assert.That(frame.ColorInfo!.Range, Is.EqualTo(RawColorRange.Limited));
+    Assert.That(frame.ColorInfo.Matrix, Is.EqualTo(RawMatrixCoefficients.Bt601));
+  }
+
+  [Test]
   public void OneIntraMacroblockDecodesToTheMidGreyItsPredictionSpecifies() {
     var frames = _Decode(_OneFlatIntraPicture());
 
@@ -73,10 +83,6 @@ public sealed class H264VideoDecoderTests {
     Assert.That(frames[0].Width, Is.EqualTo(16));
     Assert.That(frames[0].Height, Is.EqualTo(16));
 
-    // With no neighbours the Intra_16x16 DC prediction is 1 << (BitDepth − 1) for luma and for both
-    // chroma components (clauses 8.3.3 and 8.3.4.1), the coded block pattern is zero so nothing is
-    // added, and the deblocking filter finds no step to remove. Y 128 with neutral chrominance is
-    // 130 in studio-swing BT.601, and every sample of the picture is that.
     var pixels = frames[0].PixelData;
     Assert.That(pixels, Has.Length.EqualTo(16 * 16 * 3));
     Assert.That(pixels, Is.All.EqualTo(130));
@@ -91,7 +97,7 @@ public sealed class H264VideoDecoderTests {
       .FlatIntra16x16Macroblock()
       .EndNal(5, 3)
       .BeginSliceHeader(frameNum: 1)
-      .Unsigned(1) // mb_skip_run: the picture's one macroblock, skipped
+      .Unsigned(1)
       .EndNal(1, 2)
       .ToArray();
 
@@ -118,14 +124,10 @@ public sealed class H264VideoDecoderTests {
     Assert.That(frames[0].Height, Is.EqualTo(32));
   }
 
-  /// <summary>A macroblock of four quadrants, so a test can tell where a sample landed.</summary>
   private static byte _Quadrants(int x, int y) => (x < 8) == (y < 8) ? (byte)16 : (byte)235;
 
   [Test]
   public void PcmSamplesReachThePictureVerbatimAndUnfiltered() {
-    // I_PCM carries its samples rather than coding them, and its quantisation parameter is zero by
-    // definition — which sets the deblocking filter's thresholds to zero and leaves it alone. So the
-    // picture is exactly what was written, which also says where each sample landed.
     var frames = _Decode(new H264TestStream()
       .SequenceParameterSet()
       .PictureParameterSet()
@@ -139,7 +141,6 @@ public sealed class H264VideoDecoderTests {
     var pixels = frames[0].PixelData;
     for (var y = 0; y < 16; ++y)
       for (var x = 0; x < 16; ++x) {
-        // Luma 16 with neutral chrominance is black in studio-swing BT.601, and 235 is white.
         var expected = _Quadrants(x, y) == 16 ? 0 : 255;
         Assert.That(pixels[(y * 16 + x) * 3], Is.EqualTo(expected), $"({x}, {y})");
       }
@@ -147,9 +148,6 @@ public sealed class H264VideoDecoderTests {
 
   [Test]
   public void ReferenceListReorderingDecidesWhichPictureAnIndexNames() {
-    // Two references that can be told apart, and a slice that reorders the older one to the front.
-    // Without the reordering the list is in descending picture number, so index zero would be the
-    // newer picture and the last frame would be white.
     var frames = _Decode(new H264TestStream()
       .SequenceParameterSet(maxRefFrames: 2)
       .PictureParameterSet()
@@ -161,16 +159,11 @@ public sealed class H264VideoDecoderTests {
     Assert.That(frames, Has.Count.EqualTo(3));
     Assert.That(frames[0].PixelData, Is.All.EqualTo(0));
     Assert.That(frames[1].PixelData, Is.All.EqualTo(255));
-
-    // The skipped macroblock copies index zero, which the reordering made the first picture.
     Assert.That(frames[2].PixelData, Is.EqualTo(frames[0].PixelData));
   }
 
   [Test]
   public void MarkingAPictureUnusedTakesItOutOfTheReferenceList() {
-    // Three references, the middle one marked unused as the third picture is decoded. The fourth
-    // picture then names index one, which is the first picture — where without the marking the list
-    // would still hold the second and index one would be white.
     var frames = _Decode(new H264TestStream()
       .SequenceParameterSet(maxRefFrames: 3)
       .PictureParameterSet()
@@ -181,14 +174,12 @@ public sealed class H264VideoDecoderTests {
       .ToArray());
 
     Assert.That(frames, Has.Count.EqualTo(4));
-    Assert.That(frames[2].PixelData, Is.All.EqualTo(255)); // index zero was still the second picture
+    Assert.That(frames[2].PixelData, Is.All.EqualTo(255));
     Assert.That(frames[3].PixelData, Is.All.EqualTo(0));
   }
 
   [Test]
   public void AReferenceIndexTheListDoesNotHoldIsRefusedRatherThanGuessed() {
-    // One reference in the buffer and a macroblock naming the second entry. The standard leaves that
-    // entry undefined, so there is nothing to predict from and nothing to invent.
     var stream = new H264TestStream()
       .SequenceParameterSet(maxRefFrames: 2)
       .PictureParameterSet()
@@ -219,7 +210,7 @@ public sealed class H264VideoDecoderTests {
       .SequenceParameterSet(maxRefFrames: 2)
       .PictureParameterSet()
       .BeginIdrSliceHeader().PcmMacroblock(25, static (_, _) => 16, chroma: 128).EndNal(5, 3)
-      .BeginSliceHeader(frameNum: 3).Unsigned(1).EndNal(1, 2) // 1 was due
+      .BeginSliceHeader(frameNum: 3).Unsigned(1).EndNal(1, 2)
       .ToArray();
 
     Assert.That(() => _Decode(stream),
@@ -229,10 +220,6 @@ public sealed class H264VideoDecoderTests {
   [Test]
   public void TheSamePictureDecodesTheSameFromBothDeliveryForms() {
     var annexB = _OneFlatIntraPicture();
-
-    // The same NAL units with a four-byte length in front of each instead of a start code, and an
-    // AVCDecoderConfigurationRecord carrying the parameter sets — which is how MP4, Matroska and FLV
-    // carry exactly these bytes.
     var units = _SplitAnnexB(annexB);
     var configuration = _ConfigurationRecord(units[0], units[1]);
     var sample = _LengthPrefixed(units[2]);
@@ -245,7 +232,8 @@ public sealed class H264VideoDecoderTests {
     });
 
     Assert.That(decoder.TryDecode(new(0, sample), out var lengthPrefixed), Is.True);
-    Assert.That(lengthPrefixed.PixelData, Is.EqualTo(_Decode(annexB)[0].PixelData));
+    var rgb = RawImageConverter.Convert(lengthPrefixed, PixelFormat.Rgb24);
+    Assert.That(rgb.PixelData, Is.EqualTo(_Decode(annexB)[0].PixelData));
   }
 
   // ==============================================================================================
@@ -273,7 +261,7 @@ public sealed class H264VideoDecoderTests {
       .BeginIdrSliceHeader()
       .FlatIntra16x16Macroblock()
       .EndNal(5, 3)
-      .BeginSliceHeader(frameNum: 1, sliceType: 6) // B, all slices of the picture
+      .BeginSliceHeader(frameNum: 1, sliceType: 6)
       .Unsigned(0)
       .EndNal(1, 2)
       .ToArray();
@@ -286,7 +274,7 @@ public sealed class H264VideoDecoderTests {
     var stream = new H264TestStream()
       .SequenceParameterSet()
       .PictureParameterSet()
-      .BeginIdrSliceHeader(sliceType: 9) // SI
+      .BeginIdrSliceHeader(sliceType: 9)
       .EndNal(5, 3)
       .ToArray();
 
@@ -398,7 +386,7 @@ public sealed class H264VideoDecoderTests {
       .PictureParameterSet()
       .BeginIdrSliceHeader()
       .FlatIntra16x16Macroblock()
-      .EndNal(2, 3) // a slice data partition A
+      .EndNal(2, 3)
       .ToArray();
 
     Assert.That(() => _Decode(stream),
@@ -410,7 +398,7 @@ public sealed class H264VideoDecoderTests {
     var stream = new H264TestStream()
       .SequenceParameterSet()
       .PictureParameterSet()
-      .Bits(0, 24) // the three extra header bytes of a prefix NAL unit
+      .Bits(0, 24)
       .Bits(0, 8)
       .EndNal(14, 3)
       .ToArray();
@@ -438,7 +426,6 @@ public sealed class H264VideoDecoderTests {
 
   [Test]
   public void APictureWhoseSlicesLeaveMacroblocksUncodedIsRefused() {
-    // Two macroblocks declared, one coded: the picture has a hole in it, and a hole is not a decode.
     var stream = new H264TestStream()
       .SequenceParameterSet(widthInMbs: 2)
       .PictureParameterSet()
@@ -453,7 +440,6 @@ public sealed class H264VideoDecoderTests {
 
   [Test]
   public void APredictedSliceWithNoReferenceInTheBufferIsRefused() {
-    // A P slice reached without an IDR before it: decoding began in the middle of the stream.
     var stream = new H264TestStream()
       .SequenceParameterSet()
       .PictureParameterSet()
@@ -496,7 +482,6 @@ public sealed class H264VideoDecoderTests {
       H264VideoDecoder.Accepts(new() { Index = 0, Kind = MediaStreamKind.Video, Codec = CodecTag.FromCharacters("MPG1") }),
       Is.False);
 
-    // Nor to an audio stream, whatever its code says.
     Assert.That(
       H264VideoDecoder.Accepts(new() { Index = 0, Kind = MediaStreamKind.Audio, Codec = CodecTag.FromCharacters("avc1") }),
       Is.False);
@@ -535,9 +520,9 @@ public sealed class H264VideoDecoderTests {
 
   private static byte[] _ConfigurationRecord(byte[] sequenceSet, byte[] pictureSet) {
     var record = new List<byte> {
-      1, sequenceSet[1], sequenceSet[2], sequenceSet[3], // version, profile, compatibility, level
-      0xFF, // six reserved bits and lengthSizeMinusOne 3, so four-byte lengths
-      0xE1, // three reserved bits and one sequence parameter set
+      1, sequenceSet[1], sequenceSet[2], sequenceSet[3],
+      0xFF,
+      0xE1,
       (byte)(sequenceSet.Length >> 8), (byte)sequenceSet.Length,
     };
 
