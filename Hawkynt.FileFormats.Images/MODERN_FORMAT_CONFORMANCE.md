@@ -44,9 +44,13 @@ Tier-1 coding exists, but the Tier-2 packet writer still serializes code-block i
 
 ## JPEG XR
 
-Status on `main`: container fixes exist; the pixel codec is not yet independently correct.
+Status on this branch: the synthetic/private pixel codec has been replaced by a managed JXRLib-compatible T.832 implementation.
 
-The IFD magic/tag fixes allow real JPEG XR files to reach the codec, but `JpegXrReader` deliberately refuses the decoded pixels because measured output does not reproduce the source image. The encoder and decoder share the same transform/entropy assumptions, so their internal round-trip is not proof of T.832 conformance. The README capability row should not be promoted until the codec is verified against independent JPEG XR vectors/decoders.
+The old encoder/decoder, transform, quantizer, macroblock, and adaptive-VLC stack has been removed. `Formats/JpegXr/Reference` vendors the pure-managed `SharpAstro.Jxr` reference-code port pinned at commit `7cad99deda0e6c68f68e1c9c64d442c5b85d48a2`; that implementation is itself a faithful managed port of Microsoft's JXRLib and is oracle-tested upstream against `JxrEncApp`, `JxrDecApp`, and Windows WIC. Hawkynt keeps its own T.833 container and `RawImage` integration rather than taking SharpAstro's TIFF/container facade.
+
+The public path now writes real `WMPHOTO` codestreams and standard 16-byte WIC pixel-format GUIDs, and reads those codestreams rather than returning synthetic self-round-trip pixels. Gray8, RGB24, and RGBA32 are exposed through `RawImage`; RGBA uses the standard BCC2/BCC3 planar-alpha codestream. Tests cover pixel-exact lossless Gray8/RGB24/RGBA32 round trips, inspect the emitted T.833 GUID and `WMPHOTO` syntax, and decode the independent JXRLib `red.jxr` fixture through the public reader. That fixture exercises a frequency-order YUV444 colour codestream plus a separate alpha plane, so the interoperability evidence is not a Hawkynt writer/reader loop.
+
+The imported core also contains the JXRLib paths for lossy QP operation, all three overlap modes, spatial/frequency ordering, tiling, YUV444/422/420, and additional integer/float depths. The current `JpegXrFile`/`RawImage` adapter intentionally exposes the package's common 8-bit Gray/RGB/RGBA layouts first; uncommon WIC pixel layouts and interleaved-alpha variants may still be rejected at the container adapter even though the T.832 core is real. Such adapter coverage must not be confused with the former codec-conformance failure.
 
 ## Conformance rule
 
