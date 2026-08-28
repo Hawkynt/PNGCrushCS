@@ -1,14 +1,14 @@
-﻿using System;
+using System;
 using System.Buffers.Binary;
-using FileFormat.JpegXr.Codec;
+using SharpAstro.Jxr;
 
 namespace FileFormat.JpegXr;
 
-/// <summary>Assembles JPEG XR file bytes using the TIFF-like container with II byte order and the 0x01BC magic.</summary>
+/// <summary>Writes a T.833 JPEG XR container around a standards-valid T.832 codestream.</summary>
 public static class JpegXrWriter {
 
-  /// <summary>Number of IFD entries we write: PixelFormat, ImageWidth, ImageHeight, ImageOffset, ImageByteCount.</summary>
   private const int _IFD_ENTRY_COUNT = 5;
+  private const int _IFD_OFFSET = 8;
 
   public static byte[] ToBytes(JpegXrFile file) {
     ArgumentNullException.ThrowIfNull(file);
@@ -16,51 +16,67 @@ public static class JpegXrWriter {
   }
 
   internal static byte[] _Assemble(byte[] pixelData, int width, int height, int componentCount) {
-    // Encode pixel data using the JPEG XR codec
-    var compressedData = JxrEncoder.Encode(pixelData, width, height, componentCount);
+    ArgumentNullException.ThrowIfNull(pixelData);
+    if (width <= 0 || height <= 0)
+      throw new ArgumentOutOfRangeException(nameof(width), "JPEG XR dimensions must be positive.");
+    if (componentCount is not (1 or 3))
+      throw new NotSupportedException($"JPEG XR writer supports Gray8 and RGB24; got {componentCount} components.");
 
-    // Layout:
-    // [0..7]     Header (8 bytes): "II" + the 0x01BC magic + IFD offset
-    // [8..N]     IFD: 2-byte count + entries (12 bytes each) + 4-byte next IFD offset (0)
-    // [N..]      Compressed image data
+    var pixelCount = checked(width * height);
+    var expectedLength = checked(pixelCount * componentCount);
+    if (pixelData.Length != expectedLength)
+      throw new ArgumentException($"JPEG XR pixel buffer has {pixelData.Length} bytes; expected {expectedLength} for {width}x{height}x{componentCount}.", nameof(pixelData));
 
-    var ifdOffset = 8;
-    var ifdSize = 2 + _IFD_ENTRY_COUNT * 12 + 4; // count + entries + next IFD
-    var pixelDataOffset = ifdOffset + ifdSize;
-    var totalPixelBytes = compressedData.Length;
-    var fileSize = pixelDataOffset + totalPixelBytes;
+    byte[] codestream;
+    if (componentCount == 1) {
+      var y = new int[pixelCount];
+      for (var i = 0; i < pixelCount; ++i)
+        y[i] = pixelData[i];
+      codestream = JxrCodestream.EncodeGray(y, width, height, overlap: 0);
+    } else {
+      var r = new int[pixelCount];
+      var g = new int[pixelCount];
+      var b = new int[pixelCount];
+      for (var i = 0; i < pixelCount; ++i) {
+        var source = i * 3;
+        r[i] = pixelData[source];
+        g[i] = pixelData[source + 1];
+        b[i] = pixelData[source + 2];
+      }
+      codestream = JxrCodestream.Encode(r, g, b, width, height, overlap: 0);
+    }
 
+    var pixelFormatGuid = JpegXrIfd.CreatePixelFormatGuid(componentCount);
+
+    // T.833 container layout. Multi-byte IFD payloads are referenced by offset, and both the
+    // GUID and codestream are 4-byte aligned for interoperability with WIC/jxrlib readers.
+    var ifdSize = 2 + _IFD_ENTRY_COUNT * 12 + 4;
+    var guidOffset = _Align4(_IFD_OFFSET + ifdSize);
+    var imageOffset = _Align4(guidOffset + pixelFormatGuid.Length);
+    var fileSize = checked(imageOffset + codestream.Length);
     var result = new byte[fileSize];
     var span = result.AsSpan();
 
-    // Header
     result[0] = (byte)'I';
     result[1] = (byte)'I';
-    new JpegXrHeader(JpegXrReader.JPEGXR_MAGIC, (uint)ifdOffset).WriteTo(span);
+    new JpegXrHeader(JpegXrReader.JPEGXR_MAGIC, _IFD_OFFSET).WriteTo(span);
 
-    // IFD
-    var pos = ifdOffset;
+    var pos = _IFD_OFFSET;
     BinaryPrimitives.WriteUInt16LittleEndian(span[pos..], _IFD_ENTRY_COUNT);
     pos += 2;
 
-    // Pixel format: use BYTE type with count=1 for simplified encoding
-    var pixelFormatByte = componentCount == 1
-      ? JpegXrIfd.PIXEL_FORMAT_8BPP_GRAY
-      : JpegXrIfd.PIXEL_FORMAT_24BPP_RGB;
-
-    // Tags must be in ascending order per TIFF convention
-    JpegXrIfd.WriteEntry(span, ref pos, JpegXrIfd.TAG_PIXEL_FORMAT, JpegXrIfd.TYPE_BYTE, 1, pixelFormatByte);
+    // TIFF/JXR IFD entries are sorted by tag. BC01 is a 16-byte WIC GUID stored out-of-line.
+    JpegXrIfd.WriteEntry(span, ref pos, JpegXrIfd.TAG_PIXEL_FORMAT, JpegXrIfd.TYPE_BYTE, 16, (uint)guidOffset);
     JpegXrIfd.WriteEntry(span, ref pos, JpegXrIfd.TAG_IMAGE_WIDTH, JpegXrIfd.TYPE_LONG, 1, (uint)width);
     JpegXrIfd.WriteEntry(span, ref pos, JpegXrIfd.TAG_IMAGE_HEIGHT, JpegXrIfd.TYPE_LONG, 1, (uint)height);
-    JpegXrIfd.WriteEntry(span, ref pos, JpegXrIfd.TAG_IMAGE_OFFSET, JpegXrIfd.TYPE_LONG, 1, (uint)pixelDataOffset);
-    JpegXrIfd.WriteEntry(span, ref pos, JpegXrIfd.TAG_IMAGE_BYTE_COUNT, JpegXrIfd.TYPE_LONG, 1, (uint)totalPixelBytes);
+    JpegXrIfd.WriteEntry(span, ref pos, JpegXrIfd.TAG_IMAGE_OFFSET, JpegXrIfd.TYPE_LONG, 1, (uint)imageOffset);
+    JpegXrIfd.WriteEntry(span, ref pos, JpegXrIfd.TAG_IMAGE_BYTE_COUNT, JpegXrIfd.TYPE_LONG, 1, (uint)codestream.Length);
+    BinaryPrimitives.WriteUInt32LittleEndian(span[pos..], 0); // no next IFD
 
-    // Next IFD offset = 0 (no more IFDs)
-    BinaryPrimitives.WriteUInt32LittleEndian(span[pos..], 0);
-
-    // Compressed image data
-    compressedData.AsSpan(0, totalPixelBytes).CopyTo(result.AsSpan(pixelDataOffset));
-
+    pixelFormatGuid.CopyTo(result, guidOffset);
+    codestream.CopyTo(result, imageOffset);
     return result;
   }
+
+  private static int _Align4(int value) => checked((value + 3) & ~3);
 }
