@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -12,29 +12,44 @@ public static class FitsWriter {
   private const int _BLOCK_SIZE = 2880;
 
   public static byte[] ToBytes(FitsFile file) {
-    ArgumentNullException.ThrowIfNull(file);
-    return _Assemble(file.PixelData ?? [], file.Width, file.Height, file.Bitpix, file.Keywords ?? Array.Empty<FitsKeyword>());
+    var channels = file.Channels is 3 or 4 ? file.Channels : 1;
+    var expected = checked(file.Width * file.Height * channels * FitsFile.BytesPerSample(file.Bitpix));
+    var pixels = file.PixelData ?? [];
+    if (pixels.Length < expected)
+      throw new InvalidDataException(
+        $"FITS image declares {file.Width}x{file.Height}x{channels} at BITPIX {(int)file.Bitpix}, requiring {expected} bytes, but has {pixels.Length}.");
+
+    return _Assemble(pixels, file.Width, file.Height, channels, file.Bitpix, file.Keywords ?? Array.Empty<FitsKeyword>());
   }
 
   private static byte[] _Assemble(
     byte[] pixelData,
     int width,
     int height,
+    int channels,
     FitsBitpix bitpix,
     IReadOnlyList<FitsKeyword> keywords
   ) {
+    if (width < 1 || height < 1)
+      throw new InvalidDataException($"FITS dimensions must be positive; got {width}x{height}.");
+
     using var ms = new MemoryStream();
 
-    // Build header cards
+    // Build header cards. A conventional colour image is a three- or four-plane cube whose third
+    // axis is the channel; NAXIS1 remains the fastest-varying x coordinate as FITS requires.
     var cards = new List<string>();
     cards.Add(_FormatCard("SIMPLE", "T", "conforms to FITS standard"));
-    cards.Add(_FormatCard("BITPIX", ((int)bitpix).ToString(), "bits per pixel"));
-    cards.Add(_FormatCard("NAXIS", "2", "number of axes"));
+    cards.Add(_FormatCard("BITPIX", ((int)bitpix).ToString(), "bits per sample"));
+    cards.Add(_FormatCard("NAXIS", channels > 1 ? "3" : "2", "number of axes"));
     cards.Add(_FormatCard("NAXIS1", width.ToString(), "width"));
     cards.Add(_FormatCard("NAXIS2", height.ToString(), "height"));
+    if (channels > 1)
+      cards.Add(_FormatCard("NAXIS3", channels.ToString(), "colour planes"));
 
     // Add custom keywords (skip mandatory ones we already wrote)
-    var mandatory = new HashSet<string> { "SIMPLE", "BITPIX", "NAXIS", "NAXIS1", "NAXIS2", "END" };
+    var mandatory = new HashSet<string>(StringComparer.OrdinalIgnoreCase) {
+      "SIMPLE", "BITPIX", "NAXIS", "NAXIS1", "NAXIS2", "NAXIS3", "END"
+    };
     for (var i = 0; i < keywords.Count; ++i) {
       var kw = keywords[i];
       if (!mandatory.Contains(kw.Name))
@@ -57,12 +72,12 @@ public static class FitsWriter {
 
     ms.Write(headerBytes, 0, headerBytes.Length);
 
-    // Write pixel data (already big-endian)
-    if (pixelData.Length > 0)
-      ms.Write(pixelData, 0, pixelData.Length);
+    var dataLength = checked(width * height * channels * FitsFile.BytesPerSample(bitpix));
+    if (dataLength > 0)
+      ms.Write(pixelData, 0, dataLength);
 
     // Pad data to 2880-byte boundary with zeros
-    var dataRemainder = pixelData.Length % _BLOCK_SIZE;
+    var dataRemainder = dataLength % _BLOCK_SIZE;
     if (dataRemainder > 0) {
       var padding = new byte[_BLOCK_SIZE - dataRemainder];
       ms.Write(padding, 0, padding.Length);
