@@ -7,41 +7,18 @@ using FileFormat.Core;
 namespace FileFormat.Codecs;
 
 /// <summary>
-/// Decodes H.265 / HEVC video, ITU-T H.265 | ISO/IEC 23008-2: Main profile intra pictures.
+/// Decodes H.265 / HEVC video, ITU-T H.265 | ISO/IEC 23008-2.
 /// </summary>
 /// <remarks>
-/// <b>What it decodes, exactly.</b> Coded video sequences whose pictures are intra, in the Main
-/// profile — 4:2:0, eight-bit samples, progressive frames. Everything an intra picture is made of is
-/// implemented from the standard: the parameter sets, the arithmetic decoder with the context
-/// initialisation of clause 9.3.2.2 entered from Tables 9-5 to 9-37, the coding tree unit quadtree
-/// down to eight samples, all thirty-five intra prediction modes with their reference sample
-/// substitution and both smoothing filters, all four transform sizes with the sine transform the
-/// smallest luma blocks use, dequantisation with scaling lists, sign data hiding, per-unit quantiser
-/// changes, entropy coding synchronised across rows of coding tree blocks, and both in-loop filters —
-/// deblocking and the sample adaptive offset, which HEVC has and H.264 does not.
-/// <para/>
-/// "Exactly" is a measurement rather than a claim. Against a reference decoder, over forty-two
-/// encoded streams from 34x18 to 640x360, every encoder preset from the fastest to the slowest, every
-/// coding tree and transform and quantiser-group size, lossless and transform-skipped blocks and
-/// quantisers from 4 to 48, the luminance and both chrominance planes of every frame come back with
-/// zero differing samples. HEVC specifies exact integer transforms, so that is the right bar and
-/// anything short of it is a defect.
-/// <para/>
-/// <b>What it refuses, by name and with the clause.</b> Pictures predicted from other pictures —
-/// predicted and bidirectional slices — are refused at <c>slice_type</c>. The inter prediction is
-/// written and most of it is exact; it is refused because <em>most</em> is not the bar. The reasoning
-/// is set out where the refusal is raised. Also refused: tiles, dependent slice segments, coding
-/// units whose samples were sent uncompressed, 4:2:2, 4:4:4, monochrome, sample depths above eight,
-/// separately coded colour planes, the format range extensions, the screen content coding extensions,
-/// and the multilayer and 3D extensions. Every one of them throws with the syntax element that says
-/// so and what it means.
+/// The decoder reconstructs native Main-profile 4:2:0 eight-bit pictures, including intra and inter
+/// slices, reference-picture management, weighted prediction, CABAC, scaling lists, deblocking and
+/// sample-adaptive offset. Tile and dependent-slice transport structure is handled in the same
+/// picture decoder rather than flattened or silently ignored.
 /// <para/>
 /// Completed pictures are returned as native <see cref="PixelFormat.Yuv420P8"/> samples after both
-/// in-loop filters. RGB conversion is deliberately outside the decoder now; writers and viewers can
-/// request it through <see cref="RawImageConverter"/> when their output representation needs it.
-/// <para/>
-/// <b>There is no <c>catch</c> here that hands back a blank, a copied or a partly decoded picture.</b>
-/// A refusal is a result a caller can act on. A plausible wrong picture is not.
+/// in-loop filters. RGB conversion remains a consumer-side operation through <see cref="RawImageConverter"/>.
+/// Unsupported profile extensions still fail explicitly rather than returning plausible partial
+/// pictures.
 /// </remarks>
 public sealed class H265VideoDecoder : IVideoCodecDecoder<H265VideoDecoder> {
 
@@ -67,6 +44,7 @@ public sealed class H265VideoDecoder : IVideoCodecDecoder<H265VideoDecoder> {
 
   private H265FrameDecoder? _frame;
   private H265SliceHeader? _pictureHeader;
+  private H265SliceHeader? _lastIndependentSliceHeader;
   private H265SequenceParameterSet? _pictureSequence;
   private bool _skippingPicture;
 
@@ -78,7 +56,7 @@ public sealed class H265VideoDecoder : IVideoCodecDecoder<H265VideoDecoder> {
   }
 
   public static string CodecName
-    => "H.265/HEVC (ITU-T H.265 | ISO/IEC 23008-2), Main profile intra pictures";
+    => "H.265/HEVC (ITU-T H.265 | ISO/IEC 23008-2), Main profile";
 
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
@@ -193,10 +171,20 @@ public sealed class H265VideoDecoder : IVideoCodecDecoder<H265VideoDecoder> {
   }
 
   private void _DecodeSliceSegment(H265NalUnit nal) {
-    var header = H265SliceHeader.Parse(nal, this._sequenceSets, this._pictureSets);
+    var header = H265SliceHeader.Parse(
+      nal, this._sequenceSets, this._pictureSets, this._lastIndependentSliceHeader);
 
     if (header.FirstSliceSegmentInPicture)
       this._FinishPicture();
+
+    if (!header.DependentSliceSegment)
+      this._lastIndependentSliceHeader = header;
+
+    // A RASL/RADL picture may be intentionally skipped by the reference manager. Its following
+    // segments still need to be parsed so dependent-header inheritance remains synchronized, but
+    // there is deliberately no frame object to decode them into.
+    if (this._skippingPicture && !header.FirstSliceSegmentInPicture)
+      return;
 
     if (this._frame == null && !header.FirstSliceSegmentInPicture)
       throw new InvalidDataException(
@@ -240,6 +228,8 @@ public sealed class H265VideoDecoder : IVideoCodecDecoder<H265VideoDecoder> {
   }
 
   private void _FinishPicture() {
+    this._lastIndependentSliceHeader = null;
+
     if (this._skippingPicture) {
       this._skippingPicture = false;
       return;
