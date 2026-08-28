@@ -4,28 +4,43 @@ using static FileFormat.Codecs.Vp9.Vp9Constants;
 
 namespace FileFormat.Codecs.Vp9;
 
-/// <summary>
-/// Builds a block from a reference frame, at eighth-sample accuracy and through whatever change of
-/// scale lies between the two frames (specification 8.5.2).
-/// </summary>
+/// <summary>Builds inter-predicted VP9 blocks at eighth-sample accuracy.</summary>
 internal sealed class Vp9InterPrediction {
 
   private const int MAX_INTERMEDIATE_HEIGHT = (((64 - 1) * 80 + 15) >> 4) + 8;
   private const int MAX_BLOCK_WIDTH = 64;
 
+  [ThreadStatic] private static int _currentSubsamplingX;
+  [ThreadStatic] private static int _currentSubsamplingY;
+  [ThreadStatic] private static bool _currentSubsamplingConfigured;
+
   private readonly int[] _intermediate = new int[MAX_INTERMEDIATE_HEIGHT * MAX_BLOCK_WIDTH];
   private readonly byte[][] _predictions = [new byte[64 * 64], new byte[64 * 64]];
 
-  /// <summary>Profile-0 compatibility overload; profile-aware callers pass the two subsampling axes explicitly.</summary>
+  /// <summary>
+  /// Supplies the chroma geometry for the synchronous frame decode running on this thread. This keeps
+  /// the old frame-decoder call shape source-compatible while profile-aware overloads remain explicit.
+  /// </summary>
+  internal static void ConfigureCurrentFrame(int subsamplingX, int subsamplingY) {
+    if ((uint)subsamplingX > 1 || (uint)subsamplingY > 1)
+      throw new ArgumentOutOfRangeException(nameof(subsamplingX));
+
+    _currentSubsamplingX = subsamplingX;
+    _currentSubsamplingY = subsamplingY;
+    _currentSubsamplingConfigured = true;
+  }
+
+  private static int _CurrentSubsamplingX => _currentSubsamplingConfigured ? _currentSubsamplingX : 1;
+  private static int _CurrentSubsamplingY => _currentSubsamplingConfigured ? _currentSubsamplingY : 1;
+
   internal void Predict(
     byte[] destination, int destinationStride, int x, int y, int width, int height, int plane,
     ReadOnlySpan<Vp9Frame?> references, ReadOnlySpan<int> motionVectors, int filter,
     int frameWidth, int frameHeight)
     => this.Predict(
       destination, destinationStride, x, y, width, height, plane, references, motionVectors, filter,
-      1, 1, frameWidth, frameHeight);
+      _CurrentSubsamplingX, _CurrentSubsamplingY, frameWidth, frameHeight);
 
-  /// <summary>Predicts one region of one plane, from one reference or from the average of two.</summary>
   internal void Predict(
     byte[] destination, int destinationStride, int x, int y, int width, int height, int plane,
     ReadOnlySpan<Vp9Frame?> references, ReadOnlySpan<int> motionVectors, int filter,
@@ -141,15 +156,14 @@ internal sealed class Vp9InterPrediction {
     }
   }
 
-  /// <summary>Profile-0 compatibility overload; profile-aware callers pass both subsampling axes explicitly.</summary>
   internal static void SelectAndClamp(
     int plane, int list, int blockIndex, int size, ReadOnlySpan<short> blockMotionVectors,
     int modeInfoRow, int modeInfoColumn, int modeInfoRows, int modeInfoColumns, Span<int> clamped)
     => SelectAndClamp(
       plane, list, blockIndex, size, blockMotionVectors,
-      modeInfoRow, modeInfoColumn, modeInfoRows, modeInfoColumns, 1, 1, clamped);
+      modeInfoRow, modeInfoColumn, modeInfoRows, modeInfoColumns,
+      _CurrentSubsamplingX, _CurrentSubsamplingY, clamped);
 
-  /// <summary>Chooses the motion vector for a block of one plane and clamps it into range.</summary>
   internal static void SelectAndClamp(
     int plane, int list, int blockIndex, int size, ReadOnlySpan<short> blockMotionVectors,
     int modeInfoRow, int modeInfoColumn, int modeInfoRows, int modeInfoColumns,
