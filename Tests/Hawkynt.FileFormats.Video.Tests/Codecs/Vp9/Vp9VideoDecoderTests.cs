@@ -43,8 +43,8 @@ public sealed class Vp9VideoDecoderTests {
 
   [Test]
   [Category("Unit")]
-  public void TheCodecIsNamedForTheProfileItReads()
-    => Assert.That(Vp9VideoDecoder.CodecName, Does.Contain("VP9").And.Contain("profile 0"));
+  public void TheCodecIsNamedForTheProfilesItReads()
+    => Assert.That(Vp9VideoDecoder.CodecName, Does.Contain("VP9").And.Contain("profiles 0/1"));
 
   [Test]
   [Category("Unit")]
@@ -285,15 +285,14 @@ public sealed class Vp9VideoDecoderTests {
   // Refusals
   // ============================================================================================
 
-  [TestCase(1)]
   [TestCase(2)]
   [TestCase(3)]
   [Category("Unit")]
-  public void AProfileOtherThanZeroIsRefusedByName(int profile) {
+  public void AHighBitDepthProfileIsRefusedByName(int profile) {
     var failure = Assert.Throws<NotSupportedException>(
       () => _Decode(Vp9TestStream.BuildKeyFrame(new() { Profile = profile })));
 
-    Assert.That(failure!.Message, Does.Contain($"profile {profile}").And.Contain("profile 0"));
+    Assert.That(failure!.Message, Does.Contain($"profile {profile}").And.Contain("ten- or twelve-bit"));
   }
 
   [Test]
