@@ -7,15 +7,16 @@ namespace FileFormat.Core;
 /// <see cref="FormatIO.Encode{TFormat}"/> accepts any <see cref="RawImage"/>, so a writer that only
 /// understands one pixel layout has to convert rather than reject — otherwise encoding succeeds only
 /// for callers who already guessed the format's internal layout. The conversion entry point here is
-/// <see cref="RawImageConverter"/>, which understands native planar YUV and floating-point images and
-/// delegates ordinary packed integer layouts to <see cref="PixelConverter"/>.
+/// <see cref="FastRawImageConverter"/>, which adds fast RGB↔planar-YUV routes, delegates floating-point
+/// handling to <see cref="RawImageConverter"/>, and keeps the packed integer SIMD paths in
+/// <see cref="PixelConverter"/>.
 /// </remarks>
 public static class RawImageExtensions {
 
   /// <summary>Returns the image in <paramref name="format"/>, converting only when it isn't already.</summary>
   public static RawImage EnsureFormat(this RawImage image, PixelFormat format) {
     ArgumentNullException.ThrowIfNull(image);
-    return image.Format == format ? image : RawImageConverter.Convert(image, format);
+    return image.Format == format ? image : FastRawImageConverter.Convert(image, format);
   }
 
   /// <summary>Returns the image unchanged when it already uses one of <paramref name="accepted"/>,
@@ -29,7 +30,7 @@ public static class RawImageExtensions {
       if (image.Format == format)
         return image;
 
-    return RawImageConverter.Convert(image, accepted[0]);
+    return FastRawImageConverter.Convert(image, accepted[0]);
   }
 
   /// <summary>Returns the image as <paramref name="format"/> with its indices addressing
@@ -55,7 +56,7 @@ public static class RawImageExtensions {
       return indexed;
 
     var quantized = ColorQuantizer.Quantize(
-      RawImageConverter.Convert(image, PixelFormat.Bgra32).PixelData, image.Width * image.Height, colors);
+      FastRawImageConverter.Convert(image, PixelFormat.Bgra32).PixelData, image.Width * image.Height, colors);
 
     var indices = new byte[image.Width * image.Height];
     for (var i = 0; i < indices.Length; ++i)
@@ -83,7 +84,7 @@ public static class RawImageExtensions {
     if (image.Format == format && (image.Palette is not { Length: > 0 } existing || _SamePalette(existing, palette)))
       return image;
 
-    var bgra = image.Format == PixelFormat.Bgra32 ? image : RawImageConverter.Convert(image, PixelFormat.Bgra32);
+    var bgra = image.Format == PixelFormat.Bgra32 ? image : FastRawImageConverter.Convert(image, PixelFormat.Bgra32);
     var result = ColorQuantizer.MapToPalette(bgra.PixelData, image.Width * image.Height, palette, alphaTable);
 
     return new() {
@@ -144,7 +145,7 @@ public static class RawImageExtensions {
     if (image.Width < 1 || image.Height < 1)
       throw new ArgumentException("A picture needs at least one pixel.", nameof(image));
 
-    var source = RawImageConverter.Convert(image, PixelFormat.Rgb24);
+    var source = FastRawImageConverter.Convert(image, PixelFormat.Rgb24);
     if (source.Width == width && source.Height == height)
       return source;
 
@@ -184,7 +185,7 @@ public static class RawImageExtensions {
   public static int[] ToPackedArgb(this RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
 
-    var bgra = RawImageConverter.Convert(image, PixelFormat.Bgra32).PixelData;
+    var bgra = FastRawImageConverter.Convert(image, PixelFormat.Bgra32).PixelData;
     var packed = new int[image.Width * image.Height];
 
     for (var i = 0; i < packed.Length; ++i) {
