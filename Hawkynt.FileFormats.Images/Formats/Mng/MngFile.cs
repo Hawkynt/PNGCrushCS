@@ -1,12 +1,11 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using FileFormat.Core;
 using FileFormat.Png;
 
 namespace FileFormat.Mng;
 
-/// <summary>In-memory representation of an MNG (VLC profile) animation.</summary>
+/// <summary>In-memory representation of an MNG animation.</summary>
 [FormatMagicBytes([0x8A, 0x4D, 0x4E, 0x47])]
 [FormatMimeType("video/x-mng", "image/x-mng")]
 public sealed class MngFile : IImageFormatReader<MngFile>, IImageToRawImage<MngFile>, IImageFromRawImage<MngFile>, IImageFormatWriter<MngFile>, IMultiImageFileFormat<MngFile> {
@@ -29,11 +28,17 @@ public sealed class MngFile : IImageFormatReader<MngFile>, IImageToRawImage<MngF
   /// <summary>Action after the requested repeat iterations. Used only when <see cref="TermAction"/> is <see cref="MngTermAction.Repeat"/>.</summary>
   public MngTermAction ActionAfterIterations { get; init; } = MngTermAction.ShowLast;
 
-  /// <summary>Delay in MNG ticks before a TERM repeat. Used only for <see cref="MngTermAction.Repeat"/>.</summary>
+  /// <summary>Delay in MNG ticks before a TERM repeat. Used only for <see cref="TermAction"/> is <see cref="MngTermAction.Repeat"/>.</summary>
   public int RepeatDelay { get; init; }
 
   /// <summary>Embedded PNG frames (each is a complete PNG file).</summary>
   public IReadOnlyList<byte[]> Frames { get; init; } = [];
+
+  /// <summary>
+  /// Interframe delay in MNG ticks for each visible frame. Empty means the format default of one tick
+  /// per image when <see cref="TicksPerSecond"/> is nonzero. A populated list must match <see cref="Frames"/>.
+  /// </summary>
+  public IReadOnlyList<int> FrameDelays { get; init; } = [];
 
   /// <summary>Returns the number of frames in this MNG file.</summary>
   public static int ImageCount(MngFile file) => file.Frames.Count;
@@ -59,8 +64,8 @@ public sealed class MngFile : IImageFormatReader<MngFile>, IImageToRawImage<MngF
   /// <summary>Creates a single-frame MNG from a <see cref="RawImage"/> of any size.</summary>
   /// <remarks>
   /// An MNG frame is a whole PNG, so this defers to the PNG codec rather than growing a second one:
-  /// whatever PNG can hold losslessly, a one-frame MNG holds too, at any size. The result is a VLC
-  /// profile stream — one image, no delta or object chunks — which is what a still picture is.
+  /// whatever PNG can hold losslessly, a one-frame MNG holds too, at any size. The result needs no
+  /// timing clock because the MNG specification defines ticks as irrelevant for a one-frame stream.
   /// </remarks>
   public static MngFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
@@ -68,10 +73,11 @@ public sealed class MngFile : IImageFormatReader<MngFile>, IImageToRawImage<MngF
     return new() {
       Width = image.Width,
       Height = image.Height,
-      TicksPerSecond = 1,
+      TicksPerSecond = 0,
       NumPlays = 1,
       TermAction = MngTermAction.ShowLast,
       Frames = [PngWriter.ToBytes(PngFile.FromRawImage(image))],
+      FrameDelays = [],
     };
   }
 }
