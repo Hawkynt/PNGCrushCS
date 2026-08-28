@@ -1,3 +1,4 @@
+using System;
 using FileFormat.Core;
 using FileFormat.Png;
 

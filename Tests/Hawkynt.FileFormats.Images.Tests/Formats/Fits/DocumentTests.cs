@@ -30,8 +30,13 @@ public sealed class DocumentTests {
     Assert.That(FitsDocumentFile.ImageCount(restored), Is.EqualTo(2));
     var a = FitsDocumentFile.ToRawImage(restored, 0).EnsureFormat(PixelFormat.Gray8);
     var b = FitsDocumentFile.ToRawImage(restored, 1).EnsureFormat(PixelFormat.Gray8);
-    Assert.That(a.PixelData, Is.EqualTo(new byte[] { 1, 2, 3, 4, 5, 6 }));
-    Assert.That(b.PixelData, Is.EqualTo(new byte[] { 10, 20, 30, 40 }));
+    // FITS puts the origin at the bottom left, so the first row in the file is the bottom of the
+    // picture: presenting it the right way up reverses the order of the rows and nothing within
+    // them. [6,5,4,3,2,1] as 3x2 is the rows [6,5,4] then [3,2,1], which comes back [3,2,1,6,5,4].
+    // Reversing the whole array would mirror the picture horizontally as well, which FITS does not
+    // ask for.
+    Assert.That(a.PixelData, Is.EqualTo(new byte[] { 3, 2, 1, 6, 5, 4 }));
+    Assert.That(b.PixelData, Is.EqualTo(new byte[] { 20, 10, 40, 30 }));
   }
 
   [Test]
