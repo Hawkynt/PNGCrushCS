@@ -287,17 +287,20 @@ internal sealed class Vp9Decoder {
     var height = this._header.FrameHeight;
     var columns = this._header.Sb64Cols;
     var rows = this._header.Sb64Rows;
+    var subX = this._header.SubsamplingX;
+    var subY = this._header.SubsamplingY;
 
     // A slot may hold a picture of a size the stream has moved on from, because a frame is allowed
     // to predict from a reference of a different size. Only the buffers nothing is holding at all are
-    // dropped when the size changes.
+    // dropped when the size changes. Chroma geometry is part of buffer identity too: a 4:4:4 frame
+    // cannot be reconstructed into a recycled 4:2:0 buffer merely because their luma sizes match.
     Vp9Frame? free = null;
     for (var i = this._pool.Count - 1; i >= 0; --i) {
       var candidate = this._pool[i];
       if (Array.IndexOf(this._slots, candidate) >= 0 || shown.Contains(candidate))
         continue;
 
-      if (candidate.Matches(width, height, columns, rows)) {
+      if (candidate.Matches(width, height, columns, rows, subX, subY)) {
         free ??= candidate;
         continue;
       }
@@ -308,7 +311,8 @@ internal sealed class Vp9Decoder {
     if (free != null)
       return free;
 
-    var frame = new Vp9Frame(width, height, columns, rows);
+    var frame = new Vp9Frame(
+      width, height, columns, rows, subX, subY, this._header.ColorSpace, this._header.ColorRange);
     this._pool.Add(frame);
     return frame;
   }
