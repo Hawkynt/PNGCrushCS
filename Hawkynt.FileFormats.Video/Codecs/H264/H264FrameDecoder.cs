@@ -34,11 +34,10 @@ internal enum H264MacroblockKind : byte {
 /// owning any of it.
 /// <para/>
 /// <b>What is in scope.</b> I and P slices, CAVLC, 4:2:0, 8-bit samples, progressive frames, one
-/// slice group. Everything outside that is refused by name before this type is reached — by
-/// <see cref="H264SequenceParameterSet.RefuseUnsupported"/>,
-/// <see cref="H264PictureParameterSet.RefuseUnsupported"/> and
-/// <see cref="H264SliceHeader"/> — so nothing here has to cope with a B slice, an 8x8 transform, a
-/// field, or an arithmetic coded bitstream, and nothing here silently produces a picture for one.
+/// slice group, including explicit weighted P prediction. Everything outside that is refused by name
+/// before this type is reached — by <see cref="H264SequenceParameterSet.RefuseUnsupported"/>,
+/// <see cref="H264PictureParameterSet.RefuseUnsupported"/> and <see cref="H264SliceHeader"/> — so
+/// nothing here silently produces a picture for an unsupported coding tool.
 /// </remarks>
 internal sealed class H264FrameDecoder {
 
@@ -662,7 +661,8 @@ internal sealed class H264FrameDecoder {
   }
 
   /// <summary>
-  /// Predicts one partition from its reference picture, and adds its residual where it has one.
+  /// Predicts one partition from its reference picture, applies the slice's explicit weight after
+  /// interpolation, and adds its residual where it has one.
   /// </summary>
   private void _Predict(
     int mbAddr, int refIdx, int x, int y, int width, int height, int mvX, int mvY, bool addResidual) {
@@ -677,6 +677,7 @@ internal sealed class H264FrameDecoder {
     Span<byte> pred = stackalloc byte[256];
     H264MotionCompensation.PredictLuma(
       reference.Luma, reference.LumaWidth, reference.LumaHeight, x, y, mvX, mvY, width, height, pred);
+    this._header.PredictionWeights?.ApplyLuma(refIdx, pred[..(width * height)]);
 
     var mbX = mbAddr % this._mbWidth;
     var mbY = mbAddr / this._mbWidth;
@@ -848,7 +849,8 @@ internal sealed class H264FrameDecoder {
 
   /// <summary>
   /// Predicts a macroblock's chroma from the reference picture, one 4x4 luma block's motion at a
-  /// time — clause 8.4.1.4.
+  /// time — clause 8.4.1.4. Explicit weights are applied to each interpolated block before it is
+  /// copied into the macroblock prediction.
   /// </summary>
   /// <remarks>
   /// Block by block rather than partition by partition because chroma is half the size in each
@@ -875,6 +877,7 @@ internal sealed class H264FrameDecoder {
         H264MotionCompensation.PredictChroma(
           reference.Chroma(component), reference.ChromaWidth, reference.ChromaHeight,
           mbX * 8 + bx * 2, mbY * 8 + by * 2, this._mvX[at], this._mvY[at], 2, 2, block);
+        this._header.PredictionWeights?.ApplyChroma(refIdx, component, block);
 
         for (var row = 0; row < 2; ++row)
           for (var column = 0; column < 2; ++column)
