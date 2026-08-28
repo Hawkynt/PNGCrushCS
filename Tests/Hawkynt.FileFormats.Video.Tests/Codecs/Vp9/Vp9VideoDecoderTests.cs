@@ -7,16 +7,10 @@ using static FileFormat.Codecs.Vp9.Vp9Constants;
 
 namespace FileFormat.Codecs.Vp9.Tests;
 
-/// <summary>
-/// The VP9 decoder, on frames built here.
-/// </summary>
+/// <summary>The VP9 decoder, on frames built here.</summary>
 /// <remarks>
-/// The decoder's arithmetic was checked by decoding ninety-two streams here, in ffmpeg and in libvpx
-/// and comparing the sample planes frame by frame; what these tests add is what that comparison
-/// cannot reach. Most of it is the refusals, which by definition no valid stream produces. The rest
-/// is the syntax libvpx has but never chooses — intra-only frames, the frame context resets,
-/// segmentation stating absolute values, and the per-segment loop filter level — and a handful of
-/// frames whose expected samples can be worked out from the standard rather than recorded from a run.
+/// Codec reconstruction is native YUV. Display-oriented assertions explicitly convert through
+/// <see cref="RawImageConverter"/>, keeping colour conversion out of the decoder contract.
 /// </remarks>
 [TestFixture]
 public sealed class Vp9VideoDecoderTests {
@@ -44,8 +38,6 @@ public sealed class Vp9VideoDecoderTests {
     Assert.That(Vp9VideoDecoder.Accepts(_Stream(codecId: "V_AV1")), Is.False);
     Assert.That(Vp9VideoDecoder.Accepts(_Stream(code: "VP80")), Is.False);
     Assert.That(Vp9VideoDecoder.Accepts(_Stream(codecId: "A_VORBIS", kind: MediaStreamKind.Audio)), Is.False);
-
-    // The same name on an audio track is still not a picture.
     Assert.That(Vp9VideoDecoder.Accepts(_Stream(codecId: "V_VP9", kind: MediaStreamKind.Audio)), Is.False);
   }
 
@@ -67,11 +59,20 @@ public sealed class Vp9VideoDecoderTests {
 
   [Test]
   [Category("Unit")]
+  public void ThePublicDecoderReturnsTheExactNativePlanes() {
+    var frame = _DecodeNative(Vp9TestStream.BuildKeyFrame(new() { UniformMode = true }));
+
+    Assert.That(frame.Format, Is.EqualTo(PixelFormat.Yuv420P8));
+    Assert.That(frame.GetPlaneData(0).ToArray(), Is.All.EqualTo(128));
+    Assert.That(frame.GetPlaneData(1).ToArray(), Is.All.EqualTo(128));
+    Assert.That(frame.GetPlaneData(2).ToArray(), Is.All.EqualTo(128));
+    Assert.That(frame.ColorInfo!.Range, Is.EqualTo(RawColorRange.Limited));
+    Assert.That(frame.ColorInfo.Matrix, Is.EqualTo(RawMatrixCoefficients.Bt601));
+  }
+
+  [Test]
+  [Category("Unit")]
   public void AKeyFrameOfSkippedBlocksPredictedFlatIsMidGrey() {
-    // Nothing above or to the left of the first block, so direct current prediction fills it with
-    // 128, and every block after it averages neighbours that are themselves 128. With no residue the
-    // luminance is 128 and the chrominance neutral, which is
-    // (298 * (128 - 16) + 128) >> 8 = 130 in all three channels.
     var frame = _Decode(Vp9TestStream.BuildKeyFrame(new() { UniformMode = true }));
 
     Assert.That(frame.Width, Is.EqualTo(8));
@@ -88,9 +89,6 @@ public sealed class Vp9VideoDecoderTests {
   [TestCase(17, 11)]
   [Category("Unit")]
   public void ThePictureComesOutTheSizeTheKeyFrameStates(int width, int height) {
-    // VP9 codes whole superblocks whatever the picture size, so a picture that is not a whole number
-    // of them is decoded larger and handed back cropped. The samples past the edge are real coded
-    // samples that prediction reads, which is why they are kept until then.
     var frame = _Decode(Vp9TestStream.BuildKeyFrame(new() { Width = width, Height = height }));
 
     Assert.That(frame.Width, Is.EqualTo(width));
@@ -101,8 +99,6 @@ public sealed class Vp9VideoDecoderTests {
   [Test]
   [Category("Unit")]
   public void TheLoopFilterLeavesAFlatPictureAlone() {
-    // Every difference the filter measures is zero, so every adjustment it computes is zero. A
-    // filter that moved a flat picture would be moving every picture.
     var filtered = _Decode(
       Vp9TestStream.BuildKeyFrame(
         new() { Width = 64, Height = 48, UniformMode = true, LoopFilterLevel = 63, LoopFilterSharpness = 7 }));
@@ -117,9 +113,6 @@ public sealed class Vp9VideoDecoderTests {
   [TestCase(7)]
   [Category("Unit")]
   public void TheLoopFilterMovesAPictureThatHasEdgesInIt(int sharpness) {
-    // The other half of the test above, and the one that would catch a filter that never runs: a
-    // picture whose blocks each predict in a different direction has a discontinuity at every block
-    // boundary, and the filter has to change it.
     var filtered = _Decode(
       Vp9TestStream.BuildKeyFrame(
         new() { Width = 64, Height = 48, LoopFilterLevel = 32, LoopFilterSharpness = sharpness }));
@@ -131,10 +124,6 @@ public sealed class Vp9VideoDecoderTests {
   [Test]
   [Category("Unit")]
   public void TheFilterAdjustmentAFrameStatesForIntraBlocksIsApplied() {
-    // The adjustment is added to the filter level before it is used and the result is clipped, so an
-    // adjustment far enough below zero turns the filter off for those blocks entirely. That is the
-    // one outcome that can be asserted without recording samples: the picture has to come out
-    // identical to the one from a frame that never asked to be filtered.
     var unfiltered = _Decode(Vp9TestStream.BuildKeyFrame(new() { Width = 64, Height = 48 }));
     var cancelled = _Decode(
       Vp9TestStream.BuildKeyFrame(
@@ -149,8 +138,6 @@ public sealed class Vp9VideoDecoderTests {
   [Test]
   [Category("Unit")]
   public void TheSignOfAFilterAdjustmentIsAFlagAndNotTwosComplement() {
-    // The same magnitude with the two signs has to move the level in opposite directions. Read as
-    // two's complement instead, both would come out positive and this would pass for nothing.
     var raised = _Decode(
       Vp9TestStream.BuildKeyFrame(
         new() {
@@ -168,8 +155,6 @@ public sealed class Vp9VideoDecoderTests {
   [Test]
   [Category("Unit")]
   public void AFrameTheStreamAsksNotToShowIsNotHandedBack() {
-    // VP9 codes frames that exist only to become references for later ones. Handing one back would
-    // put a picture on screen that the film does not contain.
     var decoder = Vp9VideoDecoder.Create(_Stream(codecId: "V_VP9"));
     var hidden = Vp9TestStream.BuildKeyFrame(new() { ShowFrame = false });
 
@@ -180,15 +165,13 @@ public sealed class Vp9VideoDecoderTests {
   [Test]
   [Category("Unit")]
   public void ASuperframeHandsBackOnlyTheFrameItShows() {
-    // A chunk of several coded frames, indexed by its last bytes. Here the first is a reference the
-    // stream keeps and does not show and the second is the picture, which is the arrangement an
-    // alternate reference frame produces.
     var hidden = Vp9TestStream.BuildKeyFrame(new() { ShowFrame = false, UniformMode = true });
     var shown = Vp9TestStream.BuildKeyFrame(new() { UniformMode = true });
     var packet = _Superframe(hidden, shown);
 
     var decoder = Vp9VideoDecoder.Create(_Stream(codecId: "V_VP9"));
-    Assert.That(decoder.TryDecode(new(0, packet), out var frame), Is.True);
+    Assert.That(decoder.TryDecode(new(0, packet), out var native), Is.True);
+    var frame = RawImageConverter.Convert(native, PixelFormat.Rgb24);
     Assert.That(frame.PixelData.Distinct().ToArray(), Is.EqualTo(new byte[] { 130 }));
     Assert.That(decoder.Flush(), Is.Empty);
   }
@@ -196,8 +179,6 @@ public sealed class Vp9VideoDecoderTests {
   [Test]
   [Category("Unit")]
   public void AFrameThatShowsAnEarlierOneRepeatsItExactly() {
-    // Two bytes of header and no coded data at all: the frame names one of the eight reference slots
-    // and the decoder puts that picture on screen again.
     var pictures = _DecodeAll(
       Vp9TestStream.BuildKeyFrame(new() { Width = 32, Height = 32 }),
       Vp9TestStream.BuildShowExistingFrame(0));
@@ -209,9 +190,6 @@ public sealed class Vp9VideoDecoderTests {
   [Test]
   [Category("Unit")]
   public void AnIntraOnlyFrameIsDecodedAndKeptWithoutBeingShown() {
-    // An intra-only frame is coded as a frame that is not shown — the flag saying it is intra-only
-    // is only present when the frame is not shown — so the way to see one is to ask for the slot it
-    // was written into afterwards.
     var key = Vp9TestStream.BuildKeyFrame(new() { Width = 32, Height = 32, UniformMode = true });
     var intraOnly = Vp9TestStream.BuildKeyFrame(new() { Width = 32, Height = 32, IntraOnly = true });
     var alone = Vp9TestStream.BuildKeyFrame(new() { Width = 32, Height = 32 });
@@ -220,9 +198,6 @@ public sealed class Vp9VideoDecoderTests {
 
     Assert.That(pictures, Has.Count.EqualTo(2), "the intra-only frame was shown");
     Assert.That(pictures[0].PixelData.Distinct().ToArray(), Is.EqualTo(new byte[] { 130 }));
-
-    // The intra-only frame carries the same blocks as a key frame of the same shape, so what it
-    // wrote into the slot has to be the picture that key frame would have produced.
     Assert.That(pictures[1].PixelData, Is.EqualTo(_Decode(alone).PixelData));
   }
 
@@ -232,10 +207,6 @@ public sealed class Vp9VideoDecoderTests {
   [TestCase(3)]
   [Category("Unit")]
   public void TheFrameContextResetIsReadWithoutChangingThePicture(int reset) {
-    // Which of the four saved probability sets a frame overwrites is a two-bit field of the header,
-    // and an intra-only frame is the only kind that carries it. It cannot change this frame — an
-    // intra frame decodes from the format's defaults whatever it says — but reading it as anything
-    // other than two bits would put every field after it in the wrong place.
     var key = Vp9TestStream.BuildKeyFrame(new() { Width = 32, Height = 32, UniformMode = true });
     var intraOnly = Vp9TestStream.BuildKeyFrame(
       new() { Width = 32, Height = 32, IntraOnly = true, ResetFrameContext = reset });
@@ -250,9 +221,6 @@ public sealed class Vp9VideoDecoderTests {
   [Test]
   [Category("Unit")]
   public void AnErrorResilientFrameStatesFewerFieldsAndDecodesTheSame() {
-    // Error resilient mode removes three fields from the header — the frame context refresh, the
-    // parallel decoding flag and the context reset — because a frame that must stand alone has
-    // nothing to say about them. The picture is the same one.
     var resilient = _Decode(Vp9TestStream.BuildKeyFrame(new() { Width = 32, Height = 32, ErrorResilient = true }));
     var plain = _Decode(Vp9TestStream.BuildKeyFrame(new() { Width = 32, Height = 32 }));
 
@@ -266,10 +234,6 @@ public sealed class Vp9VideoDecoderTests {
   [Test]
   [Category("Unit")]
   public void ASegmentThatIsAlwaysSkippedCostsNoSkipFlagAndDecodesTheSame() {
-    // A segment carrying the skip feature says so once in the frame header instead of once in every
-    // block, so the bitstream is shorter — and since every block of this frame is skipped either way,
-    // the picture has to come out identical. A decoder that read a skip flag for those blocks anyway
-    // would be one bool out of step for the rest of the frame.
     var segments = new Vp9TestStream.Segmentation();
     for (var segment = 0; segment < MAX_SEGMENTS; segment += 2)
       segments.Set(segment, SEG_LVL_SKIP, 0);
@@ -284,9 +248,6 @@ public sealed class Vp9VideoDecoderTests {
   [Test]
   [Category("Unit")]
   public void ASegmentThatStatesAFilterLevelOfZeroIsNotFiltered() {
-    // The one segment feature that shows in an intra frame with no coefficients. Half the segments
-    // state a filter level of zero outright, so their blocks come out of the frame untouched while
-    // the rest are filtered — a picture that is neither the filtered nor the unfiltered one.
     var segments = new Vp9TestStream.Segmentation { AbsoluteValues = true };
     for (var segment = 0; segment < MAX_SEGMENTS; segment += 2)
       segments.Set(segment, SEG_LVL_ALT_L, 0);
@@ -303,9 +264,6 @@ public sealed class Vp9VideoDecoderTests {
   [Test]
   [Category("Unit")]
   public void SegmentValuesStatedOutrightAreNotAddedToTheFramesOwn() {
-    // The same numbers mean two different things depending on one flag: a distance from the frame's
-    // filter level, or the level itself. Stated outright, a zero turns the filter off; taken as an
-    // adjustment, a zero leaves it exactly where the frame put it.
     var absolute = new Vp9TestStream.Segmentation { AbsoluteValues = true };
     var relative = new Vp9TestStream.Segmentation();
     for (var segment = 0; segment < MAX_SEGMENTS; ++segment) {
@@ -359,8 +317,6 @@ public sealed class Vp9VideoDecoderTests {
   [Test]
   [Category("Unit")]
   public void TheColourSpaceProfileZeroCannotCarryIsRefusedByName() {
-    // sRGB is a profile 1 and 3 feature. A profile 0 stream that names it is stating a chrominance
-    // arrangement it has no way to carry.
     var failure = Assert.Throws<NotSupportedException>(
       () => _Decode(Vp9TestStream.BuildKeyFrame(new() { ColorSpace = 7 })));
 
@@ -405,9 +361,6 @@ public sealed class Vp9VideoDecoderTests {
   public void ASuperframeStatingMoreThanItHoldsIsRefusedByName() {
     var frame = Vp9TestStream.BuildKeyFrame(new());
     var packet = _Superframe(frame, frame);
-
-    // Overstate the first frame's size. The marker at both ends of the index still agrees, so the
-    // chunk is still recognised as a superframe and the sizes are what has to be checked.
     packet[^5] = 0xFF;
 
     Assert.That(Assert.Throws<InvalidDataException>(() => _Decode(packet))!.Message, Does.Contain("superframe"));
@@ -416,8 +369,6 @@ public sealed class Vp9VideoDecoderTests {
   [Test]
   [Category("Unit")]
   public void ShowingAReferenceSlotNothingHasWrittenIsRefusedByName() {
-    // One byte: the frame marker and profile, show_existing_frame, and which of the eight slots. A
-    // stream that begins with one is asking for a picture that has never been decoded.
     Assert.That(Assert.Throws<InvalidDataException>(() => _Decode(Vp9TestStream.BuildShowExistingFrame(3)))!.Message,
       Does.Contain("reference slot").And.Contain("shown"));
   }
@@ -435,27 +386,30 @@ public sealed class Vp9VideoDecoderTests {
       Codec = code == null ? CodecTag.None : CodecTag.FromCharacters(code),
     };
 
-  /// <summary>Decodes one packet through the public codec, as a container would.</summary>
-  private static RawImage _Decode(byte[] packet) {
+  private static RawImage _DecodeNative(byte[] packet) {
     var decoder = Vp9VideoDecoder.Create(_Stream(codecId: "V_VP9"));
     Assert.That(decoder.TryDecode(new(0, packet), out var picture), Is.True, "no picture was shown");
     return picture;
   }
 
-  /// <summary>Decodes a sequence of packets through one decoder and collects every picture shown.</summary>
+  /// <summary>Display-oriented compatibility helper. The decoder itself remains native YUV.</summary>
+  private static RawImage _Decode(byte[] packet)
+    => RawImageConverter.Convert(_DecodeNative(packet), PixelFormat.Rgb24);
+
   private static List<RawImage> _DecodeAll(params byte[][] packets) {
     var decoder = Vp9VideoDecoder.Create(_Stream(codecId: "V_VP9"));
     var pictures = new List<RawImage>();
 
     foreach (var packet in packets)
       if (decoder.TryDecode(new(0, packet), out var picture))
-        pictures.Add(picture);
+        pictures.Add(RawImageConverter.Convert(picture, PixelFormat.Rgb24));
 
-    pictures.AddRange(decoder.Flush());
+    foreach (var picture in decoder.Flush())
+      pictures.Add(RawImageConverter.Convert(picture, PixelFormat.Rgb24));
+
     return pictures;
   }
 
-  /// <summary>Packs frames into one chunk with the index of Annex B.</summary>
   private static byte[] _Superframe(params byte[][] frames) {
     var marker = (byte)(0xC0 | (3 << 3) | (frames.Length - 1));
     var index = new byte[2 + frames.Length * 4];
@@ -479,16 +433,6 @@ public sealed class Vp9VideoDecoderTests {
     return packet;
   }
 
-  /// <summary>
-  /// Overwrites the field that states how long a frame's compressed header is.
-  /// </summary>
-  /// <remarks>
-  /// The uncompressed header of a key frame built with the default options is exactly ninety-six bits
-  /// long — three bytes of frame tag and sync code apiece, four bits of colour configuration, four
-  /// bytes of picture size, and twenty-five bits of everything else — so the sixteen-bit field it
-  /// ends with begins at byte twelve. The assertion below is what says so out loud, and what fails
-  /// first if a field is ever added to the frames these tests build.
-  /// </remarks>
   private static void _SetCompressedHeaderSize(byte[] frame, int size) {
     const int AT = 12;
     Assert.That(frame[AT], Is.Zero, "the compressed header size is not where this test expects it");
