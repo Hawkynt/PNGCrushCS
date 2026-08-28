@@ -149,7 +149,6 @@ internal sealed class Vp9Decoder {
     var tilesLength = size - uncompressed - this._header.HeaderSizeInBytes;
 
     var current = this._TakeFreeFrame(shown);
-    Vp9InterPrediction.ConfigureCurrentFrame(this._header.SubsamplingX, this._header.SubsamplingY);
     this._frameDecoder.DecodeTiles(this._packet, tilesAt, tilesLength, current, this._slots);
     this._loopFilter.Apply(current, grid, this._header);
 
