@@ -81,14 +81,14 @@ public sealed class RawImage {
     }
   }
 
-  /// <summary>Converts this image to BGRA32 pixel data.</summary>
-  public byte[] ToBgra32() => Format == PixelFormat.Bgra32 ? PixelData : RawImageConverter.Convert(this, PixelFormat.Bgra32).PixelData;
+  /// <summary>Converts this image to BGRA32 pixel data through the accelerated shared conversion pipeline.</summary>
+  public byte[] ToBgra32() => Format == PixelFormat.Bgra32 ? PixelData : FastRawImageConverter.Convert(this, PixelFormat.Bgra32).PixelData;
 
-  /// <summary>Converts this image to RGBA32 pixel data.</summary>
-  public byte[] ToRgba32() => Format == PixelFormat.Rgba32 ? PixelData : RawImageConverter.Convert(this, PixelFormat.Rgba32).PixelData;
+  /// <summary>Converts this image to RGBA32 pixel data through the accelerated shared conversion pipeline.</summary>
+  public byte[] ToRgba32() => Format == PixelFormat.Rgba32 ? PixelData : FastRawImageConverter.Convert(this, PixelFormat.Rgba32).PixelData;
 
-  /// <summary>Converts this image to RGB24 pixel data.</summary>
-  public byte[] ToRgb24() => Format == PixelFormat.Rgb24 ? PixelData : RawImageConverter.Convert(this, PixelFormat.Rgb24).PixelData;
+  /// <summary>Converts this image to RGB24 pixel data through the accelerated shared conversion pipeline.</summary>
+  public byte[] ToRgb24() => Format == PixelFormat.Rgb24 ? PixelData : FastRawImageConverter.Convert(this, PixelFormat.Rgb24).PixelData;
 
   /// <summary>
   /// Returns one plane's dimensions. Packed formats have one plane equal to the image size; planar
