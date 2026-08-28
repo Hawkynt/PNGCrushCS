@@ -16,10 +16,9 @@ namespace FileFormat.Codecs.Vp9;
 /// each time would silently reset all of them and produce a picture that is wrong only where the
 /// stream was economical.
 /// <para/>
-/// <b>Profile 0 only.</b> Profiles 1 and 3 carry chrominance at other subsampling ratios and profiles
-/// 2 and 3 carry more than eight bits per sample; the transforms, the loop filter and the prediction
-/// all change shape for those. This refuses them by name at the field that states them rather than
-/// decoding most of a frame and going wrong at the end.
+/// All four profiles are parsed. Profiles 0/1 carry eight-bit samples, while profiles 2/3 carry ten-
+/// or twelve-bit samples. Profiles 0/2 are 4:2:0; profiles 1/3 carry independently stated chroma
+/// subsampling and may use the special full-range sRGB/GBR representation.
 /// </remarks>
 internal sealed class Vp9FrameHeader {
 
@@ -33,6 +32,7 @@ internal sealed class Vp9FrameHeader {
   // --------------------------------------------------------------------------------------------
 
   internal int Profile;
+  internal int BitDepth = 8;
   internal bool ShowExistingFrame;
   internal int FrameToShowMapIndex;
   internal int FrameType;
@@ -119,13 +119,7 @@ internal sealed class Vp9FrameHeader {
 
   internal int Feature(int segment, int feature) => this.FeatureData[segment * SEG_LVL_MAX + feature];
 
-  /// <summary>
-  /// Reads one uncompressed header (specification 6.2).
-  /// </summary>
-  /// <param name="reader">Positioned at the first byte of the frame.</param>
-  /// <param name="referenceWidths">The width of each of the eight reference slots, for a frame that takes its size from one.</param>
-  /// <param name="referenceHeights">The height of each of the eight reference slots.</param>
-  /// <param name="slotIsValid">Which of the eight reference slots have ever been written.</param>
+  /// <summary>Reads one uncompressed header (specification 6.2).</summary>
   internal void Parse(ref Vp9BitReader reader, int[] referenceWidths, int[] referenceHeights, bool[] slotIsValid) {
     this.SizeChanged = false;
 
@@ -137,13 +131,13 @@ internal sealed class Vp9FrameHeader {
     var profileLowBit = reader.ReadBit();
     var profileHighBit = reader.ReadBit();
     this.Profile = (profileHighBit << 1) + profileLowBit;
-
-    if (this.Profile != 0)
-      throw new NotSupportedException(
-        $"This VP9 stream states profile {this.Profile}. This decoder implements profile 0 — eight bits per sample "
-        + "at 4:2:0 chrominance — and profiles 1, 2 and 3 differ from it in the chrominance subsampling, the sample "
-        + "depth or both, which changes the transforms, the prediction and the loop filter. None of that is "
-        + "implemented here.");
+    if (this.Profile == 3) {
+      // The third profile bit is specified only for the 11 prefix. Zero names profile 3; one is the
+      // reserved profile value 4 and must be rejected rather than silently interpreted as profile 3.
+      this.Profile += reader.ReadBit();
+      if (this.Profile >= 4)
+        throw new InvalidDataException("This VP9 frame states reserved profile 4.");
+    }
 
     this.ShowExistingFrame = reader.ReadBit() != 0;
     if (this.ShowExistingFrame) {
@@ -163,9 +157,6 @@ internal sealed class Vp9FrameHeader {
       _ReadSyncCode(ref reader);
       this._ReadColorConfig(ref reader);
 
-      // Set before the size is read rather than after it, as specification 6.2 has it. The only
-      // reader of the flag during the size computation is the derivation of UsePrevFrameMvs, which
-      // no intra frame consults, so the two orders cannot be told apart from the decoded picture.
       this.IntraOnly = false;
       this.FrameIsIntra = true;
 
@@ -181,11 +172,16 @@ internal sealed class Vp9FrameHeader {
       if (this.IntraOnly) {
         _ReadSyncCode(ref reader);
 
-        // Profile 0 states no colour configuration on an intra-only frame; it is defined to be the
-        // same 8-bit 4:2:0 the sequence has been all along.
-        this.ColorSpace = CS_BT_601;
-        this.SubsamplingX = 1;
-        this.SubsamplingY = 1;
+        if (this.Profile > 0)
+          this._ReadColorConfig(ref reader);
+        else {
+          // Normative profile-0 intra-only default.
+          this.BitDepth = 8;
+          this.ColorSpace = CS_BT_601;
+          this.ColorRange = 0;
+          this.SubsamplingX = 1;
+          this.SubsamplingY = 1;
+        }
 
         this.RefreshFrameFlags = reader.ReadLiteral(8);
         this._ReadFrameSize(ref reader);
@@ -244,10 +240,7 @@ internal sealed class Vp9FrameHeader {
   internal bool ResetsAllFrameContexts { get; private set; }
   internal bool ResetsOneFrameContext { get; private set; }
 
-  /// <summary>
-  /// The frame context a frame that resets exactly one of them names, read before
-  /// <see cref="FrameContextIndex"/> is forced to zero.
-  /// </summary>
+  /// <summary>The context named before an independence reset forces frame context zero.</summary>
   internal int ContextIndexToReset { get; private set; }
 
   // ============================================================================================
@@ -266,20 +259,40 @@ internal sealed class Vp9FrameHeader {
   }
 
   private void _ReadColorConfig(ref Vp9BitReader reader) {
-    // Profile 0 states no bit depth: it is eight, and profiles 2 and 3 — the ones that state
-    // otherwise — have already been refused.
+    this.BitDepth = this.Profile >= 2 ? (reader.ReadBit() != 0 ? 12 : 10) : 8;
     this.ColorSpace = reader.ReadLiteral(3);
 
-    if (this.ColorSpace == CS_RGB)
-      throw new NotSupportedException(
-        "This VP9 key frame states the sRGB colour space, which specification 7.2.2 permits only in profiles 1 and "
-        + "3. A profile 0 stream cannot carry it.");
+    if (this.ColorSpace == CS_RGB) {
+      if (this.Profile is not (1 or 3))
+        throw new InvalidDataException(
+          $"This VP9 profile-{this.Profile} frame states sRGB. VP9 permits sRGB only in profiles 1 and 3.");
+
+      this.ColorRange = 1;
+      this.SubsamplingX = 0;
+      this.SubsamplingY = 0;
+      if (reader.ReadBit() != 0)
+        throw new InvalidDataException($"This VP9 profile-{this.Profile} sRGB frame sets reserved_zero in color_config().");
+
+      return;
+    }
 
     this.ColorRange = reader.ReadBit();
 
-    // Profile 0 is 4:2:0 and says so by not saying anything.
-    this.SubsamplingX = 1;
-    this.SubsamplingY = 1;
+    if (this.Profile is 0 or 2) {
+      this.SubsamplingX = 1;
+      this.SubsamplingY = 1;
+      return;
+    }
+
+    this.SubsamplingX = reader.ReadBit();
+    this.SubsamplingY = reader.ReadBit();
+    if (this.SubsamplingX == 1 && this.SubsamplingY == 1)
+      throw new InvalidDataException(
+        $"This VP9 profile-{this.Profile} frame states 4:2:0 chroma. Profiles 1 and 3 are the non-4:2:0 profiles; "
+        + "4:2:0 belongs to profile 0 at eight bits or profile 2 at high bit depth.");
+
+    if (reader.ReadBit() != 0)
+      throw new InvalidDataException($"This VP9 profile-{this.Profile} frame sets reserved_zero in color_config().");
   }
 
   private void _ReadFrameSize(ref Vp9BitReader reader) {
@@ -323,10 +336,7 @@ internal sealed class Vp9FrameHeader {
     this._ReadRenderSize(ref reader);
   }
 
-  /// <summary>
-  /// Records the picture size and derives everything measured in blocks from it
-  /// (specification 6.2.6 and 7.2.6).
-  /// </summary>
+  /// <summary>Records the picture size and derives everything measured in blocks from it.</summary>
   private void _SetSize(int width, int height) {
     this.FrameWidth = width;
     this.FrameHeight = height;
@@ -449,14 +459,7 @@ internal sealed class Vp9FrameHeader {
       this.TileRowsLog2 += reader.ReadBit();
   }
 
-  /// <summary>
-  /// Forgets everything a frame may have inherited from the frames before it (specification 7.2).
-  /// </summary>
-  /// <remarks>
-  /// The reference deltas do not reset to zero. Intra blocks are filtered a step harder and the two
-  /// long-term references a step softer, which is the format's standing opinion that an intra block
-  /// is where the blocking artefacts are and a golden frame is where they are not.
-  /// </remarks>
+  /// <summary>Forgets everything an independent frame may have inherited from earlier frames.</summary>
   private void _SetUpPastIndependence() {
     Array.Clear(this.FeatureEnabled);
     Array.Clear(this.FeatureData);
@@ -472,10 +475,7 @@ internal sealed class Vp9FrameHeader {
     Array.Clear(this.ReferenceFrameSignBias);
   }
 
-  /// <summary>
-  /// Works out which reference is fixed and which two are chosen between, in compound prediction
-  /// (specification 6.3.18).
-  /// </summary>
+  /// <summary>Works out the fixed and variable references in compound prediction.</summary>
   internal void SetUpCompoundReferenceMode() {
     if (this.ReferenceFrameSignBias[LAST_FRAME] == this.ReferenceFrameSignBias[GOLDEN_FRAME]) {
       this.CompoundFixedReference = ALTREF_FRAME;

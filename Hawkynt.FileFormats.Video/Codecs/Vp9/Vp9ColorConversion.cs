@@ -82,7 +82,7 @@ internal static class Vp9ColorConversion {
   /// distance written as weights. Past the edge of the plane the near sample is used for both, which
   /// replicates the edge rather than wrapping.
   /// </remarks>
-  private static int _Chroma(byte[] plane, int stride, int width, int height, int x, int y) {
+  private static int _Chroma(ushort[] plane, int stride, int width, int height, int x, int y) {
     var nearX = x >> 1;
     var nearY = y >> 1;
     var farX = _Neighbour(nearX, x, width);

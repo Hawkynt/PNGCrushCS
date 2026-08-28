@@ -105,8 +105,6 @@ internal sealed partial class Vp9FrameDecoder {
   internal void Resize(Vp9ModeInfoGrid grid) {
     this._grid = grid;
 
-    // Two entries per mode info position for the four-sample granularity the nonzero contexts use,
-    // and headroom for the blocks that reach past the last mode info position of a superblock.
     var aboveLength = grid.Columns * 2 + 32;
     var leftLength = grid.Rows * 2 + 32;
 
@@ -125,14 +123,6 @@ internal sealed partial class Vp9FrameDecoder {
   // Tiles (specification 6.4)
   // ============================================================================================
 
-  /// <summary>
-  /// Decodes every tile of the frame.
-  /// </summary>
-  /// <param name="packet">The frame's bytes.</param>
-  /// <param name="at">Where the first tile begins.</param>
-  /// <param name="length">How many bytes of tile data follow.</param>
-  /// <param name="frame">The picture being reconstructed.</param>
-  /// <param name="slots">The eight reference frame slots.</param>
   internal void DecodeTiles(byte[] packet, int at, int length, Vp9Frame frame, Vp9Frame?[] slots) {
     this._packet = packet;
     this._frame = frame;
@@ -141,8 +131,6 @@ internal sealed partial class Vp9FrameDecoder {
     var tileColumns = 1 << this._header.TileColsLog2;
     var tileRows = 1 << this._header.TileRowsLog2;
 
-    // Cleared once for the whole frame rather than once per tile. Tile columns cover disjoint ranges
-    // of it, and a tile may predict from the row above even when that row is in the tile above.
     foreach (var plane in this._aboveNonzero)
       Array.Clear(plane);
 
@@ -226,13 +214,11 @@ internal sealed partial class Vp9FrameDecoder {
           this._DecodeBlock(row, column, subsize);
           if (hasRows)
             this._DecodeBlock(row + half, column, subsize);
-
           break;
         case PARTITION_VERT:
           this._DecodeBlock(row, column, subsize);
           if (hasColumns)
             this._DecodeBlock(row, column + half, subsize);
-
           break;
         default:
           this._DecodePartition(row, column, subsize);
@@ -242,8 +228,6 @@ internal sealed partial class Vp9FrameDecoder {
           break;
       }
 
-    // A split is recorded by its parts and not by itself, except at the smallest size where the parts
-    // are sub-blocks that have no partition of their own.
     if (size != BLOCK_8X8 && partition == PARTITION_SPLIT)
       return;
 
@@ -271,9 +255,6 @@ internal sealed partial class Vp9FrameDecoder {
     this._eobTotal = 0;
     this._Residual();
 
-    // A block that said it had coefficients and turned out to have none is recorded as skipped, so
-    // that the loop filter treats it as one. An intra block is not, because its transform edges are
-    // filtered whether or not it carried a residue.
     if (this._isInter && size >= BLOCK_8X8 && this._eobTotal == 0)
       this._skip = true;
 
@@ -331,7 +312,7 @@ internal sealed partial class Vp9FrameDecoder {
             Vp9IntraPrediction.Predict(
               samples, stride, startX, startY, transformSize + 2, mode,
               this._availableLeft || x > 0, this._availableAbove || y > 0, x + step < wide,
-              maxX - 1, maxY - 1);
+              maxX - 1, maxY - 1, this._header.BitDepth);
           }
 
           if (!this._skip) {
@@ -350,14 +331,12 @@ internal sealed partial class Vp9FrameDecoder {
     }
   }
 
-  /// <summary>The block size one plane sees, once the chrominance subsampling is applied (specification 6.4.23).</summary>
   private int _PlaneBlockSize(int size, int plane) {
     var subX = plane > 0 ? this._header.SubsamplingX : 0;
     var subY = plane > 0 ? this._header.SubsamplingY : 0;
     return Vp9Tables.SubsampledSizeLookup[(size * 2 + subX) * 2 + subY];
   }
 
-  /// <summary>The transform size the chrominance planes use for the current block (specification 6.4.22).</summary>
   private int _ChromaTransformSize()
     => this._miSize < BLOCK_8X8
       ? TX_4X4
@@ -373,12 +352,15 @@ internal sealed partial class Vp9FrameDecoder {
       Vp9InterPrediction.SelectAndClamp(
         plane, list, blockIndex, this._miSize, this._blockMotionVectors,
         this._miRow, this._miCol, this._header.MiRows, this._header.MiCols,
+        this._header.SubsamplingX, this._header.SubsamplingY,
         motionVectors.Slice(list * 2, 2));
     }
 
     this._interPrediction.Predict(
       this._frame.Plane(plane), this._frame.Stride(plane), x, y, width, height, plane,
-      references, motionVectors, this._interpolationFilter, this._header.FrameWidth, this._header.FrameHeight);
+      references, motionVectors, this._interpolationFilter,
+      this._header.SubsamplingX, this._header.SubsamplingY,
+      this._header.FrameWidth, this._header.FrameHeight, this._header.BitDepth);
   }
 
   private Vp9Frame _Reference(int referenceFrame) {
@@ -393,7 +375,7 @@ internal sealed partial class Vp9FrameDecoder {
   // Dequantisation and reconstruction (specification 8.6)
   // ============================================================================================
 
-  private void _Reconstruct(int plane, int x, int y, int transformSize, byte[] samples, int stride) {
+  private void _Reconstruct(int plane, int x, int y, int transformSize, ushort[] samples, int stride) {
     var denominator = transformSize == TX_32X32 ? 2 : 1;
     var sizeLog2 = 2 + transformSize;
     var size = 1 << sizeLog2;
@@ -407,21 +389,19 @@ internal sealed partial class Vp9FrameDecoder {
     for (var i = 0; i < count; ++i)
       block[i] = block[i] * alternating / denominator;
 
-    // The corner coefficient is scaled by its own quantiser, which for the luminance plane may differ
-    // from the alternating one by the delta the frame header states.
     block[0] = directCurrent * direct / denominator;
 
     this._transform.Apply(block, sizeLog2, this._transformType, this._header.Lossless);
 
+    var maxSample = (1 << this._header.BitDepth) - 1;
     for (var row = 0; row < size; ++row) {
       var at = (y + row) * stride + x;
       var from = row * size;
       for (var column = 0; column < size; ++column)
-        samples[at + column] = (byte)Clip3(0, 255, samples[at + column] + block[from + column]);
+        samples[at + column] = (ushort)Clip3(0, maxSample, samples[at + column] + block[from + column]);
     }
   }
 
-  /// <summary>The quantiser index for the current block, which a segment may move (specification 8.6.1).</summary>
   private int _QuantiserIndex() {
     if (!this._header.IsFeatureActive(this._segmentId, SEG_LVL_ALT_Q))
       return this._header.BaseQIndex;
@@ -432,10 +412,10 @@ internal sealed partial class Vp9FrameDecoder {
 
   private int _Quantiser(int plane, bool isDirectCurrent) {
     var index = this._QuantiserIndex();
-
     if (isDirectCurrent)
-      return Vp9Tables.DcQuantiser[Clip3(0, 255, index + (plane == 0 ? this._header.DeltaQYDc : this._header.DeltaQUvDc))];
+      return Vp9QuantiserTables.Dc(
+        index, plane == 0 ? this._header.DeltaQYDc : this._header.DeltaQUvDc, this._header.BitDepth);
 
-    return Vp9Tables.AcQuantiser[Clip3(0, 255, index + (plane == 0 ? 0 : this._header.DeltaQUvAc))];
+    return Vp9QuantiserTables.Ac(index, plane == 0 ? 0 : this._header.DeltaQUvAc, this._header.BitDepth);
   }
 }

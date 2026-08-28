@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using FileFormat.Codecs.Hap;
 using FileFormat.Core;
+using FileFormat.Core.BlockDecoders;
 
 namespace FileFormat.Codecs;
 
@@ -15,10 +16,8 @@ namespace FileFormat.Codecs;
 /// with, block for block. That is what makes this codec unlike almost everything else in this
 /// package: a block's four or sixteen decoded pixels are not an approximation converging on the
 /// source, and not the output of a transform with a stated accuracy bound — they are the one and only
-/// picture that block's bits mean, defined completely by S3TC (DXT1/BC1, DXT5/BC3) and, for the "Q"
-/// pixel format, by van Waveren and Castaño's Scaled YCoCg-DXT5 reconstruction. Decoding is therefore
-/// held to the same bar as this package's lossless codecs — max delta 0 on every sample of every
-/// frame — even though the picture the encoder started from was compressed to get there.
+/// picture that block's bits mean, defined completely by S3TC (DXT1/BC1, DXT5/BC3), BC7, BC6H and,
+/// for the "Q" pixel format, by van Waveren and Castaño's Scaled YCoCg-DXT5 reconstruction.
 /// <para/>
 /// The frame layout is entirely published, in the Hap project's own repository on GitHub
 /// (<c>documentation/HapVideoDRAFT.md</c>): a run of sections, each a type byte and a size in a header
@@ -36,8 +35,8 @@ namespace FileFormat.Codecs;
 /// <c>FileFormat.Core.BlockDecoders</c>, because the two disagree on the third and fourth colour of a
 /// four-colour block and the interpolated steps of an alpha ramp: that code rounds them to the nearest
 /// whole value, where both extension texts give a plain integer division with no rounding term, and
-/// ffmpeg's Hap decoder agrees with the plain reading and not the rounded one. See
-/// <see cref="HapBlockDecoding"/>'s own remarks for the measurement that settled it.
+/// ffmpeg's Hap decoder agrees with the plain reading and not the rounded one. BC7 has no such Hap-
+/// specific interpretation, so <see cref="Bc7Decoder"/> is reused directly for Hap R.
 /// <para/>
 /// <b>The Scaled YCoCg pixel format is a DXT5 block read for different meaning.</b> The eight-sample
 /// alpha channel, reproduced at full precision rather than through a three-bit index into four
@@ -46,12 +45,11 @@ namespace FileFormat.Codecs;
 /// before 5- and 6-bit quantisation crushed them. <see cref="HapYCoCgConversion"/> carries the
 /// derivation from the paper's own fragment-program pseudocode in full.
 /// <para/>
-/// <b>Hap R (BC7) and Hap HDR (BC6U/BC6S) refuse by name.</b> Not for want of a block decoder — this
-/// package already has one for each, reused by the image formats that carry them — but because BC6 is
-/// half-float HDR data and this package's <see cref="RawImage"/> has no floating-point pixel format to
-/// receive it in, and because ffmpeg's own Hap encoder, which is what this decoder is measured
-/// against, writes none of the four HDR or BC7 variants — there is no oracle to check a BC7 or BC6
-/// path against even if one were written.
+/// <b>Hap R and Hap HDR preserve their native precision.</b> Hap R's BC7 texture becomes
+/// <see cref="PixelFormat.Rgba32"/>. Hap HDR's unsigned or signed BC6H texture becomes
+/// <see cref="PixelFormat.RgbF16"/> through <see cref="Bc6HFloatDecoder"/>; values below zero and above
+/// one remain representable and are not tone-mapped or clipped by the decoder. A writer or display
+/// path that needs integer RGB can request that conversion later through <see cref="RawImageConverter"/>.
 /// <para/>
 /// <b>Measured, and lossless with respect to its own coded blocks.</b> A DXT1, DXT5 or Scaled YCoCg
 /// block's decode is exactly defined, so — unlike the DCT and wavelet codecs elsewhere in this
@@ -97,10 +95,9 @@ namespace FileFormat.Codecs;
 /// codec knows, a "consult decode instructions" section missing its compressor table or its size
 /// table, a chunk naming a compressor that is neither uncompressed nor Snappy, a Snappy block whose
 /// elements do not produce the length its own preamble states, a back-reference pointing before the
-/// start of the output, a multiple-image section holding a combination other than Scaled YCoCg DXT5
-/// with RGTC1/BC4 alpha, and — at <c>Create</c>, before a single frame is read — the <c>Hap7</c> and
-/// <c>HapH</c> codes, for the reason above. There is no <c>catch</c> anywhere in this decoder that
-/// hands back a blank frame or repeats the one before it.
+/// start of the output, and a multiple-image section holding a combination other than Scaled YCoCg
+/// DXT5 with RGTC1/BC4 alpha. There is no <c>catch</c> anywhere in this decoder that hands back a blank
+/// frame or repeats the one before it.
 /// </remarks>
 public sealed class HapDecoder : IVideoCodecDecoder<HapDecoder> {
 
@@ -139,10 +136,6 @@ public sealed class HapDecoder : IVideoCodecDecoder<HapDecoder> {
   public static HapDecoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
-    if (stream.Codec.EqualsIgnoringCase(_Hap7) || stream.Codec.EqualsIgnoringCase(_HapH))
-      throw new NotSupportedException(
-        $"Video stream {stream.Index} is coded as {stream.Codec}, whose texture format ({(stream.Codec.EqualsIgnoringCase(_Hap7) ? "BC7" : "BC6 half-float")}) this package has no pixel format to hold — {(stream.Codec.EqualsIgnoringCase(_HapH) ? "RawImage carries no floating-point format at all, and " : "")}ffmpeg's own Hap encoder writes none of the HDR or BC7 variants, so there is no oracle to check a decode against either.");
-
     if (stream.Width <= 0 || stream.Height <= 0)
       throw new InvalidDataException(
         $"Video stream {stream.Index} states a picture size of {stream.Width}x{stream.Height}, which no frame can be decoded into.");
@@ -165,9 +158,12 @@ public sealed class HapDecoder : IVideoCodecDecoder<HapDecoder> {
     HapPixelFormat.Dxt1Rgb => this._DecodeDxt1Rgb(texture.Data),
     HapPixelFormat.Dxt5Rgba => this._DecodeDxt5Rgba(texture.Data),
     HapPixelFormat.Dxt5ScaledYCoCg => this._DecodeScaledYCoCg(texture.Data),
+    HapPixelFormat.Bc7Rgba => this._DecodeBc7Rgba(texture.Data),
     HapPixelFormat.Rgtc1Alpha => this._DecodeRgtc1Alpha(texture.Data),
+    HapPixelFormat.Bc6UnsignedFloat => this._DecodeBc6(texture.Data, isSigned: false),
+    HapPixelFormat.Bc6SignedFloat => this._DecodeBc6(texture.Data, isSigned: true),
     _ => throw new NotSupportedException(
-      $"Video stream {this._streamIndex} carries a frame in texture format {texture.Format}, which this decoder does not turn into pixels — see the codec's own remarks for why."),
+      $"Video stream {this._streamIndex} carries a frame in texture format {texture.Format}, which this decoder does not turn into pixels."),
   };
 
   private RawImage _ComposeCombined(HapTexture first, HapTexture second) {
@@ -213,6 +209,35 @@ public sealed class HapDecoder : IVideoCodecDecoder<HapDecoder> {
 
     var rgba = HapBlockDecoding.DecodeDxt5Raw(data, width, height);
     return new() { Width = width, Height = height, Format = PixelFormat.Rgba32, PixelData = rgba };
+  }
+
+  private RawImage _DecodeBc7Rgba(byte[] data) {
+    var width = this._width;
+    var height = this._height;
+    this._CheckBlockDataLength(data, width, height, 16, "BC7");
+
+    var rgba = new byte[width * height * 4];
+    Bc7Decoder.DecodeImage(data, width, height, rgba);
+    return new() { Width = width, Height = height, Format = PixelFormat.Rgba32, PixelData = rgba };
+  }
+
+  private RawImage _DecodeBc6(byte[] data, bool isSigned) {
+    var width = this._width;
+    var height = this._height;
+    this._CheckBlockDataLength(data, width, height, 16, isSigned ? "signed BC6H" : "unsigned BC6H");
+
+    var rgb = new byte[checked(width * height * 6)];
+    Bc6HFloatDecoder.DecodeImage(data, width, height, rgb, isSigned);
+    return new() {
+      Width = width,
+      Height = height,
+      Format = PixelFormat.RgbF16,
+      PixelData = rgb,
+      ColorInfo = new() {
+        Range = RawColorRange.Full,
+        Matrix = RawMatrixCoefficients.Identity,
+      },
+    };
   }
 
   private RawImage _DecodeScaledYCoCg(byte[] data) {

@@ -6,94 +6,54 @@ namespace FileFormat.Codecs.H265;
 /// <summary>
 /// A picture parameter set — ITU-T H.265, clauses 7.3.2.3 and 7.4.3.3.
 /// </summary>
-/// <remarks>
-/// What may change from one picture to the next without a new sequence: the quantiser the slices
-/// start from, whether the entropy coder is reinitialised across rows, how a picture is cut into
-/// independently decodable pieces, and a dozen switches that turn individual coding tools on.
-/// <para/>
-/// Three of the switches change the residual coding rather than describing it, and they are the ones
-/// worth naming here because a decoder that ignored any of them would decode most of a picture and
-/// then be one bin out of step for the rest of the slice. <c>sign_data_hiding_enabled_flag</c> means
-/// one coefficient's sign is not transmitted at all but inferred from the parity of the sub-block's
-/// levels; <c>cu_qp_delta_enabled_flag</c> means a quantiser change may appear inside a transform
-/// unit; <c>transform_skip_enabled_flag</c> means a small block may carry its residual with no
-/// transform applied, and the flag saying so is read before the coefficients.
-/// </remarks>
 internal sealed class H265PictureParameterSet {
 
   private H265PictureParameterSet() { }
 
   internal int Id { get; private init; }
-
   internal int SequenceParameterSetId { get; private init; }
-
-  /// <summary>Whether a slice segment may continue the previous one's header and entropy state.</summary>
   internal bool DependentSliceSegmentsEnabled { get; private init; }
-
   internal bool OutputFlagPresent { get; private init; }
-
-  /// <summary>How many bits the slice header reserves before <c>slice_type</c> for later extensions.</summary>
   internal int ExtraSliceHeaderBits { get; private init; }
-
-  /// <summary>Whether one coefficient sign per sub-block is carried in the parity of the levels.</summary>
   internal bool SignDataHidingEnabled { get; private init; }
-
-  /// <summary>Whether a slice may choose which of the three context initialisation tables it uses.</summary>
   internal bool CabacInitPresent { get; private init; }
-
   internal int NumRefIdxL0DefaultActive { get; private init; }
-
   internal int NumRefIdxL1DefaultActive { get; private init; }
-
-  /// <summary>The quantiser a slice's own delta is measured from.</summary>
   internal int InitQp { get; private init; }
-
-  /// <summary>Whether an intra block may predict from a neighbour that was itself inter coded.</summary>
   internal bool ConstrainedIntraPred { get; private init; }
-
   internal bool TransformSkipEnabled { get; private init; }
-
   internal int Log2MaxTransformSkipBlockSize { get; private init; } = 2;
-
   internal bool CuQpDeltaEnabled { get; private init; }
-
-  /// <summary>How far down the coding quadtree a quantiser group reaches.</summary>
   internal int DiffCuQpDeltaDepth { get; private init; }
-
   internal int CbQpOffset { get; private init; }
-
   internal int CrQpOffset { get; private init; }
-
   internal bool SliceChromaQpOffsetsPresent { get; private init; }
-
   internal bool WeightedPred { get; private init; }
-
   internal bool WeightedBipred { get; private init; }
-
   internal bool TransquantBypassEnabled { get; private init; }
 
   internal bool TilesEnabled { get; private init; }
+  internal int NumTileColumns { get; private init; } = 1;
+  internal int NumTileRows { get; private init; } = 1;
+  internal bool UniformTileSpacing { get; private init; } = true;
 
-  /// <summary>Whether each row of coding tree blocks is its own entropy-coded substream.</summary>
+  /// <summary>Explicit widths for every tile column except the last, as syntax value plus one CTB.</summary>
+  internal int[] TileColumnWidths { get; private init; } = [];
+
+  /// <summary>Explicit heights for every tile row except the last, as syntax value plus one CTB.</summary>
+  internal int[] TileRowHeights { get; private init; } = [];
+
+  internal bool LoopFilterAcrossTilesEnabled { get; private init; } = true;
+
   internal bool EntropyCodingSyncEnabled { get; private init; }
-
   internal bool LoopFilterAcrossSlicesEnabled { get; private init; }
-
   internal bool DeblockingFilterOverrideEnabled { get; private init; }
-
   internal bool DeblockingFilterDisabled { get; private init; }
-
   internal int BetaOffsetDiv2 { get; private init; }
-
   internal int TcOffsetDiv2 { get; private init; }
-
-  /// <summary>The matrices this picture uses, or <c>null</c> where the sequence parameter set's stand.</summary>
   internal H265ScalingList? ScalingList { get; private init; }
-
   internal bool ListsModificationPresent { get; private init; }
-
   internal int Log2ParallelMergeLevel { get; private init; }
-
   internal bool SliceSegmentHeaderExtensionPresent { get; private init; }
 
   internal static H265PictureParameterSet Parse(ReadOnlySpan<byte> payload) {
@@ -124,19 +84,29 @@ internal sealed class H265PictureParameterSet {
     var tiles = reader.ReadFlag();
     var entropyCodingSync = reader.ReadFlag();
 
+    var tileColumns = 1;
+    var tileRows = 1;
+    var uniformTileSpacing = true;
+    var tileColumnWidths = Array.Empty<int>();
+    var tileRowHeights = Array.Empty<int>();
+    var loopFilterAcrossTiles = true;
+
     if (tiles) {
-      var columns = reader.ReadUnsignedExpGolomb() + 1;
-      var rows = reader.ReadUnsignedExpGolomb() + 1;
-      if (!reader.ReadFlag())
-        for (var i = 0; i < columns + rows - 2; ++i)
-          reader.ReadUnsignedExpGolomb();
+      tileColumns = reader.ReadUnsignedExpGolomb() + 1;
+      tileRows = reader.ReadUnsignedExpGolomb() + 1;
+      uniformTileSpacing = reader.ReadFlag();
 
-      reader.Skip(1); // loop_filter_across_tiles_enabled_flag
+      if (!uniformTileSpacing) {
+        tileColumnWidths = new int[tileColumns - 1];
+        for (var i = 0; i < tileColumnWidths.Length; ++i)
+          tileColumnWidths[i] = reader.ReadUnsignedExpGolomb() + 1;
 
-      throw new NotSupportedException(
-        $"This H.265 stream divides each picture into {columns} by {rows} tiles (clause 7.3.2.3.1). A tiled picture "
-        + "is coded as several independent rectangles with their own entropy coder state and their own prediction "
-        + "boundaries; reading them is not implemented.");
+        tileRowHeights = new int[tileRows - 1];
+        for (var i = 0; i < tileRowHeights.Length; ++i)
+          tileRowHeights[i] = reader.ReadUnsignedExpGolomb() + 1;
+      }
+
+      loopFilterAcrossTiles = reader.ReadFlag();
     }
 
     var loopFilterAcrossSlices = reader.ReadFlag();
@@ -185,7 +155,13 @@ internal sealed class H265PictureParameterSet {
       WeightedPred = weightedPred,
       WeightedBipred = weightedBipred,
       TransquantBypassEnabled = transquantBypass,
-      TilesEnabled = false,
+      TilesEnabled = tiles,
+      NumTileColumns = tileColumns,
+      NumTileRows = tileRows,
+      UniformTileSpacing = uniformTileSpacing,
+      TileColumnWidths = tileColumnWidths,
+      TileRowHeights = tileRowHeights,
+      LoopFilterAcrossTilesEnabled = loopFilterAcrossTiles,
       EntropyCodingSyncEnabled = entropyCodingSync,
       LoopFilterAcrossSlicesEnabled = loopFilterAcrossSlices,
       DeblockingFilterOverrideEnabled = deblockingOverrideEnabled,

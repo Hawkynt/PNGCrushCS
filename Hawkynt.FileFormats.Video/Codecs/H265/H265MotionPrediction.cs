@@ -105,26 +105,13 @@ internal static class H265MotionPrediction {
   /// The five neighbours a merge candidate may come from — clause 8.5.3.2.3.
   /// </summary>
   /// <remarks>
-  /// Left, above, above-right, below-left and above-left, in that order, and each is dropped when it
-  /// repeats one already taken. The two exclusions that are not about repetition are the interesting
-  /// ones: the second prediction block of a horizontally split coding block may not take the block
-  /// above it and the second of a vertically split one may not take the block to its left, because
-  /// that neighbour is the <em>other half of the same coding block</em> — merging with it would make
-  /// the split meaningless and would code the same motion twice.
-  /// <para/>
-  /// <b>A candidate dropped for duplicating an earlier one is still compared against.</b> The
-  /// standard keeps two variables per neighbour — whether it exists at all, and whether it became a
-  /// candidate — and the comparisons that remove duplicates use the first. So a neighbour whose own
-  /// candidacy was cancelled for repeating an earlier one still cancels a later one that repeats it,
-  /// which is what keeps a value that was already rejected from re-entering the list under another
-  /// name and shifting every index after it.
-  /// <para/>
-  /// <b>A candidate ruled out for being the other half of the same coding block is not.</b> That
-  /// exclusion is a different thing from a duplicate: the neighbour is not a candidate and its value
-  /// was never in the list, so a later candidate that happens to match it has not been seen before
-  /// and belongs. The two cases are told apart below by which of the two flags each comparison reads,
-  /// and getting them the same way round costs a picture with the right shapes in it and the wrong
-  /// motion.
+  /// Left, above, above-right, below-left and above-left, in that order. Availability is derived
+  /// before duplicate suppression: a neighbour excluded for being the other half of an asymmetric
+  /// partition or for sharing the current parallel merge region is not a candidate and therefore
+  /// cannot suppress a later candidate which happens to carry the same motion. A neighbour which is
+  /// available but omitted only because it duplicates an earlier available candidate still takes
+  /// part in the later duplicate checks. Keeping those two cases distinct is normative because the
+  /// bitstream stores an index into this list, not the motion vector itself.
   /// </remarks>
   private static void _AddSpatialCandidates(
     H265FrameDecoder frame, List<H265MotionInfo> candidates, int xCb, int yCb, int nCbS,
@@ -150,38 +137,36 @@ internal static class H265MotionPrediction {
       return xPb >> level != xNb >> level || yPb >> level != yNb >> level;
     }
 
-    // Whether each neighbour is there, and separately whether it may be a candidate. The second
-    // prediction block of a divided coding block may not take the other half — the left neighbour of
-    // a vertically divided block, the one above a horizontally divided one — because merging with it
-    // would code the same motion twice and make the division pointless.
-    var neighbouringLeft = Exists(xPb - 1, yPb + nPbH - 1, out var left);
-    var existsLeft = neighbouringLeft && !(splitVertically && partIdx == 1);
-    var existsAbove = Exists(xPb + nPbW - 1, yPb - 1, out var above) && !(splitHorizontally && partIdx == 1);
-    var existsAboveRight = Exists(xPb + nPbW, yPb - 1, out var aboveRight);
-    var existsBelowLeft = Exists(xPb - 1, yPb + nPbH, out var belowLeft);
-    var existsAboveLeft = Exists(xPb - 1, yPb - 1, out var aboveLeft);
+    var existsLeft = Exists(xPb - 1, yPb + nPbH - 1, out var left)
+                     && !(splitVertically && partIdx == 1)
+                     && OutsideMergeRegion(xPb - 1, yPb + nPbH - 1);
 
-    var takeLeft = existsLeft && OutsideMergeRegion(xPb - 1, yPb + nPbH - 1);
+    var existsAbove = Exists(xPb + nPbW - 1, yPb - 1, out var above)
+                      && !(splitHorizontally && partIdx == 1)
+                      && OutsideMergeRegion(xPb + nPbW - 1, yPb - 1);
 
-    var takeAbove = existsAbove
-                    && !(neighbouringLeft && above.SameAs(left))
-                    && OutsideMergeRegion(xPb + nPbW - 1, yPb - 1);
+    var existsAboveRight = Exists(xPb + nPbW, yPb - 1, out var aboveRight)
+                           && OutsideMergeRegion(xPb + nPbW, yPb - 1);
 
-    var takeAboveRight = existsAboveRight
-                         && !(existsAbove && aboveRight.SameAs(above))
-                         && OutsideMergeRegion(xPb + nPbW, yPb - 1);
+    var existsBelowLeft = Exists(xPb - 1, yPb + nPbH, out var belowLeft)
+                          && OutsideMergeRegion(xPb - 1, yPb + nPbH);
 
-    var takeBelowLeft = existsBelowLeft
-                        && !(neighbouringLeft && belowLeft.SameAs(left))
-                        && OutsideMergeRegion(xPb - 1, yPb + nPbH);
+    var existsAboveLeft = Exists(xPb - 1, yPb - 1, out var aboveLeft)
+                          && OutsideMergeRegion(xPb - 1, yPb - 1);
 
-    // The corner is only consulted when one of the other four failed to become a candidate: with all
-    // four present the list is already as long as the spatial part is allowed to be.
+    var takeLeft = existsLeft;
+    var takeAbove = existsAbove && !(existsLeft && above.SameAs(left));
+    var takeAboveRight = existsAboveRight && !(existsAbove && aboveRight.SameAs(above));
+    var takeBelowLeft = existsBelowLeft && !(existsLeft && belowLeft.SameAs(left));
+
+    // B2 is considered only while fewer than four spatial candidates have been inserted. Its
+    // duplicate checks use the availability of A1/B1, not whether those neighbours themselves made
+    // it into the list after duplicate suppression (H.265 8.5.3.2.3.6).
+    var spatialCount = (takeLeft ? 1 : 0) + (takeAbove ? 1 : 0) + (takeAboveRight ? 1 : 0) + (takeBelowLeft ? 1 : 0);
     var takeAboveLeft = existsAboveLeft
-                        && !(takeLeft && takeAbove && takeAboveRight && takeBelowLeft)
-                        && !(neighbouringLeft && aboveLeft.SameAs(left))
-                        && !(existsAbove && aboveLeft.SameAs(above))
-                        && OutsideMergeRegion(xPb - 1, yPb - 1);
+                        && spatialCount < 4
+                        && !(existsLeft && aboveLeft.SameAs(left))
+                        && !(existsAbove && aboveLeft.SameAs(above));
 
     if (takeLeft)
       candidates.Add(left);

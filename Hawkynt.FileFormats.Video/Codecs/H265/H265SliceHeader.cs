@@ -21,107 +21,59 @@ internal enum H265SliceType {
 /// One slice segment header — ITU-T H.265, clauses 7.3.6.1 and 7.4.7.1.
 /// </summary>
 /// <remarks>
-/// Parsed whole, to the byte alignment that ends it, and never estimated. That is worth saying
-/// plainly because the temptation is real: the header is long, most of it is conditional on
-/// parameter set fields, and a decoder that guessed where it ended by aligning after some field it
-/// recognised would start its arithmetic decoder at the wrong byte and produce a picture anyway —
-/// mostly empty, entirely plausible, and wrong. Where the header ends is the entry point of the
-/// entropy coder, so every branch below has to be right or nothing after it is.
-/// <para/>
-/// A slice segment is not quite a slice. HEVC lets a picture be cut into segments for transport, of
-/// which the first is independent and carries the whole header and the rest may be dependent and
-/// carry almost none, continuing the entropy state of the one before. Independent segments are read
-/// here; dependent ones are refused, because carrying entropy coder state across a NAL unit boundary
-/// is the one thing in this structure that cannot be checked against the picture that comes out.
+/// The header is parsed all the way to its byte alignment because that boundary is the CABAC entry
+/// point. A dependent segment carries only the fields before <c>dependent_slice_segment_flag</c>, its
+/// address, entry-point offsets and optional extension; every slice-level value in between is
+/// inherited from the nearest preceding independent segment of the same slice.
 /// </remarks>
 internal sealed class H265SliceHeader {
 
   private H265SliceHeader() { }
 
   internal H265SequenceParameterSet Sps { get; private init; } = null!;
-
   internal H265PictureParameterSet Pps { get; private init; } = null!;
-
   internal H265NalUnit Nal { get; private init; } = null!;
 
   /// <summary>Whether this segment opens a picture.</summary>
   internal bool FirstSliceSegmentInPicture { get; private init; }
 
+  /// <summary>Whether this segment inherits its slice-level header from the preceding independent segment.</summary>
+  internal bool DependentSliceSegment { get; private init; }
+
   /// <summary>The coding tree block this segment starts at, in the picture's raster scan.</summary>
   internal int SegmentAddress { get; private init; }
 
   internal H265SliceType SliceType { get; private init; }
-
-  /// <summary>Whether the decoded picture is to be output, rather than only held as a reference.</summary>
   internal bool PicOutputFlag { get; private init; } = true;
-
-  /// <summary>The low bits of the picture order count, from which the whole count is rebuilt.</summary>
   internal int PicOrderCntLsb { get; private init; }
-
-  /// <summary>The set of pictures the buffer is to hold, as this picture states it.</summary>
   internal H265ShortTermReferencePictureSet ShortTermReferencePictureSet { get; private init; } =
     H265ShortTermReferencePictureSet.Empty;
-
-  /// <summary>The long-term references this picture names, as full picture order counts where known.</summary>
   internal int[] LongTermPocLsb { get; private init; } = [];
-
   internal bool[] LongTermUsedByCurrentPicture { get; private init; } = [];
-
   internal bool[] LongTermMsbPresent { get; private init; } = [];
-
   internal int[] LongTermMsbCycle { get; private init; } = [];
-
   internal bool TemporalMvpEnabled { get; private init; }
-
   internal bool SaoLuma { get; private init; }
-
   internal bool SaoChroma { get; private init; }
-
   internal int NumRefIdxL0Active { get; private init; }
-
   internal int NumRefIdxL1Active { get; private init; }
-
-  /// <summary>Which entry of the built list each active index takes, or <c>null</c> where unmodified.</summary>
   internal int[]? ListEntryL0 { get; private init; }
-
   internal int[]? ListEntryL1 { get; private init; }
-
-  /// <summary>Whether the second list's motion vector differences are all zero and not transmitted.</summary>
   internal bool MvdL1Zero { get; private init; }
-
-  /// <summary>Which of the three context initialisation tables the entropy coder starts from.</summary>
   internal bool CabacInitFlag { get; private init; }
-
   internal bool CollocatedFromL0 { get; private init; } = true;
-
   internal int CollocatedRefIdx { get; private init; }
-
   internal H265PredictionWeights? PredictionWeights { get; private init; }
-
   internal int MaxNumMergeCand { get; private init; } = 5;
-
-  /// <summary>The quantiser this slice's blocks start from — <c>SliceQpY</c>.</summary>
   internal int SliceQpY { get; private init; }
-
   internal int SliceCbQpOffset { get; private init; }
-
   internal int SliceCrQpOffset { get; private init; }
-
   internal bool DeblockingFilterDisabled { get; private init; }
-
   internal int BetaOffsetDiv2 { get; private init; }
-
   internal int TcOffsetDiv2 { get; private init; }
-
   internal bool LoopFilterAcrossSlicesEnabled { get; private init; }
-
-  /// <summary>Where each entropy-coded substream after the first begins, in unescaped payload bytes.</summary>
   internal int[] SubstreamOffsets { get; private init; } = [];
-
-  /// <summary>Where the slice segment data begins, in unescaped payload bytes.</summary>
   internal int DataOffset { get; private init; }
-
-  /// <summary>How many pictures this slice may itself refer to — <c>NumPicTotalCurr</c>, equation 7-57.</summary>
   internal int NumPicTotalCurr { get; private init; }
 
   internal bool IsIntra => this.SliceType == H265SliceType.I;
@@ -130,11 +82,11 @@ internal sealed class H265SliceHeader {
   internal static H265SliceHeader Parse(
     H265NalUnit nal,
     IReadOnlyDictionary<int, H265SequenceParameterSet> sequenceSets,
-    IReadOnlyDictionary<int, H265PictureParameterSet> pictureSets) {
+    IReadOnlyDictionary<int, H265PictureParameterSet> pictureSets,
+    H265SliceHeader? precedingIndependent = null) {
     var reader = new H265BitReader(nal.Payload);
 
     var firstSegment = reader.ReadFlag();
-
     if (nal.IsRandomAccessPoint)
       reader.Skip(1); // no_output_of_prior_pics_flag
 
@@ -150,13 +102,11 @@ internal sealed class H265SliceHeader {
         $"An H.265 picture parameter set {ppsId} names sequence parameter set {pps.SequenceParameterSetId}, which "
         + "this stream has not carried.");
 
+    var dependent = false;
     var segmentAddress = 0;
     if (!firstSegment) {
-      if (pps.DependentSliceSegmentsEnabled && reader.ReadFlag())
-        throw new NotSupportedException(
-          "This H.265 stream carries a dependent slice segment (dependent_slice_segment_flag, clause 7.3.6.1). Such "
-          + "a segment has almost no header of its own and continues the entropy coder state of the segment before "
-          + "it across a NAL unit boundary; reading them is not implemented.");
+      if (pps.DependentSliceSegmentsEnabled)
+        dependent = reader.ReadFlag();
 
       segmentAddress = reader.ReadBits(_CeilLog2(sps.PicSizeInCtbsY));
       if (segmentAddress >= sps.PicSizeInCtbsY)
@@ -164,6 +114,10 @@ internal sealed class H265SliceHeader {
           $"An H.265 slice segment states it begins at coding tree block {segmentAddress}, but the picture has only "
           + $"{sps.PicSizeInCtbsY}.");
     }
+
+    if (dependent)
+      return _ParseDependent(
+        nal, sps, pps, segmentAddress, precedingIndependent, ref reader);
 
     reader.Skip(pps.ExtraSliceHeaderBits);
 
@@ -173,13 +127,10 @@ internal sealed class H265SliceHeader {
         $"An H.265 slice states slice_type {sliceTypeValue}. Table 7-7 defines only 0 (B), 1 (P) and 2 (I).");
 
     var sliceType = (H265SliceType)sliceTypeValue;
-
     if (nal.IsRandomAccessPoint && sliceType != H265SliceType.I)
       throw new InvalidDataException(
         $"An H.265 intra random access point picture (NAL unit type {(int)nal.Type}) carries a "
         + $"{sliceType} slice. Clause 7.4.7.1 requires every slice of such a picture to be intra.");
-
-    _RefuseInterSlice(sliceType);
 
     var picOutputFlag = !pps.OutputFlagPresent || reader.ReadFlag();
 
@@ -200,7 +151,6 @@ internal sealed class H265SliceHeader {
         if (index >= count)
           throw new InvalidDataException(
             $"An H.265 slice names short-term reference picture set {index}, but the sequence declares only {count}.");
-
         shortTermSet = sps.ShortTermReferencePictureSets[index];
       } else {
         var count = sps.ShortTermReferencePictureSets.Length - 1;
@@ -212,7 +162,6 @@ internal sealed class H265SliceHeader {
         var fromSequence = sps.LongTermReferencePicturePocLsb.Length > 0 ? reader.ReadUnsignedExpGolomb() : 0;
         var fromSlice = reader.ReadUnsignedExpGolomb();
         var total = fromSequence + fromSlice;
-
         if (total > 32)
           throw new InvalidDataException(
             $"An H.265 slice names {total} long-term reference pictures, which exceeds every decoded picture buffer "
@@ -228,7 +177,6 @@ internal sealed class H265SliceHeader {
             var index = sps.LongTermReferencePicturePocLsb.Length > 1
               ? reader.ReadBits(_CeilLog2(sps.LongTermReferencePicturePocLsb.Length))
               : 0;
-
             longTermPocLsb[i] = sps.LongTermReferencePicturePocLsb[index];
             longTermUsed[i] = sps.LongTermReferencePictureUsed[index];
           } else {
@@ -284,7 +232,6 @@ internal sealed class H265SliceHeader {
 
       if (pps.ListsModificationPresent && picTotalCurr > 1) {
         var bits = _CeilLog2(picTotalCurr);
-
         if (reader.ReadFlag()) {
           listEntryL0 = new int[numRefIdxL0];
           for (var i = 0; i < numRefIdxL0; ++i)
@@ -300,14 +247,12 @@ internal sealed class H265SliceHeader {
 
       if (sliceType == H265SliceType.B)
         mvdL1Zero = reader.ReadFlag();
-
       if (pps.CabacInitPresent)
         cabacInit = reader.ReadFlag();
 
       if (temporalMvp) {
         if (sliceType == H265SliceType.B)
           collocatedFromL0 = reader.ReadFlag();
-
         if (collocatedFromL0 ? numRefIdxL0 > 1 : numRefIdxL1 > 1)
           collocatedRefIdx = reader.ReadUnsignedExpGolomb();
       }
@@ -338,7 +283,6 @@ internal sealed class H265SliceHeader {
     var deblockingDisabled = pps.DeblockingFilterDisabled;
     var betaOffsetDiv2 = pps.BetaOffsetDiv2;
     var tcOffsetDiv2 = pps.TcOffsetDiv2;
-
     if (pps.DeblockingFilterOverrideEnabled && reader.ReadFlag()) {
       deblockingDisabled = reader.ReadFlag();
       if (!deblockingDisabled) {
@@ -351,30 +295,14 @@ internal sealed class H265SliceHeader {
     if (pps.LoopFilterAcrossSlicesEnabled && (saoLuma || saoChroma || !deblockingDisabled))
       loopFilterAcrossSlices = reader.ReadFlag();
 
-    var substreams = Array.Empty<int>();
-    if (pps.TilesEnabled || pps.EntropyCodingSyncEnabled)
-      substreams = _ReadEntryPoints(ref reader, nal);
-
-    if (pps.SliceSegmentHeaderExtensionPresent)
-      reader.Skip(reader.ReadUnsignedExpGolomb() << 3);
-
-    // byte_alignment(): the one bit and the zeroes up to the boundary the entropy coder starts on.
-    reader.Skip(1);
-    reader.AlignToByte();
-
-    var dataOffset = reader.BytePosition;
-
-    // The entry points are counted from the first byte of slice segment data, in the escaped payload
-    // — so they can only be turned into positions here, where both that origin and the escape
-    // positions are known.
-    for (var i = 0; i < substreams.Length; ++i)
-      substreams[i] = nal.UnescapedOffsetOf(nal.EscapedOffsetOf(dataOffset) + substreams[i]);
+    _FinishHeader(ref reader, nal, pps, out var substreams, out var dataOffset);
 
     return new() {
       Sps = sps,
       Pps = pps,
       Nal = nal,
       FirstSliceSegmentInPicture = firstSegment,
+      DependentSliceSegment = false,
       SegmentAddress = segmentAddress,
       SliceType = sliceType,
       PicOutputFlag = picOutputFlag,
@@ -410,57 +338,90 @@ internal sealed class H265SliceHeader {
     };
   }
 
-  /// <summary>
-  /// Refuses a slice predicted from another picture, and says plainly why it is refused rather than
-  /// read.
-  /// </summary>
-  /// <remarks>
-  /// <b>The inter prediction is written, and it is not refused because it is missing.</b> The
-  /// reference picture sets of clause 8.3.2, the two reference lists, the merge and advanced motion
-  /// vector prediction of clause 8.5.3.2 with their spatial, temporal, combined and zero candidates,
-  /// the eight-tap luma and four-tap chroma interpolation of clause 8.5.3.3.3 and the weighted
-  /// combination of clause 8.5.3.3.4 are all here, and over a corpus of encoded streams they come
-  /// back sample-exact for most of them: a hundred predicted pictures from one intra picture, at
-  /// every coding tree size, with and without weighted prediction, with the entropy coder
-  /// synchronised across rows and without, all bit-exact against a reference decoder.
-  /// <para/>
-  /// <b>Most is not all, and that is the whole reason for this refusal.</b> Six streams out of fifty
-  /// — the ones an encoder produces at its slower settings, with asymmetric partitions or with more
-  /// reference pictures than the default — differ by between a tenth and one per cent of their
-  /// samples, in a candidate list this decoder builds in an order the encoder did not. The pictures
-  /// look right. Nobody checks a picture that looks right, and this library has already spent months
-  /// with an HEVC decoder that reported success while returning almost nothing; the lesson taken from
-  /// that is that a decoder must be exact or must say which pictures it will not read.
-  /// <para/>
-  /// So the line is drawn where the measurement puts it rather than where the code happens to stop.
-  /// Intra pictures are decoded, and they are exact — forty-two streams from 34x18 to 640x360, every
-  /// encoder preset, every coding tree and transform size, lossless and transform-skipped blocks,
-  /// zero differing samples on all three planes of every frame. Everything predicted from another
-  /// picture is refused here.
-  /// </remarks>
-  private static void _RefuseInterSlice(H265SliceType sliceType) {
-    if (sliceType == H265SliceType.I)
-      return;
+  private static H265SliceHeader _ParseDependent(
+    H265NalUnit nal,
+    H265SequenceParameterSet sps,
+    H265PictureParameterSet pps,
+    int segmentAddress,
+    H265SliceHeader? inherited,
+    ref H265BitReader reader) {
+    if (inherited == null)
+      throw new InvalidDataException(
+        "An H.265 dependent slice segment has no preceding independent slice segment to inherit. The stream was "
+        + "entered part way through a slice or the preceding segment is missing.");
 
-    throw new NotSupportedException(
-      $"This H.265 stream carries a {(sliceType == H265SliceType.P ? "predicted" : "bidirectionally predicted")} "
-      + $"slice (slice_type {sliceType}, Table 7-7): one whose blocks are copied and interpolated out of "
-      + $"{(sliceType == H265SliceType.P ? "an earlier picture" : "an earlier and a later picture")} rather than "
-      + "predicted from their own. Decoding it is implemented and is exact for most streams, but not for all of "
-      + "them — measured against a reference decoder it builds the motion candidate list differently for some "
-      + "coding structures — so it is refused rather than handed back as a picture that looks right. Intra pictures "
-      + "are decoded exactly.");
+    if (inherited.Pps.Id != pps.Id || inherited.Sps.Id != sps.Id)
+      throw new InvalidDataException(
+        $"An H.265 dependent slice segment names PPS {pps.Id}, but the independent segment it follows used PPS "
+        + $"{inherited.Pps.Id}. A dependent segment cannot change the syntax it inherits.");
+
+    _FinishHeader(ref reader, nal, pps, out var substreams, out var dataOffset);
+
+    return new() {
+      Sps = sps,
+      Pps = pps,
+      Nal = nal,
+      FirstSliceSegmentInPicture = false,
+      DependentSliceSegment = true,
+      SegmentAddress = segmentAddress,
+      SliceType = inherited.SliceType,
+      PicOutputFlag = inherited.PicOutputFlag,
+      PicOrderCntLsb = inherited.PicOrderCntLsb,
+      ShortTermReferencePictureSet = inherited.ShortTermReferencePictureSet,
+      LongTermPocLsb = inherited.LongTermPocLsb,
+      LongTermUsedByCurrentPicture = inherited.LongTermUsedByCurrentPicture,
+      LongTermMsbPresent = inherited.LongTermMsbPresent,
+      LongTermMsbCycle = inherited.LongTermMsbCycle,
+      TemporalMvpEnabled = inherited.TemporalMvpEnabled,
+      SaoLuma = inherited.SaoLuma,
+      SaoChroma = inherited.SaoChroma,
+      NumRefIdxL0Active = inherited.NumRefIdxL0Active,
+      NumRefIdxL1Active = inherited.NumRefIdxL1Active,
+      ListEntryL0 = inherited.ListEntryL0,
+      ListEntryL1 = inherited.ListEntryL1,
+      MvdL1Zero = inherited.MvdL1Zero,
+      CabacInitFlag = inherited.CabacInitFlag,
+      CollocatedFromL0 = inherited.CollocatedFromL0,
+      CollocatedRefIdx = inherited.CollocatedRefIdx,
+      PredictionWeights = inherited.PredictionWeights,
+      MaxNumMergeCand = inherited.MaxNumMergeCand,
+      SliceQpY = inherited.SliceQpY,
+      SliceCbQpOffset = inherited.SliceCbQpOffset,
+      SliceCrQpOffset = inherited.SliceCrQpOffset,
+      DeblockingFilterDisabled = inherited.DeblockingFilterDisabled,
+      BetaOffsetDiv2 = inherited.BetaOffsetDiv2,
+      TcOffsetDiv2 = inherited.TcOffsetDiv2,
+      LoopFilterAcrossSlicesEnabled = inherited.LoopFilterAcrossSlicesEnabled,
+      SubstreamOffsets = substreams,
+      DataOffset = dataOffset,
+      NumPicTotalCurr = inherited.NumPicTotalCurr,
+    };
   }
 
-  /// <summary>
-  /// Reads the entry point offsets and turns them into positions relative to the slice segment data.
-  /// </summary>
-  /// <remarks>
-  /// Each offset is stated as a length rather than a position, so they accumulate. They are counted
-  /// in bytes of the NAL unit as written — emulation prevention included, which clause 7.4.7.1 says
-  /// explicitly — and every other part of this decoder works on the payload with those bytes taken
-  /// out, so the caller translates them once the origin is known.
-  /// </remarks>
+  private static void _FinishHeader(
+    ref H265BitReader reader,
+    H265NalUnit nal,
+    H265PictureParameterSet pps,
+    out int[] substreams,
+    out int dataOffset) {
+    substreams = Array.Empty<int>();
+    if (pps.TilesEnabled || pps.EntropyCodingSyncEnabled)
+      substreams = _ReadEntryPoints(ref reader, nal);
+
+    if (pps.SliceSegmentHeaderExtensionPresent)
+      reader.Skip(reader.ReadUnsignedExpGolomb() << 3);
+
+    // byte_alignment(): alignment_bit_equal_to_one followed by zero bits.
+    reader.Skip(1);
+    reader.AlignToByte();
+    dataOffset = reader.BytePosition;
+
+    // entry_point_offset_minus1 is counted in the escaped byte sequence. The decoder consumes the
+    // unescaped RBSP, so translate every cumulative offset once, after the data origin is known.
+    for (var i = 0; i < substreams.Length; ++i)
+      substreams[i] = nal.UnescapedOffsetOf(nal.EscapedOffsetOf(dataOffset) + substreams[i]);
+  }
+
   private static int[] _ReadEntryPoints(ref H265BitReader reader, H265NalUnit nal) {
     var count = reader.ReadUnsignedExpGolomb();
     if (count == 0)
@@ -487,39 +448,25 @@ internal sealed class H265SliceHeader {
     return offsets;
   }
 
-  /// <summary>
-  /// How many of the named pictures this slice may itself predict from — equation 7-57.
-  /// </summary>
-  /// <remarks>
-  /// Not the same as how many the buffer holds. A picture may be kept only so that a later one can
-  /// refer to it, and those do not count here; the number is what sizes the reference lists and how
-  /// wide a list modification entry is, so it has to be the count of usable pictures exactly.
-  /// </remarks>
   private static int _CountPicturesUsedByCurrentPicture(
     H265ShortTermReferencePictureSet shortTerm, bool[] longTermUsed) {
     var total = 0;
-
     foreach (var used in shortTerm.UsedByCurrPicS0)
       if (used)
         ++total;
-
     foreach (var used in shortTerm.UsedByCurrPicS1)
       if (used)
         ++total;
-
     foreach (var used in longTermUsed)
       if (used)
         ++total;
-
     return total;
   }
 
-  /// <summary>How many bits it takes to hold the values 0 to <paramref name="count"/> less one.</summary>
   private static int _CeilLog2(int count) {
     var bits = 0;
     while (1 << bits < count)
       ++bits;
-
     return bits;
   }
 }
@@ -527,16 +474,6 @@ internal sealed class H265SliceHeader {
 /// <summary>
 /// The explicit weights a predicted slice applies to each reference — clause 7.3.6.3.
 /// </summary>
-/// <remarks>
-/// Weighted prediction exists for fades. When a scene dims, every sample of the next picture is the
-/// previous one times slightly less than one, and a decoder without weights codes that as a residual
-/// on every block of the picture; with them it is two numbers in the slice header. The weight is a
-/// fixed-point multiplier with a shared denominator and the offset is added after it.
-/// <para/>
-/// The chroma offsets are not stated directly. What is transmitted is the difference from what the
-/// offset would have to be for mid-grey to stay mid-grey under the weight, which is nearly always
-/// zero and so costs nearly nothing — so it has to be undone here rather than carried through.
-/// </remarks>
 internal sealed class H265PredictionWeights {
 
   private H265PredictionWeights(
@@ -556,32 +493,20 @@ internal sealed class H265PredictionWeights {
   }
 
   internal int LumaLog2WeightDenom { get; }
-
   internal int ChromaLog2WeightDenom { get; }
-
   internal int[] LumaWeightL0 { get; }
-
   internal int[] LumaOffsetL0 { get; }
-
   internal int[,] ChromaWeightL0 { get; }
-
   internal int[,] ChromaOffsetL0 { get; }
-
   internal int[] LumaWeightL1 { get; }
-
   internal int[] LumaOffsetL1 { get; }
-
   internal int[,] ChromaWeightL1 { get; }
-
   internal int[,] ChromaOffsetL1 { get; }
 
   internal int LumaWeight(int list, int index) => list == 0 ? this.LumaWeightL0[index] : this.LumaWeightL1[index];
-
   internal int LumaOffset(int list, int index) => list == 0 ? this.LumaOffsetL0[index] : this.LumaOffsetL1[index];
-
   internal int ChromaWeight(int list, int index, int component)
     => list == 0 ? this.ChromaWeightL0[index, component] : this.ChromaWeightL1[index, component];
-
   internal int ChromaOffset(int list, int index, int component)
     => list == 0 ? this.ChromaOffsetL0[index, component] : this.ChromaOffsetL1[index, component];
 
@@ -626,16 +551,12 @@ internal sealed class H265PredictionWeights {
     chromaWeight = new int[Math.Max(count, 1), 2];
     chromaOffset = new int[Math.Max(count, 1), 2];
 
-    // The default for a reference with no explicit weight is the identity: unity in the shared
-    // fixed point, and no offset.
     for (var i = 0; i < count; ++i) {
       lumaWeight[i] = 1 << lumaLog2Denom;
       chromaWeight[i, 0] = 1 << chromaLog2Denom;
       chromaWeight[i, 1] = 1 << chromaLog2Denom;
     }
 
-    // Both sets of flags are read before either set of values, so that the weights of every
-    // reference in the list are contiguous in the bitstream.
     var lumaPresent = new bool[Math.Max(count, 1)];
     for (var i = 0; i < count; ++i)
       lumaPresent[i] = reader.ReadFlag();
@@ -657,9 +578,6 @@ internal sealed class H265PredictionWeights {
       for (var component = 0; component < 2; ++component) {
         var weight = (1 << chromaLog2Denom) + reader.ReadSignedExpGolomb();
         var delta = reader.ReadSignedExpGolomb();
-
-        // Equation 7-56: what was transmitted is the difference from the offset that keeps mid-grey
-        // where it is under this weight, so mid-grey's own displacement is added back.
         chromaWeight[i, component] = weight;
         chromaOffset[i, component] =
           Math.Clamp(128 + delta - ((128 * weight) >> chromaLog2Denom), -128, 127);

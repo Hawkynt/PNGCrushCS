@@ -40,6 +40,11 @@ namespace FileFormat.Codecs;
 /// exists to undo bidirectional prediction, and this decoder refuses the slices that cause it. So
 /// there is no reorder buffer here and <see cref="Flush"/> is empty — not as a simplification, but
 /// because for every stream this accepts the two orders are the same.
+/// <para/>
+/// Completed pictures are returned as the native 8-bit 4:2:0 Y/Cb/Cr samples in
+/// <see cref="PixelFormat.Yuv420P8"/>. The old BT.601 display conversion is still available through
+/// <see cref="RawImageConverter"/>, but it is no longer part of decoding; a writer or viewer decides
+/// when narrowing into RGB is actually required.
 /// </remarks>
 public sealed class H264VideoDecoder : IVideoCodecDecoder<H264VideoDecoder> {
 
@@ -105,26 +110,11 @@ public sealed class H264VideoDecoder : IVideoCodecDecoder<H264VideoDecoder> {
     return false;
   }
 
-  /// <summary>
-  /// Builds a decoder for one stream, reading whatever the container knew about it out of band.
-  /// </summary>
-  /// <remarks>
-  /// Nothing is taken from the stream description but the codec configuration, and not even the
-  /// dimensions: every one of them is in the sequence parameter set, and a container's copy is a copy.
-  /// An MP4 that states a size its sequence parameter set disagrees with is a file whose pictures are
-  /// the size the parameter set says.
-  /// </remarks>
   public static H264VideoDecoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
-
     return new(H264DecoderConfiguration.TryParse(stream.CodecPrivateData));
   }
 
-  /// <summary>Decodes one packet — one access unit — and hands back the picture it completed.</summary>
-  /// <returns>
-  /// <c>false</c> when the packet held no whole picture, which is the case for a packet carrying only
-  /// parameter sets or supplemental information.
-  /// </returns>
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
     foreach (var nal in this._Split(packet.Data))
       switch (nal.Type) {
@@ -156,15 +146,9 @@ public sealed class H264VideoDecoder : IVideoCodecDecoder<H264VideoDecoder> {
             + "were dropped is not the stream that was encoded.");
 
         default:
-          // Supplemental enhancement information, access unit delimiters, filler, the end of a
-          // sequence or a stream, and everything the standard has not given a meaning to yet. None
-          // of them changes a sample.
           break;
       }
 
-    // The container cuts a packet per access unit, so the picture the packet's slices built is
-    // finished here. A picture whose slices arrived across two packets would be finished by the
-    // first slice of the next one instead, which _DecodeSlice does.
     this._FinishPicture();
 
     if (this._ready == null) {
@@ -177,10 +161,6 @@ public sealed class H264VideoDecoder : IVideoCodecDecoder<H264VideoDecoder> {
     return true;
   }
 
-  /// <summary>
-  /// Nothing: this decoder holds no picture between packets, because it refuses the slices that make
-  /// display order differ from decoding order.
-  /// </summary>
   public IEnumerable<RawImage> Flush() => [];
 
   private IEnumerable<H264NalUnit> _Split(ReadOnlyMemory<byte> data) {
@@ -202,7 +182,6 @@ public sealed class H264VideoDecoder : IVideoCodecDecoder<H264VideoDecoder> {
       this._AcceptParameterSet(nal);
   }
 
-  /// <summary>Wraps a bare NAL unit so that the ordinary splitting path unescapes it.</summary>
   private static byte[] _WithLengthPrefix(byte[] nalUnit) {
     var wrapped = new byte[nalUnit.Length + 4];
     wrapped[0] = (byte)(nalUnit.Length >> 24);
@@ -230,16 +209,6 @@ public sealed class H264VideoDecoder : IVideoCodecDecoder<H264VideoDecoder> {
     }
   }
 
-  /// <summary>
-  /// Refuses a picture size that changes while pictures of the old size are still references.
-  /// </summary>
-  /// <remarks>
-  /// A repeated sequence parameter set is normal and usually restates the same values. A different
-  /// picture size is not: the held references are the old size, and a P picture of the new size
-  /// predicting from them has no defined meaning. The standard's answer is an IDR picture, which
-  /// empties the buffer first — so a size change that arrives without one is a stream this decoder
-  /// cannot follow rather than one it should resample.
-  /// </remarks>
   private void _RefuseGeometryChangeMidStream(H264SequenceParameterSet sps) {
     if (this._pictureSequence == null || this._pictureSequence.SameGeometryAs(sps))
       return;
@@ -265,15 +234,6 @@ public sealed class H264VideoDecoder : IVideoCodecDecoder<H264VideoDecoder> {
     this._frame!.DecodeSlice(ref reader, header, referenceList);
   }
 
-  /// <summary>
-  /// Whether this slice belongs to a picture other than the one being built — clause 7.4.1.2.4.
-  /// </summary>
-  /// <remarks>
-  /// The standard lists a dozen fields any of which starting to differ means a new primary coded
-  /// picture. Most of them cannot differ here because the syntax that carries them is refused —
-  /// <c>field_pic_flag</c>, <c>bottom_field_flag</c>, the picture order count fields of the types this
-  /// decoder does not compute. What is left is what is tested.
-  /// </remarks>
   private bool _StartsNewPicture(H264SliceHeader header) {
     var current = this._pictureHeader!;
 
@@ -287,22 +247,11 @@ public sealed class H264VideoDecoder : IVideoCodecDecoder<H264VideoDecoder> {
 
   private void _BeginPicture(H264SliceHeader header) {
     this._RefuseFrameNumberGap(header);
-
     this._pictureHeader = header;
     this._pictureSequence = header.Sps;
     this._frame = new(header.Sps, this._references.TakeSerial());
   }
 
-  /// <summary>
-  /// Refuses a stream whose reference frame numbering skips, which means a picture is missing.
-  /// </summary>
-  /// <remarks>
-  /// <c>frame_num</c> counts reference frames and increments by one for each (clause 7.4.3). A jump
-  /// means either that pictures were lost in transmission, or that the encoder used
-  /// <c>gaps_in_frame_num_value_allowed_flag</c> to leave deliberate holes for a decoder to invent
-  /// "non-existing" frames for (clause 8.2.5.2). Inventing them is not implemented, and decoding on
-  /// without them predicts from the wrong pictures — which produces a film that plays and is wrong.
-  /// </remarks>
   private void _RefuseFrameNumberGap(H264SliceHeader header) {
     if (header.IdrPicFlag || !header.IsReference)
       return;
@@ -314,10 +263,6 @@ public sealed class H264VideoDecoder : IVideoCodecDecoder<H264VideoDecoder> {
     if (header.FrameNum == expected)
       return;
 
-    // The two things a jump can mean, and they call for different words. With the flag set the
-    // encoder left the hole on purpose and a decoder is expected to invent the missing frames
-    // (clause 8.2.5.2); without it, the frames were there when the stream was written and are not
-    // there now.
     throw new InvalidDataException(
       $"This H.264 stream's frame_num jumps from {previous} to {header.FrameNum}, where {expected} was due. "
       + (header.Sps.GapsInFrameNumValueAllowedFlag
@@ -346,12 +291,16 @@ public sealed class H264VideoDecoder : IVideoCodecDecoder<H264VideoDecoder> {
       this._references.Add(picture, header);
 
     var sps = header.Sps;
-    this._ready = new() {
-      Width = sps.DisplayWidth,
-      Height = sps.DisplayHeight,
-      Format = PixelFormat.Rgb24,
-      PixelData = H264ColorConversion.ToRgb24(
-        picture, sps.CropOffsetX, sps.CropOffsetY, sps.DisplayWidth, sps.DisplayHeight),
-    };
+    this._ready = RawImageFactory.FromYuv420P8(
+      sps.DisplayWidth,
+      sps.DisplayHeight,
+      picture.Luma,
+      picture.LumaWidth,
+      picture.Cb,
+      picture.Cr,
+      picture.ChromaWidth,
+      sps.CropOffsetX,
+      sps.CropOffsetY,
+      RawImageColorInfo.Bt601Limited);
   }
 }

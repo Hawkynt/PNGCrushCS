@@ -1,0 +1,113 @@
+using System;
+
+namespace FileFormat.Core;
+
+/// <summary>Factories for assembling canonical <see cref="RawImage"/> layouts from decoder planes.</summary>
+public static class RawImageFactory {
+
+  /// <summary>Crops three 8-bit 4:2:0 decoder planes and packs them as canonical Y, U, V planes.</summary>
+  public static RawImage FromYuv420P8(
+    int width, int height, ReadOnlySpan<byte> yPlane, int yStride,
+    ReadOnlySpan<byte> uPlane, ReadOnlySpan<byte> vPlane, int chromaStride,
+    int left = 0, int top = 0, RawImageColorInfo? colorInfo = null, ImageMetadata? metadata = null)
+    => _FromYuvP8(
+      PixelFormat.Yuv420P8, 1, 1,
+      width, height, yPlane, yStride, uPlane, vPlane, chromaStride, left, top, colorInfo, metadata);
+
+  /// <summary>Crops three 8-bit 4:2:2 decoder planes and packs them as canonical Y, U, V planes.</summary>
+  public static RawImage FromYuv422P8(
+    int width, int height, ReadOnlySpan<byte> yPlane, int yStride,
+    ReadOnlySpan<byte> uPlane, ReadOnlySpan<byte> vPlane, int chromaStride,
+    int left = 0, int top = 0, RawImageColorInfo? colorInfo = null, ImageMetadata? metadata = null)
+    => _FromYuvP8(
+      PixelFormat.Yuv422P8, 1, 0,
+      width, height, yPlane, yStride, uPlane, vPlane, chromaStride, left, top, colorInfo, metadata);
+
+  /// <summary>Crops three 8-bit 4:4:0 decoder planes and packs them as canonical Y, U, V planes.</summary>
+  public static RawImage FromYuv440P8(
+    int width, int height, ReadOnlySpan<byte> yPlane, int yStride,
+    ReadOnlySpan<byte> uPlane, ReadOnlySpan<byte> vPlane, int chromaStride,
+    int left = 0, int top = 0, RawImageColorInfo? colorInfo = null, ImageMetadata? metadata = null)
+    => _FromYuvP8(
+      PixelFormat.Yuv440P8, 0, 1,
+      width, height, yPlane, yStride, uPlane, vPlane, chromaStride, left, top, colorInfo, metadata);
+
+  /// <summary>Crops three 8-bit 4:4:4 decoder planes and packs them as canonical Y, U, V planes.</summary>
+  public static RawImage FromYuv444P8(
+    int width, int height, ReadOnlySpan<byte> yPlane, int yStride,
+    ReadOnlySpan<byte> uPlane, ReadOnlySpan<byte> vPlane, int chromaStride,
+    int left = 0, int top = 0, RawImageColorInfo? colorInfo = null, ImageMetadata? metadata = null)
+    => _FromYuvP8(
+      PixelFormat.Yuv444P8, 0, 0,
+      width, height, yPlane, yStride, uPlane, vPlane, chromaStride, left, top, colorInfo, metadata);
+
+  private static RawImage _FromYuvP8(
+    PixelFormat format,
+    int subsamplingX,
+    int subsamplingY,
+    int width,
+    int height,
+    ReadOnlySpan<byte> yPlane,
+    int yStride,
+    ReadOnlySpan<byte> uPlane,
+    ReadOnlySpan<byte> vPlane,
+    int chromaStride,
+    int left,
+    int top,
+    RawImageColorInfo? colorInfo,
+    ImageMetadata? metadata) {
+    if (width <= 0)
+      throw new ArgumentOutOfRangeException(nameof(width));
+    if (height <= 0)
+      throw new ArgumentOutOfRangeException(nameof(height));
+    if (left < 0 || top < 0)
+      throw new ArgumentOutOfRangeException(left < 0 ? nameof(left) : nameof(top));
+
+    var alignmentX = (1 << subsamplingX) - 1;
+    var alignmentY = (1 << subsamplingY) - 1;
+    if ((left & alignmentX) != 0 || (top & alignmentY) != 0)
+      throw new ArgumentException(
+        $"A {format} crop must begin on a chroma sample boundary so its chroma planes remain samples rather than resampled display pixels.");
+
+    if (yStride < left + width)
+      throw new ArgumentException("The luma stride is shorter than the requested crop.", nameof(yStride));
+
+    var chromaWidth = (width + alignmentX) >> subsamplingX;
+    var chromaHeight = (height + alignmentY) >> subsamplingY;
+    var chromaLeft = left >> subsamplingX;
+    var chromaTop = top >> subsamplingY;
+    if (chromaStride < chromaLeft + chromaWidth)
+      throw new ArgumentException("The chroma stride is shorter than the requested crop.", nameof(chromaStride));
+
+    var lastY = checked((top + height - 1) * yStride + left + width);
+    var lastC = checked((chromaTop + chromaHeight - 1) * chromaStride + chromaLeft + chromaWidth);
+    if (lastY > yPlane.Length)
+      throw new ArgumentException("The luma plane is shorter than the requested crop.", nameof(yPlane));
+    if (lastC > uPlane.Length || lastC > vPlane.Length)
+      throw new ArgumentException("A chroma plane is shorter than the requested crop.", nameof(uPlane));
+
+    var yLength = checked(width * height);
+    var cLength = checked(chromaWidth * chromaHeight);
+    var data = new byte[checked(yLength + 2 * cLength)];
+
+    for (var row = 0; row < height; ++row)
+      yPlane.Slice((top + row) * yStride + left, width).CopyTo(data.AsSpan(row * width, width));
+
+    var uOffset = yLength;
+    var vOffset = yLength + cLength;
+    for (var row = 0; row < chromaHeight; ++row) {
+      var sourceOffset = (chromaTop + row) * chromaStride + chromaLeft;
+      uPlane.Slice(sourceOffset, chromaWidth).CopyTo(data.AsSpan(uOffset + row * chromaWidth, chromaWidth));
+      vPlane.Slice(sourceOffset, chromaWidth).CopyTo(data.AsSpan(vOffset + row * chromaWidth, chromaWidth));
+    }
+
+    return new() {
+      Width = width,
+      Height = height,
+      Format = format,
+      PixelData = data,
+      ColorInfo = colorInfo,
+      Metadata = metadata,
+    };
+  }
+}
