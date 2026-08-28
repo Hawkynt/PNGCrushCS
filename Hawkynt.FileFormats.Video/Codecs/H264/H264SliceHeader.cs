@@ -57,6 +57,9 @@ internal sealed class H264SliceHeader {
 
   internal IReadOnlyList<H264ListModification> ListModificationsL0 { get; private set; } = [];
 
+  /// <summary>The explicit list-0 prediction weights of a weighted P slice, if its PPS enables them.</summary>
+  internal H264PredictionWeights? PredictionWeights { get; private set; }
+
   internal bool LongTermReferenceFlag { get; private set; }
 
   internal bool AdaptiveRefPicMarkingModeFlag { get; private set; }
@@ -147,10 +150,9 @@ internal sealed class H264SliceHeader {
     if (header.IdrPicFlag)
       header.IdrPicId = reader.ReadUnsignedExpGolomb();
 
-    // The picture order count, which is stepped over rather than computed. It exists to put pictures
-    // back into display order after bidirectional prediction has coded them out of it, and this
-    // decoder refuses B slices — so for every stream it accepts, decoding order is display order and
-    // the count decides nothing. The bits still have to be consumed exactly.
+    // The picture order count is not yet retained because B slices remain refused. The syntax still
+    // has to be consumed exactly so P/I streams using POC type 0 or 1 reach the following fields at
+    // the correct bit position.
     switch (sps.PicOrderCntType) {
       case 0:
         reader.Skip(sps.Log2MaxPicOrderCntLsb); // pic_order_cnt_lsb
@@ -178,14 +180,20 @@ internal sealed class H264SliceHeader {
 
     header.NumRefIdxL0Active = pps.NumRefIdxL0DefaultActive;
 
-    // Only a P slice reaches this: B, SP and SI were refused above, and an I slice has no reference
-    // list to size. So there is no second list to override either.
+    // Only a P slice reaches this: B, SP and SI are still refused above, and an I slice has no
+    // reference list to size.
     if (header.SliceType == H264SliceType.P && reader.ReadBit() != 0)
       header.NumRefIdxL0Active = reader.ReadUnsignedExpGolomb() + 1;
 
+    if (header.NumRefIdxL0Active > 32)
+      throw new InvalidDataException(
+        $"This H.264 slice activates {header.NumRefIdxL0Active} entries of reference picture list 0; frame pictures "
+        + "cannot activate more than 32 entries.");
+
     header.ListModificationsL0 = _ReadListModifications(ref reader, header.SliceType);
 
-    // pred_weight_table() is absent while weighted_pred_flag and weighted_bipred_idc are refused.
+    if (header.SliceType == H264SliceType.P && pps.WeightedPredFlag)
+      header.PredictionWeights = H264PredictionWeights.ParseP(ref reader, sps, header.NumRefIdxL0Active);
 
     if (header.IsReference)
       _ReadReferenceMarking(ref reader, header);
