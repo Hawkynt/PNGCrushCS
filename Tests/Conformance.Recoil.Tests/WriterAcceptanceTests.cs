@@ -87,6 +87,10 @@ public sealed class WriterAcceptanceTests {
     [ImageFormat.CutCreator] =
       "the reference tool lists .cut as Dr Halo, which is a different program and a format of its "
       + "own here",
+    [ImageFormat.NiftiPair] =
+      "the reference tool lists .hdr as Radiance HDR, which is a different format and one of its own "
+      + "here, and knows no name for the NIfTI header/image pair at all — its other extension, .img, is "
+      + "the raw half a NIfTI pair carries and not a file any tool identifies on its own",
     [ImageFormat.DegasIcon] = "the reference tool lists .icn as the Microsoft icon, which is a different format",
     [ImageFormat.Ice] = "the reference tool lists .icn as the Microsoft icon, which is a different format",
     [ImageFormat.PsionPic] = "the reference tool lists .icn as the Microsoft icon, which is a different format",
