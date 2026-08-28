@@ -179,8 +179,6 @@ internal sealed class H265SliceHeader {
         $"An H.265 intra random access point picture (NAL unit type {(int)nal.Type}) carries a "
         + $"{sliceType} slice. Clause 7.4.7.1 requires every slice of such a picture to be intra.");
 
-    _RefuseInterSlice(sliceType);
-
     var picOutputFlag = !pps.OutputFlagPresent || reader.ReadFlag();
 
     var picOrderCntLsb = 0;
@@ -408,48 +406,6 @@ internal sealed class H265SliceHeader {
       DataOffset = dataOffset,
       NumPicTotalCurr = picTotalCurr,
     };
-  }
-
-  /// <summary>
-  /// Refuses a slice predicted from another picture, and says plainly why it is refused rather than
-  /// read.
-  /// </summary>
-  /// <remarks>
-  /// <b>The inter prediction is written, and it is not refused because it is missing.</b> The
-  /// reference picture sets of clause 8.3.2, the two reference lists, the merge and advanced motion
-  /// vector prediction of clause 8.5.3.2 with their spatial, temporal, combined and zero candidates,
-  /// the eight-tap luma and four-tap chroma interpolation of clause 8.5.3.3.3 and the weighted
-  /// combination of clause 8.5.3.3.4 are all here, and over a corpus of encoded streams they come
-  /// back sample-exact for most of them: a hundred predicted pictures from one intra picture, at
-  /// every coding tree size, with and without weighted prediction, with the entropy coder
-  /// synchronised across rows and without, all bit-exact against a reference decoder.
-  /// <para/>
-  /// <b>Most is not all, and that is the whole reason for this refusal.</b> Six streams out of fifty
-  /// — the ones an encoder produces at its slower settings, with asymmetric partitions or with more
-  /// reference pictures than the default — differ by between a tenth and one per cent of their
-  /// samples, in a candidate list this decoder builds in an order the encoder did not. The pictures
-  /// look right. Nobody checks a picture that looks right, and this library has already spent months
-  /// with an HEVC decoder that reported success while returning almost nothing; the lesson taken from
-  /// that is that a decoder must be exact or must say which pictures it will not read.
-  /// <para/>
-  /// So the line is drawn where the measurement puts it rather than where the code happens to stop.
-  /// Intra pictures are decoded, and they are exact — forty-two streams from 34x18 to 640x360, every
-  /// encoder preset, every coding tree and transform size, lossless and transform-skipped blocks,
-  /// zero differing samples on all three planes of every frame. Everything predicted from another
-  /// picture is refused here.
-  /// </remarks>
-  private static void _RefuseInterSlice(H265SliceType sliceType) {
-    if (sliceType == H265SliceType.I)
-      return;
-
-    throw new NotSupportedException(
-      $"This H.265 stream carries a {(sliceType == H265SliceType.P ? "predicted" : "bidirectionally predicted")} "
-      + $"slice (slice_type {sliceType}, Table 7-7): one whose blocks are copied and interpolated out of "
-      + $"{(sliceType == H265SliceType.P ? "an earlier picture" : "an earlier and a later picture")} rather than "
-      + "predicted from their own. Decoding it is implemented and is exact for most streams, but not for all of "
-      + "them — measured against a reference decoder it builds the motion candidate list differently for some "
-      + "coding structures — so it is refused rather than handed back as a picture that looks right. Intra pictures "
-      + "are decoded exactly.");
   }
 
   /// <summary>
