@@ -28,7 +28,7 @@ namespace FileFormat.TilePic;
 /// specifies nor cares" — so what settles it is the name: <c>.tjp</c> is the JPEG one, and a tile
 /// that is not a JPEG is refused rather than guessed at.
 /// </remarks>
-public readonly record struct TilePicFile : IImageFormatReader<TilePicFile>, IImageToRawImage<TilePicFile> {
+public readonly record struct TilePicFile : IImageFormatReader<TilePicFile>, IImageToRawImage<TilePicFile>, IImageFromRawImage<TilePicFile>, IImageFormatWriter<TilePicFile> {
 
   /// <summary>The four bytes a file opens with.</summary>
   public static ReadOnlySpan<byte> Signature => "TPC\n"u8;
@@ -48,6 +48,7 @@ public readonly record struct TilePicFile : IImageFormatReader<TilePicFile>, IIm
   static string IImageFormatMetadata<TilePicFile>.PrimaryExtension => ".tjp";
   static string[] IImageFormatMetadata<TilePicFile>.FileExtensions => [".tjp"];
   static TilePicFile IImageFormatReader<TilePicFile>.FromSpan(ReadOnlySpan<byte> data) => TilePicReader.FromSpan(data);
+  static byte[] IImageFormatWriter<TilePicFile>.ToBytes(TilePicFile file) => TilePicWriter.ToBytes(file);
 
   static VideoMode[] IImageFormatMetadata<TilePicFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [16777216])
@@ -71,4 +72,17 @@ public readonly record struct TilePicFile : IImageFormatReader<TilePicFile>, IIm
     Format = PixelFormat.Rgb24,
     PixelData = file.PixelData[..],
   };
+
+  /// <summary>Creates a standards-valid one-layer TilePic from any source image.</summary>
+  public static TilePicFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width <= 0 || image.Height <= 0)
+      throw new ArgumentException("TilePic dimensions must be positive.", nameof(image));
+    var rgb = image.EnsureFormat(PixelFormat.Rgb24);
+    return new() {
+      Width = rgb.Width,
+      Height = rgb.Height,
+      PixelData = rgb.PixelData[..],
+    };
+  }
 }
