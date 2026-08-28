@@ -55,12 +55,14 @@ internal sealed class Vp9InterPrediction {
   /// <param name="references">One reference frame per list, the second null when the block is not compound.</param>
   /// <param name="motionVectors">Two components per list, in eighths of a luminance sample.</param>
   /// <param name="filter">Which of the four interpolation filters to use.</param>
+  /// <param name="subsamplingX">Horizontal chroma subsampling exponent for the current frame.</param>
+  /// <param name="subsamplingY">Vertical chroma subsampling exponent for the current frame.</param>
   /// <param name="frameWidth">The current frame's stated width, against which the references are scaled.</param>
   /// <param name="frameHeight">The current frame's stated height.</param>
   internal void Predict(
     byte[] destination, int destinationStride, int x, int y, int width, int height, int plane,
     ReadOnlySpan<Vp9Frame?> references, ReadOnlySpan<int> motionVectors, int filter,
-    int frameWidth, int frameHeight) {
+    int subsamplingX, int subsamplingY, int frameWidth, int frameHeight) {
     var isCompound = references[1] != null;
 
     for (var list = 0; list < (isCompound ? 2 : 1); ++list) {
@@ -70,7 +72,8 @@ internal sealed class Vp9InterPrediction {
           + "requires an earlier frame to have filled it.");
 
       _Scale(
-        reference, plane, x, y, motionVectors[list * 2], motionVectors[list * 2 + 1], frameWidth, frameHeight,
+        reference, plane, x, y, motionVectors[list * 2], motionVectors[list * 2 + 1],
+        subsamplingX, subsamplingY, frameWidth, frameHeight,
         out var startX, out var startY, out var stepX, out var stepY);
 
       this._Convolve(reference, plane, startX, startY, stepX, stepY, width, height, filter, this._predictions[list]);
@@ -99,7 +102,7 @@ internal sealed class Vp9InterPrediction {
 
   private static void _Scale(
     Vp9Frame reference, int plane, int x, int y, int motionVectorRow, int motionVectorColumn,
-    int frameWidth, int frameHeight,
+    int subsamplingX, int subsamplingY, int frameWidth, int frameHeight,
     out int startX, out int startY, out int stepX, out int stepY) {
     if (2 * frameWidth < reference.Width || 2 * frameHeight < reference.Height
         || frameWidth > 16 * reference.Width || frameHeight > 16 * reference.Height)
@@ -114,10 +117,13 @@ internal sealed class Vp9InterPrediction {
     var baseX = (x * xScale) >> REF_SCALE_SHIFT;
     var baseY = (y * yScale) >> REF_SCALE_SHIFT;
 
-    // The fractional part follows the luminance position even for a chrominance block, so that the
-    // two planes of a scaled reference stay in step with one another.
-    var lumaX = plane > 0 ? x << 1 : x;
-    var lumaY = plane > 0 ? y << 1 : y;
+    // The fractional part follows the luminance position even for chrominance. Profile 0 happened
+    // to make both shifts one; profile 1 makes them independent, so 4:2:2, 4:4:0 and 4:4:4 must not
+    // borrow the other axis' subsampling.
+    var subX = plane > 0 ? subsamplingX : 0;
+    var subY = plane > 0 ? subsamplingY : 0;
+    var lumaX = x << subX;
+    var lumaY = y << subY;
     var fractionX = ((16 * lumaX * xScale) >> REF_SCALE_SHIFT) & SUBPEL_MASK;
     var fractionY = ((16 * lumaY * yScale) >> REF_SCALE_SHIFT) & SUBPEL_MASK;
 
@@ -193,7 +199,8 @@ internal sealed class Vp9InterPrediction {
   /// </remarks>
   internal static void SelectAndClamp(
     int plane, int list, int blockIndex, int size, ReadOnlySpan<short> blockMotionVectors,
-    int modeInfoRow, int modeInfoColumn, int modeInfoRows, int modeInfoColumns, Span<int> clamped) {
+    int modeInfoRow, int modeInfoColumn, int modeInfoRows, int modeInfoColumns,
+    int subsamplingX, int subsamplingY, Span<int> clamped) {
     int row;
     int column;
 
@@ -212,20 +219,21 @@ internal sealed class Vp9InterPrediction {
       column = _RoundQuarter(columnSum);
     }
 
-    var subsampling = plane == 0 ? 0 : 1;
+    var subX = plane == 0 ? 0 : subsamplingX;
+    var subY = plane == 0 ? 0 : subsamplingY;
     var high = Vp9Tables.Blocks8x8High[size];
     var wide = Vp9Tables.Blocks8x8Wide[size];
 
-    var toTop = -(modeInfoRow * MI_SIZE * 16) >> subsampling;
-    var toBottom = ((modeInfoRows - high - modeInfoRow) * MI_SIZE * 16) >> subsampling;
-    var toLeft = -(modeInfoColumn * MI_SIZE * 16) >> subsampling;
-    var toRight = ((modeInfoColumns - wide - modeInfoColumn) * MI_SIZE * 16) >> subsampling;
+    var toTop = -(modeInfoRow * MI_SIZE * 16) >> subY;
+    var toBottom = ((modeInfoRows - high - modeInfoRow) * MI_SIZE * 16) >> subY;
+    var toLeft = -(modeInfoColumn * MI_SIZE * 16) >> subX;
+    var toRight = ((modeInfoColumns - wide - modeInfoColumn) * MI_SIZE * 16) >> subX;
 
-    var spelLeft = (INTERP_EXTEND + ((wide * MI_SIZE) >> subsampling)) << SUBPEL_BITS;
-    var spelTop = (INTERP_EXTEND + ((high * MI_SIZE) >> subsampling)) << SUBPEL_BITS;
+    var spelLeft = (INTERP_EXTEND + ((wide * MI_SIZE) >> subX)) << SUBPEL_BITS;
+    var spelTop = (INTERP_EXTEND + ((high * MI_SIZE) >> subY)) << SUBPEL_BITS;
 
-    clamped[0] = Clip3(toTop - spelTop, toBottom + spelTop - SUBPEL_SHIFTS, (2 * row) >> subsampling);
-    clamped[1] = Clip3(toLeft - spelLeft, toRight + spelLeft - SUBPEL_SHIFTS, (2 * column) >> subsampling);
+    clamped[0] = Clip3(toTop - spelTop, toBottom + spelTop - SUBPEL_SHIFTS, (2 * row) >> subY);
+    clamped[1] = Clip3(toLeft - spelLeft, toRight + spelLeft - SUBPEL_SHIFTS, (2 * column) >> subX);
   }
 
   private static int _RoundQuarter(int value) => (value < 0 ? value - 2 : value + 2) / 4;
