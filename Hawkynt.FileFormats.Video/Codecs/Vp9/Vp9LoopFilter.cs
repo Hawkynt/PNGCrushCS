@@ -3,9 +3,7 @@ using static FileFormat.Codecs.Vp9.Vp9Constants;
 
 namespace FileFormat.Codecs.Vp9;
 
-/// <summary>
-/// Smooths the block boundaries of a reconstructed frame (specification 8.8).
-/// </summary>
+/// <summary>Smooths reconstructed VP9 block boundaries (specification 8.8).</summary>
 internal sealed class Vp9LoopFilter {
 
   private readonly byte[] _levels = new byte[MAX_SEGMENTS * MAX_REF_FRAMES * MAX_MODE_LF_DELTAS];
@@ -103,8 +101,7 @@ internal sealed class Vp9LoopFilter {
                      && !(pass == 0 && x == 0)
                      && !(pass == 1 && y == 0);
 
-      var applyFilter = onScreen && (isBlockEdge || (isTransformEdge && (isIntra || !skip)));
-      if (!applyFilter)
+      if (!onScreen || !(isBlockEdge || (isTransformEdge && (isIntra || !skip))))
         continue;
 
       var filterSize = _FilterSize(header, transformSize, is32Edge, pass, x, y, subX, subY);
@@ -117,14 +114,16 @@ internal sealed class Vp9LoopFilter {
       if (level <= 0)
         continue;
 
-      var shift = header.LoopFilterSharpness > 4 ? 2 : header.LoopFilterSharpness > 0 ? 1 : 0;
+      var sharpShift = header.LoopFilterSharpness > 4 ? 2 : header.LoopFilterSharpness > 0 ? 1 : 0;
       var limit = header.LoopFilterSharpness > 0
-        ? Clip3(1, 9 - header.LoopFilterSharpness, level >> shift)
-        : Math.Max(1, level >> shift);
+        ? Clip3(1, 9 - header.LoopFilterSharpness, level >> sharpShift)
+        : Math.Max(1, level >> sharpShift);
       var boundaryLimit = 2 * (level + 2) + limit;
       var threshold = level >> 4;
 
-      _FilterSamples(samples, stride, x >> subX, y >> subY, dx, dy, limit, boundaryLimit, threshold, filterSize);
+      _FilterSamples(
+        samples, stride, x >> subX, y >> subY, dx, dy,
+        limit, boundaryLimit, threshold, filterSize, header.BitDepth);
     }
   }
 
@@ -138,58 +137,60 @@ internal sealed class Vp9LoopFilter {
   private static bool _IsTransformEdge(Vp9FrameHeader header, int pass, int subX, int edge, int x, int transformSize) {
     if (pass == 1 && subX == 1 && (header.MiCols & 1) != 0 && (edge & 1) != 0 && x + 8 >= header.MiCols * 8)
       return false;
-
     return edge % (1 << transformSize) == 0;
   }
 
   private static int _FilterSize(
     Vp9FrameHeader header, int transformSize, bool is32Edge, int pass, int x, int y, int subX, int subY) {
     var baseSize = transformSize == TX_4X4 && is32Edge ? TX_8X8 : Math.Min(TX_16X16, transformSize);
-
     if (pass == 0 && subX == 1 && baseSize == TX_16X16 && x >> 3 == header.MiCols - 1)
       return TX_8X8;
-
     if (pass == 1 && subY == 1 && baseSize == TX_16X16 && y >> 3 == header.MiRows - 1)
       return TX_8X8;
-
     return baseSize;
   }
 
   private static void _FilterSamples(
-    byte[] plane, int stride, int x, int y, int dx, int dy,
-    int limit, int boundaryLimit, int threshold, int filterSize) {
+    ushort[] plane, int stride, int x, int y, int dx, int dy,
+    int limit, int boundaryLimit, int threshold, int filterSize, int bitDepth) {
     var at = y * stride + x;
     var step = dy * stride + dx;
 
-    var q0 = plane[at];
-    var q1 = plane[at + step];
-    var q2 = plane[at + step * 2];
-    var q3 = plane[at + step * 3];
-    var p0 = plane[at - step];
-    var p1 = plane[at - step * 2];
-    var p2 = plane[at - step * 3];
-    var p3 = plane[at - step * 4];
+    var q0 = (int)plane[at];
+    var q1 = (int)plane[at + step];
+    var q2 = (int)plane[at + step * 2];
+    var q3 = (int)plane[at + step * 3];
+    var p0 = (int)plane[at - step];
+    var p1 = (int)plane[at - step * 2];
+    var p2 = (int)plane[at - step * 3];
+    var p3 = (int)plane[at - step * 4];
 
-    var highEdgeVariance = Math.Abs(p1 - p0) > threshold || Math.Abs(q1 - q0) > threshold;
+    var sampleShift = bitDepth - 8;
+    var limitScaled = limit << sampleShift;
+    var boundaryScaled = boundaryLimit << sampleShift;
+    var thresholdScaled = threshold << sampleShift;
+    var flatThreshold = 1 << sampleShift;
 
-    var filterMask = Math.Abs(p3 - p2) <= limit
-                     && Math.Abs(p2 - p1) <= limit
-                     && Math.Abs(p1 - p0) <= limit
-                     && Math.Abs(q1 - q0) <= limit
-                     && Math.Abs(q2 - q1) <= limit
-                     && Math.Abs(q3 - q2) <= limit
-                     && Math.Abs(p0 - q0) * 2 + Math.Abs(p1 - q1) / 2 <= boundaryLimit;
+    var highEdgeVariance = Math.Abs(p1 - p0) > thresholdScaled || Math.Abs(q1 - q0) > thresholdScaled;
+
+    var filterMask = Math.Abs(p3 - p2) <= limitScaled
+                     && Math.Abs(p2 - p1) <= limitScaled
+                     && Math.Abs(p1 - p0) <= limitScaled
+                     && Math.Abs(q1 - q0) <= limitScaled
+                     && Math.Abs(q2 - q1) <= limitScaled
+                     && Math.Abs(q3 - q2) <= limitScaled
+                     && Math.Abs(p0 - q0) * 2 + Math.Abs(p1 - q1) / 2 <= boundaryScaled;
 
     if (!filterMask)
       return;
 
     var flat = filterSize >= TX_8X8
-               && Math.Abs(p1 - p0) <= 1 && Math.Abs(q1 - q0) <= 1
-               && Math.Abs(p2 - p0) <= 1 && Math.Abs(q2 - q0) <= 1
-               && Math.Abs(p3 - p0) <= 1 && Math.Abs(q3 - q0) <= 1;
+               && Math.Abs(p1 - p0) <= flatThreshold && Math.Abs(q1 - q0) <= flatThreshold
+               && Math.Abs(p2 - p0) <= flatThreshold && Math.Abs(q2 - q0) <= flatThreshold
+               && Math.Abs(p3 - p0) <= flatThreshold && Math.Abs(q3 - q0) <= flatThreshold;
 
     if (filterSize == TX_4X4 || !flat) {
-      _FilterNarrow(plane, at, step, highEdgeVariance);
+      _FilterNarrow(plane, at, step, highEdgeVariance, bitDepth);
       return;
     }
 
@@ -198,40 +199,50 @@ internal sealed class Vp9LoopFilter {
       return;
     }
 
-    var flatter = Math.Abs(plane[at - step * 8] - p0) <= 1 && Math.Abs(plane[at + step * 7] - q0) <= 1
-                  && Math.Abs(plane[at - step * 7] - p0) <= 1 && Math.Abs(plane[at + step * 6] - q0) <= 1
-                  && Math.Abs(plane[at - step * 6] - p0) <= 1 && Math.Abs(plane[at + step * 5] - q0) <= 1
-                  && Math.Abs(plane[at - step * 5] - p0) <= 1 && Math.Abs(plane[at + step * 4] - q0) <= 1;
+    var flatter = Math.Abs(plane[at - step * 8] - p0) <= flatThreshold
+                  && Math.Abs(plane[at + step * 7] - q0) <= flatThreshold
+                  && Math.Abs(plane[at - step * 7] - p0) <= flatThreshold
+                  && Math.Abs(plane[at + step * 6] - q0) <= flatThreshold
+                  && Math.Abs(plane[at - step * 6] - p0) <= flatThreshold
+                  && Math.Abs(plane[at + step * 5] - q0) <= flatThreshold
+                  && Math.Abs(plane[at - step * 5] - p0) <= flatThreshold
+                  && Math.Abs(plane[at + step * 4] - q0) <= flatThreshold;
 
     _FilterWide(plane, at, step, flatter ? 4 : 3);
   }
 
-  private static void _FilterNarrow(byte[] plane, int at, int step, bool highEdgeVariance) {
-    var q0 = plane[at] - 128;
-    var q1 = plane[at + step] - 128;
-    var p0 = plane[at - step] - 128;
-    var p1 = plane[at - step * 2] - 128;
+  private static void _FilterNarrow(ushort[] plane, int at, int step, bool highEdgeVariance, int bitDepth) {
+    var shift = bitDepth - 8;
+    var center = 128 << shift;
+    var q0 = (int)plane[at] - center;
+    var q1 = (int)plane[at + step] - center;
+    var p0 = (int)plane[at - step] - center;
+    var p1 = (int)plane[at - step * 2] - center;
 
-    var filter = highEdgeVariance ? _Clamp8(p1 - q1) : 0;
-    filter = _Clamp8(filter + 3 * (q0 - p0));
+    var filter = highEdgeVariance ? _ClampSigned(p1 - q1, bitDepth) : 0;
+    filter = _ClampSigned(filter + 3 * (q0 - p0), bitDepth);
 
-    var first = _Clamp8(filter + 4) >> 3;
-    var second = _Clamp8(filter + 3) >> 3;
+    var first = _ClampSigned(filter + 4, bitDepth) >> 3;
+    var second = _ClampSigned(filter + 3, bitDepth) >> 3;
 
-    plane[at] = (byte)(_Clamp8(q0 - first) + 128);
-    plane[at - step] = (byte)(_Clamp8(p0 + second) + 128);
+    plane[at] = (ushort)(_ClampSigned(q0 - first, bitDepth) + center);
+    plane[at - step] = (ushort)(_ClampSigned(p0 + second, bitDepth) + center);
 
     if (highEdgeVariance)
       return;
 
+    // ROUND_POWER_OF_TWO(filter1,1), matching libvpx's highbd_filter4.
     var outer = (first + 1) >> 1;
-    plane[at + step] = (byte)(_Clamp8(q1 - outer) + 128);
-    plane[at - step * 2] = (byte)(_Clamp8(p1 + outer) + 128);
+    plane[at + step] = (ushort)(_ClampSigned(q1 - outer, bitDepth) + center);
+    plane[at - step * 2] = (ushort)(_ClampSigned(p1 + outer, bitDepth) + center);
   }
 
-  private static int _Clamp8(int value) => Clip3(-128, 127, value);
+  private static int _ClampSigned(int value, int bitDepth) {
+    var scale = 1 << (bitDepth - 8);
+    return Clip3(-128 * scale, 128 * scale - 1, value);
+  }
 
-  private static void _FilterWide(byte[] plane, int at, int step, int sizeLog2) {
+  private static void _FilterWide(ushort[] plane, int at, int step, int sizeLog2) {
     var taps = (1 << (sizeLog2 - 1)) - 1;
     Span<int> filtered = stackalloc int[16];
 
@@ -244,6 +255,6 @@ internal sealed class Vp9LoopFilter {
     }
 
     for (var i = -taps; i < taps; ++i)
-      plane[at + i * step] = (byte)filtered[i + taps];
+      plane[at + i * step] = (ushort)filtered[i + taps];
   }
 }
