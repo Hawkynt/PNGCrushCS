@@ -22,7 +22,7 @@ namespace FileFormat.Pixibox;
 /// the pixels that were put in, byte for byte, on every one of them — including the zero-count case,
 /// which was checked on its own.
 /// </remarks>
-public readonly record struct PixiboxFile : IImageFormatReader<PixiboxFile>, IImageToRawImage<PixiboxFile> {
+public readonly record struct PixiboxFile : IImageFormatReader<PixiboxFile>, IImageToRawImage<PixiboxFile>, IImageFromRawImage<PixiboxFile>, IImageFormatWriter<PixiboxFile> {
 
   /// <summary>The twelve bytes every file opens with.</summary>
   public static ReadOnlySpan<byte> Signature => [0x49, 0x49, 0x00, 0x04, 0x02, 0x00, 0x01, 0x00, 0x08, 0x00, 0x04, 0x00];
@@ -42,6 +42,7 @@ public readonly record struct PixiboxFile : IImageFormatReader<PixiboxFile>, IIm
   static string IImageFormatMetadata<PixiboxFile>.PrimaryExtension => ".pxb";
   static string[] IImageFormatMetadata<PixiboxFile>.FileExtensions => [".pxb"];
   static PixiboxFile IImageFormatReader<PixiboxFile>.FromSpan(ReadOnlySpan<byte> data) => PixiboxReader.FromSpan(data);
+  static byte[] IImageFormatWriter<PixiboxFile>.ToBytes(PixiboxFile file) => PixiboxWriter.ToBytes(file);
 
   static VideoMode[] IImageFormatMetadata<PixiboxFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [16777216])
@@ -65,4 +66,13 @@ public readonly record struct PixiboxFile : IImageFormatReader<PixiboxFile>, IIm
     Format = PixelFormat.Rgb24,
     PixelData = file.PixelData[..],
   };
+
+  /// <summary>Creates a Pixibox RLE picture from any source image.</summary>
+  public static PixiboxFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width is < 1 or > ushort.MaxValue || image.Height is < 1 or > ushort.MaxValue)
+      throw new ArgumentException($"Pixibox dimensions must fit 16-bit fields; got {image.Width}x{image.Height}.", nameof(image));
+    var rgb = image.EnsureFormat(PixelFormat.Rgb24);
+    return new() { Width = rgb.Width, Height = rgb.Height, PixelData = rgb.PixelData[..] };
+  }
 }
