@@ -10,41 +10,13 @@ internal sealed class Vp9InterPrediction {
   private const int MAX_INTERMEDIATE_HEIGHT = (((64 - 1) * 80 + 15) >> 4) + 8;
   private const int MAX_BLOCK_WIDTH = 64;
 
-  [ThreadStatic] private static int _currentSubsamplingX;
-  [ThreadStatic] private static int _currentSubsamplingY;
-  [ThreadStatic] private static bool _currentSubsamplingConfigured;
-
   private readonly int[] _intermediate = new int[MAX_INTERMEDIATE_HEIGHT * MAX_BLOCK_WIDTH];
-  private readonly byte[][] _predictions = [new byte[64 * 64], new byte[64 * 64]];
-
-  /// <summary>
-  /// Supplies the chroma geometry for the synchronous frame decode running on this thread. This keeps
-  /// the old frame-decoder call shape source-compatible while profile-aware overloads remain explicit.
-  /// </summary>
-  internal static void ConfigureCurrentFrame(int subsamplingX, int subsamplingY) {
-    if ((uint)subsamplingX > 1 || (uint)subsamplingY > 1)
-      throw new ArgumentOutOfRangeException(nameof(subsamplingX));
-
-    _currentSubsamplingX = subsamplingX;
-    _currentSubsamplingY = subsamplingY;
-    _currentSubsamplingConfigured = true;
-  }
-
-  private static int _CurrentSubsamplingX => _currentSubsamplingConfigured ? _currentSubsamplingX : 1;
-  private static int _CurrentSubsamplingY => _currentSubsamplingConfigured ? _currentSubsamplingY : 1;
+  private readonly ushort[][] _predictions = [new ushort[64 * 64], new ushort[64 * 64]];
 
   internal void Predict(
-    byte[] destination, int destinationStride, int x, int y, int width, int height, int plane,
+    ushort[] destination, int destinationStride, int x, int y, int width, int height, int plane,
     ReadOnlySpan<Vp9Frame?> references, ReadOnlySpan<int> motionVectors, int filter,
-    int frameWidth, int frameHeight)
-    => this.Predict(
-      destination, destinationStride, x, y, width, height, plane, references, motionVectors, filter,
-      _CurrentSubsamplingX, _CurrentSubsamplingY, frameWidth, frameHeight);
-
-  internal void Predict(
-    byte[] destination, int destinationStride, int x, int y, int width, int height, int plane,
-    ReadOnlySpan<Vp9Frame?> references, ReadOnlySpan<int> motionVectors, int filter,
-    int subsamplingX, int subsamplingY, int frameWidth, int frameHeight) {
+    int subsamplingX, int subsamplingY, int frameWidth, int frameHeight, int bitDepth) {
     var isCompound = references[1] != null;
 
     for (var list = 0; list < (isCompound ? 2 : 1); ++list) {
@@ -53,19 +25,25 @@ internal sealed class Vp9InterPrediction {
           "A VP9 block predicts from a reference frame slot this stream has never written. Specification 8.2 "
           + "requires an earlier frame to have filled it.");
 
+      if (reference.BitDepth != bitDepth)
+        throw new InvalidDataException(
+          $"A {bitDepth}-bit VP9 frame predicts from a {reference.BitDepth}-bit reference. Reference pictures "
+          + "inside one coded sequence must use the same sample precision.");
+
       _Scale(
         reference, plane, x, y, motionVectors[list * 2], motionVectors[list * 2 + 1],
         subsamplingX, subsamplingY, frameWidth, frameHeight,
         out var startX, out var startY, out var stepX, out var stepY);
 
-      this._Convolve(reference, plane, startX, startY, stepX, stepY, width, height, filter, this._predictions[list]);
+      this._Convolve(
+        reference, plane, startX, startY, stepX, stepY, width, height, filter, bitDepth,
+        this._predictions[list]);
     }
 
     var first = this._predictions[0];
     if (!isCompound) {
       for (var row = 0; row < height; ++row)
         Array.Copy(first, row * width, destination, (y + row) * destinationStride + x, width);
-
       return;
     }
 
@@ -74,7 +52,7 @@ internal sealed class Vp9InterPrediction {
       var at = (y + row) * destinationStride + x;
       var from = row * width;
       for (var column = 0; column < width; ++column)
-        destination[at + column] = (byte)((first[from + column] + second[from + column] + 1) >> 1);
+        destination[at + column] = (ushort)((first[from + column] + second[from + column] + 1) >> 1);
     }
   }
 
@@ -113,16 +91,19 @@ internal sealed class Vp9InterPrediction {
 
   private void _Convolve(
     Vp9Frame reference, int plane, int startX, int startY, int stepX, int stepY,
-    int width, int height, int filter, byte[] destination) {
+    int width, int height, int filter, int bitDepth, ushort[] destination) {
     var samples = reference.Plane(plane);
     var stride = reference.Stride(plane);
     var lastColumn = reference.LastColumn(plane);
     var lastRow = reference.LastRow(plane);
     var taps = Vp9Tables.SubpelFilters;
     var intermediate = this._intermediate;
+    var maxSample = (1 << bitDepth) - 1;
 
     var intermediateHeight = (((height - 1) * stepY + 15) >> 4) + 8;
 
+    // VP9 high-bit-depth convolution uses the same filter coefficients and rounding as 8-bit. The
+    // difference is the clip range after each one-dimensional pass: [0, 2^BitDepth-1], not [0,255].
     for (var row = 0; row < intermediateHeight; ++row) {
       var sourceRow = Math.Clamp((startY >> 4) + row - 3, 0, lastRow) * stride;
       var at = row * width;
@@ -136,7 +117,7 @@ internal sealed class Vp9InterPrediction {
         for (var tap = 0; tap < 8; ++tap)
           sum += taps[phase + tap] * samples[sourceRow + Math.Clamp(whole + tap, 0, lastColumn)];
 
-        intermediate[at + column] = Math.Clamp((sum + 64) >> 7, 0, 255);
+        intermediate[at + column] = Math.Clamp((sum + 64) >> 7, 0, maxSample);
       }
     }
 
@@ -151,18 +132,10 @@ internal sealed class Vp9InterPrediction {
         for (var tap = 0; tap < 8; ++tap)
           sum += taps[phase + tap] * intermediate[first + tap * width + column];
 
-        destination[at + column] = (byte)Math.Clamp((sum + 64) >> 7, 0, 255);
+        destination[at + column] = (ushort)Math.Clamp((sum + 64) >> 7, 0, maxSample);
       }
     }
   }
-
-  internal static void SelectAndClamp(
-    int plane, int list, int blockIndex, int size, ReadOnlySpan<short> blockMotionVectors,
-    int modeInfoRow, int modeInfoColumn, int modeInfoRows, int modeInfoColumns, Span<int> clamped)
-    => SelectAndClamp(
-      plane, list, blockIndex, size, blockMotionVectors,
-      modeInfoRow, modeInfoColumn, modeInfoRows, modeInfoColumns,
-      _CurrentSubsamplingX, _CurrentSubsamplingY, clamped);
 
   internal static void SelectAndClamp(
     int plane, int list, int blockIndex, int size, ReadOnlySpan<short> blockMotionVectors,
