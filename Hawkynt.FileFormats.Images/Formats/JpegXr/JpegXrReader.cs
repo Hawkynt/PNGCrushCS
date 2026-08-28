@@ -122,7 +122,7 @@ public static class JpegXrReader {
         if (alphaOffset == 0 || alphaByteCount == 0)
           throw new NotSupportedException("JPEG XR interleaved alpha is not exposed by the current T.832 adapter; a planar BCC2/BCC3 alpha codestream is required.");
 
-        var alpha = JxrCodestream.DecodeGray(_SliceCodestream(data, alphaOffset, alphaByteCount, "alpha"));
+        var alpha = JpegXrFrequencyGrayDecoder.Decode(_SliceCodestream(data, alphaOffset, alphaByteCount, "alpha"));
         _RequireMatchingDimensions(width, height, alpha.width, alpha.height, "alpha");
         pixels = new byte[checked(pixelCount * 4)];
         for (var i = 0; i < pixelCount; ++i) {
