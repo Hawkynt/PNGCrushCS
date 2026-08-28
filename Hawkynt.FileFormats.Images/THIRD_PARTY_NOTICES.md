@@ -37,20 +37,18 @@ Source: https://github.com/etemesi254/zune-image/tree/dev/crates/zune-jpegxl
 
 ## JPEG XR reference-code port
 
-The JPEG XR codec port is derived from Microsoft's JXRLib reference implementation, using `henriksson-lab/jpegxr-pure-rs` as a mechanically translated Rust cross-reference. Both carry Microsoft's New BSD license below.
+`Formats/JpegXr/Reference` vendors the pure-managed JPEG XR codec core from `SharpAstro/Codecs`, `src/SharpAstro.Jxr`, pinned at commit `7cad99deda0e6c68f68e1c9c64d442c5b85d48a2`. SharpAstro describes that code as a faithful managed port of Microsoft's JXRLib reference implementation and validates it against JXRLib/Windows WIC. Hawkynt imports the T.832 codec core only; its T.833 container and `RawImage` adapters remain local code.
 
-### Microsoft JXRLib license (New BSD)
+The pinned SharpAstro source is dedicated to the public domain under the Unlicense. A verbatim copy of that license and a pinned-source attribution note are kept beside the vendored files in `Formats/JpegXr/Reference/UNLICENSE` and `Formats/JpegXr/Reference/UPSTREAM.md`.
 
-Copyright (c) 2009, Microsoft
-All rights reserved.
+### SharpAstro.Jxr license (Unlicense / public domain dedication)
 
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+This is free and unencumbered software released into the public domain.
 
-* Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
-* Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+Anyone is free to copy, modify, publish, use, compile, sell, or distribute this software, either in source code form or as a compiled binary, for any purpose, commercial or non-commercial, and by any means.
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 Sources:
+- https://github.com/SharpAstro/Codecs
 - https://github.com/4creators/jxrlib
-- https://github.com/henriksson-lab/jpegxr-pure-rs
