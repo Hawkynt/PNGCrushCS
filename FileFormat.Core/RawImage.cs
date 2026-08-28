@@ -169,21 +169,16 @@ public sealed class RawImage {
     PixelFormat.GrayAlphaF32 => 8,
     PixelFormat.RgbF32 => 12,
     PixelFormat.RgbaF32 => 16,
-    PixelFormat.Yuv420P8 or PixelFormat.Yuv422P8 or PixelFormat.Yuv444P8
-      or PixelFormat.Yuv420P10 or PixelFormat.Yuv422P10 or PixelFormat.Yuv444P10
-      or PixelFormat.Yuv420P12 or PixelFormat.Yuv422P12 or PixelFormat.Yuv444P12
-      or PixelFormat.Yuv420P16 or PixelFormat.Yuv422P16 or PixelFormat.Yuv444P16 => 0,
+    PixelFormat.Yuv420P8 or PixelFormat.Yuv422P8 or PixelFormat.Yuv440P8 or PixelFormat.Yuv444P8
+      or PixelFormat.Yuv420P10 or PixelFormat.Yuv422P10 or PixelFormat.Yuv440P10 or PixelFormat.Yuv444P10
+      or PixelFormat.Yuv420P12 or PixelFormat.Yuv422P12 or PixelFormat.Yuv440P12 or PixelFormat.Yuv444P12
+      or PixelFormat.Yuv420P16 or PixelFormat.Yuv422P16 or PixelFormat.Yuv440P16 or PixelFormat.Yuv444P16 => 0,
     _ => throw new ArgumentOutOfRangeException(nameof(format), format, null)
   };
 
   /// <summary>
   /// The fewest bytes a picture of this size and format could possibly be held in.
   /// </summary>
-  /// <remarks>
-  /// Packed and indexed formats use their tight bit count. Planar formats are measured plane by
-  /// plane so odd widths/heights correctly round the chroma planes up rather than pretending that a
-  /// fractional average number of samples can describe the edge.
-  /// </remarks>
   public long MinimumPixelDataLength {
     get {
       if (this.IsPlanarYuv) {
@@ -197,16 +192,7 @@ public sealed class RawImage {
     }
   }
 
-  /// <summary>
-  /// Whether the picture carries enough samples to fill the size it states.
-  /// </summary>
-  /// <remarks>
-  /// A decoder that gives up part way can return a picture whose dimensions and contents disagree —
-  /// one JPEG XL file came back stating 1024 by 1024 with sixty-seven bytes behind it, and a BPG and
-  /// a PICT came back stating their full size with nothing behind them at all. That is worse than
-  /// returning nothing: it counts as a decode, and anything that reads the picture by its stated
-  /// size runs off the end of the buffer or draws whatever happens to follow it.
-  /// </remarks>
+  /// <summary>Whether the picture carries enough samples to fill the size it states.</summary>
   public bool HasEnoughPixelData {
     get {
       if (this.Width <= 0 || this.Height <= 0)
@@ -215,19 +201,12 @@ public sealed class RawImage {
       try {
         return this.PixelData != null && this.PixelData.LongLength >= this.MinimumPixelDataLength;
       } catch (ArgumentOutOfRangeException) {
-        // A format this does not measure cannot be checked, so it is not called short.
         return true;
       }
     }
   }
 
   /// <summary>Computes the stored number of bits per pixel for fixed-rate formats.</summary>
-  /// <remarks>
-  /// For P10/P12 YUV this is storage density, not signal precision: each component is intentionally
-  /// held in a 16-bit container so the numeric sample remains directly addressable. For odd-sized
-  /// planar images use <see cref="MinimumPixelDataLength"/>; an average bits-per-pixel cannot express
-  /// chroma-plane edge rounding exactly.
-  /// </remarks>
   public static int BitsPerPixel(PixelFormat format) => format switch {
     PixelFormat.Bgra32 => 32,
     PixelFormat.Rgba32 => 32,
@@ -256,20 +235,21 @@ public sealed class RawImage {
     PixelFormat.RgbF32 => 96,
     PixelFormat.RgbaF32 => 128,
     PixelFormat.Yuv420P8 => 12,
-    PixelFormat.Yuv422P8 => 16,
+    PixelFormat.Yuv422P8 or PixelFormat.Yuv440P8 => 16,
     PixelFormat.Yuv444P8 => 24,
     PixelFormat.Yuv420P10 or PixelFormat.Yuv420P12 or PixelFormat.Yuv420P16 => 24,
-    PixelFormat.Yuv422P10 or PixelFormat.Yuv422P12 or PixelFormat.Yuv422P16 => 32,
+    PixelFormat.Yuv422P10 or PixelFormat.Yuv440P10 or PixelFormat.Yuv422P12 or PixelFormat.Yuv440P12
+      or PixelFormat.Yuv422P16 or PixelFormat.Yuv440P16 => 32,
     PixelFormat.Yuv444P10 or PixelFormat.Yuv444P12 or PixelFormat.Yuv444P16 => 48,
     _ => throw new ArgumentOutOfRangeException(nameof(format), format, null)
   };
 
   /// <summary>Whether a format is one of the canonical Y/U/V planar layouts.</summary>
   public static bool IsPlanarYuvFormat(PixelFormat format) => format is
-    PixelFormat.Yuv420P8 or PixelFormat.Yuv422P8 or PixelFormat.Yuv444P8
-    or PixelFormat.Yuv420P10 or PixelFormat.Yuv422P10 or PixelFormat.Yuv444P10
-    or PixelFormat.Yuv420P12 or PixelFormat.Yuv422P12 or PixelFormat.Yuv444P12
-    or PixelFormat.Yuv420P16 or PixelFormat.Yuv422P16 or PixelFormat.Yuv444P16;
+    PixelFormat.Yuv420P8 or PixelFormat.Yuv422P8 or PixelFormat.Yuv440P8 or PixelFormat.Yuv444P8
+    or PixelFormat.Yuv420P10 or PixelFormat.Yuv422P10 or PixelFormat.Yuv440P10 or PixelFormat.Yuv444P10
+    or PixelFormat.Yuv420P12 or PixelFormat.Yuv422P12 or PixelFormat.Yuv440P12 or PixelFormat.Yuv444P12
+    or PixelFormat.Yuv420P16 or PixelFormat.Yuv422P16 or PixelFormat.Yuv440P16 or PixelFormat.Yuv444P16;
 
   /// <summary>Whether a format stores IEEE 754 component samples.</summary>
   public static bool IsFloatingPointFormat(PixelFormat format) => format is
@@ -288,15 +268,19 @@ public sealed class RawImage {
   private static (int SubsampleX, int SubsampleY, int BytesPerSample, int BitDepth) _YuvLayout(PixelFormat format) => format switch {
     PixelFormat.Yuv420P8 => (2, 2, 1, 8),
     PixelFormat.Yuv422P8 => (2, 1, 1, 8),
+    PixelFormat.Yuv440P8 => (1, 2, 1, 8),
     PixelFormat.Yuv444P8 => (1, 1, 1, 8),
     PixelFormat.Yuv420P10 => (2, 2, 2, 10),
     PixelFormat.Yuv422P10 => (2, 1, 2, 10),
+    PixelFormat.Yuv440P10 => (1, 2, 2, 10),
     PixelFormat.Yuv444P10 => (1, 1, 2, 10),
     PixelFormat.Yuv420P12 => (2, 2, 2, 12),
     PixelFormat.Yuv422P12 => (2, 1, 2, 12),
+    PixelFormat.Yuv440P12 => (1, 2, 2, 12),
     PixelFormat.Yuv444P12 => (1, 1, 2, 12),
     PixelFormat.Yuv420P16 => (2, 2, 2, 16),
     PixelFormat.Yuv422P16 => (2, 1, 2, 16),
+    PixelFormat.Yuv440P16 => (1, 2, 2, 16),
     PixelFormat.Yuv444P16 => (1, 1, 2, 16),
     _ => throw new ArgumentOutOfRangeException(nameof(format), format, "The format is not planar YUV."),
   };
