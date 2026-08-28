@@ -8483,7 +8483,7 @@ What role a chunk plays in the format. Generic categories that map onto each for
 
 #### `ChunkMobility`
 
-What a caller may do with a chunk during rewrite. Flags compose — a movable + removable metadata chunk has `Movable \| Removable`.
+What a caller may do with a chunk during rewrite. Flags compose — a movable + removable metadata chunk has `Movable | Removable`.
 
 | Value | Numeric | Summary |
 | --- | --- | --- |
