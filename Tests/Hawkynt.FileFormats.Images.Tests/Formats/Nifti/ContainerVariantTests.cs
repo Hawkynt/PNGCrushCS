@@ -58,6 +58,27 @@ public sealed class ContainerVariantTests {
 
   [Test]
   [Category("Integration")]
+  public void Pair_WriteToImgPath_WritesImgAsMainAndHdrAsCompanion() {
+    var directory = Path.Combine(Path.GetTempPath(), "nifti-pair-img-write-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(directory);
+    try {
+      var source = _Rgba();
+      var imageFile = new FileInfo(Path.Combine(directory, "scan.img"));
+      FormatIO.WriteToFile<NiftiPairFile>(source, imageFile);
+
+      Assert.That(imageFile.Exists, Is.True);
+      Assert.That(File.Exists(Path.Combine(directory, "scan.hdr")), Is.True);
+      Assert.That(File.ReadAllBytes(imageFile.FullName), Is.EqualTo(NiftiPairFile.FromRawImage(source).Nifti.PixelData));
+
+      var decoded = NiftiPairFile.ToRawImage(NiftiPairReader.FromFile(imageFile));
+      Assert.That(decoded.PixelData, Is.EqualTo(source.PixelData));
+    } finally {
+      Directory.Delete(directory, recursive: true);
+    }
+  }
+
+  [Test]
+  [Category("Integration")]
   public void NiiGz_RoundTrip_PreservesRgba32Exactly() {
     var source = _Rgba();
     var encoded = FormatIO.Encode<NiftiGzipFile>(source);
