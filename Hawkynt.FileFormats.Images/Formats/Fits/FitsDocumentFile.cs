@@ -13,17 +13,26 @@ public sealed class FitsHdu {
   public string ExtensionType { get; init; } = "IMAGE";
   public long[] Axes { get; init; } = [];
   public FitsBitpix Bitpix { get; init; }
+  public long ParameterCount { get; init; }
+  public long GroupCount { get; init; } = 1;
   public IReadOnlyList<FitsKeyword> Keywords { get; init; } = [];
   public byte[] Data { get; init; } = [];
 
-  public bool IsImage => IsPrimary || string.Equals(ExtensionType.Trim(), "IMAGE", StringComparison.OrdinalIgnoreCase);
+  /// <summary>
+  /// Whether the HDU can be projected as ordinary raster planes. Random-groups HDUs and extensions
+  /// with heap/parameter payloads are retained losslessly but are not misrepresented as pictures.
+  /// </summary>
+  public bool IsImage
+    => ParameterCount == 0
+       && GroupCount == 1
+       && (IsPrimary || string.Equals(ExtensionType.Trim(), "IMAGE", StringComparison.OrdinalIgnoreCase));
 }
 
 /// <summary>Full FITS document model retaining every HDU and exposing every 2D plane through the multi-image contract.</summary>
 /// <remarks>
 /// <see cref="FitsFile"/> remains the compact single-image API. This document model is the lossless
-/// container view for primary arrays, IMAGE extensions, arbitrary higher dimensions, and extension
-/// HDUs that an image conversion does not understand but must not discard.
+/// container view for primary arrays, IMAGE extensions, arbitrary higher dimensions, random groups,
+/// tables, and extension HDUs that an image conversion does not understand but must not discard.
 /// </remarks>
 public sealed class FitsDocumentFile :
   IImageFormatReader<FitsDocumentFile>, IImageToRawImage<FitsDocumentFile>,
@@ -55,6 +64,8 @@ public sealed class FitsDocumentFile :
         IsPrimary = true,
         Axes = axes,
         Bitpix = single.Bitpix,
+        ParameterCount = 0,
+        GroupCount = 1,
         Keywords = single.Keywords ?? [],
         Data = single.PixelData ?? [],
       }],
@@ -149,7 +160,6 @@ public static class FitsDocumentReader {
         if (!string.Equals(first, "SIMPLE  ", StringComparison.Ordinal))
           throw new InvalidDataException("FITS primary HDU does not begin with SIMPLE.");
       } else if (!string.Equals(first, "XTENSION", StringComparison.Ordinal)) {
-        // FITS padding is zero for data and space for headers; trailing all-zero/all-space blocks are not HDUs.
         if (_IsPadding(data[offset..]))
           break;
         throw new InvalidDataException($"FITS extension at byte {offset} does not begin with XTENSION.");
@@ -195,6 +205,8 @@ public static class FitsDocumentReader {
         ExtensionType = extensionType,
         Axes = axes,
         Bitpix = bitpix,
+        ParameterCount = pcount,
+        GroupCount = gcount,
         Keywords = keywords,
         Data = payload,
       });
@@ -262,6 +274,8 @@ public static class FitsDocumentWriter {
   private static void _WriteHdu(Stream output, FitsHdu hdu, bool primary) {
     if (primary != hdu.IsPrimary)
       throw new InvalidDataException(primary ? "First HDU must be primary." : "Only the first HDU may be primary.");
+    if (hdu.ParameterCount < 0 || hdu.GroupCount < 1)
+      throw new InvalidDataException("FITS PCOUNT/GCOUNT values are invalid.");
 
     var cards = new List<string>();
     if (primary)
@@ -277,9 +291,12 @@ public static class FitsDocumentWriter {
         throw new InvalidDataException($"FITS NAXIS{axis + 1} cannot be negative.");
       cards.Add(_Card($"NAXIS{axis + 1}", hdu.Axes[axis].ToString(CultureInfo.InvariantCulture), null));
     }
-    if (!primary) {
-      cards.Add(_Card("PCOUNT", "0", "parameter count"));
-      cards.Add(_Card("GCOUNT", "1", "group count"));
+
+    // Extension HDUs require both keywords. Random-groups primary HDUs use them too; keeping the
+    // explicit values is what makes a parse/write pass preserve tables and grouped data verbatim.
+    if (!primary || hdu.ParameterCount != 0 || hdu.GroupCount != 1) {
+      cards.Add(_Card("PCOUNT", hdu.ParameterCount.ToString(CultureInfo.InvariantCulture), "parameter count"));
+      cards.Add(_Card("GCOUNT", hdu.GroupCount.ToString(CultureInfo.InvariantCulture), "group count"));
     }
 
     var mandatory = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SIMPLE", "XTENSION", "BITPIX", "NAXIS", "PCOUNT", "GCOUNT", "END" };
@@ -300,7 +317,7 @@ public static class FitsDocumentWriter {
     long elements = hdu.Axes.Length == 0 ? 0 : 1;
     foreach (var axis in hdu.Axes)
       elements = checked(elements * axis);
-    var expected = checked(elements * FitsFile.BytesPerSample(hdu.Bitpix));
+    var expected = checked((long)FitsFile.BytesPerSample(hdu.Bitpix) * hdu.GroupCount * checked(hdu.ParameterCount + elements));
     if (hdu.Data.LongLength < expected)
       throw new InvalidDataException($"FITS HDU declares {expected} payload bytes but contains {hdu.Data.LongLength}.");
     if (expected > int.MaxValue)
