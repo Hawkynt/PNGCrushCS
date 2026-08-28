@@ -220,6 +220,8 @@ internal sealed class Vp9Decoder {
     var rows = this._header.Sb64Rows;
     var subX = this._header.SubsamplingX;
     var subY = this._header.SubsamplingY;
+    var colorSpace = this._header.ColorSpace;
+    var colorRange = this._header.ColorRange;
 
     Vp9Frame? free = null;
     for (var i = this._pool.Count - 1; i >= 0; --i) {
@@ -227,7 +229,7 @@ internal sealed class Vp9Decoder {
       if (Array.IndexOf(this._slots, candidate) >= 0 || shown.Contains(candidate))
         continue;
 
-      if (candidate.Matches(width, height, columns, rows, subX, subY)) {
+      if (candidate.Matches(width, height, columns, rows, subX, subY, colorSpace, colorRange)) {
         free ??= candidate;
         continue;
       }
@@ -238,8 +240,7 @@ internal sealed class Vp9Decoder {
     if (free != null)
       return free;
 
-    var frame = new Vp9Frame(
-      width, height, columns, rows, subX, subY, this._header.ColorSpace, this._header.ColorRange);
+    var frame = new Vp9Frame(width, height, columns, rows, subX, subY, colorSpace, colorRange);
     this._pool.Add(frame);
     return frame;
   }
