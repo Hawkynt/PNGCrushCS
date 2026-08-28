@@ -44,6 +44,29 @@ public sealed class FromRawImageTests {
 
   [Test]
   [Category("Integration")]
+  public void RoundTrip_ColourWithAlpha_UsesStandardRgba32AndReproducesExactly() {
+    var data = new byte[11 * 4 * 4];
+    for (var i = 0; i < data.Length / 4; ++i) {
+      data[i * 4] = (byte)(i * 7);
+      data[i * 4 + 1] = (byte)(i * 11);
+      data[i * 4 + 2] = (byte)(i * 23);
+      data[i * 4 + 3] = (byte)(255 - i * 5);
+    }
+
+    var source = new RawImage { Width = 11, Height = 4, Format = PixelFormat.Rgba32, PixelData = data };
+    var file = _Reread(NiftiFile.FromRawImage(source));
+    var decoded = NiftiFile.ToRawImage(file);
+
+    Assert.Multiple(() => {
+      Assert.That(file.Datatype, Is.EqualTo(NiftiDataType.Rgba32));
+      Assert.That(file.Bitpix, Is.EqualTo(32));
+      Assert.That(decoded.Format, Is.EqualTo(PixelFormat.Rgba32));
+      Assert.That(decoded.PixelData, Is.EqualTo(source.PixelData));
+    });
+  }
+
+  [Test]
+  [Category("Integration")]
   public void RoundTrip_SixteenBitGrey_ReproducesExactlyAtFullDepth() {
     // A scan is measurement: sixteen-bit voxels stay sixteen-bit rather than being crushed to eight.
     var source = _Gray16(9, 5);
