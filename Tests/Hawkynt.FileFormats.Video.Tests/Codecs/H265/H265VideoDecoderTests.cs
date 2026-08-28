@@ -190,25 +190,24 @@ public sealed class H265VideoDecoderTests {
     Assert.That(message, Does.Contain("log2_sao_offset_scale"));
   }
 
-  [TestCase(1, "predicted", "an earlier picture")]
-  [TestCase(0, "bidirectionally predicted", "an earlier and a later picture")]
+  [TestCase(1)]
+  [TestCase(0)]
   [Category("Unit")]
-  public void APicturePredictedFromAnotherPicture_IsRefusedAtItsSliceType(
-    int sliceType, string expected, string references) {
-    var message = _Refusal(new H265TestStream()
+  public void PredictedAndBidirectionalSlicesReachTheirImplementedHeaderPath(int sliceType) {
+    // InterSliceHeader intentionally stops immediately after slice_type. In the old decoder that was
+    // enough to hit the policy refusal. Now it must get past that point and fail only because the
+    // deliberately truncated test stream does not contain the rest of the P/B header and coded data.
+    var failure = _Decode(new H265TestStream()
       .VideoParameterSet()
       .SequenceParameterSet()
       .PictureParameterSet()
       .InterSliceHeader(sliceType)
       .ToArray());
 
-    Assert.That(message, Does.Contain("slice_type"));
-    Assert.That(message, Does.Contain(expected));
-    Assert.That(message, Does.Contain(references));
-
-    // The refusal has to say what is still true, or a caller cannot tell a decoder that reads part of
-    // this format from one that reads none of it.
-    Assert.That(message, Does.Contain("Intra pictures are decoded exactly"));
+    Assert.That(failure, Is.Not.Null, "the deliberately truncated inter slice unexpectedly decoded");
+    Assert.That(failure, Is.Not.InstanceOf<NotSupportedException>(),
+      "P/B slices are implemented and must not be rejected merely because of slice_type");
+    Assert.That(failure!.Message, Does.Not.Contain("Intra pictures are decoded exactly"));
   }
 
   [Test]
