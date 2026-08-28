@@ -40,9 +40,10 @@ namespace FileFormat.Codecs;
 /// filter, in prediction or in the probability adaptation shows up as a small difference that grows
 /// with every frame until the next key frame.
 /// <para/>
-/// The RGB this hands back differs from ffmpeg's at colour edges, and only there. That is the
-/// chrominance interpolation described in <see cref="Vp9ColorConversion"/>, which is a display
-/// convention rather than part of the decode.
+/// Those exact planes are now what this decoder returns: canonical <see cref="PixelFormat.Yuv420P8"/>
+/// with the stream's full/limited-range flag kept in <see cref="RawImage.ColorInfo"/>. RGB conversion
+/// is a display or writer concern and can be requested through <see cref="RawImageConverter"/>; it is
+/// no longer baked into a successful VP9 decode.
 /// </remarks>
 public sealed class Vp9VideoDecoder : IVideoCodecDecoder<Vp9VideoDecoder> {
 
@@ -112,12 +113,19 @@ public sealed class Vp9VideoDecoder : IVideoCodecDecoder<Vp9VideoDecoder> {
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
     foreach (var picture in this._decoder.Decode(packet.Data.Span))
       this._pending.Enqueue(
-        new() {
-          Width = picture.Width,
-          Height = picture.Height,
-          Format = PixelFormat.Rgb24,
-          PixelData = Vp9ColorConversion.ToRgb24(picture, this._decoder.ColorRange != 0),
-        });
+        RawImageFactory.FromYuv420P8(
+          picture.Width,
+          picture.Height,
+          picture.Luma,
+          picture.LumaWidth,
+          picture.Cb,
+          picture.Cr,
+          picture.ChromaWidth,
+          colorInfo: new() {
+            Range = this._decoder.ColorRange != 0 ? RawColorRange.Full : RawColorRange.Limited,
+            Matrix = RawMatrixCoefficients.Bt601,
+            ChromaLocation = RawChromaLocation.Center,
+          }));
 
     if (this._pending.Count == 0) {
       frame = null!;
