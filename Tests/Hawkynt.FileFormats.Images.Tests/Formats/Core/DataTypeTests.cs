@@ -6,8 +6,8 @@ namespace FileFormat.Core.Tests;
 public sealed class DataTypeTests {
 
   [Test]
-  public void PixelFormat_Has18Values() {
-    Assert.That(System.Enum.GetValues<PixelFormat>(), Has.Length.EqualTo(18));
+  public void PixelFormat_Has38Values() {
+    Assert.That(System.Enum.GetValues<PixelFormat>(), Has.Length.EqualTo(38));
   }
 
   /// <summary>
@@ -96,7 +96,6 @@ public sealed class DataTypeTests {
     HeaderSerializer.Write(original, buffer);
 
     var read = HeaderSerializer.Read<FileFormat.Msp.MspHeader>(buffer);
-
     Assert.That(read.Key1, Is.EqualTo(original.Key1));
     Assert.That(read.Width, Is.EqualTo(original.Width));
     Assert.That(read.Height, Is.EqualTo(original.Height));
