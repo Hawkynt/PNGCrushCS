@@ -132,6 +132,7 @@ public sealed class RoundTripTests {
         Assert.That(decoded.PixelData[p], Is.EqualTo(255), $"R at pixel {i}");
         Assert.That(decoded.PixelData[p + 1], Is.EqualTo(0), $"G at pixel {i}");
         Assert.That(decoded.PixelData[p + 2], Is.EqualTo(0), $"B at pixel {i}");
+        Assert.That(decoded.PixelData[p + 3], Is.EqualTo(255), $"A at pixel {i}");
       });
     }
   }
