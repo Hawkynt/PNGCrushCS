@@ -16,10 +16,9 @@ namespace FileFormat.Codecs.Vp9;
 /// each time would silently reset all of them and produce a picture that is wrong only where the
 /// stream was economical.
 /// <para/>
-/// <b>Profile 0 only.</b> Profiles 1 and 3 carry chrominance at other subsampling ratios and profiles
-/// 2 and 3 carry more than eight bits per sample; the transforms, the loop filter and the prediction
-/// all change shape for those. This refuses them by name at the field that states them rather than
-/// decoding most of a frame and going wrong at the end.
+/// Profiles 0 and 1 are eight-bit and share the same entropy, transform and quantisation machinery.
+/// Profile 1 adds independently stated chroma subsampling (and permits sRGB); profiles 2 and 3 raise
+/// the sample depth to ten or twelve bits and are still refused before any picture is reconstructed.
 /// </remarks>
 internal sealed class Vp9FrameHeader {
 
@@ -138,12 +137,11 @@ internal sealed class Vp9FrameHeader {
     var profileHighBit = reader.ReadBit();
     this.Profile = (profileHighBit << 1) + profileLowBit;
 
-    if (this.Profile != 0)
+    if (this.Profile >= 2)
       throw new NotSupportedException(
-        $"This VP9 stream states profile {this.Profile}. This decoder implements profile 0 — eight bits per sample "
-        + "at 4:2:0 chrominance — and profiles 1, 2 and 3 differ from it in the chrominance subsampling, the sample "
-        + "depth or both, which changes the transforms, the prediction and the loop filter. None of that is "
-        + "implemented here.");
+        $"This VP9 stream states profile {this.Profile}. Profiles 2 and 3 code ten- or twelve-bit samples; this "
+        + "decoder currently reconstructs the complete eight-bit profile 0/1 pipeline. High-bit-depth prediction, "
+        + "inverse transforms, dequantisation and loop filtering are not implemented yet.");
 
     this.ShowExistingFrame = reader.ReadBit() != 0;
     if (this.ShowExistingFrame) {
@@ -163,9 +161,6 @@ internal sealed class Vp9FrameHeader {
       _ReadSyncCode(ref reader);
       this._ReadColorConfig(ref reader);
 
-      // Set before the size is read rather than after it, as specification 6.2 has it. The only
-      // reader of the flag during the size computation is the derivation of UsePrevFrameMvs, which
-      // no intra frame consults, so the two orders cannot be told apart from the decoded picture.
       this.IntraOnly = false;
       this.FrameIsIntra = true;
 
@@ -181,11 +176,14 @@ internal sealed class Vp9FrameHeader {
       if (this.IntraOnly) {
         _ReadSyncCode(ref reader);
 
-        // Profile 0 states no colour configuration on an intra-only frame; it is defined to be the
-        // same 8-bit 4:2:0 the sequence has been all along.
-        this.ColorSpace = CS_BT_601;
-        this.SubsamplingX = 1;
-        this.SubsamplingY = 1;
+        if (this.Profile > 0)
+          this._ReadColorConfig(ref reader);
+        else {
+          this.ColorSpace = CS_BT_601;
+          this.ColorRange = 0;
+          this.SubsamplingX = 1;
+          this.SubsamplingY = 1;
+        }
 
         this.RefreshFrameFlags = reader.ReadLiteral(8);
         this._ReadFrameSize(ref reader);
@@ -266,20 +264,40 @@ internal sealed class Vp9FrameHeader {
   }
 
   private void _ReadColorConfig(ref Vp9BitReader reader) {
-    // Profile 0 states no bit depth: it is eight, and profiles 2 and 3 — the ones that state
-    // otherwise — have already been refused.
     this.ColorSpace = reader.ReadLiteral(3);
 
-    if (this.ColorSpace == CS_RGB)
-      throw new NotSupportedException(
-        "This VP9 key frame states the sRGB colour space, which specification 7.2.2 permits only in profiles 1 and "
-        + "3. A profile 0 stream cannot carry it.");
+    if (this.ColorSpace == CS_RGB) {
+      if (this.Profile != 1)
+        throw new NotSupportedException(
+          "This VP9 key frame states the sRGB colour space, which specification 7.2.2 permits only in profiles 1 and "
+          + "3. A profile 0 stream cannot carry it.");
+
+      this.ColorRange = 1;
+      this.SubsamplingX = 0;
+      this.SubsamplingY = 0;
+      if (reader.ReadBit() != 0)
+        throw new InvalidDataException("This VP9 profile-1 sRGB frame sets the reserved_zero bit in color_config().");
+
+      return;
+    }
 
     this.ColorRange = reader.ReadBit();
 
-    // Profile 0 is 4:2:0 and says so by not saying anything.
-    this.SubsamplingX = 1;
-    this.SubsamplingY = 1;
+    if (this.Profile == 0) {
+      this.SubsamplingX = 1;
+      this.SubsamplingY = 1;
+      return;
+    }
+
+    this.SubsamplingX = reader.ReadBit();
+    this.SubsamplingY = reader.ReadBit();
+    if (this.SubsamplingX == 1 && this.SubsamplingY == 1)
+      throw new InvalidDataException(
+        "This VP9 profile-1 frame states 4:2:0 chroma. Profile 1 exists for the eight-bit non-4:2:0 formats; "
+        + "4:2:0 is profile 0.");
+
+    if (reader.ReadBit() != 0)
+      throw new InvalidDataException("This VP9 profile-1 frame sets the reserved_zero bit in color_config().");
   }
 
   private void _ReadFrameSize(ref Vp9BitReader reader) {
