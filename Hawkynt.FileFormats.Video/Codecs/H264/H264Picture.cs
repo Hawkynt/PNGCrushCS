@@ -1,7 +1,7 @@
 namespace FileFormat.Codecs.H264;
 
 /// <summary>
-/// One reconstructed picture, as the three 4:2:0 sample planes it is coded as, together with the two
+/// One reconstructed picture, as the three 4:2:0 sample planes it is coded as, together with the
 /// numbers the reference machinery names it by.
 /// </summary>
 /// <remarks>
@@ -9,12 +9,6 @@ namespace FileFormat.Codecs.H264;
 /// stream of 66x50 is coded as five macroblocks by four, and the fourteen columns and rows that reach
 /// past the picture are coded, transmitted and reconstructed like any others; a later picture's motion
 /// vector may point into them. Cropping belongs at the moment a picture is handed out, not before.
-/// <para/>
-/// There is no picture order count here, and its absence is deliberate. A picture order count exists
-/// to put pictures back into display order after bidirectional prediction has coded them out of it —
-/// and this decoder refuses B slices, so for every stream it accepts the decoding order and the
-/// display order are the same. Carrying a field that nothing reads would be carrying the appearance
-/// of reordering without the fact of it.
 /// </remarks>
 internal sealed class H264Picture {
 
@@ -51,15 +45,21 @@ internal sealed class H264Picture {
 
   /// <summary>
   /// <c>PicNum</c> — clause 8.2.4.1: <see cref="FrameNum"/> shifted below the current picture's so
-  /// that the wrap-around of a counter of a few bits does not reorder the reference list.
+  /// that the wrap-around of a counter of a few bits does not reorder the short-term reference list.
   /// </summary>
-  /// <remarks>
-  /// Recomputed for every reference picture at the start of every slice, because it is relative to
-  /// the picture being decoded now: the same reference picture has a different <c>PicNum</c> in two
-  /// consecutive pictures, and caching it would order the list by where the references were rather
-  /// than by where they are.
-  /// </remarks>
   internal int PicNum { get; set; }
+
+  /// <summary>Whether this picture is currently held as a long-term rather than short-term reference.</summary>
+  internal bool IsLongTerm { get; set; }
+
+  /// <summary><c>LongTermFrameIdx</c> of clause 8.2.5, or -1 while the picture is short-term.</summary>
+  internal int LongTermFrameIdx { get; set; } = -1;
+
+  /// <summary>
+  /// <c>LongTermPicNum</c>. This decoder accepts frame pictures only, so clause 8.2.4.1 makes it
+  /// identical to <see cref="LongTermFrameIdx"/>.
+  /// </summary>
+  internal int LongTermPicNum => this.LongTermFrameIdx;
 
   /// <summary>
   /// A number unique to this picture for as long as it exists, so that two reference indices can be
