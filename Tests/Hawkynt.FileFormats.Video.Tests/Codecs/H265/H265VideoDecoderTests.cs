@@ -7,20 +7,6 @@ using FileFormat.H265Video;
 
 namespace FileFormat.Codecs.H265.Tests;
 
-/// <summary>
-/// The H.265 decoder's boundary: which streams it reads, and which it refuses and with what words.
-/// </summary>
-/// <remarks>
-/// The arithmetic — prediction, dequantisation, the two transforms, the interpolator and both loop
-/// filters — was checked against a reference decoder over a corpus of encoded streams, plane by plane
-/// and frame by frame, and not here. No test that writes its own bitstream can tell whether the
-/// decoder and the test agree with the standard or only with each other.
-/// <para/>
-/// What these check is the half that comparison cannot reach: that a stream this decoder cannot read
-/// is refused rather than decoded into a plausible picture, and that the refusal names the syntax
-/// element responsible. That is the specific failure this decoder exists to replace — its predecessor
-/// reported success while returning a picture that was almost entirely zero.
-/// </remarks>
 [TestFixture]
 public sealed class H265VideoDecoderTests {
 
@@ -35,9 +21,7 @@ public sealed class H265VideoDecoderTests {
       var decoder = H265VideoDecoder.Create(_ByteStream);
       decoder.TryDecode(new(0, stream), out _);
       foreach (var _ in decoder.Flush()) {
-        // Drain, so that a refusal raised while a held picture is handed out is seen here too.
       }
-
       return null;
     } catch (Exception e) {
       return e;
@@ -50,10 +34,6 @@ public sealed class H265VideoDecoderTests {
     Assert.That(failure, Is.InstanceOf<NotSupportedException>().Or.InstanceOf<InvalidDataException>());
     return failure!.Message;
   }
-
-  // ==============================================================================================
-  // Which streams reach this decoder at all
-  // ==============================================================================================
 
   [Test]
   [Category("Unit")]
@@ -78,10 +58,6 @@ public sealed class H265VideoDecoderTests {
       H265VideoDecoder.Accepts(new() { Index = 0, Kind = MediaStreamKind.Audio, Codec = CodecTag.FromCharacters("hvc1") }),
       Is.False);
   }
-
-  // ==============================================================================================
-  // The coded formats that are refused, each by the field that says so
-  // ==============================================================================================
 
   [TestCase(0, "monochrome")]
   [TestCase(2, "4:2:2")]
@@ -155,15 +131,15 @@ public sealed class H265VideoDecoderTests {
 
   [Test]
   [Category("Unit")]
-  public void ATiledPicture_IsRefusedWithItsGrid() {
-    var message = _Refusal(new H265TestStream()
+  public void ATiledPictureParameterSet_IsAccepted() {
+    var stream = new H265TestStream()
       .VideoParameterSet()
       .SequenceParameterSet()
       .PictureParameterSet(tiles: true)
-      .ToArray());
+      .ToArray();
 
-    Assert.That(message, Does.Contain("tiles"));
-    Assert.That(message, Does.Contain("2 by 2"));
+    Assert.That(_Decode(stream), Is.Null,
+      "tile syntax is implemented; a packet containing only parameter sets should simply produce no picture");
   }
 
   [Test]
@@ -194,9 +170,6 @@ public sealed class H265VideoDecoderTests {
   [TestCase(0)]
   [Category("Unit")]
   public void PredictedAndBidirectionalSlicesReachTheirImplementedHeaderPath(int sliceType) {
-    // InterSliceHeader intentionally stops immediately after slice_type. In the old decoder that was
-    // enough to hit the policy refusal. Now it must get past that point and fail only because the
-    // deliberately truncated test stream does not contain the rest of the P/B header and coded data.
     var failure = _Decode(new H265TestStream()
       .VideoParameterSet()
       .SequenceParameterSet()
@@ -213,8 +186,6 @@ public sealed class H265VideoDecoderTests {
   [Test]
   [Category("Unit")]
   public void APredictedSliceInsideARandomAccessPoint_IsRefusedAsMalformedRatherThanUnsupported() {
-    // A refresh picture may only carry intra slices, so this stream is wrong rather than merely
-    // beyond what is implemented — and the two are worth telling apart.
     var failure = _Decode(new H265TestStream()
       .VideoParameterSet()
       .SequenceParameterSet()
@@ -228,31 +199,25 @@ public sealed class H265VideoDecoderTests {
 
   [Test]
   [Category("Unit")]
-  public void ADependentSliceSegment_IsRefusedByName() {
-    var message = _Refusal(new H265TestStream()
+  public void ADependentSliceWithoutAnIndependentPredecessor_IsMalformed() {
+    var failure = _Decode(new H265TestStream()
       .VideoParameterSet()
       .SequenceParameterSet()
       .PictureParameterSet(dependentSliceSegments: true)
       .IntraSliceHeader(firstSegment: false, dependent: true)
       .ToArray());
 
-    Assert.That(message, Does.Contain("dependent_slice_segment_flag"));
+    Assert.That(failure, Is.InstanceOf<InvalidDataException>());
+    Assert.That(failure!.Message, Does.Contain("preceding independent"));
   }
 
   [Test]
   [Category("Unit")]
   public void AnEnhancementLayerUnit_IsRefusedByItsLayer() {
-    // A NAL unit header with nuh_layer_id set. Built by hand rather than through the writer, because
-    // the writer only ever emits the base layer.
     byte[] stream = [0, 0, 0, 1, 0x42, 0x09, 0x00];
-
     var message = _Refusal(stream);
     Assert.That(message, Does.Contain("nuh_layer_id"));
   }
-
-  // ==============================================================================================
-  // What a stream without a decoder's own parameter sets does
-  // ==============================================================================================
 
   [Test]
   [Category("Unit")]
@@ -294,10 +259,6 @@ public sealed class H265VideoDecoderTests {
     Assert.That(failure, Is.InstanceOf<InvalidDataException>());
     Assert.That(failure!.Message, Does.Contain("forbidden_zero_bit"));
   }
-
-  // ==============================================================================================
-  // The demuxer beside it
-  // ==============================================================================================
 
   [Test]
   [Category("Unit")]
@@ -354,13 +315,7 @@ public sealed class H265VideoDecoderTests {
   [Test]
   [Category("Unit")]
   public void AnH264ByteStreamIsNotMistakenForAnH265One() {
-    // 0x67 is an H.264 sequence parameter set. Read as an H.265 NAL unit header its type is 51,
-    // which no stream may be entered at, and the profile byte that follows it reads as a layer this
-    // decoder would refuse — so the signature has three separate reasons to say no.
     Assert.That(H265VideoContainer.MatchesSignature([0, 0, 0, 1, 0x67, 0x42, 0x00, 0x1E]), Is.Null);
-
-    // …and an H.264 sequence parameter set at nal_ref_idc 1, whose 0x27 does read as a valid H.265
-    // refresh picture, is told apart by the layer its second byte states.
     Assert.That(H265VideoContainer.MatchesSignature([0, 0, 0, 1, 0x27, 0x42, 0x00, 0x1E]), Is.Null);
   }
 
@@ -368,7 +323,6 @@ public sealed class H265VideoDecoderTests {
   [Category("Unit")]
   public void AnH265ByteStreamIsRecognisedByItsVideoParameterSet() {
     var stream = new H265TestStream().VideoParameterSet().ToArray();
-
     Assert.That(H265VideoContainer.MatchesSignature(stream), Is.True);
   }
 }
