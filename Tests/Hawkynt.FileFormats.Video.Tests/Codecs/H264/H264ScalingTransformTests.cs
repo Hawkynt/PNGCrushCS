@@ -1,3 +1,5 @@
+using System.Linq;
+
 namespace FileFormat.Codecs.H264.Tests;
 
 [TestFixture]
