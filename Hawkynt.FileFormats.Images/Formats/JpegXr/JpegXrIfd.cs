@@ -107,7 +107,6 @@ internal static class JpegXrIfd {
   /// <summary>Creates the canonical 16-byte WIC GUID for the formats the public JXR model writes.</summary>
   internal static byte[] CreatePixelFormatGuid(int componentCount) {
     var suffix = componentCount switch {
-    {
       1 => WIC_8BPP_GRAY,
       3 => WIC_24BPP_RGB,
       _ => throw new NotSupportedException($"JPEG XR writer supports Gray8 and RGB24; got {componentCount} components.")
@@ -136,7 +135,6 @@ internal static class JpegXrIfd {
   private static uint _ReadValue(byte[] data, int valueFieldOffset, ushort type, uint count) {
     if (count == 1) {
       return type switch {
-      {
         TYPE_BYTE => data[valueFieldOffset],
         TYPE_SHORT => BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(valueFieldOffset)),
         TYPE_LONG => BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(valueFieldOffset)),
