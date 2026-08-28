@@ -36,28 +36,15 @@ namespace FileFormat.Codecs;
 /// and the multilayer and 3D extensions. Every one of them throws with the syntax element that says
 /// so and what it means.
 /// <para/>
-/// <b>There is no <c>catch</c> here that hands back a blank, a copied or a partly decoded picture.</b>
-/// That is worth stating because this repository has had the other kind: an HEVC decoder whose
-/// arithmetic contexts were never initialised, which had no dequantisation at all, which guessed
-/// where its slice header ended — and which reported success for months while returning pictures that
-/// were almost entirely zero, because nobody compared the samples. A refusal is a result a caller can
-/// act on. A plausible wrong picture is not, because nobody checks a picture that looks like a
-/// picture.
+/// Completed pictures are returned as native <see cref="PixelFormat.Yuv420P8"/> samples after both
+/// in-loop filters. RGB conversion is deliberately outside the decoder now; writers and viewers can
+/// request it through <see cref="RawImageConverter"/> when their output representation needs it.
 /// <para/>
-/// <b>Both delivery forms.</b> A transport stream, a program stream and a bare elementary stream
-/// carry NAL units separated by start codes (Annex B); MP4, Matroska and the ISO base media family
-/// carry each unit behind its length, with the parameter sets in an
-/// <c>HEVCDecoderConfigurationRecord</c>. Which form a stream is in is decided once, from whether
-/// that record is present, rather than guessed at each packet.
+/// <b>There is no <c>catch</c> here that hands back a blank, a copied or a partly decoded picture.</b>
+/// A refusal is a result a caller can act on. A plausible wrong picture is not.
 /// </remarks>
 public sealed class H265VideoDecoder : IVideoCodecDecoder<H265VideoDecoder> {
 
-  /// <summary>The four-character codes containers name HEVC with.</summary>
-  /// <remarks>
-  /// <c>hvc1</c> and <c>hev1</c> are the ISO base media sample entry types and differ only in whether
-  /// the parameter sets may also appear in the samples; <c>hvc2</c> and <c>hev2</c> are the same two
-  /// with extractors permitted. <c>HEVC</c> and <c>H265</c> are what the AVI world writes.
-  /// </remarks>
   private static readonly CodecTag[] _Tags = [
     CodecTag.FromCharacters("hvc1"),
     CodecTag.FromCharacters("hev1"),
@@ -68,7 +55,6 @@ public sealed class H265VideoDecoder : IVideoCodecDecoder<H265VideoDecoder> {
     CodecTag.FromCharacters("h265"),
   ];
 
-  /// <summary>The name Matroska gives HEVC, which names codecs with text rather than with a code.</summary>
   private static readonly string[] _CodecIds = [
     "V_MPEGH/ISO/HEVC",
   ];
@@ -111,27 +97,11 @@ public sealed class H265VideoDecoder : IVideoCodecDecoder<H265VideoDecoder> {
     return false;
   }
 
-  /// <summary>
-  /// Builds a decoder for one stream, reading whatever the container knew about it out of band.
-  /// </summary>
-  /// <remarks>
-  /// Nothing is taken from the stream description but the codec configuration, and not even the
-  /// dimensions: every one of them is in the sequence parameter set, and a container's copy is a
-  /// copy. An MP4 that states a size its sequence parameter set disagrees with is a file whose
-  /// pictures are the size the parameter set says.
-  /// </remarks>
   public static H265VideoDecoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
-
     return new(H265DecoderConfiguration.TryParse(stream.CodecPrivateData));
   }
 
-  /// <summary>Decodes one packet — one access unit — and hands back a picture ready to be shown.</summary>
-  /// <returns>
-  /// <c>false</c> when no picture is ready, which is the case for a packet carrying only parameter
-  /// sets, for one whose picture must wait for a later one to be shown before it, and for a leading
-  /// picture skipped because the stream was entered at the access point it follows.
-  /// </returns>
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
     foreach (var nal in this._Split(packet.Data)) {
       if (nal.LayerId != 0)
@@ -155,16 +125,10 @@ public sealed class H265VideoDecoder : IVideoCodecDecoder<H265VideoDecoder> {
         default:
           if (nal.IsSlice)
             this._DecodeSliceSegment(nal);
-
-          // Supplemental enhancement information, access unit delimiters, filler, and everything the
-          // standard has not given a meaning to yet. None of them changes a sample.
           break;
       }
     }
 
-    // The container cuts a packet per access unit, so the picture this packet's slices built is
-    // finished here. A picture whose slices arrived across two packets would be finished by the
-    // first slice of the next one instead, which _DecodeSliceSegment does.
     this._FinishPicture();
 
     if (this._ready.Count == 0) {
@@ -176,9 +140,6 @@ public sealed class H265VideoDecoder : IVideoCodecDecoder<H265VideoDecoder> {
     return true;
   }
 
-  /// <summary>
-  /// The pictures still held because a picture that belongs before them might still have arrived.
-  /// </summary>
   public IEnumerable<RawImage> Flush() {
     this._FinishPicture();
 
@@ -217,22 +178,9 @@ public sealed class H265VideoDecoder : IVideoCodecDecoder<H265VideoDecoder> {
         this._pictureSets[pps.Id] = pps;
         break;
       }
-
-      // The video parameter set describes how the temporal sub-layers and the extension layers of a
-      // stream relate to one another. Nothing in the sample decoding process reads it — the sequence
-      // parameter set carries everything a picture is reconstructed from — so it is accepted and not
-      // parsed rather than parsed and not used.
     }
   }
 
-  /// <summary>Refuses a picture size that changes while pictures of the old size are still references.</summary>
-  /// <remarks>
-  /// A repeated sequence parameter set is normal and usually restates the same values. A different
-  /// picture size is not: the held references are the old size, and a predicted picture of the new
-  /// size has no defined meaning against them. The standard's answer is a refresh picture, which
-  /// empties the buffer first — so a size change that arrives without one is a stream this decoder
-  /// cannot follow rather than one it should resample.
-  /// </remarks>
   private void _RefuseGeometryChangeMidStream(H265SequenceParameterSet sps) {
     if (this._pictureSequence == null || this._pictureSequence.SameGeometryAs(sps))
       return;
@@ -256,9 +204,6 @@ public sealed class H265VideoDecoder : IVideoCodecDecoder<H265VideoDecoder> {
         + "zero and no earlier segment of the picture was read. The stream was entered part way through a picture.");
 
     if (this._frame == null) {
-      // A leading picture that predicts from before the access point the stream was entered at is
-      // not decodable and the standard says not to decode it. Skipping it is the honest answer;
-      // decoding it against whatever the buffer happens to hold would produce a picture.
       if (this._references.ShouldSkip(nal)) {
         this._skippingPicture = true;
         return;
@@ -284,9 +229,6 @@ public sealed class H265VideoDecoder : IVideoCodecDecoder<H265VideoDecoder> {
 
     var poc = this._references.ComputePictureOrderCount(header);
     this._references.ApplyReferencePictureSet(header, poc);
-
-    // Whatever the buffer can no longer be made to reorder is shown before this picture is decoded,
-    // which is where the standard puts it and is what keeps the output in order.
     this._references.BumpBeforeDecoding(header.Sps.MaxNumReorderPictures, header.Sps.MaxDecodedPictureBuffering);
 
     while (this._references.TryTakeOutput(out var released))
@@ -311,7 +253,6 @@ public sealed class H265VideoDecoder : IVideoCodecDecoder<H265VideoDecoder> {
     this._frame = null;
 
     frame.RefuseIfIncomplete();
-
     H265Deblocking.Filter(frame);
     H265SampleAdaptiveOffset.Filter(frame);
 
@@ -324,12 +265,16 @@ public sealed class H265VideoDecoder : IVideoCodecDecoder<H265VideoDecoder> {
   private RawImage _ToImage(H265Picture picture) {
     var sps = this._pictureSequence!;
 
-    return new() {
-      Width = sps.DisplayWidth,
-      Height = sps.DisplayHeight,
-      Format = PixelFormat.Rgb24,
-      PixelData = H265ColorConversion.ToRgb24(
-        picture, sps.CropOffsetX, sps.CropOffsetY, sps.DisplayWidth, sps.DisplayHeight),
-    };
+    return RawImageFactory.FromYuv420P8(
+      sps.DisplayWidth,
+      sps.DisplayHeight,
+      picture.Luma,
+      picture.Width,
+      picture.Cb,
+      picture.Cr,
+      picture.ChromaWidth,
+      sps.CropOffsetX,
+      sps.CropOffsetY,
+      RawImageColorInfo.Bt601Limited);
   }
 }
