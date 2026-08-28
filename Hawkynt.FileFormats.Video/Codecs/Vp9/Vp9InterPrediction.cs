@@ -8,57 +8,24 @@ namespace FileFormat.Codecs.Vp9;
 /// Builds a block from a reference frame, at eighth-sample accuracy and through whatever change of
 /// scale lies between the two frames (specification 8.5.2).
 /// </summary>
-/// <remarks>
-/// Two one-dimensional eight-tap convolutions, horizontal and then vertical, with the fractional part
-/// of the motion vector choosing one of sixteen phases of the filter. A whole-sample vector picks the
-/// phase whose only non-zero tap is 128 in the middle, so it costs the same as a copy and gives the
-/// same answer as one.
-/// <para/>
-/// The horizontal pass produces more rows than the block has, because the vertical pass needs three
-/// rows above it and four below. That intermediate is clamped back into eight bits between the two
-/// passes, which matters: doing the two convolutions at full precision and rounding once would give
-/// slightly different samples, and there is no "slightly" in a decoder whose output has to match
-/// another decoder's byte for byte.
-/// <para/>
-/// Reference frames may be any size between half and sixteen times this frame's, which is why the
-/// stepping through the reference is not one sample per sample. The step is a fixed-point ratio of the
-/// two frames' sizes and the filter phase advances with it, so a scaled reference is resampled by the
-/// same eight taps that do the sub-pixel work rather than by a separate resampler.
-/// <para/>
-/// Reads outside the reference are clamped to its edge rather than wrapped or refused. A motion vector
-/// is allowed to point a long way outside the picture, and clamping gives the same samples an infinite
-/// border of replicated edge would, for the cost of two comparisons.
-/// </remarks>
 internal sealed class Vp9InterPrediction {
 
-  /// <summary>
-  /// The tallest intermediate a block can need: the largest block is 64 samples high, the largest
-  /// step is 80 sixteenths, and the vertical filter reaches seven rows past the last one it produces.
-  /// </summary>
   private const int MAX_INTERMEDIATE_HEIGHT = (((64 - 1) * 80 + 15) >> 4) + 8;
-
   private const int MAX_BLOCK_WIDTH = 64;
 
   private readonly int[] _intermediate = new int[MAX_INTERMEDIATE_HEIGHT * MAX_BLOCK_WIDTH];
   private readonly byte[][] _predictions = [new byte[64 * 64], new byte[64 * 64]];
 
-  /// <summary>
-  /// Predicts one region of one plane, from one reference or from the average of two.
-  /// </summary>
-  /// <param name="destination">The plane being reconstructed.</param>
-  /// <param name="destinationStride">Its row stride.</param>
-  /// <param name="x">Column of the region's top left sample.</param>
-  /// <param name="y">Row of the region's top left sample.</param>
-  /// <param name="width">Width of the region in samples.</param>
-  /// <param name="height">Height of the region in samples.</param>
-  /// <param name="plane">Which plane is being predicted.</param>
-  /// <param name="references">One reference frame per list, the second null when the block is not compound.</param>
-  /// <param name="motionVectors">Two components per list, in eighths of a luminance sample.</param>
-  /// <param name="filter">Which of the four interpolation filters to use.</param>
-  /// <param name="subsamplingX">Horizontal chroma subsampling exponent for the current frame.</param>
-  /// <param name="subsamplingY">Vertical chroma subsampling exponent for the current frame.</param>
-  /// <param name="frameWidth">The current frame's stated width, against which the references are scaled.</param>
-  /// <param name="frameHeight">The current frame's stated height.</param>
+  /// <summary>Profile-0 compatibility overload; profile-aware callers pass the two subsampling axes explicitly.</summary>
+  internal void Predict(
+    byte[] destination, int destinationStride, int x, int y, int width, int height, int plane,
+    ReadOnlySpan<Vp9Frame?> references, ReadOnlySpan<int> motionVectors, int filter,
+    int frameWidth, int frameHeight)
+    => this.Predict(
+      destination, destinationStride, x, y, width, height, plane, references, motionVectors, filter,
+      1, 1, frameWidth, frameHeight);
+
+  /// <summary>Predicts one region of one plane, from one reference or from the average of two.</summary>
   internal void Predict(
     byte[] destination, int destinationStride, int x, int y, int width, int height, int plane,
     ReadOnlySpan<Vp9Frame?> references, ReadOnlySpan<int> motionVectors, int filter,
@@ -96,10 +63,6 @@ internal sealed class Vp9InterPrediction {
     }
   }
 
-  // ============================================================================================
-  // Where in the reference to read (specification 8.5.2.3)
-  // ============================================================================================
-
   private static void _Scale(
     Vp9Frame reference, int plane, int x, int y, int motionVectorRow, int motionVectorColumn,
     int subsamplingX, int subsamplingY, int frameWidth, int frameHeight,
@@ -117,9 +80,6 @@ internal sealed class Vp9InterPrediction {
     var baseX = (x * xScale) >> REF_SCALE_SHIFT;
     var baseY = (y * yScale) >> REF_SCALE_SHIFT;
 
-    // The fractional part follows the luminance position even for chrominance. Profile 0 happened
-    // to make both shifts one; profile 1 makes them independent, so 4:2:2, 4:4:0 and 4:4:4 must not
-    // borrow the other axis' subsampling.
     var subX = plane > 0 ? subsamplingX : 0;
     var subY = plane > 0 ? subsamplingY : 0;
     var lumaX = x << subX;
@@ -135,10 +95,6 @@ internal sealed class Vp9InterPrediction {
     startX = (int)((baseX << SUBPEL_BITS) + deltaX);
     startY = (int)((baseY << SUBPEL_BITS) + deltaY);
   }
-
-  // ============================================================================================
-  // The two convolutions (specification 8.5.2.4)
-  // ============================================================================================
 
   private void _Convolve(
     Vp9Frame reference, int plane, int startX, int startY, int stepX, int stepY,
@@ -185,18 +141,15 @@ internal sealed class Vp9InterPrediction {
     }
   }
 
-  // ============================================================================================
-  // Which motion vector (specification 8.5.2.1 and 8.5.2.2)
-  // ============================================================================================
+  /// <summary>Profile-0 compatibility overload; profile-aware callers pass both subsampling axes explicitly.</summary>
+  internal static void SelectAndClamp(
+    int plane, int list, int blockIndex, int size, ReadOnlySpan<short> blockMotionVectors,
+    int modeInfoRow, int modeInfoColumn, int modeInfoRows, int modeInfoColumns, Span<int> clamped)
+    => SelectAndClamp(
+      plane, list, blockIndex, size, blockMotionVectors,
+      modeInfoRow, modeInfoColumn, modeInfoRows, modeInfoColumns, 1, 1, clamped);
 
-  /// <summary>
-  /// Chooses the motion vector for a block of one plane and clamps it into range.
-  /// </summary>
-  /// <remarks>
-  /// A chrominance block of a sub-8x8 luminance block covers more than one luminance block, so it gets
-  /// the average of the four rather than any one of them. The rounding is away from zero, which is why
-  /// it is written out rather than left to integer division.
-  /// </remarks>
+  /// <summary>Chooses the motion vector for a block of one plane and clamps it into range.</summary>
   internal static void SelectAndClamp(
     int plane, int list, int blockIndex, int size, ReadOnlySpan<short> blockMotionVectors,
     int modeInfoRow, int modeInfoColumn, int modeInfoRows, int modeInfoColumns,
