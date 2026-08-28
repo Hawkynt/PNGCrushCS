@@ -22,16 +22,17 @@ public readonly record struct JpegXrFile : IImageFormatReader<JpegXrFile>, IImag
   /// <summary>Image height in pixels.</summary>
   public int Height { get; init; }
 
-  /// <summary>Number of components per pixel (1=Grayscale, 3=RGB).</summary>
+  /// <summary>Number of components per pixel (1=Grayscale, 3=RGB, 4=RGBA).</summary>
   public int ComponentCount { get; init; }
 
-  /// <summary>Raw pixel data: Gray8 (1 byte/pixel) or Rgb24 (3 bytes/pixel).</summary>
+  /// <summary>Raw pixel data: Gray8, RGB24, or RGBA32.</summary>
   public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(JpegXrFile file) {
     var format = file.ComponentCount switch {
       1 => PixelFormat.Gray8,
       3 => PixelFormat.Rgb24,
+      4 => PixelFormat.Rgba32,
       _ => throw new NotSupportedException($"JPEG XR with {file.ComponentCount} components is not supported.")
     };
 
@@ -45,10 +46,11 @@ public readonly record struct JpegXrFile : IImageFormatReader<JpegXrFile>, IImag
 
   public static JpegXrFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Gray8);
+    image = image.EnsureAnyFormat(PixelFormat.Rgba32, PixelFormat.Rgb24, PixelFormat.Gray8);
     var componentCount = image.Format switch {
       PixelFormat.Gray8 => 1,
       PixelFormat.Rgb24 => 3,
+      PixelFormat.Rgba32 => 4,
       _ => throw new ArgumentException($"Pixel format {image.Format} is not supported by JPEG XR.", nameof(image))
     };
 

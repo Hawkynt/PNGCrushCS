@@ -39,6 +39,7 @@ public static class MngReader {
     var offset = 8;
     MngHeader header = default;
     var frames = new List<byte[]>();
+    var frameDelays = new List<int>();
     var termAction = MngTermAction.ShowLast;
     var actionAfterIterations = MngTermAction.ShowLast;
     var repeatDelay = 0;
@@ -46,6 +47,10 @@ public static class MngReader {
     var foundMhdr = false;
     var foundTerm = false;
     List<byte[]>? currentFrameChunks = null;
+
+    var defaultDelay = 1;
+    var nextDelay = defaultDelay;
+    var oneShotDelay = false;
 
     while (offset + 12 <= data.Length) {
       var chunkLength = checked((int)_ReadUInt32BE(data[offset..]));
@@ -89,11 +94,17 @@ public static class MngReader {
           foundTerm = true;
           break;
 
+        case "FRAM":
+          if (currentFrameChunks != null)
+            throw new InvalidDataException("FRAM cannot occur inside an embedded PNG datastream.");
+          _ApplyFram(data.Slice(chunkDataStart, chunkLength), ref defaultDelay, ref nextDelay, ref oneShotDelay);
+          break;
+
         case "IHDR":
           if (!foundMhdr)
             throw new InvalidDataException("Embedded PNG encountered before MHDR.");
           if (currentFrameChunks != null)
-            throw new InvalidDataException("Nested embedded PNG datastreams are not valid MNG-VLC.");
+            throw new InvalidDataException("Nested embedded PNG datastreams are not valid MNG.");
           currentFrameChunks = [];
           _AddChunkRaw(currentFrameChunks, data, offset, chunkLength);
           break;
@@ -103,7 +114,12 @@ public static class MngReader {
             throw new InvalidDataException("IEND encountered without an embedded PNG IHDR.");
           _AddChunkRaw(currentFrameChunks, data, offset, chunkLength);
           frames.Add(_AssemblePng(currentFrameChunks));
+          frameDelays.Add(nextDelay);
           currentFrameChunks = null;
+          if (oneShotDelay) {
+            nextDelay = defaultDelay;
+            oneShotDelay = false;
+          }
           break;
 
         case "MEND":
@@ -133,13 +149,78 @@ public static class MngReader {
       TermAction = termAction,
       ActionAfterIterations = actionAfterIterations,
       RepeatDelay = repeatDelay,
-      Frames = frames
+      Frames = frames,
+      FrameDelays = frameDelays,
     };
   }
 
   public static MngFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     return FromSpan(data);
+  }
+
+  /// <summary>Reads the timing part of a general FRAM chunk while leaving unsupported presentation parameters intact.</summary>
+  private static void _ApplyFram(ReadOnlySpan<byte> chunk, ref int defaultDelay, ref int nextDelay, ref bool oneShotDelay) {
+    if (chunk.Length == 0)
+      return; // delimiter only
+
+    var framingMode = chunk[0];
+    if (framingMode > 4)
+      throw new InvalidDataException($"Invalid MNG FRAM framing mode {framingMode}.");
+    if (chunk.Length == 1)
+      return;
+
+    // A nonempty name is followed by a null separator before the four change bytes. If no separator
+    // occurs, this FRAM only changes framing mode/name and leaves all frame parameters unchanged.
+    var separator = chunk[1..].IndexOf((byte)0);
+    if (separator < 0)
+      return;
+    var changes = separator + 2;
+    if (changes == chunk.Length)
+      return;
+    if (changes + 4 > chunk.Length)
+      throw new InvalidDataException("MNG FRAM change-byte group is truncated.");
+
+    var changeDelay = chunk[changes];
+    var changeTimeout = chunk[changes + 1];
+    var changeClipping = chunk[changes + 2];
+    var changeSync = chunk[changes + 3];
+    if (changeDelay > 2 || changeTimeout > 8 || changeClipping > 2 || changeSync > 2)
+      throw new InvalidDataException("MNG FRAM contains an invalid change selector.");
+
+    var at = changes + 4;
+    if (changeDelay != 0) {
+      if (at + 4 > chunk.Length)
+        throw new InvalidDataException("MNG FRAM interframe delay is truncated.");
+      var value = _ReadUInt32BE(chunk[at..]);
+      if (value > 0x7fffffff)
+        throw new InvalidDataException("MNG FRAM interframe delay exceeds 0x7fffffff ticks.");
+      nextDelay = (int)value;
+      oneShotDelay = changeDelay == 1;
+      if (changeDelay == 2)
+        defaultDelay = nextDelay;
+      at += 4;
+    } else {
+      nextDelay = defaultDelay;
+      oneShotDelay = false;
+    }
+
+    // Parse/validate the optional fields sufficiently to keep the cursor aligned. Their rendering
+    // semantics are separate from timing, but malformed lengths must not be silently accepted.
+    if (changeTimeout != 0) {
+      if (at + 4 > chunk.Length)
+        throw new InvalidDataException("MNG FRAM timeout is truncated.");
+      at += 4;
+    }
+    if (changeClipping != 0) {
+      if (at + 17 > chunk.Length)
+        throw new InvalidDataException("MNG FRAM clipping boundary fields are truncated.");
+      if (chunk[at] > 1)
+        throw new InvalidDataException("MNG FRAM clipping delta type must be 0 or 1.");
+      at += 17;
+    }
+    if (changeSync != 0 && (chunk.Length - at) % 4 != 0)
+      throw new InvalidDataException("MNG FRAM sync-id list length is not a multiple of four.");
   }
 
   private static void _AddChunkRaw(List<byte[]> chunks, ReadOnlySpan<byte> data, int chunkStart, int chunkLength) {

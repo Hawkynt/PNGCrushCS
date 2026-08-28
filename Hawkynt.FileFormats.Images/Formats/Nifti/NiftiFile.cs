@@ -82,6 +82,18 @@ public sealed class NiftiFile :
       };
     }
 
+    if (file.Datatype == NiftiDataType.Rgba32) {
+      var bytesNeeded = pixelCount * 4;
+      var result = new byte[bytesNeeded];
+      Buffer.BlockCopy(src, 0, result, 0, Math.Min(src.Length, bytesNeeded));
+      return new() {
+        Width = width,
+        Height = height,
+        Format = PixelFormat.Rgba32,
+        PixelData = result,
+      };
+    }
+
     // 8-bit types without scaling stay at 8-bit
     if (!useScaling)
       switch (file.Datatype) {
@@ -163,12 +175,12 @@ public sealed class NiftiFile :
     };
   }
 
-  /// <summary>Writes a picture as a single-slice NIfTI volume, keeping whatever precision it arrived with.</summary>
+  /// <summary>Writes a picture as a single-slice NIfTI volume, keeping whatever precision and alpha it can represent.</summary>
   /// <remarks>
   /// A scan is measurement rather than picture, so the depth it was taken at is the thing worth
   /// keeping: sixteen-bit grey is stored as <see cref="NiftiDataType.UInt16"/> voxels rather than
-  /// being crushed to eight, and colour is stored as <see cref="NiftiDataType.Rgb24"/>, which is the
-  /// only colour voxel type NIfTI-1 has. The dimensions live in the header, so any size fits.
+  /// being crushed to eight. Colour uses the NIfTI-1 RGB24 voxel type, or RGBA32 when the source
+  /// carries alpha, so conversion does not silently discard a fourth channel.
   /// <para/>
   /// Voxels are little-endian, which is what <c>ToRawImage</c> reads them back as — the
   /// <see cref="PixelFormat.Gray16"/> buffer it hands out is big-endian, so the two orders are
@@ -189,6 +201,8 @@ public sealed class NiftiFile :
         => (NiftiDataType.UInt16, (short)16, _Gray16ToUInt16LE(image.EnsureFormat(PixelFormat.Gray16).PixelData, pixelCount)),
       PixelFormat.Gray8 or PixelFormat.GrayAlpha16
         => (NiftiDataType.UInt8, (short)8, image.EnsureFormat(PixelFormat.Gray8).PixelData[..pixelCount]),
+      PixelFormat.Rgba32 or PixelFormat.Bgra32 or PixelFormat.Argb32 or PixelFormat.Rgba64
+        => (NiftiDataType.Rgba32, (short)32, image.EnsureFormat(PixelFormat.Rgba32).PixelData[..(pixelCount * 4)]),
       _ => (NiftiDataType.Rgb24, (short)24, image.EnsureFormat(PixelFormat.Rgb24).PixelData[..(pixelCount * 3)])
     };
 

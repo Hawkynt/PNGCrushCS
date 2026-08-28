@@ -5,10 +5,13 @@ using System.IO.Hashing;
 
 namespace FileFormat.Mng;
 
-/// <summary>Assembles MNG-VLC file bytes from an MNG data model.</summary>
+/// <summary>Assembles MNG file bytes from an MNG data model.</summary>
 public static class MngWriter {
 
+  // Profile-validity + critical transparency + validity of the extended transparency bits +
+  // semitransparency + background transparency. Bit 1 is added when FRAM is emitted.
   private const uint _VLC_PROFILE_WITH_TRANSPARENCY = 457;
+  private const uint _SIMPLE_MNG_FEATURES = 1u << 1;
   private static readonly byte[] _MNG_SIGNATURE = { 0x8A, 0x4D, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
   private static readonly byte[] _PNG_SIGNATURE = { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
 
@@ -18,29 +21,41 @@ public static class MngWriter {
     if (file.Height <= 0) throw new ArgumentOutOfRangeException(nameof(file), "MNG height must be positive.");
     if (file.TicksPerSecond < 0) throw new ArgumentOutOfRangeException(nameof(file), "MNG tick rate cannot be negative.");
 
+    var hasExplicitTiming = file.FrameDelays.Count > 0;
+    if (hasExplicitTiming && file.FrameDelays.Count != file.Frames.Count)
+      throw new InvalidDataException("MNG FrameDelays must be empty or contain one value per frame.");
+    if (hasExplicitTiming && file.Frames.Count > 1 && file.TicksPerSecond == 0)
+      throw new InvalidDataException("MNG animations with explicit frame delays require a nonzero ticks_per_second.");
+    foreach (var delay in file.FrameDelays)
+      if (delay is < 0 or > 0x7fffffff)
+        throw new InvalidDataException("MNG interframe delays must be in [0, 0x7fffffff] ticks.");
+
     using var ms = new MemoryStream();
     ms.Write(_MNG_SIGNATURE);
 
-    // Every embedded visible PNG is one layer. MNG-VLC additionally counts the background layer.
-    // For VLC, nominal play time is the nominal frame count unless ticks_per_second is zero.
     var frameCount = (uint)file.Frames.Count;
+    var nominalPlayTime = _NominalPlayTime(file, hasExplicitTiming);
+    var simplicity = _VLC_PROFILE_WITH_TRANSPARENCY | (hasExplicitTiming ? _SIMPLE_MNG_FEATURES : 0u);
     var mhdrData = new byte[MngHeader.StructSize];
     var mhdr = new MngHeader(
       (uint)file.Width,
       (uint)file.Height,
       (uint)file.TicksPerSecond,
-      frameCount + 1,
+      frameCount + 1, // mandatory initial background layer plus one image layer per PNG
       frameCount,
-      file.TicksPerSecond == 0 ? 0 : frameCount,
-      _VLC_PROFILE_WITH_TRANSPARENCY
+      nominalPlayTime,
+      simplicity
     );
     mhdr.WriteTo(mhdrData);
     _WriteChunk(ms, "MHDR", mhdrData);
 
     _WriteTerm(ms, file);
 
-    // A VLC frame is an embedded PNG datastream without the PNG signature.
-    foreach (var frame in file.Frames) {
+    for (var frameIndex = 0; frameIndex < file.Frames.Count; ++frameIndex) {
+      if (hasExplicitTiming)
+        _WriteFrameDelay(ms, file.FrameDelays[frameIndex]);
+
+      var frame = file.Frames[frameIndex];
       if (frame.Length < _PNG_SIGNATURE.Length || !frame.AsSpan(0, _PNG_SIGNATURE.Length).SequenceEqual(_PNG_SIGNATURE))
         throw new InvalidDataException("MNG frames must be complete PNG datastreams.");
 
@@ -69,6 +84,36 @@ public static class MngWriter {
 
     _WriteChunk(ms, "MEND", []);
     return ms.ToArray();
+  }
+
+  private static uint _NominalPlayTime(MngFile file, bool hasExplicitTiming) {
+    if (file.TicksPerSecond == 0 || file.Frames.Count == 0)
+      return 0;
+
+    ulong total = 0;
+    if (hasExplicitTiming) {
+      foreach (var delay in file.FrameDelays)
+        total += (uint)delay;
+    } else
+      total = (uint)file.Frames.Count;
+
+    return total > 0x7fffffff ? 0x7fffffffu : (uint)total;
+  }
+
+  /// <summary>
+  /// Writes a FRAM that selects framing mode 1 and resets the default interframe delay. The optional
+  /// name is empty, therefore a null separator precedes the four change bytes; only the delay field follows.
+  /// </summary>
+  private static void _WriteFrameDelay(Stream stream, int delay) {
+    var data = new byte[10];
+    data[0] = 1; // framing mode 1: one foreground layer per frame
+    data[1] = 0; // empty subframe name separator
+    data[2] = 2; // change_interframe_delay: yes, and reset default
+    data[3] = 0; // no timeout/termination change
+    data[4] = 0; // no clipping change
+    data[5] = 0; // no sync-id change
+    _WriteUInt32BE(data.AsSpan(6), (uint)delay);
+    _WriteChunk(stream, "FRAM", data);
   }
 
   private static void _WriteTerm(Stream stream, MngFile file) {

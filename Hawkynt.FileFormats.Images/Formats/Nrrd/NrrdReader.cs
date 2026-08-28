@@ -1,4 +1,5 @@
-﻿using System;
+using System;
+using System.Buffers.Binary;
 using System.IO;
 using System.IO.Compression;
 using System.Globalization;
@@ -85,7 +86,6 @@ public static class NrrdReader {
       PixelData = pixelData,
       Labels = labels
     };
-  
   }
 
   public static NrrdFile FromBytes(byte[] data) {
@@ -119,30 +119,77 @@ public static class NrrdReader {
     var text = Encoding.ASCII.GetString(rawData);
     var parts = text.Split(new[] { ' ', '\t', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
     var bytesPerElement = _BytesPerElement(dataType);
+    var isBigEndian = string.Equals(endian, "big", StringComparison.OrdinalIgnoreCase);
+    if (!isBigEndian && !string.Equals(endian, "little", StringComparison.OrdinalIgnoreCase) && bytesPerElement > 1)
+      throw new InvalidDataException($"NRRD endian must be 'little' or 'big', got '{endian}'.");
+
     var result = new byte[parts.Length * bytesPerElement];
-
-    for (var i = 0; i < parts.Length; ++i) {
-      var bytes = _ParseAsciiElement(parts[i], dataType);
-      if (endian == "big")
-        Array.Reverse(bytes);
-
-      bytes.AsSpan(0, bytesPerElement).CopyTo(result.AsSpan(i * bytesPerElement));
-    }
+    for (var i = 0; i < parts.Length; ++i)
+      _WriteAsciiElement(parts[i], result.AsSpan(i * bytesPerElement, bytesPerElement), dataType, isBigEndian);
 
     return result;
   }
 
-  private static byte[] _ParseAsciiElement(string text, NrrdType dataType) => dataType switch {
-    NrrdType.Int8 => [unchecked((byte)sbyte.Parse(text, CultureInfo.InvariantCulture))],
-    NrrdType.UInt8 => [byte.Parse(text, CultureInfo.InvariantCulture)],
-    NrrdType.Int16 => BitConverter.GetBytes(short.Parse(text, CultureInfo.InvariantCulture)),
-    NrrdType.UInt16 => BitConverter.GetBytes(ushort.Parse(text, CultureInfo.InvariantCulture)),
-    NrrdType.Int32 => BitConverter.GetBytes(int.Parse(text, CultureInfo.InvariantCulture)),
-    NrrdType.UInt32 => BitConverter.GetBytes(uint.Parse(text, CultureInfo.InvariantCulture)),
-    NrrdType.Float => BitConverter.GetBytes(float.Parse(text, CultureInfo.InvariantCulture)),
-    NrrdType.Double => BitConverter.GetBytes(double.Parse(text, CultureInfo.InvariantCulture)),
-    _ => throw new InvalidDataException($"Unknown NRRD type: {dataType}.")
-  };
+  private static void _WriteAsciiElement(string text, Span<byte> destination, NrrdType dataType, bool isBigEndian) {
+    switch (dataType) {
+      case NrrdType.Int8:
+        destination[0] = unchecked((byte)sbyte.Parse(text, CultureInfo.InvariantCulture));
+        return;
+      case NrrdType.UInt8:
+        destination[0] = byte.Parse(text, CultureInfo.InvariantCulture);
+        return;
+      case NrrdType.Int16: {
+        var value = short.Parse(text, CultureInfo.InvariantCulture);
+        if (isBigEndian)
+          BinaryPrimitives.WriteInt16BigEndian(destination, value);
+        else
+          BinaryPrimitives.WriteInt16LittleEndian(destination, value);
+        return;
+      }
+      case NrrdType.UInt16: {
+        var value = ushort.Parse(text, CultureInfo.InvariantCulture);
+        if (isBigEndian)
+          BinaryPrimitives.WriteUInt16BigEndian(destination, value);
+        else
+          BinaryPrimitives.WriteUInt16LittleEndian(destination, value);
+        return;
+      }
+      case NrrdType.Int32: {
+        var value = int.Parse(text, CultureInfo.InvariantCulture);
+        if (isBigEndian)
+          BinaryPrimitives.WriteInt32BigEndian(destination, value);
+        else
+          BinaryPrimitives.WriteInt32LittleEndian(destination, value);
+        return;
+      }
+      case NrrdType.UInt32: {
+        var value = uint.Parse(text, CultureInfo.InvariantCulture);
+        if (isBigEndian)
+          BinaryPrimitives.WriteUInt32BigEndian(destination, value);
+        else
+          BinaryPrimitives.WriteUInt32LittleEndian(destination, value);
+        return;
+      }
+      case NrrdType.Float: {
+        var bits = BitConverter.SingleToInt32Bits(float.Parse(text, CultureInfo.InvariantCulture));
+        if (isBigEndian)
+          BinaryPrimitives.WriteInt32BigEndian(destination, bits);
+        else
+          BinaryPrimitives.WriteInt32LittleEndian(destination, bits);
+        return;
+      }
+      case NrrdType.Double: {
+        var bits = BitConverter.DoubleToInt64Bits(double.Parse(text, CultureInfo.InvariantCulture));
+        if (isBigEndian)
+          BinaryPrimitives.WriteInt64BigEndian(destination, bits);
+        else
+          BinaryPrimitives.WriteInt64LittleEndian(destination, bits);
+        return;
+      }
+      default:
+        throw new InvalidDataException($"Unknown NRRD type: {dataType}.");
+    }
+  }
 
   private static byte[] _DecodeHex(byte[] rawData) {
     var text = Encoding.ASCII.GetString(rawData).Replace(" ", "").Replace("\n", "").Replace("\r", "").Replace("\t", "");
