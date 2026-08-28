@@ -16,8 +16,8 @@ namespace FileFormat.Codecs;
 /// with, block for block. That is what makes this codec unlike almost everything else in this
 /// package: a block's four or sixteen decoded pixels are not an approximation converging on the
 /// source, and not the output of a transform with a stated accuracy bound — they are the one and only
-/// picture that block's bits mean, defined completely by S3TC (DXT1/BC1, DXT5/BC3), BC7 and, for the
-/// "Q" pixel format, by van Waveren and Castaño's Scaled YCoCg-DXT5 reconstruction.
+/// picture that block's bits mean, defined completely by S3TC (DXT1/BC1, DXT5/BC3), BC7, BC6H and,
+/// for the "Q" pixel format, by van Waveren and Castaño's Scaled YCoCg-DXT5 reconstruction.
 /// <para/>
 /// The frame layout is entirely published, in the Hap project's own repository on GitHub
 /// (<c>documentation/HapVideoDRAFT.md</c>): a run of sections, each a type byte and a size in a header
@@ -45,13 +45,11 @@ namespace FileFormat.Codecs;
 /// before 5- and 6-bit quantisation crushed them. <see cref="HapYCoCgConversion"/> carries the
 /// derivation from the paper's own fragment-program pseudocode in full.
 /// <para/>
-/// <b>Hap R (BC7) is decoded; Hap HDR (BC6U/BC6S) still refuses by name.</b> Hap R maps directly onto
-/// <see cref="PixelFormat.Rgba32"/>, and this package already has an all-modes BC7 decoder used by DDS
-/// and KTX, so refusing it at <c>Create</c> served no technical purpose. Hap HDR is different: BC6 is
-/// half-float HDR data, while <see cref="RawImage"/> has no floating-point pixel format in which to
-/// preserve those samples. The existing BC6 helper deliberately reduces HDR values to display-oriented
-/// 8-bit output and is not an exact BC6 decoder, so using it here would silently destroy the coded
-/// dynamic range. HDR therefore remains an explicit refusal rather than a plausible but lossy decode.
+/// <b>Hap R and Hap HDR preserve their native precision.</b> Hap R's BC7 texture becomes
+/// <see cref="PixelFormat.Rgba32"/>. Hap HDR's unsigned or signed BC6H texture becomes
+/// <see cref="PixelFormat.RgbF16"/> through <see cref="Bc6HFloatDecoder"/>; values below zero and above
+/// one remain representable and are not tone-mapped or clipped by the decoder. A writer or display
+/// path that needs integer RGB can request that conversion later through <see cref="RawImageConverter"/>.
 /// <para/>
 /// <b>Measured, and lossless with respect to its own coded blocks.</b> A DXT1, DXT5 or Scaled YCoCg
 /// block's decode is exactly defined, so — unlike the DCT and wavelet codecs elsewhere in this
@@ -97,10 +95,9 @@ namespace FileFormat.Codecs;
 /// codec knows, a "consult decode instructions" section missing its compressor table or its size
 /// table, a chunk naming a compressor that is neither uncompressed nor Snappy, a Snappy block whose
 /// elements do not produce the length its own preamble states, a back-reference pointing before the
-/// start of the output, a multiple-image section holding a combination other than Scaled YCoCg DXT5
-/// with RGTC1/BC4 alpha, and — at <c>Create</c>, before a single frame is read — the <c>HapH</c> HDR
-/// code, for the reason above. There is no <c>catch</c> anywhere in this decoder that hands back a
-/// blank frame or repeats the one before it.
+/// start of the output, and a multiple-image section holding a combination other than Scaled YCoCg
+/// DXT5 with RGTC1/BC4 alpha. There is no <c>catch</c> anywhere in this decoder that hands back a blank
+/// frame or repeats the one before it.
 /// </remarks>
 public sealed class HapDecoder : IVideoCodecDecoder<HapDecoder> {
 
@@ -139,13 +136,6 @@ public sealed class HapDecoder : IVideoCodecDecoder<HapDecoder> {
   public static HapDecoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
-    if (stream.Codec.EqualsIgnoringCase(_HapH))
-      throw new NotSupportedException(
-        $"Video stream {stream.Index} is coded as {stream.Codec}, whose BC6 half-float HDR texture cannot be "
-        + "represented exactly by RawImage: it carries no floating-point pixel format. The repository's current "
-        + "BC6 helper reduces HDR values to 8-bit display pixels and is intentionally not exact enough to use as a "
-        + "codec decode path, so Hap HDR is refused rather than silently losing its coded dynamic range.");
-
     if (stream.Width <= 0 || stream.Height <= 0)
       throw new InvalidDataException(
         $"Video stream {stream.Index} states a picture size of {stream.Width}x{stream.Height}, which no frame can be decoded into.");
@@ -170,8 +160,10 @@ public sealed class HapDecoder : IVideoCodecDecoder<HapDecoder> {
     HapPixelFormat.Dxt5ScaledYCoCg => this._DecodeScaledYCoCg(texture.Data),
     HapPixelFormat.Bc7Rgba => this._DecodeBc7Rgba(texture.Data),
     HapPixelFormat.Rgtc1Alpha => this._DecodeRgtc1Alpha(texture.Data),
+    HapPixelFormat.Bc6UnsignedFloat => this._DecodeBc6(texture.Data, isSigned: false),
+    HapPixelFormat.Bc6SignedFloat => this._DecodeBc6(texture.Data, isSigned: true),
     _ => throw new NotSupportedException(
-      $"Video stream {this._streamIndex} carries a frame in texture format {texture.Format}, which this decoder does not turn into pixels — see the codec's own remarks for why."),
+      $"Video stream {this._streamIndex} carries a frame in texture format {texture.Format}, which this decoder does not turn into pixels."),
   };
 
   private RawImage _ComposeCombined(HapTexture first, HapTexture second) {
@@ -227,6 +219,25 @@ public sealed class HapDecoder : IVideoCodecDecoder<HapDecoder> {
     var rgba = new byte[width * height * 4];
     Bc7Decoder.DecodeImage(data, width, height, rgba);
     return new() { Width = width, Height = height, Format = PixelFormat.Rgba32, PixelData = rgba };
+  }
+
+  private RawImage _DecodeBc6(byte[] data, bool isSigned) {
+    var width = this._width;
+    var height = this._height;
+    this._CheckBlockDataLength(data, width, height, 16, isSigned ? "signed BC6H" : "unsigned BC6H");
+
+    var rgb = new byte[checked(width * height * 6)];
+    Bc6HFloatDecoder.DecodeImage(data, width, height, rgb, isSigned);
+    return new() {
+      Width = width,
+      Height = height,
+      Format = PixelFormat.RgbF16,
+      PixelData = rgb,
+      ColorInfo = new() {
+        Range = RawColorRange.Full,
+        Matrix = RawMatrixCoefficients.Identity,
+      },
+    };
   }
 
   private RawImage _DecodeScaledYCoCg(byte[] data) {
