@@ -17,11 +17,12 @@ namespace FileFormat.CImage;
 /// On disk a set bit is white; <see cref="PixelData"/> holds the complement, a set bit being black,
 /// matching the other fax-derived formats here.
 /// </remarks>
-public readonly record struct CImageFile : IImageFormatReader<CImageFile>, IImageToRawImage<CImageFile> {
+public readonly record struct CImageFile : IImageFormatReader<CImageFile>, IImageToRawImage<CImageFile>, IImageFromRawImage<CImageFile>, IImageFormatWriter<CImageFile> {
 
   static string IImageFormatMetadata<CImageFile>.PrimaryExtension => ".dsi";
   static string[] IImageFormatMetadata<CImageFile>.FileExtensions => [".dsi"];
   static CImageFile IImageFormatReader<CImageFile>.FromSpan(ReadOnlySpan<byte> data) => CImageReader.FromSpan(data);
+  static byte[] IImageFormatWriter<CImageFile>.ToBytes(CImageFile file) => CImageWriter.ToBytes(file);
 
   /// <summary>Magic bytes at offset 0: "DI" (0x44 0x49).</summary>
   internal static readonly byte[] Magic = [0x44, 0x49];
@@ -82,6 +83,24 @@ public readonly record struct CImageFile : IImageFormatReader<CImageFile>, IImag
       Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
+    };
+  }
+
+  /// <summary>Creates a Group-4-compressed bilevel CImage page from any source picture.</summary>
+  public static CImageFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width <= 0 || image.Height <= 0)
+      throw new ArgumentException("CImage dimensions must be positive.", nameof(image));
+
+    // Palette index 0 is white and index 1 is black, exactly matching the internal bit polarity.
+    var mono = image.EnsureIndexed(PixelFormat.Indexed1, [255, 255, 255, 0, 0, 0]);
+    return new() {
+      Width = mono.Width,
+      Height = mono.Height,
+      IsGroup4 = true,
+      HorizontalResolution = 300,
+      VerticalResolution = 300,
+      PixelData = mono.PixelData[..],
     };
   }
 
