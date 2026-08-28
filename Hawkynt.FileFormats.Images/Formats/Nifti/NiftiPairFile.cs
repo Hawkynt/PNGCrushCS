@@ -20,6 +20,9 @@ public sealed class NiftiPairFile :
 
   public NiftiFile Nifti { get; init; } = new();
 
+  /// <summary>True when a path-aware write names the .img half as the main target.</summary>
+  public bool MainFileIsImage { get; init; }
+
   public static bool? MatchesSignature(ReadOnlySpan<byte> header) {
     var v2 = Nifti2Codec.Matches(header, pair: true);
     if (v2 == true)
@@ -35,6 +38,15 @@ public sealed class NiftiPairFile :
   public static NiftiPairFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
     return new() { Nifti = NiftiPairWriter.AsPair(NiftiFile.FromRawImage(image)) };
+  }
+
+  public static NiftiPairFile FromRawImage(RawImage image, FileInfo target) {
+    ArgumentNullException.ThrowIfNull(image);
+    ArgumentNullException.ThrowIfNull(target);
+    return new() {
+      Nifti = NiftiPairWriter.AsPair(NiftiFile.FromRawImage(image)),
+      MainFileIsImage = string.Equals(target.Extension, ".img", StringComparison.OrdinalIgnoreCase),
+    };
   }
 }
 
@@ -77,7 +89,7 @@ public static class NiftiPairReader {
     else
       throw new InvalidDataException("NIfTI paired header has neither a 348-byte NIfTI-1 nor 540-byte NIfTI-2 header.");
 
-    return new() { Nifti = parsed };
+    return new() { Nifti = parsed, MainFileIsImage = string.Equals(extension, ".img", StringComparison.OrdinalIgnoreCase) };
   }
 }
 
@@ -99,7 +111,10 @@ public static class NiftiPairWriter {
 
   public static byte[] ToBytes(NiftiPairFile file) {
     ArgumentNullException.ThrowIfNull(file);
-    var model = file.Nifti;
+    return file.MainFileIsImage ? file.Nifti.PixelData ?? [] : _HeaderBytes(file.Nifti);
+  }
+
+  private static byte[] _HeaderBytes(NiftiFile model) {
     if (model.Width is < 1 or > short.MaxValue || model.Height is < 1 or > short.MaxValue || model.Depth is < 1 or > short.MaxValue)
       throw new InvalidDataException("NIfTI-1 paired dimensions must fit signed 16-bit dim[] entries; use NIfTI-2 for larger dimensions.");
 
@@ -132,9 +147,13 @@ public static class NiftiPairWriter {
   public static void WriteCompanions(NiftiPairFile file, FileInfo target) {
     ArgumentNullException.ThrowIfNull(file);
     ArgumentNullException.ThrowIfNull(target);
-    var imagePath = string.Equals(target.Extension, ".img", StringComparison.OrdinalIgnoreCase)
-      ? target.FullName
-      : Path.ChangeExtension(target.FullName, ".img");
-    File.WriteAllBytes(imagePath, file.Nifti.PixelData ?? []);
+
+    if (file.MainFileIsImage) {
+      var headerPath = Path.ChangeExtension(target.FullName, ".hdr");
+      File.WriteAllBytes(headerPath, _HeaderBytes(file.Nifti));
+    } else {
+      var imagePath = Path.ChangeExtension(target.FullName, ".img");
+      File.WriteAllBytes(imagePath, file.Nifti.PixelData ?? []);
+    }
   }
 }
