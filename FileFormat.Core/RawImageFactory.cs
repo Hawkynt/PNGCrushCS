@@ -26,22 +26,80 @@ public static class RawImageFactory {
     int left = 0,
     int top = 0,
     RawImageColorInfo? colorInfo = null,
-    ImageMetadata? metadata = null) {
+    ImageMetadata? metadata = null)
+    => _FromYuvP8(
+      PixelFormat.Yuv420P8, 1, 1,
+      width, height, yPlane, yStride, uPlane, vPlane, chromaStride, left, top, colorInfo, metadata);
+
+  /// <summary>Crops three 8-bit 4:2:2 decoder planes and packs them as canonical Y, U, V planes.</summary>
+  public static RawImage FromYuv422P8(
+    int width,
+    int height,
+    ReadOnlySpan<byte> yPlane,
+    int yStride,
+    ReadOnlySpan<byte> uPlane,
+    ReadOnlySpan<byte> vPlane,
+    int chromaStride,
+    int left = 0,
+    int top = 0,
+    RawImageColorInfo? colorInfo = null,
+    ImageMetadata? metadata = null)
+    => _FromYuvP8(
+      PixelFormat.Yuv422P8, 1, 0,
+      width, height, yPlane, yStride, uPlane, vPlane, chromaStride, left, top, colorInfo, metadata);
+
+  /// <summary>Crops three 8-bit 4:4:4 decoder planes and packs them as canonical Y, U, V planes.</summary>
+  public static RawImage FromYuv444P8(
+    int width,
+    int height,
+    ReadOnlySpan<byte> yPlane,
+    int yStride,
+    ReadOnlySpan<byte> uPlane,
+    ReadOnlySpan<byte> vPlane,
+    int chromaStride,
+    int left = 0,
+    int top = 0,
+    RawImageColorInfo? colorInfo = null,
+    ImageMetadata? metadata = null)
+    => _FromYuvP8(
+      PixelFormat.Yuv444P8, 0, 0,
+      width, height, yPlane, yStride, uPlane, vPlane, chromaStride, left, top, colorInfo, metadata);
+
+  private static RawImage _FromYuvP8(
+    PixelFormat format,
+    int subsamplingX,
+    int subsamplingY,
+    int width,
+    int height,
+    ReadOnlySpan<byte> yPlane,
+    int yStride,
+    ReadOnlySpan<byte> uPlane,
+    ReadOnlySpan<byte> vPlane,
+    int chromaStride,
+    int left,
+    int top,
+    RawImageColorInfo? colorInfo,
+    ImageMetadata? metadata) {
     if (width <= 0)
       throw new ArgumentOutOfRangeException(nameof(width));
     if (height <= 0)
       throw new ArgumentOutOfRangeException(nameof(height));
     if (left < 0 || top < 0)
       throw new ArgumentOutOfRangeException(left < 0 ? nameof(left) : nameof(top));
-    if ((left & 1) != 0 || (top & 1) != 0)
-      throw new ArgumentException("A 4:2:0 crop must begin on an even luma coordinate so its chroma planes remain samples rather than resampled display pixels.");
+
+    var alignmentX = (1 << subsamplingX) - 1;
+    var alignmentY = (1 << subsamplingY) - 1;
+    if ((left & alignmentX) != 0 || (top & alignmentY) != 0)
+      throw new ArgumentException(
+        $"A {format} crop must begin on a chroma sample boundary so its chroma planes remain samples rather than resampled display pixels.");
+
     if (yStride < left + width)
       throw new ArgumentException("The luma stride is shorter than the requested crop.", nameof(yStride));
 
-    var chromaWidth = (width + 1) >> 1;
-    var chromaHeight = (height + 1) >> 1;
-    var chromaLeft = left >> 1;
-    var chromaTop = top >> 1;
+    var chromaWidth = (width + alignmentX) >> subsamplingX;
+    var chromaHeight = (height + alignmentY) >> subsamplingY;
+    var chromaLeft = left >> subsamplingX;
+    var chromaTop = top >> subsamplingY;
     if (chromaStride < chromaLeft + chromaWidth)
       throw new ArgumentException("The chroma stride is shorter than the requested crop.", nameof(chromaStride));
 
@@ -70,7 +128,7 @@ public static class RawImageFactory {
     return new() {
       Width = width,
       Height = height,
-      Format = PixelFormat.Yuv420P8,
+      Format = format,
       PixelData = data,
       ColorInfo = colorInfo,
       Metadata = metadata,
