@@ -98,10 +98,6 @@ public sealed class Vp9VideoDecoder : IVideoCodecDecoder<Vp9VideoDecoder> {
     };
   }
 
-  /// <summary>
-  /// VP9's sRGB profile stores G, B and R in the decoder's three full-resolution planes. Repacking
-  /// changes layout only; no matrix, range conversion or rounding is involved.
-  /// </summary>
   private static RawImage _FromPlanarGbr(Vp9Frame picture) {
     if (picture.SubsamplingX != 0 || picture.SubsamplingY != 0)
       throw new InvalidOperationException("A VP9 sRGB frame must be 4:4:4.");
@@ -131,10 +127,10 @@ public sealed class Vp9VideoDecoder : IVideoCodecDecoder<Vp9VideoDecoder> {
   }
 
   private static RawMatrixCoefficients _MatrixOf(int colorSpace) => colorSpace switch {
-    CS_BT_709 => RawMatrixCoefficients.Bt709,
-    CS_SMPTE_170 => RawMatrixCoefficients.Bt601,
-    CS_SMPTE_240 => RawMatrixCoefficients.Smpte240M,
-    CS_BT_2020 => RawMatrixCoefficients.Bt2020NonConstantLuminance,
+    2 => RawMatrixCoefficients.Bt709,
+    3 => RawMatrixCoefficients.Bt601,
+    4 => RawMatrixCoefficients.Smpte240M,
+    5 => RawMatrixCoefficients.Bt2020NonConstantLuminance,
     CS_BT_601 => RawMatrixCoefficients.Bt601,
     _ => RawMatrixCoefficients.Unspecified,
   };
