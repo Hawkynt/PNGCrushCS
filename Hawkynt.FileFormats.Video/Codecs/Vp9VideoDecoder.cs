@@ -6,16 +6,18 @@ using static FileFormat.Codecs.Vp9.Vp9Constants;
 
 namespace FileFormat.Codecs;
 
-/// <summary>Decodes VP9 video profiles 0 and 1.</summary>
+/// <summary>Decodes VP9 video profiles 0 through 3.</summary>
 /// <remarks>
-/// Profiles 0 and 1 are the complete eight-bit half of VP9. They share the entropy coder, transform,
-/// quantisation, prediction and loop-filter machinery; profile 1 additionally carries 4:2:2, 4:4:0,
-/// 4:4:4 and sRGB/GBR pictures. Profiles 2 and 3 raise reconstruction precision to ten or twelve bits
-/// and remain an explicit high-bit-depth boundary.
+/// Profiles 0/1 reconstruct eight-bit samples; profiles 2/3 reconstruct ten- or twelve-bit samples.
+/// Profiles 0/2 use 4:2:0 chroma, while profiles 1/3 carry the non-4:2:0 layouts and the special
+/// full-range sRGB/GBR representation. Entropy coding, prediction, transforms, filtering and reference
+/// management are shared where VP9 shares them, with arithmetic widened to the coded sample depth.
 /// <para/>
-/// YUV pictures are returned in their native planar layout with range and matrix interpretation kept
-/// beside the samples. VP9 sRGB is planar GBR internally; it is repacked losslessly to <see cref="PixelFormat.Rgb24"/>
-/// because <see cref="RawImage"/> has no planar-GBR layout and calling it YUV444 would be semantically false.
+/// YUV pictures leave the decoder without loss in their native planar P8/P10/P12 layout. VP9 sRGB is
+/// planar GBR internally. Eight-bit GBR is repacked to RGB24; high-bit-depth GBR is repacked to RGB48,
+/// scaling the 10/12-bit code values onto the full 16-bit range. That mapping is injective and therefore
+/// retains every source code value while using the canonical high-precision RGB layout already exposed
+/// by <see cref="RawImage"/>.
 /// </remarks>
 public sealed class Vp9VideoDecoder : IVideoCodecDecoder<Vp9VideoDecoder> {
 
@@ -29,7 +31,7 @@ public sealed class Vp9VideoDecoder : IVideoCodecDecoder<Vp9VideoDecoder> {
   private readonly Vp9Decoder _decoder = new();
   private readonly Queue<RawImage> _pending = new();
 
-  public static string CodecName => "VP9 (profiles 0/1)";
+  public static string CodecName => "VP9 (profiles 0-3)";
 
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
@@ -80,51 +82,134 @@ public sealed class Vp9VideoDecoder : IVideoCodecDecoder<Vp9VideoDecoder> {
       ChromaLocation = RawChromaLocation.Center,
     };
 
-    return (picture.SubsamplingX, picture.SubsamplingY) switch {
-      (1, 1) => RawImageFactory.FromYuv420P8(
-        picture.Width, picture.Height, picture.Luma, picture.LumaWidth, picture.Cb, picture.Cr,
-        picture.ChromaWidth, colorInfo: colorInfo),
-      (1, 0) => RawImageFactory.FromYuv422P8(
-        picture.Width, picture.Height, picture.Luma, picture.LumaWidth, picture.Cb, picture.Cr,
-        picture.ChromaWidth, colorInfo: colorInfo),
-      (0, 1) => RawImageFactory.FromYuv440P8(
-        picture.Width, picture.Height, picture.Luma, picture.LumaWidth, picture.Cb, picture.Cr,
-        picture.ChromaWidth, colorInfo: colorInfo),
-      (0, 0) => RawImageFactory.FromYuv444P8(
-        picture.Width, picture.Height, picture.Luma, picture.LumaWidth, picture.Cb, picture.Cr,
-        picture.ChromaWidth, colorInfo: colorInfo),
-      _ => throw new InvalidOperationException(
-        $"VP9 produced unsupported chroma subsampling ({picture.SubsamplingX}, {picture.SubsamplingY})."),
+    var format = _YuvFormat(picture.BitDepth, picture.SubsamplingX, picture.SubsamplingY);
+    var bytesPerSample = picture.BitDepth == 8 ? 1 : 2;
+    var chromaWidth = (picture.Width + (1 << picture.SubsamplingX) - 1) >> picture.SubsamplingX;
+    var chromaHeight = (picture.Height + (1 << picture.SubsamplingY) - 1) >> picture.SubsamplingY;
+    var ySamples = checked(picture.Width * picture.Height);
+    var cSamples = checked(chromaWidth * chromaHeight);
+    var data = new byte[checked((ySamples + 2 * cSamples) * bytesPerSample)];
+
+    var at = 0;
+    at = _CopyPlane(
+      picture.Luma, picture.LumaWidth, picture.Width, picture.Height,
+      data, at, bytesPerSample);
+    at = _CopyPlane(
+      picture.Cb, picture.ChromaWidth, chromaWidth, chromaHeight,
+      data, at, bytesPerSample);
+    _CopyPlane(
+      picture.Cr, picture.ChromaWidth, chromaWidth, chromaHeight,
+      data, at, bytesPerSample);
+
+    return new() {
+      Width = picture.Width,
+      Height = picture.Height,
+      Format = format,
+      PixelData = data,
+      ColorInfo = colorInfo,
     };
   }
+
+  private static int _CopyPlane(
+    ushort[] source, int sourceStride, int width, int height,
+    byte[] target, int targetOffset, int bytesPerSample) {
+    if (bytesPerSample == 1) {
+      for (var y = 0; y < height; ++y) {
+        var sourceAt = y * sourceStride;
+        for (var x = 0; x < width; ++x)
+          target[targetOffset++] = checked((byte)source[sourceAt + x]);
+      }
+      return targetOffset;
+    }
+
+    // RawImage's P10/P12 convention is a right-justified numeric sample in a little-endian ushort.
+    for (var y = 0; y < height; ++y) {
+      var sourceAt = y * sourceStride;
+      for (var x = 0; x < width; ++x) {
+        var sample = source[sourceAt + x];
+        target[targetOffset++] = (byte)sample;
+        target[targetOffset++] = (byte)(sample >> 8);
+      }
+    }
+
+    return targetOffset;
+  }
+
+  private static PixelFormat _YuvFormat(int bitDepth, int subX, int subY) => (bitDepth, subX, subY) switch {
+    (8, 1, 1) => PixelFormat.Yuv420P8,
+    (8, 1, 0) => PixelFormat.Yuv422P8,
+    (8, 0, 1) => PixelFormat.Yuv440P8,
+    (8, 0, 0) => PixelFormat.Yuv444P8,
+    (10, 1, 1) => PixelFormat.Yuv420P10,
+    (10, 1, 0) => PixelFormat.Yuv422P10,
+    (10, 0, 1) => PixelFormat.Yuv440P10,
+    (10, 0, 0) => PixelFormat.Yuv444P10,
+    (12, 1, 1) => PixelFormat.Yuv420P12,
+    (12, 1, 0) => PixelFormat.Yuv422P12,
+    (12, 0, 1) => PixelFormat.Yuv440P12,
+    (12, 0, 0) => PixelFormat.Yuv444P12,
+    _ => throw new InvalidOperationException(
+      $"VP9 produced unsupported {bitDepth}-bit chroma subsampling ({subX}, {subY})."),
+  };
 
   private static RawImage _FromPlanarGbr(Vp9Frame picture) {
     if (picture.SubsamplingX != 0 || picture.SubsamplingY != 0)
       throw new InvalidOperationException("A VP9 sRGB frame must be 4:4:4.");
 
-    var data = new byte[checked(picture.Width * picture.Height * 3)];
+    if (picture.BitDepth == 8) {
+      var data = new byte[checked(picture.Width * picture.Height * 3)];
+      for (var y = 0; y < picture.Height; ++y)
+      for (var x = 0; x < picture.Width; ++x) {
+        var source = y * picture.LumaWidth + x;
+        var target = (y * picture.Width + x) * 3;
+        data[target] = checked((byte)picture.Cr[source]);
+        data[target + 1] = checked((byte)picture.Luma[source]);
+        data[target + 2] = checked((byte)picture.Cb[source]);
+      }
+
+      return new() {
+        Width = picture.Width,
+        Height = picture.Height,
+        Format = PixelFormat.Rgb24,
+        PixelData = data,
+        ColorInfo = _SrgbColorInfo(),
+      };
+    }
+
+    var max = (1 << picture.BitDepth) - 1;
+    var rgb48 = new byte[checked(picture.Width * picture.Height * 6)];
     for (var y = 0; y < picture.Height; ++y)
     for (var x = 0; x < picture.Width; ++x) {
       var source = y * picture.LumaWidth + x;
-      var target = (y * picture.Width + x) * 3;
-      data[target] = picture.Cr[source];
-      data[target + 1] = picture.Luma[source];
-      data[target + 2] = picture.Cb[source];
+      var target = (y * picture.Width + x) * 6;
+      _WriteBigEndian16(rgb48, target, _ExpandTo16(picture.Cr[source], max));
+      _WriteBigEndian16(rgb48, target + 2, _ExpandTo16(picture.Luma[source], max));
+      _WriteBigEndian16(rgb48, target + 4, _ExpandTo16(picture.Cb[source], max));
     }
 
     return new() {
       Width = picture.Width,
       Height = picture.Height,
-      Format = PixelFormat.Rgb24,
-      PixelData = data,
-      ColorInfo = new() {
-        Range = RawColorRange.Full,
-        Primaries = RawColorPrimaries.Bt709,
-        Transfer = RawTransferCharacteristic.Srgb,
-        Matrix = RawMatrixCoefficients.Identity,
-      },
+      Format = PixelFormat.Rgb48,
+      PixelData = rgb48,
+      ColorInfo = _SrgbColorInfo(),
     };
   }
+
+  private static ushort _ExpandTo16(int sample, int max)
+    => (ushort)((sample * 65535L + max / 2) / max);
+
+  private static void _WriteBigEndian16(byte[] target, int at, ushort value) {
+    target[at] = (byte)(value >> 8);
+    target[at + 1] = (byte)value;
+  }
+
+  private static RawImageColorInfo _SrgbColorInfo() => new() {
+    Range = RawColorRange.Full,
+    Primaries = RawColorPrimaries.Bt709,
+    Transfer = RawTransferCharacteristic.Srgb,
+    Matrix = RawMatrixCoefficients.Identity,
+  };
 
   private static RawMatrixCoefficients _MatrixOf(int colorSpace) => colorSpace switch {
     2 => RawMatrixCoefficients.Bt709,
