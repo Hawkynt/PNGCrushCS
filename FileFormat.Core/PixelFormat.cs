@@ -70,24 +70,32 @@ public enum PixelFormat {
   Yuv420P8,
   /// <summary>Planar 8-bit YUV 4:2:2: Y, U, V.</summary>
   Yuv422P8,
+  /// <summary>Planar 8-bit YUV 4:4:0: Y, U, V.</summary>
+  Yuv440P8,
   /// <summary>Planar 8-bit YUV 4:4:4: Y, U, V.</summary>
   Yuv444P8,
   /// <summary>Planar 10-bit YUV 4:2:0 in right-justified little-endian ushort samples.</summary>
   Yuv420P10,
   /// <summary>Planar 10-bit YUV 4:2:2 in right-justified little-endian ushort samples.</summary>
   Yuv422P10,
+  /// <summary>Planar 10-bit YUV 4:4:0 in right-justified little-endian ushort samples.</summary>
+  Yuv440P10,
   /// <summary>Planar 10-bit YUV 4:4:4 in right-justified little-endian ushort samples.</summary>
   Yuv444P10,
   /// <summary>Planar 12-bit YUV 4:2:0 in right-justified little-endian ushort samples.</summary>
   Yuv420P12,
   /// <summary>Planar 12-bit YUV 4:2:2 in right-justified little-endian ushort samples.</summary>
   Yuv422P12,
+  /// <summary>Planar 12-bit YUV 4:4:0 in right-justified little-endian ushort samples.</summary>
+  Yuv440P12,
   /// <summary>Planar 12-bit YUV 4:4:4 in right-justified little-endian ushort samples.</summary>
   Yuv444P12,
   /// <summary>Planar 16-bit YUV 4:2:0 in little-endian ushort samples.</summary>
   Yuv420P16,
   /// <summary>Planar 16-bit YUV 4:2:2 in little-endian ushort samples.</summary>
   Yuv422P16,
+  /// <summary>Planar 16-bit YUV 4:4:0 in little-endian ushort samples.</summary>
+  Yuv440P16,
   /// <summary>Planar 16-bit YUV 4:4:4 in little-endian ushort samples.</summary>
   Yuv444P16,
 }
