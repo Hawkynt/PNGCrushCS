@@ -18,7 +18,6 @@ internal readonly record struct JpegXrPixelFormatInfo(
 /// <summary>Handles parsing and writing IFD entries for the JPEG XR TIFF-like container.</summary>
 internal static class JpegXrIfd {
 
-  // JPEG XR IFD tag IDs (ISO/IEC 29199-2 / ITU-T T.832 Annex A).
   internal const ushort TAG_PIXEL_FORMAT = 0xBC01;
   internal const ushort TAG_SPATIAL_XFRM = 0xBC02;
   internal const ushort TAG_IMAGE_WIDTH = 0xBC80;
@@ -28,14 +27,10 @@ internal static class JpegXrIfd {
   internal const ushort TAG_ALPHA_OFFSET = 0xBCC2;
   internal const ushort TAG_ALPHA_BYTE_COUNT = 0xBCC3;
 
-  // IFD field types.
   internal const ushort TYPE_BYTE = 1;
   internal const ushort TYPE_SHORT = 3;
   internal const ushort TYPE_LONG = 4;
 
-  // WIC pixel formats use this shared 15-byte prefix for the common formats. The final byte is the
-  // format discriminator. Guid.ToByteArray() has exactly the byte order used in a JPEG XR IFD.
-  // DEFINE_GUID(GUID_WICPixelFormat..., 6fddc324-4e03-4bfe-b185-3d77768dc9XX)
   private static readonly byte[] _WicPixelFormatPrefix = [
     0x24, 0xC3, 0xDD, 0x6F, 0x03, 0x4E, 0xFE, 0x4B,
     0xB1, 0x85, 0x3D, 0x77, 0x76, 0x8D, 0xC9
@@ -52,7 +47,6 @@ internal static class JpegXrIfd {
   internal const byte WIC_32BPP_BGRA = 0x0F;
   internal const byte WIC_32BPP_PBGRA = 0x10;
 
-  /// <summary>Parses all IFD entries from the given data starting at <paramref name="ifdOffset"/>.</summary>
   internal static JpegXrIfdEntry[] ParseEntries(byte[] data, int ifdOffset) {
     if (ifdOffset < 0 || ifdOffset + 2 > data.Length)
       throw new InvalidOperationException("IFD offset extends beyond data.");
@@ -104,12 +98,13 @@ internal static class JpegXrIfd {
     };
   }
 
-  /// <summary>Creates the canonical 16-byte WIC GUID for the formats the public JXR model writes.</summary>
+  /// <summary>Creates the canonical 16-byte WIC GUID for the public JXR model.</summary>
   internal static byte[] CreatePixelFormatGuid(int componentCount) {
     var suffix = componentCount switch {
       1 => WIC_8BPP_GRAY,
       3 => WIC_24BPP_RGB,
-      _ => throw new NotSupportedException($"JPEG XR writer supports Gray8 and RGB24; got {componentCount} components.")
+      4 => WIC_32BPP_BGRA,
+      _ => throw new NotSupportedException($"JPEG XR writer supports Gray8, RGB24, and RGBA32; got {componentCount} components.")
     };
     var result = new byte[16];
     _WicPixelFormatPrefix.CopyTo(result, 0);
@@ -117,7 +112,6 @@ internal static class JpegXrIfd {
     return result;
   }
 
-  /// <summary>Writes a single IFD entry at the current position and advances <paramref name="pos"/>.</summary>
   internal static void WriteEntry(Span<byte> span, ref int pos, ushort tag, ushort type, uint count, uint value) {
     BinaryPrimitives.WriteUInt16LittleEndian(span[pos..], tag);
     BinaryPrimitives.WriteUInt16LittleEndian(span[(pos + 2)..], type);
@@ -131,7 +125,6 @@ internal static class JpegXrIfd {
     pos += 12;
   }
 
-  /// <summary>Reads a tag value from the 4-byte value/offset field.</summary>
   private static uint _ReadValue(byte[] data, int valueFieldOffset, ushort type, uint count) {
     if (count == 1) {
       return type switch {
@@ -142,7 +135,6 @@ internal static class JpegXrIfd {
       };
     }
 
-    // Multi-value: the four bytes are an offset to the actual data.
     return BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(valueFieldOffset));
   }
 
