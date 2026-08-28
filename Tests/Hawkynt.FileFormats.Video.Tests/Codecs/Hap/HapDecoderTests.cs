@@ -410,6 +410,25 @@ public class HapDecoderTests {
   }
 
   // ============================================================================================
+  // Hap R — BC7
+  // ============================================================================================
+
+  [Test]
+  [Category("Unit")]
+  public void HapRDecodesBc7IntoRgba() {
+    // A mode-6 BC7 block with all endpoint and index bits zero. The existing BC7 decoder tests pin
+    // this block to sixteen transparent-black pixels; this test pins the Hap section/type plumbing.
+    var block = new byte[16];
+    block[0] = 0x40;
+    var frame = Cat(Header4(block.Length, 0xAC), block);
+
+    var picture = Decode("Hap7", 4, 4, frame);
+
+    Assert.That(picture.Format, Is.EqualTo(PixelFormat.Rgba32));
+    Assert.That(picture.PixelData, Is.EqualTo(new byte[4 * 4 * 4]));
+  }
+
+  // ============================================================================================
   // Refusals
   // ============================================================================================
 
@@ -442,12 +461,10 @@ public class HapDecoderTests {
 
   [Test]
   [Category("Unit")]
-  public void Hap7AndHapHRefuseAtCreateForTheirMissingPixelFormats() {
-    var hap7 = Assert.Throws<NotSupportedException>(() => HapDecoder.Create(Stream("Hap7", 4, 4)));
-    Assert.That(hap7!.Message, Does.Contain("BC7"));
-
+  public void HapHRefusesAtCreateBecauseHdrCannotBeRepresentedExactly() {
     var hapH = Assert.Throws<NotSupportedException>(() => HapDecoder.Create(Stream("HapH", 4, 4)));
     Assert.That(hapH!.Message, Does.Contain("floating-point"));
+    Assert.That(hapH.Message, Does.Contain("dynamic range"));
   }
 
   // ============================================================================================
@@ -471,7 +488,7 @@ public class HapDecoderTests {
   [Test]
   [Category("Unit")]
   public void EveryDecodableCodeIsReachableThroughTheRegistry() {
-    foreach (var code in new[] { "Hap1", "Hap5", "HapY", "HapM", "HapA" })
+    foreach (var code in new[] { "Hap1", "Hap5", "HapY", "HapM", "HapA", "Hap7" })
       Assert.That(
         Hawkynt.FileFormats.Video.VideoFormatRegistry.CanDecode(Stream(code, 4, 4)), Is.True, code);
   }
