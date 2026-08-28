@@ -9,19 +9,6 @@ namespace FileFormat.Codecs.Vp9;
 /// Decodes a VP9 stream: the superframe index, the frame headers, the eight reference slots and the
 /// probability state that carries from one frame to the next.
 /// </summary>
-/// <remarks>
-/// A packet is not a frame. VP9 packs several coded frames into one chunk — a superframe — with an
-/// index of their sizes in its last few bytes, and most of the frames in it are usually not meant to
-/// be shown: an alternate reference frame built from several source frames at once is decoded, stored
-/// and never displayed. That is why decoding a packet answers with a list rather than a picture, and
-/// why the list is sometimes empty.
-/// <para/>
-/// The probability state is the part that has to be got exactly right and cannot be checked from one
-/// frame alone. Four saved sets of tables live here; a frame says which to start from, the compressed
-/// header sends changes on top, and at the end of the frame the tables are moved towards the
-/// frequencies the frame turned out to have and possibly written back. Get any of that wrong and the
-/// frame still decodes perfectly — it is the frame after it that becomes noise.
-/// </remarks>
 internal sealed class Vp9Decoder {
 
   private readonly Vp9FrameHeader _header = new();
@@ -47,20 +34,10 @@ internal sealed class Vp9Decoder {
     this._frameDecoder = new(this._header, this._probabilities, this._counts);
   }
 
-  /// <summary>What the frame states the picture size is, which is what a decoded frame is cropped to.</summary>
   internal int Width => this._header.FrameWidth;
-
   internal int Height => this._header.FrameHeight;
-
   internal int ColorRange => this._header.ColorRange;
 
-  /// <summary>
-  /// Decodes one packet and answers the pictures it is meant to show, in order.
-  /// </summary>
-  /// <remarks>
-  /// Usually exactly one. A chunk of hidden reference frames answers with none, and a chunk that
-  /// carries several shown frames answers with all of them.
-  /// </remarks>
   internal IReadOnlyList<Vp9Frame> Decode(ReadOnlySpan<byte> data) {
     if (data.Length < 1)
       throw new InvalidDataException("A VP9 packet cannot be empty.");
@@ -88,23 +65,6 @@ internal sealed class Vp9Decoder {
     return shown;
   }
 
-  // ============================================================================================
-  // Superframes (specification Annex B)
-  // ============================================================================================
-
-  /// <summary>
-  /// Reads the index a superframe carries in its last bytes, if it carries one.
-  /// </summary>
-  /// <returns>How many frames the chunk holds, or zero when it is a single frame.</returns>
-  /// <remarks>
-  /// Recognised by a marker byte that appears twice, once at each end of the index. A coded frame is
-  /// required never to end in a byte that looks like the marker, so the two tests together cannot be
-  /// passed by accident.
-  /// <para/>
-  /// The sizes are little-endian, which the specification's syntax table does not quite say: it gives
-  /// the descriptor as <c>f(SzBytes)</c>, and <c>f</c> counts bits. Bytes are meant, in the order
-  /// every writer of the format has used.
-  /// </remarks>
   private static int _ReadSuperframeIndex(byte[] data, int length, Span<int> sizes) {
     if (length < 2)
       return 0;
@@ -141,10 +101,6 @@ internal sealed class Vp9Decoder {
     return frames;
   }
 
-  // ============================================================================================
-  // One frame (specification 6.1)
-  // ============================================================================================
-
   private void _DecodeFrame(int at, int size, List<Vp9Frame> shown) {
     if (size < 1)
       throw new InvalidDataException("A VP9 frame cannot be empty.");
@@ -158,7 +114,6 @@ internal sealed class Vp9Decoder {
         ?? throw new InvalidDataException(
           $"This VP9 frame asks for reference slot {this._header.FrameToShowMapIndex} to be shown, and no frame of "
           + "this stream has written it."));
-
       return;
     }
 
@@ -174,9 +129,6 @@ internal sealed class Vp9Decoder {
         this._probabilities.SaveTo(this._savedProbabilities[this._header.ContextIndexToReset]);
     }
 
-    // Checked before anything is sized to the picture the header claims, so that a packet too short
-    // to be the frame it says it is fails on its own length rather than on however much memory the
-    // stated picture size would ask for.
     var uncompressed = reader.BytePosition - at;
     if (uncompressed + this._header.HeaderSizeInBytes > size)
       throw new InvalidDataException(
@@ -197,6 +149,7 @@ internal sealed class Vp9Decoder {
     var tilesLength = size - uncompressed - this._header.HeaderSizeInBytes;
 
     var current = this._TakeFreeFrame(shown);
+    Vp9InterPrediction.ConfigureCurrentFrame(this._header.SubsamplingX, this._header.SubsamplingY);
     this._frameDecoder.DecodeTiles(this._packet, tilesAt, tilesLength, current, this._slots);
     this._loopFilter.Apply(current, grid, this._header);
 
@@ -212,9 +165,6 @@ internal sealed class Vp9Decoder {
     grid.KeepForNextFrame();
   }
 
-  /// <summary>
-  /// Builds or reuses the mode info grid, and forgets what it held when the frame says to.
-  /// </summary>
   private Vp9ModeInfoGrid _PrepareGrid() {
     var grid = this._grid;
 
@@ -228,23 +178,12 @@ internal sealed class Vp9Decoder {
     return grid;
   }
 
-  /// <summary>
-  /// Moves the probability tables towards what this frame turned out to be, and saves them if the
-  /// frame asked for it (specification 6.1.2).
-  /// </summary>
-  /// <remarks>
-  /// The adaptation starts from the tables as they were saved, not as they were used. A frame's
-  /// forward updates are its own; what the next frame inherits is the saved set moved by the
-  /// frequencies, which is why the saved set is loaded back over the working one first.
-  /// </remarks>
   private void _RefreshProbabilities() {
     var saved = this._savedProbabilities[this._header.FrameContextIndex];
 
     if (!this._header.ErrorResilientMode && !this._header.FrameParallelDecodingMode) {
       this._probabilities.LoadFrom(saved);
 
-      // A frame that follows a key frame inherited the format's defaults rather than anything
-      // measured, so it is allowed to move further towards what it saw.
       var updateFactor = !this._header.FrameIsIntra && this._header.LastFrameType == KEY_FRAME ? 128 : 112;
       Vp9Adaptation.AdaptCoefficients(this._probabilities, this._counts, updateFactor);
 
@@ -262,10 +201,6 @@ internal sealed class Vp9Decoder {
       this._probabilities.SaveTo(saved);
   }
 
-  // ============================================================================================
-  // Reference frames (specification 8.10)
-  // ============================================================================================
-
   private void _UpdateReferences(Vp9Frame current) {
     for (var i = 0; i < NUM_REF_FRAMES; ++i) {
       if (((this._header.RefreshFrameFlags >> i) & 1) == 0)
@@ -278,10 +213,6 @@ internal sealed class Vp9Decoder {
     }
   }
 
-  /// <summary>
-  /// A frame buffer no reference slot is holding and no picture already decoded from this packet is
-  /// waiting in.
-  /// </summary>
   private Vp9Frame _TakeFreeFrame(List<Vp9Frame> shown) {
     var width = this._header.FrameWidth;
     var height = this._header.FrameHeight;
@@ -290,10 +221,6 @@ internal sealed class Vp9Decoder {
     var subX = this._header.SubsamplingX;
     var subY = this._header.SubsamplingY;
 
-    // A slot may hold a picture of a size the stream has moved on from, because a frame is allowed
-    // to predict from a reference of a different size. Only the buffers nothing is holding at all are
-    // dropped when the size changes. Chroma geometry is part of buffer identity too: a 4:4:4 frame
-    // cannot be reconstructed into a recycled 4:2:0 buffer merely because their luma sizes match.
     Vp9Frame? free = null;
     for (var i = this._pool.Count - 1; i >= 0; --i) {
       var candidate = this._pool[i];
