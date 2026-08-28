@@ -337,8 +337,12 @@ public sealed class H264VideoDecoderTests {
     Assert.That(() => _Decode(stream), Throws.TypeOf<NotSupportedException>().With.Message.Contains("10-bit"));
   }
 
+  /// <summary>
+  /// Scaling matrices used to be refused by name; they are parsed and applied now, so a stream
+  /// carrying them decodes rather than throwing.
+  /// </summary>
   [Test]
-  public void ScalingMatricesAreRefusedByName() {
+  public void ScalingMatricesAreDecodedRatherThanRefused() {
     var stream = new H264TestStream()
       .HighSequenceParameterSet(scalingMatrices: true)
       .PictureParameterSet()
@@ -347,8 +351,7 @@ public sealed class H264VideoDecoderTests {
       .EndNal(5, 3)
       .ToArray();
 
-    Assert.That(() => _Decode(stream),
-      Throws.TypeOf<NotSupportedException>().With.Message.Contains("scaling matrices"));
+    Assert.That(() => _Decode(stream), Throws.Nothing);
   }
 
   [Test]
