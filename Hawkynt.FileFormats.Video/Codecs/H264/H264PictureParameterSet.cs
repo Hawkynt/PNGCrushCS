@@ -78,16 +78,8 @@ internal sealed class H264PictureParameterSet {
         $"This H.264 stream divides its pictures into {this.NumSliceGroups} slice groups "
         + $"(slice_group_map_type {this.SliceGroupMapType}). Flexible macroblock ordering is not implemented.");
 
-    // transform_8x8_mode_flag and SPS/PPS scaling matrices are retained for the High-profile path.
-
-    if (this.EntropyCodingModeFlag)
-      throw new NotSupportedException(
-        "This H.264 stream sets entropy_coding_mode_flag and therefore uses CABAC (clause 9.3). "
-        + "The CABAC syntax reader is not connected yet.");
-
-    // weighted_pred_flag is implemented by H264PredictionWeights for P slices. weighted_bipred_idc
-    // only changes B-slice reconstruction; B slices are refused from their slice_type before this PPS
-    // can be used for one, so it must not unnecessarily reject an I/P slice sharing the same PPS.
+    // transform_8x8_mode_flag, SPS/PPS scaling matrices, weighted prediction and CABAC all have
+    // reconstruction/syntax paths. Keep this guard focused on features that remain genuinely absent.
   }
 
   private static void _SkipSliceGroupMap(ref H264BitReader reader, H264PictureParameterSet pps) {
