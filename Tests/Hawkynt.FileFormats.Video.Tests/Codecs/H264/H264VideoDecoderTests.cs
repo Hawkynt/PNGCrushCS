@@ -163,7 +163,7 @@ public sealed class H264VideoDecoderTests {
       .BeginIdrSliceHeader().PcmMacroblock(25, static (_, _) => 16, chroma: 128).EndNal(5, 3)
       .BeginSliceHeader(frameNum: 1, activeRefs: 1, reorderBy: 4).Unsigned(1).EndNal(1, 2)
       .ToArray();
-    Assert.That(() => _Decode(stream), Throws.TypeOf<InvalidDataException>().With.Message.Contains("reorders its reference picture list"));
+    Assert.That(() => _Decode(stream), Throws.TypeOf<InvalidDataException>().With.Message.Contains("reorders reference list"));
   }
 
   [Test]
@@ -206,15 +206,24 @@ public sealed class H264VideoDecoderTests {
     Assert.That(() => _Decode(stream), Throws.TypeOf<NotSupportedException>().With.Message.Contains("CABAC"));
   }
 
+  /// <summary>
+  /// B slices are decoded now, so the refusal this used to assert is gone deliberately.
+  /// </summary>
+  /// <remarks>
+  /// The fixture carries a slice header and no slice data, so the decoder runs out of bitstream
+  /// part way through the first macroblock. That it gets that far is the point: reaching the data
+  /// is what says the slice type was accepted rather than turned away by name.
+  /// </remarks>
   [Test]
-  public void BidirectionalSlicesAreRefusedByName() {
+  public void BidirectionalSlicesAreDecodedRatherThanRefused() {
     var stream = new H264TestStream()
       .SequenceParameterSet()
       .PictureParameterSet()
       .BeginIdrSliceHeader().FlatIntra16x16Macroblock().EndNal(5, 3)
       .BeginSliceHeader(frameNum: 1, sliceType: 6).Unsigned(0).EndNal(1, 2)
       .ToArray();
-    Assert.That(() => _Decode(stream), Throws.TypeOf<NotSupportedException>().With.Message.Contains("B slice"));
+    Assert.That(() => _Decode(stream),
+      Throws.TypeOf<InvalidDataException>().With.Message.Contains("ended in the middle of a syntax element"));
   }
 
   [Test]
