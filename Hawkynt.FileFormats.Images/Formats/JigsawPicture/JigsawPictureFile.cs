@@ -17,7 +17,7 @@ namespace FileFormat.JigsawPicture;
 /// several fields deep.
 /// </remarks>
 public readonly record struct JigsawPictureFile
-  : IImageFormatReader<JigsawPictureFile>, IImageToRawImage<JigsawPictureFile> {
+  : IImageFormatReader<JigsawPictureFile>, IImageToRawImage<JigsawPictureFile>, IImageFromRawImage<JigsawPictureFile>, IImageFormatWriter<JigsawPictureFile> {
 
   /// <summary>What the two bytes of a bitmap's signature were replaced with.</summary>
   internal static ReadOnlySpan<byte> Signature => "JG"u8;
@@ -33,6 +33,8 @@ public readonly record struct JigsawPictureFile
 
   static JigsawPictureFile IImageFormatReader<JigsawPictureFile>.FromSpan(ReadOnlySpan<byte> data)
     => JigsawPictureReader.FromSpan(data);
+  static byte[] IImageFormatWriter<JigsawPictureFile>.ToBytes(JigsawPictureFile file)
+    => JigsawPictureWriter.ToBytes(file);
 
   static VideoMode[] IImageFormatMetadata<JigsawPictureFile>.VideoModes
     => [new("Default", [(IntegerRange.Any, IntegerRange.Any)])];
@@ -41,4 +43,9 @@ public readonly record struct JigsawPictureFile
   public RawImage Image { get; init; }
 
   public static RawImage ToRawImage(JigsawPictureFile file) => file.Image;
+
+  public static JigsawPictureFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    return new() { Image = image };
+  }
 }
