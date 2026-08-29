@@ -195,15 +195,18 @@ public sealed class H264VideoDecoderTests {
   }
 
   [Test]
-  public void ArithmeticCodingIsRefusedByName() {
+  public void ArithmeticCodingReachesCabacSyntaxRatherThanBeingRefused() {
     var stream = new H264TestStream()
       .SequenceParameterSet()
       .PictureParameterSet(cabac: true)
       .BeginIdrSliceHeader()
+      // Deliberately CAVLC-shaped payload under a CABAC PPS: it is malformed CABAC, but the
+      // decoder must now enter CABAC syntax rather than reject entropy_coding_mode_flag by policy.
       .FlatIntra16x16Macroblock()
       .EndNal(5, 3)
       .ToArray();
-    Assert.That(() => _Decode(stream), Throws.TypeOf<NotSupportedException>().With.Message.Contains("CABAC"));
+    var exception = Assert.Throws<InvalidDataException>(() => _Decode(stream));
+    Assert.That(exception!.Message, Does.Not.Contain("CABAC syntax reader is not connected"));
   }
 
   /// <summary>
@@ -395,7 +398,7 @@ public sealed class H264VideoDecoderTests {
   }
 
   [Test]
-  public void ItHoldsNoPictureBackBecauseItRefusesTheSlicesThatWouldReorderOne() {
+  public void AFlatBaselinePictureIsNotHeldForReordering() {
     var decoder = H264VideoDecoder.Create(_AnnexBStream);
     foreach (var packet in H264VideoReader.Split(_OneFlatIntraPicture()))
       decoder.TryDecode(packet, out _);

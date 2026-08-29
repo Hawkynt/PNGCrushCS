@@ -65,15 +65,30 @@ internal ref struct H264CabacDecoder {
   private int _offset;
 
   internal H264CabacDecoder(H264BitReader reader) {
-    reader.AlignToByte();
+    // clause 7.3.4: cabac_alignment_one_bit is one, not arbitrary padding. Validate it here so a
+    // corrupt slice cannot silently shift the arithmetic decoder to the next byte.
+    while ((reader.BitPosition & 7) != 0)
+      if (reader.ReadBit() != 1)
+        throw new InvalidDataException("An H.264 CABAC slice contains a zero cabac_alignment_one_bit.");
+
     this._reader = reader;
     this._range = 510;
     this._offset = this._reader.ReadBits(9);
+    if (this._offset >= 510)
+      throw new InvalidDataException(
+        $"H.264 CABAC arithmetic initialization read codIOffset {this._offset}; clause 9.3.3.2.1 requires it below 510.");
   }
 
   internal readonly int BitPosition => this._reader.BitPosition;
   internal readonly int Range => this._range;
   internal readonly int Offset => this._offset;
+
+  /// <summary>
+  /// Returns the compressed-data reader at the arithmetic engine's current byte-stream position.
+  /// This is needed by I_PCM: its terminate bin stops CABAC, raw PCM samples are read directly, then
+  /// clause 9.3.3.2.1 initializes the arithmetic engine again without resetting context variables.
+  /// </summary>
+  internal readonly H264BitReader SnapshotReader() => this._reader;
 
   internal int DecodeDecision(ref H264CabacContext context) {
     var qRange = (this._range >> 6) & 3;

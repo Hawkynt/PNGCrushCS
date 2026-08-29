@@ -8,10 +8,9 @@ namespace FileFormat.Codecs;
 
 /// <summary>Decodes progressive 8-bit 4:2:0 H.264 / AVC pictures.</summary>
 /// <remarks>
-/// The decoder reconstructs CAVLC I/P/B slices, including High-profile 8x8 transforms/scaling lists,
+/// The decoder reconstructs CAVLC and CABAC I/P/B slices, including High-profile 8x8 transforms/scaling lists,
 /// long-term references, explicit weighted P/B prediction, implicit weighted B prediction and direct
-/// B prediction. CABAC has its own syntax path and remains the next entropy-coding layer to connect.
-/// Completed pictures stay in native YUV420 and are reordered by picture order count before delivery.
+/// B prediction. Completed pictures stay in native YUV420 and are reordered by picture order count before delivery.
 /// </remarks>
 public sealed class H264VideoDecoder : IVideoCodecDecoder<H264VideoDecoder> {
   private static readonly CodecTag[] _Tags = [
@@ -173,7 +172,9 @@ public sealed class H264VideoDecoder : IVideoCodecDecoder<H264VideoDecoder> {
       this._BeginPicture(header);
 
     var lists = this._references.BuildLists(header, this._picturePoc.PicOrderCnt);
-    if (header.IsB)
+    if (header.Pps.EntropyCodingModeFlag)
+      this._frame!.DecodeCabacSlice(ref reader, header, lists.L0, lists.L1);
+    else if (header.IsB)
       this._frame!.DecodeBSlice(ref reader, header, lists.L0, lists.L1);
     else
       this._frame!.DecodeSlice(ref reader, header, lists.L0);
