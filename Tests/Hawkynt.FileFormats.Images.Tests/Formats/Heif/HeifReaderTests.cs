@@ -101,7 +101,10 @@ public sealed class HeifReaderTests {
     using var ms = new MemoryStream(heifBytes);
     var result = HeifReader.FromStream(ms);
 
-    Assert.That(result.Width, Is.EqualTo(16));
+    Assert.Multiple(() => {
+      Assert.That(result.Width, Is.EqualTo(16));
+      Assert.That(result.Height, Is.EqualTo(8));
+    });
   }
 
   [Test]
