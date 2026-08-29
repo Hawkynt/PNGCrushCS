@@ -23,7 +23,7 @@ namespace FileFormat.PlaybackBitmapSequence;
 /// </remarks>
 [FormatMagicBytes([0x42, 0x4D, 0x53, 0x57, 0x69, 0x6E, 0x50, 0x6C, 0x61, 0x79])]
 public readonly record struct PlaybackBitmapSequenceFile
-  : IImageFormatReader<PlaybackBitmapSequenceFile>, IImageToRawImage<PlaybackBitmapSequenceFile> {
+  : IImageFormatReader<PlaybackBitmapSequenceFile>, IImageToRawImage<PlaybackBitmapSequenceFile>, IImageFromRawImage<PlaybackBitmapSequenceFile>, IImageFormatWriter<PlaybackBitmapSequenceFile> {
 
   /// <summary>The ten letters a file opens with.</summary>
   public static ReadOnlySpan<byte> Magic => "BMSWinPlay"u8;
@@ -34,6 +34,7 @@ public readonly record struct PlaybackBitmapSequenceFile
   static string IImageFormatMetadata<PlaybackBitmapSequenceFile>.PrimaryExtension => ".bms";
   static string[] IImageFormatMetadata<PlaybackBitmapSequenceFile>.FileExtensions => [".bms"];
   static PlaybackBitmapSequenceFile IImageFormatReader<PlaybackBitmapSequenceFile>.FromSpan(ReadOnlySpan<byte> data) => PlaybackBitmapSequenceReader.FromSpan(data);
+  static byte[] IImageFormatWriter<PlaybackBitmapSequenceFile>.ToBytes(PlaybackBitmapSequenceFile file) => PlaybackBitmapSequenceWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<PlaybackBitmapSequenceFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)])
   ];
@@ -46,5 +47,11 @@ public readonly record struct PlaybackBitmapSequenceFile
       throw new InvalidOperationException("No picture was read.");
 
     return BmpFile.ToRawImage(BmpReader.FromSpan(file.Bitmap));
+  }
+
+  /// <summary>Creates the externally-verified single-picture form by embedding an ordinary BMP.</summary>
+  public static PlaybackBitmapSequenceFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    return new() { Bitmap = BmpWriter.ToBytes(BmpFile.FromRawImage(image)) };
   }
 }
