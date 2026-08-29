@@ -24,6 +24,17 @@ on:
         required: false
         default: false
 
+# One run per pull request, not one per push. A branch pushed a dozen times in a minute used to
+# leave a dozen CI runs stacked behind each other, every one of them testing a commit that no longer
+# existed by the time a runner picked it up; thirty such runs once sat queued while nothing ran.
+#
+# The group deliberately carries the event name. Only pull-request runs cancel their predecessors:
+# a push to main should verify every commit, and a workflow_call from the release must never be
+# cancelled by anything. Keeping those in groups of their own means neither can be caught by this.
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 # Force JavaScript-based actions (checkout, setup-dotnet, upload-artifact) to run on Node 24
 # instead of the deprecated Node 20 ahead of the 2026-06-16 hard cutover, until we bump each
 # action to a Node-24-native major version.
