@@ -6,13 +6,14 @@ namespace FileFormat.Codecs.H264;
 internal enum H264MacroblockKind : byte {
   Absent = 0,
   Intra4x4,
+  Intra8x8,
   Intra16x16,
   Pcm,
   Inter,
 }
 
 /// <summary>Reconstructs one progressive 8-bit 4:2:0 H.264 picture from CAVLC I/P slices.</summary>
-internal sealed class H264FrameDecoder {
+internal sealed partial class H264FrameDecoder {
   private const int _PCM_MB_TYPE_I = 25;
   private const int _INTRA_MB_TYPE_OFFSET_P = 5;
 
@@ -41,6 +42,7 @@ internal sealed class H264FrameDecoder {
   private readonly bool[] _blockReconstructed;
   private readonly byte[] _chromaCoeffCount;
 
+  // 256 luma coefficient slots serve either sixteen 4x4 blocks or four interleaved 8x8 blocks.
   private readonly int[] _lumaLevels = new int[16 * 16];
   private readonly int[] _lumaDcLevels = new int[16];
   private readonly int[] _chromaLevels = new int[2 * 4 * 16];
@@ -174,10 +176,16 @@ internal sealed class H264FrameDecoder {
       return;
     }
 
-    if (intraType == 0)
-      this._DecodeIntra4x4(ref reader, mbAddr);
-    else
-      this._DecodeIntra16x16(ref reader, mbAddr, intraType);
+    if (intraType == 0) {
+      var transform8x8 = this._header.Pps.Transform8x8ModeFlag && reader.ReadBit() != 0;
+      if (transform8x8)
+        this._DecodeIntra8x8(ref reader, mbAddr);
+      else
+        this._DecodeIntra4x4(ref reader, mbAddr);
+      return;
+    }
+
+    this._DecodeIntra16x16(ref reader, mbAddr, intraType);
   }
 
   private void _BeginMacroblock(int mbAddr) {
@@ -228,7 +236,6 @@ internal sealed class H264FrameDecoder {
     for (var y = 0; y < 16; ++y)
       for (var x = 0; x < 16; ++x)
         picture.Luma[(mbY * 16 + y) * picture.LumaWidth + mbX * 16 + x] = (byte)reader.ReadBits(8);
-
     for (var component = 0; component < 2; ++component) {
       var plane = picture.Chroma(component);
       for (var y = 0; y < 8; ++y)
@@ -239,7 +246,6 @@ internal sealed class H264FrameDecoder {
     this._kind[mbAddr] = H264MacroblockKind.Pcm;
     this._qpY[mbAddr] = 0;
     this._qpRunning = 0;
-
     for (var by = 0; by < 4; ++by) {
       var row = (mbY * 4 + by) * this._blockWidth + mbX * 4;
       for (var bx = 0; bx < 4; ++bx) {
@@ -247,7 +253,6 @@ internal sealed class H264FrameDecoder {
         this._blockReconstructed[row + bx] = true;
       }
     }
-
     for (var component = 0; component < 2; ++component)
       for (var by = 0; by < 2; ++by) {
         var row = this._ChromaBlockBase(component, mbX * 2, mbY * 2 + by);
@@ -265,7 +270,7 @@ internal sealed class H264FrameDecoder {
       var (bx, by) = _BlockPosition(blkIdx);
       var blockX = mbX * 4 + (bx >> 2);
       var blockY = mbY * 4 + (by >> 2);
-      var predicted = this._PredictIntra4x4Mode(mbAddr, blockX, blockY);
+      var predicted = this._PredictIntraMode(blockX, blockY);
       var mode = predicted;
       if (reader.ReadBit() == 0) {
         var remaining = reader.ReadBits(3);
@@ -276,7 +281,7 @@ internal sealed class H264FrameDecoder {
 
     var chromaMode = reader.ReadUnsignedExpGolomb();
     var cbp = H264CavlcTables.ReadCodedBlockPattern(ref reader, intra: true);
-    this._ReadResidualAndQp(ref reader, mbAddr, cbp & 15, cbp >> 4, intra16x16: false);
+    this._ReadResidualAndQp(ref reader, mbAddr, cbp & 15, cbp >> 4, intra16x16: false, transform8x8: false);
 
     var qp = this._qpY[mbAddr];
     var scaling = this._scalingLists.FourByFour(0);
@@ -305,7 +310,6 @@ internal sealed class H264FrameDecoder {
       }
       this._blockReconstructed[blockY * this._blockWidth + blockX] = true;
     }
-
     this._ReconstructChroma(mbAddr, chromaMode, intra: true);
   }
 
@@ -313,13 +317,12 @@ internal sealed class H264FrameDecoder {
     var mbX = mbAddr % this._mbWidth;
     var mbY = mbAddr / this._mbWidth;
     this._kind[mbAddr] = H264MacroblockKind.Intra16x16;
-
     var index = intraType - 1;
     var lumaMode = index % 4;
     var cbpChroma = index / 4 % 3;
     var cbpLuma = index >= 12 ? 15 : 0;
     var chromaMode = reader.ReadUnsignedExpGolomb();
-    this._ReadResidualAndQp(ref reader, mbAddr, cbpLuma, cbpChroma, intra16x16: true);
+    this._ReadResidualAndQp(ref reader, mbAddr, cbpLuma, cbpChroma, intra16x16: true, transform8x8: false);
 
     var qp = this._qpY[mbAddr];
     var scaling = this._scalingLists.FourByFour(0);
@@ -334,13 +337,11 @@ internal sealed class H264FrameDecoder {
     H264Transform.DecodeLumaDc(this._lumaDcLevels, qp, scaling, dc);
     Span<int> residual = stackalloc int[16];
     Span<byte> blockPrediction = stackalloc byte[16];
-
     for (var blkIdx = 0; blkIdx < 16; ++blkIdx) {
       var (bx, by) = _BlockPosition(blkIdx);
       for (var row = 0; row < 4; ++row)
         for (var column = 0; column < 4; ++column)
           blockPrediction[(row << 2) + column] = pred[((by + row) << 4) + bx + column];
-
       var dcValue = dc[(by >> 2) * 4 + (bx >> 2)];
       H264Transform.DecodeBlock(
         this._lumaLevels.AsSpan(blkIdx * 16, 16), qp, hasSeparateDc: true, dcValue, scaling, residual);
@@ -349,17 +350,16 @@ internal sealed class H264FrameDecoder {
       _AddResidual(this.Picture.Luma, this.Picture.LumaWidth, mbX * 16 + bx, mbY * 16 + by, 4, blockPrediction, residual);
       this._blockReconstructed[blockY * this._blockWidth + blockX] = true;
     }
-
     this._ReconstructChroma(mbAddr, chromaMode, intra: true);
   }
 
-  private int _PredictIntra4x4Mode(int mbAddr, int blockX, int blockY) {
-    var modeA = this._NeighbourIntraMode(mbAddr, blockX - 1, blockY, out var haveA);
-    var modeB = this._NeighbourIntraMode(mbAddr, blockX, blockY - 1, out var haveB);
+  private int _PredictIntraMode(int blockX, int blockY) {
+    var modeA = this._NeighbourIntraMode(blockX - 1, blockY, out var haveA);
+    var modeB = this._NeighbourIntraMode(blockX, blockY - 1, out var haveB);
     return !haveA || !haveB ? H264IntraPrediction.DC_4X4 : Math.Min(modeA, modeB);
   }
 
-  private int _NeighbourIntraMode(int mbAddr, int blockX, int blockY, out bool usable) {
+  private int _NeighbourIntraMode(int blockX, int blockY, out bool usable) {
     usable = false;
     if (blockX < 0 || blockY < 0 || blockX >= this._blockWidth || blockY >= this._mbHeight * 4)
       return H264IntraPrediction.DC_4X4;
@@ -369,7 +369,7 @@ internal sealed class H264FrameDecoder {
     if (this._kind[neighbourMb] == H264MacroblockKind.Inter && this._header.Pps.ConstrainedIntraPredFlag)
       return H264IntraPrediction.DC_4X4;
     usable = true;
-    return this._kind[neighbourMb] == H264MacroblockKind.Intra4x4
+    return this._kind[neighbourMb] is H264MacroblockKind.Intra4x4 or H264MacroblockKind.Intra8x8
       ? this._intra4x4Mode[blockY * this._blockWidth + blockX]
       : H264IntraPrediction.DC_4X4;
   }
@@ -391,7 +391,6 @@ internal sealed class H264FrameDecoder {
     this._kind[mbAddr] = H264MacroblockKind.Inter;
     var mbX = mbAddr % this._mbWidth;
     var mbY = mbAddr / this._mbWidth;
-
     if (mbType is 3 or 4) {
       this._DecodeInter8x8(ref reader, mbAddr, mbType == 4);
       return;
@@ -402,11 +401,9 @@ internal sealed class H264FrameDecoder {
       1 => (16, 8, 2),
       _ => (8, 16, 2),
     };
-
     Span<int> refIdx = stackalloc int[2];
     for (var part = 0; part < partCount; ++part)
       refIdx[part] = this._ReadReferenceIndex(ref reader);
-
     Span<int> mvXs = stackalloc int[2];
     Span<int> mvYs = stackalloc int[2];
     for (var part = 0; part < partCount; ++part) {
@@ -419,12 +416,15 @@ internal sealed class H264FrameDecoder {
     }
 
     var cbp = H264CavlcTables.ReadCodedBlockPattern(ref reader, intra: false);
-    this._ReadResidualAndQp(ref reader, mbAddr, cbp & 15, cbp >> 4, intra16x16: false);
+    var transform8x8 = this._header.Pps.Transform8x8ModeFlag && (cbp & 15) != 0 && reader.ReadBit() != 0;
+    this._ReadResidualAndQp(ref reader, mbAddr, cbp & 15, cbp >> 4, intra16x16: false, transform8x8);
     for (var part = 0; part < partCount; ++part) {
       var x = mbX * 16 + (partWidth == 8 ? part * 8 : 0);
       var y = mbY * 16 + (partHeight == 8 ? part * 8 : 0);
-      this._Predict(mbAddr, refIdx[part], x, y, partWidth, partHeight, mvXs[part], mvYs[part], addResidual: true);
+      this._Predict(mbAddr, refIdx[part], x, y, partWidth, partHeight, mvXs[part], mvYs[part], addResidual: !transform8x8);
     }
+    if (transform8x8)
+      this._AddInter8x8Residuals(mbAddr, cbp & 15);
     this._MarkReconstructed(mbX, mbY);
     this._ReconstructChroma(mbAddr, 0, intra: false);
   }
@@ -433,17 +433,18 @@ internal sealed class H264FrameDecoder {
     var mbX = mbAddr % this._mbWidth;
     var mbY = mbAddr / this._mbWidth;
     Span<int> subType = stackalloc int[4];
+    var canTransform8x8 = true;
     for (var part = 0; part < 4; ++part) {
       subType[part] = reader.ReadUnsignedExpGolomb();
       if (subType[part] > 3)
         throw new InvalidDataException(
           $"An H.264 P macroblock states sub_mb_type {subType[part]}. H.264, Table 7-17 defines 0 to 3 only.");
+      canTransform8x8 &= subType[part] == 0;
     }
 
     Span<int> refIdx = stackalloc int[4];
     for (var part = 0; part < 4; ++part)
       refIdx[part] = refZero ? 0 : this._ReadReferenceIndex(ref reader);
-
     for (var part = 0; part < 4; ++part) {
       var (subWidth, subHeight, subCount) = subType[part] switch {
         0 => (8, 8, 1),
@@ -464,14 +465,17 @@ internal sealed class H264FrameDecoder {
     }
 
     var cbp = H264CavlcTables.ReadCodedBlockPattern(ref reader, intra: false);
-    this._ReadResidualAndQp(ref reader, mbAddr, cbp & 15, cbp >> 4, intra16x16: false);
+    var transform8x8 = this._header.Pps.Transform8x8ModeFlag && canTransform8x8 && (cbp & 15) != 0 && reader.ReadBit() != 0;
+    this._ReadResidualAndQp(ref reader, mbAddr, cbp & 15, cbp >> 4, intra16x16: false, transform8x8);
     for (var by = 0; by < 4; ++by)
       for (var bx = 0; bx < 4; ++bx) {
         var at = (mbY * 4 + by) * this._blockWidth + mbX * 4 + bx;
         this._Predict(
           mbAddr, this._refIdx[at], mbX * 16 + bx * 4, mbY * 16 + by * 4, 4, 4,
-          this._mvX[at], this._mvY[at], addResidual: true);
+          this._mvX[at], this._mvY[at], addResidual: !transform8x8);
       }
+    if (transform8x8)
+      this._AddInter8x8Residuals(mbAddr, cbp & 15);
     this._MarkReconstructed(mbX, mbY);
     this._ReconstructChroma(mbAddr, 0, intra: false);
   }
@@ -514,7 +518,6 @@ internal sealed class H264FrameDecoder {
     if (refIdx < 0 || refIdx >= this._referenceList.Length)
       throw new InvalidDataException(
         $"An H.264 inter macroblock names reference index {refIdx} of a list holding {this._referenceList.Length} picture(s).");
-
     var reference = this._referenceList[refIdx];
     var picture = this.Picture;
     Span<byte> pred = stackalloc byte[256];
@@ -528,13 +531,11 @@ internal sealed class H264FrameDecoder {
     var scaling = this._scalingLists.FourByFour(3);
     Span<int> residual = stackalloc int[16];
     Span<byte> blockPrediction = stackalloc byte[16];
-
     for (var blockRow = 0; blockRow < height >> 2; ++blockRow)
       for (var blockColumn = 0; blockColumn < width >> 2; ++blockColumn) {
         for (var row = 0; row < 4; ++row)
           for (var column = 0; column < 4; ++column)
             blockPrediction[(row << 2) + column] = pred[(blockRow * 4 + row) * width + blockColumn * 4 + column];
-
         var blockX = (x >> 2) + blockColumn;
         var blockY = (y >> 2) + blockRow;
         var blkIdx = _BlockIndex(blockX - mbX * 4, blockY - mbY * 4);
@@ -555,17 +556,12 @@ internal sealed class H264FrameDecoder {
     var c = this._NeighbourMotion(mbAddr, x + partWidth, y - 1);
     if (!c.Available)
       c = this._NeighbourMotion(mbAddr, x - 1, y - 1);
-
     if (partCount == 2 && partWidth == 16 && partHeight == 8) {
-      if (partIdx == 0 && b.RefIdx == refIdx)
-        return (b.MvX, b.MvY);
-      if (partIdx == 1 && a.RefIdx == refIdx)
-        return (a.MvX, a.MvY);
+      if (partIdx == 0 && b.RefIdx == refIdx) return (b.MvX, b.MvY);
+      if (partIdx == 1 && a.RefIdx == refIdx) return (a.MvX, a.MvY);
     } else if (partCount == 2 && partWidth == 8 && partHeight == 16) {
-      if (partIdx == 0 && a.RefIdx == refIdx)
-        return (a.MvX, a.MvY);
-      if (partIdx == 1 && c.RefIdx == refIdx)
-        return (c.MvX, c.MvY);
+      if (partIdx == 0 && a.RefIdx == refIdx) return (a.MvX, a.MvY);
+      if (partIdx == 1 && c.RefIdx == refIdx) return (c.MvX, c.MvY);
     }
     return _Median(a, b, c, refIdx);
   }
@@ -575,10 +571,7 @@ internal sealed class H264FrameDecoder {
     (bool Available, int MvX, int MvY, int RefIdx) b,
     (bool Available, int MvX, int MvY, int RefIdx) c,
     int refIdx) {
-    if (!b.Available && !c.Available && a.Available) {
-      b = a;
-      c = a;
-    }
+    if (!b.Available && !c.Available && a.Available) { b = a; c = a; }
     var matches = (a.RefIdx == refIdx ? 1 : 0) + (b.RefIdx == refIdx ? 1 : 0) + (c.RefIdx == refIdx ? 1 : 0);
     if (matches == 1)
       return a.RefIdx == refIdx ? (a.MvX, a.MvY)
@@ -637,7 +630,11 @@ internal sealed class H264FrameDecoder {
         this._PredictChromaInter(mbAddr, component, pred);
       }
 
-      var scaling = this._scalingLists.FourByFour((intra ? 1 : 4) + component);
+      // Scaling-list syntax orders chroma as Cr then Cb; picture storage is Cb then Cr.
+      var scalingIndex = intra
+        ? component == 0 ? 2 : 1
+        : component == 0 ? 5 : 4;
+      var scaling = this._scalingLists.FourByFour(scalingIndex);
       H264Transform.DecodeChromaDc(this._chromaDcLevels.AsSpan(component * 4, 4), qp, scaling, dc);
       for (var blkIdx = 0; blkIdx < 4; ++blkIdx) {
         var bx = (blkIdx & 1) * 4;
@@ -675,22 +672,32 @@ internal sealed class H264FrameDecoder {
   }
 
   private void _ReadResidualAndQp(
-    ref H264BitReader reader, int mbAddr, int cbpLuma, int cbpChroma, bool intra16x16) {
+    ref H264BitReader reader,
+    int mbAddr,
+    int cbpLuma,
+    int cbpChroma,
+    bool intra16x16,
+    bool transform8x8) {
     if (cbpLuma == 0 && cbpChroma == 0 && !intra16x16) {
       this._qpY[mbAddr] = (sbyte)this._qpRunning;
       return;
     }
-
     var delta = reader.ReadSignedExpGolomb();
     if (delta is < -26 or > 25)
       throw new InvalidDataException(
         $"An H.264 macroblock states mb_qp_delta {delta}. H.264, clause 7.4.5 confines it to -26..25 for 8-bit samples.");
     this._qpRunning = (this._qpRunning + delta + 52) % 52;
     this._qpY[mbAddr] = (sbyte)this._qpRunning;
-    this._ReadResidual(ref reader, mbAddr, cbpLuma, cbpChroma, intra16x16);
+    this._ReadResidual(ref reader, mbAddr, cbpLuma, cbpChroma, intra16x16, transform8x8);
   }
 
-  private void _ReadResidual(ref H264BitReader reader, int mbAddr, int cbpLuma, int cbpChroma, bool intra16x16) {
+  private void _ReadResidual(
+    ref H264BitReader reader,
+    int mbAddr,
+    int cbpLuma,
+    int cbpChroma,
+    bool intra16x16,
+    bool transform8x8) {
     var mbX = mbAddr % this._mbWidth;
     var mbY = mbAddr / this._mbWidth;
     if (intra16x16) {
@@ -698,20 +705,41 @@ internal sealed class H264FrameDecoder {
       H264Residual.ReadBlock(ref reader, this._lumaDcLevels, nC, chromaDc: false);
     }
 
-    for (var i8x8 = 0; i8x8 < 4; ++i8x8)
-      for (var i4x4 = 0; i4x4 < 4; ++i4x4) {
-        var blkIdx = i8x8 * 4 + i4x4;
-        var (bx, by) = _BlockPosition(blkIdx);
-        var blockX = mbX * 4 + (bx >> 2);
-        var blockY = mbY * 4 + (by >> 2);
+    if (transform8x8) {
+      Span<int> temporary = stackalloc int[16];
+      for (var i8x8 = 0; i8x8 < 4; ++i8x8) {
         if ((cbpLuma & (1 << i8x8)) == 0)
           continue;
-        var nC = this._LumaNc(blockX, blockY);
-        var count = intra16x16
-          ? H264Residual.ReadBlock(ref reader, this._lumaLevels.AsSpan(blkIdx * 16 + 1, 15), nC, chromaDc: false)
-          : H264Residual.ReadBlock(ref reader, this._lumaLevels.AsSpan(blkIdx * 16, 16), nC, chromaDc: false);
-        this._lumaCoeffCount[blockY * this._blockWidth + blockX] = (byte)count;
+        var coefficients = this._lumaLevels.AsSpan(i8x8 * 64, 64);
+        for (var i4x4 = 0; i4x4 < 4; ++i4x4) {
+          temporary.Clear();
+          var blkIdx = i8x8 * 4 + i4x4;
+          var (bx, by) = _BlockPosition(blkIdx);
+          var blockX = mbX * 4 + (bx >> 2);
+          var blockY = mbY * 4 + (by >> 2);
+          var nC = this._LumaNc(blockX, blockY);
+          var count = H264Residual.ReadBlock(ref reader, temporary, nC, chromaDc: false);
+          this._lumaCoeffCount[blockY * this._blockWidth + blockX] = (byte)count;
+          for (var coefficient = 0; coefficient < 16; ++coefficient)
+            coefficients[4 * coefficient + i4x4] = temporary[coefficient];
+        }
       }
+    } else {
+      for (var i8x8 = 0; i8x8 < 4; ++i8x8)
+        for (var i4x4 = 0; i4x4 < 4; ++i4x4) {
+          var blkIdx = i8x8 * 4 + i4x4;
+          var (bx, by) = _BlockPosition(blkIdx);
+          var blockX = mbX * 4 + (bx >> 2);
+          var blockY = mbY * 4 + (by >> 2);
+          if ((cbpLuma & (1 << i8x8)) == 0)
+            continue;
+          var nC = this._LumaNc(blockX, blockY);
+          var count = intra16x16
+            ? H264Residual.ReadBlock(ref reader, this._lumaLevels.AsSpan(blkIdx * 16 + 1, 15), nC, chromaDc: false)
+            : H264Residual.ReadBlock(ref reader, this._lumaLevels.AsSpan(blkIdx * 16, 16), nC, chromaDc: false);
+          this._lumaCoeffCount[blockY * this._blockWidth + blockX] = (byte)count;
+        }
+    }
 
     if (cbpChroma == 0)
       return;
@@ -853,10 +881,17 @@ internal sealed class H264FrameDecoder {
     byte[] plane, int planeWidth, int x, int y, int size, ReadOnlySpan<byte> pred, ReadOnlySpan<int> residual) {
     for (var row = 0; row < size; ++row) {
       var target = (y + row) * planeWidth + x;
-      for (var column = 0; column < size; ++column) {
-        var value = pred[row * size + column] + residual[row * size + column];
-        plane[target + column] = (byte)Math.Clamp(value, 0, 255);
-      }
+      for (var column = 0; column < size; ++column)
+        plane[target + column] = (byte)Math.Clamp(pred[row * size + column] + residual[row * size + column], 0, 255);
+    }
+  }
+
+  private static void _AddResidualInPlace(
+    byte[] plane, int planeWidth, int x, int y, int size, ReadOnlySpan<int> residual) {
+    for (var row = 0; row < size; ++row) {
+      var target = (y + row) * planeWidth + x;
+      for (var column = 0; column < size; ++column)
+        plane[target + column] = (byte)Math.Clamp(plane[target + column] + residual[row * size + column], 0, 255);
     }
   }
 
