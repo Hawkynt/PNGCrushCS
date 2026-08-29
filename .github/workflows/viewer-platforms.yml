@@ -1,0 +1,65 @@
+name: Viewer platforms
+
+on:
+  push:
+    branches-ignore:
+      - main
+    paths:
+      - 'Crush.Viewer/**'
+      - 'FileFormat.Core/**'
+      - 'Hawkynt.FileFormats.Images/**'
+      - 'Optimizers/Optimizer.Image/**'
+      - '.github/workflows/viewer-platforms.yml'
+  pull_request:
+    paths:
+      - 'Crush.Viewer/**'
+      - 'FileFormat.Core/**'
+      - 'Hawkynt.FileFormats.Images/**'
+      - 'Optimizers/Optimizer.Image/**'
+      - '.github/workflows/viewer-platforms.yml'
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  viewer-smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout PNGCrushCS
+        uses: actions/checkout@v4
+        with:
+          path: PNGCrushCS
+          fetch-depth: 1
+
+      - name: Checkout CompressionWorkbench sibling
+        uses: actions/checkout@v4
+        with:
+          repository: Hawkynt/CompressionWorkbench
+          path: CompressionWorkbench
+          fetch-depth: 1
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.x
+            9.x
+            10.x
+
+      - name: Build viewer
+        working-directory: PNGCrushCS
+        run: dotnet build Crush.Viewer/Crush.Viewer.csproj -c Debug --nologo -p:EnableSingleFileBundle=false
+
+      - name: Smoke-test empty startup (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        working-directory: PNGCrushCS
+        run: xvfb-run -a dotnet run --project Crush.Viewer/Crush.Viewer.csproj -c Debug --no-build --no-restore -p:EnableSingleFileBundle=false -- --smoke-test
+
+      - name: Smoke-test empty startup (Windows/macOS)
+        if: runner.os != 'Linux'
+        working-directory: PNGCrushCS
+        run: dotnet run --project Crush.Viewer/Crush.Viewer.csproj -c Debug --no-build --no-restore -p:EnableSingleFileBundle=false -- --smoke-test

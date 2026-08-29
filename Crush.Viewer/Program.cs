@@ -1,141 +1,99 @@
 using System;
-using System.Diagnostics;
-using System.Drawing;
-using System.Drawing.Drawing2D;
-using System.Drawing.Imaging;
 using System.IO;
-using System.Windows.Forms;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Themes.Fluent;
+using FileFormat.Core;
+using ImageRegistry = Hawkynt.FileFormats.Images.FormatRegistry;
 
 namespace Crush.Viewer;
 
 internal static class Program {
 
-  private const string _SCREENSHOT_SWITCH = "--screenshot";
-  private static readonly TimeSpan _SCREENSHOT_TIMEOUT = TimeSpan.FromSeconds(30);
-
   [STAThread]
-  static int Main(string[] args) {
-    Application.EnableVisualStyles();
-    Application.SetCompatibleTextRenderingDefault(false);
-    Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
+  public static void Main(string[] args)
+    => AppBuilder.Configure<Application>()
+      .UsePlatformDetect()
+      .WithInterFont()
+      .Start(_Run, args);
 
-    var form = new MainForm();
-    var screenshotPath = _GetScreenshotPath(args);
-    if (screenshotPath != null)
-      return _RunScreenshotCapture(form, screenshotPath);
+  private static void _Run(Application app, string[] args) {
+    app.Styles.Add(new FluentTheme());
 
-    if (args.Length > 0)
-      form.OpenFileOnLoad(args[0]);
-
-    Application.Run(form);
-    return 0;
-  }
-
-  private static string? _GetScreenshotPath(string[] args) {
-    var index = Array.FindIndex(args, arg => string.Equals(arg, _SCREENSHOT_SWITCH, StringComparison.OrdinalIgnoreCase));
-    if (index < 0)
-      return null;
-    if (index + 1 >= args.Length || string.IsNullOrWhiteSpace(args[index + 1]))
-      throw new ArgumentException($"{_SCREENSHOT_SWITCH} requires an output path.", nameof(args));
-    return Path.GetFullPath(args[index + 1]);
-  }
-
-  private static int _RunScreenshotCapture(MainForm form, string screenshotPath) {
-    var fixturePath = Path.Combine(Path.GetTempPath(), $"pngcrushcs-viewer-{Guid.NewGuid():N}.png");
-    _CreateScreenshotFixture(fixturePath);
-    form.OpenFileOnLoad(fixturePath);
-
-    var stopwatch = Stopwatch.StartNew();
-    var exitCode = 1;
-    using var timer = new System.Windows.Forms.Timer { Interval = 100 };
-
-    form.Shown += (_, _) => timer.Start();
-    timer.Tick += (_, _) => {
-      if (stopwatch.Elapsed >= _SCREENSHOT_TIMEOUT) {
-        timer.Stop();
-        form.Close();
-        return;
-      }
-
-      if (!form.Enabled || string.Equals(form.Text, "Crush Viewer", StringComparison.Ordinal))
-        return;
-
-      timer.Stop();
-      try {
-        Directory.CreateDirectory(Path.GetDirectoryName(screenshotPath)!);
-        form.PerformLayout();
-        using var screenshot = new Bitmap(form.ClientSize.Width, form.ClientSize.Height, PixelFormat.Format32bppArgb);
-        form.DrawToBitmap(screenshot, new Rectangle(Point.Empty, screenshot.Size));
-        screenshot.Save(screenshotPath, ImageFormat.Png);
-        exitCode = 0;
-      } finally {
-        form.Close();
-      }
-    };
-
+    var options = ViewerLaunchOptions.Parse(args);
+    string? fixturePath = null;
     try {
-      Application.Run(form);
-      return exitCode;
+      if (options.ScreenshotPath != null && options.InitialPath == null) {
+        fixturePath = _CreateScreenshotFixture();
+        options = options with { InitialPath = fixturePath };
+      }
+
+      var window = new MainWindow(options);
+      window.Show();
+      app.Run(window);
     } finally {
-      try { File.Delete(fixturePath); } catch (IOException) { }
-      try { File.Delete(fixturePath + ".pal"); } catch (IOException) { }
+      if (fixturePath != null) {
+        try { File.Delete(fixturePath); } catch { }
+      }
     }
   }
 
-  private static void _CreateScreenshotFixture(string path) {
-    const int width = 720;
-    const int height = 420;
-    using var bitmap = new Bitmap(width, height, PixelFormat.Format32bppArgb);
-    using var graphics = Graphics.FromImage(bitmap);
-    graphics.SmoothingMode = SmoothingMode.AntiAlias;
-    graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+  private static string _CreateScreenshotFixture() {
+    const int width = 960;
+    const int height = 540;
+    var pixels = new byte[width * height * 4];
 
-    using (var background = new LinearGradientBrush(
-      new Rectangle(0, 0, width, height),
-      Color.FromArgb(22, 31, 52),
-      Color.FromArgb(76, 43, 100),
-      28f
-    ))
-      graphics.FillRectangle(background, 0, 0, width, height);
+    for (var y = 0; y < height; ++y)
+      for (var x = 0; x < width; ++x) {
+        var i = (y * width + x) * 4;
+        var tile = ((x / 80) + (y / 80)) & 1;
+        var fx = x / (double)(width - 1);
+        var fy = y / (double)(height - 1);
+        pixels[i] = (byte)(35 + 150 * fy + tile * 18);
+        pixels[i + 1] = (byte)(45 + 145 * fx);
+        pixels[i + 2] = (byte)(160 + 70 * (1 - fy));
+        pixels[i + 3] = 255;
+      }
 
-    using (var glow = new SolidBrush(Color.FromArgb(70, 56, 189, 248)))
-      graphics.FillEllipse(glow, 405, -105, 390, 390);
-    using (var glow = new SolidBrush(Color.FromArgb(65, 244, 114, 182)))
-      graphics.FillEllipse(glow, -135, 220, 360, 360);
-
-    using var gridPen = new Pen(Color.FromArgb(30, 255, 255, 255), 1f);
-    for (var x = 0; x < width; x += 40)
-      graphics.DrawLine(gridPen, x, 0, x, height);
-    for (var y = 0; y < height; y += 40)
-      graphics.DrawLine(gridPen, 0, y, width, y);
-
-    using var titleFont = new Font("Segoe UI", 38f, FontStyle.Bold, GraphicsUnit.Pixel);
-    using var subtitleFont = new Font("Segoe UI", 20f, FontStyle.Regular, GraphicsUnit.Pixel);
-    using var smallFont = new Font("Consolas", 15f, FontStyle.Regular, GraphicsUnit.Pixel);
-    using var white = new SolidBrush(Color.White);
-    using var muted = new SolidBrush(Color.FromArgb(215, 226, 238));
-    using var accent = new SolidBrush(Color.FromArgb(126, 231, 255));
-
-    graphics.DrawString("PNGCrushCS", titleFont, white, 56, 70);
-    graphics.DrawString("Crush Viewer", subtitleFont, accent, 59, 126);
-    graphics.DrawString("pure-managed image formats · inspect · transform · convert", smallFont, muted, 60, 178);
-
-    var swatches = new[] {
-      Color.FromArgb(255, 239, 91, 91),
-      Color.FromArgb(255, 246, 189, 96),
-      Color.FromArgb(255, 78, 205, 196),
-      Color.FromArgb(255, 90, 160, 255),
-      Color.FromArgb(255, 186, 104, 255),
+    var image = new RawImage {
+      Width = width,
+      Height = height,
+      Format = FileFormat.Core.PixelFormat.Bgra32,
+      PixelData = pixels,
     };
-    for (var i = 0; i < swatches.Length; ++i) {
-      using var brush = new SolidBrush(swatches[i]);
-      graphics.FillRectangle(brush, new Rectangle(60 + i * 74, 245, 54, 54));
+
+    var path = Path.Combine(Path.GetTempPath(), $"pngcrushcs-viewer-{Guid.NewGuid():N}.png");
+    if (!ImageRegistry.Write(image, ImageFormat.Png, new FileInfo(path)))
+      throw new InvalidOperationException("PNG writer could not create the viewer screenshot fixture.");
+    return path;
+  }
+}
+
+internal sealed record ViewerLaunchOptions(string? InitialPath, string? ScreenshotPath, bool SmokeTest) {
+
+  internal static ViewerLaunchOptions Parse(string[] args) {
+    string? initialPath = null;
+    string? screenshotPath = null;
+    var smokeTest = false;
+
+    for (var i = 0; i < args.Length; ++i) {
+      switch (args[i]) {
+        case "--screenshot" when i + 1 < args.Length:
+          screenshotPath = Path.GetFullPath(args[++i]);
+          break;
+        case "--smoke-test":
+          smokeTest = true;
+          break;
+        case "--open" when i + 1 < args.Length:
+          initialPath = Path.GetFullPath(args[++i]);
+          break;
+        default:
+          if (!args[i].StartsWith('-', StringComparison.Ordinal) && initialPath == null)
+            initialPath = Path.GetFullPath(args[i]);
+          break;
+      }
     }
 
-    using var outline = new Pen(Color.FromArgb(180, 255, 255, 255), 2f);
-    graphics.DrawRectangle(outline, new Rectangle(56, 236, 386, 72));
-    graphics.DrawString("lossless fixture.png", smallFont, muted, 60, 334);
-
-    bitmap.Save(path, ImageFormat.Png);
+    return new(initialPath, screenshotPath, smokeTest);
   }
 }
