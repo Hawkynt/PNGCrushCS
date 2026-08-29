@@ -34,6 +34,9 @@ internal sealed class H264Picture {
   /// <summary>Frame picture order count used to construct B-slice reference lists and presentation order.</summary>
   internal int PicOrderCnt { get; set; }
 
+  /// <summary>Motion metadata used when this picture becomes the co-located picture of temporal direct prediction.</summary>
+  internal H264MotionField? Motion { get; set; }
+
   internal bool IsLongTerm { get; set; }
   internal int LongTermFrameIdx { get; set; } = -1;
   internal int LongTermPicNum => this.LongTermFrameIdx;
