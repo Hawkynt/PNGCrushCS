@@ -7,10 +7,11 @@ name: CI
 #                            project falls back to its non-CW code path).
 
 on:
-  push:
-    branches: [main, master]
   pull_request:
     branches: [main, master]
+  # Nothing runs this on a push to main any more, so this is how you check a squash merge by hand —
+  # the one commit no run has seen, which is the trade-off the pull-request gate accepts.
+  workflow_dispatch:
   workflow_call:
     inputs:
       skip-coverage:
