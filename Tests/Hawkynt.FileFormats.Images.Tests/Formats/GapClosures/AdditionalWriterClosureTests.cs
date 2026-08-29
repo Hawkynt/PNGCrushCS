@@ -1,8 +1,10 @@
 using System;
+using System.Text;
 using FileFormat.ChinonEs1000;
 using FileFormat.Core;
 using FileFormat.Fff;
 using FileFormat.Hta;
+using FileFormat.KodakDc25;
 using FileFormat.PicturePublisher;
 using FileFormat.PicturePublisher4;
 using FileFormat.PostScript;
@@ -36,6 +38,14 @@ public sealed class AdditionalWriterClosureTests {
       pixels[at + 2] = (byte)(48 + 144L * (x + y) / Math.Max(1, width + height - 2));
     }
     return new() { Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = pixels };
+  }
+
+  private static double _Mae(byte[] expected, byte[] actual) {
+    Assert.That(actual.Length, Is.EqualTo(expected.Length));
+    long absoluteError = 0;
+    for (var i = 0; i < expected.Length; ++i)
+      absoluteError += Math.Abs(expected[i] - actual[i]);
+    return absoluteError / (double)expected.Length;
   }
 
   [Test]
@@ -111,11 +121,7 @@ public sealed class AdditionalWriterClosureTests {
     var source = _SmoothPattern(ChinonEs1000File.Width, ChinonEs1000File.Height);
     var bytes = ChinonEs1000Writer.ToBytes(ChinonEs1000File.FromRawImage(source));
     var decoded = ChinonEs1000File.ToRawImage(ChinonEs1000Reader.FromBytes(bytes));
-
-    long absoluteError = 0;
-    for (var i = 0; i < source.PixelData.Length; ++i)
-      absoluteError += Math.Abs(source.PixelData[i] - decoded.PixelData[i]);
-    var mae = absoluteError / (double)source.PixelData.Length;
+    var mae = _Mae(source.PixelData, decoded.PixelData);
 
     Assert.Multiple(() => {
       Assert.That(bytes.Length, Is.EqualTo(ChinonEs1000File.FileSize));
@@ -123,6 +129,24 @@ public sealed class AdditionalWriterClosureTests {
       Assert.That(decoded.Width, Is.EqualTo(ChinonEs1000File.Width));
       Assert.That(decoded.Height, Is.EqualTo(ChinonEs1000File.Height));
       Assert.That(mae, Is.LessThan(80.0), $"inverse sensor synthesis MAE was {mae:F2}");
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void KodakDc25_InverseComplementaryCfaWritesMetadataValidRawWithBoundedError() {
+    var source = _SmoothPattern(KodakDc25File.WideOutputWidth, KodakDc25File.WideOutputHeight);
+    var bytes = KodakDc25Writer.ToBytes(KodakDc25File.FromRawImage(source));
+    var decoded = KodakDc25File.ToRawImage(KodakDc25Reader.FromBytes(bytes));
+    var mae = _Mae(source.PixelData, decoded.PixelData);
+
+    Assert.Multiple(() => {
+      Assert.That(bytes.Length, Is.EqualTo(KodakDc25File.SensorOffset + KodakDc25File.WideSensorWidth * KodakDc25File.SensorHeight));
+      Assert.That(bytes.AsSpan(0, 4).ToArray(), Is.EqualTo(new byte[] { (byte)'M', (byte)'M', 0, 42 }));
+      Assert.That(Encoding.ASCII.GetString(bytes, 0, KodakDc25File.SensorOffset), Does.Contain(KodakDc25File.Model));
+      Assert.That(decoded.Width, Is.EqualTo(KodakDc25File.WideOutputWidth));
+      Assert.That(decoded.Height, Is.EqualTo(KodakDc25File.WideOutputHeight));
+      Assert.That(mae, Is.LessThan(70.0), $"inverse complementary sensor synthesis MAE was {mae:F2}");
     });
   }
 
