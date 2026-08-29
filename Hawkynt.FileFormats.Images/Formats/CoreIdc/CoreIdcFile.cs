@@ -25,7 +25,7 @@ namespace FileFormat.CoreIdc;
 /// </remarks>
 [FormatDetectionPriority(999)]
 public readonly record struct CoreIdcFile
-  : IImageFormatReader<CoreIdcFile>, IImageToRawImage<CoreIdcFile> {
+  : IImageFormatReader<CoreIdcFile>, IImageToRawImage<CoreIdcFile>, IImageFromRawImage<CoreIdcFile>, IImageFormatWriter<CoreIdcFile> {
 
   /// <summary>How long the trailer is.</summary>
   public const int TrailerSize = 32;
@@ -40,6 +40,7 @@ public readonly record struct CoreIdcFile
   static string[] IImageFormatMetadata<CoreIdcFile>.FileExtensions => [".idc"];
   static CoreIdcFile IImageFormatReader<CoreIdcFile>.FromSpan(ReadOnlySpan<byte> data)
     => CoreIdcReader.FromSpan(data);
+  static byte[] IImageFormatWriter<CoreIdcFile>.ToBytes(CoreIdcFile file) => CoreIdcWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<CoreIdcFile>.VideoModes => [
     new("Core IDC", [(IntegerRange.Any, IntegerRange.Any)], [2, 16, 256, 16777216])
   ];
@@ -117,5 +118,22 @@ public readonly record struct CoreIdcFile
       default:
         throw new InvalidOperationException($"Core IDC: {file.BitsPerPixel} bits a pixel is not a depth this reads.");
     }
+  }
+
+  /// <summary>Creates the lossless colour representation: three whole eight-bit planes in R, G, B order.</summary>
+  public static CoreIdcFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width < 1 || image.Height < 1)
+      throw new ArgumentException("Core IDC requires positive dimensions.", nameof(image));
+
+    var rgb = image.EnsureFormat(PixelFormat.Rgb24);
+    var pixels = checked(rgb.Width * rgb.Height);
+    return new() {
+      Width = rgb.Width,
+      Height = rgb.Height,
+      Planes = 3,
+      BitsPerPixel = 8,
+      PixelData = PixelConverter.InterleavedToBandSequential(rgb.PixelData, pixels, 3),
+    };
   }
 }
