@@ -16,7 +16,12 @@ public static class RawImageExtensions {
   /// <summary>Returns the image in <paramref name="format"/>, converting only when it isn't already.</summary>
   public static RawImage EnsureFormat(this RawImage image, PixelFormat format) {
     ArgumentNullException.ThrowIfNull(image);
-    return image.Format == format ? image : FastRawImageConverter.Convert(image, format);
+    if (image.Format == format)
+      return image;
+
+    return PackedPixelIntrinsics.TryConvert(image, format, out var converted)
+      ? converted
+      : FastRawImageConverter.Convert(image, format);
   }
 
   /// <summary>Returns the image unchanged when it already uses one of <paramref name="accepted"/>,
@@ -30,7 +35,9 @@ public static class RawImageExtensions {
       if (image.Format == format)
         return image;
 
-    return FastRawImageConverter.Convert(image, accepted[0]);
+    return PackedPixelIntrinsics.TryConvert(image, accepted[0], out var converted)
+      ? converted
+      : FastRawImageConverter.Convert(image, accepted[0]);
   }
 
   /// <summary>Returns the image as <paramref name="format"/> with its indices addressing
