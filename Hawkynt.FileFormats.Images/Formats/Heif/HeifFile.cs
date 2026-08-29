@@ -22,13 +22,16 @@ public readonly record struct HeifImage {
 /// ordinary single-image contract, while every directly coded top-level image is available through
 /// <see cref="IMultiImageFileFormat{TSelf}"/>.
 /// <para/>
-/// The writer beside this type remains unregistered: it predates the HEVC encoder and does not emit a
-/// conforming HEIF image item. Read support must not be used as evidence that this format is writable.
+/// Writing emits one <c>hvc1</c> Main-Still-Picture item. The first encoder profile deliberately uses
+/// HEVC's normative PCM coding-unit mode: the output is large but lossless at the YUV sample level
+/// and is a real HEVC bitstream rather than the former raw-RGB payload in an HEIF-shaped box tree.
 /// </remarks>
 [FormatMimeType("image/heif")]
 public readonly record struct HeifFile :
   IImageFormatReader<HeifFile>,
   IImageToRawImage<HeifFile>,
+  IImageFromRawImage<HeifFile>,
+  IImageFormatWriter<HeifFile>,
   IImageInfoReader<HeifFile>,
   IMultiImageFileFormat<HeifFile> {
 
@@ -36,6 +39,7 @@ public readonly record struct HeifFile :
   static string[] IImageFormatMetadata<HeifFile>.FileExtensions => [".heic", ".heif"];
   static FormatCapability IImageFormatMetadata<HeifFile>.Capabilities => FormatCapability.MultiImage;
   static HeifFile IImageFormatReader<HeifFile>.FromSpan(ReadOnlySpan<byte> data) => HeifReader.FromSpan(data);
+  static byte[] IImageFormatWriter<HeifFile>.ToBytes(HeifFile file) => HeifWriter.ToBytes(file);
 
   public static ImageInfo? ReadImageInfo(ReadOnlySpan<byte> header) => HeifReader.ReadImageInfo(header);
 
@@ -126,7 +130,7 @@ public readonly record struct HeifFile :
       Width = image.Width,
       Height = image.Height,
       PixelData = pixelData,
-      RawImageData = pixelData[..],
+      RawImageData = [],
       Brand = "heic",
       Images = [],
     };
