@@ -118,6 +118,13 @@ public sealed class WriterAcceptanceTests {
   /// what happened. A tool judged these and said no.
   /// </summary>
   private static readonly Dictionary<ImageFormat, string> _JudgedAndRejected = new() {
+    [ImageFormat.Ai] =
+      "ImageMagick reads .ai by handing it to Ghostscript, which rejects ours with \"/undefined in "
+      + "XI\". That is accurate: the writer emits Adobe's private XI revisable-raster operator under "
+      + "an empty prolog, and XI is defined only by Illustrator's own procset, so no PostScript "
+      + "interpreter has it. The file opens in Illustrator and nowhere else. Writing a prolog that "
+      + "defines XI in terms of colorimage would make it renderable anywhere, and inventing those "
+      + "semantics rather than taking them from Adobe's specification is not something to guess at",
     [ImageFormat.JpegXl] =
       "ImageMagick reads .jxl and rejects what this writer produces. The modular encoder emits a "
       + "codestream libjxl will not decode, which the package README records as the one refused "
