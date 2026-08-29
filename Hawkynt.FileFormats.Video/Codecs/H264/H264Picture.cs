@@ -25,6 +25,12 @@ internal sealed class H264Picture {
   internal int FrameNum { get; set; }
   internal int PicNum { get; set; }
 
+  /// <summary>TopFieldOrderCnt of clause 8.2.1, retained for temporal direct prediction.</summary>
+  internal int TopFieldOrderCnt { get; set; }
+
+  /// <summary>BottomFieldOrderCnt of clause 8.2.1, retained for temporal direct prediction.</summary>
+  internal int BottomFieldOrderCnt { get; set; }
+
   /// <summary>Frame picture order count used to construct B-slice reference lists and presentation order.</summary>
   internal int PicOrderCnt { get; set; }
 
