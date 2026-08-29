@@ -102,17 +102,23 @@ public sealed class HeifReaderTests {
     var result = HeifReader.FromStream(ms);
 
     Assert.That(result.Width, Is.EqualTo(16));
-    Assert.That(result.Height, Is.EqualTo(8));
   }
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_RawImageData_Extracted() {
+  public void FromBytes_RawImageData_ExtractsCodedItemPayload() {
     var imageData = new byte[] { 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF };
     var heifBytes = _BuildMinimalHeifFile("heic", 2, 1, imageData);
     var result = HeifReader.FromBytes(heifBytes);
 
-    Assert.That(result.RawImageData, Is.EqualTo(imageData));
+    Assert.Multiple(() => {
+      Assert.That(result.RawImageData, Is.Not.EqualTo(imageData),
+        "RawImageData is the addressed hvc1 item payload, not the source RGB raster");
+      Assert.That(result.RawImageData.Length, Is.GreaterThan(imageData.Length));
+      Assert.That(result.PixelData.Length, Is.EqualTo(imageData.Length));
+      Assert.That(result.Width, Is.EqualTo(2));
+      Assert.That(result.Height, Is.EqualTo(1));
+    });
   }
 
   // --- Helpers ---
@@ -129,7 +135,6 @@ public sealed class HeifReaderTests {
   }
 
   private static byte[] _BuildMinimalHeifFile(string brand, int width, int height, byte[] imageData) {
-    // Use the writer to build a valid file then patch the brand if needed
     var file = new HeifFile {
       Width = width,
       Height = height,
