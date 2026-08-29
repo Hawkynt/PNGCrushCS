@@ -19,7 +19,7 @@ namespace FileFormat.SecretPhotos;
 /// never meant.
 /// </remarks>
 public readonly record struct SecretPhotosFile
-  : IImageFormatReader<SecretPhotosFile>, IImageToRawImage<SecretPhotosFile> {
+  : IImageFormatReader<SecretPhotosFile>, IImageToRawImage<SecretPhotosFile>, IImageFromRawImage<SecretPhotosFile>, IImageFormatWriter<SecretPhotosFile> {
 
   /// <summary>The four bytes every one of these opens with.</summary>
   public static ReadOnlySpan<byte> Magic => [0x00, 0x00, 0x00, 0x01];
@@ -30,6 +30,7 @@ public readonly record struct SecretPhotosFile
   static string IImageFormatMetadata<SecretPhotosFile>.PrimaryExtension => ".xp0";
   static string[] IImageFormatMetadata<SecretPhotosFile>.FileExtensions => [".xp0"];
   static SecretPhotosFile IImageFormatReader<SecretPhotosFile>.FromSpan(ReadOnlySpan<byte> data) => SecretPhotosReader.FromSpan(data);
+  static byte[] IImageFormatWriter<SecretPhotosFile>.ToBytes(SecretPhotosFile file) => SecretPhotosWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<SecretPhotosFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [16777216])
   ];
@@ -45,4 +46,13 @@ public readonly record struct SecretPhotosFile
 
   public static RawImage ToRawImage(SecretPhotosFile file)
     => JpegFile.ToRawImage(JpegReader.FromBytes(file.Embedded ?? throw new InvalidDataException("A SecretPhotos puzzle carries no JPEG.")));
+
+  public static SecretPhotosFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      Embedded = JpegWriter.ToBytes(JpegFile.FromRawImage(image)),
+    };
+  }
 }
