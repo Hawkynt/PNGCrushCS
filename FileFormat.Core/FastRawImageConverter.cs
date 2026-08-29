@@ -367,13 +367,13 @@ public static class FastRawImageConverter {
 
   private static RawImageColorInfo _ResolveYuvColorInfo(RawImage source, RawImageColorInfo? requested) {
     if (requested != null) {
-      var matrix = requested.Matrix is RawMatrixCoefficients.Unspecified or RawMatrixCoefficients.Identity
+      var requestedMatrix = requested.Matrix is RawMatrixCoefficients.Unspecified or RawMatrixCoefficients.Identity
         ? _DefaultMatrix(source.Width, source.Height)
         : requested.Matrix;
-      var range = requested.Range == RawColorRange.Unspecified ? RawColorRange.Limited : requested.Range;
+      var requestedRange = requested.Range == RawColorRange.Unspecified ? RawColorRange.Limited : requested.Range;
       return requested with {
-        Matrix = matrix,
-        Range = range,
+        Matrix = requestedMatrix,
+        Range = requestedRange,
         ChromaLocation = requested.ChromaLocation == RawChromaLocation.Unspecified ? RawChromaLocation.Left : requested.ChromaLocation,
       };
     }
