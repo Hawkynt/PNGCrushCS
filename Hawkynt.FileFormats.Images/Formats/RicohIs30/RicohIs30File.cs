@@ -20,7 +20,7 @@ namespace FileFormat.RicohIs30;
 /// how the converter derives it. At two bits a pixel the four values are a grey ramp with zero white
 /// and three black.
 /// </remarks>
-public readonly record struct RicohIs30File : IImageFormatReader<RicohIs30File>, IImageToRawImage<RicohIs30File> {
+public readonly record struct RicohIs30File : IImageFormatReader<RicohIs30File>, IImageToRawImage<RicohIs30File>, IImageFromRawImage<RicohIs30File>, IImageFormatWriter<RicohIs30File> {
 
   /// <summary>The two bytes the file opens with.</summary>
   public static ReadOnlySpan<byte> Signature => [0x01, 0x00];
@@ -49,6 +49,7 @@ public readonly record struct RicohIs30File : IImageFormatReader<RicohIs30File>,
   static string IImageFormatMetadata<RicohIs30File>.PrimaryExtension => ".pig";
   static string[] IImageFormatMetadata<RicohIs30File>.FileExtensions => [".pig"];
   static RicohIs30File IImageFormatReader<RicohIs30File>.FromSpan(ReadOnlySpan<byte> data) => RicohIs30Reader.FromSpan(data);
+  static byte[] IImageFormatWriter<RicohIs30File>.ToBytes(RicohIs30File file) => RicohIs30Writer.ToBytes(file);
 
   static VideoMode[] IImageFormatMetadata<RicohIs30File>.VideoModes => [
     new("Bilevel", [(IntegerRange.Any, IntegerRange.Any)], [2]),
@@ -100,6 +101,31 @@ public readonly record struct RicohIs30File : IImageFormatReader<RicohIs30File>,
       PixelData = indices,
       Palette = file.BitsPerPixel == 1 ? _BlackWhitePalette[..] : _FourGreyPalette[..],
       PaletteCount = file.BitsPerPixel == 1 ? 2 : 4,
+    };
+  }
+
+  /// <summary>Creates the four-grey variant, padding only the right edge to the row width the header can represent.</summary>
+  public static RicohIs30File FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width < 1 || image.Height is < 1 or > 65535)
+      throw new ArgumentException("Ricoh IS30 requires positive dimensions and at most 65535 rows.", nameof(image));
+
+    var width = checked((image.Width + 3) & ~3);
+    var bytesPerRow = width / 4;
+    if (bytesPerRow > 9999)
+      throw new ArgumentException($"Ricoh IS30 can hold at most 39996 pixels across at 2bpp; got {image.Width}.", nameof(image));
+
+    var indexed = image.EnsureIndexed(PixelFormat.Indexed8, _FourGreyPalette);
+    var padded = new byte[checked(width * image.Height)];
+    for (var y = 0; y < image.Height; ++y)
+      indexed.PixelData.AsSpan(y * image.Width, image.Width).CopyTo(padded.AsSpan(y * width));
+
+    return new() {
+      Width = width,
+      Height = image.Height,
+      BitsPerPixel = 2,
+      Resolution = 300,
+      PixelData = PackedRows.Pack(padded, width, image.Height, 2),
     };
   }
 }
