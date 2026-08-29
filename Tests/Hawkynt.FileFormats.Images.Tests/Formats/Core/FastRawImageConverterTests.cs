@@ -135,4 +135,51 @@ public sealed class FastRawImageConverterTests {
     Assert.That(yuv.Format, Is.EqualTo(PixelFormat.Yuv420P8));
     Assert.That(yuv.HasEnoughPixelData, Is.True);
   }
+
+  [Test]
+  [Category("Unit")]
+  public void PackedWriterCoercionMatchesScalarChannelAndRgb565Layout() {
+    const int pixels = 8;
+    var bgra = new byte[pixels * 4];
+    for (var i = 0; i < pixels; ++i) {
+      bgra[i * 4] = (byte)(11 + i * 23);
+      bgra[i * 4 + 1] = (byte)(19 + i * 17);
+      bgra[i * 4 + 2] = (byte)(31 + i * 13);
+      bgra[i * 4 + 3] = (byte)(255 - i * 9);
+    }
+
+    var source = new RawImage { Width = pixels, Height = 1, Format = PixelFormat.Bgra32, PixelData = bgra };
+    var rgb = source.EnsureFormat(PixelFormat.Rgb24);
+    var rgba = source.EnsureFormat(PixelFormat.Rgba32);
+    var rgb565 = source.EnsureFormat(PixelFormat.Rgb565);
+
+    for (var i = 0; i < pixels; ++i) {
+      var src = i * 4;
+      var rgbAt = i * 3;
+      Assert.Multiple(() => {
+        Assert.That(rgb.PixelData[rgbAt], Is.EqualTo(bgra[src + 2]));
+        Assert.That(rgb.PixelData[rgbAt + 1], Is.EqualTo(bgra[src + 1]));
+        Assert.That(rgb.PixelData[rgbAt + 2], Is.EqualTo(bgra[src]));
+        Assert.That(rgba.PixelData[src], Is.EqualTo(bgra[src + 2]));
+        Assert.That(rgba.PixelData[src + 1], Is.EqualTo(bgra[src + 1]));
+        Assert.That(rgba.PixelData[src + 2], Is.EqualTo(bgra[src]));
+        Assert.That(rgba.PixelData[src + 3], Is.EqualTo(bgra[src + 3]));
+      });
+
+      var expected565 = (ushort)(((bgra[src + 2] >> 3) << 11) | ((bgra[src + 1] >> 2) << 5) | (bgra[src] >> 3));
+      var actual565 = (ushort)(rgb565.PixelData[i * 2] | (rgb565.PixelData[i * 2 + 1] << 8));
+      Assert.That(actual565, Is.EqualTo(expected565));
+    }
+
+    var restoredBgra = rgb.EnsureFormat(PixelFormat.Bgra32);
+    for (var i = 0; i < pixels; ++i) {
+      var src = i * 4;
+      Assert.Multiple(() => {
+        Assert.That(restoredBgra.PixelData[src], Is.EqualTo(bgra[src]));
+        Assert.That(restoredBgra.PixelData[src + 1], Is.EqualTo(bgra[src + 1]));
+        Assert.That(restoredBgra.PixelData[src + 2], Is.EqualTo(bgra[src + 2]));
+        Assert.That(restoredBgra.PixelData[src + 3], Is.EqualTo(255));
+      });
+    }
+  }
 }
