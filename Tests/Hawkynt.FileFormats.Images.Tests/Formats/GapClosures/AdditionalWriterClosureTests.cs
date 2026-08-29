@@ -4,6 +4,7 @@ using FileFormat.ChinonEs1000;
 using FileFormat.Core;
 using FileFormat.Fff;
 using FileFormat.Hta;
+using FileFormat.Illustrator;
 using FileFormat.KodakDc25;
 using FileFormat.PicturePublisher;
 using FileFormat.PicturePublisher4;
@@ -95,6 +96,26 @@ public sealed class AdditionalWriterClosureTests {
       Assert.That(rendering.Image.Height, Is.EqualTo(source.Height));
       Assert.That(rendering.HasInk, Is.True);
       Assert.That(rendering.PagesShown, Is.GreaterThanOrEqualTo(1));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void Illustrator6_NativeXiRasterRoundTrip_IsPixelExactAndIdentifiesNativeSyntax() {
+    var source = _Pattern(29, 21);
+    var bytes = AiWriter.ToBytes(AiFile.FromRawImage(source));
+    var text = Encoding.ASCII.GetString(bytes);
+    var parsed = AiReader.FromBytes(bytes);
+    var decoded = AiFile.ToRawImage(parsed);
+
+    Assert.Multiple(() => {
+      Assert.That(parsed.Raster, Is.Not.Null);
+      Assert.That(parsed.Version, Does.Contain("AI5_FileFormat 2.0"));
+      Assert.That(text, Does.Contain("%AI5_BeginRaster"));
+      Assert.That(text, Does.Contain("8 3 0 0 0 0 XI"));
+      Assert.That(decoded.Width, Is.EqualTo(source.Width));
+      Assert.That(decoded.Height, Is.EqualTo(source.Height));
+      Assert.That(decoded.ToRgb24(), Is.EqualTo(source.PixelData));
     });
   }
 
