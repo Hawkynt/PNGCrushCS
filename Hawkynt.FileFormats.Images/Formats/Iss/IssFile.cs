@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.Intrinsics;
 using FileFormat.Core;
 
 namespace FileFormat.Iss;

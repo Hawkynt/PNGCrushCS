@@ -422,7 +422,12 @@ public static class FastRawImageConverter {
       (RawColorRange.Limited, RawMatrixCoefficients.Bt709) => new(47, 157, 16, 16, -26, -87, 112, 112, -102, -10),
       (RawColorRange.Limited, RawMatrixCoefficients.Bt2020NonConstantLuminance) => new(58, 149, 13, 16, -32, -82, 114, 114, -104, -10),
       (RawColorRange.Full, RawMatrixCoefficients.Bt601) => new(77, 150, 29, 0, -43, -85, 128, 128, -107, -21),
-      (RawColorRange.Full, RawMatrixCoefficients.Bt709) => new(54, 183, 18, 0, -29, -99, 128, 128, -116, -12),
+      // 54 + 183 + 19 is 256, not the 54 + 183 + 18 that rounding each weight on its own produces.
+      // A luma triple summing to 255 loses a step on every neutral grey — 192 came back 191 — and
+      // both siblings below already sum to 256. The spare step goes to blue because blue carries the
+      // largest discarded remainder (0.483 against red's 0.426), which is the smallest total error
+      // available.
+      (RawColorRange.Full, RawMatrixCoefficients.Bt709) => new(54, 183, 19, 0, -29, -99, 128, 128, -116, -12),
       (RawColorRange.Full, RawMatrixCoefficients.Bt2020NonConstantLuminance) => new(67, 174, 15, 0, -36, -92, 128, 128, -118, -10),
       _ => default,
     };
