@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Text;
+using FileFormat.Core;
 
 namespace FileFormat.KodakDc25;
 
@@ -12,8 +13,25 @@ public static class KodakDc25Writer {
   private const ushort _TagModel = 272;
 
   public static byte[] ToBytes(KodakDc25File file) {
-    var sensor = file.SensorData ?? throw new ArgumentException("A Kodak DC25 file needs raw sensor samples.", nameof(file));
-    var sensorWidth = file.IsWideSensor ? KodakDc25File.WideSensorWidth : KodakDc25File.NarrowSensorWidth;
+    var sensor = file.SensorData;
+    var wide = file.IsWideSensor;
+
+    // Reader-produced objects historically contained only the rendered RGB. Keep those writable as
+    // well by resynthesizing the canonical wide sensor instead of making read->write a special case.
+    if (sensor == null && file.PixelData is { Length: > 0 }) {
+      sensor = KodakDc25Inverse.FromRgb(new RawImage {
+        Width = file.Width,
+        Height = file.Height,
+        Format = PixelFormat.Rgb24,
+        PixelData = file.PixelData,
+      });
+      wide = true;
+    }
+
+    if (sensor == null)
+      throw new ArgumentException("A Kodak DC25 file needs raw sensor samples or decoded RGB pixels.", nameof(file));
+
+    var sensorWidth = wide ? KodakDc25File.WideSensorWidth : KodakDc25File.NarrowSensorWidth;
     var expected = checked(sensorWidth * KodakDc25File.SensorHeight);
     if (sensor.Length != expected)
       throw new ArgumentException($"A {sensorWidth}-wide DC25 sensor needs exactly {expected} bytes, got {sensor.Length}.", nameof(file));
