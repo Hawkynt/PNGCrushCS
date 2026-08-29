@@ -17,11 +17,12 @@ namespace FileFormat.ImnetImage;
 /// <para/>
 /// As with the other fax-derived formats here, <see cref="PixelData"/> uses a set bit for black.
 /// </remarks>
-public readonly record struct ImnetImageFile : IImageFormatReader<ImnetImageFile>, IImageToRawImage<ImnetImageFile> {
+public readonly record struct ImnetImageFile : IImageFormatReader<ImnetImageFile>, IImageToRawImage<ImnetImageFile>, IImageFromRawImage<ImnetImageFile>, IImageFormatWriter<ImnetImageFile> {
 
   static string IImageFormatMetadata<ImnetImageFile>.PrimaryExtension => ".imt";
   static string[] IImageFormatMetadata<ImnetImageFile>.FileExtensions => [".imt"];
   static ImnetImageFile IImageFormatReader<ImnetImageFile>.FromSpan(ReadOnlySpan<byte> data) => ImnetImageReader.FromSpan(data);
+  static byte[] IImageFormatWriter<ImnetImageFile>.ToBytes(ImnetImageFile file) => ImnetImageWriter.ToBytes(file);
 
   /// <summary>Magic value at offset 0, a 32 bit big-endian 0x27433100, so the bytes 0x27 0x43 0x31 0x00.</summary>
   internal const uint Magic = 0x27433100;
@@ -67,6 +68,40 @@ public readonly record struct ImnetImageFile : IImageFormatReader<ImnetImageFile
       Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
+    };
+  }
+
+  /// <summary>
+  /// Creates an IMNET Group-4 page from any source image. The format stores width as whole bytes, so
+  /// a non-byte-aligned source is padded with white pixels on the right to the next multiple of eight.
+  /// </summary>
+  public static ImnetImageFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width <= 0 || image.Height <= 0)
+      throw new ArgumentException("IMNET dimensions must be positive.", nameof(image));
+
+    var paddedWidth = checked((image.Width + 7) & ~7);
+    var rgb = image.EnsureFormat(PixelFormat.Rgb24);
+    var padded = new byte[checked(paddedWidth * image.Height * 3)];
+    Array.Fill(padded, (byte)255);
+    for (var y = 0; y < image.Height; ++y)
+      rgb.PixelData.AsSpan(y * image.Width * 3, image.Width * 3).CopyTo(padded.AsSpan(y * paddedWidth * 3));
+
+    var paddedRaw = new RawImage {
+      Width = paddedWidth,
+      Height = image.Height,
+      Format = PixelFormat.Rgb24,
+      PixelData = padded,
+      ColorInfo = image.ColorInfo,
+      Metadata = image.Metadata,
+    };
+    var mono = paddedRaw.EnsureIndexed(PixelFormat.Indexed1, [255, 255, 255, 0, 0, 0]);
+    return new() {
+      Width = paddedWidth,
+      Height = image.Height,
+      Resolution = 300,
+      IsMostSignificantBitFirst = true,
+      PixelData = mono.PixelData[..],
     };
   }
 

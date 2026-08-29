@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.Intrinsics;
 using FileFormat.Core;
 
 namespace FileFormat.Iss;
@@ -21,7 +22,7 @@ namespace FileFormat.Iss;
 /// </remarks>
 [FormatMagicBytes([0x33, 0x4B, 0x43, 0x42, 0x49, 0x4D, 0x53, 0x50])]
 public readonly record struct IssFile
-  : IImageFormatReader<IssFile>, IImageToRawImage<IssFile> {
+  : IImageFormatReader<IssFile>, IImageToRawImage<IssFile>, IImageFromRawImage<IssFile>, IImageFormatWriter<IssFile> {
 
   /// <summary>The eight characters a file opens with.</summary>
   public static ReadOnlySpan<byte> Magic => "3KCBIMSP"u8;
@@ -41,6 +42,7 @@ public readonly record struct IssFile
   static string IImageFormatMetadata<IssFile>.PrimaryExtension => ".iss";
   static string[] IImageFormatMetadata<IssFile>.FileExtensions => [".iss"];
   static IssFile IImageFormatReader<IssFile>.FromSpan(ReadOnlySpan<byte> data) => IssReader.FromSpan(data);
+  static byte[] IImageFormatWriter<IssFile>.ToBytes(IssFile file) => IssWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<IssFile>.VideoModes => [
     new("ISS", [(IntegerRange.Any, IntegerRange.Any)], [2, 256])
   ];
@@ -90,6 +92,37 @@ public readonly record struct IssFile
       Height = height,
       Format = PixelFormat.Gray8,
       PixelData = pixels,
+    };
+  }
+
+  /// <summary>Creates the lossless eight-bit ISS raster from any source image.</summary>
+  public static IssFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width <= 0 || image.Height <= 0)
+      throw new ArgumentException("ISS dimensions must be positive.", nameof(image));
+
+    var gray = image.EnsureFormat(PixelFormat.Gray8);
+    var encoded = new byte[checked(gray.Width * gray.Height)];
+    // ISS stores inverted grayscale: zero is white and 255 is black.
+    if (System.Runtime.Intrinsics.Vector128.IsHardwareAccelerated) {
+      var i = 0;
+      var ff = System.Runtime.Intrinsics.Vector128.Create((byte)255);
+      for (; i + 16 <= encoded.Length; i += 16) {
+        var v = System.Runtime.Intrinsics.Vector128.LoadUnsafe(ref gray.PixelData[i]);
+        System.Runtime.Intrinsics.Vector128.Xor(v, ff).StoreUnsafe(ref encoded[i]);
+      }
+      for (; i < encoded.Length; ++i)
+        encoded[i] = (byte)(255 - gray.PixelData[i]);
+    } else {
+      for (var i = 0; i < encoded.Length; ++i)
+        encoded[i] = (byte)(255 - gray.PixelData[i]);
+    }
+
+    return new() {
+      Width = gray.Width,
+      Height = gray.Height,
+      Kind = GrayscaleKind,
+      PixelData = encoded,
     };
   }
 }

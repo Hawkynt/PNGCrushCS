@@ -24,7 +24,7 @@ namespace FileFormat.XionicsSmp;
 /// vendor's own; neither is decoded here, and both are refused by name rather than drawn as something
 /// else, because there is no file of either to check a reading against.
 /// </remarks>
-public readonly record struct XionicsSmpFile : IImageFormatReader<XionicsSmpFile>, IImageToRawImage<XionicsSmpFile> {
+public readonly record struct XionicsSmpFile : IImageFormatReader<XionicsSmpFile>, IImageToRawImage<XionicsSmpFile>, IImageFromRawImage<XionicsSmpFile>, IImageFormatWriter<XionicsSmpFile> {
 
   /// <summary>The fourteen bytes the file opens with.</summary>
   public static ReadOnlySpan<byte> Signature => [
@@ -63,6 +63,7 @@ public readonly record struct XionicsSmpFile : IImageFormatReader<XionicsSmpFile
   static string IImageFormatMetadata<XionicsSmpFile>.PrimaryExtension => ".smp";
   static string[] IImageFormatMetadata<XionicsSmpFile>.FileExtensions => [".smp"];
   static XionicsSmpFile IImageFormatReader<XionicsSmpFile>.FromSpan(ReadOnlySpan<byte> data) => XionicsSmpReader.FromSpan(data);
+  static byte[] IImageFormatWriter<XionicsSmpFile>.ToBytes(XionicsSmpFile file) => XionicsSmpWriter.ToBytes(file);
 
   static VideoMode[] IImageFormatMetadata<XionicsSmpFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])
@@ -99,4 +100,29 @@ public readonly record struct XionicsSmpFile : IImageFormatReader<XionicsSmpFile
     Palette = _BlackWhitePalette[..],
     PaletteCount = 2,
   };
+
+  /// <summary>Creates a Group-4 Xionics page, padding only the right edge to the byte width the format stores.</summary>
+  public static XionicsSmpFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width < 1 || image.Height is < 1 or > 65535)
+      throw new ArgumentException("Xionics SMP requires positive dimensions and at most 65535 rows.", nameof(image));
+
+    var width = checked((image.Width + 7) & ~7);
+    if (width > 65528)
+      throw new ArgumentException($"Xionics SMP can hold at most 65528 pixels across after byte alignment; got {image.Width}.", nameof(image));
+
+    var source = BilevelRows.Threshold(image, setWhenDark: true);
+    var padded = new byte[checked(width * image.Height)];
+    for (var y = 0; y < image.Height; ++y)
+      source.AsSpan(y * image.Width, image.Width).CopyTo(padded.AsSpan(y * width));
+
+    return new() {
+      Width = width,
+      Height = image.Height,
+      Compression = CompressionGroup4,
+      HorizontalResolution = 300,
+      VerticalResolution = 300,
+      PixelData = BilevelRows.Pack(padded, width, image.Height),
+    };
+  }
 }

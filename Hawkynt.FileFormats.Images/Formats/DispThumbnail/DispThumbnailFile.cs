@@ -18,7 +18,7 @@ namespace FileFormat.DispThumbnail;
 /// written.
 /// </remarks>
 public readonly record struct DispThumbnailFile
-  : IImageFormatReader<DispThumbnailFile>, IImageToRawImage<DispThumbnailFile> {
+  : IImageFormatReader<DispThumbnailFile>, IImageToRawImage<DispThumbnailFile>, IImageFromRawImage<DispThumbnailFile>, IImageFormatWriter<DispThumbnailFile> {
 
   /// <summary>The seven letters a thumbnail opens with.</summary>
   public static ReadOnlySpan<byte> Magic => "DISPTNL"u8;
@@ -38,6 +38,7 @@ public readonly record struct DispThumbnailFile
   static string IImageFormatMetadata<DispThumbnailFile>.PrimaryExtension => ".tnl";
   static string[] IImageFormatMetadata<DispThumbnailFile>.FileExtensions => [".tnl"];
   static DispThumbnailFile IImageFormatReader<DispThumbnailFile>.FromSpan(ReadOnlySpan<byte> data) => DispThumbnailReader.FromSpan(data);
+  static byte[] IImageFormatWriter<DispThumbnailFile>.ToBytes(DispThumbnailFile file) => DispThumbnailWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<DispThumbnailFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [256, 16777216])
   ];
@@ -70,5 +71,20 @@ public readonly record struct DispThumbnailFile
     }
 
     return new() { Width = file.Width, Height = file.Height, Format = PixelFormat.Rgb24, PixelData = rgb };
+  }
+
+  /// <summary>Creates the colour form by embedding a standards-valid JPEG after the fixed header.</summary>
+  public static DispThumbnailFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width is < 1 or > MaximumSide || image.Height is < 1 or > MaximumSide)
+      throw new ArgumentException($"DISPTNL dimensions must be between 1 and {MaximumSide}; got {image.Width}x{image.Height}.", nameof(image));
+
+    var jpeg = JpegFile.FromRawImage(image);
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      Embedded = JpegWriter.ToBytes(jpeg),
+      PixelData = [],
+    };
   }
 }
