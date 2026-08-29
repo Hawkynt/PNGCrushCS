@@ -1,169 +1,43 @@
 name: CI
 
-# PNGCrushCS depends on one sibling repo checked out side-by-side:
-#   * CompressionWorkbench — FileFormat.Jpeg (and friends) link individual source files via
-#                            <Compile Include="..\..\CompressionWorkbench\Compression.Core\..." />
-#                            (conditional — when sibling absent, the link is skipped and the
-#                            project falls back to its non-CW code path).
-
+# The gate a pull request has to pass. Nothing runs on a push to main: a pull request must be green
+# to merge, so re-running the same matrix on the merge commit proves nothing and costs a machine —
+# nightly.yml builds main after the merge instead.
 on:
   pull_request:
     branches: [main, master]
-  # Nothing runs this on a push to main any more, so this is how you check a squash merge by hand —
-  # the one commit no run has seen, which is the trade-off the pull-request gate accepts.
-  workflow_dispatch:
+  workflow_dispatch: {}
   workflow_call:
     inputs:
       skip-coverage:
         description: >-
           Leaves the coverage leg out. A release sets it, because the report costs about two hours
-          there and gates the package push behind it (see the job below). Phrased as "skip" rather
-          than "run" on purpose: a push or pull request supplies no inputs at all, and an expression
-          comparison casts both null and false to 0, so a "run: default true" flag would read as
-          false on exactly the events that should run it.
+          there and would gate the package push behind it. Phrased as "skip" rather than "run" on
+          purpose: a pull request supplies no inputs at all, and an expression comparison casts both
+          null and false to 0, so a "run: default true" flag would read as false on exactly the
+          events that should run it.
         type: boolean
         required: false
         default: false
 
-# One run per pull request, not one per push. A branch pushed a dozen times in a minute used to
-# leave a dozen CI runs stacked behind each other, every one of them testing a commit that no longer
-# existed by the time a runner picked it up; thirty such runs once sat queued while nothing ran.
-#
-# The group deliberately carries the event name. Only pull-request runs cancel their predecessors:
-# a push to main should verify every commit, and a workflow_call from the release must never be
-# cancelled by anything. Keeping those in groups of their own means neither can be caught by this.
-concurrency:
-  group: ci-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-
-# Force JavaScript-based actions (checkout, setup-dotnet, upload-artifact) to run on Node 24
-# instead of the deprecated Node 20 ahead of the 2026-06-16 hard cutover, until we bump each
-# action to a Node-24-native major version.
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
-
 jobs:
-  test:
-    name: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - name: Checkout PNGCrushCS
-        uses: actions/checkout@v4
-        with:
-          path: PNGCrushCS
-          fetch-depth: 0
-
-      - name: Checkout CompressionWorkbench (sibling)
-        uses: actions/checkout@v4
-        with:
-          repository: Hawkynt/CompressionWorkbench
-          path: CompressionWorkbench
-          fetch-depth: 1
-
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: |
-            8.x
-            9.x
-            10.x
-
-      - name: Stamp versions into csprojs
-        shell: bash
-        working-directory: PNGCrushCS
-        run: perl .github/workflows/scripts/version.pl --stamp
-
-      - name: Restore
-        working-directory: PNGCrushCS
-        run: dotnet restore PngCrush.slnx -p:EnableWindowsTargeting=true
-
-      - name: Build
-        working-directory: PNGCrushCS
-        run: dotnet build PngCrush.slnx --configuration Release --no-restore -p:EnableWindowsTargeting=true
-
-      # The package READMEs must follow the house template, and their API reference must still match
-      # the assemblies just built. The template itself lives in RepositoryTemplate -- nothing about
-      # it is copied into this repo.
-      # Runs on Windows, not Ubuntu: Hawkynt.ImageTransformUI targets net10.0-windows, and on a
-      # runner without the WindowsDesktop framework its System.Drawing types cannot be resolved.
-      # The reference would then legitimately differ per operating system and the drift check would
-      # fail for no reason but the runner.
-      - name: Check package READMEs
-        if: matrix.os == 'windows-latest'
-        uses: Hawkynt/RepositoryTemplate/package-readme@v1
-        with:
-          root: PNGCrushCS
-
-      - name: Test (core + format suites)
-        working-directory: PNGCrushCS
-        run: dotnet test PngCrush.slnx --configuration Release --no-build -p:EnableWindowsTargeting=true --filter "TestCategory!=Regression&TestCategory!=Performance" --logger "trx;LogFileName=tests.trx"
-
-      # Wall-clock performance tests are advisory — they run and report but a slow
-      # shared runner must not fail the build on a timing assertion.
-      - name: Performance tests (advisory)
-        working-directory: PNGCrushCS
-        continue-on-error: true
-        run: dotnet test PngCrush.slnx --configuration Release --no-build -p:EnableWindowsTargeting=true --filter "TestCategory=Performance" --logger "trx;LogFileName=perf-tests.trx"
-
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: test-results-${{ matrix.os }}
-          path: 'PNGCrushCS/**/TestResults/*.trx'
-
-  coverage:
-    # Skipped when the caller asks for it, which the release does. The two OS legs above run the same
-    # tests without instrumentation, so nothing is left unchecked by leaving this out of a release --
-    # only the report is, and a push or pull request still produces it.
-    #
-    # It costs a release about two hours. VSTest walks the 547 test projects one at a time, and since
-    # the per-format assemblies became a single Hawkynt.FileFormats.Images.dll each of them now pulls
-    # in the whole 4.9 MB of it and has it instrumented again: about 14 seconds of coverage setup per
-    # project to run tests that take 50 ms. Instrumenting only the assembly under test would fix it at
-    # the root and is worth doing; this just stops a report holding up a publish in the meantime.
-    if: ${{ !inputs['skip-coverage'] }}
-    runs-on: ubuntu-latest
-    # A wedged report should not be able to sit on a six-hour default.
-    timeout-minutes: 150
-    steps:
-      - name: Checkout PNGCrushCS
-        uses: actions/checkout@v4
-        with:
-          path: PNGCrushCS
-          fetch-depth: 0
-
-      - name: Checkout CompressionWorkbench (sibling)
-        uses: actions/checkout@v4
-        with:
-          repository: Hawkynt/CompressionWorkbench
-          path: CompressionWorkbench
-          fetch-depth: 1
-
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: |
-            8.x
-            9.x
-            10.x
-
-      - name: Stamp versions
-        working-directory: PNGCrushCS
-        run: perl .github/workflows/scripts/version.pl --stamp
-
-      - name: Test with coverage
-        working-directory: PNGCrushCS
-        run: dotnet test PngCrush.slnx --configuration Release -p:EnableWindowsTargeting=true --filter "TestCategory!=Regression&TestCategory!=Performance" --collect:"XPlat Code Coverage" --results-directory ./coverage
-
-      - name: Generate coverage report
-        working-directory: PNGCrushCS
-        run: |
-          dotnet tool install -g dotnet-reportgenerator-globaltool
-          reportgenerator -reports:./coverage/**/coverage.cobertura.xml -targetdir:./coverage/report -reporttypes:HtmlInline_AzurePipelines
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: PNGCrushCS/coverage/report
+  ci:
+    uses: Hawkynt/RepositoryTemplate/.github/workflows/dotnet-ci.yml@v1
+    with:
+      solution: PngCrush.slnx
+      dotnet-version: |
+        8.x
+        10.0.x
+      os-matrix: '["ubuntu-latest","windows-latest"]'
+      build-args: '-p:EnableWindowsTargeting=true'
+      test-args: '--filter "TestCategory!=Regression&TestCategory!=Performance"'
+      # Wall-clock timings must not redden a pull request on a slow shared runner.
+      advisory-test-args: '--filter "TestCategory=Performance"'
+      # PngCrush references CompressionWorkbench, so the sibling sits next to this checkout.
+      checkout-path: PNGCrushCS
+      working-directory: PNGCrushCS
+      siblings: '[{"repository":"Hawkynt/CompressionWorkbench","path":"CompressionWorkbench"}]'
+      # One runner only: the committed reference must not depend on which machine produced it.
+      package-readme-os: windows-latest
+      package-readme-root: PNGCrushCS
+      coverage: ${{ !inputs['skip-coverage'] }}
