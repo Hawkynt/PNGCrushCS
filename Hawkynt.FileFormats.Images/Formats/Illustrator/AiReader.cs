@@ -5,22 +5,18 @@ using FileFormat.PostScript;
 
 namespace FileFormat.Illustrator;
 
-/// <summary>Opens an Illustrator file and works out which kind it is.</summary>
+/// <summary>Opens an Illustrator file and resolves native raster artwork before generic PostScript rendering.</summary>
 public static class AiReader {
 
-  /// <summary>How far in the version comments are looked for.</summary>
   private const int _HeaderScan = 4096;
 
-  /// <summary>Reads a file from disk.</summary>
   public static AiFile FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
       throw new FileNotFoundException("Illustrator file not found.", file.FullName);
-
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  /// <summary>Reads a file from a stream.</summary>
   public static AiFile FromStream(Stream stream) {
     ArgumentNullException.ThrowIfNull(stream);
     using var memory = new MemoryStream();
@@ -28,13 +24,11 @@ public static class AiReader {
     return FromBytes(memory.ToArray());
   }
 
-  /// <summary>Reads a file from bytes.</summary>
   public static AiFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     return FromSpan(data);
   }
 
-  /// <summary>Reads a file from bytes.</summary>
   public static AiFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < 4)
       throw new InvalidDataException($"An Illustrator file of {data.Length} bytes holds no drawing.");
@@ -46,17 +40,12 @@ public static class AiReader {
       );
 
     var program = PostScriptReader.FromSpan(data);
+    if (AiNativeRaster.TryDecode(data, out var raster))
+      return new() { Program = program, Raster = raster, Version = _Version(data) };
+
     return new() { Program = program, Version = _Version(data) };
   }
 
-  /// <summary>
-  /// Which Illustrator wrote the file, out of the comments it writes about itself.
-  /// </summary>
-  /// <remarks>
-  /// <c>%%Creator</c> names the application and its version, and <c>%AI5_FileFormat</c> and
-  /// <c>%%AI8_CreatorVersion</c> name the format revision. None of them changes how the file is
-  /// read — the procedure sets do that — so this is carried for the report and not acted on.
-  /// </remarks>
   private static string? _Version(ReadOnlySpan<byte> data) {
     var text = Encoding.Latin1.GetString(data[..Math.Min(data.Length, _HeaderScan)]);
     foreach (var prefix in (string[])["%%AI8_CreatorVersion:", "%AI5_FileFormat", "%AI3_FileFormat"]) {
