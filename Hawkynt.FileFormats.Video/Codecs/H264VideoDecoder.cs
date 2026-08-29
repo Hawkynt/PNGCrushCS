@@ -6,56 +6,14 @@ using FileFormat.Core;
 
 namespace FileFormat.Codecs;
 
-/// <summary>
-/// Decodes H.264 / AVC video, ITU-T H.264 | ISO/IEC 14496-10: Baseline profile I and P slices.
-/// </summary>
+/// <summary>Decodes progressive 8-bit 4:2:0 H.264 / AVC pictures.</summary>
 /// <remarks>
-/// <b>What it decodes.</b> Coded video sequences whose slices are I or P, entropy coded with the
-/// variable-length codes of clause 9.2 (CAVLC), 4:2:0 chroma, 8-bit samples, progressive frames, one
-/// slice group, flat quantiser matrices and the 4x4 transform. That is the Baseline and Constrained
-/// Baseline profiles less their error-resilience features, and it is also every Main profile stream
-/// that happens to be coded without CABAC or B pictures. Multiple reference frames, all four
-/// partitionings and both sub-macroblock partitionings, reference list reordering, constrained intra
-/// prediction, <c>I_PCM</c> macroblocks and the deblocking filter with per-slice offsets are all
-/// implemented.
-/// <para/>
-/// <b>What it refuses, by name and with the clause.</b> CABAC (<c>entropy_coding_mode_flag</c>). B
-/// slices. SP and SI slices. The 8x8 transform and scaling matrices, which is the High profile.
-/// 4:2:2, 4:4:4 and monochrome. Sample depths above eight. Interlaced coding, both field pictures and
-/// MBAFF. Flexible macroblock ordering. Weighted prediction. Long-term references and the memory
-/// management operations that create them. Redundant coded pictures. Every one of those throws a
-/// <see cref="NotSupportedException"/> naming the syntax element and what it means, and there is no
-/// <c>catch</c> anywhere here that hands back a blank, a copied or a partly decoded picture: a
-/// plausible wrong picture is worse than a refusal, because nobody checks a picture that looks like a
-/// picture.
-/// <para/>
-/// <b>Both delivery forms.</b> A transport stream, a program stream and a bare elementary stream
-/// carry NAL units separated by start codes (Annex B); MP4, Matroska and FLV carry each unit behind
-/// its length, with the parameter sets in an <c>AVCDecoderConfigurationRecord</c> in the header. Which
-/// form a stream is in is decided once, from whether that record is present, rather than guessed at
-/// each packet — a three-byte length beginning <c>00 00 01</c> is an ordinary 256-byte NAL unit and a
-/// guess would read it as a start code.
-/// <para/>
-/// <b>Frames come out in decoding order, which for these streams is display order.</b> Reordering
-/// exists to undo bidirectional prediction, and this decoder refuses the slices that cause it. So
-/// there is no reorder buffer here and <see cref="Flush"/> is empty — not as a simplification, but
-/// because for every stream this accepts the two orders are the same.
-/// <para/>
-/// Completed pictures are returned as the native 8-bit 4:2:0 Y/Cb/Cr samples in
-/// <see cref="PixelFormat.Yuv420P8"/>. The old BT.601 display conversion is still available through
-/// <see cref="RawImageConverter"/>, but it is no longer part of decoding; a writer or viewer decides
-/// when narrowing into RGB is actually required.
+/// The decoder reconstructs CAVLC I/P/B slices, including High-profile 8x8 transforms/scaling lists,
+/// long-term references, explicit weighted P/B prediction, implicit weighted B prediction and direct
+/// B prediction. CABAC has its own syntax path and remains the next entropy-coding layer to connect.
+/// Completed pictures stay in native YUV420 and are reordered by picture order count before delivery.
 /// </remarks>
 public sealed class H264VideoDecoder : IVideoCodecDecoder<H264VideoDecoder> {
-
-  /// <summary>The four-character codes containers name H.264 with.</summary>
-  /// <remarks>
-  /// Six spellings for one codec, which is what happens to a format carried by every container ever
-  /// written. <c>avc1</c> and <c>avc3</c> are the ISO base media sample entry types and differ only in
-  /// whether the parameter sets are also in the samples; <c>H264</c> is what the AVI and Flash worlds
-  /// settled on; <c>X264</c> and <c>DAVC</c> are what two particular encoders wrote into AVI files and
-  /// nothing else has ever produced.
-  /// </remarks>
   private static readonly CodecTag[] _Tags = [
     CodecTag.FromCharacters("avc1"),
     CodecTag.FromCharacters("avc3"),
@@ -65,48 +23,46 @@ public sealed class H264VideoDecoder : IVideoCodecDecoder<H264VideoDecoder> {
     CodecTag.FromCharacters("VSSH"),
   ];
 
-  /// <summary>The names Matroska gives H.264, which names codecs with text rather than with a code.</summary>
-  private static readonly string[] _CodecIds = [
-    "V_MPEG4/ISO/AVC",
-  ];
+  private static readonly string[] _CodecIds = ["V_MPEG4/ISO/AVC"];
+
+  // Annex A caps MaxDpbFrames at 16. Without a parsed VUI max_num_reorder_frames this is the safe
+  // conservative presentation-buffer bound for Main/High streams. Baseline cannot contain B slices
+  // and is delivered immediately instead of paying that latency.
+  private const int _MAX_PRESENTATION_REORDER = 16;
 
   private readonly Dictionary<int, H264SequenceParameterSet> _sequenceSets = [];
   private readonly Dictionary<int, H264PictureParameterSet> _pictureSets = [];
   private readonly H264ReferencePictures _references = new();
-
+  private readonly H264PictureOrderCount _pictureOrderCount = new();
+  private readonly List<(int Poc, long Serial, RawImage Frame)> _presentation = [];
+  private readonly Queue<RawImage> _readyFrames = new();
   private readonly H264DecoderConfiguration? _configuration;
 
   private H264FrameDecoder? _frame;
   private H264SliceHeader? _pictureHeader;
   private H264SequenceParameterSet? _pictureSequence;
-  private RawImage? _ready;
+  private H264PictureOrderCount.Result _picturePoc;
 
   private H264VideoDecoder(H264DecoderConfiguration? configuration) {
     this._configuration = configuration;
-
     foreach (var set in configuration?.SequenceParameterSets ?? [])
       this._AcceptParameterSet(set);
-
     foreach (var set in configuration?.PictureParameterSets ?? [])
       this._AcceptParameterSet(set);
   }
 
-  public static string CodecName => "H.264/AVC (ITU-T H.264 | ISO/IEC 14496-10), Baseline I and P slices";
+  public static string CodecName => "H.264/AVC (ITU-T H.264 | ISO/IEC 14496-10)";
 
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
-
     if (stream.Kind != MediaStreamKind.Video)
       return false;
-
     foreach (var tag in _Tags)
       if (stream.Codec.EqualsIgnoringCase(tag))
         return true;
-
     foreach (var id in _CodecIds)
       if (string.Equals(stream.CodecId, id, StringComparison.OrdinalIgnoreCase))
         return true;
-
     return false;
   }
 
@@ -132,48 +88,39 @@ public sealed class H264VideoDecoder : IVideoCodecDecoder<H264VideoDecoder> {
         case H264NalUnitType.SlicePartitionB:
         case H264NalUnitType.SlicePartitionC:
           throw new NotSupportedException(
-            $"This H.264 stream uses slice data partitioning (NAL unit type {(int)nal.Type}, H.264 clause 7.3.2.9). "
-            + "A partitioned slice splits its header, its intra data and its inter data across three NAL units so "
-            + "that the important parts survive a loss; reading them is not implemented.");
+            $"This H.264 stream uses slice data partitioning (NAL unit type {(int)nal.Type}, clause 7.3.2.9), which is not implemented.");
 
         case H264NalUnitType.PrefixNalUnit:
         case H264NalUnitType.SubsetSequenceParameterSet:
         case H264NalUnitType.SliceExtension:
         case H264NalUnitType.DepthOrThreeDimensionalSliceExtension:
           throw new NotSupportedException(
-            $"This H.264 stream carries a scalable or multiview extension (NAL unit type {(int)nal.Type}, H.264 "
-            + "Annexes G, H and I). Only the base layer syntax is implemented, and a stream whose extension units "
-            + "were dropped is not the stream that was encoded.");
-
-        default:
-          break;
+            $"This H.264 stream carries a scalable or multiview extension (NAL unit type {(int)nal.Type}); only base-layer AVC is reconstructed.");
       }
 
     this._FinishPicture();
-
-    if (this._ready == null) {
+    if (this._readyFrames.Count == 0) {
       frame = null!;
       return false;
     }
 
-    frame = this._ready;
-    this._ready = null;
+    frame = this._readyFrames.Dequeue();
     return true;
   }
 
-  public IEnumerable<RawImage> Flush() => [];
+  public IEnumerable<RawImage> Flush() {
+    this._FinishPicture();
+    this._DrainPresentation();
+    while (this._readyFrames.Count > 0)
+      yield return this._readyFrames.Dequeue();
+  }
 
   private IEnumerable<H264NalUnit> _Split(ReadOnlyMemory<byte> data) {
     if (this._configuration != null)
       return H264NalReader.SplitLengthPrefixed(data, this._configuration.LengthSize);
-
     if (data.Length > 0 && !H264NalReader.LooksLikeAnnexB(data.Span))
       throw new InvalidDataException(
-        "This H.264 packet begins with neither a start code nor a length prefix this decoder could learn the size "
-        + "of: the container stated no AVCDecoderConfigurationRecord, so the packets were expected to be in the "
-        + "Annex B byte stream format, and this one is not. The stream is length-prefixed and its configuration "
-        + "record is missing.");
-
+        "This H.264 packet is not Annex B and no AVCDecoderConfigurationRecord supplied a length-prefix size.");
     return H264NalReader.SplitAnnexB(data);
   }
 
@@ -200,7 +147,6 @@ public sealed class H264VideoDecoder : IVideoCodecDecoder<H264VideoDecoder> {
         this._sequenceSets[sps.Id] = sps;
         break;
       }
-
       case H264NalUnitType.PictureParameterSet: {
         var pps = H264PictureParameterSet.Parse(nal.Payload);
         this._pictureSets[pps.Id] = pps;
@@ -212,12 +158,9 @@ public sealed class H264VideoDecoder : IVideoCodecDecoder<H264VideoDecoder> {
   private void _RefuseGeometryChangeMidStream(H264SequenceParameterSet sps) {
     if (this._pictureSequence == null || this._pictureSequence.SameGeometryAs(sps))
       return;
-
     throw new NotSupportedException(
-      $"This H.264 stream changes picture size from {this._pictureSequence.DisplayWidth}x"
-      + $"{this._pictureSequence.DisplayHeight} to {sps.DisplayWidth}x{sps.DisplayHeight} part way through, while "
-      + "pictures of the old size are still held as references. Decoding a sequence whose size changes is not "
-      + "implemented.");
+      $"This H.264 stream changes picture size from {this._pictureSequence.DisplayWidth}x{this._pictureSequence.DisplayHeight} "
+      + $"to {sps.DisplayWidth}x{sps.DisplayHeight} while old-size references can still be live.");
   }
 
   private void _DecodeSlice(H264NalUnit nal) {
@@ -226,72 +169,80 @@ public sealed class H264VideoDecoder : IVideoCodecDecoder<H264VideoDecoder> {
 
     if (this._frame != null && this._StartsNewPicture(header))
       this._FinishPicture();
-
     if (this._frame == null)
       this._BeginPicture(header);
 
-    var referenceList = this._references.BuildList0(header);
-    this._frame!.DecodeSlice(ref reader, header, referenceList);
+    var lists = this._references.BuildLists(header, this._picturePoc.PicOrderCnt);
+    if (header.IsB)
+      this._frame!.DecodeBSlice(ref reader, header, lists.L0, lists.L1);
+    else
+      this._frame!.DecodeSlice(ref reader, header, lists.L0);
   }
 
   private bool _StartsNewPicture(H264SliceHeader header) {
     var current = this._pictureHeader!;
-
     return header.FirstMbInSlice == 0
            || header.FrameNum != current.FrameNum
            || header.Pps.Id != current.Pps.Id
            || header.IdrPicFlag != current.IdrPicFlag
            || (header.IdrPicFlag && header.IdrPicId != current.IdrPicId)
-           || header.IsReference != current.IsReference;
+           || header.IsReference != current.IsReference
+           || header.PicOrderCntLsb != current.PicOrderCntLsb
+           || header.DeltaPicOrderCntBottom != current.DeltaPicOrderCntBottom
+           || header.DeltaPicOrderCnt0 != current.DeltaPicOrderCnt0
+           || header.DeltaPicOrderCnt1 != current.DeltaPicOrderCnt1;
   }
 
   private void _BeginPicture(H264SliceHeader header) {
+    if (header.IdrPicFlag) {
+      this._DrainPresentation();
+      this._pictureOrderCount.Reset();
+    }
+
     this._RefuseFrameNumberGap(header);
     this._pictureHeader = header;
     this._pictureSequence = header.Sps;
+    this._picturePoc = this._pictureOrderCount.Derive(header);
     this._frame = new(header.Sps, this._references.TakeSerial());
+    this._frame.Picture.TopFieldOrderCnt = this._picturePoc.TopFieldOrderCnt;
+    this._frame.Picture.BottomFieldOrderCnt = this._picturePoc.BottomFieldOrderCnt;
+    this._frame.Picture.PicOrderCnt = this._picturePoc.PicOrderCnt;
   }
 
   private void _RefuseFrameNumberGap(H264SliceHeader header) {
     if (header.IdrPicFlag || !header.IsReference)
       return;
-
     if (this._references.PreviousReferenceFrameNum is not { } previous)
       return;
-
     var expected = (previous + 1) % header.Sps.MaxFrameNum;
     if (header.FrameNum == expected)
       return;
-
     throw new InvalidDataException(
       $"This H.264 stream's frame_num jumps from {previous} to {header.FrameNum}, where {expected} was due. "
       + (header.Sps.GapsInFrameNumValueAllowedFlag
-        ? "The sequence sets gaps_in_frame_num_value_allowed_flag, so the gap is deliberate and the missing frames "
-          + "are meant to be invented by the decoder (H.264, clause 8.2.5.2). That is not implemented."
-        : "A reference picture is missing: either it was lost, or decoding began somewhere other than an IDR "
-          + "picture.")
-      + " Decoding on without it would predict from the wrong pictures.");
+        ? "Non-existing gap pictures would have to be synthesized, which is not implemented."
+        : "A reference picture is missing or decoding did not begin at an IDR picture."));
   }
 
   private void _FinishPicture() {
     if (this._frame == null)
       return;
 
-    var frame = this._frame;
+    var decoded = this._frame;
     var header = this._pictureHeader!;
     this._frame = null;
+    decoded.RefuseIfIncomplete();
+    H264Deblocking.Filter(decoded);
 
-    frame.RefuseIfIncomplete();
-    H264Deblocking.Filter(frame);
-
-    var picture = frame.Picture;
+    var picture = decoded.Picture;
     picture.FrameNum = header.FrameNum;
-
+    picture.Motion = decoded.ExportMotionField();
     if (header.IsReference)
       this._references.Add(picture, header);
+    this._pictureOrderCount.FinishPicture(header, this._picturePoc);
 
     var sps = header.Sps;
-    this._ready = RawImageFactory.FromYuv420P8(
+    var image = RawImageFactory.FromYuv420P8(
       sps.DisplayWidth,
       sps.DisplayHeight,
       picture.Luma,
@@ -302,5 +253,35 @@ public sealed class H264VideoDecoder : IVideoCodecDecoder<H264VideoDecoder> {
       sps.CropOffsetX,
       sps.CropOffsetY,
       RawImageColorInfo.Bt601Limited);
+    this._QueueForPresentation(image, picture, header);
+  }
+
+  private void _QueueForPresentation(RawImage image, H264Picture picture, H264SliceHeader header) {
+    // Baseline/Constrained Baseline has no B pictures, so decode and display order are identical.
+    if (header.Sps.ProfileIdc == 66) {
+      this._readyFrames.Enqueue(image);
+      return;
+    }
+
+    var at = this._presentation.BinarySearch(
+      (picture.PicOrderCnt, picture.Serial, image),
+      Comparer<(int Poc, long Serial, RawImage Frame)>.Create(static (a, b) => {
+        var byPoc = a.Poc.CompareTo(b.Poc);
+        return byPoc != 0 ? byPoc : a.Serial.CompareTo(b.Serial);
+      }));
+    if (at < 0)
+      at = ~at;
+    this._presentation.Insert(at, (picture.PicOrderCnt, picture.Serial, image));
+
+    if (this._presentation.Count > _MAX_PRESENTATION_REORDER) {
+      this._readyFrames.Enqueue(this._presentation[0].Frame);
+      this._presentation.RemoveAt(0);
+    }
+  }
+
+  private void _DrainPresentation() {
+    foreach (var item in this._presentation)
+      this._readyFrames.Enqueue(item.Frame);
+    this._presentation.Clear();
   }
 }
