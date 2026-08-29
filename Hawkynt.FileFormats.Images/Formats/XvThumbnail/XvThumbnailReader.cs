@@ -83,7 +83,7 @@ public static class XvThumbnailReader {
 
   private static ReadOnlySpan<byte> _ReadLine(ReadOnlySpan<byte> data, ref int offset) {
     var start = offset;
-    while (offset < data.Length && data[offset] is not ((byte)'\r') and not ((byte)'\n'))
+    while (offset < data.Length && data[offset] != (byte)'\r' && data[offset] != (byte)'\n')
       ++offset;
 
     var line = data[start..offset];
