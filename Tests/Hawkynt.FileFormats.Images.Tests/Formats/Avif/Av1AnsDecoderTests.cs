@@ -67,4 +67,42 @@ public sealed class Av1AnsDecoderTests {
       Assert.That(cdf[1], Is.LessThanOrEqualTo(cdf[2]));
     });
   }
+
+  [Test]
+  [Category("Unit")]
+  public void RangeEncoder_EquiprobableLiteral_RoundTripsThroughSection82Decoder() {
+    var encoder = new Av1RangeEncoder();
+    encoder.WriteLiteral(0x123456, 24);
+    var encoded = encoder.Finish();
+
+    var decoder = new Av1AnsDecoder(encoded, 0, encoded.Length, disableCdfUpdate: true);
+
+    Assert.Multiple(() => {
+      // Fixed arithmetic-writer trace for rng=0x8000/cnt=-9, not a raw literal byte stream.
+      Assert.That(encoded, Is.EqualTo(new byte[] { 0x12, 0x67, 0x79, 0x80 }));
+      Assert.That(decoder.DecodeLiteralBits(24), Is.EqualTo(0x123456u));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void RangeEncoder_InverseCdfSymbols_RoundTripWithoutAdaptation() {
+    // Decoder-side CDF is cumulative from the low end. Encoder-side AV1 CDF is inverse from the
+    // high end. These describe the same 1/4, 1/2, 1/4 three-symbol distribution.
+    ushort[] decoderCdf = [8192, 24576, 32768, 0];
+    ushort[] encoderInverseCdf = [24576, 8192, 0];
+    int[] symbols = [0, 2, 1, 1, 0, 2, 2, 1];
+
+    var encoder = new Av1RangeEncoder();
+    foreach (var symbol in symbols)
+      encoder.WriteSymbol(symbol, encoderInverseCdf);
+    var encoded = encoder.Finish();
+
+    var decoder = new Av1AnsDecoder(encoded, 0, encoded.Length, disableCdfUpdate: true);
+    var decoded = new int[symbols.Length];
+    for (var i = 0; i < decoded.Length; ++i)
+      decoded[i] = decoder.DecodeSymbol(decoderCdf, 3);
+
+    Assert.That(decoded, Is.EqualTo(symbols));
+  }
 }

@@ -15,6 +15,13 @@ namespace FileFormat.Heif;
 internal static class HeifHevcDecoder {
 
   internal static RawImage Decode(ReadOnlyMemory<byte> sample, ReadOnlyMemory<byte> configurationRecord) {
+    // HEVC PCM has a CABAC-to-raw handoff in the middle of a coding unit. The general video decoder
+    // intentionally still refuses that syntax until its streaming arithmetic engine can expose the
+    // handoff generically; the still-image codec has a narrow, standards-based PCM path for exactly
+    // the Main-Still-Picture profile emitted by HeifWriter.
+    if (H265PcmStillCodec.TryDecode(sample, configurationRecord, out var pcm))
+      return pcm;
+
     var configuration = H265DecoderConfiguration.TryParse(configurationRecord)
                         ?? throw new InvalidDataException(
                           "HEIF: the hvcC property is not a valid HEVCDecoderConfigurationRecord.");
