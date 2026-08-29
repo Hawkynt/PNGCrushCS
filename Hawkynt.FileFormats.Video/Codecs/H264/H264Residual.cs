@@ -34,7 +34,7 @@ internal static class H264Residual {
   /// <param name="nC">The neighbour-derived table selector of clause 9.2.1.</param>
   /// <param name="chromaDc">Whether this is a chroma DC block, whose <c>total_zeros</c> has its own table.</param>
   /// <returns><c>TotalCoeff</c>, which the blocks decoded after this one need for their own <c>nC</c>.</returns>
-  internal static int ReadBlock(ref H264BitReader reader, Span<int> coeffLevel, int nC, bool chromaDc) {
+  internal static int ReadBlock(ref H264BitReader reader, scoped Span<int> coeffLevel, int nC, bool chromaDc) {
     var maxNumCoeff = coeffLevel.Length;
     var token = H264CavlcTables.ReadCoeffToken(ref reader, nC);
     var totalCoeff = H264CavlcTables.TotalCoeff(token);

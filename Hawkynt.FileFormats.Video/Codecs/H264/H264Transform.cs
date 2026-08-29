@@ -16,8 +16,9 @@ namespace FileFormat.Codecs.H264;
 /// The scaling that would ordinarily be part of the transform has been moved into the quantiser: the
 /// forward transform's basis vectors have unequal norms, and rather than correct for that in the
 /// transform the standard folds the correction into the dequantisation factors
-/// (<see cref="_NORM_ADJUST"/>, the matrix of equation 8-315). So dequantisation here is not one
-/// number per block but one per coefficient position.
+/// (<see cref="_NORM_ADJUST"/>, the matrix of equation 8-315). A sequence or picture scaling list
+/// then multiplies that norm adjustment coefficient-by-coefficient; the flat list is simply sixteen
+/// everywhere.
 /// </remarks>
 internal static class H264Transform {
 
@@ -30,6 +31,14 @@ internal static class H264Transform {
     5, 2, 3, 6,
     9, 12, 13, 10,
     7, 11, 14, 15,
+  ];
+
+  /// <summary>The implicit scaling list when neither SPS nor PPS supplies one.</summary>
+  private static readonly byte[] _FLAT_4X4 = [
+    16, 16, 16, 16,
+    16, 16, 16, 16,
+    16, 16, 16, 16,
+    16, 16, 16, 16,
   ];
 
   /// <summary>
@@ -61,16 +70,17 @@ internal static class H264Transform {
   /// <summary>
   /// <c>LevelScale4x4( m, i, j )</c> with the flat weighting matrix — equation 8-313.
   /// </summary>
-  /// <remarks>
-  /// Flat because scaling lists are refused: without them <c>weightScale4x4</c> is 16 everywhere
-  /// (clause 8.5.9), so this is sixteen times the norm adjustment and nothing else.
-  /// </remarks>
-  internal static int LevelScale(int m, int row, int column) {
+  internal static int LevelScale(int m, int row, int column) => LevelScale(m, row, column, 16);
+
+  /// <summary>
+  /// <c>LevelScale4x4( m, i, j )</c> for the resolved SPS/PPS weight at this coefficient position.
+  /// </summary>
+  internal static int LevelScale(int m, int row, int column, int weightScale) {
     var kind = (row & 1) == 0
       ? (column & 1) == 0 ? 0 : 2
       : (column & 1) == 0 ? 2 : 1;
 
-    return 16 * _NORM_ADJUST[m, kind];
+    return weightScale * _NORM_ADJUST[m, kind];
   }
 
   /// <summary>The chroma quantisation parameter for a luma one — clause 8.5.8, Table 8-15.</summary>
@@ -82,7 +92,16 @@ internal static class H264Transform {
   }
 
   /// <summary>
-  /// Dequantises and inverse-transforms one 4x4 residual block, adding the result to a prediction.
+  /// Dequantises and inverse-transforms one 4x4 residual block with the implicit flat scaling list.
+  /// Kept as a convenience for focused transform tests and callers that intentionally use flat
+  /// weighting.
+  /// </summary>
+  internal static void DecodeBlock(ReadOnlySpan<int> levels, int qp, bool hasSeparateDc, int dc, Span<int> residual)
+    => DecodeBlock(levels, qp, hasSeparateDc, dc, _FLAT_4X4, residual);
+
+  /// <summary>
+  /// Dequantises and inverse-transforms one 4x4 residual block, adding the resolved SPS/PPS scaling
+  /// list to the inverse-quantisation factors coefficient by coefficient.
   /// </summary>
   /// <param name="levels">The sixteen coefficient levels in scan order.</param>
   /// <param name="qp">The quantisation parameter for this block's component.</param>
@@ -92,10 +111,18 @@ internal static class H264Transform {
   /// (clause 8.5.12.1, equation 8-335).
   /// </param>
   /// <param name="dc">That already-dequantised DC value, used when <paramref name="hasSeparateDc"/>.</param>
+  /// <param name="scalingList">The resolved 4x4 scaling list, indexed by coefficient position.</param>
   /// <param name="residual">Receives the sixteen residual samples in raster order.</param>
-  internal static void DecodeBlock(ReadOnlySpan<int> levels, int qp, bool hasSeparateDc, int dc, Span<int> residual) {
+  internal static void DecodeBlock(
+    ReadOnlySpan<int> levels,
+    int qp,
+    bool hasSeparateDc,
+    int dc,
+    ReadOnlySpan<byte> scalingList,
+    Span<int> residual) {
+    _Require4x4ScalingList(scalingList);
     Span<int> d = stackalloc int[16];
-    _Scale(levels, qp, hasSeparateDc, dc, d);
+    _Scale(levels, qp, hasSeparateDc, dc, scalingList, d);
     InverseTransform4x4(d, residual);
   }
 
@@ -141,6 +168,12 @@ internal static class H264Transform {
   }
 
   /// <summary>
+  /// The luma DC transform of an Intra_16x16 macroblock with the implicit flat scaling list.
+  /// </summary>
+  internal static void DecodeLumaDc(ReadOnlySpan<int> levels, int qp, Span<int> dc)
+    => DecodeLumaDc(levels, qp, _FLAT_4X4, dc);
+
+  /// <summary>
   /// The luma DC transform of an Intra_16x16 macroblock: an inverse Hadamard, then scaling
   /// (clause 8.5.10).
   /// </summary>
@@ -151,7 +184,9 @@ internal static class H264Transform {
   /// is dequantised here rather than in <see cref="_Scale"/>: by the time the block's own transform
   /// runs, position zero already holds a value that has been through this.
   /// </remarks>
-  internal static void DecodeLumaDc(ReadOnlySpan<int> levels, int qp, Span<int> dc) {
+  internal static void DecodeLumaDc(
+    ReadOnlySpan<int> levels, int qp, ReadOnlySpan<byte> scalingList, Span<int> dc) {
+    _Require4x4ScalingList(scalingList);
     Span<int> c = stackalloc int[16];
     for (var scan = 0; scan < 16; ++scan)
       c[ZigZagScan4x4[scan]] = levels[scan];
@@ -159,7 +194,7 @@ internal static class H264Transform {
     Span<int> f = stackalloc int[16];
     _InverseHadamard4x4(c, f);
 
-    var scale = LevelScale(qp % 6, 0, 0);
+    var scale = LevelScale(qp % 6, 0, 0, scalingList[0]);
     var shift = qp / 6;
     if (shift >= 6) {
       var by = shift - 6;
@@ -174,6 +209,10 @@ internal static class H264Transform {
       dc[i] = (f[i] * scale + rounding) >> (6 - shift);
   }
 
+  /// <summary>The 2x2 chroma DC transform with the implicit flat scaling list.</summary>
+  internal static void DecodeChromaDc(ReadOnlySpan<int> levels, int qp, Span<int> dc)
+    => DecodeChromaDc(levels, qp, _FLAT_4X4, dc);
+
   /// <summary>
   /// The 2x2 chroma DC transform of 4:2:0 and its scaling (clauses 8.5.11.1 and 8.5.11.2).
   /// </summary>
@@ -181,7 +220,9 @@ internal static class H264Transform {
   /// The four DC values are in raster order, which for a 2x2 block is also the coding order — the
   /// chroma DC block has no zig-zag of its own (clause 8.5.11.1 takes <c>c</c> as transmitted).
   /// </remarks>
-  internal static void DecodeChromaDc(ReadOnlySpan<int> levels, int qp, Span<int> dc) {
+  internal static void DecodeChromaDc(
+    ReadOnlySpan<int> levels, int qp, ReadOnlySpan<byte> scalingList, Span<int> dc) {
+    _Require4x4ScalingList(scalingList);
     // [1 1; 1 -1] * c * [1 1; 1 -1], equation 8-324.
     var f0 = levels[0] + levels[1] + levels[2] + levels[3];
     var f1 = levels[0] - levels[1] + levels[2] - levels[3];
@@ -190,7 +231,7 @@ internal static class H264Transform {
 
     // Equation 8-326: a left shift by qP/6 and a right shift by five, in that order, with no
     // rounding term at all — unlike every other scaling in clause 8.5.
-    var scale = LevelScale(qp % 6, 0, 0);
+    var scale = LevelScale(qp % 6, 0, 0, scalingList[0]);
     var shift = qp / 6;
     dc[0] = (f0 * scale << shift) >> 5;
     dc[1] = (f1 * scale << shift) >> 5;
@@ -229,7 +270,13 @@ internal static class H264Transform {
   }
 
   /// <summary>Dequantisation of a residual 4x4 block — clause 8.5.12.1.</summary>
-  private static void _Scale(ReadOnlySpan<int> levels, int qp, bool hasSeparateDc, int dc, Span<int> d) {
+  private static void _Scale(
+    ReadOnlySpan<int> levels,
+    int qp,
+    bool hasSeparateDc,
+    int dc,
+    ReadOnlySpan<byte> scalingList,
+    Span<int> d) {
     var m = qp % 6;
     var shift = qp / 6;
 
@@ -247,11 +294,16 @@ internal static class H264Transform {
         continue;
       }
 
-      var scaled = level * LevelScale(m, position >> 2, position & 3);
+      var scaled = level * LevelScale(m, position >> 2, position & 3, scalingList[position]);
 
       // Equations 8-336 and 8-337. Above QP 24 the dequantised value is larger than the level and the
       // shift goes the other way, so there is nothing to round.
       d[position] = shift >= 4 ? scaled << (shift - 4) : (scaled + (1 << (3 - shift))) >> (4 - shift);
     }
+  }
+
+  private static void _Require4x4ScalingList(ReadOnlySpan<byte> scalingList) {
+    if (scalingList.Length < 16)
+      throw new ArgumentException("An H.264 4x4 scaling list must contain sixteen values.", nameof(scalingList));
   }
 }

@@ -4,108 +4,138 @@ using System.IO;
 
 namespace FileFormat.Codecs.H264;
 
-/// <summary>
-/// The decoded picture buffer: which pictures are still references, in what order a slice sees them,
-/// and when one stops being one — ITU-T H.264, clause 8.2.4 and 8.2.5.
-/// </summary>
-/// <remarks>
-/// Short-term references only. A long-term reference is a picture an encoder asks to be kept past
-/// the point the sliding window would have dropped it, and the machinery for that — a second
-/// numbering, a second sort key in the list, and four of the six memory management operations — is
-/// refused by name here rather than written and left untested. Nothing this decoder is aimed at
-/// produces one: neither x264 at any preset nor any Baseline profile encoder in ordinary use.
-/// <para/>
-/// The ordering rule for P slices reads oddly until the wrap-around is taken into account. Pictures
-/// come out of the buffer most recently coded first, and "most recently" is decided by
-/// <c>PicNum</c> — <c>frame_num</c> shifted so that pictures coded before the current one are below
-/// it even when the counter has wrapped through zero in between (clause 8.2.4.1). Sorting on
-/// <c>frame_num</c> itself would, once per wrap, hand a slice its references in exactly the wrong
-/// order.
-/// </remarks>
+/// <summary>Decoded-picture-buffer reference marking and list construction for progressive H.264 frames.</summary>
 internal sealed class H264ReferencePictures {
-
   private readonly List<H264Picture> _shortTerm = [];
+  private readonly List<H264Picture> _longTerm = [];
   private long _nextSerial = 1;
 
-  /// <summary>Takes a serial for a newly started picture.</summary>
   internal long TakeSerial() => this._nextSerial++;
-
-  /// <summary>The <c>frame_num</c> of the most recent reference picture, for the gap check.</summary>
   internal int? PreviousReferenceFrameNum { get; private set; }
 
-  /// <summary>Forgets every reference, which is what an IDR picture does (clause 8.2.5.1).</summary>
   internal void Clear() {
     this._shortTerm.Clear();
+    this._longTerm.Clear();
     this.PreviousReferenceFrameNum = null;
   }
 
-  /// <summary>
-  /// Builds reference picture list 0 for one slice: the initialisation of clause 8.2.4.2.1 followed
-  /// by the modifications of clause 8.2.4.3.1.
-  /// </summary>
-  internal H264Picture[] BuildList0(H264SliceHeader header) {
+  internal H264Picture[] BuildList0(H264SliceHeader header)
+    => this.BuildLists(header, 0).L0;
+
+  /// <summary>Builds and modifies both reference lists. List1 is empty outside B slices.</summary>
+  internal (H264Picture[] L0, H264Picture[] L1) BuildLists(H264SliceHeader header, int currentPicOrderCnt) {
     if (header.IsIntra)
-      return [];
+      return ([], []);
 
     var maxFrameNum = header.Sps.MaxFrameNum;
+    this._UpdateShortTermPicNums(header.FrameNum, maxFrameNum);
 
-    // PicNum is relative to the picture being decoded now, so it is recomputed for every slice
-    // rather than stored once when the reference was decoded (clause 8.2.4.1).
+    if (!header.IsB) {
+      var list0 = new List<H264Picture>(this._shortTerm.Count + this._longTerm.Count);
+      var shortTerm = new List<H264Picture>(this._shortTerm);
+      shortTerm.Sort(static (a, b) => b.PicNum.CompareTo(a.PicNum));
+      list0.AddRange(shortTerm);
+      _AppendLongTerm(list0, this._longTerm);
+      _RequireReferences(list0, "P");
+      _Modify(list0, header.ListModificationsL0, header, maxFrameNum, 0);
+      _Truncate(list0, header.NumRefIdxL0Active);
+      return ([.. list0], []);
+    }
+
+    var before = new List<H264Picture>();
+    var after = new List<H264Picture>();
     foreach (var picture in this._shortTerm)
-      picture.PicNum = picture.FrameNum > header.FrameNum ? picture.FrameNum - maxFrameNum : picture.FrameNum;
+      if (picture.PicOrderCnt < currentPicOrderCnt)
+        before.Add(picture);
+      else
+        after.Add(picture);
 
-    var list = new List<H264Picture>(this._shortTerm);
-    list.Sort(static (first, second) => second.PicNum.CompareTo(first.PicNum));
+    before.Sort(static (a, b) => b.PicOrderCnt.CompareTo(a.PicOrderCnt));
+    after.Sort(static (a, b) => a.PicOrderCnt.CompareTo(b.PicOrderCnt));
 
-    if (list.Count == 0)
-      throw new InvalidDataException(
-        "An H.264 P slice was reached with no reference picture in the decoded picture buffer. Decoding must begin "
-        + "at an IDR picture, and every picture the stream predicts from must have been decoded.");
+    var l0 = new List<H264Picture>(this._shortTerm.Count + this._longTerm.Count);
+    l0.AddRange(before);
+    l0.AddRange(after);
+    _AppendLongTerm(l0, this._longTerm);
 
-    // The list is not padded out to the length the slice states. Clause 8.2.4.2 builds it from the
-    // pictures that exist and discards any beyond that length; where there are fewer, the entries
-    // past the end are left undefined for the modification below to fill in. Repeating a picture to
-    // fill them would put a second copy of it in the list, which the modification then finds instead
-    // of the one it meant — and would turn a stream that names a reference it never sent into a
-    // picture predicted from the wrong one rather than into a refusal.
-    _Modify(list, header, maxFrameNum);
+    var l1 = new List<H264Picture>(this._shortTerm.Count + this._longTerm.Count);
+    l1.AddRange(after);
+    l1.AddRange(before);
+    _AppendLongTerm(l1, this._longTerm);
 
-    if (list.Count > header.NumRefIdxL0Active)
-      list.RemoveRange(header.NumRefIdxL0Active, list.Count - header.NumRefIdxL0Active);
+    _RequireReferences(l0, "B");
+    if (l1.Count > 1 && _SameOrder(l0, l1))
+      (l1[0], l1[1]) = (l1[1], l1[0]);
 
-    return [.. list];
+    _Modify(l0, header.ListModificationsL0, header, maxFrameNum, 0);
+    _Modify(l1, header.ListModificationsL1, header, maxFrameNum, 1);
+    _Truncate(l0, header.NumRefIdxL0Active);
+    _Truncate(l1, header.NumRefIdxL1Active);
+    return ([.. l0], [.. l1]);
   }
 
-  /// <summary>The reference picture list modification of clause 8.2.4.3.1.</summary>
-  private static void _Modify(List<H264Picture> list, H264SliceHeader header, int maxFrameNum) {
-    if (header.ListModificationsL0.Count == 0)
+  private static void _AppendLongTerm(List<H264Picture> target, List<H264Picture> source) {
+    var ordered = new List<H264Picture>(source);
+    ordered.Sort(static (a, b) => a.LongTermPicNum.CompareTo(b.LongTermPicNum));
+    target.AddRange(ordered);
+  }
+
+  private static void _RequireReferences(List<H264Picture> list, string slice) {
+    if (list.Count == 0)
+      throw new InvalidDataException(
+        $"An H.264 {slice} slice was reached with no reference picture in the decoded picture buffer. Decoding must begin at an IDR picture.");
+  }
+
+  private static bool _SameOrder(List<H264Picture> first, List<H264Picture> second) {
+    if (first.Count != second.Count)
+      return false;
+    for (var i = 0; i < first.Count; ++i)
+      if (first[i].Serial != second[i].Serial)
+        return false;
+    return true;
+  }
+
+  private static void _Truncate(List<H264Picture> list, int active) {
+    if (list.Count > active)
+      list.RemoveRange(active, list.Count - active);
+  }
+
+  private void _UpdateShortTermPicNums(int currentFrameNum, int maxFrameNum) {
+    foreach (var picture in this._shortTerm)
+      picture.PicNum = picture.FrameNum > currentFrameNum ? picture.FrameNum - maxFrameNum : picture.FrameNum;
+  }
+
+  private static void _Modify(
+    List<H264Picture> list,
+    IReadOnlyList<H264ListModification> modifications,
+    H264SliceHeader header,
+    int maxFrameNum,
+    int listNumber) {
+    if (modifications.Count == 0)
       return;
 
     var predicted = header.FrameNum;
     var target = 0;
-
-    foreach (var modification in header.ListModificationsL0) {
-      if (modification.Idc == 2)
-        throw new NotSupportedException(
-          "This H.264 slice reorders its reference picture list by long-term picture number "
-          + "(modification_of_pic_nums_idc 2, H.264 clause 8.2.4.3.1). Long-term references are not implemented.");
-
-      // The differences are coded relative to the last one applied rather than to the current
-      // picture, so a slice naming several references spends few bits on each.
-      var difference = modification.Value + 1;
-      var noWrap = modification.Idc == 0
-        ? predicted - difference < 0 ? predicted - difference + maxFrameNum : predicted - difference
-        : predicted + difference >= maxFrameNum ? predicted + difference - maxFrameNum : predicted + difference;
-
-      predicted = noWrap;
-      var picNum = noWrap > header.FrameNum ? noWrap - maxFrameNum : noWrap;
-
-      var found = list.FindIndex(picture => picture.PicNum == picNum);
-      if (found < 0)
-        throw new InvalidDataException(
-          $"An H.264 slice reorders its reference picture list to put PicNum {picNum} at index {target}, and no "
-          + "picture in the decoded picture buffer has that number. The stream refers to a picture that was never "
-          + "decoded.");
+    foreach (var modification in modifications) {
+      int found;
+      if (modification.Idc == 2) {
+        var longTermPicNum = modification.Value;
+        found = list.FindIndex(p => p.IsLongTerm && p.LongTermPicNum == longTermPicNum);
+        if (found < 0)
+          throw new InvalidDataException(
+            $"An H.264 slice reorders reference list {listNumber} to long-term picture {longTermPicNum}, but the DPB holds no such picture.");
+      } else {
+        var difference = modification.Value + 1;
+        var noWrap = modification.Idc == 0
+          ? predicted - difference < 0 ? predicted - difference + maxFrameNum : predicted - difference
+          : predicted + difference >= maxFrameNum ? predicted + difference - maxFrameNum : predicted + difference;
+        predicted = noWrap;
+        var picNum = noWrap > header.FrameNum ? noWrap - maxFrameNum : noWrap;
+        found = list.FindIndex(p => !p.IsLongTerm && p.PicNum == picNum);
+        if (found < 0)
+          throw new InvalidDataException(
+            $"An H.264 slice reorders reference list {listNumber} to PicNum {picNum}, but the DPB holds no such short-term picture.");
+      }
 
       var moved = list[found];
       list.RemoveAt(found);
@@ -114,82 +144,121 @@ internal sealed class H264ReferencePictures {
     }
   }
 
-  /// <summary>
-  /// Files a decoded reference picture, dropping whichever one it displaces — clause 8.2.5.
-  /// </summary>
   internal void Add(H264Picture picture, H264SliceHeader header) {
     if (header.IdrPicFlag) {
-      if (header.LongTermReferenceFlag)
-        throw new NotSupportedException(
-          "This H.264 IDR picture sets long_term_reference_flag, so it is kept as a long-term reference "
-          + "(H.264, clause 8.2.5.1). Long-term references are not implemented.");
-
       this._shortTerm.Clear();
-      this._shortTerm.Add(picture);
+      this._longTerm.Clear();
+      if (header.LongTermReferenceFlag)
+        this._AddLongTerm(picture, 0);
+      else
+        this._AddShortTerm(picture);
       this.PreviousReferenceFrameNum = picture.FrameNum;
       return;
     }
 
+    this._UpdateShortTermPicNums(header.FrameNum, header.Sps.MaxFrameNum);
+    var currentLongTermFrameIdx = -1;
+    var resetFrameNumber = false;
     if (header.AdaptiveRefPicMarkingModeFlag)
-      this._ApplyMarking(header);
+      this._ApplyMarking(header, ref currentLongTermFrameIdx, ref resetFrameNumber);
     else
       this._SlideWindow(header.Sps);
 
-    this._shortTerm.Add(picture);
+    if (resetFrameNumber)
+      picture.FrameNum = 0;
+    if (currentLongTermFrameIdx >= 0)
+      this._AddLongTerm(picture, currentLongTermFrameIdx);
+    else
+      this._AddShortTerm(picture);
     this.PreviousReferenceFrameNum = picture.FrameNum;
   }
 
-  /// <summary>
-  /// The sliding window: the oldest reference falls out when the buffer is full — clause 8.2.5.3.
-  /// </summary>
+  private void _AddShortTerm(H264Picture picture) {
+    picture.IsLongTerm = false;
+    picture.LongTermFrameIdx = -1;
+    this._shortTerm.Add(picture);
+  }
+
+  private void _AddLongTerm(H264Picture picture, int index) {
+    this._RemoveLongTermAt(index);
+    picture.IsLongTerm = true;
+    picture.LongTermFrameIdx = index;
+    this._longTerm.Add(picture);
+  }
+
+  private void _RemoveLongTermAt(int index) {
+    var found = this._longTerm.FindIndex(p => p.LongTermFrameIdx == index);
+    if (found >= 0)
+      this._longTerm.RemoveAt(found);
+  }
+
   private void _SlideWindow(H264SequenceParameterSet sps) {
     var capacity = Math.Max(sps.MaxNumRefFrames, 1);
-    while (this._shortTerm.Count >= capacity) {
+    while (this._shortTerm.Count + this._longTerm.Count >= capacity) {
+      if (this._shortTerm.Count == 0)
+        throw new InvalidDataException(
+          $"The H.264 DPB is filled by {this._longTerm.Count} long-term references; sliding-window marking cannot discard one.");
       var oldest = 0;
       for (var i = 1; i < this._shortTerm.Count; ++i)
         if (this._shortTerm[i].PicNum < this._shortTerm[oldest].PicNum)
           oldest = i;
-
       this._shortTerm.RemoveAt(oldest);
     }
   }
 
-  /// <summary>The memory management control operations a slice may carry instead — clause 8.2.5.4.</summary>
-  private void _ApplyMarking(H264SliceHeader header) {
+  private void _ApplyMarking(H264SliceHeader header, ref int currentLongTermFrameIdx, ref bool resetFrameNumber) {
     foreach (var operation in header.MarkingOperations)
       switch (operation.Operation) {
         case 1: {
-          // Mark one short-term picture unused, named by how far below the current one it is.
-          var picNum = header.FrameNum - (operation.First + 1);
-          var found = this._shortTerm.FindIndex(picture => picture.PicNum == picNum);
+          var picNum = _ShortTermPicNumFromDifference(header, operation.First);
+          var found = this._shortTerm.FindIndex(p => p.PicNum == picNum);
           if (found < 0)
-            throw new InvalidDataException(
-              $"An H.264 slice marks PicNum {picNum} as unused for reference (memory_management_control_operation "
-              + "1), and no picture in the decoded picture buffer has that number.");
-
+            throw new InvalidDataException($"H.264 MMCO 1 names missing short-term PicNum {picNum}.");
           this._shortTerm.RemoveAt(found);
           break;
         }
-
-        case 4 when operation.First == 0:
-          // "No long-term references from here on", which for a buffer that has never held one is
-          // nothing at all. Encoders emit it to state the intent rather than to change anything.
+        case 2: {
+          var found = this._longTerm.FindIndex(p => p.LongTermPicNum == operation.First);
+          if (found < 0)
+            throw new InvalidDataException($"H.264 MMCO 2 names missing long-term picture {operation.First}.");
+          this._longTerm.RemoveAt(found);
           break;
-
-        default:
-          throw new NotSupportedException(
-            $"This H.264 slice carries memory_management_control_operation {operation.Operation} "
-            + $"({_MarkingName(operation.Operation)}, H.264 Table 7-9). This decoder implements the sliding window "
-            + "and operation 1 only; long-term references and the reference reset are not implemented.");
+        }
+        case 3: {
+          var picNum = _ShortTermPicNumFromDifference(header, operation.First);
+          var found = this._shortTerm.FindIndex(p => p.PicNum == picNum);
+          if (found < 0)
+            throw new InvalidDataException($"H.264 MMCO 3 names missing short-term PicNum {picNum}.");
+          var moved = this._shortTerm[found];
+          this._shortTerm.RemoveAt(found);
+          this._AddLongTerm(moved, operation.Second);
+          break;
+        }
+        case 4: {
+          var max = operation.First - 1;
+          this._longTerm.RemoveAll(p => p.LongTermFrameIdx > max);
+          if (currentLongTermFrameIdx > max)
+            currentLongTermFrameIdx = -1;
+          break;
+        }
+        case 5:
+          this._shortTerm.Clear();
+          this._longTerm.Clear();
+          currentLongTermFrameIdx = -1;
+          resetFrameNumber = true;
+          break;
+        case 6:
+          currentLongTermFrameIdx = operation.Second;
+          this._RemoveLongTermAt(currentLongTermFrameIdx);
+          break;
       }
   }
 
-  private static string _MarkingName(int operation) => operation switch {
-    2 => "mark a long-term picture unused",
-    3 => "turn a short-term picture into a long-term one",
-    4 => "set the largest long-term frame index",
-    5 => "mark every reference picture unused and reset the frame numbering",
-    6 => "keep the current picture as a long-term reference",
-    _ => "reserved",
-  };
+  private static int _ShortTermPicNumFromDifference(H264SliceHeader header, int differenceMinus1) {
+    var maxFrameNum = header.Sps.MaxFrameNum;
+    var noWrap = header.FrameNum - (differenceMinus1 + 1);
+    if (noWrap < 0)
+      noWrap += maxFrameNum;
+    return noWrap > header.FrameNum ? noWrap - maxFrameNum : noWrap;
+  }
 }
