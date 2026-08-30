@@ -108,13 +108,7 @@ public sealed class Yuv4MpegContainer : IVideoContainerReader<Yuv4MpegContainer>
     var offset = container.FirstFrameOffset;
     long frame = 0;
     while (offset < file.Length) {
-      var remaining = file.Span[offset..];
-      var lineLength = remaining.IndexOf((byte)'\n');
-      if (lineLength < 0)
-        throw new InvalidDataException($"The YUV4MPEG2 frame header at offset {offset} is not terminated by a line feed.");
-      if (lineLength < 5 || !remaining[..5].SequenceEqual("FRAME"u8) || (lineLength > 5 && remaining[5] != (byte)' '))
-        throw new InvalidDataException($"Expected a YUV4MPEG2 FRAME marker at offset {offset}.");
-
+      var lineLength = _FrameHeaderLength(file, offset);
       var dataOffset = checked(offset + lineLength + 1);
       if (container.FrameSize > file.Length - dataOffset)
         throw new InvalidDataException($"YUV4MPEG2 frame {frame} is truncated: expected {container.FrameSize} bytes, found {file.Length - dataOffset}.");
@@ -177,6 +171,17 @@ public sealed class Yuv4MpegContainer : IVideoContainerReader<Yuv4MpegContainer>
     }
 
     return checked((int)(samples * bytesPerSample));
+  }
+
+  private static int _FrameHeaderLength(ReadOnlyMemory<byte> file, int offset) {
+    var remaining = file.Span[offset..];
+    var lineLength = remaining.IndexOf((byte)'\n');
+    if (lineLength < 0)
+      throw new InvalidDataException($"The YUV4MPEG2 frame header at offset {offset} is not terminated by a line feed.");
+    if (lineLength < 5 || !remaining[..5].SequenceEqual("FRAME"u8) || (lineLength > 5 && remaining[5] != (byte)' '))
+      throw new InvalidDataException($"Expected a YUV4MPEG2 FRAME marker at offset {offset}.");
+
+    return lineLength;
   }
 
   private static Rational _ParseRatio(ReadOnlySpan<char> text, string field) {
