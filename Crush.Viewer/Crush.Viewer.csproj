@@ -2,25 +2,39 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0-windows</TargetFramework>
-    <UseWindowsForms>true</UseWindowsForms>
-    <Description>Image viewer supporting 500+ formats with zoom, pan, multi-image navigation, and format conversion.</Description>
-    <!-- Publish settings only apply on Windows. Linux CI (compile-only) skips them so the
-         WindowsForms runtime pack isn't required for the linux-x64 RID. -->
+    <TargetFramework>net10.0</TargetFramework>
+    <Description>Cross-platform image browser, viewer, converter, and lightweight editor for the PNGCrushCS format suite.</Description>
     <PublishSingleFile Condition="'$(OS)' == 'Windows_NT'">true</PublishSingleFile>
-    <!-- WinForms is not compatible with trimming (NETSDK1175) -->
     <SelfContained Condition="'$(OS)' == 'Windows_NT'">true</SelfContained>
     <RuntimeIdentifier Condition="'$(OS)' == 'Windows_NT' And '$(RuntimeIdentifier)' == ''">win-x64</RuntimeIdentifier>
     <EnableCompressionInSingleFile Condition="'$(OS)' == 'Windows_NT'">true</EnableCompressionInSingleFile>
     <IncludeNativeLibrariesForSelfExtract Condition="'$(OS)' == 'Windows_NT'">true</IncludeNativeLibrariesForSelfExtract>
-    <!-- Every `dotnet build` automatically post-publishes to a single exe in the bin folder. -->
     <EnableSingleFileBundle Condition="'$(OS)' == 'Windows_NT'">true</EnableSingleFileBundle>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Avalonia.Desktop" Version="12.0.3" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.0.3" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Optimizers\Optimizer.Image\Optimizer.Image.csproj" />
+    <ProjectReference Include="..\Hawkynt.FileFormats.Images\Hawkynt.FileFormats.Images.csproj" />
     <ProjectReference Include="..\FileFormat.Core\FileFormat.Core.csproj" />
-    <ProjectReference Include="..\Hawkynt.ImageTransformUI\Hawkynt.ImageTransformUI.csproj" />
+  </ItemGroup>
+
+  <!-- The original viewer was WinForms-only. Keep the source in history, not in this cross-platform build. -->
+  <ItemGroup>
+    <Compile Remove="AspectRatioCropDialog.cs" />
+    <Compile Remove="BitmapBridge.cs" />
+    <Compile Remove="CanvasSizeDialog.cs" />
+    <Compile Remove="CropToSizeDialog.cs" />
+    <Compile Remove="ImagePanel.cs" />
+    <Compile Remove="MainForm.cs" />
+    <Compile Remove="ResizeDialog.cs" />
+    <Compile Remove="ThumbnailStrip.cs" />
+    <Compile Remove="VideoModeDialog.cs" />
   </ItemGroup>
 
   <Import Project="..\build\SingleFileBundle.targets" />
