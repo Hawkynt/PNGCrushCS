@@ -545,7 +545,7 @@ internal sealed class MainWindow : Window {
   }
 
   private static RawImage _Grayscale(RawImage source) {
-    var data = source.ToBgra32().ToArray();
+    var data = (byte[])source.ToBgra32().Clone();
     for (var i = 0; i < data.Length; i += 4) {
       var luma = (byte)((data[i + 2] * 77 + data[i + 1] * 150 + data[i] * 29) >> 8);
       data[i] = data[i + 1] = data[i + 2] = luma;
@@ -554,7 +554,7 @@ internal sealed class MainWindow : Window {
   }
 
   private static RawImage _Invert(RawImage source) {
-    var data = source.ToBgra32().ToArray();
+    var data = (byte[])source.ToBgra32().Clone();
     for (var i = 0; i < data.Length; i += 4) {
       data[i] = (byte)(255 - data[i]);
       data[i + 1] = (byte)(255 - data[i + 1]);
