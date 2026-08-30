@@ -15,6 +15,7 @@ namespace Optimizer.Bmp;
 public sealed class BmpOptimizer {
   private readonly byte[] _argbPixelData;
   private readonly int _height;
+  private readonly bool _hasTransparency;
   private readonly bool _isGrayscale;
   private readonly BmpOptimizationOptions _options;
   private readonly int _uniqueColors;
@@ -26,7 +27,13 @@ public sealed class BmpOptimizer {
     this._width = image.Width;
     this._height = image.Height;
 
-    _ExtractPixelData(image, out this._argbPixelData, out this._isGrayscale, out this._uniqueColors);
+    _ExtractPixelData(
+      image,
+      out this._argbPixelData,
+      out this._isGrayscale,
+      out this._hasTransparency,
+      out this._uniqueColors
+    );
   }
 
   public static BmpOptimizer FromFile(FileInfo file, BmpOptimizationOptions? options = null) {
@@ -99,27 +106,46 @@ public sealed class BmpOptimizer {
   }
 
   private BmpOptimizationCombo[] _GenerateCombinations() {
-    var combos = new List<BmpOptimizationCombo>();
-
     var colorModes = new List<BmpColorMode>(this._options.ColorModes);
+
+    // `Original` means preserve the source's information, not "always write 24 bits". In
+    // particular, turning a 32-bit BMP into a smaller 24-bit one by deleting alpha is corruption,
+    // not optimization. Normalize the symbolic mode before generating combinations so Assemble()
+    // receives the concrete on-disk layout it must write.
+    for (var i = 0; i < colorModes.Count; ++i)
+      if (colorModes[i] == BmpColorMode.Original)
+        colorModes[i] = this._hasTransparency ? BmpColorMode.Bgra32 : BmpColorMode.Rgb24;
+
     if (this._options.AutoSelectColorMode) {
-      if (!colorModes.Contains(BmpColorMode.Rgb24))
-        colorModes.Add(BmpColorMode.Rgb24);
-      if (!colorModes.Contains(BmpColorMode.Rgb16_565))
-        colorModes.Add(BmpColorMode.Rgb16_565);
-      if (this._isGrayscale && !colorModes.Contains(BmpColorMode.Grayscale8))
-        colorModes.Add(BmpColorMode.Grayscale8);
-      if (this._uniqueColors <= 256 && !colorModes.Contains(BmpColorMode.Palette8))
-        colorModes.Add(BmpColorMode.Palette8);
-      if (this._uniqueColors <= 16 && !colorModes.Contains(BmpColorMode.Palette4))
-        colorModes.Add(BmpColorMode.Palette4);
-      if (this._uniqueColors <= 2 && !colorModes.Contains(BmpColorMode.Palette1))
-        colorModes.Add(BmpColorMode.Palette1);
+      if (this._hasTransparency) {
+        if (!colorModes.Contains(BmpColorMode.Bgra32))
+          colorModes.Add(BmpColorMode.Bgra32);
+      } else {
+        if (!colorModes.Contains(BmpColorMode.Rgb24))
+          colorModes.Add(BmpColorMode.Rgb24);
+        if (!colorModes.Contains(BmpColorMode.Rgb16_565))
+          colorModes.Add(BmpColorMode.Rgb16_565);
+        if (this._isGrayscale && !colorModes.Contains(BmpColorMode.Grayscale8))
+          colorModes.Add(BmpColorMode.Grayscale8);
+        if (this._uniqueColors <= 256 && !colorModes.Contains(BmpColorMode.Palette8))
+          colorModes.Add(BmpColorMode.Palette8);
+        if (this._uniqueColors <= 16 && !colorModes.Contains(BmpColorMode.Palette4))
+          colorModes.Add(BmpColorMode.Palette4);
+        if (this._uniqueColors <= 2 && !colorModes.Contains(BmpColorMode.Palette1))
+          colorModes.Add(BmpColorMode.Palette1);
+      }
     }
 
+    var combos = new List<BmpOptimizationCombo>();
     foreach (var colorMode in colorModes)
     foreach (var compression in this._options.Compressions)
     foreach (var rowOrder in this._options.RowOrders) {
+      // Every currently supported mode other than BGRA discards alpha. Refuse to put a
+      // transparency-bearing image through one of those paths even if explicitly requested: an
+      // optimizer may choose a different representation, but it may not silently delete pixels.
+      if (this._hasTransparency && colorMode != BmpColorMode.Bgra32)
+        continue;
+
       // Prune invalid combinations
       if (compression == BmpCompression.Rle8 && colorMode != BmpColorMode.Palette8 &&
           colorMode != BmpColorMode.Grayscale8)
@@ -166,6 +192,18 @@ public sealed class BmpOptimizer {
         }
 
         return (rgb, null, 0);
+      }
+      case BmpColorMode.Bgra32: {
+        var bgra = new byte[this._width * this._height * 4];
+        for (var i = 0; i < this._width * this._height; ++i) {
+          var srcIdx = i * 4;
+          bgra[srcIdx] = this._argbPixelData[srcIdx + 2];
+          bgra[srcIdx + 1] = this._argbPixelData[srcIdx + 1];
+          bgra[srcIdx + 2] = this._argbPixelData[srcIdx];
+          bgra[srcIdx + 3] = this._argbPixelData[srcIdx + 3];
+        }
+
+        return (bgra, null, 0);
       }
       case BmpColorMode.Rgb16_565: {
         var data = new byte[this._width * this._height * 2];
@@ -310,39 +348,42 @@ public sealed class BmpOptimizer {
     RawImage image,
     out byte[] argbPixelData,
     out bool isGrayscale,
+    out bool hasTransparency,
     out int uniqueColors
   ) {
     var width = image.Width;
     var height = image.Height;
     argbPixelData = new byte[width * height * 4]; // RGBA order: R, G, B, A
 
-    // Blue, green, red, alpha — the order the platform bitmap laid out, so the loop is unchanged.
+    // Blue, green, red, alpha — the order the platform bitmap laid out.
     var source = PixelConverter.Convert(image, PixelFormat.Bgra32).PixelData;
-    {
-      var colorSet = new HashSet<int>();
-      isGrayscale = true;
+    var colorSet = new HashSet<int>();
+    isGrayscale = true;
+    hasTransparency = false;
 
-      unsafe {
-        fixed (byte* pinned = source)
-        for (var y = 0; y < height; ++y) {
-          var row = pinned + y * width * 4;
-          for (var x = 0; x < width; ++x) {
-            var b = row[x * 4];
-            var g = row[x * 4 + 1];
-            var r = row[x * 4 + 2];
-            var dstIdx = (y * width + x) * 4;
-            argbPixelData[dstIdx] = r;
-            argbPixelData[dstIdx + 1] = g;
-            argbPixelData[dstIdx + 2] = b;
-            argbPixelData[dstIdx + 3] = 255;
-            colorSet.Add((r << 16) | (g << 8) | b);
-            if (r != g || g != b)
-              isGrayscale = false;
-          }
+    unsafe {
+      fixed (byte* pinned = source)
+      for (var y = 0; y < height; ++y) {
+        var row = pinned + y * width * 4;
+        for (var x = 0; x < width; ++x) {
+          var b = row[x * 4];
+          var g = row[x * 4 + 1];
+          var r = row[x * 4 + 2];
+          var a = row[x * 4 + 3];
+          var dstIdx = (y * width + x) * 4;
+          argbPixelData[dstIdx] = r;
+          argbPixelData[dstIdx + 1] = g;
+          argbPixelData[dstIdx + 2] = b;
+          argbPixelData[dstIdx + 3] = a;
+          colorSet.Add((r << 16) | (g << 8) | b);
+          if (a != 255)
+            hasTransparency = true;
+          if (r != g || g != b)
+            isGrayscale = false;
         }
       }
-
-      uniqueColors = colorSet.Count;
     }
+
+    uniqueColors = colorSet.Count;
   }
 }
