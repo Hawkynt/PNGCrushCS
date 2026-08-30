@@ -9,9 +9,10 @@ namespace FileFormat.Codecs.H264;
 /// <remarks>
 /// The three POC algorithms are deliberately kept independent from the DPB. POC is derived before a
 /// B slice's reference lists can be built, while MMCO-5 is applied only after the picture has been
-/// decoded. <see cref="FinishPicture"/> therefore records the one piece of post-picture state the next
-/// derivation needs: whether the previous reference picture executed MMCO-5 and, for POC type 0, its
-/// top-field order count.
+/// decoded. <see cref="FinishPicture"/> therefore records both scopes the standard distinguishes:
+/// type 0 needs to know whether the previous <em>reference</em> picture executed MMCO-5, while types
+/// 1 and 2 need the same fact for the immediately previous picture in decoding order. The former must
+/// survive intervening non-reference pictures; the latter must not.
 /// <para/>
 /// The equations are a C# adaptation of the corresponding implementation in OxideAV/oxideav-h264,
 /// Copyright (c) 2026 Karpeles Lab Inc., used under the MIT License. The implementation is restricted
@@ -23,6 +24,7 @@ internal sealed class H264PictureOrderCount {
   private int _prevPicOrderCntLsb;
   private int _prevFrameNum;
   private long _prevFrameNumOffset;
+  private bool _previousPictureHadMmco5;
   private bool _previousReferenceHadMmco5;
   private int _previousReferenceTopFieldOrderCnt;
 
@@ -41,20 +43,31 @@ internal sealed class H264PictureOrderCount {
     };
   }
 
-  /// <summary>Records MMCO-5 semantics after the current picture has completed.</summary>
-  internal void FinishPicture(H264SliceHeader header, Result result) {
-    if (!header.IsReference) {
-      this._previousReferenceHadMmco5 = false;
-      return;
+  /// <summary>Applies post-picture MMCO-5 POC normalization and records state for the next picture.</summary>
+  internal Result FinishPicture(H264SliceHeader header, Result result) {
+    var hasMmco5 = false;
+    if (header.IsReference)
+      foreach (var operation in header.MarkingOperations)
+        if (operation.Operation == 5) {
+          hasMmco5 = true;
+          break;
+        }
+
+    if (hasMmco5) {
+      var shift = result.PicOrderCnt;
+      var top = _Checked((long)result.TopFieldOrderCnt - shift);
+      var bottom = _Checked((long)result.BottomFieldOrderCnt - shift);
+      result = new(top, bottom, Math.Min(top, bottom));
     }
 
-    this._previousReferenceHadMmco5 = false;
-    foreach (var operation in header.MarkingOperations)
-      if (operation.Operation == 5) {
-        this._previousReferenceHadMmco5 = true;
+    this._previousPictureHadMmco5 = hasMmco5;
+    if (header.IsReference) {
+      this._previousReferenceHadMmco5 = hasMmco5;
+      if (hasMmco5)
         this._previousReferenceTopFieldOrderCnt = result.TopFieldOrderCnt;
-        break;
-      }
+    }
+
+    return result;
   }
 
   internal void Reset() {
@@ -62,6 +75,7 @@ internal sealed class H264PictureOrderCount {
     this._prevPicOrderCntLsb = 0;
     this._prevFrameNum = 0;
     this._prevFrameNumOffset = 0;
+    this._previousPictureHadMmco5 = false;
     this._previousReferenceHadMmco5 = false;
     this._previousReferenceTopFieldOrderCnt = 0;
   }
@@ -156,8 +170,8 @@ internal sealed class H264PictureOrderCount {
     if (header.IdrPicFlag)
       return 0;
 
-    var previousOffset = this._previousReferenceHadMmco5 ? 0 : this._prevFrameNumOffset;
-    var previousFrameNum = this._previousReferenceHadMmco5 ? 0 : this._prevFrameNum;
+    var previousOffset = this._previousPictureHadMmco5 ? 0 : this._prevFrameNumOffset;
+    var previousFrameNum = this._previousPictureHadMmco5 ? 0 : this._prevFrameNum;
     return previousFrameNum > header.FrameNum
       ? previousOffset + header.Sps.MaxFrameNum
       : previousOffset;
