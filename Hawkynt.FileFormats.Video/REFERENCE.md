@@ -4903,6 +4903,44 @@ Implements `IVideoContainerWriter<VqaWriter>`, `IVideoFormatMetadata<VqaWriter>`
 | `Finish` | `byte[] Finish()` |  |
 | `WritePacket` | `void WritePacket(CodedPacket packet)` |  |
 
+### Namespace `FileFormat.Yuv4Mpeg`
+
+[`Yuv4MpegContainer`](#yuv4mpegcontainer) · [`Yuv4MpegWriter`](#yuv4mpegwriter)
+
+#### `Yuv4MpegContainer`
+
+A YUV4MPEG2 stream containing uncompressed planar YUV frames.
+
+Implements `IVideoContainerReader<Yuv4MpegContainer>`, `IVideoFormatMetadata<Yuv4MpegContainer>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Yuv4MpegContainer` | `Yuv4MpegContainer()` |  |
+| `Chroma` | `string Chroma { get; init; }` |  |
+| `FileExtensions` | `static string[] FileExtensions { get; }` |  |
+| `File` | `ReadOnlyMemory<byte> File { get; init; }` |  |
+| `PrimaryExtension` | `static string PrimaryExtension { get; }` |  |
+| `Stream` | `MediaStreamInfo Stream { get; init; }` |  |
+| `FromBytes` | `static Yuv4MpegContainer FromBytes(byte[] data)` |  |
+| `FromSpan` | `static Yuv4MpegContainer FromSpan(ReadOnlySpan<byte> data)` |  |
+| `MatchesSignature` | `static bool? MatchesSignature(ReadOnlySpan<byte> header)` |  |
+| `ReadPackets` | `static IEnumerable<CodedPacket> ReadPackets(Yuv4MpegContainer container)` |  |
+| `Streams` | `static IReadOnlyList<MediaStreamInfo> Streams(Yuv4MpegContainer container)` |  |
+
+#### `Yuv4MpegWriter`
+
+Writes uncompressed planar YUV frames as a YUV4MPEG2 stream.
+
+Implements `IVideoContainerWriter<Yuv4MpegWriter>`, `IVideoFormatMetadata<Yuv4MpegWriter>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `FileExtensions` | `static string[] FileExtensions { get; }` |  |
+| `PrimaryExtension` | `static string PrimaryExtension { get; }` |  |
+| `Create` | `static Yuv4MpegWriter Create(IReadOnlyList<MediaStreamInfo> streams, VideoMetadata metadata)` |  |
+| `Finish` | `byte[] Finish()` |  |
+| `WritePacket` | `void WritePacket(CodedPacket packet)` |  |
+
 ### Namespace `Hawkynt.FileFormats.Video`
 
 [`MagicSignature`](#magicsignature) · [`VideoCodecEntry`](#videocodecentry) · [`VideoFormat`](#videoformat) · [`VideoFormatEntry`](#videoformatentry) · [`VideoFormatRegistry`](#videoformatregistry)
@@ -4992,6 +5030,8 @@ Supported video containers, auto-generated from discovered IVideoContainerReader
 | `VmdWriter` | `50` |  |
 | `Vqa` | `51` |  |
 | `VqaWriter` | `52` |  |
+| `Yuv4Mpeg` | `53` |  |
+| `Yuv4MpegWriter` | `54` |  |
 
 #### `VideoFormatEntry`
 
