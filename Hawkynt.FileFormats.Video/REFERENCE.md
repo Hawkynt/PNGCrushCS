@@ -4015,6 +4015,45 @@ Implements `IVideoContainerWriter<FlvWriter>`, `IVideoFormatMetadata<FlvWriter>`
 | `Finish` | `byte[] Finish()` |  |
 | `WritePacket` | `void WritePacket(CodedPacket packet)` |  |
 
+### Namespace `FileFormat.H263Video`
+
+[`H263VideoContainer`](#h263videocontainer) · [`H263VideoWriter`](#h263videowriter)
+
+#### `H263VideoContainer`
+
+A raw H.263 elementary video stream, split at byte-aligned picture start codes.
+
+Implements `IVideoContainerReader<H263VideoContainer>`, `IVideoFormatMetadata<H263VideoContainer>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `H263VideoContainer` | `H263VideoContainer()` |  |
+| `Data` | `ReadOnlyMemory<byte> Data { get; init; }` |  |
+| `FileExtensions` | `static string[] FileExtensions { get; }` |  |
+| `PrimaryExtension` | `static string PrimaryExtension { get; }` |  |
+| `FromBytes` | `static H263VideoContainer FromBytes(byte[] data)` |  |
+| `FromFile` | `static H263VideoContainer FromFile(FileInfo file)` |  |
+| `FromSpan` | `static H263VideoContainer FromSpan(ReadOnlySpan<byte> data)` |  |
+| `MatchesSignature` | `static bool? MatchesSignature(ReadOnlySpan<byte> header)` |  |
+| `Metadata` | `static VideoMetadata Metadata(H263VideoContainer container)` |  |
+| `ReadPackets` | `static IEnumerable<CodedPacket> ReadPackets(H263VideoContainer container)` |  |
+| `ReadPackets` | `static IEnumerable<CodedPacket> ReadPackets(H263VideoContainer container, int streamIndex)` |  |
+| `Streams` | `static IReadOnlyList<MediaStreamInfo> Streams(H263VideoContainer container)` |  |
+
+#### `H263VideoWriter`
+
+Writes complete H.263 coded pictures as a raw elementary stream.
+
+Implements `IVideoContainerWriter<H263VideoWriter>`, `IVideoFormatMetadata<H263VideoWriter>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `FileExtensions` | `static string[] FileExtensions { get; }` |  |
+| `PrimaryExtension` | `static string PrimaryExtension { get; }` |  |
+| `Create` | `static H263VideoWriter Create(IReadOnlyList<MediaStreamInfo> streams, VideoMetadata metadata)` |  |
+| `Finish` | `byte[] Finish()` |  |
+| `WritePacket` | `void WritePacket(CodedPacket packet)` |  |
+
 ### Namespace `FileFormat.H264Video`
 
 [`H264VideoContainer`](#h264videocontainer) · [`H264VideoReader`](#h264videoreader) · [`H264VideoWriter`](#h264videowriter)
@@ -5067,46 +5106,48 @@ Supported video containers, auto-generated from discovered IVideoContainerReader
 | `FliWriter` | `14` |  |
 | `Flv` | `15` |  |
 | `FlvWriter` | `16` |  |
-| `H264Video` | `17` |  |
-| `H264VideoWriter` | `18` |  |
-| `H265Video` | `19` |  |
-| `H265VideoWriter` | `20` |  |
-| `Idcin` | `21` |  |
-| `IdcinWriter` | `22` |  |
-| `Ivf` | `23` |  |
-| `IvfWriter` | `24` |  |
-| `Matroska` | `25` |  |
-| `MatroskaWriter` | `26` |  |
-| `Mjpeg` | `27` |  |
-| `MjpegWriter` | `28` |  |
-| `Mp4` | `29` |  |
-| `Mp4Writer` | `30` |  |
-| `MpegProgramStream` | `31` |  |
-| `MpegProgramStreamWriter` | `32` |  |
-| `MpegVideo` | `33` |  |
-| `MpegVideoWriter` | `34` |  |
-| `Mve` | `35` |  |
-| `MveWriter` | `36` |  |
-| `Ogg` | `37` |  |
-| `OggWriter` | `38` |  |
-| `RealMedia` | `39` |  |
-| `RealMediaWriter` | `40` |  |
-| `Roq` | `41` |  |
-| `RoqWriter` | `42` |  |
-| `Rpl` | `43` |  |
-| `RplWriter` | `44` |  |
-| `Smacker` | `45` |  |
-| `SmackerWriter` | `46` |  |
-| `Str` | `47` |  |
-| `StrWriter` | `48` |  |
-| `TransportStream` | `49` |  |
-| `TransportStreamWriter` | `50` |  |
-| `Vmd` | `51` |  |
-| `VmdWriter` | `52` |  |
-| `Vqa` | `53` |  |
-| `VqaWriter` | `54` |  |
-| `Yuv4Mpeg` | `55` |  |
-| `Yuv4MpegWriter` | `56` |  |
+| `H263Video` | `17` |  |
+| `H263VideoWriter` | `18` |  |
+| `H264Video` | `19` |  |
+| `H264VideoWriter` | `20` |  |
+| `H265Video` | `21` |  |
+| `H265VideoWriter` | `22` |  |
+| `Idcin` | `23` |  |
+| `IdcinWriter` | `24` |  |
+| `Ivf` | `25` |  |
+| `IvfWriter` | `26` |  |
+| `Matroska` | `27` |  |
+| `MatroskaWriter` | `28` |  |
+| `Mjpeg` | `29` |  |
+| `MjpegWriter` | `30` |  |
+| `Mp4` | `31` |  |
+| `Mp4Writer` | `32` |  |
+| `MpegProgramStream` | `33` |  |
+| `MpegProgramStreamWriter` | `34` |  |
+| `MpegVideo` | `35` |  |
+| `MpegVideoWriter` | `36` |  |
+| `Mve` | `37` |  |
+| `MveWriter` | `38` |  |
+| `Ogg` | `39` |  |
+| `OggWriter` | `40` |  |
+| `RealMedia` | `41` |  |
+| `RealMediaWriter` | `42` |  |
+| `Roq` | `43` |  |
+| `RoqWriter` | `44` |  |
+| `Rpl` | `45` |  |
+| `RplWriter` | `46` |  |
+| `Smacker` | `47` |  |
+| `SmackerWriter` | `48` |  |
+| `Str` | `49` |  |
+| `StrWriter` | `50` |  |
+| `TransportStream` | `51` |  |
+| `TransportStreamWriter` | `52` |  |
+| `Vmd` | `53` |  |
+| `VmdWriter` | `54` |  |
+| `Vqa` | `55` |  |
+| `VqaWriter` | `56` |  |
+| `Yuv4Mpeg` | `57` |  |
+| `Yuv4MpegWriter` | `58` |  |
 
 #### `VideoFormatEntry`
 
