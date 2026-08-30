@@ -236,11 +236,14 @@ public sealed class H264VideoDecoder : IVideoCodecDecoder<H264VideoDecoder> {
     H264Deblocking.Filter(decoded);
 
     var picture = decoded.Picture;
+    this._picturePoc = this._pictureOrderCount.FinishPicture(header, this._picturePoc);
+    picture.TopFieldOrderCnt = this._picturePoc.TopFieldOrderCnt;
+    picture.BottomFieldOrderCnt = this._picturePoc.BottomFieldOrderCnt;
+    picture.PicOrderCnt = this._picturePoc.PicOrderCnt;
     picture.FrameNum = header.FrameNum;
     picture.Motion = decoded.ExportMotionField();
     if (header.IsReference)
       this._references.Add(picture, header);
-    this._pictureOrderCount.FinishPicture(header, this._picturePoc);
 
     var sps = header.Sps;
     var image = RawImageFactory.FromYuv420P8(
