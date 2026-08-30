@@ -1,10 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 
 namespace FileFormat.Sixel;
 
-/// <summary>Reads Sixel (DEC terminal graphics) files from bytes, streams, or file paths.</summary>
+/// <summary>Reads SIXEL (DEC terminal graphics) files from bytes, streams, or file paths.</summary>
 public static class SixelReader {
 
   private const byte _ESC = 0x1B;
@@ -14,7 +15,7 @@ public static class SixelReader {
   public static SixelFile FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
-      throw new FileNotFoundException("Sixel file not found.", file.FullName);
+      throw new FileNotFoundException("SIXEL file not found.", file.FullName);
 
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
@@ -38,16 +39,20 @@ public static class SixelReader {
 
   public static SixelFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < 4)
-      throw new InvalidDataException("Data too small for a valid Sixel stream.");
+      throw new InvalidDataException("Data too small for a valid SIXEL stream.");
 
-    var text = Encoding.ASCII.GetString(data);
+    var (bodyStart, aspectRatio, backgroundMode) = _ParseDcs(data);
+    var bodyEnd = _FindSt(data, bodyStart);
+    var body = Encoding.ASCII.GetString(data[bodyStart..bodyEnd]);
 
-    var (dcsEnd, aspectRatio, backgroundMode) = _ParseDcs(text);
-
-    var stStart = _FindSt(text, dcsEnd);
-    var body = text[dcsEnd..stStart];
-
-    var pixelData = SixelCodec.Decode(body, out var width, out var height, out var palette, out var paletteColorCount);
+    var pixelData = SixelCodec.Decode(
+      body,
+      out var width,
+      out var height,
+      out var palette,
+      out var paletteColorCount,
+      backgroundMode
+    );
 
     return new SixelFile {
       Width = width,
@@ -60,60 +65,60 @@ public static class SixelReader {
     };
   }
 
-  private static (int BodyStart, int AspectRatio, int BackgroundMode) _ParseDcs(string text) {
+  private static (int BodyStart, int AspectRatio, int BackgroundMode) _ParseDcs(ReadOnlySpan<byte> data) {
     var i = 0;
-    if (i < text.Length && text[i] == (char)_DCS_8BIT) {
+    if (data[i] == _DCS_8BIT)
       ++i;
-    } else if (i + 1 < text.Length && text[i] == (char)_ESC && text[i + 1] == 'P') {
+    else if (i + 1 < data.Length && data[i] == _ESC && data[i + 1] == (byte)'P')
       i += 2;
-    } else
+    else
       throw new InvalidDataException("Invalid DCS introducer.");
 
-    var aspectRatio = 0;
-    var backgroundMode = 0;
-    var paramIndex = 0;
+    var parameters = new List<int>(3);
+    var value = 0;
+    var hasDigits = false;
 
-    while (i < text.Length && text[i] != 'q') {
-      if (text[i] >= '0' && text[i] <= '9') {
-        var value = 0;
-        while (i < text.Length && text[i] >= '0' && text[i] <= '9') {
-          value = value * 10 + (text[i] - '0');
-          ++i;
+    while (i < data.Length) {
+      var b = data[i++];
+      if (b is >= (byte)'0' and <= (byte)'9') {
+        hasDigits = true;
+        try {
+          value = checked(value * 10 + b - (byte)'0');
+        } catch (OverflowException exception) {
+          throw new InvalidDataException("SIXEL DCS parameter is too large.", exception);
         }
-
-        switch (paramIndex) {
-          case 0:
-            aspectRatio = value;
-            break;
-          case 1:
-            backgroundMode = value;
-            break;
-        }
+        continue;
       }
 
-      if (i < text.Length && text[i] == ';') {
-        ++paramIndex;
-        ++i;
-      } else if (i < text.Length && text[i] != 'q')
-        ++i;
+      if (b == (byte)';') {
+        parameters.Add(hasDigits ? value : 0);
+        value = 0;
+        hasDigits = false;
+        continue;
+      }
+
+      if (b != (byte)'q')
+        throw new InvalidDataException($"Invalid byte 0x{b:X2} in SIXEL DCS parameters.");
+
+      parameters.Add(hasDigits ? value : 0);
+      var aspectRatio = parameters.Count > 0 ? parameters[0] : 0;
+      var backgroundMode = parameters.Count > 1 ? parameters[1] : 0;
+      if (backgroundMode is not (0 or 1 or 2))
+        throw new InvalidDataException($"Invalid SIXEL background mode P2={backgroundMode}.");
+      return (i, aspectRatio, backgroundMode);
     }
 
-    if (i < text.Length && text[i] == 'q')
-      ++i;
-    else
-      throw new InvalidDataException("Missing 'q' after DCS parameters.");
-
-    return (i, aspectRatio, backgroundMode);
+    throw new InvalidDataException("Missing 'q' after SIXEL DCS parameters.");
   }
 
-  private static int _FindSt(string text, int start) {
-    for (var i = start; i < text.Length; ++i) {
-      if (text[i] == (char)_ST_8BIT)
+  private static int _FindSt(ReadOnlySpan<byte> data, int start) {
+    for (var i = start; i < data.Length; ++i) {
+      if (data[i] == _ST_8BIT)
         return i;
-      if (i + 1 < text.Length && text[i] == (char)_ESC && text[i + 1] == '\\')
+      if (i + 1 < data.Length && data[i] == _ESC && data[i + 1] == (byte)'\\')
         return i;
     }
 
-    return text.Length;
+    throw new InvalidDataException("Missing SIXEL string terminator.");
   }
 }
