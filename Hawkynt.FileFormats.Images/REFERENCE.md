@@ -37802,6 +37802,41 @@ Implements `IEquatable<XyzFile>`, `IImageFormatMetadata<XyzFile>`, `IImageFormat
 | --- | --- | --- |
 | `ToBytes` | `static byte[] ToBytes(XyzFile file)` |  |
 
+### Namespace `FileFormat.Ybm`
+
+[`YbmFile`](#ybmfile) · [`YbmReader`](#ybmreader) · [`YbmWriter`](#ybmwriter)
+
+#### `YbmFile`
+
+Implements `IEquatable<YbmFile>`, `IImageFormatMetadata<YbmFile>`, `IImageFormatReader<YbmFile>`, `IImageFormatWriter<YbmFile>`, `IImageFromRawImage<YbmFile>`, `IImageToRawImage<YbmFile>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `MaximumDimension` | `const int MaximumDimension` |  |
+| `Height` | `int Height { get; init; }` |  |
+| `RasterData` | `byte[] RasterData { get; init; }` |  |
+| `Width` | `int Width { get; init; }` |  |
+| `FromRawImage` | `static YbmFile FromRawImage(RawImage image)` |  |
+| `GetRowStride` | `static int GetRowStride(int width)` |  |
+| `ToRawImage` | `static RawImage ToRawImage(YbmFile file)` |  |
+
+#### `YbmReader`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `FromBytes` | `static YbmFile FromBytes(byte[] data)` |  |
+| `FromFile` | `static YbmFile FromFile(FileInfo file)` |  |
+| `FromSpan` | `static YbmFile FromSpan(ReadOnlySpan<byte> data)` |  |
+| `FromStream` | `static YbmFile FromStream(Stream stream)` |  |
+
+#### `YbmWriter`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `ToBytes` | `static byte[] ToBytes(YbmFile file)` |  |
+| `ToFile` | `static void ToFile(YbmFile file, FileInfo target)` |  |
+| `ToStream` | `static void ToStream(YbmFile file, Stream stream)` |  |
+
 ### Namespace `FileFormat.YuvRaw`
 
 [`YuvRawFile`](#yuvrawfile) · [`YuvRawReader`](#yuvrawreader) · [`YuvRawWriter`](#yuvrawwriter)
@@ -39866,39 +39901,40 @@ Implements `IEquatable<FormatEntry>`.
 | `XvThumbnail` | `836` |  |
 | `Xwd` | `837` |  |
 | `Xyz` | `838` |  |
-| `YuvRaw` | `839` |  |
-| `ZeissBivas` | `840` |  |
-| `ZeissLsm` | `841` |  |
-| `ZonerBrush` | `842` |  |
-| `Zoom4` | `843` |  |
-| `Zoomatic` | `844` |  |
-| `ZsStaffKid98` | `845` |  |
-| `Zx81` | `846` |  |
-| `ZxArtStudio` | `847` |  |
-| `ZxAttributes` | `848` |  |
-| `ZxAttributesGigascreen` | `849` |  |
-| `ZxBigFont` | `850` |  |
-| `ZxBorderMulticolor` | `851` |  |
-| `ZxBorderScreen` | `852` |  |
-| `ZxChrd` | `853` |  |
-| `ZxFlash` | `854` |  |
-| `ZxFont` | `855` |  |
-| `ZxGigascreen` | `856` |  |
-| `ZxMlg` | `857` |  |
-| `ZxMultiArtist` | `858` |  |
-| `ZxMulticolor` | `859` |  |
-| `ZxNext` | `860` |  |
-| `ZxNextImage` | `861` |  |
-| `ZxPaintbrush` | `862` |  |
-| `ZxPaintyOne` | `863` |  |
-| `ZxRgb3` | `864` |  |
-| `ZxSnapshot` | `865` |  |
-| `ZxSpectrum` | `866` |  |
-| `ZxTimex` | `867` |  |
-| `ZxTrefiBorderScreen` | `868` |  |
-| `ZxTricolor` | `869` |  |
-| `ZxUlaPlus` | `870` |  |
-| `ZzRough` | `871` |  |
+| `Ybm` | `839` |  |
+| `YuvRaw` | `840` |  |
+| `ZeissBivas` | `841` |  |
+| `ZeissLsm` | `842` |  |
+| `ZonerBrush` | `843` |  |
+| `Zoom4` | `844` |  |
+| `Zoomatic` | `845` |  |
+| `ZsStaffKid98` | `846` |  |
+| `Zx81` | `847` |  |
+| `ZxArtStudio` | `848` |  |
+| `ZxAttributes` | `849` |  |
+| `ZxAttributesGigascreen` | `850` |  |
+| `ZxBigFont` | `851` |  |
+| `ZxBorderMulticolor` | `852` |  |
+| `ZxBorderScreen` | `853` |  |
+| `ZxChrd` | `854` |  |
+| `ZxFlash` | `855` |  |
+| `ZxFont` | `856` |  |
+| `ZxGigascreen` | `857` |  |
+| `ZxMlg` | `858` |  |
+| `ZxMultiArtist` | `859` |  |
+| `ZxMulticolor` | `860` |  |
+| `ZxNext` | `861` |  |
+| `ZxNextImage` | `862` |  |
+| `ZxPaintbrush` | `863` |  |
+| `ZxPaintyOne` | `864` |  |
+| `ZxRgb3` | `865` |  |
+| `ZxSnapshot` | `866` |  |
+| `ZxSpectrum` | `867` |  |
+| `ZxTimex` | `868` |  |
+| `ZxTrefiBorderScreen` | `869` |  |
+| `ZxTricolor` | `870` |  |
+| `ZxUlaPlus` | `871` |  |
+| `ZzRough` | `872` |  |
 
 #### `MagicSignature`
 
