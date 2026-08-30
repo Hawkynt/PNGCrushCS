@@ -19,11 +19,20 @@
 | **[`Hawkynt.FileFormats.Video`](Hawkynt.FileFormats.Video/README.md)** | NuGet | Video containers and codecs with separate demux/decode/encode/mux contracts; decoded frames are `RawImage`s. |
 | **[`Hawkynt.ImageTransformUI`](Hawkynt.ImageTransformUI/README.md)** | NuGet | Shared WinForms color-reduction UI backed by FrameworkExtensions quantizer/ditherer registries. |
 | **`Crush.Image`** | CLI | Auto-detects input and runs format-specific optimization and optional cross-format conversion. |
+| **`Crush.Viewer`** | WinForms | Opens registered image formats with zoom, pan, multi-image navigation, transforms, and Save As conversion. |
 | **`Compression.Core`** | Library | Pure-C# DEFLATE/LZW/PackBits primitives, including Zopfli-class parsing used by optimizers. |
 | **`FileFormat.Core`** | Library | Shared `RawImage`, format contracts, metadata, detection primitives, and pixel conversion infrastructure. |
 | **`Optimizer.*`** | Libraries | Per-format optimization engines. Package docs: [PNG](Optimizers/Optimizer.Png/ReadMe.md), [GIF](Optimizers/Optimizer.Gif/ReadMe.md), [TIFF](Optimizers/Optimizer.Tiff/ReadMe.md). |
 
 The complete image-format cross-reference lives in [`Formats.md`](Formats.md). Video container/codec details live in [`Hawkynt.FileFormats.Video/codec-coverage.md`](Hawkynt.FileFormats.Video/codec-coverage.md).
+
+## 🖼️ Viewer
+
+`Crush.Viewer` is the Windows desktop front end for the same format registry used by the libraries. It supports drag-and-drop/open, zoom and pan, multi-image navigation, crop/resize/rotate/flip, palette reduction, text-mode rendering, and conversion through **Save As**.
+
+![Crush Viewer showing the deterministic screenshot fixture](docs/screenshots/crush-viewer.png)
+
+The screenshot is not maintained by hand. Every push to a branch other than `main` builds the viewer on Windows, opens a deterministic PNG fixture through the real decoder, captures the rendered WinForms client area, and commits a changed screenshot back to that branch. Screenshot-only commits do not recursively trigger another capture.
 
 ## 🚀 CLI usage
 
@@ -87,6 +96,7 @@ Hawkynt.FileFormats.Video
 Crush.Core
 Optimizer.*                        exhaustive per-format optimizers
 Crush.Image                        unified CLI
+Crush.Viewer                       WinForms viewer / converter
 ```
 
 Key design rules:
@@ -122,13 +132,16 @@ done
 
 # Run the unified CLI
 dotnet run --project Crush.Image -- auto -i input.png -o output.png
+
+# Run the viewer on Windows
+dotnet run --project Crush.Viewer -- input.png
 ```
 
 The cross-repo links are conditional; consumers of the published packages do not need the sibling checkout.
 
 ## 🤖 CI
 
-`ci.yml` validates pull requests and pushes. `release.yml` handles coordinated releases and NuGet publishing. Version stamping is performed by `.github/workflows/scripts/version.pl --stamp` during CI.
+`ci.yml` validates pull requests and pushes. `viewer-screenshot.yml` refreshes the README screenshot on pushes to non-`main` branches. `release.yml` handles coordinated releases and NuGet publishing. Version stamping is performed by `.github/workflows/scripts/version.pl --stamp` during CI.
 
 Stable releases are manual. Nightlies are generated from green `main` builds.
 
@@ -145,18 +158,16 @@ The breadth of format coverage is informed by tools that have spent decades deal
 
 These are comparison/inspiration sources, not implementation specifications. Format implementations should cite the normative specification, original paper, or authoritative project where possible.
 
-## ⚠️ Known limitations
+## ✅ Conformance and scope
 
-- **Windows-only optimizers** — `Optimizer.Png` and `Optimizer.Gif` use `System.Drawing.Common`. The `FileFormat.*` libraries and `Hawkynt.FileFormats.Images` package are cross-platform.
-- **16-bit precision** — full 16-bit pipeline is supported for read/write of scientific/HDR formats (FITS, EXR, DPX, Cineon, HDR, PFM, ENVI, PDS, Nifti, NRRD, BigTIFF, JPEG-LS, MRC, etc.). Optimizer pipelines remain 8-bit only.
-- **VP8 lossy encoder** — keyframe-only output; multi-pass rate control and partition threading are deferred. Alpha is preserved bit-exactly via the ALPH chunk (uncompressed method 0).
-- **Codec subsets** — HEIF/AVIF/BPG decoders are I-frame only, single tile, YCbCr 4:2:0 8-bit. JPEG XL: container (FF 0A signature, ftyp/jxlc/jxlp boxes) + SizeHeader + ImageMetadata + FrameHeader (ISO/IEC 18181-1 §3.6.2 / §3.6.3 / §3.6.5) are spec-conformant — real JPEG XL files are detected, dimensions extracted, image metadata (bit depth, color encoding, extra channels) and frame metadata (frame type, encoding mode, passes) parsed. Pixel codec (modular sub-codec body and VarDCT) is the remaining workstream — arbitrary real-world `.jxl` files won't decode their pixel data yet. Camera RAW supports DNG lossless JPEG, Canon CR2, Nikon NEF, and Sony ARW2 — other manufacturer-specific compressions are future work.
-- **Read-only formats** — of 857 registered formats all 857 decode and 785 can encode an arbitrary image; the other 72 parse a file they read without being able to author one from pixel data. Several are read-only on purpose rather than for want of effort: PDF and PE-resource extraction are one-way by nature, HAM-E and DCTV encode colour by a method never published, an embedded preview is somebody else's file rather than a picture of its own, and AVIF and HEIF have decoders here but no encoder — a container holding uncoded pixels is not one of those formats, whatever it is named. Run `Decode --readonly` for the current list; the table in [`Formats.md`](Formats.md) is maintained by hand and drifts behind it.
+Capability claims are kept next to the implementation evidence instead of duplicated as a hand-maintained backlog in this README:
 
-- **Writers only where something else can check them** — a format is given the ability to encode when a reference tool reads the result back and draws the same picture. Several that could have had one do not: their layout is only a guess, or the sample that would settle it turns out to be a misfiled file of another format, and a writer agreeing with nothing but our own reader is worth less than no writer at all. Six such were removed outright rather than kept.
-- **Decoders verified against samples** — a format being registered is not the same as its being right. Roughly two thirds of the registered formats have no sample in any corpus to check against, and several that did have one were found decoding it into something else entirely. Where a reader is known to be reading a layout no real file uses, it refuses rather than returning a picture; where it is known to be right, the commit that made it so says which files were checked and against which tools.
-- **Third-party conformance** — every format that writes is offered to whichever reference tools know one of its names, and 85 are accepted. One is refused and it is real: JPEG XL, whose modular encoder produces a codestream the tool cannot decode. Where a tool refuses a file for meaning another format by the same three letters — `.icn`, `.cin`, `.pix`, `.cut`, `.pbm` — that is recorded with the tool's own format list as the evidence rather than counted against the writer.
-- [`Formats.md`](Formats.md) is a hand-maintained cross-reference and can lag the source-generated registry. Runtime registry enumeration is authoritative for current read/write availability.
+- [`Hawkynt.FileFormats.Images/README.md`](Hawkynt.FileFormats.Images/README.md) is the public image read/write capability matrix.
+- [`Hawkynt.FileFormats.Images/MODERN_FORMAT_CONFORMANCE.md`](Hawkynt.FileFormats.Images/MODERN_FORMAT_CONFORMANCE.md) records interoperability evidence and the exact implemented scope for modern codecs such as WebP, AVIF, HEIF, JPEG XL, JPEG 2000, and JPEG XR.
+- [`Hawkynt.FileFormats.Video/codec-coverage.md`](Hawkynt.FileFormats.Video/codec-coverage.md) records video codec/container coverage.
+- [`Formats.md`](Formats.md) is the human-readable image cross-reference; runtime source-generated registry enumeration remains authoritative when that table temporarily lags the code.
+
+A capability is promoted only when its syntax and behavior have evidence beyond the project's own writer reading its own output. Unsupported profiles stay unadvertised rather than being represented as successful decode/write support.
 
 ## ❤️ Support
 

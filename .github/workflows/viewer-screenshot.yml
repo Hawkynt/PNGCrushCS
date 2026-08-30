@@ -1,0 +1,73 @@
+name: Refresh viewer screenshot
+
+on:
+  push:
+    branches-ignore:
+      - main
+    paths-ignore:
+      - docs/screenshots/**
+
+permissions:
+  contents: write
+
+concurrency:
+  group: viewer-screenshot-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  screenshot:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout PNGCrushCS
+        uses: actions/checkout@v4
+        with:
+          path: PNGCrushCS
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - name: Checkout CompressionWorkbench sibling
+        uses: actions/checkout@v4
+        with:
+          repository: Hawkynt/CompressionWorkbench
+          path: CompressionWorkbench
+          fetch-depth: 1
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.x
+            9.x
+            10.x
+
+      - name: Build viewer
+        working-directory: PNGCrushCS
+        run: dotnet build Crush.Viewer/Crush.Viewer.csproj -c Release --nologo -p:EnableSingleFileBundle=false
+
+      - name: Capture viewer
+        working-directory: PNGCrushCS
+        run: dotnet run --project Crush.Viewer/Crush.Viewer.csproj -c Release --no-build --no-restore -p:EnableSingleFileBundle=false -- --screenshot docs/screenshots/crush-viewer.png
+
+      - name: Validate screenshot
+        shell: pwsh
+        working-directory: PNGCrushCS
+        run: |
+          $path = "docs/screenshots/crush-viewer.png"
+          if (!(Test-Path $path)) { throw "Viewer screenshot was not created." }
+          $bytes = [IO.File]::ReadAllBytes($path)
+          if ($bytes.Length -lt 10000) { throw "Viewer screenshot is unexpectedly small ($($bytes.Length) bytes)." }
+          $png = [byte[]](0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A)
+          for ($i = 0; $i -lt $png.Length; ++$i) {
+            if ($bytes[$i] -ne $png[$i]) { throw "Viewer screenshot is not a PNG file." }
+          }
+
+      # Committed through the contents API rather than `git commit` on the runner: a commit git
+      # makes here is unsigned, and DontDelete requires signatures, so the refreshed screenshot
+      # would block its own pull request forever. The action also no-ops when nothing changed.
+      - name: Commit refreshed screenshot
+        uses: Hawkynt/RepositoryTemplate/commit-generated-file@v1
+        with:
+          file: PNGCrushCS/docs/screenshots/crush-viewer.png
+          message: '* refresh viewer screenshot'

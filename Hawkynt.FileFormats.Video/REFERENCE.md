@@ -311,7 +311,7 @@ Implements `IVideoContainerWriter<CdxlWriter>`, `IVideoFormatMetadata<CdxlWriter
 
 ### Namespace `FileFormat.Codecs`
 
-[`AascVideoDecoder`](#aascvideodecoder) · [`AnimVideoDecoder`](#animvideodecoder) · [`AppleGraphicsDecoder`](#applegraphicsdecoder) · [`AppleVideoDecoder`](#applevideodecoder) · [`Asv1VideoDecoder`](#asv1videodecoder) · [`Asv2VideoDecoder`](#asv2videodecoder) · [`AvrnVideoDecoder`](#avrnvideodecoder) · [`AvrpVideoDecoder`](#avrpvideodecoder) · [`AvuiVideoDecoder`](#avuivideodecoder) · [`AyuvVideoDecoder`](#ayuvvideodecoder) · [`BfiVideoDecoder`](#bfivideodecoder) · [`CanopusLosslessVideoDecoder`](#canopuslosslessvideodecoder) · [`CdxlVideoDecoder`](#cdxlvideodecoder) · [`CineFormVideoDecoder`](#cineformvideodecoder) · [`CinepakVideoDecoder`](#cinepakvideodecoder) · [`CljrVideoDecoder`](#cljrvideodecoder) · [`CreativeYuvVideoDecoder`](#creativeyuvvideodecoder) · [`CscdVideoDecoder`](#cscdvideodecoder) · [`DnxHdVideoDecoder`](#dnxhdvideodecoder) · [`EaCmvVideoDecoder`](#eacmvvideodecoder) · [`EightBpsVideoDecoder`](#eightbpsvideodecoder) · [`Escape124VideoDecoder`](#escape124videodecoder) · [`Escape130VideoDecoder`](#escape130videodecoder) · [`Ffv1Decoder`](#ffv1decoder) · [`FlashSv2VideoDecoder`](#flashsv2videodecoder) · [`FlashSvVideoDecoder`](#flashsvvideodecoder) · [`FlicVideoDecoder`](#flicvideodecoder) · [`H261VideoDecoder`](#h261videodecoder) · [`H263VideoDecoder`](#h263videodecoder) · [`H264VideoDecoder`](#h264videodecoder) · [`H265VideoDecoder`](#h265videodecoder) · [`HapDecoder`](#hapdecoder) · [`HuffYuvDecoder`](#huffyuvdecoder) · [`IdcinVideoDecoder`](#idcinvideodecoder) · [`LclZlibVideoDecoder`](#lclzlibvideodecoder) · [`LocoVideoDecoder`](#locovideodecoder) · [`M101VideoDecoder`](#m101videodecoder) · [`MagicYuvDecoder`](#magicyuvdecoder) · [`MicrosoftRleDecoder`](#microsoftrledecoder) · [`MicrosoftVideo1Decoder`](#microsoftvideo1decoder) · [`MjpegBVideoDecoder`](#mjpegbvideodecoder) · [`MotionJpegDecoder`](#motionjpegdecoder) · [`Mpeg1VideoDecoder`](#mpeg1videodecoder) · [`Mpeg2VideoDecoder`](#mpeg2videodecoder) · [`Mpeg4VideoDecoder`](#mpeg4videodecoder) · [`MsMpeg4V2VideoDecoder`](#msmpeg4v2videodecoder) · [`MsccVideoDecoder`](#msccvideodecoder) · [`Mss1VideoDecoder`](#mss1videodecoder) · [`MszhVideoDecoder`](#mszhvideodecoder) · [`MveVideoDecoder`](#mvevideodecoder) · [`MvhaVideoDecoder`](#mvhavideodecoder) · [`MwscVideoDecoder`](#mwscvideodecoder) · [`ProResVideoDecoder`](#proresvideodecoder) · [`QpegVideoDecoder`](#qpegvideodecoder) · [`QuickTimeRleDecoder`](#quicktimerledecoder) · [`R10kVideoDecoder`](#r10kvideodecoder) · [`R210VideoDecoder`](#r210videodecoder) · [`RascVideoDecoder`](#rascvideodecoder) · [`RawVideoDecoder`](#rawvideodecoder) · [`RealVideoDecoder`](#realvideodecoder) · [`RoqVideoDecoder`](#roqvideodecoder) · [`RsccVideoDecoder`](#rsccvideodecoder) · [`ScreenpressoVideoDecoder`](#screenpressovideodecoder) · [`TheoraVideoDecoder`](#theoravideodecoder) · [`TsccVideoDecoder`](#tsccvideodecoder) · [`Uncompressed012vVideoDecoder`](#uncompressed012vvideodecoder) · [`UtVideoDecoder`](#utvideodecoder) · [`V210VideoDecoder`](#v210videodecoder) · [`V308VideoDecoder`](#v308videodecoder) · [`V408VideoDecoder`](#v408videodecoder) · [`VbleVideoDecoder`](#vblevideodecoder) · [`Vc1VideoDecoder`](#vc1videodecoder) · [`VmdVideoDecoder`](#vmdvideodecoder) · [`Vp3VideoDecoder`](#vp3videodecoder) · [`Vp8VideoDecoder`](#vp8videodecoder) · [`Vp9VideoDecoder`](#vp9videodecoder) · [`VqaVideoDecoder`](#vqavideodecoder) · [`WcmvVideoDecoder`](#wcmvvideodecoder) · [`Y41pVideoDecoder`](#y41pvideodecoder) · [`ZeroCodecVideoDecoder`](#zerocodecvideodecoder) · [`ZmbvVideoDecoder`](#zmbvvideodecoder)
+[`AascVideoDecoder`](#aascvideodecoder) · [`AnimVideoDecoder`](#animvideodecoder) · [`AppleGraphicsDecoder`](#applegraphicsdecoder) · [`AppleVideoDecoder`](#applevideodecoder) · [`Asv1VideoDecoder`](#asv1videodecoder) · [`Asv2VideoDecoder`](#asv2videodecoder) · [`AvrnVideoDecoder`](#avrnvideodecoder) · [`AvrpVideoDecoder`](#avrpvideodecoder) · [`AvuiVideoDecoder`](#avuivideodecoder) · [`AyuvVideoDecoder`](#ayuvvideodecoder) · [`BfiVideoDecoder`](#bfivideodecoder) · [`CanopusLosslessVideoDecoder`](#canopuslosslessvideodecoder) · [`CdxlVideoDecoder`](#cdxlvideodecoder) · [`CineFormVideoDecoder`](#cineformvideodecoder) · [`CinepakVideoDecoder`](#cinepakvideodecoder) · [`CljrVideoDecoder`](#cljrvideodecoder) · [`CreativeYuvVideoDecoder`](#creativeyuvvideodecoder) · [`CscdVideoDecoder`](#cscdvideodecoder) · [`DnxHdVideoDecoder`](#dnxhdvideodecoder) · [`EaCmvVideoDecoder`](#eacmvvideodecoder) · [`EightBpsVideoDecoder`](#eightbpsvideodecoder) · [`Escape124VideoDecoder`](#escape124videodecoder) · [`Escape130VideoDecoder`](#escape130videodecoder) · [`Ffv1Decoder`](#ffv1decoder) · [`FlashSv2VideoDecoder`](#flashsv2videodecoder) · [`FlashSvVideoDecoder`](#flashsvvideodecoder) · [`FlicVideoDecoder`](#flicvideodecoder) · [`H261VideoDecoder`](#h261videodecoder) · [`H263VideoDecoder`](#h263videodecoder) · [`H264VideoDecoder`](#h264videodecoder) · [`H265VideoDecoder`](#h265videodecoder) · [`HapDecoder`](#hapdecoder) · [`HuffYuvDecoder`](#huffyuvdecoder) · [`IdcinVideoDecoder`](#idcinvideodecoder) · [`LclZlibVideoDecoder`](#lclzlibvideodecoder) · [`LocoVideoDecoder`](#locovideodecoder) · [`M101VideoDecoder`](#m101videodecoder) · [`MagicYuvDecoder`](#magicyuvdecoder) · [`MicrosoftRleDecoder`](#microsoftrledecoder) · [`MicrosoftVideo1Decoder`](#microsoftvideo1decoder) · [`MjpegBVideoDecoder`](#mjpegbvideodecoder) · [`MotionJpegDecoder`](#motionjpegdecoder) · [`MotionJpegVideoEncoder`](#motionjpegvideoencoder) · [`Mpeg1VideoDecoder`](#mpeg1videodecoder) · [`Mpeg2VideoDecoder`](#mpeg2videodecoder) · [`Mpeg4VideoDecoder`](#mpeg4videodecoder) · [`MsMpeg4V2VideoDecoder`](#msmpeg4v2videodecoder) · [`MsccVideoDecoder`](#msccvideodecoder) · [`Mss1VideoDecoder`](#mss1videodecoder) · [`MszhVideoDecoder`](#mszhvideodecoder) · [`MveVideoDecoder`](#mvevideodecoder) · [`MvhaVideoDecoder`](#mvhavideodecoder) · [`MwscVideoDecoder`](#mwscvideodecoder) · [`ProResVideoDecoder`](#proresvideodecoder) · [`QpegVideoDecoder`](#qpegvideodecoder) · [`QuickTimeRleDecoder`](#quicktimerledecoder) · [`R10kVideoDecoder`](#r10kvideodecoder) · [`R210VideoDecoder`](#r210videodecoder) · [`RascVideoDecoder`](#rascvideodecoder) · [`RawPlanarVideoDecoder`](#rawplanarvideodecoder) · [`RawPlanarVideoEncoder`](#rawplanarvideoencoder) · [`RawVideoDecoder`](#rawvideodecoder) · [`RealVideoDecoder`](#realvideodecoder) · [`RoqVideoDecoder`](#roqvideodecoder) · [`RsccVideoDecoder`](#rsccvideodecoder) · [`ScreenpressoVideoDecoder`](#screenpressovideodecoder) · [`TheoraVideoDecoder`](#theoravideodecoder) · [`TsccVideoDecoder`](#tsccvideodecoder) · [`Uncompressed012vVideoDecoder`](#uncompressed012vvideodecoder) · [`UtVideoDecoder`](#utvideodecoder) · [`V210VideoDecoder`](#v210videodecoder) · [`V308VideoDecoder`](#v308videodecoder) · [`V408VideoDecoder`](#v408videodecoder) · [`VbleVideoDecoder`](#vblevideodecoder) · [`Vc1VideoDecoder`](#vc1videodecoder) · [`VmdVideoDecoder`](#vmdvideodecoder) · [`Vp3VideoDecoder`](#vp3videodecoder) · [`Vp8VideoDecoder`](#vp8videodecoder) · [`Vp9VideoDecoder`](#vp9videodecoder) · [`VqaVideoDecoder`](#vqavideodecoder) · [`WcmvVideoDecoder`](#wcmvvideodecoder) · [`Y41pVideoDecoder`](#y41pvideodecoder) · [`ZeroCodecVideoDecoder`](#zerocodecvideodecoder) · [`ZmbvVideoDecoder`](#zmbvvideodecoder)
 
 #### `AascVideoDecoder`
 
@@ -870,6 +870,20 @@ Implements `IVideoCodecDecoder<MotionJpegDecoder>`, `IVideoFrameDecoder`.
 | `Create` | `static MotionJpegDecoder Create(MediaStreamInfo stream)` |  |
 | `TryDecode` | `bool TryDecode(CodedPacket packet, out RawImage frame)` | Decodes one packet, which for this codec always produces exactly one picture. |
 
+#### `MotionJpegVideoEncoder`
+
+Encodes independent video frames as baseline JPEG packets.
+
+Implements `IVideoCodecEncoder<MotionJpegVideoEncoder>`, `IVideoPacketEncoder`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `CodecName` | `static string CodecName { get; }` |  |
+| `Codec` | `static CodecTag Codec { get; }` |  |
+| `Create` | `static MotionJpegVideoEncoder Create(MediaStreamInfo stream)` |  |
+| `DescribeStream` | `MediaStreamInfo DescribeStream()` |  |
+| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` |  |
+
 #### `Mpeg1VideoDecoder`
 
 Decodes MPEG-1 video, ISO/IEC 11172-2: I, P and B pictures.
@@ -1084,6 +1098,33 @@ Implements `IVideoCodecDecoder<RascVideoDecoder>`, `IVideoFrameDecoder`.
 | `Accepts` | `static bool Accepts(MediaStreamInfo stream)` |  |
 | `Create` | `static RascVideoDecoder Create(MediaStreamInfo stream)` |  |
 | `TryDecode` | `bool TryDecode(CodedPacket packet, out RawImage frame)` |  |
+
+#### `RawPlanarVideoDecoder`
+
+Decodes canonical planar raw-video packets described by a YUV4MPEG2 chroma token.
+
+Implements `IVideoCodecDecoder<RawPlanarVideoDecoder>`, `IVideoFrameDecoder`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `CodecName` | `static string CodecName { get; }` |  |
+| `Accepts` | `static bool Accepts(MediaStreamInfo stream)` |  |
+| `Create` | `static RawPlanarVideoDecoder Create(MediaStreamInfo stream)` |  |
+| `TryDecode` | `bool TryDecode(CodedPacket packet, out RawImage frame)` |  |
+
+#### `RawPlanarVideoEncoder`
+
+Encodes RawImage frames as canonical tightly packed planar raw video.
+
+Implements `IVideoCodecEncoder<RawPlanarVideoEncoder>`, `IVideoPacketEncoder`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `CodecName` | `static string CodecName { get; }` |  |
+| `Codec` | `static CodecTag Codec { get; }` |  |
+| `Create` | `static RawPlanarVideoEncoder Create(MediaStreamInfo stream)` |  |
+| `DescribeStream` | `MediaStreamInfo DescribeStream()` |  |
+| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` |  |
 
 #### `RawVideoDecoder`
 
@@ -4162,6 +4203,52 @@ Implements `IVideoContainerWriter<MveWriter>`, `IVideoFormatMetadata<MveWriter>`
 | `Finish` | `byte[] Finish()` |  |
 | `WritePacket` | `void WritePacket(CodedPacket packet)` |  |
 
+### Namespace `FileFormat.Ivf`
+
+[`IvfContainer`](#ivfcontainer) · [`IvfWriter`](#ivfwriter)
+
+#### `IvfContainer`
+
+Duck IVF: a deliberately small packet container used by VP8, VP9 and AV1 tools.
+
+Implements `IVideoContainerReader<IvfContainer>`, `IVideoFormatMetadata<IvfContainer>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `IvfContainer` | `IvfContainer()` |  |
+| `Codec` | `CodecTag Codec { get; init; }` |  |
+| `Data` | `ReadOnlyMemory<byte> Data { get; init; }` |  |
+| `DeclaredFrameCount` | `uint DeclaredFrameCount { get; init; }` |  |
+| `FileExtensions` | `static string[] FileExtensions { get; }` |  |
+| `HeaderSize` | `ushort HeaderSize { get; init; }` |  |
+| `Height` | `int Height { get; init; }` |  |
+| `PrimaryExtension` | `static string PrimaryExtension { get; }` |  |
+| `Rate` | `uint Rate { get; init; }` |  |
+| `Scale` | `uint Scale { get; init; }` |  |
+| `Width` | `int Width { get; init; }` |  |
+| `FromBytes` | `static IvfContainer FromBytes(byte[] data)` |  |
+| `FromFile` | `static IvfContainer FromFile(FileInfo file)` |  |
+| `FromSpan` | `static IvfContainer FromSpan(ReadOnlySpan<byte> data)` |  |
+| `MatchesSignature` | `static bool? MatchesSignature(ReadOnlySpan<byte> header)` |  |
+| `Metadata` | `static VideoMetadata Metadata(IvfContainer container)` |  |
+| `ReadPackets` | `static IEnumerable<CodedPacket> ReadPackets(IvfContainer container)` |  |
+| `ReadPackets` | `static IEnumerable<CodedPacket> ReadPackets(IvfContainer container, int streamIndex)` |  |
+| `Streams` | `static IReadOnlyList<MediaStreamInfo> Streams(IvfContainer container)` |  |
+
+#### `IvfWriter`
+
+Writes one coded video stream as a version-zero Duck IVF file.
+
+Implements `IVideoContainerWriter<IvfWriter>`, `IVideoFormatMetadata<IvfWriter>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `FileExtensions` | `static string[] FileExtensions { get; }` |  |
+| `PrimaryExtension` | `static string PrimaryExtension { get; }` |  |
+| `Create` | `static IvfWriter Create(IReadOnlyList<MediaStreamInfo> streams, VideoMetadata metadata)` |  |
+| `Finish` | `byte[] Finish()` |  |
+| `WritePacket` | `void WritePacket(CodedPacket packet)` |  |
+
 ### Namespace `FileFormat.Matroska`
 
 [`MatroskaContainer`](#matroskacontainer) · [`MatroskaReader`](#matroskareader) · [`MatroskaWriter`](#matroskawriter)
@@ -4889,6 +4976,44 @@ Implements `IVideoContainerWriter<VqaWriter>`, `IVideoFormatMetadata<VqaWriter>`
 | `Finish` | `byte[] Finish()` |  |
 | `WritePacket` | `void WritePacket(CodedPacket packet)` |  |
 
+### Namespace `FileFormat.Yuv4Mpeg`
+
+[`Yuv4MpegContainer`](#yuv4mpegcontainer) · [`Yuv4MpegWriter`](#yuv4mpegwriter)
+
+#### `Yuv4MpegContainer`
+
+A YUV4MPEG2 stream containing uncompressed planar YUV frames.
+
+Implements `IVideoContainerReader<Yuv4MpegContainer>`, `IVideoFormatMetadata<Yuv4MpegContainer>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Yuv4MpegContainer` | `Yuv4MpegContainer()` |  |
+| `Chroma` | `string Chroma { get; init; }` |  |
+| `FileExtensions` | `static string[] FileExtensions { get; }` |  |
+| `File` | `ReadOnlyMemory<byte> File { get; init; }` |  |
+| `PrimaryExtension` | `static string PrimaryExtension { get; }` |  |
+| `Stream` | `MediaStreamInfo Stream { get; init; }` |  |
+| `FromBytes` | `static Yuv4MpegContainer FromBytes(byte[] data)` |  |
+| `FromSpan` | `static Yuv4MpegContainer FromSpan(ReadOnlySpan<byte> data)` |  |
+| `MatchesSignature` | `static bool? MatchesSignature(ReadOnlySpan<byte> header)` |  |
+| `ReadPackets` | `static IEnumerable<CodedPacket> ReadPackets(Yuv4MpegContainer container)` |  |
+| `Streams` | `static IReadOnlyList<MediaStreamInfo> Streams(Yuv4MpegContainer container)` |  |
+
+#### `Yuv4MpegWriter`
+
+Writes uncompressed planar YUV frames as a YUV4MPEG2 stream.
+
+Implements `IVideoContainerWriter<Yuv4MpegWriter>`, `IVideoFormatMetadata<Yuv4MpegWriter>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `FileExtensions` | `static string[] FileExtensions { get; }` |  |
+| `PrimaryExtension` | `static string PrimaryExtension { get; }` |  |
+| `Create` | `static Yuv4MpegWriter Create(IReadOnlyList<MediaStreamInfo> streams, VideoMetadata metadata)` |  |
+| `Finish` | `byte[] Finish()` |  |
+| `WritePacket` | `void WritePacket(CodedPacket packet)` |  |
+
 ### Namespace `Hawkynt.FileFormats.Video`
 
 [`MagicSignature`](#magicsignature) · [`VideoCodecEntry`](#videocodecentry) · [`VideoFormat`](#videoformat) · [`VideoFormatEntry`](#videoformatentry) · [`VideoFormatRegistry`](#videoformatregistry)
@@ -4948,36 +5073,40 @@ Supported video containers, auto-generated from discovered IVideoContainerReader
 | `H265VideoWriter` | `20` |  |
 | `Idcin` | `21` |  |
 | `IdcinWriter` | `22` |  |
-| `Matroska` | `23` |  |
-| `MatroskaWriter` | `24` |  |
-| `Mjpeg` | `25` |  |
-| `MjpegWriter` | `26` |  |
-| `Mp4` | `27` |  |
-| `Mp4Writer` | `28` |  |
-| `MpegProgramStream` | `29` |  |
-| `MpegProgramStreamWriter` | `30` |  |
-| `MpegVideo` | `31` |  |
-| `MpegVideoWriter` | `32` |  |
-| `Mve` | `33` |  |
-| `MveWriter` | `34` |  |
-| `Ogg` | `35` |  |
-| `OggWriter` | `36` |  |
-| `RealMedia` | `37` |  |
-| `RealMediaWriter` | `38` |  |
-| `Roq` | `39` |  |
-| `RoqWriter` | `40` |  |
-| `Rpl` | `41` |  |
-| `RplWriter` | `42` |  |
-| `Smacker` | `43` |  |
-| `SmackerWriter` | `44` |  |
-| `Str` | `45` |  |
-| `StrWriter` | `46` |  |
-| `TransportStream` | `47` |  |
-| `TransportStreamWriter` | `48` |  |
-| `Vmd` | `49` |  |
-| `VmdWriter` | `50` |  |
-| `Vqa` | `51` |  |
-| `VqaWriter` | `52` |  |
+| `Ivf` | `23` |  |
+| `IvfWriter` | `24` |  |
+| `Matroska` | `25` |  |
+| `MatroskaWriter` | `26` |  |
+| `Mjpeg` | `27` |  |
+| `MjpegWriter` | `28` |  |
+| `Mp4` | `29` |  |
+| `Mp4Writer` | `30` |  |
+| `MpegProgramStream` | `31` |  |
+| `MpegProgramStreamWriter` | `32` |  |
+| `MpegVideo` | `33` |  |
+| `MpegVideoWriter` | `34` |  |
+| `Mve` | `35` |  |
+| `MveWriter` | `36` |  |
+| `Ogg` | `37` |  |
+| `OggWriter` | `38` |  |
+| `RealMedia` | `39` |  |
+| `RealMediaWriter` | `40` |  |
+| `Roq` | `41` |  |
+| `RoqWriter` | `42` |  |
+| `Rpl` | `43` |  |
+| `RplWriter` | `44` |  |
+| `Smacker` | `45` |  |
+| `SmackerWriter` | `46` |  |
+| `Str` | `47` |  |
+| `StrWriter` | `48` |  |
+| `TransportStream` | `49` |  |
+| `TransportStreamWriter` | `50` |  |
+| `Vmd` | `51` |  |
+| `VmdWriter` | `52` |  |
+| `Vqa` | `53` |  |
+| `VqaWriter` | `54` |  |
+| `Yuv4Mpeg` | `55` |  |
+| `Yuv4MpegWriter` | `56` |  |
 
 #### `VideoFormatEntry`
 

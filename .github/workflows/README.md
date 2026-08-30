@@ -5,21 +5,22 @@
 
 ## What this does
 
-Three workflows, one shared build block, three helper scripts:
+Four workflows, one shared build block, three helper scripts:
 
-| File                            | Trigger                             | Purpose                                 |
-|---------------------------------|-------------------------------------|-----------------------------------------|
-| `ci.yml`                        | push + PR + `workflow_call`         | Build + categorised test tiers + coverage |
-| `release.yml`                   | tag push `v*` + manual dispatch     | Cut a GitHub Release from a tag         |
-| `nightly.yml`                   | successful CI run on `main`/`master`| Publish `nightly-YYYY-MM-DD` prerelease |
-| `_build.yml`                    | `workflow_call` (internal)          | Shared Crush.Viewer publish+zip block   |
-| `scripts/version.pl`            | invoked by the workflows            | Compute `X.Y.Z.BUILD` + stamp csprojs   |
-| `scripts/update-changelog.mjs`  | invoked by the workflows            | Bucketise commits into CHANGELOG.md     |
-| `scripts/prune-nightlies.mjs`   | invoked by the workflows            | 3-gen (GFS) retention of nightlies      |
+| File                            | Trigger                                  | Purpose                                      |
+|---------------------------------|------------------------------------------|----------------------------------------------|
+| `ci.yml`                        | push + PR + `workflow_call`              | Build + categorised test tiers + coverage    |
+| `viewer-screenshot.yml`         | push to branches other than `main`       | Build viewer + refresh README screenshot     |
+| `release.yml`                   | tag push `v*` + manual dispatch          | Cut a GitHub Release from a tag              |
+| `nightly.yml`                   | successful CI run on `main`/`master`     | Publish `nightly-YYYY-MM-DD` prerelease      |
+| `_build.yml`                    | `workflow_call` (internal)               | Shared Crush.Viewer publish+zip block        |
+| `scripts/version.pl`            | invoked by the workflows                 | Compute `X.Y.Z.BUILD` + stamp csprojs        |
+| `scripts/update-changelog.mjs`  | invoked by the workflows                 | Bucketise commits into CHANGELOG.md          |
+| `scripts/prune-nightlies.mjs`   | invoked by the workflows                 | 3-gen (GFS) retention of nightlies           |
 
 ## How it works
 
-```
+```text
                 push / PR
                     │
                     ▼
@@ -43,6 +44,15 @@ Three workflows, one shared build block, three helper scripts:
                                 ▼
                        scripts/prune-nightlies.mjs
                        (GFS: 7 daily + 4 weekly + 3 monthly)
+
+    non-main branch push
+             │
+             ▼
+    viewer-screenshot.yml
+             │
+             ├──► build Crush.Viewer on Windows
+             ├──► open deterministic PNG fixture
+             └──► commit changed docs/screenshots/crush-viewer.png
 ```
 
 ## Test tiers
@@ -60,6 +70,7 @@ Running ~1100 projects × hundreds of tests each on every PR is impractical; the
 ## What it's for
 
 - Every PR is built and tested on ubuntu + windows before it can merge.
+- Every non-`main` branch push refreshes the checked-in viewer screenshot when the rendered UI changes.
 - Every merge to `main`/`master` produces a **tested** nightly prerelease.
 - Every `v*` tag cuts a proper release with `Crush.Viewer` (win-x64 single-file, self-contained).
 - Old nightlies are auto-pruned on a **Grandfather-Father-Son** schedule.
@@ -70,6 +81,7 @@ Running ~1100 projects × hundreds of tests each on every PR is impractical; the
 - **Release calls CI via `workflow_call`.** Tag pushes don't retrigger `on: push` workflows; calling ci.yml explicitly keeps tests and releases in lockstep.
 - **Nightly builds from the `workflow_run` payload's SHA**, not branch tip — a nightly is always a build of code CI actually validated.
 - **`_build.yml` runs on windows-latest.** `Crush.Viewer` is WinForms (net10.0-windows), so cross-platform publish isn't possible for the viewer.
+- **Viewer screenshots come from the viewer itself.** The workflow opens a generated PNG through the real decoder and uses the WinForms rendering path instead of brittle mouse-coordinate automation. Screenshot-only pushes are excluded from the screenshot workflow, so its own commit cannot loop.
 - **Categorised tests.** `TestCategory=Regression` and `=Performance` are skipped on PR; they add latency disproportionate to their extra coverage.
 - **3-generation (GFS) retention**, not "keep last N". GFS guarantees at least one build per week for a month and one per month for a quarter.
 
@@ -79,7 +91,7 @@ Running ~1100 projects × hundreds of tests each on every PR is impractical; the
 
 Reads `<Version>X.Y.Z</Version>` from the first csproj at root / one level deep. Build number is `git rev-list --count HEAD`.
 
-```
+```text
 perl .github/workflows/scripts/version.pl          # 1.0.0.20
 perl .github/workflows/scripts/version.pl --base   # 1.0.0
 perl .github/workflows/scripts/version.pl --build  # 20
@@ -90,7 +102,7 @@ Replaces the old `UpdateVersions.pl`.
 
 ### `update-changelog.mjs`
 
-Prepends a new section to `CHANGELOG.md`. Commit-subject convention: `+` Added, `*` Changed, `#` Fixed, `-` Removed, `!` TODO, anything else → Other.
+Prepends a new section to CHANGELOG.md. Commit-subject convention: `+` Added, `*` Changed, `#` Fixed, `-` Removed, `!` TODO, anything else → Other.
 
 ### `prune-nightlies.mjs`
 
@@ -107,4 +119,3 @@ Every repo in the CompressionWorkbench / PNGCrushCS / AnythingToGif / ClaudeCode
 | `PNGCrushCS-cli-win-x64-<version>.zip`              | release + nightly   | Unified `crush.exe` CLI            |
 | `PNGCrushCS-Viewer-win-x64-<version>.zip`           | release + nightly   | WinForms viewer (500+ formats)     |
 | Coverage HTML report                                 | ci.yml (coverage)   | —                                  |
-

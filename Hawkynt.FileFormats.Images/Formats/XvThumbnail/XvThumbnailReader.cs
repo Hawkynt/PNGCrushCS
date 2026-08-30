@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Text;
 
@@ -7,8 +7,8 @@ namespace FileFormat.XvThumbnail;
 /// <summary>Reads XV thumbnail files from bytes, streams, or file paths.</summary>
 public static class XvThumbnailReader {
 
-  /// <summary>The magic header bytes for XV thumbnail format.</summary>
-  private static readonly byte[] _MAGIC = "P7 332\n"u8.ToArray();
+  private static ReadOnlySpan<byte> Magic => "P7 332"u8;
+  private const int _MaximumPixels = 100_000_000;
 
   public static XvThumbnailFile FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
@@ -31,58 +31,83 @@ public static class XvThumbnailReader {
   }
 
   public static XvThumbnailFile FromSpan(ReadOnlySpan<byte> data) {
-    if (data.Length < _MAGIC.Length)
-      throw new InvalidDataException($"Data too small for XV thumbnail: need at least {_MAGIC.Length} bytes, got {data.Length}.");
+    if (data.Length < Magic.Length + 1 || !data[..Magic.Length].SequenceEqual(Magic))
+      throw new InvalidDataException("Invalid XV thumbnail magic: expected 'P7 332'.");
 
-    for (var i = 0; i < _MAGIC.Length; ++i)
-      if (data[i] != _MAGIC[i])
-        throw new InvalidDataException("Invalid XV thumbnail magic: expected \"P7 332\n\".");
+    var offset = Magic.Length;
+    _ConsumeLineEnding(data, ref offset, "XV thumbnail magic");
 
-    var offset = _MAGIC.Length;
+    ReadOnlySpan<byte> dimensionLine;
+    while (true) {
+      if (offset >= data.Length)
+        throw new InvalidDataException("No dimension line found in XV thumbnail header.");
 
-    // Skip comment lines starting with '#'
-    while (offset < data.Length && data[offset] == (byte)'#') {
-      var eolRel = data[offset..].IndexOf((byte)'\n');
-      if (eolRel < 0)
-        throw new InvalidDataException("Unterminated comment line in XV thumbnail header.");
-      offset += eolRel + 1;
+      _ReadLine(data, ref offset, out var lineStart, out var lineLength);
+      dimensionLine = data.Slice(lineStart, lineLength);
+      if (dimensionLine.IsEmpty)
+        continue;
+      if (dimensionLine[0] == (byte)'#')
+        continue;
+      break;
     }
 
-    // Parse "width height maxval\n"
-    var nlRel = data[offset..].IndexOf((byte)'\n');
-    if (nlRel < 0)
-      throw new InvalidDataException("No dimension line found in XV thumbnail header.");
-    var newlineIndex = offset + nlRel;
-
-    var dimLine = Encoding.ASCII.GetString(data.Slice(offset, newlineIndex - offset));
-    var parts = dimLine.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-    if (parts.Length < 3)
-      throw new InvalidDataException($"Expected \"width height maxval\" but got \"{dimLine}\".");
-
-    if (!int.TryParse(parts[0], out var width) || !int.TryParse(parts[1], out var height) || !int.TryParse(parts[2], out _))
-      throw new InvalidDataException($"Invalid dimensions in XV thumbnail header: \"{dimLine}\".");
+    var text = Encoding.ASCII.GetString(dimensionLine);
+    var parts = text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+    if (parts.Length != 3 ||
+        !int.TryParse(parts[0], out var width) ||
+        !int.TryParse(parts[1], out var height) ||
+        !int.TryParse(parts[2], out var maxValue))
+      throw new InvalidDataException($"Expected 'width height 255' but got '{text}'.");
 
     if (width <= 0 || height <= 0)
       throw new InvalidDataException("XV thumbnail dimensions must be positive.");
+    if (maxValue != 255)
+      throw new InvalidDataException($"XV thumbnail maxval must be 255, got {maxValue}.");
 
-    var pixelOffset = newlineIndex + 1;
-    var expectedPixelBytes = width * height;
-    var available = data.Length - pixelOffset;
-    var copyLen = Math.Min(expectedPixelBytes, available);
-
-    var pixelData = new byte[expectedPixelBytes];
-    data.Slice(pixelOffset, copyLen).CopyTo(pixelData);
+    var pixelCount = (long)width * height;
+    if (pixelCount > _MaximumPixels)
+      throw new InvalidDataException($"XV thumbnail exceeds the {_MaximumPixels:N0}-pixel implementation safety limit.");
+    if (data.Length - offset < pixelCount)
+      throw new InvalidDataException($"Truncated XV thumbnail raster: expected {pixelCount} bytes, got {data.Length - offset}.");
 
     return new XvThumbnailFile {
       Width = width,
       Height = height,
-      PixelData = pixelData,
+      PixelData = data.Slice(offset, (int)pixelCount).ToArray(),
     };
-  
   }
 
   public static XvThumbnailFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     return FromSpan(data);
+  }
+
+  private static void _ReadLine(ReadOnlySpan<byte> data, ref int offset, out int start, out int length) {
+    start = offset;
+    while (offset < data.Length && data[offset] != (byte)'\r' && data[offset] != (byte)'\n')
+      ++offset;
+
+    length = offset - start;
+    if (offset < data.Length)
+      _ConsumeLineEnding(data, ref offset, "XV thumbnail header line");
+  }
+
+  private static void _ConsumeLineEnding(ReadOnlySpan<byte> data, ref int offset, string context) {
+    if (offset >= data.Length)
+      throw new InvalidDataException($"Missing line ending after {context}.");
+
+    if (data[offset] == (byte)'\r') {
+      ++offset;
+      if (offset < data.Length && data[offset] == (byte)'\n')
+        ++offset;
+      return;
+    }
+
+    if (data[offset] == (byte)'\n') {
+      ++offset;
+      return;
+    }
+
+    throw new InvalidDataException($"Missing line ending after {context}.");
   }
 }
