@@ -15,8 +15,11 @@ public sealed class Yuv4MpegContainer : IVideoContainerReader<Yuv4MpegContainer>
   public required ReadOnlyMemory<byte> File { get; init; }
   public required MediaStreamInfo Stream { get; init; }
   public required string Chroma { get; init; }
-  internal required int FirstFrameOffset { get; init; }
-  internal required int FrameSize { get; init; }
+  // Not `required`: a required member may not be less visible than its type, and these two are
+  // parser bookkeeping rather than part of the public shape. FromBytes is the only thing that
+  // constructs the container and it sets both.
+  internal int FirstFrameOffset { get; init; }
+  internal int FrameSize { get; init; }
 
   public static string PrimaryExtension => ".y4m";
   public static string[] FileExtensions => [".y4m"];
