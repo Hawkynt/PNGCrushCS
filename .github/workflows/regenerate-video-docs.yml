@@ -16,6 +16,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Build video package
+        run: dotnet build Hawkynt.FileFormats.Video/Hawkynt.FileFormats.Video.csproj -c Release
+
       - uses: Hawkynt/RepositoryTemplate/package-readme@v1
         with:
           mode: write
