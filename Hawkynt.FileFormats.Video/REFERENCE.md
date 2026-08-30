@@ -4203,6 +4203,52 @@ Implements `IVideoContainerWriter<MveWriter>`, `IVideoFormatMetadata<MveWriter>`
 | `Finish` | `byte[] Finish()` |  |
 | `WritePacket` | `void WritePacket(CodedPacket packet)` |  |
 
+### Namespace `FileFormat.Ivf`
+
+[`IvfContainer`](#ivfcontainer) · [`IvfWriter`](#ivfwriter)
+
+#### `IvfContainer`
+
+Duck IVF: a deliberately small packet container used by VP8, VP9 and AV1 tools.
+
+Implements `IVideoContainerReader<IvfContainer>`, `IVideoFormatMetadata<IvfContainer>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `IvfContainer` | `IvfContainer()` |  |
+| `Codec` | `CodecTag Codec { get; init; }` |  |
+| `Data` | `ReadOnlyMemory<byte> Data { get; init; }` |  |
+| `DeclaredFrameCount` | `uint DeclaredFrameCount { get; init; }` |  |
+| `FileExtensions` | `static string[] FileExtensions { get; }` |  |
+| `HeaderSize` | `ushort HeaderSize { get; init; }` |  |
+| `Height` | `int Height { get; init; }` |  |
+| `PrimaryExtension` | `static string PrimaryExtension { get; }` |  |
+| `Rate` | `uint Rate { get; init; }` |  |
+| `Scale` | `uint Scale { get; init; }` |  |
+| `Width` | `int Width { get; init; }` |  |
+| `FromBytes` | `static IvfContainer FromBytes(byte[] data)` |  |
+| `FromFile` | `static IvfContainer FromFile(FileInfo file)` |  |
+| `FromSpan` | `static IvfContainer FromSpan(ReadOnlySpan<byte> data)` |  |
+| `MatchesSignature` | `static bool? MatchesSignature(ReadOnlySpan<byte> header)` |  |
+| `Metadata` | `static VideoMetadata Metadata(IvfContainer container)` |  |
+| `ReadPackets` | `static IEnumerable<CodedPacket> ReadPackets(IvfContainer container)` |  |
+| `ReadPackets` | `static IEnumerable<CodedPacket> ReadPackets(IvfContainer container, int streamIndex)` |  |
+| `Streams` | `static IReadOnlyList<MediaStreamInfo> Streams(IvfContainer container)` |  |
+
+#### `IvfWriter`
+
+Writes one coded video stream as a version-zero Duck IVF file.
+
+Implements `IVideoContainerWriter<IvfWriter>`, `IVideoFormatMetadata<IvfWriter>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `FileExtensions` | `static string[] FileExtensions { get; }` |  |
+| `PrimaryExtension` | `static string PrimaryExtension { get; }` |  |
+| `Create` | `static IvfWriter Create(IReadOnlyList<MediaStreamInfo> streams, VideoMetadata metadata)` |  |
+| `Finish` | `byte[] Finish()` |  |
+| `WritePacket` | `void WritePacket(CodedPacket packet)` |  |
+
 ### Namespace `FileFormat.Matroska`
 
 [`MatroskaContainer`](#matroskacontainer) · [`MatroskaReader`](#matroskareader) · [`MatroskaWriter`](#matroskawriter)
@@ -5027,38 +5073,40 @@ Supported video containers, auto-generated from discovered IVideoContainerReader
 | `H265VideoWriter` | `20` |  |
 | `Idcin` | `21` |  |
 | `IdcinWriter` | `22` |  |
-| `Matroska` | `23` |  |
-| `MatroskaWriter` | `24` |  |
-| `Mjpeg` | `25` |  |
-| `MjpegWriter` | `26` |  |
-| `Mp4` | `27` |  |
-| `Mp4Writer` | `28` |  |
-| `MpegProgramStream` | `29` |  |
-| `MpegProgramStreamWriter` | `30` |  |
-| `MpegVideo` | `31` |  |
-| `MpegVideoWriter` | `32` |  |
-| `Mve` | `33` |  |
-| `MveWriter` | `34` |  |
-| `Ogg` | `35` |  |
-| `OggWriter` | `36` |  |
-| `RealMedia` | `37` |  |
-| `RealMediaWriter` | `38` |  |
-| `Roq` | `39` |  |
-| `RoqWriter` | `40` |  |
-| `Rpl` | `41` |  |
-| `RplWriter` | `42` |  |
-| `Smacker` | `43` |  |
-| `SmackerWriter` | `44` |  |
-| `Str` | `45` |  |
-| `StrWriter` | `46` |  |
-| `TransportStream` | `47` |  |
-| `TransportStreamWriter` | `48` |  |
-| `Vmd` | `49` |  |
-| `VmdWriter` | `50` |  |
-| `Vqa` | `51` |  |
-| `VqaWriter` | `52` |  |
-| `Yuv4Mpeg` | `53` |  |
-| `Yuv4MpegWriter` | `54` |  |
+| `Ivf` | `23` |  |
+| `IvfWriter` | `24` |  |
+| `Matroska` | `25` |  |
+| `MatroskaWriter` | `26` |  |
+| `Mjpeg` | `27` |  |
+| `MjpegWriter` | `28` |  |
+| `Mp4` | `29` |  |
+| `Mp4Writer` | `30` |  |
+| `MpegProgramStream` | `31` |  |
+| `MpegProgramStreamWriter` | `32` |  |
+| `MpegVideo` | `33` |  |
+| `MpegVideoWriter` | `34` |  |
+| `Mve` | `35` |  |
+| `MveWriter` | `36` |  |
+| `Ogg` | `37` |  |
+| `OggWriter` | `38` |  |
+| `RealMedia` | `39` |  |
+| `RealMediaWriter` | `40` |  |
+| `Roq` | `41` |  |
+| `RoqWriter` | `42` |  |
+| `Rpl` | `43` |  |
+| `RplWriter` | `44` |  |
+| `Smacker` | `45` |  |
+| `SmackerWriter` | `46` |  |
+| `Str` | `47` |  |
+| `StrWriter` | `48` |  |
+| `TransportStream` | `49` |  |
+| `TransportStreamWriter` | `50` |  |
+| `Vmd` | `51` |  |
+| `VmdWriter` | `52` |  |
+| `Vqa` | `53` |  |
+| `VqaWriter` | `54` |  |
+| `Yuv4Mpeg` | `55` |  |
+| `Yuv4MpegWriter` | `56` |  |
 
 #### `VideoFormatEntry`
 
