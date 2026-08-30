@@ -42,7 +42,8 @@ public static class XvThumbnailReader {
       if (offset >= data.Length)
         throw new InvalidDataException("No dimension line found in XV thumbnail header.");
 
-      dimensionLine = _ReadLine(data, ref offset);
+      _ReadLine(data, ref offset, out var lineStart, out var lineLength);
+      dimensionLine = data.Slice(lineStart, lineLength);
       if (dimensionLine.IsEmpty)
         continue;
       if (dimensionLine[0] == (byte)'#')
@@ -81,15 +82,14 @@ public static class XvThumbnailReader {
     return FromSpan(data);
   }
 
-  private static ReadOnlySpan<byte> _ReadLine(ReadOnlySpan<byte> data, ref int offset) {
-    var start = offset;
+  private static void _ReadLine(ReadOnlySpan<byte> data, ref int offset, out int start, out int length) {
+    start = offset;
     while (offset < data.Length && data[offset] != (byte)'\r' && data[offset] != (byte)'\n')
       ++offset;
 
-    var line = data[start..offset];
+    length = offset - start;
     if (offset < data.Length)
       _ConsumeLineEnding(data, ref offset, "XV thumbnail header line");
-    return line;
   }
 
   private static void _ConsumeLineEnding(ReadOnlySpan<byte> data, ref int offset, string context) {
