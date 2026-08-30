@@ -91,7 +91,7 @@ internal sealed class H264PictureOrderCount {
       prevLsb = 0;
     } else if (this._previousReferenceHadMmco5) {
       prevMsb = 0;
-      prevLsb = _PositiveModulo(this._previousReferenceTopFieldOrderCnt, maxLsb);
+      prevLsb = this._previousReferenceTopFieldOrderCnt;
     } else {
       prevMsb = this._prevPicOrderCntMsb;
       prevLsb = this._prevPicOrderCntLsb;
@@ -181,10 +181,5 @@ internal sealed class H264PictureOrderCount {
     if (value is < int.MinValue or > int.MaxValue)
       throw new InvalidDataException("H.264 picture order count overflowed the signed 32-bit range.");
     return (int)value;
-  }
-
-  private static int _PositiveModulo(int value, int modulus) {
-    var result = value % modulus;
-    return result < 0 ? result + modulus : result;
   }
 }

@@ -27,6 +27,38 @@ public sealed class H264PictureOrderCountTests {
   }
 
   [Test]
+  public void Type0UsesTheNormalizedTopFieldOrderCountWithoutReducingItModuloMaxLsb() {
+    var stream = _Type0SequenceParameterSet(new H264TestStream());
+    _PictureParameterSetWithBottomFieldOrderCount(stream);
+    _IdrSliceHeader(stream, pocLsb: 0, deltaPicOrderCntBottom: 0).EndNal(5, 3);
+    _IntraSliceHeader(
+      stream,
+      frameNum: 1,
+      pocLsb: 6,
+      deltaPicOrderCntBottom: -20,
+      reference: true,
+      mmco5: true).EndNal(1, 3);
+    _IntraSliceHeader(
+      stream,
+      frameNum: 0,
+      pocLsb: 12,
+      deltaPicOrderCntBottom: 0,
+      reference: true).EndNal(1, 3);
+
+    var (poc, headers) = _Parse(stream.ToArray());
+    _Finish(poc, headers[0]);
+
+    var mmco5 = poc.Derive(headers[1]);
+    Assert.That(mmco5.TopFieldOrderCnt, Is.EqualTo(6));
+    Assert.That(mmco5.BottomFieldOrderCnt, Is.EqualTo(-14));
+    var normalized = poc.FinishPicture(headers[1], mmco5);
+    Assert.That(normalized.TopFieldOrderCnt, Is.EqualTo(20));
+    Assert.That(normalized.BottomFieldOrderCnt, Is.EqualTo(0));
+
+    Assert.That(_Finish(poc, headers[2]).PicOrderCnt, Is.EqualTo(28));
+  }
+
+  [Test]
   public void Type2Mmco5StateBelongsToTheImmediatelyPreviousPicture() {
     var stream = new H264TestStream()
       .SequenceParameterSet(maxRefFrames: 2, profileIdc: 77)
@@ -86,7 +118,29 @@ public sealed class H264PictureOrderCountTests {
     return stream.EndNal(7, 3);
   }
 
-  private static H264TestStream _IdrSliceHeader(H264TestStream stream, int? pocLsb = null) {
+  private static H264TestStream _PictureParameterSetWithBottomFieldOrderCount(H264TestStream stream) {
+    stream.Unsigned(0); // pic_parameter_set_id
+    stream.Unsigned(0); // seq_parameter_set_id
+    stream.Bits(0, 1); // entropy_coding_mode_flag
+    stream.Bits(1, 1); // bottom_field_pic_order_in_frame_present_flag
+    stream.Unsigned(0); // num_slice_groups_minus1
+    stream.Unsigned(0); // num_ref_idx_l0_default_active_minus1
+    stream.Unsigned(0); // num_ref_idx_l1_default_active_minus1
+    stream.Bits(0, 1); // weighted_pred_flag
+    stream.Bits(0, 2); // weighted_bipred_idc
+    stream.Signed(0); // pic_init_qp_minus26
+    stream.Signed(0); // pic_init_qs_minus26
+    stream.Signed(0); // chroma_qp_index_offset
+    stream.Bits(0, 1); // deblocking_filter_control_present_flag
+    stream.Bits(0, 1); // constrained_intra_pred_flag
+    stream.Bits(0, 1); // redundant_pic_cnt_present_flag
+    return stream.EndNal(8, 3);
+  }
+
+  private static H264TestStream _IdrSliceHeader(
+    H264TestStream stream,
+    int? pocLsb = null,
+    int? deltaPicOrderCntBottom = null) {
     stream.Unsigned(0); // first_mb_in_slice
     stream.Unsigned(7); // I slice; all slices in this picture are I
     stream.Unsigned(0); // pic_parameter_set_id
@@ -94,6 +148,8 @@ public sealed class H264PictureOrderCountTests {
     stream.Unsigned(0); // idr_pic_id
     if (pocLsb.HasValue)
       stream.Bits(pocLsb.Value, 4);
+    if (deltaPicOrderCntBottom.HasValue)
+      stream.Signed(deltaPicOrderCntBottom.Value);
     stream.Bits(0, 1); // no_output_of_prior_pics_flag
     stream.Bits(0, 1); // long_term_reference_flag
     stream.Signed(0); // slice_qp_delta
@@ -104,6 +160,7 @@ public sealed class H264PictureOrderCountTests {
     H264TestStream stream,
     int frameNum,
     int? pocLsb = null,
+    int? deltaPicOrderCntBottom = null,
     bool reference = true,
     bool mmco5 = false) {
     stream.Unsigned(0); // first_mb_in_slice
@@ -112,6 +169,8 @@ public sealed class H264PictureOrderCountTests {
     stream.Bits(frameNum, 4);
     if (pocLsb.HasValue)
       stream.Bits(pocLsb.Value, 4);
+    if (deltaPicOrderCntBottom.HasValue)
+      stream.Signed(deltaPicOrderCntBottom.Value);
 
     if (reference) {
       stream.Bits(mmco5 ? 1 : 0, 1); // adaptive_ref_pic_marking_mode_flag
