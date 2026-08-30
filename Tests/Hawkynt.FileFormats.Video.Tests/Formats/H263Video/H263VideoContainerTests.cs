@@ -27,8 +27,14 @@ public sealed class H263VideoContainerTests {
       Assert.That(packets, Has.Length.EqualTo(2));
       Assert.That(packets[0].Data.ToArray(), Is.EqualTo(first));
       Assert.That(packets[1].Data.ToArray(), Is.EqualTo(second));
-      Assert.That(packets[0].PresentationTimestamp, Is.EqualTo(0));
-      Assert.That(packets[1].PresentationTimestamp, Is.EqualTo(1));
+      Assert.That(packets.All(packet => packet.PresentationTimestamp is null), Is.True,
+        "a raw H.263 elementary stream carries no presentation timestamps");
+      Assert.That(packets.Select(packet => packet.DecodeTimestamp).ToArray(), Is.EqualTo(new long?[] { 0, 1 }),
+        "coded order is known even though presentation timing is not");
+      Assert.That(packets.All(packet => packet.Duration is null), Is.True,
+        "there is no container time base from which to invent a duration");
+      Assert.That(packets.All(packet => !packet.IsKeyFrame), Is.True,
+        "framing alone does not parse the H.263 picture type");
     });
   }
 

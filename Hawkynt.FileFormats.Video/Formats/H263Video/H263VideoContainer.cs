@@ -66,9 +66,8 @@ public sealed class H263VideoContainer : IVideoContainerReader<H263VideoContaine
       yield return new(
         0,
         data.Slice(start, end - start),
-        PresentationTimestamp: picture,
+        PresentationTimestamp: null,
         DecodeTimestamp: picture,
-        Duration: 1,
         IsKeyFrame: false);
 
       if (next < 0)
