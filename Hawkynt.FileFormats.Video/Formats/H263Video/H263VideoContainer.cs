@@ -69,7 +69,7 @@ public sealed class H263VideoContainer : IVideoContainerReader<H263VideoContaine
         PresentationTimestamp: picture,
         DecodeTimestamp: picture,
         Duration: 1,
-        IsKeyFrame: null);
+        IsKeyFrame: false);
 
       if (next < 0)
         yield break;
