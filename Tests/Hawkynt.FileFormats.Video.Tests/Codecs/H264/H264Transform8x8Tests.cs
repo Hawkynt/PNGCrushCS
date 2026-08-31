@@ -51,7 +51,7 @@ public sealed class H264Transform8x8Tests {
   }
 
   [Test]
-  public void AsymmetricCoefficientsUseTheNormativeColumnThenRowOrder() {
+  public void AsymmetricCoefficientsUseTheNormativeRowThenColumnOrder() {
     Span<int> input = stackalloc int[64];
     input[9] = 47;
     input[11] = 198;
@@ -64,11 +64,11 @@ public sealed class H264Transform8x8Tests {
 
     int[] expected = [
        5,  4, -10, -1,  2,   8, -1, -7,
-       8, -3,  -1, -8,  5,   6, -2, -5,
+       8, -3,  -1, -8,  5,   5, -2, -5,
        4,  0,  -1, -5,  5,   0,  2, -4,
        0,  4,  -6,  3, -1,   2,  0, -2,
       -1, -1,   1,  3, -5,   3, -3,  3,
-      -2, -3,   6, -1,  0,  -5,  1,  3,
+      -2, -2,   6, -1,  0,  -5,  1,  3,
       -6,  0,   5,  2,  1, -10,  5,  4,
       -7, -1,   5,  6, -8,  -3, -2,  8,
     ];
