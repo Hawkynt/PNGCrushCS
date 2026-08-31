@@ -24,6 +24,8 @@ namespace FileFormat.MpegPs;
 /// </remarks>
 public static class MpegProgramStreamReader {
 
+  private readonly record struct StreamMapEntry(byte StreamType, ReadOnlyMemory<byte> Descriptors);
+
   /// <summary>DVD subpicture — the bitmap subtitles a disc overlays on the picture.</summary>
   private const byte _FIRST_SUBPICTURE = 0x20;
   private const byte _LAST_SUBPICTURE = 0x3F;
@@ -102,7 +104,7 @@ public static class MpegProgramStreamReader {
     var file = new ReadOnlyMemory<byte>(data);
 
     var systemsVersion = 0;
-    var streamTypes = new Dictionary<byte, byte>();
+    var streamTypes = new Dictionary<byte, StreamMapEntry>();
     var streams = new List<MpegPsStream>();
     var byId = new Dictionary<int, int>();
 
@@ -165,14 +167,20 @@ public static class MpegProgramStreamReader {
 
   /// <summary>Describes one elementary stream from its ids and whatever the file said about it.</summary>
   private static MpegPsStream _Describe(
-    int index, byte streamId, byte? substreamId, IReadOnlyDictionary<byte, byte> streamTypes, int systemsVersion) {
-    var declared = streamTypes.TryGetValue(streamId, out var type) ? type : (byte)0;
+    int index,
+    byte streamId,
+    byte? substreamId,
+    IReadOnlyDictionary<byte, StreamMapEntry> streamTypes,
+    int systemsVersion) {
+    var declaration = streamTypes.TryGetValue(streamId, out var mapped) ? mapped : default;
+    var declared = declaration.StreamType;
+    var descriptors = declaration.Descriptors;
 
     if (MpegPsScanner.IsVideo(streamId))
-      return new(streamId, null, 0, _Info(index, MediaStreamKind.Video, _VideoCodec(declared, systemsVersion)));
+      return new(streamId, null, 0, _Info(index, MediaStreamKind.Video, _VideoCodec(declared, systemsVersion), descriptors));
 
     if (MpegPsScanner.IsAudio(streamId))
-      return new(streamId, null, 0, _Info(index, MediaStreamKind.Audio, _AudioCodec(declared)));
+      return new(streamId, null, 0, _Info(index, MediaStreamKind.Audio, _AudioCodec(declared), descriptors));
 
     var (kind, codec, headerLength) = substreamId switch {
       >= _FIRST_SUBPICTURE and <= _LAST_SUBPICTURE => (MediaStreamKind.Subtitle, CodecTag.FromCharacters("subp"), _SUBPICTURE_HEADER_LENGTH),
@@ -185,7 +193,7 @@ public static class MpegProgramStreamReader {
       _ => (MediaStreamKind.Unknown, CodecTag.None, UNKNOWN_HEADER_LENGTH),
     };
 
-    return new(streamId, substreamId, headerLength, _Info(index, kind, codec));
+    return new(streamId, substreamId, headerLength, _Info(index, kind, codec, descriptors));
   }
 
   /// <summary>
@@ -224,7 +232,11 @@ public static class MpegProgramStreamReader {
       _ => CodecTag.FromCharacters("mpga"),
     };
 
-  private static MediaStreamInfo _Info(int index, MediaStreamKind kind, CodecTag codec)
+  private static MediaStreamInfo _Info(
+    int index,
+    MediaStreamKind kind,
+    CodecTag codec,
+    ReadOnlyMemory<byte> containerPrivateData = default)
     => new() {
       Index = index,
       Kind = kind,
@@ -233,11 +245,13 @@ public static class MpegProgramStreamReader {
       // the stream and whatever the codec. ffprobe reports 1/90000 as the time base of every stream of
       // every file measured here.
       TimeBase = new(1, MpegPsScanner.SYSTEM_CLOCK_HZ),
-      // No width, no height, no frame rate, no frame count and no codec private data — a program
-      // stream states none of them. They are in the elementary stream, which for MPEG video means the
-      // sequence header that the first packet of the stream begins with. Reading it here to fill these
-      // in would be this container decoding, and a caller would be handed a size no header of the
-      // container ever claimed.
+      // PSM elementary descriptors belong to the systems layer rather than to the codec. Retain the
+      // exact descriptor-loop bytes so a same-family remux can reproduce registrations and extensions
+      // it does not understand without presenting them to a decoder as codec configuration.
+      ContainerPrivateData = containerPrivateData,
+      // Width, height, frame rate and codec private data are not stated by the program-stream layer.
+      // For MPEG video they live in the sequence header of the coded elementary stream; reading them
+      // here would be decoding rather than demuxing.
     };
 
   /// <summary>
@@ -246,33 +260,78 @@ public static class MpegProgramStreamReader {
   /// <remarks>
   /// Rare — no ffmpeg muxer writes one, and every reference file here was read without it — but it is
   /// the only container-level statement of what a stream is coded with, so where it is present it
-  /// outranks the inference from the pack header. A map that is cut short is read as far as it goes
-  /// and no further rather than refused: it describes streams, and the streams themselves are still
-  /// all there in the packets.
+  /// outranks the inference from the pack header. Elementary descriptor loops are retained byte for
+  /// byte. Programme-wide descriptors have no representation in the container-independent metadata
+  /// contract, so a file carrying them is refused rather than silently losing them during remux.
   /// </remarks>
-  private static void _ReadStreamMap(ReadOnlyMemory<byte> file, MpegPsElement map, IDictionary<byte, byte> into) {
+  private static void _ReadStreamMap(
+    ReadOnlyMemory<byte> file,
+    MpegPsElement map,
+    IDictionary<byte, StreamMapEntry> into) {
     var span = file.Span.Slice(map.PayloadOffset, map.PayloadLength);
 
-    // A version byte, a marker byte, then the descriptors that apply to the programme as a whole.
-    const int _PREFIX = 4;
-    if (span.Length < _PREFIX)
-      return;
+    const int _PREFIX_LENGTH = 4;
+    const int _ELEMENTARY_LENGTH_FIELD = 2;
+    const int _CRC_LENGTH = 4;
+    const int _ENTRY_HEADER_LENGTH = 4;
 
+    if (span.Length < _PREFIX_LENGTH + _ELEMENTARY_LENGTH_FIELD + _CRC_LENGTH)
+      throw new InvalidDataException($"The program stream map at offset {map.Position} is truncated before its fixed fields end.");
+
+    if ((span[1] & 0x01) == 0)
+      throw new InvalidDataException($"The program stream map at offset {map.Position} has a zero marker bit.");
+
+    var current = (span[0] & 0x80) != 0;
     var programInfoLength = (span[2] << 8) | span[3];
-    var at = _PREFIX + programInfoLength;
-    if (at + 2 > span.Length)
-      return;
+    var at = _PREFIX_LENGTH;
 
-    var mapLength = (span[at] << 8) | span[at + 1];
-    at += 2;
+    if (programInfoLength > span.Length - at - _ELEMENTARY_LENGTH_FIELD - _CRC_LENGTH)
+      throw new InvalidDataException(
+        $"The program descriptor loop at offset {map.Position} states {programInfoLength} bytes, which run past the program stream map.");
 
-    var end = Math.Min(at + mapLength, span.Length);
-    while (at + 4 <= end) {
+    if (programInfoLength != 0)
+      throw new NotSupportedException(
+        "Program-stream programme descriptors cannot be represented by the container-independent VideoMetadata model without losing their raw bytes.");
+
+    at += programInfoLength;
+    var elementaryMapLength = (span[at] << 8) | span[at + 1];
+    at += _ELEMENTARY_LENGTH_FIELD;
+
+    if (elementaryMapLength > span.Length - at - _CRC_LENGTH)
+      throw new InvalidDataException(
+        $"The elementary-stream map at offset {map.Position} states {elementaryMapLength} bytes, which run past the program stream map.");
+
+    var end = at + elementaryMapLength;
+    if (end + _CRC_LENGTH != span.Length)
+      throw new InvalidDataException(
+        $"The program stream map at offset {map.Position} has {span.Length - end - _CRC_LENGTH} byte(s) outside its declared elementary map and CRC.");
+
+    var declarations = new List<(byte StreamId, StreamMapEntry Entry)>();
+    while (at < end) {
+      if (end - at < _ENTRY_HEADER_LENGTH)
+        throw new InvalidDataException(
+          $"The elementary-stream map at offset {map.Position} ends in the middle of a stream declaration.");
+
       var type = span[at];
       var streamId = span[at + 1];
       var infoLength = (span[at + 2] << 8) | span[at + 3];
-      into[streamId] = type;
-      at += 4 + infoLength;
+      at += _ENTRY_HEADER_LENGTH;
+
+      if (infoLength > end - at)
+        throw new InvalidDataException(
+          $"The descriptor loop for stream id 0x{streamId:X2} states {infoLength} bytes, but only {end - at} remain in the elementary-stream map.");
+
+      var descriptors = file.Slice(map.PayloadOffset + at, infoLength);
+      declarations.Add((streamId, new(type, descriptors)));
+      at += infoLength;
     }
+
+    // current_next_indicator=0 describes the next map, not the one that applies to packets now. It is
+    // fully bounds-checked above but deliberately does not overwrite the active declarations.
+    if (!current)
+      return;
+
+    foreach (var (streamId, entry) in declarations)
+      into[streamId] = entry;
   }
 }
