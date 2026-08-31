@@ -5,130 +5,120 @@ using System.IO;
 
 namespace FileFormat.Tiny;
 
-/// <summary>
-/// The run-length coding a Tiny file uses, and the order it keeps its words in.
-/// </summary>
-/// <remarks>
-/// What was here before invented both halves and agreed with itself: counts and values were read
-/// from one interleaved stream, and no real file is arranged that way. A Tiny file keeps its control
-/// bytes and its data words in two separate blocks whose lengths the header states, and the control
-/// block is walked one byte at a time to say how the next words are taken from the other.
-/// <para/>
-/// The order is the second half of it. Tiny stores the Atari's screen memory as it stands, which is
-/// always sixteen thousand words of four interleaved bitplanes whatever resolution the picture is —
-/// so even a monochrome picture, which has one plane, is stored as though it had four. Within that
-/// it runs down each column before moving across, so the words arrive in neither screen order nor
-/// plane order.
-/// <para/>
-/// Both halves were settled against RECOIL on real files: all sixteen thousand words come back
-/// identical to what it decodes.
-/// </remarks>
+/// <summary>The Tiny Stuff two-stream run-length codec and vertical word-column transform.</summary>
 internal static class TinyCompressor {
 
-  /// <summary>Words the Atari's screen holds, which is the same 32000 bytes in every resolution.</summary>
-  internal const int ScreenWords = 16000;
+  internal const int ScreenWords = TinyFile.ScreenWordCount;
+  private const int _Rows = 200;
+  private const int _WordsPerRow = 80;
+  private const int _Groups = 4;
+  private const int _ColumnsPerGroup = _WordsPerRow / _Groups;
+  private const int _WordsPerGroup = ScreenWords / _Groups;
+  private const int _ExtendedMinimum = 128;
+  private const int _ExtendedMaximum = 32_767;
 
-  /// <summary>Scanlines the screen memory is divided into.</summary>
-  private const int _ROWS = 200;
-
-  /// <summary>Words one of those lines holds.</summary>
-  private const int _WORDS_PER_ROW = 80;
-
-  /// <summary>Bitplanes the screen memory interleaves, whatever the picture's own plane count.</summary>
-  private const int _PLANES = 4;
-
-  /// <summary>Groups of interleaved planes across one line.</summary>
-  private const int _GROUPS_PER_ROW = _WORDS_PER_ROW / _PLANES;
-
-  /// <summary>Words one plane contributes to the whole screen.</summary>
-  private const int _WORDS_PER_PLANE = ScreenWords / _PLANES;
-
-  /// <summary>Where the word stored at the given position belongs on screen.</summary>
   private static int _ScreenIndexOf(int stored)
-    => stored % _ROWS * _WORDS_PER_ROW
-     + stored / _ROWS % _GROUPS_PER_ROW * _PLANES
-     + stored / _WORDS_PER_PLANE;
+    => stored % _Rows * _WordsPerRow
+     + stored / _Rows % _ColumnsPerGroup * _Groups
+     + stored / _WordsPerGroup;
 
-  /// <summary>Expands the two blocks into the screen memory they describe.</summary>
+  /// <summary>Strictly expands the separate Tiny Stuff control and data blocks into screen memory.</summary>
   public static byte[] Decompress(ReadOnlySpan<byte> control, ReadOnlySpan<byte> data) {
+    if (control.Length is < TinyFile.MinimumControlBytes or > TinyFile.MaximumControlBytes)
+      throw new InvalidDataException($"Tiny Stuff control block must contain {TinyFile.MinimumControlBytes}..{TinyFile.MaximumControlBytes} bytes.");
+    if ((data.Length & 1) != 0 || data.Length is < 2 or > TinyFile.ScreenDataSize)
+      throw new InvalidDataException("Tiny Stuff data block must contain 1..16000 complete big-endian words.");
+
     var stored = new short[ScreenWords];
-    int controlAt = 0, dataAt = 0, at = 0;
+    int controlAt = 0, dataAt = 0, outputAt = 0;
 
-    while (at < ScreenWords && controlAt < control.Length) {
-      var code = (sbyte)control[controlAt++];
+    while (outputAt < ScreenWords) {
+      if (controlAt >= control.Length)
+        throw new InvalidDataException($"Tiny Stuff control stream ended after {outputAt} of {ScreenWords} expanded words.");
 
-      // Zero and one say the count did not fit in a byte and follows as a word of its own;
-      // a negative code is a count of words to take one after another, anything else a repeat.
+      var code = unchecked((sbyte)control[controlAt++]);
+      var repeat = code >= 0;
       int count;
-      var repeats = false;
+
       switch (code) {
         case < 0:
           count = -code;
           break;
         case 0:
-          if (controlAt + 1 >= control.Length)
-            return _ToScreen(stored);
-
-          count = (control[controlAt] << 8) | control[controlAt + 1];
-          controlAt += 2;
-          repeats = true;
+          count = _ReadExtendedCount(control, ref controlAt, "repeat");
           break;
         case 1:
-          if (controlAt + 1 >= control.Length)
-            return _ToScreen(stored);
-
-          count = (control[controlAt] << 8) | control[controlAt + 1];
-          controlAt += 2;
+          repeat = false;
+          count = _ReadExtendedCount(control, ref controlAt, "literal");
           break;
         default:
           count = code;
-          repeats = true;
           break;
       }
 
-      if (repeats) {
-        if (dataAt + 1 >= data.Length)
-          break;
+      if (count > ScreenWords - outputAt)
+        throw new InvalidDataException($"Tiny Stuff command expands past the {ScreenWords}-word screen buffer.");
+
+      if (repeat) {
+        if (dataAt > data.Length - 2)
+          throw new InvalidDataException("Tiny Stuff repeat command has no data word.");
 
         var value = BinaryPrimitives.ReadInt16BigEndian(data[dataAt..]);
         dataAt += 2;
-        for (var i = 0; i < count && at < ScreenWords; ++i)
-          stored[at++] = value;
-
+        stored.AsSpan(outputAt, count).Fill(value);
+        outputAt += count;
         continue;
       }
 
-      for (var i = 0; i < count && at < ScreenWords; ++i) {
-        if (dataAt + 1 >= data.Length)
-          break;
+      var bytes = checked(count * 2);
+      if (dataAt > data.Length - bytes)
+        throw new InvalidDataException($"Tiny Stuff literal command requests {count} words beyond the data block.");
 
-        stored[at++] = BinaryPrimitives.ReadInt16BigEndian(data[dataAt..]);
+      for (var i = 0; i < count; ++i) {
+        stored[outputAt++] = BinaryPrimitives.ReadInt16BigEndian(data[dataAt..]);
         dataAt += 2;
       }
     }
 
+    if (controlAt != control.Length)
+      throw new InvalidDataException($"Tiny Stuff control block has {control.Length - controlAt} trailing byte(s) after the screen is complete.");
+    if (dataAt != data.Length)
+      throw new InvalidDataException($"Tiny Stuff data block has {(data.Length - dataAt) / 2} trailing word(s) after the screen is complete.");
+
     return _ToScreen(stored);
   }
 
-  /// <summary>Puts the stored words where they belong on screen.</summary>
-  private static byte[] _ToScreen(short[] stored) {
-    var screen = new byte[ScreenWords * 2];
+  private static int _ReadExtendedCount(ReadOnlySpan<byte> control, ref int at, string kind) {
+    if (at > control.Length - 2)
+      throw new InvalidDataException($"Tiny Stuff extended {kind} command is truncated.");
+
+    var count = BinaryPrimitives.ReadUInt16BigEndian(control[at..]);
+    at += 2;
+    if (count is < _ExtendedMinimum or > _ExtendedMaximum)
+      throw new InvalidDataException($"Tiny Stuff extended {kind} count {count} is outside {_ExtendedMinimum}..{_ExtendedMaximum}.");
+
+    return count;
+  }
+
+  private static byte[] _ToScreen(ReadOnlySpan<short> stored) {
+    var screen = new byte[TinyFile.ScreenDataSize];
     for (var i = 0; i < ScreenWords; ++i)
       BinaryPrimitives.WriteInt16BigEndian(screen.AsSpan(_ScreenIndexOf(i) * 2), stored[i]);
 
     return screen;
   }
 
-  /// <summary>Packs screen memory into the control and data blocks a Tiny file carries.</summary>
+  /// <summary>Compresses exactly one Atari ST screen into separate control-byte and data-word blocks.</summary>
   public static (byte[] Control, byte[] Data) Compress(ReadOnlySpan<byte> screen) {
+    if (screen.Length != TinyFile.ScreenDataSize)
+      throw new ArgumentException($"Tiny Stuff compression requires exactly {TinyFile.ScreenDataSize} screen bytes.", nameof(screen));
+
     var stored = new short[ScreenWords];
-    for (var i = 0; i < ScreenWords; ++i) {
-      var at = _ScreenIndexOf(i) * 2;
-      stored[i] = at + 1 < screen.Length ? BinaryPrimitives.ReadInt16BigEndian(screen[at..]) : (short)0;
-    }
+    for (var i = 0; i < ScreenWords; ++i)
+      stored[i] = BinaryPrimitives.ReadInt16BigEndian(screen[(_ScreenIndexOf(i) * 2)..]);
 
     var control = new List<byte>();
-    var data = new MemoryStream();
+    using var data = new MemoryStream(TinyFile.ScreenDataSize);
 
     void WriteWord(short value) {
       Span<byte> buffer = stackalloc byte[2];
@@ -136,52 +126,53 @@ internal static class TinyCompressor {
       data.Write(buffer);
     }
 
-    void WriteCount(int count) {
+    void WriteExtendedCount(int count) {
       control.Add((byte)(count >> 8));
       control.Add((byte)count);
     }
 
     var index = 0;
     while (index < ScreenWords) {
-      var value = stored[index];
       var run = 1;
-      while (index + run < ScreenWords && stored[index + run] == value)
+      while (index + run < ScreenWords && stored[index + run] == stored[index])
         ++run;
 
       if (run >= 2) {
-        // A run of two already pays for itself, one control byte against two bytes of word.
         if (run <= sbyte.MaxValue)
           control.Add((byte)run);
         else {
           control.Add(0);
-          WriteCount(run);
+          WriteExtendedCount(run);
         }
 
-        WriteWord(value);
+        WriteWord(stored[index]);
         index += run;
         continue;
       }
 
-      // Otherwise gather everything up to the next run worth coding.
-      var start = index;
+      var start = index++;
       while (index < ScreenWords) {
         if (index + 1 < ScreenWords && stored[index] == stored[index + 1])
           break;
-
         ++index;
       }
 
       var literals = index - start;
       if (literals <= 128)
-        control.Add((byte)(sbyte)-literals);
+        control.Add(unchecked((byte)(sbyte)-literals));
       else {
         control.Add(1);
-        WriteCount(literals);
+        WriteExtendedCount(literals);
       }
 
       for (var i = 0; i < literals; ++i)
         WriteWord(stored[start + i]);
     }
+
+    if (control.Count is < TinyFile.MinimumControlBytes or > TinyFile.MaximumControlBytes)
+      throw new InvalidOperationException($"Tiny Stuff encoder produced an invalid {control.Count}-byte control block.");
+    if ((data.Length & 1) != 0 || data.Length is < 2 or > TinyFile.ScreenDataSize)
+      throw new InvalidOperationException($"Tiny Stuff encoder produced an invalid {data.Length}-byte data block.");
 
     return (control.ToArray(), data.ToArray());
   }
