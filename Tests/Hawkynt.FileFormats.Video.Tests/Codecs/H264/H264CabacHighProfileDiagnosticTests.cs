@@ -14,7 +14,8 @@ public sealed class H264CabacHighProfileDiagnosticTests {
       "_CABAC_HIGH_8X8_IPBB",
       BindingFlags.NonPublic | BindingFlags.Static);
     Assert.That(vectorField, Is.Not.Null);
-    var encodedBytes = Convert.FromBase64String((string)vectorField!.GetRawConstantValue()!);
+    var encoded = (string)vectorField!.GetRawConstantValue()!;
+    var encodedBytes = Convert.FromBase64String(encoded);
 
     var stream = new MediaStreamInfo {
       Index = 0,
@@ -115,6 +116,7 @@ public sealed class H264CabacHighProfileDiagnosticTests {
                         + $"samples={_HorizontalSamples(picture.Luma, picture.LumaWidth, x, y)}";
             }
 
+          report += $"\nBITSTREAM_BASE64={encoded}\nPREDEBLOCK_BASE64={Convert.ToBase64String(raw)}";
           Assert.Fail(report);
           return;
       }
