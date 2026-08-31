@@ -117,17 +117,22 @@ public static class MpegVideoReader {
   }
 
   /// <summary>
-  /// Refuses anything that does not begin with a sequence header start code.
+  /// Refuses anything that does not begin with a complete minimum sequence header.
   /// </summary>
   /// <remarks>
   /// The only eager check. A stream may only be entered at a sequence header — that is where the
   /// picture size and the quantiser matrices are stated — so a file that does not open with one is
-  /// not an elementary stream from its beginning, whatever else it may be.
+  /// not an elementary stream from its beginning, whatever else it may be. The fixed part of a
+  /// sequence header is eight bytes after the four-byte start code; optional quantiser matrices are
+  /// deliberately left to the decoder rather than duplicating its bit parser here.
   /// </remarks>
   private static void _RefuseWithoutSequenceHeader(ReadOnlySpan<byte> data) {
     if (data.Length < 4 || data[0] != 0x00 || data[1] != 0x00 || data[2] != 0x01 || data[3] != SequenceHeaderCode)
       throw new InvalidDataException(
         "Data does not begin with an MPEG sequence header start code (00 00 01 B3).");
+
+    if (data.Length < 12)
+      throw new InvalidDataException("Truncated MPEG sequence header: the fixed header needs eight bytes after 00 00 01 B3.");
   }
 
   /// <summary>
@@ -181,10 +186,21 @@ public static class MpegVideoReader {
           continue;
 
         case SequenceEndCode:
-          if (sawPicture)
-            yield return _Packet(data, packetStart, pendingBoundary >= 0 ? pendingBoundary : position, ordinal, openable);
+          if (sawPicture) {
+            var trailerStart = pendingBoundary >= 0 ? pendingBoundary : position;
+            var trailerEnd = Math.Min(position + 4, data.Length);
+            yield return _Packet(data, packetStart, trailerStart, ordinal, openable, data[trailerStart..trailerEnd]);
+            ++ordinal;
+          }
 
-          yield break;
+          // H.262 Annex D explicitly permits concatenated sequences. Keep walking after the
+          // sequence_end_code instead of throwing away every byte after the first sequence.
+          packetStart = position + 4;
+          pendingBoundary = -1;
+          sawPicture = false;
+          openable = false;
+          nextOpenable = false;
+          continue;
 
         default:
           // A header that introduces whatever comes after it. It opens the next packet if a picture
@@ -218,8 +234,20 @@ public static class MpegVideoReader {
   /// is upstream still cannot be decoded on its own, because its picture size and quantiser matrices
   /// were stated there and nowhere else.
   /// </remarks>
-  private static CodedPacket _Packet(ReadOnlyMemory<byte> data, int from, int to, long ordinal, bool carriesSequenceHeader)
-    => new(0, data[from..to], PresentationTimestamp: null, DecodeTimestamp: ordinal, IsKeyFrame: carriesSequenceHeader);
+  private static CodedPacket _Packet(
+    ReadOnlyMemory<byte> data,
+    int from,
+    int to,
+    long ordinal,
+    bool carriesSequenceHeader,
+    ReadOnlyMemory<byte> containerPrivateData = default)
+    => new(
+      0,
+      data[from..to],
+      PresentationTimestamp: null,
+      DecodeTimestamp: ordinal,
+      IsKeyFrame: carriesSequenceHeader,
+      ContainerPrivateData: containerPrivateData);
 
   /// <summary>
   /// Walks every start code in the data: the offset of its leading zero byte and the byte that says
