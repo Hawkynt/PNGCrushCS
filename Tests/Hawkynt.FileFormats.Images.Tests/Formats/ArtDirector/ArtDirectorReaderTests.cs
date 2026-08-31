@@ -1,252 +1,191 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 using FileFormat.ArtDirector;
+using FileFormat.Core;
 
 namespace FileFormat.ArtDirector.Tests;
 
 [TestFixture]
 public sealed class ArtDirectorReaderTests {
 
-  private const int _EXPECTED_SIZE = 32128;
+  private static byte[] _BuildFile() {
+    var data = new byte[ArtDirectorFile.ExpectedFileSize];
+    for (var i = 0; i < ArtDirectorFile.PlanarDataSize; ++i)
+      data[i] = (byte)(i * 17 + 3);
 
-  [Test]
-  [Category("Unit")]
-  public void FromBytes_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => ArtDirectorReader.FromBytes(null!));
+    for (var palette = 0; palette < ArtDirectorFile.StoredPaletteCount; ++palette)
+      for (var color = 0; color < ArtDirectorFile.ColorsPerPalette; ++color)
+        BinaryPrimitives.WriteUInt16BigEndian(
+          data.AsSpan(ArtDirectorFile.PlanarDataSize + (palette * ArtDirectorFile.ColorsPerPalette + color) * 2),
+          (ushort)((palette << 8) | color)
+        );
+
+    return data;
   }
 
   [Test]
-  [Category("Unit")]
-  public void FromFile_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => ArtDirectorReader.FromFile(null!));
-  }
+  public void FromBytes_Null_ThrowsArgumentNullException()
+    => Assert.Throws<ArgumentNullException>(() => ArtDirectorReader.FromBytes(null!));
 
   [Test]
-  [Category("Unit")]
+  public void FromFile_Null_ThrowsArgumentNullException()
+    => Assert.Throws<ArgumentNullException>(() => ArtDirectorReader.FromFile(null!));
+
+  [Test]
   public void FromFile_Missing_ThrowsFileNotFoundException() {
     var missing = new FileInfo(Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".art"));
     Assert.Throws<FileNotFoundException>(() => ArtDirectorReader.FromFile(missing));
   }
 
   [Test]
-  [Category("Unit")]
-  public void FromStream_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => ArtDirectorReader.FromStream(null!));
+  public void Reader_RequiresExactPublished32512ByteLength() {
+    Assert.Multiple(() => {
+      Assert.Throws<InvalidDataException>(() => ArtDirectorReader.FromBytes(new byte[ArtDirectorFile.ExpectedFileSize - 1]));
+      Assert.Throws<InvalidDataException>(() => ArtDirectorReader.FromBytes(new byte[ArtDirectorFile.ExpectedFileSize + 1]));
+      Assert.Throws<InvalidDataException>(() => ArtDirectorReader.FromBytes(new byte[32_128]));
+    });
   }
 
   [Test]
-  [Category("Unit")]
-  public void FromBytes_TooSmall_ThrowsInvalidDataException() {
-    var tooSmall = new byte[100];
-    Assert.Throws<InvalidDataException>(() => ArtDirectorReader.FromBytes(tooSmall));
+  public void Reader_ParsesScreenBeforePalettes() {
+    var data = _BuildFile();
+    var file = ArtDirectorReader.FromBytes(data);
+
+    Assert.Multiple(() => {
+      Assert.That(file.Width, Is.EqualTo(320));
+      Assert.That(file.Height, Is.EqualTo(200));
+      Assert.That(file.Resolution, Is.Zero);
+      Assert.That(file.PixelData[0], Is.EqualTo(data[0]));
+      Assert.That(file.PixelData[^1], Is.EqualTo(data[ArtDirectorFile.PlanarDataSize - 1]));
+      Assert.That(file.PaletteCycle, Has.Length.EqualTo(256));
+    });
   }
 
   [Test]
-  [Category("Unit")]
-  public void FromBytes_TooLarge_ThrowsInvalidDataException() {
-    var tooLarge = new byte[_EXPECTED_SIZE + 1];
-    Assert.Throws<InvalidDataException>(() => ArtDirectorReader.FromBytes(tooLarge));
+  public void Reader_PreservesEveryStoredPaletteWord() {
+    var file = ArtDirectorReader.FromBytes(_BuildFile());
+
+    Assert.That(file.PaletteCycle, Is.Not.Null);
+    Assert.Multiple(() => {
+      Assert.That(file.PaletteCycle![0], Is.EqualTo(0x0000));
+      Assert.That(file.PaletteCycle[15], Is.EqualTo(0x000F));
+      Assert.That(file.PaletteCycle[16], Is.EqualTo(0x0100));
+      Assert.That(file.PaletteCycle[^1], Is.EqualTo(0x0F0F));
+    });
   }
 
   [Test]
-  [Category("Unit")]
-  public void FromBytes_ExactSize_Parses() {
-    var data = new byte[_EXPECTED_SIZE];
-    // Set palette entry 0 to 0x0777 (white in ST)
-    // resolution=0 (low res)
-    data[0] = 0x00; data[1] = 0x00;
-    // Set palette entry 0 at offset 2
-    data[2] = 0x07;
-    data[3] = 0x77;
+  public void Reader_ExposesEstablishedDisplayedPaletteSlot() {
+    var file = ArtDirectorReader.FromBytes(_BuildFile());
 
-    var result = ArtDirectorReader.FromBytes(data);
-
-    Assert.That(result.Width, Is.EqualTo(320));
-    Assert.That(result.Height, Is.EqualTo(200));
-    Assert.That(result.Palette.Length, Is.EqualTo(16));
-    Assert.That(result.Palette[0], Is.EqualTo(0x0777));
-    Assert.That(result.PixelData.Length, Is.EqualTo(32000));
+    Assert.Multiple(() => {
+      Assert.That(ArtDirectorFile.DisplayedPaletteIndex, Is.EqualTo(1));
+      Assert.That(file.Palette[0], Is.EqualTo(0x0100));
+      Assert.That(file.Palette[15], Is.EqualTo(0x010F));
+    });
   }
 
   [Test]
-  [Category("Unit")]
-  public void FromStream_Valid() {
-    var data = new byte[_EXPECTED_SIZE];
-    data[0] = 0x00; data[1] = 0x00; // resolution=0
-    data[2] = 0x03;
-    data[3] = 0x45;
-
-    using var ms = new MemoryStream(data);
-    var result = ArtDirectorReader.FromStream(ms);
-
-    Assert.That(result.Palette[0], Is.EqualTo(0x0345));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromBytes_CopiesPixelData() {
-    var data = new byte[_EXPECTED_SIZE];
-    data[128] = 0x42; // First byte of pixel data
-
-    var result = ArtDirectorReader.FromBytes(data);
-    data[128] = 0x00;
-
-    Assert.That(result.PixelData[0], Is.EqualTo(0x42));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ToRawImage_ProducesIndexed8() {
-    var file = new ArtDirectorFile {
-      Palette = new short[16],
-      PixelData = new byte[32000]
-    };
-
-    var raw = ArtDirectorFile.ToRawImage(file);
-
-    Assert.That(raw.Width, Is.EqualTo(320));
-    Assert.That(raw.Height, Is.EqualTo(200));
-    Assert.That(raw.Format, Is.EqualTo(FileFormat.Core.PixelFormat.Indexed8));
-    Assert.That(raw.PaletteCount, Is.EqualTo(16));
-  }
-  [Test]
-  [Category("Integration")]
-  public void RoundTrip_PaletteAndDataPreserved() {
-    var data = new byte[_EXPECTED_SIZE];
-    // Set a palette entry
-    data[0] = 0x00; data[3] = 0x00; // resolution=0
-    data[2] = 0x07;
-    data[3] = 0x00;
-    // Set some pixel data
-    data[128] = 0xAA;
-    data[_EXPECTED_SIZE - 1] = 0xBB;
-
-    var original = ArtDirectorReader.FromBytes(data);
+  public void Writer_ProducesPublishedScreenFirstLayout() {
+    var original = ArtDirectorReader.FromBytes(_BuildFile());
     var bytes = ArtDirectorWriter.ToBytes(original);
+
+    Assert.Multiple(() => {
+      Assert.That(bytes, Has.Length.EqualTo(32_512));
+      Assert.That(bytes[..ArtDirectorFile.PlanarDataSize], Is.EqualTo(original.PixelData));
+      Assert.That(BinaryPrimitives.ReadInt16BigEndian(bytes.AsSpan(ArtDirectorFile.PlanarDataSize)), Is.EqualTo(original.PaletteCycle![0]));
+      Assert.That(BinaryPrimitives.ReadInt16BigEndian(bytes.AsSpan(bytes.Length - 2)), Is.EqualTo(original.PaletteCycle[^1]));
+    });
+  }
+
+  [Test]
+  public void RoundTrip_PreservesAllPaletteSlotsAndScreenMemory() {
+    var original = ArtDirectorReader.FromBytes(_BuildFile());
+    var restored = ArtDirectorReader.FromBytes(ArtDirectorWriter.ToBytes(original));
+
+    Assert.Multiple(() => {
+      Assert.That(restored.PixelData, Is.EqualTo(original.PixelData));
+      Assert.That(restored.PaletteCycle, Is.EqualTo(original.PaletteCycle));
+      Assert.That(restored.Palette, Is.EqualTo(original.Palette));
+    });
+  }
+
+  [Test]
+  public void Writer_WhenOnlyLegacyPaletteIsProvided_RepeatsItThroughAllSlots() {
+    var palette = new short[16];
+    for (var i = 0; i < palette.Length; ++i)
+      palette[i] = (short)(0x0700 | i);
+
+    var bytes = ArtDirectorWriter.ToBytes(new ArtDirectorFile {
+      Palette = palette,
+      PixelData = new byte[ArtDirectorFile.PlanarDataSize],
+    });
     var restored = ArtDirectorReader.FromBytes(bytes);
 
-    Assert.That(restored.Palette[0], Is.EqualTo(original.Palette[0]));
-    Assert.That(restored.PixelData[0], Is.EqualTo(original.PixelData[0]));
-    Assert.That(restored.PixelData[^1], Is.EqualTo(original.PixelData[^1]));
+    Assert.That(restored.PaletteCycle, Is.Not.Null);
+    for (var slot = 0; slot < ArtDirectorFile.StoredPaletteCount; ++slot)
+      Assert.That(
+        restored.PaletteCycle!.AsSpan(slot * 16, 16).ToArray(),
+        Is.EqualTo(palette),
+        $"palette slot {slot}"
+      );
   }
 
   [Test]
-  [Category("Integration")]
-  public void RoundTrip_ViaFile() {
-    var data = new byte[_EXPECTED_SIZE];
-    data[0] = 0x00; data[1] = 0x00; // resolution=0
-    for (var i = 2; i < 34; ++i)
-      data[i] = (byte)(i * 3 % 256);
-    for (var i = 128; i < _EXPECTED_SIZE; ++i)
-      data[i] = (byte)(i * 7 % 256);
+  public void Writer_ChangingDisplayedPalettePreservesOtherAnimationSlots() {
+    var original = ArtDirectorReader.FromBytes(_BuildFile());
+    var replacement = new short[16];
+    Array.Fill(replacement, (short)0x0777);
 
-    var original = ArtDirectorReader.FromBytes(data);
-    var tempPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".art");
-    try {
-      File.WriteAllBytes(tempPath, ArtDirectorWriter.ToBytes(original));
-      var restored = ArtDirectorReader.FromFile(new FileInfo(tempPath));
+    var restored = ArtDirectorReader.FromBytes(ArtDirectorWriter.ToBytes(original with { Palette = replacement }));
 
-      Assert.That(restored.Palette, Is.EqualTo(original.Palette));
-      Assert.That(restored.PixelData, Is.EqualTo(original.PixelData));
-    } finally {
-      if (File.Exists(tempPath))
-        File.Delete(tempPath);
-    }
+    Assert.That(restored.Palette, Is.EqualTo(replacement));
+    Assert.Multiple(() => {
+      Assert.That(restored.PaletteCycle![0], Is.EqualTo(original.PaletteCycle![0]));
+      Assert.That(restored.PaletteCycle[32], Is.EqualTo(original.PaletteCycle[32]));
+    });
   }
 
   [Test]
-  [Category("Unit")]
-  public void WriterToBytes_ProducesExpectedSize() {
-    var file = new ArtDirectorFile {
+  public void Writer_RejectsInvalidGeometryResolutionPaletteRasterAndCycle() {
+    var valid = new ArtDirectorFile {
       Palette = new short[16],
-      PixelData = new byte[32000]
+      PixelData = new byte[ArtDirectorFile.PlanarDataSize],
     };
 
-    var bytes = ArtDirectorWriter.ToBytes(file);
-
-    Assert.That(bytes.Length, Is.EqualTo(_EXPECTED_SIZE));
+    Assert.Multiple(() => {
+      Assert.Throws<ArgumentException>(() => ArtDirectorWriter.ToBytes(valid with { Width = 640 }));
+      Assert.Throws<ArgumentException>(() => ArtDirectorWriter.ToBytes(valid with { Resolution = 1 }));
+      Assert.Throws<ArgumentException>(() => ArtDirectorWriter.ToBytes(valid with { Palette = new short[15] }));
+      Assert.Throws<ArgumentException>(() => ArtDirectorWriter.ToBytes(valid with { PixelData = new byte[ArtDirectorFile.PlanarDataSize - 1] }));
+      Assert.Throws<ArgumentException>(() => ArtDirectorWriter.ToBytes(valid with { PaletteCycle = new short[255] }));
+    });
   }
 
   [Test]
-  [Category("Unit")]
-  public void DataType_DefaultPixelData_IsEmpty() {
-    var file = new ArtDirectorFile();
-    Assert.That(file.PixelData, Is.Null);
+  public void ToRawImage_IsAlwaysLowResolutionFourPlane() {
+    var file = ArtDirectorReader.FromBytes(_BuildFile());
+    var image = ArtDirectorFile.ToRawImage(file);
+
+    Assert.Multiple(() => {
+      Assert.That(image.Width, Is.EqualTo(320));
+      Assert.That(image.Height, Is.EqualTo(200));
+      Assert.That(image.Format, Is.EqualTo(PixelFormat.Indexed8));
+      Assert.That(image.PaletteCount, Is.EqualTo(16));
+    });
   }
 
   [Test]
-  [Category("Unit")]
-  public void DataType_DefaultPalette_Has16Entries() {
-    var file = new ArtDirectorFile();
-    Assert.That(file.Palette, Is.Null);
-  }
+  public void StreamReader_UsesCurrentPositionAndExactRemainingLength() {
+    var payload = _BuildFile();
+    using var stream = new MemoryStream(new byte[payload.Length + 13]);
+    stream.Position = 13;
+    stream.Write(payload);
+    stream.Position = 13;
 
-  [Test]
-  [Category("Unit")]
-  public void DataType_FixedDimensions() {
-    var file = new ArtDirectorFile();
-    Assert.That(file.Width, Is.EqualTo(320));
-    Assert.That(file.Height, Is.EqualTo(200));
-  }
+    var file = ArtDirectorReader.FromStream(stream);
 
-  [Test]
-  [Category("Unit")]
-  public void DataType_ExpectedFileSize_Is32128() {
-    Assert.That(ArtDirectorFile.ExpectedFileSize, Is.EqualTo(32128));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromBytes_InvalidResolution_ThrowsInvalidDataException() {
-    var data = new byte[_EXPECTED_SIZE];
-    data[0] = 0x00; data[1] = 0x03;
-    Assert.Throws<InvalidDataException>(() => ArtDirectorReader.FromBytes(data));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromBytes_MedRes_Parses() {
-    var data = new byte[_EXPECTED_SIZE];
-    data[0] = 0x00; data[1] = 0x01;
-
-    var result = ArtDirectorReader.FromBytes(data);
-
-    Assert.That(result.Width, Is.EqualTo(640));
-    Assert.That(result.Height, Is.EqualTo(200));
-    Assert.That(result.Resolution, Is.EqualTo(1));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromBytes_HighRes_Parses() {
-    var data = new byte[_EXPECTED_SIZE];
-    data[0] = 0x00; data[1] = 0x02;
-
-    var result = ArtDirectorReader.FromBytes(data);
-
-    Assert.That(result.Width, Is.EqualTo(640));
-    Assert.That(result.Height, Is.EqualTo(400));
-    Assert.That(result.Resolution, Is.EqualTo(2));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void WriterToBytes_ResolutionInHeader() {
-    var file = new ArtDirectorFile {
-      Resolution = 1,
-      Palette = new short[16],
-      PixelData = new byte[32000]
-    };
-
-    var bytes = ArtDirectorWriter.ToBytes(file);
-
-    Assert.That(bytes[0], Is.EqualTo(0x00));
-    Assert.That(bytes[1], Is.EqualTo(0x01));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void DataType_HeaderSize_Is128() {
-    Assert.That(ArtDirectorFile.HeaderSize, Is.EqualTo(128));
+    Assert.That(file.PixelData[0], Is.EqualTo(payload[0]));
   }
 }
