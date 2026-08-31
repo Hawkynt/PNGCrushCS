@@ -27,7 +27,7 @@ internal static class Av1VideoReader {
       ++at;
     }
 
-    return _TryReadLeb128(data, ref at, out var size) && size == 0;
+    return _TryReadLeb128(data, ref at, out var payloadSize) && payloadSize == 0;
   }
 
   internal static Av1VideoContainer FromSpan(ReadOnlySpan<byte> data) => _Open(data.ToArray());
