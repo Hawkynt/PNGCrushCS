@@ -126,8 +126,10 @@ public sealed class MpegProgramStreamDescriptorTests {
   [Test]
   [Category("Unit")]
   public void Writer_SharedPrivateStreamIdWithDifferentDescriptorsIsRefused() {
-    var ac3 = _Stream(0, MediaStreamKind.Audio, "ac-3", [0xEE, 0x00]);
-    var dts = _Stream(1, MediaStreamKind.Audio, "dts ", [0xEF, 0x00]);
+    // byte[] rather than a collection expression: ReadOnlyMemory<byte> has no collection
+    // initializer to target (CS9174), it just converts from an array.
+    var ac3 = _Stream(0, MediaStreamKind.Audio, "ac-3", new byte[] { 0xEE, 0x00 });
+    var dts = _Stream(1, MediaStreamKind.Audio, "dts ", new byte[] { 0xEF, 0x00 });
 
     var failure = Assert.Throws<NotSupportedException>(
       () => VideoIO.Mux<MpegProgramStreamWriter>([ac3, dts], Array.Empty<CodedPacket>()));
