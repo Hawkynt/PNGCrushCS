@@ -16,18 +16,18 @@ internal static class Av1VideoReader {
     if (data.IsEmpty)
       return false;
 
-    var at = 0;
-    var header = data[at++];
+    var position = 0;
+    var header = data[position++];
     if ((header & 0x81) != 0 || ((header >> 3) & 0x0F) != _OBU_TEMPORAL_DELIMITER || (header & 0x02) == 0)
       return false;
 
     if ((header & 0x04) != 0) {
-      if (at >= data.Length || (data[at] & 0x07) != 0)
+      if (position >= data.Length || (data[position] & 0x07) != 0)
         return false;
-      ++at;
+      ++position;
     }
 
-    return _TryReadLeb128(data, ref at, out var payloadSize) && payloadSize == 0;
+    return _TryReadLeb128(data, ref position, out var payloadSize) && payloadSize == 0;
   }
 
   internal static Av1VideoContainer FromSpan(ReadOnlySpan<byte> data) => _Open(data.ToArray());
@@ -38,36 +38,36 @@ internal static class Av1VideoReader {
   }
 
   internal static IEnumerable<CodedPacket> Split(ReadOnlyMemory<byte> data) {
-    var at = 0;
+    var position = 0;
     var temporalUnitStart = 0;
     var sawContent = false;
     long ordinal = 0;
 
-    while (at < data.Length) {
-      var obu = _ReadObu(data, at);
+    while (position < data.Length) {
+      var obu = _ReadObu(data, position);
       if (obu.Type == _OBU_TEMPORAL_DELIMITER) {
         if (obu.PayloadLength != 0)
-          throw new InvalidDataException($"AV1 temporal delimiter OBU at byte {at} has a {obu.PayloadLength}-byte payload; the delimiter payload must be empty.");
+          throw new InvalidDataException($"AV1 temporal delimiter OBU at byte {position} has a {obu.PayloadLength}-byte payload; the delimiter payload must be empty.");
 
-        if (at != temporalUnitStart) {
+        if (position != temporalUnitStart) {
           if (!sawContent)
-            throw new InvalidDataException($"AV1 temporal unit beginning at byte {temporalUnitStart} contains no content OBU before the next temporal delimiter at byte {at}.");
+            throw new InvalidDataException($"AV1 temporal unit beginning at byte {temporalUnitStart} contains no content OBU before the next temporal delimiter at byte {position}.");
 
           yield return new(
             StreamIndex: 0,
-            Data: data.Slice(temporalUnitStart, at - temporalUnitStart),
+            Data: data.Slice(temporalUnitStart, position - temporalUnitStart),
             PresentationTimestamp: null,
             DecodeTimestamp: ordinal++);
-          temporalUnitStart = at;
+          temporalUnitStart = position;
           sawContent = false;
         }
       } else {
-        if (at == 0)
+        if (position == 0)
           throw new InvalidDataException("An AV1 .obu stream must begin each temporal unit with a temporal delimiter OBU.");
         sawContent = true;
       }
 
-      at += obu.Length;
+      position += obu.Length;
     }
 
     if (temporalUnitStart < data.Length) {
@@ -90,23 +90,23 @@ internal static class Av1VideoReader {
     if (data.IsEmpty)
       throw new InvalidDataException("An AV1 temporal-unit packet cannot be empty.");
 
-    var at = 0;
+    var position = 0;
     var first = true;
     var hasDelimiter = false;
     var hasContent = false;
-    while (at < data.Length) {
-      var obu = _ReadObu(data, at);
+    while (position < data.Length) {
+      var obu = _ReadObu(data, position);
       if (obu.Type == _OBU_TEMPORAL_DELIMITER) {
         if (!first)
-          throw new InvalidDataException($"AV1 packet contains a second temporal unit beginning at byte {at}; each coded packet must contain exactly one temporal unit.");
+          throw new InvalidDataException($"AV1 packet contains a second temporal unit beginning at byte {position}; each coded packet must contain exactly one temporal unit.");
         if (obu.PayloadLength != 0)
-          throw new InvalidDataException($"AV1 temporal delimiter OBU at byte {at} has a {obu.PayloadLength}-byte payload; the delimiter payload must be empty.");
+          throw new InvalidDataException($"AV1 temporal delimiter OBU at byte {position} has a {obu.PayloadLength}-byte payload; the delimiter payload must be empty.");
         hasDelimiter = true;
       } else
         hasContent = true;
 
       first = false;
-      at += obu.Length;
+      position += obu.Length;
     }
 
     if (!hasContent)
@@ -127,8 +127,8 @@ internal static class Av1VideoReader {
     if ((uint)offset >= (uint)span.Length)
       throw new InvalidDataException($"AV1 OBU starts at byte {offset}, outside the {span.Length}-byte stream.");
 
-    var at = offset;
-    var header = span[at++];
+    var position = offset;
+    var header = span[position++];
     if ((header & 0x80) != 0)
       throw new InvalidDataException($"AV1 OBU at byte {offset} has obu_forbidden_bit set.");
     if ((header & 0x01) != 0)
@@ -141,29 +141,29 @@ internal static class Av1VideoReader {
       throw new InvalidDataException($"AV1 low-overhead OBU at byte {offset} does not carry its required obu_size field.");
 
     if (hasExtension) {
-      if (at >= span.Length)
+      if (position >= span.Length)
         throw new InvalidDataException($"AV1 OBU at byte {offset} ends before its extension header.");
-      if ((span[at] & 0x07) != 0)
+      if ((span[position] & 0x07) != 0)
         throw new InvalidDataException($"AV1 OBU at byte {offset} has non-zero extension_header_reserved_3bits.");
-      ++at;
+      ++position;
     }
 
-    var size = _ReadLeb128(span, ref at, offset);
+    var size = _ReadLeb128(span, ref position, offset);
     if (size > int.MaxValue)
       throw new InvalidDataException($"AV1 OBU at byte {offset} declares {size} payload bytes, which this in-memory reader cannot address.");
-    if ((long)at + size > span.Length)
-      throw new InvalidDataException($"AV1 OBU at byte {offset} declares {size} payload bytes, but only {span.Length - at} remain.");
+    if ((long)position + size > span.Length)
+      throw new InvalidDataException($"AV1 OBU at byte {offset} declares {size} payload bytes, but only {span.Length - position} remain.");
 
-    return new(type, offset, checked(at - offset + (int)size), (int)size);
+    return new(type, offset, checked(position - offset + (int)size), (int)size);
   }
 
-  private static uint _ReadLeb128(ReadOnlySpan<byte> data, ref int at, int obuOffset) {
+  private static uint _ReadLeb128(ReadOnlySpan<byte> data, ref int position, int obuOffset) {
     ulong value = 0;
     for (var i = 0; i < 8; ++i) {
-      if (at >= data.Length)
+      if (position >= data.Length)
         throw new InvalidDataException($"AV1 OBU at byte {obuOffset} ends inside its obu_size LEB128 value.");
 
-      var octet = data[at++];
+      var octet = data[position++];
       value |= (ulong)(octet & 0x7F) << (i * 7);
       if ((octet & 0x80) == 0) {
         if (value > uint.MaxValue)
@@ -175,15 +175,15 @@ internal static class Av1VideoReader {
     throw new InvalidDataException($"AV1 OBU at byte {obuOffset} has an obu_size LEB128 value longer than eight bytes.");
   }
 
-  private static bool _TryReadLeb128(ReadOnlySpan<byte> data, ref int at, out uint result) {
+  private static bool _TryReadLeb128(ReadOnlySpan<byte> data, ref int position, out uint result) {
     ulong value = 0;
     for (var i = 0; i < 8; ++i) {
-      if (at >= data.Length) {
+      if (position >= data.Length) {
         result = 0;
         return false;
       }
 
-      var octet = data[at++];
+      var octet = data[position++];
       value |= (ulong)(octet & 0x7F) << (i * 7);
       if ((octet & 0x80) != 0)
         continue;
