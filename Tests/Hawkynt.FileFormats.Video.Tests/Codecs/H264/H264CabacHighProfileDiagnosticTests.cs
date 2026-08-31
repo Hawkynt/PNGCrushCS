@@ -19,10 +19,9 @@ public sealed class H264CabacHighProfileDiagnosticTests {
     var encoded = (string)field!.GetRawConstantValue()!;
     var encodedBytes = Convert.FromBase64String(encoded);
 
-    var workDirectory = TestContext.CurrentContext.WorkDirectory;
-    var bitstreamPath = Path.Combine(workDirectory, "high-profile-ipbb.h264");
-    File.WriteAllBytes(bitstreamPath, encodedBytes);
-    TestContext.AddTestAttachment(bitstreamPath);
+    var diagnosticDirectory = Path.Combine(TestContext.CurrentContext.WorkDirectory, "TestResults", "H264Diagnostic");
+    Directory.CreateDirectory(diagnosticDirectory);
+    File.WriteAllBytes(Path.Combine(diagnosticDirectory, "high-profile-ipbb.h264"), encodedBytes);
 
     var stream = new MediaStreamInfo {
       Index = 0,
@@ -39,9 +38,7 @@ public sealed class H264CabacHighProfileDiagnosticTests {
     var hashes = new string[frames.Count];
     for (var index = 0; index < frames.Count; ++index) {
       hashes[index] = Convert.ToHexString(SHA256.HashData(frames[index].PixelData));
-      var framePath = Path.Combine(workDirectory, $"high-profile-ipbb-frame-{index}.bin");
-      File.WriteAllBytes(framePath, frames[index].PixelData);
-      TestContext.AddTestAttachment(framePath);
+      File.WriteAllBytes(Path.Combine(diagnosticDirectory, $"high-profile-ipbb-frame-{index}.yuv"), frames[index].PixelData);
     }
 
     Assert.Fail($"High-profile IPBB hashes: {string.Join(", ", hashes)}");
