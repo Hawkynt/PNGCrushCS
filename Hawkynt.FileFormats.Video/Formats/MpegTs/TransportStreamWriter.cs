@@ -117,7 +117,7 @@ public sealed class TransportStreamWriter : IVideoContainerWriter<TransportStrea
     ContainerWriterTools.WriteUInt16BigEndian(section, (ushort)(0xB000 | sectionLength));
     section.Write(body);
     var withoutCrc = section.ToArray();
-    ContainerWriterTools.WriteUInt32BigEndian(section, _MpegCrc(withoutCrc));
+    ContainerWriterTools.WriteUInt32BigEndian(section, MpegSystemsTools.Crc32(withoutCrc));
     return section.ToArray();
   }
 
@@ -217,15 +217,5 @@ public sealed class TransportStreamWriter : IVideoContainerWriter<TransportStrea
       if (stream.Codec.EqualsIgnoringCase(CodecTag.FromCharacters(tag)))
         return true;
     return false;
-  }
-
-  private static uint _MpegCrc(ReadOnlySpan<byte> data) {
-    var crc = 0xFFFFFFFFu;
-    foreach (var value in data) {
-      crc ^= (uint)value << 24;
-      for (var bit = 0; bit < 8; ++bit)
-        crc = (crc & 0x80000000) != 0 ? (crc << 1) ^ 0x04C11DB7u : crc << 1;
-    }
-    return crc;
   }
 }
