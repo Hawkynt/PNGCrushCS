@@ -38,7 +38,7 @@ jobs:
         shell: pwsh
         run: |
           $fixerPath = 'tools/ApiDocSummaryFixer/Program.cs'
-          $fixer = Get-Content $fixerPath -Raw
+          $fixer = (Get-Content $fixerPath -Raw).Replace("`r`n", "`n")
           $videoRoot = '  Path.Combine(repositoryRoot, "Hawkynt.FileFormats.Video"),'
           $imageRoot = '  Path.Combine(repositoryRoot, "Hawkynt.FileFormats.Images"),'
           if (-not $fixer.Contains($imageRoot)) {
@@ -47,29 +47,47 @@ jobs:
           }
 
           $imageGeneratorPath = 'FileFormat.Registry.Generator/ImageFormatGenerator.cs'
-          $imageGenerator = Get-Content $imageGeneratorPath -Raw
+          $imageGenerator = (Get-Content $imageGeneratorPath -Raw).Replace("`r`n", "`n")
           $imageUnknown = '    sb.AppendLine("  Unknown,");'
           $imageUnknownDocs = '    sb.AppendLine("  /// <summary>Represents an unknown or unsupported image format.</summary>");' + "`n" + $imageUnknown
           if (-not $imageGenerator.Contains('Represents an unknown or unsupported image format.')) {
             $imageGenerator = $imageGenerator.Replace($imageUnknown, $imageUnknownDocs)
           }
-          $imageLoop = "    foreach (var format in formats)`n      sb.Append(\"  \").Append(format.FormatId).AppendLine(\",\");"
-          $imageLoopDocs = "    foreach (var format in formats) {`n      sb.Append(\"  /// <summary>Represents the \").Append(format.FormatId).AppendLine(\" image format.</summary>\");`n      sb.Append(\"  \").Append(format.FormatId).AppendLine(\",\");`n    }"
-          if (-not $imageGenerator.Contains('AppendLine(" image format.</summary>")')) {
+          $imageLoop = (@'
+    foreach (var format in formats)
+      sb.Append("  ").Append(format.FormatId).AppendLine(",");
+'@).Replace("`r`n", "`n")
+          $imageLoopDocs = (@'
+    foreach (var format in formats) {
+      sb.Append("  /// <summary>Represents the ").Append(format.FormatId).AppendLine(" image format.</summary>");
+      sb.Append("  ").Append(format.FormatId).AppendLine(",");
+    }
+'@).Replace("`r`n", "`n")
+          if (-not $imageGenerator.Contains(' image format.</summary>')) {
+            if (-not $imageGenerator.Contains($imageLoop)) { throw 'ImageFormat generator loop not found.' }
             $imageGenerator = $imageGenerator.Replace($imageLoop, $imageLoopDocs)
           }
           Set-Content $imageGeneratorPath $imageGenerator -NoNewline -Encoding utf8
 
           $videoGeneratorPath = 'FileFormat.Registry.Generator/VideoFormatGenerator.cs'
-          $videoGenerator = Get-Content $videoGeneratorPath -Raw
+          $videoGenerator = (Get-Content $videoGeneratorPath -Raw).Replace("`r`n", "`n")
           $videoUnknown = '    sb.AppendLine("  Unknown,");'
           $videoUnknownDocs = '    sb.AppendLine("  /// <summary>Represents an unknown or unsupported video container format.</summary>");' + "`n" + $videoUnknown
           if (-not $videoGenerator.Contains('Represents an unknown or unsupported video container format.')) {
             $videoGenerator = $videoGenerator.Replace($videoUnknown, $videoUnknownDocs)
           }
-          $videoLoop = "    foreach (var container in discovery.Containers)`n      sb.Append(\"  \").Append(container.FormatId).AppendLine(\",\");"
-          $videoLoopDocs = "    foreach (var container in discovery.Containers) {`n      sb.Append(\"  /// <summary>Represents the \").Append(container.FormatId).AppendLine(\" video container format.</summary>\");`n      sb.Append(\"  \").Append(container.FormatId).AppendLine(\",\");`n    }"
-          if (-not $videoGenerator.Contains('AppendLine(" video container format.</summary>")')) {
+          $videoLoop = (@'
+    foreach (var container in discovery.Containers)
+      sb.Append("  ").Append(container.FormatId).AppendLine(",");
+'@).Replace("`r`n", "`n")
+          $videoLoopDocs = (@'
+    foreach (var container in discovery.Containers) {
+      sb.Append("  /// <summary>Represents the ").Append(container.FormatId).AppendLine(" video container format.</summary>");
+      sb.Append("  ").Append(container.FormatId).AppendLine(",");
+    }
+'@).Replace("`r`n", "`n")
+          if (-not $videoGenerator.Contains(' video container format.</summary>')) {
+            if (-not $videoGenerator.Contains($videoLoop)) { throw 'VideoFormat generator loop not found.' }
             $videoGenerator = $videoGenerator.Replace($videoLoop, $videoLoopDocs)
           }
           Set-Content $videoGeneratorPath $videoGenerator -NoNewline -Encoding utf8
@@ -129,8 +147,14 @@ jobs:
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add -- '*.cs'
-          git reset -- tools/ApiDocSummaryFixer/Program.cs
+          git add Hawkynt.FileFormats.Images Hawkynt.FileFormats.Video Hawkynt.ImageTransformUI \
+            FileFormat.Core.Generators/HeaderSerializerGenerator.cs \
+            FileFormat.Registry.Generator/ImageFormatGenerator.cs \
+            FileFormat.Registry.Generator/VideoFormatGenerator.cs
+          git reset -- \
+            Hawkynt.FileFormats.Images/README.md Hawkynt.FileFormats.Images/REFERENCE.md \
+            Hawkynt.FileFormats.Video/README.md Hawkynt.FileFormats.Video/REFERENCE.md \
+            Hawkynt.ImageTransformUI/README.md Hawkynt.ImageTransformUI/REFERENCE.md || true
           if git diff --cached --quiet; then
             echo "No C# documentation changes produced."
           else
