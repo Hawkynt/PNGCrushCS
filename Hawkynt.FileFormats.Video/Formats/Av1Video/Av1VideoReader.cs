@@ -10,7 +10,17 @@ internal static class Av1VideoReader {
 
   private const int _OBU_TEMPORAL_DELIMITER = 2;
 
-  private readonly record struct Obu(int Type, int Offset, int Length, int PayloadLength);
+  private readonly struct Obu {
+    public Obu(int type, int length, int payloadLength) {
+      this.Type = type;
+      this.Length = length;
+      this.PayloadLength = payloadLength;
+    }
+
+    public int Type { get; }
+    public int Length { get; }
+    public int PayloadLength { get; }
+  }
 
   internal static bool LooksLikeByteStream(ReadOnlySpan<byte> data) {
     if (data.IsEmpty)
@@ -154,7 +164,7 @@ internal static class Av1VideoReader {
     if ((long)position + size > span.Length)
       throw new InvalidDataException($"AV1 OBU at byte {offset} declares {size} payload bytes, but only {span.Length - position} remain.");
 
-    return new(type, offset, checked(position - offset + (int)size), (int)size);
+    return new(type, checked(position - offset + (int)size), (int)size);
   }
 
   private static uint _ReadLeb128(ReadOnlySpan<byte> data, ref int position, int obuOffset) {
