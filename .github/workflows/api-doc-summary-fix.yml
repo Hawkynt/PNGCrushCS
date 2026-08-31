@@ -1,0 +1,112 @@
+name: Complete API summaries
+
+on:
+  push:
+    branches: [docs/complete-public-api-summaries]
+
+permissions:
+  contents: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  rewrite:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout PNGCrushCS
+        uses: actions/checkout@v4
+        with:
+          path: PNGCrushCS
+          fetch-depth: 0
+
+      - name: Checkout CompressionWorkbench sibling
+        uses: actions/checkout@v4
+        with:
+          repository: Hawkynt/CompressionWorkbench
+          path: CompressionWorkbench
+          fetch-depth: 1
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.x
+            10.0.x
+
+      - name: Rewrite missing API summaries
+        working-directory: PNGCrushCS
+        run: dotnet run --project tools/ApiDocSummaryFixer/ApiDocSummaryFixer.csproj -- .
+
+      - name: Verify rewrite is idempotent
+        working-directory: PNGCrushCS
+        run: dotnet run --project tools/ApiDocSummaryFixer/ApiDocSummaryFixer.csproj -- --check .
+
+      - name: Restore video package
+        working-directory: PNGCrushCS
+        run: dotnet restore Hawkynt.FileFormats.Video/Hawkynt.FileFormats.Video.csproj -p:EnableWindowsTargeting=true
+
+      - name: Build video package
+        working-directory: PNGCrushCS
+        run: dotnet build Hawkynt.FileFormats.Video/Hawkynt.FileFormats.Video.csproj -c Release --no-restore -p:EnableWindowsTargeting=true
+
+      - name: Restore UI package
+        working-directory: PNGCrushCS
+        run: dotnet restore Hawkynt.ImageTransformUI/Hawkynt.ImageTransformUI.csproj -p:EnableWindowsTargeting=true
+
+      - name: Build UI package
+        working-directory: PNGCrushCS
+        run: dotnet build Hawkynt.ImageTransformUI/Hawkynt.ImageTransformUI.csproj -c Release --no-restore -p:EnableWindowsTargeting=true
+
+      - name: Regenerate package API references
+        uses: Hawkynt/RepositoryTemplate/package-readme@v1
+        with:
+          mode: write
+          root: PNGCrushCS
+          configuration: Release
+          project: |
+            Hawkynt.FileFormats.Video/Hawkynt.FileFormats.Video.csproj
+            Hawkynt.ImageTransformUI/Hawkynt.ImageTransformUI.csproj
+          upload-artifact: 'false'
+
+      - name: Check generated diffs
+        working-directory: PNGCrushCS
+        shell: bash
+        run: git diff --check
+
+      - name: Commit rewritten documentation
+        working-directory: PNGCrushCS
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add Hawkynt.FileFormats.Video Hawkynt.ImageTransformUI FileFormat.Core.Generators
+          if git diff --cached --quiet; then
+            echo "No documentation changes produced."
+          else
+            git commit -m "Document complete public API surface"
+            git push
+          fi
+
+      - name: Require zero missing reference summaries
+        working-directory: PNGCrushCS
+        shell: pwsh
+        run: |
+          $referenceFiles = @(
+            'Hawkynt.FileFormats.Video/REFERENCE.md',
+            'Hawkynt.ImageTransformUI/REFERENCE.md'
+          )
+          $missing = @()
+          foreach ($file in $referenceFiles) {
+            $lineNumber = 0
+            foreach ($line in Get-Content $file) {
+              ++$lineNumber
+              if ($line -match '^\| .+ \| .+ \|  \|$') {
+                $missing += "${file}:${lineNumber}: $line"
+              }
+            }
+          }
+          if ($missing.Count -ne 0) {
+            $missing | ForEach-Object { Write-Host $_ }
+            throw "$($missing.Count) public/protected API members still have no summary."
+          }
+          Write-Host 'All generated API reference members have summaries.'
