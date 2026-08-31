@@ -1857,15 +1857,17 @@ Implements `IEquatable<ArtDirectorFile>`, `IImageFormatMetadata<ArtDirectorFile>
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `ArtDirectorFile` | `ArtDirectorFile()` |  |
+| `ColorsPerPalette` | `const int ColorsPerPalette` |  |
 | `DisplayedPaletteIndex` | `const int DisplayedPaletteIndex` |  |
 | `ExpectedFileSize` | `const int ExpectedFileSize` |  |
-| `HeaderSize` | `const int HeaderSize` |  |
+| `FixedHeight` | `const int FixedHeight` |  |
+| `FixedWidth` | `const int FixedWidth` |  |
 | `PaletteCycleSize` | `const int PaletteCycleSize` |  |
-| `PaletteOffset` | `const int PaletteOffset` |  |
-| `PaletteSize` | `const int PaletteSize` |  |
+| `PaletteCycleWords` | `const int PaletteCycleWords` |  |
 | `PlanarDataSize` | `const int PlanarDataSize` |  |
-| `ScreenFirstFileSize` | `const int ScreenFirstFileSize` |  |
+| `StoredPaletteCount` | `const int StoredPaletteCount` |  |
 | `Height` | `int Height { get; init; }` |  |
+| `PaletteCycle` | `short[] PaletteCycle { get; init; }` |  |
 | `Palette` | `short[] Palette { get; init; }` |  |
 | `PixelData` | `byte[] PixelData { get; init; }` |  |
 | `Resolution` | `short Resolution { get; init; }` |  |
