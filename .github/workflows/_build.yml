@@ -107,7 +107,9 @@ jobs:
         working-directory: PNGCrushCS
         run: |
           $v = "${{ inputs.version }}"
-          $pubDir = "Crush.Viewer/bin/Release/net10.0-windows/win-x64/publish"
+          # net10.0, not net10.0-windows: the viewer became a cross-platform browser and dropped
+          # the windows TFM. Crush.Image above is still windows-targeted, so only this one moved.
+          $pubDir = "Crush.Viewer/bin/Release/net10.0/win-x64/publish"
           Compress-Archive -Path "$pubDir/*" -DestinationPath "PNGCrushCS-Viewer-win-x64-$v.zip"
 
       - name: Upload CLI artifact
