@@ -1,5 +1,6 @@
 using System;
 using System.Reflection;
+using System.Security.Cryptography;
 using FileFormat.Core;
 using FileFormat.H264Video;
 
@@ -60,34 +61,59 @@ public sealed class H264CabacHighProfileDiagnosticTests {
 
           var frame = (H264FrameDecoder)frameField!.GetValue(decoder)!;
           var header = (H264SliceHeader)headerField!.GetValue(decoder)!;
-          var cabacTransformField = typeof(H264FrameDecoder).GetField(
-            "_cabacTransform8x8", BindingFlags.Instance | BindingFlags.NonPublic);
-          var cabacCbpField = typeof(H264FrameDecoder).GetField(
-            "_cabacCbpLuma", BindingFlags.Instance | BindingFlags.NonPublic);
+          var frameType = typeof(H264FrameDecoder);
+          var cabacTransformField = frameType.GetField("_cabacTransform8x8", BindingFlags.Instance | BindingFlags.NonPublic);
+          var cabacCbpField = frameType.GetField("_cabacCbpLuma", BindingFlags.Instance | BindingFlags.NonPublic);
           var cabacTransform = (bool[])cabacTransformField!.GetValue(frame)!;
           var cabacCbp = (byte[])cabacCbpField!.GetValue(frame)!;
 
-          const int mbAddr = 9; // (1,2), luma x=16..31 / y=32..47
+          var deblockingType = typeof(H264Deblocking);
+          var boundaryStrength = deblockingType.GetMethod("_BoundaryStrength", BindingFlags.Static | BindingFlags.NonPublic);
+          var thresholds = deblockingType.GetMethod("_Thresholds", BindingFlags.Static | BindingFlags.NonPublic);
+          Assert.Multiple(() => {
+            Assert.That(boundaryStrength, Is.Not.Null);
+            Assert.That(thresholds, Is.Not.Null);
+          });
+
           var flags = new char[16];
-          for (var address = 0; address < flags.Length; ++address)
+          var qps = new int[16];
+          for (var address = 0; address < flags.Length; ++address) {
             flags[address] = frame.Transform8x8Of(address) ? '8' : '4';
-
-          var report = $"slice={header.SliceType} mb9.kind={frame.KindOf(mbAddr)} mb9.qp={frame.QpOf(mbAddr)} "
-                       + $"mb9.cbpLuma={cabacCbp[mbAddr]} mb9.cabac8x8={cabacTransform[mbAddr]} "
-                       + $"mb9.effective8x8={frame.Transform8x8Of(mbAddr)} flags={new string(flags)}";
-
-          // Internal vertical edges x=20 and x=28. Report the two 4x4 blocks on each side for
-          // the rows where the final FFmpeg oracle differs from this decoder.
-          foreach (var (x, y) in new[] { (20, 33), (28, 33), (20, 39), (28, 39) }) {
-            var pBlockX = (x - 1) >> 2;
-            var qBlockX = x >> 2;
-            var blockY = y >> 2;
-            report += $"\nedge({x},{y}) "
-                      + $"p=({pBlockX},{blockY}) coeff={frame.BlockHasCoefficients(pBlockX, blockY)} "
-                      + $"mv={frame.BlockMotionPair(pBlockX, blockY)}; "
-                      + $"q=({qBlockX},{blockY}) coeff={frame.BlockHasCoefficients(qBlockX, blockY)} "
-                      + $"mv={frame.BlockMotionPair(qBlockX, blockY)}";
+            qps[address] = frame.QpOf(address);
           }
+
+          var picture = frame.Picture;
+          var raw = new byte[picture.Luma.Length + picture.Cb.Length + picture.Cr.Length];
+          picture.Luma.CopyTo(raw, 0);
+          picture.Cb.CopyTo(raw, picture.Luma.Length);
+          picture.Cr.CopyTo(raw, picture.Luma.Length + picture.Cb.Length);
+          var preDeblockHash = Convert.ToHexString(SHA256.HashData(raw));
+
+          const int mb5 = 5; // (1,1), above the affected MB
+          const int mb9 = 9; // (1,2), luma x=16..31 / y=32..47
+          var report = $"slice={header.SliceType} qps={string.Join(',', qps)} flags={new string(flags)}\n"
+                       + $"mb5.kind={frame.KindOf(mb5)} mb5.qp={frame.QpOf(mb5)} mb5.cbpLuma={cabacCbp[mb5]} "
+                       + $"mb5.cabac8x8={cabacTransform[mb5]} effective8x8={frame.Transform8x8Of(mb5)}\n"
+                       + $"mb9.kind={frame.KindOf(mb9)} mb9.qp={frame.QpOf(mb9)} mb9.cbpLuma={cabacCbp[mb9]} "
+                       + $"mb9.cabac8x8={cabacTransform[mb9]} effective8x8={frame.Transform8x8Of(mb9)}\n"
+                       + $"preDeblockSha256={preDeblockHash}";
+
+          foreach (var y in new[] { 32, 40 })
+            foreach (var x in new[] { 16, 20, 24, 28 }) {
+              var macroblockEdge = y == 32;
+              var pMb = (y - 1) / 16 * frame.MacroblockWidth + x / 16;
+              var qMb = y / 16 * frame.MacroblockWidth + x / 16;
+              var bs = (int)boundaryStrength!.Invoke(null, [frame, x, y - 1, x, y, macroblockEdge])!;
+              var t = ((int Alpha, int Beta, int IndexA))thresholds!.Invoke(null, [frame, qMb, pMb, false, 0])!;
+              var pBlockX = x >> 2;
+              var pBlockY = (y - 1) >> 2;
+              var qBlockY = y >> 2;
+              report += $"\nedge({x},{y}) bS={bs} alpha={t.Alpha} beta={t.Beta} indexA={t.IndexA} "
+                        + $"pMb={pMb}/qp{frame.QpOf(pMb)} qMb={qMb}/qp{frame.QpOf(qMb)} "
+                        + $"pCoeff={frame.BlockHasCoefficients(pBlockX, pBlockY)} qCoeff={frame.BlockHasCoefficients(pBlockX, qBlockY)} "
+                        + $"pMv={frame.BlockMotionPair(pBlockX, pBlockY)} qMv={frame.BlockMotionPair(pBlockX, qBlockY)} "
+                        + $"samples={_HorizontalSamples(picture.Luma, picture.LumaWidth, x, y)}";
+            }
 
           Assert.Fail(report);
           return;
@@ -96,4 +122,9 @@ public sealed class H264CabacHighProfileDiagnosticTests {
 
     Assert.Fail("The High-profile diagnostic stream did not contain the expected second coded picture.");
   }
+
+  private static string _HorizontalSamples(byte[] plane, int width, int x, int y)
+    => $"p3={plane[(y - 4) * width + x]},p2={plane[(y - 3) * width + x]},p1={plane[(y - 2) * width + x]},"
+       + $"p0={plane[(y - 1) * width + x]},q0={plane[y * width + x]},q1={plane[(y + 1) * width + x]},"
+       + $"q2={plane[(y + 2) * width + x]},q3={plane[(y + 3) * width + x]}";
 }
