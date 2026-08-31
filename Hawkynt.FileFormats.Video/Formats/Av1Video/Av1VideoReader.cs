@@ -9,12 +9,26 @@ namespace FileFormat.Av1Video;
 internal static class Av1VideoReader {
 
   private const int _OBU_TEMPORAL_DELIMITER = 2;
-  private const byte _CANONICAL_TEMPORAL_DELIMITER_HEADER = 0x12;
 
   private readonly record struct Obu(int Type, int Offset, int Length, int PayloadLength);
 
-  internal static bool LooksLikeByteStream(ReadOnlySpan<byte> data)
-    => data.Length >= 2 && data[0] == _CANONICAL_TEMPORAL_DELIMITER_HEADER && data[1] == 0;
+  internal static bool LooksLikeByteStream(ReadOnlySpan<byte> data) {
+    if (data.IsEmpty)
+      return false;
+
+    var at = 0;
+    var header = data[at++];
+    if ((header & 0x81) != 0 || ((header >> 3) & 0x0F) != _OBU_TEMPORAL_DELIMITER || (header & 0x02) == 0)
+      return false;
+
+    if ((header & 0x04) != 0) {
+      if (at >= data.Length || (data[at] & 0x07) != 0)
+        return false;
+      ++at;
+    }
+
+    return _TryReadLeb128(data, ref at, out var size) && size == 0;
+  }
 
   internal static Av1VideoContainer FromSpan(ReadOnlySpan<byte> data) => _Open(data.ToArray());
 
@@ -26,6 +40,7 @@ internal static class Av1VideoReader {
   internal static IEnumerable<CodedPacket> Split(ReadOnlyMemory<byte> data) {
     var at = 0;
     var temporalUnitStart = 0;
+    var sawContent = false;
     long ordinal = 0;
 
     while (at < data.Length) {
@@ -35,25 +50,36 @@ internal static class Av1VideoReader {
           throw new InvalidDataException($"AV1 temporal delimiter OBU at byte {at} has a {obu.PayloadLength}-byte payload; the delimiter payload must be empty.");
 
         if (at != temporalUnitStart) {
+          if (!sawContent)
+            throw new InvalidDataException($"AV1 temporal unit beginning at byte {temporalUnitStart} contains no content OBU before the next temporal delimiter at byte {at}.");
+
           yield return new(
             StreamIndex: 0,
             Data: data.Slice(temporalUnitStart, at - temporalUnitStart),
             PresentationTimestamp: null,
             DecodeTimestamp: ordinal++);
           temporalUnitStart = at;
+          sawContent = false;
         }
-      } else if (at == 0)
-        throw new InvalidDataException("An AV1 .obu stream must begin each temporal unit with a temporal delimiter OBU.");
+      } else {
+        if (at == 0)
+          throw new InvalidDataException("An AV1 .obu stream must begin each temporal unit with a temporal delimiter OBU.");
+        sawContent = true;
+      }
 
       at += obu.Length;
     }
 
-    if (temporalUnitStart < data.Length)
+    if (temporalUnitStart < data.Length) {
+      if (!sawContent)
+        throw new InvalidDataException($"AV1 temporal unit beginning at byte {temporalUnitStart} contains only its temporal delimiter OBU.");
+
       yield return new(
         StreamIndex: 0,
         Data: data[temporalUnitStart..],
         PresentationTimestamp: null,
         DecodeTimestamp: ordinal);
+    }
   }
 
   /// <summary>
@@ -67,6 +93,7 @@ internal static class Av1VideoReader {
     var at = 0;
     var first = true;
     var hasDelimiter = false;
+    var hasContent = false;
     while (at < data.Length) {
       var obu = _ReadObu(data, at);
       if (obu.Type == _OBU_TEMPORAL_DELIMITER) {
@@ -75,18 +102,22 @@ internal static class Av1VideoReader {
         if (obu.PayloadLength != 0)
           throw new InvalidDataException($"AV1 temporal delimiter OBU at byte {at} has a {obu.PayloadLength}-byte payload; the delimiter payload must be empty.");
         hasDelimiter = true;
-      }
+      } else
+        hasContent = true;
 
       first = false;
       at += obu.Length;
     }
+
+    if (!hasContent)
+      throw new InvalidDataException("An AV1 temporal-unit packet must contain at least one non-delimiter OBU.");
 
     return hasDelimiter;
   }
 
   private static Av1VideoContainer _Open(ReadOnlyMemory<byte> data) {
     if (!LooksLikeByteStream(data.Span))
-      throw new InvalidDataException("The stream does not begin with the canonical AV1 temporal delimiter OBU 12 00.");
+      throw new InvalidDataException("The stream does not begin with a valid AV1 temporal delimiter OBU in low-overhead framing.");
 
     return new() { Data = data };
   }
@@ -142,5 +173,31 @@ internal static class Av1VideoReader {
     }
 
     throw new InvalidDataException($"AV1 OBU at byte {obuOffset} has an obu_size LEB128 value longer than eight bytes.");
+  }
+
+  private static bool _TryReadLeb128(ReadOnlySpan<byte> data, ref int at, out uint result) {
+    ulong value = 0;
+    for (var i = 0; i < 8; ++i) {
+      if (at >= data.Length) {
+        result = 0;
+        return false;
+      }
+
+      var octet = data[at++];
+      value |= (ulong)(octet & 0x7F) << (i * 7);
+      if ((octet & 0x80) != 0)
+        continue;
+
+      if (value > uint.MaxValue) {
+        result = 0;
+        return false;
+      }
+
+      result = (uint)value;
+      return true;
+    }
+
+    result = 0;
+    return false;
   }
 }
