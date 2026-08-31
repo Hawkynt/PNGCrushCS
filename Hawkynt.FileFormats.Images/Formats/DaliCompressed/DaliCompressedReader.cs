@@ -11,8 +11,7 @@ public static class DaliCompressedReader {
     if (!file.Exists)
       throw new FileNotFoundException("Dali screen not found.", file.FullName);
 
-    // Only the extension says which resolution the screen is in.
-    return FromSpan(File.ReadAllBytes(file.FullName), ResolutionFromExtension(file.Extension));
+    return FromSpan(File.ReadAllBytes(file.FullName), DaliCompressedFile.ResolutionFromExtension(file.Extension));
   }
 
   public static DaliCompressedFile FromStream(Stream stream) {
@@ -20,32 +19,36 @@ public static class DaliCompressedReader {
     if (stream.CanSeek) {
       var data = new byte[stream.Length - stream.Position];
       stream.ReadExactly(data);
-      return FromBytes(data);
+      return FromSpan(data);
     }
 
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
+    return FromSpan(ms.ToArray());
   }
 
+  /// <summary>Reads bytes as the primary .LPK variant because resolution is not stored in the stream.</summary>
   public static DaliCompressedFile FromSpan(ReadOnlySpan<byte> data) => FromSpan(data, DaliResolution.Low);
 
   public static DaliCompressedFile FromSpan(ReadOnlySpan<byte> data, DaliResolution resolution) {
+    _ = DaliCompressedFile.Geometry(resolution);
     if (data.Length <= DaliCompressedFile.LengthsOffset)
       throw new InvalidDataException("Data too small for a compressed Dali screen.");
 
     var offset = DaliCompressedFile.LengthsOffset;
     var countLength = _ParseLength(data, ref offset);
     var valueLength = _ParseLength(data, ref offset);
-    if (countLength <= 0 || valueLength <= 0)
-      throw new InvalidDataException("Compressed Dali screen declares an empty stream.");
 
-    if (offset + countLength + valueLength > data.Length)
-      throw new InvalidDataException("Compressed Dali streams run past the end of the file.");
+    if (countLength is < 1 or > DaliCompressor.GroupCount)
+      throw new InvalidDataException($"Compressed Dali count table must contain 1..{DaliCompressor.GroupCount} bytes.");
+    if (valueLength != checked(countLength * DaliCompressor.GroupSize))
+      throw new InvalidDataException("Compressed Dali value table must contain exactly one four-byte value per count entry.");
 
-    var palette = new byte[DaliCompressedFile.PaletteSize];
-    data[..DaliCompressedFile.PaletteSize].CopyTo(palette);
+    var expectedLength = checked(offset + countLength + valueLength);
+    if (expectedLength != data.Length)
+      throw new InvalidDataException($"Compressed Dali declares {expectedLength} total bytes but the file contains {data.Length}.");
 
+    var palette = data[..DaliCompressedFile.PaletteSize].ToArray();
     var screen = DaliCompressor.Decompress(
       data.Slice(offset, countLength),
       data.Slice(offset + countLength, valueLength));
@@ -58,12 +61,17 @@ public static class DaliCompressedReader {
     return FromSpan(data);
   }
 
+  public static DaliCompressedFile FromBytes(byte[] data, DaliResolution resolution) {
+    ArgumentNullException.ThrowIfNull(data);
+    return FromSpan(data, resolution);
+  }
+
   /// <summary>Parses one ASCII decimal length terminated by CR LF, advancing past it.</summary>
   private static int _ParseLength(ReadOnlySpan<byte> data, ref int offset) {
     var value = 0;
     var digits = 0;
-    while (offset < data.Length && data[offset] >= (byte)'0' && data[offset] <= (byte)'9') {
-      value = value * 10 + (data[offset++] - '0');
+    while (offset < data.Length && data[offset] is >= (byte)'0' and <= (byte)'9') {
+      value = checked(value * 10 + (data[offset++] - '0'));
       if (++digits > 6)
         throw new InvalidDataException("Compressed Dali length field is implausibly long.");
     }
@@ -75,10 +83,7 @@ public static class DaliCompressedReader {
     return value;
   }
 
-  /// <summary>The resolution an extension names; the writer needs the same answer the reader gives.</summary>
-  internal static DaliResolution ResolutionFromExtension(string extension) => extension.ToLowerInvariant() switch {
-    ".mpk" => DaliResolution.Medium,
-    ".hpk" => DaliResolution.High,
-    _ => DaliResolution.Low,
-  };
+  /// <summary>Compatibility helper retained for callers that already use the reader's mapping.</summary>
+  internal static DaliResolution ResolutionFromExtension(string extension)
+    => DaliCompressedFile.ResolutionFromExtension(extension);
 }

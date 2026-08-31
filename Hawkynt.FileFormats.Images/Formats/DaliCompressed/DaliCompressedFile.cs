@@ -1,6 +1,7 @@
 using System;
-using System.IO;
+using System.Buffers.Binary;
 using System.Globalization;
+using System.IO;
 using System.Text;
 using FileFormat.Core;
 
@@ -9,34 +10,27 @@ namespace FileFormat.DaliCompressed;
 /// <summary>In-memory representation of a compressed Atari ST Dali screen.</summary>
 /// <remarks>
 /// A 32-byte palette, then two lengths written as ASCII decimal each followed by CR LF, then the
-/// run-count stream and the value stream back to back. Writing the lengths as text rather than
-/// binary is unusual but it is what the format does, and readers parse them that way.
+/// run-count stream and the four-byte-value stream back to back. The file extension is the only
+/// resolution indicator: .LPK, .MPK, and .HPK select low, medium, and high resolution respectively.
 /// </remarks>
 public readonly record struct DaliCompressedFile
   : IImageFormatReader<DaliCompressedFile>, IImageToRawImage<DaliCompressedFile>,
     IImageFromRawImage<DaliCompressedFile>, IImageFormatWriter<DaliCompressedFile> {
 
-  /// <summary>Size of the palette block.</summary>
+  /// <summary>Size of the stored Atari ST palette block.</summary>
   public const int PaletteSize = 32;
 
-  /// <summary>Offset of the first ASCII length.</summary>
+  /// <summary>Offset of the first ASCII length field.</summary>
   public const int LengthsOffset = PaletteSize;
 
   static string IImageFormatMetadata<DaliCompressedFile>.PrimaryExtension => ".lpk";
   static string[] IImageFormatMetadata<DaliCompressedFile>.FileExtensions => [".lpk", ".mpk", ".hpk"];
   static DaliCompressedFile IImageFormatReader<DaliCompressedFile>.FromSpan(ReadOnlySpan<byte> data)
     => DaliCompressedReader.FromSpan(data);
-
-  /// <summary>
-  /// Reads a named file, the extension being what its reader needs.
-  /// </summary>
-  /// <remarks>
-  /// The reader takes the extension into account and only the by-bytes entry was wired up here,
-  /// so the registry could never reach it: whatever the extension would have settled was decided
-  /// by a default instead. Ten formats carried this, each one otherwise found only when a sample
-  /// happened to expose it.
-  /// </remarks>
-  static DaliCompressedFile IImageFormatReader<DaliCompressedFile>.FromFile(FileInfo file) => DaliCompressedReader.FromFile(file);
+  static DaliCompressedFile IImageFormatReader<DaliCompressedFile>.FromFile(FileInfo file)
+    => DaliCompressedReader.FromFile(file);
+  static DaliCompressedFile IImageFromRawImage<DaliCompressedFile>.FromRawImage(RawImage image, string extension)
+    => FromRawImage(image, extension);
   static byte[] IImageFormatWriter<DaliCompressedFile>.ToBytes(DaliCompressedFile file)
     => DaliCompressedWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<DaliCompressedFile>.VideoModes => [
@@ -48,85 +42,112 @@ public readonly record struct DaliCompressedFile
   /// <summary>Which ST resolution the screen holds.</summary>
   public DaliResolution Resolution { get; init; }
 
-  /// <summary>The ST palette as big-endian 16-bit entries.</summary>
+  /// <summary>All sixteen Atari ST palette words as the exact 32 stored big-endian bytes.</summary>
   public byte[] Palette { get; init; }
 
-  /// <summary>Uncompressed screen bytes.</summary>
+  /// <summary>Exactly 32,000 uncompressed Atari ST screen bytes.</summary>
   public byte[] ScreenData { get; init; }
 
-  /// <summary>Width, colours and bitplane count for a resolution.</summary>
-  private static (int Width, int Height, int Planes) _Geometry(DaliResolution resolution) => resolution switch {
-    DaliResolution.Low => (320, 200, 4),
-    DaliResolution.Medium => (640, 200, 2),
-    DaliResolution.High => (640, 400, 1),
-    _ => throw new ArgumentOutOfRangeException(nameof(resolution), resolution, "Unknown Dali resolution.")
-  };
-
   public static RawImage ToRawImage(DaliCompressedFile file) {
-    var (width, height, planes) = _Geometry(file.Resolution);
+    Validate(file, nameof(file));
+    var (width, height, planes) = Geometry(file.Resolution);
     var colors = 1 << planes;
-
-    var palette = new byte[colors * 3];
-    for (var i = 0; i < colors; ++i) {
-      var entry = (file.Palette[i * 2] << 8) | file.Palette[i * 2 + 1];
-      // ST palette entries are three bits per channel, held in the low bits of each nibble.
-      palette[i * 3] = ChannelScaling.Expand3(((entry >> 8) & 7));
-      palette[i * 3 + 1] = ChannelScaling.Expand3(((entry >> 4) & 7));
-      palette[i * 3 + 2] = ChannelScaling.Expand3((entry & 7));
-    }
-
-    var chunky = PlanarConverter.AtariStToChunky(file.ScreenData, width, height, planes);
 
     return new() {
       Width = width,
       Height = height,
       Format = PixelFormat.Indexed8,
-      PixelData = chunky,
-      Palette = palette,
+      PixelData = PlanarConverter.AtariStToChunky(file.ScreenData, width, height, planes),
+      Palette = planes == 1
+        ? AtariStGraphics.MonochromePalette()
+        : AtariStGraphics.ReadPalette(file.Palette, 0, colors, false),
       PaletteCount = colors,
     };
   }
 
-  public static DaliCompressedFile FromRawImage(RawImage image) => FromRawImage(image, ".lpk");
+  /// <summary>Encodes the primary .LPK low-resolution variant.</summary>
+  public static DaliCompressedFile FromRawImage(RawImage image) => FromRawImage(image, DaliResolution.Low);
 
-  /// <summary>Encodes at the resolution the extension names.</summary>
-  /// <remarks>
-  /// Low is the only one that carries a colour picture and was written whatever the file was called,
-  /// so an <c>.hpk</c> held a 320 by 200 screen in four planes that every reader takes as 640 by 400
-  /// in one.
-  /// </remarks>
-  public static DaliCompressedFile FromRawImage(RawImage image, string extension) {
+  /// <summary>Encodes at the resolution selected by .LPK, .MPK, or .HPK.</summary>
+  public static DaliCompressedFile FromRawImage(RawImage image, string extension)
+    => FromRawImage(image, ResolutionFromExtension(extension));
+
+  /// <summary>Encodes a specific Dali compressed resolution without resizing or clipping.</summary>
+  public static DaliCompressedFile FromRawImage(RawImage image, DaliResolution resolution) {
     ArgumentNullException.ThrowIfNull(image);
-
-    var resolution = DaliCompressedReader.ResolutionFromExtension(extension ?? string.Empty);
-    var (width, height, planes) = _Geometry(resolution);
+    var (width, height, planes) = Geometry(resolution);
     if (image.Width != width || image.Height != height)
-      throw new ArgumentException($"Expected {width}x{height} but got {image.Width}x{image.Height}.", nameof(image));
-
-    var indexed = PixelConverter.Convert(image, PixelFormat.Indexed4);
-    var rgb = indexed.Palette ?? [];
+      throw new ArgumentException($"{resolution} compressed Dali images must be exactly {width}x{height} pixels.", nameof(image));
+    if (!image.HasEnoughPixelData)
+      throw new ArgumentException("The source image does not contain enough pixel data for its dimensions.", nameof(image));
 
     var palette = new byte[PaletteSize];
-    for (var i = 0; i < 16 && i * 3 + 2 < rgb.Length; ++i) {
-      var entry = ((rgb[i * 3] * 7 / 255) << 8) | ((rgb[i * 3 + 1] * 7 / 255) << 4) | (rgb[i * 3 + 2] * 7 / 255);
-      palette[i * 2] = (byte)(entry >> 8);
-      palette[i * 2 + 1] = (byte)entry;
-    }
+    byte[] indices;
 
-    var chunky = new byte[width * height];
-    for (var i = 0; i < chunky.Length; ++i) {
-      var b = indexed.PixelData[i >> 1];
-      chunky[i] = (byte)((i & 1) == 0 ? (b >> 4) & 0x0F : b & 0x0F);
+    if (resolution == DaliResolution.High) {
+      var rgb = image.EnsureAnyFormat(PixelFormat.Rgb24);
+      indices = new byte[width * height];
+      for (var i = 0; i < indices.Length; ++i) {
+        var at = i * 3;
+        var luma = (299 * rgb.PixelData[at] + 587 * rgb.PixelData[at + 1] + 114 * rgb.PixelData[at + 2] + 500) / 1000;
+        indices[i] = luma < 128 ? (byte)1 : (byte)0;
+      }
+    } else {
+      var colors = 1 << planes;
+      var indexed = image.EnsureIndexedAtMost(colors);
+      if (indexed.Palette is null || indexed.PaletteCount is < 1 || indexed.PaletteCount > colors
+          || indexed.Palette.Length < indexed.PaletteCount * 3)
+        throw new ArgumentException($"{resolution} compressed Dali images require between 1 and {colors} valid palette entries.", nameof(image));
+      if (indexed.PixelData.Length != width * height)
+        throw new ArgumentException("Indexed compressed Dali input must contain exactly one palette index per pixel.", nameof(image));
+
+      foreach (var index in indexed.PixelData)
+        if (index >= indexed.PaletteCount)
+          throw new ArgumentException("A compressed Dali pixel index exceeds the selected palette.", nameof(image));
+
+      indices = indexed.PixelData;
+      var stored = PlanarConverter.RgbToStPalette(indexed.Palette, indexed.PaletteCount);
+      for (var i = 0; i < Math.Min(stored.Length, 16); ++i)
+        BinaryPrimitives.WriteInt16BigEndian(palette.AsSpan(i * 2), stored[i]);
     }
 
     return new() {
       Resolution = resolution,
       Palette = palette,
-      ScreenData = PlanarConverter.ChunkyToAtariSt(chunky, width, height, planes),
+      ScreenData = PlanarConverter.ChunkyToAtariSt(indices, width, height, planes),
     };
   }
 
   /// <summary>Formats a length the way the header stores it: ASCII decimal, then CR LF.</summary>
-  internal static byte[] FormatLength(int value)
-    => Encoding.ASCII.GetBytes(value.ToString(CultureInfo.InvariantCulture) + "\r\n");
+  internal static byte[] FormatLength(int value) {
+    if (value <= 0)
+      throw new ArgumentOutOfRangeException(nameof(value), value, "Compressed Dali stream lengths must be positive.");
+
+    return Encoding.ASCII.GetBytes(value.ToString(CultureInfo.InvariantCulture) + "\r\n");
+  }
+
+  internal static DaliResolution ResolutionFromExtension(string extension) {
+    ArgumentException.ThrowIfNullOrWhiteSpace(extension);
+    return extension.ToLowerInvariant() switch {
+      ".lpk" => DaliResolution.Low,
+      ".mpk" => DaliResolution.Medium,
+      ".hpk" => DaliResolution.High,
+      _ => throw new ArgumentException("Compressed Dali extension must be .lpk, .mpk, or .hpk.", nameof(extension)),
+    };
+  }
+
+  internal static (int Width, int Height, int Planes) Geometry(DaliResolution resolution) => resolution switch {
+    DaliResolution.Low => (320, 200, 4),
+    DaliResolution.Medium => (640, 200, 2),
+    DaliResolution.High => (640, 400, 1),
+    _ => throw new ArgumentOutOfRangeException(nameof(resolution), resolution, "Unknown compressed Dali resolution."),
+  };
+
+  internal static void Validate(DaliCompressedFile file, string parameterName) {
+    _ = Geometry(file.Resolution);
+    if (file.Palette is null || file.Palette.Length != PaletteSize)
+      throw new ArgumentException($"Compressed Dali palette must contain exactly {PaletteSize} bytes.", parameterName);
+    if (file.ScreenData is null || file.ScreenData.Length != DaliCompressor.ScreenSize)
+      throw new ArgumentException($"Compressed Dali screen must contain exactly {DaliCompressor.ScreenSize} bytes.", parameterName);
+  }
 }

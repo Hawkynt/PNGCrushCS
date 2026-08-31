@@ -10934,6 +10934,7 @@ Implements `IEquatable<DaliCompressedFile>`, `IImageFormatMetadata<DaliCompresse
 | `Resolution` | `DaliResolution Resolution { get; init; }` |  |
 | `ScreenData` | `byte[] ScreenData { get; init; }` |  |
 | `FromRawImage` | `static DaliCompressedFile FromRawImage(RawImage image)` |  |
+| `FromRawImage` | `static DaliCompressedFile FromRawImage(RawImage image, DaliResolution resolution)` |  |
 | `FromRawImage` | `static DaliCompressedFile FromRawImage(RawImage image, string extension)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(DaliCompressedFile file)` |  |
 
@@ -10942,6 +10943,7 @@ Implements `IEquatable<DaliCompressedFile>`, `IImageFormatMetadata<DaliCompresse
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `FromBytes` | `static DaliCompressedFile FromBytes(byte[] data)` |  |
+| `FromBytes` | `static DaliCompressedFile FromBytes(byte[] data, DaliResolution resolution)` |  |
 | `FromFile` | `static DaliCompressedFile FromFile(FileInfo file)` |  |
 | `FromSpan` | `static DaliCompressedFile FromSpan(ReadOnlySpan<byte> data)` |  |
 | `FromSpan` | `static DaliCompressedFile FromSpan(ReadOnlySpan<byte> data, DaliResolution resolution)` |  |
