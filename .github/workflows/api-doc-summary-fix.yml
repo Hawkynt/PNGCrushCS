@@ -33,6 +33,47 @@ jobs:
             8.x
             10.0.x
 
+      - name: Expand source-only audit scope
+        working-directory: PNGCrushCS
+        shell: pwsh
+        run: |
+          $fixerPath = 'tools/ApiDocSummaryFixer/Program.cs'
+          $fixer = Get-Content $fixerPath -Raw
+          $videoRoot = '  Path.Combine(repositoryRoot, "Hawkynt.FileFormats.Video"),'
+          $imageRoot = '  Path.Combine(repositoryRoot, "Hawkynt.FileFormats.Images"),'
+          if (-not $fixer.Contains($imageRoot)) {
+            $fixer = $fixer.Replace($videoRoot, $imageRoot + "`n" + $videoRoot)
+            Set-Content $fixerPath $fixer -NoNewline -Encoding utf8
+          }
+
+          $imageGeneratorPath = 'FileFormat.Registry.Generator/ImageFormatGenerator.cs'
+          $imageGenerator = Get-Content $imageGeneratorPath -Raw
+          $imageUnknown = '    sb.AppendLine("  Unknown,");'
+          $imageUnknownDocs = '    sb.AppendLine("  /// <summary>Represents an unknown or unsupported image format.</summary>");' + "`n" + $imageUnknown
+          if (-not $imageGenerator.Contains('Represents an unknown or unsupported image format.')) {
+            $imageGenerator = $imageGenerator.Replace($imageUnknown, $imageUnknownDocs)
+          }
+          $imageLoop = "    foreach (var format in formats)`n      sb.Append(\"  \").Append(format.FormatId).AppendLine(\",\");"
+          $imageLoopDocs = "    foreach (var format in formats) {`n      sb.Append(\"  /// <summary>Represents the \").Append(format.FormatId).AppendLine(\" image format.</summary>\");`n      sb.Append(\"  \").Append(format.FormatId).AppendLine(\",\");`n    }"
+          if (-not $imageGenerator.Contains('AppendLine(" image format.</summary>")')) {
+            $imageGenerator = $imageGenerator.Replace($imageLoop, $imageLoopDocs)
+          }
+          Set-Content $imageGeneratorPath $imageGenerator -NoNewline -Encoding utf8
+
+          $videoGeneratorPath = 'FileFormat.Registry.Generator/VideoFormatGenerator.cs'
+          $videoGenerator = Get-Content $videoGeneratorPath -Raw
+          $videoUnknown = '    sb.AppendLine("  Unknown,");'
+          $videoUnknownDocs = '    sb.AppendLine("  /// <summary>Represents an unknown or unsupported video container format.</summary>");' + "`n" + $videoUnknown
+          if (-not $videoGenerator.Contains('Represents an unknown or unsupported video container format.')) {
+            $videoGenerator = $videoGenerator.Replace($videoUnknown, $videoUnknownDocs)
+          }
+          $videoLoop = "    foreach (var container in discovery.Containers)`n      sb.Append(\"  \").Append(container.FormatId).AppendLine(\",\");"
+          $videoLoopDocs = "    foreach (var container in discovery.Containers) {`n      sb.Append(\"  /// <summary>Represents the \").Append(container.FormatId).AppendLine(\" video container format.</summary>\");`n      sb.Append(\"  \").Append(container.FormatId).AppendLine(\",\");`n    }"
+          if (-not $videoGenerator.Contains('AppendLine(" video container format.</summary>")')) {
+            $videoGenerator = $videoGenerator.Replace($videoLoop, $videoLoopDocs)
+          }
+          Set-Content $videoGeneratorPath $videoGenerator -NoNewline -Encoding utf8
+
       - name: Rewrite missing API summaries
         working-directory: PNGCrushCS
         run: dotnet run --project tools/ApiDocSummaryFixer/ApiDocSummaryFixer.csproj -- .
@@ -40,6 +81,14 @@ jobs:
       - name: Verify rewrite is idempotent
         working-directory: PNGCrushCS
         run: dotnet run --project tools/ApiDocSummaryFixer/ApiDocSummaryFixer.csproj -- --check .
+
+      - name: Restore image package
+        working-directory: PNGCrushCS
+        run: dotnet restore Hawkynt.FileFormats.Images/Hawkynt.FileFormats.Images.csproj -p:EnableWindowsTargeting=true
+
+      - name: Build image package
+        working-directory: PNGCrushCS
+        run: dotnet build Hawkynt.FileFormats.Images/Hawkynt.FileFormats.Images.csproj -c Release --no-restore -p:EnableWindowsTargeting=true
 
       - name: Restore video package
         working-directory: PNGCrushCS
@@ -57,33 +106,35 @@ jobs:
         working-directory: PNGCrushCS
         run: dotnet build Hawkynt.ImageTransformUI/Hawkynt.ImageTransformUI.csproj -c Release --no-restore -p:EnableWindowsTargeting=true
 
-      - name: Regenerate package API references
+      - name: Regenerate package API references for validation
         uses: Hawkynt/RepositoryTemplate/package-readme@v1
         with:
           mode: write
           root: PNGCrushCS
           configuration: Release
           project: |
+            PNGCrushCS/Hawkynt.FileFormats.Images/Hawkynt.FileFormats.Images.csproj
             PNGCrushCS/Hawkynt.FileFormats.Video/Hawkynt.FileFormats.Video.csproj
             PNGCrushCS/Hawkynt.ImageTransformUI/Hawkynt.ImageTransformUI.csproj
           upload-artifact: 'false'
 
-      - name: Check generated diffs
+      - name: Check source diffs
         working-directory: PNGCrushCS
         shell: bash
         run: git diff --check
 
-      - name: Commit rewritten documentation
+      - name: Commit C# documentation changes only
         working-directory: PNGCrushCS
         shell: bash
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add Hawkynt.FileFormats.Video Hawkynt.ImageTransformUI FileFormat.Core.Generators
+          git add -- '*.cs'
+          git reset -- tools/ApiDocSummaryFixer/Program.cs
           if git diff --cached --quiet; then
-            echo "No documentation changes produced."
+            echo "No C# documentation changes produced."
           else
-            git commit -m "Document complete public API surface"
+            git commit -m "Document complete image and video APIs"
             git push
           fi
 
@@ -92,6 +143,7 @@ jobs:
         shell: pwsh
         run: |
           $referenceFiles = @(
+            'Hawkynt.FileFormats.Images/REFERENCE.md',
             'Hawkynt.FileFormats.Video/REFERENCE.md',
             'Hawkynt.ImageTransformUI/REFERENCE.md'
           )
