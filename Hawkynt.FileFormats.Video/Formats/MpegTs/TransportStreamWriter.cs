@@ -84,7 +84,7 @@ public sealed class TransportStreamWriter : IVideoContainerWriter<TransportStrea
     ContainerWriterTools.WriteUInt16BigEndian(body, 0xF000);
 
     for (var i = 0; i < this._streams.Count; ++i) {
-      var descriptors = this._streams[i].CodecPrivateData.Span;
+      var descriptors = this._streams[i].ContainerPrivateData.Span;
       if (descriptors.Length > 0x0FFF)
         throw new NotSupportedException($"PMT descriptor loop for stream {i} exceeds 4095 bytes.");
       body.WriteByte(this._streamTypes[i]);
