@@ -4,102 +4,112 @@ using System.IO;
 
 namespace FileFormat.Tiny;
 
-/// <summary>Reads Tiny (compressed DEGAS) files from bytes, streams, or file paths.</summary>
+/// <summary>Reads Tiny Stuff compressed Atari ST pictures from bytes, streams, or file paths.</summary>
 public static class TinyReader {
 
-  /// <summary>Bytes the palette takes.</summary>
-  private const int _PALETTE_SIZE = 16 * 2;
+  private const int _PaletteSize = 16 * 2;
+  private const int _AnimationOffset = 3;
+  private const int _AnimationSize = 4;
+  private const int _BaseHeaderSize = 1 + _PaletteSize + 4;
 
-  /// <summary>What is added to the resolution byte to say the picture cycles its colours.</summary>
-  private const int _ANIMATION_OFFSET = 3;
-
-  /// <summary>Bytes of animation settings that then sit before the palette.</summary>
-  private const int _ANIMATION_SIZE = 4;
-
-  /// <summary>Resolution byte, palette, and the two block lengths.</summary>
-  private const int _HEADER_SIZE = 1 + _PALETTE_SIZE + 4;
-
+  /// <summary>Reads a Tiny Stuff picture from a file.</summary>
   public static TinyFile FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
-      throw new FileNotFoundException("Tiny file not found.", file.FullName);
+      throw new FileNotFoundException("Tiny Stuff file not found.", file.FullName);
 
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
+  /// <summary>Reads a Tiny Stuff picture from the current stream position through end-of-stream.</summary>
   public static TinyFile FromStream(Stream stream) {
     ArgumentNullException.ThrowIfNull(stream);
     if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
+      var length = checked((int)(stream.Length - stream.Position));
+      var data = new byte[length];
       stream.ReadExactly(data);
-      return FromBytes(data);
+      return FromSpan(data);
     }
+
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
+    return FromSpan(ms.ToArray());
   }
 
+  /// <summary>Parses one complete Tiny Stuff file and rejects truncation or trailing bytes.</summary>
   public static TinyFile FromSpan(ReadOnlySpan<byte> data) {
-    if (data.Length < _HEADER_SIZE)
-      throw new InvalidDataException("Data too small for a valid Tiny file.");
+    if (data.Length < _BaseHeaderSize + TinyFile.MinimumControlBytes + 2)
+      throw new InvalidDataException("Data is too small for the smallest valid Tiny Stuff picture.");
 
-    // Three of the six resolution bytes say the picture cycles its colours, and put four bytes of
-    // animation settings between the byte and the palette. The picture itself is the same either way.
-    var resolutionByte = data[0];
-    var animated = resolutionByte >= _ANIMATION_OFFSET;
-    if (animated)
-      resolutionByte -= _ANIMATION_OFFSET;
+    var rawResolution = data[0];
+    if (rawResolution > 5)
+      throw new InvalidDataException($"Invalid Tiny Stuff resolution byte {rawResolution}; expected 0..5.");
 
-    if (resolutionByte > 2)
-      throw new InvalidDataException($"Invalid Tiny resolution value: {data[0]}.");
+    var animated = rawResolution >= _AnimationOffset;
+    var resolution = (TinyResolution)(animated ? rawResolution - _AnimationOffset : rawResolution);
+    var mode = TinyFile.GetMode(resolution);
+    var at = 1;
 
-    var resolution = (TinyResolution)resolutionByte;
-    var (width, height) = _GetFormatInfo(resolution);
+    byte animationLimits = 0;
+    sbyte animationSpeedDirection = 0;
+    ushort animationDuration = 0;
+    if (animated) {
+      if (data.Length < at + _AnimationSize)
+        throw new InvalidDataException("Tiny Stuff colour-rotation extension is truncated.");
 
-    var at = 1 + (animated ? _ANIMATION_SIZE : 0);
-    if (data.Length < at + _PALETTE_SIZE + 4)
-      throw new InvalidDataException("A Tiny file states a palette and two block lengths it does not carry.");
+      animationLimits = data[at++];
+      animationSpeedDirection = unchecked((sbyte)data[at++]);
+      animationDuration = BinaryPrimitives.ReadUInt16BigEndian(data[at..]);
+      at += 2;
+    }
+
+    if (data.Length < at + _PaletteSize + 4)
+      throw new InvalidDataException("Tiny Stuff header is truncated before its palette or stream lengths.");
 
     var palette = new short[16];
-    for (var i = 0; i < 16; ++i)
+    for (var i = 0; i < palette.Length; ++i)
       palette[i] = BinaryPrimitives.ReadInt16BigEndian(data[(at + i * 2)..]);
+    at += _PaletteSize;
 
-    at += _PALETTE_SIZE;
-
-    // The header states the two block lengths: control bytes first, then how many words of data.
     var controlCount = BinaryPrimitives.ReadUInt16BigEndian(data[at..]);
     var dataWords = BinaryPrimitives.ReadUInt16BigEndian(data[(at + 2)..]);
     at += 4;
 
-    if (controlCount == 0 || data.Length < at + controlCount)
-      throw new InvalidDataException($"A Tiny file states {controlCount} control bytes; the file holds {data.Length - at}.");
+    if (controlCount is < TinyFile.MinimumControlBytes or > TinyFile.MaximumControlBytes)
+      throw new InvalidDataException($"Tiny Stuff control block length {controlCount} is outside {TinyFile.MinimumControlBytes}..{TinyFile.MaximumControlBytes}.");
+    if (dataWords is < 1 or > TinyFile.ScreenWordCount)
+      throw new InvalidDataException($"Tiny Stuff data-word count {dataWords} is outside 1..{TinyFile.ScreenWordCount}.");
+
+    var expectedLength = checked(at + controlCount + dataWords * 2);
+    if (data.Length != expectedLength)
+      throw new InvalidDataException($"Tiny Stuff file length is {data.Length} bytes but its header requires exactly {expectedLength}.");
 
     var control = data.Slice(at, controlCount);
-    var available = Math.Min(dataWords * 2, data.Length - at - controlCount);
-    if (available <= 0)
-      throw new InvalidDataException("A Tiny file states no data words.");
-
-    var words = data.Slice(at + controlCount, available);
-    var pixelData = TinyCompressor.Decompress(control, words);
-
-    return new TinyFile {
-      Width = width,
-      Height = height,
+    var words = data.Slice(at + controlCount, dataWords * 2);
+    var file = new TinyFile {
+      Width = mode.Width,
+      Height = mode.Height,
       Resolution = resolution,
+      HasColorAnimation = animated,
+      AnimationLimits = animationLimits,
+      AnimationSpeedDirection = animationSpeedDirection,
+      AnimationDuration = animationDuration,
       Palette = palette,
-      PixelData = pixelData
+      PixelData = TinyCompressor.Decompress(control, words),
     };
+
+    try {
+      TinyFile.Validate(file, nameof(data));
+    } catch (ArgumentException exception) {
+      throw new InvalidDataException(exception.Message, exception);
+    }
+
+    return file;
   }
 
+  /// <summary>Reads a Tiny Stuff picture from a byte array.</summary>
   public static TinyFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     return FromSpan(data);
   }
-
-  private static (int Width, int Height) _GetFormatInfo(TinyResolution resolution) => resolution switch {
-    TinyResolution.Low => (320, 200),
-    TinyResolution.Medium => (640, 200),
-    TinyResolution.High => (640, 400),
-    _ => throw new InvalidDataException($"Unknown Tiny resolution: {resolution}.")
-  };
 }
