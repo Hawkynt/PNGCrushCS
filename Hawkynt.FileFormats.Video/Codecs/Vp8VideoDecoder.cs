@@ -32,6 +32,8 @@ namespace FileFormat.Codecs;
 /// convention rather than part of the decode.
 /// </remarks>
 public sealed class Vp8VideoDecoder : IVideoCodecDecoder<Vp8VideoDecoder> {
+  /// <summary>Initializes a new instance of this type.</summary>
+  public Vp8VideoDecoder() { }
 
   /// <summary>What Matroska and WebM call this codec, which is a string because Matroska has no code field.</summary>
   private const string _MATROSKA_CODEC_ID = "V_VP8";
@@ -44,8 +46,10 @@ public sealed class Vp8VideoDecoder : IVideoCodecDecoder<Vp8VideoDecoder> {
 
   private readonly Vp8Decoder _decoder = new();
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "VP8 (RFC 6386)";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 

@@ -42,6 +42,7 @@ public sealed class RawVideoDecoder : IVideoCodecDecoder<RawVideoDecoder> {
     this._expectedPacketLength = expectedPacketLength;
   }
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "Uncompressed (BI_RGB)";
 
   /// <summary>What Matroska calls a track that describes itself with a <c>BITMAPINFOHEADER</c>.</summary>
@@ -72,6 +73,7 @@ public sealed class RawVideoDecoder : IVideoCodecDecoder<RawVideoDecoder> {
            && (stream.CodecId == null || string.Equals(stream.CodecId, _VFW_CODEC_ID, StringComparison.OrdinalIgnoreCase));
   }
 
+  /// <summary>Creates a decoder for the specified media stream.</summary>
   public static RawVideoDecoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 

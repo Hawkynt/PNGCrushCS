@@ -96,8 +96,10 @@ public sealed class MicrosoftVideo1Decoder : IVideoCodecDecoder<MicrosoftVideo1D
     this._canvas = new ushort[width * height];
   }
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "Microsoft Video 1";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 

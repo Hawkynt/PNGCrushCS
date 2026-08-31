@@ -9,11 +9,16 @@ namespace FileFormat.Yuv4Mpeg;
 /// <summary>A YUV4MPEG2 stream containing uncompressed planar YUV frames.</summary>
 [FormatMimeType("video/x-yuv4mpeg")]
 public sealed class Yuv4MpegContainer : IVideoContainerReader<Yuv4MpegContainer> {
+  /// <summary>Initializes a new instance of this type.</summary>
+  public Yuv4MpegContainer() { }
 
   private static readonly byte[] _SIGNATURE = "YUV4MPEG2"u8.ToArray();
 
+  /// <summary>Gets the file.</summary>
   public required ReadOnlyMemory<byte> File { get; init; }
+  /// <summary>Gets the stream.</summary>
   public required MediaStreamInfo Stream { get; init; }
+  /// <summary>Gets the chroma.</summary>
   public required string Chroma { get; init; }
   // Not `required`: a required member may not be less visible than its type, and these two are
   // parser bookkeeping rather than part of the public shape. FromBytes is the only thing that
@@ -21,14 +26,19 @@ public sealed class Yuv4MpegContainer : IVideoContainerReader<Yuv4MpegContainer>
   internal int FirstFrameOffset { get; init; }
   internal int FrameSize { get; init; }
 
+  /// <summary>Gets the primary file extension for this format.</summary>
   public static string PrimaryExtension => ".y4m";
+  /// <summary>Gets the file extensions supported by this format.</summary>
   public static string[] FileExtensions => [".y4m"];
 
+  /// <summary>Determines whether the supplied header matches this file format.</summary>
   public static bool? MatchesSignature(ReadOnlySpan<byte> header)
     => header.Length >= _SIGNATURE.Length && header[.._SIGNATURE.Length].SequenceEqual(_SIGNATURE) ? true : null;
 
+  /// <summary>Reads an instance from the specified byte span.</summary>
   public static Yuv4MpegContainer FromSpan(ReadOnlySpan<byte> data) => FromBytes(data.ToArray());
 
+  /// <summary>Reads an instance from the specified byte array.</summary>
   public static Yuv4MpegContainer FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (data.Length < _SIGNATURE.Length + 1 || !data.AsSpan(0, _SIGNATURE.Length).SequenceEqual(_SIGNATURE))
@@ -99,11 +109,13 @@ public sealed class Yuv4MpegContainer : IVideoContainerReader<Yuv4MpegContainer>
     };
   }
 
+  /// <summary>Gets the media streams declared by the specified container.</summary>
   public static IReadOnlyList<MediaStreamInfo> Streams(Yuv4MpegContainer container) {
     ArgumentNullException.ThrowIfNull(container);
     return [container.Stream];
   }
 
+  /// <summary>Enumerates coded packets from the specified container.</summary>
   public static IEnumerable<CodedPacket> ReadPackets(Yuv4MpegContainer container) {
     ArgumentNullException.ThrowIfNull(container);
 

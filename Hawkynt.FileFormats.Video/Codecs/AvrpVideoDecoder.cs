@@ -63,14 +63,17 @@ public sealed class AvrpVideoDecoder : IVideoCodecDecoder<AvrpVideoDecoder> {
     this._stride = this._paddedWidth * 4;
   }
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "Avid 1:1 10-bit RGB Packer (avrp)";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
     return stream.Kind == MediaStreamKind.Video && stream.Codec.EqualsIgnoringCase(_Tag);
   }
 
+  /// <summary>Creates a decoder for the specified media stream.</summary>
   public static AvrpVideoDecoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
@@ -82,6 +85,7 @@ public sealed class AvrpVideoDecoder : IVideoCodecDecoder<AvrpVideoDecoder> {
     return new(stream.Width, stream.Height, stream.Index);
   }
 
+  /// <summary>Attempts to decode the specified coded packet into a raw image frame.</summary>
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
     var data = packet.Data.Span;
     var expected = (long)this._stride * this._height;

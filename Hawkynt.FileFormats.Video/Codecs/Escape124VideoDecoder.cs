@@ -54,13 +54,16 @@ public sealed class Escape124VideoDecoder : IVideoCodecDecoder<Escape124VideoDec
     this._superblockCount = this._superblocksPerRow * (height / 8);
   }
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "Escape 124";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
     return stream.Kind == MediaStreamKind.Video && stream.Codec.Value == _CODEC_ID;
   }
 
+  /// <summary>Creates a decoder for the specified media stream.</summary>
   public static Escape124VideoDecoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
@@ -80,6 +83,7 @@ public sealed class Escape124VideoDecoder : IVideoCodecDecoder<Escape124VideoDec
     return new(stream.Width, stream.Height);
   }
 
+  /// <summary>Attempts to decode the specified coded packet into a raw image frame.</summary>
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
     var words = this._Decode(packet.Data.Span);
     frame = new() {

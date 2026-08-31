@@ -74,8 +74,10 @@ public sealed class DnxHdVideoDecoder : IVideoCodecDecoder<DnxHdVideoDecoder> {
     this._height = height;
   }
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "Avid DNxHD / DNxHR (SMPTE VC-3)";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 

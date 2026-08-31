@@ -66,8 +66,10 @@ public sealed class Vp3VideoDecoder : IVideoCodecDecoder<Vp3VideoDecoder> {
 
   private readonly Vp3Decoder _decoder;
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "On2 VP3";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 

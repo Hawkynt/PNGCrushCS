@@ -106,8 +106,10 @@ public sealed class AppleGraphicsDecoder : IVideoCodecDecoder<AppleGraphicsDecod
     this._canvas = new byte[this._codedWidth * this._codedHeight];
   }
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "Apple Graphics (SMC)";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 

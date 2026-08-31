@@ -38,13 +38,16 @@ public sealed class M101VideoDecoder : IVideoCodecDecoder<M101VideoDecoder> {
     this._streamIndex = streamIndex;
   }
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "Matrox Uncompressed SD";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
     return stream.Kind == MediaStreamKind.Video && stream.Codec.EqualsIgnoringCase(_Tag);
   }
 
+  /// <summary>Creates a decoder for the specified media stream.</summary>
   public static M101VideoDecoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
@@ -84,6 +87,7 @@ public sealed class M101VideoDecoder : IVideoCodecDecoder<M101VideoDecoder> {
     return new(stream.Width, stream.Height, bits, stride, extra[12], stream.Index);
   }
 
+  /// <summary>Attempts to decode the specified coded packet into a raw image frame.</summary>
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
     var source = packet.Data.Span;
     var required = checked(this._stride * this._height);

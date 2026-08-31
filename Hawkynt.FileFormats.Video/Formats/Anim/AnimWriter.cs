@@ -26,11 +26,15 @@ public sealed class AnimWriter : IVideoContainerWriter<AnimWriter> {
     this._output.Write("ANIM"u8);
   }
 
+  /// <summary>Gets the primary file extension for this format.</summary>
   public static string PrimaryExtension => ".anim";
+  /// <summary>Gets the file extensions supported by this format.</summary>
   public static string[] FileExtensions => [".anim", ".iff"];
 
+  /// <summary>Creates a writer for the specified stream descriptions and metadata.</summary>
   public static AnimWriter Create(IReadOnlyList<MediaStreamInfo> streams, VideoMetadata metadata) => new(streams, metadata);
 
+  /// <summary>Writes the specified coded packet to the container.</summary>
   public void WritePacket(CodedPacket packet) {
     if (this._finished)
       throw new InvalidOperationException("ANIM writer has already been finished.");
@@ -52,6 +56,7 @@ public sealed class AnimWriter : IVideoContainerWriter<AnimWriter> {
     ++this._frames;
   }
 
+  /// <summary>Finishes writing the container and returns its encoded bytes.</summary>
   public byte[] Finish() {
     if (this._finished)
       throw new InvalidOperationException("ANIM writer has already been finished.");

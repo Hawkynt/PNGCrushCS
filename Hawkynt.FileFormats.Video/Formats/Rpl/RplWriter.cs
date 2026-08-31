@@ -44,11 +44,15 @@ public sealed class RplWriter : IVideoContainerWriter<RplWriter> {
     this._metadata = metadata;
   }
 
+  /// <summary>Gets the primary file extension for this format.</summary>
   public static string PrimaryExtension => ".rpl";
+  /// <summary>Gets the file extensions supported by this format.</summary>
   public static string[] FileExtensions => [".rpl"];
 
+  /// <summary>Creates a writer for the specified stream descriptions and metadata.</summary>
   public static RplWriter Create(IReadOnlyList<MediaStreamInfo> streams, VideoMetadata metadata) => new(streams, metadata);
 
+  /// <summary>Writes the specified coded packet to the container.</summary>
   public void WritePacket(CodedPacket packet) {
     if (this._finished)
       throw new InvalidOperationException("RPL writer has already been finished.");
@@ -70,6 +74,7 @@ public sealed class RplWriter : IVideoContainerWriter<RplWriter> {
     chunk.Audio = packet.Data;
   }
 
+  /// <summary>Finishes writing the container and returns its encoded bytes.</summary>
   public byte[] Finish() {
     if (this._finished)
       throw new InvalidOperationException("RPL writer has already been finished.");

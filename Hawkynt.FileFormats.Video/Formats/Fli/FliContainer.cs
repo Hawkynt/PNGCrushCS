@@ -38,6 +38,8 @@ namespace FileFormat.FlicVideo;
 [FormatMagicBytes([0x11, 0xAF], 4)]
 [FormatMagicBytes([0x12, 0xAF], 4)]
 public sealed class FliContainer : IVideoContainerReader<FliContainer> {
+  /// <summary>Initializes a new instance of this type.</summary>
+  public FliContainer() { }
 
   /// <summary>The whole file, which every packet is a window onto.</summary>
   public required ReadOnlyMemory<byte> Data { get; init; }
@@ -68,12 +70,15 @@ public sealed class FliContainer : IVideoContainerReader<FliContainer> {
 
   // -------- Format identity --------
 
+  /// <summary>Gets the primary file extension for this format.</summary>
   public static string PrimaryExtension => ".fli";
 
+  /// <summary>Gets the file extensions supported by this format.</summary>
   public static string[] FileExtensions => [".fli", ".flc", ".flx"];
 
   // -------- Demux --------
 
+  /// <summary>Reads an instance from the specified byte span.</summary>
   public static FliContainer FromSpan(ReadOnlySpan<byte> data) => FliReader.Open(data.ToArray());
 
   /// <summary>Opens a file over the caller's array, keeping it rather than copying it.</summary>
@@ -83,6 +88,7 @@ public sealed class FliContainer : IVideoContainerReader<FliContainer> {
     return FliReader.Open(data);
   }
 
+  /// <summary>Reads an instance from the specified file.</summary>
   public static FliContainer FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)

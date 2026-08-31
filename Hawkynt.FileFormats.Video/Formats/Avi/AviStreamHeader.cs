@@ -30,7 +30,42 @@ public readonly partial record struct AviStreamHeader(
   short FrameRight,
   short FrameBottom
 ) {
+  /// <summary>Gets the type.</summary>
+  public FourCC Type { get; init; } = Type;
+  /// <summary>Gets the handler.</summary>
+  public FourCC Handler { get; init; } = Handler;
+  /// <summary>Gets the flags.</summary>
+  public uint Flags { get; init; } = Flags;
+  /// <summary>Gets the priority.</summary>
+  public short Priority { get; init; } = Priority;
+  /// <summary>Gets the language.</summary>
+  public short Language { get; init; } = Language;
+  /// <summary>Gets the initial Frames.</summary>
+  public uint InitialFrames { get; init; } = InitialFrames;
+  /// <summary>Gets the scale.</summary>
+  public uint Scale { get; init; } = Scale;
+  /// <summary>Gets the rate.</summary>
+  public uint Rate { get; init; } = Rate;
+  /// <summary>Gets the start.</summary>
+  public uint Start { get; init; } = Start;
+  /// <summary>Gets the length.</summary>
+  public uint Length { get; init; } = Length;
+  /// <summary>Gets the suggested Buffer Size.</summary>
+  public uint SuggestedBufferSize { get; init; } = SuggestedBufferSize;
+  /// <summary>Gets the quality.</summary>
+  public int Quality { get; init; } = Quality;
+  /// <summary>Gets the sample Size.</summary>
+  public uint SampleSize { get; init; } = SampleSize;
+  /// <summary>Gets the frame Left.</summary>
+  public short FrameLeft { get; init; } = FrameLeft;
+  /// <summary>Gets the frame Top.</summary>
+  public short FrameTop { get; init; } = FrameTop;
+  /// <summary>Gets the frame Right.</summary>
+  public short FrameRight { get; init; } = FrameRight;
+  /// <summary>Gets the frame Bottom.</summary>
+  public short FrameBottom { get; init; } = FrameBottom;
 
+  /// <summary>The serialized structure size, in bytes.</summary>
   public const int StructSize = 56;
 
   /// <summary>
@@ -44,6 +79,7 @@ public readonly partial record struct AviStreamHeader(
   /// <summary>Whether this stream carries pictures rather than sound or text.</summary>
   public bool IsVideo => this.Type.ToString() == VIDEO_STREAM_TYPE;
 
+  /// <summary>Gets descriptors for the serialized fields.</summary>
   public static HeaderFieldDescriptor[] GetFieldMap()
     => HeaderFieldMapper.GetFieldMap<AviStreamHeader>();
 }

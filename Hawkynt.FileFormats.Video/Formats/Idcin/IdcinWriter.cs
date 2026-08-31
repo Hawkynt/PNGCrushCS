@@ -53,10 +53,14 @@ public sealed class IdcinWriter : IVideoContainerWriter<IdcinWriter> {
     this._output.Write(video.CodecPrivateData.Span);
   }
 
+  /// <summary>Gets the primary file extension for this format.</summary>
   public static string PrimaryExtension => ".cin";
+  /// <summary>Gets the file extensions supported by this format.</summary>
   public static string[] FileExtensions => [".cin"];
+  /// <summary>Creates a writer for the specified stream descriptions and metadata.</summary>
   public static IdcinWriter Create(IReadOnlyList<MediaStreamInfo> streams, VideoMetadata metadata) => new(streams, metadata);
 
+  /// <summary>Writes the specified coded packet to the container.</summary>
   public void WritePacket(CodedPacket packet) {
     if (this._finished) throw new InvalidOperationException("id Cinematic writer has already been finished.");
     if ((uint)packet.StreamIndex >= (uint)this._streams.Count) throw new ArgumentOutOfRangeException(nameof(packet));
@@ -78,6 +82,7 @@ public sealed class IdcinWriter : IVideoContainerWriter<IdcinWriter> {
     }
   }
 
+  /// <summary>Finishes writing the container and returns its encoded bytes.</summary>
   public byte[] Finish() {
     if (this._finished) throw new InvalidOperationException("id Cinematic writer has already been finished.");
     if (!this._expectVideo)

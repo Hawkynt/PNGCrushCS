@@ -64,8 +64,10 @@ public sealed class Vc1VideoDecoder : IVideoCodecDecoder<Vc1VideoDecoder> {
     this._pictures = new(sequence, (width + 15) / 16, (height + 15) / 16);
   }
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "VC-1 / Windows Media Video 9 (SMPTE 421M, Simple and Main profile intra pictures)";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 

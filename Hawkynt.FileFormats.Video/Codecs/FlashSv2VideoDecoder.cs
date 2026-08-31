@@ -110,20 +110,24 @@ public sealed class FlashSv2VideoDecoder : IVideoCodecDecoder<FlashSv2VideoDecod
 
   private FlashSv2VideoDecoder(int streamIndex) => this._streamIndex = streamIndex;
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "Flash Screen Video 2";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
     return stream.Kind == MediaStreamKind.Video && stream.Codec.EqualsIgnoringCase(_Tag);
   }
 
+  /// <summary>Creates a decoder for the specified media stream.</summary>
   public static FlashSv2VideoDecoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
     return new(stream.Index);
   }
 
+  /// <summary>Attempts to decode the specified coded packet into a raw image frame.</summary>
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
     var data = packet.Data.Span;
     if (data.Length < 5)

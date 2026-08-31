@@ -41,11 +41,15 @@ public sealed class AsfWriter : IVideoContainerWriter<AsfWriter> {
     this._metadata = metadata;
   }
 
+  /// <summary>Gets the primary file extension for this format.</summary>
   public static string PrimaryExtension => ".asf";
+  /// <summary>Gets the file extensions supported by this format.</summary>
   public static string[] FileExtensions => [".asf", ".wmv", ".wma", ".wm", ".wmx", ".asx"];
 
+  /// <summary>Creates a writer for the specified stream descriptions and metadata.</summary>
   public static AsfWriter Create(IReadOnlyList<MediaStreamInfo> streams, VideoMetadata metadata) => new(streams, metadata);
 
+  /// <summary>Writes the specified coded packet to the container.</summary>
   public void WritePacket(CodedPacket packet) {
     if (this._finished)
       throw new InvalidOperationException("ASF writer has already been finished.");
@@ -60,6 +64,7 @@ public sealed class AsfWriter : IVideoContainerWriter<AsfWriter> {
     this._packets.Add(packet);
   }
 
+  /// <summary>Finishes writing the container and returns its encoded bytes.</summary>
   public byte[] Finish() {
     if (this._finished)
       throw new InvalidOperationException("ASF writer has already been finished.");

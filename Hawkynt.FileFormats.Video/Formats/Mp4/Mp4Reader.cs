@@ -76,6 +76,7 @@ public static class Mp4Reader {
 
   private const int _FULL_BOX_PREFIX = 4;
 
+  /// <summary>Reads an instance from the specified file.</summary>
   public static Mp4Container FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
@@ -84,6 +85,7 @@ public static class Mp4Reader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
+  /// <summary>Reads an instance from the specified stream.</summary>
   public static Mp4Container FromStream(Stream stream) {
     ArgumentNullException.ThrowIfNull(stream);
     if (stream.CanSeek) {
@@ -97,6 +99,7 @@ public static class Mp4Reader {
     return FromBytes(buffer.ToArray());
   }
 
+  /// <summary>Reads an instance from the specified byte array.</summary>
   public static Mp4Container FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
 

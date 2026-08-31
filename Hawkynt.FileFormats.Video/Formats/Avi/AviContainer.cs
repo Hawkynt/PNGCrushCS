@@ -9,17 +9,26 @@ namespace FileFormat.Avi;
 /// <summary>An AVI split into its declared streams and RIFF <c>movi</c> packets.</summary>
 [FormatMimeType("video/avi", "video/msvideo", "video/x-msvideo")]
 public sealed class AviContainer : IVideoContainerReader<AviContainer> {
+  /// <summary>Initializes a new instance of this type.</summary>
+  public AviContainer() { }
 
   private const string _RECORD_LIST = "rec ";
 
+  /// <summary>Gets the header.</summary>
   public required AviMainHeader Header { get; init; }
+  /// <summary>Gets the media streams declared by the container.</summary>
   public required IReadOnlyList<MediaStreamInfo> StreamInfos { get; init; }
+  /// <summary>Gets the file Metadata.</summary>
   public required VideoMetadata FileMetadata { get; init; }
+  /// <summary>Gets the movie List.</summary>
   public required ReadOnlyMemory<byte> MovieList { get; init; }
 
+  /// <summary>Gets the primary file extension for this format.</summary>
   public static string PrimaryExtension => ".avi";
+  /// <summary>Gets the file extensions supported by this format.</summary>
   public static string[] FileExtensions => [".avi"];
 
+  /// <summary>Determines whether the supplied header matches this file format.</summary>
   public static bool? MatchesSignature(ReadOnlySpan<byte> header)
     => header.Length >= 12
        && header[0] == (byte)'R' && header[1] == (byte)'I' && header[2] == (byte)'F' && header[3] == (byte)'F'
@@ -27,9 +36,12 @@ public sealed class AviContainer : IVideoContainerReader<AviContainer> {
       ? true
       : null;
 
+  /// <summary>Reads an instance from the specified byte span.</summary>
   public static AviContainer FromSpan(ReadOnlySpan<byte> data) => AviReader.FromSpan(data);
+  /// <summary>Reads an instance from the specified byte array.</summary>
   public static AviContainer FromBytes(byte[] data) => AviReader.FromBytes(data);
 
+  /// <summary>Reads an instance from the specified file.</summary>
   public static AviContainer FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
@@ -83,16 +95,19 @@ public sealed class AviContainer : IVideoContainerReader<AviContainer> {
     };
   }
 
+  /// <summary>Gets the metadata exposed by the specified container.</summary>
   public static VideoMetadata Metadata(AviContainer container) {
     ArgumentNullException.ThrowIfNull(container);
     return container.FileMetadata;
   }
 
+  /// <summary>Enumerates coded packets from the specified container.</summary>
   public static IEnumerable<CodedPacket> ReadPackets(AviContainer container) {
     ArgumentNullException.ThrowIfNull(container);
     return _Walk(container, null);
   }
 
+  /// <summary>Enumerates coded packets for the selected stream of the specified container.</summary>
   public static IEnumerable<CodedPacket> ReadPackets(AviContainer container, int streamIndex) {
     ArgumentNullException.ThrowIfNull(container);
     return _Walk(container, streamIndex);

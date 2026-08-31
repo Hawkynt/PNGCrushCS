@@ -41,6 +41,7 @@ public static class H265VideoReader {
 
   private const int _LAST_RANDOM_ACCESS_TYPE = 23;
 
+  /// <summary>Reads an instance from the specified file.</summary>
   public static H265VideoContainer FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
@@ -49,6 +50,7 @@ public static class H265VideoReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
+  /// <summary>Reads an instance from the specified stream.</summary>
   public static H265VideoContainer FromStream(Stream stream) {
     ArgumentNullException.ThrowIfNull(stream);
     if (stream.CanSeek) {
@@ -62,6 +64,7 @@ public static class H265VideoReader {
     return FromBytes(buffer.ToArray());
   }
 
+  /// <summary>Reads an instance from the specified byte array.</summary>
   public static H265VideoContainer FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
 

@@ -97,9 +97,12 @@ public sealed class FontCodepageWindow : Form {
   /// <summary>The code page identifier the user picked (e.g. "CP437"). Always set on OK.</summary>
   public string PickedCodepage { get; private set; } = "CP437";
 
+  /// <summary>Gets the picked Columns.</summary>
   public int PickedColumns { get; private set; } = 80;
+  /// <summary>Gets the picked Rows.</summary>
   public int PickedRows { get; private set; } = 25;
 
+  /// <summary>Initializes a new instance of this type.</summary>
   public FontCodepageWindow() {
     this.Text = "Font and code page";
     this.ClientSize = new Size(820, 560);

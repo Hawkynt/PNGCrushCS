@@ -61,6 +61,7 @@ public static class RealMediaReader {
   /// <summary>The mime type an ordinary file gives the chunk that describes the file rather than a stream.</summary>
   private const string _FILE_INFO = "logical-fileinfo";
 
+  /// <summary>Reads an instance from the specified file.</summary>
   public static RealMediaContainer FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
@@ -69,6 +70,7 @@ public static class RealMediaReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
+  /// <summary>Reads an instance from the specified stream.</summary>
   public static RealMediaContainer FromStream(Stream stream) {
     ArgumentNullException.ThrowIfNull(stream);
     if (stream.CanSeek) {
@@ -82,6 +84,7 @@ public static class RealMediaReader {
     return FromBytes(buffer.ToArray());
   }
 
+  /// <summary>Reads an instance from the specified byte array.</summary>
   public static RealMediaContainer FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
 

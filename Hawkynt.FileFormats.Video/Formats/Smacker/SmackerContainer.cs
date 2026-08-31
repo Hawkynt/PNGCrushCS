@@ -27,6 +27,8 @@ namespace FileFormat.SmackerVideo;
 /// </remarks>
 [FormatMimeType("video/x-smacker")]
 public sealed class SmackerContainer : IVideoContainerReader<SmackerContainer> {
+  /// <summary>Initializes a new instance of this type.</summary>
+  public SmackerContainer() { }
 
   /// <summary>The whole file, which every packet is a window onto.</summary>
   public required ReadOnlyMemory<byte> Data { get; init; }
@@ -71,10 +73,13 @@ public sealed class SmackerContainer : IVideoContainerReader<SmackerContainer> {
 
   // -------- Format identity --------
 
+  /// <summary>Gets the primary file extension for this format.</summary>
   public static string PrimaryExtension => ".smk";
 
+  /// <summary>Gets the file extensions supported by this format.</summary>
   public static string[] FileExtensions => [".smk"];
 
+  /// <summary>Determines whether the supplied header matches this file format.</summary>
   public static bool? MatchesSignature(ReadOnlySpan<byte> header)
     => header.Length >= 4 && (header[..4].SequenceEqual("SMK2"u8) || header[..4].SequenceEqual("SMK4"u8))
       ? true
@@ -82,6 +87,7 @@ public sealed class SmackerContainer : IVideoContainerReader<SmackerContainer> {
 
   // -------- Demux --------
 
+  /// <summary>Reads an instance from the specified byte span.</summary>
   public static SmackerContainer FromSpan(ReadOnlySpan<byte> data) => SmackerReader.Open(data.ToArray());
 
   /// <summary>Opens a file over the caller's array, keeping it rather than copying it.</summary>
@@ -91,6 +97,7 @@ public sealed class SmackerContainer : IVideoContainerReader<SmackerContainer> {
     return SmackerReader.Open(data);
   }
 
+  /// <summary>Reads an instance from the specified file.</summary>
   public static SmackerContainer FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
@@ -99,6 +106,7 @@ public sealed class SmackerContainer : IVideoContainerReader<SmackerContainer> {
     return SmackerReader.Open(File.ReadAllBytes(file.FullName));
   }
 
+  /// <summary>Gets the media streams declared by the specified container.</summary>
   public static IReadOnlyList<MediaStreamInfo> Streams(SmackerContainer container) {
     ArgumentNullException.ThrowIfNull(container);
 
@@ -137,6 +145,7 @@ public sealed class SmackerContainer : IVideoContainerReader<SmackerContainer> {
     return streams;
   }
 
+  /// <summary>Enumerates coded packets from the specified container.</summary>
   public static IEnumerable<CodedPacket> ReadPackets(SmackerContainer container) {
     ArgumentNullException.ThrowIfNull(container);
 

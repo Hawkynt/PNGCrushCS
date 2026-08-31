@@ -47,11 +47,15 @@ public sealed class Mp4Writer : IVideoContainerWriter<Mp4Writer> {
     this._metadata = metadata;
   }
 
+  /// <summary>Gets the primary file extension for this format.</summary>
   public static string PrimaryExtension => ".mp4";
+  /// <summary>Gets the file extensions supported by this format.</summary>
   public static string[] FileExtensions => [".mp4", ".m4v", ".mov", ".qt", ".3gp", ".3g2", ".m4a"];
 
+  /// <summary>Creates a writer for the specified stream descriptions and metadata.</summary>
   public static Mp4Writer Create(IReadOnlyList<MediaStreamInfo> streams, VideoMetadata metadata) => new(streams, metadata);
 
+  /// <summary>Writes the specified coded packet to the container.</summary>
   public void WritePacket(CodedPacket packet) {
     if (this._finished)
       throw new InvalidOperationException("MP4 writer has already been finished.");
@@ -63,6 +67,7 @@ public sealed class Mp4Writer : IVideoContainerWriter<Mp4Writer> {
     this._tracks[packet.StreamIndex].Packets.Add(state);
   }
 
+  /// <summary>Finishes writing the container and returns its encoded bytes.</summary>
   public byte[] Finish() {
     if (this._finished)
       throw new InvalidOperationException("MP4 writer has already been finished.");

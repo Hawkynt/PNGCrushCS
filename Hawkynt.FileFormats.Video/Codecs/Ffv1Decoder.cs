@@ -85,8 +85,10 @@ public sealed class Ffv1Decoder : IVideoCodecDecoder<Ffv1Decoder> {
     this._configured = configured;
   }
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "FFV1 (RFC 9043)";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 

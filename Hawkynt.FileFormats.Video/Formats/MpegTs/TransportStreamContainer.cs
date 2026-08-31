@@ -30,6 +30,8 @@ namespace FileFormat.MpegTs;
 /// </remarks>
 [FormatMimeType("video/mp2t", "video/mpeg", "audio/mp2t")]
 public sealed class TransportStreamContainer : IVideoContainerReader<TransportStreamContainer> {
+  /// <summary>Initializes a new instance of this type.</summary>
+  public TransportStreamContainer() { }
 
   /// <summary>The whole file, which every packet is assembled out of.</summary>
   public required ReadOnlyMemory<byte> File { get; init; }
@@ -58,6 +60,7 @@ public sealed class TransportStreamContainer : IVideoContainerReader<TransportSt
 
   // -------- Format identity --------
 
+  /// <summary>Gets the primary file extension for this format.</summary>
   public static string PrimaryExtension => ".ts";
 
   /// <summary>
@@ -101,11 +104,13 @@ public sealed class TransportStreamContainer : IVideoContainerReader<TransportSt
 
   // -------- Demux --------
 
+  /// <summary>Reads an instance from the specified byte span.</summary>
   public static TransportStreamContainer FromSpan(ReadOnlySpan<byte> data) => TransportStreamReader.FromSpan(data);
 
   /// <summary>Opens a file over the caller's array, keeping it rather than copying it.</summary>
   public static TransportStreamContainer FromBytes(byte[] data) => TransportStreamReader.FromBytes(data);
 
+  /// <summary>Reads an instance from the specified file.</summary>
   public static TransportStreamContainer FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)

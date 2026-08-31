@@ -29,6 +29,8 @@ namespace FileFormat.Vmd;
 /// </remarks>
 [FormatMimeType("video/x-vmd")]
 public sealed class VmdContainer : IVideoContainerReader<VmdContainer> {
+  /// <summary>Initializes a new instance of this type.</summary>
+  public VmdContainer() { }
 
   /// <summary>The whole file, which every packet is a window or a small reconstruction onto.</summary>
   public required ReadOnlyMemory<byte> Data { get; init; }
@@ -96,14 +98,18 @@ public sealed class VmdContainer : IVideoContainerReader<VmdContainer> {
 
   // -------- Format identity --------
 
+  /// <summary>Gets the primary file extension for this format.</summary>
   public static string PrimaryExtension => ".vmd";
 
+  /// <summary>Gets the file extensions supported by this format.</summary>
   public static string[] FileExtensions => [".vmd"];
 
+  /// <summary>Determines whether the supplied header matches this file format.</summary>
   public static bool? MatchesSignature(ReadOnlySpan<byte> header) => VmdReader.LooksPlausible(header) ? true : null;
 
   // -------- Demux --------
 
+  /// <summary>Reads an instance from the specified byte span.</summary>
   public static VmdContainer FromSpan(ReadOnlySpan<byte> data) => VmdReader.Open(data.ToArray());
 
   /// <summary>Opens a file over the caller's array, keeping it rather than copying it.</summary>
@@ -113,6 +119,7 @@ public sealed class VmdContainer : IVideoContainerReader<VmdContainer> {
     return VmdReader.Open(data);
   }
 
+  /// <summary>Reads an instance from the specified file.</summary>
   public static VmdContainer FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
@@ -121,6 +128,7 @@ public sealed class VmdContainer : IVideoContainerReader<VmdContainer> {
     return VmdReader.Open(File.ReadAllBytes(file.FullName));
   }
 
+  /// <summary>Gets the media streams declared by the specified container.</summary>
   public static IReadOnlyList<MediaStreamInfo> Streams(VmdContainer container) {
     ArgumentNullException.ThrowIfNull(container);
 
@@ -153,6 +161,7 @@ public sealed class VmdContainer : IVideoContainerReader<VmdContainer> {
     return [video, audio];
   }
 
+  /// <summary>Enumerates coded packets from the specified container.</summary>
   public static IEnumerable<CodedPacket> ReadPackets(VmdContainer container) {
     ArgumentNullException.ThrowIfNull(container);
 

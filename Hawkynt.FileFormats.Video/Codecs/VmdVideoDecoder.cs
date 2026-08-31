@@ -74,14 +74,17 @@ public sealed class VmdVideoDecoder : IVideoCodecDecoder<VmdVideoDecoder> {
   private readonly int _width;
   private readonly int _height;
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "Sierra VMD Video";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
     return stream.Kind == MediaStreamKind.Video && stream.Codec.EqualsIgnoringCase(_Tag);
   }
 
+  /// <summary>Creates a decoder for the specified media stream.</summary>
   public static VmdVideoDecoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
@@ -116,6 +119,7 @@ public sealed class VmdVideoDecoder : IVideoCodecDecoder<VmdVideoDecoder> {
     this._canvas = new byte[width * height];
   }
 
+  /// <summary>Attempts to decode the specified coded packet into a raw image frame.</summary>
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
     var data = packet.Data.Span;
     if (data.Length < _RECORD_LENGTH)

@@ -45,14 +45,17 @@ public sealed class Escape130VideoDecoder : IVideoCodecDecoder<Escape130VideoDec
 
   private readonly Escape130FrameDecoder _frameDecoder;
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "Eidos Escape 130";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
     return stream.Kind == MediaStreamKind.Video && stream.Codec.Value == _EscapeCodecId;
   }
 
+  /// <summary>Creates a decoder for the specified media stream.</summary>
   public static Escape130VideoDecoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
@@ -69,6 +72,7 @@ public sealed class Escape130VideoDecoder : IVideoCodecDecoder<Escape130VideoDec
 
   private Escape130VideoDecoder(int width, int height) => this._frameDecoder = new(width, height);
 
+  /// <summary>Attempts to decode the specified coded packet into a raw image frame.</summary>
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
     var data = packet.Data.Span;
     if (data.Length < _FrameHeaderLength)

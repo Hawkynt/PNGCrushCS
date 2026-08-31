@@ -8,13 +8,19 @@ namespace FileFormat.Matroska;
 /// <summary>A Matroska/WebM document split into declared tracks and coded packets.</summary>
 [FormatMimeType("video/x-matroska", "audio/x-matroska", "video/webm", "audio/webm")]
 public sealed class MatroskaContainer : IVideoContainerReader<MatroskaContainer> {
+  /// <summary>Initializes a new instance of this type.</summary>
+  public MatroskaContainer() { }
 
+  /// <summary>Gets the doc Type.</summary>
   public required string? DocType { get; init; }
+  /// <summary>Gets the file.</summary>
   public required ReadOnlyMemory<byte> File { get; init; }
   internal int SegmentStart { get; init; }
   internal int SegmentEnd { get; init; }
+  /// <summary>Gets the timestamp Scale.</summary>
   public required long TimestampScale { get; init; }
   internal IReadOnlyList<MatroskaTrack> TrackEntries { get; init; } = [];
+  /// <summary>Gets the file Metadata.</summary>
   public required VideoMetadata FileMetadata { get; init; }
 
   private Dictionary<ulong, int>? _byTrackNumber;
@@ -31,17 +37,23 @@ public sealed class MatroskaContainer : IVideoContainerReader<MatroskaContainer>
     }
   }
 
+  /// <summary>Gets the primary file extension for this format.</summary>
   public static string PrimaryExtension => ".mkv";
+  /// <summary>Gets the file extensions supported by this format.</summary>
   public static string[] FileExtensions => [".mkv", ".mka", ".mks", ".mk3d", ".webm"];
 
+  /// <summary>Determines whether the supplied header matches this file format.</summary>
   public static bool? MatchesSignature(ReadOnlySpan<byte> header)
     => header.Length >= 4 && header[0] == 0x1A && header[1] == 0x45 && header[2] == 0xDF && header[3] == 0xA3
       ? true
       : null;
 
+  /// <summary>Reads an instance from the specified byte span.</summary>
   public static MatroskaContainer FromSpan(ReadOnlySpan<byte> data) => MatroskaReader.FromSpan(data);
+  /// <summary>Reads an instance from the specified byte array.</summary>
   public static MatroskaContainer FromBytes(byte[] data) => MatroskaReader.FromBytes(data);
 
+  /// <summary>Reads an instance from the specified file.</summary>
   public static MatroskaContainer FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
@@ -157,16 +169,19 @@ public sealed class MatroskaContainer : IVideoContainerReader<MatroskaContainer>
       Name = source.Name,
     };
 
+  /// <summary>Gets the metadata exposed by the specified container.</summary>
   public static VideoMetadata Metadata(MatroskaContainer container) {
     ArgumentNullException.ThrowIfNull(container);
     return container.FileMetadata;
   }
 
+  /// <summary>Enumerates coded packets from the specified container.</summary>
   public static IEnumerable<CodedPacket> ReadPackets(MatroskaContainer container) {
     ArgumentNullException.ThrowIfNull(container);
     return _Walk(container, null);
   }
 
+  /// <summary>Enumerates coded packets for the selected stream of the specified container.</summary>
   public static IEnumerable<CodedPacket> ReadPackets(MatroskaContainer container, int streamIndex) {
     ArgumentNullException.ThrowIfNull(container);
     if ((uint)streamIndex >= (uint)container.TrackEntries.Count)

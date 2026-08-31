@@ -49,6 +49,8 @@ namespace FileFormat.Codecs;
 /// inside the tolerance the standard's own accuracy bound allows.
 /// </remarks>
 public sealed class Mpeg2VideoDecoder : IVideoCodecDecoder<Mpeg2VideoDecoder> {
+  /// <summary>Initializes a new instance of this type.</summary>
+  public Mpeg2VideoDecoder() { }
 
   /// <summary>The four-character codes containers name MPEG-2 video with.</summary>
   /// <remarks>
@@ -72,8 +74,10 @@ public sealed class Mpeg2VideoDecoder : IVideoCodecDecoder<Mpeg2VideoDecoder> {
 
   private readonly MpegVideoDecoder _decoder = new();
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "MPEG-2 video (ISO/IEC 13818-2)";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 

@@ -19,6 +19,8 @@ namespace FileFormat.Idcin;
 /// </remarks>
 [FormatMimeType("video/x-idcin")]
 public sealed class IdcinContainer : IVideoContainerReader<IdcinContainer> {
+  /// <summary>Initializes a new instance of this type.</summary>
+  public IdcinContainer() { }
 
   /// <summary>The whole file, which every packet is a window onto.</summary>
   public required ReadOnlyMemory<byte> Data { get; init; }
@@ -52,8 +54,10 @@ public sealed class IdcinContainer : IVideoContainerReader<IdcinContainer> {
 
   // -------- Format identity --------
 
+  /// <summary>Gets the primary file extension for this format.</summary>
   public static string PrimaryExtension => ".cin";
 
+  /// <summary>Gets the file extensions supported by this format.</summary>
   public static string[] FileExtensions => [".cin"];
 
   /// <summary>
@@ -66,6 +70,7 @@ public sealed class IdcinContainer : IVideoContainerReader<IdcinContainer> {
 
   // -------- Demux --------
 
+  /// <summary>Reads an instance from the specified byte span.</summary>
   public static IdcinContainer FromSpan(ReadOnlySpan<byte> data) => IdcinReader.Open(data.ToArray());
 
   /// <summary>Opens a file over the caller's array, keeping it rather than copying it.</summary>
@@ -75,6 +80,7 @@ public sealed class IdcinContainer : IVideoContainerReader<IdcinContainer> {
     return IdcinReader.Open(data);
   }
 
+  /// <summary>Reads an instance from the specified file.</summary>
   public static IdcinContainer FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
@@ -83,6 +89,7 @@ public sealed class IdcinContainer : IVideoContainerReader<IdcinContainer> {
     return IdcinReader.Open(File.ReadAllBytes(file.FullName));
   }
 
+  /// <summary>Gets the media streams declared by the specified container.</summary>
   public static IReadOnlyList<MediaStreamInfo> Streams(IdcinContainer container) {
     ArgumentNullException.ThrowIfNull(container);
 
@@ -125,6 +132,7 @@ public sealed class IdcinContainer : IVideoContainerReader<IdcinContainer> {
       _ => "ICWS",
     });
 
+  /// <summary>Enumerates coded packets from the specified container.</summary>
   public static IEnumerable<CodedPacket> ReadPackets(IdcinContainer container) {
     ArgumentNullException.ThrowIfNull(container);
 

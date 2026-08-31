@@ -78,6 +78,7 @@ public sealed class MicrosoftRleDecoder : IVideoCodecDecoder<MicrosoftRleDecoder
     this._canvas = new byte[width * height];
   }
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "Microsoft RLE";
 
   /// <summary>

@@ -86,6 +86,7 @@ public sealed class QuickTimeRleDecoder : IVideoCodecDecoder<QuickTimeRleDecoder
         : PixelFormat.Rgb24;
   }
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "QuickTime Animation (RLE)";
 
   /// <summary>Takes a stream whose code is <c>rle </c> in any case.</summary>

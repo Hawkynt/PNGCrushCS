@@ -40,12 +40,16 @@ public sealed class MotionJpegVideoEncoder : IVideoCodecEncoder<MotionJpegVideoE
     };
   }
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "Motion JPEG (baseline JPEG, independent frames)";
 
+  /// <summary>Gets the codec.</summary>
   public static CodecTag Codec => _codec;
 
+  /// <summary>Creates an encoder for the specified media stream.</summary>
   public static MotionJpegVideoEncoder Create(MediaStreamInfo stream) => new(stream);
 
+  /// <summary>Performs the try Encode operation.</summary>
   public bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet) {
     ArgumentNullException.ThrowIfNull(frame);
     if (frame.Width != this._stream.Width || frame.Height != this._stream.Height)
@@ -64,5 +68,6 @@ public sealed class MotionJpegVideoEncoder : IVideoCodecEncoder<MotionJpegVideoE
     return true;
   }
 
+  /// <summary>Performs the describe Stream operation.</summary>
   public MediaStreamInfo DescribeStream() => this._stream;
 }

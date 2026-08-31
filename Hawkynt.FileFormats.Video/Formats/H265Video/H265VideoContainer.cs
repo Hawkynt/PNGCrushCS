@@ -26,6 +26,8 @@ namespace FileFormat.H265Video;
 [FormatMimeType("video/H265", "video/h265", "video/x-h265", "video/hevc")]
 [FormatDetectionPriority(-1)]
 public sealed class H265VideoContainer : IVideoContainerReader<H265VideoContainer> {
+  /// <summary>Initializes a new instance of this type.</summary>
+  public H265VideoContainer() { }
 
   /// <summary>The stream bytes, as one window the packets are windows onto.</summary>
   public required ReadOnlyMemory<byte> Data { get; init; }
@@ -50,19 +52,23 @@ public sealed class H265VideoContainer : IVideoContainerReader<H265VideoContaine
     },
   ];
 
+  /// <summary>Gets the primary file extension for this format.</summary>
   public static string PrimaryExtension => ".265";
 
+  /// <summary>Gets the file extensions supported by this format.</summary>
   public static string[] FileExtensions => [".265", ".h265", ".hevc", ".x265"];
 
   /// <summary>A file that opens with a start code introducing a unit a stream may be entered at.</summary>
   public static bool? MatchesSignature(ReadOnlySpan<byte> header)
     => H265VideoReader.LooksLikeByteStream(header) ? true : null;
 
+  /// <summary>Reads an instance from the specified byte span.</summary>
   public static H265VideoContainer FromSpan(ReadOnlySpan<byte> data) => H265VideoReader.FromSpan(data);
 
   /// <summary>Opens a stream over the caller's array, keeping it rather than copying it.</summary>
   public static H265VideoContainer FromBytes(byte[] data) => H265VideoReader.FromBytes(data);
 
+  /// <summary>Reads an instance from the specified file.</summary>
   public static H265VideoContainer FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)

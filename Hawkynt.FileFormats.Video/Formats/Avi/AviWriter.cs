@@ -36,11 +36,15 @@ public sealed class AviWriter : IVideoContainerWriter<AviWriter> {
     this._metadata = metadata;
   }
 
+  /// <summary>Gets the primary file extension for this format.</summary>
   public static string PrimaryExtension => ".avi";
+  /// <summary>Gets the file extensions supported by this format.</summary>
   public static string[] FileExtensions => [".avi"];
 
+  /// <summary>Creates a writer for the specified stream descriptions and metadata.</summary>
   public static AviWriter Create(IReadOnlyList<MediaStreamInfo> streams, VideoMetadata metadata) => new(streams, metadata);
 
+  /// <summary>Writes the specified coded packet to the container.</summary>
   public void WritePacket(CodedPacket packet) {
     if (this._finished)
       throw new InvalidOperationException("AVI writer has already been finished.");
@@ -49,6 +53,7 @@ public sealed class AviWriter : IVideoContainerWriter<AviWriter> {
     this._packets.Add(packet);
   }
 
+  /// <summary>Finishes writing the container and returns its encoded bytes.</summary>
   public byte[] Finish() {
     if (this._finished)
       throw new InvalidOperationException("AVI writer has already been finished.");

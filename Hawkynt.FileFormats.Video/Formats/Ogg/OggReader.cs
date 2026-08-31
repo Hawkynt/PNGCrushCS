@@ -35,6 +35,7 @@ public static class OggReader {
   /// </remarks>
   private const int _HEADER_SCAN_PAGE_LIMIT = 4096;
 
+  /// <summary>Reads an instance from the specified file.</summary>
   public static OggContainer FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
@@ -43,6 +44,7 @@ public static class OggReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
+  /// <summary>Reads an instance from the specified stream.</summary>
   public static OggContainer FromStream(Stream stream) {
     ArgumentNullException.ThrowIfNull(stream);
     if (stream.CanSeek) {
@@ -56,6 +58,7 @@ public static class OggReader {
     return FromBytes(buffer.ToArray());
   }
 
+  /// <summary>Reads an instance from the specified byte array.</summary>
   public static OggContainer FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
 

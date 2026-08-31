@@ -32,13 +32,16 @@ public sealed class ScreenpressoVideoDecoder : IVideoCodecDecoder<ScreenpressoVi
     this._streamIndex = streamIndex;
   }
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "Screenpresso";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
     return stream.Kind == MediaStreamKind.Video && stream.Codec.EqualsIgnoringCase(_Tag);
   }
 
+  /// <summary>Creates a decoder for the specified media stream.</summary>
   public static ScreenpressoVideoDecoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
     if (stream.Width <= 0 || stream.Height <= 0)
@@ -49,6 +52,7 @@ public sealed class ScreenpressoVideoDecoder : IVideoCodecDecoder<ScreenpressoVi
     return new(stream.Width, stream.Height, stream.Index);
   }
 
+  /// <summary>Attempts to decode the specified coded packet into a raw image frame.</summary>
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
     var data = packet.Data.Span;
     if (data.Length < 3)

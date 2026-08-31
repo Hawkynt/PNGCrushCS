@@ -27,6 +27,8 @@ namespace FileFormat.Mp4;
 /// </remarks>
 [FormatMimeType("video/mp4", "video/quicktime", "video/x-m4v", "video/3gpp", "video/3gpp2")]
 public sealed class Mp4Container : IVideoContainerReader<Mp4Container> {
+  /// <summary>Initializes a new instance of this type.</summary>
+  public Mp4Container() { }
 
   /// <summary>The brand from <c>ftyp</c>, where the file states one.</summary>
   public string? MajorBrand { get; init; }
@@ -51,6 +53,7 @@ public sealed class Mp4Container : IVideoContainerReader<Mp4Container> {
 
   // -------- Format identity --------
 
+  /// <summary>Gets the primary file extension for this format.</summary>
   public static string PrimaryExtension => ".mp4";
 
   /// <summary>
@@ -100,11 +103,13 @@ public sealed class Mp4Container : IVideoContainerReader<Mp4Container> {
 
   // -------- Demux --------
 
+  /// <summary>Reads an instance from the specified byte span.</summary>
   public static Mp4Container FromSpan(ReadOnlySpan<byte> data) => Mp4Reader.FromSpan(data);
 
   /// <summary>Opens a file over the caller's array, keeping it rather than copying it.</summary>
   public static Mp4Container FromBytes(byte[] data) => Mp4Reader.FromBytes(data);
 
+  /// <summary>Reads an instance from the specified file.</summary>
   public static Mp4Container FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)

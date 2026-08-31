@@ -55,14 +55,17 @@ public sealed class R210VideoDecoder : IVideoCodecDecoder<R210VideoDecoder> {
     this._stride = (width * 4 + 255) / 256 * 256;
   }
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "Uncompressed RGB 10-bit (r210)";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
     return stream.Kind == MediaStreamKind.Video && stream.Codec.EqualsIgnoringCase(_Tag);
   }
 
+  /// <summary>Creates a decoder for the specified media stream.</summary>
   public static R210VideoDecoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
@@ -74,6 +77,7 @@ public sealed class R210VideoDecoder : IVideoCodecDecoder<R210VideoDecoder> {
     return new(stream.Width, stream.Height, stream.Index);
   }
 
+  /// <summary>Attempts to decode the specified coded packet into a raw image frame.</summary>
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
     var data = packet.Data.Span;
     var expected = (long)this._stride * this._height;

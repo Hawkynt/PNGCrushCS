@@ -14,13 +14,17 @@ public sealed class H264VideoWriter : IVideoContainerWriter<H264VideoWriter> {
     => this._muxer = new(streams, metadata, "H.264 Annex B",
       static stream => stream.Codec == CodecTag.FromCharacters("avc1") && stream.CodecPrivateData.IsEmpty);
 
+  /// <summary>Gets the primary file extension for this format.</summary>
   public static string PrimaryExtension => ".264";
 
+  /// <summary>Gets the file extensions supported by this format.</summary>
   public static string[] FileExtensions => [".264", ".h264", ".avc", ".x264"];
 
+  /// <summary>Creates a writer for the specified stream descriptions and metadata.</summary>
   public static H264VideoWriter Create(IReadOnlyList<MediaStreamInfo> streams, VideoMetadata metadata)
     => new(streams, metadata);
 
+  /// <summary>Writes the specified coded packet to the container.</summary>
   public void WritePacket(CodedPacket packet) {
     var span = packet.Data.Span;
     var hasStartCode = span.Length >= 4
@@ -34,5 +38,6 @@ public sealed class H264VideoWriter : IVideoContainerWriter<H264VideoWriter> {
     this._muxer.WritePacket(packet);
   }
 
+  /// <summary>Finishes writing the container and returns its encoded bytes.</summary>
   public byte[] Finish() => this._muxer.Finish();
 }

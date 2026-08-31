@@ -100,8 +100,10 @@ public sealed class AppleVideoDecoder : IVideoCodecDecoder<AppleVideoDecoder> {
     this._canvas = new ushort[this._codedWidth * this._codedHeight];
   }
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "Apple Video (RPZA)";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 

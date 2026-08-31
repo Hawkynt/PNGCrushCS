@@ -49,18 +49,22 @@ public sealed class RascVideoDecoder : IVideoCodecDecoder<RascVideoDecoder> {
 
   private RascVideoDecoder(int streamIndex) => this._streamIndex = streamIndex;
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "RemotelyAnywhere Screen Capture";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
     return stream.Kind == MediaStreamKind.Video && stream.Codec.EqualsIgnoringCase(_Tag);
   }
 
+  /// <summary>Creates a decoder for the specified media stream.</summary>
   public static RascVideoDecoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
     return new(stream.Index);
   }
 
+  /// <summary>Attempts to decode the specified coded packet into a raw image frame.</summary>
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
     var source = packet.Data.Span;
     if (source.Length >= 4 && BinaryPrimitives.ReadUInt32LittleEndian(source) == _EMPT) {

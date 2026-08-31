@@ -24,6 +24,7 @@ public static class BitmapFontRasterizer {
     return FromFamily(family, cellWidth, cellHeight);
   }
 
+  /// <summary>Performs the from Family operation.</summary>
   public static BitmapFont FromFamily(FontFamily family, int cellWidth = 8, int cellHeight = 16) {
     if (family is null) throw new ArgumentNullException(nameof(family));
     if (cellWidth is < 1 or > 8) throw new ArgumentOutOfRangeException(nameof(cellWidth), "1 ≤ cellWidth ≤ 8.");

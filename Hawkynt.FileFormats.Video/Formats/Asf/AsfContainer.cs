@@ -30,6 +30,8 @@ namespace FileFormat.Asf;
 [FormatMagicBytes([0x30, 0x26, 0xB2, 0x75, 0x8E, 0x66, 0xCF, 0x11, 0xA6, 0xD9, 0x00, 0xAA, 0x00, 0x62, 0xCE, 0x6C])]
 [FormatMimeType("video/x-ms-asf", "video/x-ms-wmv", "audio/x-ms-wma", "video/x-ms-wm", "application/vnd.ms-asf")]
 public sealed class AsfContainer : IVideoContainerReader<AsfContainer> {
+  /// <summary>Initializes a new instance of this type.</summary>
+  public AsfContainer() { }
 
   /// <summary>Every stream the file declares, in declaration order.</summary>
   public required IReadOnlyList<MediaStreamInfo> StreamInfos { get; init; }
@@ -70,8 +72,10 @@ public sealed class AsfContainer : IVideoContainerReader<AsfContainer> {
 
   // -------- Format identity --------
 
+  /// <summary>Gets the primary file extension for this format.</summary>
   public static string PrimaryExtension => ".asf";
 
+  /// <summary>Gets the file extensions supported by this format.</summary>
   public static string[] FileExtensions => [".asf", ".wmv", ".wma", ".wm", ".wmx", ".asx"];
 
   /// <summary>An ASF file begins with the Header Object's identifier and nothing else does.</summary>
@@ -80,11 +84,13 @@ public sealed class AsfContainer : IVideoContainerReader<AsfContainer> {
 
   // -------- Demux --------
 
+  /// <summary>Reads an instance from the specified byte span.</summary>
   public static AsfContainer FromSpan(ReadOnlySpan<byte> data) => AsfReader.FromSpan(data);
 
   /// <summary>Opens an ASF file over the caller's array, keeping it rather than copying it.</summary>
   public static AsfContainer FromBytes(byte[] data) => AsfReader.FromBytes(data);
 
+  /// <summary>Reads an instance from the specified file.</summary>
   public static AsfContainer FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)

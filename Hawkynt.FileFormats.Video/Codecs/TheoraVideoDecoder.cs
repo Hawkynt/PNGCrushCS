@@ -43,6 +43,8 @@ namespace FileFormat.Codecs;
 /// convention rather than part of the decode.
 /// </remarks>
 public sealed class TheoraVideoDecoder : IVideoCodecDecoder<TheoraVideoDecoder> {
+  /// <summary>Initializes a new instance of this type.</summary>
+  public TheoraVideoDecoder() { }
 
   /// <summary>The names containers that name codecs with text give this one.</summary>
   /// <remarks>
@@ -61,8 +63,10 @@ public sealed class TheoraVideoDecoder : IVideoCodecDecoder<TheoraVideoDecoder> 
 
   private readonly TheoraDecoder _decoder = new();
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "Theora (Xiph.Org Theora I)";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 

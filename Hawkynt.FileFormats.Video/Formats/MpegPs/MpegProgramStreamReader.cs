@@ -57,6 +57,7 @@ public static class MpegProgramStreamReader {
   /// <summary>A substream whose header width is not known, so no packet of it can be handed over.</summary>
   internal const int UNKNOWN_HEADER_LENGTH = -1;
 
+  /// <summary>Reads an instance from the specified file.</summary>
   public static MpegProgramStreamContainer FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
@@ -65,6 +66,7 @@ public static class MpegProgramStreamReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
+  /// <summary>Reads an instance from the specified stream.</summary>
   public static MpegProgramStreamContainer FromStream(Stream stream) {
     ArgumentNullException.ThrowIfNull(stream);
     if (stream.CanSeek) {
@@ -78,6 +80,7 @@ public static class MpegProgramStreamReader {
     return FromBytes(buffer.ToArray());
   }
 
+  /// <summary>Reads an instance from the specified byte array.</summary>
   public static MpegProgramStreamContainer FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
 

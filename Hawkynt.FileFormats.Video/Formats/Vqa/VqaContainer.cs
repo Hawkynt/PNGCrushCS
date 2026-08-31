@@ -28,6 +28,8 @@ namespace FileFormat.Vqa;
 /// </remarks>
 [FormatMimeType("video/x-vqa")]
 public sealed class VqaContainer : IVideoContainerReader<VqaContainer> {
+  /// <summary>Initializes a new instance of this type.</summary>
+  public VqaContainer() { }
 
   /// <summary>The whole file, which every packet is a window onto.</summary>
   public required ReadOnlyMemory<byte> Data { get; init; }
@@ -64,8 +66,10 @@ public sealed class VqaContainer : IVideoContainerReader<VqaContainer> {
 
   // -------- Format identity --------
 
+  /// <summary>Gets the primary file extension for this format.</summary>
   public static string PrimaryExtension => ".vqa";
 
+  /// <summary>Gets the file extensions supported by this format.</summary>
   public static string[] FileExtensions => [".vqa"];
 
   /// <summary>
@@ -80,6 +84,7 @@ public sealed class VqaContainer : IVideoContainerReader<VqaContainer> {
 
   // -------- Demux --------
 
+  /// <summary>Reads an instance from the specified byte span.</summary>
   public static VqaContainer FromSpan(ReadOnlySpan<byte> data) => VqaReader.Open(data.ToArray());
 
   /// <summary>Opens a file over the caller's array, keeping it rather than copying it.</summary>
@@ -89,6 +94,7 @@ public sealed class VqaContainer : IVideoContainerReader<VqaContainer> {
     return VqaReader.Open(data);
   }
 
+  /// <summary>Reads an instance from the specified file.</summary>
   public static VqaContainer FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
@@ -97,6 +103,7 @@ public sealed class VqaContainer : IVideoContainerReader<VqaContainer> {
     return VqaReader.Open(File.ReadAllBytes(file.FullName));
   }
 
+  /// <summary>Gets the media streams declared by the specified container.</summary>
   public static IReadOnlyList<MediaStreamInfo> Streams(VqaContainer container) {
     ArgumentNullException.ThrowIfNull(container);
 
@@ -125,6 +132,7 @@ public sealed class VqaContainer : IVideoContainerReader<VqaContainer> {
     return [video, audio];
   }
 
+  /// <summary>Enumerates coded packets from the specified container.</summary>
   public static IEnumerable<CodedPacket> ReadPackets(VqaContainer container) {
     ArgumentNullException.ThrowIfNull(container);
 

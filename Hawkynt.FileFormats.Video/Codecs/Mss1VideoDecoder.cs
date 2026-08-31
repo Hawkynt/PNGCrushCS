@@ -54,13 +54,16 @@ public sealed class Mss1VideoDecoder : IVideoCodecDecoder<Mss1VideoDecoder> {
     this._slice = new SliceContext(fullModelSymbols: 256);
   }
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "MS Screen 1";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
     return stream.Kind == MediaStreamKind.Video && stream.Codec.EqualsIgnoringCase(_Tag);
   }
 
+  /// <summary>Creates a decoder for the specified media stream.</summary>
   public static Mss1VideoDecoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
     if (stream.Width <= 0 || stream.Height <= 0 || stream.Width > 4096 || stream.Height > 4096)
@@ -103,6 +106,7 @@ public sealed class Mss1VideoDecoder : IVideoCodecDecoder<Mss1VideoDecoder> {
     return new(stream.Width, stream.Height, freeColours, palette, stream.Index);
   }
 
+  /// <summary>Attempts to decode the specified coded packet into a raw image frame.</summary>
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
     if (packet.Data.Length < 2)
       throw new InvalidDataException($"MSS1 stream {this._streamIndex} supplied fewer than 16 arithmetic seed bits.");

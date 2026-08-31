@@ -26,6 +26,8 @@ namespace FileFormat.RoqVideo;
 [FormatMimeType("video/x-roq")]
 [FormatMagicBytes([0x84, 0x10, 0xFF, 0xFF, 0xFF, 0xFF, 0x1E, 0x00])]
 public sealed class RoqContainer : IVideoContainerReader<RoqContainer> {
+  /// <summary>Initializes a new instance of this type.</summary>
+  public RoqContainer() { }
 
   /// <summary>The whole file, which every packet is a window onto.</summary>
   public required ReadOnlyMemory<byte> Data { get; init; }
@@ -54,12 +56,15 @@ public sealed class RoqContainer : IVideoContainerReader<RoqContainer> {
 
   // -------- Format identity --------
 
+  /// <summary>Gets the primary file extension for this format.</summary>
   public static string PrimaryExtension => ".roq";
 
+  /// <summary>Gets the file extensions supported by this format.</summary>
   public static string[] FileExtensions => [".roq"];
 
   // -------- Demux --------
 
+  /// <summary>Reads an instance from the specified byte span.</summary>
   public static RoqContainer FromSpan(ReadOnlySpan<byte> data) => RoqReader.Open(data.ToArray());
 
   /// <summary>Opens a file over the caller's array, keeping it rather than copying it.</summary>
@@ -69,6 +74,7 @@ public sealed class RoqContainer : IVideoContainerReader<RoqContainer> {
     return RoqReader.Open(data);
   }
 
+  /// <summary>Reads an instance from the specified file.</summary>
   public static RoqContainer FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
@@ -77,6 +83,7 @@ public sealed class RoqContainer : IVideoContainerReader<RoqContainer> {
     return RoqReader.Open(File.ReadAllBytes(file.FullName));
   }
 
+  /// <summary>Gets the media streams declared by the specified container.</summary>
   public static IReadOnlyList<MediaStreamInfo> Streams(RoqContainer container) {
     ArgumentNullException.ThrowIfNull(container);
 
@@ -104,6 +111,7 @@ public sealed class RoqContainer : IVideoContainerReader<RoqContainer> {
     return [video, audio];
   }
 
+  /// <summary>Enumerates coded packets from the specified container.</summary>
   public static IEnumerable<CodedPacket> ReadPackets(RoqContainer container) {
     ArgumentNullException.ThrowIfNull(container);
 

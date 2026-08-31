@@ -27,10 +27,14 @@ public sealed class BfiWriter : IVideoContainerWriter<BfiWriter> {
     this._streams = streams;
   }
 
+  /// <summary>Gets the primary file extension for this format.</summary>
   public static string PrimaryExtension => ".bfi";
+  /// <summary>Gets the file extensions supported by this format.</summary>
   public static string[] FileExtensions => [".bfi"];
+  /// <summary>Creates a writer for the specified stream descriptions and metadata.</summary>
   public static BfiWriter Create(IReadOnlyList<MediaStreamInfo> streams, VideoMetadata metadata) => new(streams, metadata);
 
+  /// <summary>Writes the specified coded packet to the container.</summary>
   public void WritePacket(CodedPacket packet) {
     if (this._finished) throw new InvalidOperationException("BFI writer has already been finished.");
     if ((uint)packet.StreamIndex >= (uint)this._streams.Count) throw new ArgumentOutOfRangeException(nameof(packet));
@@ -51,6 +55,7 @@ public sealed class BfiWriter : IVideoContainerWriter<BfiWriter> {
     this._frames.Add(packet.Data);
   }
 
+  /// <summary>Finishes writing the container and returns its encoded bytes.</summary>
   public byte[] Finish() {
     if (this._finished) throw new InvalidOperationException("BFI writer has already been finished.");
     this._finished = true;

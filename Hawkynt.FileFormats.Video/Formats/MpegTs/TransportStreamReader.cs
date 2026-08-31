@@ -42,6 +42,7 @@ public static class TransportStreamReader {
   /// </remarks>
   private static readonly Rational _TIME_BASE = new(1, 90000);
 
+  /// <summary>Reads an instance from the specified file.</summary>
   public static TransportStreamContainer FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
@@ -50,6 +51,7 @@ public static class TransportStreamReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
+  /// <summary>Reads an instance from the specified stream.</summary>
   public static TransportStreamContainer FromStream(Stream stream) {
     ArgumentNullException.ThrowIfNull(stream);
     if (stream.CanSeek) {
@@ -63,6 +65,7 @@ public static class TransportStreamReader {
     return FromBytes(buffer.ToArray());
   }
 
+  /// <summary>Reads an instance from the specified byte array.</summary>
   public static TransportStreamContainer FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
 

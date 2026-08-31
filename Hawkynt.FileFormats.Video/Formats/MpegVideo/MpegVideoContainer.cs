@@ -34,6 +34,8 @@ namespace FileFormat.MpegVideo;
 /// </remarks>
 [FormatMimeType("video/mpv", "video/x-mpeg1video", "video/mpeg2video", "video/x-mpeg2video")]
 public sealed class MpegVideoContainer : IVideoContainerReader<MpegVideoContainer> {
+  /// <summary>Initializes a new instance of this type.</summary>
+  public MpegVideoContainer() { }
 
   /// <summary>The stream bytes, as one window the packets are windows onto.</summary>
   public required ReadOnlyMemory<byte> Data { get; init; }
@@ -65,8 +67,10 @@ public sealed class MpegVideoContainer : IVideoContainerReader<MpegVideoContaine
     },
   ];
 
+  /// <summary>Gets the primary file extension for this format.</summary>
   public static string PrimaryExtension => ".m1v";
 
+  /// <summary>Gets the file extensions supported by this format.</summary>
   public static string[] FileExtensions =>
     [".m1v", ".m2v", ".mpv", ".mpeg1video", ".mpeg2video", ".m1v1", ".m2v1"];
 
@@ -89,11 +93,13 @@ public sealed class MpegVideoContainer : IVideoContainerReader<MpegVideoContaine
       ? true
       : null;
 
+  /// <summary>Reads an instance from the specified byte span.</summary>
   public static MpegVideoContainer FromSpan(ReadOnlySpan<byte> data) => MpegVideoReader.FromSpan(data);
 
   /// <summary>Opens a stream over the caller's array, keeping it rather than copying it.</summary>
   public static MpegVideoContainer FromBytes(byte[] data) => MpegVideoReader.FromBytes(data);
 
+  /// <summary>Reads an instance from the specified file.</summary>
   public static MpegVideoContainer FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)

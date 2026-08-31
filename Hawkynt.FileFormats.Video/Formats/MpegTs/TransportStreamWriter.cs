@@ -42,11 +42,15 @@ public sealed class TransportStreamWriter : IVideoContainerWriter<TransportStrea
     this._WritePsi(_PMT_PID, this._Pmt());
   }
 
+  /// <summary>Gets the primary file extension for this format.</summary>
   public static string PrimaryExtension => ".ts";
+  /// <summary>Gets the file extensions supported by this format.</summary>
   public static string[] FileExtensions => [".ts", ".m2ts", ".mts", ".m2t", ".tsv"];
 
+  /// <summary>Creates a writer for the specified stream descriptions and metadata.</summary>
   public static TransportStreamWriter Create(IReadOnlyList<MediaStreamInfo> streams, VideoMetadata metadata) => new(streams, metadata);
 
+  /// <summary>Writes the specified coded packet to the container.</summary>
   public void WritePacket(CodedPacket packet) {
     if (this._finished)
       throw new InvalidOperationException("Transport-stream writer has already been finished.");
@@ -60,6 +64,7 @@ public sealed class TransportStreamWriter : IVideoContainerWriter<TransportStrea
     this._WritePayload(this._pids[packet.StreamIndex], pes, payloadUnitStart: true, randomAccess: packet.IsKeyFrame);
   }
 
+  /// <summary>Finishes writing the container and returns its encoded bytes.</summary>
   public byte[] Finish() {
     if (this._finished)
       throw new InvalidOperationException("Transport-stream writer has already been finished.");

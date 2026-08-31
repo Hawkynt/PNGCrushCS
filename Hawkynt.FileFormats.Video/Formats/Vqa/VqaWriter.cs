@@ -30,16 +30,21 @@ public sealed class VqaWriter : IVideoContainerWriter<VqaWriter> {
     this._header = streams[0].CodecPrivateData[..42].ToArray();
   }
 
+  /// <summary>Gets the primary file extension for this format.</summary>
   public static string PrimaryExtension => ".vqa";
+  /// <summary>Gets the file extensions supported by this format.</summary>
   public static string[] FileExtensions => [".vqa"];
+  /// <summary>Creates a writer for the specified stream descriptions and metadata.</summary>
   public static VqaWriter Create(IReadOnlyList<MediaStreamInfo> streams, VideoMetadata metadata) => new(streams, metadata);
 
+  /// <summary>Writes the specified coded packet to the container.</summary>
   public void WritePacket(CodedPacket packet) {
     if (this._finished) throw new InvalidOperationException("VQA writer has already been finished.");
     if ((uint)packet.StreamIndex >= (uint)this._streams.Count) throw new ArgumentOutOfRangeException(nameof(packet));
     this._packets.Add(packet);
   }
 
+  /// <summary>Finishes writing the container and returns its encoded bytes.</summary>
   public byte[] Finish() {
     if (this._finished) throw new InvalidOperationException("VQA writer has already been finished.");
     this._finished = true;

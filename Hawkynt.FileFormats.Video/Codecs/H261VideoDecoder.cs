@@ -52,6 +52,8 @@ namespace FileFormat.Codecs;
 /// There is no <c>catch</c> anywhere that hands back a blank, a copied or a zero-filled picture.
 /// </remarks>
 public sealed class H261VideoDecoder : IVideoCodecDecoder<H261VideoDecoder> {
+  /// <summary>Initializes a new instance of this type.</summary>
+  public H261VideoDecoder() { }
 
   /// <summary>The four-character code containers name ITU-T H.261 with.</summary>
   private static readonly CodecTag[] _Tags = [
@@ -61,8 +63,10 @@ public sealed class H261VideoDecoder : IVideoCodecDecoder<H261VideoDecoder> {
   private H263Frame? _reference;
   private H261PictureHeader? _geometry;
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "H.261 (ITU-T H.261)";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
@@ -76,6 +80,7 @@ public sealed class H261VideoDecoder : IVideoCodecDecoder<H261VideoDecoder> {
     return false;
   }
 
+  /// <summary>Creates a decoder for the specified media stream.</summary>
   public static H261VideoDecoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 

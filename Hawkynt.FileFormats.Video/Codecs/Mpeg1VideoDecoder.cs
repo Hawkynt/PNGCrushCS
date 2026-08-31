@@ -51,6 +51,8 @@ namespace FileFormat.Codecs;
 /// MPEG-2 pictures gets those pictures rather than a refusal it did not need.
 /// </remarks>
 public sealed class Mpeg1VideoDecoder : IVideoCodecDecoder<Mpeg1VideoDecoder> {
+  /// <summary>Initializes a new instance of this type.</summary>
+  public Mpeg1VideoDecoder() { }
 
   /// <summary>The four-character codes containers name MPEG-1 video with.</summary>
   /// <remarks>
@@ -66,8 +68,10 @@ public sealed class Mpeg1VideoDecoder : IVideoCodecDecoder<Mpeg1VideoDecoder> {
 
   private readonly MpegVideoDecoder _decoder = new();
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "MPEG-1 video (ISO/IEC 11172-2)";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 

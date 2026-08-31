@@ -13,32 +13,48 @@ namespace FileFormat.Ivf;
 /// </remarks>
 [FormatMimeType("video/x-ivf", "video/ivf")]
 public sealed class IvfContainer : IVideoContainerReader<IvfContainer> {
+  /// <summary>Initializes a new instance of this type.</summary>
+  public IvfContainer() { }
 
   private const int _MINIMUM_HEADER_SIZE = 32;
   private const int _FRAME_HEADER_SIZE = 12;
 
+  /// <summary>Gets the data.</summary>
   public required ReadOnlyMemory<byte> Data { get; init; }
+  /// <summary>Gets the header Size.</summary>
   public required ushort HeaderSize { get; init; }
+  /// <summary>Gets the codec.</summary>
   public required CodecTag Codec { get; init; }
+  /// <summary>Gets the width.</summary>
   public required int Width { get; init; }
+  /// <summary>Gets the height.</summary>
   public required int Height { get; init; }
+  /// <summary>Gets the rate.</summary>
   public required uint Rate { get; init; }
+  /// <summary>Gets the scale.</summary>
   public required uint Scale { get; init; }
+  /// <summary>Gets the declared Frame Count.</summary>
   public required uint DeclaredFrameCount { get; init; }
 
+  /// <summary>Gets the primary file extension for this format.</summary>
   public static string PrimaryExtension => ".ivf";
+  /// <summary>Gets the file extensions supported by this format.</summary>
   public static string[] FileExtensions => [".ivf"];
 
+  /// <summary>Determines whether the supplied header matches this file format.</summary>
   public static bool? MatchesSignature(ReadOnlySpan<byte> header)
     => header.Length >= 4 && header[..4].SequenceEqual("DKIF"u8) ? true : null;
 
+  /// <summary>Reads an instance from the specified byte span.</summary>
   public static IvfContainer FromSpan(ReadOnlySpan<byte> data) => _Open(data.ToArray());
 
+  /// <summary>Reads an instance from the specified byte array.</summary>
   public static IvfContainer FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     return _Open(data);
   }
 
+  /// <summary>Reads an instance from the specified file.</summary>
   public static IvfContainer FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
@@ -47,6 +63,7 @@ public sealed class IvfContainer : IVideoContainerReader<IvfContainer> {
     return _Open(File.ReadAllBytes(file.FullName));
   }
 
+  /// <summary>Gets the media streams declared by the specified container.</summary>
   public static IReadOnlyList<MediaStreamInfo> Streams(IvfContainer container) {
     ArgumentNullException.ThrowIfNull(container);
 
@@ -69,6 +86,7 @@ public sealed class IvfContainer : IVideoContainerReader<IvfContainer> {
     }];
   }
 
+  /// <summary>Enumerates coded packets from the specified container.</summary>
   public static IEnumerable<CodedPacket> ReadPackets(IvfContainer container) {
     ArgumentNullException.ThrowIfNull(container);
 
@@ -98,9 +116,11 @@ public sealed class IvfContainer : IVideoContainerReader<IvfContainer> {
     }
   }
 
+  /// <summary>Enumerates coded packets for the selected stream of the specified container.</summary>
   public static IEnumerable<CodedPacket> ReadPackets(IvfContainer container, int streamIndex)
     => streamIndex == 0 ? ReadPackets(container) : [];
 
+  /// <summary>Gets the metadata exposed by the specified container.</summary>
   public static VideoMetadata Metadata(IvfContainer container) {
     ArgumentNullException.ThrowIfNull(container);
     return new() { Streams = [new(0, MediaStreamKind.Video, container.Codec)] };

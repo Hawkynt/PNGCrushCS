@@ -56,6 +56,7 @@ public static class AsfReader {
   /// </summary>
   private static readonly Rational _TIME_BASE = new(1, 1000);
 
+  /// <summary>Reads an instance from the specified file.</summary>
   public static AsfContainer FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
@@ -64,6 +65,7 @@ public static class AsfReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
+  /// <summary>Reads an instance from the specified stream.</summary>
   public static AsfContainer FromStream(Stream stream) {
     ArgumentNullException.ThrowIfNull(stream);
     if (stream.CanSeek) {
@@ -77,6 +79,7 @@ public static class AsfReader {
     return FromBytes(buffer.ToArray());
   }
 
+  /// <summary>Reads an instance from the specified byte array.</summary>
   public static AsfContainer FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
 

@@ -75,6 +75,7 @@ public static class MpegVideoReader {
     return false;
   }
 
+  /// <summary>Reads an instance from the specified file.</summary>
   public static MpegVideoContainer FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
@@ -83,6 +84,7 @@ public static class MpegVideoReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
+  /// <summary>Reads an instance from the specified stream.</summary>
   public static MpegVideoContainer FromStream(Stream stream) {
     ArgumentNullException.ThrowIfNull(stream);
     if (stream.CanSeek) {
@@ -96,6 +98,7 @@ public static class MpegVideoReader {
     return FromBytes(buffer.ToArray());
   }
 
+  /// <summary>Reads an instance from the specified byte array.</summary>
   public static MpegVideoContainer FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
 

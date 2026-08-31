@@ -55,9 +55,11 @@ public sealed class H265VideoDecoder : IVideoCodecDecoder<H265VideoDecoder> {
       this._AcceptParameterSet(H265NalReader.Parse(set));
   }
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName
     => "H.265/HEVC (ITU-T H.265 | ISO/IEC 23008-2), Main profile";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
@@ -75,11 +77,13 @@ public sealed class H265VideoDecoder : IVideoCodecDecoder<H265VideoDecoder> {
     return false;
   }
 
+  /// <summary>Creates a decoder for the specified media stream.</summary>
   public static H265VideoDecoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
     return new(H265DecoderConfiguration.TryParse(stream.CodecPrivateData));
   }
 
+  /// <summary>Attempts to decode the specified coded packet into a raw image frame.</summary>
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
     foreach (var nal in this._Split(packet.Data)) {
       if (nal.LayerId != 0)
@@ -118,6 +122,7 @@ public sealed class H265VideoDecoder : IVideoCodecDecoder<H265VideoDecoder> {
     return true;
   }
 
+  /// <summary>Returns any frames still buffered by the decoder.</summary>
   public IEnumerable<RawImage> Flush() {
     this._FinishPicture();
 

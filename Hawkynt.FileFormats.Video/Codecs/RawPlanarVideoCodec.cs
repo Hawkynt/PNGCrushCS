@@ -24,14 +24,17 @@ public sealed class RawPlanarVideoDecoder : IVideoCodecDecoder<RawPlanarVideoDec
     this._frameBytes = _FrameBytes(stream.Width, stream.Height, format);
   }
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "Planar raw YUV";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
     return stream.Kind == MediaStreamKind.Video
       && (stream.Codec.EqualsIgnoringCase(_TAG) || string.Equals(stream.CodecId, "rawvideo", StringComparison.OrdinalIgnoreCase));
   }
 
+  /// <summary>Creates a decoder for the specified media stream.</summary>
   public static RawPlanarVideoDecoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
     if (!Accepts(stream))
@@ -43,6 +46,7 @@ public sealed class RawPlanarVideoDecoder : IVideoCodecDecoder<RawPlanarVideoDec
     return new(stream, _PixelFormat(chroma));
   }
 
+  /// <summary>Attempts to decode the specified coded packet into a raw image frame.</summary>
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
     if (packet.StreamIndex != this._streamIndex)
       throw new InvalidDataException($"Raw-video decoder for stream {this._streamIndex} cannot decode stream {packet.StreamIndex}.");
@@ -118,9 +122,12 @@ public sealed class RawPlanarVideoEncoder : IVideoCodecEncoder<RawPlanarVideoEnc
     };
   }
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "Planar raw YUV";
+  /// <summary>Gets the codec.</summary>
   public static CodecTag Codec => _TAG;
 
+  /// <summary>Creates an encoder for the specified media stream.</summary>
   public static RawPlanarVideoEncoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
     if (stream.Kind != MediaStreamKind.Video || stream.Width <= 0 || stream.Height <= 0)
@@ -131,6 +138,7 @@ public sealed class RawPlanarVideoEncoder : IVideoCodecEncoder<RawPlanarVideoEnc
     return new(stream, format, chroma);
   }
 
+  /// <summary>Performs the try Encode operation.</summary>
   public bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet) {
     ArgumentNullException.ThrowIfNull(frame);
     if (frame.Width != this._stream.Width || frame.Height != this._stream.Height)
@@ -155,6 +163,7 @@ public sealed class RawPlanarVideoEncoder : IVideoCodecEncoder<RawPlanarVideoEnc
     return true;
   }
 
+  /// <summary>Performs the describe Stream operation.</summary>
   public MediaStreamInfo DescribeStream() => this._stream;
 
   private static int _FrameBytes(int width, int height, PixelFormat format) {

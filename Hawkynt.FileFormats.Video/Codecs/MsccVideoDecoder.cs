@@ -47,14 +47,17 @@ public sealed class MsccVideoDecoder : IVideoCodecDecoder<MsccVideoDecoder> {
     this._palette = palette;
   }
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "Mandsoft / Screen Recorder Gold";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
     return stream.Kind == MediaStreamKind.Video
       && (stream.Codec.EqualsIgnoringCase(_MsccTag) || stream.Codec.EqualsIgnoringCase(_SrgcTag));
   }
 
+  /// <summary>Creates a decoder for the specified media stream.</summary>
   public static MsccVideoDecoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
     if (stream.Width <= 0 || stream.Height <= 0)
@@ -95,6 +98,7 @@ public sealed class MsccVideoDecoder : IVideoCodecDecoder<MsccVideoDecoder> {
     );
   }
 
+  /// <summary>Attempts to decode the specified coded packet into a raw image frame.</summary>
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
     var compressed = this._BuildZlibStream(packet.Data.Span);
     var inflated = _Inflate(compressed, checked(this._width * this._height * this._bpp * 2), this._streamIndex);

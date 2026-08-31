@@ -123,6 +123,7 @@ public sealed class ReduceColorsWindow : Form {
   /// <summary>When fixed-palette mode is active, the packed-RGB colour data of the chosen palette (else null).</summary>
   public byte[]? PickedFixedPaletteColors { get; private set; }
 
+  /// <summary>Initializes a new instance of this type.</summary>
   public ReduceColorsWindow(Bitmap source) {
     _source = source ?? throw new ArgumentNullException(nameof(source));
 
@@ -1449,6 +1450,7 @@ public sealed class ReduceColorsWindow : Form {
     return result;
   }
 
+  /// <summary>Releases the resources used by this instance.</summary>
   protected override void Dispose(bool disposing) {
     if (disposing) {
       _previewDebounce?.Stop();

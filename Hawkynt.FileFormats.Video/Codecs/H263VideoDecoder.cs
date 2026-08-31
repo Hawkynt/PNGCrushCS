@@ -79,8 +79,10 @@ public sealed class H263VideoDecoder : IVideoCodecDecoder<H263VideoDecoder> {
 
   private H263VideoDecoder(bool isSorenson) => this._isSorenson = isSorenson;
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "H.263 (ITU-T H.263 baseline, and Sorenson Spark)";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 

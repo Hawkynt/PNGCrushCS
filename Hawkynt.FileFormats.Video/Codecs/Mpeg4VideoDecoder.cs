@@ -126,8 +126,10 @@ public sealed class Mpeg4VideoDecoder : IVideoCodecDecoder<Mpeg4VideoDecoder> {
 
   private Mpeg4VideoDecoder(ReadOnlyMemory<byte> outOfBandHeaders) => this._outOfBandHeaders = outOfBandHeaders;
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "MPEG-4 Part 2 video (ISO/IEC 14496-2)";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 

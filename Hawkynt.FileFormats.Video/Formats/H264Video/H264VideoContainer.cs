@@ -22,6 +22,8 @@ namespace FileFormat.H264Video;
 /// </remarks>
 [FormatMimeType("video/H264", "video/h264", "video/x-h264")]
 public sealed class H264VideoContainer : IVideoContainerReader<H264VideoContainer> {
+  /// <summary>Initializes a new instance of this type.</summary>
+  public H264VideoContainer() { }
 
   /// <summary>The stream bytes, as one window the packets are windows onto.</summary>
   public required ReadOnlyMemory<byte> Data { get; init; }
@@ -46,8 +48,10 @@ public sealed class H264VideoContainer : IVideoContainerReader<H264VideoContaine
     },
   ];
 
+  /// <summary>Gets the primary file extension for this format.</summary>
   public static string PrimaryExtension => ".264";
 
+  /// <summary>Gets the file extensions supported by this format.</summary>
   public static string[] FileExtensions => [".264", ".h264", ".avc", ".x264"];
 
   /// <summary>A file that opens with a start code introducing a unit a stream may be entered at.</summary>
@@ -60,11 +64,13 @@ public sealed class H264VideoContainer : IVideoContainerReader<H264VideoContaine
   public static bool? MatchesSignature(ReadOnlySpan<byte> header)
     => H264VideoReader.LooksLikeByteStream(header) ? true : null;
 
+  /// <summary>Reads an instance from the specified byte span.</summary>
   public static H264VideoContainer FromSpan(ReadOnlySpan<byte> data) => H264VideoReader.FromSpan(data);
 
   /// <summary>Opens a stream over the caller's array, keeping it rather than copying it.</summary>
   public static H264VideoContainer FromBytes(byte[] data) => H264VideoReader.FromBytes(data);
 
+  /// <summary>Reads an instance from the specified file.</summary>
   public static H264VideoContainer FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)

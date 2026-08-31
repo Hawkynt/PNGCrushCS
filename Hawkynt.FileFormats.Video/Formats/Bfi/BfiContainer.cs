@@ -16,6 +16,8 @@ namespace FileFormat.Bfi;
 /// </remarks>
 [FormatMimeType("video/x-bfi")]
 public sealed class BfiContainer : IVideoContainerReader<BfiContainer> {
+  /// <summary>Initializes a new instance of this type.</summary>
+  public BfiContainer() { }
 
   /// <summary>The whole file, which every packet is a window onto.</summary>
   public required ReadOnlyMemory<byte> Data { get; init; }
@@ -43,14 +45,18 @@ public sealed class BfiContainer : IVideoContainerReader<BfiContainer> {
 
   // -------- Format identity --------
 
+  /// <summary>Gets the primary file extension for this format.</summary>
   public static string PrimaryExtension => ".bfi";
 
+  /// <summary>Gets the file extensions supported by this format.</summary>
   public static string[] FileExtensions => [".bfi"];
 
+  /// <summary>Determines whether the supplied header matches this file format.</summary>
   public static bool? MatchesSignature(ReadOnlySpan<byte> header) => BfiChunkReader.LooksPlausible(header) ? true : null;
 
   // -------- Demux --------
 
+  /// <summary>Reads an instance from the specified byte span.</summary>
   public static BfiContainer FromSpan(ReadOnlySpan<byte> data) => BfiChunkReader.Open(data.ToArray());
 
   /// <summary>Opens a file over the caller's array, keeping it rather than copying it.</summary>
@@ -60,6 +66,7 @@ public sealed class BfiContainer : IVideoContainerReader<BfiContainer> {
     return BfiChunkReader.Open(data);
   }
 
+  /// <summary>Reads an instance from the specified file.</summary>
   public static BfiContainer FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
@@ -68,6 +75,7 @@ public sealed class BfiContainer : IVideoContainerReader<BfiContainer> {
     return BfiChunkReader.Open(File.ReadAllBytes(file.FullName));
   }
 
+  /// <summary>Gets the media streams declared by the specified container.</summary>
   public static IReadOnlyList<MediaStreamInfo> Streams(BfiContainer container) {
     ArgumentNullException.ThrowIfNull(container);
 
@@ -94,6 +102,7 @@ public sealed class BfiContainer : IVideoContainerReader<BfiContainer> {
     return [video, audio];
   }
 
+  /// <summary>Enumerates coded packets from the specified container.</summary>
   public static IEnumerable<CodedPacket> ReadPackets(BfiContainer container) {
     ArgumentNullException.ThrowIfNull(container);
 

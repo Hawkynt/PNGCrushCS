@@ -41,12 +41,16 @@ public sealed class Yuv4MpegWriter : IVideoContainerWriter<Yuv4MpegWriter> {
     this._stream.Write(bytes);
   }
 
+  /// <summary>Gets the primary file extension for this format.</summary>
   public static string PrimaryExtension => ".y4m";
+  /// <summary>Gets the file extensions supported by this format.</summary>
   public static string[] FileExtensions => [".y4m"];
 
+  /// <summary>Creates a writer for the specified stream descriptions and metadata.</summary>
   public static Yuv4MpegWriter Create(IReadOnlyList<MediaStreamInfo> streams, VideoMetadata metadata)
     => new(streams, metadata);
 
+  /// <summary>Writes the specified coded packet to the container.</summary>
   public void WritePacket(CodedPacket packet) {
     if (packet.StreamIndex != 0)
       throw new InvalidDataException($"YUV4MPEG2 only has stream zero, not stream {packet.StreamIndex}.");
@@ -64,5 +68,6 @@ public sealed class Yuv4MpegWriter : IVideoContainerWriter<Yuv4MpegWriter> {
     this._stream.Write(packet.Data.Span);
   }
 
+  /// <summary>Finishes writing the container and returns its encoded bytes.</summary>
   public byte[] Finish() => this._stream.ToArray();
 }

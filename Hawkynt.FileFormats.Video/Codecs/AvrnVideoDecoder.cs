@@ -56,14 +56,17 @@ public sealed class AvrnVideoDecoder : IVideoCodecDecoder<AvrnVideoDecoder> {
     this._height = height;
   }
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "Avid AVRn";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
     return stream.Kind == MediaStreamKind.Video && stream.Codec.EqualsIgnoringCase(_Tag);
   }
 
+  /// <summary>Creates a decoder for the specified media stream.</summary>
   public static AvrnVideoDecoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 

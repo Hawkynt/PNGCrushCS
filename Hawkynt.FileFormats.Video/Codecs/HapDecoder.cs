@@ -119,8 +119,10 @@ public sealed class HapDecoder : IVideoCodecDecoder<HapDecoder> {
     this._streamIndex = streamIndex;
   }
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "Hap";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
@@ -133,6 +135,7 @@ public sealed class HapDecoder : IVideoCodecDecoder<HapDecoder> {
       || tag.EqualsIgnoringCase(_HapH);
   }
 
+  /// <summary>Creates a decoder for the specified media stream.</summary>
   public static HapDecoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
@@ -143,6 +146,7 @@ public sealed class HapDecoder : IVideoCodecDecoder<HapDecoder> {
     return new(stream.Width, stream.Height, stream.Index);
   }
 
+  /// <summary>Attempts to decode the specified coded packet into a raw image frame.</summary>
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
     var textures = HapFrameParser.ParseFrame(packet.Data.Span);
     frame = textures.Count switch {

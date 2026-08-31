@@ -101,8 +101,10 @@ public sealed class MagicYuvDecoder : IVideoCodecDecoder<MagicYuvDecoder> {
     this._format = format;
   }
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "MagicYUV";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 

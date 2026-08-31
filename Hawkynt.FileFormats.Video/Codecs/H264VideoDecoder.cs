@@ -50,8 +50,10 @@ public sealed class H264VideoDecoder : IVideoCodecDecoder<H264VideoDecoder> {
       this._AcceptParameterSet(set);
   }
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "H.264/AVC (ITU-T H.264 | ISO/IEC 14496-10)";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
     if (stream.Kind != MediaStreamKind.Video)
@@ -65,11 +67,13 @@ public sealed class H264VideoDecoder : IVideoCodecDecoder<H264VideoDecoder> {
     return false;
   }
 
+  /// <summary>Creates a decoder for the specified media stream.</summary>
   public static H264VideoDecoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
     return new(H264DecoderConfiguration.TryParse(stream.CodecPrivateData));
   }
 
+  /// <summary>Attempts to decode the specified coded packet into a raw image frame.</summary>
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
     foreach (var nal in this._Split(packet.Data))
       switch (nal.Type) {
@@ -107,6 +111,7 @@ public sealed class H264VideoDecoder : IVideoCodecDecoder<H264VideoDecoder> {
     return true;
   }
 
+  /// <summary>Returns any frames still buffered by the decoder.</summary>
   public IEnumerable<RawImage> Flush() {
     this._FinishPicture();
     this._DrainPresentation();

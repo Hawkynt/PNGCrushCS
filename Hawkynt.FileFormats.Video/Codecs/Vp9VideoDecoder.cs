@@ -20,6 +20,8 @@ namespace FileFormat.Codecs;
 /// by <see cref="RawImage"/>.
 /// </remarks>
 public sealed class Vp9VideoDecoder : IVideoCodecDecoder<Vp9VideoDecoder> {
+  /// <summary>Initializes a new instance of this type.</summary>
+  public Vp9VideoDecoder() { }
 
   private const string _MATROSKA_CODEC_ID = "V_VP9";
 
@@ -31,8 +33,10 @@ public sealed class Vp9VideoDecoder : IVideoCodecDecoder<Vp9VideoDecoder> {
   private readonly Vp9Decoder _decoder = new();
   private readonly Queue<RawImage> _pending = new();
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "VP9 (profiles 0-3)";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
@@ -49,11 +53,13 @@ public sealed class Vp9VideoDecoder : IVideoCodecDecoder<Vp9VideoDecoder> {
     return false;
   }
 
+  /// <summary>Creates a decoder for the specified media stream.</summary>
   public static Vp9VideoDecoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
     return new();
   }
 
+  /// <summary>Attempts to decode the specified coded packet into a raw image frame.</summary>
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
     foreach (var picture in this._decoder.Decode(packet.Data.Span))
       this._pending.Enqueue(_ToRawImage(picture));
@@ -67,6 +73,7 @@ public sealed class Vp9VideoDecoder : IVideoCodecDecoder<Vp9VideoDecoder> {
     return true;
   }
 
+  /// <summary>Returns any frames still buffered by the decoder.</summary>
   public IEnumerable<RawImage> Flush() {
     while (this._pending.Count > 0)
       yield return this._pending.Dequeue();

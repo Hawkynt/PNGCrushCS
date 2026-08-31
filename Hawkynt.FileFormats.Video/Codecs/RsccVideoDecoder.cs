@@ -48,14 +48,17 @@ public sealed class RsccVideoDecoder : IVideoCodecDecoder<RsccVideoDecoder> {
     this._palette = palette;
   }
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "innoHeim/Rsupport Screen Capture Codec";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
     return stream.Kind == MediaStreamKind.Video
       && (stream.Codec.EqualsIgnoringCase(_RsccTag) || stream.Codec.EqualsIgnoringCase(_IsccTag));
   }
 
+  /// <summary>Creates a decoder for the specified media stream.</summary>
   public static RsccVideoDecoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
     if (stream.Width <= 0 || stream.Height <= 0)
@@ -93,6 +96,7 @@ public sealed class RsccVideoDecoder : IVideoCodecDecoder<RsccVideoDecoder> {
     return new(stream.Width, stream.Height, componentSize, layout, stream.Index, palette);
   }
 
+  /// <summary>Attempts to decode the specified coded packet into a raw image frame.</summary>
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
     var data = packet.Data.Span;
     var position = 0;

@@ -22,6 +22,8 @@ namespace FileFormat.Mjpeg;
 /// </remarks>
 [FormatMimeType("video/x-motion-jpeg")]
 public sealed class MjpegContainer : IVideoContainerReader<MjpegContainer> {
+  /// <summary>Initializes a new instance of this type.</summary>
+  public MjpegContainer() { }
 
   /// <summary>The stream bytes, as one window the packets are windows onto.</summary>
   public required ReadOnlyMemory<byte> Data { get; init; }
@@ -37,15 +39,19 @@ public sealed class MjpegContainer : IVideoContainerReader<MjpegContainer> {
     },
   ];
 
+  /// <summary>Gets the primary file extension for this format.</summary>
   public static string PrimaryExtension => ".mjpg";
 
+  /// <summary>Gets the file extensions supported by this format.</summary>
   public static string[] FileExtensions => [".mjpg", ".mjpeg"];
 
+  /// <summary>Reads an instance from the specified byte span.</summary>
   public static MjpegContainer FromSpan(ReadOnlySpan<byte> data) => MjpegReader.FromSpan(data);
 
   /// <summary>Opens a stream over the caller's array, keeping it rather than copying it.</summary>
   public static MjpegContainer FromBytes(byte[] data) => MjpegReader.FromBytes(data);
 
+  /// <summary>Reads an instance from the specified file.</summary>
   public static MjpegContainer FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)

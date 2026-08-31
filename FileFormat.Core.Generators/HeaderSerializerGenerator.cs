@@ -615,6 +615,7 @@ public sealed partial class HeaderSerializerGenerator : IIncrementalGenerator {
   }
 
   private static void _GenerateReadFrom(StringBuilder sb, HeaderModel model) {
+    sb.AppendLine("  /// <summary>Reads an instance from the specified byte span.</summary>");
     var hasComputedEndian = _HasComputedEndianFields(model);
     var hasValidation = _HasValidation(model);
     var useInit = model.UseInitSyntax;
@@ -1019,6 +1020,7 @@ public sealed partial class HeaderSerializerGenerator : IIncrementalGenerator {
   }
 
   private static void _GenerateWriteTo(StringBuilder sb, HeaderModel model) {
+    sb.AppendLine("  /// <summary>Writes this instance to the specified byte span.</summary>");
     sb.AppendLine("  public void WriteTo(global::System.Span<byte> destination) {");
 
     if (model.HasGaps) {
@@ -1588,6 +1590,7 @@ public sealed partial class HeaderSerializerGenerator : IIncrementalGenerator {
   }
 
   private static void _GenerateSeqReadFrom(StringBuilder sb, HeaderModel model) {
+    sb.AppendLine("  /// <summary>Reads an instance from the specified byte span.</summary>");
     var useInit = model.UseInitSyntax;
 
     sb.Append("  public static ").Append(model.Name).AppendLine(" ReadFrom(global::System.ReadOnlySpan<byte> source) {");
@@ -1804,6 +1807,7 @@ public sealed partial class HeaderSerializerGenerator : IIncrementalGenerator {
   }
 
   private static void _GenerateSeqWriteTo(StringBuilder sb, HeaderModel model) {
+    sb.AppendLine("  /// <summary>Writes this instance to the specified byte span.</summary>");
     sb.AppendLine("  public void WriteTo(global::System.Span<byte> destination) {");
 
     if (model.HasGaps) {

@@ -14,13 +14,17 @@ public sealed class H265VideoWriter : IVideoContainerWriter<H265VideoWriter> {
     => this._muxer = new(streams, metadata, "H.265 Annex B",
       static stream => stream.Codec == CodecTag.FromCharacters("hvc1") && stream.CodecPrivateData.IsEmpty);
 
+  /// <summary>Gets the primary file extension for this format.</summary>
   public static string PrimaryExtension => ".265";
 
+  /// <summary>Gets the file extensions supported by this format.</summary>
   public static string[] FileExtensions => [".265", ".h265", ".hevc", ".x265"];
 
+  /// <summary>Creates a writer for the specified stream descriptions and metadata.</summary>
   public static H265VideoWriter Create(IReadOnlyList<MediaStreamInfo> streams, VideoMetadata metadata)
     => new(streams, metadata);
 
+  /// <summary>Writes the specified coded packet to the container.</summary>
   public void WritePacket(CodedPacket packet) {
     var span = packet.Data.Span;
     var hasStartCode = span.Length >= 5
@@ -34,5 +38,6 @@ public sealed class H265VideoWriter : IVideoContainerWriter<H265VideoWriter> {
     this._muxer.WritePacket(packet);
   }
 
+  /// <summary>Finishes writing the container and returns its encoded bytes.</summary>
   public byte[] Finish() => this._muxer.Finish();
 }

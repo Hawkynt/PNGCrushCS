@@ -106,14 +106,17 @@ public sealed class EightBpsVideoDecoder : IVideoCodecDecoder<EightBpsVideoDecod
     this._paletteCount = paletteCount;
   }
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "Apple Planar RGB (8BPS)";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
     return stream.Kind == MediaStreamKind.Video && stream.Codec.EqualsIgnoringCase(_Tag);
   }
 
+  /// <summary>Creates a decoder for the specified media stream.</summary>
   public static EightBpsVideoDecoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
@@ -139,6 +142,7 @@ public sealed class EightBpsVideoDecoder : IVideoCodecDecoder<EightBpsVideoDecod
     }
   }
 
+  /// <summary>Attempts to decode the specified coded packet into a raw image frame.</summary>
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
     var planes = this.DecodePlanes(packet.Data.Span);
 

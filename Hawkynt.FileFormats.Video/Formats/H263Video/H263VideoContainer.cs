@@ -8,6 +8,8 @@ namespace FileFormat.H263Video;
 /// <summary>A raw H.263 elementary video stream, split at byte-aligned picture start codes.</summary>
 [FormatMimeType("video/H263", "video/h263", "video/x-h263")]
 public sealed class H263VideoContainer : IVideoContainerReader<H263VideoContainer> {
+  /// <summary>Initializes a new instance of this type.</summary>
+  public H263VideoContainer() { }
 
   private static readonly MediaStreamInfo[] _STREAM = [
     new() {
@@ -18,14 +20,19 @@ public sealed class H263VideoContainer : IVideoContainerReader<H263VideoContaine
     },
   ];
 
+  /// <summary>Gets the data.</summary>
   public required ReadOnlyMemory<byte> Data { get; init; }
 
+  /// <summary>Gets the primary file extension for this format.</summary>
   public static string PrimaryExtension => ".263";
+  /// <summary>Gets the file extensions supported by this format.</summary>
   public static string[] FileExtensions => [".263", ".h263"];
 
+  /// <summary>Determines whether the supplied header matches this file format.</summary>
   public static bool? MatchesSignature(ReadOnlySpan<byte> header)
     => _IsPictureStart(header, 0) ? true : null;
 
+  /// <summary>Reads an instance from the specified byte span.</summary>
   public static H263VideoContainer FromSpan(ReadOnlySpan<byte> data) {
     if (!_IsPictureStart(data, 0))
       throw new InvalidDataException("The stream does not begin with an H.263 picture start code.");
@@ -33,6 +40,7 @@ public sealed class H263VideoContainer : IVideoContainerReader<H263VideoContaine
     return new() { Data = data.ToArray() };
   }
 
+  /// <summary>Reads an instance from the specified byte array.</summary>
   public static H263VideoContainer FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     if (!_IsPictureStart(data, 0))
@@ -41,6 +49,7 @@ public sealed class H263VideoContainer : IVideoContainerReader<H263VideoContaine
     return new() { Data = data };
   }
 
+  /// <summary>Reads an instance from the specified file.</summary>
   public static H263VideoContainer FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
@@ -49,11 +58,13 @@ public sealed class H263VideoContainer : IVideoContainerReader<H263VideoContaine
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
+  /// <summary>Gets the media streams declared by the specified container.</summary>
   public static IReadOnlyList<MediaStreamInfo> Streams(H263VideoContainer container) {
     ArgumentNullException.ThrowIfNull(container);
     return _STREAM;
   }
 
+  /// <summary>Enumerates coded packets from the specified container.</summary>
   public static IEnumerable<CodedPacket> ReadPackets(H263VideoContainer container) {
     ArgumentNullException.ThrowIfNull(container);
 
@@ -77,9 +88,11 @@ public sealed class H263VideoContainer : IVideoContainerReader<H263VideoContaine
     }
   }
 
+  /// <summary>Enumerates coded packets for the selected stream of the specified container.</summary>
   public static IEnumerable<CodedPacket> ReadPackets(H263VideoContainer container, int streamIndex)
     => streamIndex == 0 ? ReadPackets(container) : [];
 
+  /// <summary>Gets the metadata exposed by the specified container.</summary>
   public static VideoMetadata Metadata(H263VideoContainer container) {
     ArgumentNullException.ThrowIfNull(container);
     return new() { Streams = [new(0, MediaStreamKind.Video, _STREAM[0].Codec)] };

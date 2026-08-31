@@ -31,6 +31,8 @@ namespace FileFormat.Flv;
 /// </remarks>
 [FormatMimeType("video/x-flv", "flv-application/octet-stream")]
 public sealed class FlvContainer : IVideoContainerReader<FlvContainer> {
+  /// <summary>Initializes a new instance of this type.</summary>
+  public FlvContainer() { }
 
   /// <summary>The whole file, which every packet is a window onto.</summary>
   public required ReadOnlyMemory<byte> File { get; init; }
@@ -62,6 +64,7 @@ public sealed class FlvContainer : IVideoContainerReader<FlvContainer> {
 
   // -------- Format identity --------
 
+  /// <summary>Gets the primary file extension for this format.</summary>
   public static string PrimaryExtension => ".flv";
 
   /// <summary>
@@ -93,11 +96,13 @@ public sealed class FlvContainer : IVideoContainerReader<FlvContainer> {
 
   // -------- Demux --------
 
+  /// <summary>Reads an instance from the specified byte span.</summary>
   public static FlvContainer FromSpan(ReadOnlySpan<byte> data) => FlvReader.FromSpan(data);
 
   /// <summary>Opens a file over the caller's array, keeping it rather than copying it.</summary>
   public static FlvContainer FromBytes(byte[] data) => FlvReader.FromBytes(data);
 
+  /// <summary>Reads an instance from the specified file.</summary>
   public static FlvContainer FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)

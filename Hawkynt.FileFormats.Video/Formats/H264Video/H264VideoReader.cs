@@ -41,6 +41,7 @@ public static class H264VideoReader {
 
   private const int _SEQUENCE_PARAMETER_SET_TYPE = 7;
 
+  /// <summary>Reads an instance from the specified file.</summary>
   public static H264VideoContainer FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
@@ -49,6 +50,7 @@ public static class H264VideoReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
+  /// <summary>Reads an instance from the specified stream.</summary>
   public static H264VideoContainer FromStream(Stream stream) {
     ArgumentNullException.ThrowIfNull(stream);
     if (stream.CanSeek) {
@@ -62,6 +64,7 @@ public static class H264VideoReader {
     return FromBytes(buffer.ToArray());
   }
 
+  /// <summary>Reads an instance from the specified byte array.</summary>
   public static H264VideoContainer FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
 

@@ -36,6 +36,8 @@ namespace FileFormat.Codecs;
 /// so returning one on failure would be indistinguishable from working.
 /// </remarks>
 public sealed class CinepakVideoDecoder : IVideoCodecDecoder<CinepakVideoDecoder> {
+  /// <summary>Initializes a new instance of this type.</summary>
+  public CinepakVideoDecoder() { }
 
   /// <summary>The four-character code Cinepak is named by, in the spellings containers use.</summary>
   /// <remarks>
@@ -67,8 +69,10 @@ public sealed class CinepakVideoDecoder : IVideoCodecDecoder<CinepakVideoDecoder
   private int _width;
   private int _height;
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "Cinepak";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 

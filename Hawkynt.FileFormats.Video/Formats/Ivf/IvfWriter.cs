@@ -50,14 +50,18 @@ public sealed class IvfWriter : IVideoContainerWriter<IvfWriter> {
     this._output.Position = _HEADER_SIZE;
   }
 
+  /// <summary>Gets the primary file extension for this format.</summary>
   public static string PrimaryExtension => ".ivf";
+  /// <summary>Gets the file extensions supported by this format.</summary>
   public static string[] FileExtensions => [".ivf"];
 
+  /// <summary>Creates a writer for the specified stream descriptions and metadata.</summary>
   public static IvfWriter Create(IReadOnlyList<MediaStreamInfo> streams, VideoMetadata metadata) {
     ArgumentNullException.ThrowIfNull(metadata);
     return new(streams);
   }
 
+  /// <summary>Writes the specified coded packet to the container.</summary>
   public void WritePacket(CodedPacket packet) {
     if (this._finished)
       throw new InvalidOperationException("The IVF writer has already been finished.");
@@ -78,6 +82,7 @@ public sealed class IvfWriter : IVideoContainerWriter<IvfWriter> {
     ++this._frameCount;
   }
 
+  /// <summary>Finishes writing the container and returns its encoded bytes.</summary>
   public byte[] Finish() {
     if (this._finished)
       throw new InvalidOperationException("The IVF writer has already been finished.");

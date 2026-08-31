@@ -64,8 +64,10 @@ public sealed class HuffYuvDecoder : IVideoCodecDecoder<HuffYuvDecoder> {
     this._tables = tables;
   }
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "HuffYUV / FFVHUFF";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 

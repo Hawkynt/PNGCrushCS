@@ -36,6 +36,7 @@ public static class AviReader {
   private const string _STREAM_FORMAT_ID = "strf";
   private const string _STREAM_NAME_ID = "strn";
 
+  /// <summary>Reads an instance from the specified file.</summary>
   public static AviContainer FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
@@ -44,6 +45,7 @@ public static class AviReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
+  /// <summary>Reads an instance from the specified stream.</summary>
   public static AviContainer FromStream(Stream stream) {
     ArgumentNullException.ThrowIfNull(stream);
     if (stream.CanSeek) {
@@ -57,6 +59,7 @@ public static class AviReader {
     return FromBytes(buffer.ToArray());
   }
 
+  /// <summary>Reads an instance from the specified byte array.</summary>
   public static AviContainer FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
 

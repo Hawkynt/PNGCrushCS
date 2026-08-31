@@ -64,6 +64,8 @@ namespace FileFormat.RealMedia;
 [FormatMagicBytes([0x2E, 0x52, 0x4D, 0x46])]
 [FormatMimeType("application/vnd.rn-realmedia", "application/vnd.rn-realmedia-vbr", "audio/x-pn-realaudio", "video/x-pn-realvideo")]
 public sealed class RealMediaContainer : IVideoContainerReader<RealMediaContainer> {
+  /// <summary>Initializes a new instance of this type.</summary>
+  public RealMediaContainer() { }
 
   /// <summary>Every stream the file declares, in declaration order.</summary>
   public required IReadOnlyList<MediaStreamInfo> StreamInfos { get; init; }
@@ -98,6 +100,7 @@ public sealed class RealMediaContainer : IVideoContainerReader<RealMediaContaine
 
   // -------- Format identity --------
 
+  /// <summary>Gets the primary file extension for this format.</summary>
   public static string PrimaryExtension => ".rm";
 
   /// <summary>
@@ -120,11 +123,13 @@ public sealed class RealMediaContainer : IVideoContainerReader<RealMediaContaine
 
   // -------- Demux --------
 
+  /// <summary>Reads an instance from the specified byte span.</summary>
   public static RealMediaContainer FromSpan(ReadOnlySpan<byte> data) => RealMediaReader.FromSpan(data);
 
   /// <summary>Opens a RealMedia file over the caller's array, keeping it rather than copying it.</summary>
   public static RealMediaContainer FromBytes(byte[] data) => RealMediaReader.FromBytes(data);
 
+  /// <summary>Reads an instance from the specified file.</summary>
   public static RealMediaContainer FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)

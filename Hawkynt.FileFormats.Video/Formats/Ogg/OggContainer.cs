@@ -40,6 +40,8 @@ namespace FileFormat.Ogg;
 /// </remarks>
 [FormatMimeType("video/ogg", "audio/ogg", "application/ogg", "audio/opus")]
 public sealed class OggContainer : IVideoContainerReader<OggContainer> {
+  /// <summary>Initializes a new instance of this type.</summary>
+  public OggContainer() { }
 
   /// <summary>The whole file, which every packet is a window onto.</summary>
   public required ReadOnlyMemory<byte> File { get; init; }
@@ -73,6 +75,7 @@ public sealed class OggContainer : IVideoContainerReader<OggContainer> {
 
   // -------- Format identity --------
 
+  /// <summary>Gets the primary file extension for this format.</summary>
   public static string PrimaryExtension => ".ogg";
 
   /// <summary>
@@ -99,11 +102,13 @@ public sealed class OggContainer : IVideoContainerReader<OggContainer> {
 
   // -------- Demux --------
 
+  /// <summary>Reads an instance from the specified byte span.</summary>
   public static OggContainer FromSpan(ReadOnlySpan<byte> data) => OggReader.FromSpan(data);
 
   /// <summary>Opens a file over the caller's array, keeping it rather than copying it.</summary>
   public static OggContainer FromBytes(byte[] data) => OggReader.FromBytes(data);
 
+  /// <summary>Reads an instance from the specified file.</summary>
   public static OggContainer FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)

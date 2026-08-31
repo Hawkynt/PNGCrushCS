@@ -35,6 +35,38 @@ public readonly record struct RplHeader(
   int HighestChunkIndex,
   long ChunkCatalogueOffset,
   long HeaderByteLength) {
+  /// <summary>Gets the movie Name.</summary>
+  public string MovieName { get; init; } = MovieName;
+  /// <summary>Gets the copyright.</summary>
+  public string Copyright { get; init; } = Copyright;
+  /// <summary>Gets the author Tool.</summary>
+  public string AuthorTool { get; init; } = AuthorTool;
+  /// <summary>Gets the video Compression Format.</summary>
+  public int VideoCompressionFormat { get; init; } = VideoCompressionFormat;
+  /// <summary>Gets the width.</summary>
+  public int Width { get; init; } = Width;
+  /// <summary>Gets the height.</summary>
+  public int Height { get; init; } = Height;
+  /// <summary>Gets the pixel Depth.</summary>
+  public int PixelDepth { get; init; } = PixelDepth;
+  /// <summary>Gets the frame Rate.</summary>
+  public Rational FrameRate { get; init; } = FrameRate;
+  /// <summary>Gets the sound Compression Format.</summary>
+  public int SoundCompressionFormat { get; init; } = SoundCompressionFormat;
+  /// <summary>Gets the sample Rate.</summary>
+  public int SampleRate { get; init; } = SampleRate;
+  /// <summary>Gets the channel Count.</summary>
+  public int ChannelCount { get; init; } = ChannelCount;
+  /// <summary>Gets the sample Precision.</summary>
+  public int SamplePrecision { get; init; } = SamplePrecision;
+  /// <summary>Gets the frames Per Chunk.</summary>
+  public int FramesPerChunk { get; init; } = FramesPerChunk;
+  /// <summary>Gets the highest Chunk Index.</summary>
+  public int HighestChunkIndex { get; init; } = HighestChunkIndex;
+  /// <summary>Gets the chunk Catalogue Offset.</summary>
+  public long ChunkCatalogueOffset { get; init; } = ChunkCatalogueOffset;
+  /// <summary>Gets the header Byte Length.</summary>
+  public long HeaderByteLength { get; init; } = HeaderByteLength;
 
   private const int _FieldCount = 21;
 

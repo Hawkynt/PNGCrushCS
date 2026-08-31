@@ -76,8 +76,10 @@ public sealed class RealVideoDecoder : IVideoCodecDecoder<RealVideoDecoder> {
     this._macroblockHeight = (height + 15) / 16;
   }
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "RealVideo 1 (RV10/RV13)";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 

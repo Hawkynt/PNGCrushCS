@@ -83,11 +83,15 @@ public sealed class MpegProgramStreamWriter : IVideoContainerWriter<MpegProgramS
     this._WriteProgramStreamMap();
   }
 
+  /// <summary>Gets the primary file extension for this format.</summary>
   public static string PrimaryExtension => ".mpg";
+  /// <summary>Gets the file extensions supported by this format.</summary>
   public static string[] FileExtensions => [".mpg", ".mpeg", ".vob", ".m2p", ".m2ps"];
 
+  /// <summary>Creates a writer for the specified stream descriptions and metadata.</summary>
   public static MpegProgramStreamWriter Create(IReadOnlyList<MediaStreamInfo> streams, VideoMetadata metadata) => new(streams, metadata);
 
+  /// <summary>Writes the specified coded packet to the container.</summary>
   public void WritePacket(CodedPacket packet) {
     if (this._finished)
       throw new InvalidOperationException("MPEG program-stream writer has already been finished.");
@@ -120,6 +124,7 @@ public sealed class MpegProgramStreamWriter : IVideoContainerWriter<MpegProgramS
     } while (at < data.Length);
   }
 
+  /// <summary>Finishes writing the container and returns its encoded bytes.</summary>
   public byte[] Finish() {
     if (this._finished)
       throw new InvalidOperationException("MPEG program-stream writer has already been finished.");

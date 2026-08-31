@@ -84,8 +84,10 @@ public sealed class ProResVideoDecoder : IVideoCodecDecoder<ProResVideoDecoder> 
     this._height = height;
   }
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "Apple ProRes";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 

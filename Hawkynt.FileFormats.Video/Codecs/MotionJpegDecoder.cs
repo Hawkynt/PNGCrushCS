@@ -17,6 +17,8 @@ namespace FileFormat.Codecs;
 /// about JPEG or about each other.
 /// </remarks>
 public sealed class MotionJpegDecoder : IVideoCodecDecoder<MotionJpegDecoder> {
+  /// <summary>Initializes a new instance of this type.</summary>
+  public MotionJpegDecoder() { }
 
   /// <summary><c>MJPG</c> as it sits in a little-endian four-character code field.</summary>
   private static readonly CodecTag _MJPG = CodecTag.FromCharacters("MJPG");
@@ -27,6 +29,7 @@ public sealed class MotionJpegDecoder : IVideoCodecDecoder<MotionJpegDecoder> {
   /// <summary>What Matroska calls it, which is a string because Matroska has no code field at all.</summary>
   private const string _MATROSKA_CODEC_ID = "V_MJPEG";
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "Motion JPEG";
 
   /// <summary>
@@ -53,6 +56,7 @@ public sealed class MotionJpegDecoder : IVideoCodecDecoder<MotionJpegDecoder> {
                || string.Equals(stream.CodecId, _MATROSKA_CODEC_ID, System.StringComparison.OrdinalIgnoreCase));
   }
 
+  /// <summary>Creates a decoder for the specified media stream.</summary>
   public static MotionJpegDecoder Create(MediaStreamInfo stream) {
     System.ArgumentNullException.ThrowIfNull(stream);
 

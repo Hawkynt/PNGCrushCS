@@ -40,6 +40,8 @@ namespace FileFormat.MpegPs;
 [FormatMagicBytes([0x00, 0x00, 0x01, 0xBA])]
 [FormatMimeType("video/mpeg", "video/x-mpeg", "video/dvd", "video/mpeg-system")]
 public sealed class MpegProgramStreamContainer : IVideoContainerReader<MpegProgramStreamContainer> {
+  /// <summary>Initializes a new instance of this type.</summary>
+  public MpegProgramStreamContainer() { }
 
   private const byte _PICTURE_START_CODE = 0x00;
   private const byte _SEQUENCE_HEADER_CODE = 0xB3;
@@ -61,6 +63,7 @@ public sealed class MpegProgramStreamContainer : IVideoContainerReader<MpegProgr
 
   // -------- Format identity --------
 
+  /// <summary>Gets the primary file extension for this format.</summary>
   public static string PrimaryExtension => ".mpg";
 
   /// <summary>
@@ -94,11 +97,13 @@ public sealed class MpegProgramStreamContainer : IVideoContainerReader<MpegProgr
 
   // -------- Demux --------
 
+  /// <summary>Reads an instance from the specified byte span.</summary>
   public static MpegProgramStreamContainer FromSpan(ReadOnlySpan<byte> data) => MpegProgramStreamReader.FromSpan(data);
 
   /// <summary>Opens a program stream over the caller's array, keeping it rather than copying it.</summary>
   public static MpegProgramStreamContainer FromBytes(byte[] data) => MpegProgramStreamReader.FromBytes(data);
 
+  /// <summary>Reads an instance from the specified file.</summary>
   public static MpegProgramStreamContainer FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)

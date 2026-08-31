@@ -134,8 +134,10 @@ public sealed class MsMpeg4V2VideoDecoder : IVideoCodecDecoder<MsMpeg4V2VideoDec
     this._sliceHeight = this._macroblockHeight;
   }
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "Microsoft MPEG-4 version 2 video (MP42)";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 

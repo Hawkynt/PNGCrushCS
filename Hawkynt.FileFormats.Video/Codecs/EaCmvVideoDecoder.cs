@@ -58,6 +58,8 @@ namespace FileFormat.Codecs;
 /// measured against carries any of them.
 /// </remarks>
 public sealed class EaCmvVideoDecoder : IVideoCodecDecoder<EaCmvVideoDecoder> {
+  /// <summary>Initializes a new instance of this type.</summary>
+  public EaCmvVideoDecoder() { }
 
   private static readonly CodecTag _Tag = CodecTag.FromCharacters("cmv ");
 
@@ -71,20 +73,24 @@ public sealed class EaCmvVideoDecoder : IVideoCodecDecoder<EaCmvVideoDecoder> {
   private EaCmvFrame? _lastFrame;       // the most recently completed picture
   private EaCmvFrame? _secondLastFrame; // the one before that
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "Electronic Arts CMV";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
     return stream.Kind == MediaStreamKind.Video && stream.Codec.EqualsIgnoringCase(_Tag);
   }
 
+  /// <summary>Creates a decoder for the specified media stream.</summary>
   public static EaCmvVideoDecoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
     return new();
   }
 
+  /// <summary>Attempts to decode the specified coded packet into a raw image frame.</summary>
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
     var data = packet.Data.Span;
     if (data.Length < _CHUNK_HEADER_LENGTH)

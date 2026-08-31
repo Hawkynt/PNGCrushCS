@@ -53,14 +53,17 @@ public sealed class BfiVideoDecoder : IVideoCodecDecoder<BfiVideoDecoder> {
   private readonly byte[] _palette;
   private byte[]? _previous;
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "Brute Force & Ignorance Video";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
     return stream.Kind == MediaStreamKind.Video && stream.Codec.EqualsIgnoringCase(_Tag);
   }
 
+  /// <summary>Creates a decoder for the specified media stream.</summary>
   public static BfiVideoDecoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
@@ -84,6 +87,7 @@ public sealed class BfiVideoDecoder : IVideoCodecDecoder<BfiVideoDecoder> {
     this._palette = palette;
   }
 
+  /// <summary>Attempts to decode the specified coded packet into a raw image frame.</summary>
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
     var span = packet.Data.Span;
     if (span.Length < 8 || span[0] != (byte)'I' || span[1] != (byte)'V' || span[2] != (byte)'A' || span[3] != (byte)'S')

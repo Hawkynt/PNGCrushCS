@@ -85,14 +85,17 @@ public sealed class ZeroCodecVideoDecoder : IVideoCodecDecoder<ZeroCodecVideoDec
     this._canvas = new byte[width * height * 2];
   }
 
+  /// <summary>Gets the codec name.</summary>
   public static string CodecName => "ZeroCodec";
 
+  /// <summary>Determines whether the specified media stream is supported.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
     return stream.Kind == MediaStreamKind.Video && stream.Codec.EqualsIgnoringCase(_Tag);
   }
 
+  /// <summary>Creates a decoder for the specified media stream.</summary>
   public static ZeroCodecVideoDecoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
@@ -114,6 +117,7 @@ public sealed class ZeroCodecVideoDecoder : IVideoCodecDecoder<ZeroCodecVideoDec
     return new(stream.Width, stream.Height, stream.Index);
   }
 
+  /// <summary>Attempts to decode the specified coded packet into a raw image frame.</summary>
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
     var frameBytes = this._canvas.Length;
     var decoded = new byte[frameBytes];
