@@ -53,16 +53,16 @@ jobs:
           if (-not $imageGenerator.Contains('Represents an unknown or unsupported image format.')) {
             $imageGenerator = $imageGenerator.Replace($imageUnknown, $imageUnknownDocs)
           }
-          $imageLoop = (@'
-    foreach (var format in formats)
-      sb.Append("  ").Append(format.FormatId).AppendLine(",");
-'@).Replace("`r`n", "`n")
-          $imageLoopDocs = (@'
-    foreach (var format in formats) {
-      sb.Append("  /// <summary>Represents the ").Append(format.FormatId).AppendLine(" image format.</summary>");
-      sb.Append("  ").Append(format.FormatId).AppendLine(",");
-    }
-'@).Replace("`r`n", "`n")
+          $imageLoop = @(
+            '    foreach (var format in formats)'
+            '      sb.Append("  ").Append(format.FormatId).AppendLine(",");'
+          ) -join "`n"
+          $imageLoopDocs = @(
+            '    foreach (var format in formats) {'
+            '      sb.Append("  /// <summary>Represents the ").Append(format.FormatId).AppendLine(" image format.</summary>");'
+            '      sb.Append("  ").Append(format.FormatId).AppendLine(",");'
+            '    }'
+          ) -join "`n"
           if (-not $imageGenerator.Contains(' image format.</summary>')) {
             if (-not $imageGenerator.Contains($imageLoop)) { throw 'ImageFormat generator loop not found.' }
             $imageGenerator = $imageGenerator.Replace($imageLoop, $imageLoopDocs)
@@ -76,16 +76,16 @@ jobs:
           if (-not $videoGenerator.Contains('Represents an unknown or unsupported video container format.')) {
             $videoGenerator = $videoGenerator.Replace($videoUnknown, $videoUnknownDocs)
           }
-          $videoLoop = (@'
-    foreach (var container in discovery.Containers)
-      sb.Append("  ").Append(container.FormatId).AppendLine(",");
-'@).Replace("`r`n", "`n")
-          $videoLoopDocs = (@'
-    foreach (var container in discovery.Containers) {
-      sb.Append("  /// <summary>Represents the ").Append(container.FormatId).AppendLine(" video container format.</summary>");
-      sb.Append("  ").Append(container.FormatId).AppendLine(",");
-    }
-'@).Replace("`r`n", "`n")
+          $videoLoop = @(
+            '    foreach (var container in discovery.Containers)'
+            '      sb.Append("  ").Append(container.FormatId).AppendLine(",");'
+          ) -join "`n"
+          $videoLoopDocs = @(
+            '    foreach (var container in discovery.Containers) {'
+            '      sb.Append("  /// <summary>Represents the ").Append(container.FormatId).AppendLine(" video container format.</summary>");'
+            '      sb.Append("  ").Append(container.FormatId).AppendLine(",");'
+            '    }'
+          ) -join "`n"
           if (-not $videoGenerator.Contains(' video container format.</summary>')) {
             if (-not $videoGenerator.Contains($videoLoop)) { throw 'VideoFormat generator loop not found.' }
             $videoGenerator = $videoGenerator.Replace($videoLoop, $videoLoopDocs)
