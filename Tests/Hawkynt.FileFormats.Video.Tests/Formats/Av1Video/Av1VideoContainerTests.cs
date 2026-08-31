@@ -10,9 +10,11 @@ public sealed class Av1VideoContainerTests {
 
   [Test]
   [Category("Unit")]
-  public void Signature_RecognizesCanonicalTemporalDelimiter() {
+  public void Signature_RecognizesTemporalDelimiterWithOrWithoutExtensionHeader() {
     Assert.That(Av1VideoContainer.MatchesSignature([0x12, 0x00, 0x32, 0x01, 0xAA]), Is.True);
+    Assert.That(Av1VideoContainer.MatchesSignature([0x16, 0x00, 0x00, 0x32, 0x01, 0xAA]), Is.True);
     Assert.That(Av1VideoContainer.MatchesSignature([0x32, 0x01, 0xAA]), Is.Null);
+    Assert.That(Av1VideoContainer.MatchesSignature([0x16, 0x01, 0x00]), Is.Null);
   }
 
   [Test]
@@ -49,13 +51,14 @@ public sealed class Av1VideoContainerTests {
 
   [Test]
   [Category("Unit")]
-  public void Writer_PreservesAnExistingTemporalDelimiter() {
+  public void Writer_PreservesAnExistingExtendedTemporalDelimiter() {
     var stream = _Av1Stream();
-    byte[] unit = [0x12, 0x00, 0x32, 0x01, 0xAA];
+    byte[] unit = [0x16, 0x00, 0x00, 0x32, 0x01, 0xAA];
 
     var file = VideoIO.Mux<Av1VideoWriter>([stream], [new CodedPacket(0, unit)]);
 
     Assert.That(file, Is.EqualTo(unit));
+    Assert.That(Av1VideoContainer.FromBytes(file), Is.Not.Null);
   }
 
   [Test]
@@ -82,6 +85,48 @@ public sealed class Av1VideoContainerTests {
 
   [Test]
   [Category("Unit")]
+  public void Reader_RejectsLeb128AboveAv1s32BitLimit() {
+    byte[] file = [0x12, 0x00, 0x32, 0x80, 0x80, 0x80, 0x80, 0x10];
+    var container = Av1VideoContainer.FromBytes(file);
+
+    var failure = Assert.Throws<InvalidDataException>(() => Av1VideoContainer.ReadPackets(container).ToArray());
+
+    Assert.That(failure!.Message, Does.Contain("32-bit LEB128 limit"));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void Reader_RejectsReservedExtensionHeaderBits() {
+    byte[] file = [0x12, 0x00, 0x36, 0x01, 0x00, 0xAA];
+    var container = Av1VideoContainer.FromBytes(file);
+
+    var failure = Assert.Throws<InvalidDataException>(() => Av1VideoContainer.ReadPackets(container).ToArray());
+
+    Assert.That(failure!.Message, Does.Contain("extension_header_reserved_3bits"));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void Reader_RejectsDelimiterOnlyTemporalUnit() {
+    var container = Av1VideoContainer.FromBytes([0x12, 0x00]);
+
+    var failure = Assert.Throws<InvalidDataException>(() => Av1VideoContainer.ReadPackets(container).ToArray());
+
+    Assert.That(failure!.Message, Does.Contain("only its temporal delimiter"));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void Reader_RejectsConsecutiveTemporalDelimiters() {
+    var container = Av1VideoContainer.FromBytes([0x12, 0x00, 0x12, 0x00, 0x32, 0x01, 0xAA]);
+
+    var failure = Assert.Throws<InvalidDataException>(() => Av1VideoContainer.ReadPackets(container).ToArray());
+
+    Assert.That(failure!.Message, Does.Contain("no content OBU"));
+  }
+
+  [Test]
+  [Category("Unit")]
   public void Writer_RejectsPacketContainingMoreThanOneTemporalUnit() {
     var stream = _Av1Stream();
     byte[] twoUnits = [0x12, 0x00, 0x32, 0x01, 0xAA, 0x12, 0x00, 0x32, 0x01, 0xBB];
@@ -90,6 +135,15 @@ public sealed class Av1VideoContainerTests {
       VideoIO.Mux<Av1VideoWriter>([stream], [new CodedPacket(0, twoUnits)]));
 
     Assert.That(failure!.Message, Does.Contain("second temporal unit"));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void Writer_RejectsDelimiterOnlyPacket() {
+    var failure = Assert.Throws<InvalidDataException>(() =>
+      VideoIO.Mux<Av1VideoWriter>([_Av1Stream()], [new CodedPacket(0, new byte[] { 0x12, 0x00 })]));
+
+    Assert.That(failure!.Message, Does.Contain("non-delimiter OBU"));
   }
 
   [Test]
