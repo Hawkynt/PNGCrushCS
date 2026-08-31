@@ -15,7 +15,6 @@ public sealed class Av1VideoContainer : IVideoContainerReader<Av1VideoContainer>
       Index = 0,
       Kind = MediaStreamKind.Video,
       Codec = CodecTag.FromCharacters("av01"),
-      CodecId = "AV1",
     },
   ];
 
