@@ -137,7 +137,7 @@ public sealed class MpegProgramStreamWriter : IVideoContainerWriter<MpegProgramS
     using var map = new MemoryStream(6 + mapLength);
     map.Write([0x00, 0x00, 0x01, MpegPsScanner.PROGRAM_STREAM_MAP]);
     ContainerWriterTools.WriteUInt16BigEndian(map, checked((ushort)mapLength));
-    map.WriteByte(0xE0); // current_next=1, single_extension_stream=1, reserved=1, version=0
+    map.WriteByte(0xE0); // current_next=1, reserved=3, version=0
     map.WriteByte(0xFF); // reserved and marker bit
     ContainerWriterTools.WriteUInt16BigEndian(map, 0); // no program descriptors
     ContainerWriterTools.WriteUInt16BigEndian(map, checked((ushort)elementaryMapLength));
