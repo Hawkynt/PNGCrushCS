@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 
 namespace FileFormat.Stad;
@@ -7,52 +6,55 @@ namespace FileFormat.Stad;
 /// <summary>Reads STAD compressed Atari ST screen images from bytes, streams, or file paths.</summary>
 public static class StadReader {
 
-  private static readonly byte[] _MagicPM85 = [(byte)'p', (byte)'M', (byte)'8', (byte)'5'];
-  private static readonly byte[] _MagicPM86 = [(byte)'p', (byte)'M', (byte)'8', (byte)'6'];
+  private const int _HeaderSize = 7;
 
   public static StadFile FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
       throw new FileNotFoundException("STAD file not found.", file.FullName);
-
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
   public static StadFile FromStream(Stream stream) {
     ArgumentNullException.ThrowIfNull(stream);
     if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
+      var data = new byte[checked((int)(stream.Length - stream.Position))];
       stream.ReadExactly(data);
       return FromBytes(data);
     }
+
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
     return FromBytes(ms.ToArray());
   }
 
   public static StadFile FromSpan(ReadOnlySpan<byte> data) {
-    if (data.Length < 4)
-      throw new InvalidDataException($"STAD data too small: expected at least 4 bytes, got {data.Length}.");
+    if (data.Length < _HeaderSize)
+      throw new InvalidDataException($"A STAD header is {_HeaderSize} bytes; this file is {data.Length}.");
 
-    // Check for pM85 or pM86 magic
-    if (_HasMagic(data, _MagicPM85) || _HasMagic(data, _MagicPM86)) {
-      if (data.Length < _HEADER_SIZE)
-        throw new InvalidDataException($"A STAD header is {_HEADER_SIZE} bytes; this file is {data.Length}.");
+    var packing = data[..4] switch {
+      [(byte)'p', (byte)'M', (byte)'8', (byte)'5'] => StadPacking.Horizontal,
+      [(byte)'p', (byte)'M', (byte)'8', (byte)'6'] => StadPacking.Vertical,
+      _ => throw new InvalidDataException("Invalid STAD signature; expected pM85 or pM86."),
+    };
 
-      var screen = _Decompress(data);
+    var idByte = data[4];
+    var packByte = data[5];
+    var specialByte = data[6];
+    if (idByte == specialByte)
+      throw new InvalidDataException("STAD id and special escape bytes must differ.");
 
-      // pM86 stores the screen a byte-column at a time rather than a row at a time.
-      return new StadFile { RawData = _HasMagic(data, _MagicPM86) ? _Transpose(screen) : screen };
-    }
+    var packedOrder = _Decompress(data[_HeaderSize..], idByte, packByte, specialByte);
+    var screen = packing == StadPacking.Horizontal ? packedOrder : _TransposeFromColumns(packedOrder);
 
-    // Fallback: treat as raw 32000-byte uncompressed screen data
-    if (data.Length == StadFile.ScreenDataSize) {
-      var rawData = new byte[StadFile.ScreenDataSize];
-      data.Slice(0, StadFile.ScreenDataSize).CopyTo(rawData);
-      return new StadFile { RawData = rawData };
-    }
-
-    throw new InvalidDataException("Invalid STAD data: unrecognized magic and size is not 32000 bytes.");
+    return new StadFile {
+      RawData = screen,
+      Packing = packing,
+      HasCompressionParameters = true,
+      IdByte = idByte,
+      PackByte = packByte,
+      SpecialByte = specialByte,
+    };
   }
 
   public static StadFile FromBytes(byte[] data) {
@@ -60,84 +62,58 @@ public static class StadReader {
     return FromSpan(data);
   }
 
-  private static bool _HasMagic(ReadOnlySpan<byte> data, byte[] magic) {
-    for (var i = 0; i < magic.Length; ++i)
-      if (data[i] != magic[i])
-        return false;
-    return true;
-  }
-
-  /// <summary>Bytes ahead of the packed screen: the magic, two bytes for one escape and three for the other.</summary>
-  private const int _HEADER_SIZE = 7;
-
-  /// <summary>
-  /// Expands the packed screen.
-  /// </summary>
   /// <remarks>
-  /// This was read as PackBits, which STAD is not, and the header was taken to be four bytes when it
-  /// is seven — so all three samples came back as noise where RECOIL and XnView agree on the picture.
-  /// <para/>
-  /// The three bytes after the magic set up two escapes, both chosen per file from bytes the screen
-  /// makes little use of:
-  /// <list type="bullet">
-  ///   <item>Byte 4 escapes a run of one particular value, and byte 5 is that value — whichever of
-  ///     0x00 or 0xFF the picture is mostly made of. One count byte follows, and it counts from
-  ///     nought, so a run is one longer than it says.</item>
-  ///   <item>Byte 6 escapes a run of anything else: the value follows, then the count, again one
-  ///     less than the run.</item>
-  ///   <item>Any other byte stands for itself.</item>
-  /// </list>
-  /// Worked out by rebuilding the screens RECOIL draws and reading the files against them. All three
-  /// samples now expand to exactly the 32000 bytes a high-resolution screen takes and match RECOIL
-  /// byte for byte.
+  /// Both count bytes are interpreted as count-minus-one. That behavior is pinned by the repository's
+  /// real STAD samples against RECOIL and XnView; some historical prose lists disagree for the second
+  /// escape, but using a raw count there does not reproduce those files.
   /// </remarks>
-  private static byte[] _Decompress(ReadOnlySpan<byte> data) {
-    var escapeRun = data[4];
-    var runValue = data[5];
-    var escapeAny = data[6];
-
+  private static byte[] _Decompress(ReadOnlySpan<byte> encoded, byte idByte, byte packByte, byte specialByte) {
     var screen = new byte[StadFile.ScreenDataSize];
-    var written = 0;
-    var pos = _HEADER_SIZE;
+    var source = 0;
+    var target = 0;
 
-    while (pos < data.Length && written < StadFile.ScreenDataSize) {
-      var control = data[pos++];
+    while (target < screen.Length) {
+      if (source >= encoded.Length)
+        throw new InvalidDataException($"STAD stream expands to only {target} of {StadFile.ScreenDataSize} bytes.");
 
-      if (control == escapeRun) {
-        if (pos >= data.Length)
-          break;
-
-        var run = Math.Min(data[pos++] + 1, StadFile.ScreenDataSize - written);
-        screen.AsSpan(written, run).Fill(runValue);
-        written += run;
+      var control = encoded[source++];
+      if (control == idByte) {
+        if (source >= encoded.Length)
+          throw new InvalidDataException("Truncated STAD pack-byte run.");
+        var count = encoded[source++] + 1;
+        if (target + count > screen.Length)
+          throw new InvalidDataException("STAD pack-byte run exceeds the screen bitmap.");
+        screen.AsSpan(target, count).Fill(packByte);
+        target += count;
         continue;
       }
 
-      if (control == escapeAny) {
-        if (pos + 1 >= data.Length)
-          break;
-
-        var value = data[pos++];
-        var run = Math.Min(data[pos++] + 1, StadFile.ScreenDataSize - written);
-        screen.AsSpan(written, run).Fill(value);
-        written += run;
+      if (control == specialByte) {
+        if (source + 1 >= encoded.Length)
+          throw new InvalidDataException("Truncated STAD arbitrary-byte run.");
+        var value = encoded[source++];
+        var count = encoded[source++] + 1;
+        if (target + count > screen.Length)
+          throw new InvalidDataException("STAD arbitrary-byte run exceeds the screen bitmap.");
+        screen.AsSpan(target, count).Fill(value);
+        target += count;
         continue;
       }
 
-      screen[written++] = control;
+      screen[target++] = control;
     }
+
+    if (source != encoded.Length)
+      throw new InvalidDataException("Unexpected trailing data after the complete STAD screen bitmap.");
 
     return screen;
   }
 
-  /// <summary>Puts a screen stored a byte-column at a time back into rows.</summary>
-  private static byte[] _Transpose(byte[] columns) {
+  private static byte[] _TransposeFromColumns(ReadOnlySpan<byte> columns) {
     var rows = new byte[columns.Length];
-
     for (var column = 0; column < StadFile.BytesPerRow; ++column)
       for (var row = 0; row < StadFile.PixelHeight; ++row)
         rows[row * StadFile.BytesPerRow + column] = columns[column * StadFile.PixelHeight + row];
-
     return rows;
   }
 }

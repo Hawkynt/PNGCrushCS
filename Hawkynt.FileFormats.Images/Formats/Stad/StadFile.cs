@@ -3,11 +3,12 @@ using FileFormat.Core;
 
 namespace FileFormat.Stad;
 
-/// <summary>In-memory representation of a STAD compressed Atari ST high-res screen image.</summary>
+/// <summary>In-memory representation of a STAD compressed Atari ST high-resolution screen image.</summary>
+[FormatMagicBytes([0x70, 0x4D, 0x38])]
 public readonly record struct StadFile : IImageFormatReader<StadFile>, IImageToRawImage<StadFile>, IImageFromRawImage<StadFile>, IImageFormatWriter<StadFile> {
 
   /// <summary>Decompressed screen data size in bytes (640x400 monochrome = 32000 bytes).</summary>
-  internal const int ScreenDataSize = 32000;
+  internal const int ScreenDataSize = 32_000;
 
   /// <summary>Fixed pixel width.</summary>
   internal const int PixelWidth = 640;
@@ -21,7 +22,7 @@ public readonly record struct StadFile : IImageFormatReader<StadFile>, IImageToR
   static string IImageFormatMetadata<StadFile>.PrimaryExtension => ".pac";
   static string[] IImageFormatMetadata<StadFile>.FileExtensions => [".pac"];
   static StadFile IImageFormatReader<StadFile>.FromSpan(ReadOnlySpan<byte> data) => StadReader.FromSpan(data);
-  static VideoMode[] IImageFormatMetadata<StadFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
+  static VideoMode[] IImageFormatMetadata<StadFile>.VideoModes => [new("Atari ST high resolution", [(PixelWidth, PixelHeight)], [2])];
   static byte[] IImageFormatWriter<StadFile>.ToBytes(StadFile file) => StadWriter.ToBytes(file);
 
   /// <summary>Always 640.</summary>
@@ -33,26 +34,20 @@ public readonly record struct StadFile : IImageFormatReader<StadFile>, IImageToR
   /// <summary>Raw decompressed screen data (32000 bytes).</summary>
   public byte[] RawData { get; init; }
 
-  /// <summary>Paper then ink: a clear bit is white, a set bit is black.</summary>
-  /// <remarks>
-  /// These were the other way round, so every STAD came out as its own negative — which the comment
-  /// below already said was wrong, having claimed a set bit meant black while the palette put white
-  /// there. All three samples now agree with RECOIL and XnView rather than inverting them.
-  /// </remarks>
+  /// <summary>Whether compressed bytes are stored row-first or byte-column-first.</summary>
+  public StadPacking Packing { get; init; }
+
+  // Parsed files retain their original compression header values so a caller that only reads and
+  // writes does not silently change them. Newly-authored files leave this false and choose fresh,
+  // deterministic values from the raster histogram.
+  internal bool HasCompressionParameters { get; init; }
+  internal byte IdByte { get; init; }
+  internal byte PackByte { get; init; }
+  internal byte SpecialByte { get; init; }
+
   private static readonly byte[] _BlackWhitePalette = [255, 255, 255, 0, 0, 0];
 
-  /// <summary>Converts the STAD screen to an Indexed1 raw image (640x400, B&amp;W palette).
-  /// Bit=1 means black (palette index 0), bit=0 means white (palette index 1).</summary>
-  /// <summary>
-  /// Reduces a picture to the monochrome screen, a set bit standing for black.
-  /// </summary>
-  /// <remarks>
-  /// The screen is uncompressed here; the packing that makes a STAD a STAD is the writer's, and it
-  /// picks its escape bytes from what the screen turns out to contain.
-  /// <para/>
-  /// The threshold is on brightness rather than on any one channel, so a coloured picture comes out
-  /// as the light and dark of itself.
-  /// </remarks>
+  /// <summary>Reduces a picture to the fixed 640x400 Atari ST monochrome screen.</summary>
   public static StadFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
 
@@ -67,23 +62,31 @@ public readonly record struct StadFile : IImageFormatReader<StadFile>, IImageToR
           screen[y * BytesPerRow + x / 8] |= (byte)(1 << (7 - (x % 8)));
       }
 
-    return new() { RawData = screen };
+    return new() {
+      RawData = screen,
+      Packing = StadWriter.SelectPacking(screen),
+    };
   }
 
+  /// <summary>Converts the STAD screen to an Indexed1 raw image with white paper and black ink.</summary>
   public static RawImage ToRawImage(StadFile file) {
-
-    var pixelData = new byte[BytesPerRow * PixelHeight];
-    var len = Math.Min(file.RawData.Length, pixelData.Length);
-    file.RawData.AsSpan(0, len).CopyTo(pixelData);
-
+    Validate(file, nameof(file));
     return new() {
       Width = PixelWidth,
       Height = PixelHeight,
       Format = PixelFormat.Indexed1,
-      PixelData = pixelData,
+      PixelData = file.RawData[..],
       Palette = _BlackWhitePalette[..],
       PaletteCount = 2,
     };
   }
 
+  internal static void Validate(StadFile file, string parameterName) {
+    if (file.RawData is null || file.RawData.Length != ScreenDataSize)
+      throw new ArgumentException($"STAD screen data must contain exactly {ScreenDataSize} bytes.", parameterName);
+    if (file.Packing is not StadPacking.Horizontal and not StadPacking.Vertical)
+      throw new ArgumentException($"Unsupported STAD packing value {(byte)file.Packing}.", parameterName);
+    if (file.HasCompressionParameters && file.IdByte == file.SpecialByte)
+      throw new ArgumentException("STAD id and special escape bytes must differ.", parameterName);
+  }
 }
