@@ -34453,6 +34453,14 @@ Implements `IEquatable<TinyFile>`, `IImageFormatMetadata<TinyFile>`, `IImageForm
 
 | Member | Signature | Summary |
 | --- | --- | --- |
+| `MaximumControlBytes` | `const int MaximumControlBytes` |  |
+| `MinimumControlBytes` | `const int MinimumControlBytes` |  |
+| `ScreenDataSize` | `const int ScreenDataSize` |  |
+| `ScreenWordCount` | `const int ScreenWordCount` |  |
+| `AnimationDuration` | `ushort AnimationDuration { get; init; }` |  |
+| `AnimationLimits` | `byte AnimationLimits { get; init; }` |  |
+| `AnimationSpeedDirection` | `sbyte AnimationSpeedDirection { get; init; }` |  |
+| `HasColorAnimation` | `bool HasColorAnimation { get; init; }` |  |
 | `Height` | `int Height { get; init; }` |  |
 | `Palette` | `short[] Palette { get; init; }` |  |
 | `PixelData` | `byte[] PixelData { get; init; }` |  |
