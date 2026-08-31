@@ -271,8 +271,10 @@ public sealed class MpegProgramStreamDescriptorTests {
   private static byte[] _Picture() => [0x00, 0x00, 0x01, 0x00, 0x11, 0x22, 0x33, 0x44];
 
   private static void _WriteUInt16(Stream output, int value) {
-    output.WriteByte(checked((byte)(value >> 8)));
-    output.WriteByte(checked((byte)value));
+    if ((uint)value > ushort.MaxValue)
+      throw new ArgumentOutOfRangeException(nameof(value));
+    output.WriteByte((byte)(value >> 8));
+    output.WriteByte((byte)(value & 0xFF));
   }
 
   private static uint _Crc(ReadOnlySpan<byte> data) {
