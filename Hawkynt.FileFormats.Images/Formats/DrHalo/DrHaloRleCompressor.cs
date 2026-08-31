@@ -5,9 +5,9 @@ namespace FileFormat.DrHalo;
 
 /// <summary>Dr. Halo CUT per-scanline run-length coding.</summary>
 /// <remarks>
-/// A command byte governs what follows it: zero ends the row, a byte with its top bit set repeats
-/// the next byte that many times over, and one without it introduces that many literals. Both forms
-/// count in the low seven bits, so a run and a literal block are each at most 127 long.
+/// A command byte governs what follows it: a count of zero ends the row, a byte with its top bit set
+/// repeats the next byte that many times over, and one without it introduces that many literals.
+/// Both forms count in the low seven bits, so a run and a literal block are each at most 127 long.
 /// <para/>
 /// This used to write every packet as a plain count followed by a value — the run form without its
 /// top bit, which is the literal form. A reader following it takes the value byte as the first of a
@@ -67,35 +67,44 @@ internal static class DrHaloRleCompressor {
   }
 
   public static byte[] DecompressScanline(ReadOnlySpan<byte> data, int width) {
+    if (width <= 0)
+      throw new InvalidDataException("Dr. Halo scanline width must be positive.");
+
     var output = new byte[width];
     var at = 0;
     var written = 0;
 
-    while (at < data.Length && written < width) {
+    while (at < data.Length) {
       var command = data[at++];
-      if (command == 0)
-        break;
-
       var count = command & _MaxRun;
+      if (count == 0) {
+        if (written != width)
+          throw new InvalidDataException($"Dr. Halo scanline ended after {written} of {width} pixels.");
+        if (at != data.Length)
+          throw new InvalidDataException("Unexpected bytes after the Dr. Halo scanline terminator.");
+        return output;
+      }
+
+      if (written + count > width)
+        throw new InvalidDataException("Dr. Halo RLE packet overruns the declared scanline width.");
+
       if ((command & _RunFlag) != 0) {
         if (at >= data.Length)
-          break;
+          throw new InvalidDataException("Truncated Dr. Halo repeated-value packet.");
 
-        var value = data[at++];
-        for (var i = 0; i < count && written < width; ++i)
-          output[written++] = value;
-
+        output.AsSpan(written, count).Fill(data[at++]);
+        written += count;
         continue;
       }
 
-      for (var i = 0; i < count && written < width; ++i) {
-        if (at >= data.Length)
-          break;
+      if (at + count > data.Length)
+        throw new InvalidDataException("Truncated Dr. Halo literal packet.");
 
-        output[written++] = data[at++];
-      }
+      data.Slice(at, count).CopyTo(output.AsSpan(written, count));
+      at += count;
+      written += count;
     }
 
-    return output;
+    throw new InvalidDataException("Dr. Halo scanline is missing its end marker.");
   }
 }
