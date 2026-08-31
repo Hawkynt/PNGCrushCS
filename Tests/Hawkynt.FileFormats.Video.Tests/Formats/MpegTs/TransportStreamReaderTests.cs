@@ -65,9 +65,6 @@ public sealed class TransportStreamReaderTests {
   [Test]
   [Category("Unit")]
   public void TheStrideIsMeasuredAndNotTakenFromTheName() {
-    // A Blu-ray or AVCHD file puts a four-byte arrival timecode in front of every packet, so the
-    // packets are 188 bytes long inside a stride of 192 and the first sync byte is at offset four.
-    // A reader that assumed 188 would find the sync byte missing from the second packet onwards.
     var units = _Units(3);
     var plain = TransportStreamTestContainer.Build(_VIDEO_ONLY, units);
     var timecoded = TransportStreamTestContainer.Build(_VIDEO_ONLY, units, stride: 192);
@@ -92,8 +89,6 @@ public sealed class TransportStreamReaderTests {
   [Test]
   [Category("Unit")]
   public void OneSyncByteIsNotEnoughToClaimTheFormat() {
-    // The sync byte is the letter G, and a GIF begins with one. Four packets in a row put a
-    // coincidence at one in sixteen million; a single byte would claim a good deal that is not this.
     var gif = new byte[1024];
     gif[0] = (byte)'G';
     gif[1] = (byte)'I';
@@ -105,8 +100,6 @@ public sealed class TransportStreamReaderTests {
   [Test]
   [Category("Unit")]
   public void AFileWithNoProgramAssociationTableIsRefusedByName() {
-    // Nothing else in a transport stream says which PIDs carry streams. Reporting none would be
-    // indistinguishable from a multiplex that really carries none.
     var file = TransportStreamTestContainer.Build(_VIDEO_ONLY, _Units(2));
     var at = TransportStreamTestContainer.IndexOf(file, 0x0000) * TransportStreamTestContainer.PACKET_SIZE;
     file[at + 1] = (byte)(file[at + 1] & 0xE0 | 0x1F);
@@ -128,9 +121,6 @@ public sealed class TransportStreamReaderTests {
   [Test]
   [Category("Unit")]
   public void ASectionTooLongForOnePacketIsAssembledAcrossThem() {
-    // A program map describing more than about twenty streams does not fit in the 183 bytes a packet
-    // has room for. A reader that took a section to be one packet's payload would be right about
-    // every small table and wrong about this one.
     var many = new TsTestStream[40];
     for (var i = 0; i < many.Length; ++i)
       many[i] = new(0x0200 + i, 0x02);
@@ -143,10 +133,6 @@ public sealed class TransportStreamReaderTests {
   [Test]
   [Category("Unit")]
   public void ASectionWhoseCrcDoesNotCheckOutIsNotATable() {
-    // The tables repeat every hundred milliseconds precisely because a broadcast loses packets, so a
-    // section assembled across a loss is bytes from two copies of the table. Reading it would invent
-    // streams; dropping it costs nothing when the next copy is a tenth of a second away — and this
-    // file has no next copy, so the whole thing is refused rather than half read.
     var file = TransportStreamTestContainer.Build(_VIDEO_ONLY, _Units(2));
     var at = TransportStreamTestContainer.IndexOf(file, TransportStreamTestContainer.PROGRAM_MAP_PID) * TransportStreamTestContainer.PACKET_SIZE;
     file[at + 10] ^= 0xFF;
@@ -161,8 +147,6 @@ public sealed class TransportStreamReaderTests {
   [Test]
   [Category("Unit")]
   public void AUnitIsAssembledOutOfEveryPacketItWasCutInto() {
-    // 1469 bytes of one ffmpeg-written picture arrive as 157 in the packet that starts it, seven
-    // whole packets of 184, and 24 in the last — which ffprobe reports as one packet of 1469.
     var payloads = new[] { _Payload(1, 1469), _Payload(2, 480), _Payload(3, 113) };
     var file = TransportStreamTestContainer.Build(
       _VIDEO_ONLY,
@@ -178,8 +162,6 @@ public sealed class TransportStreamReaderTests {
   [Test]
   [Category("Unit")]
   public void APacketHoldsTheElementaryBytesAndNoneOfTheFraming() {
-    // Neither the four-byte transport header, nor the adaptation field, nor the PES header. ffprobe
-    // reports 1469 for a picture whose PES packet is 1469 plus fourteen bytes of header.
     var payload = _Payload(4, 200);
     var file = TransportStreamTestContainer.Build(_VIDEO_ONLY, [new(_VIDEO_PID, payload, 90000, 90000)]);
 
@@ -189,9 +171,6 @@ public sealed class TransportStreamReaderTests {
   [Test]
   [Category("Unit")]
   public void AnAdaptationFieldIsSkippedRatherThanTakenForPayload() {
-    // Every packet that carries a clock reference or a random access indicator has one, and the last
-    // packet of every unit has one as padding. A reader that read from byte four would prefix each
-    // packet with however many bytes of adaptation field the writer used.
     var payload = _Payload(5, 300);
     var file = TransportStreamTestContainer.Build(_VIDEO_ONLY, [new(_VIDEO_PID, payload, 90000, 90000, RandomAccess: true)]);
 
@@ -204,11 +183,6 @@ public sealed class TransportStreamReaderTests {
   [Test]
   [Category("Unit")]
   public void OnlyTheRandomAccessIndicatorSaysWhereDecodingMayBegin() {
-    // The container's own statement, and the only one it makes: whether a unit is a picture that can
-    // be decoded on its own is otherwise inside the coded bytes, and reading those would be the
-    // codec's job. ffprobe agrees for the file measured here — it flags the one packet whose
-    // adaptation field sets the indicator — but it reaches that answer through its parser, and with
-    // the parser off it flags nothing at all.
     var file = TransportStreamTestContainer.Build(_VIDEO_ONLY, [
       new(_VIDEO_PID, _Payload(1, 100), 90000, 90000, RandomAccess: true),
       new(_VIDEO_PID, _Payload(2, 100), 99000, 99000),
@@ -221,8 +195,6 @@ public sealed class TransportStreamReaderTests {
   [Test]
   [Category("Unit")]
   public void AUnitThatStatesNoLengthEndsWhereTheNextOneBegins() {
-    // Which is what every muxer writes for pictures, because a coded picture has no length until it
-    // has been coded. The last one of a file is only ended by the file ending.
     var file = TransportStreamTestContainer.Build(_VIDEO_ONLY, [
       new(_VIDEO_PID, _Payload(1, 500), 90000, 90000),
       new(_VIDEO_PID, _Payload(2, 40), 99000, 99000),
@@ -234,8 +206,6 @@ public sealed class TransportStreamReaderTests {
   [Test]
   [Category("Unit")]
   public void AUnitThatStatesItsLengthEndsThereAndTheRestOfThePacketIsStuffing() {
-    // Which is what a muxer writes for sound. ffprobe reports 2829 for a PES packet declaring 2837,
-    // the eight bytes of difference being the optional header it declares in front of its payload.
     var payload = _Payload(6, 2829);
     var file = TransportStreamTestContainer.Build(
       _VIDEO_AND_AUDIO,
@@ -250,10 +220,6 @@ public sealed class TransportStreamReaderTests {
   [Test]
   [Category("Unit")]
   public void PacketsComeOutInTheOrderTheyAreFinishedAndNotTheOrderTheyBegin() {
-    // The consequence of pictures stating no length: a picture is handed over at the moment the next
-    // one starts, so a unit of sound that began after it and finished before it comes out first.
-    // ffprobe reports exactly this order for the file this was measured on — three pictures, then the
-    // sound that began after the third, then the fourth picture.
     var file = TransportStreamTestContainer.Build(_VIDEO_AND_AUDIO, [
       new(_VIDEO_PID, _Payload(1, 300), 135000, 126000, RandomAccess: true),
       new(_VIDEO_PID, _Payload(2, 300), 144000, 135000),
@@ -284,10 +250,6 @@ public sealed class TransportStreamReaderTests {
   [Test]
   [Category("Unit")]
   public void ATimestampNearTheTopOfItsThirtyThreeBitsIsReadWhole() {
-    // A timestamp is scattered across five bytes in three runs with a marker bit between them, and
-    // the marker bits are one. A reader that took the five bytes as a number would be out by the
-    // three of them; one that dropped the top run would be right for the first 2^30 units, three
-    // hours and twenty minutes, and then start over.
     const long LATE = 0x1_FEDC_BA98;
     var file = TransportStreamTestContainer.Build(_VIDEO_ONLY, [new(_VIDEO_PID, _Payload(1, 40), LATE, LATE - 9000)]);
 
@@ -300,9 +262,6 @@ public sealed class TransportStreamReaderTests {
   [Test]
   [Category("Unit")]
   public void AUnitWithOnlyAPresentationTimeIsDecodedWhenItIsPresented() {
-    // What the standard says, and what ffprobe reports for the sound of every multiplex measured
-    // here: the same number in both columns. Leaving the decode time unstated would report less than
-    // the file says.
     var file = TransportStreamTestContainer.Build(
       _VIDEO_AND_AUDIO,
       [new(_AUDIO_PID, _Payload(1, 200), 132910, StreamId: 0xC0, DeclareLength: true)]);
@@ -360,8 +319,6 @@ public sealed class TransportStreamReaderTests {
   [Test]
   [Category("Unit")]
   public void APacketLostInTheMiddleOfAUnitIsRefusedByName() {
-    // What the continuity counter is for. The unit around the loss is short by 184 bytes, and handing
-    // it over would report a frame with a hole in it as a whole one.
     var file = TransportStreamTestContainer.Build(_VIDEO_ONLY, [
       new(_VIDEO_PID, _Payload(1, 900), 90000, 90000),
       new(_VIDEO_PID, _Payload(2, 100), 99000, 99000),
@@ -375,9 +332,6 @@ public sealed class TransportStreamReaderTests {
   [Test]
   [Category("Unit")]
   public void APacketSentTwiceIsNotCountedTwice() {
-    // The standard allows a packet to be repeated so a receiver that lost the first still gets it.
-    // The repeat carries the same counter and the same bytes; appending it would double 184 bytes in
-    // the middle of a unit and make every packet after it come out wrong.
     var file = TransportStreamTestContainer.Build(_VIDEO_ONLY, [new(_VIDEO_PID, _Payload(1, 600), 90000, 90000)]);
     var index = TransportStreamTestContainer.IndexOf(file, _VIDEO_PID, 1);
     var at = index * TransportStreamTestContainer.PACKET_SIZE;
@@ -405,16 +359,11 @@ public sealed class TransportStreamReaderTests {
   [Test]
   [Category("Unit")]
   public void AUnitWhoseStatedLengthTheNextOneCutsShortIsRefusedByName() {
-    // The next unit has started before this one finished, so bytes of it are missing from somewhere
-    // in the middle. It is the one case where handing the unit over would produce a packet padded out
-    // with zeroes to the length it claimed — a partly-read packet reported as a whole one.
     var file = TransportStreamTestContainer.Build(_VIDEO_AND_AUDIO, [
       new(_AUDIO_PID, _Payload(1, 200), 132910, StreamId: 0xC0, StatedLength: 4000),
       new(_AUDIO_PID, _Payload(2, 200), 135000, StreamId: 0xC0, DeclareLength: true),
     ]);
 
-    // 4006 rather than 4000: the field states everything after itself, so the whole packet is the six
-    // bytes of prefix and length plus what those bytes claim.
     var failure = Assert.Throws<InvalidDataException>(() => _Packets(file));
     Assert.That(failure!.Message, Does.Contain("4006"));
   }
@@ -422,7 +371,6 @@ public sealed class TransportStreamReaderTests {
   [Test]
   [Category("Unit")]
   public void AScrambledPacketIsRefusedByName() {
-    // What is behind the scrambling control bits is ciphertext, not the codec's bytes.
     var file = TransportStreamTestContainer.Build(_VIDEO_ONLY, _Units(2));
     var at = TransportStreamTestContainer.IndexOf(file, _VIDEO_PID) * TransportStreamTestContainer.PACKET_SIZE;
     file[at + 3] |= 0xC0;
@@ -460,9 +408,6 @@ public sealed class TransportStreamReaderTests {
   [Test]
   [Category("Unit")]
   public void StreamsAreNumberedInTheOrderTheProgramMapDeclaresThem() {
-    // Which is what ffprobe reports: the video on PID 0x100 as stream 0 and the sound on 0x101 as
-    // stream 1, in the order the map lists them rather than in PID order or in the order their
-    // packets happen to start.
     var file = TransportStreamTestContainer.Build(
       [new(_AUDIO_PID, 0x0F), new(_VIDEO_PID, 0x02)],
       [new(_VIDEO_PID, _Payload(1, 40), 90000, 90000)]);
@@ -482,9 +427,6 @@ public sealed class TransportStreamReaderTests {
   [TestCase(0x81, "ac-3", MediaStreamKind.Audio)]
   [Category("Unit")]
   public void AStreamTypeIsReportedUnderTheCodeTheWorldNamesItBy(int streamType, string expected, MediaStreamKind kind) {
-    // A transport stream numbers its codings the way an FLV does. The number is translated into the
-    // code the same stream carries in every other container and kept beside it as the handler, so a
-    // decoder written against an AVI does not have to know this format's numbering as well.
     var file = TransportStreamTestContainer.Build(
       [new(_VIDEO_PID, streamType)],
       [new(_VIDEO_PID, _Payload(1, 40), 90000, 90000)]);
@@ -499,8 +441,6 @@ public sealed class TransportStreamReaderTests {
   [Test]
   [Category("Unit")]
   public void MpegAudioKeepsItsNumberRatherThanBorrowingACodeForOneOfItsLayers() {
-    // Stream type 3 is "MPEG-1 audio" whatever layer it turns out to be, the layer is in the frame
-    // header and so is the codec's business, and .mp3 names one layer rather than the family.
     var file = TransportStreamTestContainer.Build(
       [new(_AUDIO_PID, 0x03)],
       [new(_AUDIO_PID, _Payload(1, 40), 90000, StreamId: 0xC0, DeclareLength: true)]);
@@ -514,9 +454,6 @@ public sealed class TransportStreamReaderTests {
   [Test]
   [Category("Unit")]
   public void ARegistrationDescriptorNamesACodingTheStreamTypeDoesNot() {
-    // Stream type 0x06 is "private data in PES packets" and says nothing at all. The four characters
-    // in a registration descriptor are the muxer stating what it really put there, which is how AC-3,
-    // Opus and AV1 travel in a transport stream at all.
     byte[] descriptors = [0x05, 0x04, (byte)'A', (byte)'C', (byte)'-', (byte)'3', 0x6A, 0x01, 0x00];
     var file = TransportStreamTestContainer.Build(
       [new(_AUDIO_PID, 0x06, descriptors)],
@@ -531,9 +468,6 @@ public sealed class TransportStreamReaderTests {
   [Test]
   [Category("Unit")]
   public void APrivateStreamWithNothingIdentifyingItIsReportedAsData() {
-    // Which is what a Blu-ray file's sound comes back as, and it is the honest answer: its program
-    // map declares stream type 0x06 with no descriptor at all, and ffprobe only calls it AAC because
-    // it probes the coded bytes — a decoder's reading of the file, not the container's.
     var file = TransportStreamTestContainer.Build(
       [new(_AUDIO_PID, 0x06)],
       [new(_AUDIO_PID, _Payload(1, 40), 90000, StreamId: 0xBD, DeclareLength: true)]);
@@ -547,9 +481,6 @@ public sealed class TransportStreamReaderTests {
   [Test]
   [Category("Unit")]
   public void AStreamsDescriptorsAreCarriedAcrossVerbatim() {
-    // The whole of what a transport stream says about a coding that is not inside the elementary
-    // stream itself. Picking a descriptor out and interpreting it would be the container doing a
-    // codec's work.
     byte[] descriptors = [0x0A, 0x04, (byte)'d', (byte)'e', (byte)'u', 0x00];
     var file = TransportStreamTestContainer.Build(
       [new(_AUDIO_PID, 0x0F, descriptors)],
@@ -557,17 +488,14 @@ public sealed class TransportStreamReaderTests {
 
     var stream = TransportStreamContainer.Streams(TransportStreamReader.FromBytes(file))[0];
 
-    Assert.That(stream.CodecPrivateData.ToArray(), Is.EqualTo(descriptors));
+    Assert.That(stream.ContainerPrivateData.ToArray(), Is.EqualTo(descriptors));
+    Assert.That(stream.CodecPrivateData, Is.Empty);
     Assert.That(stream.Language, Is.EqualTo("deu"));
   }
 
   [Test]
   [Category("Unit")]
   public void NothingIsReportedAboutAPictureThatIsNotInTheTables() {
-    // A transport stream states no size and no frame rate anywhere. ffprobe reports 64x48 and ten
-    // frames a second for the file measured here because it decoded the sequence header to find out,
-    // which is a decoder's reading. Inventing them here would hand a decoder a size the file never
-    // claimed.
     var file = TransportStreamTestContainer.Build(_VIDEO_ONLY, _Units(2));
 
     var stream = TransportStreamContainer.Streams(TransportStreamReader.FromBytes(file))[0];
@@ -585,8 +513,6 @@ public sealed class TransportStreamReaderTests {
   [Test]
   [Category("Unit")]
   public void TheServiceDescriptionIsTheOnlyThingInAMultiplexThatIsATitle() {
-    // ffmpeg writes "Service01" and "FFmpeg" into every transport stream it muxes, and ffprobe
-    // reports them as the program's service_name and service_provider.
     var file = TransportStreamTestContainer.Build(
       _VIDEO_ONLY, _Units(2), serviceName: "Service01", serviceProvider: "FFmpeg");
 
@@ -609,9 +535,6 @@ public sealed class TransportStreamReaderTests {
     Assert.That(metadata.EncodedBy, Is.Null);
     Assert.That(metadata.CreationTime, Is.Null);
     Assert.That(metadata.TextEntries, Is.Empty);
-
-    // No duration either. A transport stream has no header to have written one into, and the only
-    // clock in it says when a packet is due rather than how long the recording is.
     Assert.That(metadata.Duration, Is.Null);
     Assert.That(metadata.Streams, Has.Count.EqualTo(2));
   }
@@ -631,7 +554,6 @@ public sealed class TransportStreamReaderTests {
     return result;
   }
 
-  /// <summary>Bytes no two of which are alike, so a packet assembled out of the wrong pieces is visible.</summary>
   private static byte[] _Payload(int seed, int length) {
     var result = new byte[length];
     for (var i = 0; i < length; ++i)
