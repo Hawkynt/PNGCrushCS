@@ -11012,16 +11012,22 @@ Implements `IEquatable<DaliSTFile>`, `IImageFormatMetadata<DaliSTFile>`, `IImage
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `ExpectedFileSize` | `const int ExpectedFileSize` |  |
+| `FileIdSize` | `const int FileIdSize` |  |
 | `HeaderSize` | `const int HeaderSize` |  |
 | `PaletteOffset` | `const int PaletteOffset` |  |
 | `PaletteSize` | `const int PaletteSize` |  |
 | `PlanarDataSize` | `const int PlanarDataSize` |  |
+| `ReservedOffset` | `const int ReservedOffset` |  |
+| `ReservedSize` | `const int ReservedSize` |  |
 | `Height` | `int Height { get; init; }` |  |
 | `Palette` | `short[] Palette { get; init; }` |  |
 | `PixelData` | `byte[] PixelData { get; init; }` |  |
+| `ReservedData` | `byte[] ReservedData { get; init; }` |  |
 | `Resolution` | `DaliSTResolution Resolution { get; init; }` |  |
 | `Width` | `int Width { get; init; }` |  |
 | `FromRawImage` | `static DaliSTFile FromRawImage(RawImage image)` |  |
+| `FromRawImage` | `static DaliSTFile FromRawImage(RawImage image, DaliSTResolution resolution)` |  |
+| `FromRawImage` | `static DaliSTFile FromRawImage(RawImage image, string extension)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(DaliSTFile file)` |  |
 
 #### `DaliSTReader`
