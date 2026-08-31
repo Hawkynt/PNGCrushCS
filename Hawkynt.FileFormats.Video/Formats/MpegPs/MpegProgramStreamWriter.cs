@@ -10,7 +10,7 @@ namespace FileFormat.MpegPs;
 public sealed class MpegProgramStreamWriter : IVideoContainerWriter<MpegProgramStreamWriter> {
 
   private readonly record struct StreamAddress(byte StreamId, byte? SubstreamId, int PrivatePrefixLength);
-  private readonly record struct StreamMapEntry(byte StreamType, byte StreamId);
+  private readonly record struct StreamMapEntry(byte StreamType, byte StreamId, ReadOnlyMemory<byte> Descriptors);
 
   private readonly IReadOnlyList<MediaStreamInfo> _streams;
   private readonly StreamAddress[] _addresses;
@@ -36,6 +36,9 @@ public sealed class MpegProgramStreamWriter : IVideoContainerWriter<MpegProgramS
       var stream = streams[i] ?? throw new ArgumentException($"Stream {i} is null.", nameof(streams));
       if (stream.Index != i)
         throw new ArgumentException($"Program-stream streams must be indexed densely from zero; position {i} has index {stream.Index}.", nameof(streams));
+      if (!stream.CodecPrivateData.IsEmpty)
+        throw new NotSupportedException(
+          $"Program-stream muxing has no field for codec-private data on stream {i}; it must already be represented in the elementary-stream bytes.");
 
       StreamAddress address;
       if (stream.Kind == MediaStreamKind.Video) {
@@ -69,11 +72,14 @@ public sealed class MpegProgramStreamWriter : IVideoContainerWriter<MpegProgramS
           duplicate = true;
           if (entry.StreamType != streamType)
             throw new NotSupportedException($"Program-stream id 0x{address.StreamId:X2} would need conflicting stream types 0x{entry.StreamType:X2} and 0x{streamType:X2}.");
+          if (!entry.Descriptors.Span.SequenceEqual(stream.ContainerPrivateData.Span))
+            throw new NotSupportedException(
+              $"Program-stream id 0x{address.StreamId:X2} is shared by several streams whose container descriptor loops differ; a program stream map can carry only one loop for that id.");
           break;
         }
 
       if (!duplicate)
-        streamMap.Add(new(streamType, address.StreamId));
+        streamMap.Add(new(streamType, address.StreamId, stream.ContainerPrivateData));
     }
 
     this._streams = streams;
@@ -129,7 +135,14 @@ public sealed class MpegProgramStreamWriter : IVideoContainerWriter<MpegProgramS
   }
 
   private void _WriteProgramStreamMap() {
-    var elementaryMapLength = checked(4 * this._streamMap.Length);
+    var elementaryMapLength = 0;
+    foreach (var entry in this._streamMap) {
+      if (entry.Descriptors.Length > ushort.MaxValue)
+        throw new NotSupportedException(
+          $"Program-stream descriptor loop for stream id 0x{entry.StreamId:X2} exceeds its 16-bit length field.");
+      elementaryMapLength = checked(elementaryMapLength + 4 + entry.Descriptors.Length);
+    }
+
     var mapLength = checked(10 + elementaryMapLength);
     if (mapLength > 0x03FA)
       throw new NotSupportedException("MPEG program-stream map exceeds its 1018-byte H.222.0 limit.");
@@ -145,7 +158,8 @@ public sealed class MpegProgramStreamWriter : IVideoContainerWriter<MpegProgramS
     foreach (var entry in this._streamMap) {
       map.WriteByte(entry.StreamType);
       map.WriteByte(entry.StreamId);
-      ContainerWriterTools.WriteUInt16BigEndian(map, 0); // no elementary-stream descriptors
+      ContainerWriterTools.WriteUInt16BigEndian(map, checked((ushort)entry.Descriptors.Length));
+      map.Write(entry.Descriptors.Span);
     }
 
     var withoutCrc = map.ToArray();
