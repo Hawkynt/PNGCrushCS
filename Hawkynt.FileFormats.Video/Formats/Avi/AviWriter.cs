@@ -8,8 +8,10 @@ using Hawkynt.FileFormats.Video;
 
 namespace FileFormat.Avi;
 
-/// <summary>Writes a conventional RIFF AVI with one movi chunk per coded packet and an idx1 index.</summary>
+/// <summary>Writes a single-RIFF AVI with OpenDML stream indexes and extended header while retaining the legacy idx1 index.</summary>
 public sealed class AviWriter : IVideoContainerWriter<AviWriter> {
+
+  private readonly record struct IndexEntry(int StreamIndex, string Id, uint Flags, uint Offset, uint Size);
 
   private readonly IReadOnlyList<MediaStreamInfo> _streams;
   private readonly VideoMetadata _metadata;
@@ -61,23 +63,9 @@ public sealed class AviWriter : IVideoContainerWriter<AviWriter> {
       largestPacket = Math.Max(largestPacket, packet.Data.Length);
     }
 
-    using var body = new MemoryStream();
-    ContainerWriterTools.WriteAscii(body, "AVI ");
-
-    ContainerWriterTools.WriteRiffList(body, "hdrl", hdrl => {
-      ContainerWriterTools.WriteRiffChunk(hdrl, "avih", this._MainHeader(packetCounts, largestPacket));
-      for (var i = 0; i < this._streams.Count; ++i) {
-        var index = i;
-        ContainerWriterTools.WriteRiffList(hdrl, "strl", strl => this._WriteStreamList(strl, this._streams[index], packetCounts[index], largestPacket));
-      }
-    });
-
-    if (!this._metadata.IsEmpty)
-      this._WriteInfo(body);
-
     using var movi = new MemoryStream();
     ContainerWriterTools.WriteAscii(movi, "movi");
-    var indexEntries = new List<(string Id, uint Flags, uint Offset, uint Size)>(this._packets.Count);
+    var indexEntries = new List<IndexEntry>(this._packets.Count);
 
     foreach (var packet in this._packets) {
       var info = this._streams[packet.StreamIndex];
@@ -86,8 +74,16 @@ public sealed class AviWriter : IVideoContainerWriter<AviWriter> {
       var data = packet.Data.Span;
       ContainerWriterTools.WriteRiffChunk(movi, id, data);
       var flags = info.Kind != MediaStreamKind.Video || packet.IsKeyFrame ? 0x10u : 0u;
-      indexEntries.Add((id, flags, offset, checked((uint)data.Length)));
+      indexEntries.Add(new(packet.StreamIndex, id, flags, offset, checked((uint)data.Length)));
     }
+
+    var totalFrames = this._TotalFrames(packetCounts);
+    var prefix = this._BuildPrefix(packetCounts, largestPacket, indexEntries, 0, totalFrames);
+    var moviBaseOffset = checked((ulong)prefix.Length + 16UL); // RIFF header + LIST header; points at the 'movi' list type.
+    prefix = this._BuildPrefix(packetCounts, largestPacket, indexEntries, moviBaseOffset, totalFrames);
+
+    using var body = new MemoryStream();
+    body.Write(prefix);
 
     ContainerWriterTools.WriteAscii(body, "LIST");
     ContainerWriterTools.WriteUInt32LittleEndian(body, checked((uint)movi.Length));
@@ -112,6 +108,39 @@ public sealed class AviWriter : IVideoContainerWriter<AviWriter> {
     body.Position = 0;
     body.CopyTo(result);
     return result.ToArray();
+  }
+
+  private byte[] _BuildPrefix(int[] packetCounts, int largestPacket, IReadOnlyList<IndexEntry> indexEntries, ulong moviBaseOffset, uint totalFrames)
+    => ContainerWriterTools.Build(body => {
+      ContainerWriterTools.WriteAscii(body, "AVI ");
+
+      ContainerWriterTools.WriteRiffList(body, "hdrl", hdrl => {
+        ContainerWriterTools.WriteRiffChunk(hdrl, "avih", this._MainHeader(packetCounts, largestPacket));
+        for (var i = 0; i < this._streams.Count; ++i) {
+          var index = i;
+          ContainerWriterTools.WriteRiffList(hdrl, "strl", strl => this._WriteStreamList(
+            strl,
+            this._streams[index],
+            packetCounts[index],
+            largestPacket,
+            indexEntries,
+            moviBaseOffset
+          ));
+        }
+
+        ContainerWriterTools.WriteRiffList(hdrl, "odml", odml => {
+          var dmlh = ContainerWriterTools.Build(header => ContainerWriterTools.WriteUInt32LittleEndian(header, totalFrames));
+          ContainerWriterTools.WriteRiffChunk(odml, "dmlh", dmlh);
+        });
+      });
+
+      if (!this._metadata.IsEmpty)
+        this._WriteInfo(body);
+    });
+
+  private uint _TotalFrames(int[] packetCounts) {
+    var video = this._streams.FirstOrDefault(stream => stream.Kind == MediaStreamKind.Video);
+    return video == null ? 0 : checked((uint)packetCounts[video.Index]);
   }
 
   private byte[] _MainHeader(int[] packetCounts, int largestPacket) {
@@ -142,7 +171,14 @@ public sealed class AviWriter : IVideoContainerWriter<AviWriter> {
     });
   }
 
-  private void _WriteStreamList(Stream destination, MediaStreamInfo stream, int packetCount, int largestPacket) {
+  private void _WriteStreamList(
+    Stream destination,
+    MediaStreamInfo stream,
+    int packetCount,
+    int largestPacket,
+    IReadOnlyList<IndexEntry> indexEntries,
+    ulong moviBaseOffset
+  ) {
     var (scale, rate) = _AviRate(stream);
     var type = stream.Kind switch {
       MediaStreamKind.Video => "vids",
@@ -175,11 +211,44 @@ public sealed class AviWriter : IVideoContainerWriter<AviWriter> {
 
     var format = stream.CodecPrivateData.IsEmpty ? _BitmapInfoHeader(stream) : stream.CodecPrivateData.ToArray();
     ContainerWriterTools.WriteRiffChunk(destination, "strf", format);
+    this._WriteStandardIndex(destination, stream, packetCount, indexEntries, moviBaseOffset);
 
     if (!string.IsNullOrEmpty(stream.Name)) {
       var name = Encoding.Latin1.GetBytes(stream.Name + "\0");
       ContainerWriterTools.WriteRiffChunk(destination, "strn", name);
     }
+  }
+
+  private void _WriteStandardIndex(
+    Stream destination,
+    MediaStreamInfo stream,
+    int packetCount,
+    IReadOnlyList<IndexEntry> indexEntries,
+    ulong moviBaseOffset
+  ) {
+    var chunkId = $"{stream.Index:00}{_ChunkSuffix(stream)}";
+    var index = ContainerWriterTools.Build(body => {
+      ContainerWriterTools.WriteUInt16LittleEndian(body, 2); // two DWORDs per AVISTDINDEX entry
+      body.WriteByte(0); // bIndexSubType
+      body.WriteByte(1); // AVI_INDEX_OF_CHUNKS
+      ContainerWriterTools.WriteUInt32LittleEndian(body, checked((uint)packetCount));
+      ContainerWriterTools.WriteAscii(body, chunkId);
+      ContainerWriterTools.WriteUInt64LittleEndian(body, moviBaseOffset);
+      ContainerWriterTools.WriteUInt32LittleEndian(body, 0); // dwReserved3
+
+      foreach (var entry in indexEntries) {
+        if (entry.StreamIndex != stream.Index)
+          continue;
+
+        // The OpenDML offset targets the chunk payload itself. The movi-relative offset captured
+        // before writing the RIFF chunk names its header, so skip that eight-byte header here.
+        ContainerWriterTools.WriteUInt32LittleEndian(body, checked(entry.Offset + 8));
+        var isNonKeyVideoFrame = stream.Kind == MediaStreamKind.Video && (entry.Flags & 0x10) == 0;
+        ContainerWriterTools.WriteUInt32LittleEndian(body, entry.Size | (isNonKeyVideoFrame ? 0x80000000u : 0));
+      }
+    });
+
+    ContainerWriterTools.WriteRiffChunk(destination, "indx", index);
   }
 
   private static (uint Scale, uint Rate) _AviRate(MediaStreamInfo stream) {

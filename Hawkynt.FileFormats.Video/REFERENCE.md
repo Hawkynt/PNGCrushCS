@@ -210,7 +210,7 @@ Implements `IBinarySerializable<AviStreamHeader>`, `IEquatable<AviStreamHeader>`
 
 #### `AviWriter`
 
-Writes a conventional RIFF AVI with one movi chunk per coded packet and an idx1 index.
+Writes a single-RIFF AVI with OpenDML stream indexes and extended header while retaining the legacy idx1 index.
 
 Implements `IVideoContainerWriter<AviWriter>`, `IVideoFormatMetadata<AviWriter>`.
 
