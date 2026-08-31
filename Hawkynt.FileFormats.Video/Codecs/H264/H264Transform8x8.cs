@@ -88,22 +88,24 @@ internal static class H264Transform8x8 {
       throw new ArgumentException("An H.264 8x8 transform needs 64 output samples.", nameof(residual));
 
     Span<int> tmp = stackalloc int[64];
-
-    // Horizontal pass.  These are equations 8-358 through 8-373 written as the standard's
-    // butterfly, but kept in signed arithmetic so negative odd coefficients retain arithmetic shifts.
-    for (var row = 0; row < 8; ++row)
-      _Transform1D(input.Slice(row << 3, 8), tmp.Slice(row << 3, 8), round: false);
-
     Span<int> column = stackalloc int[8];
     Span<int> transformed = stackalloc int[8];
+
+    // Clause 8.5.13 applies the first one-dimensional stage down the columns. The butterfly contains
+    // arithmetic right shifts, so exchanging the two separable stages is not bit-exact for negative
+    // odd coefficients even though the corresponding real-valued transform would be commutative.
     for (var x = 0; x < 8; ++x) {
       for (var y = 0; y < 8; ++y)
-        column[y] = tmp[(y << 3) + x];
+        column[y] = input[(y << 3) + x];
 
-      _Transform1D(column, transformed, round: true);
+      _Transform1D(column, transformed, round: false);
       for (var y = 0; y < 8; ++y)
-        residual[(y << 3) + x] = transformed[y];
+        tmp[(y << 3) + x] = transformed[y];
     }
+
+    // The second stage runs across rows and performs the normative +32 / 64 rounding.
+    for (var row = 0; row < 8; ++row)
+      _Transform1D(tmp.Slice(row << 3, 8), residual.Slice(row << 3, 8), round: true);
   }
 
   private static void _Transform1D(ReadOnlySpan<int> source, Span<int> target, bool round) {
