@@ -32779,7 +32779,7 @@ Implements `IEquatable<StTrueColorFile>`, `IImageFormatMetadata<StTrueColorFile>
 
 ### Namespace `FileFormat.Stad`
 
-[`StadFile`](#stadfile) · [`StadReader`](#stadreader) · [`StadWriter`](#stadwriter)
+[`StadFile`](#stadfile) · [`StadPacking`](#stadpacking) · [`StadReader`](#stadreader) · [`StadWriter`](#stadwriter)
 
 #### `StadFile`
 
@@ -32788,10 +32788,18 @@ Implements `IEquatable<StadFile>`, `IImageFormatMetadata<StadFile>`, `IImageForm
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `Height` | `int Height { get; }` |  |
+| `Packing` | `StadPacking Packing { get; init; }` |  |
 | `RawData` | `byte[] RawData { get; init; }` |  |
 | `Width` | `int Width { get; }` |  |
 | `FromRawImage` | `static StadFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(StadFile file)` |  |
+
+#### `StadPacking`
+
+| Value | Numeric | Summary |
+| --- | --- | --- |
+| `Horizontal` | `0` |  |
+| `Vertical` | `1` |  |
 
 #### `StadReader`
 
