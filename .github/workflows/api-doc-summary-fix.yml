@@ -64,8 +64,8 @@ jobs:
           root: PNGCrushCS
           configuration: Release
           project: |
-            Hawkynt.FileFormats.Video/Hawkynt.FileFormats.Video.csproj
-            Hawkynt.ImageTransformUI/Hawkynt.ImageTransformUI.csproj
+            PNGCrushCS/Hawkynt.FileFormats.Video/Hawkynt.FileFormats.Video.csproj
+            PNGCrushCS/Hawkynt.ImageTransformUI/Hawkynt.ImageTransformUI.csproj
           upload-artifact: 'false'
 
       - name: Check generated diffs
