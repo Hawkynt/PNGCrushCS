@@ -95,7 +95,12 @@ public sealed class Av1VideoContainerTests {
   [Test]
   [Category("Unit")]
   public void Writer_RejectsCodecPrivateDataBecauseRawObuHasNowhereToStoreIt() {
-    var stream = _Av1Stream() with { CodecPrivateData = new byte[] { 1, 2, 3 } };
+    var stream = new MediaStreamInfo {
+      Index = 0,
+      Kind = MediaStreamKind.Video,
+      Codec = CodecTag.FromCharacters("av01"),
+      CodecPrivateData = new byte[] { 1, 2, 3 },
+    };
 
     Assert.Throws<NotSupportedException>(() =>
       VideoIO.Mux<Av1VideoWriter>([stream], [new CodedPacket(0, new byte[] { 0x32, 0x01, 0xAA })]));
