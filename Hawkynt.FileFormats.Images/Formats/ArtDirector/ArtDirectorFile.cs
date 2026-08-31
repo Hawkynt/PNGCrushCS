@@ -1,124 +1,138 @@
 using System;
-using System.Buffers.Binary;
 using FileFormat.Core;
 
 namespace FileFormat.ArtDirector;
 
-/// <summary>In-memory representation of an Atari ST Art Director image (128-byte header + 32000 bytes planar data).</summary>
+/// <summary>In-memory representation of an Atari ST Art Director low-resolution picture.</summary>
 public readonly record struct ArtDirectorFile() : IImageFormatReader<ArtDirectorFile>, IImageToRawImage<ArtDirectorFile>, IImageFromRawImage<ArtDirectorFile>, IImageFormatWriter<ArtDirectorFile> {
 
-  /// <summary>Header size in bytes.</summary>
-  public const int HeaderSize = 128;
+  /// <summary>Fixed image width in pixels.</summary>
+  public const int FixedWidth = 320;
 
-  /// <summary>Offset of the palette within the header.</summary>
-  public const int PaletteOffset = 2;
+  /// <summary>Fixed image height in pixels.</summary>
+  public const int FixedHeight = 200;
 
-  /// <summary>Palette size in bytes (16 words = 32 bytes).</summary>
-  public const int PaletteSize = 32;
+  /// <summary>Bytes occupied by the four-plane Atari ST low-resolution screen.</summary>
+  public const int PlanarDataSize = 32_000;
 
-  /// <summary>Planar pixel data size.</summary>
-  public const int PlanarDataSize = 32000;
+  /// <summary>Number of hardware colours in each stored palette.</summary>
+  public const int ColorsPerPalette = 16;
 
-  /// <summary>The exact file size: 128 + 32000 = 32128 bytes.</summary>
-  public const int ExpectedFileSize = HeaderSize + PlanarDataSize;
+  /// <summary>Number of palettes stored after the screen: one picture palette plus 15 animation palettes.</summary>
+  public const int StoredPaletteCount = 16;
+
+  /// <summary>Total number of 16-bit palette words stored by the format.</summary>
+  public const int PaletteCycleWords = ColorsPerPalette * StoredPaletteCount;
+
+  /// <summary>Bytes occupied by all sixteen stored palettes.</summary>
+  public const int PaletteCycleSize = PaletteCycleWords * 2;
+
+  /// <summary>Exact Art Director file size: 32,000 bytes of screen memory followed by 512 bytes of palettes.</summary>
+  public const int ExpectedFileSize = PlanarDataSize + PaletteCycleSize;
 
   /// <summary>
-  /// The size of the form every sample takes: the screen first, then the palettes.
+  /// Palette slot used for ordinary display by the repository's real-file oracle set.
   /// </summary>
   /// <remarks>
-  /// All three Art Director pictures in the corpus are 32512 bytes and none was read, the reader
-  /// wanting 32128 with a header in front. They put the 32000 bytes of screen at the very start and
-  /// 512 after it — sixteen copies of a sixteen-colour Atari palette, which is what the program used
-  /// for colour cycling. RECOIL draws the first copy and so does this.
-  /// <para/>
-  /// Established against RECOIL: the screen read as a four-plane Atari picture from byte nought puts
-  /// every pixel in the same region as RECOIL's. Which of the eight palettes it draws with took a
-  /// third sample to settle — two of them repeat one palette eight times, and the third does not, and
-  /// on that one RECOIL uses the second. All three agree on the second; only two agree on the first.
+  /// Historical format descriptions call the first palette the picture palette. The repository's
+  /// existing corpus contains files whose first two slots differ, and RECOIL renders those samples
+  /// with slot one. Keeping that established behavior avoids regressing known files while still
+  /// preserving every stored palette losslessly.
   /// </remarks>
-  public const int ScreenFirstFileSize = PlanarDataSize + PaletteCycleSize;
-
-  /// <summary>Bytes after the screen: eight palettes and then 256 of settings.</summary>
-  public const int PaletteCycleSize = 512;
-
-  /// <summary>Which of the eight palettes is the one the picture is drawn with.</summary>
   public const int DisplayedPaletteIndex = 1;
 
   static string IImageFormatMetadata<ArtDirectorFile>.PrimaryExtension => ".art";
   static string[] IImageFormatMetadata<ArtDirectorFile>.FileExtensions => [".art"];
   static ArtDirectorFile IImageFormatReader<ArtDirectorFile>.FromSpan(ReadOnlySpan<byte> data) => ArtDirectorReader.FromSpan(data);
-  static VideoMode[] IImageFormatMetadata<ArtDirectorFile>.VideoModes => [
-    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [new IntegerRange(2, 16)])
-  ];
+  static VideoMode[] IImageFormatMetadata<ArtDirectorFile>.VideoModes => [new("Atari ST low resolution", [(FixedWidth, FixedHeight)], [new IntegerRange(2, 16)])];
   static byte[] IImageFormatWriter<ArtDirectorFile>.ToBytes(ArtDirectorFile file) => ArtDirectorWriter.ToBytes(file);
 
-  /// <summary>Image width (depends on resolution).</summary>
-  public int Width { get; init; } = 320;
+  /// <summary>Image width, always 320 for a valid Art Director file.</summary>
+  public int Width { get; init; } = FixedWidth;
 
-  /// <summary>Image height (depends on resolution).</summary>
-  public int Height { get; init; } = 200;
+  /// <summary>Image height, always 200 for a valid Art Director file.</summary>
+  public int Height { get; init; } = FixedHeight;
 
-  /// <summary>Resolution: 0=low (320x200), 1=medium (640x200), 2=high (640x400).</summary>
+  /// <summary>Legacy resolution property retained for source compatibility; valid Art Director files are always zero/low resolution.</summary>
   public short Resolution { get; init; }
 
-  /// <summary>16-entry palette of 9-bit Atari ST RGB values.</summary>
+  /// <summary>The 16-entry palette used to render the picture.</summary>
   public short[] Palette { get; init; }
 
-  /// <summary>32000 bytes of Atari ST interleaved planar pixel data.</summary>
+  /// <summary>
+  /// Optional flat array containing all sixteen stored palettes, 16 words per palette.
+  /// </summary>
+  /// <remarks>
+  /// Readers always populate all 256 words. For source compatibility, writers accept <c>null</c> and
+  /// then repeat <see cref="Palette"/> into every stored slot.
+  /// </remarks>
+  public short[]? PaletteCycle { get; init; }
+
+  /// <summary>Exactly 32,000 bytes of Atari ST four-plane low-resolution screen memory.</summary>
   public byte[] PixelData { get; init; }
 
+  /// <summary>Converts the picture to indexed RGB using the displayed palette.</summary>
   public static RawImage ToRawImage(ArtDirectorFile file) {
+    ValidatePicture(file, nameof(file));
+    var chunky = PlanarConverter.AtariStToChunky(file.PixelData, FixedWidth, FixedHeight, 4);
+    var rgb = PlanarConverter.StPaletteToRgb(file.Palette);
 
-    var numPlanes = file.Resolution switch {
-      0 => 4,
-      1 => 2,
-      2 => 1,
-      _ => 4
-    };
-
-    var chunky = PlanarConverter.AtariStToChunky(file.PixelData, file.Width, file.Height, numPlanes);
-    var paletteCount = Math.Min(1 << numPlanes, file.Palette.Length);
-    var rgb = PlanarConverter.StPaletteToRgb(file.Palette.AsSpan(0, paletteCount));
-
-    return new() {
-      Width = file.Width,
-      Height = file.Height,
+    return new RawImage {
+      Width = FixedWidth,
+      Height = FixedHeight,
       Format = PixelFormat.Indexed8,
       PixelData = chunky,
       Palette = rgb,
-      PaletteCount = paletteCount,
+      PaletteCount = ColorsPerPalette,
     };
   }
 
-
-  /// <summary>Encodes a picture as an Art Director picture, scaling it to 320x200 first.</summary>
-  /// <remarks>
-  /// An Atari ST low-resolution screen: sixteen colours, four bitplanes interleaved a word at a
-  /// time, and a palette of nine-bit values. The palette is built from the picture rather than fixed
-  /// by the machine, so the colours are quantised first and the indices then split into planes —
-  /// the exact inverse of what <see cref="ToRawImage"/> puts back together.
-  /// </remarks>
+  /// <summary>Encodes an image as a 320x200 Art Director picture and repeats its palette through the animation slots.</summary>
   public static ArtDirectorFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
 
-    var indexed = image.SampleTo(320, 200).EnsureFormat(PixelFormat.Indexed8);
+    var indexed = image.SampleTo(FixedWidth, FixedHeight).EnsureFormat(PixelFormat.Indexed8);
     var quantised = ColorQuantizer.Quantize(
-      PixelConverter.Convert(indexed, PixelFormat.Bgra32).PixelData, 320 * 200, 16);
+      PixelConverter.Convert(indexed, PixelFormat.Bgra32).PixelData,
+      FixedWidth * FixedHeight,
+      ColorsPerPalette
+    );
 
-    var chunky = new byte[320 * 200];
+    var chunky = new byte[FixedWidth * FixedHeight];
     for (var i = 0; i < chunky.Length; ++i)
       chunky[i] = (byte)quantised.Indices[i];
 
-    var palette = new short[16];
-    PlanarConverter.RgbToStPalette(quantised.Palette, quantised.Count).AsSpan(0, Math.Min(quantised.Count, 16)).CopyTo(palette);
+    var palette = new short[ColorsPerPalette];
+    PlanarConverter.RgbToStPalette(quantised.Palette, quantised.Count)
+      .AsSpan(0, Math.Min(quantised.Count, ColorsPerPalette))
+      .CopyTo(palette);
 
-    return new() {
-      Width = 320,
-      Height = 200,
+    var cycle = new short[PaletteCycleWords];
+    for (var slot = 0; slot < StoredPaletteCount; ++slot)
+      palette.CopyTo(cycle, slot * ColorsPerPalette);
+
+    return new ArtDirectorFile {
+      Width = FixedWidth,
+      Height = FixedHeight,
       Resolution = 0,
       Palette = palette,
-      PixelData = PlanarConverter.ChunkyToAtariSt(chunky, 320, 200, 4),
+      PaletteCycle = cycle,
+      PixelData = PlanarConverter.ChunkyToAtariSt(chunky, FixedWidth, FixedHeight, 4),
     };
   }
 
+  internal static void ValidatePicture(ArtDirectorFile file, string parameterName) {
+    if (file.Width != FixedWidth || file.Height != FixedHeight || file.Resolution != 0)
+      throw new ArgumentException($"Art Director images are always {FixedWidth}x{FixedHeight} Atari ST low resolution.", parameterName);
+    if (file.Palette is null || file.Palette.Length != ColorsPerPalette)
+      throw new ArgumentException($"Art Director displayed palette must contain exactly {ColorsPerPalette} words.", parameterName);
+    if (file.PixelData is null || file.PixelData.Length != PlanarDataSize)
+      throw new ArgumentException($"Art Director screen memory must contain exactly {PlanarDataSize} bytes.", parameterName);
+  }
+
+  internal static void ValidateForWrite(ArtDirectorFile file, string parameterName) {
+    ValidatePicture(file, parameterName);
+    if (file.PaletteCycle is not null && file.PaletteCycle.Length != PaletteCycleWords)
+      throw new ArgumentException($"Art Director palette cycle must contain exactly {PaletteCycleWords} words when supplied.", parameterName);
+  }
 }

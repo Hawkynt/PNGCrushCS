@@ -1,24 +1,32 @@
-﻿using System;
+using System;
 using System.Buffers.Binary;
 
 namespace FileFormat.ArtDirector;
 
-/// <summary>Assembles Atari ST Art Director image bytes from an ArtDirectorFile.</summary>
+/// <summary>Writes the published Atari ST Art Director screen-first format.</summary>
 public static class ArtDirectorWriter {
 
+  /// <summary>Serializes exactly 32,000 screen bytes followed by sixteen 16-word palettes.</summary>
   public static byte[] ToBytes(ArtDirectorFile file) {
-    ArgumentNullException.ThrowIfNull(file);
+    ArtDirectorFile.ValidateForWrite(file, nameof(file));
 
     var result = new byte[ArtDirectorFile.ExpectedFileSize];
-    var span = result.AsSpan();
+    file.PixelData.CopyTo(result, 0);
 
-    new ArtDirectorHeader(file.Resolution).WriteTo(span);
+    var cycle = new short[ArtDirectorFile.PaletteCycleWords];
+    if (file.PaletteCycle is null) {
+      for (var slot = 0; slot < ArtDirectorFile.StoredPaletteCount; ++slot)
+        file.Palette.CopyTo(cycle, slot * ArtDirectorFile.ColorsPerPalette);
+    } else
+      file.PaletteCycle.CopyTo(cycle, 0);
 
-    for (var i = 0; i < 16; ++i)
-      BinaryPrimitives.WriteInt16BigEndian(span[(ArtDirectorFile.PaletteOffset + i * 2)..], i < file.Palette.Length ? file.Palette[i] : (short)0);
+    // Palette remains the public displayed-palette API. If a caller edits it after reading a file,
+    // update just that slot while preserving the other fifteen animation palettes.
+    file.Palette.CopyTo(cycle, ArtDirectorFile.DisplayedPaletteIndex * ArtDirectorFile.ColorsPerPalette);
 
-    // Bytes 34-127 are reserved/padding (left as zero)
-    file.PixelData.AsSpan(0, Math.Min(file.PixelData.Length, ArtDirectorFile.PlanarDataSize)).CopyTo(result.AsSpan(ArtDirectorFile.HeaderSize));
+    var output = result.AsSpan(ArtDirectorFile.PlanarDataSize);
+    for (var i = 0; i < cycle.Length; ++i)
+      BinaryPrimitives.WriteInt16BigEndian(output[(i * 2)..], cycle[i]);
 
     return result;
   }
