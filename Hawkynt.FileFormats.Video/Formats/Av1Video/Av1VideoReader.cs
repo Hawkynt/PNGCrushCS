@@ -164,7 +164,7 @@ internal static class Av1VideoReader {
     if ((long)position + size > span.Length)
       throw new InvalidDataException($"AV1 OBU at byte {offset} declares {size} payload bytes, but only {span.Length - position} remain.");
 
-    return new(type, checked(position - offset + (int)size), (int)size);
+    return new Obu(type, checked(position - offset + (int)size), (int)size);
   }
 
   private static uint _ReadLeb128(ReadOnlySpan<byte> data, ref int position, int obuOffset) {
