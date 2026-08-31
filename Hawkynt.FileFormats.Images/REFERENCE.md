@@ -37972,6 +37972,43 @@ Implements `IEquatable<ZeissLsmFile>`, `IImageFormatMetadata<ZeissLsmFile>`, `II
 | --- | --- | --- |
 | `ToBytes` | `static byte[] ToBytes(ZeissLsmFile file)` |  |
 
+### Namespace `FileFormat.Zinc`
+
+[`ZincFile`](#zincfile) · [`ZincReader`](#zincreader) · [`ZincWriter`](#zincwriter)
+
+#### `ZincFile`
+
+Implements `IEquatable<ZincFile>`, `IImageFormatMetadata<ZincFile>`, `IImageFormatReader<ZincFile>`, `IImageFormatWriter<ZincFile>`, `IImageFromRawImage<ZincFile>`, `IImageToRawImage<ZincFile>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `MaximumDimension` | `const int MaximumDimension` |  |
+| `MaximumPixels` | `const int MaximumPixels` |  |
+| `Height` | `int Height { get; init; }` |  |
+| `Name` | `string Name { get; init; }` |  |
+| `RasterWords` | `ushort[] RasterWords { get; init; }` |  |
+| `Width` | `int Width { get; init; }` |  |
+| `FromRawImage` | `static ZincFile FromRawImage(RawImage image)` |  |
+| `GetWordsPerRow` | `static int GetWordsPerRow(int width)` |  |
+| `ToRawImage` | `static RawImage ToRawImage(ZincFile file)` |  |
+
+#### `ZincReader`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `FromBytes` | `static ZincFile FromBytes(byte[] data)` |  |
+| `FromFile` | `static ZincFile FromFile(FileInfo file)` |  |
+| `FromSpan` | `static ZincFile FromSpan(ReadOnlySpan<byte> data)` |  |
+| `FromStream` | `static ZincFile FromStream(Stream stream)` |  |
+
+#### `ZincWriter`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `ToBytes` | `static byte[] ToBytes(ZincFile file)` |  |
+| `ToFile` | `static void ToFile(ZincFile file, FileInfo target)` |  |
+| `ToStream` | `static void ToStream(ZincFile file, Stream stream)` |  |
+
 ### Namespace `FileFormat.ZonerBrush`
 
 [`ZonerBrushFile`](#zonerbrushfile) · [`ZonerBrushReader`](#zonerbrushreader) · [`ZonerBrushWriter`](#zonerbrushwriter)
@@ -39942,36 +39979,37 @@ Implements `IEquatable<FormatEntry>`.
 | `YuvRaw` | `841` |  |
 | `ZeissBivas` | `842` |  |
 | `ZeissLsm` | `843` |  |
-| `ZonerBrush` | `844` |  |
-| `Zoom4` | `845` |  |
-| `Zoomatic` | `846` |  |
-| `ZsStaffKid98` | `847` |  |
-| `Zx81` | `848` |  |
-| `ZxArtStudio` | `849` |  |
-| `ZxAttributes` | `850` |  |
-| `ZxAttributesGigascreen` | `851` |  |
-| `ZxBigFont` | `852` |  |
-| `ZxBorderMulticolor` | `853` |  |
-| `ZxBorderScreen` | `854` |  |
-| `ZxChrd` | `855` |  |
-| `ZxFlash` | `856` |  |
-| `ZxFont` | `857` |  |
-| `ZxGigascreen` | `858` |  |
-| `ZxMlg` | `859` |  |
-| `ZxMultiArtist` | `860` |  |
-| `ZxMulticolor` | `861` |  |
-| `ZxNext` | `862` |  |
-| `ZxNextImage` | `863` |  |
-| `ZxPaintbrush` | `864` |  |
-| `ZxPaintyOne` | `865` |  |
-| `ZxRgb3` | `866` |  |
-| `ZxSnapshot` | `867` |  |
-| `ZxSpectrum` | `868` |  |
-| `ZxTimex` | `869` |  |
-| `ZxTrefiBorderScreen` | `870` |  |
-| `ZxTricolor` | `871` |  |
-| `ZxUlaPlus` | `872` |  |
-| `ZzRough` | `873` |  |
+| `Zinc` | `844` |  |
+| `ZonerBrush` | `845` |  |
+| `Zoom4` | `846` |  |
+| `Zoomatic` | `847` |  |
+| `ZsStaffKid98` | `848` |  |
+| `Zx81` | `849` |  |
+| `ZxArtStudio` | `850` |  |
+| `ZxAttributes` | `851` |  |
+| `ZxAttributesGigascreen` | `852` |  |
+| `ZxBigFont` | `853` |  |
+| `ZxBorderMulticolor` | `854` |  |
+| `ZxBorderScreen` | `855` |  |
+| `ZxChrd` | `856` |  |
+| `ZxFlash` | `857` |  |
+| `ZxFont` | `858` |  |
+| `ZxGigascreen` | `859` |  |
+| `ZxMlg` | `860` |  |
+| `ZxMultiArtist` | `861` |  |
+| `ZxMulticolor` | `862` |  |
+| `ZxNext` | `863` |  |
+| `ZxNextImage` | `864` |  |
+| `ZxPaintbrush` | `865` |  |
+| `ZxPaintyOne` | `866` |  |
+| `ZxRgb3` | `867` |  |
+| `ZxSnapshot` | `868` |  |
+| `ZxSpectrum` | `869` |  |
+| `ZxTimex` | `870` |  |
+| `ZxTrefiBorderScreen` | `871` |  |
+| `ZxTricolor` | `872` |  |
+| `ZxUlaPlus` | `873` |  |
+| `ZzRough` | `874` |  |
 
 #### `MagicSignature`
 
