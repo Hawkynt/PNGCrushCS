@@ -24160,29 +24160,37 @@ Implements `IEquatable<NeochromeFile>`, `IImageFormatMetadata<NeochromeFile>`, `
 | `AnimWidth` | `short AnimWidth { get; init; }` |  |
 | `AnimXOffset` | `short AnimXOffset { get; init; }` |  |
 | `AnimYOffset` | `short AnimYOffset { get; init; }` |  |
+| `AnimationLimits` | `short AnimationLimits { get; init; }` |  |
+| `FileName` | `byte[] FileName { get; init; }` |  |
 | `Flag` | `short Flag { get; init; }` |  |
 | `Height` | `int Height { get; init; }` |  |
 | `Palette` | `short[] Palette { get; init; }` |  |
 | `PixelData` | `byte[] PixelData { get; init; }` |  |
+| `Reserved` | `short[] Reserved { get; init; }` |  |
+| `Resolution` | `short Resolution { get; init; }` |  |
 | `Width` | `int Width { get; init; }` |  |
 | `FromRawImage` | `static NeochromeFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(NeochromeFile file)` |  |
 
 #### `NeochromeHeader`
 
-Implements `IBinarySerializable<NeochromeHeader>`, `IEquatable<NeochromeHeader>`.
+Implements `IEquatable<NeochromeHeader>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
-| `NeochromeHeader` | `NeochromeHeader(short Flag, short Resolution, short Pal0, short Pal1, short Pal2, short Pal3, short Pal4, short Pal5, short Pal6, short Pal7, short Pal8, short Pal9, short Pal10, short Pal11, short Pal12, short Pal13, short Pal14, short Pal15, byte AnimSpeed, byte AnimDirection, short AnimSteps, short AnimXOffset, short AnimYOffset, short AnimWidth, short AnimHeight)` |  |
+| `NeochromeHeader` | `NeochromeHeader(short flag, short resolution, short pal0, short pal1, short pal2, short pal3, short pal4, short pal5, short pal6, short pal7, short pal8, short pal9, short pal10, short pal11, short pal12, short pal13, short pal14, short pal15, byte animSpeed, byte animDirection, short animSteps, short animXOffset, short animYOffset, short animWidth, short animHeight)` |  |
+| `NeochromeHeader` | `NeochromeHeader(short flag, short resolution, short pal0, short pal1, short pal2, short pal3, short pal4, short pal5, short pal6, short pal7, short pal8, short pal9, short pal10, short pal11, short pal12, short pal13, short pal14, short pal15, byte[] fileName, short animationLimits, short animationSpeedDirection, short animSteps, short animXOffset, short animYOffset, short animWidth, short animHeight, short[] reserved)` |  |
 | `StructSize` | `const int StructSize` |  |
-| `AnimDirection` | `byte AnimDirection { get; init; }` |  |
+| `AnimDirection` | `byte AnimDirection { get; }` |  |
 | `AnimHeight` | `short AnimHeight { get; init; }` |  |
-| `AnimSpeed` | `byte AnimSpeed { get; init; }` |  |
+| `AnimSpeed` | `byte AnimSpeed { get; }` |  |
 | `AnimSteps` | `short AnimSteps { get; init; }` |  |
 | `AnimWidth` | `short AnimWidth { get; init; }` |  |
 | `AnimXOffset` | `short AnimXOffset { get; init; }` |  |
 | `AnimYOffset` | `short AnimYOffset { get; init; }` |  |
+| `AnimationLimits` | `short AnimationLimits { get; init; }` |  |
+| `AnimationSpeedDirection` | `short AnimationSpeedDirection { get; init; }` |  |
+| `FileName` | `byte[] FileName { get; init; }` |  |
 | `Flag` | `short Flag { get; init; }` |  |
 | `Pal0` | `short Pal0 { get; init; }` |  |
 | `Pal10` | `short Pal10 { get; init; }` |  |
@@ -24200,12 +24208,12 @@ Implements `IBinarySerializable<NeochromeHeader>`, `IEquatable<NeochromeHeader>`
 | `Pal7` | `short Pal7 { get; init; }` |  |
 | `Pal8` | `short Pal8 { get; init; }` |  |
 | `Pal9` | `short Pal9 { get; init; }` |  |
+| `Reserved` | `short[] Reserved { get; init; }` |  |
 | `Resolution` | `short Resolution { get; init; }` |  |
 | `GetFieldMap` | `static HeaderFieldDescriptor[] GetFieldMap()` |  |
-| `GetGeneratedFieldMap` | `static HeaderFieldDescriptor[] GetGeneratedFieldMap()` |  |
 | `GetPalette` | `short[] GetPalette()` |  |
-| `ReadFrom` | `static NeochromeHeader ReadFrom(ReadOnlySpan<byte> source)` |  |
-| `WriteTo` | `void WriteTo(Span<byte> destination)` |  |
+| `ReadFrom` | `static NeochromeHeader ReadFrom(ReadOnlySpan<byte> data)` |  |
+| `WriteTo` | `void WriteTo(Span<byte> data)` |  |
 
 #### `NeochromeReader`
 
