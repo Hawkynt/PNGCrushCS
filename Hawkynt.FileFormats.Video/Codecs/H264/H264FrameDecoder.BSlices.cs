@@ -417,6 +417,14 @@ internal sealed partial class H264FrameDecoder {
   }
 
   private void _DeriveDirect(int mbAddr, int x, int y, int width, int height) {
+    if (width == 16 && height == 16) {
+      var size = this._header.Sps.Direct8x8InferenceFlag ? 8 : 4;
+      for (var dy = 0; dy < 16; dy += size)
+        for (var dx = 0; dx < 16; dx += size)
+          this._DeriveDirect(mbAddr, x + dx, y + dy, size, size);
+      return;
+    }
+
     if (this._header.DirectSpatialMvPredFlag)
       this._DeriveSpatialDirect(mbAddr, x, y, width, height);
     else
@@ -459,11 +467,21 @@ internal sealed partial class H264FrameDecoder {
     return result == int.MaxValue ? -1 : result;
   }
 
+  private (int X, int Y) _DirectCoLocatedPosition(int x, int y) {
+    if (!this._header.Sps.Direct8x8InferenceFlag)
+      return (x, y);
+
+    var mbPartIdx = ((y & 15) >> 3) * 2 + ((x & 15) >> 3);
+    var (offsetX, offsetY) = _BlockPosition(5 * mbPartIdx);
+    return ((x & ~15) + offsetX, (y & ~15) + offsetY);
+  }
+
   private bool _DirectZeroPrediction(int x, int y) {
     if (this._referenceList1.Length == 0 || this._referenceList1[0].IsLongTerm)
       return false;
     var col = this._referenceList1[0].Motion;
-    if (col == null || !col.TryGet(x >> 2, y >> 2, out var motion))
+    var (colX, colY) = this._DirectCoLocatedPosition(x, y);
+    if (col == null || !col.TryGet(colX >> 2, colY >> 2, out var motion))
       return false;
     var refSerial = motion.HasList0 ? motion.RefSerial0 : motion.RefSerial1;
     var mvX = motion.HasList0 ? motion.MvX0 : motion.MvX1;
@@ -478,7 +496,8 @@ internal sealed partial class H264FrameDecoder {
 
     var colPic = this._referenceList1[0];
     var colField = colPic.Motion;
-    if (colField == null || !colField.TryGet(x >> 2, y >> 2, out var colMotion)
+    var (colX, colY) = this._DirectCoLocatedPosition(x, y);
+    if (colField == null || !colField.TryGet(colX >> 2, colY >> 2, out var colMotion)
         || (!colMotion.HasList0 && !colMotion.HasList1)) {
       this._AssignMotionList(0, x >> 2, y >> 2, width >> 2, height >> 2, 0, 0, 0);
       this._AssignMotionList(1, x >> 2, y >> 2, width >> 2, height >> 2, 0, 0, 0);
@@ -515,6 +534,13 @@ internal sealed partial class H264FrameDecoder {
   }
 
   private void _PredictBStored(int mbAddr, int x, int y, int width, int height, bool addResidual) {
+    if (width > 4 || height > 4) {
+      for (var dy = 0; dy < height; dy += 4)
+        for (var dx = 0; dx < width; dx += 4)
+          this._PredictBStored(mbAddr, x + dx, y + dy, 4, 4, addResidual);
+      return;
+    }
+
     var at = (y >> 2) * this._blockWidth + (x >> 2);
     var ref0 = this._refIdx[at];
     var ref1 = this._refIdx1![at];
