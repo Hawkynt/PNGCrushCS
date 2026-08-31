@@ -96,6 +96,19 @@ public sealed class MediaStreamInfo {
   /// </remarks>
   public ReadOnlyMemory<byte> CodecPrivateData { get; init; } = ReadOnlyMemory<byte>.Empty;
 
+  /// <summary>
+  /// Stream-level bytes owned by the container rather than by the codec, retained verbatim for
+  /// lossless remuxing where the destination knows the same container-level representation.
+  /// </summary>
+  /// <remarks>
+  /// This is deliberately separate from <see cref="CodecPrivateData"/>. An MPEG systems descriptor
+  /// loop, for example, describes how a stream participates in the multiplex; it is not a decoder
+  /// configuration record and a codec must never be expected to parse it. Most containers leave this
+  /// empty. A writer that has no representation for non-empty data must refuse it rather than append
+  /// container bytes to the coded payload or silently discard them.
+  /// </remarks>
+  public ReadOnlyMemory<byte> ContainerPrivateData { get; init; } = ReadOnlyMemory<byte>.Empty;
+
   /// <summary>The RFC 5646 language tag of this stream, where the container states one.</summary>
   public string? Language { get; init; }
 

@@ -9099,6 +9099,7 @@ Everything a demuxer can say about one stream of a container without decoding an
 | `CodecId` | `string CodecId { get; init; }` | The container's own name for the codec, where it names codecs with text rather than with a four-character code. |
 | `CodecPrivateData` | `ReadOnlyMemory<byte> CodecPrivateData { get; init; }` | The codec's own description of the stream, verbatim — an AVI's `strf`, an MP4 sample entry's codec configuration, a Matroska track's private data. |
 | `Codec` | `CodecTag Codec { get; init; }` | The code naming the codec the packets of this stream are coded with. |
+| `ContainerPrivateData` | `ReadOnlyMemory<byte> ContainerPrivateData { get; init; }` | Stream-level bytes owned by the container rather than by the codec, retained verbatim for lossless remuxing where the destination knows the same container-level representation. |
 | `DeclaredFrameCount` | `long? DeclaredFrameCount { get; init; }` | The number of frames the container's header claims, which a file left unfinished may state wrongly — hence a claim rather than a count. |
 | `FrameRate` | `Rational FrameRate { get; init; }` | The frames a second the writer stated, as an exact ratio, or unknown. |
 | `Handler` | `CodecTag Handler { get; init; }` | The code naming the decoder the writer expected to be used, where the container has such a field of its own. |
