@@ -23008,10 +23008,19 @@ Implements `IEquatable<MspFile>`, `IImageFormatMetadata<MspFile>`, `IImageFormat
 
 | Member | Signature | Summary |
 | --- | --- | --- |
+| `MaximumPixels` | `const int MaximumPixels` |  |
 | `Height` | `int Height { get; init; }` |  |
 | `PixelData` | `byte[] PixelData { get; init; }` |  |
+| `PrinterHeight` | `ushort PrinterHeight { get; init; }` |  |
+| `PrinterWidth` | `ushort PrinterWidth { get; init; }` |  |
 | `Version` | `MspVersion Version { get; init; }` |  |
 | `Width` | `int Width { get; init; }` |  |
+| `XAspectCorr` | `ushort XAspectCorr { get; init; }` |  |
+| `XAspectPrinter` | `ushort XAspectPrinter { get; init; }` |  |
+| `XAspect` | `ushort XAspect { get; init; }` |  |
+| `YAspectCorr` | `ushort YAspectCorr { get; init; }` |  |
+| `YAspectPrinter` | `ushort YAspectPrinter { get; init; }` |  |
+| `YAspect` | `ushort YAspect { get; init; }` |  |
 | `FromRawImage` | `static MspFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(MspFile file)` |  |
 

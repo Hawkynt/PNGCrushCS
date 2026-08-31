@@ -50,9 +50,10 @@ public sealed class MspReaderTests {
     var data = new byte[MspHeader.StructSize + pixelData.Length];
     BinaryPrimitives.WriteUInt16LittleEndian(data.AsSpan(0), MspHeader.V1Key1);
     BinaryPrimitives.WriteUInt16LittleEndian(data.AsSpan(2), MspHeader.V1Key2);
-    BinaryPrimitives.WriteUInt16LittleEndian(data.AsSpan(4), 8);  // width
-    BinaryPrimitives.WriteUInt16LittleEndian(data.AsSpan(6), 2);  // height
+    BinaryPrimitives.WriteUInt16LittleEndian(data.AsSpan(4), 8);
+    BinaryPrimitives.WriteUInt16LittleEndian(data.AsSpan(6), 2);
     Array.Copy(pixelData, 0, data, MspHeader.StructSize, pixelData.Length);
+    _FinalizeChecksum(data);
 
     var result = MspReader.FromBytes(data);
 
@@ -65,7 +66,6 @@ public sealed class MspReaderTests {
   [Test]
   [Category("Unit")]
   public void FromBytes_ValidV2_ParsesCorrectly() {
-    // Build a V2 file: header + scan-line map + compressed data
     var width = 8;
     var height = 2;
     var scanline1 = new byte[] { 0xFF };
@@ -82,6 +82,7 @@ public sealed class MspReaderTests {
     BinaryPrimitives.WriteUInt16LittleEndian(data.AsSpan(2), MspHeader.V2Key2);
     BinaryPrimitives.WriteUInt16LittleEndian(data.AsSpan(4), (ushort)width);
     BinaryPrimitives.WriteUInt16LittleEndian(data.AsSpan(6), (ushort)height);
+    _FinalizeChecksum(data);
 
     var offset = MspHeader.StructSize;
     BinaryPrimitives.WriteUInt16LittleEndian(data.AsSpan(offset), (ushort)compressed1.Length);
@@ -110,6 +111,7 @@ public sealed class MspReaderTests {
     BinaryPrimitives.WriteUInt16LittleEndian(data.AsSpan(4), 8);
     BinaryPrimitives.WriteUInt16LittleEndian(data.AsSpan(6), 1);
     data[MspHeader.StructSize] = 0xAA;
+    _FinalizeChecksum(data);
 
     using var stream = new MemoryStream(data);
     var result = MspReader.FromStream(stream);
@@ -117,5 +119,12 @@ public sealed class MspReaderTests {
     Assert.That(result.Width, Is.EqualTo(8));
     Assert.That(result.Height, Is.EqualTo(1));
     Assert.That(result.PixelData[0], Is.EqualTo(0xAA));
+  }
+
+  private static void _FinalizeChecksum(Span<byte> data) {
+    ushort checksum = 0;
+    for (var offset = 0; offset < 24; offset += 2)
+      checksum ^= BinaryPrimitives.ReadUInt16LittleEndian(data[offset..]);
+    BinaryPrimitives.WriteUInt16LittleEndian(data[24..], checksum);
   }
 }
