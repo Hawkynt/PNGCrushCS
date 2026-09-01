@@ -12,7 +12,7 @@ env:
 
 jobs:
   sweep:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout PNGCrushCS
         uses: actions/checkout@v4
@@ -71,19 +71,19 @@ jobs:
 
       - name: Restore image package
         working-directory: PNGCrushCS
-        run: dotnet restore Hawkynt.FileFormats.Images/Hawkynt.FileFormats.Images.csproj -p:EnableWindowsTargeting=true
+        run: dotnet restore Hawkynt.FileFormats.Images/Hawkynt.FileFormats.Images.csproj -p:TargetFramework=net8.0
 
       - name: Build image package
         working-directory: PNGCrushCS
-        run: dotnet build Hawkynt.FileFormats.Images/Hawkynt.FileFormats.Images.csproj -c Release --no-restore -p:EnableWindowsTargeting=true
+        run: dotnet build Hawkynt.FileFormats.Images/Hawkynt.FileFormats.Images.csproj -c Release -f net8.0 --no-restore
 
       - name: Restore video package
         working-directory: PNGCrushCS
-        run: dotnet restore Hawkynt.FileFormats.Video/Hawkynt.FileFormats.Video.csproj -p:EnableWindowsTargeting=true
+        run: dotnet restore Hawkynt.FileFormats.Video/Hawkynt.FileFormats.Video.csproj -p:TargetFramework=net8.0
 
       - name: Build video package
         working-directory: PNGCrushCS
-        run: dotnet build Hawkynt.FileFormats.Video/Hawkynt.FileFormats.Video.csproj -c Release --no-restore -p:EnableWindowsTargeting=true
+        run: dotnet build Hawkynt.FileFormats.Video/Hawkynt.FileFormats.Video.csproj -c Release -f net8.0 --no-restore
 
       - name: Check source diff
         working-directory: PNGCrushCS
