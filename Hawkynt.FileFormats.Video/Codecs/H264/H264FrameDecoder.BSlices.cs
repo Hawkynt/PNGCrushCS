@@ -64,10 +64,12 @@ internal sealed partial class H264FrameDecoder {
     var field = new H264MotionField(this._blockWidth, this._mbHeight * 4);
     Array.Copy(this._mvX, field.MvX0, this._mvX.Length);
     Array.Copy(this._mvY, field.MvY0, this._mvY.Length);
+    Array.Copy(this._refIdx, field.RefIdx0, this._refIdx.Length);
     Array.Copy(this._refSerial, field.RefSerial0, this._refSerial.Length);
     if (this._mvX1 != null) {
       Array.Copy(this._mvX1, field.MvX1, this._mvX1.Length);
       Array.Copy(this._mvY1!, field.MvY1, this._mvY1!.Length);
+      Array.Copy(this._refIdx1!, field.RefIdx1, this._refIdx1!.Length);
       Array.Copy(this._refSerial1!, field.RefSerial1, this._refSerial1!.Length);
     }
     return field;
@@ -432,32 +434,33 @@ internal sealed partial class H264FrameDecoder {
   }
 
   private void _DeriveSpatialDirect(int mbAddr, int x, int y, int width, int height) {
-    var ref0 = this._DirectSpatialReferenceIndex(0, mbAddr, x, y, width);
-    var ref1 = this._DirectSpatialReferenceIndex(1, mbAddr, x, y, width);
-    if (ref0 < 0 && ref1 < 0) {
-      ref0 = this._referenceList.Length > 0 ? 0 : -1;
-      ref1 = this._referenceList1.Length > 0 ? 0 : -1;
-    }
+    var ref0 = this._DirectSpatialReferenceIndex(0, mbAddr);
+    var ref1 = this._DirectSpatialReferenceIndex(1, mbAddr);
+    var directZeroPrediction = ref0 < 0 && ref1 < 0;
+    if (directZeroPrediction)
+      ref0 = ref1 = 0;
 
-    var directZero = this._DirectZeroPrediction(x, y);
+    var colZero = this._DirectColZeroFlag(x, y);
     if (ref0 >= 0) {
-      var mv = directZero && ref0 == 0
+      var mv = directZeroPrediction || ref0 == 0 && colZero
         ? (X: 0, Y: 0)
-        : this._PredictMotionForList(0, mbAddr, x, y, width, height, ref0, 0, 1);
+        : this._PredictSpatialDirectMotion(0, mbAddr, ref0);
       this._AssignMotionList(0, x >> 2, y >> 2, width >> 2, height >> 2, ref0, mv.X, mv.Y);
     }
     if (ref1 >= 0) {
-      var mv = directZero && ref1 == 0
+      var mv = directZeroPrediction || ref1 == 0 && colZero
         ? (X: 0, Y: 0)
-        : this._PredictMotionForList(1, mbAddr, x, y, width, height, ref1, 0, 1);
+        : this._PredictSpatialDirectMotion(1, mbAddr, ref1);
       this._AssignMotionList(1, x >> 2, y >> 2, width >> 2, height >> 2, ref1, mv.X, mv.Y);
     }
   }
 
-  private int _DirectSpatialReferenceIndex(int list, int mbAddr, int x, int y, int width) {
+  private int _DirectSpatialReferenceIndex(int list, int mbAddr) {
+    var x = mbAddr % this._mbWidth * 16;
+    var y = mbAddr / this._mbWidth * 16;
     var a = this._NeighbourMotionForList(list, mbAddr, x - 1, y);
     var b = this._NeighbourMotionForList(list, mbAddr, x, y - 1);
-    var c = this._NeighbourMotionForList(list, mbAddr, x + width, y - 1);
+    var c = this._NeighbourMotionForList(list, mbAddr, x + 16, y - 1);
     if (!c.Available)
       c = this._NeighbourMotionForList(list, mbAddr, x - 1, y - 1);
     var result = int.MaxValue;
@@ -465,6 +468,12 @@ internal sealed partial class H264FrameDecoder {
     if (b.Available && b.RefIdx >= 0) result = Math.Min(result, b.RefIdx);
     if (c.Available && c.RefIdx >= 0) result = Math.Min(result, c.RefIdx);
     return result == int.MaxValue ? -1 : result;
+  }
+
+  private (int X, int Y) _PredictSpatialDirectMotion(int list, int mbAddr, int refIdx) {
+    var x = mbAddr % this._mbWidth * 16;
+    var y = mbAddr / this._mbWidth * 16;
+    return this._PredictMotionForList(list, mbAddr, x, y, 16, 16, refIdx, 0, 1);
   }
 
   private (int X, int Y) _DirectCoLocatedPosition(int x, int y) {
@@ -476,18 +485,17 @@ internal sealed partial class H264FrameDecoder {
     return ((x & ~15) + offsetX, (y & ~15) + offsetY);
   }
 
-  private bool _DirectZeroPrediction(int x, int y) {
+  private bool _DirectColZeroFlag(int x, int y) {
     if (this._referenceList1.Length == 0 || this._referenceList1[0].IsLongTerm)
       return false;
     var col = this._referenceList1[0].Motion;
     var (colX, colY) = this._DirectCoLocatedPosition(x, y);
     if (col == null || !col.TryGet(colX >> 2, colY >> 2, out var motion))
       return false;
-    var refSerial = motion.HasList0 ? motion.RefSerial0 : motion.RefSerial1;
+    var refIdx = motion.HasList0 ? motion.RefIdx0 : motion.RefIdx1;
     var mvX = motion.HasList0 ? motion.MvX0 : motion.MvX1;
     var mvY = motion.HasList0 ? motion.MvY0 : motion.MvY1;
-    var colRefIdx0 = this._referenceList.Length > 0 && this._referenceList[0].Serial == refSerial;
-    return colRefIdx0 && Math.Abs(mvX) <= 1 && Math.Abs(mvY) <= 1;
+    return refIdx == 0 && Math.Abs(mvX) <= 1 && Math.Abs(mvY) <= 1;
   }
 
   private void _DeriveTemporalDirect(int x, int y, int width, int height) {
@@ -631,7 +639,7 @@ internal sealed partial class H264FrameDecoder {
         return;
       case 2:
         var (w0, w1) = this._ImplicitWeights(ref0, ref1);
-        _WeightedAverage(p0, p1, output, w0, w1);
+        _WeightedAverage(p0[..], p1[..], output[..], w0, w1);
         return;
       default:
         for (var i = 0; i < p0.Length; ++i)
@@ -651,9 +659,9 @@ internal sealed partial class H264FrameDecoder {
     var tb = Math.Clamp(this.Picture.PicOrderCnt - first.PicOrderCnt, -128, 127);
     var tx = (16384 + Math.Abs(td / 2)) / td;
     var scale = Math.Clamp((tb * tx + 32) >> 6, -1024, 1023);
-    if (scale is < -64 or > 128)
-      return (32, 32);
     var w1 = scale >> 2;
+    if (w1 is < -64 or > 128)
+      return (32, 32);
     return (64 - w1, w1);
   }
 
