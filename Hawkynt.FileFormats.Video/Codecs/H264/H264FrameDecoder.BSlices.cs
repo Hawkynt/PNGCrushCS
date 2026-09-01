@@ -12,6 +12,7 @@ internal sealed partial class H264FrameDecoder {
   private short[]? _mvY1;
   private sbyte[]? _refIdx1;
   private long[]? _refSerial1;
+  private bool[]? _motionAssigned1;
 
   /// <summary>Decodes one CAVLC B slice with two reference lists.</summary>
   internal void DecodeBSlice(
@@ -338,6 +339,7 @@ internal sealed partial class H264FrameDecoder {
     this._refIdx1 = new sbyte[count];
     this._refIdx1.AsSpan().Fill(-1);
     this._refSerial1 = new long[count];
+    this._motionAssigned1 = new bool[count];
   }
 
   private void _ClearList1Motion(int mbAddr) {
@@ -351,6 +353,7 @@ internal sealed partial class H264FrameDecoder {
         this._mvY1![row + bx] = 0;
         this._refIdx1![row + bx] = -1;
         this._refSerial1![row + bx] = 0;
+        this._motionAssigned1![row + bx] = false;
       }
     }
   }
@@ -371,13 +374,14 @@ internal sealed partial class H264FrameDecoder {
           this._mvY[at] = (short)mvY;
           this._refIdx[at] = (sbyte)refIdx;
           this._refSerial[at] = serial;
+          this._motionAssigned[at] = true;
         } else {
           this._mvX1![at] = (short)mvX;
           this._mvY1![at] = (short)mvY;
           this._refIdx1![at] = (sbyte)refIdx;
           this._refSerial1![at] = serial;
+          this._motionAssigned1![at] = true;
         }
-        this._motionAssigned[at] = true;
       }
     }
   }
@@ -407,7 +411,8 @@ internal sealed partial class H264FrameDecoder {
     if (this._sliceId[neighbourMb] != this._currentSliceId)
       return (false, 0, 0, -1);
     var at = (y >> 2) * this._blockWidth + (x >> 2);
-    if (neighbourMb == mbAddr && !this._motionAssigned[at])
+    var assigned = list == 0 ? this._motionAssigned[at] : this._motionAssigned1![at];
+    if (neighbourMb == mbAddr && !assigned)
       return (false, 0, 0, -1);
     if (this._kind[neighbourMb] != H264MacroblockKind.Inter)
       return (true, 0, 0, -1);
