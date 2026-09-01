@@ -1,0 +1,105 @@
+name: Image/video XML documentation sweep
+
+on:
+  push:
+    branches: [docs/image-video-xmldocs]
+
+permissions:
+  contents: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  sweep:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout PNGCrushCS
+        uses: actions/checkout@v4
+        with:
+          path: PNGCrushCS
+          fetch-depth: 0
+
+      - name: Checkout CompressionWorkbench sibling
+        uses: actions/checkout@v4
+        with:
+          repository: Hawkynt/CompressionWorkbench
+          path: CompressionWorkbench
+          fetch-depth: 1
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.x
+            10.0.x
+
+      - name: Prepare one-shot source audit
+        working-directory: PNGCrushCS
+        shell: pwsh
+        run: |
+          git fetch origin refs/heads/docs/complete-public-api-summaries:refs/remotes/origin/docs/complete-public-api-summaries
+          $auditRoot = Join-Path $env:RUNNER_TEMP 'ApiDocSummaryFixer'
+          New-Item -ItemType Directory -Force $auditRoot | Out-Null
+          git show origin/docs/complete-public-api-summaries:tools/ApiDocSummaryFixer/ApiDocSummaryFixer.csproj | Set-Content (Join-Path $auditRoot 'ApiDocSummaryFixer.csproj') -Encoding utf8
+          git show origin/docs/complete-public-api-summaries:tools/ApiDocSummaryFixer/Program.cs | Set-Content (Join-Path $auditRoot 'Program.cs') -Encoding utf8
+
+          $programPath = Join-Path $auditRoot 'Program.cs'
+          $program = (Get-Content $programPath -Raw).Replace("`r`n", "`n")
+          $oldRoots = @(
+            '  Path.Combine(repositoryRoot, "Hawkynt.FileFormats.Video"),'
+            '  Path.Combine(repositoryRoot, "Hawkynt.ImageTransformUI"),'
+          ) -join "`n"
+          $newRoots = @(
+            '  Path.Combine(repositoryRoot, "Hawkynt.FileFormats.Images"),'
+            '  Path.Combine(repositoryRoot, "Hawkynt.FileFormats.Video"),'
+          ) -join "`n"
+          if (-not $program.Contains($oldRoots)) { throw 'Could not locate audit source roots.' }
+          $program = $program.Replace($oldRoots, $newRoots)
+          $program = $program.Replace('var generatorChanges = PatchHeaderSerializerGenerator(repositoryRoot, checkOnly);', 'var generatorChanges = 0;')
+          Set-Content $programPath $program -NoNewline -Encoding utf8
+          "AUDIT_PROJECT=$(Join-Path $auditRoot 'ApiDocSummaryFixer.csproj')" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Fill missing XML summaries
+        working-directory: PNGCrushCS
+        shell: pwsh
+        run: dotnet run --project "$env:AUDIT_PROJECT" -- .
+
+      - name: Verify every image/video C# declaration is documented
+        working-directory: PNGCrushCS
+        shell: pwsh
+        run: dotnet run --project "$env:AUDIT_PROJECT" -- --check .
+
+      - name: Restore image package
+        working-directory: PNGCrushCS
+        run: dotnet restore Hawkynt.FileFormats.Images/Hawkynt.FileFormats.Images.csproj -p:EnableWindowsTargeting=true
+
+      - name: Build image package
+        working-directory: PNGCrushCS
+        run: dotnet build Hawkynt.FileFormats.Images/Hawkynt.FileFormats.Images.csproj -c Release --no-restore -p:EnableWindowsTargeting=true
+
+      - name: Restore video package
+        working-directory: PNGCrushCS
+        run: dotnet restore Hawkynt.FileFormats.Video/Hawkynt.FileFormats.Video.csproj -p:EnableWindowsTargeting=true
+
+      - name: Build video package
+        working-directory: PNGCrushCS
+        run: dotnet build Hawkynt.FileFormats.Video/Hawkynt.FileFormats.Video.csproj -c Release --no-restore -p:EnableWindowsTargeting=true
+
+      - name: Check source diff
+        working-directory: PNGCrushCS
+        shell: bash
+        run: git diff --check -- Hawkynt.FileFormats.Images Hawkynt.FileFormats.Video
+
+      - name: Commit package C# documentation only
+        working-directory: PNGCrushCS
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -- 'Hawkynt.FileFormats.Images/**/*.cs' 'Hawkynt.FileFormats.Video/**/*.cs'
+          if git diff --cached --quiet; then
+            echo 'No package C# documentation changes remain.'
+          else
+            git commit -m 'Complete image and video XML documentation'
+            git push
+          fi
