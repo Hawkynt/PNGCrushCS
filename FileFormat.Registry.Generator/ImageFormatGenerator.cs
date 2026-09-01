@@ -7,85 +7,60 @@ using Microsoft.CodeAnalysis;
 
 namespace FileFormat.Registry.Generator;
 
+/// <summary>
+/// Incremental source generator that builds the image format registry from the formats present in the compilation.
+/// </summary>
 [Generator]
 public sealed class ImageFormatGenerator : IIncrementalGenerator {
 
   private const string _IMAGE_FORMAT_READER = "FileFormat.Core.IImageFormatReader`1";
-  private const string _IMAGE_TO_RAW_IMAGE = "FileFormat.Core.IImageToRawImage`1";
-  private const string _IMAGE_FROM_RAW_IMAGE = "FileFormat.Core.IImageFromRawImage`1";
   private const string _IMAGE_FORMAT_WRITER = "FileFormat.Core.IImageFormatWriter`1";
-  private const string _MULTI_IMAGE_FILE_FORMAT = "FileFormat.Core.IMultiImageFileFormat`1";
+  private const string _IMAGE_FORMAT_TO_RAW = "FileFormat.Core.IImageFormatToRaw`1";
+  private const string _IMAGE_FORMAT_FROM_RAW = "FileFormat.Core.IImageFormatFromRaw`1";
+  private const string _MULTI_IMAGE_FORMAT = "FileFormat.Core.IMultiImageFormat`1";
   private const string _IMAGE_INFO_READER = "FileFormat.Core.IImageInfoReader`1";
-  private const string _FORMAT_CHUNK_LAYOUT = "FileFormat.Core.IFormatChunkLayout`1";
-  private const string _FORMAT_CHUNK_REWRITER = "FileFormat.Core.IFormatChunkRewriter`1";
-  private const string _FORMAT_CHUNK_PLAN_REWRITER = "FileFormat.Core.IFormatChunkPlanRewriter`1";
-  private const string _ADDITIONAL_IMAGE_FORMAT = "FileFormat.Core.AdditionalImageFormatAttribute";
+  private const string _CHUNK_LAYOUT_PROVIDER = "FileFormat.Core.IChunkLayoutProvider`1";
+  private const string _CHUNK_REWRITER = "FileFormat.Core.IChunkRewriter`1";
+  private const string _CHUNK_PLAN_REWRITER = "FileFormat.Core.IChunkPlanRewriter`1";
   private const string _FORMAT_MAGIC_BYTES = "FileFormat.Core.FormatMagicBytesAttribute";
   private const string _FORMAT_DETECTION_PRIORITY = "FileFormat.Core.FormatDetectionPriorityAttribute";
   private const string _FORMAT_MIME_TYPE = "FileFormat.Core.FormatMimeTypeAttribute";
+  private const string _ADDITIONAL_IMAGE_FORMAT = "FileFormat.Core.AdditionalImageFormatAttribute";
 
-  // MSBuild property `<FileFormatRegistryNamespace>` overrides the default emit namespace.
-  // Defaults to "Optimizer.Image" for back-compat with the original consumer.
   private const string _NAMESPACE_PROPERTY = "build_property.FileFormatRegistryNamespace";
-  private const string _DEFAULT_NAMESPACE = "Optimizer.Image";
-
-  /// <summary>
-  /// MSBuild property <c>&lt;FileFormatEmitImageRegistry&gt;</c>: set to <c>false</c> to suppress the
-  /// image registry in a project that runs this generator for something else.
-  /// </summary>
-  /// <remarks>
-  /// Discovery walks the referenced assemblies as well as the compilation, so any project that
-  /// references Hawkynt.FileFormats.Images and runs this generator would emit a second, complete copy
-  /// of the image registry into its own namespace. Two registries over the same formats is two
-  /// tables to keep in step, and the second one would need the whole of FormatEntry/FormatRegistry
-  /// duplicated beside it to compile at all. The video package references the image one for its JPEG
-  /// and bitmap readers and wants only the video registry, so it turns this off.
-  /// </remarks>
-  private const string _EMIT_IMAGE_REGISTRY_PROPERTY = "build_property.FileFormatEmitImageRegistry";
+  private const string _DEFAULT_NAMESPACE = "Hawkynt.FileFormats.Images";
 
   public void Initialize(IncrementalGeneratorInitializationContext context) {
-    var options = context.AnalyzerConfigOptionsProvider.Select(static (options, _) => {
+    var nsOption = context.AnalyzerConfigOptionsProvider.Select(static (options, _) => {
       options.GlobalOptions.TryGetValue(_NAMESPACE_PROPERTY, out var ns);
-      options.GlobalOptions.TryGetValue(_EMIT_IMAGE_REGISTRY_PROPERTY, out var emit);
-      return (
-        Namespace: string.IsNullOrWhiteSpace(ns) ? _DEFAULT_NAMESPACE : ns!,
-        Emit: !string.Equals(emit, "false", StringComparison.OrdinalIgnoreCase));
+      return string.IsNullOrWhiteSpace(ns) ? _DEFAULT_NAMESPACE : ns!;
     });
-    var formatTypes = context.CompilationProvider.Select(static (compilation, ct) => _DiscoverFormats(compilation, ct));
-    var combined = formatTypes.Combine(options);
-    context.RegisterSourceOutput(combined, static (spc, pair) => {
-      if (!pair.Right.Emit)
-        return;
 
-      _GenerateOutput(spc, pair.Left, pair.Right.Namespace);
-    });
+    var discovered = context.CompilationProvider.Select(static (compilation, ct) => _Discover(compilation, ct));
+    context.RegisterSourceOutput(discovered.Combine(nsOption), static (spc, pair) => _GenerateOutput(spc, pair.Left, pair.Right));
   }
 
-  private static ImmutableArray<FormatInfo> _DiscoverFormats(Compilation compilation, System.Threading.CancellationToken ct) {
-    var results = new List<FormatInfo>();
-    var visited = new HashSet<string>();
-
-    // Resolve interface symbols by metadata name for reliable comparison
+  private static ImmutableArray<FormatInfo> _Discover(Compilation compilation, System.Threading.CancellationToken ct) {
     var imageFormatReader = compilation.GetTypeByMetadataName(_IMAGE_FORMAT_READER);
-    var imageToRawImage = compilation.GetTypeByMetadataName(_IMAGE_TO_RAW_IMAGE);
-    var imageFromRawImage = compilation.GetTypeByMetadataName(_IMAGE_FROM_RAW_IMAGE);
+    if (imageFormatReader == null)
+      return ImmutableArray<FormatInfo>.Empty;
+
     var imageFormatWriter = compilation.GetTypeByMetadataName(_IMAGE_FORMAT_WRITER);
-    var multiImageFileFormat = compilation.GetTypeByMetadataName(_MULTI_IMAGE_FILE_FORMAT);
+    var imageFormatToRaw = compilation.GetTypeByMetadataName(_IMAGE_FORMAT_TO_RAW);
+    var imageFormatFromRaw = compilation.GetTypeByMetadataName(_IMAGE_FORMAT_FROM_RAW);
+    var multiImageFormat = compilation.GetTypeByMetadataName(_MULTI_IMAGE_FORMAT);
     var imageInfoReader = compilation.GetTypeByMetadataName(_IMAGE_INFO_READER);
-    var formatChunkLayout = compilation.GetTypeByMetadataName(_FORMAT_CHUNK_LAYOUT);
-    var formatChunkRewriter = compilation.GetTypeByMetadataName(_FORMAT_CHUNK_REWRITER);
-    var formatChunkPlanRewriter = compilation.GetTypeByMetadataName(_FORMAT_CHUNK_PLAN_REWRITER);
+    var chunkLayoutProvider = compilation.GetTypeByMetadataName(_CHUNK_LAYOUT_PROVIDER);
+    var chunkRewriter = compilation.GetTypeByMetadataName(_CHUNK_REWRITER);
+    var chunkPlanRewriter = compilation.GetTypeByMetadataName(_CHUNK_PLAN_REWRITER);
     var magicBytesAttr = compilation.GetTypeByMetadataName(_FORMAT_MAGIC_BYTES);
     var detectionPriorityAttr = compilation.GetTypeByMetadataName(_FORMAT_DETECTION_PRIORITY);
     var mimeTypeAttr = compilation.GetTypeByMetadataName(_FORMAT_MIME_TYPE);
 
-    if (imageFormatReader == null)
-      return ImmutableArray<FormatInfo>.Empty;
+    var results = new List<FormatInfo>();
+    var visited = new HashSet<string>();
 
-    // Scan all referenced assemblies + current compilation
-    var allSymbols = _GetAllNamedTypes(compilation, ct);
-
-    foreach (var type in allSymbols) {
+    foreach (var type in _GetAllNamedTypes(compilation, ct)) {
       ct.ThrowIfCancellationRequested();
 
       if (type.IsAbstract || (type.TypeKind != TypeKind.Class && type.TypeKind != TypeKind.Struct))
@@ -94,9 +69,9 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
         continue;
 
       var hasFormatReader = false;
+      var hasFormatWriter = false;
       var hasToRawImage = false;
       var hasFromRawImage = false;
-      var hasFormatWriter = false;
       var hasMultiImage = false;
       var hasImageInfoReader = false;
       var hasChunkLayout = false;
@@ -104,52 +79,43 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
       var hasChunkPlanRewriter = false;
 
       foreach (var iface in type.AllInterfaces) {
-        if (!iface.IsGenericType)
+        if (!iface.IsGenericType || iface.TypeArguments.Length != 1)
           continue;
-
-        var typeArgs = iface.TypeArguments;
-        if (typeArgs.Length != 1)
-          continue;
-
-        // Check that the type argument is the type itself (self-referential constraint)
-        if (!SymbolEqualityComparer.Default.Equals(typeArgs[0], type))
+        if (!SymbolEqualityComparer.Default.Equals(iface.TypeArguments[0], type))
           continue;
 
         var def = iface.OriginalDefinition;
-        if (imageFormatReader != null && SymbolEqualityComparer.Default.Equals(def, imageFormatReader))
+        if (SymbolEqualityComparer.Default.Equals(def, imageFormatReader))
           hasFormatReader = true;
-        else if (imageToRawImage != null && SymbolEqualityComparer.Default.Equals(def, imageToRawImage))
-          hasToRawImage = true;
-        else if (imageFromRawImage != null && SymbolEqualityComparer.Default.Equals(def, imageFromRawImage))
-          hasFromRawImage = true;
         else if (imageFormatWriter != null && SymbolEqualityComparer.Default.Equals(def, imageFormatWriter))
           hasFormatWriter = true;
-        else if (multiImageFileFormat != null && SymbolEqualityComparer.Default.Equals(def, multiImageFileFormat))
+        else if (imageFormatToRaw != null && SymbolEqualityComparer.Default.Equals(def, imageFormatToRaw))
+          hasToRawImage = true;
+        else if (imageFormatFromRaw != null && SymbolEqualityComparer.Default.Equals(def, imageFormatFromRaw))
+          hasFromRawImage = true;
+        else if (multiImageFormat != null && SymbolEqualityComparer.Default.Equals(def, multiImageFormat))
           hasMultiImage = true;
         else if (imageInfoReader != null && SymbolEqualityComparer.Default.Equals(def, imageInfoReader))
           hasImageInfoReader = true;
-        else if (formatChunkLayout != null && SymbolEqualityComparer.Default.Equals(def, formatChunkLayout))
+        else if (chunkLayoutProvider != null && SymbolEqualityComparer.Default.Equals(def, chunkLayoutProvider))
           hasChunkLayout = true;
-        else if (formatChunkRewriter != null && SymbolEqualityComparer.Default.Equals(def, formatChunkRewriter))
+        else if (chunkRewriter != null && SymbolEqualityComparer.Default.Equals(def, chunkRewriter))
           hasChunkRewriter = true;
-        else if (formatChunkPlanRewriter != null && SymbolEqualityComparer.Default.Equals(def, formatChunkPlanRewriter))
+        else if (chunkPlanRewriter != null && SymbolEqualityComparer.Default.Equals(def, chunkPlanRewriter))
           hasChunkPlanRewriter = true;
       }
 
-      // Must implement at least one of the format interfaces
-      if (!hasFormatReader)
+      if (!hasFormatReader && !hasFormatWriter && !hasToRawImage && !hasFromRawImage && !hasMultiImage && !hasImageInfoReader)
         continue;
 
-      var typeName = type.Name;
-      var formatId = typeName.EndsWith("File") ? typeName.Substring(0, typeName.Length - 4) : typeName;
-
-      // Deduplicate (same type from multiple assemblies)
+      var formatId = type.Name;
+      if (formatId.EndsWith("File", StringComparison.Ordinal))
+        formatId = formatId.Substring(0, formatId.Length - 4);
       if (!visited.Add(formatId))
         continue;
 
       var fullName = type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
 
-      // Extract [FormatMagicBytes] attributes at compile time
       var magicSignatures = new List<MagicBytesInfo>();
       if (magicBytesAttr != null) {
         foreach (var attr in type.GetAttributes()) {
@@ -157,21 +123,24 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
             continue;
           if (attr.ConstructorArguments.Length < 1)
             continue;
-          var sigArg = attr.ConstructorArguments[0];
-          if (sigArg.Kind != TypedConstantKind.Array)
+
+          var signature = attr.ConstructorArguments[0];
+          if (signature.Kind != TypedConstantKind.Array)
             continue;
+
           var bytes = new List<byte>();
-          foreach (var element in sigArg.Values)
+          foreach (var element in signature.Values)
             if (element.Value is byte b)
               bytes.Add(b);
+
           var offset = 0;
-          if (attr.ConstructorArguments.Length >= 2 && attr.ConstructorArguments[1].Value is int off)
-            offset = off;
-          else {
+          if (attr.ConstructorArguments.Length >= 2 && attr.ConstructorArguments[1].Value is int positional)
+            offset = positional;
+          else
             foreach (var named in attr.NamedArguments)
-              if (named.Key == "offset" && named.Value.Value is int namedOff)
-                offset = namedOff;
-          }
+              if (named.Key == "offset" && named.Value.Value is int namedOffset)
+                offset = namedOffset;
+
           if (bytes.Count > 0)
             magicSignatures.Add(new MagicBytesInfo(bytes.ToArray(), offset));
         }
@@ -252,7 +221,6 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
       ct.ThrowIfCancellationRequested();
       if (compilation.GetAssemblyOrModuleSymbol(reference) is not IAssemblySymbol assembly)
         continue;
-
       foreach (var type in _GetTypesFromNamespace(assembly.GlobalNamespace, ct))
         yield return type;
     }
@@ -283,10 +251,13 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
     sb.AppendLine();
     sb.AppendLine("/// <summary>Supported image formats, auto-generated from discovered IImageFormatReader implementations.</summary>");
     sb.AppendLine("public enum ImageFormat {");
+    sb.AppendLine("  /// <summary>Represents an unknown or unsupported image format.</summary>");
     sb.AppendLine("  Unknown,");
 
-    foreach (var format in formats)
+    foreach (var format in formats) {
+      sb.Append("  /// <summary>Represents the ").Append(format.FormatId).AppendLine(" image format.</summary>");
       sb.Append("  ").Append(format.FormatId).AppendLine(",");
+    }
 
     sb.AppendLine("}");
 
@@ -348,18 +319,15 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
     foreach (var format in formats) {
       if (format.FullTypeName == null || !format.HasMultiImage)
         continue;
-
-      if (format.HasFormatReader && format.HasToRawImage)
-        sb.Append("    _RegisterMultiImageReader<").Append(format.FullTypeName).Append(">(ImageFormat.").Append(format.FormatId).AppendLine(");");
+      sb.Append("    _RegisterMultiImage<").Append(format.FullTypeName).Append(">(ImageFormat.").Append(format.FormatId).AppendLine(");");
     }
 
     sb.AppendLine();
-    sb.AppendLine("    // Info reader registrations");
+    sb.AppendLine("    // Image-info registrations");
     foreach (var format in formats) {
       if (format.FullTypeName == null || !format.HasImageInfoReader)
         continue;
-
-      sb.Append("    _AugmentInfoReader<").Append(format.FullTypeName).Append(">(ImageFormat.").Append(format.FormatId).AppendLine(");");
+      sb.Append("    _RegisterImageInfoReader<").Append(format.FullTypeName).Append(">(ImageFormat.").Append(format.FormatId).AppendLine(");");
     }
 
     sb.AppendLine();
@@ -367,8 +335,7 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
     foreach (var format in formats) {
       if (format.FullTypeName == null || !format.HasChunkLayout)
         continue;
-
-      sb.Append("    _AugmentChunkLayout<").Append(format.FullTypeName).Append(">(ImageFormat.").Append(format.FormatId).AppendLine(");");
+      sb.Append("    _RegisterChunkLayout<").Append(format.FullTypeName).Append(">(ImageFormat.").Append(format.FormatId).AppendLine(");");
     }
 
     sb.AppendLine();
@@ -376,17 +343,15 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
     foreach (var format in formats) {
       if (format.FullTypeName == null || !format.HasChunkRewriter)
         continue;
-
-      sb.Append("    _AugmentChunkRewriter<").Append(format.FullTypeName).Append(">(ImageFormat.").Append(format.FormatId).AppendLine(");");
+      sb.Append("    _RegisterChunkRewriter<").Append(format.FullTypeName).Append(">(ImageFormat.").Append(format.FormatId).AppendLine(");");
     }
 
     sb.AppendLine();
-    sb.AppendLine("    // Chunk plan-rewriter registrations");
+    sb.AppendLine("    // Chunk-plan-rewriter registrations");
     foreach (var format in formats) {
       if (format.FullTypeName == null || !format.HasChunkPlanRewriter)
         continue;
-
-      sb.Append("    _AugmentChunkPlanRewriter<").Append(format.FullTypeName).Append(">(ImageFormat.").Append(format.FormatId).AppendLine(");");
+      sb.Append("    _RegisterChunkPlanRewriter<").Append(format.FullTypeName).Append(">(ImageFormat.").Append(format.FormatId).AppendLine(");");
     }
 
     sb.AppendLine("  }");
@@ -400,22 +365,13 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
       sb.Append("System.Array.Empty<string>()");
       return;
     }
+
     sb.Append("new string[] { ");
     for (var i = 0; i < format.MimeTypes.Length; ++i) {
       if (i > 0) sb.Append(", ");
-      sb.Append('"').Append(format.MimeTypes[i].Replace("\\", "\\\\").Replace("\"", "\\\"")).Append('"');
+      sb.Append('\"').Append(format.MimeTypes[i].Replace("\\", "\\\\").Replace("\"", "\\\"")).Append('\"');
     }
     sb.Append(" }");
-  }
-
-  private sealed class MagicBytesInfo {
-    public byte[] Signature { get; }
-    public int Offset { get; }
-
-    public MagicBytesInfo(byte[] signature, int offset) {
-      Signature = signature;
-      Offset = offset;
-    }
   }
 
   private sealed class FormatInfo {
@@ -436,30 +392,33 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
 
     public FormatInfo(
       string formatId, string? fullTypeName,
-      bool hasFormatReader, bool hasToRawImage,
-      bool hasFromRawImage, bool hasFormatWriter, bool hasMultiImage,
-      bool hasImageInfoReader = false,
-      MagicBytesInfo[]? magicSignatures = null,
-      int detectionPriority = 100,
-      string[]? mimeTypes = null,
-      bool hasChunkLayout = false,
-      bool hasChunkRewriter = false,
-      bool hasChunkPlanRewriter = false
-    ) {
-      FormatId = formatId;
-      FullTypeName = fullTypeName;
-      HasFormatReader = hasFormatReader;
-      HasToRawImage = hasToRawImage;
-      HasFromRawImage = hasFromRawImage;
-      HasFormatWriter = hasFormatWriter;
-      HasMultiImage = hasMultiImage;
-      HasImageInfoReader = hasImageInfoReader;
-      MagicSignatures = magicSignatures ?? Array.Empty<MagicBytesInfo>();
-      DetectionPriority = detectionPriority;
-      MimeTypes = mimeTypes ?? Array.Empty<string>();
-      HasChunkLayout = hasChunkLayout;
-      HasChunkRewriter = hasChunkRewriter;
-      HasChunkPlanRewriter = hasChunkPlanRewriter;
+      bool hasFormatReader, bool hasToRawImage, bool hasFromRawImage, bool hasFormatWriter,
+      bool hasMultiImage, bool hasImageInfoReader,
+      MagicBytesInfo[] magicSignatures, int detectionPriority, string[] mimeTypes,
+      bool hasChunkLayout = false, bool hasChunkRewriter = false, bool hasChunkPlanRewriter = false) {
+      this.FormatId = formatId;
+      this.FullTypeName = fullTypeName;
+      this.HasFormatReader = hasFormatReader;
+      this.HasToRawImage = hasToRawImage;
+      this.HasFromRawImage = hasFromRawImage;
+      this.HasFormatWriter = hasFormatWriter;
+      this.HasMultiImage = hasMultiImage;
+      this.HasImageInfoReader = hasImageInfoReader;
+      this.MagicSignatures = magicSignatures;
+      this.DetectionPriority = detectionPriority;
+      this.MimeTypes = mimeTypes;
+      this.HasChunkLayout = hasChunkLayout;
+      this.HasChunkRewriter = hasChunkRewriter;
+      this.HasChunkPlanRewriter = hasChunkPlanRewriter;
+    }
+  }
+
+  private sealed class MagicBytesInfo {
+    public byte[] Signature { get; }
+    public int Offset { get; }
+    public MagicBytesInfo(byte[] signature, int offset) {
+      this.Signature = signature;
+      this.Offset = offset;
     }
   }
 }
