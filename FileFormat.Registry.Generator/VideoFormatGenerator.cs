@@ -255,10 +255,13 @@ public sealed class VideoFormatGenerator : IIncrementalGenerator {
     sb.AppendLine();
     sb.AppendLine("/// <summary>Supported video containers, auto-generated from discovered IVideoContainerReader/IVideoContainerWriter implementations.</summary>");
     sb.AppendLine("public enum VideoFormat {");
+    sb.AppendLine("  /// <summary>Represents an unknown or unspecified video container format.</summary>");
     sb.AppendLine("  Unknown,");
 
-    foreach (var container in discovery.Containers)
+    foreach (var container in discovery.Containers) {
+      sb.Append("  /// <summary>Represents the ").Append(container.FormatId).AppendLine(" video container format.</summary>");
       sb.Append("  ").Append(container.FormatId).AppendLine(",");
+    }
 
     sb.AppendLine("}");
 
@@ -336,7 +339,7 @@ public sealed class VideoFormatGenerator : IIncrementalGenerator {
     for (var i = 0; i < values.Length; ++i) {
       if (i > 0)
         sb.Append(", ");
-      sb.Append('"').Append(values[i].Replace("\\", "\\\\").Replace("\"", "\\\"")).Append('"');
+      sb.Append('\"').Append(values[i].Replace("\\", "\\\\").Replace("\"", "\\\"")).Append('\"');
     }
 
     sb.Append(" }");
