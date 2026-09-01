@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -14,24 +15,26 @@ namespace FileFormat.Avi;
 /// its packets are.
 /// </summary>
 /// <remarks>
-/// An AVI is a RIFF file of form <c>AVI </c>. <c>LIST hdrl</c> holds the main header and one
+/// An AVI starts with a RIFF file of form <c>AVI </c>. <c>LIST hdrl</c> holds the main header and one
 /// <c>LIST strl</c> per stream; <c>LIST movi</c> holds the packets, one chunk each, named for the
-/// stream they belong to. None of that is codec-specific and all of it is shared with every other
-/// AVI, which is why this reader is complete for AVI while decoding only two codecs — the two are
-/// separate concerns and this file is only the first of them.
+/// stream they belong to. OpenDML files may continue with <c>RIFF AVIX</c> chunks carrying additional
+/// <c>movi</c> lists. None of that is codec-specific and all of it is shared with every other AVI,
+/// which is why this reader keeps container structure separate from codec decoding.
 /// <para/>
-/// Nothing in <c>movi</c> is read here. Only the header list is parsed, which is a few hundred bytes
-/// whatever the length of the film; the packets are walked on demand by
-/// <see cref="AviContainer.ReadPackets(AviContainer)"/>.
+/// Nothing in <c>movi</c> is decoded here. Only the header lists and RIFF boundaries are parsed; the
+/// packets are walked on demand by <see cref="AviContainer.ReadPackets(AviContainer)"/>.
 /// </remarks>
 public static class AviReader {
 
   private const string _FORM_TYPE = "AVI ";
+  private const string _EXTENDED_FORM_TYPE = "AVIX";
   private const string _HEADER_LIST = "hdrl";
   private const string _STREAM_LIST = "strl";
+  private const string _OPEN_DML_LIST = "odml";
   private const string _MOVIE_LIST = "movi";
   private const string _INFO_LIST = "INFO";
   private const string _MAIN_HEADER_ID = "avih";
+  private const string _EXTENDED_HEADER_ID = "dmlh";
   private const string _STREAM_HEADER_ID = "strh";
   private const string _STREAM_FORMAT_ID = "strf";
   private const string _STREAM_NAME_ID = "strn";
@@ -90,15 +93,15 @@ public static class AviReader {
 
     if (riffHeader.FormType.ToString() != _FORM_TYPE)
       throw new InvalidDataException($"Invalid AVI form type: expected '{_FORM_TYPE}', got '{riffHeader.FormType}'.");
+    if (riffHeader.Size < 4)
+      throw new InvalidDataException("Invalid AVI RIFF size: the form type is not included in the declared chunk.");
 
-    // The declared size is the writer's claim; the array is the fact. A file cut short keeps whatever
-    // was written, which is what every other tool reads out of it too.
-    var end = Math.Min(data.Length, (long)riffHeader.Size + 8 > int.MaxValue ? data.Length : (int)riffHeader.Size + 8);
-
+    var firstRiffEnd = _RiffEnd(0, riffHeader.Size, data.Length);
     RiffElement? headerList = null;
-    RiffElement? movieList = null;
     RiffElement? infoList = null;
-    foreach (var element in RiffScanner.Walk(memory, RiffHeader.StructSize, end)) {
+    var movieLists = new List<ReadOnlyMemory<byte>>();
+
+    foreach (var element in RiffScanner.Walk(memory, RiffHeader.StructSize, firstRiffEnd)) {
       if (!element.IsList)
         continue;
 
@@ -107,7 +110,7 @@ public static class AviReader {
           headerList ??= element;
           break;
         case _MOVIE_LIST:
-          movieList ??= element;
+          movieLists.Add(element.Body);
           break;
         case _INFO_LIST:
           infoList ??= element;
@@ -117,22 +120,56 @@ public static class AviReader {
 
     if (headerList == null)
       throw new InvalidDataException($"Missing '{_HEADER_LIST}' list.");
-    if (movieList == null)
+    if (movieLists.Count == 0)
       throw new InvalidDataException($"Missing '{_MOVIE_LIST}' list.");
 
-    var (header, streams) = _ReadHeaderList(headerList.Value);
+    for (var position = _NextRiffOffset(0, riffHeader.Size, data.Length); position < data.Length;) {
+      if (data.Length - position < RiffHeader.StructSize)
+        break; // a cut-off trailing RIFF header has no complete form type to inspect.
+
+      var extendedHeader = RiffHeader.ReadFrom(data.AsSpan(position));
+      if (extendedHeader.ChunkId.ToString() != "RIFF" || extendedHeader.FormType.ToString() != _EXTENDED_FORM_TYPE)
+        break; // OpenDML extensions are consecutive RIFF AVIX chunks; unrelated trailing bytes are not AVI media.
+      if (extendedHeader.Size < 4)
+        throw new InvalidDataException("Invalid OpenDML AVIX RIFF size: the form type is not included in the declared chunk.");
+
+      var extendedEnd = _RiffEnd(position, extendedHeader.Size, data.Length);
+      foreach (var element in RiffScanner.Walk(memory, checked(position + RiffHeader.StructSize), extendedEnd))
+        if (element.IsList && element.ListType.ToString() == _MOVIE_LIST)
+          movieLists.Add(element.Body);
+
+      var next = _NextRiffOffset(position, extendedHeader.Size, data.Length);
+      if (next <= position)
+        break;
+      position = next;
+    }
+
+    var (header, streams, extendedTotalFrames) = _ReadHeaderList(headerList.Value);
 
     return new() {
       Header = header,
       StreamInfos = streams,
-      MovieList = movieList.Value.Body,
-      FileMetadata = _ReadMetadata(header, streams, infoList),
+      MovieList = movieLists[0],
+      MovieLists = movieLists,
+      FileMetadata = _ReadMetadata(header, streams, infoList, extendedTotalFrames),
     };
   }
 
-  /// <summary>Reads <c>avih</c> and every <c>LIST strl</c> behind it.</summary>
-  private static (AviMainHeader Header, MediaStreamInfo[] Streams) _ReadHeaderList(RiffElement headerList) {
+  private static int _RiffEnd(int start, uint size, int dataLength) {
+    var declaredEnd = (long)start + 8 + size;
+    return declaredEnd >= dataLength ? dataLength : checked((int)declaredEnd);
+  }
+
+  private static int _NextRiffOffset(int start, uint size, int dataLength) {
+    var declaredEnd = (long)start + 8 + size;
+    var next = declaredEnd + (size & 1u);
+    return next >= dataLength ? dataLength : checked((int)next);
+  }
+
+  /// <summary>Reads <c>avih</c>, every <c>LIST strl</c>, and the OpenDML total-frame extension.</summary>
+  private static (AviMainHeader Header, MediaStreamInfo[] Streams, uint? ExtendedTotalFrames) _ReadHeaderList(RiffElement headerList) {
     AviMainHeader? header = null;
+    uint? extendedTotalFrames = null;
     var streams = new List<MediaStreamInfo>();
 
     foreach (var element in RiffScanner.Walk(headerList)) {
@@ -148,19 +185,34 @@ public static class AviReader {
         continue;
       }
 
-      if (element.ListType.ToString() != _STREAM_LIST)
-        continue;
-
-      // Every strl counts towards the stream number, video or not: the two digits a packet chunk's
-      // name starts with are the stream's position in this list, and skipping any of them would make
-      // the rest go looking under the wrong name.
-      streams.Add(_ReadStream(element, streams.Count));
+      switch (element.ListType.ToString()) {
+        case _STREAM_LIST:
+          // Every strl counts towards the stream number, video or not: the two digits a packet chunk's
+          // name starts with are the stream's position in this list, and skipping any of them would make
+          // the rest go looking under the wrong name.
+          streams.Add(_ReadStream(element, streams.Count));
+          break;
+        case _OPEN_DML_LIST:
+          extendedTotalFrames ??= _ReadExtendedTotalFrames(element);
+          break;
+      }
     }
 
     if (header == null)
       throw new InvalidDataException($"Missing '{_MAIN_HEADER_ID}' chunk.");
 
-    return (header.Value, streams.ToArray());
+    return (header.Value, streams.ToArray(), extendedTotalFrames);
+  }
+
+  private static uint? _ReadExtendedTotalFrames(RiffElement openDmlList) {
+    foreach (var element in RiffScanner.Walk(openDmlList)) {
+      if (element.IsList || element.Id.ToString() != _EXTENDED_HEADER_ID)
+        continue;
+      if (element.Body.Length < 4)
+        throw new InvalidDataException($"Invalid '{_EXTENDED_HEADER_ID}' chunk size: expected at least 4, got {element.Body.Length}.");
+      return BinaryPrimitives.ReadUInt32LittleEndian(element.Body.Span);
+    }
+    return null;
   }
 
   /// <summary>Describes one <c>LIST strl</c> without deciding anything about its codec.</summary>
@@ -261,13 +313,18 @@ public static class AviReader {
     };
   }
 
-  /// <summary>Gathers what the file says about itself from <c>avih</c> and the <c>INFO</c> list.</summary>
+  /// <summary>Gathers what the file says about itself from <c>avih</c>, OpenDML, and the <c>INFO</c> list.</summary>
   /// <remarks>
   /// AVI has no cover art of its own — the RIFF <c>INFO</c> list is text and nothing else — so
   /// <see cref="VideoMetadata.CoverArt"/> stays empty here. It is in the model for the containers
   /// that do carry one; an empty list means this file had none, not that it was not looked for.
   /// </remarks>
-  private static VideoMetadata _ReadMetadata(AviMainHeader header, MediaStreamInfo[] streams, RiffElement? infoList) {
+  private static VideoMetadata _ReadMetadata(
+    AviMainHeader header,
+    MediaStreamInfo[] streams,
+    RiffElement? infoList,
+    uint? extendedTotalFrames
+  ) {
     string? title = null, artist = null, album = null, encodedBy = null;
     DateTimeOffset? created = null;
     var texts = new List<TextMetadataEntry>();
@@ -310,23 +367,24 @@ public static class AviReader {
       Album = album,
       EncodedBy = encodedBy,
       CreationTime = created,
-      Duration = _DeclaredDuration(header),
+      Duration = _DeclaredDuration(header, extendedTotalFrames),
       Streams = streamMetadata,
       TextEntries = texts,
     };
   }
 
-  /// <summary>How long the main header claims the film runs.</summary>
+  /// <summary>How long the AVI headers claim the film runs.</summary>
   /// <remarks>
-  /// The product of the two fields that say so, which is the writer's claim and not a count: a file
-  /// left unfinished keeps whatever <c>dwTotalFrames</c> was there when it stopped. Counting the
-  /// packets instead would mean walking the whole file to answer a question about its header.
+  /// OpenDML keeps <c>avih.dwTotalFrames</c> scoped to the first RIFF and puts the whole-file frame
+  /// count in <c>dmlh</c>, so the extended value wins when present. Counting packets instead would
+  /// mean walking the whole file to answer a question already stated by its header.
   /// </remarks>
-  private static TimeSpan? _DeclaredDuration(AviMainHeader header) {
-    if (header.MicroSecondsPerFrame == 0 || header.TotalFrames == 0)
+  private static TimeSpan? _DeclaredDuration(AviMainHeader header, uint? extendedTotalFrames) {
+    var totalFrames = extendedTotalFrames ?? header.TotalFrames;
+    if (header.MicroSecondsPerFrame == 0 || totalFrames == 0)
       return null;
 
-    return TimeSpan.FromTicks((long)header.MicroSecondsPerFrame * header.TotalFrames * (TimeSpan.TicksPerSecond / 1_000_000));
+    return TimeSpan.FromTicks((long)header.MicroSecondsPerFrame * totalFrames * (TimeSpan.TicksPerSecond / 1_000_000));
   }
 
   /// <summary>Turns an AVI's Windows locale identifier into a language tag.</summary>
@@ -346,7 +404,6 @@ public static class AviReader {
     }
   }
 
-  /// <summary>Reads a RIFF text chunk, which is Latin-1 and terminated by a zero that may be padding.</summary>
   /// <summary>
   /// Reads a <c>strh</c> whose trailing rectangle may simply not be there.
   /// </summary>
