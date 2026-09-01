@@ -16,6 +16,7 @@ public sealed class AviContainer : IVideoContainerReader<AviContainer> {
   public required IReadOnlyList<MediaStreamInfo> StreamInfos { get; init; }
   public required VideoMetadata FileMetadata { get; init; }
   public required ReadOnlyMemory<byte> MovieList { get; init; }
+  internal IReadOnlyList<ReadOnlyMemory<byte>> MovieLists { get; init; } = [];
 
   public static string PrimaryExtension => ".avi";
   public static string[] FileExtensions => [".avi"];
@@ -100,21 +101,23 @@ public sealed class AviContainer : IVideoContainerReader<AviContainer> {
 
   private static IEnumerable<CodedPacket> _Walk(AviContainer container, int? onlyStream) {
     var ordinals = new long[container.StreamInfos.Count];
+    var movieLists = container.MovieLists.Count == 0 ? new[] { container.MovieList } : container.MovieLists;
 
-    foreach (var element in RiffScanner.Walk(container.MovieList, 0, container.MovieList.Length)) {
-      if (element.IsList) {
-        if (element.ListType.ToString() != _RECORD_LIST)
+    foreach (var movieList in movieLists)
+      foreach (var element in RiffScanner.Walk(movieList, 0, movieList.Length)) {
+        if (element.IsList) {
+          if (element.ListType.ToString() != _RECORD_LIST)
+            continue;
+
+          foreach (var record in RiffScanner.Walk(element))
+            if (_TryPacket(container, record, ordinals, onlyStream, out var recorded))
+              yield return recorded;
           continue;
+        }
 
-        foreach (var record in RiffScanner.Walk(element))
-          if (_TryPacket(container, record, ordinals, onlyStream, out var recorded))
-            yield return recorded;
-        continue;
+        if (_TryPacket(container, element, ordinals, onlyStream, out var packet))
+          yield return packet;
       }
-
-      if (_TryPacket(container, element, ordinals, onlyStream, out var packet))
-        yield return packet;
-    }
   }
 
   private static bool _TryPacket(
