@@ -64,6 +64,11 @@ jobs:
         shell: pwsh
         run: dotnet run --project "$env:AUDIT_PROJECT" -- .
 
+      - name: Complete semantic follow-up pass
+        working-directory: PNGCrushCS
+        shell: pwsh
+        run: dotnet run --project "$env:AUDIT_PROJECT" -- .
+
       - name: Verify every image/video C# declaration is documented
         working-directory: PNGCrushCS
         shell: pwsh
