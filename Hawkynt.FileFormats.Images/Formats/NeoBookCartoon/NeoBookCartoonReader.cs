@@ -50,7 +50,7 @@ public static class NeoBookCartoonReader {
     if (!picture[.._PngSignature.Length].SequenceEqual(_PngSignature))
       throw new InvalidDataException($"There is no PNG at {offset}, which is where the header says the cartoon's picture stands.");
 
-    var length = _PngLength(picture);
+    var length = PngLength(picture);
     if (length <= 0)
       throw new InvalidDataException("The PNG the cartoon points at does not run to an IEND inside the file.");
 
@@ -61,7 +61,10 @@ public static class NeoBookCartoonReader {
   }
 
   /// <summary>How long the PNG starting here is, walking its chunks to the IEND, or zero when it does not reach one.</summary>
-  private static int _PngLength(ReadOnlySpan<byte> data) {
+  internal static int PngLength(ReadOnlySpan<byte> data) {
+    if (data.Length < _PngSignature.Length || !data[.._PngSignature.Length].SequenceEqual(_PngSignature))
+      return 0;
+
     var at = _PngSignature.Length;
     while (at + 12 <= data.Length) {
       var length = (uint)((data[at] << 24) | (data[at + 1] << 16) | (data[at + 2] << 8) | data[at + 3]);
