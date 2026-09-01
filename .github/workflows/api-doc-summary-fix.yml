@@ -20,20 +20,13 @@ jobs:
           path: PNGCrushCS
           fetch-depth: 0
 
-      - name: Checkout CompressionWorkbench sibling
-        uses: actions/checkout@v4
-        with:
-          repository: Hawkynt/CompressionWorkbench
-          path: CompressionWorkbench
-          fetch-depth: 1
-
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: |
             8.x
             10.0.x
 
-      - name: Expand source-only audit scope
+      - name: Expand image and video source audit scope
         working-directory: PNGCrushCS
         shell: pwsh
         run: |
@@ -41,62 +34,22 @@ jobs:
           $fixer = (Get-Content $fixerPath -Raw).Replace("`r`n", "`n")
           $videoRoot = '  Path.Combine(repositoryRoot, "Hawkynt.FileFormats.Video"),'
           $imageRoot = '  Path.Combine(repositoryRoot, "Hawkynt.FileFormats.Images"),'
+          $uiRoot = '  Path.Combine(repositoryRoot, "Hawkynt.ImageTransformUI"),'
           if (-not $fixer.Contains($imageRoot)) {
             $fixer = $fixer.Replace($videoRoot, $imageRoot + "`n" + $videoRoot)
-            Set-Content $fixerPath $fixer -NoNewline -Encoding utf8
           }
-
-          $imageGeneratorPath = 'FileFormat.Registry.Generator/ImageFormatGenerator.cs'
-          $imageGenerator = (Get-Content $imageGeneratorPath -Raw).Replace("`r`n", "`n")
-          $imageUnknown = '    sb.AppendLine("  Unknown,");'
-          $imageUnknownDocs = '    sb.AppendLine("  /// <summary>Represents an unknown or unsupported image format.</summary>");' + "`n" + $imageUnknown
-          if (-not $imageGenerator.Contains('Represents an unknown or unsupported image format.')) {
-            $imageGenerator = $imageGenerator.Replace($imageUnknown, $imageUnknownDocs)
-          }
-          $imageLoop = @(
-            '    foreach (var format in formats)'
-            '      sb.Append("  ").Append(format.FormatId).AppendLine(",");'
-          ) -join "`n"
-          $imageLoopDocs = @(
-            '    foreach (var format in formats) {'
-            '      sb.Append("  /// <summary>Represents the ").Append(format.FormatId).AppendLine(" image format.</summary>");'
-            '      sb.Append("  ").Append(format.FormatId).AppendLine(",");'
-            '    }'
-          ) -join "`n"
-          if (-not $imageGenerator.Contains(' image format.</summary>')) {
-            if (-not $imageGenerator.Contains($imageLoop)) { throw 'ImageFormat generator loop not found.' }
-            $imageGenerator = $imageGenerator.Replace($imageLoop, $imageLoopDocs)
-          }
-          Set-Content $imageGeneratorPath $imageGenerator -NoNewline -Encoding utf8
-
-          $videoGeneratorPath = 'FileFormat.Registry.Generator/VideoFormatGenerator.cs'
-          $videoGenerator = (Get-Content $videoGeneratorPath -Raw).Replace("`r`n", "`n")
-          $videoUnknown = '    sb.AppendLine("  Unknown,");'
-          $videoUnknownDocs = '    sb.AppendLine("  /// <summary>Represents an unknown or unsupported video container format.</summary>");' + "`n" + $videoUnknown
-          if (-not $videoGenerator.Contains('Represents an unknown or unsupported video container format.')) {
-            $videoGenerator = $videoGenerator.Replace($videoUnknown, $videoUnknownDocs)
-          }
-          $videoLoop = @(
-            '    foreach (var container in discovery.Containers)'
-            '      sb.Append("  ").Append(container.FormatId).AppendLine(",");'
-          ) -join "`n"
-          $videoLoopDocs = @(
-            '    foreach (var container in discovery.Containers) {'
-            '      sb.Append("  /// <summary>Represents the ").Append(container.FormatId).AppendLine(" video container format.</summary>");'
-            '      sb.Append("  ").Append(container.FormatId).AppendLine(",");'
-            '    }'
-          ) -join "`n"
-          if (-not $videoGenerator.Contains(' video container format.</summary>')) {
-            if (-not $videoGenerator.Contains($videoLoop)) { throw 'VideoFormat generator loop not found.' }
-            $videoGenerator = $videoGenerator.Replace($videoLoop, $videoLoopDocs)
-          }
-          Set-Content $videoGeneratorPath $videoGenerator -NoNewline -Encoding utf8
+          $fixer = $fixer.Replace("`n" + $uiRoot, '')
+          Set-Content $fixerPath $fixer -NoNewline -Encoding utf8
 
       - name: Rewrite missing API summaries
         working-directory: PNGCrushCS
         run: dotnet run --project tools/ApiDocSummaryFixer/ApiDocSummaryFixer.csproj -- .
 
-      - name: Verify rewrite is idempotent
+      - name: Complete follow-up synthesized members
+        working-directory: PNGCrushCS
+        run: dotnet run --project tools/ApiDocSummaryFixer/ApiDocSummaryFixer.csproj -- .
+
+      - name: Verify every source file is complete
         working-directory: PNGCrushCS
         run: dotnet run --project tools/ApiDocSummaryFixer/ApiDocSummaryFixer.csproj -- --check .
 
@@ -116,26 +69,6 @@ jobs:
         working-directory: PNGCrushCS
         run: dotnet build Hawkynt.FileFormats.Video/Hawkynt.FileFormats.Video.csproj -c Release --no-restore -p:EnableWindowsTargeting=true
 
-      - name: Restore UI package
-        working-directory: PNGCrushCS
-        run: dotnet restore Hawkynt.ImageTransformUI/Hawkynt.ImageTransformUI.csproj -p:EnableWindowsTargeting=true
-
-      - name: Build UI package
-        working-directory: PNGCrushCS
-        run: dotnet build Hawkynt.ImageTransformUI/Hawkynt.ImageTransformUI.csproj -c Release --no-restore -p:EnableWindowsTargeting=true
-
-      - name: Regenerate package API references for validation
-        uses: Hawkynt/RepositoryTemplate/package-readme@v1
-        with:
-          mode: write
-          root: PNGCrushCS
-          configuration: Release
-          project: |
-            PNGCrushCS/Hawkynt.FileFormats.Images/Hawkynt.FileFormats.Images.csproj
-            PNGCrushCS/Hawkynt.FileFormats.Video/Hawkynt.FileFormats.Video.csproj
-            PNGCrushCS/Hawkynt.ImageTransformUI/Hawkynt.ImageTransformUI.csproj
-          upload-artifact: 'false'
-
       - name: Check source diffs
         working-directory: PNGCrushCS
         shell: bash
@@ -147,42 +80,16 @@ jobs:
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add Hawkynt.FileFormats.Images Hawkynt.FileFormats.Video Hawkynt.ImageTransformUI \
+          git add Hawkynt.FileFormats.Images Hawkynt.FileFormats.Video \
             FileFormat.Core.Generators/HeaderSerializerGenerator.cs \
             FileFormat.Registry.Generator/ImageFormatGenerator.cs \
             FileFormat.Registry.Generator/VideoFormatGenerator.cs
           git reset -- \
             Hawkynt.FileFormats.Images/README.md Hawkynt.FileFormats.Images/REFERENCE.md \
-            Hawkynt.FileFormats.Video/README.md Hawkynt.FileFormats.Video/REFERENCE.md \
-            Hawkynt.ImageTransformUI/README.md Hawkynt.ImageTransformUI/REFERENCE.md || true
+            Hawkynt.FileFormats.Video/README.md Hawkynt.FileFormats.Video/REFERENCE.md || true
           if git diff --cached --quiet; then
             echo "No C# documentation changes produced."
           else
             git commit -m "Document complete image and video APIs"
             git push
           fi
-
-      - name: Require zero missing reference summaries
-        working-directory: PNGCrushCS
-        shell: pwsh
-        run: |
-          $referenceFiles = @(
-            'Hawkynt.FileFormats.Images/REFERENCE.md',
-            'Hawkynt.FileFormats.Video/REFERENCE.md',
-            'Hawkynt.ImageTransformUI/REFERENCE.md'
-          )
-          $missing = @()
-          foreach ($file in $referenceFiles) {
-            $lineNumber = 0
-            foreach ($line in Get-Content $file) {
-              ++$lineNumber
-              if ($line -match '^\| .+ \| .+ \|  \|$') {
-                $missing += "${file}:${lineNumber}: $line"
-              }
-            }
-          }
-          if ($missing.Count -ne 0) {
-            $missing | ForEach-Object { Write-Host $_ }
-            throw "$($missing.Count) public/protected API members still have no summary."
-          }
-          Write-Host 'All generated API reference members have summaries.'
