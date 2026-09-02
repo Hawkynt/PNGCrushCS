@@ -45,7 +45,7 @@ public readonly record struct MtvFile :
   public int Height { get; init; }
 
   /// <summary>Top-to-bottom, left-to-right RGB24 pixel bytes.</summary>
-  public byte[] PixelData { get; init; } = [];
+  public byte[] PixelData { get; init; }
 
   public static RawImage ToRawImage(MtvFile file) {
     Validate(file, nameof(file));
