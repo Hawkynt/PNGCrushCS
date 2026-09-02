@@ -1,0 +1,28 @@
+name: Smoke
+
+# The fast tier, on every push to a working branch: one OS, fast tests only, no coverage, no
+# package-README check. It answers "is what I just pushed broken?" in minutes; ci.yml on the pull
+# request is the gate that runs both runners and every category.
+#
+# Never on main: that branch takes changes through pull requests, which already ran the full gate.
+on:
+  push:
+    branches-ignore: [main, master]
+  workflow_dispatch: {}
+
+jobs:
+  smoke:
+    uses: Hawkynt/RepositoryTemplate/.github/workflows/dotnet-smoke.yml@v1
+    with:
+      solution: PngCrush.slnx
+      dotnet-version: |
+        8.x
+        10.0.x
+      build-args: '-p:EnableWindowsTargeting=true'
+      # This repo's own slow tiers, plus Slow itself. TestCategory, not Category: the latter filters
+      # the reporting and still executes the excluded fixtures.
+      test-args: '--filter "TestCategory!=Slow&TestCategory!=Regression&TestCategory!=Performance"'
+      # PngCrush references CompressionWorkbench, so the sibling sits next to this checkout.
+      checkout-path: PNGCrushCS
+      working-directory: PNGCrushCS
+      siblings: '[{"repository":"Hawkynt/CompressionWorkbench","path":"CompressionWorkbench"}]'
