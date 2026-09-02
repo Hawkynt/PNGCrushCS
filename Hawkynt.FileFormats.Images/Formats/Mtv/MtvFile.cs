@@ -38,6 +38,12 @@ public readonly record struct MtvFile :
   static bool? IImageFormatMetadata<MtvFile>.MatchesSignature(ReadOnlySpan<byte> header)
     => MtvReader.MatchesSignature(header);
 
+  /// <summary>Dimensions and colour shape read from the ASCII <c>width height</c> header alone.</summary>
+  public static ImageInfo? ReadImageInfo(ReadOnlySpan<byte> header)
+    => MtvReader.TryReadHeader(header, out var width, out var height, out _)
+      ? new(width, height, 24, "Rgb24")
+      : null;
+
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
 
