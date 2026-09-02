@@ -29,6 +29,7 @@ jobs:
   version:
     needs: test
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     outputs:
       version: ${{ steps.v.outputs.version }}
     steps:
@@ -56,6 +57,7 @@ jobs:
     # the git rev-list count, producing e.g. 1.0.0.234 at pack time.
     needs: [version, test]
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     permissions:
       contents: read
       # Lets the job ask GitHub for the short-lived OIDC token that nuget.org's Trusted Publishing
@@ -133,6 +135,7 @@ jobs:
     # push, so a failed or skipped nuget job still produced a green release.
     needs: [version, build, nuget]
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
