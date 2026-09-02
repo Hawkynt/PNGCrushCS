@@ -89,11 +89,13 @@ internal static class H264Transform8x8 {
 
     Span<int> tmp = stackalloc int[64];
 
-    // Horizontal pass.  These are equations 8-358 through 8-373 written as the standard's
-    // butterfly, but kept in signed arithmetic so negative odd coefficients retain arithmetic shifts.
+    // H.264 8.5.13.2 first transforms each horizontal row. The one-dimensional butterfly contains
+    // arithmetic right shifts, so exchanging the row and column passes is not bit-exact for negative
+    // odd coefficients even though the corresponding real-valued separable transform would commute.
     for (var row = 0; row < 8; ++row)
       _Transform1D(input.Slice(row << 3, 8), tmp.Slice(row << 3, 8), round: false);
 
+    // The second pass transforms each vertical column and performs the normative +32 / 64 rounding.
     Span<int> column = stackalloc int[8];
     Span<int> transformed = stackalloc int[8];
     for (var x = 0; x < 8; ++x) {

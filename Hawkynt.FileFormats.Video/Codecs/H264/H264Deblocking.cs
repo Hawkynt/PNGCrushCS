@@ -48,8 +48,12 @@ internal static class H264Deblocking {
 
   private static void _FilterLumaVertical(H264FrameDecoder frame, int mbAddr, int mbX, int mbY, bool filterLeft) {
     var picture = frame.Picture;
+    var transform8x8 = frame.Transform8x8Of(mbAddr);
     for (var edge = 0; edge < 4; ++edge) {
       if (edge == 0 && !filterLeft) continue;
+      // Clause 8.7.1 filters only the solid luma edges when transform_size_8x8_flag is set.
+      // In 4x4-edge units those are the macroblock edge and the edge at offset 8, not 4 or 12.
+      if (transform8x8 && (edge & 1) != 0) continue;
       var x = mbX * 16 + edge * 4;
       for (var group = 0; group < 4; ++group) {
         var y = mbY * 16 + group * 4;
@@ -64,8 +68,10 @@ internal static class H264Deblocking {
 
   private static void _FilterLumaHorizontal(H264FrameDecoder frame, int mbAddr, int mbX, int mbY, bool filterTop) {
     var picture = frame.Picture;
+    var transform8x8 = frame.Transform8x8Of(mbAddr);
     for (var edge = 0; edge < 4; ++edge) {
       if (edge == 0 && !filterTop) continue;
+      if (transform8x8 && (edge & 1) != 0) continue;
       var y = mbY * 16 + edge * 4;
       for (var group = 0; group < 4; ++group) {
         var x = mbX * 16 + group * 4;

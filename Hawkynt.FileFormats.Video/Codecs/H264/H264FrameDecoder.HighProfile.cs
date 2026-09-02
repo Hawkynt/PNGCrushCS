@@ -3,11 +3,20 @@ using System;
 namespace FileFormat.Codecs.H264;
 
 internal sealed partial class H264FrameDecoder {
+  private bool[]? _transform8x8;
+
+  internal bool Transform8x8Of(int mbAddr)
+    => (this._transform8x8 is not null && this._transform8x8[mbAddr])
+       || (this._cabacTransform8x8 is not null && this._cabacTransform8x8[mbAddr]);
+
+  private void _MarkTransform8x8(int mbAddr)
+    => (this._transform8x8 ??= new bool[this._mbCount])[mbAddr] = true;
 
   private void _DecodeIntra8x8(ref H264BitReader reader, int mbAddr) {
     var mbX = mbAddr % this._mbWidth;
     var mbY = mbAddr / this._mbWidth;
     this._kind[mbAddr] = H264MacroblockKind.Intra8x8;
+    this._MarkTransform8x8(mbAddr);
 
     // Four 8x8 prediction modes are coded in raster order. Store each mode in the four 4x4 state
     // entries it covers so neighbouring 4x4/8x8 units share the same mode-derivation machinery.
@@ -73,6 +82,7 @@ internal sealed partial class H264FrameDecoder {
   }
 
   private void _AddInter8x8Residuals(int mbAddr, int cbpLuma) {
+    this._MarkTransform8x8(mbAddr);
     var mbX = mbAddr % this._mbWidth;
     var mbY = mbAddr / this._mbWidth;
     var scaling = this._scalingLists.EightByEight(intra: false);

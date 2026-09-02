@@ -64,10 +64,12 @@ internal sealed partial class H264FrameDecoder {
     var field = new H264MotionField(this._blockWidth, this._mbHeight * 4);
     Array.Copy(this._mvX, field.MvX0, this._mvX.Length);
     Array.Copy(this._mvY, field.MvY0, this._mvY.Length);
+    Array.Copy(this._refIdx, field.RefIdx0, this._refIdx.Length);
     Array.Copy(this._refSerial, field.RefSerial0, this._refSerial.Length);
     if (this._mvX1 != null) {
       Array.Copy(this._mvX1, field.MvX1, this._mvX1.Length);
       Array.Copy(this._mvY1!, field.MvY1, this._mvY1!.Length);
+      Array.Copy(this._refIdx1!, field.RefIdx1, this._refIdx1!.Length);
       Array.Copy(this._refSerial1!, field.RefSerial1, this._refSerial1!.Length);
     }
     return field;
@@ -117,6 +119,7 @@ internal sealed partial class H264FrameDecoder {
     }
 
     if (mbType == 0) {
+      this._RankMotionPartitions(mbAddr, 16, 16, 1);
       this._DeriveDirect(mbAddr, mbAddr % this._mbWidth * 16, mbAddr / this._mbWidth * 16, 16, 16);
       this._FinishBInterMacroblock(ref reader, mbAddr, canTransform8x8: this._header.Sps.Direct8x8InferenceFlag);
       return;
@@ -124,6 +127,7 @@ internal sealed partial class H264FrameDecoder {
 
     var (partWidth, partHeight, firstMode, secondMode) = _BMacroblockLayout(mbType);
     var partCount = partWidth == 16 && partHeight == 16 ? 1 : 2;
+    this._RankMotionPartitions(mbAddr, partWidth, partHeight, partCount);
     Span<BPredMode> modes = stackalloc BPredMode[2];
     modes[0] = firstMode;
     modes[1] = secondMode;
@@ -143,7 +147,8 @@ internal sealed partial class H264FrameDecoder {
       var x = mbAddr % this._mbWidth * 16 + (partWidth == 8 ? part * 8 : 0);
       var y = mbAddr / this._mbWidth * 16 + (partHeight == 8 ? part * 8 : 0);
       if (_UsesList0(modes[part])) {
-        var (px, py) = this._PredictMotionForList(0, mbAddr, x, y, partWidth, partHeight, ref0[part], part, partCount);
+        var (px, py) = this._PredictMotionForList(
+          0, mbAddr, x, y, partWidth, partHeight, ref0[part], part, partCount, _MotionPartitionRankOf(part, 0));
         this._AssignMotionList(0, x >> 2, y >> 2, partWidth >> 2, partHeight >> 2, ref0[part],
           px + reader.ReadSignedExpGolomb(), py + reader.ReadSignedExpGolomb());
       }
@@ -152,7 +157,8 @@ internal sealed partial class H264FrameDecoder {
       var x = mbAddr % this._mbWidth * 16 + (partWidth == 8 ? part * 8 : 0);
       var y = mbAddr / this._mbWidth * 16 + (partHeight == 8 ? part * 8 : 0);
       if (_UsesList1(modes[part])) {
-        var (px, py) = this._PredictMotionForList(1, mbAddr, x, y, partWidth, partHeight, ref1[part], part, partCount);
+        var (px, py) = this._PredictMotionForList(
+          1, mbAddr, x, y, partWidth, partHeight, ref1[part], part, partCount, _MotionPartitionRankOf(part, 0));
         this._AssignMotionList(1, x >> 2, y >> 2, partWidth >> 2, partHeight >> 2, ref1[part],
           px + reader.ReadSignedExpGolomb(), py + reader.ReadSignedExpGolomb());
       }
@@ -168,6 +174,7 @@ internal sealed partial class H264FrameDecoder {
     this._qpY[mbAddr] = (sbyte)this._qpRunning;
     var x = mbAddr % this._mbWidth * 16;
     var y = mbAddr / this._mbWidth * 16;
+    this._RankMotionPartitions(mbAddr, 16, 16, 1);
     this._DeriveDirect(mbAddr, x, y, 16, 16);
     this._PredictBStored(mbAddr, x, y, 16, 16, addResidual: false);
     this._MarkReconstructed(mbAddr % this._mbWidth, mbAddr / this._mbWidth);
@@ -211,6 +218,9 @@ internal sealed partial class H264FrameDecoder {
       canTransform8x8 &= subType[part] <= 3 && !directSmall;
     }
 
+    this._RankB8x8MotionPartitions(mbAddr, subType);
+    this._DeriveB8x8DirectPartitions(mbAddr, mode, cabac: false);
+
     Span<int> ref0 = stackalloc int[4];
     Span<int> ref1 = stackalloc int[4];
     ref0.Fill(-1);
@@ -236,22 +246,11 @@ internal sealed partial class H264FrameDecoder {
         for (var sub = 0; sub < subCount; ++sub) {
           var x = baseX + (subWidth == 4 ? (sub & 1) * 4 : 0);
           var y = baseY + (subHeight == 4 ? (subCount == 4 ? (sub >> 1) * 4 : sub * 4) : 0);
-          var (px, py) = this._PredictMotionForList(list, mbAddr, x, y, subWidth, subHeight, referenceIndex, part, 4);
+          var (px, py) = this._PredictMotionForList(
+            list, mbAddr, x, y, subWidth, subHeight, referenceIndex, part, 4, _MotionPartitionRankOf(part, sub));
           this._AssignMotionList(list, x >> 2, y >> 2, subWidth >> 2, subHeight >> 2, referenceIndex,
             px + reader.ReadSignedExpGolomb(), py + reader.ReadSignedExpGolomb());
         }
-      }
-
-    for (var part = 0; part < 4; ++part)
-      if (mode[part] == BPredMode.Direct) {
-        var baseX = mbX * 16 + (part & 1) * 8;
-        var baseY = mbY * 16 + (part >> 1) * 8;
-        if (this._header.Sps.Direct8x8InferenceFlag)
-          this._DeriveDirect(mbAddr, baseX, baseY, 8, 8);
-        else
-          for (var by = 0; by < 2; ++by)
-            for (var bx = 0; bx < 2; ++bx)
-              this._DeriveDirect(mbAddr, baseX + bx * 4, baseY + by * 4, 4, 4);
       }
 
     var cbp = H264CavlcTables.ReadCodedBlockPattern(ref reader, intra: false);
@@ -270,6 +269,34 @@ internal sealed partial class H264FrameDecoder {
       this._AddInter8x8Residuals(mbAddr, cbp & 15);
     this._MarkReconstructed(mbX, mbY);
     this._ReconstructChromaB(mbAddr);
+  }
+
+  /// <summary>
+  /// Derives the motion of every B_Direct_8x8 sub-macroblock of a B_8x8 macroblock.
+  /// </summary>
+  /// <remarks>
+  /// Clause 8.4.1 walks the sub-macroblock partitions in index order and resolves direct partitions
+  /// through 8.4.1.2 in place, so a direct partition already carries motion when a later partition
+  /// runs its own neighbour-based prediction. Deriving them after the coded vectors would hide them
+  /// from clause 8.4.1.3 and silently change the predictors of the partitions that follow.
+  /// </remarks>
+  private void _DeriveB8x8DirectPartitions(int mbAddr, ReadOnlySpan<BPredMode> mode, bool cabac) {
+    var mbX = mbAddr % this._mbWidth;
+    var mbY = mbAddr / this._mbWidth;
+    for (var part = 0; part < 4; ++part) {
+      if (mode[part] != BPredMode.Direct)
+        continue;
+      var baseX = mbX * 16 + (part & 1) * 8;
+      var baseY = mbY * 16 + (part >> 1) * 8;
+      if (cabac)
+        this._CabacFillDirect(baseX, baseY, 8, 8, true);
+      if (this._header.Sps.Direct8x8InferenceFlag)
+        this._DeriveDirect(mbAddr, baseX, baseY, 8, 8);
+      else
+        for (var by = 0; by < 2; ++by)
+          for (var bx = 0; bx < 2; ++bx)
+            this._DeriveDirect(mbAddr, baseX + bx * 4, baseY + by * 4, 4, 4);
+    }
   }
 
   private static (int Width, int Height, BPredMode First, BPredMode Second) _BMacroblockLayout(int mbType)
@@ -329,6 +356,43 @@ internal sealed partial class H264FrameDecoder {
     return index;
   }
 
+  /// <summary>Ranks whole-macroblock partitions so clause 6.4.11.7 can order them.</summary>
+  private void _RankMotionPartitions(int mbAddr, int partWidth, int partHeight, int partCount) {
+    var mbX = mbAddr % this._mbWidth;
+    var mbY = mbAddr / this._mbWidth;
+    for (var part = 0; part < partCount; ++part) {
+      var x = mbX * 16 + (partWidth == 8 ? part * 8 : 0);
+      var y = mbY * 16 + (partHeight == 8 ? part * 8 : 0);
+      this._RankMotionPartition(x, y, partWidth, partHeight, _MotionPartitionRankOf(part, 0));
+    }
+  }
+
+  /// <summary>Ranks the sub-macroblock partitions of a B_8x8 macroblock.</summary>
+  private void _RankB8x8MotionPartitions(int mbAddr, ReadOnlySpan<int> subType) {
+    var mbX = mbAddr % this._mbWidth;
+    var mbY = mbAddr / this._mbWidth;
+    for (var part = 0; part < 4; ++part) {
+      var (subWidth, subHeight, subCount) = _BSubGeometry(subType[part], this._header.Sps.Direct8x8InferenceFlag);
+      var baseX = mbX * 16 + (part & 1) * 8;
+      var baseY = mbY * 16 + (part >> 1) * 8;
+      for (var sub = 0; sub < subCount; ++sub) {
+        var x = baseX + (subWidth == 4 ? (sub & 1) * 4 : 0);
+        var y = baseY + (subHeight == 4 ? (subCount == 4 ? (sub >> 1) * 4 : sub * 4) : 0);
+        this._RankMotionPartition(x, y, subWidth, subHeight, _MotionPartitionRankOf(part, sub));
+      }
+    }
+  }
+
+  private static byte _MotionPartitionRankOf(int partIdx, int subPartIdx) => (byte)(partIdx * 4 + subPartIdx);
+
+  private void _RankMotionPartition(int x, int y, int width, int height, byte rank) {
+    for (var by = 0; by < height >> 2; ++by) {
+      var row = ((y >> 2) + by) * this._blockWidth + (x >> 2);
+      for (var bx = 0; bx < width >> 2; ++bx)
+        this._motionPartitionRank[row + bx] = rank;
+    }
+  }
+
   private void _EnsureList1State() {
     if (this._mvX1 != null)
       return;
@@ -383,12 +447,13 @@ internal sealed partial class H264FrameDecoder {
   }
 
   private (int X, int Y) _PredictMotionForList(
-    int list, int mbAddr, int x, int y, int partWidth, int partHeight, int refIdx, int partIdx, int partCount) {
-    var a = this._NeighbourMotionForList(list, mbAddr, x - 1, y);
-    var b = this._NeighbourMotionForList(list, mbAddr, x, y - 1);
-    var c = this._NeighbourMotionForList(list, mbAddr, x + partWidth, y - 1);
+    int list, int mbAddr, int x, int y, int partWidth, int partHeight, int refIdx, int partIdx, int partCount,
+    int partitionRank) {
+    var a = this._NeighbourMotionForList(list, mbAddr, x - 1, y, partitionRank);
+    var b = this._NeighbourMotionForList(list, mbAddr, x, y - 1, partitionRank);
+    var c = this._NeighbourMotionForList(list, mbAddr, x + partWidth, y - 1, partitionRank);
     if (!c.Available)
-      c = this._NeighbourMotionForList(list, mbAddr, x - 1, y - 1);
+      c = this._NeighbourMotionForList(list, mbAddr, x - 1, y - 1, partitionRank);
 
     if (partCount == 2 && partWidth == 16 && partHeight == 8) {
       if (partIdx == 0 && b.RefIdx == refIdx) return (b.MvX, b.MvY);
@@ -400,14 +465,24 @@ internal sealed partial class H264FrameDecoder {
     return _Median(a, b, c, refIdx);
   }
 
-  private (bool Available, int MvX, int MvY, int RefIdx) _NeighbourMotionForList(int list, int mbAddr, int x, int y) {
+  /// <summary>
+  /// Reads one neighbouring partition's list-<paramref name="list"/> motion for clause 8.4.1.3.
+  /// </summary>
+  /// <remarks>
+  /// Clause 6.4.11.7 hides a partition of the current macroblock while it is not yet decoded, and
+  /// "decoded" is a property of the partition, not of a single reference list: a partition that only
+  /// predicts from the other list still counts as decoded once its turn has passed, and then supplies
+  /// refIdxLX -1 with a zero vector rather than triggering the mbAddrC-to-mbAddrD substitution.
+  /// </remarks>
+  private (bool Available, int MvX, int MvY, int RefIdx) _NeighbourMotionForList(
+    int list, int mbAddr, int x, int y, int partitionRank) {
     if (x < 0 || y < 0 || x >= this._mbWidth * 16 || y >= this._mbHeight * 16)
       return (false, 0, 0, -1);
     var neighbourMb = y / 16 * this._mbWidth + x / 16;
     if (this._sliceId[neighbourMb] != this._currentSliceId)
       return (false, 0, 0, -1);
     var at = (y >> 2) * this._blockWidth + (x >> 2);
-    if (neighbourMb == mbAddr && !this._motionAssigned[at])
+    if (neighbourMb == mbAddr && this._motionPartitionRank[at] >= partitionRank)
       return (false, 0, 0, -1);
     if (this._kind[neighbourMb] != H264MacroblockKind.Inter)
       return (true, 0, 0, -1);
@@ -417,6 +492,14 @@ internal sealed partial class H264FrameDecoder {
   }
 
   private void _DeriveDirect(int mbAddr, int x, int y, int width, int height) {
+    if (width == 16 && height == 16) {
+      var size = this._header.Sps.Direct8x8InferenceFlag ? 8 : 4;
+      for (var dy = 0; dy < 16; dy += size)
+        for (var dx = 0; dx < 16; dx += size)
+          this._DeriveDirect(mbAddr, x + dx, y + dy, size, size);
+      return;
+    }
+
     if (this._header.DirectSpatialMvPredFlag)
       this._DeriveSpatialDirect(mbAddr, x, y, width, height);
     else
@@ -424,34 +507,35 @@ internal sealed partial class H264FrameDecoder {
   }
 
   private void _DeriveSpatialDirect(int mbAddr, int x, int y, int width, int height) {
-    var ref0 = this._DirectSpatialReferenceIndex(0, mbAddr, x, y, width);
-    var ref1 = this._DirectSpatialReferenceIndex(1, mbAddr, x, y, width);
-    if (ref0 < 0 && ref1 < 0) {
-      ref0 = this._referenceList.Length > 0 ? 0 : -1;
-      ref1 = this._referenceList1.Length > 0 ? 0 : -1;
-    }
+    var ref0 = this._DirectSpatialReferenceIndex(0, mbAddr);
+    var ref1 = this._DirectSpatialReferenceIndex(1, mbAddr);
+    var directZeroPrediction = ref0 < 0 && ref1 < 0;
+    if (directZeroPrediction)
+      ref0 = ref1 = 0;
 
-    var directZero = this._DirectZeroPrediction(x, y);
+    var colZero = this._DirectColZeroFlag(x, y);
     if (ref0 >= 0) {
-      var mv = directZero && ref0 == 0
+      var mv = directZeroPrediction || ref0 == 0 && colZero
         ? (X: 0, Y: 0)
-        : this._PredictMotionForList(0, mbAddr, x, y, width, height, ref0, 0, 1);
+        : this._PredictSpatialDirectMotion(0, mbAddr, ref0);
       this._AssignMotionList(0, x >> 2, y >> 2, width >> 2, height >> 2, ref0, mv.X, mv.Y);
     }
     if (ref1 >= 0) {
-      var mv = directZero && ref1 == 0
+      var mv = directZeroPrediction || ref1 == 0 && colZero
         ? (X: 0, Y: 0)
-        : this._PredictMotionForList(1, mbAddr, x, y, width, height, ref1, 0, 1);
+        : this._PredictSpatialDirectMotion(1, mbAddr, ref1);
       this._AssignMotionList(1, x >> 2, y >> 2, width >> 2, height >> 2, ref1, mv.X, mv.Y);
     }
   }
 
-  private int _DirectSpatialReferenceIndex(int list, int mbAddr, int x, int y, int width) {
-    var a = this._NeighbourMotionForList(list, mbAddr, x - 1, y);
-    var b = this._NeighbourMotionForList(list, mbAddr, x, y - 1);
-    var c = this._NeighbourMotionForList(list, mbAddr, x + width, y - 1);
+  private int _DirectSpatialReferenceIndex(int list, int mbAddr) {
+    var x = mbAddr % this._mbWidth * 16;
+    var y = mbAddr / this._mbWidth * 16;
+    var a = this._NeighbourMotionForList(list, mbAddr, x - 1, y, 0);
+    var b = this._NeighbourMotionForList(list, mbAddr, x, y - 1, 0);
+    var c = this._NeighbourMotionForList(list, mbAddr, x + 16, y - 1, 0);
     if (!c.Available)
-      c = this._NeighbourMotionForList(list, mbAddr, x - 1, y - 1);
+      c = this._NeighbourMotionForList(list, mbAddr, x - 1, y - 1, 0);
     var result = int.MaxValue;
     if (a.Available && a.RefIdx >= 0) result = Math.Min(result, a.RefIdx);
     if (b.Available && b.RefIdx >= 0) result = Math.Min(result, b.RefIdx);
@@ -459,17 +543,32 @@ internal sealed partial class H264FrameDecoder {
     return result == int.MaxValue ? -1 : result;
   }
 
-  private bool _DirectZeroPrediction(int x, int y) {
+  private (int X, int Y) _PredictSpatialDirectMotion(int list, int mbAddr, int refIdx) {
+    var x = mbAddr % this._mbWidth * 16;
+    var y = mbAddr / this._mbWidth * 16;
+    return this._PredictMotionForList(list, mbAddr, x, y, 16, 16, refIdx, 0, 1, 0);
+  }
+
+  private (int X, int Y) _DirectCoLocatedPosition(int x, int y) {
+    if (!this._header.Sps.Direct8x8InferenceFlag)
+      return (x, y);
+
+    var mbPartIdx = ((y & 15) >> 3) * 2 + ((x & 15) >> 3);
+    var (offsetX, offsetY) = _BlockPosition(5 * mbPartIdx);
+    return ((x & ~15) + offsetX, (y & ~15) + offsetY);
+  }
+
+  private bool _DirectColZeroFlag(int x, int y) {
     if (this._referenceList1.Length == 0 || this._referenceList1[0].IsLongTerm)
       return false;
     var col = this._referenceList1[0].Motion;
-    if (col == null || !col.TryGet(x >> 2, y >> 2, out var motion))
+    var (colX, colY) = this._DirectCoLocatedPosition(x, y);
+    if (col == null || !col.TryGet(colX >> 2, colY >> 2, out var motion))
       return false;
-    var refSerial = motion.HasList0 ? motion.RefSerial0 : motion.RefSerial1;
+    var refIdx = motion.HasList0 ? motion.RefIdx0 : motion.RefIdx1;
     var mvX = motion.HasList0 ? motion.MvX0 : motion.MvX1;
     var mvY = motion.HasList0 ? motion.MvY0 : motion.MvY1;
-    var colRefIdx0 = this._referenceList.Length > 0 && this._referenceList[0].Serial == refSerial;
-    return colRefIdx0 && Math.Abs(mvX) <= 1 && Math.Abs(mvY) <= 1;
+    return refIdx == 0 && Math.Abs(mvX) <= 1 && Math.Abs(mvY) <= 1;
   }
 
   private void _DeriveTemporalDirect(int x, int y, int width, int height) {
@@ -478,7 +577,8 @@ internal sealed partial class H264FrameDecoder {
 
     var colPic = this._referenceList1[0];
     var colField = colPic.Motion;
-    if (colField == null || !colField.TryGet(x >> 2, y >> 2, out var colMotion)
+    var (colX, colY) = this._DirectCoLocatedPosition(x, y);
+    if (colField == null || !colField.TryGet(colX >> 2, colY >> 2, out var colMotion)
         || (!colMotion.HasList0 && !colMotion.HasList1)) {
       this._AssignMotionList(0, x >> 2, y >> 2, width >> 2, height >> 2, 0, 0, 0);
       this._AssignMotionList(1, x >> 2, y >> 2, width >> 2, height >> 2, 0, 0, 0);
@@ -515,6 +615,13 @@ internal sealed partial class H264FrameDecoder {
   }
 
   private void _PredictBStored(int mbAddr, int x, int y, int width, int height, bool addResidual) {
+    if (width > 4 || height > 4) {
+      for (var dy = 0; dy < height; dy += 4)
+        for (var dx = 0; dx < width; dx += 4)
+          this._PredictBStored(mbAddr, x + dx, y + dy, 4, 4, addResidual);
+      return;
+    }
+
     var at = (y >> 2) * this._blockWidth + (x >> 2);
     var ref0 = this._refIdx[at];
     var ref1 = this._refIdx1![at];
@@ -605,7 +712,7 @@ internal sealed partial class H264FrameDecoder {
         return;
       case 2:
         var (w0, w1) = this._ImplicitWeights(ref0, ref1);
-        _WeightedAverage(p0, p1, output, w0, w1);
+        _WeightedAverage(p0[..], p1[..], output[..], w0, w1);
         return;
       default:
         for (var i = 0; i < p0.Length; ++i)
@@ -625,9 +732,9 @@ internal sealed partial class H264FrameDecoder {
     var tb = Math.Clamp(this.Picture.PicOrderCnt - first.PicOrderCnt, -128, 127);
     var tx = (16384 + Math.Abs(td / 2)) / td;
     var scale = Math.Clamp((tb * tx + 32) >> 6, -1024, 1023);
-    if (scale is < -64 or > 128)
-      return (32, 32);
     var w1 = scale >> 2;
+    if (w1 is < -64 or > 128)
+      return (32, 32);
     return (64 - w1, w1);
   }
 

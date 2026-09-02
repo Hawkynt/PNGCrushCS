@@ -444,6 +444,7 @@ internal sealed partial class H264FrameDecoder {
     var mbY = mbAddr / this._mbWidth;
     if (mbType == 0) {
       this._cabacBDirect![mbAddr] = true;
+      this._RankMotionPartitions(mbAddr, 16, 16, 1);
       this._CabacFillDirect(mbX * 16, mbY * 16, 16, 16, true);
       this._DeriveDirect(mbAddr, mbX * 16, mbY * 16, 16, 16);
       this._FinishCabacBInter(
@@ -453,6 +454,7 @@ internal sealed partial class H264FrameDecoder {
 
     var (partWidth, partHeight, firstMode, secondMode) = _BMacroblockLayout(mbType);
     var partCount = partWidth == 16 && partHeight == 16 ? 1 : 2;
+    this._RankMotionPartitions(mbAddr, partWidth, partHeight, partCount);
     Span<BPredMode> modes = stackalloc BPredMode[2];
     modes[0] = firstMode;
     modes[1] = secondMode;
@@ -485,7 +487,8 @@ internal sealed partial class H264FrameDecoder {
         var x = mbX * 16 + (partWidth == 8 ? part * 8 : 0);
         var y = mbY * 16 + (partHeight == 8 ? part * 8 : 0);
         var reference = list == 0 ? ref0[part] : ref1[part];
-        var (predX, predY) = this._PredictMotionForList(list, mbAddr, x, y, partWidth, partHeight, reference, part, partCount);
+        var (predX, predY) = this._PredictMotionForList(
+          list, mbAddr, x, y, partWidth, partHeight, reference, part, partCount, _MotionPartitionRankOf(part, 0));
         var mvdX = this._DecodeCabacMvd(ref decoder, contexts, list, mbAddr, x, y, vertical: false);
         var mvdY = this._DecodeCabacMvd(ref decoder, contexts, list, mbAddr, x, y, vertical: true);
         this._CabacFillMvd(list, x, y, partWidth, partHeight, mvdX, mvdY);
@@ -512,6 +515,9 @@ internal sealed partial class H264FrameDecoder {
       var directSmall = subType[part] == 0 && !this._header.Sps.Direct8x8InferenceFlag;
       canTransform8x8 &= subType[part] <= 3 && !directSmall;
     }
+
+    this._RankB8x8MotionPartitions(mbAddr, subType);
+    this._DeriveB8x8DirectPartitions(mbAddr, mode, cabac: true);
 
     Span<int> ref0 = stackalloc int[4];
     Span<int> ref1 = stackalloc int[4];
@@ -547,26 +553,14 @@ internal sealed partial class H264FrameDecoder {
         for (var sub = 0; sub < subCount; ++sub) {
           var x = baseX + (subWidth == 4 ? (sub & 1) * 4 : 0);
           var y = baseY + (subHeight == 4 ? (subCount == 4 ? (sub >> 1) * 4 : sub * 4) : 0);
-          var (predX, predY) = this._PredictMotionForList(list, mbAddr, x, y, subWidth, subHeight, reference, part, 4);
+          var (predX, predY) = this._PredictMotionForList(
+            list, mbAddr, x, y, subWidth, subHeight, reference, part, 4, _MotionPartitionRankOf(part, sub));
           var mvdX = this._DecodeCabacMvd(ref decoder, contexts, list, mbAddr, x, y, vertical: false);
           var mvdY = this._DecodeCabacMvd(ref decoder, contexts, list, mbAddr, x, y, vertical: true);
           this._CabacFillMvd(list, x, y, subWidth, subHeight, mvdX, mvdY);
           this._AssignMotionList(
             list, x >> 2, y >> 2, subWidth >> 2, subHeight >> 2, reference, predX + mvdX, predY + mvdY);
         }
-      }
-
-    for (var part = 0; part < 4; ++part)
-      if (mode[part] == BPredMode.Direct) {
-        var baseX = mbX * 16 + (part & 1) * 8;
-        var baseY = mbY * 16 + (part >> 1) * 8;
-        this._CabacFillDirect(baseX, baseY, 8, 8, true);
-        if (this._header.Sps.Direct8x8InferenceFlag)
-          this._DeriveDirect(mbAddr, baseX, baseY, 8, 8);
-        else
-          for (var by = 0; by < 2; ++by)
-            for (var bx = 0; bx < 2; ++bx)
-              this._DeriveDirect(mbAddr, baseX + bx * 4, baseY + by * 4, 4, 4);
       }
 
     this._FinishCabacBInter(ref decoder, contexts, mbAddr, canTransform8x8, ref lastQpDelta);

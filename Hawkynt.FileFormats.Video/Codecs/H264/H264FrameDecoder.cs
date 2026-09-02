@@ -17,6 +17,9 @@ internal sealed partial class H264FrameDecoder {
   private const int _PCM_MB_TYPE_I = 25;
   private const int _INTRA_MB_TYPE_OFFSET_P = 5;
 
+  // Ranks above every real partition rank, so a block still carrying it reads as "not yet decoded".
+  private const byte _MOTION_PARTITION_UNDECODED = byte.MaxValue;
+
   private readonly int _mbWidth;
   private readonly int _mbHeight;
   private readonly int _mbCount;
@@ -39,6 +42,10 @@ internal sealed partial class H264FrameDecoder {
   private readonly sbyte[] _refIdx;
   private readonly long[] _refSerial;
   private readonly bool[] _motionAssigned;
+
+  // Decoding rank of the macroblock/sub-macroblock partition that owns each 4x4 luma block, used by
+  // clause 6.4.11.7 to hide partitions of the current macroblock that are not decoded yet.
+  private readonly byte[] _motionPartitionRank;
   private readonly bool[] _blockReconstructed;
   private readonly byte[] _chromaCoeffCount;
 
@@ -82,6 +89,7 @@ internal sealed partial class H264FrameDecoder {
     this._refIdx.AsSpan().Fill(-1);
     this._refSerial = new long[lumaBlocks];
     this._motionAssigned = new bool[lumaBlocks];
+    this._motionPartitionRank = new byte[lumaBlocks];
     this._blockReconstructed = new bool[lumaBlocks];
     this._chromaCoeffCount = new byte[2 * this._chromaBlockWidth * this._mbHeight * 2];
   }
@@ -203,6 +211,7 @@ internal sealed partial class H264FrameDecoder {
       for (var bx = 0; bx < 4; ++bx) {
         this._lumaCoeffCount[row + bx] = 0;
         this._motionAssigned[row + bx] = false;
+        this._motionPartitionRank[row + bx] = _MOTION_PARTITION_UNDECODED;
         this._blockReconstructed[row + bx] = false;
         this._refIdx[row + bx] = -1;
         this._refSerial[row + bx] = 0;
