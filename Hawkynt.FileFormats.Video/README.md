@@ -9,7 +9,7 @@
 > packet-level remuxing never has to become a decode/re-encode by accident. The package claims the
 > WHOLE domain — every video container and codec, not a selection of it. Where one is missing or only
 > partly supported that is a tracked gap, recorded in [Format / codec support](#-format--codec-support)
-> below and codec by codec in [`codec-coverage.md`](codec-coverage.md).
+> below and codec by codec in [`codec-coverage.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/codec-coverage.md).
 
 ## 📦 Installation
 
