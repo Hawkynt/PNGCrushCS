@@ -10,13 +10,17 @@ on:
       - 'Hawkynt.FileFormats.Images/**'
       - 'Optimizers/Optimizer.Image/**'
       - '.github/workflows/viewer-platforms.yml'
-  pull_request:
-    paths:
-      - 'Crush.Viewer/**'
-      - 'FileFormat.Core/**'
-      - 'Hawkynt.FileFormats.Images/**'
-      - 'Optimizers/Optimizer.Image/**'
-      - '.github/workflows/viewer-platforms.yml'
+  workflow_dispatch: {}
+
+# Push only, deliberately. This used to trigger on pull_request as well, so once a branch had a
+# pull request every commit ran the whole matrix TWICE on the same sha. Collapsing the pair with a
+# shared concurrency group looked like the fix and was worse: the superseded run lands as a
+# CANCELLED check on the head, GitHub rolls the head's checks up to FAILURE, and the merge box goes
+# BLOCKED - even though none of these contexts is required and all of them passed. Not scheduling
+# the duplicate is the fix; cancelling it only moves the cost.
+concurrency:
+  group: viewer-platforms-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
