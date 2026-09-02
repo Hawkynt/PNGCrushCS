@@ -1,0 +1,39 @@
+name: Coverage
+
+# Coverage used to be a required check on every pull request. It costs 36 minutes here against 8.5
+# for the same tests uninstrumented, and about two hours on the release path, so it was the slowest
+# thing on the critical path and a pull request waited on it to report a number nobody was gating on.
+# It is a reporting metric, not a correctness gate: the two test-matrix legs decide whether main is
+# good. So it runs on its own schedule, where it has the time it needs and holds nobody up.
+on:
+  schedule:
+    # 03:41 UTC daily — off the hour, because everybody's cron fires on the hour.
+    - cron: '41 3 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+# Deliberately NOT cancel-in-progress: a run this long has to be allowed to finish.
+concurrency:
+  group: coverage
+  cancel-in-progress: false
+
+jobs:
+  coverage:
+    uses: Hawkynt/RepositoryTemplate/.github/workflows/dotnet-ci.yml@v1
+    with:
+      solution: PngCrush.slnx
+      dotnet-version: |
+        8.x
+        10.0.x
+      os-matrix: '["ubuntu-latest"]'
+      build-args: '-p:EnableWindowsTargeting=true'
+      test-args: '--filter "TestCategory!=Regression&TestCategory!=Performance"'
+      checkout-path: PNGCrushCS
+      working-directory: PNGCrushCS
+      siblings: '[{"repository":"Hawkynt/CompressionWorkbench","path":"CompressionWorkbench"}]'
+      # The package-README check belongs to the pull request; this run is only about the number.
+      package-readme: false
+      coverage: true
+      coverage-timeout-minutes: 180

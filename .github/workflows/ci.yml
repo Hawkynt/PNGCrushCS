@@ -40,4 +40,8 @@ jobs:
       # One runner only: the committed reference must not depend on which machine produced it.
       package-readme-os: windows-latest
       package-readme-root: PNGCrushCS
-      coverage: ${{ !inputs['skip-coverage'] }}
+      # Coverage does NOT gate a pull request. It costs 36 minutes against 8.5 for the same tests
+      # uninstrumented here, and about two hours on the release path -- so as a required check it
+      # was simply the slowest thing on the critical path, and a pull request sat waiting on a
+      # reporting metric. coverage.yml measures it daily, where it has the time and blocks nobody.
+      coverage: false
