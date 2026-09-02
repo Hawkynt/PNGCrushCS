@@ -223,6 +223,7 @@ This table is generated from `FormatRegistry.AllFormats`, which is the authorita
 | Commodore64Font | `.64c`, `.g` | ✅ | ✅ |
 | CommodoreGrafix | `.cgx` | ✅ | ✅ |
 | CommodorePet | `.pet` | ✅ | ✅ |
+| CompuServeRle | `.rle` | ✅ | ✅ |
 | ComputerEyes | `.ce`, `.ce1`, `.ce2` | ✅ | ✅ |
 | ComputerEyesSt | `.ce3` | ✅ | ✅ |
 | CompW | `.wlm` | ✅ | ✅ |
