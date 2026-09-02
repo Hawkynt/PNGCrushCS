@@ -26,10 +26,13 @@ That leaves **211 distinct video codecs**, which is the number this package is m
 | Established as not implementable from files alone | 32 | 15% |
 | Not yet attempted | 99 | 47% |
 
-The 80 are the codec table in `README.md`, which has fewer
-table rows — one row covers several names where a decoder does. Every one was cross-checked frame by
-frame against ffmpeg's decode of the same bitstream before it was merged, and the measurements are in
-each one's section of that file. The ones that reach exact equality on every sample of every frame
+The package registers **82 decoder classes** — the count is
+`VideoFormatRegistration.g.cs`'s own `_RegisterDecoder<T>()` calls, not a count of files, since ten of
+those classes do not have `VideoDecoder` in their name. The 80 above are those 82 less the two raw
+packings, `RawVideoDecoder` and `RawPlanarVideoDecoder`, because the denominator excludes ffmpeg's
+`rawvideo` for the same reason. One decoder often opens several four-character codes; the section
+below lists every one of them. Every codec was cross-checked frame by frame against ffmpeg's decode of
+the same bitstream before it was merged. The ones that reach exact equality on every sample of every frame
 are Microsoft RLE, Microsoft Video 1, Cinepak, QuickTime Animation, Apple Video, Apple Graphics, FLIC, HuffYUV,
 FFVHUFF, FFV1, ZMBV, TSCC, CSCD, Flash Screen Video, Flash Screen Video 2, id RoQ, Interplay Video,
 id Cinematic Video, Westwood VQA Video, Electronic Arts CMV, Commodore CDXL Video, IFF ANIM Video, BFI Video, QPEG Video,
@@ -167,6 +170,123 @@ no frame, however large, that was ever going to carry it.
 
 All thirty-two are finished investigations with negative answers, not gaps waiting to be filled —
 under this file's own rule about what counts as a source, which the section below now qualifies.
+
+## Codec by codec
+
+One row per registered decoder, which is what `VideoFormatRegistration.g.cs` generates a
+`_RegisterDecoder<T>()` call for and what `VideoFormatRegistry.AllCodecs` enumerates at run time.
+`README.md`'s codec table carries the same 82 rows with each one's implemented scope and what it
+refuses; this table carries the other half — which four-character codes a codec claims, and where the
+description it was built from came from. The distinction that matters most in this file is the last
+column: a specification, an independent technical write-up, a layout recovered by measurement, and a
+licence-compatible reference implementation are four different kinds of evidence, and a reader
+deciding how far to trust a decoder should be able to see which one is behind it.
+
+**Codes claimed, not codes decoded.** A codec's `Accepts` decides which streams reach it, and several
+claim codes they then refuse by name in `Create` — that is deliberate, so the refusal can say *which*
+variant is missing instead of the registry saying only that nothing matched. Those are marked
+"claimed, refused" below. The one place this cuts the other way is RealVideo: `RV20`, `RV30` and
+`RV40` are *not* claimed, so through `VideoFormatRegistry.CreateDecoder` such a stream reaches the
+registry's own "no registered codec decodes this" refusal rather than RealVideo's more informative
+one.
+
+| Codec | Codes claimed | Where the description came from |
+| --- | --- | --- |
+| Motion JPEG | `MJPG`, `jpeg`, `V_MJPEG` | ITU-T T.81; decoding is the image package's JPEG reader |
+| Apple Motion JPEG-B | `mjpb` | Nothing published; the 48-byte field header recovered from two real captures against ffmpeg's decode |
+| Avid AVRn | `AVRn` | Nothing published; recovered from four real captures at samples.ffmpeg.org |
+| MPEG-1 Video | `MPG1`, `PIM1`, `mp1v` | ISO/IEC 11172-2 |
+| MPEG-2 Video | `MPEG`, `MPG2`, `hdv1`, `hdv2`, `hdv3`, `m2v1`, `mp2v`, `V_MPEG2` | ISO/IEC 13818-2 / ITU-T H.262 |
+| MPEG-4 Part 2 | `mp4v`, `DIVX`, `DX50`, `XVID`, `FMP4`, `FVFW`, `M4S2`, `MP4S`, `RMP4`, `3IV2`, `V_MPEG4/ISO/SP`, `V_MPEG4/ISO/ASP`, `V_MPEG4/ISO/AP` | ISO/IEC 14496-2 |
+| H.261 | `H261` | ITU-T H.261 |
+| H.263 | `H263`, `U263`, `s263`, `FLV1` (Sorenson Spark) | ITU-T H.263 |
+| H.264 / AVC | `H264`, `avc1`, `avc3`, `DAVC`, `VSSH`, `X264`, `V_MPEG4/ISO/AVC` | ITU-T H.264. The CABAC binarization tables are adapted from OxideAV/oxideav-h264 (MIT) and cross-checked against FFmpeg's `h264_cabac.c`; the context values are the normative tables |
+| H.265 / HEVC | `H265`, `HEVC`, `h265`, `hev1`, `hev2`, `hvc1`, `hvc2`, `V_MPEGH/ISO/HEVC` | ITU-T H.265 |
+| VC-1 / WMV 9 | `WMV3`, `WMV9`, `VC-1`, `WVC1` (claimed, refused), `V_MS/VFW/FOURCC/WMV3`, `V_VC1` | SMPTE 421M |
+| Microsoft MPEG-4 v2 | `MP42`; version 1 (`MPG4`, `DIV1`, `DIV2`) and version 3 (`MP43`, `DIV3`, `DIV4`, `DIV5`, `DIV6`, `MPG3`, `AP41`, `COL1`) claimed, refused | ISO/IEC 14496-2 for the shared block layer; Microsoft's seven-bit picture header established by measurement |
+| RealVideo 1 | `RV10`, `RV13` | ITU-T H.263 below the picture header; the slice header established against real files |
+| On2 VP3 | `VP31`, `VP32`; `VP30` claimed, refused | The Theora specification's Appendix B, which writes down VP3's built-in tables. The VP3 frame header itself derived from real streams |
+| VP8 | `VP80`, `vp08`, `V_VP8` | RFC 6386 |
+| VP9 | `VP90`, `vp09`, `V_VP9` | The VP9 bitstream specification |
+| Theora | `Theo`, `theora`, `V_THEORA` | Xiph.Org's Theora I specification |
+| FFV1 | `FFV1`, `V_FFV1` | RFC 9043 |
+| Apple ProRes | `apco`, `apcs`, `apcn`, `apch`, `ap4h`, `ap4x` | SMPTE RDD 36:2022 |
+| Avid DNxHD / DNxHR | `AVdn`, `AVdh`, `AVd1`, `V_DNXHD`, `V_MS/VFW/FOURCC/AVdn` | SMPTE ST 2019-1:2016 |
+| GoPro CineForm | `CFHD` | SMPTE ST 2073-1:2017, the free part of the VC-5 standard |
+| Hap | `Hap1`, `Hap5`, `HapY`, `HapM`, `HapA`, `Hap7`, `HapH` | The Hap project's own `HapVideoDRAFT.md`, plus S3TC, BC6H/BC7 and the Scaled YCoCg-DXT5 reconstruction |
+| Matrox Uncompressed SD | `M101` | FFmpeg's LGPL-2.1-or-later `m101.c`. No wiki page, no encoder and no sample exists for this format |
+| Avid 1:1 10-bit RGB | `AVrp` | Recovered by measurement: known and pseudo-random samples through ffmpeg's own encoder at eight geometries |
+| Avid Meridien Uncompressed | `AVUI` | Recovered by measurement against ffmpeg's avui encoder, which itself accepts only the two SD geometries |
+| Microsoft Video 1 | `CRAM`, `MSVC`, `WHAM` | MultimediaWiki's Microsoft Video 1 page |
+| Microsoft RLE | `MRLE`, `BI_RLE8` (1), `BI_RLE4` (2) | The run-length Windows bitmap coding; the opcode walk is shared with the image package's `MicrosoftRle` |
+| Cinepak | `cvid`, `CVID` | MultimediaWiki's Cinepak page |
+| QuickTime Animation | `rle ` | MultimediaWiki's QuickTime RLE page; the coded-unit rule per depth established by measurement |
+| Apple Video (RPZA) | `rpza`, `azpr` | MultimediaWiki's Apple RPZA page |
+| QuickTime Graphics (SMC) | `smc ` | Melanson and Shishkov's write-up, mirrored on MultimediaWiki |
+| Apple Planar RGB (8BPS) | `8BPS` | Togni's "Description of the Planar RGB (8BPS) Codec", 2003, GNU FDL |
+| Autodesk Animator Codec | `AASC` | MultimediaWiki's AASC page, with the byte-rather-than-pixel walk settled by measurement against a real file |
+| Autodesk FLIC | `FLIC` | MultimediaWiki's FLIC page |
+| Q-Team QPEG | `QPEG`, `Q1.0`, `Q1.1` | Melanson and Shishkov's "Description of the QPEG Video Codec", with two run-length formulas corrected by measurement |
+| ASUS V1 | `ASV1` | Niedermayer's "ASUS V1/V2 Codecs" (`asv1.txt`), GNU FDL/GPL — a genuine bitstream specification |
+| ASUS V2 | `ASV2` | The same document; its level table's unstated range closed by a formula checked against a real file |
+| Creative YUV | `cyuv` | Ferguson's `cyuv.txt` and Melanson's "Simple YUV Coding Formats", which check each other arithmetically |
+| Cirrus Logic AccuPak | `CLJR` | Recovered by measurement; the encoder dithers, so the oracle is ffmpeg's decode rather than the source picture |
+| HuffYUV / FFVHUFF | `HFYU`, `FFVH` | MultimediaWiki's HuffYUV page, with the code assignment order and word endianness established by measurement |
+| Ut Video | `ULRG`, `ULRA`, `ULY0`, `ULY2`, `ULY4`, `ULH0`, `ULH2`, `ULH4`; `UQRG`, `UQRA`, `UQY0`, `UQY2`, `UMRG`, `UMRA`, `UMY2`, `UMY4`, `UMH2`, `UMH4` claimed, refused | The author's published code list and the community write-up; bit order, tie-breaks and slice-edge behaviour by measurement |
+| MagicYUV | `MAGY`, `M0G0`, `M0RA`, `M0RG`, `M0Y0`, `M0Y2`, `M0Y4`, `M2RA`, `M2RG`, `M4RA`, `M4RG`, `M8G0`, `M8GA`, `M8RA`, `M8RG`, `M8Y0`, `M8Y2`, `M8Y4`, `M8YA` — `MAGY`, `M8GA` and the deeper codes claimed, refused | Almost nothing is published. The code list is the author's; the rest was measured against the pictures the frames were made from, ffmpeg's encoder standing in as ground truth |
+| LCL ZLIB | `ZLIB` | Togni's "Description of the LCL codecs (MSZH and ZLIB)", GNU FDL 1.2, plus measurement where it leaves placeholders |
+| LCL MSZH | `MSZH` | The same document for the frame wrapper; the back-reference coding, which that document leaves as an unfilled placeholder, from FFmpeg's LGPL-2.1-or-later `lcldec.c` |
+| LOCO | `LOCO` | FFmpeg's LGPL-2.1-or-later `loco.c`. Its MultimediaWiki page postdates that decoder and describes it |
+| Canopus Lossless | `CLLC` | FFmpeg's LGPL-2.1-or-later `cllc.c`. Its wiki page has carried no bitstream fact since 2009 |
+| VBLE | `VBLE` | FFmpeg's LGPL-2.1-or-later `vble.c`. Its wiki page prints a line of C where a rule should be |
+| MidiVid Archive | `MVHA` | FFmpeg's LGPL-2.1-or-later `mvha.c`. Its only description was written the day after that decoder |
+| ZeroCodec | `ZECO` | No specification exists; established by decompressing the one real recording and comparing against ffmpeg's decode |
+| TechSmith Screen Capture | `tscc` | MultimediaWiki's TSCC page; the not-a-zlib-stream-means-unchanged-frame rule by measurement |
+| CamStudio | `CSCD` | MultimediaWiki's CamStudio page, with the delta rule and the compression-byte rule settled against real files |
+| Flash Screen Video | `FSV1` | The SWF File Format Specification's own appendix |
+| Flash Screen Video 2 | `FSV2` | The same appendix, which describes three features too loosely to check — each is refused rather than guessed |
+| Zip Motion Blocks Video | `ZMBV` | MultimediaWiki's ZMBV page |
+| MS Screen 1 | `MSS1` | FFmpeg's LGPL-2.1-or-later `mss1.c`. No independent description of its arithmetic coder exists |
+| Mandsoft / Screen Recorder Gold | `MSCC`, `SRGC` | FFmpeg's LGPL-2.1-or-later `mscc.c`. No sample corpus for this format exists |
+| MatchWare Screen Capture | `MWSC` | FFmpeg's LGPL-2.1-or-later `mwsc.c`. Exactly one sample file exists |
+| RemotelyAnywhere Screen Capture | `RASC` | FFmpeg's LGPL-2.1-or-later `rasc.c`. No sample corpus exists |
+| innoHeim / Rsupport Screen Capture | `RSCC`, `ISCC` | FFmpeg's LGPL-2.1-or-later `rscc.c` |
+| Screenpresso | `SPV1` | FFmpeg's LGPL-2.1-or-later `screenpresso.c`. No sample corpus exists |
+| WinCAM Motion Video | `WCMV` | FFmpeg's LGPL-2.1-or-later `wcmv.c`. No sample corpus exists |
+| Uncompressed (BI_RGB) | codec tag 0, `vfw` | The `BITMAPINFOHEADER` the container carries; the pixel array is a device-independent bitmap's |
+| Planar raw YUV | `YUV `, `rawvideo` | The YUV4MPEG2 chroma tokens |
+| v210 | `v210` | MultimediaWiki's v210 page, which states the group layout in full |
+| 012v | `012v` | v210's own group layout; the row-length rule and the masked top two bits established against the one real sample |
+| r210 | `r210` | Recovered by measurement — the wiki page's stated bit order is not what a real encoder writes |
+| r10k | `R10k` | Recovered by measurement; a different bit arrangement from r210 despite the family resemblance |
+| y41p | `Y41P` | Recovered by measurement; the bottom-row-first order found only once pseudo-random content was used |
+| v308 | `v308` | Recovered by measurement; no page describes this tag and ffmpeg routes it through no codec of its own |
+| v408 | `v408` | Recovered by measurement, the same way |
+| ayuv | `AYUV` | Recovered by measurement; the byte order is the reverse of what the name spells |
+| id RoQ | `RoQV` | MultimediaWiki's RoQ page; the two-buffer behaviour established by measurement |
+| Interplay Video | `IMVE` | Interplay's own published format description, which states the two-buffer rule outright |
+| id Cinematic | `IDCV` | The format's own documentation for the Huffman table; the bit order settled by measurement |
+| Westwood VQA | `WSVQ` | The format's own description, including the codebook rationed across eight pictures |
+| Electronic Arts CMV | `cmv ` | MultimediaWiki's EA CMV page |
+| Commodore CDXL | `CDXL` | MultimediaWiki's CDXL page |
+| IFF ANIM | `ANIM` | Bonham's "An IFF Format For CEL Animations", mirrored at wiki.amigaos.net |
+| BFI | `BFIV` | MultimediaWiki's BFI page, whose byte tables leave several fields marked unknown |
+| Sierra VMD | `VMDV` | The format's own description plus measurement against four real files |
+| Eidos Escape 124 | ARMovie/RPL codec id 124 | FFmpeg's LGPL-2.1-or-later `escape124.c`; the skip-count coding is published nowhere |
+| Eidos Escape 130 | ARMovie/RPL codec id 130 | The format's technical description, with four points it gets wrong settled against real files |
+
+### Encoders
+
+Two, and they are reached through `IVideoCodecEncoder<T>` rather than through the registry, which
+holds decoders only:
+
+| Encoder | Codec written | Note |
+| --- | --- | --- |
+| `MotionJpegVideoEncoder` | `MJPG` / `V_MJPEG` | Baseline JPEG through the image package's writer; every packet is a key frame, since Motion JPEG has no inter-picture prediction. Needs the output dimensions before the muxer is built |
+| `RawPlanarVideoEncoder` | `YUV ` / `rawvideo` | Tightly packed planar YUV at the chroma token the stream states, converting the incoming `RawImage` where its format differs |
+
+Nothing else in this package encodes video, so every other row's Encode column in `README.md` reads
+—. That is a statement about the package, not an omission from this file.
 
 ## What is left, by family
 
