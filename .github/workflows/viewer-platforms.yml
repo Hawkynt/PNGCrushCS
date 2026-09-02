@@ -18,6 +18,13 @@ on:
       - 'Optimizers/Optimizer.Image/**'
       - '.github/workflows/viewer-platforms.yml'
 
+# A newer run for the same branch supersedes the older one. github.head_ref is set only for a
+# pull_request and github.ref_name only for a push, so both events land in the SAME group and the
+# duplicate pair a branch with an open pull request would otherwise produce collapses to one.
+concurrency:
+  group: viewer-platforms-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
