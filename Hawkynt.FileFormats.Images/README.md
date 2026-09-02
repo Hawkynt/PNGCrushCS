@@ -8,7 +8,10 @@
 ![Formats](https://img.shields.io/badge/formats-850%2B-brightgreen)
 ![Reflection](https://img.shields.io/badge/runtime%20reflection-zero-success)
 
-> One drop-in pure-C# package for detecting, reading, writing, and converting an unusually broad range of image formats through one source-generated registry and one platform-independent `RawImage` model.
+> One drop-in pure-C# package for detecting, reading, writing and converting image formats, through
+> one source-generated registry and one platform-independent `RawImage` model. The package claims the
+> WHOLE domain — every image format, not a selection of it. Where a format is missing or only partly
+> supported that is a tracked gap, recorded row by row in [Format support](#-format-support) below.
 
 ## 📦 Installation
 
