@@ -1,24 +1,37 @@
-﻿using System;
-using System.IO;
-using System.Text;
+using System;
+using System.Buffers.Text;
 
 namespace FileFormat.Mtv;
 
-/// <summary>Assembles MTV Ray Tracer file bytes from pixel data.</summary>
+/// <summary>Assembles canonical MTV/PRT file bytes from RGB pixel data.</summary>
 public static class MtvWriter {
 
-  public static byte[] ToBytes(MtvFile file) => Assemble(file.PixelData, file.Width, file.Height);
+  public static byte[] ToBytes(MtvFile file) {
+    MtvFile.Validate(file, nameof(file));
+    return _Assemble(file.PixelData, file.Width, file.Height);
+  }
 
   internal static byte[] Assemble(byte[] pixelData, int width, int height) {
-    var header = Encoding.ASCII.GetBytes($"{width} {height}\n");
-    var expectedPixelBytes = width * height * 3;
+    var file = new MtvFile { Width = width, Height = height, PixelData = pixelData };
+    MtvFile.Validate(file, nameof(pixelData));
+    return _Assemble(pixelData, width, height);
+  }
 
-    var result = new byte[header.Length + expectedPixelBytes];
-    header.AsSpan(0, header.Length).CopyTo(result.AsSpan(0));
+  private static byte[] _Assemble(byte[] pixelData, int width, int height) {
+    Span<byte> header = stackalloc byte[32];
+    if (!Utf8Formatter.TryFormat(width, header, out var widthLength))
+      throw new InvalidOperationException("Could not format MTV width.");
 
-    var copyLen = Math.Min(expectedPixelBytes, pixelData.Length);
-    pixelData.AsSpan(0, copyLen).CopyTo(result.AsSpan(header.Length));
+    header[widthLength] = (byte)' ';
+    if (!Utf8Formatter.TryFormat(height, header[(widthLength + 1)..], out var heightLength))
+      throw new InvalidOperationException("Could not format MTV height.");
 
+    var headerLength = widthLength + 1 + heightLength;
+    header[headerLength++] = (byte)'\n';
+
+    var result = new byte[checked(headerLength + pixelData.Length)];
+    header[..headerLength].CopyTo(result);
+    pixelData.CopyTo(result.AsSpan(headerLength));
     return result;
   }
 }

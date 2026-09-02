@@ -23887,6 +23887,7 @@ Implements `IEquatable<MtvFile>`, `IImageFormatMetadata<MtvFile>`, `IImageFormat
 | `PixelData` | `byte[] PixelData { get; init; }` |  |
 | `Width` | `int Width { get; init; }` |  |
 | `FromRawImage` | `static MtvFile FromRawImage(RawImage image)` |  |
+| `ReadImageInfo` | `static ImageInfo? ReadImageInfo(ReadOnlySpan<byte> header)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(MtvFile file)` |  |
 
 #### `MtvReader`

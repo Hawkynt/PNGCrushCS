@@ -1,11 +1,12 @@
-﻿using System;
+using System;
 using System.IO;
-using System.Text;
 
 namespace FileFormat.Mtv;
 
-/// <summary>Reads MTV Ray Tracer files from bytes, streams, or file paths.</summary>
+/// <summary>Reads MTV/PRT ray-tracer files from bytes, streams, or file paths.</summary>
 public static class MtvReader {
+
+  private const int _MaximumHeaderLength = 128;
 
   public static MtvFile FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
@@ -22,31 +23,18 @@ public static class MtvReader {
       stream.ReadExactly(data);
       return FromBytes(data);
     }
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
+
+    using var buffer = new MemoryStream();
+    stream.CopyTo(buffer);
+    return FromBytes(buffer.ToArray());
   }
 
   public static MtvFile FromSpan(ReadOnlySpan<byte> data) {
+    if (!TryReadHeader(data, out var width, out var height, out var pixelOffset))
+      throw new InvalidDataException("Invalid MTV header; expected one 'width height' ASCII line with positive dimensions.");
 
-    var newlineIndex = data.IndexOf((byte)'\n');
-    if (newlineIndex < 0)
-      throw new InvalidDataException("No newline found in MTV header.");
-
-    var headerText = Encoding.ASCII.GetString(data.Slice(0, newlineIndex));
-    var parts = headerText.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-
-    // Two numbers and nothing else. The size line is the only thing telling this format from the
-    // others that answer to .pic, so a line carrying anything more is not one of ours.
-    if (parts.Length != 2 || !int.TryParse(parts[0], out var width) || !int.TryParse(parts[1], out var height))
-      throw new InvalidDataException("Invalid MTV header dimensions.");
-
-    if (width <= 0 || height <= 0)
-      throw new InvalidDataException("MTV image dimensions must be positive.");
-
-    var pixelOffset = newlineIndex + 1;
-    var expectedPixelBytes = (long)width * height * 3;
-    var available = (long)data.Length - pixelOffset;
+    var expectedPixelBytes = checked(width * height * 3);
+    var available = data.Length - pixelOffset;
 
     // nconvert puts one 0x00 between the size line and the samples and will not read a file back
     // without it, though neither Rayshade nor the MTV tracer itself writes one. It is taken as
@@ -57,24 +45,100 @@ public static class MtvReader {
       --available;
     }
 
-    // A file that cannot fill the size it states is not this format; padding it out would hand back
-    // a picture half of which was never in the file.
+    // The historical PBMPLUS converter reads exactly the stated raster and stops. Match that
+    // behavior: truncation is invalid, while bytes after a complete raster are not part of it.
     if (available < expectedPixelBytes)
       throw new InvalidDataException($"MTV payload holds {available} bytes but {width}x{height} needs {expectedPixelBytes}.");
 
-    var pixelData = new byte[expectedPixelBytes];
-    data.Slice(pixelOffset, (int)expectedPixelBytes).CopyTo(pixelData.AsSpan(0));
-
-    return new MtvFile {
+    return new() {
       Width = width,
       Height = height,
-      PixelData = pixelData
+      PixelData = data.Slice(pixelOffset, expectedPixelBytes).ToArray(),
     };
-
   }
 
   public static MtvFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     return FromSpan(data);
   }
+
+  internal static bool? MatchesSignature(ReadOnlySpan<byte> data) {
+    var lineEnd = data.IndexOf((byte)'\n');
+    if (lineEnd < 0)
+      return data.Length < _MaximumHeaderLength ? null : false;
+
+    if (!TryReadHeader(data, out var width, out var height, out var pixelOffset))
+      return false;
+
+    var expectedPixelBytes = checked(width * height * 3);
+    var available = data.Length - pixelOffset;
+    if (available < expectedPixelBytes)
+      return null;
+
+    // This format has no magic bytes. Only claim a structural match when the inspected buffer
+    // contains one complete canonical raster (or nconvert's known one-byte pad), rather than
+    // classifying arbitrary text beginning with two integers as MTV.
+    if (available == expectedPixelBytes)
+      return true;
+    if (available == expectedPixelBytes + 1 && data[pixelOffset] == 0)
+      return true;
+
+    return false;
+  }
+
+  internal static bool TryReadHeader(ReadOnlySpan<byte> data, out int width, out int height, out int pixelOffset) {
+    width = 0;
+    height = 0;
+    pixelOffset = 0;
+
+    var lineEnd = data.IndexOf((byte)'\n');
+    if (lineEnd < 0 || lineEnd > _MaximumHeaderLength)
+      return false;
+
+    var line = data[..lineEnd];
+    var offset = 0;
+    if (!_TryReadPositiveInteger(line, ref offset, out width)
+        || !_TryReadPositiveInteger(line, ref offset, out height))
+      return false;
+
+    _SkipWhitespace(line, ref offset);
+    if (offset != line.Length)
+      return false;
+
+    if ((long)width * height > MtvFile.MaximumPixels)
+      return false;
+
+    pixelOffset = lineEnd + 1;
+    return true;
+  }
+
+  private static bool _TryReadPositiveInteger(ReadOnlySpan<byte> text, ref int offset, out int value) {
+    value = 0;
+    _SkipWhitespace(text, ref offset);
+    if (offset >= text.Length)
+      return false;
+
+    if (text[offset] == (byte)'+')
+      ++offset;
+    else if (text[offset] == (byte)'-')
+      return false;
+
+    var firstDigit = offset;
+    while (offset < text.Length && text[offset] is >= (byte)'0' and <= (byte)'9') {
+      var digit = text[offset++] - (byte)'0';
+      if (value > (int.MaxValue - digit) / 10)
+        return false;
+      value = value * 10 + digit;
+    }
+
+    return offset != firstDigit && value > 0;
+  }
+
+  private static void _SkipWhitespace(ReadOnlySpan<byte> text, ref int offset) {
+    while (offset < text.Length && _IsAsciiWhitespace(text[offset]))
+      ++offset;
+  }
+
+  private static bool _IsAsciiWhitespace(byte value)
+    => value == (byte)' ' || value is >= 0x09 and <= 0x0D;
 }
