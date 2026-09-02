@@ -42,6 +42,7 @@ env:
 jobs:
   build:
     runs-on: windows-latest
+    timeout-minutes: 20
     outputs:
       cli-artifact: PNGCrushCS-cli-win-x64-${{ inputs.version }}
       ui-artifact:  PNGCrushCS-Viewer-win-x64-${{ inputs.version }}
