@@ -5,7 +5,11 @@
 [![License](https://img.shields.io/github/license/Hawkynt/PNGCrushCS)](https://github.com/Hawkynt/PNGCrushCS/blob/main/LICENSE)
 ![Target](https://img.shields.io/badge/target-net8.0-blue)
 
-> Pure-C# video containers and codecs with demuxing, decoding, encoding, and muxing kept as separate contracts so packet-level remuxing never has to become a decode/re-encode by accident.
+> Pure-C# video handling, with demuxing, decoding, encoding and muxing kept as separate contracts so
+> packet-level remuxing never has to become a decode/re-encode by accident. The package claims the
+> WHOLE domain — every video container and codec, not a selection of it. Where one is missing or only
+> partly supported that is a tracked gap, recorded in [Format / codec support](#-format--codec-support)
+> below and codec by codec in [`codec-coverage.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/codec-coverage.md).
 
 ## 📦 Installation
 
@@ -61,7 +65,7 @@ The tables below are the package-level overview. The detailed codec-by-codec imp
 | [PlayStation STR](https://wiki.multimedia.cx/index.php/PlayStation_STR) | `.str` | ✅ | ✅ | [MultimediaWiki STR](https://wiki.multimedia.cx/index.php/PlayStation_STR) |
 | [ARMovie/RPL](https://wiki.multimedia.cx/index.php/ARMovie) | `.rpl` | ✅ | ✅ | [MultimediaWiki ARMovie](https://wiki.multimedia.cx/index.php/ARMovie) |
 
-### Codec highlights
+### Codec support
 
 | Codec | Decode | Encode | Implemented scope / note | Reference |
 | --- | :---: | :---: | --- | --- |
