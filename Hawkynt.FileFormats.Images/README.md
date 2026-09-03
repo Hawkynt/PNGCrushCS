@@ -521,12 +521,12 @@ This table is generated from `FormatRegistry.AllFormats`, which is the authorita
 | McPainter | `.mcp` | ✅ | ✅ |
 | Mcs | `.mcs` | ✅ | ✅ |
 | Mda | `.mda` | ✅ | ✅ |
-| Mdp | `.mdp` | ✅ | — |
+| Mdp | `.mdp` | ✅ | ✅ |
 | MegaluxFrame | `.frm` | ✅ | ✅ |
 | MegaPaint | `.bld` | ✅ | ✅ |
 | MetaImage | `.mha`, `.mhd` | ✅ | ✅ |
 | MgrBitmap | `.mgr` | ✅ | ✅ |
-| MicroDesignCut | `.cut` | ✅ | — |
+| MicroDesignCut | `.cut` | ✅ | ✅ |
 | MicroDesignGrf | `.grf` | ✅ | ✅ |
 | MicroDynamicsMars | `.pbt` | ✅ | ✅ |
 | MicroIllustrator | `.mil` | ✅ | ✅ |
