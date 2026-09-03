@@ -11,7 +11,7 @@ namespace FileFormat.MicroDesignCut;
 /// </remarks>
 [FormatDetectionPriority(999)]
 public readonly record struct MicroDesignCutFile
-  : IImageFormatReader<MicroDesignCutFile>, IImageToRawImage<MicroDesignCutFile>, IImageFormatWriter<MicroDesignCutFile> {
+  : IImageFormatReader<MicroDesignCutFile>, IImageToRawImage<MicroDesignCutFile>, IImageFromRawImage<MicroDesignCutFile>, IImageFormatWriter<MicroDesignCutFile> {
 
   /// <summary>Number of bytes in the two-word CUT header.</summary>
   public const int HeaderSize = 4;
@@ -50,6 +50,20 @@ public readonly record struct MicroDesignCutFile
   /// <summary>Decodes the stored height code using the format's integer division rule.</summary>
   public static int GetHeight(ushort heightCode) => (heightCode + 3) / 2;
 
+  /// <summary>
+  /// Gets the canonical height code used for generic pixel conversion.
+  /// </summary>
+  /// <remarks>
+  /// Most heights have two equivalent historical codes. The lower code is chosen deterministically;
+  /// readers and metadata-aware writes continue to preserve whichever code was actually supplied.
+  /// </remarks>
+  public static ushort GetCanonicalHeightCode(int height) {
+    if (height <= 0 || height > GetHeight(ushort.MaxValue))
+      throw new ArgumentOutOfRangeException(nameof(height), $"MicroDesign CUT height must be in the range 1..{GetHeight(ushort.MaxValue)} pixels.");
+
+    return height == 1 ? (ushort)0 : checked((ushort)(height * 2 - 3));
+  }
+
   /// <summary>Gets the number of bytes physically stored for one CUT row.</summary>
   public static int GetRowStride(int width) => checked((width + 8) / 8);
 
@@ -65,6 +79,14 @@ public readonly record struct MicroDesignCutFile
         .CopyTo(compact.AsSpan(y * compactStride, compactStride));
 
     return MonochromePage.Decode(compact, file.Width, file.Height, inkIsWhite: true);
+  }
+
+  /// <summary>
+  /// Creates a CUT bitmap using the canonical lower height-code alias for the source height.
+  /// </summary>
+  public static MicroDesignCutFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    return FromRawImage(image, GetCanonicalHeightCode(image.Height));
   }
 
   /// <summary>
