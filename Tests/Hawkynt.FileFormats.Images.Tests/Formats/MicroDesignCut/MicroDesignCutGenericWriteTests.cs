@@ -24,7 +24,9 @@ public sealed class MicroDesignCutGenericWriteTests {
       Assert.That(file.HeightCode, Is.EqualTo(3));
       Assert.That(file.WidthCode, Is.EqualTo(6));
       Assert.That(file.RasterData, Is.EqualTo(new byte[] { 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00 }));
-      Assert.That(restored, Is.EqualTo(file));
+      Assert.That(restored.HeightCode, Is.EqualTo(file.HeightCode));
+      Assert.That(restored.WidthCode, Is.EqualTo(file.WidthCode));
+      Assert.That(restored.RasterData, Is.EqualTo(file.RasterData));
     });
   }
 
