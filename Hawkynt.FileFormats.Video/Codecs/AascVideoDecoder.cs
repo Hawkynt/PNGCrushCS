@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 using FileFormat.Bmp;
 using FileFormat.Core;
@@ -36,16 +37,15 @@ namespace FileFormat.Codecs;
 /// times the true picture's width — are never once all thirty-two-bit-aligned enough to read as
 /// plausible small BGR triples.
 /// <para/>
-/// <b>Every frame's coded data opens on a row that does not exist.</b> The row cursor starts at
-/// <c>height</c> — one past the bottom row a <c>height</c>-row picture actually has — and the very
-/// first opcode of every measured frame, keyframe and delta alike, targets that row and is silently
-/// discarded before the frame's first end-of-row or reposition escape brings the cursor onto row
-/// <c>height - 1</c>, the true bottom row the coding then walks upward from. Starting the cursor at
-/// <c>height - 1</c> instead — the picture's real bottom row — decodes every frame from 0 to 11 of the
-/// one sample this was checked against correctly regardless, since all twelve happen to be solid
-/// black, but frame 12's first reposition — the four bytes <c>00 02 1B 3C</c>, a sixty-row upward
-/// move — then lands one row short of the row its own five painted pixels belong to, because the
-/// frame's row cursor started one row too high to begin with.
+/// <b>Every frame opens on a four-byte little-endian compression word, and it is not an opcode.</b>
+/// A value of 1 says the rest of the packet is the run-length coding above, walked from the bottom
+/// row; a value of 0 says the rest of the packet is the picture uncompressed, rows bottom up, each
+/// padded to a multiple of four bytes. Every frame of the one real sample is compression 1, and its
+/// word — <c>01 00 00 00</c> — reads, if taken as opcodes, as a one-byte run followed by an end-of-row
+/// escape, which is how an earlier reading of this codec came to open its row cursor one row past the
+/// picture and discard "the first opcode" of every frame: it was discarding the compression word.
+/// Reading the word as the word makes the raw form decodable as well, and leaves no row that does not
+/// exist for a frame to open on.
 /// <para/>
 /// <b>Measured.</b> The one sample on <c>samples.mplayerhq.hu/V-codecs/AASC/</c> and mirrored on
 /// ffmpeg's own sample server — <c>AASC.AVI</c>, 320x175, 113 frames, twelve of them solid black and
@@ -54,10 +54,9 @@ namespace FileFormat.Codecs;
 /// codec was found published anywhere.
 /// <para/>
 /// What is not implemented refuses and says so: a stream that does not state twenty-four bits a pixel,
-/// one storing its rows top-down rather than bottom-up, coded data that runs out before a frame signals
-/// its own end, and any run, literal run or reposition addressing a row outside the picture or a column
-/// running past the end of its row — the sentinel row every frame opens on excepted, since a run
-/// addressing it is not malformed, it is what every measured frame's first opcode does.
+/// one storing its rows top-down rather than bottom-up, a compression word other than 0 or 1, coded
+/// data that runs out before a frame signals its own end, and any run, literal run or reposition
+/// addressing a row outside the picture or a column running past the end of its row.
 /// </remarks>
 public sealed class AascVideoDecoder : IVideoCodecDecoder<AascVideoDecoder> {
 
@@ -128,7 +127,26 @@ public sealed class AascVideoDecoder : IVideoCodecDecoder<AascVideoDecoder> {
 
   /// <summary>Decodes one packet, which for this codec is always exactly one whole frame.</summary>
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
-    this._Decode(packet.Data.Span);
+    var data = packet.Data.Span;
+    if (data.Length < 4)
+      throw new InvalidDataException(
+        $"An AASC frame holds {data.Length} byte(s), fewer than the four-byte compression word every frame opens on.");
+
+    var compression = BinaryPrimitives.ReadUInt32LittleEndian(data);
+    switch (compression) {
+      case 0:
+        this._CopyRaw(data[4..]);
+        break;
+
+      case 1:
+        this._Decode(data[4..]);
+        break;
+
+      default:
+        throw new NotSupportedException(
+          $"An AASC frame states compression {compression}. Only 0 (uncompressed rows) and 1 (run-length coded) "
+          + "are defined, and nothing else is read.");
+    }
 
     frame = new() {
       Width = this._width,
@@ -145,11 +163,28 @@ public sealed class AascVideoDecoder : IVideoCodecDecoder<AascVideoDecoder> {
   /// frame, a reposition, or (any other value) a literal run — every run's length and every
   /// reposition's offsets counted in bytes of the picture's <c>width * 3</c>-wide row, not in pixels.
   /// </summary>
+  /// <summary>
+  /// The uncompressed form: every row of the picture in turn, bottom row first, each padded to a whole
+  /// number of four-byte words.
+  /// </summary>
+  private void _CopyRaw(ReadOnlySpan<byte> data) {
+    var stride = this._stride;
+    var padded = (stride + 3) & ~3;
+    if (data.Length < padded * this._height)
+      throw new InvalidDataException(
+        $"An uncompressed AASC frame holds {data.Length} byte(s) where a {this._width}x{this._height} picture at "
+        + $"{padded} bytes a row needs {padded * this._height}.");
+
+    for (var row = this._height - 1; row >= 0; --row) {
+      data[..stride].CopyTo(this._canvas.AsSpan(row * stride, stride));
+      data = data[padded..];
+    }
+  }
+
   private void _Decode(ReadOnlySpan<byte> data) {
-    var height = this._height;
     var n = data.Length;
     var pos = 0;
-    var row = height; // one past the last real row; see the remarks on the type.
+    var row = this._height - 1; // the bottom row, which the coding walks upward from.
     var col = 0;
     var done = false;
 
@@ -160,9 +195,7 @@ public sealed class AascVideoDecoder : IVideoCodecDecoder<AascVideoDecoder> {
       if (code != 0) {
         _Require(pos < n, "a run's byte value");
         var value = data[pos++];
-        var target = this._Target(row, col, code);
-        if (!target.IsEmpty)
-          target.Fill(value);
+        this._Target(row, col, code).Fill(value);
         col += code;
         continue;
       }
@@ -190,9 +223,7 @@ public sealed class AascVideoDecoder : IVideoCodecDecoder<AascVideoDecoder> {
         default: { // literal run of `command` bytes, padded to even
           var count = command;
           _Require(pos + count <= n, "a literal run's bytes");
-          var target = this._Target(row, col, count);
-          if (!target.IsEmpty)
-            data.Slice(pos, count).CopyTo(target);
+          data.Slice(pos, count).CopyTo(this._Target(row, col, count));
           pos += count;
           col += count;
           if ((count & 1) != 0) {
@@ -207,16 +238,11 @@ public sealed class AascVideoDecoder : IVideoCodecDecoder<AascVideoDecoder> {
 
   /// <summary>
   /// The span a run of <paramref name="count"/> bytes at (<paramref name="row"/>, <paramref name="col"/>)
-  /// writes into, or an empty span when the row is the one-past-the-end sentinel every frame's first
-  /// opcode legitimately targets. Any other row outside the picture, or a run reaching past the end of
-  /// its row, is the coded data disagreeing with the picture's own size rather than the sentinel — that
-  /// refuses by name.
+  /// writes into. A row outside the picture, or a run reaching past the end of its row, is the coded
+  /// data disagreeing with the picture's own size — that refuses by name.
   /// </summary>
   private Span<byte> _Target(int row, int col, int count) {
-    if (row == this._height)
-      return default;
-
-    if (row < 0 || col + count > this._stride)
+    if (row < 0 || row >= this._height || col + count > this._stride)
       throw new InvalidDataException(
         $"An AASC frame writes {count} byte(s) at column {col} of row {row}, outside its {this._width}x"
         + $"{this._height} picture.");
