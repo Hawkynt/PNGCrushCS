@@ -26,9 +26,9 @@ namespace FileFormat.Codecs;
 /// <para/>
 /// <b>Decoded straight into <see cref="PixelFormat.Rgb30"/> and nothing is lost doing it.</b> That
 /// format's layout — red in bits 0-9, green in 10-19, blue in 20-29, little-endian — is a different
-/// bit arrangement from r10k's own word, so unlike r210 this is a real repacking and not a plain byte
-/// reversal: each component is pulled out of its own position in the big-endian word and written back
-/// into <see cref="PixelFormat.Rgb30"/>'s. The two bits this format leaves unused become that format's
+/// bit arrangement from r10k's own word, so this is a real repacking and not a plain byte reversal:
+/// each component is pulled out of its own position in the big-endian word and written back into
+/// <see cref="PixelFormat.Rgb30"/>'s. The two bits this format leaves unused become that format's
 /// alpha field, set to fully opaque.
 /// <para/>
 /// <b>Verified exactly.</b> Three geometries and ninety frames of ffmpeg's <c>rgbtestsrc</c> — 8x2,

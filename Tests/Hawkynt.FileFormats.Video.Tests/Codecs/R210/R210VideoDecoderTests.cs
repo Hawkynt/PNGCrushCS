@@ -8,11 +8,12 @@ namespace FileFormat.Codecs.Tests;
 /// The r210 decoder, on words built here bit by bit.
 /// </summary>
 /// <remarks>
-/// The decoder as a whole was measured against ffmpeg's own encoder over three geometries and 90
-/// frames — 8x2 and 64x40, both a whole number of 256-byte rows, and 33x25, which needs the padding
-/// — comparing every word this decoder produces against the <c>x2rgb10le</c> samples that went into
-/// the encoder: every one identical. What these tests pin down is the packing itself, since that
-/// comparison alone does not say which bit range of the word a mistake would have hidden in.
+/// The packing as a whole was measured against ffmpeg over two geometries and twenty frames — 64x40,
+/// a whole number of 256-byte rows, and 33x25, which needs the padding — comparing the
+/// <c>gbrp10le</c> planes ffmpeg decodes from this package's own r210 packets against the samples
+/// that went in: every one identical. What these tests pin down is which bit range of the word each
+/// component owns, since ffmpeg's encoder fed pure red writes <c>3F A0 00 00</c> and fed pure blue
+/// <c>00 20 03 FC</c>, and a byte reversal into <see cref="PixelFormat.Rgb30"/> would swap the two.
 /// </remarks>
 [TestFixture]
 public class R210VideoDecoderTests {
@@ -49,14 +50,14 @@ public class R210VideoDecoderTests {
 
   [Test]
   [Category("Unit")]
-  public void DecodesOnePixelRedInTheLowTenBitsGreenInTheMiddleBlueInTheHighTen() {
-    // R=500, G=300, B=700, packed as R | G<<10 | B<<20 and stored big-endian: 2B C4 B1 F4. One
+  public void DecodesOnePixelRedInTheHighTenBitsGreenInTheMiddleBlueInTheLowTen() {
+    // R=500, G=300, B=700, packed as R<<20 | G<<10 | B and stored big-endian: 1F 44 B2 BC. One
     // pixel is one 256-byte row here, so the packet is padded out to that.
     var row = new byte[256];
-    row[0] = 0x2B;
-    row[1] = 0xC4;
-    row[2] = 0xB1;
-    row[3] = 0xF4;
+    row[0] = 0x1F;
+    row[1] = 0x44;
+    row[2] = 0xB2;
+    row[3] = 0xBC;
     var decoder = R210VideoDecoder.Create(_Stream(1, 1));
 
     var decoded = decoder.TryDecode(new(0, row), out var frame);
@@ -64,16 +65,16 @@ public class R210VideoDecoderTests {
     Assert.That(decoded, Is.True);
     Assert.That(frame.Format, Is.EqualTo(PixelFormat.Rgb30));
     var packed = BitConverter.ToUInt32(frame.PixelData, 0);
-    Assert.That(packed & 0x3FF, Is.EqualTo(500u), "red, low ten bits");
-    Assert.That((packed >> 10) & 0x3FF, Is.EqualTo(300u), "green, middle ten bits");
-    Assert.That((packed >> 20) & 0x3FF, Is.EqualTo(700u), "blue, high ten bits");
+    Assert.That(packed & 0x3FF, Is.EqualTo(500u), "red, Rgb30's low ten bits");
+    Assert.That((packed >> 10) & 0x3FF, Is.EqualTo(300u), "green, Rgb30's middle ten bits");
+    Assert.That((packed >> 20) & 0x3FF, Is.EqualTo(700u), "blue, Rgb30's high ten bits");
   }
 
   [Test]
   [Category("Unit")]
   public void TheTwoUnusedBitsBecomeAFullyOpaqueAlphaField() {
     // Every real sample of this format leaves its top two bits zero; ffmpeg's own decoder writes
-    // fully opaque there when it hands the same 30 bits back out as x2rgb10le, and this matches it.
+    // fully opaque there when it hands the picture back out with alpha, and this matches it.
     var row = new byte[256];
     var decoder = R210VideoDecoder.Create(_Stream(1, 1));
 
