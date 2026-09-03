@@ -1,3 +1,4 @@
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Mdp.Tests;
