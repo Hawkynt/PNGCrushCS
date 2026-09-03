@@ -43,7 +43,16 @@ public enum MdpPageFormat : byte {
 /// </remarks>
 [FormatDetectionPriority(100)]
 [FormatMagicBytes([0x2E, 0x4D, 0x44, 0x50])]
-public readonly record struct MdpFile : IImageFormatReader<MdpFile>, IImageToRawImage<MdpFile>, IImageFormatWriter<MdpFile> {
+public readonly record struct MdpFile : IImageFormatReader<MdpFile>, IImageToRawImage<MdpFile>, IImageFromRawImage<MdpFile>, IImageFormatWriter<MdpFile> {
+
+  /// <summary>Default resolution used when generic pixel conversion has no page metadata.</summary>
+  public const MdpResolution DefaultResolution = MdpResolution.Dpi240;
+
+  /// <summary>Default page format used when generic pixel conversion has no page metadata.</summary>
+  public const MdpPageFormat DefaultPageFormat = MdpPageFormat.A5Portrait;
+
+  /// <summary>Number of bytes represented by one page-RAM block in the MDP stamp.</summary>
+  public const int PageRamBlockSize = 16 * 1024;
 
   static string IImageFormatMetadata<MdpFile>.PrimaryExtension => ".mdp";
   static string[] IImageFormatMetadata<MdpFile>.FileExtensions => [".mdp"];
@@ -81,6 +90,34 @@ public readonly record struct MdpFile : IImageFormatReader<MdpFile>, IImageToRaw
   }
 
   /// <summary>
+  /// Creates an MDP page from pixels using deterministic defaults for metadata that pixels cannot
+  /// describe.
+  /// </summary>
+  /// <remarks>
+  /// The MDP specification stores resolution, page format, page-RAM requirement, and user serial
+  /// independently from the AREA3 raster. Generic conversion therefore uses the lowest format codes
+  /// (<see cref="DefaultResolution"/> and <see cref="DefaultPageFormat"/>), the MDA default serial,
+  /// and derives the RAM requirement from the uncompressed raster size. Use the metadata-aware
+  /// overload when those values are known.
+  /// </remarks>
+  public static MdpFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var area = MdaFile.FromRawImage(image);
+    var pageRamBlocks = (area.RasterData.Length + PageRamBlockSize - 1) / PageRamBlockSize;
+    if (pageRamBlocks > byte.MaxValue)
+      throw new ArgumentOutOfRangeException(nameof(image), $"MDP raster requires {pageRamBlocks} page-RAM blocks, but the stamp can store at most {byte.MaxValue}.");
+
+    return _FromArea(
+      area,
+      DefaultResolution,
+      DefaultPageFormat,
+      checked((byte)pageRamBlocks),
+      MdaFile.DefaultSerialNumber
+    );
+  }
+
+  /// <summary>
   /// Creates an MDP file from pixels plus the page metadata that cannot be inferred from the pixels
   /// themselves.
   /// </summary>
@@ -99,15 +136,7 @@ public readonly record struct MdpFile : IImageFormatReader<MdpFile>, IImageToRaw
     MdaFile.ValidateSerialNumber(serialNumber, nameof(serialNumber));
 
     var area = MdaFile.FromRawImage(image);
-    return new MdpFile {
-      Width = area.Width,
-      Height = area.Height,
-      SerialNumber = serialNumber,
-      Resolution = resolution,
-      PageFormat = pageFormat,
-      PageRamBlocks = pageRamBlocks,
-      RasterData = area.RasterData,
-    };
+    return _FromArea(area, resolution, pageFormat, pageRamBlocks, serialNumber);
   }
 
   internal static void Validate(MdpFile file, string parameterName) {
@@ -120,6 +149,22 @@ public readonly record struct MdpFile : IImageFormatReader<MdpFile>, IImageToRaw
   }
 
   internal static MdaFile AsMda(MdpFile file) => _AsMda(file);
+
+  private static MdpFile _FromArea(
+    MdaFile area,
+    MdpResolution resolution,
+    MdpPageFormat pageFormat,
+    byte pageRamBlocks,
+    string serialNumber
+  ) => new() {
+    Width = area.Width,
+    Height = area.Height,
+    SerialNumber = serialNumber,
+    Resolution = resolution,
+    PageFormat = pageFormat,
+    PageRamBlocks = pageRamBlocks,
+    RasterData = area.RasterData,
+  };
 
   private static MdaFile _AsMda(MdpFile file) => new() {
     Width = file.Width,
