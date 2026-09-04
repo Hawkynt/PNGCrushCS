@@ -4962,7 +4962,7 @@ Takes an Ogg file apart: which logical bitstreams it multiplexes, what each of t
 
 #### `OggWriter`
 
-Writes Ogg logical bitstreams, preserving codec header packets and granule timing.
+Writes Ogg logical bitstreams, preserving codec header packets and granule timing, and carrying what the file says about itself in their comment headers.
 
 Implements `IVideoContainerWriter<OggWriter>`, `IVideoFormatMetadata<OggWriter>`.
 
