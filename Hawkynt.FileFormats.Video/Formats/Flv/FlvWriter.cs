@@ -7,6 +7,11 @@ using Hawkynt.FileFormats.Video;
 namespace FileFormat.Flv;
 
 /// <summary>Writes original-header FLV 1 tags for video and AAC audio streams.</summary>
+/// <remarks>
+/// The file opens with an <c>onMetaData</c> script tag where the metadata carries anything to say,
+/// so that what <see cref="FlvReader"/> reads out of one is what a remux writes back into the next.
+/// See <see cref="Amf0Writer"/> for which fields cross and which deliberately do not.
+/// </remarks>
 public sealed class FlvWriter : IVideoContainerWriter<FlvWriter> {
 
   private readonly IReadOnlyList<MediaStreamInfo> _streams;
@@ -59,6 +64,14 @@ public sealed class FlvWriter : IVideoContainerWriter<FlvWriter> {
     this._output.WriteByte((byte)((videoSeen ? 1 : 0) | (audioSeen ? 4 : 0)));
     ContainerWriterTools.WriteUInt32BigEndian(this._output, 9);
     ContainerWriterTools.WriteUInt32BigEndian(this._output, 0);
+
+    // What the file says about itself goes ahead of everything else, which is where every writer of
+    // the format puts it and where a reader looks for it without walking the film. Without this a
+    // remux read the title, the author and the comments out of one container and dropped them into
+    // nothing.
+    var announcement = Amf0Writer.OnMetaData(metadata);
+    if (announcement != null)
+      this._WriteTag(18, 0, announcement);
 
     // Configuration tags are the first declaration an FLV has of these streams. Emit them in stream
     // order so reading the file back gives the same stream indices the caller supplied.

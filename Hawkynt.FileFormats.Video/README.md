@@ -346,6 +346,7 @@ A few container rules explain much of the implementation shape:
 - **Motion JPEG** uses the JPEG parser from the image package rather than byte-searching for `FF D9`, which can occur inside entropy-coded data or embedded thumbnails.
 - **PlayStation STR** remuxing writes actual 2352-byte Mode-2 sectors, including Form-1 EDC/ECC and Form-2 EDC; parity is not left blank merely because the demuxer does not need it.
 - **RoQ and STR** retain rare packet-local framing state in `CodedPacket.ContainerPrivateData` when that state is required to reproduce the container but is not part of the codec payload itself.
+- **Flash Video** writes back what it reads: the title, author, album, encoder, creation date, duration and every annotation cross a remux as an `onMetaData` script tag. A reader that finds a field and a writer with nowhere to put it are not a round trip, they are a quiet deletion.
 
 Those rules exist because “find a familiar marker and split there” works on demo files and fails on real media. Detailed validation notes live next to the relevant readers and in [`codec-notes.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/codec-notes.md).
 
@@ -369,6 +370,7 @@ Every public and protected member of all 335 types, generated from the built ass
 
 ## ⚠️ Limitations
 
+- Metadata crosses a remux only where the destination container has somewhere to put it. AVI, Matroska, MP4, ASF, RealMedia, RPL and FLV write it back; the raw byte streams and most of the game formats have no metadata area at all and drop it, which is a property of those formats rather than of this package.
 - Mux support is packet-level remuxing, not codec transcoding. A writer may require container-specific stream description bytes, timing geometry, fragment offsets, or packet-private state when those cannot be reconstructed from coded payload alone.
 - H.264/H.265 raw-stream muxers accept Annex B packets only; length-prefixed MP4/QuickTime packet representations are refused rather than silently written as invalid byte streams.
 - MP4/QuickTime muxing requires a complete sample entry in `CodecPrivateData` for codecs whose configuration cannot be synthesized safely; missing codec configuration is refused rather than guessed.
