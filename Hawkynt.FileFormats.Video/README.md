@@ -237,7 +237,7 @@ nothing could be verified even with a description in hand.
 Fourteen decoders are adaptations of FFmpeg's own LGPL-2.1-or-later decoders rather than
 implementations from a published description: Escape 124, LCL MSZH's back-reference parser, LOCO,
 Canopus Lossless, Matrox M101, VBLE, MidiVid Archive, MS Screen 1, RemotelyAnywhere, MSCC, MWSC,
-RSCC, Screenpresso and WinCAM. Ten of the twenty-two encoders are as well: CLJR, FFV1, Flash Screen
+RSCC, Screenpresso and WinCAM. Ten of the encoders are as well: CLJR, FFV1, Flash Screen
 Video, HuffYUV, LCL ZLIB, MagicYUV, Microsoft RLE, QuickTime Animation, Ut Video and ZMBV. Every one
 of those files
 carries the original author and the licence notice it came under; LGPL-2.1-or-later permits
@@ -377,7 +377,7 @@ Every public and protected member of all 359 types, generated from the built ass
 - Large RealVideo pictures require preserved slice offsets when they must be split across 16-bit RealMedia packet lengths, and RoQ sound requires its original predictor argument.
 - Several advanced codecs intentionally implement well-defined subsets (for example H.264 progressive 8-bit 4:2:0, HEVC Main profile, and VC-1 Simple/Main intra pictures). Every row marked ⚠️ in the codec table names its own subset. Unsupported profiles/features are refused by name rather than silently misdecoded.
 - Codec support is more precise than a single green check can express; consult [`codec-notes.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/codec-notes.md) before relying on a profile/level/feature not named in this README.
-- Encoding is a smaller domain than decoding on purpose: 22 codecs of the 82 read can also be written, and every one of the twenty-two is lossless or format-faithful. Nothing here transcodes a picture into a lossy codec, so a stream read as H.264 cannot be written back as H.264.
+- Encoding is a smaller domain than decoding on purpose: 22 codecs of the 82 read can also be written, and every one of them is lossless or format-faithful. Nothing here transcodes a picture into a lossy codec, so a stream read as H.264 cannot be written back as H.264.
 - Video correctness depends on real-world packetization as much as codec math. The project therefore validates packet counts, sizes, timestamps, and key-frame flags against external tools where samples are available.
 
 ## ❤️ Support

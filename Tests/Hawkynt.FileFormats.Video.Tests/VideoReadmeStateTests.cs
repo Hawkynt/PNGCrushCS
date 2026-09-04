@@ -136,6 +136,24 @@ public sealed class VideoReadmeStateTests {
       + $"Ticked without an encoder: {_Only(ticked, registered)}. Encoder without a tick: {_Only(registered, ticked)}.");
   }
 
+  [Test]
+  [Category("Unit")]
+  public void TheCountsTheProseStatesAreTheCountsTheRegistryHolds() {
+    var readme = _Readme();
+    var decoders = VideoFormatRegistry.AllCodecs.Count();
+    var encoders = VideoFormatRegistry.AllEncoders.Count();
+
+    // A number in prose is a claim like any cell of the table, and it is the one a reader takes away
+    // — "82 codecs" is what gets quoted, not the eighty-second row. Guarded by the exact sentence
+    // rather than by a pattern, so rewording it is a deliberate act with a failing test attached.
+    Assert.Multiple(() => {
+      Assert.That(readme, Does.Contain($"builds, {decoders} of them"), "the decoder count in the codec section");
+      Assert.That(readme, Does.Contain($"builds, {encoders} of them"), "the encoder count in the codec section");
+      Assert.That(readme, Does.Contain($"{encoders} codecs of the {decoders} read can also be written"),
+        "the counts in the limitations section");
+    });
+  }
+
   // ============================================================================================
   // Reading the tables
   // ============================================================================================
