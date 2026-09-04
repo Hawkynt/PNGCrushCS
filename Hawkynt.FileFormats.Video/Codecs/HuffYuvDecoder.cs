@@ -41,8 +41,10 @@ namespace FileFormat.Codecs;
 /// <b>What refuses.</b> The original codec, whose frames carry no description at all; samples deeper
 /// than eight bits; a description that states neither interlaced nor progressive and expects the
 /// height to be guessed from; a prediction method that is none of the three; a Huffman table whose
-/// lengths do not describe a complete code. There is no <c>catch</c> here returning a blank or a
-/// repeated frame.
+/// lengths do not describe a complete code; median prediction over colour coded a pixel at a time,
+/// which the reference coder has on neither side; and an interleaved picture too small for the rows
+/// median prediction reads before its first median sample. There is no <c>catch</c> here returning a
+/// blank or a repeated frame.
 /// </remarks>
 public sealed class HuffYuvDecoder : IVideoCodecDecoder<HuffYuvDecoder> {
 
@@ -102,6 +104,8 @@ public sealed class HuffYuvDecoder : IVideoCodecDecoder<HuffYuvDecoder> {
     var format = HuffYuvFormat.Parse(extra, stream.BitsPerPixel, stream.Index);
 
     _RefuseInterlacedHalfHeightMedian(format, stream.Index);
+    _RefusePackedColourMedian(format, stream.Index);
+    _RefuseUndersizedInterleavedMedian(format, stream.Width, stream.Height, stream.Index);
 
     var tables = format.TablesPerFrame
       ? null
@@ -130,6 +134,60 @@ public sealed class HuffYuvDecoder : IVideoCodecDecoder<HuffYuvDecoder> {
 
     throw new NotSupportedException(
       $"Video stream {streamIndex} is interlaced 4:2:0 coded as interleaved rows with median prediction. The order its rows are written in could not be established against any file, and reading it as the nearest arrangement that is known reproduces five rows of a frame and then diverges — so it is refused rather than half decoded. Interlaced 4:2:0 predicted from the left or by gradient, interlaced 4:2:2 with median, and the planar form of all three are read.");
+  }
+
+  /// <summary>
+  /// Refuses median prediction with colour coded a pixel at a time, which the format does not have.
+  /// </summary>
+  /// <remarks>
+  /// The reference coder has the combination on neither side: its encoder answers <c>Error: RGB is
+  /// incompatible with median predictor</c> and refuses to start, and its decoder answers
+  /// <c>prediction type not supported!</c> on a stream whose description claims it. There is
+  /// therefore no such stream to be read, and no arrangement of one to measure against.
+  /// <para/>
+  /// Named here rather than left to fall through, because falling through is what it used to do:
+  /// the packed reader tests the predictor only for gradient, so a description claiming median came
+  /// out as left prediction, a whole picture wrong with nothing said about it. The encoder in this
+  /// package already refuses the same combination, so the two halves now agree.
+  /// </remarks>
+  private static void _RefusePackedColourMedian(HuffYuvFormat format, int streamIndex) {
+    if (format.ColourSpace != HuffYuvColourSpace.PackedBgr || format.Predictor != HuffYuvPredictor.Median)
+      return;
+
+    throw new NotSupportedException(
+      $"Video stream {streamIndex} states median prediction with colour coded a pixel at a time, which HuffYUV does not combine — the reference coder refuses it when writing and reports it unsupported when reading. Colour a pixel at a time is predicted from the left or by gradient; median is coded in the planar form.");
+  }
+
+  /// <summary>
+  /// Refuses an interleaved picture too small for the rows median prediction reads out of it.
+  /// </summary>
+  /// <remarks>
+  /// Median prediction over the interleaved layout reads a whole second row before the first median
+  /// sample, and the first four luminance samples of that row — with the two chrominance samples
+  /// beside them — from the left rather than from the median. The reference coder reads exactly four
+  /// whatever the picture's width, and a frame of two fields reads a third row before any of it. A
+  /// picture with fewer rows or columns than that therefore has no coding either side can agree on:
+  /// the reference reads past the row it is on and what it finds there is not part of the picture.
+  /// <para/>
+  /// Refused rather than clamped. Clamping is what this used to do — four samples became as many as
+  /// the row had — and it silently reads fewer symbols out of the frame than the writer put in,
+  /// which puts every sample after it one code out of step. The encoder in this package refuses the
+  /// same geometries.
+  /// </remarks>
+  private static void _RefuseUndersizedInterleavedMedian(HuffYuvFormat format, int width, int height, int streamIndex) {
+    if (format.Version >= 3 || format.ColourSpace != HuffYuvColourSpace.Yuv || format.Predictor != HuffYuvPredictor.Median)
+      return;
+
+    // A frame of two fields predicts from two rows up, so it reads two rows before the first median
+    // one instead of one.
+    var rowsRead = format.Interlaced ? 2 : 1;
+    var chromaRows = format.BitstreamBitsPerPixel == 12 ? height >> 1 : height;
+
+    if (width >= 4 && height > rowsRead && chromaRows > rowsRead)
+      return;
+
+    throw new NotSupportedException(
+      $"Video stream {streamIndex} is {width}x{height}, which HuffYUV cannot code as interleaved rows with median prediction: the reference coder reads {rowsRead + 1} rows and four luminance samples of the last of them before the first median sample, whatever the picture's size, so a picture with less has no defined coding. Left and gradient prediction code it.");
   }
 
   /// <summary>Decodes one frame, which for this codec is always exactly one whole picture.</summary>
@@ -278,27 +336,29 @@ public sealed class HuffYuvDecoder : IVideoCodecDecoder<HuffYuvDecoder> {
       // from the left rather than from the median. That last part is easy to miss: a picture whose
       // second row repeats its first hides it completely, which is why it only showed up on content
       // busy enough for the two to disagree.
-      var lumaLeft = Math.Min(4, this._width);
-      var chromaLeft = Math.Min(2, chromaWidth);
+      // Four and two, not as many as the row happens to hold: the reference reads exactly this many
+      // whatever the width, and a picture too narrow for it is refused when the decoder is built.
+      const int _LUMA_LEFT = 4;
+      const int _CHROMA_LEFT = 2;
 
       this._Read422(bits, tables, lumaDifferences, cbDifferences, crDifferences, this._width);
-      leftY = HuffYuvPrediction.AddLeft(luma.Row(y), lumaDifferences, lumaLeft, leftY);
-      leftU = HuffYuvPrediction.AddLeft(cb.Row(chromaRow), cbDifferences, chromaLeft, leftU);
-      leftV = HuffYuvPrediction.AddLeft(cr.Row(chromaRow), crDifferences, chromaLeft, leftV);
+      leftY = HuffYuvPrediction.AddLeft(luma.Row(y), lumaDifferences, _LUMA_LEFT, leftY);
+      leftU = HuffYuvPrediction.AddLeft(cb.Row(chromaRow), cbDifferences, _CHROMA_LEFT, leftU);
+      leftV = HuffYuvPrediction.AddLeft(cr.Row(chromaRow), crDifferences, _CHROMA_LEFT, leftV);
 
-      leftAboveY = luma.ReadRow(y - above)[lumaLeft - 1];
-      leftAboveU = cb.ReadRow(chromaRow - above)[chromaLeft - 1];
-      leftAboveV = cr.ReadRow(chromaRow - above)[chromaLeft - 1];
+      leftAboveY = luma.ReadRow(y - above)[_LUMA_LEFT - 1];
+      leftAboveU = cb.ReadRow(chromaRow - above)[_CHROMA_LEFT - 1];
+      leftAboveV = cr.ReadRow(chromaRow - above)[_CHROMA_LEFT - 1];
 
       HuffYuvPrediction.AddMedian(
-        luma.Row(y)[lumaLeft..], luma.ReadRow(y - above)[lumaLeft..], lumaDifferences.AsSpan(lumaLeft),
-        this._width - lumaLeft, ref leftY, ref leftAboveY);
+        luma.Row(y)[_LUMA_LEFT..], luma.ReadRow(y - above)[_LUMA_LEFT..], lumaDifferences.AsSpan(_LUMA_LEFT),
+        this._width - _LUMA_LEFT, ref leftY, ref leftAboveY);
       HuffYuvPrediction.AddMedian(
-        cb.Row(chromaRow)[chromaLeft..], cb.ReadRow(chromaRow - above)[chromaLeft..], cbDifferences.AsSpan(chromaLeft),
-        chromaWidth - chromaLeft, ref leftU, ref leftAboveU);
+        cb.Row(chromaRow)[_CHROMA_LEFT..], cb.ReadRow(chromaRow - above)[_CHROMA_LEFT..], cbDifferences.AsSpan(_CHROMA_LEFT),
+        chromaWidth - _CHROMA_LEFT, ref leftU, ref leftAboveU);
       HuffYuvPrediction.AddMedian(
-        cr.Row(chromaRow)[chromaLeft..], cr.ReadRow(chromaRow - above)[chromaLeft..], crDifferences.AsSpan(chromaLeft),
-        chromaWidth - chromaLeft, ref leftV, ref leftAboveV);
+        cr.Row(chromaRow)[_CHROMA_LEFT..], cr.ReadRow(chromaRow - above)[_CHROMA_LEFT..], crDifferences.AsSpan(_CHROMA_LEFT),
+        chromaWidth - _CHROMA_LEFT, ref leftV, ref leftAboveV);
 
       ++y;
       ++chromaRow;

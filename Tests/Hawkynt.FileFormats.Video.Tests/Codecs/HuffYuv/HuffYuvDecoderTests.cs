@@ -335,6 +335,58 @@ public class HuffYuvDecoderTests {
 
   [Test]
   [Category("Unit")]
+  public void ColourCodedAPixelAtATimeWithMedianPredictionIsRefusedByName() {
+    // The reference coder has no such combination: its encoder answers "RGB is incompatible with
+    // median predictor" and its decoder "prediction type not supported!". Read as the left
+    // prediction it resembles, the picture comes out wrong with nothing said.
+    foreach (var depth in new byte[] { 24, 32 }) {
+      var stream = HuffYuvTestStream.InterleavedStream(8, 8, _MEDIAN, depth, _PROGRESSIVE);
+
+      var failure = Assert.Throws<NotSupportedException>(() => HuffYuvDecoder.Create(stream), $"{depth} bits");
+      Assert.That(failure!.Message, Does.Contain("colour coded a pixel at a time"));
+    }
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void AnInterleavedMedianPictureWithNoSecondRowIsRefusedByName() {
+    var stream = HuffYuvTestStream.InterleavedStream(8, 1, _MEDIAN, 16, _PROGRESSIVE);
+
+    var failure = Assert.Throws<NotSupportedException>(() => HuffYuvDecoder.Create(stream));
+    Assert.That(failure!.Message, Does.Contain("8x1"));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void AnInterleavedMedianPictureNarrowerThanFourSamplesIsRefusedByName() {
+    // The reference coder reads four luminance samples of the second row whatever the width, so a
+    // narrower picture has no coding either side can agree on.
+    var stream = HuffYuvTestStream.InterleavedStream(2, 4, _MEDIAN, 16, _PROGRESSIVE);
+
+    var failure = Assert.Throws<NotSupportedException>(() => HuffYuvDecoder.Create(stream));
+    Assert.That(failure!.Message, Does.Contain("2x4"));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void AnInterlacedInterleavedMedianPictureWithNoThirdRowIsRefusedByName() {
+    var stream = HuffYuvTestStream.InterleavedStream(8, 2, _MEDIAN, 16, _INTERLACED);
+
+    var failure = Assert.Throws<NotSupportedException>(() => HuffYuvDecoder.Create(stream));
+    Assert.That(failure!.Message, Does.Contain("8x2"));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void AProgressiveFourTwoZeroMedianPictureWithNoSecondChrominanceRowIsRefusedByName() {
+    var stream = HuffYuvTestStream.InterleavedStream(8, 2, _MEDIAN, 12, _PROGRESSIVE);
+
+    var failure = Assert.Throws<NotSupportedException>(() => HuffYuvDecoder.Create(stream));
+    Assert.That(failure!.Message, Does.Contain("8x2"));
+  }
+
+  [Test]
+  [Category("Unit")]
   public void ABitstreamDepthTheCodecDoesNotUseIsRefusedByName() {
     var stream = HuffYuvTestStream.InterleavedStream(4, 4, _LEFT, 20, _PROGRESSIVE);
 

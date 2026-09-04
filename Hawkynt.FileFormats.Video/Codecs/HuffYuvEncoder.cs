@@ -497,8 +497,10 @@ public sealed class HuffYuvEncoder : IVideoCodecEncoder<HuffYuvEncoder> {
 
     var y = 1;
     if (this._prediction == HuffYuvPredictionMethod.Median && height > 1) {
-      var lumaLeft = Math.Min(4, width);
-      var chromaLeft = Math.Min(2, chromaWidth);
+      // Four and two exactly, as the reference writes whatever the width; a picture too narrow for
+      // it is refused when the encoder is built rather than coded with fewer.
+      const int _LUMA_LEFT = 4;
+      const int _CHROMA_LEFT = 2;
       var rowY = luma.Slice(width, width);
       var rowU = cb.Slice(chromaWidth, chromaWidth);
       var rowV = cr.Slice(chromaWidth, chromaWidth);
@@ -506,16 +508,16 @@ public sealed class HuffYuvEncoder : IVideoCodecEncoder<HuffYuvEncoder> {
       var aboveU = cb[..chromaWidth];
       var aboveV = cr[..chromaWidth];
 
-      leftY = _SubtractLeft(rowY, dY, lumaLeft, leftY);
-      leftU = _SubtractLeft(rowU, dU, chromaLeft, leftU);
-      leftV = _SubtractLeft(rowV, dV, chromaLeft, leftV);
+      leftY = _SubtractLeft(rowY, dY, _LUMA_LEFT, leftY);
+      leftU = _SubtractLeft(rowU, dU, _CHROMA_LEFT, leftU);
+      leftV = _SubtractLeft(rowV, dV, _CHROMA_LEFT, leftV);
 
-      var leftAboveY = aboveY[lumaLeft - 1];
-      var leftAboveU = aboveU[chromaLeft - 1];
-      var leftAboveV = aboveV[chromaLeft - 1];
-      _SubtractMedian(aboveY[lumaLeft..], rowY[lumaLeft..], dY.AsSpan(lumaLeft), width - lumaLeft, ref leftY, ref leftAboveY);
-      _SubtractMedian(aboveU[chromaLeft..], rowU[chromaLeft..], dU.AsSpan(chromaLeft), chromaWidth - chromaLeft, ref leftU, ref leftAboveU);
-      _SubtractMedian(aboveV[chromaLeft..], rowV[chromaLeft..], dV.AsSpan(chromaLeft), chromaWidth - chromaLeft, ref leftV, ref leftAboveV);
+      var leftAboveY = aboveY[_LUMA_LEFT - 1];
+      var leftAboveU = aboveU[_CHROMA_LEFT - 1];
+      var leftAboveV = aboveV[_CHROMA_LEFT - 1];
+      _SubtractMedian(aboveY[_LUMA_LEFT..], rowY[_LUMA_LEFT..], dY.AsSpan(_LUMA_LEFT), width - _LUMA_LEFT, ref leftY, ref leftAboveY);
+      _SubtractMedian(aboveU[_CHROMA_LEFT..], rowU[_CHROMA_LEFT..], dU.AsSpan(_CHROMA_LEFT), chromaWidth - _CHROMA_LEFT, ref leftU, ref leftAboveU);
+      _SubtractMedian(aboveV[_CHROMA_LEFT..], rowV[_CHROMA_LEFT..], dV.AsSpan(_CHROMA_LEFT), chromaWidth - _CHROMA_LEFT, ref leftV, ref leftAboveV);
       _AddGroups(symbols, dY, dU, dV, 0, width);
 
       for (y = 2; y < height; ++y) {
