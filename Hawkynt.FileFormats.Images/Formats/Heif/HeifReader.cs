@@ -16,10 +16,17 @@ public static class HeifReader {
 
   private static readonly HashSet<string> _HEIF_BRANDS = new(StringComparer.Ordinal) {
     "heic", "heix", "hevc", "heim", "heis", "hevm", "hevs", "mif1",
+    // AVCI is the same container with an H.264 picture in it.
+    "avci", "avcs",
   };
 
   private static readonly HashSet<string> _HEVC_ITEM_TYPES = new(StringComparer.Ordinal) {
     "hvc1", "hev1", "hvc2", "hev2",
+  };
+
+  /// <summary>The item types whose picture is an H.264 access unit.</summary>
+  private static readonly HashSet<string> _AVC_ITEM_TYPES = new(StringComparer.Ordinal) {
+    "avc1", "avc2", "avc3", "avc4",
   };
 
   public static HeifFile FromFile(FileInfo file) {
@@ -185,10 +192,10 @@ public static class HeifReader {
 
   private static HeifImage _DecodeItem(HeifContainer container, byte[] bytes, uint itemId) {
     var descriptor = _DescribeItem(container, itemId);
-    if (descriptor.HevcConfiguration == null)
+    if (descriptor.HevcConfiguration == null && descriptor.AvcConfiguration == null)
       throw new NotSupportedException(
-        $"HEIF: image item {itemId} ('{descriptor.ItemType}') has no hvcC property. "
-        + "Only directly coded HEVC items are implemented.");
+        $"HEIF: image item {itemId} ('{descriptor.ItemType}') has neither an hvcC nor an avcC property. "
+        + "Only directly coded HEVC and AVC items are implemented.");
 
     if (!container.Locations.TryGetValue(itemId, out var location))
       throw new InvalidDataException($"HEIF: image item {itemId} has no iloc entry.");
@@ -196,7 +203,11 @@ public static class HeifReader {
     var sample = _ReadItemData(container, bytes, location);
     RawImage decoded;
     try {
-      decoded = HeifHevcDecoder.Decode(sample, descriptor.HevcConfiguration);
+      // The property is what says which codec the item is coded in; the item
+      // type agrees with it, and an item carrying both is coded in neither.
+      decoded = descriptor.HevcConfiguration != null
+        ? HeifHevcDecoder.Decode(sample, descriptor.HevcConfiguration)
+        : HeifAvcDecoder.Decode(sample, descriptor.AvcConfiguration!);
     } catch (NotSupportedException e) {
       throw new NotSupportedException($"HEIF/HEVC item {itemId}: {e.Message}", e);
     }
@@ -243,7 +254,8 @@ public static class HeifReader {
 
     bool IsDecodable(uint id) {
       var type = container.ItemInfos.TryGetValue(id, out var itemType) ? itemType : string.Empty;
-      return _HEVC_ITEM_TYPES.Contains(type) || _HasProperty(container, id, IsoBmffBox.HvcC);
+      return _HEVC_ITEM_TYPES.Contains(type) || _AVC_ITEM_TYPES.Contains(type)
+             || _HasProperty(container, id, IsoBmffBox.HvcC) || _HasProperty(container, id, IsoBmffBox.AvcC);
     }
 
     if (container.PrimaryItemId != 0 && IsDecodable(container.PrimaryItemId))
@@ -277,6 +289,7 @@ public static class HeifReader {
     var width = 0;
     var height = 0;
     byte[]? hvcc = null;
+    byte[]? avcc = null;
     CleanAperture? aperture = null;
 
     if (container.Associations.TryGetValue(itemId, out var associations)) {
@@ -303,11 +316,15 @@ public static class HeifReader {
           case IsoBmffBox.HvcC:
             hvcc = property.Data;
             break;
+
+          case IsoBmffBox.AvcC:
+            avcc = property.Data;
+            break;
         }
       }
     }
 
-    return new(itemType, width, height, aperture, hvcc);
+    return new(itemType, width, height, aperture, hvcc, avcc);
   }
 
   private static bool _LegacyHasHevcConfiguration(HeifContainer container) {
@@ -840,7 +857,8 @@ public static class HeifReader {
     int CodedWidth,
     int CodedHeight,
     CleanAperture? Aperture,
-    byte[]? HevcConfiguration
+    byte[]? HevcConfiguration,
+    byte[]? AvcConfiguration
   );
 
   private readonly record struct LegacyDescriptor(int Width, int Height, CleanAperture? Aperture);

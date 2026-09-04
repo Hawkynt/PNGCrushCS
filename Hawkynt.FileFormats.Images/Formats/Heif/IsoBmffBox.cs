@@ -31,6 +31,9 @@ internal readonly struct IsoBmffBox {
   internal const string Ispe = "ispe";
   internal const string Clap = "clap";
   internal const string HvcC = "hvcC";
+
+  /// <summary>The AVC decoder configuration an AVCI item is coded against.</summary>
+  internal const string AvcC = "avcC";
   internal const string Mdat = "mdat";
 
   private const int _HEADER_SIZE = 8;
