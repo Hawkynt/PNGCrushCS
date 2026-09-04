@@ -63,7 +63,7 @@ internal sealed class Ffv1SliceDecoder {
       var top = plane.At(x, y - 1);
       var topLeft = plane.At(x - 1, y - 1);
 
-      var context = _Context(tables, plane, x, y, left, top, topLeft);
+      var context = ContextOf(tables, plane, x, y, left, top, topLeft);
       var negative = context < 0;
       if (negative)
         context = -context;
@@ -75,7 +75,7 @@ internal sealed class Ffv1SliceDecoder {
       if (negative)
         difference = -difference;
 
-      plane[x, y] = (_Median(left, top, left + top - topLeft) + difference) & this._sampleMask;
+      plane[x, y] = (Median(left, top, left + top - topLeft) + difference) & this._sampleMask;
     }
   }
 
@@ -89,7 +89,7 @@ internal sealed class Ffv1SliceDecoder {
       var top = plane.At(x, y - 1);
       var topLeft = plane.At(x - 1, y - 1);
 
-      var context = _Context(tables, plane, x, y, left, top, topLeft);
+      var context = ContextOf(tables, plane, x, y, left, top, topLeft);
       var negative = context < 0;
       if (negative)
         context = -context;
@@ -135,7 +135,7 @@ internal sealed class Ffv1SliceDecoder {
       if (negative)
         difference = -difference;
 
-      plane[x, y] = (_Median(left, top, left + top - topLeft) + difference) & this._sampleMask;
+      plane[x, y] = (Median(left, top, left + top - topLeft) + difference) & this._sampleMask;
     }
   }
 
@@ -147,7 +147,7 @@ internal sealed class Ffv1SliceDecoder {
   /// entries were already multiplied by the range of the tables before it, adding them cannot make
   /// two different neighbourhoods land on the same number.
   /// </remarks>
-  private static int _Context(int[][] tables, Ffv1Plane plane, int x, int y, int left, int top, int topLeft) {
+  internal static int ContextOf(int[][] tables, Ffv1Plane plane, int x, int y, int left, int top, int topLeft) {
     var topRight = plane.At(x + 1, y - 1);
     var leftLeft = plane.At(x - 2, y);
     var topTop = plane.At(x, y - 2);
@@ -159,7 +159,7 @@ internal sealed class Ffv1SliceDecoder {
            + tables[4][(topTop - top) & 0xFF];
   }
 
-  private static int _Median(int a, int b, int c) {
+  internal static int Median(int a, int b, int c) {
     if (a > b)
       (a, b) = (b, a);
 
