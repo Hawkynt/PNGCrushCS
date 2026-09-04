@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using FileFormat.Core;
 
 namespace FileFormat.DrHalo;
@@ -15,14 +15,21 @@ public readonly record struct DrHaloFile : IImageFormatReader<DrHaloFile>, IImag
   public byte[] PixelData { get; init; }
   public byte[]? Palette { get; init; }
 
+  /// <remarks>
+  /// Dr. Halo keeps its colours in a separate .PAL that the .CUT does not name, so a CUT read on its
+  /// own has none. It gets the ramp from <see cref="IndexedPalette"/> rather than a null palette,
+  /// which is the difference between a grey picture and an exception on every conversion.
+  /// </remarks>
   public static RawImage ToRawImage(DrHaloFile file) {
+    var palette = file.Palette is { Length: > 0 } p ? p[..] : IndexedPalette.GrayRamp(256);
+
     return new() {
       Width = file.Width,
       Height = file.Height,
       Format = PixelFormat.Indexed8,
       PixelData = file.PixelData[..],
-      Palette = file.Palette is { } p ? p[..] : null,
-      PaletteCount = file.Palette is { } pal ? pal.Length / 3 : 0,
+      Palette = palette,
+      PaletteCount = palette.Length / 3,
     };
   }
 

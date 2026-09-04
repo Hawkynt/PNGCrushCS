@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using FileFormat.Core;
 
 namespace FileFormat.Wal;
@@ -20,7 +20,12 @@ public readonly record struct WalFile : IImageFormatReader<WalFile>, IImageToRaw
   public byte[] PixelData { get; init; }
   public byte[][]? MipMaps { get; init; }
 
-  /// <summary>Converts a WAL file to a <see cref="RawImage"/>. No palette is embedded (uses external Quake 2 palette).</summary>
+  /// <summary>Converts a WAL file to a <see cref="RawImage"/>.</summary>
+  /// <remarks>
+  /// A WAL embeds no palette; Quake 2 colours it from <c>pics/colormap.pcx</c> in the game's own
+  /// pak. Standing the ramp from <see cref="IndexedPalette"/> in its place keeps the texture
+  /// drawable — declaring 256 colours and handing back a null palette made every conversion throw.
+  /// </remarks>
   public static RawImage ToRawImage(WalFile file) {
 
     return new RawImage {
@@ -28,6 +33,7 @@ public readonly record struct WalFile : IImageFormatReader<WalFile>, IImageToRaw
       Height = file.Height,
       Format = PixelFormat.Indexed8,
       PixelData = file.PixelData[..],
+      Palette = IndexedPalette.GrayRamp(256),
       PaletteCount = 256
     };
   }

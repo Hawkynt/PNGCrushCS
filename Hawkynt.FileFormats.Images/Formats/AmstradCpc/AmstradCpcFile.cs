@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using FileFormat.Core;
 
 namespace FileFormat.AmstradCpc;
@@ -87,12 +87,18 @@ public readonly record struct AmstradCpcFile : IImageFormatReader<AmstradCpcFile
         }
       }
 
+    // A screen dump captures the pixels the Gate Array was reading and none of the pen colours it
+    // was reading them through, so the file cannot say what colour an index was. The ramp keeps the
+    // picture drawable; an indexed image with a null palette threw on every conversion out of it.
+    var paletteCount = _GetPaletteCount(file.Mode);
+
     return new() {
       Width = width,
       Height = height,
       Format = PixelFormat.Indexed8,
       PixelData = pixels,
-      PaletteCount = _GetPaletteCount(file.Mode),
+      Palette = IndexedPalette.GrayRamp(paletteCount),
+      PaletteCount = paletteCount,
     };
   }
 

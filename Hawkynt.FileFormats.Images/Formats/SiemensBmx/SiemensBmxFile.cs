@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using FileFormat.Core;
 
 namespace FileFormat.SiemensBmx;
@@ -18,12 +18,19 @@ public readonly record struct SiemensBmxFile : IImageFormatReader<SiemensBmxFile
   public int Height { get; init; }
   public byte[] PixelData { get; init; }
 
+  /// <remarks>
+  /// The BMX body is bare indices with no colour table behind them, so the ramp from
+  /// <see cref="IndexedPalette"/> supplies one. Without it the picture came back indexed with a
+  /// null palette, which no consumer can convert.
+  /// </remarks>
   public static RawImage ToRawImage(SiemensBmxFile file) {
     return new() {
       Width = file.Width,
       Height = file.Height,
       Format = PixelFormat.Indexed8,
       PixelData = file.PixelData[..],
+      Palette = IndexedPalette.GrayRamp(256),
+      PaletteCount = 256,
     };
   }
 

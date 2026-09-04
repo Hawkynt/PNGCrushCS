@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using FileFormat.Core;
 
@@ -18,6 +18,12 @@ public readonly record struct ArtFile : IImageFormatReader<ArtFile>, IImageToRaw
   public IReadOnlyList<ArtTile> Tiles { get; init; }
 
   /// <summary>Converts the first tile of an ART file to a <see cref="RawImage"/>.</summary>
+  /// <remarks>
+  /// An ART archive stores indices only — the colours are in the game's own <c>palette.dat</c>,
+  /// which this file neither contains nor names. The ramp from <see cref="IndexedPalette"/> stands
+  /// in for it so the tile can be drawn; with a null palette the picture announced 256 colours and
+  /// then threw on every conversion out of it.
+  /// </remarks>
   public static RawImage ToRawImage(ArtFile file) {
     if (file.Tiles.Count == 0)
       throw new ArgumentException("ART file contains no tiles.", nameof(file));
@@ -28,6 +34,7 @@ public readonly record struct ArtFile : IImageFormatReader<ArtFile>, IImageToRaw
       Height = tile.Height,
       Format = PixelFormat.Indexed8,
       PixelData = tile.PixelData[..],
+      Palette = IndexedPalette.GrayRamp(256),
       PaletteCount = 256
     };
   }
