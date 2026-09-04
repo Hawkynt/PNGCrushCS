@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Text;
+using FileFormat.Core;
 using Hawkynt.FileFormats.Images;
 
 namespace Hawkynt.FileFormats.Images.Tests;
@@ -47,8 +48,8 @@ public sealed class FormatSupportReadmeTests {
 
   private static string _BuildMatrix() {
     var builder = new StringBuilder();
-    builder.Append("| Format | Extensions | Read | Write |\n");
-    builder.Append("| --- | --- | :---: | :---: |\n");
+    builder.Append("| Format | Extensions | Read | Write | Info | Multi | Optimizer |\n");
+    builder.Append("| --- | --- | :---: | :---: | :---: | :---: | :---: |\n");
 
     foreach (var entry in FormatRegistry.AllFormats
                .OrderBy(static entry => entry.Name, StringComparer.OrdinalIgnoreCase)
@@ -65,6 +66,12 @@ public sealed class FormatSupportReadmeTests {
         .Append(entry.SupportsRead ? "✅" : "—")
         .Append(" | ")
         .Append(entry.SupportsWrite ? "✅" : "—")
+        .Append(" | ")
+        .Append(entry.ReadImageInfo != null ? "✅" : "—")
+        .Append(" | ")
+        .Append(entry.SupportsMultiImage ? "✅" : "—")
+        .Append(" | ")
+        .Append((entry.Capabilities & FormatCapability.HasDedicatedOptimizer) != 0 ? "✅" : "—")
         .Append(" |\n");
     }
 
@@ -86,7 +93,7 @@ public sealed class FormatSupportReadmeTests {
     var section = $"""
       {_SUPPORT_HEADING}
 
-      This table is generated from `FormatRegistry.AllFormats`, which is the authoritative package inventory. Every registered image format has one row; extensions and read/write capability come directly from its `FormatEntry`.
+      This table is generated from `FormatRegistry.AllFormats`, which is the authoritative package inventory. Every registered image format has one row; extensions and capabilities come directly from its `FormatEntry`.
 
       `✅` means the corresponding registry operation is available. A registered operation can still have format-specific subset limitations described later in this README; the matrix records capability presence, not a claim that every producer-specific variant is implemented.
 

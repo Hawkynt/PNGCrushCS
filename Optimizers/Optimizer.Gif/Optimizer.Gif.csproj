@@ -4,7 +4,6 @@
     <TargetFramework>net8.0</TargetFramework>
 
     <Description>GIF optimization engine with palette reordering, LZW re-encoding, and frame optimization.</Description>
-    <PackageReadmeFile>ReadMe.md</PackageReadmeFile>
     <PackageProjectUrl>https://github.com/Hawkynt/PNGCrushCS</PackageProjectUrl>
     <PackageTags>GifOptimizer;ImageCrush;Hawkynt</PackageTags>
     <RepositoryUrl>https://github.com/Hawkynt/PNGCrushCS</RepositoryUrl>
@@ -13,7 +12,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="ReadMe.md" Pack="true" PackagePath="\" />
     <InternalsVisibleTo Include="Optimizer.Gif.Tests" />
   </ItemGroup>
 
