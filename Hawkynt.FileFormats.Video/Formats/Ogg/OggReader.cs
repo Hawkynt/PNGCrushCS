@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Text;
 using FileFormat.Core;
@@ -274,13 +275,14 @@ public static class OggReader {
   private static VideoMetadata _ReadMetadata(List<_Scan> scans, OggBitstream[] bitstreams) {
     var texts = new List<TextMetadataEntry>();
     string? title = null, artist = null, album = null, encoder = null;
+    DateTimeOffset? created = null;
 
     foreach (var scan in scans) {
       var comment = _CommentOf(scan);
       if (comment.IsEmpty)
         continue;
 
-      _ReadComment(comment.Span, texts, ref title, ref artist, ref album, ref encoder);
+      _ReadComment(comment.Span, texts, ref title, ref artist, ref album, ref encoder, ref created);
     }
 
     var streams = new MediaStreamMetadata[bitstreams.Length];
@@ -294,6 +296,7 @@ public static class OggReader {
       Artist = artist,
       Album = album,
       EncodedBy = encoder,
+      CreationTime = created,
       Streams = streams,
       TextEntries = texts,
     };
@@ -319,7 +322,8 @@ public static class OggReader {
 
   private static void _ReadComment(
     ReadOnlySpan<byte> comment, List<TextMetadataEntry> texts,
-    ref string? title, ref string? artist, ref string? album, ref string? encoder) {
+    ref string? title, ref string? artist, ref string? album, ref string? encoder,
+    ref DateTimeOffset? created) {
     if (!_TryTakeString(ref comment, out var vendor))
       return;
 
@@ -353,11 +357,26 @@ public static class OggReader {
         case "ALBUM":
           album ??= value;
           break;
+        case "DATE":
+          // ISO 8601, which is what the field is defined to hold. A file that wrote something else
+          // there keeps it as the annotation it also is, rather than becoming a date it does not
+          // state.
+          created ??= _Date(value);
+          break;
       }
 
       texts.Add(new(name, value));
     }
   }
+
+  /// <summary>An ISO 8601 date field as the instant it names, or nothing where it names none.</summary>
+  /// <remarks>
+  /// A date with no time of day is read as UTC rather than as the reading machine's own zone, so that
+  /// the same file says the same thing wherever it is opened. A value stating an offset keeps the one
+  /// it states.
+  /// </remarks>
+  private static DateTimeOffset? _Date(string value)
+    => DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsed) ? parsed : null;
 
   private static bool _TryTakeString(ref ReadOnlySpan<byte> data, out string value) {
     value = string.Empty;

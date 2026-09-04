@@ -8,7 +8,16 @@ using Hawkynt.FileFormats.Video;
 
 namespace FileFormat.Ogg;
 
-/// <summary>Writes Ogg logical bitstreams, preserving codec header packets and granule timing.</summary>
+/// <summary>
+/// Writes Ogg logical bitstreams, preserving codec header packets and granule timing, and carrying
+/// what the file says about itself in their comment headers.
+/// </summary>
+/// <remarks>
+/// The header packets arrive whole in <see cref="MediaStreamInfo.CodecPrivateData"/> and are written
+/// out again unchanged, with one exception: the comment header, which is the one place in an Ogg file
+/// a title, an artist, an album or an annotation can live. See <see cref="VorbisCommentWriter"/> for
+/// what is put there and what is deliberately not.
+/// </remarks>
 public sealed class OggWriter : IVideoContainerWriter<OggWriter> {
 
   private sealed class StreamState(MediaStreamInfo info, uint serial, ReadOnlyMemory<byte>[] headers) {
@@ -44,6 +53,12 @@ public sealed class OggWriter : IVideoContainerWriter<OggWriter> {
       if (headers.Length == 0)
         throw new NotSupportedException(
           $"Ogg bitstream {i} needs its mapping/header packets in CodecPrivateData. Without a BOS identification packet the logical bitstream cannot be declared before interleaved data begins.");
+
+      // What the file says about itself goes into every bitstream that has a comment header to put
+      // it in, because Ogg has nowhere else for it and the comment header belongs to the bitstream
+      // rather than to the file. It is the second header packet of every mapping that has one.
+      if (headers.Length > 1 && VorbisCommentWriter.TryRewrite(headers[1], metadata, out var comment))
+        headers[1] = comment;
 
       var state = new StreamState(info, 0x504E4700u + checked((uint)i + 1), headers);
       if (info.CodecId?.Equals("theora", StringComparison.OrdinalIgnoreCase) == true) {
