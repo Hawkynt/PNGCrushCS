@@ -182,7 +182,8 @@ internal static class JxlAcDecoder {
     JxlBlockContextMap contextMap,
     int groupBlocksWide,
     int groupBlocksHigh,
-    int numChannels
+    int numChannels,
+    int[][]? quantField = null
   ) {
     ArgumentNullException.ThrowIfNull(reader);
     ArgumentNullException.ThrowIfNull(entropy);
@@ -211,11 +212,17 @@ internal static class JxlAcDecoder {
     var result = new JxlDctBlock[numChannels][];
     for (var c = 0; c < numChannels; ++c) {
       result[c] = new JxlDctBlock[totalBlocks];
-      for (var i = 0; i < totalBlocks; ++i) {
-        result[c][i] = new JxlDctBlock {
-          Width = 8,
-          Height = 8,
-          Coefficients = new short[64],
+      for (var by = 0; by < groupBlocksHigh; ++by)
+      for (var bx = 0; bx < groupBlocksWide; ++bx) {
+        // A transform holds sixty-four coefficients for every block it covers,
+        // so the block at its origin carries all of them and the ones it covers
+        // carry none.
+        var strategy = strategies[by][bx];
+        var coefficients = JxlAcStrategyGeometry.CoveredBlocks(strategy) * 64;
+        result[c][by * groupBlocksWide + bx] = new JxlDctBlock {
+          Width = 8 * JxlAcStrategyGeometry.BlocksWide(strategy),
+          Height = 8 * JxlAcStrategyGeometry.BlocksHigh(strategy),
+          Coefficients = new short[coefficients],
         };
       }
     }
@@ -238,30 +245,24 @@ internal static class JxlAcDecoder {
     // entropy stream and is part of the wire contract.
     ReadOnlySpan<int> channelOrder = stackalloc int[3] { 1, 0, 2 };
     for (var by = 0; by < groupBlocksHigh; ++by)
-      for (var bx = 0; bx < groupBlocksWide; ++bx) {
+      for (var bx = 0; bx < groupBlocksWide;) {
         var strategy = strategies[by][bx];
+        var wide = JxlAcStrategyGeometry.BlocksWide(strategy);
 
-        // Reject non-first sub-blocks (multi-block strategies). For first-
-        // wave we don't have multi-block strategies anyway, but the marker
-        // value is reserved by JxlAcStrategyDecoder.CoveredByNeighbour.
-        if (strategy == JxlAcStrategyDecoder.CoveredByNeighbour)
-          throw new NotImplementedException(
-            "JxlAcDecoder.DecodeGroup: covered-by-neighbour blocks are not " +
-            "yet supported. They appear when a multi-block AC strategy " +
-            "(DCT16+, rectangular, etc.) marks its trailing 8×8 sub-blocks. " +
-            "First-wave decoder is DCT8-only; tracked as a future TODO " +
-            "alongside JxlVarDctIdct's rectangular/large strategy support.");
+        // A cell that names no transform of its own is one another already
+        // covers, and nothing is read for it.
+        if (JxlAcStrategyGeometry.IsCovered(strategy)) {
+          ++bx;
+          continue;
+        }
 
-        if (strategy != JxlAcStrategyType.Dct8x8)
-          throw new NotImplementedException(
-            $"JxlAcDecoder.DecodeGroup: AC strategy {strategy} is not yet " +
-            "supported by the first-wave decoder. Only DCT8x8 is wired in. " +
-            "Adding a new strategy requires: (1) the matching natural " +
-            "coefficient order from `AcStrategy::ComputeNaturalCoeffOrder` " +
-            "in libjxl `lib/jxl/ac_strategy.cc`; (2) the strategy's " +
-            "`covered_blocks_x()` × `covered_blocks_y()` size; (3) updating " +
-            "the row_nzeros store loop below to mark all covered sub-blocks; " +
-            "(4) the matching IDCT in JxlVarDctIdct.");
+        // Only the block a transform starts at is read. The rest of the
+        // rectangle it covers is stepped over, which is what libjxl's
+        // IsFirstBlock check amounts to.
+        if (!_IsTransformOrigin(strategies, bx, by, strategy)) {
+          bx += wide;
+          continue;
+        }
 
         for (var ci = 0; ci < numChannels; ++ci) {
           // Map the iteration index to a logical channel. For numChannels < 3
@@ -269,12 +270,15 @@ internal static class JxlAcDecoder {
           var c = numChannels == 3 ? channelOrder[ci] : ci;
           if (c >= numChannels) continue;
 
-          _DecodeAcVarBlockDct8(
-            reader, entropy, contextMap, strategy,
-            nzerosPlane[c], bx, by, groupBlocksWide,
+          _DecodeAcVarBlock(
+            entropy, contextMap, strategy,
+            nzerosPlane[c], bx, by, groupBlocksWide, groupBlocksHigh,
+            quantField is null ? 0 : quantField[by][bx],
             channel: c,
             outBlock: result[c][by * groupBlocksWide + bx].Coefficients);
         }
+
+        bx += wide;
       }
 
     return result;
@@ -287,20 +291,19 @@ internal static class JxlAcDecoder {
   /// <summary>Decode the AC stream for one DCT8 block (one channel).
   /// Mirrors libjxl <c>DecodeACVarBlock&lt;ACType::k16, false&gt;</c> with
   /// <c>log2_covered_blocks = 0</c> and <c>covered_blocks = 1</c>.</summary>
-  private static void _DecodeAcVarBlockDct8(
-    JxlBitReader reader,
+  private static void _DecodeAcVarBlock(
     JxlEntropyDecoder entropy,
     JxlBlockContextMap contextMap,
     JxlAcStrategyType strategy,
     int[] rowNzeros,
-    int bx, int by, int blocksWide,
+    int bx, int by, int blocksWide, int blocksHigh,
+    int quantField,
     int channel,
     short[] outBlock
   ) {
-    _ = reader; // entropy.ReadInt drives the bit reader directly
-    const int coveredBlocks = 1;
-    const int log2CoveredBlocks = 0;
-    const int size = coveredBlocks * 64; // = 64 for DCT8
+    var log2CoveredBlocks = JxlAcStrategyGeometry.Log2Blocks(strategy);
+    var coveredBlocks = 1 << log2CoveredBlocks;
+    var size = coveredBlocks * 64;
 
     // (1) Predicted nzeros from the blocks above and to the left, per libjxl
     //     `PredictFromTopAndLeft` in entropy_coder.h. The average is only taken
@@ -316,8 +319,10 @@ internal static class JxlAcDecoder {
     //     answers the same as the right one.
     var predicted = _PredictNonZeros(rowNzeros, blocksWide, bx, by);
 
-    // (2) block context (qf and dc both 0 for first wave).
-    var blockCtx = contextMap.GetContext(channel, strategy, qfIndex: 0);
+    // (2) The block's context, keyed on the quantisation step the metadata
+    //     stated for it. The DC bucket stays zero until the DC plane is
+    //     thresholded, which only matters for a file that states DC thresholds.
+    var blockCtx = contextMap.GetContext(channel, strategy, contextMap.QuantFieldIndex(quantField));
 
     // (3) nzeros context. libjxl `NonZeroContext`:
     //   ctx = predicted < 8 ? predicted : 4 + predicted/2
@@ -330,9 +335,14 @@ internal static class JxlAcDecoder {
         $"Invalid AC: nzeros={nzeros} out of [0, {size - coveredBlocks}] " +
         $"at block ({bx},{by}) channel {channel}.");
 
-    // (4) Store nzeros into the prediction plane for the next row/col.
-    //     For DCT8 covered_blocks=1, so just one cell.
-    rowNzeros[by * blocksWide + bx] = (nzeros + coveredBlocks - 1) >> log2CoveredBlocks;
+    // (4) Store the count over every block the transform covers, so the
+    //     neighbours that predict from it see the same number.
+    var stored = (nzeros + coveredBlocks - 1) >> log2CoveredBlocks;
+    var wide = JxlAcStrategyGeometry.BlocksWide(strategy);
+    var high = JxlAcStrategyGeometry.BlocksHigh(strategy);
+    for (var cy = 0; cy < high && by + cy < blocksHigh; ++cy)
+    for (var cx = 0; cx < wide && bx + cx < blocksWide; ++cx)
+      rowNzeros[(by + cy) * blocksWide + bx + cx] = stored;
 
     // (5) Iterate non-zero coefficient positions.
     var histoOffset = _ZeroDensityContextsOffset(blockCtx, contextMap.NumContexts);
@@ -355,7 +365,11 @@ internal static class JxlAcDecoder {
       // position so the downstream IDCT (which expects natural order) sees
       // coefficients at the correct frequency positions. For DCT8 the
       // permutation is the JPEG zigzag (precomputed in Dct8NaturalOrder).
-      outBlock[Dct8NaturalOrder[k]] += (short)coeff;
+      // The coefficient's place inside the block comes from the scan order the
+      // frame states. Only the plain 8x8 order is applied here; a larger
+      // transform's coefficients land in scan order, which is the right count
+      // of them in the wrong arrangement, and the picture is refused for it.
+      outBlock[coveredBlocks == 1 ? Dct8NaturalOrder[k] : k] += (short)coeff;
 
       prev = uCoeff != 0 ? 1 : 0;
       nzeros -= prev;
@@ -365,6 +379,27 @@ internal static class JxlAcDecoder {
       throw new System.IO.InvalidDataException(
         $"Invalid AC: nzeros at end of block is {nzeros}, should be 0. " +
         $"Block ({bx},{by}), channel {channel}.");
+  }
+
+  /// <summary>
+  /// Whether a block is where its transform starts, rather than one it covers.
+  /// </summary>
+  /// <remarks>
+  /// A transform's rectangle carries the same strategy in every block, so the
+  /// origin is the top-left one: a block whose neighbour above or to the left
+  /// states the same strategy and lies inside the same rectangle is covered by
+  /// it. Blocks are visited in raster order, so checking those two is enough.
+  /// </remarks>
+  private static bool _IsTransformOrigin(JxlAcStrategyType[][] strategies, int bx, int by, JxlAcStrategyType strategy) {
+    var wide = JxlAcStrategyGeometry.BlocksWide(strategy);
+    var high = JxlAcStrategyGeometry.BlocksHigh(strategy);
+    if (wide == 1 && high == 1)
+      return true;
+
+    if (bx > 0 && strategies[by][bx - 1] == strategy)
+      return false;
+
+    return by <= 0 || strategies[by - 1][bx] != strategy;
   }
 
   /// <summary>

@@ -311,7 +311,8 @@ internal static class JxlModularSpecDecoder {
     int numChannels,
     int bitDepth,
     JxlMaTree? globalTree,
-    JxlEntropyDecoder? globalEntropy
+    JxlEntropyDecoder? globalEntropy,
+    int streamId = 0
   ) {
     ArgumentNullException.ThrowIfNull(reader);
     if (width <= 0 || height <= 0)
@@ -322,7 +323,7 @@ internal static class JxlModularSpecDecoder {
       throw new ArgumentOutOfRangeException(nameof(bitDepth), "Bit depth must be in (0, 32].");
 
     var channels = _CreateInitialChannels(width, height, numChannels);
-    return DecodeGroupChannels(reader, channels, bitDepth, globalTree, globalEntropy);
+    return DecodeGroupChannels(reader, channels, bitDepth, globalTree, globalEntropy, streamId);
   }
 
   /// <summary>
@@ -339,8 +340,11 @@ internal static class JxlModularSpecDecoder {
     JxlChannel[] channels,
     int bitDepth,
     JxlMaTree? globalTree,
-    JxlEntropyDecoder? globalEntropy
-  ) => DecodeStream(reader, channels, bitDepth, globalTree, globalEntropy, JxlModularStreamOptions.WholeImage).Image;
+    JxlEntropyDecoder? globalEntropy,
+    int streamId = 0
+  ) => DecodeStream(
+    reader, channels, bitDepth, globalTree, globalEntropy,
+    JxlModularStreamOptions.WholeImage with { StreamId = streamId }).Image;
 
   /// <summary>
   /// Decode one modular stream — a frame's global stream or one of its groups.

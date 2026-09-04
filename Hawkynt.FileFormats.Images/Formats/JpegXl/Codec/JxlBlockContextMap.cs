@@ -224,6 +224,23 @@ internal sealed class JxlBlockContextMap {
   /// "order" in <see cref="StrategyOrder"/>.</param>
   /// <param name="qfIndex">Pre-computed quant-field bucket
   /// <c>0..qf_thresholds.size()</c>.</param>
+  /// <summary>
+  /// Which quantisation bucket a block's quant field falls in, per libjxl
+  /// <c>BlockCtxMap::Context</c>'s opening loop.
+  /// </summary>
+  /// <remarks>
+  /// A frame that states no thresholds has one bucket, and every block lands in
+  /// it whatever its quant field says.
+  /// </remarks>
+  public int QuantFieldIndex(int quantField) {
+    var index = 0;
+    foreach (var threshold in this._qfThresholds)
+      if (quantField > threshold)
+        ++index;
+
+    return index;
+  }
+
   public int GetContext(int channel, JxlAcStrategyType strategy, int qfIndex) {
     if ((uint)channel >= 3u)
       throw new ArgumentOutOfRangeException(nameof(channel), "Must be 0..2.");
