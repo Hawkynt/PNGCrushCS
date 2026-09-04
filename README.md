@@ -22,9 +22,9 @@
 | **`Crush.Viewer`** | WinForms | Opens registered image formats with zoom, pan, multi-image navigation, transforms, and Save As conversion. |
 | **`Compression.Core`** | Library | Pure-C# DEFLATE/LZW/PackBits primitives, including Zopfli-class parsing used by optimizers. |
 | **`FileFormat.Core`** | Library | Shared `RawImage`, format contracts, metadata, detection primitives, and pixel conversion infrastructure. |
-| **`Optimizer.*`** | Libraries | Per-format optimization engines. Package docs: [PNG](Optimizers/Optimizer.Png/ReadMe.md), [GIF](Optimizers/Optimizer.Gif/ReadMe.md), [TIFF](Optimizers/Optimizer.Tiff/ReadMe.md). |
+| **`Optimizer.*`** | Libraries | Per-format lossless optimization engines. What each one does is tabled in the [image package README](Hawkynt.FileFormats.Images/README.md#-format-support). |
 
-The complete image-format cross-reference lives in [`Formats.md`](Formats.md). Video container and codec support lives in [`Hawkynt.FileFormats.Video/README.md`](Hawkynt.FileFormats.Video/README.md).
+The complete image support table (read, write, metadata-only, multi-image, optimizer, per format) lives in the [image package README](Hawkynt.FileFormats.Images/README.md#-format-support). Video container and codec support lives in the [video package README](Hawkynt.FileFormats.Video/README.md#-format--codec-support).
 
 ## 🖼️ Viewer
 
@@ -162,10 +162,9 @@ These are comparison/inspiration sources, not implementation specifications. For
 
 Capability claims are kept next to the implementation evidence instead of duplicated as a hand-maintained backlog in this README:
 
-- [`Hawkynt.FileFormats.Images/README.md`](Hawkynt.FileFormats.Images/README.md) is the public image read/write capability matrix.
-- [`Hawkynt.FileFormats.Images/MODERN_FORMAT_CONFORMANCE.md`](Hawkynt.FileFormats.Images/MODERN_FORMAT_CONFORMANCE.md) records interoperability evidence and the exact implemented scope for modern codecs such as WebP, AVIF, HEIF, JPEG XL, JPEG 2000, and JPEG XR.
-- [`Hawkynt.FileFormats.Video/README.md`](Hawkynt.FileFormats.Video/README.md) records video container and codec support; [`codec-notes.md`](Hawkynt.FileFormats.Video/codec-notes.md) how each was measured and [`codec-investigations.md`](Hawkynt.FileFormats.Video/codec-investigations.md) what stopped the ones that are not decoded.
-- [`Formats.md`](Formats.md) is the human-readable image cross-reference; runtime source-generated registry enumeration remains authoritative when that table temporarily lags the code.
+- [`Hawkynt.FileFormats.Images/README.md`](Hawkynt.FileFormats.Images/README.md) is the image support table — read, write, metadata-only, multi-image and optimizer per format — together with the interoperability evidence for the modern codecs (WebP, AVIF, HEIF, JPEG XL, JPEG 2000, JPEG XR) and the oracle-corpus results.
+- [`Hawkynt.FileFormats.Video/README.md`](Hawkynt.FileFormats.Video/README.md) is the video support table — demux, mux, decode, encode per container and codec, and what is not decoded with the reason; [`codec-notes.md`](Hawkynt.FileFormats.Video/codec-notes.md) records how each was measured and [`codec-investigations.md`](Hawkynt.FileFormats.Video/codec-investigations.md) what stopped the rest.
+- [`Tools/parity/README.md`](Tools/parity/README.md) is how those numbers are measured against RECOIL, ImageMagick, ffmpeg, XnView and IrfanView.
 
 A capability is promoted only when its syntax and behavior have evidence beyond the project's own writer reading its own output. Unsupported profiles stay unadvertised rather than being represented as successful decode/write support.
 

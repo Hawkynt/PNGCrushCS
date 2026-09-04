@@ -7,3 +7,4 @@
 # Local-only — Claude Code instructions and skills; not part of the repo.
 CLAUDE.md
 .claude/
+__pycache__/

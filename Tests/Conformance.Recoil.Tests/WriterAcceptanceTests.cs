@@ -46,6 +46,10 @@ public sealed class WriterAcceptanceTests {
     [ImageFormat.PalmPdb] = "the reference tool reads .pdb as the ImageViewer variant, which is a different record layout",
     [ImageFormat.Art] = ".art belongs to several unrelated programs and the tool means another one",
     [ImageFormat.FirstPublisher] = ".art belongs to several unrelated programs and the tool means another one",
+    [ImageFormat.ArtDirector] = ".art belongs to several unrelated programs and the tool means another one",
+    [ImageFormat.CompuServeRle] =
+      "the reference tool reads .rle as the Utah Raster Toolkit one, which is a different format — this "
+      + "is the CompuServe monochrome RLE that preceded GIF, and nothing here but our own reader knows it",
     [ImageFormat.AliasPix] =
       "the reference tool reads one pixel more than each run states and cannot take a run of one at "
       + "all, so it rejects any picture whose neighbouring pixels differ, however it is encoded",
