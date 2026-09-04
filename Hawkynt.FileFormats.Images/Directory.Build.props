@@ -7,5 +7,8 @@
   <ItemGroup>
     <Compile Include="..\Hawkynt.FileFormats.Video\Codecs\H265\*.cs"
              LinkBase="Shared\H265" />
+    <!-- AVCI still images are H.264 pictures, and reach this assembly the same way. -->
+    <Compile Include="..\Hawkynt.FileFormats.Video\Codecs\H264\*.cs"
+             LinkBase="Shared\H264" />
   </ItemGroup>
 </Project>

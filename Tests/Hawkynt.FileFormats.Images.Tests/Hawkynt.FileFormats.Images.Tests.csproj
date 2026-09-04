@@ -61,6 +61,14 @@
     </None>
   </ItemGroup>
 
+  <!-- An AVCI written from an x264 intra frame, and libheif's own decode of it. -->
+  <ItemGroup>
+    <None Include="Formats\Heif\Fixtures\*">
+      <Link>Fixtures\Heif\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <ItemGroup>
     <Using Include="NUnit.Framework" />
   </ItemGroup>
