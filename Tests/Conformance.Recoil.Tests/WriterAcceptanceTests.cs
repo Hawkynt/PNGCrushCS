@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -129,11 +129,6 @@ public sealed class WriterAcceptanceTests {
       + "interpreter has it. The file opens in Illustrator and nowhere else. Writing a prolog that "
       + "defines XI in terms of colorimage would make it renderable anywhere, and inventing those "
       + "semantics rather than taking them from Adobe's specification is not something to guess at",
-    [ImageFormat.JpegXl] =
-      "ImageMagick reads .jxl and rejects what this writer produces. The modular encoder emits a "
-      + "codestream libjxl will not decode, which the package README records as the one refused "
-      + "writer. Not a missing oracle — a real negative result, skipped here so the suite reports "
-      + "the state the README already states rather than going red on a known one",
   };
 
   private static IEnumerable<TestCaseData> Writable() {
