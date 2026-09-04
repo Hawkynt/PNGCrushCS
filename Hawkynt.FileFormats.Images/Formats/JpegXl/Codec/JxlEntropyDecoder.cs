@@ -16,7 +16,7 @@ internal sealed class JxlEntropyDecoder {
   private readonly int[] _msb;
   private readonly int[] _lsb;
   private readonly JxlAnsDecoder _ansDecoder;
-  private readonly JxlBitReader _reader;
+  private JxlBitReader _reader;
   private readonly bool _usePrefixCode;
   private readonly int[][] _prefixLengths;
   private readonly int[][] _prefixSymbols;
@@ -77,7 +77,27 @@ internal sealed class JxlEntropyDecoder {
   /// will re-trigger <see cref="JxlAnsDecoder.Init"/> via the
   /// <see cref="_ansInitDone"/> guard.
   /// </remarks>
-  public void ResetForGroup(uint distanceMultiplier) {
+  /// <summary>
+  /// Point this decoder at the stream that is about to be read.
+  /// </summary>
+  /// <remarks>
+  /// libjxl builds a new arithmetic reader for every modular stream, sharing
+  /// only the histograms; a frame in several groups reads each group from its
+  /// own offset in the file. This decoder was bound to the reader it was built
+  /// with, so a group asked it for tokens and it answered from wherever the
+  /// global stream had left off — which is why groups came back empty.
+  ///
+  /// <para>The state flag is cleared whether or not the stream uses back
+  /// references: the arithmetic state is a word read at the start of each
+  /// stream, and a stream that does not re-read it is decoding from the last
+  /// one's.</para>
+  /// </remarks>
+  public void ResetForGroup(JxlBitReader reader, uint distanceMultiplier) {
+    ArgumentNullException.ThrowIfNull(reader);
+    _reader = reader;
+    if (!_usePrefixCode)
+      _ansInitDone = false;
+
     if (!_lz77Enabled)
       return;
     _numDecoded = 0;
@@ -92,10 +112,6 @@ internal sealed class JxlEntropyDecoder {
     // Clear ring buffer so stale back-references don't bleed across groups.
     if (_lz77Window is not null)
       Array.Clear(_lz77Window);
-    // For the rANS path, force re-Init on next ReadInt so the 32-bit state
-    // is re-read from the new bit position.
-    if (!_usePrefixCode)
-      _ansInitDone = false;
   }
 
   private JxlEntropyDecoder(

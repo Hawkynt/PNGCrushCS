@@ -41,7 +41,13 @@ public static class JpegXlReader {
     if (!_TryExtractCodestream(bytes, out var codestream, out var brand))
       throw new InvalidDataException("Input is neither a JPEG XL bare codestream nor a valid JPEG XL container.");
 
+    // A VarDCT frame is decoded for the diagnostic API but not handed back as a
+    // picture. The pipeline runs end to end and lands within a couple of levels
+    // of libjxl on the files it gets through, and a couple of levels is still a
+    // different picture from the one that was encoded. Until it is exact this
+    // reader says so rather than rounding the difference away.
     if (_TryDecodeSpec(codestream, out var metadata, out var imageMetadata, out var decoded)
+        && metadata.IsModularFrame
         && _TryPackDecoded(metadata, imageMetadata!, decoded, brand, out var file))
       return file;
 
@@ -165,27 +171,34 @@ public static class JpegXlReader {
       var frame = JxlSpecFrameHeader.Decode(reader, imageMetadata);
       metadata = _Metadata(width, height, imageMetadata, frame);
 
-      var numGroupsX = (width + 255) / 256;
-      var numGroupsY = (height + 255) / 256;
+      // A group is 128 pixels shifted by what the frame header states, and a
+      // low-frequency group is eight of those across.
+      var groupDim = 128 << (int)frame.GroupSizeShift;
+      var numGroupsX = (width + groupDim - 1) / groupDim;
+      var numGroupsY = (height + groupDim - 1) / groupDim;
       var numGroups = checked(numGroupsX * numGroupsY);
-      var numDcGroups = checked(((width + 2047) / 2048) * ((height + 2047) / 2048));
-      _ = JxlFrameToc.Decode(reader, numGroups, (int)frame.NumPasses, numDcGroups);
+      var lfGroupDim = groupDim * 8;
+      var numDcGroups = checked(((width + lfGroupDim - 1) / lfGroupDim) * ((height + lfGroupDim - 1) / lfGroupDim));
+      var toc = JxlFrameToc.Decode(reader, numGroups, (int)frame.NumPasses, numDcGroups);
+
+      // The table of contents ends byte-aligned on the frame's first section.
+      var frameBody = checked((int)(reader.BitsRead / 8));
 
       // Every frame carries the DC quantization defaults, including modular frames.
       var dcQuant = JxlFrameQuantizer.ReadDcQuantization(reader);
 
       if (frame.Encoding == JxlFrameEncoding.Modular) {
-        // The current modular decoder consumes one group serially. Single-group frames cover the
-        // complete fast-lossless profile up to 256x256 and all included independent cjxl fixtures.
-        // Multi-group section seeking is kept explicit rather than silently decoding only group zero.
-        if (numGroups != 1)
-          return false;
-
         var isGray = imageMetadata.ColorEncoding.ColorSpace == 1;
         var baseChannels = isGray ? 1 : 3;
         var totalChannels = checked(baseChannels + (int)imageMetadata.NumExtraChannels);
-        image = JxlModularSpecDecoder.Decode(
-          reader, width, height, totalChannels, (int)imageMetadata.BitDepth.BitsPerSample, isTopLevelFrame: true);
+        var bits = (int)imageMetadata.BitDepth.BitsPerSample;
+
+        image = numGroups == 1
+          ? JxlModularSpecDecoder.Decode(reader, width, height, totalChannels, bits, isTopLevelFrame: true)
+          : JxlModularSpecDecoder.DecodeMultiGroup(
+            codestream, reader, width, height, totalChannels, bits,
+            groupDim, numGroupsX, numGroupsY, numDcGroups, (int)frame.NumPasses, toc, frameBody);
+
         return _ValidateDecodedImage(image, width, height, totalChannels);
       }
 

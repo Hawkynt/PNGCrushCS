@@ -34,12 +34,15 @@ public sealed class LibjxlDecodeParityTests {
   /// <c>cjxl_flat_tuned_predictor</c> states weighted-predictor parameters of its
   /// own instead of taking the defaults, which is the case that used to be read
   /// past and predicted with the defaults anyway; <c>cjxl_palette_effort7</c>
-  /// carries a palette transform, which used to be refused outright.
+  /// carries a palette transform, which used to be refused outright; and
+  /// <c>cjxl_two_groups</c> is 300 pixels wide, so it is coded in two groups at
+  /// two offsets in the file rather than as one stream.
   /// </param>
   [TestCase("cjxl_lossless_effort1")]
   [TestCase("cjxl_lossless_effort9")]
   [TestCase("cjxl_flat_tuned_predictor")]
   [TestCase("cjxl_palette_effort7")]
+  [TestCase("cjxl_two_groups")]
   public void ALosslessFileDecodesToWhatLibjxlDecodesItTo(string name) {
     var file = JpegXlReader.FromBytes(_Fixture(name + ".jxl"));
     var (width, height, expected) = _ReadPpm(_Fixture(name + ".ppm"));
