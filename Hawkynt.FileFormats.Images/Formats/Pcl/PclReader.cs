@@ -28,6 +28,9 @@ public static class PclReader {
   private const int _MaxOffset = 1 << 16;
 
   /// <summary>Black and white, which is what a printer starts in.</summary>
+  /// <summary>ESC*v#W's pixel-encoding byte for a palette of indices.</summary>
+  private const byte _IndexedPalette = 1;
+
   private static readonly byte[] _Bilevel = PclFile.BilevelPalette;
 
   /// <summary>The eight-entry device RGB palette of <c>ESC*r3U</c>.</summary>
@@ -97,6 +100,20 @@ public static class PclReader {
     public int Planes = 1;
     public byte[] Palette = _Bilevel;
     public int PaletteCount = 2;
+
+    /// <summary>Bits an index takes in the raster, which ESC*v#W's fourth byte states.</summary>
+    /// <remarks>
+    /// One is the planar default every simple job uses: each plane carries one bit of the index and
+    /// <see cref="_Spread"/> gathers them. A configure-image-data job may state two, four or eight
+    /// instead, and then a row is indices packed edge to edge in a single plane rather than planes
+    /// to be combined.
+    /// </remarks>
+    public int BitsPerIndex = 1;
+
+    /// <summary>The colour being assembled by ESC*v#a#b#c before ESC*v#I files it.</summary>
+    public int PendingRed;
+    public int PendingGreen;
+    public int PendingBlue;
     public int RowBytes;
     public byte[]? Seed;
 
@@ -276,8 +293,33 @@ public static class PclReader {
             return next;
         }
 
-      case (byte)'v' when command == 'W' && hadNumber:
-        throw new InvalidDataException("This job configures its own image data with ESC*v#W, whose palette comes from commands this reader does not read.");
+      case (byte)'v':
+        switch (command) {
+          // ESC*v#a, #b and #c carry one primary each and state nothing on their own; ESC*v#I files
+          // the three of them at the index it names.
+          case (byte)'A':
+            job.PendingRed = number;
+            return next;
+
+          case (byte)'B':
+            job.PendingGreen = number;
+            return next;
+
+          case (byte)'C':
+            job.PendingBlue = number;
+            return next;
+
+          case (byte)'I':
+            _AssignPaletteEntry(job, number);
+            return next;
+
+          case (byte)'W' when hadNumber:
+            _ConfigureImageData(job, data.Slice(at, Math.Min(number, data.Length - at)));
+            return next;
+
+          default:
+            return next;
+        }
 
       default:
         return next;
@@ -291,7 +333,7 @@ public static class PclReader {
     // The manual: ending a raster zeroes the seed row. Starting one therefore begins from nothing
     // rather than from whatever the last picture on the page left behind.
     job.Seed = null;
-    job.RowBytes = job.StatedWidth > 0 ? (job.StatedWidth + 7) >> 3 : 0;
+    job.RowBytes = job.StatedWidth > 0 ? (job.StatedWidth * job.BitsPerIndex + 7) >> 3 : 0;
   }
 
   private static void _EndRaster(Job job) {
@@ -305,6 +347,51 @@ public static class PclReader {
     if (job.Rows.Count > 0)
       job.Finished = true;
   }
+
+  /// <summary>Reads ESC*v#W's payload, which states how the raster that follows is coded.</summary>
+  /// <remarks>
+  /// Six bytes: colour space, pixel encoding, bits an index takes, and bits each of the three
+  /// primaries takes. Only the indexed-palette encoding is read here, because it is the one a
+  /// palette applies to — a direct-pixel job carries its colour in the raster itself and needs a
+  /// different row model rather than a different palette.
+  /// <para/>
+  /// Configuring image data also clears the palette to black, which is what the manual says: the
+  /// entries that follow are the whole of the colour, and an entry never sent stays black rather
+  /// than keeping whatever a previous simple-colour command left behind.
+  /// </remarks>
+  private static void _ConfigureImageData(Job job, ReadOnlySpan<byte> payload) {
+    if (payload.Length < 6)
+      throw new InvalidDataException($"An ESC*v#W configure-image-data block is six bytes and this one is {payload.Length}.");
+
+    var encoding = payload[1];
+    var bitsPerIndex = payload[2];
+
+    if (encoding != _IndexedPalette)
+      throw new InvalidDataException(
+        $"This job configures pixel encoding {encoding}. Only the indexed-palette encoding is read here; "
+        + "direct-pixel colour carries its own primaries in the raster and is a different picture entirely.");
+
+    if (bitsPerIndex is not (1 or 2 or 4 or 8))
+      throw new InvalidDataException($"An index of {bitsPerIndex} bits is not one the manual defines.");
+
+    job.BitsPerIndex = bitsPerIndex;
+    job.PaletteCount = 1 << bitsPerIndex;
+    job.Palette = new byte[job.PaletteCount * 3];
+    job.Planes = 1;
+  }
+
+  /// <summary>Files the three primaries gathered so far at the index ESC*v#I names.</summary>
+  private static void _AssignPaletteEntry(Job job, int index) {
+    if (index < 0 || index >= job.PaletteCount)
+      throw new InvalidDataException($"A palette entry is assigned to index {index}, and this job's palette holds {job.PaletteCount}.");
+
+    job.Palette[index * 3] = _Primary(job.PendingRed);
+    job.Palette[index * 3 + 1] = _Primary(job.PendingGreen);
+    job.Palette[index * 3 + 2] = _Primary(job.PendingBlue);
+    job.PendingRed = job.PendingGreen = job.PendingBlue = 0;
+  }
+
+  private static byte _Primary(int value) => (byte)(value < 0 ? 0 : value > 255 ? 255 : value);
 
   private static void _SimpleColour(Job job, int number) {
     switch (number) {
@@ -423,6 +510,24 @@ public static class PclReader {
     }
   }
 
+  /// <summary>Reads a row of indices packed edge to edge, most significant bits first.</summary>
+  private static byte[] _Unpack(Job job, byte[] row) {
+    var bits = job.BitsPerIndex;
+    if (bits == 8)
+      return row;
+
+    var perByte = 8 / bits;
+    var mask = (1 << bits) - 1;
+    var pixels = new byte[row.Length * perByte];
+    for (var i = 0; i < row.Length; ++i) {
+      var value = row[i];
+      for (var slot = 0; slot < perByte; ++slot)
+        pixels[i * perByte + slot] = (byte)((value >> (8 - bits * (slot + 1))) & mask);
+    }
+
+    return pixels;
+  }
+
   /// <summary>Turns the planes gathered for one row into one index a pixel.</summary>
   private static void _Finish(Job job) {
     if (job.Rows.Count >= _MaxRows)
@@ -439,6 +544,11 @@ public static class PclReader {
   /// index, which is what makes index one red in the device RGB palette.
   /// </summary>
   private static byte[] _Spread(Job job, IReadOnlyList<byte[]> planes) {
+    // A configure-image-data job packs whole indices along the row instead of spreading one bit of
+    // each across a plane apiece, so there is nothing to gather and the row is simply unpacked.
+    if (job.BitsPerIndex > 1)
+      return _Unpack(job, planes[0]);
+
     var width = job.RowBytes * 8;
     var pixels = new byte[width];
     for (var plane = 0; plane < planes.Count; ++plane) {
