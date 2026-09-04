@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 
 namespace FileFormat.JpegXl.Codec;
@@ -107,6 +108,151 @@ internal static class JxlModularSpecDecoder {
   }
 
   /// <summary>
+  /// Decode a modular frame that is coded in more than one group.
+  /// </summary>
+  /// <remarks>
+  /// A frame wider or taller than one group is split: the global stream carries
+  /// every channel that fits inside a group and stops at the first that does
+  /// not, and the channels it stopped at are carried a group at a time by a
+  /// stream of their own. Each of those sits at its own offset in the frame,
+  /// which is what the table of contents is for, and each is decoded into a
+  /// window on the full channel and copied back into it.
+  ///
+  /// <para>The transforms stay on until every group has been read, because they
+  /// apply to the whole picture and not to the piece of it any one group holds.</para>
+  /// </remarks>
+  public static JxlModularImage DecodeMultiGroup(
+    byte[] codestream,
+    JxlBitReader reader,
+    int width,
+    int height,
+    int numChannels,
+    int bitDepth,
+    int groupDim,
+    int groupsX,
+    int groupsY,
+    int numDcGroups,
+    int numPasses,
+    JxlFrameToc toc,
+    int frameBody
+  ) {
+    ArgumentNullException.ThrowIfNull(codestream);
+    ArgumentNullException.ThrowIfNull(reader);
+    ArgumentNullException.ThrowIfNull(toc);
+    if (toc.Permuted)
+      throw new NotSupportedException(
+        "This frame states its sections in a permuted order, which is read from a Lehmer code this decoder does not have.");
+
+    var (globalTree, globalEntropy) = DecodeGlobalInfo(reader, distanceMultiplierHint: (uint)width);
+
+    // The global stream: every channel small enough to fit a group, transforms
+    // left on for the groups that follow.
+    var channels = _CreateInitialChannels(width, height, numChannels);
+    var global = DecodeStream(reader, channels, bitDepth, globalTree, globalEntropy, new JxlModularStreamOptions {
+      MaxChannelSize = groupDim,
+      StreamId = 0,
+      UndoTransforms = false,
+    });
+
+    var full = global.Image.Channels;
+    var transforms = global.Transforms;
+
+    // Where the global stream stopped is where the groups begin: the first
+    // channel too big to have been carried with it.
+    var metaChannels = 0;
+    foreach (var transform in transforms)
+      if (transform.Type == JxlModularTransformType.Palette)
+        ++metaChannels;
+
+    var firstGroupChannel = metaChannels;
+    while (firstGroupChannel < full.Length
+           && full[firstGroupChannel].Width <= groupDim
+           && full[firstGroupChannel].Height <= groupDim)
+      ++firstGroupChannel;
+
+    var numGroups = groupsX * groupsY;
+    var sectionsBeforeGroups = 2 + numDcGroups;
+
+    for (var pass = 0; pass < numPasses; ++pass)
+    for (var group = 0; group < numGroups; ++group) {
+      var section = sectionsBeforeGroups + pass * numGroups + group;
+      if (section >= toc.SectionOffsets.Length)
+        throw new InvalidDataException($"This frame states no section for group {group} of pass {pass}.");
+
+      var originX = group % groupsX * groupDim;
+      var originY = group / groupsX * groupDim;
+
+      // The window this group covers in each channel it carries, at that
+      // channel's own resolution.
+      var windows = new List<(int Channel, JxlChannel Piece, int X, int Y)>();
+      for (var c = firstGroupChannel; c < full.Length; ++c) {
+        var channel = full[c];
+        var x = originX >> channel.HShift;
+        var y = originY >> channel.VShift;
+        var pieceWidth = Math.Min((groupDim >> channel.HShift), channel.Width - x);
+        var pieceHeight = Math.Min((groupDim >> channel.VShift), channel.Height - y);
+        if (pieceWidth <= 0 || pieceHeight <= 0)
+          continue;
+
+        windows.Add((c, new JxlChannel {
+          Width = pieceWidth,
+          Height = pieceHeight,
+          HShift = channel.HShift,
+          VShift = channel.VShift,
+          Pixels = new int[pieceWidth * pieceHeight],
+        }, x, y));
+      }
+
+      if (windows.Count == 0)
+        continue;
+
+      var pieces = new JxlChannel[windows.Count];
+      for (var i = 0; i < windows.Count; ++i)
+        pieces[i] = windows[i].Piece;
+
+      var at = checked(frameBody + toc.SectionOffsets[section]);
+      if (at < 0 || at > codestream.Length)
+        throw new InvalidDataException($"Group {group} of pass {pass} sits past the end of the codestream.");
+
+      var groupReader = new JxlBitReader(codestream, at);
+      var decoded = DecodeStream(groupReader, pieces, bitDepth, globalTree, globalEntropy, new JxlModularStreamOptions {
+        MaxChannelSize = int.MaxValue,
+        StreamId = _AcStreamId(numDcGroups, numGroups, pass, group),
+        UndoTransforms = true,
+      });
+
+      for (var i = 0; i < windows.Count; ++i) {
+        var (channelIndex, _, x, y) = windows[i];
+        var piece = decoded.Image.Channels[i];
+        var target = full[channelIndex];
+        for (var row = 0; row < piece.Height; ++row)
+          Array.Copy(
+            piece.Pixels, row * piece.Width,
+            target.Pixels, (y + row) * target.Width + x,
+            piece.Width);
+      }
+    }
+
+    return new JxlModularImage { Channels = JxlModularTransforms.InvertAll(full, transforms) };
+  }
+
+  /// <summary>
+  /// The number a group's stream goes by, which an MA tree may split on.
+  /// </summary>
+  /// <remarks>
+  /// libjxl <c>ModularStreamId::ModularAC</c>. The numbering leaves room for the
+  /// streams a VarDCT frame would have used — its DC groups, its AC metadata and
+  /// its quantisation tables — whether or not this frame has any of them, so the
+  /// count of low-frequency groups and the seventeen quantisation tables are in
+  /// the sum even for a frame coded entirely in modular mode.
+  /// </remarks>
+  private static int _AcStreamId(int numDcGroups, int numGroups, int pass, int group)
+    => 1 + 3 * numDcGroups + _QuantTableCount + numGroups * pass + group;
+
+  /// <summary>libjxl <c>kNumQuantTables</c>.</summary>
+  private const int _QuantTableCount = 17;
+
+  /// <summary>
   /// Decode the global modular setup (libjxl
   /// <c>ModularFrameDecoder::DecodeGlobalInfo</c> in <c>dec_modular.cc</c>):
   /// 1-bit <c>has_tree</c> + (if true) the global MA tree + global residual
@@ -194,15 +340,37 @@ internal static class JxlModularSpecDecoder {
     int bitDepth,
     JxlMaTree? globalTree,
     JxlEntropyDecoder? globalEntropy
+  ) => DecodeStream(reader, channels, bitDepth, globalTree, globalEntropy, JxlModularStreamOptions.WholeImage).Image;
+
+  /// <summary>
+  /// Decode one modular stream — a frame's global stream or one of its groups.
+  /// </summary>
+  /// <remarks>
+  /// A frame wider or taller than one group is not one stream but several: the
+  /// global one carries every channel small enough to fit a group, stopping at
+  /// the first that does not, and a stream per group carries the rest a group's
+  /// worth at a time. The options say which of those this call is, because the
+  /// bitstream does not: the size a channel has to be under, the stream's number
+  /// (which a tree may split on), and whether the transforms come off at the end
+  /// or wait until every group has been read.
+  /// </remarks>
+  internal static JxlModularStream DecodeStream(
+    JxlBitReader reader,
+    JxlChannel[] channels,
+    int bitDepth,
+    JxlMaTree? globalTree,
+    JxlEntropyDecoder? globalEntropy,
+    JxlModularStreamOptions options
   ) {
     ArgumentNullException.ThrowIfNull(reader);
     ArgumentNullException.ThrowIfNull(channels);
     if (bitDepth <= 0 || bitDepth > 32)
       throw new ArgumentOutOfRangeException(nameof(bitDepth), "Bit depth must be in (0, 32].");
 
-    // libjxl ModularDecode early-return on empty channel set.
+    // libjxl ModularDecode early-return on empty channel set: a group with no
+    // channels of its own reads nothing at all, not even its header.
     if (channels.Length == 0)
-      return new JxlModularImage { Channels = channels };
+      return new JxlModularStream(new JxlModularImage { Channels = channels }, []);
 
     // libjxl creates a fresh ANSSymbolReader per ModularDecode call (matches
     // `encoding.cc::ModularDecode`). Distance multiplier = max channel width
@@ -213,7 +381,7 @@ internal static class JxlModularSpecDecoder {
       if ((uint)ch.Width > perCallDistanceMultiplier)
         perCallDistanceMultiplier = (uint)ch.Width;
     }
-    globalEntropy?.ResetForGroup(perCallDistanceMultiplier);
+    globalEntropy?.ResetForGroup(reader, perCallDistanceMultiplier);
 
     // ---------------------------------------------------------------
     // Step 2: Read GroupHeader (use_global_tree, wp_header, transforms).
@@ -222,6 +390,13 @@ internal static class JxlModularSpecDecoder {
     var wpHeader = _ReadWpHeader(reader);
     var transforms = JxlModularTransforms.ReadAll(reader);
     channels = _ApplyTransformMetaOrSkeleton(channels, transforms);
+
+    // Each palette in the chain put its lookup table at the front, and a meta
+    // channel belongs to this stream whatever size it is.
+    var metaChannels = 0;
+    foreach (var transform in transforms)
+      if (transform.Type == JxlModularTransformType.Palette)
+        ++metaChannels;
 
     // ---------------------------------------------------------------
     // Step 3 + 4: Resolve MA tree + residual entropy decoder.
@@ -250,15 +425,18 @@ internal static class JxlModularSpecDecoder {
     // failure and leave the remaining channels at their zero fill, which handed
     // back a picture built partly from decoded samples and partly from nothing.
     // ---------------------------------------------------------------
-    var idx = 0;
-    foreach (var channel in channels) {
-      if (channel.Width == 0 || channel.Height == 0) {
-        ++idx;
+    // libjxl stops at the first channel too big for this stream rather than
+    // skipping it: what follows belongs to the groups, and reading it here would
+    // take their tokens.
+    for (var idx = 0; idx < channels.Length; ++idx) {
+      var channel = channels[idx];
+      if (idx >= metaChannels
+          && (channel.Width > options.MaxChannelSize || channel.Height > options.MaxChannelSize))
+        break;
+      if (channel.Width == 0 || channel.Height == 0)
         continue;
-      }
 
-      _DecodeChannelPixels(channel, maTree, entropy, channelIndex: idx, bitDepth, wpHeader);
-      ++idx;
+      _DecodeChannelPixels(channel, maTree, entropy, channelIndex: idx, bitDepth, wpHeader, options.StreamId);
     }
 
     // The arithmetic decoder returns to its initial state only when every token
@@ -281,9 +459,10 @@ internal static class JxlModularSpecDecoder {
     // Each Palette transform's lookup table is taken as the reverse pass reaches
     // it, in JxlModularTransforms.InvertAll, because only the transform being
     // inverted owns channels[0] at that moment.
-    channels = _InvertTransformChainOrSkeleton(channels, transforms);
+    if (options.UndoTransforms)
+      channels = _InvertTransformChainOrSkeleton(channels, transforms);
 
-    return new JxlModularImage { Channels = channels };
+    return new JxlModularStream(new JxlModularImage { Channels = channels }, transforms);
   }
 
   // =============================================================
@@ -469,7 +648,8 @@ internal static class JxlModularSpecDecoder {
     JxlEntropyDecoder entropy,
     int channelIndex,
     int bitDepth,
-    JxlWpHeader wpHeader
+    JxlWpHeader wpHeader,
+    int streamId
   ) {
     var width = channel.Width;
     var height = channel.Height;
@@ -514,7 +694,7 @@ internal static class JxlModularSpecDecoder {
           properties[15] = wp.MaxErrorProperty;
         }
 
-        _ComputeProperties(properties, channelIndex, x, y, w, n, nw, ne, nn, ww);
+        _ComputeProperties(properties, channelIndex, streamId, x, y, w, n, nw, ne, nn, ww);
 
         // Walk MA tree → leaf.
         var leaf = maTree.Traverse(properties);
@@ -606,6 +786,7 @@ internal static class JxlModularSpecDecoder {
   private static void _ComputeProperties(
     int[] properties,
     int channelIndex,
+    int streamId,
     int x,
     int y,
     int w,
@@ -616,9 +797,7 @@ internal static class JxlModularSpecDecoder {
     int ww
   ) {
     properties[0] = channelIndex;
-    // The stream index. Every image this decodes is one modular stream, so it is
-    // zero; a frame split into groups would number them here.
-    properties[1] = 0;
+    properties[1] = streamId;
     properties[2] = y;
     properties[3] = x;
     properties[4] = Math.Abs(n);
