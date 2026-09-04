@@ -61,6 +61,8 @@ public sealed class ImageMagickCorpusTests {
     [".epsf"] = "a page in points, which we draw at ninety-six pixels to the inch and the reference tool at seventy-two",
     [".epsi"] = "a page in points, which we draw at ninety-six pixels to the inch and the reference tool at seventy-two",
     [".ept"] = "the reference tool draws the PostScript and we take the preview it is wrapped around, which is a smaller picture of the same page",
+    [".ase"] = "the reference tool cannot read the sprites it writes itself — its own file and ours both come back as a canvas of zeroes — so its decode judges its reader, not ours",
+    [".aseprite"] = "the reference tool cannot read the sprites it writes itself — its own file and ours both come back as a canvas of zeroes — so its decode judges its reader, not ours",
   };
 
   [TestCaseSource(nameof(Samples))]
