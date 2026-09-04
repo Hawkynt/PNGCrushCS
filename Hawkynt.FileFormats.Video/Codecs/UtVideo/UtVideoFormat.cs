@@ -18,7 +18,12 @@ internal enum UtVideoColourSpace {
 }
 
 /// <summary>The four ways a sample can be predicted from the ones already decoded.</summary>
-internal enum UtVideoPredictor {
+/// <remarks>
+/// Numbered as the frame trailer numbers them. Public because the encoder takes one: which
+/// predictor a frame uses is the encoder's choice and is not in the stream description, so there is
+/// no other way to ask for it.
+/// </remarks>
+public enum UtVideoPredictor {
 
   /// <summary>None: the coded symbol is the sample.</summary>
   None = 0,
@@ -120,6 +125,45 @@ internal sealed class UtVideoFormat {
   }
 
   /// <summary>
+  /// The layout an encoder is going to write, from the code alone and the choices it has made.
+  /// </summary>
+  /// <remarks>
+  /// The encoder's side of <see cref="Parse"/>: the same table of codes, but the slice count and
+  /// trailer size are what the encoder decided rather than what a description states, and the
+  /// description is written from the result rather than read into it.
+  /// </remarks>
+  internal static UtVideoFormat ForEncoding(CodecTag codec, int sliceCount, int frameInfoSize, int streamIndex) {
+    var (colourSpace, planes, hshift, vshift, bt709) = _Layout(codec.ToString(), streamIndex);
+    return new(colourSpace, planes, hshift, vshift, bt709, sliceCount, frameInfoSize);
+  }
+
+  /// <summary>The sixteen bytes an encoder puts behind the bitmap header to describe this.</summary>
+  /// <remarks>
+  /// The first word is an encoder version whose last byte is an implementation identifier the
+  /// format's author hands out; the second names what the picture was before it was coded and is
+  /// read by nothing. Both are written as libavcodec writes them, since every decoder measured
+  /// against ignores them and a value nobody has seen is a worse choice than one everybody has.
+  /// </remarks>
+  internal byte[] Describe() {
+    var original = this.ColourSpace switch {
+      UtVideoColourSpace.Rgb => new byte[] { 0x00, 0x00, 0x01, 0x18 },
+      UtVideoColourSpace.Rgba => new byte[] { 0x00, 0x00, 0x02, 0x18 },
+      _ when this.ChromaVerticalShift > 0 => "YV12"u8.ToArray(),
+      _ when this.ChromaHorizontalShift > 0 => "YUY2"u8.ToArray(),
+      _ => "YV24"u8.ToArray(),
+    };
+
+    var flags = _HUFFMAN | ((uint)(this.SliceCount - 1) << 24);
+    var extra = new byte[_EXTRA_SIZE];
+    extra[0] = 0xF0;
+    extra[3] = 0x01;
+    original.CopyTo(extra, 4);
+    _WriteUInt32(extra, 8, (uint)this.FrameInfoSize);
+    _WriteUInt32(extra, 12, flags);
+    return extra;
+  }
+
+  /// <summary>
   /// The prediction method, which is in the last bytes of a frame rather than in the description.
   /// </summary>
   internal UtVideoPredictor PredictorOf(ReadOnlySpan<byte> frame, int streamIndex) {
@@ -189,4 +233,11 @@ internal sealed class UtVideoFormat {
 
   private static uint _ReadUInt32(ReadOnlySpan<byte> source, int offset)
     => (uint)(source[offset] | (source[offset + 1] << 8) | (source[offset + 2] << 16) | (source[offset + 3] << 24));
+
+  private static void _WriteUInt32(Span<byte> target, int offset, uint value) {
+    target[offset] = (byte)value;
+    target[offset + 1] = (byte)(value >> 8);
+    target[offset + 2] = (byte)(value >> 16);
+    target[offset + 3] = (byte)(value >> 24);
+  }
 }

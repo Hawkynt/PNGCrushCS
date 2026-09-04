@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Linq;
 using FileFormat.Codecs;
 using FileFormat.Core;
@@ -89,6 +90,6 @@ public sealed class MotionJpegVideoEncoderTests {
       PixelData = new byte[8 * 8 * 3],
     };
 
-    Assert.Throws<InvalidOperationException>(() => encoder.TryEncode(wrongSize, 0, out _));
+    Assert.Throws<InvalidDataException>(() => encoder.TryEncode(wrongSize, 0, out _));
   }
 }

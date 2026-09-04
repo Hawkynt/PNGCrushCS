@@ -1,4 +1,4 @@
-# Hawkynt.FileFormats.Video
+# Hawkynt.FileFormats.Video — how it was measured
 
 > Pure-C# video containers and codecs, with demuxing, decoding, encoding and muxing kept as four
 > separate things.
@@ -25,142 +25,55 @@ could only ever produce pictures, which turns every remux into a re-encode.
 Packets and frames are reached lazily. A film is not a list of pictures held in memory, and a caller
 who wants one frame of a two-hour recording pays for one frame.
 
-## Supported
+## What a codec has to clear to be counted
 
-| Container | Extensions | Read | Write |
-| --- | --- | --- | --- |
-| Advanced Systems Format (ASF, WMV, WMA) | `.asf`, `.wmv`, `.wma`, `.wm`, `.wmx`, `.asx` | Y | — |
-| AVI (RIFF) | `.avi` | Y | — |
-| Flash Video (FLV) | `.flv`, `.f4v` | Y | — |
-| ISO base media (MP4, QuickTime, 3GP) | `.mp4`, `.m4v`, `.mov`, `.qt`, `.3gp`, `.3g2`, `.m4a` | Y | — |
-| Matroska / WebM (EBML) | `.mkv`, `.mka`, `.mks`, `.mk3d`, `.webm` | Y | — |
-| H.264 byte stream (Annex B) | `.264`, `.h264`, `.avc`, `.x264` | Y | — |
-| H.265 byte stream (Annex B) | `.265`, `.h265`, `.hevc`, `.x265` | Y | — |
-| MPEG program stream (MPEG-1, MPEG-2, VOB) | `.mpg`, `.mpeg`, `.vob`, `.m2p`, `.m2ps` | Y | — |
-| Motion JPEG stream | `.mjpg`, `.mjpeg` | Y | — |
-| MPEG video elementary stream | `.m1v`, `.m2v`, `.mpv`, `.mpeg1video`, `.mpeg2video` | Y | — |
-| MPEG-2 transport stream (also Blu-ray, AVCHD) | `.ts`, `.m2ts`, `.mts`, `.m2t`, `.tsv` | Y | — |
-| Ogg (Theora, Vorbis, Opus, FLAC) | `.ogg`, `.ogv`, `.oga`, `.ogx`, `.opus`, `.spx` | Y | — |
-| RealMedia (RealVideo, RealAudio) | `.rm`, `.rmvb`, `.ra`, `.rmj`, `.rms` | Y | — |
-| Autodesk FLIC | `.fli`, `.flc`, `.flx` | Y | — |
-| id RoQ | `.roq` | Y | — |
-| Interplay MVE | `.mve` | Y | — |
-| id Cinematic | `.cin` | Y | — |
-| Westwood VQA | `.vqa` | Y | — |
-| Smacker | `.smk` | Y | — |
-| Electronic Arts Multimedia | `.wve`, `.cmv`, `.tgv`, `.uv`, `.uv2` | Y | — |
-| Brute Force & Ignorance (BFI) | `.bfi` | Y | — |
-| Commodore CDXL | `.cdxl` | Y | — |
-| IFF ANIM | `.anim`, `.iff` | Y | — |
-| Sierra VMD | `.vmd` | Y | — |
-| Sony PlayStation STR | `.str` | Y | — |
+Nothing goes in the first table because it produces a plausible picture. Each one is compared with
+ffmpeg's decode of the same bitstream, and the rules that comparison follows were all learned by
+getting them wrong first:
 
-| Codec | Tag | Decode | Encode |
-| --- | --- | --- | --- |
-| Uncompressed (`BI_RGB`) | 0 | Y | — |
-| Motion JPEG | `MJPG`, `mjpg`, `jpeg`, `V_MJPEG` | Y | — |
-| MPEG-1 video (ISO/IEC 11172-2) | `MPG1`, `PIM1`, `mp1v` | Y | — |
-| MPEG-2 video (ISO/IEC 13818-2) | `MPG2`, `MPEG`, `mp2v`, `m2v1`, `hdv1`–`hdv3`, `V_MPEG2` | Y | — |
-| Microsoft RLE | `MRLE`, `mrle`, `BI_RLE8` (1), `BI_RLE4` (2) | Y | — |
-| Microsoft Video 1 | `CRAM`, `MSVC`, `WHAM` | Y | — |
-| Cinepak | `cvid`, `CVID` | Y | — |
-| QuickTime Animation (RLE) | `rle ` | Y | — |
-| Apple Video (RPZA) | `rpza`, `azpr` | Y | — |
-| Apple Graphics (SMC) | `smc ` | Y | — |
-| H.261 (ITU-T H.261) | `H261` | Y | — |
-| H.263 (ITU-T H.263 baseline) | `H263`, `s263`, `U263` | Y | — |
-| Sorenson Spark (Flash Video's H.263) | `FLV1` | Y | — |
-| RealVideo 1 (revision 0 only) | `RV10`, `RV13` | Y | — |
-| H.264 / AVC, Baseline I and P slices | `avc1`, `avc3`, `H264`, `X264`, `DAVC`, `VSSH`, `V_MPEG4/ISO/AVC` | Y | — |
-| H.265 / HEVC, Main profile intra pictures | `hvc1`, `hev1`, `hvc2`, `hev2`, `HEVC`, `H265`, `V_MPEGH/ISO/HEVC` | Y | — |
-| On2 VP3.1 | `VP31`, `VP32` (and `VP30`, refused by name) | Y | — |
-| VP8 (RFC 6386) | `VP80`, `vp08`, `V_VP8` | Y | — |
-| VP9, profile 0 | `VP90`, `vp09`, `V_VP9` | Y | — |
-| HuffYUV / FFVHUFF | `HFYU`, `FFVH` | Y | — |
-| Avid DNxHD / DNxHR (SMPTE VC-3) | `AVdn`, `AVdh`, `AVd1`, `V_DNXHD` | Y | — |
-| FFV1 (RFC 9043) | `FFV1`, `V_FFV1` | Y | — |
-| MPEG-4 Part 2 (ISO/IEC 14496-2) | `mp4v`, `XVID`, `DIVX`, `DX50`, `FMP4`, `MP4S`, `M4S2`, `3IV2`, `FVFW`, `RMP4`, `V_MPEG4/ISO/*` | Y | — |
-| Apple ProRes (SMPTE RDD 36) | `apco`, `apcs`, `apcn`, `apch`, `ap4h`, `ap4x` | Y | — |
-| VC-1 / Windows Media Video 9, intra pictures | `WMV3`, `WMV9` | Y | — |
-| Microsoft MPEG-4 version 2 | `MP42`, `DIV2` | Y | — |
-| Theora (Xiph.Org Theora I) | `theora`, `V_THEORA`, `Theo` | Y | — |
-| FLIC (Autodesk Animator / Animator Pro) | `FLIC` (synthetic — the format states no codec tag of its own) | Y | — |
+- **Compare planes, not RGB**, for any subsampled codec. This library interpolates chroma when
+  upsampling and ffmpeg replicates, so an RGB comparison of a 4:2:0 codec shows tens of thousands of
+  differing samples at a maximum delta around 130 *even when the decode is exact*. That metric once
+  condemned a correct H.263 decoder here, and the same measurement applied to an already-accepted
+  MPEG-1 decoder produced 5,928 differing samples of 9,216 — which is how it was caught.
+- **Sample every frame, not the endpoints**, and use a long group of pictures (`-g 1000`) so a single
+  intra picture anchors the chain. A 25-frame test once read a maximum delta of 3 where the same
+  decoder over 100 frames read 204.
+- **Read the shape of the error, not only its size.** Flat error across a group of pictures is
+  rounding. Error that grows and resets at each intra picture is motion compensation, dequantisation
+  or reference handling — a real defect wearing a small number.
+- **Know what the oracle actually does.** ffmpeg's default integer inverse transform is itself an
+  approximation, so a codec measuring 3 against it measured 1 against `-idct faani`; ffmpeg's
+  frame-threaded Theora decode is not deterministic on large frames; `ffprobe` without
+  `-fflags +noparse` invents timestamps a container never carried.
+- **Know what the tool did to the pictures before you compare them.** Every one of these has produced
+  a false alarm here, and each looks exactly like a decoder defect:
+  - `ffmpeg -i in out%04d.ppm` runs the image2 muxer at a constant frame rate and **duplicates
+    frames** to fill it. It reported a 348-frame file as 824 and a 272-frame one as 3485. Pass
+    `-fps_mode passthrough`, and check against `ffprobe -count_frames`.
+  - Decoder options go **before** `-i`. `-idct faani` placed after is an output option and silently
+    does nothing — with it misplaced a codec measured 6 where it actually measures 2.
+  - **PPM carries no alpha.** Comparing an alpha-bearing format through it makes both sides
+    composite and invents a large error; one codec read max delta 179 that way and 0 on its planes.
+  - Frame files named with a fixed two-digit index sort lexicographically as 10, 100, 11 once a
+    stream passes a hundred frames. That put frame 100 against frame 12 and looked precisely like a
+    decoder diverging mid-stream.
+  - Decode with `-threads 1`: ffmpeg's frame-threaded decode is not deterministic for every codec.
 
-| Zip Motion Blocks Video (ZMBV) | `ZMBV` | Y | — |
-| MagicYUV | `M8RG`, `M8RA`, `M8Y0`, `M8Y2`, `M8Y4`, `M8YA`, `M8G0` | Y | — |
+- **Refuse by name.** No `catch` may hand back a blank frame or repeat the last one. That silent
+  zero-fill is the worst defect shape in this repository — a wrong picture nothing announces — and
+  several instances have been removed from it.
 
-| Ut Video | `ULRG`, `ULRA`, `ULY0`, `ULY2`, `ULY4`, `ULH0`, `ULH2`, `ULH4` | Y | — |
 
-| TechSmith Screen Capture (TSCC) | `tscc` | Y | — |
+## How each reader and decoder was measured
 
-| CamStudio Screen Codec (CSCD) | `CSCD` | Y | — |
-
-| Flash Screen Video (FSV1) | `FSV1` | Y | — |
-
-| Uncompressed 4:2:2 10-bit (v210) | `v210` | Y | — |
-
-| Uncompressed 4:2:2 10-bit (012v) | `012v` | Y | — |
-
-| Uncompressed RGB 10-bit (r210) | `r210` | Y | — |
-
-| AJA Kona 10-bit RGB (r10k) | `R10k` | Y | — |
-
-| Uncompressed 4:1:1 (y41p) | `Y41P` | Y | — |
-
-| Cirrus Logic AccuPak (CLJR) | `CLJR` | Y | — |
-
-| Avid Meridien Uncompressed (avui) | `AVUI` | Y | — |
-
-| Uncompressed 4:4:4 (v308) | `v308` | Y | — |
-
-| Uncompressed 4:4:4 with alpha (v408) | `v408` | Y | — |
-
-| Uncompressed 4:4:4:4 (ayuv) | `AYUV` | Y | — |
-
-| Avid 1:1 10-bit RGB Packer (avrp) | `AVrp` | Y | — |
-
-| id RoQ | `RoQV` (synthetic — the format states no codec tag of its own) | Y | — |
-
-| Flash Screen Video 2 (FSV2) | `FSV2` | Y | — |
-
-| ZeroCodec | `ZECO` | Y | — |
-
-| Interplay Video | `IMVE` (synthetic — the format states no codec tag of its own) | Y | — |
-
-| Lossless Codec Library, ZLIB variant | `ZLIB` | Y | — |
-
-| Vidvox Hap | `Hap1`, `Hap5`, `HapY`, `HapM`, `HapA` (`Hap7`, `HapH` refused by name) | Y | — |
-| id Cinematic Video | `IDCV` (synthetic — the format states no codec tag of its own) | Y | — |
-
-| Westwood VQA Video | `WSVQ` (synthetic — the format states no codec tag of its own) | Y | — |
-
-| Electronic Arts CMV | `cmv ` (synthetic — the format states no codec tag of its own) | Y | — |
-
-| Apple Planar RGB (8BPS) | `8BPS` | Y | — |
-
-| GoPro CineForm (SMPTE VC-5) | `CFHD` | Y | — |
-
-| Brute Force & Ignorance Video | `BFIV` (synthetic — the format states no codec tag of its own) | Y | — |
-
-| Q-Team QPEG | `QPEG`, `Q1.0`, `Q1.1` | Y | — |
-
-| Commodore CDXL Video | `CDXL` (synthetic — the format states no codec tag of its own) | Y | — |
-
-| IFF ANIM Video | `ANIM` (synthetic — the format states no codec tag of its own) | Y | — |
-
-| Autodesk Animator Codec | `AASC` | Y | — |
-
-| Sierra VMD Video | `VMDV` (synthetic — the format states no codec tag of its own) | Y | — |
-
-| ASUS V1 | `ASV1` | Y | — |
-
-| ASUS V2 | `ASV2` | Y | — |
-
-| Creative YUV | `cyuv` | Y | — |
-
-| Apple Motion JPEG-B | `mjpb` | Y | — |
-
-| Avid AVRn | `AVRn` | Y | — |
+The two support tables that used to sit here are gone, and not because they were long: they were
+wrong. They claimed no container could be written when all twenty-nine can, and they listed 67 of the
+82 codecs and no encoder at all. A table kept in two places drifts, and the copy nobody regenerates is
+the one people read. One table now, in
+[`README.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/README.md), re-derived from the compile-time registry by a test that fails the build
+when it disagrees. What is left in this file is the part a table cannot hold: how each reader and each
+decoder was measured, and against what.
 
 One reader for MP4, MOV, M4V and 3GP because they are one format under four names — the same box
 structure with different brands in `ftyp`. Its packet boundaries are not in the data at all: `mdat`
@@ -3074,7 +2987,7 @@ columns, and the two samples and one column past the width are discarded rather 
 **Why the earlier investigation stopped, and why that was the wrong codec.** This format was once set
 aside because the reference decoder logs "transparency is not implemented" for it, and an oracle that
 announces its own incompleteness is a real problem — it is part of why Lagarith is in
-`undecodable-codecs.md`. That message is not this codec's. The same implementation serves a second
+`codec-investigations.md`. That message is not this codec's. The same implementation serves a second
 four-character code, `a12v`, which carries an alpha channel it drops, and the message belongs to that
 one: patching nothing but the four tag bytes of the real sample from `012v` to `a12v` makes it appear
 on byte-identical picture data, and the unpatched file decodes with no warning at all. So the oracle is
@@ -3224,7 +3137,7 @@ binary catalogue at the offset the header names, stating every chunk's own file 
 length of its video and sound payloads, video first and sound immediately after at that same offset.
 The header's own "number of chunks" field states the highest chunk index rather than a count, so the
 catalogue holds one more line than that field says — the same off-by-one Escape 124's own investigation
-found and recorded in `undecodable-codecs.md` before any codec riding this container was implemented,
+found and recorded in `codec-investigations.md` before any codec riding this container was implemented,
 confirmed again here against real files whose header states three chunks and twenty-five frames a
 chunk, seventy-five frames read literally, where the catalogue holds four lines and ffmpeg reports the
 true count, `4 x 25 = 100`. Every catalogue entry's own offset and two sizes land exactly on the next

@@ -48,4 +48,10 @@ internal static partial class VideoFormatRegistration {
       CodecName: T.CodecName,
       Accepts: static stream => T.Accepts(stream),
       CreateDecoder: static stream => T.Create(stream)));
+
+  private static void _RegisterEncoder<T>() where T : IVideoCodecEncoder<T>
+    => VideoFormatRegistry.RegisterEncoder(new(
+      CodecName: T.CodecName,
+      Codec: T.Codec,
+      CreateEncoder: static stream => T.Create(stream)));
 }

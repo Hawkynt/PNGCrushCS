@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using FileFormat.Core;
 using FileFormat.Jpeg;
 
@@ -40,7 +41,7 @@ public sealed class MotionJpegVideoEncoder : IVideoCodecEncoder<MotionJpegVideoE
     };
   }
 
-  public static string CodecName => "Motion JPEG (baseline JPEG, independent frames)";
+  public static string CodecName => "Motion JPEG";
 
   public static CodecTag Codec => _codec;
 
@@ -49,10 +50,11 @@ public sealed class MotionJpegVideoEncoder : IVideoCodecEncoder<MotionJpegVideoE
   public bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet) {
     ArgumentNullException.ThrowIfNull(frame);
     if (frame.Width != this._stream.Width || frame.Height != this._stream.Height)
-      throw new InvalidOperationException(
+      throw new InvalidDataException(
         $"The encoder was created for {this._stream.Width}x{this._stream.Height} pictures, but received {frame.Width}x{frame.Height}.");
     if (!frame.HasEnoughPixelData)
-      throw new InvalidOperationException("The input picture does not contain enough pixel data for its declared size and format.");
+      throw new InvalidDataException(
+        $"A {frame.Width}x{frame.Height} {frame.Format} picture needs {frame.MinimumPixelDataLength} bytes and carries {frame.PixelData.Length}.");
 
     var jpeg = FormatIO.Encode<JpegFile>(frame);
     packet = new(
