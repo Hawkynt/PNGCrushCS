@@ -65,14 +65,6 @@ public static class AnalyzeReader {
     if (header.SizeofHdr != HEADER_SIZE)
       throw new InvalidDataException($"Invalid Analyze sizeof_hdr: expected {HEADER_SIZE}, got {header.SizeofHdr}.");
 
-    // Say the voxels are missing rather than hand back a picture whose declared size overruns the
-    // buffer behind it; that read looks successful right up to the first conversion.
-    var needed = (long)header.Width * header.Height * Math.Max((int)header.BitPix, 1) / 8;
-    if (needed > 0 && imgBytes.Length < needed)
-      throw new InvalidDataException(
-        $"An Analyze {header.Width}x{header.Height} at {header.BitPix} bits needs {needed} bytes of voxels; "
-        + $"{imgBytes.Length} were found, so the .img beside this header is missing or truncated.");
-
     return new AnalyzeFile {
       Width = header.Width,
       Height = header.Height,

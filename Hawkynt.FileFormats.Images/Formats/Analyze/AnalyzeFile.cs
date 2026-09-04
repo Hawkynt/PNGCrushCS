@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using FileFormat.Core;
 
@@ -45,6 +45,16 @@ public readonly record struct AnalyzeFile : IImageFormatReader<AnalyzeFile>, IIm
       AnalyzeDataType.Rgb24 => PixelFormat.Rgb24,
       _ => throw new NotSupportedException($"Unsupported Analyze data type for raw image conversion: {file.DataType}.")
     };
+
+    // An Analyze header is legitimately voxel-less — the pair keeps them in the .img beside it — so
+    // parsing one is fine and turning one into a picture is not. This used to hand back an image
+    // stating its size with nothing behind it, which read as a success and then indexed off the end
+    // of its own buffer on the first conversion.
+    var needed = (long)file.Width * file.Height * Math.Max(file.BitsPerPixel, 1) / 8;
+    if (file.PixelData is null || file.PixelData.Length < needed)
+      throw new InvalidDataException(
+        $"An Analyze {file.Width}x{file.Height} at {file.BitsPerPixel} bits needs {needed} bytes of voxels; "
+        + $"{file.PixelData?.Length ?? 0} are present, so the .img beside this header is missing or truncated.");
 
     return new() {
       Width = file.Width,
